@@ -149,6 +149,15 @@ body.transfer-server-mode #toolWorkspace>#pageContent{overflow:hidden!important;
 .transfer-server-config-panel .transfer-server-settings>.field:not(.transfer-interface-field):not(.transfer-port-field):not(.wide){grid-column:1/-1!important;}
 .transfer-server-config-panel .transfer-server-settings .field>label{display:block;overflow-wrap:anywhere;}
 .transfer-server-config-panel .transfer-server-settings>.transfer-port-field input{height:34px;min-height:34px;}
+/* Keep adapter and port in shared label/control rows when either label wraps. */
+.transfer-server-config-panel .transfer-server-settings>.transfer-interface-field,
+.transfer-server-config-panel .transfer-server-settings>.transfer-port-field{display:contents!important;}
+.transfer-server-config-panel .transfer-interface-field>label{grid-column:1;grid-row:1;align-self:end;}
+.transfer-server-config-panel .transfer-port-field>label{grid-column:2;grid-row:1;align-self:end;}
+.transfer-server-config-panel .transfer-interface-field>select{grid-column:1;grid-row:2;}
+.transfer-server-config-panel .transfer-port-field>input{grid-column:2;grid-row:2;}
+.transfer-server-config-panel .transfer-interface-field>.transfer-sidebar-refresh{grid-column:1/-1;grid-row:3;justify-self:start;margin-top:0;}
+.transfer-server-config-panel .transfer-server-settings>.transfer-bind-hint{grid-row:4!important;}
 .transfer-server-config-panel .transfer-root-actions{display:flex;flex-wrap:wrap;gap:6px;}
 .transfer-server-config-panel .transfer-sidebar-refresh{padding:3px 5px;margin-top:5px;font-size:10px;max-width:100%;}
 .transfer-server-config-panel .help-line{overflow-wrap:anywhere;line-height:1.45;}

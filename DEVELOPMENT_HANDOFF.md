@@ -110,10 +110,15 @@ Automatic checks/reminders do not authorize automatic download or installation.
 
 ## Validation status and unresolved work
 
-1.17.63 verification is in progress. The required local Go suites, existing
-355 JavaScript checks, three new adapter-to-startup regressions and fourteen
-Python checks have passed. Hosted rendered checks and final packaging are
-pending; update this section with their terminal results before release.
+1.17.63 passed the required root/desktop/terminal Go suites, all 358 JavaScript
+checks, fourteen Python checks, release/resource validation and Windows x64 GUI
+cross-compilation. The private Checks workflow also passed rendered server and
+client regressions with real Chromium: native selector/client style parity,
+adapter/port alignment, mouse and keyboard selection, saved-address reload,
+activity resizing, sidebar docking and five window sizes in both themes.
+The public ZIP was checked against its exact four-member allowlist and both
+internal and external SHA-256 checksums. Native Windows/WebView2 execution
+remains unverified; this does not establish Windows updater runtime behavior.
 
 1.17.62 passed focused/root/desktop/terminal Go checks, updater race checks,
 Windows executable and test cross-compilation, 14 Python tests and 355 JS tests
@@ -124,7 +129,7 @@ canonical reopen and elevated helper identity were not executed here.
 
 The last user-confirmed working Windows version was **1.17.60**; user confirmation
 of **1.17.62 and 1.17.63 is pending**. Do not describe cross-compilation as Windows runtime
-verification. First useful next step is a real-device 1.17.60-to-1.17.62 update,
+verification. First useful next step is a real-device update to 1.17.63 from the installed version,
 checking visible startup, stable EXE path, shortcut preservation, retained
 settings, one rollback copy and safe cleanup/recovery.
 

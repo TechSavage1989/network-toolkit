@@ -44,9 +44,9 @@ async function main(){
  await page.waitForFunction(()=>window.__networkToolkitStartupState===1);
  for(const viewport of [{width:1920,height:1080},{width:1366,height:900},{width:1000,height:768},{width:820,height:620},{width:570,height:720}]){
   await page.setViewportSize(viewport);
-  for(const protocol of ['sftp','tftp','ftp'])for(const theme of ['light','dark']){
+  for(const protocol of ['sftp','tftp','ftp'])for(const theme of ['light','dark'])for(const sidebarWidth of [270,320,460]){
    await page.evaluate(theme=>setTheme(theme),theme);
-   await render(page,protocol,320,true);
+   await render(page,protocol,sidebarWidth,true);
    const select=page.locator('select[data-transfer-setting="bind"]');
    assert.ok(await select.isVisible());
    assert.equal(await select.getAttribute('class'),'connection-source-select transfer-bind-picker');
@@ -70,8 +70,8 @@ async function main(){
    await select.selectOption('192.168.1.4');
    assert.match(await select.getAttribute('title'),/Intel\(R\) Ethernet Connection \(17\) I219-LM/);
    assert.equal(await page.evaluate(protocol=>state.transferServerSettings[protocol].bind,protocol),'192.168.1.4');
-   if(out&&viewport.width===1366&&theme==='light'&&protocol==='sftp')await page.screenshot({path:path.join(out,'sftp-server-adapter-select.png')});
-   results.push({protocol,theme,viewport,activityHeight:data.log.height,readableActivityHeight:data.console.height});
+   if(out&&viewport.width===1366&&theme==='light'&&protocol==='sftp'&&sidebarWidth===320)await page.screenshot({path:path.join(out,'sftp-server-adapter-select.png')});
+   results.push({protocol,theme,viewport,sidebarWidth,activityHeight:data.log.height,readableActivityHeight:data.console.height});
   }
  }
  // Keyboard and pointer paths operate on the same input and saved settings.

@@ -9,15 +9,22 @@ locking and unavailable saved-address labels are retained.
 
 PASSED LOCALLY
 - Root application, internal/desktop and internal/terminal Go suites.
-- Existing 355 JavaScript checks and three new protocol-specific regressions
+- All 358 JavaScript checks, including three new protocol-specific regressions
   for selection persistence, startup address propagation, control locking,
   duplicate-address filtering and unavailable saved-address preservation.
 - Fourteen Python release metadata, publication-guard and packaging tests.
 - JavaScript syntax and release metadata/resource validation.
 
-IN PROGRESS
-- Hosted Chromium server/client layout checks and final release packaging.
-- Windows x64 cross-compilation and archive/checksum validation.
+PASSED BUILD AND HOSTED BROWSER CHECKS
+- Windows x64 GUI cross-compilation, PE architecture/subsystem and version
+  resource checks, using the compile-time embedded icon/resource approach.
+- Real Chromium server and client transfer layout regressions in the private
+  Checks workflow, at five window sizes in light and dark themes. Coverage
+  includes native client/server selector style parity, adapter/port alignment,
+  pointer/keyboard selection, unchanged form height while opening choices,
+  saved-address reload, sidebar docking and activity resizing/persistence.
+- Exact four-member binary-only public update ZIP, CRC integrity, inner file
+  checksums, external archive SHA-256 and stable installed executable naming.
 
 LIMITATIONS
 Native Windows/WebView2 and real physical network equipment are not available
