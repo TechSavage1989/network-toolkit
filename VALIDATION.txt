@@ -34,8 +34,13 @@ PASSED HOSTED AND PUBLISHED
 - Revised63 production updater check against main reports current/latest63,
   no false update, and same-version download rejects with409 without staging.
 
-UNVERIFIED
-- Native Windows runtime update, bootstrap, shortcut and restart validation.
+USER-REPORTED RESULT
+2026-10-24 23:48:27 UTC: the user confirmed "the update works."
+Revised1.17.63 is the user-reported working update baseline. This is not a claim
+of exhaustive native Windows, shortcut, rollback, cleanup or feature coverage.
+
+UNVERIFIED BY AUTOMATED TESTS
+- Exhaustive native Windows update, bootstrap, shortcut and restart coverage.
 
 LIMITATIONS
 Original 1.17.63 validation below is historical evidence, not a claim that

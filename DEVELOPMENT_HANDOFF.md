@@ -133,11 +133,11 @@ network/interface tests need privileges unavailable in the Linux sandbox.
 Native Windows/WebView2, real shortcut COM APIs, mapped-image replacement,
 canonical reopen and elevated helper identity were not executed here.
 
-The last user-confirmed working Windows version was **1.17.60**; user confirmation
-of **1.17.62 and 1.17.63 is pending**. Do not describe cross-compilation as Windows runtime
-verification. First useful next step is a real-device bootstrap to 1.17.63 from the installed version,
-checking visible startup, stable EXE path, shortcut preservation, retained
-settings, one rollback copy and safe cleanup/recovery.
+The revised **1.17.63** update is now the user-reported working baseline.
+On 2026-10-24 at 23:48:27 UTC, the user confirmed: "the update works."
+This confirms the reported update experience, not exhaustive native Windows,
+shortcut, rollback, cleanup, elevated-tool or feature testing. Keep the remaining
+platform limits above. The missing-banner report still has no proven root cause.
 
 The reported missing automatic update banner has **no proven root cause**.
 Manual checking succeeding does not establish the original cause. Improvements
