@@ -1,8 +1,20 @@
 NETWORK TOOLKIT UPDATES
 
-From 1.17.58: open App settings > Check for updates, download 1.17.63,
-then Review install and restart. For a fresh install, start the 1.17.63 EXE.
-Saved app data stays at its current location.
+ONE-TIME FEED MIGRATION IN REVISED 1.17.63
+The revised 1.17.63 build checks the main network-toolkit repository. Installed
+1.17.62 clients can download this revised release from their existing feed,
+then subsequent checks use the main repository. Review and confirm installation.
+If an original63 download is already staged, close and reopen the old app,
+then check and download again after revised63 is published. Previously downloaded
+ZIPs may still contain the original build despite identical filenames; verify
+them against the revised release checksum manifest.
+
+If you already installed the ORIGINAL 1.17.63, the same version number is not
+considered newer. Close all app windows and manually replace your application
+EXE with the revised Network_Toolkit.exe, keeping its folder, launch options
+and --data-dir if used. Keep your settings folder unchanged. The manual update
+importer also accepts only newer versions, so it cannot replace same-version
+1.17.63. Do not import source-containing Portable.zip as an updater package.
 
 Future updates: open App settings > Updates, choose Check for updates,
 then Download update. Review the staged version and choose Install and restart.
@@ -10,8 +22,9 @@ The app requests an explicit confirmation. Export diagnostic results, save
 open editor files, and close other Network Toolkit windows first. Active
 jobs, terminal sessions, transfers and configuration changes block installation.
 
-Downloads come from https://github.com/TechSavage1989/network-toolkit-releases
-This repository contains binaries only; application source remains private.
+Downloads come from https://github.com/TechSavage1989/network-toolkit
+The repository contains public source and release assets. The updater downloads
+only the strictly allowlisted binary-only Update.zip and SHA256SUMS.
 The app does not ask for or save GitHub credentials. Downloads use HTTPS;
 SHA-256 checks compare the downloaded ZIP and executable against checksums.
 Checksums detect corruption, not a compromised publisher/repository. This

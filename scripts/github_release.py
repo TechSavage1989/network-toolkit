@@ -88,11 +88,23 @@ def remote_tag(repo, tag):
     raise ValueError('Release tag nesting is too deep')
 
 
-def prepare(tag, default_branch):
+def prepare(tag, default_branch, revision=False, expected_old_commit="", expected_old_manifest="", expected_new_commit="", request_branch=False):
     event = os.environ.get('GITHUB_EVENT_NAME', '')
     ref = os.environ.get('GITHUB_REF', '')
     main_push = event == 'push' and ref == 'refs/heads/' + default_branch
     require(not git('status', '--porcelain'), 'Release checkout has uncommitted changes')
+    if revision:
+        require((event == 'workflow_dispatch' and ref == 'refs/heads/' + default_branch) or
+                (request_branch and event == 'push' and ref == 'refs/heads/release-revision-v1.17.63'),
+                'Revision requires explicit manual dispatch or the bounded revision request')
+        current = validate(tag)
+        import revise_release
+        revise_release.snapshot(os.environ['GITHUB_REPOSITORY'], tag, expected_old_commit, expected_old_manifest)
+        commit = git('rev-parse', 'HEAD')
+        require(re.fullmatch(r'[0-9a-f]{40}', expected_new_commit) and commit == expected_new_commit and commit != expected_old_commit, 'Revision requires the explicitly selected new source commit')
+        with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+            output.write(f'publish=true\ntag={tag}\nversion={current}\ncommit={commit}\nrevision=true\nold_commit={expected_old_commit}\nold_manifest={expected_old_manifest}\nnew_commit={expected_new_commit}\n')
+        return
     if main_push:
         current = validate()
         tag = 'v' + current
@@ -124,6 +136,33 @@ def prepare(tag, default_branch):
     print(f'Validated {tag} at {commit}')
 
 
+def prepare_request(path, default_branch):
+    require(os.environ.get('GITHUB_EVENT_NAME') == 'push' and
+            os.environ.get('GITHUB_REF') == 'refs/heads/release-revision-v1.17.63',
+            'One-time revision request is restricted to its exact branch')
+    require(os.environ.get('GITHUB_REPOSITORY') == 'TechSavage1989/network-toolkit',
+            'One-time revision is restricted to the main repository')
+    request_commit = git('rev-parse', 'HEAD')
+    require(request_commit == os.environ.get('GITHUB_SHA'), 'Request checkout differs from triggering commit')
+    request = json.loads(Path(path).read_text())
+    require(set(request) == {'tag', 'old_commit', 'old_manifest', 'new_commit'}, 'Unexpected revision request fields')
+    require(request['tag'] == 'v1.17.63' and
+            request['old_commit'] == '8df9b401111e09767591491bc973b4160a17a9bc' and
+            request['old_manifest'] == '513dbd928837fe23785cf89a0bcbdb3d94613d7b759efcd0884459fc4116225f',
+            'One-time revision differs from the authorized original release')
+    require(re.fullmatch(r'[0-9a-f]{40}', request['new_commit']), 'Invalid new source commit')
+    head = gh_json('repos/TechSavage1989/network-toolkit/git/ref/heads/main')['object']['sha']
+    require(head == request['new_commit'], 'Revision source is no longer main')
+    subprocess.run(['git', 'merge-base', '--is-ancestor', head, 'HEAD'], cwd=ROOT, check=True)
+    require(git('diff', '--name-only', head, 'HEAD') == '.github/revision-request.json',
+            'Revision request branch must change only its request file')
+    subprocess.run(['git', 'checkout', '--detach', head], cwd=ROOT, check=True)
+    prepare(request['tag'], default_branch, True, request['old_commit'],
+            request['old_manifest'], request['new_commit'], request_branch=True)
+    with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+        output.write(f'request_commit={request_commit}\n')
+
+
 def check_exe(data, current):
     require(len(data) >= 128 and data[:2] == b'MZ', 'Release executable is not a Windows PE file')
     at = struct.unpack_from('<I', data, 0x3c)[0]
@@ -146,7 +185,7 @@ def source_files(allow_untracked):
     result = []
     for path in sorted(paths):
         relative = path.relative_to(ROOT)
-        if {'.git', 'build', 'dist', 'public-dist', 'validation', '__pycache__'}.intersection(relative.parts):
+        if {'.git', 'build', 'dist', 'public-dist', 'validation', 'previous-release', '__pycache__'}.intersection(relative.parts):
             continue
         if path.name in {'SHA256SUMS', 'SHA256SUMS.txt'} or path.name.startswith('.env'):
             continue
@@ -198,7 +237,10 @@ def package(exe, output, tag, allow_untracked):
             require(bundle.read(prefix + '/' + name) == data, f'Portable ZIP differs from source: {name}')
     os.replace(temporary, archive)
     atomic_write(output / STABLE_EXE, binary)
-    atomic_write(output / 'SHA256SUMS', sums({STABLE_EXE: binary, archive.name: archive.read_bytes()}))
+    import package_public_update
+    update_archive = package_public_update.package(exe, output, write_manifest=False)
+    atomic_write(output / 'SHA256SUMS', sums({STABLE_EXE: binary, archive.name: archive.read_bytes(),
+                                           update_archive.name: update_archive.read_bytes()}))
     verify(output, tag)
     print(json.dumps({'version': current, 'archive': str(archive), 'bytes': archive.stat().st_size,
                       'sha256': sha(archive.read_bytes()), 'members': len(entries)}))
@@ -222,7 +264,11 @@ def verify(output, tag=None):
     current = validate(tag)
     archive = output / f'Network_Toolkit_{current}_Portable.zip'
     release_names = check_sums((output / 'SHA256SUMS').read_bytes(), lambda name: (output / name).read_bytes())
-    require(release_names == {STABLE_EXE, archive.name}, 'Unexpected release assets in checksum manifest')
+    update_archive = output / f'Network_Toolkit_{current}_Update.zip'
+    require(release_names == {STABLE_EXE, archive.name, update_archive.name},
+            'Unexpected release assets in checksum manifest')
+    import package_public_update
+    package_public_update.verify_archive(update_archive, (output / STABLE_EXE).read_bytes(), current)
     check_exe((output / STABLE_EXE).read_bytes(), current)
     prefix = f'Network_Toolkit_{current}/'
     with zipfile.ZipFile(archive) as bundle:
@@ -252,6 +298,7 @@ def publish(output, repo, tag):
     subprocess.run(['gh', 'release', 'create', tag, '--repo', repo, '--target', local_commit,
                     '--title', 'Network Toolkit ' + current, '--notes-file', str(ROOT / f'RELEASE_NOTES_{current}.txt'),
                     str(output / STABLE_EXE), str(output / f'Network_Toolkit_{current}_Portable.zip'),
+                    str(output / f'Network_Toolkit_{current}_Update.zip'),
                     str(output / 'SHA256SUMS')], check=True)
 
 
@@ -265,6 +312,11 @@ def main():
             command.add_argument('--output-dir', type=Path, default=ROOT / 'dist')
         if name == 'prepare':
             command.add_argument('--default-branch', required=True)
+            command.add_argument('--revision', action='store_true')
+            command.add_argument('--revision-request', default='')
+            command.add_argument('--expected-old-commit', default='')
+            command.add_argument('--expected-old-manifest', default='')
+            command.add_argument('--expected-new-commit', default='')
         if name == 'package':
             command.add_argument('--exe', type=Path, required=True)
             command.add_argument('--allow-untracked-source', action='store_true', help='Explicit local setup/testing only')
@@ -274,7 +326,10 @@ def main():
     if args.command == 'validate':
         print(validate(args.tag))
     elif args.command == 'prepare':
-        prepare(args.tag, args.default_branch)
+        if args.revision_request:
+            prepare_request(args.revision_request, args.default_branch)
+        else:
+            prepare(args.tag, args.default_branch, args.revision, args.expected_old_commit, args.expected_old_manifest, args.expected_new_commit)
     elif args.command == 'package':
         package(args.exe, args.output_dir.resolve(), args.tag, args.allow_untracked_source)
     elif args.command == 'verify':

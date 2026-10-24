@@ -1,7 +1,19 @@
 NETWORK TOOLKIT 1.17.63
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.63
+CURRENT RELEASE - 1.17.63 (REVISED UPDATE FEED)
+
+REVISED 1.17.63 UPDATE DESTINATION
+
+Updates now use https://github.com/TechSavage1989/network-toolkit exclusively.
+Releases retain the standalone EXE and complete-source Portable.zip, and add
+strict four-member binary-only Update.zip with a combined SHA256SUMS manifest.
+The old feed offers this revised 1.17.63 once for installed 1.17.62 clients;
+subsequent update checks from this build use the original main repository.
+An already-installed original 1.17.63 cannot detect a same-version replacement:
+close the app and manually replace its EXE with this revised build, keeping
+its folder, launch options and settings/data folder unchanged. See UPDATING.txt.
+All server adapter selector improvements below are retained.
 
 - SFTP, FTP/FTPS and TFTP servers use the same compact dropdown control as
   client connection sources for Listen on adapter.
@@ -11,7 +23,7 @@ CURRENT RELEASE - 1.17.63
   labels and selected-address tooltips use the native dropdown behavior.
 - Network controls remain disabled while the server is running. Existing
   loopback, all-adapter and individual IPv4 listening choices are retained.
-- The existing public update feed, stable executable name, settings retention
+- The main public update feed, stable executable name, settings retention
   and confirmation-based download/install workflow are retained.
 
 RELEASE HISTORY

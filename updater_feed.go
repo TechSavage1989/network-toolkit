@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-const updateRepository = "TechSavage1989/network-toolkit-releases"
+const updateRepository = "TechSavage1989/network-toolkit"
 const updateAPIURL = "https://api.github.com/repos/" + updateRepository + "/releases/latest"
 
 type updateRelease struct {

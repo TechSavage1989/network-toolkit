@@ -1,5 +1,17 @@
 NETWORK TOOLKIT 1.17.63
 
+REVISED 1.17.63 UPDATE DESTINATION
+
+Updates now use https://github.com/TechSavage1989/network-toolkit exclusively.
+Releases retain the standalone EXE and complete-source Portable.zip, and add
+strict four-member binary-only Update.zip with a combined SHA256SUMS manifest.
+The old feed offers this revised 1.17.63 once for installed 1.17.62 clients;
+subsequent update checks from this build use the original main repository.
+An already-installed original 1.17.63 cannot detect a same-version replacement:
+close the app and manually replace its EXE with this revised build, keeping
+its folder, launch options and settings/data folder unchanged. See UPDATING.txt.
+All server adapter selector improvements below are retained.
+
 SFTP, FTP/FTPS and TFTP server modes now use the same native dropdown control
 and shared appearance as client connection-source selectors for Listen on
 adapter. The control stays compact when opened, supports normal mouse and
@@ -11,6 +23,6 @@ locking are retained. No duplicate adapter display or inline option list is
 created. Existing activity resizing, file management and sidebar behavior
 are preserved.
 
-Available through the existing public update feed. Automatic checks notify;
+Available through the main public repository. Automatic checks notify;
 download and installation still require user confirmation. Settings, profiles,
 credentials and the stable Network_Toolkit.exe launch path are retained.

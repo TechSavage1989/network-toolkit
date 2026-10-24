@@ -1,6 +1,43 @@
 NETWORK TOOLKIT 1.17.63 VALIDATION
 
 CHANGES
+Uses the original, now-public network-toolkit repository for update metadata,
+trusted release asset URLs and all UI release links. Unified release packaging
+retains the complete source Portable.zip and standalone EXE and adds a strict
+four-member binary-only Update.zip with combined external SHA256SUMS.
+The 1.17.63 server adapter control changes are retained unchanged.
+
+PASSED LOCALLY
+- All 359 JavaScript checks, including the updated release-link assertion.
+- Thirty-one Python release/publication/packaging checks, including combined
+  manifests, exact update member allowlist and standalone/update EXE identity.
+- Release metadata and regenerated numeric/text Windows resource validation.
+- Python/JavaScript syntax and git whitespace checks.
+- Root/desktop/terminal Go suites using official Go 1.23.2, verified against
+  the vendor SHA-256, and Windows x64 GUI cross-compilation.
+- Independent scoped updater/revision guard review, focused Go updater tests
+  and extraction of the actual generated update package.
+- Built EXE, complete source Portable.zip and strict Update.zip packaging,
+  exact four-member allowlist, inner/outer checksums and byte-identical EXEs.
+
+PENDING
+- Hosted Checks/Release workflows and final remote asset/tag verification.
+- Native Windows runtime update, bootstrap, shortcut and restart validation.
+
+LIMITATIONS
+Original 1.17.63 validation below is historical evidence, not a claim that
+revised 1.17.63 passed the original hosted browser workflow.
+Native Windows/WebView2 and real physical network equipment are unavailable.
+Original 1.17.63 installations cannot detect a same-version replacement.
+See UPDATING.txt. Replacement publication on both repositories is owner-authorized and awaits
+verified completion. Earlier clients can migrate through the revised63 bridge.
+The previously reported missing automatic update banner remains unproven.
+
+HISTORICAL BASELINE VALIDATION
+
+NETWORK TOOLKIT 1.17.63 VALIDATION
+
+CHANGES
 Server-mode Listen on adapter uses the same native select and shared appearance
 as the SFTP/FTP client connection-source controls. The listening port remains
 on its right. Adapter selection updates the saved server configuration and the

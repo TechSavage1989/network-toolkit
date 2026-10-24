@@ -68,3 +68,13 @@ func TestUpdateFetchLimit(t *testing.T) {
 		t.Fatal("unbounded body")
 	}
 }
+
+func TestUpdateFeedUsesMainRepositoryOnly(t *testing.T) {
+	if updateRepository != "TechSavage1989/network-toolkit" || updateAPIURL != "https://api.github.com/repos/TechSavage1989/network-toolkit/releases/latest" || updateReleasesURL != "https://github.com/TechSavage1989/network-toolkit/releases/latest" {
+		t.Fatal("updater must use the main repository exclusively")
+	}
+	old := strings.ReplaceAll(string(feedFixture("1.17.65")), "network-toolkit/", "network-toolkit-releases/")
+	if _, err := updateParseRelease([]byte(old)); err == nil {
+		t.Fatal("retired feed assets accepted")
+	}
+}

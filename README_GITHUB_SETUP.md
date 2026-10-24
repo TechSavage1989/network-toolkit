@@ -1,3 +1,18 @@
+# Current repository status
+
+Network Toolkit already uses the public TechSavage1989/network-toolkit repository.
+Do not rerun initial setup or create a replacement repository. Start with
+DEVELOPMENT_HANDOFF.md for current build, release, updater and validation details.
+Version 1.17.63 switches the updater to this main repository; older installations
+require the one-time bootstrap documented in UPDATING.txt. Existing permissions
+and authentication settings must not be changed as part of normal releases.
+
+The original setup instructions below are historical, not the current release
+procedure. Their private-repository/updater-not-yet-implemented assumptions no
+longer apply.
+
+---
+
 # Network Toolkit GitHub setup
 
 This folder contains the complete Network Toolkit 1.17.57 source, vendored dependencies, automated checks and release publishing. No password, GitHub token or signing key is included.

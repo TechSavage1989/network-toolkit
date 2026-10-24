@@ -2,35 +2,34 @@
 
 ## Start here
 
-The current application source is **1.17.63** in the private repository
-https://github.com/TechSavage1989/network-toolkit on `main`. Fetch the latest
-`main` and read this file before continuing. Do not restart from an old 1.17.21
-ZIP or overwrite newer source with earlier chat attachments. Preserve the
-owner's existing `README.md`; the detailed application manual is `README.txt`.
+The current application source is **1.17.63** in the public repository
+https://github.com/TechSavage1989/network-toolkit on `main`. Start from latest
+main, not earlier chat ZIPs. Preserve the owner's README.md.
 
-This release starts from the verified 1.17.62 private-main snapshot at
-c88a05b41dfe707f730c0bfddfa2442cda365f3a. Server Listen on adapter now uses
-the same native select and shared control appearance as SFTP/FTP client
-connection sources. The native popup does not expand the settings panel.
-Existing listening addresses, running-server locking, saved settings and
-adapter-left/port-right layout are retained. No updater transport, installation,
-credential or SSH/SFTP session lifecycle changes are included.
+This release starts from exact 1.17.63 commit
+8df9b401111e09767591491bc973b4160a17a9bc, retaining its native server adapter
+selectors, layout and behavior. Only update-feed routing, release packaging,
+version metadata, regression tests and documentation are changed.
 
-The Checks workflow now runs rendered transfer server and client regressions
-in an isolated Chromium job. Browser test dependencies remain outside the app.
-Read VALIDATION.txt for completed checks and platform limits.
+## Single public source and release destination
 
-## Private source, public binaries
+Use network-toolkit for future source and release updates. The owner requested
+revised 1.17.63 itself switch feeds and be offered through the old repository
+once, so 1.17.62 clients can migrate. Original 1.17.63 was already published on both repositories. The owner
+authorized revised63 replacement and revised source publication on 2026-10-24,
+and stated nobody has 1.17.63. Keep the same-version installation caveat for
+any copy downloaded earlier. Do not silently overwrite or move existing tags.
+Do not delete repositories or change their access/security settings.
 
-- Keep source, tests, vendored dependencies, build resources and development
-  documentation in this **private** repository.
-- https://github.com/TechSavage1989/network-toolkit-releases is the separate
-  **public binary-only** repository and updater feed. Never upload source,
-  private portable archives, development ZIPs or repository credentials there.
-- Existing Checks/Release workflows remain private-repository workflows. A
-  `main` push validates and may create a private release when that version is
-  not already published. They do not publish to the public feed. No new
-  credentials or security changes are needed for this handoff.
+An already-installed original 1.17.63 cannot discover a same-version update;
+it needs manual EXE replacement. Earlier clients can receive the revised63
+bridge once its replacement publication is verified. No later release uses the second feed.
+
+The existing main-push Release workflow publishes a new version once, with
+standalone EXE, source Portable.zip, binary-only Update.zip and combined
+SHA256SUMS. The updater accepts only the new repository's exact asset URLs.
+The strict Update.zip has four members and the same executable bytes as the
+standalone asset. Never use Portable.zip for the in-app updater.
 
 ## Build and checks
 
@@ -56,14 +55,14 @@ Keep `vendor/`, bundled web assets, the vendor database and the compile-time
 The Go build uses CGO_ENABLED=0, GOOS=windows, GOARCH=amd64, GOTOOLCHAIN=local,
 `-buildvcs=false -trimpath -ldflags='-s -w -H windowsgui'`.
 
-Private packaging:
+Complete release packaging:
 
 ```sh
 python3 scripts/github_release.py package --tag v1.17.63 --exe build/Network_Toolkit.exe
 ```
 
 Use the tracked checkout for release packaging; `--allow-untracked-source` is
-only for a consciously reviewed local snapshot. Public packaging is separate:
+only for a consciously reviewed local snapshot. Binary-only packaging is also available:
 
 ```sh
 python3 scripts/package_public_update.py --exe build/Network_Toolkit.exe --output-dir public-dist
@@ -102,7 +101,7 @@ must contain exactly four members under `Network_Toolkit_X.Y.Z/`:
 The versioned filename **inside this ZIP is deliberate compatibility**, even
 though the installed/direct-download executable is `Network_Toolkit.exe`.
 Do not rename the ZIP member without testing all supported older updater
-versions. The private portable package uses the stable EXE name and is not the
+versions. The source-containing portable package uses the stable EXE name and is not the
 public updater payload. Validate outer ZIP checksum, inner executable checksum,
 PE x64 GUI resources, version and exact member allowlist. Checksums provide
 integrity, not publisher authentication; releases are not Authenticode signed.
@@ -110,9 +109,14 @@ Automatic checks/reminders do not authorize automatic download or installation.
 
 ## Validation status and unresolved work
 
+Revised 1.17.63 currently passes 359 JavaScript checks, 31 Python checks,
+release metadata/resource validation, root/desktop/terminal Go suites and
+Windows x64 GUI cross-compilation. Independent migration/revision-mode review passed. Hosted CI and remote
+publication verification remain pending. Read VALIDATION.txt for the latest verified status.
+
 1.17.63 passed the required root/desktop/terminal Go suites, all 358 JavaScript
 checks, fourteen Python checks, release/resource validation and Windows x64 GUI
-cross-compilation. The private Checks workflow also passed rendered server and
+cross-compilation. The then-private Checks workflow also passed rendered server and
 client regressions with real Chromium: native selector/client style parity,
 adapter/port alignment, mouse and keyboard selection, saved-address reload,
 activity resizing, sidebar docking and five window sizes in both themes.
@@ -129,7 +133,7 @@ canonical reopen and elevated helper identity were not executed here.
 
 The last user-confirmed working Windows version was **1.17.60**; user confirmation
 of **1.17.62 and 1.17.63 is pending**. Do not describe cross-compilation as Windows runtime
-verification. First useful next step is a real-device update to 1.17.63 from the installed version,
+verification. First useful next step is a real-device bootstrap to 1.17.63 from the installed version,
 checking visible startup, stable EXE path, shortcut preservation, retained
 settings, one rollback copy and safe cleanup/recovery.
 
@@ -142,19 +146,64 @@ claiming the original issue is fixed. Never log credentials or private results.
 
 ## Continuing development
 
-1. Start from latest private `main`, inspect current changes and the user's next
+1. Start from latest `main`, inspect current changes and the user's next
    requested improvement, and retain existing unrelated work.
 2. Make focused changes with regression tests. Increment the version for each
    new distributable build; keep Go/UI/package metadata, README/release notes
    and Windows resources consistent.
 3. Run the checks above and applicable Windows runtime tests. Record honest
    validation limits and user-confirmed results.
-4. Sync source/tests/build assets and updated handoff to the private repository.
-   Inspect the remote first; preserve unrelated work and never force-overwrite.
-5. Build the separate binary-only public package, verify hashes and allowlist,
-   then publish the authorized new version to the public release repository.
-   Never replace an existing release silently or leak private source.
-6. Verify remote commit, workflow terminal outcomes, release tag/assets/hashes
-   and updater metadata. Share a private-source link and public-binary link.
-   Future source syncing accompanies user-requested builds, not unsolicited
-   development changes.
+4. Update this handoff whenever implementation, release routing, validation,
+   known issues or next steps change. Keep it current so new development chats
+   do not inherit stale assumptions. AGENTS.md points new chats here.
+5. Sync authorized source/tests/build assets and handoff to network-toolkit.
+   Inspect remote HEAD first; preserve unrelated work and never force-overwrite.
+   Its release workflow builds all four assets together for the new version.
+   Do not publish future builds to the second repository beyond any explicitly
+   authorized migration exception, and never overwrite an old release.
+6. Verify remote commit, terminal workflow outcomes, release tag/assets/hashes
+   and updater metadata. Share the main repository release link and describe
+   any one-time bootstrap requirement. Do not claim unperformed runtime tests.
+
+## Explicit same-version repair and recovery
+
+Ordinary main pushes never replace an existing release. A separately approved
+same-version correction uses Release workflow_dispatch with revise_existing,
+exact tag, original tag commit, original SHA256SUMS file digest, and exact new
+source commit. It must be dispatched from main after new-source checks pass.
+The revision helper is restricted to network-toolkit, not the binary bridge repo.
+Before dispatch, retain original assets and metadata in durable private storage;
+the job also verifies and saves a 90-day original-release recovery artifact
+before replacing any asset. Publishing is blocked on backup failure.
+
+Revised assets are verified locally, uploaded one at a time with SHA256SUMS
+last, and rechecked against GitHub digests. Only then is the existing lightweight
+tag moved to the tested new commit and the release notes refreshed. The release
+record is retained. No repository permission or credential change is needed.
+
+If an upload, verification, tag move or notes edit fails, STOP. Do not rerun the
+workflow blindly: its strict original-state guard intentionally rejects partial
+replacement. Preserve the failed run, original recovery bundle and built new
+artifacts. Read current release ID, every asset name/size/digest and tag commit.
+Classify each asset as exact original, exact approved new, missing or unknown.
+Unknown bytes, an unexpected tag or extra assets require owner review; do not
+overwrite them. Record exactly which actions completed, including uncertain
+outcomes. Reconcile read-only before asking for the specific remaining repair.
+
+With appropriate authorization, finish only the missing approved new uploads
+(checksums last), or restore exact original asset bytes from the durable backup
+and their original manifest. Verify all remote hashes, tag/source provenance
+and release metadata before declaring recovery. A tag move or published asset
+replacement is never inferred from a successful partial upload. Do not delete
+an entire release or repository to recover. Existing clients reject mixed
+ZIP/checksum combinations; nevertheless ask users to wait while reconciling.
+
+When manual dispatch is unavailable, the one-time release-revision-v1.17.63
+branch is a bounded alternative. Only that exact branch triggers request mode,
+with .github/revision-request.json containing tag, old_commit, old_manifest and
+new_commit. The first three fields are hard-pinned to the original63 release;
+new_commit must equal current main. The request commit must descend from that
+source and change only this request JSON. Build detaches the selected source.
+Before replacement, both source main and request branch must still match their
+recorded commits. Replay after successful replacement fails the original-tag
+and original-asset guards. Ordinary main pushes never use request mode.

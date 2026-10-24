@@ -107,6 +107,7 @@ class ReleaseGuards(unittest.TestCase):
         self.assertEqual(command[command.index('--target') + 1], COMMIT)
         self.assertEqual(command[command.index('--repo') + 1], REPOSITORY)
         self.assertNotIn('--clobber', command)
+        self.assertIn(str(Path(self.temporary.name) / f'Network_Toolkit_{self.current}_Update.zip'), command)
 
     def test_publisher_refuses_existing_release(self):
         with self.assertRaisesRegex(ValueError, 'refusing to replace'):

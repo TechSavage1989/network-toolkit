@@ -2,13 +2,26 @@ name: Release
 
 on:
   push:
-    branches: [main]
+    branches: [main, release-revision-v1.17.63]
     tags: ['v*']
   workflow_dispatch:
     inputs:
       tag:
         description: 'Existing version tag to publish, for example v1.17.57'
         required: true
+        type: string
+      revise_existing:
+        description: 'Explicitly authorized same-version asset replacement and tag move; durable original backup required'
+        type: boolean
+        default: false
+      expected_old_commit:
+        description: 'Full original tag commit SHA, required for revision'
+        type: string
+      expected_new_commit:
+        description: 'Exact revised source commit SHA, required for revision'
+        type: string
+      expected_old_manifest:
+        description: 'Original SHA256SUMS file SHA-256, required for revision'
         type: string
 
 permissions:
@@ -27,6 +40,11 @@ jobs:
       tag: ${{ steps.release.outputs.tag }}
       version: ${{ steps.release.outputs.version }}
       commit: ${{ steps.release.outputs.commit }}
+      revision: ${{ steps.release.outputs.revision }}
+      old_commit: ${{ steps.release.outputs.old_commit }}
+      old_manifest: ${{ steps.release.outputs.old_manifest }}
+      new_commit: ${{ steps.release.outputs.new_commit }}
+      request_commit: ${{ steps.release.outputs.request_commit }}
     env:
       GOTOOLCHAIN: local
     steps:
@@ -45,7 +63,18 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ inputs.tag || (github.ref_type == 'tag' && github.ref_name) || '' }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-        run: python3 scripts/github_release.py prepare --tag "$RELEASE_TAG" --default-branch "$DEFAULT_BRANCH"
+          REVISE_EXISTING: ${{ inputs.revise_existing || 'false' }}
+          EXPECTED_OLD_COMMIT: ${{ inputs.expected_old_commit }}
+          EXPECTED_OLD_MANIFEST: ${{ inputs.expected_old_manifest }}
+          EXPECTED_NEW_COMMIT: ${{ inputs.expected_new_commit }}
+        run: |
+          if [ "$GITHUB_REF" = "refs/heads/release-revision-v1.17.63" ]; then
+            python3 scripts/github_release.py prepare --default-branch "$DEFAULT_BRANCH" --revision-request .github/revision-request.json
+          elif [ "$REVISE_EXISTING" = "true" ]; then
+            python3 scripts/github_release.py prepare --tag "$RELEASE_TAG" --default-branch "$DEFAULT_BRANCH" --revision --expected-old-commit "$EXPECTED_OLD_COMMIT" --expected-old-manifest "$EXPECTED_OLD_MANIFEST" --expected-new-commit "$EXPECTED_NEW_COMMIT"
+          else
+            python3 scripts/github_release.py prepare --tag "$RELEASE_TAG" --default-branch "$DEFAULT_BRANCH"
+          fi
       - uses: actions/setup-go@v7
         if: steps.release.outputs.publish == 'true'
         with:
@@ -68,7 +97,7 @@ jobs:
       - name: Build Windows x64 GUI application
         if: steps.release.outputs.publish == 'true'
         run: sh ./build.sh
-      - name: Package and verify portable application and complete source
+      - name: Package and verify portable source and binary-only updater assets
         if: steps.release.outputs.publish == 'true'
         env:
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
@@ -102,7 +131,37 @@ jobs:
         with:
           name: release-assets
           path: dist
+      - name: Back up and verify the explicitly selected original release
+        if: needs.build.outputs.revision == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.build.outputs.tag }}
+          RELEASE_REPOSITORY: ${{ github.repository }}
+          EXPECTED_OLD_COMMIT: ${{ needs.build.outputs.old_commit }}
+          EXPECTED_OLD_MANIFEST: ${{ needs.build.outputs.old_manifest }}
+          EXPECTED_NEW_COMMIT: ${{ needs.build.outputs.new_commit }}
+          EXPECTED_REQUEST_COMMIT: ${{ needs.build.outputs.request_commit }}
+        run: python3 scripts/revise_release.py backup --tag "$RELEASE_TAG" --repo "$RELEASE_REPOSITORY" --expected-old-commit "$EXPECTED_OLD_COMMIT" --expected-old-manifest "$EXPECTED_OLD_MANIFEST" --expected-new-commit "$EXPECTED_NEW_COMMIT"
+      - uses: actions/upload-artifact@v7
+        if: needs.build.outputs.revision == 'true'
+        with:
+          name: original-release-before-revision
+          path: previous-release/*
+          if-no-files-found: error
+          retention-days: 90
+      - name: Publish explicitly authorized same-version revision
+        if: needs.build.outputs.revision == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.build.outputs.tag }}
+          RELEASE_REPOSITORY: ${{ github.repository }}
+          EXPECTED_OLD_COMMIT: ${{ needs.build.outputs.old_commit }}
+          EXPECTED_OLD_MANIFEST: ${{ needs.build.outputs.old_manifest }}
+          EXPECTED_NEW_COMMIT: ${{ needs.build.outputs.new_commit }}
+          EXPECTED_REQUEST_COMMIT: ${{ needs.build.outputs.request_commit }}
+        run: python3 scripts/revise_release.py publish --tag "$RELEASE_TAG" --repo "$RELEASE_REPOSITORY" --expected-old-commit "$EXPECTED_OLD_COMMIT" --expected-old-manifest "$EXPECTED_OLD_MANIFEST" --expected-new-commit "$EXPECTED_NEW_COMMIT" --expected-request-commit "$EXPECTED_REQUEST_COMMIT"
       - name: Verify and publish a new release without overwriting an existing release
+        if: needs.build.outputs.revision != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.build.outputs.tag }}
