@@ -21,7 +21,7 @@ func (a *application) runPrimaryLifecycle(url string, noBrowser bool, dataDir, t
 		}
 		a.views.notifyLocked()
 		a.views.mu.Unlock()
-		runLifecycle(viewContext, url, cancel, noBrowser, dataDir, title, a.windowActivate, a.beginPrimaryClose)
+		runLifecycle(viewContext, url, cancel, noBrowser, dataDir, title, a.windowActivate, a.beginPrimaryClose, a.updateStartupReady)
 		cancel()
 		a.primaryMu.Lock()
 		a.primaryCancel = nil

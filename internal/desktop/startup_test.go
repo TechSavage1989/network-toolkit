@@ -52,3 +52,28 @@ func TestSplashCentersWithinSelectedMonitorWorkArea(t *testing.T) {
 		}
 	}
 }
+
+func TestStartupNotificationRequiresReadyVisibleNonclosingWindow(t *testing.T) {
+	var notice startupNotification
+	calls := 0
+	callback := func() { calls++ }
+	for _, state := range []struct{ ready, visible, closing bool }{
+		{false, false, false}, // HTTP/navigation alone is not interface readiness.
+		{false, true, false},  // A visible startup error is not success.
+		{true, false, false},  // A loaded but hidden UI is not success.
+		{true, true, true},    // Cancellation wins over a late ready callback.
+	} {
+		notice.notify(state.ready, state.visible, state.closing, callback)
+		if calls != 0 || notice.sent {
+			t.Fatalf("premature startup acknowledgement for %+v", state)
+		}
+	}
+	notice.notify(true, true, false, func() {
+		calls++
+		notice.notify(true, true, false, callback)
+	})
+	notice.notify(true, true, false, callback)
+	if calls != 1 || !notice.sent {
+		t.Fatalf("startup must acknowledge once, including reentrant callbacks: %d", calls)
+	}
+}

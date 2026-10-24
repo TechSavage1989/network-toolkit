@@ -17,7 +17,7 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 VERSION_PATTERN = r'(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)'
-STABLE_EXE = 'Network_Toolkit_Windows_x64.exe'
+STABLE_EXE = 'Network_Toolkit.exe'
 
 
 def require(condition, message):
@@ -49,15 +49,14 @@ def validate(tag=None):
     require(re.search(r"const VERSION=['\"]" + re.escape(current) + r"['\"];", html), 'UI version differs from Go version')
     executable = f'Network_Toolkit_{current}_Windows_x64.exe'
     for name in ['build.sh', 'BUILD_WINDOWS.cmd', 'Open_Terminal.cmd']:
-        names = re.findall(r'Network_Toolkit_\d+\.\d+\.\d+_Windows_x64\.exe', (ROOT / name).read_text())
-        require(names and all(name == executable for name in names), f'Current executable name differs in {name}')
+        require('Network_Toolkit.exe' in (ROOT / name).read_text(), f'Stable executable name missing in {name}')
     resources = runpy.run_path(str(ROOT / 'scripts/build_windows_resources.py'))['version_info']()
     major, minor, patch = map(int, current.split('.'))
     fixed = struct.pack('<6I', 0xFEEF04BD, 0x00010000, major << 16 | minor, patch << 16,
                         major << 16 | minor, patch << 16)
     require(fixed in resources, 'Numeric Windows resource version differs from Go version')
     require((current + '.0').encode('utf-16le') in resources, 'Windows resource text differs from Go version')
-    require(executable.encode('utf-16le') in resources, 'Windows resource executable name differs')
+    require('Network_Toolkit.exe'.encode('utf-16le') in resources, 'Windows resource executable name differs')
     require(resources in (ROOT / 'resource_windows_amd64.syso').read_bytes(),
             'Regenerate resource_windows_amd64.syso with scripts/build_windows_resources.py before pushing this version')
     require((ROOT / f'RELEASE_NOTES_{current}.txt').is_file(), 'Current release notes are missing')
@@ -147,7 +146,7 @@ def source_files(allow_untracked):
     result = []
     for path in sorted(paths):
         relative = path.relative_to(ROOT)
-        if {'.git', 'build', 'dist', 'validation', '__pycache__'}.intersection(relative.parts):
+        if {'.git', 'build', 'dist', 'public-dist', 'validation', '__pycache__'}.intersection(relative.parts):
             continue
         if path.name in {'SHA256SUMS', 'SHA256SUMS.txt'} or path.name.startswith('.env'):
             continue
@@ -174,7 +173,7 @@ def package(exe, output, tag, allow_untracked):
     binary = exe.read_bytes()
     check_exe(binary, current)
     prefix = f'Network_Toolkit_{current}'
-    versioned_exe = f'{prefix}_Windows_x64.exe'
+    versioned_exe = STABLE_EXE
     entries = {versioned_exe: binary,
                'Open_Terminal.cmd': ('@echo off\r\nsetlocal DisableDelayedExpansion\r\ncd /d "%~dp0"\r\n'
                                      f'start "" "%~dp0{versioned_exe}" --terminal\r\n').encode()}
@@ -237,7 +236,7 @@ def verify(output, tag=None):
         expected.update(prefix + 'source/' + name for name in source_names | {'SHA256SUMS'})
         require(set(members) == expected, 'Unverified entries found in portable ZIP')
         require(sum(name.lower().endswith('.exe') for name in members) == 1, 'Portable ZIP must contain exactly one executable')
-        require(bundle.read(prefix + f'Network_Toolkit_{current}_Windows_x64.exe') == (output / STABLE_EXE).read_bytes(),
+        require(bundle.read(prefix + STABLE_EXE) == (output / STABLE_EXE).read_bytes(),
                 'Standalone and portable executables differ')
     return current
 

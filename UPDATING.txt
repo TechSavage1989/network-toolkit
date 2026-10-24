@@ -1,0 +1,78 @@
+NETWORK TOOLKIT UPDATES
+
+From 1.17.58: open App settings > Check for updates, download 1.17.62,
+then Review install and restart. For a fresh install, start the 1.17.62 EXE.
+Saved app data stays at its current location.
+
+Future updates: open App settings > Updates, choose Check for updates,
+then Download update. Review the staged version and choose Install and restart.
+The app requests an explicit confirmation. Export diagnostic results, save
+open editor files, and close other Network Toolkit windows first. Active
+jobs, terminal sessions, transfers and configuration changes block installation.
+
+Downloads come from https://github.com/TechSavage1989/network-toolkit-releases
+This repository contains binaries only; application source remains private.
+The app does not ask for or save GitHub credentials. Downloads use HTTPS;
+SHA-256 checks compare the downloaded ZIP and executable against checksums.
+Checksums detect corruption, not a compromised publisher/repository. This
+release is not Authenticode signed and Windows may show an unknown-publisher
+warning. Only run releases obtained from the official repository.
+
+Installation preserves the app data folder. Update staging, helpers, logs and
+one immediately previous executable live under updates in the settings folder.
+Each app installation folder has a separate cache. Official names migrate once
+to Network_Toolkit.exe and keep that stable name for future updates. Matching
+shortcuts in your personal Desktop and Start Menu are retargeted, with original
+shortcut backups under settings. Pinned, shared and other-location shortcuts
+may need manual retargeting. Custom executable names stay unchanged. Unrelated/manual copies are never removed by filename alone.
+
+The app folder must remain writable. If settings are on a different drive,
+short-lived transaction files beside the app allow atomic replacement. They
+are removed only after verified transfer to the settings update cache. Locked
+or changed files are left pending, with a warning rather than unsafe deletion.
+The helper waits for the app to close, replaces it atomically, and restarts with
+the same options and working directory. If visible startup cannot be confirmed,
+it attempts to restore and reopen the old EXE. update-result.txt and
+update-progress.txt record the outcome during installation. The retained
+previous.json record keeps a bounded copy of the latest outcome/progress. The previous-version backup is retained
+until the next successful upgrade, when it is replaced by the newly previous one.
+
+Recovery: close all app windows. Copy updates/<installation-id>/previous.exe
+from the settings folder to the application folder, using its original filename
+recorded in previous.json, and use the same launch options/working directory
+(including --data-dir). Do not launch the backup from inside settings.
+If cleanup is pending, the verified backup may still
+be previous.exe in the recorded staging folder. Do not move/delete settings.
+
+Offline/restricted networks: check/download failure leaves the current app
+unchanged. Retry later, or use the optional official ZIP + SHA256SUMS import.
+Only newer stable Windows x64 releases can be staged. Do not mix files from
+different releases. Downloading does not install until you confirm restart.
+
+AUTOMATIC REMINDERS (1.17.59 AND LATER)
+The main Windows window checks after startup and every six hours while open.
+The update banner asks before downloading; a verified download then offers
+Review install and restart, with a separate final confirmation. Nothing is
+automatically downloaded, installed, or restarted. Later hides that reminder
+for 24 hours. Use App settings > Check for updates to show it sooner.
+Automatic checks can be disabled in App settings. Quiet network failures retry
+after 30 seconds and 2 minutes, then back off from 15 minutes to six hours.
+App settings shows the last automatic result and next check; manual checks remain available.
+Updates apply only to the executable. Saved settings/profiles are retained.
+
+1.17.62 BOOTSTRAP AND DIAGNOSTICS
+The initial update is performed by the currently installed version's helper.
+An older helper may initially create a sibling .network-toolkit-update-* folder.
+The new app migrates verified backups and removes managed artifacts only after
+successful install confirmation and the helper has exited. Future updates stage
+in settings and directly launch the stable name. No full compatibility
+launcher chain is retained. During the first migration, a one-time final reopen starts the current
+stable EXE after the old process exits, preserving elevated-tool identity.
+The visible-window readiness fix and 90-second startup timeout are preserved.
+No native Windows updater execution was available during build validation.
+
+The legacy .network-toolkit-current.json pointer is removed only after a healthy
+stable-name relaunch and safe shortcut/alias cleanup. This build never creates
+a new pointer beside the EXE. A collision with an existing Network_Toolkit.exe
+is preserved, never overwritten. Close other copies and resolve the collision
+before retrying migration. Unverified/changed legacy files are preserved.

@@ -11,8 +11,8 @@ set GOOS=windows
 set GOARCH=amd64
 set GOTOOLCHAIN=local
 if not exist build mkdir build
-go build -mod=vendor -buildvcs=false -trimpath -ldflags="-s -w -H windowsgui" -o build\Network_Toolkit_1.17.57_Windows_x64.exe .
+go build -mod=vendor -buildvcs=false -trimpath -ldflags="-s -w -H windowsgui" -o build\Network_Toolkit.exe .
 if errorlevel 1 exit /b 1
-echo Build complete: build\Network_Toolkit_1.17.57_Windows_x64.exe
+echo Build complete: build\Network_Toolkit.exe
 echo The loader is compiled into the EXE. No companion DLL is required.
 endlocal

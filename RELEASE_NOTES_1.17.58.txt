@@ -1,0 +1,13 @@
+NETWORK TOOLKIT 1.17.58
+In-app updates
+
+Adds App settings > Updates to verify a downloaded update and install it
+with an explicit restart confirmation. The update replaces the executable;
+it does not overwrite profiles, credentials, settings or app-data folders.
+
+Source remains private; a separate public repository distributes binary-only
+updates. Check and download updates directly inside App settings. No GitHub
+credentials are required or stored. SHA-256 checks detect corruption and
+mismatched files; they are not a publisher signature.
+
+See UPDATING.txt and VALIDATION.txt for limits and tested coverage.

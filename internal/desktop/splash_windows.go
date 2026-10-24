@@ -66,7 +66,7 @@ func newSplashWindow(owner *hostWindow, instance uintptr, work Rect) (*splashWin
 	if button != 0 {
 		wndSendMessage.Call(button, 0x0030, owner.font, 1)
 	}
-	wndShowWindow.Call(hwnd, 1)
+	showWindowVisible(hwnd, 1)
 	wndUpdateWindow.Call(hwnd)
 	return s, nil
 }
@@ -210,20 +210,41 @@ func (w *hostWindow) finishStartup() {
 }
 
 func (w *hostWindow) showMainWindow() {
+	if w.hwnd == 0 || w.ctx.Err() != nil || w.isClosing() {
+		return
+	}
 	w.finishStartup()
 	if !w.mainShown {
 		show := uintptr(1)
 		if w.state.Maximized {
 			show = 3
 		}
-		wndShowWindow.Call(w.hwnd, show)
-		w.mainShown = true
-		w.initializing = false
-		w.captureBounds()
+		w.mainShown = showWindowVisible(w.hwnd, show)
+		if w.mainShown {
+			w.initializing = false
+			w.captureBounds()
+		}
 	}
 	w.layout()
 	wndUpdateWindow.Call(w.hwnd)
 	if w.ready && w.view != nil {
 		w.view.Focus()
 	}
+	visible, _, _ := wndIsWindowVisible.Call(w.hwnd)
+	w.startupNotice.notify(w.ready, w.mainShown && visible != 0, w.ctx.Err() != nil || w.isClosing(), w.cfg.OnReady)
+}
+
+func showWindowVisible(hwnd, show uintptr) bool {
+	wndShowWindow.Call(hwnd, show)
+	visible, _, _ := wndIsWindowVisible.Call(hwnd)
+	if visible == 0 {
+		// An older updater launches with STARTF_USESHOWWINDOW/SW_HIDE. Windows
+		// may override the first ShowWindow call with that hidden state. An
+		// explicit second call restores the requested normal/maximized state.
+		// ShowWindow's return value describes the *previous* visibility, so it
+		// cannot be used as confirmation that the window was actually shown.
+		wndShowWindow.Call(hwnd, show)
+		visible, _, _ = wndIsWindowVisible.Call(hwnd)
+	}
+	return visible != 0
 }

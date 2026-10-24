@@ -562,7 +562,7 @@ func launchIndependentTerminal(ctx context.Context, root string, preset *termina
 	if err := ctx.Err(); err != nil {
 		return false, err
 	}
-	exe, err := os.Executable()
+	exe, err := updateCurrentExecutable()
 	if err != nil {
 		return false, err
 	}

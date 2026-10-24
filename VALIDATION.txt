@@ -1,65 +1,44 @@
-NETWORK TOOLKIT 1.17.57 VALIDATION REPORT
-October 24, 2026
+NETWORK TOOLKIT 1.17.62 VALIDATION
 
-WINDOWS BUILD - PASS
-Windows x64 GUI cross-compilation, Go 1.23.2, CGO_ENABLED=0.
-Standard PE32+ AMD64 Windows GUI executable with icon, manifest and 1.17.57
-version resources embedded before linking. No executable patching.
+CHANGES
+Official installations normalize once to Network_Toolkit.exe. Settings-local,
+installation-specific journals gate migration on committed install and helper
+exit, followed by a genuinely healthy canonical reopen. Exact verified old-path
+shortcuts on the per-user Desktop and Start Menu are retargeted through native
+IShellLink/IPersistFile, preserving fields/custom data and backing originals up
+under settings. Pinned, shared, and other-location shortcuts are not migrated.
+Custom EXE names, existing stable-name collisions, unrelated/changed files and
+unverified legacy metadata are preserved. No permanent pointer/helper/log/backup
+is newly generated next to the EXE. Brief atomic replacement files and unresolved
+recovery files may still exist until safe cleanup is possible.
 
-APPLICATION TESTS - PASS
-go test -mod=vendor . ./internal/terminal ./internal/desktop
-Includes shared SSH/SFTP transport, credential, lifecycle and embedded-asset
-route regressions. Sidebar sanitizer accepts only supported docking values.
+The previous single rollback slot and crash-safe retention remain. Pending naming
+migration can carry forward through a verified future update hash chain. Startup
+update checks wait for saved preferences, not unrelated system/jobs requests;
+short early transient retries and visible background-check status are included.
+No automatic downloads/installations. State recovery suppresses unsafe writes
+instead of overwriting saved data after an initial settings-load failure.
 
-JAVASCRIPT - PASS
-301 JavaScript tests. Includes Open SFTP routing, session eligibility,
-connection-ID-only file operations, credential reuse, and clearing remote
-folders when switching to another SSH session.
+PASSED LOCALLY
+- Root application, internal/desktop and internal/terminal Go suites.
+- Focused updater/stable-name/shortcut Go tests and updater race checks.
+- Windows x64 GUI executable and root/desktop test cross-compilation.
+- Fourteen Python release metadata, publication-guard and package tests.
+- All 355 JavaScript controller and DOM integration tests.
+- Stable-name no-sidecar, collision/custom-name preservation, two-phase reopen,
+  legacy cleanup, verified journal carryforward and rollback retention coverage.
+- Shortcut field/custom-block/icon preservation, exact target matching, original
+  backups, modified/replaced file rejection, symlink rejection, partial failures
+  and traversal-limit checks.
 
-UNIVERSAL WORKSPACE GEOMETRY - PASS
-280 rendered cases covering 34 main tool/tab/mode variants plus independent
-Terminal windows, four window sizes from 570 to 2560 pixels, and both themes.
-Verified shared margins, full available width, aligned headers, contained
-header controls, and no document-level horizontal overflow.
-Representative desktop and narrow layouts were also inspected visually.
-
-TRANSFER CLIENT SIDEBARS - PASS
-60 rendered SFTP, FTP/FTPS and TFTP cases covering five window sizes, both
-themes and both sidebar docks. Verified side-swap controls, saved docking,
-desktop and narrow pointer/keyboard resizing, selected-tab open/close,
-preference reload, activity sizing, and no extra directory requests.
-Directory double-click, immediate editor loading feedback and stale folder
-response handling continue to pass with the final session-bar layout.
-
-TRANSFER SERVERS - PASS
-30 rendered SFTP, FTP/FTPS and TFTP server cases with both themes and five
-window sizes. Adapter selection, log resizing, preference persistence,
-viewport recovery and containment remain working with the shared spacing.
-
-ACTIVE SESSION BARS - PASS
-16 rendered cases across four window sizes, both themes and both positions.
-Open SFTP selects the active SSH session rather than another available one,
-switches to Client mode, and sends no new connection credentials.
-Computed bar, button, heading, picker and icon styles match Terminal.
-Position changes retain file-pane DOM nodes and remain available with the
-sidebar closed. Non-SSH, closed and unavailable sessions disable the action.
-Independent/detached Terminal retains its existing Browse SFTP sidebar action.
-
-LIVE APPLICATION INTERFACE - PASS
-Linux development engine exercised through Chromium with real loopback SFTP
-and FTPS servers, using temporary test credentials only.
-Verified profile sharing, credential creation/update, authenticated browsing,
-owned disconnect/reconnect, failed shell promotion preserving SFTP, and
-restart persistence. Eight Terminal layout cases cover four sizes/both docks.
-No browser page errors were reported.
-
-PACKAGE - PASS
-Archive is closed and verified before atomic publication. Every ZIP member
-matches its source SHA-256; ZIP CRC check passes. Exactly one Windows
-executable is included, together with complete editable source and vendored
-dependencies. SHA256SUMS files cover the release and source contents.
-
-PLATFORM LIMITATION
-Native Windows GUI execution was not available in this environment.
-The Windows executable was cross-compiled and inspected; rendered interface
-and live integration checks ran in Chromium against the Linux engine.
+LIMITATIONS
+Native Windows/WebView2 runtime was not available. Real IShellLink/KnownFolder,
+ReplaceFileW, mapped-image rename/delete, OS shortcut use, canonical reopen and
+elevated helper identity were cross-compiled/reviewed, not executed on Windows.
+Full go test ./... was attempted: deviceinfo/diag/platform source-interface and
+neighbor tests fail on sandbox netlink/neighbor access permissions; the relevant
+root, desktop and terminal suites pass. Chromium startup regression could not
+launch due sandbox restrictions; reviewed escalation also failed before launch.
+A manual check succeeding after an absent startup banner does not establish the
+user's original cause; these are tested reliability improvements, not a proven
+root-cause diagnosis. Real-device updater verification remains necessary.

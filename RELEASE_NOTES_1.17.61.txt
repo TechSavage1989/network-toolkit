@@ -1,0 +1,28 @@
+NETWORK TOOLKIT 1.17.61
+
+UPDATER STORAGE AND RETENTION
+Update staging, helper files, logs and the immediately previous executable
+now live under updates in the resolved app settings location. Each app folder
+has a separate managed update cache, including custom --data-dir locations.
+After confirmed successful installation and helper exit, verified managed
+artifacts are cleaned. One current versioned EXE remains in the app folder;
+only the immediately previous version is retained for recovery. Old filename
+shortcuts may need to be recreated. Unrelated files and manually downloaded
+copies are not removed merely because their names resemble app releases.
+
+Settings may be on another drive. Atomic replacement uses short-lived verified
+transaction files beside the app, then transfers recovery bytes to settings.
+The old backup is not discarded until the new app is healthy and its newer
+rollback backup is committed. Locked or changed files produce a cleanup-pending
+warning instead of unsafe deletion. A 1.17.60 bootstrap initially uses its old
+helper folder, then migrates it after committed success and helper exit.
+
+The visible restart/readiness fix from 1.17.60 is preserved. Future installers
+start the canonical versioned filename directly. First bootstrap migration uses a one-time final reopen into the canonical
+filename, waiting for the old process to exit before opening the interface.
+This preserves strict elevated-tool process identity without keeping aliases.
+Settings, profiles and custom executable names are preserved.
+
+Validation includes real child-process success/exit/timeout rollback and
+separate-volume staging, safe cleanup/ownership tests, Windows cross-compilation,
+frontend and packaging tests. Native Windows execution was not available here.

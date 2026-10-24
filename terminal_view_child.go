@@ -130,7 +130,7 @@ func launchDetachedTerminal(ctx context.Context, launch terminalViewLaunch) (<-c
 	if err != nil {
 		return nil, err
 	}
-	executable, err := os.Executable()
+	executable, err := updateCurrentExecutable()
 	if err != nil {
 		clear(raw)
 		return nil, fmt.Errorf("locate the detached Terminal executable: %w", err)

@@ -106,6 +106,9 @@ type application struct {
 	dragMu             sync.Mutex
 	dragTickets        map[string]remoteDragTicket
 	httpGate           sync.RWMutex
+	updater            appUpdater
+	updateHealthDir    string
+	updateFinalizing   atomic.Bool
 }
 
 func randomHex(n int) string {
@@ -117,6 +120,17 @@ func randomHex(n int) string {
 }
 
 func main() {
+	if err := waitUpdateReopenIfRequested(); err != nil {
+		platform.NotifyFatal("Network Toolkit could not finish reopening: " + err.Error())
+		return
+	}
+	if runUpdateHelperIfRequested() {
+		return
+	}
+	if runUpdateCompatibilityLauncherIfRequested() {
+		return
+	}
+	updateHealth := flag.String("update-health", "", "Private update startup health marker")
 	port := flag.Int("port", 0, "Local port, 0 chooses an available port")
 	noBrowser := flag.Bool("no-browser", false, "Run the local diagnostic engine without opening its interface")
 	dataDir := flag.String("data-dir", "", "Override the configured app-data folder")
@@ -239,6 +253,11 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 	a := newApplication(ctx, filepath.Join(*dataDir, "Network_Toolkit.settings.json"))
+	a.updateHealthDir = *updateHealth
+	if _, official := updateOfficialExecutableVersion(filepath.Base(executable)); official {
+		a.updateFinalizing.Store(true)
+	}
+	defer a.cleanupStagedUpdate()
 	a.storage = storage
 	a.headless = *noBrowser
 	if runtime.GOOS == "windows" || *noBrowser {
@@ -336,6 +355,9 @@ func main() {
 		defer unregister()
 	}
 	fmt.Printf("%s %s\n%s\n", appName, model.Version, url)
+	if *noBrowser {
+		a.updateStartupReady()
+	}
 	a.runPrimaryLifecycle(url, *noBrowser, *dataDir, title)
 }
 
@@ -385,6 +407,24 @@ func newApplication(parent context.Context, dataPath string) *application {
 func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	a.httpGate.RLock()
 	defer a.httpGate.RUnlock()
+	if r.URL.Path == "/api/updates/install" {
+		a.updater.requestGate.Lock()
+		defer a.updater.requestGate.Unlock()
+	} else {
+		a.updater.requestGate.RLock()
+		defer a.updater.requestGate.RUnlock()
+	}
+	a.updater.mu.Lock()
+	updating := a.updater.installing
+	a.updater.mu.Unlock()
+	if updating {
+		jsonError(w, http.StatusServiceUnavailable, "The application is restarting to install an update.")
+		return
+	}
+	if a.updateFinalizing.Load() && r.Method != http.MethodGet && r.Method != http.MethodHead {
+		jsonError(w, http.StatusServiceUnavailable, "Finishing the update and reopening the current executable. Please wait.")
+		return
+	}
 	if a.ctx.Err() != nil {
 		jsonError(w, http.StatusServiceUnavailable, "The application is closing.")
 		return
@@ -413,6 +453,9 @@ func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		html = strings.ReplaceAll(html, "__WINDOW_MODE__", a.windowMode)
 		html = strings.ReplaceAll(html, "__TERMINAL_VIEW__", "null")
 		html = embeddedAssetPaths(html)
+		if a.updateFinalizing.Load() {
+			html = updateFinalizingHTML(html, a.token)
+		}
 		_, _ = io.WriteString(w, html)
 		return
 	}
@@ -455,6 +498,8 @@ func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch {
+	case strings.HasPrefix(r.URL.Path, "/api/updates/"):
+		a.handleUpdates(w, r)
 	case r.URL.Path == "/api/status":
 		if r.Method != http.MethodGet {
 			methodError(w)

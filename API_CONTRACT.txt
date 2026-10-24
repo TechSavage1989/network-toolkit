@@ -1898,3 +1898,28 @@ Compact layouts retain minimum list/detail heights within a scrollable view.
 Delayed packet-detail responses cannot replace a more recently chosen packet.
 
 GET /api/local-tools/ip adapter entries may include dhcpServer when Windows reports a valid IPv4 DHCP server.
+
+APP UPDATES (1.17.58)
+All endpoints require the existing local session token/origin protections.
+GET /api/updates/status: installed/latest/staged versions, busy activities.
+POST /api/updates/check {}: public binary-only GitHub release metadata.
+POST /api/updates/download {"version":"1.17.59"}: fetch and verify; no install.
+POST /api/updates/import: multipart package ZIP + checksums SHA256SUMS.
+POST /api/updates/install {"confirm":true,"version":"1.17.59"}: explicit
+version-specific confirmation; rejects busy work or stale staged version.
+POST /api/updates/open-releases {}: opens only the fixed public release URL.
+Downloads/imports stage an executable beside the running application. Only
+Windows x64 main workspaces can update. Normal diagnostic requests remain
+responsive during network fetches. Concurrent updater mutations are rejected.
+Install and other HTTP requests are gated so new work cannot race busy checks.
+
+UPDATE VISIBILITY AND NAMING (1.17.60)
+Update status additionally returns restartedAfterUpdate and executable metadata:
+managedName, currentPath/currentFilename, canonicalPath/canonicalFilename,
+compatibilityPaths/compatibilityFilenames, and warning. These are display-only;
+no client-supplied target path is accepted. Paths remain local to the app.
+The health marker is written only after native startup succeeds and the main
+window is visible (explicit headless mode acknowledges its ready engine).
+Versioned-name promotion runs after that marker. Its failure is a visible
+warning and does not undo a healthy update. Exact official versioned filenames
+use a same-directory, version/hash/product-validated compatibility pointer.

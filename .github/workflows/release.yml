@@ -73,7 +73,7 @@ jobs:
         env:
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
           RELEASE_VERSION: ${{ steps.release.outputs.version }}
-        run: python3 scripts/github_release.py package --tag "$RELEASE_TAG" --exe "build/Network_Toolkit_${RELEASE_VERSION}_Windows_x64.exe"
+        run: python3 scripts/github_release.py package --tag "$RELEASE_TAG" --exe "build/Network_Toolkit.exe"
       - uses: actions/upload-artifact@v7
         if: steps.release.outputs.publish == 'true'
         with:

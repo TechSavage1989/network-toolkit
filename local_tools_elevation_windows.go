@@ -212,7 +212,7 @@ func localLaunchElevatedMode(id string, parent uint32, packetCapture bool) (sysc
 	if localSystemDirectoryError != nil {
 		return 0, localSystemDirectoryError
 	}
-	executable, err := os.Executable()
+	executable, err := updateCurrentExecutable()
 	if err != nil {
 		return 0, err
 	}

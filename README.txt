@@ -1,7 +1,34 @@
+NETWORK TOOLKIT 1.17.62
+Portable network diagnostics and device terminals in a native app window
+
+CURRENT RELEASE - 1.17.62
+
+- Update staging, helpers and rollback storage now use the resolved settings
+  location, including custom data folders. Only the immediately previous
+  version is retained after a successful update.
+- Official names migrate to stable Network_Toolkit.exe, without new persistent
+  sidecar files. Verified personal Desktop/Start Menu shortcuts are retargeted;
+  pinned/shared/other-location shortcuts may need manual retargeting. Custom
+  names and unrelated files are unchanged. Original shortcut backups use settings.
+- Startup checks no longer wait for unrelated system/jobs discovery; saved
+  preferences load first, early transient errors retry sooner, and automatic
+  attempt/result/next-check details are visible in settings.
+- Legacy updater folders migrate after confirmed success and helper exit.
+  Unrelated files and unverified/manual copies are preserved.
+- Cross-drive settings use short-lived same-volume replacement files, with
+  checksum verification and resumable backup rotation. Locked cleanup is
+  reported, never forced. First migration safely finishes reopening before
+  allowing new work, preserving elevated-tool identity checks.
+- The successful 1.17.60 visible restart fix, settings and profiles are retained.
+- Windows binary and native tests were cross-compiled; live Windows/WebView2
+  updater behavior could not be executed here. Read UPDATING.txt and VALIDATION.txt.
+
+RELEASE HISTORY
+
 NETWORK TOOLKIT 1.17.57
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.57
+PREVIOUS RELEASE - 1.17.57
 
 - Shared compact window margins, full usable width and consistent panel gaps.
 - SFTP, FTP/FTPS and TFTP sidebars can swap sides and retain their docking.

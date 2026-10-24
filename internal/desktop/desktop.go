@@ -17,6 +17,10 @@ type Config struct {
 	// close handshake or immediate shutdown. It must return promptly. The
 	// notification does not cancel the context or shorten the final save wait.
 	OnClosing func()
+	// OnReady is called once on the UI thread after interface startup succeeds
+	// and the native main window is verified visible. An error screen does not
+	// qualify. The callback must return promptly.
+	OnReady func()
 }
 
 // Rect has the layout of a Win32 RECT. Coordinates are physical screen pixels

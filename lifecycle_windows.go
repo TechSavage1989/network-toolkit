@@ -11,7 +11,7 @@ import (
 	"networktoolkit/internal/platform"
 )
 
-func runLifecycle(ctx context.Context, url string, stop context.CancelFunc, noBrowser bool, dataDir, title string, activate <-chan struct{}, onClosing func()) {
+func runLifecycle(ctx context.Context, url string, stop context.CancelFunc, noBrowser bool, dataDir, title string, activate <-chan struct{}, onClosing, onReady func()) {
 	if noBrowser {
 		<-ctx.Done()
 		return
@@ -24,6 +24,7 @@ func runLifecycle(ctx context.Context, url string, stop context.CancelFunc, noBr
 		Stop:      stop,
 		Activate:  activate,
 		OnClosing: onClosing,
+		OnReady:   onReady,
 	})
 	if err != nil {
 		platform.NotifyFatal("Unable to open Network Toolkit.\n\n" + err.Error())

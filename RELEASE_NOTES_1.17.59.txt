@@ -1,0 +1,20 @@
+NETWORK TOOLKIT 1.17.59
+Automatic update reminders
+
+- Checks the existing public binary-only feed five seconds after the main
+  Windows UI is ready and every six hours while the app is open.
+- A non-blocking banner asks to download an available update. It never takes
+  over an open dialog, starts a download, or restarts the app automatically.
+- After verification, the banner offers Review install and restart. The final
+  Install and restart confirmation still saves settings and checks active work.
+- Later hides that version/stage reminder for 24 hours across restarts. Manual
+  Check for updates restores it immediately. A newer version is not hidden.
+- App settings includes an automatic-check toggle, enabled by default.
+- Background network failures remain quiet; details and a manual retry are in
+  App settings. Failed checks retry with backoff from 15 minutes to six hours.
+- Settings, profiles, executable-only replacement, verification, rollback and
+  the public release package format are unchanged from 1.17.58.
+
+The existing 1.17.58 app must use App settings > Check for updates to obtain
+this first automatic-reminder build. Automatic reminders apply after 1.17.59
+is installed. Native Windows replacement/restart remains a required live test.

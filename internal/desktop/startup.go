@@ -20,6 +20,21 @@ type startupGate struct {
 	finished bool
 }
 
+// Startup acknowledgement is distinct from navigation or an HTTP response:
+// the interface must finish initialization and its window must be visible.
+// Latch before invoking the callback so repeated or reentrant updates are safe.
+type startupNotification struct{ sent bool }
+
+func (n *startupNotification) notify(ready, visible, closing bool, callback func()) {
+	if n.sent || !ready || !visible || closing {
+		return
+	}
+	n.sent = true
+	if callback != nil {
+		callback()
+	}
+}
+
 func (s *startupGate) tick(now time.Time) startupDecision {
 	if s.finished {
 		return startupWait

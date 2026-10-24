@@ -46,6 +46,7 @@ var (
 	wndGetWindowRect    = wndUser32.NewProc("GetWindowRect")
 	wndIsZoomed         = wndUser32.NewProc("IsZoomed")
 	wndIsIconic         = wndUser32.NewProc("IsIconic")
+	wndIsWindowVisible  = wndUser32.NewProc("IsWindowVisible")
 	wndSetWindowPos     = wndUser32.NewProc("SetWindowPos")
 	wndMonitorFromRect  = wndUser32.NewProc("MonitorFromRect")
 	wndGetMonitorInfo   = wndUser32.NewProc("GetMonitorInfoW")
@@ -188,6 +189,7 @@ type hostWindow struct {
 	ready            bool
 	mainShown        bool
 	startup          startupGate
+	startupNotice    startupNotification
 	startupTimer     uintptr
 	splash           *splashWindow
 	statusTitle      string
