@@ -2,17 +2,23 @@
 
 ## Start here
 
-The current application source is **1.17.62** in the private repository
+The current application source is **1.17.63** in the private repository
 https://github.com/TechSavage1989/network-toolkit on `main`. Fetch the latest
 `main` and read this file before continuing. Do not restart from an old 1.17.21
 ZIP or overwrite newer source with earlier chat attachments. Preserve the
 owner's existing `README.md`; the detailed application manual is `README.txt`.
 
-This snapshot matches the source in the privately delivered 1.17.62 portable
-archive, excluding generated checksum inventories; this handoff is added.
-Archive SHA-256: `a45da58286974a1a9618ad946aa3e8a24bac95ae3404141204f47d08a082fd48`.
-Released executable SHA-256:
-`f98359e38aa853ab35aac0845a91f36e42a0bf6c27c4b94e5c7fd56e84e45412`.
+This release starts from the verified 1.17.62 private-main snapshot at
+c88a05b41dfe707f730c0bfddfa2442cda365f3a. Server Listen on adapter now uses
+the same native select and shared control appearance as SFTP/FTP client
+connection sources. The native popup does not expand the settings panel.
+Existing listening addresses, running-server locking, saved settings and
+adapter-left/port-right layout are retained. No updater transport, installation,
+credential or SSH/SFTP session lifecycle changes are included.
+
+The Checks workflow now runs rendered transfer server and client regressions
+in an isolated Chromium job. Browser test dependencies remain outside the app.
+Read VALIDATION.txt for completed checks and platform limits.
 
 ## Private source, public binaries
 
@@ -53,7 +59,7 @@ The Go build uses CGO_ENABLED=0, GOOS=windows, GOARCH=amd64, GOTOOLCHAIN=local,
 Private packaging:
 
 ```sh
-python3 scripts/github_release.py package --tag v1.17.62 --exe build/Network_Toolkit.exe
+python3 scripts/github_release.py package --tag v1.17.63 --exe build/Network_Toolkit.exe
 ```
 
 Use the tracked checkout for release packaging; `--allow-untracked-source` is
@@ -104,6 +110,11 @@ Automatic checks/reminders do not authorize automatic download or installation.
 
 ## Validation status and unresolved work
 
+1.17.63 verification is in progress. The required local Go suites, existing
+355 JavaScript checks, three new adapter-to-startup regressions and fourteen
+Python checks have passed. Hosted rendered checks and final packaging are
+pending; update this section with their terminal results before release.
+
 1.17.62 passed focused/root/desktop/terminal Go checks, updater race checks,
 Windows executable and test cross-compilation, 14 Python tests and 355 JS tests
 when packaged. See `VALIDATION.txt` for precise limits. Some full `go test ./...`
@@ -112,7 +123,7 @@ Native Windows/WebView2, real shortcut COM APIs, mapped-image replacement,
 canonical reopen and elevated helper identity were not executed here.
 
 The last user-confirmed working Windows version was **1.17.60**; user confirmation
-of **1.17.62 is pending**. Do not describe cross-compilation as Windows runtime
+of **1.17.62 and 1.17.63 is pending**. Do not describe cross-compilation as Windows runtime
 verification. First useful next step is a real-device 1.17.60-to-1.17.62 update,
 checking visible startup, stable EXE path, shortcut preservation, retained
 settings, one rollback copy and safe cleanup/recovery.

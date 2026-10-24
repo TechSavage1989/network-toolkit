@@ -47,39 +47,50 @@ async function main(){
   for(const protocol of ['sftp','tftp','ftp'])for(const theme of ['light','dark']){
    await page.evaluate(theme=>setTheme(theme),theme);
    await render(page,protocol,320,true);
-   await page.locator('.transfer-bind-picker summary').click();
+   const select=page.locator('select[data-transfer-setting="bind"]');
+   assert.ok(await select.isVisible());
+   assert.equal(await select.getAttribute('class'),'connection-source-select transfer-bind-picker');
+   assert.equal(await select.locator('option').count(),20);
+   assert.equal(await page.locator('[data-transfer-bind-value],details.transfer-bind-picker').count(),0);
    const data=await page.evaluate(()=>{
-    const choices=[...document.querySelectorAll('.transfer-bind-choice')];
-    const menu=document.querySelector('.transfer-bind-choices'),body=document.querySelector('.transfer-server-sidebar-body');
     const box=e=>e.getBoundingClientRect().toJSON();
-    return {choice:choices.map(e=>({height:e.clientHeight,scrollHeight:e.scrollHeight,width:e.clientWidth,scrollWidth:e.scrollWidth,box:box(e)})),menu:box(menu),body:box(body),pickerOverflow:getComputedStyle(document.querySelector('.transfer-bind-picker')).overflow,port:box(document.querySelector('[data-transfer-setting="port"]')),summary:box(document.querySelector('.transfer-bind-picker summary')),log:box(document.querySelector('.transfer-log-panel')),console:box(document.querySelector('.transfer-console')),innerMax:getComputedStyle(document.querySelector('.transfer-log-scroll')).maxHeight};
+    const select=document.querySelector('select[data-transfer-setting="bind"]'),body=document.querySelector('.transfer-server-sidebar-body');
+    return {select:box(select),body:box(body),port:box(document.querySelector('[data-transfer-setting="port"]')),log:box(document.querySelector('.transfer-log-panel')),console:box(document.querySelector('.transfer-console')),settings:box(document.querySelector('.transfer-server-settings')),innerMax:getComputedStyle(document.querySelector('.transfer-log-scroll')).maxHeight,overflow:document.documentElement.scrollWidth>innerWidth+1};
    });
-   for(const item of data.choice){assert.ok(item.scrollHeight<=item.height+1,'adapter text exceeds option height');assert.ok(item.scrollWidth<=item.width+1,'adapter text exceeds option width');}
-   for(let i=1;i<data.choice.length;i++)assert.ok(data.choice[i].box.top>=data.choice[i-1].box.bottom,'adapter choices overlap');
-   assert.equal(data.pickerOverflow,'visible');
-   assert.ok(data.menu.right<=data.body.right+1,'adapter menu exceeds sidebar');
-   assert.ok(data.summary.right<=data.port.left,'adapter overlaps listening port');
+   assert.equal(data.overflow,false,'server workspace overflows horizontally');
+   assert.equal(data.select.height,34,'server selector must match the client source control height');
+   assert.equal(data.select.top,data.port.top,'adapter and listening port must align');
+   assert.ok(data.select.right<=data.port.left,'adapter overlaps listening port');
+   assert.ok(data.select.right<=data.body.right+1,'adapter exceeds sidebar');
    assert.ok(data.log.height>=179,'activity pane too small');
    assert.ok(data.console.height>=79,'activity content too small');
    assert.equal(data.innerMax,'none');
-   assert.equal(await page.locator('.transfer-bind-choice').count(),20);
-   if(out&&viewport.width===1366&&theme==='light'&&protocol==='sftp')await page.screenshot({path:path.join(out,'sftp-server-adapter-menu.png')});
-   await page.locator('[data-transfer-bind-value="192.168.1.4"]').click();
-   assert.equal(await page.locator('[data-transfer-setting="bind"]').inputValue(),'192.168.1.4');
-   assert.ok((await page.locator('.transfer-bind-picker summary').textContent()).includes('Intel(R) Ethernet Connection (17) I219-LM'));
-   assert.equal(await page.locator('.transfer-bind-picker').getAttribute('open'),null);
+   await select.click();await page.keyboard.press('Escape');
+   assert.equal(await page.locator('.transfer-server-settings').evaluate(e=>e.getBoundingClientRect().height),data.settings.height,'opening adapter choices resized the form');
+   await select.selectOption('192.168.1.4');
+   assert.match(await select.getAttribute('title'),/Intel\(R\) Ethernet Connection \(17\) I219-LM/);
    assert.equal(await page.evaluate(protocol=>state.transferServerSettings[protocol].bind,protocol),'192.168.1.4');
+   if(out&&viewport.width===1366&&theme==='light'&&protocol==='sftp')await page.screenshot({path:path.join(out,'sftp-server-adapter-select.png')});
    results.push({protocol,theme,viewport,activityHeight:data.log.height,readableActivityHeight:data.console.height});
   }
  }
  // Keyboard and pointer paths operate on the same input and saved settings.
  await page.setViewportSize({width:1600,height:1100});await render(page,'sftp',270,true);
- await page.locator('.transfer-bind-picker summary').focus();await page.keyboard.press('End');await page.keyboard.press('Enter');
+ await page.locator('select.transfer-bind-picker').focus();await page.keyboard.press('End');await page.keyboard.press('Enter');
  assert.equal(await page.locator('[data-transfer-setting="bind"]').inputValue(),'192.168.17.4');
- await page.locator('.transfer-bind-picker summary').click();await page.keyboard.press('Escape');
- assert.equal(await page.locator('.transfer-bind-picker').getAttribute('open'),null);
- await page.locator('.transfer-bind-picker summary').click();await page.locator('.transfer-server-sidebar-header strong').click();
- assert.equal(await page.locator('.transfer-bind-picker').getAttribute('open'),null);
+ await page.locator('select.transfer-bind-picker').click();await page.keyboard.press('Escape');
+ await page.locator('.transfer-server-sidebar-header strong').click();
+ assert.equal(await page.locator('select.transfer-bind-picker').inputValue(),'192.168.17.4');
+ // Compare actual SFTP/FTP client controls with the server selector, in both themes.
+ for(const theme of ['light','dark'])for(const protocol of ['sftp','ftp']){
+  await page.evaluate(theme=>setTheme(theme),theme);await render(page,protocol,320,true);
+  const serverStyle=await page.locator('select.transfer-bind-picker').evaluate(e=>{const c=getComputedStyle(e);return [c.height,c.fontSize,c.paddingTop,c.paddingRight,c.borderRadius,c.color,c.backgroundColor];});
+  await page.evaluate(protocol=>{state.transferModes[protocol]='client';renderPage();},protocol);await settle(page);
+  const clientStyle=await page.locator('[data-rb-connection-source]').evaluate(e=>{const c=getComputedStyle(e);return [c.height,c.fontSize,c.paddingTop,c.paddingRight,c.borderRadius,c.color,c.backgroundColor];});
+  assert.deepEqual(serverStyle,clientStyle,protocol+' server and client dropdown styling differs');
+ }
+ await render(page,'sftp',270,true);
+ await page.locator('select.transfer-bind-picker').selectOption('192.168.17.4');
  const divider=page.locator('.transfer-activity-splitter'),initial=Number(await divider.getAttribute('aria-valuenow'));
  const b=await divider.boundingBox();await page.mouse.move(b.x+b.width/2,b.y+b.height/2);await page.mouse.down();await page.mouse.move(b.x+b.width/2,b.y-90,{steps:8});await page.mouse.up();
  const enlarged=Number(await divider.getAttribute('aria-valuenow'));assert.ok(enlarged>=initial+80,'dragging does not enlarge activity');

@@ -1,7 +1,7 @@
 NETWORK TOOLKIT UPDATES
 
-From 1.17.58: open App settings > Check for updates, download 1.17.62,
-then Review install and restart. For a fresh install, start the 1.17.62 EXE.
+From 1.17.58: open App settings > Check for updates, download 1.17.63,
+then Review install and restart. For a fresh install, start the 1.17.63 EXE.
 Saved app data stays at its current location.
 
 Future updates: open App settings > Updates, choose Check for updates,

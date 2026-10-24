@@ -80,7 +80,8 @@ body.remote-browser-mode #toolWorkspace>#pageContent{grid-column:1!important;gri
 .rb-connect-head strong{font-size:12px;}
 .rb-source{display:flex;align-items:end;flex-wrap:wrap;gap:7px;margin:5px 0 0;min-width:0;}
 .rb-source label{flex:0 0 auto;font-size:11px;color:var(--muted);align-self:center;}
-.rb-source select{flex:1 1 240px;min-width:150px;min-height:32px;height:34px;font-size:11px;padding:5px 7px;}
+.rb-source select{flex:1 1 240px;min-width:150px;}
+.connection-source-select{box-sizing:border-box;max-width:100%;min-width:0;height:34px;min-height:34px;font-size:11px;padding:5px 7px;}
 .rb-source>.btn{min-height:32px;}
 .rb-connection-details{margin-top:7px;padding:8px;background:var(--panel2);border:1px solid var(--line);border-radius:7px;}
 .rb-connection-details[hidden]{display:none!important;}

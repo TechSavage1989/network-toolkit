@@ -47,3 +47,35 @@ jobs:
       - name: Build Windows x64 GUI application
         run: sh ./build.sh
 
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install isolated browser test tools
+        run: |
+          npm install --prefix "$RUNNER_TEMP/ntk-browser-tests" --no-audit --no-fund playwright@1.62.1
+          node "$RUNNER_TEMP/ntk-browser-tests/node_modules/playwright/cli.js" install --with-deps chromium
+      - name: Check server selectors, saved addresses and responsive layouts
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
+        run: node scripts/transfer-server-layout.browser.cjs
+      - name: Check client connection controls and activity layout
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+        run: node scripts/transfer-client-layout.browser.cjs
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: transfer-browser-checks
+          path: ${{ runner.temp }}/ntk-browser-results
+          if-no-files-found: ignore
+          retention-days: 7
+

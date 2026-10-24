@@ -1,44 +1,29 @@
-NETWORK TOOLKIT 1.17.62 VALIDATION
+NETWORK TOOLKIT 1.17.63 VALIDATION
 
 CHANGES
-Official installations normalize once to Network_Toolkit.exe. Settings-local,
-installation-specific journals gate migration on committed install and helper
-exit, followed by a genuinely healthy canonical reopen. Exact verified old-path
-shortcuts on the per-user Desktop and Start Menu are retargeted through native
-IShellLink/IPersistFile, preserving fields/custom data and backing originals up
-under settings. Pinned, shared, and other-location shortcuts are not migrated.
-Custom EXE names, existing stable-name collisions, unrelated/changed files and
-unverified legacy metadata are preserved. No permanent pointer/helper/log/backup
-is newly generated next to the EXE. Brief atomic replacement files and unresolved
-recovery files may still exist until safe cleanup is possible.
-
-The previous single rollback slot and crash-safe retention remain. Pending naming
-migration can carry forward through a verified future update hash chain. Startup
-update checks wait for saved preferences, not unrelated system/jobs requests;
-short early transient retries and visible background-check status are included.
-No automatic downloads/installations. State recovery suppresses unsafe writes
-instead of overwriting saved data after an initial settings-load failure.
+Server-mode Listen on adapter uses the same native select and shared appearance
+as the SFTP/FTP client connection-source controls. The listening port remains
+on its right. Adapter selection updates the saved server configuration and the
+startup request, without an inline menu resizing the settings panel. Server
+locking and unavailable saved-address labels are retained.
 
 PASSED LOCALLY
 - Root application, internal/desktop and internal/terminal Go suites.
-- Focused updater/stable-name/shortcut Go tests and updater race checks.
-- Windows x64 GUI executable and root/desktop test cross-compilation.
-- Fourteen Python release metadata, publication-guard and package tests.
-- All 355 JavaScript controller and DOM integration tests.
-- Stable-name no-sidecar, collision/custom-name preservation, two-phase reopen,
-  legacy cleanup, verified journal carryforward and rollback retention coverage.
-- Shortcut field/custom-block/icon preservation, exact target matching, original
-  backups, modified/replaced file rejection, symlink rejection, partial failures
-  and traversal-limit checks.
+- Existing 355 JavaScript checks and three new protocol-specific regressions
+  for selection persistence, startup address propagation, control locking,
+  duplicate-address filtering and unavailable saved-address preservation.
+- Fourteen Python release metadata, publication-guard and packaging tests.
+- JavaScript syntax and release metadata/resource validation.
+
+IN PROGRESS
+- Hosted Chromium server/client layout checks and final release packaging.
+- Windows x64 cross-compilation and archive/checksum validation.
 
 LIMITATIONS
-Native Windows/WebView2 runtime was not available. Real IShellLink/KnownFolder,
-ReplaceFileW, mapped-image rename/delete, OS shortcut use, canonical reopen and
-elevated helper identity were cross-compiled/reviewed, not executed on Windows.
-Full go test ./... was attempted: deviceinfo/diag/platform source-interface and
-neighbor tests fail on sandbox netlink/neighbor access permissions; the relevant
-root, desktop and terminal suites pass. Chromium startup regression could not
-launch due sandbox restrictions; reviewed escalation also failed before launch.
-A manual check succeeding after an absent startup banner does not establish the
-user's original cause; these are tested reliability improvements, not a proven
-root-cause diagnosis. Real-device updater verification remains necessary.
+Native Windows/WebView2 and real physical network equipment are not available
+in this environment. Local Chromium installation failed because the downloaded
+browser archive was incomplete; rendered verification is delegated to the
+private repository's hosted Checks workflow. No native Windows runtime update
+or shortcut migration verification is claimed. The previously reported missing
+automatic update banner still has no proven root cause; 1.17.62's reliability
+improvements are retained without new updater behavior changes.

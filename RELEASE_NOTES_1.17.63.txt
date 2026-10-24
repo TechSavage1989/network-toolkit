@@ -1,0 +1,16 @@
+NETWORK TOOLKIT 1.17.63
+
+SFTP, FTP/FTPS and TFTP server modes now use the same native dropdown control
+and shared appearance as client connection-source selectors for Listen on
+adapter. The control stays compact when opened, supports normal mouse and
+keyboard selection, and shows the complete chosen label as its tooltip.
+
+The listening port stays immediately to the right. Loopback, all adapters,
+individual available IPv4 addresses, saved selections and running-server
+locking are retained. No duplicate adapter display or inline option list is
+created. Existing activity resizing, file management and sidebar behavior
+are preserved.
+
+Available through the existing public update feed. Automatic checks notify;
+download and installation still require user confirmation. Settings, profiles,
+credentials and the stable Network_Toolkit.exe launch path are retained.

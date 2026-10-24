@@ -17,7 +17,7 @@
 
 /* 1.17.44: Single full-width adapter selector and bounded controls. */
 .transfer-server-settings .field:first-child{grid-column:1/-1;max-width:100%;}
-.transfer-server-settings [data-transfer-setting="bind"]{width:100%;max-width:100%;font-size:12px;}
+.transfer-server-settings [data-transfer-setting="bind"]{width:100%;max-width:100%;}
 .transfer-server-app .fm-config-toggle{padding:10px 12px!important;border:1px solid var(--border);border-radius:7px;}
 .transfer-server-app .fm-config-toggle > summary{padding:5px 7px!important;flex-wrap:wrap;line-height:1.5;overflow-wrap:anywhere;}
 .transfer-server-app .fm-config-toggle > summary span{margin-left:0;overflow-wrap:anywhere;}
@@ -28,31 +28,5 @@
 .modal :is(.data-grid strong,.data-grid small){min-width:0;overflow-wrap:anywhere;white-space:normal;}
 .modal .btn{max-width:100%;overflow-wrap:anywhere;white-space:normal;}
 
-/* 1.17.44: A single wrapping adapter picker, with no duplicate label. */
-.transfer-server-settings>.field:first-child{grid-column:1/-1;}
-.transfer-server-settings .transfer-bind-picker{position:relative;width:100%;min-width:0;max-width:100%;font-size:12px;}
-.transfer-server-settings .transfer-bind-picker summary{display:flex;align-items:center;gap:8px;min-height:37px;padding:9px 32px 9px 12px;line-height:1.5;border:1px solid var(--border);border-radius:7px;background:var(--panel2);color:var(--text);cursor:pointer;white-space:normal;overflow-wrap:anywhere;word-break:normal;position:relative;list-style:none;}
-.transfer-server-settings .transfer-bind-picker summary::-webkit-details-marker{display:none;}
-.transfer-server-settings .transfer-bind-picker summary:after{content:"⌄";position:absolute;right:12px;top:50%;transform:translateY(-50%);font-size:16px;}
-.transfer-server-settings .transfer-bind-picker[open] summary,.transfer-server-settings .transfer-bind-picker summary:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
-.transfer-server-settings .transfer-bind-picker[data-locked="true"] summary{opacity:.65;pointer-events:none;cursor:default;}
-.transfer-server-settings .transfer-bind-choices{display:flex;flex-direction:column;gap:3px;max-height:260px;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;border:1px solid var(--border);border-radius:7px;padding:5px;margin-top:4px;background:var(--panel);}
-.transfer-server-settings .transfer-bind-choice{display:block;flex:0 0 auto;width:100%;min-width:0;min-height:34px;height:auto;max-width:100%;text-align:left;background:transparent;color:var(--text);border:1px solid transparent;border-radius:5px;padding:8px 9px;font:inherit;font-size:12px;line-height:1.5;white-space:normal;overflow-wrap:anywhere;cursor:pointer;}
-.transfer-server-settings .transfer-bind-choice:hover,.transfer-server-settings .transfer-bind-choice.selected{background:var(--panel2);border-color:var(--border);}
-
-/* Override the enclosing server settings summary styling for the inner picker. */
-.transfer-server-app .fm-config-toggle .transfer-bind-picker > summary{padding:9px 30px 9px 10px;display:block;line-height:1.5;font-size:12px;font-weight:400;user-select:none;}
-.transfer-server-settings select[hidden]{display:none!important;}
-
-/* Adapter menus use the full sidebar width. Every option keeps its natural
-   wrapped height instead of flex-shrinking below its text. */
-.transfer-server-config-panel .transfer-interface-field{position:static;}
-.transfer-server-config-panel .transfer-server-settings{position:relative;}
-.transfer-server-config-panel .transfer-bind-picker{position:static;}
-.transfer-server-config-panel .transfer-bind-picker > summary{position:relative;}
-.transfer-server-config-panel .transfer-bind-choices{width:calc(100% + 106px);max-width:none!important;position:relative;z-index:9;box-shadow:0 4px 12px #0002;}
-.transfer-server-config-panel .transfer-bind-choice{flex-shrink:0;}
-.transfer-server-settings .transfer-bind-choice:focus-visible{outline:2px solid var(--accent);outline-offset:-3px;}
 .transfer-server-app.transfer-server-layout .transfer-server-config-panel .fm-config-toggle{padding:0!important;border:0;margin:0;overflow:visible;}
-.transfer-server-app .fm-config-toggle .transfer-bind-picker{overflow:visible;border:0;margin:0;}
 .transfer-server-sidebar-button span{white-space:nowrap;font-size:9px;letter-spacing:-.2px;}

@@ -119,8 +119,6 @@ body.transfer-server-mode #toolWorkspace>#pageContent{grid-column:1!important;gr
 .transfer-server-settings>.transfer-bind-hint{grid-column:1/3;grid-row:2;margin:0!important;line-height:1.45;min-width:0;overflow-wrap:anywhere;}
 .transfer-server-settings>.field.wide[data-transfer-root-field]{grid-row:auto;}
 .transfer-server-settings>.transfer-interface-field .transfer-bind-picker{box-sizing:border-box;position:relative;max-width:100%;width:100%;min-width:0;margin:0;}
-.transfer-server-settings>.transfer-interface-field .transfer-bind-picker summary{box-sizing:border-box;min-height:38px;min-width:0;max-width:100%;width:100%;overflow-wrap:anywhere;}
-.transfer-server-settings>.transfer-interface-field .transfer-bind-choices{z-index:8;max-width:100%;box-sizing:border-box;}
 @media(max-width:690px){
  .transfer-server-settings{grid-template-columns:minmax(0,1fr) clamp(106px,25vw,140px);gap:7px 9px;}
  .transfer-server-settings>.transfer-bind-hint{grid-column:1/-1;}
@@ -143,16 +141,14 @@ body.transfer-server-mode #toolWorkspace>#pageContent{overflow:hidden!important;
 .transfer-server-config-panel .fm-config-toggle{border:0!important;margin:0!important;padding:0!important;}
 .transfer-server-config-panel .fm-config-toggle>summary{display:none!important;}
 .transfer-server-config-panel .fm-config-toggle>.transfer-server-settings{margin:0!important;}
-.transfer-server-config-panel .transfer-server-settings{display:grid!important;grid-template-columns:minmax(0,1fr) 98px!important;gap:9px 8px!important;align-items:start;}
+.transfer-server-config-panel .transfer-server-settings{display:grid!important;grid-template-columns:minmax(0,1fr) 88px!important;gap:9px 8px!important;align-items:start;}
 .transfer-server-config-panel .transfer-server-settings>.transfer-interface-field{grid-column:1!important;grid-row:1!important;z-index:3;}
 .transfer-server-config-panel .transfer-server-settings>.transfer-port-field{grid-column:2!important;grid-row:1!important;}
 .transfer-server-config-panel .transfer-server-settings>.transfer-bind-hint{grid-column:1/-1!important;grid-row:2!important;margin:0!important;}
 .transfer-server-config-panel .transfer-server-settings>.wide,.transfer-server-config-panel .transfer-server-settings>.toggle-row{grid-column:1/-1!important;}
 .transfer-server-config-panel .transfer-server-settings>.field:not(.transfer-interface-field):not(.transfer-port-field):not(.wide){grid-column:1/-1!important;}
 .transfer-server-config-panel .transfer-server-settings .field>label{display:block;overflow-wrap:anywhere;}
-.transfer-server-config-panel .transfer-server-settings>.transfer-port-field input{min-height:35px;}
-.transfer-server-config-panel .transfer-bind-picker summary{min-height:35px!important;max-height:none;line-height:1.4;}
-.transfer-server-config-panel .transfer-bind-picker .transfer-bind-choices{max-width:100%;}
+.transfer-server-config-panel .transfer-server-settings>.transfer-port-field input{height:34px;min-height:34px;}
 .transfer-server-config-panel .transfer-root-actions{display:flex;flex-wrap:wrap;gap:6px;}
 .transfer-server-config-panel .transfer-sidebar-refresh{padding:3px 5px;margin-top:5px;font-size:10px;max-width:100%;}
 .transfer-server-config-panel .help-line{overflow-wrap:anywhere;line-height:1.45;}

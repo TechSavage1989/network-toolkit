@@ -1,7 +1,25 @@
+NETWORK TOOLKIT 1.17.63
+Portable network diagnostics and device terminals in a native app window
+
+CURRENT RELEASE - 1.17.63
+
+- SFTP, FTP/FTPS and TFTP servers use the same compact dropdown control as
+  client connection sources for Listen on adapter.
+- Adapter and listening port stay aligned on one row. Opening adapter choices
+  does not expand the settings sidebar or reduce file and activity space.
+- Mouse and keyboard selection, saved listening addresses, complete option
+  labels and selected-address tooltips use the native dropdown behavior.
+- Network controls remain disabled while the server is running. Existing
+  loopback, all-adapter and individual IPv4 listening choices are retained.
+- The existing public update feed, stable executable name, settings retention
+  and confirmation-based download/install workflow are retained.
+
+RELEASE HISTORY
+
 NETWORK TOOLKIT 1.17.62
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.62
+PREVIOUS RELEASE - 1.17.62
 
 - Update staging, helpers and rollback storage now use the resolved settings
   location, including custom data folders. Only the immediately previous
@@ -22,8 +40,6 @@ CURRENT RELEASE - 1.17.62
 - The successful 1.17.60 visible restart fix, settings and profiles are retained.
 - Windows binary and native tests were cross-compiled; live Windows/WebView2
   updater behavior could not be executed here. Read UPDATING.txt and VALIDATION.txt.
-
-RELEASE HISTORY
 
 NETWORK TOOLKIT 1.17.57
 Portable network diagnostics and device terminals in a native app window
