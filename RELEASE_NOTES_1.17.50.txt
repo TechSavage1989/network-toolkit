@@ -1,0 +1,48 @@
+NETWORK TOOLKIT 1.17.50 - PORTABLE WINDOWS X64
+24 October 2026
+
+NEW AND UPDATED
+- TFTP and SFTP server listening port and adapter fields are aligned
+  horizontally, with the port on the left.
+- TFTP Client gains named Saved and Recent connection configurations.
+  TFTP is connectionless; these reuse transfer settings, not live sockets.
+- SFTP client now presents active SSH sessions, saved terminal SSH profiles,
+  recent SSH terminal connections and recent SFTP connections in one selector.
+  Refreshed session lists no longer discard recent entries.
+- Saved SFTP profiles with changed SSH server host keys open an explicit
+  re-verification dialog. Connecting remains blocked unless the user enters
+  an independently verified fingerprint matching the one presented.
+  Confirmed fingerprints are tied to the particular SFTP host and port.
+  Terminal trusted-host records are not automatically overwritten.
+- Standalone Text Editor's Browse / Open remote button now displays a remote
+  folder/file picker using the selected active SSH/SFTP/FTP/FTPS connection.
+- Double-click behavior repaired in Text Editor remote picker, full SFTP/FTP
+  browser and terminal SFTP sidebar. Selection no longer rebuilds active rows.
+- TFTP transfer direction selector widened so names are not clipped.
+- Copy controls are suppressed in file browser, terminal and editor areas
+  where they are not appropriate. Diagnostic value copying remains available.
+- Terminal color presets (including pastel and custom palettes) persist
+  after saving and reopening. The terminal Files sidebar selection is kept.
+- Recent client histories are bounded and sanitized. No passwords, private
+  keys or passphrases are saved in ordinary preferences.
+
+INCLUDED
+- Network_Toolkit_1.17.50_Windows_x64.exe
+- Complete editable Go + JavaScript/HTML/CSS source code
+- Build scripts, Go and JavaScript tests, validations, resource definitions
+
+SECURITY
+A changed SSH host key may indicate server rebuild or interception. Confirm
+fingerprints out-of-band with the device administrator before re-trusting.
+The application does not bypass fingerprint checks for saved connections.
+
+TESTED
+- Go test suite
+- JavaScript regression suite
+- Browser-driven simulated workflows for host-key change, saved/recent
+  connection selection and remote editor file picking
+- Windows x64 cross-compilation and ZIP integrity
+
+NOT TESTED
+- Native Windows execution, real devices, production TFTP transfers
+- Native Windows Explorer drag-out from file manager

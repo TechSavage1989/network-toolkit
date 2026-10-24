@@ -1,0 +1,8 @@
+.input-clear-host{position:relative}
+button.input-clear-button{position:absolute;display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;min-width:0;min-height:0;padding:3px;border:0;border-radius:4px;background:transparent;color:var(--muted);cursor:pointer;z-index:2;line-height:1}
+button.input-clear-button:hover{background:var(--hover);color:var(--text)}
+button.input-clear-button:focus-visible{outline:2px solid var(--accent);outline-offset:0}
+button.input-clear-button[hidden]{display:none!important}
+button.input-clear-button:disabled{opacity:.45;cursor:default}
+.input-clear-button .input-clear-icon{display:block;flex:none;width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;pointer-events:none}
+input.input-clear-enhanced[type="search"]::-webkit-search-cancel-button{display:none}

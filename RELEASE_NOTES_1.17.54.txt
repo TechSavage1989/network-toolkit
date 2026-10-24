@@ -1,0 +1,45 @@
+NETWORK TOOLKIT 1.17.54
+Released: October 24, 2026
+
+REMOTE SFTP FILE OPENING
+- Text file opens perform the size check and bounded read on one SFTP
+  subsystem and one authenticated connection. The former separate stat
+  login and temporary download have been removed from SFTP editor reads.
+- Opening the editor immediately shows a loading tab. Reopening a file
+  already loading uses that request instead of downloading it again.
+- Connecting uses the directory listing already returned by the server.
+- Opening, closing or switching client sidebar tabs keeps the current file
+  list and does not request another directory listing.
+- A brief hover delay prepares Windows drag-out. Quick clicks and pointer
+  movement cancel that preparation before it starts a remote request.
+- Late folder responses cannot replace a more recently selected directory.
+- Text encoding, revision conflict checks and the 8 MiB editor limit apply.
+
+CLIENT ACTIVITY PANELS
+- SFTP, FTP/FTPS and TFTP client activity uses the server-style horizontal
+  divider. Drag up to enlarge activity or down to enlarge file/results space.
+- Up/Down arrows resize the focused divider; Shift uses larger steps.
+  Double-click or Home restores automatic sizing; End enlarges activity.
+- Each protocol remembers its client activity height separately from server
+  mode. Window resizing constrains the displayed height while keeping the
+  preferred height for larger windows.
+- Removed the small nested height limits from the client activity content.
+
+CLIENT CONNECTION SIDEBARS
+- Uses the terminal rail, tabs, headings and saved-session list components.
+- Saved, Recent and Setup tabs remain available in the collapsed rail.
+- Drag the vertical divider to adjust width. Double-click or Enter/Space
+  shows or hides the sidebar; arrow keys resize it and Home resets width.
+- Sidebar width, selected tab and collapsed state are saved per protocol.
+- Connection settings scroll independently from files and activity.
+- Small windows show expanded settings over the workspace, with a visible
+  collapse control, leaving the collapsed workspace available for files.
+- Compact port fields retain readable values without an overlaid clear icon.
+- The working saved SSH/SFTP authentication policy and shared terminal
+  connections continue to be used.
+
+PACKAGE
+- Windows x64 executable with icon, manifest and 1.17.54 version resource
+  embedded at compile time.
+- Complete editable Go/web source, vendored dependencies and build scripts.
+- See VALIDATION.txt for verification results and environment limitations.

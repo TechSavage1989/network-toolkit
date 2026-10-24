@@ -1,0 +1,55 @@
+NETWORK TOOLKIT 1.17.52 - COLLAPSIBLE SERVER SIDEBAR AND SFTP PROFILE COMPATIBILITY
+
+WHAT CHANGED
+
+1. SFTP, TFTP, AND FTP/FTPS SERVER LAYOUT
+- Server configuration has moved out of the full-width main content area
+  into a dedicated sidebar. It uses the application's existing panel and
+  button styling and a narrow Settings rail.
+- The settings sidebar may be collapsed or expanded at any time. A draggable
+  divider and keyboard resizing are available; the saved width and collapsed
+  state persist individually for SFTP, FTP/FTPS, and TFTP server pages.
+- On smaller windows, settings become a collapsible overlay so the file
+  browser and transfer logs keep the available main workspace width.
+- The interface picker and Listening Port remain side by side within the
+  sidebar, with the adapter left and the port immediately to its right.
+- Port fields remain readable without a redundant input-clear icon.
+- Current server status, file management, and live transfer activity stay
+  in the main panel. Existing server controls and permissions are retained.
+
+2. SAVED TERMINAL SSH PROFILE AND SFTP RELIABILITY
+- The standalone SFTP client now uses exactly the same explicit host-key,
+  cipher, key-exchange, and MAC algorithm preference lists as the interactive
+  SSH Terminal for modern and opt-in legacy compatibility modes.
+- The previous SFTP client used a library-default host-key preference
+  ordering that could negotiate a different key from the same SSH device
+  (for example ECDSA instead of RSA SHA-2), incorrectly looking like a
+  changed SSH key even though Terminal trusted the connection.
+- Saved terminal SSH profiles pass their SSH compatibility mode to SFTP,
+  including per-profile legacy mode. SFTP and Terminal continue to share
+  trusted host-key records and protected credential references.
+- When the SFTP client is given an active matching SSH terminal session,
+  the existing authenticated transport remains reusable without a second
+  authentication or a second SSH host-key negotiation.
+- Real changed or untrusted SSH keys remain blocked pending independent
+  verification; no automatic trust reset or host-key bypass was added.
+
+TESTS
+- Go test suite, including an authenticated loopback SFTP server offering
+  both RSA and ECDSA host keys: passed.
+- Node.js/JavaScript regression tests, including saved-profile modern and
+  legacy compatibility modes: passed.
+- Rendered Chromium smoke checks for server sidebars and layout at 570,
+  820 and 1300 CSS pixel widths for SFTP, TFTP and FTP: passed.
+- Sidebar collapse, expansion, resize keyboard controls and in-app state
+  restoration for all three protocols: passed.
+- Portable Windows x64 compilation and ZIP integrity: passed.
+
+NOT VERIFIED
+- Real Windows GUI / Windows WebView2 or Explorer integration.
+- Connection to the user's actual physical SSH/SFTP server and FTP server.
+- Server policy outside the current OS environment (including firewalls).
+
+SECURITY
+A changed SSH host key must still be confirmed independently. Do not trust a
+changed fingerprint only because the application's dialog displays it.

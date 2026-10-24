@@ -1,0 +1,117 @@
+NETWORK TOOLKIT 1.17.35 - TERMINAL HIGHLIGHTING
+Reviewed: 2026-10-22
+
+WHAT THE COLORS MEAN
+
+IP / CIDR                 Valid IPv4/IPv6 addresses, masks and networks.
+MAC address               Colon, hyphen and Cisco dotted hardware addresses.
+Interface label           Standard interface IDs and names in interface rows.
+Command / config verb     Config, edit, set, unset, next, end, show and similar.
+Setting / field name      Field positions and common configuration keywords.
+Protocol / service        SSH, HTTPS, TCP, UDP, BGP, OSPF, LACP and similar.
+Mode / named value        Static, physical, tunnel, enable/disable and objects.
+Number / unit             Numeric configuration/table parameters and units.
+Comment / description     Comment lines and description/comment values.
+Up / success              Recognized operational up/connected/success states.
+Warning / pending         Recognized warning, pending and incomplete states.
+Error / down              Recognized down, failures and connection errors.
+
+Colors are application conventions, not a vendor or networking color standard.
+An intentional disable/deny setting is not automatically an error. Recognition
+uses command positions, token boundaries and table context. Generic field names
+after set/unset are colored even when absent from the common-keyword list.
+Quoted object names and descriptions do not become operational failures just
+because they contain words such as down or error. Zero error counts are not
+classified as failures. Version-like values are not treated as IP addresses.
+
+The FortiOS interface summary supports named physical, aggregate and tunnel
+rows with static/DHCP/PPPoE modes, IP/mask columns, and up/down state columns.
+One-space, wider-space and tab-separated columns use the same state colors.
+A valid address directly followed by up/down is handled within an interface
+table. The final zero in 0.0.0.0 is not interpreted as a zero event count.
+
+Standard interface families include Cisco Ethernet variants and port channels;
+AOS-CX member/slot/port IDs in context; AOS-S slot ports and Trk IDs; Junos
+physical/logical interface IDs; FortiOS port, WAN/LAN and named table interfaces;
+PAN-OS ethernet/ae IDs; and SonicOS X interfaces. Arbitrary object names remain
+named values unless the local syntax identifies an interface value/row.
+
+Display has purpose labels, examples, custom colors for all twelve categories,
+and one Underline highlighted text switch. The preview/legend share the actual
+palette. Distinct foreground colors, backgrounds and inverse formatting sent
+by the remote device remain authoritative; hidden SGR text is not exposed.
+An explicit background matching the console also permits syntax colors.
+Default, neutral white/gray and RGB normal-text foregrounds can receive syntax
+colors. This prevents a device pager's explicit white/reset boundary from
+leaving older output permanently plain. Custom chromatic ANSI text slots are
+preserved. Buffer attributes and copied text are unchanged. Highlights pause
+in alternate-screen applications. Only visible output is decorated, with up to
+300 rows, 1000 columns, 4096 characters per logical line and 8192 decorations.
+Extremely long/complex lines can be skipped. This is a display aid, not a full
+vendor grammar validator, a command interpreter or a device-health verdict.
+
+The terminal stream, command text, selected/copied output and logs are not
+rewritten. Syntax-only color categories do not add new click-to-copy hot spots
+over every word. Existing address/interface/status copying behavior is kept.
+
+Newly parsed output starts a bounded highlight scan immediately. Decoration
+changes explicitly repaint the affected visible terminal rows. Later batches
+always make progress, even on a busy frame; unchanged marks keep their identity
+and do not request repeated redraws. Scrolling is not needed to reveal newly
+recognized colors. Turning highlighting off also repaints the removed marks.
+
+Manual scrollback moves complete all supported visible rows before the next
+scroll repaint, including rows newly exposed above the previous view. The
+ordinary per-batch time/row budget still applies to incoming-output work.
+Buffer growth and scrollback trimming do not trigger a full scan per newline.
+Unchanged overlapping marks remain in place during scrolling.
+
+Renderer-index correction (1.17.11): the bundled xterm deletion queue now finds
+the exact decoration object independently of its marker's mutable row key.
+This prevents disposed-marker entries from corrupting lookup after overlapping
+up/down scroll moves. Before the fix, recognized/marked text could remain
+plain permanently even after all timers and repaints finished. The same scroll
+sequence passes with the correction in both the real renderer-service fixture
+and actual Chromium DOM rendering. The optional browser regression checks
+every character of each recognized token against its expected computed color.
+
+The pinned upstream asset hash, patched hash and patch description are in
+web/assets/SOURCE.json. scripts/patch_xterm_decoration_index.py reproduces the
+isolated method change and verifies already-patched assets without rewriting.
+Normal source builds include the patched asset and do not require Python.
+
+PRIMARY REFERENCES
+
+xterm.js, Terminal parsed-write/render events and public refresh API:
+https://xtermjs.org/docs/api/terminal/classes/terminal/
+
+Fortinet, Interface settings, FortiOS Administration Guide:
+https://docs.fortinet.com/document/fortigate/7.6.6/administration-guide/574723/interface-settings
+
+Fortinet, config system interface, FortiOS CLI Reference:
+https://docs.fortinet.com/document/fortigate/7.6.6/cli-reference/317104469/config-system-interface
+
+Cisco, IOS XE 17 Interface Characteristics Configuration Guide:
+https://www.cisco.com/c/en/us/td/docs/switches/lan/c9000/infra/interface-characteristics/interface-characteristics-configuration-guide.html
+
+HPE Aruba Networking, AOS-CX show interface:
+https://arubanetworking.hpe.com/techdocs/AOS-CX/10.15/HTML/fundamentals_4100i-6000-6100/Content/Chp_IfaceCfg/Iface_cmds/sho-int-10.htm
+
+HPE Aruba Networking, AOS-CX LAG membership:
+https://arubanetworking.hpe.com/techdocs/AOS-CX/10.17/HTML/link_aggregation/Content/Chp_LAG/cha-lag-mem-int-10.htm
+
+HPE Aruba Networking, AOS-S tagged/untagged port status:
+https://arubanetworking.hpe.com/techdocs/AOS-S/16.11/MCG/KB/content/kb/the-por-vla-tag-sta.htm
+
+Juniper, Modify the Configuration of a Device, Junos CLI:
+https://www.juniper.net/documentation/us/en/software/junos/cli/topics/topic-map/modifying-configuration.html
+
+Palo Alto Networks, CLI interface management/configuration example:
+https://knowledgebase.paloaltonetworks.com/KCSArticleDetail?id=kA10g000000ClMfCAK&lang=en_US
+
+SonicWall, SonicOS CLI Guide (address objects, zones and interfaces):
+https://help.sonicwall.com/help/sw/eng/published/26.2.0_141009_0947/content/Appendix_A_CLI_Guide/CLIguide.htm
+
+Address/status validation also follows the format references listed in
+web/assets/terminal-highlight.js. Vendor examples establish syntax roles;
+the RGB choices and optional underline styles are Network Toolkit preferences.

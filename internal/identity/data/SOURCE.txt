@@ -1,0 +1,36 @@
+Network Toolkit - bundled MAC assignment data
+
+Source: IEEE Registration Authority public assignment registries.
+https://standards.ieee.org/products-programs/regauth/
+Retrieved: 2026-10-20 UTC
+
+The embedded table retains only assignment prefixes, registry names,
+and assigned organization names. It contains no mailing addresses.
+An assignment identifies its registered organization, not a device model.
+The original registry data belongs to its respective rights holders.
+
+MA-L: 40354 source rows
+https://standards-oui.ieee.org/oui/oui.csv
+Last-Modified: Tue, 20 Oct 2026 16:01:46 GMT
+SHA256: de55be3b1ac2a6534add37b13b21a985eeffa6398d8d31e68b58fb0ebfa2c9f8
+
+MA-M: 6644 source rows
+https://standards-oui.ieee.org/oui28/mam.csv
+Last-Modified: Tue, 20 Oct 2026 16:01:24 GMT
+SHA256: 2baa65bf524e60291277adad418d51a5d7f789d30c622eb80e2426b2d5f99a56
+
+MA-S: 7238 source rows
+https://standards-oui.ieee.org/oui36/oui36.csv
+Last-Modified: Tue, 20 Oct 2026 16:01:58 GMT
+SHA256: bca24850297472e959a439def1cf82c2c96a807c4b60238ca2ac2f9260eabfa7
+
+IAB: 4575 source rows
+https://standards-oui.ieee.org/iab/iab.csv
+Last-Modified: Tue, 20 Oct 2026 16:01:12 GMT
+SHA256: 6e71aa3d47f00f19d09cb3b31ce1038de1834703420f0ce4ce111da586f1a533
+
+Rare historical prefixes with multiple registered organizations retain
+all listed organization names, separated by semicolons.
+
+Embedded unique prefixes: 58808
+Embedded SHA256: be0dfe758546ef3e1e449e12968e1a3230f2657278ca72604d34006331f39496

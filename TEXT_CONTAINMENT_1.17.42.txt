@@ -1,0 +1,3 @@
+Network Toolkit 1.17.42
+UI: full adapter labels, wrapped value fields, responsive action controls, and containment rules.
+Native select option rendering is managed by Windows; selected full text is also available through existing tooltip behavior where provided.

@@ -1,0 +1,49 @@
+name: Checks
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GOTOOLCHAIN: local
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - name: Validate current release metadata
+        run: python3 scripts/github_release.py validate
+      - name: Test release publication guards
+        run: python3 -m unittest discover -s scripts -p '*_test.py' -v
+      - name: Test application and terminal lifecycle
+        run: go test -mod=vendor . ./internal/terminal ./internal/desktop
+      - name: Test JavaScript behavior
+        run: node --test scripts/*.test.cjs
+      - name: Embed Windows icon and version resources
+        run: python3 scripts/build_windows_resources.py
+      - name: Build Windows x64 GUI application
+        run: sh ./build.sh
+

@@ -1,0 +1,69 @@
+NETWORK TOOLKIT 1.17.46 PORTABLE - 24 OCTOBER 2026
+Windows x64 application; full editable Go, HTML, CSS and JavaScript source.
+
+SFTP/FTP CLIENT SPACE
+- SFTP combines active authenticated SSH terminal connections, saved SSH
+  terminal profiles and manual login in a single connection source selector.
+- SFTP connection details are collapsed until needed. Profiles that lack
+  stored credentials expand their login fields instead of silently attempting
+  blank-password authentication. Host-key trust remains required.
+- Explorer panes occupy remaining client height; transfer activity is compact.
+- FTP navigation now has its own file transfer icon (not the terminal icon).
+
+TERMINAL SIDEBAR
+- Use the two-sided docking control in the sidebar header to choose left or
+  right. The selection persists. The SFTP tab is below the Macros tab.
+- SFTP appears only for SSH connections that support an SFTP subsystem.
+- Browse, navigate, rename, recursively copy/delete folders, download files
+  and folders, upload files, create files/folders, preview, edit and set
+  permissions from the compact session-linked sidebar.
+- Uploaded files and file transfers reuse the selected SSH session; no
+  second credential login or SSH shell shutdown is needed.
+
+FILE BROWSER AND FILE EDITOR
+- FTP/FTPS and SFTP remote browsers have local and remote panes with
+  drag/drop transfers in either direction. File drag/drop from Windows
+  uploads to the remote pane without entering a local file path.
+- Drag/drop from the terminal's SFTP file list into the main browser's
+  local pane can recursively download directories and their contents.
+- Right-click operations provide file editing, new UTF-8 files, preview,
+  folder navigation, copy/cut/paste, rename/move, confirmed recursive delete,
+  directory creation, transfer actions and SFTP permissions when supported.
+- The integrated text editor offers multiple tabs, plain-text and language
+  highlighting, line numbers, undo/redo, search/replace including regular
+  expressions, go to line, comment toggles, line duplication, indentation,
+  word wrap, line ending and UTF-8 BOM controls, save, save as, and save copy.
+- Edit files from the terminal sidebar or either pane. Local editor saves use
+  a same-directory temporary file and atomic rename where supported; remote
+  file editing uses staged transfers with a revision check before upload.
+- Existing destination files are not silently overwritten by Save As.
+  Text contents do not autosave or enter app settings or diagnostic logs.
+
+SUPPORTED LIMITS / SAFETY
+- The text editor intentionally supports UTF-8 text files up to 2 MiB.
+  Binary, other-encoded, or larger files can still be downloaded/managed.
+- Direct native drag-out of a remote file into Windows Explorer is NOT
+  supported by this browser-hosted UI. Download to a selected local path,
+  or drag between the app's local and remote panes instead.
+- Remote file compare-and-upload is not a server-side atomic transaction;
+  concurrent changes in the interval between revision check and upload
+  are not fully preventable.
+- Files and folders dragged from Windows into the remote file pane work
+  for ordinary files; OS folder drag-upload and native Explorer drag-out
+  are not implemented. In-app folder transfers are recursive (up to 1,500
+  entries per recursive action).
+- Native Windows file dialogs, Win32 drag-out and compatibility with every
+  SSH/FTP server have not been physically tested in this Linux build setup.
+
+VALIDATION
+- Go suite: passed, including UTF-8 BOM, text revision, stale update,
+  permissions preservation, text size checks and local HTTP editor tests.
+- JavaScript suite: 272 passed.
+- Chromium DOM smoke checks (inlined offline preview) passed: SFTP
+  connection controls, file pane proportions, text editor, terminal sidebar
+  relocation, and Saved/Recent/Macros/SFTP tab order.
+- Text editor interaction smoke check passed: CRLF/BOM preservation,
+  expected file revision on save and Replace All action.
+- Windows x64 GUI executable: compiled successfully; not executed on
+  physical Windows in this environment.
+- The application can be rebuilt using source/BUILD_WINDOWS.cmd (Go required).

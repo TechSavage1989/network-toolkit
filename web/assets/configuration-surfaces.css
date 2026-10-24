@@ -1,0 +1,158 @@
+/* Compact configuration surfaces outside the diagnostic sidebar.
+   Keep existing scroll owners, field order, labels and validation messages.
+   Terminal console panes and live editors retain their existing geometry. */
+
+.local-config-toolbar{gap:6px;padding:9px 11px}
+.local-config-toolbar .grow{flex:1 1 180px;min-width:0}
+.local-config-toolbar h3{margin-bottom:2px}
+.local-config-scroll,.wifi-profile-scroll{padding:10px 11px}
+.local-adapter-picker{max-width:none;margin-bottom:10px;gap:4px}
+.local-config-card{padding:11px}
+.local-config-card .form-stack{gap:9px}
+.local-config-card .section-heading{margin-bottom:8px}
+.local-config-card .notice{margin-bottom:9px;padding:8px 10px}
+
+/* Both cards fit their actual available width without forcing a narrow
+   viewport into side-by-side columns. Current addresses remain exposed. */
+.ip-configuration-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:10px}
+#ipConfiguration .local-config-card .data-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line);margin-bottom:0}
+#ipConfiguration .local-config-card .data-item{border:0;background:var(--panel);padding:7px 9px}
+#ipConfiguration .local-config-card .data-item .key{margin-bottom:2px}
+#ipConfiguration .local-config-card .data-item .val{line-height:1.45}
+#ipConfigurationForm .field{gap:4px}
+#ipStaticFields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;align-items:end}
+#ipStaticFields>.field:last-child{grid-column:1/-1}
+#ipDNSFields textarea{min-height:64px}
+#ipConfigurationForm>.help-line{margin-top:1px}
+
+/* Wi-Fi selection and key actions stay visible; the profile metadata is
+   smaller through spacing only. No secret value enters a summary. */
+.wifi-view-tabs{gap:6px;margin-bottom:8px}
+.wifi-current-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:8px}
+.wifi-current-card{padding:9px 10px}
+.wifi-current-meta{margin-top:4px}
+.wifi-current-card>.btn.mt{margin-top:8px}
+.wifi-saved-section{margin-top:13px}
+.wifi-profile-controls{grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:8px;margin-bottom:10px}
+.wifi-profile-controls .field{gap:4px}
+.wifi-profile-details{padding:11px}
+.wifi-profile-details .data-grid{margin-bottom:9px}
+.wifi-profile-details .data-item{padding:7px 9px}
+.wifi-key-area{margin-top:10px;padding-top:9px}
+.wifi-key-area>.field-label{margin-bottom:6px}
+.wifi-secret-line{gap:6px}
+.wifi-secret-line input{min-width:min(100%,180px)}
+
+/* The host editor remains the flexible content region. Only its surrounding
+   metadata and help receive smaller spacing. */
+.hosts-file-meta{padding:7px 11px;gap:5px 10px}
+.hosts-file-notes{padding:6px 11px}
+.hosts-editor-help{padding:6px 11px;gap:5px 10px}
+
+/* Calculator forms use two panels when both have useful working width.
+   The MAC editor/list already has its own bounded compact layout. */
+#utilityBody>.utility-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:12px;align-items:start}
+#utilityBody>.utility-grid>.panel>.panel-head{padding:10px 12px}
+#utilityBody>.utility-grid>.panel>.panel-body{padding:12px}
+#utilityBody>.utility-grid>.panel:first-child .form-stack{gap:9px}
+#utilityBody .utility-grid .field{gap:4px}
+#utilityBody .utility-grid .form-row{gap:8px}
+#utilityBody .utility-grid .form-row>.field:first-child{flex:1.35}
+#utilityBody .utility-grid .form-row>.field:last-child{flex:.85}
+#utilityBody .utility-grid .notice{padding:8px 10px}
+#utilityBody .subnet-disclosure{margin-top:10px}
+#utilityBody .subnet-disclosure>summary{padding:9px 12px;font-size:12px}
+#utilityBody .subnet-disclosure>summary .summary-note{margin-top:3px}
+#utilityBody .subnet-disclosure>.panel-body{padding:11px 12px}
+#utilityBody .subnet-plan-controls{gap:8px;margin-top:10px}
+#utilityBody .subnet-plan-toolbar{gap:7px;margin-top:10px}
+#utilityBody .subnet-split-controls{gap:8px}
+
+/* Labels remain above the controls. Reduce padding rather than font sizes
+   so inputs remain readable at both normal and enlarged display scaling. */
+#ipConfiguration :is(input:not([type="checkbox"]),select,textarea),
+#wifiConfiguration :is(input:not([type="checkbox"]),select),
+#utilityBody .utility-grid :is(input,select),
+#toolWorkspace[data-tool="reports"] .report-meta input,
+.modal:has(#settingsTheme) :is(input:not([type="checkbox"]):not([type="file"]),select),
+#terminalConnectForm :is(input:not([type="checkbox"]):not([type="file"]),select){min-height:32px;padding:6px 8px;line-height:1.4}
+
+/* Report context stays directly editable above the result list. */
+#toolWorkspace[data-tool="reports"] #pageContent>.panel>.panel-body{padding:11px 13px}
+#toolWorkspace[data-tool="reports"] .report-meta{grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:10px}
+#toolWorkspace[data-tool="reports"] .report-meta .field{gap:4px}
+
+/* Settings retain their existing modal scroller and pinned action footer.
+   Async storage/vendor refreshes still own only their existing sections. */
+.modal:has(#settingsTheme) .modal-body{padding:14px 16px}
+.modal:has(#settingsTheme) .setting-row{padding:9px 0;gap:12px}
+.modal:has(#settingsTheme) .form-stack{gap:10px}
+.modal:has(#settingsTheme) .field{gap:4px}
+.modal:has(#settingsTheme) .notice{padding:8px 10px}
+.modal:has(#settingsTheme) .data-grid{margin-bottom:9px}
+.modal:has(#settingsTheme) .data-item{padding:8px 10px}
+#storageSettings,#vendorSettings{margin:8px 0}
+#storageSettings .toggle-row{padding:6px 0}
+#storageSettings .toggle-row p{line-height:1.45}
+#vendorSettings .data-grid.mt,#storageSettings .field.mt{margin-top:10px}
+
+/* Optional semantic disclosures can wrap a section without replacing its
+   controls or changing focus, drafts, or async renderer ownership. */
+.configuration-surface-disclosure{margin-top:10px;border-color:var(--border)}
+.configuration-surface-disclosure>summary{padding:9px 11px;color:var(--text)}
+.configuration-surface-disclosure>summary .summary-note{display:block;margin-top:2px;font-size:10px;font-weight:400;color:var(--muted);overflow-wrap:anywhere}
+.configuration-surface-disclosure>.panel-body{padding:10px 11px}
+.configuration-surface-disclosure>#storageSettings,
+.configuration-surface-disclosure>#vendorSettings{margin:0;padding:10px 11px}
+
+/* Connection setup shares the same density while console panes are untouched.
+   Serial parameters are naturally parallel; their original DOM order stays. */
+#terminalConnectForm .connect-grid{gap:9px}
+#terminalConnectForm .field{gap:4px}
+#terminalConnectForm .terminal-connection-credentials{display:flex;flex-direction:column;gap:10px;margin-top:10px}
+#terminalConnectForm .terminal-connection-credentials>.field.mt,
+#terminalConnectForm .terminal-connection-credentials>.notice.mt,
+#terminalConnectForm .terminal-connection-credentials>.terminal-credential-field{margin-top:0}
+.terminal-connection-status{flex:none;display:flex;align-items:center;gap:9px;padding:8px 10px;border-top:1px solid var(--border);background:var(--panel2);color:var(--text);font-size:11px}
+.terminal-connection-status>svg{width:16px;height:16px;flex:none;color:var(--warn)}
+.terminal-connection-status .terminal-connection-message{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
+.terminal-connection-status .btn{flex:none}
+.terminal-connection-overlay{position:absolute;inset:0;z-index:8;display:grid;place-items:safe center;padding:14px;overflow:auto;overscroll-behavior:contain;container-type:size;background:color-mix(in srgb,var(--panel) 68%,transparent)}
+.terminal-disconnected-card{width:min(100%,420px);min-width:0;display:flex;flex-direction:column;align-items:center;gap:12px;margin:auto;padding:24px 22px;border:1px solid var(--border);border-radius:12px;background:var(--panel2);box-shadow:0 12px 38px #0003;text-align:center;color:var(--text)}
+.terminal-disconnected-card h3{display:flex;align-items:center;gap:8px;margin:0;font-size:17px}
+.terminal-disconnected-card h3 svg{width:20px;height:20px;color:var(--warn)}
+.terminal-disconnected-card p{margin:0;max-width:100%;overflow-wrap:anywhere}
+.terminal-disconnected-target{font-size:12px;font-weight:600}
+.terminal-disconnected-message{font-size:11px;color:var(--muted);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.terminal-center-reconnect{min-width:132px;min-height:36px}
+.terminal-new-connection-label{font-size:10px;color:var(--muted);margin-top:2px}
+.terminal-disconnected-card .terminal-welcome-actions{gap:7px}
+.terminal-view-output{margin-top:2px}
+@media(max-height:600px){.terminal-connection-overlay{padding:8px}.terminal-disconnected-card{gap:7px;padding:12px 14px}.terminal-disconnected-card h3{font-size:14px}.terminal-disconnected-message{-webkit-line-clamp:2}.terminal-center-reconnect{min-height:30px}}
+.terminal-pane-grid:not(.maximized)[data-layout="rows"] .terminal-disconnected-card,.terminal-pane-grid:not(.maximized)[data-layout="three"] .terminal-disconnected-card,.terminal-pane-grid:not(.maximized)[data-layout="grid"] .terminal-disconnected-card{gap:6px;padding:10px 12px}
+.terminal-pane-grid:not(.maximized)[data-layout="rows"] .terminal-disconnected-target,.terminal-pane-grid:not(.maximized)[data-layout="three"] .terminal-disconnected-target,.terminal-pane-grid:not(.maximized)[data-layout="grid"] .terminal-disconnected-target{display:none}
+@container(max-height:280px){.terminal-disconnected-card{gap:4px;padding:8px 10px}.terminal-disconnected-card h3{font-size:14px}.terminal-disconnected-target,.terminal-new-connection-label{display:none}.terminal-disconnected-message{font-size:10px;-webkit-line-clamp:1}.terminal-disconnected-card .btn{min-height:27px;padding:3px 8px}.terminal-disconnected-card .terminal-view-output{margin:0;min-height:24px;padding:2px 7px}}
+@media(max-width:540px){.terminal-connection-status{gap:6px;padding:6px}.terminal-connection-status .terminal-connection-message{display:none}}
+#terminalConnectForm .form-divider{padding-top:10px;margin-top:10px}
+#terminalConnectForm .field.mt,#terminalConnectForm .notice.mt{margin-top:10px}
+#terminalConnectForm .toggle-row{padding:6px 0}
+#terminalConnectForm .terminal-profile-note{margin-top:6px;line-height:1.45}
+#terminalConnectForm textarea{min-height:100px}
+#terminalConnectFields>.connect-grid:has(#con-serialPort){grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr))}
+
+@media(max-width:540px){
+  .local-config-toolbar .grow{flex-basis:100%}
+  #ipConfiguration .local-config-card .data-grid{grid-template-columns:minmax(0,1fr)}
+  #ipStaticFields{grid-template-columns:minmax(0,1fr)}
+  #toolWorkspace[data-tool="reports"] .report-meta{grid-template-columns:minmax(0,1fr)}
+  .modal:has(#settingsTheme) .modal-body{padding:12px}
+}
+
+@media(max-height:600px){
+  .local-config-toolbar{padding-top:7px;padding-bottom:7px}
+  .local-config-scroll,.wifi-profile-scroll{padding-top:8px;padding-bottom:8px}
+  .local-config-card,.wifi-profile-details{padding:9px}
+  #utilityBody>.utility-grid>.panel>.panel-head{padding-top:8px;padding-bottom:8px}
+  #utilityBody>.utility-grid>.panel>.panel-body{padding:10px}
+  .modal:has(#settingsTheme) .modal-body{padding-top:10px;padding-bottom:10px}
+}

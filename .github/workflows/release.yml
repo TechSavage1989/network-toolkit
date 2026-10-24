@@ -1,0 +1,110 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing version tag to publish, for example v1.17.57'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    outputs:
+      publish: ${{ steps.release.outputs.publish }}
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
+      commit: ${{ steps.release.outputs.commit }}
+    env:
+      GOTOOLCHAIN: local
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - name: Test release publication guards
+        run: python3 -m unittest discover -s scripts -p '*_test.py' -v
+      - name: Select and validate the exact release tag
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag || (github.ref_type == 'tag' && github.ref_name) || '' }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: python3 scripts/github_release.py prepare --tag "$RELEASE_TAG" --default-branch "$DEFAULT_BRANCH"
+      - uses: actions/setup-go@v7
+        if: steps.release.outputs.publish == 'true'
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: actions/setup-node@v7
+        if: steps.release.outputs.publish == 'true'
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Test application and terminal lifecycle
+        if: steps.release.outputs.publish == 'true'
+        run: go test -mod=vendor . ./internal/terminal ./internal/desktop
+      - name: Test JavaScript behavior
+        if: steps.release.outputs.publish == 'true'
+        run: node --test scripts/*.test.cjs
+      - name: Embed Windows icon and version resources
+        if: steps.release.outputs.publish == 'true'
+        run: python3 scripts/build_windows_resources.py
+      - name: Build Windows x64 GUI application
+        if: steps.release.outputs.publish == 'true'
+        run: sh ./build.sh
+      - name: Package and verify portable application and complete source
+        if: steps.release.outputs.publish == 'true'
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          RELEASE_VERSION: ${{ steps.release.outputs.version }}
+        run: python3 scripts/github_release.py package --tag "$RELEASE_TAG" --exe "build/Network_Toolkit_${RELEASE_VERSION}_Windows_x64.exe"
+      - uses: actions/upload-artifact@v7
+        if: steps.release.outputs.publish == 'true'
+        with:
+          name: release-assets
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    needs: build
+    if: needs.build.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.build.outputs.commit }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-assets
+          path: dist
+      - name: Verify and publish a new release without overwriting an existing release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.build.outputs.tag }}
+          RELEASE_REPOSITORY: ${{ github.repository }}
+        run: python3 scripts/github_release.py publish --tag "$RELEASE_TAG" --repo "$RELEASE_REPOSITORY"

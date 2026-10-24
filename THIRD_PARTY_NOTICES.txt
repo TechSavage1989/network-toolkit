@@ -1,0 +1,221 @@
+NETWORK TOOLKIT 1.17.35
+
+Application source uses Go's standard library, operating system APIs, and the
+included official Go x/crypto and x/sys modules. SSH is compiled into the EXE.
+The browser interface includes the locally bundled xterm terminal renderer and
+Fit/Search/Serialize addons under the MIT license.
+The compiled-in loader adapts ISC-licensed source from OpenWebView2Loader
+and Wails go-webview2; attribution and license follow below.
+The installed Microsoft WebView2 Runtime is a system prerequisite. No additional
+language runtime, online font, CDN asset, external SSH or Telnet program, serial
+package, or companion WebView2 loader DLL is required for built-in tools. The
+third-party application dependencies listed here are included at build time.
+
+The supplied Windows executable includes Go runtime and standard library code.
+Their license follows.
+
+Copyright 2009 The Go Authors.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+   * Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+   * Redistributions in binary form must reproduce the above
+copyright notice, this list of conditions and the following disclaimer
+in the documentation and/or other materials provided with the
+distribution.
+   * Neither the name of Google LLC nor the names of its
+contributors may be used to endorse or promote products derived from
+this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+GO-NATIVE WEBVIEW2 LOADER
+
+The loader adaptation is included as source and compiled into the EXE.
+It derives from Wails go-webview2 v1.0.23, commit
+e08e9397f04ad0b1050d7e5bdc8e27faddc87987, and OpenWebView2Loader.
+The optional upstream native DLL loader and in-memory loader are not included.
+No third-party Go module dependency is required to build this adaptation.
+The Microsoft WebView2 Runtime remains a separate installed Microsoft component.
+
+ISC License (ISC)
+
+Copyright (c) 2020 John Chadwick
+Copyright (c) 2022 Wails Project Developers
+
+Permission to use, copy, modify, and/or distribute this software for any
+purpose with or without fee is hereby granted, provided that the above
+copyright notice and this permission notice appear in all copies.
+
+THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES WITH
+REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT,
+INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM
+LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
+OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
+PERFORMANCE OF THIS SOFTWARE.
+
+IEEE REGISTRATION AUTHORITY DATA
+
+Network Toolkit embeds selected factual fields from the IEEE public MAC
+assignment registries: MA-L, MA-M, MA-S, and legacy IAB. The table contains
+registered prefixes, organization names, and registry names. Source data
+belongs to its respective rights holders. Attribution does not imply IEEE
+endorsement or identification of a device's model.
+
+The source registry index is:
+https://standards.ieee.org/products-programs/regauth/
+
+CSV sources:
+https://standards-oui.ieee.org/oui/oui.csv
+https://standards-oui.ieee.org/oui28/mam.csv
+https://standards-oui.ieee.org/oui36/oui36.csv
+https://standards-oui.ieee.org/iab/iab.csv
+
+The bundled snapshot was retrieved on 2026-10-20 and contains 58,808 unique
+prefixes. Original download hashes, sizes and Last-Modified values are in
+source/internal/identity/data/SOURCE.txt. Rare historical prefixes with more
+than one listed organization retain all organization names. No mailing
+addresses or additional IEEE documents are included in the embedded table.
+
+OFFICIAL GO EXTENSION MODULES
+
+golang.org/x/crypto v0.58.0
+https://pkg.go.dev/golang.org/x/crypto@v0.58.0/ssh
+https://go.googlesource.com/crypto
+
+golang.org/x/sys v0.49.0
+https://pkg.go.dev/golang.org/x/sys@v0.49.0
+https://go.googlesource.com/sys
+
+Module versions and checksums are pinned in source/go.mod and source/go.sum.
+Required source files and module licenses are included in source/vendor.
+The Go Authors' BSD-style license reproduced above also applies to these
+modules; any included source-specific notices remain with their source.
+
+XTERM TERMINAL RENDERER AND ADDONS
+
+@xterm/xterm 6.0.0
+@xterm/addon-fit 0.11.0
+@xterm/addon-search 0.16.0
+@xterm/addon-serialize 0.14.0
+https://github.com/xtermjs/xterm.js
+https://xtermjs.org/
+
+The xterm.js bundle includes one local decoration-index correction. Queued
+deletions find entries by object identity rather than a marker's mutable row
+key, and duplicate queued deletions are rejected. Lazy cleanup is preserved.
+The exact change is reproducible with scripts/patch_xterm_decoration_index.py;
+ordinary source builds use the included patched asset and still need Go only.
+Other browser UMD bundles and the stylesheet are unmodified.
+No runtime network request loads these dependencies. Exact npm tarball URLs,
+SHA-512 package integrity values, and original/patched SHA-256 file hashes are in
+source/web/assets/SOURCE.json. The full MIT licenses follow.
+
+XTERM LICENSE
+
+Copyright (c) 2017-2019, The xterm.js authors (https://github.com/xtermjs/xterm.js)
+Copyright (c) 2014-2016, SourceLair Private Company (https://www.sourcelair.com)
+Copyright (c) 2012-2013, Christopher Jeffrey (https://github.com/chjj/)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+
+ADDON-FIT LICENSE
+
+Copyright (c) 2019, The xterm.js authors (https://github.com/xtermjs/xterm.js)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+
+ADDON-SEARCH LICENSE
+
+Copyright (c) 2017, The xterm.js authors (https://github.com/xtermjs/xterm.js)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+
+ADDON-SERIALIZE LICENSE
+
+Copyright (c) 2017-2019, The xterm.js authors (https://github.com/xtermjs/xterm.js)
+Copyright (c) 2014-2016, SourceLair Private Company (https://www.sourcelair.com)
+Copyright (c) 2012-2013, Christopher Jeffrey (https://github.com/chjj/)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.

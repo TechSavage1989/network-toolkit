@@ -1,0 +1,68 @@
+{
+  "retrieved": "2026-10-20",
+  "upstream": "https://github.com/xtermjs/xterm.js",
+  "packages": [
+    {
+      "name": "@xterm/xterm",
+      "version": "6.0.0",
+      "tarball": "https://registry.npmjs.org/@xterm/xterm/-/xterm-6.0.0.tgz",
+      "integrity": "sha512-TQwDdQGtwwDt+2cgKDLn0IRaSxYu1tSUjgKarSDkUM0ZNiSRXFpjxEsvc/Zgc5kq5omJ+V0a8/kIM2WD3sMOYg=="
+    },
+    {
+      "name": "@xterm/addon-fit",
+      "version": "0.11.0",
+      "tarball": "https://registry.npmjs.org/@xterm/addon-fit/-/addon-fit-0.11.0.tgz",
+      "integrity": "sha512-jYcgT6xtVYhnhgxh3QgYDnnNMYTcf8ElbxxFzX0IZo+vabQqSPAjC3c1wJrKB5E19VwQei89QCiZZP86DCPF7g=="
+    },
+    {
+      "name": "@xterm/addon-search",
+      "version": "0.16.0",
+      "tarball": "https://registry.npmjs.org/@xterm/addon-search/-/addon-search-0.16.0.tgz",
+      "integrity": "sha512-9OeuBFu0/uZJPu+9AHKY6g/w0Czyb/Ut0A5t79I4ULoU4IfU5BEpPFVGQxP4zTTMdfZEYkVIRYbHBX1xWwjeSA=="
+    },
+    {
+      "name": "@xterm/addon-serialize",
+      "version": "0.14.0",
+      "tarball": "https://registry.npmjs.org/@xterm/addon-serialize/-/addon-serialize-0.14.0.tgz",
+      "tarball_sha256": "f9a290923dc9c6178446e3fc082c29812a7096a1664fd7bf904022c141c5bbfb",
+      "upstream_commit": "f447274f430fd22513f6adbf9862d19524471c04",
+      "license_file": "xterm upstream LICENSE, same pinned repository commit",
+      "integrity": "sha512-uteyTU1EkrQa2Ux6P/uFl2fzmXI46jy5uoQMKEOM0fKTyiW7cSn0WrFenHm5vO5uEXX/GpwW/FgILvv3r0WbkA=="
+    }
+  ],
+  "files": [
+    {
+      "file": "xterm.js",
+      "package": "@xterm/xterm",
+      "version": "6.0.0",
+      "sha256": "f052db32885cf98aa0aa17263dae6c307fc62ceb266e00c3d25ebcd5c4adfdac",
+      "upstream_sha256": "14903579ff54664cd72f8e8699e6961a6272c21863ec1c3b118cdc8af5d4a972",
+      "local_patch": "scripts/patch_xterm_decoration_index.py"
+    },
+    {
+      "file": "xterm.css",
+      "package": "@xterm/xterm",
+      "version": "6.0.0",
+      "sha256": "854a7c0fb70e8b1a083c16797ab827299fb18744f5ad34f227b48337e33293c6"
+    },
+    {
+      "file": "addon-fit.js",
+      "package": "@xterm/addon-fit",
+      "version": "0.11.0",
+      "sha256": "ba3ea256ce0620a0992a197d6c9baea64823fc93d8da07a9e366ca9943c18527"
+    },
+    {
+      "file": "addon-search.js",
+      "package": "@xterm/addon-search",
+      "version": "0.16.0",
+      "sha256": "7bc1b8c7b3549411f6f6f779524c4ded6ca621fd80d64b40a70ae7c78aefbf55"
+    },
+    {
+      "file": "addon-serialize.js",
+      "package": "@xterm/addon-serialize",
+      "version": "0.14.0",
+      "sha256": "65d8dd7c2b3b37a77f583ea5e0d14a23bbcc846e4ae0d6bb534ae12a380aea0d"
+    }
+  ],
+  "modifications": "xterm.js has one local correction: delete decoration-index entries by object identity after marker row keys change, preserving lazy cleanup and rejecting duplicate queued deletes. The reproducible patch script, upstream hash and patched hash are retained. Other UMD bundles and the stylesheet are unmodified; source maps are not included."
+}

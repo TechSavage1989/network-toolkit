@@ -1,0 +1,24 @@
+NETWORK TOOLKIT GITHUB SETUP
+
+Account: TechSavage1989
+Recommended private repository name: network-toolkit
+
+RECOMMENDED ROUTE
+Create the private repository on GitHub with Add a README enabled,
+then provide its URL in this ChatGPT conversation. The GitHub connection
+can then be used to upload the prepared source and release workflows.
+No local development tools are required for this route.
+
+OPTIONAL LOCAL ROUTE
+Read README_GITHUB_SETUP.md before running Setup_GitHub.cmd.
+This alternative requires Git, Python 3 and GitHub CLI on your computer.
+Use it only if you have not already initialized the remote with a README.
+
+CURRENT STATUS
+Repository files prepared locally. No remote repository was created,
+no code has been pushed, and no GitHub workflow has run yet.
+13 release guard tests passed. Real Windows executable packaging,
+ZIP CRC and per-file checksum verification passed locally.
+The in-application updater remains a separate implementation step.
+
+Prepared source commit: 8b4a8e9f01a3dfd646da66cea60084d0073045ad

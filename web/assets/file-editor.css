@@ -1,0 +1,107 @@
+/* Standalone integrated text editor, independent of remote-browser re-renders. */
+.nt-editor[hidden],.nt-editor [hidden]{display:none!important}
+.nt-editor{position:fixed;inset:0;z-index:300;display:flex;padding:2vh 2vw;background:#0009;box-sizing:border-box}
+.nt-editor-window{background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:9px;box-shadow:0 18px 80px #0008;display:flex;flex:1;flex-direction:column;min-width:0;min-height:0;overflow:hidden}
+.nt-editor-title{display:flex;gap:10px;align-items:center;padding:7px 12px;border-bottom:1px solid var(--border);min-height:42px}
+.nt-editor-title strong{white-space:nowrap}.nt-editor-title>button{margin-left:auto}
+.nt-editor-filetitle{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--muted)}
+.nt-editor-tabs{display:flex;gap:2px;padding:4px 6px 0;min-height:32px;overflow:auto;border-bottom:1px solid var(--border)}
+.nt-editor-tab{display:flex;flex:0 0 auto;align-items:stretch;max-width:210px;border-radius:6px 6px 0 0;background:var(--panel2);font-size:11px;overflow:hidden}
+.nt-editor-tab:has([aria-selected="true"]){box-shadow:inset 0 2px var(--accent)}
+.nt-editor-tab button{border:0;background:transparent;padding:5px 9px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nt-editor-tab button:last-child{flex:0 0 22px;padding:4px}
+.nt-editor-toolbar,.nt-editor-options,.nt-editor-find{display:flex;flex:0 0 auto;align-items:center;gap:5px;padding:6px 10px;flex-wrap:wrap;border-bottom:1px solid var(--line);min-height:39px}
+.nt-editor-toolbar .btn{min-height:26px;padding:3px 7px;font-size:11px}
+.nt-editor-rule{border-left:1px solid var(--border);height:19px;margin:0 4px}
+.nt-editor-options{font-size:10px;gap:13px;min-height:30px;padding:4px 12px;color:var(--muted)}
+.nt-editor-options label{display:flex;align-items:center;gap:5px;white-space:nowrap}
+.nt-editor-options select{width:auto;min-height:26px;padding:2px 5px;font-size:11px}
+.nt-editor-options input[type=checkbox],.nt-editor-find input[type=checkbox]{width:14px;height:14px;margin:0}
+.nt-editor-find{font-size:11px;gap:8px}
+.nt-editor-find label{display:flex;align-items:center;gap:5px}
+.nt-editor-find label input:not([type=checkbox]){width:min(24vw,240px);min-height:28px;padding:4px 6px}
+.nt-editor-replace-fields{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.nt-editor-code{display:flex;flex:1 1 0;min-height:110px;min-width:0;overflow:hidden;background:var(--input);font:12px/1.55 Consolas,'Cascadia Code',monospace;}
+.nt-editor-gutter{flex:0 0 55px;min-width:45px;overflow:hidden;white-space:pre;text-align:right;color:var(--faint);border-right:1px solid var(--border);padding:10px 9px 20px 0;line-height:1.55;user-select:none;box-sizing:border-box}
+.nt-editor-surface{flex:1;min-width:0;min-height:0;position:relative;overflow:hidden}
+.nt-editor-highlight,.nt-editor-surface textarea{position:absolute;inset:0;width:100%;height:100%;margin:0;padding:10px 12px 20px;border:0;border-radius:0;background:transparent;font:inherit;line-height:1.55;letter-spacing:0;tab-size:4;white-space:pre;overflow:auto;resize:none;box-shadow:none;overflow-wrap:normal;}
+.nt-editor-highlight{height:auto;min-height:100%;width:max-content;min-width:100%;overflow:visible;pointer-events:none;color:var(--text)}
+.nt-editor-surface textarea{z-index:1;color:var(--text);caret-color:var(--text);outline:0!important;}
+.nt-editor-surface textarea.highlight-active{color:transparent!important;-webkit-text-fill-color:transparent;caret-color:var(--text)!important}
+.nt-editor-surface textarea.highlight-active::selection{background:var(--accentBg);-webkit-text-fill-color:var(--text);color:var(--text)}
+.nt-editor-surface textarea.is-wrapped{white-space:pre-wrap;overflow-wrap:anywhere}
+.nt-ed-comment{color:#63a49a}.nt-ed-string{color:#c79d55}.nt-ed-keyword{color:#719ef1}.nt-ed-number{color:#bf8bd9}
+.nt-editor-status{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:6px 12px;border-top:1px solid var(--border);font-size:10px;color:var(--muted)}
+.nt-editor-status [data-ed-message]{flex:1;min-width:0;overflow-wrap:anywhere}
+.nt-editor-status .error{color:var(--bad)}
+@media(max-width:680px){.nt-editor{padding:0}.nt-editor-window{border-radius:0}.nt-editor-toolbar{max-height:130px;overflow:auto}.nt-editor-gutter{flex-basis:40px}.nt-editor-options{gap:6px}.nt-editor-filetitle{display:none}}
+/* 1.17.48: the shared editor docks in Tools and opens from connected file browsers. */
+body:has(.nt-editor-embedded) #toolWorkspace{display:grid;grid-template-columns:minmax(0,1fr)!important;grid-template-rows:minmax(0,1fr)!important;min-height:0;}
+body:has(.nt-editor-embedded) #toolWorkspace>#toolConfiguration,
+body:has(.nt-editor-embedded) #toolDivider,
+body:has(.nt-editor-embedded) #toolCommandBar{display:none!important;}
+body:has(.nt-editor-embedded) #toolWorkspace>#pageContent{grid-row:1!important;grid-column:1!important;min-height:min(660px,calc(100vh - 180px));min-width:0;display:flex;flex-direction:column;padding:0;overflow:hidden}
+.nt-editor-page-toolbar{padding:8px;display:flex;gap:7px;flex-wrap:wrap;align-items:center;border:1px solid var(--border);border-radius:8px 8px 0 0;background:var(--panel);min-width:0;}
+.nt-editor-page-toolbar label{min-width:200px;flex:1 1 250px;display:flex;gap:8px;align-items:center;font-size:11px;color:var(--muted);}
+.nt-editor-page-toolbar label input{width:100%;min-width:0;flex:1;min-height:31px;font-size:11px;}
+.nt-editor-page-toolbar>.muted{font-size:10px;flex-basis:100%;}
+#ntEditorPageMount{flex:1 1 0;min-height:320px;min-width:0;display:flex;flex-direction:column;}
+.nt-editor.nt-editor-embedded{position:relative;inset:auto;z-index:1;padding:0;box-shadow:none;background:transparent;flex:1 1 0;min-height:0;}
+.nt-editor-embedded .nt-editor-window{border-radius:0 0 8px 8px;box-shadow:none;}
+.nt-editor-embedded [data-ed="localTools"]{display:none}
+.nt-editor-options input[data-ed-font]{width:50px;min-width:46px;min-height:26px;height:26px;padding:3px 5px;font-size:11px}
+.nt-editor-options select[data-ed-language-select]{min-width:87px;max-width:126px}
+.nt-editor-options select[data-ed-palette]{min-width:91px;max-width:135px}
+.nt-editor-code{background:var(--nt-code-bg,var(--input));font-size:var(--nt-editor-font,13px)}
+.nt-editor-highlight{color:var(--nt-code-fg,var(--text));}
+.nt-editor-surface textarea{color:var(--nt-code-fg,var(--text));caret-color:var(--nt-code-fg,var(--text));}
+.nt-editor-surface textarea.highlight-active{caret-color:var(--nt-code-fg,var(--text))!important}
+.nt-ed-comment{color:var(--nt-code-comment,#83b69d)}
+.nt-ed-string{color:var(--nt-code-string,#e3b978)}
+.nt-ed-keyword{color:var(--nt-code-keyword,#91b7ff)}
+.nt-ed-number{color:var(--nt-code-number,#b69ce8)}
+.nt-ed-property{color:var(--nt-code-property,#78d7dc)}
+.nt-editor[data-palette=dark]{--nt-code-bg:#18202e;--nt-code-fg:#dee8f5;--nt-code-comment:#87b5a0;--nt-code-string:#eed093;--nt-code-keyword:#98bdff;--nt-code-number:#d0a9f4;--nt-code-property:#90d8dd;}
+.nt-editor[data-palette=light]{--nt-code-bg:#fbfdff;--nt-code-fg:#233145;--nt-code-comment:#49816b;--nt-code-string:#a06318;--nt-code-keyword:#315ca9;--nt-code-number:#7445aa;--nt-code-property:#147c95;}
+.nt-editor[data-palette=pastel]{--nt-code-bg:#2d293d;--nt-code-fg:#eee8f6;--nt-code-comment:#9bc9a6;--nt-code-string:#ecd5ac;--nt-code-keyword:#b4cfff;--nt-code-number:#e2bcf4;--nt-code-property:#b1e4e0;}
+.nt-editor[data-palette=forest]{--nt-code-bg:#1f322b;--nt-code-fg:#e9f3e7;--nt-code-comment:#83bc9d;--nt-code-string:#f0d4a0;--nt-code-keyword:#a5cde2;--nt-code-number:#d0b3e6;--nt-code-property:#9fdbbf;}
+.nt-editor[data-palette=highContrast]{--nt-code-bg:#000;--nt-code-fg:#fff;--nt-code-comment:#72ed90;--nt-code-string:#ffdd62;--nt-code-keyword:#7bd7ff;--nt-code-number:#ff9cf1;--nt-code-property:#86eff3;}
+.nt-editor[data-palette=auto]{--nt-code-bg:var(--input);--nt-code-fg:var(--text);}
+/* The HTML color picker is paired with a hex box for exact editing. */
+.terminal-color-control .terminal-color-hex{width:83px;min-width:83px;flex:0 0 83px;font:11px/1.3 Consolas,monospace;padding:5px;height:30px;max-width:100%;}
+.terminal-color-control .terminal-color-description{min-width:70px;flex:1 1 110px;}
+.terminal-color-grid .terminal-color-control{flex-wrap:wrap;align-items:center;}
+@media(max-width:770px){.nt-editor-page-toolbar label{flex-basis:100%;}.nt-editor-embedded .nt-editor-toolbar{max-height:105px;overflow:auto}.nt-editor-options{max-height:92px;overflow:auto}.terminal-color-control .terminal-color-hex{flex:0 0 80px}}
+
+.nt-editor-local{display:flex;flex:1 1 auto;min-height:0;min-width:0;flex-direction:column}
+.nt-editor-local .nt-editor-page-toolbar{flex:0 0 auto}
+.nt-editor-local #ntEditorPageMount{flex:1 1 0;min-height:320px}
+
+.nt-editor-color-controls{flex:0 0 auto;padding:6px 11px;background:var(--panel2);border-bottom:1px solid var(--border);max-height:160px;overflow:auto;min-width:0}
+.nt-editor-color-controls>.row{padding:3px 0 6px;font-size:11px}
+.nt-editor-palette-box{display:grid;grid-template-columns:repeat(auto-fit,minmax(175px,1fr));gap:5px 10px}
+.nt-editor-palette-box label{display:flex;gap:6px;align-items:center;min-width:0;font-size:10px}
+.nt-editor-palette-box label span{flex:1;min-width:0;overflow-wrap:anywhere}
+.nt-editor-palette-box input[type=color]{height:25px;width:34px;flex:0 0 34px;padding:2px;min-height:25px}
+.nt-editor-palette-box input[type=text]{width:79px;flex:0 0 79px;font-size:10px;font-family:var(--mono);padding:3px}
+.nt-editor[data-palette=custom]{--nt-code-bg:#202535;--nt-code-fg:#e5eaf4;--nt-code-comment:#97c8aa;--nt-code-string:#edcb98;--nt-code-keyword:#a8bbff;--nt-code-number:#ddb8f2;--nt-code-property:#99dbe7}
+
+/* Compact connected remote-source picker for the standalone Tools editor. */
+.nt-editor-remote-toolbar{display:flex;align-items:end;gap:7px;padding:7px 9px;flex-wrap:wrap;background:var(--panel2);border:1px solid var(--border);border-top:0;min-width:0}
+.nt-editor-remote-toolbar>label{display:flex;flex:1 1 230px;min-width:185px;gap:4px;flex-direction:column;font-size:11px;color:var(--muted)}
+.nt-editor-remote-toolbar>label:first-child{flex:2 1 310px}
+.nt-editor-remote-toolbar input,.nt-editor-remote-toolbar select{min-height:32px;height:32px;padding:5px 8px;font-size:11px;min-width:0}
+.nt-editor-remote-toolbar>button{flex:0 0 auto;min-height:32px}
+.nt-editor-remote-hint{flex-basis:100%;font-size:10px;line-height:1.35;color:var(--muted);overflow-wrap:anywhere}
+@media(max-width:760px){.nt-editor-remote-toolbar>label{flex-basis:100%;min-width:0}}
+
+/* Connected-session file picker, shared by SSH terminal and FTP/SFTP clients. */
+.nt-editor-file-picker{min-width:0;max-width:100%;display:flex;flex-direction:column;gap:9px}
+.nt-editor-picker-nav{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+.nt-editor-picker-nav input{flex:1 1 210px;min-width:130px}
+.nt-editor-picker-list{display:flex;flex-direction:column;max-height:55vh;min-height:140px;overflow:auto;border:1px solid var(--border);border-radius:8px}
+.nt-editor-picker-row{display:flex;gap:8px;align-items:center;text-align:left;min-height:32px;background:transparent;color:var(--text);border:0;border-bottom:1px solid var(--border);padding:6px 10px;min-width:0}
+.nt-editor-picker-row span:nth-child(2){flex:1;overflow-wrap:anywhere}.nt-editor-picker-row small{color:var(--muted);flex:0 0 auto}
+.nt-editor-picker-row svg{width:15px;height:15px}
+.nt-editor-picker-row:hover,.nt-editor-picker-row.selected{background:var(--accentBg)}
+.nt-editor-remote-toolbar label:first-child{min-width:155px}

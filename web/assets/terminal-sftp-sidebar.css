@@ -1,0 +1,47 @@
+/* Compact session-scoped SFTP file manager for the right terminal sidebar. */
+.terminal-sidebar-sftp{display:flex;flex-direction:column;overflow:hidden!important;}
+.tsftp-browser{display:flex;flex-direction:column;flex:1 1 0;min-width:0;min-height:0;overflow:hidden;font-size:11px;}
+.tsftp-browser>*{min-width:0;flex-shrink:0;}
+.tsftp-connection{padding:10px 11px 8px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:3px;min-width:0;}
+.tsftp-connection strong{font-size:12px;line-height:1.5;overflow-wrap:anywhere;}
+.tsftp-connection small{font-size:10px;color:var(--muted);overflow-wrap:anywhere;}
+.tsftp-toolbar{padding:7px;display:flex;flex-wrap:wrap;align-items:center;gap:5px;border-bottom:1px solid var(--line);}
+.tsftp-toolbar .btn{flex:0 1 auto;white-space:normal;min-width:0;padding:5px 7px;line-height:1.25;overflow-wrap:anywhere;}
+.tsftp-toolbar .btn svg{width:13px;height:13px;}
+.tsftp-path-form{display:flex;gap:5px;min-width:0;padding:7px 8px 4px;}
+.tsftp-path-form input{min-width:0;flex:1 1 0;height:30px;padding:4px 6px;font-size:10px;}
+.tsftp-path-form button{flex:0 0 auto;}
+.tsftp-filter{display:block;max-width:calc(100% - 16px);margin:4px 8px 7px;min-height:30px;padding:5px 8px;font-size:11px;}
+.tsftp-file-list{flex:1 1 0;min-height:80px;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;padding:4px 6px;}
+.tsftp-item{width:100%;display:grid;grid-template-columns:17px minmax(0,1fr) auto;align-items:center;gap:6px;border:0;border-radius:5px;padding:7px 6px;min-height:29px;text-align:left;background:transparent;color:var(--text);font:inherit;}
+.tsftp-item:hover{background:var(--hover);}
+.tsftp-item.selected{background:var(--accentBg);color:var(--accent);}
+.tsftp-item .tsftp-file-icon{display:flex;align-items:center;justify-content:center;}
+.tsftp-item .tsftp-file-icon svg{width:15px;height:15px;}
+.tsftp-name{min-width:0;overflow-wrap:anywhere;line-height:1.4;}
+.tsftp-item small{color:var(--muted);font-size:9px;white-space:nowrap;max-width:62px;}
+.tsftp-empty{padding:16px 8px;color:var(--muted);text-align:center;overflow-wrap:anywhere;}
+.tsftp-file-tools{display:flex;flex-wrap:wrap;gap:5px;padding:8px;border-top:1px solid var(--line);}
+.tsftp-file-tools .btn{flex:1 1 70px;min-width:0;white-space:normal;line-height:1.3;padding:5px 6px;overflow-wrap:anywhere;}
+.tsftp-footer{padding:6px 9px;border-top:1px solid var(--line);display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;color:var(--muted);font-size:10px;}
+.tsftp-notice{padding:7px 9px;margin:2px 8px;border-radius:5px;border:1px solid var(--line);background:var(--panel2);font-size:10px;overflow-wrap:anywhere;}
+.tsftp-notice[hidden]{display:none!important;}
+.tsftp-notice.error{color:var(--bad);}
+.tsftp-check{display:flex;align-items:center;gap:7px;margin:10px 0;}
+.tsftp-check input{flex:0 0 16px;}
+.tsftp-preview{max-height:60vh;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font-family:var(--mono);font-size:11px;}
+/* Terminal saved profiles are the source for SFTP client connection settings. */
+.rb-saved-profiles{margin:8px 0;padding:10px 12px;border:1px solid var(--line);border-radius:7px;background:var(--panel2);min-width:0;}
+.rb-saved-profiles>label{display:block;margin-bottom:5px;font-weight:600;font-size:11px;}
+.rb-saved-profile-row{display:flex;align-items:center;flex-wrap:wrap;gap:7px;min-width:0;}
+.rb-saved-profile-row select{flex:1 1 260px;min-width:0;max-width:100%;min-height:34px;font-size:11px;}
+.rb-saved-profile-row .btn{flex:0 0 auto;min-height:34px;white-space:normal;}
+.rb-saved-profiles .help-line{margin:6px 0 0;overflow-wrap:anywhere;}
+@media(max-width:620px){.rb-saved-profile-row select{flex-basis:100%;}.tsftp-toolbar .btn{flex:1 1 auto;}}
+
+/* SFTP sidebar drag/drop and file context commands */
+.tsftp-file-list.tsftp-drop-target{outline:2px dashed var(--accent);outline-offset:-3px;background:var(--accentBg)}
+.tsftp-context-menu{position:fixed;z-index:270;display:flex;flex-direction:column;min-width:165px;max-height:75vh;overflow:auto;padding:5px;border-radius:7px;background:var(--panel);color:var(--text);border:1px solid var(--border);box-shadow:0 8px 28px #0006;}
+.tsftp-context-menu button{padding:6px 10px;text-align:left;background:transparent;border:0;border-radius:4px;font-size:11px;min-height:27px;}
+.tsftp-context-menu button:hover{background:var(--accentBg)}
+.tsftp-file-tools .btn{min-width:65px;flex:1 1 75px;}

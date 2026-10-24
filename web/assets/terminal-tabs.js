@@ -1,0 +1,58 @@
+(function(root){
+'use strict';
+let menu=null,target=null,pending=[];
+const items=[['reconnect','Reconnect','refresh'],['disconnect','Disconnect','stop'],['browse','Browse SFTP files','folder'],['editor','Open Text Editor','fileEdit'],['control-c','Send Ctrl+C','stop'],['copy','Copy selection','copy'],['paste','Paste into console','clipboard'],['select-all','Select all output','terminal'],['select-output','Select last command output','terminal'],['copy-output','Copy last command output','copy'],['scroll-top','Scroll to top','arrowUp'],['scroll-bottom','Scroll to bottom','arrowDown'],['search','Find in output','search'],['clear','Clear scrollback','trash'],['export','Export transcript','download'],['save-connection','Save connection...','save'],['rename','Rename tab','edit'],['duplicate','Duplicate connection settings','plus'],['move','Detach / reattach session','external'],['workspace','Detach / reattach workspace','maximize'],['copy-connection','Copy connection details','copy'],['close','Close tab','close'],['close-others','Close other tabs','close'],['close-disconnected','Close disconnected tabs','trash']];
+function token(id){const entry=terminalSessions.get(id),draft=terminalDraftTabs.get(id);return entry||draft?{id,entry,draft,revision:entry?terminalSessionRevision(id):0}:null;}
+function valid(t){return !!t&&(t.entry?terminalSessions.get(t.id)===t.entry&&terminalSessionRevision(t.id)===t.revision:terminalDraftTabs.get(t.id)===t.draft);}
+function enabled(action,t){if(!valid(t))return false;const entry=t.entry,owned=entry&&terminalOwnerCanMutate(entry)&&!entry.transferBusy;
+ if(action==='close')return !!t.draft||!!owned;
+ if(action==='close-others')return [...terminalSessions.values()].some(e=>e!==entry&&terminalOwnerCanMutate(e)&&!e.transferBusy)||[...terminalDraftTabs.keys()].some(id=>id!==t.id);
+ if(action==='close-disconnected')return [...terminalSessions.values()].some(e=>['closed','error'].includes(e.info.state)&&terminalOwnerCanMutate(e)&&!e.transferBusy);
+ if(action==='rename')return !!t.draft||!!owned;
+ if(action==='duplicate')return !(DETACHED_TERMINAL&&!DETACHED_WORKSPACE)&&!terminalConnectBusy&&!terminalWorkspaceTransferBusy;
+ if(!entry)return action==='workspace'&&terminalViewRegistry.available;
+ if(action==='reconnect')return terminalReconnectAllowed(entry);
+ if(action==='disconnect')return owned&&terminalLive(entry)&&entry.info.state!=='disconnecting'&&online;
+ if(['browse','editor'].includes(action))return !TERMINAL_ONLY&&entry.info.type==='ssh'&&entry.info.state==='connected'&&online;
+ if(['paste','control-c'].includes(action))return owned&&entry.info.state==='connected'&&online;
+ if(action==='copy')return !!entry.xterm?.hasSelection();
+ if(['select-output','copy-output'].includes(action))return !!NetworkToolkitTerminalExtras.output(entry,NetworkToolkitTerminalExtras.current(entry),true)?.text;
+ if(action==='move')return !terminalWorkspaceTransferBusy&&!terminalConnectBusy&&(DETACHED_WORKSPACE?!terminalSingleDetachReason(entry)&&terminalViewRegistry.available:!!terminalViewForSession(entry.info.id)||!terminalSingleDetachReason(entry)&&terminalViewRegistry.available);
+ if(action==='workspace')return terminalViewRegistry.available&&!terminalWorkspaceTransferBusy&&!terminalConnectBusy;
+ return !!entry.xterm;
+}
+function close(focus=false){const old=target;menu?.remove();menu=null;target=null;if(focus&&valid(old))document.querySelector('[data-terminal-tab="'+CSS.escape(old.id)+'"]')?.focus({preventScroll:true});}
+function open(id,x,y){close();const t=token(id);if(!t)return;target=t;menu=document.createElement('div');menu.id='terminalTabContextMenu';menu.className='terminal-context-menu terminal-tab-context-menu';menu.setAttribute('role','menu');menu.setAttribute('aria-label','Terminal tab actions');const title=t.entry?.info.label||t.draft?.label||'Terminal';menu.innerHTML='<div class="terminal-context-label">'+esc(title)+'</div>'+items.map(([action,label,ico])=>'<button role="menuitem" type="button" data-terminal-tab-action="'+action+'" '+(enabled(action,t)?'':'disabled')+'>'+icon(ico)+'<span>'+label+'</span></button>').join('');document.body.append(menu);const rect=menu.getBoundingClientRect();menu.style.left=Math.max(6,Math.min(x,innerWidth-rect.width-6))+'px';menu.style.top=Math.max(6,Math.min(y,innerHeight-rect.height-6))+'px';menu.querySelector('button:not(:disabled)')?.focus({preventScroll:true});}
+function activate(entry){if(entry)selectTerminal(entry.info.id,true);}
+function bulk(ids){pending=ids;const live=ids.filter(id=>terminalLive(terminalSessions.get(id))).length;openModal('Close terminal tabs','<p>Close '+ids.length+' selected tab'+(ids.length===1?'':'s')+'?</p>'+(live?'<p>'+live+' active connection'+(live===1?' will':'s will')+' be disconnected. Export any output you need first.</p>':''),'<button class="btn ghost" data-action="close-modal">Cancel</button><button class="btn danger" data-terminal-tab-confirm>Close tabs</button>',true);}
+async function run(action,t){if(!enabled(action,t))return;const entry=t.entry;close();switch(action){
+ case'reconnect':await reconnectTerminal(entry);break;case'disconnect':await disconnectTerminal(entry);break;case'browse':if(root.NetworkToolkitTerminalSFTP?.available?.(entry)){activate(entry);root.NetworkToolkitSessionSidebar?.activateTab?.('files');}else{root.NetworkToolkitRemoteBrowser?.useTerminalSession(entry.info.id);state.transferModes=state.transferModes||{};state.transferModes.sftp='client';navigate('sftp');}break;
+ case'editor':root.NetworkToolkitFileEditor?.preferConnection?.('terminal:'+entry.info.id);navigate('editor');break;
+ case'control-c':activate(entry);enqueueTerminalInput(entry,'\x03');break;
+ case'copy':await NetworkToolkitTerminalInteraction.copy(entry);break;
+ case'paste':activate(entry);await NetworkToolkitTerminalInteraction.paste(entry);break;
+ case'select-all':activate(entry);root.NetworkToolkitTerminalCopy?.withInputSuppressed?root.NetworkToolkitTerminalCopy.withInputSuppressed(entry,()=>entry.xterm.selectAll()):entry.xterm.selectAll();break;
+ case'select-output':activate(entry);NetworkToolkitTerminalExtras.select(entry);break;
+ case'copy-output':await NetworkToolkitTerminalExtras.copy(entry);break;
+ case'scroll-top':activate(entry);NetworkToolkitTerminalExtras.scrollTop(entry);break;case'scroll-bottom':activate(entry);NetworkToolkitTerminalExtras.scrollBottom(entry);break;
+ case'search':activate(entry);showTerminalSearch();break;
+ case'clear':NetworkToolkitTerminalExtras.clear(entry);entry.xterm.clear();entry.outputRevision=(entry.outputRevision||0)+1;break;
+ case'export':exportTerminalTranscript(entry);break;
+ case'save-connection':root.NetworkToolkitSessionSidebar?.save(entry);break;
+ case'rename':openModal('Rename terminal tab','<form id="terminalTabRenameForm" data-terminal-id="'+esc(t.id)+'"><div class="field"><label for="terminalTabName">Tab name</label><input id="terminalTabName" maxlength="100" value="'+esc(entry?.info.label||t.draft?.label||'Terminal')+'" required autocomplete="off"></div></form>','<button class="btn ghost" data-action="close-modal">Cancel</button><button class="btn primary" type="submit" form="terminalTabRenameForm">Rename</button>',true);break;
+ case'duplicate':{const config=entry?safeTerminalConfig(entry.config):safeTerminalConfig(state.terminalConnection);newTerminalTab();openTerminalConnect(config);break;}
+ case'move':if(DETACHED_WORKSPACE)await detachTerminal(entry);else if(terminalViewForSession(entry.info.id)||DETACHED_TERMINAL)await requestTerminalReattach(entry);else await detachTerminal(entry);break;
+ case'workspace':if(DETACHED_TERMINAL||terminalWorkspaceView(entry))await requestTerminalReattach(entry);else await detachTerminalWorkspace();break;
+ case'copy-connection':{const i=entry.info;await NetworkToolkitTerminalInteraction.copyValue([terminalProtocolLabel(i),i.host?i.host+':'+i.port:i.serialPort,i.username?'Username: '+i.username:''].filter(Boolean).join('\n'),{entry});break;}
+ case'close':if(t.draft)closeTerminalDraft(t.id);else await removeTerminal(entry);break;
+ case'close-others':bulk([...terminalSessions.values()].filter(e=>e!==entry&&terminalOwnerCanMutate(e)&&!e.transferBusy).map(e=>e.info.id).concat([...terminalDraftTabs.keys()].filter(id=>id!==t.id)));break;
+ case'close-disconnected':for(const e of [...terminalSessions.values()].filter(e=>['closed','error'].includes(e.info.state)&&terminalOwnerCanMutate(e)&&!e.transferBusy))await deleteTerminalTab(e,true);break;
+ }renderTerminalChrome();}
+document.addEventListener('contextmenu',event=>{const tab=event.target.closest('#terminalTabs .terminal-tab');if(!tab)return;const button=tab.querySelector('[data-terminal-tab]');if(!button)return;event.preventDefault();event.stopImmediatePropagation();open(button.dataset.terminalTab,event.clientX,event.clientY);},true);
+document.addEventListener('keydown',event=>{const tab=event.target.closest?.('#terminalTabs [data-terminal-tab]');if(tab&&(event.key==='ContextMenu'||event.shiftKey&&event.key==='F10')){event.preventDefault();event.stopImmediatePropagation();const r=tab.getBoundingClientRect();open(tab.dataset.terminalTab,r.left,r.bottom);return;}if(!menu)return;if(event.key==='Escape'){event.preventDefault();close(true);return;}if(event.key==='Tab'){close();return;}if(['ArrowUp','ArrowDown','Home','End'].includes(event.key)){event.preventDefault();const list=[...menu.querySelectorAll('button:not(:disabled)')],at=list.indexOf(document.activeElement),index=event.key==='Home'?0:event.key==='End'?list.length-1:(at+(event.key==='ArrowUp'?-1:1)+list.length)%list.length;list[index]?.focus({preventScroll:true});}},true);
+document.addEventListener('pointerdown',event=>{if(menu&&!menu.contains(event.target))close();},true);
+document.addEventListener('click',event=>{const action=event.target.closest('[data-terminal-tab-action]');if(action){event.preventDefault();event.stopImmediatePropagation();if(!action.disabled)void run(action.dataset.terminalTabAction,target).catch(e=>toast(e.message,'error'));return;}const confirm=event.target.closest('[data-terminal-tab-confirm]');if(confirm){event.preventDefault();const ids=pending;pending=[];closeModal();void(async()=>{for(const id of ids){if(terminalDraftTabs.has(id))closeTerminalDraft(id);else{const e=terminalSessions.get(id);if(e&&terminalOwnerCanMutate(e)&&!e.transferBusy)await deleteTerminalTab(e,true)}}})().catch(e=>toast(e.message,'error'));}},true);
+document.addEventListener('submit',event=>{if(event.target.id!=='terminalTabRenameForm')return;event.preventDefault();event.stopImmediatePropagation();const id=event.target.dataset.terminalId,label=nodeValue();if(!label||label.length>100)return;if(terminalDraftTabs.has(id)){terminalDraftTabs.get(id).label=label;terminalTabsSignature='';closeModal();renderTerminalChrome();return;}void api('/terminals/'+encodeURIComponent(id)+'/rename','POST',{label}).then(()=>{closeModal();startTerminalFeed()}).catch(e=>toast(e.message,'error'));function nodeValue(){return document.getElementById('terminalTabName').value.trim();}},true);
+root.addEventListener('resize',()=>close());
+root.NetworkToolkitTerminalTabs=Object.freeze({open,close,run,enabled,token,items});
+})(window);

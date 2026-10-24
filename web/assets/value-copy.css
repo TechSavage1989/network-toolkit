@@ -1,0 +1,13 @@
+/* Reserve a small copy slot while leaving result text selectable. */
+.value-copy-cell{position:relative;padding-right:28px!important}
+.value-copy-control{position:absolute;right:4px;top:50%;transform:translateY(-50%);display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;min-width:20px;min-height:20px;margin:0;padding:3px!important;border:1px solid transparent;border-radius:4px;background:var(--panel);color:var(--muted);opacity:0;cursor:pointer;line-height:1;vertical-align:middle}
+.value-copy-control svg{width:13px;height:13px;flex:none;pointer-events:none}
+.value-copy-cell:hover>.value-copy-control,.value-copy-cell:focus-within>.value-copy-control,.value-copy-control:focus-visible{opacity:1}
+.value-copy-control:hover,.value-copy-control:focus-visible{color:var(--accent);border-color:var(--accent);background:var(--accentBg);outline:0}
+.data-item>.val.value-copy-cell>.value-copy-control,dd.value-copy-cell>.value-copy-control{top:0;transform:none}
+@media(hover:none){.value-copy-control{opacity:.7}}
+
+/* Never allow copy controls to flow below an observed value. */
+.value-copy-cell{min-width:0;box-sizing:border-box}
+.value-copy-cell>.value-copy-control{position:absolute!important;top:7px!important;right:4px!important;transform:none!important;float:none!important}
+.value-copy-cell.value-copy-cell{vertical-align:middle}

@@ -1,0 +1,136 @@
+/* High-density remote browser; consistent with Network Toolkit panels. */
+body.remote-browser-mode #toolWorkspace{grid-template-columns:minmax(0,1fr)!important;grid-template-rows:minmax(0,1fr)!important}
+body.remote-browser-mode #toolWorkspace>#toolConfiguration,body.remote-browser-mode #toolDivider,body.remote-browser-mode #toolCommandBar,body.remote-browser-mode #toolConfigurationRail{display:none!important}
+body.remote-browser-mode #toolWorkspace>#pageContent{grid-column:1!important;grid-row:1!important;min-height:0!important;overflow:auto!important;display:flex!important;flex-direction:column!important}
+.rb-app{height:100%;min-height:580px;display:flex;flex-direction:column;gap:9px;padding-bottom:12px}
+.rb-app>.panel{padding:10px 12px;min-width:0}
+.rb-app h2{font-size:14px;margin:0}
+.rb-app .help-line{font-size:11px;margin:2px 0}
+.rb-connection-fields{display:grid;grid-template-columns:minmax(120px,2fr) 72px minmax(115px,1.4fr) minmax(135px,1.4fr) minmax(145px,1.5fr);align-items:end;gap:8px;margin:10px 0 6px}
+.rb-connection-fields label{display:flex;flex-direction:column;gap:3px;font-size:11px;color:var(--muted);min-width:0}
+.rb-connection-fields label.rb-long{grid-column:span 2}
+.rb-connection-fields input,.rb-connection-fields select{width:100%;min-width:0;font-size:12px;min-height:32px}
+.rb-connection-buttons{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.rb-notice{border:1px solid var(--border);background:var(--panel2);border-radius:6px;font-size:11px;padding:7px;margin:6px 0}
+.rb-notice[hidden]{display:none!important}.rb-notice.error{color:var(--bad,#cc3e3e)}.rb-notice.success{color:var(--good,#288b60)}
+.rb-fingerprint{font-size:12px;padding:10px;border:1px solid var(--border);border-radius:7px;word-break:break-all;user-select:text}
+.rb-explorer{flex:1 1 380px;min-height:245px;display:flex;flex-direction:column;overflow:hidden}
+.rb-toolbar{display:flex;align-items:center;gap:5px;flex-wrap:wrap;border-bottom:1px solid var(--border);padding:1px 0 7px;flex:0 0 auto}
+.rb-toolbar .btn{white-space:nowrap}.rb-divider{height:20px;border-left:1px solid var(--border);margin:0 3px}
+.rb-overwrite{margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-size:11px;white-space:nowrap}
+.rb-overwrite input{width:auto!important;height:auto!important;margin:0}
+.rb-panes{flex:1 1 auto;min-height:185px;display:grid;grid-template-columns:minmax(0,var(--rb-left,50%)) 6px minmax(0,1fr);overflow:hidden}
+.rb-splitter{background:var(--border);cursor:col-resize;touch-action:none;min-width:6px}
+.rb-splitter:hover{background:var(--accent)}
+.rb-pane{min-width:0;min-height:0;display:flex;flex-direction:column;border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.rb-pane-heading{flex:0 0 auto;background:var(--panel2);display:flex;align-items:center;justify-content:space-between;gap:6px;padding:7px 9px;font-size:12px}
+.rb-pane-heading span{font-size:10px;color:var(--muted)}
+.rb-navigation{display:flex;align-items:center;gap:3px;padding:5px;border-bottom:1px solid var(--border);flex:0 0 auto}
+.rb-navigation .btn{padding:3px 6px;min-width:24px}
+.rb-navigation input{flex:1 1 auto;min-width:40px;font-size:11px;height:28px}
+.rb-filter{display:flex;align-items:center;gap:5px;padding:5px;border-bottom:1px solid var(--border);flex:0 0 auto}
+.rb-filter input{flex:1;min-width:10px;height:28px;font-size:11px}.rb-filter small{white-space:nowrap;color:var(--muted);font-size:10px}
+.rb-scroll{flex:1 1 auto;min-height:0;overflow:auto;overscroll-behavior:contain}
+.rb-scroll table{border-collapse:collapse;width:100%;table-layout:auto;font-size:11px}
+.rb-scroll thead{position:sticky;top:0;background:var(--panel2);z-index:2}
+.rb-scroll th{text-align:left;font-weight:600;color:var(--muted);cursor:pointer;user-select:none;font-size:10px}
+.rb-scroll th,.rb-scroll td{padding:4px 7px!important;border-bottom:1px solid var(--border);white-space:nowrap}
+.rb-scroll tr[data-rb-item]{cursor:default;user-select:none}
+.rb-scroll tr[data-rb-item]:hover{background:var(--panel2)}
+.rb-scroll tr[data-rb-item].selected{background:color-mix(in srgb,var(--accent) 20%,transparent)}
+.rb-file-name{display:flex;align-items:center;gap:5px;max-width:min(35vw,480px)}
+.rb-file-name svg{height:13px;width:13px;flex:0 0 auto}
+.rb-file-name span{overflow:hidden;text-overflow:ellipsis}
+.rb-scroll td:nth-child(2){text-align:right}
+.rb-empty{color:var(--muted);padding:20px!important;text-align:center}
+.rb-pane-footer{font-size:10px;color:var(--muted);padding:5px 8px;border-top:1px solid var(--border);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rb-activity{flex:0 0 auto;max-height:175px;overflow:hidden;display:flex;flex-direction:column}
+.rb-activity .row h2{margin:0}.rb-queue-status{color:var(--muted);font-size:10px}
+.rb-activity-list{max-height:95px;overflow:auto;font-family:ui-monospace,Consolas,monospace;font-size:10px}
+.rb-log{padding:2px 3px;border-bottom:1px solid var(--border);overflow-wrap:anywhere}.rb-log time{color:var(--muted)}
+.rb-log.error{color:var(--bad,#cc3e3e)}.rb-log.success{color:var(--good,#388459)}
+@media(max-width:1050px){.rb-connection-fields{grid-template-columns:minmax(110px,2fr) 65px minmax(110px,1.5fr)}.rb-connection-fields label.rb-long{grid-column:span 2}}
+@media(max-width:720px){.rb-app{min-height:650px}.rb-connection-fields{grid-template-columns:1fr 95px}.rb-connection-fields label.rb-long{grid-column:1/-1}.rb-panes{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(180px,1fr) minmax(180px,1fr);overflow:auto;gap:5px}.rb-splitter{display:none}.rb-explorer{overflow:auto}.rb-scroll{min-height:135px}}
+/* The connection panel must never shrink beneath its controls. The explorer
+   claims the remaining space, and the workspace itself scrolls if necessary. */
+.rb-app>.rb-connect{flex:0 0 auto!important;min-height:max-content;overflow:visible!important}
+.rb-app>.rb-explorer{min-height:230px}
+
+/* 1.17.44: Shared terminal SSH connection selection. */
+.rb-terminal-link{margin:10px 0 8px;padding:10px 12px;border:1px solid var(--border);border-radius:7px;background:var(--panel2);min-width:0;}
+.rb-terminal-link-title{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;min-width:0;}
+.rb-terminal-link-title strong{font-size:12px;overflow-wrap:anywhere;}
+.rb-terminal-link-controls{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:7px;min-width:0;}
+.rb-terminal-link-controls select{flex:2 1 260px;min-width:140px;max-width:100%;height:33px;font-size:11px;}
+.rb-terminal-link-controls button{flex:0 1 auto;}
+.rb-connection-fields[hidden],.rb-connection-buttons[hidden]{display:none!important}
+@media(max-width:640px){.rb-terminal-link-controls select{flex-basis:100%;}}
+
+/* 1.17.44: Keep file pane navigation labels and input within their controls. */
+.rb-navigation{flex-wrap:wrap;min-width:0;}
+.rb-navigation .btn{flex:0 0 auto;min-width:30px;white-space:nowrap!important;overflow-wrap:normal!important;height:28px;}
+.rb-navigation input{flex:1 1 100px;min-width:95px;max-width:100%;}
+.rb-navigation [data-rb-nav="go"]{min-width:39px;}
+.rb-terminal-link-controls .btn{white-space:normal;overflow-wrap:anywhere;line-height:1.4;}
+
+/* 1.17.46 compact connection source: file panes take the available height. */
+.rb-app{min-height:490px;gap:6px;}
+.rb-app>.rb-connect{padding:7px 10px;min-height:0!important;}
+.rb-connect-head{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0;flex-wrap:wrap;}
+.rb-connect-head strong{font-size:12px;}
+.rb-source{display:flex;align-items:end;flex-wrap:wrap;gap:7px;margin:5px 0 0;min-width:0;}
+.rb-source label{flex:0 0 auto;font-size:11px;color:var(--muted);align-self:center;}
+.rb-source select{flex:1 1 240px;min-width:150px;min-height:32px;height:34px;font-size:11px;padding:5px 7px;}
+.rb-source>.btn{min-height:32px;}
+.rb-connection-details{margin-top:7px;padding:8px;background:var(--panel2);border:1px solid var(--line);border-radius:7px;}
+.rb-connection-details[hidden]{display:none!important;}
+.rb-connect .rb-notice{margin:5px 0 0;}
+.rb-app>.rb-explorer{flex:1 1 360px;min-height:270px;}
+.rb-app>.rb-activity{max-height:94px;padding:5px 10px;}
+.rb-activity .row h2{font-size:11px;}
+.rb-activity-list{max-height:52px;}
+@media(max-width:720px){.rb-source label{flex-basis:100%;}.rb-source select{flex-basis:100%;}}
+
+.rb-pane.rb-drag-target{outline:2px dashed var(--accent);outline-offset:-2px;background:var(--accentBg)}
+.rb-context-menu{position:fixed;z-index:270;background:var(--panel);color:var(--text);border:1px solid var(--border);border-radius:7px;box-shadow:0 8px 35px #0006;display:flex;flex-direction:column;max-width:230px;min-width:155px;max-height:80vh;overflow:auto;padding:5px;}
+.rb-context-menu button{padding:6px 10px;min-height:27px;background:transparent;border:0;text-align:left;border-radius:4px;font-size:11px;}
+.rb-context-menu button:hover{background:var(--accentBg)}
+
+.rb-ftp-profile{display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid var(--border);padding:10px 4px;min-width:0;flex-wrap:wrap}.rb-ftp-profile>div:first-child{min-width:0;flex:1}.rb-ftp-profile .mono{overflow-wrap:anywhere}.rb-credential-controls{display:flex;align-items:end;gap:6px;flex-wrap:wrap}.rb-source{align-items:end;flex-wrap:wrap}.nt-transfer-protocols{display:inline-flex;align-items:center;gap:5px;margin-right:8px;flex-wrap:wrap}.nt-editor-local{min-height:450px;min-width:0;}
+
+/* Keep FTPS password-vault buttons legible at desktop and compact widths. */
+.rb-connection-fields .rb-credential-controls{grid-column:span 2;display:flex;flex-wrap:wrap;gap:6px;align-items:center;min-width:0}
+.rb-connection-fields .rb-credential-controls .btn{flex:0 0 auto;white-space:nowrap!important;overflow-wrap:normal!important;min-height:32px;}
+@media(max-width:720px){.rb-connection-fields .rb-credential-controls{grid-column:1/-1}}
+
+/* 1.17.51: Terminal-style Saved/Recent library, available to both SFTP and FTP. */
+.rb-connect{position:relative!important;isolation:isolate;}
+.rb-session-library{position:absolute;z-index:35;top:calc(100% - 2px);right:9px;width:min(390px,calc(100% - 18px));max-height:min(490px,calc(100vh - 165px));display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--line);border-radius:8px;background:var(--panel);box-shadow:0 12px 36px #0005;color:var(--text);}
+.rb-session-library[hidden]{display:none!important;}
+.rb-library-heading{display:flex;align-items:center;justify-content:space-between;gap:5px;padding:5px 10px;background:var(--panel2);font-size:12px;}
+.rb-library-heading button{flex:0 0 28px;}
+.rb-library-tabs{display:flex;min-width:0;flex:0 0 auto;background:var(--panel2);border-bottom:1px solid var(--line);}
+.rb-library-tabs button{display:inline-flex;justify-content:center;align-items:center;gap:7px;flex:1 1 50%;min-width:0;padding:8px;border:0;border-bottom:2px solid transparent;background:transparent;color:var(--muted);cursor:pointer;font-size:12px;}
+.rb-library-tabs button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--accent);background:var(--accentBg);}
+.rb-library-tabs svg{width:14px;height:14px;}
+.rb-library-tabs small{color:var(--muted);}
+.rb-session-library>[data-rb-library-search]{margin:8px 10px;flex:0 0 auto;min-height:30px;width:calc(100% - 20px);box-sizing:border-box;}
+.rb-library-list{flex:1 1 auto;min-height:68px;overflow:auto;scrollbar-width:thin;padding:2px 0 6px;}
+.rb-library-list .rb-library-row[hidden]{display:none!important;}
+.rb-library-row .session-library-entry{min-width:0;}
+.rb-library-row .session-library-text{min-width:0;}
+.rb-library-row .iconbtn{flex:0 0 24px;width:24px;height:27px;align-self:center;padding:4px;opacity:.75;}
+.rb-library-row .iconbtn svg{width:14px;height:14px;}
+.rb-library-row .iconbtn.session-library-delete{opacity:0;pointer-events:none;}
+.rb-library-row:hover .iconbtn.session-library-delete,.rb-library-row:focus-within .iconbtn.session-library-delete{opacity:1;pointer-events:auto;}
+.rb-library-footer{display:flex;gap:6px;flex-wrap:wrap;align-items:center;border-top:1px solid var(--line);padding:8px;}
+.rb-session-library>p.help-line{margin:0!important;padding:0 9px 8px;}
+@media(max-width:730px){.rb-session-library{right:0;width:100%;max-height:45vh;}.rb-source{gap:5px;}.rb-source .btn{font-size:10px;}}
+
+.rb-app>.rb-connect{z-index:4;}
+
+/* Session actions share Terminal's visible row, controls and top/bottom choice. */
+.rb-connect-head .rb-session-endpoint{flex:1 1 190px;min-width:0;color:var(--muted);font-size:10px;overflow-wrap:anywhere;text-align:right;}
+.rb-client-layout>.rb-client-primary>.rb-explorer{padding:0;}
+.rb-explorer>.rb-toolbar{padding:6px 8px;}
+.rb-explorer>.rb-panes{margin:6px 8px 8px;}

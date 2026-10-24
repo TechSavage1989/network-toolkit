@@ -1,0 +1,343 @@
+.packet-workspace{display:flex;flex:1;flex-direction:column;min-height:0;min-width:0;overflow:hidden;background:var(--panel);border:1px solid var(--border);border-radius:var(--radius)}
+.packet-commandbar,.packet-viewbar{display:flex;align-items:center;flex-wrap:wrap;gap:5px;padding:7px 9px;border-bottom:1px solid var(--line);background:var(--panel2);flex:none}
+.packet-commandbar strong{display:flex;align-items:center;gap:6px;font-size:12px;margin-right:5px}.packet-commandbar strong svg{width:16px;height:16px}.packet-commandbar select{max-width:230px}.packet-workspace .btn{white-space:nowrap;min-height:28px;padding:4px 8px;font-size:11px}.packet-workspace select,.packet-workspace input{min-height:29px;font-size:11px;padding:5px 7px}.packet-workspace select{padding-right:25px}.packet-workspace .field{min-width:0;margin:0}.packet-workspace .field label{font-size:10px;margin-bottom:4px}.packet-setup{display:grid;grid-template-columns:minmax(190px,1.4fr) minmax(125px,1fr) minmax(105px,.7fr) minmax(160px,1fr) minmax(100px,.7fr);gap:7px;padding:7px 9px;flex:none;border-bottom:1px solid var(--line)}.packet-interface select{min-width:0;flex:1;width:100%}.packet-interface .row{flex-wrap:nowrap}.packet-limits{grid-column:1/-1;font-size:11px}.packet-limits>summary{cursor:pointer;color:var(--muted);padding:3px 0}.packet-options{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;padding-top:7px}.packet-limits[open]{max-height:210px;overflow:auto}.packet-limits .hint{margin-top:6px}
+#packetCaptureAvailability{padding:4px 9px;font-size:10px;flex:none}#packetCaptureError:empty{display:none}.packet-error{padding:6px 9px;color:var(--bad);font-size:11px;flex:none;overflow-wrap:anywhere}.packet-status{font-size:10px;padding:5px 9px;background:var(--panel2);border-block:1px solid var(--line);flex:none;overflow-wrap:anywhere}.packet-filterbar{display:flex;align-items:flex-end;flex-wrap:wrap;gap:6px;padding:6px 9px;flex:none;border-bottom:1px solid var(--line)}.packet-search{flex:1;min-width:160px!important}.packet-expression{flex:2;min-width:220px!important}.packet-preset-filters{display:flex;gap:4px;flex-wrap:wrap}.packet-viewbar{padding:3px 9px}.packet-viewbar .tabs{margin:0;margin-right:auto;border:0}.packet-viewbar .tab{padding:6px 9px;font-size:11px}.packet-viewbar select{width:115px}.packet-check{display:flex;align-items:center;gap:4px;font-size:10px;white-space:nowrap}.packet-check input{min-height:0;width:12px;height:12px;accent-color:var(--accent)}
+.packet-analysis{display:flex;flex:1;min-height:180px;min-width:0;overflow:hidden}.packet-list-panel{display:flex;flex-direction:column;min-height:0;min-width:0;flex:1.8}.packet-table-scroll{flex:1;min-height:0;min-width:0;overflow:auto;scrollbar-width:thin}.packet-table{min-width:670px;width:100%;border-collapse:collapse;font-size:10px;table-layout:auto}.packet-table th{position:sticky;top:0;z-index:2;background:var(--panel2);padding:0;border-bottom:1px solid var(--border);white-space:nowrap}.packet-table th button{font:inherit;font-weight:600;text-align:left;background:none;color:inherit;border:0;padding:7px 8px;width:100%}.packet-table td{padding:5px 8px;border-bottom:1px solid var(--line);font-family:var(--mono);white-space:nowrap;max-width:560px;overflow:hidden;text-overflow:ellipsis}.packet-table tr{cursor:pointer}.packet-table tr:hover{background:var(--accentBg)}.packet-table tr.selected{outline:1px solid var(--accent);outline-offset:-1px;background:var(--accentBg)}.packet-proto-dns td:nth-child(5),.packet-proto-arp td:nth-child(5){color:var(--accent)}.packet-expert,.packet-expert-note{color:var(--warn)}.packet-pagination{display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding:5px 7px;border-top:1px solid var(--line);flex:none;font-size:10px}.packet-pagination>span:first-child{margin-right:auto}.packet-pagination .btn{min-height:25px;padding:3px 5px;font-size:10px}.packet-inspector{display:flex;flex-direction:column;flex:1;min-width:270px;min-height:0;max-width:48%;overflow:auto;border-left:1px solid var(--border);padding:7px;font-size:10px;scrollbar-width:thin}.packet-detail-heading{display:flex;gap:4px;align-items:center;flex-wrap:wrap;margin-bottom:6px}.packet-detail-heading strong{margin-right:auto}.packet-inspector details>summary{cursor:pointer;font-weight:600;padding:6px 3px;overflow-wrap:anywhere}.packet-layer-tree details{border-bottom:1px solid var(--line)}.packet-field{display:flex;width:100%;gap:7px;justify-content:space-between;align-items:baseline;border:0;background:transparent;color:var(--text);text-align:left;padding:4px 7px;font:inherit;cursor:pointer}.packet-field:hover{background:var(--accentBg)}.packet-field>span:last-child{font-family:var(--mono);text-align:right;overflow-wrap:anywhere}.packet-byte-section{margin-top:6px}.packet-hex{font-family:var(--mono);font-size:10px;line-height:1.8;overflow:auto;white-space:nowrap}.packet-hex>div{display:flex;gap:10px}.packet-byte-offset{color:var(--muted);flex:none}.packet-byte-hex{width:290px;flex:none}.packet-byte-ascii{flex:none}.packet-hex .selected{background:var(--accent);color:var(--panel)}.packet-ascii-section pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:10px}.packet-expert-note{font-size:10px;padding:5px;border:1px solid var(--line);border-radius:5px}.packet-empty{padding:22px 16px;color:var(--muted);font-size:11px;line-height:1.6}.packet-summary-scroll{flex:1;min-height:0;min-width:0;overflow:auto;padding:10px}.packet-summary-table{font-size:11px;width:100%;border-collapse:collapse}.packet-summary-table th,.packet-summary-table td{padding:7px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}.packet-summary-table th{position:sticky;top:0;background:var(--panel2)}.packet-stat-cards{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px}.packet-stat-cards>div{flex:1;display:flex;flex-direction:column;gap:4px;padding:12px;border:1px solid var(--border);border-radius:8px;min-width:140px}.packet-stat-cards strong{font-size:17px}.packet-stat-cards span{font-size:10px;color:var(--muted)}.packet-statistics h3{font-size:12px;margin:12px 0 7px}.packet-timeline{width:100%;max-height:145px;border-bottom:1px solid var(--line);background:var(--panel2)}.packet-timeline rect{fill:var(--accent)}.packet-stream-text{width:100%;min-height:160px;height:25vh;white-space:pre;overflow:auto;font-size:11px}.packet-help{font-size:12px;line-height:1.6}.packet-help li{margin:6px 0}.packet-help pre{font-size:11px;white-space:pre-wrap}
+@media(max-width:1000px){.packet-setup{grid-template-columns:minmax(190px,1fr) minmax(140px,1fr) minmax(110px,1fr)}.packet-expression{min-width:180px!important}.packet-preset-filters{width:100%}.packet-inspector{min-width:240px;max-width:43%}.packet-commandbar select{max-width:190px}}
+@media(max-width:760px){.packet-setup{grid-template-columns:repeat(2,minmax(0,1fr))}.packet-interface{grid-column:1/-1}.packet-analysis{flex-direction:column;overflow:auto}.packet-list-panel{flex:none;min-height:240px;max-height:50vh}.packet-inspector{flex:none;min-width:0;max-width:100%;max-height:40vh;border-left:0;border-top:1px solid var(--border)}.packet-viewbar .tabs{width:100%}.packet-workspace .btn{padding:4px 6px}.packet-commandbar select{max-width:160px}.packet-stat-cards strong{font-size:14px}}
+
+/* Keep packet details within their pane and preserve one vertical reader. */
+.packet-configuration-region{flex:0 3 auto;min-height:0;max-height:52%;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;scrollbar-width:thin}
+.packet-analysis{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(260px,1fr);grid-template-rows:minmax(0,1fr);flex:1 1 180px;min-height:100px;overflow:hidden;align-items:stretch}
+.packet-list-panel{min-height:0;max-height:none;min-width:0;overflow:hidden}
+.packet-inspector{display:flex;flex-direction:column;width:100%;min-width:0;min-height:0;max-width:none;max-height:none;overflow:hidden;box-sizing:border-box}
+.packet-detail-heading{flex:0 0 auto;min-width:0;padding-bottom:6px;border-bottom:1px solid var(--line)}
+.packet-detail-scroll{flex:1 1 0;min-width:0;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;scrollbar-width:thin;padding-right:4px}
+.packet-detail-scroll>*{min-width:0;max-width:100%;box-sizing:border-box}
+.packet-layer-tree,.packet-layer-tree details,.packet-byte-section,.packet-ascii-section{min-width:0;width:100%;max-width:100%;box-sizing:border-box}
+.packet-field{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:8px;align-items:start;box-sizing:border-box}
+.packet-field>span{min-width:0;white-space:normal;overflow-wrap:anywhere;word-break:normal}
+.packet-field>span:last-child{text-align:left}
+.packet-hex{max-width:100%;max-height:none;overflow-x:auto;overscroll-behavior-x:contain}
+.packet-hex>div{display:grid;grid-template-columns:6ch 24ch 8ch;gap:8px;min-width:max-content}
+.packet-byte-hex{width:auto}.packet-byte-ascii{min-width:8ch}
+.packet-hex>.hint{white-space:normal;overflow-wrap:anywhere}
+.packet-ascii-section pre{max-width:100%;max-height:none;white-space:pre-wrap;overflow-wrap:anywhere;word-break:normal;box-sizing:border-box}
+.packet-analysis>.packet-summary-scroll,.packet-analysis>.packet-empty{grid-column:1/-1;grid-row:1;min-height:0;min-width:0}
+@media(max-width:760px){
+ .packet-analysis{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(90px,.9fr) minmax(180px,1.1fr);overflow-y:auto;overscroll-behavior:contain}
+ .packet-analysis>.packet-summary-scroll,.packet-analysis>.packet-empty{grid-row:1/-1}
+ .packet-list-panel{min-height:0;max-height:none}
+ .packet-inspector{min-width:0;max-width:none;max-height:none;border-left:0;border-top:1px solid var(--border)}
+}
+
+/* Start with the troubleshooting task, then keep technical controls available. */
+.packet-guided-setup{display:grid;grid-template-columns:minmax(240px,1.2fr) minmax(250px,1.5fr) 105px;gap:8px 12px;padding:9px 10px 6px;min-width:0}
+.packet-guided-setup .field select,.packet-guided-setup .field input{width:100%;min-width:0}
+.packet-guided-setup .packet-adapter-hint{grid-column:1/-1;margin:0;font-size:10px;line-height:1.5;color:var(--muted)}
+.packet-task-hint{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:10px;min-width:0}
+.packet-task-hint p{margin:0;font-size:11px;line-height:1.5;min-width:0}.packet-task-hint .btn{flex:none}
+.packet-duration input{max-width:105px}
+.packet-workflow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;list-style:none;margin:0;padding:8px 10px;border-block:1px solid var(--line);background:var(--panel2)}
+.packet-workflow li{display:flex;flex-direction:column;gap:2px;min-width:0}.packet-workflow strong{font-size:11px}.packet-workflow span{font-size:10px;color:var(--muted)}
+.packet-advanced,.packet-display-options{padding:6px 10px;border-bottom:1px solid var(--line);font-size:11px}
+.packet-advanced>summary,.packet-display-options>summary{cursor:pointer;color:var(--muted);font-weight:600}
+.packet-advanced .packet-setup{grid-template-columns:repeat(auto-fit,minmax(150px,1fr));border:0;padding:8px 0 0;gap:8px}
+.packet-advanced .hint{font-size:10px;line-height:1.5;display:block}.packet-display-options .packet-filterbar{padding:8px 0 0;border:0}
+.packet-welcome h2{font-size:15px;color:var(--text);margin:0 0 10px}.packet-welcome p{max-width:820px;margin:8px 0}
+.packet-glossary{margin:15px 0 4px;padding:10px;border:1px solid var(--line);border-radius:6px;font-size:11px;line-height:1.55}
+.packet-glossary>summary{cursor:pointer;font-weight:600;color:var(--text)}.packet-glossary dl{display:grid;grid-template-columns:130px minmax(0,1fr);gap:7px 12px;margin:10px 0 0}.packet-glossary dt{font-weight:600}.packet-glossary dd{margin:0;color:var(--muted)}
+.packet-troubleshooting{font-size:11px;line-height:1.55;overscroll-behavior:contain;overflow-wrap:anywhere}
+.packet-review-heading{display:flex;justify-content:space-between;align-items:start;gap:10px;flex-wrap:wrap}.packet-review-heading h2{font-size:16px;margin:0 0 5px}.packet-review-heading p{margin:0;max-width:850px}
+.packet-review-actions{display:flex;gap:6px;flex-wrap:wrap}.packet-review-scope{margin:10px 0;color:var(--muted);font-size:10px;padding:7px 9px;background:var(--panel2);border:1px solid var(--line);border-radius:5px}
+.packet-review-metrics{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:7px;margin:10px 0}.packet-review-metrics>div{padding:8px;border:1px solid var(--line);border-radius:6px;display:flex;flex-direction:column;gap:3px;min-width:0}.packet-review-metrics strong{font-size:17px;color:var(--text)}.packet-review-metrics span{font-size:10px;color:var(--muted)}
+.packet-findings{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.packet-finding{padding:11px 12px;border:1px solid var(--border);border-radius:7px;min-width:0;background:var(--panel2)}.packet-finding-attention{border-left:3px solid var(--warn)}
+.packet-finding-heading{display:flex;justify-content:space-between;gap:9px;align-items:start}.packet-finding-heading h3{font-size:12px;margin:0;min-width:0}.packet-finding-heading>span{font-size:10px;color:var(--muted);flex:none}.packet-finding-attention .packet-finding-heading>span{color:var(--warn)}
+.packet-finding p{margin:8px 0}.packet-finding h4{font-size:11px;margin:9px 0 4px}.packet-finding ul,.packet-review-limitations ul{margin:0;padding-left:17px}.packet-finding li,.packet-review-limitations li{margin:4px 0}.packet-finding-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:10px}.packet-finding-actions .hint{font-size:10px}
+.packet-review-limitations{margin:12px 0 0;padding:10px 12px;border:1px solid var(--line);border-radius:6px}.packet-review-limitations h3{font-size:12px;margin:0 0 5px}
+.packet-plain-explanation{padding:9px;margin-bottom:7px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;font-size:11px;line-height:1.55;overflow-wrap:anywhere}.packet-plain-explanation h3{font-size:12px;margin:0 0 5px}.packet-plain-explanation p{margin:6px 0}.packet-explanation-path{color:var(--muted)}
+.packet-guide-setup>summary{padding:7px 10px;font-size:11px;font-weight:600;color:var(--text);cursor:pointer;border-bottom:1px solid var(--line)}
+.packet-analysis.packet-analysis-summary{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr);overflow:hidden}
+.packet-analysis.packet-analysis-summary>.packet-summary-scroll,.packet-analysis.packet-analysis-summary>.packet-empty{grid-column:1;grid-row:1;min-height:0;min-width:0;overflow:auto}
+@media(max-width:1050px){.packet-review-metrics{grid-template-columns:repeat(3,minmax(0,1fr))}.packet-findings{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:800px){.packet-guided-setup{grid-template-columns:minmax(0,1fr) 110px}.packet-guided-setup .packet-interface{grid-column:1/-1}.packet-workflow{gap:6px}.packet-task-hint{align-items:start}.packet-task-hint .btn{white-space:normal;max-width:120px}.packet-review-actions .btn{font-size:10px}}
+@media(max-width:520px){.packet-workflow{grid-template-columns:minmax(0,1fr)}.packet-workflow li{flex-direction:row;gap:7px}.packet-workflow strong{flex:none}.packet-glossary dl{grid-template-columns:minmax(0,1fr);gap:2px}.packet-glossary dd{margin-bottom:7px}.packet-review-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.packet-finding-heading{flex-direction:column;gap:3px}}
+
+/* Packet details use the same adjacent divider and visibility controls as other result panes. */
+.packet-analysis:not(.packet-analysis-summary){overflow:hidden;grid-template-columns:minmax(0,1fr) 6px 360px;grid-template-rows:minmax(0,1fr)}
+.packet-analysis>.packet-list-panel{grid-column:1;grid-row:1}
+#packetDetailsDivider{grid-column:2;grid-row:1;min-width:0;min-height:0;cursor:col-resize;background:var(--line);touch-action:none;outline-offset:-2px}
+#packetDetailsDivider:hover,#packetDetailsDivider:focus-visible,#packetDetailsDivider.dragging{background:var(--accent);outline:1px solid var(--accent)}
+.packet-analysis>.packet-inspector{grid-column:3;grid-row:1;height:100%;border:0;min-height:0;max-height:none}
+.packet-details-rail{grid-column:3;grid-row:1;display:flex;align-items:flex-start;justify-content:center;background:var(--panel2);padding-top:5px;min-width:0;min-height:0}
+.packet-detail-heading .panel-visibility-toggle,.packet-details-rail .panel-visibility-toggle{flex:none;width:26px;height:26px;min-width:26px;padding:4px}
+#packetInspector[hidden],#packetDetailsRail[hidden]{display:none}
+.packet-analysis.packet-details-bottom>.packet-list-panel{grid-column:1;grid-row:1}
+.packet-analysis.packet-details-bottom>#packetDetailsDivider{grid-column:1;grid-row:2;cursor:row-resize}
+.packet-analysis.packet-details-bottom>.packet-inspector,.packet-analysis.packet-details-bottom>.packet-details-rail{grid-column:1;grid-row:3}
+.packet-analysis.packet-details-bottom>.packet-details-rail{align-items:center;justify-content:flex-start;padding:0 6px}
+.packet-list-scope{display:flex;align-items:center;justify-content:space-between;gap:8px;flex:none;min-width:0;padding:6px 8px;border-bottom:1px solid var(--line);background:var(--panel2);font-size:10px;line-height:1.4}
+.packet-list-scope>span{min-width:0;overflow-wrap:anywhere}.packet-list-scope .btn{flex:none}.packet-active-filter{display:block;color:var(--muted);max-height:3em;overflow:auto;scrollbar-width:thin}
+.packet-actions-menu{position:fixed;z-index:10010;min-width:220px;max-width:calc(100vw - 12px);max-height:calc(100vh - 12px);overflow:auto;padding:4px;border:1px solid var(--border);border-radius:7px;background:var(--panel);color:var(--text);box-shadow:0 10px 30px #0005;font-size:11px}
+.packet-actions-label{padding:6px 9px;color:var(--muted);font-weight:600;overflow-wrap:anywhere;border-bottom:1px solid var(--line);margin-bottom:3px}
+.packet-actions-menu>button{display:block;width:100%;min-height:29px;padding:6px 9px;border:0;border-radius:4px;background:transparent;color:inherit;font:inherit;text-align:left;cursor:pointer;white-space:normal;overflow-wrap:anywhere}
+.packet-actions-menu>button:hover,.packet-actions-menu>button:focus-visible{background:var(--accentBg);outline:1px solid var(--accent);outline-offset:-1px}.packet-actions-menu>button:disabled{opacity:.45;cursor:default}
+.packet-preset-filters .btn{white-space:normal;text-align:left;max-width:100%}
+.packet-filter-hint{flex-basis:100%;margin:0;font-size:10px;line-height:1.5;overflow-wrap:anywhere}
+.packet-no-results p{margin:6px 0}.packet-no-results{overflow-wrap:anywhere}
+.packet-dhcp-guidance{margin-top:7px;padding-left:8px;border-left:2px solid var(--border)}
+.packet-protocol-note{padding-top:5px;border-top:1px solid var(--line)}
+
+/* Dense packet rows: high information density without reducing font legibility. */
+.packet-table{font-size:11px;line-height:1.2;font-variant-numeric:tabular-nums}
+.packet-table td{padding:2px 7px;line-height:16px;max-height:20px}
+.packet-table th button{padding:4px 7px;line-height:17px}
+.packet-table tbody tr{height:21px}
+.packet-table td:nth-child(1),.packet-table td:nth-child(2),.packet-table td:nth-child(6){font-variant-numeric:tabular-nums}
+.packet-detail-heading #packetDetailsDock{width:auto;min-width:86px;max-width:110px;min-height:27px;padding:3px 6px;margin-left:auto}
+
+/* Subtle protocol family cues, retained in both themes without replacing selection states. */
+.packet-table tbody tr:nth-child(even):not(.selected){background:color-mix(in srgb,var(--panel2) 35%,transparent)}
+.packet-table tbody tr.packet-proto-dns:not(.selected),.packet-table tbody tr.packet-proto-mdns:not(.selected){box-shadow:inset 3px 0 color-mix(in srgb,var(--accent) 55%,transparent)}
+.packet-table tbody tr.packet-proto-dhcp:not(.selected),.packet-table tbody tr.packet-proto-arp:not(.selected){box-shadow:inset 3px 0 color-mix(in srgb,var(--warn) 65%,transparent)}
+.packet-table tbody tr.packet-proto-tcp:not(.selected){box-shadow:inset 3px 0 color-mix(in srgb,var(--muted) 45%,transparent)}
+.packet-table tbody tr:hover{background:var(--accentBg)}
+
+/* Continuous packet scrolling. Spacer cells preserve the full filtered scroll range
+   while keeping the DOM to a few hundred actual packet rows. */
+.packet-list-body{flex:1 1 0;display:flex;min-width:0;min-height:0;overflow:hidden}
+.packet-list-body>.packet-table-scroll{min-width:0;flex:1 1 0;scrollbar-gutter:stable}
+.packet-table{min-width:680px;table-layout:fixed;border-collapse:collapse}
+.packet-table col.col-no{width:56px}.packet-table col.col-time{width:95px}
+.packet-table col.col-source,.packet-table col.col-destination{width:150px}
+.packet-table col.col-protocol{width:83px}.packet-table col.col-length{width:65px}
+.packet-table col.col-severity{width:26px}.packet-table col.col-info{width:auto}
+.packet-table tbody tr:not(.packet-spacer){height:21px;max-height:21px}
+.packet-table tbody tr.packet-spacer{height:auto;max-height:none;pointer-events:none;box-shadow:none!important;background:transparent!important}
+.packet-table tbody tr.packet-spacer td{padding:0!important;border:0!important;line-height:0!important;min-height:0;overflow:hidden;max-height:none}
+.packet-table td{padding:2px 5px;line-height:16px;height:21px;max-height:21px;box-sizing:border-box}
+.packet-table th button{padding:3px 5px;line-height:18px;max-height:25px;overflow:hidden;text-overflow:ellipsis}
+.packet-table th button:disabled{opacity:1;cursor:default}
+.packet-table .packet-signal-cell{text-align:center;padding-inline:0}
+.packet-signal-dot{display:inline-flex;justify-content:center;align-items:center;min-width:13px;width:13px;height:13px;border-radius:3px;line-height:1;font-weight:800;font-size:10px}
+.packet-map-error{background:#be3f48;color:#fff}.packet-map-warn{background:#dfa344;color:#191919}.packet-map-note{background:#66b9cf;color:#111b24}
+.packet-map-normal{background:color-mix(in srgb,var(--accent) 19%,var(--panel2))}
+.packet-list-scope{padding:3px 6px;min-height:26px}
+.packet-list-scope>span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.packet-list-actions{display:flex;align-items:center;gap:4px;flex:none}
+.packet-active-filter{max-height:1.5em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.packet-list-footer{padding:2px 6px;display:flex;align-items:center;gap:5px;border-top:1px solid var(--line);font-size:10px;color:var(--muted);min-height:26px;flex:none}
+.packet-list-footer span{margin-right:auto}
+.packet-list-footer .btn,.packet-list-scope .btn{min-height:22px!important;padding:1px 5px!important;font-size:10px!important}
+.packet-intelligent-scroll{display:flex;position:relative;flex-direction:column;flex:0 0 16px;min-width:16px;height:100%;border-inline:1px solid var(--border);background:var(--panel2);cursor:crosshair;outline-offset:-1px}
+.packet-intelligent-scroll:focus-visible{outline:2px solid var(--accent)}
+.packet-map-bars{display:flex;flex:1 1 0;flex-direction:column;overflow:hidden;min-height:0;width:100%;pointer-events:none}
+.packet-map-bin{display:block;flex:1 1 0;min-height:0;max-height:none;width:100%;border-bottom:1px solid color-mix(in srgb,var(--panel) 25%,transparent)}
+.packet-map-viewport{position:absolute;left:0;right:0;height:9px;border:1px solid var(--text);background:color-mix(in srgb,var(--panel) 55%,transparent);pointer-events:none;box-shadow:0 0 1px var(--panel)}
+.packet-insights{flex:0 0 215px;display:flex;flex-direction:column;min-width:0;min-height:0;max-width:32%;border-left:1px solid var(--border);background:var(--panel);font-size:10px;overflow:hidden}
+.packet-insights[hidden]{display:none}
+.packet-insights-heading{display:flex;align-items:center;gap:5px;justify-content:space-between;min-height:30px;padding:4px 7px;border-bottom:1px solid var(--line);background:var(--panel2)}
+.packet-insights-heading strong{font-size:11px}.packet-insights-heading .iconbtn{width:23px;height:23px;min-width:23px;min-height:23px;font-size:17px}
+.packet-insight-totals{padding:7px;border-bottom:1px solid var(--line);color:var(--muted);line-height:1.4}
+.packet-insight-totals strong{color:var(--text);font-size:15px;font-variant-numeric:tabular-nums}
+.packet-insight-levels{display:block;margin-top:3px}
+.packet-insights-list{overflow-y:auto;overscroll-behavior:contain;min-height:0;flex:1 1 0;scrollbar-width:thin}
+.packet-insight-event{width:100%;display:block;cursor:pointer;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);padding:8px 7px;font:inherit;color:var(--text);overflow-wrap:anywhere}
+.packet-insight-event:hover,.packet-insight-event:focus-visible{background:var(--accentBg);outline:1px solid var(--accent);outline-offset:-2px}
+.packet-insight-event-top{display:flex;align-items:center;gap:4px}
+.packet-insight-event-top strong{font-size:10px;line-height:1.35;flex:1;min-width:0}
+.packet-insight-count{font-variant-numeric:tabular-nums;font-size:9px;padding:2px 4px;border-radius:4px;background:var(--panel2);flex:none}
+.packet-insight-explanation{display:block;color:var(--muted);line-height:1.4;margin-top:4px}
+.packet-insight-location{display:block;margin-top:5px;color:var(--accent);font-weight:600}
+.packet-insight-empty{padding:10px;color:var(--muted);line-height:1.5}
+.packet-insight-caution{padding:7px;margin:0;border-top:1px solid var(--line);font-size:9px;color:var(--muted);line-height:1.45;flex:none}
+.packet-frame-metadata{display:flex;gap:5px;flex-wrap:wrap;margin:0 0 6px;padding:5px 0;border-bottom:1px solid var(--line)}
+.packet-frame-metadata span{font-family:var(--mono);font-size:10px;color:var(--muted);background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:2px 4px}
+.packet-plain-guide{border:1px solid var(--line);border-radius:5px;margin:0 0 6px;overflow:hidden}
+.packet-plain-guide>summary{padding:4px 6px!important;font-size:10px;color:var(--accent)}
+.packet-plain-guide .packet-plain-explanation{padding:6px;border:0;margin:0}
+.packet-detail-heading{gap:3px;margin-bottom:3px;padding-bottom:3px}
+.packet-detail-heading .btn{min-height:23px!important;padding:2px 5px!important;font-size:10px!important}
+.packet-detail-heading #packetDetailsDock{min-height:23px!important;min-width:76px;max-width:89px;padding:2px 4px;margin-left:auto}
+.packet-inspector details>summary{padding:3px 3px}
+.packet-field{padding:2px 5px;line-height:1.35}
+.packet-hex{line-height:1.45}
+.packet-inspector .packet-expert-note{padding:4px;margin:0 0 5px}
+.packet-configuration-region{max-height:42%}
+.packet-commandbar,.packet-viewbar{padding:4px 7px;gap:4px}
+.packet-workspace .btn{min-height:25px;padding:3px 6px}
+.packet-status{padding:3px 7px}
+@media(max-width:1250px){
+ .packet-insights{flex-basis:185px}
+ .packet-commandbar strong{font-size:11px}
+ .packet-viewbar .tab{padding:4px 6px}
+}
+@media(max-width:700px){
+ .packet-insights{flex-basis:155px;max-width:42%}
+ .packet-table{min-width:665px}
+}
+/* The intelligent bar uses muted protocol families when no expert event
+   overrides the bar with an error, warning, or note color. */
+.packet-map-bin.packet-map-normal.packet-map-proto-dns{background:#b8a5d9}
+.packet-map-bin.packet-map-normal.packet-map-proto-arp,
+.packet-map-bin.packet-map-normal.packet-map-proto-dhcp{background:#e1c691}
+.packet-map-bin.packet-map-normal.packet-map-proto-tcp{background:#a7c6e9}
+.packet-map-bin.packet-map-normal.packet-map-proto-udp{background:#b6d9df}
+.packet-map-bin.packet-map-normal.packet-map-proto-icmp,
+.packet-map-bin.packet-map-normal.packet-map-proto-icmpv6{background:#8dcfce}
+.packet-map-bin.packet-map-normal.packet-map-proto-tls,
+.packet-map-bin.packet-map-normal.packet-map-proto-ssh{background:#beb8dc}
+.packet-map-bin.packet-map-normal.packet-map-proto-http{background:#a7d9af}
+
+/* 1.17.30: geometry-correct intelligent scrollbar; viewport has a proportional
+   height and selected packet has an independent 2px location marker. */
+.packet-map-viewport{top:0;height:10px;box-sizing:border-box;will-change:transform;z-index:2;transition:none}
+.packet-map-selected{position:absolute;top:0;left:0;right:0;height:2px;z-index:3;background:var(--accent);box-shadow:0 0 0 1px var(--panel);pointer-events:none;will-change:transform}
+.packet-map-selected[hidden]{display:none}
+/* Content stays mounted while virtual rows advance: prevent scroll chaining
+   into the surrounding tool pane at the end of long captures. */
+.packet-table-scroll{overscroll-behavior:contain}
+
+.packet-table-scroll{overflow-anchor:none}
+
+/* 1.17.32: full-capture scrubber plus an actual frame-resolution lane.
+   The fine map spends only 14 extra pixels and virtualizes its raster lines. */
+.packet-list-panel{position:relative}
+.packet-intelligent-scroll{flex:0 0 12px;min-width:12px;touch-action:none;cursor:ns-resize;user-select:none}
+.packet-map-viewport{background:color-mix(in srgb,var(--panel) 28%,transparent);border:1px solid var(--text);pointer-events:none}
+.packet-map-detail-scroll{flex:0 0 15px;min-width:15px;height:100%;min-height:0;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;border-right:1px solid var(--border);background:var(--panel2);cursor:ns-resize;user-select:none;touch-action:none;outline-offset:-1px}
+.packet-map-detail-scroll::-webkit-scrollbar{width:0;height:0}
+.packet-map-detail-scroll:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.packet-map-detail-content{position:relative;width:100%;min-height:1px;pointer-events:none}
+.packet-map-detail-lines{position:absolute;inset:0;pointer-events:none}
+.packet-detail-line.packet-map-bin{position:absolute;left:0;right:0;display:block;min-height:2px!important;max-height:2px!important;height:2px!important;flex:none!important;border:0!important;margin:0;padding:0;pointer-events:none}
+.packet-map-detail-viewport{position:absolute;left:0;right:0;z-index:2;border:1px solid var(--text);background:color-mix(in srgb,var(--panel) 25%,transparent);box-sizing:border-box;pointer-events:none}
+.packet-map-detail-selected{position:absolute;left:0;right:0;height:2px;z-index:3;background:var(--accent);outline:1px solid var(--panel);pointer-events:none}
+.packet-map-detail-selected[hidden]{display:none}
+.packet-detail-line.packet-map-normal.packet-map-proto-wireguard{background:#96aedb}
+.packet-detail-line.packet-map-normal.packet-map-proto-mdns{background:#bea6d5}
+.packet-detail-line.packet-map-normal.packet-map-proto-smb{background:#aacabb}
+.packet-detail-line.packet-map-normal.packet-map-proto-ntp{background:#b8ccc0}
+/* Troubleshooting aid overlays the packet rows rather than consuming screen
+   height. It is hidden by default and scrolls independently when opened. */
+.packet-quick-guide{position:absolute;top:29px;right:5px;z-index:15;width:min(460px,calc(100% - 12px));max-height:min(77%,620px);display:flex;flex-direction:column;overflow:hidden;background:var(--panel);border:1px solid var(--border);border-radius:7px;box-shadow:0 9px 25px rgba(0,0,0,.18);font-size:10px;line-height:1.4}
+.packet-quick-guide[hidden]{display:none}
+.packet-quick-guide>header{display:flex;align-items:center;gap:6px;justify-content:space-between;padding:5px 8px;border-bottom:1px solid var(--line);background:var(--panel2)}
+.packet-quick-guide>header strong{font-size:11px}
+.packet-quick-guide>header .iconbtn{width:22px;height:22px;min-height:22px;min-width:22px}
+.packet-guide-intro,.packet-guide-caution{margin:0;padding:6px 9px;color:var(--muted);flex:none}
+.packet-guide-caution{border-top:1px solid var(--line);font-size:9px}
+.packet-guide-scroll{min-height:0;overflow-y:auto;scrollbar-width:thin;overscroll-behavior:contain}
+.packet-guide-case{padding:7px 9px;border-top:1px solid var(--line)}
+.packet-guide-case:first-child{border-top:0}
+.packet-guide-title{display:flex;align-items:center;gap:7px;justify-content:space-between;min-width:0}
+.packet-guide-title strong{font-size:10px;line-height:1.3;min-width:0;overflow-wrap:anywhere}
+.packet-guide-title button{flex:none;min-height:22px!important;padding:2px 6px!important}
+.packet-guide-case p{margin:3px 0 0;color:var(--muted);overflow-wrap:anywhere}
+.packet-guide-case b{color:var(--text);font-weight:600}
+@media(max-width:1050px){.packet-insights{flex-basis:170px}.packet-map-detail-scroll{flex-basis:13px;min-width:13px}}
+@media(max-width:720px){.packet-quick-guide{max-height:67%;top:28px;width:min(420px,calc(100% - 10px))}}
+
+/* 1.17.32: user-configurable packet colors and map geometry. Values come from
+   validated, locally stored appearance preferences; selection remains distinct. */
+.packet-intelligent-scroll{flex:0 0 var(--packet-map-overview-width,12px);min-width:var(--packet-map-overview-width,12px)}
+.packet-map-detail-scroll{flex:0 0 var(--packet-map-detail-width,15px);min-width:var(--packet-map-detail-width,15px)}
+.packet-detail-line.packet-map-bin{height:var(--packet-map-line-height,1px)!important;min-height:var(--packet-map-line-height,1px)!important;max-height:var(--packet-map-line-height,1px)!important}
+.packet-map-detail-selected{height:var(--packet-map-line-height,1px)}
+.packet-workspace .packet-map-bin.packet-map-error,.packet-workspace .packet-detail-line.packet-map-error,.packet-workspace .packet-signal-dot.packet-map-error{background:var(--packet-color-error)}
+.packet-workspace .packet-signal-dot.packet-map-error{color:var(--packet-contrast-error,#fff)}
+.packet-workspace .packet-map-bin.packet-map-warn,.packet-workspace .packet-detail-line.packet-map-warn,.packet-workspace .packet-signal-dot.packet-map-warn{background:var(--packet-color-warn)}
+.packet-workspace .packet-signal-dot.packet-map-warn{color:var(--packet-contrast-warn,#fff)}
+.packet-workspace .packet-map-bin.packet-map-note,.packet-workspace .packet-detail-line.packet-map-note,.packet-workspace .packet-signal-dot.packet-map-note{background:var(--packet-color-note)}
+.packet-workspace .packet-signal-dot.packet-map-note{color:var(--packet-contrast-note,#fff)}
+.packet-workspace .packet-map-bin.packet-map-normal.packet-map-proto-other,.packet-workspace .packet-detail-line.packet-map-normal.packet-map-proto-other{background:var(--packet-color-other)}
+.packet-workspace.packet-map-mode-protocols .packet-map-bin.packet-map-proto-other,.packet-workspace.packet-map-mode-protocols .packet-detail-line.packet-map-proto-other{background:var(--packet-color-other)}
+.packet-workspace .packet-map-bin.packet-map-normal.packet-map-proto-tcp,.packet-workspace .packet-detail-line.packet-map-normal.packet-map-proto-tcp{background:var(--packet-color-tcp)}
+.packet-workspace.packet-map-mode-protocols .packet-map-bin.packet-map-proto-tcp,.packet-workspace.packet-map-mode-protocols .packet-detail-line.packet-map-proto-tcp{background:var(--packet-color-tcp)}
+.packet-workspace .packet-map-bin.packet-map-normal.packet-map-proto-udp,.packet-workspace .packet-detail-line.packet-map-normal.packet-map-proto-udp{background:var(--packet-color-udp)}
+.packet-workspace.packet-map-mode-protocols .packet-map-bin.packet-map-proto-udp,.packet-workspace.packet-map-mode-protocols .packet-detail-line.packet-map-proto-udp{background:var(--packet-color-udp)}
+.packet-workspace .packet-map-bin.packet-map-normal.packet-map-proto-dns,.packet-workspace .packet-detail-line.packet-map-normal.packet-map-proto-dns{background:var(--packet-color-dns)}
+.packet-workspace.packet-map-mode-protocols .packet-map-bin.packet-map-proto-dns,.packet-workspace.packet-map-mode-protocols .packet-detail-line.packet-map-proto-dns{background:var(--packet-color-dns)}
+.packet-workspace .packet-map-bin.packet-map-normal.packet-map-proto-dhcp,.packet-workspace .packet-detail-line.packet-map-normal.packet-map-proto-dhcp{background:var(--packet-color-dhcp)}
+.packet-workspace.packet-map-mode-protocols .packet-map-bin.packet-map-proto-dhcp,.packet-workspace.packet-map-mode-protocols .packet-detail-line.packet-map-proto-dhcp{background:var(--packet-color-dhcp)}
+.packet-workspace .packet-map-bin.packet-map-normal.packet-map-proto-arp,.packet-workspace .packet-detail-line.packet-map-normal.packet-map-proto-arp{background:var(--packet-color-arp)}
+.packet-workspace.packet-map-mode-protocols .packet-map-bin.packet-map-proto-arp,.packet-workspace.packet-map-mode-protocols .packet-detail-line.packet-map-proto-arp{background:var(--packet-color-arp)}
+.packet-workspace .packet-map-bin.packet-map-normal.packet-map-proto-icmp,.packet-workspace .packet-detail-line.packet-map-normal.packet-map-proto-icmp{background:var(--packet-color-icmp)}
+.packet-workspace.packet-map-mode-protocols .packet-map-bin.packet-map-proto-icmp,.packet-workspace.packet-map-mode-protocols .packet-detail-line.packet-map-proto-icmp{background:var(--packet-color-icmp)}
+.packet-workspace .packet-map-bin.packet-map-normal.packet-map-proto-icmpv6,.packet-workspace .packet-detail-line.packet-map-normal.packet-map-proto-icmpv6{background:var(--packet-color-icmpv6)}
+.packet-workspace.packet-map-mode-protocols .packet-map-bin.packet-map-proto-icmpv6,.packet-workspace.packet-map-mode-protocols .packet-detail-line.packet-map-proto-icmpv6{background:var(--packet-color-icmpv6)}
+.packet-workspace .packet-map-bin.packet-map-normal.packet-map-proto-tls,.packet-workspace .packet-detail-line.packet-map-normal.packet-map-proto-tls{background:var(--packet-color-tls)}
+.packet-workspace.packet-map-mode-protocols .packet-map-bin.packet-map-proto-tls,.packet-workspace.packet-map-mode-protocols .packet-detail-line.packet-map-proto-tls{background:var(--packet-color-tls)}
+.packet-workspace .packet-map-bin.packet-map-normal.packet-map-proto-http,.packet-workspace .packet-detail-line.packet-map-normal.packet-map-proto-http{background:var(--packet-color-http)}
+.packet-workspace.packet-map-mode-protocols .packet-map-bin.packet-map-proto-http,.packet-workspace.packet-map-mode-protocols .packet-detail-line.packet-map-proto-http{background:var(--packet-color-http)}
+.packet-workspace .packet-map-bin.packet-map-normal.packet-map-proto-ssh,.packet-workspace .packet-detail-line.packet-map-normal.packet-map-proto-ssh{background:var(--packet-color-ssh)}
+.packet-workspace.packet-map-mode-protocols .packet-map-bin.packet-map-proto-ssh,.packet-workspace.packet-map-mode-protocols .packet-detail-line.packet-map-proto-ssh{background:var(--packet-color-ssh)}
+.packet-workspace .packet-map-bin.packet-map-normal.packet-map-proto-mdns,.packet-workspace .packet-detail-line.packet-map-normal.packet-map-proto-mdns{background:var(--packet-color-mdns)}
+.packet-workspace.packet-map-mode-protocols .packet-map-bin.packet-map-proto-mdns,.packet-workspace.packet-map-mode-protocols .packet-detail-line.packet-map-proto-mdns{background:var(--packet-color-mdns)}
+.packet-workspace .packet-map-bin.packet-map-normal.packet-map-proto-smb,.packet-workspace .packet-detail-line.packet-map-normal.packet-map-proto-smb{background:var(--packet-color-smb)}
+.packet-workspace.packet-map-mode-protocols .packet-map-bin.packet-map-proto-smb,.packet-workspace.packet-map-mode-protocols .packet-detail-line.packet-map-proto-smb{background:var(--packet-color-smb)}
+.packet-workspace .packet-map-bin.packet-map-normal.packet-map-proto-ntp,.packet-workspace .packet-detail-line.packet-map-normal.packet-map-proto-ntp{background:var(--packet-color-ntp)}
+.packet-workspace.packet-map-mode-protocols .packet-map-bin.packet-map-proto-ntp,.packet-workspace.packet-map-mode-protocols .packet-detail-line.packet-map-proto-ntp{background:var(--packet-color-ntp)}
+.packet-workspace .packet-map-bin.packet-map-normal.packet-map-proto-wireguard,.packet-workspace .packet-detail-line.packet-map-normal.packet-map-proto-wireguard{background:var(--packet-color-wireguard)}
+.packet-workspace.packet-map-mode-protocols .packet-map-bin.packet-map-proto-wireguard,.packet-workspace.packet-map-mode-protocols .packet-detail-line.packet-map-proto-wireguard{background:var(--packet-color-wireguard)}
+.packet-workspace .packet-map-bin.packet-map-normal.packet-map-proto-lldp,.packet-workspace .packet-detail-line.packet-map-normal.packet-map-proto-lldp{background:var(--packet-color-lldp)}
+.packet-workspace.packet-map-mode-protocols .packet-map-bin.packet-map-proto-lldp,.packet-workspace.packet-map-mode-protocols .packet-detail-line.packet-map-proto-lldp{background:var(--packet-color-lldp)}
+.packet-workspace .packet-map-bin.packet-map-normal.packet-map-proto-cdp,.packet-workspace .packet-detail-line.packet-map-normal.packet-map-proto-cdp{background:var(--packet-color-cdp)}
+.packet-workspace.packet-map-mode-protocols .packet-map-bin.packet-map-proto-cdp,.packet-workspace.packet-map-mode-protocols .packet-detail-line.packet-map-proto-cdp{background:var(--packet-color-cdp)}
+
+.packet-workspace.packet-map-mode-alerts .packet-map-bin.packet-map-normal,
+.packet-workspace.packet-map-mode-alerts .packet-detail-line.packet-map-normal{background:var(--packet-color-other)}
+.packet-workspace.packet-row-mode-off .packet-table tbody tr:not(.packet-spacer):not(.selected),
+.packet-workspace.packet-row-mode-off .packet-table tbody tr:not(.packet-spacer):not(.selected):hover{box-shadow:none}
+.packet-workspace.packet-row-mode-marker .packet-table tbody tr:not(.packet-spacer):not(.selected),
+.packet-workspace.packet-row-mode-subtle .packet-table tbody tr:not(.packet-spacer):not(.selected),
+.packet-workspace.packet-row-mode-strong .packet-table tbody tr:not(.packet-spacer):not(.selected){box-shadow:inset 3px 0 var(--packet-row-color)}
+.packet-workspace.packet-row-mode-subtle .packet-table tbody tr:not(.packet-spacer):not(.selected){background:color-mix(in srgb,var(--packet-row-color) 11%,var(--panel))}
+.packet-workspace.packet-row-mode-strong .packet-table tbody tr:not(.packet-spacer):not(.selected){background:color-mix(in srgb,var(--packet-row-color) 25%,var(--panel))}
+.packet-workspace .packet-table tbody tr:not(.packet-spacer):hover{background:var(--accentBg)}
+.packet-appearance-settings{position:absolute;top:29px;right:5px;z-index:16;width:min(440px,calc(100% - 12px));max-height:min(79%,650px);display:flex;flex-direction:column;overflow:hidden;background:var(--panel);border:1px solid var(--border);border-radius:7px;box-shadow:0 9px 25px rgba(0,0,0,.2);font-size:10px}
+.packet-appearance-settings[hidden]{display:none}
+.packet-appearance-settings>header,.packet-appearance-settings>footer{display:flex;gap:6px;align-items:center;justify-content:space-between;padding:5px 8px;background:var(--panel2);flex:none}
+.packet-appearance-settings>header{border-bottom:1px solid var(--line)}
+.packet-appearance-settings>header strong{font-size:11px}
+.packet-appearance-settings>header .iconbtn{min-width:22px;min-height:22px;width:22px;height:22px;font-size:17px}
+.packet-appearance-settings>footer{border-top:1px solid var(--line);font-size:9px;color:var(--muted)}
+.packet-appearance-scroll{min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;padding:7px 9px}
+.packet-appearance-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.packet-appearance-controls label{display:flex;flex-direction:column;gap:3px;color:var(--muted);min-width:0}
+.packet-appearance-controls select{width:100%;max-width:100%;min-width:0;color:var(--text)}
+.packet-appearance-hint{font-size:10px;line-height:1.5;color:var(--muted);margin:8px 0}
+.packet-appearance-group{border-top:1px solid var(--line);padding-top:5px;margin-top:5px}
+.packet-appearance-group h3{margin:0 0 5px;font-size:10px;color:var(--text)}
+.packet-appearance-palette{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px 6px}
+.packet-appearance-palette label{display:flex;align-items:center;gap:4px;min-width:0;color:var(--text)}
+.packet-appearance-palette input[type=color]{appearance:auto;padding:1px;width:27px;height:22px;min-width:27px;min-height:22px;cursor:pointer}
+.packet-appearance-palette span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:700px){.packet-appearance-palette{grid-template-columns:repeat(2,minmax(0,1fr))}.packet-appearance-settings{max-height:67%;top:28px}}
+
+/* 1.17.33: optional per-frame resolution on the full-capture map.
+   In Fit mode the original compressed bins remain a complete overview.
+   Pixel modes scroll an inexpensive virtual window of one line per packet. */
+.packet-overview-content{position:relative;display:flex;flex-direction:column;flex:1 1 0;width:100%;height:100%;min-height:0}
+.packet-intelligent-scroll.packet-overview-scaled{overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-width:none}
+.packet-intelligent-scroll.packet-overview-scaled::-webkit-scrollbar{width:0;height:0}
+.packet-intelligent-scroll.packet-overview-scaled .packet-overview-content{flex:none;min-height:1px}
+.packet-intelligent-scroll.packet-overview-scaled .packet-map-bars{display:none}
+.packet-map-overview-lines{display:none;position:absolute;inset:0;pointer-events:none}
+.packet-intelligent-scroll.packet-overview-scaled .packet-map-overview-lines{display:block}
+.packet-overview-line.packet-map-bin{position:absolute;left:0;right:0;height:var(--packet-map-overview-line-height,1px)!important;min-height:var(--packet-map-overview-line-height,1px)!important;max-height:var(--packet-map-overview-line-height,1px)!important;flex:none!important;border:0!important;margin:0;padding:0;pointer-events:none}
+.packet-intelligent-scroll.packet-overview-scaled .packet-map-selected{height:var(--packet-map-overview-line-height,1px)}
+
+/* Full strength is intentionally a 100% saturated background. Use each
+   customizable color's calculated foreground for readable packet values. */
+.packet-workspace.packet-row-mode-full .packet-table tbody tr:not(.packet-spacer):not(.selected){background:var(--packet-row-color);color:var(--packet-row-contrast);box-shadow:none}
+.packet-workspace.packet-row-mode-full .packet-table tbody tr:not(.packet-spacer):not(.selected) td,
+.packet-workspace.packet-row-mode-full .packet-table tbody tr:not(.packet-spacer):not(.selected) td:nth-child(5){color:inherit}
+.packet-workspace.packet-row-mode-full .packet-table tbody tr:not(.packet-spacer):not(.selected):hover,
+.packet-workspace.packet-row-mode-full .packet-table tbody tr:not(.packet-spacer):not(.selected):focus-visible{background:var(--packet-row-color);color:var(--packet-row-contrast);outline:2px solid var(--text);outline-offset:-2px}
+
+/* 1.17.35: independently optional packet maps reclaim every pixel of list width. */
+.packet-list-body>#packetOverviewMap[hidden],.packet-list-body>#packetDetailMap[hidden]{display:none!important;flex-basis:0!important;min-width:0!important}
+.packet-map-visible-toggle{display:flex!important;flex-direction:row!important;align-items:center;gap:5px;color:var(--text)!important;min-height:27px}
+.packet-map-visible-toggle input{width:14px!important;height:14px!important;flex:none}

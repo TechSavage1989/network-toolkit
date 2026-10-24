@@ -1,0 +1,21 @@
+/* Shared diagnostic source control. Keep recorded source visible without adding a toolbar row. */
+#diagnosticSourceHost{min-width:0;width:100%;flex-basis:100%}
+#diagnosticSourceHost[hidden]{display:none}
+.diagnostic-source-control{min-width:0;padding-top:9px;border-top:1px solid var(--line)}
+.source-control-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px}
+.source-control-heading label{font-size:11px;font-weight:550;color:var(--muted)}
+.source-control-heading .source-refresh{min-height:24px;padding:2px 6px;font-size:10px}
+.diagnostic-source-control select{width:100%;max-width:100%;font-size:11px;padding:7px 9px;min-height:32px}
+.source-hint{font-size:10px;line-height:1.5;color:var(--faint);margin-top:5px;overflow-wrap:anywhere}
+.source-unavailable .source-hint{color:var(--warn)}
+.source-unavailable select{border-color:var(--warn)}
+.device-diagnostic-source{margin:16px 0;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--panel2)}
+.device-diagnostic-source .diagnostic-source-control{border-top:0;padding-top:5px}
+.device-diagnostic-source>.help-line{margin-top:8px}
+.job-meta{display:flex;align-items:center;gap:10px;min-width:0}
+.job-meta-context{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1}
+.job-source-label{display:inline-block;flex:0 1 auto;max-width:55%;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px;line-height:1.6;padding:0 4px;border:1px solid transparent;border-radius:4px;background:var(--panel2);color:var(--muted);text-align:left}
+.job-source-label:hover{border-color:var(--border);color:var(--text)}
+.job-source-label.bad{color:var(--bad)}
+@media(min-width:1441px){.job-source-label{max-width:48%}}
+@media(max-height:600px){.source-hint{margin-top:3px}.diagnostic-source-control{padding-top:6px}.job-meta{gap:6px}}

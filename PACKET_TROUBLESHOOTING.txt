@@ -1,0 +1,270 @@
+NETWORK TOOLKIT 1.17.29 - GUIDED PACKET TROUBLESHOOTING
+
+DHCP and address assignment
+
+Choose the address-assignment task or DHCP filter to find decoded DHCPv4 and
+traffic on DHCPv4/v6 UDP ports. Record on the adapter whose address assignment
+is being investigated. Begin recording before the connection or renewal event;
+an adapter with an existing lease may produce no DHCP during a short capture.
+The task does not automatically release, renew or change the adapter address.
+
+A new DHCPv4 lease commonly uses Discover, Offer, Request and ACK messages.
+Renewal can show only Request and ACK. Missing messages in this recording do
+not prove a failed server or an incomplete exchange. Capture timing, recording
+filters, the selected adapter and static addressing can affect what is visible.
+DHCPv4 message explanations aid inspection without adding automatic lease or
+server validation. DHCPv6 packets currently show UDP information and raw bytes.
+
+Named focus shortcuts replace unrelated packet Search and protocol constraints.
+An empty filtered view explains how to return to all retained packets. Clearing
+display constraints does not restore packets discarded by recording settings.
+
+Start with a problem
+
+Open Packet capture and choose the adapter used by the affected application,
+usually Ethernet, Wi-Fi or a VPN connection. Choose a troubleshooting task
+for practical instructions and a suggested view. The task does not discard
+packets or change recording filters.
+
+1. Start capture before trying the connection.
+2. Reproduce the problem once while capture is recording.
+3. Stop capture and review Troubleshooting.
+
+If live recording is unavailable, Open PCAP / PCAPNG accepts an existing
+capture file. Compatibility file recording may show packets only after Stop.
+The capture normally shows traffic visible to this computer and its selected
+adapter. It does not automatically expose every device on a switched network.
+
+Read the troubleshooting review
+
+The default review examines all retained packets, including packets beyond
+the current table page. Display filters do not change its scope. Each finding
+provides an observation, a plain-language explanation, suggested next checks
+and example packets. View example packets opens a focused packet list and its
+first example. Examples are bounded; the finding count can be larger than the
+number of examples shown.
+
+The review checks supported patterns such as DNS error responses, requests
+with no matching reply visible, rejected or reset TCP connections, repeated
+TCP data, ICMP delivery or packet-size messages, repeated local address
+lookups, and plaintext HTTP error responses. Exact supported patterns and
+counts are implemented in internal/capture/troubleshoot.go.
+
+A finding is a clue, not a confirmed root cause. A connection reset can be
+normal application behavior. Repeated TCP data may be a retransmission or a
+duplicate observation at the capture point. Neither establishes a measured
+network packet-loss percentage. Time Exceeded messages can be normal during
+Trace route. Unanswered ARP queries can be normal when scanning unused IPs.
+
+Missing-reply checks require at least three more seconds of retained packet
+timestamps after the request. This is an observation window, not a statement
+that the application or protocol timed out. Replies can be outside the
+recording, on another adapter, or excluded by a recording filter. A capture
+ending soon after a request does not establish that its reply was lost.
+
+No supported warning patterns found does not mean that the network is healthy
+or that the reported problem has been ruled out. Reproduce the problem while
+recording, confirm the adapter, and use the relevant diagnostic tools.
+
+Useful follow-up checks
+
+- Names do not resolve: use DNS lookup with the same name and DNS server.
+  Check spelling, the selected resolver and any local Hosts file entry.
+  Cached answers and encrypted DNS can explain why ordinary DNS is absent.
+- A service does not connect: use TCP ports with the same destination and
+  port, then review the service, routing and firewall logs.
+- Some traffic works while larger or VPN traffic stalls: inspect packet-size
+  messages and compare MTU settings along the path before changing them.
+- A local device appears unreachable: compare its IP, subnet, VLAN and link
+  with Local network and Network discovery. An unused address may be normal.
+- An application returns an HTTP error: compare HTTP check with application,
+  web server or proxy logs. HTTP errors do not automatically mean a network
+  failure.
+
+Capture quality and visibility
+
+Review the capture limitations alongside the findings. Lost capture events,
+overwritten retention, truncated packets, incomplete decoding, fragments,
+one-sided recording filters and capture timing can limit interpretation.
+Capture-event loss is distinct from packet loss in the network. A native
+Windows drop reason, when present, records a separate local-stack observation.
+
+TLS/HTTPS and SSH content is encrypted. The app does not decrypt it. It can
+show captured addresses, ports and supported visible protocol metadata, but
+cannot infer encrypted page contents or the application's complete behavior.
+
+Basic and advanced controls
+
+Capture setup and step-by-step guide opens for a new capture. Its initial
+automatic layout can fold setup after selecting a recording. Once you open
+or close setup yourself, refreshes and capture changes keep your choice.
+Choose New capture to return to setup without losing a retained recording.
+
+Keep the default Automatic recording method unless troubleshooting requires
+another mode. The visible stop duration bounds a normal recording. Advanced
+capture settings expose recording filters, retention and size limits.
+Recording filters discard traffic before the review; excluded traffic cannot
+be restored from that recording. Display filters only change the packet list.
+
+Packets, Conversations, Devices / endpoints and Statistics remain available.
+Select a packet for a plain-language description followed by protocol fields,
+captured bytes and text. Conversation following is a bounded payload view;
+it is not full application or IP reassembly.
+
+Drag the packet details divider to resize its width, or its height when docked
+below the list on a narrow window. Double-click the divider or press Enter or
+Space while it has focus to hide/restore details. Arrow keys resize it; Home
+restores its default expanded size. The shared arrow button also hides or
+restores details. Resizing and hiding preserve the selected packet and reader
+position. The Quick guide stays open through automatic refreshes.
+
+Copy or save the troubleshooting findings to retain explanations and next
+checks. Export the original capture separately when another engineer needs
+the packet evidence. Captures and copied reports can contain device names,
+addresses and unencrypted application data; review them before sharing.
+
+Sidebar controls
+
+All sidebar visibility buttons use the same chevron without visible text.
+Hover hints and accessibility labels identify the panel and its current action.
+Resizable divider double-click and keyboard behavior remain available.
+Click anywhere on a collapsed panel rail to reopen it. Visibility controls
+sit at the leading edge of their header, before the other panel actions.
+
+Packet shortcuts
+
+Open Packet actions in the inspector, or right-click a packet row. Related
+views can show traffic for an address, conversation or protocol, or exclude
+a source. These are display filters only. The scope strip shows when the
+list is filtered; Show all packets clears the display expression, search
+and protocol filter together without changing capture retention settings.
+
+Copy packet endpoints from the menu. Right-click a decoded field to copy
+its value; ordinary field selection still highlights the corresponding
+captured bytes. Keyboard access remains available through the packet menu.
+
+Implementation references
+
+Reviewed against primary documentation on 2026-10-23:
+
+DHCPv4 allocation, renewal and message interpretation:
+https://www.rfc-editor.org/rfc/rfc2131.html
+DHCPv6 ports, operation and coexistence with SLAAC:
+https://www.rfc-editor.org/rfc/rfc9915.html
+
+Wireshark TCP analysis and interpretation limits:
+https://www.wireshark.org/docs/wsug_html_chunked/ChAdvTCPAnalysis.html
+Microsoft DNS client troubleshooting:
+https://learn.microsoft.com/en-us/troubleshoot/windows-client/networking/troubleshoot-dns-client-resolution-issues
+DNS response codes and negative responses:
+https://www.rfc-editor.org/rfc/rfc1035.html
+https://www.rfc-editor.org/rfc/rfc2308.html
+TCP handshake and reset behavior:
+https://www.rfc-editor.org/rfc/rfc9293.html
+ARP:
+https://www.rfc-editor.org/rfc/rfc826.html
+TLS visibility:
+https://wiki.wireshark.org/TLS/
+Microsoft Packet Monitor and local-stack observations:
+https://learn.microsoft.com/en-us/windows-server/networking/technologies/pktmon/pktmon
+
+PACKET MAP, EVENT SIDEBAR, AND FRAME DETAILS (1.17.29)
+
+The compact packet position map takes inspiration from Wireshark's Intelligent
+Scrollbar. A packet list's displayed, sorted order is divided into up to 180
+segments. Each segment has a subdued color for its first packet's decoded
+protocol; observed decoder errors and interesting events override the segment
+color. Clicking the bar seeks within the same filtered packet view.
+
+The Interesting traffic sidebar is a conservative counterpart to Expert
+Information, grouping decoder notes and selected protocol events. Severity
+labels refer only to those observable conditions. Counts apply to the current
+display filter; the broader Troubleshooting review still analyzes all
+retained packets unless recording keep filters excluded traffic.
+
+Frame metadata is prepended to the existing protocol details. The Frame fields
+do not claim byte ranges that are not part of the packet bytes. The original
+recorded packet bytes are unchanged.
+
+Wireshark references:
+https://www.wireshark.org/docs/wsug_html_chunked/ChUsePacketListPaneSection.html
+https://www.wireshark.org/docs/wsug_html_chunked/ChAdvExpert.html
+
+PACKET MAP AND SMOOTH SCROLL (1.17.30)
+
+- The map represents the sorted and filtered packet list in proportional
+  capture order. Clicking selects the indicated frame and centers it in view.
+- A thin line indicates the selected frame. A translucent rectangle shows the
+  portion of the packet list currently visible, at proportional height.
+- Continuous scrolling changes only the virtual table body; header, map,
+  findings sidebar, and packet inspector stay in place.
+- Adjacent decoded windows are cached, in-flight duplicates are merged,
+  unchanged completed captures are not polled for the same packet window,
+  and full-capture overview analysis is requested only when needed.
+
+DRAGGABLE, FRAME-LEVEL MAP AND QUICK GUIDANCE (1.17.31)
+
+- The full-capture map thumb can be dragged. Its mouse offset is retained,
+  and it scrolls the packet list smoothly as the thumb moves.
+- A neighboring frame-level map is scrollable and synchronized. Every
+  filtered/sorted packet is represented by one packet-level mark. Rendered
+  DOM nodes are limited to a small visible window around the map viewport.
+- By default the two tracks occupy roughly 27 px in total, leaving the packet table as
+  the main visual content. Both maps preserve direct jump/selection behavior.
+- The compact What to look for menu includes example packet patterns and
+  careful interpretations for DHCP, DNS, TCP setup, slow connections, local
+  reachability, HTTPS/TLS, VPN traffic and discovery/SMB, with compatible
+  one-click display filters. The menu overlays the table only while open.
+- The maps do not claim protocol completeness or any deeper detection than
+  the underlying decoder. Errors, warnings and notes are diagnostic hints.
+
+CUSTOM PACKET COLORS AND MAP BAR SIZE (1.17.32)
+
+- Open Packet Capture > Packets > Colors & maps. This floating menu occupies
+  no permanent screen space when closed.
+- Pick custom color swatches for protocol families and decoder Error,
+  Warning and Note severities. Protocol color settings also apply to packet
+  rows when row color mode is enabled.
+- Packet-row modes: Off, Color marker only (default), Subtle row tint,
+  Stronger row tint. Selected frames keep the separate selection highlight.
+- Full-map color choices: Protocol + alerts (default; alerts take priority),
+  Protocols only, or Alerts only.
+- Detailed map line height defaults to 1 logical CSS pixel per packet.
+  Optional 2, 3 and 4 pixel heights help with high-DPI screens or precise
+  mouse selection. The list stays virtualized in all modes.
+- Full map width: 8, 12, 16, 20 or 24 px; detailed map width: 10, 15, 18,
+  24 or 32 px. Width and line height changes do not change retained capture
+  data or recording filters. Click and drag navigation tracks the new scale.
+- Preferences are validated when loaded and saved in the existing local app
+  settings. Restore defaults to revert both maps and all color choices.
+- Colors alone never establish a network failure; check the decoded packet,
+  surrounding sequence, endpoint direction, and Troubleshooting findings.
+
+DIRECT MAP DRAGGING, SCALING, AND FULL-STRENGTH ROW COLORS (1.17.33)
+
+- In the detailed packet map, grab the viewport outline and drag vertically.
+  The list follows the pointer one packet per pixel at the 1-pixel default.
+  Other scales move one packet per 2, 3, or 4 pixels as selected.
+- The full map can remain in Fit entire capture mode, or render one separate
+  1/2/3/4-pixel line per displayed packet. Pixel modes also support exact
+  dragging, clicking, and wheel scrolling with bounded virtual lines.
+- Default event colors: pure red for errors, yellow for warnings, blue for
+  notes. Custom colors can still be selected and saved.
+- Packet row coloring now supports Full strength (100% color with readable
+  text), alongside Off, Marker, Subtle, and Strong.
+- Restore default colors & maps resets both map scales and the palette.
+- Important: Colored events indicate potential clues, not proven defects.
+
+LIVE PACKET WINDOWS, MAP VISIBILITY AND SHARED COLORS (1.17.35)
+
+- Packet list and packet map severity share one decoder classification.
+- Colors & maps: Show full map and Show fine map are independent options.
+  Hiding both maximizes packet-list width. Preferences are saved automatically.
+- Continuous scrolling requests a bounded packet window without calculating
+  the complete overview. Event maps load separately and periodically.
+- Follow new packets automatically scrolls the real packet reader to the most
+  recent retained frames while the selected capture is active.
+- Status colors on diagnostic pages configure shared colors for error/missing,
+  warning, success, information and latency graph lines. Missing samples in
+  Ping and Connection monitor are shaded with the configured error color.
+- Severity colors reflect observed packet indications and are not diagnoses.

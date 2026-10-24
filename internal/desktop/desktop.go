@@ -1,0 +1,40 @@
+// Package desktop hosts the local application in a native Windows WebView2 window.
+package desktop
+
+import "context"
+
+// Config describes one app window. DataDir is the portable application's folder.
+// The embedded UI uses the Microsoft WebView2 Runtime installed on Windows.
+type Config struct {
+	Title   string
+	URL     string
+	DataDir string
+	Stop    context.CancelFunc
+	// Activate requests that an existing window be restored and brought forward.
+	// Sends may be coalesced; closing the channel disables further requests.
+	Activate <-chan struct{}
+	// OnClosing is called once on the UI thread when the window starts its
+	// close handshake or immediate shutdown. It must return promptly. The
+	// notification does not cancel the context or shorten the final save wait.
+	OnClosing func()
+}
+
+// Rect has the layout of a Win32 RECT. Coordinates are physical screen pixels
+// for window state and client pixels for the WebView controller.
+type Rect struct {
+	Left   int32 `json:"left"`
+	Top    int32 `json:"top"`
+	Right  int32 `json:"right"`
+	Bottom int32 `json:"bottom"`
+}
+
+// WebViewConfig connects the COM browser with the native window. All callbacks
+// except Post execute on the window's STA thread. Post may be called from any
+// goroutine and returns false once the window starts shutting down.
+type WebViewConfig struct {
+	AppURL       string
+	UserDataPath string
+	SaveDownload func(suggestedName string) (path string, ok bool)
+	Post         func(func()) bool
+	OnError      func(error)
+}

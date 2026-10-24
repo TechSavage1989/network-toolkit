@@ -1,0 +1,70 @@
+NETWORK TOOLKIT 1.17.45 PORTABLE
+Windows x64 GUI executable and complete editable Go/web source
+
+CHANGES
+
+1. ONE SFTP CLIENT / FILE BROWSER
+- Removed the separate SSH Browser entry from Workspace navigation.
+- SFTP > Client contains the full two-pane SSH file browser and transfer features.
+- Old settings pointing to SSH Browser automatically open SFTP in Client mode.
+
+2. SAVED TERMINAL SSH CONNECTION PROFILES
+- SFTP Client can select an existing saved SSH terminal connection.
+- Load profile imports host, port, username, authentication mode and
+  a known, previously verified SSH host-key fingerprint when available.
+- Profiles linked to Windows-protected credentials can authenticate SFTP
+  with a password or inline SSH private key, without a separate key file.
+- Credentials are resolved per live request and never stored in the
+  remote-browser settings, diagnostic history or browser form values.
+- Profiles without stored credentials still require manual authentication.
+- Unverified hosts still require independent fingerprint verification.
+- Previously connected SSH terminal sessions remain directly reusable.
+
+3. AUTOMATIC TERMINAL RIGHT-SIDEBAR SFTP TAB
+- Terminal sidebar now sits to the right of the terminal display.
+- For an active, authenticated SSH terminal, the application probes SFTP
+  subsystem support on a separate channel, without a new TCP login.
+- If supported, an SFTP tab appears automatically in the terminal sidebar.
+  Unsupported SSH, Telnet, serial and disconnected terminals do not show it.
+- The SFTP tab follows the selected terminal session and retains its
+  session-specific browsing state while that terminal remains connected.
+- Compact browser includes remote folder navigation, listing, filtering,
+  preview, new folder, upload, download, rename and confirmed delete.
+- The Expand action opens SFTP > Client for the full two-pane browser.
+- Closing the file browser does not close the terminal or SSH transport.
+- The capability check does not enumerate directories. Remote listing
+  begins when the SFTP sidebar tab is opened.
+- Sidebar resizing and arrow directions have been adjusted for right-side
+  placement; terminal panes and scrollback are retained.
+
+4. STABILITY AND SECURITY
+- Server-side session ownership, revision, active-connection state and
+  per-request validation remain enforced for shared SFTP operations.
+- A request cannot inject authentication credentials into a borrowed
+  terminal session or probe SFTP support without a terminal session.
+- Sidebar renders avoid destroying focused file rows unnecessarily.
+- Windows executable includes compiled-in icon, manifest and version
+  resource 1.17.45, with all assets embedded.
+
+TESTING
+- Go application and package test suite: PASSED.
+- JavaScript unit/regression test suite: 272 passed, 0 failed.
+- End-to-end Go SSH/SFTP test: probe, listing, preview, upload and download
+  share one authenticated SSH TCP connection and preserve shell access.
+- New JS tests: sidebar probe, dynamic visibility, unsupported servers,
+  session change and disconnect, file operations, saved passwords/keys,
+  and profile host verification.
+- JavaScript syntax checks: PASSED.
+- Windows x64 cross-build and PE file identification: PASSED.
+- ZIP integrity and SHA-256: see SHA256SUMS.txt.
+- Native Windows GUI and network-device tests: not performed in this build
+  environment. Browser-based live UI smoke testing was blocked by the local
+  Chromium environment, so Windows visual validation is still required.
+
+USE
+- Terminal: connect with SSH. If its SFTP subsystem is supported, click
+  the dynamically appearing SFTP tab in the right sidebar.
+- From Terminal Tools or terminal tab context menu, choose Browse SFTP.
+- Open SFTP > Client for the full file browser. Select a connected SSH
+  terminal or load a saved terminal profile and connect independently.
+- SFTP requires server-side subsystem support and account file permissions.

@@ -1,0 +1,48 @@
+NETWORK TOOLKIT 1.17.55
+Released: October 24, 2026
+
+CONNECTION SIDEBARS
+- Added Connection settings as the first Terminal sidebar tab, labelled Setup.
+- Moved Setup above Saved and Recent in SFTP, FTP/FTPS and TFTP clients.
+- Clicking the selected tab closes an open sidebar. Clicking it again opens
+  it. Clicking another tab opens that tab directly.
+- Removed the separate Show/hide and close buttons from these tabbed
+  sidebars. Divider resizing, keyboard navigation and left/right Terminal
+  docking remain available.
+- Programmatic tab selection expands a tab without toggling it closed.
+- Selected tabs, collapsed state and preferred widths retain their existing
+  per-tool persistence.
+
+TERMINAL CONNECTION SETTINGS
+- The sidebar uses the same SSH, Telnet and Serial connection form and
+  handlers as the existing connection dialog.
+- Includes saved profiles, profile naming and saving, authentication,
+  protected credentials and SSH compatibility/serial options.
+- Use active session copies the selected terminal's connection settings.
+- Terminal form drafts stay in memory across tab changes and navigation.
+  Opening a separate connection dialog uses one form instance so IDs and
+  authentication fields do not conflict.
+- Terminal panes and output remain mounted while sidebar tabs change.
+- Restricted single-session detached views retain their existing limits.
+
+SFTP AND FTP/FTPS CREDENTIALS
+- Added Saved credential and Save / update credential to both client setups.
+- Uses the same protected-vault save/update operation as Terminal.
+- SFTP supports password or SSH private-key credentials and passphrases.
+  Keys can be pasted, chosen from a desktop file or read from a local path.
+- FTP/FTPS selectors show compatible password credentials.
+- New credentials link to the current connection. Saving a profile retains
+  that link; saving a credential for an existing profile updates its link.
+- Editing a password retains the current profile and credential update
+  target. Updates retain the credential ID used by shared profiles.
+- New manual connection settings clear the previous profile's credential
+  update target.
+- Profile names are editable directly in client connection settings.
+- Password-manager edits refresh credential selections. Removing a
+  credential clears its references across profiles and transfer histories.
+- Passwords, private keys and passphrases remain outside ordinary settings.
+
+PACKAGE
+- Windows x64 executable, complete editable Go/web source and vendored modules.
+- Icon, manifest and version resources embedded at compile time.
+- See VALIDATION.txt for checks performed and test limitations.

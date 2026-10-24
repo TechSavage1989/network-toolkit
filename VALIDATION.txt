@@ -1,0 +1,65 @@
+NETWORK TOOLKIT 1.17.57 VALIDATION REPORT
+October 24, 2026
+
+WINDOWS BUILD - PASS
+Windows x64 GUI cross-compilation, Go 1.23.2, CGO_ENABLED=0.
+Standard PE32+ AMD64 Windows GUI executable with icon, manifest and 1.17.57
+version resources embedded before linking. No executable patching.
+
+APPLICATION TESTS - PASS
+go test -mod=vendor . ./internal/terminal ./internal/desktop
+Includes shared SSH/SFTP transport, credential, lifecycle and embedded-asset
+route regressions. Sidebar sanitizer accepts only supported docking values.
+
+JAVASCRIPT - PASS
+301 JavaScript tests. Includes Open SFTP routing, session eligibility,
+connection-ID-only file operations, credential reuse, and clearing remote
+folders when switching to another SSH session.
+
+UNIVERSAL WORKSPACE GEOMETRY - PASS
+280 rendered cases covering 34 main tool/tab/mode variants plus independent
+Terminal windows, four window sizes from 570 to 2560 pixels, and both themes.
+Verified shared margins, full available width, aligned headers, contained
+header controls, and no document-level horizontal overflow.
+Representative desktop and narrow layouts were also inspected visually.
+
+TRANSFER CLIENT SIDEBARS - PASS
+60 rendered SFTP, FTP/FTPS and TFTP cases covering five window sizes, both
+themes and both sidebar docks. Verified side-swap controls, saved docking,
+desktop and narrow pointer/keyboard resizing, selected-tab open/close,
+preference reload, activity sizing, and no extra directory requests.
+Directory double-click, immediate editor loading feedback and stale folder
+response handling continue to pass with the final session-bar layout.
+
+TRANSFER SERVERS - PASS
+30 rendered SFTP, FTP/FTPS and TFTP server cases with both themes and five
+window sizes. Adapter selection, log resizing, preference persistence,
+viewport recovery and containment remain working with the shared spacing.
+
+ACTIVE SESSION BARS - PASS
+16 rendered cases across four window sizes, both themes and both positions.
+Open SFTP selects the active SSH session rather than another available one,
+switches to Client mode, and sends no new connection credentials.
+Computed bar, button, heading, picker and icon styles match Terminal.
+Position changes retain file-pane DOM nodes and remain available with the
+sidebar closed. Non-SSH, closed and unavailable sessions disable the action.
+Independent/detached Terminal retains its existing Browse SFTP sidebar action.
+
+LIVE APPLICATION INTERFACE - PASS
+Linux development engine exercised through Chromium with real loopback SFTP
+and FTPS servers, using temporary test credentials only.
+Verified profile sharing, credential creation/update, authenticated browsing,
+owned disconnect/reconnect, failed shell promotion preserving SFTP, and
+restart persistence. Eight Terminal layout cases cover four sizes/both docks.
+No browser page errors were reported.
+
+PACKAGE - PASS
+Archive is closed and verified before atomic publication. Every ZIP member
+matches its source SHA-256; ZIP CRC check passes. Exactly one Windows
+executable is included, together with complete editable source and vendored
+dependencies. SHA256SUMS files cover the release and source contents.
+
+PLATFORM LIMITATION
+Native Windows GUI execution was not available in this environment.
+The Windows executable was cross-compiled and inspected; rendered interface
+and live integration checks ran in Chromium against the Linux engine.

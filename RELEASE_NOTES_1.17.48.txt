@@ -1,0 +1,61 @@
+NETWORK TOOLKIT 1.17.48 PORTABLE
+24 October 2026
+
+PUBLIC IP PLACEMENT
+- The public IPv4/IPv6 card is now rendered only on Tools > Local network >
+  IP Configuration. It is not rendered on Overview, Routes, ARP, Connections,
+  Wi-Fi, or other local diagnostic views.
+- Public IP refresh and copy actions remain available from IP Configuration.
+
+FTP / FTPS CONNECTION SETTINGS
+- Fixed the Connection settings panel and button to use one shared expanded
+  state; opening the FTP/FTPS client with Manual selected no longer forces
+  settings visible while the control says Connection settings.
+- The first click expands the settings, the second click hides them. Button
+  text and accessibility aria-expanded agree with actual visibility.
+- SFTP connection settings behavior is retained.
+
+TOOLS NAVIGATION
+- Renamed the Local tools sidebar section to Tools.
+- Text Editor now has a distinct top-level Tools entry, not a Local network tab.
+- Migrates saved Local network editor-tab selection to the new entry.
+- Uses a separate Text Editor icon; corrected icon fallback behavior for local
+  IP Configuration, Routing Table, ARP, Connection tools and context actions.
+  FTP and SFTP protocol buttons display distinct transfer-related icons.
+
+TEXT EDITOR INTEGRATION
+- Text Editor under Tools can open local Windows files, including files chosen
+  in the Windows file picker or from full local file paths, as before.
+- Added a Connected session dropdown with connected SSH terminal sessions,
+  connected SFTP client browsers, and connected FTP/FTPS client browsers.
+- Added a remote file path field, Open remote and New remote commands, and
+  a Refresh action for connected-session discovery.
+- SSH terminal files use their authenticated SSH connection over SFTP.
+  SFTP and FTP/FTPS files use the existing authenticated file-browser client.
+  The editor checks the selected connection is still active and prevents
+  saves after a terminal session ID/revision or browser identity changes.
+- Added Open Text Editor action in SSH terminal tab context menus and the
+  terminal's session-specific SFTP sidebar; SFTP/FTP file browsers provide
+  a full Text Editor action with the connected source and selected file path.
+- The existing open-by-selection Edit action, multi-document editing,
+  encoding options, syntax coloring and guarded saves remain available.
+
+VALIDATION
+- Windows x64 GUI executable compiled using the included Go vendor tree.
+- Go unit/integration tests passed; 274 existing JavaScript regression tests
+  passed. JavaScript syntax checks passed.
+- Automated Chromium UI smoke tests passed for the standalone Tools editor,
+  public IP location, FTP settings toggle, distinct navigation/local-tool
+  icons, connection routing for FTP/FTPS and SFTP, and a mocked SSH session
+  file read. No uncaught browser JavaScript errors in those checks.
+- ZIP CRC and executable checksum are recorded in VALIDATION.txt.
+
+TESTING LIMITATIONS
+- Physical Windows execution and real SSH/SFTP/FTP/FTPS server connections
+  have not been verified in this environment. Some browser-only checks used
+  simulated live connection responses, not real equipment.
+- Windows Explorer drag-out, Windows file picker integration and other
+  platform-specific operations remain unverified on native Windows.
+- The editor is for plain text including the formats already supported in
+  1.17.47, not a binary or rich-text Office document editor. Existing 8 MiB
+  per-document and single-file Explorer drag-out limits remain unchanged.
