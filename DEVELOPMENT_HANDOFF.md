@@ -23,7 +23,7 @@ Do not delete repositories or change their access/security settings.
 
 An already-installed original 1.17.63 cannot discover a same-version update;
 it needs manual EXE replacement. Earlier clients can receive the revised63
-bridge once its replacement publication is verified. No later release uses the second feed.
+bridge now published on the old feed. No later release uses the second feed.
 
 The existing main-push Release workflow publishes a new version once, with
 standalone EXE, source Portable.zip, binary-only Update.zip and combined
@@ -111,8 +111,10 @@ Automatic checks/reminders do not authorize automatic download or installation.
 
 Revised 1.17.63 currently passes 359 JavaScript checks, 31 Python checks,
 release metadata/resource validation, root/desktop/terminal Go suites and
-Windows x64 GUI cross-compilation. Independent migration/revision-mode review passed. Hosted CI and remote
-publication verification remain pending. Read VALIDATION.txt for the latest verified status.
+Windows x64 GUI cross-compilation. Independent migration/revision-mode review
+passed. Hosted source Checks, including rendered Chromium server/client layout
+regressions, and the guarded main release revision completed successfully.
+Read VALIDATION.txt and the release record below for verified provenance.
 
 1.17.63 passed the required root/desktop/terminal Go suites, all 358 JavaScript
 checks, fourteen Python checks, release/resource validation and Windows x64 GUI
@@ -207,3 +209,41 @@ source and change only this request JSON. Build detaches the selected source.
 Before replacement, both source main and request branch must still match their
 recorded commits. Replay after successful replacement fails the original-tag
 and original-asset guards. Ordinary main pushes never use request mode.
+
+## Revised 1.17.63 publication record (2026-10-24)
+
+The released application/source tag is
+6bb00ea7224ce1e9e0b4b2db4b806915fc9947aa. Main source Checks run 40143510699
+passed; main revision Release run 40143608659 passed. Request-only commit
+cf38b17aa28402f0b17a5d4eafa326b8fa27c524 also passed Checks 40143608763.
+The original main release ID 423021173 was preserved and its actual v1.17.63
+tag now resolves to the revised source. GitHub's historical target_commitish
+field may retain the original creation target; use the resolved tag for source
+provenance, not that informational creation field.
+
+Official release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.63
+EXE SHA-256: b2e9232330a0098134dcd8c41ba8a1fa6df02908f8acb879aab4bf98695b0f18
+Update ZIP SHA-256: 6bf8305211166b14841505e5bca1e4a9358051ac47d45060a865a5dd64fac7d7
+Source Portable ZIP SHA-256: 2b1d4dbb3a889925a04139c50657cc7ec0fbfc1fa3e28770533853915e455025
+All three downloaded official assets passed external manifests, inner checksums,
+strict updater allowlist, PE/version and matching-executable verification.
+The exact hosted ZIP is the bridge payload; independently repackaging ZIPs can
+change their hashes through timestamps even with identical executable bytes.
+
+The main repository's consumed request-branch push trigger has been removed
+from its current workflow. Historical request branches and releases are retained;
+old-state checks prevent replay. Ordinary main pushes still publish only new
+versions. Explicit manual revision mode remains guarded, not blanket overwrite
+permission. This final handoff/validation maintenance does not rebuild or change
+the already verified application assets or move their source tag.
+
+Legacy bridge completion: old-feed revision run 40143885776 succeeded,
+preserving release ID 423040841 and its historical tag. Its two published assets
+are the exact same Update.zip hash above and a binary-only checksum manifest.
+The archived original 1.17.62 updater fetched the real old feed and successfully
+verified/staged the revised63 EXE hash above. The unchanged revised63 updater
+then checked the real main feed, reported current/latest63 with no false update,
+and rejected same-version download without staging or installation. These are
+Go/API/feed compatibility checks, not native Windows GUI/restart tests.
+The old repository is retained solely for this completed bootstrap and history;
+all later updates use the main repository.

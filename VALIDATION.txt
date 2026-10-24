@@ -20,8 +20,21 @@ PASSED LOCALLY
 - Built EXE, complete source Portable.zip and strict Update.zip packaging,
   exact four-member allowlist, inner/outer checksums and byte-identical EXEs.
 
-PENDING
-- Hosted Checks/Release workflows and final remote asset/tag verification.
+PASSED HOSTED AND PUBLISHED
+- Source Checks 40143510699 and request Checks 40143608763, including rendered
+  Chromium server/client layout coverage in light/dark themes at five sizes.
+- Guarded main revision Release 40143608659, preserving existing release ID
+  423021173 and moving v1.17.63 to tested source 6bb00ea7224ce1e9e0b4b2db4b806915fc9947aa.
+- Downloaded official EXE, source Portable.zip, Update.zip and SHA256SUMS;
+  all external and internal hashes, binary identity, strict allowlist and
+  main-repository API embedded in the executable verified.
+- Old-feed bridge Release 40143885776 preserved release423040841 and published
+  the identical revised ZIP. Archived original1.17.62 fetched the actual oldfeed
+  and verified/staged revised63 EXE b2e9232330a0098134dcd8c41ba8a1fa6df02908f8acb879aab4bf98695b0f18.
+- Revised63 production updater check against main reports current/latest63,
+  no false update, and same-version download rejects with409 without staging.
+
+UNVERIFIED
 - Native Windows runtime update, bootstrap, shortcut and restart validation.
 
 LIMITATIONS
@@ -29,8 +42,9 @@ Original 1.17.63 validation below is historical evidence, not a claim that
 revised 1.17.63 passed the original hosted browser workflow.
 Native Windows/WebView2 and real physical network equipment are unavailable.
 Original 1.17.63 installations cannot detect a same-version replacement.
-See UPDATING.txt. Replacement publication on both repositories is owner-authorized and awaits
-verified completion. Earlier clients can migrate through the revised63 bridge.
+See UPDATING.txt. Both revised release publications and old62/new63 feed compatibility are
+verified. Earlier clients migrate through the completed one-time revised63
+bridge; see current handoff.
 The previously reported missing automatic update banner remains unproven.
 
 HISTORICAL BASELINE VALIDATION
