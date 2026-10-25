@@ -5,28 +5,22 @@ main and preserve existing changes. Update the handoff whenever behavior,
 release destination, validation, known issues or next steps change. Follow
 repository checks and release safeguards.
 
-Current work: authorized 1.17.71 publication for SMTP password retention.
-Read the first handoff section for exact scope and validation. The password
-stays only in the open form and is cleared on switching tools. Never persist
-it in app state/settings/history. Keep temporary request options scrubbed.
-Preserve earlier features, especially the single final update-install action.
+Current release: 1.17.71 retains the SMTP password for repeat tests and clears
+it on switching tools. Keep it only in the open form, outside app state,
+settings and history. Temporary request options must still be scrubbed.
+Preserve all earlier features and the single final update-install action.
 
-The user explicitly authorized publication of 1.17.71 on 2026-10-25 after the
-completed review build. This covers the focused SMTP change and its new release,
-not unrelated future releases. No further approval is needed for this version.
-Main pushes publish new versions automatically. Retain the verified runtime and
-promote only after checking remote main. Never replace earlier tags/assets or
-change repository access. Main network-toolkit is the only source/update feed.
-Published baseline before promotion is 1.17.70, source/tag
-538657ac04477b9192cfcd547f5ddc34d2f3eaed. Record final publication evidence in
-the first handoff section and VALIDATION.txt.
-Native Windows/WebView2, live SMTP and actual native install/restart are not
-verified here. Record completed checks honestly in the handoff and validation.
+The user authorized this specific 71 source upload and publication on
+2026-10-25 after the review build. Future releases need their own authorization.
+Main pushes publish new versions automatically. Main network-toolkit is the
+only source/update destination. Never replace old tags/assets or change access.
 
-Full runtime Checks 40163863165 passed on source
-90433f9617e2568e4cb8d00a8287f68ba1d9168d: 432 JS tests, 31 Python guards,
-required Go suites, Windows build/package and all browser scenarios including
-SMTP at 390/1280px and the real five-minute update timer. Review artifact
-12587098378 matches the local portable/EXE. The first handoff section records
-hashes, publication boundaries and platform limits. This final documentation
-follow-up changes no runtime or review artifact; no repeat validation is needed.
+Published source/tag: 0b3ffe7cbc12be9778429651507b442f33073aa1.
+Full runtime Checks 40163863165 passed on source 90433f9, with only subsequent
+documentation changes before publication. Release 40164554695 passed. All
+four official downloads, all 677 packaged source files and unchanged released70
+live feed/download/staging are verified. Ten older releases/tags are preserved.
+See the first handoff section for exact hashes, provenance and validation limits.
+This final documentation follow-up must not change or republish the runtime.
+Native Windows/WebView2, live SMTP and actual native install/restart remain
+unverified here. Do not treat mocked browser tests as native runtime proof.

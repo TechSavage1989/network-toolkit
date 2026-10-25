@@ -26,10 +26,30 @@ unverified. The final documentation follow-up leaves the tested runtime and
 review artifacts unchanged; duplicate automatic checks need not be awaited.
 
 The user explicitly authorized publication on 2026-10-25 after the verified
-review build. Preparation changes only four documentation files; the tested
-runtime and EXE remain unchanged. Official release verification is pending.
-The previous 1.17.70 release and all earlier tags/assets must be preserved.
-See DEVELOPMENT_HANDOFF.md for scope, provenance and validation limits.
+review build. Published source/tag is
+0b3ffe7cbc12be9778429651507b442f33073aa1. Only four documentation files
+changed before promotion; the tested runtime and EXE remain unchanged.
+Release 40164554695 succeeded. Main Checks 40164554729 passed its check job
+and browser steps before the duplicate native timer suite; the completed full
+runtime run above is authoritative and docs may supersede duplicate checks.
+
+OFFICIAL PUBLICATION VERIFICATION
+- All four actual public downloads match GitHub asset digests.
+- Outer/inner SHA-256 manifests, both ZIP CRCs and strict updater allowlist pass.
+- Windows x64 GUI PE/version and standalone/portable/update EXE identity pass.
+- All 677 packaged source files match the exact published source commit.
+- Public portable matches the local publication-source package byte-for-byte.
+- The official EXE is identical to the verified review build.
+- Ten older release IDs and all asset IDs/sizes/digests remain unchanged.
+- Ten older source-tag SHAs match the prepublication snapshot.
+- Exact released70 handlers checked/downloaded/verified/staged live71 in 11.35s.
+- Staged bytes match the independently downloaded official EXE.
+- No install/restart or original test executable modification occurred.
+
+The live harness uses only platform-independent production feed handlers,
+real HTTPS and isolated temporary settings. See DEVELOPMENT_HANDOFF.md for
+hashes, provenance and native Windows/live SMTP validation limits. This final
+documentation follow-up must not rebuild, replace or republish released assets.
 
 HISTORICAL PUBLISHED BASELINE
 

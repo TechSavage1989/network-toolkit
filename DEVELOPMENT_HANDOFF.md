@@ -1,6 +1,6 @@
 # Network Toolkit development handoff
 
-## 1.17.71 authorized publication: retain SMTP password for repeat tests
+## 1.17.71 published: retain SMTP password for repeat tests
 
 Prepared from latest main df712385f61108ca43271d22ed9e73d3f6e88629 in response
 to the request to keep the SMTP password filled after a test and clear it when
@@ -54,15 +54,47 @@ Review Portable.zip SHA-256 (9,052,210 bytes):
 Review EXE SHA-256 (14,183,424 bytes):
 8f078b44d5bf2b165c749754aaac41cd60a194b19bf3487d769f2a18052833fa
 
-The publication-preparation commit changes only README.txt, AGENTS.md, this
-handoff and VALIDATION.txt from reviewed documentation commit
-082ca75078458efd989a2cdc61a9474205b5f33b. Review-only status wording is removed.
-No application, version, resource or test code changes after full validation.
-The verified EXE stays byte-identical; the source portable is repackaged with
-the current publication documentation. Promotion starts from checked main
-df712385f61108ca43271d22ed9e73d3f6e88629. Do not overwrite prior assets/tags.
-Record final source/tag, release workflow, official downloaded hashes and the
-unchanged released70 live feed/download/staging result after publication.
+Published source/tag is 0b3ffe7cbc12be9778429651507b442f33073aa1 (tree
+f79fcf76ffbca0866245d0aa64c1a3c98a031bd3). It changes only README.txt,
+AGENTS.md, this handoff and VALIDATION.txt from reviewed documentation commit
+082ca75078458efd989a2cdc61a9474205b5f33b. No application, version, resource
+or test code changes after full runtime validation. Main was promoted using
+an expected-SHA non-forced update from
+df712385f61108ca43271d22ed9e73d3f6e88629. The source portable is repackaged
+with current publication documentation; the approved EXE stays byte-identical.
+
+Release 40164554695 completed successfully and created stable release
+423161784. Automatic main Checks 40164554729 passed its check job and the
+browser steps before the duplicate native timer suite. The completed runtime
+run 40163863165 above remains the full validation. Documentation follow-ups
+may supersede automatic duplicate checks without changing the tagged runtime.
+
+All four actual public downloads match GitHub asset digests. Outer/inner
+SHA-256 manifests, both ZIP CRCs, the strict four-member updater allowlist,
+Windows x64 GUI PE/version and standalone/portable/update EXE identity pass.
+All 677 packaged source files match the exact published commit. The public
+portable matches the local publication-source package byte-for-byte, and its
+EXE is identical to the reviewed build. All ten earlier release IDs and asset
+IDs/sizes/digests remain unchanged; all ten older source-tag SHAs are preserved.
+
+The unchanged released 1.17.70 production feed handlers checked the live feed,
+verified/downloaded/staged 1.17.71 in 11.35 seconds. The staged EXE matches the
+independently downloaded official file. The harness used real HTTPS, isolated
+temporary settings and only platform-independent feed handlers. No installation
+or restart occurred and its original test executable hash stayed unchanged.
+Verification records, baseline snapshots and the raw log remain in local QA.
+
+Official release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.71
+EXE SHA-256: 8f078b44d5bf2b165c749754aaac41cd60a194b19bf3487d769f2a18052833fa
+Portable ZIP SHA-256: 6afc63126af28e83f00b2e9d6356a18d242cb684f1c3d47d92974e71d54b326b
+Update ZIP SHA-256: 5ddf1eb922b2b10e80f304f27ca226a3a2c0a8ee2f3daf6f7d65a35d1a3e54f3
+SHA256SUMS file SHA-256: 6150a3a661b814633fd4724cc1f235d88fe3caf90a0929414b79ce06e2019e39
+
+This final publication-record follow-up changes only AGENTS.md, this handoff
+and VALIDATION.txt. Do not move the released 1.17.71 tag, replace its assets
+or republish it. Continue future work from latest main, preserve SMTP's form-only
+password lifetime and keep all earlier features. Future releases need their own
+user authorization; the current publish instruction covers this version only.
 
 Native Windows/WebView2 and live SMTP authentication remain untested here.
 The unchanged 70 updater and prior native install/restart limits remain as
