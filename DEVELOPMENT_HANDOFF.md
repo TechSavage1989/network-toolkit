@@ -2,6 +2,45 @@
 
 ## Start here
 
+Current candidate: **1.17.65**, based on exact public main
+f4754d11a9df4d93c7028a1a65b20536921dc9ef (tree
+8342a0d3e09e15f40e40972284110b692edf85c1). The user approved building and
+publishing this narrow timer fix on 2026-10-25. Release is gated on independent
+review, hosted native-browser negative/positive proof, and passing Checks.
+Until that gate passes, 1.17.64 below remains the published release.
+
+## 1.17.65 native update timers
+
+The production scheduler environment now wraps both setTimeout and clearTimeout
+through the Window root. Previously, bare native functions were invoked as
+methods of the scheduler environment, giving them the wrong receiver. The
+receiver-enforcing integration fixture reproduces the resulting exception after
+nextAt is set but before any live timer is registered. The wrapper preserves
+injected test clocks while providing the correct receiver to native browsers.
+
+The native browser suite uses the actual index page and native timers, without
+page.clock or timer replacement. Its negative control restores only the exact
+released 64 timer wiring; the candidate must demonstrate the positive counterpart.
+Before hosted execution, this is a diagnosis and test expectation, not a claim
+that native Chromium or the user's Windows runtime has confirmed the cause.
+
+Retained unchanged: saved opt-out and startup preference loading, six-hour checks,
+30-second/2-minute retries and bounded backoff, manual checks, per-stage/version
+24-hour reminders, safe release notes, stable executable naming, settings backup,
+all revised 63 features, and explicit download/install consent. No installer,
+cleanup permissions, file-storage or restart behavior is modified. The user
+independently removed a stale folder to resolve their earlier cleanup warning;
+this release does not claim to fix that separate warning.
+
+Local validation passed: 379 JavaScript tests, 31 Python tests, root/terminal/
+desktop Go tests, release/resource validation and Windows x64 GUI cross-build.
+Validation status will be finalized after hosted proof and publication. Native
+Windows/WebView2, real installation and restart remain untested here. Retain all
+old release tags/assets and use the main repository only; do not write to the
+retired update repository or change repository access.
+
+## Published 1.17.64 baseline
+
 The current released application is **1.17.64**, based on verified public main
 71df414ea97496c26565df12e9e2ac5a0d3c3203. The last published/user-confirmed
 baseline is revised 1.17.63, source tag 6bb00ea7224ce1e9e0b4b2db4b806915fc9947aa.

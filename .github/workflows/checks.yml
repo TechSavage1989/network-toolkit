@@ -76,6 +76,11 @@ jobs:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
         run: node scripts/app-updater-startup.browser.cjs
+      - name: Check native Chromium update timers and released regression control
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
+        run: node scripts/app-updater-native-timers.browser.cjs
       - uses: actions/upload-artifact@v7
         if: always()
         with:

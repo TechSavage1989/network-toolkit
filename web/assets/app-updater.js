@@ -165,7 +165,9 @@
   function start(savedPreferences,reloadSavedState){
     if(OFFLINE||TERMINAL_ONLY||DETACHED_TERMINAL||scheduler)return;
     preferencesPending=!!savedPreferences;preferencesLoaded=!savedPreferences;
-    scheduler=createScheduler({setTimeout,clearTimeout,enabled:()=>!preferencesLoaded||preferences().enabled!==false,ready:()=>!shutDown,changed:renderAutomaticStatus,
+    // Native Window timers require their Window receiver, not the scheduler env.
+    // Resolve them through root so injected browser/test clocks still work.
+    scheduler=createScheduler({setTimeout:(...args)=>root.setTimeout(...args),clearTimeout:(...args)=>root.clearTimeout(...args),enabled:()=>!preferencesLoaded||preferences().enabled!==false,ready:()=>!shutDown,changed:renderAutomaticStatus,
       describeResult:result=>result==='retry'?getController().snapshot().backgroundError||preferencesError:result==='ok'?(getController().snapshot().data?.supported===false?'Automatic updates are not supported on this platform.':getController().snapshot().data?.hasUpdate?'Update available: '+getController().snapshot().data.latest.version+'.':'No newer update is available.'):'',
       check:async()=>{
         // Never contact the release feed using default preferences when the saved

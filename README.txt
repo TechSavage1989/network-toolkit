@@ -1,7 +1,13 @@
-NETWORK TOOLKIT 1.17.64
+NETWORK TOOLKIT 1.17.65
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.64
+CURRENT RELEASE - 1.17.65
+
+Fixes native browser timer binding for automatic update checks and their
+cancellation. Saved preferences, release notes and explicit update approval
+remain unchanged.
+
+PREVIOUS RELEASE - 1.17.64
 
 Checks for updates immediately at launch and offers an automatic main-window
 banner. Review a simple What's new card before downloading and installing.

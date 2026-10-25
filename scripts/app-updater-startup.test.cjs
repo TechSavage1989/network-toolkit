@@ -17,6 +17,11 @@ function ui(options={}){
     api:async(path,method,body)=>{calls.push([path,method,body]);if(options.api)return options.api(path,method,body);return structuredClone(data)},
     openModal:(title,body,footer)=>{document.getElementById('modalRoot').innerHTML='<h2>'+title+'</h2>'+body+footer},
     ...options.context};
+  if(options.brandTimers){
+    const schedule=c.setTimeout,cancel=c.clearTimeout;
+    c.setTimeout=function(...args){assert.equal(this?.window,this,'setTimeout requires the Window receiver');return schedule(...args)};
+    c.clearTimeout=function(...args){assert.equal(this?.window,this,'clearTimeout requires the Window receiver');return cancel(...args)};
+  }
   c.window=c;vm.createContext(c);vm.runInContext(fs.readFileSync(require.resolve('../web/assets/app-update-notes.js'),'utf8'),c);vm.runInContext(source,c);
   return {c,document,calls,timers,saved,toasts,setData:value=>data=value,
     async tick(){const entry=[...timers.entries()].sort((a,b)=>a[1].delay-b[1].delay)[0];assert.ok(entry,'a timer is pending');const [id,timer]=entry;timers.delete(id);now+=timer.delay;await timer.fn();await settle();},
@@ -169,4 +174,38 @@ test('changed diagnostic work cannot permanently prevent saved updater preferenc
   let reads=0;const h=ui({api:async path=>{if(path==='/state'){if(++reads===1)throw Error('Temporary failure');return {profiles:[],appUpdatePreferences:{enabled:true}};}return path==='/jobs'?[]:available;}});
   await init(h);await settle();h.c.state.profiles=[{id:'unsaved'}];await h.tick();
   assert.match(h.noticeText(),/1.17.62 is available/);assert.equal(h.c.state.profiles[0].id,'unsaved');assert.equal(h.saved.length,0);
+});
+
+
+test('actual initializer preserves Window receiver for startup, manual replacement and toggle cancellation',async()=>{
+  const h=ui({brandTimers:true,api:async path=>path==='/state'?{appUpdatePreferences:{enabled:true}}:path==='/jobs'?[]:available});
+  await init(h);await settle();assert.equal(h.timers.size,1);assert.equal(h.nextDelay(),0);
+  await h.tick();assert.equal(h.calls.filter(c=>c[0]==='/updates/check').length,1);
+  assert.equal(h.timers.size,1);assert.equal(h.nextDelay(),21600000);
+  await h.settings();assert.match(h.scheduleText(),/Last automatic attempt:.*Update available/);
+  await h.click('check');assert.equal(h.calls.filter(c=>c[0]==='/updates/check').length,2);
+  assert.equal(h.timers.size,1);assert.equal(h.nextDelay(),21600000);
+  for(const enabled of [false,true]){
+    const box=h.document.querySelector('[data-app-update-auto]');box.checked=enabled;
+    for(const handler of h.document.listeners.change||[])await handler({target:box});
+    assert.equal(h.timers.size,1);assert.equal(h.nextDelay(),0);
+    await h.tick();assert.equal(h.timers.size,1);assert.equal(h.nextDelay(),21600000);
+  }
+  assert.equal(h.calls.filter(c=>c[0]==='/updates/check').length,3);
+  assert.equal(h.calls.some(c=>/updates\/(download|install)/.test(c[0])),false);
+});
+
+test('Window-bound timer cancellation retains bounded retry and no duplicate timer',async()=>{
+  let attempts=0;
+  const h=ui({brandTimers:true,api:async path=>{
+    if(path==='/state')return {appUpdatePreferences:{enabled:true}};
+    if(path==='/jobs')return [];
+    if(path==='/updates/check'&&++attempts===1)throw new Error('Temporary connection failure');
+    return available;
+  }});
+  await init(h);await settle();await h.tick();
+  assert.equal(attempts,1);assert.equal(h.timers.size,1);assert.equal(h.nextDelay(),30000);
+  await h.settings();assert.match(h.scheduleText(),/Next automatic retry/);
+  await h.click('check');assert.equal(attempts,2);assert.equal(h.timers.size,1);assert.equal(h.nextDelay(),21600000);
+  await h.tick();assert.equal(attempts,3);assert.equal(h.timers.size,1);
 });
