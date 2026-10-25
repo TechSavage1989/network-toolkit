@@ -23,7 +23,7 @@ const profile=(id,name,extra={})=>({id,name,type:'ssh',host:id+'.test',port:22,u
   try{
    const file=path.join(root,'web',p==='/'?'index.html':p);let body=fs.readFileSync(fs.existsSync(file)?file:path.join(root,p));
    if(p==='/')body=body.toString().replaceAll('__SESSION_TOKEN__','folder-fixture').replaceAll('__WINDOW_MODE__','main');
-   return route.fulfill({body,contentType:p==='/'?'text/html':p.endsWith('.js')?'application/javascript':p.endsWith('.css')?'text/css':'application/octet-stream'});
+   return route.fulfill({body,contentType:p==='/'?'text/html':p.endsWith('.js')?'application/javascript':p.endsWith('.css')?'text/css':p.endsWith('.svg')?'image/svg+xml':p.endsWith('.ico')?'image/x-icon':'application/octet-stream'});
   }catch{return route.fulfill({status:404,body:''});}
  });
  const select=async value=>page.selectOption('#sessionLibraryFolder',value);
@@ -61,7 +61,7 @@ const profile=(id,name,extra={})=>({id,name,type:'ssh',host:id+'.test',port:22,u
    const remote=NetworkToolkitRemoteBrowser;
    for(const kind of ['ssh','ftp']){
     const record=kind==='ssh'?state.terminalProfiles.find(row=>row.id==='core'):state.ftpProfiles[0],draft=remote.configurations[kind],model=remote.get(kind);
-    Object.assign(draft,{host:record.host,username:record.username,port:record.port,fingerprint:'',credentialId:record.credentialId});model.profileId=record.id;
+    Object.assign(draft,{host:record.host,username:record.username,port:record.port,fingerprint:'',credentialId:record.credentialId,security:record.security||'ssh',authMode:record.authMethod||'password'});model.profileId=record.id;
     if(kind==='ssh')remote.saveSharedSSHProfile(record.name);else remote.saveFTPProfile(record.name);
    }
    navigate('terminal');NetworkToolkitSessionSidebar.activateTab('saved');
@@ -74,9 +74,9 @@ const profile=(id,name,extra={})=>({id,name,type:'ssh',host:id+'.test',port:22,u
   const cases=[];
   for(const width of [1280,768,390])for(const theme of ['light','dark'])for(const side of ['left','right']){
    await page.setViewportSize({width,height:900});await page.evaluate(({theme,side})=>{state.terminalSidebarSide=side;setTheme(theme);NetworkToolkitSessionSidebar.render();},{theme,side});
-   const box=await page.locator('#sessionLibraryFolder').evaluate(el=>{const b=el.getBoundingClientRect(),p=el.closest('.terminal-sidebar-content').getBoundingClientRect(),s=getComputedStyle(el);return {left:b.left,right:b.right,parentLeft:p.left,parentRight:p.right,contentHeight:el.clientHeight-parseFloat(s.paddingTop)-parseFloat(s.paddingBottom),lineHeight:parseFloat(s.lineHeight)};});
-   assert(box.left>=box.parentLeft-1&&box.right<=box.parentRight+1,JSON.stringify({width,theme,side,box}));assert(box.contentHeight>=box.lineHeight);
-   cases.push({width,theme,side});
+   const box=await page.locator('#sessionLibraryFolder').evaluate(el=>{const b=el.getBoundingClientRect(),p=el.closest('.terminal-sidebar-content').getBoundingClientRect(),s=getComputedStyle(el),canvas=document.createElement('canvas').getContext('2d');canvas.font=[s.fontStyle,s.fontWeight,s.fontSize,s.fontFamily].join(' ');const m=canvas.measureText('Ag'),fontHeight=(m.fontBoundingBoxAscent??m.actualBoundingBoxAscent)+(m.fontBoundingBoxDescent??m.actualBoundingBoxDescent);return {left:b.left,right:b.right,parentLeft:p.left,parentRight:p.right,contentHeight:el.clientHeight-parseFloat(s.paddingTop)-parseFloat(s.paddingBottom),lineHeightText:s.lineHeight,requiredHeight:Math.max(parseFloat(s.lineHeight)||0,fontHeight)};});
+   assert(box.left>=box.parentLeft-1&&box.right<=box.parentRight+1,JSON.stringify({width,theme,side,box}));assert(box.contentHeight>=box.requiredHeight,JSON.stringify({width,theme,side,box}));
+   cases.push({width,theme,side,box});
    if(output&&width===1280&&theme==='light'&&side==='right')await page.screenshot({path:path.join(output,'saved-session-folders-wide.png')});
    if(output&&width===390&&theme==='dark'&&side==='left')await page.screenshot({path:path.join(output,'saved-session-folders-compact.png')});
   }
@@ -85,7 +85,7 @@ const profile=(id,name,extra={})=>({id,name,type:'ssh',host:id+'.test',port:22,u
   const opened=requests.filter(row=>row.path==='/api/terminals'&&row.method==='POST');assert.equal(opened.length,1);assert.equal(opened[0].body.profileId,'core');assert.equal(opened[0].body.host,'edited-core.test');assert.equal(opened[0].body.password,'fixture-only-secret');assert.equal(Object.hasOwn(opened[0].body,'folder'),false);
   await page.evaluate(()=>flushState());assert(!JSON.stringify(saved).includes('fixture-only-secret'));
   assert.equal(requests.filter(row=>row.path.includes('macro')&&row.method==='PUT').length,0);assert.deepEqual(errors,[]);
-  const result={passed:true,createAssignMove:true,unfiled:true,searchAndFilter:true,duplicateAndEdit:true,ftpAndSftpPreserveFolders:true,reloadPersistence:true,credentialLinkPreserved:true,folderExcludedFromConnection:true,renderedCases:cases.length,errors};
+  const result={passed:true,createAssignMove:true,unfiled:true,searchAndFilter:true,duplicateAndEdit:true,ftpAndSftpPreserveFolders:true,reloadPersistence:true,credentialLinkPreserved:true,folderExcludedFromConnection:true,renderedCases:cases.length,layouts:cases,errors};
   if(output)fs.writeFileSync(path.join(output,'saved-session-folders-results.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result));
  }catch(error){if(output)await page.screenshot({path:path.join(output,'saved-session-folders-failure.png')}).catch(()=>{});throw error;}
  finally{await browser.close();}

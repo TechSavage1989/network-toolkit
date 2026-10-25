@@ -29,6 +29,7 @@ func TestSavedSessionFoldersPersistWithoutSecrets(t *testing.T) {
 	if saved.Terminal[0]["folder"] != "MDF" || saved.Terminal[0]["credentialId"] != "vault-reference" || saved.FTP[0]["folder"] != "Branch" {
 		t.Fatalf("folder metadata lost: %#v", saved)
 	}
+	saved.Terminal, saved.FTP = nil, nil
 	if err := json.Unmarshal(disk, &saved); err != nil || len(saved.Terminal) != 1 || len(saved.FTP) != 1 || saved.Terminal[0]["folder"] != "MDF" || saved.FTP[0]["folder"] != "Branch" {
 		t.Fatalf("folders were not written to disk: %v", err)
 	}

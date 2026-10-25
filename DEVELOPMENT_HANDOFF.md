@@ -49,8 +49,12 @@ entry is now corrected and the full Go suite passes. First hosted Checks
 40166046647 passed its check job, including Windows build/package, but its new
 browser regression caught the FTP startup loader dropping folder metadata.
 That client normalization is now corrected; the new browser assertion is
-retained. Revised hosted checks, package/release and live updater staging are
-pending. Record
+retained. The next run 40166218700 passed all behavioral folder actions and
+reload assertions, then its layout check relied on parsing the native select's
+line-height as a number. It now uses actual font bounds, matching the
+existing Hosts regression, and records computed metrics. A follow-up test-only
+change also clears prior decode results before verifying settings from disk.
+Revised hosted checks, package/release and live updater staging are pending. Record
 completed checks and publication evidence here. Native Windows, installation/
 restart and actual terminal hardware remain unverified.
 
