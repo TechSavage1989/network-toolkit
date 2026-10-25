@@ -1,17 +1,46 @@
-NETWORK TOOLKIT 1.17.74 CANDIDATE VALIDATION
+NETWORK TOOLKIT 1.17.74 VALIDATION
 
 Restores the original terminal connection modal and removes Setup/Connection
-settings from its sidebar. Preserves profile folders, credentials, macros,
-command-input scrollbar suppression and the existing update flow.
+settings from the Terminal sidebar. Keeps the original new-tab/protocol flow,
+profile/credential handlers, folders, macros, command-input scrollbar suppression,
+SMTP password lifetime and update flow. Old Setup selections migrate to Saved.
+The modal entry matches the pre-Setup 54 flow with the current folder-enabled form.
 
-Local validation passed 444 JavaScript tests, 31 Python release guards,
-required root/terminal/desktop Go suites, release/resource metadata, HTML/
-browser syntax and Windows x64 GUI build. Restored modal entry matches the
-pre-Setup 54 flow, retaining the current folder-enabled form.
-Hosted browser validation, package/artifact checks and publication are pending.
-Browser API fixtures are not native Windows or physical connection proof.
-Native Windows/WebView2, hardware and actual install/restart remain unverified.
-See DEVELOPMENT_HANDOFF.md for the scope and publication authorization.
+Full review Checks 40170178327 passed on exact published source/tag
+feb1467a5db9fa5d49a8d454ee9402e80ed82de6: 444 JavaScript tests, 31 Python
+release guards, required root/terminal/desktop Go suites, Windows x64 GUI build/
+package and all browser steps. The new regression covers 36 theme/dock/protocol
+layouts at 390/768/1280px, short windows, profile editing/folders/credential links,
+cancel/Escape/focus, retry/fixture connections, retained terminal DOM, unique form
+IDs and secret exclusion. Wide/compact screenshots were inspected. Existing
+Hosts/client/server/SMTP/folders/command-input/install checks and seven native
+Chromium timer scenarios pass, including the real five-minute poll/focus collision.
+The optional live credential browser script was adapted and syntax-checked only.
+
+Review artifact 12589993784 matches the local portable/EXE byte-for-byte. Main
+was promoted to the identical tested commit after explicit publication approval.
+Release 40170716790 succeeded. Main duplicate Checks 40170716795 passed its
+check job and restored-dialog browser step. Completed review is full runtime
+validation and docs may supersede automatic duplicate runs.
+
+OFFICIAL PUBLICATION VERIFICATION
+- All four actual public downloads match GitHub asset digests.
+- Outer/inner manifests, both ZIP CRCs and strict four-member updater allowlist.
+- Windows x64 GUI PE/version and standalone/portable/update EXE identity.
+- All 686 packaged source files match the exact published commit.
+- Official portable and EXE match the reviewed build byte-for-byte.
+- Thirteen older release IDs and asset IDs/sizes/digests remain unchanged.
+- Thirteen older source-tag SHAs match the prepublication snapshot.
+- Exact released73 handlers checked/downloaded/verified/staged live74 in 10.09s.
+- Staged bytes match the independently downloaded official EXE.
+- No installation/restart or original test executable change occurred.
+
+The live harness uses platform-independent production handlers, real HTTPS and
+isolated temporary settings. Browser actions use isolated API fixtures and no
+real terminal transports. Native Windows/WebView2, hardware and actual install/
+restart remain unverified. See DEVELOPMENT_HANDOFF.md for exact hashes, provenance
+and limits. This final docs follow-up must not move tags, replace assets or
+republish the runtime.
 
 HISTORICAL PUBLISHED BASELINE
 

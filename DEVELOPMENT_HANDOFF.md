@@ -1,46 +1,90 @@
 # Network Toolkit development handoff
 
-## 1.17.74 candidate: restore the original terminal connection window
+## 1.17.74 published: restore the original terminal connection window
 
 Prepared from main c07ef169a90c326ce205a37a34b6223eeacdba41 after the user
 confirmed the requested scope: restore the original New Session style from
-before the Setup sidebar tab and remove Setup/Connection settings from the
-Terminal sidebar. On 2026-10-25 the user explicitly authorized build and
-publication. This covers this scoped new release only; preserve prior assets.
+before Setup was added to the sidebar and remove Setup/Connection settings
+from the Terminal sidebar. On 2026-10-25 the user explicitly authorized build
+and publication. This covers this scoped release only; preserve prior assets.
 
-Compared the pre-Setup 1.17.54 source retained in the earlier portable package.
+Compared the pre-Setup 1.17.54 source retained in its earlier portable package.
 Its centered wide modal and responsive two-column connection form remain in
-current source. Remove only the redirect/inline branch, parked-form module,
-its asset route and sidebar-specific form styles. Keep the original new-tab
-empty-tab/protocol buttons, modal title/actions, profile/credential handlers,
-SSH/Telnet/serial fields, destination ownership and busy/detached guards.
-The recent saved-session folder field remains available in the dialog.
+current source. Removed the redirect/inline branch, parked-form module, its
+asset route and sidebar-specific form styles. Restored openTerminalConnect
+matches the pre-Setup function after replacing its inline form with the current
+folder-enabled form helper. Existing New tab empty-tab/protocol selection,
+modal title/actions, profile/credential handlers, SSH/Telnet/serial fields,
+destination/ownership checks and busy/detached guards are retained.
 
-The terminal rail now starts with Saved and retains Recent/Macros/SFTP. No
-Setup button or Connection settings panel is mounted. Frontend preference
-loading and Go settings sanitization migrate old settings-tab selections to
-Saved while keeping docking/width/collapse preferences. File-transfer tool
-Setup tabs are outside this request and retained. No transport/updater changes.
+New connections and saved-profile edits use that modal. The terminal rail now
+starts with Saved and retains Recent/Macros/SFTP. No Setup button or Connection
+settings panel is mounted. Frontend preference loading and Go sanitization
+migrate an old settings-tab selection to Saved while keeping dock/width/collapse
+preferences. File-transfer Setup tabs are outside this request and retained.
+Saved-session folder assignment remains available in the dialog. No transport
+or updater code changes; command-input scrollbar suppression and SMTP's form-only
+password lifetime remain intact. Go/UI/package/Windows resources are 1.17.74.
 
-Regression coverage updates existing sidebar/folder checks, tests old-setting
-migration through persisted state/workspace display, and adds a real-page
-browser test for modal opening, three protocols, cancellation/escape/focus,
-profile edits/credential links/folders, retries, fixture connections, retained
-terminal DOM and 36 theme/dock/protocol layouts at 390/768/1280px. These use
-isolated API fixtures; they do not establish real hardware/native execution.
+Local validation passed 444 JavaScript tests, 31 Python release guards,
+required root/terminal/desktop Go suites, release/resource metadata, HTML/browser
+syntax, Windows x64 GUI build and portable/update package verification. Existing
+sidebar expectations were updated for the removed tab and migration has both
+persisted-state/workspace-display and frontend coverage. The optional live
+credential browser script was adapted to the modal and syntax-checked only.
 
-Version/resources are consistently 1.17.74. Local validation passed 444 JS
-tests, 31 Python release guards, required root/terminal/desktop Go suites,
-release/resource metadata, HTML/browser syntax and Windows x64 GUI build.
-Restored openTerminalConnect matches the pre-Setup 54 function after replacing
-its inline form with the current folder-enabled form helper. An obsolete Go
-assertion expecting the removed settings tab was updated to retain Recent.
-The optional live credential browser script now uses the restored modal; it
-has syntax validation only. Hosted validation, package/artifact verification,
-publication and released73 live staging are pending.
-Main network-toolkit remains the only source/update feed. Do not alter old
-tags/releases/assets or repository visibility. Native Windows/WebView2,
-hardware and actual installation/restart remain unverified here.
+Full review Checks 40170178327 passed on exact published source/tag
+feb1467a5db9fa5d49a8d454ee9402e80ed82de6 (tree
+dbf77129fd50c5938fe134be620824fbc0613a44). Both jobs succeeded. The new
+real-page browser regression passed 36 theme/dock/protocol cases across
+390/768/1280px, including the short 600px-high wide layout. Modal containment,
+responsive columns and reachable footer actions pass. New tab/protocol and
+Saved/New actions, profile editing, folders/credential links, cancel/Escape,
+keyboard focus, retry, SSH/Telnet/serial fixture connections, retained terminal
+DOM, one form instance and secret exclusion pass. Inspected wide/compact
+screenshots show the restored centered modal. These use isolated APIs and do
+not connect to real terminal hardware or authenticate to real servers.
+
+Existing Hosts/client/server/SMTP/folders/command-input/install browser checks
+also pass, along with seven native Chromium updater-timer scenarios including
+the real five-minute poll/focus collision. Review artifact 12589993784 matches
+the local portable and EXE byte-for-byte. Its outer SHA-256 is
+653dacc3e3598effd776814b06f97019a65839f19209b299cd09f31bcc7fce42.
+Browser artifact 12590245421 digest and ZIP CRC pass; outer SHA-256 is
+900669dee1f305be24eb1c1392814a270fa8a3514c78e9d3db5a0662626aeb90.
+
+Main was fast-forwarded to that identical tested commit using expected old SHA
+c07ef169a90c326ce205a37a34b6223eeacdba41 without force. No code or docs changed
+between full review and promotion. Release 40170716790 succeeded and created
+stable release 423199653. Main duplicate Checks 40170716795 passed its check
+job and restored-dialog browser step. Completed review above remains full
+runtime validation; this documentation may supersede automatic duplicate runs.
+
+All four actual public downloads match GitHub asset digests. Outer/inner SHA-256
+manifests, both ZIP CRCs, the strict four-member updater allowlist, Windows x64
+GUI PE/version and standalone/portable/update EXE identity pass. All 686 packaged
+source files match the exact published commit. Official portable and EXE match
+the reviewed build byte-for-byte. All thirteen earlier release IDs and asset
+IDs/sizes/digests remain unchanged, with all thirteen older source-tag SHAs
+preserved. Verification snapshots and raw logs are retained with local QA.
+
+The unchanged released 1.17.73 production feed handlers checked the live feed,
+verified/downloaded/staged 1.17.74 in 10.09 seconds. Staged bytes match the
+independently downloaded official EXE. The harness used real HTTPS, isolated
+temporary settings and only platform-independent feed handlers. No installation
+or restart occurred and its original test executable hash remained unchanged.
+
+Official release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.74
+EXE SHA-256: c9625795dcbae4825e46deefd0a7289670d9310db3846def8cbf4b7e6eeda620
+Portable ZIP SHA-256: 38efe88cce31e652d8991737b9f7d4901822e091354ab515fb66f28614e434ea
+Update ZIP SHA-256: d5bf02593ad353f64207e4aad7d4b4a4a6dc8a0d723b959c8960a5ea89e24eec
+SHA256SUMS file SHA-256: ace2ac344d97ec451f623fdf541be44847dfc85fc71695471467bb2f30f7109f
+
+This final publication record changes only AGENTS.md, this handoff and
+VALIDATION.txt. Do not move the released 74 source tag, replace assets or
+republish it. Continue future work from latest main. Native Windows/WebView2,
+hardware and actual install/restart remain unverified here; browser fixtures
+and live-feed staging are not proof of native Windows execution.
 
 ## 1.17.73 published: command input without scrollbar tracks
 
