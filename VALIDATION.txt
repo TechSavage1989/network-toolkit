@@ -1,3 +1,17 @@
+NETWORK TOOLKIT 1.17.70 VALIDATION
+
+User authorized a small visible change and publication to test updating from
+1.17.69. The update section heading is now Network Toolkit updates. Version
+metadata is consistently 1.17.70. Existing install flow and backend are retained.
+No new test is added for this cosmetic heading change. Run the existing required
+suites and validate the exact released source and official downloads.
+
+After installing via 1.17.69, the user can confirm the new heading and Installed
+version: 1.17.70 in App settings. Native Windows installation/restart and the
+user's actual end-to-end update confirmation remain unverified here.
+
+HISTORICAL PUBLISHED BASELINE
+
 NETWORK TOOLKIT 1.17.69 VALIDATION
 
 The user authorized this update-flow change and publication when finished.

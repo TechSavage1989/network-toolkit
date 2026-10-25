@@ -65,7 +65,7 @@
   }
   function html(state,available,currentVersion){
     const {data,busy,error,message,backgroundError}=state,disabled=!available||busy||data?.installing||data?.supported===false,staged=data?.staged;
-    return '<h3>App updates</h3><p class="help-line">Installed version: '+escape(data?.currentVersion||currentVersion)+'</p>'+
+    return '<h3>Network Toolkit updates</h3><p class="help-line">Installed version: '+escape(data?.currentVersion||currentVersion)+'</p>'+
       (data?.executable?'<p class="help-line" style="overflow-wrap:anywhere">Running file: '+escape(data.executable.currentPath)+'</p>'+(data.executable.canonicalPath&&data.executable.canonicalPath!==data.executable.currentPath?'<p class="help-line" style="overflow-wrap:anywhere">Stable executable: '+escape(data.executable.canonicalPath)+'. Pinned shortcuts, shared shortcuts, and shortcuts elsewhere may need to be pointed to Network_Toolkit.exe manually.</p>':'')+(data.executable.warning?'<div class="notice warn">'+escape(data.executable.warning)+'</div>':''):'')+
       '<p class="help-line">Check the official public binary-release feed. Downloads are verified before installation; the public main repository provides a binary-only update package. Nothing installs until you confirm.</p>'+
       '<div class="row gap6 wrap"><button type="button" class="btn small primary" data-app-update="check" '+(disabled?'disabled':'')+'>Check for updates</button><button type="button" class="btn small ghost" data-app-update="releases" '+(disabled?'disabled':'')+'>Open release notes in browser</button></div>'+

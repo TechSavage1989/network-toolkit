@@ -1,5 +1,30 @@
 # Network Toolkit development handoff
 
+## 1.17.70: small update-flow test release, publication authorized
+
+Prepared from main 61999347587b321dde1f498517dd6970450c0ad6. The user requested
+a small change to test whether the new updater flow works and explicitly
+authorized publication when complete on 2026-10-25. No additional approval is
+needed for the new 1.17.70 source and release after validation.
+
+The only functional-file change is the App settings update heading in
+app-updater.js: App updates becomes Network Toolkit updates. Consistent
+Go/UI/package/Windows resources are 1.17.70. This is a visible confirmation
+marker after installing from 1.17.69. No tests are added for this cosmetic text
+change; run the existing required suites, including final-install-flow browser
+coverage. Preserve the 69 single-action install flow and all earlier features.
+
+Use the review branch's completed Checks result before promoting the identical
+source to main. Verify all four actual public assets, exact source provenance,
+and a live unchanged released69 check/download/stage. Record final evidence in a
+documentation follow-up without republishing or moving the released tag.
+
+User test: run installed 1.17.69, check for updates, approve download, and choose
+the single final Install and restart action. After restart, App settings should
+show Network Toolkit updates and Installed version: 1.17.70. Native Windows
+installation/restart cannot be exercised here, so actual user confirmation is
+still required before claiming a complete native end-to-end update test.
+
 ## 1.17.69 published: one final update-install action
 
 Prepared from main 74d4a1103c6887fce793ed8ce24e298526d715b0 after the user

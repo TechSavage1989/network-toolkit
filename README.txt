@@ -1,7 +1,13 @@
-NETWORK TOOLKIT 1.17.69
+NETWORK TOOLKIT 1.17.70
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.69
+CURRENT RELEASE - 1.17.70
+
+App settings now labels its update section Network Toolkit updates. This small
+visible change lets you confirm the 1.17.69-to-1.17.70 update after restart.
+The single final Install and restart flow from 1.17.69 is retained.
+
+PREVIOUS RELEASE - 1.17.69
 
 Removes the redundant Review install and restart action. A verified download
 opens the final Install and restart prompt directly. The staged-update banner
