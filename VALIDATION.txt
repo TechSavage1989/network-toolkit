@@ -20,11 +20,30 @@ runs the full required suites and packages the review artifact. The downloaded
 hosted portable matched the local verified package byte-for-byte.
 
 The user approved public source upload and publication of 1.17.68 on 2026-10-24.
-This publication preparation changes documentation only from the tested source.
-Verify main workflows and official downloads before declaring release complete;
-record the exact source, asset hashes and live released67 updater result in a
-documentation follow-up. No native Windows runtime result is inferred from the
-user's publication approval.
+Published source/tag 04bffc583445fa48656c40dc44a80af4c54e5edc changes only
+documentation from the reviewed runtime. Release 40159396027 passed and
+created release 423132212. Main source Checks 40159396034 passed both jobs,
+including compact text/DPI checks, existing client/server/updater regressions,
+and all seven native Chromium timer scenarios. Its real five-minute poll and
+focus collision passed.
+
+OFFICIAL PUBLICATION VERIFICATION
+- All four actual public downloads match their GitHub asset digests.
+- Outer/inner checksums, both ZIP CRCs and strict four-member updater allowlist.
+- Windows x64 GUI PE/version and standalone/portable/update executable identity.
+- All 672 source files match the exact published source commit.
+- The published executable matches the approved review build byte-for-byte.
+- All seven earlier release IDs and all asset IDs/sizes/digests remain unchanged.
+- All seven earlier source-tag SHAs match the prepublication snapshot.
+- Exact released67 production feed check/download/stage of live68 in 10.76s.
+- Staged executable matches the independently downloaded official EXE.
+- No installation/restart or original executable modification occurred.
+
+The live updater harness uses the unchanged platform-independent production
+feed handlers, real HTTPS and isolated temporary settings. Native Windows
+execution, installation/restart and hosts elevation remain unverified. See
+DEVELOPMENT_HANDOFF.md for official hashes and source provenance. This final
+documentation follow-up must not rebuild, replace or republish released 68.
 
 HISTORICAL PUBLISHED BASELINE
 

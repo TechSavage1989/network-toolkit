@@ -1,6 +1,6 @@
 # Network Toolkit development handoff
 
-## 1.17.68 Hosts filter text clipping: publication approved
+## 1.17.68 published: Hosts filter text clipping
 
 Prepared from exact main 99ff403c866953706290e312c425a58429f9567e after the
 user reported clipped text in the Hosts Entries status dropdown. The completed
@@ -39,12 +39,41 @@ Version metadata and compile-time Windows resources are 1.17.68. The existing
 review-branch workflow supplies a Windows x64 portable source/build artifact.
 Local release/resource validation, browser-script syntax, thirty Hosts model
 tests and the Windows x64 GUI cross-build passed before source upload.
-Publication preparation changes only AGENTS.md, this handoff and VALIDATION.txt
-from the tested source. Run the established main-push workflow, then verify
-its terminal result, release tag, all four actual public downloads, complete
-source provenance and the live unchanged released67 check/download/stage path.
-Record final evidence in a documentation follow-up without changing released
-runtime code, replacing old assets or republishing 1.17.68.
+Published source/tag is 04bffc583445fa48656c40dc44a80af4c54e5edc (tree
+e41000868502bd10d1855c05072dcaaea1011da2). It changes only AGENTS.md, this
+handoff and VALIDATION.txt from the reviewed runtime source. Release
+40159396027 passed and created release 423132212. Main source Checks
+40159396034 passed both jobs, including all compact text/DPI checks, existing
+client/server and updater startup checks, and all seven native Chromium timer
+scenarios. Its real five-minute poll and focus collision passed.
+
+All four actual public release downloads passed their GitHub asset digests,
+outer/inner SHA-256 manifests, both ZIP CRCs, the strict four-member updater
+allowlist, PE/version checks and standalone/portable/update EXE identity. All
+672 packaged source files match the exact published source commit. The official
+EXE is byte-for-byte identical to the approved review build. All seven older
+release IDs and asset IDs/sizes/digests are unchanged, and all seven older
+source-tag SHAs match the prepublication snapshot.
+
+The exact released 1.17.67 source's unchanged production feed handlers checked
+the live main feed, verified/downloaded/staged 1.17.68 in 10.76 seconds. The
+staged bytes match the independently downloaded official EXE. The harness used
+real HTTPS and isolated temporary settings and called only the platform-
+independent feed handlers. No installation/restart occurred and its original
+executable hash was unchanged. The raw log, baseline snapshots and download
+verification record are retained with this publication's local QA files.
+Native Windows execution, hosts-file save/elevation, installation and restart
+remain unverified. The user's approval is not native runtime confirmation.
+
+Official release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.68
+EXE SHA-256: 5fda37ea59822b2131febe39c685743cbcdbfbac4020cac31e55828d5af597b5
+Portable ZIP SHA-256: b81701b207444e8012a6ca153884386d9fe67cd9a6a24b237d62e1e4424b9e30
+Update ZIP SHA-256: 0c5837f10f3c6a30ac7070767d80de3624a8edfa7e9478c6ad581bc400e99ee1
+SHA256SUMS file SHA-256: db1fb17890f1df0496709d36577abd866d1e75a85523118ee8e8071533f77d01
+
+This final documentation follow-up changes no runtime code and must not move
+the released 1.17.68 tag, replace its assets or republish it. Continue from latest
+main for future development, preserving the corrected compact Hosts controls.
 
 ## 1.17.67 published: expanded Hosts editor
 
