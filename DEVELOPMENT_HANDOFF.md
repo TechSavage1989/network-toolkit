@@ -1,41 +1,78 @@
 # Network Toolkit development handoff
 
-## 1.17.73 in progress: command input without scrollbar tracks
+## 1.17.73 published: command input without scrollbar tracks
 
-Prepared from latest main fff6000c413bd01566891b4b0ea5072e71da3587 after the
-user reported scrollbar tracks inside the terminal command input and explicitly
-requested the fix and publication on 2026-10-25. This authorizes the focused
-1.17.73 source/build/release after validation. Preserve released 72 and all
-older releases/tags/assets. Main network-toolkit is the sole source/update feed.
+Prepared from main fff6000c413bd01566891b4b0ea5072e71da3587 after the user
+reported native scrollbar tracks inside the terminal command input and explicitly
+requested the fix and publication on 2026-10-25. This authorizes this scoped
+1.17.73 source/build/release. Future releases need their own authorization.
+Main network-toolkit remains the sole source/update feed; preserve prior assets.
 
-The command composer is a textarea with overflow:auto and white-space:pre.
-A long placeholder/command can reserve a horizontal scrollbar inside its
-30-pixel collapsed height, leaving too little vertical room for the text.
-The focused CSS fix sets scrollbar-width:none and hides its WebKit scrollbar
-pseudo-element with display:none and zero width/height. It keeps overflow:auto,
-existing dimensions, expansion/manual resize, selection, caret/keyboard/wheel
-scrolling and unchanged command text. No macro/transport JavaScript is changed.
-Both collapsed and expanded modes inherit the same track-free policy.
+The focused fix changes only command-composer textarea scrollbar styling:
+scrollbar-width:none plus a WebKit scrollbar pseudo-element with display:none
+and zero width/height. It applies to compact and expanded modes. overflow:auto,
+white-space:pre, existing dimensions/expansion/resize, selection, caret/keyboard/
+wheel scrolling and command text are retained. No macro/transport JavaScript
+changes. Other macro editors, outputs and application scrollbars remain governed
+by their existing rules. Go/UI/package/Windows resource versions are 1.17.73.
 
-The new real-page browser regression restores the released scrollbar policy
-as a negative control, then checks hidden track styles and zero gutters for
-empty, short, long and multiline commands. Chromium may use overlay scrollbars
-without reserving gutters, so the negative control verifies both overflow axes
-and the restored track styles rather than assuming Windows scrollbar geometry. It checks caret and wheel scrolling, compact/expanded states, input
-preservation and layouts/themes/docks, using isolated API fixtures only.
-No real terminal command is sent by this layout test. Local validation passed
-443 JavaScript tests, 31 Python guards, required root/terminal/desktop Go suites,
-release/resource metadata checks and browser syntax. First hosted Checks
-40167638283 passed its check job, but the browser negative control assumed
-classic reserved gutters. Its platform-dependent assertion is now corrected.
-The runtime CSS is unchanged. Revised hosted browser checks,
-Windows build/package, publication and live updater staging are pending.
+Local validation passed 443 JavaScript tests, 31 Python guards, required root/
+terminal/desktop Go suites, release/resource metadata, browser syntax, Windows
+x64 GUI cross-build and portable/update verification. The first browser control
+assumed classic reserved scrollbar gutters; headless Chromium uses overlays
+here, so the test was corrected to verify restored track styles and both logical
+overflow axes. The runtime CSS did not change during that test correction.
 
-Version metadata and Windows resources are 1.17.73. Preserve saved-session
-folders, SMTP password lifetime, credential protection and the single final
-update-install action. Native Windows/WebView2, hardware and actual install/
-restart remain unverified here. Record exact evidence before finishing.
+Full review Checks 40167818500 passed on exact published source/tag
+752f40225ef47e7208948fd264efc0e5493530b7 (tree
+1a9d74f8173851e2e9b2a9300b6e3cda4fb17ee2). Both jobs succeeded. The new
+browser regression checks twelve layouts across 768/1024/1280px, both themes
+and both docks. Empty/short/long/multiline commands have zero reserved gutters,
+scrollbar-width:none and hidden WebKit tracks. Long-command caret movement,
+multiline caret/wheel scrolling, hide/reopen and exact text preservation pass.
+No terminal command is sent by these isolated real-page/API-fixture tests.
+Inspected compact/expanded screenshots show no scrollbar tracks.
 
+Existing Hosts, client/server, SMTP, saved-folder and final-install browser
+checks also pass, along with seven native updater-timer scenarios including the
+real five-minute poll/focus collision. Review artifact 12589190184 matches the
+local portable and EXE byte-for-byte. Artifact outer SHA-256:
+fbd831792a5cf6002c1b116bf79b40af0fd08f3fa9397ddd77594bad7b7a52a1.
+
+Main was fast-forwarded to that identical tested commit using expected old SHA
+fff6000c413bd01566891b4b0ea5072e71da3587 without force. No code or docs changed
+between completed review and promotion. Release 40168358427 succeeded and
+created stable release 423183483. Automatic main Checks 40168358460 passed
+its check job and command-bar browser step. The completed review above remains
+full runtime validation; documentation may supersede automatic duplicate runs.
+
+All four actual public downloads match GitHub asset digests. Outer/inner SHA-256
+manifests, both ZIP CRCs, the strict four-member updater allowlist, Windows x64
+GUI PE/version and standalone/portable/update EXE identity pass. All 685 packaged
+source files match the exact published commit. Official portable and EXE match
+the verified review build byte-for-byte. All twelve earlier release IDs and
+asset IDs/sizes/digests remain unchanged, and all twelve older source tags
+retain their original SHAs. Verification snapshots and raw logs are retained
+with local QA records.
+
+The unchanged released 1.17.72 production feed handlers checked the live feed,
+verified/downloaded/staged 1.17.73 in 10.58 seconds. Staged bytes match the
+independently downloaded official EXE. The harness used real HTTPS, isolated
+temporary settings and only platform-independent feed handlers. No install or
+restart occurred and its original test executable hash remained unchanged.
+
+Official release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.73
+EXE SHA-256: f294d9582361f6859fb4aa9a94c2e7658b1e4258be59ae5ca58635fa6d993b16
+Portable ZIP SHA-256: 5fca57cf554152454d6038b52c6fabd43d4c8ba306c28bba39a35d073775e053
+Update ZIP SHA-256: 9d53622eb90b1815b677ffde2ea5bf1975a76f5d6370d9f35d5da9ef3e0f6e1e
+SHA256SUMS file SHA-256: 78fbec5c6f1b75ade1763ddc612d4c5b20f00a45c162b155f768dc1307e00913
+
+This final publication record changes only AGENTS.md, this handoff and
+VALIDATION.txt. Do not move the released 73 source tag, replace assets or
+republish it. Continue future work from latest main. Preserve saved-session
+folders, SMTP password lifetime, protected credentials and single final update
+installation. Native Windows/WebView2, hardware and actual install/restart
+remain unverified here; browser fixtures and feed staging are not native proof.
 
 ## 1.17.72 published: folders for saved sessions
 

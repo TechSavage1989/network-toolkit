@@ -1,16 +1,44 @@
 NETWORK TOOLKIT 1.17.73 VALIDATION
 
 The terminal command textarea hides horizontal/vertical scrollbar tracks in
-both compact and expanded modes. Existing scroll/caret behavior, resize,
-command contents and Insert only / Run command handling are retained.
+compact and expanded modes. Native scrolling/caret behavior, resize, command
+contents and Insert only / Run command handling are retained. No command or
+macro transport JavaScript changes. Existing features remain unchanged.
 
-The user explicitly requested the fix and publication. Local 443 JS tests,
-31 Python guards, required Go suites, release/resource validation and browser
-syntax pass. Hosted real-page regression, Windows build/package and official
-release verification are pending.
-Preserve all previous releases/tags/assets and existing features. See the first
-handoff section for scope and validation limits. No native Windows, hardware
-or actual install/restart test has been performed here.
+Full review Checks 40167818500 passed on exact published source/tag
+752f40225ef47e7208948fd264efc0e5493530b7: 443 JavaScript tests, 31 Python
+release guards, required root/terminal/desktop Go suites, Windows x64 GUI build/
+package and all browser steps. The focused regression checks track styles,
+zero gutters, empty/short/long/multiline input, caret and wheel scrolling and
+exact input preservation in twelve theme/dock/layout cases at 768/1024/1280px.
+The negative control restores the released scrollbar policy and permits OS
+specific overlay geometry. No real command is sent by the layout fixture.
+Compact and expanded screenshots were inspected. Existing Hosts/client/server/
+SMTP/folders/install checks and seven native update-timer scenarios pass,
+including the real five-minute poll/focus collision. Review artifact
+12589190184 matches the local portable/EXE. Main was promoted to that identical
+tested commit after the user explicitly requested publication.
+Release 40168358427 succeeded. Main duplicate Checks 40168358460 passed its
+check job and command-bar browser step; completed review is full runtime
+validation and docs may supersede automatic duplicate runs.
+
+OFFICIAL PUBLICATION VERIFICATION
+- All four actual public downloads match GitHub asset digests.
+- Outer/inner manifests, both ZIP CRCs and strict four-member updater allowlist.
+- Windows x64 GUI PE/version and standalone/portable/update EXE identity.
+- All 685 packaged source files match the exact published commit.
+- Official portable and EXE match the reviewed build byte-for-byte.
+- Twelve older release IDs and asset IDs/sizes/digests remain unchanged.
+- Twelve older source-tag SHAs match the prepublication snapshot.
+- Exact released72 handlers checked/downloaded/verified/staged live73 in 10.58s.
+- Staged bytes match the independently downloaded official EXE.
+- No install/restart or original test executable change occurred.
+
+The live harness uses platform-independent production handlers, real HTTPS and
+isolated temporary settings. Native Windows/WebView2, hardware and actual
+install/restart remain unverified. See DEVELOPMENT_HANDOFF.md for exact hashes,
+provenance and limits. This final docs follow-up must not move tags, replace
+assets or republish the runtime.
 
 HISTORICAL PUBLISHED BASELINE
 
