@@ -10,6 +10,7 @@ const root=path.resolve(__dirname,'../web');
 const out=process.env.TOOLKIT_TEST_OUTPUT;
 const results=[];
 const errors=[];
+const tabCases=[];
 let browser,server;
 const settle=page=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
 async function render(page,protocol,width=320,commander=false){
@@ -89,6 +90,37 @@ async function main(){
   const clientStyle=await page.locator('[data-rb-connection-source]').evaluate(e=>{const c=getComputedStyle(e);return [c.height,c.fontSize,c.paddingTop,c.paddingRight,c.borderRadius,c.color,c.backgroundColor];});
   assert.deepEqual(serverStyle,clientStyle,protocol+' server and client dropdown styling differs');
  }
+ // Server Settings uses the same selected tab, hover and keyboard-focus styles
+ // as client Setup. Compare actual computed styles and rail-relative geometry.
+ async function tabAppearance(button){return button.evaluate(el=>{
+  const style=getComputedStyle(el),rail=el.closest('.terminal-sidebar-rail'),r=getComputedStyle(rail),b=el.getBoundingClientRect(),rb=rail.getBoundingClientRect(),label=getComputedStyle(el.querySelector('span')),svg=getComputedStyle(el.querySelector('svg'));
+  const keys=['backgroundColor','color','borderTopWidth','borderRightWidth','borderBottomWidth','borderLeftWidth','borderTopColor','borderRightColor','borderBottomColor','borderLeftColor','borderRadius','paddingTop','paddingRight','paddingBottom','paddingLeft','fontSize','lineHeight','gap','outlineStyle','outlineWidth','outlineColor','outlineOffset','boxShadow'];
+  return {button:Object.fromEntries(keys.map(k=>[k,style[k]])),rail:Object.fromEntries(['width','paddingTop','paddingRight','paddingBottom','paddingLeft','gap','backgroundColor'].map(k=>[k,r[k]])),label:Object.fromEntries(['fontSize','letterSpacing','lineHeight','whiteSpace','textAlign'].map(k=>[k,label[k]])),icon:{width:svg.width,height:svg.height},box:{width:b.width,height:b.height,left:b.left-rb.left,top:b.top-rb.top}};
+ });}
+ async function tabState(button,interaction){
+  await page.mouse.move(1,1);await button.evaluate(el=>el.blur());
+  if(interaction==='hover')await button.hover();
+  if(interaction==='focus'){await page.keyboard.press('Tab');await button.focus();assert(await button.evaluate(el=>el.matches(':focus-visible')));}
+  await settle(page);return tabAppearance(button);
+ }
+ for(const viewport of [{width:1366,height:900},{width:820,height:620},{width:570,height:720}])for(const protocol of ['sftp','tftp','ftp'])for(const theme of ['light','dark']){
+  await page.setViewportSize(viewport);await page.evaluate(theme=>setTheme(theme),theme);await render(page,protocol,320,true);
+  const button=page.locator('.transfer-server-sidebar-button'),server={};
+  assert.equal(await button.getAttribute('aria-expanded'),'true');
+  for(const interaction of ['normal','hover','focus'])server[interaction]=await tabState(button,interaction);
+  if(out&&viewport.width===1366&&protocol==='tftp'&&theme==='light')await button.screenshot({path:path.join(out,'server-selected-tab.png')});
+  // Existing disclosure actions and saved state remain available with the
+  // shared appearance. No server is started by these UI-only checks.
+  await button.click();assert.equal(await button.getAttribute('aria-expanded'),'false');assert.equal(await page.locator('.transfer-server-sidebar-body').isVisible(),false);
+  await button.focus();await page.keyboard.press('Enter');assert.equal(await button.getAttribute('aria-expanded'),'true');
+  await page.keyboard.press('Space');assert.equal(await button.getAttribute('aria-expanded'),'false');await button.click();
+  assert.equal(await page.evaluate(p=>state.transferServerSidebar[p].collapsed,protocol),false);
+  await page.evaluate(protocol=>{state.transferModes[protocol]='client';state.transferClientLayout=state.transferClientLayout||{};state.transferClientLayout[protocol]={width:300,side:'left',collapsed:false,tab:'settings'};renderPage();},protocol);await settle(page);
+  const client=page.locator('.rb-client-sidebar [data-client-tab="settings"]');
+  for(const interaction of ['normal','hover','focus'])assert.deepEqual(server[interaction],await tabState(client,interaction),protocol+'/'+theme+'/'+viewport.width+'/'+interaction+' selected tab differs');
+  if(out&&viewport.width===1366&&protocol==='tftp'&&theme==='light')await client.screenshot({path:path.join(out,'client-selected-tab.png')});
+  tabCases.push({protocol,theme,viewport});
+ }
  await render(page,'sftp',270,true);
  await page.locator('select.transfer-bind-picker').selectOption('192.168.17.4');
  const divider=page.locator('.transfer-activity-splitter'),initial=Number(await divider.getAttribute('aria-valuenow'));
@@ -113,7 +145,7 @@ async function main(){
  assert.equal(await page.evaluate(()=>state.transferServerSidebar.sftp.activityHeight),0);
  if(out)await page.screenshot({path:path.join(out,'sftp-server-activity.png')});
  assert.deepEqual(errors,[]);
- const summary={passed:true,renderedCases:results.length,adapterSelection:true,pointerAndKeyboardResize:true,reloadPersistence:true,viewportRecovery:true,errors,results};
+ const summary={passed:true,renderedCases:results.length,selectedTabCases:tabCases.length,selectedTabStyleParity:true,selectedTabHoverAndFocus:true,serverSidebarToggle:true,adapterSelection:true,pointerAndKeyboardResize:true,reloadPersistence:true,viewportRecovery:true,errors,results};
  if(out)fs.writeFileSync(path.join(out,'server-layout-results.json'),JSON.stringify(summary,null,2));
  console.log(JSON.stringify(summary));
 }

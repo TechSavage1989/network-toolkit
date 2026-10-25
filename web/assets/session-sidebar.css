@@ -12,7 +12,7 @@
 .terminal-sidebar-tab svg{width:17px;height:17px}
 .terminal-sidebar-tab span{white-space:nowrap}
 .terminal-sidebar-tab:hover{background:var(--hover);color:var(--text)}
-.terminal-sidebar-tab[aria-selected="true"]{background:var(--accentBg);border-left-color:var(--accent);color:var(--accent)}
+.terminal-sidebar-tab:is([aria-selected="true"],[aria-expanded="true"]){background:var(--accentBg);border-left-color:var(--accent);color:var(--accent)}
 .terminal-sidebar-tab:focus-visible{outline:2px solid var(--accent);outline-offset:-3px}
 .terminal-sidebar-content{display:flex;flex:1 1 0;flex-direction:column;min-width:0;min-height:0;overflow:hidden}
 .terminal-session-sidebar.is-collapsed{flex-basis:44px;max-width:44px}

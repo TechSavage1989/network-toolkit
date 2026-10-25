@@ -1,5 +1,38 @@
 # Network Toolkit development handoff
 
+## 1.17.76 candidate: match selected server and client sidebar tab styles
+
+Prepared from main 11c52273cb62f066ff563352d667b8eeb2346c89 after the user
+provided server/client screenshots, requested server selected-tab appearance
+match client mode, and explicitly authorized build/publication on 2026-10-25.
+This covers this scoped new release only; preserve all prior tags/assets.
+Main network-toolkit remains the sole source/update destination.
+
+Server Settings previously combined a generic panel-visibility-toggle class
+with separate rail/button rules. The generic control introduced a rounded
+outline and different spacing/focus styling. Server rail/button markup now
+uses the existing terminal-sidebar-rail and terminal-sidebar-tab classes used
+by client mode. Remove the duplicate server rail/button CSS and its span font/
+letter-spacing override. Shared selected styling accepts aria-expanded=true
+for the server disclosure control as well as aria-selected=true for client/
+terminal tabs. Native button/disclosure semantics and existing toggle handlers
+remain intact. No tab labels, server settings, resizing, transfer or updater
+logic changes. The 75 editor initial-view fix and all earlier features remain.
+
+Extend the existing real-page server browser check to compare actual selected
+server/client computed styles and rail-relative geometry in normal, hover and
+keyboard-focus states. Covers SFTP/TFTP/FTP in both themes at 570/820/1366px:
+18 cases, 54 style comparisons. Existing click/Enter/Space collapse/expand and
+saved collapsed state are checked without starting any real server.
+
+Go/UI/package/Windows resources are 1.17.76. Local validation passed 446 JS
+tests, 31 Python release guards, required root/terminal/desktop Go suites,
+release/resource metadata, HTML/browser syntax and Windows x64 GUI build.
+Hosted validation, package/artifact verification, publication and released75
+live staging are pending.
+Native Windows/WebView2, hardware and actual install/restart remain unverified.
+Future work requires its own publication authorization.
+
 ## 1.17.75 published: text files open at the document start
 
 Prepared from main 59cd8fb4348be28fa2efa91570de6c221f5162e6 after the user

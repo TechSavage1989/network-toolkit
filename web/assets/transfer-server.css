@@ -129,11 +129,6 @@ body.transfer-server-mode #toolWorkspace>#pageContent{grid-column:1!important;gr
 body.transfer-server-mode #toolWorkspace>#pageContent{overflow:hidden!important;}
 .transfer-server-app.transfer-server-layout{--transfer-sidebar-width:320px;display:flex!important;flex-direction:row!important;align-items:stretch!important;gap:0!important;width:100%;height:100%;min-height:370px;overflow:hidden!important;padding:0!important;position:relative;}
 .transfer-server-layout>.transfer-server-config-panel{display:flex;flex:0 0 var(--transfer-sidebar-width);width:var(--transfer-sidebar-width);min-width:0!important;min-height:0!important;overflow:hidden!important;padding:0!important;margin:0!important;border:1px solid var(--border);border-radius:8px 0 0 8px;background:var(--panel);}
-.transfer-server-sidebar-rail{width:44px;flex:0 0 44px;display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 2px;background:var(--panel2);border-right:1px solid var(--border);}
-.transfer-server-sidebar-button{display:flex!important;width:40px;min-height:64px;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:6px 1px!important;border:0;border-left:2px solid transparent;background:transparent;color:var(--muted);font-size:9px;cursor:pointer;}
-.transfer-server-sidebar-button svg{width:18px;height:18px;flex-shrink:0;}
-.transfer-server-sidebar-button span{white-space:normal;overflow-wrap:anywhere;}
-.transfer-server-sidebar-button[aria-expanded="true"]{background:var(--accentBg);color:var(--accent);border-left-color:var(--accent);}
 .transfer-server-sidebar-body{display:flex;flex:1 1 0;min-width:0;min-height:0;flex-direction:column;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;padding:10px;gap:8px;}
 .transfer-server-sidebar-header{display:flex;align-items:center;justify-content:space-between;gap:4px;padding-bottom:7px;border-bottom:1px solid var(--border);font-size:12px;}
 .transfer-server-sidebar-header .btn{flex:0 0 28px;height:27px;min-width:0;padding:4px;}

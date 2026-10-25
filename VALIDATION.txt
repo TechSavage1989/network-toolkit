@@ -1,3 +1,19 @@
+NETWORK TOOLKIT 1.17.76 CANDIDATE VALIDATION
+
+Server Settings buttons reuse client sidebar tab/rail styles, including the
+selected highlight, spacing, icon size, hover and keyboard focus. Existing
+labels, disclosure behavior, resizing, settings and transfers are retained.
+
+The existing server browser suite now compares selected computed styles and
+geometry against client mode in 18 cases and three interaction states. No
+cosmetic unit tests are added. Local validation passed 446 JavaScript tests,
+31 Python release guards, required root/terminal/desktop Go suites, metadata/
+resource validation, HTML/browser syntax and Windows x64 GUI build. Hosted
+checks, package/artifact verification, publication and live staging are pending. Native Windows/
+WebView2, hardware and real install/restart remain unverified. See the handoff.
+
+HISTORICAL PUBLISHED BASELINE
+
 NETWORK TOOLKIT 1.17.75 VALIDATION
 
 Text files open/reload at caret offset zero with both scroll axes at zero.

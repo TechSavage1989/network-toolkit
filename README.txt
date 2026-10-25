@@ -1,7 +1,13 @@
-NETWORK TOOLKIT 1.17.75
+NETWORK TOOLKIT 1.17.76
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.75
+CURRENT RELEASE - 1.17.76
+
+The selected Settings tab in SFTP, TFTP and FTP/FTPS server modes now uses the
+same appearance as client mode, including highlight, spacing, hover and keyboard
+focus. Existing server settings, collapse/expand actions and resizing are retained.
+
+PREVIOUS RELEASE - 1.17.75
 
 Text files open with the start of the document visible. Opening or reloading
 a file resets the caret and both scroll positions, including desktop imports
