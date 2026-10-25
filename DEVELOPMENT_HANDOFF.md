@@ -1,63 +1,92 @@
 # Network Toolkit development handoff
 
-## 1.17.72 in progress: folders for saved sessions
+## 1.17.72 published: folders for saved sessions
 
-Prepared from latest main 1c9dea8ffd50bf51dc0596550c1e3c6a0e4f4505 after the
-user requested folders for saved sessions similar to macros, and explicitly
-instructed build and publish on 2026-10-25. This authorizes the new 1.17.72
-source and release after validation; no further approval is required for this
-scoped change. Preserve released 1.17.71 (source/tag 0b3ffe7) and all older
-releases/tags/assets. Main network-toolkit remains the sole source/update feed.
+Prepared from main 1c9dea8ffd50bf51dc0596550c1e3c6a0e4f4505 after the user
+requested folders for saved sessions similar to macros and explicitly instructed
+build and publish on 2026-10-25. This authorizes this scoped 1.17.72 source and
+release; future releases need their own user authorization. Preserve all earlier
+releases/tags/assets. Main network-toolkit is the sole source/update feed.
 
-Folders use the same flat named-label approach as macros. Assignment is an
-optional folder field on saved terminal/FTP profiles. The Saved sidebar offers
-All folders, Unfiled and named folders, with search matching folder names and
-folder labels on rows. Existing sessions remain unfiled. Folder choices are
-derived from saved sessions, so an unused folder disappears automatically.
-The filter is temporary UI state, like the macro folder filter.
+Folders follow the macro library's flat named-label approach. An optional
+folder field is stored on saved SSH, Telnet, serial and FTP/FTPS profiles. The
+Saved sidebar offers All folders, Unfiled and named folders, with folder-name
+search and labels on rows. Existing sessions remain unfiled. Folder choices
+are derived from saved records; an unused folder disappears automatically.
+The selected filter is temporary UI state, like the macro folder filter.
 
-The terminal connection form and Save/Duplicate/Rename dialogs can choose an
-existing folder or create one by typing. Existing terminal and FTP/FTPS rows
-have an accessible Move to folder action; terminal context menus have it too.
-Blank assignment returns a session to Unfiled. Moving keeps profile IDs and
-credential references unchanged. Duplication inherits the folder. Both SFTP
-and FTP client profile rewrites preserve folder metadata. Connection settings,
-protected-credential handling, recent lists and macro bindings are unchanged.
+The connection form and Save/Duplicate/Rename dialogs can choose or create a
+folder by typing. Existing saved terminal/FTP rows have a Move to folder button;
+terminal context menus offer the same action. Blank returns a session to Unfiled.
+Moving preserves profile IDs, protected credential references and macro bindings.
+Duplication inherits the folder. Both SFTP/FTP client profile rewrites and the
+FTP startup loader preserve assignment. No macro library data is modified.
 
-The small saved-session-folders.js helper normalizes/escapes labels and shares
-folder choices/filtering across controls. Browser and backend bound labels to
-100 Unicode characters and remove ASCII controls. safeTerminalProfile permits
-folder only on named profiles; the existing profile allowlist still excludes
-secrets. FTP profiles allow the same bounded metadata. Existing linked-workspace
-profile sanitization carries terminal folders; labels never enter transport
-payloads or filesystem operations. The new asset is explicitly served from
-both main and detached routes through the existing asset allowlist.
+saved-session-folders.js normalizes/escapes labels and shares choices/filtering.
+Labels are bounded to 100 Unicode characters with ASCII controls removed.
+The backend named-profile and FTP allowlists accept only that bounded string.
+Terminal connection configurations exclude folder metadata. Existing workspace
+sanitization preserves named profile folders. Labels never become filesystem
+paths or transport options. The new asset is explicitly allowlisted for main
+and detached routes. The 71 SMTP form-only password lifetime and existing
+single final updater installation action are preserved.
 
-Regression coverage includes filter/search, Unfiled, folder creation/moves,
-stale-dialog protection, duplicate/edit preservation, both file-client profile
-rewrites, HTTP settings/disk reload, credential exclusion and linked-workspace
-sanitization. Hosted browser coverage uses the real page with isolated mock
-APIs, checks reloads and saved-session opening, verifies folder metadata stays
-out of connection requests, and checks both themes/docks at 390/768/1280 pixels.
-No real network sessions or mail are opened by the browser fixtures.
+Local validation passed all 443 JavaScript tests, 31 Python release guards,
+root/terminal/desktop Go suites, release/resource validation, browser syntax,
+Windows x64 GUI cross-build and portable/update package verification. Coverage
+includes filter/search, Unfiled, moves, stale-dialog protection, duplicate/edit
+preservation, both file-client rewrites, HTTP settings/disk reload, credential
+exclusion and linked-workspace sanitization. The initial browser run caught
+FTP startup normalization dropping the new field; that path is corrected.
+Native selects report normal line-height in Chromium, so layout checks use
+measured font bounds rather than parsing that word as a number.
 
-Version metadata and Windows resources are 1.17.72. Local validation passed
-443 JavaScript tests, 31 Python release guards, root/terminal/desktop Go suites,
-release/resource metadata and browser-script syntax checks. The existing asset
-coverage caught the initially missing new-asset route; its explicit allowlist
-entry is now corrected and the full Go suite passes. First hosted Checks
-40166046647 passed its check job, including Windows build/package, but its new
-browser regression caught the FTP startup loader dropping folder metadata.
-That client normalization is now corrected; the new browser assertion is
-retained. The next run 40166218700 passed all behavioral folder actions and
-reload assertions, then its layout check relied on parsing the native select's
-line-height as a number. It now uses actual font bounds, matching the
-existing Hosts regression, and records computed metrics. A follow-up test-only
-change also clears prior decode results before verifying settings from disk.
-Revised hosted checks, package/release and live updater staging are pending. Record
-completed checks and publication evidence here. Native Windows, installation/
-restart and actual terminal hardware remain unverified.
+Full review Checks 40166424785 passed on exact published source/tag
+3ca1db2fb52132e36a7610e006cfb606e6d9a973 (tree
+7b10c925b7f3620ada6bfcb7e40d81f1df5099da). Both jobs succeeded, including
+folder actions, app reload, saved-session opening with the retained credential
+reference and no folder in the connection request. Twelve folder layouts cover
+390/768/1280 pixels, both themes and both docks, with selector containment and
+font fit. Inspected wide/compact screenshots show the folder selector/actions.
+The real page uses isolated API fixtures, not real hardware or network sessions.
+Existing Hosts/client/server/SMTP browser checks, final-install cases and all
+seven native updater-timer scenarios passed, including the real five-minute
+poll/focus collision. Review artifact 12588292955 matches local portable/EXE
+bytes exactly; its outer SHA-256 is
+0d5e7c475918ac8c62e40059faeb17804a6b8893b410cd107de16ca4ea938a57.
 
+Main was fast-forwarded to that identical tested commit using expected old SHA
+1c9dea8ffd50bf51dc0596550c1e3c6a0e4f4505, without force. No code or docs
+changed between completed review and promotion. Release 40166916669 succeeded
+and created stable release 423175191. Automatic main Checks 40166916735 passed
+its check job and folder browser step. The completed review run above is full
+runtime validation; docs follow-ups may supersede automatic duplicate runs.
+
+All four actual public downloads match GitHub asset digests. Outer/inner SHA-256
+manifests, both ZIP CRCs, the strict four-member updater allowlist, Windows x64
+GUI PE/version and standalone/portable/update EXE identity pass. All 683 packaged
+source files match the exact published commit. Public portable and EXE match
+the verified review build byte-for-byte. All eleven earlier release IDs and
+asset IDs/sizes/digests remain unchanged, with all eleven older source-tag SHAs
+preserved. QA snapshots, raw logs and verification results are retained locally.
+
+The unchanged released 1.17.71 production feed handlers checked the live feed,
+verified/downloaded/staged 1.17.72 in 17.95 seconds. The staged bytes match the
+independently downloaded official EXE. The harness used real HTTPS, isolated
+temporary settings and only platform-independent feed handlers. No install or
+restart occurred and the original test executable hash remained unchanged.
+
+Official release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.72
+EXE SHA-256: 2e55969c271778fff89592e8aa47dbc1fa6f4c6ede1ab0ff9af777a19a55920d
+Portable ZIP SHA-256: a47abe6e0cb8851d750c9d0b50f28efcf12cb433cb9266e78ea17c92a7cacfaa
+Update ZIP SHA-256: 3cf05e34d1b0b6ba069c8f7becc5c04205c4e15d43c56f7736ce10cdb3847e32
+SHA256SUMS file SHA-256: 3f3e3ba691f87a3484155671728a6e8273b5aa45dd945b20596b8b63c60fb075
+
+This final publication record changes only AGENTS.md, this handoff and
+VALIDATION.txt. Do not move the released 72 source tag, replace assets or
+republish it. Continue future work from latest main. Native Windows/WebView2,
+real terminal hardware and native installation/restart remain unverified here.
+Do not treat isolated browser tests or feed staging as native runtime proof.
 
 ## 1.17.71 published: retain SMTP password for repeat tests
 

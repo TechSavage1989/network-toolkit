@@ -5,20 +5,21 @@ main and preserve existing changes. Update the handoff whenever behavior,
 release destination, validation, known issues or next steps change. Follow
 repository checks and release safeguards.
 
-Current work: 1.17.72 folders for saved terminal and FTP/FTPS sessions, similar
-to macros. Read the first handoff section for scope and validation. Keep folder
-labels as bounded nonsecret profile metadata, outside connection payloads.
-Preserve IDs, protected credential references, macro bindings, the 71 SMTP
-password lifetime and the single final updater install action.
+Current release: 1.17.72 folders for saved terminal and FTP/FTPS sessions.
+Use the first handoff section for scope and evidence. Keep folders as bounded,
+nonsecret profile labels, outside connection payloads and filesystem paths.
+Preserve profile IDs, protected credential references, macro bindings, the 71
+SMTP password lifetime and the single final updater installation action.
 
-The user explicitly instructed build and publish for this feature on
-2026-10-25. No further approval is needed for the scoped 72 source/release
-once validation passes. Main pushes publish new versions automatically.
-Use review/hosts-editor-1.17.72 for prepublication checks and portable artifact.
-Main network-toolkit is the only source/update destination. Never replace old
-tags/assets or change repository access. Published baseline remains 1.17.71,
-source/tag 0b3ffe7cbc12be9778429651507b442f33073aa1, until the new release.
+The user authorized building and publishing this specific feature/version on
+2026-10-25. Future releases need their own authorization. Main pushes publish
+new versions automatically. Main network-toolkit is the sole source/update
+feed. Never replace earlier tags/assets or change repository access.
 
-Record completed checks and publication evidence in the handoff. Native
-Windows/WebView2, live hardware and native install/restart remain unverified.
-Do not treat isolated browser fixtures as native runtime proof.
+Published source/tag: 3ca1db2fb52132e36a7610e006cfb606e6d9a973.
+Full Checks 40166424785 and Release 40166916669 passed. All official downloads,
+683 packaged source files and unchanged released71 feed/download/staging are
+verified. Eleven older releases/tags are preserved. This final documentation
+follow-up must not rebuild, change or republish the released runtime.
+Native Windows/WebView2, real hardware and native install/restart remain
+unverified. Use the first handoff section for hashes and honest test limits.

@@ -1,17 +1,42 @@
 NETWORK TOOLKIT 1.17.72 VALIDATION
 
-Saved sessions have bounded folder labels, assignment/move controls, folder
-filtering and folder-name search. Existing sessions remain unfiled, IDs and
-credential references are preserved, and folder metadata never enters a
-connection payload. SFTP/FTP profile rewrites retain assignments. Macro library
-and startup bindings are not modified. The 71 SMTP password behavior remains.
+Saved terminal/FTP sessions support named folder labels, creation/assignment,
+moves, Unfiled, folder filtering and folder-name search. Assignments persist
+through saved-state loading, file-client edits and duplication. IDs, protected
+credential references and macro bindings are retained. Folder metadata stays
+out of connection requests and filesystem operations. The 71 SMTP behavior and
+single final update-install action remain unchanged.
 
-Local checks passed 443 JavaScript tests, 31 Python guards, required root/
-terminal/desktop Go suites, release/resource validation and browser syntax.
-Hosted browser validation and Windows build/package checks are in progress.
-The user authorized building and publishing this scoped update. Preserve all
-prior releases/tags/assets. See DEVELOPMENT_HANDOFF.md for scope and evidence.
-Native Windows, terminal hardware and install/restart remain unverified here.
+Full review Checks 40166424785 passed on exact published source/tag
+3ca1db2fb52132e36a7610e006cfb606e6d9a973: 443 JS tests, 31 Python release
+guards, required root/terminal/desktop Go suites, Windows GUI build/package,
+12 folder layouts in both themes/docks at 390/768/1280px, folder actions/reload,
+saved connection opening and credential exclusion. Existing Hosts/client/server/
+SMTP checks, final-install cases and all seven native update-timer scenarios
+passed, including the real five-minute poll/focus collision. Wide/compact folder
+screenshots were inspected. Review artifact 12588292955 matches the local
+portable and EXE byte-for-byte. The user explicitly authorized publication;
+main was promoted to that identical tested commit. Release 40166916669 passed.
+Main duplicate Checks 40166916735 passed its check job and folder browser step;
+the completed review is full runtime validation and docs may supersede duplicates.
+
+OFFICIAL PUBLICATION VERIFICATION
+- All four actual public downloads match GitHub asset digests.
+- Outer/inner manifests, both ZIP CRCs and strict four-member updater allowlist.
+- Windows x64 GUI PE/version and standalone/portable/update EXE identity.
+- All 683 packaged source files match the exact published commit.
+- Official portable and EXE match the tested review build byte-for-byte.
+- Eleven older release IDs and asset IDs/sizes/digests are unchanged.
+- Eleven older source-tag SHAs match the prepublication snapshot.
+- Exact released71 feed handlers checked/downloaded/verified/staged live72 in 17.95s.
+- Staged bytes match the independently downloaded official EXE.
+- No install/restart or original test executable change occurred.
+
+The live harness uses platform-independent production handlers, real HTTPS and
+isolated temporary settings. Browser actions use isolated API fixtures and no
+real hardware sessions. Native Windows/WebView2, hardware and real install/
+restart remain unverified. See DEVELOPMENT_HANDOFF.md for exact hashes and
+provenance. This final docs follow-up must not change tags/assets or republish.
 
 HISTORICAL PUBLISHED BASELINE
 
