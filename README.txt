@@ -1,7 +1,13 @@
-NETWORK TOOLKIT 1.17.67
+NETWORK TOOLKIT 1.17.68
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.67
+CURRENT RELEASE - 1.17.68
+
+Fixes clipped text in the Hosts entry-status dropdown. Compact Hosts search and
+find/replace fields also have enough vertical text space. Every status label,
+including With validation issues, fits without shrinking the selector.
+
+PREVIOUS RELEASE - 1.17.67
 
 The Hosts file editor now has Entries and Text views, add/edit forms, per-entry
 and bulk enable/disable/delete, filters, duplicate/conflict validation, undo/redo,

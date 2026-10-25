@@ -18,6 +18,17 @@ async function setup(page,text=initial){
  if(await page.locator('#hostsIssueButton').getAttribute('aria-expanded')==='true')await page.locator('#hostsIssueButton').click();
 }
 async function more(page,action){await page.locator('.he-more>summary').click();await page.locator('[data-hosts-action="'+action+'"]').click();}
+async function compactMetrics(page,selector){
+ return page.locator(selector).evaluate(e=>{const s=getComputedStyle(e),ctx=document.createElement('canvas').getContext('2d');ctx.font=[s.fontStyle,s.fontWeight,s.fontSize,s.fontFamily].join(' ');const select=e.tagName==='SELECT',label=select?e.selectedOptions[0].text:e.value||e.placeholder||'Ag',m=ctx.measureText(label),font=ctx.measureText('Ag'),fontHeight=(font.fontBoundingBoxAscent??font.actualBoundingBoxAscent)+(font.fontBoundingBoxDescent??font.actualBoundingBoxDescent);return {label,contentHeight:e.clientHeight-parseFloat(s.paddingTop)-parseFloat(s.paddingBottom),requiredHeight:Math.max(parseFloat(s.lineHeight)||0,fontHeight),contentWidth:e.clientWidth-parseFloat(s.paddingLeft)-parseFloat(s.paddingRight)-(select?24:0),textWidth:m.width};});
+}
+async function checkCompactText(page,view){
+ if(view==='entries'){
+  for(const value of ['all','enabled','disabled','issues']){await page.selectOption('#hostsEntryFilter',value);const m=await compactMetrics(page,'#hostsEntryFilter');assert.ok(m.contentHeight+.25>=m.requiredHeight,'Entry filter clips text vertically: '+JSON.stringify(m));assert.ok(m.contentWidth+.25>=m.textWidth,'Entry filter clips label horizontally: '+JSON.stringify(m));}
+  await page.selectOption('#hostsEntryFilter','all');const search=await compactMetrics(page,'#hostsEntrySearch');assert.ok(search.contentHeight+.25>=search.requiredHeight,'Hosts search clips text vertically: '+JSON.stringify(search));
+ }else{
+  await page.locator('[data-hosts-action="find"]').click();for(const selector of ['#hostsFind','#hostsReplacement']){const m=await compactMetrics(page,selector);assert.ok(m.contentHeight+.25>=m.requiredHeight,'Hosts find/replace clips text vertically: '+JSON.stringify(m));}await page.locator('[data-hosts-action="close-find"]').click();
+ }
+}
 async function main(){
  if(output)fs.mkdirSync(output,{recursive:true});
  server=http.createServer((req,res)=>{
@@ -52,6 +63,8 @@ async function main(){
  browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE||undefined,args:['--no-sandbox']});
  page=await browser.newPage({viewport:{width:1366,height:900},acceptDownloads:true});page.on('pageerror',error=>errors.push(error.message));
  await page.goto('http://127.0.0.1:'+server.address().port+'/');await page.waitForFunction(()=>window.__networkToolkitStartupState===1);await setup(page);
+ // Reproduce the released 67 padding/line-height defect before checking the fix.
+ const releasedPadding=await page.addStyleTag({content:'#hostsEntryFilter{padding:9px 11px!important;line-height:1.5!important}'}),clipped=await compactMetrics(page,'#hostsEntryFilter');assert.ok(clipped.contentHeight<clipped.requiredHeight,'Released padding control no longer reproduces clipped text');await releasedPadding.evaluate(e=>e.remove());await checkCompactText(page,'entries');
  assert.equal(await page.locator('#hostsEntryRows tr').count(),4);
  assert.match(await page.locator('#hostsEntryCounts').textContent(),/3 enabled.*1 disabled/);
  assert.match(await page.locator('#hostsIssueButton').textContent(),/0 errors.*0 warnings/);
@@ -101,7 +114,7 @@ async function main(){
  for(const viewport of [{width:1920,height:1080},{width:1366,height:768},{width:1024,height:768},{width:768,height:720},{width:390,height:844}]){
   await page.setViewportSize(viewport);
   for(const theme of ['light','dark'])for(const view of ['entries','text']){
-   await setup(page);await page.evaluate(theme=>setTheme(theme),theme);await page.locator('[data-hosts-view="'+view+'"]').click();await settle(page);
+   await setup(page);await page.evaluate(theme=>setTheme(theme),theme);await page.locator('[data-hosts-view="'+view+'"]').click();await checkCompactText(page,view);await settle(page);
    const geometry=await page.evaluate(()=>{const panel=document.querySelector('#hostsConfiguration'),work=document.querySelector('#hostsEntries:not([hidden]),#hostsText:not([hidden])'),r=panel.getBoundingClientRect();return {documentWidth:document.documentElement.scrollWidth,width:innerWidth,bottom:r.bottom,height:innerHeight,workHeight:work.getBoundingClientRect().height};});
    assert.ok(geometry.documentWidth<=geometry.width+2,'application horizontal overflow: '+JSON.stringify({viewport,theme,view,geometry}));assert.ok(geometry.bottom<=geometry.height+2,'hosts panel exceeds window height');assert.ok(geometry.workHeight>=95,'file workspace too short');
    await page.locator('.he-more>summary').click();await settle(page);
@@ -113,8 +126,12 @@ async function main(){
    if(output&&((viewport.width===1366&&theme==='dark')||(viewport.width===390&&theme==='light')))await page.screenshot({path:path.join(output,'hosts-'+view+'-'+theme+'-'+viewport.width+'.png')});
   }
  }
+ for(const deviceScaleFactor of [1,1.25,1.5,2]){
+  const scaled=await browser.newPage({viewport:{width:1366,height:900},deviceScaleFactor});scaled.on('pageerror',error=>errors.push(error.message));
+  try{await scaled.goto('http://127.0.0.1:'+server.address().port+'/');await scaled.waitForFunction(()=>window.__networkToolkitStartupState===1);for(const theme of ['light','dark']){await setup(scaled);await scaled.evaluate(theme=>setTheme(theme),theme);await checkCompactText(scaled,'entries');await scaled.locator('[data-hosts-view="text"]').click();await checkCompactText(scaled,'text');if(output){await scaled.locator('[data-hosts-view="entries"]').click();await scaled.selectOption('#hostsEntryFilter','issues');await scaled.locator('#hostsEntryControls').screenshot({path:path.join(output,'hosts-filter-'+theme+'-scale-'+deviceScaleFactor+'.png')});}}}finally{await scaled.close();}
+ }
  assert.deepEqual(errors,[]);
- const result={passed:true,renderedCases:cases.length,entryEditing:true,reviewedSave:true,activeOperationLock:true,reloadProtection:true,undoRedo:true,findReplace:true,validationNavigation:true,backupImport:true,explicitExport:true,pagination:true,errors};
+ const result={passed:true,renderedCases:cases.length,entryEditing:true,reviewedSave:true,activeOperationLock:true,reloadProtection:true,undoRedo:true,findReplace:true,validationNavigation:true,backupImport:true,explicitExport:true,pagination:true,compactTextFits:true,filterLabels:4,displayScales:[1,1.25,1.5,2],releasedPaddingReproduced:true,errors};
  if(output)fs.writeFileSync(path.join(output,'hosts-editor-results.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result));
 }
 main().catch(async error=>{console.error(error);if(output&&page)try{await page.screenshot({path:path.join(output,'hosts-editor-failure.png')});}catch{}process.exitCode=1;}).finally(async()=>{await browser?.close();if(server)await new Promise(resolve=>server.close(resolve));});

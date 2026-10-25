@@ -1,3 +1,20 @@
+NETWORK TOOLKIT 1.17.68 CANDIDATE VALIDATION
+
+Changes are limited to compact Hosts control sizing, focused browser regression
+coverage, documentation and consistent 1.17.68 resource/version metadata.
+
+Hosts browser coverage measures vertical text clearance and every status label's
+horizontal clearance, reproduces released 67 padding as a negative control,
+retains twenty responsive cases, and adds 100/125/150/200 percent device scales
+in light and dark themes. Its latest review-branch Checks result is authoritative.
+Native Windows/WebView2 runtime remains unverified. Publication is not authorized.
+
+Local checks passed: release/resource consistency, JavaScript syntax, thirty
+Hosts model tests and Windows x64 GUI cross-compilation. The hosted workflow
+runs the full required suites and packages the review artifact.
+
+HISTORICAL PUBLISHED BASELINE
+
 NETWORK TOOLKIT 1.17.67 VALIDATION
 
 LOCAL RESULTS

@@ -1,5 +1,35 @@
 # Network Toolkit development handoff
 
+## 1.17.68 candidate: Hosts filter text clipping
+
+Prepared from exact main 99ff403c866953706290e312c425a58429f9567e after the
+user reported clipped text in the Hosts Entries status dropdown. Published
+1.17.67 remains unchanged. This review build is on review/hosts-editor-1.17.68;
+the prior publication approval specifically covered 1.17.67.
+
+The 32-pixel selector inherited 9-pixel vertical padding and a 1.5 line height,
+leaving only 12 pixels for 16.5-pixel text. hosts-editor.css now supplies compact
+padding and explicit line height for the selector and adjacent search field.
+The selector keeps its 170-pixel width instead of shrinking to 130 pixels, so
+the longest With validation issues label also fits. The 31-pixel find/replace
+inputs receive equivalent vertical clearance for the same inherited-padding
+problem. No editing, file-write, privilege or updater behavior is changed.
+
+The hosted Hosts browser test now checks the content box against measured
+font/line height and all four status labels' widths, with space reserved for
+the native arrow. It reproduces the released padding defect as a negative
+control. Existing twenty responsive light/dark cases remain; additional
+light/dark pages cover device scales 1, 1.25, 1.5 and 2. Toolbar screenshots
+show the longest label at each scale. Read the latest review-branch Checks
+result before claiming hosted success. Native Windows/WebView2 remains
+unverified; browser/DPI results are Chromium coverage, not Windows runtime.
+
+Version metadata and compile-time Windows resources are 1.17.68. The existing
+review-branch workflow supplies a Windows x64 portable source/build artifact.
+Local release/resource validation, browser-script syntax, thirty Hosts model
+tests and the Windows x64 GUI cross-build passed before source upload.
+Do not overwrite released 1.17.67; publish 1.17.68 only when authorized.
+
 ## 1.17.67 published: expanded Hosts editor
 
 Prepared from exact main 2d071bec99979397e3d80cec6db5d7d4716c4e3e on

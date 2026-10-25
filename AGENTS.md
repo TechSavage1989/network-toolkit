@@ -18,3 +18,7 @@ all official downloads and the released66 live updater path are verified.
 Main source Checks 40157685265 passed, including the real five-minute timer.
 The documentation follow-up must not republish or change the released runtime.
 Native Windows execution, hosts elevation and installation remain unverified.
+
+Candidate: 1.17.68 corrects compact Hosts selector text clipping on
+review/hosts-editor-1.17.68. Read the first handoff section and its validation
+record. Prepare the review build without replacing or republishing 1.17.67.

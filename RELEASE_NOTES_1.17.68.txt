@@ -1,0 +1,9 @@
+Network Toolkit 1.17.68
+
+Fixes
+- Prevent clipped text in the Hosts entry-status filter.
+- Keep every filter label visible, including With validation issues.
+- Align compact Hosts search and find/replace text within their fields.
+
+Hosts editing, reviewed saving, backups and automatic update behavior remain
+unchanged. This build changes only control sizing and version metadata.

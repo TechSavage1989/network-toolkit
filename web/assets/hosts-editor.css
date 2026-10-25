@@ -15,8 +15,9 @@
 .he-menu .btn{text-align:left;justify-content:flex-start;width:100%;}
 .he-entry-controls{display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:8px 10px;border-bottom:1px solid var(--line);flex:0 0 auto;}
 .he-filter{flex:1 1 220px;min-width:120px;}
-.he-filter input{width:100%;height:32px;font-size:11px;}
-.he-entry-controls select{flex:0 1 170px;min-width:130px;height:32px;font-size:11px;}
+.he-filter input,.he-entry-controls select{height:32px;padding:5px 10px;font-size:11px;line-height:20px;}
+.he-filter input{width:100%;}
+.he-entry-controls select{flex:0 0 170px;min-width:170px;}
 .he-entry-controls>.faint{font-size:10px;}
 .he-entries{display:flex;flex:1 1 0;flex-direction:column;min-height:100px;min-width:0;overflow:hidden;}
 .he-table-scroll{flex:1 1 0;min-height:0;overflow:auto;scrollbar-width:thin;overscroll-behavior:contain;}
@@ -49,7 +50,7 @@
 .he-textarea.is-wrap{white-space:pre-wrap;overflow-wrap:anywhere;}
 .he-find{display:flex;align-items:end;flex-wrap:wrap;gap:7px;padding:8px 10px;background:var(--panel2);border-bottom:1px solid var(--line);flex:0 0 auto;}
 .he-find>label:not(.he-check){display:flex;flex-direction:column;gap:3px;flex:1 1 160px;font-size:10px;color:var(--muted);}
-.he-find input:not([type="checkbox"]){min-width:0;width:100%;height:31px;font-size:11px;}
+.he-find input:not([type="checkbox"]){min-width:0;width:100%;height:31px;padding:4px 10px;font-size:11px;line-height:20px;}
 .he-find>.he-check{margin-bottom:7px;}
 .he-find>.faint{font-size:10px;align-self:center;}
 .he-form-error{min-height:1em;color:var(--bad);font-size:11px;overflow-wrap:anywhere;}
