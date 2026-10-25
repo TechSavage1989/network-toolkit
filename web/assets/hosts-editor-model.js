@@ -40,7 +40,7 @@
    const fields=content.split(/\s+/),ip=address(fields[0]),hosts=fields.slice(1),valid=!!ip&&hosts.length>0&&hosts.every(hostname);
    // Ordinary comments are never interpreted as mappings or rewritten.
    if(commented&&!valid)return;
-   const row={line,index,raw,indent,enabled:!commented,address:fields[0]||'',hosts,comment,valid,family:ip?.family||0,canonical:ip?.canonical||''};
+   const row={line,index,raw,indent,enabled:!commented,address:fields[0]||'',hosts,comment,valid:valid&&!controls,family:ip?.family||0,canonical:ip?.canonical||''};
    rows.push(row);row.enabled?enabled++:disabled++;
    if(!row.enabled)return;
    if(controls){row.valid=false;return;}
