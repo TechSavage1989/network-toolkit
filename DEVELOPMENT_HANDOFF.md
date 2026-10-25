@@ -1,5 +1,37 @@
 # Network Toolkit development handoff
 
+## 1.17.73 in progress: command input without scrollbar tracks
+
+Prepared from latest main fff6000c413bd01566891b4b0ea5072e71da3587 after the
+user reported scrollbar tracks inside the terminal command input and explicitly
+requested the fix and publication on 2026-10-25. This authorizes the focused
+1.17.73 source/build/release after validation. Preserve released 72 and all
+older releases/tags/assets. Main network-toolkit is the sole source/update feed.
+
+The command composer is a textarea with overflow:auto and white-space:pre.
+A long placeholder/command can reserve a horizontal scrollbar inside its
+30-pixel collapsed height, leaving too little vertical room for the text.
+The focused CSS fix sets scrollbar-width:none and hides its WebKit scrollbar
+pseudo-element with display:none and zero width/height. It keeps overflow:auto,
+existing dimensions, expansion/manual resize, selection, caret/keyboard/wheel
+scrolling and unchanged command text. No macro/transport JavaScript is changed.
+Both collapsed and expanded modes inherit the same track-free policy.
+
+The new real-page browser regression reproduces classic scrollbar gutters as
+a negative control, then checks zero gutters for empty, short, long and multiline
+commands. It checks caret and wheel scrolling, compact/expanded states, input
+preservation and layouts/themes/docks, using isolated API fixtures only.
+No real terminal command is sent by this layout test. Local validation passed
+443 JavaScript tests, 31 Python guards, required root/terminal/desktop Go suites,
+release/resource metadata checks and browser syntax. Hosted browser checks,
+Windows build/package, publication and live updater staging are pending.
+
+Version metadata and Windows resources are 1.17.73. Preserve saved-session
+folders, SMTP password lifetime, credential protection and the single final
+update-install action. Native Windows/WebView2, hardware and actual install/
+restart remain unverified here. Record exact evidence before finishing.
+
+
 ## 1.17.72 published: folders for saved sessions
 
 Prepared from main 1c9dea8ffd50bf51dc0596550c1e3c6a0e4f4505 after the user

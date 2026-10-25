@@ -509,7 +509,7 @@ html,body{height:auto!important;min-height:0!important;overflow:visible!importan
   <aside class="sidebar" id="sidebar" aria-label="Primary navigation">
     <div class="brand"><div class="brand-mark"><img src="../assets/Network_Toolkit_Icon.svg" width="36" height="36" alt="" draggable="false"></div><div><div class="brand-name">Network Toolkit</div><div class="brand-sub">Diagnostics workbench</div></div></div>
     <div class="nav-scroll" id="navigation"></div>
-    <div class="sidebar-foot"><div class="engine-label" id="engineLabel"><span class="dot warn pulse"></span><span>Connecting to app</span></div><div class="engine-sub" id="engineSub">Portable edition · v1.17.72</div></div>
+    <div class="sidebar-foot"><div class="engine-label" id="engineLabel"><span class="dot warn pulse"></span><span>Connecting to app</span></div><div class="engine-sub" id="engineSub">Portable edition · v1.17.73</div></div>
   </aside>
   <main class="main">
     <div class="topbar"><div class="row"><span class="terminal-app-brand"><img src="../assets/Network_Toolkit_Icon.svg" width="26" height="26" alt="" draggable="false"><span>Network Toolkit</span></span><button class="iconbtn mobile-menu" aria-label="Toggle navigation" id="mobileMenu" data-action="toggle-nav"></button><div class="breadcrumb"><span>NETWORK TOOLKIT</span><span class="crumb-sep">/</span><strong id="crumb">Overview</strong></div></div><div class="row gap6"><span class="top-meta" id="hostTop">Local diagnostics</span><span class="pill" id="runningCount" hidden>0 running</span><button class="iconbtn" id="themeButton" data-action="theme" aria-label="Switch color theme" title="Switch color theme"></button><button class="iconbtn" id="settingsButton" data-action="settings" aria-label="App settings" title="App settings"></button></div></div>
@@ -528,7 +528,7 @@ html,body{height:auto!important;min-height:0!important;overflow:visible!importan
       </div>
       <div id="terminalWorkspace" class="hidden" role="region" aria-label="Terminal connections and output" tabindex="0"></div>
       </div>
-      <div class="app-foot"><span>Network Toolkit 1.17.72 · Local, portable diagnostics</span><span id="footerStatus">No diagnostic has run.</span></div>
+      <div class="app-foot"><span>Network Toolkit 1.17.73 · Local, portable diagnostics</span><span id="footerStatus">No diagnostic has run.</span></div>
     </div>
   </main>
 </div>
@@ -585,7 +585,7 @@ html,body{height:auto!important;min-height:0!important;overflow:visible!importan
 'use strict';
 const SESSION='__SESSION_TOKEN__';
 const OFFLINE=location.protocol==='file:' || !/^https?:$/.test(location.protocol) || SESSION==='__SESSION_'+'TOKEN__';
-const VERSION='1.17.72';
+const VERSION='1.17.73';
 const WINDOW_MODE='__WINDOW_MODE__';
 const TERMINAL_VIEW=(()=>{try{return JSON.parse('__TERMINAL_VIEW__')}catch{return null}})();
 const DETACHED_TERMINAL=WINDOW_MODE==='detached'&&!!TERMINAL_VIEW?.id;

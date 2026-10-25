@@ -1,3 +1,19 @@
+NETWORK TOOLKIT 1.17.73 VALIDATION
+
+The terminal command textarea hides horizontal/vertical scrollbar tracks in
+both compact and expanded modes. Existing scroll/caret behavior, resize,
+command contents and Insert only / Run command handling are retained.
+
+The user explicitly requested the fix and publication. Local 443 JS tests,
+31 Python guards, required Go suites, release/resource validation and browser
+syntax pass. Hosted real-page regression, Windows build/package and official
+release verification are pending.
+Preserve all previous releases/tags/assets and existing features. See the first
+handoff section for scope and validation limits. No native Windows, hardware
+or actual install/restart test has been performed here.
+
+HISTORICAL PUBLISHED BASELINE
+
 NETWORK TOOLKIT 1.17.72 VALIDATION
 
 Saved terminal/FTP sessions support named folder labels, creation/assignment,

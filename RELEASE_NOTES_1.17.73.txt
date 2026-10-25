@@ -1,0 +1,9 @@
+Network Toolkit 1.17.73
+
+What's new
+- Remove visible scrollbars from the terminal command input.
+- Apply the same behavior to expanded multiline input.
+
+Typing, caret movement, keyboard/wheel scrolling, manual resizing and existing
+Insert only / Run command behavior are retained. Command text is not changed.
+Saved-session folders, credentials, macros and the update flow are preserved.

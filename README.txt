@@ -1,7 +1,13 @@
-NETWORK TOOLKIT 1.17.72
+NETWORK TOOLKIT 1.17.73
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.72
+CURRENT RELEASE - 1.17.73
+
+The terminal command input no longer shows horizontal or vertical scrollbar
+tracks, including expanded multiline input. Typing, caret movement, keyboard
+and wheel scrolling, manual resizing and command execution are retained.
+
+PREVIOUS RELEASE - 1.17.72
 
 Saved sessions now support folders, like the macro library. Choose or create a
 folder while saving or editing a terminal profile, or use Move to folder on
