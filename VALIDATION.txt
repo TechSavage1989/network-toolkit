@@ -9,7 +9,9 @@ geometry against client mode in 18 cases and three interaction states. No
 cosmetic unit tests are added. Local validation passed 446 JavaScript tests,
 31 Python release guards, required root/terminal/desktop Go suites, metadata/
 resource validation, HTML/browser syntax and Windows x64 GUI build. Hosted
-checks, package/artifact verification, publication and live staging are pending. Native Windows/
+checks, package/artifact verification, publication and live staging are pending.
+Initial browser comparison caught Settings wrapping to two lines; shared short
+labels now stay on one line and have explicit containment checks. Native Windows/
 WebView2, hardware and real install/restart remain unverified. See the handoff.
 
 HISTORICAL PUBLISHED BASELINE

@@ -101,7 +101,10 @@ async function main(){
   await page.mouse.move(1,1);await button.evaluate(el=>el.blur());
   if(interaction==='hover')await button.hover();
   if(interaction==='focus'){await page.keyboard.press('Tab');await button.focus();assert(await button.evaluate(el=>el.matches(':focus-visible')));}
-  await settle(page);return tabAppearance(button);
+  await settle(page);
+  const label=await button.evaluate(el=>{const span=el.querySelector('span'),r=span.getBoundingClientRect(),b=el.getBoundingClientRect();return {height:r.height,lineHeight:parseFloat(getComputedStyle(span).lineHeight),left:r.left,right:r.right,buttonLeft:b.left,buttonRight:b.right};});
+  assert(label.height<=label.lineHeight+1&&label.left>=label.buttonLeft-1&&label.right<=label.buttonRight+1,'Tab label wraps or leaves the button: '+JSON.stringify(label));
+  return tabAppearance(button);
  }
  for(const viewport of [{width:1366,height:900},{width:820,height:620},{width:570,height:720}])for(const protocol of ['sftp','tftp','ftp'])for(const theme of ['light','dark']){
   await page.setViewportSize(viewport);await page.evaluate(theme=>setTheme(theme),theme);await render(page,protocol,320,true);

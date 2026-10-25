@@ -70,7 +70,7 @@
 
 /* 1.17.45: SFTP tab appears only on an SFTP-capable active SSH terminal. */
 .terminal-sidebar-sftp{overflow:hidden;min-width:0;}
-.terminal-sidebar-tab span{white-space:normal;overflow-wrap:anywhere;text-align:center;}
+.terminal-sidebar-tab span{white-space:nowrap;overflow-wrap:normal;text-align:center;}
 .terminal-session-sidebar .terminal-sidebar-rail{border-right:1px solid var(--line);}
 .terminal-window .terminal-session-sidebar{border-width:0 0 0 1px;}
 

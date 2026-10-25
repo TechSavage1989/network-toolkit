@@ -16,7 +16,8 @@ by client mode. Remove the duplicate server rail/button CSS and its span font/
 letter-spacing override. Shared selected styling accepts aria-expanded=true
 for the server disclosure control as well as aria-selected=true for client/
 terminal tabs. Native button/disclosure semantics and existing toggle handlers
-remain intact. No tab labels, server settings, resizing, transfer or updater
+remain intact. Shared short tab labels stay on one line. No tab labels, server
+settings, resizing, transfer or updater
 logic changes. The 75 editor initial-view fix and all earlier features remain.
 
 Extend the existing real-page server browser check to compare actual selected
@@ -28,7 +29,10 @@ saved collapsed state are checked without starting any real server.
 Go/UI/package/Windows resources are 1.17.76. Local validation passed 446 JS
 tests, 31 Python release guards, required root/terminal/desktop Go suites,
 release/resource metadata, HTML/browser syntax and Windows x64 GUI build.
-Hosted validation, package/artifact verification, publication and released75
+Initial browser run 40173978151 found only a height difference in its first
+selected-tab comparison: the longer Settings label wrapped. Shared short labels
+now stay on one line, and the browser checks single-line label containment.
+Hosted full validation, package/artifact verification, publication and released75
 live staging are pending.
 Native Windows/WebView2, hardware and actual install/restart remain unverified.
 Future work requires its own publication authorization.
