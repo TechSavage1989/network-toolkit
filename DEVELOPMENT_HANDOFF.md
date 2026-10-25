@@ -1,11 +1,14 @@
 # Network Toolkit development handoff
 
-## 1.17.67 Hosts editor candidate
+## 1.17.67 Hosts editor: publication approved
 
 Prepared from exact main 2d071bec99979397e3d80cec6db5d7d4716c4e3e on
 review/hosts-editor-1.17.67 in response to the request for more Hosts editor
-features. The current published baseline remains 1.17.66. No 1.17.67 publication
-has been authorized; keep this work on the review branch until approved.
+features. The user approved public source upload and publication on 2026-10-24
+after the completed review build was delivered. The published baseline before
+this publication is 1.17.66. This approval covers only the new 1.17.67 release;
+preserve every existing tag, release and asset. The main repository remains the
+only source and update feed. The retired second repository must not be changed.
 
 New code is hosts-editor-model.js, hosts-editor.js and hosts-editor.css. The
 existing index delegates Hosts rendering, controls and validation to the module.
@@ -41,11 +44,20 @@ browser-added export extension; exports now use explicit hosts-draft.txt and
 hosts-loaded-copy.txt names. Subsequent polish excludes the source textarea
 from global one-click input clearing and supplies complete tab semantics.
 
-The review branch Checks workflow runs these Hosts browser checks plus the
-existing application regressions and provides a portable review artifact. Its
-latest terminal result is authoritative; include the final run link when handing
-this candidate to the user. Native Windows hosts-file save/elevation and actual
-runtime remain unverified. Publication still requires separate authorization.
+Final reviewed runtime source 3c379fb1653b1f24de3f820bc5bf525acfaa9b52 passed
+Checks 40156697029, including all twenty Hosts rendered cases, existing client
+and server layout checks, automatic startup/release notes, and all seven native
+Chromium timer scenarios. The real five-minute poll and focus collision passed
+with two checks and no overlap. Review portable artifact 12585125922 matched
+the local verified build byte-for-byte and passed ZIP/checksum verification.
+
+Publication preparation changes only AGENTS.md, this handoff and VALIDATION.txt
+from that reviewed source. Run the established main-push release workflow,
+then verify its terminal result, new release tag, all four downloaded assets,
+source provenance and live production updater check/download/stage. Record
+the final evidence in a documentation follow-up without changing released
+runtime code or republishing 1.17.67. Native Windows hosts-file save/elevation,
+installation/restart and actual runtime remain unverified.
 
 
 ## 1.17.66 published: concise review and faster detection

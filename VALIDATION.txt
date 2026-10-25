@@ -1,4 +1,4 @@
-NETWORK TOOLKIT 1.17.67 CANDIDATE VALIDATION
+NETWORK TOOLKIT 1.17.67 VALIDATION
 
 LOCAL RESULTS
 - All 422 JavaScript tests, including 30 new Hosts draft-model regressions.
@@ -17,14 +17,21 @@ PASSED BUILD AND HOSTED HOSTS CHECKS
 - Export filenames are explicit. The source textarea opts out of one-click
   clearing, retaining its normal select/delete and undo controls.
 
-The review branch's latest Checks run covers the final candidate and remaining
-application regressions. Read its terminal result with this validation record.
+Final reviewed runtime source 3c379fb1653b1f24de3f820bc5bf525acfaa9b52 passed
+Checks 40156697029. Both jobs succeeded, including twenty Hosts rendered cases,
+all client/server layout checks, update startup/release notes and seven native
+Chromium timer scenarios. The real five-minute poll/focus collision passed.
+The downloaded review portable matches the verified local package byte-for-byte.
+User approved public source upload and publication of 1.17.67 on 2026-10-24.
+This publication-preparation commit changes documentation only from the tested
+runtime. Verify main workflows and downloaded official assets before declaring
+the release complete; record final evidence in a documentation follow-up.
 
 The browser fixture uses fictional hosts text and mocked local-tools responses;
 it does not read or write this machine's system hosts file. Native Windows
 hosts writes, elevation, encoding/ACL preservation and DNS cache refresh are
 not claimed as runtime-tested. Existing protected backend code is unchanged.
-Publication of this candidate has not been authorized.
+No native Windows runtime result is inferred from the user's publication approval.
 
 HISTORICAL BASELINE VALIDATION
 
