@@ -67,6 +67,7 @@ async function copy(button,expected,keyboard=false){
    const bad=await fit();assert.deepEqual(bad,[],JSON.stringify({width,theme,page:id,bad}));
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false,JSON.stringify({width,theme,page:id,overflow:true}));
    result.cases.push({width,theme,page:id});
+   if(out&&id==='terminal'&&(width===1600||width===390))await page.screenshot({path:path.join(out,'ui-terminal-'+theme+'-'+width+'.png')});
   }
   await page.evaluate(()=>navigate('overview'));await settle(page);
   assert.equal(await page.locator('#pageContent .tool-card,#adapterList .adapter-address button:not([data-value-copy-control])').count(),0);
