@@ -124,6 +124,7 @@ async function main(){
   if(out&&viewport.width===1366&&protocol==='tftp'&&theme==='light')await client.screenshot({path:path.join(out,'client-selected-tab.png')});
   tabCases.push({protocol,theme,viewport});
  }
+ await page.setViewportSize({width:1600,height:1100});
  await render(page,'sftp',270,true);
  await page.locator('select.transfer-bind-picker').selectOption('192.168.17.4');
  const divider=page.locator('.transfer-activity-splitter'),initial=Number(await divider.getAttribute('aria-valuenow'));

@@ -11,7 +11,9 @@ cosmetic unit tests are added. Local validation passed 446 JavaScript tests,
 resource validation, HTML/browser syntax and Windows x64 GUI build. Hosted
 checks, package/artifact verification, publication and live staging are pending.
 Initial browser comparison caught Settings wrapping to two lines; shared short
-labels now stay on one line and have explicit containment checks. Native Windows/
+labels now stay on one line and have explicit containment checks. All 54 style
+comparisons then passed. The following existing activity-resize test now restores
+its original large viewport after the compact comparison cases. Native Windows/
 WebView2, hardware and real install/restart remain unverified. See the handoff.
 
 HISTORICAL PUBLISHED BASELINE

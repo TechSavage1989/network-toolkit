@@ -32,6 +32,10 @@ release/resource metadata, HTML/browser syntax and Windows x64 GUI build.
 Initial browser run 40173978151 found only a height difference in its first
 selected-tab comparison: the longer Settings label wrapped. Shared short labels
 now stay on one line, and the browser checks single-line label containment.
+The next browser run 40174214223 passed all 54 selected-tab comparisons and
+label containment checks. Its subsequent existing activity-resize check inherited
+the compact viewport from the new cases; that test now restores its original
+1600x1100 viewport first. No application change was needed for this test reset.
 Hosted full validation, package/artifact verification, publication and released75
 live staging are pending.
 Native Windows/WebView2, hardware and actual install/restart remain unverified.
