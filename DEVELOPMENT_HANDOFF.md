@@ -2,12 +2,14 @@
 
 ## Start here
 
-Current candidate: **1.17.65**, based on exact public main
-f4754d11a9df4d93c7028a1a65b20536921dc9ef (tree
-8342a0d3e09e15f40e40972284110b692edf85c1). The user approved building and
-publishing this narrow timer fix on 2026-10-25. Release is gated on independent
-review, hosted native-browser negative/positive proof, and passing Checks.
-Until that gate passes, 1.17.64 below remains the published release.
+Current released version: **1.17.65**, source/tag
+97a0b4c3902e10acc11b1c78715e1ab7ba5de6c4 (tree
+445b2b768df738dd5fb9fbaf33e8f2da4e3fe320), built from exact prior public main
+f4754d11a9df4d93c7028a1a65b20536921dc9ef. The user approved this narrow timer
+fix and publication on 2026-10-25. Review Checks 40147301635 and 40147544940,
+main Checks 40147728836 and Release 40147728832 all passed. Publication and
+asset verification are complete; see the final record below. The user's native
+Windows/WebView2 confirmation of automatic startup in 65 is still pending.
 
 ## 1.17.65 native update timers
 
@@ -40,8 +42,8 @@ this release does not claim to fix that separate warning.
 Local validation passed: 379 JavaScript tests, 31 Python tests, root/terminal/
 desktop Go tests, release/resource validation and Windows x64 GUI cross-build.
 Independent review found no confirmed must-fix and passed 75 focused JS tests.
-The test now scrolls to the update status before settings screenshots; final
-review Checks and publication status will be recorded below. Native
+The final test scrolls to update status before screenshots: inspected images
+show the old stale schedule versus the fixed last attempt and next check. Native
 Windows/WebView2, real installation and restart remain untested here. Retain all
 old release tags/assets and use the main repository only; do not write to the
 retired update repository or change repository access.
@@ -385,3 +387,45 @@ The improved automatic startup and notes interface runs only after installing
 1.17.64; it cannot retroactively change the UI of installed 1.17.63. A subsequent
 newer release will exercise that UI on the user's actual installation. No user
 confirmation of the new 64 UI or native runtime is recorded yet.
+
+
+## 1.17.65 publication record (2026-10-25)
+
+Release ID: 423068312
+URL: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.65
+Source/tag: 97a0b4c3902e10acc11b1c78715e1ab7ba5de6c4
+Tree: 445b2b768df738dd5fb9fbaf33e8f2da4e3fe320
+Initial review Checks: 40147301635. Final review Checks: 40147544940.
+Main Checks: 40147728836. Release: 40147728832. All succeeded.
+
+Published EXE SHA-256:
+de50ade7bf554e8d6140e2dca802c37deea2ee575e750f5945390404ee271d40
+Published source Portable.zip SHA-256:
+671d639e605d6ee745203f92d647ddacbb7d6d8e873c9d790ee8080155d5a3c6
+Published Update.zip SHA-256:
+6ba4c8b462b1026571e60744b1085216cb6d313db03e4c4c769f168a1e8fd47d
+
+Downloaded official files passed every outer and inner manifest, both ZIP CRCs,
+strict four-member Update.zip allowlist, Windows x64 GUI/version checks and exact
+EXE identity across all packages. All 663 published source files match the exact
+reviewed tree. The hosted EXE matches the privately backed-up local build. Use
+the hosted ZIP hashes above, not a separately generated timestamped updater ZIP.
+Release 64 ID, tag and all asset digests were verified unchanged after publication.
+
+The unchanged released 64 production updater, sourced from the verified 64
+Portable.zip, fetched the real main feed, verified/downloaded/staged the exact
+65 EXE in 11.67 seconds. No installation/restart ran, and the original running
+executable was unchanged. This proves feed and staging compatibility, not a
+native Windows install. Full native UI/install/restart remains unverified here.
+
+The user was told to use Check for updates once from installed 64, install 65,
+then reopen and allow an automatic attempt without pressing Check. Only 65 has
+the timer fix; publishing it cannot repair the already-running 64 scheduler.
+User confirmation of that native automatic attempt is pending. Do not claim it
+based on the hosted browser proof. The separate stale-folder cleanup warning
+was resolved independently by the user and is not changed by this release.
+
+This documentation-only follow-up does not change application code, rebuild the
+released EXE, replace published assets, or move the source tag. Private complete
+prepublication and verified-published backups preserve source, build assets,
+validation and handoff. Continue using main network-toolkit only.

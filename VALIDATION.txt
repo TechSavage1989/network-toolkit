@@ -1,4 +1,4 @@
-NETWORK TOOLKIT 1.17.65 CANDIDATE VALIDATION
+NETWORK TOOLKIT 1.17.65 RELEASE VALIDATION
 
 The only production behavior change is correct Window receiver binding for both
 automatic update scheduler timers. Receiver-enforcing initializer regressions
@@ -9,8 +9,16 @@ Hosted review Checks 40147301635 passed: exact released-64 negative control
 reproduces Illegal invocation/no feed check in Chromium 155.0.8059.0; six native
 scenarios verify fixed startup, opt-out, real retry, manual/toggle cancellation
 and no overlap without fake clocks. Independent review cleared the change.
-The test screenshot positioning is improved for a final review run.
-Do not interpret this candidate as published or Windows-native verified yet.
+Final review Checks 40147544940 and main Checks 40147728836 also passed.
+Inspected final screenshots show the stale negative-control status, fixed last
+automatic attempt/next check, automatic main banner and readable mobile notes.
+Release 40147728832 published v1.17.65 at source 97a0b4c3902e10acc11b1c78715e1ab7ba5de6c4.
+Downloaded official files passed every outer/inner hash, both ZIP CRCs, strict
+updater allowlist, PE/version validation and EXE identity. All 663 source files
+match the reviewed tree. Released 64 production handlers verified/staged 65 in
+11.67 seconds without installing or changing the original running executable.
+Published 64 tag and asset digests remain unchanged.
+Native Windows automatic-startup confirmation from the user is still pending.
 Native Windows/WebView2, installation and restart are not exercised here.
 
 HISTORICAL 1.17.64 VALIDATION FOLLOWS
