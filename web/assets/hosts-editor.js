@@ -245,7 +245,7 @@
   if(event.target.id==='hostsFind'&&event.key==='Enter'){event.preventDefault();find(event.shiftKey?-1:1);return;}
   if(event.target.id==='hostsGoLine'&&event.key==='Enter'){event.preventDefault();const line=Number(event.target.value);closeModal();jump(line);return;}
   if(event.target.matches('[data-hosts-view]')&&['ArrowLeft','ArrowRight','Home','End'].includes(event.key)){event.preventDefault();ui.view=event.key==='Home'?'entries':event.key==='End'?'text':ui.view==='entries'?'text':'entries';render();q('[data-hosts-view="'+ui.view+'"]').focus();return;}
-  if(event.key==='F3'&&ui.view==='text'){event.preventDefault();find(event.shiftKey?-1:1);return;}
+  if(event.key==='F3'&&ui.view==='text'&&event.target.closest('#hostsConfiguration')){event.preventDefault();find(event.shiftKey?-1:1);return;}
   const mod=event.ctrlKey||event.metaKey;if(!mod)return;const key=event.key.toLowerCase();
   if(key==='s'&&event.target.closest('#hostsConfiguration')){event.preventDefault();doc();controls();reviewLocalConfiguration('hosts');return;}
   if(!event.target.closest('#hostsConfiguration'))return;
