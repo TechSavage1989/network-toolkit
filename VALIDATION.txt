@@ -1,4 +1,4 @@
-NETWORK TOOLKIT 1.17.71 REVIEW VALIDATION
+NETWORK TOOLKIT 1.17.71 VALIDATION
 
 SMTP passwords remain in the current masked form after accepted, completed,
 failed and rejected tests. Switching tools creates an empty password field on
@@ -25,8 +25,11 @@ exact hashes and tested source. Native Windows/WebView2 and live SMTP remain
 unverified. The final documentation follow-up leaves the tested runtime and
 review artifacts unchanged; duplicate automatic checks need not be awaited.
 
-This is an unpublished review build. Published 1.17.70 and its assets are
-preserved. See DEVELOPMENT_HANDOFF.md for scope and publication boundaries.
+The user explicitly authorized publication on 2026-10-25 after the verified
+review build. Preparation changes only four documentation files; the tested
+runtime and EXE remain unchanged. Official release verification is pending.
+The previous 1.17.70 release and all earlier tags/assets must be preserved.
+See DEVELOPMENT_HANDOFF.md for scope, provenance and validation limits.
 
 HISTORICAL PUBLISHED BASELINE
 

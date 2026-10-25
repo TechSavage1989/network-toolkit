@@ -1,13 +1,13 @@
 NETWORK TOOLKIT 1.17.71
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.71 (review build; not published)
+CURRENT RELEASE - 1.17.71
 
 SMTP passwords stay filled after successful and failed tests for repeat runs.
 Switching to another tool clears the field. Credentials are not saved in
 application settings or diagnostic history.
 
-PUBLISHED RELEASE - 1.17.70
+PREVIOUS RELEASE - 1.17.70
 
 App settings now labels its update section Network Toolkit updates. This small
 visible change lets you confirm the 1.17.69-to-1.17.70 update after restart.

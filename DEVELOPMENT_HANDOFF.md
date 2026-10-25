@@ -1,14 +1,14 @@
 # Network Toolkit development handoff
 
-## 1.17.71 review: retain SMTP password for repeat tests
+## 1.17.71 authorized publication: retain SMTP password for repeat tests
 
 Prepared from latest main df712385f61108ca43271d22ed9e73d3f6e88629 in response
 to the request to keep the SMTP password filled after a test and clear it when
-switching tools. This request authorizes the focused implementation and review
-build. It does not extend the prior explicit 1.17.70 publication authorization.
-Use review/hosts-editor-1.17.71 for hosted checks and its existing portable-build
-artifact hook. Do not promote to main or publish without a new user instruction.
-The published release remains 1.17.70 and its source/tag/assets are preserved.
+switching tools. After the completed review build was delivered, the user
+explicitly instructed publish on 2026-10-25. This authorizes the new 1.17.71
+source and release; no additional approval is needed for this scoped publication.
+Use network-toolkit only. The previous published release is 1.17.70 and all
+its source/tag/assets, plus every earlier release, must be preserved.
 
 The only SMTP runtime behavior change removes both explicit password-field
 resets in startJob, on accepted responses and errors. The masked password stays
@@ -54,18 +54,21 @@ Review Portable.zip SHA-256 (9,052,210 bytes):
 Review EXE SHA-256 (14,183,424 bytes):
 8f078b44d5bf2b165c749754aaac41cd60a194b19bf3487d769f2a18052833fa
 
-This final follow-up changes only AGENTS.md, this handoff and VALIDATION.txt.
-The reviewed runtime and its build artifacts stay unchanged. Main remains
-at df712385f61108ca43271d22ed9e73d3f6e88629; the public updater still offers
-1.17.70 (release 423148288). No 71 tag or public release has been created.
-Future publication requires a new user instruction and removal of review-only
-status wording from README/current handoff before preparing the authorized
-release. Do not overwrite any prior release/tag/asset.
+The publication-preparation commit changes only README.txt, AGENTS.md, this
+handoff and VALIDATION.txt from reviewed documentation commit
+082ca75078458efd989a2cdc61a9474205b5f33b. Review-only status wording is removed.
+No application, version, resource or test code changes after full validation.
+The verified EXE stays byte-identical; the source portable is repackaged with
+the current publication documentation. Promotion starts from checked main
+df712385f61108ca43271d22ed9e73d3f6e88629. Do not overwrite prior assets/tags.
+Record final source/tag, release workflow, official downloaded hashes and the
+unchanged released70 live feed/download/staging result after publication.
 
 Native Windows/WebView2 and live SMTP authentication remain untested here.
 The unchanged 70 updater and prior native install/restart limits remain as
 recorded below. Full runtime validation above applies to this documentation
-follow-up; an automatic duplicate review-branch run need not be awaited again.
+follow-up; automatic duplicate runs may be superseded without repeating the
+already-passed runtime validation.
 
 
 ## 1.17.70 published: small update-flow test release
