@@ -9,7 +9,7 @@ const pause=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {pro
   const browser=await playwright.chromium.launch({headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:fs.existsSync('/usr/bin/chromium')?{executablePath:'/usr/bin/chromium'}:{}),args:['--no-sandbox']});
   try{
     async function scenario(name,options={},verify){
-      const page=await browser.newPage(),errors=[],requests=[];let checks=0,latest=options.staged?{...available,staged:{version:'1.17.62',sha256:'verified'}}:{...available,hasUpdate:false,latest:null};
+      const page=await browser.newPage(),errors=[],requests=[],installBodies=[];let checks=0,latest=options.staged?{...available,staged:{version:'1.17.62',sha256:'verified'}}:{...available,hasUpdate:false,latest:null};
       const stateGate=options.holdState?pause():null,unrelatedGate=options.holdUnrelated?pause():null;
       page.on('pageerror',error=>errors.push(error.message));
       await page.clock.install();
@@ -32,6 +32,8 @@ const pause=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {pro
             if(options.failFirst&&checks===1)return route.fulfill({status:502,contentType:'application/json',body:JSON.stringify({error:'Temporary network interruption'})});
             latest=options.staleFirst&&checks===1?{...available,hasUpdate:false,latest:{version:'1.17.61'}}:options.staged?{...available,staged:{version:'1.17.62',sha256:'verified'}}:options.release||available;data=latest;
           }
+          if(p==='/api/updates/download'){assert.equal(options.installFlow,true,'Unapproved download');assert.equal(route.request().postDataJSON().version,'1.17.62');latest={...available,staged:{version:'1.17.62',sha256:'verified'}};data=latest;}
+          if(p==='/api/updates/install'){assert.equal(options.installFlow,true,'Unapproved install');installBodies.push(route.request().postDataJSON());data={restarting:true};}
           return route.fulfill({contentType:'application/json',body:JSON.stringify(data)});
         }
         try{
@@ -45,12 +47,12 @@ const pause=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {pro
         // Let initial fetches settle before advancing the actual app's timers.
         await page.waitForFunction(()=>typeof NetworkToolkitUpdater==='object'&&online);
         await page.waitForTimeout(50);
-        const h={page,requests,get checks(){return checks},stateGate,unrelatedGate,
+        const h={page,requests,installBodies,get checks(){return checks},stateGate,unrelatedGate,
           advance:async ms=>{await page.clock.runFor(ms);await page.waitForTimeout(50)},
           settings:async()=>{await page.evaluate(()=>appSettings());await page.waitForTimeout(50)},
           notice:()=>page.locator('#appUpdateNotice').innerText()};
         await verify(h);
-        assert.deepEqual(errors,[]);assert.equal(requests.some(p=>p==='/api/updates/download'||p==='/api/updates/install'),false);
+        assert.deepEqual(errors,[]);if(!options.installFlow)assert.equal(requests.some(p=>p==='/api/updates/download'||p==='/api/updates/install'),false);
         console.log('PASS '+name+' ('+checks+' release checks)');
       }finally{stateGate?.resolve();unrelatedGate?.resolve();await page.close()}
     }
@@ -112,24 +114,26 @@ const pause=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {pro
         await h.page.screenshot({path:path.join(out,'update-current-notes-'+width+'.png')});
       }
     });
-    await scenario('concise install review preserves confirmation at narrow and wide sizes',{staged:true},async h=>{
+    await scenario('staged banner and settings expose one final install action',{staged:true,installFlow:true},async h=>{
       await h.advance(100);
       for(const width of [390,768,1280]){
         await h.page.setViewportSize({width,height:900});
-        await h.page.locator('#appUpdateNotice [data-app-update="review"]').click();
-        const modal=h.page.locator('#modalRoot'),text=await modal.innerText();
+        const banner=h.page.locator('#appUpdateNotice'),text=await banner.innerText();
         assert.match(text,/Save your work before restarting\./);
-        assert.match(text,/Replace the current app with version 1.17.62 and restart\?/);
-        assert.doesNotMatch(text,/Export any diagnostic results|Updates keep|previous.json|atomic swap|SHA-256 verification checks/);
-        await modal.getByRole('button',{name:'Install and restart',exact:true}).waitFor({state:'visible'});
-        assert.equal(await modal.locator('.nt-update-notes').count(),1);
-        assert.equal(await modal.evaluate(el=>el.scrollWidth<=el.clientWidth+1),true);
+        assert.match(text,/1.17.62/);assert.doesNotMatch(text,/Review install/);
+        assert.equal(await banner.getByRole('button',{name:'Install and restart',exact:true}).getAttribute('data-app-update'),'confirm');
+        assert.equal(await banner.evaluate(el=>el.scrollWidth<=el.clientWidth+1),true);
+        assert.equal(h.installBodies.length,0);
         const out=process.env.TOOLKIT_TEST_OUTPUT||'/tmp/ntk-updater-browser';fs.mkdirSync(out,{recursive:true});
-        await h.page.screenshot({path:path.join(out,'update-install-'+width+'.png')});
-        await modal.getByRole('button',{name:'Cancel',exact:true}).click();
-        assert.equal(await modal.innerText(),'');
-        assert.match(await h.notice(),/downloaded and verified/);
+        await h.page.screenshot({path:path.join(out,'update-ready-'+width+'.png')});
       }
+      await h.settings();const settings=h.page.locator('#appUpdateSettings');assert.match(await settings.innerText(),/Save your work before restarting/);assert.equal(await settings.locator('[data-app-update="review"]').count(),0);await settings.getByRole('button',{name:'Install and restart',exact:true}).click();await h.page.waitForFunction(()=>document.querySelector('#appUpdateNotice').textContent==='');assert.deepEqual(h.installBodies,[{confirm:true,version:'1.17.62'}]);
+    });
+    for(const width of [390,768,1280])for(const surface of ['modal','banner'])await scenario('download goes directly to final '+surface+' install action at '+width,{installFlow:true},async h=>{
+      await h.page.setViewportSize({width,height:900});await h.advance(100);await h.page.locator('#appUpdateNotice [data-app-update="download"]').click();assert.equal(h.requests.includes('/api/updates/download'),false);await h.page.locator('#modalRoot [data-app-update="confirm-download"]').click();const modal=h.page.locator('#modalRoot');await modal.locator('[data-app-update="confirm"]').waitFor({state:'visible'});assert.equal(h.requests.filter(p=>p==='/api/updates/download').length,1);assert.equal(h.installBodies.length,0);assert.match(await modal.innerText(),/Save your work before restarting/);assert.match(await modal.innerText(),/Replace the current app with version 1.17.62 and restart\?/);assert.equal(await h.page.locator('[data-app-update="review"]').count(),0);assert.equal(await modal.evaluate(el=>el.scrollWidth<=el.clientWidth+1),true);
+      const out=process.env.TOOLKIT_TEST_OUTPUT||'/tmp/ntk-updater-browser';fs.mkdirSync(out,{recursive:true});await h.page.screenshot({path:path.join(out,'update-install-'+surface+'-'+width+'.png')});
+      if(surface==='banner'){await modal.getByRole('button',{name:'Cancel',exact:true}).click();assert.equal(h.installBodies.length,0);await h.page.locator('#appUpdateNotice').getByRole('button',{name:'Install and restart',exact:true}).click();assert.equal(await modal.innerText(),'');}else await modal.getByRole('button',{name:'Install and restart',exact:true}).click();
+      await h.page.waitForFunction(()=>document.querySelector('#appUpdateNotice').textContent==='');assert.deepEqual(h.installBodies,[{confirm:true,version:'1.17.62'}]);
     });
     await scenario('notes are safe and readable before any download',{},async h=>{
       await h.advance(100);assert.equal(h.checks,1);

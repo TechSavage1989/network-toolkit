@@ -22,7 +22,7 @@
       if(!file||!checksums){error='Choose both the portable ZIP and SHA256SUMS from the same official release.';render();return;}
       if(!/\.zip$/i.test(file.name)||file.size>128*1024*1024||checksums.size>64*1024){error='Choose a portable ZIP under 128 MiB and a SHA256SUMS file under 64 KiB.';render();return;}
       busy=true;error='';message='Uploading and verifying the update. The installed app is unchanged.';render();
-      try{data=await env.upload(file,checksums);if(!data.staged)throw new Error('No staged package was returned. Refresh update status before retrying.');message='Update verified and staged. Review it before installing.';}
+      try{data=await env.upload(file,checksums);if(!data.staged)throw new Error('No staged package was returned. Refresh update status before retrying.');message='Update verified and staged. Ready to install when you choose.';}
       catch(e){error='Update was not imported: '+e.message;message='';}
       finally{busy=false;render();changed();}
     }
@@ -40,18 +40,18 @@
       if(busy||data?.installing)return;
       if(!data?.latest||data.latest.version!==version){error='The available release changed. Check again before downloading.';render();return;}
       busy=true;error='';message='Downloading and verifying the update. The installed app is unchanged.';render();
-      try{data=await env.api('/updates/download','POST',{version});if(!data.staged)throw new Error('No staged package was returned. Refresh update status before retrying.');message='Update downloaded, verified and staged. Review it before installing.';}
+      try{data=await env.api('/updates/download','POST',{version});if(!data.staged)throw new Error('No staged package was returned. Refresh update status before retrying.');message='Update downloaded, verified and staged. Ready to install when you choose.';}
       catch(e){error='The update could not be downloaded: '+e.message;message='';}
       finally{busy=false;render();changed();}
     }
     async function install(version){
       if(busy||data?.installing)return;
-      if(!data?.staged||data.staged.version!==version){error='The staged update changed. Refresh and review it again.';render();return;}
+      if(!data?.staged||data.staged.version!==version){error='The staged update changed. Refresh update status and try again.';render();return;}
       busy=true;error='';message='Saving settings before restart…';render();
       try{
         if(!await env.save())throw new Error('Settings could not be saved. Installation was not started.');
         const current=await env.api('/updates/status');data=current;
-        if(!current.staged||current.staged.version!==version)throw new Error('The staged update changed. Review it again.');
+        if(!current.staged||current.staged.version!==version)throw new Error('The staged update changed. Refresh update status and try again.');
         if(current.busy?.length)throw new Error('Finish or stop active operations first: '+current.busy.join(', '));
         message='Requesting installation. Do not close the app until it restarts.';render();
         const result=await env.api('/updates/install','POST',{confirm:true,version});
@@ -73,7 +73,7 @@
       '<details class="mt"><summary>Import a downloaded update instead</summary><p class="help-line">Select the binary-only Update.zip and SHA256SUMS from the same official release. No GitHub credentials are needed.</p><p class="help-line" style="overflow-wrap:anywhere">Official feed: '+RELEASES+'</p>'+
       (!available?'<p class="help-line">Open the executable to import and install updates.</p>':data?.supported===false?'<p class="help-line">In-app installation is supported only by the Windows x64 executable.</p>':'<div class="form-stack mt"><div class="field"><label for="appUpdatePackage">Official binary-only Update ZIP</label><input type="file" id="appUpdatePackage" accept=".zip" '+(disabled?'disabled':'')+'></div><div class="field"><label for="appUpdateChecksums">SHA256SUMS from the same release</label><input type="file" id="appUpdateChecksums" '+(disabled?'disabled':'')+'></div><div><button type="button" class="btn small" data-app-update="import" '+(disabled?'disabled':'')+'>Verify and stage update</button></div></div>')+
       '</details><p class="help-line">SHA-256 checks detect corruption, not publisher identity. Use files only from the official release page. Only the app executable is replaced; your app data folder is not changed.</p>'+
-      (staged?'<div class="notice info mt"><span>Ready to install version '+escape(staged.version)+'.</span></div><p class="help-line" style="overflow-wrap:anywhere">Executable SHA-256: '+escape(staged.sha256)+'</p><button type="button" class="btn primary" data-app-update="review" '+(disabled?'disabled':'')+'>Review install and restart</button>':'')+
+      (staged?'<div class="notice info mt"><span>Ready to install version '+escape(staged.version)+'. Save your work before restarting.</span></div><p class="help-line" style="overflow-wrap:anywhere">Executable SHA-256: '+escape(staged.sha256)+'</p><button type="button" class="btn primary" data-app-update="confirm" data-version="'+escape(staged.version)+'" '+(disabled?'disabled':'')+'>Install and restart</button>':'')+
       (data?.busy?.length?'<p class="help-line">Active operations: '+escape(data.busy.join(', '))+'. Finish or stop them before installing.</p>':'')+
       '<div role="status" aria-live="polite">'+(message?'<p class="help-line">'+escape(message)+'</p>':'')+(busy&&!message?'<p class="help-line">Reading update status…</p>':'')+(backgroundError?'<p class="help-line">'+escape(backgroundError)+' Use Check for updates to retry.</p>':'')+(error?'<div class="notice warn mt">'+escape(error)+'</div>':'')+'</div>';
   }
@@ -138,7 +138,7 @@
   }
   function noticeHTML(state,preferences,now){
     const item=notice(state,preferences,now);if(!item)return '';
-    return '<div class="notice info row wrap gap6" role="status" aria-live="polite"><span style="flex:1;min-width:180px">Network Toolkit '+escape(item.version)+(item.kind==='install'?' is downloaded and verified. Install and restart?':' is available. See what’s new before updating.')+'</span><button type="button" class="btn small primary" data-app-update="'+(item.kind==='install'?'review':'download')+'" data-version="'+escape(item.version)+'" '+(state.busy?'disabled':'')+'>'+(item.kind==='install'?'Review install and restart':"See what's new")+'</button><button type="button" class="btn small ghost" data-app-update="later">Remind me tomorrow</button>'+(state.error?'<span style="flex-basis:100%" role="alert">'+escape(state.error)+'</span>':'')+(state.busy&&state.message?'<span style="flex-basis:100%">'+escape(state.message)+'</span>':'')+'</div>';
+    return '<div class="notice info row wrap gap6" role="status" aria-live="polite"><span style="flex:1;min-width:180px">Network Toolkit '+escape(item.version)+(item.kind==='install'?' is downloaded and verified. Save your work before restarting.':' is available. See what’s new before updating.')+'</span><button type="button" class="btn small primary" data-app-update="'+(item.kind==='install'?'confirm':'download')+'" data-version="'+escape(item.version)+'" '+(state.busy?'disabled':'')+'>'+(item.kind==='install'?'Install and restart':"See what's new")+'</button><button type="button" class="btn small ghost" data-app-update="later">Remind me tomorrow</button>'+(state.error?'<span style="flex-basis:100%" role="alert">'+escape(state.error)+'</span>':'')+(state.busy&&state.message?'<span style="flex-basis:100%">'+escape(state.message)+'</span>':'')+'</div>';
   }
   if(typeof module==='object'&&module.exports)module.exports={createController,createScheduler,notice,noticeHTML,html};
   if(!root.document)return;
@@ -231,8 +231,8 @@
       '<p class="help-line">Download and verify this update now? Your current app stays running. Installation and restart require a separate confirmation.</p><div id="appUpdateDownloadResult" role="status" aria-live="polite"></div>',
       '<button class="btn ghost" data-action="close-modal">Not now</button><button class="btn primary" data-app-update="confirm-download" data-version="'+escape(version)+'">Download update</button>');
   }
-  function review(){
-    const state=getController().snapshot(),version=state.data?.staged?.version;if(state.busy||!version)return;
+  function showInstallConfirmation(version){
+    const state=getController().snapshot();if(state.busy||state.data?.staged?.version!==version)return;
     openModal('Install Network Toolkit '+version,
       releaseNotes(state.data,version)+'<p>Replace the current app with version '+escape(version)+' and restart?</p><div class="notice warn mt">Save your work before restarting.</div><div id="appUpdateInstallError" class="help-line" role="alert"></div>',
       '<button class="btn ghost" data-action="close-modal">Cancel</button><button class="btn primary" data-app-update="confirm" data-version="'+escape(version)+'">Install and restart</button>');
@@ -248,15 +248,14 @@
       const result=document.getElementById('appUpdateDownloadResult');button.disabled=true;
       if(result)result.textContent='Downloading and verifying…';
       await c.download(button.dataset.version);
-      if(result?.isConnected){
+      if(result?.isConnected&&document.getElementById('appUpdateDownloadResult')===result){
         result.textContent=c.snapshot().error||c.snapshot().message;
-        if(c.snapshot().data?.staged?.version===button.dataset.version){button.dataset.appUpdate='review';button.textContent='Review install and restart';}
+        if(!c.snapshot().error&&c.snapshot().data?.staged?.version===button.dataset.version)showInstallConfirmation(button.dataset.version);
       }
       if(button.isConnected)button.disabled=false;
     }
     else if(action==='refresh')await c.load();
     else if(action==='import')await c.importPackage(document.getElementById('appUpdatePackage')?.files?.[0],document.getElementById('appUpdateChecksums')?.files?.[0]);
-    else if(action==='review')review();
     else if(action==='confirm'){
       const error=document.getElementById('appUpdateInstallError');button.disabled=true;await c.install(button.dataset.version);
       if(error?.isConnected)error.textContent=c.snapshot().error||c.snapshot().message;

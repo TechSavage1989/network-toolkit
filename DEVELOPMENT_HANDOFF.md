@@ -1,5 +1,42 @@
 # Network Toolkit development handoff
 
+## 1.17.69: one final update-install action, publication authorized
+
+Prepared from main 74d4a1103c6887fce793ed8ce24e298526d715b0 after the user
+requested removal of the redundant Review install and restart option, then
+explicitly said to publish when finished. This authorizes the new 1.17.69 source
+and release after validation; no further approval is needed for this build.
+The baseline remains published 1.17.68 until publication completes.
+
+app-updater.js has no install-review action. A successful explicit download
+automatically changes its still-current notes dialog into the final installation
+prompt. Install and restart there is the single installation confirmation.
+If that dialog was closed or replaced during download, it is not reopened and
+does not replace unrelated work. The staged banner and App settings buttons
+also call the final version-bound install action directly without another
+dialog. They show the staged version and Save your work reminder.
+
+Explicit download approval, settings flush, fresh staged-version/status checks,
+active-operation checks and single-flight installation guards are retained.
+No timer or download completion calls install automatically. Failed downloads
+stay retryable. Backend installation, staging, recovery and scheduling code are
+unchanged, as are the Hosts editor improvements.
+
+Focused UI/controller tests cover direct final confirmation, cancellation then
+single-click banner installation, settings installation, repeated clicks,
+failed downloads, stale versions, settings-save failures, active operations and
+closing a pending download without reopening or installing. Browser regressions
+exercise real page DOM transitions and mock install requests at 390/768/1280px,
+checking exactly one explicit install POST from dialog/banner/settings. Other
+startup/native-timer cases still forbid all download/install calls.
+
+Read the review branch's latest Checks result before publishing the exact tested
+source. Verify all four actual official assets, source provenance and an unchanged
+released68 check/download/stage after publication. Preserve all older releases,
+tags and assets. Update this section and VALIDATION.txt with final results in a
+documentation follow-up that must not republish or move the released 69 tag.
+Native Windows/WebView2 installation and restart remain unverified here.
+
 ## 1.17.68 published: Hosts filter text clipping
 
 Prepared from exact main 99ff403c866953706290e312c425a58429f9567e after the

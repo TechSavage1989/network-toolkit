@@ -17,8 +17,9 @@ importer also accepts only newer versions, so it cannot replace same-version
 1.17.63. Do not import source-containing Portable.zip as an updater package.
 
 Future updates: open App settings > Updates, choose Check for updates,
-then Download update. Review the staged version and choose Install and restart.
-The app requests an explicit confirmation. Export diagnostic results, save
+then Download update. Once verified, the final Install and restart prompt opens
+directly. Its Install and restart button is the final confirmation and starts
+installation. There is no extra review action. Export diagnostic results, save
 open editor files, and close other Network Toolkit windows first. Active
 jobs, terminal sessions, transfers and configuration changes block installation.
 
@@ -67,8 +68,10 @@ From 1.17.66, the main Windows window checks after startup and every five minute
 while visible and online. Returning to the app can check after two minutes since
 the last attempt, unless a retry or service cooldown is pending. Hidden/offline
 windows pause periodic checks. This is polling, not push notification delivery.
-The update banner asks before downloading; a verified download then offers
-Review install and restart, with a separate final confirmation. Nothing is
+The update banner asks before downloading; a verified download then opens
+the final Install and restart prompt directly. Staged updates in the banner
+and App settings use one Install and restart click, without another dialog.
+Save your work before clicking it. Nothing is
 automatically downloaded, installed, or restarted. Later hides that reminder
 for 24 hours. Use App settings > Check for updates to show it sooner.
 Automatic checks can be disabled in App settings. Quiet network failures retry

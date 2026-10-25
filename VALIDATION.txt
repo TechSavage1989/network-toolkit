@@ -1,3 +1,20 @@
+NETWORK TOOLKIT 1.17.69 VALIDATION
+
+The user authorized this update-flow change and publication when finished.
+Removes only the redundant install-review step. Explicit final installation,
+version binding, settings flush, active-operation checks and concurrency guards
+remain. The backend installer and scheduling code are unchanged.
+
+Focused UI/controller tests cover the single final action, banner/settings
+installation, cancellation, duplicate clicks, download failures and replacing a
+pending download dialog with unrelated work. Hosted full-page tests check the
+download-to-final transition and exactly one mocked install POST at narrow,
+medium and wide sizes. Existing automatic tests still forbid automatic writes.
+Use the review branch's latest Checks result and actual release verification
+before declaring publication complete. Native Windows installation is untested.
+
+HISTORICAL PUBLISHED BASELINE
+
 NETWORK TOOLKIT 1.17.68 VALIDATION
 
 Changes are limited to compact Hosts control sizing, focused browser regression

@@ -1,7 +1,14 @@
-NETWORK TOOLKIT 1.17.68
+NETWORK TOOLKIT 1.17.69
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.68
+CURRENT RELEASE - 1.17.69
+
+Removes the redundant Review install and restart action. A verified download
+opens the final Install and restart prompt directly. The staged-update banner
+and App settings also offer that same final install action in one click.
+Downloading still requires approval and does not start installation by itself.
+
+PREVIOUS RELEASE - 1.17.68
 
 Fixes clipped text in the Hosts entry-status dropdown. Compact Hosts search and
 find/replace fields also have enough vertical text space. Every status label,
