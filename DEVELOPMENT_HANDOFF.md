@@ -1,5 +1,42 @@
 # Network Toolkit development handoff
 
+## 1.17.71 review: retain SMTP password for repeat tests
+
+Prepared from latest main df712385f61108ca43271d22ed9e73d3f6e88629 in response
+to the request to keep the SMTP password filled after a test and clear it when
+switching tools. This request authorizes the focused implementation and review
+build. It does not extend the prior explicit 1.17.70 publication authorization.
+Use review/hosts-editor-1.17.71 for hosted checks and its existing portable-build
+artifact hook. Do not promote to main or publish without a new user instruction.
+The published release remains 1.17.70 and its source/tag/assets are preserved.
+
+The only SMTP runtime behavior change removes both explicit password-field
+resets in startJob, on accepted responses and errors. The masked password stays
+in the current form for repeat tests. A tool switch discards that form and
+returning to SMTP creates an empty field. Temporary request options are still
+scrubbed after the request settles. No password is added to app state, saved
+settings or history; no backend SMTP, TLS, mail-delivery or updater code changes.
+The SMTP note explains this form-only lifetime. Go/UI/package/Windows version
+resources are consistently 1.17.71 for the new review build.
+
+Seven focused tests exercise the real field renderer, startJob and navigation
+handler: successful and failed jobs, request failures/retries, explicit clearing,
+input/change state exclusion, navigation and late success/failure responses
+without clearing or restoring the new form's password. The new hosted browser
+regression uses the actual page and mock SMTP/settings APIs at 390/1280 pixels,
+including repeated runs, failed jobs/requests, saved-state exclusion, navigation
+and an in-flight old-form response. It sends no actual email or credentials.
+
+Local validation passed all 432 JavaScript tests, 31 Python release guards,
+root/terminal/desktop Go suites, release/resource metadata validation and browser
+script syntax. Running the new lifecycle tests against exact main's old page in
+an isolated fixture reproduces five expected failures (retention, retries and
+late responses); all seven pass with the focused fix. Hosted browser results
+and the Windows x64 review package are pending. Native Windows/WebView2 and
+live SMTP authentication remain untested here. The unchanged 70 updater and
+prior native install/restart limits remain as recorded below.
+
+
 ## 1.17.70 published: small update-flow test release
 
 Prepared from main 61999347587b321dde1f498517dd6970450c0ad6. The user requested

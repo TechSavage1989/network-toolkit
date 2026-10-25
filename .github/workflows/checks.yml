@@ -88,6 +88,10 @@ jobs:
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
         run: node scripts/transfer-client-layout.browser.cjs
+      - name: Check SMTP password retention and navigation clearing
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+        run: node scripts/smtp-password.browser.cjs
       - name: Check automatic update startup and release notes
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright

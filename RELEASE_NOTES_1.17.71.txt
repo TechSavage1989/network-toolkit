@@ -1,0 +1,9 @@
+Network Toolkit 1.17.71
+
+What's new
+- The SMTP password stays filled after a test so you can run another test.
+- Switching to another tool clears the SMTP password field.
+
+The password remains only in the open form. Credentials are not saved in
+application settings or diagnostic history. Existing SMTP connection, TLS,
+authentication and opt-in email delivery behavior is retained.

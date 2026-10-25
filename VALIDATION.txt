@@ -1,3 +1,23 @@
+NETWORK TOOLKIT 1.17.71 REVIEW VALIDATION
+
+SMTP passwords remain in the current masked form after accepted, completed,
+failed and rejected tests. Switching tools creates an empty password field on
+return. The password is not added to state or settings; temporary request
+options are still cleared. Backend SMTP and updater code are unchanged.
+
+All 432 JavaScript tests (including seven SMTP lifecycle regressions), 31 Python
+release guards, root/terminal/desktop Go suites, release/resource metadata and
+browser-script syntax passed locally. The exact old page fails five of the new
+lifecycle checks; the candidate passes all seven. Hosted checks and the Windows
+x64 package are pending.
+The browser regression uses actual page DOM and mock SMTP/settings endpoints
+at 390/1280 pixels. Native Windows/WebView2 and live SMTP remain unverified.
+
+This is an unpublished review build. Published 1.17.70 and its assets are
+preserved. See DEVELOPMENT_HANDOFF.md for scope and publication boundaries.
+
+HISTORICAL PUBLISHED BASELINE
+
 NETWORK TOOLKIT 1.17.70 VALIDATION
 
 User authorized a small visible change and publication to test updating from
