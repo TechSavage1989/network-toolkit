@@ -2,6 +2,8 @@
   'use strict';
   const RELEASES='https://github.com/TechSavage1989/network-toolkit/releases/latest';
   const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const notesView=typeof module==='object'&&module.exports?require('./app-update-notes.js'):root.NetworkToolkitUpdateNotes;
+  function releaseNotes(data,version){return notesView.html({version,currentVersion:data?.currentVersion,notes:data?.latest?.version===version?data.latest.notes:''});}
   function createController(env){
     let data=null,busy=false,error='',message='',backgroundError='',revision=0;
     const changed=()=>env.changed?.(snapshot());
@@ -66,7 +68,7 @@
       (data?.executable?'<p class="help-line" style="overflow-wrap:anywhere">Running file: '+escape(data.executable.currentPath)+'</p>'+(data.executable.canonicalPath&&data.executable.canonicalPath!==data.executable.currentPath?'<p class="help-line" style="overflow-wrap:anywhere">Stable executable: '+escape(data.executable.canonicalPath)+'. Pinned shortcuts, shared shortcuts, and shortcuts elsewhere may need to be pointed to Network_Toolkit.exe manually.</p>':'')+(data.executable.warning?'<div class="notice warn">'+escape(data.executable.warning)+'</div>':''):'')+
       '<p class="help-line">Check the official public binary-release feed. Downloads are verified before installation; the public main repository provides a binary-only update package. Nothing installs until you confirm.</p>'+
       '<div class="row gap6 wrap"><button type="button" class="btn small primary" data-app-update="check" '+(disabled?'disabled':'')+'>Check for updates</button><button type="button" class="btn small ghost" data-app-update="releases" '+(disabled?'disabled':'')+'>Open release notes in browser</button></div>'+
-      (data?.latest?'<div class="notice info mt">Latest release: '+escape(data.latest.version)+'</div>'+(data.latest.notes?'<p class="help-line" style="white-space:pre-wrap;overflow-wrap:anywhere">'+escape(data.latest.notes)+'</p>':'')+(data.hasUpdate===true?'<button type="button" class="btn small" data-app-update="download" data-version="'+escape(data.latest.version)+'" '+(disabled?'disabled':'')+'>Download update</button>':'<p class="help-line">You are up to date.</p>'):'')+
+      (data?.latest?'<div class="notice info mt">Latest release: '+escape(data.latest.version)+'</div>'+releaseNotes(data,data.latest.version)+(data.hasUpdate===true?'<button type="button" class="btn small" data-app-update="download" data-version="'+escape(data.latest.version)+'" '+(disabled?'disabled':'')+'>Download update</button>':'<p class="help-line">You are up to date.</p>'):'')+
       '<details class="mt"><summary>Import a downloaded update instead</summary><p class="help-line">Select the binary-only Update.zip and SHA256SUMS from the same official release. No GitHub credentials are needed.</p><p class="help-line" style="overflow-wrap:anywhere">Official feed: '+RELEASES+'</p>'+
       (!available?'<p class="help-line">Open the executable to import and install updates.</p>':data?.supported===false?'<p class="help-line">In-app installation is supported only by the Windows x64 executable.</p>':'<div class="form-stack mt"><div class="field"><label for="appUpdatePackage">Official binary-only Update ZIP</label><input type="file" id="appUpdatePackage" accept=".zip" '+(disabled?'disabled':'')+'></div><div class="field"><label for="appUpdateChecksums">SHA256SUMS from the same release</label><input type="file" id="appUpdateChecksums" '+(disabled?'disabled':'')+'></div><div><button type="button" class="btn small" data-app-update="import" '+(disabled?'disabled':'')+'>Verify and stage update</button></div></div>')+
       '</details><p class="help-line">SHA-256 checks detect corruption, not publisher identity. Use files only from the official release page. Only the app executable is replaced; your app data folder is not changed.</p>'+
@@ -105,7 +107,7 @@
     function stop(){started=false;generation++;if(timer!==null)env.clearTimeout(timer);timer=null;nextAt=0;nextKind='';running=false;changed();}
     return {
       snapshot,
-      start(){if(started)return;started=true;schedule(5000,++generation,'check');},
+      start(){if(started)return;started=true;schedule(0,++generation,'check');},
       stop,
       reset(){stop();failures=0;this.start();},
       checked(result){
@@ -126,7 +128,7 @@
   }
   function noticeHTML(state,preferences,now){
     const item=notice(state,preferences,now);if(!item)return '';
-    return '<div class="notice info row wrap gap6" role="status" aria-live="polite"><span style="flex:1;min-width:180px">Network Toolkit '+escape(item.version)+(item.kind==='install'?' is downloaded and verified. Install and restart?':' is available. Download it now?')+'</span><button type="button" class="btn small primary" data-app-update="'+(item.kind==='install'?'review':'download')+'" data-version="'+escape(item.version)+'" '+(state.busy?'disabled':'')+'>'+(item.kind==='install'?'Review install and restart':'Download update')+'</button><button type="button" class="btn small ghost" data-app-update="later">Later</button>'+(state.error?'<span style="flex-basis:100%" role="alert">'+escape(state.error)+'</span>':'')+(state.busy&&state.message?'<span style="flex-basis:100%">'+escape(state.message)+'</span>':'')+'</div>';
+    return '<div class="notice info row wrap gap6" role="status" aria-live="polite"><span style="flex:1;min-width:180px">Network Toolkit '+escape(item.version)+(item.kind==='install'?' is downloaded and verified. Install and restart?':' is available. See what’s new before updating.')+'</span><button type="button" class="btn small primary" data-app-update="'+(item.kind==='install'?'review':'download')+'" data-version="'+escape(item.version)+'" '+(state.busy?'disabled':'')+'>'+(item.kind==='install'?'Review install and restart':"See what's new")+'</button><button type="button" class="btn small ghost" data-app-update="later">Remind me tomorrow</button>'+(state.error?'<span style="flex-basis:100%" role="alert">'+escape(state.error)+'</span>':'')+(state.busy&&state.message?'<span style="flex-basis:100%">'+escape(state.message)+'</span>':'')+'</div>';
   }
   if(typeof module==='object'&&module.exports)module.exports={createController,createScheduler,notice,noticeHTML,html};
   if(!root.document)return;
@@ -150,27 +152,27 @@
   }
   function automaticStatusHTML(){return '<p class="help-line" data-app-update-schedule role="status" aria-live="polite">'+escape(automaticStatusText())+'</p>';}
   function renderAutomaticStatus(){const host=document.querySelector('[data-app-update-schedule]');if(host)host.textContent=automaticStatusText();}
-  function preferenceHTML(){return '<div class="setting-row"><div><div class="setting-title">Automatic update checks</div><div class="setting-desc">Check after startup and every six hours, with earlier retries after temporary failures. Downloads and installation always need your approval. Later hides that reminder for 24 hours; App settings stays available.</div></div><input type="checkbox" aria-label="Automatically check for updates" data-app-update-auto '+(preferences().enabled!==false?'checked':'')+' '+(!preferencesLoaded?'disabled':'')+'></div>'+automaticStatusHTML();}
+  function preferenceHTML(){return '<div class="setting-row"><div><div class="setting-title">Automatic update checks</div><div class="setting-desc">Check after startup and every six hours, with earlier retries after temporary failures. Downloads and installation always need your approval. Remind me tomorrow hides that version for 24 hours, including after reopening; App settings stays available.</div></div><input type="checkbox" aria-label="Automatically check for updates" data-app-update-auto '+(preferences().enabled!==false?'checked':'')+' '+(!preferencesLoaded?'disabled':'')+'></div>'+automaticStatusHTML();}
   function setPreferences(changes){Object.assign(preferenceChanges,changes);state.appUpdatePreferences={...preferences(),...changes};if(preferencesLoaded)saveState();else preferenceWritesPending=true;}
   function mergePreferences(value){
     const p=value&&typeof value==='object'&&!Array.isArray(value)?value:{};
     state.appUpdatePreferences={enabled:p.enabled!==false,dismissed:typeof p.dismissed==='string'?p.dismissed.slice(0,80):'',until:Number.isFinite(p.until)?Math.min(p.until,Date.now()+86400000):0,...preferenceChanges};
   }
-  function preferencesReady(){preferencesLoaded=true;preferencesPending=false;preferencesError='';if(preferenceWritesPending){preferenceWritesPending=false;saveState();}render();}
+  function preferencesReady(canSave=true){preferencesLoaded=true;preferencesPending=false;preferencesError='';if(preferenceWritesPending){preferenceWritesPending=false;if(canSave)saveState();}render();}
   function dismiss(){const item=notice(getController().snapshot(),preferences());if(!item)return;setPreferences({dismissed:item.key,until:Date.now()+24*60*60*1000});render();}
   function reveal(){setPreferences({dismissed:'',until:0});}
-  function renderNotice(){const host=document.getElementById('appUpdateNotice');if(!host)return;const content=online&&!OFFLINE&&!shutDown&&!TERMINAL_ONLY?noticeHTML(getController().snapshot(),preferences()):'';if(host.innerHTML!==content)host.innerHTML=content;}
+  function renderNotice(){const host=document.getElementById('appUpdateNotice');if(!host)return;const content=!OFFLINE&&!shutDown&&!TERMINAL_ONLY?noticeHTML(getController().snapshot(),preferences()):'';if(host.innerHTML!==content)host.innerHTML=content;}
   function start(savedPreferences,reloadSavedState){
     if(OFFLINE||TERMINAL_ONLY||DETACHED_TERMINAL||scheduler)return;
     preferencesPending=!!savedPreferences;preferencesLoaded=!savedPreferences;
-    scheduler=createScheduler({setTimeout,clearTimeout,enabled:()=>!preferencesLoaded||preferences().enabled!==false,ready:()=>online&&!shutDown,changed:renderAutomaticStatus,
+    scheduler=createScheduler({setTimeout,clearTimeout,enabled:()=>!preferencesLoaded||preferences().enabled!==false,ready:()=>!shutDown,changed:renderAutomaticStatus,
       describeResult:result=>result==='retry'?getController().snapshot().backgroundError||preferencesError:result==='ok'?(getController().snapshot().data?.supported===false?'Automatic updates are not supported on this platform.':getController().snapshot().data?.hasUpdate?'Update available: '+getController().snapshot().data.latest.version+'.':'No newer update is available.'):'',
       check:async()=>{
         // Never contact the release feed using default preferences when the saved
         // choice has not loaded. Retry only this local read until it succeeds.
         if(!preferencesLoaded){
           try{if(!reloadSavedState)throw new Error('Reopen the app to load saved settings before saving changes.');await reloadSavedState();preferencesReady();}
-          catch(error){preferencesError='Saved update preferences could not be loaded: '+error.message;return 'retry';}
+          catch(error){if(error.updatePreferencesLoaded){preferencesReady(false);preferencesError=error.message;}else{preferencesError='Saved update preferences could not be loaded: '+error.message;return 'retry';}}
         }
         if(preferences().enabled===false)return 'skip';
         const c=getController(),result=await c.load(true);
@@ -179,13 +181,23 @@
         if(c.snapshot().data?.supported!==true)return 'ok';
         return c.check(true);
       }});
-    if(savedPreferences)Promise.resolve(savedPreferences).then(()=>preferencesReady(),error=>{preferencesPending=false;preferencesError='Saved update preferences could not be loaded: '+error.message;render();}).then(()=>{scheduler.start();if(preferencesLoaded&&pendingManualResult){scheduler.checked(pendingManualResult);pendingManualResult='';}});
+    if(savedPreferences)Promise.resolve(savedPreferences).then(()=>preferencesReady(),error=>{if(error.updatePreferencesLoaded){preferencesReady(false);preferencesError=error.message;}else{preferencesPending=false;preferencesError='Saved update preferences could not be loaded: '+error.message;render();}}).then(()=>{scheduler.start();if(preferencesLoaded&&pendingManualResult){scheduler.checked(pendingManualResult);pendingManualResult='';}});
     else scheduler.start();
+  }
+  // Startup/local reads must not hang the update workflow. Aborting also cancels
+  // server-side feed work; Promise.race protects against an unresponsive transport.
+  async function boundedAPI(path,method='GET',body){
+    if(!['/state','/status','/updates/status','/updates/check'].includes(path))return api(path,method,body);
+    const abort=new AbortController();let timer;
+    try{return await Promise.race([
+      api(path,method,body,false,abort.signal),
+      new Promise((_,reject)=>{timer=setTimeout(()=>{abort.abort();reject(new Error('The update or saved-settings request timed out. It will be retried.'));},path==='/updates/check'?25000:10000);})
+    ]);}finally{clearTimeout(timer);}
   }
   function getController(){
     if(controller)return controller;
     controller=createController({
-      api:(...args)=>api(...args),save:()=>flushState({closing:true}),
+      api:(...args)=>boundedAPI(...args),save:()=>flushState({closing:true}),
       upload:async(file,checksums)=>{
         const form=new FormData();form.append('package',file);form.append('checksums',checksums);
         const response=await fetch('/api/updates/import',{method:'POST',headers:{'X-Session-Token':SESSION},body:form});
@@ -197,10 +209,17 @@
     });return controller;
   }
   function render(){const section=document.getElementById('appUpdateSettings');if(section)section.innerHTML=preferenceHTML()+html(getController().snapshot(),online&&!OFFLINE,status.version||VERSION);renderNotice();}
+  function reviewDownload(version){
+    const current=getController().snapshot();
+    if(current.busy||!current.data?.hasUpdate||current.data.latest?.version!==version)return;
+    openModal('Update Network Toolkit',releaseNotes(current.data,version)+
+      '<p class="help-line">Download and verify this update now? Your current app stays running. Installation and restart require a separate confirmation.</p><div id="appUpdateDownloadResult" role="status" aria-live="polite"></div>',
+      '<button class="btn ghost" data-action="close-modal">Not now</button><button class="btn primary" data-app-update="confirm-download" data-version="'+escape(version)+'">Download update</button>');
+  }
   function review(){
     const state=getController().snapshot(),version=state.data?.staged?.version;if(state.busy||!version)return;
     openModal('Install Network Toolkit '+version,
-      '<p>Replace the current app with version '+escape(version)+' and restart?</p><div class="notice warn mt">Export any diagnostic results and save any edited files first. Restart closes this app and its connections. Finish diagnostics, transfers, packet captures, and terminal sessions before continuing. Close other Network Toolkit windows too.</div><p class="help-line">Updates keep the stable Network_Toolkit.exe filename. During one-time migration, matching shortcuts on your personal Desktop and Start Menu are updated. Pinned shortcuts, shared shortcuts, and shortcuts elsewhere may need to be pointed to Network_Toolkit.exe manually. Custom-named executables are left unchanged. Update state and the previous-version backup are kept in your settings folder. Saved preferences and connection profiles stay in the app data folder. Brief atomic swap files may exist during an update; error recovery may preserve verified files. Managed staging files and older backups are cleaned after confirmed success; locked files remain pending until safely removable. If reopening fails, a local error explains recovery. Installation logs are kept in the update staging folder while installing; after successful cleanup, previous.json beside the settings-local backup retains the latest outcome and progress. SHA-256 verification checks integrity, not the identity of the publisher.</p><div id="appUpdateInstallError" class="help-line" role="alert"></div>',
+      releaseNotes(state.data,version)+'<p>Replace the current app with version '+escape(version)+' and restart?</p><div class="notice warn mt">Export any diagnostic results and save any edited files first. Restart closes this app and its connections. Finish diagnostics, transfers, packet captures, and terminal sessions before continuing. Close other Network Toolkit windows too.</div><p class="help-line">Updates keep the stable Network_Toolkit.exe filename. During one-time migration, matching shortcuts on your personal Desktop and Start Menu are updated. Pinned shortcuts, shared shortcuts, and shortcuts elsewhere may need to be pointed to Network_Toolkit.exe manually. Custom-named executables are left unchanged. Update state and the previous-version backup are kept in your settings folder. Saved preferences and connection profiles stay in the app data folder. Brief atomic swap files may exist during an update; error recovery may preserve verified files. Managed staging files and older backups are cleaned after confirmed success; locked files remain pending until safely removable. If reopening fails, a local error explains recovery. Installation logs are kept in the update staging folder while installing; after successful cleanup, previous.json beside the settings-local backup retains the latest outcome and progress. SHA-256 verification checks integrity, not the identity of the publisher.</p><div id="appUpdateInstallError" class="help-line" role="alert"></div>',
       '<button class="btn ghost" data-action="close-modal">Cancel</button><button class="btn primary" data-app-update="confirm" data-version="'+escape(version)+'">Install and restart</button>');
   }
   document.addEventListener('click',async event=>{
@@ -209,7 +228,17 @@
     if(action==='releases'){button.disabled=true;try{await api('/updates/open-releases','POST',{});}catch(error){toast('Could not open releases: '+error.message,'error');}finally{if(button.isConnected)button.disabled=false;}}
     else if(action==='later')dismiss();
     else if(action==='check'){const result=await c.check();if(preferencesLoaded)scheduler?.checked(result);else if(result!=='skip')pendingManualResult=result;}
-    else if(action==='download')await c.download(button.dataset.version);
+    else if(action==='download')reviewDownload(button.dataset.version);
+    else if(action==='confirm-download'){
+      const result=document.getElementById('appUpdateDownloadResult');button.disabled=true;
+      if(result)result.textContent='Downloading and verifying…';
+      await c.download(button.dataset.version);
+      if(result?.isConnected){
+        result.textContent=c.snapshot().error||c.snapshot().message;
+        if(c.snapshot().data?.staged?.version===button.dataset.version){button.dataset.appUpdate='review';button.textContent='Review install and restart';}
+      }
+      if(button.isConnected)button.disabled=false;
+    }
     else if(action==='refresh')await c.load();
     else if(action==='import')await c.importPackage(document.getElementById('appUpdatePackage')?.files?.[0],document.getElementById('appUpdateChecksums')?.files?.[0]);
     else if(action==='review')review();
@@ -223,5 +252,5 @@
     if(!event.target.matches?.('[data-app-update-auto]'))return;
     if(!preferencesLoaded)return;setPreferences({enabled:event.target.checked});scheduler?.reset();render();
   });
-  root.NetworkToolkitUpdater={html:()=>preferenceHTML()+html(getController().snapshot(),online&&!OFFLINE,status.version||VERSION),load:()=>getController().load(),start,mergePreferences};
+  root.NetworkToolkitUpdater={html:()=>preferenceHTML()+html(getController().snapshot(),online&&!OFFLINE,status.version||VERSION),load:()=>getController().load(),start,mergePreferences,request:boundedAPI};
 })(typeof window==='object'?window:globalThis);

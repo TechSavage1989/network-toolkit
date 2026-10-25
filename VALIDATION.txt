@@ -1,3 +1,28 @@
+NETWORK TOOLKIT 1.17.64 VALIDATION
+
+PASSED LOCALLY
+- 377 JavaScript tests, including actual index initializer integration,
+  preference/status timeouts, late responses, opt-out, snooze, safe notes,
+  separate download/install consent and closing a pending download review.
+- 31 Python publication/packaging guards.
+- Root, desktop and terminal Go suites with Go 1.23.2 and vendored modules.
+- Windows x64 GUI cross-compilation, version resources and release validation.
+- JavaScript syntax and git whitespace checks.
+- Independent scoped review: 73 updater/notes tests and focused Go updater
+  checks passed; no confirmed must-fix issue.
+
+LIMITS
+No native Windows/WebView2 runtime, live installation, restart, shortcut COM
+or rollback test was performed for this build. The user's 'the update works'
+confirmation refers to revised 1.17.63, not this build. The original missing
+banner cause is unproven; concrete startup blocking paths were repaired.
+Rendered browser regressions have been extended and added to CI but did not
+execute locally: Chromium's IPC socket was sandbox-blocked and escalation
+failed environment setup. No screenshot or visual pass is claimed.
+No source push or release publication is implied by this local validation.
+
+PREVIOUS BASELINE VALIDATION (HISTORICAL)
+
 NETWORK TOOLKIT 1.17.63 VALIDATION
 
 CHANGES

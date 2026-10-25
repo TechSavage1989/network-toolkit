@@ -1,0 +1,12 @@
+Network Toolkit 1.17.64
+
+What's new
+- Fresh update checks when you open the app, without waiting for unrelated diagnostics.
+- An automatic main-window banner when a newer release is available.
+- Clear, compact What's new cards before you download or install an update.
+- Quieter recovery from temporary connection problems, with check status in App settings.
+- Clearer Remind me tomorrow wording for the existing 24-hour reminder.
+
+You stay in control: downloads require your action, and installation requires a
+separate Install and restart confirmation. Existing saved settings are kept.
+Automatic checks honor your saved on/off preference.

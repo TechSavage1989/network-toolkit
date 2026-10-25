@@ -3,10 +3,10 @@
 // when Playwright or Chromium are installed outside the usual local preview paths.
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 let playwright;try{playwright=require(process.env.PLAYWRIGHT_MODULE||'playwright')}catch{playwright=require('/opt/codex/cua_node/lib/node_modules/playwright')}
-const root=path.resolve(__dirname,'..'),available={currentVersion:'1.17.61',supported:true,hasUpdate:true,busy:[],installing:false,latest:{version:'1.17.62'}};
+const root=path.resolve(__dirname,'..'),available={currentVersion:'1.17.61',supported:true,hasUpdate:true,busy:[],installing:false,latest:{version:'1.17.62',notes:"What's new\n- Faster startup checks.\n- Clear update notes.\n- Settings are preserved.\n- Update when you choose.\n- More details.\n<script>window.notesExecuted=true</script>"}};
 const pause=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve}};
 (async()=>{
-  const browser=await playwright.chromium.launch({headless:true,executablePath:process.env.CHROMIUM_PATH||'/usr/bin/chromium',args:['--no-sandbox']});
+  const browser=await playwright.chromium.launch({headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:fs.existsSync('/usr/bin/chromium')?{executablePath:'/usr/bin/chromium'}:{}),args:['--no-sandbox']});
   try{
     async function scenario(name,options={},verify){
       const page=await browser.newPage(),errors=[],requests=[];let checks=0,latest={...available,hasUpdate:false,latest:null};
@@ -52,7 +52,7 @@ const pause=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {pro
     }
     await scenario('startup independent of slow system/jobs; dialog and navigation preserved',{holdUnrelated:true},async h=>{
       await h.page.evaluate(()=>openModal('Keep my work','<input id="testDraft" value="not lost">'));
-      await h.advance(5100);assert.equal(h.checks,1);assert.match(await h.notice(),/1.17.62 is available/);
+      await h.advance(100);assert.equal(h.checks,1);assert.match(await h.notice(),/1.17.62 is available/);
       assert.equal(await h.page.locator('#testDraft').inputValue(),'not lost');
       assert.equal(await h.page.evaluate(()=>window.__networkToolkitStartupState),0);
       await h.page.evaluate(()=>{closeModal();navigate('subnet')});assert.match(await h.notice(),/1.17.62 is available/);
@@ -66,13 +66,31 @@ const pause=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {pro
       await h.page.locator('[data-app-update="check"]').click();await h.page.waitForFunction(()=>document.querySelector('#appUpdateNotice').textContent.includes('1.17.62'));assert.equal(h.checks,1);
     });
     await scenario('transient startup failure retries quietly',{failFirst:true},async h=>{
-      await h.advance(5100);assert.equal(h.checks,1);assert.equal(await h.notice(),'');await h.settings();
+      await h.advance(100);assert.equal(h.checks,1);assert.equal(await h.notice(),'');await h.settings();
       assert.match(await h.page.locator('[data-app-update-schedule]').innerText(),/Temporary network interruption.*Next automatic retry/s);
       await h.advance(30100);assert.equal(h.checks,2);assert.match(await h.notice(),/1.17.62 is available/);
     });
-    await scenario('manual check before startup delay does not duplicate',{preferences:{dismissed:'download:1.17.62',until:Date.now()+86400000}},async h=>{
-      await h.settings();await h.page.locator('[data-app-update="check"]').click();await h.page.waitForFunction(()=>document.querySelector('#appUpdateNotice').textContent.includes('1.17.62'));
-      await h.advance(6000);assert.equal(h.checks,1);assert.match(await h.notice(),/1.17.62 is available/);
+    await scenario('manual check replaces next automatic timer without duplicates',{preferences:{dismissed:'download:1.17.62',until:Date.now()+86400000}},async h=>{
+      await h.advance(100);const previous=h.checks;await h.settings();await h.page.locator('[data-app-update="check"]').click();await h.page.waitForFunction(()=>document.querySelector('#appUpdateNotice').textContent.includes('1.17.62'));
+      await h.advance(6000);assert.equal(h.checks,previous+1);assert.match(await h.notice(),/1.17.62 is available/);
+    });
+    await scenario('notes are safe and readable before any download',{},async h=>{
+      await h.advance(100);assert.equal(h.checks,1);
+      for(const width of [390,768,1280]){
+        await h.page.setViewportSize({width,height:900});
+        await h.page.locator('#appUpdateNotice [data-app-update="download"]').click();
+        const card=h.page.locator('.nt-update-notes');await card.waitFor();
+        assert.match(await card.innerText(),/What's new/);
+        assert.equal(await h.page.evaluate(()=>window.notesExecuted===true),false);
+        assert.equal(await card.locator('a,script,img,iframe').count(),0);
+        assert.equal(await card.evaluate(el=>el.scrollWidth<=el.clientWidth+1),true);
+        const summary=card.locator('summary');await summary.focus();await summary.press('Enter');
+        assert.equal(await card.locator('details').getAttribute('open'),'');
+        const out=process.env.TOOLKIT_TEST_OUTPUT||'/tmp/ntk-updater-browser';fs.mkdirSync(out,{recursive:true});
+        await h.page.screenshot({path:path.join(out,'update-notes-'+width+'.png')});
+        await h.page.getByRole('button',{name:'Not now',exact:true}).click();
+        assert.match(await h.notice(),/1.17.62/);
+      }
     });
   }finally{await browser.close()}
 })().catch(error=>{console.error(error);process.exitCode=1});

@@ -78,3 +78,15 @@ func TestUpdateFeedUsesMainRepositoryOnly(t *testing.T) {
 		t.Fatal("retired feed assets accepted")
 	}
 }
+
+func TestUpdateFetchRequestsFreshMetadata(t *testing.T) {
+	c := &http.Client{Transport: updateRoundTrip(func(r *http.Request) (*http.Response, error) {
+		if r.Header.Get("Cache-Control") != "no-cache" {
+			t.Fatal("release checks must request revalidation")
+		}
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader("ok"))}, nil
+	})}
+	if _, err := updateFetch(context.Background(), c, updateAPIURL, 100); err != nil {
+		t.Fatal(err)
+	}
+}

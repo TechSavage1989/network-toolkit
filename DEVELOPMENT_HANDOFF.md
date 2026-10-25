@@ -2,9 +2,63 @@
 
 ## Start here
 
-The current application source is **1.17.63** in the public repository
-https://github.com/TechSavage1989/network-toolkit on `main`. Start from latest
-main, not earlier chat ZIPs. Preserve the owner's README.md.
+The current local build is **1.17.64**, based on verified public main
+71df414ea97496c26565df12e9e2ac5a0d3c3203. The last published/user-confirmed
+baseline is revised 1.17.63, source tag 6bb00ea7224ce1e9e0b4b2db4b806915fc9947aa.
+Repository: https://github.com/TechSavage1989/network-toolkit. Preserve README.md.
+This document records a local build, not a claim of 1.17.64 publication.
+
+## 1.17.64 automatic checks and release notes
+
+The actual index initializer starts the updater after saved update preferences
+are read, independently of /status, /system and /jobs. The first scheduler task
+has zero delay. Local startup/status reads abort after 10 seconds; feed checks
+have a 20-second backend deadline and a 25-second frontend deadline. Timed-out
+responses cannot overwrite later results. Feed requests ask for cache
+revalidation. Automatic checks ignore cached check timestamps and retain the
+existing 30-second, 2-minute and bounded six-hour retry cadence.
+
+A failed full-settings merge caused by intervening diagnostic work no longer
+blocks reading the saved updater opt-out. Unsaved work remains unchanged, and
+the existing full-state writer refuses to persist startup defaults. A missing
+or failed preference read never assumes opt-in: retry the local read instead.
+The main banner can render even while unrelated platform startup is pending.
+
+The automatic banner opens a safe What's new review before explicit download;
+installation still requires separate Install and restart confirmation. The new
+app-update-notes.js helper renders four compact highlights, version badges and
+keyboard-accessible full notes as escaped, inert text. It executes no release
+body HTML or links. Install review uses notes only when the feed release
+matches the staged version; otherwise it honestly reports unavailable notes.
+The existing 24-hour per-version/stage snooze is preserved and now explicitly
+labelled Remind me tomorrow, including the across-reopen behavior in settings.
+
+Verified code gaps fixed here: the unnecessary five-second delay, indefinitely
+pending local startup requests and an unrelated settings-edit guard blocking
+updater preferences. These do not prove the cause of the earlier Windows
+missing-banner report. Adapter/sidebar controls and installer/restart logic
+remain unchanged.
+
+Local validation: 377 JavaScript tests, 31 Python tests, root/desktop/terminal
+Go suites, release/resource validation and Windows x64 GUI cross-build passed.
+The real-index VM integration covers hung startup dependencies, saved opt-out,
+preference timeout/retry, late feed replies, navigation/dialog preservation and
+no automatic download/install. Independent scoped review passed 73 updater/notes tests and focused Go
+updater checks, with no confirmed must-fix issue.
+
+Rendered Chromium tests were extended for immediate startup and safe notes at
+390/768/1280px, with keyboard disclosure and screenshots, and added to Checks.
+They have NOT run locally: Chromium IPC creation is sandbox-blocked; escalation
+failed environment setup. The cloud browser also disallows local file URLs.
+Do not claim rendered or native Windows/WebView2 validation until it runs.
+
+Publication is a separate step. A main push auto-publishes a new version, so
+obtain the user's specific publication authorization before pushing this build.
+Use main network-toolkit only; never write another release to the retired feed.
+Keep a private source/build backup first. Package all four assets together,
+verify exact hashes and strict Update.zip contents, and preserve published63.
+
+## Previous 1.17.63 baseline
 
 This release starts from exact 1.17.63 commit
 8df9b401111e09767591491bc973b4160a17a9bc, retaining its native server adapter
@@ -58,7 +112,7 @@ The Go build uses CGO_ENABLED=0, GOOS=windows, GOARCH=amd64, GOTOOLCHAIN=local,
 Complete release packaging:
 
 ```sh
-python3 scripts/github_release.py package --tag v1.17.63 --exe build/Network_Toolkit.exe
+python3 scripts/github_release.py package --tag v1.17.64 --exe build/Network_Toolkit.exe
 ```
 
 Use the tracked checkout for release packaging; `--allow-untracked-source` is

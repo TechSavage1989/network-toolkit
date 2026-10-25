@@ -11,15 +11,15 @@ function ui(options={}){
   const document=makeDocument('<button id="mobileMenu"></button><button id="settingsButton"></button><div id="appUpdateNotice"></div><div id="modalRoot"><div id="existingDialog">Existing work</div></div>');
   const calls=[],timers=new Map(),saved=[],toasts=[];let timerId=0,now=1792872000000,data=structuredClone(available);
   class TestDate extends Date{constructor(value=now){super(value)}static now(){return now}}
-  const c={document,Date:TestDate,online:true,OFFLINE:false,shutDown:false,TERMINAL_ONLY:false,DETACHED_TERMINAL:false,status:{version:'1.17.61'},VERSION:'1.17.61',state:{appUpdatePreferences:{enabled:true,...options.preferences}},
+  const c={document,AbortController,Date:TestDate,online:true,OFFLINE:false,shutDown:false,TERMINAL_ONLY:false,DETACHED_TERMINAL:false,status:{version:'1.17.61'},VERSION:'1.17.61',state:{appUpdatePreferences:{enabled:true,...options.preferences}},
     setTimeout:(fn,delay)=>{timers.set(++timerId,{fn,delay});return timerId},clearTimeout:id=>timers.delete(id),
     saveState:()=>saved.push(structuredClone(c.state.appUpdatePreferences)),flushState:async()=>true,toast:message=>toasts.push(message),
     api:async(path,method,body)=>{calls.push([path,method,body]);if(options.api)return options.api(path,method,body);return structuredClone(data)},
     openModal:(title,body,footer)=>{document.getElementById('modalRoot').innerHTML='<h2>'+title+'</h2>'+body+footer},
     ...options.context};
-  c.window=c;vm.createContext(c);vm.runInContext(source,c);
+  c.window=c;vm.createContext(c);vm.runInContext(fs.readFileSync(require.resolve('../web/assets/app-update-notes.js'),'utf8'),c);vm.runInContext(source,c);
   return {c,document,calls,timers,saved,toasts,setData:value=>data=value,
-    async tick(){const entry=timers.entries().next().value;assert.ok(entry,'a timer is pending');const [id,timer]=entry;timers.delete(id);now+=timer.delay;await timer.fn();await settle();},
+    async tick(){const entry=[...timers.entries()].sort((a,b)=>a[1].delay-b[1].delay)[0];assert.ok(entry,'a timer is pending');const [id,timer]=entry;timers.delete(id);now+=timer.delay;await timer.fn();await settle();},
     nextDelay:()=>timers.values().next().value?.delay,
     async click(action){const button=document.querySelector('[data-app-update="'+action+'"]');assert.ok(button,action+' exists');for(const listener of document.listeners.click||[])await listener({target:button});},
     settings(){document.getElementById('modalRoot').innerHTML='<section id="appUpdateSettings">'+c.NetworkToolkitUpdater.html()+'</section>';return c.NetworkToolkitUpdater.load()},
@@ -38,7 +38,7 @@ test('actual initializer starts the updater before unrelated system and jobs req
   const system=deferred(),jobs=deferred();
   const h=ui({context:{online:false},api:async path=>path==='/status'?{version:'1.17.61'}:path==='/state'?{appUpdatePreferences:{enabled:true}}:path==='/system'?system.promise:path==='/jobs'?jobs.promise:available});
   let finished=false;const initializing=init(h).then(()=>finished=true);await settle();
-  assert.equal(finished,false);assert.equal(h.nextDelay(),5000);
+  assert.equal(finished,false);assert.equal(h.nextDelay(),0);
   await h.tick();assert.match(h.noticeText(),/1.17.62 is available/);
   assert.deepEqual(h.calls.filter(c=>c[0].startsWith('/updates/')).map(c=>c[0]),['/updates/status','/updates/check']);
   assert.ok(h.document.getElementById('existingDialog'));
@@ -47,7 +47,7 @@ test('actual initializer starts the updater before unrelated system and jobs req
 
 test('delayed saved preferences prevent checks and preserve disabled setting',async()=>{
   const prefs=deferred();const h=ui({api:async path=>path==='/status'?{}:path==='/state'?prefs.promise:path==='/jobs'?[]:{}});
-  const initializing=init(h);await settle();assert.equal(h.timers.size,0);
+  const initializing=init(h);await settle();assert.equal([...h.timers.values()].some(t=>t.delay===0),false);
   await h.settings();assert.match(h.scheduleText(),/waiting for your saved update preferences/);
   assert.equal(h.document.querySelector('[data-app-update-auto]').hasAttribute('disabled'),true);
   prefs.resolve({appUpdatePreferences:{enabled:false}});await initializing;await settle();await h.tick();
@@ -65,7 +65,7 @@ test('a failed preferences read retries locally and never assumes permission to 
 test('settings status loading overlapping the timer is deferred, then automatically recovered',async()=>{
   const pending=deferred();let count=0;const h=ui({api:async path=>path==='/updates/status'&&++count===1?pending.promise:available});
   h.c.NetworkToolkitUpdater.start();const settings=h.settings();await h.tick();
-  assert.equal(h.nextDelay(),15000);assert.equal(h.calls.some(c=>c[0]==='/updates/check'),false);
+  assert.ok([...h.timers.values()].some(t=>t.delay===15000));assert.equal(h.calls.some(c=>c[0]==='/updates/check'),false);
   assert.match(h.scheduleText(),/Deferred while another update action was busy/);
   pending.resolve({...available,hasUpdate:false});await settings;await h.tick();
   assert.match(h.noticeText(),/1.17.62 is available/);assert.match(h.scheduleText(),/Last automatic attempt/);assert.match(h.scheduleText(),/Update available: 1.17.62/);assert.match(h.scheduleText(),/Next automatic check/);
@@ -135,4 +135,38 @@ test('full-state writer refuses startup defaults until saved settings are loaded
   const calls=[],c={stateLoaded:false,state:{profiles:[]},stateRevision:0,savedStateRevision:-1,stateWrites:Promise.resolve(true),shutDown:false,OFFLINE:false,online:true,clearTimeout:()=>{},saveTimer:null,api:async(...args)=>calls.push(args),storageError:()=>{},lastStorageError:''};
   vm.createContext(c);vm.runInContext(pageSource.slice(pageSource.indexOf('function flushState('),pageSource.indexOf('\nfunction closeApp(')),c);
   assert.equal(await c.flushState(),false);assert.equal(calls.length,0);c.stateLoaded=true;assert.equal(await c.flushState(),true);assert.equal(calls.length,1);
+});
+
+
+test('actual startup checks with unrelated platform status and diagnostics still pending',async()=>{
+  const pending=deferred();const h=ui({context:{online:false},api:async path=>path==='/state'?{appUpdatePreferences:{enabled:true}}:['/status','/system','/jobs'].includes(path)?pending.promise:available});
+  const initializing=init(h);await settle();await h.tick();
+  assert.equal(h.c.online,false);assert.match(h.noticeText(),/1.17.62 is available/);
+  assert.equal(h.calls.filter(c=>c[0]==='/updates/check').length,1);
+  pending.resolve({});await initializing;
+});
+
+test('hung startup preferences time out locally and recover without assuming opt-in',async()=>{
+  const pending=deferred();let reads=0;
+  const h=ui({api:async path=>path==='/state'?(++reads===1?pending.promise:{appUpdatePreferences:{enabled:false}}):path==='/jobs'?[]:available});
+  const initializing=init(h);await settle();assert.equal(h.calls.some(c=>c[0]==='/updates/check'),false);
+  await h.tick();await initializing;await settle();await h.tick();
+  assert.equal(reads,2);assert.equal(h.c.state.appUpdatePreferences.enabled,false);
+  assert.equal(h.calls.some(c=>c[0]==='/updates/check'),false);
+  pending.resolve({appUpdatePreferences:{enabled:true}});await settle();assert.equal(h.c.state.appUpdatePreferences.enabled,false);
+});
+
+test('hung release request aborts and late response cannot replace the next result',async()=>{
+  const pending=deferred();let checks=0;
+  const h=ui({api:async path=>path==='/updates/check'&&++checks===1?pending.promise:{...available,hasUpdate:path==='/updates/check'}});
+  h.c.NetworkToolkitUpdater.start();const running=h.tick();await settle();
+  await h.tick();await running;assert.equal(h.noticeText(),'');assert.equal(h.nextDelay(),30000);
+  await h.tick();assert.match(h.noticeText(),/1.17.62 is available/);
+  pending.resolve({...available,latest:{version:'9.9.9'}});await settle();assert.doesNotMatch(h.noticeText(),/9.9.9/);
+});
+
+test('changed diagnostic work cannot permanently prevent saved updater preferences loading',async()=>{
+  let reads=0;const h=ui({api:async path=>{if(path==='/state'){if(++reads===1)throw Error('Temporary failure');return {profiles:[],appUpdatePreferences:{enabled:true}};}return path==='/jobs'?[]:available;}});
+  await init(h);await settle();h.c.state.profiles=[{id:'unsaved'}];await h.tick();
+  assert.match(h.noticeText(),/1.17.62 is available/);assert.equal(h.c.state.profiles[0].id,'unsaved');assert.equal(h.saved.length,0);
 });

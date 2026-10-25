@@ -53,6 +53,7 @@ func updateFetch(ctx context.Context, client *http.Client, raw string, limit int
 	}
 	r.Header.Set("User-Agent", "Network-Toolkit/"+model.Version)
 	r.Header.Set("Accept", "application/vnd.github+json")
+	r.Header.Set("Cache-Control", "no-cache")
 	response, e := client.Do(r)
 	if e != nil {
 		return nil, fmt.Errorf("Unable to reach GitHub: %w", e)
@@ -134,7 +135,11 @@ func (a *application) handleUpdateFeedLocked(w http.ResponseWriter, r *http.Requ
 	a.updater.networkBusy = true
 	defer func() { a.updater.networkBusy = false }()
 	_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(6 * time.Minute))
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
+	timeout := 5 * time.Minute
+	if r.URL.Path == "/api/updates/check" {
+		timeout = 20 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), timeout)
 	defer cancel()
 	client := updateHTTPClient()
 	if r.URL.Path == "/api/updates/check" {

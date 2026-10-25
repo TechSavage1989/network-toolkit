@@ -1,7 +1,13 @@
-NETWORK TOOLKIT 1.17.63
+NETWORK TOOLKIT 1.17.64
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.63 (REVISED UPDATE FEED)
+CURRENT RELEASE - 1.17.64
+
+Checks for updates immediately at launch and offers an automatic main-window
+banner. Review a simple What's new card before downloading and installing.
+Explicit disabled checks and 24-hour reminders are respected.
+
+PREVIOUS RELEASE - 1.17.63 (REVISED UPDATE FEED)
 
 REVISED 1.17.63 UPDATE DESTINATION
 
