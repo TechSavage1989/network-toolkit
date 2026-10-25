@@ -1,7 +1,13 @@
-NETWORK TOOLKIT 1.17.78
+NETWORK TOOLKIT 1.17.79
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.78
+CURRENT RELEASE - 1.17.79
+
+Remove the divider below the target entry row on the Overview page for a
+cleaner appearance. Target entry, source interface selection and run controls
+keep their existing behavior.
+
+PREVIOUS RELEASE - 1.17.78
 
 Detached terminal sessions and workspaces retain the sidebar side chosen in
 the main window. Detaching immediately after moving the sidebar also uses the

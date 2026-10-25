@@ -43,6 +43,12 @@ async function main(){
  const page=await browser.newPage();page.on('pageerror',e=>errors.push(e.message));
  await page.goto('http://127.0.0.1:'+server.address().port+'/');
  await page.waitForFunction(()=>window.__networkToolkitStartupState===1);
+ // Overview captures for manual appearance review, using the existing page.
+ if(out)for(const width of [1600,570])for(const theme of ['light','dark']){
+  await page.setViewportSize({width,height:900});
+  await page.evaluate(theme=>{online=true;state.activePage='overview';state.target='https://example.test';setTheme(theme);renderPage();},theme);
+  await settle(page);await page.locator('#targetForm').screenshot({path:path.join(out,'overview-target-'+theme+'-'+width+'.png')});
+ }
  for(const viewport of [{width:1920,height:1080},{width:1366,height:900},{width:1000,height:768},{width:820,height:620},{width:570,height:720}]){
   await page.setViewportSize(viewport);
   for(const protocol of ['sftp','tftp','ftp'])for(const theme of ['light','dark'])for(const sidebarWidth of [270,320,460]){

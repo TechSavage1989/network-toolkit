@@ -1,3 +1,20 @@
+NETWORK TOOLKIT 1.17.79 CANDIDATE VALIDATION
+
+Removes the top border of the Overview diagnostic source control, the unwanted
+line below Enter to run. The rule is scoped to Overview; existing target entry,
+hint, source-interface selection, spacing and run controls remain.
+
+No cosmetic tests were added. Four screenshots from the existing server browser
+page will cover the Overview target form at 1600/570px in both themes for manual
+visual review. Local validation passed 448 JavaScript tests, 31 Python release
+guards, required root/terminal/desktop Go suites, release/resource metadata,
+inline HTML/browser script syntax and Windows x64 GUI build. Hosted review,
+package verification, publication and released78 live staging are pending. Native Windows/
+WebView2, hardware and actual installation/restart remain unverified.
+See DEVELOPMENT_HANDOFF.md for scope and authorization.
+
+HISTORICAL PUBLISHED BASELINE
+
 NETWORK TOOLKIT 1.17.78 VALIDATION
 
 Detached terminal workspaces and individual sessions retain the selected sidebar

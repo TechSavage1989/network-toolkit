@@ -1,5 +1,32 @@
 # Network Toolkit development handoff
 
+## 1.17.79 candidate: remove the overview target divider
+
+Prepared from main 7ef55a25f00429324d02e556d3fe39112328e36e after the user
+provided an overview screenshot and requested removing the line below Enter to
+run, explicitly authorizing build/publication on 2026-10-25. This authorizes
+this scoped new release only. Preserve prior tags/assets and use main
+network-toolkit as the sole public source/update feed.
+
+The line is the top border of the diagnostic source control, immediately below
+the target entry row. A scoped source-interface.css rule removes that border
+only inside the Overview workspace. Target entry, the Enter to run hint,
+source-interface picker, padding and run controls retain their existing behavior.
+Other source-control contexts keep their styling. No JavaScript handlers,
+transport, ownership, credentials or updater code changes.
+
+Go/UI/package/Windows resources are consistently 1.17.79. No new cosmetic tests
+were added for this one-rule change. The existing server browser script only
+adds four Overview target-form screenshot captures, at 1600/570px in both themes,
+for manual visual review before its unchanged existing layout checks.
+
+Local validation passed 448 JavaScript tests, 31 Python release guards, required
+root/terminal/desktop Go suites, release/resource metadata, inline HTML/browser
+script syntax and Windows x64 GUI build. Hosted review, package verification,
+screenshot inspection, publication and released78 live staging are pending.
+Native Windows/WebView2, hardware and actual installation/restart remain
+unverified.
+
 ## 1.17.78 published: detached terminal sidebar side
 
 Prepared from main 7e54d7ee0b3a42af9f384453e0742bf9458d9e29 after the user
