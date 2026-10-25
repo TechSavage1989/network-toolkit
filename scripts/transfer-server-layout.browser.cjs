@@ -90,8 +90,8 @@ async function main(){
   const clientStyle=await page.locator('[data-rb-connection-source]').evaluate(e=>{const c=getComputedStyle(e);return [c.height,c.fontSize,c.paddingTop,c.paddingRight,c.borderRadius,c.color,c.backgroundColor];});
   assert.deepEqual(serverStyle,clientStyle,protocol+' server and client dropdown styling differs');
  }
- // Server Settings uses the same selected tab, hover and keyboard-focus styles
- // as client Setup. Compare actual computed styles and rail-relative geometry.
+ // Server Connect uses the same selected tab, hover and keyboard-focus styles
+ // as client Connect. Compare actual computed styles and rail-relative geometry.
  async function tabAppearance(button){return button.evaluate(el=>{
   const style=getComputedStyle(el),rail=el.closest('.terminal-sidebar-rail'),r=getComputedStyle(rail),b=el.getBoundingClientRect(),rb=rail.getBoundingClientRect(),label=getComputedStyle(el.querySelector('span')),svg=getComputedStyle(el.querySelector('svg'));
   const keys=['backgroundColor','color','borderTopWidth','borderRightWidth','borderBottomWidth','borderLeftWidth','borderTopColor','borderRightColor','borderBottomColor','borderLeftColor','borderRadius','paddingTop','paddingRight','paddingBottom','paddingLeft','fontSize','lineHeight','gap','outlineStyle','outlineWidth','outlineColor','outlineOffset','boxShadow'];

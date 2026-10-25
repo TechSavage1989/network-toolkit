@@ -1,0 +1,7 @@
+Network Toolkit 1.17.77
+
+What's new
+- Rename the client Setup and server Settings sidebar tabs to Connect.
+
+Applies to SFTP, TFTP and FTP/FTPS in both modes. Existing tab styling,
+connection controls, saved settings and transfer behavior are retained.

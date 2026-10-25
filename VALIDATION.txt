@@ -1,3 +1,18 @@
+NETWORK TOOLKIT 1.17.77 CANDIDATE VALIDATION
+
+Client Setup and server Settings sidebar tabs are labelled Connect for SFTP,
+TFTP and FTP/FTPS. Internal tab keys, styles, settings, handlers and transfers
+are retained. No new tests are added for this small label change.
+
+Local validation passed 446 JavaScript tests, 31 Python release guards, required
+root/terminal/desktop Go suites, release/resource metadata, HTML/browser syntax
+and Windows x64 GUI build. Hosted checks, package/artifact verification,
+publication and live update staging are pending. Existing layout/style browser checks will cover
+the labels in their rendered views. Native Windows/WebView2, hardware and
+actual install/restart remain unverified. See the handoff for scope/authorization.
+
+HISTORICAL PUBLISHED BASELINE
+
 NETWORK TOOLKIT 1.17.76 VALIDATION
 
 Selected server Settings controls reuse the client sidebar tab/rail styles,

@@ -1,5 +1,30 @@
 # Network Toolkit development handoff
 
+## 1.17.77 candidate: Connect labels in client and server sidebars
+
+Prepared from main 6b32d2fadd9fd2f076309a3a379784a6b2e93590 after the user
+requested Setup/settings tabs in client/server mode be called Connect and
+explicitly instructed publication on 2026-10-25. This authorizes this scoped
+new build/release only. Preserve all prior tags/assets. Main network-toolkit
+remains the sole source/update destination.
+
+The shared client rail label changes Setup to Connect; the shared server rail
+label changes Settings to Connect. This covers SFTP, TFTP and FTP/FTPS in both
+modes. Internal settings tab IDs, data attributes and stored preference keys
+remain unchanged, so saved selections continue working. Panel headings and
+existing connection/transfer controls are retained. No handlers, server behavior,
+credential storage or updater logic changes. Keep the 76 shared tab styles and
+all earlier editor/terminal/folder/macro/SMTP functionality.
+
+Go/UI/package/Windows resources are 1.17.77. No new tests are added for this
+small label change; run the existing required suites and real-page layout/style
+checks and inspect their Connect tab screenshots. Local validation passed
+446 JavaScript tests, 31 Python release guards, required root/terminal/desktop
+Go suites, release/resource metadata, HTML/browser syntax and Windows x64 GUI
+build. Hosted checks, package/artifact verification, publication and released76
+live staging are pending.
+Native Windows/WebView2, hardware and actual install/restart remain unverified.
+
 ## 1.17.76 published: match selected server and client sidebar tabs
 
 Prepared from main 11c52273cb62f066ff563352d667b8eeb2346c89 after the user
