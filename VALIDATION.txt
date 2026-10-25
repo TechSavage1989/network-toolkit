@@ -10,7 +10,10 @@ and pass with the fix. Local validation passed 446 JavaScript tests, 31 Python
 release guards, required root/terminal/desktop Go suites, release/resource
 metadata, HTML/browser syntax and Windows x64 GUI build. Hosted checks, package/
 artifact verification, publication and live updater staging are pending.
-Browser fixture tests do not
+Initial hosted check/build/package passed. Its browser run passed twelve editor
+layouts and connected-SSH opening, then the synthetic HTTP import fixture lacked
+Web Crypto. The corrected HTTPS fixture verifies cryptography before imports;
+no application changes were needed. Browser fixture tests do not
 establish native Windows/file-dialog or real-server behavior. See the handoff.
 
 HISTORICAL PUBLISHED BASELINE

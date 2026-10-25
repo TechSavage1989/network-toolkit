@@ -30,7 +30,12 @@ real file is written. Native Windows/file dialogs and real servers are untested.
 Go/UI/package/Windows resources are 1.17.75. Local validation passed 446 JS
 tests, 31 Python release guards, required root/terminal/desktop Go suites,
 release/resource metadata, HTML/browser syntax and Windows x64 GUI build.
-Hosted browser checks, package/artifact verification, publication and released74
+Initial hosted Checks 40171877865 passed its check job, including the Windows
+build/package. The browser passed the twelve layouts and connected-SSH load,
+then its desktop-import fixture lacked crypto.subtle on the synthetic HTTP
+origin. The fixture now uses HTTPS and verifies Web Crypto before testing
+imports. Application code is unchanged by this test-environment correction.
+Hosted full validation, package/artifact verification, publication and released74
 live update staging are pending. Preserve all earlier UI/credential/folder/
 macro/updater features. Future work requires its own publication authorization.
 

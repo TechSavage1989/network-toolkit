@@ -4,9 +4,9 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const root=path.resolve(__dirname,'..'),version=require('../package.json').version,output=process.env.TOOLKIT_TEST_OUTPUT;
 const text='# START OF DOCUMENT\n'+Array.from({length:300},(_,i)=>'Line '+(i+2)+' '+ 'readable file contents '.repeat(12)).join('\n')+'\n# END OF DOCUMENT';
 (async()=>{
- const browser=await chromium.launch({headless:true,args:['--no-sandbox','--unsafely-treat-insecure-origin-as-secure=http://toolkit.local']}),page=await browser.newPage({viewport:{width:1280,height:900}}),errors=[],writes=[];
+ const browser=await chromium.launch({headless:true,args:['--no-sandbox']}),page=await browser.newPage({viewport:{width:1280,height:900}}),errors=[],writes=[];
  page.on('pageerror',error=>errors.push(error.message));page.on('dialog',dialog=>dialog.accept());
- await page.route('http://toolkit.local/**',async route=>{
+ await page.route('https://toolkit.local/**',async route=>{
   const request=route.request(),p=new URL(request.url()).pathname;
   if(p.startsWith('/api/')){
    const body=request.postData()?request.postDataJSON():null;let data={};
@@ -39,7 +39,8 @@ const text='# START OF DOCUMENT\n'+Array.from({length:300},(_,i)=>'Line '+(i+2)+
  async function close(){await page.evaluate(()=>{NetworkToolkitFileEditor.closeAll();navigate('overview');});}
  try{
   if(output)fs.mkdirSync(output,{recursive:true});
-  await page.goto('http://toolkit.local/');await page.waitForFunction(()=>window.__networkToolkitStartupState===1&&online);
+  await page.goto('https://toolkit.local/');await page.waitForFunction(()=>window.__networkToolkitStartupState===1&&online);
+  assert.equal(await page.evaluate(()=>isSecureContext&&typeof crypto.subtle?.digest==='function'),true,'Desktop import fixture requires a secure browser origin');
   const layouts=[];
   for(const width of [1280,768,390])for(const theme of ['light','dark'])for(const mode of ['embedded','overlay']){
    await page.setViewportSize({width,height:900});await page.evaluate(({theme,mode})=>{setTheme(theme);navigate(mode==='embedded'?'editor':'overview');},{theme,mode});
@@ -64,7 +65,7 @@ const text='# START OF DOCUMENT\n'+Array.from({length:300},(_,i)=>'Line '+(i+2)+
   await bottom();
   // Desktop imports enter through the populated create path, retaining CRLF/BOM.
   await page.evaluate(async text=>{await NetworkToolkitFileEditor.importFiles([new File([new Uint8Array([239,187,191]),text.replaceAll('\n','\r\n')],'desktop.txt',{type:'text/plain'})]);},text);
-  await atStart('desktop import');assert.equal(await input().inputValue(),text);assert.deepEqual(await page.evaluate(()=>({encoding:NetworkToolkitFileEditor.active.encoding,bom:NetworkToolkitFileEditor.active.bom,eol:NetworkToolkitFileEditor.active.eol,dirty:NetworkToolkitFileEditor.active.dirty})),{encoding:'UTF-8',bom:true,eol:'CRLF',dirty:false});
+  assert.equal(await page.evaluate(()=>NetworkToolkitFileEditor.active.path),'desktop.txt');await atStart('desktop import');assert.equal(await input().inputValue(),text);assert.deepEqual(await page.evaluate(()=>({encoding:NetworkToolkitFileEditor.active.encoding,bom:NetworkToolkitFileEditor.active.bom,eol:NetworkToolkitFileEditor.active.eol,dirty:NetworkToolkitFileEditor.active.dirty})),{encoding:'UTF-8',bom:true,eol:'CRLF',dirty:false});
   await input().press('P');assert((await input().inputValue()).startsWith('P# START'));assert.equal(await page.evaluate(()=>NetworkToolkitFileEditor.active.dirty),true);
   await close();await page.evaluate(()=>navigate('editor'));
   // A slow read/reload must not move or replace another active document.
