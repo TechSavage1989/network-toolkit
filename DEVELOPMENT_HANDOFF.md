@@ -12,7 +12,9 @@ The shared file editor assigned loaded text to its textarea and then focused
 it without resetting selection or scrolling. A one-time per-document showStart
 flag is now set when loading file values or explicitly reopening an existing
 file. The next draw places the caret at offset zero and sets scrollTop/scrollLeft
-to zero before synchronizing highlighting, gutter and position status. Normal
+to zero before synchronizing highlighting, gutter and position status. The
+initial display explicitly focuses the text field after positioning its caret,
+and draw avoids assigning an unchanged textarea value. Normal
 editing, Find and manual navigation do not continually reset the view. Desktop
 imports and local/remote readers share this path. No file bytes, encoding,
 line endings, save/transport handlers or updater code changes.
@@ -35,8 +37,13 @@ build/package. The browser passed the twelve layouts and connected-SSH load,
 then its desktop-import fixture lacked crypto.subtle on the synthetic HTTP
 origin. The fixture now uses HTTPS and verifies Web Crypto before testing
 imports. Application code is unchanged by this test-environment correction.
-Hosted full validation, package/artifact verification, publication and released74
-live update staging are pending. Preserve all earlier UI/credential/folder/
+Second hosted Checks 40172081062 passed its check/build/package job and the
+secure desktop import. A first display of a background-loaded tab still moved
+the caret after reset, so draw now avoids assigning unchanged text and explicitly
+focuses the initial display at the zero caret before resetting scrolling. Background
+completion itself remains inactive and cannot steal focus. Full hosted
+validation, package/artifact verification, publication and released74 live
+update staging are pending. Preserve all earlier UI/credential/folder/
 macro/updater features. Future work requires its own publication authorization.
 
 ## 1.17.74 published: restore the original terminal connection window

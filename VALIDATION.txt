@@ -13,7 +13,10 @@ artifact verification, publication and live updater staging are pending.
 Initial hosted check/build/package passed. Its browser run passed twelve editor
 layouts and connected-SSH opening, then the synthetic HTTP import fixture lacked
 Web Crypto. The corrected HTTPS fixture verifies cryptography before imports;
-no application changes were needed. Browser fixture tests do not
+that correction required no application changes. The next browser run passed
+import, then found the background-tab initial caret moving after reset. Draw
+now avoids assigning unchanged text and focuses the one-time initial display
+at the zero caret before resetting scrolling. Browser fixture tests do not
 establish native Windows/file-dialog or real-server behavior. See the handoff.
 
 HISTORICAL PUBLISHED BASELINE
