@@ -1,7 +1,21 @@
-NETWORK TOOLKIT 1.17.66
+NETWORK TOOLKIT 1.17.67
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.66
+CURRENT RELEASE - 1.17.67
+
+The Hosts file editor now has Entries and Text views, add/edit forms, per-entry
+and bulk enable/disable/delete, filters, duplicate/conflict validation, undo/redo,
+find/replace, line navigation, draft previews and paginated large-file viewing.
+Import UTF-8, UTF-16 or Windows-1252 text, including a hosts backup, into the
+draft. Choose replace or append and review before saving. Export the draft or
+loaded copy as UTF-8 text. Automatic local-engine backups retain the original
+file bytes when saving; original encoding and newline handling are preserved.
+
+Drafts and undo history are kept only in memory. Entry actions change the draft;
+Review and save uses the existing revision-checked, administrator-approved save
+path. Importing or exporting does not itself replace the Windows hosts file.
+
+PREVIOUS RELEASE - 1.17.66
 
 Checks for new releases every five minutes while the app is visible and online,
 and when you return after at least two minutes. Service limits may delay checks.

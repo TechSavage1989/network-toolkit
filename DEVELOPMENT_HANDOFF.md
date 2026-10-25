@@ -1,5 +1,41 @@
 # Network Toolkit development handoff
 
+## 1.17.67 Hosts editor candidate
+
+Prepared from exact main 2d071bec99979397e3d80cec6db5d7d4716c4e3e on
+review/hosts-editor-1.17.67 in response to the request for more Hosts editor
+features. The current published baseline remains 1.17.66. No 1.17.67 publication
+has been authorized; keep this work on the review branch until approved.
+
+New code is hosts-editor-model.js, hosts-editor.js and hosts-editor.css. The
+existing index delegates Hosts rendering, controls and validation to the module.
+All actual file saving still uses reviewLocalConfiguration/applyLocalConfiguration
+and the original local-tools hosts request, revision check, elevation helper,
+encoding/newline preservation, atomic replacement and automatic backup code.
+No backend file-write or privilege behavior is changed.
+
+Features: Entries/Text views; add/edit mappings with aliases/comments; individual
+and bulk enable/disable/delete; text/status filters; duplicate/conflict/invalid
+line diagnostics; undo/redo; literal find/replace with case/whole-host options;
+line navigation/wrapping; format/sort/deduplicate previews; import/restore or
+append UTF-8/UTF-16/Windows-1252 text; draft/loaded-copy UTF-8 exports. Ordinary
+comments and unrelated lines are preserved. Exact deduplication retains distinct
+comments, alias order and disabled copies. IPv4 plus IPv6 for one name is valid.
+
+Drafts, import bytes and bounded undo history stay in memory and are not placed
+in saved app state or reports. Entry lists show 100 rows per page; validation
+counts all rows and caps displayed issues at 200. Undo history is bounded to
+100 checkpoints and approximately 16 MiB of text. The backend retains its 1 MiB
+hosts-file limit. Exported text copies are not byte-for-byte original backups;
+original automatic backups remain under the existing protected save process.
+
+Validation is in progress. Thirty new model tests and all 422 JavaScript tests
+passed, along with root/desktop/terminal Go suites. Add the final build/browser
+results before completing this handoff. The hosted Checks workflow runs the
+new Hosts browser checks and produces a portable review artifact on this branch.
+Native Windows hosts-file save/elevation and actual runtime remain unverified.
+
+
 ## 1.17.66 published: concise review and faster detection
 
 Prepared from exact main ed078e0bced8a4d0dbc86a7bcaf9532795cc9da6, including
@@ -215,7 +251,7 @@ The Go build uses CGO_ENABLED=0, GOOS=windows, GOARCH=amd64, GOTOOLCHAIN=local,
 Complete release packaging:
 
 ```sh
-python3 scripts/github_release.py package --tag v1.17.64 --exe build/Network_Toolkit.exe
+python3 scripts/github_release.py package --tag v1.17.67 --exe build/Network_Toolkit.exe
 ```
 
 Use the tracked checkout for release packaging; `--allow-untracked-source` is

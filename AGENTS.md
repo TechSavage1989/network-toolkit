@@ -11,3 +11,7 @@ features and release assets. Main pushes publish new versions automatically;
 the user authorized this specific 66 source upload and publication, not unrelated
 future releases. The updater/release destination is main network-toolkit only.
 Never overwrite older releases or change repository access.
+
+Candidate work: 1.17.67 Hosts editor on review/hosts-editor-1.17.67. Read the
+first candidate handoff section. Prepare and validate the portable review build;
+keep main and published 1.17.66 unchanged until publication is authorized.

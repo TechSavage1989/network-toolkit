@@ -1,0 +1,59 @@
+.he-app{height:100%;min-height:0;}
+.he-app [hidden]{display:none!important;}
+.he-app .local-config-toolbar{padding:10px 12px;gap:6px;}
+.he-app .hosts-file-meta{padding:7px 12px;gap:7px;}
+.he-path{min-width:0;overflow-wrap:anywhere;}
+.he-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:5px;padding:8px 10px;border-bottom:1px solid var(--line);flex:0 0 auto;}
+.he-tabs{display:flex;gap:2px;padding:2px;border:1px solid var(--border);border-radius:7px;}
+.he-tabs button{border:0;background:transparent;color:var(--muted);border-radius:5px;padding:5px 10px;font:inherit;font-size:11px;cursor:pointer;}
+.he-tabs [aria-selected="true"]{background:var(--accentBg);color:var(--accent);}
+.he-counts{margin-left:auto;color:var(--muted);font-size:10px;}
+.he-more{position:relative;}
+.he-more>summary{list-style:none;cursor:pointer;}
+.he-more>summary::-webkit-details-marker{display:none;}
+.he-menu{position:absolute;top:calc(100% + 4px);left:0;z-index:45;display:flex;flex-direction:column;min-width:230px;max-width:min(280px,80vw);max-height:55vh;overflow:auto;padding:5px;gap:2px;background:var(--panel);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow);}
+.he-menu .btn{text-align:left;justify-content:flex-start;width:100%;}
+.he-entry-controls{display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:8px 10px;border-bottom:1px solid var(--line);flex:0 0 auto;}
+.he-filter{flex:1 1 220px;min-width:120px;}
+.he-filter input{width:100%;height:32px;font-size:11px;}
+.he-entry-controls select{flex:0 1 170px;min-width:130px;height:32px;font-size:11px;}
+.he-entry-controls>.faint{font-size:10px;}
+.he-entries{display:flex;flex:1 1 0;flex-direction:column;min-height:100px;min-width:0;overflow:hidden;}
+.he-table-scroll{flex:1 1 0;min-height:0;overflow:auto;scrollbar-width:thin;overscroll-behavior:contain;}
+.he-table{width:100%;min-width:760px;border-collapse:collapse;table-layout:fixed;font-size:11px;}
+.he-table th{position:sticky;top:0;background:var(--panel2);z-index:1;color:var(--muted);font-size:10px;text-align:left;}
+.he-table th,.he-table td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top;overflow-wrap:anywhere;}
+.he-table th:first-child{width:32px;}.he-table th:nth-child(2){width:62px;}.he-table th:nth-child(3){width:180px;}.he-table th:nth-child(6){width:46px;}.he-table th:last-child{width:107px;}
+.he-table td small{display:block;font-size:9px;color:var(--muted);margin-top:3px;font-family:var(--sans);}
+.he-table input[type="checkbox"]{width:14px;height:14px;min-height:14px;}
+.he-name{border:0;background:transparent;color:var(--text);padding:0;text-align:left;font:inherit;cursor:pointer;overflow-wrap:anywhere;}
+.he-name:hover{text-decoration:underline;}
+.he-row-actions{display:flex;gap:4px;}
+.he-row-actions .btn{font-size:10px;padding:3px 6px;min-height:25px;}
+.he-invalid td:nth-child(3),.he-has-errors{color:var(--bad)!important;}
+.he-warning td:nth-child(3) small{color:var(--warn);}
+.he-empty{padding:25px!important;color:var(--muted);text-align:center;}
+.he-pagination{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;padding:7px 10px;border-top:1px solid var(--line);font-size:10px;color:var(--muted);flex:0 0 auto;}
+.he-pagination>div{display:flex;gap:5px;flex-wrap:wrap;}
+.he-issues{flex:0 0 auto;max-height:155px;overflow:auto;padding:7px 10px;background:var(--panel2);border-bottom:1px solid var(--line);}
+.he-issue{display:block;width:100%;text-align:left;border:0;border-radius:4px;background:transparent;color:var(--muted);font-size:11px;line-height:1.5;padding:4px 5px;cursor:pointer;overflow-wrap:anywhere;}
+.he-issue:hover{background:var(--hover);}.he-issue.error{color:var(--bad);}.he-issue.warning{color:var(--warn);}
+.he-text{display:flex;flex:1 1 0;min-height:130px;min-width:0;flex-direction:column;overflow:hidden;}
+.he-text-tools{display:flex;align-items:center;flex-wrap:wrap;gap:10px;padding:5px 10px;border-bottom:1px solid var(--line);}
+.he-text-tools>.faint{margin-left:auto;font-size:10px;}
+.he-check{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);}
+.he-check input[type="checkbox"]{width:14px;min-width:14px;height:14px;min-height:14px;}
+.he-source{display:flex;flex:1 1 0;min-height:0;min-width:0;overflow:hidden;background:var(--panel2);}
+.he-line-numbers{flex:0 0 55px;min-width:40px;margin:0;padding:10px 10px 10px 5px;overflow:hidden;white-space:pre;text-align:right;background:var(--panel);color:var(--faint);font:12px/20px var(--mono);user-select:none;border-right:1px solid var(--line);}
+.he-textarea{display:block;flex:1 1 0;min-height:0;min-width:0;width:100%;padding:10px 12px;border:0;border-radius:0;resize:none;outline-offset:-2px;color:var(--text);background:var(--panel2);font:12px/20px var(--mono);tab-size:4;white-space:pre;overflow:auto;overscroll-behavior:contain;}
+.he-textarea.is-wrap{white-space:pre-wrap;overflow-wrap:anywhere;}
+.he-find{display:flex;align-items:end;flex-wrap:wrap;gap:7px;padding:8px 10px;background:var(--panel2);border-bottom:1px solid var(--line);flex:0 0 auto;}
+.he-find>label:not(.he-check){display:flex;flex-direction:column;gap:3px;flex:1 1 160px;font-size:10px;color:var(--muted);}
+.he-find input:not([type="checkbox"]){min-width:0;width:100%;height:31px;font-size:11px;}
+.he-find>.he-check{margin-bottom:7px;}
+.he-find>.faint{font-size:10px;align-self:center;}
+.he-form-error{min-height:1em;color:var(--bad);font-size:11px;overflow-wrap:anywhere;}
+.he-import-preview{max-height:220px;white-space:pre-wrap;overflow:auto;font:11px/1.5 var(--mono);border:1px solid var(--border);border-radius:6px;background:var(--panel2);padding:10px;}
+.he-diff{font:11px/1.6 var(--mono);padding:10px;border:1px solid var(--border);border-radius:6px;background:var(--panel2);}
+@media(max-width:800px){.he-toolbar{gap:4px;}.he-counts{width:100%;margin-left:0;}.he-filter{flex-basis:100%;}.he-text-tools>.faint{display:none;}.he-table th:nth-child(3){width:155px;}.he-menu{left:auto;right:0;}}
+@media(max-height:650px){.he-app .local-config-toolbar{padding:7px 10px;}.he-app .hosts-file-meta{padding:5px 10px;}.he-entry-controls,.he-toolbar{padding:5px 8px;}.he-app .hosts-editor-help{padding:5px 8px;}.he-issues{max-height:95px;}}

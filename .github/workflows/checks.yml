@@ -46,6 +46,18 @@ jobs:
         run: python3 scripts/build_windows_resources.py
       - name: Build Windows x64 GUI application
         run: sh ./build.sh
+      - name: Package review build
+        if: startsWith(github.ref, 'refs/heads/review/hosts-editor-')
+        run: |
+          REVIEW_VERSION=$(node -p "require('./package.json').version")
+          python3 scripts/github_release.py package --tag "v${REVIEW_VERSION}" --exe build/Network_Toolkit.exe
+      - uses: actions/upload-artifact@v7
+        if: startsWith(github.ref, 'refs/heads/review/hosts-editor-')
+        with:
+          name: Network-Toolkit-Hosts-Editor-Review
+          path: dist/*_Portable.zip
+          if-no-files-found: error
+          retention-days: 30
 
   browser:
     runs-on: ubuntu-latest
@@ -62,6 +74,11 @@ jobs:
         run: |
           npm install --prefix "$RUNNER_TEMP/ntk-browser-tests" --no-audit --no-fund playwright@1.62.1
           node "$RUNNER_TEMP/ntk-browser-tests/node_modules/playwright/cli.js" install --with-deps chromium
+      - name: Check Hosts editor interactions and responsive layouts
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
+        run: node scripts/hosts-editor.browser.cjs
       - name: Check server selectors, saved addresses and responsive layouts
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
