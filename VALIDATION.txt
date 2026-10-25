@@ -8,10 +8,22 @@ options are still cleared. Backend SMTP and updater code are unchanged.
 All 432 JavaScript tests (including seven SMTP lifecycle regressions), 31 Python
 release guards, root/terminal/desktop Go suites, release/resource metadata and
 browser-script syntax passed locally. The exact old page fails five of the new
-lifecycle checks; the candidate passes all seven. Hosted checks and the Windows
-x64 package are pending.
-The browser regression uses actual page DOM and mock SMTP/settings endpoints
-at 390/1280 pixels. Native Windows/WebView2 and live SMTP remain unverified.
+lifecycle checks; the candidate passes all seven.
+
+Full hosted Checks 40163863165 passed on exact source
+90433f9617e2568e4cb8d00a8287f68ba1d9168d. Both jobs succeeded, including the
+new SMTP real-page/mock-API checks at 390/1280 pixels, existing Hosts and
+client/server browser suites, final-install cases and seven native timer
+scenarios. The real five-minute poll/focus collision passed. No real SMTP or
+email delivery occurred in the browser fixtures.
+
+Local/hosted Windows x64 GUI builds and portable/update package verification
+passed. Downloaded artifact 12587098378 matches the local portable byte-for-
+byte, including its EXE. Both ZIP CRCs, outer/inner manifests, Windows x64 GUI
+PE/version and updater allowlist validation pass. The handoff records the
+exact hashes and tested source. Native Windows/WebView2 and live SMTP remain
+unverified. The final documentation follow-up leaves the tested runtime and
+review artifacts unchanged; duplicate automatic checks need not be awaited.
 
 This is an unpublished review build. Published 1.17.70 and its assets are
 preserved. See DEVELOPMENT_HANDOFF.md for scope and publication boundaries.

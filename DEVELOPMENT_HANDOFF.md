@@ -31,10 +31,41 @@ Local validation passed all 432 JavaScript tests, 31 Python release guards,
 root/terminal/desktop Go suites, release/resource metadata validation and browser
 script syntax. Running the new lifecycle tests against exact main's old page in
 an isolated fixture reproduces five expected failures (retention, retries and
-late responses); all seven pass with the focused fix. Hosted browser results
-and the Windows x64 review package are pending. Native Windows/WebView2 and
-live SMTP authentication remain untested here. The unchanged 70 updater and
-prior native install/restart limits remain as recorded below.
+late responses); all seven pass with the focused fix.
+
+Full hosted Checks 40163863165 passed on exact runtime source
+90433f9617e2568e4cb8d00a8287f68ba1d9168d (tree
+df12c88886c05f28f54cc6bcd62a73dd62d66590). Both check and browser jobs
+completed successfully. This includes the new real-page SMTP regressions at
+390/1280 pixels, existing Hosts/client/server browser checks, single-final-install
+cases and all seven native Chromium timer scenarios. The real five-minute
+poll/focus collision passed with two release checks. No real SMTP requests or
+email delivery occurred in the browser fixtures.
+
+Windows x64 GUI cross-build, release/resource validation, portable/update
+packaging and package verification passed locally and in the hosted check job.
+The downloaded review artifact 12587098378 and local portable match byte-for-
+byte; both contain the identical verified EXE. ZIP CRCs and the release
+packager's outer/inner manifests, PE/version and updater allowlist checks pass.
+Review artifact outer SHA-256:
+deb9f34b92c5d1ce59475833e2bdc19936a4e9151d58097027c970d32480a48d
+Review Portable.zip SHA-256 (9,052,210 bytes):
+541254db32531f5faacf06b1f657a907239ef0539a82cf61d9731a756a2d0a53
+Review EXE SHA-256 (14,183,424 bytes):
+8f078b44d5bf2b165c749754aaac41cd60a194b19bf3487d769f2a18052833fa
+
+This final follow-up changes only AGENTS.md, this handoff and VALIDATION.txt.
+The reviewed runtime and its build artifacts stay unchanged. Main remains
+at df712385f61108ca43271d22ed9e73d3f6e88629; the public updater still offers
+1.17.70 (release 423148288). No 71 tag or public release has been created.
+Future publication requires a new user instruction and removal of review-only
+status wording from README/current handoff before preparing the authorized
+release. Do not overwrite any prior release/tag/asset.
+
+Native Windows/WebView2 and live SMTP authentication remain untested here.
+The unchanged 70 updater and prior native install/restart limits remain as
+recorded below. Full runtime validation above applies to this documentation
+follow-up; an automatic duplicate review-branch run need not be awaited again.
 
 
 ## 1.17.70 published: small update-flow test release
