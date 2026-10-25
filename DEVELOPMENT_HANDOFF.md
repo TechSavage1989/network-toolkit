@@ -1,45 +1,90 @@
 # Network Toolkit development handoff
 
-## 1.17.76 candidate: match selected server and client sidebar tab styles
+## 1.17.76 published: match selected server and client sidebar tabs
 
 Prepared from main 11c52273cb62f066ff563352d667b8eeb2346c89 after the user
-provided server/client screenshots, requested server selected-tab appearance
-match client mode, and explicitly authorized build/publication on 2026-10-25.
-This covers this scoped new release only; preserve all prior tags/assets.
-Main network-toolkit remains the sole source/update destination.
+provided server/client screenshots and requested matching server selected-tab
+appearance, explicitly authorizing build/publication on 2026-10-25. This covers
+this scoped release only; preserve prior tags/assets. Main network-toolkit
+remains the sole source/update destination.
 
 Server Settings previously combined a generic panel-visibility-toggle class
-with separate rail/button rules. The generic control introduced a rounded
-outline and different spacing/focus styling. Server rail/button markup now
-uses the existing terminal-sidebar-rail and terminal-sidebar-tab classes used
-by client mode. Remove the duplicate server rail/button CSS and its span font/
-letter-spacing override. Shared selected styling accepts aria-expanded=true
-for the server disclosure control as well as aria-selected=true for client/
-terminal tabs. Native button/disclosure semantics and existing toggle handlers
-remain intact. Shared short tab labels stay on one line. No tab labels, server
-settings, resizing, transfer or updater
-logic changes. The 75 editor initial-view fix and all earlier features remain.
+with separate rail/button rules, introducing a rounded outline and different
+spacing/focus styling. Server rail/button markup now uses terminal-sidebar-rail
+and terminal-sidebar-tab, the existing client components. Remove the duplicate
+server rail/button CSS and its span font/letter-spacing override. Shared selected
+styling accepts aria-expanded=true for the server disclosure control as well as
+aria-selected=true for client/terminal tabs. Short tab labels stay on one line.
+Native disclosure semantics, labels, toggle handlers, server settings, resizing,
+transfers and updater logic are retained. Existing client short labels retain
+their appearance. Go/UI/package/Windows resources are consistently 1.17.76.
 
-Extend the existing real-page server browser check to compare actual selected
-server/client computed styles and rail-relative geometry in normal, hover and
-keyboard-focus states. Covers SFTP/TFTP/FTP in both themes at 570/820/1366px:
-18 cases, 54 style comparisons. Existing click/Enter/Space collapse/expand and
-saved collapsed state are checked without starting any real server.
-
-Go/UI/package/Windows resources are 1.17.76. Local validation passed 446 JS
+The 75 editor initial-view fix, restored terminal connection modal, saved folders/
+credentials/macros, command-input scrollbar suppression and SMTP lifetime remain.
+No cosmetic unit tests were added. Local validation passed all 446 JavaScript
 tests, 31 Python release guards, required root/terminal/desktop Go suites,
-release/resource metadata, HTML/browser syntax and Windows x64 GUI build.
-Initial browser run 40173978151 found only a height difference in its first
-selected-tab comparison: the longer Settings label wrapped. Shared short labels
-now stay on one line, and the browser checks single-line label containment.
-The next browser run 40174214223 passed all 54 selected-tab comparisons and
-label containment checks. Its subsequent existing activity-resize check inherited
-the compact viewport from the new cases; that test now restores its original
-1600x1100 viewport first. No application change was needed for this test reset.
-Hosted full validation, package/artifact verification, publication and released75
-live staging are pending.
-Native Windows/WebView2, hardware and actual install/restart remain unverified.
-Future work requires its own publication authorization.
+release/resource metadata, HTML/browser syntax, Windows x64 GUI build and
+portable/update package verification.
+
+The first rendered comparison caught the longer Settings label wrapping to two
+lines. Shared short labels now stay on one line with containment checks. The
+next run passed all style comparisons but its following existing activity-resize
+test inherited a compact viewport. That test now explicitly restores its
+original 1600x1100 viewport. No application resize behavior changed.
+
+Full review Checks 40174421236 passed on exact published source/tag
+a441493cecd7c92a0951bbb8ae1531348654ef11 (tree
+7dbb47d4918ccb2d69c2fbd6716826031543d2e1). Both jobs succeeded. The extended
+real-page server browser suite passes 90 existing server layout cases plus
+18 selected-tab cases across SFTP/TFTP/FTP, both themes and 570/820/1366px.
+All 54 normal/hover/keyboard-focus comparisons match actual computed client
+styles and rail-relative button geometry, including background, border, radius,
+padding, typography, icon size and focus outline. Labels stay on one line inside
+the button. Click/Enter/Space collapse/expand, saved state, adapter selection,
+pointer/keyboard resizing, persistence and viewport recovery pass. Inspected
+server/client selected-tab screenshots have matching square highlight/outline,
+spacing and height. These are isolated UI/API fixtures; no real server starts.
+
+Existing Hosts/client/SMTP/folders/terminal-dialog/command-input/editor/install
+browser checks also pass, together with seven native Chromium updater-timer
+scenarios including the real five-minute poll/focus collision. Review artifact
+12591657018 matches the local portable and EXE byte-for-byte. Outer SHA-256:
+9257dfb25e229644a7e7e818e3a0472ea586eeaa8a802983c8bbbb63d787678c.
+Browser artifact 12591897343 digest and ZIP CRC pass; outer SHA-256:
+67305f0f3076185a97064c389572a0151c64bdab92dd5c4791c7a38f121d7282.
+
+Main was fast-forwarded to that identical tested commit using expected old SHA
+11c52273cb62f066ff563352d667b8eeb2346c89 without force. No code or docs changed
+between full review and promotion. Release 40175002006 succeeded and created
+stable release 423236946. Main duplicate Checks 40175001980 passed its check
+job and server-style browser step. Completed review above remains full runtime
+validation; this documentation may supersede automatic duplicate runs.
+
+All four actual public downloads match GitHub asset digests. Outer/inner SHA-256
+manifests, both ZIP CRCs, strict four-member updater allowlist, Windows x64 GUI
+PE/version and standalone/portable/update EXE identity pass. All 690 packaged
+source files match the exact published commit. Official portable and EXE match
+the reviewed build byte-for-byte. All fifteen earlier release IDs and asset
+IDs/sizes/digests remain unchanged, with all fifteen older source-tag SHAs
+preserved. Verification snapshots and raw logs are retained with local QA.
+
+The unchanged released 1.17.75 production feed handlers checked the live feed,
+verified/downloaded/staged 1.17.76 in 8.23 seconds. Staged bytes match the
+independently downloaded official EXE. The harness used real HTTPS, isolated
+temporary settings and only platform-independent feed handlers. No installation
+or restart occurred and its original test executable hash remained unchanged.
+
+Official release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.76
+EXE SHA-256: 91151251b449a8212a13a9c683ffed47267b7ee4f385fcd7d811f0612719b00d
+Portable ZIP SHA-256: f7ea56460a9104c253de022da06dab0081e12901cdff29ee59ba443e9f1e424f
+Update ZIP SHA-256: b97e45af24abea48a3d4e9907dad909710e6fbf485f81eedcb1f7fb9d4d57879
+SHA256SUMS file SHA-256: 9b729ca1d248a2c9ecaeded20c1ad80190ae6cdd8f247dcb8e2baf7e20c5b34b
+
+This final publication record changes only AGENTS.md, this handoff and
+VALIDATION.txt. Do not move the released 76 source tag, replace assets or
+republish it. Continue future work from latest main. Native Windows/WebView2,
+hardware and actual installation/restart remain unverified here; browser
+fixtures and live-feed staging are not native Windows execution proof.
 
 ## 1.17.75 published: text files open at the document start
 

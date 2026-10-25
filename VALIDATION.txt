@@ -1,20 +1,51 @@
-NETWORK TOOLKIT 1.17.76 CANDIDATE VALIDATION
+NETWORK TOOLKIT 1.17.76 VALIDATION
 
-Server Settings buttons reuse client sidebar tab/rail styles, including the
-selected highlight, spacing, icon size, hover and keyboard focus. Existing
-labels, disclosure behavior, resizing, settings and transfers are retained.
+Selected server Settings controls reuse the client sidebar tab/rail styles,
+including highlight, spacing, icon size, hover and keyboard focus. Short labels
+stay on one line. Existing labels, disclosure behavior, settings, resizing,
+transfers and updater logic are retained, along with earlier editor/terminal/
+folder/credential/macro/SMTP functionality.
 
-The existing server browser suite now compares selected computed styles and
-geometry against client mode in 18 cases and three interaction states. No
-cosmetic unit tests are added. Local validation passed 446 JavaScript tests,
-31 Python release guards, required root/terminal/desktop Go suites, metadata/
-resource validation, HTML/browser syntax and Windows x64 GUI build. Hosted
-checks, package/artifact verification, publication and live staging are pending.
-Initial browser comparison caught Settings wrapping to two lines; shared short
-labels now stay on one line and have explicit containment checks. All 54 style
-comparisons then passed. The following existing activity-resize test now restores
-its original large viewport after the compact comparison cases. Native Windows/
-WebView2, hardware and real install/restart remain unverified. See the handoff.
+Full review Checks 40174421236 passed on exact published source/tag
+a441493cecd7c92a0951bbb8ae1531348654ef11: 446 JavaScript tests, 31 Python
+release guards, required root/terminal/desktop Go suites, Windows x64 GUI build/
+package and all browser steps. No cosmetic unit tests were added.
+
+The server browser suite passes 90 existing layout cases plus 18 selected-tab
+cases across SFTP/TFTP/FTP, both themes and 570/820/1366px. All 54 normal/hover/
+keyboard-focus computed-style and rail-relative geometry comparisons match
+client mode. Labels remain on one line inside the button. Click/Enter/Space,
+saved state, adapter selection, pointer/keyboard resizing, persistence and
+viewport recovery pass. Initial validation caught label wrapping and a test
+viewport reset, both resolved before publication. Server/client selected-tab
+screenshots were inspected and match in highlight, outline, spacing and height.
+
+Existing Hosts/client/SMTP/folders/terminal/command-input/editor/install checks
+and seven native Chromium updater-timer scenarios pass, including the real
+five-minute poll/focus collision. Review artifact 12591657018 matches the local
+portable/EXE byte-for-byte. Main was promoted to the identical tested commit
+after explicit publication approval. Release 40175002006 succeeded. Main
+duplicate Checks 40175001980 passed its check job and server-style browser step.
+Completed review is full runtime validation; docs may supersede duplicate runs.
+
+OFFICIAL PUBLICATION VERIFICATION
+- All four actual public downloads match GitHub asset digests.
+- Outer/inner manifests, both ZIP CRCs and strict four-member updater allowlist.
+- Windows x64 GUI PE/version and standalone/portable/update EXE identity.
+- All 690 packaged source files match the exact published commit.
+- Official portable and EXE match the reviewed build byte-for-byte.
+- Fifteen older release IDs and asset IDs/sizes/digests remain unchanged.
+- Fifteen older source-tag SHAs match the prepublication snapshot.
+- Exact released75 handlers checked/downloaded/verified/staged live76 in 8.23s.
+- Staged bytes match the independently downloaded official EXE.
+- No installation/restart or original test executable change occurred.
+
+The live harness uses platform-independent production handlers, real HTTPS and
+isolated temporary settings. Browser tests use isolated APIs; no real server is
+started by the new style checks. Native Windows/WebView2, hardware and actual
+install/restart remain unverified. See DEVELOPMENT_HANDOFF.md for exact hashes,
+provenance and limits. This final docs follow-up must not move tags, replace
+assets or republish the runtime.
 
 HISTORICAL PUBLISHED BASELINE
 
