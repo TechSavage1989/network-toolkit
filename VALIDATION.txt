@@ -1,17 +1,44 @@
-NETWORK TOOLKIT 1.17.79 CANDIDATE VALIDATION
+NETWORK TOOLKIT 1.17.79 VALIDATION
 
 Removes the top border of the Overview diagnostic source control, the unwanted
 line below Enter to run. The rule is scoped to Overview; existing target entry,
 hint, source-interface selection, spacing and run controls remain.
 
-No cosmetic tests were added. Four screenshots from the existing server browser
-page will cover the Overview target form at 1600/570px in both themes for manual
-visual review. Local validation passed 448 JavaScript tests, 31 Python release
-guards, required root/terminal/desktop Go suites, release/resource metadata,
-inline HTML/browser script syntax and Windows x64 GUI build. Hosted review,
-package verification, publication and released78 live staging are pending. Native Windows/
-WebView2, hardware and actual installation/restart remain unverified.
-See DEVELOPMENT_HANDOFF.md for scope and authorization.
+Full review Checks 40179023641 passed on exact published source/tag
+fccf4f93a9405878a3772fe24c0ab35e21c5b5c6: 448 JavaScript tests, 31 Python
+release guards, required root/terminal/desktop Go suites, Windows x64 GUI build/
+package and all browser steps. No cosmetic unit tests were added.
+
+Four Overview target-form screenshots, captured by the existing server browser
+page at 1600/570px in both themes, were inspected. The line is absent, while
+target entry, save/run buttons, source selector and hint remain contained and
+readable. The desktop keyboard hint remains; compact layouts retain their
+existing hiding behavior. Browser UI/API fixtures create no real transports.
+
+Existing Hosts/client/server/SMTP/folders/terminal/command-input/editor/install
+checks and seven native Chromium updater-timer scenarios pass, including the
+real five-minute poll/focus collision. Review artifact 12593475795 matches the
+local portable/EXE byte-for-byte. Main was promoted to the identical tested
+commit after explicit publication approval. Release 40179754298 succeeded.
+Completed review is full runtime validation; docs may supersede duplicate runs.
+
+OFFICIAL PUBLICATION VERIFICATION
+- All four actual public downloads match GitHub asset digests.
+- Outer/inner manifests, both ZIP CRCs and strict four-member updater allowlist.
+- Windows x64 GUI PE/version and standalone/portable/update EXE identity.
+- All 693 packaged source files match the exact published commit.
+- Official portable and EXE match the reviewed build byte-for-byte.
+- Eighteen older release IDs and asset IDs/sizes/digests remain unchanged.
+- Eighteen older source-tag SHAs match the prepublication snapshot.
+- Exact released78 handlers checked/downloaded/verified/staged live79 in 9.49s.
+- Staged bytes match the independently downloaded official EXE.
+- No installation/restart or original test executable change occurred.
+
+The live harness uses platform-independent production handlers, real HTTPS and
+isolated temporary settings. Native Windows/WebView2, hardware and actual
+install/restart remain unverified. See DEVELOPMENT_HANDOFF.md for exact hashes,
+provenance and limits. This final docs follow-up must not move tags, replace
+assets or republish the runtime.
 
 HISTORICAL PUBLISHED BASELINE
 

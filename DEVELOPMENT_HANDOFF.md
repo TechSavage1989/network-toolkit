@@ -1,6 +1,6 @@
 # Network Toolkit development handoff
 
-## 1.17.79 candidate: remove the overview target divider
+## 1.17.79 published: remove the overview target divider
 
 Prepared from main 7ef55a25f00429324d02e556d3fe39112328e36e after the user
 provided an overview screenshot and requested removing the line below Enter to
@@ -12,24 +12,71 @@ The line is the top border of the diagnostic source control, immediately below
 the target entry row. A scoped source-interface.css rule removes that border
 only inside the Overview workspace. Target entry, the Enter to run hint,
 source-interface picker, padding and run controls retain their existing behavior.
-Other source-control contexts keep their styling. No JavaScript handlers,
-transport, ownership, credentials or updater code changes.
+Other source-control contexts keep their styling. No application JavaScript
+handlers, transport, ownership, credentials or updater code changes.
 
 Go/UI/package/Windows resources are consistently 1.17.79. No new cosmetic tests
 were added for this one-rule change. The existing server browser script only
 adds four Overview target-form screenshot captures, at 1600/570px in both themes,
 for manual visual review before its unchanged existing layout checks.
+All four were inspected: the divider is absent; the target field, save/run
+buttons, source selector and hint remain contained and readable. The existing
+desktop Enter to run hint remains; compact layouts keep their existing hiding
+behavior. These isolated browser UI/API fixtures create no real transports.
+
+The first review (40178869013) forced online state for its screenshot capture,
+which triggered live polling in the isolated server fixture and disrupted a
+later layout check. The capture now retains the existing offline fixture state.
+No application polling or layout logic changed. Final hosted review below
+passes with that capture setup corrected.
 
 Local validation passed 448 JavaScript tests, 31 Python release guards, required
 root/terminal/desktop Go suites, release/resource metadata, inline HTML/browser
-script syntax and Windows x64 GUI build. Hosted review, package verification,
-screenshot inspection, publication and released78 live staging are pending.
-The first hosted screenshot capture forced online state in the isolated
-server fixture and triggered live polling that disrupted a later layout check.
-The capture now retains the existing offline fixture state; no application
-polling or layout behavior changed. Hosted review is being rerun.
-Native Windows/WebView2, hardware and actual installation/restart remain
-unverified.
+script syntax, Windows x64 GUI build and portable/update package verification.
+
+Full review Checks 40179023641 passed on exact published source/tag
+fccf4f93a9405878a3772fe24c0ab35e21c5b5c6 (tree
+36616f132d1542e2eac2bf72f4c0463d1f6cade5). Both jobs succeeded. Existing
+Hosts/client/server/SMTP/folders/terminal/command-input/editor/install browser
+checks pass, together with all seven native Chromium updater-timer scenarios
+including the real five-minute poll/focus collision. No cosmetic unit tests
+were added. Review artifact 12593475795 matches the local portable and EXE
+byte-for-byte. Outer SHA-256:
+2ea10de95d54583a2e5ec7560970e70b5726df23dab0b8a3a468369f9c0bd372.
+Browser artifact 12594205818 digest and ZIP CRC pass; outer SHA-256:
+217519d29203fb8afcb7277556dc444094374ecd66ca72d6841d657bf3426283.
+
+Main was fast-forwarded to that identical tested commit using expected old SHA
+7ef55a25f00429324d02e556d3fe39112328e36e without force. No code or docs changed
+between full review and promotion. Release 40179754298 succeeded and created
+stable release 423280580. Completed review above remains full runtime
+validation; this documentation may supersede automatic duplicate main runs.
+
+All four actual public downloads match GitHub asset digests. Outer/inner SHA-256
+manifests, both ZIP CRCs, strict four-member updater allowlist, Windows x64 GUI
+PE/version and standalone/portable/update EXE identity pass. All 693
+packaged source files match the exact published commit. Official portable and
+EXE match the reviewed build byte-for-byte. All eighteen earlier release IDs
+and asset IDs/sizes/digests remain unchanged, with all eighteen older source-tag
+SHAs preserved. Verification snapshots and raw logs are retained with local QA.
+
+The unchanged released 1.17.78 production feed handlers checked the live feed,
+verified/downloaded/staged 1.17.79 in 9.49 seconds. Staged bytes match the
+independently downloaded official EXE. The harness used real HTTPS, isolated
+temporary settings and only platform-independent feed handlers. No installation
+or restart occurred and its original test executable hash remained unchanged.
+
+Official release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.79
+EXE SHA-256: 7c90288a829c443c2cf08d9004759127dde6f224619b3f1ca2c249d419632874
+Portable ZIP SHA-256: 517490729efcba4b1bbdf0a3b55500a09cf8e3f6736bfc6edaa38ba5a7ac5094
+Update ZIP SHA-256: e71f8efb5856d3440dfaf420fb979e589fbe30a217aafc296df70b89e8a4fffb
+SHA256SUMS file SHA-256: 0ceec207192c8c2ebf4df917dbd51e4b435a028b48deee48555175adc9821783
+
+This final publication record changes only AGENTS.md, this handoff and
+VALIDATION.txt. Do not move the released 79 source tag, replace assets or
+republish it. Continue future work from latest main. Native Windows/WebView2,
+hardware and actual installation/restart remain unverified here; browser
+fixtures and live-feed staging are not native Windows execution proof.
 
 ## 1.17.78 published: detached terminal sidebar side
 
