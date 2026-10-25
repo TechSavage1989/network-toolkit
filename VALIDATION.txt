@@ -5,9 +5,20 @@ LOCAL RESULTS
 - Root application, internal/terminal and internal/desktop Go suites.
 - JavaScript syntax checks for the new editor, model and rendered test fixture.
 
-IN PROGRESS
-- Final version/resource validation, Windows x64 build and package verification.
-- Hosted Hosts editor browser interactions and responsive screenshot review.
+PASSED BUILD AND HOSTED HOSTS CHECKS
+- Thirty-one Python release/publication/packaging tests.
+- Version/resource validation and Windows x64 GUI cross-compilation.
+- Portable source archive and exact four-member updater ZIP creation/verification.
+- Hosted Hosts editor interactions on fe9189c / Checks 40156261618: row editing,
+  aliases/comments, undo/redo, reviewed saves, operation locking, reload guards,
+  find/replace, invalid-line navigation, UTF-16 backup import, literal export,
+  pagination and filtered bulk selection.
+- Twenty rendered cases across five window sizes in light and dark themes.
+- Export filenames are explicit. The source textarea opts out of one-click
+  clearing, retaining its normal select/delete and undo controls.
+
+The review branch's latest Checks run covers the final candidate and remaining
+application regressions. Read its terminal result with this validation record.
 
 The browser fixture uses fictional hosts text and mocked local-tools responses;
 it does not read or write this machine's system hosts file. Native Windows

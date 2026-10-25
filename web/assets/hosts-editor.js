@@ -48,7 +48,7 @@
     '<div id="hostsEntryControls" class="he-entry-controls"'+(ui.view==='entries'?'':' hidden')+'><label class="he-filter"><span class="sr-only">Filter hosts entries</span><input type="search" id="hostsEntrySearch" placeholder="Search IP, hostname, alias or comment" value="'+esc(ui.query)+'" autocomplete="off"></label><select id="hostsEntryFilter" aria-label="Entry status filter"><option value="all">All entries</option><option value="enabled">Enabled</option><option value="disabled">Disabled</option><option value="issues">With validation issues</option></select><span id="hostsSelectionCount" class="faint"></span>'+button('enable','Enable selected',true)+button('disable','Disable selected',true)+button('delete','Delete selected',true)+'</div>'+
     '<div id="hostsFindPanel" class="he-find"'+(ui.view==='text'&&ui.findOpen?'':' hidden')+'><label><span>Find</span><input id="hostsFind" value="'+esc(ui.find)+'" autocomplete="off" placeholder="Find text"></label><label><span>Replace with</span><input id="hostsReplacement" value="'+esc(ui.replace)+'" autocomplete="off"></label><label class="he-check"><input type="checkbox" id="hostsFindCase"'+(ui.matchCase?' checked':'')+'>Match case</label><label class="he-check"><input type="checkbox" id="hostsFindWhole"'+(ui.whole?' checked':'')+'>Whole hostname</label>'+button('find-next','Next')+button('find-previous','Previous')+button('replace-one','Replace',!editable())+button('replace-all','Replace all',!editable())+'<span class="faint" id="hostsFindCount"></span>'+button('close-find','Close')+'</div>'+
     '<div id="hostsEntries" class="he-entries" role="tabpanel" aria-labelledby="hostsViewEntries"'+(ui.view==='entries'?'':' hidden')+'><div class="he-table-scroll"><table class="he-table"><thead><tr><th><input type="checkbox" id="hostsSelectPage" aria-label="Select entries on this page"></th><th>Enabled</th><th>IP address</th><th>Hostnames / aliases</th><th>Comment</th><th>Line</th><th>Actions</th></tr></thead><tbody id="hostsEntryRows"></tbody></table></div><div class="he-pagination"><span id="hostsPageSummary"></span><div>'+button('select-matching','Select all matches')+button('clear-selection','Clear selection')+button('previous-page','Previous')+button('next-page','Next')+'</div></div></div>'+
-    '<div id="hostsText" class="he-text" role="tabpanel" aria-labelledby="hostsViewText"'+(ui.view==='text'?'':' hidden')+'><div class="he-text-tools">'+button('goto','Go to line')+'<label class="he-check"><input type="checkbox" id="hostsWordWrap"'+(ui.wrap?' checked':'')+'>Word wrap</label><span class="faint">Ctrl+F find · Ctrl+H replace · Ctrl+S review and save</span></div><div class="he-source"><pre id="hostsLineNumbers" class="he-line-numbers" aria-hidden="true"'+(ui.wrap?' hidden':'')+'></pre><textarea id="hostsSourceEditor" class="he-textarea'+(ui.wrap?' is-wrap':'')+'" aria-label="Hosts file source text" wrap="'+(ui.wrap?'soft':'off')+'" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea></div></div>'+
+    '<div id="hostsText" class="he-text" role="tabpanel" aria-labelledby="hostsViewText"'+(ui.view==='text'?'':' hidden')+'><div class="he-text-tools">'+button('goto','Go to line')+'<label class="he-check"><input type="checkbox" id="hostsWordWrap"'+(ui.wrap?' checked':'')+'>Word wrap</label><span class="faint">Ctrl+F find · Ctrl+H replace · Ctrl+S review and save</span></div><div class="he-source"><pre id="hostsLineNumbers" class="he-line-numbers" aria-hidden="true"'+(ui.wrap?' hidden':'')+'></pre><textarea id="hostsSourceEditor" data-input-clear="off" class="he-textarea'+(ui.wrap?' is-wrap':'')+'" aria-label="Hosts file source text" wrap="'+(ui.wrap?'soft':'off')+'" spellcheck="false" autocomplete="off" autocapitalize="off"></textarea></div></div>'+
     '<div class="hosts-editor-help"><span id="hostsLineCount"></span><span>Drafts and undo history stay in this session. Changes take effect after Review and save.</span></div><input type="file" id="hostsImportFile" hidden>')+'</section>';
   if(ready){const editor=q('#hostsSourceEditor');editor.value=current.draft;q('#hostsEntryFilter').value=ui.filter;doc();renderRows();renderIssues();lineNumbers();controls();updateFindCount();}
   if(online&&!snapshot&&!current.loading&&!current.attempted)void loadLocalConfiguration('hosts');
@@ -116,17 +116,18 @@
   if(text===item().draft){toast('No draft changes are needed.','info');return;}
   const base=item().draft;ui.pendingDraft={base,text};openModal(title,previewHTML(base,text)+'<p class="help-line">Apply this change to the draft? Undo remains available.</p>',button('cancel-modal','Cancel')+'<button type="button" class="btn primary" data-hosts-action="draft-confirm">Update draft</button>');
  }
- function updateFindCount(){const count=q('#hostsFindCount');if(count&&ui.findOpen)count.textContent=M.matches(item().draft,ui.find,ui.matchCase,ui.whole).length.toLocaleString()+' matches';}
+ function matchLabel(count){return count.toLocaleString()+(count===1?' match':' matches');}
+ function updateFindCount(){const count=q('#hostsFindCount');if(count&&ui.findOpen)count.textContent=matchLabel(M.matches(item().draft,ui.find,ui.matchCase,ui.whole).length);}
  function find(direction=1){
   const editor=q('#hostsSourceEditor');if(!editor)return;
   const found=M.matches(item().draft,ui.find,ui.matchCase,ui.whole),position=direction>0?editor.selectionEnd:editor.selectionStart;
   const match=direction>0?(found.find(x=>x.start>=position)||found[0]):([...(found)].reverse().find(x=>x.end<=position)||found[found.length-1]);
-  q('#hostsFindCount').textContent=found.length.toLocaleString()+' matches';if(!match)return;
+  q('#hostsFindCount').textContent=found.length.toLocaleString()+(found.length===1?' match':' matches');if(!match)return;
   editor.focus();editor.setSelectionRange(match.start,match.end);editor.scrollTop=Math.max(0,(item().draft.slice(0,match.start).split('\n').length-4)*20);q('#hostsLineNumbers').scrollTop=editor.scrollTop;
  }
  function replace(one){
   if(!editable()||!ui.find)return;
-  if(!one){const result=M.replaceAll(item().draft,ui.find,ui.replace,ui.matchCase,ui.whole);setDraft(result.text);toast(result.count+' matches replaced in the draft.','info');return;}
+  if(!one){const result=M.replaceAll(item().draft,ui.find,ui.replace,ui.matchCase,ui.whole);setDraft(result.text);toast(matchLabel(result.count)+' replaced in the draft.','info');return;}
   const editor=q('#hostsSourceEditor'),found=M.matches(item().draft,ui.find,ui.matchCase,ui.whole),match=found.find(x=>x.start>=editor.selectionStart)||found[0];if(!match)return;
   const text=item().draft.slice(0,match.start)+ui.replace+item().draft.slice(match.end);setDraft(text);const next=q('#hostsSourceEditor');next.focus();next.setSelectionRange(match.start+ui.replace.length,match.start+ui.replace.length);
  }
@@ -170,7 +171,7 @@
   try{switch(action){
    case'add':entryDialog();break;
    case'entry-commit':commitEntry();break;
-   case'cancel-modal':closeModal();break;
+   case'cancel-modal':imported=null;editBase=null;ui.pendingDraft=null;closeModal();break;
    case'undo':case'redo':travel(action);break;
    case'issues':ui.issues=!ui.issues;q('#hostsIssueButton').setAttribute('aria-expanded',ui.issues);renderIssues();break;
    case'enable':case'disable':setDraft(M.toggle(item().draft,ui.selected,action==='enable'));break;
@@ -210,7 +211,7 @@
   if(element.id==='hostsEntrySearch'){ui.query=element.value;ui.page=0;renderRows();return;}
   if(element.id==='hostsFind')ui.find=element.value;
   if(element.id==='hostsReplacement')ui.replace=element.value;
-  if(['hostsFind','hostsReplacement'].includes(element.id))q('#hostsFindCount').textContent=M.matches(item().draft,ui.find,ui.matchCase,ui.whole).length.toLocaleString()+' matches';
+  if(['hostsFind','hostsReplacement'].includes(element.id))q('#hostsFindCount').textContent=matchLabel(M.matches(item().draft,ui.find,ui.matchCase,ui.whole).length);
  });
  document.addEventListener('change',event=>{
   const e=event.target;

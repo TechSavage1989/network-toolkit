@@ -29,11 +29,23 @@ counts all rows and caps displayed issues at 200. Undo history is bounded to
 hosts-file limit. Exported text copies are not byte-for-byte original backups;
 original automatic backups remain under the existing protected save process.
 
-Validation is in progress. Thirty new model tests and all 422 JavaScript tests
-passed, along with root/desktop/terminal Go suites. Add the final build/browser
-results before completing this handoff. The hosted Checks workflow runs the
-new Hosts browser checks and produces a portable review artifact on this branch.
-Native Windows hosts-file save/elevation and actual runtime remain unverified.
+Local validation passed all 422 JavaScript tests (30 new Hosts model tests),
+31 Python packaging tests, root/desktop/terminal Go suites, release/resource
+validation, Windows x64 cross-build and portable/update packaging verification.
+Hosted Hosts browser interactions passed on fe9189c (Checks 40156261618):
+entry edits, aliases/comments, inactive/active/bulk changes, reviewed saving,
+operation locks, reload protection, literal find/replace, validation navigation,
+UTF-16 backup import, explicit export and paginated selection. Twenty rendered
+cases passed at five window sizes in both themes. The first run caught only a
+browser-added export extension; exports now use explicit hosts-draft.txt and
+hosts-loaded-copy.txt names. Subsequent polish excludes the source textarea
+from global one-click input clearing and supplies complete tab semantics.
+
+The review branch Checks workflow runs these Hosts browser checks plus the
+existing application regressions and provides a portable review artifact. Its
+latest terminal result is authoritative; include the final run link when handing
+this candidate to the user. Native Windows hosts-file save/elevation and actual
+runtime remain unverified. Publication still requires separate authorization.
 
 
 ## 1.17.66 published: concise review and faster detection
