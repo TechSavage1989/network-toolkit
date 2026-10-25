@@ -1,15 +1,50 @@
-NETWORK TOOLKIT 1.17.77 CANDIDATE VALIDATION
+NETWORK TOOLKIT 1.17.77 VALIDATION
 
 Client Setup and server Settings sidebar tabs are labelled Connect for SFTP,
-TFTP and FTP/FTPS. Internal tab keys, styles, settings, handlers and transfers
-are retained. No new tests are added for this small label change.
+TFTP and FTP/FTPS. Internal tab keys, matched styles, settings, disclosure
+behavior, handlers and transfers are retained, along with earlier editor/
+terminal/folder/credential/macro/SMTP functionality. No cosmetic unit tests
+were added for this small label change.
 
-Local validation passed 446 JavaScript tests, 31 Python release guards, required
-root/terminal/desktop Go suites, release/resource metadata, HTML/browser syntax
-and Windows x64 GUI build. Hosted checks, package/artifact verification,
-publication and live update staging are pending. Existing layout/style browser checks will cover
-the labels in their rendered views. Native Windows/WebView2, hardware and
-actual install/restart remain unverified. See the handoff for scope/authorization.
+Full review Checks 40175759939 passed on exact published source/tag
+690084bb8910ecbffb4c792e117ec609e0fd8af1: 446 JavaScript tests, 31 Python
+release guards, required root/terminal/desktop Go suites, Windows x64 GUI build/
+package and all browser steps.
+
+The server browser suite passes 90 existing layout cases plus 18 selected-tab
+cases across SFTP/TFTP/FTP, both themes and 570/820/1366px. All 54 normal/hover/
+keyboard-focus computed-style and rail-relative geometry comparisons match
+client mode. Connect labels remain on one line inside their buttons.
+Click/Enter/Space, saved state, adapter selection, pointer/keyboard resizing,
+persistence and viewport recovery pass. Server/client selected-tab screenshots
+were inspected; both show Connect with matching highlight, outline, spacing
+and height. No real server is started by these isolated UI/API fixtures.
+
+Existing Hosts/client/SMTP/folders/terminal/command-input/editor/install checks
+and seven native Chromium updater-timer scenarios pass, including the real
+five-minute poll/focus collision. Review artifact 12592580148 matches the local
+portable/EXE byte-for-byte. Main was promoted to the identical tested commit
+after explicit publication approval. Release 40176334534 succeeded. Main
+duplicate Checks 40176334533 passed its check job and server-style browser step.
+Completed review is full runtime validation; docs may supersede duplicate runs.
+
+OFFICIAL PUBLICATION VERIFICATION
+- All four actual public downloads match GitHub asset digests.
+- Outer/inner manifests, both ZIP CRCs and strict four-member updater allowlist.
+- Windows x64 GUI PE/version and standalone/portable/update EXE identity.
+- All 691 packaged source files match the exact published commit.
+- Official portable and EXE match the reviewed build byte-for-byte.
+- Sixteen older release IDs and asset IDs/sizes/digests remain unchanged.
+- Sixteen older source-tag SHAs match the prepublication snapshot.
+- Exact released76 handlers checked/downloaded/verified/staged live77 in 11.10s.
+- Staged bytes match the independently downloaded official EXE.
+- No installation/restart or original test executable change occurred.
+
+The live harness uses platform-independent production handlers, real HTTPS and
+isolated temporary settings. Native Windows/WebView2, hardware and actual
+install/restart remain unverified. See DEVELOPMENT_HANDOFF.md for exact hashes,
+provenance and limits. This final docs follow-up must not move tags, replace
+assets or republish the runtime.
 
 HISTORICAL PUBLISHED BASELINE
 

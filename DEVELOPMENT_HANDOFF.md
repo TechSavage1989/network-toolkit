@@ -1,6 +1,6 @@
 # Network Toolkit development handoff
 
-## 1.17.77 candidate: Connect labels in client and server sidebars
+## 1.17.77 published: Connect labels in client and server sidebars
 
 Prepared from main 6b32d2fadd9fd2f076309a3a379784a6b2e93590 after the user
 requested Setup/settings tabs in client/server mode be called Connect and
@@ -16,14 +16,64 @@ existing connection/transfer controls are retained. No handlers, server behavior
 credential storage or updater logic changes. Keep the 76 shared tab styles and
 all earlier editor/terminal/folder/macro/SMTP functionality.
 
-Go/UI/package/Windows resources are 1.17.77. No new tests are added for this
-small label change; run the existing required suites and real-page layout/style
-checks and inspect their Connect tab screenshots. Local validation passed
-446 JavaScript tests, 31 Python release guards, required root/terminal/desktop
-Go suites, release/resource metadata, HTML/browser syntax and Windows x64 GUI
-build. Hosted checks, package/artifact verification, publication and released76
-live staging are pending.
-Native Windows/WebView2, hardware and actual install/restart remain unverified.
+Go/UI/package/Windows resources are consistently 1.17.77. No cosmetic unit tests
+were added for this small label change. Local validation passed 446 JavaScript
+tests, 31 Python release guards, required root/terminal/desktop Go suites,
+release/resource metadata, HTML/browser syntax, Windows x64 GUI build and
+portable/update package verification.
+
+Full review Checks 40175759939 passed on exact published source/tag
+690084bb8910ecbffb4c792e117ec609e0fd8af1 (tree
+bee333bf1705795fd42294bcc062896ff8e6be3d). Both jobs succeeded. The server
+browser suite passes 90 existing layout cases plus 18 selected-tab cases across
+SFTP/TFTP/FTP, both themes and 570/820/1366px. All 54 normal/hover/keyboard-focus
+computed-style and rail-relative geometry comparisons match client mode.
+Connect labels stay on one line inside their buttons. Click/Enter/Space
+collapse/expand, saved state, adapter selection, pointer/keyboard resizing,
+persistence and viewport recovery pass. Inspected server/client selected-tab
+screenshots both show Connect with matching highlight, outline, spacing and
+height. These use isolated UI/API fixtures; no real server starts.
+
+Existing Hosts/client/SMTP/folders/terminal-dialog/command-input/editor/install
+browser checks pass, together with seven native Chromium updater-timer scenarios
+including the real five-minute poll/focus collision. Review artifact 12592580148
+matches the local portable and EXE byte-for-byte. Outer SHA-256:
+5558f149e5d5768986b0f1c32ad2ef3769ebe207f8cce9714e52fa0054147e43.
+Browser artifact 12593015019 digest and ZIP CRC pass; outer SHA-256:
+3db5c9e08f959ac5676cbd8c766abb2ae8fc6af99154e824888c2d8c96b88b3b.
+
+Main was fast-forwarded to that identical tested commit using expected old SHA
+6b32d2fadd9fd2f076309a3a379784a6b2e93590 without force. No code or docs changed
+between full review and promotion. Release 40176334534 succeeded and created
+stable release 423249789. Main duplicate Checks 40176334533 passed its check
+job and server-style browser step. Completed review above remains full runtime
+validation; this documentation may supersede automatic duplicate runs.
+
+All four actual public downloads match GitHub asset digests. Outer/inner SHA-256
+manifests, both ZIP CRCs, strict four-member updater allowlist, Windows x64 GUI
+PE/version and standalone/portable/update EXE identity pass. All 691 packaged
+source files match the exact published commit. Official portable and EXE match
+the reviewed build byte-for-byte. All sixteen earlier release IDs and asset
+IDs/sizes/digests remain unchanged, with all sixteen older source-tag SHAs
+preserved. Verification snapshots and raw logs are retained with local QA.
+
+The unchanged released 1.17.76 production feed handlers checked the live feed,
+verified/downloaded/staged 1.17.77 in 11.10 seconds. Staged bytes match the
+independently downloaded official EXE. The harness used real HTTPS, isolated
+temporary settings and only platform-independent feed handlers. No installation
+or restart occurred and its original test executable hash remained unchanged.
+
+Official release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.77
+EXE SHA-256: 8aab091415e580940c2e4a209ad99f1a611b12f174a1758214a271c7d1f7ac3c
+Portable ZIP SHA-256: 24fe857dbe765f778247c3070193342653dc49418b6115f7c3281d1d0f2f9012
+Update ZIP SHA-256: e8faa994885796f9f995d696beac843cc9ba742c8388e0701e4d440e18b16bc8
+SHA256SUMS file SHA-256: 4f57940bfcda7f3a83ba93a52d0070c4dc1228e78b0ae0d752ad12888b7caa25
+
+This final publication record changes only AGENTS.md, this handoff and
+VALIDATION.txt. Do not move the released 77 source tag, replace assets or
+republish it. Continue future work from latest main. Native Windows/WebView2,
+hardware and actual installation/restart remain unverified here; browser
+fixtures and live-feed staging are not native Windows execution proof.
 
 ## 1.17.76 published: match selected server and client sidebar tabs
 
