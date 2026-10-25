@@ -1,11 +1,13 @@
 # Network Toolkit development handoff
 
-## 1.17.68 candidate: Hosts filter text clipping
+## 1.17.68 Hosts filter text clipping: publication approved
 
 Prepared from exact main 99ff403c866953706290e312c425a58429f9567e after the
-user reported clipped text in the Hosts Entries status dropdown. Published
-1.17.67 remains unchanged. This review build is on review/hosts-editor-1.17.68;
-the prior publication approval specifically covered 1.17.67.
+user reported clipped text in the Hosts Entries status dropdown. The completed
+review build on review/hosts-editor-1.17.68 was delivered and the user approved
+public source upload and publication on 2026-10-24. This approval covers only
+the new 1.17.68 release; preserve all earlier tags, releases and assets. The main
+network-toolkit repository remains the only source/update destination.
 
 The 32-pixel selector inherited 9-pixel vertical padding and a 1.5 line height,
 leaving only 12 pixels for 16.5-pixel text. hosts-editor.css now supplies compact
@@ -20,15 +22,29 @@ font/line height and all four status labels' widths, with space reserved for
 the native arrow. It reproduces the released padding defect as a negative
 control. Existing twenty responsive light/dark cases remain; additional
 light/dark pages cover device scales 1, 1.25, 1.5 and 2. Toolbar screenshots
-show the longest label at each scale. Read the latest review-branch Checks
-result before claiming hosted success. Native Windows/WebView2 remains
-unverified; browser/DPI results are Chromium coverage, not Windows runtime.
+show the longest label at each scale. Final review source
+9fe18dfff0a3fc37b116807be2601361858a9d6b passed Checks 40158776871, including
+all required Go suites, 422 JavaScript tests, 31 Python guards, twenty responsive
+cases, four status labels, all four device scales in both themes, existing
+client/server checks and all seven native update-timer scenarios. The actual
+five-minute poll passed. Inspected normal/light and 150-percent/dark toolbar
+screenshots show the complete longest label; the 390-pixel layout is readable.
+The downloaded review artifact 12584858650 matches the verified local portable
+byte-for-byte. Its SHA-256 is
+4b7cb87393194bf9188fe49f902148d994601b4cbdc70a73b8708c51af5352a0.
+Native Windows/WebView2 remains unverified; browser/DPI results are Chromium
+coverage, not Windows runtime.
 
 Version metadata and compile-time Windows resources are 1.17.68. The existing
 review-branch workflow supplies a Windows x64 portable source/build artifact.
 Local release/resource validation, browser-script syntax, thirty Hosts model
 tests and the Windows x64 GUI cross-build passed before source upload.
-Do not overwrite released 1.17.67; publish 1.17.68 only when authorized.
+Publication preparation changes only AGENTS.md, this handoff and VALIDATION.txt
+from the tested source. Run the established main-push workflow, then verify
+its terminal result, release tag, all four actual public downloads, complete
+source provenance and the live unchanged released67 check/download/stage path.
+Record final evidence in a documentation follow-up without changing released
+runtime code, replacing old assets or republishing 1.17.68.
 
 ## 1.17.67 published: expanded Hosts editor
 

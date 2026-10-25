@@ -5,20 +5,16 @@ main and preserve existing changes. Update the handoff whenever behavior,
 release destination, validation, known issues or next steps change, so a new
 chat can continue accurately. Follow repository checks and release safeguards.
 
-Current release: 1.17.67 expanded Hosts editor.
-Read the first 1.17.67 handoff section and validation limits. Preserve all earlier
+Current work: 1.17.68 Hosts selector text fix, approved for publication.
+Read the first 1.17.68 handoff section and validation limits. Preserve all earlier
 features and release assets. Main pushes publish new versions automatically;
-the user authorized this specific 67 source upload and publication, not unrelated
+the user authorized this specific 68 source upload and publication, not unrelated
 future releases. The updater/release destination is main network-toolkit only.
 Never overwrite older releases or change repository access.
 
-Published source/tag: c88448fd1b4e2290b5614e35f8485968c5786413.
-The user approved publication on 2026-10-24. Release 40157685254 passed;
-all official downloads and the released66 live updater path are verified.
-Main source Checks 40157685265 passed, including the real five-minute timer.
-The documentation follow-up must not republish or change the released runtime.
-Native Windows execution, hosts elevation and installation remain unverified.
-
-Candidate: 1.17.68 corrects compact Hosts selector text clipping on
-review/hosts-editor-1.17.68. Read the first handoff section and its validation
-record. Prepare the review build without replacing or republishing 1.17.67.
+Reviewed source: 9fe18dfff0a3fc37b116807be2601361858a9d6b.
+Checks 40158776871 passed, including compact-field text/DPI checks and the real
+five-minute update timer. The user approved publication on 2026-10-24.
+Verify the main workflows, all official assets and the live released67 updater
+path before recording publication as complete. Native Windows execution,
+hosts elevation and installation remain unverified.
