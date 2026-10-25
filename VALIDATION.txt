@@ -1,19 +1,31 @@
-NETWORK TOOLKIT 1.17.66 CANDIDATE VALIDATION
+NETWORK TOOLKIT 1.17.66 RELEASE VALIDATION
 
 Prepared from main ed078e0bced8a4d0dbc86a7bcaf9532795cc9da6.
 Local checks passed: 392 JavaScript tests, 31 Python tests, root/terminal/desktop
 Go suites, focused updater race tests, release/resource validation and Windows
 x64 GUI cross-build. Independent scoped review cleared the change.
-User authorized public upload and publication after hosted checks pass. No
-publication has been performed yet.
+User authorized public source upload and publication after hosted checks pass.
+Hosted review Checks 40149250883 and main Checks 40149810832 both passed.
+Release 40149810863 published source/tag de0a635eb0a3270c69e3c704beab1ea1001b55af.
+Verified all four downloaded hosted hashes, outer/inner manifests, both ZIP CRCs,
+four-member updater allowlist, PE/version and standalone/ZIP EXE identity.
+All 665 source files match reviewed tree 45547eaa2635ffafa65287338269a827ee6404f6.
+Exact released65 production check/download/stage of live66 passed in 11.21s;
+no installation or modification of the original running executable occurred.
+The 65 source tag and every old release asset ID/digest remain unchanged.
 JavaScript tests include five-minute scheduling, focus freshness, simultaneous
 wake events, offline/hidden pause, opt-out, server cooldown, cached release
 retention, concise install copy and preserved explicit confirmation.
 Browser regression coverage includes narrow/medium/wide install review,
-cancel/reopen, five-minute/focus checks, and native timer checks, including a real five-minute poll/focus collision.
+cancel/reopen, five-minute/focus checks, and native timer checks, including a
+real five-minute poll/focus collision.
 Local Chromium failed to launch because sockets are blocked by the sandbox;
 an approved unsandboxed attempt failed during environment setup. No local
-browser result or screenshots are claimed. Hosted CI remains pending.
+browser result is claimed. Hosted Chromium tests passed, including the
+actual five-minute poll (300,075.68ms) and focus collision with max concurrency 1.
+All seven native scenarios passed without fake clocks or timer replacement.
+Inspected hosted screenshots at 390/1280px show concise warning/confirmation,
+additional-only Read more, and one badge for equal installed/release versions.
 Native Windows/WebView2, installation and restart remain untested here.
 
 HISTORICAL 1.17.65 RELEASE VALIDATION FOLLOWS

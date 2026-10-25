@@ -1,10 +1,10 @@
 # Network Toolkit development handoff
 
-## 1.17.66 candidate: concise review and faster detection
+## 1.17.66 published: concise review and faster detection
 
 Prepared from exact main ed078e0bced8a4d0dbc86a7bcaf9532795cc9da6, including
-the final 65 documentation. The user approved public source upload, hosted checks and publication after
-those checks pass on 2026-10-25. The install
+the final 65 documentation. The user approved public source upload, hosted
+checks and publication after those checks pass on 2026-10-25. The install
 review removes only its long explanatory paragraph and replaces the large
 warning with "Save your work before restarting." Notes/version badges, explicit
 confirmation, error messages and all active-operation guards remain. Full
@@ -27,14 +27,31 @@ introduced. Installer, staging, cleanup and restart behavior are unchanged.
 
 Local validation passed: 392 JavaScript tests, 31 Python tests, root/terminal/
 desktop Go tests, focused updater race tests, release/resource validation and
-Windows x64 GUI cross-build. Independent review cleared the changes. Local browser launch is
-blocked by the executor sandbox. Hosted browser CI and independent review are
-required before publication. Native Windows/WebView2 and real installation have
-not been tested here.
+Windows x64 GUI cross-build. Independent review cleared the changes.
+Local browser launch was
+blocked by the executor sandbox. Hosted review Checks 40149250883 and main
+Checks 40149810832 both passed. The inspected 390/1280px screenshots show the
+short warning, explicit confirmation, additional-only Read more and single badge
+for equal versions. Seven native Chromium scenarios passed without replacing
+native timers; the actual periodic check ran after 300,075.68 ms and never
+exceeded one in-flight request. Native Windows/WebView2 and real installation
+have not been tested here; user runtime confirmation remains pending.
+
+Release 40149810863 published v1.17.66 at source/tag
+de0a635eb0a3270c69e3c704beab1ea1001b55af (tree
+45547eaa2635ffafa65287338269a827ee6404f6). All four downloaded official assets
+passed their hosted SHA-256 values, outer/inner manifests, both ZIP CRCs,
+strict four-member updater validation, PE/version validation and EXE identity.
+All 665 source files match the reviewed tree. The exact released 65 production
+handlers checked the live main feed, verified/downloaded/staged 66 in 11.21
+seconds without installing or modifying the original executable. Its raw result
+log is retained alongside the verification records. The 65 tag and all its asset IDs
+and digests remain unchanged. This final documentation commit changes no runtime
+code and must not republish or alter the released 66 tag/assets.
 
 ## Published 1.17.65 baseline
 
-Current released version: **1.17.65**, source/tag
+Previous released version: **1.17.65**, source/tag
 97a0b4c3902e10acc11b1c78715e1ab7ba5de6c4 (tree
 445b2b768df738dd5fb9fbaf33e8f2da4e3fe320), built from exact prior public main
 f4754d11a9df4d93c7028a1a65b20536921dc9ef. The user approved this narrow timer
