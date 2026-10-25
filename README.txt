@@ -1,7 +1,14 @@
-NETWORK TOOLKIT 1.17.73
+NETWORK TOOLKIT 1.17.74
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.73
+CURRENT RELEASE - 1.17.74
+
+Terminal connection setup returns to the original centered window. Choose SSH,
+Telnet or Serial from a new tab, or New in Saved. The Setup sidebar tab and
+Connection settings panel are removed. Saved profiles, folders, credentials,
+macros and existing terminal sessions are retained.
+
+PREVIOUS RELEASE - 1.17.73
 
 The terminal command input no longer shows horizontal or vertical scrollbar
 tracks, including expanded multiline input. Typing, caret movement, keyboard

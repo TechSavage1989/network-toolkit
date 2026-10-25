@@ -82,22 +82,3 @@
 .terminal-sidebar-side-button svg{width:14px;height:14px;}
 .terminal-workspace-columns.sidebar-left .terminal-sidebar-rail{order:0;border-right:1px solid var(--line);border-left:0;}
 .terminal-workspace-columns.sidebar-left .terminal-window .terminal-session-sidebar{border-right:1px solid var(--line);border-left:0;}
-
-/* Shared connection form inside the first sidebar tab. */
-.terminal-sidebar-connection{padding:10px;gap:10px;}
-.terminal-sidebar-connection .terminal-connect-form{min-width:0;width:100%;}
-.terminal-sidebar-connection .connect-grid{grid-template-columns:minmax(0,1fr)!important;gap:9px;}
-.terminal-sidebar-connection .field,.terminal-sidebar-connection .full-width{min-width:0;max-width:100%;grid-column:1/-1;}
-.terminal-sidebar-connection .field>.row{flex-wrap:wrap;gap:5px;}
-.terminal-sidebar-connection .field>.row>input{flex:1 1 100%;min-width:0;}
-.terminal-sidebar-connection input,.terminal-sidebar-connection select,.terminal-sidebar-connection textarea{min-width:0;max-width:100%;width:100%;font-size:11px;}
-.terminal-sidebar-connection textarea{min-height:100px;resize:vertical;}
-.terminal-sidebar-connection .row{flex-wrap:wrap;min-width:0;gap:5px;}
-.terminal-sidebar-connection .row .btn{white-space:normal;overflow-wrap:anywhere;}
-.terminal-sidebar-connection .hint,.terminal-sidebar-connection .help-line,.terminal-sidebar-connection .terminal-profile-note{font-size:10px;line-height:1.5;overflow-wrap:anywhere;}
-.terminal-sidebar-connection .notice{padding:8px;font-size:10px;}
-.terminal-sidebar-connection .form-divider{margin-top:10px;padding-top:10px;}
-.terminal-inline-connect-actions{display:flex;flex-wrap:wrap;gap:6px;flex:0 0 auto;}
-.terminal-inline-connect-actions .btn{flex:1 1 auto;white-space:normal;}
-.terminal-sidebar-connection #terminalConnectError{overflow-wrap:anywhere;}
-.terminal-sidebar-connection input[type="checkbox"]{width:auto;}

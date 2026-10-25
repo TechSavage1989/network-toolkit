@@ -102,6 +102,11 @@ jobs:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
         run: node scripts/terminal-commandbar.browser.cjs
+      - name: Check restored terminal connection dialog and sidebar
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
+        run: node scripts/terminal-connection-dialog.browser.cjs
       - name: Check automatic update startup and release notes
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright

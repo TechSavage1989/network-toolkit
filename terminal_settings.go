@@ -25,7 +25,7 @@ func sanitizeTerminalSettings(state map[string]any) {
 	}
 	if value, present := state["terminalSidebarTab"]; present {
 		tab, _ := value.(string)
-		if tab != "settings" && tab != "saved" && tab != "recent" && tab != "macros" && tab != "files" {
+		if tab != "saved" && tab != "recent" && tab != "macros" && tab != "files" {
 			tab = "saved"
 		}
 		state["terminalSidebarTab"] = tab

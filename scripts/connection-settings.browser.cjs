@@ -15,8 +15,8 @@ async function main(){
  await page.goto(url);await page.waitForFunction(()=>window.__networkToolkitStartupState===1&&online);
  const sftpPort=await port(),ftpPort=await port();
  const statuses={};for(const protocol of ['sftp','ftp'])statuses[protocol]=await page.evaluate(async({protocol,port,share})=>api('/transfer/server','POST',{action:'start',protocol,root:share,bind:'127.0.0.1',port,access:'readwrite',overwrite:true,username:'operator',password:'updated-fixture-'+protocol,security:'explicit'}),{protocol,port:protocol==='sftp'?sftpPort:ftpPort,share});
- await navigate('terminal');await page.locator('#terminalSidebarTabConnection').click();await page.locator('#terminalConnectForm').waitFor({state:'visible'});
- assert.equal(await page.locator('[data-session-tab]').first().getAttribute('data-session-tab'),'settings');assert.equal(await page.locator('#terminalSidebarVisibilityToggle,[data-session-action="collapse"]').count(),0);
+ await navigate('terminal');await page.locator('[data-session-action="new"]').click();await page.locator('.modal #terminalConnectForm').waitFor({state:'visible'});
+ assert.equal(await page.locator('[data-session-tab]').first().getAttribute('data-session-tab'),'saved');assert.equal(await page.locator('#terminalSidebarTabConnection,#terminalSidebarConnection').count(),0);assert.equal(await page.locator('#terminalSidebarVisibilityToggle,[data-session-action="collapse"]').count(),0);
  await page.evaluate(()=>globalThis.__originalTerminalGrid=document.querySelector('#terminalPaneGrid'));
  await page.locator('#con-host').fill('127.0.0.1');await page.locator('#con-port').fill(String(sftpPort));await page.locator('#con-username').fill('operator');await page.locator('#terminalProfileName').fill('Shared SSH profile');await page.locator('#terminalPassword').fill('initial-fixture-sftp');
  await page.locator('[data-terminal-action="save-profile"]').click();const sshProfile=await page.evaluate(()=>terminalProfileID);
@@ -25,22 +25,24 @@ async function main(){
  await page.locator('#terminalPassword').fill('updated-fixture-sftp');await page.locator('[data-credential-action="save-current"]').click();
  await page.waitForFunction(async id=>(await api('/credentials/'+id)).secret==='updated-fixture-sftp',sshCredential);
  assert.equal(await page.evaluate(id=>state.terminalProfiles.find(row=>row.id===id).credentialId,sshProfile),sshCredential);
- // Active tab toggles, selecting another tab opens it, and the editor draft
- // and terminal panes remain the same DOM nodes.
- await page.locator('#terminalSidebarTabConnection').click();assert.equal(await page.locator('#terminalSidebarContent').isVisible(),false);
- await page.locator('#terminalSidebarTabConnection').click();assert.equal(await page.locator('#terminalPassword').inputValue(),'updated-fixture-sftp');
- await page.locator('#terminalSidebarTabSaved').click();await page.locator('#terminalSidebarTabRecent').click();await page.locator('#terminalSidebarTabConnection').click();
+ // The original connection modal keeps the terminal panes mounted. Closing
+ // it removes secrets, and reopening a saved profile retains its vault link.
+ await page.locator('.modal-foot [data-action="close-modal"]').click();
+ await page.locator('#terminalSidebarTabSaved').click();assert.equal(await page.locator('#terminalSidebarContent').isVisible(),false);
+ await page.locator('#terminalSidebarTabSaved').click();await page.locator('#terminalSidebarTabRecent').click();await page.locator('#terminalSidebarTabSaved').click();
+ await page.evaluate(id=>openTerminalConnect(state.terminalProfiles.find(row=>row.id===id),id),sshProfile);
  assert.equal(await page.evaluate(()=>globalThis.__originalTerminalGrid===document.querySelector('#terminalPaneGrid')),true);
- assert.equal(await page.locator('#terminalProfileName').inputValue(),'Shared SSH profile');
+ assert.equal(await page.locator('#terminalProfileName').inputValue(),'Shared SSH profile');assert.equal(await page.locator('#terminalPassword').inputValue(),'');
  // Full connection controls remain contained at several sizes and both docks.
  const rendered=[];
  for(const viewport of [{width:1600,height:1000},{width:1000,height:768},{width:820,height:620},{width:570,height:720}])for(const side of ['left','right']){
   await page.setViewportSize(viewport);await page.evaluate(side=>{state.terminalSidebarSide=side;NetworkToolkitSessionSidebar.render();},side);
-  const layout=await page.evaluate(()=>{const panel=document.querySelector('#terminalSidebarConnection');return {viewportOverflow:document.documentElement.scrollWidth>innerWidth+1,fields:[...panel.querySelectorAll('input:not([hidden]),select,textarea,button')].filter(el=>el.getClientRects().length).map(el=>{const b=el.getBoundingClientRect(),parent=el.parentElement.getBoundingClientRect();return {id:el.id,left:b.left,right:b.right,parentLeft:parent.left,parentRight:parent.right};})};});
+  const layout=await page.evaluate(()=>{const panel=document.querySelector('.modal');return {viewportOverflow:document.documentElement.scrollWidth>innerWidth+1,fields:[...panel.querySelectorAll('input:not([hidden]),select,textarea,button')].filter(el=>el.getClientRects().length).map(el=>{const b=el.getBoundingClientRect(),parent=el.parentElement.getBoundingClientRect();return {id:el.id,left:b.left,right:b.right,parentLeft:parent.left,parentRight:parent.right};})};});
   assert.equal(layout.viewportOverflow,false);for(const field of layout.fields)assert.ok(field.left>=field.parentLeft-2&&field.right<=field.parentRight+2,'terminal field leaves parent: '+JSON.stringify(field));rendered.push({viewport,side});
  }
- await page.setViewportSize({width:1600,height:1000});await page.screenshot({path:path.join(output,'terminal-connection-settings.png')});
+ await page.setViewportSize({width:1600,height:1000});await page.screenshot({path:path.join(output,'terminal-connection-dialog.png')});
  // SFTP reuses the profile and credential created in Terminal.
+ await page.locator('.modal-foot [data-action="close-modal"]').click();
  await page.evaluate(()=>{state.transferModes={...state.transferModes,sftp:'client'};});await navigate('sftp');assert.equal(await page.locator('#terminalConnectForm').count(),0);
  await page.locator('[data-rb-setting="host"]').fill('127.0.0.1');await page.locator('[data-rb-setting="port"]').fill(String(sftpPort));await page.locator('[data-rb-setting="fingerprint"]').fill(statuses.sftp.fingerprint);
  await page.locator('[data-rb-connection-source]').selectOption('profile:'+sshProfile);await page.locator('[data-rb-action="selectSource"]').click();
@@ -61,10 +63,9 @@ async function main(){
  await page.waitForFunction(async id=>(await api('/credentials/'+id)).secret==='third-fixture-sftp',sshCredential);
  assert.equal(await page.evaluate(()=>NetworkToolkitRemoteBrowser.get('ssh').profileId),sshProfile);
  assert.equal(await page.evaluate(id=>state.terminalProfiles.find(row=>row.id===id).credentialId,sshProfile),sshCredential);
- // A profile editor opened from the file client and the restored Terminal
- // settings share one set of form IDs.
+ // Profile editing from the file client and Terminal uses one modal form.
  await page.evaluate(id=>openTerminalConnect(state.terminalProfiles.find(row=>row.id===id),id),sshProfile);assert.equal(await page.locator('#terminalConnectForm').count(),1);await page.locator('[data-action="close-modal"]').first().click();
- await navigate('terminal');assert.equal(await page.locator('#terminalConnectForm').count(),1);assert.equal(await page.locator('#terminalCredentialId').inputValue(),sshCredential);
+ await navigate('terminal');assert.equal(await page.locator('#terminalConnectForm').count(),0);await page.evaluate(id=>openTerminalConnect(state.terminalProfiles.find(row=>row.id===id),id),sshProfile);assert.equal(await page.locator('#terminalConnectForm').count(),1);assert.equal(await page.locator('#terminalCredentialId').inputValue(),sshCredential);
  const terminalRequests=[];page.on('request',request=>{if(request.url().endsWith('/api/terminals')&&request.method()==='POST')terminalRequests.push(request.postDataJSON());});
  await page.locator('#terminalConnectButton').click();await page.waitForFunction(()=>[...terminalSessions.values()].length>0);assert.equal(terminalRequests.at(-1)?.password,'third-fixture-sftp');
  // FTP uses the same create/update flow and then authenticates with it.
@@ -98,7 +99,7 @@ async function main(){
  await stop();url=await start();await page.goto(url);await page.waitForFunction(()=>window.__networkToolkitStartupState===1&&online);saved=await page.evaluate(()=>api('/state'));
  assert.equal(saved.terminalProfiles.find(row=>row.id===sshProfile).credentialId,sshCredential);assert.equal(saved.ftpProfiles.find(row=>row.id===ftpProfile).credentialId,ftpCredential);
  const secrets=await page.evaluate(async({sshCredential,ftpCredential})=>({ssh:(await api('/credentials/'+sshCredential)).secret,ftp:(await api('/credentials/'+ftpCredential)).secret}),{sshCredential,ftpCredential});assert.equal(secrets.ssh,'third-fixture-sftp');assert.equal(secrets.ftp,'updated-fixture-ftp');
- await navigate('terminal');await page.evaluate(()=>NetworkToolkitSessionSidebar.activateTab('settings'));await page.locator('#terminalConnectProfileSelect').selectOption(sshProfile);assert.equal(await page.locator('#terminalCredentialId').inputValue(),sshCredential);
+ await navigate('terminal');await page.locator('[data-session-action="new"]').click();await page.locator('#terminalConnectProfileSelect').selectOption(sshProfile);assert.equal(await page.locator('#terminalCredentialId').inputValue(),sshCredential);
  assert.deepEqual(errors,[]);fs.writeFileSync(path.join(output,'connection-settings-results.json'),JSON.stringify({passed:true,terminalCredentialCreateUpdate:true,sftpSharedProfileUpdate:true,ftpCredentialCreateUpdate:true,sftpKeyCredentialCreate:true,ftpFiltersSshKeys:true,ownedToolbarDisconnectReconnect:true,sftpOnlyTerminalFailureSafe:true,ftpLogin:true,terminalUsesUpdatedSftpCredential:true,applicationRestartPersistence:true,tabToggling:true,singleConnectionForm:true,renderedCases:rendered.length,errors},null,2));
  console.log(JSON.stringify({passed:true,renderedCases:rendered.length,credentialCreateUpdate:true,sharedSshProfile:true,ftpLogin:true,restartPersistence:true,errors}));
 }

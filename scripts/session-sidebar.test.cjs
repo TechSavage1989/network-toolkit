@@ -71,12 +71,12 @@ test('selected tabs toggle sidebar content without separate visibility buttons',
  const h=harness(),saved=h.document.getElementById('terminalSidebarTabSaved');
  assert.equal(h.document.getElementById('terminalSidebarVisibilityToggle'),null);
  assert.equal(h.document.querySelectorAll('[data-session-action="collapse"]').length,0);
- assert.equal(h.document.querySelector('[data-session-tab]').dataset.sessionTab,'settings');
+ assert.equal(h.document.querySelector('[data-session-tab]').dataset.sessionTab,'saved');
  h.document.emit('click',saved);assert(h.state.terminalSidebarCollapsed);assert.equal(saved.getAttribute('aria-expanded'),'false');
  h.document.emit('click',saved);assert(!h.state.terminalSidebarCollapsed);assert.equal(saved.getAttribute('aria-expanded'),'true');
- h.document.emit('click',h.document.getElementById('terminalSidebarTabConnection'));assert(!h.state.terminalSidebarCollapsed);assert.equal(h.api.activeTab(),'settings');assert(!h.document.getElementById('terminalSidebarConnection').hidden);
- h.document.emit('keydown',h.document.getElementById('terminalSidebarTabConnection'),{key:' '});assert(h.state.terminalSidebarCollapsed);
- h.document.emit('keydown',h.document.getElementById('terminalSidebarTabConnection'),{key:'Enter'});assert(!h.state.terminalSidebarCollapsed);
+ h.document.emit('click',h.document.getElementById('terminalSidebarTabRecent'));assert(!h.state.terminalSidebarCollapsed);assert.equal(h.api.activeTab(),'recent');assert(!h.document.getElementById('terminalSidebarRecent').hidden);
+ h.document.emit('keydown',h.document.getElementById('terminalSidebarTabRecent'),{key:' '});assert(h.state.terminalSidebarCollapsed);
+ h.document.emit('keydown',h.document.getElementById('terminalSidebarTabRecent'),{key:'Enter'});assert(!h.state.terminalSidebarCollapsed);
  assert.equal(h.document.getElementById('existingConsole').textContent,'Retained transcript');
 });
 test('terminal sidebar drag resizing is bounded and double-click restores its previous width',()=>{
@@ -129,17 +129,17 @@ test('collapsing retains the vertical rail and clicking any tab reopens the chos
  h.api.setCollapsed(true);h.api.activateTab('saved',{expand:false});assert(h.state.terminalSidebarCollapsed);assert.equal(h.api.activeTab(),'saved');assert.equal(h.document.getElementById('terminalSidebarTabSaved').getAttribute('aria-selected'),'true');
 });
 test('programmatic tab activation expands without toggling an open tab',()=>{
- const h=harness();h.api.activateTab('settings');h.api.activateTab('settings');assert(!h.state.terminalSidebarCollapsed);
- h.api.setCollapsed(true);h.api.activateTab('settings');assert(!h.state.terminalSidebarCollapsed);
- assert.equal(h.api.activeTab(),'settings');assert.equal(h.api.displayPreferences().terminalSidebarTab,'settings');
- h.api.preferences(h.api.displayPreferences());assert.equal(h.api.activeTab(),'settings');
+ const h=harness();h.api.activateTab('saved');h.api.activateTab('saved');assert(!h.state.terminalSidebarCollapsed);
+ h.api.setCollapsed(true);h.api.activateTab('saved');assert(!h.state.terminalSidebarCollapsed);
+ assert.equal(h.api.activeTab(),'saved');assert.equal(h.api.displayPreferences().terminalSidebarTab,'saved');
+ h.api.preferences(h.api.displayPreferences());assert.equal(h.api.activeTab(),'saved');
 });
 test('vertical tabs support roving keyboard focus and persist the selected tab',()=>{
  const h=harness(),saved=h.document.getElementById('terminalSidebarTabSaved'),recent=h.document.getElementById('terminalSidebarTabRecent'),macros=h.document.getElementById('terminalSidebarTabMacros');
  h.document.emit('keydown',saved,{key:'ArrowDown'});assert.equal(h.api.activeTab(),'recent');assert.equal(h.document.activeElement,recent);assert.equal(recent.tabIndex,0);assert.equal(saved.tabIndex,-1);
  h.document.emit('keydown',recent,{key:'End'});assert.equal(h.api.activeTab(),'macros');assert.equal(h.document.activeElement,macros);
  h.document.emit('keydown',macros,{key:'ArrowUp'});assert.equal(h.api.activeTab(),'recent');
- h.document.emit('keydown',recent,{key:'Home'});assert.equal(h.api.activeTab(),'settings');
+ h.document.emit('keydown',recent,{key:'Home'});assert.equal(h.api.activeTab(),'saved');
  h.api.setCollapsed(true);h.document.emit('keydown',saved,{key:'Enter'});assert(!h.state.terminalSidebarCollapsed);
  h.api.activateTab('macros');h.api.setCollapsed(true);const persisted=JSON.parse(JSON.stringify(h.api.displayPreferences())),restored=harness({preferences:persisted});assert.equal(restored.api.activeTab(),'macros');assert(restored.state.terminalSidebarCollapsed);assert(restored.document.getElementById('terminalSidebarContent').hidden);
  restored.api.preferences({terminalSidebarTab:'invalid'});assert.equal(restored.api.activeTab(),'saved');assert(!restored.state.terminalSidebarCollapsed);
@@ -154,7 +154,7 @@ test('sidebar change events describe only actual changes and tolerate macro UI s
 test('a restricted detached pane keeps Macros available while session tabs stay unavailable',async()=>{
  const h=harness({flags:{DETACHED_TERMINAL:true,DETACHED_WORKSPACE:false},preferences:{terminalSidebarTab:'saved'}}),sidebar=h.document.getElementById('terminalSessionSidebar');
  assert(sidebar);assert.equal(h.api.activeTab(),'macros');assert(!h.document.getElementById('terminalSidebarMacros').hidden);
- for(const name of ['Connection','Saved','Recent']){const tab=h.document.getElementById('terminalSidebarTab'+name);assert(tab.hidden);assert(tab.disabled);assert(h.document.getElementById('terminalSidebar'+name).hidden);}
+ for(const name of ['Saved','Recent']){const tab=h.document.getElementById('terminalSidebarTab'+name);assert(tab.hidden);assert(tab.disabled);assert(h.document.getElementById('terminalSidebar'+name).hidden);}
  assert.equal(h.api.activateTab('saved'),false);assert.equal(h.api.activeTab(),'macros');
  h.api.setCollapsed(true);h.document.emit('keydown',h.document.getElementById('terminalSidebarTabMacros'),{key:'Home'});assert(!h.state.terminalSidebarCollapsed);assert.equal(h.api.activeTab(),'macros');
  h.state.terminalProfiles=[stored()];await h.api.open(h.api.token('saved','saved-one'));assert(!h.calls.some(call=>call[0]==='request'||call[0]==='edit'));
@@ -230,4 +230,12 @@ test('SFTP file browser sidebar tab appears dynamically for supported active SSH
  entry.info.state='closed';h.api.render();
  assert.equal(tab.hidden,true);assert(panel.hidden);assert.equal(h.api.activeTab(),'saved');
  entry.info.state='connected';entry.info.type='telnet';h.api.render();assert(tab.hidden);
+});
+
+test('removed Setup preferences fall back to Saved without reopening connection settings',()=>{
+ const h=harness({preferences:{terminalSidebarTab:'settings',terminalSidebarSide:'left',terminalSidebarWidth:372,terminalSidebarCollapsed:true}});
+ assert.equal(h.api.activeTab(),'saved');assert.equal(h.api.displayPreferences().terminalSidebarTab,'saved');
+ assert.equal(h.document.getElementById('terminalSidebarTabConnection'),null);assert.equal(h.document.getElementById('terminalSidebarConnection'),null);
+ assert.equal(h.api.activateTab('settings'),false);assert.equal(h.state.terminalSidebarSide,'left');assert.equal(h.state.terminalSidebarWidth,372);assert(h.state.terminalSidebarCollapsed);
+ assert(!h.calls.some(call=>call[0]==='edit'||call[0]==='request'));h.api.preferences({terminalSidebarTab:'settings'});assert.equal(h.api.activeTab(),'saved');
 });

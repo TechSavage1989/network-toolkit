@@ -1,0 +1,11 @@
+Network Toolkit 1.17.74
+
+What's new
+- Restore Terminal's original connection window for SSH, Telnet and Serial.
+- Remove the Setup tab and Connection settings panel from the Terminal sidebar.
+
+New connections and saved-profile edits use the centered dialog again, with
+its normal two-column layout and compact-window layout. Saved profiles,
+folders, protected credentials, macros and existing sessions are retained.
+A saved selection of the removed Setup tab returns to Saved automatically.
+The terminal command input continues to hide scrollbar tracks.

@@ -51,6 +51,7 @@ const profile=(id,name,extra={})=>({id,name,type:'ssh',host:id+'.test',port:22,u
   assert.equal(await page.locator('#terminalProfileFolder').inputValue(),'Branch');await page.fill('#con-host','edited-core.test');await page.locator('[data-terminal-action="save-profile"]').click();
   assert.equal(await page.evaluate(()=>state.terminalProfiles.find(row=>row.id==='core').folder),'Branch');
   assert.equal(await page.evaluate(()=>state.terminalProfiles.find(row=>row.id==='core').credentialId),'vault-reference');
+  await page.locator('.modal-foot [data-action="close-modal"]').click();
   await page.evaluate(()=>NetworkToolkitSessionSidebar.activateTab('recent'));assert.equal(await page.locator('#sessionFolderFilterGroup').isVisible(),false);
   await page.locator('[data-session-id="recent"] [data-session-entry]').click({button:'right'});await page.locator('[data-session-menu="save"]').click();
   await page.fill('#sessionLibraryName','Saved recent');await page.fill('#sessionLibrarySaveFolder','New site');await page.locator('button[form="sessionLibraryNameForm"]').click();

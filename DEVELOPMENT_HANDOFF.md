@@ -1,5 +1,47 @@
 # Network Toolkit development handoff
 
+## 1.17.74 candidate: restore the original terminal connection window
+
+Prepared from main c07ef169a90c326ce205a37a34b6223eeacdba41 after the user
+confirmed the requested scope: restore the original New Session style from
+before the Setup sidebar tab and remove Setup/Connection settings from the
+Terminal sidebar. On 2026-10-25 the user explicitly authorized build and
+publication. This covers this scoped new release only; preserve prior assets.
+
+Compared the pre-Setup 1.17.54 source retained in the earlier portable package.
+Its centered wide modal and responsive two-column connection form remain in
+current source. Remove only the redirect/inline branch, parked-form module,
+its asset route and sidebar-specific form styles. Keep the original new-tab
+empty-tab/protocol buttons, modal title/actions, profile/credential handlers,
+SSH/Telnet/serial fields, destination ownership and busy/detached guards.
+The recent saved-session folder field remains available in the dialog.
+
+The terminal rail now starts with Saved and retains Recent/Macros/SFTP. No
+Setup button or Connection settings panel is mounted. Frontend preference
+loading and Go settings sanitization migrate old settings-tab selections to
+Saved while keeping docking/width/collapse preferences. File-transfer tool
+Setup tabs are outside this request and retained. No transport/updater changes.
+
+Regression coverage updates existing sidebar/folder checks, tests old-setting
+migration through persisted state/workspace display, and adds a real-page
+browser test for modal opening, three protocols, cancellation/escape/focus,
+profile edits/credential links/folders, retries, fixture connections, retained
+terminal DOM and 36 theme/dock/protocol layouts at 390/768/1280px. These use
+isolated API fixtures; they do not establish real hardware/native execution.
+
+Version/resources are consistently 1.17.74. Local validation passed 444 JS
+tests, 31 Python release guards, required root/terminal/desktop Go suites,
+release/resource metadata, HTML/browser syntax and Windows x64 GUI build.
+Restored openTerminalConnect matches the pre-Setup 54 function after replacing
+its inline form with the current folder-enabled form helper. An obsolete Go
+assertion expecting the removed settings tab was updated to retain Recent.
+The optional live credential browser script now uses the restored modal; it
+has syntax validation only. Hosted validation, package/artifact verification,
+publication and released73 live staging are pending.
+Main network-toolkit remains the only source/update feed. Do not alter old
+tags/releases/assets or repository visibility. Native Windows/WebView2,
+hardware and actual installation/restart remain unverified here.
+
 ## 1.17.73 published: command input without scrollbar tracks
 
 Prepared from main fff6000c413bd01566891b4b0ea5072e71da3587 after the user

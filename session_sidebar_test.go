@@ -69,6 +69,27 @@ func TestSessionHistoryBoundsAndInvalidPreferences(t *testing.T) {
 	}
 }
 
+func TestRemovedTerminalSetupTabMigratesToSaved(t *testing.T) {
+	a := testApplication(t)
+	response := requestApp(a, http.MethodPut, "/api/state", `{"terminalSidebarTab":"settings","terminalSidebarSide":"left","terminalSidebarWidth":372,"terminalSidebarCollapsed":true}`, true)
+	if response.Code != http.StatusOK {
+		t.Fatalf("save old Setup preference: %d %s", response.Code, response.Body.String())
+	}
+	disk, err := os.ReadFile(a.dataPath)
+	var saved map[string]any
+	if err != nil || json.Unmarshal(disk, &saved) != nil || saved["terminalSidebarTab"] != "saved" || saved["terminalSidebarSide"] != "left" || saved["terminalSidebarWidth"] != float64(372) || saved["terminalSidebarCollapsed"] != true {
+		t.Fatalf("old Setup preference did not migrate with other preferences retained: %s %v", disk, err)
+	}
+	response = requestApp(a, http.MethodGet, "/api/state", "", true)
+	var loaded map[string]any
+	if response.Code != http.StatusOK || json.Unmarshal(response.Body.Bytes(), &loaded) != nil || loaded["terminalSidebarTab"] != "saved" || terminalWorkspaceDisplay(loaded)["terminalSidebarTab"] != "saved" {
+		t.Fatalf("old Setup preference returned after reload or workspace transfer: %d %s", response.Code, response.Body.String())
+	}
+	if len(a.terminals.List()) != 0 {
+		t.Fatal("migrating the sidebar preference opened a transport")
+	}
+}
+
 func TestTerminalSidebarWidthRejectsMalformedPreferencesAndKeepsBoundaries(t *testing.T) {
 	for _, tc := range []struct {
 		name  string
@@ -130,18 +151,18 @@ func TestTerminalSidebarWidthPersistsAndReloads(t *testing.T) {
 	}
 }
 
-func TestTerminalConnectionSettingsTabPersists(t *testing.T) {
+func TestTerminalRecentTabPersists(t *testing.T) {
 	a := testApplication(t)
-	response := requestApp(a, http.MethodPut, "/api/state", `{"terminalSidebarTab":"settings","terminalSidebarCollapsed":true}`, true)
+	response := requestApp(a, http.MethodPut, "/api/state", `{"terminalSidebarTab":"recent","terminalSidebarCollapsed":true}`, true)
 	if response.Code != http.StatusOK {
-		t.Fatalf("save connection tab: %d %s", response.Code, response.Body.String())
+		t.Fatalf("save recent tab: %d %s", response.Code, response.Body.String())
 	}
 	saved := requestApp(a, http.MethodGet, "/api/state", "", true)
 	var state map[string]any
 	if err := json.Unmarshal(saved.Body.Bytes(), &state); err != nil {
 		t.Fatal(err)
 	}
-	if state["terminalSidebarTab"] != "settings" || state["terminalSidebarCollapsed"] != true {
-		t.Fatalf("connection tab preference lost: %#v", state)
+	if state["terminalSidebarTab"] != "recent" || state["terminalSidebarCollapsed"] != true {
+		t.Fatalf("recent tab preference lost: %#v", state)
 	}
 }

@@ -1,3 +1,20 @@
+NETWORK TOOLKIT 1.17.74 CANDIDATE VALIDATION
+
+Restores the original terminal connection modal and removes Setup/Connection
+settings from its sidebar. Preserves profile folders, credentials, macros,
+command-input scrollbar suppression and the existing update flow.
+
+Local validation passed 444 JavaScript tests, 31 Python release guards,
+required root/terminal/desktop Go suites, release/resource metadata, HTML/
+browser syntax and Windows x64 GUI build. Restored modal entry matches the
+pre-Setup 54 flow, retaining the current folder-enabled form.
+Hosted browser validation, package/artifact checks and publication are pending.
+Browser API fixtures are not native Windows or physical connection proof.
+Native Windows/WebView2, hardware and actual install/restart remain unverified.
+See DEVELOPMENT_HANDOFF.md for the scope and publication authorization.
+
+HISTORICAL PUBLISHED BASELINE
+
 NETWORK TOOLKIT 1.17.73 VALIDATION
 
 The terminal command textarea hides horizontal/vertical scrollbar tracks in
