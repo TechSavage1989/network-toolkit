@@ -24,6 +24,13 @@
 .terminal-sidebar-rail>#terminalSidebarVisibilityToggle{flex:0 0 auto;width:30px;height:28px;min-height:28px;margin:2px auto 3px}
 #sessionLibrarySearchGroup{flex:0 0 auto;min-width:0}
 #sessionLibrarySearch{width:calc(100% - 20px);margin:0 10px 9px;min-height:30px;font-size:11px;flex-shrink:0}
+.session-library-folder-filter{margin:0 10px 9px;min-width:0;}
+.session-library-folder-filter select{width:100%;min-width:0;height:32px;padding:4px 7px;font-size:11px;line-height:16px;}
+#sessionFolderFilterGroup[hidden]{display:none!important;}
+.session-library-folder-action{flex:0 0 26px;width:26px;height:30px;align-self:center;padding:5px;color:var(--muted);}
+.session-library-folder-action svg{width:14px;height:14px;}
+.session-library-folder-action:hover,.session-library-folder-action:focus-visible{color:var(--accent);background:var(--accentBg);}
+.session-library-text .session-library-folder{color:var(--accent);font-size:10px;}
 .session-library-lists{display:flex;flex:1 1 0;min-width:0;min-height:0;overflow:hidden}
 .session-library-tabpanel{display:flex;flex:1 1 0;flex-direction:column;min-width:0;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin}
 .terminal-sidebar-macros{overflow:hidden}

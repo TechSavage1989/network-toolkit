@@ -1,7 +1,14 @@
-NETWORK TOOLKIT 1.17.71
+NETWORK TOOLKIT 1.17.72
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.71
+CURRENT RELEASE - 1.17.72
+
+Saved sessions now support folders, like the macro library. Choose or create a
+folder while saving or editing a terminal profile, or use Move to folder on
+an existing terminal or FTP/FTPS session. Filter by All folders, Unfiled or a
+named folder and search by folder name. Assignments survive app restarts.
+
+PREVIOUS RELEASE - 1.17.71
 
 SMTP passwords stay filled after successful and failed tests for repeat runs.
 Switching to another tool clears the field. Credentials are not saved in

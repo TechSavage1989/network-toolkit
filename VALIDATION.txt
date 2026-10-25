@@ -1,3 +1,20 @@
+NETWORK TOOLKIT 1.17.72 VALIDATION
+
+Saved sessions have bounded folder labels, assignment/move controls, folder
+filtering and folder-name search. Existing sessions remain unfiled, IDs and
+credential references are preserved, and folder metadata never enters a
+connection payload. SFTP/FTP profile rewrites retain assignments. Macro library
+and startup bindings are not modified. The 71 SMTP password behavior remains.
+
+Local checks passed 443 JavaScript tests, 31 Python guards, required root/
+terminal/desktop Go suites, release/resource validation and browser syntax.
+Hosted browser validation and Windows build/package checks are in progress.
+The user authorized building and publishing this scoped update. Preserve all
+prior releases/tags/assets. See DEVELOPMENT_HANDOFF.md for scope and evidence.
+Native Windows, terminal hardware and install/restart remain unverified here.
+
+HISTORICAL PUBLISHED BASELINE
+
 NETWORK TOOLKIT 1.17.71 VALIDATION
 
 SMTP passwords remain in the current masked form after accepted, completed,

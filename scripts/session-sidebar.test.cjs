@@ -14,6 +14,7 @@ function harness(options={}){
  vm.runInContext(html.split('\n').find(line=>line.startsWith('const TERMINAL_SAFE_FIELDS=')),c);
  for(const name of ['safeTerminalConfig','validateTerminalConfig','terminalConnectPayload'])vm.runInContext(html.split('\n').find(line=>line.startsWith('function '+name+'(')),c);
  vm.runInContext(fs.readFileSync(require.resolve('../web/assets/panel-controls.js'),'utf8'),c);
+ vm.runInContext(fs.readFileSync(require.resolve('../web/assets/saved-session-folders.js'),'utf8'),c);
  vm.runInContext(source,c);
  const api=c.NetworkToolkitSessionSidebar;api.preferences(options.preferences||state);api.mount(document.getElementById('terminalWorkspace'));
  for(const button of document.querySelectorAll('[data-session-tab]'))button.focus=()=>{document.activeElement=button;};
@@ -21,6 +22,38 @@ function harness(options={}){
 }
 const stored=(id='saved-one',extra={})=>({id,name:'Core switch',type:'ssh',host:'192.0.2.10',port:2222,username:'operator',credentialId:'vault-reference',...extra});
 const settle=()=>new Promise(resolve=>setImmediate(resolve));
+test('saved session folder filtering combines terminal and FTP records and searches folder names',()=>{
+ const h=harness();h.state.terminalProfiles=[stored('a',{name:'Core',folder:'MDF'}),stored('b',{name:'Access',folder:'IDF'}),stored('c',{name:'Console'})];
+ h.state.ftpProfiles=[{id:'ftp',name:'Files',host:'files.test',username:'operator',port:990,folder:'MDF'}];h.api.render();
+ const picker=h.document.getElementById('sessionLibraryFolder');assert(picker.innerHTML.includes('folder:MDF'));assert.equal(h.document.getElementById('sessionSavedCount').textContent,'4');
+ picker.value='folder:MDF';h.document.emit('change',picker);
+ assert.equal(h.document.querySelectorAll('[data-session-kind="saved"]').length,1);assert.equal(h.document.querySelectorAll('[data-transfer-session-kind="saved"]').length,1);
+ const search=h.document.getElementById('sessionLibrarySearch');search.value='mdf';h.document.emit('input',search);assert.equal(h.document.querySelectorAll('[data-session-kind="saved"]').length,1);
+ search.value='';picker.value='unfiled';h.document.emit('change',picker);assert.equal(h.document.querySelector('[data-session-kind="saved"]').dataset.sessionId,'c');assert.equal(h.document.querySelectorAll('[data-transfer-session-kind="saved"]').length,0);
+ h.state.terminalProfiles=h.state.terminalProfiles.filter(row=>row.id!=='c');h.api.render();assert(h.document.getElementById('sessionSavedList').textContent.includes('No matching sessions'));
+});
+test('moving saved terminal and FTP sessions changes only their folder and supports Unfiled',()=>{
+ const h=harness();h.state.terminalProfiles=[stored('a',{folder:'MDF'})];h.state.ftpProfiles=[{id:'ftp',name:'Files',host:'files.test',username:'operator',port:990,credentialId:'ftp-vault',folder:'MDF'}];h.api.render();
+ for(const [type,id,item] of [['terminal','a',h.state.terminalProfiles[0]],['ftp','ftp',h.state.ftpProfiles[0]]]){
+  const prior={...item};h.document.emit('click',h.document.querySelector('[data-session-folder="'+type+'"][data-session-folder-id="'+id+'"]'));
+  h.document.getElementById('sessionLibraryMoveFolder').value='  Branch  ';h.document.emit('submit',h.document.getElementById('sessionLibraryFolderForm'));
+  assert.deepEqual(item,{...prior,folder:'Branch'});
+  h.document.emit('click',h.document.querySelector('[data-session-folder="'+type+'"][data-session-folder-id="'+id+'"]'));h.document.getElementById('sessionLibraryMoveFolder').value='';h.document.emit('submit',h.document.getElementById('sessionLibraryFolderForm'));assert.equal(item.folder,'');
+ }
+ assert(h.calls.some(call=>call[0]==='save-state'));assert(!h.calls.some(call=>call[0]==='request'));
+});
+test('a stale folder dialog cannot overwrite an edited or deleted saved connection',()=>{
+ const h=harness();h.state.terminalProfiles=[stored('a',{folder:'MDF'})];h.api.render();
+ h.document.emit('click',h.document.querySelector('[data-session-folder]'));h.document.getElementById('sessionLibraryMoveFolder').value='Branch';h.state.terminalProfiles[0].host='changed.test';h.document.emit('submit',h.document.getElementById('sessionLibraryFolderForm'));
+ assert.equal(h.state.terminalProfiles[0].folder,'MDF');assert(h.calls.some(call=>call[0]==='toast'&&call[1].includes('session changed')));
+ h.api.render();h.document.emit('click',h.document.querySelector('[data-session-folder]'));h.state.terminalProfiles=[];h.document.emit('submit',h.document.getElementById('sessionLibraryFolderForm'));assert.equal(h.state.terminalProfiles.length,0);
+});
+test('duplicate inherits its folder and saving a recent connection can create a folder',async()=>{
+ const h=harness();h.state.terminalProfiles=[stored('a',{folder:'MDF'})];h.api.render();await h.api.run('duplicate',h.api.token('saved','a'));
+ assert.equal(h.document.getElementById('sessionLibrarySaveFolder').getAttribute('value'),'MDF');h.document.getElementById('sessionLibrarySaveFolder').value='MDF';h.document.getElementById('sessionLibraryName').value='Core copy';h.document.emit('submit',h.document.getElementById('sessionLibraryNameForm'));
+ assert.equal(h.state.terminalProfiles[0].folder,'MDF');assert.equal(h.state.terminalProfiles[0].credentialId,'vault-reference');assert.equal(h.state.terminalProfiles[1].name,'Core switch');
+ h.state.terminalRecent=[stored('recent',{name:'New device'})];await h.api.run('save',h.api.token('recent','recent'));h.document.getElementById('sessionLibrarySaveFolder').value='New site';h.document.getElementById('sessionLibraryName').value='New saved device';h.document.emit('submit',h.document.getElementById('sessionLibraryNameForm'));assert.equal(h.state.terminalProfiles[0].folder,'New site');
+});
 test('session sidebar preserves the existing console and persists collapse and deletion preferences',()=>{
  const h=harness(),consoleNode=h.document.getElementById('existingConsole');
  assert.equal(consoleNode.textContent,'Retained transcript');assert.equal(consoleNode.closest('#terminalWorkspaceColumns').id,'terminalWorkspaceColumns');

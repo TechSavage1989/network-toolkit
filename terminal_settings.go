@@ -207,6 +207,9 @@ func safeTerminalProfile(value any, named bool) map[string]any {
 	stringFields := []string{"type", "host", "username", "authMethod", "credentialId", "serialPort", "stopBits", "parity", "flowControl", "lineEnding"}
 	if named {
 		stringFields = append(stringFields, "id", "name")
+		if folder, present := profile["folder"]; present {
+			clean["folder"] = safeSessionFolder(folder)
+		}
 	}
 	for _, key := range stringFields {
 		if value, ok := profile[key].(string); ok && len(value) <= 1024 {

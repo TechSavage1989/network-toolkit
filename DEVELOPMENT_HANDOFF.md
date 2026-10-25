@@ -1,5 +1,56 @@
 # Network Toolkit development handoff
 
+## 1.17.72 in progress: folders for saved sessions
+
+Prepared from latest main 1c9dea8ffd50bf51dc0596550c1e3c6a0e4f4505 after the
+user requested folders for saved sessions similar to macros, and explicitly
+instructed build and publish on 2026-10-25. This authorizes the new 1.17.72
+source and release after validation; no further approval is required for this
+scoped change. Preserve released 1.17.71 (source/tag 0b3ffe7) and all older
+releases/tags/assets. Main network-toolkit remains the sole source/update feed.
+
+Folders use the same flat named-label approach as macros. Assignment is an
+optional folder field on saved terminal/FTP profiles. The Saved sidebar offers
+All folders, Unfiled and named folders, with search matching folder names and
+folder labels on rows. Existing sessions remain unfiled. Folder choices are
+derived from saved sessions, so an unused folder disappears automatically.
+The filter is temporary UI state, like the macro folder filter.
+
+The terminal connection form and Save/Duplicate/Rename dialogs can choose an
+existing folder or create one by typing. Existing terminal and FTP/FTPS rows
+have an accessible Move to folder action; terminal context menus have it too.
+Blank assignment returns a session to Unfiled. Moving keeps profile IDs and
+credential references unchanged. Duplication inherits the folder. Both SFTP
+and FTP client profile rewrites preserve folder metadata. Connection settings,
+protected-credential handling, recent lists and macro bindings are unchanged.
+
+The small saved-session-folders.js helper normalizes/escapes labels and shares
+folder choices/filtering across controls. Browser and backend bound labels to
+100 Unicode characters and remove ASCII controls. safeTerminalProfile permits
+folder only on named profiles; the existing profile allowlist still excludes
+secrets. FTP profiles allow the same bounded metadata. Existing linked-workspace
+profile sanitization carries terminal folders; labels never enter transport
+payloads or filesystem operations. The new asset is explicitly served from
+both main and detached routes through the existing asset allowlist.
+
+Regression coverage includes filter/search, Unfiled, folder creation/moves,
+stale-dialog protection, duplicate/edit preservation, both file-client profile
+rewrites, HTTP settings/disk reload, credential exclusion and linked-workspace
+sanitization. Hosted browser coverage uses the real page with isolated mock
+APIs, checks reloads and saved-session opening, verifies folder metadata stays
+out of connection requests, and checks both themes/docks at 390/768/1280 pixels.
+No real network sessions or mail are opened by the browser fixtures.
+
+Version metadata and Windows resources are 1.17.72. Local validation passed
+443 JavaScript tests, 31 Python release guards, root/terminal/desktop Go suites,
+release/resource metadata and browser-script syntax checks. The existing asset
+coverage caught the initially missing new-asset route; its explicit allowlist
+entry is now corrected and the full Go suite passes. Windows build, hosted
+browser checks, package/release and live updater staging are pending. Record
+completed checks and publication evidence here. Native Windows, installation/
+restart and actual terminal hardware remain unverified.
+
+
 ## 1.17.71 published: retain SMTP password for repeat tests
 
 Prepared from latest main df712385f61108ca43271d22ed9e73d3f6e88629 in response

@@ -1,0 +1,13 @@
+Network Toolkit 1.17.72
+
+What's new
+- Organize saved SSH, Telnet, serial and FTP/FTPS sessions in named folders.
+- Choose or create a folder when saving or editing a terminal session.
+- Move existing sessions between folders or back to Unfiled.
+- Filter saved sessions by folder and search by folder name.
+- Folder assignments are kept when editing, duplicating and reopening profiles.
+
+Folders follow the macro library's named-folder approach. Existing saved
+sessions remain Unfiled until assigned. Connection settings, protected
+credential links and startup macro bindings are retained. Folder names are
+saved labels and never become filesystem paths or connection options.

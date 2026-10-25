@@ -1,7 +1,8 @@
 (function(root){
 'use strict';
 const bindings=new Map();
-let menu=null,menuTarget=null,pendingDelete=null,pendingName=null,pendingOpen=null,sidebarSizeObserver=null,sidebarRenderedWidth=null;
+let menu=null,menuTarget=null,pendingDelete=null,pendingName=null,pendingOpen=null,pendingFolder=null,savedFolder='',sidebarSizeObserver=null,sidebarRenderedWidth=null;
+const folders=root.NetworkToolkitSessionFolders;
 const byId=id=>document.getElementById(id);
 const profiles=()=>state.terminalProfiles||[];
 const recent=()=>state.terminalRecent||[];
@@ -86,13 +87,15 @@ function record(entry,name=''){
 }
 function rowHTML(kind,item){
  const detail=description(item),used=kind==='recent'&&item.lastUsed?'Last opened: '+new Date(item.lastUsed).toLocaleString():'';
- return '<div class="session-library-row" data-session-kind="'+kind+'" data-session-id="'+esc(item.id)+'"><button type="button" class="session-library-entry" data-session-entry title="'+esc([detail,used,'Double-click or press Enter to open'].filter(Boolean).join('\n'))+'"><span class="session-library-icon">'+icon(item.type==='serial'?'plug':'terminal')+'</span><span class="session-library-text"><strong>'+esc(item.name||label(item))+'</strong><small>'+esc(detail)+'</small></span></button><button type="button" class="iconbtn session-library-delete" data-session-remove aria-label="Remove '+esc(item.name||label(item))+' from '+(kind==='saved'?'Saved':'Recent')+'" title="Remove from '+(kind==='saved'?'Saved':'Recent')+'">'+icon('close')+'</button></div>';
+ return '<div class="session-library-row" data-session-kind="'+kind+'" data-session-id="'+esc(item.id)+'"><button type="button" class="session-library-entry" data-session-entry title="'+esc([detail,used,'Double-click or press Enter to open'].filter(Boolean).join('\n'))+'"><span class="session-library-icon">'+icon(item.type==='serial'?'plug':'terminal')+'</span><span class="session-library-text"><strong>'+esc(item.name||label(item))+'</strong><small>'+esc(detail)+'</small>'+(kind==='saved'&&item.folder?'<small class="session-library-folder" title="'+esc(item.folder)+'">'+esc(item.folder)+'</small>':'')+'</span></button>'+(kind==='saved'?folderButton('terminal',item):'')+'<button type="button" class="iconbtn session-library-delete" data-session-remove aria-label="Remove '+esc(item.name||label(item))+' from '+(kind==='saved'?'Saved':'Recent')+'" title="Remove from '+(kind==='saved'?'Saved':'Recent')+'">'+icon('close')+'</button></div>';
 }
+function folderButton(type,item){return '<button type="button" class="iconbtn session-library-folder-action" data-session-folder="'+type+'" data-session-folder-id="'+esc(item.id)+'" aria-label="Move '+esc(item.name||item.host)+' to folder" title="Move to folder">'+icon('folder')+'</button>';}
 function transferItems(kind){const key=kind==='saved'?'ftpProfiles':'ftpRecent';return (Array.isArray(state[key])?state[key]:[]).filter(x=>x&&x.id&&x.host);}
-function transferRowsHTML(kind,query){const items=transferItems(kind).filter(x=>([x.name,x.host,x.username,x.security].join(' ').toLowerCase()).includes(query));
+function transferRowsHTML(kind,query,filter=''){const items=transferItems(kind).filter(x=>(kind!=='saved'||folders.matches(x,filter))&&([x.name,x.folder,x.host,x.username,x.security].join(' ').toLocaleLowerCase()).includes(query));
+ if(kind==='saved'&&filter&&!items.length)return '';
  if(!items.length&&!transferItems(kind).length)return '';
  return '<div class="session-library-section transfer-session-section"><div class="session-library-section-heading"><strong class="session-library-section-toggle">FTP / FTPS</strong><span class="session-library-section-count">'+transferItems(kind).length+'</span></div><div class="session-library-section-body">'+
- (items.map(x=>'<div class="session-library-row" data-transfer-session-kind="'+kind+'" data-transfer-session-id="'+esc(x.id)+'"><button type="button" class="session-library-entry" data-transfer-session-open title="Open in FTP/FTPS client"><span class="session-library-icon">'+icon('ftp')+'</span><span class="session-library-text"><strong>'+esc(x.name||x.host)+'</strong><small>'+esc((x.username||'')+'@'+x.host+':'+x.port+' · '+(x.security||'ftp'))+'</small></span></button><button type="button" class="iconbtn session-library-delete" data-transfer-session-remove title="Remove FTP/FTPS session" aria-label="Remove FTP/FTPS session">'+icon('close')+'</button></div>').join('')||'<p class="session-library-empty">No matching FTP/FTPS connections.</p>')+'</div></div>';
+ (items.map(x=>'<div class="session-library-row" data-transfer-session-kind="'+kind+'" data-transfer-session-id="'+esc(x.id)+'"><button type="button" class="session-library-entry" data-transfer-session-open title="Open in FTP/FTPS client"><span class="session-library-icon">'+icon('ftp')+'</span><span class="session-library-text"><strong>'+esc(x.name||x.host)+'</strong><small>'+esc((x.username||'')+'@'+x.host+':'+x.port+' · '+(x.security||'ftp'))+'</small>'+(kind==='saved'&&x.folder?'<small class="session-library-folder" title="'+esc(x.folder)+'">'+esc(x.folder)+'</small>':'')+'</span></button>'+(kind==='saved'?folderButton('ftp',x):'')+'<button type="button" class="iconbtn session-library-delete" data-transfer-session-remove title="Remove FTP/FTPS session" aria-label="Remove FTP/FTPS session">'+icon('close')+'</button></div>').join('')||'<p class="session-library-empty">No matching FTP/FTPS connections.</p>')+'</div></div>';
 }
 function sectionHTML(kind){
  const saved=kind==='saved',title=saved?'Saved':'Recent',action=saved?'new':'clear-recent',caption=saved?'New':'Clear',description=saved?'New saved session':'Clear recent sessions';
@@ -103,7 +106,7 @@ function mount(workspace){
  if(!byId('terminalSessionSidebar')){
   const panel=workspace.querySelector('.terminal-panel');if(!panel)return;
   const columns=document.createElement('div');columns.id='terminalWorkspaceColumns';columns.className='terminal-workspace-columns';
-  columns.innerHTML='<aside id="terminalSessionSidebar" class="terminal-session-sidebar" aria-label="Terminal sidebar"><div class="terminal-sidebar-rail"><div class="terminal-sidebar-tabs" role="tablist" aria-label="Terminal sidebar tools" aria-orientation="vertical">'+sidebarTabs.map(tab=>'<button type="button" id="terminalSidebarTab'+tabTitle(tab)+'" class="terminal-sidebar-tab" role="tab" data-session-tab="'+tab+'" aria-controls="terminalSidebar'+tabTitle(tab)+'" aria-selected="false" tabindex="-1" title="Open '+tabTitle(tab)+'">'+icon(tab==='settings'?'settings':tab==='saved'?'bookmark':tab==='recent'?'clock':tab==='files'?'folder':'play')+'<span>'+(tab==='settings'?'Setup':tabTitle(tab))+'</span></button>').join('')+'</div></div><div id="terminalSidebarContent" class="terminal-sidebar-content"><div class="session-library-heading"><strong id="terminalSidebarHeading">Saved</strong><button type="button" class="iconbtn terminal-sidebar-side-button" data-session-action="swap-side" title="Move sidebar to other side" aria-label="Move terminal sidebar to other side">'+icon('arrowSwap')+'</button></div><div id="sessionLibrarySearchGroup"><label class="sr-only" for="sessionLibrarySearch">Search recent and saved sessions</label><input id="sessionLibrarySearch" type="search" placeholder="Search sessions" autocomplete="off"></div><div id="terminalSidebarPanels" class="session-library-lists"><div id="terminalSidebarConnection" class="session-library-tabpanel terminal-sidebar-connection" role="tabpanel" aria-labelledby="terminalSidebarTabConnection"></div><div id="terminalSidebarSaved" class="session-library-tabpanel" role="tabpanel" aria-labelledby="terminalSidebarTabSaved">'+sectionHTML('saved')+'</div><div id="terminalSidebarRecent" class="session-library-tabpanel" role="tabpanel" aria-labelledby="terminalSidebarTabRecent">'+sectionHTML('recent')+'</div><div id="terminalSidebarSFTP" class="session-library-tabpanel terminal-sidebar-sftp" role="tabpanel" aria-labelledby="terminalSidebarTabSFTP"></div><div id="terminalSidebarMacros" class="session-library-tabpanel terminal-sidebar-macros" role="tabpanel" aria-labelledby="terminalSidebarTabMacros"></div></div><div id="sessionLibrarySettings" class="session-library-settings"><label><input type="checkbox" id="sessionConfirmDelete" checked><span>Confirm before removing sessions</span></label><p>Double-click or press Enter to open. Right-click for more actions.</p></div></div></aside>';
+  columns.innerHTML='<aside id="terminalSessionSidebar" class="terminal-session-sidebar" aria-label="Terminal sidebar"><div class="terminal-sidebar-rail"><div class="terminal-sidebar-tabs" role="tablist" aria-label="Terminal sidebar tools" aria-orientation="vertical">'+sidebarTabs.map(tab=>'<button type="button" id="terminalSidebarTab'+tabTitle(tab)+'" class="terminal-sidebar-tab" role="tab" data-session-tab="'+tab+'" aria-controls="terminalSidebar'+tabTitle(tab)+'" aria-selected="false" tabindex="-1" title="Open '+tabTitle(tab)+'">'+icon(tab==='settings'?'settings':tab==='saved'?'bookmark':tab==='recent'?'clock':tab==='files'?'folder':'play')+'<span>'+(tab==='settings'?'Setup':tabTitle(tab))+'</span></button>').join('')+'</div></div><div id="terminalSidebarContent" class="terminal-sidebar-content"><div class="session-library-heading"><strong id="terminalSidebarHeading">Saved</strong><button type="button" class="iconbtn terminal-sidebar-side-button" data-session-action="swap-side" title="Move sidebar to other side" aria-label="Move terminal sidebar to other side">'+icon('arrowSwap')+'</button></div><div id="sessionLibrarySearchGroup"><label class="sr-only" for="sessionLibrarySearch">Search recent and saved sessions</label><input id="sessionLibrarySearch" type="search" placeholder="Search sessions" autocomplete="off"><div id="sessionFolderFilterGroup" class="session-library-folder-filter"><label class="sr-only" for="sessionLibraryFolder">Saved session folder</label><select id="sessionLibraryFolder"><option value="">All folders</option><option value="unfiled">Unfiled</option></select></div></div><div id="terminalSidebarPanels" class="session-library-lists"><div id="terminalSidebarConnection" class="session-library-tabpanel terminal-sidebar-connection" role="tabpanel" aria-labelledby="terminalSidebarTabConnection"></div><div id="terminalSidebarSaved" class="session-library-tabpanel" role="tabpanel" aria-labelledby="terminalSidebarTabSaved">'+sectionHTML('saved')+'</div><div id="terminalSidebarRecent" class="session-library-tabpanel" role="tabpanel" aria-labelledby="terminalSidebarTabRecent">'+sectionHTML('recent')+'</div><div id="terminalSidebarSFTP" class="session-library-tabpanel terminal-sidebar-sftp" role="tabpanel" aria-labelledby="terminalSidebarTabSFTP"></div><div id="terminalSidebarMacros" class="session-library-tabpanel terminal-sidebar-macros" role="tabpanel" aria-labelledby="terminalSidebarTabMacros"></div></div><div id="sessionLibrarySettings" class="session-library-settings"><label><input type="checkbox" id="sessionConfirmDelete" checked><span>Confirm before removing sessions</span></label><p>Double-click or press Enter to open. Right-click for more actions.</p></div></div></aside>';
   columns.insertAdjacentHTML('beforeend','<div id="terminalSidebarDivider" role="separator" tabindex="0" aria-label="Resize or hide terminal sidebar" aria-controls="terminalSidebarContent" aria-orientation="vertical" aria-valuemin="260" aria-valuemax="480" aria-valuenow="300"></div>');
   workspace.append(columns);columns.append(panel);columns.append(byId('terminalSidebarDivider'),byId('terminalSessionSidebar'));
   if(typeof ResizeObserver==='function'){sidebarSizeObserver=new ResizeObserver(layoutSidebarSize);sidebarSizeObserver.observe(columns);}
@@ -133,22 +136,27 @@ function render(){
  if(filesSupported&&tab==='files')root.NetworkToolkitTerminalSFTP?.render?.(byId('terminalSidebarSFTP'),current);
  const confirm=byId('sessionConfirmDelete');if(confirm)confirm.checked=state.terminalSessionConfirmDelete!==false;
  const query=(byId('sessionLibrarySearch')?.value||'').trim().toLocaleLowerCase();
+ const filterGroup=byId('sessionFolderFilterGroup'),picker=byId('sessionLibraryFolder'),folderNames=folders.names(profiles(),transferItems('saved'));
+ if(filterGroup)filterGroup.hidden=tab!=='saved';
+ if(savedFolder.startsWith('folder:')&&!folderNames.includes(savedFolder.slice(7)))savedFolder='';
+ if(picker){const options='<option value="">All folders</option><option value="unfiled">Unfiled</option>'+folderNames.map(name=>'<option value="'+esc('folder:'+name)+'">'+esc(name)+'</option>').join('');if(picker.innerHTML!==options)picker.innerHTML=options;picker.value=savedFolder;picker.title=savedFolder.startsWith('folder:')?savedFolder.slice(7):savedFolder==='unfiled'?'Unfiled':'All folders';}
  for(const kind of ['recent','saved']){
   const title=kind==='recent'?'Recent':'Saved',items=list(kind),area=byId('session'+title+'List'),collapsed=state[kind==='recent'?'terminalRecentCollapsed':'terminalSavedCollapsed']===true;
   byId('session'+title+'Toggle')?.setAttribute('aria-expanded',String(!collapsed));
   if(area)area.hidden=collapsed;
-  const count=byId('session'+title+'Count');if(count)count.textContent=String(items.length);
+  const count=byId('session'+title+'Count');if(count)count.textContent=String(items.length+(kind==='saved'?transferItems(kind).length:0));
   if(!area)continue;
   const rows=kind==='saved'?items.slice().sort((a,b)=>a.name.localeCompare(b.name)):items;
-  const filtered=rows.filter(item=>(item.name+' '+description(item)).toLocaleLowerCase().includes(query));
-  const html=(filtered.map(item=>rowHTML(kind,item)).join('')||'<p class="session-library-empty">'+(query?'No matching SSH sessions.':kind==='recent'?'SSH connections you open appear here.':'Save an SSH or terminal connection to open it here.')+'</p>')+transferRowsHTML(kind,query);
+  const filtered=rows.filter(item=>(kind!=='saved'||folders.matches(item,savedFolder))&&(item.name+' '+(kind==='saved'?item.folder||'':'')+' '+description(item)).toLocaleLowerCase().includes(query));
+  const transferHTML=transferRowsHTML(kind,query,kind==='saved'?savedFolder:'');
+  const html=(filtered.map(item=>rowHTML(kind,item)).join('')||(!transferHTML?'<p class="session-library-empty">'+(query||kind==='saved'&&savedFolder?'No matching sessions.':kind==='recent'?'SSH connections you open appear here.':'Save a connection to open it here.')+'</p>':''))+transferHTML;
   if(area._sessionHTML!==html){area.innerHTML=html;area._sessionHTML=html;}
  }
  const clear=sidebar.querySelector('[data-session-action="clear-recent"]');if(clear)clear.disabled=!recent().length;
 }
 function changed(){saveState();render();renderTerminalProfiles();if(typeof terminalProfileListConfig==='function'&&typeof dataListViews!=='undefined'){const config=terminalProfileListConfig();dataListViews.set(config.id,config);refreshDataList(config.id);}}
 function closeMenu(focus=false){const old=menuTarget;menu?.remove();menu=null;menuTarget=null;if(focus&&itemFor(old))document.querySelector('[data-session-kind="'+old.kind+'"][data-session-id="'+CSS.escape(old.id)+'"] [data-session-entry]')?.focus({preventScroll:true});}
-function menuItems(kind){return kind==='saved'?[['open','Open','play'],['new-tab','Open in new tab','plus'],['edit','Edit connection...','settings'],['rename','Rename...','edit'],['duplicate','Duplicate...','copy'],['copy','Copy connection details','copy'],['remove','Remove from Saved...','trash']]:[['open','Open / reconnect','play'],['new-tab','Open in new tab','plus'],['save','Save connection...','save'],['edit','Edit and open...','settings'],['copy','Copy connection details','copy'],['remove','Remove from Recent...','trash']];}
+function menuItems(kind){return kind==='saved'?[['open','Open','play'],['new-tab','Open in new tab','plus'],['edit','Edit connection...','settings'],['rename','Rename...','edit'],['folder','Move to folder...','folder'],['duplicate','Duplicate...','copy'],['copy','Copy connection details','copy'],['remove','Remove from Saved...','trash']]:[['open','Open / reconnect','play'],['new-tab','Open in new tab','plus'],['save','Save connection...','save'],['edit','Edit and open...','settings'],['copy','Copy connection details','copy'],['remove','Remove from Recent...','trash']];}
 function openMenu(target,x,y){
  closeMenu();const item=itemFor(target);if(!item)return;
  menuTarget=target;menu=document.createElement('div');menu.id='sessionLibraryContextMenu';menu.className='terminal-context-menu';menu.setAttribute('role','menu');menu.setAttribute('aria-label','Session actions');
@@ -177,7 +185,12 @@ function commitDelete(targets){
 }
 function nameDialog(mode,target,config,name){
  pendingName={mode,target,config:safeTerminalConfig(config)};
- openModal(mode==='rename'?'Rename saved session':mode==='duplicate'?'Duplicate saved session':'Save session','<form id="sessionLibraryNameForm"><div class="field"><label for="sessionLibraryName">Session name</label><input id="sessionLibraryName" maxlength="100" value="'+esc(name||label(config))+'" required autocomplete="off"></div><p class="help-line">'+esc(description(config))+'</p></form>','<button class="btn ghost" data-action="close-modal">Cancel</button><button type="submit" form="sessionLibraryNameForm" class="btn primary">'+(mode==='rename'?'Rename':'Save session')+'</button>',true);
+ openModal(mode==='rename'?'Rename saved session':mode==='duplicate'?'Duplicate saved session':'Save session','<form id="sessionLibraryNameForm"><div class="field"><label for="sessionLibraryName">Session name</label><input id="sessionLibraryName" maxlength="100" value="'+esc(name||label(config))+'" required autocomplete="off"></div>'+folders.inputHTML('sessionLibrarySaveFolder',config.folder,folders.names(profiles(),transferItems('saved')))+'<p class="help-line">'+esc(description(config))+'</p></form>','<button class="btn ghost" data-action="close-modal">Cancel</button><button type="submit" form="sessionLibraryNameForm" class="btn primary">'+(mode==='rename'?'Rename':'Save session')+'</button>',true);
+}
+function folderDialog(type,id){
+ const item=(type==='ftp'?transferItems('saved'):profiles()).find(row=>row.id===id);if(!item)return;
+ closeMenu();pendingFolder={type,id,signature:signature(item)};
+ openModal('Move saved session','<form id="sessionLibraryFolderForm"><p>'+esc(item.name||item.host)+'</p>'+folders.inputHTML('sessionLibraryMoveFolder',item.folder,folders.names(profiles(),transferItems('saved')))+'</form>','<button class="btn ghost" data-action="close-modal">Cancel</button><button type="submit" form="sessionLibraryFolderForm" class="btn primary">Move session</button>',true);
 }
 function save(entry){if(entry?.config)nameDialog('save',null,entry.config,entry.info.label);}
 async function open(target,newTab=false){
@@ -233,6 +246,7 @@ async function run(action,target){
   case'edit':openTerminalConnect(item,target.kind==='saved'?item.id:'');break;
   case'rename':nameDialog('rename',target,item,item.name);break;
   case'duplicate':nameDialog('duplicate',target,item,item.name+' copy');break;
+  case'folder':if(target.kind==='saved')folderDialog('terminal',item.id);break;
   case'save':nameDialog('save',target,item,item.name);break;
   case'copy':await NetworkToolkitTerminalInteraction.copyValue(description(item));break;
   case'remove':remove(target.kind,target.id);break;
@@ -243,6 +257,7 @@ document.addEventListener('dblclick',event=>{const ftp=event.target.closest?.('[
 document.addEventListener('dblclick',event=>{if(event.target.id==='terminalSidebarDivider'){event.preventDefault();event.stopImmediatePropagation();setCollapsed(!state.terminalSidebarCollapsed);return;}if(!event.target.closest?.('[data-session-entry]'))return;const target=eventTarget(event.target);if(target){event.preventDefault();event.stopImmediatePropagation();void open(target).catch(error=>toast(error.message,'error'));}},true);
 document.addEventListener('contextmenu',event=>{const target=eventTarget(event.target);if(!target)return;event.preventDefault();event.stopImmediatePropagation();openMenu(target,event.clientX,event.clientY);},true);
 document.addEventListener('click',event=>{
+ const folder=event.target.closest?.('[data-session-folder]');if(folder){event.preventDefault();event.stopImmediatePropagation();folderDialog(folder.dataset.sessionFolder,folder.dataset.sessionFolderId);return;}
  const ftpOpen=event.target.closest?.('[data-transfer-session-open]');
  const ftpRemove=event.target.closest?.('[data-transfer-session-remove]');
  if(ftpOpen||ftpRemove){const row=(ftpOpen||ftpRemove).closest('[data-transfer-session-id]');if(!row)return;event.preventDefault();event.stopImmediatePropagation();
@@ -272,9 +287,15 @@ document.addEventListener('submit',event=>{
   event.preventDefault();event.stopImmediatePropagation();
   const pending=pendingName,name=byId('sessionLibraryName')?.value.trim();if(!pending||!name||name.length>100)return;
   if(pending.target&&!itemFor(pending.target)){toast('This session changed. Open its actions again.');closeModal();return;}
-  if(pending.mode==='rename'){const item=itemFor(pending.target);item.name=name;}
-  else{if(profiles().length>=100){toast('Remove a saved session before adding another. The limit is 100.');return;}state.terminalProfiles=[{id:'terminal-profile-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8),name,...pending.config},...profiles()];}
+  const folder=folders.normalize(byId('sessionLibrarySaveFolder')?.value);
+  if(pending.mode==='rename'){const item=itemFor(pending.target);item.name=name;item.folder=folder;}
+  else{if(profiles().length>=100){toast('Remove a saved session before adding another. The limit is 100.');return;}state.terminalProfiles=[{id:'terminal-profile-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8),name,folder,...pending.config},...profiles()];}
   pendingName=null;closeModal();changed();
+ }else if(event.target.id==='sessionLibraryFolderForm'){
+  event.preventDefault();event.stopImmediatePropagation();const pending=pendingFolder;if(!pending)return;
+  const item=(pending.type==='ftp'?transferItems('saved'):profiles()).find(row=>row.id===pending.id);
+  if(!item||signature(item)!==pending.signature){pendingFolder=null;closeModal();toast('This session changed. Open its actions again.');return;}
+  item.folder=folders.normalize(byId('sessionLibraryMoveFolder')?.value);pendingFolder=null;closeModal();changed();
  }else if(event.target.id==='sessionLibraryAuthForm'){
   event.preventDefault();event.stopImmediatePropagation();
   const pending=pendingOpen;if(!pending||!canOpen())return;
@@ -284,7 +305,7 @@ document.addEventListener('submit',event=>{
  }
 },true);
 document.addEventListener('input',event=>{if(event.target.id==='sessionLibrarySearch')render();});
-document.addEventListener('change',event=>{if(event.target.id==='sessionConfirmDelete'){state.terminalSessionConfirmDelete=event.target.checked;saveState();}});
+document.addEventListener('change',event=>{if(event.target.id==='sessionLibraryFolder'){savedFolder=event.target.value;closeMenu();render();return;}if(event.target.id==='sessionConfirmDelete'){state.terminalSessionConfirmDelete=event.target.checked;saveState();}});
 document.addEventListener('pointerdown',event=>{if(menu&&!menu.contains(event.target))closeMenu();if(event.target.id==='terminalSidebarDivider')resizeSidebar(event);},true);
 document.addEventListener('keydown',event=>{
  if(event.target.id==='terminalSidebarDivider'&&['Enter',' ','ArrowLeft','ArrowRight','Home','End'].includes(event.key)){

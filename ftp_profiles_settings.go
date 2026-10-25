@@ -52,7 +52,11 @@ func sanitizeFTPProfiles(state map[string]any) {
 		if len(credentialID) > 120 || strings.ContainsAny(credentialID, "/\\\x00\n") {
 			credentialID = ""
 		}
-		clean = append(clean, map[string]any{"id": id, "name": name, "host": host, "username": username, "port": port, "security": security, "fingerprint": fingerprint, "credentialId": credentialID})
+		row := map[string]any{"id": id, "name": name, "host": host, "username": username, "port": port, "security": security, "fingerprint": fingerprint, "credentialId": credentialID}
+		if folder, present := item["folder"]; present {
+			row["folder"] = safeSessionFolder(folder)
+		}
+		clean = append(clean, row)
 	}
 	state["ftpProfiles"] = clean
 }
