@@ -3,9 +3,10 @@
 Read DEVELOPMENT_HANDOFF.md before editing or building. Start from current
 main, preserve existing changes and follow the checks/release safeguards.
 
-Current candidate: 1.17.80 aligns Hosts More, simplifies Overview shortcuts and
-unifies value copy controls. Read the first handoff section. Preserve all earlier
-terminal/sidebar, Connect-label, editor, session folder, credential, macro,
+Current published release: 1.17.80 aligns Hosts More, simplifies Overview and
+unifies copy controls. Read the first handoff section. Keep the native Hosts
+path copy/opt-out, compact terminal recipient wrapping and all previous
+terminal/sidebar, Connect-label, editor, saved folder/credential/macro,
 command-input, SMTP and updater fixes.
 
 The user authorized this specific build/publication on 2026-10-25. Future
@@ -13,6 +14,12 @@ releases need their own authorization. Main pushes publish new versions
 automatically. Main network-toolkit is the sole source/update feed. Never
 replace earlier tags/assets or change repository access.
 
-Current published release is 1.17.79. Local checks passed; hosted review/publication are pending.
+Published source/tag is e7b6e1855789402f22ca56b37f26836a3155fc05.
+Full Checks 40219794786 and Release 40220639811 passed. All four public assets
+verify, including all 696 packaged source files. Nineteen older releases,
+their assets and source tags remain unchanged. Unchanged released79 handlers
+checked/downloaded/verified/staged live80 in 11.23 seconds without installation
+or restart. The final three-file docs record must not move the tag, replace
+assets or republish the runtime. Continue future work from latest main.
 Native Windows/WebView2, hardware and actual install/restart remain unverified.
 Keep the handoff current and do not claim unperformed checks.

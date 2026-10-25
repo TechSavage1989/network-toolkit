@@ -1,6 +1,6 @@
 # Network Toolkit development handoff
 
-## 1.17.80 candidate: consistent copy actions and UI layout
+## 1.17.80 published: consistent copy actions and UI layout
 
 Prepared from main 8769ab4ae7cb311a2d54d97fabb15d29a357b22d after the user
 provided Hosts/Overview screenshots and requested aligned controls, removal of
@@ -32,13 +32,11 @@ copy buttons remain sole owners. Inputs, terminals, secrets, statuses, action
 cells and placeholders remain excluded. Shared toolbar SVGs retain their shape
 when labels wrap. Compact terminal recipient labels now wrap instead of clipping with an ellipsis,
 while retaining the command input scrollbar suppression. No transport,
-credentials or updater logic changes. Identical toast notifications now reuse
-their existing element and refresh expiry, preventing rapid copy feedback from
-covering the workspace.
+credentials or updater logic changes.
 
 Review found and corrected a CRLF export-fixture expectation and a clipped
 View recipients label at 390px. Icon fixture requests now use the same shared
-asset location as the app. Final hosted review is pending these corrections.
+asset location as the app. Those issues were resolved before the successful hosted review below.
 
 Three focused JavaScript regressions cover new copy availability, individual
 addresses, retained nodes, deduplication, native controls and exclusions.
@@ -50,11 +48,76 @@ use/export. The existing real app DNS/TCP clipboard regression is now run in CI
 against a freshly built Linux headless app. Browser tests use isolated/local
 fixtures, not external devices or Windows system files.
 
-Go/UI/package/Windows resources are consistently 1.17.80. Local required validation passed 453 JavaScript tests, 31 Python release guards,
-root/terminal/desktop Go suites, resource/release metadata and inline/browser
-syntax checks. Hosted browser/build artifacts, package verification, publication
-and released79 live update staging are pending. Native Windows/WebView2, hardware and actual installation/restart
-remain unverified. Do not claim every possible application state was exercised.
+Final visual review caught identical clipboard success notifications piling up
+during rapid copies. Identical message/severity pairs now reuse one existing
+notification and reset its original expiry; distinct messages remain separate.
+Two focused timer/identity regressions cover this behavior, and the real-page
+clipboard check asserts one visible copy notification.
+
+Go/UI/package/Windows resources are consistently 1.17.80. Local required
+validation passed 453 JavaScript tests, 31 Python release guards, required
+root/terminal/desktop Go suites, release/resource metadata, inline/browser
+syntax, Windows x64 GUI build and portable/update package verification.
+
+Full review Checks 40219794786 passed on exact published source/tag
+e7b6e1855789402f22ca56b37f26836a3155fc05 (tree
+cd4ae18f3f9dc7a6665b8f3a775d45c43b9ce3f3). Both jobs succeeded. The new full-page
+review passes all 138 layouts across 23 navigation pages, at 1600/820/390px in
+both themes, with no reported button text/icon clipping, viewport overflow,
+copy-control containment failure, browser error or missing asset. It verifies
+18 actual clipboard copies, six Hosts menu keyboard/alignment cases, Escape
+focus return and CRLF export without any Hosts write. Representative Overview,
+Hosts and terminal screenshots were inspected in both themes/sizes.
+
+The newly enabled real headless-app regression also passes actual local DNS
+and TCP traffic, browser clipboard contents, meaningful TXT whitespace,
+native selection, context menus, keyboard entry detail selection, subnet
+values, retained live monitor control identity/focus and imported PCAP actions.
+It confirms inputs, terminal content and secrets retain their exclusions.
+An outdated optional expectation for copy controls on DNS record-type badges
+was corrected to the already established helper/unit-test contract; no app
+behavior was changed for that expectation.
+
+Existing Hosts/client/server/SMTP/folders/terminal-dialog/command-input/editor/
+install browser checks and all seven native Chromium updater-timer scenarios
+pass, including the real five-minute poll/focus collision. Review artifact
+12609232136 matches the local portable and EXE byte-for-byte. Outer SHA-256:
+820b9391b71f936147d0515efae8353f46df641957b3f437e10e84ec5e196d03.
+Browser artifact 12609522485 digest and ZIP CRC pass; outer SHA-256:
+b6c3aab4fd300f57931717f91f6c7b09af702dfc546159804c66d180ec80eb53.
+
+Main was fast-forwarded to the identical tested source using expected old SHA
+8769ab4ae7cb311a2d54d97fabb15d29a357b22d without force. No code or docs changed
+between full review and promotion. Release 40220639811 succeeded and created
+stable release 423578162. Completed review remains full runtime validation;
+this documentation may supersede automatic duplicate main runs.
+
+All four actual public downloads match GitHub asset digests. Outer/inner SHA-256
+manifests, both ZIP CRCs, strict four-member updater allowlist, Windows x64 GUI
+PE/version and standalone/portable/update EXE identity pass. All 696
+packaged source files match the exact published commit. Official portable and
+EXE match the reviewed build byte-for-byte. All nineteen earlier release IDs
+and asset IDs/sizes/digests remain unchanged, with all nineteen older source-tag
+SHAs preserved. Verification snapshots and logs are retained with local QA.
+
+The unchanged released 1.17.79 production feed handlers checked the live feed,
+verified/downloaded/staged 1.17.80 in 11.23 seconds. Staged bytes match the
+independently downloaded official EXE. The harness uses real HTTPS, isolated
+temporary settings and only platform-independent feed handlers. No installation
+or restart occurred; its original test executable hash remained unchanged.
+
+Official release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.80
+EXE SHA-256: 3d165ebc258de65c8f5caa447303f2c272ea41f8bbc22ec2db3be7f3861ea733
+Portable ZIP SHA-256: 2d459c02e98fe41d977bbcb2ac23c5ea1fe8c4d14d2784a8482c40b9921f61e2
+Update ZIP SHA-256: 40e7e71db7baf35a7f64e6516ed45690ad237037f7ca61f3a4c03d240d40ad6b
+SHA256SUMS file SHA-256: b71500b467e9c1f041791cd583708362efeec54ff6b9445aaf52bd3887729ab7
+
+The final publication record changes only AGENTS.md, this handoff and
+VALIDATION.txt. Do not move the released 80 tag, replace assets or republish.
+Continue from latest main. Native Windows/WebView2, real hardware and actual
+installation/restart remain unverified. Browser fixtures, Linux headless tests
+and live-feed staging are not native Windows execution proof. This review covers
+the listed layouts and scenarios, not every possible application state.
 
 ## 1.17.79 published: remove the overview target divider
 

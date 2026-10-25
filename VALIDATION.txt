@@ -1,16 +1,57 @@
-NETWORK TOOLKIT 1.17.80 CANDIDATE VALIDATION
+NETWORK TOOLKIT 1.17.80 VALIDATION
 
-Aligns Hosts More, simplifies Overview shortcuts and consolidates automatic
-copy controls. Individual adapter addresses and reusable detail values get
-direct copy actions without wrapping their original text. Existing native copy
-controls, text selection, context actions and exclusions are retained.
+Aligns Hosts More, adds native path copy and Escape focus return, removes the
+Overview shortcut grid/per-address Tools buttons, and consolidates useful value
+copy actions. Original text nodes, selection, clipboard payloads, row actions,
+native copy owners and exclusions remain. Compact terminal recipient labels
+wrap instead of clipping. Repeated identical copy feedback reuses one notification instead of covering
+the page. Two notification timer/identity regressions pass. No transport,
+credential or updater logic changes.
 
-Three focused JavaScript regressions pass; the coverage regression fails
-against released79. Local required checks passed 453 JavaScript tests, 31 Python release guards,
-root/terminal/desktop Go suites, resource/release metadata and inline/browser
-syntax. Hosted navigation/clipboard review, build/package verification,
-publication and unchanged released79 live update staging are pending. Native Windows/WebView2, hardware and actual
-installation/restart remain unverified. See DEVELOPMENT_HANDOFF.md.
+Full review Checks 40219794786 passed on exact published source/tag
+e7b6e1855789402f22ca56b37f26836a3155fc05: 453 JavaScript tests, 31 Python
+release guards, required root/terminal/desktop Go suites, Windows x64 GUI build/
+package and all browser steps. The coverage regression fails against released79
+and passes with the fix; all 13 copy-helper tests pass.
+
+The new browser review passes 138 layouts across 23 navigation pages at
+1600/820/390px in both themes, checking button text/icons, viewport overflow,
+copy placement, 18 clipboard copies and six Hosts menu cases. CRLF export
+and menu keyboard/Escape focus pass with no Hosts writes. Representative
+Overview/Hosts/terminal screenshots were inspected. Initial review corrected
+the CRLF fixture, shared icon fixture paths and a real compact recipient label
+clipping issue.
+
+Real local DNS/TCP tests through the unchanged application APIs also verify
+clipboard payloads, TXT whitespace, native selection, row/context actions,
+keyboard details, subnet values, live monitor DOM identity/focus and imported
+PCAP actions. A stale optional DNS badge expectation was aligned with the
+existing unit-test contract. Inputs, terminal content and secrets stay excluded.
+
+Existing Hosts/client/server/SMTP/folders/terminal/command-input/editor/install
+checks and seven native Chromium updater-timer scenarios pass, including the
+real five-minute poll/focus collision. Review artifact 12609232136 matches the
+local portable/EXE byte-for-byte. Main was promoted to that identical reviewed
+source after explicit publication approval. Release 40220639811 succeeded.
+Full review is runtime validation; docs may supersede duplicate main runs.
+
+OFFICIAL PUBLICATION VERIFICATION
+- All four actual public downloads match GitHub asset digests.
+- Outer/inner manifests, both ZIP CRCs and strict four-member updater allowlist.
+- Windows x64 GUI PE/version and standalone/portable/update EXE identity.
+- All 696 packaged source files match the exact published commit.
+- Official portable and EXE match the reviewed build byte-for-byte.
+- Nineteen earlier release IDs and asset IDs/sizes/digests remain unchanged.
+- Nineteen older source-tag SHAs match the prepublication snapshot.
+- Exact released79 handlers checked/downloaded/verified/staged live80 in 11.23s.
+- Staged bytes match the independently downloaded official EXE.
+- No installation/restart or original test executable change occurred.
+
+The harness uses platform-independent handlers, real HTTPS and isolated settings.
+Native Windows/WebView2, hardware and actual install/restart remain unverified.
+The UI review covers the listed layouts/scenarios, not every possible app state.
+See DEVELOPMENT_HANDOFF.md for hashes, provenance and limits. This final docs
+follow-up must not move tags, replace assets or republish the runtime.
 
 HISTORICAL PUBLISHED BASELINE
 
