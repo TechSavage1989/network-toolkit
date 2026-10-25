@@ -2,11 +2,12 @@
 
 ## Start here
 
-The current local build is **1.17.64**, based on verified public main
+The current released application is **1.17.64**, based on verified public main
 71df414ea97496c26565df12e9e2ac5a0d3c3203. The last published/user-confirmed
 baseline is revised 1.17.63, source tag 6bb00ea7224ce1e9e0b4b2db4b806915fc9947aa.
 Repository: https://github.com/TechSavage1989/network-toolkit. Preserve README.md.
-This document records a local build, not a claim of 1.17.64 publication.
+Release/source tag v1.17.64 resolves to 991f32387c52a35d32f86d13257ab8ef86014b38.
+The source tree exactly matches the privately backed-up local build d1e81be.
 
 ## 1.17.64 automatic checks and release notes
 
@@ -48,15 +49,20 @@ updater checks, with no confirmed must-fix issue.
 
 Rendered Chromium tests were extended for immediate startup and safe notes at
 390/768/1280px, with keyboard disclosure and screenshots, and added to Checks.
-They have NOT run locally: Chromium IPC creation is sandbox-blocked; escalation
-failed environment setup. The cloud browser also disallows local file URLs.
-Do not claim rendered or native Windows/WebView2 validation until it runs.
+They could not run locally because Chromium IPC creation was sandbox-blocked
+and escalation failed environment setup. They subsequently PASSED on hosted
+review Checks 40144964705 and main Checks 40145219932. Downloaded screenshots
+at all three widths were inspected: readable version badges/highlights, no
+card overflow, visible keyboard focus, disclosure and actions. Script/link
+security fixtures remained inert. Native Windows/WebView2 remains unverified.
 
-Publication is a separate step. A main push auto-publishes a new version, so
-obtain the user's specific publication authorization before pushing this build.
-Use main network-toolkit only; never write another release to the retired feed.
-Keep a private source/build backup first. Package all four assets together,
-verify exact hashes and strict Update.zip contents, and preserve published63.
+The user explicitly authorized this public source upload and v1.17.64 release
+on 2026-10-24 at 23:56:13 UTC. A private complete prepublication backup was
+saved before promotion. Review branch CI and screenshots were verified before
+main was moved with a checked expected SHA. Release 40145219925 succeeded on
+2026-10-25; main Checks 40145219932 also passed. Published63 remains unchanged.
+Future publication remains a separate authorized step; main pushes publish new
+versions. Use main network-toolkit only, never the retired update feed.
 
 ## Previous 1.17.63 baseline
 
@@ -70,13 +76,13 @@ version metadata, regression tests and documentation are changed.
 Use network-toolkit for future source and release updates. The owner requested
 revised 1.17.63 itself switch feeds and be offered through the old repository
 once, so 1.17.62 clients can migrate. Original 1.17.63 was already published on both repositories. The owner
-authorized revised63 replacement and revised source publication on 2026-10-24,
+authorized revised 63 replacement and revised source publication on 2026-10-24,
 and stated nobody has 1.17.63. Keep the same-version installation caveat for
 any copy downloaded earlier. Do not silently overwrite or move existing tags.
 Do not delete repositories or change their access/security settings.
 
 An already-installed original 1.17.63 cannot discover a same-version update;
-it needs manual EXE replacement. Earlier clients can receive the revised63
+it needs manual EXE replacement. Earlier clients can receive the revised 63
 bridge now published on the old feed. No later release uses the second feed.
 
 The existing main-push Release workflow publishes a new version once, with
@@ -295,9 +301,41 @@ Legacy bridge completion: old-feed revision run 40143885776 succeeded,
 preserving release ID 423040841 and its historical tag. Its two published assets
 are the exact same Update.zip hash above and a binary-only checksum manifest.
 The archived original 1.17.62 updater fetched the real old feed and successfully
-verified/staged the revised63 EXE hash above. The unchanged revised63 updater
+verified/staged the revised 63 EXE hash above. The unchanged revised 63 updater
 then checked the real main feed, reported current/latest63 with no false update,
 and rejected same-version download without staging or installation. These are
 Go/API/feed compatibility checks, not native Windows GUI/restart tests.
 The old repository is retained solely for this completed bootstrap and history;
 all later updates use the main repository.
+
+
+## 1.17.64 publication record (2026-10-25)
+
+Release ID: 423054360
+URL: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.64
+Source/tag: 991f32387c52a35d32f86d13257ab8ef86014b38
+Review Checks: 40144964705; main Checks: 40145219932; Release: 40145219925.
+All terminal outcomes succeeded. This documentation follow-up does not rebuild,
+replace release assets or move the application source tag.
+
+Published EXE SHA-256:
+9d0affc356695edd4bd748d25865fac707973fb68c6d2968bc5609137e9ece61
+Published source Portable.zip SHA-256:
+25a98904fb51e0db7c5340b5dc5770aa111a4b285d012470956a9d4b0b3d02e5
+Published Update.zip SHA-256:
+712737fbc25f6e3e06bd5364c3305e353b800789ead09246db2e633bf8d9bc32
+Use the hosted Update.zip hash, not a local repackaged ZIP hash: timestamps can
+change ZIP bytes even when the executable and members are identical.
+
+All downloaded official assets were verified against the hosted outer manifest.
+The Update.zip exact four-member allowlist, both ZIP CRCs, every inner manifest,
+Windows x64 GUI/version resources and matching EXE bytes in both ZIPs passed.
+The actual unchanged revised 63 updater (source 6bb00ea) fetched main release 64,
+verified/downloaded/staged the expected EXE successfully in 12.63 seconds.
+The installed executable was unchanged; no installation or restart was attempted.
+This is production-feed/API/staging compatibility, not native Windows UI proof.
+
+The improved automatic startup and notes interface runs only after installing
+1.17.64; it cannot retroactively change the UI of installed 1.17.63. A subsequent
+newer release will exercise that UI on the user's actual installation. No user
+confirmation of the new 64 UI or native runtime is recorded yet.

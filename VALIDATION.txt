@@ -16,10 +16,18 @@ No native Windows/WebView2 runtime, live installation, restart, shortcut COM
 or rollback test was performed for this build. The user's 'the update works'
 confirmation refers to revised 1.17.63, not this build. The original missing
 banner cause is unproven; concrete startup blocking paths were repaired.
-Rendered browser regressions have been extended and added to CI but did not
-execute locally: Chromium's IPC socket was sandbox-blocked and escalation
-failed environment setup. No screenshot or visual pass is claimed.
-No source push or release publication is implied by this local validation.
+Rendered browser regressions could not execute locally because Chromium IPC
+was sandbox-blocked. Hosted review Checks 40144964705 and main Checks
+40145219932 subsequently passed all browser tests, including updater startup,
+retry, opt-out, duplicate avoidance, safe release notes and keyboard disclosure.
+Downloaded actual screenshots at 390/768/1280px were inspected successfully.
+Release 40145219925 published v1.17.64 at source 991f32387c52a35d32f86d13257ab8ef86014b38.
+Official downloaded release assets passed outer and inner SHA-256 manifests,
+ZIP CRCs, strict four-member Update.zip allowlist, PE/version checks and matching
+standalone/update/source-package EXE identity. Actual unchanged revised 63
+production updater fetched and verified/staged 64 in 12.63 seconds without
+installing or changing its original executable. Native GUI/restart is untested.
+See DEVELOPMENT_HANDOFF.md for exact asset hashes and provenance.
 
 PREVIOUS BASELINE VALIDATION (HISTORICAL)
 
@@ -53,9 +61,9 @@ PASSED HOSTED AND PUBLISHED
 - Downloaded official EXE, source Portable.zip, Update.zip and SHA256SUMS;
   all external and internal hashes, binary identity, strict allowlist and
   main-repository API embedded in the executable verified.
-- Old-feed bridge Release 40143885776 preserved release423040841 and published
+- Old-feed bridge Release 40143885776 preserved release 423040841 and published
   the identical revised ZIP. Archived original1.17.62 fetched the actual oldfeed
-  and verified/staged revised63 EXE b2e9232330a0098134dcd8c41ba8a1fa6df02908f8acb879aab4bf98695b0f18.
+  and verified/staged revised 63 EXE b2e9232330a0098134dcd8c41ba8a1fa6df02908f8acb879aab4bf98695b0f18.
 - Revised63 production updater check against main reports current/latest63,
   no false update, and same-version download rejects with409 without staging.
 
@@ -72,8 +80,8 @@ Original 1.17.63 validation below is historical evidence, not a claim that
 revised 1.17.63 passed the original hosted browser workflow.
 Native Windows/WebView2 and real physical network equipment are unavailable.
 Original 1.17.63 installations cannot detect a same-version replacement.
-See UPDATING.txt. Both revised release publications and old62/new63 feed compatibility are
-verified. Earlier clients migrate through the completed one-time revised63
+See UPDATING.txt. Both revised release publications and old62/new 63 feed compatibility are
+verified. Earlier clients migrate through the completed one-time revised 63
 bridge; see current handoff.
 The previously reported missing automatic update banner remains unproven.
 
