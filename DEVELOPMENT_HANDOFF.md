@@ -1,5 +1,52 @@
 # Network Toolkit development handoff
 
+## 1.17.80 candidate: consistent copy actions and UI layout
+
+Prepared from main 8769ab4ae7cb311a2d54d97fabb15d29a357b22d after the user
+provided Hosts/Overview screenshots and requested aligned controls, removal of
+redundant Overview tools, consistent useful copy actions and an application UI
+review, explicitly authorizing publication on 2026-10-25. This authorizes this
+scoped new release only. Preserve older tags/assets and main network-toolkit
+as the sole public source/update feed.
+
+Hosts More inherited generic details/summary spacing and borders. Scoped CSS
+resets the outer disclosure and aligns its summary with toolbar buttons. Native
+click/Enter behavior, viewport-bounded menu positioning and focus return remain;
+Escape now closes the menu and focuses More.
+
+Overview removes the repeated diagnostic shortcut tile grid and per-IP Tools
+buttons. Main navigation, adapter address context menus/keyboard access, network
+scan actions and View details remain. Each address and adapter name has an explicit copy payload. Hosts paths and
+expanded DNS metadata fields also have direct value copy actions.
+
+The hover-only legacy ntkOfferCopy helper wrapped value DOM and created inline
+buttons. It overlapped the newer result-copy helper, skipped addresses containing
+Tools actions and inherited generic minimum button sizing. Remove the old helper
+and its styles; NetworkToolkitValueCopy now also covers Overview, adapter and
+reusable diagnostic/detail values. Controls reserve a fixed slot alongside the
+first text line and stay visible. Text DOM, selection, current-value copying,
+DNS whitespace, keyboard use, result reconciliation and context actions remain.
+Nested value groups get no extra aggregate copy control. Existing public-IP
+copy buttons remain sole owners. Inputs, terminals, secrets, statuses, action
+cells and placeholders remain excluded. Shared toolbar SVGs retain their shape
+when labels wrap. No transport, credentials or updater logic changes.
+
+Three focused JavaScript regressions cover new copy availability, individual
+addresses, retained nodes, deduplication, native controls and exclusions.
+The coverage test fails against released79 and all 13 copy-helper tests pass
+with the fix. A new isolated full-page browser review surveys navigation pages
+at 1600/820/390px in both themes, checks visible labels/icons, viewport overflow,
+copy placement and actual clipboard contents, and exercises Hosts menu keyboard
+use/export. The existing real app DNS/TCP clipboard regression is now run in CI
+against a freshly built Linux headless app. Browser tests use isolated/local
+fixtures, not external devices or Windows system files.
+
+Go/UI/package/Windows resources are consistently 1.17.80. Local required validation passed 451 JavaScript tests, 31 Python release guards,
+root/terminal/desktop Go suites, resource/release metadata and inline/browser
+syntax checks. Hosted browser/build artifacts, package verification, publication
+and released79 live update staging are pending. Native Windows/WebView2, hardware and actual installation/restart
+remain unverified. Do not claim every possible application state was exercised.
+
 ## 1.17.79 published: remove the overview target divider
 
 Prepared from main 7ef55a25f00429324d02e556d3fe39112328e36e after the user

@@ -4,7 +4,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),net=require('node:net'),dgram=require('node:dgram'),{spawn}=require('node:child_process');
 const help='Usage: NTK_APP_EXECUTABLE=/absolute/path/to/app [CHROME_EXECUTABLE=/path/to/chrome] [NTK_BROWSER_OUTPUT_DIR=/path/to/results] node scripts/value-copy-live.cjs [--baseline]';
 if(process.argv.includes('--help')){console.log(help);process.exit(0);}if(!process.env.NTK_APP_EXECUTABLE){console.error(help);process.exit(2);}
-function playwright(){try{return require('playwright');}catch(error){if(error.code!=='MODULE_NOT_FOUND')throw error;return require(path.join(process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES||'','playwright'));}}
+function playwright(){try{return require(process.env.PLAYWRIGHT_MODULE||'playwright');}catch(error){if(error.code!=='MODULE_NOT_FOUND')throw error;return require(path.join(process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES||'','playwright'));}}
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms)),baseline=process.argv.includes('--baseline'),temporary=fs.mkdtempSync(path.join(os.tmpdir(),'ntk-value-copy-')),sockets=new Set(),report={binary:path.resolve(process.env.NTK_APP_EXECUTABLE),baseline,checks:[],observations:{},copied:[],geometry:[],errors:[],assetFailures:[],dnsQueries:0};let app,browser,context,page,resolver,peer,log='';
 const txtValue='  v=spf1 include:copylookup.test ~all  ';
 function pass(label){report.checks.push(label);console.log('PASS '+label);}

@@ -1,13 +1,13 @@
 /* Copy individual result values without changing text selection or row actions. */
 (function (root) {
   'use strict';
-  const selector = 'td,.data-item .val,.result-record-grid dd,.device-data-grid dd,[data-copy-value]';
+  const selector = 'td,.data-item .val,.result-record-grid dd,.device-data-grid dd,.adapter-detail .value,.stat .value,.overview-info-card .overview-card-value,.calc-value,.packet-detail .value,.packet-details .value,.device-details .value,.result-detail .value,.detail-value,.kv-value,.wifi-detail .value,.data-grid .value,[data-copy-value]';
   const nonDataLabel = /^(?:tools?|actions?|result|status|state|type|record|hop|asc|sort|controls?|options?|elapsed|duration|count|records?|rtt)$/i;
   const informationalValue = /^(?:timeout|ttl_expired|destination|completed|failed|success|error|warning|info|pending|running|stopped|not applicable|lookup timed out)$/i;
-  const excluded = '.rb-app,.fm-explorer,.transfer-file-scroller,.transfer-log-panel,.nt-editor-page,.nt-editor-overlay,.session-library,.terminal-sidebar-sftp,.xterm,.terminal-workspace,.terminal-pane,#terminalWorkspace,#terminalPanes,#terminalTabs,[data-terminal-pane],input,textarea,select,[contenteditable="true"],[data-no-value-copy],[data-secret],[data-sensitive],[data-value-copy-control]';
+  const excluded = 'button,a,summary,[role="button"],.rb-app,.fm-explorer,.transfer-file-scroller,.transfer-log-panel,.nt-editor-page,.nt-editor-overlay,.session-library,.terminal-sidebar-sftp,.xterm,.terminal-workspace,.terminal-pane,.terminal-view,.terminal-output,.public-ip-value,[data-terminal-secret],[data-wifi-secret],#terminalWorkspace,#terminalPanes,#terminalTabs,[data-terminal-pane],input,textarea,select,[contenteditable="true"],[data-no-value-copy],[data-secret],[data-sensitive],[data-value-copy-control]';
   const interactive = 'button,a,input,textarea,select,summary,[contenteditable="true"],[role="button"],[role="checkbox"],[role="switch"]';
   const sensitive = /password|passphrase|private[\s_-]*key|secret|credential|(?:access|refresh|api|auth|session)[\s_-]*token|api[\s_-]*key|^key$/i;
-  const placeholder = /^(?:[-\u2013\u2014]|true|false|yes|no|n\/a|null|undefined|not reported|not measured|not available|unknown|none)$/i;
+  const placeholder = /^(?:[-\u2013\u2014]|true|false|yes|no|n\/a|null|undefined|not reported|not measured|not available|not loaded|not checked|unavailable|loading|checking|no data|unknown|none)$/i;
   const copyIcon = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg>';
   let initialized = false, observer, scheduled = false, contextSequence = 0;
   const pending = new Set(), contexts = new Map();
@@ -19,14 +19,16 @@
       const headers = table?.querySelectorAll('thead th') || [], header = headers[cells.indexOf(element)];
       return (header?.getAttribute('data-column-name') || header?.textContent || '').trim().replace(/\s+/g,' ') || 'Value';
     }
-    const group = element.closest('.data-item') || element.parentElement;
-    return (group?.querySelector('.key,dt')?.textContent || '').trim().replace(/\s+/g,' ') || 'Value';
+    const group = element.closest('.data-item') || element.closest('.overview-info-card') || element.parentElement;
+    return (group?.querySelector('.key,dt,.label,.overview-card-title,.section-eyebrow')?.textContent || '').trim().replace(/\s+/g,' ') || 'Value';
   }
 
   function captureContext(target) {
     const element = target?.closest?.(selector);
-    if (!element || element.closest(excluded) || element.querySelector('input,textarea,select,[contenteditable="true"],[data-secret],[data-sensitive]')) return null;
+    if (!element || element.closest(excluded) || element.querySelector('input,textarea,select,[contenteditable="true"],[data-secret],[data-sensitive],[data-terminal-secret],[data-wifi-secret]')) return null;
     if (element.tagName === 'TD' && (Number(element.getAttribute('colspan') || 1) > 1 || element.classList.contains('list-empty'))) return null;
+    // A group of individual values must not also get an aggregate copy action.
+    if (element.querySelector(selector)) return null;
     const controls = [...element.querySelectorAll(interactive)].filter(control => !control.hasAttribute('data-value-copy-control'));
     if (controls.some(control => !control.matches('.network-address-details[data-select-device]'))) return null;
     const label = labelFor(element);

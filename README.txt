@@ -1,7 +1,14 @@
-NETWORK TOOLKIT 1.17.79
+NETWORK TOOLKIT 1.17.80
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.79
+CURRENT RELEASE - 1.17.80
+
+Clean up the Overview page by removing repeated tool shortcuts and per-address
+Tools buttons. Copy controls consistently sit beside displayed values, including
+adapter IP and MAC addresses. Hosts editor More aligns with the toolbar and its
+menu supports Escape. Existing navigation, adapter actions and diagnostics remain.
+
+PREVIOUS RELEASE - 1.17.79
 
 Remove the divider below the target entry row on the Overview page for a
 cleaner appearance. Target entry, source interface selection and run controls

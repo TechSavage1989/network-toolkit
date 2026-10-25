@@ -11,3 +11,6 @@
 }
 .tool-panel-tabs{min-width:0;max-width:100%;flex-wrap:wrap;align-items:stretch}
 .tool-panel-tabs>button{flex:1 1 auto;min-width:0;max-width:100%;height:auto;white-space:normal;overflow-wrap:anywhere;line-height:1.4;text-align:center}
+
+/* Icons keep their shape when labels wrap in compact toolbars. */
+:where(.main,.modal) :is(.btn,.iconbtn,summary.btn)>svg{flex:0 0 auto;align-self:center}

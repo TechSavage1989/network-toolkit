@@ -1,3 +1,19 @@
+NETWORK TOOLKIT 1.17.80 CANDIDATE VALIDATION
+
+Aligns Hosts More, simplifies Overview shortcuts and consolidates automatic
+copy controls. Individual adapter addresses and reusable detail values get
+direct copy actions without wrapping their original text. Existing native copy
+controls, text selection, context actions and exclusions are retained.
+
+Three focused JavaScript regressions pass; the coverage regression fails
+against released79. Local required checks passed 451 JavaScript tests, 31 Python release guards,
+root/terminal/desktop Go suites, resource/release metadata and inline/browser
+syntax. Hosted navigation/clipboard review, build/package verification,
+publication and unchanged released79 live update staging are pending. Native Windows/WebView2, hardware and actual
+installation/restart remain unverified. See DEVELOPMENT_HANDOFF.md.
+
+HISTORICAL PUBLISHED BASELINE
+
 NETWORK TOOLKIT 1.17.79 VALIDATION
 
 Removes the top border of the Overview diagnostic source control, the unwanted

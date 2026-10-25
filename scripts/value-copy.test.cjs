@@ -42,3 +42,24 @@ test('status labels and Tools action cells never receive copy controls',()=>{
  assert.equal(cells[1].querySelector('[data-value-copy-control]'),null);
  assert.equal(cells[2].querySelector('[data-value-copy-control]'),null);
 });
+
+test('overview adapter and reusable detail values copy immediately with useful labels and retained text nodes',()=>{
+ const h=harness('<div class="overview-info-card"><div class="overview-card-title">Computer</div><div class="overview-card-value"><span id="computer">workstation.test</span></div></div><div class="adapter-detail"><div><span class="label">MAC address</span><span class="value">02:00:00:00:00:05</span></div></div><div class="packet-detail"><span class="label">Source</span><span class="value">2001:db8::1</span></div><div class="wifi-detail"><span class="label">SSID</span><span class="value">Office WiFi</span></div><div class="calc-value">30 seconds</div>');
+ const values=[...h.doc.querySelectorAll('[data-value-copy-control]')];assert.equal(values.length,5);
+ assert.equal(h.doc.getElementById('computer').parentElement.className.includes('overview-card-value'),true);
+ for(const button of values)h.doc.emit('click',button);
+ assert.deepEqual(h.copied,['workstation.test','02:00:00:00:00:05','2001:db8::1','Office WiFi','30 seconds']);
+ assert.equal(values[0].getAttribute('aria-label'),'Copy Computer value');assert.equal(values[1].getAttribute('aria-label'),'Copy MAC address value');
+});
+test('each adapter address receives one copy action while its aggregate container and existing Tools action stay intact',()=>{
+ const h=harness('<div class="adapter-detail"><div><span class="label">IP addresses</span><div class="value"><div class="adapter-address"><span data-copy-value="192.0.2.4/24" data-copy-label="IP address">192.0.2.4/24</span><button id="tools">Tools</button></div><div class="adapter-address"><span data-copy-value="2001:db8::4/64" data-copy-label="IP address">2001:db8::4/64</span></div></div></div></div>');
+ assert.equal(h.doc.querySelectorAll('[data-value-copy-control]').length,2);
+ assert.equal([...h.doc.querySelector('.value').children].filter(el=>el.hasAttribute('data-value-copy-control')).length,0);
+ for(const button of h.doc.querySelectorAll('[data-value-copy-control]'))h.doc.emit('click',button);
+ assert.deepEqual(h.copied,['192.0.2.4/24','2001:db8::4/64']);assert.equal(h.doc.getElementById('tools').textContent,'Tools');
+ h.api.prepare(h.doc);assert.equal(h.doc.querySelectorAll('[data-value-copy-control]').length,2);
+});
+test('expanded copy coverage still excludes secret labels, native public IP controls and loading placeholders',()=>{
+ const h=harness('<div class="wifi-detail"><span class="label">WiFi password</span><span class="value">secret-canary</span></div><div data-wifi-secret><div class="wifi-detail"><span class="value">secret-canary</span></div></div><div class="public-ip-value"><span class="public-ip-address">192.0.2.5</span><button data-public-ip-copy="ipv4">Copy</button></div><div class="overview-info-card"><div class="overview-card-value">Not loaded</div></div><div class="adapter-detail"><span class="value">Checking</span></div><button><span data-copy-value="button payload">Action</span></button><a href="https://example.test"><span data-copy-value="link payload">Open</span></a>');
+ assert.equal(h.doc.querySelectorAll('[data-value-copy-control]').length,0);assert.equal(h.doc.querySelectorAll('[data-public-ip-copy]').length,1);
+});
