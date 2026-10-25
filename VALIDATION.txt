@@ -3,8 +3,31 @@ NETWORK TOOLKIT 1.17.70 VALIDATION
 User authorized a small visible change and publication to test updating from
 1.17.69. The update section heading is now Network Toolkit updates. Version
 metadata is consistently 1.17.70. Existing install flow and backend are retained.
-No new test is added for this cosmetic heading change. Run the existing required
-suites and validate the exact released source and official downloads.
+No new test is added for this cosmetic heading change. Full source Checks
+40161679755 passed on 538657ac04477b9192cfcd547f5ddc34d2f3eaed before that
+identical commit was published: 425 JavaScript tests, 31 Python guards, required
+Go suites, Windows x64 GUI build/packaging, Hosts/client/server browser checks,
+seven explicit final-install browser cases and seven native timer scenarios
+including a real five-minute poll/focus collision. Release 40162206418 passed.
+The automatic duplicate main checks use the same source; the completed review
+run is the full runtime validation and documentation may supersede a duplicate.
+
+OFFICIAL PUBLICATION VERIFICATION
+- All four actual public downloads match GitHub asset digests.
+- Outer/inner checksums, both ZIP CRCs and strict four-member updater allowlist.
+- Windows x64 GUI PE/version and standalone/portable/update executable identity.
+- All 674 source files match the exact released commit.
+- Public portable and EXE match the tested review build byte-for-byte.
+- All nine earlier release IDs and asset IDs/sizes/digests remain unchanged.
+- All nine earlier source-tag SHAs match the prepublication snapshot.
+- Exact released69 production feed check/download/stage of live70 in 8.25s.
+- Staged EXE matches the independently downloaded official EXE.
+- No installation/restart or original executable modification occurred.
+
+See DEVELOPMENT_HANDOFF.md for official hashes and provenance. The live harness
+uses unchanged platform-independent production feed handlers, real HTTPS and
+isolated temporary settings. This documentation follow-up must not rebuild,
+replace or republish the released runtime.
 
 After installing via 1.17.69, the user can confirm the new heading and Installed
 version: 1.17.70 in App settings. Native Windows installation/restart and the

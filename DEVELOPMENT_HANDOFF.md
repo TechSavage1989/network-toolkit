@@ -1,6 +1,6 @@
 # Network Toolkit development handoff
 
-## 1.17.70: small update-flow test release, publication authorized
+## 1.17.70 published: small update-flow test release
 
 Prepared from main 61999347587b321dde1f498517dd6970450c0ad6. The user requested
 a small change to test whether the new updater flow works and explicitly
@@ -14,10 +14,44 @@ marker after installing from 1.17.69. No tests are added for this cosmetic text
 change; run the existing required suites, including final-install-flow browser
 coverage. Preserve the 69 single-action install flow and all earlier features.
 
-Use the review branch's completed Checks result before promoting the identical
-source to main. Verify all four actual public assets, exact source provenance,
-and a live unchanged released69 check/download/stage. Record final evidence in a
-documentation follow-up without republishing or moving the released tag.
+Exact source/tag 538657ac04477b9192cfcd547f5ddc34d2f3eaed (tree
+93ab65056c28425a0fd0336dac6b183d7f161c99) passed full Checks 40161679755 before
+the identical commit was promoted to main. Its completed results include all
+425 JavaScript tests, 31 Python guards, required Go suites, Windows x64 GUI
+build/packaging, Hosts/client/server browser checks, seven explicit final-install
+browser cases and seven native timer scenarios including a real five-minute
+poll/focus collision. Review artifact 12586428949 matched the local verified
+portable byte-for-byte. No new test was added for the cosmetic heading.
+
+Release 40162206418 passed and created release 423148288. Main also automatically
+reruns Checks 40162206424 on the same tagged source; the completed review run
+above is the full runtime validation. Documentation may supersede automatic
+duplicate checks without changing the released code.
+
+All four actual public downloads passed GitHub asset digests, outer/inner
+SHA-256 manifests, both ZIP CRCs, the strict four-member Update.zip allowlist,
+Windows x64 GUI PE/version checks and standalone/portable/update EXE identity.
+All 674 packaged source files match the exact published commit. The public
+portable and EXE match the tested review build byte-for-byte. All nine older
+release IDs and asset IDs/sizes/digests remain unchanged, and all nine older
+source-tag SHAs match the prepublication snapshot.
+
+The unchanged released 1.17.69 production feed handlers checked the live feed,
+verified/downloaded/staged 1.17.70 in 8.25 seconds. The staged bytes match the
+independently downloaded official EXE. The harness used real HTTPS, isolated
+temporary settings and only platform-independent feed handlers. No install or
+restart occurred and its original executable hash was unchanged. Raw logs and
+verification snapshots are retained with the local publication QA files.
+
+Official release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.70
+EXE SHA-256: 1fcd379da1751d082cbc419bfff3a3cb40812f34846832d1716e3d733a811371
+Portable ZIP SHA-256: 572a3be4f36e37320b16b8a92345eabf17e95b802971092e076a0afb491bda42
+Update ZIP SHA-256: 773e6f128321579deebc481d51d7bfb4f6796d0b3ff40dabc939e3a8debc2879
+SHA256SUMS file SHA-256: 542c506c91728839a8d4aab8e9cd4bb0e93746bf36bd040b02f15c0a92ea7478
+
+This final documentation follow-up must not move the released 1.17.70 tag,
+replace any published asset or republish it. Continue future work from latest
+main and preserve the single final install action and earlier improvements.
 
 User test: run installed 1.17.69, check for updates, approve download, and choose
 the single final Install and restart action. After restart, App settings should
