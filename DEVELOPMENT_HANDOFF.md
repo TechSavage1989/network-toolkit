@@ -1,5 +1,15 @@
 # Network Toolkit development handoff
 
+## README navigation refresh (2026-10-25)
+
+Documentation-only: README.md now introduces the app, links verified release
+assets and existing guides, and explains setup, updates and safety boundaries.
+No application code, version, workflow, release asset or tag changed. The commit
+uses [skip ci] to avoid triggering builds or release automation for this prose
+change. Relative links were checked against the repository tree and download
+names against the current stable release. No new runtime validation is claimed;
+the published-version validation and its limits below remain unchanged.
+
 ## 1.17.80 published: consistent copy actions and UI layout
 
 Prepared from main 8769ab4ae7cb311a2d54d97fabb15d29a357b22d after the user
