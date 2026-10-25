@@ -1,7 +1,14 @@
-NETWORK TOOLKIT 1.17.74
+NETWORK TOOLKIT 1.17.75
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.74
+CURRENT RELEASE - 1.17.75
+
+Text files open with the start of the document visible. Opening or reloading
+a file resets the caret and both scroll positions, including desktop imports
+and files opened through connected sessions. Background reads leave the
+currently active document view in place. File contents remain unchanged.
+
+PREVIOUS RELEASE - 1.17.74
 
 Terminal connection setup returns to the original centered window. Choose SSH,
 Telnet or Serial from a new tab, or New in Saved. The Setup sidebar tab and

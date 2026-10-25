@@ -1,5 +1,39 @@
 # Network Toolkit development handoff
 
+## 1.17.75 candidate: text files open at the document start
+
+Prepared from main 59cd8fb4348be28fa2efa91570de6c221f5162e6 after the user
+reported that the text editor loads files scrolled to the bottom and explicitly
+requested fix, build and publication on 2026-10-25. This authorizes this scoped
+new release only; preserve all prior releases/tags/assets. Main network-toolkit
+remains the sole source/update destination.
+
+The shared file editor assigned loaded text to its textarea and then focused
+it without resetting selection or scrolling. A one-time per-document showStart
+flag is now set when loading file values or explicitly reopening an existing
+file. The next draw places the caret at offset zero and sets scrollTop/scrollLeft
+to zero before synchronizing highlighting, gutter and position status. Normal
+editing, Find and manual navigation do not continually reset the view. Desktop
+imports and local/remote readers share this path. No file bytes, encoding,
+line endings, save/transport handlers or updater code changes.
+
+Reload completion updates the visible editor only if that document is still
+active and present. Inactive loads retain the pending initial view until their
+tab is shown, so a background completion cannot move another document's view.
+Two focused tests fail against exact released74 editor source and pass with
+the fix. New real-page browser coverage checks 12 theme/width/view cases at
+390/768/1280px for embedded and overlay views, loading/reloading/reopening,
+local and connected-SSH readers, desktop BOM/CRLF import, background reads,
+Find/typing and large/wrapped documents. APIs are isolated fixtures and no
+real file is written. Native Windows/file dialogs and real servers are untested.
+
+Go/UI/package/Windows resources are 1.17.75. Local validation passed 446 JS
+tests, 31 Python release guards, required root/terminal/desktop Go suites,
+release/resource metadata, HTML/browser syntax and Windows x64 GUI build.
+Hosted browser checks, package/artifact verification, publication and released74
+live update staging are pending. Preserve all earlier UI/credential/folder/
+macro/updater features. Future work requires its own publication authorization.
+
 ## 1.17.74 published: restore the original terminal connection window
 
 Prepared from main c07ef169a90c326ce205a37a34b6223eeacdba41 after the user

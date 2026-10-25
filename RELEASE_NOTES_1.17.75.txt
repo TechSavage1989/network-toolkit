@@ -1,0 +1,10 @@
+Network Toolkit 1.17.75
+
+What's new
+- Open text files at the start of the document instead of the bottom.
+- Reset the caret and both scroll positions when opening or reloading a file.
+
+The shared editor applies this to local files, desktop imports and files from
+connected sessions. Highlighting and line numbers align with the first line.
+Background reads leave the currently active document view in place.
+File contents, encoding, line endings and the existing save workflow are retained.

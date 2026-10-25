@@ -1,3 +1,20 @@
+NETWORK TOOLKIT 1.17.75 CANDIDATE VALIDATION
+
+Text files start at caret offset zero with both scroll axes at zero on load,
+reload and explicit reopen. Highlighting, line numbers and status align with
+the first line. Background reads leave the active file's view alone. Editing,
+Find, file bytes, encoding/line endings and save behavior are retained.
+
+Two focused regressions reproduce failures against exact released74 source
+and pass with the fix. Local validation passed 446 JavaScript tests, 31 Python
+release guards, required root/terminal/desktop Go suites, release/resource
+metadata, HTML/browser syntax and Windows x64 GUI build. Hosted checks, package/
+artifact verification, publication and live updater staging are pending.
+Browser fixture tests do not
+establish native Windows/file-dialog or real-server behavior. See the handoff.
+
+HISTORICAL PUBLISHED BASELINE
+
 NETWORK TOOLKIT 1.17.74 VALIDATION
 
 Restores the original terminal connection modal and removes Setup/Connection
