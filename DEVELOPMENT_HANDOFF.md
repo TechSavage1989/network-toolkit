@@ -45,8 +45,12 @@ Version metadata and Windows resources are 1.17.72. Local validation passed
 443 JavaScript tests, 31 Python release guards, root/terminal/desktop Go suites,
 release/resource metadata and browser-script syntax checks. The existing asset
 coverage caught the initially missing new-asset route; its explicit allowlist
-entry is now corrected and the full Go suite passes. Windows build, hosted
-browser checks, package/release and live updater staging are pending. Record
+entry is now corrected and the full Go suite passes. First hosted Checks
+40166046647 passed its check job, including Windows build/package, but its new
+browser regression caught the FTP startup loader dropping folder metadata.
+That client normalization is now corrected; the new browser assertion is
+retained. Revised hosted checks, package/release and live updater staging are
+pending. Record
 completed checks and publication evidence here. Native Windows, installation/
 restart and actual terminal hardware remain unverified.
 

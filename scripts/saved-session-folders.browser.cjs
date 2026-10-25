@@ -21,7 +21,7 @@ const profile=(id,name,extra={})=>({id,name,type:'ssh',host:id+'.test',port:22,u
    return route.fulfill({contentType:'application/json',body:JSON.stringify(data)});
   }
   try{
-   let body=fs.readFileSync(path.join(root,'web',p==='/'?'index.html':p));
+   const file=path.join(root,'web',p==='/'?'index.html':p);let body=fs.readFileSync(fs.existsSync(file)?file:path.join(root,p));
    if(p==='/')body=body.toString().replaceAll('__SESSION_TOKEN__','folder-fixture').replaceAll('__WINDOW_MODE__','main');
    return route.fulfill({body,contentType:p==='/'?'text/html':p.endsWith('.js')?'application/javascript':p.endsWith('.css')?'text/css':'application/octet-stream'});
   }catch{return route.fulfill({status:404,body:''});}
