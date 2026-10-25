@@ -24,6 +24,10 @@ Local validation passed 448 JavaScript tests, 31 Python release guards, required
 root/terminal/desktop Go suites, release/resource metadata, inline HTML/browser
 script syntax and Windows x64 GUI build. Hosted review, package verification,
 screenshot inspection, publication and released78 live staging are pending.
+The first hosted screenshot capture forced online state in the isolated
+server fixture and triggered live polling that disrupted a later layout check.
+The capture now retains the existing offline fixture state; no application
+polling or layout behavior changed. Hosted review is being rerun.
 Native Windows/WebView2, hardware and actual installation/restart remain
 unverified.
 
