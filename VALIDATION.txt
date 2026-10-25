@@ -23,9 +23,29 @@ all client/server layout checks, update startup/release notes and seven native
 Chromium timer scenarios. The real five-minute poll/focus collision passed.
 The downloaded review portable matches the verified local package byte-for-byte.
 User approved public source upload and publication of 1.17.67 on 2026-10-24.
-This publication-preparation commit changes documentation only from the tested
-runtime. Verify main workflows and downloaded official assets before declaring
-the release complete; record final evidence in a documentation follow-up.
+Published source/tag c88448fd1b4e2290b5614e35f8485968c5786413 changes only
+documentation from that tested runtime. Release 40157685254 passed.
+Main source Checks 40157685265 passed, including all Hosts/client/server browser
+checks, updater startup and all seven native Chromium timer scenarios.
+The real five-minute poll and focus collision passed on the released source.
+
+OFFICIAL PUBLICATION VERIFICATION
+- All four actual public downloads match their GitHub asset digests.
+- Outer/inner checksums, both ZIP CRCs and strict four-member updater allowlist.
+- Windows x64 GUI PE/version and standalone/portable/update executable identity.
+- All 671 source files match the exact published commit.
+- The published executable matches the approved review build byte-for-byte.
+- All six earlier release IDs and all asset IDs/sizes/digests remain unchanged.
+- The previously verified 1.17.63/64/65/66 source tags remain unchanged.
+- Exact released66 production feed check/download/stage of live67 in 9.80s.
+- Staged executable matches the independently downloaded official EXE.
+- No installation/restart or original executable modification occurred.
+
+The live updater harness calls the unchanged platform-independent production
+feed handlers with real HTTPS and isolated temporary settings. This verifies
+the network, package checks and staging path, not native Windows installation.
+See DEVELOPMENT_HANDOFF.md for official hashes and provenance. This final
+documentation follow-up must not rebuild, overwrite or republish released 67.
 
 The browser fixture uses fictional hosts text and mocked local-tools responses;
 it does not read or write this machine's system hosts file. Native Windows
