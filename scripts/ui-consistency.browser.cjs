@@ -23,6 +23,7 @@ async function fit(){return page.locator('.main .btn,.main .tab,.main .scope-swi
 async function copy(button,expected,keyboard=false){
  await button.scrollIntoViewIfNeeded();if(keyboard){await button.focus();await page.keyboard.press('Enter');}else await button.click();
  await page.waitForFunction(async value=>(await navigator.clipboard.readText())===value,expected);
+ assert.equal(await page.locator('#toastStack .toast').filter({hasText:'Copied to clipboard.'}).count(),1);
  result.copies.push({expected,keyboard});
 }
 (async()=>{
@@ -80,7 +81,7 @@ async function copy(button,expected,keyboard=false){
   await copy(address.locator('[data-value-copy-control]'),'192.0.2.4/24',theme==='dark');
   await copy(page.locator('#adapterList [aria-label="Copy MAC address value"]').first(),'02:00:00:00:00:04');
   assert.equal(await page.locator('#entryContextMenu:not(.hidden)').count(),0);
-  if(out&&(width===1600||width===390))await page.screenshot({path:path.join(out,'ui-overview-'+theme+'-'+width+'.png')});
+  if(out&&(width===1600||width===390)){await page.evaluate(()=>document.querySelector('#workspaceScroll').scrollTo({top:0,left:0}));await settle(page);await page.screenshot({path:path.join(out,'ui-overview-'+theme+'-'+width+'.png')});}
   await page.evaluate(()=>navigate('hosts'));await page.waitForSelector('.he-toolbar');await settle(page);
   await copy(page.locator('[data-hosts-action="copy-path"]'),'C:\\Windows\\System32\\drivers\\etc\\hosts',theme==='dark');
   const summary=page.locator('.he-more>summary'),find=page.locator('[data-hosts-action="find"]');

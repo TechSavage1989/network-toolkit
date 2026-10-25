@@ -5,6 +5,7 @@ What's new
 - Remove repeated diagnostic shortcuts and per-address Tools buttons from Overview.
 - Use consistent copy controls beside displayed values throughout the app.
 - Make adapter addresses and reusable detail values directly copyable.
+- Keep repeated copy notifications in one message.
 
 Navigation, adapter context menus, scans, result selection and existing clipboard
 actions remain available. Copy controls keep inputs, terminal content and secrets

@@ -6,7 +6,7 @@ direct copy actions without wrapping their original text. Existing native copy
 controls, text selection, context actions and exclusions are retained.
 
 Three focused JavaScript regressions pass; the coverage regression fails
-against released79. Local required checks passed 451 JavaScript tests, 31 Python release guards,
+against released79. Local required checks passed 453 JavaScript tests, 31 Python release guards,
 root/terminal/desktop Go suites, resource/release metadata and inline/browser
 syntax. Hosted navigation/clipboard review, build/package verification,
 publication and unchanged released79 live update staging are pending. Native Windows/WebView2, hardware and actual

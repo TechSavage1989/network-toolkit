@@ -32,7 +32,9 @@ copy buttons remain sole owners. Inputs, terminals, secrets, statuses, action
 cells and placeholders remain excluded. Shared toolbar SVGs retain their shape
 when labels wrap. Compact terminal recipient labels now wrap instead of clipping with an ellipsis,
 while retaining the command input scrollbar suppression. No transport,
-credentials or updater logic changes.
+credentials or updater logic changes. Identical toast notifications now reuse
+their existing element and refresh expiry, preventing rapid copy feedback from
+covering the workspace.
 
 Review found and corrected a CRLF export-fixture expectation and a clipped
 View recipients label at 390px. Icon fixture requests now use the same shared
@@ -48,7 +50,7 @@ use/export. The existing real app DNS/TCP clipboard regression is now run in CI
 against a freshly built Linux headless app. Browser tests use isolated/local
 fixtures, not external devices or Windows system files.
 
-Go/UI/package/Windows resources are consistently 1.17.80. Local required validation passed 451 JavaScript tests, 31 Python release guards,
+Go/UI/package/Windows resources are consistently 1.17.80. Local required validation passed 453 JavaScript tests, 31 Python release guards,
 root/terminal/desktop Go suites, resource/release metadata and inline/browser
 syntax checks. Hosted browser/build artifacts, package verification, publication
 and released79 live update staging are pending. Native Windows/WebView2, hardware and actual installation/restart
