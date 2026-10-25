@@ -10,8 +10,34 @@ installation, cancellation, duplicate clicks, download failures and replacing a
 pending download dialog with unrelated work. Hosted full-page tests check the
 download-to-final transition and exactly one mocked install POST at narrow,
 medium and wide sizes. Existing automatic tests still forbid automatic writes.
-Use the review branch's latest Checks result and actual release verification
-before declaring publication complete. Native Windows installation is untested.
+Full source Checks 40160319478 passed on
+fd9341f48c67204c9987ff4f923c08f30cc4b0ac before that exact commit was published.
+Results: 425 JavaScript tests, 31 Python tests, required Go suites, Windows x64
+GUI build and packaging; all Hosts/client/server checks; seven final-action
+browser cases; seven native Chromium timer scenarios including a real five-
+minute poll/focus collision. Inspected narrow/desktop final prompts are readable.
+Release 40160830448 passed and published v1.17.69 at the identical tested SHA.
+The automatic main Checks rerun uses the same source; the completed review run
+is the full runtime validation and may be retained if documentation supersedes
+the duplicate main run.
+
+OFFICIAL PUBLICATION VERIFICATION
+- All four actual public downloads match GitHub asset digests.
+- Outer/inner checksums, both ZIP CRCs and strict four-member updater allowlist.
+- Windows x64 GUI PE/version and standalone/portable/update executable identity.
+- All 673 source files match the exact released commit.
+- Published portable and EXE match the tested review build byte-for-byte.
+- All eight earlier release IDs and asset IDs/sizes/digests are unchanged.
+- All eight earlier source-tag SHAs match the prepublication snapshot.
+- Exact released68 production feed check/download/stage of live69 in 11.48s.
+- Staged EXE matches the independently downloaded official EXE.
+- No installation/restart or original executable modification occurred.
+
+See DEVELOPMENT_HANDOFF.md for official hashes and source provenance. The live
+harness uses real HTTPS and isolated temporary settings with unchanged production
+feed handlers. Native Windows installation/restart remains untested. Older
+clients use their embedded old prompts once to install 69. This documentation
+follow-up must not rebuild, replace or republish the released runtime.
 
 HISTORICAL PUBLISHED BASELINE
 

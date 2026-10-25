@@ -1,12 +1,12 @@
 # Network Toolkit development handoff
 
-## 1.17.69: one final update-install action, publication authorized
+## 1.17.69 published: one final update-install action
 
 Prepared from main 74d4a1103c6887fce793ed8ce24e298526d715b0 after the user
 requested removal of the redundant Review install and restart option, then
 explicitly said to publish when finished. This authorizes the new 1.17.69 source
 and release after validation; no further approval is needed for this build.
-The baseline remains published 1.17.68 until publication completes.
+The prior published baseline is 1.17.68, which is preserved.
 
 app-updater.js has no install-review action. A successful explicit download
 automatically changes its still-current notes dialog into the final installation
@@ -30,12 +30,52 @@ exercise real page DOM transitions and mock install requests at 390/768/1280px,
 checking exactly one explicit install POST from dialog/banner/settings. Other
 startup/native-timer cases still forbid all download/install calls.
 
-Read the review branch's latest Checks result before publishing the exact tested
-source. Verify all four actual official assets, source provenance and an unchanged
-released68 check/download/stage after publication. Preserve all older releases,
-tags and assets. Update this section and VALIDATION.txt with final results in a
-documentation follow-up that must not republish or move the released 69 tag.
-Native Windows/WebView2 installation and restart remain unverified here.
+Full Checks 40160319478 passed on exact source
+fd9341f48c67204c9987ff4f923c08f30cc4b0ac (tree
+2ebc70874caae34ac42fc313f64b57170bde6a23) before main was fast-forwarded to
+that identical commit. This is the published v1.17.69 source/tag. No code or
+documentation changed between reviewed source and publication. The completed
+Checks run includes all 425 JavaScript tests, 31 Python guards, required Go
+suites, Windows x64 GUI build, packaging, Hosts/client/server browser checks,
+all seven explicit final-action browser cases, and seven native timer scenarios
+including the real five-minute poll/focus collision. Inspected 390/1280-pixel
+screenshots show a readable final prompt with one Install and restart action.
+Review artifact 12586001236 matches the local portable byte-for-byte.
+
+Release 40160830448 passed and created release 423140565. The main push also
+starts Checks 40160830439 on that same source; the completed prepublication
+run above is the full runtime validation. Documentation follow-ups may supersede
+automatic duplicate main checks without changing the tagged runtime.
+
+All four actual public downloads passed GitHub asset digests, outer/inner
+SHA-256 manifests, both ZIP CRCs, strict four-member Update.zip validation,
+Windows x64 GUI PE/version checks and standalone/portable/update EXE identity.
+All 673 packaged source files match the exact published commit. The public
+portable and executable match the tested review build byte-for-byte. All eight
+older release IDs and asset IDs/sizes/digests are unchanged, and all eight
+older source-tag SHAs match the prepublication snapshot.
+
+The unchanged released 1.17.68 production feed handlers checked the live feed,
+verified/downloaded/staged 1.17.69 in 11.48 seconds. The staged EXE matches the
+independently downloaded official EXE. The harness used real HTTPS and isolated
+temporary settings and only the platform-independent feed handlers. No install
+or restart occurred; the original executable hash was unchanged. Raw logs and
+verification snapshots are retained with local publication QA records.
+
+An already-running older client uses its embedded old prompts once to install
+1.17.69. The simpler flow takes effect after 69 launches. Native Windows/WebView2
+installation, restart and actual user confirmation of the new flow remain
+unverified here; mocked browser install requests are not native installation.
+
+Official release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.69
+EXE SHA-256: cd4dca22be0dc8c1bc1f3381fab058fe40b7f2e3d2db90bd1cce9f1f427de33e
+Portable ZIP SHA-256: 0df37e50c7a4139b43c794a718838e1d14c16441d1ed48ae3870e3de6c9de8cb
+Update ZIP SHA-256: 34afdad86ff9b66553d43cfba53a258227b1674ed85aa774ee0134648dec65f5
+SHA256SUMS file SHA-256: 60405a6b0513bd89a87c1c26adde7ece02a82500cd7a70869a9b6913384e7b91
+
+This final documentation follow-up changes no runtime code and must not move
+the released 1.17.69 tag, replace its assets or republish it. Continue from latest
+main for future work, preserving one final install action and earlier features.
 
 ## 1.17.68 published: Hosts filter text clipping
 
