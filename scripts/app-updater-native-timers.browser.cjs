@@ -238,9 +238,23 @@ async function main() {
       assert.equal(h.checks, 1, 'Manual check should still work with saved automatic opt-out');
     });
 
-    // Run the three real 30-second windows together, without changing browser
+    // Run real retry and five-minute polling windows together, without changing browser
     // time, production delays, timer functions or scheduling implementation.
     const delayed = await Promise.allSettled([
+      scenario('real-five-minute-poll-and-focus-collision', { holdCheck: 2 }, async h => {
+        await waitFor(() => h.checks === 1 && h.activeChecks === 0, 'Startup check did not finish');
+        await h.settings();await h.waitForSchedule('Next automatic check:');
+        await h.page.evaluate(() => { window.dispatchEvent(new Event('focus')); window.dispatchEvent(new Event('online')); document.dispatchEvent(new Event('visibilitychange')); });
+        await sleep(250);assert.equal(h.checks, 1, 'Fresh focus events must not duplicate startup');
+        await waitFor(() => h.checks === 2 && h.activeChecks === 1, 'Native five-minute poll never ran', 320000);
+        const gap = h.report.checks[1].startedMs - h.report.checks[0].completedMs;
+        assert.ok(gap >= 299500 && gap < 320000, 'Unexpected real five-minute poll delay: ' + gap);
+        await h.page.evaluate(() => { window.dispatchEvent(new Event('focus')); window.dispatchEvent(new Event('online')); document.dispatchEvent(new Event('visibilitychange')); });
+        await sleep(250);assert.equal(h.checks, 2, 'Focus events overlapped the pending periodic check');
+        h.releaseCheck();await waitFor(() => h.activeChecks === 0, 'Held periodic check did not finish');
+        await h.waitForSchedule('Next automatic check:');assert.equal(h.maxActiveChecks, 1);
+        await h.screenshot('periodic-result');
+      }),
       scenario('real-backoff-retry', { failFirst: true }, async h => {
         await waitFor(() => h.checks === 1 && h.activeChecks === 0, 'First release check did not complete');
         await h.settings();

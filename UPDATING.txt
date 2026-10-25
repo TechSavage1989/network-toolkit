@@ -63,14 +63,22 @@ Only newer stable Windows x64 releases can be staged. Do not mix files from
 different releases. Downloading does not install until you confirm restart.
 
 AUTOMATIC REMINDERS (1.17.59 AND LATER)
-The main Windows window checks after startup and every six hours while open.
+From 1.17.66, the main Windows window checks after startup and every five minutes
+while visible and online. Returning to the app can check after two minutes since
+the last attempt, unless a retry or service cooldown is pending. Hidden/offline
+windows pause periodic checks. This is polling, not push notification delivery.
 The update banner asks before downloading; a verified download then offers
 Review install and restart, with a separate final confirmation. Nothing is
 automatically downloaded, installed, or restarted. Later hides that reminder
 for 24 hours. Use App settings > Check for updates to show it sooner.
 Automatic checks can be disabled in App settings. Quiet network failures retry
 after 30 seconds and 2 minutes, then back off from 15 minutes to six hours.
-App settings shows the last automatic result and next check; manual checks remain available.
+App settings shows the last automatic result and next check. GitHub service
+cooldowns apply to manual checks too. Conditional requests reduce bandwidth,
+but unauthenticated checks still share GitHub's per-IP request limit. Multiple
+app instances or other apps on that IP may delay detection. No credentials or
+notification permissions are required. Cached release details survive temporary
+errors and valid not-modified responses; no cached response authorizes installation.
 Updates apply only to the executable. Saved settings/profiles are retained.
 
 1.17.62 BOOTSTRAP AND DIAGNOSTICS

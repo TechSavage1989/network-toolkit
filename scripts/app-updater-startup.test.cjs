@@ -9,9 +9,10 @@ const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve
 const settle=async()=>{for(let i=0;i<12;i++)await Promise.resolve();};
 function ui(options={}){
   const document=makeDocument('<button id="mobileMenu"></button><button id="settingsButton"></button><div id="appUpdateNotice"></div><div id="modalRoot"><div id="existingDialog">Existing work</div></div>');
-  const calls=[],timers=new Map(),saved=[],toasts=[];let timerId=0,now=1792872000000,data=structuredClone(available);
+  const calls=[],timers=new Map(),saved=[],toasts=[],listeners={};let timerId=0,now=1792872000000,data=structuredClone(available);
   class TestDate extends Date{constructor(value=now){super(value)}static now(){return now}}
   const c={document,AbortController,Date:TestDate,online:true,OFFLINE:false,shutDown:false,TERMINAL_ONLY:false,DETACHED_TERMINAL:false,status:{version:'1.17.61'},VERSION:'1.17.61',state:{appUpdatePreferences:{enabled:true,...options.preferences}},
+    addEventListener:(name,fn)=>(listeners[name]??=[]).push(fn),
     setTimeout:(fn,delay)=>{timers.set(++timerId,{fn,delay});return timerId},clearTimeout:id=>timers.delete(id),
     saveState:()=>saved.push(structuredClone(c.state.appUpdatePreferences)),flushState:async()=>true,toast:message=>toasts.push(message),
     api:async(path,method,body)=>{calls.push([path,method,body]);if(options.api)return options.api(path,method,body);return structuredClone(data)},
@@ -23,7 +24,7 @@ function ui(options={}){
     c.clearTimeout=function(...args){assert.equal(this?.window,this,'clearTimeout requires the Window receiver');return cancel(...args)};
   }
   c.window=c;vm.createContext(c);vm.runInContext(fs.readFileSync(require.resolve('../web/assets/app-update-notes.js'),'utf8'),c);vm.runInContext(source,c);
-  return {c,document,calls,timers,saved,toasts,setData:value=>data=value,
+  return {c,document,calls,timers,saved,toasts,listeners,advance:ms=>now+=ms,setData:value=>data=value,
     async tick(){const entry=[...timers.entries()].sort((a,b)=>a[1].delay-b[1].delay)[0];assert.ok(entry,'a timer is pending');const [id,timer]=entry;timers.delete(id);now+=timer.delay;await timer.fn();await settle();},
     nextDelay:()=>timers.values().next().value?.delay,
     async click(action){const button=document.querySelector('[data-app-update="'+action+'"]');assert.ok(button,action+' exists');for(const listener of document.listeners.click||[])await listener({target:button});},
@@ -76,18 +77,18 @@ test('settings status loading overlapping the timer is deferred, then automatica
   assert.match(h.noticeText(),/1.17.62 is available/);assert.match(h.scheduleText(),/Last automatic attempt/);assert.match(h.scheduleText(),/Update available: 1.17.62/);assert.match(h.scheduleText(),/Next automatic check/);
 });
 
-test('transient failure retries promptly and quietly, then returns to the six-hour cadence',async()=>{
+test('transient failure retries promptly and quietly, then returns to the five-minute cadence',async()=>{
   let checks=0;const h=ui({api:async path=>{if(path==='/updates/check'&&++checks===1)throw Error('Network briefly unavailable');return {...available,hasUpdate:path==='/updates/check'};}});
   h.c.NetworkToolkitUpdater.start();await h.tick();assert.equal(h.nextDelay(),30000);assert.equal(h.noticeText(),'');assert.equal(h.toasts.length,0);
   await h.settings();assert.match(h.scheduleText(),/Network briefly unavailable/);assert.match(h.scheduleText(),/Next automatic retry/);
-  await h.tick();assert.equal(checks,2);assert.equal(h.nextDelay(),21600000);assert.match(h.noticeText(),/1.17.62 is available/);
+  await h.tick();assert.equal(checks,2);assert.equal(h.nextDelay(),300000);assert.match(h.noticeText(),/1.17.62 is available/);
   assert.equal(h.calls.some(c=>['/updates/download','/updates/install'].includes(c[0])),false);
 });
 
 test('manual check before startup timer reveals a snoozed release without a duplicate check',async()=>{
   const h=ui({preferences:{dismissed:'download:1.17.62',until:Date.now()+86400000}});
   h.c.NetworkToolkitUpdater.start();await h.settings();await h.click('check');
-  assert.equal(h.calls.filter(c=>c[0]==='/updates/check').length,1);assert.equal(h.nextDelay(),21600000);assert.equal(h.timers.size,1);assert.match(h.noticeText(),/available/);
+  assert.equal(h.calls.filter(c=>c[0]==='/updates/check').length,1);assert.equal(h.nextDelay(),300000);assert.equal(h.timers.size,1);assert.match(h.noticeText(),/available/);
 });
 
 test('manual check while initial preferences load preserves the explicit reveal and does not overwrite saved opt-out',async()=>{
@@ -181,15 +182,15 @@ test('actual initializer preserves Window receiver for startup, manual replaceme
   const h=ui({brandTimers:true,api:async path=>path==='/state'?{appUpdatePreferences:{enabled:true}}:path==='/jobs'?[]:available});
   await init(h);await settle();assert.equal(h.timers.size,1);assert.equal(h.nextDelay(),0);
   await h.tick();assert.equal(h.calls.filter(c=>c[0]==='/updates/check').length,1);
-  assert.equal(h.timers.size,1);assert.equal(h.nextDelay(),21600000);
+  assert.equal(h.timers.size,1);assert.equal(h.nextDelay(),300000);
   await h.settings();assert.match(h.scheduleText(),/Last automatic attempt:.*Update available/);
   await h.click('check');assert.equal(h.calls.filter(c=>c[0]==='/updates/check').length,2);
-  assert.equal(h.timers.size,1);assert.equal(h.nextDelay(),21600000);
+  assert.equal(h.timers.size,1);assert.equal(h.nextDelay(),300000);
   for(const enabled of [false,true]){
     const box=h.document.querySelector('[data-app-update-auto]');box.checked=enabled;
     for(const handler of h.document.listeners.change||[])await handler({target:box});
     assert.equal(h.timers.size,1);assert.equal(h.nextDelay(),0);
-    await h.tick();assert.equal(h.timers.size,1);assert.equal(h.nextDelay(),21600000);
+    await h.tick();assert.equal(h.timers.size,1);assert.equal(h.nextDelay(),enabled?300000:21600000);
   }
   assert.equal(h.calls.filter(c=>c[0]==='/updates/check').length,3);
   assert.equal(h.calls.some(c=>/updates\/(download|install)/.test(c[0])),false);
@@ -206,6 +207,18 @@ test('Window-bound timer cancellation retains bounded retry and no duplicate tim
   await init(h);await settle();await h.tick();
   assert.equal(attempts,1);assert.equal(h.timers.size,1);assert.equal(h.nextDelay(),30000);
   await h.settings();assert.match(h.scheduleText(),/Next automatic retry/);
-  await h.click('check');assert.equal(attempts,2);assert.equal(h.timers.size,1);assert.equal(h.nextDelay(),21600000);
+  await h.click('check');assert.equal(attempts,2);assert.equal(h.timers.size,1);assert.equal(h.nextDelay(),300000);
   await h.tick();assert.equal(attempts,3);assert.equal(h.timers.size,1);
+});
+
+test('native-bound focus, visibility and online handlers share freshness and one automatic timer',async()=>{
+  const h=ui({brandTimers:true,context:{navigator:{onLine:true}}});h.c.NetworkToolkitUpdater.start();await h.tick();
+  assert.equal(h.listeners.focus.length,1);assert.equal(h.listeners.online.length,1);
+  h.advance(120000);for(const fn of h.listeners.focus)fn();for(const fn of h.document.listeners.visibilitychange)fn();for(const fn of h.listeners.online)fn();
+  assert.equal(h.timers.size,1);assert.equal(h.nextDelay(),0);await h.tick();assert.equal(h.calls.filter(c=>c[0]==='/updates/check').length,2);
+  h.c.document.hidden=true;await h.tick();assert.equal(h.calls.filter(c=>c[0]==='/updates/check').length,2);assert.equal(h.nextDelay(),300000);
+  h.c.document.hidden=false;for(const fn of h.document.listeners.visibilitychange)fn();await h.tick();assert.equal(h.calls.filter(c=>c[0]==='/updates/check').length,3);
+  h.c.navigator.onLine=false;await h.tick();assert.equal(h.calls.filter(c=>c[0]==='/updates/check').length,3);
+  h.c.navigator.onLine=true;for(const fn of h.listeners.online)fn();await h.tick();assert.equal(h.calls.filter(c=>c[0]==='/updates/check').length,4);
+  assert.equal(h.calls.some(c=>/updates\/(download|install)/.test(c[0])),false);
 });

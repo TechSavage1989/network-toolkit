@@ -44,6 +44,7 @@ type appUpdater struct {
 	latest      *updateRelease
 	checked     bool
 	networkBusy bool
+	feed        updateFeedCache
 }
 
 func updateNewer(candidate, current string) bool {
@@ -247,7 +248,7 @@ func (a *application) updateBusy() []string {
 	return busy
 }
 func (a *application) updateStatusLocked() map[string]any {
-	return map[string]any{"currentVersion": model.Version, "executable": updateNamingStatus(), "restartedAfterUpdate": a.updateHealthDir != "", "finalizing": a.updateFinalizing.Load(), "supported": runtime.GOOS == "windows" && runtime.GOARCH == "amd64" && a.windowMode == "main", "mode": "direct", "latest": a.updater.latest, "checked": a.updater.checked, "hasUpdate": a.updater.latest != nil && updateNewer(a.updater.latest.Version, model.Version), "releasesUrl": updateReleasesURL, "staged": a.updater.staged, "installing": a.updater.installing, "busy": a.updateBusy()}
+	return map[string]any{"currentVersion": model.Version, "executable": updateNamingStatus(), "restartedAfterUpdate": a.updateHealthDir != "", "finalizing": a.updateFinalizing.Load(), "supported": runtime.GOOS == "windows" && runtime.GOARCH == "amd64" && a.windowMode == "main", "mode": "direct", "latest": a.updater.latest, "checked": a.updater.checked, "checkAfter": a.updater.feed.checkAfterMillis(), "hasUpdate": a.updater.latest != nil && updateNewer(a.updater.latest.Version, model.Version), "releasesUrl": updateReleasesURL, "staged": a.updater.staged, "installing": a.updater.installing, "busy": a.updateBusy()}
 }
 func (a *application) handleUpdates(w http.ResponseWriter, r *http.Request) {
 	a.updater.mu.Lock()

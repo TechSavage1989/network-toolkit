@@ -1,7 +1,14 @@
-NETWORK TOOLKIT 1.17.65
+NETWORK TOOLKIT 1.17.66
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.65
+CURRENT RELEASE - 1.17.66
+
+Checks for new releases every five minutes while the app is visible and online,
+and when you return after at least two minutes. Service limits may delay checks.
+The install review is shorter, with clear notes and a Save your work reminder.
+Nothing downloads or installs without your approval.
+
+PREVIOUS RELEASE - 1.17.65
 
 Fixes native browser timer binding for automatic update checks and their
 cancellation. Saved preferences, release notes and explicit update approval

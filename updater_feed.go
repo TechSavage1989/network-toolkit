@@ -9,12 +9,157 @@ import (
 	"net/http"
 	"net/url"
 	"networktoolkit/internal/model"
+	"strconv"
 	"strings"
 	"time"
 )
 
 const updateRepository = "TechSavage1989/network-toolkit"
 const updateAPIURL = "https://api.github.com/repos/" + updateRepository + "/releases/latest"
+
+const updateFeedMaxBody = 2 << 20
+
+var errUpdateFeedCooldown = errors.New("GitHub has temporarily limited update checks. Please wait until the next permitted check")
+
+// Feed state belongs to this app process, not to a browser window. Only a
+// successfully parsed trusted release can replace the cached payload and ETag.
+// Download requests deliberately do not share this metadata cache or cooldown.
+type updateFeedCache struct {
+	etag       string
+	payload    []byte
+	checkAfter time.Time
+}
+
+func (cache updateFeedCache) checkAfterMillis() int64 {
+	if cache.checkAfter.IsZero() {
+		return 0
+	}
+	// Round up so a millisecond-resolution browser timer cannot retry just
+	// before the backend's higher-resolution deadline.
+	return cache.checkAfter.Add(time.Millisecond - time.Nanosecond).UnixMilli()
+}
+
+func updateFeedETag(raw string) string {
+	if len(raw) > 1024 {
+		return ""
+	}
+	value := strings.TrimPrefix(raw, "W/")
+	if len(value) < 2 || value[0] != '"' || value[len(value)-1] != '"' {
+		return ""
+	}
+	for _, c := range []byte(value[1 : len(value)-1]) {
+		if c < 0x21 || c == '"' || c == 0x7f {
+			return ""
+		}
+	}
+	return raw
+}
+
+// Use the latest server deadline. Integer parsing is bounded before converting
+// seconds to durations; Unix reset dates are restricted to representable calendar
+// dates, which also keeps checkAfter inside JavaScript's exact integer range.
+func updateFeedCheckAfter(header http.Header, status int, now time.Time) time.Time {
+	var after time.Time
+	extend := func(candidate time.Time) {
+		if candidate.After(now) && candidate.After(after) {
+			after = candidate
+		}
+	}
+	secondsAfter := func(raw string) bool {
+		raw = strings.TrimSpace(raw)
+		if raw == "" || strings.IndexFunc(raw, func(c rune) bool { return c < '0' || c > '9' }) >= 0 {
+			return false
+		}
+		seconds, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || seconds > int64(time.Duration(1<<63-1)/time.Second) {
+			return false
+		}
+		extend(now.Add(time.Duration(seconds) * time.Second))
+		return true
+	}
+	if retry := header.Get("Retry-After"); !secondsAfter(retry) {
+		if date, err := http.ParseTime(retry); err == nil {
+			extend(date)
+		}
+	}
+	secondsAfter(header.Get("X-Poll-Interval"))
+	if strings.TrimSpace(header.Get("X-RateLimit-Remaining")) == "0" {
+		reset, err := strconv.ParseInt(strings.TrimSpace(header.Get("X-RateLimit-Reset")), 10, 64)
+		if err == nil && reset > 0 && reset <= 253402300799 { // 9999-12-31T23:59:59Z
+			extend(time.Unix(reset, 0))
+		}
+	}
+	if status == http.StatusForbidden || status == http.StatusTooManyRequests {
+		extend(now.Add(time.Minute))
+	}
+	return after
+}
+
+// The returned cache retains all previous validated data on errors, but records
+// cooldown headers even when the response body or status cannot be accepted.
+func updateFetchRelease(ctx context.Context, client *http.Client, cache updateFeedCache) (*updateRelease, updateFeedCache, error) {
+	if time.Now().Before(cache.checkAfter) {
+		return nil, cache, errUpdateFeedCooldown
+	}
+	r, err := http.NewRequestWithContext(ctx, http.MethodGet, updateAPIURL, nil)
+	if err != nil {
+		return nil, cache, err
+	}
+	r.Header.Set("User-Agent", "Network-Toolkit/"+model.Version)
+	r.Header.Set("Accept", "application/vnd.github+json")
+	r.Header.Set("Cache-Control", "no-cache")
+	if etag := updateFeedETag(cache.etag); etag != "" && len(cache.payload) > 0 {
+		r.Header.Set("If-None-Match", etag)
+	}
+	response, err := client.Do(r)
+	if err != nil {
+		return nil, cache, fmt.Errorf("Unable to reach GitHub: %w", err)
+	}
+	defer response.Body.Close()
+	if after := updateFeedCheckAfter(response.Header, response.StatusCode, time.Now()); after.After(cache.checkAfter) {
+		cache.checkAfter = after
+	}
+	if response.StatusCode == http.StatusNotModified {
+		if r.Header.Get("If-None-Match") == "" || len(cache.payload) > updateFeedMaxBody {
+			return nil, cache, errors.New("GitHub returned unchanged metadata without a valid cached release")
+		}
+		// Do not promote a 304 into a trusted release without the same asset,
+		// stable-version, size and repository validation used for a fresh 200.
+		latest, err := updateParseRelease(cache.payload)
+		if err == nil {
+			if etag := updateFeedETag(response.Header.Get("ETag")); etag != "" {
+				cache.etag = etag
+			}
+		}
+		return latest, cache, err
+	}
+	if response.StatusCode == http.StatusNotFound {
+		return nil, cache, errors.New("The public update feed is not available yet. Your current installation is unchanged")
+	}
+	if response.StatusCode == http.StatusForbidden || response.StatusCode == http.StatusTooManyRequests {
+		return nil, cache, errors.New("GitHub has temporarily limited update requests. Try again later")
+	}
+	if response.StatusCode != http.StatusOK {
+		return nil, cache, fmt.Errorf("GitHub returned HTTP %d; your current installation is unchanged", response.StatusCode)
+	}
+	if response.ContentLength > updateFeedMaxBody {
+		return nil, cache, errors.New("Update response exceeds its size limit")
+	}
+	data, err := io.ReadAll(io.LimitReader(response.Body, updateFeedMaxBody+1))
+	if err != nil {
+		return nil, cache, err
+	}
+	if len(data) > updateFeedMaxBody {
+		return nil, cache, errors.New("Update response exceeds its size limit")
+	}
+	latest, err := updateParseRelease(data)
+	if err != nil {
+		return nil, cache, err
+	}
+	cache.etag = updateFeedETag(response.Header.Get("ETag"))
+	cache.payload = data
+	return latest, cache, nil
+}
 
 type updateRelease struct {
 	Version     string `json:"version"`
@@ -132,6 +277,10 @@ func (a *application) handleUpdateFeedLocked(w http.ResponseWriter, r *http.Requ
 	if r.URL.Path != "/api/updates/check" && r.URL.Path != "/api/updates/download" {
 		return false
 	}
+	if a.updater.networkBusy {
+		jsonError(w, 409, "An update check or download is already running.")
+		return true
+	}
 	a.updater.networkBusy = true
 	defer func() { a.updater.networkBusy = false }()
 	_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(6 * time.Minute))
@@ -143,14 +292,13 @@ func (a *application) handleUpdateFeedLocked(w http.ResponseWriter, r *http.Requ
 	defer cancel()
 	client := updateHTTPClient()
 	if r.URL.Path == "/api/updates/check" {
-		data, e := a.updateFetchUnlocked(ctx, client, updateAPIURL, 2<<20)
+		latest, e := a.updateReleaseUnlocked(ctx, client)
 		if e != nil {
-			jsonError(w, 502, e.Error())
-			return true
-		}
-		latest, e := updateParseRelease(data)
-		if e != nil {
-			jsonError(w, 502, e.Error())
+			status := http.StatusBadGateway
+			if errors.Is(e, errUpdateFeedCooldown) {
+				status = http.StatusTooManyRequests
+			}
+			jsonResponse(w, status, map[string]any{"error": e.Error(), "checkAfter": a.updater.feed.checkAfterMillis()})
 			return true
 		}
 		a.updater.latest = latest
@@ -191,6 +339,19 @@ func (a *application) handleUpdateFeedLocked(w http.ResponseWriter, r *http.Requ
 	}
 	jsonResponse(w, 200, a.updateStatusLocked())
 	return true
+}
+
+// Caller holds updater.mu and has reserved networkBusy. Release the mutex for
+// the network round trip, then publish cache/cooldown state under the same lock.
+func (a *application) updateReleaseUnlocked(ctx context.Context, client *http.Client) (*updateRelease, error) {
+	cache := a.updater.feed
+	a.updater.mu.Unlock()
+	defer func() {
+		a.updater.mu.Lock()
+		a.updater.feed = cache
+	}()
+	latest, cache, err := updateFetchRelease(ctx, client, cache)
+	return latest, err
 }
 
 // The updater's network state is reserved, but normal diagnostics and status

@@ -11,16 +11,14 @@ test('release card shows a title and current-to-next version with accessible lab
   assert.equal(labels.find(node=>node.getAttribute('aria-label')==='Installed version').textContent,'1.17.63');
   assert.equal(labels.find(node=>node.getAttribute('aria-label')==='Release version').textContent,'1.17.64');
   assert.match(doc.querySelector('.nt-update-notes-versions').textContent,/1\.17\.63→1\.17\.64/);
-  assert.equal(doc.querySelector('details').hasAttribute('open'),false);
-  assert.equal(doc.querySelector('summary').textContent,'Read all release notes');
-  assert.equal(doc.querySelector('.nt-update-notes-full').getAttribute('tabindex'),'0');
+  assert.equal(doc.querySelector('details'),null);
 });
 
 test('headings do not consume the four highlight slots, and full notes keep later changes',()=>{
   const doc=render('# Network Toolkit 1.17.64\n\n## Improvements\n- One\n* Two\n+ Three\n4. Four\n5) Five\n\n### Fixes ###\n- Six');
   assert.deepEqual(doc.querySelectorAll('li').map(node=>node.textContent),['One','Two','Three','Four']);
   const full=doc.querySelector('.nt-update-notes-full').textContent;
-  assert.match(full,/Network Toolkit 1\.17\.64/);assert.match(full,/Improvements/);assert.match(full,/• Five/);assert.match(full,/Fixes\n• Six/);
+  assert.doesNotMatch(full,/Network Toolkit 1\.17\.64|• One|• Two|• Three|• Four/);assert.match(full,/Improvements/);assert.match(full,/• Five/);assert.match(full,/Fixes\n• Six/);
   assert.doesNotMatch(full,/^#/m);
 });
 
@@ -54,7 +52,7 @@ test('simple emphasis is readable without losing punctuation or file-name unders
 test('plain paragraphs become concise highlights and support Windows newlines',()=>{
   const doc=render('## Changes\r\n\r\nFaster checks,\r\nwith clearer status.\r\n\r\nSettings are retained.');
   assert.deepEqual(doc.querySelectorAll('li').map(node=>node.textContent),['Faster checks, with clearer status.','Settings are retained.']);
-  assert.doesNotMatch(doc.querySelector('.nt-update-notes-full').textContent,/\r/);
+  assert.equal(doc.querySelector('.nt-update-notes-full'),null);assert.doesNotMatch(doc.textContent,/\r/);
 });
 
 test('missing, blank and non-string notes use an honest fallback instead of invented changes',()=>{
@@ -109,4 +107,28 @@ test('helper exposes the same contract in a browser without requiring Node',()=>
   vm.runInContext(fs.readFileSync(require.resolve('../web/assets/app-update-notes.js'),'utf8'),context);
   assert.equal(typeof context.window.NetworkToolkitUpdateNotes.html,'function');
   assert.match(context.window.NetworkToolkitUpdateNotes.html({version:'1.2.3',notes:'- Safe text'}),/Safe text/);
+});
+
+test('same-version notes have one badge and never imply an upgrade',()=>{
+  const doc=makeDocument(html({currentVersion:'1.17.65',version:'1.17.65',notes:'- Improved status.'}));
+  assert.equal(doc.querySelector('.nt-update-notes-versions').textContent,'1.17.65');
+  assert.equal(doc.querySelectorAll('[aria-label="Installed version"]').length,0);assert.doesNotMatch(doc.textContent,/→/);
+});
+test('summary content appears once and disclosure contains only additional notes',()=>{
+  const doc=makeDocument(html({currentVersion:'1.17.65',version:'1.17.66',notes:"Network Toolkit 1.17.66\n\nWhat's new\n- One\n- Two\n- Three\n- Four\n\nDownloads still require your action.\n\n## Compatibility\n- Five"}));
+  for(const text of ['One','Two','Three','Four'])assert.equal(doc.textContent.split(text).length-1,1);
+  assert.equal(doc.querySelector('summary').textContent,'Read more');
+  assert.match(doc.querySelector('.nt-update-notes-full').textContent,/Downloads still require your action\.\nCompatibility\n• Five/);
+  assert.doesNotMatch(doc.querySelector('.nt-update-notes-full').textContent,/What's new|Network Toolkit 1.17.66/);
+});
+test('four complete highlights without extra content have no redundant disclosure',()=>{
+  for(const heading of ["What's new", "## What's new",'## Changes']){
+    const doc=render('Network Toolkit 1.17.64\n\n'+heading+'\n- One\n- Two\n- Three\n- Four');
+    assert.equal(doc.querySelector('details'),null);assert.equal(doc.querySelectorAll('li').length,4);
+  }
+});
+test('deduplication ignores presentation markers and whitespace but retains extra historical headings',()=>{
+  const doc=render('## Improvements\n- **One**\n- One\n- Two\n- Three\n- Four\n\n## Network Toolkit 1.17.63\nOlder compatibility information.');
+  assert.deepEqual(doc.querySelectorAll('li').map(node=>node.textContent),['One','Two','Three','Four']);
+  const extra=doc.querySelector('.nt-update-notes-full').textContent;assert.match(extra,/Network Toolkit 1.17.63\nOlder compatibility information/);assert.doesNotMatch(extra,/• One/);
 });

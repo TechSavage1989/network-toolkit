@@ -9,7 +9,7 @@ const pause=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {pro
   const browser=await playwright.chromium.launch({headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:fs.existsSync('/usr/bin/chromium')?{executablePath:'/usr/bin/chromium'}:{}),args:['--no-sandbox']});
   try{
     async function scenario(name,options={},verify){
-      const page=await browser.newPage(),errors=[],requests=[];let checks=0,latest={...available,hasUpdate:false,latest:null};
+      const page=await browser.newPage(),errors=[],requests=[];let checks=0,latest=options.staged?{...available,staged:{version:'1.17.62',sha256:'verified'}}:{...available,hasUpdate:false,latest:null};
       const stateGate=options.holdState?pause():null,unrelatedGate=options.holdUnrelated?pause():null;
       page.on('pageerror',error=>errors.push(error.message));
       await page.clock.install();
@@ -25,8 +25,12 @@ const pause=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {pro
           if(p==='/api/updates/status')data=latest;
           if(p==='/api/updates/check'){
             checks++;
+            if(options.rateAfterFirst&&checks===2){
+              latest={...latest,checkAfter:await page.evaluate(()=>Date.now()+600000)};
+              return route.fulfill({status:429,contentType:'application/json',body:JSON.stringify({error:'GitHub rate limit; wait before checking again',checkAfter:latest.checkAfter})});
+            }
             if(options.failFirst&&checks===1)return route.fulfill({status:502,contentType:'application/json',body:JSON.stringify({error:'Temporary network interruption'})});
-            latest=options.staleFirst&&checks===1?{...available,hasUpdate:false,latest:{version:'1.17.61'}}:available;data=latest;
+            latest=options.staleFirst&&checks===1?{...available,hasUpdate:false,latest:{version:'1.17.61'}}:options.staged?{...available,staged:{version:'1.17.62',sha256:'verified'}}:options.release||available;data=latest;
           }
           return route.fulfill({contentType:'application/json',body:JSON.stringify(data)});
         }
@@ -74,6 +78,59 @@ const pause=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {pro
       await h.advance(100);const previous=h.checks;await h.settings();await h.page.locator('[data-app-update="check"]').click();await h.page.waitForFunction(()=>document.querySelector('#appUpdateNotice').textContent.includes('1.17.62'));
       await h.advance(6000);assert.equal(h.checks,previous+1);assert.match(await h.notice(),/1.17.62 is available/);
     });
+    await scenario('five-minute checks and focus freshness preserve opt-in and no automatic install',{},async h=>{
+      await h.advance(100);assert.equal(h.checks,1);
+      await h.page.evaluate(()=>{window.dispatchEvent(new Event('focus'));window.dispatchEvent(new Event('online'));});
+      await h.advance(100);assert.equal(h.checks,1);
+      await h.advance(120000);
+      await h.page.evaluate(()=>{window.dispatchEvent(new Event('focus'));document.dispatchEvent(new Event('visibilitychange'));window.dispatchEvent(new Event('online'));});
+      await h.advance(100);assert.equal(h.checks,2);
+      await h.advance(300100);assert.equal(h.checks,3);
+      await h.settings();await h.page.locator('[data-app-update-auto]').uncheck();
+      await h.advance(100);
+      await h.page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+      await h.advance(300100);assert.equal(h.checks,3);
+    });
+    await scenario('server cooldown survives focus and manual checks without losing known release',{rateAfterFirst:true},async h=>{
+      await h.advance(100);assert.equal(h.checks,1);await h.settings();
+      await h.page.locator('[data-app-update="check"]').click();await h.page.waitForFunction(()=>document.querySelector('#appUpdateSettings').textContent.includes('GitHub rate limit'));
+      assert.equal(h.checks,2);assert.match(await h.notice(),/1.17.62 is available/);
+      await h.advance(120100);
+      await h.page.evaluate(()=>{window.dispatchEvent(new Event('focus'));window.dispatchEvent(new Event('online'));});
+      await h.page.locator('[data-app-update="check"]').click();await h.advance(100);assert.equal(h.checks,2);
+      await h.advance(480100);assert.equal(h.checks,3);
+    });
+    await scenario('current-version release notes show one badge with no duplicate disclosure',{release:{...available,currentVersion:'1.17.62',hasUpdate:false,latest:{version:'1.17.62',notes:"Network Toolkit 1.17.62\n\nWhat's new\n- One\n- Two\n- Three\n- Four"}}},async h=>{
+      await h.advance(100);await h.settings();
+      const card=h.page.locator('.nt-update-notes');
+      assert.equal(await card.locator('.nt-update-notes-versions').innerText(),'1.17.62');
+      assert.equal(await card.locator('details').count(),0);assert.equal(await card.locator('li').count(),4);
+      const out=process.env.TOOLKIT_TEST_OUTPUT||'/tmp/ntk-updater-browser';fs.mkdirSync(out,{recursive:true});
+      for(const width of [390,768,1280]){
+        await h.page.setViewportSize({width,height:900});await card.scrollIntoViewIfNeeded();
+        assert.equal(await card.evaluate(el=>el.scrollWidth<=el.clientWidth+1),true);
+        await h.page.screenshot({path:path.join(out,'update-current-notes-'+width+'.png')});
+      }
+    });
+    await scenario('concise install review preserves confirmation at narrow and wide sizes',{staged:true},async h=>{
+      await h.advance(100);
+      for(const width of [390,768,1280]){
+        await h.page.setViewportSize({width,height:900});
+        await h.page.locator('#appUpdateNotice [data-app-update="review"]').click();
+        const modal=h.page.locator('#modalRoot'),text=await modal.innerText();
+        assert.match(text,/Save your work before restarting\./);
+        assert.match(text,/Replace the current app with version 1.17.62 and restart\?/);
+        assert.doesNotMatch(text,/Export any diagnostic results|Updates keep|previous.json|atomic swap|SHA-256 verification checks/);
+        await modal.getByRole('button',{name:'Install and restart',exact:true}).waitFor({state:'visible'});
+        assert.equal(await modal.locator('.nt-update-notes').count(),1);
+        assert.equal(await modal.evaluate(el=>el.scrollWidth<=el.clientWidth+1),true);
+        const out=process.env.TOOLKIT_TEST_OUTPUT||'/tmp/ntk-updater-browser';fs.mkdirSync(out,{recursive:true});
+        await h.page.screenshot({path:path.join(out,'update-install-'+width+'.png')});
+        await modal.getByRole('button',{name:'Cancel',exact:true}).click();
+        assert.equal(await modal.innerText(),'');
+        assert.match(await h.notice(),/downloaded and verified/);
+      }
+    });
     await scenario('notes are safe and readable before any download',{},async h=>{
       await h.advance(100);assert.equal(h.checks,1);
       for(const width of [390,768,1280]){
@@ -86,6 +143,8 @@ const pause=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {pro
         assert.equal(await card.evaluate(el=>el.scrollWidth<=el.clientWidth+1),true);
         const summary=card.locator('summary');await summary.focus();await summary.press('Enter');
         assert.equal(await card.locator('details').getAttribute('open'),'');
+        assert.doesNotMatch(await card.locator('.nt-update-notes-full').innerText(),/Faster startup checks|Clear update notes|Settings are preserved|Update when you choose/);
+        assert.match(await card.locator('.nt-update-notes-full').innerText(),/More details/);
         const out=process.env.TOOLKIT_TEST_OUTPUT||'/tmp/ntk-updater-browser';fs.mkdirSync(out,{recursive:true});
         await h.page.screenshot({path:path.join(out,'update-notes-'+width+'.png')});
         await h.page.getByRole('button',{name:'Not now',exact:true}).click();

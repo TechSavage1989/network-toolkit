@@ -1,6 +1,38 @@
 # Network Toolkit development handoff
 
-## Start here
+## 1.17.66 candidate: concise review and faster detection
+
+Prepared from exact main ed078e0bced8a4d0dbc86a7bcaf9532795cc9da6, including
+the final 65 documentation. The user approved public source upload, hosted checks and publication after
+those checks pass on 2026-10-25. The install
+review removes only its long explanatory paragraph and replaces the large
+warning with "Save your work before restarting." Notes/version badges, explicit
+confirmation, error messages and all active-operation guards remain. Full
+installation/recovery details remain in UPDATING.txt. Release notes show complete
+highlights only once; Read more contains additional content, retaining complete
+text for shortened highlights. Equal installed/release versions use one badge.
+
+Automatic checks now run every five minutes while visible and online. Focus,
+visibility and reconnect events share a two-minute freshness gate, one timer
+and the controller single-flight guard. Retries and server cooldowns cannot be
+accelerated by focus. The root-bound native timers, saved opt-out, 24-hour
+reminders and independent startup are preserved. Hidden/offline checks pause;
+this is periodic detection, not server push or OS notifications.
+
+Release metadata uses conditional requests and validated cached release details.
+GitHub rate and polling headers govern the next allowed check, including manual
+checks. Unauthenticated conditional requests still count against the shared-IP
+quota. No account credentials, new infrastructure, or notification permission is
+introduced. Installer, staging, cleanup and restart behavior are unchanged.
+
+Local validation passed: 392 JavaScript tests, 31 Python tests, root/terminal/
+desktop Go tests, focused updater race tests, release/resource validation and
+Windows x64 GUI cross-build. Independent review cleared the changes. Local browser launch is
+blocked by the executor sandbox. Hosted browser CI and independent review are
+required before publication. Native Windows/WebView2 and real installation have
+not been tested here.
+
+## Published 1.17.65 baseline
 
 Current released version: **1.17.65**, source/tag
 97a0b4c3902e10acc11b1c78715e1ab7ba5de6c4 (tree

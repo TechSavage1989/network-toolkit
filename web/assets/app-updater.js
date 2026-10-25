@@ -5,14 +5,14 @@
   const notesView=typeof module==='object'&&module.exports?require('./app-update-notes.js'):root.NetworkToolkitUpdateNotes;
   function releaseNotes(data,version){return notesView.html({version,currentVersion:data?.currentVersion,notes:data?.latest?.version===version?data.latest.notes:''});}
   function createController(env){
-    let data=null,busy=false,error='',message='',backgroundError='',revision=0;
+    let data=null,busy=false,error='',message='',backgroundError='',revision=0,checkAfter=0;
     const changed=()=>env.changed?.(snapshot());
-    const snapshot=()=>({data,busy,error,message,backgroundError});
+    const snapshot=()=>({data,busy,error,message,backgroundError,checkAfter});
     const render=()=>env.render(snapshot());
     async function load(background=false){
       if(busy)return 'skip';const turn=++revision;busy=true;if(!background)error='';render();
       let outcome='retry';
-      try{const result=await env.api('/updates/status');if(turn===revision){data=result;outcome='ok';}}
+      try{const result=await env.api('/updates/status');if(turn===revision){data=result;checkAfter=Number(result.checkAfter)||0;outcome='ok';}}
       catch(e){if(turn===revision){if(background)backgroundError='Automatic update status could not be read: '+e.message;else error='Could not read update status: '+e.message;}}
       finally{if(turn===revision){busy=false;render();}}
       return outcome;
@@ -28,10 +28,11 @@
     }
     async function check(background=false){
       if(busy||data?.installing)return 'skip';
+      if(checkAfter>(env.now?.()??Date.now())){if(!background){error='Update checks are paused until '+new Date(checkAfter).toLocaleString()+'. Please try again then.';render();}return 'retry';}
       busy=true;if(!background){error='';message='Checking the official release feed…';}render();
       let outcome='retry';
-      try{data=await env.api('/updates/check','POST',{});backgroundError='';if(!background){message=data.hasUpdate?'Update available: '+data.latest.version+'.':'No newer update is available.';env.reveal?.();}outcome='ok';}
-      catch(e){if(background)backgroundError='Automatic update check could not complete: '+e.message;else{error='Could not check for updates: '+e.message;message='';}}
+      try{data=await env.api('/updates/check','POST',{});checkAfter=Number(data.checkAfter)||0;backgroundError='';if(!background){message=data.hasUpdate?'Update available: '+data.latest.version+'.':'No newer update was found at the last successful check.';env.reveal?.();}outcome='ok';}
+      catch(e){checkAfter=Math.max(checkAfter,Number(e.checkAfter)||0);if(background){backgroundError='Automatic update check could not complete: '+e.message;message='';}else{error='Could not check for updates: '+e.message;message='';}}
       finally{busy=false;render();changed();}
       return outcome;
     }
@@ -68,7 +69,7 @@
       (data?.executable?'<p class="help-line" style="overflow-wrap:anywhere">Running file: '+escape(data.executable.currentPath)+'</p>'+(data.executable.canonicalPath&&data.executable.canonicalPath!==data.executable.currentPath?'<p class="help-line" style="overflow-wrap:anywhere">Stable executable: '+escape(data.executable.canonicalPath)+'. Pinned shortcuts, shared shortcuts, and shortcuts elsewhere may need to be pointed to Network_Toolkit.exe manually.</p>':'')+(data.executable.warning?'<div class="notice warn">'+escape(data.executable.warning)+'</div>':''):'')+
       '<p class="help-line">Check the official public binary-release feed. Downloads are verified before installation; the public main repository provides a binary-only update package. Nothing installs until you confirm.</p>'+
       '<div class="row gap6 wrap"><button type="button" class="btn small primary" data-app-update="check" '+(disabled?'disabled':'')+'>Check for updates</button><button type="button" class="btn small ghost" data-app-update="releases" '+(disabled?'disabled':'')+'>Open release notes in browser</button></div>'+
-      (data?.latest?'<div class="notice info mt">Latest release: '+escape(data.latest.version)+'</div>'+releaseNotes(data,data.latest.version)+(data.hasUpdate===true?'<button type="button" class="btn small" data-app-update="download" data-version="'+escape(data.latest.version)+'" '+(disabled?'disabled':'')+'>Download update</button>':'<p class="help-line">You are up to date.</p>'):'')+
+      (data?.latest?'<div class="notice info mt">Latest release: '+escape(data.latest.version)+'</div>'+releaseNotes(data,data.latest.version)+(data.hasUpdate===true?'<button type="button" class="btn small" data-app-update="download" data-version="'+escape(data.latest.version)+'" '+(disabled?'disabled':'')+'>Download update</button>':'<p class="help-line">'+'No newer update was found at the last successful check.'+'</p>'):'')+
       '<details class="mt"><summary>Import a downloaded update instead</summary><p class="help-line">Select the binary-only Update.zip and SHA256SUMS from the same official release. No GitHub credentials are needed.</p><p class="help-line" style="overflow-wrap:anywhere">Official feed: '+RELEASES+'</p>'+
       (!available?'<p class="help-line">Open the executable to import and install updates.</p>':data?.supported===false?'<p class="help-line">In-app installation is supported only by the Windows x64 executable.</p>':'<div class="form-stack mt"><div class="field"><label for="appUpdatePackage">Official binary-only Update ZIP</label><input type="file" id="appUpdatePackage" accept=".zip" '+(disabled?'disabled':'')+'></div><div class="field"><label for="appUpdateChecksums">SHA256SUMS from the same release</label><input type="file" id="appUpdateChecksums" '+(disabled?'disabled':'')+'></div><div><button type="button" class="btn small" data-app-update="import" '+(disabled?'disabled':'')+'>Verify and stage update</button></div></div>')+
       '</details><p class="help-line">SHA-256 checks detect corruption, not publisher identity. Use files only from the official release page. Only the app executable is replaced; your app data folder is not changed.</p>'+
@@ -78,21 +79,23 @@
   }
   // Timers are independent of navigation. No timer may download, install, or restart.
   function createScheduler(env){
-    let timer=null,started=false,generation=0,failures=0;
+    let timer=null,started=false,generation=0,failures=0,lastContact=null;
     let lastAttempt=0,lastResult='',lastSummary='',nextAt=0,nextKind='',running=false;
-    const normal=6*60*60*1000,now=()=>env.now?.()??Date.now();
+    const normal=5*60*1000,maximumBackoff=6*60*60*1000,now=()=>env.now?.()??Date.now();
+    const active=()=>env.active?.()!==false,notBefore=()=>Math.max(0,Number(env.notBefore?.())||0);
     const snapshot=()=>({lastAttempt,lastResult,lastSummary,nextAt,nextKind,running,failures});
     const changed=()=>env.changed?.(snapshot());
     // Brief startup/network interruptions get two early retries, then bounded backoff.
-    const retryDelay=()=>failures===1?30000:failures===2?120000:Math.min(normal,15*60*1000*2**Math.min(failures-3,5));
+    const retryDelay=()=>failures===1?30000:failures===2?120000:Math.min(maximumBackoff,15*60*1000*2**Math.min(failures-3,5));
     function schedule(delay,epoch,kind){
+      delay=Math.min(2147483647,Math.max(delay,notBefore()-now()));
       nextAt=now()+delay;nextKind=kind;
       timer=env.setTimeout(async()=>{
         timer=null;if(!started||epoch!==generation)return;
         nextAt=0;nextKind='';
         let result='skip';
-        if(env.enabled()&&env.ready()){
-          lastAttempt=now();running=true;changed();
+        if(env.enabled()&&env.ready()&&active()&&now()>=notBefore()){
+          lastAttempt=lastContact=now();running=true;changed();
           try{result=await env.check();}catch{result='retry';}
           if(!started||epoch!==generation)return;
           running=false;lastResult=result;lastSummary=env.describeResult?.(result)||'';
@@ -100,7 +103,7 @@
         if(!started||epoch!==generation)return;
         if(result==='ok')failures=0;else if(result==='retry')failures++;
         const enabled=env.enabled();
-        schedule(!enabled?normal:result==='skip'?15000:result==='retry'?retryDelay():normal,epoch,!enabled?'disabled':result==='skip'?'waiting':result==='retry'?'retry':'check');
+        schedule(!enabled?maximumBackoff:!active()?normal:result==='skip'?15000:result==='retry'?retryDelay():normal,epoch,!enabled?'disabled':result==='skip'?'waiting':result==='retry'?'retry':'check');
       },delay);
       changed();
     }
@@ -110,11 +113,18 @@
       start(){if(started)return;started=true;schedule(0,++generation,'check');},
       stop,
       reset(){stop();failures=0;this.start();},
+      wake(){
+        // Focus, visibility and reconnect share the timer, freshness and retry gates.
+        if(!started||running||!env.enabled()||!env.ready()||!active()||now()<notBefore()||nextKind==='retry')return;
+        if(lastContact!==null&&now()-lastContact<120000)return;
+        if(timer!==null)env.clearTimeout(timer);
+        timer=null;schedule(0,generation,'check');
+      },
       checked(result){
         if(result==='skip')return;
         // A manual check replaces a pending automatic check, rather than duplicating it.
-        stop();started=true;if(result==='ok')failures=0;else failures++;
-        schedule(result==='ok'?normal:retryDelay(),generation,result==='ok'?'check':'retry');
+        stop();started=true;lastContact=now();if(result==='ok')failures=0;else failures++;
+        schedule(!env.enabled()?maximumBackoff:result==='ok'?normal:retryDelay(),generation,!env.enabled()?'disabled':result==='ok'?'check':'retry');
       }
     };
   }
@@ -152,7 +162,7 @@
   }
   function automaticStatusHTML(){return '<p class="help-line" data-app-update-schedule role="status" aria-live="polite">'+escape(automaticStatusText())+'</p>';}
   function renderAutomaticStatus(){const host=document.querySelector('[data-app-update-schedule]');if(host)host.textContent=automaticStatusText();}
-  function preferenceHTML(){return '<div class="setting-row"><div><div class="setting-title">Automatic update checks</div><div class="setting-desc">Check after startup and every six hours, with earlier retries after temporary failures. Downloads and installation always need your approval. Remind me tomorrow hides that version for 24 hours, including after reopening; App settings stays available.</div></div><input type="checkbox" aria-label="Automatically check for updates" data-app-update-auto '+(preferences().enabled!==false?'checked':'')+' '+(!preferencesLoaded?'disabled':'')+'></div>'+automaticStatusHTML();}
+  function preferenceHTML(){return '<div class="setting-row"><div><div class="setting-title">Automatic update checks</div><div class="setting-desc">Check after startup, every five minutes while active, and when you return to the app. Temporary failures and service limits may delay checks. Downloads and installation always need your approval. Remind me tomorrow hides that version for 24 hours, including after reopening; App settings stays available.</div></div><input type="checkbox" aria-label="Automatically check for updates" data-app-update-auto '+(preferences().enabled!==false?'checked':'')+' '+(!preferencesLoaded?'disabled':'')+'></div>'+automaticStatusHTML();}
   function setPreferences(changes){Object.assign(preferenceChanges,changes);state.appUpdatePreferences={...preferences(),...changes};if(preferencesLoaded)saveState();else preferenceWritesPending=true;}
   function mergePreferences(value){
     const p=value&&typeof value==='object'&&!Array.isArray(value)?value:{};
@@ -167,8 +177,8 @@
     preferencesPending=!!savedPreferences;preferencesLoaded=!savedPreferences;
     // Native Window timers require their Window receiver, not the scheduler env.
     // Resolve them through root so injected browser/test clocks still work.
-    scheduler=createScheduler({setTimeout:(...args)=>root.setTimeout(...args),clearTimeout:(...args)=>root.clearTimeout(...args),enabled:()=>!preferencesLoaded||preferences().enabled!==false,ready:()=>!shutDown,changed:renderAutomaticStatus,
-      describeResult:result=>result==='retry'?getController().snapshot().backgroundError||preferencesError:result==='ok'?(getController().snapshot().data?.supported===false?'Automatic updates are not supported on this platform.':getController().snapshot().data?.hasUpdate?'Update available: '+getController().snapshot().data.latest.version+'.':'No newer update is available.'):'',
+    scheduler=createScheduler({setTimeout:(...args)=>root.setTimeout(...args),clearTimeout:(...args)=>root.clearTimeout(...args),enabled:()=>!preferencesLoaded||preferences().enabled!==false,ready:()=>!shutDown,active:()=>document.hidden!==true&&root.navigator?.onLine!==false,notBefore:()=>getController().snapshot().checkAfter,changed:renderAutomaticStatus,
+      describeResult:result=>result==='retry'?getController().snapshot().backgroundError||preferencesError:result==='ok'?(getController().snapshot().data?.supported===false?'Automatic updates are not supported on this platform.':getController().snapshot().data?.hasUpdate?'Update available: '+getController().snapshot().data.latest.version+'.':'No newer update was found at the last successful check.'):'',
       check:async()=>{
         // Never contact the release feed using default preferences when the saved
         // choice has not loaded. Retry only this local read until it succeeds.
@@ -183,6 +193,9 @@
         if(c.snapshot().data?.supported!==true)return 'ok';
         return c.check(true);
       }});
+    root.addEventListener?.('focus',()=>scheduler.wake());
+    root.addEventListener?.('online',()=>scheduler.wake());
+    document.addEventListener('visibilitychange',()=>scheduler.wake());
     if(savedPreferences)Promise.resolve(savedPreferences).then(()=>preferencesReady(),error=>{if(error.updatePreferencesLoaded){preferencesReady(false);preferencesError=error.message;}else{preferencesPending=false;preferencesError='Saved update preferences could not be loaded: '+error.message;render();}}).then(()=>{scheduler.start();if(preferencesLoaded&&pendingManualResult){scheduler.checked(pendingManualResult);pendingManualResult='';}});
     else scheduler.start();
   }
@@ -221,7 +234,7 @@
   function review(){
     const state=getController().snapshot(),version=state.data?.staged?.version;if(state.busy||!version)return;
     openModal('Install Network Toolkit '+version,
-      releaseNotes(state.data,version)+'<p>Replace the current app with version '+escape(version)+' and restart?</p><div class="notice warn mt">Export any diagnostic results and save any edited files first. Restart closes this app and its connections. Finish diagnostics, transfers, packet captures, and terminal sessions before continuing. Close other Network Toolkit windows too.</div><p class="help-line">Updates keep the stable Network_Toolkit.exe filename. During one-time migration, matching shortcuts on your personal Desktop and Start Menu are updated. Pinned shortcuts, shared shortcuts, and shortcuts elsewhere may need to be pointed to Network_Toolkit.exe manually. Custom-named executables are left unchanged. Update state and the previous-version backup are kept in your settings folder. Saved preferences and connection profiles stay in the app data folder. Brief atomic swap files may exist during an update; error recovery may preserve verified files. Managed staging files and older backups are cleaned after confirmed success; locked files remain pending until safely removable. If reopening fails, a local error explains recovery. Installation logs are kept in the update staging folder while installing; after successful cleanup, previous.json beside the settings-local backup retains the latest outcome and progress. SHA-256 verification checks integrity, not the identity of the publisher.</p><div id="appUpdateInstallError" class="help-line" role="alert"></div>',
+      releaseNotes(state.data,version)+'<p>Replace the current app with version '+escape(version)+' and restart?</p><div class="notice warn mt">Save your work before restarting.</div><div id="appUpdateInstallError" class="help-line" role="alert"></div>',
       '<button class="btn ghost" data-action="close-modal">Cancel</button><button class="btn primary" data-app-update="confirm" data-version="'+escape(version)+'">Install and restart</button>');
   }
   document.addEventListener('click',async event=>{
