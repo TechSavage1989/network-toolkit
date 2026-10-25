@@ -23,16 +23,16 @@ const root=path.resolve(__dirname,'..'),version=require('../package.json').versi
   }catch{return route.fulfill({status:404,body:''});}
  });
  const input=page.locator('#terminalMacroCommand'),composer=page.locator('#terminalMacroComposer');
- async function metrics(){return input.evaluate(el=>{const s=getComputedStyle(el),bar=getComputedStyle(el,'::-webkit-scrollbar');return {horizontalGutter:el.offsetHeight-el.clientHeight-parseFloat(s.borderTopWidth)-parseFloat(s.borderBottomWidth),verticalGutter:el.offsetWidth-el.clientWidth-parseFloat(s.borderLeftWidth)-parseFloat(s.borderRightWidth),scrollWidth:el.scrollWidth,clientWidth:el.clientWidth,scrollHeight:el.scrollHeight,clientHeight:el.clientHeight,scrollbarWidth:s.scrollbarWidth,webkitDisplay:bar.display,overflowX:s.overflowX,overflowY:s.overflowY};});}
+ async function metrics(){return input.evaluate(el=>{const s=getComputedStyle(el),bar=getComputedStyle(el,'::-webkit-scrollbar');return {horizontalGutter:el.offsetHeight-el.clientHeight-parseFloat(s.borderTopWidth)-parseFloat(s.borderBottomWidth),verticalGutter:el.offsetWidth-el.clientWidth-parseFloat(s.borderLeftWidth)-parseFloat(s.borderRightWidth),scrollWidth:el.scrollWidth,clientWidth:el.clientWidth,scrollHeight:el.scrollHeight,clientHeight:el.clientHeight,scrollbarWidth:s.scrollbarWidth,webkitDisplay:bar.display,webkitWidth:bar.width,webkitHeight:bar.height,overflowX:s.overflowX,overflowY:s.overflowY};});}
  async function noTracks(label){const m=await metrics();assert(m.horizontalGutter<=1&&m.verticalGutter<=1,label+': '+JSON.stringify(m));assert.equal(m.scrollbarWidth,'none');assert.equal(m.webkitDisplay,'none');assert.equal(m.overflowX,'auto');assert.equal(m.overflowY,'auto');return m;}
  async function collapsed(){if(await composer.evaluate(el=>el.classList.contains('is-expanded')))await page.locator('#terminalMacroExpand').click();}
  try{
   if(output)fs.mkdirSync(output,{recursive:true});
   await page.goto('http://toolkit.local/');await page.waitForFunction(()=>window.__networkToolkitStartupState===1&&online);await page.evaluate(()=>navigate('terminal'));
-  // Restore the released scrolling policy and classic tracks to reproduce the crop.
-  await input.fill('show '+ 'x'.repeat(1000));
+  // Restore the released policy. Overlay-scrollbar engines may reserve no gutters.
+  await input.fill(Array.from({length:40},()=> 'show '+ 'x'.repeat(200)).join('\n'));
   const old=await page.addStyleTag({content:'#terminalMacroCommand{scrollbar-width:auto!important}#terminalMacroCommand::-webkit-scrollbar{display:block!important;width:15px!important;height:15px!important}'}),negative=await metrics();
-  assert(negative.horizontalGutter>=14&&negative.verticalGutter>=14,'Released track policy did not reproduce both gutters: '+JSON.stringify(negative));
+  assert.equal(negative.scrollbarWidth,'auto');assert.equal(negative.webkitDisplay,'block');assert.equal(negative.webkitWidth,'15px');assert.equal(negative.webkitHeight,'15px');assert(negative.scrollWidth>negative.clientWidth&&negative.scrollHeight>negative.clientHeight,'Released policy must expose both scrolling axes: '+JSON.stringify(negative));
   if(output)await composer.screenshot({path:path.join(output,'terminal-commandbar-released-tracks.png')});await old.evaluate(el=>el.remove());await noTracks('restored candidate');
   const layouts=[];
   for(const width of [1280,1024,768])for(const theme of ['light','dark'])for(const side of ['left','right']){
@@ -53,7 +53,7 @@ const root=path.resolve(__dirname,'..'),version=require('../package.json').versi
    layouts.push({width,theme,side});
   }
   assert.equal(writes.filter(p=>p==='/api/terminals'||p.includes('/terminal-macros/send')).length,0);assert.deepEqual(errors,[]);
-  const result={passed:true,renderedCases:layouts.length,classicScrollbarRegression:negative,noVisibleTracks:true,longCommandCaret:true,multilineCaretAndWheel:true,inputPreserved:true,noCommandsSent:true,errors};
+  const result={passed:true,renderedCases:layouts.length,releasedScrollbarPolicy:negative,noVisibleTracks:true,longCommandCaret:true,multilineCaretAndWheel:true,inputPreserved:true,noCommandsSent:true,errors};
   if(output)fs.writeFileSync(path.join(output,'terminal-commandbar-results.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result));
  }catch(error){if(output)await page.screenshot({path:path.join(output,'terminal-commandbar-failure.png')}).catch(()=>{});throw error;}
  finally{await browser.close();}

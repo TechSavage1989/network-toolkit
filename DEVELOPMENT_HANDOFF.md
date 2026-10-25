@@ -17,13 +17,18 @@ existing dimensions, expansion/manual resize, selection, caret/keyboard/wheel
 scrolling and unchanged command text. No macro/transport JavaScript is changed.
 Both collapsed and expanded modes inherit the same track-free policy.
 
-The new real-page browser regression reproduces classic scrollbar gutters as
-a negative control, then checks zero gutters for empty, short, long and multiline
-commands. It checks caret and wheel scrolling, compact/expanded states, input
+The new real-page browser regression restores the released scrollbar policy
+as a negative control, then checks hidden track styles and zero gutters for
+empty, short, long and multiline commands. Chromium may use overlay scrollbars
+without reserving gutters, so the negative control verifies both overflow axes
+and the restored track styles rather than assuming Windows scrollbar geometry. It checks caret and wheel scrolling, compact/expanded states, input
 preservation and layouts/themes/docks, using isolated API fixtures only.
 No real terminal command is sent by this layout test. Local validation passed
 443 JavaScript tests, 31 Python guards, required root/terminal/desktop Go suites,
-release/resource metadata checks and browser syntax. Hosted browser checks,
+release/resource metadata checks and browser syntax. First hosted Checks
+40167638283 passed its check job, but the browser negative control assumed
+classic reserved gutters. Its platform-dependent assertion is now corrected.
+The runtime CSS is unchanged. Revised hosted browser checks,
 Windows build/package, publication and live updater staging are pending.
 
 Version metadata and Windows resources are 1.17.73. Preserve saved-session
