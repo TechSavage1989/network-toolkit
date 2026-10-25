@@ -1,4 +1,4 @@
-NETWORK TOOLKIT 1.17.78 CANDIDATE VALIDATION
+NETWORK TOOLKIT 1.17.78 VALIDATION
 
 Detached terminal workspaces and individual sessions retain the selected sidebar
 side, including panes moved from a linked workspace. Settings flush before a
@@ -6,14 +6,43 @@ single-session/pane detach preserves immediate side changes. Invalid imported
 side values use the right-side default; failed saves leave the session in place.
 Existing connections, ownership, display controls and update logic are retained.
 
-Focused Go HTTP/round-trip regressions and two JavaScript regressions fail
-against released77 behavior and pass with the fix. Existing terminal browser
-checks extend to both sidebar placements, workspace capture/apply and immediate
-single-session detach. Local full checks passed: 448 JavaScript tests, 31 Python
-release guards, required root/terminal/desktop Go suites, release/resource
-metadata, browser script syntax and Windows x64 GUI build. Hosted review,
-publication and released77 live update staging are pending. Native Windows/WebView2, hardware and actual
-installation/restart remain unverified. See DEVELOPMENT_HANDOFF.md.
+Full review Checks 40177180488 passed on exact published source/tag
+7477c0ca7a5f076576754d91c68c06971a35c195: 448 JavaScript tests, 31 Python
+release guards, required root/terminal/desktop Go suites, Windows x64 GUI build/
+package and all browser steps. Focused Go endpoint/round-trip and two JavaScript
+regressions reproduce released77 failures and pass with the fix.
+
+The extended terminal browser check retains 36 modal layout cases and covers
+both sidebar sides, workspace capture/apply, actual rendered placement and
+single-session detach immediately after changing sides in the same event turn.
+Both detaches reach the fixture endpoint with the latest saved side. Left/right
+screenshots were inspected. These isolated UI/API fixtures launch no native
+detached windows and create no actual external transports.
+
+Existing Hosts/client/server/SMTP/folders/command-input/editor/install checks
+and seven native Chromium updater-timer scenarios pass, including the real
+five-minute poll/focus collision. Review artifact 12592197603 matches the local
+portable/EXE byte-for-byte. Main was promoted to the identical tested commit
+after explicit publication approval. Release 40177805807 succeeded. Completed
+review is full runtime validation; docs may supersede duplicate main runs.
+
+OFFICIAL PUBLICATION VERIFICATION
+- All four actual public downloads match GitHub asset digests.
+- Outer/inner manifests, both ZIP CRCs and strict four-member updater allowlist.
+- Windows x64 GUI PE/version and standalone/portable/update EXE identity.
+- All 692 packaged source files match the exact published commit.
+- Official portable and EXE match the reviewed build byte-for-byte.
+- Seventeen older release IDs and asset IDs/sizes/digests remain unchanged.
+- Seventeen older source-tag SHAs match the prepublication snapshot.
+- Exact released77 handlers checked/downloaded/verified/staged live78 in 9.65s.
+- Staged bytes match the independently downloaded official EXE.
+- No installation/restart or original test executable change occurred.
+
+The live harness uses platform-independent production handlers, real HTTPS and
+isolated temporary settings. Native Windows/WebView2, hardware and actual
+install/restart remain unverified. See DEVELOPMENT_HANDOFF.md for exact hashes,
+provenance and limits. This final docs follow-up must not move tags, replace
+assets or republish the runtime.
 
 HISTORICAL PUBLISHED BASELINE
 

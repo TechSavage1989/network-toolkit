@@ -1,6 +1,6 @@
 # Network Toolkit development handoff
 
-## 1.17.78 candidate: detached terminal sidebar side
+## 1.17.78 published: detached terminal sidebar side
 
 Prepared from main 7e54d7ee0b3a42af9f384453e0742bf9458d9e29 after the user
 reported detached terminals forgetting which side the sidebar occupied in the
@@ -27,16 +27,61 @@ Focused Go endpoint/round-trip regressions reproduce the omission in released77
 and pass with the fix, covering single views, linked workspaces, nested pane
 moves, detached preference edits, reattach and safe left/right validation.
 Two JavaScript regressions reproduce the immediate-detach race and failed-save
-behavior in released77 and pass with the fix. The existing real-page terminal
-browser fixture now checks both sidebar placements, workspace capture/apply and
-single-session detachment immediately after swapping sides. It uses isolated
-APIs, not native windows or actual external transports.
+behavior in released77 and pass with the fix. Local validation passed all
+448 JavaScript tests, 31 Python release guards, required root/terminal/desktop
+Go suites, release/resource metadata, inline HTML/browser script syntax,
+Windows x64 GUI build and portable/update package verification.
 
-Local full checks passed: 448 JavaScript tests, 31 Python release guards,
-required root/terminal/desktop Go suites, release/resource metadata, browser
-script syntax and Windows x64 GUI build. Hosted browser/build artifacts,
-publication and released77 live update staging are pending. Native Windows/WebView2, hardware and actual
-installation/restart remain unverified.
+Full review Checks 40177180488 passed on exact published source/tag
+7477c0ca7a5f076576754d91c68c06971a35c195 (tree
+15b0d80ee1b4651ab5a3585254134f7ba07eaf31). Both jobs succeeded. The extended
+real-page terminal browser test retains all 36 modal layout cases and checks
+both sidebar positions, workspace capture/apply, actual rendered placement and
+single-session detach immediately after swapping sides in the same event turn.
+Both detaches reach the fixture endpoint with the latest saved side. Inspected
+left/right screenshots show the sidebar beside the retained terminal area.
+These use isolated UI/API fixtures; native detached Windows windows are not
+launched and no actual external transport is created by the browser test.
+
+Existing Hosts/client/server/SMTP/folders/command-input/editor/install browser
+checks pass, together with seven native Chromium updater-timer scenarios
+including the real five-minute poll/focus collision. Review artifact 12592197603
+matches the local portable and EXE byte-for-byte. Outer SHA-256:
+e733633c3f7943226d834c31b05fc8f06132eb956e184705db910e3844759666.
+Browser artifact 12592412894 digest and ZIP CRC pass; outer SHA-256:
+25a28be13b2b56934cbeba008b0c24855d889faf0cb7f72c50f09ce2d4646e7f.
+
+Main was fast-forwarded to that identical tested commit using expected old SHA
+7e54d7ee0b3a42af9f384453e0742bf9458d9e29 without force. No code or docs changed
+between full review and promotion. Release 40177805807 succeeded and created
+stable release 423263218. Completed review above remains full runtime
+validation; this documentation may supersede automatic duplicate main runs.
+
+All four actual public downloads match GitHub asset digests. Outer/inner SHA-256
+manifests, both ZIP CRCs, strict four-member updater allowlist, Windows x64 GUI
+PE/version and standalone/portable/update EXE identity pass. All 692
+packaged source files match the exact published commit. Official portable and
+EXE match the reviewed build byte-for-byte. All seventeen earlier release IDs
+and asset IDs/sizes/digests remain unchanged, with all seventeen older source-tag
+SHAs preserved. Verification snapshots and raw logs are retained with local QA.
+
+The unchanged released 1.17.77 production feed handlers checked the live feed,
+verified/downloaded/staged 1.17.78 in 9.65 seconds. Staged bytes match the
+independently downloaded official EXE. The harness used real HTTPS, isolated
+temporary settings and only platform-independent feed handlers. No installation
+or restart occurred and its original test executable hash remained unchanged.
+
+Official release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.78
+EXE SHA-256: 0769801672739056876f7aab426a425e22b4ee1bbb1c9c39ebb4c333f1b7ee7f
+Portable ZIP SHA-256: 7e0d1271cd63d50b55dac295573c84305ff5876bce1d74fe6aa8bae2e7427016
+Update ZIP SHA-256: 0a0a5e1fbef6a8afb782079bb0c36b41b39b31c0bffa52c7e21c24395c9971b7
+SHA256SUMS file SHA-256: 13da9f3ba7a4c444bd303e0261ee04105408fd9ba82fd6bfe85e78eab81fe1c6
+
+This final publication record changes only AGENTS.md, this handoff and
+VALIDATION.txt. Do not move the released 78 source tag, replace assets or
+republish it. Continue future work from latest main. Native Windows/WebView2,
+hardware and actual installation/restart remain unverified here; browser
+fixtures and live-feed staging are not native Windows execution proof.
 
 ## 1.17.77 published: Connect labels in client and server sidebars
 
