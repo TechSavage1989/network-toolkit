@@ -1,50 +1,91 @@
 # Network Toolkit development handoff
 
-## 1.17.75 candidate: text files open at the document start
+## 1.17.75 published: text files open at the document start
 
 Prepared from main 59cd8fb4348be28fa2efa91570de6c221f5162e6 after the user
 reported that the text editor loads files scrolled to the bottom and explicitly
-requested fix, build and publication on 2026-10-25. This authorizes this scoped
+requested fix, build and publication on 2026-10-25. This authorized this scoped
 new release only; preserve all prior releases/tags/assets. Main network-toolkit
 remains the sole source/update destination.
 
-The shared file editor assigned loaded text to its textarea and then focused
-it without resetting selection or scrolling. A one-time per-document showStart
-flag is now set when loading file values or explicitly reopening an existing
-file. The next draw places the caret at offset zero and sets scrollTop/scrollLeft
-to zero before synchronizing highlighting, gutter and position status. The
-initial display explicitly focuses the text field after positioning its caret,
-and draw avoids assigning an unchanged textarea value. Normal
-editing, Find and manual navigation do not continually reset the view. Desktop
-imports and local/remote readers share this path. No file bytes, encoding,
-line endings, save/transport handlers or updater code changes.
+The shared file editor previously assigned loaded text and focused its textarea
+without resetting selection/scrolling. A one-time per-document showStart flag
+is now set when loading file values or explicitly reopening an existing file.
+The next display places the caret at offset zero, focuses the text field and
+sets scrollTop/scrollLeft to zero before synchronizing highlighting, line numbers
+and position status. Draw avoids assigning an unchanged textarea value. This
+keeps the initial view stable while ordinary editing, Find and navigation remain
+usable. Local files, desktop imports and local/remote reader callbacks share
+this path. No file bytes, encoding/line endings, save/transport handlers or
+updater code changes. Go/UI/package/Windows resources are consistently 1.17.75.
 
-Reload completion updates the visible editor only if that document is still
-active and present. Inactive loads retain the pending initial view until their
-tab is shown, so a background completion cannot move another document's view.
-Two focused tests fail against exact released74 editor source and pass with
-the fix. New real-page browser coverage checks 12 theme/width/view cases at
-390/768/1280px for embedded and overlay views, loading/reloading/reopening,
-local and connected-SSH readers, desktop BOM/CRLF import, background reads,
-Find/typing and large/wrapped documents. APIs are isolated fixtures and no
-real file is written. Native Windows/file dialogs and real servers are untested.
+Reload completion redraws only a document that is still present and active.
+Inactive loads retain the pending initial view until their tab is shown, so a
+background completion cannot move another document's view or steal its focus.
+Saved folders/credentials/macros, restored terminal connection modal, command-
+input scrollbar suppression, SMTP lifetime and the update flow are retained.
 
-Go/UI/package/Windows resources are 1.17.75. Local validation passed 446 JS
-tests, 31 Python release guards, required root/terminal/desktop Go suites,
-release/resource metadata, HTML/browser syntax and Windows x64 GUI build.
-Initial hosted Checks 40171877865 passed its check job, including the Windows
-build/package. The browser passed the twelve layouts and connected-SSH load,
-then its desktop-import fixture lacked crypto.subtle on the synthetic HTTP
-origin. The fixture now uses HTTPS and verifies Web Crypto before testing
-imports. Application code is unchanged by this test-environment correction.
-Second hosted Checks 40172081062 passed its check/build/package job and the
-secure desktop import. A first display of a background-loaded tab still moved
-the caret after reset, so draw now avoids assigning unchanged text and explicitly
-focuses the initial display at the zero caret before resetting scrolling. Background
-completion itself remains inactive and cannot steal focus. Full hosted
-validation, package/artifact verification, publication and released74 live
-update staging are pending. Preserve all earlier UI/credential/folder/
-macro/updater features. Future work requires its own publication authorization.
+Local validation passed 446 JavaScript tests, 31 Python release guards,
+required root/terminal/desktop Go suites, release/resource metadata, HTML/browser
+syntax, Windows x64 GUI build and portable/update package verification. Two
+focused regressions fail against exact released74 editor source and pass with
+the fix. Initial browser validation caught a synthetic HTTP origin lacking
+Web Crypto and a caret reset when a background-loaded tab was first displayed.
+The fixture now uses HTTPS; the final focus/unchanged-value handling addresses
+the background-tab behavior. Both were resolved before publication.
+
+Full review Checks 40172396873 passed on exact published source/tag
+5f41a1176ba2212c49ad1274a4833125c3f130f8 (tree
+86b8b1c52b4be670c95d91ccc7658a03f3320b08). Both jobs succeeded. The new
+real-page browser regression passed twelve cases at 390/768/1280px, in both
+themes and embedded/overlay views. The first line is visibly on screen, with
+caret offset zero, both scroll axes zero and aligned highlighting/line numbers.
+Loading/reloading/reopening, local and connected-SSH readers, desktop UTF-8 BOM/
+CRLF import, background reads/reloads, Find/typing and large/wrapped documents
+pass without file writes. Inspected wide/compact screenshots show line one
+and Ln 1, Col 1. These use isolated API fixtures and synthetic File objects;
+they do not prove native Windows file-dialog or real-server behavior.
+
+Existing Hosts/client/server/SMTP/folders/terminal-dialog/command-input/install
+browser checks also pass, along with seven native Chromium updater-timer
+scenarios including the real five-minute poll/focus collision. Review artifact
+12590927264 matches the local portable and EXE byte-for-byte. Outer SHA-256:
+6deb30281acc55752074dceb1bf2a4109d4a65bdfd60b7c0ce241bbaf8c357fd.
+Browser artifact 12590753464 digest and ZIP CRC pass; outer SHA-256:
+1984181d10b105aa6d015b25b4f0aa0ec3db733e2ee8968b11181f3022cefda2.
+
+Main was fast-forwarded to that identical tested commit using expected old SHA
+59cd8fb4348be28fa2efa91570de6c221f5162e6 without force. No code or docs changed
+between full review and promotion. Release 40172945610 succeeded and created
+stable release 423217913. Main duplicate Checks 40172945578 passed its check
+job and editor browser step. Completed review above remains full runtime
+validation; this documentation may supersede automatic duplicate runs.
+
+All four actual public downloads match GitHub asset digests. Outer/inner SHA-256
+manifests, both ZIP CRCs, strict four-member updater allowlist, Windows x64 GUI
+PE/version and standalone/portable/update EXE identity pass. All 689 packaged
+source files match the exact published commit. Official portable and EXE match
+the reviewed build byte-for-byte. All fourteen earlier release IDs and asset
+IDs/sizes/digests remain unchanged, with all fourteen older source-tag SHAs
+preserved. Verification snapshots and raw logs are retained with local QA.
+
+The unchanged released 1.17.74 production feed handlers checked the live feed,
+verified/downloaded/staged 1.17.75 in 10.51 seconds. Staged bytes match the
+independently downloaded official EXE. The harness used real HTTPS, isolated
+temporary settings and only platform-independent feed handlers. No installation
+or restart occurred and its original test executable hash remained unchanged.
+
+Official release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.75
+EXE SHA-256: 935c1c74a27777dcb350de20a021a8de37b9f7f94ad63ef5fc9748fad41d057f
+Portable ZIP SHA-256: 23cd86caabc2e1c8012a9ca8b3dad1a5116a2f73e5a9a62fc7818f0558573e05
+Update ZIP SHA-256: 9d67eac962ff941dbfabebc3e5cc46275cf69410b933bb34a3d169a56cd79893
+SHA256SUMS file SHA-256: 94f09a3bec1e8785fd6aaaf98c1ca17f9aa83a3f9d4457a48adea55c4d12b001
+
+This final publication record changes only AGENTS.md, this handoff and
+VALIDATION.txt. Do not move the released 75 source tag, replace assets or
+republish it. Continue future work from latest main. Native Windows/WebView2,
+file dialogs/real servers and actual installation/restart remain unverified;
+browser fixtures and live-feed staging are not native Windows execution proof.
 
 ## 1.17.74 published: restore the original terminal connection window
 

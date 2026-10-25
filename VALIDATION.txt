@@ -1,23 +1,51 @@
-NETWORK TOOLKIT 1.17.75 CANDIDATE VALIDATION
+NETWORK TOOLKIT 1.17.75 VALIDATION
 
-Text files start at caret offset zero with both scroll axes at zero on load,
-reload and explicit reopen. Highlighting, line numbers and status align with
-the first line. Background reads leave the active file's view alone. Editing,
-Find, file bytes, encoding/line endings and save behavior are retained.
+Text files open/reload at caret offset zero with both scroll axes at zero.
+Highlighting, line numbers and status align with the first line. The one-time
+initial display reset and unchanged-value draw handling retain ordinary editing,
+Find and navigation. Background reads/reloads leave the active file's view alone.
+File bytes, encoding/line endings, save/transport handlers and updater are retained.
 
-Two focused regressions reproduce failures against exact released74 source
-and pass with the fix. Local validation passed 446 JavaScript tests, 31 Python
-release guards, required root/terminal/desktop Go suites, release/resource
-metadata, HTML/browser syntax and Windows x64 GUI build. Hosted checks, package/
-artifact verification, publication and live updater staging are pending.
-Initial hosted check/build/package passed. Its browser run passed twelve editor
-layouts and connected-SSH opening, then the synthetic HTTP import fixture lacked
-Web Crypto. The corrected HTTPS fixture verifies cryptography before imports;
-that correction required no application changes. The next browser run passed
-import, then found the background-tab initial caret moving after reset. Draw
-now avoids assigning unchanged text and focuses the one-time initial display
-at the zero caret before resetting scrolling. Browser fixture tests do not
-establish native Windows/file-dialog or real-server behavior. See the handoff.
+Full review Checks 40172396873 passed on exact published source/tag
+5f41a1176ba2212c49ad1274a4833125c3f130f8: 446 JavaScript tests, 31 Python
+release guards, required root/terminal/desktop Go suites, Windows x64 GUI build/
+package and all browser steps. Two focused regressions reproduce failures in
+released74 source. Browser validation corrected an HTTP/Web Crypto fixture and
+caught the background-tab caret path; both are resolved in the final source.
+
+Twelve browser cases cover 390/768/1280px, both themes and embedded/overlay
+views. The first line is visibly on screen with selection/scrolling at zero and
+aligned highlight/gutter/status. Local and connected-SSH readers, desktop UTF-8
+BOM/CRLF import, reloading/reopening, background reads/reloads, Find/typing and
+large/wrapped documents pass. No file writes occur in the fixtures. Wide/compact
+screenshots were inspected. Existing Hosts/client/server/SMTP/folders/terminal/
+command-input/install checks and seven native Chromium updater-timer scenarios
+pass, including the real five-minute poll/focus collision.
+
+Review artifact 12590927264 matches the local portable/EXE byte-for-byte. Main
+was promoted to the identical tested commit after explicit publication approval.
+Release 40172945610 succeeded. Main duplicate Checks 40172945578 passed its
+check job and editor browser step. Completed review is full runtime validation
+and docs may supersede automatic duplicate runs.
+
+OFFICIAL PUBLICATION VERIFICATION
+- All four actual public downloads match GitHub asset digests.
+- Outer/inner manifests, both ZIP CRCs and strict four-member updater allowlist.
+- Windows x64 GUI PE/version and standalone/portable/update EXE identity.
+- All 689 packaged source files match the exact published commit.
+- Official portable and EXE match the reviewed build byte-for-byte.
+- Fourteen older release IDs and asset IDs/sizes/digests remain unchanged.
+- Fourteen older source-tag SHAs match the prepublication snapshot.
+- Exact released74 handlers checked/downloaded/verified/staged live75 in 10.51s.
+- Staged bytes match the independently downloaded official EXE.
+- No installation/restart or original test executable change occurred.
+
+The live harness uses platform-independent production handlers, real HTTPS and
+isolated temporary settings. Browser tests use isolated APIs and synthetic File
+objects. Native Windows/WebView2, actual file dialogs/real servers and actual
+install/restart remain unverified. See DEVELOPMENT_HANDOFF.md for exact hashes,
+provenance and limits. This final docs follow-up must not move tags, replace
+assets or republish the runtime.
 
 HISTORICAL PUBLISHED BASELINE
 
