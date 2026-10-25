@@ -3,7 +3,7 @@
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),assert=require('node:assert/strict');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const root=path.resolve(__dirname,'../web'),out=process.env.TOOLKIT_TEST_OUTPUT,version=require('../package.json').version;
-const hosts='# UI review fixture\n127.0.0.1 localhost\n::1 localhost\n192.0.2.20 switch.test\n';
+const hosts='# UI review fixture\n127.0.0.1 localhost\n::1 localhost\n192.0.2.20 switch.test\n'.replaceAll('\n','\r\n');
 const adapters=[{index:7,name:'Ethernet',description:'Realtek PCIe 5GbE Family Controller',up:true,addresses:['192.0.2.4/24','2001:db8:1234:5678::4/64'],mac:'02:00:00:00:00:04',mtu:1500,speedMbps:1000,gateway:'192.0.2.1',gateways:['192.0.2.1'],dns:['192.0.2.53','2001:db8:1234:5678::53']},{index:8,name:'Ethernet 5',description:'Virtual adapter with a deliberately long description for responsive layout review',up:true,addresses:['198.51.100.4/24'],mac:'02:00:00:00:00:08',mtu:1500,speedMbps:1000,dns:['198.51.100.53']}];
 const snapshot=()=>({available:true,editable:true,exists:true,path:'C:\\Windows\\System32\\drivers\\etc\\hosts',content:hosts,revision:crypto.createHash('sha256').update(hosts).digest('hex'),encoding:'UTF-8',newline:'CRLF',warnings:[]});
 const result={passed:false,pages:[],cases:[],copies:[],hostsMenu:[],errors:[],assetFailures:[]};
