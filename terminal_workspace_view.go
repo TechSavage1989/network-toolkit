@@ -29,7 +29,7 @@ type terminalWorkspaceSnapshot struct {
 
 func terminalWorkspaceDisplay(input map[string]any) map[string]any {
 	clean := map[string]any{"activePage": "terminal"}
-	for _, key := range []string{"theme", "terminalFontSize", "terminalHighlight", "terminalInteraction", "terminalActiveActionsPosition", "terminalAppearance", "terminalLayout", "terminalConnection", "terminalProfiles", "terminalRecent", "terminalSidebarCollapsed", "terminalSidebarTab", "terminalSidebarWidth", "terminalComposerCollapsed", "terminalMacroConfirmation", "terminalRecentCollapsed", "terminalSavedCollapsed", "terminalSessionConfirmDelete"} {
+	for _, key := range []string{"theme", "terminalFontSize", "terminalHighlight", "terminalInteraction", "terminalActiveActionsPosition", "terminalAppearance", "terminalLayout", "terminalConnection", "terminalProfiles", "terminalRecent", "terminalSidebarCollapsed", "terminalSidebarTab", "terminalSidebarSide", "terminalSidebarWidth", "terminalComposerCollapsed", "terminalMacroConfirmation", "terminalRecentCollapsed", "terminalSavedCollapsed", "terminalSessionConfirmDelete"} {
 		if value, ok := input[key]; ok {
 			clean[key] = value
 		}

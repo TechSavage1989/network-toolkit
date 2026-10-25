@@ -8,6 +8,7 @@ const root=path.resolve(__dirname,'..'),version=require('../package.json').versi
   {id:'telnet',name:'Lab Telnet',folder:'Lab',type:'telnet',host:'telnet.test',port:23},
   {id:'serial',name:'Console',folder:'MDF',type:'serial',serialPort:'COM4',baudRate:115200,dataBits:8,stopBits:'1',parity:'none',flowControl:'none',lineEnding:'cr',localEcho:true}
  ]},rejectNext=false,sessionNumber=0;
+ const detachedViews=[],detachmentSides=[];
  const browser=await chromium.launch({headless:true,args:['--no-sandbox']}),page=await browser.newPage({viewport:{width:1280,height:900}}),errors=[],requests=[];
  page.on('pageerror',error=>errors.push(error.message));
  await page.route('http://toolkit.local/**',async route=>{
@@ -17,6 +18,12 @@ const root=path.resolve(__dirname,'..'),version=require('../package.json').versi
    if(p==='/api/status')data={version,os:'windows',arch:'amd64',terminalWindowAvailable:true};
    if(p==='/api/state'){if(request.method()==='GET')data=saved;else saved=body;}
    if(p==='/api/jobs')data=[];
+   if(p==='/api/terminal-views'){
+    if(request.method()==='POST'){
+     const view={id:'detached-'+body.sessionId,sessionId:body.sessionId,state:'opening',revision:0};
+     detachedViews.push(view);detachmentSides.push(saved.terminalSidebarSide);data={view};
+    }else data={available:true,views:detachedViews,owners:{}};
+   }
    if(p==='/api/terminals'){
     if(request.method()==='POST'){
      if(rejectNext){rejectNext=false;return route.fulfill({status:400,contentType:'application/json',body:JSON.stringify({error:'Fixture connection rejected'})});}
@@ -92,10 +99,36 @@ const root=path.resolve(__dirname,'..'),version=require('../package.json').versi
   assert.equal(posts()[1].body.host,'updated-core.test');assert.equal(posts()[1].body.profileId,'core');assert.equal(posts()[1].body.password,'dialog-fixture-secret');assert.equal(Object.hasOwn(posts()[1].body,'folder'),false);
   await page.locator('[data-session-action="new"]').click();await dialog();await page.locator('#terminalConnectProfileSelect').selectOption('telnet');await page.locator('#terminalConnectButton').click();await page.waitForFunction(()=>terminalSessions.has('dialog-session-2'));assert.equal(posts().at(-1).body.type,'telnet');assert.equal(posts().at(-1).body.port,23);
   await page.locator('[data-session-action="new"]').click();await dialog();await page.locator('#terminalConnectProfileSelect').selectOption('serial');await page.locator('#terminalConnectButton').click();await page.waitForFunction(()=>terminalSessions.has('dialog-session-3'));assert.equal(posts().at(-1).body.type,'serial');assert.equal(posts().at(-1).body.serialPort,'COM4');assert.equal(posts().at(-1).body.baudRate,115200);
+
+  const sidebarTransfers=[];
+  for(const [index,side] of ['left','right'].entries()){
+   await page.evaluate(side=>{
+    state.terminalSidebarSide=side;NetworkToolkitSessionSidebar.render();
+   },side);
+   const snapshot=await page.evaluate(()=>captureTerminalWorkspace());assert.equal(snapshot.display.terminalSidebarSide,side);
+   await page.evaluate(display=>{
+    state.terminalSidebarSide=display.terminalSidebarSide==='left'?'right':'left';
+    applyTerminalWorkspaceDisplay(display);NetworkToolkitSessionSidebar.render();
+   },snapshot.display);
+   const placement=await page.evaluate(()=>{
+    const sidebar=document.querySelector('#terminalSessionSidebar').getBoundingClientRect(),terminal=document.querySelector('.terminal-panel').getBoundingClientRect();
+    return {side:state.terminalSidebarSide,left:sidebar.left,right:sidebar.right,terminalLeft:terminal.left,terminalRight:terminal.right};
+   });
+   assert.equal(placement.side,side);assert(side==='left'?placement.right<=placement.terminalLeft+1:placement.left>=placement.terminalRight-1,JSON.stringify(placement));
+   if(output)await page.screenshot({path:path.join(output,'terminal-sidebar-'+side+'.png')});
+   // Change side and detach within the same event turn, ahead of the 550ms
+   // autosave. The detach endpoint must observe the just-selected preference.
+   await page.evaluate(async({side,index})=>{
+    state.terminalSidebarSide=side==='left'?'right':'left';NetworkToolkitSessionSidebar.render();await flushState();
+    document.querySelector('[data-session-action="swap-side"]').click();
+    await detachTerminal(terminalSessions.get('dialog-session-'+(index+1)));
+   },{side,index});
+   assert.equal(detachmentSides[index],side);sidebarTransfers.push({side,workspaceSnapshot:true,renderedPlacement:true,immediateSessionDetach:true});
+  }
   await page.evaluate(()=>flushState());for(const secret of ['dialog-fixture-secret','cancelled-dialog-secret','switched-dialog-secret'])assert(!JSON.stringify(saved).includes(secret));
   await page.reload();await page.waitForFunction(()=>window.__networkToolkitStartupState===1&&online);await page.evaluate(()=>navigate('terminal'));assert.equal(await page.locator('#terminalConnectForm,#terminalSidebarTabConnection,#terminalSidebarConnection').count(),0);assert.equal(await page.evaluate(()=>state.terminalSidebarTab),'saved');
   assert.deepEqual(errors,[]);
-  const result={passed:true,originalModal:true,noSetupSidebar:true,migratedPreference:true,protocols:['ssh','telnet','serial'],profilesAndCredentials:true,folderPreserved:true,cancelAndEscape:true,singleForm:true,retainedTerminalGrid:true,retryAndConnect:true,noPersistedSecrets:true,renderedCases:layouts.length,errors};
+  const result={passed:true,originalModal:true,noSetupSidebar:true,migratedPreference:true,protocols:['ssh','telnet','serial'],profilesAndCredentials:true,folderPreserved:true,cancelAndEscape:true,singleForm:true,retainedTerminalGrid:true,retryAndConnect:true,noPersistedSecrets:true,renderedCases:layouts.length,sidebarTransfers,errors};
   if(output)fs.writeFileSync(path.join(output,'terminal-connection-dialog-results.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result));
  }catch(error){if(output)await page.screenshot({path:path.join(output,'terminal-connection-dialog-failure.png')}).catch(()=>{});throw error;}
  finally{await browser.close();}

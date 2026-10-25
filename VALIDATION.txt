@@ -1,3 +1,22 @@
+NETWORK TOOLKIT 1.17.78 CANDIDATE VALIDATION
+
+Detached terminal workspaces and individual sessions retain the selected sidebar
+side, including panes moved from a linked workspace. Settings flush before a
+single-session/pane detach preserves immediate side changes. Invalid imported
+side values use the right-side default; failed saves leave the session in place.
+Existing connections, ownership, display controls and update logic are retained.
+
+Focused Go HTTP/round-trip regressions and two JavaScript regressions fail
+against released77 behavior and pass with the fix. Existing terminal browser
+checks extend to both sidebar placements, workspace capture/apply and immediate
+single-session detach. Local full checks passed: 448 JavaScript tests, 31 Python
+release guards, required root/terminal/desktop Go suites, release/resource
+metadata, browser script syntax and Windows x64 GUI build. Hosted review,
+publication and released77 live update staging are pending. Native Windows/WebView2, hardware and actual
+installation/restart remain unverified. See DEVELOPMENT_HANDOFF.md.
+
+HISTORICAL PUBLISHED BASELINE
+
 NETWORK TOOLKIT 1.17.77 VALIDATION
 
 Client Setup and server Settings sidebar tabs are labelled Connect for SFTP,

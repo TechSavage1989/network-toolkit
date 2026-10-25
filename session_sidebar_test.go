@@ -166,3 +166,33 @@ func TestTerminalRecentTabPersists(t *testing.T) {
 		t.Fatalf("recent tab preference lost: %#v", state)
 	}
 }
+
+func TestTerminalSidebarSideDisplayValidation(t *testing.T) {
+	for _, item := range []struct {
+		name  string
+		input any
+		want  string
+	}{
+		{"left", "left", "left"}, {"right", "right", "right"},
+		{"invalid string", "top", "right"}, {"invalid object", map[string]any{"password": "secret-canary"}, "right"},
+	} {
+		t.Run(item.name, func(t *testing.T) {
+			input := map[string]any{"terminalSidebarSide": item.input, "password": "secret-canary"}
+			for name, encoded := range map[string][]byte{
+				"single": terminalSingleViewDisplay(input),
+				"workspace": func() []byte {
+					raw, err := json.Marshal(terminalWorkspaceDisplay(input))
+					if err != nil {
+						t.Fatal(err)
+					}
+					return raw
+				}(),
+			} {
+				var display map[string]any
+				if json.Unmarshal(encoded, &display) != nil || display["terminalSidebarSide"] != item.want || bytes.Contains(encoded, []byte("secret-canary")) {
+					t.Fatalf("%s did not retain a safe sidebar side: %s", name, encoded)
+				}
+			}
+		})
+	}
+}

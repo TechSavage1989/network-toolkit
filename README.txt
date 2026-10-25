@@ -1,7 +1,13 @@
-NETWORK TOOLKIT 1.17.77
+NETWORK TOOLKIT 1.17.78
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.77
+CURRENT RELEASE - 1.17.78
+
+Detached terminal sessions and workspaces retain the sidebar side chosen in
+the main window. Detaching immediately after moving the sidebar also uses the
+latest selection.
+
+PREVIOUS RELEASE - 1.17.77
 
 The first sidebar tab is now labelled Connect in both client and server modes
 for SFTP, TFTP and FTP/FTPS. The matched tab appearance and existing connection,

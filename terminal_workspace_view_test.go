@@ -62,10 +62,10 @@ func TestTerminalWorkspaceEmptyAndSafeDraftRoundTrip(t *testing.T) {
 			a := testApplication(t)
 			initial := terminalWorkspaceSnapshot{Display: map[string]any{
 				"theme": "dark", "terminalLayout": map[string]any{"kind": "grid", "columnRatio": .65, "rowRatio": .4},
-				"terminalSidebarWidth": float64(372),
-				"terminalConnection":   map[string]any{"type": "ssh", "host": "draft.example", "username": "operator", "password": "draft-secret", "privateKey": "key-secret", "passphrase": "phrase-secret"},
-				"terminalProfiles":     []any{map[string]any{"name": "Saved", "type": "ssh", "host": "profile.example", "password": "profile-secret"}},
-				"targets":              []any{map[string]any{"host": "unrelated.example"}},
+				"terminalSidebarWidth": float64(372), "terminalSidebarSide": "left",
+				"terminalConnection": map[string]any{"type": "ssh", "host": "draft.example", "username": "operator", "password": "draft-secret", "privateKey": "key-secret", "passphrase": "phrase-secret"},
+				"terminalProfiles":   []any{map[string]any{"name": "Saved", "type": "ssh", "host": "profile.example", "password": "profile-secret"}},
+				"targets":            []any{map[string]any{"host": "unrelated.example"}},
 			}}
 			info, launch := workspaceTestCreate(t, a, initial)
 			current := workspaceTestDecode(t, viewTestRequest(a, launch.ViewToken, "GET", "/api/terminal-views/current", nil, nil), 200)
@@ -103,12 +103,12 @@ func TestTerminalWorkspaceEmptyAndSafeDraftRoundTrip(t *testing.T) {
 			if !strings.Contains(state.Body.String(), "draft.example") || !strings.Contains(state.Body.String(), "profile.example") {
 				t.Fatal("safe draft or profile was lost")
 			}
-			if current.Workspace.Display["terminalSidebarWidth"] != float64(372) {
+			if current.Workspace.Display["terminalSidebarWidth"] != float64(372) || current.Workspace.Display["terminalSidebarSide"] != "left" {
 				t.Fatal("workspace transfer lost the sidebar width")
 			}
 			if ready {
 				workspaceTestDecode(t, viewTestRequest(a, launch.ViewToken, "POST", "/api/terminal-views/current/ready", map[string]any{}, nil), 200)
-				updated := map[string]any{"theme": "light", "terminalFontSize": 16, "terminalSidebarWidth": 416, "terminalConnection": map[string]any{"type": "serial", "serialPort": "COM9", "baudRate": 115200, "password": "late-secret"}, "terminalLayout": map[string]any{"kind": "columns", "columnRatio": .7}}
+				updated := map[string]any{"theme": "light", "terminalFontSize": 16, "terminalSidebarWidth": 416, "terminalSidebarSide": "right", "terminalConnection": map[string]any{"type": "serial", "serialPort": "COM9", "baudRate": 115200, "password": "late-secret"}, "terminalLayout": map[string]any{"kind": "columns", "columnRatio": .7}}
 				if response := viewTestRequest(a, launch.ViewToken, "PUT", "/api/state", updated, nil); response.Code != 200 {
 					t.Fatal(response.Body.String())
 				}
@@ -124,11 +124,11 @@ func TestTerminalWorkspaceEmptyAndSafeDraftRoundTrip(t *testing.T) {
 			if ready && returned.Workspace.Display["theme"] != "light" {
 				t.Fatal("returning workspace lost its edited preferences")
 			}
-			wantWidth := float64(372)
+			wantWidth, wantSide := float64(372), "left"
 			if ready {
-				wantWidth = 416
+				wantWidth, wantSide = 416, "right"
 			}
-			if returned.Workspace.Display["terminalSidebarWidth"] != wantWidth {
+			if returned.Workspace.Display["terminalSidebarWidth"] != wantWidth || returned.Workspace.Display["terminalSidebarSide"] != wantSide {
 				t.Fatal("returning workspace lost its sidebar width")
 			}
 			encoded, _ := json.Marshal(returned)

@@ -1,0 +1,8 @@
+Network Toolkit 1.17.78
+
+What's new
+- Detached terminal sessions and workspaces keep the sidebar on the selected side.
+- Detaching immediately after moving the sidebar uses the latest choice.
+
+Applies to complete workspaces, individual sessions and panes moved out of an
+already detached workspace. Existing connections and display controls are retained.

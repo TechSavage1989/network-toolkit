@@ -1,5 +1,43 @@
 # Network Toolkit development handoff
 
+## 1.17.78 candidate: detached terminal sidebar side
+
+Prepared from main 7e54d7ee0b3a42af9f384453e0742bf9458d9e29 after the user
+reported detached terminals forgetting which side the sidebar occupied in the
+main window and explicitly requested build/publication on 2026-10-25. This
+authorizes this scoped new release only. Preserve prior tags/assets and use
+main network-toolkit as the sole source/update feed.
+
+Both the single-session display filter and linked-workspace display filter
+omitted terminalSidebarSide although the sidebar already persisted/emitted it.
+Both filters now include the field. The shared settings sanitizer retains only
+left/right, using the existing right-side default for invalid values. A pane
+moved out of a linked workspace inherits that workspace's current side. Detached
+display saves and workspace checkpoints/return snapshots retain the choice.
+
+Before a single-session/pane detach, await the existing queued settings flush
+so an immediate detach after swapping sides observes the current selection
+rather than the 550ms delayed autosave. A failed save leaves the session in its
+original window and reports the error. Whole-workspace capture already includes
+current sidebar preferences directly. No transport, ownership or updater logic
+changes. Existing connection/modal, credentials/folders/macros and all prior
+UI fixes remain. Go/UI/package/Windows resources are consistently 1.17.78.
+
+Focused Go endpoint/round-trip regressions reproduce the omission in released77
+and pass with the fix, covering single views, linked workspaces, nested pane
+moves, detached preference edits, reattach and safe left/right validation.
+Two JavaScript regressions reproduce the immediate-detach race and failed-save
+behavior in released77 and pass with the fix. The existing real-page terminal
+browser fixture now checks both sidebar placements, workspace capture/apply and
+single-session detachment immediately after swapping sides. It uses isolated
+APIs, not native windows or actual external transports.
+
+Local full checks passed: 448 JavaScript tests, 31 Python release guards,
+required root/terminal/desktop Go suites, release/resource metadata, browser
+script syntax and Windows x64 GUI build. Hosted browser/build artifacts,
+publication and released77 live update staging are pending. Native Windows/WebView2, hardware and actual
+installation/restart remain unverified.
+
 ## 1.17.77 published: Connect labels in client and server sidebars
 
 Prepared from main 6b32d2fadd9fd2f076309a3a379784a6b2e93590 after the user

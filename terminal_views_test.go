@@ -87,6 +87,9 @@ func TestTerminalLiveViewOwnershipAndScope(t *testing.T) {
 		launched = launch
 		return nil, nil
 	}
+	if result := viewTestRequest(a, a.token, "PUT", "/api/state", map[string]any{"terminalSidebarSide": "left"}, nil); result.Code != 200 {
+		t.Fatal(result.Body.String())
+	}
 	session := viewTestConnected(t, a)
 	other := viewTestConnected(t, a)
 	snapshot := viewTestSnapshot(a, session)
@@ -123,6 +126,11 @@ func TestTerminalLiveViewOwnershipAndScope(t *testing.T) {
 			t.Fatalf("view list leaked or lost session: %s", result.Body.String())
 		}
 	}
+	initialPreferences := viewTestRequest(a, launched.ViewToken, "GET", "/api/state", nil, nil)
+	var initialDisplay map[string]any
+	if initialPreferences.Code != 200 || json.Unmarshal(initialPreferences.Body.Bytes(), &initialDisplay) != nil || initialDisplay["terminalSidebarSide"] != "left" {
+		t.Fatalf("detached session lost its source sidebar side: %s", initialPreferences.Body.String())
+	}
 	zero, one, two := uint64(0), uint64(1), uint64(2)
 	input := map[string]string{"data": base64.StdEncoding.EncodeToString([]byte("input\r"))}
 	path := "/api/terminals/" + session.ID + "/input"
@@ -153,12 +161,12 @@ func TestTerminalLiveViewOwnershipAndScope(t *testing.T) {
 		t.Fatal("home removed a detached connection")
 	}
 	stateBefore := string(a.state)
-	if result := viewTestRequest(a, launched.ViewToken, "PUT", "/api/state", map[string]any{"theme": "light", "terminalSidebarTab": "macros", "terminalSidebarWidth": 372, "terminalSidebarCollapsed": true, "terminalComposerCollapsed": true, "terminalMacroConfirmation": "never", "terminalProfiles": []any{map[string]string{"password": "forbidden-secret"}}}, nil); result.Code != 200 {
+	if result := viewTestRequest(a, launched.ViewToken, "PUT", "/api/state", map[string]any{"theme": "light", "terminalSidebarSide": "right", "terminalSidebarTab": "macros", "terminalSidebarWidth": 372, "terminalSidebarCollapsed": true, "terminalComposerCollapsed": true, "terminalMacroConfirmation": "never", "terminalProfiles": []any{map[string]string{"password": "forbidden-secret"}}}, nil); result.Code != 200 {
 		t.Fatal("transient view preferences failed")
 	}
 	preferences := viewTestRequest(a, launched.ViewToken, "GET", "/api/state", nil, nil)
 	var presented map[string]any
-	if preferences.Code != 200 || json.Unmarshal(preferences.Body.Bytes(), &presented) != nil || presented["terminalSidebarTab"] != "macros" || presented["terminalSidebarWidth"] != float64(372) || presented["terminalSidebarCollapsed"] != true || presented["terminalComposerCollapsed"] != true || presented["terminalMacroConfirmation"] != "never" {
+	if preferences.Code != 200 || json.Unmarshal(preferences.Body.Bytes(), &presented) != nil || presented["terminalSidebarSide"] != "right" || presented["terminalSidebarTab"] != "macros" || presented["terminalSidebarWidth"] != float64(372) || presented["terminalSidebarCollapsed"] != true || presented["terminalComposerCollapsed"] != true || presented["terminalMacroConfirmation"] != "never" {
 		t.Fatalf("detached macro presentation preferences were lost: %s", preferences.Body.String())
 	}
 	if _, exists := presented["terminalProfiles"]; exists || bytes.Contains(preferences.Body.Bytes(), []byte("forbidden-secret")) {

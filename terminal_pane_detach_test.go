@@ -18,7 +18,7 @@ func paneDetachFixture(t *testing.T) (*application, terminalViewInfo, terminalVi
 	workspace := terminalWorkspaceSnapshot{
 		Sessions: map[string]terminalScreenSnapshot{}, Panes: []string{sessions[0].ID, sessions[1].ID, sessions[2].ID, ""},
 		Active: sessions[0].ID, PaneFocus: 0, Maximized: -1,
-		Display: map[string]any{"theme": "light", "terminalFontSize": 16, "terminalLayout": map[string]any{"kind": "grid"}, "terminalProfiles": []any{map[string]any{"name": "Private profile", "host": "profile.example"}}},
+		Display: map[string]any{"terminalSidebarSide": "left", "theme": "light", "terminalFontSize": 16, "terminalLayout": map[string]any{"kind": "grid"}, "terminalProfiles": []any{map[string]any{"name": "Private profile", "host": "profile.example"}}},
 	}
 	for _, session := range sessions {
 		workspace.Sessions[session.ID] = viewTestSnapshot(a, session)
@@ -73,7 +73,7 @@ func TestTerminalPaneDetachFromLinkedWorkspace(t *testing.T) {
 		t.Fatal("selected pane scrollback did not reach the new window")
 	}
 	display := viewTestRequest(a, childLaunch.ViewToken, "GET", "/api/state", nil, nil)
-	if !strings.Contains(display.Body.String(), `"terminalFontSize":16`) || strings.Contains(display.Body.String(), "profile.example") {
+	if !strings.Contains(display.Body.String(), `"terminalSidebarSide":"left"`) || !strings.Contains(display.Body.String(), `"terminalFontSize":16`) || strings.Contains(display.Body.String(), "profile.example") {
 		t.Fatal("single pane display settings were lost or included workspace profiles")
 	}
 	if rejected := viewTestRequest(a, childLaunch.ViewToken, "POST", "/api/terminal-views/current/detach-session", map[string]any{"sessionId": sessions[0].ID, "snapshot": snapshot}, nil); rejected.Code != http.StatusForbidden {

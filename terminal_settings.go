@@ -37,6 +37,13 @@ func sanitizeTerminalSettings(state map[string]any) {
 		}
 		state["terminalSidebarWidth"] = width
 	}
+	if value, present := state["terminalSidebarSide"]; present {
+		side, _ := value.(string)
+		if side != "left" {
+			side = "right"
+		}
+		state["terminalSidebarSide"] = side
+	}
 	if value, present := state["terminalMacroConfirmation"]; present {
 		policy, _ := value.(string)
 		if policy != "always" && policy != "multiple" && policy != "never" {
