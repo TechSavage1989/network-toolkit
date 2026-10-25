@@ -51,7 +51,8 @@ async function copy(button,expected,keyboard=false){
    if(p.includes('/events')){await new Promise(resolve=>setTimeout(resolve,100));data={events:[],sessions:[],after:0};}
    return route.fulfill({contentType:'application/json',body:JSON.stringify(data)});
   }
-  const file=path.resolve(root,'.'+(p==='/'?'/index.html':p));if(!file.startsWith(root+path.sep))return route.fulfill({status:403,body:''});
+  let file=path.resolve(root,'.'+(p==='/'?'/index.html':p));if(!file.startsWith(root+path.sep))return route.fulfill({status:403,body:''});
+  if(!fs.existsSync(file)&&/^\/assets\/Network_Toolkit_Icon\.(?:svg|ico)$/.test(p))file=path.join(root,'../assets',path.basename(p));
   try{let body=fs.readFileSync(file);if(p==='/')body=body.toString().replaceAll('__SESSION_TOKEN__','ui-fixture').replaceAll('__WINDOW_MODE__','main');return route.fulfill({body,contentType:p==='/'?'text/html':p.endsWith('.js')?'application/javascript':p.endsWith('.css')?'text/css':p.endsWith('.svg')?'image/svg+xml':'application/octet-stream'});}catch{return route.fulfill({status:404,body:''});}
  });
  if(out)fs.mkdirSync(out,{recursive:true});
@@ -80,6 +81,7 @@ async function copy(button,expected,keyboard=false){
   assert.equal(await page.locator('#entryContextMenu:not(.hidden)').count(),0);
   if(out&&(width===1600||width===390))await page.screenshot({path:path.join(out,'ui-overview-'+theme+'-'+width+'.png')});
   await page.evaluate(()=>navigate('hosts'));await page.waitForSelector('.he-toolbar');await settle(page);
+  await copy(page.locator('[data-hosts-action="copy-path"]'),'C:\\Windows\\System32\\drivers\\etc\\hosts',theme==='dark');
   const summary=page.locator('.he-more>summary'),find=page.locator('[data-hosts-action="find"]');
   const a=await summary.boundingBox(),b=await find.boundingBox();
   if(Math.abs(a.y-b.y)<Math.min(a.height,b.height))assert(Math.abs((a.y+a.height/2)-(b.y+b.height/2))<=1,JSON.stringify({width,theme,a,b}));

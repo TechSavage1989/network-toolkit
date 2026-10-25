@@ -59,3 +59,8 @@
 .he-diff{font:11px/1.6 var(--mono);padding:10px;border:1px solid var(--border);border-radius:6px;background:var(--panel2);}
 @media(max-width:800px){.he-toolbar{gap:4px;}.he-counts{width:100%;margin-left:0;}.he-filter{flex-basis:100%;}.he-text-tools>.faint{display:none;}.he-table th:nth-child(3){width:155px;}.he-menu{left:auto;right:0;}}
 @media(max-height:650px){.he-app .local-config-toolbar{padding:7px 10px;}.he-app .hosts-file-meta{padding:5px 10px;}.he-entry-controls,.he-toolbar{padding:5px 8px;}.he-app .hosts-editor-help{padding:5px 8px;}.he-issues{max-height:95px;}}
+
+.he-path-wrap{display:inline-flex;align-items:flex-start;gap:5px;min-width:0;max-width:100%}
+.he-path-wrap>.he-path{min-width:0}
+.he-copy-path.iconbtn{flex:0 0 22px;width:22px;height:22px;min-height:22px;padding:4px;color:var(--muted);background:transparent}
+.he-copy-path svg{width:13px;height:13px}

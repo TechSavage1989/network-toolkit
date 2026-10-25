@@ -26,3 +26,6 @@
 
 /* Command input scrolls with its caret, keyboard and wheel, without visible tracks. */
 .terminal-macro-composer textarea::-webkit-scrollbar{display:none;width:0;height:0}
+
+/* Recipient labels remain readable beside the count at compact widths. */
+.terminal-macro-composer .macro-composer-recipients #terminalMacroChooseTargets{white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;height:auto;line-height:1.4}

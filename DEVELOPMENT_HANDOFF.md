@@ -17,7 +17,8 @@ Escape now closes the menu and focuses More.
 Overview removes the repeated diagnostic shortcut tile grid and per-IP Tools
 buttons. Main navigation, adapter address context menus/keyboard access, network
 scan actions and View details remain. Each address and adapter name has an explicit copy payload. Hosts paths and
-expanded DNS metadata fields also have direct value copy actions.
+expanded DNS metadata fields also have direct value copy actions. Hosts keeps
+its editor opt-out and uses an explicit native path copy action.
 
 The hover-only legacy ntkOfferCopy helper wrapped value DOM and created inline
 buttons. It overlapped the newer result-copy helper, skipped addresses containing
@@ -29,7 +30,13 @@ DNS whitespace, keyboard use, result reconciliation and context actions remain.
 Nested value groups get no extra aggregate copy control. Existing public-IP
 copy buttons remain sole owners. Inputs, terminals, secrets, statuses, action
 cells and placeholders remain excluded. Shared toolbar SVGs retain their shape
-when labels wrap. No transport, credentials or updater logic changes.
+when labels wrap. Compact terminal recipient labels now wrap instead of clipping with an ellipsis,
+while retaining the command input scrollbar suppression. No transport,
+credentials or updater logic changes.
+
+Review found and corrected a CRLF export-fixture expectation and a clipped
+View recipients label at 390px. Icon fixture requests now use the same shared
+asset location as the app. Final hosted review is pending these corrections.
 
 Three focused JavaScript regressions cover new copy availability, individual
 addresses, retained nodes, deduplication, native controls and exclusions.
