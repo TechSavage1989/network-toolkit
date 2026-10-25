@@ -21,8 +21,13 @@ injected test clocks while providing the correct receiver to native browsers.
 The native browser suite uses the actual index page and native timers, without
 page.clock or timer replacement. Its negative control restores only the exact
 released 64 timer wiring; the candidate must demonstrate the positive counterpart.
-Before hosted execution, this is a diagnosis and test expectation, not a claim
-that native Chromium or the user's Windows runtime has confirmed the cause.
+Hosted review Checks 40147301635 passed on bb2fc58. In Chromium 155.0.8059.0,
+the exact released wiring throws Illegal invocation at schedule(), makes zero
+feed checks and leaves the stale scheduled state. All six native scenarios pass
+with the wrappers, unchanged native timer identities and at most one active
+feed check. The real retry occurred about 30.02 seconds after failure. Manual
+and toggle cancellation were observed past the old retry deadline. This confirms
+the native Chromium defect, not a direct inspection of the user's Windows runtime.
 
 Retained unchanged: saved opt-out and startup preference loading, six-hour checks,
 30-second/2-minute retries and bounded backoff, manual checks, per-stage/version
@@ -34,7 +39,9 @@ this release does not claim to fix that separate warning.
 
 Local validation passed: 379 JavaScript tests, 31 Python tests, root/terminal/
 desktop Go tests, release/resource validation and Windows x64 GUI cross-build.
-Validation status will be finalized after hosted proof and publication. Native
+Independent review found no confirmed must-fix and passed 75 focused JS tests.
+The test now scrolls to the update status before settings screenshots; final
+review Checks and publication status will be recorded below. Native
 Windows/WebView2, real installation and restart remain untested here. Retain all
 old release tags/assets and use the main repository only; do not write to the
 retired update repository or change repository access.

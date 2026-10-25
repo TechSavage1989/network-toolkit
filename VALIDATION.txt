@@ -5,8 +5,12 @@ automatic update scheduler timers. Receiver-enforcing initializer regressions
 cover startup, manual replacement, toggles and retry cancellation.
 Local checks passed: 379 JavaScript tests, 31 Python tests, root/terminal/desktop
 Go tests, release/resource validation and Windows x64 GUI cross-build.
-Hosted native-browser proof and independent review are pending at this snapshot.
-Do not interpret this candidate as published or native-runtime verified yet.
+Hosted review Checks 40147301635 passed: exact released-64 negative control
+reproduces Illegal invocation/no feed check in Chromium 155.0.8059.0; six native
+scenarios verify fixed startup, opt-out, real retry, manual/toggle cancellation
+and no overlap without fake clocks. Independent review cleared the change.
+The test screenshot positioning is improved for a final review run.
+Do not interpret this candidate as published or Windows-native verified yet.
 Native Windows/WebView2, installation and restart are not exercised here.
 
 HISTORICAL 1.17.64 VALIDATION FOLLOWS
