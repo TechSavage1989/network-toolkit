@@ -156,3 +156,9 @@
   #utilityBody>.utility-grid>.panel>.panel-body{padding:10px}
   .modal:has(#settingsTheme) .modal-body{padding-top:10px;padding-bottom:10px}
 }
+
+/* The subnet input and planner share the left column without disclosure margins. */
+#utilityBody .subnet-input-column>#possibleNetworks{margin:0}
+#utilityBody .subnet-input-column>.panel>.panel-head{padding:10px 12px}
+#utilityBody .subnet-input-column>.panel>.panel-body{padding:12px}
+#utilityBody .subnet-input-column>.panel .form-stack{gap:9px}
