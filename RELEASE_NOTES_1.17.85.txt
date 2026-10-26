@@ -5,3 +5,4 @@ Network Toolkit 1.17.85
 - Keep local shell coloring independent of network-device output highlighting.
 - Make confirmation before closing terminal tabs and sessions configurable.
 - Keep collapsed tool icons clickable; use the arrow or double-click the divider to reopen navigation.
+- Keep terminal Display settings inside the window at narrower widths.

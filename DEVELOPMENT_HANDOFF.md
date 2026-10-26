@@ -38,6 +38,8 @@ The main left tool rail stays collapsed while tool icons navigate. Only its
 arrow or explicit divider double-click / Enter / Space toggles it. Surface clicks
 no longer reveal that rail; other panel reveal behavior and mobile drawer remain.
 The divider is a toggle boundary, not a new drag-resize feature.
+The Display popover is clamped inside the viewport at compact widths. The full
+app browser geometry test caught the prior left-edge overflow at 820 pixels.
 
 Local verification so far: 503 JS tests and 31 Python release guards pass; focused
 real renderer/native transcript tests pass. Native probe Windows lifecycle and
