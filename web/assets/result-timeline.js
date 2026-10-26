@@ -122,11 +122,15 @@
     const svg='<svg data-rt-surface="'+name+'" tabindex="0" role="group" aria-label="'+(metric==='rtt'?'Response time':'Absolute RTT change between consecutive measured replies')+'. Use Left and Right arrows to inspect samples, Home and End to jump, Enter to select, Escape to clear." viewBox="0 0 '+(progressive?geometry.viewport:width)+' '+height+'" preserveAspectRatio="none">'+plotContent(model,metric,maximum,average)+'</svg>';
     return '<div class="rt-plot rt-'+name+'"><div class="rt-axis-label">'+escape(number(maximum))+'</div>'+(progressive?'<div class="rt-scroll" data-rt-scroll="'+name+'" tabindex="0" aria-label="Scroll '+name+' retained history"><div class="rt-track" style="width:'+geometry.track+'px"><div class="rt-visible-plot" style="width:'+geometry.viewport+'px">'+svg+'</div></div></div>':svg)+'</div>';
   }
+  function capturePendingScroll(model,scroll){
+    if(!(scroll?.clientWidth>0)||!Number.isFinite(scroll.scrollLeft)||!Number.isFinite(scroll._rtAppliedLeft)||Math.abs(scroll.scrollLeft-scroll._rtAppliedLeft)<=.5)return false;
+    model.scrollLeft=scroll.scrollLeft;model.follow=Math.max(0,(scroll.scrollWidth||0)-scroll.clientWidth)-model.scrollLeft<=12;scroll._rtAppliedLeft=model.scrollLeft;return true;
+  }
   function captureScroll(model){
     if(model.skipCaptureOnce){model.skipCaptureOnce=false;return;}
     const container=findContainer(model.id),scroll=container?.querySelector('[data-rt-scroll="latency"]');
-    if(!scroll||model.mode!=='progressive'||!Number.isFinite(scroll.scrollLeft))return;
-    model.scrollLeft=scroll.scrollLeft;
+    if(!scroll||model.mode!=='progressive'||!(scroll.clientWidth>0)||!Number.isFinite(scroll.scrollLeft))return;
+    capturePendingScroll(model,scroll);model.scrollLeft=scroll.scrollLeft;
   }
   function latency(samples,context={}){
     if(!Array.isArray(samples)||!samples.length)return '';
@@ -223,12 +227,13 @@
     if(model.mode==='progressive'){
       const main=container.querySelector('[data-rt-scroll="latency"]'),measured=main?.clientWidth||main?.getBoundingClientRect?.().width;
       if(main&&resizeObserver&&!observedScrollers.has(main)){resizeObserver.observe(main);observedScrollers.add(main);}
-      if(measured>0)model.viewportWidth=measured;
+      if(measured>0)model.viewportWidth=measured;capturePendingScroll(model,main);
       const geometry=plotGeometry(model);model.scrollLeft=model.follow?followPosition(model):Math.max(0,Math.min(model.scrollLeft,geometry.track-geometry.viewport));
       for(const scroll of container.querySelectorAll('[data-rt-scroll]')){
         const track=scroll.querySelector('.rt-track'),visible=scroll.querySelector('.rt-visible-plot'),svg=scroll.querySelector('[data-rt-surface]');if(!track||!visible||!svg)continue;
         track.style.width=geometry.track+'px';visible.style.width=geometry.viewport+'px';
         if(Math.abs((scroll.scrollLeft||0)-model.scrollLeft)>.5)scroll.scrollLeft=model.scrollLeft;
+        if(scroll.clientWidth>0)scroll._rtAppliedLeft=scroll.scrollLeft;
         svg.setAttribute('viewBox','0 0 '+geometry.viewport+' '+height);
         const metric=scroll.dataset.rtScroll==='jitter'?'jitter':'rtt',filter=filterState(model),stamp=[model.scrollLeft,geometry.viewport,model.points.length,model.points.at(-1)?.key,model.zoom,model.pinned,model.hovered,metric,JSON.stringify(filter)].join('|');
         if(svg.dataset.rtWindow!==stamp){svg.innerHTML=plotContent(model,metric,metric==='rtt'?model.maximum:model.maxJitter,metric==='rtt'?model.stats.average:model.stats.jitter);svg.dataset.rtWindow=stamp;}
@@ -285,7 +290,7 @@
       if(!points[index])return;context.model.keyboardInspect=true;inspection(context.model,true);pinPoint(context,points[index]);revealPoint(context,points[index]);
     });
     document.addEventListener('scroll',event=>{
-      if(!event.target.matches?.('[data-rt-scroll]')||restoring)return;const context=contextFor(event.target);if(!context?.model||context.model.mode!=='progressive')return;
+      if(!event.target.matches?.('[data-rt-scroll]')||restoring||!(event.target.clientWidth>0))return;const context=contextFor(event.target);if(!context?.model||context.model.mode!=='progressive')return;
       const scroll=event.target,maximum=Math.max(0,(scroll.scrollWidth||0)-(scroll.clientWidth||context.model.viewportWidth));context.model.scrollLeft=scroll.scrollLeft||0;context.model.follow=maximum-context.model.scrollLeft<=12;restoreContainer(context.container,context.model);hideTooltip();
     },true);
     document.addEventListener('focusin',event=>{const surface=event.target.closest?.('[data-rt-surface]'),context=contextFor(event.target);if(surface&&context)lastFocus={node:surface,id:context.model.id,surface:surface.dataset.rtSurface};else lastFocus=null;});

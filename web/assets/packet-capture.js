@@ -95,9 +95,12 @@ function rememberDisclosures(){for(const details of document.querySelectorAll('#
 function restoreDisclosures(container=node('packetCaptureWorkspace')){if(!container)return;for(const details of container.querySelectorAll('details')){const key=disclosureKey(details);if(key){if(model.disclosures[key])details.setAttribute('open','');else details.removeAttribute('open');}}}
 function layoutPacketConfiguration(){
  const region=document.querySelector('.packet-configuration-region');if(!region)return;const put=(key,value)=>{if(region.style[key]!==value)region.style[key]=value;};
- const cap=model.view==='packets'&&state.packetGraphPreferences?.collapsed&&Number.isFinite(model.graphCollapseConfigurationHeight)?model.graphCollapseConfigurationHeight:null;
+ const formsOpen=!!node('packetCaptureSetup')?.hasAttribute('open')||!!region.querySelector('.packet-display-options')?.hasAttribute('open'),compact=(Number.isFinite(root.innerWidth)&&root.innerWidth>0&&root.innerWidth<=760)||(Number.isFinite(root.innerHeight)&&root.innerHeight>0&&root.innerHeight<=720),review=model.view==='packets'&&!!model.selected;
+ const workspace=node('packetCaptureWorkspace'),available=Number(workspace?.clientHeight)||workspace?.getBoundingClientRect?.().height||600;
+ if(formsOpen&&review&&compact){const height=Math.max(32,Math.min(160,Math.floor(available*.42)));put('maxHeight','42%');put('minHeight',height+'px');put('flexBasis',height+'px');return;}
+ const cap=!formsOpen&&review&&compact?32:!formsOpen&&review&&state.packetGraphPreferences?.collapsed&&Number.isFinite(model.graphCollapseConfigurationHeight)?model.graphCollapseConfigurationHeight:null;
  if(cap===null){for(const key of ['maxHeight','minHeight','flexBasis'])put(key,'');return;}
- const workspace=node('packetCaptureWorkspace'),available=Number(workspace?.clientHeight)||workspace?.getBoundingClientRect?.().height||600,height=Math.round(clamp(cap,32,Math.max(32,available*.42)));
+ const height=Math.round(clamp(cap,32,Math.max(32,available*.42)));
  // Keep setup and filtering scrollable while the released plot space goes to
  // results. A formerly compressed region still gets one usable control row.
  put('maxHeight',height+'px');put('minHeight','32px');put('flexBasis',height+'px');
@@ -827,7 +830,7 @@ function help(filters){openModal(filters?'Packet display filters':'Packet captur
 document.addEventListener('click',event=>{
  const choice=event.target.closest('[data-packet-menu-action]');if(choice){event.preventDefault();event.stopImmediatePropagation();if(!choice.disabled&&!choice.hasAttribute('disabled'))packetMenuAction(choice.dataset.packetMenuAction);return;}
  if(packetMenu&&!packetMenu.contains(event.target)&&!event.target.closest('[data-packet-action="packet-menu"]'))closePacketMenu();
- const summary=event.target.closest('summary'),details=summary?.parentElement,key=disclosureKey(details);if(key){event.preventDefault();model.disclosures[key]=!details.hasAttribute('open');if(key==='setup')model.setupManual=true;if(model.disclosures[key])details.setAttribute('open','');else details.removeAttribute('open');return;}
+ const summary=event.target.closest('summary'),details=summary?.parentElement,key=disclosureKey(details);if(key){event.preventDefault();model.disclosures[key]=!details.hasAttribute('open');if(key==='setup')model.setupManual=true;if(model.disclosures[key])details.setAttribute('open','');else details.removeAttribute('open');if(key==='setup'||key==='display')layoutDetails();return;}
  const trigger=event.target.closest('[data-packet-action]'),action=trigger?.dataset.packetAction;if(action==='packet-menu'){event.preventDefault();event.stopImmediatePropagation();if(packetMenu)closePacketMenu(true);else openPacketMenu(model.detail?.packet,trigger);return;}if(action==='hide-details'||action==='toggle-details'){event.preventDefault();event.stopImmediatePropagation();closePacketMenu();toggleDetails(action==='hide-details'?true:undefined);}
 });
 document.addEventListener('contextmenu',packetContextMenu);

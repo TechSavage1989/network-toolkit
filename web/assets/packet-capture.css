@@ -432,3 +432,20 @@
 .packet-workspace .packet-table tbody tr.packet-graph-hovered:not(.packet-spacer){box-shadow:none;outline:2px solid var(--text);outline-offset:-2px}.packet-timeline [data-packet-bucket].selected .packet-timeline-hit{fill:none;stroke:var(--text)}
 @media(max-width:600px){.packet-graph-summary{padding:4px;gap:4px}.packet-statistic{min-height:41px;padding:4px 6px;flex-basis:106px}.packet-statistic strong{font-size:12px}.packet-detail-filters{padding:3px 5px}.packet-graph-heading{padding:3px 6px}}
 .packet-review-metrics>button{padding:8px;border:1px solid var(--line);border-radius:6px;display:flex;flex-direction:column;gap:3px;min-width:0;background:var(--panel2);color:var(--text);font:inherit;text-align:left;cursor:pointer}.packet-review-metrics>button:hover,.packet-review-metrics>button:focus-visible{border-color:var(--accent);outline:1px solid var(--accent);outline-offset:-2px}.packet-review-metrics>button[data-packet-stat="tcpresets"] strong{color:var(--packet-color-note,var(--info,var(--accent)))}.packet-review-metrics>button[data-packet-stat="icmperrors"] strong{color:var(--packet-color-warn,var(--warn))}
+
+/* Compact capture toolbars stay readable and expose every action through
+   horizontal scrolling instead of consuming the packet-reader height. */
+@media(max-width:760px),(max-height:720px){
+ .packet-commandbar,.packet-viewbar{flex-wrap:nowrap;min-width:0;overflow-x:auto;overflow-y:hidden;white-space:nowrap;overscroll-behavior-x:contain;scrollbar-width:thin}
+ .packet-commandbar>*,.packet-viewbar>*{flex-shrink:0}
+ .packet-viewbar>.tabs{width:auto;flex:0 0 auto;flex-wrap:nowrap;margin-right:0;overflow:visible}
+ .packet-viewbar .tab{flex:none;white-space:nowrap}
+ .packet-commandbar::-webkit-scrollbar,.packet-viewbar::-webkit-scrollbar{height:6px}
+ .packet-has-traffic-graph>.packet-configuration-region{min-height:32px}
+}
+@media(max-width:760px),(max-height:720px){
+ .packet-has-traffic-graph>.packet-configuration-region>.packet-guide-setup{margin-top:0}
+ .packet-has-traffic-graph>.packet-configuration-region>.packet-guide-setup>summary{padding:6px 10px}
+ .packet-graph-summary>.packet-statistic{flex:0 0 auto;min-width:150px}
+ .packet-graph-summary>.packet-statistic strong,.packet-graph-summary>.packet-statistic span{white-space:nowrap}
+}

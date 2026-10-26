@@ -257,3 +257,21 @@ test('complete aggregate filter explanations stay escaped and below the plot wit
   assert.match(note.textContent,/Run average RTT reference: 18.5 ms/);assert(html.indexOf('rt-time-axis')<html.indexOf('rt-filter-note'),'The full explanation follows the plot and time axis');assert(html.indexOf('rt-filter-note')<html.indexOf('rt-window-stats'));
  }
 });
+
+test('hidden jitter scroll events cannot resume following or override a manual history position',()=>{
+ const h=harness(),rows=Array.from({length:400},(_,i)=>reply(i+1,10+i%9,new Date(Date.parse('2026-10-26T16:00:00Z')+i*1000).toISOString()));h.api.setPreferences({mode:'progressive'},{persist:false});h.render(rows);
+ const main=h.document.querySelector('[data-rt-scroll="latency"]'),jitter=h.document.querySelector('[data-rt-scroll="jitter"]');main.clientWidth=600;main.scrollWidth=3210;h.observe();main.scrollLeft=0;h.document.emit('scroll',main);
+ assert.equal(main.scrollLeft,0);assert.equal(h.document.querySelector('[data-rt-follow]').getAttribute('aria-pressed'),'false');assert(h.document.querySelector('[data-rt-surface="latency"] [data-rt-sequence="1"]'));
+ jitter.clientWidth=0;jitter.scrollWidth=0;jitter.scrollLeft=0;h.document.emit('scroll',jitter);h.observe();
+ assert.equal(main.scrollLeft,0,'A hidden scroller cannot pull the visible history to its tail');assert.equal(h.document.querySelector('[data-rt-follow]').getAttribute('aria-pressed'),'false');assert(h.document.querySelector('[data-rt-surface="latency"] [data-rt-sequence="1"]'));
+});
+
+test('mounted native scroll changes survive restoration before their queued scroll event',()=>{
+ const h=harness(),rows=Array.from({length:400},(_,i)=>reply(i+1,10+i%9,new Date(Date.parse('2026-10-26T16:00:00Z')+i*1000).toISOString()));h.api.setPreferences({mode:'progressive'},{persist:false});h.render(rows);
+ let main=h.document.querySelector('[data-rt-scroll="latency"]');main.clientWidth=600;main.scrollWidth=3210;h.observe();assert(main.scrollLeft>2000);assert.equal(h.document.querySelector('[data-rt-follow]').getAttribute('aria-pressed'),'true');
+ main.scrollLeft=0;h.observe(); // Native scroll changed the mounted node; the browser scroll event has not arrived.
+ assert.equal(main.scrollLeft,0);assert.equal(h.document.querySelector('[data-rt-follow]').getAttribute('aria-pressed'),'false');assert(h.document.querySelector('[data-rt-surface="latency"] [data-rt-sequence="1"]'));
+ h.document.emit('scroll',main);h.observe();assert.equal(main.scrollLeft,0);assert.equal(h.document.querySelector('[data-rt-follow]').getAttribute('aria-pressed'),'false');
+ h.api.jumpLatest('job');assert(main.scrollLeft>2000);h.api.zoom('job','in');main=h.document.querySelector('[data-rt-scroll="latency"]');main.clientWidth=600;main.scrollWidth=6410;h.observe();assert(main.scrollLeft>5000,'A newly mounted zoom scroller keeps the intended latest position instead of treating initial DOM zero as manual input');
+ main.scrollLeft=0;const nextHTML=h.api.latency([...rows,reply(401,10,'2026-10-26T17:00:00Z')],{id:'job'});h.document.innerHTML=nextHTML;main=h.document.querySelector('[data-rt-scroll="latency"]');main.clientWidth=600;main.scrollWidth=6410;main.scrollLeft=0;h.observe();assert.equal(main.scrollLeft,0,'Source rendering captures pending native input before replacing the mounted scroller');assert.equal(h.document.querySelector('[data-rt-follow]').getAttribute('aria-pressed'),'false');
+});
