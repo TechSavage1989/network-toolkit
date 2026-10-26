@@ -10,6 +10,7 @@
   <a href="#getting-started">Get started</a> ·
   <a href="#features">Features</a> ·
   <a href="#updates-and-settings">Updates</a> ·
+  <a href="docs/releases">Release history</a> ·
   <a href="#development">Development</a>
 </p>
 

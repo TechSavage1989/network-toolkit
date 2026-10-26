@@ -255,7 +255,7 @@ PREVIOUS RELEASE - 1.17.57
 - SFTP/FTP session bars share Terminal's styling and Top/Bottom preference.
 - Run Network_Toolkit_1.17.57_Windows_x64.exe. Complete editable source is
   in source. Open_Terminal.cmd opens the terminal window.
-- See RELEASE_NOTES_1.17.57.txt and VALIDATION.txt for details.
+- See docs/releases/RELEASE_NOTES_1.17.57.txt and VALIDATION.txt for details.
 
 RELEASE HISTORY
 
@@ -273,7 +273,7 @@ PREVIOUS RELEASE - 1.17.56
   be detached from the browser without disconnecting Terminal.
 - Run Network_Toolkit_1.17.56_Windows_x64.exe. Complete editable source is
   in source. Open_Terminal.cmd opens the terminal window.
-- See RELEASE_NOTES_1.17.56.txt and VALIDATION.txt for details.
+- See docs/releases/RELEASE_NOTES_1.17.56.txt and VALIDATION.txt for details.
 
 RELEASE HISTORY
 
@@ -290,7 +290,7 @@ PREVIOUS RELEASE - 1.17.55
 - Credential updates keep profile links and survive application restarts.
 - Run Network_Toolkit_1.17.55_Windows_x64.exe. Complete editable source is
   in source. Open_Terminal.cmd opens the terminal window.
-- See RELEASE_NOTES_1.17.55.txt and VALIDATION.txt for details.
+- See docs/releases/RELEASE_NOTES_1.17.55.txt and VALIDATION.txt for details.
 
 RELEASE HISTORY
 
@@ -308,7 +308,7 @@ PREVIOUS RELEASE - 1.17.54
 - Run Network_Toolkit_1.17.54_Windows_x64.exe. It works without the source
   directory. Open_Terminal.cmd opens its terminal window.
 - Complete editable source and Windows build scripts are in source.
-- See RELEASE_NOTES_1.17.54.txt and VALIDATION.txt for details.
+- See docs/releases/RELEASE_NOTES_1.17.54.txt and VALIDATION.txt for details.
 
 RELEASE HISTORY
 
@@ -327,7 +327,7 @@ WHAT IS NEW IN 1.17.53 - RESIZABLE ACTIVITY AND SERVER ADAPTER FIXES
 - Long server adapter options wrap fully without clipping or overlap.
 - The adapter remains on the left and the listening port on the right.
 - The working saved SSH/SFTP connection behavior from 1.17.52 is retained.
-- See RELEASE_NOTES_1.17.53.txt and VALIDATION.txt for details.
+- See docs/releases/RELEASE_NOTES_1.17.53.txt and VALIDATION.txt for details.
 
 PREVIOUS RELEASE - 1.17.52
 
@@ -339,7 +339,7 @@ WHAT IS NEW IN 1.17.52 - COLLAPSIBLE SERVER SIDEBAR AND SHARED SSH POLICY
 - Saved SSH profile connections in SFTP use the same SSH algorithm policy
   as Terminal, avoiding false SSH host-key changes due to different server
   key algorithms. No host-key trust safeguards were bypassed.
-- See RELEASE_NOTES_1.17.52.txt for details and testing limitations.
+- See docs/releases/RELEASE_NOTES_1.17.52.txt for details and testing limitations.
 
 PREVIOUS RELEASE - 1.17.51
 
@@ -351,7 +351,7 @@ WHAT IS NEW IN 1.17.51 - COMPACT SERVER CONTROLS, SHARED SESSIONS
   SSH sessions and prioritizes Terminal's trusted host-key records.
 - FTP/FTPS saved/recent sessions can also be opened from Terminal's library.
 - Home and Root controls for SFTP/FTP file browsers and terminal SFTP sidebar.
-- See RELEASE_NOTES_1.17.51.txt for details and validation limits.
+- See docs/releases/RELEASE_NOTES_1.17.51.txt for details and validation limits.
 
 PREVIOUS RELEASE - 1.17.50
 
@@ -399,7 +399,7 @@ PREVIOUS RELEASE - 1.17.49 - SAVED SSH PROFILE CONNECT FIX
 - Fixed the Use connection button remaining disabled after a connection.
   Active terminal session SFTP reuse remains available and unchanged.
 - Keeps connection settings collapsed after successful saved-profile sign-in.
-- See RELEASE_NOTES_1.17.49.txt and VALIDATION.txt for test coverage.
+- See docs/releases/RELEASE_NOTES_1.17.49.txt and VALIDATION.txt for test coverage.
 
 PREVIOUS RELEASE - 1.17.48
 
@@ -422,7 +422,7 @@ WHAT IS NEW IN 1.17.48 - LOCAL NETWORK LAYOUT, TRANSFER SETTINGS, TEXT EDITOR
 - Added distinct icons for Text Editor, IP Configuration, Routes, ARP and
   Connections, and corrected fallback icons used by certain context actions.
   Separate FTP and SFTP controls now have matching transfer-protocol icons.
-- See RELEASE_NOTES_1.17.48.txt and VALIDATION.txt for implementation details,
+- See docs/releases/RELEASE_NOTES_1.17.48.txt and VALIDATION.txt for implementation details,
   test coverage and limitations.
 
 PREVIOUS RELEASE - 1.17.47
@@ -460,7 +460,7 @@ WHAT IS NEW IN 1.17.47 - THEMES, FILE-TRANSFER PROFILES AND LOCAL TEXT EDITOR
   download tickets; native Windows Explorer operation must still be confirmed
   on a physical Windows system. Use the Download action or local file pane
   as fallback. In-app file transfers, including folders, remain supported.
-- See RELEASE_NOTES_1.17.47.txt and VALIDATION.txt for implementation details,
+- See docs/releases/RELEASE_NOTES_1.17.47.txt and VALIDATION.txt for implementation details,
   test coverage, and environment limitations.
 
 PREVIOUS RELEASE - 1.17.46
@@ -492,7 +492,7 @@ WHAT IS NEW IN 1.17.45 - SFTP CLIENT INTEGRATION AND TERMINAL FILE SIDEBAR
   starts when the SFTP tab is opened. The terminal shell is never replaced.
 - Sidebar controls, sizing, and keyboard resize direction now fit the
   right-side layout. Long filenames wrap inside their available width.
-- Release details and testing are in RELEASE_NOTES_1.17.45.txt.
+- Release details and testing are in docs/releases/RELEASE_NOTES_1.17.45.txt.
 
 PREVIOUS RELEASE - 1.17.44
 WHAT IS NEW IN 1.17.44 - SINGLE ADAPTER PICKER AND SHARED SSH BROWSING

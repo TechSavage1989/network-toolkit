@@ -18,3 +18,14 @@ The user authorized this publication and it is complete. Future releases need
 authorization. Main network-toolkit is the sole public source/update feed.
 Never replace old tags/assets, change access or write the retired feed. This
 final documentation-only record uses [skip ci]. See handoff for scope and proof.
+
+## Release-note organization
+
+Keep only the current version's `RELEASE_NOTES_<version>.txt` at the repository
+root: release validation, packaging and publication require that path. Use the
+version in `internal/model/model.go` (and its matching UI version), not a guessed
+filename. When an authorized build advances the version, move the prior note
+unchanged into `docs/releases/`, update that directory's index and any references,
+and leave the new current note at root. Preserve every historical note; do not
+recreate the release-note wall in the root directory. This organization does not
+authorize a build, new release, tag move, asset replacement or access change.
