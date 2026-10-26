@@ -123,3 +123,5 @@ body:has(.nt-editor-embedded) #toolWorkspace>#pageContent{grid-row:1!important;g
 
 [data-ed-gutter-lines]{will-change:transform;white-space:pre;overflow:visible}
 [data-ed-gutter-lines]>div{margin:0;padding:0;border:0}
+
+.nt-editor-picker-head,.nt-editor-picker-row{display:grid;grid-template-columns:minmax(160px,1fr) 90px 120px 180px;gap:8px}.nt-editor-picker-row{grid-template-columns:20px minmax(132px,1fr) 90px 120px 180px}.nt-editor-picker-list,.nt-editor-file-picker{overflow-x:auto}.nt-editor-picker-head{min-width:610px}.nt-editor-picker-row{min-width:610px}

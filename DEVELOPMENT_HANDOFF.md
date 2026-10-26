@@ -1,5 +1,9 @@
 # Network Toolkit development handoff
 
+## 1.17.87 authorized update
+
+User requested shell coloring corrections and sortable remote editor directory details, with publication. Empty CMD labels now color; adapter headings remain headings. Remote structured banner labels use existing field colors. Remote picker sorts Name, Type, Size and Modified, toggling direction while retaining selection. Native ANSI and underlying terminal content remain unchanged.
+
 ## 1.17.86 published: editor corrections and structured shell output
 
 The user explicitly requested "publish the build", lifting the earlier hold for

@@ -300,6 +300,9 @@
       if (priority <= 191 && priority % 8 <= 4) add(syslog[1].length, syslog[1].length + syslog[2].length, priority % 8 < 4 ? 'error' : 'warning');
     }
     syntaxHighlights(text, syntax, found, add);
+    // Structured status labels may share a line in remote login banners.
+    const fields = /(?:^|\s{2,})([A-Za-z][A-Za-z /-]{1,35}):(?=\s|$)/g;
+    while ((match = fields.exec(text))) { const start=match.index+match[0].indexOf(match[1]); add(start,start+match[1].length,'field'); }
     return found.sort((a, b) => a.start - b.start || a.end - b.end);
   }
 
