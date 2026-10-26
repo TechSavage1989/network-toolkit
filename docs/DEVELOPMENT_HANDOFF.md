@@ -2,6 +2,16 @@
 
 ## Repository source layout (no application version change)
 
+**Continuing an older development branch:** before the next build or release,
+merge/rebase current main and preserve this layout. Move newly added root Go
+files into `cmd/network-toolkit/`; resolve edits to existing Go files at their
+new paths. Do not restore the old root `main` package, resource object or guides.
+Keep `resources.go`, updated wrappers/CI, and packaging doc mappings. Prior
+pre-layout package validation does not validate the combined tree: rerun the
+current Go, JavaScript, resource, package and native/browser Checks on the
+integrated commit. Preserve newer feature/version edits and rotate release
+notes using AGENTS.md; this cleanup itself does not advance the version.
+
 The repository root is reduced from 212 entries to 22. The intact application
 package (177 Go files) and Windows resource object now live in
 `cmd/network-toolkit/`. Root `resources.go` owns the identical embedded file
