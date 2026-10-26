@@ -1,10 +1,44 @@
-1.17.83 REVIEW IN PROGRESS - 2026-10-26
-Macro folders, local shells, scan sizing/copy spacing, discovery scheduling and
-update progress. Initial hosted Go/Windows/build suites pass; the compact-results browser
-fixture and additional lifecycle/race coverage are being verified in a final
-candidate. Exact final hosted validation and review artifact are pending.
-Local selected-source routing fixtures encounter netlink permission errors;
-full discovery tests are included in hosted Checks. Main remains published82.
+NETWORK TOOLKIT 1.17.83 PUBLISHED VALIDATION - 2026-10-26
+
+Implemented macro folders, local Windows shells, scan sizing/copy spacing,
+discovery scheduling/TCP badges and update progress. The user explicitly authorized publication on 2026-10-26
+after the no-update diagnosis; stable release 423808053 is now available.
+
+Exact source a384a47d5b8782fb821eda492fa9ad92a3ca540d
+Tree ebec06684689f0ad48cfcd8e5661c6da4a740232
+Full Checks 40258417658: application, browser and Windows jobs pass.
+475 JS tests, 31 Python guards, required Go and full discovery/device suites pass.
+Native cmd/PowerShell output, resize, Ctrl+C, shutdown and owned-child cleanup
+pass. Installer activity-window visibility/lifecycle including SW_HIDE passes.
+Each Windows command has its own CI step; detailed logs were inspected.
+All seven native browser updater timer cases pass, including real five-minute
+poll/focus collision. Existing 17-case terminal selection/live input, 138 UI
+layouts, copies, Hosts, client/server, SMTP, folders, editor and dialog checks
+remain. New six populated scan layouts, long answers, exact TCP copying, live
+updates, macro-folder reloads, local custom themes and download progress pass.
+Focused discovery and full updater-download race fixtures pass.
+
+Artifact 12623039560 SHA256 3e29a1978562dd31af0a53fdc73ff710d906f9efe781cdd36ed20372420da9b0
+Portable SHA256 edcfd279c94eaa3b18662748bf915f959052f65007300505ed9a77e8eea04023
+EXE SHA256 dd50538a54ea21c2a563497525ad59fd1cc23c18134cce0cd34a34b5026d1698
+All 713 source files match the exact tested commit. Both checksum
+inventories/ZIP CRCs, Windows x64 GUI PE/version, strict update ZIP and local/
+hosted byte equality pass. Browser artifact 12623776589 SHA256
+ffff4e90628bbabf352182b5a06b6e94f67a1175d9b793a7db2abb2deb6bbbd0; reports/CRC/screenshots verified.
+
+Native full WebView2 interaction, physical hardware and actual installation/
+restart remain unverified. The installer window applies to updates launched
+from 83 onward; updates from 82 use its older helper. No field scan speed
+multiplier is claimed. All 22 prior releases/assets/tag SHAs remain unchanged.
+This final three-file publication record changes no runtime files and uses [skip ci].
+
+Publication: Release 40260010077 passed on exact tested source/tag
+a384a47d5b8782fb821eda492fa9ad92a3ca540d. All four actual official downloads verify, portable/EXE equal the
+reviewed artifacts, and all 713 packaged sources equal the tag.
+Unchanged released82 feed handlers checked/downloaded/verified/staged live83 in
+11.75s through real HTTPS with isolated settings. Original test EXE unchanged;
+no installation or restart. Official EXE SHA256 dd50538a54ea21c2a563497525ad59fd1cc23c18134cce0cd34a34b5026d1698.
+Official release https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.83
 
 NETWORK TOOLKIT 1.17.82 VALIDATION
 

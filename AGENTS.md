@@ -3,28 +3,29 @@
 Read DEVELOPMENT_HANDOFF.md before editing or building. Start from current
 main, preserve unrelated work and follow the checks/release safeguards.
 
-Current published release: 1.17.82 fixes terminal selection deletion/replacement
-with preceding whitespace as well as trailing padding. Read the first handoff
-section. Preserve its prompt/output/input guards, the shared settings gear and
-all earlier Hosts/Overview/copy, terminal/sidebar/detach/Connect, editor,
-folders/credentials/macros, command-input, SMTP and updater fixes.
+Current published release: 1.17.83. Read the first handoff section. It adds macro
+folders matching saved sessions, local Command Prompt/Windows PowerShell with
+shared appearance, intrinsic scan-column/copy spacing, bounded parallel discovery,
+TCP-port badges and download/native installation activity progress. Preserve
+all prior selection/prompt guards, gear, Hosts/Overview/copy, terminal/sidebar/
+detach/Connect, editor, folders/credentials/macros, command input and SMTP fixes.
 
-The user authorized this scoped publication on 2026-10-25. Future releases need
-their own authorization. Main pushes publish new versions automatically. Main
-network-toolkit is the sole public source/update feed. Never replace older tags/
-assets or change repository access.
+The user explicitly authorized this scoped publication on 2026-10-26 after the
+no-update diagnosis. Future releases need their own authorization. Main pushes
+publish new versions automatically. Main network-toolkit is the sole public
+source/update feed. Never replace older tags/assets, change repository access
+or write the retired feed.
 
-Published source/tag is 0ebd276e651eaf40bca4d80e317f68ff35b650aa.
-Full Checks 40252863225 and Release 40253776095 passed. All four public
-assets and 699 packaged source files verify; 21 older releases/assets/tags
-remain unchanged. Released81 handlers checked/downloaded/verified/staged live82
-in 11.97 seconds without installation or restart. This three-file final docs
-record uses [skip ci] and must not move the tag, replace assets or republish.
-Continue from latest main. Native Windows/WebView2, hardware and actual install/
-restart remain unverified. Keep the handoff current and report checks honestly.
+Published source/tag: a384a47d5b8782fb821eda492fa9ad92a3ca540d
+Tree: ebec06684689f0ad48cfcd8e5661c6da4a740232
+Full Checks 40258417658 and Release 40260010077 passed. Detailed
+Windows shell and progress-window logs were inspected; independent steps prevent
+masked command failures. All four public assets and 713 packaged source files
+verify and equal the reviewed runtime. All 22 earlier releases/assets/tags
+remain unchanged. Released82 handlers checked/downloaded/verified/staged live83
+in 11.75 seconds without installation/restart or changing the original EXE.
 
-1.17.83 is being prepared on review/hosts-editor-1.17.83 for the 2026-10-26
-feature request: macro folders, local Windows shells, compact scan columns/copy
-spacing, discovery scheduling/ports and update progress. This request does not
-explicitly authorize publishing 83. Keep main and the published 82 assets intact.
-Read the first handoff section for progress and validation limits.
+This three-file final docs record uses [skip ci]; do not move the 83 tag,
+replace assets or republish. Continue from latest main. Native full WebView2
+interaction, hardware and actual installation/restart remain unverified. Keep
+the handoff current and report checks honestly.
