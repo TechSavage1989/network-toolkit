@@ -45,9 +45,109 @@ For the subsequently authorized 1.17.90 build, the 1.17.89 note has also been
 moved unchanged into the archive. Current `RELEASE_NOTES_1.17.90.txt` alone stays
 at root, and the archive index identifies 1.17.90 as current and 1.17.89 as previous.
 
-## 1.17.94 authorized graph, statistics and result filtering update
+## 1.17.94 published scalable graphs, statistics filters and result tracking
 
-The user explicitly authorized implementing all eleven confirmed graph/statistics/result requirements, building and publishing. Scope includes zoom/reset, permanent clickable statistics above collapsible graphs, roomier independent results, sort/filter-aware latest tracking and controls, outside-click deselection, detailed status/type filters, consistent severity colors, and preservation of existing graph, clock, copy, export, settings and updater functionality. Publication pending full validation.
+The user explicitly authorized implementing, building and publishing this update.
+Published source/tag: 3305c38d4fc7da067fed98d54f57abe1cedd3fe4
+Tree: d15db7e42a0d6f8f0d0f5eba0844df726c91fbe9
+Official release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.94
+Release ID: 424862893
+
+Relevant graphs support zooming and a reset, with recorded timestamps, hover
+details and graph/result associations maintained at the covered scales. Scan
+statistics remain above the graph and available when it is collapsed; collapse
+frees space for independently scrolling, readable results. Existing resize,
+moving-window and progressive retained-history behavior remains available.
+
+Result lists follow the newest matching record at its position in the active
+sort order after hover inspection ends, while active inspection is respected.
+Graph and result readers have separate latest-data controls. Pointer departure
+alone preserves a selected point; clicking outside the graph clears the point
+selection without resetting active filters or sorting.
+
+Statistics provide meaningful result filters and related graph emphasis. Counts,
+extrema and aggregate measures retain their actual meanings; averages and RTT
+variability are not represented as invented individual measurements. Detailed
+status and type controls combine with searches and statistic filters, expose
+their active state and distinguish filtered-empty results from absent scan data.
+Configured positive, negative, warning and informational colors remain distinct
+from hover and selection styling. Original data, timestamp precision, exports,
+12/24-hour and timezone preferences, copy controls and existing settings remain
+covered by regression checks. Exact coverage is recorded below.
+
+Current release note, validated at the required root path:
+Network Toolkit 1.17.94
+
+Graphs support zoom, reset and latest controls, with scan statistics kept above a collapsible graph and more space for independently scrolling results.
+Statistics filter related results and highlight contributing graph measurements. Detailed status and type filters combine with existing searches and sorting, with consistent configured status colors.
+Lists follow the newest matching result after hover inspection ends. Clicking outside a graph clears its point selection while preserving active filters and sorting.
+Existing graph popups, linked highlighting, history modes, timestamp preferences, copy actions, raw recorded data, saved settings and updater safeguards are preserved.
+
+Verified implementation scope:
+- Ping and Connection Monitor: zoom/reset, retained point details, aggregate contributors, independent latest controls, permanent statistics and collapsible adjustable graph/result panes.
+- Packet Capture: exact interval selection, status/protocol/statistic predicates across all retained packets, newest packet under active sorting, zoom/collapse and preserved precision/export semantics.
+- Detailed scan result lists: status/type filters combined with text searches and raw-data-preserving sorting; tool-specific summary actions where matching measurements exist.
+- Generic result timestamp sorting preserves nanosecond chronology, including same-millisecond instants and equivalent UTC offsets, with invalid and missing dates last.
+- Packet timeline axes distinguish the visible viewport range from the full retained range; interpolation preserves native nanosecond source data and aggregate interval meaning.
+- Selected statistics provide a clear-on-card action; active status/type/text filters share a sort-preserving Clear filters control and keep short-window result space available.
+
+Full Checks 40415580921 passed application 121896948732, native
+Windows 121896948926 and browser 121896948502 on this exact
+published source. 624 JavaScript tests and 35
+Python release guards pass, together with the required application, terminal,
+desktop, diagnostic, device-information, platform and capture Go suites. Native
+cmd/PowerShell color and interactive lifecycle, installer progress and Windows
+GUI/resource build/package checks pass.
+
+The UI94 browser report passes 8 groups across
+16 layout cases, with 8 zoom cases,
+24 filter cases, 10 tracking cases and
+10 packet cases. These counts come from the verified final report.
+Retained UI93 passes 7 groups / 16 layouts,
+UI92 passes 6 groups / 12 layouts and UI91
+passes 4 groups / 14 layouts. UI90 passes
+4 groups / 8 layouts / 5 header groups, Local Network passes 5 groups / 12 layouts
+and UI88 passes 4 groups / 9 layouts. Covered editor, shell, copy, Hosts,
+client/server, SMTP, folder and selection regressions pass. All 7 native updater
+timer cases pass, including the real five-minute poll. Current reports have no
+runtime or asset failures; the released64 negative control retains its expected
+Illegal invocation regression result.
+
+Release 40417147184 passed build 121902218611 and publish
+121902750490. All four downloaded public assets match GitHub
+digests and SHA256SUMS. Official EXE and portable ZIP match the reviewed local
+build; standalone, portable and update EXEs are identical. All
+785 packaged source files match the tag. ZIP CRCs,
+manifests, PE GUI/version, the strict update inventory and
+14 vendored editor-library digests verify. All
+33 older releases/assets and
+33 older tags remain unchanged.
+
+Released93 production handlers checked/downloaded/verified/staged live94 through
+real HTTPS with isolated settings in 13.11s. The staged
+17852416-byte candidate matches the independently verified official
+executable, and the original test executable is unchanged. No actual
+installation, restart or full native WebView2 interaction was performed.
+
+Review artifact 12695282193: b2b4a0d6b1c13c059d9c52c1eda1d40d2d5584943d240ca91cccf922c94e5572
+Browser artifact 12695553502: e5eda5adb9f02b52ea44737aa72cf5a8f0147c5dccaaf3ce0618635971577479
+Final screenshots inspected: ui94-monitor-1440x1000-dark.png, ui94-monitor-390x1000-light.png, ui94-monitor-820x650-dark.png, ui94-packets-1440x1000-dark.png, ui94-packets-390x1000-dark.png, ui94-packets-820x650-light.png
+Network_Toolkit.exe SHA256: b3e2b8929182228cbd7677c13bdaf07767aa4d91f02173269431865f1dc8939b
+Network_Toolkit_1.17.94_Portable.zip SHA256: 2bec380fd98820675861c792628cdc60248c25555809261a7f2eb7296d54e449
+Network_Toolkit_1.17.94_Update.zip SHA256: 286f62a8203b60fcc3c0191b5b26bf9e310fe2d458ae1dc95c8ce1314af91999
+SHA256SUMS SHA256: d41b972bd928ee0e18e92e5670a3c14a19a3a018496795d076bff71708313294
+
+The prior 93 release note is archived unchanged under docs/releases; only the
+current 94 note remains at root. All 51 historical notes and the complete AGENTS
+repository policies are preserved, including compact source layout and the
+tracked root allowlist. Follow release-note rotation for the next authorized
+version change.
+
+Main network-toolkit remains the sole public source/update feed. Do not move old
+tags, replace assets, change access or write the retired feed. Publication is
+complete; future releases require authorization. This final three-file
+documentation completion uses [skip ci], preserving published source, runtime
+and release assets. Continue from latest main and preserve previous fixes.
 
 ## 1.17.93 published graph interaction, layout and timestamp preferences
 
