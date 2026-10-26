@@ -54,7 +54,15 @@ async function settled(text,cursor=text.length){
  },{text,cursor,prompt,previous});
  assert.equal(editor.text,text);assert.equal(editor.cursor,cursor);
 }
+async function fitted(){
+ await page.waitForFunction(()=>{
+  const entry=currentTerminal(),term=entry?.xterm,size=entry?.fit?.proposeDimensions();
+  return size&&term.cols===size.cols&&term.rows===size.rows&&!entry.resizeSending&&!entry.desiredResize&&entry.info.cols===term.cols&&entry.info.rows===term.rows&&entry.lastResize===term.cols+'x'+term.rows;
+ });
+ cols=await page.evaluate(()=>currentTerminal().xterm.cols);
+}
 async function command(text){
+ await fitted();
  await page.evaluate(()=>currentTerminal().xterm.focus());await page.keyboard.press('Control+c');await settled('');editor.wire='';
  await page.keyboard.type(text);await settled(text);editor.wire='';
 }
@@ -67,7 +75,7 @@ async function screenshot(name){if(out)await page.screenshot({path:path.join(out
  const base=await start();browser=await chromium.launch({executablePath:process.env.CHROME_EXECUTABLE||undefined,headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
  const context=await browser.newContext({viewport:{width:1450,height:1000},permissions:['clipboard-read','clipboard-write']});page=await context.newPage();page.setDefaultTimeout(15000);page.on('pageerror',error=>report.errors.push(error.message));page.on('response',r=>{if(r.url().includes('/assets/')&&r.status()>=400)report.assetFailures.push(r.url());});
  if(out)fs.mkdirSync(out,{recursive:true});await page.goto(base,{waitUntil:'domcontentloaded'});await page.click('[data-page="terminal"]');await page.locator('#terminalStage [data-terminal-new-type="telnet"]').first().click();await page.fill('#con-host','127.0.0.1');await page.fill('#con-port',String(peer.address().port));await page.click('#terminalConnectButton');await page.waitForFunction(()=>currentTerminal()?.info.state==='connected'&&currentTerminal()?.xterm);
- cols=await page.evaluate(()=>currentTerminal().xterm.cols);assert(cols>35);await settled('');
+ await fitted();assert(cols>35);await settled('');
  for(const key of ['Backspace','Delete']){
   await command('show version');await select(13,cols-2);await screenshot(key+'-selected');await page.keyboard.press(key);await settled('show ');
   assert.equal(editor.wire,'\x7f'.repeat(7));assert.equal(await page.evaluate(()=>currentTerminal().xterm.hasSelection()),false);pass(key+' deletes selected text plus empty screen cells without deleting extra characters');
@@ -87,6 +95,9 @@ async function screenshot(name){if(out)await page.screenshot({path:path.join(out
  assert.deepEqual(protectedSelections,[false,false,false,false]);assert.equal(editor.wire,'');await settled('show version');pass('Previous output, prompts, empty-only and later hard-line selections cannot trigger selection edits');
  for(const theme of ['light','dark']){await page.evaluate(theme=>setTheme(theme),theme);await screenshot('fixed-'+theme);}
  assert.deepEqual(report.submitted,[]);assert.deepEqual(report.errors,[]);assert.deepEqual(report.assetFailures,[]);report.passed=true;console.log(JSON.stringify(report));
-})().catch(async error=>{report.failure=error.stack||String(error);console.error(report.failure);process.exitCode=1;if(page)await screenshot('failure').catch(()=>{});}).finally(async()=>{
+})().catch(async error=>{
+ report.failure=error.stack||String(error);report.peer=editor;console.error(report.failure);process.exitCode=1;
+ if(page){report.terminal=await page.evaluate(()=>{const e=currentTerminal(),t=e?.xterm,b=t?.buffer.normal;return {cols:t?.cols,rows:t?.rows,cursorX:b?.cursorX,cursorY:b?.cursorY,baseY:b?.baseY,selection:t?.getSelectionPosition(),anchor:e&&NetworkToolkitTerminalInput.snapshot(e),fit:e?.fit?.proposeDimensions(),lines:b&&Array.from({length:4},(_,i)=>b.getLine(i)?.translateToString(false)),inputBytes:e?.inputBytes};}).catch(()=>null);await screenshot('failure').catch(()=>{});}
+}).finally(async()=>{
  if(out)fs.writeFileSync(path.join(out,'terminal-selection-report.json'),JSON.stringify(report,null,2)+'\n');if(browser)await browser.close();if(app)app.kill();for(const socket of sockets)socket.destroy();if(peer)await new Promise(resolve=>peer.close(resolve));fs.rmSync(temporary,{recursive:true,force:true});
 });
