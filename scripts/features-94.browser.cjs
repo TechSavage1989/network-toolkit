@@ -185,6 +185,10 @@ async function rowIsInViewport(sequence,label){
 async function leaveInspection(){await page.mouse.move(1,1);await settle();await settle();}
 async function geometry(kind,label){
  const packet=kind==='packet',area=packet?page.locator('#packetCaptureWorkspace'):workspace(),scroller=packet?page.locator('#packetTableScroll'):list();
+ // Resizing into the compact workspace exposes its explicit Configuration /
+ // Results choice. Activate Results before measuring the requested results UI.
+ if(!packet){const results=page.locator('#toolResultsTab');if(await results.isVisible()&&await results.getAttribute('aria-selected')!=='true')await results.click();}
+ await settle();await area.waitFor({state:'visible'});await page.evaluate(()=>window.scrollTo(0,0));await settle();
  await scroller.evaluate(el=>{el.scrollTop=0;});await settle();if(packet)await page.waitForFunction(()=>document.querySelector('#packetRows [data-packet-index="0"]'));
  const frame=await assertNoPageOverflow(label);
  const value=await area.evaluate((area,packet)=>{
