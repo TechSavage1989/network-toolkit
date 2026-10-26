@@ -2,6 +2,7 @@
   'use strict';
 
   let initialized = false, compactQuery = null, sidebar = null, toggleButton = null, toggleAnchor = null, brandHeader = null, backdrop = null, drawerClose = null, main = null;
+  let lastRailClick = null;
   let previousDrawerOpen = false, layoutMode = '', layoutPending = false, ownsMainInert = false, previousMainInert = false;
 
   function terminalOnly() { return typeof TERMINAL_ONLY !== 'undefined' && TERMINAL_ONLY; }
@@ -39,7 +40,7 @@
     root.NetworkToolkitPanelControls.set(toggleButton, {name: 'navigation', edge: 'left', expanded: small ? open : !collapsed});
     root.NetworkToolkitPanelControls.set(drawerClose, {name: 'navigation', edge: 'left', expanded: true});
     // The collapsed rail stays usable for navigation; revealing the panel is an
-    // explicit action on the arrow or divider, never a side effect of a tab.
+    // explicit arrow, divider or double-click action. Single clicks navigate.
     root.NetworkToolkitPanelControls.bindReveal(sidebar, {collapsed: () => !compact() && state.navigationCollapsed === true, button: () => toggleButton, clickToReveal:false});
     for (const button of sidebar.querySelectorAll('.nav-item[data-page]')) {
       const text = [...button.children].find(element => element.tagName === 'SPAN' && !element.classList.contains('badge'));
@@ -97,6 +98,7 @@
     if (!sidebar || !toggleButton || !main) return;
     const divider=document.createElement('div');divider.id='appNavigationDivider';divider.className='app-navigation-divider';divider.setAttribute('role','separator');divider.setAttribute('aria-orientation','vertical');divider.setAttribute('aria-label','Expand or collapse tool navigation');divider.tabIndex=0;divider.title='Double-click or press Enter or Space to expand or collapse tool navigation.';sidebar.append(divider);
     divider.addEventListener('dblclick',event=>{if(compact())return;event.preventDefault();event.stopPropagation();toggle();});
+    sidebar.addEventListener('dblclick',event=>{if(compact()||state.navigationCollapsed!==true||!event.target.closest?.('.nav-item,.brand-mark,#engineLabel'))return;event.preventDefault();event.stopPropagation();toggle();});
     divider.addEventListener('keydown',event=>{if(compact()||!['Enter',' '].includes(event.key))return;event.preventDefault();event.stopPropagation();toggle();});
     document.body.classList.add('app-navigation-ready');
     toggleButton.type = 'button';
@@ -145,6 +147,9 @@
       const button = event.target.closest?.('#sidebar .nav-item[data-page]');
       if (!button || event.button !== 0 || button.disabled) return;
       const small = compact(), page = button.dataset.page;
+      // Navigation redraws its buttons after the first click; recognize the
+      // second click by page identity rather than relying on a surviving node.
+      if(!small&&state.navigationCollapsed===true){const now=Date.now();if(lastRailClick?.page===page&&now-lastRailClick.at<500){lastRailClick=null;toggle();}else lastRailClick={page,at:now};}else lastRailClick=null;
       if (small) closeDrawer(false);
       requestAnimationFrame(() => {
         if (state.activePage !== page) return;

@@ -3,7 +3,8 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
 const {document:makeDocument}=require('./terminal-dom-fixture.cjs');
 function harness({small=false,collapsed=false}={}){
  const document=makeDocument('<aside id="sidebar"><div class="brand"><div class="brand-mark"><img></div><div class="nav-brand-copy"><div class="brand-name">Network Toolkit</div></div></div><div class="nav-scroll"><div class="nav-label">Tools</div><button class="nav-item active" data-page="overview" aria-current="page"><svg></svg><span>Overview</span></button><button class="nav-item" data-page="ping"><svg></svg><span>Ping</span></button></div><div class="sidebar-foot"><div id="engineLabel"><span>Ready</span></div><div id="engineSub">Portable edition</div></div></aside><main class="main"><div id="topbar"><button id="mobileMenu" data-action="toggle-nav"></button><span>Workspace</span></div><div id="workspaceScroll"></div></main>');document.body=document;
- const state={navigationCollapsed:collapsed,activePage:'overview'},calls=[],frames=[],media={matches:small,addEventListener(type,callback){this.change=callback;}},c={document,state,console,TERMINAL_ONLY:false,MutationObserver:class{observe(){}},matchMedia:()=>media,requestAnimationFrame:callback=>frames.push(callback),saveState:()=>calls.push('save'),closeEntryContextMenu(){},titleFor:page=>page,NetworkToolkitWorkspace:{layoutDetails(){}},applyToolLayout(){},scheduleTerminalFit(){}};
+ let clock=0;
+ const state={navigationCollapsed:collapsed,activePage:'overview'},calls=[],frames=[],media={matches:small,addEventListener(type,callback){this.change=callback;}},c={document,state,console,Date:{now:()=>clock},TERMINAL_ONLY:false,MutationObserver:class{observe(){}},matchMedia:()=>media,requestAnimationFrame:callback=>frames.push(callback),saveState:()=>calls.push('save'),closeEntryContextMenu(){},titleFor:page=>page,NetworkToolkitWorkspace:{layoutDetails(){}},applyToolLayout(){},scheduleTerminalFit(){}};
  c.window=c;vm.createContext(c);
  for(const file of ['panel-controls.js','app-navigation.js'])vm.runInContext(fs.readFileSync(require.resolve('../web/assets/'+file),'utf8'),c);
  function all(owner){return owner.children.flatMap(child=>[child,...all(child)]);}
@@ -12,6 +13,7 @@ function harness({small=false,collapsed=false}={}){
  const api=c.NetworkToolkitNavigation;api.init();focusable();
  const sidebar=document.getElementById('sidebar'),toggle=document.getElementById('mobileMenu'),brand=sidebar.querySelector('.brand'),main=document.querySelector('.main'),drawerClose=document.getElementById('sidebarDrawerClose');
  function click(target,button=0){
+  clock+=600;
   if(target.disabled)return;
   const event={target,button,defaultPrevented:false,stopped:false,immediate:false,preventDefault(){this.defaultPrevented=true;},stopPropagation(){this.stopped=true;},stopImmediatePropagation(){this.stopped=this.immediate=true;}};
   for(const callback of document.listeners.click||[]){callback(event);if(event.immediate)break;}

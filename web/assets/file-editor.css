@@ -105,11 +105,16 @@ body:has(.nt-editor-embedded) #toolWorkspace>#pageContent{grid-row:1!important;g
 .nt-editor-file-picker{min-width:0;max-width:100%;display:flex;flex-direction:column;gap:9px}
 .nt-editor-picker-nav{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
 .nt-editor-picker-nav input{flex:1 1 210px;min-width:130px}
-.nt-editor-picker-list{display:flex;flex-direction:column;max-height:55vh;min-height:140px;overflow:auto;border:1px solid var(--border);border-radius:8px}
-.nt-editor-picker-row{display:flex;gap:8px;align-items:center;text-align:left;min-height:32px;background:transparent;color:var(--text);border:0;border-bottom:1px solid var(--border);padding:6px 10px;min-width:0}
-.nt-editor-picker-row span:nth-child(2){flex:1;overflow-wrap:anywhere}.nt-editor-picker-row small{color:var(--muted);flex:0 0 auto}
-.nt-editor-picker-row svg{width:15px;height:15px}
-.nt-editor-picker-row:hover,.nt-editor-picker-row.selected{background:var(--accentBg)}
+/* A single table sizes both headers and directory details, including scrollbar space. */
+.nt-editor-picker-list{display:block;max-height:55vh;min-height:140px;overflow:auto;border:1px solid var(--border);border-radius:8px;scrollbar-gutter:stable}
+.nt-editor-picker-table{width:100%;min-width:620px;table-layout:fixed;border-collapse:separate;border-spacing:0}
+.nt-editor-picker-table .picker-name{width:40%}.nt-editor-picker-table .picker-type{width:13%}.nt-editor-picker-table .picker-size{width:20%}.nt-editor-picker-table .picker-modified{width:27%}
+.nt-editor-picker-table th,.nt-editor-picker-table td{padding:7px 10px;text-align:left;border:0;border-bottom:1px solid var(--border);overflow-wrap:anywhere;font-size:11px}
+.nt-editor-picker-table thead th{position:sticky;top:0;z-index:1;background:var(--panel)}
+.nt-editor-picker-table th button{border:0;background:transparent;display:flex;align-items:center;justify-content:flex-start;gap:5px;padding:3px 0;min-height:26px;width:100%;text-align:left;font-weight:600}
+.nt-editor-picker-table th svg{width:13px;height:13px}.nt-editor-picker-row{cursor:pointer}.nt-editor-picker-row td:not(:first-child){color:var(--muted)}
+.nt-editor-picker-name{display:flex;align-items:center;gap:8px;min-width:0}.nt-editor-picker-name svg{width:15px;height:15px;flex-shrink:0}
+.nt-editor-picker-row:hover,.nt-editor-picker-row.selected{background:var(--accentBg)}.nt-editor-picker-row:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .nt-editor-remote-toolbar label:first-child{min-width:155px}
 
 /* Wrapped syntax uses the textarea's exact client width, excluding its scrollbar. */
@@ -123,5 +128,3 @@ body:has(.nt-editor-embedded) #toolWorkspace>#pageContent{grid-row:1!important;g
 
 [data-ed-gutter-lines]{will-change:transform;white-space:pre;overflow:visible}
 [data-ed-gutter-lines]>div{margin:0;padding:0;border:0}
-
-.nt-editor-picker-head,.nt-editor-picker-row{display:grid;grid-template-columns:minmax(160px,1fr) 90px 120px 180px;gap:8px}.nt-editor-picker-row{grid-template-columns:20px minmax(132px,1fr) 90px 120px 180px}.nt-editor-picker-list,.nt-editor-file-picker{overflow-x:auto}.nt-editor-picker-head{min-width:610px}.nt-editor-picker-row{min-width:610px}

@@ -1,7 +1,7 @@
-NETWORK TOOLKIT 1.17.87
+NETWORK TOOLKIT 1.17.88
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.87
+CURRENT RELEASE - 1.17.88
 
 Editor actions preserve selection and scroll position. Wrapped text retains
 syntax colors and aligned line numbers. Editor close, reload, Save As and Go to

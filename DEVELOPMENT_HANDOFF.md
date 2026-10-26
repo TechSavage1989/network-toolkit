@@ -1,5 +1,9 @@
 # Network Toolkit development handoff
 
+## 1.17.88 authorized layout update
+
+User explicitly authorized building and publishing the confirmed remote picker, public IP, subnet layout, collapsed navigation and Local Network tab readability changes. Preserve all previous features. Publication pending full validation.
+
 ## 1.17.87 published update
 
 1.17.87 publication verified
