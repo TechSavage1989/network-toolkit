@@ -1,3 +1,9 @@
+1.17.83 REVIEW IN PROGRESS - 2026-10-26
+Macro folders, local shells, scan sizing/copy spacing, discovery scheduling and
+update progress. Exact final hosted validation and review artifact are pending.
+Local selected-source routing fixtures encounter netlink permission errors;
+full discovery tests are included in hosted Checks. Main remains published82.
+
 NETWORK TOOLKIT 1.17.82 VALIDATION
 
 Terminal selection starts in preceding prompt whitespace normalize to the

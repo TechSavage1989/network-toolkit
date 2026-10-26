@@ -9,3 +9,8 @@ td.value-copy-cell>.value-copy-control{top:6px;right:3px}
 .value-copy-control:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .adapter-address>.value-copy-cell{flex:1 1 0}
 @media(hover:none){.value-copy-control{opacity:1}}
+
+/* Inline no-wrap labels must respect the space reserved for their copy action. */
+.value-copy-cell{white-space:normal;word-break:normal}
+.value-copy-cell .nowrap,.value-copy-cell .mono{white-space:normal;overflow-wrap:anywhere}
+.value-copy-cell> :not(.value-copy-control){max-width:100%;box-sizing:border-box}

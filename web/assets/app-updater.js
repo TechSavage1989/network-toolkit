@@ -5,10 +5,19 @@
   const notesView=typeof module==='object'&&module.exports?require('./app-update-notes.js'):root.NetworkToolkitUpdateNotes;
   function releaseNotes(data,version){return notesView.html({version,currentVersion:data?.currentVersion,notes:data?.latest?.version===version?data.latest.notes:''});}
   function createController(env){
-    let data=null,busy=false,error='',message='',backgroundError='',revision=0,checkAfter=0;
+    let data=null,busy=false,error='',message='',backgroundError='',revision=0,checkAfter=0,progress=null;
     const changed=()=>env.changed?.(snapshot());
-    const snapshot=()=>({data,busy,error,message,backgroundError,checkAfter});
+    const snapshot=()=>({data,busy,error,message,backgroundError,checkAfter,progress});
     const render=()=>env.render(snapshot());
+    function watchProgress(turn){
+      let active=true,timer=null;
+      const schedule=()=>{if(active&&env.setTimeout)timer=env.setTimeout(async()=>{
+        timer=null;if(!active||turn!==revision||!busy)return;
+        try{const status=await env.api('/updates/status');if(active&&turn===revision&&busy){if(status.progress){progress=status.progress;data={...data,progress,statusBusy:status.networkBusy};render();}}}catch{}
+        if(active&&turn===revision&&busy)schedule();
+      },400);};
+      schedule();return ()=>{active=false;if(timer!==null)env.clearTimeout?.(timer);};
+    }
     async function load(background=false){
       if(busy)return 'skip';const turn=++revision;busy=true;if(!background)error='';render();
       let outcome='retry';
@@ -39,29 +48,38 @@
     async function download(version){
       if(busy||data?.installing)return;
       if(!data?.latest||data.latest.version!==version){error='The available release changed. Check again before downloading.';render();return;}
-      busy=true;error='';message='Downloading and verifying the update. The installed app is unchanged.';render();
-      try{data=await env.api('/updates/download','POST',{version});if(!data.staged)throw new Error('No staged package was returned. Refresh update status before retrying.');message='Update downloaded, verified and staged. Ready to install when you choose.';}
-      catch(e){error='The update could not be downloaded: '+e.message;message='';}
-      finally{busy=false;render();changed();}
+      const turn=++revision;busy=true;error='';progress={phase:'checksums',version};message='Downloading and verifying the update. The installed app is unchanged.';render();const stop=watchProgress(turn);
+      try{data=await env.api('/updates/download','POST',{version});if(!data.staged)throw new Error('No staged package was returned. Refresh update status before retrying.');progress={phase:'ready',version};message='Update downloaded, verified and staged. Ready to install when you choose.';}
+      catch(e){progress=null;error='The update could not be downloaded: '+e.message;message='';}
+      finally{stop();busy=false;render();changed();}
     }
     async function install(version){
       if(busy||data?.installing)return;
       if(!data?.staged||data.staged.version!==version){error='The staged update changed. Refresh update status and try again.';render();return;}
-      busy=true;error='';message='Saving settings before restart…';render();
+      busy=true;error='';progress={phase:'saving',version};message='Saving settings before restart…';render();
       try{
         if(!await env.save())throw new Error('Settings could not be saved. Installation was not started.');
         const current=await env.api('/updates/status');data=current;
         if(!current.staged||current.staged.version!==version)throw new Error('The staged update changed. Refresh update status and try again.');
         if(current.busy?.length)throw new Error('Finish or stop active operations first: '+current.busy.join(', '));
-        message='Requesting installation. Do not close the app until it restarts.';render();
+        progress={phase:'installing',version};message='Requesting installation. Do not close the app until it restarts.';render();
         const result=await env.api('/updates/install','POST',{confirm:true,version});
         if(!result?.restarting)throw new Error('The app did not confirm a restart. Refresh status before trying again.');
-        data={...data,installing:true};message='Installation requested. The app will close and restart. Settings are kept.';
+        data={...data,installing:true};progress={phase:'restarting',version};message='Installation requested. The app will close and restart. Settings are kept.';
         env.restarting();
-      }catch(e){error=e.message;message='';}
+      }catch(e){progress=null;error=e.message;message='';}
       finally{busy=false;render();changed();}
     }
     return {snapshot,load,importPackage,check,download,install};
+  }
+  function progressHTML(state){
+    const p=state.progress;if(!p)return '';
+    const phases={checksums:'Preparing download',download:'Downloading update',verifying:'Verifying update',staging:'Staging update',ready:'Update verified and ready',saving:'Saving settings',installing:'Preparing installation',restarting:'Installing and restarting'};
+    if(!phases[p.phase])return '';
+    const received=Math.max(0,Number(p.received)||0),total=Math.max(0,Number(p.total)||0),known=p.phase==='download'&&total>0&&received<=total;
+    const bytes=n=>n<1048576?(n/1024).toFixed(0)+' KiB':(n/1048576).toFixed(1)+' MiB';
+    const detail=p.phase==='download'?(known?bytes(received)+' of '+bytes(total)+' ('+Math.floor(received/total*100)+'%)':bytes(received)+' received'):'',label=phases[p.phase];
+    return '<div class="app-update-progress"><div class="row between gap6"><span>'+escape(label)+'</span>'+(detail?'<span>'+escape(detail)+'</span>':'')+'</div><progress aria-label="'+escape(label)+'" '+(p.phase==='ready'?'value="1" max="1"':known?'value="'+received+'" max="'+total+'"':'')+'></progress>'+(p.phase==='restarting'?'<small>The installer keeps a progress window open until the updated app starts.</small>':'')+'</div>';
   }
   function html(state,available,currentVersion){
     const {data,busy,error,message,backgroundError}=state,disabled=!available||busy||data?.installing||data?.supported===false,staged=data?.staged;
@@ -75,7 +93,7 @@
       '</details><p class="help-line">SHA-256 checks detect corruption, not publisher identity. Use files only from the official release page. Only the app executable is replaced; your app data folder is not changed.</p>'+
       (staged?'<div class="notice info mt"><span>Ready to install version '+escape(staged.version)+'. Save your work before restarting.</span></div><p class="help-line" style="overflow-wrap:anywhere">Executable SHA-256: '+escape(staged.sha256)+'</p><button type="button" class="btn primary" data-app-update="confirm" data-version="'+escape(staged.version)+'" '+(disabled?'disabled':'')+'>Install and restart</button>':'')+
       (data?.busy?.length?'<p class="help-line">Active operations: '+escape(data.busy.join(', '))+'. Finish or stop them before installing.</p>':'')+
-      '<div role="status" aria-live="polite">'+(message?'<p class="help-line">'+escape(message)+'</p>':'')+(busy&&!message?'<p class="help-line">Reading update status…</p>':'')+(backgroundError?'<p class="help-line">'+escape(backgroundError)+' Use Check for updates to retry.</p>':'')+(error?'<div class="notice warn mt">'+escape(error)+'</div>':'')+'</div>';
+      progressHTML(state)+'<div role="status" aria-live="polite">'+(message?'<p class="help-line">'+escape(message)+'</p>':'')+(busy&&!message?'<p class="help-line">Reading update status…</p>':'')+(backgroundError?'<p class="help-line">'+escape(backgroundError)+' Use Check for updates to retry.</p>':'')+(error?'<div class="notice warn mt">'+escape(error)+'</div>':'')+'</div>';
   }
   // Timers are independent of navigation. No timer may download, install, or restart.
   function createScheduler(env){
@@ -138,9 +156,9 @@
   }
   function noticeHTML(state,preferences,now){
     const item=notice(state,preferences,now);if(!item)return '';
-    return '<div class="notice info row wrap gap6" role="status" aria-live="polite"><span style="flex:1;min-width:180px">Network Toolkit '+escape(item.version)+(item.kind==='install'?' is downloaded and verified. Save your work before restarting.':' is available. See what’s new before updating.')+'</span><button type="button" class="btn small primary" data-app-update="'+(item.kind==='install'?'confirm':'download')+'" data-version="'+escape(item.version)+'" '+(state.busy?'disabled':'')+'>'+(item.kind==='install'?'Install and restart':"See what's new")+'</button><button type="button" class="btn small ghost" data-app-update="later">Remind me tomorrow</button>'+(state.error?'<span style="flex-basis:100%" role="alert">'+escape(state.error)+'</span>':'')+(state.busy&&state.message?'<span style="flex-basis:100%">'+escape(state.message)+'</span>':'')+'</div>';
+    return '<div class="notice info row wrap gap6" role="status" aria-live="polite"><span style="flex:1;min-width:180px">Network Toolkit '+escape(item.version)+(item.kind==='install'?' is downloaded and verified. Save your work before restarting.':' is available. See what’s new before updating.')+'</span><button type="button" class="btn small primary" data-app-update="'+(item.kind==='install'?'confirm':'download')+'" data-version="'+escape(item.version)+'" '+(state.busy?'disabled':'')+'>'+(item.kind==='install'?'Install and restart':"See what's new")+'</button><button type="button" class="btn small ghost" data-app-update="later">Remind me tomorrow</button>'+(state.error?'<span style="flex-basis:100%" role="alert">'+escape(state.error)+'</span>':'')+(state.busy&&state.message?'<span style="flex-basis:100%">'+escape(state.message)+'</span>':'')+(state.busy?progressHTML(state):'')+'</div>';
   }
-  if(typeof module==='object'&&module.exports)module.exports={createController,createScheduler,notice,noticeHTML,html};
+  if(typeof module==='object'&&module.exports)module.exports={createController,createScheduler,notice,noticeHTML,progressHTML,html};
   if(!root.document)return;
   let controller,scheduler,updateWelcomeShown=false,namingWarningShown=false;
   let preferencesLoaded=true,preferencesPending=false,preferencesError='',preferenceWritesPending=false,pendingManualResult='';
@@ -212,7 +230,7 @@
   function getController(){
     if(controller)return controller;
     controller=createController({
-      api:(...args)=>boundedAPI(...args),save:()=>flushState({closing:true}),
+      api:(...args)=>boundedAPI(...args),setTimeout:(...args)=>root.setTimeout(...args),clearTimeout:(...args)=>root.clearTimeout(...args),save:()=>flushState({closing:true}),
       upload:async(file,checksums)=>{
         const form=new FormData();form.append('package',file);form.append('checksums',checksums);
         const response=await fetch('/api/updates/import',{method:'POST',headers:{'X-Session-Token':SESSION},body:form});
@@ -223,18 +241,18 @@
       restarting:()=>{toast('Installing update. The app will close, then reopen. Allow up to 90 seconds.');}
     });return controller;
   }
-  function render(){const section=document.getElementById('appUpdateSettings');if(section)section.innerHTML=preferenceHTML()+html(getController().snapshot(),online&&!OFFLINE,status.version||VERSION);renderNotice();}
+  function render(){for(const host of document.querySelectorAll('[data-app-update-progress-host]'))host.innerHTML=progressHTML(getController().snapshot());const section=document.getElementById('appUpdateSettings');if(section)section.innerHTML=preferenceHTML()+html(getController().snapshot(),online&&!OFFLINE,status.version||VERSION);renderNotice();}
   function reviewDownload(version){
     const current=getController().snapshot();
     if(current.busy||!current.data?.hasUpdate||current.data.latest?.version!==version)return;
     openModal('Update Network Toolkit',releaseNotes(current.data,version)+
-      '<p class="help-line">Download and verify this update now? Your current app stays running. Installation and restart require a separate confirmation.</p><div id="appUpdateDownloadResult" role="status" aria-live="polite"></div>',
+      '<p class="help-line">Download and verify this update now? Your current app stays running. Installation and restart require a separate confirmation.</p><div data-app-update-progress-host></div><div id="appUpdateDownloadResult" role="status" aria-live="polite"></div>',
       '<button class="btn ghost" data-action="close-modal">Not now</button><button class="btn primary" data-app-update="confirm-download" data-version="'+escape(version)+'">Download update</button>');
   }
   function showInstallConfirmation(version){
     const state=getController().snapshot();if(state.busy||state.data?.staged?.version!==version)return;
     openModal('Install Network Toolkit '+version,
-      releaseNotes(state.data,version)+'<p>Replace the current app with version '+escape(version)+' and restart?</p><div class="notice warn mt">Save your work before restarting.</div><div id="appUpdateInstallError" class="help-line" role="alert"></div>',
+      releaseNotes(state.data,version)+'<p>Replace the current app with version '+escape(version)+' and restart?</p><div class="notice warn mt">Save your work before restarting.</div><div data-app-update-progress-host></div><div id="appUpdateInstallError" class="help-line" role="alert"></div>',
       '<button class="btn ghost" data-action="close-modal">Cancel</button><button class="btn primary" data-app-update="confirm" data-version="'+escape(version)+'">Install and restart</button>');
   }
   document.addEventListener('click',async event=>{

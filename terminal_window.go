@@ -84,8 +84,12 @@ func (p *terminalWindowPreset) normalize() error {
 	if p.Type == "" {
 		p.Type = "ssh"
 	}
-	if p.Type != "ssh" && p.Type != "telnet" && p.Type != "serial" {
-		return errors.New("Choose SSH, Telnet, or Serial for the terminal window.")
+	if p.Type != "ssh" && p.Type != "telnet" && p.Type != "serial" && p.Type != "cmd" && p.Type != "powershell" {
+		return errors.New("Choose SSH, Telnet, Serial, Command Prompt, or PowerShell for the terminal window.")
+	}
+	if p.Type == "cmd" || p.Type == "powershell" {
+		*p = terminalWindowPreset{Type: p.Type, TimeoutMs: 10000, SSHCompatibility: "modern", AuthMethod: "password", Port: 22, BaudRate: 9600, DataBits: 8, StopBits: "1", Parity: "none", FlowControl: "none"}
+		return nil
 	}
 	if p.SSHCompatibility == "" {
 		p.SSHCompatibility = "modern"

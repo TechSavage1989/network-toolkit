@@ -106,3 +106,21 @@ test('cached no-update status during server cooldown never claims a fresh succes
   const h=harness({now:()=>1000,api:async()=>({...available,hasUpdate:false,checkAfter:61000})});await h.c.load();await h.c.check(true);
   const text=html(h.c.snapshot(),true,'1.17.58');assert.doesNotMatch(text,/You are up to date|No newer update is available/);assert.match(text,/last successful check/);
 });
+
+test('download progress polls only while pending and ignores a late status after completion',async()=>{
+ const pending=new Map(),calls=[];let id=0,finish,late;
+ const h=harness({setTimeout:fn=>{pending.set(++id,fn);return id;},clearTimeout:id=>pending.delete(id),api:async path=>{
+  calls.push(path);if(path==='/updates/check')return available;if(path==='/updates/download')return new Promise(resolve=>finish=resolve);return new Promise(resolve=>late=resolve);
+ }});
+ await h.c.check();const download=h.c.download('1.17.60');assert.equal(pending.size,1);
+ const [timer,poll]=pending.entries().next().value;pending.delete(timer);const status=poll();
+ finish({...available,staged:{version:'1.17.60'}});await download;late({...available,progress:{phase:'download',received:5,total:10}});await status;
+ assert.equal(h.c.snapshot().progress.phase,'ready');assert.equal(h.c.snapshot().busy,false);assert.equal(pending.size,0);assert(!calls.includes('/updates/install'));
+});
+test('measured and unknown download sizes render accessible honest progress',()=>{
+ const {progressHTML}=require('../web/assets/app-updater.js');
+ const measured=progressHTML({busy:true,progress:{phase:'download',received:1048576,total:2097152}});
+ assert.match(measured,/value="1048576" max="2097152"/);assert.match(measured,/1.0 MiB of 2.0 MiB \(50%\)/);
+ const unknown=progressHTML({busy:true,progress:{phase:'download',received:1024,total:0}});assert.match(unknown,/1 KiB received/);assert.doesNotMatch(unknown,/<progress[^>]*value=/);
+ const installing=progressHTML({progress:{phase:'restarting'}});assert.match(installing,/Installing and restarting/);assert.doesNotMatch(installing,/<progress[^>]*value=/);
+});

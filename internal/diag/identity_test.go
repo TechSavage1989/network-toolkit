@@ -104,7 +104,7 @@ func TestDiscoveryRetainsPartialRespondingHost(t *testing.T) {
 	}
 	probes.tcp = nil
 	probes.device = nil
-	out, err := runSubnetScan(ctx, model.Request{Tool: "discover", Target: "192.0.2.1", Options: map[string]any{"ports": "80"}}, nil, probes)
+	out, err := runSubnetScan(ctx, model.Request{Tool: "discover", Target: "192.0.2.1", Options: map[string]any{"concurrency": 1, "ports": "80"}}, nil, probes)
 	if !errors.Is(err, context.Canceled) {
 		t.Fatal(err)
 	}

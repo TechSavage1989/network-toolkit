@@ -326,7 +326,7 @@ func (a *application) serveDetachedAPI(w http.ResponseWriter, r *http.Request, i
 			methodError(w)
 			return
 		}
-		jsonResponse(w, 200, map[string]any{"name": appName, "version": model.Version, "os": runtime.GOOS, "arch": runtime.GOARCH, "uiHost": a.uiHost, "windowMode": "detached", "terminalWindowAvailable": false, "terminalDetachAvailable": info.Workspace && a.launchTerminalView != nil, "started": a.started.UTC().Format(time.RFC3339), "portable": true, "storageWritable": false, "storageError": "", "capabilities": []string{}, "system": map[string]any{"interfaces": []any{}}, "terminalView": a.terminalViewBootstrap(info)})
+		jsonResponse(w, 200, map[string]any{"name": appName, "version": model.Version, "os": runtime.GOOS, "arch": runtime.GOARCH, "uiHost": a.uiHost, "windowMode": "detached", "localShellAvailable": terminal.LocalShellAvailable(), "terminalWindowAvailable": false, "terminalDetachAvailable": info.Workspace && a.launchTerminalView != nil, "started": a.started.UTC().Format(time.RFC3339), "portable": true, "storageWritable": false, "storageError": "", "capabilities": []string{}, "system": map[string]any{"interfaces": []any{}}, "terminalView": a.terminalViewBootstrap(info)})
 	case r.URL.Path == "/api/state":
 		a.handleDetachedState(w, r, id)
 	case strings.HasPrefix(r.URL.Path, "/api/terminal-automation/"):

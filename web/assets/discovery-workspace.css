@@ -276,3 +276,20 @@
  .terminal-page .terminal-focus-label{display:none}
  .terminal-tools-panel{right:4px;width:calc(100% - 8px)}
 }
+
+/* Results grow with their content, never with unused viewport space. */
+#toolResultsScroll table.auto-fit-results,#toolResult table.auto-fit-results,table.auto-fit-results{table-layout:auto!important;width:max-content!important;min-width:0!important;max-width:none!important}
+.auto-fit-results th,.auto-fit-results td{padding-left:6px!important;padding-right:6px!important;white-space:normal;vertical-align:top}
+.auto-fit-results td{overflow:visible;max-width:32rem!important;text-overflow:clip;overflow-wrap:anywhere}
+.auto-fit-results td.value-copy-cell{padding-right:30px!important}
+.auto-fit-results th .table-sort{width:auto;justify-content:flex-start;gap:5px;white-space:nowrap}
+.auto-fit-results .identity-value,.auto-fit-results .identity-source{min-width:0!important}
+.network-open-ports{max-width:22rem;min-width:0}
+.network-port-list{display:flex;flex-wrap:wrap;align-items:center;gap:4px}
+.network-port-badge{display:inline-flex;align-items:center;gap:5px;padding:2px 6px;border:1px solid color-mix(in srgb,var(--good) 35%,var(--line));border-radius:5px;background:color-mix(in srgb,var(--good) 8%,var(--panel));white-space:nowrap;font-size:10px;line-height:1.6}
+.network-port-badge::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--good);flex:none}
+.network-port-number{font-family:var(--mono);font-weight:650}
+.network-port-service{color:var(--muted);font-size:9px}
+.network-ports-empty{color:var(--muted);font-size:10px}
+
+.app-update-progress{flex:1 1 100%;min-width:0;margin:10px 0;font-size:11px}.app-update-progress progress{display:block;width:100%;height:9px;margin-top:6px;accent-color:var(--accent)}.app-update-progress .row{flex-wrap:wrap}.app-update-progress small{display:block;color:var(--muted);margin-top:5px}

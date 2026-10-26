@@ -513,7 +513,7 @@ func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		a.stateMu.Lock()
 		writable, storageErr := a.storageWritable, a.storageError
 		a.stateMu.Unlock()
-		jsonResponse(w, 200, map[string]any{"name": appName, "version": model.Version, "os": runtime.GOOS, "arch": runtime.GOARCH, "uiHost": a.uiHost, "windowMode": a.windowMode, "terminalWindowAvailable": a.windowMode == "terminal" || a.openTerminalWindow != nil, "terminalDetachAvailable": a.launchTerminalView != nil, "connectionLaunchAvailable": runtime.GOOS == "windows", "started": a.started.UTC().Format(time.RFC3339), "portable": true, "storagePath": a.dataPath, "storageWritable": writable, "storageError": storageErr, "capabilities": capabilities, "limits": map[string]int{"maxJobs": maxConcurrent, "maxHistory": maxRetained}, "system": a.getSystem(false)})
+		jsonResponse(w, 200, map[string]any{"name": appName, "version": model.Version, "os": runtime.GOOS, "arch": runtime.GOARCH, "uiHost": a.uiHost, "windowMode": a.windowMode, "localShellAvailable": terminal.LocalShellAvailable(), "terminalWindowAvailable": a.windowMode == "terminal" || a.openTerminalWindow != nil, "terminalDetachAvailable": a.launchTerminalView != nil, "connectionLaunchAvailable": runtime.GOOS == "windows", "started": a.started.UTC().Format(time.RFC3339), "portable": true, "storagePath": a.dataPath, "storageWritable": writable, "storageError": storageErr, "capabilities": capabilities, "limits": map[string]int{"maxJobs": maxConcurrent, "maxHistory": maxRetained}, "system": a.getSystem(false)})
 	case r.URL.Path == "/api/terminal-views" || strings.HasPrefix(r.URL.Path, "/api/terminal-views/"):
 		a.handleTerminalViews(w, r)
 	case strings.HasPrefix(r.URL.Path, "/api/terminal-automation/"):

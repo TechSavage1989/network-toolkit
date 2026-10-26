@@ -85,8 +85,10 @@ func NewManager(parent context.Context, dataDir string) (*Manager, error) {
 		"ssh": func(ctx context.Context, req ConnectRequest, cb transportCallbacks) (transport, error) {
 			return openSSH(ctx, req, cb, known)
 		},
-		"telnet": openTelnet,
-		"serial": openSerial,
+		"telnet":     openTelnet,
+		"serial":     openSerial,
+		"cmd":        openLocalShell,
+		"powershell": openLocalShell,
 	}
 	return m, err
 }
@@ -115,8 +117,8 @@ func normalizeRequest(req ConnectRequest) (ConnectRequest, error) {
 	default:
 		return req, errors.New("line ending must be cr, lf, or crlf")
 	}
-	if req.Type != "ssh" && req.Type != "telnet" && req.Type != "serial" {
-		return req, errors.New("terminal type must be ssh, telnet, or serial")
+	if req.Type != "ssh" && req.Type != "telnet" && req.Type != "serial" && req.Type != "cmd" && req.Type != "powershell" {
+		return req, errors.New("terminal type must be ssh, telnet, serial, cmd, or powershell")
 	}
 	switch req.SSHCompatibility {
 	case "":
@@ -148,6 +150,10 @@ func normalizeRequest(req ConnectRequest) (ConnectRequest, error) {
 	}
 	if req.TimeoutMs < 1000 || req.TimeoutMs > 30000 {
 		return req, errors.New("connection timeout must be between 1000 and 30000 ms")
+	}
+	if req.Type == "cmd" || req.Type == "powershell" {
+		// Local shells never inherit hidden remote credentials or device fields.
+		return ConnectRequest{Type: req.Type, ProfileID: req.ProfileID, Cols: req.Cols, Rows: req.Rows, Terminal: req.Terminal, TimeoutMs: req.TimeoutMs, LineEnding: "cr", SSHCompatibility: SSHCompatibilityModern}, nil
 	}
 	if req.Type == "serial" {
 		req.Username, req.Password, req.PrivateKey, req.Passphrase = "", "", "", ""
@@ -300,6 +306,10 @@ func newLiveSession(parent context.Context, id string, req ConnectRequest) *live
 	label := strings.ToUpper(req.Type) + " " + net.JoinHostPort(req.Host, fmt.Sprint(req.Port))
 	if req.Type == "serial" {
 		label = "Serial " + req.SerialPort
+	} else if req.Type == "cmd" {
+		label = "Command Prompt (local)"
+	} else if req.Type == "powershell" {
+		label = "PowerShell (local)"
 	}
 	return &liveSession{automation: make(map[*AutomationSubscription]struct{}), ctx: ctx, cancel: cancel, request: cloneConnectRequest(req), done: make(chan struct{}), input: make(chan []byte, 64), resize: make(chan struct{}, 1), controls: make(chan ControlRequest, 16),
 		info: SessionInfo{ID: id, ProfileID: req.ProfileID, LineEnding: req.LineEnding, Type: req.Type, Label: label, Host: req.Host, Port: req.Port, Username: req.Username,

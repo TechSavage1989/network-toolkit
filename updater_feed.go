@@ -188,7 +188,31 @@ func updateHTTPClient() *http.Client {
 		return nil
 	}}
 }
+
+type updateProgress struct {
+	Phase    string `json:"phase"`
+	Version  string `json:"version"`
+	Received int64  `json:"received"`
+	Total    int64  `json:"total"`
+}
+type updateProgressReader struct {
+	reader          io.Reader
+	received, total int64
+	report          func(int64, int64)
+}
+
+func (r *updateProgressReader) Read(b []byte) (int, error) {
+	n, err := r.reader.Read(b)
+	r.received += int64(n)
+	if n > 0 {
+		r.report(r.received, r.total)
+	}
+	return n, err
+}
 func updateFetch(ctx context.Context, client *http.Client, raw string, limit int64) ([]byte, error) {
+	return updateFetchProgress(ctx, client, raw, limit, nil)
+}
+func updateFetchProgress(ctx context.Context, client *http.Client, raw string, limit int64, report func(int64, int64)) ([]byte, error) {
 	if !updateSafeURL(raw) {
 		return nil, errors.New("Unsafe update URL refused")
 	}
@@ -216,7 +240,16 @@ func updateFetch(ctx context.Context, client *http.Client, raw string, limit int
 	if response.ContentLength > limit {
 		return nil, errors.New("Update response exceeds its size limit")
 	}
-	b, e := io.ReadAll(io.LimitReader(response.Body, limit+1))
+	var reader io.Reader = io.LimitReader(response.Body, limit+1)
+	if report != nil {
+		total := response.ContentLength
+		if total < 0 {
+			total = 0
+		}
+		report(0, total)
+		reader = &updateProgressReader{reader: reader, total: total, report: report}
+	}
+	b, e := io.ReadAll(reader)
 	if e != nil {
 		return nil, e
 	}
@@ -318,25 +351,39 @@ func (a *application) handleUpdateFeedLocked(w http.ResponseWriter, r *http.Requ
 		jsonError(w, 409, "Check for a newer update before downloading.")
 		return true
 	}
+	a.updater.progress = &updateProgress{Phase: "checksums", Version: latest.Version}
+	finished := false
+	defer func() {
+		if !finished {
+			a.updater.progress.Phase = "failed"
+		}
+	}()
 	sums, e := a.updateFetchUnlocked(ctx, client, latest.sumsURL, 64<<10)
 	if e != nil {
 		jsonError(w, 502, e.Error())
 		return true
 	}
-	archive, e := a.updateFetchUnlocked(ctx, client, latest.packageURL, updateMaxPackage)
+	a.updater.progress = &updateProgress{Phase: "download", Version: latest.Version}
+	archive, e := a.updateDownloadUnlocked(ctx, client, latest.packageURL, updateMaxPackage, latest.Version)
 	if e != nil {
 		jsonError(w, 502, e.Error())
 		return true
 	}
+	a.updater.progress.Phase = "verifying"
+	a.updater.mu.Unlock()
 	version, binary, e := updateExtractPackage(latest.packageName, archive, sums, model.Version)
+	a.updater.mu.Lock()
 	if e != nil {
 		jsonError(w, 400, e.Error())
 		return true
 	}
+	a.updater.progress.Phase = "staging"
 	if e = a.updateStageBinary(version, binary); e != nil {
 		jsonError(w, 409, e.Error())
 		return true
 	}
+	finished = true
+	a.updater.progress.Phase = "ready"
 	jsonResponse(w, 200, a.updateStatusLocked())
 	return true
 }
@@ -360,4 +407,19 @@ func (a *application) updateFetchUnlocked(ctx context.Context, client *http.Clie
 	a.updater.mu.Unlock()
 	defer a.updater.mu.Lock()
 	return updateFetch(ctx, client, raw, limit)
+}
+
+// Only the reserved download writes progress. Status reads remain responsive
+// while bytes arrive; no timer or progress read starts an update action.
+func (a *application) updateDownloadUnlocked(ctx context.Context, client *http.Client, raw string, limit int64, version string) ([]byte, error) {
+	a.updater.mu.Unlock()
+	defer a.updater.mu.Lock()
+	return updateFetchProgress(ctx, client, raw, limit, func(received, total int64) {
+		a.updater.mu.Lock()
+		defer a.updater.mu.Unlock()
+		if p := a.updater.progress; p != nil && p.Phase == "download" && p.Version == version {
+			p.Received = received
+			p.Total = total
+		}
+	})
 }

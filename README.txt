@@ -1,7 +1,30 @@
-NETWORK TOOLKIT 1.17.82
+NETWORK TOOLKIT 1.17.83
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.82
+CURRENT RELEASE - 1.17.83
+
+Macro folders now use the saved-session folder controls: All folders, Unfiled,
+choose or create a folder, and Move to folder. Commands, shortcuts and automatic
+bindings stay with the macro.
+
+Start local Command Prompt and Windows PowerShell sessions in the terminal on
+Windows 10 version 1809 / Server 2019 or later. They share terminal theme, font,
+cursor, ANSI colors, saved profiles, macros, split panes and linked workspaces.
+They run as your current Windows user, starting in your home folder.
+
+Scan columns fit the displayed contents with compact spacing. Copy actions keep
+reserved space beside values. Discovery shows open TCP ports as compact badges
+with conventional service labels. Independent discovery checks overlap with a
+64-operation ceiling; reachability appears before optional device details.
+Windows reverse lookups respect OS DNS policy and bounded caller timeouts.
+
+Update downloads show bytes and percentage when the server provides a total,
+and an activity bar when it does not. Verification has its own phase. The new
+installer helper keeps a native activity window visible through replacement and
+restart until the interface is ready. The first update from an older build uses
+that older build's helper. Installation still requires your explicit choice.
+
+PREVIOUS RELEASE - 1.17.82
 
 Terminal selections can include spaces before the command as well as trailing
 empty cells. Backspace, Delete, typing and paste edit the selected command text.

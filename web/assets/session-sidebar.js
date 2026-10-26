@@ -58,8 +58,8 @@ function resizeSidebar(event){
 const canOpen=()=>!restricted()&&!terminalConnectBusy&&!terminalWorkspaceTransferBusy&&(!DETACHED_TERMINAL||terminalDetachedReady&&!terminalDetachedReturning)&&online&&!OFFLINE&&terminalAssetsReady();
 function token(kind,id){const item=list(kind).find(item=>item.id===id);return item?{kind,id,signature:signature(item)}:null;}
 function itemFor(target){const item=target&&list(target.kind).find(item=>item.id===target.id);return item&&signature(item)===target.signature?item:null;}
-function label(config){return config.type==='serial'?config.serialPort:config.host;}
-function description(config){return terminalProtocolLabel(config)+' · '+(config.type==='serial'?config.serialPort+' · '+config.baudRate+' baud':(config.username?config.username+'@':'')+config.host+':'+config.port);}
+function label(config){return ['cmd','powershell'].includes(config.type)?terminalProtocolLabel(config):config.type==='serial'?config.serialPort:config.host;}
+function description(config){if(['cmd','powershell'].includes(config.type))return terminalProtocolLabel(config)+' · This computer';return terminalProtocolLabel(config)+' · '+(config.type==='serial'?config.serialPort+' · '+config.baudRate+' baud':(config.username?config.username+'@':'')+config.host+':'+config.port);}
 function preferences(value={}){
  const before=sidebarSnapshot();
  state.terminalSidebarCollapsed=value.terminalSidebarCollapsed===true;

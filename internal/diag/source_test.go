@@ -276,7 +276,8 @@ func TestDiscoverySourceReachesEveryCombinedProbe(t *testing.T) {
 			t.Errorf("%s calls %d, want %d", name, calls[name], count)
 		}
 	}
-	// Cancelling between combined probes retains source and response evidence.
+	// Cancelling between sequential combined probes retains source and response evidence.
+	req.Options["concurrency"] = 1
 	ctx, cancel := context.WithCancel(ctx)
 	probes.ping = func(ctx context.Context, target string, _ time.Duration, _ int) (platform.PingReply, error) {
 		check(ctx, "cancelled-icmp")

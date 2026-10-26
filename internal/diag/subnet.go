@@ -29,6 +29,7 @@ type SubnetHost struct {
 	HostnameIdentity
 	Address    string               `json:"address"`
 	Status     string               `json:"status"`
+	Enriching  bool                 `json:"enriching,omitempty"`
 	Completed  bool                 `json:"completed"`
 	Responded  bool                 `json:"responded"`
 	Evidence   []string             `json:"evidence"`
@@ -79,15 +80,16 @@ type SubnetResult struct {
 }
 
 type subnetOptions struct {
-	targets          []netip.Addr
-	network          string
-	scopes           []string
-	ports            []int
-	icmp             bool
-	identify         bool
-	resolveHostnames bool
-	timeout          time.Duration
-	concurrency      int
+	targets           []netip.Addr
+	network           string
+	scopes            []string
+	ports             []int
+	icmp              bool
+	identify          bool
+	resolveHostnames  bool
+	timeout           time.Duration
+	concurrency       int
+	parallelDiscovery bool
 }
 
 // Injectable operations keep scheduler tests deterministic and require no
@@ -118,6 +120,7 @@ func parseSubnetOptions(req model.Request) (subnetOptions, error) {
 		options.icmp = true
 		defaultTimeout, minimumTimeout = 1500, 200
 	case "discover":
+		options.parallelDiscovery = true
 		options.icmp = true
 		defaultTimeout, defaultConcurrency = 400, 16
 		defaultPorts, portLimit = "80,443,22,445,3389", 64
@@ -165,11 +168,11 @@ type subnetUpdate struct {
 	host    *SubnetHost
 }
 
-// All probe types share this single host pool. Probes within one address are
-// sequential, so the configured host concurrency is also the total maximum
-// concurrent probe operations, including optional device identification.
+// Host admission stays bounded. Discovery overlaps independent operations
+// through a separate bounded semaphore; other sweeps keep their original pool.
 func scanSubnetHosts(ctx context.Context, options subnetOptions, probes subnetProbes, consume func(subnetUpdate)) {
 	workers := min(options.concurrency, len(options.targets))
+	slots := make(chan struct{}, min(4*options.concurrency, 64))
 	jobs := make(chan netip.Addr)
 	updates := make(chan subnetUpdate, 2*workers)
 	var wg sync.WaitGroup
@@ -182,9 +185,13 @@ func scanSubnetHosts(ctx context.Context, options subnetOptions, probes subnetPr
 					return
 				}
 				updates <- subnetUpdate{started: true}
-				host := probeSubnetHost(ctx, address.String(), options, probes, func() {
-					updates <- subnetUpdate{probes: 1}
-				})
+				complete := func() { updates <- subnetUpdate{probes: 1} }
+				var host SubnetHost
+				if options.parallelDiscovery && options.concurrency > 1 {
+					host = probeDiscoveryHost(ctx, address.String(), options, probes, slots, complete, func(early SubnetHost) { updates <- subnetUpdate{host: &early} })
+				} else {
+					host = probeSubnetHost(ctx, address.String(), options, probes, complete)
+				}
 				// Retain this send after cancellation. The coordinator drains all
 				// workers so that observations from incomplete hosts survive.
 				updates <- subnetUpdate{host: &host}
@@ -241,7 +248,7 @@ func runSubnetScan(ctx context.Context, req model.Request, emit model.Emit, prob
 		data.Note += " Device identification adds one unicast UPnP request and at most one same-device description retrieval per address, within a 2.5-second total device budget. Reported models are optional and are never guessed from a MAC or port."
 	}
 	if options.resolveHostnames {
-		data.Note += " Hostnames use one reverse lookup through configured DNS servers and the hosts file per address, with a 1.5-second limit inside the same worker pool. Resolved or cached names do not establish that a device responded."
+		data.Note += " Hostnames use one reverse lookup through configured DNS servers and the hosts file per address, with a 1.5-second lookup limit. Independent discovery checks overlap within bounded host and operation limits. Resolved or cached names do not establish that a device responded."
 	}
 	hostKind, progressKind := "subnet-host", "subnet-progress"
 	if req.Tool == "discover" {
@@ -284,6 +291,7 @@ func runSubnetScan(ctx context.Context, req model.Request, emit model.Emit, prob
 	model.Log(emit, "info", fmt.Sprintf("Testing %d unique IPv4 addresses from %s with at most %d concurrent host probes", data.Total, data.Network, options.concurrency), nil)
 
 	lastProgress := time.Now()
+	hostIndex := map[string]int{}
 	scanSubnetHosts(ctx, options, probes, func(update subnetUpdate) {
 		if update.started {
 			data.Started++
@@ -292,18 +300,25 @@ func runSubnetScan(ctx context.Context, req model.Request, emit model.Emit, prob
 		if update.host != nil {
 			host := *update.host
 			host.HostIdentity = known[host.Address]
-			data.Hosts = append(data.Hosts, host)
-			if host.Completed {
+			previous := SubnetHost{}
+			if index, ok := hostIndex[host.Address]; ok {
+				previous = data.Hosts[index]
+				data.Hosts[index] = host
+			} else {
+				hostIndex[host.Address] = len(data.Hosts)
+				data.Hosts = append(data.Hosts, host)
+			}
+			if host.Completed && !previous.Completed {
 				data.Completed++
 			}
-			if host.Responded {
+			if host.Responded && !previous.Responded {
 				data.Responded++
 			}
 			emitSubnetHost(emit, hostKind, host)
 		}
 		data.NotStarted = data.Total - data.Started
 		// Per-probe counts remain exact while progress messages are bounded.
-		// Only one immutable host snapshot is normally emitted per address.
+		// Immutable reachability snapshots may precede optional metadata updates.
 		if time.Since(lastProgress) >= 200*time.Millisecond {
 			publishProgress(fmt.Sprintf("%d of %d addresses completed; %d of %d probes finished", data.Completed, data.Total, data.CompletedProbes, data.RequestedProbes))
 			lastProgress = time.Now()
@@ -454,7 +469,9 @@ func emitSubnetHost(emit model.Emit, kind string, host SubnetHost) {
 	message := host.Address + ": " + strings.ReplaceAll(host.Status, "_", " ")
 	if host.Responded {
 		message = host.Address + ": " + strings.Join(host.Evidence, "; ")
-		if !host.Completed {
+		if host.Enriching {
+			message += "; device details pending"
+		} else if !host.Completed {
 			message += "; remaining probes cancelled"
 		}
 	}

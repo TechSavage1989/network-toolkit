@@ -30,3 +30,11 @@ for(const kind of ['ssh','ftp'])test(kind+' file-client edits retain a saved ses
  if(kind==='ssh')remote.saveSharedSSHProfile('Updated');else remote.saveFTPProfile('Updated');
  const profile=state[kind==='ssh'?'terminalProfiles':'ftpProfiles'][0];assert.equal(profile.id,'existing');assert.equal(profile.name,'Updated');assert.equal(profile.folder,'Branch');assert.equal(profile.credentialId,'vault-reference');assert(!JSON.stringify(state).includes('transient-secret'));assert(writes.length>0);
 });
+
+test('macro folder helpers preserve the existing 120-character limit independently of sessions',()=>{
+ const macro=folders.withLimit(120),name='😀'.repeat(120);
+ assert.equal(macro.normalize(name),name);assert.equal(Array.from(folders.normalize(name)).length,100);
+ assert.equal(macro.names([{folder:name}])[0],name);assert(macro.matches({folder:name},'folder:'+name));
+ assert(macro.inputHTML('macro',name,[name]).includes('maxlength="120"'));
+ assert.equal(folders.withLimit(120),macro);assert.equal(folders.withLimit(100),folders);
+});

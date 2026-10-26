@@ -167,10 +167,10 @@ func TestSubnetPingIsOneICMPAttemptPerAddress(t *testing.T) {
 	}
 }
 
-func TestSubnetOneGlobalPoolForAllProbeTypes(t *testing.T) {
+func TestDiscoveryBoundedParallelOperations(t *testing.T) {
 	probes := fakeSubnetProbes()
 	var active, maximum, total atomic.Int32
-	entered := make(chan struct{}, 4)
+	entered := make(chan struct{}, 16)
 	gate := make(chan struct{})
 	var mu sync.Mutex
 	visits := map[string]int{}
@@ -179,7 +179,7 @@ func TestSubnetOneGlobalPoolForAllProbeTypes(t *testing.T) {
 		defer active.Add(-1)
 		for previous := maximum.Load(); current > previous && !maximum.CompareAndSwap(previous, current); previous = maximum.Load() {
 		}
-		if total.Add(1) <= 4 {
+		if total.Add(1) <= 16 {
 			entered <- struct{}{}
 			<-gate
 		}
@@ -214,7 +214,7 @@ func TestSubnetOneGlobalPoolForAllProbeTypes(t *testing.T) {
 		}
 		finished <- out
 	}()
-	for i := 0; i < 4; i++ {
+	for i := 0; i < 16; i++ {
 		select {
 		case <-entered:
 		case <-time.After(2 * time.Second):
@@ -230,7 +230,7 @@ func TestSubnetOneGlobalPoolForAllProbeTypes(t *testing.T) {
 		t.Fatal("bounded scan did not finish")
 	}
 	data := out.Data.(SubnetResult)
-	if maximum.Load() != 4 || active.Load() != 0 || total.Load() != 84 || data.CompletedProbes != 84 || data.RequestedProbes != 84 || data.Completed != 14 || data.Responded != 14 {
+	if maximum.Load() != 16 || active.Load() != 0 || total.Load() != 84 || data.CompletedProbes != 84 || data.RequestedProbes != 84 || data.Completed != 14 || data.Responded != 14 {
 		t.Fatalf("global bounds/counts: peak %d active %d total %d %+v", maximum.Load(), active.Load(), total.Load(), data.SubnetProgress)
 	}
 	for _, host := range data.Hosts {
@@ -288,7 +288,7 @@ func TestSubnetCancellationRetainsEvidenceAndImmutableEvents(t *testing.T) {
 			events = append(events, data["value"].(SubnetHost))
 		}
 	}
-	out, err := runSubnetScan(ctx, model.Request{Tool: "discover", Target: "192.0.2.9", Options: map[string]any{"ports": "80,443", "identify": false}}, emit, probes)
+	out, err := runSubnetScan(ctx, model.Request{Tool: "discover", Target: "192.0.2.9", Options: map[string]any{"concurrency": 1, "ports": "80,443", "identify": false}}, emit, probes)
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("error %v", err)
 	}

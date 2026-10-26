@@ -1,5 +1,55 @@
 # Network Toolkit development handoff
 
+## 1.17.83 prepared for review: folders, local shells, discovery and progress
+
+The user requested these features on 2026-10-26 after 82 publication finished.
+Start from main 12156a2897604bc7c78292f76c3aed6c9f227d29. The new request did
+not explicitly authorize 83 publication. Work is on review/hosts-editor-1.17.83;
+main remains on the final 82 documentation and 82 stays the published release.
+
+Macro folders share the saved-session helper with a separate 120-character
+limit, preserving existing macro metadata. All/Unfiled/named filters, a shared
+choose/create input and direct/context-menu moves retain IDs, commands,
+shortcuts and bindings. Moves check library revision and dialog ownership.
+
+Local cmd and Windows PowerShell use ConPTY with built-in system paths, current
+user/policies, home-directory startup and the same xterm renderer/appearance.
+Remote host/credentials/serial fields are dropped for local requests. Processes
+start suspended, join a kill-on-close job, then resume; output drains separately
+from ConPTY shutdown. Runtime capability gates choices. Profiles/recent entries,
+macros, panes, reconnect and linked workspaces use the existing terminal path.
+
+Discovery retains bounded host admission and overlaps up to four independent
+checks per host, with a scan-wide 64-operation ceiling. Concurrency one and
+Ping/TCP sweeps retain sequential behavior. Immutable reachability snapshots can
+precede metadata; the coordinator updates rows and counts once per transition.
+UPnP-only devices, no-response/error/cancelled rows, all requested ports and
+selected-source contexts remain. Windows automatic PTR uses OS DNS policies,
+with bounded caller waits and at most 64 outstanding native requests.
+
+Scan tables use intrinsic browser sizing over all rows, without saved fixed
+widths or surplus stretching. Other table resize controls remain. Copy cells
+reserve a control slot and wrap labels. TCP badges retain exact comma-separated
+port copy payloads; service names are conventional labels, not detected services.
+
+Download status exposes real received/total bytes, with bounded read limits and
+existing package/hash/PE verification. The controller polls only a pending
+explicit download and ignores late responses. Unknown sizes and verification
+use activity bars. Installation phases use an activity bar and a native helper
+window, which survives original WebView shutdown until readiness/rollback. The
+first update from 82 uses the 82 helper; this native window applies when 83 is
+the installing version. No automatic download/install or extra consent stage.
+
+Validation is in progress. Initial JavaScript suites pass 470 tests before the
+new local-shell/progress tests; those focused tests also pass. Required root,
+terminal and desktop Go tests pass; new discovery tests pass locally with five
+pre-existing selected-source transport tests excluded because the container
+blocks routing netlink queries. Hosted Checks includes the full discovery suite,
+Windows shell/progress lifecycle tests and new real-browser UI fixtures. An
+initial Windows x64 GUI cross-build passes. Final exact-source review/build
+artifact validation is still pending. Do not claim native desktop interaction,
+real hardware, actual installation/restart or final release publication.
+
 ## 1.17.82 published: preceding whitespace in terminal selections
 
 Prepared from main c0a3c3ebe4558de38ad6c7e007803e6de3d47bdc after the user

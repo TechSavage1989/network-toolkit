@@ -189,7 +189,7 @@ func TestDiscoveryHostnameCancellationRetainsProbeEvidence(t *testing.T) {
 		cancel()
 		return []string{"late.test"}, context.Canceled
 	}
-	out, err := runSubnetScan(ctx, model.Request{Tool: "discover", Target: "192.0.2.1", Options: map[string]any{"ports": "443", "identify": false}}, nil, probes)
+	out, err := runSubnetScan(ctx, model.Request{Tool: "discover", Target: "192.0.2.1", Options: map[string]any{"concurrency": 1, "ports": "443", "identify": false}}, nil, probes)
 	if !errors.Is(err, context.Canceled) {
 		t.Fatal(err)
 	}

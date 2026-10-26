@@ -28,10 +28,9 @@ type HostnameIdentity struct {
 
 type reverseLookup func(context.Context, string) ([]string, error)
 
-// The standard Windows native PTR path calls synchronous DnsQuery and does
-// not finish context cancellation while that call is in progress. PreferGo
-// uses the configured DNS servers/hosts file and cancellable network I/O, so
-// one slow name server cannot consume a worker beyond the lookup deadline.
+// Automatic Windows lookups retain the OS resolver's enterprise DNS policies.
+// Native DnsQuery can ignore cancellation, so its caller uses a bounded wait and
+// shared admission slots which remain occupied until the native call returns.
 var hostnameResolver = &net.Resolver{PreferGo: true}
 
 func systemReverseLookup(ctx context.Context, address string) ([]string, error) {
@@ -46,7 +45,7 @@ func systemReverseLookup(ctx context.Context, address string) ([]string, error) 
 	// suffixes, policies and NRPT configuration. Prefer that resolution path
 	// in automatic mode so reverse lookups match the local system.
 	if runtime.GOOS == "windows" {
-		return net.DefaultResolver.LookupAddr(ctx, address)
+		return boundedNativeReverseLookup(ctx, address, net.DefaultResolver.LookupAddr)
 	}
 	return hostnameResolver.LookupAddr(ctx, address)
 }
@@ -140,4 +139,30 @@ func makeHostnameCheck(ctx context.Context, address string, lookup reverseLookup
 		detail = strings.Join(identity.Hostnames, ", ") + " (" + address + ")"
 	}
 	return QuickCheck{Name: "Hostname", Status: "info", Detail: detail, Data: hostnameCheckData{Address: address, HostnameIdentity: identity}}
+}
+
+var nativeReverseSlots = make(chan struct{}, 64)
+
+func boundedNativeReverseLookup(ctx context.Context, address string, lookup reverseLookup) ([]string, error) {
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case nativeReverseSlots <- struct{}{}:
+	}
+	type answer struct {
+		names []string
+		err   error
+	}
+	ready := make(chan answer, 1)
+	go func() {
+		defer func() { <-nativeReverseSlots }()
+		names, err := lookup(ctx, address)
+		ready <- answer{names, err}
+	}()
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case result := <-ready:
+		return result.names, result.err
+	}
 }

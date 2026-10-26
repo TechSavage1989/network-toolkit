@@ -250,6 +250,8 @@ func applyUpdatePlanWithOperations(dir string, ops updateInstallOperations) (res
 	if e != nil || selfHash != p.OriginalSHA256 {
 		return errors.New("Update helper integrity check failed.")
 	}
+	progress := startUpdateProgressWindow(p.Version)
+	defer progress.Close()
 	updateLog(dir, "Helper started; waiting for original application to exit.")
 	target := updatePlanTarget(dir, p)
 	candidate := filepath.Join(dir, "candidate.exe")
@@ -260,6 +262,7 @@ func applyUpdatePlanWithOperations(dir string, ops updateInstallOperations) (res
 	if e = ops.waitParent(p.ParentPID, 45*time.Second, filepath.Join(dir, "helper-ready")); e != nil {
 		return e
 	}
+	progress.Set("Verifying the application and update files...")
 	updateLog(dir, "Original application exited; verifying files.")
 	oldHash, e := updateFileHash(target)
 	if e != nil || oldHash != p.OriginalSHA256 {
@@ -285,6 +288,7 @@ func applyUpdatePlanWithOperations(dir string, ops updateInstallOperations) (res
 		}
 		defer updateRemoveVerified(candidate, p.CandidateSHA256)
 	}
+	progress.Set("Installing the verified update...")
 	if e = ops.replace(target, candidate, backup); e != nil {
 		// ReplaceFileW can leave the original under its backup name on error1177.
 		if _, statErr := os.Stat(target); os.IsNotExist(statErr) {
@@ -306,6 +310,7 @@ func applyUpdatePlanWithOperations(dir string, ops updateInstallOperations) (res
 		}
 	}
 	updateLog(dir, "Executable replaced; starting version %s at %s.", p.Version, target)
+	progress.Set("Starting the updated application...")
 	cmd := updateRestartCommand(target, p, dir)
 	configureUpdateAppProcess(cmd)
 	if startErr == nil {
@@ -314,6 +319,7 @@ func applyUpdatePlanWithOperations(dir string, ops updateInstallOperations) (res
 	if startErr == nil {
 		done := make(chan error, 1)
 		go func() { done <- cmd.Wait() }()
+		progress.Set("Waiting for the updated interface to be ready...")
 		updateLog(dir, "New process started (PID %d); waiting for visible interface readiness.", cmd.Process.Pid)
 		timeout := time.NewTimer(ops.startupTimeout)
 		defer timeout.Stop()
@@ -350,6 +356,7 @@ func applyUpdatePlanWithOperations(dir string, ops updateInstallOperations) (res
 			}
 		}
 	}
+	progress.Set("Restoring the previous application after a restart failure...")
 	updateLog(dir, "Restart failed: %v. Restoring the previous executable.", startErr)
 	// The failed new process is stopped before rollback; keep its binary for diagnostics.
 	failed := filepath.Join(dir, "failed.exe")

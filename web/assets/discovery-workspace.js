@@ -237,6 +237,18 @@
       const headers = headerRow ? [...headerRow.cells] : [];
       if (!headers.length || headers.some(header => header.tagName !== 'TH' || header.colSpan > 1 || header.rowSpan > 1)) continue;
       const view = viewKey(table, headers); table.dataset.columnView = view; table.classList.add('resizable-data-table');
+      // Scan results follow every row's intrinsic size, including live updates.
+      // Native table layout measures all rows without samples or surplus width.
+      const automatic=!!table.closest('#toolResultsScroll, #toolResult, [data-network-results]');
+      table.classList.toggle('auto-fit-results',automatic);
+      if(automatic){
+        table.querySelector('colgroup[data-column-sizes]')?.remove();
+        for(const header of headers){header.scope='col';header.querySelector('[data-column-resize]')?.remove();}
+        table.style.width='max-content';
+        for(const control of table.closest('[data-list-view], [data-network-results], .table-wrap')?.querySelectorAll('[data-column-reset]')||[])if(control.dataset.columnReset===view)control.remove();
+        continue;
+      }
+
       let group = table.querySelector('colgroup[data-column-sizes]');
       if (!group) { group = document.createElement('colgroup'); group.dataset.columnSizes = ''; table.prepend(group); }
       const definitions = headers.map((header,index) => {
@@ -249,17 +261,6 @@
       const wrapper = table.closest('.table-wrap') || table.parentElement;
       const available = Math.floor(wrapper?.clientWidth || 0);
       let total = definitions.reduce((sum,item)=>sum+item.width,0);
-      // Distribute unused width; keep pinned/manual widths stable and put the
-      // extra room where longer strings benefit from fewer wrapped lines.
-      if (available>total && total>0) {
-        const surplus=available-total;
-        let flexible=definitions.filter(item=>!item.manual);
-        if (!flexible.length) flexible=definitions;
-        const weight=item=>/(?:value|name|description|hostname|detail|address|server|path|info)/i.test(item.id)?3: /^(?:tools|actions)$/.test(item.id)?0.12:1;
-        const weights=flexible.reduce((sum,item)=>sum+weight(item),0);
-        for (const item of flexible) item.width+=Math.round(surplus*weight(item)/weights);
-        total=definitions.reduce((sum,item)=>sum+item.width,0);
-      }
       definitions.forEach(({header,id,name,width},index) => {
         let column = group.children[index]; if (!column) { column=document.createElement('col'); group.append(column); }
         column.dataset.columnId=id; column.style.width=width+'px';
@@ -268,7 +269,7 @@
         handle.setAttribute('aria-label','Resize '+name+' column'); handle.setAttribute('aria-valuemin','64'); handle.setAttribute('aria-valuemax','1200'); handle.setAttribute('aria-valuenow',String(Math.round(width))); handle.title='Drag to resize. Double-click or Enter fits contents. Arrow keys resize; Home resets.';
       });
       while (group.children.length>headers.length) group.lastElementChild.remove();
-      table.style.width=Math.max(total,available)+'px';
+      table.style.width=total+'px';
       let toolbar=table.closest('[data-list-view]')?.querySelector(':scope > .data-list-tools');
       if (!toolbar && view.startsWith('network:')) toolbar=table.closest('[data-network-results]')?.querySelector(':scope > .network-list-toolbar > .network-table-tools');
       if (!toolbar && !view.startsWith('network:') && table.dataset.columnOwner!=='list') { const wrapper=table.closest('.table-wrap'); if(wrapper){toolbar=[...wrapper.children].find(child=>child.classList.contains('table-size-tools'));if(!toolbar){toolbar=document.createElement('div');toolbar.className='table-size-tools';wrapper.insertBefore(toolbar,table);}}}

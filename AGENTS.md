@@ -22,3 +22,9 @@ in 11.97 seconds without installation or restart. This three-file final docs
 record uses [skip ci] and must not move the tag, replace assets or republish.
 Continue from latest main. Native Windows/WebView2, hardware and actual install/
 restart remain unverified. Keep the handoff current and report checks honestly.
+
+1.17.83 is being prepared on review/hosts-editor-1.17.83 for the 2026-10-26
+feature request: macro folders, local Windows shells, compact scan columns/copy
+spacing, discovery scheduling/ports and update progress. This request does not
+explicitly authorize publishing 83. Keep main and the published 82 assets intact.
+Read the first handoff section for progress and validation limits.
