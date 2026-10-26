@@ -31,12 +31,46 @@ editor. Empty-editor actions are guarded. Find typing keeps query focus, and
 wrapped search uses measured logical-line positions. Late saves retain newer
 edits as unsaved and cannot activate a different tab on completion.
 
-Validation is in progress. New source regressions cover action scroll retention,
-disabled native dialogs, cancel/discard/stale-close, Go to line validation, late
-save edits and real xterm output colors with immutable native ANSI/buffers.
-The new static browser test checks these actions and six wrapped syntax/gutter
-layouts; existing 84/85 browser fixtures are also scheduled. No claim of full
-native WebView2 interaction or a new executable is made.
+Source validation COMPLETE on 947a65a422280afaffeafb395169a49a298f98e2,
+tree bff0be0f6993ec2c97e20d12905de7be6064715f. Source-only workflow
+40277446727 / job 121423082359 passes: all 510 JS tests and four static browser
+scripts. New editor/output tests have 5 groups and 6 dark/light layouts at 1440,
+820 and 390 pixels; file-open/import/connected-source/reload tests cover 12 cases;
+existing 84 and 85 browser suites also pass. Current reports have no runtime
+errors. Native script prompt/confirm functions deliberately throw in the new
+browser fixture, proving editor controls use the in-app dialogs instead.
+
+The gutter now has a fixed clipping frame and separately translated line-label
+content. It stays visible while scrolling, including wrapped logical lines.
+Measurements use the same unitless line-height as the textarea to avoid rounding
+drift, checked through logical line 150. A long wrapped line can naturally have
+its label above the viewport when only its continuation is visible. Final wide /
+compact editor and PowerShell output screenshots were visually inspected.
+
+Newly saved Untitled documents now use the real local-file reader for Reload,
+and local Save As IDs match normal local-file opens. A late save preserves newer
+edits as dirty; keyboard Enter on Cancel and Escape preserve unsaved files.
+Source regression fixtures use synthetic documentation-range IP addresses. The
+new output roles are included in both JS normalization and Go's settings allowlist.
+The Go whitelist has been formatted but not compiled under the build hold.
+
+Browser artifact 12630099280 has 22 verified members (digest, CRC, report checks):
+acbff75c63224c2ab5543159f33dee05beb0594362f958fa5648af4f24a29442
+Screens inspected: editor-review-1440-dark.png, editor-review-390-light.png,
+shell-output-review-powershell.png. Actual DOM text colors are checked for both
+local shell types, preserving native ANSI red and buffer bytes. Rendering checks
+wait for the native xterm repaint rather than assuming a decoration element alone
+means its foreground is already painted.
+
+No version/resource bump, Go/Windows application build, package, installation,
+restart, main push, tag change or release was made. Published 85 remains current;
+its existing local EXE still has SHA-256
+94f2c1c7abfd76434fbafafbea806010eb3d7c67d509ec4eeb6d8b5a13ae5c8e.
+Full Go/native Windows/WebView2/build/package validation must run after the user
+explicitly authorizes a new build. Use a normal review branch then, bump the next
+version and preserve old tags/assets; do not replace 85. This final source-review
+record changes documentation only and uses [skip ci]. The user's build hold
+remains active; do not infer authorization from these passing source tests.
 
 ## 1.17.85 published: shell colors, close preferences and tool navigation
 
