@@ -25,6 +25,7 @@ func safeTerminalAppearance(value any) map[string]any {
 		}
 	}
 	clean["highlightColors"] = highlights
+	clean["shells"] = safeTerminalShellAppearance(source["shells"])
 	if family, ok := source["fontFamily"].(string); ok {
 		family = strings.TrimSpace(family)
 		valid := len([]rune(family)) > 0 && len([]rune(family)) <= 80
@@ -58,5 +59,23 @@ func safeTerminalAppearance(value any) map[string]any {
 		}
 	}
 	clean["colors"] = colors
+	return clean
+}
+
+func safeTerminalShellAppearance(value any) map[string]any {
+	source, _ := value.(map[string]any)
+	clean := map[string]any{}
+	for _, kind := range []string{"powershell", "cmd"} {
+		settings, _ := source[kind].(map[string]any)
+		colors := map[string]any{}
+		if requested, ok := settings["colors"].(map[string]any); ok {
+			for _, role := range []string{"command", "keyword", "parameter", "variable", "string", "operator", "number", "type", "comment"} {
+				if color, ok := requested[role].(string); ok && terminalColorPattern.MatchString(color) {
+					colors[role] = strings.ToLower(color)
+				}
+			}
+		}
+		clean[kind] = map[string]any{"enabled": settings["enabled"] != false, "colors": colors}
+	}
 	return clean
 }

@@ -16,6 +16,9 @@ body.app-navigation-ready:not(.terminal-window) #mobileMenu{display:inline-flex;
 .app-navigation-backdrop[hidden]{display:none}
 .app-navigation-ready .nav-scroll{overflow-x:hidden}
 @media(min-width:1101px){
+ .app-navigation-ready .sidebar{position:relative}
+ .app-navigation-divider{position:absolute;right:-3px;top:0;bottom:0;width:6px;z-index:5;cursor:pointer;touch-action:none}
+ .app-navigation-divider:hover,.app-navigation-divider:focus-visible{background:var(--accentBg);outline:1px solid var(--accent)}
  .app-nav-collapsed .app{grid-template-columns:64px minmax(0,1fr)}
  .app-nav-collapsed .sidebar{width:64px;transform:none}
  .app-nav-collapsed .main{grid-column:2}
@@ -34,6 +37,7 @@ body.app-navigation-ready:not(.terminal-window) #mobileMenu{display:inline-flex;
  .app-nav-collapsed .engine-label:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 }
 @media(max-width:1100px){
+ .app-navigation-divider{display:none}
  .app-navigation-ready .sidebar-drawer-close{display:inline-flex;width:26px;height:26px}
  .app-navigation-ready .sidebar-foot{padding:10px 14px}
 }

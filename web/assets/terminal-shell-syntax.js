@@ -7,12 +7,14 @@ const psKeywords=new Set('begin break catch class continue data define do dynami
 const cmdKeywords=new Set('if else for in do not exist defined errorlevel cmdextversion equ neq lss leq gtr geq call set setlocal endlocal echo goto exit shift title prompt color chcp cd chdir dir copy del erase move ren rename type start pushd popd path pause cls assoc ftype verify vol ver md mkdir rd rmdir rem'.split(' '));
 const psOperators=/^-(?:[ic]?(?:eq|ne|ge|gt|le|lt|notcontains|contains|notin|in|notlike|like|notmatch|match|replace|split)|bnot|band|bor|bxor|and|or|xor|not|as|isnot|is|join|f|shl|shr)\b/i;
 function supported(language){return language==='powershell'||language==='cmd';}
-function palette(theme={},mode='dark'){
+function normalizePreferences(value){const out={};for(const type of ['powershell','cmd']){const source=value&&typeof value==='object'&&!Array.isArray(value)?value[type]:null,colors={};if(source&&typeof source==='object'&&!Array.isArray(source))for(const role of Object.keys(roles))if(typeof source.colors?.[role]==='string'&&/^#[a-f\d]{6}$/i.test(source.colors[role]))colors[role]=source.colors[role].toLowerCase();out[type]={enabled:source?.enabled!==false,colors};}return out;}
+function palette(theme={},mode='dark',overrides={}){
  const light=mode==='light',fallback={foreground:light?'#20324c':'#dce6f6',yellow:light?'#916400':'#eec16f',brightYellow:light?'#a87400':'#ffda91',green:light?'#17734a':'#6aca9e',brightGreen:light?'#208d5e':'#8ce2b6',cyan:light?'#07847e':'#67cdd1',brightBlack:light?'#6c7f96':'#73829a',blue:light?'#2465bc':'#7baaff'};
  const c={...fallback,...Object.fromEntries(Object.entries(theme).filter(([,v])=>typeof v==='string'&&/^#[a-f\d]{6}$/i.test(v)))};
- return {'shell-command':c.brightYellow,'shell-keyword':c.brightGreen,'shell-parameter':c.brightBlack,'shell-variable':c.brightGreen,'shell-string':c.cyan,'shell-operator':c.foreground,'shell-number':c.foreground,'shell-type':c.cyan,'shell-comment':c.green};
+ const result={'shell-command':c.brightYellow,'shell-keyword':c.brightGreen,'shell-parameter':c.brightBlack,'shell-variable':c.brightGreen,'shell-string':c.cyan,'shell-operator':c.foreground,'shell-number':c.foreground,'shell-type':c.cyan,'shell-comment':c.green};
+ for(const role of Object.keys(roles))if(typeof overrides[role]==='string'&&/^#[a-f\d]{6}$/i.test(overrides[role]))result['shell-'+role]=overrides[role].toLowerCase();return result;
 }
-function legend(theme,mode){const colors=palette(theme,mode);return Object.entries(roles).map(([role,label])=>({kind:'shell-'+role,label,color:colors['shell-'+role],borderStyle:'none',borderWidth:0}));}
+function legend(theme,mode,overrides){const colors=palette(theme,mode,overrides);return Object.entries(roles).map(([role,label])=>({kind:'shell-'+role,label,color:colors['shell-'+role],borderStyle:'none',borderWidth:0}));}
 function promptLength(text,language){
  const match=language==='powershell'?/^(?:\[[^\]\r\n]+\]:\s*)?PS [^\r\n]*?> ?/.exec(text):/^(?:(?:[A-Za-z]:\\|\\\\)[^>\r\n]*>|>) ?/.exec(text);
  return match?match[0].length:-1;
@@ -56,5 +58,5 @@ function analyze(text,language){
  }
  return found;
 }
-root.NTKTerminalShellSyntax=Object.freeze({analyze,supported,palette,legend});
+root.NTKTerminalShellSyntax=Object.freeze({analyze,supported,palette,legend,normalizePreferences,roles:Object.freeze(roles)});
 })(globalThis);

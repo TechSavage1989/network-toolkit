@@ -96,3 +96,15 @@
 @media(max-width:760px){.terminal-active-actions{padding:3px 5px;gap:3px 5px}.terminal-active-actions .btn{padding:3px 5px}.terminal-active-actions .terminal-toolgroup{gap:3px}}
 @media(max-width:1100px){.terminal-consolebar{justify-content:flex-start}.terminal-output-actions,.terminal-live-actions{width:100%}.terminal-live-actions{justify-content:flex-start}.terminal-scroll-actions{margin-left:auto}}
 @media(max-width:760px){.terminal-consolebar{padding:3px 5px;gap:3px}.terminal-output-actions,.terminal-live-actions{gap:3px}.terminal-consolebar .btn{padding:3px 5px}.terminal-consolebar select{max-width:145px}.terminal-output-switch .btn{padding:3px 5px;font-size:10px}.terminal-quick-check{font-size:10px}#terminalQuickPagerKey{width:70px}}
+/* Explicit local shell controls, kept separate from network-device highlights. */
+.terminal-local-shell-settings{margin:12px 0;padding:9px;border:1px solid var(--border);border-radius:7px;background:var(--panel2)}
+.terminal-local-shell-settings>h4{margin:0 0 6px}
+.terminal-shell-settings+.terminal-shell-settings{margin-top:11px;padding-top:10px;border-top:1px solid var(--border)}
+.terminal-shell-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;font-size:12px}
+.terminal-shell-heading label,.terminal-close-confirmation{display:flex;gap:7px;align-items:center;font-size:11px}
+.terminal-shell-heading input,.terminal-close-confirmation input{width:14px;height:14px;margin:0;flex:none}
+.terminal-shell-preview{margin:8px 0;padding:8px;border:1px solid var(--border);border-radius:5px;font:12px/1.5 Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
+.terminal-shell-settings>details>summary{font-size:11px;cursor:pointer;padding:4px 0}
+.terminal-shell-settings .terminal-color-grid{margin:7px 0}
+.terminal-close-settings{padding:8px 0;border-bottom:1px solid var(--border);margin-bottom:10px}
+.terminal-close-settings h4{margin:0 0 7px}

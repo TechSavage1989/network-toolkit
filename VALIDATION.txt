@@ -1,3 +1,13 @@
+NETWORK TOOLKIT 1.17.85 - REVIEW VALIDATION IN PROGRESS
+
+503 JavaScript tests and 31 Python release guards pass locally. The new renderer
+regression fails on released84 and passes with the local ANSI-black background
+fix. Actual native Windows startup/typing captures for cmd and PowerShell replay
+through real xterm with unchanged buffers and custom token colors. Independent
+controls, normalization and stale-owner bulk-close guards have focused tests.
+Full updated browser, hosted Go/Windows, GUI build and package checks are pending.
+The user explicitly authorized publication when complete. No 85 publication yet.
+
 NETWORK TOOLKIT 1.17.84 - VERIFIED PUBLISHED BUILD
 
 Tested source: 3e1aa2ee2bca8e632e00e7fdc0c52ca1fb7fc766

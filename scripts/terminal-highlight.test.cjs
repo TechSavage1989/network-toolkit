@@ -4,7 +4,7 @@ global.self=global;const {Terminal}=require('../web/assets/xterm.js');
 function harness(options,dimensions={},runtime={}){
  const timers=new Map(),decorations=[],refreshes=[],frames=[],painted=new Map();let next=0,clock=0,renders=0;const context={setTimeout:fn=>{timers.set(++next,fn);return next;},clearTimeout:id=>timers.delete(id),performance:{now:()=>clock+=runtime.clockStep||0}};
  vm.createContext(context);
- for(const name of ['terminal-shell-syntax.js','terminal-highlight.js'])vm.runInContext(fs.readFileSync(require.resolve('../web/assets/'+name),'utf8'),context);
+ for(const name of ['terminal-shell-syntax.js','terminal-highlight.js'])vm.runInContext(fs.readFileSync(name==='terminal-highlight.js'&&process.env.TOOLKIT_HIGHLIGHT_SOURCE?process.env.TOOLKIT_HIGHLIGHT_SOURCE:require.resolve('../web/assets/'+name),'utf8'),context);
  const term=new Terminal({cols:80,rows:8,scrollback:100,allowProposedApi:true,...dimensions});Object.defineProperty(term,'element',{value:{getClientRects:()=>[{}]}});
  const nativeDecoration=term.registerDecoration.bind(term),renderRow=runtime.realDecorations?require('./terminal-render-fixture.cjs')(term):null;
  term.registerDecoration=options=>{
@@ -251,4 +251,18 @@ test('local syntax follows live palette edits while SSH uses its original device
  const h=harness({language:'cmd',underlines:false},{cols:100,theme:{brightGreen:'#123456'}});await h.write('C:\\> echo %TEMP%');assert(h.decorations.some(d=>!d.disposed&&d.options.foregroundColor==='#123456'));
  h.term.options.theme={brightGreen:'#654321'};h.controller.setAppearance({theme:'dark',language:'cmd',underlines:false});h.flush();assert(h.decorations.some(d=>!d.disposed&&d.options.foregroundColor==='#654321'));assert(!h.decorations.some(d=>!d.disposed&&d.options.foregroundColor==='#123456'));h.dispose();
  const remote=harness({language:'ssh',underlines:false});await remote.write('switch# set mtu 1500');assert(remote.controller.tokensAtRow(0).some(t=>t.kind==='field'));assert(remote.controller.tokensAtRow(0).every(t=>!t.kind.startsWith('shell-')));remote.dispose();
+});
+test('ConPTY white-on-black console attributes receive syntax colors in the default terminal theme',async()=>{
+ const colors={background:'#0b1220',foreground:'#dce6f6',black:'#243149',white:'#c8d4e8',brightWhite:'#f1f6ff',brightGreen:'#8ce2b6',brightYellow:'#ffda91',cyan:'#67cdd1',green:'#6aca9e',brightBlack:'#73829a'};
+ for(const language of ['cmd','powershell'])for(const ansi of ['\x1b[37;40m','\x1b[97;40m']){
+  const h=harness({language,underlines:false},{cols:110,theme:colors},{realDecorations:true,renderer:true}),line=language==='cmd'?'C:\\> echo %TEMP% && dir /a':'PS C:\\> Get-ChildItem -Path "$env:TEMP"';await h.write(ansi+line);assert(h.decorations.some(d=>!d.disposed&&d.options.foregroundColor),'recognized native syntax remained white');assert.equal(h.term.buffer.active.getLine(0).translateToString(true),line);assert.equal(h.term.buffer.active.getLine(0).getCell(0).getBgColor(),0,'native background was rewritten');h.dispose();
+ }
+});
+test('recorded native Windows cmd and PowerShell output renders syntax and custom role colors without changing buffers',async()=>{
+ const recordings=require('./fixtures/windows-local-shells.json');
+ for(const language of ['cmd','powershell']){
+  const h=harness({language,underlines:false},{cols:120,rows:20},{realDecorations:true,renderer:true});await h.write(Buffer.from(recordings.captures[language],'base64').toString('utf8'));
+  const rows=Array.from({length:h.term.buffer.active.length},(_,i)=>h.term.buffer.active.getLine(i).translateToString(true)),promptRow=rows.findIndex(line=>line.includes(language==='cmd'?'%TEMP%':'$env:TEMP'));assert(promptRow>=0,language);const tokens=h.controller.tokensAtRow(promptRow);assert(tokens.some(t=>t.kind==='shell-variable'),language+' native variable was not recognized');
+  h.controller.setAppearance({language,theme:'dark',underlines:false,shellColors:{command:'#bb44ee',keyword:'#11aaee',variable:'#00ab91'}});h.flush();assert(h.decorations.some(d=>!d.disposed&&d.options.foregroundColor==='#00ab91'),language+' custom variable color was not applied');assert.deepEqual(Array.from({length:h.term.buffer.active.length},(_,i)=>h.term.buffer.active.getLine(i).translateToString(true)),rows);h.dispose();
+ }
 });

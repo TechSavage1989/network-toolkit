@@ -1,19 +1,49 @@
 # Network Toolkit development handoff
 
-## 1.17.85 review in progress: shell colors and close confirmations
+## 1.17.85 review: shell settings, close prompts and collapsed navigation
+
+The user explicitly authorized publication when this work is complete. Main
+network-toolkit is the sole public source/update feed. Work stays on
+review/hosts-editor-1.17.85 until the full current-source Checks pass, then publish
+that exact runtime without replacing old releases, assets or tags.
 
 Started from main b0ee0c9eb1ed171d834eef7aae944506f65246c2 / published 84.
-The user reports white text in PowerShell/cmd, missing dedicated settings, and
-requests a configurable prompt when closing terminal tabs/sessions. A synthetic
-xterm reproduction shows recognized syntax with zero colored marks under SGR
-97;40 / 37;40 and the app's default theme, while unformatted text receives colors.
-This is under investigation with native ConPTY output; no native cause or fix is
-claimed yet. Existing global device highlighting also gates local shell colors.
-Implement explicit per-shell controls and a saved close-confirmation preference,
-preserving current close behavior by default. A native transcript probe will
-exercise real Windows startup/typing, followed by replay through the renderer.
-The user subsequently requested collapsed tool-sidebar navigation without auto-
-expansion and explicitly authorized publication of the completed 85 update.
+A real xterm reproduction under default app colors recognizes syntax but applies
+zero foreground colors to SGR 37;40 / 97;40: ANSI black differs from the console
+background enough to fail the old background check. The released84 highlighter
+fails the new regression; the fix passes. Explicit local ANSI-black backgrounds
+can receive syntax colors without changing cells/backgrounds or device behavior.
+This is a reproduced cause, not a claim that the user's exact native transcript
+was captured. Native Windows captures from probe commit 27feb4ffeed91d93bed1d94b54f73ad715cd6e5a,
+Windows job 121396949969, show plain cmd input and colored PowerShell PSReadLine.
+They are replayed as regression fixtures; sample commands were typed, not run.
+
+Terminal Display now has separate PowerShell and Command Prompt switches,
+previews, nine role colors and a per-shell reset. Defaults follow the selected
+ANSI palette and preserve distinct shell colors; a deliberate role override can
+recolor that recognized input token. Local syntax is independent of the device
+highlight checkbox, including startup/theme/workspace/restore paths. Ordinary
+program output, nonstandard prompts and alternate screens retain their behavior.
+No keyboard/input interception, command execution, profile or policy changes.
+
+Display also has a close-confirmation checkbox, enabled by default. Turning it
+off skips active-session / Close other tabs prompts and still disconnects before
+deleting. Both dialogs offer Do not ask again, persisted only on confirmation.
+Single/bulk actions check current ownership/revisions; stale or transferred
+sessions are not closed. Saved/Recent entry deletion remains independently
+configured and is labeled explicitly. New preferences are sanitized and survive
+state saves, detached single/workspace displays and standalone terminal seeds.
+
+The main left tool rail stays collapsed while tool icons navigate. Only its
+arrow or explicit divider double-click / Enter / Space toggles it. Surface clicks
+no longer reveal that rail; other panel reveal behavior and mobile drawer remain.
+The divider is a toggle boundary, not a new drag-resize feature.
+
+Local verification so far: 503 JS tests and 31 Python release guards pass; focused
+real renderer/native transcript tests pass. Native probe Windows lifecycle and
+progress steps passed. Full updated browser, hosted Go/Windows and package
+verification are pending. Preserve all 84 and earlier runtime fixes. No full
+native WebView2 interaction, hardware or actual install/restart is claimed.
 
 ## 1.17.84 published: editor languages and local shell syntax
 

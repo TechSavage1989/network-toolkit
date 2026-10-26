@@ -111,7 +111,7 @@
     };
   }
   function legend(theme, options = {}) {
-    if (global.NTKTerminalShellSyntax?.supported(options.language)) return global.NTKTerminalShellSyntax.legend(options.terminalTheme, theme);
+    if (global.NTKTerminalShellSyntax?.supported(options.language)) return global.NTKTerminalShellSyntax.legend(options.terminalTheme, theme, options.shellColors);
     const colors = palette(theme, options.colors);
     return Object.keys(LABELS).map(kind => ({ kind, label: LABELS[kind], color: colors[kind],
       borderStyle: options.underlines === false ? 'none' : MARKS[kind][0], borderWidth: options.underlines === false ? 0 : MARKS[kind][1] }));
@@ -341,7 +341,9 @@
     const opts = options || {};
     let language = opts.language;
     const shell = () => !!global.NTKTerminalShellSyntax?.supported(language);
-    const appearanceColors = (mode, custom) => ({ ...palette(mode, custom), ...(shell() ? global.NTKTerminalShellSyntax.palette(term.options?.theme, mode) : {}) });
+    const cleanShellColors = value => global.NTKTerminalShellSyntax?.normalizePreferences({[language]:{colors:value}})?.[language]?.colors || {};
+    let requestedShellColors = cleanShellColors(opts.shellColors);
+    const appearanceColors = (mode, custom) => ({ ...palette(mode, custom), ...(shell() ? global.NTKTerminalShellSyntax.palette(term.options?.theme, mode, requestedShellColors) : {}) });
     let enabled = opts.enabled !== false, theme = themeName(opts.theme), disposed = false;
     let requestedColors = customColors(opts.colors), colors = appearanceColors(theme, requestedColors), underlines = opts.underlines !== false;
     let timer = null, active = false, suspended = '', limited = false, count = 0;
@@ -454,7 +456,7 @@
       for (let row = first; row <= last; row++) {
         const line = buffer.getLine(row);
         if (!line) return null;
-        const entry = { y: row, start: text.length, end: text.length, starts: [], ends: [], hidden: [], colorable: [] };
+        const entry = { y: row, start: text.length, end: text.length, starts: [], ends: [], hidden: [], colorable: [], overrideable: [] };
         let rowText = '';
         if (term.cols > LIMITS.columns) return null;
         let columns = Math.min(term.cols, line.length);
@@ -482,16 +484,21 @@
           // Backgrounds matching the console are ordinary text too. Distinct
           // colors/backgrounds, inverse and hidden text keep their original
           // presentation; the parsed cells are never changed.
-          const colorable = neutralForeground(value) &&
-            normalBackground(value) &&
+          // ConPTY can explicitly emit SGR 40 for its normal console background.
+          // The ANSI black slot differs from the app background in many themes.
+          // It is still a normal local command line, not a colored status panel.
+          const localBlack = shell() && typeof value.isBgPalette === 'function' && value.isBgPalette() && value.getBgColor() === 0;
+          const overrideable = (normalBackground(value) || localBlack) &&
             typeof value.isInverse === 'function' && !value.isInverse() &&
             typeof value.isInvisible === 'function' && !hidden;
+          const colorable = neutralForeground(value) && overrideable;
           rowText += visibleChars;
           for (let i = 0; i < visibleChars.length; i++) {
             entry.starts.push(column);
             entry.ends.push(Math.min(term.cols, column + width));
             entry.hidden.push(hidden);
             entry.colorable.push(!!colorable);
+            entry.overrideable.push(!!overrideable);
           }
         }
         text += rowText;
@@ -558,9 +565,10 @@
           // label. Split its visual span at those boundaries without changing
           // the recognized token, original cells or any remote attributes.
           for (let start = first; start < last;) {
-            const colorable = row.colorable[start - row.start];
+            const canColor = index => row.colorable[index - row.start] || shell() && !!requestedShellColors[hit.kind.slice(6)] && row.overrideable[index - row.start];
+            const colorable = !!canColor(start);
             let finish = start + 1;
-            while (finish < last && row.colorable[finish - row.start] === colorable) finish++;
+            while (finish < last && !!canColor(finish) === colorable) finish++;
             const x = row.starts[start - row.start], end = row.ends[finish - row.start - 1];
             if (Number.isInteger(x) && end > x) segments.push({ x, width: end - x, kind: hit.kind, colorable });
             start = finish;
@@ -682,6 +690,7 @@
     function setAppearance(value = {}) {
       if (disposed) return;
       if (value.language !== undefined) language = value.language;
+      if (Object.prototype.hasOwnProperty.call(value, 'shellColors')) requestedShellColors = cleanShellColors(value.shellColors);
       const nextTheme = themeName(value.theme), nextRequested = customColors(value.colors), nextColors = appearanceColors(nextTheme, nextRequested);
       const changed = [...new Set([...Object.keys(colors), ...Object.keys(nextColors)])].some(kind => colors[kind] !== nextColors[kind]);
       theme = nextTheme; requestedColors = nextRequested; colors = nextColors; underlines = value.underlines !== false;

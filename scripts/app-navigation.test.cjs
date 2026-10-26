@@ -23,21 +23,20 @@ function harness({small=false,collapsed=false}={}){
  toggle.click=()=>click(toggle);drawerClose.click=()=>click(drawerClose);flush();
  return {api,c,document,state,calls,sidebar,toggle,brand,main,drawerClose,click,flush,resize(value){media.matches=value;media.change();flush();}};
 }
-test('desktop navigation has one leading toggle and its entire collapsed surface reveals once',()=>{
- const h=harness(),mark=h.sidebar.querySelector('.brand-mark');
+test('desktop navigation reveals only through its arrow or an explicit divider action',()=>{
+ const h=harness(),mark=h.sidebar.querySelector('.brand-mark'),divider=h.document.getElementById('appNavigationDivider');
  assert.equal(h.brand.firstElementChild,h.toggle);assert.equal(h.document.querySelectorAll('#mobileMenu').length,1);assert.equal(h.toggle.getAttribute('aria-label'),'Hide navigation');
- h.click(h.toggle.querySelector('svg'));assert(h.state.navigationCollapsed);assert.equal(h.brand.firstElementChild,h.toggle);assert(h.sidebar.classList.contains('panel-reveal-surface'));assert.equal(h.calls.filter(x=>x==='save').length,1);
+ h.click(h.toggle.querySelector('svg'));assert(h.state.navigationCollapsed);assert(!h.sidebar.classList.contains('panel-reveal-surface'));assert.equal(divider.getAttribute('aria-valuenow'),'0');
  for(let i=0;i<5;i++)h.api.sync();assert.equal(h.sidebar.listeners.click.length,1);
- h.click(mark.querySelector('img'),2);assert(h.state.navigationCollapsed);
- h.click(mark.querySelector('img'));assert(!h.state.navigationCollapsed);assert(!h.sidebar.classList.contains('panel-reveal-surface'));assert.equal(h.calls.filter(x=>x==='save').length,2);
- h.click(h.sidebar);assert(!h.state.navigationCollapsed);assert.equal(h.calls.filter(x=>x==='save').length,2);
- h.click(h.toggle);h.click(h.sidebar.querySelector('.sidebar-foot'));assert(!h.state.navigationCollapsed);assert.equal(h.calls.filter(x=>x==='save').length,4);
+ for(const el of [mark.querySelector('img'),h.sidebar,h.sidebar.querySelector('.sidebar-foot'),divider])h.click(el);assert(h.state.navigationCollapsed);assert.equal(h.calls.filter(x=>x==='save').length,1);
+ divider.emit('dblclick',divider);assert(!h.state.navigationCollapsed);assert.equal(divider.getAttribute('aria-valuenow'),'1');assert.equal(h.calls.filter(x=>x==='save').length,2);
+ divider.emit('keydown',divider,{key:'Enter'});assert(h.state.navigationCollapsed);divider.emit('keydown',divider,{key:' '});assert(!h.state.navigationCollapsed);assert.equal(h.calls.filter(x=>x==='save').length,4);
 });
-test('collapsed navigation icons reveal and select their page without toggling closed again',()=>{
+test('collapsed navigation tool icons select pages while keeping the rail collapsed',()=>{
  const h=harness({collapsed:true}),ping=h.sidebar.querySelector('[data-page="ping"]'),overview=h.sidebar.querySelector('[data-page="overview"]');
- h.click(ping.querySelector('svg'));assert(!h.state.navigationCollapsed);assert.equal(h.state.activePage,'ping');assert.equal(h.document.activeElement,ping);assert.equal(h.calls.filter(x=>x==='save').length,1);assert.equal(h.calls.filter(x=>x==='page:ping').length,1);
- h.click(h.toggle);h.click(ping);assert(!h.state.navigationCollapsed);assert.equal(h.state.activePage,'ping');assert.equal(h.document.activeElement,ping);assert.equal(h.calls.filter(x=>x==='save').length,3);
- h.click(overview);assert(!h.state.navigationCollapsed);assert.equal(h.state.activePage,'overview');assert.equal(h.calls.filter(x=>x==='save').length,3);
+ h.click(ping.querySelector('svg'));assert(h.state.navigationCollapsed);assert.equal(h.state.activePage,'ping');assert.equal(h.document.activeElement,ping);assert.equal(h.calls.filter(x=>x==='save').length,0);assert.equal(h.calls.filter(x=>x==='page:ping').length,1);
+ h.click(ping);h.click(overview);assert(h.state.navigationCollapsed);assert.equal(h.state.activePage,'overview');assert.equal(h.document.activeElement,overview);assert.equal(h.calls.filter(x=>x==='save').length,0);
+ h.click(h.toggle);assert(!h.state.navigationCollapsed);h.click(ping);assert(!h.state.navigationCollapsed);assert.equal(h.calls.filter(x=>x==='save').length,1);
 });
 test('mobile navigation retains its main opener and a leading drawer close with inert and focus restoration',()=>{
  const h=harness({small:true}),topbar=h.document.getElementById('topbar');
@@ -50,5 +49,5 @@ test('mobile navigation retains its main opener and a leading drawer close with 
 test('breakpoint transitions relocate the same toggle and release drawer inert state',()=>{
  const h=harness({collapsed:true});h.resize(true);assert.equal(h.toggle.parentElement.id,'topbar');assert.equal(h.brand.firstElementChild,h.drawerClose);assert(h.state.navigationCollapsed);
  h.click(h.toggle);assert(h.main.inert);h.drawerClose.focus();h.resize(false);assert.equal(h.brand.firstElementChild,h.toggle);assert.equal(h.main.inert,undefined);assert(!h.sidebar.classList.contains('open'));assert(h.state.navigationCollapsed);assert.equal(h.document.activeElement,h.toggle);assert.equal(h.document.querySelectorAll('#mobileMenu').length,1);
- h.click(h.sidebar.querySelector('.nav-scroll'));assert(!h.state.navigationCollapsed);h.resize(true);h.main.inert=true;h.click(h.toggle);h.click(h.drawerClose);assert.equal(h.main.inert,true,'Closing the drawer preserves an existing inert owner');
+ h.click(h.sidebar.querySelector('.nav-scroll'));assert(h.state.navigationCollapsed);h.click(h.toggle);assert(!h.state.navigationCollapsed);h.resize(true);h.main.inert=true;h.click(h.toggle);h.click(h.drawerClose);assert.equal(h.main.inert,true,'Closing the drawer preserves an existing inert owner');
 });

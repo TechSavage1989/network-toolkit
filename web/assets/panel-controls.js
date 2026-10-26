@@ -33,7 +33,7 @@
       binding = {options}; revealBindings.set(surface, binding);
       surface.addEventListener('click', event => {
         const current = binding.options, collapsed = typeof current.collapsed === 'function' ? current.collapsed() : current.collapsed;
-        if (!collapsed || event.defaultPrevented || event.button != null && event.button !== 0) return;
+        if (!collapsed || current.clickToReveal === false || event.defaultPrevented || event.button != null && event.button !== 0) return;
         const control = event.target?.closest?.(interactive);
         if (control && control !== surface) return;
         const button = typeof current.button === 'function' ? current.button() : current.button;
@@ -42,7 +42,7 @@
       });
     }
     binding.options = options;
-    surface.classList.toggle('panel-reveal-surface', !!(typeof options.collapsed === 'function' ? options.collapsed() : options.collapsed));
+    surface.classList.toggle('panel-reveal-surface', options.clickToReveal !== false && !!(typeof options.collapsed === 'function' ? options.collapsed() : options.collapsed));
   }
   root.NetworkToolkitPanelControls = Object.freeze({icon, caption, set, bindReveal});
 })(globalThis);

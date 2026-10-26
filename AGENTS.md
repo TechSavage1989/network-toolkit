@@ -2,7 +2,8 @@
 
 Current work: unpublished 1.17.85 review. The user reports monochrome local
 shells and missing shell-specific controls, and requests configurable terminal
-close confirmations. Preserve the 84 editor and all earlier fixes. The user has now explicitly authorized publication when complete.
+close confirmations and collapsed tool navigation. Preserve the 84 editor and
+all earlier fixes. The user explicitly authorized publication when complete.
 
 Read DEVELOPMENT_HANDOFF.md before editing or building. Start from current
 main, preserve unrelated work and follow the checks/release safeguards.
@@ -13,8 +14,9 @@ local shell syntax colors and removal of Fit console. Preserve all prior macro /
 folder / local shell / discovery / progress / selection / prompt / gear / Hosts /
 Overview / copy / sidebar / detach / Connect / editor / SMTP fixes.
 
-The user explicitly authorized publication after receiving the verified review
-build. Future releases need their own authorization. Main pushes publish new
+The user explicitly authorized publishing the completed 85 update. Finish full
+Checks and exact-package verification before promotion. Future releases need
+their own authorization. Main pushes publish new
 versions automatically. Main network-toolkit is the sole public source/update
 feed. Never replace older tags/assets, change access or write the retired feed.
 

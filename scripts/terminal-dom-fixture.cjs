@@ -22,6 +22,7 @@ class Element {
  closest(selector){let node=this;while(node){if(node.matches(selector))return node;node=node.parentElement;}return null;}
  addEventListener(type,fn){(this.listeners[type]||=[]).push(fn);}removeEventListener(){}
  emit(type,target,properties={}){const event={target,preventDefault(){},stopPropagation(){},stopImmediatePropagation(){},...properties};for(const fn of this.listeners[type]||[])fn(event);}
+ setCustomValidity(message){this.validationMessage=message;}
  focus(){}getBoundingClientRect(){return {left:0,right:100,top:0,bottom:30};}
  select(){this.selectionStart=0;this.selectionEnd=this.value.length;}
  setSelectionRange(start,end){this.selectionStart=start;this.selectionEnd=end;}

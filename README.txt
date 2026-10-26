@@ -5,6 +5,15 @@ CURRENT RELEASE - 1.17.85
 
 Local PowerShell and Command Prompt have explicit syntax-color controls.
 Closing active terminal tabs and sessions has a saved confirmation preference.
+Open Terminal, Display for separate PowerShell and Command Prompt switches,
+syntax color previews and per-role colors, plus the close confirmation checkbox.
+Local command coloring works independently of Highlight device output. Default
+colors follow the terminal palette and preserve native shell colors; custom role
+colors override matching command tokens. Ordinary output keeps its own format.
+
+Collapsed main navigation icons select tools without opening the sidebar. Click
+the arrow or double-click the divider to expand it; Enter and Space also work on
+the focused divider. The compact-screen drawer keeps its existing behavior.
 
 PREVIOUS RELEASE - 1.17.84
 

@@ -27,6 +27,7 @@
     if (brandHeader.firstElementChild !== leading) brandHeader.firstElementChild.before(leading);
     if (!small && sidebar.classList.contains('open')) sidebar.classList.remove('open');
     const open = drawerOpen(), collapsed = !small && state.navigationCollapsed === true;
+    const divider=document.getElementById('appNavigationDivider');if(divider){divider.setAttribute('aria-valuemin','0');divider.setAttribute('aria-valuemax','1');divider.setAttribute('aria-valuenow',collapsed?'0':'1');divider.setAttribute('aria-valuetext',collapsed?'Collapsed':'Expanded');}
     const returnFocus = restoreFocus && previousDrawerOpen && !open && sidebar.contains(document.activeElement);
     document.body.classList.toggle('app-nav-collapsed', collapsed);
     document.body.classList.toggle('app-nav-drawer-open', open);
@@ -37,7 +38,9 @@
     else if (!open && ownsMainInert) { main.inert = previousMainInert; ownsMainInert = false; }
     root.NetworkToolkitPanelControls.set(toggleButton, {name: 'navigation', edge: 'left', expanded: small ? open : !collapsed});
     root.NetworkToolkitPanelControls.set(drawerClose, {name: 'navigation', edge: 'left', expanded: true});
-    root.NetworkToolkitPanelControls.bindReveal(sidebar, {collapsed: () => !compact() && state.navigationCollapsed === true, button: () => toggleButton});
+    // The collapsed rail stays usable for navigation; revealing the panel is an
+    // explicit action on the arrow or divider, never a side effect of a tab.
+    root.NetworkToolkitPanelControls.bindReveal(sidebar, {collapsed: () => !compact() && state.navigationCollapsed === true, button: () => toggleButton, clickToReveal:false});
     for (const button of sidebar.querySelectorAll('.nav-item[data-page]')) {
       const text = [...button.children].find(element => element.tagName === 'SPAN' && !element.classList.contains('badge'));
       text?.classList.add('nav-item-text');
@@ -92,6 +95,9 @@
     toggleButton = document.getElementById('mobileMenu');
     main = document.querySelector('.main');
     if (!sidebar || !toggleButton || !main) return;
+    const divider=document.createElement('div');divider.id='appNavigationDivider';divider.className='app-navigation-divider';divider.setAttribute('role','separator');divider.setAttribute('aria-orientation','vertical');divider.setAttribute('aria-label','Expand or collapse tool navigation');divider.tabIndex=0;divider.title='Double-click or press Enter or Space to expand or collapse tool navigation.';sidebar.append(divider);
+    divider.addEventListener('dblclick',event=>{if(compact())return;event.preventDefault();event.stopPropagation();toggle();});
+    divider.addEventListener('keydown',event=>{if(compact()||!['Enter',' '].includes(event.key))return;event.preventDefault();event.stopPropagation();toggle();});
     document.body.classList.add('app-navigation-ready');
     toggleButton.type = 'button';
     toggleButton.setAttribute('aria-controls', 'sidebar');
@@ -140,11 +146,6 @@
       if (!button || event.button !== 0 || button.disabled) return;
       const small = compact(), page = button.dataset.page;
       if (small) closeDrawer(false);
-      else if (state.navigationCollapsed === true) {
-        state.navigationCollapsed = false;
-        sync();
-        saveState();
-      }
       requestAnimationFrame(() => {
         if (state.activePage !== page) return;
         const target = small ? document.getElementById('workspaceScroll') : [...sidebar.querySelectorAll('.nav-item[data-page]')].find(item => item.dataset.page === page);

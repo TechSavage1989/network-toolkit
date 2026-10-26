@@ -5,7 +5,7 @@ const html=fs.readFileSync(require.resolve('../web/index.html'),'utf8'),source=f
 function harness(){
  const document=makeDocument('<div id="terminalSessionPanel"><select id="terminalFontSize"></select></div>'),state={theme:'dark',terminalFontSize:13};let saves=0,fits=0;
  const c={document,state,terminalSessions:new Map(),terminalInitialized:true,saveState(){saves++;},scheduleTerminalFit(){fits++;}};c.window=c;
- vm.createContext(c);vm.runInContext(fs.readFileSync(require.resolve('../web/assets/terminal-highlight.js'),'utf8'),c);vm.runInContext(source,c);
+ vm.createContext(c);for(const name of ['terminal-shell-syntax.js','terminal-highlight.js'])vm.runInContext(fs.readFileSync(require.resolve('../web/assets/'+name),'utf8'),c);vm.runInContext(source,c);
  for(const name of ['terminalTheme','updateTerminalTheme'])vm.runInContext(html.split('\n').find(line=>line.startsWith('function '+name+'(')),c);
  const api=c.NetworkToolkitTerminalAppearance;api.mount(document.getElementById('terminalSessionPanel'));
  return{c,api,document,state,get saves(){return saves},get fits(){return fits}};
@@ -41,4 +41,14 @@ test('underline and named highlight color edits match the preview and live termi
  h.state.terminalHighlight=false;h.api.sync();assert.equal(preview.style.borderBottom,'none');assert.equal(preview.style.color,h.api.theme(h.state.terminalAppearance,h.state.theme).foreground);
  const scheme=d.getElementById('terminalAppearanceScheme');scheme.value='light';d.emit('change',scheme);assert.deepEqual(JSON.parse(JSON.stringify(h.state.terminalAppearance.highlightColors)),{});assert.equal(h.state.terminalAppearance.highlightUnderlines,true);
  const clean=h.api.normalize({highlightUnderlines:'false',highlightColors:{address:'#ABCDEF',error:'url(secret-canary)',unknown:'#ffffff'}});assert.equal(clean.highlightUnderlines,true);assert.deepEqual(JSON.parse(JSON.stringify(clean.highlightColors)),{address:'#abcdef'});
+});
+test('PowerShell and Command Prompt controls are independent, survive normalization and match live session settings',()=>{
+ const h=harness(),d=h.document;for(const type of ['powershell','cmd']){assert(d.querySelector('[data-terminal-shell-card="'+type+'"]'));assert(d.querySelector('[data-terminal-shell-enabled="'+type+'"]').checked);assert.equal(d.querySelectorAll('[data-terminal-shell-color]').filter(el=>el.dataset.terminalShellColor.startsWith(type+':')).length,9);}
+ const normal=h.api.normalize({shells:{powershell:{enabled:false,colors:{command:'#ABCDEF',string:'url(secret)',unknown:'#123456'}},cmd:{enabled:true,colors:{variable:'#112233'}}}});assert.equal(normal.shells.powershell.enabled,false);assert.deepEqual(JSON.parse(JSON.stringify(normal.shells.powershell.colors)),{command:'#abcdef'});assert.equal(normal.shells.cmd.colors.variable,'#112233');assert(!JSON.stringify(normal).includes('secret'));
+ h.state.terminalHighlight=false;assert.equal(h.api.enabled({},'powershell',false),true);assert.equal(h.api.enabled({},'cmd',false),true);assert.equal(h.api.enabled({},'ssh',false),false);
+ const entry={info:{type:'powershell'},xterm:{options:{}},element:new Element(),highlighter:{setAppearance:s=>entry.settings=s,setEnabled:e=>entry.enabled=e}};h.c.terminalSessions.set('ps',entry);
+ const hex=d.querySelector('[data-terminal-shell-hex="powershell:command"]');hex.value='#123abc';d.emit('change',hex);assert.equal(h.state.terminalAppearance.shells.powershell.colors.command,'#123abc');assert.equal(entry.settings.shellColors.command,'#123abc');assert(entry.enabled);assert.equal(d.querySelector('[data-terminal-shell-preview="powershell:command"]').style.color,'#123abc');assert.equal(h.state.terminalAppearance.scheme,'app');
+ const enabled=d.querySelector('[data-terminal-shell-enabled="powershell"]');enabled.checked=false;d.emit('change',enabled);assert.equal(entry.enabled,false);assert(h.api.enabled(h.state.terminalAppearance,'cmd',false));
+ d.emit('click',d.querySelector('[data-terminal-shell-reset="powershell"]'));assert(h.state.terminalAppearance.shells.powershell.enabled);assert.deepEqual(JSON.parse(JSON.stringify(h.state.terminalAppearance.shells.powershell.colors)),{});
+ const close=d.getElementById('terminalConfirmClose');close.checked=false;d.emit('change',close);assert.equal(h.state.terminalConfirmClose,false);
 });

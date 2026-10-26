@@ -51,7 +51,7 @@ func sanitizeTerminalSettings(state map[string]any) {
 		}
 		state["terminalMacroConfirmation"] = policy
 	}
-	for _, key := range []string{"terminalSidebarCollapsed", "terminalRecentCollapsed", "terminalSavedCollapsed", "terminalSessionConfirmDelete", "terminalComposerCollapsed"} {
+	for _, key := range []string{"terminalSidebarCollapsed", "terminalRecentCollapsed", "terminalSavedCollapsed", "terminalSessionConfirmDelete", "terminalComposerCollapsed", "terminalConfirmClose"} {
 		if value, present := state[key]; present {
 			if _, ok := value.(bool); !ok {
 				delete(state, key)
