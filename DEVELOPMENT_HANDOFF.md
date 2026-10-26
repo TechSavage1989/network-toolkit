@@ -1,60 +1,96 @@
 # Network Toolkit development handoff
 
-## 1.17.84 review in progress: editor languages and local shell syntax
+## 1.17.84 review ready: editor languages and local shell syntax (unpublished)
 
-Prepared from published main ce5bf2d0f0c452fb0089703ab1fe15f5b61d7879.
-The user requested removal of Fit console, broad editor language recognition /
-syntax / formatting, and themed local PowerShell/Command Prompt syntax colors.
-This request does not authorize a new public release. Work stays on the review
-branch until publication is explicitly authorized. Main and the 83 release /
-assets / tag remain unchanged.
+The requested features and build are complete on review/hosts-editor-1.17.84.
+The user requested removal of Fit console, broad language recognition / syntax /
+formatting in the editor and themed local PowerShell/Command Prompt syntax.
+This request did not authorize a new public release. Do not publish until that
+separate authorization arrives. Main remains ce5bf2d0f0c452fb0089703ab1fe15f5b61d7879
+and the live stable feed remains 1.17.83 (release 423808053). Do not change old
+releases/tags/assets, repository access or the retired update repository.
 
-The editor now offers 300 language choices backed by 292 bundled Prism grammars
-plus explicit HTML/XML, JSONC/JSON Lines, registry, Vue, network config and plain
-text modes. Common extensions, dotfiles, exact filenames and script shebangs
-select a language; users can select an override or return to Auto. Detection and
-syntax painting do not change content, encoding, BOM, EOL or saving safeguards.
-Sources reference the official Notepad++ language list; this is not a claim of
-full Notepad++ editor feature parity.
+Exact tested build source: 3e1aa2ee2bca8e632e00e7fdc0c52ca1fb7fc766
+Tree: 2d4c033c40ac2105491c88eb1caadb03c775907c
+Full Checks 40264715184 passed on that exact source:
+- check 121384817713: 497 JS tests, 31 Python release guards, root / terminal /
+  desktop / discovery / deviceinfo Go suites, resource/version validation and
+  Windows x64 GUI build/package.
+- windows-terminal 121384817665: separate passing steps; detailed logs inspected.
+  Cmd lifecycle passes in 0.54 s and PowerShell in 3.52 s (output, resize, Ctrl+C,
+  shutdown and owned children). Native progress-window lifecycle passes in 0.36 s.
+- browser 121384817479: all new and existing browser steps pass. Current app
+  reports have no runtime/asset failures in their covered cases. The released64
+  negative control deliberately reproduces its historical Illegal invocation;
+  this is the expected control, not an error in the current build.
 
-Bundled Prism 1.30.0 and Prettier 3.9.10 are MIT licensed, integrity checked from
-the npm tarballs and recorded with per-file digests in editor-vendor/SOURCE.json.
-Their notices are included in source packages. No CDN / remote language service /
-runtime package installation is required. Explicit asset allowlists and embedding
-cover the worker and parser scripts; private metadata paths stay inaccessible.
+The editor offers 300 language choices using 292 bundled Prism grammars plus
+HTML/XML, JSONC/JSON Lines, registry, Vue, network config and plain text modes.
+File extensions, exact filenames/dotfiles and script headers select the language.
+A per-document override or Auto remains available. Save As immediately refreshes
+automatic recognition. The official Notepad++ language list informed coverage;
+this does not claim full Notepad++ editor feature parity.
 
-Language parsing runs in local workers, separated for highlighting and formatting.
-Paints debounce, supersede stale work and verify active document/text/language /
-generation. Requests time out and terminate workers. Explicit formatting uses
-parsers for JS/TS/JSX/TSX, JSON/JSONC/JSON5, HTML/Vue, CSS/SCSS/Less, Markdown,
-YAML and GraphQL. Other listed code families (including PowerShell and C/C++/C#/
-Java) offer Indent document, which adjusts leading whitespace only, protects
-multiline strings/comments/macros and rejects incomplete delimiters. It does not
-promise full structural beautification. Format is one undo action and cannot
-replace a document edited/closed/switched during the request. Files above 250,000
-characters retain plain editing. Existing 8 MiB open limits and start-of-file view
-remain. Enter, Tab/Shift+Tab selections and language-specific comment toggles are
-implemented; XML/HTML comments now close correctly and Batch uses REM. Existing
-word wrap uses its plain-text display path.
+Prism 1.30.0 / Prettier 3.9.10 are bundled offline with their MIT licenses/notices,
+verified npm tarball integrity and per-file digests in editor-vendor/SOURCE.json.
+There is no runtime CDN, package install or external language service. Explicit
+asset allowlists and embedding cover all worker/parser dependencies; metadata and
+directory paths stay private. Language processing runs in separate local workers
+for syntax and formatting, with debounce, stale-document/text/language/generation
+checks, timeout termination and worker-identity guards on late errors. File text
+is escaped for rendering and is never executed. Opening/highlighting do not rewrite
+source, encoding, BOM or EOL, and the existing save/revision safeguards remain.
 
-Local shell prompt syntax is display-only on parsed xterm cells. It reads no
-keystrokes and sends no data. Standard PS / drive / UNC prompts select dedicated
-PowerShell / cmd token recognition, without network-device heuristics on local
-shell output. Shell ANSI colors take precedence. Fallback colors map to the
-configured ANSI palette, update live and use no underlines. Ordinary output and
-full-screen apps preserve rendering. Custom prompts without a recognized standard
-prefix keep their shell colors. Copy/transcripts/input/selection and transports
-are unchanged. Fit console is removed from toolbar/context choices; all existing
-automatic fit callbacks remain.
+Explicit parser formatting covers JS/TS/JSX/TSX, JSON/JSONC/JSON5, HTML/Vue,
+CSS/SCSS/Less, Markdown, YAML and GraphQL. PowerShell and the listed C-like code
+families offer Indent document, which adjusts leading whitespace only, preserves
+multiline strings/comments/macros and rejects incomplete delimiters. It is not a
+full structural beautifier. Formatting is one undo action, preserves view/file
+metadata, and cannot replace a changed, closed or switched document. Enter,
+Tab/Shift+Tab selection indentation and language-specific comments are supported.
+XML/HTML comments close correctly; Batch uses REM and JSON stays comment-free.
+Files above 250,000 characters and word wrap retain plain-text display; the 8 MiB
+open limit and document-start behavior remain. Clear controls no longer cover
+the editor's source, compact font value or custom color hex values.
 
-Local validation: 490 JavaScript tests and all 31 Python release guards pass.
-Root/terminal/desktop retest and Windows build follow the asset-embedding fix.
-Full discovery/device suites are blocked locally by the known netlink restriction;
-they are required on the hosted runner. New browser checks cover real workers,
-language families, formatting/undo/invalid syntax/late replies, six editor layouts
-and actual xterm coloring/palette/ANSI behavior. Hosted results and verified review
-artifact details will be recorded after completion. No publication, installation
-or real shell interaction has been performed in this review yet.
+Local shell fallback syntax reads parsed xterm cells only, not keyboard events.
+It sends no session data and does not rewrite ANSI, input, copy, selection or
+transcripts. Standard PS / drive / UNC prompts select dedicated PowerShell/cmd
+roles, including variables inside double-quoted strings. Shell-provided colors
+take precedence. Fallback colors map to the selected terminal ANSI palette,
+update live and have no underlines. Ordinary output and full-screen applications
+keep their rendering; custom prompts without a recognized standard prefix keep
+shell colors. Transport/startup/user profiles/execution policies are unchanged.
+Fit console is removed from toolbar/context choices; automatic fitting remains.
+
+The six new browser scenario groups cover real local workers, language families,
+format/undo/invalid syntax/late replies, six editor layouts (1440/820/390, dark /
+light), real xterm syntax colors, ANSI precedence, live palette edits and unchanged
+buffers. Final wide/compact editor and shell screenshots were inspected; font
+size is readable and the source has no overlaid clear control. Existing 138 UI
+layouts / 18 copies, 20 Hosts editor cases, scan/macro/local shell/update progress
+checks, client/server/SMTP/folders/dialog/command input/editor-start tests and the
+17-case real app / loopback terminal selection regression pass. All seven native
+Chromium timer cases pass, including the real five-minute poll/focus collision.
+Local JS also passes all 497; local selected-source discovery/device tests remain
+blocked by netlink permissions, with the full suites passing on the hosted runner.
+
+Review artifact 12626345743 outer SHA-256: df23730f7bc0d6a06a0e3fbddb29fbe25face409a9267e1e412cc173ee246137
+Portable ZIP SHA-256: 4911a592dc20bc9192fd53043778ef73a45fc5d698f498b074731ec270ebf1b4
+EXE SHA-256: 4086c823766e960c67de29f1661bf3d3f55b4cd675dfff60d30db43cf7c9a6ef (17567232 bytes)
+All 738 packaged source files equal the exact tested commit.
+Outer/inner ZIP CRC, both checksum inventories, Windows x64 GUI PE/version,
+strict four-member update ZIP and 14 vendored file digests pass.
+Hosted/local portable ZIP and EXE bytes match. Delivered review ZIP is
+Network_Toolkit_1.17.84_Portable.zip in editor84-qa.
+Browser artifact 12626476464 has 115 verified members and SHA-256
+18d061e828d36aba31044a1d47fb968b1a553ab903171c16fc64e79198f51675; CRC/reports/screens pass.
+
+No full native WebView2 UI interaction, physical hardware or actual installation /
+restart was tested. No public 84 release exists yet. This final three-file record
+changes AGENTS.md, this handoff and VALIDATION.txt only with [skip ci]; it does
+not rebuild, alter the reviewed binary/source tag or publish. Preserve exact
+source 3e1aa2ee2bca8e632e00e7fdc0c52ca1fb7fc766 for any subsequently authorized publication.
 
 ## 1.17.83 published: folders, local shells, discovery and update progress
 

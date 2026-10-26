@@ -1,10 +1,19 @@
 # Network Toolkit development
 
-Current work: unpublished 1.17.84 review for editor languages, explicit local
-formatting / code indentation, shell syntax palette and removal of Fit console.
-Read the new first handoff section and preserve the published 83 fixes below.
-Only review-branch work is authorized; this request does not authorize publishing
-84. Main, existing releases/tags/assets and the update feed remain unchanged.
+Current work: 1.17.84 review is complete and unpublished. The user requested
+editor languages/formatting, shell syntax colors and removal of Fit console;
+publication was not part of this request. The original future-release approval
+rule below still applies. Do not publish without the user's separate authorization.
+
+Exact tested source: 3e1aa2ee2bca8e632e00e7fdc0c52ca1fb7fc766
+Tree: 2d4c033c40ac2105491c88eb1caadb03c775907c
+Full Checks 40264715184 passed, including detailed Windows shell/progress tests,
+497 JS / 31 Python guards, required Go suites and all browser steps. Review
+artifact 12626345743 and browser artifact 12626476464 verify. Read the first
+handoff section for scope, formatting limits, checksums and validation limits.
+Main remains ce5bf2d0f0c452fb0089703ab1fe15f5b61d7879 / live release 1.17.83.
+This three-file review record uses [skip ci] and must not change the binary,
+move a tag, trigger a release or replace older assets.
 
 Read DEVELOPMENT_HANDOFF.md before editing or building. Start from current
 main, preserve unrelated work and follow the checks/release safeguards.
