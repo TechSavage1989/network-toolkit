@@ -179,7 +179,7 @@ function packetTimelineIndex(statistics,selection){
 }
 function packetTimelineValues(bucket){
  const m=packetBucketMetrics(bucket),item=(label,value,raw)=>'<div><dt>'+esc(label)+'</dt><dd'+(raw?' data-copy-value="'+esc(value+' | '+raw)+'"':'')+'>'+esc(value)+'</dd></div>',zone=packetZone();
- return '<dl class="packet-timeline-values">'+item('Start ('+zone+')',packetLocalTime(bucket.time),bucket.time)+item('End ('+zone+')',packetLocalTime(bucket.endTime),bucket.endTime)+item('Packets',packetNumber(m.packets,0))+item('Bytes',bytes(m.bytes))+item('Observed interval',Number.isFinite(m.start)&&Number.isFinite(m.end)?packetNumber(Math.max(0,m.end-m.start)/1000,6)+' s':'Not recorded')+item('Packet rate',m.measured?packetNumber(m.packets/m.interval)+' packets/s':'Not measured')+item('Traffic rate',m.measured?packetNumber(m.bytes*8/m.interval)+' bit/s':'Not measured')+(bucket.severities?item('Recorded clues',Object.entries(bucket.severities).filter(([,count])=>Number(count)>0).map(([level,count])=>packetNumber(count,0)+' '+({normal:'without a clue',error:'decoder errors',warn:'warnings',note:'informational notes'}[level]||level)).join(', ')):'')+(model.statFilter==='traffic'?item('Aggregate traffic reference',(()=>{const summary=model.summaryStatistics||model.statistics||{},duration=Number(summary.duration),value=Number(summary.timedBytes);return duration>0&&Number.isFinite(value)?packetNumber(value*8/duration)+' bit/s across the observed span':'Not measured';})()):'')+(model.statFilter==='average'?item('Aggregate average reference',(()=>{const summary=model.summaryStatistics||model.statistics||{},count=Object.values(summary.protocols||{}).reduce((sum,value)=>sum+Number(value||0),0);return count?bytes(Number(summary.bytes||0)/count)+' per contributing packet':'Not measured';})()):'')+'</dl>';
+ return '<dl class="packet-timeline-values">'+item('Start ('+zone+')',packetLocalTime(bucket.time),bucket.time)+item('End ('+zone+')',packetLocalTime(bucket.endTime),bucket.endTime)+item('Packets',packetNumber(m.packets,0))+item('Bytes',bytes(m.bytes))+item('Observed interval',Number.isFinite(m.start)&&Number.isFinite(m.end)?packetNumber(Math.max(0,m.end-m.start)/1000,6)+' s':'Not recorded')+item('Packet rate',m.measured?packetNumber(m.packets/m.interval)+' packets/s':'Not measured')+item('Traffic rate',m.measured?packetNumber(m.bytes*8/m.interval)+' bit/s':'Not measured')+(bucket.severities?item('Recorded clues',Object.entries(bucket.severities).filter(([,count])=>Number(count)>0).map(([level,count])=>packetNumber(count,0)+' '+({normal:'without a clue',error:'decoder errors',warn:'warnings',note:'informational notes'}[level]||level)).join(', ')):'')+(model.statFilter==='traffic'?item('Aggregate traffic reference',(()=>{const summary=model.summaryStatistics||model.statistics||{},duration=Number(summary.duration),value=Number(summary.timedBytes);return duration>0&&Number.isFinite(value)?packetNumber(value*8/duration)+' bit/s across the observed span':'Not measured';})()):'')+(model.statFilter==='average'?item('Aggregate average reference',(()=>{const summary=model.summaryStatistics||model.statistics||{},count=Object.values(summary.protocols||{}).reduce((sum,value)=>sum+Number(value||0),0);return count?packetAverageBytes(Number(summary.bytes||0)/count)+' per contributing packet':'Not measured';})()):'')+'</dl>';
 }
 function packetTimelineDetails(statistics,index){
  const selection=packetTimelineState(),bucket=selection.pinned?selection.pin:statistics?.timeline?.[index];
@@ -201,7 +201,7 @@ function packetBucketSeverity(bucket){const counts=bucket?.severities||{};return
 const packetStatisticLabels={packets:'Displayed packets',bytes:'Displayed bytes',duration:'Observed capture span',expert:'Packets with expert notes',average:'Average packet size',traffic:'Observed average traffic',dnsrequests:'Name lookup requests',dnsreplies:'Name lookup replies',tcpstarts:'TCP connection attempts',tcpresets:'Connection resets',icmperrors:'Delivery / hop-limit messages'};
 function packetStatisticSummary(statistics){
  const s=statistics||{},total=Object.values(s.protocols||{}).reduce((n,count)=>n+Math.max(0,Number(count)||0),0),duration=Number(s.duration)||0,timedBytes=Number(s.timedBytes),measured=duration>0&&Number.isFinite(timedBytes)&&Number.isFinite(packetEpoch(s.started))&&Number.isFinite(packetEpoch(s.finished));
- const values={packets:packetNumber(total,0),bytes:bytes(Number(s.bytes)||0),duration:duration.toFixed(3)+' s',expert:packetNumber(s.expert||0,0),average:total?bytes(Number(s.bytes)/total):'Not measured',traffic:measured?packetNumber(timedBytes*8/duration)+' bit/s':'Not measured'};
+ const values={packets:packetNumber(total,0),bytes:bytes(Number(s.bytes)||0),duration:duration.toFixed(3)+' s',expert:packetNumber(s.expert||0,0),average:total?packetAverageBytes(Number(s.bytes)/total):'Not measured',traffic:measured?packetNumber(timedBytes*8/duration)+' bit/s':'Not measured'};
  return '<div id="packetGraphSummary" class="packet-graph-summary" role="group" aria-label="Packet statistics">'+['packets','bytes','duration','expert','average','traffic'].map(key=>[key,packetStatisticLabels[key]]).map(([key,label])=>'<button type="button" class="packet-statistic'+(model.statFilter===key?' active':'')+'" data-packet-stat="'+key+'" aria-pressed="'+(model.statFilter===key)+'" title="'+esc(packetStatisticExplanation(key))+'"><strong>'+esc(values[key])+'</strong><span>'+label+'</span></button>').join('')+'</div>';
 }
 function packetStatisticExplanation(key){return {packets:'Shows all packets within the other active filters.',bytes:'Shows packets contributing nonzero displayed bytes.',duration:'Shows packets with recorded times that contribute to the observed span.',expert:'Shows packets with recorded decoder or capture notes; notes are not necessarily faults.',average:'Shows every contributing packet. The displayed average is an aggregate reference, not an individual packet.',traffic:'Shows timed packets contributing bytes to the aggregate observed average traffic rate.',dnsrequests:'Shows assessed DNS requests contributing to this report, within the other display filters.',dnsreplies:'Shows assessed DNS replies contributing to this report, within the other display filters.',tcpstarts:'The report counts distinct connection attempts. Shows their captured initial SYN contributors; retries may contribute more than one packet per attempt.',tcpresets:'Shows captured TCP reset packets; a reset alone does not establish a fault.',icmperrors:'Shows assessed ICMP delivery and hop-limit messages; hop-limit messages may be expected during a trace route.'}[key]||'';}
@@ -287,24 +287,34 @@ function renderStatistics(statistics){
  area._ntStatisticsMarkup=markup;area.innerHTML=markup;const reader=area.querySelector('.packet-summary-scroll');if(reader)reader.scrollTop=scroll;restorePacketGraphScroll();updatePacketTimeline();
  if(inside)area.querySelector('[data-packet-bucket="'+(selected??Math.min(Number(point.dataset.packetBucket),Math.max(0,(statistics.timeline||[]).length-1)))+'"]')?.focus?.({preventScroll:true});
 }
+function packetAverageBytes(value){const number=Number(value);return Number.isFinite(number)?number<1024?packetNumber(number,2)+' B':bytes(number):'Not measured';}
 function packetGraphHeight(){const value=Number(state.packetGraphPreferences?.height);return Number.isFinite(value)?clamp(value,100,600):230;}
 function packetListOverhead(){
  const panel=node('packetCaptureAnalysis')?.querySelector('.packet-list-panel'),table=node('packetTableScroll');
  const panelHeight=panel?.getBoundingClientRect?.().height,tableHeight=table?.getBoundingClientRect?.().height;
  return Number.isFinite(panelHeight)&&Number.isFinite(tableHeight)&&panelHeight>0&&tableHeight>0?Math.max(0,panelHeight-tableHeight):70;
 }
+function packetGraphMinimum(){
+ const dock=node('packetGraphDock'),reader=node('packetGraphReader'),plot=reader?.querySelector('svg.packet-timeline'),frame=dock?.getBoundingClientRect?.(),body=reader?.getBoundingClientRect?.(),svg=plot?.getBoundingClientRect?.(),height=Number(reader?.clientHeight);
+ if(!frame||!body||!svg||!Number.isFinite(frame.height)||frame.height<=0||!Number.isFinite(body.top)||!Number.isFinite(svg.top)||!Number.isFinite(svg.height)||svg.height<=0||!Number.isFinite(height)||height<0)return 100;
+ // The saved height describes the pane. Its actual display must also fit the
+ // permanent statistics, current wrapped controls and at least 90px of SVG.
+ // Add the reader's scrollTop back to recover the natural plot offset.
+ const chrome=Math.max(0,frame.height-height),lead=Math.max(0,svg.top-body.top-(Number(reader.clientTop)||0)+(Number(reader.scrollTop)||0));
+ return clamp(Math.ceil(chrome+lead+90),100,600);
+}
 function layoutPacketGraph(){
  const dock=node('packetGraphDock'),area=node('packetCaptureAnalysis'),workspace=node('packetCaptureWorkspace');if(!dock||!area)return;
  const show=model.view==='packets'&&!!model.selected&&!dock.hidden;workspace?.classList.toggle('packet-has-traffic-graph',show);
- if(!show){area.style.minHeight='';dock.style.maxHeight='';return;}
+ if(!show){area.style.minHeight='';dock.style.maxHeight='';dock.style.minHeight='';return;}
  const bounds=area.getBoundingClientRect(),bottom=preferences().dock==='bottom'||preferences().dock==='auto'&&(bounds.width||area.clientWidth||1000)<1070;
  // Reserve actual row-list chrome as well as readable rows. The old fixed
  // panel reserve ignored wrapped toolbar/footer content on narrow windows.
  const minimum=Math.ceil(packetListOverhead()+140+(bottom?(preferences().hidden?36:86):0));
- if(state.packetGraphPreferences?.collapsed){dock.style.maxHeight='none';dock.style.flexBasis='auto';area.style.minHeight=Math.ceil(minimum)+'px';return;}
- const available=Math.floor((dock.getBoundingClientRect?.().height||packetGraphHeight())+(bounds.height||area.clientHeight||minimum)),maximum=Math.max(100,Math.min(600,available-minimum));
- area.style.minHeight=Math.ceil(minimum)+'px';dock.style.maxHeight=Math.round(maximum)+'px';dock.style.flexBasis=Math.round(Math.min(packetGraphHeight(),maximum))+'px';
- const divider=node('packetGraphDivider');if(divider){divider.setAttribute('aria-valuenow',String(Math.round(dock.getBoundingClientRect?.().height||packetGraphHeight())));divider.setAttribute('aria-valuemin','100');divider.setAttribute('aria-valuemax',String(Math.round(maximum)));}
+ if(state.packetGraphPreferences?.collapsed){dock.style.minHeight='0px';dock.style.maxHeight='none';dock.style.flexBasis='auto';area.style.minHeight=Math.ceil(minimum)+'px';return;}
+ const graphMinimum=packetGraphMinimum(),available=Math.floor((dock.getBoundingClientRect?.().height||packetGraphHeight())+(bounds.height||area.clientHeight||minimum)),maximum=Math.max(graphMinimum,Math.min(600,available-minimum));
+ area.style.minHeight=Math.ceil(minimum)+'px';dock.style.minHeight=graphMinimum+'px';dock.style.maxHeight=Math.round(maximum)+'px';dock.style.flexBasis=Math.round(clamp(packetGraphHeight(),graphMinimum,maximum))+'px';
+ const divider=node('packetGraphDivider');if(divider){divider.setAttribute('aria-valuenow',String(Math.round(dock.getBoundingClientRect?.().height||packetGraphHeight())));divider.setAttribute('aria-valuemin',String(graphMinimum));divider.setAttribute('aria-valuemax',String(Math.round(maximum)));}
 }
 function refreshPacketGraph(){
  const dock=node('packetGraphDock');if(!dock)return;
@@ -401,10 +411,10 @@ document.addEventListener('keydown',event=>{
 },true);
 let packetGraphDrag=null;
 document.addEventListener('pointerdown',event=>{if(event.target.id!=='packetGraphDivider'||event.button!==undefined&&event.button!==0)return;event.preventDefault();event.stopPropagation();packetGraphDrag={y:event.clientY,height:node('packetGraphDock').getBoundingClientRect?.().height||packetGraphHeight(),pointer:event.pointerId};event.target.setPointerCapture?.(event.pointerId);});
-root.addEventListener?.('pointermove',event=>{if(!packetGraphDrag||packetGraphDrag.pointer!==undefined&&event.pointerId!==undefined&&event.pointerId!==packetGraphDrag.pointer)return;state.packetGraphPreferences={...state.packetGraphPreferences,height:clamp(packetGraphDrag.height+event.clientY-packetGraphDrag.y,100,600)};layoutPacketGraph();layoutDetails();});
+root.addEventListener?.('pointermove',event=>{if(!packetGraphDrag||packetGraphDrag.pointer!==undefined&&event.pointerId!==undefined&&event.pointerId!==packetGraphDrag.pointer)return;state.packetGraphPreferences={...state.packetGraphPreferences,height:clamp(packetGraphDrag.height+event.clientY-packetGraphDrag.y,packetGraphMinimum(),600)};layoutPacketGraph();layoutDetails();});
 function finishPacketGraphDrag(){if(!packetGraphDrag)return;packetGraphDrag=null;persistDetails();}
 for(const name of ['pointerup','pointercancel','blur'])root.addEventListener?.(name,finishPacketGraphDrag);
-document.addEventListener('keydown',event=>{if(event.target.id!=='packetGraphDivider'||!['ArrowUp','ArrowDown','Home'].includes(event.key))return;event.preventDefault();event.stopImmediatePropagation();state.packetGraphPreferences={...state.packetGraphPreferences,height:event.key==='Home'?230:clamp(packetGraphHeight()+(event.key==='ArrowDown'?1:-1)*(event.shiftKey?40:15),100,600)};layoutPacketGraph();layoutDetails();persistDetails();});
+document.addEventListener('keydown',event=>{if(event.target.id!=='packetGraphDivider'||!['ArrowUp','ArrowDown','Home'].includes(event.key))return;event.preventDefault();event.stopImmediatePropagation();state.packetGraphPreferences={...state.packetGraphPreferences,height:event.key==='Home'?230:clamp(packetGraphHeight()+(event.key==='ArrowDown'?1:-1)*(event.shiftKey?40:15),packetGraphMinimum(),600)};layoutPacketGraph();layoutDetails();persistDetails();});
 function options(values,current){return values.map(([value,text])=>'<option value="'+esc(value)+'" '+(value===current?'selected':'')+'>'+esc(text)+'</option>').join('');}
 function request(path,method='GET',body){return api('/packet-captures'+path,method,body);}
 function error(message){if(node('packetCaptureError'))node('packetCaptureError').textContent=message||'';}
