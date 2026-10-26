@@ -116,7 +116,7 @@ async function main(){
   for(const theme of ['light','dark'])for(const view of ['entries','text']){
    await setup(page);await page.evaluate(theme=>setTheme(theme),theme);await page.locator('[data-hosts-view="'+view+'"]').click();await checkCompactText(page,view);await settle(page);
    const geometry=await page.evaluate(()=>{const panel=document.querySelector('#hostsConfiguration'),work=document.querySelector('#hostsEntries:not([hidden]),#hostsText:not([hidden])'),r=panel.getBoundingClientRect();return {documentWidth:document.documentElement.scrollWidth,width:innerWidth,bottom:r.bottom,height:innerHeight,workHeight:work.getBoundingClientRect().height};});
-   assert.ok(geometry.documentWidth<=geometry.width+2,'application horizontal overflow: '+JSON.stringify({viewport,theme,view,geometry}));assert.ok(geometry.bottom<=geometry.height+2,'hosts panel exceeds window height');assert.ok(geometry.workHeight>=95,'file workspace too short');
+   assert.ok(geometry.documentWidth<=geometry.width+2,'application horizontal overflow: '+JSON.stringify({viewport,theme,view,geometry}));assert.ok(geometry.bottom<=geometry.height+2,'hosts panel exceeds window height: '+JSON.stringify({viewport,theme,view,geometry}));assert.ok(geometry.workHeight>=95,'file workspace too short');
    await page.locator('.he-more>summary').click();await settle(page);
    const menu=await page.locator('.he-menu').boundingBox(),panel=await page.locator('#hostsConfiguration').boundingBox();
    assert.ok(menu.x>=panel.x-1&&menu.x+menu.width<=panel.x+panel.width+1,'More menu is clipped horizontally');
