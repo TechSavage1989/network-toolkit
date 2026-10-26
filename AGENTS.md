@@ -3,16 +3,24 @@
 Read DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-Current verified published version: 1.17.89.
-Source/tag: eb318708454130b09d93204021b23b138657d6a2
-Tree: 9be08c4672db7b0bfc6ea08360c137329f22ef44
-Full Checks 40289268615 and Release 40290524884 pass.
-Required JavaScript, release guards, Go/native Windows and browser checks pass.
-Local Network layout/refresh: 5 browser groups / 12 cases; all previous 88 layout
-and covered regressions pass. Review/local/public files match and all
-749 source files match the tag. All 28 older releases/assets and
-28 older tags are unchanged. Released88 verified/staged89 in 14.56s.
-No actual installation/restart or full native WebView2 interaction is claimed.
+Current verified published version: 1.17.90.
+Source/tag: 3d6c6da7fe214620adf9d32d776c74166dbe2300
+Tree: c5644c74335d55220a954d2ed37e390120b5edf9
+Full Checks 40295261490 passed at original runtime source:
+730d8eb88233187b49985a54c026e945ba5ca2f5
+The final documentation-only merge has identical runtime files and EXE bytes;
+31 guards and its final repack inventory verify. Final Release
+40298071558 passed on the published source. The official portable
+matches the final repack; its archived documentation differs from the original
+review ZIP. All 753 source files match the final tag.
+513 JavaScript tests, 31 release guards, required Go/native Windows and browser
+checks passed on the unchanged original runtime. Shared UI: 4 groups / 8 layouts
+/ 5 header groups; existing Local Network 5/12, 88 layout 4/9 and covered
+regressions pass. All 47 historical notes and the AGENTS organization policy are
+preserved. All
+29 older releases/assets and 29 older tags are unchanged.
+Released89 verified/staged90 in 9.60s. No actual installation/restart or
+full native WebView2 interaction is claimed.
 
 The user authorized this publication and it is complete. Future releases need
 authorization. Main network-toolkit is the sole public source/update feed.

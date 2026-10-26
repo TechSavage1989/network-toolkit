@@ -17,9 +17,109 @@ For the subsequently authorized 1.17.90 build, the 1.17.89 note has also been
 moved unchanged into the archive. Current `RELEASE_NOTES_1.17.90.txt` alone stays
 at root, and the archive index identifies 1.17.90 as current and 1.17.89 as previous.
 
-## 1.17.90 authorized UI consistency update
+## 1.17.90 published shared UI and navigation improvements
 
-User authorized implementation, build and publication of larger proportional result headers, two-way main-sidebar tab double-click, a more visible/wider divider, and consistent Status colors/shared heading actions. Preserve previous fixes. Publication pending full validation.
+The user explicitly authorized building and publishing all confirmed changes.
+Published source/tag: 3d6c6da7fe214620adf9d32d776c74166dbe2300
+Tree: c5644c74335d55220a954d2ed37e390120b5edf9
+Official release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.90
+Release ID: 424042932
+
+Result-list column headings share one readable typography layer: 12px heading
+text at weight 650, 10px sort indicators and 14px heading icons. Sort buttons
+inherit the heading scale. This covers diagnostic result tables, discovery and
+local connection lists, remote browsers, the editor's remote picker, Hosts,
+packet and transfer tables, including modal lists. Column sizing, result data,
+scrolling and virtualized packet body-row heights retain their existing owners.
+
+Status colors consistently belongs to the page-heading actions for diagnostic
+pages that previously exposed it and for Local Network. It no longer creates a
+separate row above one tool's content. Shared page-heading buttons use a common
+32px minimum height, 12px text and 16px icons, with consistent gaps and wrapping.
+Existing page actions remain available alongside the shared controls.
+
+Double-clicking a main sidebar tool tab toggles both expanded-to-collapsed and
+collapsed-to-expanded. Tool identity recognizes the click pair even when the
+first navigation redraws the tab nodes. A following native dblclick does not
+toggle again. Single clicks continue to navigate, while compact navigation
+retains its existing drawer behavior and keyboard/focus handling.
+
+The desktop sidebar divider has a 16px interaction target, a visible 4px line
+and an 8px grip, with hover/focus feedback. Its double-click and keyboard toggle
+remain available. Desktop sidebar min-height is explicitly zero so visible
+overflow for the divider cannot enlarge the app grid beyond the window. Main
+frame and Hosts pane bounds are regression checked. The wider target is checked alongside adjacent content and
+navigation controls, rather than changing their underlying actions.
+
+The embedded asset dependency check caught the new stylesheet registration,
+and browser hit-testing caught outer sidebar clipping; both were corrected
+before publication. Stalled hosted browser installation was retried on a fresh
+runner with the source tree unchanged.
+
+Full Checks 40295261490 validated the original runtime source
+730d8eb88233187b49985a54c026e945ba5ca2f5: application 121479664850, native Windows
+121479665360 and browser 121479665189 passed. That run passed
+513 JavaScript tests, 31 Python release guards, required root/terminal/desktop/
+diag/deviceinfo Go suites, native cmd/PowerShell color and interactive lifecycle,
+installer progress and Windows GUI/resource build/package checks.
+
+A concurrent documentation-only main update organized historical release notes
+and added the AGENTS release-note policy. Its integration produced the final
+published source 3d6c6da7fe214620adf9d32d776c74166dbe2300. Every runtime file is byte-identical to the
+browser-tested source, and the rebuilt executable has the same bytes and hash.
+The final portable package was separately repacked and verified with its merged
+source inventory; 31 release guards passed again. All 47 historical notes are
+preserved unchanged in docs/releases, with only the current 90 note at root.
+The full browser proof recorded here is the original unchanged-runtime run;
+final merge validation additionally proves runtime/EXE identity and the final
+package inventory. The final Release run validated and built the merged source
+before publication.
+
+The new shared-UI browser report passes 4 groups and 8 layouts, covering 5
+header groups. It checks readable header/control text and usable text bounds,
+consistent Status colors/page-action placement, both-direction sidebar toggles,
+and the enlarged divider target. Existing Local Network checks pass 5 groups /
+12 cases, retaining the stable layout and automatic routing/ARP/connections
+refresh behavior. Previous 88 layout checks pass 4 groups / 9 cases. All covered
+editor, shell, copy, Hosts, client/server, SMTP, folder and selection regressions
+pass. All 7 native updater timer cases pass, including the real five-minute
+poll. Current reports have no runtime or asset failures; the released64
+negative control retains its expected Illegal invocation regression result.
+
+Release 40298071558 passed build 121488918020 and publish
+121489462032. All four actual public assets match GitHub digests
+and SHA256SUMS. The official executable matches the original reviewed build;
+standalone, portable and update EXEs are identical. The official portable ZIP
+matches the verified final repack, not the original review ZIP, because the
+source package includes the integrated documentation organization. All
+753 packaged source files match the final tag. ZIP CRCs,
+manifests, PE GUI/version, strict update inventory and
+14 vendored editor-library digests verify. All
+29 older releases/assets and 29 older tags remain unchanged.
+
+Released89 production handlers checked/downloaded/verified/staged live90 using
+isolated settings through real HTTPS in 9.60s. The staged 17602560-byte
+candidate matches the independently verified official executable. Original test
+EXE unchanged. No actual installation, restart or full native WebView2 UI
+interaction was performed.
+
+Original review artifact 12638190572 (source 730d8eb88233187b49985a54c026e945ba5ca2f5):
+18216877d971abcd5e0c11db074674cbf634709c4778b50a44086935b523b889
+Browser artifact 12638606412 (same original runtime source):
+5a672374d2354c33402391b48999177d45845e27b4666f894a03dfa915cc4d66
+Final repacked portable ZIP SHA256: 4048f39decfa6230b4520bbd6b556d2fbb66c1f683bed79d24001b558e51b621
+Final repack inventory: 753 source files / 760 ZIP members.
+Final screenshots inspected: ui90-connections-1440.png, ui90-shared-controls-1440.png, ui90-shared-controls-390.png, ui90-remote-1440.png, hosts-entries-dark-1366.png, features83-scan-dark-1600.png
+Network_Toolkit.exe SHA256: e089c06a08410680d84d12138010f27ce7f93cd3f17cd176eb02503d05eb8db2
+Network_Toolkit_1.17.90_Portable.zip SHA256: 4048f39decfa6230b4520bbd6b556d2fbb66c1f683bed79d24001b558e51b621
+Network_Toolkit_1.17.90_Update.zip SHA256: b13b23d825c3bb390da0994edda662a65d086642fbbfef36e9178034f5807348
+SHA256SUMS SHA256: df6fc0a4ae53c093bea9665ac90527353acef7ec18da024776a7df07c8b93842
+
+Main network-toolkit remains the sole public source/update feed. Do not move old
+tags, replace assets, change access or write the retired feed. Publication is
+complete; future releases require authorization. This final three-file
+documentation completion uses [skip ci], preserving published source, runtime
+and release assets. Continue from latest main and preserve previous fixes.
 
 ## 1.17.89 published Local Network layout and refresh fixes
 
