@@ -18,7 +18,9 @@ async function replay(id,base64){await page.evaluate(async({id,base64})=>{const 
 async function buffer(id){return page.evaluate(id=>{const b=terminalSessions.get(id).xterm.buffer.normal;return Array.from({length:b.length},(_,y)=>b.getLine(y).translateToString(false)).join('\n');},id);}
 (async()=>{
  if(out)fs.mkdirSync(out,{recursive:true});browser=await chromium.launch({headless:true,args:['--no-sandbox']});
- const context=await browser.newContext({viewport:{width:1440,height:1000},serviceWorkers:'block'});page=await context.newPage();page.setDefaultTimeout(15000);page.on('pageerror',e=>report.errors.push(e.message));
+ const context=await browser.newContext({viewport:{width:1440,height:1000},serviceWorkers:'block'});
+ await context.addInitScript(()=>{globalThis.__shellColors=(id,word)=>{const host=terminalSessions.get(id).element;for(const row of host.querySelectorAll('.xterm-rows>div')){const start=row.textContent.indexOf(word);if(start<0)continue;const colors=[];let at=0;for(const span of row.children){const end=at+span.textContent.length;if(end>start&&at<start+word.length)colors.push(getComputedStyle(span).color);at=end;}return colors;}return [];};});
+ page=await context.newPage();page.setDefaultTimeout(15000);page.on('pageerror',e=>report.errors.push(e.message));
  page.on('response',r=>{if(r.url().includes('/assets/')&&r.status()>=400)report.assetFailures.push(r.url());});
  await context.route('**/*',async route=>{
   const req=route.request(),url=new URL(req.url());assert.equal(url.origin,'https://shells.toolkit.test','Unexpected request '+req.url());const p=url.pathname,body=req.postData()?req.postDataJSON():null;
@@ -46,14 +48,14 @@ async function buffer(id){return page.evaluate(id=>{const b=terminalSessions.get
  await page.evaluate(()=>flushState());await page.reload();await page.waitForFunction(()=>window.__networkToolkitStartupState===1&&online);assert.equal(await page.evaluate(()=>state.navigationCollapsed),true);await page.evaluate(()=>navigate('terminal'));
  check('collapsed tool icons navigate without opening; arrow, divider double-click and keyboard toggle; preference reloads');
  const cmd=await start('cmd'),ps=await start('powershell');await replay(cmd,captures.cmd);
- assert.equal(await page.evaluate(()=>state.terminalHighlight),false);assert((await page.locator('[data-terminal-session="'+cmd+'"] .xterm-rows span').evaluateAll(els=>els.filter(el=>el.textContent.includes('%TEMP%')).map(el=>getComputedStyle(el).color))).some(Boolean));
+ assert.equal(await page.evaluate(()=>state.terminalHighlight),false);assert.deepEqual([...new Set(await page.evaluate(id=>__shellColors(id,'%TEMP%'),cmd))],['rgb(140, 226, 182)']);
  await replay(ps,captures.powershell);const original=await buffer(ps);
  await display();await page.locator('[data-terminal-shell-card="powershell"] summary').click();const hex=page.locator('[data-terminal-shell-hex="powershell:variable"]');await hex.fill('#00ab91');await hex.press('Tab');
- await page.waitForFunction(id=>[...terminalSessions.get(id).element.querySelectorAll('.xterm-rows span')].some(el=>el.textContent.includes('$env:TEMP')&&getComputedStyle(el).color==='rgb(0, 171, 145)'),ps);assert.equal(await buffer(ps),original);
+ await page.waitForFunction(id=>__shellColors(id,'$env:TEMP').includes('rgb(0, 171, 145)'),ps);assert.equal(await buffer(ps),original);
  await page.locator('[data-terminal-shell-enabled="powershell"]').uncheck();await page.waitForFunction(id=>terminalSessions.get(id).highlighter.getState().enabled===false,ps);assert.equal(await page.evaluate(id=>terminalSessions.get(id).highlighter.getState().enabled,cmd),true);
  await page.locator('[data-terminal-shell-enabled="powershell"]').check();await page.evaluate(()=>{applyTerminalWorkspaceDisplay({...terminalWorkspaceDisplay(),terminalHighlight:false});});assert.equal(await page.evaluate(id=>terminalSessions.get(id).highlighter.getState().enabled,ps),true);
  await page.evaluate(()=>flushState());await page.reload();await page.waitForFunction(()=>window.__networkToolkitStartupState===1&&online);await page.evaluate(()=>navigate('terminal'));await page.waitForFunction(id=>terminalSessions.get(id)?.xterm,ps);assert.equal(await page.evaluate(()=>state.terminalAppearance.shells.powershell.colors.variable),'#00ab91');await replay(ps,captures.powershell);
- await page.waitForFunction(id=>[...terminalSessions.get(id).element.querySelectorAll('.xterm-rows span')].some(el=>el.textContent.includes('$env:TEMP')&&getComputedStyle(el).color==='rgb(0, 171, 145)'),ps);
+ await page.waitForFunction(id=>__shellColors(id,'$env:TEMP').includes('rgb(0, 171, 145)'),ps);
  check('real app session rendering replays native cmd and PowerShell transcripts with independent settings, custom native-token colors and reload persistence');
  await display();await page.locator('[data-terminal-shell-card="powershell"] summary').click();await page.locator('[data-terminal-shell-reset="powershell"]').click();assert.deepEqual(await page.evaluate(()=>state.terminalAppearance.shells.powershell.colors),{});
  for(const width of [1440,820,390])for(const theme of ['dark','light']){
@@ -65,7 +67,7 @@ async function buffer(id){return page.evaluate(id=>{const b=terminalSessions.get
   report.layouts.push({width,theme,metrics});if(out&&(width===1440||width===390))await page.screenshot({path:path.join(out,'shell85-settings-'+theme+'-'+width+'.png')});
  }
  check('separate shell settings and color fields fit in six desktop/compact layouts without input overlap');
- await page.setViewportSize({width:1440,height:1000});await page.evaluate(()=>setTheme('dark'));await replay(cmd,Buffer.from('\x1b[37;40mC:\\Work> echo %TEMP% && dir /a').toString('base64'));assert((await page.locator('[data-terminal-session="'+cmd+'"] .xterm-rows span').evaluateAll(els=>els.filter(el=>el.textContent.includes('%TEMP%')).map(el=>getComputedStyle(el).color))).some(Boolean));if(out)await page.screenshot({path:path.join(out,'shell85-live-console.png')});
+ await page.setViewportSize({width:1440,height:1000});await page.evaluate(()=>setTheme('dark'));await replay(cmd,Buffer.from('\x1b[37;40mC:\\Work> echo %TEMP% && dir /a').toString('base64'));assert.deepEqual([...new Set(await page.evaluate(id=>__shellColors(id,'%TEMP%'),cmd))],['rgb(140, 226, 182)']);if(out)await page.screenshot({path:path.join(out,'shell85-live-console.png')});
  await page.locator('[data-terminal-close="'+cmd+'"]').click();await page.locator('#terminalCloseDontAsk').check();await page.locator('.modal-foot [data-action="close-modal"]').click();assert.equal(await page.evaluate(()=>state.terminalConfirmClose),true);assert(sessions.some(s=>s.id===cmd&&s.state==='connected'));
  await page.locator('[data-terminal-close="'+cmd+'"]').click();await page.locator('#terminalCloseDontAsk').check();await page.locator('[data-terminal-remove-confirm]').click();await page.waitForFunction(id=>!terminalSessions.has(id),cmd);assert.equal(await page.evaluate(()=>state.terminalConfirmClose),false);
  assert.deepEqual(requests.filter(r=>r.path==='/api/terminals/'+cmd||r.path==='/api/terminals/'+cmd+'/disconnect').map(r=>[r.path,r.method]),[['/api/terminals/'+cmd+'/disconnect','POST'],['/api/terminals/'+cmd,'DELETE']]);
