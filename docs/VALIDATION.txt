@@ -1,3 +1,104 @@
+NETWORK TOOLKIT 1.17.93 VERIFIED PUBLISHED BUILD
+
+1.17.93 published graph interaction, layout and timestamp preferences
+
+The user explicitly authorized implementing, building and publishing this update.
+Published source/tag: 15968eb1e4ad2dc5b2c56a6af229f144c36632fb
+Tree: c53eb1c2f8e44b7a0f0420fce5aafa718845f7f0
+Official release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.93
+Release ID: 424707900
+
+Graph selection stays pinned when the pointer leaves and while results update.
+Hover inspection remains separate from selection and exposes a nearby details
+popup. Corresponding graph samples and result rows highlight together in both
+directions. Packet traffic represents recorded intervals, so interval links
+identify the corresponding packet group rather than implying a single packet.
+
+Graph display offers the existing moving-window behavior and a progressive,
+scrollable view of retained history. The relevant tool layouts keep graphs and
+their associated information available while result lists scroll independently,
+with readable controls and text across the covered desktop and compact cases.
+Timestamp preferences support 12-hour and 24-hour clocks, computer-local time,
+UTC and a selected named time zone. Formatting does not alter recorded instants,
+original timestamp precision or chronological sorting. Unknown times remain
+unknown. Existing settings, themes, scan data and update safeguards are retained.
+
+Current release note, validated at the required root path:
+Network Toolkit 1.17.93
+
+Graph selections remain pinned while new results arrive. Hovering shows a point-detail popup and links the graph with the associated result rows.
+Graphs offer the existing moving-window view and a progressive view with scrollable retained history.
+Timestamp display supports 12-hour and 24-hour clocks, computer local time, UTC and named time zones.
+Relevant tools keep graph information visible above independently scrollable result lists, with usable adjustable space and consistent styling.
+
+Verified implementation scope:
+- Clicked sample selections retain their recorded point separately from transient hover inspection, including honest retained snapshots outside the current moving window.
+- Graph modes include the existing latest-180 moving window and virtualized progressive retained history, with saved mode, viewport times, preserved scroll position and Follow latest.
+- Hover popups expose the actual point or packet interval time and measurements. Graph marks and corresponding sorted or filtered result rows highlight together.
+- Ping and monitor use adjustable graph/result panes with independent scrolling, saved size and per-job scroll positions; packet capture retains a graph area above its virtual result list.
+- Timestamp preferences support 12-hour or 24-hour clocks and computer-local, UTC or validated named time zones throughout relevant tables, graphs, details and reports; source instants, nanoseconds and chronological sorting are preserved.
+- Packet intervals preserve immutable selected evidence across regrouping and use exact timestamp boundaries for row correlation. Progressive capture graphs grow with observed time and distinguish missing or zero-span data.
+- Live sample rows use graph-scoped identities and prebuilt copy controls to preserve the original focused button and copied value as new same-endpoint results arrive.
+
+Full Checks 40390730308 passed application 121810715385, native
+Windows 121810715004 and browser 121810715287 on this exact
+published source. 558 JavaScript tests and 35
+Python release guards pass, together with the required application, terminal,
+desktop, diagnostic, device-information, platform and capture Go suites. Native
+cmd/PowerShell color and interactive lifecycle, installer progress and Windows
+GUI/resource build/package checks pass.
+
+The UI93 browser report passes 7 groups across
+16 layout cases, with 10 preference cases,
+3 interaction cases and 3 packet cases.
+These counts come from the verified final report. Retained UI92 passes
+6 groups / 12 layouts, UI91 passes
+4 groups / 14 layouts, UI90 passes 4 groups /
+8 layouts / 5 header groups, Local Network passes 5 groups / 12 layouts and UI88
+passes 4 groups / 9 layouts. Covered editor, shell, copy, Hosts, client/server,
+SMTP, folder and selection regressions pass. All 7 native updater timer cases
+pass, including the real five-minute poll. Current reports have no runtime or
+asset failures; the released64 negative control retains its expected
+Illegal invocation regression result.
+
+Release 40392644362 passed build 121817347471 and publish
+121818126851. All four downloaded public assets match GitHub
+digests and SHA256SUMS. Official EXE and portable ZIP match the reviewed local
+build; standalone, portable and update EXEs are identical. All
+778 packaged source files match the tag. ZIP CRCs,
+manifests, PE GUI/version, the strict update inventory and
+14 vendored editor-library digests verify. All
+32 older releases/assets and
+32 older tags remain unchanged.
+
+Released92 production handlers checked/downloaded/verified/staged live93 through
+real HTTPS with isolated settings in 16.01s. The staged
+17742848-byte candidate matches the independently verified official
+executable, and the original test executable is unchanged. No actual
+installation, restart or full native WebView2 interaction was performed.
+
+Review artifact 12683625411: 7d6d8d62622a69fb151ee390e0e29511d6807ea2dcb471de1cb843b698b03c21
+Browser artifact 12685825159: 58268471febeb2305fe61d611d3f6188592d262fcd8a2e45f8d1da0e4e548c25
+Final screenshots inspected: ui93-monitor-1440x1000-dark.png, ui93-monitor-390x1000-light.png, ui93-monitor-820x650-dark.png, ui93-packets-390x1000-dark.png, ui93-packets-820x650-light.png, ui93-packets-1440x1000-dark.png
+Network_Toolkit.exe SHA256: 43331106d8493ae263532619b455731e5d599237c31df4aff65b8a2f42ea25b5
+Network_Toolkit_1.17.93_Portable.zip SHA256: 9edeec923591bb0cba2795de85d560e49cbc85e9332fe08f86351f96aa995419
+Network_Toolkit_1.17.93_Update.zip SHA256: c06b86a83121df9dd95a68cdb1c0fd13fb27c57a2c32e79cca664204feb782db
+SHA256SUMS SHA256: 2b39efdb041f20128a6f946c2ae4bd3111e3f2019ffcc0ed03a5a0d862ce4016
+
+The prior 92 release note is archived unchanged under docs/releases; only the
+current 93 note remains at root. All 50 historical notes and the complete AGENTS
+repository policies are preserved, including compact source layout and the
+tracked root allowlist. Follow release-note rotation for the next authorized
+version change.
+
+Main network-toolkit remains the sole public source/update feed. Do not move old
+tags, replace assets, change access or write the retired feed. Publication is
+complete; future releases require authorization. This final three-file
+documentation completion uses [skip ci], preserving published source, runtime
+and release assets. Continue from latest main and preserve previous fixes.
+
+PREVIOUS VALIDATION
+
 NETWORK TOOLKIT 1.17.92 VERIFIED PUBLISHED BUILD
 
 1.17.92 published measurement timestamps and interactive graphs
