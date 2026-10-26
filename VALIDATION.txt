@@ -1,3 +1,24 @@
+NETWORK TOOLKIT 1.17.81 VALIDATION CHECKPOINT
+
+Shared settings icon is a symmetric gear. Terminal selection edits clamp empty
+padding to the current command end, retaining the existing prompt/output,
+revision, queue, hidden-input, mode and paste-review checks. Range detection is
+unchanged so printed erase spaces do not cause extra character deletion.
+
+Local: 459 JavaScript tests, 31 Python release guards, required root/terminal/
+desktop Go suites, release/resource metadata, changed and inline JavaScript
+syntax, and Windows x64 GUI cross-build pass. Six new input regressions include
+padded Delete/Backspace with cursor movement, wrapping, real/erased spaces,
+typing/paste replacement and protected selections. Exact released80 assets fail
+five regressions (11 pass); candidate passes all 16 terminal-input tests.
+
+Hosted browser review, matching review build, package/publication verification
+and released80 live feed staging are pending at this checkpoint. Native
+Windows/WebView2, hardware and actual installation/restart remain unverified.
+See DEVELOPMENT_HANDOFF.md for authorization, scope and current release status.
+
+HISTORICAL PUBLISHED BASELINE
+
 NETWORK TOOLKIT 1.17.80 VALIDATION
 
 Aligns Hosts More, adds native path copy and Escape focus return, removes the

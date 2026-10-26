@@ -47,7 +47,7 @@ function range(entry){
  }
  positions.push(end);
  if(positions.length>MAX_EDIT+1||!positions.includes(cursor))return null;
- return {line,start,end,cursor,positions,cols,arrow:term.modes.applicationCursorKeysMode?'\x1bO':'\x1b['};
+ return {line,start,end,cursor,positions,cols,paddingEnd:(last-line+1)*cols,arrow:term.modes.applicationCursorKeysMode?'\x1bO':'\x1b['};
 }
 function ready(entry){return terminalEntryAcceptsInput(entry)&&!entry.inputSending&&!entry.inputBytes&&!entry.xterm.options.disableStdin&&!root.NetworkToolkitTerminalInteraction?.suppressesInput();}
 function movement(value,target){
@@ -62,7 +62,11 @@ function send(entry,data,reserveBytes=0){
 function selection(entry){
  const value=range(entry),selected=entry?.xterm?.getSelectionPosition?.();
  if(!value||!selected)return null;
- const start=(selected.start.y-value.line)*value.cols+selected.start.x,end=(selected.end.y-value.line)*value.cols+selected.end.x;
+ const start=(selected.start.y-value.line)*value.cols+selected.start.x,selectedEnd=(selected.end.y-value.line)*value.cols+selected.end.x;
+ // Empty cells after the command are selection padding, not device input.
+ // Limit the overrun to this logical line, never a later prompt/output line.
+ if(selectedEnd>value.paddingEnd)return null;
+ const end=Math.min(selectedEnd,value.end);
  const first=value.positions.indexOf(start),last=value.positions.indexOf(end);
  if(first<0||last<=first)return null;
  const arrows=movement(value,end);if(arrows===null)return null;

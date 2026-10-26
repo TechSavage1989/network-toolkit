@@ -94,6 +94,10 @@ async function copy(button,expected,keyboard=false){
   if(width===1600&&theme==='light'){
    const downloadPromise=page.waitForEvent('download');await page.locator('[data-hosts-action="export"]').click();const download=await downloadPromise;assert.equal(fs.readFileSync(await download.path(),'utf8'),hosts);
   }else{await page.keyboard.press('Escape');assert.equal(await page.locator('.he-more').getAttribute('open'),null);assert.equal(await summary.evaluate(el=>document.activeElement===el),true);}
+  if(out&&(width===1600||width===390)){
+   await page.locator('#settingsButton').click();await page.locator('#modalTitle').filter({hasText:'App settings'}).waitFor();await settle(page);
+   await page.screenshot({path:path.join(out,'ui-settings-gear-'+theme+'-'+width+'.png')});await page.keyboard.press('Escape');
+  }
  }
  assert.equal(writes,0);assert.deepEqual(result.errors,[]);assert.deepEqual(result.assetFailures,[]);result.passed=true;
  console.log(JSON.stringify({passed:true,pages:result.pages.length,renderedCases:result.cases.length,copies:result.copies.length,hostsMenuCases:result.hostsMenu.length,noHostsWrites:true}));

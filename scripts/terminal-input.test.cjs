@@ -30,6 +30,41 @@ test('Backspace or Delete removes an input selection using the current device cu
  for(const key of ['Backspace','Delete']){const h=harness();await h.write('switch# ');await h.type('show version');h.select(13,0,20,0);assert.equal(h.key(key),false);assert.equal(h.drain(),'\x7f'.repeat(7));assert.equal(h.selected,null);assert.equal(h.copied,1);h.dispose();}
  const h=harness();await h.write('switch# ');await h.type('show version');h.select(8,0,12,0);h.key('Delete');assert.equal(h.drain(),'\x1b[D'.repeat(8)+'\x7f'.repeat(4));h.dispose();
 });
+test('Backspace and Delete ignore empty cells selected after the current command',async()=>{
+ for(const key of ['Backspace','Delete'])for(const left of [0,3]){
+  const h=harness();await h.write('switch# ');await h.type('show version');if(left)await h.write('\x1b['+left+'D');h.select(13,0,35,0);
+  assert.equal(h.key(key),false);assert.equal(h.drain(),'\x1b[C'.repeat(left)+'\x7f'.repeat(7));assert.equal(h.selected,null);assert.equal(h.copied,1);h.dispose();
+ }
+});
+test('wrapped selections can end in padding or at the next row boundary',async()=>{
+ for(const [x,y] of [[18,1],[0,2]]){
+  const h=harness(20);await h.write('sw# ');await h.type('show interfaces description');h.select(14,0,x,y);
+  assert.equal(h.api.deleteSelection(h.entry),true);assert.equal(h.drain(),'\x7f'.repeat(17));assert.equal(h.selected,null);h.dispose();
+ }
+});
+test('trailing spaces before the device cursor are included but empty padding adds no deletes',async()=>{
+ const h=harness();await h.write('sw# ');await h.type('show version   ');h.select(9,0,35,0);
+ assert.equal(h.api.deleteSelection(h.entry),true);assert.equal(h.drain(),'\x7f'.repeat(10));assert.equal(h.selected,null);h.dispose();
+});
+test('space cells left by a device backspace echo are not treated as extra command characters',async()=>{
+ const h=harness();await h.write('sw# ');await h.type('show versionx');await h.write('\b \b');h.select(9,0,35,0);
+ assert.equal(h.api.deleteSelection(h.entry),true);assert.equal(h.drain(),'\x7f'.repeat(7));assert.equal(h.selected,null);h.dispose();
+});
+test('typing and accepted paste replace text selected with trailing empty cells',async()=>{
+ for(const paste of [false,true]){
+  const h=harness();await h.write('sw# ');await h.type('show version');h.select(9,0,35,0);
+  if(paste)assert.equal(h.c.acceptText({entry:h.entry,xterm:h.term},'other'),true);
+  else{assert.equal(h.key('x'),true);h.term.input('x',true);}
+  assert.equal(h.drain(),'\x7f'.repeat(7)+(paste?'other':'x'));assert.equal(h.selected,null);h.dispose();
+ }
+});
+test('padding edits reject prompt, previous output, empty-only and later hard-line selections',async()=>{
+ const h=harness();await h.write('OLDER OUTPUT\r\nswitch# ');await h.type('show version');
+ for(const selection of [[0,0,35,1],[0,1,35,1],[21,1,35,1],[13,1,5,2]]){
+  h.select(...selection);assert.equal(h.api.deleteSelection(h.entry),false);assert.equal(h.drain(),'');assert(h.selected);
+ }
+ h.select(13,1,35,1);h.entry.inputSending=true;assert.equal(h.api.deleteSelection(h.entry),false);assert.equal(h.drain(),'');assert(h.selected);h.dispose();
+});
 test('wrapped commands permit click positioning and deletion across screen rows',async()=>{
  const h=harness(20);await h.write('sw# ');await h.type('show interfaces description');assert.equal(h.api.move(h.entry,h.event(7)),true);assert.equal(h.drain(),'\x1b[D'.repeat(24));h.select(14,0,8,1);assert.equal(h.api.deleteSelection(h.entry),true);assert.equal(h.drain(),'\x1b[D'.repeat(3)+'\x7f'.repeat(14));h.dispose();
 });

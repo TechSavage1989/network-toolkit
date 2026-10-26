@@ -1,0 +1,10 @@
+Network Toolkit 1.17.81
+
+What's new
+- Replace the settings symbol with a recognizable gear throughout the app.
+- Fix terminal selection deletion when the highlight includes trailing empty cells.
+- Keep typing and paste replacement working for those selections.
+- Delete spaces in the current input without counting unused screen cells.
+
+Terminal edits remain limited to the current unsubmitted command. Prompt text,
+previous output and later output lines remain outside selection editing.

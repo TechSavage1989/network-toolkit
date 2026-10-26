@@ -1,5 +1,47 @@
 # Network Toolkit development handoff
 
+## 1.17.81 prepared: settings gear and terminal selection padding
+
+Prepared from current main d311c9a6def119c20de6345ecee6b0139151190d, retaining
+its documentation navigation refresh and all 1.17.80 changes. The user requested
+a recognizable settings icon throughout the app, terminal selection deletion
+with trailing empty cells fixed, and publication on 2026-10-25. This authorizes
+this scoped new release only. Keep prior tags/assets and use main network-toolkit
+as the sole source and updater feed.
+
+The shared settings SVG now draws a symmetric eight-tooth gear with a circular
+center, keeping existing size, stroke, labels and event handlers across all
+settings/tool controls. No separate icon copies or dependencies are introduced.
+
+terminal-input.js rejected a selection when its end was outside the tracked
+command's character positions. Normalize the selected end to the command end
+when the overrun is only empty cells on that same logical command line. Permit
+the exclusive next-row-zero boundary, including wrapped commands, but never
+later hard lines. Keep the start-position, revision, prompt/output, hidden-input,
+mode, ownership, queue, paste-review and size checks. The existing cursor/text
+range detection is unchanged: spaces before the cursor remain part of input,
+while empty or erased cells after it do not generate extra movement/deletion. Backspace/Delete, typing and
+accepted paste share the fixed selection helper. No input characters are stored
+in persistent settings, and no transport, credential or updater code changes.
+
+Six focused regressions cover padded Backspace/Delete, wrapped row boundaries,
+spaces before the cursor, explicit-space device erase echoes, typing/paste
+replacement and protected selections. Five regressions fail against exact
+released80 assets (11 pass, five fail); all 16 input tests pass with the fix. A new live browser regression uses unchanged app
+assets/APIs, native xterm selection/key events and a real loopback Telnet peer,
+including native drag, clipboard paste and echoed command results. Hosted Checks
+will run it against the same Linux headless build as the live copy regression.
+The existing UI survey also captures the gear and App settings in both themes.
+
+Go/UI/package/Windows metadata is consistently 1.17.81. Local validation passes
+459 JavaScript tests, 31 Python release guards, required root/terminal/desktop
+Go suites, metadata/resource checks, inline/changed JavaScript syntax and the
+Windows x64 GUI build. Hosted browser review, build comparison and publication
+verification are pending. Do not treat this as a published-release record.
+Native Windows/WebView2, real hardware and actual installation/restart remain
+unverified here. Preserve prior Hosts/Overview/copy, sidebar/detach/Connect,
+editor, folders/macros/credentials, command-input, SMTP and updater fixes.
+
 ## README navigation refresh (2026-10-25)
 
 Documentation-only: README.md now introduces the app, links verified release

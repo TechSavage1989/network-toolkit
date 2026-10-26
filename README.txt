@@ -1,7 +1,15 @@
-NETWORK TOOLKIT 1.17.80
+NETWORK TOOLKIT 1.17.81
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.80
+CURRENT RELEASE - 1.17.81
+
+Use a recognizable gear for settings throughout the app. In the terminal,
+Backspace and Delete remove selected command text even when the highlight
+includes empty cells after it. Typing and paste can replace the same selection.
+Trailing spaces in the current input remain part of the edit. Prompts and
+previous output remain outside selection editing.
+
+PREVIOUS RELEASE - 1.17.80
 
 Clean up the Overview page by removing repeated tool shortcuts and per-address
 Tools buttons. Copy controls consistently sit beside displayed values, including

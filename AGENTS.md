@@ -3,6 +3,11 @@
 Read DEVELOPMENT_HANDOFF.md before editing or building. Start from current
 main, preserve existing changes and follow the checks/release safeguards.
 
+Preparing 1.17.81 for the user's explicitly requested settings gear and terminal
+selection-padding fix, with publication authorized on 2026-10-25 for this scoped
+release. Read the first handoff section. Current published release remains
+1.17.80 until the new release is verified. Preserve every earlier tag/asset.
+
 Current published release: 1.17.80 aligns Hosts More, simplifies Overview and
 unifies copy controls. Read the first handoff section. Keep the native Hosts
 path copy/opt-out, compact terminal recipient wrapping and all previous

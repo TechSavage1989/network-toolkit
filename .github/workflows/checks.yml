@@ -92,6 +92,12 @@ jobs:
         run: |
           CGO_ENABLED=0 go build -mod=vendor -o "$NTK_APP_EXECUTABLE" .
           node scripts/value-copy-live.cjs
+      - name: Check terminal selection deletion with trailing empty cells
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          NTK_APP_EXECUTABLE: ${{ runner.temp }}/Network_Toolkit_UI_Test
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-browser-results
+        run: node scripts/terminal-selection-live.cjs
       - name: Check Hosts editor interactions and responsive layouts
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
