@@ -99,7 +99,7 @@ async function save(as=false){const d=current();if(!d||d.loading)return;as=as||d
  if(updating)return;updating=true;setMessage('Saving '+path+'...');
  try{const result=await d.write({path,content:outgoing(d),expectedHash:as?'':d.hash,bom:d.bom,encoding:d.encoding});d.hash=result.hash||d.hash;d.saved=d.content;d.savedEol=d.eol;d.savedBOM=d.bom;d.savedEncoding=d.encoding;d.untitled=false;d.dirty=false;
   if(as){const oldId=d.id;documents.delete(oldId);if(d.source==='Desktop import'){d.source='Local computer';d.read=p=>api('/file-editor/local','POST',{action:'read-text',path:p});d.write=data=>api('/file-editor/local','POST',{action:'write-text',...data});}d.path=path;d.id=d.source+':'+path;documents.set(d.id,d);active=d.id;}
-  drawTabs();status();setMessage('Saved '+new Date().toLocaleTimeString());if(typeof d.afterSave==='function')void d.afterSave();}
+  paintText(d);drawTabs();status();setMessage('Saved '+new Date().toLocaleTimeString());if(typeof d.afterSave==='function')void d.afterSave();}
  catch(e){setMessage('Save failed: '+e.message,true);}finally{updating=false;}
 }
 function closeTab(key){const d=documents.get(key);if(!d)return;if(d.dirty&&!confirm('Discard unsaved changes to '+nameOf(d.path)+'?'))return;documents.delete(key);if(active===key)active=[...documents.keys()].at(-1)||'';if(active)draw();else overlay.hidden=true;}

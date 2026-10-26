@@ -13,3 +13,7 @@ test('cmd environment, delayed, positional and for variables stay complete; esca
 test('Fit console is absent from toolbar and context choices while automatic fitting stays wired',()=>{
  const html=fs.readFileSync(require.resolve('../web/index.html'),'utf8'),interaction=fs.readFileSync(require.resolve('../web/assets/terminal-interaction.js'),'utf8');assert(!html.includes('Fit console'));assert(!interaction.includes("id:'fit'"));assert(html.includes('function scheduleTerminalFit()'));
 });
+test('double-quoted interpolation colors variables while single quotes and escaped dollars stay literal',()=>{
+ const ps=tokens('PS C:\\> Write-Output "Hello $env:USERNAME and `$literal" \'$verbatim\'','powershell');assert(ps.some(t=>t[0]==='$env:USERNAME'&&t[1]==='shell-variable'));assert(!ps.some(t=>t[0]==='$literal'&&t[1]==='shell-variable'));assert(!ps.some(t=>t[0]==='$verbatim'&&t[1]==='shell-variable'));
+ const cmd=tokens('C:\\> echo "Hello %USERNAME% and !NAME!"','cmd');assert(cmd.some(t=>t[0]==='%USERNAME%'&&t[1]==='shell-variable'));assert(cmd.some(t=>t[0]==='!NAME!'&&t[1]==='shell-variable'));
+});

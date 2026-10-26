@@ -60,3 +60,6 @@ test('manual syntax override, indentation selection and formatting undo preserve
  h.ta().setSelectionRange(0,h.ta().value.length);h.root().emit('keydown',h.ta(),{key:'Tab'});assert(h.api.active.content.startsWith('    if'));h.root().emit('keydown',h.ta(),{key:'Tab',shiftKey:true});assert(h.api.active.content.startsWith('if'));
  const before=h.api.active.content;h.click('format');h.complete({text:before.replace('Write-Output','    Write-Output'),mode:'indent'});await h.settle();assert(h.api.active.dirty);h.click('undo');assert.equal(h.api.active.content,before);assert.equal(h.api.active.encoding,'UTF-8');assert.equal(h.api.active.eol,'LF');h.api.closeAll();
 });
+test('Save As immediately updates automatic language recognition without modifying the saved source',async()=>{
+ const h=editorHarness(),source='Write-Output "hello"';await h.open('Untitled.txt',source);h.c.prompt=()=>'/tmp/example.ps1';h.click('saveAs');await h.settle();assert.equal(h.api.active.path,'/tmp/example.ps1');assert.equal(h.api.active.language,'');assert.equal(h.api.active.content,source);assert.equal(h.api.active.dirty,false);assert.match(h.document.querySelector('[data-ed-auto-language]').textContent,/PowerShell/);h.api.closeAll();
+});

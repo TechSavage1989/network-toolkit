@@ -27,9 +27,15 @@ function analyze(text,language){
   if(powershell&&ch==='#'||!powershell&&command&&(text.slice(i,i+2)==='::'||/^rem(?:\s|$)/i.test(text.slice(i)))){add(i,text.length,'comment');break;}
   if(ch===(powershell?'`':'^')){i=Math.min(text.length,i+2);continue;}
   if(ch==='"'||powershell&&ch==="'"){
-   const quote=ch;i++;
-   while(i<text.length){if(text[i]===(powershell?'`':'^')&&quote!=="'"){i+=2;continue;}if(text[i]===quote){if(powershell&&quote==="'"&&text[i+1]==="'"){i+=2;continue;}i++;break;}i++;}
-   add(start,Math.min(i,text.length),'string');command=false;continue;
+   const quote=ch;let closed=false;i++;
+   while(i<text.length){if(text[i]===(powershell?'`':'^')&&quote!=="'"){i+=2;continue;}if(text[i]===quote){if(powershell&&quote==="'"&&text[i+1]==="'"){i+=2;continue;}i++;closed=true;break;}i++;}
+   const end=Math.min(i,text.length);
+   if(quote==='"'){
+    const variables=powershell?/\$(?:\{[^}\r\n]*\}|[\w?:^$]+(?::[\w]+)?)/g:/(?:%%[A-Za-z]|%~[^%\s]*[0-9]|%[0-9*]|%[^%\r\n]+%|%[A-Za-z]|![^!\r\n]+!)/g;
+    const inner=text.slice(start+1,end-(closed?1:0));let match,last=start;
+    while((match=variables.exec(inner))){const at=start+1+match.index;let escapes=0;for(let back=at-1;back>start&&text[back]===(powershell?'`':'^');back--)escapes++;if(escapes%2)continue;add(last,at,'string');add(at,at+match[0].length,'variable');last=at+match[0].length;}
+    add(last,end,'string');
+   }else add(start,end,'string');command=false;continue;
   }
   let match;
   if(powershell&&(match=/^\$(?:\{[^}\r\n]*\}|[\w?:^$]+(?::[\w]+)?)/.exec(text.slice(i)))){i+=match[0].length;add(start,i,'variable');command=false;continue;}
