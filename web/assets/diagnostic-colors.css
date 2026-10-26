@@ -37,3 +37,5 @@
 .app-accent-row .btn{flex:0 0 auto}
 .app-accent-swatches{display:flex;gap:7px;flex-wrap:wrap}
 .app-accent-settings .help-line{margin:0}
+
+#pageActions>.diagnostic-colors-shortcut{height:auto;margin:0}

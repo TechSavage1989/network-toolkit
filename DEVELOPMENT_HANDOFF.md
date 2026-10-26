@@ -1,5 +1,9 @@
 # Network Toolkit development handoff
 
+## 1.17.89 authorized Local Network fixes
+
+The user authorized build and publication. Move Status colors to stable local page actions to remove the disappearing row above the tabs. Explicit Routing table, ARP / neighbors and Connections tab selections start a fresh snapshot, with pending POST and running-job guards. Rendering/polling does not start scans. Publication awaits full validation.
+
 ## 1.17.88 published layout and navigation update
 
 The user explicitly authorized build and publication of all confirmed changes.
