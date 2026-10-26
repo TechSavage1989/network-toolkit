@@ -84,3 +84,6 @@
 .diagnostic-page #toolResultsScroll .graph-workspace-stats>.result-stats>.graph-stat{min-width:max-content}
 .diagnostic-page #toolResultsScroll .graph-workspace-stats>.result-stats>.graph-stat:last-child{min-width:max-content}
 .diagnostic-page #toolResultsScroll .graph-workspace-stats .graph-stat strong{white-space:nowrap;overflow-wrap:normal}
+@media(max-width:600px){.graph-workspace{--graph-min-height:150px}}
+
+.graph-workspace .graph-stat-context{display:block;position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}

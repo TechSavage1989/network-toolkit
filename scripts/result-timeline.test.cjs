@@ -248,3 +248,12 @@ test('repeated restoration retains actual timeline control nodes despite browser
   selectors.forEach((selector,index)=>{assert.equal(h.document.querySelector(selector),controls[index],mode+' keeps the exact '+selector+' element attached');assert.equal(controls[index].isConnected,true);});
  }
 });
+
+test('complete aggregate filter explanations stay escaped and below the plot without replacing reference labels',()=>{
+ const h=harness(),message='Average uses all successful measured replies; 18.5 ms is an aggregate, not a recorded sample. <img src=x onerror="unsafe()">';
+ h.context.NetworkToolkitResultFilters={current:()=>({active:true,statistic:'average',reference:18.5,referenceKind:'run',message}),graphMatches:()=>true};
+ for(const mode of ['window','progressive']){h.api.setPreferences({mode},{persist:false});const section=h.render(),note=h.document.querySelector('.rt-filter-note'),html=section.innerHTML;
+  assert.match(note.textContent,/Average uses all successful measured replies; 18.5 ms is an aggregate, not a recorded sample/);assert.match(note.innerHTML,/&lt;img src=x onerror=&quot;unsafe\(\)&quot;&gt;/);assert.equal(note.querySelector('img'),null);
+  assert.match(note.textContent,/Run average RTT reference: 18.5 ms/);assert(html.indexOf('rt-time-axis')<html.indexOf('rt-filter-note'),'The full explanation follows the plot and time axis');assert(html.indexOf('rt-filter-note')<html.indexOf('rt-window-stats'));
+ }
+});

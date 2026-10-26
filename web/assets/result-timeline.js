@@ -114,7 +114,8 @@
     const filter=filterState(model);if(!filter.active)return '';
     const name=filter.statistic==='average'?'average RTT':filter.statistic==='jitter'?'RTT variability':'';
     const reference=name&&Number.isFinite(filter.reference)?' '+(filter.referenceKind==='run'?'Run':'Retained')+' '+name+' reference: '+number(filter.reference)+'.':'';
-    return '<p class="rt-filter-note">Matching samples are emphasized; other recorded samples remain visible for context.'+escape(reference)+'</p>';
+    const explanation=typeof filter.message==='string'&&filter.message.trim()?filter.message.trim()+' ':'';
+    return '<p class="rt-filter-note">'+escape(explanation)+'Matching samples are emphasized; other recorded samples remain visible for context.'+escape(reference)+'</p>';
   }
   function plot(model,metric,maximum,average){
     const name=metric==='rtt'?'latency':'jitter',geometry=plotGeometry(model),progressive=model.mode==='progressive';

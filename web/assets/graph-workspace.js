@@ -55,16 +55,16 @@
  function latest(id,{automatic=false}={}){const node=find(id),item=model(id),config=configFor(id);if(!node||!config||typeof dataListRows!=='function')return false;if(automatic&&inspecting(node,item))return false;const rows=dataListRows(config),choice=newestMatching(config,rows);item.followPending=false;item.fingerprint=fingerprint(config);if(!choice)return false;const found=revealSample(id,choice.key);if(found)capture(node,item);return found;}
  function refreshStatistics(node){
   const id=node.dataset.graphWorkspace,current=root.NetworkToolkitResultFilters?.current?.(id)||{};
-  for(const button of node.querySelectorAll('[data-result-stat]')){const active=button.dataset.resultStat===current.statistic;button.setAttribute('aria-pressed',String(active));button.classList.toggle('active',active);}
-  const context=node.querySelector('[data-graph-stat-context]');if(!context)return;
-  if(!current.statistic){if(context.textContent||context.children.length)context.textContent='';return;}
-  // HTML serialization expands empty data attributes and normalizes entities.
-  // Reconcile the existing nodes so observer delivery cannot replace a focused
-  // Clear action or repeatedly schedule another context mutation.
-  let message=context.querySelector('span');if(!message){message=root.document.createElement('span');context.append(message);}
-  const text=current.message||'Statistics filter: '+current.statistic;if(message.textContent!==text)message.textContent=text;
-  let clear=context.querySelector('[data-result-stat-clear]');if(!clear){clear=root.document.createElement('button');clear.type='button';clear.className='btn small ghost';clear.setAttribute('data-result-stat-clear','');clear.textContent='Clear statistics filter';context.append(clear);}
-  if(clear.getAttribute('data-result-stat-job')!==id)clear.setAttribute('data-result-stat-job',id);
+  for(const button of node.querySelectorAll('[data-result-stat]')){
+   const active=button.dataset.resultStat===current.statistic,label=button.querySelector('span'),base=button.dataset.graphStatLabel||label?.textContent.replace(' · Clear filter','')||button.dataset.resultStat,hint=button.dataset.graphStatHint||button.getAttribute('title')||'';
+   button.dataset.graphStatLabel=base;button.dataset.graphStatHint=hint;button.setAttribute('aria-pressed',String(active));button.classList.toggle('active',active);
+   if(active){button.setAttribute('data-result-stat-clear','');button.setAttribute('aria-description',current.message||'Clear the active statistics filter.');}else{button.removeAttribute('data-result-stat-clear');button.removeAttribute('aria-description');}
+   const text=base+(active?' · Clear filter':'');if(label&&label.textContent!==text)label.textContent=text;
+   const title=active?(current.message||hint)+' Click to clear the statistics filter.':hint;if(button.getAttribute('title')!==title)button.setAttribute('title',title);
+  }
+  // The selected card is the stable Clear action. Announce the full aggregate
+  // explanation without consuming another permanent row above the graph.
+  const context=node.querySelector('[data-graph-stat-context]');if(context){context.classList.add('sr-only');const message=current.statistic?current.message||'Statistics filter: '+current.statistic:'';if(context.textContent!==message)context.textContent=message;}
  }
  function restore(){
   scheduled=false;for(const node of root.document?.querySelectorAll?.('[data-graph-workspace]')||[]){const item=model(node.dataset.graphWorkspace),graph=node.querySelector('[data-graph-pane]'),results=resultScroller(node);
