@@ -1,66 +1,102 @@
 # Network Toolkit development handoff
 
-## 1.17.83 review in progress: folders, local shells, discovery and progress
+## 1.17.83 implemented, built and validated; publication awaits authorization
 
-The user requested these features on 2026-10-26 after 82 publication finished.
-Start from main 12156a2897604bc7c78292f76c3aed6c9f227d29. The new request did
-not explicitly authorize 83 publication. Work is on review/hosts-editor-1.17.83;
-main remains on the final 82 documentation and 82 stays the published release.
+The 2026-10-26 request covers macro folders, local Command Prompt/PowerShell,
+scan-column/copy layout, discovery scheduling/TCP ports and update progress.
+All requested implementation is complete. The user did not explicitly authorize
+83 publication. Main remains 12156a2897604bc7c78292f76c3aed6c9f227d29 and the
+published release remains 82. Main network-toolkit is the sole source/update
+feed. Never write the retired update repository, change access, replace old
+assets/tags, or promote this version without a new publication instruction.
 
-Macro folders share the saved-session helper with a separate 120-character
-limit. All/Unfiled/named filters, choose/create inputs and direct/context moves
-retain IDs, commands, shortcuts and bindings. Moves check revisions and dialog
-ownership; stale pre-move refreshes cannot undo completed moves.
+Exact tested runtime/source: a384a47d5b8782fb821eda492fa9ad92a3ca540d
+Tree: ebec06684689f0ad48cfcd8e5661c6da4a740232
+Full Checks 40258417658: check, browser and windows-terminal all pass.
+The review branch's final follow-up changes only AGENTS.md, this handoff and
+VALIDATION.txt with [skip ci]. It must not move the tested source/tag or publish.
+If publication is authorized, promote the exact tested runtime commit after
+confirming main/release state, then verify the official release and update this
+record. Preserve all older tags/assets and all existing app fixes.
 
-Local cmd and Windows PowerShell use built-in system paths, current user/policies,
-home-directory startup and the same xterm appearance. Remote host/credential/
-serial fields are discarded. Suspended children join a kill-on-close job before
-resuming; output drains separately from ConPTY shutdown. Capability gates the
-choices. Profiles, recent entries, macros, panes, reconnect and linked workspaces
-use the existing terminal path.
+Macro folders share the saved-session helper with the existing 120-character
+macro limit separate from 100-character session labels. All folders, Unfiled,
+named folders, choose/create inputs and direct/context-menu moves preserve IDs,
+commands, shortcuts, metadata and startup bindings. Revision/dialog checks and
+stale-refresh guards protect completed moves.
+
+Local Command Prompt and built-in Windows PowerShell use ConPTY, trusted system
+paths, current user/policies and home-folder startup. They share xterm theme,
+font, cursor, ANSI/highlight colors, profiles/recent entries, macros, panes,
+reconnect and linked workspaces. Local requests discard remote credentials and
+host/serial fields. Children join a kill-on-close job before resuming; output
+keeps draining separately from ConPTY shutdown. STARTF_USESTDHANDLES with empty
+handles prevents redirected parent streams being duplicated into the shell,
+matching Microsoft Terminal's ConptyConnection implementation. Shell fixtures
+wait for the initial prompt. Windows test commands are separate steps so a
+later passing command cannot mask an earlier failure.
 
 Discovery overlaps up to four independent checks per host and at most 64 scan
-operations. Concurrency one and Ping/TCP sweeps retain sequential behavior.
-Immutable reachability snapshots precede metadata and update one row per address.
-UPnP-only devices, all requested ports, source binding, partial/cancelled/error
-rows and exact counts remain. Native Windows PTR preserves OS DNS policy, bounds
-caller waits and admits at most 64 outstanding native requests.
+operations. Concurrency one and Ping/TCP sweeps keep sequential behavior. Early
+immutable reachability snapshots update the same row when metadata finishes;
+counts change only once. UPnP-only devices, all ports, selected-source contexts,
+partial/error/silent rows and cancellation evidence remain. Automatic Windows
+PTR preserves OS DNS policy with bounded waits and at most 64 outstanding
+native calls. No field-network speed multiplier has been measured.
 
-Scan columns use intrinsic sizing across all rendered rows without surplus
-stretching. Long hostname/vendor labels wrap; copy controls reserve space even
-in the last column. TCP badges copy exact comma-separated port numbers and use
-conventional service labels, not detected services.
+Scan tables size intrinsically over all rendered rows and fit again on live
+updates, without surplus stretching or sampled-row widths. Long hostname/vendor
+values wrap. Copy controls reserve space, including last-column long answers.
+TCP badges show exact ports with conventional service labels, not detected apps;
+copying a port group returns comma-separated numbers.
 
-Downloads report measured bytes/totals and preserve package/hash/PE verification.
-Progress polling only observes pending explicit downloads and ignores late reads.
-Unknown totals and verification use activity bars. A native helper activity
-window survives the original WebView, until readiness/rollback. The first update
-from 82 uses the 82 helper. There is no automatic download or installation.
+Downloads expose received/total bytes, keep size/hash/PE checks and report
+verification/staging separately. A bounded observer polls only explicit pending
+downloads and ignores late replies. Unknown totals use activity bars. The native
+installer keeps an activity window visible through file replacement and restart
+until interface readiness/rollback. The first update from 82 uses its older
+helper; this native progress window applies to updates launched from 83 onward.
+Explicit install choice and all busy/settings/version/rollback guards remain.
 
-Candidate d6b8ecb97cff11ddc50c8ff09919a61369983b5b passes hosted 475 JS tests,
-31 Python guards, root/terminal/desktop/discovery/device Go suites and packaging.
-The reviewed EXE/portable match local bytes; all 713 source files match that
-commit. Review artifact 12623247262 SHA a6ffe46c2b4ced8ce2149d820713479ae8d2a1671f57898f51bbdf9a56b4d5e2.
-Browser feature cases pass folders, local-theme UI, six populated scan layouts,
-long answers, exact port copying, live updates and download progress; remaining
-native timer checks are tracked in run 40257498471. A scratch race-enabled full
-download handler fixture passes measured progress, responsive status, verification,
-staging and no-install guards. Focused discovery race tests also pass.
+Validation passes 475 JavaScript tests, 31 Python release guards and required
+root/terminal/desktop plus full discovery/device Go suites. Five selected-source
+transport tests blocked locally by netlink permissions pass on the hosted
+runner. The DNS fixture now reserves TCP first and retries a matching UDP bind,
+removing an independently allocated port collision without weakening assertions.
+Focused discovery race tests cover bounds, early results, deadlines and retained
+cancellation evidence. A separate race-enabled full production download-handler
+fixture passes partial progress, responsive status, package verification, staged
+bytes/hash and no installation. It uses isolated synthetic test data.
 
-IMPORTANT CORRECTION: prior Windows job success was false confidence. PowerShell
-ran two commands in one step, so the passing progress-window test masked failed
-shell tests. Detailed logs show shell standard handles were duplicated from the
-redirected parent instead of using ConPTY. The fix explicitly sets
-STARTF_USESTDHANDLES with empty handles, matching Microsoft Terminal's primary
-ConptyConnection implementation. The fixture waits for the first prompt before
-typing. Native Go commands are now separate steps so either failure fails CI.
-These shell tests have NOT yet passed; do not repeat the earlier claim.
-Native progress-window creation/visibility/lifecycle does pass, including SW_HIDE.
+Detailed native Windows logs explicitly pass cmd and PowerShell output, resize,
+Ctrl+C, shutdown, owned child-process cleanup, and native progress-window
+visibility/lifecycle including hidden-start behavior. Earlier iterations had a
+masked Windows command failure; that was corrected in code, workflow and the
+user-facing status. Do not rely on the old green job or the obsolete D6B build.
 
-Full final review, corrected native shell tests, fresh exact-source build/artifact
-verification and final handoff are still required. Do not publish 83 without a
-new user instruction. Do not claim actual install/restart, full WebView2 visual
-interaction, real serial/network hardware, or a measured field-scan speedup.
+The full browser run passes all new feature cases, six populated scan layouts
+with 60 rows including late long values, long unbroken answers, exact port copy,
+live updates, macro persistence and local custom themes. Existing 138 layouts
+across 23 pages/two themes/three widths, 18 copies, six Hosts cases and the
+17-case real-app loopback terminal selection test remain. Existing client/server,
+SMTP, folders, dialog, command input and editor cases pass. All seven native
+Chromium updater-timer cases pass, including the actual five-minute poll/focus
+collision and the deliberately failing released negative control. Current app
+reports have no runtime/asset failures in their covered cases.
+
+Reviewed artifact 12623039560: SHA-256 3e29a1978562dd31af0a53fdc73ff710d906f9efe781cdd36ed20372420da9b0
+Portable ZIP: edcfd279c94eaa3b18662748bf915f959052f65007300505ed9a77e8eea04023
+EXE: dd50538a54ea21c2a563497525ad59fd1cc23c18134cce0cd34a34b5026d1698 (14260736 bytes)
+All 713 packaged source files match the exact tested commit;
+outer/inner ZIP CRC, both checksum inventories, x64 GUI PE/version and strict
+four-member update ZIP verification pass. Local and hosted portable/EXE bytes
+match. Browser artifact 12623776589 digest/CRC/reports pass:
+ffff4e90628bbabf352182b5a06b6e94f67a1175d9b793a7db2abb2deb6bbbd0
+New scan, long-copy and update progress screenshots were inspected.
+
+This is a review build, not a published update. Native full WebView2 interaction,
+physical serial/network hardware and actual installation/restart were not tested.
+The UI survey covers its listed states, not every possible application state.
 
 ## 1.17.82 published: preceding whitespace in terminal selections
 
