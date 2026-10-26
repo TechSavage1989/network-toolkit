@@ -71,3 +71,10 @@
  .graph-workspace:not(.graph-workspace-collapsed)>.graph-workspace-header>strong{display:none}
  .graph-workspace:not(.graph-workspace-collapsed) .rt-view-controls{width:calc(100% - var(--graph-inline-actions-width,200px))}
 }
+/* Monitoring statistics use one accessible horizontal strip at every width.
+   Override the general responsive summary grid without changing other tools. */
+.diagnostic-page #toolResultsScroll .graph-workspace-stats>.result-stats{display:flex;flex-flow:row nowrap;overflow-x:auto;overflow-y:hidden}
+.diagnostic-page #toolResultsScroll .graph-workspace-stats>.result-stats>.graph-stat{min-width:105px;flex-shrink:0}
+.diagnostic-page #toolResultsScroll .graph-workspace-stats>.result-stats>.graph-stat:last-child{min-width:170px}
+@media(max-height:720px){.diagnostic-page #toolResultsScroll .graph-workspace-stats>.result-stats>.graph-stat{padding-top:5px;padding-bottom:5px}}
+@media(max-height:720px){.graph-workspace{gap:2px}.graph-workspace:not(.graph-workspace-collapsed)>.graph-workspace-header{top:calc(var(--graph-statistics-height,60px) + 9px)}}
