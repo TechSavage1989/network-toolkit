@@ -1,3 +1,100 @@
+NETWORK TOOLKIT 1.17.92 VERIFIED PUBLISHED BUILD
+
+1.17.92 published measurement timestamps and interactive graphs
+
+The user explicitly authorized implementing, building and publishing this update.
+Published source/tag: 4a8de90ec08b3010d6fe4cef455a5cc78d05350f
+Tree: c9e03f800d40cc7c020836a03e440b08864e6a1d
+Official release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.92
+Release ID: 424602503
+
+Relevant diagnostic and monitoring entries expose their actual recorded times
+in the computer's local time zone. Original timestamp data remains available for
+sorting, copies and exports. Older entries without an original timestamp are
+identified as not recorded; a render or refresh does not invent a measurement
+time. Point-in-time snapshots are identified as snapshots rather than historical
+per-event observations. Packet capture preserves its native absolute timestamp
+and relative timing while presenting local-time context in the interface.
+
+Graphs expose useful measurements and local-time details through pointer hover,
+click and keyboard interaction. Additional visual statistics use the available
+measurements, with unavailable values distinguished from measured zero values.
+The existing scan controls, retained results, data export, themes, UI layout,
+terminal/editor behavior and update safeguards remain covered by regression
+checks. Coverage and actual case counts are recorded below.
+
+Current release note, validated at the required root path:
+Network Toolkit 1.17.92
+
+Diagnostic result entries show actual recorded local times where applicable, including ping, connection monitoring and packet capture.
+Graphs expose local timestamps, measurements and context on hover, click and keyboard focus.
+Additional measured statistics are shown visually where supported, preserving existing scan data and controls.
+
+Verified implementation scope:
+- Per-record RFC3339Nano acquisition times remain associated with live and final diagnostic measurements; original probe times are retained.
+- Local display includes date, milliseconds and time-zone information; original instants remain in details, structured data and exports.
+- Local network tables explicitly describe acquisition snapshots instead of socket or configuration creation times; unknown legacy times are not fabricated.
+- Latency charts retain the latest 180 samples, provide hover/click/keyboard details and preserve selection during live refresh; displayed-window loss and RTT variability respect unsuccessful samples.
+- Packet rows preserve original UTC nanosecond timestamps and elapsed seconds. Traffic intervals derive absolute bounds and rates from timed packets only; missing times and zero spans never produce invented times or rates.
+- Compact diagnostic headers and latency statistics wrap into usable rows on narrow windows.
+
+Full Checks 40374300840 passed application 121753038161, native
+Windows 121753037626 and browser 121753037997 on this exact
+published source. 529 JavaScript tests and 35
+Python release guards pass, together with the required cmd/network-toolkit and
+internal terminal/desktop/diag/deviceinfo Go suites, native cmd/PowerShell color
+and interactive lifecycle, installer progress, and Windows GUI/resource
+build/package validation.
+
+The UI92 browser report passes 6 groups across
+12 layout cases, with 2 time-zone cases,
+10 table cases, 1 graph cases and
+2 packet cases. These counts come from the verified report.
+The retained UI91 report passes 4 groups and
+14 layouts; UI90 passes 4 groups / 8 layouts / 5 header groups,
+Local Network 5 groups / 12 layouts and UI88 4 groups / 9 layouts. Covered editor,
+shell, copy, Hosts, client/server, SMTP, folder and selection regressions pass.
+All 7 native updater timer cases pass, including the real five-minute poll.
+Current reports have no runtime or asset failures; the released64 negative
+control retains its expected Illegal invocation regression result.
+
+Release 40376041429 passed build 121759251191 and publish
+121759976722. All four downloaded public assets match GitHub
+digests and SHA256SUMS. Official EXE and portable ZIP match the reviewed local
+build; standalone, portable and update EXEs are identical. All
+772 packaged source files match the tag. ZIP CRCs,
+manifests, PE GUI/version, the strict update inventory and
+14 vendored editor-library digests verify. All
+31 older releases/assets and
+31 older tags remain unchanged.
+
+Released91 production handlers checked/downloaded/verified/staged live92 through
+real HTTPS with isolated settings in 12.22s. The staged
+17681920-byte candidate matches the independently verified official
+executable, and the original test executable is unchanged. No actual
+installation, restart or full native WebView2 interaction was performed.
+
+Review artifact 12674935717: 1ceddc544d166d1e14663cb30dc8c1133e7524e251736691f33ab0af515402f4
+Browser artifact 12674967182: 7ed4ba3ffd2f0504d124d1636426c2877540849a6c79a96c66fdb8999667c3da
+Final screenshots inspected: ui92-monitor-1440-dark.png, ui92-monitor-390-dark.png, ui92-monitor-820-light.png, ui92-packet-statistics-390-dark.png
+Network_Toolkit.exe SHA256: 3d7149394ab0353b67de35de6b32ccf3fb5d919ef02a2811171e20274bc22f1f
+Network_Toolkit_1.17.92_Portable.zip SHA256: 60ec980d0db4dca06cb3372cc0991b55909ada3abaab2b9edc99d0357622b9d1
+Network_Toolkit_1.17.92_Update.zip SHA256: 6205618ca5a352a24f7c16c5446fb6b9b4800049b38b243e75ebfcf8f062f370
+SHA256SUMS SHA256: c2586d22bee9e6543d294e2ef74e907087b9b8fcf6522cb373a3bbc2b136b9ba
+
+The prior 91 release note is archived unchanged under docs/releases; only the
+current 92 note remains at root. All 49 historical notes and both AGENTS
+repository policies are preserved. Keep the compact source layout and follow
+release-note rotation on the next authorized version change.
+
+Main network-toolkit remains the sole public source/update feed. Do not move old
+tags, replace assets, change access or write the retired feed. Publication is
+complete; future releases require authorization. This final three-file
+documentation completion uses [skip ci], preserving published source, runtime
+and release assets. Continue from latest main and preserve previous fixes.
+
+PREVIOUS VALIDATION
+
 NETWORK TOOLKIT 1.17.91 VERIFIED PUBLISHED BUILD
 
 1.17.91 published navigation and subnet-list improvements

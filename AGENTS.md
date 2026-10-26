@@ -3,17 +3,19 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-Current verified published version: 1.17.91.
-Source/tag: b41eb360d29abc8a1a332028ee8fadd9fd9d6c62
-Tree: 4f839ed0a8c5cb4599f4b3c587d649cd6635814b
-Full Checks 40302662081 and Release 40304158166 pass on this source.
-513 JavaScript tests, 33 release guards, required Go/native Windows and browser
-checks pass. UI91: 4 groups / 14 layouts; existing UI90,
-Local Network and UI88 checks and covered regressions pass. Review/local/public
-files match and all 759 source files match the tag. All
-30 older releases/assets and 30 older tags are unchanged.
-Released90 verified/staged91 in 24.41s. No actual installation/restart or
-full native WebView2 interaction is claimed.
+Current verified published version: 1.17.92.
+Source/tag: 4a8de90ec08b3010d6fe4cef455a5cc78d05350f
+Tree: c9e03f800d40cc7c020836a03e440b08864e6a1d
+Full Checks 40374300840 and Release 40376041429 pass on this source.
+529 JavaScript tests, 35 release guards and the
+required Go/native Windows/browser checks pass. UI92: 6 groups /
+12 layouts; UI91/90, Local Network/UI88 and covered regressions
+also pass. Review/local/public files match and all
+772 packaged source files match the tag. All
+31 older releases/assets and
+31 older tags are unchanged. Released91 verified/staged92
+in 12.22s. No actual installation/restart or full native WebView2 interaction
+is claimed.
 
 The user authorized this publication and it is complete. Future releases need
 authorization. Main network-toolkit is the sole public source/update feed.
