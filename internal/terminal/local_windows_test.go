@@ -48,6 +48,7 @@ func TestWindowsLocalShellInteractiveLifecycle(t *testing.T) {
 				mu.Unlock()
 				t.Fatalf("missing %q in local shell output: %q", marker, text)
 			}
+			waitFor(">") // Shell initialization can discard input before its first prompt.
 			if kind == "cmd" {
 				_, err = tr.Write([]byte("echo NTK_%PROCESSOR_ARCHITECTURE%_READY\r"))
 				waitFor("NTK_AMD64_READY")

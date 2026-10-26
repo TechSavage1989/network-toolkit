@@ -73,9 +73,11 @@ jobs:
       - name: Test Windows terminal transports and local shells
         env:
           GOTOOLCHAIN: local
-        run: |
-          go test -mod=vendor ./internal/terminal -run 'TestWindowsLocalShell|TestLocalShell' -count=1 -v
-          go test -mod=vendor . -run TestUpdateProgressWindowLifecycle -count=1 -v
+        run: go test -mod=vendor ./internal/terminal -run 'TestWindowsLocalShell|TestLocalShell' -count=1 -v
+      - name: Test visible Windows installer progress
+        env:
+          GOTOOLCHAIN: local
+        run: go test -mod=vendor . -run TestUpdateProgressWindowLifecycle -count=1 -v
 
   browser:
     runs-on: ubuntu-latest

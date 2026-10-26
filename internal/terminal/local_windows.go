@@ -156,6 +156,11 @@ func openLocalShell(ctx context.Context, req ConnectRequest, cb transportCallbac
 	}
 	startup := localStartupInfo{attributes: &attributes[0]}
 	startup.Cb = uint32(unsafe.Sizeof(startup))
+	// Explicitly clear inherited standard handles. Otherwise CreateProcess can
+	// duplicate redirected parent handles instead of using the pseudoconsole.
+	// This matches Windows Terminal's ConptyConnection startup configuration.
+	startup.Flags = 0x00000100 // STARTF_USESTDHANDLES; ConPTY supplies the handles.
+
 	application, err := syscall.UTF16PtrFromString(exe)
 	if err != nil {
 		return nil, err
