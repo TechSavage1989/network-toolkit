@@ -68,3 +68,7 @@ test('confirmation Enter on Cancel preserves edits, Escape dismisses, and accept
  const escape=h.api.closeAll();root.emit('keydown',root.querySelector('[data-ed-dialog-action="accept"]'),{key:'Escape'});assert.equal(await escape,false);assert.equal(h.api.documents.size,1);
  const accept=h.api.closeAll();root.emit('keydown',root.querySelector('[data-ed-dialog-action="accept"]'),{key:'Enter'});assert.equal(await accept,true);assert.equal(h.api.documents.size,0);
 });
+
+test('a new local document acquires a real reader after Save As and reopens under its canonical file ID',async()=>{
+ const h=harness();let contents='';h.c.api=async(_path,_method,body)=>{if(body.action==='write-text'){contents=body.content;return {hash:'written'};}assert.equal(body.action,'read-text');return {content:contents+'\nRead from disk',hash:'reloaded'};};h.click('new');await settle();const root=h.document.getElementById('networkToolkitFileEditor'),ta=h.document.querySelector('[data-ed-text]');ta.value='new file contents';root.emit('input',ta);h.click('save');root.querySelector('[data-ed-dialog-input]').value='C:\\Review\\new.txt';root.emit('click',root.querySelector('[data-ed-dialog-action="accept"]'));await settle();assert.equal(h.api.active.source,'Local computer');assert.equal(h.api.active.id,'local:C:\\Review\\new.txt');h.click('reload');await settle();assert.equal(h.api.active.content,'new file contents\nRead from disk');assert.equal(h.api.active.dirty,false);
+});
