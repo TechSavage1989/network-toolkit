@@ -3,7 +3,8 @@ const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/st
 global.self=global;const {Terminal}=require('../web/assets/xterm.js');
 function harness(options,dimensions={},runtime={}){
  const timers=new Map(),decorations=[],refreshes=[],frames=[],painted=new Map();let next=0,clock=0,renders=0;const context={setTimeout:fn=>{timers.set(++next,fn);return next;},clearTimeout:id=>timers.delete(id),performance:{now:()=>clock+=runtime.clockStep||0}};
- vm.runInNewContext(fs.readFileSync(require.resolve('../web/assets/terminal-highlight.js'),'utf8'),context);
+ vm.createContext(context);
+ for(const name of ['terminal-shell-syntax.js','terminal-highlight.js'])vm.runInContext(fs.readFileSync(require.resolve('../web/assets/'+name),'utf8'),context);
  const term=new Terminal({cols:80,rows:8,scrollback:100,allowProposedApi:true,...dimensions});Object.defineProperty(term,'element',{value:{getClientRects:()=>[{}]}});
  const nativeDecoration=term.registerDecoration.bind(term),renderRow=runtime.realDecorations?require('./terminal-render-fixture.cjs')(term):null;
  term.registerDecoration=options=>{
@@ -226,4 +227,28 @@ test('dense visible configuration remains colored past the former 512-decoration
  await h.write(rows.join('\r\n'));const marks=h.decorations.filter(mark=>!mark.disposed);assert(marks.length>512);assert.equal(h.controller.getState().limited,false);
  for(let i=0;i<rows.length;i++){const tokens=h.controller.tokensAtRow(i);assert(tokens.some(token=>token.text==='Site-'+i&&token.kind==='interface'),'missing interface row '+i);assert(tokens.some(token=>token.text===(i%2?'down':'up')&&token.kind===(i%2?'error':'success')),'missing state row '+i);}
  h.controller.refresh();h.flush();assert(marks.every(mark=>!mark.disposed));assert(marks.every(mark=>mark.element.style.borderBottom==='none'));h.dispose();
+});
+test('local shells color prompt syntax using the selected ANSI palette without changing cells or copies',async()=>{
+ const selected={foreground:'#e0e0e0',background:'#101010',brightYellow:'#f0a000',brightGreen:'#00c040',green:'#407040',cyan:'#00b0d0',brightBlack:'#708090'};
+ for(const language of ['powershell','cmd']){
+  const h=harness({language,underlines:true},{cols:120,theme:selected},{realDecorations:true,renderer:true});
+  const line=language==='powershell'?'PS C:\\Users\\Operator> Get-ChildItem -Path $env:TEMP | Where-Object { $_.Length -gt 12 }':'C:\\Users\\Operator> echo %PATH% && dir /a';
+  await h.write(line);assert.equal(h.term.buffer.active.getLine(0).translateToString(true),line);assert(h.controller.tokensAtRow(0).some(t=>t.kind==='shell-variable'&&t.text===(language==='powershell'?'$env:TEMP':'%PATH%')));
+  const variable=h.decorations.find(d=>!d.disposed&&d.options.foregroundColor==='#00c040');assert(variable,'ANSI variable slot was ignored');const stringCopy=h.term.buffer.active.getLine(0).translateToString(true);assert.equal(stringCopy,line);
+  assert(h.controller.tokensAtRow(0).every(t=>t.kind.startsWith('shell-')));h.dispose();
+ }
+});
+test('shell-provided colors, hidden output and alternate screens retain their rendering',async()=>{
+ const h=harness({language:'powershell',underlines:false},{cols:100},{realDecorations:true,renderer:true});
+ await h.write('PS C:\\> \x1b[31mGet-Process\x1b[0m -Name "app"');
+ const command=h.controller.tokensAtRow(0).find(t=>t.text==='Get-Process');assert(command);const red=h.term.buffer.active.getLine(0).getCell(8);assert(red.isFgPalette());assert.equal(red.getFgColor(),1);
+ const covering=h.decorations.filter(d=>!d.disposed&&d.options.x>=8&&d.options.x<19);assert(covering.length);assert(covering.every(d=>d.options.foregroundColor===undefined),'fallback replaced shell red');
+ await h.write('\r\nplain output with Get-Process -Name "app"');assert.equal(h.controller.tokensAtRow(1).length,0,'ordinary output was mistaken for input');
+ await h.write('\r\nPS C:\\> \x1b[8mGet-Date\x1b[0m');assert.equal(h.controller.tokensAtRow(2).length,0,'hidden text was decorated');
+ await h.write('\x1b[?1049hPS C:\\> Get-Date');assert.equal(h.controller.getState().suspended,'alternate');await h.write('\x1b[?1049l');assert.notEqual(h.controller.getState().suspended,'alternate');h.dispose();
+});
+test('local syntax follows live palette edits while SSH uses its original device highlights',async()=>{
+ const h=harness({language:'cmd',underlines:false},{cols:100,theme:{brightGreen:'#123456'}});await h.write('C:\\> echo %TEMP%');assert(h.decorations.some(d=>!d.disposed&&d.options.foregroundColor==='#123456'));
+ h.term.options.theme={brightGreen:'#654321'};h.controller.setAppearance({theme:'dark',language:'cmd',underlines:false});h.flush();assert(h.decorations.some(d=>!d.disposed&&d.options.foregroundColor==='#654321'));assert(!h.decorations.some(d=>!d.disposed&&d.options.foregroundColor==='#123456'));h.dispose();
+ const remote=harness({language:'ssh',underlines:false});await remote.write('switch# set mtu 1500');assert(remote.controller.tokensAtRow(0).some(t=>t.kind==='field'));assert(remote.controller.tokensAtRow(0).every(t=>!t.kind.startsWith('shell-')));remote.dispose();
 });

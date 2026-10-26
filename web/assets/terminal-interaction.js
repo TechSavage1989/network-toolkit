@@ -23,7 +23,6 @@
     {id:'zoom-in',label:'Larger text',icon:'plus',key:'Ctrl+wheel up',group:'display'},
     {id:'zoom-out',label:'Smaller text',icon:'minus',key:'Ctrl+wheel down',group:'display'},
     {id:'reset-font',label:'Reset text size',icon:'refresh',group:'display'},
-    {id:'fit',label:'Fit console',icon:'grid',group:'display'},
     {id:'maximize',label:'Maximize / restore pane',icon:'maximize',group:'display'},
     {id:'control-c',label:'Send Ctrl+C',icon:'stop',group:'session'},
     {id:'pager-toggle',label:'Toggle auto pager',icon:'play',group:'session'},
@@ -398,7 +397,6 @@
       case 'zoom-in': zoom(1); break;
       case 'zoom-out': zoom(-1); break;
       case 'reset-font': setFontSize(13); break;
-      case 'fit': scheduleTerminalFit(); break;
       case 'maximize': maximizeTerminalPane(terminalPaneIndex(entry.info.id)); break;
       case 'control-c': enqueueTerminalInput(entry,'\x03'); break;
       case 'pager-toggle': { const p=root.NetworkToolkitTerminalExtras.prefs(entry); entry._ntSessionPrefs={...entry._ntSessionPrefs,autoPager:!p.autoPager}; entry.outputRevision=(entry.outputRevision||0)+1; sync(); toast('Auto pager '+(!p.autoPager?'enabled.':'disabled.')); break; }

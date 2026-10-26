@@ -50,7 +50,7 @@ body:has(.nt-editor-embedded) #toolWorkspace>#pageContent{grid-row:1!important;g
 .nt-editor-embedded .nt-editor-window{border-radius:0 0 8px 8px;box-shadow:none;}
 .nt-editor-embedded [data-ed="localTools"]{display:none}
 .nt-editor-options input[data-ed-font]{width:50px;min-width:46px;min-height:26px;height:26px;padding:3px 5px;font-size:11px}
-.nt-editor-options select[data-ed-language-select]{min-width:87px;max-width:126px}
+.nt-editor-options select[data-ed-language-select]{min-width:150px;max-width:min(300px,65vw)}
 .nt-editor-options select[data-ed-palette]{min-width:91px;max-width:135px}
 .nt-editor-code{background:var(--nt-code-bg,var(--input));font-size:var(--nt-editor-font,13px)}
 .nt-editor-highlight{color:var(--nt-code-fg,var(--text));}
@@ -61,6 +61,12 @@ body:has(.nt-editor-embedded) #toolWorkspace>#pageContent{grid-row:1!important;g
 .nt-ed-keyword{color:var(--nt-code-keyword,#91b7ff)}
 .nt-ed-number{color:var(--nt-code-number,#b69ce8)}
 .nt-ed-property{color:var(--nt-code-property,#78d7dc)}
+.nt-ed-variable,.nt-ed-type{color:var(--nt-code-property,#78d7dc)}
+.nt-ed-function{color:var(--nt-code-keyword,#91b7ff)}
+.nt-ed-operator,.nt-ed-punctuation{color:var(--nt-code-fg,var(--text))}
+.nt-editor-highlight,.nt-editor-surface textarea{tab-size:var(--nt-editor-tab,4)}
+.nt-editor[data-palette=auto]{--nt-code-comment:#83b69d;--nt-code-string:#e3b978;--nt-code-keyword:#91b7ff;--nt-code-number:#b69ce8;--nt-code-property:#78d7dc}
+[data-theme=light] .nt-editor[data-palette=auto]{--nt-code-comment:#49816b;--nt-code-string:#a06318;--nt-code-keyword:#315ca9;--nt-code-number:#7445aa;--nt-code-property:#147c95}
 .nt-editor[data-palette=dark]{--nt-code-bg:#18202e;--nt-code-fg:#dee8f5;--nt-code-comment:#87b5a0;--nt-code-string:#eed093;--nt-code-keyword:#98bdff;--nt-code-number:#d0a9f4;--nt-code-property:#90d8dd;}
 .nt-editor[data-palette=light]{--nt-code-bg:#fbfdff;--nt-code-fg:#233145;--nt-code-comment:#49816b;--nt-code-string:#a06318;--nt-code-keyword:#315ca9;--nt-code-number:#7445aa;--nt-code-property:#147c95;}
 .nt-editor[data-palette=pastel]{--nt-code-bg:#2d293d;--nt-code-fg:#eee8f6;--nt-code-comment:#9bc9a6;--nt-code-string:#ecd5ac;--nt-code-keyword:#b4cfff;--nt-code-number:#e2bcf4;--nt-code-property:#b1e4e0;}

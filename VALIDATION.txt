@@ -1,3 +1,18 @@
+NETWORK TOOLKIT 1.17.84 - REVIEW VALIDATION IN PROGRESS
+
+490 JavaScript tests and 31 Python release guards pass locally.
+Dedicated language worker / parser tests cover recognized file types, escaping,
+comments, protected literals, stale-format guards, undo and metadata retention.
+Native xterm tests cover prompt syntax, full variables, selected ANSI palettes,
+explicit colors, hidden text, alternate screen, live palette edits and unchanged
+buffers. Existing automatic fit tests remain after removal of the manual UI.
+
+Local discovery/deviceinfo suites require netlink access unavailable in this
+container. Full hosted Checks, Windows tests, browser layouts and review package
+verification are pending. No public release or installation has occurred.
+
+PREVIOUS RELEASE VALIDATION
+
 NETWORK TOOLKIT 1.17.83 PUBLISHED VALIDATION - 2026-10-26
 
 Implemented macro folders, local Windows shells, scan sizing/copy spacing,

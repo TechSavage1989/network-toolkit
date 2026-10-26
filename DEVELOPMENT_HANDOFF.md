@@ -1,5 +1,61 @@
 # Network Toolkit development handoff
 
+## 1.17.84 review in progress: editor languages and local shell syntax
+
+Prepared from published main ce5bf2d0f0c452fb0089703ab1fe15f5b61d7879.
+The user requested removal of Fit console, broad editor language recognition /
+syntax / formatting, and themed local PowerShell/Command Prompt syntax colors.
+This request does not authorize a new public release. Work stays on the review
+branch until publication is explicitly authorized. Main and the 83 release /
+assets / tag remain unchanged.
+
+The editor now offers 300 language choices backed by 292 bundled Prism grammars
+plus explicit HTML/XML, JSONC/JSON Lines, registry, Vue, network config and plain
+text modes. Common extensions, dotfiles, exact filenames and script shebangs
+select a language; users can select an override or return to Auto. Detection and
+syntax painting do not change content, encoding, BOM, EOL or saving safeguards.
+Sources reference the official Notepad++ language list; this is not a claim of
+full Notepad++ editor feature parity.
+
+Bundled Prism 1.30.0 and Prettier 3.9.10 are MIT licensed, integrity checked from
+the npm tarballs and recorded with per-file digests in editor-vendor/SOURCE.json.
+Their notices are included in source packages. No CDN / remote language service /
+runtime package installation is required. Explicit asset allowlists and embedding
+cover the worker and parser scripts; private metadata paths stay inaccessible.
+
+Language parsing runs in local workers, separated for highlighting and formatting.
+Paints debounce, supersede stale work and verify active document/text/language /
+generation. Requests time out and terminate workers. Explicit formatting uses
+parsers for JS/TS/JSX/TSX, JSON/JSONC/JSON5, HTML/Vue, CSS/SCSS/Less, Markdown,
+YAML and GraphQL. Other listed code families (including PowerShell and C/C++/C#/
+Java) offer Indent document, which adjusts leading whitespace only, protects
+multiline strings/comments/macros and rejects incomplete delimiters. It does not
+promise full structural beautification. Format is one undo action and cannot
+replace a document edited/closed/switched during the request. Files above 250,000
+characters retain plain editing. Existing 8 MiB open limits and start-of-file view
+remain. Enter, Tab/Shift+Tab selections and language-specific comment toggles are
+implemented; XML/HTML comments now close correctly and Batch uses REM. Existing
+word wrap uses its plain-text display path.
+
+Local shell prompt syntax is display-only on parsed xterm cells. It reads no
+keystrokes and sends no data. Standard PS / drive / UNC prompts select dedicated
+PowerShell / cmd token recognition, without network-device heuristics on local
+shell output. Shell ANSI colors take precedence. Fallback colors map to the
+configured ANSI palette, update live and use no underlines. Ordinary output and
+full-screen apps preserve rendering. Custom prompts without a recognized standard
+prefix keep their shell colors. Copy/transcripts/input/selection and transports
+are unchanged. Fit console is removed from toolbar/context choices; all existing
+automatic fit callbacks remain.
+
+Local validation: 490 JavaScript tests and all 31 Python release guards pass.
+Root/terminal/desktop retest and Windows build follow the asset-embedding fix.
+Full discovery/device suites are blocked locally by the known netlink restriction;
+they are required on the hosted runner. New browser checks cover real workers,
+language families, formatting/undo/invalid syntax/late replies, six editor layouts
+and actual xterm coloring/palette/ANSI behavior. Hosted results and verified review
+artifact details will be recorded after completion. No publication, installation
+or real shell interaction has been performed in this review yet.
+
 ## 1.17.83 published: folders, local shells, discovery and update progress
 
 The user explicitly authorized publication on 2026-10-26 after reporting no

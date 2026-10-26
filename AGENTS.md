@@ -1,5 +1,11 @@
 # Network Toolkit development
 
+Current work: unpublished 1.17.84 review for editor languages, explicit local
+formatting / code indentation, shell syntax palette and removal of Fit console.
+Read the new first handoff section and preserve the published 83 fixes below.
+Only review-branch work is authorized; this request does not authorize publishing
+84. Main, existing releases/tags/assets and the update feed remain unchanged.
+
 Read DEVELOPMENT_HANDOFF.md before editing or building. Start from current
 main, preserve unrelated work and follow the checks/release safeguards.
 

@@ -18,6 +18,12 @@ func serveWebAsset(w http.ResponseWriter, r *http.Request) {
 	contentType := ""
 	embeddedPath := "web" + r.URL.Path
 	switch r.URL.Path {
+	case "/assets/terminal-shell-syntax.js", "/assets/editor-languages.js", "/assets/editor-language-service.js", "/assets/editor-language-worker.js",
+		"/assets/editor-vendor/languages.js", "/assets/editor-vendor/prism.js", "/assets/editor-vendor/prettier.js",
+		"/assets/editor-vendor/prettier-babel.js", "/assets/editor-vendor/prettier-estree.js", "/assets/editor-vendor/prettier-typescript.js",
+		"/assets/editor-vendor/prettier-html.js", "/assets/editor-vendor/prettier-postcss.js", "/assets/editor-vendor/prettier-markdown.js",
+		"/assets/editor-vendor/prettier-yaml.js", "/assets/editor-vendor/prettier-graphql.js":
+		contentType = "text/javascript; charset=utf-8"
 	case "/assets/hosts-editor-model.js", "/assets/hosts-editor.js", "/assets/transfer-client-layout.js", "/assets/panel-controls.js", "/assets/input-clear.js", "/assets/value-copy.js":
 		contentType = "text/javascript; charset=utf-8"
 	case "/assets/hosts-editor.css", "/assets/workspace-layout.css", "/assets/transfer-client-layout.css", "/assets/panel-controls.css", "/assets/input-clear.css", "/assets/value-copy.css", "/assets/responsive-controls.css", "/assets/text-containment.css":

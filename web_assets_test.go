@@ -228,3 +228,30 @@ func TestDiscoveryAssetsAreEmbeddedAndRooted(t *testing.T) {
 		t.Fatal("asset allowlist exposed an unknown file")
 	}
 }
+
+func TestEditorWorkerDependenciesAreEmbeddedAndServed(t *testing.T) {
+	a := testApplication(t)
+	source, err := web.ReadFile("web/assets/editor-language-worker.js")
+	if err != nil {
+		t.Fatal(err)
+	}
+	paths := []string{"/assets/editor-language-worker.js"}
+	for _, match := range regexp.MustCompile(`['"](editor-vendor/[^'"]+\.js)['"]`).FindAllStringSubmatch(string(source), -1) {
+		paths = append(paths, "/assets/"+match[1])
+	}
+	if len(paths) < 10 {
+		t.Fatal("worker imports were not discovered")
+	}
+	for _, path := range paths {
+		response := requestApp(a, http.MethodGet, path, "", false)
+		expected, readErr := web.ReadFile("web" + path)
+		if readErr != nil || response.Code != http.StatusOK || !bytes.Equal(expected, response.Body.Bytes()) || !strings.HasPrefix(response.Header().Get("Content-Type"), "text/javascript") {
+			t.Fatalf("worker dependency %s is unavailable: %d %v", path, response.Code, readErr)
+		}
+	}
+	for _, path := range []string{"/assets/editor-vendor/", "/assets/editor-vendor/SOURCE.json", "/assets/editor-vendor/prettier-NOTICES.txt", "/assets/editor-vendor/not-a-language.js"} {
+		if response := requestApp(a, http.MethodGet, path, "", false); response.Code != http.StatusNotFound {
+			t.Fatalf("non-public worker path exposed: %s", path)
+		}
+	}
+}

@@ -175,7 +175,6 @@ function sync(){
        section.insertAdjacentHTML('beforeend','<label class="terminal-active-position" for="terminalActiveActionsPosition"><span>Position</span><select id="terminalActiveActionsPosition" aria-label="Active session button position"><option value="top">Top</option><option value="bottom">Bottom</option></select></label>');
      }else if(heading==='Display')panel.append(section);
    }
-   const fit=panel.querySelector('[data-terminal-action="fit"]');if(fit)document.querySelector('#terminalActiveActions .terminal-toolgroup').append(fit);
    panel.insertAdjacentHTML('beforeend','<p class="hint">Auto pager, Auto scroll, Review paste and Include commands in the console bar apply to the focused session.</p><button class="btn small ghost" data-terminal-extra="mouse-settings">Mouse and keyboard defaults</button>');
    document.querySelector('.terminal-panel').append(panel);
    root.NetworkToolkitTerminalAppearance?.mount(panel);

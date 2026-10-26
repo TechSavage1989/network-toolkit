@@ -111,6 +111,7 @@
     };
   }
   function legend(theme, options = {}) {
+    if (global.NTKTerminalShellSyntax?.supported(options.language)) return global.NTKTerminalShellSyntax.legend(options.terminalTheme, theme);
     const colors = palette(theme, options.colors);
     return Object.keys(LABELS).map(kind => ({ kind, label: LABELS[kind], color: colors[kind],
       borderStyle: options.underlines === false ? 'none' : MARKS[kind][0], borderWidth: options.underlines === false ? 0 : MARKS[kind][1] }));
@@ -222,7 +223,8 @@
     return !/[A-Za-z0-9_./-]/.test(text[start - 1] || '') && !/[A-Za-z0-9_./-]/.test(text[end] || '');
   }
 
-  function analyze(input) {
+  function analyze(input, language) {
+    if (global.NTKTerminalShellSyntax?.supported(language)) return global.NTKTerminalShellSyntax.analyze(input, language);
     const text = typeof input === 'string' ? input : '';
     if (!text || text.length > LIMITS.text) return [];
     const found = [];
@@ -337,8 +339,11 @@
 
   function attach(term, options) {
     const opts = options || {};
+    let language = opts.language;
+    const shell = () => !!global.NTKTerminalShellSyntax?.supported(language);
+    const appearanceColors = (mode, custom) => ({ ...palette(mode, custom), ...(shell() ? global.NTKTerminalShellSyntax.palette(term.options?.theme, mode) : {}) });
     let enabled = opts.enabled !== false, theme = themeName(opts.theme), disposed = false;
-    let requestedColors = customColors(opts.colors), colors = palette(theme, requestedColors), underlines = opts.underlines !== false;
+    let requestedColors = customColors(opts.colors), colors = appearanceColors(theme, requestedColors), underlines = opts.underlines !== false;
     let timer = null, active = false, suspended = '', limited = false, count = 0;
     let lastState = '', geometry = '', unsupported = false, scrollView = null;
     let records = new Map();
@@ -389,13 +394,13 @@
       if (first <= last && typeof term.refresh === 'function') term.refresh(first - current.first, last - current.first);
     }
     function style(element, kind) {
-      const color = colors[kind], mark = MARKS[kind];
+      const color = colors[kind], mark = MARKS[kind] || ['solid', 1];
       element.setAttribute('aria-hidden', 'true');
       element.setAttribute('data-nt-highlight', kind);
       element.style.pointerEvents = 'none';
       element.style.userSelect = 'none';
       element.style.boxSizing = 'border-box';
-      element.style.borderBottom = underlines ? mark[1] + 'px ' + mark[0] + ' ' + color : 'none';
+      element.style.borderBottom = underlines && !shell() ? mark[1] + 'px ' + mark[0] + ' ' + color : 'none';
       // Underlines provide the non-color cue. A vertical stroke beside a
       // short status such as "up" looks like terminal text or a cursor.
       element.style.borderLeft = 'none';
@@ -534,7 +539,7 @@
         updateRow(y, [], current);
         return 1;
       }
-      const matches = analyze(group.text);
+      const matches = analyze(group.text, language);
       if (matches.length === LIMITS.matches) limited = true;
       // Never decorate invisible SGR 8 cells or disclose their token shape.
       const safe = matches.filter(hit => !group.rows.some(row => {
@@ -604,7 +609,7 @@
         if (y < current.first || y > current.last) return [];
         const group = collect(current.buffer, y);
         if (!group) return [];
-        const matches = analyze(group.text), result = [];
+        const matches = analyze(group.text, language), result = [];
         for (const hit of matches) {
           let hidden = false;
           const spans = [];
@@ -676,8 +681,9 @@
     } catch (_) { unsupported = true; suspended = 'unsupported'; }
     function setAppearance(value = {}) {
       if (disposed) return;
-      const nextTheme = themeName(value.theme), nextRequested = customColors(value.colors), nextColors = palette(nextTheme, nextRequested);
-      const changed = Object.keys(LABELS).some(kind => colors[kind] !== nextColors[kind]);
+      if (value.language !== undefined) language = value.language;
+      const nextTheme = themeName(value.theme), nextRequested = customColors(value.colors), nextColors = appearanceColors(nextTheme, nextRequested);
+      const changed = [...new Set([...Object.keys(colors), ...Object.keys(nextColors)])].some(kind => colors[kind] !== nextColors[kind]);
       theme = nextTheme; requestedColors = nextRequested; colors = nextColors; underlines = value.underlines !== false;
       // Foreground options are immutable in xterm's public API. Underline-only
       // edits restyle existing elements without replacing their decorations.

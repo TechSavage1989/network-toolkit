@@ -32,7 +32,7 @@ import (
 	"networktoolkit/internal/terminal"
 )
 
-//go:embed web/index.html web/assets/*.js web/assets/*.css assets/Network_Toolkit_Icon.svg assets/Network_Toolkit_Icon.ico
+//go:embed web/index.html web/assets/*.js web/assets/*.css web/assets/editor-vendor assets/Network_Toolkit_Icon.svg assets/Network_Toolkit_Icon.ico
 var web embed.FS
 
 const appName = "Network Toolkit"

@@ -1,7 +1,18 @@
-NETWORK TOOLKIT 1.17.83
+NETWORK TOOLKIT 1.17.84
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.83
+CURRENT RELEASE - 1.17.84
+
+The editor detects file languages and supplies offline grammar-based syntax
+colors, explicit parser formatting for web/data formats and safe code indentation
+for PowerShell and C-family languages. Manual language selection, comment
+syntax and selection indentation follow the current document language.
+
+Local PowerShell and Command Prompt commands use the configured terminal ANSI
+palette, preserving shell-provided colors. Fit console is removed from the UI;
+console dimensions continue to update automatically.
+
+PREVIOUS RELEASE - 1.17.83
 
 Macro folders now use the saved-session folder controls: All folders, Unfiled,
 choose or create a folder, and Move to folder. Commands, shortcuts and automatic
