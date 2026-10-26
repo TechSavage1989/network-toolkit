@@ -1,11 +1,31 @@
-NETWORK TOOLKIT 1.17.86 - BUILD VALIDATION
+NETWORK TOOLKIT 1.17.86 - VERIFIED PUBLISHED BUILD
 
-The user authorized building and publishing the reviewed source fixes. Source-only
-validation passed 510 JS tests and four browser suites before this version bump.
-Full Go/native Windows/browser/build/package validation runs on the release review
-branch. Final verification and publication results are recorded in the repository
-handoff. Source fixes cover scroll/selection retention, wrapped syntax/gutter,
-in-app editor dialogs, asynchronous save/reload safety and structured shell output.
+Published source/tag: 5e1e303066e8cd89b1b2e4ce06c204566d57e2e3
+Tree: 2c16347f61593ca746f3b90218f4e2554418f9ba
+Checks 40278209364 and Release 40279270997: success.
+510 JS tests, 31 Python guards, required Go suites, native Windows shell/progress,
+Windows GUI/resource build/package and all browser steps pass. Editor actions,
+disabled native dialogs, wrapped syntax/deep gutter alignment, save/reload safety,
+actual local shell output colors, persistence and all prior regressions pass.
+All seven native update timer cases pass, including the real five-minute poll.
+Current covered reports have no runtime/asset failures. Final screenshots inspected.
+
+Review artifact 12630839084: 3746137e97c837df4d86f0dc5448c521acb383cfefae33473f59ae3d734d4eff
+Browser artifact 12631801051: 5aa8a10ff472e232c071c7c52e03ee1d95ad0347df9fb9c2ecf1c6ede44cb270
+EXE SHA-256: d998fe81dbdc99c003d929d6f60ca42f790bfec5ecd8addbe59a6347ebdf38bb
+EXE bytes: 17593344; packaged source files exactly matching tag: 744.
+All four public assets match GitHub digests, SHA256SUMS and the reviewed package.
+ZIP CRCs, inner/source manifests, PE GUI/version, strict update ZIP and all 14
+vendored source digests verify. All 25 older releases/assets/tags are unchanged.
+Released85 production handlers verified/staged live86 via real HTTPS in 10.97s,
+with isolated settings, original EXE unchanged and no installation/restart.
+Official release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.86
+
+The user explicitly authorized the build/publication. Full native WebView2 UI,
+physical hardware and actual installation/restart are not claimed. This final
+three-file documentation record uses [skip ci] and leaves tag/runtime/assets intact.
+
+PREVIOUS RELEASE VALIDATION
 
 NETWORK TOOLKIT 1.17.85 - VERIFIED PUBLISHED BUILD
 

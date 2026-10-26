@@ -1,20 +1,83 @@
 # Network Toolkit development handoff
 
-## 1.17.86 build and publication authorized
+## 1.17.86 published: editor corrections and structured shell output
 
 The user explicitly requested "publish the build", lifting the earlier hold for
-the reviewed editor and shell-output changes. Start from the verified source
-review at 9ca9399a6b02ac9e365f3e74e2cdcedbeb417af5 (runtime 947a65a422280afaffeafb395169a49a298f98e2).
-Main remains published 85 at 2914db942015742a26d03c9822f1a2efe6645fab.
-Normal full Checks are restored on all branches, including the new editor browser
-review, Go output-color persistence, native Windows transports/progress and all
-existing browser/update regressions. Version/resources are bumped to 86.
-Publication is authorized after these checks and exact package verification.
-Keep older versions intact and use main network-toolkit as the only update feed.
-The source-only record below describes the completed fixes and prior validation;
-its historical hold was superseded by the user's current explicit instruction.
+these changes. Publication is complete. Future work needs its own authorization.
+Main network-toolkit remains the sole public source/update feed. Preserve all
+older tags/assets and repository access; never write the retired feed.
 
-## Active source review, no new build authorized
+Published source/tag: 5e1e303066e8cd89b1b2e4ce06c204566d57e2e3
+Tree: 2c16347f61593ca746f3b90218f4e2554418f9ba
+Main fast-forwarded without force from 2914db942015742a26d03c9822f1a2efe6645fab.
+Full Checks 40278209364 passed check 121425449651, native
+Windows 121425449827 and browser 121425449949. Release
+40279270997 passed build 121428705226 and publish
+121429161901, creating stable release 423914966.
+
+The editor preserves selections and both scroll positions for case changes,
+line tools, sorting and undo/redo. Wrap retains worker syntax colors, with an
+aligned overlay and measured logical-line gutter; a fixed gutter frame prevents
+line numbers disappearing on scroll. Matching unitless line heights avoid drift
+through deep wrapped documents. In-app dialogs replace blocked browser prompts
+for Close, Reload, Save As and Go to line (Ctrl+G). Cancel/Enter/Escape and stale
+revision checks preserve unsaved work. New local documents acquire a real reader
+and canonical local IDs after Save As. Late saves keep newer edits dirty and
+cannot steal another tab's focus. Find typing keeps the query field focused.
+
+Local PowerShell and Command Prompt recognize output headings, fields, values,
+validated addresses/MACs and status words, including ipconfig-style results.
+Seven output-role colors are configurable separately for each shell in Display,
+follow the terminal palette and preserve native ANSI by default. Unrecognized
+prose and full-screen programs keep their rendering. These are recognition cues,
+not a health judgment for Yes/No fields. Copies, buffer cells, input and transport
+remain unchanged. Output colors persist through Go sanitization and detached /
+standalone terminal settings transfers. All 85 and earlier fixes are preserved.
+
+Full validation: 510 JS tests, 31 Python release guards, root/terminal/desktop/
+discovery/deviceinfo Go suites, Windows x64 GUI/resource build and package pass.
+Native ConPTY typing/lifecycle and visible installer progress pass separately.
+All browser steps pass, including the new editor/output suite's 5 groups / 6
+layouts, editor open/import/reload/connected-source lifecycle, existing 84/85
+features, all earlier UI/copy/Hosts/client/server/SMTP/folder/selection checks and
+all seven native update timer cases with the real five-minute poll. Native script
+dialogs deliberately throw in editor tests; all editor controls use built-in UI.
+Actual DOM text colors are checked for both shell types using synthetic addresses.
+Current reports have no runtime/asset errors; released64's negative-control
+Illegal invocation is expected. Final editor and shell screenshots inspected.
+
+All four actual public downloads match GitHub asset digests and SHA256SUMS.
+Portable ZIP and EXE equal the reviewed/local package. Standalone, portable and
+update EXEs are identical. All 744 packaged source files equal the tag;
+ZIP CRCs, both checksum inventories, Windows x64 GUI/version, strict update
+allowlist and all 14 vendored editor-library digests pass. All
+25 older releases' asset IDs/names/sizes/digests and 25 older tag SHAs
+remain unchanged.
+
+Unchanged released85 handlers from 427e50d765835f632f44ca4a9b185241169dd91c
+checked/downloaded/verified/staged live86 via real HTTPS in 10.97s, using
+isolated settings. The staged 17593344-byte candidate matches the independently
+verified official EXE. Original test EXE unchanged; no install or restart. Users
+can open App settings, Updates, Check for updates. An identical 86 review build
+already has this version and correctly sees no newer update.
+
+Review artifact 12630839084: 3746137e97c837df4d86f0dc5448c521acb383cfefae33473f59ae3d734d4eff
+Browser artifact 12631801051 (128 members):
+5aa8a10ff472e232c071c7c52e03ee1d95ad0347df9fb9c2ecf1c6ede44cb270
+Official release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.86
+Network_Toolkit.exe SHA-256: d998fe81dbdc99c003d929d6f60ca42f790bfec5ecd8addbe59a6347ebdf38bb
+Network_Toolkit_1.17.86_Portable.zip SHA-256: d48a5a1fb6d8313b685a65150ba06e8f54cb3f3e7d46aa66d9660ad078784041
+Network_Toolkit_1.17.86_Update.zip SHA-256: d7ca28e2e30fb2593c3a751362b4bc9d04c4fd6b70a6fdfd749df4abd78bc4cb
+SHA256SUMS SHA-256: 31370619f731ed3219f4c37f81af6d376cde3f5023f70ac31ef13478833ad299
+
+No full native WebView2 UI interaction, physical hardware or actual installation /
+restart was tested. This completion changes AGENTS.md, this handoff and
+VALIDATION.txt only with [skip ci]. Do not move the 86 tag, replace assets or
+republish. Continue from latest main and preserve previous fixes.
+
+The build hold recorded below was subsequently lifted for published 86.
+
+## Historical source-only review before the authorized 86 build
 
 The user explicitly said not to proceed to a new build until told to do so.
 Published 85 remains unchanged. Work is on fix/editor-shell-review-no-build,
