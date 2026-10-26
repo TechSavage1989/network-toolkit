@@ -1,12 +1,34 @@
-NETWORK TOOLKIT 1.17.85 - REVIEW VALIDATION IN PROGRESS
+NETWORK TOOLKIT 1.17.85 - VERIFIED PUBLISHED BUILD
 
-503 JavaScript tests and 31 Python release guards pass locally. The new renderer
-regression fails on released84 and passes with the local ANSI-black background
-fix. Actual native Windows startup/typing captures for cmd and PowerShell replay
-through real xterm with unchanged buffers and custom token colors. Independent
-controls, normalization and stale-owner bulk-close guards have focused tests.
-Full updated browser, hosted Go/Windows, GUI build and package checks are pending.
-The user explicitly authorized publication when complete. No 85 publication yet.
+Published source/tag: 427e50d765835f632f44ca4a9b185241169dd91c
+Tree: 358b647ddf32872ab6a6ca5a5bd9ee185790da54
+Checks 40271392085 and Release 40272271825: success.
+503 JavaScript tests, 31 Python guards, root / terminal / desktop / discovery /
+deviceinfo Go suites, native Windows shell lifecycle and installer progress pass.
+Six new full-app browser groups and six shell-settings layouts pass, alongside
+all previous editor, macro, scan, copy, Hosts, client/server, saved folders,
+connection dialogs, SMTP, command input, 17 selection and seven updater timer
+cases. Real per-character renderer colors and unchanged native transcript buffers
+are checked; released84 reproduces the white/black attribute regression. Current
+covered reports have no runtime/asset failures; released64's negative-control
+Illegal invocation is expected. Final screenshots inspected.
+
+Review artifact 12627993521: 2b0f8cd7cf105c31320ffc189b45154a773f4ec893c02ab614ebd6675b7c9651
+Browser artifact 12628067982: 7dcf4f86a7290d027aa20a6eea006de6898d27428eeed51d23ea59a1ad2c1d02
+EXE SHA-256: 94f2c1c7abfd76434fbafafbea806010eb3d7c67d509ec4eeb6d8b5a13ae5c8e
+EXE bytes: 17581056; exact packaged source files: 741.
+Public assets match GitHub digests, SHA256SUMS and the reviewed local package.
+ZIP CRCs, both checksum inventories, PE x64 GUI/version, strict update allowlist
+and all 14 editor-library digests verify. All 24 old releases/assets/tags are intact.
+Released84 production handlers checked/downloaded/verified/staged live85 in
+10.41s using real HTTPS and isolated settings. Original test EXE unchanged;
+no installation/restart. Official release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.85
+
+The user authorized publication when complete. No full native WebView2 UI,
+physical hardware or actual installation/restart is claimed. This final three-file
+docs record uses [skip ci] and does not alter the tested tag, runtime or assets.
+
+PREVIOUS RELEASE VALIDATION
 
 NETWORK TOOLKIT 1.17.84 - VERIFIED PUBLISHED BUILD
 

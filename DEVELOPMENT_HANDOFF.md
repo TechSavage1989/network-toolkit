@@ -1,51 +1,96 @@
 # Network Toolkit development handoff
 
-## 1.17.85 review: shell settings, close prompts and collapsed navigation
+## 1.17.85 published: shell colors, close preferences and tool navigation
 
-The user explicitly authorized publication when this work is complete. Main
-network-toolkit is the sole public source/update feed. Work stays on
-review/hosts-editor-1.17.85 until the full current-source Checks pass, then publish
-that exact runtime without replacing old releases, assets or tags.
+The user explicitly authorized publishing the completed 85 update. Publication
+is complete. Future releases need their own authorization. Main network-toolkit
+remains the sole public source/update feed; preserve old releases/assets/tags,
+repository access and the retired feed.
 
-Started from main b0ee0c9eb1ed171d834eef7aae944506f65246c2 / published 84.
-A real xterm reproduction under default app colors recognizes syntax but applies
-zero foreground colors to SGR 37;40 / 97;40: ANSI black differs from the console
-background enough to fail the old background check. The released84 highlighter
-fails the new regression; the fix passes. Explicit local ANSI-black backgrounds
-can receive syntax colors without changing cells/backgrounds or device behavior.
-This is a reproduced cause, not a claim that the user's exact native transcript
-was captured. Native Windows captures from probe commit 27feb4ffeed91d93bed1d94b54f73ad715cd6e5a,
-Windows job 121396949969, show plain cmd input and colored PowerShell PSReadLine.
-They are replayed as regression fixtures; sample commands were typed, not run.
+Published source/tag: 427e50d765835f632f44ca4a9b185241169dd91c
+Tree: 358b647ddf32872ab6a6ca5a5bd9ee185790da54
+Main fast-forwarded without force from b0ee0c9eb1ed171d834eef7aae944506f65246c2
+to the exact runtime verified by full Checks 40271392085.
+All three jobs pass: check 121404772023, native Windows
+121404772187 and browser 121404772175.
+Release 40272271825 passed build 121407447605 and
+publish 121407837540, creating stable release 423876100.
+
+All four public downloads match GitHub asset digests and SHA256SUMS. The portable
+ZIP and standalone/portable/update EXEs equal the reviewed package and local
+build. All 741 packaged source files equal the tag; ZIP CRCs, both checksum
+inventories, Windows x64 GUI/version, the strict four-member update allowlist and
+14 bundled editor-library file hashes pass. All 24 older releases' assets
+(IDs, names, sizes, digests) and 24 older tag SHAs remain unchanged.
+
+Unchanged released84 production handlers from source
+3e1aa2ee2bca8e632e00e7fdc0c52ca1fb7fc766 checked/downloaded/verified/staged
+live85 through real HTTPS in 10.41s. The staged 17581056-byte candidate
+matches the independently verified official EXE. Temporary isolated settings,
+original test EXE unchanged, no installation/restart. Users can open App settings,
+Updates, Check for updates. An identical 85 review build already has this version.
 
 Terminal Display now has separate PowerShell and Command Prompt switches,
-previews, nine role colors and a per-shell reset. Defaults follow the selected
-ANSI palette and preserve distinct shell colors; a deliberate role override can
-recolor that recognized input token. Local syntax is independent of the device
-highlight checkbox, including startup/theme/workspace/restore paths. Ordinary
-program output, nonstandard prompts and alternate screens retain their behavior.
-No keyboard/input interception, command execution, profile or policy changes.
+previews, nine role colors and per-shell reset. Defaults follow the terminal
+palette and preserve distinct native colors. A custom role can recolor that
+recognized command token. Local syntax is independent of Highlight device output
+across startup/theme/workspace/restore paths. Ordinary program output, custom
+unrecognized prompts, alternate screens, buffers/copy/transcripts and input stay
+intact. There are no startup/profile/execution-policy changes.
 
-Display also has a close-confirmation checkbox, enabled by default. Turning it
-off skips active-session / Close other tabs prompts and still disconnects before
-deleting. Both dialogs offer Do not ask again, persisted only on confirmation.
-Single/bulk actions check current ownership/revisions; stale or transferred
-sessions are not closed. Saved/Recent entry deletion remains independently
-configured and is labeled explicitly. New preferences are sanitized and survive
-state saves, detached single/workspace displays and standalone terminal seeds.
+The old default-theme renderer skips syntax foregrounds under SGR 37;40 / 97;40
+because ANSI black differs from the app background. The released84 negative
+control fails and the fix passes. Parsed local ANSI-black backgrounds now permit
+syntax colors without changing backgrounds or remote-device rendering. This is
+a reproduced case, not a claim to have captured the user's exact environment.
+Native Windows transcript probes capture plain cmd input and native PSReadLine
+colors. Samples are typed without Enter, then replayed through real app sessions.
+Browser assertions inspect actual per-character rendered colors, including live
+custom role overrides over native ANSI; they do not mistake the empty decoration
+overlay for rendered text. Early browser assertion corrections changed tests only.
 
-The main left tool rail stays collapsed while tool icons navigate. Only its
-arrow or explicit divider double-click / Enter / Space toggles it. Surface clicks
-no longer reveal that rail; other panel reveal behavior and mobile drawer remain.
-The divider is a toggle boundary, not a new drag-resize feature.
-The Display popover is clamped inside the viewport at compact widths. The full
-app browser geometry test caught the prior left-edge overflow at 820 pixels.
+The saved close-confirmation checkbox defaults on in Display. Turning it off
+skips active-session and Close other tabs prompts while disconnecting before
+removal. Both dialogs offer Do not ask again, saved only on confirmation. Current
+ownership/revision guards reject stale or transferred targets. Saved/Recent entry
+removal keeps its separate preference and explicit label. Normalized shell and
+close settings persist and transfer into detached single/workspace displays and
+standalone terminal seeds; malformed/unknown values are discarded.
 
-Local verification so far: 503 JS tests and 31 Python release guards pass; focused
-real renderer/native transcript tests pass. Native probe Windows lifecycle and
-progress steps passed. Full updated browser, hosted Go/Windows and package
-verification are pending. Preserve all 84 and earlier runtime fixes. No full
-native WebView2 interaction, hardware or actual install/restart is claimed.
+The collapsed main tool rail remains clickable for navigation. The arrow or
+divider double-click / Enter / Space toggles it; ordinary surface/icon clicks do
+not reveal it. The divider is a toggle boundary, not a new drag-resize feature.
+The compact-screen drawer keeps navigation, close, focus and inert behavior.
+Display settings are clamped inside the viewport; the new browser layout test
+reproduced the former left-edge overflow at 820 pixels before this fix.
+
+503 JS tests, 31 Python release guards and required root/terminal/desktop/
+discovery/deviceinfo Go suites pass. Native Windows ConPTY startup/typing,
+interactive output/resize/Ctrl+C/shutdown and native installer progress pass in
+separate steps. Browser's six new groups cover actual local sessions, white/
+black attributes, native token overrides, independent switches, persistence and
+workspace settings, default/cancel/opt-out/restored single/bulk close dialogs,
+six shell-settings layouts and collapsed/compact tool navigation. Existing 84
+editor/workers/formatting/colors, 83 macros/discovery/copy/progress, 138 UI layouts,
+17 actual-app selection regressions and all previous browser steps pass. All seven
+native Chromium update timer cases pass, including the real five-minute poll.
+The released64 negative control's Illegal invocation is expected; current covered
+reports have no runtime/asset failures. Final settings/console screenshots were
+inspected. Earlier local source-binding limits are covered by passing hosted Go.
+
+Review artifact 12627993521 outer SHA-256: 2b0f8cd7cf105c31320ffc189b45154a773f4ec893c02ab614ebd6675b7c9651
+Browser artifact 12628067982 (121 members) SHA-256:
+7dcf4f86a7290d027aa20a6eea006de6898d27428eeed51d23ea59a1ad2c1d02
+Official release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.85
+Network_Toolkit.exe SHA-256: 94f2c1c7abfd76434fbafafbea806010eb3d7c67d509ec4eeb6d8b5a13ae5c8e
+Network_Toolkit_1.17.85_Portable.zip SHA-256: 16ea7a4697c086b07ed319de0cc32c339735e3c63b14691a491e00df0c31e935
+Network_Toolkit_1.17.85_Update.zip SHA-256: 67e5c2691290eecd2e009c3bdf44a0fc6258e8cc06b57e899ab836531be785c1
+SHA256SUMS SHA-256: 2d594618dd45d58e985e39a11ed701b7787e61a87873a65b92ad2b0cfb7e55dc
+
+No full native WebView2 interaction, physical hardware or actual installation /
+restart was tested. This final record changes only AGENTS.md, this handoff and
+VALIDATION.txt with [skip ci]. Do not move the 85 tag, replace assets or republish.
+Continue from latest main and preserve all 84 and earlier fixes.
 
 ## 1.17.84 published: editor languages and local shell syntax
 
