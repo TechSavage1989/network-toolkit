@@ -362,7 +362,7 @@ async function packetExact(expected,label){await packetReady();const values=awai
  await page.locator('#packetSearch').fill('First timestamped');await page.locator('[data-packet-action="filter"]').click();await packetReady();await packetExact([1],'Packet query combines with detailed filters');
  const packetDownload=page.waitForEvent('download');await page.locator('#packetExportFormat').selectOption('csv');await page.locator('[data-packet-action="export"]').click();const csv=fs.readFileSync(await (await packetDownload).path(),'utf8');assert(csv.includes(packetStamp)&&!csv.includes(packetEnd),'Matching export respects composed filters and preserves exact nanoseconds');assert.equal(JSON.stringify(packetRows),packetOriginal,'Packet display/statistic filters cannot discard recorded source packets');
  report.packets.push({kind:'composedFilters',severity:'error',type:'TCP',statistic:'expert',query:'First timestamped',matching:[1],emptyFiltered:true,rawNanoseconds:true,sourcePreserved:true});
- await page.locator('[data-packet-action="reset-filter"]').click();await packetReady();await packetExact([1,2,3],'Show all restores packet data');if(await find.getAttribute('open')!==null)await find.locator('summary').click();
+ await find.locator('.packet-filterbar [data-packet-action="reset-filter"]').click();await packetReady();await packetExact([1,2,3],'Show all restores packet data');if(await find.getAttribute('open')!==null)await find.locator('summary').click();
  // Every graph zoom operates on the original absolute buckets. It must never
  // re-bin the evidence or change source interval details while magnifying it.
  const bucketBefore=await page.evaluate(()=>JSON.parse(JSON.stringify(NetworkToolkitPacketCapture.model.statistics.timeline)));
