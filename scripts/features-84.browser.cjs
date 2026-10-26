@@ -54,7 +54,9 @@ const check=name=>report.checks.push(name),settle=()=>page.evaluate(()=>new Prom
  });
  await page.waitForFunction(()=>__syntaxTerminals.every(x=>x.highlighter.tokensAtRow(0).some(t=>t.kind==='shell-variable')));
  for(const theme of ['dark','light']){
-  const results=await page.evaluate(theme=>__syntaxTerminals.map(x=>{const options=NetworkToolkitTerminalAppearance.options({scheme:theme},theme);Object.assign(x.term.options,options);x.highlighter.setAppearance({language:x.language,theme,underlines:true});return {language:x.language,text:x.term.buffer.active.getLine(0).translateToString(true),original:x.text,outputMarks:x.highlighter.tokensAtRow(1).length,variable:x.highlighter.tokensAtRow(0).find(t=>t.kind==='shell-variable')?.text};}),theme);await settle();
+  await page.evaluate(theme=>{for(const x of __syntaxTerminals){const options=NetworkToolkitTerminalAppearance.options({scheme:theme},theme);Object.assign(x.term.options,options);x.highlighter.setAppearance({language:x.language,theme,underlines:true});}},theme);
+  await page.waitForFunction(()=>__syntaxTerminals.every(x=>x.highlighter.tokensAtRow(0).some(t=>t.kind==='shell-variable')));
+  const results=await page.evaluate(()=>__syntaxTerminals.map(x=>({language:x.language,text:x.term.buffer.active.getLine(0).translateToString(true),original:x.text,outputMarks:x.highlighter.tokensAtRow(1).length,variable:x.highlighter.tokensAtRow(0).find(t=>t.kind==='shell-variable')?.text})));await settle();
   for(const result of results){assert.equal(result.text,result.original);assert.equal(result.outputMarks,0);assert.equal(result.variable,result.language==='powershell'?'$env:TEMP':'%PATH%');}
  }
  const underlines=await page.locator('[data-shell-fixture] [data-nt-highlight]').evaluateAll(els=>els.map(el=>getComputedStyle(el).borderBottomStyle));assert(underlines.length);assert(underlines.every(v=>v==='none'));
