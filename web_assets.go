@@ -26,7 +26,7 @@ func serveWebAsset(w http.ResponseWriter, r *http.Request) {
 		contentType = "text/javascript; charset=utf-8"
 	case "/assets/hosts-editor-model.js", "/assets/hosts-editor.js", "/assets/transfer-client-layout.js", "/assets/panel-controls.js", "/assets/input-clear.js", "/assets/value-copy.js":
 		contentType = "text/javascript; charset=utf-8"
-	case "/assets/hosts-editor.css", "/assets/workspace-layout.css", "/assets/transfer-client-layout.css", "/assets/panel-controls.css", "/assets/input-clear.css", "/assets/value-copy.css", "/assets/responsive-controls.css", "/assets/text-containment.css":
+	case "/assets/result-typography.css", "/assets/hosts-editor.css", "/assets/workspace-layout.css", "/assets/transfer-client-layout.css", "/assets/panel-controls.css", "/assets/input-clear.css", "/assets/value-copy.css", "/assets/responsive-controls.css", "/assets/text-containment.css":
 		contentType = "text/css; charset=utf-8"
 	case "/assets/Network_Toolkit_Icon.svg":
 		contentType = "image/svg+xml"
