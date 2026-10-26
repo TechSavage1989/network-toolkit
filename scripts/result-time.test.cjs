@@ -85,3 +85,47 @@ test('saved application preferences are read dynamically and preview overrides a
  context.state.resultTimePreferences={hourFormat:'24',zoneMode:'named',timeZone:'not a timezone'};
  assert.doesNotThrow(()=>api.format(stamp));assert.equal(api.zoneLabel(),'local');
 });
+
+test('original timestamp comparison orders nanoseconds, offsets and instants before 1970 exactly',()=>{
+ const early='2026-10-26T12:00:00.000100000Z',late='2026-10-26T12:00:00.000900000Z',one='2026-10-26T12:00:00.000000001Z',two='2026-10-26T12:00:00.000000002Z';
+ assert.equal(time.epoch(early),time.epoch(late),'display milliseconds intentionally remain unchanged');
+ assert.equal(time.compareInstants(early,late),-1);assert.equal(time.compareInstants(late,early),1);
+ assert.equal(time.compareInstants(one,two),-1);assert.equal(time.compareInstants(two,one),1);
+ assert.equal(time.compareInstants(late,'2026-10-26T08:00:00.000900000-04:00'),0);
+ assert.equal(time.compareInstants('1969-12-31T23:59:59.999999998Z','1969-12-31T23:59:59.999999999Z'),-1);
+ assert.equal(time.compareInstants('1969-12-31T23:59:59.999999999Z',0),-1);
+ assert.equal(time.compareInstants('1970-01-01T00:00:00.000000001Z',0),1);
+ assert.equal(time.compareInstants('2026-11-01T01:30:00.000000001-04:00','2026-11-01T01:30:00.000000001-05:00'),-1);
+});
+
+test('exact comparison preserves Date and numeric millisecond compatibility and unknown instants',()=>{
+ const stamp='2026-10-26T12:00:00.123Z',date=new Date(stamp),millis=date.getTime();
+ assert.equal(time.compareInstants(date,stamp),0);assert.equal(time.compareInstants(millis,stamp),0);
+ assert.equal(time.compareInstants(0.0001,'1970-01-01T00:00:00.000000101Z'),-1);
+ assert.equal(time.compareInstants(-0.0001,'1969-12-31T23:59:59.999999901Z'),-1);
+ assert.equal(time.compareInstants(0.0000001,0),1);assert.equal(time.compareInstants(-0.0000001,0),-1);
+ for(const missing of [null,undefined,'','Not recorded','0001-01-01T00:00:00Z','2026-02-30T00:00:00Z',new Date(NaN),Infinity]){
+  assert.equal(time.compareInstants(missing,stamp),1);assert.equal(time.compareInstants(stamp,missing),-1);
+  assert.equal(time.compareInstants(missing,undefined),0);
+ }
+});
+
+test('generic date sorting keeps exact order and stable missing rows last in both directions without changing data',()=>{
+ const fs=require('node:fs'),vm=require('node:vm'),html=fs.readFileSync(require.resolve('../web/index.html'),'utf8'),start=html.indexOf('function compareListValues('),end=html.indexOf('\nfunction dataListRows(',start),context=vm.createContext({NetworkToolkitResultTime:time});
+ vm.runInContext(html.slice(start,end),context);
+ const rows=[{id:'late',time:'2026-10-26T12:00:00.000900000Z'},{id:'missing',time:null},{id:'invalid',time:'bad timestamp'},{id:'early',time:'2026-10-26T12:00:00.000100000Z'},{id:'unknown',time:'0001-01-01T00:00:00Z'},{id:'early-offset',time:'2026-10-26T08:00:00.000100000-04:00'}],before=JSON.stringify(rows),columns=[{id:'time',type:'date',value:row=>row.time}];
+ assert.deepEqual(Array.from(context.sortDataRows(rows,columns,{sort:'time',direction:'asc'}),row=>row.id),['early','early-offset','late','missing','invalid','unknown']);
+ assert.deepEqual(Array.from(context.sortDataRows(rows,columns,{sort:'time',direction:'desc'}),row=>row.id),['late','early','early-offset','missing','invalid','unknown']);
+ assert.equal(JSON.stringify(rows),before,'sorting retains every raw timestamp and original row order');
+});
+
+test('exact comparison does not alter display precision, copied raw instants or timezone preferences',()=>{
+ const early='2026-10-26T12:00:00.123100000Z',late='2026-10-26T12:00:00.123900000Z';
+ try{
+  for(const preferences of [{hourFormat:'12',zoneMode:'utc',timeZone:'UTC'},{hourFormat:'24',zoneMode:'named',timeZone:'America/New_York'}]){
+   time.configure(preferences);const before=time.format(early),saved=time.preferences();
+   assert.equal(time.compareInstants(early,late),-1);assert.equal(time.format(early),before);assert.equal(time.format(early),time.format(late));
+   assert.deepEqual(time.preferences(),saved);assert(time.cell(early).includes('datetime="'+early+'"'));assert(time.cell(early).includes('Recorded timestamp: '+early));
+  }
+ }finally{time.configure(null);}
+});

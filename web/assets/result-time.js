@@ -48,6 +48,21 @@
   if(month<1||month>12||day<1||day>days[month-1]||hour>23||minute>59||second>59)return NaN;
   const number=Date.parse(value);return Number.isFinite(number)?number:NaN;
  }
+ // Compare original instants before presentation formatting. Date.parse keeps
+ // milliseconds only, so retain the source's remaining RFC3339 nanoseconds.
+ function instantParts(value){
+  const milliseconds=epoch(value);if(!Number.isFinite(milliseconds))return null;
+  const whole=Math.floor(milliseconds),fraction=typeof value==='string'?value.match(/\.(\d{1,9})(?:Z|[+-]\d{2}:\d{2})$/i)?.[1]:null;
+  const nanos=typeof value==='string'?Number(fraction?fraction.padEnd(9,'0').slice(3):0):(milliseconds-whole)*1000000;
+  const integral=Math.floor(nanos);
+  return {nanoseconds:BigInt(whole)*1000000n+BigInt(integral),remainder:nanos-integral};
+ }
+ function compareInstants(left,right){
+  const a=instantParts(left),b=instantParts(right);
+  if(!a||!b)return a?-1:b?1:0;
+  if(a.nanoseconds!==b.nanoseconds)return a.nanoseconds<b.nanoseconds?-1:1;
+  return Math.sign(a.remainder-b.remainder);
+ }
  function format(value,{date=true,milliseconds=true,timezone=true,preferences:selectedPreferences}={}){
   const number=epoch(value);if(!Number.isFinite(number))return unknown;
   const p=selectedPreferences===undefined?preferences():normalizePreferences(selectedPreferences),options={hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:p.hourFormat==='12'?'h12':'h23'};
@@ -75,7 +90,7 @@
   const name=columnLabel(snapshot(job)?'Snapshot':'Recorded');
   return {id:'time',name,type:'date',value:row=>recorded(row,job),render:row=>cell(recorded(row,job),{label:name})};
  }
- const api=Object.freeze({epoch,format,cell,value,isKey,recorded,column,snapshot,unknown,defaults,preferences,normalizePreferences,configure,zoneLabel,timeLabel,columnLabel,timeZones,isTimeZone});
+ const api=Object.freeze({epoch,compareInstants,format,cell,value,isKey,recorded,column,snapshot,unknown,defaults,preferences,normalizePreferences,configure,zoneLabel,timeLabel,columnLabel,timeZones,isTimeZone});
  if(typeof module==='object'&&module.exports)module.exports=api;
  if(root)root.NetworkToolkitResultTime=api;
 })(typeof window!=='undefined'?window:typeof globalThis!=='undefined'?globalThis:this);
