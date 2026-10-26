@@ -1,0 +1,7 @@
+Network Toolkit 1.17.86
+
+- Keep editor scroll position and selections during case conversion, line tools, sorting and undo/redo.
+- Keep syntax colors and aligned line numbers when wrapping text or scrolling.
+- Replace blocked browser dialogs with editor dialogs for Close, Reload, Save As and Go to line.
+- Preserve newer edits during pending saves and correctly reload newly saved files.
+- Add configurable colors for recognized PowerShell and Command Prompt output, including ipconfig fields and addresses.

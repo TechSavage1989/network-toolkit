@@ -1,7 +1,18 @@
-NETWORK TOOLKIT 1.17.85
+NETWORK TOOLKIT 1.17.86
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.85
+CURRENT RELEASE - 1.17.86
+
+Editor actions preserve selection and scroll position. Wrapped text retains
+syntax colors and aligned line numbers. Editor close, reload, Save As and Go to
+line use built-in dialogs. Saves preserve edits made while a write is pending;
+newly saved files reload through the actual local file reader.
+
+PowerShell and Command Prompt color recognized output headings, fields, values,
+addresses and status words. Output colors have separate role controls in Display
+and follow the terminal palette. Program-provided ANSI colors remain intact.
+
+PREVIOUS RELEASE - 1.17.85
 
 Local PowerShell and Command Prompt have explicit syntax-color controls.
 Closing active terminal tabs and sessions has a saved confirmation preference.

@@ -1,5 +1,19 @@
 # Network Toolkit development handoff
 
+## 1.17.86 build and publication authorized
+
+The user explicitly requested "publish the build", lifting the earlier hold for
+the reviewed editor and shell-output changes. Start from the verified source
+review at 9ca9399a6b02ac9e365f3e74e2cdcedbeb417af5 (runtime 947a65a422280afaffeafb395169a49a298f98e2).
+Main remains published 85 at 2914db942015742a26d03c9822f1a2efe6645fab.
+Normal full Checks are restored on all branches, including the new editor browser
+review, Go output-color persistence, native Windows transports/progress and all
+existing browser/update regressions. Version/resources are bumped to 86.
+Publication is authorized after these checks and exact package verification.
+Keep older versions intact and use main network-toolkit as the only update feed.
+The source-only record below describes the completed fixes and prior validation;
+its historical hold was superseded by the user's current explicit instruction.
+
 ## Active source review, no new build authorized
 
 The user explicitly said not to proceed to a new build until told to do so.

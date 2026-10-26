@@ -2,8 +2,7 @@ name: Checks
 
 on:
   push:
-    # This source-review branch is explicitly held from application builds.
-    branches-ignore: ['fix/editor-shell-review-no-build']
+    branches: ['**']
   pull_request:
   workflow_dispatch:
 
@@ -110,6 +109,11 @@ jobs:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
         run: node scripts/features-85.browser.cjs
+      - name: Check editor actions, in-app dialogs, wrapped syntax and shell output
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
+        run: node scripts/editor-source-review.browser.cjs
       - name: Check application layout and consistent copy controls
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright

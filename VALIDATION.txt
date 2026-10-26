@@ -1,3 +1,12 @@
+NETWORK TOOLKIT 1.17.86 - BUILD VALIDATION
+
+The user authorized building and publishing the reviewed source fixes. Source-only
+validation passed 510 JS tests and four browser suites before this version bump.
+Full Go/native Windows/browser/build/package validation runs on the release review
+branch. Final verification and publication results are recorded in the repository
+handoff. Source fixes cover scroll/selection retention, wrapped syntax/gutter,
+in-app editor dialogs, asynchronous save/reload safety and structured shell output.
+
 NETWORK TOOLKIT 1.17.85 - VERIFIED PUBLISHED BUILD
 
 Published source/tag: 427e50d765835f632f44ca4a9b185241169dd91c

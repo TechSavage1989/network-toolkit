@@ -13,7 +13,7 @@ import (
 func TestTerminalAppearanceAndActionsPositionPersistAndTransfer(t *testing.T) {
 	a := testApplication(t)
 	a.dataPath = filepath.Join(filepath.Dir(a.dataPath), "Network_Toolkit.settings.json")
-	body := `{"terminalConfirmClose":false,"terminalActiveActionsPosition":"bottom","terminalAppearance":{"fontFamily":"Cascadia Mono","fontWeight":"bold","lineHeight":1.3,"scheme":"custom","highlightUnderlines":false,"highlightColors":{"address":"#AABBCC","command":"#112233","field":"#223344","protocol":"#334455","value":"#445566","number":"#556677","comment":"#667788","error":"url(secret-canary)","unknown":"secret-canary"},"colors":{"background":"#112233","foreground":"#FAFAFA","brightRed":"#FF8888","selectionBackground":"#12345688","command":"secret-canary"},"shells":{"powershell":{"enabled":false,"colors":{"command":"#AABBCC","string":"url(secret-canary)","unknown":"#ffffff"}},"cmd":{"enabled":true,"colors":{"variable":"#112233"}},"unknown":"secret-canary"},"password":"secret-canary"}}`
+	body := `{"terminalConfirmClose":false,"terminalActiveActionsPosition":"bottom","terminalAppearance":{"fontFamily":"Cascadia Mono","fontWeight":"bold","lineHeight":1.3,"scheme":"custom","highlightUnderlines":false,"highlightColors":{"address":"#AABBCC","command":"#112233","field":"#223344","protocol":"#334455","value":"#445566","number":"#556677","comment":"#667788","error":"url(secret-canary)","unknown":"secret-canary"},"colors":{"background":"#112233","foreground":"#FAFAFA","brightRed":"#FF8888","selectionBackground":"#12345688","command":"secret-canary"},"shells":{"powershell":{"enabled":false,"colors":{"command":"#AABBCC","outputAddress":"#CC99EE","string":"url(secret-canary)","unknown":"#ffffff"}},"cmd":{"enabled":true,"colors":{"variable":"#112233"}},"unknown":"secret-canary"},"password":"secret-canary"}}`
 	r := requestApp(a, http.MethodPut, "/api/state", body, true)
 	if r.Code != http.StatusOK {
 		t.Fatalf("save terminal appearance: %d %s", r.Code, r.Body.String())
@@ -40,7 +40,7 @@ func TestTerminalAppearanceAndActionsPositionPersistAndTransfer(t *testing.T) {
 		}
 		shells := appearance["shells"].(map[string]any)
 		want := map[string]any{
-			"powershell": map[string]any{"enabled": false, "colors": map[string]any{"command": "#aabbcc"}},
+			"powershell": map[string]any{"enabled": false, "colors": map[string]any{"command": "#aabbcc", "outputAddress": "#cc99ee"}},
 			"cmd":        map[string]any{"enabled": true, "colors": map[string]any{"variable": "#112233"}},
 		}
 		if !reflect.DeepEqual(shells, want) {

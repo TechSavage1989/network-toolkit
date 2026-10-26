@@ -1,15 +1,9 @@
 # Network Toolkit development
 
-ACTIVE HOLD: The user explicitly forbids a new application build or publication
-until they authorize it. Source fixes and source-only tests are authorized.
-Work is isolated on fix/editor-shell-review-no-build. Do not push main, bump
-versions, run build/package scripts or trigger the normal build workflows. The
-branch-specific source test workflow runs JS and static browser fixtures only.
-Source-only validation is complete on 947a65a422280afaffeafb395169a49a298f98e2:
-510 JS tests and four browser suites pass in workflow 40277446727. The handoff
-records code scope, artifacts, limits and the unchanged published EXE. These are
-unbuilt source changes; future compilation/publication still requires the user's
-explicit instruction. This docs-only completion commit uses [skip ci].
+CURRENT WORK: The user explicitly authorized building and publishing the reviewed
+editor/shell fixes. The previous build hold is lifted for this 1.17.86 release.
+Run full Checks on review/hosts-editor-1.17.86, verify the exact package and then
+publish that source through main. Do not replace old tags/assets or change feeds.
 
 Read DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main,
 preserve unrelated work and all previous fixes, and follow release safeguards.
