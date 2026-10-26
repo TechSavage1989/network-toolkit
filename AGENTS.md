@@ -1,24 +1,13 @@
 # Network Toolkit development
 
-Read DEVELOPMENT_HANDOFF.md before editing/building. Start from latest main and
-preserve all working features/settings and previous release safeguards.
+Read DEVELOPMENT_HANDOFF.md before changes. Preserve existing working features and settings.
 
-Current published release: 1.17.86. The user explicitly authorized its build and
-publication, superseding the prior source-only hold. Publication is complete.
-Future releases need their own authorization. Main pushes publish new versions
-automatically. Main network-toolkit is the sole public source/update feed; never
-replace older tags/assets, change access or write the retired feed.
-
-Published source/tag: 5e1e303066e8cd89b1b2e4ce06c204566d57e2e3
-Tree: 2c16347f61593ca746f3b90218f4e2554418f9ba
-Full Checks 40278209364 and Release 40279270997 pass.
-510 JS / 31 Python guards, required Go suites, native Windows shell/progress and
-all browser steps pass. All four actual public assets and 744 source files
-verify and equal the reviewed build. All 25 older releases/assets/tags are intact.
-Released85 handlers verified/staged live86 in 10.97s using isolated settings,
-original test EXE unchanged and no installation/restart. The handoff records
-editor scroll/selection/wrap/gutter/dialog/save/reload fixes and shell output colors.
-
-This three-file docs completion uses [skip ci]. Do not move the 86 tag, replace
-assets or republish. Full native WebView2 interaction, hardware and actual update
-installation/restart remain unverified. Preserve all previous fixes.
+1.17.87 publication verified
+Source/tag: d7cd098b8ab639fc418954b38047fe254ab4ac5e
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.87
+Full Checks 40280780231 passed. Initial Windows lifecycle interruption timed out; retry passed without source changes. 510 JS tests and browser/Windows/build checks pass. Direct screenshot empty-field/heading checks and all four picker sort columns in both directions pass, preserving selection. Browser artifact 12632209025 verifies with no current runtime errors. Release 40281905179 build 121436851024 and publish 121437289706 passed.
+All four public downloads match GitHub digests/checksums, local EXE and portable package. All 745 source files match the tag. All 26 older releases/assets/tags remain unchanged. Released85 production updater checked/downloaded/verified/staged 87 in 11.11 seconds. Original executable unchanged; no install/restart performed. Full physical Windows UI interaction is not claimed.
+EXE SHA256: e05b4c60010e1f870cc3b7c736b3d38fef06c400c5299628398d363692621dcf
+Portable SHA256: 9caa907135e62d4dc9ebed5db45c035b908a73e2ab0a55e684878d29219c78e8
+Update SHA256: 5757aef8d84f56355954c0219aea7e81dfef4660ed79c6f78c186fd0b576d51b
+Publication authorized by user. Do not replace tags/assets or write the retired feed. Final documentation uses [skip ci]. Future releases require authorization.
