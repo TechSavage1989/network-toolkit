@@ -145,11 +145,13 @@ func TestWindowsLocalShellInteractiveLifecycle(t *testing.T) {
 				commandReady("Write-Output ('NTK_WIDTH_' + [Console]::WindowWidth)\r", "NTK_WIDTH_67", true)
 			}
 			// A long command must accept Ctrl+C and return to the same interactive shell.
-			// The evaluated marker cannot be satisfied by the command's input
-			// echo, and proves the long-running command has actually started.
-			command := "echo NTK_%PROCESSOR_ARCHITECTURE%_BUSY && ping -n 60 127.0.0.1 >nul\r"
-			marker := "NTK_AMD64_BUSY"
+			// Wait for ping's first real loopback reply. A preceding echo can
+			// complete before the child is ready to handle console input.
+			// TTL= is absent from the command echo and is emitted by ping itself.
+			command := "ping -n 60 127.0.0.1\r"
+			marker := "TTL="
 			if kind == "powershell" {
+				// The evaluated marker cannot be satisfied by the input echo.
 				command = "Write-Output ('NTK_' + 'BUSY'); Start-Sleep -Seconds 60\r"
 				marker = "NTK_BUSY"
 			}
