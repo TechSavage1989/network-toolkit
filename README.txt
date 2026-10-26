@@ -1,7 +1,12 @@
-NETWORK TOOLKIT 1.17.84
+NETWORK TOOLKIT 1.17.85
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.84
+CURRENT RELEASE - 1.17.85
+
+Local PowerShell and Command Prompt have explicit syntax-color controls.
+Closing active terminal tabs and sessions has a saved confirmation preference.
+
+PREVIOUS RELEASE - 1.17.84
 
 The editor detects file languages and supplies offline grammar-based syntax
 colors, explicit parser formatting for web/data formats and safe code indentation

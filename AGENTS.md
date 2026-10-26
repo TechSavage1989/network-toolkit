@@ -1,5 +1,9 @@
 # Network Toolkit development
 
+Current work: unpublished 1.17.85 review. The user reports monochrome local
+shells and missing shell-specific controls, and requests configurable terminal
+close confirmations. Preserve the 84 editor and all earlier fixes. The user has now explicitly authorized publication when complete.
+
 Read DEVELOPMENT_HANDOFF.md before editing or building. Start from current
 main, preserve unrelated work and follow the checks/release safeguards.
 

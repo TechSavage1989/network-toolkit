@@ -2,6 +2,7 @@ package terminal
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -11,6 +12,69 @@ import (
 	"testing"
 	"time"
 )
+
+// Capture actual ConPTY rendering so browser tests can replay real Windows
+// prompts/SGR attributes rather than assuming an unformatted synthetic prompt.
+func TestWindowsLocalShellColorTranscript(t *testing.T) {
+	if !LocalShellAvailable() {
+		t.Fatal("ConPTY is unavailable")
+	}
+	for _, kind := range []string{"cmd", "powershell"} {
+		t.Run(kind, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+			defer cancel()
+			req, err := normalizeRequest(ConnectRequest{Type: kind, Cols: 120, Rows: 20})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var mu sync.Mutex
+			var output strings.Builder
+			tr, err := openLocalShell(ctx, req, transportCallbacks{Output: func(b []byte) {
+				mu.Lock()
+				if output.Len()+len(b) <= 128*1024 {
+					output.Write(b)
+				}
+				mu.Unlock()
+			}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer tr.Close()
+			deadline := time.Now().Add(10 * time.Second)
+			for time.Now().Before(deadline) {
+				mu.Lock()
+				ready := strings.Contains(output.String(), ">")
+				mu.Unlock()
+				if ready {
+					break
+				}
+				time.Sleep(20 * time.Millisecond)
+			}
+			command := "echo %TEMP% && dir /a REM_NTK_COLOR_SAMPLE"
+			if kind == "powershell" {
+				command = "Get-ChildItem -Path \"$env:TEMP\" | Select-Object -First 2 # NTK_COLOR_SAMPLE"
+			}
+			// Intentionally no Enter: this records typing without executing a command.
+			if _, err = tr.Write([]byte(command)); err != nil {
+				t.Fatal(err)
+			}
+			time.Sleep(800 * time.Millisecond)
+			mu.Lock()
+			raw := output.String()
+			mu.Unlock()
+			if !strings.Contains(raw, ">") || !strings.Contains(raw, "NTK_COLOR_SAMPLE") {
+				t.Fatalf("native command line did not render: %q", raw)
+			}
+			t.Logf("NTK_SHELL_CAPTURE_%s=%s", strings.ToUpper(kind), base64.StdEncoding.EncodeToString([]byte(raw)))
+			cancel()
+			select {
+			case <-tr.Done():
+			case <-time.After(10 * time.Second):
+				t.Fatal("probe shell did not close")
+			}
+		})
+	}
+}
 
 func TestWindowsLocalShellInteractiveLifecycle(t *testing.T) {
 	if !LocalShellAvailable() {

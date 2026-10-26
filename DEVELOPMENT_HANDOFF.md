@@ -1,5 +1,20 @@
 # Network Toolkit development handoff
 
+## 1.17.85 review in progress: shell colors and close confirmations
+
+Started from main b0ee0c9eb1ed171d834eef7aae944506f65246c2 / published 84.
+The user reports white text in PowerShell/cmd, missing dedicated settings, and
+requests a configurable prompt when closing terminal tabs/sessions. A synthetic
+xterm reproduction shows recognized syntax with zero colored marks under SGR
+97;40 / 37;40 and the app's default theme, while unformatted text receives colors.
+This is under investigation with native ConPTY output; no native cause or fix is
+claimed yet. Existing global device highlighting also gates local shell colors.
+Implement explicit per-shell controls and a saved close-confirmation preference,
+preserving current close behavior by default. A native transcript probe will
+exercise real Windows startup/typing, followed by replay through the renderer.
+The user subsequently requested collapsed tool-sidebar navigation without auto-
+expansion and explicitly authorized publication of the completed 85 update.
+
 ## 1.17.84 published: editor languages and local shell syntax
 
 The user explicitly authorized publication after receiving the verified 84 review

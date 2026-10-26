@@ -1,0 +1,6 @@
+Network Toolkit 1.17.85
+
+- Fix local shell syntax colors when Windows emits white-on-black console attributes.
+- Add separate PowerShell and Command Prompt syntax-color settings and previews.
+- Keep local shell coloring independent of network-device output highlighting.
+- Make confirmation before closing terminal tabs and sessions configurable.
