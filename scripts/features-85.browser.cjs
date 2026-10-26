@@ -14,7 +14,7 @@ async function start(type){
  const id='shell85-'+serial;await page.waitForFunction(id=>terminalSessions.get(id)?.xterm,id);return id;
 }
 async function display(){if(await page.locator('#terminalSessionPanel.hidden').count())await page.locator('#terminalSessionToggle').click();await page.locator('#terminalAppearanceEditor').waitFor({state:'visible'});}
-async function replay(id,base64){await page.evaluate(async({id,base64})=>{const e=terminalSessions.get(id);selectTerminal(id,false);e.xterm.reset();e.xterm.resize(120,20);appendTerminalOutput(e,Uint8Array.from(atob(base64),c=>c.charCodeAt(0)));await terminalDisplayBarrier(e);},{id,base64});await page.waitForFunction(id=>terminalSessions.get(id).element.querySelector('[data-nt-highlight="shell-variable"]'),id);await settle();}
+async function replay(id,base64){await page.evaluate(async({id,base64})=>{const e=terminalSessions.get(id);selectTerminal(id,false);e.xterm.reset();e.xterm.resize(120,20);appendTerminalOutput(e,Uint8Array.from(atob(base64),c=>c.charCodeAt(0)));await terminalDisplayBarrier(e);},{id,base64});await page.waitForFunction(id=>terminalSessions.get(id).element.querySelector('[data-nt-highlight="shell-variable"]'),id);await settle();await page.waitForFunction(id=>terminalSessions.get(id).info.type!=='cmd'||__shellColors(id,'%TEMP%').includes('rgb(140, 226, 182)'),id);}
 async function buffer(id){return page.evaluate(id=>{const b=terminalSessions.get(id).xterm.buffer.normal;return Array.from({length:b.length},(_,y)=>b.getLine(y).translateToString(true)).join('\n').replace(/\n+$/,'');},id);}
 (async()=>{
  if(out)fs.mkdirSync(out,{recursive:true});browser=await chromium.launch({headless:true,args:['--no-sandbox']});
