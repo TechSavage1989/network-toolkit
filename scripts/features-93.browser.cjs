@@ -52,7 +52,7 @@ async function pointDetails(){return page.locator('.rt-timeline .rt-detail').fir
 const timeline=()=>page.locator('.rt-timeline[data-rt-id="ui93-monitor"]');
 const marker=sequence=>timeline().locator('[data-rt-surface="latency"] [data-rt-sequence="'+sequence+'"]');
 const sampleRow=sequence=>page.locator('tr[data-result-graph-id="ui93-monitor"][data-result-sequence="'+sequence+'"]');
-const list=()=>page.locator('[data-graph-workspace="ui93-monitor"] [data-graph-results]');
+const list=()=>page.locator('[data-graph-workspace="ui93-monitor"] [data-graph-results] .table-wrap');
 const packetGraph=()=>page.locator('#packetGraphDock [data-packet-timeline]');
 const packetBucket=index=>packetGraph().locator('[data-packet-bucket="'+index+'"]');
 const popup=()=>page.locator('[data-rt-tooltip]');
@@ -106,40 +106,57 @@ async function assertDisplayedClock(expected,{hourFormat,zoneMode,timeZone}){
 }
 
 async function latencyGeometry(label){
+ await list().evaluate(el=>{for(const node of [el,...el.querySelectorAll('*')])if(node.scrollTop&&['auto','scroll'].includes(getComputedStyle(node).overflowY))node.scrollTop=0;});await settle();
+ await list().scrollIntoViewIfNeeded();await settle();
  const frame=await assertNoPageOverflow(label);
  const geometry=await page.locator('[data-graph-workspace="ui93-monitor"]').evaluate(workspace=>{
   const rect=el=>{const b=el.getBoundingClientRect();return {left:b.left,right:b.right,top:b.top,bottom:b.bottom,width:b.width,height:b.height};};
   const graph=workspace.querySelector('[data-graph-pane]'),results=workspace.querySelector('[data-graph-results]'),panel=workspace.closest('.panel'),title=panel.querySelector('.result-title h2'),source=panel.querySelector('.job-source-label');
   const textBoxes=el=>{const r=document.createRange();r.selectNodeContents(el);return [...r.getClientRects()].filter(r=>r.width&&r.height).map(rect=>({left:rect.left,right:rect.right}));};
   const stats=[...graph.querySelectorAll('.result-stat')].map(card=>({card:rect(card),text:[...textBoxes(card.querySelector('strong')),...textBoxes(card.querySelector('span'))]}));
-  return {workspace:rect(workspace),graph:rect(graph),results:rect(results),title:rect(title),titleLineHeight:parseFloat(getComputedStyle(title).lineHeight),source:rect(source),scrollHeight:results.scrollHeight,overflow:getComputedStyle(results).overflowY,stats};
+  const wrap=results.querySelector('.table-wrap'),table=wrap.querySelector('table');let clipTop=0,clipBottom=innerHeight;
+  for(let node=wrap;node;node=node.parentElement){if(['auto','scroll','hidden','clip'].includes(getComputedStyle(node).overflowY)){const b=node.getBoundingClientRect();clipTop=Math.max(clipTop,b.top+node.clientTop);clipBottom=Math.min(clipBottom,b.top+node.clientTop+node.clientHeight);}}
+  const headers=[...table.querySelectorAll('thead th')].map(rect).filter(b=>b.bottom>clipTop&&b.top<clipBottom),bodyTop=Math.max(clipTop,...headers.map(b=>b.bottom)),bodyBottom=clipBottom,rows=[...table.querySelectorAll('tbody tr[data-result-graph-id]')].map(rect),completeRows=rows.filter(b=>b.top>=bodyTop-1&&b.bottom<=bodyBottom+1).length;
+  const graphRect=rect(graph);let graphTop=Math.max(0,graphRect.top),graphBottom=Math.min(innerHeight,graphRect.bottom);for(let node=graph.parentElement;node;node=node.parentElement){if(['auto','scroll','hidden','clip'].includes(getComputedStyle(node).overflowY)){const b=node.getBoundingClientRect();graphTop=Math.max(graphTop,b.top+node.clientTop);graphBottom=Math.min(graphBottom,b.top+node.clientTop+node.clientHeight);}}
+  return {workspace:rect(workspace),graph:graphRect,visibleGraphHeight:Math.max(0,graphBottom-graphTop),results:rect(results),reader:rect(wrap),title:rect(title),titleLineHeight:parseFloat(getComputedStyle(title).lineHeight),source:rect(source),scrollHeight:wrap.scrollHeight,overflow:getComputedStyle(wrap).overflowY,stats,tableBody:{top:bodyTop,bottom:bodyBottom,height:Math.max(0,bodyBottom-bodyTop),completeRows,rowHeight:rows[0]?.height||0}};
  });
  assert(geometry.title.width>=Math.min(120,geometry.workspace.width-24)&&geometry.title.height<=3*geometry.titleLineHeight+1,label+' has a readable results heading');
  assert(geometry.source.width>=Math.min(90,geometry.workspace.width-24),label+' has a readable source caption');
  assert(geometry.graph.height>=Math.min(150,geometry.workspace.height*.3),label+' graph pane is not crushed');
+ assert(geometry.visibleGraphHeight>=90,label+' graph remains visible while its result rows are accessible '+JSON.stringify(geometry));
  assert(geometry.results.height>=Math.min(120,geometry.workspace.height*.25),label+' list pane is not crushed');
  assert(geometry.results.top>=geometry.graph.bottom-1,label+' graph remains above its associated list');
- assert(geometry.scrollHeight>geometry.results.height+30,label+' result list has independent scrolling');
+ assert(geometry.scrollHeight>geometry.reader.height+30,label+' result list has independent scrolling');
  assert(['auto','scroll'].includes(geometry.overflow),label+' result list owns its vertical scrollbar');
+ const minimumRows=frame.height<800?2:3;report.lastMonitorGeometry={label,...geometry};
+ assert(geometry.tableBody.completeRows>=minimumRows,label+' has at least'+minimumRows+' complete visible sample rows after toolbar, headers and footer '+JSON.stringify(geometry.tableBody));
  assert.equal(geometry.stats.length,7,label+' keeps every run statistic available');
  for(const item of geometry.stats)for(const text of item.text)assert(text.left>=item.card.left-1&&text.right<=item.card.right+1,label+' statistic text remains inside its tile');
  const before=geometry.graph;
  await list().evaluate(el=>{el.scrollTop=el.scrollHeight;});await settle();
- const scrolled=await page.locator('[data-graph-workspace="ui93-monitor"]').evaluate(el=>{const g=el.querySelector('[data-graph-pane]').getBoundingClientRect(),r=el.querySelector('[data-graph-results]');return {graphTop:g.top,graphBottom:g.bottom,listScroll:r.scrollTop};});
+ const scrolled=await page.locator('[data-graph-workspace="ui93-monitor"]').evaluate(el=>{const g=el.querySelector('[data-graph-pane]').getBoundingClientRect(),r=el.querySelector('[data-graph-results] .table-wrap');return {graphTop:g.top,graphBottom:g.bottom,listScroll:r.scrollTop};});
  assert(scrolled.listScroll>30,label+' rows can scroll to the end');
  assert(Math.abs(scrolled.graphTop-before.top)<1&&Math.abs(scrolled.graphBottom-before.bottom)<1,label+' scrolling results does not move the graph pane');
  return {frame,geometry,scrolled};
 }
 
 async function packetGeometry(label){
+ await page.locator('#packetTableScroll').scrollIntoViewIfNeeded();await settle();
  const frame=await assertNoPageOverflow(label);
  const geometry=await page.evaluate(()=>{
   const rect=el=>{const b=el.getBoundingClientRect();return {left:b.left,right:b.right,top:b.top,bottom:b.bottom,width:b.width,height:b.height};};
   const graph=document.querySelector('#packetGraphDock'),reader=document.querySelector('#packetGraphReader'),table=document.querySelector('#packetTableScroll'),row=document.querySelector('#packetRows [data-packet-number]'),cell=row.querySelector('.packet-local-time'),clock=cell.querySelector('time');
-  return {graph:rect(graph),reader:rect(reader),table:rect(table),row:rect(row),cell:rect(cell),clock:rect(clock),scrollHeight:table.scrollHeight,overflow:getComputedStyle(table).overflowY};
+  let clipTop=0,clipBottom=innerHeight;for(let node=table;node;node=node.parentElement){if(['auto','scroll','hidden','clip'].includes(getComputedStyle(node).overflowY)){const b=node.getBoundingClientRect();clipTop=Math.max(clipTop,b.top+node.clientTop);clipBottom=Math.min(clipBottom,b.top+node.clientTop+node.clientHeight);}}
+  const headers=[...table.querySelectorAll('thead th')].map(rect).filter(b=>b.bottom>clipTop&&b.top<clipBottom),bodyTop=Math.max(clipTop,...headers.map(b=>b.bottom)),bodyBottom=clipBottom,rows=[...table.querySelectorAll('tbody tr[data-packet-number]')].map(rect),completeRows=rows.filter(b=>b.top>=bodyTop-1&&b.bottom<=bodyBottom+1).length;
+  const graphRect=rect(graph);let graphTop=Math.max(0,graphRect.top),graphBottom=Math.min(innerHeight,graphRect.bottom);for(let node=graph.parentElement;node;node=node.parentElement){if(['auto','scroll','hidden','clip'].includes(getComputedStyle(node).overflowY)){const b=node.getBoundingClientRect();graphTop=Math.max(graphTop,b.top+node.clientTop);graphBottom=Math.min(graphBottom,b.top+node.clientTop+node.clientHeight);}}
+  return {graph:graphRect,visibleGraphHeight:Math.max(0,graphBottom-graphTop),reader:rect(reader),table:rect(table),row:rect(row),cell:rect(cell),clock:rect(clock),scrollHeight:table.scrollHeight,overflow:getComputedStyle(table).overflowY,workspaceScroll:document.querySelector('#packetCaptureWorkspace').scrollTop,tableBody:{top:bodyTop,bottom:bodyBottom,height:Math.max(0,bodyBottom-bodyTop),completeRows,rowHeight:rows[0]?.height||0}};
  });
- assert(geometry.reader.height>=90,label+' retains readable graph details');
- assert(geometry.table.height>=90,label+' retains usable packet list height');
+ report.lastPacketGeometry={label,...geometry};
+ assert(geometry.reader.height>=90,label+' retains readable graph details '+JSON.stringify(geometry));
+ assert(geometry.visibleGraphHeight>=90,label+' graph remains visible while its packet rows are accessible '+JSON.stringify(geometry));
+ assert(geometry.table.height>=90,label+' retains usable packet list height '+JSON.stringify(geometry));
+ const minimumRows=frame.height<800?2:3;
+ assert(geometry.tableBody.completeRows>=minimumRows,label+' has at least'+minimumRows+' complete visible packet rows after header, scrollbar and surrounding panes '+JSON.stringify(geometry));
  assert(geometry.row.height<=22,label+' retains the packet virtualization row height');
  assert(geometry.clock.left>=geometry.cell.left-1&&geometry.clock.right<=geometry.cell.right+1,label+' clock text stays inside its packet column');
  assert(geometry.table.top>=geometry.graph.bottom-1,label+' packet graph stays above its list');
@@ -224,6 +241,8 @@ async function packetGeometry(label){
   if(out)await page.screenshot({path:path.join(out,'ui93-monitor-'+viewport.width+'x'+viewport.height+'-'+theme+'.png')});report.layouts.push({kind:'monitor',...viewport,theme,...geometry});
  }
  check('Graphs and details stay above independently scrollable result lists with usable adjustable space across desktop, compact, narrow and short layouts');
+
+ await page.setViewportSize({width:1440,height:1000});await show('monitor');await timeline().locator('[data-rt-mode]').selectOption('progressive');const savedRatio=await page.evaluate(()=>state.graphWorkspacePreferences.ratio);await page.evaluate(()=>flushState());await page.reload();await page.waitForFunction(()=>__networkToolkitStartupState===1&&online);await show('monitor');assert.equal(await timeline().locator('[data-rt-mode]').inputValue(),'progressive','Graph view preference survives app state reload');assert.equal(await page.evaluate(()=>state.graphWorkspacePreferences.ratio),savedRatio,'Graph/list space preference survives app state reload');report.preferences.push({graphModeRestored:'progressive',paneRatioRestored:savedRatio});await timeline().locator('[data-rt-mode]').selectOption('window');
 
  await page.setViewportSize({width:1440,height:1000});await page.evaluate(()=>navigate('capture'));await page.waitForFunction(()=>NetworkToolkitPacketCapture.model.selected&&!NetworkToolkitPacketCapture.model.busy);await page.locator('[data-packet-view="packets"]').click();await page.locator('#packetRows [data-packet-number="1"]').waitFor();await packetBucket(0).waitFor();
  await packetBucket(0).hover({force:true});const packetTip=await popupBounds(page.locator('#packetGraphPopup'),'Packet interval popup');assert(packetTip.text.includes('01:00:00.625')&&packetTip.text.includes('100 B'),'Packet popup contains recorded interval evidence');

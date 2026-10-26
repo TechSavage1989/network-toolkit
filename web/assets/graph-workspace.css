@@ -1,11 +1,14 @@
 /* The graph and its selected-point context keep their own space while results
    scroll independently. The divider uses the same grip as the other panes. */
-.graph-workspace{display:grid;grid-template-rows:minmax(0,var(--graph-pane-share,60fr)) 10px minmax(0,var(--graph-result-share,40fr));gap:4px;min-width:0;min-height:360px;height:min(72vh,700px);overflow:hidden}
+.graph-workspace{display:grid;grid-template-rows:minmax(var(--graph-min-height,180px),var(--graph-pane-share,60fr)) 10px minmax(var(--graph-list-min-height,230px),var(--graph-result-share,40fr));gap:4px;min-width:0;min-height:360px;height:min(72vh,700px);overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
 .graph-workspace-graph,.graph-workspace-results{min-width:0;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--border) transparent;scrollbar-gutter:stable}
 .graph-workspace-graph{padding:0 3px 3px 0}
 .graph-workspace-graph>.rt-timeline{margin-top:0;margin-bottom:10px}
 .graph-workspace-graph>.result-stats{margin-top:10px}
-.graph-workspace-results{border:1px solid var(--border);border-radius:8px;background:var(--panel)}
+.graph-workspace-graph>details{margin-top:8px}
+.graph-workspace-results{display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--border);border-radius:8px;background:var(--panel);scrollbar-gutter:auto}
+.graph-workspace-results>.data-list{display:flex;flex-direction:column;flex:1;min-height:0;min-width:0}
+.graph-workspace-results [data-list-content]{display:flex;flex-direction:column;flex:1;min-height:0;min-width:0}
 .graph-workspace-divider{position:relative;border:0;border-radius:5px;background:var(--line);cursor:row-resize;touch-action:none;outline-offset:2px}
 .graph-workspace-divider:after{content:'';position:absolute;left:calc(50% - 16px);top:4px;width:32px;height:2px;border-radius:2px;background:var(--faint)}
 .graph-workspace-divider:hover,.graph-workspace-divider:focus-visible,.graph-workspace-dragging>.graph-workspace-divider{background:var(--border)}
@@ -14,9 +17,16 @@
 #toolResultsScroll:has(>.graph-workspace){display:flex;flex-direction:column;gap:6px;overflow:hidden;scrollbar-gutter:auto}
 #toolResultsScroll>.graph-workspace{flex:1;height:auto;min-height:0}
 #toolResultsScroll:has(>.graph-workspace)>details{flex:0 0 auto;max-height:32%;overflow:auto;margin-top:0}
-#toolResultsScroll .graph-workspace-results .data-list-tools{position:sticky;top:0;left:0;padding:7px 9px;margin:0;box-shadow:none;background:var(--panel);z-index:5}
-#toolResultsScroll .graph-workspace-results .table-wrap{overflow:visible;max-height:none}
-#toolResultsScroll .graph-workspace-results .table-wrap thead th{position:sticky;top:var(--graph-list-toolbar-height,48px);z-index:3}
-#toolResultsScroll .graph-workspace-results .data-list-foot{padding:7px 9px}
+#toolResultsScroll .graph-workspace-results .data-list-tools{position:relative;flex:0 0 auto;flex-wrap:nowrap;top:auto;left:0;width:100%;transform:none;padding:5px 8px;margin:0;box-shadow:none;background:var(--panel);z-index:5}
+#toolResultsScroll .graph-workspace-results .data-list-tools .list-query{flex:1 1 0;min-width:0}
+#toolResultsScroll .graph-workspace-results .table-wrap{flex:1;min-height:var(--graph-table-min-height,140px);overflow:auto;max-height:none;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-gutter:stable}
+#toolResultsScroll .graph-workspace-results .data-table{min-width:850px}
+#toolResultsScroll .graph-workspace-results .data-table th,#toolResultsScroll .graph-workspace-results .data-table td{white-space:nowrap;overflow-wrap:normal}
+#toolResultsScroll .graph-workspace-results .table-wrap thead th{position:sticky;top:0;z-index:3}
+#toolResultsScroll .graph-workspace-results .data-list-foot{flex:0 0 auto;flex-wrap:nowrap;gap:8px;padding:4px 8px;border-top:1px solid var(--line);background:var(--panel)}
+#toolResultsScroll .graph-workspace-results .data-list-foot>.row{flex-wrap:nowrap}
+#toolResultsScroll .graph-workspace-results .data-list-foot>span{white-space:nowrap;min-width:0}
+@media(max-height:720px){.graph-workspace{--graph-min-height:150px}#toolResultsScroll:has(>.graph-workspace){padding:6px}}
+@media(max-width:600px){.graph-workspace-results .list-match-count{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}}
 @media(max-width:600px){.graph-workspace{gap:3px}.graph-workspace-graph{padding-right:0}#toolResultsScroll:has(>.graph-workspace){padding:6px}}
 @media print{.graph-workspace,.graph-workspace-graph,.graph-workspace-results{display:block;height:auto;min-height:0;overflow:visible}.graph-workspace-divider{display:none}}

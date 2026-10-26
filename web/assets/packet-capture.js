@@ -96,7 +96,7 @@ function restoreDisclosures(container=node('packetCaptureWorkspace')){if(!contai
 function layoutDetails(){
  const area=node('packetCaptureAnalysis');if(!area)return;if(model.view!=='packets'||!node('packetInspector')){area.style.gridTemplateColumns='';area.style.gridTemplateRows='';return;}
  const pref=preferences(),bounds=area.getBoundingClientRect(),width=bounds.width||area.clientWidth||1000,height=bounds.height||area.clientHeight||400,bottom=pref.dock==='bottom'||(pref.dock==='auto'&&width<1070);
- const listMinimum=node('packetGraphDock')&&!node('packetGraphDock').hidden?166:96;
+ const graphVisible=node('packetGraphDock')&&!node('packetGraphDock').hidden,listMinimum=graphVisible?Math.ceil(packetListOverhead()+146):96;
  const minimum=bottom?Math.min(80,Math.max(40,height-listMinimum)):260,maximum=bottom?Math.max(minimum,Math.min(650,height*.65,height-listMinimum)):Math.max(260,Math.min(700,width-326)),dimension=Math.round(clamp(pref[bottom?'height':'width'],minimum,maximum));
  area.classList.toggle('packet-details-bottom',bottom);area.classList.toggle('packet-details-hidden',pref.hidden);
  area.style.gridTemplateColumns=bottom?'minmax(0,1fr)':'minmax(0,1fr) 6px '+(pref.hidden?30:dimension)+'px';area.style.gridTemplateRows=bottom?'minmax(0,1fr) 6px '+(pref.hidden?30:dimension)+'px':'minmax(0,1fr)';
@@ -104,6 +104,7 @@ function layoutDetails(){
  const inspector=node('packetInspector'),rail=node('packetDetailsRail');if(inspector)inspector.hidden=pref.hidden;if(rail)rail.hidden=!pref.hidden;
  for(const button of area.querySelectorAll('[data-packet-action="toggle-details"],[data-packet-action="hide-details"]'))root.NetworkToolkitPanelControls?.set(button,{name:'packet details',edge:bottom?'bottom':'right',expanded:!pref.hidden});
  if(rail)root.NetworkToolkitPanelControls?.bindReveal?.(rail,{collapsed:()=>preferences().hidden,button:()=>rail.querySelector('[data-packet-action="toggle-details"]')});
+ if(graphVisible)layoutPacketGraph();
  if(!detailObserver&&typeof ResizeObserver==='function')detailObserver=new ResizeObserver(layoutDetails);if(detailObserver&&observedAnalysis!==area){if(observedAnalysis)detailObserver.unobserve(observedAnalysis);observedAnalysis=area;detailObserver.observe(area);}
 }
 function dockSelector(){return '<label class="sr-only" for="packetDetailsDock">Details position</label><select id="packetDetailsDock" aria-label="Details position" title="Details position">'+options([['auto','Auto'],['right','Right'],['bottom','Bottom']],preferences().dock)+'</select>';}
@@ -254,10 +255,26 @@ function renderStatistics(statistics){
  if(inside)area.querySelector('[data-packet-bucket="'+(selected??Math.min(Number(point.dataset.packetBucket),Math.max(0,(statistics.timeline||[]).length-1)))+'"]')?.focus?.({preventScroll:true});
 }
 function packetGraphHeight(){const value=Number(state.packetGraphPreferences?.height);return Number.isFinite(value)?clamp(value,100,600):230;}
-function layoutPacketGraph(){const dock=node('packetGraphDock');if(!dock)return;dock.style.flexBasis=packetGraphHeight()+'px';const divider=node('packetGraphDivider');if(divider){divider.setAttribute('aria-valuenow',String(Math.round(dock.getBoundingClientRect?.().height||packetGraphHeight())));divider.setAttribute('aria-valuemin','100');divider.setAttribute('aria-valuemax','600');}}
+function packetListOverhead(){
+ const panel=node('packetCaptureAnalysis')?.querySelector('.packet-list-panel'),table=node('packetTableScroll');
+ const panelHeight=panel?.getBoundingClientRect?.().height,tableHeight=table?.getBoundingClientRect?.().height;
+ return Number.isFinite(panelHeight)&&Number.isFinite(tableHeight)&&panelHeight>0&&tableHeight>0?Math.max(0,panelHeight-tableHeight):70;
+}
+function layoutPacketGraph(){
+ const dock=node('packetGraphDock'),area=node('packetCaptureAnalysis'),workspace=node('packetCaptureWorkspace');if(!dock||!area)return;
+ const show=model.view==='packets'&&!!model.selected&&!dock.hidden;workspace?.classList.toggle('packet-has-traffic-graph',show);
+ if(!show){area.style.minHeight='';dock.style.maxHeight='';return;}
+ const bounds=area.getBoundingClientRect(),bottom=preferences().dock==='bottom'||preferences().dock==='auto'&&(bounds.width||area.clientWidth||1000)<1070;
+ // Reserve actual row-list chrome as well as readable rows. The old fixed
+ // panel reserve ignored wrapped toolbar/footer content on narrow windows.
+ const minimum=Math.ceil(packetListOverhead()+140+(bottom?(preferences().hidden?36:86):0));
+ const available=Math.floor((dock.getBoundingClientRect?.().height||packetGraphHeight())+(bounds.height||area.clientHeight||minimum)),maximum=Math.max(100,Math.min(600,available-minimum));
+ area.style.minHeight=Math.ceil(minimum)+'px';dock.style.maxHeight=Math.round(maximum)+'px';dock.style.flexBasis=Math.round(Math.min(packetGraphHeight(),maximum))+'px';
+ const divider=node('packetGraphDivider');if(divider){divider.setAttribute('aria-valuenow',String(Math.round(dock.getBoundingClientRect?.().height||packetGraphHeight())));divider.setAttribute('aria-valuemin','100');divider.setAttribute('aria-valuemax',String(Math.round(maximum)));}
+}
 function refreshPacketGraph(){
  const dock=node('packetGraphDock');if(!dock)return;
- const show=model.view==='packets'&&!!model.selected;dock.hidden=!show;if(!show){dock.innerHTML='';dock._ntGraphMarkup='';return;}
+ const show=model.view==='packets'&&!!model.selected;dock.hidden=!show;if(!show){dock.innerHTML='';dock._ntGraphMarkup='';layoutPacketGraph();return;}
  const stats=model.statistics||{timeline:[]},markup=packetTrafficHTML(stats),old=node('packetGraphReader'),top=old?.scrollTop||0;rememberPacketGraphScroll();
  if(dock._ntGraphMarkup!==markup||!old){hidePacketGraphPopup();dock.innerHTML='<div id="packetGraphReader" class="packet-graph-reader" tabindex="0" role="region" aria-label="Packet graph and associated information">'+markup+'</div><div id="packetGraphDivider" class="packet-graph-divider" role="separator" tabindex="0" aria-orientation="horizontal" aria-label="Resize packet graph and packet list" title="Drag to resize graph area. Arrow keys resize; Home resets."></div>';dock._ntGraphMarkup=markup;node('packetGraphReader').scrollTop=top;}
  layoutPacketGraph();restorePacketGraphScroll();updatePacketTimeline();
@@ -571,7 +588,7 @@ async function refreshPacketWindow(offset){
 }
 async function analysis(seq=model.sequence,force=false){
  const area=node('packetCaptureAnalysis');if(!area)return;rememberDisclosures();area.classList.toggle('packet-analysis-summary',model.view!=='packets');layoutDetails();
- if(!model.selected){if(!area.querySelector('.packet-welcome')){area.innerHTML='<div class="packet-empty packet-welcome"><h2>Start with the problem you want to reproduce</h2><p>Choose the network adapter above, select a troubleshooting task, and start capture before trying the connection. Stop once the problem occurs.</p><p>Already have a recording? Use <strong>Open capture file</strong> to review a PCAP or PCAPNG file.</p><p>The Troubleshooting view explains observed patterns and suggests next checks. Packets and technical details remain available in the other tabs.</p>'+glossaryHTML()+'</div>';restoreDisclosures(area);}return;}
+ if(!model.selected){refreshPacketGraph();if(!area.querySelector('.packet-welcome')){area.innerHTML='<div class="packet-empty packet-welcome"><h2>Start with the problem you want to reproduce</h2><p>Choose the network adapter above, select a troubleshooting task, and start capture before trying the connection. Stop once the problem occurs.</p><p>Already have a recording? Use <strong>Open capture file</strong> to review a PCAP or PCAPNG file.</p><p>The Troubleshooting view explains observed patterns and suggests next checks. Packets and technical details remain available in the other tabs.</p>'+glossaryHTML()+'</div>';restoreDisclosures(area);}return;}
  if(model.view==='troubleshooting'){
   const capture=model.captures.find(s=>s.id===model.selected),stamp=model.selected+':'+(capture?.revision??capture?.count??0)+':'+capture?.state;
   if(!model.report||model.reportStamp!==stamp){const value=await request('/'+model.selected+'/troubleshoot');if(!visible()||seq!==model.sequence)return;model.report=value;model.reportStamp=stamp;}

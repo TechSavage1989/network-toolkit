@@ -9,7 +9,8 @@
  function mergePreferences(saved){const target=appState();if(target)target.graphWorkspacePreferences=normalize(saved?.graphWorkspacePreferences);}
  function model(id){const key=String(id??'').slice(0,512);let item=models.get(key);if(!item)item={graphTop:0,graphLeft:0,resultTop:0,resultLeft:0,node:null};models.delete(key);models.set(key,item);while(models.size>64){const first=models.keys().next().value,removed=models.get(first);if(removed?.node){resizeObserver?.unobserve(removed.node);const results=removed.node.querySelector('[data-graph-results]');if(results)resizeObserver?.unobserve(results);}models.delete(first);}return item;}
  function find(id){return [...(root.document?.querySelectorAll?.('[data-graph-workspace]')||[])].find(node=>node.dataset.graphWorkspace===id);}
- function capture(node,item){if(!node||!item)return;const graph=node.querySelector('[data-graph-pane]'),results=node.querySelector('[data-graph-results]');if(graph){item.graphTop=graph.scrollTop||0;item.graphLeft=graph.scrollLeft||0;}if(results){item.resultTop=results.scrollTop||0;item.resultLeft=results.scrollLeft||0;}}
+ function resultScroller(node){const results=node?.querySelector('[data-graph-results]');return results?.querySelector('.table-wrap')||results;}
+ function capture(node,item){if(!node||!item)return;const graph=node.querySelector('[data-graph-pane]'),results=resultScroller(node);item.workspaceTop=node.scrollTop||0;item.workspaceLeft=node.scrollLeft||0;if(graph){item.graphTop=graph.scrollTop||0;item.graphLeft=graph.scrollLeft||0;}if(results){item.resultTop=results.scrollTop||0;item.resultLeft=results.scrollLeft||0;}}
  function html(id,graph,results){
   const key=String(id??'').slice(0,512),item=model(key);capture(find(key),item);
   const percent=Math.round(preferences().ratio*100);
@@ -23,7 +24,12 @@
   if(persist&&typeof saveState==='function')saveState();
   return value;
  }
- function measure(node){const results=node.querySelector('[data-graph-results]'),toolbar=results?.querySelector('.data-list-tools');if(results&&toolbar)property(results,'--graph-list-toolbar-height',Math.ceil(toolbar.getBoundingClientRect().height||0)+'px');}
+ function measure(node){
+  const results=node.querySelector('[data-graph-results]'),toolbar=results?.querySelector('.data-list-tools'),footer=results?.querySelector('.data-list-foot'),scroll=resultScroller(node),head=scroll?.querySelector('thead'),row=scroll?.querySelector('tbody tr');
+  if(results&&toolbar){const toolbarHeight=toolbar.getBoundingClientRect().height||0,footerHeight=footer?.getBoundingClientRect().height||0,headHeight=head?.getBoundingClientRect().height||0,rowHeight=row?.getBoundingClientRect().height||0,scrollbar=Math.max(16,(scroll?.offsetHeight||0)-(scroll?.clientHeight||0)),rows=root.innerHeight&&root.innerHeight<=720?2:3,tableMinimum=Math.max(140,Math.ceil(headHeight+rowHeight*rows+scrollbar+2));property(results,'--graph-list-toolbar-height',Math.ceil(toolbarHeight)+'px');property(results,'--graph-table-min-height',tableMinimum+'px');property(node,'--graph-list-min-height',Math.ceil(toolbarHeight+footerHeight+tableMinimum+2)+'px');}
+  const graph=node.querySelector('[data-graph-pane]'),divider=node.querySelector('[data-graph-divider]'),graphHeight=graph?.getBoundingClientRect().height,resultHeight=results?.getBoundingClientRect().height;
+  if(graphHeight>0&&resultHeight>0){const percent=Math.round(graphHeight/(graphHeight+resultHeight)*100),saved=Math.round(preferences().ratio*100);divider?.setAttribute('aria-valuenow',String(percent));divider?.setAttribute('aria-valuetext',percent+' percent graph, '+(100-percent)+' percent results'+(percent!==saved?' (saved preference '+saved+' percent graph)':''));}
+ }
  function revealSample(id,key){
   const node=find(String(id)),results=node?.querySelector('[data-graph-results]');
   if(!results||typeof dataListViews==='undefined'||typeof dataListRows!=='function'||typeof refreshDataList!=='function')return false;
@@ -32,16 +38,18 @@
   const page=Math.floor(index/(config.pageSize||100));
   if(typeof dataListPages!=='undefined'&&dataListPages.get(config.id)!==page){dataListPages.set(config.id,page);refreshDataList(config.id);measure(node);}
   const row=[...results.querySelectorAll('[data-result-sample-key]')].find(value=>value.dataset.resultSampleKey===key);if(!row)return false;
-  const bounds=results.getBoundingClientRect(),rect=row.getBoundingClientRect(),toolbar=results.querySelector('.data-list-tools'),heading=results.querySelector('thead'),inset=(toolbar?.getBoundingClientRect().height||0)+(heading?.getBoundingClientRect().height||0);
-  if(rect.top<bounds.top+inset)results.scrollTop+=rect.top-bounds.top-inset;
-  else if(rect.bottom>bounds.bottom)results.scrollTop+=rect.bottom-bounds.bottom;
+  const owner=resultScroller(node),bounds=owner.getBoundingClientRect(),rect=row.getBoundingClientRect(),heading=results.querySelector('thead'),inset=heading?.getBoundingClientRect().height||0;
+  if(rect.top<bounds.top+inset)owner.scrollTop+=rect.top-bounds.top-inset;
+  else if(rect.bottom>bounds.bottom)owner.scrollTop+=rect.bottom-bounds.bottom;
   capture(node,model(String(id)));return true;
  }
  function restore(){
   scheduled=false;
   for(const node of root.document?.querySelectorAll?.('[data-graph-workspace]')||[]){
-   const item=model(node.dataset.graphWorkspace),graph=node.querySelector('[data-graph-pane]'),results=node.querySelector('[data-graph-results]');
-   if(item.node!==node){if(item.node){resizeObserver?.unobserve(item.node);const oldResults=item.node.querySelector('[data-graph-results]');if(oldResults)resizeObserver?.unobserve(oldResults);}item.node=node;if(graph){graph.scrollTop=item.graphTop;graph.scrollLeft=item.graphLeft;}if(results){results.scrollTop=item.resultTop;results.scrollLeft=item.resultLeft;}resizeObserver?.observe(node);if(results)resizeObserver?.observe(results);}
+   const item=model(node.dataset.graphWorkspace),graph=node.querySelector('[data-graph-pane]'),results=resultScroller(node);
+   if(item.node!==node){if(item.node){resizeObserver?.unobserve(item.node);const oldResults=item.node.querySelector('[data-graph-results]');if(oldResults)resizeObserver?.unobserve(oldResults);}item.node=node;node.scrollTop=item.workspaceTop||0;node.scrollLeft=item.workspaceLeft||0;resizeObserver?.observe(node);const region=node.querySelector('[data-graph-results]');if(region)resizeObserver?.observe(region);}
+   if(item.graph!==graph){item.graph=graph;if(graph){graph.scrollTop=item.graphTop;graph.scrollLeft=item.graphLeft;}}
+   if(item.owner!==results){item.owner=results;if(results){results.scrollTop=item.resultTop;results.scrollLeft=item.resultLeft;}}
    const percent=Math.round(preferences().ratio*100);property(node,'--graph-pane-share',percent+'fr');property(node,'--graph-result-share',(100-percent)+'fr');measure(node);
   }
  }
@@ -50,7 +58,7 @@
  function initialize(){
   const document=root.document;if(initialized||!document?.addEventListener)return;initialized=true;
   if(typeof root.ResizeObserver==='function')resizeObserver=new root.ResizeObserver(entries=>{for(const entry of entries){const node=entry.target.closest?.('[data-graph-workspace]');if(node)measure(node);}});
-  document.addEventListener('scroll',event=>{const node=event.target.closest?.('[data-graph-workspace]');if(node&&(event.target.hasAttribute('data-graph-pane')||event.target.hasAttribute('data-graph-results')))capture(node,model(node.dataset.graphWorkspace));},true);
+  document.addEventListener('scroll',event=>{const node=event.target.closest?.('[data-graph-workspace]');if(node&&(event.target===node||event.target.hasAttribute('data-graph-pane')||event.target.hasAttribute('data-graph-results')||event.target===resultScroller(node)))capture(node,model(node.dataset.graphWorkspace));},true);
   document.addEventListener('pointerdown',event=>{const divider=event.target.closest?.('[data-graph-divider]'),node=divider?.closest('[data-graph-workspace]');if(!node||event.button!==0)return;const bounds=node.getBoundingClientRect();if(!(bounds.height>10))return;event.preventDefault();drag={node,pointer:event.pointerId,top:bounds.top,height:bounds.height-10};node.classList.add('graph-workspace-dragging');try{divider.setPointerCapture?.(event.pointerId);}catch{}});
   document.addEventListener('pointermove',event=>{if(!drag||drag.pointer!==event.pointerId)return;event.preventDefault();setRatio(drag.node,(event.clientY-drag.top)/drag.height);});
   document.addEventListener('pointerup',finish);document.addEventListener('pointercancel',finish);document.addEventListener('lostpointercapture',finish);
@@ -59,7 +67,7 @@
   if(typeof root.MutationObserver==='function')new root.MutationObserver(schedule).observe(document.documentElement||document,{subtree:true,childList:true});
   root.addEventListener?.('resize',schedule);schedule();
  }
- const api=Object.freeze({html,normalize,preferences,mergePreferences,restore,revealSample,initialize});
+ const api=Object.freeze({html,normalize,preferences,mergePreferences,restore,revealSample,resultScroller,initialize});
  if(typeof module==='object'&&module.exports)module.exports=api;
  root.NetworkToolkitGraphWorkspace=api;initialize();
 })(typeof window!=='undefined'?window:globalThis);

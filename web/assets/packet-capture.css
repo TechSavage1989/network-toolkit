@@ -410,3 +410,10 @@
  .packet-graph-popup{padding:8px;font-size:10px}
  .packet-graph-popup .packet-timeline-values{gap:4px 8px}
 }
+
+
+/* When a compact window cannot fit both readers, scroll the workspace rather
+   than shrinking packet rows or removing access to toolbar controls. */
+.packet-workspace.packet-has-traffic-graph{overflow-y:auto;overscroll-behavior-y:contain;scrollbar-width:thin}
+.packet-has-traffic-graph>.packet-graph-dock{position:sticky;top:0;z-index:4}
+.packet-has-traffic-graph>.packet-analysis{flex-shrink:0}

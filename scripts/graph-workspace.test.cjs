@@ -48,6 +48,19 @@ test('saved graph layout merges only its own normalized preference',()=>{
  h.api.mergePreferences({graphWorkspacePreferences:{ratio:99}});assert.equal(h.context.state.graphWorkspacePreferences.ratio,.75);
  h.api.mergePreferences({graphWorkspacePreferences:{ratio:'bad'}});assert.equal(h.context.state.graphWorkspacePreferences.ratio,.6);
 });
+test('nested sample table keeps both scroll axes and the short-workspace fallback position',()=>{
+ const h=harness(),content='<div class="data-list-tools">Filter</div><div class="table-wrap"><table><tbody><tr><td>Sample</td></tr></tbody></table></div><div class="data-list-foot">Page controls</div>';
+ let node=h.render('nested',content),owner=h.api.resultScroller(node);assert(owner.classList.contains('table-wrap'));
+ owner.scrollTop=312;owner.scrollLeft=145;node.scrollTop=61;h.document.emit('scroll',owner);h.document.emit('scroll',node);
+ node=h.render('nested',content);owner=h.api.resultScroller(node);assert.equal(owner.scrollTop,312);assert.equal(owner.scrollLeft,145);assert.equal(node.scrollTop,61);
+ assert.equal(node.querySelector('[data-graph-results]').scrollTop,undefined,'The fixed filter/footer region is not the sample-row scroll owner');
+});
+test('pane minimum accounts for real toolbar, footer, header and sample rows without changing the saved split',()=>{
+ const h=harness(),node=h.render('minimum','<div class="data-list-tools">Filter</div><div class="table-wrap"><table><thead><tr><th>Sample</th></tr></thead><tbody><tr><td>Result</td></tr></tbody></table></div><div class="data-list-foot">Pages</div>'),region=node.querySelector('[data-graph-results]'),owner=h.api.resultScroller(node);
+ node.querySelector('.data-list-tools').getBoundingClientRect=()=>({height:41});node.querySelector('.data-list-foot').getBoundingClientRect=()=>({height:39});owner.querySelector('thead').getBoundingClientRect=()=>({height:30});owner.querySelector('tbody tr').getBoundingClientRect=()=>({height:38});owner.offsetHeight=170;owner.clientHeight=154;h.context.state.graphWorkspacePreferences={ratio:.6};
+ h.context.innerHeight=1000;h.api.restore();assert.equal(region.style['--graph-table-min-height'],'162px');assert.equal(node.style['--graph-list-min-height'],'244px');
+ h.context.innerHeight=650;h.api.restore();assert.equal(region.style['--graph-table-min-height'],'140px');assert.equal(node.style['--graph-list-min-height'],'222px');assert.equal(h.context.state.graphWorkspacePreferences.ratio,.6);
+});
 test('graph-driven result reveal uses actual filtered sort position and never clears filters',()=>{
  const h=harness(),rows=Array.from({length:240},(_,i)=>({key:'sample-'+(240-i)})),config={id:'samples',graphId:'job',graphKey:row=>row.key,rows,pageSize:100};
  const node=h.render('job','<div class="data-list-tools">Filters</div><table><thead><tr><th>Sample</th></tr></thead><tbody><tr data-result-sample-key="sample-61"><td>61</td></tr></tbody></table>');
