@@ -1,5 +1,43 @@
 # Network Toolkit development handoff
 
+## 1.17.82 prepared: preceding whitespace in terminal selections
+
+Prepared from current main c0a3c3ebe4558de38ad6c7e007803e6de3d47bdc after the
+user reported the selection-deletion issue also occurs with preceding spaces
+and explicitly requested fix/publication on 2026-10-25. This authorizes this
+scoped release only. Keep prior tags/assets and main network-toolkit as the
+sole public source/update feed.
+
+The 81 selection helper normalized trailing padding but still rejected a start
+before the tracked input anchor. A highlight can include the spacing after the
+prompt, so this left preceding-space selections outside editable positions.
+Normalize the start to the input anchor only when every selected pre-anchor
+cell on the same logical line is visible whitespace/empty and has width one.
+Reject prompt glyphs, wide-character continuations, hidden cells and previous
+hard lines. The end clamp and remaining editing guards are retained. Never
+count prompt spacing as input; actual spaces typed after the anchor remain
+editable. Partial prefix selections, both whitespace boundaries, wrapped prompts/
+commands, typing and approved paste use the same corrected helper. No transport,
+credential, settings storage or updater logic changes. Preserve the shared gear
+and all other 81 and earlier features.
+
+Seven focused input regressions cover both deletion keys/cursor movement,
+partial prefixes, actual leading input spaces, wrapped prompts/commands, wide/
+combining characters, typing/paste and protected selections. Exact released81
+assets reproduce six failures (17 pass); all 23 input tests pass with the fix.
+The live app/Telnet/browser regression now includes eight additional cases for
+preceding whitespace, native dragging, partial deletion, typed spaces, wrapped
+commands and native typing/paste, while retaining the original nine cases.
+Protected cases include selected prompt characters and whitespace-only gaps.
+
+Go/UI/package/Windows metadata is consistently 1.17.82. Local validation passes
+466 JavaScript tests, 31 Python release guards, required root/terminal/desktop
+Go suites, release/resource metadata, inline/changed JavaScript syntax and the
+Windows x64 GUI cross-build. Packaging, hosted browser review, publication and
+released81 live-feed staging are pending at this preparation checkpoint.
+Native Windows/WebView2, real hardware and actual installation/restart remain
+unverified. Do not treat this checkpoint as a published-release record.
+
 ## 1.17.81 published: settings gear and terminal selection padding
 
 Prepared from main d311c9a6def119c20de6345ecee6b0139151190d, retaining its

@@ -62,11 +62,15 @@ function send(entry,data,reserveBytes=0){
 function selection(entry){
  const value=range(entry),selected=entry?.xterm?.getSelectionPosition?.();
  if(!value||!selected)return null;
- const start=(selected.start.y-value.line)*value.cols+selected.start.x,selectedEnd=(selected.end.y-value.line)*value.cols+selected.end.x;
- // Empty cells after the command are selection padding, not device input.
- // Limit the overrun to this logical line, never a later prompt/output line.
- if(selectedEnd>value.paddingEnd)return null;
- const end=Math.min(selectedEnd,value.end);
+ const selectedStart=(selected.start.y-value.line)*value.cols+selected.start.x,selectedEnd=(selected.end.y-value.line)*value.cols+selected.end.x;
+ // Normalize whitespace around the editable input, within this logical line.
+ // A selection may include prompt spacing, but never prompt glyphs or output.
+ if(selectedStart<0||selectedEnd>value.paddingEnd)return null;
+ for(let pos=selectedStart;pos<value.start;pos++){
+   const cell=entry.xterm.buffer.normal.getLine(value.line+Math.floor(pos/value.cols))?.getCell(pos%value.cols);
+   if(!cell||cell.isInvisible?.()||cell.getWidth()!==1||cell.getChars().trim())return null;
+ }
+ const start=Math.max(selectedStart,value.start),end=Math.min(selectedEnd,value.end);
  const first=value.positions.indexOf(start),last=value.positions.indexOf(end);
  if(first<0||last<=first)return null;
  const arrows=movement(value,end);if(arrows===null)return null;

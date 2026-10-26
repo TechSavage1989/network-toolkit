@@ -1,0 +1,9 @@
+Network Toolkit 1.17.82
+
+What's new
+- Fix terminal deletion when highlighted command text includes preceding spaces.
+- Support preceding and trailing whitespace together, including wrapped commands.
+- Keep typing and paste replacement working for these selections.
+
+Selected prompt spacing is excluded from the edit. Actual spaces typed into
+the command remain editable. Prompt characters and earlier output stay protected.

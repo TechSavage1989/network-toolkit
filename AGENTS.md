@@ -3,6 +3,11 @@
 Read DEVELOPMENT_HANDOFF.md before editing or building. Start from current
 main, preserve unrelated work and follow the checks/release safeguards.
 
+Preparing 1.17.82 for the user's preceding-space terminal selection fix, with
+publication explicitly authorized on 2026-10-25 for this scoped release. Read
+the first handoff section. Published 1.17.81 remains the baseline until the new
+release is verified. Preserve all earlier tags/assets.
+
 Current published release: 1.17.81 uses a recognizable shared settings gear and
 fixes terminal deletion/replacement when selections include empty trailing cells.
 Read the first handoff section. Preserve its input guards and all previous

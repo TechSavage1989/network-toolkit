@@ -65,6 +65,47 @@ test('padding edits reject prompt, previous output, empty-only and later hard-li
  }
  h.select(13,1,35,1);h.entry.inputSending=true;assert.equal(h.api.deleteSelection(h.entry),false);assert.equal(h.drain(),'');assert(h.selected);h.dispose();
 });
+test('Backspace and Delete accept preceding prompt spaces and trailing padding together',async()=>{
+ for(const key of ['Backspace','Delete'])for(const left of [0,3]){
+  const h=harness();await h.write('switch#   ');await h.type('show version');if(left)await h.write('\x1b['+left+'D');h.select(7,0,35,0);
+  assert.equal(h.key(key),false);assert.equal(h.drain(),'\x1b[C'.repeat(left)+'\x7f'.repeat(12));assert.equal(h.selected,null);assert.equal(h.copied,1);h.dispose();
+ }
+});
+test('preceding prompt whitespace does not add deletes when only a command prefix is selected',async()=>{
+ const h=harness();await h.write('switch# ');await h.type('show version');h.select(7,0,12,0);
+ assert.equal(h.api.deleteSelection(h.entry),true);assert.equal(h.drain(),'\x1b[D'.repeat(8)+'\x7f'.repeat(4));assert.equal(h.selected,null);h.dispose();
+});
+test('actual leading input spaces are deleted while selected prompt spacing is excluded',async()=>{
+ for(const start of [7,8]){
+  const h=harness();await h.write('switch# ');await h.type('  show version');h.select(start,0,35,0);
+  assert.equal(h.api.deleteSelection(h.entry),true);assert.equal(h.drain(),'\x7f'.repeat(14));assert.equal(h.selected,null);h.dispose();
+ }
+});
+test('leading whitespace normalization follows a wrapped prompt and wrapped command',async()=>{
+ const h=harness(20);await h.write('abcdefghijklmnopqrstuvwx#  ');await h.type('show interfaces description');h.select(5,1,0,3);
+ assert.equal(h.api.deleteSelection(h.entry),true);assert.equal(h.drain(),'\x7f'.repeat(27));assert.equal(h.selected,null);h.dispose();
+});
+test('preceding whitespace preserves wide and combining character deletion counts',async()=>{
+ const h=harness();await h.write('sw# ');await h.type('a界e\u0301z');h.select(3,0,30,0);
+ assert.equal(h.api.deleteSelection(h.entry),true);assert.equal(h.drain(),'\x7f'.repeat(4));assert.equal(h.selected,null);h.dispose();
+});
+test('typing and approved paste replace selections that start in preceding prompt whitespace',async()=>{
+ for(const paste of [false,true]){
+  const h=harness();await h.write('switch# ');await h.type('show version');h.select(7,0,35,0);
+  if(paste)assert.equal(h.c.acceptText({entry:h.entry,xterm:h.term},'other'),true);
+  else{assert.equal(h.key('x'),true);h.term.input('x',true);}
+  assert.equal(h.drain(),'\x7f'.repeat(12)+(paste?'other':'x'));assert.equal(h.selected,null);h.dispose();
+ }
+});
+test('leading padding rejects prompt characters, prior blank lines, glyph continuations and hidden cells',async()=>{
+ const h=harness();await h.write('       \r\nswitch# ');await h.type('show version');
+ for(const selection of [[7,0,25,1],[6,1,25,1],[0,1,25,1],[7,1,8,1]]){
+  h.select(...selection);assert.equal(h.api.deleteSelection(h.entry),false);assert.equal(h.drain(),'');assert(h.selected);
+ }
+ h.select(7,1,35,1);h.entry.inputSending=true;assert.equal(h.api.deleteSelection(h.entry),false);assert.equal(h.drain(),'');assert(h.selected);h.dispose();
+ const wide=harness();await wide.write('sw界 ');await wide.type('abc');wide.select(3,0,20,0);assert.equal(wide.api.deleteSelection(wide.entry),false);assert.equal(wide.drain(),'');wide.dispose();
+ const hidden=harness();await hidden.write('switch#\x1b[8m \x1b[0m');await hidden.type('abc');hidden.select(7,0,20,0);assert.equal(hidden.api.deleteSelection(hidden.entry),false);assert.equal(hidden.drain(),'');hidden.dispose();
+});
 test('wrapped commands permit click positioning and deletion across screen rows',async()=>{
  const h=harness(20);await h.write('sw# ');await h.type('show interfaces description');assert.equal(h.api.move(h.entry,h.event(7)),true);assert.equal(h.drain(),'\x1b[D'.repeat(24));h.select(14,0,8,1);assert.equal(h.api.deleteSelection(h.entry),true);assert.equal(h.drain(),'\x1b[D'.repeat(3)+'\x7f'.repeat(14));h.dispose();
 });

@@ -1,3 +1,24 @@
+NETWORK TOOLKIT 1.17.82 VALIDATION CHECKPOINT
+
+Terminal selections can include preceding prompt whitespace. The start clamp
+accepts only visible blank, width-one cells before the tracked input on the same
+logical line. Prompt glyphs, wide continuations, hidden cells and previous hard
+lines remain excluded. Actual leading input spaces count toward deletion;
+prompt spacing does not. The trailing clamp and remaining editing gates remain.
+
+Local validation passes 466 JavaScript tests, 31 Python release guards, required
+root/terminal/desktop Go suites, metadata/resources, inline/changed JavaScript
+syntax and Windows x64 GUI cross-build. Seven focused regressions reproduce
+six failures against exact released81 assets (17 pass). Candidate passes all
+23 terminal-input tests. The real app/browser/Telnet regression now includes
+eight more preceding-whitespace cases and retains the original nine scenarios.
+
+Package, full hosted browser review, publication verification and released81
+live-feed staging are pending at this checkpoint. Native Windows/WebView2,
+hardware and actual installation/restart remain unverified. See the handoff.
+
+HISTORICAL PUBLISHED BASELINE
+
 NETWORK TOOLKIT 1.17.81 VALIDATION
 
 Shared settings icon is a recognizable gear. Terminal selection edits clamp

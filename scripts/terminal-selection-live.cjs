@@ -105,9 +105,22 @@ async function screenshot(name){if(out)await page.screenshot({path:path.join(out
  await command('show version   ');await select(13,cols-2);await page.keyboard.press('Delete');await settled('show ');assert.equal(editor.wire,'\x7f'.repeat(10));pass('Trailing spaces before the device cursor are deleted without counting empty cells');
  await command('show version');await select(13,cols-2);await page.keyboard.type('x');await settled('show x');assert.equal(editor.wire,'\x7f'.repeat(7)+'x');pass('Typing replaces selected text when the highlight includes empty cells');
  await command('show version');await page.evaluate(()=>navigator.clipboard.writeText('other'));await select(13,cols-2);await page.keyboard.press('Control+v');await settled('show other');assert.equal(editor.wire,'\x7f'.repeat(7)+'other');pass('Native clipboard paste replaces selected text with trailing padding');
+ for(const key of ['Backspace','Delete']){
+  await command('show version');await select(7,cols-2);await screenshot('leading-'+key+'-selected');await page.keyboard.press(key);await settled('');
+  assert.equal(editor.wire,'\x7f'.repeat(12));assert.equal(await page.evaluate(()=>currentTerminal().xterm.hasSelection()),false);pass(key+' deletes text with preceding prompt spaces and trailing padding without editing the prompt');
+ }
  await command('show version');
- const protectedSelections=await page.evaluate(()=>{const entry=currentTerminal(),t=entry.xterm,results=[];for(const [x,y,length] of [[0,0,t.cols+20],[0,1,25],[21,1,10],[13,1,t.cols]]){t.select(x,y,length);results.push(NetworkToolkitTerminalInput.deleteSelection(entry));}t.clearSelection();return results;});
- assert.deepEqual(protectedSelections,[false,false,false,false]);assert.equal(editor.wire,'');await settled('show version');pass('Previous output, prompts, empty-only and later hard-line selections cannot trigger selection edits');
+ const leadingPoints=await page.evaluate(()=>{const t=currentTerminal().xterm,r=currentTerminal().element.querySelector('.xterm-screen').getBoundingClientRect(),w=r.width/t.cols,h=r.height/t.rows;return {x:r.left+7*w+.1,y:r.top+1.5*h,end:r.left+(t.cols-2)*w+.1};});
+ await page.mouse.move(leadingPoints.x,leadingPoints.y);await page.mouse.down();await page.mouse.move(leadingPoints.end,leadingPoints.y,{steps:8});await page.mouse.up();
+ assert.equal((await page.evaluate(()=>currentTerminal().xterm.getSelectionPosition())).start.x,7);await page.keyboard.press('Delete');await settled('');assert.equal(editor.wire,'\x7f'.repeat(12));await screenshot('leading-deleted');pass('Native mouse highlighting accepts preceding and trailing spaces together');
+ await command('show version');await select(7,12);await page.keyboard.press('Delete');await settled(' version',0);assert.equal(editor.wire,'\x1b[D'.repeat(8)+'\x7f'.repeat(4));pass('Partial prefix deletion ignores preceding prompt whitespace and retains unselected text');
+ await command('  show version');await select(7,cols-2);await page.keyboard.press('Backspace');await settled('');assert.equal(editor.wire,'\x7f'.repeat(14));pass('Actual leading input spaces are deleted while selected prompt spacing remains');
+ await command(wrapped);await select(7,2*cols);await page.keyboard.press('Delete');await settled('');assert.equal(editor.wire,'\x7f'.repeat(wrapped.length));pass('Wrapped command selections accept whitespace before and after the input');
+ await command('show version');await select(7,cols-2);await page.keyboard.type('x');await settled('x');assert.equal(editor.wire,'\x7f'.repeat(12)+'x');pass('Typing replaces a selection beginning in preceding prompt whitespace');
+ await command('show version');await page.evaluate(()=>navigator.clipboard.writeText('other'));await select(7,cols-2);await page.keyboard.press('Control+v');await settled('other');assert.equal(editor.wire,'\x7f'.repeat(12)+'other');pass('Native clipboard paste replaces a selection with preceding prompt whitespace');
+ await command('show version');
+ const protectedSelections=await page.evaluate(()=>{const entry=currentTerminal(),t=entry.xterm,results=[];for(const [x,y,length] of [[0,0,t.cols+20],[0,1,25],[21,1,10],[13,1,t.cols],[6,1,20],[7,1,1]]){t.select(x,y,length);results.push(NetworkToolkitTerminalInput.deleteSelection(entry));}t.clearSelection();return results;});
+ assert.deepEqual(protectedSelections,[false,false,false,false,false,false]);assert.equal(editor.wire,'');await settled('show version');pass('Previous output, prompt characters, empty-only and later hard-line selections cannot trigger selection edits');
  for(const theme of ['light','dark']){await page.evaluate(theme=>setTheme(theme),theme);await screenshot('fixed-'+theme);}
  assert.deepEqual(report.submitted,[]);assert.deepEqual(report.errors,[]);assert.deepEqual(report.assetFailures,[]);report.passed=true;console.log(JSON.stringify(report));
 })().catch(async error=>{

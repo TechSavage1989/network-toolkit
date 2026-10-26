@@ -1,7 +1,14 @@
-NETWORK TOOLKIT 1.17.81
+NETWORK TOOLKIT 1.17.82
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.81
+CURRENT RELEASE - 1.17.82
+
+Terminal selections can include spaces before the command as well as trailing
+empty cells. Backspace, Delete, typing and paste edit the selected command text.
+Prompt spacing is preserved; actual spaces typed into the command are editable.
+Wrapped selections work with both leading and trailing whitespace.
+
+PREVIOUS RELEASE - 1.17.81
 
 Use a recognizable gear for settings throughout the app. In the terminal,
 Backspace and Delete remove selected command text even when the highlight
