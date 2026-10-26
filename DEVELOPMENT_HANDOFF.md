@@ -17,6 +17,10 @@ For the subsequently authorized 1.17.90 build, the 1.17.89 note has also been
 moved unchanged into the archive. Current `RELEASE_NOTES_1.17.90.txt` alone stays
 at root, and the archive index identifies 1.17.90 as current and 1.17.89 as previous.
 
+## 1.17.91 authorized sidebar and subnet layout update
+
+User authorized implementation, build and publication of the confirmed sidebar divider style, stationary navigation icons, and full-height generated Possible networks list. Preserve previous features and release-note archive policy. Publication pending validation.
+
 ## 1.17.90 published shared UI and navigation improvements
 
 The user explicitly authorized building and publishing all confirmed changes.

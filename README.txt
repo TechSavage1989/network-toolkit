@@ -1,11 +1,15 @@
-NETWORK TOOLKIT 1.17.90
+NETWORK TOOLKIT 1.17.91
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.90
+CURRENT RELEASE - 1.17.91
 
-Release details: RELEASE_NOTES_1.17.90.txt
-Previous release: docs/releases/RELEASE_NOTES_1.17.89.txt
+Release details: RELEASE_NOTES_1.17.91.txt
+Previous release: docs/releases/RELEASE_NOTES_1.17.90.txt
 Full release-note archive: docs/releases/README.md
+
+The main navigation divider follows the shared sidebar style. Tool icons retain
+their position between expanded and collapsed navigation. Possible networks
+grows to show the full generated list in the subnet calculator.
 
 Editor actions preserve selection and scroll position. Wrapped text retains
 syntax colors and aligned line numbers. Editor close, reload, Save As and Go to

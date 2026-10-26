@@ -17,6 +17,9 @@
  .transfer-server-app.transfer-server-layout{gap:var(--workspace-gap);}
  .transfer-server-app.transfer-server-layout>.transfer-server-primary{padding:0;gap:var(--workspace-gap);}
  #utilityBody{scrollbar-gutter:auto;}
+ /* Possible networks grows with its generated rows. The utility workspace
+    owns vertical scrolling; retain horizontal scrolling on narrow screens. */
+ #utilityBody .subnet-input-column .possible-table-wrap{height:auto;max-height:none;}
  .local-tool-header .tabs{padding-bottom:var(--workspace-gap);}
  .content :is(.columns,.stats-grid,.tool-grid,.profile-grid){gap:var(--workspace-gap);}
 
