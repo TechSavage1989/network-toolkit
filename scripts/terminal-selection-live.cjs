@@ -12,7 +12,16 @@ function makePeer(){return net.createServer(socket=>{
  sockets.add(socket);socket.on('error',()=>{});socket.on('close',()=>sockets.delete(socket));
  const state={text:'',cursor:0,wire:''},decoder=new StringDecoder('utf8');editor=state;
  let negotiation=0,sub=false,subIAC=false,escape='';
- function draw(){const cell=prompt.length+state.cursor;socket.write('\x1b[1;1H\x1b[2K'+previous+'\r\n\x1b[J'+prompt+state.text+'\x1b['+(2+Math.floor(cell/cols))+';'+(1+cell%cols)+'H');}
+ // Redraw the editable command only. Rewriting old output on every key can
+ // temporarily move the parser outside the command and invalidate its anchor.
+ function draw(){
+  const cell=prompt.length+state.cursor;
+  // At end of input, retain the terminal's delayed-wrap cursor. Moving to the
+  // next empty row at an exact column boundary would create a hard line.
+  const position=state.cursor===state.text.length?'':'\x1b['+(2+Math.floor(cell/cols))+';'+(1+cell%cols)+'H';
+  socket.write('\x1b[2;1H\x1b[J'+prompt+state.text+position);
+ }
+ socket.write(previous+'\r\n');
  draw();
  function input(character){
   state.wire+=character;
@@ -50,7 +59,8 @@ async function settled(text,cursor=text.length){
  await page.waitForFunction(({text,cursor,prompt,previous})=>{
   const entry=currentTerminal(),term=entry?.xterm,b=term?.buffer.normal;if(!b)return false;
   const count=Math.max(1,Math.ceil((prompt.length+text.length)/term.cols)),shown=Array.from({length:count},(_,i)=>b.getLine(1+i)?.translateToString(false)||'').join('');
-  return !entry.inputSending&&!entry.inputBytes&&!entry.renderPendingBytes&&b.getLine(0)?.translateToString(true)===previous&&shown.slice(0,prompt.length+text.length)===prompt+text&&b.baseY+b.cursorY===1+Math.floor((prompt.length+cursor)/term.cols)&&b.cursorX===(prompt.length+cursor)%term.cols;
+  const cell=prompt.length+cursor,pending=cursor===text.length&&cell>0&&cell%term.cols===0;
+  return !entry.inputSending&&!entry.inputBytes&&!entry.renderPendingBytes&&b.getLine(0)?.translateToString(true)===previous&&shown.slice(0,prompt.length+text.length)===prompt+text&&b.baseY+b.cursorY===1+Math.floor(cell/term.cols)-(pending?1:0)&&b.cursorX===(pending?term.cols:cell%term.cols);
  },{text,cursor,prompt,previous});
  assert.equal(editor.text,text);assert.equal(editor.cursor,cursor);
 }
