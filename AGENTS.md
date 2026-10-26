@@ -39,3 +39,8 @@ embedded UI assets; preserve its embed patterns and paths. Build the command
 with `go build ./cmd/network-toolkit`, not `go build .`. Use the root build
 wrappers and read `docs/DEVELOPMENT.md` for tests and packaging. Update all
 consumers when moving paths. Keep release-note rotation above unchanged.
+
+The exact tracked root allowlist is enforced by `scripts/repository_layout_test.py`
+in existing Checks and release CI. Put new files under the documented directories,
+not at root. Intentional new root entries require a reviewed allowlist change and
+justification; the sole current release note is derived from the application version.
