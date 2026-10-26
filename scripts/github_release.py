@@ -57,10 +57,10 @@ def validate(tag=None):
     require(fixed in resources, 'Numeric Windows resource version differs from Go version')
     require((current + '.0').encode('utf-16le') in resources, 'Windows resource text differs from Go version')
     require('Network_Toolkit.exe'.encode('utf-16le') in resources, 'Windows resource executable name differs')
-    require(resources in (ROOT / 'resource_windows_amd64.syso').read_bytes(),
+    require(resources in (ROOT / 'cmd/network-toolkit/resource_windows_amd64.syso').read_bytes(),
             'Regenerate resource_windows_amd64.syso with scripts/build_windows_resources.py before pushing this version')
     require((ROOT / f'RELEASE_NOTES_{current}.txt').is_file(), 'Current release notes are missing')
-    readme = (ROOT / 'README.txt').read_text()
+    readme = (ROOT / 'docs/README.txt').read_text()
     require(readme.startswith('NETWORK TOOLKIT ' + current + '\n'), 'README current version differs')
     require('CURRENT RELEASE - ' + current in readme, 'README current release differs')
     return current
@@ -217,7 +217,7 @@ def package(exe, output, tag, allow_untracked):
                'Open_Terminal.cmd': ('@echo off\r\nsetlocal DisableDelayedExpansion\r\ncd /d "%~dp0"\r\n'
                                      f'start "" "%~dp0{versioned_exe}" --terminal\r\n').encode()}
     for name in ['README.txt', f'RELEASE_NOTES_{current}.txt', 'VALIDATION.txt']:
-        entries[name] = (ROOT / name).read_bytes()
+        entries[name] = (ROOT / name if name.startswith('RELEASE_NOTES_') else ROOT / 'docs' / name).read_bytes()
     entries['SHA256SUMS'] = sums(entries)
     sources = {path.relative_to(ROOT).as_posix(): path.read_bytes() for path in source_files(allow_untracked)}
     sources['SHA256SUMS'] = sums(sources)

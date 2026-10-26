@@ -1,6 +1,6 @@
 # Network Toolkit development
 
-Read DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
+Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
 Current verified published version: 1.17.90.
@@ -37,3 +37,12 @@ unchanged into `docs/releases/`, update that directory's index and any reference
 and leave the new current note at root. Preserve every historical note; do not
 recreate the release-note wall in the root directory. This organization does not
 authorize a build, new release, tag move, asset replacement or access change.
+
+## Compact repository layout
+
+Keep application Go source and tests together in `cmd/network-toolkit/`; put
+new developer and user guides in `docs/`. `resources.go` at root owns the
+embedded UI assets; preserve its embed patterns and paths. Build the command
+with `go build ./cmd/network-toolkit`, not `go build .`. Use the root build
+wrappers and read `docs/DEVELOPMENT.md` for tests and packaging. Update all
+consumers when moving paths. Keep release-note rotation above unchanged.

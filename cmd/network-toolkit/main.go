@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/subtle"
-	"embed"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -24,6 +23,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	resources "networktoolkit"
 	"networktoolkit/internal/diag"
 	"networktoolkit/internal/identity"
 	"networktoolkit/internal/macros"
@@ -32,8 +32,7 @@ import (
 	"networktoolkit/internal/terminal"
 )
 
-//go:embed web/index.html web/assets/*.js web/assets/*.css web/assets/editor-vendor assets/Network_Toolkit_Icon.svg assets/Network_Toolkit_Icon.ico
-var web embed.FS
+var web = resources.Web
 
 const appName = "Network Toolkit"
 const maxConcurrent = 8

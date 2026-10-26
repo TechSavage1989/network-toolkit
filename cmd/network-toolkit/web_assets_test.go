@@ -127,7 +127,7 @@ func TestApplicationIconAssets(t *testing.T) {
 		{"/assets/Network_Toolkit_Icon.ico", "assets/Network_Toolkit_Icon.ico", "image/x-icon"},
 		{"/favicon.ico", "assets/Network_Toolkit_Icon.ico", "image/x-icon"},
 	} {
-		original, err := os.ReadFile(item.source)
+		original, err := os.ReadFile("../../" + item.source)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -159,7 +159,7 @@ func TestApplicationIconAssets(t *testing.T) {
 		}
 	}
 	for _, ref := range []string{"../assets/Network_Toolkit_Icon.svg", "../assets/Network_Toolkit_Icon.ico"} {
-		if _, err := os.Stat(filepath.Join("web", filepath.FromSlash(ref))); err != nil {
+		if _, err := os.Stat(filepath.Join("../../web", filepath.FromSlash(ref))); err != nil {
 			t.Fatalf("offline icon path %s: %v", ref, err)
 		}
 	}

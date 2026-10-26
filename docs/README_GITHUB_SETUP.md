@@ -37,7 +37,7 @@ This route does not require Git, Python or GitHub CLI on your computer. Creating
 
 ChatGPT can push future requested changes when the GitHub connection provides repository write access. GitHub Actions runs the building and publishing after the push. This is a repository workflow, not a continuously running ChatGPT background session.
 
-Before publishing a new version, update the current version consistently in internal/model/model.go, web/index.html, build scripts, the Windows resource generator, README.txt and the current release notes. Regenerate resource_windows_amd64.syso by running Python on scripts/build_windows_resources.py. The validation helper rejects mismatches. Historical release notes can keep their original versions.
+Before publishing a new version, update the current version consistently in internal/model/model.go, web/index.html, build scripts, the Windows resource generator, docs/README.txt and the current release notes. Regenerate cmd/network-toolkit/resource_windows_amd64.syso by running Python on scripts/build_windows_resources.py. The validation helper rejects mismatches. Historical release notes can keep their original versions.
 
 ## Optional local setup on your Windows computer
 
@@ -64,3 +64,9 @@ The first GitHub workflow run must be checked after the repository is created. P
 ## Application auto-updates
 
 This setup prepares source hosting and automated releases. The application updater still needs to be added to Network Toolkit. A private repository requires authenticated update access; a separate public release repository is another option when downloads should work without a GitHub login. Update signatures and restart/rollback handling belong to that next implementation.
+
+## Current source layout
+
+Run setup/build commands from the repository root, not from `docs/`. Application
+Go files and the Windows resource object are in `cmd/network-toolkit/`. See
+[Development](DEVELOPMENT.md) for current build and test commands.
