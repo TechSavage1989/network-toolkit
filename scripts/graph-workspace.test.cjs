@@ -35,6 +35,12 @@ test('pointer divider resizing uses available workspace height and ignores other
  h.document.emit('pointerup',divider,{pointerId:8});assert.equal(h.saved(),0);
  h.document.emit('pointerup',divider,{pointerId:7});assert.equal(h.saved(),1);assert.equal(node.classList.contains('graph-workspace-dragging'),false);
 });
+test('keyboard resize starts at the actual constrained divider without passively changing saved preferences',()=>{
+ const h=harness(),node=h.render(),divider=node.querySelector('[data-graph-divider]');h.context.state.graphWorkspacePreferences={ratio:.6};
+ node.querySelector('[data-graph-pane]').getBoundingClientRect=()=>({height:260});node.querySelector('[data-graph-results]').getBoundingClientRect=()=>({height:240});
+ h.api.restore();assert.equal(divider.getAttribute('aria-valuenow'),'52');assert.equal(h.context.state.graphWorkspacePreferences.ratio,.6);assert.equal(h.saved(),0,'Responsive minimums do not overwrite the stored choice');
+ h.document.emit('keydown',divider,{key:'ArrowUp'});assert(Math.abs(h.context.state.graphWorkspacePreferences.ratio-.47)<1e-9,'The explicit step uses52percentactualminus5, not60percentsavedminus5');assert.equal(h.saved(),1);
+});
 test('graph and list scroll independently and keep their positions across live replacement',()=>{
  const h=harness();let node=h.render(),graph=node.querySelector('[data-graph-pane]'),results=node.querySelector('[data-graph-results]');
  graph.scrollTop=44;graph.scrollLeft=3;h.document.emit('scroll',graph);results.scrollTop=275;results.scrollLeft=60;h.document.emit('scroll',results);

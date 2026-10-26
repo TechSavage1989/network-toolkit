@@ -20,7 +20,7 @@
  function setRatio(node,ratio,persist=false){
   const value=normalize({ratio}).ratio,percent=Math.round(value*100),target=appState();
   if(target)target.graphWorkspacePreferences={ratio:value};
-  for(const workspace of root.document?.querySelectorAll?.('[data-graph-workspace]')||[node]){property(workspace,'--graph-pane-share',percent+'fr');property(workspace,'--graph-result-share',(100-percent)+'fr');const divider=workspace.querySelector('[data-graph-divider]');divider?.setAttribute('aria-valuenow',String(percent));divider?.setAttribute('aria-valuetext',percent+' percent graph, '+(100-percent)+' percent results');}
+  for(const workspace of root.document?.querySelectorAll?.('[data-graph-workspace]')||[node]){property(workspace,'--graph-pane-share',percent+'fr');property(workspace,'--graph-result-share',(100-percent)+'fr');const divider=workspace.querySelector('[data-graph-divider]');divider?.setAttribute('aria-valuenow',String(percent));divider?.setAttribute('aria-valuetext',percent+' percent graph, '+(100-percent)+' percent results');measure(workspace);}
   if(persist&&typeof saveState==='function')saveState();
   return value;
  }
@@ -55,6 +55,12 @@
  }
  function schedule(){if(scheduled)return;scheduled=true;if(typeof root.requestAnimationFrame==='function')root.requestAnimationFrame(restore);else restore();}
  function finish(event){if(!drag||event?.pointerId!=null&&event.pointerId!==drag.pointer)return;drag.node.classList.remove('graph-workspace-dragging');drag=null;if(typeof saveState==='function')saveState();}
+ function displayedRatio(node){
+  const graphHeight=node.querySelector('[data-graph-pane]')?.getBoundingClientRect().height,resultHeight=node.querySelector('[data-graph-results]')?.getBoundingClientRect().height;
+  // Minimum readable pane sizes can constrain the saved preference. A key
+  // step starts from the visible divider rather than an unapplied ratio.
+  return graphHeight>0&&resultHeight>0?graphHeight/(graphHeight+resultHeight):preferences().ratio;
+ }
  function initialize(){
   const document=root.document;if(initialized||!document?.addEventListener)return;initialized=true;
   if(typeof root.ResizeObserver==='function')resizeObserver=new root.ResizeObserver(entries=>{for(const entry of entries){const node=entry.target.closest?.('[data-graph-workspace]');if(node)measure(node);}});
@@ -62,7 +68,7 @@
   document.addEventListener('pointerdown',event=>{const divider=event.target.closest?.('[data-graph-divider]'),node=divider?.closest('[data-graph-workspace]');if(!node||event.button!==0)return;const bounds=node.getBoundingClientRect();if(!(bounds.height>10))return;event.preventDefault();drag={node,pointer:event.pointerId,top:bounds.top,height:bounds.height-10};node.classList.add('graph-workspace-dragging');try{divider.setPointerCapture?.(event.pointerId);}catch{}});
   document.addEventListener('pointermove',event=>{if(!drag||drag.pointer!==event.pointerId)return;event.preventDefault();setRatio(drag.node,(event.clientY-drag.top)/drag.height);});
   document.addEventListener('pointerup',finish);document.addEventListener('pointercancel',finish);document.addEventListener('lostpointercapture',finish);
-  document.addEventListener('keydown',event=>{const divider=event.target.closest?.('[data-graph-divider]'),node=divider?.closest('[data-graph-workspace]');if(!node||!['ArrowUp','ArrowDown','Home','End','Enter'].includes(event.key))return;event.preventDefault();event.stopPropagation();const step=event.shiftKey ? .1 : .05,current=preferences().ratio;setRatio(node,event.key==='Home'?minimum:event.key==='End'?maximum:event.key==='Enter'?defaultRatio:current+(event.key==='ArrowUp'?-step:step),true);});
+  document.addEventListener('keydown',event=>{const divider=event.target.closest?.('[data-graph-divider]'),node=divider?.closest('[data-graph-workspace]');if(!node||!['ArrowUp','ArrowDown','Home','End','Enter'].includes(event.key))return;event.preventDefault();event.stopPropagation();const step=event.shiftKey ? .1 : .05,current=displayedRatio(node);setRatio(node,event.key==='Home'?minimum:event.key==='End'?maximum:event.key==='Enter'?defaultRatio:current+(event.key==='ArrowUp'?-step:step),true);});
   document.addEventListener('dblclick',event=>{const divider=event.target.closest?.('[data-graph-divider]'),node=divider?.closest('[data-graph-workspace]');if(node){event.preventDefault();setRatio(node,defaultRatio,true);}});
   if(typeof root.MutationObserver==='function')new root.MutationObserver(schedule).observe(document.documentElement||document,{subtree:true,childList:true});
   root.addEventListener?.('resize',schedule);schedule();
