@@ -1,3 +1,87 @@
+NETWORK TOOLKIT 1.17.91 VERIFIED PUBLISHED BUILD
+
+1.17.91 published navigation and subnet-list improvements
+
+The user explicitly authorized implementing, building and publishing these fixes.
+Published source/tag: b41eb360d29abc8a1a332028ee8fadd9fd9d6c62
+Tree: 4f839ed0a8c5cb4599f4b3c587d649cd6635814b
+Official release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.91
+Release ID: 424086624
+
+The main navigation divider visually matches the other sidebar dividers: a
+rounded 6px track with a thin 32px grip. The wider interaction area is preserved;
+it remains a collapse/expand control rather than a draggable resize control.
+The tool icons keep their horizontal and vertical positions when main navigation
+collapses or expands. Existing single-click navigation, double-click toggling,
+keyboard access and compact-screen drawer behavior are preserved.
+
+The subnet calculator's Possible networks table now grows to show every
+generated row, within the existing 128-row generation cap. Its previous bounded
+internal vertical scrollbar is removed; the outer utilities workspace owns
+vertical scrolling. Filtering reduces the list's height, and clearing the filter
+restores the generated list. Existing calculations, network order, current-subnet,
+copy and CSV actions remain. Prior UI, editor, terminal and updater fixes remain.
+
+Current release note, validated at the required root path:
+Network Toolkit 1.17.91
+
+The main navigation divider matches the other sidebar divider controls, without draggable resizing.
+Navigation icons remain in place when the main sidebar collapses or expands.
+The subnet calculator Possible networks list grows dynamically to display every generated row.
+
+Full Checks 40302662081 passed application 121504056264, native
+Windows 121504055888 and browser 121504056137, on this exact
+published source. 513 JavaScript tests, 33 Python release guards, required
+cmd/network-toolkit and internal terminal/desktop/diag/deviceinfo Go suites, native cmd/PowerShell color and
+interactive lifecycle, installer progress and Windows GUI/resource build/package
+checks pass.
+
+The new UI91 browser report passes 4 groups across 14 layout cases:
+8 navigation-position cases, 6 subnet-list cases and
+4 divider comparisons. The report covers desktop and narrow layouts,
+light/dark themes and the applicable scroll positions. Actual counts come from
+the verified report. Existing UI90 shared-control/header checks pass 4 groups /
+8 layouts / 5 header groups, Local Network checks pass 5 groups / 12 layouts,
+and UI88 layouts pass 4 groups / 9 cases. All covered editor, shell, copy, Hosts,
+client/server, SMTP, folder and selection regressions pass. All 7 native updater
+timer cases pass, including the real five-minute poll. Current reports have no
+runtime or asset failures; the released64 regression control retains its
+expected Illegal invocation result.
+
+Release 40304158166 passed build 121509015109 and publish
+121509682917. All four actual public assets match GitHub digests
+and SHA256SUMS. Official EXE and portable ZIP match the reviewed local build;
+standalone, portable and update EXEs are identical. All
+759 packaged source files match the tag. ZIP CRCs, manifests,
+PE GUI/version, strict update inventory and 14 vendored editor-library
+digests verify. All 30 older releases/assets and
+30 older tags remain unchanged.
+
+Released90 production handlers checked/downloaded/verified/staged live91 using
+isolated settings through real HTTPS in 24.41s. The staged 17605632-byte
+candidate matches the independently verified official executable. Original test
+EXE unchanged. No actual installation, restart or full native WebView2 UI
+interaction was performed.
+
+Review artifact 12641261723: 182616cac35dd0b467063ea6dc48e60afa4d133cde34f2facf390b93f69f6ed0
+Browser artifact 12641058734: 1d2da171c3292ab419cfb76d04e2061ccec1f9b10f5809c1c586ba35b4e1ad17
+Final screenshots inspected: ui91-nav-1440-dark-expanded.png, ui91-nav-1440-dark-collapsed.png, ui91-subnets-1440-dark-full.png, ui91-subnets-390-light-full.png
+Network_Toolkit.exe SHA256: 5cbd60d4e870539d225e44ec3947da7d49c16cafb345605e24e4a732930316b2
+Network_Toolkit_1.17.91_Portable.zip SHA256: 88f1c47e50ebfda18b5809a9aca0c0207917e22a60070c6aeca496f1ebbc4600
+Network_Toolkit_1.17.91_Update.zip SHA256: 94b71e459e9f0f52ceb4b5a8a42b2bc0630659c0bbf5c503cc5b01abda3b043b
+SHA256SUMS SHA256: 41c5373c69494ebf595cf1b504929b6b72a3976c71f8c9e49001f5b0540c39cc
+
+The prior 90 release note is archived under docs/releases, and only the current
+91 note remains at root. Preserve all historical notes and follow the AGENTS
+release-note organization policy on the next authorized version change.
+Main network-toolkit remains the sole public source/update feed. Do not move old
+tags, replace assets, change access or write the retired feed. Publication is
+complete; future releases require authorization. This final three-file
+documentation completion uses [skip ci], preserving published source, runtime
+and release assets. Continue from latest main and preserve previous fixes.
+
+PREVIOUS VALIDATION
+
 NETWORK TOOLKIT 1.17.90 VERIFIED PUBLISHED BUILD
 
 1.17.90 published shared UI and navigation improvements

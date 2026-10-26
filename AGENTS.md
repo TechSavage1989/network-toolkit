@@ -3,23 +3,16 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-Current verified published version: 1.17.90.
-Source/tag: 3d6c6da7fe214620adf9d32d776c74166dbe2300
-Tree: c5644c74335d55220a954d2ed37e390120b5edf9
-Full Checks 40295261490 passed at original runtime source:
-730d8eb88233187b49985a54c026e945ba5ca2f5
-The final documentation-only merge has identical runtime files and EXE bytes;
-31 guards and its final repack inventory verify. Final Release
-40298071558 passed on the published source. The official portable
-matches the final repack; its archived documentation differs from the original
-review ZIP. All 753 source files match the final tag.
-513 JavaScript tests, 31 release guards, required Go/native Windows and browser
-checks passed on the unchanged original runtime. Shared UI: 4 groups / 8 layouts
-/ 5 header groups; existing Local Network 5/12, 88 layout 4/9 and covered
-regressions pass. All 47 historical notes and the AGENTS organization policy are
-preserved. All
-29 older releases/assets and 29 older tags are unchanged.
-Released89 verified/staged90 in 9.60s. No actual installation/restart or
+Current verified published version: 1.17.91.
+Source/tag: b41eb360d29abc8a1a332028ee8fadd9fd9d6c62
+Tree: 4f839ed0a8c5cb4599f4b3c587d649cd6635814b
+Full Checks 40302662081 and Release 40304158166 pass on this source.
+513 JavaScript tests, 33 release guards, required Go/native Windows and browser
+checks pass. UI91: 4 groups / 14 layouts; existing UI90,
+Local Network and UI88 checks and covered regressions pass. Review/local/public
+files match and all 759 source files match the tag. All
+30 older releases/assets and 30 older tags are unchanged.
+Released90 verified/staged91 in 24.41s. No actual installation/restart or
 full native WebView2 interaction is claimed.
 
 The user authorized this publication and it is complete. Future releases need
