@@ -263,13 +263,17 @@ async function packetGeometry(label){
  check('Packet interval popups and bidirectional highlighting preserve explicit selection, respect unknown times and retain honest selected evidence after rebucketing');
 
  // A larger retained capture verifies actual independent packet scrolling.
+ // Leave the inspected zero-span bar before advancing the recording. Native
+ // selectOption changes a control without moving the pointer, so otherwise
+ // this fixture correctly retains the hovered snapshot and queues new data.
+ await page.mouse.move(1,1);await settle();
  for(let i=4;i<=81;i++)packetRows.push({number:i,time:new Date(Date.parse(packetStamp)+i*3000).toISOString(),relative:i*3,source:'192.0.2.10',destination:'192.0.2.20',protocol:'TCP',length:100,captured:100,info:'Retained frame '+i,expert:[]});
  capture.count=packetRows.length;capture.bytes=packetRows.reduce((sum,row)=>sum+row.length,0);capture.revision++;
  const span=243,startMs=Date.parse(packetStamp),end=new Date(startMs+span*1000).toISOString();
  const bins=Array.from({length:60},(_,i)=>({seconds:i*span/60,packets:0,bytes:0,time:new Date(startMs+i*span/60*1000).toISOString(),endTime:new Date(startMs+(i+1)*span/60*1000).toISOString(),intervalSeconds:span/60}));
  for(const row of packetRows){const t=Date.parse(row.time);if(!Number.isFinite(t)||row.time.startsWith('0001-'))continue;const bin=bins[Math.min(59,Math.floor((t-startMs)/(span/60*1000)))];bin.packets++;bin.bytes+=row.length;}
  packetStats={...originalStats,duration:span,finished:end,bytes:capture.bytes,timedBytes:capture.bytes-64,protocols:{TCP:80,UDP:1},timedPackets:80,untimedPackets:1,timeline:bins};
- await page.evaluate(()=>NetworkToolkitPacketCapture.refresh(true));await page.waitForFunction(()=>NetworkToolkitPacketCapture.model.total===81&&!NetworkToolkitPacketCapture.model.busy);await settle();
+ await page.evaluate(()=>NetworkToolkitPacketCapture.refresh(true));await page.waitForFunction(()=>NetworkToolkitPacketCapture.model.total===81&&!NetworkToolkitPacketCapture.model.busy&&NetworkToolkitPacketCapture.model.statistics?.duration===243&&NetworkToolkitPacketCapture.model.statistics?.timeline?.length===60);await settle();
  await page.locator('[data-packet-graph-mode]').selectOption('progressive');await settle();
  const progressivePacket=await packetGraph().evaluate(el=>[...el.querySelectorAll('*')].map(node=>({width:node.clientWidth,scrollWidth:node.scrollWidth,overflow:getComputedStyle(node).overflowX})).find(node=>['auto','scroll'].includes(node.overflow)&&node.scrollWidth>node.width+100));assert(progressivePacket,'Progressive capture timeline provides horizontal history scrolling');
  await page.locator('[data-packet-graph-mode]').selectOption('window');await settle();
