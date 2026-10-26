@@ -32,8 +32,9 @@
  function configFor(id){if(typeof dataListViews==='undefined')return null;return [...dataListViews.values()].find(value=>value.graphId===String(id)&&typeof value.graphKey==='function')||null;}
  function newestMatching(config,rows){if(!config||!Array.isArray(rows)||!rows.length)return null;const number=value=>value!==null&&value!==''&&value!==undefined&&Number.isFinite(Number(value))?Number(value):null,sequence=rows.some(row=>number(row.sequence)!==null),clock=row=>{if(root.NetworkToolkitResultTime){const n=root.NetworkToolkitResultTime.epoch(root.NetworkToolkitResultTime.value(row));if(Number.isFinite(n))return n;}return null;};let newest=rows[0],score=sequence?number(newest.sequence):clock(newest),original=Array.isArray(config.rows)?config.rows:rows;for(const row of rows){const next=sequence?number(row.sequence):clock(row);if(next!==null&&(score===null||next>score)||next===null&&score===null&&original.indexOf(row)>original.indexOf(newest)){newest=row;score=next;}}return {row:newest,index:rows.indexOf(newest),key:config.graphKey(newest)};}
  function inspecting(node,item){if(item.inspections.size)return true;const active=root.document?.activeElement;if(active&&node.contains(active)&&active.closest?.('[data-graph-results]')&&(active.matches?.('input,textarea,[data-value-copy-control],[data-result-sample-key]')||active.isContentEditable))return true;const selected=root.getSelection?.();return !!(selected&&!selected.isCollapsed&&node.contains(selected.anchorNode));}
- function inspection(id,active,source='graph'){const item=model(id);if(active)item.inspections.add(source);else{item.inspections.delete(source);item.followPending=true;}schedule();}
+ function inspection(id,active,source='graph'){const item=model(id);if(active)item.inspections.add(source);else{item.inspections.delete(source);if(source==='graph')item.graphInspectionKey=null;item.followPending=true;}schedule();}
  function revealSample(id,key){
+  const item=model(id);if(item.inspections.has('graph'))item.graphInspectionKey=key;
   const node=find(String(id)),results=node?.querySelector('[data-graph-results]'),config=configFor(id);if(!results||!config||typeof dataListRows!=='function'||typeof refreshDataList!=='function')return false;
   const rows=dataListRows(config),index=rows.findIndex(row=>config.graphKey(row)===key);if(index<0)return false;const page=Math.floor(index/(config.pageSize||100));
   if(typeof dataListPages!=='undefined'&&dataListPages.get(config.id)!==page){dataListPages.set(config.id,page);refreshDataList(config.id);measure(node);}
@@ -70,7 +71,7 @@
    if(item.owner!==results){item.owner=results;if(results){results.scrollTop=item.resultTop;results.scrollLeft=item.resultLeft;}}
    if(item.inspections.has('row')&&item.hoverRow&&!node.contains(item.hoverRow)){item.inspections.delete('row');item.hoverRow=null;item.followPending=true;}
    const percent=Math.round(preferences().ratio*100);property(node,'--graph-pane-share',percent+'fr');property(node,'--graph-result-share',(100-percent)+'fr');refreshStatistics(node);measure(node);
-   const config=configFor(itemId(node)),signature=fingerprint(config);if(signature!==item.fingerprint){item.fingerprint=signature;item.followPending=true;}if(item.followPending&&!inspecting(node,item))latest(node.dataset.graphWorkspace,{automatic:true});
+   const config=configFor(itemId(node)),signature=fingerprint(config);if(signature!==item.fingerprint){item.fingerprint=signature;item.followPending=true;const anchor=item.inspections.has('row')?item.hoverRow?.dataset.resultSampleKey:item.inspections.has('graph')?item.graphInspectionKey:null;if(anchor)revealSample(node.dataset.graphWorkspace,anchor);}if(item.followPending&&!inspecting(node,item))latest(node.dataset.graphWorkspace,{automatic:true});
   }
  }
  function itemId(node){return node.dataset.graphWorkspace;}
