@@ -55,11 +55,16 @@ async function settled(text,cursor=text.length){
  assert.equal(editor.text,text);assert.equal(editor.cursor,cursor);
 }
 async function fitted(){
- await page.waitForFunction(()=>{
-  const entry=currentTerminal(),term=entry?.xterm,size=entry?.fit?.proposeDimensions();
-  return size&&term.cols===size.cols&&term.rows===size.rows&&!entry.resizeSending&&!entry.desiredResize&&entry.info.cols===term.cols&&entry.info.rows===term.rows&&entry.lastResize===term.cols+'x'+term.rows;
- });
- cols=await page.evaluate(()=>currentTerminal().xterm.cols);
+ let previous='',since=0,latest;
+ const deadline=Date.now()+15000;
+ while(Date.now()<deadline){
+  latest=await page.evaluate(()=>{const entry=currentTerminal(),term=entry?.xterm,size=entry?.fit?.proposeDimensions();return {cols:term?.cols,rows:term?.rows,fits:!!size&&term.cols===size.cols&&term.rows===size.rows};});
+  const signature=latest.fits?latest.cols+'x'+latest.rows:'';
+  if(signature&&signature===previous){if(Date.now()-since>=250){cols=latest.cols;return;}}
+  else{previous=signature;since=Date.now();}
+  await delay(50);
+ }
+ throw new Error('Visible terminal size did not settle: '+JSON.stringify(latest));
 }
 async function command(text){
  await fitted();
