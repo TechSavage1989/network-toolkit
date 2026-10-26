@@ -1,8 +1,71 @@
 # Network Toolkit development handoff
 
-## 1.17.88 authorized layout update
+## 1.17.88 published layout and navigation update
 
-User explicitly authorized building and publishing the confirmed remote picker, public IP, subnet layout, collapsed navigation and Local Network tab readability changes. Preserve all previous features. Publication pending full validation.
+The user explicitly authorized build and publication of all confirmed changes.
+Published source/tag: 4a99e2b51042dbc6291d1d2b4c2708fc0c4ac377
+Tree: 84a63470de6e7f760f955272fe076a6f7e4478e1
+Official release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.88
+Release ID: 423968146
+
+Remote editor Browse/Open remote uses one table for aligned headers and details,
+with sticky headers inside the same scroll region. Headers show sort direction
+and aria-sort; sorting keeps folders first, supports both directions for Name,
+Type, Size and Modified, preserves file selection and keyboard focus, and formats
+modification timestamps locally. Keyboard Enter opens rows and Space selects.
+File/folder double-click and existing connection/open actions are preserved.
+
+Public IP is inside Local Network's scrollable IP configuration content and also
+on Overview beside the network context. Both views share the transient cached
+IPv4/IPv6 result, refresh/copy controls and partial-failure feedback. The public
+address follows the computer's current Internet route, including VPN routes; it
+is not the selected adapter's private IPv4 address and is not persisted in state.
+
+Possible networks is compact and directly below the calculator in the left
+column, beside details on wide screens, stacking on narrow screens. Its table
+has bounded scrolling and sticky headers; filtering, order, copy, CSV and current
+subnet actions remain. The calculator retains compact spacing.
+
+Collapsed main navigation supports double-click on a tool icon to expand, even
+when the first click redraws navigation. Single clicks still navigate without
+expanding. The brand/status icon also supports double-click. The divider has a
+visible line and grip; its existing double-click/keyboard toggle remains.
+Local Network tabs use 13px text and proportionate 18px icons.
+
+Full Checks 40286388008 passed application 121451147242, native
+Windows 121451146928, browser 121451146573. 510 JS tests,
+31 Python release guards, all root/terminal/desktop/diag/deviceinfo Go suites,
+native cmd/PowerShell color and interactive lifecycle, installer progress and
+Windows GUI/resource build/package pass. Local container network-binding tests
+could not complete due blocked netlink operations; all passed on hosted Linux.
+New browser layout checks cover 4 groups and 9 desktop/compact/narrow layouts;
+all prior editor/shell/copy/Hosts/client/server/SMTP/folder/selection regressions
+and 7 native update timer cases including the real five-minute poll pass.
+Final layout screenshots inspected; no current runtime errors in reports.
+An initial browser check caught an inherited planner margin; final source fixes
+that margin and restores compact input-panel spacing.
+
+Release 40287626301 passed build 121454930033 and publish
+121455460993. All four actual public assets match GitHub digests
+and SHA256SUMS. EXE/portable equal the reviewed local build; standalone, portable
+and update EXEs are identical. All 747 packaged source files match the tag.
+ZIP CRCs, manifests, PE GUI/version, strict update inventory and 14 vendored
+editor-library digests verify. All 27 older releases/assets and 27 tags remain unchanged.
+Released87 production handlers checked/downloaded/verified/staged live88 using
+isolated settings via real HTTPS in 12.04s. Original test EXE unchanged.
+No install/restart or full physical Windows UI interaction was performed.
+
+Review artifact 12633669616: 62cf10a3e50653e7009b44d160a849dd68404e2a4fe738c1d40607975cb98b93
+Browser artifact 12634926316: 613c40244aaebb52ed5a2b4689aef1dbb0f8da234e78380fdab8fb484b48423c
+Network_Toolkit.exe SHA256: 30972651b79fcfee0ceb5019dd8ad5553c4b165db324906cd32bbd2e7c7b472d
+Network_Toolkit_1.17.88_Portable.zip SHA256: 0b9ef31e65d6ec1d9ed70213a475332e5699cfafd5b940a02ac4b1b5602af802
+Network_Toolkit_1.17.88_Update.zip SHA256: 1f5ca4d8f600963d652ba03daf0fda367ac46ab55fbe93468cda67d2e60ccc90
+SHA256SUMS SHA256: 8eac3b5a55da67e629f308878b7cfce245ff0e22242f0980e98d55eaa4100bbc
+
+Main network-toolkit is the sole public source/update feed. Do not move old tags,
+replace assets, change access or write the retired feed. Publication is complete;
+future releases require authorization. This final three-file documentation
+completion uses [skip ci], leaving published source/runtime/assets intact.
 
 ## 1.17.87 published update
 
