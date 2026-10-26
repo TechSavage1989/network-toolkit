@@ -1,0 +1,29 @@
+/* Shared column-heading scale. Table sizing, scrolling and result data remain
+   owned by each tool; this layer only standardizes readable heading text. */
+:root{--result-heading-size:12px;--result-sort-size:10px;--result-heading-icon-size:14px}
+:is(.content,.modal) table thead th{
+ font-family:var(--sans);
+ font-size:var(--result-heading-size);
+ font-weight:650;
+ line-height:1.4;
+ letter-spacing:normal;
+}
+:is(.content,.modal) table thead th :is(button,.table-sort){
+ font-family:inherit;
+ font-size:inherit;
+ font-weight:inherit;
+ line-height:inherit;
+}
+:is(.content,.modal) table thead th .sort-indicator{
+ font-size:var(--result-sort-size);
+ line-height:1.4;
+ flex-shrink:0;
+}
+:is(.content,.modal) table thead th svg{
+ width:var(--result-heading-icon-size);
+ height:var(--result-heading-icon-size);
+ flex-shrink:0;
+}
+/* Compact fixed-column lists may wrap headings, while their rows keep their
+   existing geometry and virtualized packet rows keep the same height. */
+:is(.content,.modal) .he-table thead th{white-space:normal}

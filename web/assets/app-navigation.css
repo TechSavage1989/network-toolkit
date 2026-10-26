@@ -17,9 +17,9 @@ body.app-navigation-ready:not(.terminal-window) #mobileMenu{display:inline-flex;
 .app-navigation-ready .nav-scroll{overflow-x:hidden}
 @media(min-width:1101px){
  .app-navigation-ready .sidebar{position:relative}
- .app-navigation-divider{position:absolute;right:-3px;top:0;bottom:0;width:6px;z-index:5;cursor:pointer;touch-action:none}
- .app-navigation-divider::before{content:"";position:absolute;left:2px;top:0;bottom:0;width:2px;background:var(--border)}
- .app-navigation-divider::after{content:"";position:absolute;left:1px;top:45%;width:4px;height:44px;border-radius:4px;background:var(--muted)}
+ .app-navigation-divider{position:absolute;right:-10px;top:0;bottom:0;width:16px;z-index:5;cursor:pointer;touch-action:none}
+ .app-navigation-divider::before{content:"";position:absolute;left:4px;top:0;bottom:0;width:4px;background:color-mix(in srgb,var(--muted) 55%,var(--border))}
+ .app-navigation-divider::after{content:"";position:absolute;left:2px;top:45%;width:8px;height:52px;border-radius:4px;background:var(--muted)}
  .app-navigation-divider:hover,.app-navigation-divider:focus-visible{background:var(--accentBg);outline:1px solid var(--accent)}
  .app-nav-collapsed .app{grid-template-columns:64px minmax(0,1fr)}
  .app-nav-collapsed .sidebar{width:64px;transform:none}

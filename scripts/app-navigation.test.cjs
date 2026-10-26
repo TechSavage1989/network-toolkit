@@ -12,8 +12,8 @@ function harness({small=false,collapsed=false}={}){
  function flush(){while(frames.length)frames.shift()();}
  const api=c.NetworkToolkitNavigation;api.init();focusable();
  const sidebar=document.getElementById('sidebar'),toggle=document.getElementById('mobileMenu'),brand=sidebar.querySelector('.brand'),main=document.querySelector('.main'),drawerClose=document.getElementById('sidebarDrawerClose');
- function click(target,button=0){
-  clock+=600;
+ function click(target,button=0,advance=600){
+  clock+=advance;
   if(target.disabled)return;
   const event={target,button,defaultPrevented:false,stopped:false,immediate:false,preventDefault(){this.defaultPrevented=true;},stopPropagation(){this.stopped=true;},stopImmediatePropagation(){this.stopped=this.immediate=true;}};
   for(const callback of document.listeners.click||[]){callback(event);if(event.immediate)break;}
@@ -25,7 +25,7 @@ function harness({small=false,collapsed=false}={}){
  toggle.click=()=>click(toggle);drawerClose.click=()=>click(drawerClose);flush();
  return {api,c,document,state,calls,sidebar,toggle,brand,main,drawerClose,click,flush,resize(value){media.matches=value;media.change();flush();}};
 }
-test('desktop navigation reveals only through its arrow or an explicit divider action',()=>{
+test('single desktop clicks preserve the rail until an explicit panel action',()=>{
  const h=harness(),mark=h.sidebar.querySelector('.brand-mark'),divider=h.document.getElementById('appNavigationDivider');
  assert.equal(h.brand.firstElementChild,h.toggle);assert.equal(h.document.querySelectorAll('#mobileMenu').length,1);assert.equal(h.toggle.getAttribute('aria-label'),'Hide navigation');
  h.click(h.toggle.querySelector('svg'));assert(h.state.navigationCollapsed);assert(!h.sidebar.classList.contains('panel-reveal-surface'));assert.equal(divider.getAttribute('aria-valuenow'),'0');
@@ -52,4 +52,36 @@ test('breakpoint transitions relocate the same toggle and release drawer inert s
  const h=harness({collapsed:true});h.resize(true);assert.equal(h.toggle.parentElement.id,'topbar');assert.equal(h.brand.firstElementChild,h.drawerClose);assert(h.state.navigationCollapsed);
  h.click(h.toggle);assert(h.main.inert);h.drawerClose.focus();h.resize(false);assert.equal(h.brand.firstElementChild,h.toggle);assert.equal(h.main.inert,undefined);assert(!h.sidebar.classList.contains('open'));assert(h.state.navigationCollapsed);assert.equal(h.document.activeElement,h.toggle);assert.equal(h.document.querySelectorAll('#mobileMenu').length,1);
  h.click(h.sidebar.querySelector('.nav-scroll'));assert(h.state.navigationCollapsed);h.click(h.toggle);assert(!h.state.navigationCollapsed);h.resize(true);h.main.inert=true;h.click(h.toggle);h.click(h.drawerClose);assert.equal(h.main.inert,true,'Closing the drawer preserves an existing inert owner');
+});
+
+test('tool-tab double clicks toggle each desktop panel state once despite node redraw and native dblclick',()=>{
+ for(const collapsed of [false,true]){
+  const h=harness({collapsed});
+  h.click(h.sidebar.querySelector('[data-page="ping"] svg'));
+  assert.equal(h.state.navigationCollapsed,collapsed,'First click only navigates');
+  // The real navigate() replaces the tab DOM after its first click.
+  h.sidebar.querySelector('.nav-scroll').innerHTML='<button class="nav-item active" data-page="ping"><svg></svg><span>Ping</span></button>';
+  const icon=h.sidebar.querySelector('[data-page="ping"] svg');
+  h.click(icon,0,100);
+  assert.equal(h.state.navigationCollapsed,!collapsed,'Second click toggles the panel');
+  assert.equal(h.state.activePage,'ping');
+  assert.equal(h.calls.filter(x=>x==='save').length,1);
+  h.sidebar.emit('dblclick',icon);
+  assert.equal(h.state.navigationCollapsed,!collapsed,'Native dblclick does not toggle again');
+  assert.equal(h.calls.filter(x=>x==='save').length,1);
+ }
+});
+test('rapid clicks on different tabs and delayed repeats remain ordinary navigation',()=>{
+ const h=harness(),overview=h.sidebar.querySelector('[data-page="overview"]'),ping=h.sidebar.querySelector('[data-page="ping"]');
+ h.click(ping);h.click(overview,0,100);assert.equal(h.state.navigationCollapsed,false);
+ h.click(overview,0,600);assert.equal(h.state.navigationCollapsed,false);
+ h.click(overview,0,100);assert.equal(h.state.navigationCollapsed,true);
+ h.click(h.toggle);assert.equal(h.state.navigationCollapsed,false);
+ h.click(overview,0,100);assert.equal(h.state.navigationCollapsed,false,'Arrow toggle clears the previous click pair');
+});
+
+test('an intervening control click breaks a tool-tab double-click sequence',()=>{
+ const h=harness(),ping=h.sidebar.querySelector('[data-page="ping"]');
+ h.click(ping);h.click(h.document.getElementById('workspaceScroll'),0,100);h.click(ping,0,100);
+ assert.equal(h.state.navigationCollapsed,false);
 });

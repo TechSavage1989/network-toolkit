@@ -47,7 +47,7 @@
       text?.classList.add('nav-item-text');
       const name = text?.textContent.trim() || titleFor(button.dataset.page), badge = button.querySelector('.badge')?.textContent.trim();
       button.setAttribute('aria-label', name + (badge ? ', ' + badge + ' diagnostics' : ''));
-      button.title = name + (badge ? ' (' + badge + ')' : '');
+      button.title = name + (badge ? ' (' + badge + ')' : '') + (small ? '' : '. Double-click to ' + (collapsed ? 'expand' : 'collapse') + ' navigation.');
     }
     const status = sidebar.querySelector('#engineLabel'), version = sidebar.querySelector('#engineSub');
     if (status) {
@@ -73,6 +73,7 @@
 
   function toggle() {
     if (!initialized || !sidebar || terminalOnly()) return;
+    lastRailClick = null;
     closeEntryContextMenu(false);
     if (compact()) {
       if (drawerOpen()) { closeDrawer(); return; }
@@ -98,7 +99,7 @@
     if (!sidebar || !toggleButton || !main) return;
     const divider=document.createElement('div');divider.id='appNavigationDivider';divider.className='app-navigation-divider';divider.setAttribute('role','separator');divider.setAttribute('aria-orientation','vertical');divider.setAttribute('aria-label','Expand or collapse tool navigation');divider.tabIndex=0;divider.title='Double-click or press Enter or Space to expand or collapse tool navigation.';sidebar.append(divider);
     divider.addEventListener('dblclick',event=>{if(compact())return;event.preventDefault();event.stopPropagation();toggle();});
-    sidebar.addEventListener('dblclick',event=>{if(compact()||state.navigationCollapsed!==true||!event.target.closest?.('.nav-item,.brand-mark,#engineLabel'))return;event.preventDefault();event.stopPropagation();toggle();});
+    sidebar.addEventListener('dblclick',event=>{if(compact()||state.navigationCollapsed!==true||!event.target.closest?.('.brand-mark,#engineLabel'))return;event.preventDefault();event.stopPropagation();toggle();});
     divider.addEventListener('keydown',event=>{if(compact()||!['Enter',' '].includes(event.key))return;event.preventDefault();event.stopPropagation();toggle();});
     document.body.classList.add('app-navigation-ready');
     toggleButton.type = 'button';
@@ -129,6 +130,7 @@
     document.body.append(backdrop);
     compactQuery = matchMedia('(max-width:1100px)');
     compactQuery.addEventListener('change', () => {
+      lastRailClick = null;
       const focused = document.activeElement, returnFocus = sidebar.contains(focused) && (compact() || focused === drawerClose);
       closeDrawer(false);
       if (returnFocus) toggleButton.focus({preventScroll:true});
@@ -145,11 +147,13 @@
     }, true);
     document.addEventListener('click', event => {
       const button = event.target.closest?.('#sidebar .nav-item[data-page]');
-      if (!button || event.button !== 0 || button.disabled) return;
+      if (!button || event.button !== 0 || button.disabled) { lastRailClick = null; return; }
       const small = compact(), page = button.dataset.page;
       // Navigation redraws its buttons after the first click; recognize the
       // second click by page identity rather than relying on a surviving node.
-      if(!small&&state.navigationCollapsed===true){const now=Date.now();if(lastRailClick?.page===page&&now-lastRailClick.at<500){lastRailClick=null;toggle();}else lastRailClick={page,at:now};}else lastRailClick=null;
+      // Handle tool-tab pairs here in both panel states. A native dblclick
+      // following the second click must not toggle the sidebar a second time.
+      if(!small){const now=Date.now();if(lastRailClick?.page===page&&now-lastRailClick.at<500){lastRailClick=null;toggle();}else lastRailClick={page,at:now};}else lastRailClick=null;
       if (small) closeDrawer(false);
       requestAnimationFrame(() => {
         if (state.activePage !== page) return;

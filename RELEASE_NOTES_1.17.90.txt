@@ -1,0 +1,5 @@
+Network Toolkit 1.17.90
+
+Results-list column headings are larger and consistently scaled across tools.
+Status colors and shared page actions use consistent heading placement and sizing.
+Double-click main sidebar tool tabs to collapse or expand navigation. The vertical divider is more visible and easier to target.

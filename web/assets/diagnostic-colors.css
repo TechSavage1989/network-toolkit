@@ -39,3 +39,11 @@
 .app-accent-settings .help-line{margin:0}
 
 #pageActions>.diagnostic-colors-shortcut{height:auto;margin:0}
+
+/* Shared page actions live beside the tool heading, before Reset layout. */
+#pageActions{display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;gap:6px;min-width:0}
+#pageActions>.diagnostic-colors-shortcut{height:auto;margin:0}
+#pageActions .btn,#pageActions .iconbtn{min-height:32px;font-size:12px;line-height:1.4;padding:5px 10px;gap:6px}
+#pageActions .btn svg,#pageActions .iconbtn svg{width:16px;height:16px}
+#pageActions .iconbtn{width:32px;height:32px;padding:7px}
+@media(max-width:760px){#pageActions{justify-content:flex-start}}

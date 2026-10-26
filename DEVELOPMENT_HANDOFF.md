@@ -1,5 +1,9 @@
 # Network Toolkit development handoff
 
+## 1.17.90 authorized UI consistency update
+
+User authorized implementation, build and publication of larger proportional result headers, two-way main-sidebar tab double-click, a more visible/wider divider, and consistent Status colors/shared heading actions. Preserve previous fixes. Publication pending full validation.
+
 ## 1.17.89 published Local Network layout and refresh fixes
 
 The user explicitly authorized building and publishing these fixes.
