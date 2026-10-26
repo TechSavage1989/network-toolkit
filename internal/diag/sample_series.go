@@ -78,7 +78,8 @@ func (s *sampleSeries) collect(ctx context.Context, count int, interval time.Dur
 		}
 		started := time.Now()
 		reply, err := probe(ctx)
-		reply.Sequence, reply.Time = sequence, time.Now().UTC().Format(time.RFC3339Nano)
+		reply.Sequence = sequence
+		stampReply(&reply)
 		if err != nil {
 			reply.Success, reply.Status, reply.Error = false, "error", err.Error()
 		}

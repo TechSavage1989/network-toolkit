@@ -37,6 +37,7 @@ type localWiFiProfile struct {
 }
 
 type localWiFiInterface struct {
+	Time          string               `json:"time,omitempty"`
 	ID            string               `json:"id"`
 	Description   string               `json:"description"`
 	State         string               `json:"state"`
@@ -47,6 +48,8 @@ type localWiFiInterface struct {
 }
 
 type localWiFiSnapshot struct {
+	Time       string               `json:"time,omitempty"`
+	TimeKind   string               `json:"timeKind,omitempty"`
 	Available  bool                 `json:"available"`
 	Elevated   bool                 `json:"elevated"`
 	Interfaces []localWiFiInterface `json:"interfaces"`
@@ -205,6 +208,7 @@ func (a *application) handleLocalWiFi(w http.ResponseWriter, r *http.Request, m 
 		if ctx.Err() != nil {
 			return
 		}
+		stampLocalWiFiSnapshot(&snapshot, time.Now())
 		jsonResponse(w, http.StatusOK, snapshot)
 		return
 	}

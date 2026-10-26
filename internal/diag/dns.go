@@ -22,6 +22,7 @@ var dnsTypes = map[string]uint16{"A": 1, "NS": 2, "CNAME": 5, "SOA": 6, "PTR": 1
 var dnsNames = map[uint16]string{1: "A", 2: "NS", 5: "CNAME", 6: "SOA", 12: "PTR", 15: "MX", 16: "TXT", 28: "AAAA", 33: "SRV", 41: "OPT", 257: "CAA", 43: "DS", 48: "DNSKEY", 52: "TLSA", 65: "HTTPS"}
 
 type DNSRecord struct {
+	Time    string         `json:"time,omitempty"`
 	Name    string         `json:"name"`
 	Type    string         `json:"type"`
 	Value   string         `json:"value"`
@@ -30,6 +31,7 @@ type DNSRecord struct {
 	Details map[string]any `json:"details,omitempty"`
 }
 type DNSQueryResult struct {
+	Time       string  `json:"time,omitempty"`
 	Type       string  `json:"type"`
 	Status     string  `json:"status"`
 	DurationMs float64 `json:"durationMs"`
@@ -143,6 +145,7 @@ func dns(ctx context.Context, req model.Request, emit model.Emit) (model.Result,
 			}
 		}
 		qr.DurationMs = ms(time.Since(queryStart))
+		qr.Time = measurementTime()
 		if lookupErr != nil {
 			qr.Error = lookupErr.Error()
 			qr.Status = "error"
@@ -165,6 +168,9 @@ func dns(ctx context.Context, req model.Request, emit model.Emit) (model.Result,
 			}
 		}
 		for i := range rows {
+			if rows[i].Time == "" {
+				rows[i].Time = qr.Time
+			}
 			if rows[i].Details == nil {
 				rows[i].Details = dnsRecordDetails(rows[i])
 			}

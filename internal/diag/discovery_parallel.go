@@ -89,6 +89,7 @@ func probeDiscoveryHost(ctx context.Context, address string, options subnetOptio
 			if !item.Completed {
 				host.Completed = false
 			}
+			host.Time = laterMeasurementTime(host.Time, item.Time)
 			host.Evidence = append(host.Evidence, item.Evidence...)
 			host.OpenPorts = append(host.OpenPorts, item.OpenPorts...)
 			host.Ports = append(host.Ports, item.Ports...)

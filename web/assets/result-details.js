@@ -85,7 +85,7 @@
   function fieldsHTML(record) {
     if (!record || typeof record !== 'object' || Array.isArray(record)) return '<pre class="result-record-value">' + esc(typeof record === 'object' ? JSON.stringify(record, null, 2) : scalar(record)) + '</pre>';
     const entries = Object.entries(record), simple = entries.filter(([,value]) => value == null || typeof value !== 'object'), nested = entries.filter(([,value]) => value != null && typeof value === 'object');
-    const values = simple.length ? '<dl class="result-record-grid">' + simple.map(([key,value]) => '<div><dt>' + esc(label(key)) + '</dt><dd>' + esc(scalar(value)) + '</dd></div>').join('') + '</dl>' : '';
+    const values = simple.length ? '<dl class="result-record-grid">' + simple.map(([key,value]) => '<div><dt>' + esc(root.NetworkToolkitResultTime?.isKey(key)?'Recorded (local)':label(key)) + '</dt><dd>' + (root.NetworkToolkitResultTime?.isKey(key)?root.NetworkToolkitResultTime.cell(value):esc(scalar(value))) + '</dd></div>').join('') + '</dl>' : '';
     return values + nested.map(([key,value]) => '<details class="result-record-nested"><summary>' + esc(label(key)) + (Array.isArray(value) ? ' (' + value.length + ' ' + (value.length === 1 ? 'entry' : 'entries') + ')' : '') + '</summary>' + renderStaticObject(value, 1) + '</details>').join('');
   }
 
@@ -121,7 +121,7 @@
 
   function detailBody(detail) {
     const json=JSON.stringify(detail.record,null,2),context=detail.context;
-    const run=context?'<section class="result-run-context"><dl class="result-record-grid">'+[['Tool',titleFor(context.tool)],['Target',context.target],['Run started',context.started],['Method',context.mode],['Port',context.port]].filter(([,value])=>value!==undefined&&value!=='').map(([key,value])=>'<div><dt>'+esc(key)+'</dt><dd>'+esc(scalar(value))+'</dd></div>').join('')+'</dl></section>':'';
+    const run=context?'<section class="result-run-context"><dl class="result-record-grid">'+[['Tool',titleFor(context.tool)],['Target',context.target],['Run started',context.started],['Method',context.mode],['Port',context.port]].filter(([,value])=>value!==undefined&&value!=='').map(([key,value])=>'<div><dt>'+esc(key)+'</dt><dd>'+(key==='Run started'&&root.NetworkToolkitResultTime?root.NetworkToolkitResultTime.cell(value,{label:'Run started'}):esc(scalar(value)))+'</dd></div>').join('')+'</dl></section>':'';
     return '<div class="result-row-detail"><p class="result-detail-caption">Recorded '+esc(String(detail.name).replace(/\./g,' '))+' entry</p><div class="result-detail-actions result-detail-copy"><button class="btn small ghost" data-result-copy="text">'+icon('copy')+'Copy details</button><button class="btn small ghost" data-result-copy="json">Copy JSON</button></div>'+run+fieldsHTML(detail.record)+toolsHTML(detail)+'<details class="result-record-json"><summary>Raw record JSON</summary><pre>'+esc(json)+'</pre></details></div>';
   }
 
@@ -214,7 +214,7 @@
       const detailForCopy=copy?.closest('#resultEntryPane')?sideDetail:activeDetail;
       if (copy && detailForCopy && copy.closest('.result-row-detail')) {
         event.preventDefault(); event.stopImmediatePropagation();
-        const record = detailForCopy.record, text = copy.dataset.resultCopy === 'json' || !record || typeof record !== 'object' ? JSON.stringify(record,null,2) : Object.entries(record).map(([key,value]) => label(key) + ': ' + (value != null && typeof value === 'object' ? JSON.stringify(value, null, 2) : scalar(value))).join('\n');
+        const record = detailForCopy.record, text = copy.dataset.resultCopy === 'json' || !record || typeof record !== 'object' ? JSON.stringify(record,null,2) : Object.entries(record).map(([key,value]) => label(key) + ': ' + (value != null && typeof value === 'object' ? JSON.stringify(value, null, 2) : root.NetworkToolkitResultTime?.isKey(key)?root.NetworkToolkitResultTime.format(value)+' ('+String(value??'Not recorded')+')':scalar(value))).join('\n');
         void copyText(text); return;
       }
       if (event.target.closest('[data-result-back]')) { event.preventDefault(); event.stopImmediatePropagation(); returnToPrevious(); return; }

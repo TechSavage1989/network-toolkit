@@ -1,10 +1,10 @@
 /* Network Toolkit report rendering. Original project code, no runtime dependencies. */
 (function (root, factory) {
   'use strict';
-  const api = factory(typeof module === 'object' && module.exports ? require('./source-interface.js') : root.NetworkToolkitSource);
+  const api = factory(typeof module === 'object' && module.exports ? require('./source-interface.js') : root.NetworkToolkitSource, typeof module === 'object' && module.exports ? require('./result-time.js') : root.NetworkToolkitResultTime);
   if (typeof module === 'object' && module.exports) module.exports = api;
   if (root) root.NetworkToolkitReportExport = api;
-})(typeof globalThis === 'object' ? globalThis : this, function (sourceInfo) {
+})(typeof globalThis === 'object' ? globalThis : this, function (sourceInfo, resultTime) {
   'use strict';
 
   const toolNames = Object.freeze({
@@ -15,7 +15,7 @@
     wifi: 'Wi-Fi', ipconfig: 'IP configuration', wol: 'Wake-on-LAN'
   });
   const labels = Object.freeze({
-    address: 'IP address', hostname: 'Hostname', hostnames: 'Hostname aliases',
+    time: 'Recorded time (local)', timestamp: 'Recorded time (local)', captured: 'Snapshot recorded (local)', address: 'IP address', hostname: 'Hostname', hostnames: 'Hostname aliases',
     hostnameSource: 'Hostname source', hostnameStatus: 'Hostname lookup status',
     hostnameNote: 'Hostname lookup note', mac: 'MAC address', vendor: 'Vendor',
     rttMs: 'RTT (ms)', latencyMs: 'Latency (ms)', elapsedMs: 'Elapsed (ms)',
@@ -36,7 +36,7 @@
     nameResolution: 'Name resolution', dnsServer: 'DNS server', resolveHostnames: 'Resolve hostnames'
   });
   const preferredColumns = [
-    'address', 'hostname', 'name', 'hop', 'sequence', 'port', 'type',
+    'time', 'timestamp', 'address', 'hostname', 'name', 'hop', 'sequence', 'port', 'type',
     'status', 'state', 'success', 'value', 'detail', 'rttMs', 'latencyMs',
     'ttl', 'service', 'mac', 'vendor', 'destination', 'gateway', 'interface'
   ];
@@ -58,6 +58,7 @@
   })[value] || title(value || 'Not reported');
 
   function scalar(value, key) {
+    if (resultTime?.isKey(key)) return timestamp(value);
     if (value === null || value === undefined) return 'Not reported';
     if (typeof value === 'boolean') return value ? 'Yes' : 'No';
     if (typeof value === 'number') {
@@ -75,7 +76,8 @@
   }
 
   function timestamp(value) {
-    if (!value) return 'Not reported';
+    if (resultTime) { const local=resultTime.format(value);return Number.isFinite(resultTime.epoch(value))?local+' ('+String(value)+')':local; }
+    if (!value) return 'Not recorded';
     const date = new Date(value);
     return Number.isFinite(date.getTime()) ? date.toISOString().replace('T', ' ').replace('Z', ' UTC') : String(value);
   }
@@ -211,7 +213,8 @@
     const rows = hosts.map(host => {
       const cells = [
       '<strong class="mono">' + esc(host.address || 'Not reported') + '</strong>' +
-        '<span class="cell-sub">' + esc(hostName(host)) + '</span>',
+        '<span class="cell-sub">' + esc(hostName(host)) + '</span>' +
+        '<span class="cell-sub">Recorded (local): ' + esc(timestamp(host.time)) + '</span>',
       esc(hostOutcome(host)) + (host.status === 'cancelled' && host.responded ? '<span class="cell-sub">Cancelled after response</span>' : ''),
       esc(scalar(host.mac)) + '<span class="cell-sub">' + esc(scalar(host.vendor)) + '</span>',
       esc(host.latencyMs == null ? 'Not measured' : scalar(host.latencyMs, 'latencyMs') + ' ms'),
@@ -305,7 +308,7 @@
       '<header class="report-header"><p class="eyebrow">Network Toolkit report</p><h1>' + esc(heading) + '</h1><div class="meta"><p>Exported ' + esc(timestamp(report.exported)) +
       ' | Version ' + esc(report.version || 'Not reported') + '</p><p>Computer: ' + esc(report.system.hostname || 'Not reported') +
       (report.system.os ? ' | ' + esc(report.system.os) + (report.system.arch ? ' ' + esc(report.system.arch) : '') : '') +
-      '</p><p>Times are shown in UTC. This report contains saved observations from the selected diagnostic runs.</p></div>' +
+      '</p><p>Times use the exporting computer’s local time zone, followed by the original recorded instant. This report contains saved observations from the selected diagnostic runs.</p></div>' +
       '<div class="summary-cards">' + [[counts.results, 'Selected results'], [counts.completed, 'Completed runs'], [counts.running, 'In-progress snapshots'], [counts.attention, 'Failed / cancelled runs']]
         .map(([count, name]) => '<div class="summary-card"><strong>' + count + '</strong><span>' + esc(name) + '</span></div>').join('') + '</div>' +
       (report.notes ? '<section class="report-notes"><h2>Report notes</h2><p>' + esc(report.notes) + '</p></section>' : '') + '</header>' +
@@ -336,7 +339,7 @@
     const report = reportValue(input);
     const lines = [report.label || 'Network diagnostics list', 'Network Toolkit ' + (report.version || ''),
       'Exported: ' + timestamp(report.exported), 'Computer: ' + (report.system.hostname || 'Not reported'),
-      'Selected results: ' + report.jobs.length, 'Times shown in UTC. All recorded rows are included.', ''];
+      'Selected results: ' + report.jobs.length, 'Times use the exporting computer local zone with original recorded instants. All recorded rows are included.', ''];
     if (report.notes) lines.push('NOTES', String(report.notes), '');
     report.jobs.forEach((job, index) => {
       lines.push('='.repeat(64), (index + 1) + '. ' + jobName(job),

@@ -180,6 +180,7 @@ function runTests() {
     const source = fs.readFileSync(path.join(__dirname, '../web/assets/report-export.js'), 'utf8');
     const context = vm.createContext({URL});
     vm.runInContext(fs.readFileSync(path.join(__dirname, '../web/assets/source-interface.js'), 'utf8'), context, {timeout: 1000});
+    vm.runInContext(fs.readFileSync(path.join(__dirname, '../web/assets/result-time.js'), 'utf8'), context, {timeout: 1000});
     vm.runInContext(source, context, {timeout: 1000});
     const r = deepFreeze(reportFixture(3));
     assert.equal(context.NetworkToolkitReportExport.toHTML(r), renderer.toHTML(r));
@@ -188,6 +189,18 @@ function runTests() {
     const text = renderer.toText(r);
     assert.doesNotMatch(text.replace(/\r\n/g, ''), /[\r\n]/);
     assert.ok(text.endsWith('\r\n'));
+  });
+  check('measurement timestamps remain visible as local instants with original source precision', () => {
+    const r=reportFixture(1),stamp='2026-10-26T19:20:30.123456789Z';
+    r.jobs[0].result.data.hosts[0].time=stamp;
+    r.jobs[1].result.data.samples[0].time=stamp;
+    const before=JSON.stringify(r);
+    for(const output of [renderer.toHTML(r),renderer.toText(r)]){
+      assert(output.includes(stamp));assert(output.includes('123'));
+      assert(output.includes('local'));
+      assert(!output.includes('Times are shown in UTC.'));
+    }
+    assert.equal(JSON.stringify(r),before);
   });
   check('empty reports and absent data remain explicit and do not invent results', () => {
     assert.match(renderer.toHTML({jobs: []}), /No diagnostic results were selected/);

@@ -33,6 +33,7 @@ type localIPAddress struct {
 }
 
 type localIPAdapter struct {
+	Time            string           `json:"time,omitempty"`
 	ID              string           `json:"id"`
 	Index           uint32           `json:"index"`
 	Name            string           `json:"name"`
@@ -60,6 +61,8 @@ type localIPAdapter struct {
 }
 
 type localIPSnapshot struct {
+	Time      string           `json:"time,omitempty"`
+	TimeKind  string           `json:"timeKind,omitempty"`
 	Available bool             `json:"available"`
 	Elevated  bool             `json:"elevated"`
 	Adapters  []localIPAdapter `json:"adapters"`
@@ -396,6 +399,7 @@ func (a *application) handleLocalToolsWithManager(w http.ResponseWriter, r *http
 				jsonError(w, 500, err.Error())
 				return
 			}
+			stampLocalIPSnapshot(&value, time.Now())
 			jsonResponse(w, 200, value)
 		} else {
 			value, err := m.backend.readHosts(ctx)

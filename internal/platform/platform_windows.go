@@ -599,10 +599,11 @@ func Snapshot(ctx context.Context, tool string) (model.Result, error) {
 		cmd.Stdout = &buffer
 		cmd.Stderr = &buffer
 		err := cmd.Run()
+		recorded := snapshotTime()
 		contextErr := commandCtx.Err()
 		cancel()
 		output := strings.TrimSpace(decodeCommandOutput(buffer.bytes))
-		section := map[string]any{"title": item.title, "command": item.exe + " " + strings.Join(item.args, " "), "output": output, "success": err == nil}
+		section := map[string]any{"time": recorded, "timeKind": "snapshot", "title": item.title, "command": item.exe + " " + strings.Join(item.args, " "), "output": output, "success": err == nil}
 		if err != nil {
 			message := err.Error()
 			if contextErr != nil {
@@ -620,16 +621,16 @@ func Snapshot(ctx context.Context, tool string) (model.Result, error) {
 		sections = append(sections, section)
 		outputs = append(outputs, item.title+"\n\n"+output)
 	}
-	data := map[string]any{"sections": sections, "output": strings.Join(outputs, "\n\n"), "warnings": warnings, "captured": time.Now().UTC().Format(time.RFC3339)}
+	data := map[string]any{"sections": sections, "output": strings.Join(outputs, "\n\n"), "warnings": warnings, "timeKind": "snapshot"}
 	if tool == "connections" && len(sections) > 0 {
-		data["connections"] = parseNetstat(fmt.Sprint(sections[0]["output"]))
+		data["connections"] = stampSnapshotRows(parseNetstat(fmt.Sprint(sections[0]["output"])), fmt.Sprint(sections[0]["time"]))
 	}
 	if tool == "routes" && len(sections) > 0 {
 		routes := parseWindowsRoutes(fmt.Sprint(sections[0]["output"]))
 		if adapters, err := readWindowsAdapters(); err == nil {
 			captureAdapterContext(adapters).annotateRoutes(routes)
 		}
-		data["routes"] = routes
+		data["routes"] = stampSnapshotRows(routes, fmt.Sprint(sections[0]["time"]))
 		data["note"] = "The table lists active routes. Persistent routes and full interface details remain in the captured command output."
 	}
 	if tool == "arp" {
@@ -645,6 +646,7 @@ func Snapshot(ctx context.Context, tool string) (model.Result, error) {
 	}
 	if tool == "ipconfig" {
 		if system, err := System(ctx); err == nil {
+			stampSystemSnapshot(system, snapshotTime())
 			data["system"] = system
 		} else {
 			warnings = append(warnings, "Structured adapter information: "+err.Error())
@@ -654,12 +656,14 @@ func Snapshot(ctx context.Context, tool string) (model.Result, error) {
 	if tool == "wifi" {
 		data["note"] = "Windows may limit wireless details when the wireless adapter is unavailable, WLAN AutoConfig is stopped, or location access is disabled. No wireless passwords are collected."
 	}
+	data["time"] = snapshotTime()
+	data["captured"] = data["time"]
 	summary := title + " captured"
 	if !succeeded {
 		summary = title + " could not be fully read; review command output and errors"
-		return model.Result{Summary: summary, Data: data}, errors.New(summary)
+		return model.Result{Time: data["time"].(string), Summary: summary, Data: data}, errors.New(summary)
 	}
-	return model.Result{Summary: summary, Data: data}, ctx.Err()
+	return model.Result{Time: data["time"].(string), Summary: summary, Data: data}, ctx.Err()
 }
 
 type limitedBuffer struct {

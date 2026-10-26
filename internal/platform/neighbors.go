@@ -14,6 +14,7 @@ import (
 // It is not a liveness assertion. The same address can occur on more than one
 // interface, so consumers must retain interface association when MACs conflict.
 type Neighbor struct {
+	Time                 string `json:"time,omitempty"`
 	Address              string `json:"address"`
 	MAC                  string `json:"mac"`
 	Interface            string `json:"interface"`
@@ -39,10 +40,12 @@ func Neighbors(ctx context.Context) ([]Neighbor, error) {
 		return nil, err
 	}
 	rows, err := readNeighbors(ctx)
+	recorded := snapshotTime()
 	if rows == nil {
 		rows = []Neighbor{}
 	}
 	for i := range rows {
+		rows[i].Time = recorded
 		if contextErr := ctx.Err(); contextErr != nil {
 			return rows[:i], contextErr
 		}

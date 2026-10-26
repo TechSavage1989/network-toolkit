@@ -51,12 +51,29 @@ func TestSMTPConnectivityDoesNotSendMailByDefault(t *testing.T) {
 	}()
 	port := listener.Addr().(*net.TCPAddr).Port
 	req := model.Request{Tool: "smtp", Target: "127.0.0.1", Options: map[string]any{"port": port, "security": "none", "timeoutMs": 3000}}
-	result, err := smtpTest(context.Background(), req, nil)
+	var liveSteps []map[string]any
+	result, err := smtpTest(context.Background(), req, func(event model.Event) {
+		if data, ok := event.Data.(map[string]any); ok && data["type"] == "smtp" {
+			liveSteps = append(liveSteps, data["value"].(map[string]any))
+		}
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if result.Summary != "SMTP connection test completed" {
 		t.Fatalf("unexpected summary %s", result.Summary)
+	}
+	steps := result.Data.(map[string]any)["steps"].([]map[string]any)
+	if len(liveSteps) != len(steps) || len(steps) < 3 {
+		t.Fatalf("SMTP stages missing from live events: %+v %+v", liveSteps, steps)
+	}
+	previous := time.Time{}
+	for i, step := range steps {
+		stamp := parsedMeasurement(t, step["time"].(string))
+		if stamp.Before(previous) || liveSteps[i]["time"] != step["time"] {
+			t.Fatalf("SMTP stage clock association changed: %+v %+v", liveSteps, steps)
+		}
+		previous = stamp
 	}
 	transcript := <-done
 	if strings.Contains(transcript, "MAIL FROM") || strings.Contains(transcript, "RCPT TO") || strings.Contains(transcript, "DATA") {

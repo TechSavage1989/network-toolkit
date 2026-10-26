@@ -2,7 +2,7 @@ package model
 
 import "time"
 
-const Version = "1.17.91"
+const Version = "1.17.92"
 
 type Request struct {
 	Tool    string         `json:"tool"`
@@ -18,6 +18,7 @@ type Event struct {
 }
 
 type Result struct {
+	Time    string `json:"time,omitempty"`
 	Summary string `json:"summary"`
 	Data    any    `json:"data,omitempty"`
 }

@@ -44,6 +44,7 @@ func deviceIdentity(info deviceinfo.Info, err error) DeviceIdentity {
 }
 
 type IdentifyResult struct {
+	Time   string          `json:"time,omitempty"`
 	Source *SourceMetadata `json:"source,omitempty"`
 	HostIdentity
 	DeviceIdentity
@@ -106,6 +107,7 @@ func runIdentify(ctx context.Context, req model.Request, emit model.Emit, neighb
 		return result(), err
 	}
 	known, neighborErr := readNeighborIdentities(ctx, neighbors)
+	data.Time = measurementTime()
 	data.HostIdentity = known[data.Address]
 	if neighborErr != nil {
 		data.NeighborNote = "Initial neighbor cache: " + neighborErr.Error()
@@ -115,6 +117,7 @@ func runIdentify(ctx context.Context, req model.Request, emit model.Emit, neighb
 	}
 	model.Log(emit, "info", "Requesting device-reported details from "+data.Address, nil)
 	info, probeErr := probe(ctx, data.Address, timeout)
+	data.Time = measurementTime()
 	data.DeviceIdentity = deviceIdentity(info, probeErr)
 	data.Responded = info.Responded
 	if data.Responded {
@@ -125,8 +128,10 @@ func runIdentify(ctx context.Context, req model.Request, emit model.Emit, neighb
 	}
 	if resolveName && ctx.Err() == nil {
 		data.HostnameIdentity = resolveHostname(ctx, data.Address, lookup)
+		data.Time = measurementTime()
 	}
 	refreshed, refreshErr := refreshNeighborIdentities(ctx, neighbors)
+	data.Time = measurementTime()
 	if identity, ok := refreshed[data.Address]; ok {
 		data.HostIdentity = identity
 	}

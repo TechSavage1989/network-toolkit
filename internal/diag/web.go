@@ -23,6 +23,7 @@ import (
 )
 
 type Certificate struct {
+	Time               string   `json:"time,omitempty"`
 	Subject            string   `json:"subject"`
 	Issuer             string   `json:"issuer"`
 	Serial             string   `json:"serial"`
@@ -65,9 +66,12 @@ func tlsVersion(v uint16) string {
 }
 
 func tlsMetadata(ctx context.Context, state tls.ConnectionState, name string, verify bool) map[string]any {
+	recorded := measurementTime()
 	chain := make([]Certificate, 0, len(state.PeerCertificates))
 	for _, c := range state.PeerCertificates {
-		chain = append(chain, certificateDetails(c))
+		certificate := certificateDetails(c)
+		certificate.Time = recorded
+		chain = append(chain, certificate)
 	}
 	valid := false
 	validationError := ""
@@ -98,7 +102,7 @@ func tlsMetadata(ctx context.Context, state tls.ConnectionState, name string, ve
 	if !verify {
 		warnings = append(warnings, "The diagnostic connection was allowed to collect certificates without enforcing validation; the separate validation result is shown")
 	}
-	return map[string]any{"version": tlsVersion(state.Version), "cipher": tls.CipherSuiteName(state.CipherSuite), "serverName": name, "alpn": state.NegotiatedProtocol, "verified": valid, "verificationError": validationError, "verificationEnforced": verify, "certificates": chain, "warnings": warnings}
+	return map[string]any{"time": recorded, "version": tlsVersion(state.Version), "cipher": tls.CipherSuiteName(state.CipherSuite), "serverName": name, "alpn": state.NegotiatedProtocol, "verified": valid, "verificationError": validationError, "verificationEnforced": verify, "certificates": chain, "warnings": warnings}
 }
 
 func tlsCheck(ctx context.Context, req model.Request, emit model.Emit) (model.Result, error) {
@@ -145,6 +149,7 @@ func tlsCheck(ctx context.Context, req model.Request, emit model.Emit) (model.Re
 	data["tcpMs"] = ms(connected.Sub(started))
 	data["handshakeMs"] = ms(time.Since(connected))
 	data["totalMs"] = ms(time.Since(started))
+	data["time"] = measurementTime()
 	valid, _ := data["verified"].(bool)
 	level, summary := "success", "Certificate validation passed"
 	if !valid {
@@ -156,6 +161,7 @@ func tlsCheck(ctx context.Context, req model.Request, emit model.Emit) (model.Re
 }
 
 type HTTPHop struct {
+	Time          string   `json:"time,omitempty"`
 	URL           string   `json:"url"`
 	Method        string   `json:"method"`
 	RemoteAddress string   `json:"remoteAddress"`
@@ -172,6 +178,7 @@ type HTTPHop struct {
 }
 
 type HTTPHeader struct {
+	Time  string `json:"time,omitempty"`
 	Name  string `json:"name"`
 	Value string `json:"value"`
 }
@@ -334,6 +341,7 @@ func httpCheck(ctx context.Context, req model.Request, emit model.Emit) (model.R
 		resp, requestErr := requestClient.Do(r)
 		if requestErr != nil {
 			mu.Lock()
+			hop.Time = measurementTime()
 			hop.TotalMs = ms(time.Since(hopStart))
 			hop.Error = requestErr.Error()
 			hops = append(hops, hop)
@@ -366,6 +374,10 @@ func httpCheck(ctx context.Context, req model.Request, emit model.Emit) (model.R
 		}
 		mu.Lock()
 		hop.TotalMs = ms(time.Since(hopStart))
+		hop.Time = measurementTime()
+		for i := range headers {
+			headers[i].Time = hop.Time
+		}
 		if readErr != nil {
 			hop.Error = readErr.Error()
 		}

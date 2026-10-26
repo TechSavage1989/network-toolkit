@@ -45,6 +45,10 @@ For the subsequently authorized 1.17.90 build, the 1.17.89 note has also been
 moved unchanged into the archive. Current `RELEASE_NOTES_1.17.90.txt` alone stays
 at root, and the archive index identifies 1.17.90 as current and 1.17.89 as previous.
 
+## 1.17.92 authorized timestamp and graph update
+
+User authorized implementation, build and publication of local per-entry measurement timestamps across relevant scan tools, graph hover/click details including local time, and useful additional visual statistics supported by the data. Preserve existing features, settings, compact source layout and release-note policy. Publication pending validation.
+
 ## 1.17.91 published navigation and subnet-list improvements
 
 The user explicitly authorized implementing, building and publishing these fixes.

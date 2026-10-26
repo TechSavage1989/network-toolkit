@@ -201,10 +201,11 @@ func Snapshot(ctx context.Context, tool string) (model.Result, error) {
 	switch tool {
 	case "routes":
 		raw, err := os.ReadFile("/proc/net/route")
+		recorded := snapshotTime()
 		if err != nil {
 			return model.Result{}, fmt.Errorf("routing snapshot unavailable on this development host: %w", err)
 		}
-		return model.Result{Summary: "IPv4 routing table captured", Data: map[string]any{"routes": parseLinuxRoutes(string(raw)), "output": string(raw), "note": "The portable Windows executable shows both IPv4 and IPv6 routes."}}, nil
+		return model.Result{Time: recorded, Summary: "IPv4 routing table captured", Data: map[string]any{"time": recorded, "captured": recorded, "timeKind": "snapshot", "routes": stampSnapshotRows(parseLinuxRoutes(string(raw)), recorded), "output": string(raw), "note": "The portable Windows executable shows both IPv4 and IPv6 routes."}}, nil
 	case "arp":
 		rows, err := Neighbors(ctx)
 		data := map[string]any{"neighbors": rows, "note": neighborCacheNote}
@@ -216,21 +217,28 @@ func Snapshot(ctx context.Context, tool string) (model.Result, error) {
 			summary = "Neighbor cache could not be fully read"
 			data["warnings"] = []string{err.Error()}
 		}
-		return model.Result{Summary: summary, Data: data}, err
+		recorded := snapshotTime()
+		data["time"], data["captured"], data["timeKind"] = recorded, recorded, "snapshot"
+		return model.Result{Time: recorded, Summary: summary, Data: data}, err
 	case "ipconfig":
 		data, err := System(ctx)
-		return model.Result{Summary: "Local network configuration captured", Data: data}, err
+		recorded := snapshotTime()
+		stampSystemSnapshot(data, recorded)
+		return model.Result{Time: recorded, Summary: "Local network configuration captured", Data: data}, err
 	case "connections":
 		outputs := []string{}
+		sections := []map[string]any{}
 		for _, path := range []string{"/proc/net/tcp", "/proc/net/tcp6", "/proc/net/udp", "/proc/net/udp6"} {
 			if data, err := os.ReadFile(path); err == nil {
 				outputs = append(outputs, path+"\n"+string(data))
+				sections = append(sections, map[string]any{"title": path, "output": string(data), "time": snapshotTime(), "timeKind": "snapshot", "success": true})
 			}
 		}
 		if len(outputs) == 0 {
 			return model.Result{}, errors.New("connection snapshot unavailable on this development host")
 		}
-		return model.Result{Summary: "Kernel socket tables captured", Data: map[string]any{"output": strings.Join(outputs, "\n"), "note": "The portable Windows executable presents readable endpoint addresses and process IDs."}}, nil
+		recorded := snapshotTime()
+		return model.Result{Time: recorded, Summary: "Kernel socket tables captured", Data: map[string]any{"time": recorded, "captured": recorded, "timeKind": "snapshot", "sections": sections, "output": strings.Join(outputs, "\n"), "note": "The portable Windows executable presents readable endpoint addresses and process IDs."}}, nil
 	case "wifi":
 		return model.Result{}, errors.New("wireless adapter inspection is implemented for the portable Windows executable")
 	default:

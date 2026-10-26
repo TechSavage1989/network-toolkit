@@ -60,12 +60,13 @@ func smtpTest(ctx context.Context, req model.Request, emit model.Emit) (model.Re
 	address := net.JoinHostPort(host, strconv.Itoa(port))
 	steps := []map[string]any{}
 	add := func(stage, status, detail string) {
-		steps = append(steps, map[string]any{"stage": stage, "status": status, "detail": detail})
+		step := map[string]any{"time": measurementTime(), "stage": stage, "status": status, "detail": detail}
+		steps = append(steps, step)
 		level := "info"
 		if status == "failed" {
 			level = "warning"
 		}
-		event(emit, "smtp", level, stage+": "+detail, nil)
+		event(emit, "smtp", level, stage+": "+detail, step)
 	}
 	result := func(summary string) model.Result {
 		return model.Result{Summary: summary, Data: map[string]any{"host": host, "port": port, "securityRequested": mode, "steps": steps, "messageSent": send && len(steps) > 0 && steps[len(steps)-1]["stage"] == "Test message" && steps[len(steps)-1]["status"] == "passed"}}

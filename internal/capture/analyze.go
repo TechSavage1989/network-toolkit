@@ -3,45 +3,57 @@ package capture
 import (
 	"bytes"
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"time"
 )
 
 type Endpoint struct {
-	Address  string `json:"address"`
-	Packets  int    `json:"packets"`
-	Bytes    uint64 `json:"bytes"`
-	Sent     int    `json:"sent"`
-	Received int    `json:"received"`
+	Address  string     `json:"address"`
+	Packets  int        `json:"packets"`
+	Bytes    uint64     `json:"bytes"`
+	Sent     int        `json:"sent"`
+	Received int        `json:"received"`
+	Start    *time.Time `json:"start,omitempty"`
+	End      *time.Time `json:"end,omitempty"`
 }
 type Conversation struct {
-	ID              string    `json:"id"`
-	Protocol        string    `json:"protocol"`
-	A               string    `json:"a"`
-	B               string    `json:"b"`
-	Packets         int       `json:"packets"`
-	Bytes           uint64    `json:"bytes"`
-	AToB            int       `json:"aToB"`
-	BToA            int       `json:"bToA"`
-	Start           time.Time `json:"start"`
-	Duration        float64   `json:"duration"`
-	Resets          int       `json:"resets"`
-	Retransmissions int       `json:"retransmissions"`
+	ID              string     `json:"id"`
+	Protocol        string     `json:"protocol"`
+	A               string     `json:"a"`
+	B               string     `json:"b"`
+	Packets         int        `json:"packets"`
+	Bytes           uint64     `json:"bytes"`
+	AToB            int        `json:"aToB"`
+	BToA            int        `json:"bToA"`
+	Start           time.Time  `json:"start"`
+	End             *time.Time `json:"end,omitempty"`
+	Duration        float64    `json:"duration"`
+	Resets          int        `json:"resets"`
+	Retransmissions int        `json:"retransmissions"`
 }
 type Bucket struct {
-	Seconds float64 `json:"seconds"`
-	Packets int     `json:"packets"`
-	Bytes   uint64  `json:"bytes"`
+	Seconds         float64    `json:"seconds"`
+	Packets         int        `json:"packets"`
+	Bytes           uint64     `json:"bytes"`
+	Time            *time.Time `json:"time,omitempty"`
+	EndTime         *time.Time `json:"endTime,omitempty"`
+	IntervalSeconds float64    `json:"intervalSeconds"`
 }
 type Statistics struct {
-	Protocols     map[string]int `json:"protocols"`
-	Endpoints     []Endpoint     `json:"endpoints"`
-	Conversations []Conversation `json:"conversations"`
-	Timeline      []Bucket       `json:"timeline"`
-	Bytes         uint64         `json:"bytes"`
-	Expert        int            `json:"expert"`
-	Duration      float64        `json:"duration"`
+	Protocols      map[string]int `json:"protocols"`
+	Endpoints      []Endpoint     `json:"endpoints"`
+	Conversations  []Conversation `json:"conversations"`
+	Timeline       []Bucket       `json:"timeline"`
+	Bytes          uint64         `json:"bytes"`
+	Expert         int            `json:"expert"`
+	Duration       float64        `json:"duration"`
+	Started        *time.Time     `json:"started,omitempty"`
+	Finished       *time.Time     `json:"finished,omitempty"`
+	TimedPackets   int            `json:"timedPackets"`
+	UntimedPackets int            `json:"untimedPackets"`
+	TimedBytes     uint64         `json:"timedBytes"`
 }
 
 func Stats(packets []Packet) Statistics {
@@ -49,8 +61,13 @@ func Stats(packets []Packet) Statistics {
 	if len(packets) == 0 {
 		return s
 	}
-	first, last := packets[0].Time, packets[0].Time
+	var first, last time.Time
 	for _, p := range packets {
+		if p.Time.IsZero() {
+			s.UntimedPackets++
+			continue
+		}
+		s.TimedPackets++
 		if !p.Time.IsZero() && (first.IsZero() || p.Time.Before(first)) {
 			first = p.Time
 		}
@@ -60,12 +77,26 @@ func Stats(packets []Packet) Statistics {
 	}
 	if !first.IsZero() {
 		s.Duration = max(0, last.Sub(first).Seconds())
+		start, finish := first.UTC(), last.UTC()
+		s.Started, s.Finished = &start, &finish
 	}
-	bins := 60
-	step := max(1, s.Duration/float64(bins))
+	// Bound the timeline without extending its time range beyond observed data.
+	// A single timestamp is still a useful count, but has no measured rate.
+	bins := 0
+	step := max(1, s.Duration/60)
+	if s.TimedPackets > 0 {
+		bins = min(60, max(1, int(math.Ceil(s.Duration/step))))
+	}
 	s.Timeline = make([]Bucket, bins)
 	for i := range s.Timeline {
 		s.Timeline[i].Seconds = float64(i) * step
+		start := first.Add(time.Duration(float64(i) * step * float64(time.Second))).UTC()
+		end := first.Add(time.Duration(min(s.Duration, float64(i+1)*step) * float64(time.Second))).UTC()
+		if i == bins-1 {
+			end = last.UTC()
+		}
+		s.Timeline[i].Time, s.Timeline[i].EndTime = &start, &end
+		s.Timeline[i].IntervalSeconds = max(0, end.Sub(start).Seconds())
 	}
 	endpoints := map[string]*Endpoint{}
 	flows := map[string]*Conversation{}
@@ -76,12 +107,12 @@ func Stats(packets []Packet) Statistics {
 		if len(p.Expert) > 0 {
 			s.Expert++
 		}
-		bin := 0
 		if !p.Time.IsZero() && !first.IsZero() {
-			bin = min(bins-1, max(0, int(p.Time.Sub(first).Seconds()/step)))
+			bin := min(bins-1, max(0, int(p.Time.Sub(first).Seconds()/step)))
+			s.Timeline[bin].Packets++
+			s.Timeline[bin].Bytes += uint64(p.Length)
+			s.TimedBytes += uint64(p.Length)
 		}
-		s.Timeline[bin].Packets++
-		s.Timeline[bin].Bytes += uint64(p.Length)
 		for _, side := range []struct {
 			address string
 			sent    bool
@@ -96,6 +127,15 @@ func Stats(packets []Packet) Statistics {
 			}
 			v.Packets++
 			v.Bytes += uint64(p.Length)
+			if !p.Time.IsZero() {
+				tm := p.Time.UTC()
+				if v.Start == nil || tm.Before(*v.Start) {
+					v.Start = &tm
+				}
+				if v.End == nil || tm.After(*v.End) {
+					v.End = &tm
+				}
+			}
 			if side.sent {
 				v.Sent++
 			} else {
@@ -118,8 +158,15 @@ func Stats(packets []Packet) Statistics {
 		} else {
 			v.BToA++
 		}
-		if !p.Time.IsZero() && !v.Start.IsZero() {
-			v.Duration = max(v.Duration, p.Time.Sub(v.Start).Seconds())
+		if !p.Time.IsZero() {
+			tm := p.Time.UTC()
+			if v.Start.IsZero() || tm.Before(v.Start) {
+				v.Start = tm
+			}
+			if v.End == nil || tm.After(*v.End) {
+				v.End = &tm
+			}
+			v.Duration = max(0, v.End.Sub(v.Start).Seconds())
 		}
 		if p.TCPFlags&4 != 0 {
 			v.Resets++

@@ -24,6 +24,7 @@ const (
 // partial work on cancellation. Responded describes ICMP, TCP, or UPnP evidence; a
 // cancelled row can retain true response evidence from its completed probes.
 type SubnetHost struct {
+	Time string `json:"time,omitempty"`
 	HostIdentity
 	DeviceIdentity
 	HostnameIdentity
@@ -60,6 +61,7 @@ type discoveryProgress struct {
 }
 
 type SubnetResult struct {
+	Time   string          `json:"time,omitempty"`
 	Source *SourceMetadata `json:"source,omitempty"`
 	SubnetProgress
 	Scope             string         `json:"scope"`
@@ -262,6 +264,7 @@ func runSubnetScan(ctx context.Context, req model.Request, emit model.Emit, prob
 		event(emit, progressKind, "info", message, progress)
 	}
 	result := func() model.Result {
+		data.Time = measurementTime()
 		data.ElapsedMs = ms(time.Since(start))
 		data.Cancelled = ctx.Err() != nil
 		data.NotStarted = data.Total - data.Started
@@ -382,6 +385,8 @@ func probeSubnetHost(ctx context.Context, address string, options subnetOptions,
 			return finish()
 		}
 		reply, err := probes.ping(ctx, address, options.timeout, 128)
+		stampReply(&reply)
+		host.Time = laterMeasurementTime(host.Time, reply.Time)
 		reply.Sequence = 1
 		if err != nil {
 			reply.Success = false
@@ -410,6 +415,10 @@ func probeSubnetHost(ctx context.Context, address string, options subnetOptions,
 			return finish()
 		}
 		result := probes.tcp(ctx, address, port, options.timeout)
+		if result.Time == "" {
+			result.Time = measurementTime()
+		}
+		host.Time = laterMeasurementTime(host.Time, result.Time)
 		host.Ports = append(host.Ports, result)
 		if result.State == "open" || result.State == "closed" {
 			state := "open"
@@ -436,6 +445,7 @@ func probeSubnetHost(ctx context.Context, address string, options subnetOptions,
 			return finish()
 		}
 		info, err := probes.device(ctx, address, deviceProbeTimeout)
+		host.Time = laterMeasurementTime(host.Time, measurementTime())
 		host.DeviceIdentity = deviceIdentity(info, err)
 		if info.Responded {
 			host.Evidence = append(host.Evidence, "UPnP discovery reply")
@@ -451,6 +461,7 @@ func probeSubnetHost(ctx context.Context, address string, options subnetOptions,
 			return finish()
 		}
 		host.HostnameIdentity = resolveHostname(ctx, address, probes.hostname)
+		host.Time = laterMeasurementTime(host.Time, measurementTime())
 		completedProbe()
 		if ctx.Err() != nil {
 			host.Completed = false

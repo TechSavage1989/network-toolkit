@@ -19,7 +19,13 @@ var errDeviceCheckSubnet = errors.New("Device check supports one target only; us
 
 // Run performs only the diagnostic explicitly requested by the caller.
 func Run(ctx context.Context, req model.Request, emit model.Emit) (model.Result, error) {
-	return runWithSource(ctx, req, emit, platform.ResolveSourceBinding)
+	result, err := runWithSource(ctx, req, emit, platform.ResolveSourceBinding)
+	// Validation failures do not produce a measurement/result entry. Preserve
+	// their existing empty result and source-rejection contract.
+	if result.Summary == "" {
+		return result, err
+	}
+	return recordResultTime(result), err
 }
 
 func runDiagnostic(ctx context.Context, req model.Request, emit model.Emit) (model.Result, error) {
@@ -53,8 +59,8 @@ func runDiagnostic(ctx context.Context, req model.Request, emit model.Emit) (mod
 		return smtpTest(ctx, req, emit)
 	case "sftp":
 		return sftpTest(ctx, req, emit)
- case "ftp":
-        return ftpTest(ctx,req,emit)
+	case "ftp":
+		return ftpTest(ctx, req, emit)
 	case "tftp":
 		return tftpTest(ctx, req, emit)
 	case "tcp":

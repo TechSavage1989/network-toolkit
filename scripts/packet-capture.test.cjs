@@ -1,5 +1,6 @@
 'use strict';
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),{test}=require('node:test'),{document:makeDocument,Element}=require('./terminal-dom-fixture.cjs');
+const resultTime=require('../web/assets/result-time.js');
 function harness(initialCapture=null,config={}){
  const calls=[],copied=[],downloads=[],saved=[],doc=makeDocument('<div id="pageContent"></div>'),window={listeners:{},addEventListener(type,fn){(this.listeners[type]||=[]).push(fn);},removeEventListener(type,fn){this.listeners[type]=(this.listeners[type]||[]).filter(item=>item!==fn);},emit(type,properties={}){for(const fn of [...(this.listeners[type]||[])])fn(properties);}};doc.body=doc;let capture=initialCapture;
  const report=config.report||{packetCount:capture?.count||1,duration:1,summary:'A pattern worth checking was observed.',scope:'All retained packets in this capture.',limitations:['This capture cannot prove the complete network is healthy.'],metrics:{dnsQueries:2,dnsResponses:1,dnsErrors:1,tcpConnectionAttempts:1,tcpResets:0,icmpErrors:0,arpRequests:0},findings:[{id:'dns-errors',severity:'attention',title:'Name lookup failed',observation:'A DNS error reply was observed.',meaning:'The resolver did not return the requested answer.',nextSteps:['Check the requested name and configured DNS resolver.'],count:1,packetNumbers:[1],filter:'frame.number == 1'}]};
@@ -8,6 +9,7 @@ function harness(initialCapture=null,config={}){
   if(path.endsWith('/capabilities'))return config.capabilities||{available:true,note:'Windows capture',interfaces:[{id:'nics',name:'All adapters',engine:'auto'}]};
   if(path.endsWith('/interfaces')){if(config.loadAdapters)return config.loadAdapters();return {interfaces:config.interfaces||[{id:'nics',name:'All configurable network adapters',engine:'auto'},{id:'live:wifi',name:'Wi-Fi',engine:'live'},{id:'file:12',name:'Wi-Fi',engine:'file'}]};}
   if(path.endsWith('/troubleshoot'))return config.loadReport?config.loadReport():report;
+  if(path.includes('/statistics?'))return config.loadStatistics?config.loadStatistics():config.statistics||{timeline:[],protocols:{},conversations:[],endpoints:[],bytes:0,duration:0,expert:0};
   if(method==='POST'){capture={id:'a'.repeat(24),name:'Packet capture',state:'running',engine:'live',count:1,bytes:54,lost:0,overwritten:0,revision:1};return capture;}
   if(/\/packet\/\d+$/.test(path)){const number=Number(path.split('/').at(-1));return (typeof config.detail==='function'?config.detail(number):config.detail)||{packet:{number,protocol:'TCP',tcpFlags:2,source:'192.0.2.1',destination:'198.51.100.2',destinationPort:443,expert:[]},layers:Array.from({length:5},(_,i)=>({name:'Layer '+i,offset:0,length:8,fields:[{name:'Long address',value:'2001:db8:1234:5678:'.repeat(30),offset:0,length:8}]})),data:Buffer.from(Array.from({length:512},(_,i)=>i%256)).toString('base64'),ascii:'PAYLOAD'.repeat(200)};}
   if(path.includes('/overview?'))return config.loadOverview?config.loadOverview():config.overview||{bins:[],packetMarks:'',signals:[],interesting:0,counts:{error:0,warn:0,note:0}};
@@ -15,6 +17,7 @@ function harness(initialCapture=null,config={}){
   return {captures:capture?[capture]:[]};
  }};
  vm.runInNewContext(fs.readFileSync(require.resolve('../web/assets/panel-controls.js'),'utf8'),c);window.NetworkToolkitPanelControls=c.NetworkToolkitPanelControls;
+ vm.runInNewContext(fs.readFileSync(require.resolve('../web/assets/result-time.js'),'utf8'),c);
  vm.runInNewContext(fs.readFileSync(require.resolve('../web/assets/packet-capture.js'),'utf8'),c);const api=window.NetworkToolkitPacketCapture;api.render();
  const settle=async()=>{for(let i=0;i<40;i++)await Promise.resolve();};
  return {api,doc,c,calls,copied,downloads,saved,settle,setCapture:next=>capture=next};
@@ -505,4 +508,32 @@ test('slow overview refresh does not prevent packet windows from rendering',asyn
  assert(h.api.model.windowStart>0,'packet window advanced while overview request was still unresolved');
  resolveOverview({packetMarks:'C'.repeat(400),bins:[],signals:[],counts:{},interesting:0});await h.settle();
  assert.equal(h.doc.getElementById('packetTableScroll'),scroller);
+});
+
+test('packet arrival rows and inspector retain original nanoseconds while showing actual local time and elapsed seconds',async()=>{
+ const stamp='2026-11-01T05:59:59.625123456Z',base={source:'192.0.2.1',destination:'198.51.100.2',protocol:'UDP',length:80,captured:80,info:'Fixture',expert:[]},packets=[{...base,number:1,time:stamp,relative:0},{...base,number:2,time:'0001-01-01T00:00:00Z',relative:.25}];
+ const h=harness({id:'1'.repeat(24),name:'Imported capture',state:'completed',count:2,bytes:160,revision:1},{packets,detail:number=>({packet:packets[number-1],layers:[],data:'',ascii:''})});await h.settle();h.doc.emit('click',h.doc.querySelector('[data-packet-view="packets"]'));await h.settle();
+ const cell=h.doc.querySelector('[data-packet-number="1"] .packet-local-time'),time=cell.querySelector('time');assert.equal(time.getAttribute('datetime'),stamp);assert.match(time.textContent,/\.625$/);assert(cell.getAttribute('title').includes(resultTime.format(stamp)));assert(cell.getAttribute('title').includes(stamp));assert.match(cell.querySelector('.packet-elapsed').textContent,/0\.000000 s/);assert(cell.getAttribute('data-copy-value').includes(stamp));
+ const missing=h.doc.querySelector('[data-packet-number="2"] .packet-local-time');assert.equal(missing.querySelector('time').getAttribute('datetime'),null);assert.match(missing.textContent,/Not recorded/);assert.match(missing.textContent,/0\.250000 s/);
+ h.doc.emit('click',h.doc.querySelector('[data-packet-number="1"]'));await h.settle();assert.equal(h.doc.querySelector('#packetInspector time').getAttribute('datetime'),stamp);assert.equal(h.doc.querySelector('#packetInspector time').textContent,resultTime.format(stamp));
+ h.doc.emit('click',h.doc.querySelector('[data-packet-sort="time"]'));await h.settle();assert(h.calls.some(call=>call.path.includes('sort=time')),'time sorting must retain the native absolute-time sort request');
+ h.doc.emit('click',h.doc.querySelector('[data-packet-action="copy-packet"]'));assert(JSON.parse(h.copied.at(-1)).packet.time===stamp,'copying details retains the original capture precision');
+});
+
+test('packet traffic intervals expose local time and measured rates on hover, pin, keyboard and refresh',async()=>{
+ const started='2026-11-01T05:59:59.625123456Z',middle='2026-11-01T06:00:00.625123456Z',finished='2026-11-01T06:00:01.625123456Z';
+ let statistics={started,finished,duration:2,bytes:400,timedBytes:300,timedPackets:2,untimedPackets:1,expert:0,protocols:{TCP:2,UDP:1},endpoints:[],conversations:[],timeline:[{time:started,endTime:middle,intervalSeconds:1,seconds:0,packets:1,bytes:100},{time:middle,endTime:finished,intervalSeconds:1,seconds:1,packets:1,bytes:200}]};
+ const h=harness({id:'2'.repeat(24),name:'Timed capture',state:'completed',count:3,bytes:400,revision:1},{loadStatistics:()=>statistics});await h.settle();h.doc.emit('click',h.doc.querySelector('[data-packet-view="statistics"]'));await h.settle();
+ let first=h.doc.querySelector('[data-packet-bucket="0"]'),last=h.doc.querySelector('[data-packet-bucket="1"]');assert(first&&last);h.doc.emit('pointerover',first);let details=h.doc.getElementById('packetTimelineDetails');assert(details.textContent.includes(resultTime.format(started)));assert.match(details.textContent,/800 bit\/s/);h.doc.emit('click',first);assert.equal(first.getAttribute('aria-pressed'),'true');h.doc.emit('pointerout',first);assert.match(details.textContent,/800 bit\/s/);
+ h.doc.emit('pointerover',last);assert.match(details.textContent,/1,?600 bit\/s/);h.doc.emit('pointerout',last);assert.match(details.textContent,/800 bit\/s/);
+ h.doc.emit('keydown',first,{key:'End'});assert.equal(h.doc.querySelector('[data-packet-bucket="1"]').getAttribute('aria-pressed'),'true');assert.match(details.textContent,/1,?600 bit\/s/);assert(details.textContent.includes(resultTime.format(middle)),'adjacent interval boundaries must select the later bucket');
+ const reader=h.doc.querySelector('.packet-summary-scroll');reader.scrollTop=123;await h.api.refresh(true);details=h.doc.getElementById('packetTimelineDetails');assert.equal(h.api.model.timelineState.index,1);assert.match(details.textContent,/1,?600 bit\/s/);assert.equal(h.doc.querySelector('.packet-summary-scroll').scrollTop,123);assert.match(h.doc.querySelector('.packet-protocol-distribution').textContent,/66\.7%/);assert.equal(h.doc.querySelectorAll('.packet-protocol-share').length,2);
+ h.doc.emit('keydown',h.doc.querySelector('[data-packet-bucket="1"]'),{key:'Escape'});assert.equal(h.api.model.timelineState.pinned,false);assert.match(h.doc.getElementById('packetTimelineDetails').textContent,/Hover over/);
+ statistics={...statistics,finished:started,duration:0,timedBytes:100,timedPackets:1,untimedPackets:0,timeline:[{time:started,endTime:started,intervalSeconds:0,seconds:0,packets:1,bytes:100}]};await h.api.refresh(true);h.doc.emit('click',h.doc.querySelector('[data-packet-bucket="0"]'));assert.match(h.doc.getElementById('packetTimelineDetails').textContent,/Not measured/);assert.doesNotMatch(h.doc.getElementById('packetTimelineDetails').textContent,/Infinity|NaN/);
+ statistics={...statistics,started:undefined,finished:undefined,timedBytes:0,timedPackets:0,untimedPackets:1,timeline:[]};await h.api.refresh(true);assert.equal(h.doc.querySelectorAll('[data-packet-bucket]').length,0);assert.match(h.doc.querySelector('[data-packet-timeline]').textContent,/No packets with recorded timestamps/);assert.match(h.doc.querySelector('[data-packet-timeline]').textContent,/excluded from the time graph/);
+});
+
+test('packet endpoint and conversation summaries show observed first and last times without inventing missing values',async()=>{
+ const start='2026-10-26T14:30:00.123456789Z',end='2026-10-26T14:30:02.123456789Z',statistics={endpoints:[{address:'192.0.2.1',packets:2,sent:1,received:1,bytes:200,start,end}],conversations:[{id:'flow',protocol:'TCP',a:'192.0.2.1:1234',b:'198.51.100.2:443',packets:2,aToB:1,bToA:1,bytes:200,duration:2,resets:0,retransmissions:0,start,end}]};
+ const h=harness({id:'3'.repeat(24),name:'Summary capture',state:'completed',count:2,bytes:200,revision:1},{statistics});await h.settle();for(const view of ['endpoints','conversations']){h.doc.emit('click',h.doc.querySelector('[data-packet-view="'+view+'"]'));await h.settle();const cells=h.doc.querySelectorAll('.packet-observed-time');assert.equal(cells.length,2);assert.equal(cells[0].textContent,resultTime.format(start));assert.equal(cells[1].textContent,resultTime.format(end));}
 });

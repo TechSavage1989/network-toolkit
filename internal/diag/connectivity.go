@@ -155,13 +155,14 @@ func monitor(ctx context.Context, req model.Request, emit model.Emit) (model.Res
 	}
 	err = series.collect(ctx, count, interval, "tcp", port, emit, func(ctx context.Context) (platform.PingReply, error) {
 		p := dialPort(ctx, probeHost, port, timeout)
-		return platform.PingReply{Address: p.Address, Success: p.State == "open", RTTMs: p.LatencyMs, Status: p.State, Error: p.Error}, nil
+		return platform.PingReply{Time: p.Time, Address: p.Address, Success: p.State == "open", RTTMs: p.LatencyMs, Status: p.State, Error: p.Error}, nil
 	})
 	return result(), err
 }
 
 type TraceHop struct {
 	HostnameIdentity
+	Time    string               `json:"time,omitempty"`
 	Hop     int                  `json:"hop"`
 	Address string               `json:"address"`
 	Status  string               `json:"status"`
@@ -243,6 +244,8 @@ func runTrace(ctx context.Context, req model.Request, emit model.Emit, probe fun
 				return result(), err
 			}
 			r, probeErr := probe(ctx, address, timeout, ttl)
+			stampReply(&r)
+			hop.Time = laterMeasurementTime(hop.Time, r.Time)
 			r.Sequence = p + 1
 			if probeErr != nil {
 				r.Status = "error"
@@ -292,6 +295,7 @@ func runTrace(ctx context.Context, req model.Request, emit model.Emit, probe fun
 }
 
 type PortResult struct {
+	Time      string  `json:"time,omitempty"`
 	Port      int     `json:"port"`
 	Service   string  `json:"service"`
 	State     string  `json:"state"`
@@ -307,6 +311,7 @@ func dialPort(ctx context.Context, host string, port int, timeout time.Duration)
 	start := time.Now()
 	conn, err := diagnosticDialContext(ctx, "tcp", r.Address, timeout)
 	r.LatencyMs = ms(time.Since(start))
+	r.Time = measurementTime()
 	if err == nil {
 		r.State = "open"
 		r.Address = conn.RemoteAddr().String()
@@ -413,6 +418,7 @@ func tcp(ctx context.Context, req model.Request, emit model.Emit) (model.Result,
 }
 
 type QuickCheck struct {
+	Time   string `json:"time,omitempty"`
 	Name   string `json:"name"`
 	Status string `json:"status"`
 	Detail string `json:"detail"`
@@ -430,6 +436,9 @@ func quick(ctx context.Context, req model.Request, emit model.Emit) (model.Resul
 	}
 	checks := make([]QuickCheck, 0, 5)
 	add := func(c QuickCheck) {
+		if c.Time == "" {
+			c.Time = measurementTime()
+		}
 		checks = append(checks, c)
 		event(emit, "check", c.Status, c.Name+": "+c.Detail, c)
 	}
@@ -475,6 +484,7 @@ func quick(ctx context.Context, req model.Request, emit model.Emit) (model.Resul
 			return result(), err
 		}
 		p, e := platform.Ping(ctx, addresses[0], 1500*time.Millisecond, 128)
+		stampReply(&p)
 		p.Sequence = i + 1
 		samples = append(samples, p)
 		if e != nil {
@@ -500,7 +510,7 @@ func quick(ctx context.Context, req model.Request, emit model.Emit) (model.Resul
 		if p.State == "open" {
 			state = "success"
 		}
-		add(QuickCheck{Name: fmt.Sprintf("TCP %d %s", p.Port, p.Service), Status: state, Detail: p.State, Data: p})
+		add(QuickCheck{Time: p.Time, Name: fmt.Sprintf("TCP %d %s", p.Port, p.Service), Status: state, Detail: p.State, Data: p})
 	}
 	return result(), ctx.Err()
 }

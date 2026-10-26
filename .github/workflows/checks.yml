@@ -39,7 +39,7 @@ jobs:
       - name: Test release publication guards
         run: python3 -m unittest discover -s scripts -p '*_test.py' -v
       - name: Test application and terminal lifecycle
-        run: go test -mod=vendor ./cmd/network-toolkit ./internal/terminal ./internal/desktop ./internal/diag ./internal/deviceinfo
+        run: go test -mod=vendor ./cmd/network-toolkit ./internal/terminal ./internal/desktop ./internal/diag ./internal/deviceinfo ./internal/platform ./internal/capture
       - name: Test JavaScript behavior
         run: node --test scripts/*.test.cjs
       - name: Embed Windows icon and version resources
@@ -78,6 +78,11 @@ jobs:
         env:
           GOTOOLCHAIN: local
         run: go test -mod=vendor ./cmd/network-toolkit -run TestUpdateProgressWindowLifecycle -count=1 -v
+
+      - name: Test native timestamp acquisition and packet statistics
+        env:
+          GOTOOLCHAIN: local
+        run: go test -mod=vendor ./cmd/network-toolkit ./internal/platform ./internal/capture -run 'TestSnapshotRows|TestStatistics|TestLocalSnapshotTimes|TestUnavailableLocalSnapshots' -count=1 -v
 
   browser:
     runs-on: ubuntu-latest
@@ -134,6 +139,11 @@ jobs:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
         run: node scripts/features-91.browser.cjs
+      - name: Check recorded local times and interactive result graphs
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
+        run: node scripts/features-92.browser.cjs
       - name: Check application layout and consistent copy controls
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
