@@ -151,3 +151,89 @@ test('progressive time-axis endpoints describe the visible scroll viewport',()=>
  let axis=h.document.querySelector('.rt-time-axis').querySelectorAll('time');assert.equal(axis[0].textContent,'LOCAL '+rows[0].time);assert.equal(axis[1].textContent,'LOCAL '+rows[73].time);
  scroll.scrollLeft=1600;h.document.emit('scroll',scroll);axis=h.document.querySelector('.rt-time-axis').querySelectorAll('time');assert.equal(axis[0].textContent,'LOCAL '+rows[199].time);assert.equal(axis[1].textContent,'LOCAL '+rows[273].time);h.api.setPreferences({mode:'window'},{persist:false});
 });
+
+test('moving-window zoom changes sample range, hit testing and axis accurately, then resets',()=>{
+ const h=harness(),rows=Array.from({length:400},(_,i)=>reply(i+1,10,new Date(Date.parse('2026-10-26T16:00:00Z')+i*1000).toISOString()));h.render(rows);
+ assert.equal(h.document.querySelectorAll('[data-rt-surface="latency"] [data-rt-point]').length,180);
+ h.document.emit('click',h.document.querySelector('[data-rt-zoom="in"]'));
+ assert.equal(h.document.querySelector('[data-rt-zoom-level]').textContent,'2x');assert.equal(h.document.querySelectorAll('[data-rt-surface="latency"] [data-rt-point]').length,90);
+ let axis=h.document.querySelector('.rt-time-axis').querySelectorAll('time');assert.equal(axis[0].textContent,'LOCAL '+rows[310].time);assert.equal(axis[1].textContent,'LOCAL '+rows[399].time);
+ let surface=h.document.querySelector('[data-rt-surface="latency"]');surface.getBoundingClientRect=()=>({left:10,width:820});h.document.emit('pointermove',surface,{clientX:19});assert.match(h.document.querySelector('[data-rt-tooltip]').textContent,/Sample 311/);
+ h.document.emit('pointermove',surface,{clientX:821});assert.match(h.document.querySelector('[data-rt-tooltip]').textContent,/Sample 400/);
+ h.document.emit('click',h.document.querySelector('[data-rt-zoom="out"]'));assert.equal(h.document.querySelectorAll('[data-rt-surface="latency"] [data-rt-point]').length,180);
+ h.api.zoom('job','out');assert.equal(h.document.querySelectorAll('[data-rt-surface="latency"] [data-rt-point]').length,360);
+ h.document.emit('click',h.document.querySelector('[data-rt-zoom="reset"]'));assert.equal(h.document.querySelector('[data-rt-zoom-level]').textContent,'1x');assert.equal(h.document.querySelectorAll('[data-rt-surface="latency"] [data-rt-point]').length,180);
+ assert.deepEqual(rows.map(row=>row.sequence),Array.from({length:400},(_,i)=>i+1),'Zoom never mutates recorded rows');
+});
+
+test('progressive zoom scales coordinates and axes while bounding the SVG at every scale',()=>{
+ const h=harness(),rows=Array.from({length:10000},(_,i)=>reply(i+1,10,new Date(Date.parse('2026-10-26T16:00:00Z')+i*1000).toISOString()));h.api.setPreferences({mode:'progressive'},{persist:false});h.render(rows);
+ let scroll=h.document.querySelector('[data-rt-scroll="latency"]');scroll.clientWidth=600;scroll.scrollWidth=80010;scroll.scrollLeft=1600;h.document.emit('scroll',scroll);
+ h.api.zoom('job',2);scroll=h.document.querySelector('[data-rt-scroll="latency"]');scroll.clientWidth=600;scroll.scrollWidth=160010;scroll.scrollLeft=1600;h.document.emit('scroll',scroll);
+ let surface=h.document.querySelector('[data-rt-surface="latency"]');surface.getBoundingClientRect=()=>({left:0,width:600});h.document.emit('pointermove',surface,{clientX:9});assert.match(h.document.querySelector('[data-rt-tooltip]').textContent,/Sample 101/);
+ let axis=h.document.querySelector('.rt-time-axis').querySelectorAll('time');assert.equal(axis[0].textContent,'LOCAL '+rows[100].time);assert.equal(axis[1].textContent,'LOCAL '+rows[136].time);
+ assert(h.document.querySelectorAll('[data-rt-surface="latency"] [data-rt-point]').length<45);
+ h.api.zoom('job',.25);assert(h.document.querySelectorAll('[data-rt-surface="latency"] [data-rt-point]').length<420,'Zoom out virtualizes the 10k history');
+ h.api.zoom('job',999);assert.equal(h.document.querySelector('[data-rt-zoom-level]').textContent,'16x');assert(h.document.querySelector('[data-rt-zoom="in"]').hasAttribute('disabled'));
+ h.api.zoom('job','reset');assert.equal(h.document.querySelector('[data-rt-zoom-level]').textContent,'1x');assert.equal(h.api.preferences().mode,'progressive');
+});
+
+test('outside clicks clear a persistent pin and keep filters, while pointer leave alone preserves it',()=>{
+ const h=harness();let filter={active:true,statistic:'maximum'},clears=0;h.context.NetworkToolkitResultFilters={current:()=>filter,graphMatches:(_,raw)=>raw.sequence===4,clearStatistic:()=>clears++};h.render();
+ h.document.emit('click',h.mark(1));h.document.emit('pointermove',h.mark(1));h.document.emit('pointerout',h.mark(1),{relatedTarget:null});assert(h.mark(1).classList.contains('rt-point-selected'));
+ const statistic=h.document.createElement('button');statistic.dataset.statistic='loss';h.document.append(statistic);h.document.emit('click',statistic);
+ assert.equal(h.document.querySelector('[data-rt-clear]').disabled,true);assert(!h.mark(1).classList.contains('rt-point-selected'));assert.equal(clears,0);assert.equal(filter.statistic,'maximum');
+ h.document.emit('click',h.mark(2));h.document.emit('click',h.document.querySelector('[data-rt-zoom="in"]'));assert.match(h.detail(),/Sample3/,'Graph controls keep selected measurements');h.document.emit('click',h.document);assert.equal(h.document.querySelector('[data-rt-clear]').disabled,true);
+});
+
+test('latest graph control respects active matching samples in both modes without resetting zoom or preferences',()=>{
+ const h=harness(),rows=Array.from({length:400},(_,i)=>reply(i+1,10,new Date(Date.parse('2026-10-26T16:00:00Z')+i*1000).toISOString()));let active=false;
+ h.context.NetworkToolkitResultFilters={current:()=>({active}),graphMatches:(_,raw)=>raw.sequence<=200};h.render(rows);h.api.zoom('job',2);active=true;h.document.emit('click',h.document.querySelector('[data-rt-latest]'));
+ assert.equal(h.document.querySelector('[data-rt-zoom-level]').textContent,'2x');assert.equal(h.document.querySelector('.rt-time-axis').querySelectorAll('time')[1].textContent,'LOCAL '+rows[199].time);assert.equal(active,true);
+ h.api.setPreferences({mode:'progressive'},{persist:false});h.render(rows);h.observe();let scroll=h.document.querySelector('[data-rt-scroll="latency"]');assert(scroll.scrollLeft<3200,'Latest locates matching sample instead of blindly using the end of the history');
+ scroll.clientWidth=600;scroll.scrollWidth=6400;scroll.scrollLeft=0;h.document.emit('scroll',scroll);h.document.emit('click',h.document.querySelector('[data-rt-latest]'));assert(scroll.scrollLeft>2500&&scroll.scrollLeft<3300);assert.equal(h.document.querySelector('[data-rt-zoom-level]').textContent,'2x');assert.equal(h.api.preferences().mode,'progressive');
+});
+
+test('graph marks use actual status palette categories and combined filters retain raw source values',()=>{
+ const h=harness();let filter={active:true,statistic:'average',reference:35,referenceKind:'run'},seen=[];const rows=[reply(1,1000),{...reply(2,5),success:false,status:'Timed out'},{...reply(3,5),success:false,status:'Cancelled'},reply(4,30)];
+ h.context.NetworkToolkitResultFilters={current:()=>filter,graphMatches:(_,raw)=>{seen.push(raw);return raw.sequence===1||raw.sequence===4;},severity:raw=>raw.success?'good':raw.status==='Cancelled'?'warn':'bad'};h.render(rows);
+ assert(h.mark(0).classList.contains('rt-severity-good'),'High measured RTT is successful rather than falsely negative');assert(h.mark(1).classList.contains('rt-severity-bad'));assert(h.mark(2).classList.contains('rt-severity-warn'));assert(h.mark(0).classList.contains('rt-point-filtered'));assert(h.mark(1).classList.contains('rt-point-filter-dimmed'));assert(seen.every(raw=>rows.includes(raw)));
+ assert(h.document.querySelector('[data-rt-stat-reference]'));assert.match(h.document.querySelector('.rt-filter-note').textContent,/Run average RTT reference: 35 ms/);
+ h.document.emit('click',h.mark(1));h.document.emit('pointermove',h.mark(2));assert(h.mark(1).classList.contains('rt-severity-bad'));assert(h.mark(1).classList.contains('rt-point-selected'));assert(h.mark(2).classList.contains('rt-severity-warn'));assert(h.mark(2).classList.contains('rt-point-hovered'));
+ filter={active:false};h.document.emit('networkToolkitResultFilterChange',h.document,{detail:{jobId:'job'}});assert(!h.document.querySelector('[data-rt-stat-reference]'));assert(!h.mark(0).classList.contains('rt-point-filtered'));assert(!h.mark(1).classList.contains('rt-point-filter-dimmed'));assert.deepEqual(rows.map(row=>row.rttMs),[1000,5,5,30]);
+});
+
+test('hover and keyboard inspection pause list tracking only while a measurement is being inspected',()=>{
+ const h=harness(),calls=[];h.context.NetworkToolkitGraphWorkspace={inspection:(id,on)=>calls.push([id,on]),revealSample:()=>true};h.render();
+ h.document.emit('pointermove',h.mark(0));assert.deepEqual(calls.at(-1),['job',true]);h.document.emit('click',h.mark(0));h.document.emit('pointerout',h.mark(0),{relatedTarget:null});assert.deepEqual(calls.at(-1),['job',false]);assert(h.mark(0).classList.contains('rt-point-selected'),'Pinned point survives resuming list tracking');
+ const surface=h.document.querySelector('[data-rt-surface="latency"]');h.document.emit('keydown',surface,{key:'End'});assert.deepEqual(calls.at(-1),['job',true]);h.document.emit('focusout',surface,{relatedTarget:h.document.querySelector('[data-rt-latest]')});assert.deepEqual(calls.at(-1),['job',false]);
+ const row=h.document.createElement('tr');row.dataset.resultGraphId='job';row.dataset.resultSampleKey=h.api.sampleKey(samples()[2],2);h.document.append(row);h.document.emit('pointermove',row);assert.deepEqual(calls.at(-1),['job',true]);h.document.emit('pointerout',row,{relatedTarget:null});assert.deepEqual(calls.at(-1),['job',false]);
+});
+
+test('sequence gaps never invent jitter pairs or connect across unrecorded probes',()=>{
+ const rows=[reply(1,10),reply(3,30),reply(4,25),{...reply(5,50),success:false,status:'Lost'},reply(6,15),reply(7,20)];
+ assert.deepEqual(timeline.normalize(rows).map(point=>point.jitter),[null,null,5,null,null,5]);assert.equal(timeline.summary(timeline.normalize(rows)).jitterPairs,2);
+ const h=harness();h.render(rows);const lines=h.document.querySelector('[data-rt-surface="latency"]').querySelectorAll('polyline');assert.equal(lines.length,2,'Latency connects only the observed consecutive pairs, with failures breaking the line');
+ const legacy=[{rttMs:2,success:true},{rttMs:4,success:true}];assert.equal(timeline.normalize(legacy)[1].jitter,2,'Legacy records without recorded sequence remain usable');
+});
+
+test('zoom can inspect a pinned older measurement, while graph Latest returns to the newest viewport',()=>{
+ const h=harness(),rows=Array.from({length:400},(_,i)=>reply(i+1,10,new Date(Date.parse('2026-10-26T16:00:00Z')+i*1000).toISOString()));h.render(rows);h.document.emit('click',h.mark(20));h.api.zoom('job',4);
+ assert.match(h.detail(),/Sample241/);assert(h.document.querySelector('[data-rt-sequence="241"]').classList.contains('rt-point-selected'));
+ let last=h.document.querySelector('.rt-time-axis').querySelectorAll('time')[1].textContent;assert.notEqual(last,'LOCAL '+rows[399].time);
+ h.document.emit('click',h.document.querySelector('[data-rt-latest]'));last=h.document.querySelector('.rt-time-axis').querySelectorAll('time')[1].textContent;assert.equal(last,'LOCAL '+rows[399].time);assert.match(h.detail(),/Sample241/,'Latest moves the viewport and retains the recorded pin');assert.equal(h.document.querySelector('[data-rt-zoom-level]').textContent,'4x');
+});
+
+test('restoration settles without repeatedly replacing unchanged detail nodes',()=>{
+ const h=harness();h.render();h.document.emit('click',h.mark(0));h.observe();
+ const details=h.document.querySelector('.rt-detail').firstElementChild,context=h.document.querySelector('.rt-selection-context').firstElementChild;
+ for(let pass=0;pass<4;pass++)h.observe();
+ assert.equal(h.document.querySelector('.rt-detail').firstElementChild,details);assert.equal(h.document.querySelector('.rt-selection-context').firstElementChild,context,'Mutation restoration must settle without child-list feedback');
+});
+
+test('removed hovered rows, hidden graphs and tool switches release temporary tracking pauses',()=>{
+ const h=harness(),calls=[];h.context.NetworkToolkitGraphWorkspace={inspection:(id,on)=>calls.push([id,on]),revealSample:()=>true};h.render();
+ const row=h.document.createElement('tr');row.dataset.resultGraphId='job';row.dataset.resultSampleKey=h.api.sampleKey(samples()[2],2);h.document.append(row);h.document.emit('pointermove',row);assert.deepEqual(calls.at(-1),['job',true]);row.remove();h.observe();assert.deepEqual(calls.at(-1),['job',false]);assert.equal(h.document.querySelector('[data-rt-tooltip]').hidden,true);
+ h.document.emit('pointermove',h.mark(0));h.document.querySelector('.rt-timeline').setAttribute('hidden','');h.observe();assert.deepEqual(calls.at(-1),['job',false]);h.document.querySelector('.rt-timeline').removeAttribute('hidden');
+ const surface=h.document.querySelector('[data-rt-surface="latency"]');h.document.emit('keydown',surface,{key:'Home'});assert.deepEqual(calls.at(-1),['job',true]);h.render(samples(),'other');h.observe();assert(calls.some(([id,on])=>id==='job'&&on===false),'A detached tool must not preserve its keyboard inspection pause');
+});

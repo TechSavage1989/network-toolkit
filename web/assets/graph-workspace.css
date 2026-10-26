@@ -1,10 +1,27 @@
-/* The graph and its selected-point context keep their own space while results
-   scroll independently. The divider uses the same grip as the other panes. */
-.graph-workspace{display:grid;grid-template-rows:minmax(var(--graph-min-height,180px),var(--graph-pane-share,60fr)) 10px minmax(var(--graph-list-min-height,230px),var(--graph-result-share,40fr));gap:4px;min-width:0;min-height:360px;height:min(72vh,700px);overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+/* Complete-run statistics remain above the plot and its independently scrolling
+   sample table. The split retains the existing persisted sizing preference. */
+.graph-workspace{display:grid;grid-template-rows:auto auto minmax(var(--graph-min-height,190px),var(--graph-pane-share,40fr)) 10px minmax(var(--graph-list-min-height,280px),var(--graph-result-share,60fr));gap:4px;min-width:0;min-height:470px;height:min(76vh,820px);overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+.graph-workspace-stats{position:sticky;top:0;z-index:8;min-width:0;background:var(--panel)}
+.graph-workspace-stats>.result-stats{display:flex;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;scrollbar-color:var(--border) transparent;margin:0;border-radius:8px}
+.graph-workspace-stats .graph-stat{appearance:none;flex:1 0 105px;min-width:105px;padding:8px 12px;text-align:left;border:0;border-right:1px solid var(--line);border-radius:0;color:var(--text);background:var(--panel2)}
+.graph-workspace-stats .graph-stat:last-child{border-right:0;flex-basis:170px}
+.graph-workspace-stats .graph-stat strong{display:block;line-height:1.4;font-size:18px}
+.graph-workspace-stats .graph-stat span{font-size:11px;white-space:nowrap;line-height:1.5}
+.graph-workspace-stats .graph-stat:hover{background:var(--hover)}
+.graph-workspace-stats .graph-stat[aria-pressed="true"]{box-shadow:inset 0 -3px var(--accent);background:var(--accentBg)}
+.graph-workspace-stats .graph-stat:focus-visible{position:relative;outline:2px solid var(--accent);outline-offset:-3px}
+.graph-workspace-stats .graph-stat .graph-stat-info{color:var(--diag-info,var(--accent))}
+.graph-workspace-stats .graph-stat .graph-stat-good{color:var(--diag-good,var(--good))}
+.graph-workspace-stats .graph-stat .graph-stat-bad{color:var(--diag-bad,var(--bad))}
+.graph-workspace-stats .graph-stat .graph-stat-warn{color:var(--diag-warn,var(--warn))}
+.graph-stat-context:not(:empty){display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 2px;font-size:11px;line-height:1.4;color:var(--muted)}
+.graph-stat-context .btn{flex:0 0 auto}
+.graph-workspace-header{position:sticky;top:var(--graph-statistics-height,0px);z-index:7;display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0;background:var(--panel)}
+.graph-workspace-header>strong{font-size:12px;font-weight:650;white-space:nowrap}
+.graph-workspace-header>.row{flex-wrap:nowrap}
 .graph-workspace-graph,.graph-workspace-results{min-width:0;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--border) transparent;scrollbar-gutter:stable}
 .graph-workspace-graph{padding:0 3px 3px 0}
-.graph-workspace-graph>.rt-timeline{margin-top:0;margin-bottom:10px}
-.graph-workspace-graph>.result-stats{margin-top:10px}
+.graph-workspace-graph>.rt-timeline{margin-top:0;margin-bottom:8px}
 .graph-workspace-graph>details{margin-top:8px}
 .graph-workspace-results{display:flex;flex-direction:column;overflow:hidden;border:1px solid var(--border);border-radius:8px;background:var(--panel);scrollbar-gutter:auto}
 .graph-workspace-results>.data-list{display:flex;flex-direction:column;flex:1;min-height:0;min-width:0}
@@ -14,6 +31,8 @@
 .graph-workspace-divider:hover,.graph-workspace-divider:focus-visible,.graph-workspace-dragging>.graph-workspace-divider{background:var(--border)}
 .graph-workspace-divider:focus-visible{outline:2px solid var(--accent)}
 .graph-workspace-dragging{cursor:row-resize;user-select:none}
+.graph-workspace-collapsed{grid-template-rows:auto auto minmax(var(--graph-list-min-height,280px),1fr)}
+.graph-workspace [hidden]{display:none!important}
 #toolResultsScroll:has(>.graph-workspace){display:flex;flex-direction:column;gap:6px;overflow:hidden;scrollbar-gutter:auto}
 #toolResultsScroll>.graph-workspace{flex:1;height:auto;min-height:0}
 #toolResultsScroll:has(>.graph-workspace)>details{flex:0 0 auto;max-height:32%;overflow:auto;margin-top:0}
@@ -22,11 +41,33 @@
 #toolResultsScroll .graph-workspace-results .table-wrap{flex:1;min-height:var(--graph-table-min-height,140px);overflow:auto;max-height:none;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-gutter:stable}
 #toolResultsScroll .graph-workspace-results .data-table{min-width:850px}
 #toolResultsScroll .graph-workspace-results .data-table th,#toolResultsScroll .graph-workspace-results .data-table td{white-space:nowrap;overflow-wrap:normal}
+#toolResultsScroll .graph-workspace-results .data-table td{padding-top:6px;padding-bottom:6px}
 #toolResultsScroll .graph-workspace-results .table-wrap thead th{position:sticky;top:0;z-index:3}
 #toolResultsScroll .graph-workspace-results .data-list-foot{flex:0 0 auto;flex-wrap:nowrap;gap:8px;padding:4px 8px;border-top:1px solid var(--line);background:var(--panel)}
 #toolResultsScroll .graph-workspace-results .data-list-foot>.row{flex-wrap:nowrap}
 #toolResultsScroll .graph-workspace-results .data-list-foot>span{white-space:nowrap;min-width:0}
-@media(max-height:720px){.graph-workspace{--graph-min-height:150px}#toolResultsScroll:has(>.graph-workspace){padding:6px}}
-@media(max-width:600px){.graph-workspace-results .list-match-count{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}}
-@media(max-width:600px){.graph-workspace{gap:3px}.graph-workspace-graph{padding-right:0}#toolResultsScroll:has(>.graph-workspace){padding:6px}}
-@media print{.graph-workspace,.graph-workspace-graph,.graph-workspace-results{display:block;height:auto;min-height:0;overflow:visible}.graph-workspace-divider{display:none}}
+.graph-run-details{display:none}
+@media(max-height:720px){.graph-workspace{--graph-min-height:150px}.graph-workspace-stats .graph-stat{padding-top:7px;padding-bottom:7px}.graph-workspace-stats .graph-stat strong{font-size:16px}#toolResultsScroll:has(>.graph-workspace){padding:6px}.graph-run-panel>.result-heading{position:relative;padding:8px 12px}.graph-run-panel>.result-heading .graph-run-expanded-context{display:none}.graph-run-panel .result-title{flex-wrap:wrap;gap:6px}.graph-run-details{display:block;margin:0;font-size:11px}.graph-run-details>summary{cursor:pointer;white-space:nowrap;color:var(--muted)}.graph-run-details[open]>div{position:absolute;left:10px;right:10px;top:calc(100% - 1px);z-index:25;padding:12px;border:1px solid var(--border);border-radius:8px;background:var(--panel);box-shadow:0 6px 18px #0004;max-height:220px;overflow:auto}.graph-run-details .result-summary{margin-top:0}}
+@media(max-width:600px){.graph-workspace-results .list-match-count{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}.graph-workspace{gap:3px}.graph-workspace-graph{padding-right:0}.graph-workspace-header>strong{font-size:11px}.graph-workspace-header .btn{padding-left:6px;padding-right:6px}.graph-workspace-stats .graph-stat{flex-basis:110px}#toolResultsScroll:has(>.graph-workspace){padding:6px}.graph-stat-context:not(:empty){align-items:flex-start;flex-direction:column}}
+@media print{.graph-workspace,.graph-workspace-graph,.graph-workspace-results{display:block;height:auto;min-height:0;overflow:visible}.graph-workspace-stats,.graph-workspace-header{position:static}.graph-workspace-divider,.graph-workspace-header button{display:none}}
+
+/* Short diagnostic windows retain the controls and current target. The
+   duplicate source/time captions remain available in the Run details disclosure. */
+@media(max-height:720px){
+ .diagnostic-page:has(#toolResult>.graph-run-panel) #toolCommandBar{padding:4px 8px;gap:8px}
+ .diagnostic-page:has(#toolResult>.graph-run-panel) #toolTargetLabel,.diagnostic-page:has(#toolResult>.graph-run-panel) #toolTargetMeta{display:none}
+ .diagnostic-page:has(#toolResult>.graph-run-panel) .app-foot{margin-top:2px;padding-top:2px}
+ .diagnostic-page #toolResult>.graph-run-panel>.result-heading{padding:6px 10px}
+ #toolResultsScroll .graph-workspace-results .data-list-tools{padding-top:3px;padding-bottom:3px}
+ #toolResultsScroll .graph-workspace-results .data-table th{padding-top:6px;padding-bottom:6px}
+ #toolResultsScroll .graph-workspace-results .data-list-foot{padding-top:2px;padding-bottom:2px}
+}
+
+/* Share one control strip in short windows. Each action remains its original
+   focusable button; the timeline reserves space instead of covering controls. */
+@media(max-height:720px){
+ .graph-workspace:not(.graph-workspace-collapsed){position:relative;grid-template-rows:auto minmax(var(--graph-min-height,150px),var(--graph-pane-share,40fr)) 10px minmax(var(--graph-list-min-height,220px),var(--graph-result-share,60fr))}
+ .graph-workspace:not(.graph-workspace-collapsed)>.graph-workspace-header{position:absolute;top:calc(var(--graph-statistics-height,60px) + 11px);right:14px;width:max-content;background:transparent}
+ .graph-workspace:not(.graph-workspace-collapsed)>.graph-workspace-header>strong{display:none}
+ .graph-workspace:not(.graph-workspace-collapsed) .rt-view-controls{width:calc(100% - var(--graph-inline-actions-width,200px))}
+}

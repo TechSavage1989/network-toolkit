@@ -45,6 +45,10 @@ For the subsequently authorized 1.17.90 build, the 1.17.89 note has also been
 moved unchanged into the archive. Current `RELEASE_NOTES_1.17.90.txt` alone stays
 at root, and the archive index identifies 1.17.90 as current and 1.17.89 as previous.
 
+## 1.17.94 authorized graph, statistics and result filtering update
+
+The user explicitly authorized implementing all eleven confirmed graph/statistics/result requirements, building and publishing. Scope includes zoom/reset, permanent clickable statistics above collapsible graphs, roomier independent results, sort/filter-aware latest tracking and controls, outside-click deselection, detailed status/type filters, consistent severity colors, and preservation of existing graph, clock, copy, export, settings and updater functionality. Publication pending full validation.
+
 ## 1.17.93 published graph interaction, layout and timestamp preferences
 
 The user explicitly authorized implementing, building and publishing this update.

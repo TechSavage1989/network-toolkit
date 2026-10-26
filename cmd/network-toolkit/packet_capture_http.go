@@ -132,7 +132,7 @@ func (a *application) handlePacketCapture(w http.ResponseWriter, r *http.Request
 		r.URL.Query().Get("filter") == "" && r.URL.Query().Get("query") == "" &&
 		(r.URL.Query().Get("protocol") == "" || r.URL.Query().Get("protocol") == "any") &&
 		(r.URL.Query().Get("sort") == "" || r.URL.Query().Get("sort") == "number") &&
-		r.URL.Query().Get("direction") != "desc" {
+		r.URL.Query().Get("direction") != "desc" && r.URL.Query().Get("latest") != "1" && r.URL.Query().Get("locate_start") == "" {
 		offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
 		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 		info, total, start, page, e := m.windowCapture(id, offset, limit)
@@ -140,7 +140,7 @@ func (a *application) handlePacketCapture(w http.ResponseWriter, r *http.Request
 			jsonError(w, 404, e.Error())
 			return
 		}
-		jsonResponse(w, 200, map[string]any{"capture": info, "total": total, "offset": start, "packets": page})
+		jsonResponse(w, 200, map[string]any{"capture": info, "total": total, "offset": start, "packets": page, "newestIndex": total - 1})
 		return
 	}
 	info, packets, e := m.snapshot(id)
@@ -199,14 +199,43 @@ func (a *application) handlePacketCapture(w http.ResponseWriter, r *http.Request
 	case "packets":
 		sortField, direction := r.URL.Query().Get("sort"), r.URL.Query().Get("direction")
 		sortPackets(filtered, sortField, direction)
+		newestIndex := -1
+		var newestNumber uint64
+		for i, packet := range filtered {
+			if newestIndex < 0 || packet.Number > newestNumber {
+				newestIndex, newestNumber = i, packet.Number
+			}
+		}
 		offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
 		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
 		if limit <= 0 || limit > 500 {
 			limit = 100
 		}
+		if r.URL.Query().Get("latest") == "1" && newestIndex >= 0 {
+			offset = max(0, newestIndex-limit/2)
+		}
+		locateIndex := -1
+		if value := r.URL.Query().Get("locate_start"); value != "" {
+			start, startErr := time.Parse(time.RFC3339Nano, value)
+			finish, finishErr := time.Parse(time.RFC3339Nano, r.URL.Query().Get("locate_end"))
+			if startErr != nil || finishErr != nil || finish.Before(start) {
+				jsonError(w, 400, "Choose recorded interval boundaries.")
+				return
+			}
+			inclusive := r.URL.Query().Get("locate_end_inclusive") == "1"
+			for i, packet := range filtered {
+				if !packet.Time.IsZero() && !packet.Time.Before(start) && (packet.Time.Before(finish) || inclusive && packet.Time.Equal(finish)) {
+					locateIndex = i
+					break
+				}
+			}
+			if locateIndex >= 0 {
+				offset = max(0, locateIndex-limit/2)
+			}
+		}
 		offset = min(len(filtered), max(0, offset))
 		end := min(len(filtered), offset+limit)
-		response := map[string]any{"capture": info, "total": len(filtered), "offset": offset, "packets": filtered[offset:end]}
+		response := map[string]any{"capture": info, "total": len(filtered), "offset": offset, "packets": filtered[offset:end], "newestIndex": newestIndex, "locateIndex": locateIndex}
 		if r.URL.Query().Get("overview") != "0" {
 			response["overview"] = packetOverviewFor(filtered)
 		}

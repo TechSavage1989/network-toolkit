@@ -171,6 +171,18 @@ func present(name string) (Predicate, error) {
 		bits := map[string]uint8{"syn": 2, "ack": 16, "fin": 1, "reset": 4, "rst": 4}
 		flag := bits[name[strings.LastIndexByte(name, '.')+1:]]
 		return func(p Packet) bool { return p.Transport == "TCP" && p.TCPFlags&flag != 0 }, nil
+	case "dns.request", "dns.response":
+		return func(p Packet) bool {
+			message, ok := dnsTroubleMessage(p)
+			return ok && message.response == (name == "dns.response")
+		}, nil
+	case "icmp.error":
+		return func(p Packet) bool {
+			kind, _, ok := troubleICMP(p)
+			return ok && ((p.Protocol == "ICMP" && (kind == 3 || kind == 11)) || (p.Protocol == "ICMPv6" && (kind == 1 || kind == 2 || kind == 3)))
+		}, nil
+	case "frame.time_recorded":
+		return func(p Packet) bool { return !p.Time.IsZero() }, nil
 	case "expert", "_ws.expert":
 		return func(p Packet) bool { return len(p.Expert) > 0 }, nil
 	}
@@ -340,6 +352,14 @@ func comparison(name, op, want string) (Predicate, error) {
 			}
 			return matched
 		}, nil
+	case "frame.severity":
+		if op != "==" && op != "!=" {
+			return nil, errors.New("Severity filters use == or !=.")
+		}
+		if want != "error" && want != "warn" && want != "note" && want != "normal" {
+			return nil, errors.New("Severity must be error, warn, note or normal.")
+		}
+		return func(p Packet) bool { return stringCompare(PacketSeverity(p), op, want) }, nil
 	case "protocol", "frame.protocols":
 		return func(p Packet) bool { return stringCompare(p.Protocol, op, want) }, nil
 	case "info":
@@ -375,4 +395,23 @@ func Compile(text string) (Predicate, error) {
 		return nil, errors.New("Join filter conditions with && or ||.")
 	}
 	return p, nil
+}
+
+// PacketSeverity describes recorded decoder/capture clues. A normal packet is
+// not a claim that its conversation or the network succeeded.
+func PacketSeverity(p Packet) string {
+	if p.Highlight == "error" || p.Highlight == "warn" || p.Highlight == "note" {
+		return p.Highlight
+	}
+	notes, info := strings.ToLower(strings.Join(p.Expert, " ")), strings.ToLower(p.Info)
+	if strings.Contains(notes, "malformed") || strings.Contains(notes, "invalid") || strings.Contains(notes, "incomplete") {
+		return "error"
+	}
+	if strings.Contains(notes, "drop reason") || p.Protocol == "DNS" && (strings.Contains(info, "servfail") || strings.Contains(info, "refused")) || p.Protocol == "DHCP" && (strings.Contains(info, "nak") || strings.Contains(info, "decline")) || (p.Protocol == "ICMP" || p.Protocol == "ICMPv6") && (strings.Contains(info, "unreachable") || strings.Contains(info, "administratively prohibited")) {
+		return "warn"
+	}
+	if p.Transport == "TCP" && p.TCPFlags&4 != 0 || notes != "" || p.Protocol == "DNS" && strings.Contains(info, "nxdomain") || p.Transport == "TCP" && (strings.Contains(info, "retransmission") || strings.Contains(info, "out-of-order")) {
+		return "note"
+	}
+	return "normal"
 }

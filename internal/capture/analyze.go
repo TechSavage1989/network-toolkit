@@ -34,12 +34,13 @@ type Conversation struct {
 	Retransmissions int        `json:"retransmissions"`
 }
 type Bucket struct {
-	Seconds         float64    `json:"seconds"`
-	Packets         int        `json:"packets"`
-	Bytes           uint64     `json:"bytes"`
-	Time            *time.Time `json:"time,omitempty"`
-	EndTime         *time.Time `json:"endTime,omitempty"`
-	IntervalSeconds float64    `json:"intervalSeconds"`
+	Severities      map[string]int `json:"severities,omitempty"`
+	Seconds         float64        `json:"seconds"`
+	Packets         int            `json:"packets"`
+	Bytes           uint64         `json:"bytes"`
+	Time            *time.Time     `json:"time,omitempty"`
+	EndTime         *time.Time     `json:"endTime,omitempty"`
+	IntervalSeconds float64        `json:"intervalSeconds"`
 }
 type Statistics struct {
 	Protocols      map[string]int `json:"protocols"`
@@ -110,6 +111,10 @@ func Stats(packets []Packet) Statistics {
 		if !p.Time.IsZero() && !first.IsZero() {
 			bin := min(bins-1, max(0, int(p.Time.Sub(first).Seconds()/step)))
 			s.Timeline[bin].Packets++
+			if s.Timeline[bin].Severities == nil {
+				s.Timeline[bin].Severities = map[string]int{}
+			}
+			s.Timeline[bin].Severities[PacketSeverity(p)]++
 			s.Timeline[bin].Bytes += uint64(p.Length)
 			s.TimedBytes += uint64(p.Length)
 		}

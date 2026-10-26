@@ -66,3 +66,39 @@
 .rt-tooltip .rt-detail-values dd{font-size:10px}
 @media(max-width:600px){.rt-view-controls{margin-left:0;width:100%}.rt-view-controls label{flex:1}.rt-view-controls select{flex:1}.rt-tooltip .rt-detail-values{max-width:calc(100vw - 44px)}}
 .rt-hover-context:not(:empty){font-size:10px;line-height:1.5;color:var(--diag-warn,var(--warn));margin:5px 0}
+
+.rt-zoom-controls{display:flex;align-items:center;gap:4px;flex:0 0 auto;min-width:0}
+.rt-zoom-controls [data-rt-zoom-level]{min-width:3.3em;text-align:center;font-family:var(--mono);font-size:10px;color:var(--text)}
+.rt-view-controls .btn:disabled{opacity:.45;cursor:default}
+.rt-point.rt-severity-good{fill:var(--diag-good,var(--good))}
+.rt-point.rt-severity-bad{fill:var(--diag-bad,var(--bad))}
+.rt-point.rt-severity-warn{fill:var(--diag-warn,var(--warn))}
+.rt-point.rt-severity-info{fill:var(--diag-info,var(--accent))}
+.rt-jitter .rt-point[class*="rt-severity-"]{stroke:var(--panel)}
+.rt-missed.rt-severity-good rect,.rt-missed.rt-severity-good path{--rt-status:var(--diag-good,var(--good))}
+.rt-missed.rt-severity-bad rect,.rt-missed.rt-severity-bad path{--rt-status:var(--diag-bad,var(--bad))}
+.rt-missed.rt-severity-warn rect,.rt-missed.rt-severity-warn path{--rt-status:var(--diag-warn,var(--warn))}
+.rt-missed.rt-severity-info rect,.rt-missed.rt-severity-info path{--rt-status:var(--diag-info,var(--accent))}
+.rt-missed[class*="rt-severity-"] rect{fill:var(--rt-status)}
+.rt-missed[class*="rt-severity-"] path{stroke:var(--rt-status)}
+.rt-point-filter-dimmed{opacity:.2}
+.rt-point-filtered{stroke-width:2;filter:drop-shadow(0 0 1px var(--text))}
+.rt-point.rt-point-hovered,.rt-jitter .rt-point.rt-point-hovered{opacity:1;stroke:var(--text);stroke-width:3;filter:drop-shadow(0 0 2px var(--panel))}
+.rt-point.rt-point-selected,.rt-jitter .rt-point.rt-point-selected{opacity:1;stroke:var(--text);stroke-width:4;filter:drop-shadow(0 0 2px var(--panel))}
+.rt-point.rt-point-selected.rt-point-hovered{stroke-width:5}
+.rt-missed.rt-point-hovered rect,.rt-missed.rt-point-selected rect{stroke:var(--text);opacity:.4}
+.rt-stat-reference{stroke:var(--diag-info,var(--accent));stroke-width:2;stroke-dasharray:3 3;vector-effect:non-scaling-stroke;pointer-events:none}
+@media(max-width:600px){.rt-zoom-controls{flex-wrap:wrap}.rt-view-controls{gap:6px}.rt-view-controls>label{flex-basis:100%}}
+.rt-filter-note{font-size:10px;color:var(--muted);line-height:1.5;margin:6px 0}
+@media(max-height:720px){
+ .graph-workspace-graph .rt-timeline{padding:6px 8px}
+ .graph-workspace-graph .rt-heading{display:block;margin-bottom:3px}
+ .graph-workspace-graph .rt-heading>h3,.graph-workspace-graph .rt-heading>span{display:none}
+ .graph-workspace-graph .rt-view-controls{width:100%;max-width:100%;margin-left:0;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;white-space:nowrap;gap:6px;padding-bottom:2px;scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+ .graph-workspace-graph .rt-view-controls>label,.graph-workspace-graph .rt-view-controls select,.graph-workspace-graph .rt-view-controls .btn{flex:0 0 auto}
+ .graph-workspace-graph .rt-zoom-controls{flex-wrap:nowrap}
+ .graph-workspace-graph .rt-latency{padding-top:14px}
+ .graph-workspace-graph .rt-latency svg,.graph-workspace-graph .rt-latency .rt-track,.graph-workspace-graph .rt-latency .rt-visible-plot{height:90px}
+ .graph-workspace-graph .rt-latency .rt-scroll{min-height:103px}
+ .graph-workspace-graph .rt-axis-label{line-height:1.2}
+}
