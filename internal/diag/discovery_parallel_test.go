@@ -90,3 +90,52 @@ func TestNativeHostnameDeadlineDoesNotReleaseOutstandingAdmission(t *testing.T) 
 		t.Fatal("native admission was leaked")
 	}
 }
+
+func TestParallelDiscoveryCancellationKeepsCompletedResponseEvidence(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	probes := fakeSubnetProbes()
+	started := make(chan struct{}, 2)
+	probes.ping = func(context.Context, string, time.Duration, int) (platform.PingReply, error) {
+		started <- struct{}{}
+		return platform.PingReply{Success: true, Status: "reply", RTTMs: 1}, nil
+	}
+	probes.tcp = func(ctx context.Context, address string, port int, _ time.Duration) PortResult {
+		<-ctx.Done()
+		return PortResult{Address: address, Port: port, State: "cancelled"}
+	}
+	probes.device = func(ctx context.Context, _ string, _ time.Duration) (deviceinfo.Info, error) {
+		<-ctx.Done()
+		return deviceinfo.Info{}, ctx.Err()
+	}
+	probes.hostname = func(ctx context.Context, _ string) ([]string, error) { <-ctx.Done(); return nil, ctx.Err() }
+	done := make(chan SubnetResult, 1)
+	go func() {
+		out, err := runSubnetScan(ctx, model.Request{Tool: "discover", Target: "192.0.2.0/30", Options: map[string]any{"ports": "80,443", "concurrency": 2}}, nil, probes)
+		if !errors.Is(err, context.Canceled) {
+			t.Errorf("scan error: %v", err)
+		}
+		done <- out.Data.(SubnetResult)
+	}()
+	for n := 0; n < 2; n++ {
+		select {
+		case <-started:
+		case <-time.After(time.Second):
+			t.Fatal("parallel hosts did not start")
+		}
+	}
+	cancel()
+	select {
+	case data := <-done:
+		if !data.Cancelled || data.Completed != 0 || data.Responded != 2 || len(data.Hosts) != 2 {
+			t.Fatalf("partial rows/counts: %+v", data)
+		}
+		for _, host := range data.Hosts {
+			if !host.Responded || host.Completed || host.Enriching || host.Status != "cancelled" || len(host.Samples) != 1 {
+				t.Fatalf("partial response lost: %+v", host)
+			}
+		}
+	case <-time.After(time.Second):
+		t.Fatal("parallel scan did not cancel")
+	}
+}

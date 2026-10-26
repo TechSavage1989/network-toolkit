@@ -3,8 +3,11 @@ package terminal
 import (
 	"context"
 	"fmt"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -88,11 +91,48 @@ func TestWindowsLocalShellInteractiveLifecycle(t *testing.T) {
 				t.Fatal(err)
 			}
 			waitFor(marker)
+			var child syscall.Handle
+			if kind == "powershell" {
+				shell, _, err := localShellExecutable(kind)
+				if err != nil {
+					t.Fatal(err)
+				}
+				command = "$owned=Start-Process -FilePath '" + strings.ReplaceAll(shell, "'", "''") + "' -ArgumentList '-NoLogo','-NoProfile','-Command','Start-Sleep -Seconds 60' -NoNewWindow -PassThru; Write-Output ('NTK_CHILD_' + $owned.Id)\r"
+				if _, err = tr.Write([]byte(command)); err != nil {
+					t.Fatal(err)
+				}
+				marker := regexp.MustCompile(`NTK_CHILD_([0-9]+)`)
+				deadline := time.Now().Add(10 * time.Second)
+				for time.Now().Before(deadline) {
+					mu.Lock()
+					match := marker.FindStringSubmatch(output.String())
+					mu.Unlock()
+					if len(match) > 1 {
+						pid, _ := strconv.ParseUint(match[1], 10, 32)
+						child, err = syscall.OpenProcess(0x00100000, false, uint32(pid))
+						if err != nil {
+							t.Fatal(err)
+						}
+						break
+					}
+					time.Sleep(20 * time.Millisecond)
+				}
+				if child == 0 {
+					t.Fatal("owned child process did not start")
+				}
+				defer syscall.CloseHandle(child)
+			}
 			cancel()
 			select {
 			case <-tr.Done():
 			case <-time.After(10 * time.Second):
 				t.Fatal("local shell did not shut down")
+			}
+			if child != 0 {
+				state, err := syscall.WaitForSingleObject(child, 5000)
+				if err != nil || state != 0 {
+					t.Fatalf("local shell left its owned child running: %d %v", state, err)
+				}
 			}
 			if _, err = tr.Write([]byte("must fail")); err == nil {
 				t.Fatal("closed local shell accepted input")

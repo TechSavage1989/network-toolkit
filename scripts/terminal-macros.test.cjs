@@ -127,3 +127,10 @@ test('a move dialog cannot overwrite a library changed by another window',async(
  const h=harness();await settle();h.click('[data-macro-action="move-folder"]');h.document.querySelector('#terminalMacroMoveFolder').value='Changed';
  h.library.revision='revision-2';await h.module.refresh(true);h.click('[data-macro-action="move-folder-confirm"]');await settle();assert(!h.calls.some(c=>c.method==='PUT'));assert.match(h.document.querySelector('[data-macro-error]').textContent,/library changed/);h.dispose();
 });
+
+test('a library refresh started before a folder move cannot undo the completed move',async()=>{
+ const h=harness();await settle();const original=h.c.api,old=JSON.parse(JSON.stringify(h.library));let release;
+ h.c.api=async(url,...args)=>url==='/terminal-automation/library'&&!args[0]?new Promise(resolve=>release=resolve):original(url,...args);
+ const refresh=h.module.refresh(true);await settle();h.click('[data-macro-action="move-folder"]');h.document.querySelector('#terminalMacroMoveFolder').value='Moved';h.click('[data-macro-action="move-folder-confirm"]');await settle();
+ release(old);await refresh;assert.equal(h.library.macros[0].folder,'Moved');assert(h.document.querySelector('#terminalMacroFolder option[value="folder:Moved"]'));h.dispose();
+});

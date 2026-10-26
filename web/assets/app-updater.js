@@ -13,7 +13,7 @@
       let active=true,timer=null;
       const schedule=()=>{if(active&&env.setTimeout)timer=env.setTimeout(async()=>{
         timer=null;if(!active||turn!==revision||!busy)return;
-        try{const status=await env.api('/updates/status');if(active&&turn===revision&&busy){if(status.progress){progress=status.progress;data={...data,progress,statusBusy:status.networkBusy};render();}}}catch{}
+        try{const status=await env.api('/updates/status');if(active&&turn===revision&&busy){if(status.progress){progress=status.progress;data={...data,progress};render();}}}catch{}
         if(active&&turn===revision&&busy)schedule();
       },400);};
       schedule();return ()=>{active=false;if(timer!==null)env.clearTimeout?.(timer);};

@@ -239,11 +239,11 @@
       const view = viewKey(table, headers); table.dataset.columnView = view; table.classList.add('resizable-data-table');
       // Scan results follow every row's intrinsic size, including live updates.
       // Native table layout measures all rows without samples or surplus width.
-      const automatic=!!table.closest('#toolResultsScroll, #toolResult, [data-network-results]');
+      const automatic=view.startsWith('network:')||view.startsWith('result:')||!!table.closest('#toolResultsScroll, #toolResult, [data-network-results]');
       table.classList.toggle('auto-fit-results',automatic);
       if(automatic){
         table.querySelector('colgroup[data-column-sizes]')?.remove();
-        for(const header of headers){header.scope='col';header.querySelector('[data-column-resize]')?.remove();}
+        for(const [index,header] of headers.entries()){const id=columnId(header,index);header.dataset.columnId=id;header.scope='col';header.querySelector('[data-column-resize]')?.remove();for(const body of table.tBodies)for(const row of body.rows){const cell=row.cells[index];if(cell&&cell.colSpan===1)cell.dataset.columnId=id;}}
         table.style.width='max-content';
         for(const control of table.closest('[data-list-view], [data-network-results], .table-wrap')?.querySelectorAll('[data-column-reset]')||[])if(control.dataset.columnReset===view)control.remove();
         continue;

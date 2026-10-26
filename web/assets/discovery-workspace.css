@@ -293,3 +293,5 @@
 .network-ports-empty{color:var(--muted);font-size:10px}
 
 .app-update-progress{flex:1 1 100%;min-width:0;margin:10px 0;font-size:11px}.app-update-progress progress{display:block;width:100%;height:9px;margin-top:6px;accent-color:var(--accent)}.app-update-progress .row{flex-wrap:wrap}.app-update-progress small{display:block;color:var(--muted);margin-top:5px}
+
+.auto-fit-results td[data-column-id="hostname"] .identity-value,.auto-fit-results td[data-column-id="hostname"] .identity-source,.auto-fit-results td[data-column-id="vendor"] .identity-value,.auto-fit-results td[data-column-id="vendor"] .identity-source{max-width:28ch}

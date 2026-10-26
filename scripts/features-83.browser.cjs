@@ -59,6 +59,11 @@ async function copyGeometry(){return page.locator('#toolResult [data-value-copy-
  assert.equal(library.macros.find(m=>m.id==='core').folder,'Site West');assert.equal(library.bindings[0].macroId,'core');assert.equal(library.macros.find(m=>m.id==='core').shortcut,'Ctrl+Alt+1');
  await page.selectOption('#terminalMacroFolder','folder:Site West');await page.locator('[data-macro-action="new"]').click();assert.equal(await page.inputValue('#terminalMacroEditorFolder'),'Site West');await page.locator('[data-macro-action="close"]').click();
  await page.reload();await page.waitForFunction(()=>window.__networkToolkitStartupState===1&&online);await page.evaluate(()=>{navigate('terminal');NetworkToolkitSessionSidebar.activateTab('macros');});await page.locator('#terminalMacroFolder option[value="folder:Site West"]').waitFor({state:'attached'});check('macro folder filters, move, inherited editor folder and reload preserve the library');
+ for(const width of [1280,820,390])for(const type of ['cmd','powershell']){
+  await page.setViewportSize({width,height:1000});await page.evaluate(type=>openTerminalConnect({type}),type);await settle();
+  const fit=await page.locator('.modal').evaluate(modal=>{const box=modal.getBoundingClientRect();return box.left>=0&&box.right<=innerWidth+1&&modal.scrollWidth<=modal.clientWidth+1;});assert(fit,'local shell dialog at '+width);await page.evaluate(()=>closeModal());
+ }
+ await page.setViewportSize({width:1440,height:1000});
  for(const type of ['cmd','powershell']){
   await page.evaluate(type=>openTerminalConnect({type,host:'discarded.test',username:'discarded',credentialId:'discarded'}),type);
   assert.equal(await page.locator('#con-host,#terminalPassword,#terminalCredentialId,#con-serialPort').count(),0);await page.fill('#terminalProfileName',type+' local');await page.locator('[data-terminal-action="save-profile"]').click();await page.click('#terminalConnectButton');await page.locator('#terminalConnectForm').waitFor({state:'detached'});
@@ -74,15 +79,15 @@ async function copyGeometry(){return page.locator('#toolResult [data-value-copy-
  });
  await page.locator('#toolResult table.auto-fit-results').waitFor();await page.locator('.network-open-ports [data-value-copy-control]').first().waitFor();
  for(const width of [1600,820,390])for(const theme of ['light','dark']){
-  await page.setViewportSize({width,height:1000});await page.evaluate(theme=>setTheme(theme),theme);await settle();
+  await page.setViewportSize({width,height:1000});await page.evaluate(theme=>{setTheme(theme);setToolPanel("results");},theme);await settle();
   assert.deepEqual(await copyGeometry(),[],JSON.stringify({width,theme}));
   const metrics=await page.locator('#toolResult table').first().evaluate(table=>({layout:getComputedStyle(table).tableLayout,latency:table.rows[1].cells[6].getBoundingClientRect().width,rows:table.tBodies[0].rows.length,handles:table.querySelectorAll('[data-column-resize]').length}));
-  assert.equal(metrics.layout,'auto');assert.equal(metrics.rows,60);assert.equal(metrics.handles,0);assert(metrics.latency<140,JSON.stringify(metrics));
+  assert.equal(metrics.layout,'auto');assert.equal(metrics.rows,60);assert.equal(metrics.handles,0);assert(metrics.latency>0&&metrics.latency<140,JSON.stringify(metrics));
   assert.equal(await page.locator('.network-port-badge').first().getAttribute('title'),'TCP 22 open · Conventional SSH port, service not verified');
   report.layouts.push({width,theme,metrics});if(out&&(width===1600||width===390))await page.screenshot({path:path.join(out,'features83-scan-'+theme+'-'+width+'.png')});
  }
- await page.locator('.network-open-ports [data-value-copy-control]').first().click();await page.waitForFunction(async()=>await navigator.clipboard.readText()==='22, 80, 443, 3389, 5985, 8080, 8443');
- await page.evaluate(()=>{featureScan.result.data.hosts[59].hostname='updated-live-hostname-with-more-text.branch.example.test';refreshNetworkResultBody('scan83');});await settle();assert.deepEqual(await copyGeometry(),[]);check('all 60 scan rows auto fit, TCP badges copy exact ports, live changes and copy controls stay clear in six layouts');
+ await page.locator('.network-open-ports [data-value-copy-control]').first().scrollIntoViewIfNeeded();await page.locator('.network-open-ports [data-value-copy-control]').first().click();await page.waitForFunction(async()=>await navigator.clipboard.readText()==='22, 80, 443, 3389, 5985, 8080, 8443');
+ await page.evaluate(()=>{featureScan.result.data.hosts[59].hostname='updated-live-hostname-with-more-text.branch.example.test';refreshNetworkResultBody('scan83');});await settle();assert.equal(await page.locator('#toolResult table.auto-fit-results').count(),1);assert.deepEqual(await copyGeometry(),[]);check('all 60 scan rows auto fit, TCP badges copy exact ports, live changes and copy controls stay clear in six layouts');
  await page.setViewportSize({width:1280,height:1000});await page.evaluate(()=>NetworkToolkitUpdater.load());await page.locator('#appUpdateNotice [data-app-update="download"]').click();await page.locator('[data-app-update="confirm-download"]').click();
  await page.waitForFunction(()=>document.querySelector('[data-app-update-progress-host] progress')?.value===1048576);assert.match(await page.locator('[data-app-update-progress-host]').innerText(),/1.0 MiB of 4.0 MiB \(25%\)/);
  downloadProgress={phase:'download',version:latest.version,received:2097152,total:0};await page.waitForFunction(()=>document.querySelector('[data-app-update-progress-host] progress')&&!document.querySelector('[data-app-update-progress-host] progress').hasAttribute('value'));

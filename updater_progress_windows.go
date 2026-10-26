@@ -109,7 +109,7 @@ func startUpdateProgressWindow(version string) updateProgressWindow {
 		if screenHeight > height {
 			y = (screenHeight - height) / 2
 		}
-		hwnd, _, _ := updateProgressCreate.Call(1, uintptr(unsafe.Pointer(className)), uintptr(unsafe.Pointer(wide("Updating Network Toolkit "+version))), 0x90c00000, x, y, width, height, 0, 0, instance, 0)
+		hwnd, _, _ := updateProgressCreate.Call(1, uintptr(unsafe.Pointer(className)), uintptr(unsafe.Pointer(wide("Updating Network Toolkit "+version))), 0x80c00000, x, y, width, height, 0, 0, instance, 0)
 		if hwnd == 0 {
 			ready <- silentUpdateProgress{}
 			return
@@ -130,6 +130,12 @@ func startUpdateProgressWindow(version string) updateProgressWindow {
 		updateProgressSend.Call(label, 0x30, font, 1)
 		updateProgressSend.Call(hint, 0x30, font, 1)
 		updateProgressSend.Call(bar, 0x040a, 1, 30) // PBM_SETMARQUEE
+		// Consume the helper's inherited SW_HIDE startup setting, then show
+		// this explicit progress window without exposing a console window.
+		show := updateProgressUser.NewProc("ShowWindow")
+		show.Call(hwnd, 10) // SW_SHOWDEFAULT
+		show.Call(hwnd, 5)  // SW_SHOW
+		updateProgressUser.NewProc("UpdateWindow").Call(hwnd)
 		progress := &nativeUpdateProgress{hwnd: hwnd, done: make(chan struct{})}
 		ready <- progress
 		defer close(progress.done)

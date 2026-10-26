@@ -83,12 +83,12 @@ function renderRuns(){
 function renderActivity(){const el=$('#terminalMacroActivity');if(!el)return;const rec=S.recording,active=S.runs.filter(running);el.classList.toggle('hidden',!rec&&!active.length);if(rec){el.textContent=(rec.paused?'Paused recording ':'Recording ')+rec.steps.length;el.title=(rec.paused?'Recording paused: ':'Recording: ')+rec.label+' · Open recording controls';}else if(active.length){const run=active[0],step=(run.targets||[]).reduce((n,t)=>n+Number(t.step||0),0),total=(run.targets||[]).reduce((n,t)=>n+Number(t.total||0),0);el.textContent=active.length>1?'Runs '+active.length:(run.state==='paused'?'Paused ':'Run ')+step+'/'+total;el.title=active.map(r=>r.name+': '+r.state).join(' · ')+' · Open run controls';}else{el.textContent='';el.title='Macro activity';}}
 function schedule(){if(S.timer||S.disposed)return;S.timer=setTimeout(()=>{S.timer=null;refresh(false);},S.open||S.runs.some(running)?1000:3000);S.timer?.unref?.();}
 async function refresh(library=false){
- if(S.polling||S.disposed)return;S.polling=true;const runsEpoch=S.runsEpoch;
+ if(S.polling||S.disposed)return;S.polling=true;const runsEpoch=S.runsEpoch,libraryRevision=S.library.revision;
  const requests=[call('/targets'),call('/runs')];if(library||!S.loaded||Date.now()-S.libraryCheckedAt>5000)requests.push(call('/library'));
  const results=await Promise.allSettled(requests);S.polling=false;if(S.disposed)return;
  if(results[0].status==='fulfilled')S.targets=results[0].value.targets||[];
  if(results[1].status==='fulfilled'&&runsEpoch===S.runsEpoch){const next=results[1].value.runs||[];discardRunLinks(S.runs.filter(run=>!next.some(item=>item.id===run.id)).map(run=>run.id));S.runs=next;}
- if(results[2]?.status==='fulfilled'){S.library={macros:(results[2].value.macros||[]).map(m=>model().normalize(m)),bindings:results[2].value.bindings||[],revision:results[2].value.revision};S.loaded=true;S.libraryCheckedAt=Date.now();}
+ if(results[2]?.status==='fulfilled'&&S.library.revision===libraryRevision){S.library={macros:(results[2].value.macros||[]).map(m=>model().normalize(m)),bindings:results[2].value.bindings||[],revision:results[2].value.revision};S.loaded=true;S.libraryCheckedAt=Date.now();}
  if(library&&results.some(r=>r.status==='rejected'))notify(results.find(r=>r.status==='rejected').reason.message,'error');
  render();schedule();
 }

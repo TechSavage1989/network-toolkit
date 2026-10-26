@@ -40,15 +40,25 @@ window, which survives original WebView shutdown until readiness/rollback. The
 first update from 82 uses the 82 helper; this native window applies when 83 is
 the installing version. No automatic download/install or extra consent stage.
 
-Validation is in progress. Initial JavaScript suites pass 470 tests before the
-new local-shell/progress tests; those focused tests also pass. Required root,
-terminal and desktop Go tests pass; new discovery tests pass locally with five
-pre-existing selected-source transport tests excluded because the container
-blocks routing netlink queries. Hosted Checks includes the full discovery suite,
-Windows shell/progress lifecycle tests and new real-browser UI fixtures. An
-initial Windows x64 GUI cross-build passes. Final exact-source review/build
-artifact validation is still pending. Do not claim native desktop interaction,
-real hardware, actual installation/restart or final release publication.
+Initial hosted Checks 40256719688 on 48962fe40a14284c6489a12021545859276709d7
+passes all 474 JavaScript tests, 31 Python guards, required Go plus the full
+discovery/device suites, Windows GUI build and review packaging. Windows native
+Command Prompt/PowerShell output, resize, Ctrl+C and shutdown tests pass; native
+progress-window lifecycle passes. Existing browser suites through the editor
+pass. The new feature fixture passed folders, local UI/themes and desktop copy
+geometry, then failed because compact layouts were still showing Configuration
+when trying to click a Results control. The fixture now explicitly selects
+Results and rejects zero-width measurements. Long hostname/vendor values wrap
+at a readable width while retaining all text. Intrinsic sizing also applies to
+detached live-result patches by their stable view keys.
+
+Additional changes prevent pre-move library refreshes from undoing a completed
+move, test parallel cancellation/evidence, test owned local-shell child cleanup,
+and show the native progress window even when the helper inherits SW_HIDE.
+Local focused macro tests pass 32 cases; focused discovery race tests pass.
+The final candidate needs a fresh full hosted run and artifact verification.
+Do not claim actual installation/restart, real hardware, desktop visual QA or
+release publication. Main and the published 82 assets remain intact.
 
 ## 1.17.82 published: preceding whitespace in terminal selections
 
