@@ -190,7 +190,7 @@ async function packetGeometry(label){
  const raw=page.waitForEvent('download');await page.locator('[data-action="export-job"][data-id="ui93-monitor"]').click();await page.locator('[data-export-format="json"]').click();const rawData=JSON.parse(fs.readFileSync(await (await raw).path(),'utf8'));assert(JSON.stringify(rawData).includes(after)&&JSON.stringify(rawData).includes(before),'Formatting preferences preserve original exported instants');
  check('Timestamp settings apply12/24-hour local, UTC and named-zone displays to tables, graph details and hover popups, reject invalid zones and survive saved-state reload');
 
- await show('monitor');await timeline().locator('[data-rt-clear]').click();
+ await show('monitor');assert.equal(await timeline().locator('[data-rt-clear]').isEnabled(),false,'The outside-graph export action cleared the previous clock-test pin');await marker(2).click({force:true});await isSelected(2);await timeline().locator('[data-rt-clear]').click();assert.equal(await timeline().locator('[data-rt-clear]').isEnabled(),false,'Clear selection removes a freshly selected point');
  let rows=replies(240);await replaceSamples(rows);
  assert.equal(await timeline().locator('[data-rt-surface="latency"] [data-rt-point]').count(),180,'Default moving window still retains180displayed points');
  await marker(61).click({force:true});await isSelected(61);
