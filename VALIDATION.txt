@@ -1,15 +1,52 @@
-NETWORK TOOLKIT 1.17.84 - REVIEW VALIDATION IN PROGRESS
+NETWORK TOOLKIT 1.17.84 - VERIFIED PUBLISHED BUILD
 
-490 JavaScript tests and 31 Python release guards pass locally.
-Dedicated language worker / parser tests cover recognized file types, escaping,
-comments, protected literals, stale-format guards, undo and metadata retention.
-Native xterm tests cover prompt syntax, full variables, selected ANSI palettes,
-explicit colors, hidden text, alternate screen, live palette edits and unchanged
-buffers. Existing automatic fit tests remain after removal of the manual UI.
+Tested source: 3e1aa2ee2bca8e632e00e7fdc0c52ca1fb7fc766
+Tree: 2d4c033c40ac2105491c88eb1caadb03c775907c
+Full Checks 40264715184: success on that exact source.
+497 JavaScript tests, 31 Python guards and required root/terminal/desktop/
+discovery/deviceinfo Go suites pass. Detailed Windows cmd / PowerShell lifecycle
+and native installer progress tests pass in separate workflow steps.
 
-Local discovery/deviceinfo suites require netlink access unavailable in this
-container. Full hosted Checks, Windows tests, browser layouts and review package
-verification are pending. No public release or installation has occurred.
+All browser steps pass: six new feature groups / six editor layouts, full local
+worker/parser integration, invalid syntax / undo / stale replies / comments /
+indentation, real xterm colors / ANSI precedence / live palettes, existing 138 UI
+layouts / 18 copies, 20 Hosts cases, 17 real-app loopback terminal selection cases,
+and all prior client/server/SMTP/folder/dialog/command bar/editor/update cases.
+Seven native Chromium timer cases pass, including the real five-minute poll / focus
+collision and expected released64 negative control. Current reports have no
+runtime/asset failures in covered states. Final screenshots were inspected.
+
+Review artifact: 12626345743
+Outer SHA-256: df23730f7bc0d6a06a0e3fbddb29fbe25face409a9267e1e412cc173ee246137
+Portable SHA-256: 4911a592dc20bc9192fd53043778ef73a45fc5d698f498b074731ec270ebf1b4
+EXE SHA-256: 4086c823766e960c67de29f1661bf3d3f55b4cd675dfff60d30db43cf7c9a6ef
+EXE bytes: 17567232
+Exact source files: 738
+CRC, outer/inner manifests, PE x64 GUI/version, strict update allowlist and
+vendored source digests verify. Hosted/local ZIP and EXE bytes match.
+Browser artifact 12626476464: 18d061e828d36aba31044a1d47fb968b1a553ab903171c16fc64e79198f51675
+All 115 members verify (digest/CRC/reports).
+
+Formatting is explicit: parser formatting for supported web/data languages and
+leading indentation only for PowerShell/C-family languages. Plain display remains
+for word wrap / files over 250,000 characters. No source runs or leaves the local
+language worker. File-open/save encodings and revision guards remain.
+
+Local Go source-binding tests require netlink access unavailable in this container;
+full suites pass hosted. Full native WebView2 UI interaction, physical hardware
+and installation/restart were not tested. The user explicitly authorized 84
+publication after the review. This final three-file publication record does not
+alter the tested runtime/tag/assets or trigger another release.
+
+Publication: Release 40266573099 passed build 121390177026 and publish
+121390518234 on exact source/tag 3e1aa2ee2bca8e632e00e7fdc0c52ca1fb7fc766, creating stable release 423845092.
+All four actual public downloads verify; portable/EXE equal the reviewed build,
+all 738 packaged sources equal the tag and all 23 older releases/assets/tag
+SHAs remain unchanged. Unchanged released83 feed handlers checked/downloaded/
+verified/staged live84 in 11.79s through real HTTPS, using isolated settings.
+Original test EXE unchanged; no installation/restart. Official EXE SHA-256:
+4086c823766e960c67de29f1661bf3d3f55b4cd675dfff60d30db43cf7c9a6ef
+Official release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.84
 
 PREVIOUS RELEASE VALIDATION
 

@@ -1,37 +1,29 @@
 # Network Toolkit development
 
-Current work: unpublished 1.17.84 review for editor languages, explicit local
-formatting / code indentation, shell syntax palette and removal of Fit console.
-Read the new first handoff section and preserve the published 83 fixes below.
-Only review-branch work is authorized; this request does not authorize publishing
-84. Main, existing releases/tags/assets and the update feed remain unchanged.
-
 Read DEVELOPMENT_HANDOFF.md before editing or building. Start from current
 main, preserve unrelated work and follow the checks/release safeguards.
 
-Current published release: 1.17.83. Read the first handoff section. It adds macro
-folders matching saved sessions, local Command Prompt/Windows PowerShell with
-shared appearance, intrinsic scan-column/copy spacing, bounded parallel discovery,
-TCP-port badges and download/native installation activity progress. Preserve
-all prior selection/prompt guards, gear, Hosts/Overview/copy, terminal/sidebar/
-detach/Connect, editor, folders/credentials/macros, command input and SMTP fixes.
+Current published release: 1.17.84. The first handoff section records the editor's
+300 language choices / auto detection / explicit formatting and code indentation,
+local shell syntax colors and removal of Fit console. Preserve all prior macro /
+folder / local shell / discovery / progress / selection / prompt / gear / Hosts /
+Overview / copy / sidebar / detach / Connect / editor / SMTP fixes.
 
-The user explicitly authorized this scoped publication on 2026-10-26 after the
-no-update diagnosis. Future releases need their own authorization. Main pushes
-publish new versions automatically. Main network-toolkit is the sole public
-source/update feed. Never replace older tags/assets, change repository access
-or write the retired feed.
+The user explicitly authorized publication after receiving the verified review
+build. Future releases need their own authorization. Main pushes publish new
+versions automatically. Main network-toolkit is the sole public source/update
+feed. Never replace older tags/assets, change access or write the retired feed.
 
-Published source/tag: a384a47d5b8782fb821eda492fa9ad92a3ca540d
-Tree: ebec06684689f0ad48cfcd8e5661c6da4a740232
-Full Checks 40258417658 and Release 40260010077 passed. Detailed
-Windows shell and progress-window logs were inspected; independent steps prevent
-masked command failures. All four public assets and 713 packaged source files
-verify and equal the reviewed runtime. All 22 earlier releases/assets/tags
-remain unchanged. Released82 handlers checked/downloaded/verified/staged live83
-in 11.75 seconds without installation/restart or changing the original EXE.
+Published source/tag: 3e1aa2ee2bca8e632e00e7fdc0c52ca1fb7fc766
+Tree: 2d4c033c40ac2105491c88eb1caadb03c775907c
+Full Checks 40264715184 and Release 40266573099 passed on the identical source.
+497 JS / 31 Python guards, required Go suites, detailed Windows shell/progress
+steps and all browser checks pass. All four public assets and 738 source files
+verify and equal the reviewed runtime. All 23 earlier releases/assets/tag SHAs
+are unchanged. Released83 handlers checked/downloaded/verified/staged live84 in
+11.79 seconds with isolated settings, unchanged original EXE and no install/restart.
 
-This three-file final docs record uses [skip ci]; do not move the 83 tag,
+This three-file final docs record uses [skip ci]; do not move the 84 tag,
 replace assets or republish. Continue from latest main. Native full WebView2
 interaction, hardware and actual installation/restart remain unverified. Keep
 the handoff current and report checks honestly.
