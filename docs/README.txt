@@ -913,7 +913,7 @@ Recording filters and other technical options remain available under Advanced
 capture settings. Suggested task views only filter the displayed packet list;
 they do not discard recorded traffic. Selected packets now have a plain-language
 explanation before their technical fields and original bytes. See
-source/PACKET_TROUBLESHOOTING.txt for the workflow and interpretation limits.
+source/docs/PACKET_TROUBLESHOOTING.txt for the workflow and interpretation limits.
 
 All sidebar show/hide buttons now use the same chevron without visible words.
 Hover hints and accessibility labels still name the action and panel.
@@ -999,7 +999,7 @@ Saved-session startup macros are optional, with separate first-connect and
 reconnect choices. Runtime secret variables are not stored as defaults and
 are masked in previews. Macro runs stop on disconnect or reconnect rather
 than sending remaining steps to a replacement connection. See
-source/TERMINAL_MACROS.txt for usage, timing and retention details.
+source/docs/TERMINAL_MACROS.txt for usage, timing and retention details.
 
 Double-click a configuration or device-details resize bar to collapse or
 restore the panel. Enter and Space do the same when the bar has focus. The
@@ -1066,7 +1066,7 @@ HTTPS destinations, download-size limits and the shared deadline remain.
 HTTP refusals and certificate errors do not trigger the fallback. Any failure
 keeps the previous database; Windows failures identify the failing API/error.
 No companion DLL, external downloader or PowerShell script is required.
-See source/VENDOR_DOWNLOADS.txt for the download path and verification limits.
+See source/docs/VENDOR_DOWNLOADS.txt for the download path and verification limits.
 
 New and rewritten terminal output starts highlighting in the parsed-write turn.
 Changed highlight rows explicitly request a terminal repaint, so colors do not
@@ -1102,7 +1102,7 @@ suppresses state colors. Dense screens can retain up to 8192 decorations.
 The new roles have purpose labels and examples in Display and the live preview.
 Existing custom colors and the optional underline preference are preserved.
 Syntax colors do not add click-to-copy targets for every command/setting word.
-See source/TERMINAL_HIGHLIGHTING.txt for scope, examples and vendor references.
+See source/docs/TERMINAL_HIGHLIGHTING.txt for scope, examples and vendor references.
 
 Select output and Copy output now retain complete parsed command output past
 the former byte and row cutoffs. Completed rows are stored as text chunks while

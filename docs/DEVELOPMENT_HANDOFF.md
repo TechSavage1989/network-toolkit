@@ -1,5 +1,23 @@
 # Network Toolkit development handoff
 
+## Repository source layout (no application version change)
+
+The repository root is reduced from 212 entries to 22. The intact application
+package (177 Go files) and Windows resource object now live in
+`cmd/network-toolkit/`. Root `resources.go` owns the identical embedded file
+patterns, preserving every runtime asset path. Supporting internal packages,
+web assets, themes, vendored dependencies and scripts retain their locations.
+
+User/developer guides live in `docs/`; the current release note remains at root
+and older notes remain in `docs/releases/`. Historical `SETUP_SHA256SUMS` is
+preserved unchanged under `docs/archive/` and is not a current manifest.
+Build wrappers, CI package targets, test fixtures and source-document inputs
+for both packagers use the new layout. Release archive entry names and the
+strict binary-only update allowlist are unchanged. See [DEVELOPMENT.md](DEVELOPMENT.md)
+for current commands; prior sections below record their original historical
+paths and results. No version, tag, release asset, updater behavior or repository
+access change is authorized by this layout cleanup.
+
 ## Repository release-history layout (documentation only)
 
 Historical release notes 1.17.43 through 1.17.88 now live unchanged in

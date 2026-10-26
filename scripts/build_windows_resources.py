@@ -93,7 +93,7 @@ def main():
     header = struct.pack('<HHIIIHH', 0x8664, 1, 0, symbols_offset, 1, 0, 0)
     sh = struct.pack('<8sIIIIIIHHI', b'.rsrc\0\0\0', 0, 0, len(section), raw_offset, reloc_offset, 0, len(leaves), 0, 0x40300040)
     symbol = struct.pack('<8sIhHBB', b'.rsrc\0\0\0', 0, 1, 0, 3, 0)
-    output = ROOT / 'resource_windows_amd64.syso'
+    output = ROOT / 'cmd/network-toolkit/resource_windows_amd64.syso'
     output.write_bytes(header + sh + section + relocations + symbol + struct.pack('<I', 4))
     print(f'{output.name}: {output.stat().st_size} bytes, {len(leaves)} native resources')
 

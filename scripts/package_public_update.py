@@ -12,7 +12,7 @@ def package(binary_path, output, write_manifest=True):
     name = root + '_Windows_x64.exe'
     entries = {name: binary}
     for filename in ['UPDATING.txt', 'THIRD_PARTY_NOTICES.txt']:
-        content = (release.ROOT / filename).read_text()
+        content = (release.ROOT / 'docs' / filename).read_text()
         if filename == 'THIRD_PARTY_NOTICES.txt':
             content = content.replace('NETWORK TOOLKIT 1.17.35', 'NETWORK TOOLKIT ' + current)
             content = content.replace('included official Go x/crypto and x/sys modules', 'official Go x/crypto and x/sys modules')
