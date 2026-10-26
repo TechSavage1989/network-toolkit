@@ -940,7 +940,7 @@ function renderCurrentResult(force=false){
  NetworkToolkitWorkspace.prepareResult(template,j);window.NetworkToolkitValueCopy?.prepare?.(template.content);
  if(same)patchResultNode(area.firstElementChild,template.content.firstElementChild);else area.replaceChildren(template.content);
  if(t==='tftp')window.NetworkToolkitTFTPConnections?.refreshActivity?.();lastRender=sig;resultUpdateDeferred=false;area.dataset.scrollContext=scrollContext;bindToolResultRegion();NetworkToolkitWorkspace.afterRender();NetworkToolkitResultDetails.afterRender();if(scroll){const next=area.querySelector('#toolResultsScroll');if(next){next.scrollTop=scroll.top;next.scrollLeft=scroll.left;}}
- updateRunButtons();
+ updateRunButtons();window.NetworkToolkitGraphWorkspace?.restore?.();
 }
 document.addEventListener('selectionchange',()=>{if(!resultUpdateDeferred||!window.getSelection()?.isCollapsed)return;clearTimeout(resultSelectionTimer);resultSelectionTimer=setTimeout(()=>{if(resultUpdateDeferred&&window.getSelection()?.isCollapsed)renderCurrentResult(true);},80);});
 document.addEventListener('focusout',event=>{if(resultControlPending&&event.target.closest?.('#toolResult')&&event.target.tagName==='SELECT'){resultControlPending=false;setTimeout(()=>renderCurrentResult(true),0);}});
