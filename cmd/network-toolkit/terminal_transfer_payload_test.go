@@ -20,7 +20,7 @@ func TestActualBrowserWorkspacePayloadDetachesActiveTerminal(t *testing.T) {
 	var launched terminalViewLaunch
 	a.launchTerminalView = func(_ context.Context, l terminalViewLaunch) (<-chan error, error) { launched = l; return nil, nil }
 	session := viewTestConnected(t, a)
-	raw, e := exec.Command(node, "scripts/terminal-transfer-fixture.cjs", session.ID, session.Host, strconv.Itoa(session.Port)).Output()
+	raw, e := exec.Command(node, "../../scripts/terminal-transfer-fixture.cjs", session.ID, session.Host, strconv.Itoa(session.Port)).Output()
 	if e != nil {
 		if exit, ok := e.(*exec.ExitError); ok {
 			t.Fatalf("browser snapshot: %s", exit.Stderr)

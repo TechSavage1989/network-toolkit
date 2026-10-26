@@ -49,11 +49,11 @@ Download **`Network_Toolkit.exe`** from [the latest release](https://github.com/
 
 | Topic | Reference |
 | --- | --- |
-| Tools, storage, reports and troubleshooting | [Detailed user guide](README.txt) |
-| Update installation, offline import and recovery | [Update guide](UPDATING.txt) |
-| Packet recording and analysis | [Packet troubleshooting](PACKET_TROUBLESHOOTING.txt) |
-| Reusable terminal commands | [Terminal macros](TERMINAL_MACROS.txt) |
-| Terminal appearance and matching rules | [Terminal highlighting](TERMINAL_HIGHLIGHTING.txt) |
+| Tools, storage, reports and troubleshooting | [Detailed user guide](docs/README.txt) |
+| Update installation, offline import and recovery | [Update guide](docs/UPDATING.txt) |
+| Packet recording and analysis | [Packet troubleshooting](docs/PACKET_TROUBLESHOOTING.txt) |
+| Reusable terminal commands | [Terminal macros](docs/TERMINAL_MACROS.txt) |
+| Terminal appearance and matching rules | [Terminal highlighting](docs/TERMINAL_HIGHLIGHTING.txt) |
 
 ## Updates and settings
 
@@ -63,7 +63,7 @@ Automatic checks run at startup and periodically while the app is visible and on
 
 - Updates use this repository's stable releases and verify the binary-only **`Update.zip`** and its checksums. **Do not import the source-containing `Portable.zip` as an update.**
 - Settings and saved profiles are retained. App settings lets you choose the data folder; `--data-dir` is an explicit per-run override. Keep the same data folder and launch options when replacing the executable manually.
-- A previous executable is retained for recovery. See [UPDATING.txt](UPDATING.txt) before restoring it or handling an older update-feed migration.
+- A previous executable is retained for recovery. See [UPDATING.txt](docs/UPDATING.txt) before restoring it or handling an older update-feed migration.
 - Builds are not Authenticode signed. Windows may show an unknown-publisher warning. Use the official release assets; SHA-256 checks detect corruption, not a compromised publisher.
 
 ## Development
@@ -71,12 +71,14 @@ Automatic checks run at startup and periodically while the app is visible and on
 <details>
 <summary>Build, checks and release safeguards</summary>
 
-Read [AGENTS.md](AGENTS.md) and [DEVELOPMENT_HANDOFF.md](DEVELOPMENT_HANDOFF.md) before editing or building. Start from current `main`; the handoff records the released source, required checks and known validation limits.
+Read [AGENTS.md](AGENTS.md) and [DEVELOPMENT_HANDOFF.md](docs/DEVELOPMENT_HANDOFF.md) before editing or building. Start from current `main`; the handoff records the released source, required checks and known validation limits.
+
+Application source and Go tests live in [`cmd/network-toolkit/`](cmd/network-toolkit); supporting packages are in `internal/`, interface assets in `web/`, and guides in [`docs/`](docs/DEVELOPMENT.md).
 
 The application uses Go with an embedded web interface. Use the toolchain specified in [go.mod](go.mod). Windows build entry points are [BUILD_WINDOWS.cmd](BUILD_WINDOWS.cmd) and [build.sh](build.sh); the [Checks workflow](.github/workflows/checks.yml) is the reference for Go, JavaScript, release-guard and browser validation.
 
 **Publication is a separate action:** main pushes can publish new application versions. Do not change versions, move released tags, replace existing assets or change repository access as part of documentation work. This repository is the canonical source and update feed.
 
-See [VALIDATION.txt](VALIDATION.txt) for recorded results and [THIRD_PARTY_NOTICES.txt](THIRD_PARTY_NOTICES.txt) for dependency notices. Cross-compilation, browser fixtures and update staging are not proof of native Windows/WebView2 interaction or an actual install/restart.
+See [VALIDATION.txt](docs/VALIDATION.txt) for recorded results and [THIRD_PARTY_NOTICES.txt](docs/THIRD_PARTY_NOTICES.txt) for dependency notices. Cross-compilation, browser fixtures and update staging are not proof of native Windows/WebView2 interaction or an actual install/restart.
 
 </details>

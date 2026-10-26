@@ -39,7 +39,7 @@ jobs:
       - name: Test release publication guards
         run: python3 -m unittest discover -s scripts -p '*_test.py' -v
       - name: Test application and terminal lifecycle
-        run: go test -mod=vendor . ./internal/terminal ./internal/desktop ./internal/diag ./internal/deviceinfo
+        run: go test -mod=vendor ./cmd/network-toolkit ./internal/terminal ./internal/desktop ./internal/diag ./internal/deviceinfo
       - name: Test JavaScript behavior
         run: node --test scripts/*.test.cjs
       - name: Embed Windows icon and version resources
@@ -77,7 +77,7 @@ jobs:
       - name: Test visible Windows installer progress
         env:
           GOTOOLCHAIN: local
-        run: go test -mod=vendor . -run TestUpdateProgressWindowLifecycle -count=1 -v
+        run: go test -mod=vendor ./cmd/network-toolkit -run TestUpdateProgressWindowLifecycle -count=1 -v
 
   browser:
     runs-on: ubuntu-latest
@@ -150,7 +150,7 @@ jobs:
           NTK_APP_EXECUTABLE: ${{ runner.temp }}/Network_Toolkit_UI_Test
           NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-browser-results
         run: |
-          CGO_ENABLED=0 go build -mod=vendor -o "$NTK_APP_EXECUTABLE" .
+          CGO_ENABLED=0 go build -mod=vendor -o "$NTK_APP_EXECUTABLE" ./cmd/network-toolkit
           node scripts/value-copy-live.cjs
       - name: Check terminal selection deletion with trailing empty cells
         env:
