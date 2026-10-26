@@ -95,14 +95,23 @@ func TestWindowsLocalShellInteractiveLifecycle(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer tr.Close()
-			waitFor := func(marker string) {
+			// ConPTY can split prompt/color sequences across reads. Only new
+			// output may acknowledge a command or completed interruption.
+			control := regexp.MustCompile(`\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1b\\))`)
+			prompt := regexp.MustCompile(`(?m)^(?:PS )?[^\r\n>]*>[ \t]*\r?$`)
+			watermark := func() int {
+				mu.Lock()
+				defer mu.Unlock()
+				return output.Len()
+			}
+			waitForSince := func(from int, description string, ready func(string) bool) {
 				t.Helper()
 				deadline := time.Now().Add(30 * time.Second)
 				for time.Now().Before(deadline) {
 					mu.Lock()
 					text := output.String()
 					mu.Unlock()
-					if strings.Contains(text, marker) {
+					if ready(control.ReplaceAllString(text[from:], "")) {
 						return
 					}
 					time.Sleep(20 * time.Millisecond)
@@ -110,52 +119,53 @@ func TestWindowsLocalShellInteractiveLifecycle(t *testing.T) {
 				mu.Lock()
 				text := output.String()
 				mu.Unlock()
-				t.Fatalf("missing %q in local shell output: %q", marker, text)
+				t.Fatalf("missing %s in local shell output after byte %d: %q", description, from, text)
 			}
-			waitFor(">") // Shell initialization can discard input before its first prompt.
+			commandReady := func(command, marker string, requirePrompt bool) {
+				t.Helper()
+				from := watermark()
+				if _, err := tr.Write([]byte(command)); err != nil {
+					t.Fatal(err)
+				}
+				waitForSince(from, marker, func(text string) bool {
+					index := strings.Index(text, marker)
+					return index >= 0 && (!requirePrompt || prompt.MatchString(text[index+len(marker):]))
+				})
+			}
+			waitForSince(0, "initial shell prompt", prompt.MatchString)
 			if kind == "cmd" {
-				_, err = tr.Write([]byte("echo NTK_%PROCESSOR_ARCHITECTURE%_READY\r"))
-				waitFor("NTK_AMD64_READY")
+				commandReady("echo NTK_%PROCESSOR_ARCHITECTURE%_READY\r", "NTK_AMD64_READY", true)
 			} else {
-				_, err = tr.Write([]byte("Write-Output ('NTK_' + 'READY')\r"))
-				waitFor("NTK_READY")
-			}
-			if err != nil {
-				t.Fatal(err)
+				commandReady("Write-Output ('NTK_' + 'READY')\r", "NTK_READY", true)
 			}
 			if err = tr.Resize(67, 19); err != nil {
 				t.Fatal(err)
 			}
 			if kind == "powershell" {
-				_, err = tr.Write([]byte("Write-Output ('NTK_WIDTH_' + [Console]::WindowWidth)\r"))
-				if err != nil {
-					t.Fatal(err)
-				}
-				waitFor("NTK_WIDTH_67")
+				commandReady("Write-Output ('NTK_WIDTH_' + [Console]::WindowWidth)\r", "NTK_WIDTH_67", true)
 			}
 			// A long command must accept Ctrl+C and return to the same interactive shell.
-			command := "ping -n 60 127.0.0.1 >nul\r"
+			// The evaluated marker cannot be satisfied by the command's input
+			// echo, and proves the long-running command has actually started.
+			command := "echo NTK_%PROCESSOR_ARCHITECTURE%_BUSY && ping -n 60 127.0.0.1 >nul\r"
+			marker := "NTK_AMD64_BUSY"
 			if kind == "powershell" {
-				command = "Start-Sleep -Seconds 60\r"
+				command = "Write-Output ('NTK_' + 'BUSY'); Start-Sleep -Seconds 60\r"
+				marker = "NTK_BUSY"
 			}
-			if _, err = tr.Write([]byte(command)); err != nil {
-				t.Fatal(err)
-			}
-			time.Sleep(300 * time.Millisecond)
+			commandReady(command, marker, false)
+			beforeInterrupt := watermark()
 			if _, err = tr.Write([]byte{3}); err != nil {
 				t.Fatal(err)
 			}
-			time.Sleep(150 * time.Millisecond)
+			waitForSince(beforeInterrupt, "new shell prompt after Ctrl+C", prompt.MatchString)
 			command = "echo NTK_%PROCESSOR_ARCHITECTURE%_AFTER\r"
-			marker := "NTK_AMD64_AFTER"
+			marker = "NTK_AMD64_AFTER"
 			if kind == "powershell" {
 				command = "Write-Output ('NTK_' + 'AFTER')\r"
 				marker = "NTK_AFTER"
 			}
-			if _, err = tr.Write([]byte(command)); err != nil {
-				t.Fatal(err)
-			}
-			waitFor(marker)
+			commandReady(command, marker, true)
 			var child syscall.Handle
 			if kind == "powershell" {
 				shell, _, err := localShellExecutable(kind)
