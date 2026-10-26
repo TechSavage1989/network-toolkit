@@ -36,7 +36,7 @@ const text='# START OF DOCUMENT\n'+Array.from({length:300},(_,i)=>'Line '+(i+2)+
  }
  async function bottom(){await input().focus();await input().press('Control+End');await settled();assert(await input().evaluate(el=>el.scrollTop>0));}
  async function openLocal(file){await page.evaluate(file=>NetworkToolkitFileEditor.openLocalPath(file),file);await atStart(file);assert.equal(await input().inputValue(),text);}
- async function close(){await page.evaluate(()=>{NetworkToolkitFileEditor.closeAll();navigate('overview');});}
+ async function close(){await page.evaluate(()=>{globalThis.__editorClosing=NetworkToolkitFileEditor.closeAll();});if(await page.locator('.nt-editor-dialog').count())await page.locator('[data-ed-dialog-action="accept"]').click();await page.evaluate(()=>__editorClosing);await page.evaluate(()=>navigate('overview'));}
  try{
   if(output)fs.mkdirSync(output,{recursive:true});
   await page.goto('https://toolkit.local/');await page.waitForFunction(()=>window.__networkToolkitStartupState===1&&online);

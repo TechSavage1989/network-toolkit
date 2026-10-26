@@ -27,6 +27,11 @@ jobs:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/editor-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/editor-source-results
         run: node scripts/editor-source-review.browser.cjs
+      - name: File-open position, imports, reloads and connected-source lifecycle
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/editor-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/editor-source-results
+        run: node scripts/file-editor-start.browser.cjs
       - name: Existing editor and shell behavior
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/editor-browser-tests/node_modules/playwright
