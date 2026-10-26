@@ -56,6 +56,18 @@ Additional changes prevent pre-move library refreshes from undoing a completed
 move, test parallel cancellation/evidence, test owned local-shell child cleanup,
 and show the native progress window even when the helper inherits SW_HIDE.
 Local focused macro tests pass 32 cases; focused discovery race tests pass.
+Second Windows run 40257189400 also passes owned PowerShell-child cleanup and
+visible native progress under inherited SW_HIDE. Its application job exposed an
+intermittent pre-existing DNS fixture collision: UDP and TCP had independently
+allocated the same ephemeral number while another TCP socket held it. The
+fixture now reserves TCP first and retries a matching UDP bind. Full validation
+remains required. Last-column copy cells force wrapping over the old action-cell
+nowrap rule; a long-answer browser case covers that layout.
+The second browser run passes the actual compact-results checks in all six
+layouts, exact TCP-port copying, live updates, local themes/folders and measured,
+unknown-total and verifying download phases. It then waited for an empty error
+div to be visibly sized; the fixture now waits for attachment and the visible
+Install and restart button instead. No installation was invoked.
 The final candidate needs a fresh full hosted run and artifact verification.
 Do not claim actual installation/restart, real hardware, desktop visual QA or
 release publication. Main and the published 82 assets remain intact.

@@ -11,6 +11,6 @@ td.value-copy-cell>.value-copy-control{top:6px;right:3px}
 @media(hover:none){.value-copy-control{opacity:1}}
 
 /* Inline no-wrap labels must respect the space reserved for their copy action. */
-.value-copy-cell{white-space:normal;word-break:normal}
+.value-copy-cell{white-space:normal!important;overflow-wrap:anywhere!important;word-break:normal}
 .value-copy-cell .nowrap,.value-copy-cell .mono{white-space:normal;overflow-wrap:anywhere}
 .value-copy-cell> :not(.value-copy-control){max-width:100%;box-sizing:border-box}

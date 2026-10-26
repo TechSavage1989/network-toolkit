@@ -93,13 +93,23 @@ func sourceDNSResponse(query []byte, truncated bool) ([]byte, string, error) {
 
 func startSourceDNSFixture(t *testing.T, truncate bool) *sourceDNSFixture {
 	t.Helper()
-	udp, err := net.ListenPacket("udp4", "127.0.0.1:0")
-	if err != nil {
-		t.Fatal(err)
+	// TCP and UDP allocate ephemeral ports independently. Reserve TCP first
+	// and retry the pair if its matching UDP port is already occupied.
+	var udp net.PacketConn
+	var tcp net.Listener
+	var err error
+	for attempt := 0; attempt < 10; attempt++ {
+		tcp, err = net.Listen("tcp4", "127.0.0.1:0")
+		if err != nil {
+			t.Fatal(err)
+		}
+		udp, err = net.ListenPacket("udp4", tcp.Addr().String())
+		if err == nil {
+			break
+		}
+		_ = tcp.Close()
 	}
-	tcp, err := net.Listen("tcp4", udp.LocalAddr().String())
 	if err != nil {
-		udp.Close()
 		t.Fatal(err)
 	}
 	fixture := &sourceDNSFixture{endpoint: udp.LocalAddr().String()}
