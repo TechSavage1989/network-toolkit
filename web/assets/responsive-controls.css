@@ -14,3 +14,24 @@
 
 /* Icons keep their shape when labels wrap in compact toolbars. */
 :where(.main,.modal) :is(.btn,.iconbtn,summary.btn)>svg{flex:0 0 auto;align-self:center}
+
+/* Seven monitoring metrics need room for their values, including unavailable
+   measurements, rather than shrinking to the old minimum tile width. */
+@media(max-width:1000px){
+ .diagnostic-page #toolResultsScroll .result-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(140px,100%),1fr))}
+ .diagnostic-page #toolResultsScroll .result-stat{min-width:0}
+ .diagnostic-page #toolResultsScroll .result-stat strong{display:block;overflow-wrap:anywhere}
+}
+
+/* The zero flex basis of .grow must not leave a narrow title beside the run
+   selector. Compact results give their heading and actions separate rows. */
+@media(max-width:600px){
+ .diagnostic-page #toolResult>.panel>.result-heading>.grow{flex:1 1 100%;display:block}
+ .diagnostic-page #toolResult>.panel>.result-heading>.row{flex:1 1 100%;flex-wrap:wrap}
+ .diagnostic-page #toolResult .result-title{flex-wrap:wrap}
+ .diagnostic-page #toolResult .result-title h2{min-width:0}
+ .diagnostic-page #toolResult .job-select{flex:1 1 160px;max-width:100%}
+ .diagnostic-page #toolResult .job-meta{flex-wrap:wrap;gap:3px 8px;white-space:normal}
+ .diagnostic-page #toolResult .job-meta-context{flex:1 1 100%}
+ .diagnostic-page #toolResult .job-source-label{max-width:100%}
+}
