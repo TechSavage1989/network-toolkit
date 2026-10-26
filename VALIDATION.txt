@@ -1,21 +1,52 @@
-NETWORK TOOLKIT 1.17.82 VALIDATION CHECKPOINT
+NETWORK TOOLKIT 1.17.82 VALIDATION
 
-Terminal selections can include preceding prompt whitespace. The start clamp
-accepts only visible blank, width-one cells before the tracked input on the same
-logical line. Prompt glyphs, wide continuations, hidden cells and previous hard
-lines remain excluded. Actual leading input spaces count toward deletion;
-prompt spacing does not. The trailing clamp and remaining editing gates remain.
+Terminal selection starts in preceding prompt whitespace normalize to the
+tracked input anchor only across visible blank width-one cells on the same
+logical line. Prompt glyphs, wide continuations, hidden cells and prior hard
+lines remain excluded. Actual leading input spaces are editable; prompt spacing
+adds no deletion. Keep trailing normalization and all remaining editing gates.
 
-Local validation passes 466 JavaScript tests, 31 Python release guards, required
-root/terminal/desktop Go suites, metadata/resources, inline/changed JavaScript
-syntax and Windows x64 GUI cross-build. Seven focused regressions reproduce
-six failures against exact released81 assets (17 pass). Candidate passes all
-23 terminal-input tests. The real app/browser/Telnet regression now includes
-eight more preceding-whitespace cases and retains the original nine scenarios.
+Full review Checks 40252863225 passed on exact published source/tag
+0ebd276e651eaf40bca4d80e317f68ff35b650aa: 466 JavaScript tests, 31 Python
+release guards, required root/terminal/desktop Go suites, release/resources,
+syntax, Windows x64 GUI build/package and all browser steps. Seven focused
+regressions reproduce six failures against exact released81 assets; the fixed
+candidate passes all 23 terminal-input tests.
 
-Package, full hosted browser review, publication verification and released81
-live-feed staging are pending at this checkpoint. Native Windows/WebView2,
-hardware and actual installation/restart remain unverified. See the handoff.
+All 17 real-app/browser/loopback-Telnet cases pass: preceding/trailing/both-edge
+selections, both deletion keys, native dragging, partial prefixes, actual leading
+spaces, cursor movement, wrapping, typing, native paste and protected selections.
+Exact edits and echoed text match; prompt/previous output remains and no command
+is submitted. Leading-selected and deleted-state screenshots were inspected.
+
+The UI survey passes 138 layouts across 23 pages at three widths in both themes,
+18 copies and six Hosts cases, with no Hosts writes or reported clipping,
+overflow, browser error or missing asset. Existing live copy and all Hosts/client/
+server/SMTP/folders/terminal/command-input/editor/install browser tests pass.
+All seven native Chromium updater-timer cases pass, including the actual
+five-minute poll/focus collision.
+
+Review artifact 12621178816 matches local portable/EXE bytes and all
+699 source files equal the reviewed commit. Browser artifact 12621269872
+digest/CRC pass. Main was promoted to the identical reviewed source after the
+user's explicit publication request. Release 40253776095 succeeded. Full
+review is runtime validation; automatic duplicate main runs may continue.
+
+OFFICIAL PUBLICATION VERIFICATION
+- All four actual downloads match GitHub digests and outer/inner manifests.
+- Both ZIP CRCs, exact update allowlist and Windows x64 GUI PE/version pass.
+- Standalone/portable/update EXEs equal each other and the reviewed build.
+- All 699 packaged source files match the exact published commit.
+- 21 older release IDs/assets/digests and source-tag SHAs remain unchanged.
+- Released81 handlers checked/downloaded/verified/staged live82 in 11.97s.
+- Staged bytes match the independently downloaded official EXE.
+- No install/restart or original test executable modification occurred.
+
+The staging harness uses platform-independent production handlers, real HTTPS
+and isolated settings. Native Windows/WebView2, real hardware and actual
+installation/restart remain unverified. The UI survey covers listed scenarios,
+not every possible app state. See the handoff for hashes/provenance. This final
+three-file docs record uses [skip ci]; preserve all tags and release assets.
 
 HISTORICAL PUBLISHED BASELINE
 

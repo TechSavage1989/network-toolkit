@@ -1,42 +1,88 @@
 # Network Toolkit development handoff
 
-## 1.17.82 prepared: preceding whitespace in terminal selections
+## 1.17.82 published: preceding whitespace in terminal selections
 
-Prepared from current main c0a3c3ebe4558de38ad6c7e007803e6de3d47bdc after the
-user reported the selection-deletion issue also occurs with preceding spaces
-and explicitly requested fix/publication on 2026-10-25. This authorizes this
-scoped release only. Keep prior tags/assets and main network-toolkit as the
-sole public source/update feed.
+Prepared from main c0a3c3ebe4558de38ad6c7e007803e6de3d47bdc after the user
+reported selection deletion also fails with preceding spaces and explicitly
+requested fix/publication on 2026-10-25. This authorizes this scoped release
+only. Preserve all previous tags/assets and main network-toolkit as the sole
+public source and updater feed.
 
-The 81 selection helper normalized trailing padding but still rejected a start
-before the tracked input anchor. A highlight can include the spacing after the
-prompt, so this left preceding-space selections outside editable positions.
-Normalize the start to the input anchor only when every selected pre-anchor
-cell on the same logical line is visible whitespace/empty and has width one.
-Reject prompt glyphs, wide-character continuations, hidden cells and previous
-hard lines. The end clamp and remaining editing guards are retained. Never
-count prompt spacing as input; actual spaces typed after the anchor remain
-editable. Partial prefix selections, both whitespace boundaries, wrapped prompts/
-commands, typing and approved paste use the same corrected helper. No transport,
-credential, settings storage or updater logic changes. Preserve the shared gear
-and all other 81 and earlier features.
+The 81 fix clamped trailing padding but rejected a start before the tracked
+input anchor. A native highlight can begin in the spacing after the prompt.
+Normalize that start to the input anchor only if every selected pre-anchor cell
+on the same logical line is visible whitespace/empty and has width one. Reject
+prompt glyphs, wide-character continuations, hidden cells and previous hard
+lines. Prompt spacing never adds movement/deletion; real spaces typed inside
+the command remain editable. Partial prefix selections, both whitespace edges,
+wrapped prompts/commands, typing and approved paste share the corrected helper.
+Keep the existing trailing clamp, input range and remaining mode, revision,
+ownership, queue, paste-review and size guards. No transport, credential,
+settings storage or updater logic changes. The shared gear and all older UI,
+editor, sidebar, folder/macro and SMTP fixes remain.
 
 Seven focused input regressions cover both deletion keys/cursor movement,
 partial prefixes, actual leading input spaces, wrapped prompts/commands, wide/
 combining characters, typing/paste and protected selections. Exact released81
-assets reproduce six failures (17 pass); all 23 input tests pass with the fix.
-The live app/Telnet/browser regression now includes eight additional cases for
-preceding whitespace, native dragging, partial deletion, typed spaces, wrapped
-commands and native typing/paste, while retaining the original nine cases.
-Protected cases include selected prompt characters and whitespace-only gaps.
+assets reproduce six failures (17 pass); candidate passes all 23 input tests.
+Local and hosted validation passes 466 JavaScript tests, 31 Python release
+guards, required root/terminal/desktop Go suites, release/resources, syntax,
+Windows x64 GUI build and portable/update verification. All versions are 1.17.82.
 
-Go/UI/package/Windows metadata is consistently 1.17.82. Local validation passes
-466 JavaScript tests, 31 Python release guards, required root/terminal/desktop
-Go suites, release/resource metadata, inline/changed JavaScript syntax and the
-Windows x64 GUI cross-build. Packaging, hosted browser review, publication and
-released81 live-feed staging are pending at this preparation checkpoint.
-Native Windows/WebView2, real hardware and actual installation/restart remain
-unverified. Do not treat this checkpoint as a published-release record.
+Full review Checks 40252863225 passed on exact published source/tag
+0ebd276e651eaf40bca4d80e317f68ff35b650aa (tree
+3a8f507f74a3316fa861542a5e8d30a66a7c6560). Both jobs succeeded. The real app/browser/
+loopback-Telnet regression passes all 17 cases. Eight added cases cover leading
+whitespace with Backspace/Delete, native mouse drag, partial prefix deletion,
+actual leading spaces, wrapped commands, typing and native clipboard paste.
+Original trailing-space/cursor cases remain. Exact transmitted edits and echoed
+text match; prompts/previous output remain, protected selections send no edits
+and no command is submitted. Leading-selected and deleted-state screenshots
+were inspected. These use local test sessions, not real hardware.
+
+The UI survey passes 138 layouts across 23 pages in both themes at
+1600/820/390px, 18 copies and six Hosts cases, with no Hosts writes or reported
+clipping/overflow, browser errors or missing assets. Existing real DNS/TCP copy,
+Hosts/client/server/SMTP/folders/terminal-dialog/command-input/editor/install
+browser tests and all seven native Chromium updater-timer cases pass, including
+the actual five-minute poll/focus collision.
+
+Review artifact 12621178816 matches local portable/EXE bytes, and all
+699 packaged source files equal the exact reviewed commit.
+Outer SHA-256: a63bba3064c6f03686a51d0dbc5bf3714bfb21708f4c23b782e9572697844e63.
+Browser artifact 12621269872 digest/CRC pass.
+Outer SHA-256: 7ecaef648ae35a4f0128db181ace13dab0f1da2fb394f187c342a073e7fd50aa.
+
+Main was fast-forwarded without force from the checked expected c0a3c3eb SHA to
+the identical tested source, with no intervening source/doc changes. Release
+40253776095 succeeded and created stable release 423774404.
+Completed review is runtime validation; duplicate automatic main Checks may
+continue independently on that same source.
+
+All four actual public downloads match GitHub asset digests. Outer/inner
+manifests, both ZIP CRCs, strict four-member update allowlist, Windows x64 GUI
+PE/version and standalone/portable/update EXE identity pass. All
+699 packaged source files match the published commit; official portable and
+EXE equal the reviewed build. All 21 earlier release IDs, asset
+IDs/sizes/digests and 21 older source-tag SHAs remain unchanged.
+
+Unchanged released 1.17.81 production feed handlers checked the live feed,
+verified/downloaded/staged 1.17.82 in 11.97 seconds. Staged bytes match the
+independently downloaded official EXE. The harness uses platform-independent
+handlers, real HTTPS and isolated temporary settings. No installation/restart
+occurred and the original test executable hash remained unchanged.
+
+Official release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.82
+EXE SHA-256: 8148791b34539f2d2edd88333b4197aef4f6bee893e831ca8f1b17ea2ab55159
+Portable ZIP SHA-256: 598bb5c5a7d92a7194407e3cff98f3f869b9daffd975de68cb447f0ee28df523
+Update ZIP SHA-256: ad40ea9e9a0e708d369dfd8e6b4cefc2151e747a116a8e6c6a9abe3b57d62a62
+SHA256SUMS file SHA-256: 43836eaaea6c809a71f7c21b988b703fb28532e497f3bb99d48e0994dbc04914
+
+This final record changes only AGENTS.md, this handoff and VALIDATION.txt and
+uses [skip ci]. Do not move the 82 source tag, replace assets or republish it.
+Continue from latest main. Native Windows/WebView2, real hardware and actual
+installation/restart remain unverified. The UI survey covers its listed scenarios,
+not every possible application state. Do not claim unperformed checks.
 
 ## 1.17.81 published: settings gear and terminal selection padding
 
