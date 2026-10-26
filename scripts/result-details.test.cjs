@@ -59,3 +59,15 @@ test('closing or changing page during a drag removes sizing state while preservi
  const h=harness(),row=h.document.querySelector('[data-result-row="0"]');h.api.openRow(h.api.captureRow(row),row);const divider=h.document.getElementById('resultEntryDivider'),area=h.document.getElementById('toolResult');h.document.emit('pointerdown',divider,{button:0,clientX:500});h.c.state.activePage='dns';h.api.afterRender();assert.equal(h.document.getElementById('resultEntryDivider'),null);assert.equal(h.listeners.get('pointermove').size,0);assert.equal(h.observers[0].nodes.size,0);assert(!area.classList.contains('entry-details-bottom'));assert.equal(area.style['--entry-details-size'],undefined);
  h.c.state.activePage='monitor';h.api.openRow(h.api.captureRow(row),row);h.document.emit('dblclick',h.document.getElementById('resultEntryDivider'));assert.equal(h.c.state.entryDetails.hidden,true);h.c.state.activePage='dns';h.api.afterRender();assert.equal(h.c.state.entryDetails.hidden,true);h.c.state.activePage='monitor';h.api.openRow(h.api.captureRow(row),row);assert.equal(h.c.state.entryDetails.hidden,false,'selecting an entry reveals its details as in the device pane');
 });
+
+test('changing timestamp display refreshes retained entry details without losing scroll or disclosure state',()=>{
+ const h=harness();vm.runInContext(fs.readFileSync(require.resolve('../web/assets/result-time.js'),'utf8'),h.c);
+ h.c.state.resultTimePreferences={hourFormat:'24',zoneMode:'local',timeZone:'UTC'};
+ const row=h.document.querySelector('[data-result-row="0"]');h.api.openRow(h.api.captureRow(row),row);
+ const body=h.document.getElementById('resultEntryBody');body.scrollTop=145;body.querySelector('.result-record-json').open=true;
+ h.c.state.resultTimePreferences={hourFormat:'12',zoneMode:'utc',timeZone:'UTC'};h.api.afterRender();
+ assert.match(body.textContent,/Recorded \(UTC\)/);assert.match(body.textContent,/02:00:00\.000\s*PM/i);
+ assert.equal(body.scrollTop,145);assert.equal(body.querySelector('.result-record-json').open,true);
+ assert.equal(row.getAttribute('aria-current'),'true');
+ h.document.emit('click',body.querySelector('[data-result-copy="json"]'));assert.equal(JSON.parse(h.calls.at(-1)[1]).time,'2026-10-22T14:00:00Z');
+});

@@ -85,7 +85,7 @@
   function fieldsHTML(record) {
     if (!record || typeof record !== 'object' || Array.isArray(record)) return '<pre class="result-record-value">' + esc(typeof record === 'object' ? JSON.stringify(record, null, 2) : scalar(record)) + '</pre>';
     const entries = Object.entries(record), simple = entries.filter(([,value]) => value == null || typeof value !== 'object'), nested = entries.filter(([,value]) => value != null && typeof value === 'object');
-    const values = simple.length ? '<dl class="result-record-grid">' + simple.map(([key,value]) => '<div><dt>' + esc(root.NetworkToolkitResultTime?.isKey(key)?'Recorded (local)':label(key)) + '</dt><dd>' + (root.NetworkToolkitResultTime?.isKey(key)?root.NetworkToolkitResultTime.cell(value):esc(scalar(value))) + '</dd></div>').join('') + '</dl>' : '';
+    const values = simple.length ? '<dl class="result-record-grid">' + simple.map(([key,value]) => '<div><dt>' + esc(root.NetworkToolkitResultTime?.isKey(key)?(root.NetworkToolkitResultTime.columnLabel?.()||'Recorded (local)'):label(key)) + '</dt><dd>' + (root.NetworkToolkitResultTime?.isKey(key)?root.NetworkToolkitResultTime.cell(value):esc(scalar(value))) + '</dd></div>').join('') + '</dl>' : '';
     return values + nested.map(([key,value]) => '<details class="result-record-nested"><summary>' + esc(label(key)) + (Array.isArray(value) ? ' (' + value.length + ' ' + (value.length === 1 ? 'entry' : 'entries') + ')' : '') + '</summary>' + renderStaticObject(value, 1) + '</details>').join('');
   }
 
@@ -147,8 +147,13 @@
     let rail=document.getElementById('resultEntryRail');if(!rail){rail=document.createElement('div');rail.id='resultEntryRail';rail.className='result-entry-rail';area.append(rail);}
     let show=document.getElementById('resultEntryShow');if(!show){show=document.createElement('button');show.id='resultEntryShow';show.className='iconbtn result-entry-show';show.setAttribute('type','button');show.setAttribute('data-result-side-show','');show.setAttribute('aria-controls','resultEntryPane');rail.append(show);}
     if(!document.getElementById('resultEntryDivider')){const divider=document.createElement('div');divider.id='resultEntryDivider';divider.setAttribute('role','separator');divider.setAttribute('tabindex','0');divider.setAttribute('aria-controls','resultEntryPane');area.append(divider);}
-    const signature=JSON.stringify(sideDetail.record),body=document.getElementById('resultEntryBody');
-    if(body._recordSignature!==signature){body.innerHTML=detailBody(sideDetail);body._recordSignature=signature;body.scrollTop=0;document.getElementById('resultEntryTitle').textContent=recordTitle(sideDetail.record)||sideDetail.name;}
+    const signature=JSON.stringify(sideDetail.record),displaySignature=signature+'|'+JSON.stringify(root.NetworkToolkitResultTime?.preferences?.()||{}),body=document.getElementById('resultEntryBody');
+    if(body._recordSignature!==displaySignature){
+      const sameRecord=body._sourceRecordSignature===signature,scrollTop=sameRecord?body.scrollTop:0,expanded=sameRecord?[...body.querySelectorAll('details')].map(detail=>detail.open):null;
+      body.innerHTML=detailBody(sideDetail);body._recordSignature=displaySignature;body._sourceRecordSignature=signature;
+      if(expanded)[...body.querySelectorAll('details')].forEach((detail,index)=>{detail.open=expanded[index]===true;});
+      body.scrollTop=scrollTop;document.getElementById('resultEntryTitle').textContent=recordTitle(sideDetail.record)||sideDetail.name;
+    }
     for(const row of area.querySelectorAll('tr[data-result-row]')){
       const detail=captureRow(row),selected=detail?.list===sideDetail.list&&JSON.stringify(detail.record)===signature;
       row.classList.toggle('result-entry-selected',selected);if(selected)row.setAttribute('aria-current','true');else row.removeAttribute('aria-current');

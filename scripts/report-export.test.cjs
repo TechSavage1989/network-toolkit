@@ -202,6 +202,23 @@ function runTests() {
     }
     assert.equal(JSON.stringify(r),before);
   });
+  check('report captions and formatted values follow selected clock and timezone preferences', () => {
+    const resultTime=require('../web/assets/result-time.js'),r=reportFixture(1),stamp='2026-10-26T19:20:30.123456789Z';
+    r.jobs[0].result.data.hosts[0].time=stamp;r.jobs[1].result.data.samples[0].time=stamp;
+    const before=JSON.stringify(r);
+    try{
+      resultTime.configure({hourFormat:'12',zoneMode:'utc',timeZone:'UTC'});
+      for(const output of [renderer.toHTML(r),renderer.toText(r)]){
+        assert.match(output,/UTC with 12-hour clocks/);assert.match(output,/07:20:30\.123\s*PM/i);
+        assert(output.includes(stamp));assert(!output.includes('Recorded (local)'));assert(!output.includes('Recorded time (local)'));
+      }
+      resultTime.configure({hourFormat:'24',zoneMode:'named',timeZone:'Asia/Tokyo'});
+      for(const output of [renderer.toHTML(r),renderer.toText(r)]){
+        assert(output.includes('Asia/Tokyo with 24-hour clocks'));assert(output.includes('Recorded time (Asia/Tokyo)'));assert.match(output,/04:20:30\.123/);
+      }
+      assert.equal(JSON.stringify(r),before);
+    }finally{resultTime.configure(null);}
+  });
   check('empty reports and absent data remain explicit and do not invent results', () => {
     assert.match(renderer.toHTML({jobs: []}), /No diagnostic results were selected/);
     assert.match(renderer.toText({jobs: []}), /Selected results: 0/);

@@ -377,3 +377,36 @@
  .packet-statistics .packet-stat-cards{gap:6px}
  .packet-statistics .packet-stat-cards>div{padding:8px;min-width:min(100%,140px)}
 }
+
+/* Keep the packet graph above the independent virtual packet-list reader. */
+.packet-graph-dock{display:flex;flex-direction:column;flex:0 1 230px;min-height:100px;max-height:43%;min-width:0;border-bottom:1px solid var(--border);background:var(--panel);overflow:hidden}
+.packet-graph-dock[hidden]{display:none}
+.packet-graph-reader{flex:1 1 0;min-height:0;min-width:0;overflow:auto;overscroll-behavior:contain;padding:8px 10px;scrollbar-width:thin}
+.packet-graph-divider{height:8px;min-height:8px;flex:0 0 8px;cursor:row-resize;background:var(--line);border:1px solid var(--border);border-radius:4px;position:relative;touch-action:none}
+.packet-graph-divider:after{content:'';position:absolute;width:34px;height:2px;left:calc(50% - 17px);top:2px;background:var(--faint);border-radius:2px}
+.packet-graph-divider:hover,.packet-graph-divider:focus-visible{background:var(--accentBg);border-color:var(--accent);outline-offset:-2px}
+.packet-traffic-heading{display:flex;align-items:center;gap:6px 10px;flex-wrap:wrap;margin-bottom:5px}
+.packet-traffic-heading h3{margin:0 auto 0 0;font-size:12px}
+.packet-traffic-heading label{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted);min-width:0}
+.packet-traffic-heading select{width:auto;max-width:210px;min-height:25px;font-size:10px;padding:3px 22px 3px 5px}
+.packet-graph-scroll{min-width:0;max-width:100%;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;scrollbar-width:thin}
+.packet-graph-scroll .packet-timeline{max-width:none;overflow:hidden;height:105px}
+.packet-timeline [data-packet-bucket].packet-bucket-hovered .packet-timeline-hit{fill:var(--accent);fill-opacity:.2;stroke:var(--text);stroke-width:1;vector-effect:non-scaling-stroke}
+.packet-timeline [data-packet-bucket].selected .packet-timeline-hit{stroke:var(--accent);stroke-width:2;vector-effect:non-scaling-stroke}
+.packet-timeline-retained,.packet-timeline-correlation,.packet-timeline-aggregation{margin:4px 0 7px;font-size:10px;line-height:1.5;color:var(--muted);overflow-wrap:anywhere}
+.packet-graph-reader .packet-timeline-values{grid-template-columns:repeat(auto-fit,minmax(min(100%,135px),1fr));gap:5px 10px}
+.packet-graph-reader .packet-timeline-details{margin-bottom:5px;padding:7px}
+.packet-graph-reader .packet-timeline-selection{margin-bottom:4px}
+.packet-graph-reader .packet-timeline-scope{font-size:10px;margin-bottom:4px}
+.packet-graph-popup{position:fixed;z-index:10010;pointer-events:none;max-width:min(430px,calc(100vw - 16px));max-height:calc(100vh - 16px);overflow:hidden;padding:10px 12px;border:1px solid var(--accent);border-radius:8px;background:var(--panel);color:var(--text);box-shadow:0 5px 22px #0005;font-size:11px}
+.packet-graph-popup>strong{display:block;margin-bottom:7px;font-size:12px}
+.packet-graph-popup .packet-timeline-values{grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 12px}
+.packet-workspace .packet-table tbody tr.packet-graph-hovered:not(.packet-spacer){outline:2px solid var(--accent);outline-offset:-2px;box-shadow:inset 0 0 0 999px color-mix(in srgb,var(--accent) 13%,transparent)}
+.packet-workspace .packet-table tbody tr.packet-graph-pinned:not(.packet-spacer){border-inline:2px solid var(--accent)}
+@media(max-width:600px){
+ .packet-graph-dock{flex-basis:200px;max-height:39%}
+ .packet-graph-reader{padding:6px}
+ .packet-graph-reader .packet-timeline-selection strong{font-size:11px}
+ .packet-graph-popup{padding:8px;font-size:10px}
+ .packet-graph-popup .packet-timeline-values{gap:4px 8px}
+}

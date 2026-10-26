@@ -47,7 +47,7 @@
   const primitive = value => value === null || typeof value !== 'object';
   const simple = value => primitive(value) || Array.isArray(value) && value.every(primitive);
   const own = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
-  const title = key => labels[key] || String(key).replace(/([a-z\d])([A-Z])/g, '$1 $2')
+  const title = key => (resultTime?.isKey(key) ? (key==='captured'?'Snapshot recorded':'Recorded time')+' ('+(resultTime.zoneLabel?.()||'local')+')' : labels[key]) || String(key).replace(/([a-z\d])([A-Z])/g, '$1 $2')
     .replace(/[_-]+/g, ' ').replace(/^./, c => c.toUpperCase())
     .replace(/\bDns\b/g, 'DNS').replace(/\bTcp\b/g, 'TCP').replace(/\bIp\b/g, 'IP');
   const statusText = value => ({
@@ -214,7 +214,7 @@
       const cells = [
       '<strong class="mono">' + esc(host.address || 'Not reported') + '</strong>' +
         '<span class="cell-sub">' + esc(hostName(host)) + '</span>' +
-        '<span class="cell-sub">Recorded (local): ' + esc(timestamp(host.time)) + '</span>',
+        '<span class="cell-sub">' + esc(resultTime?.columnLabel?.()||'Recorded (local)') + ': ' + esc(timestamp(host.time)) + '</span>',
       esc(hostOutcome(host)) + (host.status === 'cancelled' && host.responded ? '<span class="cell-sub">Cancelled after response</span>' : ''),
       esc(scalar(host.mac)) + '<span class="cell-sub">' + esc(scalar(host.vendor)) + '</span>',
       esc(host.latencyMs == null ? 'Not measured' : scalar(host.latencyMs, 'latencyMs') + ' ms'),
@@ -308,7 +308,7 @@
       '<header class="report-header"><p class="eyebrow">Network Toolkit report</p><h1>' + esc(heading) + '</h1><div class="meta"><p>Exported ' + esc(timestamp(report.exported)) +
       ' | Version ' + esc(report.version || 'Not reported') + '</p><p>Computer: ' + esc(report.system.hostname || 'Not reported') +
       (report.system.os ? ' | ' + esc(report.system.os) + (report.system.arch ? ' ' + esc(report.system.arch) : '') : '') +
-      '</p><p>Times use the exporting computer’s local time zone, followed by the original recorded instant. This report contains saved observations from the selected diagnostic runs.</p></div>' +
+      '</p><p>Times use ' + esc(timeContext()) + ', followed by the original recorded instant. This report contains saved observations from the selected diagnostic runs.</p></div>' +
       '<div class="summary-cards">' + [[counts.results, 'Selected results'], [counts.completed, 'Completed runs'], [counts.running, 'In-progress snapshots'], [counts.attention, 'Failed / cancelled runs']]
         .map(([count, name]) => '<div class="summary-card"><strong>' + count + '</strong><span>' + esc(name) + '</span></div>').join('') + '</div>' +
       (report.notes ? '<section class="report-notes"><h2>Report notes</h2><p>' + esc(report.notes) + '</p></section>' : '') + '</header>' +
@@ -335,11 +335,16 @@
       : indent + title(key) + ':\n' + textValue(item, depth + 1)).join('\n') || indent + 'No fields recorded';
   }
 
+  function timeContext() {
+    const zone=resultTime?.zoneLabel?.()||'local',clock=resultTime?.preferences?.().hourFormat==='12'?'12-hour':'24-hour';
+    return (zone==='local'?'the exporting computer local timezone':zone)+' with '+clock+' clocks';
+  }
+
   function toText(input) {
     const report = reportValue(input);
     const lines = [report.label || 'Network diagnostics list', 'Network Toolkit ' + (report.version || ''),
       'Exported: ' + timestamp(report.exported), 'Computer: ' + (report.system.hostname || 'Not reported'),
-      'Selected results: ' + report.jobs.length, 'Times use the exporting computer local zone with original recorded instants. All recorded rows are included.', ''];
+      'Selected results: ' + report.jobs.length, 'Times use '+timeContext()+' with original recorded instants. All recorded rows are included.', ''];
     if (report.notes) lines.push('NOTES', String(report.notes), '');
     report.jobs.forEach((job, index) => {
       lines.push('='.repeat(64), (index + 1) + '. ' + jobName(job),

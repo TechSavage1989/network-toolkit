@@ -10,7 +10,7 @@ function harness(input='192.0.2.17/28',compare=''){
  for(const name of ['defaults','empty','compactStats','kv','ipToNum','numToIp','classifyIP','subnetPrefixDetails','subnetCalculator','synchronizeSubnetPrefix','selectSubnetPrefix','possibleNetworksMarkup','subnetSplitMarkup','renderSubnet','subnetClassField','updateSubnetPlanner','setPossibleListControls','possibleNetworksExplanation','renderPossibleNetworks','handleSubnetPlanInput','handleSubnetPlanChange','updateSubnetSplit','calculateSubnet']){
   const source=lines.find(line=>line.startsWith('function '+name+'('));assert(source,'Missing application function '+name);vm.runInContext(source,c);
  }
- for(const type of ['input','change'])vm.runInContext(lines.find(line=>line.startsWith("document.addEventListener('"+type+"',")),c);
+ for(const type of ['input','change']){const handler=lines.find(line=>line.startsWith("document.addEventListener('"+type+"',")&&line.includes(type==='input'?'handleSubnetPlanInput':'handleSubnetPlanChange'));assert(handler,'Missing application form '+type+' handler');vm.runInContext(handler,c);}
  c.renderSubnet();
  return {c,document,state,saved,$,plan:()=>vm.runInContext('subnetPlanState',c),enter(value){$('#subnetInput').value=value;document.emit('input',$('#subnetInput'));},compare(value){$('#subnetCompare').value=value;document.emit('input',$('#subnetCompare'));}};
 }

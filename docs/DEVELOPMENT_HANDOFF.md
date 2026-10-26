@@ -45,6 +45,10 @@ For the subsequently authorized 1.17.90 build, the 1.17.89 note has also been
 moved unchanged into the archive. Current `RELEASE_NOTES_1.17.90.txt` alone stays
 at root, and the archive index identifies 1.17.90 as current and 1.17.89 as previous.
 
+## 1.17.93 authorized graph interaction and timestamp preferences
+
+The user explicitly authorized implementing, building and publishing persistent graph selections, linked graph/result hover highlighting, point-detail popups, moving-window and progressive scrollable graph modes, configurable 12/24-hour and local/UTC/named-zone timestamps, and usable independently scrolling graph/result workspaces. Preserve all working features, settings, source-layout and release safeguards. Publication pending validation.
+
 ## 1.17.92 published measurement timestamps and interactive graphs
 
 The user explicitly authorized implementing, building and publishing this update.

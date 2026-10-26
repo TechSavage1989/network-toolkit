@@ -45,3 +45,43 @@ test('a large render reuses bounded formatters and periodically refreshes local 
  clock=1000;context.NetworkToolkitResultTime.format('2026-10-26T19:20:30.123Z');
  assert.equal(constructions,3,'Local settings refresh without recreating an unchanged formatter');
 });
+
+test('clock preferences support 12 and 24 hour formats without changing source instants',()=>{
+ const stamp='2026-10-26T19:20:30.123456789Z',before=time.epoch(stamp);
+ try{
+  time.configure({hourFormat:'12',zoneMode:'utc',timeZone:'UTC'});
+  assert.match(time.format(stamp),/07:20:30\.123\s*PM/i);
+  assert.match(time.format(stamp),/UTC/);
+  assert.equal(time.zoneLabel(),'UTC');assert.equal(time.timeLabel(),'Time (UTC)');
+  assert.equal(time.column({tool:'ping'}).name,'Recorded (UTC)');
+  const html=time.cell(stamp);assert(html.includes('datetime="'+stamp+'"'));assert(html.includes('Recorded timestamp: '+stamp));
+  time.configure({hourFormat:'24',zoneMode:'utc',timeZone:'UTC'});
+  assert.match(time.format(stamp),/19:20:30\.123/);assert.doesNotMatch(time.format(stamp),/\b(?:AM|PM)\b/i);
+  assert.equal(time.epoch(stamp),before);
+ }finally{time.configure(null);}
+});
+
+test('named timezone preferences follow DST and invalid restored zones fall back safely',()=>{
+ try{
+  time.configure({hourFormat:'12',zoneMode:'named',timeZone:'America/New_York'});
+  const first=time.format('2026-11-01T05:30:00.456Z'),second=time.format('2026-11-01T06:30:00.456Z');
+  assert.match(first,/01:30:00\.456\s*AM/i);assert.match(second,/01:30:00\.456\s*AM/i);assert.notEqual(first,second);
+  assert.equal(time.zoneLabel(),'America/New_York');assert.equal(time.timeLabel(),'Time (America/New_York)');
+  assert.equal(time.column({tool:'connections'}).name,'Snapshot (America/New_York)');
+  assert.equal(time.isTimeZone('Mars/Invalid'),false);assert.equal(time.isTimeZone('UTC'),true);assert.equal(time.isTimeZone('America/New_York'),true);
+  for(const value of [null,[],{hourFormat:'99',zoneMode:'bad',timeZone:'<invalid>'},{zoneMode:'named',timeZone:'Mars/Invalid'}])assert.deepEqual(time.normalizePreferences(value),{hourFormat:'24',zoneMode:'local',timeZone:'UTC'});
+  const zones=time.timeZones();assert(zones.includes('UTC'));assert(zones.includes('America/New_York'));zones.push('fake');assert(!time.timeZones().includes('fake'));
+ }finally{time.configure(null);}
+});
+
+test('saved application preferences are read dynamically and preview overrides are isolated',()=>{
+ const fs=require('node:fs'),vm=require('node:vm'),context=vm.createContext({Intl,Date,state:{resultTimePreferences:{hourFormat:'24',zoneMode:'utc',timeZone:'UTC'}}});
+ vm.runInContext(fs.readFileSync(require.resolve('../web/assets/result-time.js'),'utf8'),context);const api=context.NetworkToolkitResultTime,stamp='2026-10-26T19:20:30.123Z';
+ assert.match(api.format(stamp),/19:20:30\.123/);
+ context.state.resultTimePreferences={hourFormat:'12',zoneMode:'named',timeZone:'Asia/Tokyo'};
+ assert.match(api.format(stamp),/04:20:30\.123\s*AM/i);assert.equal(api.zoneLabel(),'Asia/Tokyo');
+ const preview=api.format(stamp,{preferences:{hourFormat:'24',zoneMode:'utc',timeZone:'UTC'}});assert.match(preview,/19:20:30\.123/);
+ assert.equal(api.preferences().zoneMode,'named');assert.equal(api.preferences().timeZone,'Asia/Tokyo');
+ context.state.resultTimePreferences={hourFormat:'24',zoneMode:'named',timeZone:'not a timezone'};
+ assert.doesNotThrow(()=>api.format(stamp));assert.equal(api.zoneLabel(),'local');
+});
