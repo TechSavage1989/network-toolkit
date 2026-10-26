@@ -1,21 +1,52 @@
-NETWORK TOOLKIT 1.17.81 VALIDATION CHECKPOINT
+NETWORK TOOLKIT 1.17.81 VALIDATION
 
-Shared settings icon is a symmetric gear. Terminal selection edits clamp empty
-padding to the current command end, retaining the existing prompt/output,
-revision, queue, hidden-input, mode and paste-review checks. Range detection is
-unchanged so printed erase spaces do not cause extra character deletion.
+Shared settings icon is a recognizable gear. Terminal selection edits clamp
+empty trailing cells to the current unsubmitted command. Existing range,
+prompt/output, revision, mode, hidden-input, ownership, queue and paste-review
+guards remain. Printed erase spaces do not add extra deletion. Typing and
+approved paste use the same corrected selection helper.
 
-Local: 459 JavaScript tests, 31 Python release guards, required root/terminal/
-desktop Go suites, release/resource metadata, changed and inline JavaScript
-syntax, and Windows x64 GUI cross-build pass. Six new input regressions include
-padded Delete/Backspace with cursor movement, wrapping, real/erased spaces,
-typing/paste replacement and protected selections. Exact released80 assets fail
-five regressions (11 pass); candidate passes all 16 terminal-input tests.
+Full review Checks 40250670925 passed on exact published source/tag
+4d948b7124d9af71b8251390a6e378df8e9fabf5: 459 JavaScript tests, 31 Python
+release guards, required root/terminal/desktop Go suites, release/resources,
+syntax, Windows x64 GUI build/package and all browser steps. Six focused input
+regressions reproduce five failures against exact released80 assets; the
+candidate passes all 16 terminal-input tests.
 
-Hosted browser review, matching review build, package/publication verification
-and released80 live feed staging are pending at this checkpoint. Native
-Windows/WebView2, hardware and actual installation/restart remain unverified.
-See DEVELOPMENT_HANDOFF.md for authorization, scope and current release status.
+Nine real-app/browser/loopback-Telnet cases verify Backspace, Delete, native
+mouse selection, cursor movement, wrapping, trailing spaces, typing, native
+clipboard paste and protected selections, including exact edits and echoed text.
+No commands are submitted and previous output remains. Fixture fit/redraw/
+delayed-wrap issues were corrected before the successful full review.
+
+The UI survey passes 138 layouts across 23 pages in both themes at three widths,
+18 copies and six Hosts cases, with no Hosts writes or reported clipping,
+overflow, browser error or missing asset. Gear and terminal screenshots were
+inspected. Existing live copy and all Hosts/client/server/SMTP/folders/terminal/
+command-input/editor/install browser tests pass. All seven native Chromium
+updater-timer cases pass, including the real five-minute poll/focus collision.
+
+Review artifact 12620496048 matches local portable/EXE bytes and all
+698 source files match the reviewed commit. Browser artifact 12620721891
+digest/CRC pass. Main was promoted to the identical reviewed source after the
+user's explicit publication instruction. Release 40251443716 succeeded.
+Completed review is runtime validation; automatic duplicate main runs may continue.
+
+OFFICIAL PUBLICATION VERIFICATION
+- All four actual downloads match GitHub digests and outer/inner manifests.
+- Both ZIP CRCs, exact updater allowlist and Windows x64 GUI PE/version pass.
+- Standalone/portable/update EXEs are identical and match the reviewed build.
+- All 698 packaged source files match the exact published commit.
+- 20 earlier release IDs/assets/digests and source-tag SHAs remain unchanged.
+- Unchanged released80 handlers checked/downloaded/verified/staged live81 in 11.65s.
+- Staged bytes match the independently downloaded official EXE.
+- No installation/restart or original test executable modification occurred.
+
+The staging harness uses platform-independent production handlers, real HTTPS
+and isolated temporary settings. Native Windows/WebView2, real hardware and
+actual installation/restart remain unverified. The UI survey covers the listed
+scenarios, not every app state. See DEVELOPMENT_HANDOFF.md for hashes/provenance.
+This three-file final docs record uses [skip ci]; preserve tags and release assets.
 
 HISTORICAL PUBLISHED BASELINE
 

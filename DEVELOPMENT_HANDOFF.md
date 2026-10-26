@@ -1,46 +1,102 @@
 # Network Toolkit development handoff
 
-## 1.17.81 prepared: settings gear and terminal selection padding
+## 1.17.81 published: settings gear and terminal selection padding
 
-Prepared from current main d311c9a6def119c20de6345ecee6b0139151190d, retaining
-its documentation navigation refresh and all 1.17.80 changes. The user requested
-a recognizable settings icon throughout the app, terminal selection deletion
-with trailing empty cells fixed, and publication on 2026-10-25. This authorizes
-this scoped new release only. Keep prior tags/assets and use main network-toolkit
-as the sole source and updater feed.
+Prepared from main d311c9a6def119c20de6345ecee6b0139151190d, retaining its
+README/navigation refresh and all 1.17.80 changes. The user requested a
+recognizable settings icon throughout the app, terminal deletion with trailing
+empty selection cells fixed, and publication on 2026-10-25. This authorizes this
+scoped release only. Preserve previous tags/assets and main network-toolkit as
+the sole public source and updater feed.
 
-The shared settings SVG now draws a symmetric eight-tooth gear with a circular
-center, keeping existing size, stroke, labels and event handlers across all
-settings/tool controls. No separate icon copies or dependencies are introduced.
+The shared settings SVG is now a symmetric eight-tooth gear with a circular
+center. Existing sizes, strokes, labels and handlers remain across App settings,
+terminal tools/context settings, client/server connection controls and other
+configuration/detail tools. No icon dependency or separate asset is introduced.
 
-terminal-input.js rejected a selection when its end was outside the tracked
-command's character positions. Normalize the selected end to the command end
-when the overrun is only empty cells on that same logical command line. Permit
-the exclusive next-row-zero boundary, including wrapped commands, but never
-later hard lines. Keep the start-position, revision, prompt/output, hidden-input,
-mode, ownership, queue, paste-review and size checks. The existing cursor/text
-range detection is unchanged: spaces before the cursor remain part of input,
-while empty or erased cells after it do not generate extra movement/deletion. Backspace/Delete, typing and
-accepted paste share the fixed selection helper. No input characters are stored
-in persistent settings, and no transport, credential or updater code changes.
+terminal-input.js rejected a selection whose end was outside known command
+character positions. Clamp the selected end to the editable command end when
+the overrun is only empty cells on that same logical line. The exclusive
+next-row-zero boundary is allowed, including wrapped commands; later hard
+lines remain excluded. The start-position, prompt/output, revision, mode,
+hidden-input, queue, ownership, paste-review and size checks remain. Keep the
+existing cursor/text range detection: spaces before the cursor are included,
+while empty/erased cells do not add movement or deletion. Backspace/Delete,
+typing and approved paste share the fixed helper. No transport, credential,
+settings storage or updater logic changes.
 
-Six focused regressions cover padded Backspace/Delete, wrapped row boundaries,
-spaces before the cursor, explicit-space device erase echoes, typing/paste
-replacement and protected selections. Five regressions fail against exact
-released80 assets (11 pass, five fail); all 16 input tests pass with the fix. A new live browser regression uses unchanged app
-assets/APIs, native xterm selection/key events and a real loopback Telnet peer,
-including native drag, clipboard paste and echoed command results. Hosted Checks
-will run it against the same Linux headless build as the live copy regression.
-The existing UI survey also captures the gear and App settings in both themes.
+Six focused regressions cover padded Delete/Backspace with cursor movement,
+wrapped boundaries, real trailing spaces, explicit-space device erase echoes,
+typing/paste and protected selections. Exact released80 assets reproduce five
+failures (11 pass); all 16 terminal-input tests pass with the fix. Full local
+and hosted validation passes 459 JavaScript tests, 31 Python release guards,
+required root/terminal/desktop Go suites, metadata/resources, JavaScript syntax,
+Windows x64 GUI build and portable/update verification. All versions are 1.17.81.
 
-Go/UI/package/Windows metadata is consistently 1.17.81. Local validation passes
-459 JavaScript tests, 31 Python release guards, required root/terminal/desktop
-Go suites, metadata/resource checks, inline/changed JavaScript syntax and the
-Windows x64 GUI build. Hosted browser review, build comparison and publication
-verification are pending. Do not treat this as a published-release record.
-Native Windows/WebView2, real hardware and actual installation/restart remain
-unverified here. Preserve prior Hosts/Overview/copy, sidebar/detach/Connect,
-editor, folders/macros/credentials, command-input, SMTP and updater fixes.
+Early live-test reviews exposed fixture races, not additional runtime changes:
+the console's initial fit cleared a synthetic selection; an overly strict wait
+then depended on asynchronous resize metadata; the peer's full-history redraw
+and forced cursor move at an exact column boundary invalidated its command
+anchor. The fixture now waits for stable rendered dimensions, redraws only the
+editable line and preserves delayed wrap. A fragmented real-xterm echo check
+also verified its anchor and exact deletion count before the final hosted run.
+
+Full review Checks 40250670925 passed on exact published source/tag
+4d948b7124d9af71b8251390a6e378df8e9fabf5 (tree
+b4d466590f805c3dcd9f7a0a56a2f87b35d8cb7b). Both jobs succeeded. The new real-app browser
+regression passes nine live cases through unchanged app assets/APIs and a
+loopback Telnet peer: Backspace, Delete, native mouse drag, cursor movement,
+wrapped selection, trailing spaces, typing, native clipboard paste and protected
+selection guards. Echoed text and exact transmitted edits match; previous output
+remains and no command is submitted. These are local test sessions, not real
+hardware or native Windows execution.
+
+The application survey passes 138 layouts across 23 pages at 1600/820/390px in
+both themes, 18 clipboard copies and six Hosts menu cases, with no Hosts writes,
+reported clipping/overflow, browser error or missing asset. Gear/settings and
+terminal selection/result screenshots were inspected in both themes. Existing
+real DNS/TCP copy, Hosts/client/server/SMTP/folders/terminal-dialog/command-input/
+editor/install browser tests and all seven native Chromium updater-timer cases
+pass, including the real five-minute poll/focus collision.
+
+Review artifact 12620496048 matches the local portable and EXE
+byte-for-byte, with all 698 source files equal to the exact reviewed commit.
+Outer SHA-256: 98da70d4e348574b497b19173c06d3c00a003c6061fd1028acd993d3db1ec518.
+Browser artifact 12620721891 digest and ZIP CRC pass.
+Outer SHA-256: effd8b04acaa41359b755da6dc6f9a19b1a39660e64f2fe6bd2e4fe1572c19de.
+
+Main was fast-forwarded without force from the checked expected SHA d311c9a6 to
+the identical tested source, with no intervening source/doc changes. Release
+40251443716 succeeded and created stable release 423761885.
+Full review above is runtime validation; duplicate automatic main Checks may
+continue independently and do not change the reviewed source.
+
+All four actual public downloads match GitHub asset digests. Outer/inner
+manifests, both ZIP CRCs, strict four-member update allowlist, Windows x64 GUI
+PE/version and standalone/portable/update EXE identity pass. All
+698 packaged source files match the published commit; official portable
+and EXE match the reviewed build. All 20 earlier release IDs, asset
+IDs/sizes/digests and 20 older source-tag SHAs remain unchanged.
+
+The unchanged released 1.17.80 production feed handlers checked the live feed,
+verified/downloaded/staged 1.17.81 in 11.65 seconds. Staged bytes match the
+independently downloaded official EXE. The harness uses platform-independent
+handlers, real HTTPS and isolated temporary settings. No installation or restart
+occurred, and the original test executable hash remained unchanged.
+
+Official release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.81
+EXE SHA-256: 738eb863d3f165fcbe89ae39a34e79981f13e7e2d002100bc59c5c56041d080a
+Portable ZIP SHA-256: 71a2fc9392467eb3eddf7c1339bd0ddfcd6a967a0fc52c792a153b309a8b6c85
+Update ZIP SHA-256: 9875a67623f9efc0f5c777747f0580e7cf87d4be96a5f37bd45853098bd347cf
+SHA256SUMS file SHA-256: d7e3e2555acce42192ed0cb606e5df76a9402596fcbe935984c387fb0e3cfd32
+
+This final record changes only AGENTS.md, this handoff and VALIDATION.txt and
+uses [skip ci]. Do not move the 81 source tag, replace assets or republish it.
+Continue future work from latest main. Preserve all previous Hosts/Overview/copy,
+terminal/sidebar/detach/Connect, editor, folders/macros/credentials, command-input,
+SMTP and updater fixes. Native Windows/WebView2, real hardware and actual
+installation/restart remain unverified. The UI survey covers the listed scenarios,
+not every possible application state.
 
 ## README navigation refresh (2026-10-25)
 
