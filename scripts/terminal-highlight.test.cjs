@@ -266,3 +266,13 @@ test('recorded native Windows cmd and PowerShell output renders syntax and custo
   h.controller.setAppearance({language,theme:'dark',underlines:false,shellColors:{command:'#bb44ee',keyword:'#11aaee',variable:'#00ab91'}});h.flush();assert(h.decorations.some(d=>!d.disposed&&d.options.foregroundColor==='#00ab91'),language+' custom variable color was not applied');assert.deepEqual(Array.from({length:h.term.buffer.active.length},(_,i)=>h.term.buffer.active.getLine(i).translateToString(true)),rows);h.dispose();
  }
 });
+test('local command output colors ipconfig fields, addresses and statuses without altering ANSI or buffer cells',async()=>{
+ for(const language of ['cmd','powershell']){
+  const h=harness({language,underlines:false},{cols:120,rows:12},{realDecorations:true,renderer:true});
+  const text='Windows IP Configuration\r\nEthernet adapter Ethernet 2:\r\n   IPv4 Address. . . . . . . . . . : 10.86.250.35(Preferred)\r\n   DNS Servers . . . . . . . . . . : 10.0.0.243\r\n   Media State . . . . . . . . . . : Media disconnected\r\n\x1b[31mERROR: native red\x1b[0m\r\nordinary unstructured output';await h.write(text);
+  for(const [row,kind]of [[0,'outputHeading'],[1,'outputHeading'],[2,'outputField'],[2,'outputAddress'],[3,'outputAddress'],[4,'outputWarning']])assert(h.controller.tokensAtRow(row).some(t=>t.kind==='shell-'+kind),language+' missing '+kind);
+  assert(h.decorations.some(d=>!d.disposed&&d.options.marker.line===2&&d.options.foregroundColor));assert.equal(h.controller.tokensAtRow(6).length,0);
+  const rows=Array.from({length:h.term.buffer.normal.length},(_,i)=>h.term.buffer.normal.getLine(i).translateToString(false));assert(h.term.buffer.normal.getLine(5).getCell(0).isFgPalette());assert.equal(h.term.buffer.normal.getLine(5).getCell(0).getFgColor(),1);
+  h.controller.setAppearance({language,theme:'light',shellColors:{outputAddress:'#aa33dd'}});h.flush();assert(h.decorations.some(d=>!d.disposed&&d.options.foregroundColor==='#aa33dd'));assert.deepEqual(Array.from({length:h.term.buffer.normal.length},(_,i)=>h.term.buffer.normal.getLine(i).translateToString(false)),rows);h.dispose();
+ }
+});

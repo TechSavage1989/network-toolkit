@@ -1,5 +1,11 @@
 # Network Toolkit development
 
+ACTIVE HOLD: The user explicitly forbids a new application build or publication
+until they authorize it. Source fixes and source-only tests are authorized.
+Work is isolated on fix/editor-shell-review-no-build. Do not push main, bump
+versions, run build/package scripts or trigger the normal build workflows. The
+branch-specific source test workflow runs JS and static browser fixtures only.
+
 Read DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main,
 preserve unrelated work and all previous fixes, and follow release safeguards.
 

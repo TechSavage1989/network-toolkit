@@ -224,7 +224,7 @@
   }
 
   function analyze(input, language) {
-    if (global.NTKTerminalShellSyntax?.supported(language)) return global.NTKTerminalShellSyntax.analyze(input, language);
+    if (global.NTKTerminalShellSyntax?.supported(language)) {const shell=global.NTKTerminalShellSyntax;if(shell.isPrompt(input,language))return shell.analyze(input,language);return shell.analyzeOutput(input,{address:addressKind,mac});}
     const text = typeof input === 'string' ? input : '';
     if (!text || text.length > LIMITS.text) return [];
     const found = [];

@@ -1,0 +1,40 @@
+'use strict';
+// Source-only UI validation: static bundled assets, mock files and transports.
+// No Go executable, application package, real shell, install or release.
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
+const root=path.resolve(__dirname,'..'),out=process.env.TOOLKIT_TEST_OUTPUT;
+const report={passed:false,checks:[],layouts:[],errors:[]};let browser,page;
+const check=name=>{report.checks.push(name);console.log('PASS '+name);};
+const settle=()=>page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+(async()=>{
+ if(out)fs.mkdirSync(out,{recursive:true});browser=await chromium.launch({headless:true,args:['--no-sandbox']});const context=await browser.newContext({viewport:{width:1440,height:1000}});page=await context.newPage();page.setDefaultTimeout(12000);page.on('pageerror',e=>report.errors.push(e.message));
+ await context.addInitScript(()=>{window.confirm=window.prompt=()=>{throw Error('Native script dialogs are disabled in the desktop host');};});
+ await context.route('**/*',async route=>{const req=route.request(),url=new URL(req.url());assert.equal(url.origin,'https://source-review.toolkit.test');const p=url.pathname;let data={};
+  if(p.startsWith('/api/')){if(p==='/api/status')data={version:require('../package.json').version,os:'windows',arch:'amd64',localShellAvailable:true};if(p==='/api/state'&&req.method()==='GET')data={appUpdatePreferences:{enabled:false}};if(p==='/api/jobs')data=[];if(p==='/api/terminals'||p==='/api/remote-browser')data={sessions:[]};if(p==='/api/terminal-views')data={available:false,owners:{},views:[]};if(p.includes('/events')){await new Promise(r=>setTimeout(r,100));data={events:[],sessions:[],after:0};}return route.fulfill({contentType:'application/json',body:JSON.stringify(data)});}
+  try{let file=path.join(root,'web',p==='/'?'index.html':p);if(!fs.existsSync(file))file=path.join(root,p);let body=fs.readFileSync(file);if(p==='/')body=body.toString().replaceAll('__SESSION_TOKEN__','source-review').replaceAll('__WINDOW_MODE__','main');return route.fulfill({body,contentType:p==='/'?'text/html':p.endsWith('.js')?'application/javascript':p.endsWith('.css')?'text/css':p.endsWith('.svg')?'image/svg+xml':'application/octet-stream'});}catch{return route.fulfill({status:404,body:''});}
+ });
+ await page.goto('https://source-review.toolkit.test/');await page.waitForFunction(()=>__networkToolkitStartupState===1&&online);await page.evaluate(()=>navigate('editor'));
+ const text=Array.from({length:220},(_,i)=>'Write-Output "line '+i+' '+('long text '.repeat(i%4===0?32:2))+'" # sample').join('\n');
+ async function open(id,content=text){await page.evaluate(async({id,content})=>NetworkToolkitFileEditor.open({id,path:id+'.ps1',source:'Local computer',create:true,initialContent:content,read:async()=>({content}),write:async data=>{globalThis.__savedEditorFile=data;return {hash:'saved'};}}),{id,content});}
+ const ta=page.locator('[data-ed-text]'),action=name=>page.locator('[data-ed="'+name+'"]');
+ await open('review');await page.waitForFunction(()=>NetworkToolkitFileEditor.active.syntaxCache);
+ for(const name of ['upper','lower','comment','duplicate','trim','sortLines','undo','redo']){
+  await ta.evaluate(el=>{const start=el.value.indexOf('line 60');el.setSelectionRange(start,start+7);el.scrollTop=700;el.scrollLeft=25;});const before=await ta.evaluate(el=>({top:el.scrollTop,left:el.scrollLeft}));await action(name).click();await settle();assert.deepEqual(await ta.evaluate(el=>({top:el.scrollTop,left:el.scrollLeft})),before,name);
+ }
+ check('case, comment, duplicate, trim, sort, undo and redo preserve both scroll positions');
+ await action('goto').click();await page.locator('[data-ed-dialog-input]').fill('30');await page.locator('[data-ed-dialog-action="accept"]').click();await settle();assert.equal(await ta.evaluate(el=>el.value.slice(0,el.selectionStart).split('\n').length),30);
+ await action('saveAs').click();await page.locator('[data-ed-dialog-input]').fill('C:\\Review\\saved.ps1');await page.locator('[data-ed-dialog-action="accept"]').click();await page.waitForFunction(()=>__savedEditorFile?.path==='C:\\Review\\saved.ps1');assert.equal(await page.evaluate(()=>NetworkToolkitFileEditor.active.dirty),false);
+ await ta.press('Home');await ta.press('x');await action('reload').click();await page.locator('[data-ed-dialog-action="cancel"]').click();assert.equal(await page.evaluate(()=>NetworkToolkitFileEditor.active.dirty),true);check('Go to line, Save As and reload confirmation work with native dialogs disabled');
+ for(const width of [1440,820,390])for(const theme of ['dark','light']){
+  await page.setViewportSize({width,height:1000});await page.evaluate(theme=>setTheme(theme),theme);await page.locator('[data-ed-wrap]').check();await page.waitForFunction(()=>{const d=NetworkToolkitFileEditor.active;return d.syntaxCache?.text===d.content&&!document.querySelector('[data-ed-highlight]').hidden;});await settle();
+  const metrics=await page.evaluate(()=>{const ta=document.querySelector('[data-ed-text]'),pre=document.querySelector('[data-ed-highlight]'),g=document.querySelector('[data-ed-gutter]'),font=getComputedStyle(ta);const nodes=[];const walker=document.createTreeWalker(pre,NodeFilter.SHOW_TEXT);while(walker.nextNode())nodes.push(walker.currentNode);function topAt(offset){let at=0;for(const node of nodes){if(at+node.length>offset){const range=document.createRange();range.setStart(node,offset-at);range.setEnd(node,offset-at+1);return range.getBoundingClientRect().top;}at+=node.length;}}const content=NetworkToolkitFileEditor.active.content,offset=content.indexOf('\n')+1,syntaxDelta=topAt(offset)-topAt(0),gutterDelta=g.children[1].getBoundingClientRect().top-g.children[0].getBoundingClientRect().top;return {textWidth:ta.clientWidth,overlayWidth:pre.getBoundingClientRect().width,syntaxDelta,gutterDelta,syntax:getComputedStyle(pre).whiteSpace,tokens:pre.querySelectorAll('span').length,font:font.font};});
+  assert.equal(metrics.textWidth,metrics.overlayWidth);assert.equal(metrics.syntax,'pre-wrap');assert(metrics.tokens>0);assert(Math.abs(metrics.syntaxDelta-metrics.gutterDelta)<1.5,JSON.stringify({width,theme,metrics}));report.layouts.push({width,theme,metrics});if(out&&(width===1440||width===390))await page.screenshot({path:path.join(out,'editor-review-'+width+'-'+theme+'.png')});
+ }
+ check('wrapped worker syntax, text overlay and logical line numbers align in six layouts');
+ await page.setViewportSize({width:1440,height:1000});await page.locator('[data-ed-wrap]').uncheck();
+ await page.locator('[data-ed-close-tab]').first().click();await page.locator('[data-ed-dialog-action="cancel"]').click();assert.equal(await page.evaluate(()=>NetworkToolkitFileEditor.documents.size),1);assert(await page.locator('#networkToolkitFileEditor').isVisible());
+ await action('close').click();await page.locator('[data-ed-dialog-action="cancel"]').click();assert(await page.locator('#networkToolkitFileEditor').isVisible());
+ await page.locator('[data-ed-close-tab]').first().click();await page.locator('[data-ed-dialog-action="accept"]').click();await page.waitForFunction(()=>NetworkToolkitFileEditor.documents.size===0);await action('undo').click();await action('goto').click();assert.equal(await page.locator('.nt-editor-dialog').count(),0);await open('clean','plain');await action('close').click();await page.waitForFunction(()=>NetworkToolkitFileEditor.documents.size===0);check('tab and whole-editor close can cancel/discard, and empty-editor buttons stay safe');
+ assert.deepEqual(report.errors,[]);report.passed=true;
+})().catch(async e=>{report.failure=e.stack||String(e);console.error(report.failure);if(page&&out)await page.screenshot({path:path.join(out,'editor-review-failure.png')}).catch(()=>{});process.exitCode=1;}).finally(async()=>{if(out)fs.writeFileSync(path.join(out,'editor-source-review.json'),JSON.stringify(report,null,2));await browser?.close();});

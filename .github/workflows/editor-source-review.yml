@@ -1,0 +1,45 @@
+name: Editor source review (no app build)
+on:
+  push:
+    branches: ['fix/editor-shell-review-no-build']
+permissions:
+  contents: read
+jobs:
+  source-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: JavaScript source tests
+        run: node --test scripts/*.test.cjs
+      - name: Prepare browser test runtime
+        run: |
+          npm install --prefix "$RUNNER_TEMP/editor-browser-tests" --no-audit --no-fund playwright@1.62.1
+          node "$RUNNER_TEMP/editor-browser-tests/node_modules/playwright/cli.js" install --with-deps chromium
+      - name: Editor actions, embedded dialogs and wrapped syntax
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/editor-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/editor-source-results
+        run: node scripts/editor-source-review.browser.cjs
+      - name: Existing editor and shell behavior
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/editor-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/editor-source-results
+        run: node scripts/features-84.browser.cjs
+      - name: Local shell settings, close preferences and navigation
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/editor-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/editor-source-results
+        run: node scripts/features-85.browser.cjs
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: editor-source-review
+          path: ${{ runner.temp }}/editor-source-results
+          if-no-files-found: ignore

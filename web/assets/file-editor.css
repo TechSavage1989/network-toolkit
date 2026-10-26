@@ -111,3 +111,12 @@ body:has(.nt-editor-embedded) #toolWorkspace>#pageContent{grid-row:1!important;g
 .nt-editor-picker-row svg{width:15px;height:15px}
 .nt-editor-picker-row:hover,.nt-editor-picker-row.selected{background:var(--accentBg)}
 .nt-editor-remote-toolbar label:first-child{min-width:155px}
+
+/* Wrapped syntax uses the textarea's exact client width, excluding its scrollbar. */
+.nt-editor-highlight.is-wrapped{white-space:pre-wrap;overflow-wrap:anywhere;word-break:normal;min-width:0;right:auto;bottom:auto;box-sizing:border-box}
+.nt-editor-wrap-measure{position:fixed;left:-100000px;top:0;visibility:hidden;pointer-events:none;white-space:pre-wrap;overflow-wrap:anywhere;word-break:normal;padding:0;border:0}
+.nt-editor-wrap-measure>div{margin:0;padding:0;border:0;min-height:1em}
+.nt-editor-window{position:relative}
+.nt-editor-dialog{position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;background:#0007;padding:12px}
+.nt-editor-dialog-card{width:min(460px,100%);max-height:100%;overflow:auto;background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:16px;box-shadow:var(--shadow);font-size:12px}
+.nt-editor-dialog-card h3{margin:0 0 10px;font-size:14px}.nt-editor-dialog-card label{display:flex;flex-direction:column;gap:7px}.nt-editor-dialog-card input{width:100%;min-width:0}.nt-editor-dialog-card .row{justify-content:flex-end;flex-wrap:wrap;gap:8px}.nt-editor-dialog-card [data-ed-dialog-error]{color:var(--bad);min-height:1em}

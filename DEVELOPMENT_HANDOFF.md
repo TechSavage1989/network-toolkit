@@ -1,5 +1,43 @@
 # Network Toolkit development handoff
 
+## Active source review, no new build authorized
+
+The user explicitly said not to proceed to a new build until told to do so.
+Published 85 remains unchanged. Work is on fix/editor-shell-review-no-build,
+without a version bump, executable/package build, main push or release.
+Checks excludes this exact source-review branch. Its separate source workflow
+runs JS tests and static browser fixtures only, without Go, Windows resources,
+application compilation, packaging, install or publication. Normal Checks for
+other branches are preserved. When a future build is authorized, use a normal
+review branch and run the full required native/Go/build checks.
+
+The user's screenshot shows a colored cmd command and monochrome ipconfig
+results. The old renderer deliberately recognized only prompt syntax. Source
+changes add recognized output headings, field names/values, validated addresses,
+MACs and status words for both local shells. Seven explicit output-role colors
+follow the terminal palette, preserve program ANSI by default and have per-role
+controls. Free prose and full-screen programs keep their formatting. These are
+recognition colors, not a health judgment about Yes/No or DHCP settings.
+
+Editor source changes preserve selection and both scroll positions across case,
+line transforms, sorting and undo/redo; sort respects selections ending at a
+newline. Wrapped syntax remains active with the textarea's client width, and
+logical-line gutter heights are measured using the same font/wrap/tab metrics.
+Resize/font changes remeasure the wrapped gutter. In-editor dialogs replace all
+native prompt/confirm calls for dirty close, close-all, reload, Save As and Go to
+line (also Ctrl+G). Cancel preserves the docked editor; stale document/revision
+checks guard discard/reload. The embedded Close button now actually closes the
+editor. Empty-editor actions are guarded. Find typing keeps query focus, and
+wrapped search uses measured logical-line positions. Late saves retain newer
+edits as unsaved and cannot activate a different tab on completion.
+
+Validation is in progress. New source regressions cover action scroll retention,
+disabled native dialogs, cancel/discard/stale-close, Go to line validation, late
+save edits and real xterm output colors with immutable native ANSI/buffers.
+The new static browser test checks these actions and six wrapped syntax/gutter
+layouts; existing 84/85 browser fixtures are also scheduled. No claim of full
+native WebView2 interaction or a new executable is made.
+
 ## 1.17.85 published: shell colors, close preferences and tool navigation
 
 The user explicitly authorized publishing the completed 85 update. Publication

@@ -69,7 +69,7 @@ func safeTerminalShellAppearance(value any) map[string]any {
 		settings, _ := source[kind].(map[string]any)
 		colors := map[string]any{}
 		if requested, ok := settings["colors"].(map[string]any); ok {
-			for _, role := range []string{"command", "keyword", "parameter", "variable", "string", "operator", "number", "type", "comment"} {
+			for _, role := range []string{"command", "keyword", "parameter", "variable", "string", "operator", "number", "type", "comment", "outputHeading", "outputField", "outputValue", "outputAddress", "outputSuccess", "outputWarning", "outputError"} {
 				if color, ok := requested[role].(string); ok && terminalColorPattern.MatchString(color) {
 					colors[role] = strings.ToLower(color)
 				}

@@ -17,6 +17,7 @@ const check=name=>report.checks.push(name),settle=()=>page.evaluate(()=>new Prom
  await page.goto('https://languages.toolkit.test/');await page.waitForFunction(()=>window.__networkToolkitStartupState===1&&online);await page.evaluate(()=>navigate('editor'));
  const input=()=>page.locator('[data-ed-text]');
  async function open(file,text){await page.evaluate(async({file,text})=>NetworkToolkitFileEditor.open({id:file,path:file,source:'Local computer',create:true,initialContent:text,read:async()=>({content:text}),write:async()=>{throw Error('The browser fixture must not write files');}}),{file,text});}
+ async function closeEditorFiles(){await page.evaluate(()=>{globalThis.__editorClose=NetworkToolkitFileEditor.closeAll();});if(await page.locator('.nt-editor-dialog').count())await page.locator('[data-ed-dialog-action="accept"]').click();await page.evaluate(()=>__editorClose);await page.evaluate(()=>navigate('editor'));}
  async function highlighted(){await page.waitForFunction(()=>{const d=NetworkToolkitFileEditor.active;return !!d?.syntaxCache&&d.syntaxCache.text===d.content;});}
  const ps='<# comment #>\nfunction Get-Example {\n$path = $env:TEMP\nWrite-Output "hello # string"\n}\n';
  await open('example.ps1',ps);await highlighted();assert.equal(await page.locator('[data-ed-language-select]').inputValue(),'');assert.match(await page.locator('[data-ed-auto-language]').textContent(),/PowerShell/);assert.equal(await input().inputValue(),ps);assert.equal(await page.evaluate(()=>NetworkToolkitFileEditor.active.dirty),false);assert(await page.locator('.nt-ed-variable').count());
@@ -32,11 +33,11 @@ const check=name=>report.checks.push(name),settle=()=>page.evaluate(()=>new Prom
  check('manual override, parser formatting, invalid syntax, Enter, selection indentation and XML comments');
  // Deliberately delay a highlight to prove an old document cannot repaint the
  // next document even when worker results arrive after a tab switch.
- await page.evaluate(()=>{NetworkToolkitFileEditor.closeAll();navigate('editor');});
+ await closeEditorFiles();
  await page.evaluate(()=>{globalThis.__highlightOriginal=NTKEditorLanguageService;globalThis.__lateHighlight=null;globalThis.NTKEditorLanguageService={...__highlightOriginal,highlight:(text,id)=>new Promise(resolve=>__lateHighlight=()=>resolve({html:'<span class="nt-ed-keyword">STALE</span>'}))};});
  await open('late.py','print("late result")');await page.waitForFunction(()=>typeof __lateHighlight==='function');await open('current.txt','Current plain text');await page.evaluate(()=>{__lateHighlight();globalThis.NTKEditorLanguageService=__highlightOriginal;});await settle();assert.equal(await page.locator('[data-ed-highlight]').textContent(),'Current plain text\n');assert.equal(await input().inputValue(),'Current plain text');check('late worker paint cannot replace a different document');
  // Show palette and text overlay alignment at three widths in both themes.
- await page.evaluate(()=>NetworkToolkitFileEditor.closeAll());await page.evaluate(()=>navigate('editor'));
+ await closeEditorFiles();await page.evaluate(()=>navigate('editor'));
  for(const width of [1440,820,390])for(const theme of ['dark','light']){
   await page.setViewportSize({width,height:1000});await page.evaluate(theme=>setTheme(theme),theme);await open('layout.ps1',ps);await highlighted();await settle();
   const geometry=await page.locator('.nt-editor').evaluate(el=>{const ta=el.querySelector('[data-ed-text]'),pre=el.querySelector('[data-ed-highlight]'),a=ta.getBoundingClientRect(),b=pre.getBoundingClientRect(),style=getComputedStyle(ta),syntax=getComputedStyle(pre);return {left:el.getBoundingClientRect().left,right:el.getBoundingClientRect().right,viewport:innerWidth,textWidth:a.width,textHeight:a.height,aligned:Math.abs(a.left-b.left)<1&&Math.abs(a.top-b.top)<1,font:style.font,syntaxFont:syntax.font,tab:style.tabSize,syntaxTab:syntax.tabSize,source:ta.value,languageLabel:el.querySelector('[data-ed-language-select]').selectedOptions[0].textContent};});

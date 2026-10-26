@@ -2,7 +2,8 @@ name: Checks
 
 on:
   push:
-    branches: ['**']
+    # This source-review branch is explicitly held from application builds.
+    branches-ignore: ['fix/editor-shell-review-no-build']
   pull_request:
   workflow_dispatch:
 

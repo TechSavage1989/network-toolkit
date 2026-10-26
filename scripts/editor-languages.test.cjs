@@ -53,7 +53,7 @@ function editorHarness(){const document=makeDocument('');document.body=document;
 test('formatting cannot overwrite a changed, closed or switched editor document',async()=>{
  const h=editorHarness();await h.open('one.json','{"x":1}');h.click('format');h.ta().value='{"x":2}';h.root().emit('input',h.ta());h.complete({text:'{"x":1}\n',mode:'format'});await h.settle();assert.equal(h.api.active.content,'{"x":2}');
  h.click('format');await h.open('other.json','{"other":true}');h.complete({text:'overwritten',mode:'format'});await h.settle();assert.equal(h.api.active.content,'{"other":true}');assert.equal(h.api.documents.get('one.json').content,'{"x":2}');
- h.click('format');h.api.closeAll();h.complete({text:'overwritten',mode:'format'});await h.settle();assert.equal(h.api.documents.size,0);
+ h.click('format');const closing=h.api.closeAll();h.root().emit('click',h.root().querySelector('[data-ed-dialog-action="accept"]'));await closing;h.complete({text:'overwritten',mode:'format'});await h.settle();assert.equal(h.api.documents.size,0);
 });
 test('manual syntax override, indentation selection and formatting undo preserve file metadata',async()=>{
  const h=editorHarness();await h.open('script.ps1','if ($ok) {\nWrite-Output 1\n}');const select=h.document.querySelector('[data-ed-language-select]');assert.equal(select.value,'');select.value='java';h.root().emit('change',select);assert.equal(h.api.active.language,'java');select.value='';h.root().emit('change',select);assert.equal(h.api.active.language,'');
@@ -61,5 +61,5 @@ test('manual syntax override, indentation selection and formatting undo preserve
  const before=h.api.active.content;h.click('format');h.complete({text:before.replace('Write-Output','    Write-Output'),mode:'indent'});await h.settle();assert(h.api.active.dirty);h.click('undo');assert.equal(h.api.active.content,before);assert.equal(h.api.active.encoding,'UTF-8');assert.equal(h.api.active.eol,'LF');h.api.closeAll();
 });
 test('Save As immediately updates automatic language recognition without modifying the saved source',async()=>{
- const h=editorHarness(),source='Write-Output "hello"';await h.open('Untitled.txt',source);h.c.prompt=()=>'/tmp/example.ps1';h.click('saveAs');await h.settle();assert.equal(h.api.active.path,'/tmp/example.ps1');assert.equal(h.api.active.language,'');assert.equal(h.api.active.content,source);assert.equal(h.api.active.dirty,false);assert.match(h.document.querySelector('[data-ed-auto-language]').textContent,/PowerShell/);h.api.closeAll();
+ const h=editorHarness(),source='Write-Output "hello"';await h.open('Untitled.txt',source);h.c.prompt=()=>{throw Error('Native dialogs are disabled');};h.click('saveAs');h.root().querySelector('[data-ed-dialog-input]').value='/tmp/example.ps1';h.root().emit('click',h.root().querySelector('[data-ed-dialog-action="accept"]'));await h.settle();assert.equal(h.api.active.path,'/tmp/example.ps1');assert.equal(h.api.active.language,'');assert.equal(h.api.active.content,source);assert.equal(h.api.active.dirty,false);assert.match(h.document.querySelector('[data-ed-auto-language]').textContent,/PowerShell/);h.api.closeAll();
 });
