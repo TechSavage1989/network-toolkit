@@ -237,3 +237,14 @@ test('removed hovered rows, hidden graphs and tool switches release temporary tr
  h.document.emit('pointermove',h.mark(0));h.document.querySelector('.rt-timeline').setAttribute('hidden','');h.observe();assert.deepEqual(calls.at(-1),['job',false]);h.document.querySelector('.rt-timeline').removeAttribute('hidden');
  const surface=h.document.querySelector('[data-rt-surface="latency"]');h.document.emit('keydown',surface,{key:'Home'});assert.deepEqual(calls.at(-1),['job',true]);h.render(samples(),'other');h.observe();assert(calls.some(([id,on])=>id==='job'&&on===false),'A detached tool must not preserve its keyboard inspection pause');
 });
+
+test('repeated restoration retains actual timeline control nodes despite browser serialization differences',()=>{
+ for(const mode of ['window','progressive']){
+  const h=harness();h.context.NetworkToolkitResultFilters={current:()=>({active:true,statistic:'average',reference:18.5,referenceKind:'run'}),graphMatches:()=>true};h.api.setPreferences({mode},{persist:false});h.render();h.document.emit('click',h.mark(0));h.observe();
+  const selectors=['[data-rt-clear]','[data-rt-zoom="in"]','[data-rt-zoom="reset"]','[data-rt-latest]','[data-rt-mode]',...(mode==='progressive'?['[data-rt-follow]']:[])],controls=selectors.map(selector=>h.document.querySelector(selector));
+  let serializedReads=0;for(const node of [h.document.querySelector('.rt-detail'),h.document.querySelector('.rt-selection-context'),...h.document.querySelectorAll('[data-rt-surface]')]){const descriptor=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(node),'innerHTML');Object.defineProperty(node,'innerHTML',{get(){serializedReads++;return '<browser-canonical-serialization data-empty=""></browser-canonical-serialization>';},set(value){descriptor.set.call(this,value);}});}
+  for(let pass=0;pass<32;pass++)h.observe();
+  assert.equal(serializedReads,0,'Restore compares prepared semantic content rather than browser-normalized HTML');
+  selectors.forEach((selector,index)=>{assert.equal(h.document.querySelector(selector),controls[index],mode+' keeps the exact '+selector+' element attached');assert.equal(controls[index].isConnected,true);});
+ }
+});

@@ -43,7 +43,19 @@
  }
  function fingerprint(config){if(!config)return '';const rows=config.rows||[],first=rows[0],last=rows.at(-1),target=appState(),pref=target?.listPreferences?.[config.view]||{},filter=root.NetworkToolkitResultFilters?.current?.(config.job?.id)||{};return JSON.stringify([rows.length,first&&config.graphKey(first),last&&config.graphKey(last),config.job?.eventSequence||0,pref.query,pref.status,pref.sort,pref.direction,filter.status,filter.type,filter.statistic,filter.reference]);}
  function latest(id,{automatic=false}={}){const node=find(id),item=model(id),config=configFor(id);if(!node||!config||typeof dataListRows!=='function')return false;if(automatic&&inspecting(node,item))return false;const rows=dataListRows(config),choice=newestMatching(config,rows);item.followPending=false;item.fingerprint=fingerprint(config);if(!choice)return false;const found=revealSample(id,choice.key),owner=resultScroller(node);if(found&&owner){if(choice.index===0)owner.scrollTop=0;else if(choice.index===rows.length-1)owner.scrollTop=Math.max(0,(owner.scrollHeight||0)-(owner.clientHeight||0));capture(node,item);}return found;}
- function refreshStatistics(node){const id=node.dataset.graphWorkspace,current=root.NetworkToolkitResultFilters?.current?.(id)||{};for(const button of node.querySelectorAll('[data-result-stat]')){const active=button.dataset.resultStat===current.statistic;button.setAttribute('aria-pressed',String(active));button.classList.toggle('active',active);}const context=node.querySelector('[data-graph-stat-context]');if(context){const html=current.statistic?'<span>'+escape(current.message||'Statistics filter: '+current.statistic)+'</span><button type="button" class="btn small ghost" data-result-stat-clear data-result-stat-job="'+escape(id)+'">Clear statistics filter</button>':'';if(context.innerHTML!==html)context.innerHTML=html;}}
+ function refreshStatistics(node){
+  const id=node.dataset.graphWorkspace,current=root.NetworkToolkitResultFilters?.current?.(id)||{};
+  for(const button of node.querySelectorAll('[data-result-stat]')){const active=button.dataset.resultStat===current.statistic;button.setAttribute('aria-pressed',String(active));button.classList.toggle('active',active);}
+  const context=node.querySelector('[data-graph-stat-context]');if(!context)return;
+  if(!current.statistic){if(context.textContent||context.children.length)context.textContent='';return;}
+  // HTML serialization expands empty data attributes and normalizes entities.
+  // Reconcile the existing nodes so observer delivery cannot replace a focused
+  // Clear action or repeatedly schedule another context mutation.
+  let message=context.querySelector('span');if(!message){message=root.document.createElement('span');context.append(message);}
+  const text=current.message||'Statistics filter: '+current.statistic;if(message.textContent!==text)message.textContent=text;
+  let clear=context.querySelector('[data-result-stat-clear]');if(!clear){clear=root.document.createElement('button');clear.type='button';clear.className='btn small ghost';clear.setAttribute('data-result-stat-clear','');clear.textContent='Clear statistics filter';context.append(clear);}
+  if(clear.getAttribute('data-result-stat-job')!==id)clear.setAttribute('data-result-stat-job',id);
+ }
  function restore(){
   scheduled=false;for(const node of root.document?.querySelectorAll?.('[data-graph-workspace]')||[]){const item=model(node.dataset.graphWorkspace),graph=node.querySelector('[data-graph-pane]'),results=resultScroller(node);
    if(item.node!==node){if(item.node){resizeObserver?.unobserve(item.node);const oldResults=item.node.querySelector('[data-graph-results]');if(oldResults)resizeObserver?.unobserve(oldResults);}item.node=node;node.scrollTop=item.workspaceTop||0;node.scrollLeft=item.workspaceLeft||0;resizeObserver?.observe(node);const region=node.querySelector('[data-graph-results]');if(region)resizeObserver?.observe(region);}

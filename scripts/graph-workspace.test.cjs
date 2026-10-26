@@ -130,3 +130,13 @@ test('removing a hovered result row releases the temporary inspection without re
  h.context.dataListViews=new Map([['samples',config]]);h.context.dataListPages=new Map();h.context.dataListRows=()=>[...rows].reverse();h.context.refreshDataList=()=>{};h.api.restore();h.document.emit('pointerover',old);owner.scrollTop=43;rows.push({sequence:3,key:'s2'});h.api.restore();assert.equal(owner.scrollTop,43);
  old.remove();h.api.restore();assert.equal(owner.scrollTop,0,'Removed DOM origins cannot leave following paused forever');
 });
+
+test('statistics context preserves the exact normalized Clear button across observer and live message updates',()=>{
+ const h=harness(),current={statistic:'received',message:'Showing successful replies'},stats='<div class="result-stats"><button data-result-stat="received">Received</button></div><div data-graph-stat-context><span>Showing successful replies</span><button type="button" class="btn small ghost" data-result-stat-clear data-result-stat-job="job">Clear statistics filter</button></div>';
+ h.context.NetworkToolkitResultFilters={current:()=>current};const node=h.render('job','RESULTS',{statistics:stats,tool:'monitor'}),context=node.querySelector('[data-graph-stat-context]'),button=context.querySelector('[data-result-stat-clear]'),message=context.querySelector('span');
+ assert(context.innerHTML.includes('data-result-stat-clear=""'),'Fixture reproduces browser normalization of an authored empty data attribute');
+ let writes=0;Object.defineProperty(context,'innerHTML',{get(){return this.children.map(child=>child.outerHTML).join('');},set(){writes++;throw new Error('Normalized markup must not replace the context');}});
+ for(let i=0;i<8;i++){h.api.restore();h.observe();assert.equal(context.querySelector('[data-result-stat-clear]'),button);assert.equal(button.isConnected,true);}
+ h.document.activeElement=button;current.message='Showing2successful replies';h.api.restore();assert.equal(context.querySelector('[data-result-stat-clear]'),button);assert.equal(context.querySelector('span'),message);assert.equal(message.textContent,current.message);assert.equal(h.document.activeElement,button);assert.equal(writes,0);
+ current.statistic='';h.api.restore();assert.equal(context.textContent,'');assert.equal(context.querySelector('[data-result-stat-clear]'),null);h.api.restore();assert.equal(writes,0);
+});
