@@ -78,3 +78,9 @@
 .diagnostic-page #toolResultsScroll .graph-workspace-stats>.result-stats>.graph-stat:last-child{min-width:170px}
 @media(max-height:720px){.diagnostic-page #toolResultsScroll .graph-workspace-stats>.result-stats>.graph-stat{padding-top:5px;padding-bottom:5px}}
 @media(max-height:720px){.graph-workspace{gap:2px}.graph-workspace:not(.graph-workspace-collapsed)>.graph-workspace-header{top:calc(var(--graph-statistics-height,60px) + 9px)}}
+
+/* A measured value stays on one line; each card grows to its content width
+   and the strip scrolls when the complete values need more horizontal room. */
+.diagnostic-page #toolResultsScroll .graph-workspace-stats>.result-stats>.graph-stat{min-width:max-content}
+.diagnostic-page #toolResultsScroll .graph-workspace-stats>.result-stats>.graph-stat:last-child{min-width:max-content}
+.diagnostic-page #toolResultsScroll .graph-workspace-stats .graph-stat strong{white-space:nowrap;overflow-wrap:normal}

@@ -90,7 +90,7 @@
 .rt-stat-reference{stroke:var(--diag-info,var(--accent));stroke-width:2;stroke-dasharray:3 3;vector-effect:non-scaling-stroke;pointer-events:none}
 @media(max-width:600px){.rt-zoom-controls{flex-wrap:wrap}.rt-view-controls{gap:6px}.rt-view-controls>label{flex-basis:100%}}
 .rt-filter-note{font-size:10px;color:var(--muted);line-height:1.5;margin:6px 0}
-@media(max-height:720px){
+@media(max-height:720px),(max-width:600px){
  .graph-workspace-graph .rt-timeline{padding:6px 8px}
  .graph-workspace-graph .rt-heading{display:block;margin-bottom:3px}
  .graph-workspace-graph .rt-heading>h3,.graph-workspace-graph .rt-heading>span{display:none}

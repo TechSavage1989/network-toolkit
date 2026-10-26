@@ -26,6 +26,7 @@
  }
  function severity(row,tool=''){
   const value=status(row,tool);
+  if(tool==='trace'&&row?.reached===true)return 'good';
   if(tool==='trace'&&row?.address&&['ttl_expired','reply'].includes(value))return 'info';
   if(/^(?:warn|warning|partial|cancelled|canceled|unknown|pending|queued|running|in_progress)$/.test(value))return ['unknown','pending','queued','running','in_progress'].includes(value)?'info':'warn';
   if(row?.error||/^(?:fail|failed|failure|error|closed|invalid|unreachable|unavailable|no_response|timeout|unsuccessful|refused|denied|blocked|offline|down|expired)$/.test(value)||/^http_[45]\d\d$/.test(value))return 'bad';

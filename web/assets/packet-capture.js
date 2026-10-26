@@ -304,18 +304,37 @@ function refreshTimeDisplay(){
  }else if(['statistics','conversations','endpoints'].includes(model.view)&&model.statistics)renderStatistics(model.statistics);
 }
 function packetInspectionPaused(){const selected=root.getSelection?.();return model.inspectPointer||model.inspectFocus||!!document.activeElement?.closest?.('#packetRows, #packetInspector, .packet-list-actions, .packet-detail-filters')||!!(selected&&!selected.isCollapsed&&String(selected).trim());}
+function packetReaderViewport(reader=node('packetTableScroll')){
+ if(!reader)return null;const bounds=reader.getBoundingClientRect?.(),height=Number(reader.clientHeight);if(!bounds||!Number.isFinite(bounds.top)||!Number.isFinite(bounds.height)||height<=0)return null;
+ const innerTop=bounds.top+(Number(reader.clientTop)||0);let top=innerTop,bottom=innerTop+height;
+ if(Number.isFinite(root.innerHeight)&&root.innerHeight>0){top=Math.max(0,top);bottom=Math.min(root.innerHeight,bottom);}
+ for(let parent=reader.parentElement;parent&&parent.tagName!=='DOCUMENT';parent=parent.parentElement){const style=root.getComputedStyle?.(parent);if(!style||!/(auto|scroll|hidden|clip)/.test(style.overflowY||style.overflow||''))continue;const rect=parent.getBoundingClientRect?.(),client=Number(parent.clientHeight);if(!rect||!Number.isFinite(rect.top)||client<=0)continue;const edge=rect.top+(Number(parent.clientTop)||0);top=Math.max(top,edge);bottom=Math.min(bottom,edge+client);}
+ for(const header of reader.querySelectorAll('thead th')){const rect=header.getBoundingClientRect?.();if(rect&&rect.bottom>top&&rect.top<bottom)top=Math.max(top,rect.bottom);}
+ const dock=node('packetGraphDock'),graph=dock&&!dock.hidden?dock.getBoundingClientRect?.():null;if(graph&&graph.top<=top&&graph.bottom>top&&graph.bottom>graph.top)top=Math.max(top,graph.bottom);
+ return {top,bottom,height:Math.max(0,bottom-top),innerTop,topOffset:top-innerTop,bottomOffset:bottom-innerTop};
+}
+function ensurePacketRowVisible(number){
+ const reader=node('packetTableScroll'),row=reader?.querySelector('[data-packet-number="'+number+'"]');if(!reader||!row||!packetReaderViewport(reader))return;
+ const correction=()=>{const view=packetReaderViewport(reader),rect=row.getBoundingClientRect?.();if(!view||view.height<=0||!rect||!Number.isFinite(rect.height)||rect.height<=0)return 0;return rect.top<view.top?rect.top-view.top:rect.bottom>view.bottom?rect.bottom-view.bottom:0;};
+ let delta=correction();if(Math.abs(delta)<.5)return;reader.scrollTop+=delta;delta=correction();
+ // A compact workspace can clip the actual table viewport even when the
+ // table's own scrollbar is already at its edge. Reveal through the owning
+ // scrollable ancestors without focusing the row or touching either sort.
+ for(let parent=reader.parentElement;parent&&Math.abs(delta)>=.5;parent=parent.parentElement){const style=root.getComputedStyle?.(parent);if(!style||!/(auto|scroll)/.test(style.overflowY||style.overflow||'')||Number(parent.scrollHeight)<=Number(parent.clientHeight))continue;parent.scrollTop+=delta;delta=correction();}
+ model.scrollTop=Number(reader.scrollTop)||0;
+}
 async function followPacketLatest(force=false){
  if(!visible()||model.view!=='packets'||model.paused||!model.total||(!force&&(!model.follow||packetInspectionPaused())))return;
  const index=clamp(Number(model.newestIndex)||0,0,model.total-1),scroll=node('packetTableScroll');if(!scroll)return;
- const {rowHeight,headerHeight}=packetMetrics(),position=model.sort==='number'?(model.direction==='desc'?0:Math.max(0,model.total*rowHeight+headerHeight-(scroll.clientHeight||400))):Math.max(0,index*rowHeight+headerHeight-(scroll.clientHeight||400)/2);
+ const {rowHeight,headerHeight}=packetMetrics(),view=packetReaderViewport(scroll),bottomOffset=view?.height>0?view.bottomOffset:scroll.clientHeight||400,centerOffset=view?.height>0?(view.topOffset+view.bottomOffset)/2:(scroll.clientHeight||400)/2,position=model.sort==='number'?(model.direction==='desc'?0:Math.max(0,model.total*rowHeight+headerHeight-bottomOffset)):Math.max(0,index*rowHeight+headerHeight-centerOffset);
  model.scrollTop=position;scroll.scrollTop=position;const offset=windowOffset(model.total,position);if(offset!==model.windowStart)await refreshPacketWindow(offset);if(!visible()||model.view!=='packets')return;
- const current=node('packetTableScroll');if(current){current.scrollTop=position;model.scrollTop=current.scrollTop;updateMapViewport();}
+ const current=node('packetTableScroll');if(current){current.scrollTop=position;model.scrollTop=current.scrollTop;const newest=model.loaded[index-model.windowStart];if(newest)ensurePacketRowVisible(newest.number);updateMapViewport();}
 }
 function flushPacketInspection(){if(packetInspectionPaused())return;if(model.pendingStatistics){model.statistics=model.pendingStatistics;model.pendingStatistics=null;refreshPacketGraph();}if(model.selected&&model.view==='packets'&&!model.windowSignature.startsWith(packetSourceSignature()+'|'))void refreshPacketWindow(windowOffset()).then(()=>followPacketLatest());else void followPacketLatest();}
 function revealPacketInterval(index){
  const bucket=model.statistics?.timeline?.[index],reader=node('packetTableScroll');if(!bucket||!reader)return;
  const match=model.loaded.findIndex(packet=>packetIntervalContains(bucket,packet.time,index===model.statistics.timeline.length-1));
- if(match>=0){const {rowHeight,headerHeight}=packetMetrics(),position=(model.windowStart+match)*rowHeight+headerHeight,top=Number(reader.scrollTop)||0,height=reader.clientHeight||400;if(position<top+headerHeight||position+rowHeight>top+height){model.scrollTop=Math.max(0,position-height/2);reader.scrollTop=model.scrollTop;updateMapViewport();}return;}
+ if(match>=0){const {rowHeight,headerHeight}=packetMetrics(),position=(model.windowStart+match)*rowHeight+headerHeight,top=Number(reader.scrollTop)||0,height=reader.clientHeight||400;if(position<top+headerHeight||position+rowHeight>top+height){model.scrollTop=Math.max(0,position-height/2);reader.scrollTop=model.scrollTop;updateMapViewport();}ensurePacketRowVisible(model.loaded[match].number);return;}
  if(Number(bucket.packets)>0)void refreshPacketWindow(model.windowStart,bucket);
 }
 function endPacketInspection(){model.inspectPointer=false;packetTimelineState().hover=null;hidePacketGraphPopup();updatePacketTimeline();flushPacketInspection();}
@@ -638,6 +657,7 @@ async function refreshPacketWindow(offset,locate=null,metadataOnly=false){
   const reader=node('packetTableScroll');if(reader){
    // A virtual-row swap must not reset scrollTop or replace this element.
    if(rebuild||locate)reader.scrollTop=model.scrollTop;
+   if(locate){const linked=model.loaded.find(packet=>packetIntervalContains(locate,packet.time,locate===model.statistics?.timeline?.at(-1)));if(linked)ensurePacketRowVisible(linked.number);}
    model.scrollTop=reader.scrollTop;
   }
   updateMapViewport();if(rebuild){renderDetail();layoutDetails();}await completePacketSelection();
@@ -886,5 +906,5 @@ document.addEventListener('click',event=>{if(model.appearanceOpen&&!event.target
 document.addEventListener('input',event=>{if(event.target?.dataset?.packetColor)updateAppearanceSetting(event.target);});
 document.addEventListener('change',event=>{const el=event.target;if(el.dataset?.packetColor||el.dataset?.packetAppearance||el.dataset?.packetVisibility){updateAppearanceSetting(el);return;}if(el.id==='packetDetailsDock'){preferences().dock=el.value;layoutDetails();persistDetails();return;}if(el.id==='packetTask'){model.goal=Object.hasOwn(tasks,el.value)?el.value:'general';renderTask();}else if(el.id==='packetEngine'){renderInterfaces();updateStatus();}else if(el.id==='packetCaptureSelect'){model.newCapture=el.value==='';if(model.newCapture)setView('troubleshooting');selectCapture(el.value);model.detail=null;model.page=0;model.scrollTop=0;model.windowStart=0;model.windowToken++;model.sequence++;void refresh(true)}else if(el.id==='packetPauseDisplay'){model.paused=el.checked;if(!model.paused)void refresh(true)}else if(el.id==='packetFollow'){model.follow=el.checked;void refresh(true)}else if(el.id==='packetCaptureFile'&&el.files?.[0]){const file=el.files[0];if(file.size>128*1024*1024){error('Capture imports are limited to 128 MiB.');el.value='';return}void fetch('/api/packet-captures/import?name='+encodeURIComponent(file.name),{method:'POST',headers:{'X-Session-Token':SESSION,'Content-Type':'application/octet-stream'},body:file}).then(async r=>{const data=await r.json();if(!r.ok)throw new Error(data.error||'Could not import capture.');setView('troubleshooting');selectCapture(data.id);model.page=0;model.scrollTop=0;model.windowStart=0;model.windowToken++;model.detail=null;model.sequence++;await refresh(true)}).catch(e=>error(e.message)).finally(()=>el.value='')}});
 document.addEventListener('keydown',event=>{if(!visible())return;if(event.key==='Escape'&&model.appearanceOpen){toggleAppearance(false);document.querySelector('[data-packet-action="toggle-appearance"]')?.focus?.({preventScroll:true});return;}if(event.key==='Escape'&&model.guideOpen){model.guideOpen=false;const guide=node('packetQuickGuide');if(guide)guide.hidden=true;document.querySelector('[data-packet-action="toggle-guide"]')?.focus?.({preventScroll:true});return;}if(['packetSearch','packetDisplayFilter'].includes(event.target.id)&&event.key==='Enter'){event.preventDefault();applyFilter();return}if(event.target.closest('#packetTableScroll')&&['ArrowUp','ArrowDown','Enter'].includes(event.key)){event.preventDefault();let index=model.loaded.findIndex(p=>p.number===model.detail?.packet.number);if(index<0)index=0;if(event.key==='ArrowUp')index--;if(event.key==='ArrowDown')index++;const p=model.loaded[index];if(p){void selectPacket(p.number);const row=document.querySelector('[data-packet-number="'+p.number+'"]');row?.scrollIntoView?.({block:'nearest'});}else if(event.key!=='Enter'){packetJump(clamp(model.windowStart+index,0,model.total-1));}}});
-root.NetworkToolkitPacketCapture=Object.freeze({render,refresh,refreshTimeDisplay,optionRequest,mergePreferences,layoutDetails,model,parameters,packetLevel,followPacketLatest});
+root.NetworkToolkitPacketCapture=Object.freeze({render,refresh,refreshTimeDisplay,optionRequest,mergePreferences,layoutDetails,model,parameters,packetLevel,followPacketLatest,packetReaderViewport});
 })(window);

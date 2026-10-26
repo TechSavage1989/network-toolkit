@@ -38,11 +38,18 @@
   const rows=dataListRows(config),index=rows.findIndex(row=>config.graphKey(row)===key);if(index<0)return false;const page=Math.floor(index/(config.pageSize||100));
   if(typeof dataListPages!=='undefined'&&dataListPages.get(config.id)!==page){dataListPages.set(config.id,page);refreshDataList(config.id);measure(node);}
   const row=[...results.querySelectorAll('[data-result-sample-key]')].find(value=>value.dataset.resultSampleKey===key);if(!row)return false;
-  const owner=resultScroller(node),bounds=owner.getBoundingClientRect(),rect=row.getBoundingClientRect(),heading=results.querySelector('thead'),inset=heading?.getBoundingClientRect().height||0;
-  if(rect.top<bounds.top+inset)owner.scrollTop+=rect.top-bounds.top-inset;else if(rect.bottom>bounds.bottom)owner.scrollTop+=rect.bottom-bounds.bottom;capture(node,model(String(id)));return true;
+  const owner=resultScroller(node),bounds=owner.getBoundingClientRect(),rect=row.getBoundingClientRect(),heading=owner.querySelector('thead'),inset=heading?.getBoundingClientRect().height||0,clientTop=bounds.top+(owner.clientTop||0);
+  // The border box includes the horizontal scrollbar and can extend beyond a
+  // clipped results pane. Only its actual visible client area can show a row.
+  let top=clientTop,bottom=typeof owner.clientHeight==='number'?clientTop+owner.clientHeight:bounds.bottom;
+  if(typeof root.innerHeight==='number'&&root.innerHeight>0){top=Math.max(0,top);bottom=Math.min(root.innerHeight,bottom);}
+  for(let ancestor=owner.parentElement;ancestor;ancestor=ancestor.parentElement){const style=root.getComputedStyle?.(ancestor);if(!style||!['auto','scroll','hidden','clip','overlay'].includes(style.overflowY))continue;const clip=ancestor.getBoundingClientRect(),start=clip.top+(ancestor.clientTop||0),end=typeof ancestor.clientHeight==='number'?start+ancestor.clientHeight:clip.bottom;top=Math.max(top,start);bottom=Math.min(bottom,end);}
+  top=Math.max(top,clientTop+inset);
+  if(bottom>top){if(rect.top<top)owner.scrollTop+=rect.top-top;else if(rect.bottom>bottom)owner.scrollTop+=rect.bottom-bottom;}
+  capture(node,model(String(id)));return true;
  }
  function fingerprint(config){if(!config)return '';const rows=config.rows||[],first=rows[0],last=rows.at(-1),target=appState(),pref=target?.listPreferences?.[config.view]||{},filter=root.NetworkToolkitResultFilters?.current?.(config.job?.id)||{};return JSON.stringify([rows.length,first&&config.graphKey(first),last&&config.graphKey(last),config.job?.eventSequence||0,pref.query,pref.status,pref.sort,pref.direction,filter.status,filter.type,filter.statistic,filter.reference]);}
- function latest(id,{automatic=false}={}){const node=find(id),item=model(id),config=configFor(id);if(!node||!config||typeof dataListRows!=='function')return false;if(automatic&&inspecting(node,item))return false;const rows=dataListRows(config),choice=newestMatching(config,rows);item.followPending=false;item.fingerprint=fingerprint(config);if(!choice)return false;const found=revealSample(id,choice.key),owner=resultScroller(node);if(found&&owner){if(choice.index===0)owner.scrollTop=0;else if(choice.index===rows.length-1)owner.scrollTop=Math.max(0,(owner.scrollHeight||0)-(owner.clientHeight||0));capture(node,item);}return found;}
+ function latest(id,{automatic=false}={}){const node=find(id),item=model(id),config=configFor(id);if(!node||!config||typeof dataListRows!=='function')return false;if(automatic&&inspecting(node,item))return false;const rows=dataListRows(config),choice=newestMatching(config,rows);item.followPending=false;item.fingerprint=fingerprint(config);if(!choice)return false;const found=revealSample(id,choice.key);if(found)capture(node,item);return found;}
  function refreshStatistics(node){
   const id=node.dataset.graphWorkspace,current=root.NetworkToolkitResultFilters?.current?.(id)||{};
   for(const button of node.querySelectorAll('[data-result-stat]')){const active=button.dataset.resultStat===current.statistic;button.setAttribute('aria-pressed',String(active));button.classList.toggle('active',active);}

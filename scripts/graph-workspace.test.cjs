@@ -106,15 +106,15 @@ test('latest result respects filtered sorted pagination without changing the pre
 test('automatic latest follows new source samples but pauses inspection and resumes when inspection ends',()=>{
  const h=harness(),first={sequence:1,key:'s1'},second={sequence:2,key:'s2'},rows=[first],config={id:'samples',graphId:'job',graphKey:row=>row.key,rows,pageSize:100};
  const node=h.render('job','<div class="table-wrap"><table><tbody><tr data-result-sample-key="s2"><td>2</td></tr><tr data-result-sample-key="s1"><td>1</td></tr></tbody></table></div>'),owner=h.api.resultScroller(node);
- h.context.dataListViews=new Map([['samples',config]]);h.context.dataListPages=new Map([['samples',0]]);h.context.dataListRows=()=>[...rows].reverse();h.context.refreshDataList=()=>{};owner.scrollHeight=600;owner.clientHeight=200;
+ h.context.dataListViews=new Map([['samples',config]]);h.context.dataListPages=new Map([['samples',0]]);h.context.dataListRows=()=>[...rows].reverse();h.context.refreshDataList=()=>{};owner.scrollHeight=600;owner.clientHeight=200;owner.querySelector('[data-result-sample-key="s2"]').getBoundingClientRect=()=>({top:-owner.scrollTop,bottom:43-owner.scrollTop,height:43});
  h.api.restore();owner.scrollTop=77;h.document.emit('scroll',owner);h.api.restore();assert.equal(owner.scrollTop,77,'An unchanged poll does not reset ordinary manual scrolling');
  h.api.inspection('job',true);rows.push(second);h.api.restore();assert.equal(owner.scrollTop,77,'Active graph inspection pauses source tracking');h.api.inspection('job',false);assert.equal(owner.scrollTop,0,'End of inspection returns to the newest matching item under descending sorting');
- h.context.dataListRows=()=>[...rows];h.api.inspection('job',true,'row');owner.scrollTop=35;h.document.emit('scroll',owner);h.api.inspection('job',false,'row');assert.equal(owner.scrollTop,400,'Ascending sorting follows the newest sample at the end');
+ h.context.dataListRows=()=>[...rows];owner.getBoundingClientRect=()=>({top:0,bottom:200});owner.querySelector('[data-result-sample-key="s2"]').getBoundingClientRect=()=>({top:557-owner.scrollTop,bottom:600-owner.scrollTop,height:43});h.api.inspection('job',true,'row');owner.scrollTop=35;h.document.emit('scroll',owner);h.api.inspection('job',false,'row');assert.equal(owner.scrollTop,400,'Ascending sorting follows the newest sample at the end');
 });
 test('copy focus and selected result text pause automatic movement until inspection ends',()=>{
  const h=harness(),rows=[{sequence:1,key:'s1'}],config={id:'samples',graphId:'job',graphKey:row=>row.key,rows,pageSize:100};
  const node=h.render('job','<div class="table-wrap"><table><tbody><tr data-result-sample-key="s2"><td><button data-value-copy-control>Copy</button></td></tr><tr data-result-sample-key="s1"><td>1</td></tr></tbody></table></div>'),owner=h.api.resultScroller(node),copy=node.querySelector('[data-value-copy-control]');
- h.context.dataListViews=new Map([['samples',config]]);h.context.dataListPages=new Map();h.context.dataListRows=()=>[...rows].reverse();h.context.refreshDataList=()=>{};h.api.restore();owner.scrollTop=45;h.document.activeElement=copy;rows.push({sequence:2,key:'s2'});h.api.restore();assert.equal(owner.scrollTop,45);
+ h.context.dataListViews=new Map([['samples',config]]);h.context.dataListPages=new Map();h.context.dataListRows=()=>[...rows].reverse();h.context.refreshDataList=()=>{};owner.querySelector('[data-result-sample-key="s2"]').getBoundingClientRect=()=>({top:-owner.scrollTop,bottom:30-owner.scrollTop,height:30});h.api.restore();owner.scrollTop=45;h.document.activeElement=copy;rows.push({sequence:2,key:'s2'});h.api.restore();assert.equal(owner.scrollTop,45);
  h.document.activeElement=null;h.document.emit('focusout',copy);assert.equal(owner.scrollTop,0);
  const text=node.querySelector('td');h.context.getSelection=()=>({isCollapsed:false,anchorNode:text});owner.scrollTop=52;rows.push({sequence:3,key:'s2'});h.api.restore();assert.equal(owner.scrollTop,52);h.context.getSelection=()=>({isCollapsed:true});h.document.emit('selectionchange',text);assert.equal(owner.scrollTop,0);
 });
@@ -127,7 +127,7 @@ test('toolbar minimum counts a nested status toolbar once and includes a separat
 test('removing a hovered result row releases the temporary inspection without requiring pointerout',()=>{
  const h=harness(),rows=[{sequence:1,key:'s1'},{sequence:2,key:'s2'}],config={id:'samples',graphId:'job',graphKey:row=>row.key,rows,pageSize:100};
  const node=h.render('job','<div class="table-wrap"><table><tbody><tr data-result-graph-id="job" data-result-sample-key="s2"><td>2</td></tr><tr data-result-graph-id="job" data-result-sample-key="s1"><td>1</td></tr></tbody></table></div>'),owner=h.api.resultScroller(node),old=node.querySelector('[data-result-sample-key="s1"]');
- h.context.dataListViews=new Map([['samples',config]]);h.context.dataListPages=new Map();h.context.dataListRows=()=>[...rows].reverse();h.context.refreshDataList=()=>{};h.api.restore();h.document.emit('pointerover',old);owner.scrollTop=43;rows.push({sequence:3,key:'s2'});h.api.restore();assert.equal(owner.scrollTop,43);
+ h.context.dataListViews=new Map([['samples',config]]);h.context.dataListPages=new Map();h.context.dataListRows=()=>[...rows].reverse();h.context.refreshDataList=()=>{};owner.querySelector('[data-result-sample-key="s2"]').getBoundingClientRect=()=>({top:-owner.scrollTop,bottom:30-owner.scrollTop,height:30});h.api.restore();h.document.emit('pointerover',old);owner.scrollTop=43;rows.push({sequence:3,key:'s2'});h.api.restore();assert.equal(owner.scrollTop,43);
  old.remove();h.api.restore();assert.equal(owner.scrollTop,0,'Removed DOM origins cannot leave following paused forever');
 });
 
@@ -139,4 +139,16 @@ test('statistics context preserves the exact normalized Clear button across obse
  for(let i=0;i<8;i++){h.api.restore();h.observe();assert.equal(context.querySelector('[data-result-stat-clear]'),button);assert.equal(button.isConnected,true);}
  h.document.activeElement=button;current.message='Showing2successful replies';h.api.restore();assert.equal(context.querySelector('[data-result-stat-clear]'),button);assert.equal(context.querySelector('span'),message);assert.equal(message.textContent,current.message);assert.equal(h.document.activeElement,button);assert.equal(writes,0);
  current.statistic='';h.api.restore();assert.equal(context.textContent,'');assert.equal(context.querySelector('[data-result-stat-clear]'),null);h.api.restore();assert.equal(writes,0);
+});
+
+test('graph reveal fits the complete row inside client scrollbars, sticky headers and clipped ancestors',()=>{
+ const h=harness(),target={sequence:2,key:'target'},config={id:'samples',graphId:'job',graphKey:row=>row.key,rows:[target],pageSize:100},node=h.render('job','<div class="table-wrap"><table><thead><tr><th>Sample</th></tr></thead><tbody><tr data-result-sample-key="target"><td>2</td></tr></tbody></table></div>'),owner=h.api.resultScroller(node),region=node.querySelector('[data-graph-results]'),row=owner.querySelector('[data-result-sample-key]');
+ h.context.dataListViews=new Map([['samples',config]]);h.context.dataListPages=new Map([['samples',0]]);h.context.dataListRows=()=>[target];h.context.refreshDataList=()=>{};
+ owner.getBoundingClientRect=()=>({top:100,bottom:320,height:220});owner.clientTop=2;owner.clientHeight=198;owner.querySelector('thead').getBoundingClientRect=()=>({height:30});owner.scrollTop=100;row.getBoundingClientRect=()=>({top:280,bottom:323,height:43});
+ h.api.revealSample('job','target');assert.equal(owner.scrollTop,123,'The full43px row ends above the horizontal scrollbar at client bottom300, not border bottom320');
+ region.getBoundingClientRect=()=>({top:70,bottom:292,height:222});region.clientTop=1;region.clientHeight=180;h.context.getComputedStyle=element=>({overflowY:element===region?'hidden':'visible'});h.context.innerHeight=280;owner.scrollTop=100;row.getBoundingClientRect=()=>({top:230,bottom:273,height:43});
+ h.api.revealSample('job','target');assert.equal(owner.scrollTop,122,'A row is brought fully above the clipped ancestor client bottom251');
+ config.rows=[{sequence:1,key:'other'},target];h.context.dataListRows=()=>config.rows;owner.scrollHeight=600;owner.scrollTop=100;h.api.latest('job');assert.equal(owner.scrollTop,122,'Ascending Latest preserves the fitted clipped position instead of overwriting it with scrollHeight-clientHeight');
+ region.clientHeight=300;h.context.innerHeight=270;owner.scrollTop=100;row.getBoundingClientRect=()=>({top:250,bottom:293,height:43});h.api.revealSample('job','target');assert.equal(owner.scrollTop,123,'The window is also a real visibility boundary');
+ owner.scrollTop=100;row.getBoundingClientRect=()=>({top:115,bottom:158,height:43});h.api.revealSample('job','target');assert.equal(owner.scrollTop,83,'Scrolling upward leaves the row below the sticky table heading ending at132');
 });
