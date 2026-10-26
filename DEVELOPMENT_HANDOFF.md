@@ -1,5 +1,22 @@
 # Network Toolkit development handoff
 
+## Historical repository release-history layout (documentation only)
+
+Historical release notes 1.17.43 through 1.17.88 now live unchanged in
+`docs/releases/`, with a linked index and a compact README navigation link.
+At that point only then-current `RELEASE_NOTES_1.17.89.txt` remained at root, preserving existing
+release validation, packaging and publication paths. README.txt historical note
+references point to the archive. Follow AGENTS.md's rotation policy on future
+authorized version changes. The GitHub file table still precedes the README;
+this removes the historical-note wall, not the application's source listing.
+
+That documentation update made no application, version, workflow, release tag, asset or repository-access change.
+That documentation commit used [skip ci] to avoid a publication workflow run.
+
+For the subsequently authorized 1.17.90 build, the 1.17.89 note has also been
+moved unchanged into the archive. Current `RELEASE_NOTES_1.17.90.txt` alone stays
+at root, and the archive index identifies 1.17.90 as current and 1.17.89 as previous.
+
 ## 1.17.90 authorized UI consistency update
 
 User authorized implementation, build and publication of larger proportional result headers, two-way main-sidebar tab double-click, a more visible/wider divider, and consistent Status colors/shared heading actions. Preserve previous fixes. Publication pending full validation.
