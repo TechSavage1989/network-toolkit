@@ -1,18 +1,20 @@
 # Network Toolkit development
 
-Read DEVELOPMENT_HANDOFF.md before edits or builds. Start from latest main and
-preserve working features, settings and previous release safeguards.
+Read DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
+and preserve working features, settings and previous release safeguards.
 
-Current verified published version: 1.17.88.
-Source/tag: 4a99e2b51042dbc6291d1d2b4c2708fc0c4ac377
-Tree: 84a63470de6e7f760f955272fe076a6f7e4478e1
-Full Checks 40286388008 and Release 40287626301 pass.
-510 JS tests, 31 release guards, required Go/native Windows and browser checks
-pass. Review/local/public files match; 747 source files match tag. All
-27 older releases/assets/tags unchanged. Released87 verified/staged88 in 12.04s.
-No actual update install/restart or full native WebView2 interaction is claimed.
+Current verified published version: 1.17.89.
+Source/tag: eb318708454130b09d93204021b23b138657d6a2
+Tree: 9be08c4672db7b0bfc6ea08360c137329f22ef44
+Full Checks 40289268615 and Release 40290524884 pass.
+Required JavaScript, release guards, Go/native Windows and browser checks pass.
+Local Network layout/refresh: 5 browser groups / 12 cases; all previous 88 layout
+and covered regressions pass. Review/local/public files match and all
+749 source files match the tag. All 28 older releases/assets and
+28 older tags are unchanged. Released88 verified/staged89 in 14.56s.
+No actual installation/restart or full native WebView2 interaction is claimed.
 
-User authorized this publication and it is complete. Future releases require
-authorization. Main network-toolkit remains the sole public source/update feed.
+The user authorized this publication and it is complete. Future releases need
+authorization. Main network-toolkit is the sole public source/update feed.
 Never replace old tags/assets, change access or write the retired feed. This
 final documentation-only record uses [skip ci]. See handoff for scope and proof.

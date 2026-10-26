@@ -1,8 +1,76 @@
 # Network Toolkit development handoff
 
-## 1.17.89 authorized Local Network fixes
+## 1.17.89 published Local Network layout and refresh fixes
 
-The user authorized build and publication. Move Status colors to stable local page actions to remove the disappearing row above the tabs. Explicit Routing table, ARP / neighbors and Connections tab selections start a fresh snapshot, with pending POST and running-job guards. Rendering/polling does not start scans. Publication awaits full validation.
+The user explicitly authorized building and publishing these fixes.
+Published source/tag: eb318708454130b09d93204021b23b138657d6a2
+Tree: 9be08c4672db7b0bfc6ea08360c137329f22ef44
+Official release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.89
+Release ID: 423987946
+
+Local Network's Status colors control now belongs to the stable page-heading
+actions. It is no longer inserted as a separate row above the local tabs during
+full-page rendering. Initial navigation, tab selection and direct renderLocal
+updates therefore retain the same tab and content positions, with one Status
+colors control. The heading override removes that control's old row margins.
+
+Explicit selection of Routing table, ARP / neighbors or Connections starts a
+fresh local snapshot through the existing startJob path, including another
+click on an already selected tab after its previous snapshot completes.
+Rendering, job polling and main-page navigation do not trigger automatic scans.
+IP configuration and Wi-Fi keep their existing refresh behavior.
+
+The selection helper checks the active local page, supported subtool, executable
+mode, engine availability, shutdown state, pending POST and running job. A
+per-tool pending-request Set is updated synchronously before POST and released
+in finally, including on errors. Rapid clicks and clicks during an active job
+do not create duplicate snapshots. Local Run controls reflect pending requests;
+offline selections make no diagnostic requests. A failed refresh can be retried.
+
+Full Checks 40289268615 passed application 121460230971, native
+Windows 121460230960 and browser 121460230557. The required
+JavaScript tests, release guards, root/terminal/desktop/diag/deviceinfo Go suites,
+native cmd/PowerShell color and interactive lifecycle, installer progress and
+Windows GUI/resource build/package checks pass.
+
+The new Local Network browser report passes all 5 groups and 12 initial/repeated
+layout cases across desktop, compact and narrow widths in dark and light themes.
+It verifies stable positions and a single heading Status colors control, fresh
+snapshots on selections, pending/active deduplication, refresh after completion,
+render/poll/offline suppression and retry after a failed request. The previous
+88 layout report passes all 4 groups / 9 cases. All previous covered editor,
+shell, copy, Hosts, client/server, SMTP, folder and selection regressions pass.
+All 7 native updater timer cases pass, including the real five-minute poll.
+Current reports have no runtime or asset failures; the released64 negative
+control's expected Illegal invocation is retained as a regression control.
+
+Release 40290524884 passed build 121464243288 and publish
+121464741674. All four actual public assets match GitHub digests
+and SHA256SUMS. EXE/portable match the reviewed local build; standalone, portable
+and update EXEs are identical. All 749 packaged source files match the tag.
+ZIP CRCs, manifests, PE GUI/version, strict update inventory and
+14 vendored editor-library digests verify. All
+28 older releases/assets and 28 older tags remain unchanged.
+
+Released88 production handlers checked/downloaded/verified/staged live89 using
+isolated settings through real HTTPS in 14.56s. The staged 17600000-byte
+candidate matches the independently verified official executable. Original test
+EXE unchanged. No actual installation, restart or full native WebView2 UI
+interaction was performed.
+
+Review artifact 12635079929: 40fe36a4c034e81788a9f4fb58c4c766b2f5e048380e8b63916b9b75cddba577
+Browser artifact 12636036648: 12f23fd71224502f9a941702408b3c252640ed1a21b4ae888c630d1855107c2e
+Final screenshots inspected: local89-ipconfig-1440.png, local89-routes-1440.png, local89-ipconfig-390.png, local89-routes-390.png
+Network_Toolkit.exe SHA256: e157e71b8b6ed64eb88c1ad393df17cc69fa85541109cfba40d8b63b4da1ebc7
+Network_Toolkit_1.17.89_Portable.zip SHA256: aa7c6f12bb378d4e3ec84b1021ba5d3a7b963b3668c33e070b705de399578937
+Network_Toolkit_1.17.89_Update.zip SHA256: 412b708f49751afdb440beeb77d769c5bc3ab71e93297ef0ab88c8f63950a255
+SHA256SUMS SHA256: 0e6f0867f10ea84361bd3b465380a261c7d750902b24367c57134f12da265c15
+
+Main network-toolkit remains the sole public source/update feed. Do not move old
+tags, replace assets, change access or write the retired feed. Publication is
+complete; future releases require authorization. This final three-file
+documentation completion uses [skip ci], preserving published source, runtime
+and release assets. Continue from latest main and preserve previous fixes.
 
 ## 1.17.88 published layout and navigation update
 
