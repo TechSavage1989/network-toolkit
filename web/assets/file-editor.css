@@ -120,3 +120,6 @@ body:has(.nt-editor-embedded) #toolWorkspace>#pageContent{grid-row:1!important;g
 .nt-editor-dialog{position:absolute;inset:0;z-index:5;display:flex;align-items:center;justify-content:center;background:#0007;padding:12px}
 .nt-editor-dialog-card{width:min(460px,100%);max-height:100%;overflow:auto;background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:16px;box-shadow:var(--shadow);font-size:12px}
 .nt-editor-dialog-card h3{margin:0 0 10px;font-size:14px}.nt-editor-dialog-card label{display:flex;flex-direction:column;gap:7px}.nt-editor-dialog-card input{width:100%;min-width:0}.nt-editor-dialog-card .row{justify-content:flex-end;flex-wrap:wrap;gap:8px}.nt-editor-dialog-card [data-ed-dialog-error]{color:var(--bad);min-height:1em}
+
+[data-ed-gutter-lines]{will-change:transform;white-space:pre;overflow:visible}
+[data-ed-gutter-lines]>div{margin:0;padding:0;border:0}
