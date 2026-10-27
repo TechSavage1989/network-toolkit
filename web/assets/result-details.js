@@ -119,10 +119,29 @@
     return parts.length ? '<section class="result-detail-tools"><h3>Available tools</h3>' + parts.join('') + '</section>' : '';
   }
 
+  function graphExtras(detail){
+    if(!detail.graph)return '';const g=detail.graph,point=g.point,members=point.members||[],page=Math.max(0,Math.min(Math.ceil(members.length/50)-1,detail.contributorPage||0)),start=page*50;
+    const controls='<div class="result-detail-actions"><button type="button" class="btn small ghost" data-result-graph-clear="'+esc(g.id)+'">Clear selection</button><button type="button" class="btn small ghost" data-result-graph-latest="'+esc(g.id)+'">Latest</button></div>';
+    const contributors=members.length?'<section class="result-graph-contributors"><strong>Contributing recorded results ('+members.length+')</strong><p>Choose an individual result to inspect its exact recorded fields.</p>'+members.slice(start,start+50).map(p=>'<button type="button" class="btn small ghost" data-result-graph-source="'+esc(p.key)+'" data-result-graph-id="'+esc(g.id)+'">#'+esc(p.sequence)+' · '+esc(root.NetworkToolkitResultTime?.format?.(p.time)||p.time)+' · '+esc(p.status)+' · '+(p.rtt==null?'Not measured':esc(p.rtt)+' ms')+'</button>').join('')+(members.length>50?'<div class="result-detail-actions"><button type="button" class="btn small ghost" data-result-graph-page="'+(page-1)+'" '+(page===0?'disabled':'')+'>Previous</button><span>'+(start+1)+'-'+Math.min(start+50,members.length)+' of '+members.length+'</span><button type="button" class="btn small ghost" data-result-graph-page="'+(page+1)+'" '+(start+50>=members.length?'disabled':'')+'>Next</button></div>':'')+'</section>':'';
+    return '<section class="result-graph-summary"><p class="help-line">'+esc(g.message)+'</p>'+controls+(root.NetworkToolkitResultTimeline?.pointDetails?.(point)||'')+contributors+'</section>';
+  }
+  function showGraphSelection(graph){
+    const area=document.getElementById('toolResult');if(!area||!graph?.point)return false;
+    const config=typeof dataListViews!=='undefined'?[...dataListViews.values()].find(c=>c.graphId===String(graph.id)):null,point=graph.point,job=graph.job||config?.job;
+    const key=String(point.key),same=sideDetail?.graph?.id===graph.id&&sideDetail.graph.point.key===key;
+    if(same){sideDetail.graph={...graph};if(graph.force&&preferences().hidden){preferences().hidden=false;persist();}afterRender();return true;}
+    let record;try{record=JSON.parse(JSON.stringify(point.source||{}));}catch{record={...point.source};}
+    const anchor=[...area.querySelectorAll('[data-result-sample-key]')].find(row=>row.dataset.resultSampleKey===key)||area.querySelector('[data-graph-workspace]')||area;
+    const detail={record,name:point.members?'Condensed interval':'Sample',list:config?.id||'',view:config?.view||'',key:'',context:job?{tool:job.tool,target:job.target,started:job.started,mode:job.options?.mode,port:job.options?.port,source:job.options?.source}:null,graph:{...graph},anchor,run:area.dataset.scrollContext,page:viewToken()};
+    if(sideDetail?.graph?.id===graph.id){sideDetail=detail;if(graph.force&&preferences().hidden){preferences().hidden=false;persist();}afterRender();return true;}
+    return openSide(detail,anchor);
+  }
+  function clearGraphSelection(id){if(sideDetail?.graph?.id===id)closeSide();}
+
   function detailBody(detail) {
     const json=JSON.stringify(detail.record,null,2),context=detail.context;
-    const run=context?'<section class="result-run-context"><dl class="result-record-grid">'+[['Tool',titleFor(context.tool)],['Target',context.target],['Run started',context.started],['Method',context.mode],['Port',context.port]].filter(([,value])=>value!==undefined&&value!=='').map(([key,value])=>'<div><dt>'+esc(key)+'</dt><dd>'+(key==='Run started'&&root.NetworkToolkitResultTime?root.NetworkToolkitResultTime.cell(value,{label:'Run started'}):esc(scalar(value)))+'</dd></div>').join('')+'</dl></section>':'';
-    return '<div class="result-row-detail"><p class="result-detail-caption">Recorded '+esc(String(detail.name).replace(/\./g,' '))+' entry</p><div class="result-detail-actions result-detail-copy"><button class="btn small ghost" data-result-copy="text">'+icon('copy')+'Copy details</button><button class="btn small ghost" data-result-copy="json">Copy JSON</button></div>'+run+fieldsHTML(detail.record)+toolsHTML(detail)+'<details class="result-record-json"><summary>Raw record JSON</summary><pre>'+esc(json)+'</pre></details></div>';
+    const run=context?'<section class="result-run-context"><dl class="result-record-grid">'+[['Tool',titleFor(context.tool)],['Target',context.target],['Run started',context.started],['Method',context.mode],['Port',context.port],['Source interface',context.source]].filter(([,value])=>value!==undefined&&value!=='').map(([key,value])=>'<div><dt>'+esc(key)+'</dt><dd>'+(key==='Run started'&&root.NetworkToolkitResultTime?root.NetworkToolkitResultTime.cell(value,{label:'Run started'}):esc(scalar(value)))+'</dd></div>').join('')+'</dl></section>':'';
+    return '<div class="result-row-detail"><p class="result-detail-caption">Recorded '+esc(String(detail.name).replace(/\./g,' '))+' entry</p><div class="result-detail-actions result-detail-copy"><button class="btn small ghost" data-result-copy="text">'+icon('copy')+'Copy details</button><button class="btn small ghost" data-result-copy="json">Copy JSON</button></div>'+graphExtras(detail)+run+fieldsHTML(detail.record)+toolsHTML(detail)+'<details class="result-record-json"><summary>Raw record JSON</summary><pre>'+esc(json)+'</pre></details></div>';
   }
 
   function closeSide(focus=false) {
@@ -147,15 +166,15 @@
     let rail=document.getElementById('resultEntryRail');if(!rail){rail=document.createElement('div');rail.id='resultEntryRail';rail.className='result-entry-rail';area.append(rail);}
     let show=document.getElementById('resultEntryShow');if(!show){show=document.createElement('button');show.id='resultEntryShow';show.className='iconbtn result-entry-show';show.setAttribute('type','button');show.setAttribute('data-result-side-show','');show.setAttribute('aria-controls','resultEntryPane');rail.append(show);}
     if(!document.getElementById('resultEntryDivider')){const divider=document.createElement('div');divider.id='resultEntryDivider';divider.setAttribute('role','separator');divider.setAttribute('tabindex','0');divider.setAttribute('aria-controls','resultEntryPane');area.append(divider);}
-    const signature=JSON.stringify(sideDetail.record),displaySignature=signature+'|'+JSON.stringify(root.NetworkToolkitResultTime?.preferences?.()||{}),body=document.getElementById('resultEntryBody');
+    const signature=JSON.stringify(sideDetail.record),displaySignature=signature+'|'+JSON.stringify(root.NetworkToolkitResultTime?.preferences?.()||{})+'|'+(sideDetail.graph?.message||'')+'|'+(sideDetail.contributorPage||0),body=document.getElementById('resultEntryBody');
     if(body._recordSignature!==displaySignature){
       const sameRecord=body._sourceRecordSignature===signature,scrollTop=sameRecord?body.scrollTop:0,expanded=sameRecord?[...body.querySelectorAll('details')].map(detail=>detail.open):null;
       body.innerHTML=detailBody(sideDetail);body._recordSignature=displaySignature;body._sourceRecordSignature=signature;
       if(expanded)[...body.querySelectorAll('details')].forEach((detail,index)=>{detail.open=expanded[index]===true;});
-      body.scrollTop=scrollTop;document.getElementById('resultEntryTitle').textContent=recordTitle(sideDetail.record)||sideDetail.name;
+      body.scrollTop=scrollTop;document.getElementById('resultEntryTitle').textContent=sideDetail.graph?.point.members?'Condensed interval · '+sideDetail.graph.point.members.length+' samples':recordTitle(sideDetail.record)||sideDetail.name;
     }
     for(const row of area.querySelectorAll('tr[data-result-row]')){
-      const detail=captureRow(row),selected=detail?.list===sideDetail.list&&JSON.stringify(detail.record)===signature;
+      const detail=captureRow(row),selected=sideDetail.graph&&!sideDetail.graph.point.members?row.dataset.resultSampleKey===sideDetail.graph.point.key:detail?.list===sideDetail.list&&JSON.stringify(detail.record)===signature;
       row.classList.toggle('result-entry-selected',selected);if(selected)row.setAttribute('aria-current','true');else row.removeAttribute('aria-current');
     }
     layoutDetails();
@@ -194,6 +213,7 @@
 
   function cancelPending() { if (pendingClick) clearTimeout(pendingClick); pendingClick = 0; }
   function showCandidate(row, detail) {
+    if(row.dataset.resultGraphId&&row.dataset.resultSampleKey&&root.NetworkToolkitResultTimeline?.selectResult?.(row.dataset.resultGraphId,row.dataset.resultSampleKey))return;
     if (row.hasAttribute('data-result-row')) openRow(detail || captureRow(row), row.isConnected ? row : null);
     else if (row.dataset.entryKey && deviceRecords.has(row.dataset.entryKey)) { row.focus({preventScroll:true}); openDeviceTools(row.dataset.entryKey); }
   }
@@ -212,6 +232,8 @@
     }, true);
     document.addEventListener('click', event => {
       cancelPending();
+      const graphClear=event.target.closest('[data-result-graph-clear]'),graphLatest=event.target.closest('[data-result-graph-latest]'),graphSource=event.target.closest('[data-result-graph-source]'),graphPage=event.target.closest('[data-result-graph-page]');
+      if(graphClear||graphLatest||graphSource||graphPage){event.preventDefault();event.stopImmediatePropagation();if(graphClear)root.NetworkToolkitResultTimeline?.clearSelection?.(graphClear.dataset.resultGraphClear);else if(graphLatest)root.NetworkToolkitResultTimeline?.jumpLatest?.(graphLatest.dataset.resultGraphLatest);else if(graphSource)root.NetworkToolkitResultTimeline?.selectResult?.(graphSource.dataset.resultGraphId,graphSource.dataset.resultGraphSource);else if(sideDetail){sideDetail.contributorPage=Number(graphPage.dataset.resultGraphPage)||0;afterRender();}return;}
       if(event.target.closest('[data-result-side-close]')&&sideDetail){event.preventDefault();event.stopImmediatePropagation();toggleDetails(true);return;}
       if(event.target.closest('[data-result-side-show]')&&sideDetail){event.preventDefault();event.stopImmediatePropagation();toggleDetails(false);return;}
       if(event.target.closest('[data-result-side-expand]')&&sideDetail){event.preventDefault();event.stopImmediatePropagation();openRow(sideDetail,null,true);return;}
@@ -226,6 +248,7 @@
       const row = candidate(event.target);
       if (!row || event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey || event.detail > 1 || root.getSelection()?.isCollapsed === false) return;
       if (pointerStart?.row === row && (Math.abs(event.clientX-pointerStart.x)>5 || Math.abs(event.clientY-pointerStart.y)>5)) return;
+      if(row.dataset.resultGraphId&&row.dataset.resultSampleKey&&root.NetworkToolkitResultTimeline?.selectResult?.(row.dataset.resultGraphId,row.dataset.resultSampleKey)){event.preventDefault();event.stopImmediatePropagation();return;}
       const detail = row.hasAttribute('data-result-row') ? captureRow(row) : null, view = viewToken(), parentModal = row.closest('.modal');
       // Let double-click or drag selection finish before opening a row dialog.
       pendingClick = setTimeout(() => { pendingClick = 0; if (viewToken() === view && parentModal === document.querySelector('.modal') && root.getSelection()?.isCollapsed !== false) showCandidate(row, detail); }, 250);
@@ -236,12 +259,12 @@
         const area=document.getElementById('toolResult'),bottom=area.classList.contains('entry-details-bottom');if(bottom&&!['ArrowUp','ArrowDown','Home'].includes(event.key)||!bottom&&!['ArrowLeft','ArrowRight','Home'].includes(event.key))return;
         if(preferences().hidden){preferences().hidden=false;layoutDetails();}const name=bottom?'height':'width';preferences()[name]=event.key==='Home'?defaults[name]:Math.round(clamp(Number(event.target.getAttribute('aria-valuenow'))+(['ArrowLeft','ArrowUp'].includes(event.key)?1:-1)*(event.shiftKey?30:10),Number(event.target.getAttribute('aria-valuemin')),Number(event.target.getAttribute('aria-valuemax'))));layoutDetails();persist();return;
       }
-      if (event.key === 'Escape') {cancelPending();if(sideDetail&&!document.querySelector('.modal')){event.preventDefault();event.stopImmediatePropagation();closeSide(true);return;}}
+      if (event.key === 'Escape') {cancelPending();if(sideDetail&&!document.querySelector('.modal')){event.preventDefault();event.stopImmediatePropagation();if(sideDetail.graph)root.NetworkToolkitResultTimeline?.clearSelection?.(sideDetail.graph.id);else closeSide(true);return;}}
       const row = candidate(event.target);
       if (!row || event.target !== row || !['Enter',' '].includes(event.key) || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
       cancelPending(); event.preventDefault(); event.stopImmediatePropagation(); showCandidate(row);
     }, true);
   }
 
-  root.NetworkToolkitResultDetails = Object.freeze({init,rowAttributes,openRow,afterRender,closeSide,captureRow,mergePreferences,layoutDetails});
+  root.NetworkToolkitResultDetails = Object.freeze({init,rowAttributes,openRow,afterRender,closeSide,captureRow,mergePreferences,layoutDetails,showGraphSelection,clearGraphSelection});
 })(globalThis);

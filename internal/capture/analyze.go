@@ -34,6 +34,8 @@ type Conversation struct {
 	Retransmissions int        `json:"retransmissions"`
 }
 type Bucket struct {
+	PacketNumber    uint64         `json:"packetNumber,omitempty"`
+	EndInclusive    bool           `json:"endInclusive,omitempty"`
 	Severities      map[string]int `json:"severities,omitempty"`
 	Seconds         float64        `json:"seconds"`
 	Packets         int            `json:"packets"`
@@ -43,6 +45,9 @@ type Bucket struct {
 	IntervalSeconds float64        `json:"intervalSeconds"`
 }
 type Statistics struct {
+	GraphStarted   *time.Time     `json:"graphStarted,omitempty"`
+	GraphFinished  *time.Time     `json:"graphFinished,omitempty"`
+	GraphNote      string         `json:"graphNote,omitempty"`
 	Protocols      map[string]int `json:"protocols"`
 	Endpoints      []Endpoint     `json:"endpoints"`
 	Conversations  []Conversation `json:"conversations"`

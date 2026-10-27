@@ -45,6 +45,10 @@ For the subsequently authorized 1.17.90 build, the 1.17.89 note has also been
 moved unchanged into the archive. Current `RELEASE_NOTES_1.17.90.txt` alone stays
 at root, and the archive index identifies 1.17.90 as current and 1.17.89 as previous.
 
+## 1.17.95 authorized condensed history and linked entry details
+
+The user explicitly authorized building and publishing the confirmed graph-history, time-range and linked-selection update. Preserve current features, saved settings and updater safeguards. Publication is pending full validation of the final source, native/browser checks, public assets and live updater staging.
+
 ## 1.17.94 published scalable graphs, statistics filters and result tracking
 
 The user explicitly authorized implementing, building and publishing this update.

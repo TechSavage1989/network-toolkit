@@ -102,3 +102,7 @@
  .graph-workspace-graph .rt-latency .rt-scroll{min-height:103px}
  .graph-workspace-graph .rt-axis-label{line-height:1.2}
 }
+
+.graph-time-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));gap:12px;min-width:0}.graph-time-form>p{grid-column:1/-1;font-size:11px;line-height:1.5;color:var(--muted)}.graph-time-form label{display:flex;flex-direction:column;gap:5px;font-size:11px;min-width:0}.graph-time-form input,.graph-time-form select{width:100%;min-width:0}#graphTimeError{color:var(--bad)}.rt-aggregate-range{stroke:currentColor;stroke-width:2;vector-effect:non-scaling-stroke}.rt-aggregate{stroke-dasharray:2 1}.rt-held-note{font-size:10px;color:var(--muted)}.result-graph-contributors{display:flex;flex-direction:column;gap:5px;margin-top:10px}.result-graph-contributors .btn{text-align:left;white-space:normal;overflow-wrap:anywhere}
+
+.rt-heading>.rt-view-controls{flex:1 0 100%;max-width:100%;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;white-space:nowrap;scrollbar-width:thin;padding-bottom:2px}.rt-heading>.rt-view-controls>*{flex-shrink:0}.rt-heading>.rt-view-controls>label{flex:0 0 auto}.rt-heading>.rt-view-controls .rt-zoom-controls{flex-wrap:nowrap}.result-graph-summary{margin-bottom:12px}.result-graph-summary>.rt-detail-values{margin-top:10px}

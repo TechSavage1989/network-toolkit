@@ -449,3 +449,7 @@
  .packet-graph-summary>.packet-statistic{flex:0 0 auto;min-width:150px}
  .packet-graph-summary>.packet-statistic strong,.packet-graph-summary>.packet-statistic span{white-space:nowrap}
 }
+
+.packet-selection-controls{display:flex;flex-wrap:wrap;gap:5px;padding:5px 0 8px}.packet-selection-controls>p{flex-basis:100%;margin:0 0 3px}.packet-interval-pages{display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin-top:10px}.packet-selected-interval-details{padding:7px;border:1px solid var(--line);border-radius:5px;margin:6px 0}
+
+.packet-graph-reader .packet-traffic-heading{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;white-space:nowrap;scrollbar-width:thin;min-width:0;padding-bottom:2px}.packet-graph-reader .packet-traffic-heading>h3{display:none}.packet-graph-reader .packet-traffic-heading>*{flex-shrink:0}
