@@ -8,6 +8,7 @@ import (
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/fips140"
 	"crypto/rand"
 	"encoding/binary"
 	"errors"
@@ -403,11 +404,14 @@ func ecHash(curve elliptic.Curve) crypto.Hash {
 var kexAlgoMap = map[string]kexAlgorithm{}
 
 func init() {
+	// mlkem768x25519-sha256 we'll work with fips140=on but not fips140=only
+	// until Go 1.26.
+	kexAlgoMap[KeyExchangeMLKEM768X25519] = &mlkem768WithCurve25519sha256{}
 	kexAlgoMap[KeyExchangeECDHP521] = &ecdh{elliptic.P521()}
 	kexAlgoMap[KeyExchangeECDHP384] = &ecdh{elliptic.P384()}
 	kexAlgoMap[KeyExchangeECDHP256] = &ecdh{elliptic.P256()}
 
-	if false {
+	if fips140.Enabled() {
 		defaultKexAlgos = slices.DeleteFunc(defaultKexAlgos, func(algo string) bool {
 			_, ok := kexAlgoMap[algo]
 			return !ok

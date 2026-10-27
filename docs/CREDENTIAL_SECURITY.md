@@ -94,6 +94,12 @@ or a guarantee against unknown vulnerabilities. Report scanner/database failures
 and findings rather than treating them as a pass. No dependency upgrade is implied
 by a formatting or vendor-metadata repair.
 
+Canonical comparison also found six historical Go-compatibility edits in the
+vendored SSH package. The development branch restores those files byte-for-byte
+from checksum-verified x/crypto v0.58.0: upstream FIPS-mode checks and supported
+hybrid ML-KEM key exchange are no longer patched out. The module versions are
+unchanged. This does not enable system FIPS mode or certify Toolkit as FIPS compliant.
+
 At the 2026-10-27 development checkpoint, both source configurations reported
 zero reachable-symbol or imported-package vulnerabilities. The module-level
 [GO-2026-5932 advisory](https://pkg.go.dev/vuln/GO-2026-5932) concerns the

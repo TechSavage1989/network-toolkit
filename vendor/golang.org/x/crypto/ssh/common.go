@@ -6,6 +6,7 @@ package ssh
 
 import (
 	"crypto"
+	"crypto/fips140"
 	"crypto/rand"
 	"fmt"
 	"io"
@@ -83,6 +84,7 @@ var (
 	// supportedKexAlgos specifies key-exchange algorithms implemented by this
 	// package in preference order, excluding those with security issues.
 	supportedKexAlgos = []string{
+		KeyExchangeMLKEM768X25519,
 		KeyExchangeCurve25519,
 		KeyExchangeECDHP256,
 		KeyExchangeECDHP384,
@@ -94,6 +96,7 @@ var (
 	// defaultKexAlgos specifies the default preference for key-exchange
 	// algorithms in preference order.
 	defaultKexAlgos = []string{
+		KeyExchangeMLKEM768X25519,
 		KeyExchangeCurve25519,
 		KeyExchangeECDHP256,
 		KeyExchangeECDHP384,
@@ -260,7 +263,7 @@ func init() {
 	supportedPubKeyAuthAlgos = slices.Concat(supportedPubKeyAuthAlgos, mldsaKeyAlgos)
 	defaultPubKeyAuthAlgos = slices.Concat(defaultPubKeyAuthAlgos, mldsaKeyAlgos)
 
-	if false {
+	if fips140.Enabled() {
 		defaultHostKeyAlgos = slices.DeleteFunc(defaultHostKeyAlgos, func(algo string) bool {
 			_, err := hashFunc(underlyingAlgo(algo))
 			return err != nil
@@ -288,7 +291,7 @@ func hashFunc(format string) (crypto.Hash, error) {
 		// is decided by mldsaKeyAlgos.
 		return 0, nil
 	case KeyAlgoRSA, InsecureKeyAlgoDSA:
-		if false {
+		if fips140.Enabled() {
 			return 0, fmt.Errorf("ssh: hash algorithm for format %q not allowed in FIPS 140 mode", format)
 		}
 		return crypto.SHA1, nil

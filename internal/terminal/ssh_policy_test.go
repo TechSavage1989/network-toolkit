@@ -208,6 +208,28 @@ func TestSSHLegacyKEXRequiresExplicitOptIn(t *testing.T) {
 	}
 }
 
+func TestSSHModernKEXCanonicalVendorCompatibility(t *testing.T) {
+	for _, kex := range []string{ssh.KeyExchangeMLKEM768X25519, ssh.KeyExchangeCurve25519} {
+		t.Run(kex, func(t *testing.T) {
+			f := newSSHFixture(t, func(config *ssh.ServerConfig) { config.KeyExchanges = []string{kex} }, true)
+			m := sshManager(t, t.TempDir())
+			info, err := m.Connect(f.request())
+			if err != nil {
+				t.Fatal(err)
+			}
+			pending := awaitSession(t, m, info.ID, func(s SessionInfo) bool { return s.Prompt != nil })
+			if pending.Prompt.Kind != "host-key" || f.auth.Load() != 0 {
+				t.Fatal("modern key exchange bypassed host verification")
+			}
+			acceptCurrentPrompt(t, m, info.ID, "once")
+			connected := awaitSession(t, m, info.ID, func(s SessionInfo) bool { return s.State == "connected" })
+			if connected.SSHCompatibility != SSHCompatibilityModern || fixtureAlgorithms(t, f).KeyExchange != kex {
+				t.Fatalf("modern connection failed to negotiate the supported key exchange %q", kex)
+			}
+		})
+	}
+}
+
 func TestSSHLegacyExactDeviceOfferRSAAndCBC(t *testing.T) {
 	key, _ := rsaFixtureKey(t)
 	key = restrictedFixtureSigner(t, key, ssh.KeyAlgoRSA)
