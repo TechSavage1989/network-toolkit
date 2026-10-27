@@ -1,8 +1,95 @@
-NETWORK TOOLKIT 1.17.96 VALIDATION IN PROGRESS
+NETWORK TOOLKIT 1.17.96 VERIFIED PUBLISHED BUILD
 
-The authorized graph interface update must pass current JavaScript, release guard,
-Go, native Windows and browser Checks before publication. Final verified source,
-package, public asset and live updater evidence will be recorded here.
+1.17.96 published shared graph plots, fitted time axes and unified following
+
+The user explicitly authorized implementing, building and publishing this update.
+Development started from current main fd6dfbe729741b6dbfe1955b154fd0291971024d.
+Published source/tag: 8c5e64e4b2bdab0aa9219650c72eeb58d77bb374
+Tree: aee336e0f9d5ef6a00ea25008abd5bd09cdcbf78
+Official release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.96
+Release ID: 425027266
+
+One Follow latest control in the shared graph/results header releases a held
+selection and resumes linked graph, sorted filtered list and entry-details
+following. Its state distinguishes following, a held selection and a paused
+time view. It remains accessible while the graph is collapsed. Duration, zoom,
+sorting and active filters survive this action.
+
+Every mode now projects actual recorded times into the fitted plot viewport.
+Progressive history no longer creates a wide DOM track or leaves a short range
+clustered at the left. Genuine time gaps and original timestamp precision remain
+intact. Condensed history labels its nonlinear time distribution; adaptive ticks
+use the configured clock/timezone, increase precision when compressed ticks would
+repeat and distinguish offset changes across daylight-saving boundaries.
+
+Response time (RTT) and RTT variability use two tabs in one shared plot. The
+per-tool choice is saved separately without changing the existing graph-mode
+preference shape. Sample and aggregate point markers use measured SVG pixel
+coordinates, circular geometry and usable hit areas. Closely spaced hits choose
+the nearest actual point. Failures/unmeasured values use an explained status
+lane rather than fabricated response-time values. Packet traffic retains honest
+interval bars, exact contributor selection and original nanosecond boundaries.
+
+Statistics stay above the plot; result lists and entry details scroll
+independently. Compact responsive controls, zoom/reset and data panning replace
+graph-pane scrollbars. Graph options provides Earlier/Later, selection clearing
+and expanded recorded run data in a dialog outside the plot. Redundant graph
+Activity content and duplicate latest actions are removed; events, raw records,
+copy/export and existing settings remain available. Held graph/list selections
+and their recorded response details survive live updates and plot changes.
+
+Full Checks 40446884740 passed application 122000162574, native
+Windows 122000162643 and browser 122000162305 on this exact source.
+647 JavaScript tests and 35 release guards pass, together with the required
+application, terminal, desktop, diagnostics, device information, platform and
+capture Go suites. Native local-shell lifecycle/colors, installer progress and
+Windows timestamp/statistics checks pass.
+
+UI96 passes 3 groups: 48 base and 24 selected-result layouts across all three
+modes, both plots, four desktop/narrow/short viewports and both themes for base
+layouts; 48 time-axis checks and 12 packet-mode layouts also pass. These cover
+10-second Progressive fitting, fixed circle sizing, hover/click association,
+held details, live updates, saved plot preferences, zoom, pan, collapse, linked
+following and graph-pane overflow. Retained UI95 passes 2 groups / 16 base and
+8 selected layouts. UI94 passes 8 groups / 16 layouts, 8 zoom, 24 filter,
+10 tracking and 10 packet cases. UI93/92 pass 7/6 groups and 16/12 layouts;
+UI91/90, Local Network/UI88 and the covered editor, copy, Hosts, client/server,
+SMTP, folder and terminal selection regressions also pass. All 7 native updater
+timer cases pass, including the real five-minute poll. Current reports have no
+runtime/asset failures; the released64 negative control retains its expected
+Illegal invocation result.
+
+Release 40448315958 passed build 122004786010 and publish 122005296776.
+All four independently downloaded public files match GitHub digests and the
+public SHA256SUMS. The official EXE and portable ZIP match local and reviewed
+artifacts. Standalone, portable and update executables are identical. All
+796 packaged source files match the immutable tag; ZIP CRCs,
+root/source manifests, the strict binary-only update inventory, Windows GUI/PE
+version resources and 14 editor-library digests verify.
+All 53 historical notes are preserved, including an unchanged
+archived 1.17.95 note. All 35 older releases/assets and 35 older tags are unchanged.
+Update ZIP container hashes can differ between packaging runs; each public
+container and its embedded executable were independently verified.
+
+Released95 production feed/download/staging handlers checked, downloaded,
+verified and staged live96 through real HTTPS with isolated settings in
+9.66s. The 17919488-byte candidate matches the independently
+verified official EXE and reached ready. The original test executable is
+unchanged. No actual installation, restart or full native WebView2 interaction
+was performed.
+
+Published asset evidence:
+- Network_Toolkit.exe: 17919488 bytes; asset 680402478; SHA256 e986411db28fdb570e5607b46b87883762064d030594fb5ecdb551ca54b16c2e
+- Network_Toolkit_1.17.96_Portable.zip: 11413487 bytes; asset 680402482; SHA256 8cf431c471749754cf692b36bc5cd23a3363dd059fc011dd70ede5599197a38d
+- Network_Toolkit_1.17.96_Update.zip: 7014192 bytes; asset 680402480; SHA256 e320c5ea60302704538f63ae738e9749407ce8debb41f03fa00907f780ccf4ad
+- SHA256SUMS: 290 bytes; asset 680402485; SHA256 ca0f63e2d40751b56cfa8782802c5985da2ac8ada31bdd2b1373586760c338da
+
+Review artifact 12708502590: sha256:edbaa75fb6a77a6f5f83ae126731bbea895cbadec3d7e9093bc658110cf9ee81
+Browser artifact 12709665736: sha256:1f18aabc784416aec824476d48235ea5abcfccd443a8f60db1f48da80eca2800
+Final screenshots inspected: ui96-progressive-rtt-1440x1000.png, ui96-condensed-jitter-390x1000-selected.png, ui96-packet-progressive-820x650.png, ui96-window-rtt-820x650-selected.png, ui96-condensed-rtt-1440x1000.png, ui95-packets-selected-390x1000.png
+
+The final proof update changes only AGENTS.md, this handoff and VALIDATION.txt,
+using [skip ci]. It does not rebuild or replace the published tag/assets.
 
 NETWORK TOOLKIT 1.17.95 VERIFIED PUBLISHED BUILD
 

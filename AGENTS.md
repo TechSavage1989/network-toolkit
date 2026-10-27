@@ -3,19 +3,18 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-Current verified published version: 1.17.95.
-Source/tag: 12c6ffda0769330a7d0e48d555558957408838d2
-Tree: c539ef9113d034dbe608e322461fb17b1594a234
-Full Checks 40431761171 and Release 40433123013 pass on this source.
-640 JavaScript tests, 35 release guards and the
-required Go/native Windows/browser checks pass. UI95: 2 groups /
-16 base and 8 selected layouts; UI94/93/92/91/90, Local Network/UI88 and covered regressions
-also pass. Review/local/public files match and all
-793 packaged source files match the tag. All
-34 older releases/assets and
-34 older tags are unchanged. Released94 verified/staged95
-in 10.20s. No actual installation/restart or full native WebView2 interaction
-is claimed.
+Current verified published version: 1.17.96.
+Source/tag: 8c5e64e4b2bdab0aa9219650c72eeb58d77bb374
+Tree: aee336e0f9d5ef6a00ea25008abd5bd09cdcbf78
+Full Checks 40446884740 and Release 40448315958 pass on this source.
+647 JavaScript tests, 35 release guards and the required Go/native Windows/browser
+checks pass. UI96: 3 groups / 48 base, 24 selected and 12 packet layouts, with
+48 time-axis cases. UI95/94/93/92/91/90, Local Network/UI88 and covered regressions
+also pass, including all 7 native updater timer cases and the real five-minute poll.
+Review/local/public EXE and portable files match; all 796 packaged source files,
+53 historic notes and 14 editor-library digests verify. All 35 older releases/assets
+and 35 older tags are unchanged. Released95 verified/staged96 in 9.66s.
+No actual installation/restart or full native WebView2 interaction is claimed.
 
 The user authorized this publication and it is complete. Future releases need
 authorization. Main network-toolkit is the sole public source/update feed.
