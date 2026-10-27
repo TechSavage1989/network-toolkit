@@ -66,7 +66,7 @@ tr.result-entry-selected{background:var(--accentBg);box-shadow:inset 3px 0 var(-
 
 #toolResult:has(.result-graph-entry)>.graph-run-panel>.result-heading{flex-wrap:wrap;gap:6px}
 #toolResult:has(.result-graph-entry)>.graph-run-panel>.result-heading>.grow{flex:1 1 170px}
-#toolResult:has(.result-graph-entry)>.graph-run-panel>.result-heading>.row{flex:0 1 auto;min-width:0;max-width:100%}
+#toolResult:has(.result-graph-entry)>.graph-run-panel>.result-heading>.row{flex:1 1 150px;min-width:0;max-width:100%}
 #toolResult:has(.result-graph-entry)>.graph-run-panel>.result-heading .job-select{min-width:80px;flex:1 1 160px;max-width:210px}
 #toolResult:has(.result-graph-entry)>.graph-run-panel>.result-heading .result-title{flex-wrap:wrap;gap:6px}
 #toolResult:has(.result-graph-entry)>.graph-run-panel>.result-heading h2{overflow-wrap:normal}
