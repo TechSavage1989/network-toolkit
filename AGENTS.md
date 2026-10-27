@@ -3,24 +3,12 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-Current verified published version: 1.17.98.
-Source/tag: f727135d5789ec2015d3d5ae5c1853b9b5c97f8e
-Tree: e9ec0584c719dc0b7d88bfc3e5c131b90bf2242e
-Full Checks 40470397974 and Release 40470397914 pass on this source.
-667 JavaScript tests, 35 safeguards and required Go/native Windows/browser
-suites pass, including all seven updater timer cases and the real five-minute poll.
-UI98: five groups, 24 diagnostic layouts and 11 packet cases; retained
-UI97/96/95/94/93/92 and other application regressions also pass.
-Prepared/public EXEs and publication-candidate/public portable files match.
-All 808 packaged source files, 55 historical notes and 14 editor digests verify.
-All 37 older releases/assets/bodies and 37 tags remain unchanged.
-Released97 detected, verified and staged98 in 12.09s; no installation/restart
-or complete native WebView2 interaction is claimed. See handoff for evidence.
-
-Publication was explicitly authorized and is complete. Future releases require
-authorization. Main network-toolkit remains the sole source/update feed.
-Never replace old tags/assets, change access or write the retired feed. This
-final three-file documentation record uses [skip ci].
+The user authorized the focused 1.17.99 graph-control cleanup, endpoint containment,
+build and publication. Baseline: completed published 1.17.98 at main
+5b78eea4b2fea5585fa312324a17920878b1b242. Preserve its navigator and settings.
+1.17.99 publication is pending exact-source Checks, Release and asset verification.
+See docs/DEVELOPMENT_HANDOFF.md for scope, validation and historical evidence.
+Do not replace old tags/assets, alter access or write the retired update feed.
 
 ## Release-note organization
 

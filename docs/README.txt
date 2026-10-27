@@ -1,11 +1,14 @@
-NETWORK TOOLKIT 1.17.98
+NETWORK TOOLKIT 1.17.99
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.98
+CURRENT RELEASE - 1.17.99
 
-Release details: RELEASE_NOTES_1.17.98.txt
-Previous release: docs/releases/RELEASE_NOTES_1.17.97.txt
+Release details: RELEASE_NOTES_1.17.99.txt
+Previous release: docs/releases/RELEASE_NOTES_1.17.98.txt
 Full release-note archive: docs/releases/README.md
+
+Graph Options has been replaced by direct compact controls. Recent 180 and Full
+history retain their distinct defaults. Visible endpoint markers have safe gutters.
 
 Fit selects All retained history. The compact navigator beneath the main plot
 supports proportional time-window dragging and independent boundary resizing.

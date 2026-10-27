@@ -228,8 +228,8 @@ async function geometry(kind,label){
 }
 async function packetReady(){await page.waitForFunction(()=>NetworkToolkitPacketCapture.model.selected&&!NetworkToolkitPacketCapture.model.busy);await settle();}
 async function packetExact(expected,label){await packetReady();const values=await page.evaluate(()=>NetworkToolkitPacketCapture.model.loaded.map(row=>row.number));assert.deepEqual(values.slice().sort((a,b)=>a-b),expected.slice().sort((a,b)=>a-b),label+' returns exactly matching retained packets');assert.equal(await page.evaluate(()=>NetworkToolkitPacketCapture.model.total),expected.length);return values;}
-async function graphAction96(name,action){if(name==='zoom'){await timeline().locator('[data-rt-zoom="'+action+'"]').click();await settle();return;}await timeline().locator('[data-rt-options]').click();await page.locator('[data-rt-'+name+(action?'="'+action+'"':'')+']').click();await page.evaluate(()=>closeModal());await settle();}
-async function packetAction96(name,action){if(name==='zoom'){await page.locator('[data-packet-zoom="'+action+'"]').click();await settle();return;}await page.locator('[data-packet-graph-options]').click();await page.locator('[data-packet-'+name+(action?'="'+action+'"':'')+']').click();await page.evaluate(()=>closeModal());await settle();}
+async function graphAction96(name,action){if(name==='zoom'){await timeline().locator('[data-rt-zoom="'+action+'"]').click();await settle();return;}if(name==='clear')await page.locator('[data-result-graph-clear]').click();else await page.evaluate(({id,amount})=>NetworkToolkitResultTimeline.pan(id,amount),{id:await timeline().getAttribute('data-rt-id'),amount:Number(action)});await settle();}
+async function packetAction96(name,action){if(name==='zoom'){await page.locator('[data-packet-zoom="'+action+'"]').click();await settle();return;}if(name==='pan'){await page.locator('[data-packet-timeline] [data-gn-part="window"]').focus();for(let i=0;i<2;i++)await page.keyboard.press(Number(action)<0?'PageUp':'PageDown');for(let i=0;i<10;i++)await page.keyboard.press(Number(action)<0?'ArrowLeft':'ArrowRight');}else await page.locator('[data-packet-'+name+(action?'="'+action+'"':'')+']').first().click();await settle();}
 (async()=>{
  if(out)fs.mkdirSync(out,{recursive:true});browser=await chromium.launch({headless:true,args:['--no-sandbox']});
  const context=await openContext('America/New_York');await show('monitor');
@@ -287,7 +287,7 @@ async function packetAction96(name,action){if(name==='zoom'){await page.locator(
  const pointCount=()=>timeline().locator('[data-rt-surface="latency"] [data-rt-point]').count();
  assert.equal(await pointCount(),180,'Unzoomed moving window retains its existing180 samples');
  for(const [action,expectedZoom,expectedCount]of [['in','2x',90],['out','1x',180],['out','0.5x',359],['reset','1x',360]]){
-  await graphAction96('zoom',action);await settle();assert.equal(await timeline().locator('[data-rt-options]').evaluate(el=>(/([\d.]+)×/.exec(el.textContent)||[])[1]+'x'),expectedZoom);assert.equal(await pointCount(),expectedCount,'Zoom changes the visible chronological range');
+  await graphAction96('zoom',action);await settle();assert.equal(await timeline().locator('[data-rt-zoom-level]').evaluate(el=>(/([\d.]+)×/.exec(el.textContent)||[])[1]+'x'),expectedZoom);assert.equal(await pointCount(),expectedCount,'Zoom changes the visible chronological range');
   await marker(360).hover({force:true});const tip=await popupBounds(popup(),'Zoom '+expectedZoom+' point popup');assert(tip.text.includes('360'),'Zoom hit testing returns the actual latest sample');assert((await pointDetails()).Sample==='360');const axis=await timeline().locator('.rt-time-axis').innerText();assert(!/NaN|Invalid Date|Infinity/.test(axis),'Zoom axes remain valid timestamps');
   report.zoom.push({kind:'window',action,zoom:expectedZoom,points:expectedCount,last:360,popup:tip.text,axis});await leaveInspection();
  }

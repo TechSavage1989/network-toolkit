@@ -83,4 +83,4 @@ See [VALIDATION.txt](docs/VALIDATION.txt) for recorded results and [THIRD_PARTY_
 
 </details>
 
-Current version: [1.17.98 graph navigator update](RELEASE_NOTES_1.17.98.txt).
+Current version: [1.17.99 compact graph controls](RELEASE_NOTES_1.17.99.txt).

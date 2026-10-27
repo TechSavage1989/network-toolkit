@@ -158,7 +158,7 @@ test('outside controls preserve a held pin and filters until explicit deselectio
 });
 
 test('Follow latest respects matching samples in both modes without resetting zoom or preferences',()=>{
- for(const mode of ['window','progressive','condensed']){const h=harness(),rows=Array.from({length:400},(_,i)=>reply(i+1,10,stamp(i)));h.context.NetworkToolkitResultFilters={current:()=>({active:true}),graphMatches:(_,row)=>row.sequence<=350};h.api.setPreferences({mode},{persist:false});h.render(rows);h.document.emit('click',h.mark(0));h.api.zoom('job',2);h.api.jumpLatest('job');assert.match(h.detail(),/Sample350/);assert.equal(h.api.tracking('job').following,true);assert.equal(h.api.isHeld('job'),false);assert.equal(h.api.preferences().mode,mode);assert.match(h.document.querySelector('[data-rt-options]').textContent,/2×/);}
+ for(const mode of ['window','progressive','condensed']){const h=harness(),rows=Array.from({length:400},(_,i)=>reply(i+1,10,stamp(i)));h.context.NetworkToolkitResultFilters={current:()=>({active:true}),graphMatches:(_,row)=>row.sequence<=350};h.api.setPreferences({mode},{persist:false});h.render(rows);h.document.emit('click',h.mark(0));h.api.zoom('job',2);h.api.jumpLatest('job');assert.match(h.detail(),/Sample350/);assert.equal(h.api.tracking('job').following,true);assert.equal(h.api.isHeld('job'),false);assert.equal(h.api.preferences().mode,mode);assert.match(h.document.querySelector('[data-rt-zoom-level]').textContent,/2×/);}
 });
 
 test('graph marks use actual status palette categories and combined filters retain raw source values',()=>{
@@ -173,7 +173,7 @@ test('graph marks use actual status palette categories and combined filters reta
 test('hover and keyboard inspection pause list tracking only while a measurement is being inspected',()=>{
  const h=harness(),calls=[];h.context.NetworkToolkitGraphWorkspace={inspection:(id,on)=>calls.push([id,on]),revealSample:()=>true};h.render();
  h.document.emit('pointermove',h.mark(0));assert.deepEqual(calls.at(-1),['job',true]);h.document.emit('click',h.mark(0));h.document.emit('pointerout',h.mark(0),{relatedTarget:null});assert.deepEqual(calls.at(-1),['job',false]);assert(h.mark(0).classList.contains('rt-point-selected'),'Pinned point survives ending transient inspection; the workspace hold remains separate');
- const surface=h.document.querySelector('[data-rt-surface="latency"]');h.document.emit('keydown',surface,{key:'End'});assert.deepEqual(calls.at(-1),['job',true]);h.document.emit('focusout',surface,{relatedTarget:h.document.querySelector('[data-rt-options]')});assert.deepEqual(calls.at(-1),['job',false]);
+ const surface=h.document.querySelector('[data-rt-surface="latency"]');h.document.emit('keydown',surface,{key:'End'});assert.deepEqual(calls.at(-1),['job',true]);h.document.emit('focusout',surface,{relatedTarget:h.document.querySelector('[data-rt-mode]')});assert.deepEqual(calls.at(-1),['job',false]);
  const row=h.document.createElement('tr');row.dataset.resultGraphId='job';row.dataset.resultSampleKey=h.api.sampleKey(samples()[2],2);h.document.append(row);h.document.emit('pointermove',row);assert.deepEqual(calls.at(-1),['job',true]);h.document.emit('pointerout',row,{relatedTarget:null});assert.deepEqual(calls.at(-1),['job',false]);
 });
 
@@ -185,7 +185,7 @@ test('sequence gaps never invent jitter pairs or connect across unrecorded probe
 });
 
 test('zoom and panning retain an older entry, and Follow latest releases it while preserving zoom',()=>{
- const h=harness(),rows=Array.from({length:400},(_,i)=>reply(i+1,10,stamp(i)));h.render(rows);h.document.emit('click',h.mark(20));h.api.zoom('job',4);assert.match(h.detail(),/Sample241/);h.api.pan('job',-.5);assert.match(h.detail(),/Sample241/);h.api.jumpLatest('job');assert.match(h.detail(),/Sample400/);assert.equal(h.api.isHeld('job'),false);assert.match(h.document.querySelector('[data-rt-options]').textContent,/4×/);
+ const h=harness(),rows=Array.from({length:400},(_,i)=>reply(i+1,10,stamp(i)));h.render(rows);h.document.emit('click',h.mark(20));h.api.zoom('job',4);assert.match(h.detail(),/Sample241/);h.api.pan('job',-.5);assert.match(h.detail(),/Sample241/);h.api.jumpLatest('job');assert.match(h.detail(),/Sample400/);assert.equal(h.api.isHeld('job'),false);assert.match(h.document.querySelector('[data-rt-zoom-level]').textContent,/4×/);
 });
 
 test('restoration settles without repeatedly replacing unchanged detail nodes',()=>{
@@ -205,7 +205,7 @@ test('removed hovered rows, hidden graphs and tool switches release temporary tr
 test('repeated restoration retains actual timeline control nodes despite browser serialization differences',()=>{
  for(const mode of ['window','progressive']){
   const h=harness();h.context.NetworkToolkitResultFilters={current:()=>({active:true,statistic:'average',reference:18.5,referenceKind:'run'}),graphMatches:()=>true};h.api.setPreferences({mode},{persist:false});h.render();h.document.emit('click',h.mark(0));h.observe();
-  const selectors=['[data-rt-options]','[data-rt-mode]'],controls=selectors.map(selector=>h.document.querySelector(selector));
+  const selectors=['[data-graph-time-open]','[data-rt-mode]'],controls=selectors.map(selector=>h.document.querySelector(selector));
   let serializedReads=0;for(const node of [h.document.querySelector('.mock-point-details'),h.document.querySelector('.mock-selection-context'),...h.document.querySelectorAll('[data-rt-surface]')]){const descriptor=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(node),'innerHTML');Object.defineProperty(node,'innerHTML',{get(){serializedReads++;return '<browser-canonical-serialization data-empty=""></browser-canonical-serialization>';},set(value){descriptor.set.call(this,value);}});}
   for(let pass=0;pass<32;pass++)h.observe();
   assert.equal(serializedReads,0,'Restore compares prepared semantic content rather than browser-normalized HTML');
@@ -213,8 +213,8 @@ test('repeated restoration retains actual timeline control nodes despite browser
  }
 });
 
-test('aggregate filter explanations remain escaped and accessible in compact graph options',()=>{
- const h=harness();let body='';h.context.openModal=(_,html)=>{body=html;};h.context.NetworkToolkitResultFilters={current:()=>({active:true,statistic:'average',reference:18.5,referenceKind:'run',message:'Average is an aggregate <img src=x onerror="unsafe()">'}),graphMatches:()=>true};h.render();h.document.emit('click',h.document.querySelector('[data-rt-options]'));assert.match(body,/Average is an aggregate &lt;img/);assert.doesNotMatch(body,/<img/);assert.match(body,/Run average RTT reference: 18.5 ms/);assert(h.document.querySelector('[data-rt-stat-reference]'));
+test('aggregate filter explanations remain escaped and accessible beside the graph',()=>{
+ const h=harness();let body='';h.context.openModal=(_,html)=>{body=html;};h.context.NetworkToolkitResultFilters={current:()=>({active:true,statistic:'average',reference:18.5,referenceKind:'run',message:'Average is an aggregate <img src=x onerror="unsafe()">'}),graphMatches:()=>true};h.render();body=h.document.querySelector('.rt-filter-note').innerHTML;assert.match(body,/Average is an aggregate &lt;img/);assert.doesNotMatch(body,/<img/);assert.match(body,/Run average RTT reference: 18.5 ms/);assert(h.document.querySelector('[data-rt-stat-reference]'));
 });
 
 test('switching plots preserves the panned viewport and cannot silently resume following',()=>{
@@ -238,4 +238,24 @@ test('chosen time range never includes an RTT change whose previous source sampl
 
 test('a held aggregate can open an original contributor after it leaves retained graph history',()=>{
  const h=harness(),rows=Array.from({length:300},(_,i)=>reply(i+1,5+i%30,new Date(Date.parse('2026-10-26T12:00:00Z')+i*1000).toISOString()));h.api.setPreferences({mode:'condensed'},{persist:false});h.render(rows);const first=h.document.querySelector('[data-rt-surface="latency"] [data-rt-aggregate]');assert(first);h.document.emit('click',first);assert.match(h.detail(),/Grouped samples/);h.render(rows.map(row=>({...row,sequence:row.sequence+1000,time:new Date(Date.parse(row.time)+1000000).toISOString()})));assert.equal(h.api.selectResult('job',h.api.sampleKey(rows[0],0)),true);assert.match(h.detail(),/Sample1/);assert.match(h.document.querySelector('.mock-selection-context').textContent,/snapshot/);
+});
+
+test('endpoint gutters contain singleton, paired and selected markers across modes, ranges, zoom and resize',()=>{
+ for(const mode of ['window','progressive','condensed'])for(const count of [1,2,5]){
+  const h=harness(),rows=Array.from({length:count},(_,i)=>reply(i+1,10+i,stamp(i)));h.api.setPreferences({mode},{persist:false});h.render(rows);
+  assert.equal(h.document.querySelector('[data-rt-options]'),null,'No redundant options menu');
+  assert(h.document.querySelector('[data-graph-time-open]'),'Range is a direct control');
+  for(const size of [180,320,820])for(const zoom of [1,2,.5]){
+   h.api.zoom('job',zoom);const svg=h.document.querySelector('[data-rt-surface]');svg.getBoundingClientRect=()=>({left:0,top:0,width:size,height:80});h.api.restore();
+   for(const marker of svg.querySelectorAll('[data-rt-marker]')){const x=Number(marker.getAttribute('cx')),radius=Number(marker.getAttribute('r'))+2;assert(x-radius>=0,mode+' left highlighted endpoint');assert(x+radius<=size,mode+' right highlighted endpoint');}
+   assert.equal(h.document.querySelector('.rt-time-axis').style.marginRight,'12px','Axis shares the plot gutter');
+  }
+  const htime=h.context.NetworkToolkitGraphHistory;htime.setPreferences({anchor:'range',start:stamp(1),end:stamp(3)});h.render(rows);
+  for(const marker of h.document.querySelectorAll('[data-rt-marker]')){const x=Number(marker.getAttribute('cx')),radius=Number(marker.getAttribute('r'))+2;assert(x-radius>=0&&x+radius<=820);}
+ }
+ const h=harness();assert.equal(h.api.latency([],{id:'empty'}),'','Empty history does not invent endpoints');
+});
+
+test('clearer graph labels preserve distinct 180-sample and retained-history defaults and stored modes',()=>{
+ for(const [mode,count] of [['window',180],['progressive',400]]){const h=harness();h.api.mergePreferences({graphPreferences:{mode}});h.render(Array.from({length:400},(_,i)=>reply(i+1,10,stamp(i))));assert.equal(h.document.querySelectorAll('[data-rt-marker]').length,count);assert.equal(h.api.preferences().mode,mode);const text=h.document.querySelector('[data-rt-mode]').textContent;assert.match(text,/Recent 180/);assert.match(text,/Full history/);}
 });

@@ -169,8 +169,8 @@ async function packetGeometry(label){
 }
 
 const workspace=()=>page.locator('[data-graph-workspace="ui93-monitor"]');
-async function graphAction96(name,action){if(name==='zoom'){await timeline().locator('[data-rt-zoom="'+action+'"]').click();await settle();return;}await timeline().locator('[data-rt-options]').click();await page.locator('[data-rt-'+name+(action?'="'+action+'"':'')+']').click();await page.evaluate(()=>closeModal());await settle();}
-async function packetAction96(name,action){if(name==='zoom'){await page.locator('[data-packet-zoom="'+action+'"]').click();await settle();return;}await page.locator('[data-packet-graph-options]').click();await page.locator('[data-packet-'+name+(action?'="'+action+'"':'')+']').click();await page.evaluate(()=>closeModal());await settle();}
+async function graphAction96(name,action){if(name==='zoom'){await timeline().locator('[data-rt-zoom="'+action+'"]').click();await settle();return;}if(name==='clear')await page.locator('[data-result-graph-clear]').click();else await page.evaluate(({id,amount})=>NetworkToolkitResultTimeline.pan(id,amount),{id:await timeline().getAttribute('data-rt-id'),amount:Number(action)});await settle();}
+async function packetAction96(name,action){if(name==='zoom'){await page.locator('[data-packet-zoom="'+action+'"]').click();await settle();return;}if(name==='pan'){await page.locator('[data-packet-timeline] [data-gn-part="window"]').focus();for(let i=0;i<2;i++)await page.keyboard.press(Number(action)<0?'PageUp':'PageDown');for(let i=0;i<10;i++)await page.keyboard.press(Number(action)<0?'ArrowLeft':'ArrowRight');}else await page.locator('[data-packet-'+name+(action?'="'+action+'"':'')+']').first().click();await settle();}
 (async()=>{
  if(out)fs.mkdirSync(out,{recursive:true});browser=await chromium.launch({headless:true,args:['--no-sandbox']});
  const context=await openContext('America/New_York');await show('monitor');

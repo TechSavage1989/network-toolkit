@@ -1,5 +1,35 @@
 # Network Toolkit development handoff
 
+## 1.17.99 authorized compact graph-control update
+
+The user requested a quick focused build and publication of the graph cleanup,
+and explicitly added fully contained first/last visible markers at every range.
+The baseline is published 1.17.98, with its completed publication record at main
+5b78eea4b2fea5585fa312324a17920878b1b242. No unpublished work was borrowed.
+
+Graph Options dialogs are removed. Range stays directly available at narrow
+widths, Run data is in the existing header, Clear selection remains in entry
+details, and the full-history navigator provides panning and interval resizing.
+Window and Progressive are NOT equivalent for diagnostics: their default ranges
+are 180 and up to 10,000 retained samples respectively. They are labeled Recent
+180 and Full history; existing stored identifiers remain valid without migration.
+Explicit duration/Fit continues to override the default ranges. Condensed and
+the shared mode setting are retained, including packet capture behavior.
+
+The diagnostic plot uses a 12px endpoint gutter, with the same projection bounds
+for the time axis and pointer-anchored zoom. Marker/stroke/highlight containment
+is checked with all/range/zoom, singleton/two-point/empty and resized plots.
+No time-domain stretching, data truncation, navigator or updater redesign.
+
+Local focused JavaScript, syntax and release/layout validation are run. The
+cloud subprocess environment has no usable Go compiler and blocks Chromium IPC;
+a supported escalation failed environment setup. Hosted existing Checks must
+provide native/build/browser verification. No CI suites are removed or skipped.
+Publication is authorized but not complete until the exact source Checks and
+Release pass and tag, four assets, checksums and updater package identity verify.
+No native Windows installation or restart is claimed.
+
+
 ## Repository source layout (no application version change)
 
 **Continuing an older development branch:** before the next build or release,
