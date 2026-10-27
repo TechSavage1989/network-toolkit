@@ -374,13 +374,18 @@ jobs:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-security-browser-tests/node_modules/playwright
           NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-security-browser-results
         run: node scripts/terminal-banner.browser.cjs
-      - name: Check discovery multi-item filters and explicit port actions
+      - name: Check discovery multi-item filters
+        if: success() || failure()
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-security-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-security-browser-results
-        run: |
-          node scripts/discovery-filter.browser.cjs
-          node scripts/discovery-port-actions.browser.cjs
+        run: node scripts/discovery-filter.browser.cjs
+      - name: Check explicit discovery port actions
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-security-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-security-browser-results
+        run: node scripts/discovery-port-actions.browser.cjs
       - uses: actions/upload-artifact@v7
         if: always()
         with:

@@ -75,7 +75,7 @@ function findLine(state,text){return state.lines.findIndex(line=>line.text.inclu
   await receive('\r\n\x1b[32mSTATUS UP\x1b[0m\r\nraw\nNEXT\r\nswitch# ',1);
   const shell=await snapshot(),raw=findLine(shell,'raw'),next=raw+1,status=findLine(shell,'STATUS UP');
   assert.equal(shell.lines[raw].text,'raw');assert.equal(shell.lines[next].text,'   NEXT','Normal PTY bare LF is not rewritten');
-  assert.equal(shell.lines[findLine(shell,'switch#')].text,'switch#');assert.equal(shell.cursorX,'switch# '.length);
+  assert.equal(shell.lines[findLine(shell,'switch#')].text,'switch# ');assert.equal(shell.cursorX,'switch# '.length);
   assert.deepEqual(await page.evaluate(row=>{const c=term.buffer.active.getLine(row).getCell(0);return {palette:!!c.isFgPalette(),color:c.getFgColor()};},status),{palette:true,color:2},'Normal PTY ANSI color is preserved');
   pass('Post-banner '+layout.name+' PTY output retains bare LF, ANSI color and shell-prompt cursor semantics');
  }

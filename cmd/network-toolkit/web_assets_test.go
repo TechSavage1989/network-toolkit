@@ -173,6 +173,8 @@ func TestDiscoveryAssetsAreEmbeddedAndRooted(t *testing.T) {
 	for _, item := range []struct{ path, contentType string }{
 		{"/assets/scan-scopes.js", "text/javascript"},
 		{"/assets/discovery-workspace.js", "text/javascript"},
+		{"/assets/discovery-filter.js", "text/javascript"},
+		{"/assets/discovery-port-actions.js", "text/javascript"},
 		{"/assets/discovery-workspace.css", "text/css"},
 		{"/assets/source-interface.js", "text/javascript"},
 		{"/assets/source-interface.css", "text/css"},

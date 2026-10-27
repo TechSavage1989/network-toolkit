@@ -96,3 +96,21 @@ rejected visibly without partially replacing the current query.
 
 Browser, native Windows, dependency, build and package results are pending.
 Do not promote from these local results alone.
+
+## First hosted checkpoint and focused repairs
+
+Review 0c04945483af2b99568384874efa75e140a95edd (tree ea2208ea) ran
+Checks 40589587198. Windows native and dependency-security jobs passed. The banner
+Go fixtures and shell transition passed. The application dependency-serving test
+correctly caught 404s for the two new embedded discovery scripts: their exact
+filenames were missing from the strict HTTP allowlist. Added only those two
+entries, retaining deny-by-default and unsafe-path checks.
+
+Existing credential/pager browser cases passed; the new normal-width banner
+rendered aligned and its actual PNG was inspected. Its shell-prompt assertion
+incorrectly expected a written trailing space to disappear. Corrected the exact
+expected string while retaining cursor/ANSI checks; bundled-xterm buffer replay
+passes at both widths and all byte boundaries. Independent discovery browser
+steps now run after another test failure, without ignoring failures or weakening
+assertions. First-run discovery browser cases had not yet run. New exact-source
+hosted validation remains required; this failed checkpoint is not acceptance.
