@@ -45,18 +45,62 @@ For the subsequently authorized 1.17.90 build, the 1.17.89 note has also been
 moved unchanged into the archive. Current `RELEASE_NOTES_1.17.90.txt` alone stays
 at root, and the archive index identifies 1.17.90 as current and 1.17.89 as previous.
 
-## 1.17.97 authorized publication
+## 1.17.97 published smooth history, direct controls and visible-value scaling
 
-The user explicitly requested publishing the completed 1.17.97 build.
-The validated runtime is f3604b7823f26e687cb9774cc8c74cc56e3984cc from full
-Checks 40455898670. Publication changes release labels and documentation
-only, preserving the prepared executable and application behavior.
+The user explicitly authorized publication of the completed 1.17.97 update.
+The release is live from the main source/update repository.
+Source/tag: c57ad0e52da1d40cda8a6d268e4161928a686a61
+Tree: e670de6d771d9ee18663960a586b4898176c1fd5
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.97
+Release ID: 425082113
 
-Publication and public updater verification are in progress. Replace this
-paragraph with the final release/source/asset and updater evidence.
+Publication refreshed six release-label/documentation files. Every application
+and embedded runtime input remains identical to the prepared source
+f3604b7823f26e687cb9774cc8c74cc56e3984cc. The public executable matches the
+prepared review executable byte for byte. Release wording identifies the
+published version, and the portable source matches the publication commit.
 
-The completed review evidence below records the state before this subsequent
-publication authorization.
+Full Checks 40458096035 passes on this exact published source:
+application 122036018679, native Windows 122036018389 and browser
+122036018684. Release 40458095982 build and publication also pass.
+659 JavaScript tests, 35 publication/layout safeguards and the required Go
+suites pass. Native Windows shell, installer progress and timestamp/statistics
+checks pass. UI97 passes 4 groups with 8 scale cases, 72 diagnostic layouts
+(48 base and 24 selected) and 17 packet cases. All graph modes, both plots,
+desktop/narrow/short layouts, circular geometry, direct controls, exact time
+axes, wheel anchoring, held details and live following are covered.
+Retained UI96/95/94/93/92 and the earlier application regressions pass.
+All 7 native Chromium updater cases pass, including the real five-minute poll.
+
+All four public files were downloaded and verified against their GitHub asset
+digests and the release manifest. PE GUI/version resources, ZIP integrity,
+binary-only update allowlist, all 799 packaged source files,
+54 historical notes and 14 editor-library digests verify.
+The local publication candidate EXE/portable match the public files.
+All 36 older releases, their original asset IDs/digests/bodies and
+all 36 older tags are unchanged. No old release asset/tag, retired feed,
+repository access or credential was modified.
+
+Public assets:
+- Network_Toolkit.exe: asset 680622800, 17937408 bytes, SHA256 3a0d2dd07b5e22bd1921f84beaa93b5662028456002ddeb2c513b921f3128bd7
+- Network_Toolkit_1.17.97_Portable.zip: asset 680622801, 11453703 bytes, SHA256 73a3f474ea8f21bfcfb91e569d4fc577f6dbf8c5dde8aa3328e6f8cb3d2dd336
+- Network_Toolkit_1.17.97_Update.zip: asset 680622798, 7017546 bytes, SHA256 7957ee274d82afe60237bf9b5337dbf6a09aac10f69ef481dffe5461fe984c02
+- SHA256SUMS: asset 680622803, 290 bytes, SHA256 d4e6ebf64576adb09cf6b876b32ce37da23a57237d1f580832cfd2adef55376f
+
+Live acceptance used the released 1.17.96 production updater code against the
+real public feed. It detected 1.17.97, downloaded and verified its candidate,
+and reached ready in 10.06 seconds. Check/download responses were HTTP
+200 and the staged executable matched the independently verified public hash.
+The source executable was unchanged. No installation, restart or complete
+native WebView2 interaction is claimed.
+
+Main network-toolkit is the sole public source/update feed. This publication is
+complete; future releases need user authorization. This final three-document
+record uses [skip ci] after successful validation/publication. The immutable
+release tag and packaged source remain the published source above.
+
+The completed review evidence below records the earlier review state, before
+the subsequent authorized publication above.
 
 ## 1.17.97 review build — smooth history, direct controls and visible-value scaling
 
