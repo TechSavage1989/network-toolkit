@@ -9,6 +9,10 @@ these protections, nor a high-assurance certification.
 - Windows HTTP pages no longer disclose full application/view capabilities.
   The native host injects an in-memory capability before navigating to its exact
   trusted top-level document. Bootstrap registration failure stops startup.
+  The native host grants only its initial exact-document navigation. After that
+  one-shot permit is consumed, full document reloads, nested documents and new
+  full-page navigations are denied before network access. In-app panels continue
+  to work; close and reopen the native window for a fresh document/bootstrap.
   Independent Terminal activation records contain a separate activation-only
   capability, not a key to credential or other application APIs.
 - Saved passwords and private keys never return from credential GET endpoints.
@@ -89,6 +93,13 @@ scan is evidence about known reachable vulnerabilities, not an independent audit
 or a guarantee against unknown vulnerabilities. Report scanner/database failures
 and findings rather than treating them as a pass. No dependency upgrade is implied
 by a formatting or vendor-metadata repair.
+
+At the 2026-10-27 development checkpoint, both source configurations reported
+zero reachable-symbol or imported-package vulnerabilities. The module-level
+[GO-2026-5932 advisory](https://pkg.go.dev/vuln/GO-2026-5932) concerns the
+unmaintained `golang.org/x/crypto/openpgp` packages, which Toolkit neither imports
+nor vendors. It has no fixed version; this is not a claim that every package in
+the required module is vulnerability-free. Re-run the gate on the final source.
 
 Run the normal Checks pipeline and added Windows security steps. Windows tests
 must exercise real DPAPI round trips/tamper detection, inspect the actual DACL,

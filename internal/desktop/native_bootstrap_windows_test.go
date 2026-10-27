@@ -29,6 +29,12 @@ func TestNativeBootstrapWaitsForSuccessfulRegistration(t *testing.T) {
 			})
 			vtbl[28] = syscall.NewCallback(func(this, id uintptr) uintptr { removals++; return hresultOK })
 			object := &fakeObject{vtable: &vtbl}
+			// uintptr does not keep a Go allocation on the heap or stable across
+			// stack growth. Native COM objects are not Go memory; pin this mock.
+			var pinned runtime.Pinner
+			pinned.Pin(&vtbl)
+			pinned.Pin(object)
+			defer pinned.Unpin()
 			var posted []func()
 			w := &WebView{core: uintptr(unsafe.Pointer(object)), cfg: WebViewConfig{
 				AppURL: "http://127.0.0.1:1234/", SessionToken: strings.Repeat("ab", 32),
@@ -52,7 +58,7 @@ func TestNativeBootstrapWaitsForSuccessfulRegistration(t *testing.T) {
 				w.Close()
 				return
 			}
-			if err != nil || retained == 0 || navigations != 0 || len(posted) != 0 {
+			if err != nil || retained == 0 || navigations != 0 || len(posted) != 0 || w.documentRequestPermit.started {
 				t.Fatalf("navigation raced registration: %v", err)
 			}
 			if _, err := comQuery(retained, iidAddScriptCompleted); err != nil {
@@ -86,7 +92,7 @@ func TestNativeBootstrapWaitsForSuccessfulRegistration(t *testing.T) {
 				fn()
 			}
 			if scenario == "success" {
-				if navigations != 1 || w.bootstrapScriptID != id || failures != 0 {
+				if navigations != 1 || w.bootstrapScriptID != id || failures != 0 || !w.documentRequestPermit.pending || !w.documentRequestPermit.navigationPending {
 					t.Fatal("successful callback did not release exact navigation")
 				}
 			} else if navigations != 0 {
@@ -96,6 +102,9 @@ func TestNativeBootstrapWaitsForSuccessfulRegistration(t *testing.T) {
 				t.Fatal("asynchronous bootstrap failure not reported")
 			}
 			w.Close()
+			if w.documentRequestPermit.pending || w.documentRequestPermit.navigationPending {
+				t.Fatal("closed host retained an initial navigation permit")
+			}
 			if scenario == "success" && removals != 1 {
 				t.Fatal("native bootstrap script was not removed on close")
 			}

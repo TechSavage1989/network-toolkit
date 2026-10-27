@@ -5,20 +5,37 @@ import (
 	"testing"
 )
 
-func TestNativeBootstrapDocumentRequestDestination(t *testing.T) {
+func TestNativeBootstrapInitialDocumentPermit(t *testing.T) {
 	for _, document := range []string{"/", "/terminal-view/" + strings.Repeat("ab", 16)} {
 		app := "http://127.0.0.1:1234" + document
-		if !nativeDocumentRequestAllowed(app, app, "document") {
-			t.Fatal("exact top-level document was rejected")
+		var missing nativeDocumentRequestPermit
+		if missing.consume(app, app) || missing.allowNavigation(app, app) || missing.pending || missing.navigationPending {
+			t.Fatal("renderer navigation armed a missing native permit")
 		}
-		for _, destination := range []string{"", "iframe", "frame", "object", "embed", "empty", "Document"} {
-			if nativeDocumentRequestAllowed(app, app, destination) {
-				t.Fatalf("non-top-level destination %q was accepted", destination)
+		for _, resourceFirst := range []bool{false, true} {
+			var permit nativeDocumentRequestPermit
+			if !permit.begin() || permit.begin() {
+				t.Fatal("initial permit could not be armed exactly once")
+			}
+			if resourceFirst {
+				if !permit.consume(app, app) || !permit.allowNavigation(app, app) {
+					t.Fatal("initial exact document was rejected in resource-first order")
+				}
+			} else if !permit.allowNavigation(app, app) || !permit.consume(app, app) {
+				t.Fatal("initial exact document was rejected in navigation-first order")
+			}
+			if permit.consume(app, app) || permit.allowNavigation(app, app) || permit.begin() {
+				t.Fatal("iframe, reload or repeated native start reused the startup permit")
 			}
 		}
-		for _, target := range []string{"http://127.0.0.1:1234/forbidden", app + "?x=1", "http://localhost:1234" + document, "https://example.invalid/"} {
-			if nativeDocumentRequestAllowed(app, target, "document") {
-				t.Fatalf("alternate document %q was accepted", target)
+		for _, target := range []string{"", "http://127.0.0.1:1234/forbidden", app + "?x=1", app + "#fragment", "http://localhost:1234" + document, "https://example.invalid/"} {
+			var permit nativeDocumentRequestPermit
+			permit.begin()
+			if permit.consume(app, target) || permit.consume(app, app) {
+				t.Fatalf("first wrong document %q failed to consume the resource permit", target)
+			}
+			if permit.allowNavigation(app, target) || permit.allowNavigation(app, app) || permit.begin() {
+				t.Fatalf("wrong or ordinary navigation %q rearmed the initial permit", target)
 			}
 		}
 	}

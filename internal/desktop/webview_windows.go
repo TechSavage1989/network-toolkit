@@ -35,22 +35,23 @@ var (
 // WebView must be created, resized, focused, and closed on the caller's STA UI
 // thread. The Win32 window owner supplies the message pump and COM apartment.
 type WebView struct {
-	parent            uintptr
-	cfg               WebViewConfig
-	ready             func(*WebView, error)
-	readySent         bool
-	closed            bool
-	webRuntime        *installedWebViewRuntime
-	environment       uintptr
-	controller        uintptr
-	core              uintptr
-	core4             uintptr
-	bounds            Rect
-	registrations     []eventRegistration
-	downloads         map[uintptr]eventRegistration
-	pendingDownloads  map[*pendingDownload]bool
-	bootstrapScriptID string
+	parent                  uintptr
+	cfg                     WebViewConfig
+	ready                   func(*WebView, error)
+	readySent               bool
+	closed                  bool
+	webRuntime              *installedWebViewRuntime
+	environment             uintptr
+	controller              uintptr
+	core                    uintptr
+	core4                   uintptr
+	bounds                  Rect
+	registrations           []eventRegistration
+	downloads               map[uintptr]eventRegistration
+	pendingDownloads        map[*pendingDownload]bool
+	bootstrapScriptID       string
 	blockedDocumentResponse uintptr
+	documentRequestPermit   nativeDocumentRequestPermit
 }
 
 type pendingDownload struct {
@@ -234,9 +235,12 @@ func (w *WebView) initializeController() error {
 	}
 	navigation := func(_ uintptr, args uintptr) uintptr {
 		uri, err := comGetString(args, 3)
-		// Ordinary page navigation stays on the exact native document.
+		// Preserve the live application by cancelling every full navigation after
+		// native startup, including reloads of this exact URL. Genuine fragment
+		// changes do not raise this event. Close/reopen for a fresh bootstrap.
 		// Blob reports are accepted only by the separate DownloadStarting path.
-		observeNavigation("top", uri, args, w.closed || err != nil || !sameNativeDocument(w.cfg.AppURL, uri))
+		allowed := w.documentRequestPermit.allowNavigation(w.cfg.AppURL, uri)
+		observeNavigation("top", uri, args, w.closed || err != nil || !allowed)
 		return hresultOK
 	}
 	if err = add(w.core, 7, 8, iidNavigationStarting, navigation); err != nil {
@@ -558,6 +562,8 @@ func (w *WebView) Close() {
 		return
 	}
 	w.closed = true
+	w.documentRequestPermit.pending = false
+	w.documentRequestPermit.navigationPending = false
 	if w.bootstrapScriptID != "" && w.core != 0 {
 		_ = comPutString(w.core, 28, w.bootstrapScriptID)
 		w.bootstrapScriptID = ""

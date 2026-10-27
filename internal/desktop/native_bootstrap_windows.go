@@ -67,6 +67,10 @@ func (w *WebView) installNativeBootstrap() error {
 				return
 			}
 			w.bootstrapScriptID = id
+			if !w.documentRequestPermit.begin() {
+				w.fail(errors.New("The native interface document was already started; close and reopen the window"))
+				return
+			}
 			if err := comPutString(w.core, 5, w.cfg.AppURL); err != nil {
 				w.fail(err)
 			}

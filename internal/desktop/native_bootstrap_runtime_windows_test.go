@@ -27,7 +27,7 @@ func TestNativeBootstrapInstalledWebView2(t *testing.T) {
 		t.Run(document, func(t *testing.T) {
 			token := strings.Repeat("cd", 32)
 			var validProbe, ready, forbiddenExecuted atomic.Bool
-			var unexpectedNavigation atomic.Int32
+			var unexpectedNavigation, nativeDocumentRequests atomic.Int32
 			var requestMu sync.Mutex
 			var unexpectedRequests []string
 			ctx, cancel := context.WithTimeout(context.Background(), 35*time.Second)
@@ -47,7 +47,8 @@ func TestNativeBootstrapInstalledWebView2(t *testing.T) {
 					w.WriteHeader(http.StatusNoContent)
 					return
 				}
-				if r.URL.Path != document || r.Header.Get("Sec-Fetch-Dest") == "iframe" {
+				repeatDocument := r.URL.Path == document && r.Header.Get("Sec-Fetch-Dest") == "document" && nativeDocumentRequests.Add(1) != 1
+				if r.URL.Path != document || r.Header.Get("Sec-Fetch-Dest") == "iframe" || repeatDocument {
 					unexpectedNavigation.Add(1)
 					requestMu.Lock()
 					unexpectedRequests = append(unexpectedRequests, fmt.Sprintf("%s %s destination=%q mode=%q", r.Method, r.URL.RequestURI(), r.Header.Get("Sec-Fetch-Dest"), r.Header.Get("Sec-Fetch-Mode")))
@@ -76,7 +77,9 @@ fetch('/native-probe',{headers:{'X-Native-Test':capability}}).then(response=>{
  const frame=document.createElement('iframe');frame.src='/forbidden-frame';document.body.appendChild(frame);
  const exactFrame=document.createElement('iframe');exactFrame.src=location.href;document.body.appendChild(exactFrame);
  location.href='/forbidden-navigation';
- setTimeout(()=>{window.__networkToolkitStartupState=1;},300);
+ setTimeout(()=>{location.hash='same-document';},75);
+ setTimeout(()=>{location.reload();},150);
+ setTimeout(()=>{window.__networkToolkitStartupState=location.hash==='#same-document'?1:-1;},500);
 }).catch(()=>{window.__networkToolkitStartupState=-1;});}
 </script></body>`)
 			}))
@@ -117,13 +120,16 @@ fetch('/native-probe',{headers:{'X-Native-Test':capability}}).then(response=>{
 				}
 			})
 			err = Run(ctx, Config{Title: "Network Toolkit native security test", URL: server.URL + document, SessionToken: token, DataDir: dataDir, Stop: cancel, OnReady: func() { ready.Store(true); cancel() }, navigationObserver: func(observation nativeNavigationObservation) {
-				t.Logf("native navigation: kind=%s URI=%q blocked=%t cancelHRESULT=%#x readHRESULT=%#x cancelled=%t destination=%q responseHRESULT=%#x runtime=%q", observation.Kind, observation.URI, observation.Blocked, observation.CancelResult, observation.CancelReadResult, observation.Cancelled, observation.ResourceDestination, observation.ResponseResult, observation.RuntimeVersion)
+				t.Logf("native navigation: kind=%s URI=%q blocked=%t cancelHRESULT=%#x readHRESULT=%#x cancelled=%t initialPermit=%t responseHRESULT=%#x runtime=%q", observation.Kind, observation.URI, observation.Blocked, observation.CancelResult, observation.CancelReadResult, observation.Cancelled, observation.InitialDocumentPermit, observation.ResponseResult, observation.RuntimeVersion)
 			}})
 			if err != nil {
 				t.Fatal(err)
 			}
 			if !ready.Load() || !validProbe.Load() {
 				t.Fatal("installed WebView2 did not initialize through native-only capability")
+			}
+			if nativeDocumentRequests.Load() != 1 {
+				t.Fatalf("expected exactly one native document request, got %d", nativeDocumentRequests.Load())
 			}
 			if unexpectedNavigation.Load() != 0 {
 				requestMu.Lock()

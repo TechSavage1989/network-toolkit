@@ -72,8 +72,6 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
-      - name: Record security source formatting review
-        run: git ls-files -z 'cmd/**/*.go' 'internal/**/*.go' | xargs -0 gofmt -d > "$RUNNER_TEMP/network-toolkit-gofmt.patch"
       - name: Verify pinned module checksums and vendored source
         run: |
           go mod download
@@ -109,7 +107,6 @@ jobs:
         with:
           name: dependency-security-review
           path: |
-            ${{ runner.temp }}/network-toolkit-gofmt.patch
             ${{ runner.temp }}/network-toolkit-vendor-review.patch
             ${{ runner.temp }}/network-toolkit-vuln-*.txt
           if-no-files-found: error

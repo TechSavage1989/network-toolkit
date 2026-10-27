@@ -5,7 +5,6 @@ package desktop
 import (
 	"errors"
 	"runtime"
-	"syscall"
 	"unsafe"
 )
 
@@ -57,59 +56,27 @@ func (w *WebView) installDocumentRequestPolicy() error {
 
 func (w *WebView) documentResourceRequested(_ uintptr, args uintptr) uintptr {
 	var request uintptr
-	uri, destination := "", ""
+	uri := ""
 	if !failed(comCall(args, 3, uintptr(unsafe.Pointer(&request)))) && request != 0 {
 		defer comRelease(request)
 		uri, _ = comGetString(request, 3)
-		destination, _ = nativeRequestHeader(request, "Sec-Fetch-Dest")
 	}
-	// Sec-Fetch-Dest is browser-generated, not a script-settable header. Missing
-	// or unrecognized metadata fails closed; a nested exact-app-URL frame is not
-	// a top-level document and must not slip through the URI allowlist.
-	blocked := w.closed || !nativeDocumentRequestAllowed(w.cfg.AppURL, uri, destination)
+	// Fetch-Metadata headers are not yet available at this interception stage.
+	// A single-use native startup permit distinguishes the initial trusted page
+	// without relying on renderer-controlled headers or same-URL frame guesses.
+	pending := w.documentRequestPermit.pending
+	allowed := w.documentRequestPermit.consume(w.cfg.AppURL, uri)
+	blocked := w.closed || !allowed
 	hr := hresultOK
 	if blocked {
 		hr = comCall(args, 5, w.blockedDocumentResponse)
 	}
 	if w.cfg.navigationObserver != nil {
-		w.cfg.navigationObserver(nativeNavigationObservation{Kind: "resource", URI: uri, Blocked: blocked, ResourceDestination: destination, ResponseResult: uint32(hr)})
+		w.cfg.navigationObserver(nativeNavigationObservation{Kind: "resource", URI: uri, Blocked: blocked, InitialDocumentPermit: pending, ResponseResult: uint32(hr)})
 	}
 	if failed(hr) {
 		// Never continue with the original request if response replacement failed.
 		w.fail(errors.New("The native document request could not be blocked"))
 	}
 	return hr
-}
-
-func nativeRequestHeader(request uintptr, name string) (string, error) {
-	var headers uintptr
-	if err := hresultError("Read native request headers", comCall(request, 9, uintptr(unsafe.Pointer(&headers)))); err != nil {
-		return "", err
-	}
-	if headers == 0 {
-		return "", errors.New("Native request headers are unavailable")
-	}
-	defer comRelease(headers)
-	key := utf16String(name)
-	var value *uint16
-	hr := comCall(headers, 3, uintptr(unsafe.Pointer(key)), uintptr(unsafe.Pointer(&value)))
-	runtime.KeepAlive(key)
-	if value != nil {
-		defer oleMemory.Call(uintptr(unsafe.Pointer(value)))
-	}
-	if err := hresultError("Read native request destination", hr); err != nil {
-		return "", err
-	}
-	if value == nil {
-		return "", errors.New("Native request destination is absent")
-	}
-	chars := make([]uint16, 0, 16)
-	for i := 0; i < 256; i++ {
-		ch := *(*uint16)(unsafe.Add(unsafe.Pointer(value), i*2))
-		if ch == 0 {
-			return syscall.UTF16ToString(chars), nil
-		}
-		chars = append(chars, ch)
-	}
-	return "", errors.New("Native request destination is invalid")
 }

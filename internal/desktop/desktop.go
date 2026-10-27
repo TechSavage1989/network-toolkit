@@ -30,15 +30,15 @@ type Config struct {
 }
 
 type nativeNavigationObservation struct {
-	Kind             string
-	URI              string
-	Blocked          bool
-	CancelResult     uint32
-	CancelReadResult uint32
-	Cancelled        bool
-	ResourceDestination string
-	ResponseResult uint32
-	RuntimeVersion string
+	Kind                  string
+	URI                   string
+	Blocked               bool
+	CancelResult          uint32
+	CancelReadResult      uint32
+	Cancelled             bool
+	InitialDocumentPermit bool
+	ResponseResult        uint32
+	RuntimeVersion        string
 }
 
 // Rect has the layout of a Win32 RECT. Coordinates are physical screen pixels
@@ -54,11 +54,11 @@ type Rect struct {
 // except Post execute on the window's STA thread. Post may be called from any
 // goroutine and returns false once the window starts shutting down.
 type WebViewConfig struct {
-	AppURL       string
-	SessionToken string
-	UserDataPath string
-	SaveDownload func(suggestedName string) (path string, ok bool)
-	Post         func(func()) bool
-	OnError      func(error)
+	AppURL             string
+	SessionToken       string
+	UserDataPath       string
+	SaveDownload       func(suggestedName string) (path string, ok bool)
+	Post               func(func()) bool
+	OnError            func(error)
 	navigationObserver func(nativeNavigationObservation)
 }

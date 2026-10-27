@@ -53,8 +53,37 @@ func sameNativeDocument(appURL, candidate string) bool {
 	return err == nil && target.Scheme == app.Scheme && target.Host == app.Host && target.Path == app.Path
 }
 
-func nativeDocumentRequestAllowed(appURL, candidate, destination string) bool {
-	return destination == "document" && sameNativeDocument(appURL, candidate)
+// Only the first native-host navigation may fetch a document. No renderer page
+// exists when this permit is armed. It is consumed before that page is returned,
+// so child frames and renderer-triggered reloads cannot reuse it. Subresources
+// and API requests never enter this document-only policy.
+type nativeDocumentRequestPermit struct {
+	started           bool
+	pending           bool
+	navigationPending bool
+}
+
+func (p *nativeDocumentRequestPermit) begin() bool {
+	if p.started {
+		return false
+	}
+	p.started, p.pending, p.navigationPending = true, true, true
+	return true
+}
+
+// NavigationStarting and resource interception may arrive independently. Both
+// permits are armed only by the native initial Navigate, and consumed once.
+// Genuine same-document fragments do not raise NavigationStarting.
+func (p *nativeDocumentRequestPermit) allowNavigation(appURL, candidate string) bool {
+	allowed := p.navigationPending && candidate == appURL && sameNativeDocument(appURL, candidate)
+	p.navigationPending = false
+	return allowed
+}
+
+func (p *nativeDocumentRequestPermit) consume(appURL, candidate string) bool {
+	allowed := p.pending && candidate == appURL && sameNativeDocument(appURL, candidate)
+	p.pending = false
+	return allowed
 }
 
 func nativeSessionBootstrap(appURL, token string) (string, error) {
