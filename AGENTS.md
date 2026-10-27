@@ -3,9 +3,16 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-Current development review: 1.17.98, based on main 8a3c876.
-The user authorized implementation/build delivery, not publication.
-Read the current handoff section for validation progress.
+Current verified review build: 1.17.98, based on main 8a3c876.
+Source: 78360788f4f1b426cc9c7d11cfd0988340379422
+Tree: 891660297914c5c331dd6b4858af69161c67b857
+Full Checks 40468142795 passes application, native Windows and browser jobs.
+667 JavaScript tests, 35 safeguards, required Go/native/browser suites and all
+7 updater timer cases pass, including the real five-minute poll. Local/GitHub
+portable files and embedded EXEs match; 808 source files, 55 historical notes
+and 14 editor digests verify. See handoff for evidence and platform limits.
+The user authorized implementation/build delivery, not publication. The public
+update remains 1.17.97. This final three-file documentation child uses [skip ci].
 
 Current verified published version: 1.17.97.
 Source/tag: c57ad0e52da1d40cda8a6d268e4161928a686a61

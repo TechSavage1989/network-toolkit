@@ -1,9 +1,77 @@
-NETWORK TOOLKIT 1.17.98 REVIEW DEVELOPMENT
+NETWORK TOOLKIT 1.17.98 VERIFIED REVIEW BUILD
 
-Base: main 8a3c87648a2c991051e8b05e19232afee1b1b3bb.
-The requested Fit and timeline navigator changes are being validated.
-Public main/update feed and 1.17.97 release assets remain unchanged.
-No installation/restart or complete native WebView2 execution is claimed.
+The user authorized implementation, build delivery, validation and handoff updates.
+The completed work is on review/hosts-editor-1.17.98, based on main
+8a3c87648a2c991051e8b05e19232afee1b1b3bb. Publication is not authorized by
+this request. Main and its public update feed remain at published 1.17.97.
+
+Build source: 78360788f4f1b426cc9c7d11cfd0988340379422
+Tree: 891660297914c5c331dd6b4858af69161c67b857
+Full Checks: https://github.com/TechSavage1989/network-toolkit/actions/runs/40468142795
+Application 122068446101, native Windows 122068445511 and browser
+122068445811 all pass on this exact source. The required Go suites,
+667 JavaScript tests and 35 publication/layout safeguards pass. Native Windows
+shell, installer-progress and timestamp/statistics checks pass. Focused local
+capture/graph race checks also pass; restricted local network-interface tests
+are covered by the successful hosted application checks.
+
+Fit selects All retained history, resets temporal positioning/zoom and fits
+full retained timestamps, including with active filters and held selections.
+Mode, measurement tab, filters, sorting and original entry details remain intact.
+A compact linear-time navigator shows the entire retained run or capture and
+an exact proportional viewing window. Body dragging preserves duration;
+independent handles and keyboard controls adjust the respective boundaries.
+Captured pointer drags, focus retention and exact timestamp descriptions stay
+reliable through rendering. Tiny windows retain honest coverage and larger
+hit areas; requested intervals outside the recording remain explicit.
+
+Presets, advanced historical intervals, plot buttons, wheel zoom, panning,
+measurement tabs and Condensed history use the same viewport. Manual views
+hold absolute nanosecond boundaries during live updates. Follow latest releases
+held entries and resumes linked tracking with the selected duration and zoom;
+an All view continues expanding with incoming history. Singleton timelines
+retain their actual instant, centered marker and truthful time-axis label.
+
+Full-history previews use bounded extrema/status summaries and preserve gaps,
+zeros and failure information. Each main plot still fits original visible
+contributors independently. Packet capture caches full-extent summaries and
+chronological indexes by recording revision and display-filter tuple. A light
+viewport endpoint groups exact contributing frames using binary-searched
+bounds; drag requests reuse the overview revision while new frames arrive.
+Rapid requests are coalesced and stale responses discarded. Full statistics,
+original frames, export scope and recorded timestamps are unchanged. Switching
+analysis views clears stale content before loading, avoiding duplicate graphs
+while a selected interval opens its details in Packets.
+
+UI98 passes five groups, including 24 diagnostic layouts, packet layouts,
+all graph modes and both plots, proportional drag/resize, keyboard/pointer
+capture, custom/outside ranges, filtered Fit, live/held selections, linked
+following, collapse/restore, sparse/empty/zero/unsuccessful cases, nanosecond
+intervals, ten thousand measurements and complete packet exports. Compact
+responsive sizing preserves actual plots, complete result rows and visible
+footers without graph-pane scrolling. Retained UI97/96/95/94/93/92 and the
+other application/browser regressions pass in their covered themes and sizes.
+All seven native Chromium updater cases pass, including the real five-minute
+poll and the released negative control. No installation/restart or complete
+native WebView2 interaction is claimed.
+
+The local portable archive matches GitHub review artifact 12717656219 byte
+for byte, so its embedded EXE also matches. All 808 packaged source files match
+the exact build commit. ZIP integrity, PE x64 GUI/version resources, source and
+binary manifests, the strict binary-only update inventory, 55 historical notes
+and all 14 editor-library digests verify. The previous 1.17.97 note is archived
+unchanged. All 37 existing releases/assets/bodies and 37 tags retain their
+verified metadata and digests. No old release, retired feed, access or credential
+was changed.
+
+EXE SHA256: 6a48dd47c69ec178bfe5653cfef1260bc183d59c631fe7043e06af67a1a16094
+Portable SHA256: 182e71b7629a8268d56e667cd0ecef0207d41812e7c050cde2554a8dc49c35f3
+Update ZIP SHA256: e2273ab4a5ccded4dcd14323561eee281b57eb92666a3d34ce6d4b0445edb17c
+
+This final three-document record is a [skip ci] child of the validated build.
+It changes no runtime input and does not rebuild or replace the delivered
+review artifacts. Their frozen packaged source remains the build commit above.
+Future publication requires user authorization.
 
 Previous verified release evidence follows.
 
