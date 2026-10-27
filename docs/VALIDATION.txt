@@ -1,34 +1,77 @@
-NETWORK TOOLKIT 1.17.100 VALIDATION IN PROGRESS
+NETWORK TOOLKIT 1.17.100 PUBLISHED AND VERIFIED
 
-1.17.100 authorized Linear/Condensed cleanup
+1.17.100 published Linear/Condensed graph cleanup
 
-The user approved this focused build/publication, then added nonlinear Condensed
-Fit matching a visual reference and stable contained oldest/last endpoints.
+User-authorized publication is complete:
+https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.100
+Release ID: 425311484
+Source/tag: 783981434a615307b09eeb7f83ef2671b04b3d44
+Tree: 29575b61c21ed028f8450b6814900ba0bb4a2cb5
 Baseline: published 1.17.99 and docs main c8d084e5c09ae84f5a13babc68c3001423dd397f.
-Fresh main/release/active-run checks found no intervening concurrent source work.
+Fresh remote/concurrency checks preceded editing and promotion. No unpublished
+concurrent work was borrowed, overwritten or force-pushed.
 
-Linear replaces Window/Progressive and their 180-sample default; both old stored
-values normalize to Linear. The 10,000-sample retention bound, raw source records,
-held selections, plots, Timeframe, zoom and full-history navigator remain intact.
-Packet requests accept the new Linear identifier and retain old API aliases.
-The shared Run data toolbar button and narrow heading Run details are removed.
-Unique context/activity/raw run data are accessible in the existing entry-details
-Run details disclosure, with access beside empty results when no entry exists.
+Graphs offer only Linear and Condensed. Old Window/Progressive stored values
+migrate to Linear; the obsolete 180-sample default is removed. The existing
+10,000-sample retention bound, full recorded data, selections, shared plots,
+Timeframe, zoom, navigation and Follow latest are preserved. Packet graph APIs
+accept Linear and retain legacy mode aliases for compatibility.
 
-Both user images were viewed. The reference shows progressively denser equal-time
-spacing to the left. Existing logarithmic projection was nearly linear on short
-ranges and grouped markers obscured its spacing on modest histories. The shared
-projection now limits its recent-time scale to visible span/9, with the exact same
-scale for inverse ticks and anchored zoom. Diagnostic histories up to 1,400 visible
-points retain raw markers; larger histories keep bounded grouping and contributors.
-No timestamps are moved, no source records removed and no arbitrary range is fitted.
-Existing endpoint padding and full-history Fit are retained and regression-tested.
+Both supplied reference images were viewed. Condensed uses a smooth nonlinear
+time projection with progressively denser older-left spacing, including short
+Fit ranges. Its effective recent scale is capped at visible span/9; projection,
+inverse axis ticks and pointer-anchored zoom share the same mapping. Diagnostic
+histories up to 1,400 visible points retain original markers; larger histories
+retain bounded grouping, original contributors, extrema and loss counts.
+Fit remains anchored to the actual retained extent, including growth across the
+raw/group threshold and retention rollover. Endpoint gutters contain markers
+and highlights. Explicit ranges preserve genuine blank intervals and exact times.
+A row-hover reveal now reapplies hover after the navigation rebuild clears it.
 
-Focused local graph/migration/details tests, syntax and release/layout validation
-are run; existing complete hosted Checks remain mandatory without weakening.
-Local Go/native browser unavailable as documented for 1.17.99. Publication remains
-pending exact-source Checks, safe expected-head promotion, Release and four-asset
-updater/manifest/version/source identity checks. No native installation is claimed.
+The extra Run details heading control and Run data graph-toolbar button are
+removed. Unique run context, activity log and raw result data are together in
+Run details within the existing entry-details pane. Empty runs retain access
+beside the empty-result message. No unique recorded information was deleted.
+
+Exact-source review Checks 40486961204 PASSED all jobs:
+application/build 122131049328, Windows 122131049581, browser 122131049558.
+672 JavaScript tests, 35 release/layout safeguards and required Go suites pass.
+All retained browser suites pass, including migration, details, graph scale,
+full-history navigation, visible rows and all seven native updater cases with
+the real five-minute poll. Local 181 focused tests, syntax and metadata checks
+passed. Desktop and narrow rendered graph screenshots were inspected.
+Two earlier review attempts exposed test-only assumptions: a pixel-ambiguous
+click in newly full Linear history, then an undefined helper in the relocated
+Run details smoke. The tests now choose an explicit timeframe before precise
+pointer selection, Fit before all-history assertions, and use the existing
+suite settling helper. No CI job/assertion was disabled or weakened.
+
+Release 40489248759 PASSED. Main was advanced non-forcibly with an expected-head
+lease to the exact reviewed source. Tag/main provenance and latest feed verified.
+Duplicate main Checks 40489248768 is still running: application 122138723499 and
+Windows 122138723323 pass; browser 122138723495 is pending completion. This is
+not claimed as a completed all-green duplicate run. Observation is only to close
+its record; it does not delay this fully reviewed and verified release.
+
+All four public assets were downloaded and their GitHub digests, outer/inner
+checksums, ZIP CRCs, PE x64 GUI/version resources, exact four-member binary-only
+updater allowlist, executable identity and all 810 packaged source files verify.
+Standalone EXE and portable ZIP match review artifact 12725512545 byte for byte.
+The live latest feed resolves to v1.17.100 with the expected updater URLs.
+v1.17.99 retains its release ID, asset IDs/digests and body. No old tag/asset,
+retired feed, repository access or credential was changed.
+
+Public SHA256:
+- Network_Toolkit.exe: 2c119254884ad52dcfd73a2f87aca96626878d43316493fe0f611238474ad301
+- Network_Toolkit_1.17.100_Portable.zip: f24b5328d75744a128fb9e9971b3721fb59b39c3a11adb9f275cb3ba1e99dc10
+- Network_Toolkit_1.17.100_Update.zip: 83c9a74fd5b1f4bf6672f6fc96c6ccc6b51fbb41ec976999f78161cf00869882
+- SHA256SUMS: 1a5e805e36e5a43811f7ecb034175e73889980782ea33b7d07c59274a18b1aad
+
+No native installation/restart, complete WebView2 session or new live updater
+staging run is claimed. Local Go/browser execution was unavailable; hosted
+native/build/browser evidence is used. Updater implementation is unchanged.
+This documentation-only publication record does not rebuild assets or move the
+release tag. Future builds/publication require separate authorization.
 
 Earlier verified release evidence follows.
 

@@ -3,13 +3,18 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-The user authorized 1.17.100 Linear/Condensed cleanup, nonlinear Condensed Fit,
-contained stable endpoints, run-detail relocation, build and publication.
-Baseline: published 1.17.99 and main c8d084e5c09ae84f5a13babc68c3001423dd397f.
-1.17.100 is pending exact-source Checks, Release and four-asset verification.
-See docs/DEVELOPMENT_HANDOFF.md for current scope and historical evidence.
-Do not replace old tags/assets, change access or write the retired update feed.
-Final handoff-only records use [skip ci].
+Current published version: 1.17.100. Source/tag:
+783981434a615307b09eeb7f83ef2671b04b3d44
+Full exact-source review Checks 40486961204 and Release 40489248759 passed.
+All four public assets, updater inventory, PE/version, matching executable and
+810 packaged source files verify. Source and executable match the reviewed build.
+Duplicate main Checks 40489248768 has passed application and Windows jobs;
+its browser job is still running. Do not claim that duplicate run is all green yet.
+See docs/DEVELOPMENT_HANDOFF.md for implementation, hashes and honest limits.
+
+Publication was authorized and is complete. Future builds/publication require
+separate authorization. Never replace old tags/assets, change access or write
+the retired update feed. Final handoff-only records use [skip ci].
 
 ## Release-note organization
 
