@@ -1,14 +1,87 @@
 # Network Toolkit development handoff
 
-## Authorized 1.17.105 candidate
+## 1.17.105 published and independently verified
 
-The user approved the SSH banner fix, multi-item discovery filters and clickable
-TCP-port connection actions, then explicitly said to push and keep them updated.
-The combined work starts from closure main1197870a348b71558af1ce3402601aa09cfaccc6
-(tree d052531be61be98642f59bdeb13819c05e7d92ff), preserving published104 safeguards.
-See RELEASE105_HANDOFF.md for scope, tests and the current publication state.
-104 remains published until exact-source required gates and controlled promotion
-complete. Do not overwrite its tag/assets or broaden these three features.
+Published 2026-10-27:
+https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.105
+Release ID: 426056352
+Exact reviewed/published source and tag: 1d716c1916833d9fb14dee44016bf0f75e568305
+Tree: 31fafbe7e2b327254e68b95cb2bb3bfa46f0a8cc
+Baseline: main 1197870a348b71558af1ce3402601aa09cfaccc6, the completed 104 closure.
+Expected-head, non-force promotion succeeded after all exact-source gates passed.
+This later handoff-only record does not rebuild, move the tag or replace assets.
+
+Completed user-authorized scope:
+- SSH authentication-banner bare-LF normalization prevents cumulative staircase
+  indentation while preserving CRLF/lone CR, callback boundaries, UTF-8/ANSI and
+  normal PTY/Telnet/serial bytes. The screenshot-shaped negative control reproduces
+  the original symptom; normal/narrow corrected banners and later prompts align.
+- Discovery filters accept multiline clipboard lists, whitespace/comma-separated
+  alternatives and quoted phrases. MAC colon/hyphen/plain/Cisco-dotted forms
+  normalize; complete IP addresses match exactly. Text searches retain relevant
+  device fields. Existing outcome/type/view controls remain AND constraints.
+  Shared discovery/TCP/ping/neighbor views use the same semantics. Network-only
+  persistence accepts 32,768 UTF-16 units/98,304 UTF-8 bytes; oversized paste is
+  rejected explicitly without partial replacement, not silently truncated.
+- Open TCP ports are keyboard-accessible connection actions. Recorded verified
+  service evidence, when present, is preferred; port numbers remain hints, and unknown
+  services require a choice. Terminal/file clients prepare the clicked host/port
+  with blank fresh authentication and no auto-connect. Browser/RDP reuse the
+  constrained native launcher. Busy/pending existing file operations are not
+  displaced. Independent numeric port-list copy controls remain available.
+
+Required exact-source Checks 40592954170 completed SUCCESS, all five jobs:
+- Application 122501580365: Go lifecycle/banner/filter API tests, 787 JavaScript
+  tests, 42 Python guards, Windows x64 GUI build and review portable package.
+- Dependency 122501580515: canonical vendor exact match; Linux/Windows scans
+  report zero reachable/imported-package vulnerabilities. Unused/unvendored
+  OpenPGP advisory GO-2026-5932 remains disclosed, not a blanket audit claim.
+- Security/new-feature browser 122501580500: credential and pager regressions,
+  byte-boundary banner replay, native multiline clipboard filters, port routing,
+  independent copy and zero-unintended-launch checks with synthetic fixtures.
+- Windows 122501580636: existing DPAPI/native vault/bootstrap/security acceptance.
+- Full browser 122501580585: existing layout/graph/clipboard/session regressions,
+  six-layout scan/copy checks and actual five-minute updater timer 301,577 ms,
+  plus historical negative control. No timer shortcut or skipped required gate.
+
+Actual normal/narrow banner, filter/pinned-header and port/chooser PNGs, clean
+light/dark scan layouts and native vault/credential/pager images were inspected.
+Earlier missing asset allowlist, exact prompt-space fixture, responsive Results
+selection fixture and aggregate port-copy compatibility failures were fixed;
+existing security/clipboard/layout assertions were not weakened for acceptance.
+Short fixture summary/icon/toast artifacts are not live-device acceptance claims.
+
+Release 40595062787 completed SUCCESS (build 122508776981, publish 122509396402).
+All four public assets were independently downloaded from their exact release
+URLs. GitHub digests/sizes, manifests, ZIP safety/CRCs, x64 GUI PE/version, all 897
+packaged source files and the updater four-file allowlist were verified. Public
+EXE and portable ZIP exactly match the reviewed package. Latest release/update
+feed and tag point to 105. Prior 104 release 425987316, body, asset IDs, sizes and
+digests remain unchanged. No repository access or retired update feed was changed.
+
+Public SHA256:
+- Network_Toolkit.exe: a2fa3a3b8669ba468234936f21e7bcf9e6e32506e609d5edebe6e14b75757442
+- Network_Toolkit_1.17.105_Portable.zip: ebb043802f5ca1e0c2ede0bbfa7526b677364a0c0a78525c423aa33d97f2b57a
+- Network_Toolkit_1.17.105_Update.zip: 6a089a514a382b5671a87ed16945772e4e61ab11844e657454b1c8c542aea307
+- SHA256SUMS: 7a034efd40ede195105107280ce5e93cb30c8adbaa8e1d800c15bcd9c158cf43
+Updater members are only Network_Toolkit_1.17.105_Windows_x64.exe, SHA256SUMS,
+THIRD_PARTY_NOTICES.txt and UPDATING.txt under Network_Toolkit_1.17.105/.
+
+Automatic duplicate-main Checks 40595062882 completed SUCCESS at 22:42:57 UTC:
+application 122508777810, dependency 122508777455, browser 122508777815,
+security/new-feature browser 122508777994 and Windows 122508778002 all passed.
+No optional rerun or application change followed publication. This closure changes
+only AGENTS.md, DEVELOPMENT_HANDOFF.md, RELEASE105_HANDOFF.md and VALIDATION.txt
+with [skip ci]; published source, tags and assets remain immutable.
+
+Limits: all fixture/device data is synthetic; no real user switch, credentials,
+settings, migration, installation or reboot was accessed. This is a focused
+banner fix, not universal terminal-format/device-fleet certification. Existing
+104 vault threat-model limitations, bounded pager patterns/archives and explicit
+saved preferences remain unchanged. No credential-backend/vaultcrypto/native
+launcher behavior was broadened. Future implementation needs new user scope.
+
+See RELEASE105_HANDOFF.md for retained implementation and failed-checkpoint history.
 
 ## 1.17.104 published and independently verified
 

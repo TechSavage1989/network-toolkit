@@ -3,17 +3,20 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-Authorized development target: 1.17.105, covering SSH authentication-banner
-line endings, multi-item discovery filtering and explicit TCP-port actions.
-Publication is authorized after exact-source required checks and release asset
-verification. See docs/RELEASE105_HANDOFF.md. No user devices or credentials may
-be accessed for validation. Keep the published 104 tag/assets immutable.
+Current published version: 1.17.105. The user-authorized SSH banner alignment,
+multi-item discovery filtering and explicit TCP-port actions are published and
+independently verified. Exact source/tag:
+1d716c1916833d9fb14dee44016bf0f75e568305 (tree 31fafbe7e2b327254e68b95cb2bb3bfa46f0a8cc).
+All five exact-source required Checks and Release passed; four public assets,
+source bytes, reviewed binary/portable identity and latest update feed verified.
+Read docs/RELEASE105_HANDOFF.md and docs/DEVELOPMENT_HANDOFF.md for evidence,
+limits and duplicate-main closure. This docs-only closure is not another build.
 
-Current published version: 1.17.104. The combined credential-security, graph,
-canonical icon, terminal pager and new/unset-default release is published and
-independently verified. Read docs/DEVELOPMENT_HANDOFF.md,
-docs/SECURITY104_HANDOFF.md, docs/CREDENTIAL_SECURITY.md and
-docs/CONDENSED_GRAPH_SCALING.md before further work.
+Published 104 credential security, graph, canonical icon, terminal pager/defaults
+and output archives remain intact. Read docs/SECURITY104_HANDOFF.md,
+docs/CREDENTIAL_SECURITY.md and docs/CONDENSED_GRAPH_SCALING.md as applicable.
+No new feature/release or live user devices/credentials access is authorized by
+this historical handoff. Keep every published tag/asset immutable.
 
 The user expressly chose master-password encryption with Windows-account
 remembered unlock across restarts and reboots after same-user-risk disclosure.
@@ -23,7 +26,7 @@ are blocked. Recovery is optional and migration is explicit native setup.
 The retained old DPAPI vault requires separate user-confirmed cleanup. No actual
 user vault/settings access or migration is authorized by this development record.
 
-The reviewed/published source is 554f360613aa960a28ee459a44018da39a0bbcff.
+The prior 104 reviewed/published source is 554f360613aa960a28ee459a44018da39a0bbcff.
 This handoff-only closure does not replace published assets or authorize a new
 feature/release. Keep future work scoped, preserve explicit settings and existing
 release safeguards, and coordinate concurrent files before editing.
