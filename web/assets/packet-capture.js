@@ -296,7 +296,7 @@ function renderPacketInterval(area){
  area.dataset.packetDetail=stamp;layoutDetails();return true;
 }
 async function resumePacketLatest(){
- model.graphViewEnd=''; model.graphHold=false;model.graphSelectionVersion=(model.graphSelectionVersion||0)+1;model.graphHeldEnd='';model.heldPacketNumber=null;model.intervalSelection=null;model.liveDetails=true;model.follow=true;if(node('packetFollow'))node('packetFollow').checked=true;
+ model.graphViewEnd='';model.graphBaseScope=null; model.graphHold=false;model.graphSelectionVersion=(model.graphSelectionVersion||0)+1;model.graphHeldEnd='';model.heldPacketNumber=null;model.intervalSelection=null;model.liveDetails=true;model.follow=true;if(node('packetFollow'))node('packetFollow').checked=true;
  const selection=packetTimelineState();selection.pinned=false;selection.pin=null;selection.hover=null;selection.follow=true;model.inspectPointer=false;model.inspectFocus=false;model.keyboardInspection=false;hidePacketGraphPopup();restorePacketGraphScroll();updatePacketTimeline();
  if(root.NetworkToolkitGraphHistory?.preferences?.().anchor!=='latest'&&root.NetworkToolkitGraphHistory)root.NetworkToolkitGraphHistory.setPreferences({anchor:'latest'});
  await refresh(true);await followPacketLatest(true);restorePacketGraphScroll();renderDetail();
