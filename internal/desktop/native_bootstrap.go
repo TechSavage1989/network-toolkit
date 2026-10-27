@@ -53,6 +53,10 @@ func sameNativeDocument(appURL, candidate string) bool {
 	return err == nil && target.Scheme == app.Scheme && target.Host == app.Host && target.Path == app.Path
 }
 
+func nativeDocumentRequestAllowed(appURL, candidate, destination string) bool {
+	return destination == "document" && sameNativeDocument(appURL, candidate)
+}
+
 func nativeSessionBootstrap(appURL, token string) (string, error) {
 	u, err := nativeDocumentURL(appURL)
 	if err != nil {

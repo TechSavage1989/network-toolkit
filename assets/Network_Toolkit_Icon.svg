@@ -1,11 +1,25 @@
+<?xml version='1.0' encoding='utf-8'?>
 <svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
-  <rect x="16" y="16" width="224" height="224" rx="48" fill="#17233a"/>
-  <path d="M72 82h112v88H72z" fill="none" stroke="#6388be" stroke-width="16" stroke-linejoin="round"/>
-  <path d="M128 70v116M70 128h116" fill="none" stroke="#6388be" stroke-width="12"/>
-  <rect x="46" y="54" width="54" height="54" rx="14" fill="#3b82f6"/>
-  <rect x="156" y="54" width="54" height="54" rx="14" fill="#22d3ee"/>
-  <rect x="46" y="148" width="54" height="54" rx="14" fill="#14b8a6"/>
-  <rect x="156" y="148" width="54" height="54" rx="14" fill="#f5b94c"/>
-  <circle cx="128" cy="128" r="25" fill="#e8f3ff"/>
-  <path d="m112 129 10 10 22-23" fill="none" stroke="#17233a" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <g>
+    <g id="background-tile">
+      <path fill="#17233A" id="background" d="M64,16h128c26.51,0,48,21.49,48,48v128     c0,26.51-21.49,48-48,48H64c-26.51,0-48-21.49-48-48V64C16,37.49,37.49,16,64,16z" />
+    </g>
+    <g id="network-connections">
+      <path fill="none" stroke="#6388BE" stroke-width="16" stroke-linejoin="round" id="border" d="M72,82h112v88H72V82z" />
+      <path fill="none" stroke="#6388BE" stroke-width="12" id="cross" d="M128,54v148 M70,128h116" />
+    </g>
+    <g id="connected-devices">
+      <path fill="#3B82F6" id="blue" d="M60,54h26c7.73,0,14,6.27,14,14v26c0,7.73-6.27,14-14,14H60     c-7.73,0-14-6.27-14-14V68C46,60.27,52.27,54,60,54z" />
+      <path fill="#22D3EE" id="cyan" d="M170,54h26c7.73,0,14,6.27,14,14v26c0,7.73-6.27,14-14,14h-26     c-7.73,0-14-6.27-14-14V68C156,60.27,162.27,54,170,54z" />
+      <path fill="#14B8A6" id="teal" d="M60,148h26c7.73,0,14,6.27,14,14v26c0,7.73-6.27,14-14,14H60     c-7.73,0-14-6.27-14-14v-26C46,154.27,52.27,148,60,148z" />
+      <path fill="#F5B94C" id="yellow" d="M170,148h26c7.73,0,14,6.27,14,14v26     c0,7.73-6.27,14-14,14h-26c-7.73,0-14-6.27-14-14v-26C156,154.27,162.27,148,170,148z" />
+    </g>
+    <g id="front-connections">
+      <path fill="none" stroke="#6388BE" stroke-width="12" d="M210,128H46 M128,70v116" />
+    </g>
+    <g id="check">
+      <path fill="#E8F3FF" d="M153,128c0,13.81-11.19,25-25,25s-25-11.19-25-25s11.19-25,25-25     S153,114.19,153,128z" />
+      <path fill="none" stroke="#17233A" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" d="M112,129l10,10l22-23" />
+    </g>
+  </g>
 </svg>

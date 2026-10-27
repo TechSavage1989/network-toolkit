@@ -59,6 +59,69 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  dependency-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GOTOOLCHAIN: local
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Record security source formatting review
+        run: git ls-files -z 'cmd/**/*.go' 'internal/**/*.go' | xargs -0 gofmt -d > "$RUNNER_TEMP/network-toolkit-gofmt.patch"
+      - name: Verify pinned module checksums and vendored source
+        run: |
+          go mod download
+          go mod verify
+          go mod vendor -o "$RUNNER_TEMP/network-toolkit-canonical-vendor"
+          diff -ru vendor "$RUNNER_TEMP/network-toolkit-canonical-vendor" > "$RUNNER_TEMP/network-toolkit-vendor-review.patch"
+          git diff --exit-code -- go.mod go.sum
+      - name: Install pinned Go vulnerability scanner
+        if: success() || failure()
+        run: GOBIN="$RUNNER_TEMP/network-toolkit-security-tools" go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
+      - name: Scan Linux source configuration
+        if: success() || failure()
+        env:
+          GOFLAGS: -mod=vendor
+          CGO_ENABLED: '0'
+          GOOS: linux
+          GOARCH: amd64
+        run: |
+          set -o pipefail
+          "$RUNNER_TEMP/network-toolkit-security-tools/govulncheck" -show verbose ./cmd/... ./internal/... 2>&1 | tee "$RUNNER_TEMP/network-toolkit-vuln-linux.txt"
+      - name: Scan Windows source configuration
+        if: success() || failure()
+        env:
+          GOFLAGS: -mod=vendor
+          CGO_ENABLED: '0'
+          GOOS: windows
+          GOARCH: amd64
+        run: |
+          set -o pipefail
+          "$RUNNER_TEMP/network-toolkit-security-tools/govulncheck" -show verbose ./cmd/... ./internal/... 2>&1 | tee "$RUNNER_TEMP/network-toolkit-vuln-windows.txt"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: dependency-security-review
+          path: |
+            ${{ runner.temp }}/network-toolkit-gofmt.patch
+            ${{ runner.temp }}/network-toolkit-vendor-review.patch
+            ${{ runner.temp }}/network-toolkit-vuln-*.txt
+          if-no-files-found: error
+          retention-days: 7
+      - uses: actions/upload-artifact@v7
+        if: failure()
+        with:
+          name: canonical-vendor-review
+          path: ${{ runner.temp }}/network-toolkit-canonical-vendor
+          if-no-files-found: ignore
+          retention-days: 7
+
   windows-terminal:
     runs-on: windows-latest
     timeout-minutes: 10

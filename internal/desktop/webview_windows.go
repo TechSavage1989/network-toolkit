@@ -50,6 +50,7 @@ type WebView struct {
 	downloads         map[uintptr]eventRegistration
 	pendingDownloads  map[*pendingDownload]bool
 	bootstrapScriptID string
+	blockedDocumentResponse uintptr
 }
 
 type pendingDownload struct {
@@ -298,6 +299,9 @@ func (w *WebView) initializeController() error {
 		return err
 	}
 	w.Resize(w.bounds)
+	if err := w.installDocumentRequestPolicy(); err != nil {
+		return err
+	}
 	return w.installNativeBootstrap()
 }
 
@@ -575,6 +579,8 @@ func (w *WebView) Close() {
 	if w.controller != 0 {
 		comCall(w.controller, 24)
 	}
+	comRelease(w.blockedDocumentResponse)
+	w.blockedDocumentResponse = 0
 	comRelease(w.core4)
 	comRelease(w.core)
 	comRelease(w.controller)

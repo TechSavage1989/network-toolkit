@@ -36,6 +36,9 @@ type nativeNavigationObservation struct {
 	CancelResult     uint32
 	CancelReadResult uint32
 	Cancelled        bool
+	ResourceDestination string
+	ResponseResult uint32
+	RuntimeVersion string
 }
 
 // Rect has the layout of a Win32 RECT. Coordinates are physical screen pixels

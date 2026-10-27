@@ -11,6 +11,29 @@ const metadata=record=>{const {id,name,kind,username,bindings=[],updatedAt='fixt
 const sameEndpoint=(a,b)=>['protocol','host','port','username'].every(key=>a[key]===b[key]);
 const noAuth=body=>{for(const field of ['password','privateKey','passphrase','keyPath','secret'])assert(!Object.hasOwn(body,field),'Saved reference request contains '+field);};
 async function until(predicate,label){const deadline=Date.now()+10000;while(!predicate()){if(Date.now()>deadline)throw Error('Timed out: '+label);await new Promise(resolve=>setTimeout(resolve,20));}}
+async function stableCredentialLayout(page){
+ return page.locator('.modal').evaluate(async el=>{
+  // Viewport changes can precede the renderer's completed responsive layout.
+  // Settle geometry, NOT the assertion: a stable overflowing layout is returned
+  // unchanged and fails the same strict test below.
+  await document.fonts.ready;
+  const frame=()=>new Promise(resolve=>requestAnimationFrame(resolve));
+  const body=el.querySelector('.modal-body'),history=[];
+  let previous='',stable=0,layout;
+  for(let i=0;i<90;i++){
+   await frame();
+   const box=el.getBoundingClientRect();
+   layout={left:box.left,right:box.right,width:innerWidth,clientWidth:body.clientWidth,scrollWidth:body.scrollWidth,overflow:body.scrollWidth-body.clientWidth};
+   history.push(layout);
+   const current=JSON.stringify(layout);
+   stable=current===previous?stable+1:0;previous=current;
+   if(stable>=2)break;
+  }
+  const bodyBox=body.getBoundingClientRect();
+  const overflowing=[...body.querySelectorAll('*')].map(node=>{const box=node.getBoundingClientRect();return {tag:node.tagName,id:node.id,className:String(node.className||'').slice(0,100),left:box.left,right:box.right,width:box.width,clientWidth:node.clientWidth,scrollWidth:node.scrollWidth};}).filter(box=>box.width>0&&(box.left<bodyBox.left-1||box.right>bodyBox.right+1)).slice(0,30);
+  return {...layout,settled:stable>=2,frames:history.length,history,overflowing};
+ });
+}
 (async()=>{
  const records=new Map([
   ['password',{id:'password',name:'Core password',username:'operator',kind:'password',secret:canaries[0],bindings:[ssh,ftps]}],
@@ -83,12 +106,15 @@ async function until(predicate,label){const deadline=Date.now()+10000;while(!pre
   await until(()=>responses.filter(row=>row.path==='/api/credentials'&&row.status===403).length===2,'denied update');assert.equal(records.get(created.id).bindings.length,1);assert.equal(records.get(created.id).secret,canaries[4]);
   await submit();await until(()=>records.get(created.id).bindings.length===2,'approved update');await waitEditorCleared();assert.equal(posts('/api/credentials').at(-1).body.secret,undefined);
   await page.locator('[data-credential-edit="'+created.id+'"]').click();await page.locator('#credentialSecret').fill(canaries[5]);await submit();await until(()=>records.get(created.id).secret===canaries[5],'replacement update');await waitEditorCleared();await assertNoSecretsInDOM();
-  // Render the longer approval UI at both supported representative widths.
-  const rendered=[];
-  for(const width of [1280,390]){
+  // Repeated resize transitions cover stale responsive geometry, not just a
+  // fresh page at each size. Persistent overflow still fails immediately once
+  // the layout itself has settled; no assertion threshold is relaxed.
+  const rendered=[],layouts=[];
+  for(const [round,width] of [1280,390,1280,390,1280,390].entries()){
    await page.setViewportSize({width,height:1000});
-   const layout=await page.locator('.modal').evaluate(el=>{const box=el.getBoundingClientRect(),body=el.querySelector('.modal-body');return {left:box.left,right:box.right,width:innerWidth,overflow:body.scrollWidth-body.clientWidth};});
-   assert(layout.left>=-1&&layout.right<=width+1&&layout.overflow<=1,JSON.stringify(layout));rendered.push(width);
+   const layout=await stableCredentialLayout(page);layouts.push({round,...layout});
+   if(output)fs.writeFileSync(path.join(output,'credential-security-layouts.json'),JSON.stringify(layouts,null,2));
+   assert(layout.settled&&layout.width===width&&layout.left>=-1&&layout.right<=width+1&&layout.overflow<=1,JSON.stringify({round,...layout}));if(!rendered.includes(width))rendered.push(width);
    if(output)await page.screenshot({path:path.join(output,'credential-manager-'+width+'.png')});
   }
   await page.setViewportSize({width:1280,height:1000});await page.evaluate(()=>{closeModal();navigate('terminal');openTerminalConnect({type:'ssh',host:'legacy.test',port:22,username:'operator',credentialId:'legacy'});});

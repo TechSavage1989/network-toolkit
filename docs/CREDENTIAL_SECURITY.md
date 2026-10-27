@@ -74,11 +74,37 @@ fall back to weaker old data. Recovery/backup retention and cleanup are explicit
 
 ## Required verification
 
+Build maintenance is part of this work. The release toolchain is pinned to the
+patched, supported Go 1.26.10 series (released 2026-10-19), rather than the old
+unsupported Go 1.23.2 pin. This preserves the Windows 10/x64 platform minimum and
+avoids taking Go 1.27's additional default JSON and platform-certificate-store
+behavior changes in the same security build. See the official
+[Go release history](https://go.dev/doc/devel/release) and
+[Go 1.27 notes](https://go.dev/doc/go1.27).
+
+The dependency gate verifies the existing pinned module sums, regenerates vendor
+content for comparison, and runs pinned govulncheck v1.9.0 against the public Go
+vulnerability database for both Linux and Windows build configurations. A clean
+scan is evidence about known reachable vulnerabilities, not an independent audit
+or a guarantee against unknown vulnerabilities. Report scanner/database failures
+and findings rather than treating them as a pass. No dependency upgrade is implied
+by a formatting or vendor-metadata repair.
+
 Run the normal Checks pipeline and added Windows security steps. Windows tests
 must exercise real DPAPI round trips/tamper detection, inspect the actual DACL,
 verify activation-only isolation, and load both root/detached pages in real WebView2.
 The native bootstrap test requires NETWORK_TOOLKIT_NATIVE_SECURITY_TEST=1 and
 fails, rather than skips, when the required runtime is unavailable.
+
+Native document-request interception requires WebView2's ICoreWebView2_22 API.
+Microsoft documents Runtime 122.0.2365.46 as the compatibility minimum for its
+[SDK 1.0.2365.46 APIs](https://learn.microsoft.com/en-us/microsoft-edge/webview2/release-notes/sdk/1-0-2365-46).
+This is only an API floor, not a recommendation to run that old runtime: install
+the latest security-updated Evergreen x64 runtime from the
+[official Microsoft download page](https://developer.microsoft.com/microsoft-edge/webview2/#download).
+An unsupported runtime receives a clear update-required startup error; the app
+does not install anything or fall back to weaker filtering. Windows 10/11 x64
+remains the application platform requirement.
 
 `scripts/credential-security.browser.cjs` uses isolated intercepted synthetic
 responses to check UI behavior/layout only; it does not establish native approval,

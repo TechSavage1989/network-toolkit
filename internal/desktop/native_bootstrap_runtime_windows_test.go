@@ -47,7 +47,7 @@ func TestNativeBootstrapInstalledWebView2(t *testing.T) {
 					w.WriteHeader(http.StatusNoContent)
 					return
 				}
-				if r.URL.Path != document {
+				if r.URL.Path != document || r.Header.Get("Sec-Fetch-Dest") == "iframe" {
 					unexpectedNavigation.Add(1)
 					requestMu.Lock()
 					unexpectedRequests = append(unexpectedRequests, fmt.Sprintf("%s %s destination=%q mode=%q", r.Method, r.URL.RequestURI(), r.Header.Get("Sec-Fetch-Dest"), r.Header.Get("Sec-Fetch-Mode")))
@@ -74,6 +74,7 @@ if(!/^[a-f0-9]{64}$/.test(capability||'')){window.__networkToolkitStartupState=-
 fetch('/native-probe',{headers:{'X-Native-Test':capability}}).then(response=>{
  if(!response.ok)throw Error('native capability unavailable');
  const frame=document.createElement('iframe');frame.src='/forbidden-frame';document.body.appendChild(frame);
+ const exactFrame=document.createElement('iframe');exactFrame.src=location.href;document.body.appendChild(exactFrame);
  location.href='/forbidden-navigation';
  setTimeout(()=>{window.__networkToolkitStartupState=1;},300);
 }).catch(()=>{window.__networkToolkitStartupState=-1;});}
@@ -116,7 +117,7 @@ fetch('/native-probe',{headers:{'X-Native-Test':capability}}).then(response=>{
 				}
 			})
 			err = Run(ctx, Config{Title: "Network Toolkit native security test", URL: server.URL + document, SessionToken: token, DataDir: dataDir, Stop: cancel, OnReady: func() { ready.Store(true); cancel() }, navigationObserver: func(observation nativeNavigationObservation) {
-				t.Logf("native navigation: kind=%s URI=%q blocked=%t cancelHRESULT=%#x readHRESULT=%#x cancelled=%t", observation.Kind, observation.URI, observation.Blocked, observation.CancelResult, observation.CancelReadResult, observation.Cancelled)
+				t.Logf("native navigation: kind=%s URI=%q blocked=%t cancelHRESULT=%#x readHRESULT=%#x cancelled=%t destination=%q responseHRESULT=%#x runtime=%q", observation.Kind, observation.URI, observation.Blocked, observation.CancelResult, observation.CancelReadResult, observation.Cancelled, observation.ResourceDestination, observation.ResponseResult, observation.RuntimeVersion)
 			}})
 			if err != nil {
 				t.Fatal(err)

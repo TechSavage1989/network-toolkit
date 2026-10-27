@@ -1199,11 +1199,14 @@ collapsed view, and in the header of independent and detached terminal
 windows. The interface icon, native window/taskbar icon and startup splash
 use the same artwork, compiled into the EXE without companion image files.
 
-The editable original is assets/Network_Toolkit_Icon.svg in the source folder.
-Open it in Inkscape, Illustrator or another SVG editor. Every element remains
-a vector shape. The matching Windows ICO contains 16, 24, 32, 48, 64, 128 and
-256 pixel sizes. To update the artwork, edit the SVG, export a matching ICO,
-run python scripts/build_windows_resources.py and rebuild with BUILD_WINDOWS.cmd
+The exact editable Illustrator original is preserved in
+assets/source/Network_Toolkit_Icon.original.svg. The application uses the derived
+safe assets/Network_Toolkit_Icon.svg, without editor metadata, DTDs or external
+resources. Every drawing element remains a vector shape. The matching Windows
+ICO contains 16, 20, 24, 32, 40, 48, 64, 128 and 256 pixel sizes; a 256-pixel PNG
+is also included. To update the artwork, edit the preserved original, run
+python scripts/generate_icon_assets.py (Inkscape is needed for regeneration),
+then python scripts/build_windows_resources.py and rebuild with BUILD_WINDOWS.cmd
 or build.sh. The interface loads the SVG directly; Windows uses the ICO.
 
 Active session commands now appear above the console by default. Use the
@@ -2516,10 +2519,13 @@ need no network download or Python. The optional source-maintenance script
 scripts/build_vendor_database.py rebuilds the table from previously downloaded
 IEEE CSVs and their provenance. In-app Update is the normal way to refresh it.
 
-To regenerate resources after editing the ICO or manifest, run the standard
-Python script scripts/build_windows_resources.py, then rebuild with Go.
-The editable SVG is in assets/Network_Toolkit_Icon.svg. Changing the SVG
-requires re-exporting the ICO before regenerating the resource object.
+For future artwork updates, edit assets/source/Network_Toolkit_Icon.original.svg
+and run python scripts/generate_icon_assets.py with Inkscape on PATH. This derives
+the safe runtime SVG, PNG, nine-size ICO and source/asset integrity manifest.
+Then run python scripts/build_windows_resources.py and rebuild with Go.
+Ordinary builds need only Python's standard library for resource generation;
+the freshness guard rejects stale or changed icon inputs instead of silently
+compiling a mismatched icon. Do not hand-edit the derived SVG, PNG, ICO or manifest.
 
 TROUBLESHOOTING
 

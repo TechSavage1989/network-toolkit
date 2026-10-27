@@ -5,6 +5,25 @@ import (
 	"testing"
 )
 
+func TestNativeBootstrapDocumentRequestDestination(t *testing.T) {
+	for _, document := range []string{"/", "/terminal-view/" + strings.Repeat("ab", 16)} {
+		app := "http://127.0.0.1:1234" + document
+		if !nativeDocumentRequestAllowed(app, app, "document") {
+			t.Fatal("exact top-level document was rejected")
+		}
+		for _, destination := range []string{"", "iframe", "frame", "object", "embed", "empty", "Document"} {
+			if nativeDocumentRequestAllowed(app, app, destination) {
+				t.Fatalf("non-top-level destination %q was accepted", destination)
+			}
+		}
+		for _, target := range []string{"http://127.0.0.1:1234/forbidden", app + "?x=1", "http://localhost:1234" + document, "https://example.invalid/"} {
+			if nativeDocumentRequestAllowed(app, target, "document") {
+				t.Fatalf("alternate document %q was accepted", target)
+			}
+		}
+	}
+}
+
 func TestNativeBootstrapAcceptsOnlyCanonicalDocumentsAndCapabilities(t *testing.T) {
 	token := strings.Repeat("ab", 32)
 	for _, address := range []string{"http://127.0.0.1:1234/", "http://127.0.0.1:1234/terminal-view/" + strings.Repeat("ab", 16)} {

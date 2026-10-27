@@ -5,6 +5,7 @@ The generated object is included so ordinary source builds require Go only.
 """
 from pathlib import Path
 import struct
+from generate_icon_assets import validate_assets
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -45,6 +46,7 @@ def version_info():
 
 
 def main():
+    validate_assets(ROOT)
     icon = (ROOT / 'assets/Network_Toolkit_Icon.ico').read_bytes()
     reserved, kind, count = struct.unpack_from('<HHH', icon)
     if reserved or kind != 1 or not 1 <= count <= 30:
