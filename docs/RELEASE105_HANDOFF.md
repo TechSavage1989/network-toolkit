@@ -114,3 +114,18 @@ passes at both widths and all byte boundaries. Independent discovery browser
 steps now run after another test failure, without ignoring failures or weakening
 assertions. First-run discovery browser cases had not yet run. New exact-source
 hosted validation remains required; this failed checkpoint is not acceptance.
+
+## Copy-action compatibility repair before acceptance
+
+Review 8015cfbe37f050ccaa65ac486be309489a258013 / Checks40591037403 passed
+application, dependency, Windows native and security/new-feature browser jobs.
+Actual normal/narrow banner, filter, sticky-header and port-action pixels were
+inspected. The long browser gate correctly caught a compatibility regression:
+interactive TCP-port buttons caused the existing value-copy helper to omit the
+independent numeric open-port-list copy control. Restore that narrowly labeled,
+validated numeric aggregate only, preserving all sensitive/editable/terminal and
+arbitrary-control exclusions. The existing long-browser assertion is retained,
+with new unit and native-browser clipboard coverage checking no connection launch.
+Independent targeted review and all 787 JavaScript / 42 Python tests pass locally.
+All five exact-source hosted gates must run again before promotion; the previous
+four passing jobs and reviewed package are not acceptance for this repaired tree.

@@ -63,3 +63,19 @@ test('expanded copy coverage still excludes secret labels, native public IP cont
  const h=harness('<div class="wifi-detail"><span class="label">WiFi password</span><span class="value">secret-canary</span></div><div data-wifi-secret><div class="wifi-detail"><span class="value">secret-canary</span></div></div><div class="public-ip-value"><span class="public-ip-address">192.0.2.5</span><button data-public-ip-copy="ipv4">Copy</button></div><div class="overview-info-card"><div class="overview-card-value">Not loaded</div></div><div class="adapter-detail"><span class="value">Checking</span></div><button><span data-copy-value="button payload">Action</span></button><a href="https://example.test"><span data-copy-value="link payload">Open</span></a>');
  assert.equal(h.doc.querySelectorAll('[data-value-copy-control]').length,0);assert.equal(h.doc.querySelectorAll('[data-public-ip-copy]').length,1);
 });
+test('discovery port connection buttons retain one independent numeric aggregate copy action',()=>{
+ const html='<div class="network-open-ports" data-copy-value="22, 443" data-copy-label="Open TCP ports"><span class="network-port-list"><button type="button" class="network-port-connect" data-network-port="22" data-network-port-key="device">22 SSH</button><button type="button" class="network-port-connect" data-network-port="443" data-network-port-key="device">443 HTTPS</button></span></div>',h=harness(html),group=h.doc.querySelector('.network-open-ports'),port=group.querySelector('[data-network-port="22"]'),copy=group.querySelector('[data-value-copy-control]');
+ assert(copy,'The existing aggregate copy action remains available');assert.equal(group.querySelectorAll('[data-value-copy-control]').length,1);assert.equal(copy.getAttribute('aria-label'),'Copy Open TCP ports value');h.doc.emit('click',copy);assert.deepEqual(h.copied,['22, 443']);h.doc.emit('click',port);assert.deepEqual(h.copied,['22, 443'],'A connection click must not also copy');assert.equal(h.api.captureContext(port).value,'22, 443','Context-menu Copy value retains the explicit numeric aggregate');h.api.prepare(group);assert.equal(group.querySelector('[data-network-port="22"]'),port);assert.equal(group.querySelector('[data-value-copy-control]'),copy);assert.equal(group.querySelectorAll('[data-value-copy-control]').length,1);assert.equal(h.selection.toString(),'selected text');
+});
+test('numeric discovery copy exception never enables arbitrary buttons, secret groups or non-port payloads',()=>{
+ const port='<button type="button" class="network-port-connect" data-network-port="22" data-network-port-key="device">22 SSH</button>';
+ for(const html of [
+  '<div data-copy-value="22" data-copy-label="Open TCP ports">'+port+'</div>',
+  '<div class="network-open-ports" data-copy-value="22, secret-canary" data-copy-label="Open TCP ports">'+port+'</div>',
+  '<div class="network-open-ports" data-copy-value="65536" data-copy-label="Open TCP ports">'+port+'</div>',
+  '<div class="network-open-ports" data-copy-value="22" data-copy-label="Password">'+port+'</div>',
+  '<div class="network-open-ports" data-copy-value="22" data-copy-label="Open TCP ports"><button>Unrelated action</button></div>',
+  '<div data-secret><div class="network-open-ports" data-copy-value="22" data-copy-label="Open TCP ports">'+port+'</div></div>',
+  '<div class="network-open-ports" data-copy-value="22" data-copy-label="Open TCP ports">'+port+'<input value="secret-canary"></div>'
+ ]){const h=harness(html);assert.equal(h.doc.querySelectorAll('[data-value-copy-control]').length,0,html);}
+});

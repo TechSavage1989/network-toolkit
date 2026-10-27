@@ -23,6 +23,16 @@
     return (group?.querySelector('.key,dt,.label,.overview-card-title,.section-eyebrow')?.textContent || '').trim().replace(/\s+/g,' ') || 'Value';
   }
 
+  function copyCompatibleControl(control, element) {
+    if (control.matches('.network-address-details[data-select-device]')) return true;
+    // Discovery's explicit numeric aggregate still needs its separate copy
+    // action now that each port is a connection button. Do not enable copying
+    // arbitrary controls, their labels, editable fields or credential groups.
+    if (!element.matches('.network-open-ports[data-copy-value]') || element.getAttribute('data-copy-label') !== 'Open TCP ports' || !control.matches('button.network-port-connect[data-network-port][data-network-port-key]')) return false;
+    const ports = element.getAttribute('data-copy-value').split(', ');
+    return ports.length > 0 && ports.every(port => /^[1-9]\d{0,4}$/.test(port) && Number(port) <= 65535);
+  }
+
   function captureContext(target) {
     const element = target?.closest?.(selector);
     if (!element || element.closest(excluded) || element.querySelector('input,textarea,select,[contenteditable="true"],[data-secret],[data-sensitive],[data-terminal-secret],[data-wifi-secret]')) return null;
@@ -30,11 +40,11 @@
     // A group of individual values must not also get an aggregate copy action.
     if (element.querySelector(selector)) return null;
     const controls = [...element.querySelectorAll(interactive)].filter(control => !control.hasAttribute('data-value-copy-control'));
-    if (controls.some(control => !control.matches('.network-address-details[data-select-device]'))) return null;
+    if (controls.some(control => !copyCompatibleControl(control, element))) return null;
     const label = labelFor(element);
     if (sensitive.test(label) || sensitive.test(element.getAttribute('data-copy-field') || '') || nonDataLabel.test(label)) return null;
     if (element.closest('[data-tools-menu],.tools-cell,.status-pill,.badge,.pill')) return null;
-    if (controls.some(control => !control.matches('.network-address-details[data-select-device]'))) return null;
+    if (controls.some(control => !copyCompatibleControl(control, element))) return null;
     const address = element.querySelector('.network-address-details .mono'), record = element.querySelector('.record-value'), explicit = element.getAttribute('data-copy-value');
     const value = String(explicit !== null ? explicit : address?.textContent ?? record?.textContent ?? element.textContent ?? ''), eligible = value.trim();
     if (!eligible || placeholder.test(eligible) || informationalValue.test(eligible) || !/[\p{L}\p{N}]/u.test(eligible)) return null;
