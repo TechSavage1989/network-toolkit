@@ -61,3 +61,5 @@ tr.result-entry-selected{background:var(--accentBg);box-shadow:inset 3px 0 var(-
  .result-record-grid>div:nth-child(odd){border-right:0}
  .result-detail-target{align-items:flex-start;flex-direction:column;gap:4px}
 }
+
+.result-graph-entry .result-entry-heading{padding:5px 8px}.result-graph-entry .result-entry-footer{padding:3px 8px}.result-graph-entry .result-entry-footer .btn{min-height:23px;padding:2px 5px;font-size:10px}.result-graph-entry .result-entry-body{padding:8px}.entry-details-bottom:has(.result-graph-entry)>.graph-run-panel>.result-heading{position:relative;padding:6px 10px}.entry-details-bottom:has(.result-graph-entry) .graph-run-expanded-context{display:none}.entry-details-bottom:has(.result-graph-entry) .graph-run-details{display:block;font-size:11px}.entry-details-bottom:has(.result-graph-entry) .graph-run-details>summary{cursor:pointer;white-space:nowrap;color:var(--muted)}.entry-details-bottom:has(.result-graph-entry) .graph-run-details[open]>div{position:absolute;left:8px;right:8px;top:100%;z-index:25;padding:10px;background:var(--panel);border:1px solid var(--border);border-radius:7px;max-height:180px;overflow:auto}

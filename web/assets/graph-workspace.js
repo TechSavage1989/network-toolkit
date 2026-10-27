@@ -53,7 +53,7 @@
  }
  function fingerprint(config){if(!config)return '';const rows=config.rows||[],first=rows[0],last=rows.at(-1),target=appState(),pref=target?.listPreferences?.[config.view]||{},filter=root.NetworkToolkitResultFilters?.current?.(config.job?.id)||{};return JSON.stringify([rows.length,first&&config.graphKey(first),last&&config.graphKey(last),config.job?.eventSequence||0,pref.query,pref.status,pref.sort,pref.direction,filter.status,filter.type,filter.statistic,filter.reference]);}
  function latest(id,{automatic=false,linked=true}={}){if(!automatic&&linked&&root.NetworkToolkitResultTimeline?.jumpLatest)return root.NetworkToolkitResultTimeline.jumpLatest(id);const node=find(id),item=model(id),config=configFor(id);if(!node||!config||typeof dataListRows!=='function')return false;if(automatic&&inspecting(node,item))return false;const rows=dataListRows(config),choice=newestMatching(config,rows);item.followPending=false;item.fingerprint=fingerprint(config);if(!choice)return false;const found=revealSample(id,choice.key);if(found)capture(node,item);return found;}
- function hold(id,active,key=null){const item=model(id);item.held=active===true;item.heldKey=active?key:null;if(!active)item.followPending=true;}
+ function hold(id,active,key=null){const item=model(id);item.held=active===true;item.heldKey=active?key:null;if(active){const node=find(id);if(node){node.scrollTop=0;item.workspaceTop=0;}}if(!active)item.followPending=true;}
  function refreshStatistics(node){
   const id=node.dataset.graphWorkspace,current=root.NetworkToolkitResultFilters?.current?.(id)||{};
   for(const button of node.querySelectorAll('[data-result-stat]')){

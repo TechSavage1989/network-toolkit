@@ -5,20 +5,21 @@
  let fallback={...defaults},initialized=false;
  const epoch=value=>root.NetworkToolkitResultTime?.epoch?.(value)??(typeof value==='string'&&!/^0001-/.test(value)?Date.parse(value):NaN);
  const compare=(a,b)=>root.NetworkToolkitResultTime?.compareInstants?.(a,b)||Math.sign(epoch(a)-epoch(b));
- const valid=value=>typeof value==='string'&&value.length<=100&&Number.isFinite(epoch(value));
- function normalize(value){const v=value&&typeof value==='object'&&!Array.isArray(value)?value:{};const anchor=['latest','end','range'].includes(v.anchor)?v.anchor:'latest',start=valid(v.start)?v.start:'',end=valid(v.end)?v.end:'';return {durationMs:typeof v.durationMs==='number'&&Number.isFinite(v.durationMs)&&v.durationMs>=1000?Math.min(315360000000,Math.round(v.durationMs)):0,anchor:anchor==='latest'||end&&(anchor!=='range'||start&&compare(start,end)<=0)?anchor:'latest',start,end,recentMs:typeof v.recentMs==='number'&&Number.isFinite(v.recentMs)?Math.max(1000,Math.min(86400000,Math.round(v.recentMs))):60000};}
+ const valid=value=>(typeof value==='number'||typeof value==='string'&&value.length<=100)&&Number.isFinite(epoch(value));
+ const savedStamp=value=>typeof value==='string'&&valid(value);
+ function normalize(value){const v=value&&typeof value==='object'&&!Array.isArray(value)?value:{};const anchor=['latest','end','range'].includes(v.anchor)?v.anchor:'latest',start=savedStamp(v.start)?v.start:'',end=savedStamp(v.end)?v.end:'';return {durationMs:typeof v.durationMs==='number'&&Number.isFinite(v.durationMs)&&v.durationMs>=1000?Math.min(315360000000,Math.round(v.durationMs)):0,anchor:anchor==='latest'||end&&(anchor!=='range'||start&&compare(start,end)<=0)?anchor:'latest',start,end,recentMs:typeof v.recentMs==='number'&&Number.isFinite(v.recentMs)?Math.max(1000,Math.min(86400000,Math.round(v.recentMs))):60000};}
  function preferences(){try{return normalize(typeof state!=='undefined'?state.graphTimeRange:fallback);}catch{return normalize(fallback);}}
  function mergePreferences(saved){fallback=normalize(saved?.graphTimeRange);try{if(typeof state!=='undefined')state.graphTimeRange=fallback;}catch{}return {...fallback};}
  function setPreferences(value,{persist=true}={}){fallback=normalize({...preferences(),...value});try{if(typeof state!=='undefined')state.graphTimeRange=fallback;if(persist&&typeof saveState==='function')saveState();}catch{}if(root.document?.dispatchEvent&&typeof root.CustomEvent==='function')root.document.dispatchEvent(new root.CustomEvent('networkToolkitGraphTimeChange',{detail:{...fallback}}));return {...fallback};}
  function shift(stamp,delta){const ms=epoch(stamp)+delta;if(!Number.isFinite(ms)||!Number.isFinite(new Date(ms).getTime()))return '';const nano=String(stamp).match(/\.(\d{1,9})(?:Z|[+-]\d\d:\d\d)$/i)?.[1]?.padEnd(9,'0');return new Date(ms).toISOString().replace(/\.(\d{3})Z$/,(_,m)=>'.'+m+(nano? nano.slice(3):'')+'Z');}
  function range(items,pref=preferences(),heldEnd='',getStamp=item=>item.time){
-  const stamps=items.map(getStamp).filter(valid).sort(compare),first=stamps[0]||'',last=stamps.at(-1)||'',end=pref.anchor==='latest'?(valid(heldEnd)?heldEnd:last):pref.end,start=pref.anchor==='range'?pref.start:pref.durationMs&&end?shift(end,-pref.durationMs):first;
-  return {start,end,from:start?epoch(start):-Infinity,to:end?epoch(end):Infinity,enabled:pref.durationMs>0||pref.anchor!=='latest',unknown:items.length-stamps.length,first,last};
+  const stamps=items.map(getStamp).filter(valid).sort(compare),first=stamps[0]??'',last=stamps.at(-1)??'',end=pref.anchor==='latest'?(valid(heldEnd)?heldEnd:last):pref.end,start=pref.anchor==='range'?pref.start:pref.durationMs&&valid(end)?shift(end,-pref.durationMs):first;
+  return {start,end,from:valid(start)?epoch(start):-Infinity,to:valid(end)?epoch(end):Infinity,enabled:pref.durationMs>0||pref.anchor!=='latest',unknown:items.length-stamps.length,first,last};
  }
- function contains(stamp,scope){return valid(stamp)&&(!scope.start||compare(stamp,scope.start)>=0)&&(!scope.end||compare(stamp,scope.end)<=0);}
+ function contains(stamp,scope){return valid(stamp)&&(!valid(scope.start)||compare(stamp,scope.start)>=0)&&(!valid(scope.end)||compare(stamp,scope.end)<=0);}
  function select(items,scope,getStamp=item=>item.time){return items.filter(item=>contains(getStamp(item),scope)).sort((a,b)=>compare(getStamp(a),getStamp(b)));}
  function condense(items,{end,recentMs=60000,getStamp=item=>item.time}={}){
-  const sorted=items.filter(item=>valid(getStamp(item))).slice().sort((a,b)=>compare(getStamp(a),getStamp(b))),last=epoch(end||getStamp(sorted.at(-1)||{})),bins=new Map(),result=[];
+  const sorted=items.filter(item=>valid(getStamp(item))).slice().sort((a,b)=>compare(getStamp(a),getStamp(b))),last=epoch(end??getStamp(sorted.at(-1)||{})),bins=new Map(),result=[];
   for(const item of sorted){const age=Math.max(0,last-epoch(getStamp(item)));if(age<recentMs){result.push({items:[item],aggregate:false});continue;}const tier=Math.max(0,Math.floor(Math.log2(age/recentMs))),step=recentMs*2**tier/12,key=tier+':'+Math.floor(age/step);let group=bins.get(key);if(!group){group={items:[],aggregate:true};bins.set(key,group);result.push(group);}group.items.push(item);}
   return result.sort((a,b)=>compare(getStamp(a.items[0]),getStamp(b.items[0]))).map(group=>({...group,aggregate:group.items.length>1,start:getStamp(group.items[0]),end:getStamp(group.items.at(-1)),count:group.items.length}));
  }

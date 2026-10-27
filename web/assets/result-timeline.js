@@ -82,7 +82,7 @@
     if(history&&(model.mode==='condensed'||pref.durationMs>0||pref.anchor!=='latest')){
       let scope=history.range(model.allPoints,pref,model.heldEnd||(filterState(model).active?latestPoint(model)?.time||'':''));
       if(model.zoom!==1&&Number.isFinite(scope.from)&&Number.isFinite(scope.to)&&scope.to>scope.from){scope={...scope,start:history.shift(scope.end,-Math.round((scope.to-scope.from)/model.zoom))};scope.from=history.epoch(scope.start);}
-      model.timeScope=scope;model.rawVisiblePoints=history.select(model.allPoints,scope);
+      model.timeScope=scope;const visible=history.select(model.allPoints,scope),indices=new Set(visible.map(point=>point.index));model.rawVisiblePoints=visible.map(point=>({...point,jitter:indices.has(point.index-1)?point.jitter:null}));
       const groups=model.mode==='condensed'?history.condense(model.rawVisiblePoints,{end:scope.end,recentMs:pref.recentMs}):model.rawVisiblePoints.map(point=>({items:[point],aggregate:false}));
       return groups.map(aggregate);
     }

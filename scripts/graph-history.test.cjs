@@ -25,3 +25,7 @@ test('time entry uses the configured named zone and rejects ambiguous or nonexis
 test('all retained time, empty ranges and saved display settings remain independent of raw data',()=>{
  history.setPreferences({durationMs:900000,anchor:'end',end:stamp(10)},{persist:false});const saved=history.preferences();history.mergePreferences({graphTimeRange:saved});assert.deepEqual(history.preferences(),saved);assert.equal(history.select([{time:stamp(12)}],history.range([{time:stamp(12)}],saved)).length,0);history.mergePreferences({});assert.equal(history.range([]).unknown,0);assert.deepEqual(history.select([],history.range([])),[]);
 });
+
+test('numeric epoch zero is a valid recorded boundary without allowing numeric saved date fields',()=>{
+ const rows=[{time:-1000},{time:0},{time:1000}],scope=history.range(rows,history.normalize({durationMs:1000}),0);assert.equal(scope.to,0);assert.deepEqual(history.select(rows,scope).map(row=>row.time),[-1000,0]);const groups=history.condense(rows,{end:0,recentMs:1000});assert.equal(groups.flatMap(group=>group.items).length,3);assert.equal(history.normalize({anchor:'end',end:0}).anchor,'latest');
+});
