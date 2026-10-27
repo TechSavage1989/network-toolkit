@@ -1,34 +1,70 @@
 # Network Toolkit development handoff
 
-## 1.17.99 authorized compact graph-control update
+## 1.17.99 published compact graph controls and contained endpoints
 
-The user requested a quick focused build and publication of the graph cleanup,
-and explicitly added fully contained first/last visible markers at every range.
-The baseline is published 1.17.98, with its completed publication record at main
-5b78eea4b2fea5585fa312324a17920878b1b242. No unpublished work was borrowed.
+The user authorized this focused build and publication. It is live at:
+https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.99
+Release ID: 425224974
+Source/tag: 3f8341f775d65dda98fcd34c6c9f2669b5ef66dc
+Tree: b87f5efc32da6b6167318e21fd631b0df0a745ed
+Baseline: completed published 1.17.98, main 5b78eea4b2fea5585fa312324a17920878b1b242.
+No unpublished concurrent work was borrowed or overwritten.
 
-Graph Options dialogs are removed. Range stays directly available at narrow
-widths, Run data is in the existing header, Clear selection remains in entry
-details, and the full-history navigator provides panning and interval resizing.
-Window and Progressive are NOT equivalent for diagnostics: their default ranges
-are 180 and up to 10,000 retained samples respectively. They are labeled Recent
-180 and Full history; existing stored identifiers remain valid without migration.
-Explicit duration/Fit continues to override the default ranges. Condensed and
-the shared mode setting are retained, including packet capture behavior.
+Graph Options dialogs are removed. Range is directly accessible at narrow
+widths, recorded Run data is in the shared header, and Clear selection remains
+with entry details. The full-history navigator supplies pan/resize controls
+without duplicate menu actions. Window and Progressive retain their distinct
+diagnostic defaults (180 and up to 10,000 samples), labeled Recent 180 and Full
+history. Explicit timeframe/Fit overrides the defaults; saved identifiers and
+Condensed behavior remain intact. The shared packet setting is retained.
 
-The diagnostic plot uses a 12px endpoint gutter, with the same projection bounds
-for the time axis and pointer-anchored zoom. Marker/stroke/highlight containment
-is checked with all/range/zoom, singleton/two-point/empty and resized plots.
-No time-domain stretching, data truncation, navigator or updater redesign.
+A 12px endpoint gutter keeps visible markers and selection/hover strokes inside
+the plot. Axis labels and pointer-anchored zoom use the same bounds. The selected
+time domain and proportional spacing are unchanged. Compact mobile Run data
+access and the graph/list height budget preserve complete selected result rows.
+Held entries, shared tabs, Follow latest, filters, recorded data, full-history
+navigation and updater behavior remain intact.
 
-Local focused JavaScript, syntax and release/layout validation are run. The
-cloud subprocess environment has no usable Go compiler and blocks Chromium IPC;
-a supported escalation failed environment setup. Hosted existing Checks must
-provide native/build/browser verification. No CI suites are removed or skipped.
-Publication is authorized but not complete until the exact source Checks and
-Release pass and tag, four assets, checksums and updater package identity verify.
-No native Windows installation or restart is claimed.
+Exact-source review Checks 40475601591 PASSED all jobs before promotion:
+application 122092942249, Windows 122092942167, browser 122092941901.
+669 JavaScript tests, 35 release/layout safeguards and required Go suites pass.
+All existing browser suites pass, including endpoint/range/resize coverage,
+full-history navigation, visible rows and all seven native Chromium updater
+cases with the real five-minute poll. Focused local tests/syntax/metadata checks
+also passed. Local Go/browser execution was unavailable; hosted evidence is
+used instead. Narrow/short rendered screenshots were inspected.
 
+Release 40477775024 PASSED. Main was advanced non-forcibly with an expected-head
+lease to the exact reviewed commit, and remote main/tag provenance verified.
+The duplicate main Checks 40477774992 is NOT an all-green result: application
+job 122100135511 passes, but Windows job 122100135847 failed the unchanged
+TestWindowsLocalShellColorTranscript/powershell case because no prompt appeared
+within its 10-second wait. Its cmd transcript and both interactive shell lifecycle
+cases passed. The same exact source passed the full Windows job in review, and
+no terminal implementation was changed. Runner timing is a plausible explanation,
+not a proven root cause. No test was weakened and no optional retry was launched.
+Duplicate main browser job 122100135825 is still running; terminal status is being
+observed only to close this CI record, not to delay the already verified release.
+
+All four public assets were downloaded. GitHub digests, outer/inner checksums,
+ZIP CRCs, PE x64 GUI/version resources, exact four-member Update.zip allowlist,
+EXE identity across standalone/portable/updater and all 809 packaged source files
+verify. Public EXE and portable ZIP match review artifact 12720735991 byte for
+byte. The live latest feed resolves to v1.17.99 with the expected updater URLs.
+v1.17.98 retains its release ID, asset IDs/digests and body. No old tag/asset,
+retired feed, repository access or credential was modified.
+
+Public SHA256:
+- Network_Toolkit.exe: 3420d18aff6e3a6c5a976e318e949ad9af22ced436f7e3ffe1de16e6330aa52b
+- Network_Toolkit_1.17.99_Portable.zip: 2762fa23c480a4b2fb6f18c274431374bd979c95bfdcd41f722dc62c1287a880
+- Network_Toolkit_1.17.99_Update.zip: 1fdbad4ba6b3b075eeec5b02934b901ba7efd014fa9d44737190259dcc097c99
+- SHA256SUMS: fd5e7c940f25ec33dae4a14bdfb5b1bec7dbf7845ad099452b206b51f8fe07ee
+
+No native installation/restart, complete WebView2 session or new live updater
+staging run is claimed. Existing updater code is unchanged; package/feed identity
+and hosted updater regressions were verified. This documentation-only record does
+not rebuild assets or move the release tag. Future builds/publication require
+their own authorization; main network-toolkit remains the sole source/update feed.
 
 ## Repository source layout (no application version change)
 

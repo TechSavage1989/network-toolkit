@@ -3,12 +3,21 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-The user authorized the focused 1.17.99 graph-control cleanup, endpoint containment,
-build and publication. Baseline: completed published 1.17.98 at main
-5b78eea4b2fea5585fa312324a17920878b1b242. Preserve its navigator and settings.
-1.17.99 publication is pending exact-source Checks, Release and asset verification.
-See docs/DEVELOPMENT_HANDOFF.md for scope, validation and historical evidence.
-Do not replace old tags/assets, alter access or write the retired update feed.
+Current published version: 1.17.99. Source/tag:
+3f8341f775d65dda98fcd34c6c9f2669b5ef66dc
+Full exact-source review Checks 40475601591 and Release 40477775024 passed.
+All four public assets, updater inventory, PE/version, matching executable and
+809 packaged source files verify. Source and executable match the reviewed build.
+See docs/DEVELOPMENT_HANDOFF.md for implementation, hashes and honest limits.
+
+Duplicate main Checks 40477774992 has a native PowerShell transcript timeout in
+unchanged terminal code; its application job passes and browser job is pending.
+This is not an all-green duplicate run. The same source passed all review jobs.
+No optional rerun or code/test weakening was done. Keep that distinction in reports.
+
+Publication was authorized and is complete. Future builds/publication require
+separate authorization. Never replace old tags/assets, change access or write
+the retired update feed. Final handoff-only records use [skip ci].
 
 ## Release-note organization
 
