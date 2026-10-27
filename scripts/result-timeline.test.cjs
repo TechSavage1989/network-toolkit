@@ -284,3 +284,27 @@ test('Condensed Fit keeps both retained edges inside the plot across raw-to-aggr
  }
  assert.equal(JSON.stringify(rows),original,'Fit, grouping and retention display never rewrite source rows');
 });
+
+test('Condensed recent markers keep their pixels as older history grows, across grouping, resize, filters and a held selection',()=>{
+ const h=harness(),rows=Array.from({length:10000},(_,i)=>reply(i+1,42,stamp(i))),before=JSON.stringify(rows),references=new Map();h.api.setPreferences({mode:'condensed'},{persist:false});
+ for(const count of [706,1400,1401,7201]){
+  h.render(rows.slice(-count));h.api.zoom('job','reset');if(count===706)h.api.selectResult('job',h.api.sampleKey(rows[9990]));
+  for(const width of [820,320]){
+   const svg=h.document.querySelector('[data-rt-surface]');svg.getBoundingClientRect=()=>({left:0,top:0,width,height:100});h.api.restore();const markers=svg.querySelectorAll('[data-rt-marker]'),recent=Array.from({length:20},(_,i)=>Number(svg.querySelector('[data-rt-sequence="'+(9981+i)+'"] [data-rt-marker]').getAttribute('cx')));
+   assert.equal(Number(markers[0].getAttribute('cx')),Number(svg.dataset.rtLeft));assert.equal(Number(markers.at(-1).getAttribute('cx')),width-12);
+   if(references.has(width))recent.forEach((x,i)=>assert(Math.abs(x-references.get(width)[i])<=.01,'More old history cannot move recent pixels'));else references.set(width,recent);
+   for(const marker of [markers[0],markers.at(-1)]){const x=Number(marker.getAttribute('cx')),radius=Number(marker.getAttribute('r'))+2;assert(x-radius>=0&&x+radius<=width);}
+  }
+  assert.match(h.detail(),/Sample9991/);assert.equal(h.api.isHeld('job'),true);assert.equal(h.context.NetworkToolkitGraphHistory.instant(h.document.querySelector('.rt-timeline').dataset.rtScopeStart),h.context.NetworkToolkitGraphHistory.instant(rows.at(-count).time));
+ }
+ h.context.NetworkToolkitResultFilters={current:()=>({active:true}),graphMatches:(_,row)=>row.sequence%2===0};h.document.emit('networkToolkitResultFilterChange',h.document,{detail:{jobId:'job'}});assert.match(h.detail(),/Sample9991/);assert.equal(Number(h.document.querySelector('[data-rt-marker]').getAttribute('cx')),Number(h.document.querySelector('[data-rt-surface]').dataset.rtLeft));assert.equal(JSON.stringify(rows),before);
+ const history=h.context.NetworkToolkitGraphHistory,container=h.document.querySelector('.rt-timeline'),scope={start:container.dataset.rtScopeStart,end:container.dataset.rtScopeEnd},svg=h.document.querySelector('[data-rt-surface]'),left=Number(svg.dataset.rtLeft),plot=320-12-left,from=left+plot*.8,to=left+plot*.9,anchor=history.instant(history.at(.8,scope,'condensed'));svg.getBoundingClientRect=()=>({left:0,top:0,width:320,height:100});
+ h.document.emit('pointerdown',svg,{button:0,pointerId:9,clientX:from});h.document.emit('pointerup',svg,{pointerId:9,clientX:to});const moved=h.document.querySelector('.rt-timeline');assert.equal(history.instant(history.at(.9,{start:moved.dataset.rtScopeStart,end:moved.dataset.rtScopeEnd},'condensed')),anchor);assert.match(h.detail(),/Sample9991/);
+});
+
+test('Condensed groups retain duplicate timestamps, gaps, zero, spikes and failures with truthful original details',()=>{
+ const h=harness(),rows=Array.from({length:2001},(_,i)=>({...reply(i+1,i===0?0:i===1?9999:42,stamp(i<4?0:i+(i>=1000?600:0))),...(i===2?{success:false,status:'Timed out',rttMs:null}:{})})),before=JSON.stringify(rows);h.api.setPreferences({mode:'condensed'},{persist:false});h.render(rows);const svg=h.document.querySelector('[data-rt-surface]');assert.equal(Number(svg.dataset.rtMinimum),0);assert.equal(Number(svg.dataset.rtMaximum),9999);assert(svg.querySelector('.rt-aggregate-range'));
+ const history=h.context.NetworkToolkitGraphHistory,groups=history.condense(h.api.normalize(rows),{end:rows.at(-1).time,recentMs:60000,preserveRaw:true}),oldest=groups[0],stats=h.api.summary(oldest.items);assert.equal(groups.flatMap(group=>group.items).length,rows.length);assert(oldest.items.some(point=>point.sequence===1)&&oldest.items.some(point=>point.sequence===2)&&oldest.items.some(point=>point.sequence===3));h.document.emit('click',svg.querySelector('[data-rt-aggregate]'));
+ const detail=h.detail();for(const value of ['Grouped samples'+stats.count,'Unsuccessful'+stats.lost,'Minimum RTT0 ms','Maximum RTT9,999 ms','LOCAL '+oldest.start,'LOCAL '+oldest.end])assert(detail.includes(value),value);
+ h.api.selectResult('job',h.api.sampleKey(rows[2]));assert.match(h.detail(),/Sample3/);assert.match(h.detail(),/Timed out/);h.api.zoom('job',2);h.api.setPlot('job','jitter');assert.match(h.detail(),/Sample3/);assert.equal(JSON.stringify(rows),before,'Grouping and navigation preserve every original result');
+});

@@ -48,8 +48,14 @@
  function wheelLevel(event,current,minimum=.25,maximum=16){if(event.ctrlKey||event.metaKey||event.altKey||!Number.isFinite(event.deltaY)||event.deltaY===0)return current;const pixels=event.deltaY*(event.deltaMode===1?16:event.deltaMode===2?160:1);return zoomLevel(current*Math.pow(2,-Math.max(-240,Math.min(240,pixels))/350),minimum,maximum);}
  function anchoredEnd(scope,oldZoom,nextZoom,share,mode='linear'){
   const a=instant(scope?.start),b=instant(scope?.end);if(a===null||b===null||b<=a)return '';
-  const p=Math.max(0,Math.min(1,Number(share)||0)),anchor=instant(at(p,scope,mode)),span=Math.max(1,Math.round(Number(b-a)*oldZoom/nextZoom)),recent=condensedScale(span,preferences().recentMs),age=mode==='condensed'?recent*Math.expm1((1-p)*Math.log1p(span/recent)):(1-p)*span;
+  const p=Math.max(0,Math.min(1,Number(share)||0)),anchor=instant(at(p,scope,mode)),span=Math.max(1,Math.round(Number(b-a)*oldZoom/nextZoom)),age=mode==='condensed'?condensedAge(1-p,span,preferences().recentMs):(1-p)*span;
   return timestamp(anchor+BigInt(Math.round(age)));
+ }
+ // Main-plot dragging keeps the grabbed timestamp under the pointer. The
+ // overview and keyboard pans deliberately retain their linear time arithmetic.
+ function panScope(scope,fromShare,toShare,mode='linear'){
+  const a=instant(scope?.start),b=instant(scope?.end),from=instant(at(fromShare,scope,mode)),to=instant(at(toShare,scope,mode));if(a===null||b===null||from===null||to===null)return scope;
+  const start=timestamp(a+from-to),end=timestamp(b+from-to);return {...scope,start,end,from:epoch(start),to:epoch(end)};
  }
  function valueScale(values,{whole=false}={}){
   const measured=values.filter(value=>typeof value==='number'&&Number.isFinite(value)&&value>=0);if(!measured.length)return {minimum:null,maximum:null,lower:0,upper:1,empty:true};
@@ -63,11 +69,37 @@
  function instant(value){const ms=epoch(value);if(!Number.isFinite(ms))return null;const fraction=typeof value==='string'?value.match(/\.(\d{1,9})(?:Z|[+-]\d\d:\d\d)$/i)?.[1]:null;return BigInt(Math.floor(ms))*1000000n+BigInt(fraction?fraction.padEnd(9,'0').slice(3):Math.round((ms-Math.floor(ms))*1000000));}
  function timestamp(ns){if(typeof ns!=='bigint')return '';let seconds=ns/1000000000n,part=ns%1000000000n;if(part<0){seconds--;part+=1000000000n;}try{return new Date(Number(seconds*1000n)).toISOString().replace(/\.\d{3}Z$/,'.'+String(part).padStart(9,'0')+'Z');}catch{return '';}}
  function viewport(scope,zoom=1,end=''){let a=instant(scope.start),b=instant(scope.end);if(a===null||b===null)return scope;if(a===b&&Number(zoom)===1&&(!end||instant(end)===b)){const stamp=timestamp(a);return {...scope,start:stamp,end:stamp,from:epoch(stamp),to:epoch(stamp)};}if(b<=a)a=b-1000000000n;const span=BigInt(Math.max(1,Math.round(Number(b-a)/Math.max(1e-18,Number(zoom)||1))));b=instant(end)??b;a=b-span;const start=timestamp(a),finish=timestamp(b);return {...scope,start,end:finish,from:epoch(start),to:epoch(finish)};}
- // A relative lower bound on curvature keeps even short Fit ranges visibly
- // compressed. The same scale is used by projection, inverse and zoom anchoring.
- function condensedScale(span,recentMs){return Math.max(Number.MIN_VALUE,Math.min(Math.max(1,recentMs)*1000000,span/9));}
- function fraction(value,scope,mode='linear',recentMs=preferences().recentMs){const a=instant(scope?.start),b=instant(scope?.end),t=instant(value);if(a===null||b===null||t===null||b<a)return NaN;if(b===a)return t===a?.5:t<a?-Infinity:Infinity;const span=Number(b-a),share=Number(t-a)/span;if(mode!=='condensed')return share;const recent=condensedScale(span,recentMs);return 1-Math.log1p(Math.max(0,Number(b-t))/recent)/Math.log1p(span/recent);}
- function at(share,scope,mode='linear',recentMs=preferences().recentMs){const a=instant(scope?.start),b=instant(scope?.end);if(a===null||b===null||b<a)return '';if(b===a)return timestamp(a);const p=Math.max(0,Math.min(1,share)),span=b-a;if(mode==='condensed'&&p>0&&p<1){const recent=condensedScale(Number(span),recentMs),age=recent*Math.expm1((1-p)*Math.log1p(Number(span)/recent));return timestamp(b-BigInt(Math.max(0,Math.min(Number(span),Math.round(age)))));}const scale=1000000000000n;return timestamp(a+(span*BigInt(Math.round(p*Number(scale)))+scale/2n)/scale);}
+ // Keep the latest configured interval in the right half at a fixed time
+ // resolution. Only the older half changes curvature as history grows. Before
+ // three recent intervals exist, Fit fills the plot with a continuous warm-up.
+ // The two logarithmic regions share both position and slope at age=recent.
+ const condensedCurves=new Map(),logTwo=Math.log(2),logFour=2*logTwo;
+ function condensedCurve(span,recentMs){
+  const recent=Math.max(1,Number(recentMs)||60000)*1000000,key=span+':'+recent;
+  if(condensedCurves.has(key))return condensedCurves.get(key);
+  let curve;
+  if(span<=3*recent)curve={recent:span/3,warm:true};
+  else{
+   const older=span/recent-1;let low=0,high=2;
+   // beta*log(1+older/beta)=2*log(2) fixes the tail's initial slope.
+   // For spans>=3*recent the unique positive solution lies in (0,2].
+   for(let i=0;i<52;i++){const beta=(low+high)/2;if(beta*Math.log1p(older/beta)<logFour)low=beta;else high=beta;}
+   curve={recent,beta:(low+high)/2,warm:false};
+  }
+  if(condensedCurves.size>=64)condensedCurves.delete(condensedCurves.keys().next().value);condensedCurves.set(key,curve);return curve;
+ }
+ function condensedDistance(age,span,recentMs){
+  const curve=condensedCurve(span,recentMs),u=Math.max(0,age)/curve.recent;
+  if(curve.warm)return Math.log1p(u)/logFour;
+  return u<=1?Math.log1p(u)/logFour:.5+curve.beta*Math.log1p((u-1)/curve.beta)/(2*logFour);
+ }
+ function condensedAge(distance,span,recentMs){
+  if(distance<=0)return 0;if(distance>=1)return span;
+  const curve=condensedCurve(span,recentMs);
+  return curve.recent*(curve.warm||distance<=.5?Math.expm1(distance*logFour):1+curve.beta*Math.expm1((distance-.5)*2*logFour/curve.beta));
+ }
+ function fraction(value,scope,mode='linear',recentMs=preferences().recentMs){const a=instant(scope?.start),b=instant(scope?.end),t=instant(value);if(a===null||b===null||t===null||b<a)return NaN;if(b===a)return t===a?.5:t<a?-Infinity:Infinity;const span=Number(b-a),share=Number(t-a)/span;if(mode!=='condensed')return share;if(t===a)return 0;if(t===b)return 1;return 1-condensedDistance(Number(b-t),span,recentMs);}
+ function at(share,scope,mode='linear',recentMs=preferences().recentMs){const a=instant(scope?.start),b=instant(scope?.end);if(a===null||b===null||b<a)return '';if(b===a)return timestamp(a);const p=Math.max(0,Math.min(1,share)),span=b-a;if(mode==='condensed'&&p>0&&p<1){const age=condensedAge(1-p,Number(span),recentMs);return timestamp(b-BigInt(Math.max(0,Math.min(Number(span),Math.round(age)))));}const scale=1000000000000n;return timestamp(a+(span*BigInt(Math.round(p*Number(scale)))+scale/2n)/scale);}
  function axisHTML(scope,width=820,mode='linear'){
   if(instant(scope?.start)===null||instant(scope?.end)===null)return '<span class="rt-axis-unrecorded">Recorded time unavailable</span>';
   if(instant(scope.start)===instant(scope.end))return '<time class="rt-time-tick" style="left:50%;transform:translateX(-50%)" datetime="'+esc(scope.start)+'" title="'+esc(scope.start)+'">'+esc(root.NetworkToolkitResultTime?.format?.(scope.start,{milliseconds:true})||scope.start)+'</time>';
@@ -81,5 +113,5 @@
  function open(){if(typeof openModal!=='function')return;const p=preferences(),zone=root.NetworkToolkitResultTime?.zoneLabel?.()||'local';openModal('Graph time range','<form id="graphTimeForm" class="graph-time-form"><p>Dates without an offset use '+esc(zone)+'. ISO timestamps with an explicit offset are also accepted. Ambiguous daylight-saving times require an offset.</p><label>Time range<select id="graphTimeDuration">'+[[0,'All retained time'],[10000,'10 seconds'],[30000,'30 seconds'],[60000,'1 minute'],[300000,'5 minutes'],[900000,'15 minutes'],[3600000,'1 hour'],[21600000,'6 hours'],[86400000,'24 hours'],[-1,'Custom duration']].map(([value,name])=>'<option value="'+value+'"'+((value===p.durationMs||value===-1&&![0,10000,30000,60000,300000,900000,3600000,21600000,86400000].includes(p.durationMs))?' selected':'')+'>'+name+'</option>').join('')+'</select></label><label>Custom duration (seconds)<input id="graphTimeSeconds" type="number" min="1" max="315360000" value="'+(p.durationMs/1000||300)+'"></label><label>Position<select id="graphTimeAnchor">'+[['latest','Follow latest'],['end','End at a chosen date/time'],['range','Explicit start and end']].map(([value,name])=>'<option value="'+value+'"'+(p.anchor===value?' selected':'')+'>'+name+'</option>').join('')+'</select></label><label>Start date/time<input id="graphTimeStart" type="text" value="'+esc(p.start)+'" placeholder="2026-10-26 14:30:00"></label><label>End date/time<input id="graphTimeEnd" type="text" value="'+esc(p.end)+'" placeholder="2026-10-26 15:30:00"></label><label>Condensed history: keep individual results for the latest (seconds)<input id="graphTimeRecent" type="number" min="1" max="86400" value="'+p.recentMs/1000+'"></label><p id="graphTimeError" role="alert"></p><p>These display settings do not remove recorded results or change list filters.</p></form>','<button type="button" class="btn ghost" data-action="close-modal">Cancel</button><button type="button" class="btn primary" data-graph-time-apply>Apply</button>',true);updateForm();}
  function updateForm(){const d=root.document,anchor=d?.getElementById('graphTimeAnchor')?.value,duration=d?.getElementById('graphTimeDuration')?.value;for(const [id,disabled] of [['graphTimeSeconds',duration!=='-1'||anchor==='range'],['graphTimeStart',anchor!=='range'],['graphTimeEnd',anchor==='latest'],['graphTimeDuration',anchor==='range']]){const input=d?.getElementById(id);if(input)input.disabled=disabled;}}
  function initialize(){if(initialized||!root.document?.addEventListener)return;initialized=true;root.document.addEventListener('click',event=>{if(event.target.closest?.('[data-graph-time-open]')){event.preventDefault();open();}if(event.target.closest?.('[data-graph-time-apply]')){event.preventDefault();const d=root.document,get=id=>d.getElementById(id).value;try{const anchor=get('graphTimeAnchor'),duration=Number(get('graphTimeDuration')),seconds=Number(get('graphTimeSeconds')),recent=Number(get('graphTimeRecent'));if(duration===-1&&(!(seconds>=1)||seconds>315360000)||!(recent>=1&&recent<=86400))throw Error('Choose a valid duration in seconds.');const start=anchor==='range'?parseTime(get('graphTimeStart')):'',end=anchor!=='latest'?parseTime(get('graphTimeEnd')):'';if(start&&compare(start,end)>0)throw Error('The start must not be after the end.');setPreferences({anchor,start,end,allHistory:anchor==='latest'&&duration===0,durationMs:duration===-1?seconds*1000:duration,recentMs:recent*1000});if(typeof closeModal==='function')closeModal();}catch(error){d.getElementById('graphTimeError').textContent=error.message;}}});root.document.addEventListener('change',event=>{if(event.target.matches?.('[data-graph-time-preset]')){if(event.target.value==='custom')open();else setDuration(event.target.value);return;}if(['graphTimeAnchor','graphTimeDuration'].includes(event.target.id))updateForm();});}
- const api=Object.freeze({defaults,normalize,preferences,mergePreferences,setPreferences,epoch,compare,range,contains,select,condense,shift,parseTime,label,controlHTML,presets,setDuration,zoomLevel,wheelLevel,anchoredEnd,valueScale,scaleLabel,scaleLabels,instant,timestamp,viewport,fraction,at,axisHTML,initialize});if(typeof module==='object'&&module.exports)module.exports=api;root.NetworkToolkitGraphHistory=api;initialize();
+ const api=Object.freeze({defaults,normalize,preferences,mergePreferences,setPreferences,epoch,compare,range,contains,select,condense,shift,parseTime,label,controlHTML,presets,setDuration,zoomLevel,wheelLevel,anchoredEnd,panScope,valueScale,scaleLabel,scaleLabels,instant,timestamp,viewport,fraction,at,axisHTML,initialize});if(typeof module==='object'&&module.exports)module.exports=api;root.NetworkToolkitGraphHistory=api;initialize();
 })(typeof window!=='undefined'?window:globalThis);

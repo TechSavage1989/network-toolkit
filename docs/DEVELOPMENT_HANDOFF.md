@@ -1,5 +1,49 @@
 # Network Toolkit development handoff
 
+## 1.17.102 authorized stable-recent Condensed review build
+
+The user supplied the detailed Condensed scaling prompt and said "build and push
+it". This authorizes the isolated review build/push only; main promotion and
+publication are not yet approved. Published 1.17.101 remains the live release.
+Baseline: exact 1.17.101 source 2493e1978565b5302098df7dc7ed940c4764a6ef and
+publication handoff main a870103aad95cceca763859ae0a1991f0edd27db. Its sticky
+Local Network controls are preserved unchanged. Separate worktree/branch and
+fresh remote checks prevent interference with that publication.
+
+Cause: the prior logarithmic transform normalized the whole history, so its
+growing denominator squeezed recent samples too. The latest saved recent time
+interval now uses a fixed right-half scale once the displayed span reaches
+three recent intervals. Only the older-left logarithmic tail adapts curvature.
+Both pieces share position and first derivative; chronology and inverse remain
+consistent. Short Fit histories warm up continuously to this scale; endpoint
+filling takes priority until then. Single/equal-time samples remain centered.
+See docs/CONDENSED_GRAPH_SCALING.md for exact formulas, policy and limits.
+
+Fit endpoints keep existing marker gutters and original first/last timestamps,
+including raw/group transitions, filtering and resize. Original results,
+contributors, extrema, zeros, spikes and failures remain accessible; existing
+bounded display grouping is unchanged. Main-plot drag now uses the same inverse
+as zoom and axis ticks in both diagnostic and packet graphs. Overview and
+Linear remain time-proportional. Timeframe, held selections, Follow latest,
+shared graph tabs, independent list/details scrolling, exports and updater stay
+intact. No removed graph-mode choices are restored.
+
+151 focused graph/history/projection/navigation/timeline/packet tests pass.
+At fixed usable widths of 760/280 px, the newest one-second gap stays exactly
+9.06176194/3.33854387 px as history grows from 706 to 1,000,000 seconds. Tests
+cover smooth joins/warm-up, inverse pan/zoom, 706/1400/1401/7201-point renderer
+growth, held originals, filters, resize, grouping boundaries, irregular and
+duplicate times, gaps, spikes, zeros and failures. Existing UI97/98 suites
+were updated upfront: real rounded pointer coordinates retain the 1 ms zoom
+anchor tolerance; normal/narrow before/after recent-pixel, hover/selection and
+four screenshot comparisons are required. No assertions or CI gates weakened.
+
+Syntax/diff checks pass; release metadata and 35 layout/publication guards run
+before review push. Hosted build/native/browser acceptance and screenshot
+inspection remain pending. Local Go/browser execution is unavailable; no native
+installation, WebView2 session or live updater staging is claimed.
+Do not publish this version or move main until separately authorized.
+
 ## 1.17.101 published pinned Local Network filters
 
 User-authorized publication is complete:

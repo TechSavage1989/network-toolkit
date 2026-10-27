@@ -1,0 +1,5 @@
+Network Toolkit 1.17.102
+
+Condensed keeps a stable recent-right time scale as retained history grows, instead of squeezing the newest points. The latest configured recent interval occupies the right half once at least three such intervals exist; a smoothly joined older-left region absorbs additional compression. Short startup histories fill the plot continuously until this stable scale is established.
+Fit/All retains the complete recorded extent and pins first/last eligible points inside the existing marker gutters. Old groups preserve original timestamps, contributors, extrema, zeros and failures; recorded results are not deleted or averaged away.
+Axis ticks, hover/selection, pointer-anchored zoom and direct graph dragging share matching forward/inverse time coordinates. The full-history navigator and Linear remain proportional to actual time. Timeframe, held selections, Follow latest, graph/list details and the Local Network pinned-filter fix are preserved.

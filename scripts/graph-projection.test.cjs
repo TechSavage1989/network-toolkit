@@ -38,3 +38,32 @@ test('Condensed Fit has visibly increasing equal-time spacing even when retained
   }
  }
 });
+
+test('recent Condensed pixel spacing is independent of older history after the Fit warm-up',()=>{
+ const end=history.instant(scope.end),recent=60000,ages=[0,.25,1,5,15,30,59,60],atAge=seconds=>history.timestamp(end-BigInt(Math.round(seconds*1e9)));let reference;
+ for(const seconds of [180,706,1399,1400,1401,7201,1000000]){
+  const s={start:atAge(seconds),end:scope.end},positions=ages.map(age=>history.fraction(atAge(age),s,'condensed',recent));
+  assert.equal(history.fraction(s.start,s,'condensed',recent),0);assert.equal(positions[0],1);assert.equal(positions.at(-1),.5,'Configured recent interval owns the right half');
+  if(reference)for(const width of [280,760])positions.forEach((x,i)=>assert(Math.abs((x-reference[i])*width)<1e-9,'Older history cannot squeeze recent pixels'));else reference=positions;
+  for(const [i,stamp] of ages.map(atAge).entries())assert.equal(history.at(positions[i],s,'condensed',recent),stamp,'Recent inverse returns the precise original instant');
+ }
+});
+
+test('Condensed old/recent join is continuous in position and slope with steadily increasing age compression',()=>{
+ const end=history.instant(scope.end),atAge=seconds=>history.timestamp(end-BigInt(Math.round(seconds*1e9))),eps=.00001;
+ for(const seconds of [180,181,706,1401,7201,1000000]){
+  const s={start:atAge(seconds),end:scope.end},x=age=>history.fraction(atAge(age),s,'condensed',60000),recentSlope=(x(60-eps)-x(60))/eps,olderSlope=(x(60)-x(60+eps))/eps;
+  assert(Math.abs(olderSlope/recentSlope-1)<.0001,'No two-speed join at '+seconds+'s');
+  const slopes=[0,1,30,59,60,61,120,seconds-.01].map(age=>(x(age)-x(age+.001))/.001);for(let i=1;i<slopes.length;i++)assert(slopes[i]<=slopes[i-1]+1e-10,'Compression increases with age');
+ }
+ for(const age of [1,30,60,100,179]){const stamp=atAge(age),before=history.fraction(stamp,{start:atAge(179.999),end:scope.end},'condensed'),after=history.fraction(stamp,{start:atAge(180.001),end:scope.end},'condensed');assert(Math.abs(after-before)<.00001,'Warm-up enters stable resolution without a jump');}
+});
+
+test('inverse-based plot dragging and zoom preserve the grabbed instant on both sides of the recent join',()=>{
+ const end=history.instant(scope.end);
+ for(const mode of ['linear','condensed'])for(const seconds of [10,180,181,7200])for(const [from,to] of [[.2,.35],[.45,.55],[.8,.9]]){
+  const s={start:history.timestamp(end-BigInt(seconds)*1000000000n),end:scope.end},anchor=history.instant(history.at(from,s,mode)),next=history.panScope(s,from,to,mode);
+  assert.equal(history.instant(next.end)-history.instant(next.start),BigInt(seconds)*1000000000n);assert.equal(history.instant(history.at(to,next,mode)),anchor,'Drag follows the nonlinear inverse rather than linear dx');
+  for(const zoom of [.5,2,8]){const finish=history.anchoredEnd(s,1,zoom,from,mode),zoomed=history.viewport(s,zoom,finish),hit=history.instant(history.at(from,zoomed,mode));assert(hit>=anchor-1n&&hit<=anchor+1n,'Pointer-anchored zoom crosses the region/warm-up boundary accurately');}
+ }
+});
