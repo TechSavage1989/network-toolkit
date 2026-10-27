@@ -105,6 +105,11 @@ jobs:
           if ! PLAYWRIGHT_MODULE="$RUNNER_TEMP/ntk-browser-tests/node_modules/playwright" node -e 'require(process.env.PLAYWRIGHT_MODULE).chromium.launch({headless:true}).then(browser=>browser.close()).catch(error=>{console.error(error.message);process.exitCode=1})'; then
             node "$RUNNER_TEMP/ntk-browser-tests/node_modules/playwright/cli.js" install --with-deps chromium
           fi
+      - name: Check stable Local Network layout and automatic snapshots
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
+        run: node scripts/features-89.browser.cjs
       - name: Check full-history Fit and proportional timeline navigators
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
@@ -155,11 +160,6 @@ jobs:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
         run: node scripts/features-88.browser.cjs
-      - name: Check stable Local Network layout and automatic snapshots
-        env:
-          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
-          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
-        run: node scripts/features-89.browser.cjs
       - name: Check proportional headers, shared controls and sidebar toggles
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright

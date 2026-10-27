@@ -10,8 +10,8 @@ was found. The duplicate 1.17.100 main Checks run 40489248768 finished green.
 
 Cause: nongraph result filters were siblings after the sticky list toolbar.
 Local Network list filters now live inside that same toolbar. Scoped CSS keeps
-all controls visible at the scrollport top, wraps them on narrow layouts and
-positions table headings using the existing measured toolbar height. Existing
+controls wrapped on narrow layouts, retaining the existing scrollport padding
+compensation and measured toolbar height for table headings. Existing
 horizontal anchoring, saved filter preferences, keyboard controls and list
 refresh remain intact. Other tools and graph/details scrollers are unchanged.
 
@@ -19,6 +19,9 @@ Local checks: 19 focused filter tests, JavaScript syntax and inline-script parse
 pass. Release metadata/layout safeguards run before the review push. The existing
 Local Network browser suite now covers actual vertical/horizontal list scrolling,
 wide/narrow/short layouts, keyboard changes and preserved filters on rerender.
+Initial hosted review caught a redundant offset override leaving a 12 px gap;
+the override was removed, retaining the shared sticky offsets. The affected
+Local Network suite now runs first in the browser job; no checks were removed.
 Local Go and browser execution are unavailable; required hosted application,
 Windows and browser Checks remain unchanged and must pass before promotion.
 No native installation/restart or full WebView2 session is claimed.
