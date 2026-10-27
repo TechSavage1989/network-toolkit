@@ -1,48 +1,120 @@
 # Network Toolkit development handoff
 
-## 1.17.102 authorized stable-recent Condensed review build
+## 1.17.102 published stable-recent Condensed graphs
+
+The user explicitly authorized main promotion and publication on 2026-10-27
+15:52 UTC ("publsih toolkit"). Publication and public-asset verification completed:
+https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.102
+Release ID: 425676221
+Source/tag: 4a58f6c86cf6a54b798f90d7a17802f6ad4e2202
+Tree: 51d5ba09a01859d46bd4ddc663c5409aaaf2c045
+Main baseline: a870103aad95cceca763859ae0a1991f0edd27db.
+Fresh main/review/tag/release/CI checks showed no competing changes. Main was
+advanced non-forcibly with an expected-head lease to the already reviewed source,
+not the later documentation-only review commit. No application code or tests
+were changed and no optional rebuild/test pass was launched for publication.
+
+Exact-source review Checks 40496464349 passed, as detailed below. Required
+Release 40535557250 PASSED (build 122299715187, publish 122300511444).
+All four public assets were downloaded. GitHub digests, outer/inner SHA256
+manifests, ZIP CRCs and safe inventory, PE x64 GUI/version resources, binary-only
+updater allowlist and executable identity verify. All 813 packaged source files
+match the exact release checkout. Public EXE and portable ZIP match verified
+review artifact 12730609117 hashes exactly. Latest feed points to v1.17.102 and
+the expected updater/checksum URLs; tag/main provenance verifies.
+v1.17.101 retains its release ID, asset IDs/digests and body unchanged.
+
+Public SHA256:
+- Network_Toolkit.exe: abadfdf48a3f5949470f0cfe7c5d54bdb2c8bebb670d445b9f8d8bc0bdab0dac
+- Network_Toolkit_1.17.102_Portable.zip: a27b7325f760c80d064fa112d9eaab22f12027d31f9ee12da5c940ac23cf7e4f
+- Network_Toolkit_1.17.102_Update.zip: 49baf5ff55acdde5411b5d67c5dba9069c3865e402a1fa699fe0ca12b39bb7fb
+- SHA256SUMS: e18cc3c885e27ac242e32c36a83a9480e5a9741744dbd2a76f9e4e9126a61a17
+
+Updater archive contains only the versioned Windows executable, SHA256SUMS,
+THIRD_PARTY_NOTICES.txt and UPDATING.txt under Network_Toolkit_1.17.102/.
+Automatic duplicate main Checks 40535557196 is still being observed on the
+same published source: application 122299715153 and Windows 122299715501 have
+passed; browser 122299715367 remains running. Review and Release are complete.
+This is not an optional rerun or an additional release gate.
+
+No native installation/restart, full WebView2 session or live updater staging
+is claimed. The former local workspace expired; a clean exact-source checkout
+was restored solely to verify downloaded assets/source. No old tag/assets,
+retired feed, repository access or credentials were changed. This final
+docs-only record uses [skip ci] and does not rebuild assets or move the tag.
+Future builds/publication require separate authority.
+
+## 1.17.102 review evidence before publication approval
 
 The user supplied the detailed Condensed scaling prompt and said "build and push
-it". This authorizes the isolated review build/push only; main promotion and
-publication are not yet approved. Published 1.17.101 remains the live release.
-Baseline: exact 1.17.101 source 2493e1978565b5302098df7dc7ed940c4764a6ef and
+it". The isolated build/review push completed first. Main promotion/publication
+was then separately authorized and completed as recorded above.
+Review branch: review/hosts-editor-1.17.102
+Exact built/reviewed source: 4a58f6c86cf6a54b798f90d7a17802f6ad4e2202
+Tree: 51d5ba09a01859d46bd4ddc663c5409aaaf2c045
+Baseline: published 1.17.101 source 2493e1978565b5302098df7dc7ed940c4764a6ef and
 publication handoff main a870103aad95cceca763859ae0a1991f0edd27db. Its sticky
-Local Network controls are preserved unchanged. Separate worktree/branch and
-fresh remote checks prevent interference with that publication.
+Local Network controls are unchanged. Source was developed in an isolated
+worktree and checked against current branches/releases before the review push.
 
-Cause: the prior logarithmic transform normalized the whole history, so its
-growing denominator squeezed recent samples too. The latest saved recent time
-interval now uses a fixed right-half scale once the displayed span reaches
-three recent intervals. Only the older-left logarithmic tail adapts curvature.
-Both pieces share position and first derivative; chronology and inverse remain
-consistent. Short Fit histories warm up continuously to this scale; endpoint
-filling takes priority until then. Single/equal-time samples remain centered.
-See docs/CONDENSED_GRAPH_SCALING.md for exact formulas, policy and limits.
+Cause: the old whole-span logarithmic normalization squeezed recent samples as
+history grew. The saved recent interval R now occupies a fixed right half once
+span >= 3R; only the older-left tail adapts. Both regions share position and
+first derivative. Projection, inverse ticks, pointer-anchored zoom and main-plot
+drag agree for diagnostic and packet graphs. The overview and Linear remain
+proportional to time. Fit endpoints retain original first/last timestamps and
+marker gutters across growth/group boundaries, filtering and resize.
+Original contributors, extrema, zeros, spikes, failures and source data remain
+accessible through existing bounded groups and selections. Timeframe, shared
+tabs, Follow latest, details/list scrolling, exports and updater are preserved.
 
-Fit endpoints keep existing marker gutters and original first/last timestamps,
-including raw/group transitions, filtering and resize. Original results,
-contributors, extrema, zeros, spikes and failures remain accessible; existing
-bounded display grouping is unchanged. Main-plot drag now uses the same inverse
-as zoom and axis ticks in both diagnostic and packet graphs. Overview and
-Linear remain time-proportional. Timeframe, held selections, Follow latest,
-shared graph tabs, independent list/details scrolling, exports and updater stay
-intact. No removed graph-mode choices are restored.
+Short-history limit: before 3R exists, continuous Fit warm-up prioritizes pinned
+endpoints; exact fixed recent spacing and full-width filling cannot both hold
+for arbitrarily few points. Empty/single/equal-time cases remain sensible.
+Discrete aggregates have representative positions and counts: the smoothness
+claim concerns the time transform, not identical gaps between every grouped
+marker. See docs/CONDENSED_GRAPH_SCALING.md for policy and equations.
 
-151 focused graph/history/projection/navigation/timeline/packet tests pass.
-At fixed usable widths of 760/280 px, the newest one-second gap stays exactly
-9.06176194/3.33854387 px as history grows from 706 to 1,000,000 seconds. Tests
-cover smooth joins/warm-up, inverse pan/zoom, 706/1400/1401/7201-point renderer
-growth, held originals, filters, resize, grouping boundaries, irregular and
-duplicate times, gaps, spikes, zeros and failures. Existing UI97/98 suites
-were updated upfront: real rounded pointer coordinates retain the 1 ms zoom
-anchor tolerance; normal/narrow before/after recent-pixel, hover/selection and
-four screenshot comparisons are required. No assertions or CI gates weakened.
+Validation:
+- 151 focused graph/history/projection/navigation/timeline/packet tests pass;
+  syntax/inline parse, metadata and 35 release/layout guards pass.
+- Exact-source Checks 40496464349 passed all required jobs (attempt 2).
+  Original application/build 122163050539 and browser 122163050637 passed;
+  Windows retry 122170179512 passed. Attempt-2 carried-forward success jobs are
+  application 122170243018 and browser 122170181800. All 679 JavaScript tests,
+  required Go/native/browser suites and real five-minute updater cases pass.
+- First Windows attempt 122163050309 timed out waiting for an unchanged
+  PowerShell transcript; its later interactive lifecycle test passed. A retry
+  request while the overall run was active was rejected without execution.
+  After terminal evidence, the same Windows-only job was retried once and
+  passed unchanged. No source/assertion weakening or whole-run rerun occurred.
+- Deterministic tests retain identical recent positions for 180 to 1,000,000 s
+  histories, smooth join/warm-up, exact inverse pan/zoom, irregular/duplicate
+  timestamps, gaps, extremes/failures and original held selections.
+- All four 706/7201-sample comparison screenshots were inspected at 1440/390 px
+  window widths. Actual newest gaps stay 5.03/3.00 px respectively; all 20 recent
+  marker coordinates are identical before/after growth. Endpoint coordinates
+  remain [48,470] and [48,300]. Browser hover/held-source checks pass.
+- The apparent grouped-marker seam was quantified and inspected in the pixels:
+  a two-sample first old bin gives a 4.992713 px representative gap versus nearby
+  2.279039/2.568865 px single-sample gaps, but marker radii overlap by 3.507 px.
+  No empty seam or transform jump exists; join slopes agree to numerical error.
 
-Syntax/diff checks pass; release metadata and 35 layout/publication guards run
-before review push. Hosted build/native/browser acceptance and screenshot
-inspection remain pending. Local Go/browser execution is unavailable; no native
-installation, WebView2 session or live updater staging is claimed.
-Do not publish this version or move main until separately authorized.
+Verified build artifact 12730609117:
+https://github.com/TechSavage1989/network-toolkit/actions/runs/40496464349/artifacts/12730609117
+Network_Toolkit_1.17.102_Portable.zip SHA256:
+a27b7325f760c80d064fa112d9eaab22f12027d31f9ee12da5c940ac23cf7e4f
+Embedded Network_Toolkit.exe SHA256:
+abadfdf48a3f5949470f0cfe7c5d54bdb2c8bebb670d445b9f8d8bc0bdab0dac
+Safe ZIP inventory, CRCs, complete source/root manifests, PE x64 GUI/version,
+executable identity and all 813 packaged source files match the exact candidate.
+Rendered evidence artifact: 12732051592. Publication is recorded above.
+
+Local Go/browser execution was unavailable; hosted evidence is used. No native
+installation/restart, full WebView2 session or live updater staging is claimed.
+This final docs-only review record uses [skip ci]; it does not change the built
+source above or rebuild assets. Publication subsequently used that exact built
+source. Do not overwrite old tags/assets or change repository access.
 
 ## 1.17.101 published pinned Local Network filters
 
@@ -88,8 +160,9 @@ Public SHA256:
 - Network_Toolkit_1.17.101_Update.zip: 8c530677851a369bb212b0b5b7fefd934abf4c18a6796162a9745107a1f28a1c
 - SHA256SUMS: e494f58a654e7fdf522bbb74e378d13fb5b653a47938c99b583419635b8f3e94
 
-Duplicate main Checks 40495692791 remains under observation on the same tested
-source; this is not a new release gate or an optional rerun. No native install/
+Duplicate main Checks 40495692791 also PASSED all jobs on the same tested
+source (application 122160440111, Windows 122160440110, browser 122160439865).
+The observation is closed; no optional rerun occurred. No native install/
 restart, full WebView2 session or new live updater staging run is claimed.
 Local Go/browser execution was unavailable; hosted evidence is used.
 The separately authorized stable-recent Condensed change is being built on an
