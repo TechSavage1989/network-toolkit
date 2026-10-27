@@ -3,18 +3,18 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-Current verified published version: 1.17.94.
-Source/tag: 3305c38d4fc7da067fed98d54f57abe1cedd3fe4
-Tree: d15db7e42a0d6f8f0d0f5eba0844df726c91fbe9
-Full Checks 40415580921 and Release 40417147184 pass on this source.
-624 JavaScript tests, 35 release guards and the
-required Go/native Windows/browser checks pass. UI94: 8 groups /
-16 layouts; UI93/92/91/90, Local Network/UI88 and covered regressions
+Current verified published version: 1.17.95.
+Source/tag: 12c6ffda0769330a7d0e48d555558957408838d2
+Tree: c539ef9113d034dbe608e322461fb17b1594a234
+Full Checks 40431761171 and Release 40433123013 pass on this source.
+640 JavaScript tests, 35 release guards and the
+required Go/native Windows/browser checks pass. UI95: 2 groups /
+16 base and 8 selected layouts; UI94/93/92/91/90, Local Network/UI88 and covered regressions
 also pass. Review/local/public files match and all
-785 packaged source files match the tag. All
-33 older releases/assets and
-33 older tags are unchanged. Released93 verified/staged94
-in 13.11s. No actual installation/restart or full native WebView2 interaction
+793 packaged source files match the tag. All
+34 older releases/assets and
+34 older tags are unchanged. Released94 verified/staged95
+in 10.20s. No actual installation/restart or full native WebView2 interaction
 is claimed.
 
 The user authorized this publication and it is complete. Future releases need

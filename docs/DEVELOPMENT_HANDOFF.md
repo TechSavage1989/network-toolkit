@@ -45,9 +45,120 @@ For the subsequently authorized 1.17.90 build, the 1.17.89 note has also been
 moved unchanged into the archive. Current `RELEASE_NOTES_1.17.90.txt` alone stays
 at root, and the archive index identifies 1.17.90 as current and 1.17.89 as previous.
 
-## 1.17.95 authorized condensed history and linked entry details
+## 1.17.95 published condensed history, configurable time ranges and linked entry details
 
-The user explicitly authorized building and publishing the confirmed graph-history, time-range and linked-selection update. Preserve current features, saved settings and updater safeguards. Publication is pending full validation of the final source, native/browser checks, public assets and live updater staging.
+The user explicitly authorized implementing, building and publishing this update.
+Published source/tag: 12c6ffda0769330a7d0e48d555558957408838d2
+Tree: c539ef9113d034dbe608e322461fb17b1594a234
+Official release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.95
+Release ID: 424944301
+
+Condensed history is an additional graph mode. Recent measurements remain
+individual; older retained measurements use progressively wider intervals.
+Latency groups retain minimum/average/maximum and failure information, and
+packet groups show actual counts, bytes and interval boundaries. Every retained
+contributor stays available in the existing entry details sidebar. Display
+aggregation never deletes original results or changes exports.
+
+The Time range dialog saves duration presets/custom duration, a fixed end or an
+explicit start/end, plus the recent individual period. Wall-clock input follows
+the configured local/UTC/named zone, with explicit offsets required for ambiguous
+DST times. Source timestamp precision is preserved. Latest reanchors the linked
+graph/list/sidebar while retaining the configured duration and zoom.
+
+Clicking a graph measurement and clicking its result row share the same held
+selection and entry details sidebar, including actual response time. Packet
+frames without measured RTT say Not measured. Aggregate selections honestly show
+interval summaries and paginated original contributors. The duplicate selected
+point panel below the graph is removed; transient hover popups remain.
+
+Ordinary outside clicks, controls, filters, sorts, zoom, collapse and incoming
+data do not replace a held selection. Blank graph space, Clear selection or
+Escape deselect; selecting another result replaces it. Either Latest control
+releases the hold and resumes following the newest matching result. Excluded or
+evicted diagnostic records retain an explained selected snapshot. The graph,
+list and details remain usable with saved/adjustable pane dimensions in the
+covered desktop, narrow and short window layouts.
+
+Current release note, validated at the required root path:
+Network Toolkit 1.17.95
+
+Condensed history combines older measurements into clearly identified intervals while preserving retained source results and access to their contributors.
+Graph time controls support saved durations, a chosen end time and explicit start/end ranges, using the configured timezone and clock display.
+Graph points and result rows share a held selection in the entry details sidebar, including response time and recorded context. Hovering or new results do not replace that selection.
+Latest releases the hold and resumes linked graph, result-list and sidebar following while preserving the chosen duration, zoom, filters and sorting.
+Existing statistics, graph modes, palette, scrolling, copy/export, saved settings and updater safeguards remain available.
+
+Verified implementation scope:
+- Shared latency graphs add condensed retained history with extrema/failure evidence, saved time ranges and a configurable recent individual period.
+- Graph/list selections share exact immutable entry details with response time, contributors and filter/eviction context; either Latest control resumes linked matching-result following.
+- Packet capture uses native precise interval grouping, exact frame navigation and paginated contributors under original filters, without inventing frame RTTs.
+- Adaptive Auto details and compact run headings retain complete selected rows and visible plots; explicit dock and adjustable pane preferences remain supported.
+- Packet Statistics hover popups survive refresh and defer new measurements until inspection ends.
+- CI uses existing Chromium libraries with the full dependency installer as fallback; required tests are preserved.
+- Selected packet intervals retain full mouse hit areas; fresh graph responses clear stale queued hover statistics before a held selection is released.
+
+Full Checks 40431761171 passed application 121950875248, native
+Windows 121950875571 and browser 121950875857 on this exact
+published source. 640 JavaScript tests and 35
+Python release guards pass, together with the required application, terminal,
+desktop, diagnostic, device-information, platform and capture Go suites. Native
+cmd/PowerShell color and interactive lifecycle, installer progress and Windows
+GUI/resource build/package checks pass.
+
+The UI95 browser report passes 2 groups across
+16 base layouts and 8 selected-detail layouts,
+with 2 history cases, 3 selection cases and
+2 packet cases.
+The retained UI94 browser report passes 8 groups across
+16 layout cases, with 8 zoom cases,
+24 filter cases, 10 tracking cases and
+10 packet cases. These counts come from the verified final report.
+Retained UI93 passes 7 groups / 16 layouts,
+UI92 passes 6 groups / 12 layouts and UI91
+passes 4 groups / 14 layouts. UI90 passes
+4 groups / 8 layouts / 5 header groups, Local Network passes 5 groups / 12 layouts
+and UI88 passes 4 groups / 9 layouts. Covered editor, shell, copy, Hosts,
+client/server, SMTP, folder and selection regressions pass. All 7 native updater
+timer cases pass, including the real five-minute poll. Current reports have no
+runtime or asset failures; the released64 negative control retains its expected
+Illegal invocation regression result.
+
+Release 40433123013 passed build 121955350689 and publish
+121955745573. All four downloaded public assets match GitHub
+digests and SHA256SUMS. Official EXE and portable ZIP match the reviewed local
+build; standalone, portable and update EXEs are identical. All
+793 packaged source files match the tag. ZIP CRCs,
+manifests, PE GUI/version, the strict update inventory and
+14 vendored editor-library digests verify. All
+34 older releases/assets and
+34 older tags remain unchanged.
+
+Released94 production handlers checked/downloaded/verified/staged live95 through
+real HTTPS with isolated settings in 10.20s. The staged
+17917440-byte candidate matches the independently verified official
+executable, and the original test executable is unchanged. No actual
+installation, restart or full native WebView2 interaction was performed.
+
+Review artifact 12702412700: c2690a66f59286675acc406f9ee4aa9f684bf9c453f4d3c164c8a44ec6c0cd2a
+Browser artifact 12703280514: ef9498689f14c03f2a3fc88abe9d682d2395251fd5032965a72b6cfa4ed91c34
+Final screenshots inspected: ui95-monitor-1440x1000-dark.png, ui95-monitor-390x1000-light.png, ui95-monitor-selected-820x650.png, ui95-monitor-selected-390x1000.png, ui95-packets-1440x1000-light.png, ui95-packets-selected-390x1000.png, ui95-packets-selected-820x650.png, ui95-packets-selected-1440x1000.png
+Network_Toolkit.exe SHA256: a7b2873a6813b77ecf65742543688472db63e287c270b426695a7b9d48749658
+Network_Toolkit_1.17.95_Portable.zip SHA256: a40b6d6a5676ea06f39e2b5a381fd043d17455372cc49d33b0bf9e089196ef2d
+Network_Toolkit_1.17.95_Update.zip SHA256: c93981c72544a6b4ce995ed77d228e6ebaae68e15c5534c5897fdf800513d2ef
+SHA256SUMS SHA256: 9f4706acb89d9fb4777a9016df99140e7d11e3129fd4407bb3555f9a2a6f0e21
+
+The prior 94 release note is archived unchanged under docs/releases; only the
+current 95 note remains at root. All 52 historical notes and the complete AGENTS
+repository policies are preserved, including compact source layout and the
+tracked root allowlist. Follow release-note rotation for the next authorized
+version change.
+
+Main network-toolkit remains the sole public source/update feed. Do not move old
+tags, replace assets, change access or write the retired feed. Publication is
+complete; future releases require authorization. This final three-file
+documentation completion uses [skip ci], preserving published source, runtime
+and release assets. Continue from latest main and preserve previous fixes.
 
 ## 1.17.94 published scalable graphs, statistics filters and result tracking
 
