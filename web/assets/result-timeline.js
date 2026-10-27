@@ -1,11 +1,11 @@
 (function (root) {
   'use strict';
 
-  const limit=180, retainedLimit=10000, width=820, height=110, padding=12, spacing=8, minZoom=.25, maxZoom=16;
+  const retainedLimit=10000, width=820, height=110, padding=12, spacing=8, minZoom=.25, maxZoom=16;
   const models=new Map(),wheelFrames=new Map();
   let initialized=false,lastFocus=null,activeHover=null,hoverPointer=null,tooltip=null,restoring=false,resizeObserver=null;
   const observedScrollers=new Set();
-  let fallbackPreferences={mode:'window'},fallbackPlots={};
+  let fallbackPreferences={mode:'linear'},fallbackPlots={};
   const plotName=value=>value==='jitter'?'jitter':'rtt';
   function plotPreferences(){try{return typeof state!=='undefined'&&state.graphPlotPreferences||fallbackPlots;}catch{return fallbackPlots;}}
   function setPlot(id,value){const model=models.get(String(id));if(!model)return false;model.plot=plotName(value);fallbackPlots={...plotPreferences(),[model.tool]:model.plot};try{if(typeof state!=='undefined')state.graphPlotPreferences=fallbackPlots;if(typeof saveState==='function')saveState();}catch{}const container=findContainer(id);if(container)rebuild(container,model);return true;}
@@ -15,7 +15,7 @@
   const numeric=value=>(typeof value==='number'||typeof value==='string'&&value.trim())&&Number.isFinite(Number(value))&&Number(value)>=0?Number(value):null;
   const numberFormatter=new Intl.NumberFormat(undefined,{maximumFractionDigits:3}),lossFormatter=new Intl.NumberFormat(undefined,{maximumFractionDigits:1});
   const number=value=>value==null?'Not measured':numberFormatter.format(value)+' ms';
-  function normalizePreferences(value){return {mode:['window','progressive','condensed'].includes(value?.mode)?value.mode:'window'};}
+  function normalizePreferences(value){return {mode:value?.mode==='condensed'?'condensed':'linear'};}
   function preferences(){try{return normalizePreferences(typeof state!=='undefined'?state.graphPreferences:fallbackPreferences);}catch{return normalizePreferences(fallbackPreferences);}}
   function mergePreferences(value){fallbackPlots={};for(const [key,v] of Object.entries(value?.graphPlotPreferences||{}))if(['ping','monitor','latency'].includes(key)&&['rtt','jitter'].includes(v))fallbackPlots[key]=v;try{if(typeof state!=='undefined')state.graphPlotPreferences={...fallbackPlots};}catch{}if(!value||!Object.prototype.hasOwnProperty.call(value,'graphPreferences'))return preferences();const next=normalizePreferences(value.graphPreferences);fallbackPreferences=next;try{if(typeof state!=='undefined')state.graphPreferences=next;}catch{}return next;}
   function setPreferences(value,{persist=true}={}){
@@ -38,7 +38,7 @@
   }
   function normalize(samples,options={}){
     if(!Array.isArray(samples))return [];
-    const count=options.mode==='progressive'?retainedLimit:limit,offset=Math.max(0,samples.length-count);let previous=null,previousSequence=null;
+    const offset=Math.max(0,samples.length-retainedLimit);let previous=null,previousSequence=null;
     return samples.slice(offset).map((sample,index)=>{
       const source=sample&&typeof sample==='object'?sample:{},time=sampleTime(source),success=source.success===true,rtt=success?numeric(source.rttMs):null;
       const sequence=numeric(source.sequence),consecutive=previousSequence==null||sequence==null||sequence===previousSequence+1;
@@ -64,7 +64,7 @@
     if(!model.pinned)return '';
     const retained=model.allPoints.some(point=>point.key===model.pinned),displayed=model.points.some(point=>point.key===model.pinned);
     if(!retained)return '<p class="rt-selected-context">Selected sample '+escape(model.pinnedSnapshot?.sequence)+' is no longer in retained history. Its recorded details remain selected.</p>';
-    if(!displayed)return '<p class="rt-selected-context">Selected sample '+escape(selectedPoint(model)?.sequence)+' is outside the moving window. Its recorded details remain selected; switch to progressive history to locate it.</p>';
+    if(!displayed)return '<p class="rt-selected-context">Selected sample '+escape(selectedPoint(model)?.sequence)+' is outside the displayed time range. Its recorded details remain selected; use Fit or navigation to locate it.</p>';
     return '<p class="rt-selected-context">Sample '+escape(selectedPoint(model)?.sequence)+' stays selected until you select another point, click outside the graph or clear the selection.</p>';
   }
   const zoomValue=value=>Math.max(1e-18,Math.min(1e24,Number.isFinite(Number(value))?Number(value):1));
@@ -85,16 +85,12 @@
   function selectPoints(model){
     const history=root.NetworkToolkitGraphHistory,pref=history?.preferences?.();
     let candidates=model.allPoints;
-    if(model.mode==='window'&&!pref?.allHistory&&!(pref?.durationMs>0)&&(pref?.anchor||'latest')==='latest'){
-      const end=model.follow?latestPoint(model):model.allPoints.find(p=>p.key===model.windowEndKey)||model.allPoints.at(-1),index=end?model.allPoints.indexOf(end):model.allPoints.length-1;
-      candidates=model.allPoints.slice(Math.max(0,index-limit+1),index+1);
-    }
     if(history){
       let scope=history.range(candidates,pref,model.heldEnd||(filterState(model).active&&!(pref.allHistory&&model.zoom===1&&model.follow)?latestPoint(model)?.time||'':''));
       if(model.panSpanNs&&history.instant(scope.end)!==null)scope={...scope,start:history.timestamp(history.instant(scope.end)-BigInt(model.panSpanNs))};model.baseScope=scope;scope=model.manualScope?{...scope,...root.NetworkToolkitGraphNavigator.scope(model.manualScope.start,model.manualScope.end)}:history.viewport(scope,model.zoom,model.viewEnd||'');model.timeScope=scope;
-      const timed=Number.isFinite(scope.from)&&Number.isFinite(scope.to),visible=timed?history.select(model.mode==='window'&&!pref.allHistory&&!pref.durationMs&&pref.anchor==='latest'&&model.zoom>=1&&!model.viewEnd&&!model.manualScope?candidates:model.allPoints,scope):candidates,indices=new Set(visible.map(point=>point.index));
+      const timed=Number.isFinite(scope.from)&&Number.isFinite(scope.to),visible=timed?history.select(model.allPoints,scope):candidates,indices=new Set(visible.map(point=>point.index));
       model.rawVisiblePoints=visible.map(point=>({...point,jitter:indices.has(point.index-1)?point.jitter:null}));
-      const groups=model.mode==='condensed'?history.condense(model.rawVisiblePoints,{end:scope.end,recentMs:pref.recentMs}):model.rawVisiblePoints.map(point=>({items:[point],aggregate:false}));
+      const groups=model.mode==='condensed'?history.condense(model.rawVisiblePoints,{end:scope.end,recentMs:pref.recentMs,preserveRaw:true}):model.rawVisiblePoints.map(point=>({items:[point],aggregate:false}));
       return groups.map(aggregate);
     }
     model.timeScope=null;model.rawVisiblePoints=candidates;return candidates.map((p,index)=>({...p,index}));
@@ -165,14 +161,14 @@
     let model=models.get(id);
     if(!model)model={id,pinned:null,pinnedSnapshot:null,hovered:null,follow:true,scrollLeft:0,viewportWidth:width,viewportHeight:height,zoom:1};
     else captureScroll(model);
-    const oldMode=model.mode;if(!model.renderingViewport)model.allPoints=normalize(samples,{mode:'progressive'});model.samples=samples;model.title=String(context.title||'Response time');model.tool=context.tool||context.job?.tool||model.tool||'monitor';model.context={...context,id,title:model.title};model.mode=mode;model.plot=plotName(plotPreferences()[model.tool]||model.plot);model.zoom=zoomValue(model.zoom);refreshModel(model);
+    const oldMode=model.mode;if(!model.renderingViewport)model.allPoints=normalize(samples);model.samples=samples;model.title=String(context.title||'Response time');model.tool=context.tool||context.job?.tool||model.tool||'monitor';model.context={...context,id,title:model.title};model.mode=mode;model.plot=plotName(plotPreferences()[model.tool]||model.plot);model.zoom=zoomValue(model.zoom);refreshModel(model);
     if(oldMode!==mode)model.scrollLeft=0;
     if(model.hovered&&!model.allPoints.some(point=>point.key===model.hovered)&&!model.points.some(point=>point.key===model.hovered))model.hovered=null;
     if(model.pinned){const refreshed=model.allPoints.find(point=>point.key===model.pinned);if(refreshed)model.pinnedSnapshot={...refreshed};}
     models.delete(id);models.set(id,model);while(models.size>64)models.delete(models.keys().next().value);
     const stats=model.stats;
-    const scope=mode==='condensed'?'Condensed · nonlinear time axis; older intervals compressed':model.mode==='window'&&!root.NetworkToolkitGraphHistory?.preferences?.().allHistory&&!root.NetworkToolkitGraphHistory?.preferences?.().durationMs?'Moving window · '+model.points.length+' samples':root.NetworkToolkitGraphHistory?.label?.()||'Retained measurements',metric=model.plot;
-    return '<section class="rt-timeline" data-rt-id="'+escape(id)+'" data-rt-scope-start="'+escape(model.timeScope?.start||'')+'" data-rt-scope-end="'+escape(model.timeScope?.end||'')+'" data-rt-mode-active="'+mode+'" data-rt-plot-active="'+metric+'" aria-label="'+escape(model.title)+' timeline"><div class="rt-heading"><div class="rt-view-controls"><label class="rt-mode-control"><span class="sr-only">Graph view</span><select data-rt-mode aria-label="Graph view" title="Recent 180 defaults to the latest 180 samples; Full history keeps all retained samples. A chosen timeframe or Fit overrides the default range."><option value="window"'+(mode==='window'?' selected':'')+'>Recent 180</option><option value="progressive"'+(mode==='progressive'?' selected':'')+'>Full history</option><option value="condensed"'+(mode==='condensed'?' selected':'')+'>Condensed</option></select></label>'+(root.NetworkToolkitGraphHistory?.controlHTML?.()||'')+zoomControls(model)+'<span class="sr-only" data-rt-selection-status></span></div></div>'+plot(model,metric,metric==='rtt'?model.maximum:model.maxJitter,metric==='rtt'?stats.average:stats.jitter)+'<div class="rt-time-axis" style="margin-left:'+plotGeometry(model).left+'px;margin-right:'+(plotGeometry(model).viewport-plotGeometry(model).right)+'px" aria-label="'+escape(timeLabel())+' horizontal time axis">'+axisHTML(model)+'</div>'+navigatorHTML(model)+'<div class="rt-plot-caption" title="'+escape(scope+' · '+(filterState(model).active?'Matching samples emphasized. ':'')+stats.count+' samples; dashed line: displayed average. Unmeasured values use the top status lane. Drag plot to pan time.')+'">'+escape(scope)+' · '+escape(root.NetworkToolkitResultTime?.zoneLabel?.()||'Local time')+'</div><div class="sr-only">'+filterDescription(model)+'</div><span class="sr-only rt-selection-announcement" role="status"></span></section>';
+    const scope=mode==='condensed'?'Condensed · nonlinear time axis; older intervals compressed':root.NetworkToolkitGraphHistory?.label?.()||'Retained measurements',metric=model.plot;
+    return '<section class="rt-timeline" data-rt-id="'+escape(id)+'" data-rt-scope-start="'+escape(model.timeScope?.start||'')+'" data-rt-scope-end="'+escape(model.timeScope?.end||'')+'" data-rt-mode-active="'+mode+'" data-rt-plot-active="'+metric+'" aria-label="'+escape(model.title)+' timeline"><div class="rt-heading"><div class="rt-view-controls"><label class="rt-mode-control"><span class="sr-only">Graph view</span><select data-rt-mode aria-label="Graph view" title="Linear uses proportional recorded time; Condensed compresses older time. Timeframe, zoom and navigation control the displayed range."><option value="linear"'+(mode==='linear'?' selected':'')+'>Linear</option><option value="condensed"'+(mode==='condensed'?' selected':'')+'>Condensed</option></select></label>'+(root.NetworkToolkitGraphHistory?.controlHTML?.()||'')+zoomControls(model)+'<span class="sr-only" data-rt-selection-status></span></div></div>'+plot(model,metric,metric==='rtt'?model.maximum:model.maxJitter,metric==='rtt'?stats.average:stats.jitter)+'<div class="rt-time-axis" style="margin-left:'+plotGeometry(model).left+'px;margin-right:'+(plotGeometry(model).viewport-plotGeometry(model).right)+'px" aria-label="'+escape(timeLabel())+' horizontal time axis">'+axisHTML(model)+'</div>'+navigatorHTML(model)+'<div class="rt-plot-caption" title="'+escape(scope+' · '+(filterState(model).active?'Matching samples emphasized. ':'')+stats.count+' samples; dashed line: displayed average. Unmeasured values use the top status lane. Drag plot to pan time.')+'">'+escape(scope)+' · '+escape(root.NetworkToolkitResultTime?.zoneLabel?.()||'Local time')+'</div><div class="sr-only">'+filterDescription(model)+'</div><span class="sr-only rt-selection-announcement" role="status"></span></section>';
   }
 
   function findContainer(id){return [...(root.document?.querySelectorAll?.('.rt-timeline')||[])].find(item=>item.dataset.rtId===id)||null;}
@@ -288,10 +284,13 @@
     document.addEventListener('pointermove',event=>{
       const row=rowContext(event.target),context=row||contextFor(event.target),point=row?.point||pointerPoint(event,context);
       if(!point||!context?.model||context.model.navigatorDragging){clearHover();return;}
+      // Revealing an offscreen row pans/rebuilds the plot and clears transient
+      // hover. Apply this row's hover afterwards to the current plot container.
+      if(row){context.model.rowUnavailable=null;if(!context.model.pinned)revealPoint(context,point);context.container=findContainer(context.model.id)||context.container;}
       if(activeHover&&activeHover!==context.model.id)clearHover();activeHover=context.model.id;hoverPointer={target:event.target,clientX:event.clientX,clientY:event.clientY};
       const changed=context.model.hovered!==point.key;context.model.hovered=point.key;context.model.hoverOrigin=row?'row':'graph';inspection(context.model,true);
-      if(row){context.model.rowUnavailable=null;if(!context.model.pinned)revealPoint(context,point);}else if(changed&&!context.model.pinned)context.model.rowUnavailable=root.NetworkToolkitGraphWorkspace?.revealSample?.(context.model.id,point.key)===false?point.key:null;
-      if(changed)renderSelection(context);showTooltip(point,event,context.model);
+      if(!row&&changed&&!context.model.pinned)context.model.rowUnavailable=root.NetworkToolkitGraphWorkspace?.revealSample?.(context.model.id,point.key)===false?point.key:null;
+      if(changed||row)renderSelection(context);showTooltip(point,event,context.model);
     });
     document.addEventListener('pointerout',event=>{
       const context=rowContext(event.target)||contextFor(event.target);if(!context)return;
@@ -305,7 +304,6 @@
 
       if(!context?.model)return;
       const tab=event.target.closest?.('[data-rt-tab]');if(tab){setPlot(context.model.id,tab.dataset.rtTab);findContainer(context.model.id)?.closest('[data-graph-workspace]')?.querySelector('[data-rt-tab="'+tab.dataset.rtTab+'"]')?.focus({preventScroll:true});return;}
-      if(event.target.closest?.('[data-rt-records]')){root.NetworkToolkitGraphWorkspace?.openRecords?.(context.model.id);return;}
       const panControl=event.target.closest?.('[data-rt-pan]');if(panControl){pan(context.model.id,Number(panControl.dataset.rtPan));return;}
       if(event.target.closest?.('[data-rt-clear]')){clearHover();clearPin(context.model,context.container);return;}
       const zoomControl=event.target.closest?.('[data-rt-zoom]');if(zoomControl){const action=zoomControl.dataset.rtZoom;zoom(context.model.id,action);findContainer(context.model.id)?.querySelector('[data-rt-zoom="'+action+'"]')?.focus?.({preventScroll:true});return;}

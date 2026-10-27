@@ -16,7 +16,7 @@ func packetGraphOptions(q url.Values) (capture.GraphOptions, bool, error) {
 	if !active {
 		return options, false, nil
 	}
-	if mode := q.Get("graph_mode"); mode != "" && mode != "window" && mode != "progressive" && mode != "condensed" {
+	if mode := q.Get("graph_mode"); mode != "" && mode != "linear" && mode != "window" && mode != "progressive" && mode != "condensed" {
 		return options, true, fmt.Errorf("choose a supported graph mode")
 	}
 	options.Condensed = q.Get("graph_mode") == "condensed"

@@ -1,14 +1,16 @@
-NETWORK TOOLKIT 1.17.99
+NETWORK TOOLKIT 1.17.100
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.99
+CURRENT RELEASE - 1.17.100
 
-Release details: RELEASE_NOTES_1.17.99.txt
-Previous release: docs/releases/RELEASE_NOTES_1.17.98.txt
+Release details: RELEASE_NOTES_1.17.100.txt
+Previous release: docs/releases/RELEASE_NOTES_1.17.99.txt
 Full release-note archive: docs/releases/README.md
 
-Graph Options has been replaced by direct compact controls. Recent 180 and Full
-history retain their distinct defaults. Visible endpoint markers have safe gutters.
+Graphs offer Linear and Condensed, with Timeframe, zoom and navigation controlling
+the range. Old mode preferences migrate to Linear. Run details are in entry details.
+Condensed spacing is smoothly nonlinear even for short Fit ranges; endpoints have
+safe gutters.
 
 Fit selects All retained history. The compact navigator beneath the main plot
 supports proportional time-window dragging and independent boundary resizing.

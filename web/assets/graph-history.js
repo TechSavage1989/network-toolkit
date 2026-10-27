@@ -18,8 +18,10 @@
  }
  function contains(stamp,scope){return valid(stamp)&&(!valid(scope.start)||compare(stamp,scope.start)>=0)&&(!valid(scope.end)||compare(stamp,scope.end)<=0);}
  function select(items,scope,getStamp=item=>item.time){return items.filter(item=>contains(getStamp(item),scope)).sort((a,b)=>compare(getStamp(a),getStamp(b)));}
- function condense(items,{end,recentMs=60000,getStamp=item=>item.time}={}){
+ function condense(items,{end,recentMs=60000,preserveRaw=false,getStamp=item=>item.time}={}){
   const sorted=items.filter(item=>valid(getStamp(item))).slice().sort((a,b)=>compare(getStamp(a),getStamp(b))),last=epoch(end??getStamp(sorted.at(-1)||{})),bins=new Map(),result=[],gaps=[];
+  // Modest visible histories need no aggregation: preserve their true time spacing.
+  if(preserveRaw&&sorted.length<=1400)return sorted.map(item=>({items:[item],aggregate:false,start:getStamp(item),end:getStamp(item),count:1}));
   for(let i=Math.max(1,sorted.length-256);i<sorted.length;i++){const gap=Number(instant(getStamp(sorted[i]))-instant(getStamp(sorted[i-1])))/1000000;if(gap>0)gaps.push(gap);}gaps.sort((a,b)=>a-b);
   const cadence=gaps[Math.floor(gaps.length/2)]||recentMs/60,oldest=Math.max(1,(last-epoch(getStamp(sorted[0]||{})))/recentMs),density=Math.min(120,Math.max(1,recentMs/cadence),1400/Math.max(1,2*(Math.sqrt(oldest)-1)));
   // Bin widths grow with the square root of age, more slowly than the time
@@ -44,9 +46,9 @@
  function setDuration(value){const n=Number(value),p=preferences();if(!presets.some(([duration])=>duration===n))return false;setPreferences({durationMs:n,allHistory:n===0,...(p.anchor==='range'?{anchor:'end'}:{})},{fit:true});return true;}
  function zoomLevel(value,minimum=.25,maximum=16){return Math.max(minimum,Math.min(maximum,Math.round((Number(value)||1)*1000)/1000));}
  function wheelLevel(event,current,minimum=.25,maximum=16){if(event.ctrlKey||event.metaKey||event.altKey||!Number.isFinite(event.deltaY)||event.deltaY===0)return current;const pixels=event.deltaY*(event.deltaMode===1?16:event.deltaMode===2?160:1);return zoomLevel(current*Math.pow(2,-Math.max(-240,Math.min(240,pixels))/350),minimum,maximum);}
- function anchoredEnd(scope,oldZoom,nextZoom,share,mode='window'){
+ function anchoredEnd(scope,oldZoom,nextZoom,share,mode='linear'){
   const a=instant(scope?.start),b=instant(scope?.end);if(a===null||b===null||b<=a)return '';
-  const p=Math.max(0,Math.min(1,Number(share)||0)),anchor=instant(at(p,scope,mode)),span=Math.max(1,Math.round(Number(b-a)*oldZoom/nextZoom)),recent=preferences().recentMs*1000000,age=mode==='condensed'?recent*Math.expm1((1-p)*Math.log1p(span/recent)):(1-p)*span;
+  const p=Math.max(0,Math.min(1,Number(share)||0)),anchor=instant(at(p,scope,mode)),span=Math.max(1,Math.round(Number(b-a)*oldZoom/nextZoom)),recent=condensedScale(span,preferences().recentMs),age=mode==='condensed'?recent*Math.expm1((1-p)*Math.log1p(span/recent)):(1-p)*span;
   return timestamp(anchor+BigInt(Math.round(age)));
  }
  function valueScale(values,{whole=false}={}){
@@ -61,9 +63,12 @@
  function instant(value){const ms=epoch(value);if(!Number.isFinite(ms))return null;const fraction=typeof value==='string'?value.match(/\.(\d{1,9})(?:Z|[+-]\d\d:\d\d)$/i)?.[1]:null;return BigInt(Math.floor(ms))*1000000n+BigInt(fraction?fraction.padEnd(9,'0').slice(3):Math.round((ms-Math.floor(ms))*1000000));}
  function timestamp(ns){if(typeof ns!=='bigint')return '';let seconds=ns/1000000000n,part=ns%1000000000n;if(part<0){seconds--;part+=1000000000n;}try{return new Date(Number(seconds*1000n)).toISOString().replace(/\.\d{3}Z$/,'.'+String(part).padStart(9,'0')+'Z');}catch{return '';}}
  function viewport(scope,zoom=1,end=''){let a=instant(scope.start),b=instant(scope.end);if(a===null||b===null)return scope;if(a===b&&Number(zoom)===1&&(!end||instant(end)===b)){const stamp=timestamp(a);return {...scope,start:stamp,end:stamp,from:epoch(stamp),to:epoch(stamp)};}if(b<=a)a=b-1000000000n;const span=BigInt(Math.max(1,Math.round(Number(b-a)/Math.max(1e-18,Number(zoom)||1))));b=instant(end)??b;a=b-span;const start=timestamp(a),finish=timestamp(b);return {...scope,start,end:finish,from:epoch(start),to:epoch(finish)};}
- function fraction(value,scope,mode='window',recentMs=preferences().recentMs){const a=instant(scope?.start),b=instant(scope?.end),t=instant(value);if(a===null||b===null||t===null||b<a)return NaN;if(b===a)return t===a?.5:t<a?-Infinity:Infinity;const span=Number(b-a),share=Number(t-a)/span;if(mode!=='condensed')return share;const recent=Math.max(1,recentMs)*1000000;return 1-Math.log1p(Math.max(0,Number(b-t))/recent)/Math.log1p(span/recent);}
- function at(share,scope,mode='window',recentMs=preferences().recentMs){const a=instant(scope?.start),b=instant(scope?.end);if(a===null||b===null||b<a)return '';if(b===a)return timestamp(a);const p=Math.max(0,Math.min(1,share)),span=b-a;if(mode==='condensed'&&p>0&&p<1){const recent=Math.max(1,recentMs)*1000000,age=recent*Math.expm1((1-p)*Math.log1p(Number(span)/recent));return timestamp(b-BigInt(Math.max(0,Math.min(Number(span),Math.round(age)))));}const scale=1000000000000n;return timestamp(a+(span*BigInt(Math.round(p*Number(scale)))+scale/2n)/scale);}
- function axisHTML(scope,width=820,mode='window'){
+ // A relative lower bound on curvature keeps even short Fit ranges visibly
+ // compressed. The same scale is used by projection, inverse and zoom anchoring.
+ function condensedScale(span,recentMs){return Math.max(Number.MIN_VALUE,Math.min(Math.max(1,recentMs)*1000000,span/9));}
+ function fraction(value,scope,mode='linear',recentMs=preferences().recentMs){const a=instant(scope?.start),b=instant(scope?.end),t=instant(value);if(a===null||b===null||t===null||b<a)return NaN;if(b===a)return t===a?.5:t<a?-Infinity:Infinity;const span=Number(b-a),share=Number(t-a)/span;if(mode!=='condensed')return share;const recent=condensedScale(span,recentMs);return 1-Math.log1p(Math.max(0,Number(b-t))/recent)/Math.log1p(span/recent);}
+ function at(share,scope,mode='linear',recentMs=preferences().recentMs){const a=instant(scope?.start),b=instant(scope?.end);if(a===null||b===null||b<a)return '';if(b===a)return timestamp(a);const p=Math.max(0,Math.min(1,share)),span=b-a;if(mode==='condensed'&&p>0&&p<1){const recent=condensedScale(Number(span),recentMs),age=recent*Math.expm1((1-p)*Math.log1p(Number(span)/recent));return timestamp(b-BigInt(Math.max(0,Math.min(Number(span),Math.round(age)))));}const scale=1000000000000n;return timestamp(a+(span*BigInt(Math.round(p*Number(scale)))+scale/2n)/scale);}
+ function axisHTML(scope,width=820,mode='linear'){
   if(instant(scope?.start)===null||instant(scope?.end)===null)return '<span class="rt-axis-unrecorded">Recorded time unavailable</span>';
   if(instant(scope.start)===instant(scope.end))return '<time class="rt-time-tick" style="left:50%;transform:translateX(-50%)" datetime="'+esc(scope.start)+'" title="'+esc(scope.start)+'">'+esc(root.NetworkToolkitResultTime?.format?.(scope.start,{milliseconds:true})||scope.start)+'</time>';
   const span=Number(instant(scope.end)-instant(scope.start))/1000000,p=root.NetworkToolkitResultTime?.preferences?.()||{},date=span>=86400000,minLabel=date?150:span<10000?125:p.hourFormat==='12'?110:85;let ms=span<10000,nano=span<1,timezone=false;let count=Math.max(2,Math.min(8,Math.floor(Math.max(1,width)/minLabel)+1));

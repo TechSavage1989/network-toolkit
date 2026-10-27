@@ -128,5 +128,3 @@
 }
 /* The compact labeled timeframe uses a second text line without shrinking the plot. */
 @media(max-width:600px){.graph-workspace,.diagnostic-page:has(.result-graph-entry) .graph-workspace{--graph-min-height:122px}}
-/* Keep the shared plot tabs at two lines on narrow windows. */
-@media(max-width:600px){.graph-workspace-header [data-rt-records]{font-size:0;width:26px;min-width:26px;padding:3px;flex:0 0 26px}.graph-workspace-header [data-rt-records]:after{content:'{}';font:11px var(--mono)}}

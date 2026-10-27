@@ -1,5 +1,36 @@
 # Network Toolkit development handoff
 
+## 1.17.100 authorized Linear/Condensed cleanup
+
+The user approved this focused build/publication, then added nonlinear Condensed
+Fit matching a visual reference and stable contained oldest/last endpoints.
+Baseline: published 1.17.99 and docs main c8d084e5c09ae84f5a13babc68c3001423dd397f.
+Fresh main/release/active-run checks found no intervening concurrent source work.
+
+Linear replaces Window/Progressive and their 180-sample default; both old stored
+values normalize to Linear. The 10,000-sample retention bound, raw source records,
+held selections, plots, Timeframe, zoom and full-history navigator remain intact.
+Packet requests accept the new Linear identifier and retain old API aliases.
+The shared Run data toolbar button and narrow heading Run details are removed.
+Unique context/activity/raw run data are accessible in the existing entry-details
+Run details disclosure, with access beside empty results when no entry exists.
+
+Both user images were viewed. The reference shows progressively denser equal-time
+spacing to the left. Existing logarithmic projection was nearly linear on short
+ranges and grouped markers obscured its spacing on modest histories. The shared
+projection now limits its recent-time scale to visible span/9, with the exact same
+scale for inverse ticks and anchored zoom. Diagnostic histories up to 1,400 visible
+points retain raw markers; larger histories keep bounded grouping and contributors.
+No timestamps are moved, no source records removed and no arbitrary range is fitted.
+Existing endpoint padding and full-history Fit are retained and regression-tested.
+
+Focused local graph/migration/details tests, syntax and release/layout validation
+are run; existing complete hosted Checks remain mandatory without weakening.
+Local Go/native browser unavailable as documented for 1.17.99. Publication remains
+pending exact-source Checks, safe expected-head promotion, Release and four-asset
+updater/manifest/version/source identity checks. No native installation is claimed.
+
+
 ## 1.17.99 published compact graph controls and contained endpoints
 
 The user authorized this focused build and publication. It is live at:
@@ -43,8 +74,8 @@ within its 10-second wait. Its cmd transcript and both interactive shell lifecyc
 cases passed. The same exact source passed the full Windows job in review, and
 no terminal implementation was changed. Runner timing is a plausible explanation,
 not a proven root cause. No test was weakened and no optional retry was launched.
-Duplicate main browser job 122100135825 is still running; terminal status is being
-observed only to close this CI record, not to delay the already verified release.
+Duplicate main Checks is terminal failure; browser job 122100135825 passed.
+The only failed job is the unchanged Windows transcript timeout described above.
 
 All four public assets were downloaded. GitHub digests, outer/inner checksums,
 ZIP CRCs, PE x64 GUI/version resources, exact four-member Update.zip allowlist,

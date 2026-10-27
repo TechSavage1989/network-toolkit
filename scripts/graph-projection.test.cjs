@@ -4,7 +4,7 @@ const time=require('../web/assets/result-time.js');global.NetworkToolkitResultTi
 const history=require('../web/assets/graph-history.js');
 const scope={start:'2026-10-27T00:00:00.000000001Z',end:'2026-10-27T00:00:10.000000001Z'};
 test('each mode projects the complete 10-second domain to the viewport and preserves genuine gaps',()=>{
- for(const mode of ['window','progressive']){assert.equal(history.fraction(scope.start,scope,mode),0);assert.equal(history.fraction(scope.end,scope,mode),1);assert.equal(history.fraction('2026-10-27T00:00:01.000000001Z',scope,mode),.1);assert.equal(history.fraction('2026-10-27T00:00:08.000000001Z',scope,mode),.8);}
+ for(const mode of ['linear','window','progressive']){assert.equal(history.fraction(scope.start,scope,mode),0);assert.equal(history.fraction(scope.end,scope,mode),1);assert.equal(history.fraction('2026-10-27T00:00:01.000000001Z',scope,mode),.1);assert.equal(history.fraction('2026-10-27T00:00:08.000000001Z',scope,mode),.8);}
 });
 test('zoom scales actual time while preserving raw nanosecond endpoints and selected interval settings',()=>{
  const before=JSON.stringify(scope),zoomed=history.viewport(scope,2);assert.equal(zoomed.start,'2026-10-27T00:00:05.000000001Z');assert.equal(zoomed.end,scope.end);assert.equal(JSON.stringify(scope),before);const panned=history.viewport(scope,2,'2026-10-27T00:00:07.000000001Z');assert.equal(panned.start,'2026-10-27T00:00:02.000000001Z');assert.equal(panned.end,'2026-10-27T00:00:07.000000001Z');
@@ -24,4 +24,17 @@ test('unknown times are not projected or invented and equal instants get an hone
 
 test('compressed time ticks increase displayed precision instead of repeating indistinguishable second labels',()=>{
  time.configure({hourFormat:'24',zoneMode:'utc'});history.setPreferences({recentMs:1000},{persist:false});const html=history.axisHTML(scope,820,'condensed'),labels=[...html.matchAll(/>([^<]+)<\/time>/g)].map(match=>match[1]);assert.equal(new Set(labels).size,labels.length);assert(labels.length>=2);history.setPreferences({recentMs:60000},{persist:false});
+});
+
+test('Condensed Fit has visibly increasing equal-time spacing even when retained history is shorter than the recent interval',()=>{
+ for(const seconds of [1,10,60,7200]){
+  const start=history.instant(scope.start),span=BigInt(seconds)*1000000000n,s={start:scope.start,end:history.timestamp(start+span)},times=Array.from({length:21},(_,i)=>history.timestamp(start+span*BigInt(i)/20n)),positions=times.map(stamp=>history.fraction(stamp,s,'condensed',60000)),gaps=positions.slice(1).map((x,i)=>x-positions[i]);
+  assert.equal(positions[0],0);assert.equal(positions.at(-1),1);
+  for(let i=1;i<gaps.length;i++)assert(gaps[i]>gaps[i-1],seconds+'s progressively spreads equal-time samples toward the right');
+  assert(gaps.at(-1)>gaps[0]*2,seconds+'s must not look uniformly compressed');
+  for(const [i,stamp] of times.entries()){
+   assert(Math.abs(history.fraction(stamp,s,'linear')-i/20)<1e-12,'Linear preserves timestamp-proportional spacing');
+   const reconstructed=history.instant(history.at(positions[i],s,'condensed',60000));assert(reconstructed>=history.instant(stamp)-1n&&reconstructed<=history.instant(stamp)+1n,'Condensed inverse preserves the actual source instant');
+  }
+ }
 });

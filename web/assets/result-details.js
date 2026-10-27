@@ -139,9 +139,9 @@
   function clearGraphSelection(id){if(sideDetail?.graph?.id===id)closeSide();}
 
   function detailBody(detail) {
-    const json=JSON.stringify(detail.record,null,2),context=detail.context;
+    const json=JSON.stringify(detail.record,null,2),context=detail.context,records=detail.graph?root.NetworkToolkitGraphWorkspace?.recordsHTML?.(detail.graph.id)||'':'',runDetails=records?'<details data-run-details><summary>Run details</summary>'+records+'</details>':'';
     const run=context?'<section class="result-run-context"><dl class="result-record-grid">'+[['Tool',titleFor(context.tool)],['Target',context.target],['Run started',context.started],['Method',context.mode],['Port',context.port],['Source interface',context.source]].filter(([,value])=>value!==undefined&&value!=='').map(([key,value])=>'<div><dt>'+esc(key)+'</dt><dd>'+(key==='Run started'&&root.NetworkToolkitResultTime?root.NetworkToolkitResultTime.cell(value,{label:'Run started'}):esc(scalar(value)))+'</dd></div>').join('')+'</dl></section>':'';
-    return '<div class="result-row-detail"><p class="result-detail-caption">Recorded '+esc(String(detail.name).replace(/\./g,' '))+' entry</p><div class="result-detail-actions result-detail-copy"><button class="btn small ghost" data-result-copy="text">'+icon('copy')+'Copy details</button><button class="btn small ghost" data-result-copy="json">Copy JSON</button></div>'+graphExtras(detail)+run+fieldsHTML(detail.record)+toolsHTML(detail)+'<details class="result-record-json"><summary>Raw record JSON</summary><pre>'+esc(json)+'</pre></details></div>';
+    return '<div class="result-row-detail"><p class="result-detail-caption">Recorded '+esc(String(detail.name).replace(/\./g,' '))+' entry</p><div class="result-detail-actions result-detail-copy"><button class="btn small ghost" data-result-copy="text">'+icon('copy')+'Copy details</button><button class="btn small ghost" data-result-copy="json">Copy JSON</button></div>'+graphExtras(detail)+run+runDetails+fieldsHTML(detail.record)+toolsHTML(detail)+'<details class="result-record-json"><summary>Raw record JSON</summary><pre>'+esc(json)+'</pre></details></div>';
   }
 
   function closeSide(focus=false) {

@@ -14,7 +14,7 @@ function harness(){
 test('layout preferences normalize invalid restoration and bound both pane shares',()=>{
  for(const value of [undefined,null,[],{ratio:null},{ratio:''},{ratio:'0.7'},{ratio:NaN},{ratio:Infinity}])assert.deepEqual(workspace.normalize(value),{ratio:.4,collapsedTools:{}});
  assert.deepEqual(workspace.normalize({ratio:0}),{ratio:.3,collapsedTools:{}});assert.deepEqual(workspace.normalize({ratio:1}),{ratio:.75,collapsedTools:{}});assert.deepEqual(workspace.normalize({ratio:.52}),{ratio:.52,collapsedTools:{}});
- const html=workspace.html('"<unsafe>','GRAPH','RESULTS');assert(html.includes('&quot;&lt;unsafe&gt;'));assert(!html.includes('data-graph-workspace=""<'));
+ const html=workspace.html('"<unsafe>','GRAPH','RESULTS',{details:'<section>Unique recorded run data</section>'});assert.doesNotMatch(html,/data-rt-records|Run data/);assert.equal(workspace.recordsHTML('"<unsafe>'),'<section>Unique recorded run data</section>');assert(html.includes('&quot;&lt;unsafe&gt;'));assert(!html.includes('data-graph-workspace=""<'));
  assert.match(html,/data-graph-pane/);assert.match(html,/data-graph-results/);assert.match(html,/role="separator"/);assert.match(html,/aria-orientation="horizontal"/);
 });
 test('keyboard divider resizing persists actual bounded shares without affecting scan data',()=>{

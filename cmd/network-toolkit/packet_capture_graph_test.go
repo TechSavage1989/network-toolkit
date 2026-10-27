@@ -96,6 +96,15 @@ func TestPacketCaptureLatestLocateAndRecordedFiltersUseFullCapture(t *testing.T)
 }
 
 func TestPacketGraphZoomQueryValidation(t *testing.T) {
+	for _, mode := range []string{"linear", "window", "progressive", "condensed"} {
+		options, active, err := packetGraphOptions(url.Values{"graph_mode": {mode}})
+		if err != nil || !active || options.Condensed != (mode == "condensed") {
+			t.Fatalf("graph mode %s: %+v %v", mode, options, err)
+		}
+	}
+	if _, _, err := packetGraphOptions(url.Values{"graph_mode": {"invalid"}}); err == nil {
+		t.Fatal("invalid graph mode accepted")
+	}
 	for _, value := range []string{"0", "0.1", "17", "NaN", "Inf", "bad"} {
 		if _, _, err := packetGraphOptions(url.Values{"graph_zoom": {value}}); err == nil {
 			t.Fatalf("invalid zoom accepted: %s", value)
