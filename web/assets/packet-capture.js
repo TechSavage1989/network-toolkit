@@ -317,10 +317,12 @@ function refreshPacketGraphAxis(){
 }
 function rememberPacketGraphScroll(){refreshPacketGraphAxis();if(packetGraphPreferences().mode!=='progressive'&&packetGraphZoom()===1)return;const scroll=document.querySelector('[data-packet-graph-scroll]');if(!scroll)return;const selection=packetTimelineState();selection.scrollLeft=Number(scroll.scrollLeft)||0;selection.follow=!model.graphHold&&scroll.scrollWidth-scroll.clientWidth-scroll.scrollLeft<=3;}
 function restorePacketGraphScroll(){const scroll=document.querySelector('[data-packet-graph-scroll]');if(!scroll)return;const selection=packetTimelineState();scroll.scrollLeft=selection.follow?Math.max(0,scroll.scrollWidth-scroll.clientWidth):selection.scrollLeft;refreshPacketGraphAxis();}
-function renderStatistics(statistics){
+function renderStatistics(statistics,force=false){
  const area=node('packetCaptureAnalysis');if(!area)return;const previous=area.querySelector('.packet-summary-scroll'),scroll=previous?.scrollTop||0,focused=document.activeElement,point=focused?.closest?.('[data-packet-bucket]'),inside=point&&area.contains(point);rememberPacketGraphScroll();
- const selection=packetTimelineState();model.statistics=statistics;selection.hover=null;hidePacketGraphPopup();const selected=packetTimelineIndex(statistics,selection),markup=statisticsHTML(statistics);
- if(area._ntStatisticsMarkup===markup&&previous)return;
+ if(previous&&packetInspectionPaused(false)&&!force){model.pendingStatistics=statistics;return;}
+ const selection=packetTimelineState();model.statistics=statistics;model.pendingStatistics=null;const selected=packetTimelineIndex(statistics,selection),markup=statisticsHTML(statistics);
+ if(area._ntStatisticsMarkup===markup&&previous){updatePacketTimeline();return;}
+ selection.hover=null;hidePacketGraphPopup();
  area._ntStatisticsMarkup=markup;area.innerHTML=markup;const reader=area.querySelector('.packet-summary-scroll');if(reader)reader.scrollTop=scroll;restorePacketGraphScroll();updatePacketTimeline();
  if(inside)area.querySelector('[data-packet-bucket="'+(selected??Math.min(Number(point.dataset.packetBucket),Math.max(0,(statistics.timeline||[]).length-1)))+'"]')?.focus?.({preventScroll:true});
 }
@@ -368,7 +370,7 @@ function refreshTimeDisplay(){
   const body=node('packetRows');if(body){const html=packetWindowRows(model.loaded,model.windowStart,model.total);body.innerHTML=html;body._ntRows=html;}
   const heading=document.querySelector('[data-packet-sort="time"]');if(heading)heading.textContent='Recorded ('+packetZone()+')'+(model.sort==='time'?' '+(model.direction==='asc'?'▲':'▼'):'');
   const detailTime=node('packetInspector')?.querySelector('.packet-recorded-time time');if(detailTime)detailTime.textContent=packetLocalTime(model.detail?.packet?.time);refreshPacketGraph();renderDetail();
- }else if(['statistics','conversations','endpoints'].includes(model.view)&&model.statistics)renderStatistics(model.statistics);
+ }else if(['statistics','conversations','endpoints'].includes(model.view)&&model.statistics)renderStatistics(model.statistics,true);
 }
 function packetInspectionPaused(includeHold=true){if(includeHold&&model.graphHold)return true;const selected=root.getSelection?.(),keyboardFocus=model.keyboardInspection&&document.activeElement?.closest?.('#packetRows, #packetInspector, .packet-list-actions, .packet-detail-filters');return model.inspectPointer||model.inspectFocus||!!keyboardFocus||!!packetMenu||!!(selected&&!selected.isCollapsed&&String(selected).trim());}
 function packetReaderViewport(reader=node('packetTableScroll')){
@@ -397,7 +399,7 @@ async function followPacketLatest(force=false){
  model.scrollTop=position;scroll.scrollTop=position;const offset=windowOffset(model.total,position);if(offset!==model.windowStart)await refreshPacketWindow(offset);if(!visible()||model.view!=='packets')return;
  const current=node('packetTableScroll');if(current){current.scrollTop=position;model.scrollTop=current.scrollTop;const newest=model.loaded[index-model.windowStart];if(newest){ensurePacketRowVisible(newest.number);if(model.liveDetails)await selectPacket(newest.number,{hold:false});}updateMapViewport();}
 }
-function flushPacketInspection(){if(packetInspectionPaused())return;if(model.pendingStatistics){model.statistics=model.pendingStatistics;model.pendingStatistics=null;refreshPacketGraph();}if(model.selected&&model.view==='packets'&&!model.windowSignature.startsWith(packetSourceSignature()+'|'))void refreshPacketWindow(windowOffset()).then(()=>followPacketLatest());else void followPacketLatest();}
+function flushPacketInspection(){if(packetInspectionPaused())return;if(model.pendingStatistics){const statistics=model.pendingStatistics;model.pendingStatistics=null;if(model.view==='statistics')renderStatistics(statistics);else{model.statistics=statistics;refreshPacketGraph();}}if(model.selected&&model.view==='packets'&&!model.windowSignature.startsWith(packetSourceSignature()+'|'))void refreshPacketWindow(windowOffset()).then(()=>followPacketLatest());else void followPacketLatest();}
 function revealPacketInterval(index){if(model.graphHold)return;
  const bucket=model.statistics?.timeline?.[index],reader=node('packetTableScroll');if(!bucket||!reader)return;
  const match=model.loaded.findIndex(packet=>packetIntervalContains(bucket,packet.time,index===model.statistics.timeline.length-1));
@@ -410,7 +412,7 @@ document.addEventListener('click',event=>{
  const graph=event.target.closest?.('[data-packet-timeline]'),point=event.target.closest?.('[data-packet-bucket]');
  if(!graph&&!point&&!event.target.closest?.('#packetGraphPopup')){if(!event.target.closest?.('#packetRows, #packetInspector')){model.inspectFocus=false;flushPacketInspection();}}
  const zoom=event.target.closest?.('[data-packet-zoom]'),collapse=event.target.closest?.('[data-packet-graph-collapse]'),stat=event.target.closest?.('[data-packet-stat]');
- if(zoom){event.preventDefault();event.stopImmediatePropagation();rememberPacketGraphScroll();const selection=packetTimelineState(),old=packetGraphZoom(),factor=zoom.dataset.packetZoom==='reset'?1:clamp(old*(zoom.dataset.packetZoom==='in'?2:.5),1,16);selection.scrollLeft=selection.scrollLeft/old*factor;state.packetGraphPreferences={...state.packetGraphPreferences,zoom:factor};persistDetails();if(model.view==='statistics')renderStatistics(model.statistics);else refreshPacketGraph();return;}
+ if(zoom){event.preventDefault();event.stopImmediatePropagation();rememberPacketGraphScroll();const selection=packetTimelineState(),old=packetGraphZoom(),factor=zoom.dataset.packetZoom==='reset'?1:clamp(old*(zoom.dataset.packetZoom==='in'?2:.5),1,16);selection.scrollLeft=selection.scrollLeft/old*factor;state.packetGraphPreferences={...state.packetGraphPreferences,zoom:factor};persistDetails();if(model.view==='statistics')renderStatistics(model.statistics,true);else refreshPacketGraph();return;}
  if(collapse){event.preventDefault();event.stopImmediatePropagation();const wasCollapsed=state.packetGraphPreferences?.collapsed===true,area=node('packetCaptureAnalysis'),inspector=node('packetInspector'),height=inspector?.getBoundingClientRect?.().height,configurationHeight=document.querySelector('.packet-configuration-region')?.getBoundingClientRect?.().height;
  // In an overflowing short workspace, flex growth alone cannot redistribute
  // the removed plot. Transfer its actual reader/divider height to the list
@@ -449,7 +451,7 @@ document.addEventListener('click',event=>{const contributor=event.target.closest
 document.addEventListener('networkToolkitGraphTimeChange',()=>{if(visible()){if(!model.graphHold&&root.NetworkToolkitGraphHistory?.preferences?.().anchor!=='latest'){clearPacketGraphSelection();packetTimelineState().follow=false;}model.statisticsSource='';void refresh(true);}});
 document.addEventListener('change',event=>{if(event.target.matches?.('[data-packet-graph-mode]'))setPacketGraphMode(event.target.value);});
 document.addEventListener('scroll',event=>{if(event.target.matches?.('[data-packet-graph-scroll]'))rememberPacketGraphScroll();},true);
-document.addEventListener('network-toolkit-graph-preferences',()=>{if(!visible())return;if(model.view==='packets')refreshPacketGraph();else if(model.view==='statistics'&&model.statistics)renderStatistics(model.statistics);});
+document.addEventListener('network-toolkit-graph-preferences',()=>{if(!visible())return;if(model.view==='packets')refreshPacketGraph();else if(model.view==='statistics'&&model.statistics)renderStatistics(model.statistics,true);});
 document.addEventListener('keydown',event=>{
  const point=event.target.closest?.('[data-packet-bucket]');if(!point||!['Enter',' ','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','Escape'].includes(event.key))return;event.preventDefault();event.stopImmediatePropagation();
  if(event.key==='Escape'){clearPacketGraphSelection();return;}
