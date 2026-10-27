@@ -43,10 +43,10 @@
       copyOnClick:v.copyOnClick !== false,
       pasteReview:v.pasteReview !== false,
       pasteIncludeCommands:v.pasteIncludeCommands === true,
-      autoPager:v.autoPager === true,
+      autoPager:v.autoPager !== false,
       pagerKey:['auto','space','enter'].includes(v.pagerKey) ? v.pagerKey : 'auto',
       rightClick:v.rightClick === 'menu' ? 'menu' : 'paste',
-      ctrlC:v.ctrlC === 'copy-selection' ? 'copy-selection' : 'send',
+      ctrlC:v.ctrlC === 'send' ? 'send' : 'copy-selection',
       menuItems:Array.isArray(v.menuItems) ? MENU_ITEMS.filter(item=>v.menuItems.includes(item.id)).map(item=>item.id) : DEFAULT_MENU.slice()
     };
   }

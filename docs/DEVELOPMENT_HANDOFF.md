@@ -1,5 +1,16 @@
 # Network Toolkit development handoff
 
+## 1.17.104 combined candidate in development
+
+User-authorized security, Linear-30-second-equivalent Condensed spacing, canonical
+Toolkit icon, terminal paging and new/unset defaults are combined in one release.
+Master-password encryption with remembered unlock across restarts/reboots is
+confirmed after same-user-risk disclosure; optional recovery and explicit native
+migration are implemented in the candidate, not yet verified/published.
+Read SECURITY104_HANDOFF.md and CREDENTIAL_SECURITY.md. Required exact-source
+Windows/native/browser checks and artifact inspection remain promotion gates.
+No installed user configuration, vault, old release assets or access changed.
+
 ## 1.17.103 published accumulated-history cluster and RTT accent
 
 Publication was explicitly authorized by the user's attached Pasted text(7).md

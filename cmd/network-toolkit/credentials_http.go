@@ -16,11 +16,17 @@ func (a *application) handleCredentials(w http.ResponseWriter, r *http.Request) 
 		a.credentialChanges.Lock()
 		defer a.credentialChanges.Unlock()
 	}
+	if r.Method != http.MethodGet {
+		if err := a.credentials.requireUnlocked(); err != nil {
+			jsonError(w, http.StatusLocked, err.Error())
+			return
+		}
+	}
 	suffix := strings.TrimPrefix(r.URL.Path, "/api/credentials")
 	if suffix == "" || suffix == "/" {
 		switch r.Method {
 		case http.MethodGet:
-			jsonResponse(w, http.StatusOK, map[string]any{"available": true, "entries": a.credentials.list(), "protection": credentialProtectionLabel()})
+			jsonResponse(w, http.StatusOK, map[string]any{"available": true, "entries": a.credentials.list(), "protection": a.credentials.status().Protection, "vault": a.credentials.status()})
 		case http.MethodPost:
 			var input credentialRecord
 			if err := decodeBody(w, r, 512<<10, &input); err != nil {
@@ -97,6 +103,10 @@ func (a *application) handleCredentials(w http.ResponseWriter, r *http.Request) 
 	}
 	switch r.Method {
 	case http.MethodGet:
+		if err := a.credentials.requireUnlocked(); err != nil {
+			jsonError(w, http.StatusLocked, err.Error())
+			return
+		}
 		item, ok := a.credentials.get(id)
 		if !ok {
 			jsonError(w, http.StatusNotFound, "Saved credential was not found.")

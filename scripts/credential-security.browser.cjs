@@ -6,6 +6,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const root=path.resolve(__dirname,'..'),version=require('../package.json').version,output=process.env.TOOLKIT_TEST_OUTPUT;
 const ssh={protocol:'ssh',host:'core.test',port:22,username:'operator',fingerprint:'SHA256:synthetic-host-key'},ftps={protocol:'ftp-explicit',host:'files.test',port:21,username:'operator',fingerprint:'SHA256:synthetic-tls-pin'};
+const nativeCanaries=['MASTER_NATIVE_ONLY_104','RECOVERY_NATIVE_ONLY_104','ROTATED_MASTER_NATIVE_ONLY_104'];
 const canaries=['SAVED_PASSWORD_NEVER_SENT_104','SAVED_KEY_NEVER_SENT_104','SAVED_PASSPHRASE_NEVER_SENT_104','LEGACY_SECRET_NEVER_SENT_104','TYPED_NEW_PASSWORD_104','TYPED_REPLACEMENT_PASSWORD_104'];
 const metadata=record=>{const {id,name,kind,username,bindings=[],updatedAt='fixture'}=record;return {id,name,kind,username,bindings,updatedAt};};
 const sameEndpoint=(a,b)=>['protocol','host','port','username'].every(key=>a[key]===b[key]);
@@ -41,6 +42,7 @@ async function stableCredentialLayout(page){
   ['legacy',{id:'legacy',name:'Legacy password',username:'operator',kind:'password',secret:canaries[3],bindings:[]}]
  ]);
  let saved={appUpdatePreferences:{enabled:false},terminalProfiles:[],ftpProfiles:[],transferModes:{sftp:'client',ftp:'client'}},denyNext=false,holdNext=false,releaseApproval=null,sessionNumber=0;
+ let vault={available:true,state:'legacy',remembered:false,hasRecovery:false,legacyBackup:true,warning:'',protection:'Synthetic UI-only v2 fixture (not cryptographic verification)'},failLockAfterCompletion=false,vaultGeneration=0;
  const calls=[],responses=[],errors=[];
  const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE||undefined,args:['--no-sandbox']}),page=await browser.newPage({viewport:{width:1280,height:1000}});
  page.on('pageerror',error=>errors.push(error.message));
@@ -54,12 +56,28 @@ async function stableCredentialLayout(page){
    if(p==='/api/state'){if(method==='GET')data=saved;else saved=body;}
    if(p==='/api/jobs')data=[];
    if(p==='/api/terminal-views')data={available:false,views:[],owners:{}};
+   if(p==='/api/credential-vault'){
+    if(method==='GET')return respond({...vault});
+    assert.equal(method,'POST');assert.deepEqual(Object.keys(body),['action'],'Vault requests must contain only an action, never native secrets');
+    const action=body.action;assert(['setup','unlock','lock','forget','change-password','recover','delete-vault','cleanup-legacy'].includes(action));
+    if(!await simulatedNativeApproval())return respond({error:'Fixture: native vault dialog cancelled; existing data was kept.'},400);
+    if(['setup','unlock','change-password','recover'].includes(action)){
+     if(action!=='unlock')vaultGeneration++;
+     vault={...vault,state:'unlocked',remembered:true,hasRecovery:true,warning:''};
+    }else if(action==='lock'||action==='forget'){
+     vault={...vault,state:'locked',remembered:false,warning:''};
+     if(failLockAfterCompletion){failLockAfterCompletion=false;vault.remembered=true;vault.warning='Fixture: memory locked, but a remembered record could not be removed. It may still unlock a future launch.';return respond({error:vault.warning},400);}
+    }else if(action==='cleanup-legacy')vault={...vault,legacyBackup:false,warning:''};
+    else if(action==='delete-vault'){records.clear();vault={...vault,state:vault.legacyBackup?'legacy':'setup-required',remembered:false,hasRecovery:false,warning:''};}
+    return respond({...vault});
+   }
    if(p==='/api/credentials'){
     if(method==='POST'){
+     if(vault.state!=='unlocked')return respond({error:'Fixture: vault locked.'},423);
      const prior=records.get(body.id),id=body.id||'created-'+records.size;
      if(body.bindings?.some(binding=>!prior?.bindings?.some(old=>sameEndpoint(old,binding)&&old.fingerprint===binding.fingerprint))&&!await simulatedNativeApproval())return respond({error:'Fixture: native destination approval cancelled.'},403);
      const record={...prior,...body,id};records.set(id,record);data={entry:metadata(record)};
-    }else data={entries:[...records.values()].map(metadata),protection:'Synthetic UI-only metadata fixture (not DPAPI verification)'};
+    }else data={vault:{...vault},entries:vault.state==='unlocked'?[...records.values()].map(metadata):[],protection:vault.protection};
    }
    if(/^\/api\/credentials\/[^/]+\/bindings$/.test(p)){
     const record=records.get(decodeURIComponent(p.split('/')[3]));
@@ -84,13 +102,34 @@ async function stableCredentialLayout(page){
   }catch{return route.fulfill({status:404,body:''});}
  });
  const posts=path=>calls.filter(row=>row.path===path&&row.method==='POST');
- const assertNoSecretsInDOM=async()=>{const snapshot=await page.evaluate(()=>({html:document.documentElement.outerHTML,values:[...document.querySelectorAll('input,textarea')].map(el=>el.value)}));for(const value of canaries)assert(!JSON.stringify(snapshot).includes(value),'Secret canary exposed in rendered DOM');};
+ const assertNoSecretsInDOM=async()=>{const snapshot=await page.evaluate(()=>({html:document.documentElement.outerHTML,values:[...document.querySelectorAll('input,textarea')].map(el=>el.value)}));for(const value of [...canaries,...nativeCanaries])assert(!JSON.stringify(snapshot).includes(value),'Secret canary exposed in rendered DOM');};
+ const vaultAction=action=>page.evaluate(async action=>{try{return {ok:true,value:await NetworkToolkitCredentials.vaultAction(action)};}catch(error){return {ok:false,error:error.message};}},action);
+ const assertNativeOnlyEntry=async()=>{assert.equal(await page.locator('#credentialVaultPanel input,#credentialVaultPanel textarea').count(),0);await assertNoSecretsInDOM();};
+ const stateLayouts=[];
+ const captureVaultState=async label=>{
+  for(const width of [1280,390]){
+   await page.setViewportSize({width,height:1000});const layout=await stableCredentialLayout(page);stateLayouts.push({state:label,...layout});
+   assert(layout.settled&&layout.width===width&&layout.left>=-1&&layout.right<=width+1&&layout.overflow<=1,JSON.stringify({state:label,...layout}));
+   if(output)await page.screenshot({path:path.join(output,'credential-vault-'+label+'-'+width+'.png')});
+  }
+  if(output)fs.writeFileSync(path.join(output,'credential-vault-layouts.json'),JSON.stringify(stateLayouts,null,2));
+  await page.setViewportSize({width:1280,height:1000});
+ };
  const submit=async()=>{await page.locator('#credentialManagerForm button[type="submit"]').click();};
  const waitEditorCleared=async()=>{await page.waitForFunction(()=>document.querySelector('#credentialID')?.value===''&&document.querySelector('#credentialName')?.value===''&&document.querySelector('#credentialSecret')?.value==='');};
  try{
   if(output)fs.mkdirSync(output,{recursive:true});
   await page.goto('http://toolkit.local/');await page.waitForFunction(()=>window.__networkToolkitStartupState===1&&online);
   await page.evaluate(()=>NetworkToolkitCredentials.show());
+  assert.equal(await page.evaluate(()=>NetworkToolkitCredentials.meta('password')),null);assert.equal(await page.locator('#credentialManagerForm').count(),0);
+  await assertNativeOnlyEntry();await captureVaultState('legacy');
+  vault={...vault,state:'setup-required',legacyBackup:false};await page.evaluate(()=>NetworkToolkitCredentials.show());
+  assert.equal(await page.locator('[data-vault-action="setup"]').innerText(),'Set up vault');await captureVaultState('setup');
+  vault={...vault,state:'legacy',legacyBackup:true};await page.evaluate(()=>NetworkToolkitCredentials.show());
+  denyNext=true;const deniedSetup=await vaultAction('setup');assert.equal(deniedSetup.ok,false);assert.match(deniedSetup.error,/cancelled/);assert.equal(vault.state,'legacy');assert.equal(records.size,3);assert.equal(vaultGeneration,0);await assertNativeOnlyEntry();
+  await page.locator('[data-vault-action="setup"]').click();await page.waitForFunction(()=>NetworkToolkitCredentials.vaultStatus().state==='unlocked'&&!!document.querySelector('#credentialManagerForm')&&!document.querySelector('[data-vault-action="lock"]')?.disabled);assert.equal(vaultGeneration,1);assert.equal(vault.remembered,true);assert.equal(await page.locator('[data-credential-edit="password"]').count(),1);
+  assert.match(await page.locator('#credentialVaultPanel').innerText(),/master password is not saved/);
+  assert.match(await page.locator('#credentialVaultPanel').innerText(),/Software running as you/);
   await page.locator('[data-credential-edit="password"]').click();assert.equal(await page.locator('#credentialSecret').inputValue(),'');await assertNoSecretsInDOM();
   await page.locator('#credentialName').fill('Renamed password');await submit();await waitEditorCleared();
   assert.equal(records.get('password').secret,canaries[0]);assert.equal(posts('/api/credentials').at(-1).body.secret,undefined);
@@ -135,11 +174,51 @@ async function stableCredentialLayout(page){
    await page.evaluate(protocol=>NetworkToolkitRemoteBrowser.connect(protocol),protocol);assert.equal(await page.evaluate(protocol=>NetworkToolkitRemoteBrowser.get(protocol).connected,protocol),true);
    const call=posts('/api/remote-browser').findLast(row=>row.body.protocol===protocol&&row.body.credentialId==='password');assert(call);noAuth(call.body);assert.equal(call.body.fingerprint,binding.fingerprint);assert.equal(call.body.host,binding.host);
   }
+  // Native vault operations use actions only. Cancellation must not discard
+  // an unsaved credential editor, while a completed/partially failed lock must.
+  await page.evaluate(()=>NetworkToolkitCredentials.show());
+  await page.locator('#credentialName').fill('Unsaved credential');await page.locator('#credentialSecret').fill('UNSAVED_EDITOR_ONLY_104');
+  denyNext=true;const deniedRotation=await vaultAction('change-password');assert.equal(deniedRotation.ok,false);assert.equal(vaultGeneration,1);
+  assert.equal(await page.locator('#credentialName').inputValue(),'Unsaved credential');assert.equal(await page.locator('#credentialSecret').inputValue(),'UNSAVED_EDITOR_ONLY_104');
+  const connectionSnapshot=await page.evaluate(()=>({terminalIDs:[...terminalSessions.keys()],sftp:NetworkToolkitRemoteBrowser.get('ssh').connected,ftps:NetworkToolkitRemoteBrowser.get('ftp').connected}));
+  assert(connectionSnapshot.terminalIDs.includes('security-session-1'),'Established SSH fixture must be present before lock');assert.equal(connectionSnapshot.sftp,true);assert.equal(connectionSnapshot.ftps,true);
+  const beforeLockCalls=calls.length;
+  assert.equal((await vaultAction('lock')).ok,true);assert.equal(vault.state,'locked');assert.equal(vault.remembered,false);
+  assert.equal(await page.locator('#credentialManagerForm').count(),0);assert.equal(await page.evaluate(()=>NetworkToolkitCredentials.meta('password')),null);
+  assert.equal(await page.locator('.modal input,.modal textarea').count(),0);await assertNativeOnlyEntry();await captureVaultState('locked');
+  assert.deepEqual(await page.evaluate(()=>({terminalIDs:[...terminalSessions.keys()],sftp:NetworkToolkitRemoteBrowser.get('ssh').connected,ftps:NetworkToolkitRemoteBrowser.get('ftp').connected})),connectionSnapshot);
+  assert.equal(calls.slice(beforeLockCalls).filter(row=>(row.method==='DELETE'&&row.path.startsWith('/api/terminals'))||(row.path==='/api/remote-browser'&&row.body?.action==='disconnect')).length,0,'Lock must preserve established connections');
+  const blockedUse=await page.evaluate(async()=>{try{await NetworkToolkitCredentials.prepare({type:'ssh',host:'core.test',port:22,username:'operator',credentialId:'password'});return '';}catch(error){return error.message;}});assert.match(blockedUse,/locked/);
+  denyNext=true;assert.equal((await vaultAction('unlock')).ok,false);assert.equal(vault.state,'locked');assert.equal(await page.locator('#credentialManagerForm').count(),0);
+  // Dismissal during native entry must not reopen a closed manager. A repeated
+  // command is deduplicated even when invoked programmatically (not just disabled).
+  holdNext=true;const beforeUnlock=posts('/api/credential-vault').length;
+  await page.evaluate(()=>{window.__vaultPendingFirst=NetworkToolkitCredentials.vaultAction('unlock').then(()=>({ok:true}),error=>({ok:false,error:error.message}));});
+  await until(()=>!!releaseApproval,'held native vault unlock');
+  await page.evaluate(()=>{window.__vaultPendingSecond=NetworkToolkitCredentials.vaultAction('unlock').then(()=>({ok:true}),error=>({ok:false,error:error.message}));closeModal();});
+  assert.equal(posts('/api/credential-vault').length,beforeUnlock+1);releaseApproval();
+  assert.deepEqual(await page.evaluate(async()=>Promise.all([window.__vaultPendingFirst,window.__vaultPendingSecond])),[{ok:true},{ok:true}]);
+  assert.equal(await page.locator('#credentialVaultPanel').count(),0);assert.equal(await page.locator('#modalRoot .modal').count(),0);assert.equal(vault.state,'unlocked');
+  await page.evaluate(()=>NetworkToolkitCredentials.show());
+  assert.equal((await vaultAction('change-password')).ok,true);assert.equal(vaultGeneration,2);assert.equal(vault.remembered,true);await assertNativeOnlyEntry();
+  // A backend may have cleared keys before a remembered-file removal fails.
+  // Refresh state after the error; never leave stale unlocked metadata/editor.
+  await page.locator('#credentialName').fill('Must disappear after partial lock');await page.locator('#credentialSecret').fill('PARTIAL_LOCK_EDITOR_ONLY_104');failLockAfterCompletion=true;
+  const partialLock=await vaultAction('lock');assert.equal(partialLock.ok,false);assert.match(partialLock.error,/could not be removed/);
+  assert.equal(await page.evaluate(()=>NetworkToolkitCredentials.vaultStatus().state),'locked');assert.equal(await page.evaluate(()=>NetworkToolkitCredentials.meta('password')),null);assert.equal(await page.locator('#credentialManagerForm').count(),0);assert.match(await page.locator('#credentialVaultPanel').innerText(),/may still unlock a future launch/);
+  denyNext=true;assert.equal((await vaultAction('recover')).ok,false);assert.equal(vaultGeneration,2);assert.equal(vault.state,'locked');
+  assert.equal((await vaultAction('recover')).ok,true);assert.equal(vaultGeneration,3);assert.equal(vault.state,'unlocked');await assertNativeOnlyEntry();
+  denyNext=true;assert.equal((await vaultAction('cleanup-legacy')).ok,false);assert.equal(vault.legacyBackup,true);
+  assert.equal((await vaultAction('cleanup-legacy')).ok,true);assert.equal(vault.legacyBackup,false);assert.equal(await page.locator('[data-vault-action="cleanup-legacy"]').count(),0);
+  denyNext=true;assert.equal((await vaultAction('delete-vault')).ok,false);assert.equal(records.size,4);assert.equal(vault.state,'unlocked');
+  assert.equal((await vaultAction('delete-vault')).ok,true);assert.equal(vault.state,'setup-required');assert.equal(records.size,0);assert.equal(await page.locator('#credentialManagerForm').count(),0);await assertNativeOnlyEntry();
+  for(const row of posts('/api/credential-vault'))assert.deepEqual(Object.keys(row.body),['action']);
+  for(const secret of nativeCanaries)assert(!JSON.stringify({calls,responses,saved}).includes(secret),'Native secret crossed the UI/API fixture boundary');
   await page.evaluate(()=>flushState());for(const secret of canaries)assert(!JSON.stringify(saved).includes(secret));
   assert.equal(calls.filter(row=>/^\/api\/credentials\/[^/]+$/.test(row.path)&&row.method==='GET').length,0);
   for(const response of responses.filter(row=>row.path.startsWith('/api/credentials')))for(const secret of canaries)assert(!JSON.stringify(response.data).includes(secret));
   await assertNoSecretsInDOM();assert.deepEqual(errors,[]);
-  const result={passed:true,scope:'UI-only synthetic route fixture; NOT Windows native/DPAPI/bootstrap verification',blankPasswordAndKeyEditor:true,createUpdateDenialAndSuccess:true,blankUpdatePreservesSecret:true,explicitDestinationApproval:true,duplicateApprovalDeduplicated:true,staleDestinationNotGranted:true,savedConnectionsIDOnly:['terminal','sftp','ftps'],noSavedSecretReads:true,noSecretMetadataOrPersistence:true,renderedWidths:rendered,errors};
+  const result={passed:true,scope:'UI-only synthetic route fixture; NOT Windows native/DPAPI/bootstrap verification',blankPasswordAndKeyEditor:true,createUpdateDenialAndSuccess:true,blankUpdatePreservesSecret:true,explicitDestinationApproval:true,duplicateApprovalDeduplicated:true,staleDestinationNotGranted:true,savedConnectionsIDOnly:['terminal','sftp','ftps'],noSavedSecretReads:true,noSecretMetadataOrPersistence:true,renderedWidths:rendered,vaultStatesRendered:['legacy','setup','locked'],nativeVaultActionOnly:true,vaultSetupCancellation:true,rotationAndRecoveryMocks:true,lockPreservesConnections:true,lockHidesMetadata:true,partialLockFailureRefreshed:true,cancelledRotationPreservesEditor:true,pendingVaultActionDeduplicated:true,dismissedManagerStaysClosed:true,legacyCleanupAndDeleteConfirmationMocks:true,errors};
   if(output)fs.writeFileSync(path.join(output,'credential-security-results.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result));
  }catch(error){if(output)await page.screenshot({path:path.join(output,'credential-security-failure.png')}).catch(()=>{});throw error;}
  finally{await browser.close();}

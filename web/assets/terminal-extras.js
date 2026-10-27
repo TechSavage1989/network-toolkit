@@ -9,13 +9,15 @@ function withoutInput(entry,callback){return root.NetworkToolkitTerminalCopy?.wi
 function prefs(entry){return {...(root.NetworkToolkitTerminalInteraction?.preferences?.()||{}),autoScroll:true,...entry?._ntSessionPrefs};}
 function history(entry){return entry?(entry._ntOutputHistory||(entry._ntOutputHistory=[])):[];}
 function marker(entry,line){try{const b=entry.xterm.buffer.active;return entry.xterm.registerMarker(line===undefined?0:line-b.baseY-b.cursorY)||null}catch{return null}}
+function idlePrompt(text){return /^[\w.@:/()~\[\] -]{0,150}[#>$%]\s*$/.test(text);}
+function echoMatches(line,echo){return echo.text===undefined||line.text.trimEnd()===echo.text.trimEnd()||echo.prefix&&line.text.startsWith(echo.text);}
 function live(m){return !!m&&!m.isDisposed&&m.line>=0;}
 function normal(entry){return !!entry?.xterm&&entry.xterm.buffer.active===entry.xterm.buffer.normal;}
 function disposeItem(item){for(const m of [item.start,item.end,...(item.echo||[]).flatMap(e=>[e.start,e.end])])try{m?.dispose()}catch{}}
 function touch(entry){entry.outputRevision=(entry.outputRevision||0)+1;}
 function finalize(entry){const item=history(entry).at(-1);if(item&&!item.closed){item.end=marker(entry);item.closed=true;root.NetworkToolkitTerminalOutputArchive?.close(entry,item);}}
 function add(entry,kind,start,expected=[]){const list=history(entry);const item={id:'block-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7),kind,start,end:null,closed:false,at:Date.now(),echo:[],expected,submitted:kind==='command'};list.push(item);while(list.length>MAX_HISTORY){const old=list.shift();root.NetworkToolkitTerminalOutputArchive?.dispose(entry,old);disposeItem(old);}entry._ntOutputChoice=kind==='paste'?'last-paste':'last-command';touch(entry);sync();return item;}
-function notePaste(entry,text){if(!normal(entry)||!text)return;entry._ntInputDraft?.start?.dispose();entry._ntInputDraft=null;finalize(entry);const expected=String(text).replace(/\r\n?/g,'\n').split('\n').map(s=>s.trim()).filter(Boolean);const item=add(entry,'paste',marker(entry),expected);root.NetworkToolkitTerminalOutputArchive?.begin(entry,item,logicalLine(entry,entry.xterm.buffer.normal.baseY+entry.xterm.buffer.normal.cursorY).text,expected);item.submitted=/[\r\n]/.test(text);entry._ntPendingPaste=item.submitted?null:item;}
+function notePaste(entry,text){if(!normal(entry)||!text)return;if(pagerInput(entry,text)&&/^[ \r\nqQ\x03]+$/.test(text)){consumePagerInput(entry);return;}entry._ntInputDraft?.start?.dispose();entry._ntInputDraft=null;finalize(entry);const expected=String(text).replace(/\r\n?/g,'\n').split('\n').map(s=>s.trim()).filter(Boolean);const item=add(entry,'paste',marker(entry),expected);root.NetworkToolkitTerminalOutputArchive?.begin(entry,item,inputLine(entry,entry.xterm.buffer.normal.baseY+entry.xterm.buffer.normal.cursorY).text,expected);item.submitted=/[\r\n]/.test(text);entry._ntPendingPaste=item.submitted?null:item;}
 function lineText(buffer,row){
  const line=buffer.getLine(row),next=buffer.getLine(row+1);if(!line)return '';
  const wrapped=next?.isWrapped,last=line.getCell(line.length-1);
@@ -25,17 +27,22 @@ function lineText(buffer,row){
  return line.translateToString(!wrapped,0,line.length-(padding?1:0));
 }
 function logicalLine(entry,row){const b=entry.xterm.buffer.normal;let start=row,end=row;while(start>0&&b.getLine(start)?.isWrapped)start--;while(end+1<b.length&&b.getLine(end+1)?.isWrapped)end++;let text='';for(let y=start;y<=end;y++)text+=lineText(b,y);return{start,end,text};}
+function inputLine(entry,row){
+ const line=logicalLine(entry,row),b=entry.xterm.buffer.normal;
+ if(line.end===row){const beforeCursor=b.getLine(row)?.translateToString(false,0,b.cursorX)||'',tail=lineText(b,row);if(beforeCursor.length>tail.length)line.text+=' '.repeat(beforeCursor.length-tail.length);}
+ return line;
+}
 function noteManualInput(entry,data){
  if(!normal(entry)||!data||!terminalEntryAcceptsInput(entry)||root.NetworkToolkitTerminalInteraction?.suppressesInput?.())return;
  // Pager responses, mouse reports, focus reports and terminal replies are not commands.
- if(pagerPrompt(entry._ntPagerTail)&&/^[ \r\n]$/.test(data))return;
+ if(pagerInput(entry,data)){consumePagerInput(entry);return;}
  if(data.startsWith('\x1b')&&!/^\x1b(?:\[(?:[ABCDHF]|[1-8](?:;\d+)?[~ABCDHF])|O[ABCDHF])$/.test(data))return;
  if(entry.xterm.buffer.active.type==='alternate')return;
  if(/^[\x03\x04\x1a]$/.test(data)){entry._ntInputDraft?.start?.dispose();entry._ntInputDraft=null;entry._ntPendingPaste=null;return;}
  if(/^[\x11\x13\t]$/.test(data))return;
  const enter=/[\r\n]/.test(data), b=entry.xterm.buffer.normal;
  if(entry._ntPendingPaste&&history(entry).includes(entry._ntPendingPaste)){
-   if(enter){const item=entry._ntPendingPaste,line=logicalLine(entry,b.baseY+b.cursorY);if(line.text.trim())item.echo.push({start:marker(entry,line.start),end:marker(entry,line.end)});item.submitted=true;entry._ntPendingPaste=null;touch(entry);sync();}return;
+   if(enter){const item=entry._ntPendingPaste,line=logicalLine(entry,b.baseY+b.cursorY);if(line.text.trim())item.echo.push({start:marker(entry,line.start),end:marker(entry,line.end),text:line.text,prefix:idlePrompt(line.text)});item.submitted=true;entry._ntPendingPaste=null;touch(entry);sync();}return;
  }
  let draft=entry._ntInputDraft;
  if(!draft){
@@ -43,9 +50,9 @@ function noteManualInput(entry,data){
    finalize(entry);draft=entry._ntInputDraft={start:marker(entry),row:b.baseY+b.cursorY};
  }
  if(enter){
-   const line=logicalLine(entry,b.baseY+b.cursorY),item=add(entry,'command',draft.start);root.NetworkToolkitTerminalOutputArchive?.begin(entry,item,line.text,[],true);
+   const line=logicalLine(entry,b.baseY+b.cursorY),item=add(entry,'command',draft.start);root.NetworkToolkitTerminalOutputArchive?.begin(entry,item,inputLine(entry,b.baseY+b.cursorY).text,[],true);
    // Save the displayed echo's positions, never keystrokes or hidden password input.
-   if(line.text.trim())item.echo.push({start:marker(entry,line.start),end:marker(entry,line.end)});
+   if(line.text.trim())item.echo.push({start:marker(entry,line.start),end:marker(entry,line.end),text:line.text,prefix:idlePrompt(line.text)});
    entry._ntInputDraft=null;
  }
 }
@@ -66,22 +73,24 @@ function rows(entry,item){
    else lines.push({start:y,end:y,text});
  }
  // Recognize pasted echoes in their original order. Do not strip arbitrary suffixes
- // or every later output line that happens to repeat a submitted command.
+ // or bare output lines that happen to repeat a submitted command. Without a
+ // visible prompt prefix an echo cannot safely be distinguished from real output.
  if(item.expected?.length){let next=item.matched||0;for(const line of lines){
    if(item.echo.some(e=>live(e.start)&&line.start===e.start.line))continue;
    const cmd=item.expected[next];if(!cmd)break;
    const t=line.text.trim();const at=t.length-cmd.length;
    const prefix=at>=0?t.slice(0,at):'';
-   if(t===cmd||(at>0&&t.endsWith(cmd)&&/^[^\r\n]{1,160}[#>$%]\s*$/.test(prefix))){
-     item.echo.push({start:marker(entry,line.start),end:marker(entry,line.end)});next++;
+   if(at>0&&t.endsWith(cmd)&&/^[^\r\n]{1,160}[#>$%]\s*$/.test(prefix)){
+     item.echo.push({start:marker(entry,line.start),end:marker(entry,line.end),text:line.text,prefix:idlePrompt(line.text)});next++;
    }
  }item.matched=next;if(next>=item.expected.length){item.expected=[];item.matched=0;}}
  return {buffer:b,start,end,lines};
 }
 function screenOutput(entry,item,includeCommands=false){
  const range=rows(entry,item);if(!range)return null;
- let lines=range.lines;
- if(!includeCommands)lines=lines.filter(line=>!item.echo.some(e=>live(e.start)&&live(e.end)&&line.start>=e.start.line&&line.start<=e.end.line));
+ let lines=range.lines.filter(line=>!matchPagerLine(line.text));
+ if(!includeCommands&&lines[0]?.start===range.start&&idlePrompt(lines[0].text))lines=lines.slice(1);
+ if(!includeCommands)lines=lines.filter(line=>!item.echo.some(e=>live(e.start)&&live(e.end)&&line.start>=e.start.line&&line.start<=e.end.line&&echoMatches(line,e)));
  // The final idle prompt is a boundary, rather than generated command output.
  if(lines.length&&!item.closed&&/^[\w.@:/()~\[\] -]{0,150}[#>$%]\s*$/.test(lines.at(-1).text))lines=lines.slice(0,-1);
  while(lines.length&&!lines.at(-1).text.trim())lines=lines.slice(0,-1);
@@ -132,21 +141,94 @@ function selectReady(entry,item,includeCommands){
 async function copy(entry,includeCommands=prefs(entry).pasteIncludeCommands===true,choice){const item=current(entry,choice);return afterCapture(entry,item,async()=>{const result=output(entry,item,includeCommands);if(!result?.text){toast('No retained output is available for this block yet.');return false;}const copied=await root.NetworkToolkitTerminalInteraction.copyValue(result.text,{entry});if(copied&&result.truncated)toast('Copied the retained portion. This window received a shortened output archive.');return copied;});}
 function scrollTop(entry){pauseFollow(entry);withoutInput(entry,()=>{entry?.xterm?.scrollToTop?.();entry?.xterm?.focus?.();});}
 function scrollBottom(entry){setFollow(entry,true);withoutInput(entry,()=>{entry?.xterm?.scrollToBottom?.();entry?.xterm?.focus?.();});sync();}
-function pagerPrompt(text){const clean=String(text||'').replace(/\x1b\[[0-?]*[ -\/]*[@-~]/g,'').replace(/\x1b\][^\x07]*(?:\x07|\x1b\\)/g,'');const tail=clean.slice(-240);for(const p of [{re:/(?:--\s*More\s*--|<---\s*More\s*--->|\(more\)|\bMore:\s*)\s*$/i,key:'space'},{re:/press\s+(?:the\s+)?space(?:bar)?(?:\s+to\s+(?:continue|more))?\s*$/i,key:'space'},{re:/press\s+(?:enter|return)(?:\s+to\s+(?:continue|more))?\s*$/i,key:'enter'}])if(p.re.test(tail))return{key:p.key,signature:tail.trim().slice(-100)};return null;}
+// Match complete visible pager lines, never prose suffixes or confirmation prompts.
+// In particular, a bare "Press Enter to continue" is ambiguous and is NOT paging.
+function matchPagerLine(text){
+ const line=String(text||'').trim();if(!line||line.length>512)return null;
+ const marker='(?:-{2,}\\s*More\\s*-{2,}|<---\\s*More\\s*--->|\\(more\\)|More:)';
+ const help='(?:,\\s*next page:\\s*Space,\\s*next line:\\s*(?:Enter|Return(?: key)?),\\s*quit:\\s*(?:q|Control-C|Ctrl-C|\\^C))?';
+ if(new RegExp('^'+marker+help+'$','i').test(line)||/^---\(more(?:\s+\d{1,3}%)?\)---$/i.test(line)||/^--More--\(\d{1,3}%\)$/i.test(line))return {key:'space',signature:line};
+ if(/^\[?Press\s+(?:the\s+)?space(?:bar)?\s+(?:to\s+continue,?\s*['"]?q['"]?\s+to\s+quit\.?|for\s+(?:the\s+)?(?:next\s+)?page)\]?$/i.test(line))return {key:'space',signature:line};
+ if(/^Press\s+(?:Enter|Return)\s+(?:for\s+more|for\s+(?:the\s+)?next\s+(?:page|line))$/i.test(line))return {key:'enter',signature:line};
+ return null;
+}
+// Small incremental visible-line parser. It is intentionally not a second terminal:
+// xterm remains authoritative for cells/selection/archive. This parser only recognizes
+// bounded pager lines, handling split UTF-8, CSI/OSC, CR overwrite and backspace.
+function createPagerRecognizer(){
+ let cells=[],column=0,state='text',sequence='',overflow=false,epoch=0,used=-1,rewrite=false,decoder=new TextDecoder();
+ const reset=()=>{cells=[];column=0;overflow=false;rewrite=false;epoch++;};
+ function csi(final){
+  const values=sequence.split(';').map(n=>Number(n)||0),n=values[0]||1;
+  if(final==='K'){
+   const before=cells.join('').trimEnd();
+   if(values[0]===2){cells=[];overflow=false;}else if(values[0]===1){for(let i=0;i<=column&&i<cells.length;i++)cells[i]=' ';}else cells.length=Math.min(cells.length,column);
+   if(cells.join('').trimEnd()!==before)epoch++;rewrite=false;
+  }else if(final==='J'){reset();}
+  else if(final==='G'||final==='`')column=Math.max(0,n-1);
+  else if(final==='D')column=Math.max(0,column-n);
+  else if(final==='C')column=Math.min(4096,column+n);
+  else if(final==='H'||final==='f'){reset();column=Math.max(0,(values[1]||1)-1);}
+  else if('ABEFd'.includes(final)){reset();}
+  else if(!'mhlcn'.includes(final)){reset();}
+  // SGR, private modes and reports change no visible pager characters.
+ }
+ function feed(bytes){
+  const text=typeof bytes==='string'?bytes:decoder.decode(bytes,{stream:true});
+  for(const c of text){
+   if(state==='osc'||state==='string'){if(c==='\x9c'||c==='\x07'&&state==='osc')state='text';else if(c==='\x1b')state=state==='osc'?'osc-escape':'string-escape';continue;}
+   if(state==='osc-escape'||state==='string-escape'){state=c==='\\'?'text':state==='osc-escape'?'osc':'string';continue;}
+   if(state==='escape'){
+    if(c==='['){state='csi';sequence='';}else if(c===']')state='osc';else if('P_^X'.includes(c))state='string';else if('()*+-./'.includes(c))state='charset';else{state='text';if(c==='c'||c==='D'||c==='E')reset();}continue;
+   }
+   if(state==='charset'){state='text';continue;}
+   if(state==='csi'){
+    if(c>='@'&&c<='~'){csi(c);state='text';sequence='';}
+    else if(sequence.length<128)sequence+=c;else{state='text';reset();overflow=true;}continue;
+   }
+   if(c==='\x1b'){state='escape';continue;}
+   if(c==='\x9b'){state='csi';sequence='';continue;}
+   if(c==='\x9d'){state='osc';continue;}
+   if(c==='\x90'){state='string';continue;}
+   if(c==='\r'){column=0;rewrite=true;continue;}
+   if(c==='\n'){reset();continue;}
+   if(c==='\b'||c==='\x7f'){column=Math.max(0,column-1);rewrite=true;continue;}
+   if(c==='\t'){column=Math.min(4096,(Math.floor(column/8)+1)*8);continue;}
+   if(c<' '||c==='\x9c')continue;
+   if(column>=4096){overflow=true;continue;}
+   if(rewrite&&used===epoch&&cells[column]!==c){epoch++;rewrite=false;}
+   while(cells.length<column)cells.push(' ');cells[column++]=c;
+  }
+  return current();
+ }
+ function current(){return overflow||state!=='text'?null:matchPagerLine(cells.join(''));}
+ return {feed,current,consume(){used=epoch;},ready(){return used!==epoch&&!!current();},reset(){reset();state='text';sequence='';decoder=new TextDecoder();},get epoch(){return epoch;}};
+}
+function pagerPrompt(text){return createPagerRecognizer().feed(String(text||''));}
+function pagerState(entry){return entry._ntPagerState||(entry._ntPagerState=createPagerRecognizer());}
+function pagerInput(entry,data){return !!data&&!!entry?._ntPagerState?.current();}
+function cancelPagerTimer(entry){if(entry?._ntPagerTimer){clearTimeout(entry._ntPagerTimer);entry._ntPagerTimer=null;}}
+function consumePagerInput(entry){cancelPagerTimer(entry);entry._ntPagerState?.consume();root.NetworkToolkitTerminalInput?.clear(entry);}
+function schedulePager(entry){
+ cancelPagerTimer(entry);const state=pagerState(entry),match=state.current(),p=prefs(entry);
+ if(!match||!p.autoPager||!state.ready()||root.NetworkToolkitTerminalMacros?.ownsPager?.(entry)||!terminalEntryAcceptsInput(entry))return;
+ const epoch=state.epoch;
+ // Allow a split explanatory suffix or confirmation to finish before deciding.
+ entry._ntPagerTimer=setTimeout(()=>{
+  entry._ntPagerTimer=null;const now=state.current(),settings=prefs(entry);
+  if(entry._ntPagerState!==state||state.epoch!==epoch||!now||!state.ready()||!settings.autoPager||root.NetworkToolkitTerminalMacros?.ownsPager?.(entry)||!terminalEntryAcceptsInput(entry))return;
+  const key=['space','enter'].includes(settings.pagerKey)?settings.pagerKey:now.key;
+  if(enqueueTerminalInput(entry,key==='enter'?'\r':' ',false,'pager')===true)state.consume();
+ },35);
+}
 function observeOutput(entry,bytes){
  root.NetworkToolkitTerminalOutputArchive?.feed(entry,bytes);
- if(!entry||!bytes)return;let text='';try{text=typeof bytes==='string'?bytes:(entry._ntPagerDecoder||(entry._ntPagerDecoder=new TextDecoder())).decode(bytes,{stream:true})}catch{return;}
- entry._ntPagerTail=((entry._ntPagerTail||'')+text).slice(-512);
- const p=prefs(entry),match=pagerPrompt(entry._ntPagerTail);if(!p.autoPager||!match){entry._ntPagerLast='';return;}
- if(root.NetworkToolkitTerminalMacros?.ownsPager?.(entry)||match.signature===entry._ntPagerLast&&Date.now()-(entry._ntPagerLastAt||0)<800||!terminalEntryAcceptsInput(entry))return;
- entry._ntPagerLast=match.signature;entry._ntPagerLastAt=Date.now();
- const key=p.pagerKey==='space'||p.pagerKey==='enter'?p.pagerKey:match.key;enqueueTerminalInput(entry,key==='enter'?'\r':' ',false,'pager');
- // Clear the consumed prompt so a later identical pager with new output advances.
- entry._ntPagerTail='';
+ if(!entry||!bytes)return;try{pagerState(entry).feed(bytes);}catch{return;}
+ schedulePager(entry);
 }
 function beforeOutput(entry){if(!entry?.xterm)return null;nativeFollow(entry,prefs(entry).autoScroll);return {epoch:entry._ntScrollEpoch||0};}
 function afterOutput(entry,position){if(!entry?.xterm||!position)return;const follow=prefs(entry).autoScroll;nativeFollow(entry,follow);if(follow&&position.epoch===(entry._ntScrollEpoch||0))entry.xterm.scrollToBottom();sync();}
-function clear(entry){if(!entry)return;root.NetworkToolkitTerminalInput?.clear(entry);for(const item of history(entry)){root.NetworkToolkitTerminalOutputArchive?.dispose(entry,item);disposeItem(item);}entry._ntOutputHistory=[];entry._ntInputDraft?.start?.dispose();entry._ntInputDraft=null;entry._ntPendingPaste=null;touch(entry);sync();}
+function clear(entry){if(!entry)return;cancelPagerTimer(entry);entry._ntPagerState?.reset();root.NetworkToolkitTerminalInput?.clear(entry);for(const item of history(entry)){root.NetworkToolkitTerminalOutputArchive?.dispose(entry,item);disposeItem(item);}entry._ntOutputHistory=[];entry._ntInputDraft?.start?.dispose();entry._ntInputDraft=null;entry._ntPendingPaste=null;touch(entry);sync();}
 function snapshot(entry){
  const list=history(entry);for(const item of list)rows(entry,item);let budget=4*1024*1024;const saved=new Map();
  for(const item of [...list].reverse()){const value=root.NetworkToolkitTerminalOutputArchive?.snapshot(entry,item);if(!value)continue;const bytes=new TextEncoder().encode(value.screen).length;if(bytes<=budget){saved.set(item,value);budget-=bytes;}}
@@ -157,7 +239,12 @@ function restore(entry,value){clear(entry);entry._ntSessionPrefs={};if(!value||v
  if(['auto','space','enter'].includes(value.settings?.pagerKey))entry._ntSessionPrefs.pagerKey=value.settings.pagerKey;
  for(const i of (value.blocks||[]).slice(-MAX_HISTORY)){if(!['paste','command'].includes(i.kind)||!Number.isInteger(i.start)||i.start<0&&!i.archive||i.start>=entry.xterm.buffer.normal.length)continue;
  history(entry).push({...i,start:i.start>=0?marker(entry,i.start):null,end:i.closed&&i.end>=0?marker(entry,i.end):null,echo:(i.echo||[]).filter(e=>e.start>=0&&e.end>=e.start&&e.end<entry.xterm.buffer.normal.length).map(e=>({start:marker(entry,e.start),end:marker(entry,e.end)})),expected:[]});root.NetworkToolkitTerminalOutputArchive?.restore(entry,history(entry).at(-1),i.archive);}
- entry._ntOutputChoice=value.choice||'last-command';root.NetworkToolkitTerminalInput?.restore(entry,value.input);sync();}
+ entry._ntOutputChoice=value.choice||'last-command';root.NetworkToolkitTerminalInput?.restore(entry,value.input);
+ // A restored screen can already be paused at a pager with no new bytes due.
+ // Recognize manual responses, but do not replay an automatic key that the old
+ // window may already have queued before handing ownership over.
+ if(normal(entry)){const b=entry.xterm.buffer.normal,line=logicalLine(entry,b.baseY+b.cursorY).text;if(matchPagerLine(line)){pagerState(entry).feed(line);pagerState(entry).consume();}}
+ sync();}
 function bottomHTML(){return '<div id="terminalConsoleBar" class="terminal-consolebar" aria-label="Console output controls"><div class="terminal-output-actions" role="group" aria-label="Command and paste output"><div id="terminalOutputBlock" class="terminal-output-switch" role="group" aria-label="Output source"><button type="button" class="btn small ghost" data-terminal-output-kind="last-command" aria-pressed="true" title="Use the latest typed command output">Last command</button><button type="button" class="btn small ghost" data-terminal-output-kind="last-paste" aria-pressed="false" title="Use the latest pasted input output">Last paste</button></div><button class="iconbtn" data-terminal-extra="output-start" aria-label="Jump to selected output start" title="Jump to selected output start">'+icon('outputStart')+'</button><button class="iconbtn" data-terminal-extra="output-end" aria-label="Jump to selected output end" title="Jump to selected output end">'+icon('outputEnd')+'</button><button class="btn small ghost" data-terminal-extra="select-output" title="Select the chosen command or paste output">Select output</button><button class="btn small ghost" data-terminal-extra="copy-output" title="Copy the chosen command or paste output">'+icon('copy')+'Copy output</button><label class="terminal-quick-check" title="Include recognized command echoes when selecting or copying"><input type="checkbox" id="terminalIncludeInput">Include commands</label></div><div class="terminal-live-actions" role="group" aria-label="Active session controls"><label class="terminal-quick-check" title="Automatically continue --More-- prompts for manually entered commands. Macros use their own automatic paging setting."><input type="checkbox" id="terminalQuickPager">Auto pager</label><label class="sr-only" for="terminalQuickPagerKey">Pager key</label><select id="terminalQuickPagerKey" title="Pager advance key for this session"><option value="auto">Auto key</option><option value="space">Space</option><option value="enter">Enter</option></select><label class="terminal-quick-check" title="Follow new output in this session. Jumping to earlier output pauses this."><input type="checkbox" id="terminalQuickFollow">Auto scroll</label><label class="terminal-quick-check" title="Review and edit multiline pastes before sending in this session"><input type="checkbox" id="terminalQuickReview">Review paste</label><div class="terminal-scroll-actions" role="group" aria-label="Scroll console"><button class="iconbtn" data-terminal-extra="scroll-top" aria-label="Scroll to top" title="Scroll to top">'+icon('arrowUp')+'</button><button class="iconbtn" data-terminal-extra="scroll-bottom" aria-label="Scroll to bottom" title="Scroll to bottom">'+icon('arrowDown')+'</button></div></div></div>';}
 function setSessionOpen(open){sessionOpen=!!open;const panel=document.querySelector('#terminalSessionPanel'),button=document.querySelector('#terminalSessionToggle');if(!panel||!button)return;panel.classList.toggle('hidden',!sessionOpen);button.setAttribute('aria-expanded',String(sessionOpen));const r=button.getBoundingClientRect(),width=panel.getBoundingClientRect().width;panel.style.top=Math.min(innerHeight-100,r.bottom+5)+'px';panel.style.right=Math.max(6,Math.min(innerWidth-width-6,innerWidth-r.right))+'px';panel.style.maxHeight=Math.max(100,innerHeight-r.bottom-12)+'px';if(sessionOpen)panel.querySelector('button,select,input')?.focus({preventScroll:true});}
 function sync(){
@@ -206,7 +293,7 @@ function sync(){
 }
 function changed(event){const entry=currentTerminal(),el=event.target;if(el.id==='terminalActiveActionsPosition'){state.terminalActiveActionsPosition=el.value==='bottom'?'bottom':'top';saveState();sync();scheduleTerminalFit();return;}
  const fields={terminalQuickPager:'autoPager',terminalQuickFollow:'autoScroll',terminalQuickReview:'pasteReview',terminalIncludeInput:'pasteIncludeCommands',terminalQuickPagerKey:'pagerKey'},key=fields[el.id];if(!key||!entry)return;
- entry._ntSessionPrefs={...entry._ntSessionPrefs,[key]:el.type==='checkbox'?el.checked:el.value};touch(entry);if(key==='autoScroll'){setFollow(entry,el.checked);if(el.checked)entry.xterm.scrollToBottom();}if(key==='autoPager')entry._ntPagerLast='';sync();
+ entry._ntSessionPrefs={...entry._ntSessionPrefs,[key]:el.type==='checkbox'?el.checked:el.value};touch(entry);if(key==='autoScroll'){setFollow(entry,el.checked);if(el.checked)entry.xterm.scrollToBottom();}if(key==='autoPager'||key==='pagerKey')schedulePager(entry);sync();
 }
 function clicked(event){const source=event.target.closest('[data-terminal-output-kind]');if(source){event.preventDefault();const entry=currentTerminal(),kind=source.dataset.terminalOutputKind;if(!source.disabled&&entry&&['last-command','last-paste'].includes(kind)){entry._ntOutputChoice=kind;touch(entry);sync();}return;}const button=event.target.closest('[data-terminal-extra]');if(!button||button.disabled)return;event.preventDefault();const entry=currentTerminal();switch(button.dataset.terminalExtra){
  case'session':setTerminalToolsOpen(false,false);setSessionOpen(!sessionOpen);return;
@@ -224,5 +311,5 @@ function bind(entry){if(!entry?.xterm||bindings.has(entry))return;bindings.add(e
  const scrolled=entry.xterm.onScroll?.(()=>{if(!prefs(entry).autoScroll)nativeFollow(entry,false);});const parsed=entry.xterm.onWriteParsed?.(()=>{if(currentTerminal()===entry)sync();});
  entry.disposables.push({dispose(){entry.element?.removeEventListener('wheel',wheel,true);entry.element?.removeEventListener('pointerdown',pointer,true);entry.element?.removeEventListener('keydown',key,true);scrolled?.dispose();parsed?.dispose();clear(entry);}});
 }
-root.NetworkToolkitTerminalExtras=Object.freeze({notePaste,noteManualInput,observeOutput,beforeOutput,afterOutput,beforeFit,afterFit,followCurrent,scrollTop,scrollBottom,jump,step,select,copy,sync,finalize,prefs,clear,snapshot,restore,current,output,rows,lineText,screenOutput,followInput,pauseFollow,flush:entry=>root.NetworkToolkitTerminalOutputArchive?.flush(entry),pagerPrompt,pasteChoice});
+root.NetworkToolkitTerminalExtras=Object.freeze({notePaste,noteManualInput,observeOutput,beforeOutput,afterOutput,beforeFit,afterFit,followCurrent,scrollTop,scrollBottom,jump,step,select,copy,sync,finalize,prefs,clear,snapshot,restore,current,output,rows,lineText,screenOutput,followInput,pauseFollow,flush:entry=>root.NetworkToolkitTerminalOutputArchive?.flush(entry),pagerPrompt,matchPagerLine,idlePrompt,echoMatches,createPagerRecognizer,pagerInput,pasteChoice});
 })(window);

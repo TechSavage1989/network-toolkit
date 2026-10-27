@@ -1,4 +1,23 @@
-# 1.17.104 development checkpoint — green, publication on hold
+# 1.17.104 combined candidate — implementation and validation in progress
+
+2026-10-27 update: the user confirmed master password with remembered unlock
+across app restarts and Windows reboots after explicit same-user risk disclosure.
+The former decision hold below is historical and superseded. Publication is
+approved after required combined checks, not before. Main/latest103 remain
+unchanged until promotion. No actual vault/settings were accessed or migrated.
+
+Current additional scope: authenticated v2 vault/Argon2id, native setup/unlock/
+rotation/recovery dialogs, optional offline recovery, CurrentUser DPAPI remembered
+random key, configuration-bound reset/lock, cross-instance transaction guard,
+verified explicit legacy migration with separate cleanup, action-only web UI;
+plus terminal pager correctness and new/unset Auto pager + Ctrl+C copy defaults.
+See CREDENTIAL_SECURITY.md and TERMINAL_PAGING.md. Earlier graph/icon/bootstrap
+work and its green evidence are retained, but that evidence does not validate the
+new v2 code. First combined hosted checkpoint is pending; local JS/Python,
+formatting and source review are preliminary only. Native Windows dialogs and
+new DPAPI/lifecycle tests must run and their captured pixels must be inspected.
+
+## Historical independent checkpoint (before confirmed choices)
 
 Recorded 2026-10-27. This is an isolated development branch, not a released
 1.17.104 application. Published main/latest remain unchanged:

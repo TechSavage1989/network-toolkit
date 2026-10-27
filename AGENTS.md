@@ -7,10 +7,15 @@ Current published version: 1.17.103. The accumulated-history cluster/theme
 release and its required review, Release and duplicate-main checks are complete.
 Read docs/DEVELOPMENT_HANDOFF.md and docs/CONDENSED_GRAPH_SCALING.md.
 
-The isolated 1.17.104 security/graph/icon development checkpoint is green but
-ON HOLD, not released. Read docs/SECURITY104_HANDOFF.md before resuming it.
-Master-password/recovery and lock/active-session choices remain unanswered;
-do not infer them, promote main, or describe the current DPAPI vault as locked.
+The combined 1.17.104 candidate is in development, not yet published. Read
+docs/SECURITY104_HANDOFF.md before resuming it. The user confirmed master-password
+encryption with Windows-account remembered unlock across restarts and reboots
+after disclosure of the same-user risk. Established sessions stay connected;
+manual Lock and forget blocks new credential uses. Recovery is optional during
+explicit native setup. No actual user vault migration or settings change is
+authorized here. Finish required exact-source/native/rendered checks before
+the authorized combined publication. Terminal pager/default and canonical icon
+updates are also part of this build. No competing release or unrelated scope.
 
 The next user-authorized work combines credential security and graph recent
 spacing matching the supplied 30-second reference. The security lead owns the

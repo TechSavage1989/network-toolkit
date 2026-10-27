@@ -1,3 +1,12 @@
+NETWORK TOOLKIT 1.17.104 CANDIDATE — VALIDATION PENDING
+
+New combined v2 vault/native-dialog/pager/default changes require fresh hosted
+validation. Earlier v104 independent checkpoint evidence is in
+SECURITY104_HANDOFF.md; it is not a claim that new crypto/lifecycle code passed.
+Main/latest remain103 until required exact-source checks and publication.
+
+HISTORICAL PUBLISHED103 RECORD
+
 NETWORK TOOLKIT 1.17.103 PUBLISHED AND VERIFIED
 
 1.17.103 published accumulated-history cluster and RTT accent

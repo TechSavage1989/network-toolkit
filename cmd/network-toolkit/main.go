@@ -101,6 +101,9 @@ type application struct {
 	publicIP                     *publicIPManager
 	credentials                  *credentialVault
 	credentialChanges            sync.Mutex
+	promptVaultSecret            func(context.Context, desktop.VaultSecretRequest) (desktop.VaultSecretResponse, error)
+	confirmVaultAction           func(context.Context, desktop.VaultActionRequest) (bool, error)
+	confirmVaultRecovery         func(context.Context, string) (bool, error)
 	confirmCredentialDestination func(context.Context, desktop.CredentialDestinationConfirmation) (bool, error)
 	inspectCredentialDestination func(context.Context, credentialBinding) (string, error)
 	packetCaptures               *packetCaptureManager
@@ -369,16 +372,22 @@ func main() {
 func newApplication(parent context.Context, dataPath string) *application {
 	ctx, cancel := context.WithCancel(parent)
 	a := &application{ctx: ctx, stop: cancel, jobs: make(map[string]*Job), started: time.Now(), token: randomHex(32), uiHost: "browser", dataPath: dataPath, state: json.RawMessage(`{}`), windowMode: "main", windowInstanceID: randomHex(16), windowActivationToken: randomHex(32), windowActivate: make(chan struct{}, 1), primaryWake: make(chan struct{}, 1)}
+	a.promptVaultSecret = desktop.PromptVaultSecret
+	a.confirmVaultAction = desktop.ConfirmVaultAction
+	a.confirmVaultRecovery = desktop.ConfirmVaultRecovery
 	a.confirmCredentialDestination = desktop.ConfirmCredentialDestination
 	a.inspectCredentialDestination = inspectCredentialDestination
 	a.localTools = newLocalToolsManager(ctx)
 	a.packetCaptures = newPacketCaptureManager(ctx)
 	a.transfers = newTransferHostManager(ctx, filepath.Dir(dataPath))
 	a.publicIP = newPublicIPManager(ctx)
-	if vault, err := newCredentialVault(filepath.Dir(dataPath)); err == nil {
-		a.credentials = vault
-	} else {
-		a.storageError = "Credential vault could not be opened: " + err.Error()
+	vault, vaultErr := newCredentialVaultForSettings(dataPath)
+	a.credentials = vault
+	if vaultErr != nil {
+		a.storageError = "Credential vault could not be opened: " + vaultErr.Error()
+	}
+	if vault != nil {
+		go func() { <-ctx.Done(); vault.close() }()
 	}
 	var terminalErr error
 	a.terminals, terminalErr = terminal.NewManager(ctx, filepath.Dir(dataPath))
@@ -561,6 +570,8 @@ func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		a.handleStorage(w, r)
 	case r.URL.Path == "/api/terminal-window" || strings.HasPrefix(r.URL.Path, "/api/terminal-window/"):
 		a.handleTerminalWindow(w, r)
+	case r.URL.Path == "/api/credential-vault":
+		a.handleCredentialVault(w, r)
 	case r.URL.Path == "/api/credentials" || strings.HasPrefix(r.URL.Path, "/api/credentials/"):
 		a.handleCredentials(w, r)
 	case r.URL.Path == "/api/system":
@@ -919,6 +930,17 @@ func (a *application) handleState(w http.ResponseWriter, r *http.Request) {
 		if state == nil {
 			jsonError(w, 400, "Settings must be a JSON object.")
 			return
+		}
+		release, lockErr := acquireCredentialGuard(filepath.Dir(a.dataPath))
+		if lockErr != nil {
+			jsonError(w, http.StatusConflict, lockErr.Error())
+			return
+		}
+		defer release()
+		// Vault config identity is native/backend-owned, never supplied by the renderer.
+		delete(state, credentialConfigIdentityField)
+		if id := credentialConfigID(a.dataPath); id != "" {
+			state[credentialConfigIdentityField] = id
 		}
 		sanitizeTerminalSettings(state)
 		sanitizeFTPProfiles(state)

@@ -12,7 +12,7 @@ function range(a){
  if(a.item.start.isDisposed){a.item.start=position(a.term,0);a.truncated=true;}
  return root.NetworkToolkitTerminalExtras.rows(a.entry,a.item);
 }
-function isEcho(a,line,index){return a.echo.has(index)||a.item.echo.some(e=>!e.start.isDisposed&&!e.end.isDisposed&&line.start>=e.start.line&&line.start<=e.end.line);}
+function isEcho(a,line,index){return a.echo.has(index)||a.item.echo.some(e=>!e.start.isDisposed&&!e.end.isDisposed&&line.start>=e.start.line&&line.start<=e.end.line&&root.NetworkToolkitTerminalExtras.echoMatches(line,e));}
 function tail(a){
  if(!a.term)return a.value;
  if(a.cached)return a.cached;
@@ -61,7 +61,8 @@ function value(a){
 }
 function read(entry,item,include=false){
  const a=archives.get(item);if(!a)return null;const saved=value(a);if(!saved)return null;
- let lines=saved.screen.split('\n');if(!include){const echoes=new Set(saved.echo);lines=lines.filter((_,i)=>!echoes.has(i));}
+ let lines=saved.screen.split('\n');if(!include){const echoes=new Set(saved.echo);lines=lines.filter((line,i)=>!echoes.has(i)&&!(i===0&&root.NetworkToolkitTerminalExtras.idlePrompt(line)));}
+ lines=lines.filter(line=>!root.NetworkToolkitTerminalExtras.matchPagerLine(line));
  if(!saved.closed&&lines.length&&/^[\w.@:/()~\[\] -]{0,150}[#>$%]\s*$/.test(lines.at(-1)))lines.pop();
  while(lines.length&&!lines.at(-1).trim())lines.pop();return {text:lines.join('\n'),truncated:saved.truncated,archived:true};
 }
@@ -70,7 +71,7 @@ function seed(entry,item,saved,expected=[],initialEcho=false){
  const term=new root.Terminal({cols:entry.xterm.cols,rows:entry.xterm.rows,scrollback:8192,allowProposedApi:true,convertEol:false,logLevel:'off'}),shadow={xterm:term};
  const block={start:term.registerMarker(0),end:null,closed:false,echo:[],expected:expected.slice()};
  const a={term,owner:entry,entry:shadow,item:block,value:null,chunks:[],lines:0,bytes:0,echo:new Set(saved.echo||[]),truncated:!!saved.truncated,pending:0,chain:Promise.resolve(),waiters:new Set()};
- if(initialEcho)a.echo.add(0);
+ if(initialEcho)block.echo.push({start:term.registerMarker(0),end:term.registerMarker(0),text:saved.screen,prefix:root.NetworkToolkitTerminalExtras.idlePrompt(saved.screen)});
  archives.set(item,a);entry._ntArchiveActive=item;
  queue(a,()=>writeChunks(a,saved.screen.replace(/\n/g,'\r\n')));
 }

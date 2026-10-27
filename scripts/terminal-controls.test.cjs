@@ -146,3 +146,54 @@ test('sealing wrapped rows preserves very long logical lines and interleaved pas
  assert(h.api.output(h.entry,h.api.current(h.entry),true).text.includes('switch# show final\nLAST PASTED OUTPUT'));
  h.dispose();
 });
+
+test('screenshot pager and manual Space Enter q Ctrl+C never split complete command archives',async()=>{
+ const pager='-- MORE --, next page: Space, next line: Enter, quit: q';
+ for(const key of [' ','\r','q','\x03']){
+  const h=harness();await h.write('switch# ');h.input('show running-config');await h.write('show running-config');h.input('\r');
+  await h.write('\r\nFIRST\r\n'+pager);h.input(key);assert.equal(h.entry._ntOutputHistory.length,1);assert.equal(h.entry._ntInputDraft,null);
+  // The 40-column fixture wraps this prompt over two physical rows.
+  await h.write('\r\x1b[2K\x1b[A\x1b[2KSECOND\r\nswitch# ');assert.equal(h.api.output(h.entry,h.api.current(h.entry)).text,'FIRST\nSECOND');
+  await h.api.copy(h.entry);assert.equal(h.clipboard,'FIRST\nSECOND');h.dispose();
+ }
+});
+test('manual multiline paste paging retains all output across ANSI redraw and scrollback trim',async()=>{
+ const h=harness(),pager='-- MORE --, next page: Space, next line: Enter, quit: q';await h.write('switch# ');h.api.notePaste(h.entry,'show one\rshow two\r');
+ const first=Array.from({length:500},(_,i)=>'FIRST '+i),second=Array.from({length:500},(_,i)=>'SECOND '+i);
+ await h.write('show one\r\n'+first.join('\r\n')+'\r\n'+pager);h.input(' ');
+ await h.write('\r\x1b[2K\x1b[A\x1b[2Kswitch# show two\r\n'+second.join('\r\n')+'\r\n'+pager);h.input('\r');
+ await h.write('\r\x1b[2K\x1b[A\x1b[2Kswitch# ');
+ const item=h.api.current(h.entry,'last-paste');assert.equal(h.entry._ntOutputHistory.length,1);assert.equal(item.start.isDisposed,true);assert.equal(h.api.output(h.entry,item).text,[...first,...second].join('\n'));
+ await h.api.select(h.entry);assert.equal(h.document.querySelector('#terminalSelectedOutput').value,[...first,...second].join('\n'));await h.api.copy(h.entry);assert.equal(h.clipboard,[...first,...second].join('\n'));h.dispose();
+});
+test('non-echoing command and paste do not lose their first output line',async()=>{
+ for(const pasted of [false,true]){
+  const h=harness();await h.write('switch# ');if(pasted)h.api.notePaste(h.entry,'show hidden-echo\r');else{h.input('show hidden-echo');h.input('\r');}
+  await h.write('\r\nFIRST WITHOUT ECHO\r\nLAST WITHOUT ECHO\r\nswitch# ');
+  // A no-echo paste has no command to strip; the original idle prompt is not output.
+  assert.equal(h.api.output(h.entry,h.api.current(h.entry)).text,'FIRST WITHOUT ECHO\nLAST WITHOUT ECHO');h.dispose();
+ }
+});
+test('ANSI redraw over the input row preserves output instead of treating the old marker as echo',async()=>{
+ const h=harness();await h.write('switch# ');h.input('show redraw');await h.write('show redraw');h.input('\r');
+ await h.write('\r\x1b[2KFIRST REDRAWN OUTPUT\r\nLAST OUTPUT\r\nswitch# ');
+ const item=h.api.current(h.entry);assert.equal(h.api.output(h.entry,item).text,'FIRST REDRAWN OUTPUT\nLAST OUTPUT');assert.equal(h.api.screenOutput(h.entry,item).text,'FIRST REDRAWN OUTPUT\nLAST OUTPUT');
+ await h.api.select(h.entry);assert.deepEqual(h.selection,{start:0,end:1});h.dispose();
+});
+test('no-echo paste output identical to a submitted command remains real output',async()=>{
+ const h=harness();await h.write('switch# ');h.api.notePaste(h.entry,'show version\r');await h.write('\r\nshow version\r\nRESULT\r\nswitch# ');
+ assert.equal(h.api.output(h.entry,h.api.current(h.entry)).text,'show version\nRESULT');h.dispose();
+});
+test('paste and delayed echo archives preserve the prompt cursor spacing',async()=>{
+ for(const paste of [true,false]){
+  const h=harness();await h.write('switch# ');if(paste)h.api.notePaste(h.entry,'show version\r');else{h.input('show version');h.input('\r');}
+  await h.write('show version\r\nRESULT\r\nswitch# ');const item=h.api.current(h.entry);
+  assert.equal(h.api.output(h.entry,item,true).text,'switch# show version\nRESULT');assert.equal(h.api.output(h.entry,item).text,'RESULT');h.dispose();
+ }
+});
+test('restored paused pagers keep manual continuation in the original output archive',async()=>{
+ const a=harness();await a.write('switch# ');a.input('show long');await a.write('show long');a.input('\r');await a.write('\r\nFIRST\r\n--More--');
+ const snapshot=JSON.parse(JSON.stringify(a.api.snapshot(a.entry))),b=harness();await b.write('switch# show long\r\nFIRST\r\n--More--');b.api.restore(b.entry,snapshot);await b.api.flush(b.entry);
+ assert.equal(b.api.pagerInput(b.entry,' '),true);b.input(' ');assert.equal(b.entry._ntInputDraft,null);assert.equal(b.api.current(b.entry).closed,false);
+ await b.write('\r\x1b[2KSECOND\r\nswitch# ');assert.equal(b.entry._ntOutputHistory.length,1);assert.equal(b.api.output(b.entry,b.api.current(b.entry)).text,'FIRST\nSECOND');a.dispose();b.dispose();
+});

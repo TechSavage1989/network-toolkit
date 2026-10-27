@@ -4,10 +4,12 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"syscall"
 	"testing"
 	"unsafe"
@@ -17,6 +19,16 @@ func TestWindowsCredentialDPAPIAndFilePermissions(t *testing.T) {
 	root := t.TempDir()
 	vault, err := newCredentialVault(root)
 	if err != nil {
+		t.Fatal(err)
+	}
+	if err := vault.setup(context.Background(), []byte(syntheticMasterPassword), false, nil); err != nil {
+		t.Fatal(err)
+	}
+	configID := strings.Repeat("a", 32)
+	if err := os.WriteFile(vault.configPath, []byte(`{"_credentialVaultConfigID":"`+configID+`"}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := vault.remember(configID, true); err != nil {
 		t.Fatal(err)
 	}
 	secret := "windows-native-synthetic-credential-canary"
@@ -40,6 +52,11 @@ func TestWindowsCredentialDPAPIAndFilePermissions(t *testing.T) {
 		t.Fatal("native DPAPI same-user reload failed")
 	}
 	assertPrivateCredentialDACL(t, vault.path)
+	assertPrivateCredentialDACL(t, vault.rememberPath)
+	raw, err = os.ReadFile(vault.rememberPath)
+	if err != nil {
+		t.Fatal(err)
+	}
 	raw[len(raw)-1] ^= 1
 	if _, err := unprotectCredentialBlob(raw); err == nil {
 		t.Fatal("tampered DPAPI blob decrypted")

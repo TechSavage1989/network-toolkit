@@ -6,7 +6,7 @@ function harness(){const records=new Map(),calls=[],state={},fields={},document=
  const root={state,document,URL,OFFLINE:false,console,esc:String,icon:()=>'',CustomEvent:class{constructor(type,options){this.type=type;this.detail=options?.detail;}},api:async(path,method,body)=>{
   calls.push({path,method,body:body&&JSON.parse(JSON.stringify(body))});
   if(path==='/credentials'&&method==='POST'){const id=body.id||'credential-'+(records.size+1),record={...records.get(id),...body,id};records.set(id,record);const {secret,...entry}=record;return {entry};}
-  if(path==='/credentials')return {entries:[...records.values()].map(({secret,...record})=>record)};
+  if(path==='/credentials')return {vault:{available:true,state:'unlocked'},entries:[...records.values()].map(({secret,...record})=>record)};
   if(path.endsWith('/bindings')&&method==='POST'){const item=records.get(path.split('/')[2]);item.bindings=[...(item.bindings||[]),body.binding];return {entry:item};}
   throw Error('Unexpected credential request '+path+' '+method);
  }};root.window=root;vm.runInNewContext(source.replace('root.NetworkToolkitCredentials=Object.freeze','root.__test={renderSecret,editorHTML,saveForm};root.NetworkToolkitCredentials=Object.freeze'),root);return {root,tool:root.NetworkToolkitCredentials,records,calls,state,fields};}
@@ -67,7 +67,7 @@ test('missing credentials and empty replacements fail before update submission',
  assert.equal(h.calls.filter(x=>x.method==='POST').length,0);
 });
 test('unexpected secret fields in metadata responses are discarded and editor never populates them',async()=>{
- const h=harness();h.root.api=async()=>({entries:[{id:'id',kind:'password',secret:'MUST-NOT-RENDER',password:'MUST-NOT-RENDER',privateKey:'MUST-NOT-RENDER'}]});await h.tool.refresh();
+ const h=harness();h.root.api=async()=>({vault:{available:true,state:'unlocked'},entries:[{id:'id',kind:'password',secret:'MUST-NOT-RENDER',password:'MUST-NOT-RENDER',privateKey:'MUST-NOT-RENDER'}]});await h.tool.refresh();
  assert(!JSON.stringify(h.tool.meta('id')).includes('MUST-NOT-RENDER'));
  const node={innerHTML:''};h.fields['#credentialSecretFields']=node;h.fields['#credentialKind']={value:'password'};h.root.__test.renderSecret({id:'id',kind:'password',secret:'MUST-NOT-RENDER'});
  assert(!node.innerHTML.includes('MUST-NOT-RENDER'));assert.match(node.innerHTML,/never displayed/);assert.doesNotMatch(node.innerHTML,/data-credential-action="reveal"/);
@@ -80,4 +80,46 @@ test('destination metadata and explicit approval preserve the approved server fi
  assert.equal((await h.tool.prepare({...endpoint,credentialId:entry.id})).credentialId,entry.id);
  h.records.set('legacy',{id:'legacy',kind:'password',username:'operator',bindings:[]});await h.tool.refresh();await h.tool.approveConnection({...binding,credentialId:'legacy'});
  assert.equal(h.calls.find(row=>row.path==='/credentials/legacy/bindings').body.binding.fingerprint,binding.fingerprint);
+});
+
+test('locked or uninitialized vault drops metadata and refuses saved credential use',async()=>{
+ for(const state of ['locked','legacy','setup-required','unavailable']){
+  const h=harness();h.root.api=async()=>({vault:{available:state!=='unavailable',state},entries:[{id:'id',name:'HIDDEN_WHILE_LOCKED',kind:'password',username:'operator',bindings:[endpoint]}]});
+  await h.tool.refresh();assert.equal(h.tool.meta('id'),null);assert(!h.tool.options().includes('HIDDEN_WHILE_LOCKED'));
+  await assert.rejects(()=>h.tool.prepare({...endpoint,credentialId:'id'}),/locked|Set up/);
+  await assert.rejects(()=>h.tool.saveConnection({...endpoint,password:'typed'}),/locked|Set up/);
+ }
+});
+test('native vault actions send only the action and clear editor secrets after successful lock',async()=>{
+ const h=harness();h.records.set('id',{id:'id',kind:'password',username:'operator',bindings:[endpoint]});await h.tool.refresh();
+ for(const id of ['credentialSecret','credentialPrivateKey','credentialPassphrase'])h.fields['#'+id]={value:'TRANSIENT_EDITOR_CANARY'};
+ h.root.api=async(path,method,body)=>{h.calls.push({path,method,body});return path==='/credential-vault'?{available:true,state:'locked',remembered:false}:{vault:{available:true,state:'locked'},entries:[]};};
+ await h.tool.vaultAction('lock');assert.equal(h.tool.meta('id'),null);assert.equal(h.tool.vaultStatus().state,'locked');
+ assert.deepEqual(JSON.parse(JSON.stringify(h.calls.find(x=>x.path==='/credential-vault').body)),{action:'lock'});
+ for(const id of ['credentialSecret','credentialPrivateKey','credentialPassphrase'])assert.equal(h.fields['#'+id].value,'');
+ assert(!JSON.stringify(h.calls).includes('TRANSIENT_EDITOR_CANARY'));
+});
+test('cancelled native vault operation preserves current editor input and unlocked metadata',async()=>{
+ const h=harness();h.records.set('id',{id:'id',kind:'password'});await h.tool.refresh();h.fields['#credentialSecret']={value:'keep-typed-input'};
+ const original=h.root.api;h.root.api=async(path,...args)=>{if(path==='/credential-vault')throw Error('Native vault dialog cancelled');return original(path,...args);};await assert.rejects(()=>h.tool.vaultAction('change-password'),/cancelled/);
+ assert.equal(h.fields['#credentialSecret'].value,'keep-typed-input');assert.equal(h.tool.meta('id').id,'id');assert.equal(h.tool.vaultStatus().state,'unlocked');
+});
+test('duplicate vault clicks share one native operation and stale metadata response cannot undo lock',async()=>{
+ const h=harness();let finishOld,finishAction,posts=0,gets=0;
+ h.root.api=async(path,method)=>{if(path==='/credential-vault'){posts++;await new Promise(resolve=>finishAction=resolve);return {available:true,state:'locked'};}if(++gets===1)return new Promise(resolve=>finishOld=resolve);return {vault:{available:true,state:'locked'},entries:[]};};
+ const old=h.tool.refresh(),one=h.tool.vaultAction('lock'),two=h.tool.vaultAction('lock');assert.equal(posts,1);finishAction();await Promise.all([one,two]);
+ finishOld({vault:{available:true,state:'unlocked'},entries:[{id:'stale',kind:'password'}]});await old;
+ assert.equal(h.tool.vaultStatus().state,'locked');assert.equal(h.tool.meta('stale'),null);
+});
+test('vault UI has no master-password or recovery input fields and unknown actions are rejected',async()=>{
+ const h=harness();await assert.rejects(()=>h.tool.vaultAction('arbitrary'),/Unknown/);assert.equal(h.calls.length,0);
+ assert.doesNotMatch(source,/id=["'](?:masterPassword|recoveryKey)|type=["']password[^\n]*master/i);
+ assert.match(source,/api\('\/credential-vault','POST',\{action\}\)/);
+ assert.match(source,/Resetting app configuration forgets automatic unlock but keeps encrypted vault files/);
+});
+test('partly completed lock failure still removes rendered secrets and stale metadata',async()=>{
+ const h=harness();h.records.set('id',{id:'id',kind:'password'});await h.tool.refresh();h.fields['#credentialSecret']={value:'MUST_CLEAR_AFTER_PARTIAL_LOCK'};
+ h.root.api=async(path)=>{if(path==='/credential-vault')throw Error('Remembered record removal failed');return {vault:{available:true,state:'locked',warning:'Future launch may still unlock'},entries:[]};};
+ await assert.rejects(()=>h.tool.vaultAction('lock'),/removal failed/);
+ assert.equal(h.fields['#credentialSecret'].value,'');assert.equal(h.tool.meta('id'),null);assert.equal(h.tool.vaultStatus().state,'locked');
 });

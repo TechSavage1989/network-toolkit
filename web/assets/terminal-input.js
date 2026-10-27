@@ -13,6 +13,7 @@ function setAnchor(entry,line,offset){
 }
 function noteInput(entry,data,origin='user'){
  if(origin==='edit'||origin==='pager')return;
+ if(root.NetworkToolkitTerminalExtras?.pagerInput?.(entry,data)){clear(entry);return;}
  if(!normal(entry)){clear(entry);return;}
  if(!data||!terminalEntryAcceptsInput(entry))return;
  if(/[\r\n\x03\x04\x1a]/.test(data)){clear(entry);return;}

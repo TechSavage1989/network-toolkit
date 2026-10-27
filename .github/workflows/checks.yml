@@ -39,7 +39,7 @@ jobs:
       - name: Test release publication guards
         run: python3 -m unittest discover -s scripts -p '*_test.py' -v
       - name: Test application and terminal lifecycle
-        run: go test -mod=vendor ./cmd/network-toolkit ./internal/terminal ./internal/desktop ./internal/diag ./internal/deviceinfo ./internal/platform ./internal/capture
+        run: go test -mod=vendor ./cmd/network-toolkit ./internal/terminal ./internal/desktop ./internal/vaultcrypto ./internal/diag ./internal/deviceinfo ./internal/platform ./internal/capture
       - name: Test JavaScript behavior
         run: node --test scripts/*.test.cjs
       - name: Embed Windows icon and version resources
@@ -137,12 +137,24 @@ jobs:
       - name: Test native credential protection and capability isolation
         env:
           GOTOOLCHAIN: local
-        run: go test -mod=vendor ./cmd/network-toolkit -run 'TestWindowsCredential|TestCredential|TestPublicBootstrap|TestTerminalActivationRecord|TestEmbeddedUI|TestTerminalWindow|TestTerminalView' -count=1 -v
+        run: go test -mod=vendor ./cmd/network-toolkit -run 'TestWindowsCredential|TestCredential|TestVaultV2|TestPublicBootstrap|TestTerminalActivationRecord|TestEmbeddedUI|TestTerminalWindow|TestTerminalView' -count=1 -v
+      - name: Test authenticated vault envelopes on Windows
+        env:
+          GOTOOLCHAIN: local
+        run: go test -mod=vendor ./internal/vaultcrypto -count=1 -v
       - name: Verify real WebView2 private bootstrap
         env:
           GOTOOLCHAIN: local
           NETWORK_TOOLKIT_NATIVE_SECURITY_TEST: '1'
-        run: go test -mod=vendor ./internal/desktop -run 'TestNativeBootstrap|TestCredentialConfirmation' -count=1 -v
+          TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/network-toolkit-native-dialogs
+        run: go test -mod=vendor ./internal/desktop -run 'TestNativeBootstrap|TestCredentialConfirmation|TestVaultDialog' -count=1 -v
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: native-vault-dialog-checks
+          path: ${{ runner.temp }}/network-toolkit-native-dialogs
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Test visible Windows installer progress
         env:
           GOTOOLCHAIN: local
@@ -352,6 +364,11 @@ jobs:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-security-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-security-browser-results
         run: node scripts/credential-security.browser.cjs
+      - name: Check terminal paging and full command/paste output
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-security-browser-tests/node_modules/playwright
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-security-browser-results
+        run: node scripts/terminal-pager.browser.cjs
       - uses: actions/upload-artifact@v7
         if: always()
         with:

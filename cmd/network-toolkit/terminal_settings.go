@@ -154,10 +154,10 @@ func safeTerminalInteraction(value any) map[string]any {
 		"copyOnClick":          true,
 		"pasteReview":          true,
 		"pasteIncludeCommands": false,
-		"autoPager":            false,
+		"autoPager":            true,
 		"pagerKey":             "auto",
 		"rightClick":           "paste",
-		"ctrlC":                "send",
+		"ctrlC":                "copy-selection",
 		"menuItems":            []string{"copy", "copy-line", "copy-token", "paste", "scroll-top", "scroll-bottom", "paste-start", "copy-paste-output", "select-all", "search", "export", "zoom-in", "zoom-out", "control-c", "move"},
 	}
 	source, ok := value.(map[string]any)
@@ -172,8 +172,8 @@ func safeTerminalInteraction(value any) map[string]any {
 	if source["rightClick"] == "menu" {
 		clean["rightClick"] = "menu"
 	}
-	if source["ctrlC"] == "copy-selection" {
-		clean["ctrlC"] = "copy-selection"
+	if source["ctrlC"] == "send" {
+		clean["ctrlC"] = "send"
 	}
 	if key, ok := source["pagerKey"].(string); ok && (key == "auto" || key == "space" || key == "enter") {
 		clean["pagerKey"] = key

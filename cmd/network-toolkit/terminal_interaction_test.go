@@ -19,7 +19,7 @@ func TestTerminalInteractionPersistenceAndWindowTransfer(t *testing.T) {
 	}
 	want := map[string]any{
 		"copyOnSelect": false, "copyOnClick": false, "rightClick": "menu", "ctrlC": "copy-selection",
-		"pasteReview": true, "pasteIncludeCommands": false, "autoPager": false, "pagerKey": "auto",
+		"pasteReview": true, "pasteIncludeCommands": false, "autoPager": true, "pagerKey": "auto",
 		"menuItems": []any{"copy-line", "copy-token", "paste"},
 	}
 	check := func(label string, data []byte) {
@@ -80,10 +80,51 @@ func TestTerminalInteractionInvalidImportUsesDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 	prefs := state["terminalInteraction"].(map[string]any)
-	if prefs["copyOnSelect"] != true || prefs["copyOnClick"] != true || prefs["rightClick"] != "paste" || prefs["ctrlC"] != "send" || prefs["pasteReview"] != true || prefs["pasteIncludeCommands"] != false || prefs["autoPager"] != false || prefs["pagerKey"] != "auto" || len(prefs["menuItems"].([]any)) != 15 {
+	if prefs["copyOnSelect"] != true || prefs["copyOnClick"] != true || prefs["rightClick"] != "paste" || prefs["ctrlC"] != "copy-selection" || prefs["pasteReview"] != true || prefs["pasteIncludeCommands"] != false || prefs["autoPager"] != true || prefs["pagerKey"] != "auto" || len(prefs["menuItems"].([]any)) != 15 {
 		t.Fatalf("invalid import changed default terminal behavior: %#v", prefs)
 	}
 	if strings.Contains(response.Body.String(), "secret-canary") || strings.Contains(response.Body.String(), "run-command") {
 		t.Fatal("invalid preference payload survived normalization")
+	}
+}
+
+func TestTerminalInteractionDefaultsPreserveExplicitChoices(t *testing.T) {
+	for _, value := range []any{nil, map[string]any{}, map[string]any{"autoPager": "false", "ctrlC": "invalid"}} {
+		prefs := safeTerminalInteraction(value)
+		if prefs["autoPager"] != true || prefs["ctrlC"] != "copy-selection" || prefs["copyOnSelect"] != true || prefs["copyOnClick"] != true || prefs["pasteReview"] != true || prefs["rightClick"] != "paste" || prefs["pagerKey"] != "auto" {
+			t.Fatalf("new/unset preferences do not match requested defaults: %#v", prefs)
+		}
+	}
+	saved := map[string]any{"copyOnSelect": false, "copyOnClick": false, "pasteReview": false, "autoPager": false, "ctrlC": "send", "rightClick": "menu", "pagerKey": "enter"}
+	prefs := safeTerminalInteraction(saved)
+	for key, want := range saved {
+		if prefs[key] != want {
+			t.Fatalf("explicit saved preference %s changed: got %#v want %#v", key, prefs[key], want)
+		}
+	}
+	if again := safeTerminalInteraction(prefs); !reflect.DeepEqual(again, prefs) {
+		t.Fatalf("repeated normalization changed explicit saved choices: %#v", again)
+	}
+	// Removing the overrides (the normalization/reset path) restores defaults.
+	defaults := safeTerminalInteraction(map[string]any{})
+	if defaults["autoPager"] != true || defaults["ctrlC"] != "copy-selection" {
+		t.Fatalf("empty preferences did not restore defaults: %#v", defaults)
+	}
+}
+
+func TestTerminalInteractionExplicitPagerOffAndSendCtrlCSurviveStateRoundTrip(t *testing.T) {
+	a := testApplication(t)
+	body := `{"terminalInteraction":{"autoPager":false,"ctrlC":"send","pasteReview":false,"rightClick":"menu","pagerKey":"enter"}}`
+	if response := requestApp(a, http.MethodPut, "/api/state", body, true); response.Code != http.StatusOK {
+		t.Fatalf("save explicit choices: %d %s", response.Code, response.Body.String())
+	}
+	response := requestApp(a, http.MethodGet, "/api/state", "", true)
+	var state map[string]any
+	if err := json.Unmarshal(response.Body.Bytes(), &state); err != nil {
+		t.Fatal(err)
+	}
+	prefs := state["terminalInteraction"].(map[string]any)
+	if prefs["autoPager"] != false || prefs["ctrlC"] != "send" || prefs["pasteReview"] != false || prefs["rightClick"] != "menu" || prefs["pagerKey"] != "enter" {
+		t.Fatalf("round trip overwrote explicit choices: %#v", prefs)
 	}
 }

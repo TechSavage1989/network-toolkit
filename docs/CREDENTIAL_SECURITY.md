@@ -42,39 +42,91 @@ these protections, nor a high-assurance certification.
 - Vault size/quota rejection rolls back; authenticated FTP rejection text is not
   echoed because a server could include the submitted password in its reply.
 
-## Important remaining limits and pending choices
+## Master-password vault and remembered unlock
 
-The current branch still uses the existing per-user DPAPI vault format and
-unlocks it automatically at startup. A true master-password/protected-key vault,
-offline recovery and automatic locking require the user's pending decisions.
-Do not describe this checkpoint as implementing them.
+The v2 implementation uses AES-256-GCM with a fresh random 256-bit vault key.
+Argon2id (64 MiB, three iterations, one lane, random 16-byte salt) derives the
+password wrapping key. All entries, names, usernames, destination bindings and
+saved secret fields are encrypted together. Only format/KDF/cryptographic framing
+metadata is outside encryption, authenticated against modification. Passwords
+are exact UTF-8 without trimming or normalization: new passwords need at least
+12 Unicode characters and at most 1024 UTF-8 bytes. Expensive KDF parameters,
+message sizes and concurrent KDF work are bounded before derivation.
+
+The user explicitly chose remembered unlock across application restarts and
+Windows reboots after the security tradeoff was explained. The default native
+Remember option saves a CurrentUser DPAPI-protected random vault key, never the
+master password. It is bound to vault identity/generation and a backend-owned
+configuration identity. **Software running as the same Windows account can
+access remembered unlock.** A master password does not prevent that while a
+usable remembered record exists. Unchecking Remember gives session-only unlock.
+No automatic idle/workstation-lock prompt is enabled. Manual Lock and forget
+clears current key access, removes remembrance and invalidates other instances
+on their next credential use/status check. It preserves established authenticated
+connections but blocks new saved-credential uses and reconnects.
+
+Master passwords and optional recovery keys are entered in native Windows
+controls, not web inputs or HTTP request bodies. Setup/rotation can offer a fresh
+random offline recovery key, displayed only in the native dialog and requiring
+full re-entry plus acknowledgment before activation. It is an alternate unlock
+secret: store it separately and securely. There is no vendor recovery. Losing all
+usable passwords/recovery keys and remembered unlock means losing vault access.
+Changing password or recovering rotates the key and identity; old password,
+recovery and remembered records no longer unlock the new vault. This does not
+make old copied vault versions unreadable to their old keys.
+
+## Storage, migration and reset
+
+Files are under the selected application-data directory, alongside app settings:
+
+- `Network_Toolkit.credentials.v2.vault`: authenticated master-password envelope.
+- `Network_Toolkit.credentials.remember`: optional DPAPI-protected remembered key.
+- `Network_Toolkit.credentials.vault`: retained legacy DPAPI-only vault, if any.
+
+A persistent private lock file serializes credential transactions across app
+instances. Expected-file checks reject stale updates rather than overwriting a
+newer vault. The ordinary settings save cannot supply or restore the backend-owned
+configuration identity from renderer JSON.
+
+An existing legacy vault is **not automatically opened or migrated**. Explicit
+native setup reads it, validates the new encrypted candidate with the entered
+password and optional recovery key, writes/readbacks a protected temporary file,
+and atomically activates the new version. Cancellation/failure before activation
+keeps the existing copy unchanged. A corrupt v2 file never silently falls back
+to v1. The old DPAPI copy remains a weaker-protected backup until the user invokes
+separate native-confirmed cleanup after verifying migration and recovery.
+
+Configuration reset/deletion forgets remembered unlock but retains encrypted
+vaults. Moving/copying app data does not copy remembered unlock. Deleting one
+credential or connection never deletes the entire vault. Deleting the current
+master-password vault is a separate native default-No confirmation; any retained
+legacy copy stays setup-only, never silently reactivated. Backup copies may
+retain old credentials or unlock keys; manage them separately. File deletion is
+not guaranteed secure erasure of disk blocks, SSD remnants or external backups.
+
+## Important limits
 
 The browser still holds the full app capability and can use legitimate local
-cmd/PowerShell tools. Therefore a fully compromised renderer can reach same-user
-native execution. This work removes unnecessary saved-secret exposure and stops
-unauthenticated local token harvesting; it does not establish a strong isolation
-boundary against a compromised renderer, same-user malware, administrator or OS.
+cmd/PowerShell tools. A fully compromised renderer can reach same-user native
+execution. This removes unnecessary secret exposure and unauthenticated local
+token harvesting; it is not a strong isolation boundary against a compromised
+renderer, same-user malware, administrator, kernel or operating system.
+Native confirmation is not a substitute for cryptographic authentication.
 
-New manually entered credentials still pass transiently through web input fields.
-Manual SSH input caches clear after successful authentication; manual FTPS still
-needs its transient password for stateless operations.
-Native secret entry is a separate planned improvement. Ordinary memory copies,
-OS paging and crash dumps are not guaranteed securely erased. An established
-remote connection remains authorized even if its saved credential is deleted.
+New manually entered connection credentials still pass transiently through web
+input fields. Only vault master/recovery secrets use native entry. Manual SSH
+input caches clear after successful authentication; manual FTPS still needs its
+transient password for stateless operations. Ordinary memory copies, paging and
+crash dumps are not guaranteed securely erased. Established remote connections
+remain authorized when a credential is locked/deleted; revoke remote credentials
+on the server when necessary. Terminal transcripts/exports can contain secrets
+printed by remote programs. No automatic transcript redaction can identify every
+possible secret. This is not an independent security audit or certification.
 
-Deleting a record does not revoke remote credentials or erase old backups/disk
-blocks. Legacy DPAPI-only copies retain their original protection. No irreversible
-cleanup or credential rotation is automatic. Terminal transcript export captures
-screen/scrollback and can contain secrets printed by remote programs.
-
-## Pending cryptographic/locking design
-
-Before implementation, choose a real master-password-derived or supported
-protected-key unlock mechanism, a recovery policy, and whether locking disconnects
-existing credential-backed sessions. A Hello/PIN consent dialog followed by ordinary
-DPAPI decryption is not a cryptographic lock. Migration must be versioned and
-transactional, explicitly initiated, verified before activation, and never silently
-fall back to weaker old data. Recovery/backup retention and cleanup are explicit.
+Whole-directory rollback is not cryptographically prevented: restoring an old
+vault, old settings identity and its remembered record can restore the old state.
+Cryptographic authentication detects tampering, not every replay of a valid old
+backup. Remote credential rotation and sensible backup retention remain necessary.
 
 ## Required verification
 

@@ -26,6 +26,7 @@ var storagePortableFiles = []struct {
 	{"Network_Toolkit.settings.json", 2 << 20},
 	{terminalMacroLibraryFilename, terminalMacroLibraryLimit},
 	{credentialVaultFilename, 2 << 20},
+	{credentialVaultV2Filename, 4 << 20},
 	{"Network_Toolkit.ssh_known_hosts.json", 4 << 20},
 	{"Network_Toolkit.vendors.json.gz", 24 << 20},
 	{"Network_Toolkit.window.json", 64 << 10},
@@ -207,7 +208,16 @@ func copyStorageData(source, destination *storageRoot) ([]string, func(), error)
 			return nil, nil, err
 		}
 		name := filepath.Base(item.path)
-		file, err := openStorageRegular(parent, name, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+		var file *os.File
+		if isCredentialVaultStorage(name) {
+			var path string
+			path, err = parent.checkedPath(name, true)
+			if err == nil {
+				file, err = createSecureCredentialFileAt(path)
+			}
+		} else {
+			file, err = openStorageRegular(parent, name, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+		}
 		if err != nil {
 			closeParent()
 			rollback()
@@ -390,7 +400,17 @@ func replaceStorageCopy(parent *storageRoot, name string, raw []byte, expected [
 		return err
 	}
 	temporary := ".network-toolkit-copy-" + hex.EncodeToString(random[:]) + ".tmp"
-	file, err := parent.OpenFile(temporary, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	var file *os.File
+	var err error
+	if isCredentialVaultStorage(name) {
+		var path string
+		path, err = parent.checkedPath(temporary, true)
+		if err == nil {
+			file, err = createSecureCredentialFileAt(path)
+		}
+	} else {
+		file, err = parent.OpenFile(temporary, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	}
 	if err != nil {
 		return err
 	}
@@ -460,7 +480,7 @@ func inspectStorageCopyDestination(destination *storageRoot) error {
 				return err
 			}
 		}
-		names := []string{storageBrowserDirectory, storageViewsDirectory, "Network_Toolkit.instance.json"}
+		names := []string{storageBrowserDirectory, storageViewsDirectory, "Network_Toolkit.instance.json", credentialRememberFilename}
 		for _, allowed := range storagePortableFiles {
 			names = append(names, allowed.name)
 		}
@@ -528,9 +548,14 @@ func walkStorageData(root *storageRoot, options storageWalkOptions, budget *int)
 }
 
 func walkStorageWorkspace(root *storageRoot, options storageWalkOptions, budget *int) error {
-	names := []string{"Network_Toolkit.instance.json"}
+	// Deleting app configuration invalidates remembered unlock, not the vault.
+	// Both current encrypted data and retained legacy copies require separate
+	// explicit native vault actions. Remembered keys are never copied.
+	names := []string{"Network_Toolkit.instance.json", credentialRememberFilename}
 	for _, allowed := range storagePortableFiles {
-		names = append(names, allowed.name)
+		if !isCredentialVaultStorage(allowed.name) {
+			names = append(names, allowed.name)
+		}
 	}
 	for _, name := range names {
 		info, err := root.Lstat(name)
@@ -705,4 +730,8 @@ func removeStorageEmptyDirectory(parent *storageRoot, name string) error {
 		return nil
 	}
 	return parent.Remove(name)
+}
+
+func isCredentialVaultStorage(name string) bool {
+	return name == credentialVaultFilename || name == credentialVaultV2Filename
 }

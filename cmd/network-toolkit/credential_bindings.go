@@ -226,6 +226,9 @@ func (a *application) resolveCredential(ctx context.Context, id string, binding 
 	if a.credentials == nil {
 		return credentialRecord{}, errors.New("The protected credential vault is unavailable.")
 	}
+	if err := a.credentials.requireUnlocked(); err != nil {
+		return credentialRecord{}, err
+	}
 	if id == "" || strings.TrimSpace(id) != id || len(id) > 120 || strings.ContainsAny(id, "/\\\x00") {
 		return credentialRecord{}, errors.New("Saved credential ID is invalid.")
 	}

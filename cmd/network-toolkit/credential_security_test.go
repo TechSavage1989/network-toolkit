@@ -19,9 +19,11 @@ import (
 	"networktoolkit/internal/terminal"
 )
 
+const syntheticMasterPassword = "synthetic master password only"
+
 // Explicit encrypted test provider, scoped to one synthetic vault. Production
 // constructors cannot select it, and no development flag enables it.
-func syntheticCredentialVault(t *testing.T, root string) *credentialVault {
+func syntheticUnconfiguredCredentialVault(t *testing.T, root string) *credentialVault {
 	t.Helper()
 	key := make([]byte, 32)
 	if _, err := rand.Read(key); err != nil {
@@ -54,9 +56,20 @@ func syntheticCredentialVault(t *testing.T, root string) *credentialVault {
 	}
 	return vault
 }
+func syntheticCredentialVault(t *testing.T, root string) *credentialVault {
+	t.Helper()
+	vault := syntheticUnconfiguredCredentialVault(t, root)
+	if err := vault.setup(context.Background(), []byte(syntheticMasterPassword), false, nil); err != nil {
+		t.Fatal(err)
+	}
+	bindFixtureVault(t, vault)
+	return vault
+}
 func credentialTestApplication(t *testing.T) *application {
 	a := testApplication(t)
 	a.credentials = syntheticCredentialVault(t, filepath.Dir(a.dataPath))
+	a.credentials.configPath = a.dataPath
+	bindFixtureVault(t, a.credentials)
 	a.inspectCredentialDestination = func(context.Context, credentialBinding) (string, error) {
 		return "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA", nil
 	}
@@ -107,6 +120,10 @@ func TestCredentialStorageContainsNoPlaintextAndDetectsTamper(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if err := loaded.unlock(context.Background(), []byte(syntheticMasterPassword)); err != nil {
+		t.Fatal(err)
+	}
+	bindFixtureVault(t, loaded)
 	if record, ok := loaded.get(item.ID); !ok || record.Secret != "fixture-only-private-secret" {
 		t.Fatal("synthetic encrypted round trip failed")
 	}
@@ -280,24 +297,24 @@ func TestCredentialFTPSWithoutApprovedPinUsesSystemTrust(t *testing.T) {
 
 func TestCredentialOversizeSaveRollsBackBeforeDiskWrite(t *testing.T) {
 	a := credentialTestApplication(t)
-	item := fixtureCredential(t, a)
+	for i := 0; i < 7; i++ {
+		if _, err := a.credentials.put(credentialRecord{Name: "Large fixture", Kind: "password", Secret: strings.Repeat("x", maxCredentialSecretBytes)}); err != nil {
+			t.Fatal(err)
+		}
+	}
 	before, err := os.ReadFile(a.credentials.path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	original := a.credentials.protect
-	a.credentials.protect = func([]byte) ([]byte, error) { return make([]byte, (2<<20)+1), nil }
-	_, err = a.credentials.put(credentialRecord{ID: item.ID, Name: item.Name, Kind: "password", Secret: "replacement"})
-	a.credentials.protect = original
+	_, err = a.credentials.put(credentialRecord{Name: "Over payload limit", Kind: "password", Secret: strings.Repeat("x", maxCredentialSecretBytes)})
 	if err == nil {
-		t.Fatal("oversized encrypted vault was accepted")
+		t.Fatal("oversized vault accepted")
 	}
 	after, err := os.ReadFile(a.credentials.path)
 	if err != nil || !bytes.Equal(before, after) {
-		t.Fatal("oversized save changed disk")
+		t.Fatal("oversize save changed disk")
 	}
-	record, _ := a.credentials.get(item.ID)
-	if record.Secret != "fixture-only-private-secret" {
-		t.Fatal("oversized save changed memory")
+	if len(a.credentials.list()) != 7 {
+		t.Fatal("oversize save changed memory")
 	}
 }

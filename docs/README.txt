@@ -1,11 +1,27 @@
-NETWORK TOOLKIT 1.17.103
+NETWORK TOOLKIT 1.17.104
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.103
+CURRENT RELEASE - 1.17.104
 
-Release details: RELEASE_NOTES_1.17.103.txt
-Previous release: docs/releases/RELEASE_NOTES_1.17.102.txt
+Release details: RELEASE_NOTES_1.17.104.txt
+Previous release: docs/releases/RELEASE_NOTES_1.17.103.txt
 Full release-note archive: docs/releases/README.md
+
+Set up the master-password credential vault explicitly in the native Windows dialog.
+Remembered unlock is on by default and survives app restarts and Windows reboots
+using a CurrentUser DPAPI-protected random unlock key, not a saved password.
+Same-user software can access remembered unlock. Optional offline recovery must
+be stored separately. Configuration reset forgets unlock, not encrypted vaults;
+Lock and forget preserves established connections but blocks new credential use.
+Legacy DPAPI copies remain until separately confirmed cleanup. Read
+docs/CREDENTIAL_SECURITY.md for migration, backup and security limits.
+
+Automatic terminal paging and Ctrl+C copy-selection are defaults only for new or
+unset settings; existing explicit choices remain. Full paged output belongs to
+its originating command/paste. See docs/TERMINAL_PAGING.md.
+The supplied Toolkit SVG is the canonical source for current and future icons.
+Condensed All-mode newest spacing is calibrated to Linear 30 seconds and remains
+fixed as older history accumulates; explicit time ranges still control geometry.
 
 Condensed RTT uses a fixed recent-time scale from startup and one accumulating
 left history cluster. Sparse startup leaves empty past space; no Fit warm-up
