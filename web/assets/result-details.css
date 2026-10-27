@@ -70,7 +70,7 @@ tr.result-entry-selected{background:var(--accentBg);box-shadow:inset 3px 0 var(-
 #toolResult:has(.result-graph-entry)>.graph-run-panel>.result-heading .job-select{min-width:80px;flex:1 1 160px;max-width:210px}
 #toolResult:has(.result-graph-entry)>.graph-run-panel>.result-heading .result-title{flex-wrap:wrap;gap:6px}
 #toolResult:has(.result-graph-entry)>.graph-run-panel>.result-heading h2{overflow-wrap:normal}
-@media(max-height:720px){
+@media(max-height:720px),(max-width:600px){
  #toolResult:has(.result-graph-entry)>.graph-run-panel>.result-heading{flex-direction:column;align-items:stretch;gap:3px;padding:5px 8px}
  #toolResult:has(.result-graph-entry)>.graph-run-panel>.result-heading>.grow,#toolResult:has(.result-graph-entry)>.graph-run-panel>.result-heading>.row{flex:0 0 auto}
  #toolResult:has(.result-graph-entry)>.graph-run-panel>.result-heading .result-title{gap:4px}

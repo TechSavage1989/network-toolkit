@@ -192,7 +192,7 @@ async function geometry(kind,label){
  // Results choice. Activate Results before measuring the requested results UI.
  if(!packet){const results=page.locator('#toolResultsTab');if(await results.isVisible()&&await results.getAttribute('aria-selected')!=='true')await results.click();}
  await settle();await area.waitFor({state:'visible'});await page.evaluate(()=>window.scrollTo(0,0));await settle();
- await scroller.evaluate(el=>{el.scrollTop=0;});await settle();if(packet)await page.waitForFunction(()=>document.querySelector('#packetRows [data-packet-index="0"]'));
+ if(packet){await page.locator('[data-packet-action="scroll-first"]').click();await packetReady();await page.waitForFunction(()=>NetworkToolkitPacketCapture.model.windowStart===0&&document.querySelector('#packetRows [data-packet-index="0"]')&&document.querySelector('#packetTableScroll').scrollTop<1);}else await scroller.evaluate(el=>{el.scrollTop=0;});await settle();
  const frame=await assertNoPageOverflow(label);
  const value=await area.evaluate((area,packet)=>{
   const rect=el=>{if(!el)return null;const b=el.getBoundingClientRect();return {left:b.left,right:b.right,top:b.top,bottom:b.bottom,width:b.width,height:b.height};};
