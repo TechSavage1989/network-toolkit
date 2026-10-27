@@ -18,7 +18,7 @@ test('standalone SFTP authenticates once and sends only its connection ID for la
  assert.equal(h.resolves(),1);assert(!JSON.stringify(h.state).includes('vault-password'));
 });
 test('Disconnect closes the owned SSH connection once; Reconnect explicitly authenticates a new connection',async()=>{
- const h=harness();await h.browser.connect('ssh');await h.browser.disconnect('ssh');
+ const h=harness();h.browser.configurations.ssh.credentialId='vault-id';h.browser.configurations.ssh.password='';await h.browser.connect('ssh');await h.browser.disconnect('ssh');
  assert.equal(h.calls.filter(x=>x.body?.action==='disconnect').length,1);assert.equal(h.browser.get('ssh').connected,false);
  await h.browser.reconnect('ssh');assert.equal(h.browser.get('ssh').connectionId,'connection-2');assert.equal(h.calls.filter(x=>x.body?.action==='connect').length,2);
 });
@@ -64,4 +64,25 @@ test('selecting another Terminal directly also clears the old remote folder',asy
 });
 test('first Open SFTP does not restore a saved folder from an unrelated server',()=>{
  const h=harness(),m=h.browser.get('ssh');m.saved=false;h.state.remoteBrowserSettings={ssh:{host:'previous.test',remotePath:'/previous-server-only'}};h.browser.useTerminalSession('chosen-terminal');assert.equal(m.remote.path,'');assert.equal(m.autoTerminal,'chosen-terminal');
+});
+
+test('successful manual SSH authentication clears password, private key and passphrase but not failed retries',async()=>{
+ const h=harness(),c=h.browser.configurations.ssh;Object.assign(c,{privateKey:'temporary-private-key',passphrase:'temporary-passphrase'});
+ const original=h.root.api;h.root.api=async(path,method,body)=>{if(body?.action==='connect')throw Error('Synthetic authentication rejected');return original(path,method,body);};
+ await h.browser.connect('ssh');assert.equal(c.password,'temporary-password');assert.equal(c.privateKey,'temporary-private-key');assert.equal(c.passphrase,'temporary-passphrase');
+ h.root.api=original;await h.browser.connect('ssh');assert.equal(h.browser.get('ssh').connected,true);
+ for(const field of ['password','privateKey','passphrase'])assert.equal(c[field],'');
+ const count=h.calls.filter(row=>row.body?.action==='connect').length;await h.browser.reconnect('ssh');
+ assert.equal(h.calls.filter(row=>row.body?.action==='connect').length,count);assert.equal(h.browser.get('ssh').showSettings,true);assert.equal(h.browser.get('ssh').connected,true);
+});
+test('manual FTPS password remains transiently available for per-operation authentication',async()=>{
+ const h=harness(),c=h.browser.configurations.ftp;h.browser.get('ftp').saved=true;Object.assign(c,{host:'files.test',port:21,username:'operator',password:'manual-ftps-password',security:'explicit'});
+ await h.browser.connect('ftp');assert.equal(h.browser.get('ftp').connected,true);assert.equal(c.password,'manual-ftps-password');
+ await h.browser.request('ftp','list',{path:'/'});assert.equal(h.calls.at(-1).body.password,'manual-ftps-password');assert(!JSON.stringify(h.state).includes('manual-ftps-password'));
+});
+test('late SSH success does not erase a newly entered unrelated draft secret',async()=>{
+ const h=harness();let finish;h.root.api=async(path,method,body)=>body?.action==='connect'?new Promise(resolve=>finish=resolve):{};
+ const pending=h.browser.connect('ssh');while(!finish)await new Promise(resolve=>setImmediate(resolve));
+ h.browser.configurations.ssh.password='new-draft-not-used-in-authentication';finish({connectionId:'authenticated',path:'/',entries:[]});await pending;
+ assert.equal(h.browser.configurations.ssh.password,'new-draft-not-used-in-authentication');
 });

@@ -30,8 +30,10 @@ these protections, nor a high-assurance certification.
   remains possible without caching its original key material.
 - Non-Windows builds fail closed for the credential vault. Synthetic tests inject
   an isolated encrypted provider; there is no runtime plaintext fallback switch.
-- New encrypted vault files receive a protected Windows DACL for the current user,
-  SYSTEM and Administrators before writing. File/link and size checks reject
+- New encrypted vault files are created with a protected Windows DACL for the
+  current user, SYSTEM and Administrators, using an exclusive, non-inheritable
+  handle. Creation never opens an existing file or changes its permissions.
+  File/link and size checks reject
   unsafe or unreadable storage instead of silently downgrading protection.
 - Vault size/quota rejection rolls back; authenticated FTP rejection text is not
   echoed because a server could include the submitted password in its reply.
@@ -50,6 +52,8 @@ unauthenticated local token harvesting; it does not establish a strong isolation
 boundary against a compromised renderer, same-user malware, administrator or OS.
 
 New manually entered credentials still pass transiently through web input fields.
+Manual SSH input caches clear after successful authentication; manual FTPS still
+needs its transient password for stateless operations.
 Native secret entry is a separate planned improvement. Ordinary memory copies,
 OS paging and crash dumps are not guaranteed securely erased. An established
 remote connection remains authorized even if its saved credential is deleted.

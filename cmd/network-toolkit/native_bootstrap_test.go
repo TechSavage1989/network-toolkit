@@ -50,6 +50,7 @@ func TestTerminalActivationRecordIsNotGeneralAPICapability(t *testing.T) {
 	}
 	activate := func(origin string) int {
 		r := httptest.NewRequest(http.MethodPost, "http://"+a.host+"/api/terminal-window", strings.NewReader(`{}`))
+		r.Header.Set("Content-Type", "application/json")
 		r.Header.Set("X-Window-Activation-Token", record.Token)
 		if origin != "" {
 			r.Header.Set("Origin", origin)

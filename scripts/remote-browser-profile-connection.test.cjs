@@ -110,3 +110,9 @@ test('new SFTP connection defaults to modern SSH algorithm compatibility',async(
  const sent=h.events.find(x=>x.path==='/remote-browser'&&x.body?.action==='connect').body;
  assert.equal(sent.sshCompatibility,'modern');
 });
+
+test('successful manual saved-profile SSH sign-in clears secrets and reconnect opens a fresh sign-in form',async()=>{
+ const h=harness({profile:saved('manual',{credentialId:''})}),m=h.browser.get('ssh'),c=h.browser.configurations.ssh;await h.browser.loadProfile('ssh','manual');
+ c.password='one-use-password';m.profileManualAuth=true;await h.browser.useSavedSSHProfile('manual');assert.equal(m.connected,true);assert.equal(c.password,'');
+ await h.browser.reconnect('ssh');assert.equal(m.connected,false);assert.equal(h.events.filter(row=>row.body?.action==='connect').length,1);assert.match(h.dialogs.at(-1).body,/id="rbSSHProfilePassword"/);
+});

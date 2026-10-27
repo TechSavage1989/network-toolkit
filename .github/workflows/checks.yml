@@ -34,6 +34,14 @@ jobs:
       - uses: actions/setup-python@v7
         with:
           python-version: '3.13'
+      - name: Record Go formatting review
+        run: |
+          git ls-files -z 'cmd/**/*.go' 'internal/**/*.go' | xargs -0 gofmt -d > "$RUNNER_TEMP/network-toolkit-gofmt.patch"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: go-format-review
+          path: ${{ runner.temp }}/network-toolkit-gofmt.patch
+          retention-days: 7
       - name: Validate current release metadata
         run: python3 scripts/github_release.py validate
       - name: Test release publication guards

@@ -63,7 +63,7 @@ async function until(predicate,label){const deadline=Date.now()+10000;while(!pre
  const posts=path=>calls.filter(row=>row.path===path&&row.method==='POST');
  const assertNoSecretsInDOM=async()=>{const snapshot=await page.evaluate(()=>({html:document.documentElement.outerHTML,values:[...document.querySelectorAll('input,textarea')].map(el=>el.value)}));for(const value of canaries)assert(!JSON.stringify(snapshot).includes(value),'Secret canary exposed in rendered DOM');};
  const submit=async()=>{await page.locator('#credentialManagerForm button[type="submit"]').click();};
- const waitEditorCleared=async()=>{await page.waitForFunction(()=>document.querySelector('#credentialID')?.value==='');};
+ const waitEditorCleared=async()=>{await page.waitForFunction(()=>document.querySelector('#credentialID')?.value===''&&document.querySelector('#credentialName')?.value===''&&document.querySelector('#credentialSecret')?.value==='');};
  try{
   if(output)fs.mkdirSync(output,{recursive:true});
   await page.goto('http://toolkit.local/');await page.waitForFunction(()=>window.__networkToolkitStartupState===1&&online);

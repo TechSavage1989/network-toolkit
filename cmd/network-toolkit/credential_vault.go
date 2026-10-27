@@ -175,15 +175,13 @@ func (v *credentialVault) saveLocked() error {
 	if err := os.MkdirAll(filepath.Dir(v.path), 0700); err != nil {
 		return err
 	}
-	file, err := os.CreateTemp(filepath.Dir(v.path), ".network-toolkit-credential-*")
+	file, err := createSecureCredentialTempFile(filepath.Dir(v.path))
 	if err != nil {
 		return err
 	}
 	temp := file.Name()
 	defer os.Remove(temp)
-	if err = secureCredentialTempFile(file); err == nil {
-		_, err = file.Write(encrypted)
-	}
+	_, err = file.Write(encrypted)
 	if err == nil {
 		err = file.Sync()
 	}
