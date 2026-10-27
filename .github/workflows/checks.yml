@@ -98,7 +98,13 @@ jobs:
       - name: Install isolated browser test tools
         run: |
           npm install --prefix "$RUNNER_TEMP/ntk-browser-tests" --no-audit --no-fund playwright@1.62.1
-          node "$RUNNER_TEMP/ntk-browser-tests/node_modules/playwright/cli.js" install --with-deps chromium
+          node "$RUNNER_TEMP/ntk-browser-tests/node_modules/playwright/cli.js" install chromium
+          # Hosted images normally provide Chromium's shared libraries. Avoid
+          # downloading unrelated font/library upgrades from a slow apt mirror;
+          # retain the full dependency installer when a browser cannot launch.
+          if ! PLAYWRIGHT_MODULE="$RUNNER_TEMP/ntk-browser-tests/node_modules/playwright" node -e 'require(process.env.PLAYWRIGHT_MODULE).chromium.launch({headless:true}).then(browser=>browser.close()).catch(error=>{console.error(error.message);process.exitCode=1})'; then
+            node "$RUNNER_TEMP/ntk-browser-tests/node_modules/playwright/cli.js" install --with-deps chromium
+          fi
       - name: Check condensed history, time navigation and held entry selections
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
