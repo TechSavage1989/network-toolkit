@@ -84,6 +84,13 @@ window widths. It records numerical evidence and four comparison screenshots
 the inverse, and UI97 keeps the existing 1ms wheel-anchor tolerance using the
 actual rounded browser pointer coordinate.
 
-Local focused checks are not a claim of hosted browser/native acceptance.
-Required build/CI and rendered screenshot inspection must establish those
-results on the final integrated source before delivery.
+Exact-source hosted Checks 40496464349 passed, including native Windows after
+one isolated startup-timeout retry and all browser/timer gates. All four rendered
+comparisons were inspected: the newest gap stays 5.03 px at a 1440 px window and
+3.00 px at a 390 px window for both history sizes; all 20 recent positions match.
+A discrete two-sample group at the recent boundary has a larger representative
+gap than a single point, but its larger marker overlaps its neighbor: pixels and
+numerical slopes confirm no empty seam or transform jump. Grouped representative
+positions are necessarily quantized, not perfectly uniformly spaced.
+See DEVELOPMENT_HANDOFF.md for exact source, artifact hashes and remaining limits.
+No native installation or full WebView2 session is claimed.

@@ -3,14 +3,16 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-Current development version: 1.17.102; published baseline: 1.17.101.
-The user authorized the stable-recent Condensed change for an isolated build
-and review-branch push ONLY. Do not promote main or publish without approval.
-Preserve the completed 1.17.101 pinned Local Network controls.
-Read docs/CONDENSED_GRAPH_SCALING.md for formulas and short-history policy.
-Exact-source required Checks and rendered screenshot inspection remain pending.
-See docs/DEVELOPMENT_HANDOFF.md for baseline, scope, evidence and honest limits.
+Current built review version: 1.17.102; published baseline: 1.17.101.
+Exact built source: 4a58f6c86cf6a54b798f90d7a17802f6ad4e2202
+Required Checks 40496464349 passed (Windows-only retry after startup timeout).
+Review artifact 12730609117, all 813 source files and normal/narrow rendered
+spacing comparisons verify. See docs/DEVELOPMENT_HANDOFF.md for full evidence.
+Read docs/CONDENSED_GRAPH_SCALING.md for formulas and short-history limits.
 
+Only the isolated build/review push was authorized and is complete.
+Do not promote main or publish 1.17.102 without separate approval.
+Preserve the published 1.17.101 pinned Local Network controls.
 Never replace old tags/assets, change access or write the retired update feed.
 Final handoff-only records use [skip ci].
 
