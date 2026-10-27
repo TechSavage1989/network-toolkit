@@ -45,6 +45,25 @@ For the subsequently authorized 1.17.90 build, the 1.17.89 note has also been
 moved unchanged into the archive. Current `RELEASE_NOTES_1.17.90.txt` alone stays
 at root, and the archive index identifies 1.17.90 as current and 1.17.89 as previous.
 
+## 1.17.98 authorized publication in progress
+
+The user explicitly authorized publishing the completed 1.17.98 review build.
+Publication starts from review handoff b423759ce9d2f672bbc471dc5425386ebb2ce6fe,
+based on main 8a3c87648a2c991051e8b05e19232afee1b1b3bb. The exact prepared
+runtime source is 78360788f4f1b426cc9c7d11cfd0988340379422, verified by
+Full Checks 40468142795 and review artifact 12717656219. All application,
+embedded runtime inputs and the reviewed executable remain unchanged.
+This publication refreshes release labels and documentation only.
+
+The publication workflow must produce a new v1.17.98 release from main with
+all four validated assets together. Verify exact source/tag provenance,
+checksums, portable source contents and live updater staging before claiming
+completion. Preserve all 37 previous releases/assets and tags. Never write the
+retired update repository, replace old assets/tags, or change access/credentials.
+No installation/restart or complete native WebView2 interaction is claimed.
+
+The verified review evidence below records the earlier unpublished review state.
+
 ## 1.17.98 verified review build: full-history Fit and compact timeline navigation
 
 The user authorized implementation, build delivery, validation and handoff updates.

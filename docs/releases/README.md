@@ -8,7 +8,7 @@ releases, tags and downloadable assets are unchanged.
 
 ## Current version
 
-- [1.17.98 review build](../../RELEASE_NOTES_1.17.98.txt)
+- [1.17.98](../../RELEASE_NOTES_1.17.98.txt)
 
 ## Previous versions
 

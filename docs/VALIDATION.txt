@@ -1,3 +1,14 @@
+NETWORK TOOLKIT 1.17.98 AUTHORIZED PUBLICATION CANDIDATE
+
+The user explicitly authorized publishing the completed review build.
+The runtime inputs remain identical to reviewed source
+78360788f4f1b426cc9c7d11cfd0988340379422 and successful Checks 40468142795.
+Release labeling/documentation is refreshed for publication. Public release,
+source/tag, assets and live updater staging must be verified before completion.
+No installation/restart or complete native WebView2 interaction is claimed.
+
+Earlier verified review evidence follows.
+
 NETWORK TOOLKIT 1.17.98 VERIFIED REVIEW BUILD
 
 The user authorized implementation, build delivery, validation and handoff updates.

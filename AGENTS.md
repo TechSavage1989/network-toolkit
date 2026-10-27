@@ -3,16 +3,15 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-Current verified review build: 1.17.98, based on main 8a3c876.
-Source: 78360788f4f1b426cc9c7d11cfd0988340379422
-Tree: 891660297914c5c331dd6b4858af69161c67b857
-Full Checks 40468142795 passes application, native Windows and browser jobs.
-667 JavaScript tests, 35 safeguards, required Go/native/browser suites and all
-7 updater timer cases pass, including the real five-minute poll. Local/GitHub
-portable files and embedded EXEs match; 808 source files, 55 historical notes
-and 14 editor digests verify. See handoff for evidence and platform limits.
-The user authorized implementation/build delivery, not publication. The public
-update remains 1.17.97. This final three-file documentation child uses [skip ci].
+Publication of 1.17.98 is explicitly authorized and in progress.
+Prepared runtime source: 78360788f4f1b426cc9c7d11cfd0988340379422
+Prepared Checks 40468142795 passed all jobs, including 667 JavaScript tests,
+35 safeguards, Go/native Windows/browser suites and all 7 updater timer cases.
+This publication changes only release labels/documentation. Preserve the
+verified application inputs and EXE SHA256
+6a48dd47c69ec178bfe5653cfef1260bc183d59c631fe7043e06af67a1a16094.
+Main network-toolkit remains the sole source/update feed. Verify publication,
+assets, tag and updater staging before recording completion in the handoff.
 
 Current verified published version: 1.17.97.
 Source/tag: c57ad0e52da1d40cda8a6d268e4161928a686a61

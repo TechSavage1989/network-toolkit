@@ -83,4 +83,4 @@ See [VALIDATION.txt](docs/VALIDATION.txt) for recorded results and [THIRD_PARTY_
 
 </details>
 
-Development review: [1.17.98 graph navigator build](RELEASE_NOTES_1.17.98.txt). Published downloads remain at 1.17.97 until publication is authorized.
+Current version: [1.17.98 graph navigator update](RELEASE_NOTES_1.17.98.txt).
