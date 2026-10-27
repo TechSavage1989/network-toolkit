@@ -289,3 +289,7 @@ test('fixed time navigation stays anchored during live updates while Latest rest
 test('chosen time range never includes an RTT change whose previous source sample is outside it',()=>{
  const h=harness(),rows=Array.from({length:5},(_,i)=>reply(i+1,[1,5,100,104,108][i],'2026-10-26T16:00:0'+i+'Z'));h.context.NetworkToolkitGraphHistory.setPreferences({anchor:'range',start:rows[2].time,end:rows[4].time},{persist:false});h.render(rows);assert.match(h.document.querySelector('.rt-variability').textContent,/4 ms/);h.document.emit('click',h.mark(0));assert.match(h.detail(),/Response time100 ms/);h.document.emit('click',h.mark(1));assert.match(h.detail(),/RTT change4 ms/);
 });
+
+test('a held aggregate can open an original contributor after it leaves retained graph history',()=>{
+ const h=harness(),rows=Array.from({length:300},(_,i)=>reply(i+1,5+i%30,new Date(Date.parse('2026-10-26T12:00:00Z')+i*1000).toISOString()));h.api.setPreferences({mode:'condensed'},{persist:false});h.render(rows);const first=h.document.querySelector('[data-rt-surface="latency"] [data-rt-aggregate]');assert(first);h.document.emit('click',first);assert.match(h.detail(),/Grouped samples/);h.render(rows.map(row=>({...row,sequence:row.sequence+1000,time:new Date(Date.parse(row.time)+1000000).toISOString()})));assert.equal(h.api.selectResult('job',h.api.sampleKey(rows[0],0)),true);assert.match(h.detail(),/Sample1/);assert.match(h.document.querySelector('.mock-selection-context').textContent,/snapshot/);
+});
