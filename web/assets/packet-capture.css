@@ -356,7 +356,7 @@
 .packet-timeline{display:block;width:100%;height:145px;max-height:none;overflow:visible;border:1px solid var(--line);border-radius:6px}
 .packet-timeline [data-packet-bucket]{cursor:pointer;outline:none}
 .packet-timeline .packet-timeline-bar{fill:var(--accent);opacity:.75;pointer-events:none}
-.packet-timeline .packet-timeline-hit{fill:transparent}
+.packet-timeline .packet-timeline-hit{fill:transparent;pointer-events:all}
 .packet-timeline [data-packet-bucket]:hover .packet-timeline-hit,.packet-timeline [data-packet-bucket].selected .packet-timeline-hit{fill:var(--accent);fill-opacity:.16}
 .packet-timeline [data-packet-bucket]:focus-visible .packet-timeline-hit{stroke:var(--accent);stroke-width:2;vector-effect:non-scaling-stroke}
 .packet-timeline [data-packet-bucket].selected .packet-timeline-bar{opacity:1}
