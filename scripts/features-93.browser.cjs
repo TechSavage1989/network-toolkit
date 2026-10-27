@@ -267,7 +267,7 @@ async function packetAction96(name,action){await page.locator('[data-packet-grap
  packetStats={...originalStats,duration:span,finished:end,bytes:capture.bytes,timedBytes:capture.bytes-64,protocols:{TCP:80,UDP:1},timedPackets:80,untimedPackets:1,timeline:bins};
  await page.evaluate(()=>NetworkToolkitPacketCapture.refresh(true));await page.waitForFunction(()=>NetworkToolkitPacketCapture.model.total===81&&!NetworkToolkitPacketCapture.model.busy&&NetworkToolkitPacketCapture.model.statistics?.duration===243&&NetworkToolkitPacketCapture.model.statistics?.timeline?.length===60);await settle();
  await page.locator('[data-packet-graph-mode]').selectOption('progressive');await settle();
- const progressivePacket=await packetGraph().evaluate(el=>[...el.querySelectorAll('*')].map(node=>({width:node.clientWidth,scrollWidth:node.scrollWidth,overflow:getComputedStyle(node).overflowX})).find(node=>['auto','scroll'].includes(node.overflow)&&node.scrollWidth>node.width+100));assert(progressivePacket,'Progressive capture timeline provides horizontal history scrolling');
+ const progressivePacket=await page.locator('[data-packet-graph-scroll]').evaluate(el=>({width:el.clientWidth,total:el.scrollWidth}));assert.equal(progressivePacket.width,progressivePacket.total,'Progressive capture timeline fits the time range without DOM scrolling');
  await page.locator('[data-packet-graph-mode]').selectOption('window');await settle();
  report.packets.push({retainedPackets:81,progressivePacket});
  for(const viewport of [{width:1440,height:1000},{width:820,height:1000},{width:390,height:1000},{width:820,height:650}])for(const theme of ['dark','light']){

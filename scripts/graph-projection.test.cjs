@@ -21,3 +21,7 @@ test('adaptive ticks respect configured 12/24-hour clock and named timezone and 
 test('unknown times are not projected or invented and equal instants get an honest nonzero view domain',()=>{
  assert(Number.isNaN(history.fraction('0001-01-01T00:00:00Z',scope)));assert.match(history.axisHTML({start:'',end:''},400),/Recorded time unavailable/);const s=history.viewport({start:scope.end,end:scope.end});assert.equal(history.instant(s.end)-history.instant(s.start),1000000000n);assert.equal(s.end,scope.end);
 });
+
+test('compressed time ticks increase displayed precision instead of repeating indistinguishable second labels',()=>{
+ time.configure({hourFormat:'24',zoneMode:'utc'});history.setPreferences({recentMs:1000},{persist:false});const html=history.axisHTML(scope,820,'condensed'),labels=[...html.matchAll(/>([^<]+)<\/time>/g)].map(match=>match[1]);assert.equal(new Set(labels).size,labels.length);assert(labels.length>=2);history.setPreferences({recentMs:60000},{persist:false});
+});
