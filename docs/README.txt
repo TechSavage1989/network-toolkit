@@ -1,14 +1,15 @@
-NETWORK TOOLKIT 1.17.102
+NETWORK TOOLKIT 1.17.103
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.102
+CURRENT RELEASE - 1.17.103
 
-Release details: RELEASE_NOTES_1.17.102.txt
-Previous release: docs/releases/RELEASE_NOTES_1.17.101.txt
+Release details: RELEASE_NOTES_1.17.103.txt
+Previous release: docs/releases/RELEASE_NOTES_1.17.102.txt
 Full release-note archive: docs/releases/README.md
 
-Condensed keeps recent-right spacing stable after a short Fit warm-up, while
-older-left history absorbs additional compression. See docs/CONDENSED_GRAPH_SCALING.md.
+Condensed RTT uses a fixed recent-time scale from startup and one accumulating
+left history cluster. Sparse startup leaves empty past space; no Fit warm-up
+rescaling. RTT traces follow the current accent. See docs/CONDENSED_GRAPH_SCALING.md.
 
 Local Network Status and Type stay beside the search filter while results scroll.
 The pinned controls wrap on narrow windows without hiding table headings.

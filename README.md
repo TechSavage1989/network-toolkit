@@ -83,4 +83,4 @@ See [VALIDATION.txt](docs/VALIDATION.txt) for recorded results and [THIRD_PARTY_
 
 </details>
 
-Current version: [1.17.102 stable recent Condensed spacing](RELEASE_NOTES_1.17.102.txt).
+Current version: [1.17.103 accumulated Condensed history and theme colors](RELEASE_NOTES_1.17.103.txt).

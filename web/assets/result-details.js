@@ -132,7 +132,7 @@
     if(same){sideDetail.graph={...graph};if(graph.force&&preferences().hidden){preferences().hidden=false;persist();}afterRender();return true;}
     let record;try{record=JSON.parse(JSON.stringify(point.source||{}));}catch{record={...point.source};}
     const anchor=[...area.querySelectorAll('[data-result-sample-key]')].find(row=>row.dataset.resultSampleKey===key)||area.querySelector('[data-graph-workspace]')||area;
-    const detail={record,name:point.members?'Condensed interval':'Sample',list:config?.id||'',view:config?.view||'',key:'',context:job?{tool:job.tool,target:job.target,started:job.started,mode:job.options?.mode,port:job.options?.port,source:job.options?.source}:null,graph:{...graph},anchor,run:area.dataset.scrollContext,page:viewToken()};
+    const detail={record,name:point.historical?'Historical cluster':point.members?'Condensed interval':'Sample',list:config?.id||'',view:config?.view||'',key:'',context:job?{tool:job.tool,target:job.target,started:job.started,mode:job.options?.mode,port:job.options?.port,source:job.options?.source}:null,graph:{...graph},anchor,run:area.dataset.scrollContext,page:viewToken()};
     if(sideDetail?.graph?.id===graph.id){sideDetail=detail;if(graph.force&&preferences().hidden){preferences().hidden=false;persist();}afterRender();return true;}
     return openSide(detail,anchor);
   }
@@ -171,7 +171,7 @@
       const sameRecord=body._sourceRecordSignature===signature,scrollTop=sameRecord?body.scrollTop:0,expanded=sameRecord?[...body.querySelectorAll('details')].map(detail=>detail.open):null;
       body.innerHTML=detailBody(sideDetail);body._recordSignature=displaySignature;body._sourceRecordSignature=signature;
       if(expanded)[...body.querySelectorAll('details')].forEach((detail,index)=>{detail.open=expanded[index]===true;});
-      body.scrollTop=scrollTop;document.getElementById('resultEntryTitle').textContent=sideDetail.graph?.point.members?'Condensed interval · '+sideDetail.graph.point.members.length+' samples':(recordTitle(sideDetail.record)||sideDetail.name)+(sideDetail.graph?' · '+(sideDetail.graph.point.rtt==null?'Not measured':sideDetail.graph.point.rtt+' ms')+' · '+sideDetail.graph.point.status:'');
+      body.scrollTop=scrollTop;document.getElementById('resultEntryTitle').textContent=sideDetail.graph?.point.members?(sideDetail.graph.point.historical?'Historical cluster':'Condensed interval')+' · '+(sideDetail.graph.point.stats?.count??sideDetail.graph.point.members.length)+' samples':(recordTitle(sideDetail.record)||sideDetail.name)+(sideDetail.graph?' · '+(sideDetail.graph.point.rtt==null?'Not measured':sideDetail.graph.point.rtt+' ms')+' · '+sideDetail.graph.point.status:'');
     }
     for(const row of area.querySelectorAll('tr[data-result-row]')){
       const detail=captureRow(row),selected=sideDetail.graph&&!sideDetail.graph.point.members?row.dataset.resultSampleKey===sideDetail.graph.point.key:detail?.list===sideDetail.list&&JSON.stringify(detail.record)===signature;

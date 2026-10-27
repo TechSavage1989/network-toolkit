@@ -1,96 +1,97 @@
-# Condensed graph scaling
+# Condensed RTT history and theme policy
 
-## Stable recent resolution
+## Fixed recent-time geometry
 
-Condensed maps actual elapsed time, not result indices. Let `R` be the existing
-**Condensed history: keep individual results for the latest (seconds)** setting
-(default 60 seconds), `S` the displayed time span, and `a` a sample's age relative
-to the displayed right endpoint. The plotting width excludes the existing axis
-inset and 12-pixel right gutter.
+Condensed RTT diagnostics use a fixed age horizon `H`: the explicit range duration,
+the chosen Timeframe duration, or `3 × recentMs` for All (default 180 seconds),
+divided by the existing zoom factor. `H` never depends on total sample count or
+run duration. Given age `a` from the displayed right timestamp, for `0 <= a < H`:
 
-Once `S >= 3R`, the latest `R` occupies the right half of that usable width. Its
-mapping is independent of `S`. With the same viewport and sampling cadence,
-adding old history or new arrivals does not squeeze recent samples. Irregular
-intervals remain irregular; duplicate timestamps share a coordinate. Changing
-`R`, viewport width or the actual sampling cadence intentionally changes pixels
-per sample. A changing Y-axis label width can also slightly change usable width.
+`x = plotLeft + plotWidth × (1 - log(1 + 3a/H) / log(4))`
 
-The older half alone adapts as retained history grows. Define distance from the
-right edge, normalized to the usable width:
+The inverse is `a = H × expm1((1-share) × log(4)) / 3`. Axis labels, points,
+pointer hit testing, pan and anchored zoom share this projection. The overview
+remains proportional to real elapsed time, not this nonlinear display.
 
-- For `a <= R`, `d = log(1 + a/R) / log(4)`.
-- For `a > R`, `d = 1/2 + beta * log(1 + (a/R - 1)/beta) / (2 log(4))`.
-- `beta` is the unique positive solution of
-  `beta * log(1 + (S/R - 1)/beta) = log(4)`.
+No whole-history Fit warm-up exists. The newest sample starts at the right
+boundary; sparse histories leave genuinely unused past space on the left. With
+unchanged controls, usable width and sample cadence, recent spacing is identical
+as the run grows. Explicit zoom/timeframe/viewport/cadence changes can change it.
 
-At `a = R`, both regions have the same position and first derivative: there is
-no abrupt change of speed. The derivative decreases with age, so older time
-intervals become progressively denser. At `a = S`, `d = 1`; at `a = 0`, `d = 0`.
-The oldest representative uses its original first timestamp, not its group's
-midpoint. Fit therefore pins both endpoints to the same plotting boundaries,
-including raw/group transitions. The existing marker/stroke gutters remain.
+The Y-axis label gutter is fixed outside the plot, so changing RTT magnitude does
+not gradually shrink its width. Grid, clip rectangle, data coordinates and hit
+testing share the same plot boundaries. Marker rendering room outside that
+rectangle keeps endpoint circles/strokes/highlights visible without moving their
+centers inward. The oldest cluster's center is the visible left grid boundary;
+the newest point's center is the right grid boundary, not a grouped centroid.
 
-A bounded 64-entry layout cache avoids repeatedly solving the same curve for
-each mark. Only a new visible span/recent setting requires the small monotone
-scalar solve. Projection, inverse axis ticks, pointer-anchored zoom and direct
-plot dragging use the same mapping. The full-history navigator remains linear
-in recorded time, as do keyboard/API time-step pans.
+## One historical cluster, not growing buckets
 
-## Short histories and exact ranges
+RTT points older than `H` merge into one fixed-footprint historical marker. It is
+not an individual RTT sample. Its horizontal anchor does not depend on its count,
+mean timestamp, represented interval or number of original contributors.
 
-For `0 < S < 3R`, Fit fills the available width with
-`d = log(1 + 3a/S) / log(4)`. This warm-up meets the stable mapping exactly at
-`S = 3R`, including the age derivative. A one-point/equal-timestamp history is
-centered; an empty history creates no point. Two distinct points pin both edges.
+The raw storage policy remains bounded: completed ICMP/TCP-monitor runs retain at
+most 10,000 raw samples, and live jobs expose at most 2,200 activity events (some
+are not samples). Before either window trims an original sample, an independent
+run-local prefix summary accumulates its contribution. The live summary is
+`job.sampleHistory`; the completed summary is `result.data.history`. Each must be
+paired only with its corresponding retained rows; merging both double-counts.
 
-There is a physical limit: while a short history first fills the graph, constant
-pixel spacing and both pinned endpoints cannot all hold as the number of points
-changes. Fit endpoints take priority during this bounded warm-up. Recent spacing
-is fixed thereafter, rather than shrinking indefinitely with total duration.
+The summary contains counts, successful/measured/lost counts, measured RTT sum,
+minimum/maximum, zero count, first/last recorded timestamps and sequences, valid
+consecutive-pair jitter sum/count/extrema and the last pair boundary. Failed,
+invalid or nonconsecutive measurements do not become zero RTT or invented jitter.
+Status counts retain at most 16 labels plus `other`; unknown time counts remain
+explicit. There is no indefinitely growing raw array in the summary.
 
-The mapping also supports chosen timeframes and zoomed/panned ranges. It never
-stretches actual samples to invented timestamps: an explicit range outside the
-recorded extent keeps its genuine blank interval. Fit/All uses retained extent;
-a held selection or an intentionally fixed historical interval remains held
-until existing Fit/Follow controls change it.
+The renderer combines that prefix with retained originals old enough for the
+cluster, without changing recent coordinates. When the selected horizon exceeds
+available raw retention, a wholly included prefix still belongs to the one left
+archive cluster even if retention forced summarization earlier than the ideal
+age boundary; details explain this. Exact raw positions cannot be reconstructed.
+Min/max bars and Y bounds include represented extremes rather than averages alone.
 
-## Grouping and data integrity
+## Availability, selection and persistence
 
-Existing grouping is retained: diagnostic histories up to 1,400 visible samples
-keep individual markers; larger histories progressively group older samples
-with bounded display work. The configured recent interval keeps original
-individual samples. This grouping is display-only. Every contributor, original
-timestamp, zero, failure and status remains accessible. Group details report
-actual start/end, count, failures and RTT min/mean/max. Extrema bars and the Y-axis
-use represented source values, not only averages. The existing packet aggregation
-and linear overview are unchanged; packet plotting and drag/zoom share the same
-forward/inverse time mapping.
+The cluster's details identify its recorded time span, total/unsuccessful count,
+minimum/average/maximum RTT, available retained contributors and summarized-only
+count. Selecting it selects its summary, not an arbitrary original measurement.
+Retained originals and held original selections remain accessible through the
+existing results/details interfaces. JSON/HTML/text exports retain the applicable
+history summary and retained rows without pretending discarded rows exist.
 
-## Focused verification
+A chosen interval that only partly overlaps an archived prefix cannot recover
+exact subset statistics; the UI explicitly reports unavailable archived detail
+instead of inventing it. Arbitrary filters cannot exactly classify discarded raw
+records, so summary/filter scope is stated rather than fabricating matches.
+Legacy/imported runs without the new prefix cannot recover already discarded
+history from lifetime totals alone. Their missing-summary limitation is explicit.
 
-Deterministic numerical tests compare the identical recent section over spans
-from 180 seconds to 1,000,000 seconds, at normal/narrow widths; verify the smooth
-join, monotone compression, warm-up continuity and inverse drag/zoom. Renderer
-unit tests cover 706/1,400/1,401/7,201-point growth, selection, filters, resizing,
-raw/group endpoints and the existing 10,000-point retention rollover. Additional
-fixtures retain duplicate/irregular timestamps, gaps, spikes, zero and failures
-with exact contributor details. Existing Linear, timeline/navigation, grouping
-and packet tests remain enforced.
+New/cleared runs use separate state and cannot inherit another host/run's prefix.
+Summaries serialize with normal job/result/export data and follow existing session
+lifetime; this is not new restart recovery for a run the app itself did not save.
+Packet traffic keeps its existing published projection/bucket semantics; the RTT
+archive is not silently applied to unrelated packet counts. Linear retains actual
+time-proportional spacing and deliberate ranges without Condensed aggregation.
 
-The existing UI98 browser suite compares actual recent marker pixels and source
-hover/held selection before and after 706 to 7,201 samples at 1440- and 390-pixel
-window widths. It records numerical evidence and four comparison screenshots
-(`ui98-condensed-stable-<width>-<count>.png`). Main-plot drag is checked against
-the inverse, and UI97 keeps the existing 1ms wheel-anchor tolerance using the
-actual rounded browser pointer coordinate.
+## Theme behavior
 
-Exact-source hosted Checks 40496464349 passed, including native Windows after
-one isolated startup-timeout retry and all browser/timer gates. All four rendered
-comparisons were inspected: the newest gap stays 5.03 px at a 1440 px window and
-3.00 px at a 390 px window for both history sizes; all 20 recent positions match.
-A discrete two-sample group at the recent boundary has a larger representative
-gap than a single point, but its larger marker overlaps its neighbor: pixels and
-numerical slopes confirm no empty seam or transform jump. Grouped representative
-positions are necessarily quantized, not perfectly uniformly spaced.
-See DEVELOPMENT_HANDOFF.md for exact source, artifact hashes and remaining limits.
-No native installation or full WebView2 session is claimed.
+RTT traces, successful RTT markers and RTT indicators use the existing `--accent`
+CSS token. They repaint when the accent or light/dark theme changes, without a
+new run. Failure/loss/warning states, selection highlighting and jitter/packet
+semantics retain their distinct styles. The minimal index fallback uses the same
+RTT token and leaves failed-probe markers unchanged.
+
+## Focused evidence
+
+Required acceptance is the actual rendered path, not helper formulas alone:
+normal/narrow windows with deterministic arrivals through sparse startup, former
+warm-up boundaries, raw rollover and a million-sample bounded summary; equal
+recent positions, actual visible-grid endpoints, changing Y labels, resize,
+summary/source selection, mixed values/failures and live theme changes.
+Backend tests cover one million arrivals without a million-element raw array,
+live activity trimming, metadata/statistical integrity, snapshot immutability,
+JSON restoration and run reset. Existing graph/navigation/packet and release
+gates remain enforced. See DEVELOPMENT_HANDOFF.md for exact completed versus
+pending evidence, source and release status.

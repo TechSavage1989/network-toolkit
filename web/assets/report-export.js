@@ -241,7 +241,7 @@
     if (job.result?.data !== undefined) return job.result.data;
     if (!['ping','monitor'].includes(job.tool) || !record(job.sampleStatistics)) return undefined;
     const samples=(Array.isArray(job.events)?job.events:[]).filter(event=>event?.data?.type==='sample').map(event=>event.data.value);
-    return {statistics:job.sampleStatistics,samples,note:'Statistics cover the complete run. This live snapshot contains the latest '+samples.length+' retained sample rows.'};
+    return {statistics:job.sampleStatistics,...(record(job.sampleHistory)?{history:job.sampleHistory}:{}),samples,note:'Statistics cover the complete run. This live snapshot contains the latest '+samples.length+' retained sample rows.'};
   }
 
   function activityHTML(job) {

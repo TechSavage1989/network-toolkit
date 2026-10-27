@@ -112,3 +112,19 @@ func TestLiveSampleTotalsSurviveActivityHistoryTrimming(t *testing.T) {
 		t.Fatal("lifetime sample totals were lost or changed after publication")
 	}
 }
+
+func TestLiveHistoricalSummaryPrecedesActivityRolloverAndRemainsRunScoped(t *testing.T) {
+ a := testApplication(t)
+ j := &Job{ID: strings.Repeat("d", 24), Tool: "monitor", Status: "running", Events: []model.Event{}}
+ a.jobs[j.ID] = j
+ const total = maxEvents + 35
+ for i := 0; i < 3; i++ { a.recordJobEvent(j, model.Event{Data:map[string]any{"type":"progress","value":"preparing"}}) }
+ for i := 1; i <= total; i++ {
+  a.recordJobEvent(j, model.Event{Time: "2026-10-27T00:00:00Z", Data: map[string]any{"type":"sample", "value":map[string]any{"sequence":i,"success":i%5!=0,"rttMs":float64(i%31),"status":"recorded"}}})
+ }
+ response := requestApp(a, http.MethodGet, "/api/jobs/"+j.ID, "", true)
+ var restored Job
+ if response.Code != http.StatusOK || json.Unmarshal(response.Body.Bytes(), &restored) != nil { t.Fatal("live history unavailable") }
+ if restored.SampleHistory == nil || restored.SampleHistory.Count != 35 || restored.SampleHistory.Lost != 7 || restored.SampleHistory.LastSequence != 35 || len(restored.Events) != maxEvents || restored.SampleHistory.Count+len(restored.Events) != total { t.Fatalf("live prefix lost or doubled: %+v", restored.SampleHistory) }
+ if (&Job{ID:strings.Repeat("e",24),Tool:"monitor"}).SampleHistory != nil { t.Fatal("history leaked across runs") }
+}

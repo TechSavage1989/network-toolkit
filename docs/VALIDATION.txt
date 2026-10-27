@@ -1,3 +1,49 @@
+NETWORK TOOLKIT 1.17.103 REVIEW PENDING
+
+1.17.103 authorized accumulated-history cluster build
+
+The user supplied Pasted text(7).md and explicitly said "publish when complete".
+This authorizes isolated implementation/build, then safe main promotion/release
+once focused rendered acceptance and existing required gates pass.
+Baseline: main eb09b7923f3716b899aa08860ddc7726bb6c64a4, published v1.17.102
+source 4a58f6c86cf6a54b798f90d7a17802f6ad4e2202. Fresh branch/release/tag checks
+found no conflicting work and 1.17.103 free. The published 102 duplicate main
+Checks 40535557196 completed successfully; no rerun was needed.
+The final standalone 102 closure upload encountered an automatic approval-review
+state-change error, explicitly not executed. No alternate write bypass was used;
+its terminal result is recorded here under fresh 103 authorization instead.
+
+Actual causes: the v102 warm-up still normalized by total span before 3R; dynamic
+Y-label width changed usable plot width; older display bins were not one persistent
+history cluster. Completed raw rows cap at 10,000, while active jobs expose only
+2,200 activity events. Both rollover paths need a bounded summary before trimming.
+RTT CSS used a diagnostic latency token before the selected accent token.
+
+Implementation is complete in an isolated worktree. Fixed age projection,
+single left cluster, shared visible plot boundaries, honest sparse startup and
+live accent RTT styling replace those assumptions. Backend summaries are run-local
+and retain counts, first/last recorded times and sequences, measured sum/extrema,
+zeros, loss/status counts and valid consecutive-pair jitter. No unlimited raw
+array is introduced. Completed result.data.history pairs with completed samples;
+active job.sampleHistory pairs with retained sample events, never both at once.
+JSON/HTML/text export preserve the applicable summary. Old runs lacking summaries
+cannot recover discarded originals; partial archived intervals must not invent
+precise subset statistics. Existing Linear, packet traffic semantics, navigation,
+selections, details, filters and updater must remain intact.
+
+Focused regressions cover million-sample aggregation with only 10,000 raw rows,
+live-event rollover, summary immutability/JSON restoration, zero/failure/jitter
+semantics, reset isolation and exports. Local report-export 15 groups passed. Seven focused JS suites passed 171/171;
+after the added long-horizon pairing regression, affected suites passed 70/70
+and final targeted rollover/filter/duplicate/selection checks passed 5/5. Changed
+JS/browser and inline syntax plus whitespace checks pass. Release metadata and
+35 Python publication/layout guards pass.
+Local Go is not an available compiler and local browser sockets are unavailable;
+no denied-path retry/escalation is used. Hosted native/build/browser gates remain
+required. Actual normal/narrow rendered growth, Y-label changes, endpoints and
+active theme-change checks are pending; helper tests alone do not establish a fix.
+No publication or native installation is claimed until verification completes.
+
 NETWORK TOOLKIT 1.17.102 PUBLISHED AND VERIFIED
 
 1.17.102 published stable-recent Condensed graphs
@@ -32,10 +78,9 @@ Public SHA256:
 
 Updater archive contains only the versioned Windows executable, SHA256SUMS,
 THIRD_PARTY_NOTICES.txt and UPDATING.txt under Network_Toolkit_1.17.102/.
-Automatic duplicate main Checks 40535557196 is still being observed on the
-same published source: application 122299715153 and Windows 122299715501 have
-passed; browser 122299715367 remains running. Review and Release are complete.
-This is not an optional rerun or an additional release gate.
+Automatic duplicate main Checks 40535557196 completed successfully at
+16:10:51 UTC: application 122299715153, Windows 122299715501 and browser
+122299715367 all passed. No optional rerun was needed.
 
 No native installation/restart, full WebView2 session or live updater staging
 is claimed. The former local workspace expired; a clean exact-source checkout

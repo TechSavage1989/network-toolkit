@@ -99,7 +99,7 @@ func ping(ctx context.Context, req model.Request, emit model.Emit, monitoring bo
 	series := &sampleSeries{}
 	result := func() model.Result {
 		s := series.statistics()
-		return model.Result{Summary: fmt.Sprintf("%d of %d ICMP replies, %.1f%% no response", s.Received, s.Sent, s.LossPercent), Data: map[string]any{"target": host, "address": address, "addresses": addresses, "samples": series.samples(), "statistics": s, "continuous": count == 0, "retainedSampleLimit": MaxRetainedSamples, "samplesOmitted": s.Sent - len(series.rows), "note": "ICMP can be filtered. No response alone does not establish that a device is offline. Jitter is the mean absolute RTT difference between consecutive successful samples. Lifetime statistics cover the complete run; at most the latest 10,000 individual samples are retained."}}
+		return model.Result{Summary: fmt.Sprintf("%d of %d ICMP replies, %.1f%% no response", s.Received, s.Sent, s.LossPercent), Data: map[string]any{"target": host, "address": address, "addresses": addresses, "samples": series.samples(), "statistics": s, "history": series.history.Snapshot(), "continuous": count == 0, "retainedSampleLimit": MaxRetainedSamples, "samplesOmitted": s.Sent - len(series.rows), "note": "ICMP can be filtered. No response alone does not establish that a device is offline. Jitter is the mean absolute RTT difference between consecutive successful samples. Lifetime statistics cover the complete run; at most the latest 10,000 individual samples are retained."}}
 	}
 	message := fmt.Sprintf("Sending %d ICMP echo requests to %s", count, address)
 	if count == 0 {
@@ -151,7 +151,7 @@ func monitor(ctx context.Context, req model.Request, emit model.Emit) (model.Res
 	series := &sampleSeries{}
 	result := func() model.Result {
 		s := series.statistics()
-		return model.Result{Summary: fmt.Sprintf("%d of %d TCP connections to port %d succeeded", s.Received, s.Sent, port), Data: map[string]any{"target": host, "mode": "tcp", "port": port, "samples": series.samples(), "statistics": s, "continuous": count == 0, "retainedSampleLimit": MaxRetainedSamples, "samplesOmitted": s.Sent - len(series.rows), "note": "Samples measure TCP connection establishment, not ICMP latency or application response time. Failed connections do not by themselves prove a host outage. Lifetime statistics cover the complete run; at most the latest 10,000 individual samples are retained."}}
+		return model.Result{Summary: fmt.Sprintf("%d of %d TCP connections to port %d succeeded", s.Received, s.Sent, port), Data: map[string]any{"target": host, "mode": "tcp", "port": port, "samples": series.samples(), "statistics": s, "history": series.history.Snapshot(), "continuous": count == 0, "retainedSampleLimit": MaxRetainedSamples, "samplesOmitted": s.Sent - len(series.rows), "note": "Samples measure TCP connection establishment, not ICMP latency or application response time. Failed connections do not by themselves prove a host outage. Lifetime statistics cover the complete run; at most the latest 10,000 individual samples are retained."}}
 	}
 	err = series.collect(ctx, count, interval, "tcp", port, emit, func(ctx context.Context) (platform.PingReply, error) {
 		p := dialPort(ctx, probeHost, port, timeout)

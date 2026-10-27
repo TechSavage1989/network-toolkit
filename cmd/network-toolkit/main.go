@@ -54,6 +54,7 @@ type Job struct {
 	EventSequence    uint64         `json:"eventSequence"`
 	LiveHosts        map[string]any `json:"liveHosts,omitempty"`
 	SampleStatistics any            `json:"sampleStatistics,omitempty"`
+	SampleHistory    *diag.SampleHistory `json:"sampleHistory,omitempty"`
 	Result           *model.Result  `json:"result,omitempty"`
 	Error            string         `json:"error,omitempty"`
 	cancel           context.CancelFunc
@@ -789,6 +790,24 @@ func (a *application) recordJobEvent(j *Job, event model.Event) {
 		}
 	}
 	if len(j.Events) >= maxEvents {
+		// Live graph rows come from the retained activity window, which is
+		// smaller than the completed diagnostic sample window. Summarize
+		// each discarded original before trimming, including on reconnect.
+		if j.Tool == "ping" || j.Tool == "monitor" {
+			for _, old := range j.Events[:len(j.Events)-maxEvents+1] {
+				if data, ok := old.Data.(map[string]any); ok && data["type"] == "sample" {
+					if row, ok := data["value"].(map[string]any); ok {
+						encoded, err := json.Marshal(row)
+						var sample platform.PingReply
+						if err == nil && json.Unmarshal(encoded, &sample) == nil {
+							if sample.Time == "" { sample.Time = old.Time }
+							if j.SampleHistory == nil { j.SampleHistory = &diag.SampleHistory{} }
+							j.SampleHistory.Add(sample)
+						}
+					}
+				}
+			}
+		}
 		j.Events = append(j.Events[:0], j.Events[len(j.Events)-maxEvents+1:]...)
 	}
 	j.Events = append(j.Events, event)

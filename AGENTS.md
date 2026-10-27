@@ -3,19 +3,15 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-Current published version: 1.17.102. Source/tag:
-4a58f6c86cf6a54b798f90d7a17802f6ad4e2202
-The user separately approved publication; it is complete and verified.
-Exact-source review Checks 40496464349 and Release 40535557250 passed.
-All four public assets, updater contents/feed, PE/version and 813 source files
-verify and match the reviewed EXE/portable build. Duplicate main Checks
-40535557196 is still under observation; review and release are complete.
-See docs/DEVELOPMENT_HANDOFF.md for full evidence and honest limits.
-Read docs/CONDENSED_GRAPH_SCALING.md for formulas and short-history policy.
+Current development version: 1.17.103; published baseline: 1.17.102.
+The user authorized the attached accumulated-history cluster/theme work and
+publication when complete. Required exact-source gates and actual rendered
+acceptance must pass before safe expected-head main promotion and release.
+Read docs/DEVELOPMENT_HANDOFF.md and docs/CONDENSED_GRAPH_SCALING.md.
+Preserve completed Local Network pinned filters and unrelated behavior.
 
-Preserve the published 1.17.101 pinned Local Network controls.
 Never replace old tags/assets, change access or write the retired update feed.
-Future builds/publication require separate authority.
+Record honest retention/legacy/partial-summary limits; no unbounded raw history.
 Final handoff-only records use [skip ci].
 
 ## Release-note organization

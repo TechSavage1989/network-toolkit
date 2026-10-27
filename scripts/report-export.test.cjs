@@ -219,6 +219,15 @@ function runTests() {
       assert.equal(JSON.stringify(r),before);
     }finally{resultTime.configure(null);}
   });
+  check('live and completed history summaries export without inventing discarded raw rows', () => {
+    const history={count:999998,received:999997,lost:1,measured:999997,minMs:0,maxMs:9999,sumMs:1234567,firstTime:'2026-10-01T00:00:00Z',lastTime:'2026-10-27T00:00:00Z'};
+    const job={id:'history-export',tool:'monitor',status:'running',sampleStatistics:{sent:1000000,received:999999,lost:1},sampleHistory:history,events:[{data:{type:'sample',value:{sequence:999999,time:'2026-10-27T00:00:01Z',success:true,rttMs:7}}},{data:{type:'sample',value:{sequence:1000000,time:'2026-10-27T00:00:02Z',success:true,rttMs:8}}}]};
+    const before=JSON.stringify(job);
+    for(const output of [renderer.toHTML({jobs:[job]}),renderer.toText({jobs:[job]})]){assert.match(output,/History/i);assert.match(output,/999[,]?998/);assert.match(output,/9999|9,999/);assert.match(output,/latest 2 retained sample rows/);}
+    assert.equal(JSON.stringify(job),before);
+    job.result={data:{history:{...history,count:777},samples:[],statistics:{sent:777}}};
+    for(const output of [renderer.toHTML({jobs:[job]}),renderer.toText({jobs:[job]})]){assert.match(output,/777/);assert.doesNotMatch(output,/999[,]?998/);}
+  });
   check('empty reports and absent data remain explicit and do not invent results', () => {
     assert.match(renderer.toHTML({jobs: []}), /No diagnostic results were selected/);
     assert.match(renderer.toText({jobs: []}), /Selected results: 0/);

@@ -20,6 +20,7 @@ type sampleSeries struct {
 	sum, minimum, maximum float64
 	jitter, previous      float64
 	hasPrevious           bool
+	history               SampleHistory
 }
 
 func (s *sampleSeries) add(reply platform.PingReply) {
@@ -44,6 +45,7 @@ func (s *sampleSeries) add(reply platform.PingReply) {
 	if len(s.rows) < MaxRetainedSamples {
 		s.rows = append(s.rows, reply)
 	} else {
+		s.history.Add(s.rows[s.next])
 		s.rows[s.next] = reply
 		s.next = (s.next + 1) % MaxRetainedSamples
 	}

@@ -14,9 +14,9 @@ function harness(){
  const api=context.NetworkToolkitResultTimeline;
  context.NetworkToolkitResultDetails={showGraphSelection:value=>{selected=value;let box=document.querySelector('.mock-entry-details');if(!box){box=document.createElement('aside');box.className='mock-entry-details';box.innerHTML='<div class="mock-point-details"></div><p class="mock-selection-context"></p>';document.append(box);}const content=api.pointDetails(value.point),detail=box.querySelector('.mock-point-details'),note=box.querySelector('.mock-selection-context');if(detail._source!==content){detail.innerHTML=content;detail._source=content;}if(note.textContent!==value.message)note.textContent=value.message;},clearGraphSelection:()=>{selected=null;document.querySelector('.mock-entry-details')?.remove();}};
 
- function render(rows=samples(),id='job'){
+ function render(rows=samples(),id='job',options={}){
   for(const child of [...document.children])child.remove();
-  document.innerHTML=api.latency(rows,{id});
+  document.innerHTML=api.latency(rows,{id,...options});
   for(const surface of document.querySelectorAll('[data-rt-surface]'))surface.focus=()=>{document.activeElement=surface;document.emit('focusin',surface);};
   api.restore();return document.querySelector('.rt-timeline');
  }
@@ -129,7 +129,7 @@ test('retained row hover reveals and highlights the original source in condensed
   h.document.emit('pointermove',row);assert(h.document.querySelector('[data-rt-point][data-rt-sequence="1"]'));assert.match(h.document.querySelector('[data-rt-tooltip]').textContent,/Sample 1/);h.document.emit('pointerout',row,{relatedTarget:null});
   if(view==='condensed')h.api.setPreferences({mode:'condensed'},{persist:false});else h.api.zoom('job',2);
   h.render(rows);row=h.document.createElement('tr');row.dataset.resultGraphId='job';row.dataset.resultSampleKey=h.api.sampleKey(rows[0],0);h.document.append(row);h.observe();h.document.emit('pointermove',row);
-  assert(h.document.querySelector('[data-rt-surface="latency"] [data-rt-sequence="1"]').classList.contains('rt-point-hovered'),view+' highlights the exact revealed source');assert.match(h.document.querySelector('[data-rt-tooltip]').textContent,/Sample 1/);assert.equal(h.document.querySelector('[data-rt-scroll]'),null);
+  assert(h.document.querySelector(view==='condensed'?'[data-rt-surface="latency"] [data-rt-aggregate]':'[data-rt-surface="latency"] [data-rt-sequence="1"]').classList.contains('rt-point-hovered'),view+' highlights the exact revealed source');assert.match(h.document.querySelector('[data-rt-tooltip]').textContent,/Sample 1/);assert.equal(h.document.querySelector('[data-rt-scroll]'),null);
  }
 });
 
@@ -280,7 +280,7 @@ test('Condensed Fit keeps both retained edges inside the plot across raw-to-aggr
   assert.equal(history.instant(container.dataset.rtScopeStart),history.instant(rows[first].time));assert.equal(history.instant(container.dataset.rtScopeEnd),history.instant(rows[count-1].time));
   assert.equal(Number(markers[0].getAttribute('cx')),Number(svg.dataset.rtLeft),'Oldest raw or aggregate point stays at the retained left edge');assert.equal(Number(markers.at(-1).getAttribute('cx')),808,'Newest point keeps the12px right gutter');
   for(const marker of [markers[0],markers.at(-1)]){const x=Number(marker.getAttribute('cx')),radius=Number(marker.getAttribute('r'))+2;assert(x-radius>=0&&x+radius<=820,'Endpoints include marker and highlight padding');}
-  assert.equal(markers.length===count,count===1400,'Small histories remain raw and larger histories use bounded aggregates');assert.match(h.detail(),/Sample700/);assert.equal(h.api.isHeld('job'),true);
+  assert.equal(markers.length,181,'One older cluster plus the fixed 180-second individual region');assert.equal(svg.querySelectorAll('[data-rt-aggregate]').length,1);assert.match(h.detail(),/Sample700/);assert.equal(h.api.isHeld('job'),true);
  }
  assert.equal(JSON.stringify(rows),original,'Fit, grouping and retention display never rewrite source rows');
 });
@@ -304,7 +304,35 @@ test('Condensed recent markers keep their pixels as older history grows, across 
 
 test('Condensed groups retain duplicate timestamps, gaps, zero, spikes and failures with truthful original details',()=>{
  const h=harness(),rows=Array.from({length:2001},(_,i)=>({...reply(i+1,i===0?0:i===1?9999:42,stamp(i<4?0:i+(i>=1000?600:0))),...(i===2?{success:false,status:'Timed out',rttMs:null}:{})})),before=JSON.stringify(rows);h.api.setPreferences({mode:'condensed'},{persist:false});h.render(rows);const svg=h.document.querySelector('[data-rt-surface]');assert.equal(Number(svg.dataset.rtMinimum),0);assert.equal(Number(svg.dataset.rtMaximum),9999);assert(svg.querySelector('.rt-aggregate-range'));
- const history=h.context.NetworkToolkitGraphHistory,groups=history.condense(h.api.normalize(rows),{end:rows.at(-1).time,recentMs:60000,preserveRaw:true}),oldest=groups[0],stats=h.api.summary(oldest.items);assert.equal(groups.flatMap(group=>group.items).length,rows.length);assert(oldest.items.some(point=>point.sequence===1)&&oldest.items.some(point=>point.sequence===2)&&oldest.items.some(point=>point.sequence===3));h.document.emit('click',svg.querySelector('[data-rt-aggregate]'));
+ const history=h.context.NetworkToolkitGraphHistory,items=h.api.normalize(rows).filter(point=>history.instant(point.time)<=history.instant(rows.at(-1).time)-180000000000n),oldest={items,start:items[0].time,end:items.at(-1).time},stats=h.api.summary(items);assert.equal(svg.querySelectorAll('[data-rt-aggregate]').length,1);assert(oldest.items.some(point=>point.sequence===1)&&oldest.items.some(point=>point.sequence===2)&&oldest.items.some(point=>point.sequence===3));h.document.emit('click',svg.querySelector('[data-rt-aggregate]'));
  const detail=h.detail();for(const value of ['Grouped samples'+stats.count,'Unsuccessful'+stats.lost,'Minimum RTT0 ms','Maximum RTT9,999 ms','LOCAL '+oldest.start,'LOCAL '+oldest.end])assert(detail.includes(value),value);
  h.api.selectResult('job',h.api.sampleKey(rows[2]));assert.match(h.detail(),/Sample3/);assert.match(h.detail(),/Timed out/);h.api.zoom('job',2);h.api.setPlot('job','jitter');assert.match(h.detail(),/Sample3/);assert.equal(JSON.stringify(rows),before,'Grouping and navigation preserve every original result');
+});
+
+
+test('single history cluster preserves a million-sample prefix across raw rollover without retaining its raw records',()=>{
+ const h=harness(),prefix={count:1000000,received:900000,lost:100000,measured:900000,minMs:0,maxMs:9999,sumMs:9000000,zeroCount:1,firstTime:stamp(-1000000),lastTime:stamp(-1),firstSequence:1,lastSequence:1000000,jitterSumMs:22,jitterPairs:2,jitterMinMs:2,jitterMaxMs:20,lastSuccess:true,lastRttMs:10},rows=Array.from({length:10000},(_,i)=>reply(1000001+i,10,stamp(i))),before=JSON.stringify(prefix);h.api.setPreferences({mode:'condensed'},{persist:false});h.render(rows,'job',{history:prefix});
+ const svg=h.document.querySelector('[data-rt-surface]'),cluster=svg.querySelector('[data-rt-aggregate]');assert.equal(svg.querySelectorAll('[data-rt-aggregate]').length,1);assert.equal(Number(cluster.dataset.rtAggregate),1009820);assert.equal(svg.querySelectorAll('[data-rt-marker]').length,181);assert.equal(Number(cluster.querySelector('[data-rt-marker]').getAttribute('cx')),Number(svg.dataset.rtLeft));assert.equal(Number(svg.dataset.rtMinimum),0);assert.equal(Number(svg.dataset.rtMaximum),9999);h.document.emit('click',cluster);assert.match(h.detail(),/1000000 summarized only/);assert.match(h.detail(),/Unsuccessful100000/);assert.match(h.detail(),/Minimum RTT0 ms/);assert.match(h.detail(),/Maximum RTT9,999 ms/);assert.equal(JSON.stringify(prefix),before);
+ const next={...prefix,count:1000001,received:900001,measured:900001,sumMs:9000010,lastTime:rows[0].time,lastSequence:1000001};h.render([...rows.slice(1),reply(1010001,10,stamp(10000))],'job',{history:next});assert.equal(Number(h.document.querySelector('[data-rt-aggregate]').dataset.rtAggregate),1009820,'Held time range does not silently advance');assert.equal(h.api.isHeld('job'),true,'A held aggregate remains a truthful snapshot');h.api.jumpLatest('job');assert.equal(Number(h.document.querySelector('[data-rt-aggregate]').dataset.rtAggregate),1009821);
+ h.api.setPreferences({mode:'linear'},{persist:false});h.render([...rows.slice(1),reply(1010001,10,stamp(10000))],'job',{history:next});assert.equal(h.document.querySelectorAll('[data-rt-aggregate]').length,0);assert.equal(h.document.querySelectorAll('[data-rt-marker]').length,10000,'Linear remains individual retained data');
+ h.api.setPreferences({mode:'condensed'},{persist:false});h.render([reply(1,5,stamp(0))],'new-run');assert.equal(h.document.querySelectorAll('[data-rt-aggregate]').length,0);assert.equal(Number(h.document.querySelector('[data-rt-marker]').getAttribute('cx')),808,'One point anchors latest; no synthetic older cluster');
+});
+test('sparse startup and changing Y labels never rescale recent X, and partial archived ranges never invent statistics',()=>{
+ const h=harness();h.api.setPreferences({mode:'condensed'},{persist:false});const points=[];let gap;
+ for(const count of [2,10,60,179,180,181,300]){const rows=Array.from({length:count},(_,i)=>reply(i+1,count%2?1e10:.000002,stamp(i)));h.render(rows);const svg=h.document.querySelector('[data-rt-surface]'),markers=svg.querySelectorAll('[data-rt-marker]'),last=Number(markers.at(-1).getAttribute('cx')),current=last-Number(markers.at(-2).getAttribute('cx'));if(gap!=null)assert(Math.abs(current-gap)<.01);gap=current;assert.equal(Number(svg.dataset.rtLeft),64);assert.equal(last,808);assert.equal(svg.querySelectorAll('[data-rt-aggregate]').length,count>180?1:0);points.push(current);}
+ const prefix={count:500,received:500,measured:500,sumMs:5000,minMs:1,maxMs:9999,firstTime:stamp(-500),lastTime:stamp(-1)},rows=Array.from({length:301},(_,i)=>reply(i+1,10,stamp(i)));h.context.NetworkToolkitGraphHistory.setPreferences({anchor:'range',start:stamp(-250),end:stamp(300)},{persist:false});h.render(rows,'job',{history:prefix});const svg=h.document.querySelector('[data-rt-surface]');assert.equal(Number(svg.dataset.rtMaximum),10,'Partial prefix extrema are unknown, not fabricated');assert.match(h.document.querySelector('.rt-plot-caption').textContent,/Partial archived interval unavailable/);
+});
+
+test('legacy omitted history and archived filter matches are explicitly unavailable, not invented',()=>{
+ const h=harness(),rows=Array.from({length:301},(_,i)=>reply(i+701,10,stamp(i)));h.api.setPreferences({mode:'condensed'},{persist:false});h.render(rows,'job',{job:{result:{data:{samples:rows,statistics:{sent:1001}}}}});assert.match(h.document.querySelector('.rt-plot-caption').textContent,/700 earlier results have no recoverable summary/);assert.equal(Number(h.document.querySelector('[data-rt-aggregate]').dataset.rtAggregate),121);
+ const prefix={count:700,received:700,measured:700,sumMs:7000,minMs:10,maxMs:10,firstTime:stamp(-700),lastTime:stamp(-1)};h.context.NetworkToolkitResultFilters={current:()=>({active:true}),graphMatches:(_,row)=>row.sequence===1001};h.render(rows,'job',{history:prefix});h.document.emit('click',h.document.querySelector('[data-rt-aggregate]'));assert.match(h.document.querySelector('.mock-selection-context').textContent,/exact matches among discarded records are unavailable/);assert.match(h.detail(),/Grouped samples821/);
+});
+
+test('duplicate timestamps across prefix rollover preserve counts using distinct sequence identities',()=>{
+ const h=harness(),rows=Array.from({length:301},(_,i)=>reply(i+3,10,stamp(i))),prefix={count:2,received:1,lost:1,measured:1,sumMs:0,minMs:0,maxMs:0,firstTime:stamp(-1),lastTime:rows[0].time,firstSequence:1,lastSequence:2};h.api.setPreferences({mode:'condensed'},{persist:false});h.render(rows,'job',{history:prefix});const cluster=h.document.querySelector('[data-rt-aggregate]');assert.equal(Number(cluster.dataset.rtAggregate),123);h.document.emit('click',cluster);assert.match(h.detail(),/2 summarized only/);assert.match(h.detail(),/Minimum RTT0 ms/);
+});
+
+test('Fit includes whole archive prefix before a long horizon and pairs only the actual live or completed sample source',()=>{
+ const h=harness(),rows=Array.from({length:2200},(_,i)=>reply(i+1000001,10,stamp(i))),history={count:1000000,received:1000000,measured:1000000,minMs:5,maxMs:50,sumMs:10000000,firstTime:stamp(-1000000),lastTime:stamp(-1),lastSequence:1000000};h.api.setPreferences({mode:'condensed'},{persist:false});h.context.NetworkToolkitGraphHistory.setPreferences({recentMs:86400000},{persist:false});h.render(rows,'live',{job:{sampleHistory:history}});const cluster=h.document.querySelector('[data-rt-aggregate]');assert.equal(Number(cluster.dataset.rtAggregate),1000000);assert.equal(h.document.querySelectorAll('[data-rt-point]').length,2201);h.document.emit('click',cluster);assert.match(h.detail(),/summarized before the display horizon/);assert.match(h.detail(),/1000000 summarized only/);
+ h.render(rows,'complete',{job:{sampleHistory:{...history,count:99},result:{data:{samples:rows,history}}}});assert.equal(Number(h.document.querySelector('[data-rt-aggregate]').dataset.rtAggregate),1000000,'Completed raw rows pair only with completed prefix');
 });

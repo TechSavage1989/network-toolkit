@@ -2,7 +2,7 @@
 .graph-navigator{min-width:0;min-height:0;height:46px;display:grid;grid-template-rows:30px 14px;gap:1px;overflow:visible;color:var(--muted);user-select:none}
 .gn-track{position:relative;min-width:0;margin:0 7px;border:1px solid var(--border);border-radius:3px;background:var(--panel2);touch-action:none}
 .gn-overview{position:absolute;inset:1px 0;width:100%;height:calc(100% - 2px);overflow:hidden;pointer-events:none}
-.gn-series{fill:none;stroke:var(--diag-latency,var(--accent));stroke-width:1;vector-effect:non-scaling-stroke}
+.gn-series{fill:none;stroke:var(--accent);stroke-width:1;vector-effect:non-scaling-stroke}
 .gn-series.gn-bad,.gn-series.gn-error{stroke:var(--diag-bad,var(--bad))}.gn-series.gn-warn{stroke:var(--diag-warn,var(--warn))}.gn-series.gn-info,.gn-series.gn-note{stroke:var(--diag-info,var(--accent))}.gn-series.gn-good,.gn-series.gn-normal{stroke:var(--diag-good,var(--good))}.gn-series.gn-dim{opacity:.25}.gn-overview circle{fill:currentColor;stroke:none}
 .gn-shade{position:absolute;top:0;bottom:0;background:color-mix(in srgb,var(--panel) 68%,transparent);pointer-events:none}.gn-shade-before{left:0}.gn-shade-after{right:0}
 .gn-window{position:absolute;top:0;bottom:0;outline:1px solid var(--accent);outline-offset:-1px;background:color-mix(in srgb,var(--accent) 10%,transparent);pointer-events:none;box-sizing:border-box;min-width:0}
@@ -24,3 +24,6 @@
 .graph-inline-zoom [data-rt-zoom-level],.graph-inline-zoom [data-packet-zoom-value]{max-width:45px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}@container(max-width:420px){.graph-inline-zoom [data-rt-zoom-level],.graph-inline-zoom [data-packet-zoom-value]{max-width:32px}}
 /* Compact height reserves a real plot and complete rows, with 26px handle hits. */
 @media(max-height:720px){.graph-workspace{--graph-min-height:136px}.graph-workspace-graph>.rt-timeline{grid-template-rows:auto minmax(44px,1fr) 18px 34px}.graph-navigator{height:34px;grid-template-rows:22px 11px}.graph-navigator .gn-labels{line-height:11px}.packet-traffic-section{grid-template-rows:auto minmax(35px,1fr) 20px 34px 14px}}
+
+.rt-timeline[data-rt-plot-active="rtt"] .gn-series.gn-good,.rt-timeline[data-rt-plot-active="rtt"] .gn-series.gn-info{stroke:var(--accent)}
+.rt-timeline[data-rt-plot-active="jitter"] .gn-series.gn-good,.rt-timeline[data-rt-plot-active="jitter"] .gn-series.gn-info{stroke:var(--diag-warn,var(--warn))}

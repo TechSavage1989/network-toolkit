@@ -1,7 +1,7 @@
 'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const time=require('../web/assets/result-time.js');global.NetworkToolkitResultTime=time;const graph=require('../web/assets/graph-history.js');
-const start='2026-10-27T00:00:00.123456789Z',end='2026-10-27T00:00:10.123456789Z',scope={start,end};
+const start='2026-10-27T00:00:00.123456789Z',end='2026-10-27T00:00:10.123456789Z',scope={start,end,condensedMs:180000};
 test('visible timeframe presets include common durations and fit without erasing custom historical dates',()=>{
  graph.mergePreferences({graphTimeRange:{anchor:'range',start,end,recentMs:17000}});const html=graph.controlHTML();assert.match(html,/Timeframe/);assert.match(html,/data-graph-time-preset/);assert.match(html,/Custom/);assert.deepEqual(graph.presets.map(p=>p[0]),[10000,30000,60000,300000,900000,3600000,21600000,86400000,0]);assert(graph.setDuration(30000));assert.deepEqual(graph.preferences(),{anchor:'end',start,end,recentMs:17000,durationMs:30000});assert.equal(graph.setDuration(17),false);graph.mergePreferences({});
 });
@@ -24,14 +24,14 @@ test('continuous age grouping gradually widens intervals without power-of-two ti
 
 test('axis labels distinguish tightly clustered measurements and compact extremely small or large magnitudes',()=>{for(const values of [[42.000001,42.000002],[1e-12,2e-12],[1e10,2e10]]){const labels=graph.scaleLabels(graph.valueScale(values));assert.notEqual(labels[0],labels[1]);assert(labels.every(label=>label.length<=14));}assert.deepEqual(graph.scaleLabels(graph.valueScale([])),['—','—']);});
 
-test('condensed displayed point spacing becomes progressively denser toward old history while recent raw samples have the most space',()=>{
- const base=Date.parse(end),items=Array.from({length:7201},(_,i)=>({id:i,time:new Date(base-7200000+i*1000).toISOString()})),groups=graph.condense(items,{end,recentMs:60000}),scope={start:items[0].time,end},positions=groups.map(g=>graph.fraction(g.start,scope,'condensed')),gaps=positions.slice(1).map((x,i)=>x-positions[i]),average=values=>values.reduce((a,b)=>a+b,0)/values.length;
+test('packet condensed displayed point spacing becomes progressively denser toward old history while recent raw samples have the most space',()=>{
+ const base=Date.parse(end),items=Array.from({length:7201},(_,i)=>({id:i,time:new Date(base-7200000+i*1000).toISOString()})),groups=graph.condense(items,{end,recentMs:60000}),scope={start:items[0].time,end,legacyCondensed:true},positions=groups.map(g=>graph.fraction(g.start,scope,'condensed')),gaps=positions.slice(1).map((x,i)=>x-positions[i]),average=values=>values.reduce((a,b)=>a+b,0)/values.length;
  assert(groups.length<1600&&groups.length>60);assert(average(gaps.slice(-20))>average(gaps.slice(1,101))*3,'Newest samples have more display space than old aggregates');assert(average(gaps.slice(100,200))>average(gaps.slice(1,101)),'Aggregation spacing widens gradually toward recent time');assert.equal(groups.flatMap(g=>g.items).length,7201);
 });
 
 
-test('a 706-sample Condensed Fit retains every original point instead of introducing irregular aggregate spacing',()=>{
- const items=Array.from({length:706},(_,i)=>({id:i,time:new Date(Date.parse(start)+i*1000).toISOString(),value:i===17?5000:i===26?0:42})),before=JSON.stringify(items),scope={start:items[0].time,end:items.at(-1).time},groups=graph.condense(items,{end:scope.end,recentMs:60000,preserveRaw:true});
+test('optional packet grouping can retain modest raw histories without changing source spacing',()=>{
+ const items=Array.from({length:706},(_,i)=>({id:i,time:new Date(Date.parse(start)+i*1000).toISOString(),value:i===17?5000:i===26?0:42})),before=JSON.stringify(items),scope={start:items[0].time,end:items.at(-1).time,legacyCondensed:true},groups=graph.condense(items,{end:scope.end,recentMs:60000,preserveRaw:true});
  assert.equal(groups.length,items.length);assert(groups.every((group,index)=>!group.aggregate&&group.items.length===1&&group.items[0]===items[index]));assert.equal(groups[0].start,scope.start);assert.equal(groups.at(-1).end,scope.end);assert.equal(JSON.stringify(items),before);
  const positions=groups.map(group=>graph.fraction(group.start,scope,'condensed')),gaps=positions.slice(1).map((x,i)=>x-positions[i]);assert.equal(positions[0],0);assert.equal(positions.at(-1),1);for(let i=1;i<gaps.length;i++)assert(gaps[i]>gaps[i-1],'Each equally timed original point spreads farther apart toward newer history');
 });
