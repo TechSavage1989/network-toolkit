@@ -219,7 +219,7 @@ function packetStatisticSummary(statistics){
 }
 function packetStatisticExplanation(key){return {packets:'Shows all packets within the other active filters.',bytes:'Shows packets contributing nonzero displayed bytes.',duration:'Shows packets with recorded times that contribute to the observed span.',expert:'Shows packets with recorded decoder or capture notes; notes are not necessarily faults.',average:'Shows every contributing packet. The displayed average is an aggregate reference, not an individual packet.',traffic:'Shows timed packets contributing bytes to the aggregate observed average traffic rate.',dnsrequests:'Shows assessed DNS requests contributing to this report, within the other display filters.',dnsreplies:'Shows assessed DNS replies contributing to this report, within the other display filters.',tcpstarts:'The report counts distinct connection attempts. Shows their captured initial SYN contributors; retries may contribute more than one packet per attempt.',tcpresets:'Shows captured TCP reset packets; a reset alone does not establish a fault.',icmperrors:'Shows assessed ICMP delivery and hop-limit messages; hop-limit messages may be expected during a trace route.'}[key]||'';}
 function packetBaseScope(statistics=model.statistics){
- const rows=statistics?.timeline||[],history=root.NetworkToolkitGraphHistory,first=model.graphOverview?.start||statistics?.started||rows[0]?.time,last=model.graphOverview?.end||statistics?.finished||rows.at(-1)?.endTime;
+ const rows=statistics?.timeline||[],history=root.NetworkToolkitGraphHistory,all=history?.preferences?.().allHistory&&packetGraphZoom()===1,first=(all?model.graphOverview?.start||statistics?.started:statistics?.started||model.graphOverview?.start)||rows[0]?.time,last=(all?model.graphOverview?.end||statistics?.finished:statistics?.finished||model.graphOverview?.end)||rows.at(-1)?.endTime;
  const base=model.graphBaseScope||history?.range?.([{time:first},{time:last}],history.preferences(),model.graphHeldEnd||'');if(model.graphBaseSpan&&history.instant(base?.end)!==null)return {...base,start:history.timestamp(history.instant(base.end)-BigInt(model.graphBaseSpan))};return base||{start:first,end:last,from:packetEpoch(first),to:packetEpoch(last)};
 }
 function packetPlotScope(statistics=model.statistics){const history=root.NetworkToolkitGraphHistory,scope=packetBaseScope(statistics);if(model.graphWindow)return root.NetworkToolkitGraphNavigator.scope(model.graphWindow.start,model.graphWindow.end);return history?.viewport?.(scope,packetGraphZoom(),model.graphViewEnd||'')||scope;}
@@ -313,6 +313,7 @@ function renderPacketInterval(area){
  area.dataset.packetDetail=stamp;layoutDetails();updatePacketViewContext();return true;
 }
 async function resumePacketLatest(){
+ if(root.NetworkToolkitGraphHistory?.preferences?.().allHistory&&packetGraphZoom()===1)model.graphBaseSpan='';
  model.graphViewEnd='';model.graphBaseScope=null;model.graphWindow=null; model.graphHold=false;model.graphSelectionVersion=(model.graphSelectionVersion||0)+1;model.graphHeldEnd='';model.heldPacketNumber=null;model.intervalSelection=null;model.liveDetails=true;model.follow=true;if(node('packetFollow'))node('packetFollow').checked=true;
  const selection=packetTimelineState();selection.pinned=false;selection.pin=null;selection.hover=null;selection.follow=true;model.inspectPointer=false;model.inspectFocus=false;model.keyboardInspection=false;hidePacketGraphPopup();restorePacketGraphScroll();updatePacketTimeline();
  if(root.NetworkToolkitGraphHistory?.preferences?.().anchor!=='latest'&&root.NetworkToolkitGraphHistory)root.NetworkToolkitGraphHistory.setPreferences({anchor:'latest'});
@@ -379,7 +380,7 @@ function packetGraphMinimum(){
  // permanent statistics, current wrapped controls and at least 90px of SVG.
  // Add the reader's scrollTop back to recover the natural plot offset.
  const chrome=Math.max(0,frame.height-height);
- return clamp(Math.ceil(chrome+161),146,600);
+ return clamp(Math.ceil(chrome+(root.innerHeight>0&&root.innerHeight<=720?149:161)),146,600);
 }
 function layoutPacketGraph(){
  layoutPacketConfiguration();const dock=node('packetGraphDock'),area=node('packetCaptureAnalysis'),workspace=node('packetCaptureWorkspace');if(!dock||!area)return;

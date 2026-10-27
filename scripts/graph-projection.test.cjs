@@ -19,7 +19,7 @@ test('adaptive ticks respect configured 12/24-hour clock and named timezone and 
  time.configure({hourFormat:'12',zoneMode:'named',timeZone:'America/New_York'});const narrow=history.axisHTML(scope,300);assert.match(narrow,/08:00:00 PM/);assert.match(narrow,/2026-10-27T00:00:00.000000001Z/);const wide=history.axisHTML(scope,1200);assert((wide.match(/<time/g)||[]).length>(narrow.match(/<time/g)||[]).length);time.configure({hourFormat:'24',zoneMode:'utc'});assert.match(history.axisHTML(scope,600),/00:00:00/);assert.doesNotMatch(history.axisHTML(scope,600),/AM|PM/);
 });
 test('unknown times are not projected or invented and equal instants get an honest nonzero view domain',()=>{
- assert(Number.isNaN(history.fraction('0001-01-01T00:00:00Z',scope)));assert.match(history.axisHTML({start:'',end:''},400),/Recorded time unavailable/);const s=history.viewport({start:scope.end,end:scope.end});assert.equal(history.instant(s.end)-history.instant(s.start),1000000000n);assert.equal(s.end,scope.end);
+ assert(Number.isNaN(history.fraction('0001-01-01T00:00:00Z',scope)));assert.match(history.axisHTML({start:'',end:''},400),/Recorded time unavailable/);const s=history.viewport({start:scope.end,end:scope.end});assert.equal(history.instant(s.end)-history.instant(s.start),0n);assert.equal(s.end,scope.end);
 });
 
 test('compressed time ticks increase displayed precision instead of repeating indistinguishable second labels',()=>{

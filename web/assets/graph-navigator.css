@@ -15,10 +15,12 @@
 .gn-labels{display:flex;justify-content:space-between;gap:6px;min-width:0;font:9px var(--mono);line-height:14px;padding:0 7px;white-space:nowrap;overflow:hidden}.gn-labels>span{min-width:0;overflow:hidden;text-overflow:ellipsis}.gn-context{text-align:center;font-family:var(--font);flex:1}
 .rt-timeline{grid-template-rows:auto minmax(38px,1fr) 20px 46px 14px;height:265px;min-height:180px}
 .packet-traffic-section{grid-template-rows:auto minmax(35px,1fr) 20px 46px 14px;height:245px}
-.graph-workspace{--graph-min-height:185px}
-@media(max-height:720px){.graph-workspace{--graph-min-height:157px}.graph-workspace-graph>.rt-timeline{grid-template-rows:auto minmax(30px,1fr) 18px 40px}.graph-navigator{height:40px;grid-template-rows:26px 13px}.graph-workspace-graph>.rt-timeline{min-height:0}}
-@media(max-width:600px){.graph-workspace,.diagnostic-page:has(.result-graph-entry) .graph-workspace{--graph-min-height:168px}.graph-workspace-graph>.rt-timeline,.diagnostic-page:has(.result-graph-entry) .graph-workspace-graph>.rt-timeline{grid-template-rows:auto minmax(30px,1fr) 18px 40px;min-height:0}.graph-workspace-graph .rt-plot-caption{display:none}.graph-navigator{height:40px;grid-template-rows:26px 13px}.gn-context{font-size:0}.gn-context:after{content:'History';font-size:9px}}
+.graph-workspace{--graph-min-height:230px}
+@media(max-height:720px){.graph-workspace{--graph-min-height:135px}.graph-workspace-graph>.rt-timeline{grid-template-rows:auto minmax(30px,1fr) 18px 40px}.graph-navigator{height:40px;grid-template-rows:26px 13px}.graph-workspace-graph>.rt-timeline{min-height:0}}
+@media(max-width:600px){.graph-workspace,.diagnostic-page:has(.result-graph-entry) .graph-workspace{--graph-min-height:190px}.graph-workspace-graph>.rt-timeline,.diagnostic-page:has(.result-graph-entry) .graph-workspace-graph>.rt-timeline{grid-template-rows:auto minmax(30px,1fr) 18px 40px;min-height:0}.graph-workspace-graph .rt-plot-caption{display:none}.graph-navigator{height:40px;grid-template-rows:26px 13px}.gn-context{font-size:0}.gn-context:after{content:'History';font-size:9px}}
 
 .graph-navigator[data-gn-tiny="true"] .gn-start-hit{bottom:50%;top:-2px}.graph-navigator[data-gn-tiny="true"] .gn-end-hit{top:50%;bottom:-2px}.graph-navigator[data-gn-tiny="true"] .gn-start-hit span,.graph-navigator[data-gn-tiny="true"] .gn-end-hit span{height:9px}
 
 .graph-inline-zoom [data-rt-zoom-level],.graph-inline-zoom [data-packet-zoom-value]{max-width:45px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}@container(max-width:420px){.graph-inline-zoom [data-rt-zoom-level],.graph-inline-zoom [data-packet-zoom-value]{max-width:32px}}
+/* Compact height reserves a real plot and complete rows, with 26px handle hits. */
+@media(max-height:720px){.graph-workspace{--graph-min-height:136px}.graph-workspace-graph>.rt-timeline{grid-template-rows:auto minmax(44px,1fr) 18px 34px}.graph-navigator{height:34px;grid-template-rows:22px 11px}.graph-navigator .gn-labels{line-height:11px}.packet-traffic-section{grid-template-rows:auto minmax(35px,1fr) 20px 34px 14px}}

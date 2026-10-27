@@ -90,7 +90,7 @@
       candidates=model.allPoints.slice(Math.max(0,index-limit+1),index+1);
     }
     if(history){
-      let scope=history.range(candidates,pref,model.heldEnd||(filterState(model).active?latestPoint(model)?.time||'':''));
+      let scope=history.range(candidates,pref,model.heldEnd||(filterState(model).active&&!(pref.allHistory&&model.zoom===1&&model.follow)?latestPoint(model)?.time||'':''));
       if(model.panSpanNs&&history.instant(scope.end)!==null)scope={...scope,start:history.timestamp(history.instant(scope.end)-BigInt(model.panSpanNs))};model.baseScope=scope;scope=model.manualScope?{...scope,...root.NetworkToolkitGraphNavigator.scope(model.manualScope.start,model.manualScope.end)}:history.viewport(scope,model.zoom,model.viewEnd||'');model.timeScope=scope;
       const timed=Number.isFinite(scope.from)&&Number.isFinite(scope.to),visible=timed?history.select(model.mode==='window'&&!pref.allHistory&&!pref.durationMs&&pref.anchor==='latest'&&model.zoom>=1&&!model.viewEnd&&!model.manualScope?candidates:model.allPoints,scope):candidates,indices=new Set(visible.map(point=>point.index));
       model.rawVisiblePoints=visible.map(point=>({...point,jitter:indices.has(point.index-1)?point.jitter:null}));
@@ -230,7 +230,7 @@
   function clearPin(model,container,{close=true}={}){model.pinned=null;model.pinnedSnapshot=null;model.keyboardInspect=false;model.heldEnd='';model.liveDetails=false;model.follow=(root.NetworkToolkitGraphHistory?.preferences?.().anchor||'latest')==='latest'&&!model.viewEnd;root.NetworkToolkitGraphWorkspace?.hold?.(model.id,false);if(close)root.NetworkToolkitResultDetails?.clearGraphSelection?.(model.id);inspection(model,model.hovered!=null);refreshModel(model);if(container)renderSelection({container,model});}
   function jumpLatest(id){
     const model=models.get(String(id)),container=model&&findContainer(model.id);if(!model)return false;
-    clearHover();clearPin(model,container,{close:false});model.liveDetails=true;model.follow=true;model.viewEnd='';model.manualScope=null;model.windowEndKey=null;
+    if(root.NetworkToolkitGraphHistory?.preferences?.().allHistory&&model.zoom===1)model.panSpanNs='';clearHover();clearPin(model,container,{close:false});model.liveDetails=true;model.follow=true;model.viewEnd='';model.manualScope=null;model.windowEndKey=null;
     if(root.NetworkToolkitGraphHistory?.preferences?.().anchor!=='latest'&&root.NetworkToolkitGraphHistory)root.NetworkToolkitGraphHistory.setPreferences({anchor:'latest'},{persist:true});refreshModel(model);
     if(container?.isConnected)rebuild(container,model);root.NetworkToolkitGraphWorkspace?.latest?.(model.id,{linked:false});presentSelection(model,latestPoint(model),true,true);return !!latestPoint(model);
   }
