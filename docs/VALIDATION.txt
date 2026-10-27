@@ -1,36 +1,56 @@
-NETWORK TOOLKIT 1.17.101 REVIEW PENDING
+NETWORK TOOLKIT 1.17.101 PUBLISHED AND VERIFIED
 
-1.17.101 authorized pinned Local Network filters build
+1.17.101 published pinned Local Network filters
 
-The user requested Status and Type stay beside the search filter while Local
-Network results scroll, then explicitly authorized publication when complete.
-Baseline is published 1.17.100 and main b6cbf307157705b2115e82bd6cd7dc7eea5b666b.
-Fresh main, releases, active branches and CI were checked; no competing source
-was found. The duplicate 1.17.100 main Checks run 40489248768 finished green.
+User-authorized publication is complete:
+https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.101
+Release ID: 425363233
+Source/tag: 2493e1978565b5302098df7dc7ed940c4764a6ef
+Tree: f7248ad5829a1f8f7fb47979c6e7a357c52f5802
+Baseline: published 1.17.100 and docs main b6cbf307157705b2115e82bd6cd7dc7eea5b666b.
+Fresh remote/concurrency checks preceded editing and promotion. No competing
+source was borrowed or overwritten. Main advanced non-forcibly with an exact
+expected-head lease to the reviewed source.
 
-Cause: nongraph result filters were siblings after the sticky list toolbar.
-Local Network list filters now live inside that same toolbar. Scoped CSS keeps
-controls wrapped on narrow layouts, retaining the existing scrollport padding
-compensation and measured toolbar height for table headings. Existing
-horizontal anchoring, saved filter preferences, keyboard controls and list
-refresh remain intact. Other tools and graph/details scrollers are unchanged.
+Status and Type previously rendered after the sticky search toolbar. Local
+Network result lists now keep them inside that toolbar. Existing horizontal
+anchoring, scrollport-padding compensation and measured table-header offsets
+are retained; controls wrap together on narrow windows. Other tools and graph/
+details scrollers, filtering, saved preferences and live refresh are unchanged.
 
-Local checks: 19 focused filter tests, JavaScript syntax and inline-script parse
-pass. Release metadata/layout safeguards run before the review push. The existing
-Local Network browser suite now covers actual vertical/horizontal list scrolling,
-wide/narrow/short layouts, keyboard changes and preserved filters on rerender.
-Initial hosted review caught a redundant offset override leaving a 12 px gap;
-the override was removed, retaining the shared sticky offsets. The affected
-Local Network suite now runs first in the browser job; no checks were removed.
-Local Go and browser execution are unavailable; required hosted application,
-Windows and browser Checks remain unchanged and must pass before promotion.
-No native installation/restart or full WebView2 session is claimed.
+Local 19 filter tests, syntax/inline parse, metadata and 35 release/layout guards
+passed. Exact-source review Checks 40493778300 passed all jobs:
+application/build 122153952036, Windows 122153952234, browser 122153951797.
+673 JavaScript tests and all required Go/native/browser suites passed, including
+the real five-minute updater poll. Existing Local Network browser coverage adds
+actual vertical/horizontal scrolling at desktop, narrow and short sizes,
+keyboard selection, combined filters and rerender preference preservation.
+Desktop/narrow screenshots were inspected. Initial review 40492655185 exposed a
+redundant local sticky-offset override leaving a 12 px gap; it was removed rather
+than relaxing the assertion. The affected existing suite now runs first; no CI
+job, test or assertion was removed or weakened.
 
-Publication is pending exact-source review, expected-head nonforce promotion,
-Release and four-asset/updater/source-identity verification. No old tags/assets,
-retired feed, repository access or unrelated graph behavior may be changed.
-The newly discussed fixed recent-point spacing in Condensed is a separate,
-unapproved follow-on and is deliberately not included in this release.
+Release 40495692846 passed. All four public assets were downloaded; GitHub digests,
+outer/inner checksums, ZIP CRCs, PE x64 GUI/version resources, exact four-member
+binary-only updater allowlist, executable identity and all 811 packaged source
+files verify. Public EXE and portable ZIP match review artifact 12729996197 byte
+for byte. Latest feed resolves to v1.17.101 and its expected updater URLs.
+v1.17.100 retains its release ID, asset IDs/digests and body. No old tag/assets,
+retired feed, repository access or credential was changed.
+
+Public SHA256:
+- Network_Toolkit.exe: 322f1f6cd34983abd3353dc4c5c966f860d2ad3c69026f3ed7a0fb71675aeef1
+- Network_Toolkit_1.17.101_Portable.zip: 30633c471038eb821db53eb57c1c295a6dfb7c875d53f8ae8a10a75df05bd127
+- Network_Toolkit_1.17.101_Update.zip: 8c530677851a369bb212b0b5b7fefd934abf4c18a6796162a9745107a1f28a1c
+- SHA256SUMS: e494f58a654e7fdf522bbb74e378d13fb5b653a47938c99b583419635b8f3e94
+
+Duplicate main Checks 40495692791 remains under observation on the same tested
+source; this is not a new release gate or an optional rerun. No native install/
+restart, full WebView2 session or new live updater staging run is claimed.
+Local Go/browser execution was unavailable; hosted evidence is used.
+The separately authorized stable-recent Condensed change is being built on an
+isolated next-version branch; only its build/review push is approved, not main
+promotion/publication. It was not included in 1.17.101.
 
 NETWORK TOOLKIT 1.17.100 PUBLISHED AND VERIFIED
 
