@@ -45,24 +45,63 @@ For the subsequently authorized 1.17.90 build, the 1.17.89 note has also been
 moved unchanged into the archive. Current `RELEASE_NOTES_1.17.90.txt` alone stays
 at root, and the archive index identifies 1.17.90 as current and 1.17.89 as previous.
 
-## 1.17.98 authorized publication in progress
+## 1.17.98 published full-history Fit and compact timeline navigation
 
-The user explicitly authorized publishing the completed 1.17.98 review build.
-Publication starts from review handoff b423759ce9d2f672bbc471dc5425386ebb2ce6fe,
-based on main 8a3c87648a2c991051e8b05e19232afee1b1b3bb. The exact prepared
-runtime source is 78360788f4f1b426cc9c7d11cfd0988340379422, verified by
-Full Checks 40468142795 and review artifact 12717656219. All application,
-embedded runtime inputs and the reviewed executable remain unchanged.
-This publication refreshes release labels and documentation only.
+The user explicitly authorized publishing the completed 1.17.98 update.
+The release is live from the main source/update repository.
+Source/tag: f727135d5789ec2015d3d5ae5c1853b9b5c97f8e
+Tree: e9ec0584c719dc0b7d88bfc3e5c131b90bf2242e
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.98
+Release ID: 425167543
 
-The publication workflow must produce a new v1.17.98 release from main with
-all four validated assets together. Verify exact source/tag provenance,
-checksums, portable source contents and live updater staging before claiming
-completion. Preserve all 37 previous releases/assets and tags. Never write the
-retired update repository, replace old assets/tags, or change access/credentials.
-No installation/restart or complete native WebView2 interaction is claimed.
+Publication refreshed seven release-label/documentation files. Every application
+and embedded runtime input remains identical to prepared source
+78360788f4f1b426cc9c7d11cfd0988340379422, validated by Checks 40468142795.
+The public executable matches the reviewed executable byte for byte. Published
+release labels are current, and the portable source matches the publication commit.
 
-The verified review evidence below records the earlier unpublished review state.
+Full Checks 40470397974 passes on this exact published source:
+application 122075872274, native Windows 122075872497 and browser
+122075872601. Release 40470397914 build and publication also pass.
+667 JavaScript tests, 35 publication/layout safeguards and the required Go
+suites pass. Native Windows shell, installer progress and timestamp/statistics
+checks pass. UI98 passes five groups with 24 diagnostic layouts and 11 packet
+cases covering both plots, all modes, body/handle/keyboard navigation, exact
+time-window proportions, filters, held selections, live updates, Follow latest,
+custom and outside ranges, empty/zero/unsuccessful and nanosecond cases,
+large histories, exports and graph-pane overflow. Retained UI97/96/95/94/93/92
+and the other application regressions pass. All seven native Chromium updater
+cases pass, including the real five-minute poll and released negative control.
+
+All four public files were downloaded and verified against GitHub asset digests
+and the release manifest. PE x64 GUI/version resources, ZIP integrity,
+binary-only updater allowlist, all 808 packaged source files,
+55 historical notes and 14 editor-library digests verify.
+The local publication candidate EXE/portable match the public files.
+All 37 older releases retain their asset IDs, digests and bodies;
+all 37 older tag objects are unchanged. No old release asset/tag,
+retired feed, repository access or credential was modified.
+
+Public assets:
+- Network_Toolkit.exe: asset 680882678, 17987072 bytes, SHA256 6a48dd47c69ec178bfe5653cfef1260bc183d59c631fe7043e06af67a1a16094
+- Network_Toolkit_1.17.98_Portable.zip: asset 680882676, 11511411 bytes, SHA256 667af502603a57ab098596f3a7139c4ee8b2f10cafa3d66481190d420898eeb9
+- Network_Toolkit_1.17.98_Update.zip: asset 680882677, 7031207 bytes, SHA256 b9c506f9b391c03a09cd2e25d2e96b589ee73aa9ce959e039191f402d05bf8e2
+- SHA256SUMS: asset 680882682, 290 bytes, SHA256 1b4f980313225076870e3453a58f80342c5c17aede9ca3cdcf8617c3e0e0927d
+
+Live acceptance used released 1.17.97 production updater code against the real
+public feed. It detected 1.17.98, downloaded and verified the official candidate,
+and reached ready in 12.09 seconds. Check/download responses were HTTP
+200. The staged 17987072-byte executable matched the independently
+verified public hash, and the source executable remained unchanged.
+No installation, restart or complete native WebView2 interaction is claimed.
+
+Main network-toolkit is the sole public source/update feed. Publication is
+complete; future releases need user authorization. This final three-document
+record uses [skip ci] after successful validation/publication. The immutable
+release tag and packaged source remain the published source above.
+
+The review evidence below records the earlier unpublished review state, before
+the subsequent authorized publication above.
 
 ## 1.17.98 verified review build: full-history Fit and compact timeline navigation
 

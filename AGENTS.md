@@ -3,32 +3,22 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-Publication of 1.17.98 is explicitly authorized and in progress.
-Prepared runtime source: 78360788f4f1b426cc9c7d11cfd0988340379422
-Prepared Checks 40468142795 passed all jobs, including 667 JavaScript tests,
-35 safeguards, Go/native Windows/browser suites and all 7 updater timer cases.
-This publication changes only release labels/documentation. Preserve the
-verified application inputs and EXE SHA256
-6a48dd47c69ec178bfe5653cfef1260bc183d59c631fe7043e06af67a1a16094.
-Main network-toolkit remains the sole source/update feed. Verify publication,
-assets, tag and updater staging before recording completion in the handoff.
-
-Current verified published version: 1.17.97.
-Source/tag: c57ad0e52da1d40cda8a6d268e4161928a686a61
-Tree: e670de6d771d9ee18663960a586b4898176c1fd5
-Full Checks 40458096035 and Release 40458095982 pass on this source.
-659 JavaScript tests, 35 safeguards and the required Go/native Windows/browser
-suites pass, including all 7 updater timer cases and the real five-minute poll.
-UI97: 4 groups, 8 scale cases, 72 diagnostic layouts and 17 packet cases;
-retained UI96/95/94/93/92 and earlier application regressions also pass.
-Prepared/public EXE and publication-candidate/public portable files match.
-All 799 packaged source files, 54 historical notes and 14 editor digests verify.
-All 36 older releases/assets and 36 older tags are unchanged.
-Released96 detected/verified/staged97 in 10.06s; no installation/restart
+Current verified published version: 1.17.98.
+Source/tag: f727135d5789ec2015d3d5ae5c1853b9b5c97f8e
+Tree: e9ec0584c719dc0b7d88bfc3e5c131b90bf2242e
+Full Checks 40470397974 and Release 40470397914 pass on this source.
+667 JavaScript tests, 35 safeguards and required Go/native Windows/browser
+suites pass, including all seven updater timer cases and the real five-minute poll.
+UI98: five groups, 24 diagnostic layouts and 11 packet cases; retained
+UI97/96/95/94/93/92 and other application regressions also pass.
+Prepared/public EXEs and publication-candidate/public portable files match.
+All 808 packaged source files, 55 historical notes and 14 editor digests verify.
+All 37 older releases/assets/bodies and 37 tags remain unchanged.
+Released97 detected, verified and staged98 in 12.09s; no installation/restart
 or complete native WebView2 interaction is claimed. See handoff for evidence.
 
-The user authorized publication and it is complete. Future releases need
-authorization. Main network-toolkit is the sole public source/update feed.
+Publication was explicitly authorized and is complete. Future releases require
+authorization. Main network-toolkit remains the sole source/update feed.
 Never replace old tags/assets, change access or write the retired feed. This
 final three-file documentation record uses [skip ci].
 
