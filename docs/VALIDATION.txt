@@ -1,48 +1,119 @@
-NETWORK TOOLKIT 1.17.103 REVIEW PENDING
+NETWORK TOOLKIT 1.17.103 PUBLISHED AND VERIFIED
 
-1.17.103 authorized accumulated-history cluster build
+1.17.103 published accumulated-history cluster and RTT accent
 
-The user supplied Pasted text(7).md and explicitly said "publish when complete".
-This authorizes isolated implementation/build, then safe main promotion/release
-once focused rendered acceptance and existing required gates pass.
-Baseline: main eb09b7923f3716b899aa08860ddc7726bb6c64a4, published v1.17.102
-source 4a58f6c86cf6a54b798f90d7a17802f6ad4e2202. Fresh branch/release/tag checks
-found no conflicting work and 1.17.103 free. The published 102 duplicate main
-Checks 40535557196 completed successfully; no rerun was needed.
-The final standalone 102 closure upload encountered an automatic approval-review
-state-change error, explicitly not executed. No alternate write bypass was used;
-its terminal result is recorded here under fresh 103 authorization instead.
+Publication was explicitly authorized by the user's attached Pasted text(7).md
+and subsequent "publish when complete" instruction. Completed release:
+https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.103
+Release ID: 425758158
+Exact source/tag: b9f365e6a8df0a04be7daf3a083e2334a63f9f52
+Tree: bd6fd6bdd2f475a77ebcdf8adfcd0dc90676ef78
+Main baseline: eb09b7923f3716b899aa08860ddc7726bb6c64a4.
+Fresh main/review/tag/release checks found no competing change. Expected-head,
+non-force main promotion preserved that baseline and the exact reviewed source.
 
-Actual causes: the v102 warm-up still normalized by total span before 3R; dynamic
-Y-label width changed usable plot width; older display bins were not one persistent
-history cluster. Completed raw rows cap at 10,000, while active jobs expose only
-2,200 activity events. Both rollover paths need a bounded summary before trimming.
-RTT CSS used a diagnostic latency token before the selected accent token.
+The actual v102 causes were whole-span warm-up normalization, a changing Y-label
+width and multiple transient old display buckets. Completed raw rows cap at
+10,000 while active jobs expose only 2,200 activity events, so both independent
+rollover paths now accumulate a bounded run-local prefix before discarding rows.
+Condensed RTT uses fixed age-to-x geometry and one left historical cluster;
+sparse startup honestly leaves unused old space. Grid boundaries, data centers
+and interactions agree, with marker rendering room outside rather than an
+inward data gutter. RTT traces/success markers now repaint with the live accent.
+Linear, packet semantics, held selections, local pinned controls and updater
+behavior remain intact. See CONDENSED_GRAPH_SCALING.md for policy and limits.
 
-Implementation is complete in an isolated worktree. Fixed age projection,
-single left cluster, shared visible plot boundaries, honest sparse startup and
-live accent RTT styling replace those assumptions. Backend summaries are run-local
-and retain counts, first/last recorded times and sequences, measured sum/extrema,
-zeros, loss/status counts and valid consecutive-pair jitter. No unlimited raw
-array is introduced. Completed result.data.history pairs with completed samples;
-active job.sampleHistory pairs with retained sample events, never both at once.
-JSON/HTML/text export preserve the applicable summary. Old runs lacking summaries
-cannot recover discarded originals; partial archived intervals must not invent
-precise subset statistics. Existing Linear, packet traffic semantics, navigation,
-selections, details, filters and updater must remain intact.
+Validation:
+- 171/171 initial focused JS cases; 70/70 affected-suite cases after the added
+  long-horizon source-pairing regression; final targeted cases 5/5; report export
+  15 groups; syntax/inline parse, metadata and 35 release/layout guards pass.
+- Required final review Checks 40544688990 PASSED on the exact source above:
+  application 122332012323, Windows 122332012574, browser 122332011913. Hosted Go
+  includes one million arrivals with only 10,000 raw rows, live event rollover,
+  bounded status labels, JSON restoration, snapshot isolation and failures/zeros.
+  All 685 JavaScript cases pass, along with existing native/browser safeguards.
+- Initial review 40543493293 exposed one stale browser assertion expecting green
+  successful RTT glyphs. Only that test expectation was changed to require the
+  selected accent while preserving row/failure/warning semantics. No application
+  fix or weakened assertion was needed. Final review above is fully green.
+- Browser artifact 12753177979: deterministic actual SVG rendering at 1440x1000
+  and 390x1000 covers totals 2, 60, 179, 180, 181, 706, 10,000, 10,001 and
+  1,010,000. Newest gaps remain 9.09 px and 2.77 px respectively despite growth
+  and large Y-label changes. At full history the single cluster center is exactly
+  plot-left (64 SVG units), newest exactly plot-right (826 normal / 296 narrow).
+  Represented counts stay exact across retention. Normal/narrow screenshots were
+  inspected, including sparse startup and million-summary views. Four live
+  light/dark/accent combinations preserve distinct loss colors. The actual native
+  five-minute updater check passed (302264 ms), not a shortened simulation.
+- Final review portable artifact 12752810805 verified before promotion. Required
+  Release 40547665547 PASSED (build 122342534768, publish 122343545199).
+- All four public assets downloaded and verified: GitHub SHA256 digests, outer
+  and inner manifests, safe ZIP inventory/CRCs, x64 GUI PE/version resources,
+  all 816 source files and updater allowlist/executable identity. Public EXE and
+  portable ZIP exactly match the final review artifact. Latest release/feed and
+  tag/main provenance point to v1.17.103; v1.17.102 ID/body/asset IDs/digests remain
+  unchanged. The source archive contains the pre-publication validation record;
+  this later docs-only handoff does not rebuild or replace published assets.
 
-Focused regressions cover million-sample aggregation with only 10,000 raw rows,
-live-event rollover, summary immutability/JSON restoration, zero/failure/jitter
-semantics, reset isolation and exports. Local report-export 15 groups passed. Seven focused JS suites passed 171/171;
-after the added long-horizon pairing regression, affected suites passed 70/70
-and final targeted rollover/filter/duplicate/selection checks passed 5/5. Changed
-JS/browser and inline syntax plus whitespace checks pass. Release metadata and
-35 Python publication/layout guards pass.
-Local Go is not an available compiler and local browser sockets are unavailable;
-no denied-path retry/escalation is used. Hosted native/build/browser gates remain
-required. Actual normal/narrow rendered growth, Y-label changes, endpoints and
-active theme-change checks are pending; helper tests alone do not establish a fix.
-No publication or native installation is claimed until verification completes.
+Public SHA256:
+- Network_Toolkit.exe: 6fc02de501019d93023df87691d25522eb3cf6c88389d551f851e013fff32733
+- Network_Toolkit_1.17.103_Portable.zip: 56d4823dd357c4db1304121b385ca76781f0390923de90261a6eb6169e5de410
+- Network_Toolkit_1.17.103_Update.zip: a2c39e24db6d6f44f820a759075cae39b690e0a0f588108b79260e933e0cb975
+- SHA256SUMS: 7415fff53b9825cc522fcd3b39239a06632a929d3ec3353efbfc0f16085a32aa
+Updater contains only the versioned executable, SHA256SUMS,
+THIRD_PARTY_NOTICES.txt and UPDATING.txt under Network_Toolkit_1.17.103/.
+
+Automatic duplicate main Checks 40547665503 completed SUCCESS at 17:23:50 UTC:
+application 122342536431, Windows 122342536800 and browser 122342535698 passed.
+No optional rerun or release repair was needed.
+
+Availability limits are explicit, not silently reconstructed: older raw rows are
+summarized, not infinitely retained; the live/completed prefixes pair only with
+matching raw rows. Partial archived intervals and arbitrary filtered historical
+subsets cannot recover exact discarded records; legacy runs without summaries
+cannot regain them. Summaries follow existing run/session persistence. Explicit
+range/zoom/viewport/cadence changes may change spacing; elapsed history alone
+does not. Sparse startup does not stretch its first point to the left boundary.
+No native installation, full Windows WebView2 session or live updater staging
+is claimed. Local Go/browser execution was unavailable; hosted checks supplied
+that evidence. No access changes, old tag/asset replacement or retired feed writes.
+
+The previous v102 duplicate main Checks 40535557196 completed successfully at
+16:10:51 UTC. Its standalone closure write was explicitly not executed after an
+automatic approval-review state-change error; no bypass was used. That terminal
+result was incorporated under fresh v103 authorization instead. This final
+handoff uses [skip ci]. Future feature/build/publication work needs user scope.
+
+#Subsequent separately authorized combined build scope
+
+The user's 17:17 screenshot was inspected as pixels. It shows Condensed / All /
+1x, a 3-minute recent horizon, 171 samples across about 170 seconds and ~817 px
+of actual plot width. Adjacent newest samples are about 9-10 px apart, consistent
+with the published fixed-age formula (~9.74 px at a one-second interval). This
+is an absolute density/readability issue; that still frame does not establish
+renewed growth-dependent compression. Stable spacing is not the same as a
+readable minimum at every configured cadence and viewport.
+
+A proposed next change is an approximately 18-20 px recent gap at 1x for the
+normal configured sample interval, with the horizon derived from viewport and
+stable cadence rather than growing history; older points would join the existing
+left cluster sooner. The recent-horizon label must stay truthful. Preserve real
+irregular/duplicate timestamps and explicit control effects rather than inventing
+even spacing. The user was asked for separate build/publication approval; it is
+pending. No source change, next version or new build is authorized by this note.
+
+Separate credential-security implementation/build/publication was subsequently
+authorized and assigned to the security worker. That authority does not approve
+the graph-density proposal. Coordinate its isolated branch with this docs-only
+main update; preserve the completed v103 source and avoid concurrent promotion.
+
+The user then refined the graph target to the newest-point spacing in the
+30-second reference view, with progressively older-left compression, and
+explicitly requested implementation in the same build as security features.
+This supersedes the tentative 18-20 px proposal and prior approval hold.
+The combined build is owned by the security lead; graph changes must be an
+isolated coordinated patch, not a competing release or main promotion.
+The actual reference screenshot must ground the new mapping and acceptance.
 
 NETWORK TOOLKIT 1.17.102 PUBLISHED AND VERIFIED
 

@@ -3,12 +3,16 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-Current development version: 1.17.103; published baseline: 1.17.102.
-The user authorized the attached accumulated-history cluster/theme work and
-publication when complete. Required exact-source gates and actual rendered
-acceptance must pass before safe expected-head main promotion and release.
+Current published version: 1.17.103. The accumulated-history cluster/theme
+release and its required review, Release and duplicate-main checks are complete.
 Read docs/DEVELOPMENT_HANDOFF.md and docs/CONDENSED_GRAPH_SCALING.md.
-Preserve completed Local Network pinned filters and unrelated behavior.
+
+The next user-authorized work combines credential security and graph recent
+spacing matching the supplied 30-second reference. The security lead owns the
+combined build/main promotion/release. Keep graph work isolated and coordinate
+its patch; do not publish a competing graph release or overwrite concurrent work.
+Preserve Local Network pinned filters and unrelated behavior. Required exact-source
+checks and actual rendered acceptance remain mandatory before safe promotion.
 
 Never replace old tags/assets, change access or write the retired update feed.
 Record honest retention/legacy/partial-summary limits; no unbounded raw history.
