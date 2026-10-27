@@ -83,6 +83,19 @@ func ApplyGraph(s *Statistics, packets []Packet, options GraphOptions) {
 	if groupRecent && options.Condensed {
 		s.GraphNote = "High-volume recent traffic is grouped into intervals. Every retained matching frame remains available in the interval details and packet list."
 	}
+	gaps := make([]time.Duration, 0, 256)
+	for i := max(1, len(window)-256); i < len(window); i++ {
+		if gap := window[i].Time.Sub(window[i-1].Time); gap > 0 {
+			gaps = append(gaps, gap)
+		}
+	}
+	sort.Slice(gaps, func(i, j int) bool { return gaps[i] < gaps[j] })
+	cadence := float64(recent) / 60
+	if len(gaps) > 0 {
+		cadence = float64(gaps[len(gaps)/2])
+	}
+	oldest := max(1, float64(end.Sub(window[0].Time))/float64(recent))
+	density := min(120, max(1, float64(recent)/cadence), 1400/max(1, 2*(math.Sqrt(oldest)-1)))
 	bins := map[string]int{}
 	uniformStep := max(time.Second, time.Duration(math.Ceil(float64(window[len(window)-1].Time.Sub(window[0].Time))/60)))
 	for _, p := range window {
@@ -96,9 +109,9 @@ func ApplyGraph(s *Statistics, packets []Packet, options GraphOptions) {
 					step := max(time.Nanosecond, recent/1000)
 					key = "recent:" + uintString(uint64(age/step))
 				} else {
-					// Equal steps in continuous log-age space produce smoothly
-					// growing intervals without power-of-two resolution jumps.
-					bin := uint64(math.Floor(12 * math.Log(float64(age)/float64(recent))))
+					// Growing square-root-age intervals stay denser toward older
+					// time after nonlinear projection, without resolution tiers.
+					bin := uint64(math.Floor(2 * density * (math.Sqrt(float64(age)/float64(recent)) - 1)))
 					key = "older:" + uintString(bin)
 				}
 			}

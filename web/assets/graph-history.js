@@ -19,8 +19,13 @@
  function contains(stamp,scope){return valid(stamp)&&(!valid(scope.start)||compare(stamp,scope.start)>=0)&&(!valid(scope.end)||compare(stamp,scope.end)<=0);}
  function select(items,scope,getStamp=item=>item.time){return items.filter(item=>contains(getStamp(item),scope)).sort((a,b)=>compare(getStamp(a),getStamp(b)));}
  function condense(items,{end,recentMs=60000,getStamp=item=>item.time}={}){
-  const sorted=items.filter(item=>valid(getStamp(item))).slice().sort((a,b)=>compare(getStamp(a),getStamp(b))),last=epoch(end??getStamp(sorted.at(-1)||{})),bins=new Map(),result=[];
-  for(const item of sorted){const age=Math.max(0,last-epoch(getStamp(item)));if(age<recentMs){result.push({items:[item],aggregate:false});continue;}const key=String(Math.floor(12*Math.log(Math.max(1,age/recentMs))));let group=bins.get(key);if(!group){group={items:[],aggregate:true};bins.set(key,group);result.push(group);}group.items.push(item);}
+  const sorted=items.filter(item=>valid(getStamp(item))).slice().sort((a,b)=>compare(getStamp(a),getStamp(b))),last=epoch(end??getStamp(sorted.at(-1)||{})),bins=new Map(),result=[],gaps=[];
+  for(let i=Math.max(1,sorted.length-256);i<sorted.length;i++){const gap=Number(instant(getStamp(sorted[i]))-instant(getStamp(sorted[i-1])))/1000000;if(gap>0)gaps.push(gap);}gaps.sort((a,b)=>a-b);
+  const cadence=gaps[Math.floor(gaps.length/2)]||recentMs/60,oldest=Math.max(1,(last-epoch(getStamp(sorted[0]||{})))/recentMs),density=Math.min(120,Math.max(1,recentMs/cadence),1400/Math.max(1,2*(Math.sqrt(oldest)-1)));
+  // Bin widths grow with the square root of age, more slowly than the time
+  // projection compresses it. Older displayed groups therefore get denser to
+  // the left, instead of turning into an evenly spaced row of averages.
+  for(const item of sorted){const age=Math.max(0,last-epoch(getStamp(item)));if(age<recentMs){result.push({items:[item],aggregate:false});continue;}const key=String(Math.floor(2*density*(Math.sqrt(Math.max(1,age/recentMs))-1)));let group=bins.get(key);if(!group){group={items:[],aggregate:true};bins.set(key,group);result.push(group);}group.items.push(item);}
   return result.sort((a,b)=>compare(getStamp(a.items[0]),getStamp(b.items[0]))).map(group=>({...group,aggregate:group.items.length>1,start:getStamp(group.items[0]),end:getStamp(group.items.at(-1)),count:group.items.length}));
  }
  function parseTime(value){

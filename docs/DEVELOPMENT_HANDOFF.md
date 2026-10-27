@@ -51,7 +51,7 @@ The user authorized implementation, validation, build delivery and handoff updat
 Work starts from main d03f9bf005fb08e8d94237cd6c0b850349480b01 and remains on
 review/hosts-editor-1.17.97. The published update feed and main remain at 1.17.96.
 
-This build replaces power-of-two age grouping with continuous log-age intervals,
+This build replaces power-of-two age grouping with cadence-aware square-root-age intervals,
 adds a visible Timeframe selector and direct zoom/Fit controls, and supports
 pointer-anchored wheel/trackpad zoom. Each measurement plot fits the genuine
 visible minimum/maximum with a small margin, including original extrema inside

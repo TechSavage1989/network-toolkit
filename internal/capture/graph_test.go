@@ -18,7 +18,7 @@ func TestCondensedGraphPreservesAllPacketsCountsSeverityAndExactTimes(t *testing
 	before, _ := json.Marshal(packets)
 	s := Stats(packets)
 	ApplyGraph(&s, packets, GraphOptions{Condensed: true, Recent: time.Minute})
-	if len(s.Timeline) >= 250 {
+	if len(s.Timeline) >= 1600 {
 		t.Fatalf("older history was not condensed: %d", len(s.Timeline))
 	}
 	total, bytes, notes, singles := 0, uint64(0), 0, 0
