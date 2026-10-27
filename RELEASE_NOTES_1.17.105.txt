@@ -1,0 +1,19 @@
+Network Toolkit 1.17.105
+
+SSH login-banner formatting
+- Aligns SSH authentication banners that use bare line feeds by adding only the missing carriage return. Existing CRLF, lone carriage returns, Unicode and terminal controls remain intact, including split banner callbacks.
+- Normal shell/PTY output is unchanged. The fix is scoped to pre-PTY authentication banners rather than globally rewriting device output or changing terminal cursor semantics. Existing pager and command/paste archives are preserved.
+
+Discovery multi-item filtering
+- Filter discovery lists with multiple IP addresses, MAC addresses or other searchable device details, separated by newlines, spaces or commas. An entry matches any listed value; status/type controls continue to narrow the results.
+- MAC addresses accept colon, hyphen, plain hexadecimal and Cisco dotted formats without case sensitivity. Complete IP addresses match exactly; ordinary text keeps substring matching. Quote a multi-word phrase to keep it together.
+- Pasted multiline lists keep their separators rather than merging into one value. Duplicate and empty entries are harmless.
+
+Explicit TCP-port connection actions
+- Open TCP-port entries provide keyboard-accessible actions for the existing terminal, browser, remote-file and supported native connection tools, carrying the selected device and port.
+- Reliable service information is preferred; conventional port mappings are labeled hints, not service detection. Unrecognized services require an explicit tool choice.
+- No connection starts from rendering or scanning alone. New terminal/file destinations do not reuse stored credentials automatically, and existing native destination approval, SSH host identity and vault protections remain in force.
+
+Compatibility and limits
+- Preserves the 1.17.104 encrypted vault, new/unset terminal defaults, icon resources, Condensed graphs and bounded output archives.
+- Validation uses synthetic fixtures and hosted browser/native checks, not actual user credentials or a live device fleet. The banner fix does not claim to repair every server-side terminal format or PTY-size issue.

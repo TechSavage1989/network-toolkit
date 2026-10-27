@@ -1,0 +1,74 @@
+{
+  "description": "Synthetic compatibility cases, not captured device bytes. Normalized bytes are verified by Go tests and replayed by browser acceptance.",
+  "cases": [
+    {
+      "name": "empty",
+      "chunks": [
+        ""
+      ],
+      "normalized": ""
+    },
+    {
+      "name": "bare-lf",
+      "chunks": [
+        "first\nsecond\n"
+      ],
+      "normalized": "first\r\nsecond\r\n"
+    },
+    {
+      "name": "crlf",
+      "chunks": [
+        "first\r\nsecond\r\n"
+      ],
+      "normalized": "first\r\nsecond\r\n"
+    },
+    {
+      "name": "mixed",
+      "chunks": [
+        "first\nsecond\r\nthird\rFOURTH\n"
+      ],
+      "normalized": "first\r\nsecond\r\nthird\rFOURTH\r\n"
+    },
+    {
+      "name": "split-crlf",
+      "chunks": [
+        "first\r",
+        "",
+        "\nsecond\r",
+        "\n"
+      ],
+      "normalized": "first\r\nsecond\r\n"
+    },
+    {
+      "name": "repeated-banners",
+      "chunks": [
+        "first\n",
+        "second\n",
+        "second\n"
+      ],
+      "normalized": "first\r\nsecond\r\nsecond\r\n"
+    },
+    {
+      "name": "lone-cr-controls",
+      "chunks": [
+        "\r\r\nabc\r\u001b[2KX\bY\tZ\u0007\n"
+      ],
+      "normalized": "\r\r\nabc\r\u001b[2KX\bY\tZ\u0007\r\n"
+    },
+    {
+      "name": "unicode-ansi",
+      "chunks": [
+        "\u001b[32mCafé 東京 🌐\u001b[0m\n",
+        "\u001b]0;Title\u0007Done\n"
+      ],
+      "normalized": "\u001b[32mCafé 東京 🌐\u001b[0m\r\n\u001b]0;Title\u0007Done\r\n"
+    },
+    {
+      "name": "aruba-style-synthetic",
+      "chunks": [
+        "(C) Copyright 2017-2023 Hewlett Packard Enterprise Development LP\n\n                    RESTRICTED RIGHTS LEGEND\n Confidential computer software. Valid license from Hewlett Packard Enterprise\n Development LP required for possession, use, or copying. License found at\n https://www.arubanetworks.com/assets/legal/EULA.pdf and\n https://www.hpe.com/software/SWLicensing.\n\nWe would like to keep you up to date about:\n * Software feature updates\n * New product announcements\n"
+      ],
+      "normalized": "(C) Copyright 2017-2023 Hewlett Packard Enterprise Development LP\r\n\r\n                    RESTRICTED RIGHTS LEGEND\r\n Confidential computer software. Valid license from Hewlett Packard Enterprise\r\n Development LP required for possession, use, or copying. License found at\r\n https://www.arubanetworks.com/assets/legal/EULA.pdf and\r\n https://www.hpe.com/software/SWLicensing.\r\n\r\nWe would like to keep you up to date about:\r\n * Software feature updates\r\n * New product announcements\r\n"
+    }
+  ]
+}

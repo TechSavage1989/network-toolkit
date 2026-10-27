@@ -1,11 +1,21 @@
-NETWORK TOOLKIT 1.17.104
+NETWORK TOOLKIT 1.17.105
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.104
+CURRENT RELEASE - 1.17.105
 
-Release details: RELEASE_NOTES_1.17.104.txt
-Previous release: docs/releases/RELEASE_NOTES_1.17.103.txt
+Release details: RELEASE_NOTES_1.17.105.txt
+Previous release: docs/releases/RELEASE_NOTES_1.17.104.txt
 Full release-note archive: docs/releases/README.md
+
+SSH login banners with bare line feeds are aligned without changing normal PTY
+output, terminal controls or paging. Discovery filters accept lists separated by
+newlines, spaces or commas; quote multi-word phrases to match them together.
+Complete IP/MAC entries match exact normalized addresses, while ordinary text
+matches searchable device details. Existing status/type controls remain combined.
+Click an open TCP port to prepare the appropriate existing connection tool or
+open the browser/RDP route; unknown services require an explicit tool choice.
+Port mappings are hints, not proof of a detected service. No port action runs
+merely because scan results arrive. Existing connection security checks remain.
 
 Set up the master-password credential vault explicitly in the native Windows dialog.
 Remembered unlock is on by default and survives app restarts and Windows reboots

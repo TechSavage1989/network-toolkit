@@ -304,6 +304,9 @@ func openSSHConnection(parent context.Context, req ConnectRequest, cb transportC
 	}
 	auth = append(auth, keyboard)
 	algorithms := sshAlgorithmPolicy(req.SSHCompatibility)
+	// Authentication banners precede the PTY and do not receive its newline
+	// processing. Keep this compatibility conversion out of normal shell I/O.
+	banner := sshBannerNormalizer{}
 	config := &ssh.ClientConfig{User: req.Username, Auth: auth, HostKeyCallback: hostKey, HostKeyAlgorithms: algorithms.HostKeys,
 		Config:        ssh.Config{KeyExchanges: algorithms.KeyExchanges, Ciphers: algorithms.Ciphers, MACs: algorithms.MACs},
 		ClientVersion: "SSH-2.0-NetworkToolkit", BannerCallback: func(message string) error {
@@ -311,7 +314,7 @@ func openSSHConnection(parent context.Context, req ConnectRequest, cb transportC
 				return errors.New("SSH authentication banner exceeded its limit")
 			}
 			if cb.Output != nil {
-				cb.Output([]byte(message))
+				cb.Output(banner.normalize(message))
 			}
 			return lifetime.Err()
 		}}

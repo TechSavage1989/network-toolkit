@@ -295,3 +295,9 @@
 .app-update-progress{flex:1 1 100%;min-width:0;margin:10px 0;font-size:11px}.app-update-progress progress{display:block;width:100%;height:9px;margin-top:6px;accent-color:var(--accent)}.app-update-progress .row{flex-wrap:wrap}.app-update-progress small{display:block;color:var(--muted);margin-top:5px}
 
 .auto-fit-results td[data-column-id="hostname"] .identity-value,.auto-fit-results td[data-column-id="hostname"] .identity-source,.auto-fit-results td[data-column-id="vendor"] .identity-value,.auto-fit-results td[data-column-id="vendor"] .identity-source{max-width:28ch}
+
+/* Port controls retain the compact badges and native keyboard activation. */
+.network-port-connect{color:var(--text);font-family:inherit;cursor:pointer}
+.network-port-connect:hover{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--panel))}
+.network-port-connect:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.network-port-connect:disabled{cursor:not-allowed;opacity:.5}

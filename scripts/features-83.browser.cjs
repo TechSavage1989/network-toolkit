@@ -83,7 +83,8 @@ async function copyGeometry(){return page.locator('#toolResult [data-value-copy-
   assert.deepEqual(await copyGeometry(),[],JSON.stringify({width,theme}));
   const metrics=await page.locator('#toolResult table').first().evaluate(table=>({layout:getComputedStyle(table).tableLayout,latency:table.rows[1].cells[6].getBoundingClientRect().width,rows:table.tBodies[0].rows.length,handles:table.querySelectorAll('[data-column-resize]').length}));
   assert.equal(metrics.layout,'auto');assert.equal(metrics.rows,60);assert.equal(metrics.handles,0);assert(metrics.latency>0&&metrics.latency<140,JSON.stringify(metrics));
-  assert.equal(await page.locator('.network-port-badge').first().getAttribute('title'),'TCP 22 open · Conventional SSH port, service not verified');
+  assert.match(await page.locator('.network-port-badge').first().getAttribute('title'),/^TCP 22 open · Conventional SSH port; service not verified\. Open SSH terminal for 192\.0\.2\.1 on port 22\.$/);
+  assert.equal(await page.locator('.network-port-badge').first().evaluate(el=>el.tagName),'BUTTON');
   report.layouts.push({width,theme,metrics});if(out&&(width===1600||width===390))await page.screenshot({path:path.join(out,'features83-scan-'+theme+'-'+width+'.png')});
  }
  await page.locator('.network-open-ports [data-value-copy-control]').first().scrollIntoViewIfNeeded();await page.locator('.network-open-ports [data-value-copy-control]').first().click();await page.waitForFunction(async()=>await navigator.clipboard.readText()==='22, 80, 443, 3389, 5985, 8080, 8443');

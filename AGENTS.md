@@ -3,6 +3,12 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
+Authorized development target: 1.17.105, covering SSH authentication-banner
+line endings, multi-item discovery filtering and explicit TCP-port actions.
+Publication is authorized after exact-source required checks and release asset
+verification. See docs/RELEASE105_HANDOFF.md. No user devices or credentials may
+be accessed for validation. Keep the published 104 tag/assets immutable.
+
 Current published version: 1.17.104. The combined credential-security, graph,
 canonical icon, terminal pager and new/unset-default release is published and
 independently verified. Read docs/DEVELOPMENT_HANDOFF.md,

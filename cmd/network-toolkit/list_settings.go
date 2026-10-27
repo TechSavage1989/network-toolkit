@@ -1,6 +1,33 @@
 package main
 
-import "sort"
+import (
+	"sort"
+	"strings"
+	"unicode/utf8"
+)
+
+// Match the discovery search input's maxLength and JavaScript string length,
+// which count UTF-16 code units. A unit needs at most three UTF-8 bytes; astral
+// characters use two units and four bytes. The overall state API still caps
+// both the incoming request and serialized settings at 2 MiB.
+const networkListQueryUTF16Limit = 32768
+
+func validNetworkListQuery(text string) bool {
+	if len(text) > 3*networkListQueryUTF16Limit || !utf8.ValidString(text) {
+		return false
+	}
+	units := 0
+	for _, char := range text {
+		units++
+		if char > 0xffff {
+			units++
+		}
+		if units > networkListQueryUTF16Limit {
+			return false
+		}
+	}
+	return true
+}
 
 // Persist table controls only. Rows, terminal output and nested arbitrary
 // objects must not be retained through the preference schema.
@@ -28,8 +55,14 @@ func sanitizeListPreferences(state map[string]any) {
 		}
 		row := map[string]any{}
 		for field, limit := range map[string]int{"query": 512, "sort": 128, "status": 64} {
-			if text, ok := input[field].(string); ok && len(text) <= limit {
-				row[field] = text
+			if text, ok := input[field].(string); ok {
+				allowed := len(text) <= limit
+				if field == "query" && strings.HasPrefix(key, "network:") {
+					allowed = validNetworkListQuery(text)
+				}
+				if allowed {
+					row[field] = text
+				}
 			}
 		}
 		if direction, ok := input["direction"].(string); ok && (direction == "asc" || direction == "desc") {

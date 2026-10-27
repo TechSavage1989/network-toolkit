@@ -1,5 +1,15 @@
 # Network Toolkit development handoff
 
+## Authorized 1.17.105 candidate
+
+The user approved the SSH banner fix, multi-item discovery filters and clickable
+TCP-port connection actions, then explicitly said to push and keep them updated.
+The combined work starts from closure main1197870a348b71558af1ce3402601aa09cfaccc6
+(tree d052531be61be98642f59bdeb13819c05e7d92ff), preserving published104 safeguards.
+See RELEASE105_HANDOFF.md for scope, tests and the current publication state.
+104 remains published until exact-source required gates and controlled promotion
+complete. Do not overwrite its tag/assets or broaden these three features.
+
 ## 1.17.104 published and independently verified
 
 Published 2026-10-27:

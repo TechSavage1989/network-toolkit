@@ -83,4 +83,4 @@ See [VALIDATION.txt](docs/VALIDATION.txt) for recorded results and [THIRD_PARTY_
 
 </details>
 
-Current version: [1.17.104 remembered master-password vault, terminal paging and graph spacing](RELEASE_NOTES_1.17.104.txt).
+Current version: [1.17.105 login-banner formatting and discovery workflow](RELEASE_NOTES_1.17.105.txt).

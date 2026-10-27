@@ -1,3 +1,14 @@
+1.17.105 CANDIDATE - validation in progress
+
+Authorized scope: SSH authentication-banner bare-LF alignment, multi-item
+discovery filtering and explicit TCP-port actions. Based on verified104 closure
+main1197870a; no credentials/settings or live user devices are accessed.
+Integrated local 785 JavaScript tests and 42 Python guards pass. Exact-source
+hosted application, dependency, native Windows and browser gates are required
+before publication; a candidate record is not a completed release claim.
+See RELEASE105_HANDOFF.md. Historical104 validation below remains applicable to
+that published source, not proof that the new candidate has passed its gates.
+
 NETWORK TOOLKIT 1.17.104 PUBLISHED AND VERIFIED
 
 1.17.104 published and independently verified
