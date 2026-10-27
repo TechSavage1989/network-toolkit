@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"net/url"
 	"strconv"
 	"time"
@@ -11,7 +12,7 @@ import (
 
 func packetGraphOptions(q url.Values) (capture.GraphOptions, bool, error) {
 	options := capture.GraphOptions{Recent: time.Minute}
-	active := q.Get("graph_mode") != "" || q.Get("graph_start") != "" || q.Get("graph_end") != "" || q.Get("graph_duration_ms") != ""
+	active := q.Get("graph_mode") != "" || q.Get("graph_start") != "" || q.Get("graph_end") != "" || q.Get("graph_duration_ms") != "" || q.Get("graph_zoom") != "" || q.Get("graph_view_end") != ""
 	if !active {
 		return options, false, nil
 	}
@@ -22,7 +23,7 @@ func packetGraphOptions(q url.Values) (capture.GraphOptions, bool, error) {
 	for _, v := range []struct {
 		name   string
 		target **time.Time
-	}{{"graph_start", &options.Start}, {"graph_end", &options.End}} {
+	}{{"graph_start", &options.Start}, {"graph_end", &options.End}, {"graph_view_end", &options.ViewEnd}} {
 		if value := q.Get(v.name); value != "" {
 			t, err := time.Parse(time.RFC3339Nano, value)
 			if err != nil || t.IsZero() {
@@ -46,6 +47,13 @@ func packetGraphOptions(q url.Values) (capture.GraphOptions, bool, error) {
 			}
 			*v.target = time.Duration(n) * time.Millisecond
 		}
+	}
+	if value := q.Get("graph_zoom"); value != "" {
+		zoom, err := strconv.ParseFloat(value, 64)
+		if err != nil || math.IsNaN(zoom) || math.IsInf(zoom, 0) || zoom < .25 || zoom > 16 {
+			return options, true, fmt.Errorf("choose a supported graph zoom")
+		}
+		options.Zoom = zoom
 	}
 	return options, true, nil
 }

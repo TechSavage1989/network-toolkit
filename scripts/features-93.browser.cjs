@@ -169,8 +169,8 @@ async function packetGeometry(label){
 }
 
 const workspace=()=>page.locator('[data-graph-workspace="ui93-monitor"]');
-async function graphAction96(name,action){await timeline().locator('[data-rt-options]').click();await page.locator('[data-rt-'+name+(action?'="'+action+'"':'')+']').click();await page.evaluate(()=>closeModal());await settle();}
-async function packetAction96(name,action){await page.locator('[data-packet-graph-options]').click();await page.locator('[data-packet-'+name+(action?'="'+action+'"':'')+']').click();await page.evaluate(()=>closeModal());await settle();}
+async function graphAction96(name,action){if(name==='zoom'){await timeline().locator('[data-rt-zoom="'+action+'"]').click();await settle();return;}await timeline().locator('[data-rt-options]').click();await page.locator('[data-rt-'+name+(action?'="'+action+'"':'')+']').click();await page.evaluate(()=>closeModal());await settle();}
+async function packetAction96(name,action){if(name==='zoom'){await page.locator('[data-packet-zoom="'+action+'"]').click();await settle();return;}await page.locator('[data-packet-graph-options]').click();await page.locator('[data-packet-'+name+(action?'="'+action+'"':'')+']').click();await page.evaluate(()=>closeModal());await settle();}
 (async()=>{
  if(out)fs.mkdirSync(out,{recursive:true});browser=await chromium.launch({headless:true,args:['--no-sandbox']});
  const context=await openContext('America/New_York');await show('monitor');

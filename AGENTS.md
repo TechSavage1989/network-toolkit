@@ -3,6 +3,11 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
+Active authorized review build: 1.17.97 on review/hosts-editor-1.17.97.
+The current request authorizes implementation, validation and build delivery.
+The public source/update baseline below remains 1.17.96; keep this work on the
+review branch so a main push does not automatically publish the review version.
+
 Current verified published version: 1.17.96.
 Source/tag: 8c5e64e4b2bdab0aa9219650c72eeb58d77bb374
 Tree: aee336e0f9d5ef6a00ea25008abd5bd09cdcbf78

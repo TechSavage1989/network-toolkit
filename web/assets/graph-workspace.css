@@ -126,3 +126,5 @@
  .diagnostic-page:has(.result-graph-entry) .graph-workspace-graph>.rt-timeline{grid-template-rows:auto minmax(30px,1fr) 20px;padding:4px 6px;gap:1px}
  .diagnostic-page:has(.result-graph-entry) .graph-workspace-graph .rt-plot-caption{display:none}
 }
+/* The compact labeled timeframe uses a second text line without shrinking the plot. */
+@media(max-width:600px){.graph-workspace,.diagnostic-page:has(.result-graph-entry) .graph-workspace{--graph-min-height:122px}}

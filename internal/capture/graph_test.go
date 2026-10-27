@@ -71,3 +71,67 @@ func TestHighVolumeCondensedGraphRemainsBoundedWithoutLosingSameTimestampPackets
 		t.Fatal("high volume must be an honest grouped interval")
 	}
 }
+
+func TestGraphZoomAndPanUseExactVisibleContributorsAndKeepFullStatistics(t *testing.T) {
+	start := time.Date(2026, 10, 27, 0, 0, 0, 123456789, time.UTC)
+	packets := make([]Packet, 21)
+	for i := range packets {
+		stamp := start.Add(time.Duration(i) * time.Second)
+		packets[i] = Packet{Number: uint64(i + 1), Time: stamp, Record: Record{Time: stamp}, Length: 100, Protocol: "TCP"}
+	}
+	before, _ := json.Marshal(packets)
+	for _, condensed := range []bool{false, true} {
+		s := Stats(packets)
+		ApplyGraph(&s, packets, GraphOptions{Condensed: condensed, Duration: 10 * time.Second, Zoom: 2, Recent: time.Second})
+		wantStart, wantEnd := start.Add(15*time.Second), start.Add(20*time.Second)
+		if !s.GraphStarted.Equal(wantStart) || !s.GraphFinished.Equal(wantEnd) {
+			t.Fatalf("zoomed bounds: %v %v", s.GraphStarted, s.GraphFinished)
+		}
+		total := 0
+		for _, b := range s.Timeline {
+			total += b.Packets
+			if b.Time.Before(wantStart) || b.EndTime.After(wantEnd) {
+				t.Fatal("outside contributors stretched the visible graph")
+			}
+		}
+		if total != 6 || s.Protocols["TCP"] != 21 || s.Bytes != 2100 {
+			t.Fatalf("zoom affected original totals: %d %+v", total, s)
+		}
+		viewEnd := start.Add(17 * time.Second)
+		ApplyGraph(&s, packets, GraphOptions{Condensed: condensed, Duration: 10 * time.Second, Zoom: 2, ViewEnd: &viewEnd})
+		if !s.GraphStarted.Equal(start.Add(12*time.Second)) || !s.GraphFinished.Equal(viewEnd) {
+			t.Fatal("panning changed span or lost end precision")
+		}
+	}
+	after, _ := json.Marshal(packets)
+	if string(before) != string(after) {
+		t.Fatal("graph navigation changed original packets")
+	}
+}
+
+func TestGraphZoomKeepsAdjacentNanosecondContributorsAndEmptyRanges(t *testing.T) {
+	start := time.Date(2026, 10, 27, 0, 0, 0, 123456780, time.UTC)
+	end := start.Add(10 * time.Nanosecond)
+	packets := make([]Packet, 11)
+	for i := range packets {
+		stamp := start.Add(time.Duration(i))
+		packets[i] = Packet{Number: uint64(i + 1), Time: stamp, Record: Record{Time: stamp}, Length: 64}
+	}
+	s := Stats(packets)
+	ApplyGraph(&s, packets, GraphOptions{Start: &start, End: &end, Zoom: 2, Condensed: true})
+	if !s.GraphStarted.Equal(start.Add(5*time.Nanosecond)) || !s.GraphFinished.Equal(end) {
+		t.Fatal("zoom rounded native precision")
+	}
+	count := 0
+	for _, b := range s.Timeline {
+		count += b.Packets
+	}
+	if count != 6 {
+		t.Fatalf("nanosecond contributors: %d", count)
+	}
+	empty := end.Add(time.Hour)
+	ApplyGraph(&s, packets, GraphOptions{Start: &start, End: &end, Zoom: 2, ViewEnd: &empty})
+	if len(s.Timeline) != 0 || !s.GraphFinished.Equal(empty) {
+		t.Fatal("empty zoom range invented points")
+	}
+}

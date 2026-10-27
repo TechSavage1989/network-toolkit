@@ -45,6 +45,24 @@ For the subsequently authorized 1.17.90 build, the 1.17.89 note has also been
 moved unchanged into the archive. Current `RELEASE_NOTES_1.17.90.txt` alone stays
 at root, and the archive index identifies 1.17.90 as current and 1.17.89 as previous.
 
+## 1.17.97 review build — smooth history, direct controls and visible-value scaling
+
+The user authorized implementation, validation, build delivery and handoff updates.
+Work starts from main d03f9bf005fb08e8d94237cd6c0b850349480b01 and remains on
+review/hosts-editor-1.17.97. The published update feed and main remain at 1.17.96.
+
+This build replaces power-of-two age grouping with continuous log-age intervals,
+adds a visible Timeframe selector and direct zoom/Fit controls, and supports
+pointer-anchored wheel/trackpad zoom. Each measurement plot fits the genuine
+visible minimum/maximum with a small margin, including original extrema inside
+condensed groups. Packet graph zoom/view-end queries group original frames only
+inside the visible interval, while whole-capture statistics and exports retain
+their original scope. Existing shared tabs, held selections, follow state,
+clock/timezone settings and independent results/details scrolling are preserved.
+
+Implementation and full validation are in progress. Final review build evidence
+will replace this pending paragraph before delivery.
+
 ## 1.17.96 published shared graph plots, fitted time axes and unified following
 
 The user explicitly authorized implementing, building and publishing this update.

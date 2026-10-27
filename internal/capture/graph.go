@@ -11,6 +11,8 @@ import (
 type GraphOptions struct {
 	Condensed        bool
 	Start, End       *time.Time
+	ViewEnd          *time.Time
+	Zoom             float64
 	Duration, Recent time.Duration
 }
 
@@ -40,6 +42,18 @@ func ApplyGraph(s *Statistics, packets []Packet, options GraphOptions) {
 	}
 	if options.Start != nil {
 		start = *options.Start
+	}
+	zoom := options.Zoom
+	if zoom <= 0 || math.IsNaN(zoom) || math.IsInf(zoom, 0) {
+		zoom = 1
+	}
+	if zoom != 1 || options.ViewEnd != nil {
+		span := max(float64(time.Nanosecond), math.Round(float64(end.Sub(start))/zoom))
+		span = min(span, float64(1<<63-1)-1024)
+		if options.ViewEnd != nil {
+			end = *options.ViewEnd
+		}
+		start = end.Add(-time.Duration(span))
 	}
 	from, to := start.UTC(), end.UTC()
 	s.GraphStarted, s.GraphFinished = &from, &to
@@ -78,17 +92,15 @@ func ApplyGraph(s *Statistics, packets []Packet, options GraphOptions) {
 			if age < recent && !groupRecent {
 				key = "packet:" + uintString(p.Number)
 			} else {
-				tier := 0
-				if age >= recent {
-					tier = max(0, int(math.Floor(math.Log2(float64(age)/float64(recent)))))
-				}
-				step := max(time.Nanosecond, time.Duration(float64(recent)*math.Pow(2, float64(tier))/12))
-				prefix := "older:"
 				if age < recent {
-					step = max(time.Nanosecond, recent/1000)
-					prefix = "recent:"
+					step := max(time.Nanosecond, recent/1000)
+					key = "recent:" + uintString(uint64(age/step))
+				} else {
+					// Equal steps in continuous log-age space produce smoothly
+					// growing intervals without power-of-two resolution jumps.
+					bin := uint64(math.Floor(12 * math.Log(float64(age)/float64(recent))))
+					key = "older:" + uintString(bin)
 				}
-				key = prefix + uintString(uint64(tier)) + ":" + uintString(uint64(age/step))
 			}
 		} else {
 			key = "uniform:" + uintString(uint64(min(59, p.Time.Sub(window[0].Time)/uniformStep)))

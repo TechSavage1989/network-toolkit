@@ -469,3 +469,20 @@
 .packet-graph-heading{flex-wrap:wrap;gap:4px}.packet-graph-heading>strong{margin-right:auto}
 .packet-graph-heading [data-packet-graph-follow][data-follow-state="following"]{color:var(--diag-good,var(--good))}
 .packet-graph-heading [data-packet-graph-follow][data-follow-state="held"]{color:var(--diag-warn,var(--warn))}
+
+.packet-traffic-section{container-type:inline-size}
+.packet-traffic-heading .packet-mode-control{flex:0 1 150px;min-width:85px;max-width:180px}
+.packet-traffic-heading .graph-timeframe{display:flex;align-items:center;gap:4px;flex:0 0 auto;max-width:none;font-size:10px}
+.packet-traffic-heading .graph-timeframe select{width:108px;min-width:0}
+.packet-traffic-heading .graph-inline-zoom{margin:0;flex:0 0 auto;gap:3px}
+.packet-traffic-heading .graph-inline-zoom .btn{padding:3px 5px;min-width:27px}
+.packet-graph-scroll{position:relative;display:grid;grid-template-columns:40px minmax(0,1fr);gap:0}
+.packet-y-axis{position:relative;min-height:0;font:9px var(--mono);color:var(--muted);overflow:hidden}
+.packet-y-axis span{position:absolute;right:5px;white-space:nowrap}
+.packet-y-upper{top:4px}.packet-y-lower{bottom:5px}
+.packet-time-ticks{margin-left:40px}
+@container (max-width:650px){.packet-traffic-heading .graph-range-advanced{display:none}.packet-traffic-heading .packet-mode-control{flex-basis:110px}.packet-traffic-heading .graph-timeframe select{width:77px}.packet-traffic-heading [data-packet-graph-options]{font-size:0;width:24px;padding:3px}.packet-traffic-heading [data-packet-graph-options]:after{content:'⋯';font-size:14px}}
+@container (max-width:420px){.packet-traffic-heading{gap:3px}.packet-traffic-heading .packet-mode-control{flex:0 0 85px;max-width:85px}.packet-traffic-heading select{font-size:10px;padding-left:3px;padding-right:17px}.packet-traffic-heading .graph-timeframe{font-size:9px;gap:2px}.packet-traffic-heading .graph-timeframe select{width:54px}.packet-traffic-heading .graph-inline-zoom{gap:2px}.packet-traffic-heading .graph-inline-zoom .btn{width:20px;min-width:20px;padding:3px 2px}.packet-traffic-heading .graph-inline-zoom [data-packet-zoom="reset"]{width:24px;min-width:24px}.packet-traffic-heading .graph-inline-zoom [data-packet-zoom-value]{min-width:22px;font-size:9px}.packet-traffic-heading [data-packet-graph-options]{width:22px;min-width:22px}}
+@container (max-width:420px){.packet-traffic-heading{gap:2px}.packet-traffic-heading .graph-inline-zoom{gap:1px}.packet-traffic-heading .graph-inline-zoom [data-packet-zoom-value]{min-width:20px}.packet-traffic-heading [data-packet-graph-options]{width:20px;min-width:20px}}
+
+@container (max-width:420px){.packet-traffic-heading{gap:3px;align-items:flex-end}.packet-traffic-heading .packet-mode-control{flex:0 1 100px;min-width:85px;max-width:100px}.packet-traffic-heading .graph-timeframe{position:relative;display:block;padding-top:11px;width:64px;font-size:10px;line-height:10px}.packet-traffic-heading .graph-timeframe>span{position:absolute;left:1px;top:0}.packet-traffic-heading .graph-timeframe select{width:64px;font-size:11px}.packet-traffic-heading .graph-inline-zoom{align-self:flex-end;gap:2px}.packet-traffic-heading .graph-inline-zoom .btn{width:22px;min-width:22px}.packet-traffic-heading .graph-inline-zoom [data-packet-zoom="reset"]{width:26px;min-width:26px}.packet-traffic-heading [data-packet-graph-options]{width:22px;min-width:22px}}

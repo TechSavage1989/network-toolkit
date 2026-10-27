@@ -94,3 +94,68 @@ func TestPacketCaptureLatestLocateAndRecordedFiltersUseFullCapture(t *testing.T)
 		t.Fatal("display filters removed recorded packets")
 	}
 }
+
+func TestPacketGraphZoomQueryValidation(t *testing.T) {
+	for _, value := range []string{"0", "0.1", "17", "NaN", "Inf", "bad"} {
+		if _, _, err := packetGraphOptions(url.Values{"graph_zoom": {value}}); err == nil {
+			t.Fatalf("invalid zoom accepted: %s", value)
+		}
+	}
+	end := "2026-10-27T00:00:10.123456789Z"
+	for _, value := range []string{".25", "1", "1.325", "16"} {
+		options, active, err := packetGraphOptions(url.Values{"graph_zoom": {value}, "graph_view_end": {end}})
+		if err != nil || !active || options.ViewEnd == nil || options.ViewEnd.Nanosecond() != 123456789 {
+			t.Fatalf("valid zoom rejected: %s %v", value, err)
+		}
+	}
+	if _, _, err := packetGraphOptions(url.Values{"graph_view_end": {"invalid"}}); err == nil {
+		t.Fatal("invalid view end accepted")
+	}
+}
+
+func TestPacketCaptureGraphZoomUsesNativeVisibleFramesWithoutChangingExport(t *testing.T) {
+	a := testApplication(t)
+	start := time.Date(2026, 10, 27, 0, 0, 0, 123456780, time.UTC)
+	records := make([]capture.Record, 11)
+	for i := range records {
+		records[i] = captureFixtureRecord(443)
+		records[i].Time = start.Add(time.Duration(i))
+	}
+	var input bytes.Buffer
+	if err := capture.WritePCAPNG(&input, records); err != nil {
+		t.Fatal(err)
+	}
+	imported := captureRequest(a, "POST", "/api/packet-captures/import?name=zoom-ns.pcapng", input.Bytes(), a.token)
+	var info packetCaptureInfo
+	if err := json.Unmarshal(imported.Body.Bytes(), &info); err != nil || imported.Code != 201 {
+		t.Fatalf("import failed: %v %s", err, imported.Body)
+	}
+	end := start.Add(10 * time.Nanosecond)
+	params := url.Values{"graph_mode": {"condensed"}, "graph_start": {start.Format(time.RFC3339Nano)}, "graph_end": {end.Format(time.RFC3339Nano)}, "graph_zoom": {"2"}}
+	w := captureRequest(a, "GET", "/api/packet-captures/"+info.ID+"/statistics?"+params.Encode(), nil, a.token)
+	var stats capture.Statistics
+	if err := json.Unmarshal(w.Body.Bytes(), &stats); err != nil || w.Code != 200 {
+		t.Fatalf("zoom response: %v %s", err, w.Body)
+	}
+	count := 0
+	for _, b := range stats.Timeline {
+		count += b.Packets
+		if b.Time.Before(start.Add(5 * time.Nanosecond)) {
+			t.Fatal("out-of-view frame entered a visible group")
+		}
+	}
+	if count != 6 || stats.Protocols["TCP"] != 11 {
+		t.Fatalf("visible/whole counts: %d %+v", count, stats.Protocols)
+	}
+	exported := captureRequest(a, "GET", "/api/packet-captures/"+info.ID+"/export?format=pcapng", nil, a.token)
+	index := 0
+	if err := capture.Read(bytes.NewReader(exported.Body.Bytes()), func(r capture.Record) error {
+		if !r.Time.Equal(records[index].Time) || !bytes.Equal(r.Data, records[index].Data) {
+			t.Fatal("graph zoom changed exported bytes or precision")
+		}
+		index++
+		return nil
+	}); err != nil || index != len(records) {
+		t.Fatalf("export count: %d %v", index, err)
+	}
+}

@@ -1,3 +1,8 @@
+NETWORK TOOLKIT 1.17.97 REVIEW BUILD — VALIDATION IN PROGRESS
+
+The graph controls, compression and visible-value scaling update is being
+validated on the review branch. The published update feed remains 1.17.96.
+
 NETWORK TOOLKIT 1.17.96 VERIFIED PUBLISHED BUILD
 
 1.17.96 published shared graph plots, fitted time axes and unified following
