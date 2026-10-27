@@ -7,6 +7,11 @@ Current published version: 1.17.103. The accumulated-history cluster/theme
 release and its required review, Release and duplicate-main checks are complete.
 Read docs/DEVELOPMENT_HANDOFF.md and docs/CONDENSED_GRAPH_SCALING.md.
 
+The isolated 1.17.104 security/graph/icon development checkpoint is green but
+ON HOLD, not released. Read docs/SECURITY104_HANDOFF.md before resuming it.
+Master-password/recovery and lock/active-session choices remain unanswered;
+do not infer them, promote main, or describe the current DPAPI vault as locked.
+
 The next user-authorized work combines credential security and graph recent
 spacing matching the supplied 30-second reference. The security lead owns the
 combined build/main promotion/release. Keep graph work isolated and coordinate
