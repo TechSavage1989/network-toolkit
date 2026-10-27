@@ -123,3 +123,10 @@ test('partly completed lock failure still removes rendered secrets and stale met
  await assert.rejects(()=>h.tool.vaultAction('lock'),/removal failed/);
  assert.equal(h.fields['#credentialSecret'].value,'');assert.equal(h.tool.meta('id'),null);assert.equal(h.tool.vaultStatus().state,'locked');
 });
+
+test('missing vault status never turns metadata-only fixture data into an unlocked vault',async()=>{
+ const h=harness();h.root.api=async()=>({entries:[{id:'id',name:'MISSING_STATUS_MUST_HIDE',kind:'password',username:'operator',bindings:[endpoint]}]});
+ await h.tool.refresh();assert.equal(h.tool.meta('id'),null);assert(!h.tool.options().includes('MISSING_STATUS_MUST_HIDE'));assert.equal(h.tool.vaultStatus().available,false);
+ await assert.rejects(()=>h.tool.prepare({...endpoint,credentialId:'id'}),/locked|Set up/);
+ assert.equal(h.calls.filter(row=>row.method==='POST').length,0);
+});

@@ -15,7 +15,7 @@ const profile=(id,name,extra={})=>({id,name,type:'ssh',host:id+'.test',port:22,u
    if(p==='/api/state'){if(request.method()==='GET')data=saved;else saved=request.postDataJSON();}
    if(p==='/api/jobs')data=[];
    if(p==='/api/terminals')data=request.method()==='POST'?{session:{id:'opened-core',type:'ssh',host:'edited-core.test',username:'operator',port:22,state:'connected',profileId:'core'}}:{sessions:[]};
-   if(p==='/api/credentials')data={entries:[{id:'vault-reference',name:'Core credential',kind:'password',username:'operator',bindings:[{protocol:'ssh',host:'edited-core.test',port:22,username:'operator'}]}]};
+   if(p==='/api/credentials')data={vault:{available:true,state:'unlocked',remembered:true},entries:[{id:'vault-reference',name:'Core credential',kind:'password',username:'operator',bindings:[{protocol:'ssh',host:'edited-core.test',port:22,username:'operator'}]}]};
    if(p==='/api/credentials/vault-reference')throw Error('The browser must never retrieve a saved secret.');
    if(p.includes('/events')){await new Promise(resolve=>setTimeout(resolve,100));data={events:[],sessions:[],after:0};}
    return route.fulfill({contentType:'application/json',body:JSON.stringify(data)});

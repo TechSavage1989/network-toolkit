@@ -31,7 +31,7 @@ const root=path.resolve(__dirname,'..'),version=require('../package.json').versi
     }else data={sessions:[]};
    }
    if(p==='/api/terminals/serial-ports')data={ports:[{name:'COM4',description:'Fixture console'}]};
-   if(p==='/api/credentials')data={entries:[{id:'vault-reference',name:'Core credential',kind:'password',username:'operator',bindings:[{protocol:'ssh',host:'core.test',port:2222,username:'operator'},{protocol:'ssh',host:'updated-core.test',port:2222,username:'operator'}]}]};
+   if(p==='/api/credentials')data={vault:{available:true,state:'unlocked',remembered:true},entries:[{id:'vault-reference',name:'Core credential',kind:'password',username:'operator',bindings:[{protocol:'ssh',host:'core.test',port:2222,username:'operator'},{protocol:'ssh',host:'updated-core.test',port:2222,username:'operator'}]}]};
    if(p==='/api/credentials/vault-reference')throw Error('The browser must never retrieve a saved secret.');
    if(p.includes('/events')){await new Promise(resolve=>setTimeout(resolve,100));data={events:[],sessions:[],after:0};}
    return route.fulfill({contentType:'application/json',body:JSON.stringify(data)});
