@@ -453,3 +453,19 @@
 .packet-selection-controls{display:flex;flex-wrap:wrap;gap:5px;padding:5px 0 8px}.packet-selection-controls>p{flex-basis:100%;margin:0 0 3px}.packet-interval-pages{display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin-top:10px}.packet-selected-interval-details{padding:7px;border:1px solid var(--line);border-radius:5px;margin:6px 0}
 
 .packet-graph-reader .packet-traffic-heading{flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;white-space:nowrap;scrollbar-width:thin;min-width:0;padding-bottom:2px}.packet-graph-reader .packet-traffic-heading>h3{display:none}.packet-graph-reader .packet-traffic-heading>*{flex-shrink:0}
+
+/* Traffic history uses data panning; this reader never scrolls. */
+.packet-graph-reader{overflow:hidden;padding:5px 8px;display:flex;flex-direction:column}
+.packet-graph-reader>.packet-traffic-section{flex:1;min-height:0;height:100%}
+.packet-traffic-section{display:grid;grid-template-rows:auto minmax(35px,1fr) 20px 14px;gap:2px;overflow:hidden;height:200px}
+.packet-graph-reader .packet-traffic-heading,.packet-traffic-heading{flex-wrap:nowrap;overflow:hidden;padding:0;margin:0;gap:5px;min-height:26px}
+.packet-traffic-heading label{flex:1;min-width:0;max-width:210px}
+.packet-traffic-heading select{min-width:0;width:100%;font-size:10px}
+.packet-traffic-heading>.btn{font-size:10px;min-height:26px;padding:3px 5px;flex:0 0 auto;white-space:nowrap}
+.packet-graph-scroll{overflow:hidden;min-height:0;width:100%;display:flex}
+.packet-graph-scroll .packet-timeline{flex:1;width:100%;min-width:0;height:100%;min-height:0;touch-action:none}
+.packet-time-ticks{margin:0;min-width:0}
+.packet-timeline-aggregation{font-size:10px;line-height:13px;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;margin:0;min-width:0}
+.packet-graph-heading{flex-wrap:wrap;gap:4px}.packet-graph-heading>strong{margin-right:auto}
+.packet-graph-heading [data-packet-graph-follow][data-follow-state="following"]{color:var(--diag-good,var(--good))}
+.packet-graph-heading [data-packet-graph-follow][data-follow-state="held"]{color:var(--diag-warn,var(--warn))}

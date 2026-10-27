@@ -5,14 +5,19 @@
   const models=new Map();
   let initialized=false,lastFocus=null,activeHover=null,hoverPointer=null,tooltip=null,restoring=false,resizeObserver=null;
   const observedScrollers=new Set();
-  let fallbackPreferences={mode:'window'};
+  let fallbackPreferences={mode:'window'},fallbackPlots={};
+  const plotName=value=>value==='jitter'?'jitter':'rtt';
+  function plotPreferences(){try{return typeof state!=='undefined'&&state.graphPlotPreferences||fallbackPlots;}catch{return fallbackPlots;}}
+  function setPlot(id,value){const model=models.get(String(id));if(!model)return false;model.plot=plotName(value);fallbackPlots={...plotPreferences(),[model.tool]:model.plot};try{if(typeof state!=='undefined')state.graphPlotPreferences=fallbackPlots;if(typeof saveState==='function')saveState();}catch{}const container=findContainer(id);if(container)rebuild(container,model);return true;}
+  function tabsHTML(id){const model=models.get(String(id));if(!model)return '';return '<div class="rt-plot-tabs" role="tablist" aria-label="Measurement plot">'+[['rtt','Response time (RTT)'],['jitter','RTT variability']].map(([key,label])=>'<button type="button" class="btn small ghost" role="tab" data-rt-tab="'+key+'" aria-selected="'+(model.plot===key)+'" tabindex="'+(model.plot===key?'0':'-1')+'" aria-controls="rt-active-'+encodeURIComponent(model.id)+'">'+label+'</button>').join('')+'</div>';}
+  function tracking(id){const m=models.get(String(id));return {following:!!m?.follow&&!m?.pinned,held:!!m?.pinned};}
   const escape=value=>String(value==null?'':value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const numeric=value=>(typeof value==='number'||typeof value==='string'&&value.trim())&&Number.isFinite(Number(value))&&Number(value)>=0?Number(value):null;
   const numberFormatter=new Intl.NumberFormat(undefined,{maximumFractionDigits:3}),lossFormatter=new Intl.NumberFormat(undefined,{maximumFractionDigits:1});
   const number=value=>value==null?'Not measured':numberFormatter.format(value)+' ms';
   function normalizePreferences(value){return {mode:['window','progressive','condensed'].includes(value?.mode)?value.mode:'window'};}
   function preferences(){try{return normalizePreferences(typeof state!=='undefined'?state.graphPreferences:fallbackPreferences);}catch{return normalizePreferences(fallbackPreferences);}}
-  function mergePreferences(value){if(!value||!Object.prototype.hasOwnProperty.call(value,'graphPreferences'))return preferences();const next=normalizePreferences(value.graphPreferences);fallbackPreferences=next;try{if(typeof state!=='undefined')state.graphPreferences=next;}catch{}return next;}
+  function mergePreferences(value){fallbackPlots={};for(const [key,v] of Object.entries(value?.graphPlotPreferences||{}))if(['ping','monitor','latency'].includes(key)&&['rtt','jitter'].includes(v))fallbackPlots[key]=v;try{if(typeof state!=='undefined')state.graphPlotPreferences={...fallbackPlots};}catch{}if(!value||!Object.prototype.hasOwnProperty.call(value,'graphPreferences'))return preferences();const next=normalizePreferences(value.graphPreferences);fallbackPreferences=next;try{if(typeof state!=='undefined')state.graphPreferences=next;}catch{}return next;}
   function setPreferences(value,{persist=true}={}){
     const next=normalizePreferences(value);fallbackPreferences=next;
     try{if(typeof state!=='undefined')state.graphPreferences=next;if(persist&&typeof saveState==='function')saveState();}catch{}
@@ -79,58 +84,50 @@
   }
   function selectPoints(model){
     const history=root.NetworkToolkitGraphHistory,pref=history?.preferences?.();
-    if(history&&(model.mode==='condensed'||pref.durationMs>0||pref.anchor!=='latest')){
-      let scope=history.range(model.allPoints,pref,model.heldEnd||(filterState(model).active?latestPoint(model)?.time||'':''));
-      if(model.zoom!==1&&Number.isFinite(scope.from)&&Number.isFinite(scope.to)&&scope.to>scope.from){scope={...scope,start:history.shift(scope.end,-Math.round((scope.to-scope.from)/model.zoom))};scope.from=history.epoch(scope.start);}
-      model.timeScope=scope;const visible=history.select(model.allPoints,scope),indices=new Set(visible.map(point=>point.index));model.rawVisiblePoints=visible.map(point=>({...point,jitter:indices.has(point.index-1)?point.jitter:null}));
+    let candidates=model.allPoints;
+    if(model.mode==='window'&&!(pref?.durationMs>0)&&(pref?.anchor||'latest')==='latest'){
+      const end=model.follow?latestPoint(model):model.allPoints.find(p=>p.key===model.windowEndKey)||model.allPoints.at(-1),index=end?model.allPoints.indexOf(end):model.allPoints.length-1;
+      candidates=model.allPoints.slice(Math.max(0,index-limit+1),index+1);
+    }
+    if(history){
+      let scope=history.range(candidates,pref,model.heldEnd||(filterState(model).active?latestPoint(model)?.time||'':''));
+      if(model.panSpanNs&&history.instant(scope.end)!==null)scope={...scope,start:history.timestamp(history.instant(scope.end)-BigInt(model.panSpanNs))};scope=history.viewport(scope,model.zoom,model.viewEnd||'');model.timeScope=scope;
+      const timed=Number.isFinite(scope.from)&&Number.isFinite(scope.to),visible=timed?history.select(model.mode==='window'&&!pref.durationMs&&pref.anchor==='latest'&&model.zoom>=1&&!model.viewEnd?candidates:model.allPoints,scope):candidates,indices=new Set(visible.map(point=>point.index));
+      model.rawVisiblePoints=visible.map(point=>({...point,jitter:indices.has(point.index-1)?point.jitter:null}));
       const groups=model.mode==='condensed'?history.condense(model.rawVisiblePoints,{end:scope.end,recentMs:pref.recentMs}):model.rawVisiblePoints.map(point=>({items:[point],aggregate:false}));
       return groups.map(aggregate);
     }
-    model.timeScope=null;
-    if(model.mode==='progressive'){model.rawVisiblePoints=model.allPoints;return model.allPoints;}
-    const count=Math.min(retainedLimit,Math.max(5,Math.round(limit/zoomValue(model.zoom))));
-    let end=model.allPoints.length-1;
-    const target=model.follow?latestPoint(model):model.allPoints.find(point=>point.key===model.windowEndKey);
-    if(target)end=target.index;
-    const start=Math.max(0,end-count+1);model.rawVisiblePoints=model.allPoints.slice(start,end+1).map((point,index)=>({...point,index,jitter:index?point.jitter:null}));return model.rawVisiblePoints;
+    model.timeScope=null;model.rawVisiblePoints=candidates;return candidates.map((p,index)=>({...p,index}));
   }
   function refreshModel(model){
     model.points=selectPoints(model);model.stats=summary(model.rawVisiblePoints||model.points);const filter=filterState(model),reference=Number.isFinite(filter.reference)?filter.reference:null;
     model.maximum=Math.max(1,model.stats.max||0,filter.statistic==='average'?reference||0:0)*1.12;
     model.maxJitter=Math.max(1,...model.points.map(point=>point.jitter||0),filter.statistic==='jitter'?reference||0:0)*1.12;
   }
-  function plotGeometry(model){
-    const viewport=Math.max(1,model.viewportWidth||width),step=stepFor(model),track=model.mode==='progressive'?Math.max(viewport,padding*2+(model.points.length-1)*step):viewport;
-    const left=model.mode==='progressive'?Math.max(0,Math.min(model.scrollLeft||0,track-viewport)):0;
-    const first=model.mode==='progressive'?Math.max(0,Math.floor((left-padding)/step)-1):0;
-    const last=model.mode==='progressive'?Math.min(model.points.length,Math.ceil((left+viewport-padding)/step)+2):model.points.length;
-    return {viewport,track,left,first,last,step};
-  }
-  function axisPoints(model){if(model.timeScope&&model.mode!=='progressive')return [{time:model.timeScope.start},{time:model.timeScope.end}];if(model.mode!=='progressive')return [model.points[0],model.points.at(-1)];const geometry=plotGeometry(model),first=Math.max(0,Math.min(model.points.length-1,Math.ceil((geometry.left-padding)/geometry.step))),last=Math.max(first,Math.min(model.points.length-1,Math.floor((geometry.left+geometry.viewport-padding)/geometry.step)));return [model.points[first],model.points[last]];}
+  function plotGeometry(model){return {viewport:model.viewportWidth||width,track:model.viewportWidth||width,left:0,first:0,last:model.points.length,step:0};}
   function coordinate(index,model,geometry){
-    if(model.mode==='progressive')return padding+index*geometry.step-geometry.left;
-    const scope=model.timeScope,point=model.points[index],history=root.NetworkToolkitGraphHistory;
-    if(scope&&point&&scope.to>scope.from){const time=history.epoch(point.time),age=Math.max(0,scope.to-time),span=scope.to-scope.from,recent=history.preferences().recentMs,share=model.mode==='condensed'?1-Math.log1p(age/recent)/Math.log1p(span/recent):(time-scope.from)/span;return padding+Math.max(0,Math.min(1,share))*(width-2*padding);}
-    return padding+index*(width-2*padding)/Math.max(1,model.points.length-1);
+    const point=model.points[index],history=root.NetworkToolkitGraphHistory,share=history?.fraction?.(point?.time,model.timeScope,model.mode);
+    return padding+(Number.isFinite(share)?Math.max(0,Math.min(1,share)):index/Math.max(1,model.points.length-1))*(geometry.viewport-padding*2);
   }
-  function ordinate(value,maximum){return height-padding-value/maximum*(height-2*padding);}
+  function ordinate(value,maximum,model){const h=model?.viewportHeight||height;return h-padding-value/maximum*Math.max(1,h-padding*2-12);}
+
   function plotContent(model,metric,maximum,average){
-    const geometry=plotGeometry(model),viewWidth=model.mode==='progressive'?geometry.viewport:width,segments=[],marks=[];let segment=[],previousPoint=null;
+    const geometry=plotGeometry(model),viewWidth=geometry.viewport,segments=[],marks=[];let segment=[],previousPoint=null;
     for(const point of model.points.slice(geometry.first,geometry.last)){
       const x=coordinate(point.index,model,geometry),value=point[metric],filter=filterState(model),classes=' rt-severity-'+severity(point,model)+(filter.active?(pointMatches(model,point)?' rt-point-filtered':' rt-point-filter-dimmed'):'')+(point.key===model.pinned?' rt-point-selected':'')+(point.key===model.hovered?' rt-point-hovered':'');
       if(previousPoint&&numeric(previousPoint.sequence)!=null&&numeric(point.sequence)!=null&&Number(point.sequence)!==Number(previousPoint.sequence)+1){if(segment.length)segments.push(segment);segment=[];}previousPoint=point;
-      if(value==null){if(segment.length)segments.push(segment);segment=[];}else segment.push(x.toFixed(2)+','+ordinate(value,maximum).toFixed(2));
+      if(value==null){if(segment.length)segments.push(segment);segment=[];}else segment.push(x.toFixed(2)+','+ordinate(value,maximum,model).toFixed(2));
       const attrs=' data-rt-point="'+point.index+'" data-rt-key="'+escape(point.key)+'" data-rt-sequence="'+escape(point.sequence)+'"';
-      if(point.aggregate&&metric==='rtt'&&point.stats.min!=null)marks.push('<line class="rt-aggregate-range rt-severity-'+severity(point,model)+'" x1="'+x+'" x2="'+x+'" y1="'+ordinate(point.stats.min,maximum)+'" y2="'+ordinate(point.stats.max,maximum)+'"/>');
-      if(metric==='rtt'&&!point.success&&!point.aggregate)marks.push('<g class="rt-point rt-missed'+classes+'"'+attrs+'><rect x="'+(x-3).toFixed(2)+'" y="3" width="6" height="104"/><path d="M'+(x-3).toFixed(2)+' 5l6 6m-6 0l6-6"/></g>');
-      else if(value!=null)marks.push('<circle class="rt-point'+classes+'"'+attrs+' cx="'+x.toFixed(2)+'" cy="'+ordinate(value,maximum).toFixed(2)+'" r="'+(point.aggregate?5:3)+'"'+(point.aggregate?' data-rt-aggregate="'+point.members.length+'"':'')+'/>');
-      if(point.aggregate&&value==null)marks.push('<rect class="rt-point rt-aggregate'+classes+'"'+attrs+' data-rt-aggregate="'+point.members.length+'" x="'+(x-4)+'" y="4" width="8" height="8"/>');
+      if(point.aggregate&&metric==='rtt'&&point.stats.min!=null)marks.push('<line class="rt-aggregate-range rt-severity-'+severity(point,model)+'" x1="'+x+'" x2="'+x+'" y1="'+ordinate(point.stats.min,maximum,model)+'" y2="'+ordinate(point.stats.max,maximum,model)+'"/>');
+      const y=value==null?8:ordinate(value,maximum,model);point.plotX=x;point.plotY=y;const radius=point.aggregate?5:3.5;
+      // Missing measurements occupy a separate status lane; they are not zero RTT.
+      marks.push('<g class="rt-point'+classes+(value==null?' rt-unmeasured':'')+'"'+attrs+(point.aggregate?' data-rt-aggregate="'+point.members.length+'"':'')+'><circle class="rt-point-hit" cx="'+x.toFixed(2)+'" cy="'+y.toFixed(2)+'" r="9"/><circle data-rt-marker cx="'+x.toFixed(2)+'" cy="'+y.toFixed(2)+'" r="'+radius+'"/>'+(value==null?'<title>'+escape(point.status)+': '+(metric==='rtt'?'response time not measured':'no consecutive measured pair')+'</title>':'')+'</g>');
     }
     if(segment.length)segments.push(segment);
     const lines=segments.filter(segment=>segment.length>1).map(segment=>'<polyline points="'+segment.join(' ')+'"/>').join('');
-    const mean=average==null?'':'<line class="rt-average" x1="0" x2="'+viewWidth+'" y1="'+ordinate(average,maximum).toFixed(2)+'" y2="'+ordinate(average,maximum).toFixed(2)+'"/>';
-    const filter=filterState(model),reference=Number.isFinite(filter.reference)?filter.reference:null,referenceMetric=metric==='rtt'&&filter.statistic==='average'||metric==='jitter'&&filter.statistic==='jitter',runReference=referenceMetric&&reference!=null?'<line class="rt-stat-reference" data-rt-stat-reference x1="0" x2="'+viewWidth+'" y1="'+ordinate(reference,maximum).toFixed(2)+'" y2="'+ordinate(reference,maximum).toFixed(2)+'"><title>'+escape((filter.referenceKind==='run'?'Run':'Retained')+' '+(metric==='rtt'?'average RTT':'RTT variability')+': '+number(reference))+'</title></line>':'';
-    return '<path class="rt-grid" d="M0 27H'+viewWidth+' M0 55H'+viewWidth+' M0 82H'+viewWidth+'"/>'+mean+runReference+'<g class="rt-series">'+lines+'</g><g class="rt-points" aria-hidden="true">'+marks.join('')+'</g>';
+    const mean=average==null?'':'<line class="rt-average" x1="0" x2="'+viewWidth+'" y1="'+ordinate(average,maximum,model).toFixed(2)+'" y2="'+ordinate(average,maximum,model).toFixed(2)+'"/>';
+    const filter=filterState(model),reference=Number.isFinite(filter.reference)?filter.reference:null,referenceMetric=metric==='rtt'&&filter.statistic==='average'||metric==='jitter'&&filter.statistic==='jitter',runReference=referenceMetric&&reference!=null?'<line class="rt-stat-reference" data-rt-stat-reference x1="0" x2="'+viewWidth+'" y1="'+ordinate(reference,maximum,model).toFixed(2)+'" y2="'+ordinate(reference,maximum,model).toFixed(2)+'"><title>'+escape((filter.referenceKind==='run'?'Run':'Retained')+' '+(metric==='rtt'?'average RTT':'RTT variability')+': '+number(reference))+'</title></line>':'';
+    return '<path class="rt-grid" d="'+[.25,.5,.75].map(v=>'M0 '+((model.viewportHeight||height)*v)+'H'+viewWidth).join(' ')+'"/>'+mean+runReference+'<g class="rt-series">'+lines+'</g><g class="rt-points" aria-hidden="true">'+marks.join('')+'</g>';
   }
   function filterDescription(model){
     const filter=filterState(model);if(!filter.active)return '';
@@ -139,39 +136,31 @@
     const explanation=typeof filter.message==='string'&&filter.message.trim()?filter.message.trim()+' ':'';
     return '<p class="rt-filter-note">'+escape(explanation)+'Matching samples are emphasized; other recorded samples remain visible for context.'+escape(reference)+'</p>';
   }
+  function axisHTML(model){return root.NetworkToolkitGraphHistory?.axisHTML?.(model.timeScope,Math.max(1,(model.viewportWidth||width)-2*padding),model.mode)||'';}
   function plot(model,metric,maximum,average){
-    const name=metric==='rtt'?'latency':'jitter',geometry=plotGeometry(model),progressive=model.mode==='progressive';
-    const svg='<svg data-rt-surface="'+name+'" tabindex="0" role="group" aria-label="'+(metric==='rtt'?'Response time':'Absolute RTT change between consecutive measured replies')+'. Use Left and Right arrows to inspect samples, Home and End to jump, Enter to select, Escape to clear." viewBox="0 0 '+(progressive?geometry.viewport:width)+' '+height+'" preserveAspectRatio="none">'+plotContent(model,metric,maximum,average)+'</svg>';
-    return '<div class="rt-plot rt-'+name+'"><div class="rt-axis-label">'+escape(number(maximum))+'</div>'+(progressive?'<div class="rt-scroll" data-rt-scroll="'+name+'" tabindex="0" aria-label="Scroll '+name+' retained history"><div class="rt-track" style="width:'+geometry.track+'px"><div class="rt-visible-plot" style="width:'+geometry.viewport+'px">'+svg+'</div></div></div>':svg)+'</div>';
+    const name=metric==='rtt'?'latency':'jitter';
+    return '<div class="rt-plot rt-'+name+'" id="rt-active-'+encodeURIComponent(model.id)+'" role="tabpanel" aria-label="'+(metric==='rtt'?'Response time (RTT)':'RTT variability')+'"><div class="rt-axis-label">'+escape(number(maximum))+' · '+(metric==='rtt'?'response time':'absolute change')+'</div><svg data-rt-surface="'+name+'" tabindex="0" role="group" aria-label="'+(metric==='rtt'?'Response time':'Absolute RTT change between consecutive measured replies')+'. Drag to pan time. Use arrows to inspect, Enter to select, Escape to clear." viewBox="0 0 '+(model.viewportWidth||width)+' '+(model.viewportHeight||height)+'" preserveAspectRatio="xMidYMid meet">'+plotContent(model,metric,maximum,average)+'</svg></div>';
   }
-  function capturePendingScroll(model,scroll){
-    if(!(scroll?.clientWidth>0)||!Number.isFinite(scroll.scrollLeft)||!Number.isFinite(scroll._rtAppliedLeft)||Math.abs(scroll.scrollLeft-scroll._rtAppliedLeft)<=.5)return false;
-    model.scrollLeft=scroll.scrollLeft;model.follow=!model.pinned&&Math.max(0,(scroll.scrollWidth||0)-scroll.clientWidth)-model.scrollLeft<=12;scroll._rtAppliedLeft=model.scrollLeft;return true;
-  }
-  function captureScroll(model){
-    if(model.skipCaptureOnce){model.skipCaptureOnce=false;return;}
-    const container=findContainer(model.id),scroll=container?.querySelector('[data-rt-scroll="latency"]');
-    if(!scroll||model.mode!=='progressive'||!(scroll.clientWidth>0)||!Number.isFinite(scroll.scrollLeft))return;
-    capturePendingScroll(model,scroll);model.scrollLeft=scroll.scrollLeft;
-  }
+  function captureScroll(){} // Retained API call sites; history navigation now pans data.
+
   function latency(samples,context={}){
     if(!Array.isArray(samples)||!samples.length)return '';
     const id=String(context.id??'latency').slice(0,512),mode=preferences().mode;
     let model=models.get(id);
-    if(!model)model={id,pinned:null,pinnedSnapshot:null,hovered:null,follow:true,scrollLeft:0,viewportWidth:width,zoom:1};
+    if(!model)model={id,pinned:null,pinnedSnapshot:null,hovered:null,follow:true,scrollLeft:0,viewportWidth:width,viewportHeight:height,zoom:1};
     else captureScroll(model);
-    const oldMode=model.mode;model.allPoints=normalize(samples,{mode:'progressive'});model.samples=samples;model.title=String(context.title||'Response time');model.tool=context.tool||context.job?.tool||model.tool||'monitor';model.context={...context,id,title:model.title};model.mode=mode;model.zoom=zoomValue(model.zoom);refreshModel(model);
-    if(oldMode!==mode){model.scrollLeft=0;if(!model.pinned)model.follow=true;}
+    const oldMode=model.mode;model.allPoints=normalize(samples,{mode:'progressive'});model.samples=samples;model.title=String(context.title||'Response time');model.tool=context.tool||context.job?.tool||model.tool||'monitor';model.context={...context,id,title:model.title};model.mode=mode;model.plot=plotName(plotPreferences()[model.tool]||model.plot);model.zoom=zoomValue(model.zoom);refreshModel(model);
+    if(oldMode!==mode)model.scrollLeft=0;
     if(model.hovered&&!model.allPoints.some(point=>point.key===model.hovered)&&!model.points.some(point=>point.key===model.hovered))model.hovered=null;
     if(model.pinned){const refreshed=model.allPoints.find(point=>point.key===model.pinned);if(refreshed)model.pinnedSnapshot={...refreshed};}
-    if(mode==='progressive'&&model.follow)model.scrollLeft=followPosition(model);
     models.delete(id);models.set(id,model);while(models.size>64)models.delete(models.keys().next().value);
     refreshModel(model);const stats=model.stats;
-    const windowLabel=mode==='condensed'?'Condensed history (groups are aggregate measurements)':model.timeScope?root.NetworkToolkitGraphHistory.label():mode==='progressive'?'Progressive retained history':samples.length>model.points.length?(model.follow?'Latest ':'Displayed ')+model.points.length+' retained samples':'Displayed samples',loss=lossFormatter.format(stats.lossPercent);
-    return '<section class="rt-timeline" data-rt-id="'+escape(id)+'" data-rt-mode-active="'+mode+'" aria-label="'+escape(model.title)+' timeline"><div class="rt-heading"><h3>'+escape(model.title)+'</h3><span>'+escape(windowLabel)+' ('+model.points.length+')</span><div class="rt-view-controls"><label>Graph view <select data-rt-mode aria-label="Graph view"><option value="window"'+(mode==='window'?' selected':'')+'>Moving window</option><option value="progressive"'+(mode==='progressive'?' selected':'')+'>Progressive history</option><option value="condensed"'+(mode==='condensed'?' selected':'')+'>Condensed history</option></select></label>'+ (root.NetworkToolkitGraphHistory?.controlHTML?.()||'') +'<button type="button" class="btn small ghost" data-rt-clear '+(model.pinned||model.liveDetails?'':'disabled')+'>Clear selection</button><span class="sr-only" data-rt-selection-status></span><div class="rt-zoom-controls" role="group" aria-label="Graph time zoom"><button type="button" class="btn small ghost" data-rt-zoom="out" aria-label="Zoom graph out" '+(model.zoom<=minZoom?'disabled':'')+'>-</button><span data-rt-zoom-level aria-live="polite">'+model.zoom+'x</span><button type="button" class="btn small ghost" data-rt-zoom="in" aria-label="Zoom graph in" '+(model.zoom>=maxZoom?'disabled':'')+'>+</button><button type="button" class="btn small ghost" data-rt-zoom="reset">Reset zoom</button></div><button type="button" class="btn small ghost" data-rt-latest>Latest</button>'+(mode==='progressive'?'<button type="button" class="btn small ghost" data-rt-follow aria-pressed="'+model.follow+'">Follow latest</button>':'')+'</div></div>'+(model.points.length?plot(model,'rtt',model.maximum,stats.average):'<p class="help-line">No recorded measurements in the displayed time range.</p>')+'<div class="rt-time-axis"><time>'+escape(localTime(axisPoints(model)[0]?.time))+'</time><time>'+escape(localTime(axisPoints(model)[1]?.time))+'</time></div>'+filterDescription(model)+'<div class="rt-window-stats" aria-label="Statistics for displayed samples"><span><strong>'+stats.received+'/'+stats.count+'</strong> successful</span><span><strong>'+loss+'%</strong> unsuccessful</span><span>Minimum <strong>'+escape(number(stats.min))+'</strong></span><span>Average <strong>'+escape(number(stats.average))+'</strong></span><span>Maximum <strong>'+escape(number(stats.max))+'</strong></span></div><div class="rt-loss-bar" role="img" aria-label="Displayed samples: '+stats.received+' successful, '+stats.lost+' unsuccessful"><span class="rt-success-share" style="width:'+(stats.count?(stats.count-stats.lost)/stats.count*100:0).toFixed(4)+'%"></span><span class="rt-loss-share" style="width:'+stats.lossPercent.toFixed(4)+'%"></span></div><div class="rt-loss-legend"><span>Successful: '+stats.received+'</span><span>Unsuccessful: '+stats.lost+'</span><span>Dashed line: displayed average RTT</span></div><details class="rt-variability"'+(model.variabilityOpen?' open':'')+'><summary>RTT variability <span>'+escape(number(stats.jitter))+' mean absolute change</span></summary><p>Absolute RTT change between consecutive successful measured replies in this displayed window. A missing or unsuccessful probe breaks the pair.</p>'+(stats.jitterPairs?plot(model,'jitter',model.maxJitter,stats.jitter):'<p>No consecutive measured reply pairs are available.</p>')+'</details><span class="sr-only rt-selection-announcement" role="status"></span></section>';
+    const scope=mode==='condensed'?'Condensed · nonlinear time axis; older intervals compressed':model.mode==='window'&&!root.NetworkToolkitGraphHistory?.preferences?.().durationMs?'Moving window · '+model.points.length+' samples':root.NetworkToolkitGraphHistory?.label?.()||'Retained measurements',metric=model.plot;
+    return '<section class="rt-timeline" data-rt-id="'+escape(id)+'" data-rt-mode-active="'+mode+'" data-rt-plot-active="'+metric+'" aria-label="'+escape(model.title)+' timeline"><div class="rt-heading"><div class="rt-view-controls"><label><span class="sr-only">Graph view</span><select data-rt-mode aria-label="Graph view"><option value="window"'+(mode==='window'?' selected':'')+'>Moving window</option><option value="progressive"'+(mode==='progressive'?' selected':'')+'>Progressive history</option><option value="condensed"'+(mode==='condensed'?' selected':'')+'>Condensed history</option></select></label>'+(root.NetworkToolkitGraphHistory?.controlHTML?.()||'')+'<button type="button" class="btn small ghost" data-rt-options aria-label="Graph zoom, pan and selection options" title="Zoom, pan and selection">Options · '+model.zoom+'×</button><span class="sr-only" data-rt-selection-status></span></div></div>'+plot(model,metric,metric==='rtt'?model.maximum:model.maxJitter,metric==='rtt'?stats.average:stats.jitter)+'<div class="rt-time-axis" aria-label="'+escape(timeLabel())+' horizontal time axis">'+axisHTML(model)+'</div><div class="rt-plot-caption" title="'+escape(scope+' · '+(filterState(model).active?'Matching samples emphasized. ':'')+stats.count+' samples; dashed line: displayed average. Unmeasured values use the top status lane. Drag plot to pan time.')+'">'+escape(scope)+' · '+escape(root.NetworkToolkitResultTime?.zoneLabel?.()||'Local time')+'</div><span class="sr-only rt-selection-announcement" role="status"></span></section>';
   }
+
   function findContainer(id){return [...(root.document?.querySelectorAll?.('.rt-timeline')||[])].find(item=>item.dataset.rtId===id)||null;}
-  function contextFor(target){const container=target?.closest?.('.rt-timeline');return container?{container,model:models.get(container.dataset.rtId)}:null;}
+  function contextFor(target){const container=target?.closest?.('.rt-timeline')||findContainer(target?.closest?.('[data-graph-workspace]')?.dataset.graphWorkspace||target?.closest?.('[data-rt-options-for]')?.dataset.rtOptionsFor);return container?{container,model:models.get(container.dataset.rtId)}:null;}
   function rowContext(target){
     const row=target?.closest?.('[data-result-graph-id][data-result-sample-key]');if(!row)return null;
     const model=models.get(row.dataset.resultGraphId),container=model?findContainer(model.id):null;
@@ -185,26 +174,26 @@
   function presentSelection(model,point,following=false,force=false){
     if(!point)return;
     const retained=point.members?point.members.every(p=>model.allPoints.some(q=>q.key===p.key)):model.allPoints.some(p=>p.key===point.key),displayed=model.points.some(p=>p.key===point.key||p.members?.some(q=>q.key===point.key)),matches=pointMatches(model,point);
-    const message=(!retained?'This selection is retained as a snapshot. ':'')+(!displayed?'This result is outside the displayed graph range. ':'')+(!matches?'This result is outside the active result filters. ':'')+(following?'Following the latest matching result.':'Selection held. New results continue recording. Choose Latest to follow again.');
+    const message=(!retained?'This selection is retained as a snapshot. ':'')+(!displayed?'This result is outside the displayed graph range. ':'')+(!matches?'This result is outside the active result filters. ':'')+(following?'Following the latest matching result.':'Selection held. New results continue recording. Choose Follow latest to follow again.');
     root.NetworkToolkitResultDetails?.showGraphSelection?.({id:model.id,point,job:model.context?.job,message,following,force});
   }
   function renderSelection(context){
     if(!context?.model)return;const {container,model}=context;
     const follow=container.querySelector('[data-rt-follow]');if(follow)follow.setAttribute('aria-pressed',String(model.follow&&!model.pinned));
     const clear=container.querySelector('[data-rt-clear]');if(clear)clear.disabled=!model.pinned&&!model.liveDetails;
-    const note=container.querySelector('[data-rt-selection-status]'),message=model.pinned?'Selection held. Latest resumes following.':model.liveDetails?'Following latest matching result.':'';if(note&&note.textContent!==message)note.textContent=message;
+    const note=container.querySelector('[data-rt-selection-status]'),message=model.pinned?'Selection held. Follow latest resumes following.':model.liveDetails?'Following latest matching result.':'';if(note&&note.textContent!==message)note.textContent=message;
+    root.NetworkToolkitGraphWorkspace?.refreshFollowState?.(model.id);
     updateHighlights(context);
     if(model.pinned)presentSelection(model,selectedPoint(model));else if(model.liveDetails&&model.follow)presentSelection(model,latestPoint(model),true);
   }
   function pointerPoint(event,context){
     const surface=event.target?.closest?.('[data-rt-surface]');if(!surface||!context?.model)return null;
-    const mark=event.target.closest?.('[data-rt-point]');if(mark)return context.model.points[Number(mark.dataset.rtPoint)]||null;
-    const bounds=surface.getBoundingClientRect(),actualWidth=bounds.width||bounds.right-bounds.left;if(!actualWidth||!Number.isFinite(event.clientX))return null;
-    const geometry=plotGeometry(context.model),x=(event.clientX-bounds.left)/actualWidth*(context.model.mode==='progressive'?geometry.viewport:width);
-    if(context.model.timeScope&&context.model.mode!=='progressive'){let closest=null,distance=Infinity;for(const point of context.model.points){const delta=Math.abs(coordinate(point.index,context.model,geometry)-x);if(delta<distance){distance=delta;closest=point;}}return closest;}
-    const index=context.model.mode==='progressive'?Math.round((x+geometry.left-padding)/geometry.step):Math.round((x-padding)/(width-2*padding)*(context.model.points.length-1));
-    return context.model.points[Math.max(0,Math.min(context.model.points.length-1,index))]||null;
+    const mark=event.target.closest?.('[data-rt-point]'),bounds=surface.getBoundingClientRect(),actualWidth=bounds.width||bounds.right-bounds.left;
+    if(!actualWidth||!Number.isFinite(event.clientX)||mark&&(event.clientX<bounds.left||event.clientX>bounds.left+actualWidth))return mark?context.model.points[Number(mark.dataset.rtPoint)]||null:null;
+    const geometry=plotGeometry(context.model),x=(event.clientX-bounds.left)/actualWidth*geometry.viewport,h=bounds.height||bounds.bottom-bounds.top,y=Number.isFinite(event.clientY)&&h>0?(event.clientY-bounds.top)/h*(context.model.viewportHeight||height):null;
+    let closest=null,distance=Infinity;for(const point of context.model.points){const dx=(point.plotX??coordinate(point.index,context.model,geometry))-x,dy=y==null?0:(point.plotY??0)-y,delta=dx*dx+dy*dy;if(delta<distance){distance=delta;closest=point;}}return closest;
   }
+
   function hideTooltip(){if(tooltip){tooltip.hidden=true;tooltip.setAttribute('aria-hidden','true');}}
   function showTooltip(point,event,model){
     const document=root.document;if(!document?.createElement||!document.body)return;
@@ -223,27 +212,31 @@
     if(activeHover){const model=models.get(activeHover),container=findContainer(activeHover);if(model){model.hovered=null;model.hoverOrigin=null;model.rowUnavailable=null;inspection(model,false);if(container)renderSelection({container,model});}}activeHover=null;hoverPointer=null;hideTooltip();
   }
   function clearPin(model,container,{close=true}={}){model.pinned=null;model.pinnedSnapshot=null;model.keyboardInspect=false;model.heldEnd='';model.liveDetails=false;model.follow=(root.NetworkToolkitGraphHistory?.preferences?.().anchor||'latest')==='latest';root.NetworkToolkitGraphWorkspace?.hold?.(model.id,false);if(close)root.NetworkToolkitResultDetails?.clearGraphSelection?.(model.id);inspection(model,model.hovered!=null);refreshModel(model);if(container)renderSelection({container,model});}
-  function followPosition(model){const geometry=plotGeometry(model),point=latestPoint(model);return Math.max(0,Math.min(geometry.track-geometry.viewport,point?padding+Math.max(0,model.points.findIndex(p=>p.key===point.key))*geometry.step+padding-geometry.viewport:0));}
   function jumpLatest(id){
     const model=models.get(String(id)),container=model&&findContainer(model.id);if(!model)return false;
-    clearHover();clearPin(model,container,{close:false});model.liveDetails=true;model.follow=true;model.skipCaptureOnce=true;model.windowEndKey=null;if(root.NetworkToolkitGraphHistory?.preferences?.().anchor!=='latest'&&root.NetworkToolkitGraphHistory)root.NetworkToolkitGraphHistory.setPreferences({anchor:'latest'},{persist:true});refreshModel(model);if(model.mode==='progressive')model.scrollLeft=followPosition(model);
-    if(container){if(model.mode==='progressive')restoreContainer(container,model);else{model.skipCaptureOnce=true;rebuild(container,model);}}root.NetworkToolkitGraphWorkspace?.latest?.(model.id,{linked:false});presentSelection(model,latestPoint(model),true,true);return !!latestPoint(model);
+    clearHover();clearPin(model,container,{close:false});model.liveDetails=true;model.follow=true;model.viewEnd='';model.panSpanNs='';model.windowEndKey=null;
+    if(root.NetworkToolkitGraphHistory?.preferences?.().anchor!=='latest'&&root.NetworkToolkitGraphHistory)root.NetworkToolkitGraphHistory.setPreferences({anchor:'latest'},{persist:true});refreshModel(model);
+    if(container?.isConnected)rebuild(container,model);root.NetworkToolkitGraphWorkspace?.latest?.(model.id,{linked:false});presentSelection(model,latestPoint(model),true,true);return !!latestPoint(model);
   }
   function zoom(id,action){
     const model=models.get(String(id)),container=model&&findContainer(model.id);if(!model)return null;
-    captureScroll(model);const oldZoom=zoomValue(model.zoom),next=zoomValue(action==='in'?oldZoom*2:action==='out'?oldZoom/2:action==='reset'?1:action);if(next===oldZoom)return next;
-    const geometry=plotGeometry(model),selected=selectedPoint(model),hovered=model.allPoints.find(point=>point.key===model.hovered),visible=model.mode==='progressive'?model.points.slice(geometry.first,geometry.last):model.points;
-    const anchor=[hovered,selected].find(point=>point&&visible.some(item=>item.key===point.key))||visible[Math.floor(visible.length/2)],index=anchor?model.allPoints.findIndex(point=>point.key===anchor.key):model.allPoints.length-1;
-    model.zoom=next;
-    if(model.mode==='progressive')model.scrollLeft=model.follow?followPosition(model):Math.max(0,padding+index*stepFor(model)-geometry.viewport/2);
-    else if(!model.follow||((hovered||selected)&&index<model.allPoints.length-1)){model.follow=false;const count=Math.min(retainedLimit,Math.max(5,Math.round(limit/next))),end=Math.min(model.allPoints.length-1,index+Math.floor(count/2));model.windowEndKey=model.allPoints[end]?.key;}
-    refreshModel(model);model.skipCaptureOnce=true;if(container)rebuild(container,model);return next;
+    const next=zoomValue(action==='in'?model.zoom*2:action==='out'?model.zoom/2:action==='reset'?1:action);if(next===model.zoom)return next;
+    model.zoom=next;refreshModel(model);if(container)rebuild(container,model);const level=root.document?.querySelector('[data-rt-options-for="'+model.id+'"] [data-rt-zoom-level]');if(level)level.textContent=next+'×';return next;
+  }
+  function pan(id,amount){
+    const model=models.get(String(id)),history=root.NetworkToolkitGraphHistory,container=model&&findContainer(model.id);if(!model||!history||!model.timeScope)return false;
+    const span=history.instant(model.timeScope.end)-history.instant(model.timeScope.start);if(span<=0n)return false;
+    model.panSpanNs=String(span*BigInt(Math.round(model.zoom*4))/4n);model.viewEnd=history.timestamp(history.instant(model.timeScope.end)+BigInt(Math.round(Number(span)*amount)));model.follow=false;model.heldEnd=model.viewEnd;refreshModel(model);if(container)rebuild(container,model);return true;
   }
   function revealPoint(context,point){
-    if(context.model.mode!=='progressive')return;
-    const {model}=context,geometry=plotGeometry(model),index=model.points.findIndex(p=>p.key===point.key);if(index<0)return;const x=padding+index*geometry.step;
-    if(x<geometry.left+padding||x>geometry.left+geometry.viewport-padding){model.follow=false;model.scrollLeft=Math.max(0,x-geometry.viewport/2);restoreContainer(context.container,model);}
+    const {model}=context,history=root.NetworkToolkitGraphHistory;if(!history||!Number.isFinite(history.epoch(point.time))||history.contains(point.time,model.timeScope))return;
+    const span=history.instant(model.timeScope.end)-history.instant(model.timeScope.start);model.viewEnd=history.timestamp(history.instant(point.time)+span/2n);model.heldEnd=model.viewEnd;refreshModel(model);const current=findContainer(model.id);if(current)rebuild(current,model);
   }
+  function openOptions(model){
+    if(typeof openModal!=='function')return;
+    openModal('Graph options','<div class="rt-options" data-rt-options-for="'+escape(model.id)+'"><p>Drag the plot horizontally to pan through recorded time. Zoom changes the viewport, preserving the selected duration and held result.</p><div class="rt-zoom-controls" role="group" aria-label="Graph time zoom"><button class="btn small ghost" data-rt-zoom="out">Zoom out</button><span data-rt-zoom-level>'+model.zoom+'×</span><button class="btn small ghost" data-rt-zoom="in">Zoom in</button><button class="btn small ghost" data-rt-zoom="reset">Reset zoom</button></div><div class="rt-zoom-controls"><button class="btn small ghost" data-rt-pan="-0.5">Earlier</button><button class="btn small ghost" data-rt-pan="0.5">Later</button><button class="btn small ghost" data-rt-clear '+(model.pinned||model.liveDetails?'':'disabled')+'>Clear selection</button></div><button class="btn small ghost" data-rt-records>Recorded run data</button>'+filterDescription(model)+'<p>Displayed samples: '+model.stats.count+' · Successful: '+model.stats.received+' · Unsuccessful: '+model.stats.lost+'. Unmeasured values use the top status lane; they are not zero response times. The dashed line represents the displayed average.</p></div>','<button class="btn primary" data-action="close-modal">Done</button>',true);
+  }
+
   function pinPoint(context,point){const model=context.model;model.pinned=point.key;model.pinnedSnapshot={...point};model.liveDetails=false;model.follow=false;model.windowEndKey=(model.rawVisiblePoints||model.points).at(-1)?.key||model.allPoints.at(-1)?.key;model.heldEnd=model.timeScope?.end||root.NetworkToolkitGraphHistory?.range?.(model.allPoints).end||'';root.NetworkToolkitGraphWorkspace?.hold?.(model.id,true,point.members?null:point.key);if(!point.members)root.NetworkToolkitGraphWorkspace?.revealSample?.(model.id,point.key);presentSelection(model,point,false,true);renderSelection(context);}
   function selectResult(id,key){const model=models.get(String(id)),container=model&&findContainer(model.id),selected=model&&selectedPoint(model),point=model?.allPoints.find(p=>p.key===key)||selected?.members?.find(p=>p.key===key)||(selected?.key===key?selected:null);if(!model||!point||!container)return false;pinPoint({container,model},point);revealPoint({container,model},point);return true;}
   function clearSelection(id){const model=models.get(String(id)),container=model&&findContainer(model.id);if(!model)return false;clearHover();clearPin(model,container);model.skipCaptureOnce=true;if(container)rebuild(container,model);return true;}
@@ -253,26 +246,18 @@
     container.before(replacement);container.remove();restore();
   }
   function restoreContainer(container,model){
-    if(model.mode==='progressive'){
-      const main=container.querySelector('[data-rt-scroll="latency"]'),measured=main?.clientWidth||main?.getBoundingClientRect?.().width;
-      if(main&&resizeObserver&&!observedScrollers.has(main)){resizeObserver.observe(main);observedScrollers.add(main);}
-      if(measured>0)model.viewportWidth=measured;capturePendingScroll(model,main);
-      const geometry=plotGeometry(model);model.scrollLeft=model.follow?followPosition(model):Math.max(0,Math.min(model.scrollLeft,geometry.track-geometry.viewport));
-      for(const scroll of container.querySelectorAll('[data-rt-scroll]')){
-        const track=scroll.querySelector('.rt-track'),visible=scroll.querySelector('.rt-visible-plot'),svg=scroll.querySelector('[data-rt-surface]');if(!track||!visible||!svg)continue;
-        track.style.width=geometry.track+'px';visible.style.width=geometry.viewport+'px';
-        if(Math.abs((scroll.scrollLeft||0)-model.scrollLeft)>.5)scroll.scrollLeft=model.scrollLeft;
-        if(scroll.clientWidth>0)scroll._rtAppliedLeft=scroll.scrollLeft;
-        svg.setAttribute('viewBox','0 0 '+geometry.viewport+' '+height);
-        const metric=scroll.dataset.rtScroll==='jitter'?'jitter':'rtt',filter=filterState(model),stamp=[model.scrollLeft,geometry.viewport,model.points.length,model.points.at(-1)?.key,model.zoom,model.pinned,model.hovered,metric,JSON.stringify(filter)].join('|');
-        if(svg.dataset.rtWindow!==stamp){svg.innerHTML=plotContent(model,metric,metric==='rtt'?model.maximum:model.maxJitter,metric==='rtt'?model.stats.average:model.stats.jitter);svg.dataset.rtWindow=stamp;}
-      }
+    const svg=container.querySelector('[data-rt-surface]'),measured=svg?.getBoundingClientRect?.();
+    if(svg&&resizeObserver&&!observedScrollers.has(svg)){resizeObserver.observe(svg);observedScrollers.add(svg);}
+    if(svg&&measured?.width>0&&measured?.height>0){
+      model.viewportWidth=measured.width;model.viewportHeight=measured.height;
+      const metric=model.plot,stamp=[model.viewportWidth,model.viewportHeight,model.points.length,model.points.at(-1)?.key,model.timeScope?.start,model.timeScope?.end,model.zoom,model.pinned,model.hovered,metric,JSON.stringify(filterState(model))].join('|');
+      if(svg.dataset.rtWindow!==stamp){svg.setAttribute('viewBox','0 0 '+model.viewportWidth+' '+model.viewportHeight);svg.innerHTML=plotContent(model,metric,metric==='rtt'?model.maximum:model.maxJitter,metric==='rtt'?model.stats.average:model.stats.jitter);svg.dataset.rtWindow=stamp;}
     }
-    const follow=container.querySelector('[data-rt-follow]');if(follow)follow.setAttribute('aria-pressed',String(model.follow));
-    const axis=container.querySelector('.rt-time-axis')?.querySelectorAll('time')||[],times=axisPoints(model).map(point=>localTime(point?.time));
-    for(let index=0;index<axis.length;index++)if(axis[index].textContent!==times[index])axis[index].textContent=times[index];
+    const axis=container.querySelector('.rt-time-axis'),ticks=axisHTML(model);if(axis&&axis.innerHTML!==ticks)axis.innerHTML=ticks;
+    const slot=container.closest('[data-graph-workspace]')?.querySelector('[data-graph-tabs-slot]'),tabs=tabsHTML(model.id);if(slot&&slot.innerHTML!==tabs)slot.innerHTML=tabs;
     renderSelection({container,model});if(activeHover===model.id&&model.hovered&&hoverPointer){const point=model.allPoints.find(p=>p.key===model.hovered)||model.points.find(p=>p.key===model.hovered);if(point)showTooltip(point,hoverPointer,model);}
   }
+
   function restore(){
     if(restoring)return;restoring=true;
     try{if(activeHover){const model=models.get(activeHover),container=findContainer(activeHover),hidden=container?.closest?.('[hidden]')||container?.closest?.('[data-graph-pane]')?.hidden===true;
@@ -305,10 +290,14 @@
       if(activeHover&&activeHover!==context?.model?.id)clearHover();
 
       if(!context?.model)return;
+      const tab=event.target.closest?.('[data-rt-tab]');if(tab){setPlot(context.model.id,tab.dataset.rtTab);findContainer(context.model.id)?.closest('[data-graph-workspace]')?.querySelector('[data-rt-tab="'+tab.dataset.rtTab+'"]')?.focus({preventScroll:true});return;}
+      if(event.target.closest?.('[data-rt-records]')){root.NetworkToolkitGraphWorkspace?.openRecords?.(context.model.id);return;}
+      if(event.target.closest?.('[data-rt-options]')){openOptions(context.model);return;}
+      const panControl=event.target.closest?.('[data-rt-pan]');if(panControl){pan(context.model.id,Number(panControl.dataset.rtPan));return;}
       if(event.target.closest?.('[data-rt-clear]')){clearHover();clearPin(context.model,context.container);return;}
       const zoomControl=event.target.closest?.('[data-rt-zoom]');if(zoomControl){const action=zoomControl.dataset.rtZoom;zoom(context.model.id,action);findContainer(context.model.id)?.querySelector('[data-rt-zoom="'+action+'"]')?.focus?.({preventScroll:true});return;}
       if(event.target.closest?.('[data-rt-latest]')||event.target.closest?.('[data-rt-follow]')){jumpLatest(context.model.id);return;}
-      const point=event.target.closest?.('[data-rt-point]')?pointerPoint(event,context):null;if(point)pinPoint(context,point);else if(event.target.matches?.('[data-rt-surface]'))clearSelection(context.model.id);
+      if(context.model.dragged){context.model.dragged=false;return;}const point=event.target.closest?.('[data-rt-point]')?pointerPoint(event,context):null;if(point)pinPoint(context,point);else if(event.target.matches?.('[data-rt-surface]'))clearSelection(context.model.id);
     });
     document.addEventListener('change',event=>{if(!event.target.matches?.('[data-rt-mode]'))return;setPreferences({mode:event.target.value});for(const container of [...document.querySelectorAll('.rt-timeline')]){const model=models.get(container.dataset.rtId);if(model)rebuild(container,model);}hideTooltip();});
     document.addEventListener('keydown',event=>{
@@ -318,19 +307,20 @@
       const points=context.model.points,current=points.findIndex(point=>point.key===(context.model.pinned||context.model.hovered)),index=event.key==='Home'?0:event.key==='End'?points.length-1:event.key==='ArrowLeft'?Math.max(0,(current<0?points.length:current)-1):event.key==='ArrowRight'?Math.min(points.length-1,current+1):Math.max(0,current);
       if(!points[index])return;context.model.keyboardInspect=true;inspection(context.model,true);pinPoint(context,points[index]);revealPoint(context,points[index]);
     });
-    document.addEventListener('scroll',event=>{
-      if(!event.target.matches?.('[data-rt-scroll]')||restoring||!(event.target.clientWidth>0))return;const context=contextFor(event.target);if(!context?.model||context.model.mode!=='progressive')return;
-      const scroll=event.target,maximum=Math.max(0,(scroll.scrollWidth||0)-(scroll.clientWidth||context.model.viewportWidth));context.model.scrollLeft=scroll.scrollLeft||0;context.model.follow=!context.model.pinned&&maximum-context.model.scrollLeft<=12;if(!context.model.follow&&context.model.timeScope)context.model.heldEnd=context.model.timeScope.end;restoreContainer(context.container,context.model);hideTooltip();
-    },true);
+    let panning=null;
+    document.addEventListener('pointerdown',event=>{const surface=event.target.closest?.('[data-rt-surface]'),context=contextFor(surface);if(!surface||!context?.model||event.button!==0)return;panning={context,surface,id:event.pointerId,x:event.clientX,width:surface.getBoundingClientRect().width};});
+    document.addEventListener('pointerup',event=>{if(!panning||panning.id!==event.pointerId)return;const p=panning;panning=null;const distance=event.clientX-p.x;if(Math.abs(distance)>8&&p.width>0){p.context.model.dragged=true;clearHover();pan(p.context.model.id,-distance/p.width);root.setTimeout?.(()=>{p.context.model.dragged=false;},0);}});
+    document.addEventListener('pointercancel',()=>{panning=null;});
+    document.addEventListener('keydown',event=>{const tab=event.target.closest?.('[data-rt-tab]'),context=contextFor(tab);if(!context?.model||!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const next=event.key==='Home'?'rtt':event.key==='End'?'jitter':context.model.plot==='rtt'?'jitter':'rtt';setPlot(context.model.id,next);findContainer(context.model.id)?.closest('[data-graph-workspace]')?.querySelector('[data-rt-tab="'+next+'"]')?.focus({preventScroll:true});});
     document.addEventListener('focusin',event=>{const surface=event.target.closest?.('[data-rt-surface]'),context=contextFor(event.target);if(surface&&context)lastFocus={node:surface,id:context.model.id,surface:surface.dataset.rtSurface};else lastFocus=null;});
     document.addEventListener('focusout',event=>{const context=contextFor(event.target);if(context&&event.target.closest?.('[data-rt-surface]')&&event.relatedTarget){context.model.keyboardInspect=false;inspection(context.model,context.model.hovered!=null);}if(lastFocus&&event.target===lastFocus.node&&event.relatedTarget)lastFocus=null;});
     document.addEventListener('toggle',event=>{if(!event.target.matches?.('.rt-variability'))return;const context=contextFor(event.target);if(context?.model)context.model.variabilityOpen=event.target.open===true;},true);
-    document.addEventListener('networkToolkitGraphTimeChange',()=>{for(const [key,model] of [...models]){if(!model.pinned){model.follow=root.NetworkToolkitGraphHistory.preferences().anchor==='latest';if(!model.follow){model.liveDetails=false;root.NetworkToolkitResultDetails?.clearGraphSelection?.(key);}}const container=findContainer(key);if(container){model.skipCaptureOnce=true;rebuild(container,model);}}});
+    document.addEventListener('networkToolkitGraphTimeChange',()=>{for(const [key,model] of [...models]){model.viewEnd='';model.panSpanNs='';if(!model.pinned){model.follow=root.NetworkToolkitGraphHistory.preferences().anchor==='latest';if(!model.follow){model.liveDetails=false;root.NetworkToolkitResultDetails?.clearGraphSelection?.(key);}}const container=findContainer(key);if(container){model.skipCaptureOnce=true;rebuild(container,model);}}});
     document.addEventListener('networkToolkitResultFilterChange',event=>{const id=event.detail?.jobId;for(const [key,model] of [...models]){if(id!=null&&String(id)!==key)continue;const container=findContainer(key);if(container){refreshModel(model);model.skipCaptureOnce=true;rebuild(container,model);}}});
     root.addEventListener?.('resize',()=>{hideTooltip();restore();});
     if(typeof root.ResizeObserver==='function')resizeObserver=new root.ResizeObserver(restore);
     if(typeof root.MutationObserver==='function')new root.MutationObserver(restore).observe(document.documentElement||document,{subtree:true,childList:true});
   }
-  const api=Object.freeze({latency,normalize,summary,pointDetails,sampleKey,preferences,normalizePreferences,setPreferences,mergePreferences,zoom,jumpLatest,selectResult,clearSelection,isHeld,restore,initialize});
+  const api=Object.freeze({latency,normalize,summary,pointDetails,sampleKey,preferences,normalizePreferences,setPreferences,mergePreferences,tabsHTML,setPlot,tracking,pan,zoom,jumpLatest,selectResult,clearSelection,isHeld,restore,initialize});
   if(typeof module==='object'&&module.exports)module.exports=api;root.NetworkToolkitResultTimeline=api;initialize();
 })(typeof window!=='undefined'?window:globalThis);

@@ -105,6 +105,11 @@ jobs:
           if ! PLAYWRIGHT_MODULE="$RUNNER_TEMP/ntk-browser-tests/node_modules/playwright" node -e 'require(process.env.PLAYWRIGHT_MODULE).chromium.launch({headless:true}).then(browser=>browser.close()).catch(error=>{console.error(error.message);process.exitCode=1})'; then
             node "$RUNNER_TEMP/ntk-browser-tests/node_modules/playwright/cli.js" install --with-deps chromium
           fi
+      - name: Check fitted graph tabs, shared following and responsive time axes
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
+        run: node scripts/features-96.browser.cjs
       - name: Check condensed history, time navigation and held entry selections
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright

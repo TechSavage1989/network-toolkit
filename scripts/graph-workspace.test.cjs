@@ -83,7 +83,7 @@ test('collapse preserves permanent statistics, frees the plot track and persists
  h.context.state.graphWorkspacePreferences={ratio:.67};h.document.emit('click',node.querySelector('[data-graph-toggle]'));
  assert.equal(graph.hidden,true);assert.equal(node.querySelector('[data-graph-divider]').hidden,true);assert.equal(node.querySelector('[data-graph-toggle]').getAttribute('aria-expanded'),'false');assert.equal(summary.textContent,'Sent30');assert.equal(h.context.state.graphWorkspacePreferences.ratio,.67);assert.equal(h.context.state.graphWorkspacePreferences.collapsedTools.ping,true);
  node=h.render('ping2','RESULTS',{statistics:stats,tool:'ping'});assert.equal(node.querySelector('[data-graph-pane]').hasAttribute('hidden'),true);
- node=h.render('monitor1','RESULTS',{statistics:stats,tool:'monitor'});assert.equal(node.querySelector('[data-graph-pane]').hidden,undefined);assert.equal(node.querySelector('[data-graph-toggle]').textContent,'Collapse graph');
+ node=h.render('monitor1','RESULTS',{statistics:stats,tool:'monitor'});assert.equal(node.querySelector('[data-graph-pane]').hidden,undefined);assert.equal(node.querySelector('[data-graph-toggle]').textContent,'Collapse');
  node=h.render('ping1','RESULTS',{statistics:stats,tool:'ping'});h.api.toggle('ping1',false);assert.equal(node.querySelector('[data-graph-pane]').hidden,false);assert.equal(node.querySelector('[data-graph-divider]').hidden,false);assert.equal(node.querySelector('[data-graph-toggle]').getAttribute('aria-expanded'),'true');
  assert.equal(h.context.state.graphWorkspacePreferences.ratio,.67);assert.equal(h.saved(),2);
 });

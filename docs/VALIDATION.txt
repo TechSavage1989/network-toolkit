@@ -1,3 +1,9 @@
+NETWORK TOOLKIT 1.17.96 VALIDATION IN PROGRESS
+
+The authorized graph interface update must pass current JavaScript, release guard,
+Go, native Windows and browser Checks before publication. Final verified source,
+package, public asset and live updater evidence will be recorded here.
+
 NETWORK TOOLKIT 1.17.95 VERIFIED PUBLISHED BUILD
 
 1.17.95 published condensed history, configurable time ranges and linked entry details

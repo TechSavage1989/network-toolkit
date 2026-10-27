@@ -1,17 +1,17 @@
-NETWORK TOOLKIT 1.17.95
+NETWORK TOOLKIT 1.17.96
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.95
+CURRENT RELEASE - 1.17.96
 
-Release details: RELEASE_NOTES_1.17.95.txt
-Previous release: docs/releases/RELEASE_NOTES_1.17.94.txt
+Release details: RELEASE_NOTES_1.17.96.txt
+Previous release: docs/releases/RELEASE_NOTES_1.17.95.txt
 Full release-note archive: docs/releases/README.md
 
 Graphs offer condensed history, keeping recent results individual and grouping
 older retained history into wider intervals. Time-range controls support saved
 durations, chosen end times and explicit start/end intervals.
 Graph points and result rows share a held selection in the entry details pane.
-Latest releases the hold and resumes linked following without resetting filters.
+Follow latest releases the hold and resumes linked following without resetting filters.
 
 Scan results show actual recorded local times where relevant. Interactive graphs
 show timestamped measurements and additional statistics grounded in the data.

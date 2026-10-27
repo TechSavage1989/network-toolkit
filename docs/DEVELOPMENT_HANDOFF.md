@@ -45,6 +45,19 @@ For the subsequently authorized 1.17.90 build, the 1.17.89 note has also been
 moved unchanged into the archive. Current `RELEASE_NOTES_1.17.90.txt` alone stays
 at root, and the archive index identifies 1.17.90 as current and 1.17.89 as previous.
 
+## 1.17.96 graph interface update (authorized; validation in progress)
+
+The user explicitly authorized this build and publication, starting at current main
+fd6dfbe729741b6dbfe1955b154fd0291971024d. This update consolidates Follow latest,
+fits timestamp intervals in every graph mode, adds adaptive time ticks, retains
+circular markers and uses saved Response time (RTT) / RTT variability tabs in a
+single non-scrollable plot. Data panning and Graph options replace DOM history
+scrollbars. Statistics remain above independently scrolling results; selected
+records stay in entry details. Expanded run records remain outside the plot.
+Packet traffic retains real interval bars, raw precision and its contributor
+sidebar. No updater, recording, export or repository-access changes are intended.
+Release proof will replace this pending record after required checks pass.
+
 ## 1.17.95 published condensed history, configurable time ranges and linked entry details
 
 The user explicitly authorized implementing, building and publishing this update.

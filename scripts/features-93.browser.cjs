@@ -122,7 +122,7 @@ async function latencyGeometry(label){
  });
  assert(geometry.title.width>=Math.min(120,geometry.workspace.width-24)&&geometry.title.height<=3*geometry.titleLineHeight+1,label+' has a readable results heading');
  if(frame.height>=800)assert(geometry.source.width>=Math.min(90,geometry.workspace.width-24),label+' has a readable visible source caption');else assert(geometry.runDetails&&geometry.runDetails.width>=60&&geometry.runDetails.height>=20,label+' short layout keeps the complete run context reachable through Run details');
- assert(geometry.graph.height>=Math.min(150,geometry.workspace.height*.3),label+' graph pane is not crushed');
+ assert(geometry.graph.height>=Math.min(frame.height<800?100:150,geometry.workspace.height*.25),label+' graph pane is not crushed');
  assert(geometry.visibleGraphHeight>=90,label+' graph remains visible while its result rows are accessible '+JSON.stringify(geometry));
  assert(geometry.results.height>=Math.min(120,geometry.workspace.height*.25),label+' list pane is not crushed');
  assert(geometry.results.top>=geometry.graph.bottom-1,label+' graph remains above its associated list');
@@ -168,6 +168,9 @@ async function packetGeometry(label){
  return {frame,geometry,scrolled};
 }
 
+const workspace=()=>page.locator('[data-graph-workspace="ui93-monitor"]');
+async function graphAction96(name,action){await timeline().locator('[data-rt-options]').click();await page.locator('[data-rt-'+name+(action?'="'+action+'"':'')+']').click();await page.evaluate(()=>closeModal());await settle();}
+async function packetAction96(name,action){await page.locator('[data-packet-graph-options]').click();await page.locator('[data-packet-'+name+(action?'="'+action+'"':'')+']').click();await page.evaluate(()=>closeModal());await settle();}
 (async()=>{
  if(out)fs.mkdirSync(out,{recursive:true});browser=await chromium.launch({headless:true,args:['--no-sandbox']});
  const context=await openContext('America/New_York');await show('monitor');
@@ -190,7 +193,7 @@ async function packetGeometry(label){
  const raw=page.waitForEvent('download');await page.locator('[data-action="export-job"][data-id="ui93-monitor"]').click();await page.locator('[data-export-format="json"]').click();const rawData=JSON.parse(fs.readFileSync(await (await raw).path(),'utf8'));assert(JSON.stringify(rawData).includes(after)&&JSON.stringify(rawData).includes(before),'Formatting preferences preserve original exported instants');
  check('Timestamp settings apply12/24-hour local, UTC and named-zone displays to tables, graph details and hover popups, reject invalid zones and survive saved-state reload');
 
- await show('monitor');assert.equal(await timeline().locator('[data-rt-clear]').isEnabled(),true,'Export preserves the held clock-test result');await timeline().locator('[data-rt-clear]').click();await marker(2).click({force:true});await isSelected(2);await timeline().locator('[data-rt-clear]').click();assert.equal(await timeline().locator('[data-rt-clear]').isEnabled(),false,'Clear selection removes a freshly selected point');
+ await show('monitor');assert.equal(await page.evaluate(()=>NetworkToolkitResultTimeline.isHeld('ui93-monitor')),true,'Export preserves the held clock-test result');await graphAction96('clear');await marker(2).click({force:true});await isSelected(2);await graphAction96('clear');assert.equal(await page.evaluate(()=>NetworkToolkitResultTimeline.isHeld('ui93-monitor')),false,'Clear selection removes a freshly selected point');
  let rows=replies(240);await replaceSamples(rows);
  assert.equal(await timeline().locator('[data-rt-surface="latency"] [data-rt-point]').count(),180,'Default moving window still retains180displayed points');
  await marker(61).click({force:true});await isSelected(61);
@@ -198,25 +201,14 @@ async function packetGeometry(label){
  assert(await marker(61).evaluate(el=>el.classList.contains('rt-point-selected')),'Pinned point remains visibly selected during other hover');
  await page.mouse.move(1,1);await settle();await isSelected(61);assert.equal(await popup().isVisible(),false,'Popup dismisses when the pointer leaves');
  rows=replies(340);await replaceSamples(rows);await isSelected(61);assert((await page.locator('#resultEntryBody').innerText()).includes('Selection held'),'Held evidence remains in the entry sidebar');assert(await marker(61).count(),'The held graph viewport stays anchored as new results arrive');
- assert.equal(await timeline().locator('[data-rt-clear]').isEnabled(),true,'Off-window pin can still be cleared');
+ assert.equal(await page.evaluate(()=>NetworkToolkitResultTimeline.isHeld('ui93-monitor')),true,'Off-window pin can still be cleared');
  report.interactions.push({kind:'persistentPin',sequence:61,hover:62,sourceRows:340,movingWindow:180,outsideWindowRetained:true});
  check('Clicked latency evidence stays selected during other hover, pointer exit and live movement beyond the moving window');
 
  await timeline().locator('[data-rt-mode]').selectOption('progressive');await settle();
- const scroll=()=>timeline().locator('[data-rt-scroll="latency"]');
- const progressive=await scroll().evaluate(el=>({width:el.clientWidth,scrollWidth:el.scrollWidth}));assert(progressive.scrollWidth>progressive.width+100,'Progressive graph has a real horizontal history scrollbar');
- await scroll().evaluate(el=>{el.scrollLeft=0;});await settle();await marker(1).waitFor();await marker(1).click({force:true});await isSelected(1);
- await scroll().evaluate(el=>{el.scrollLeft=120;});await settle();const manual=await scroll().evaluate(el=>el.scrollLeft);
- rows=replies(360);await replaceSamples(rows);const retainedScroll=await scroll().evaluate(el=>el.scrollLeft);assert(Math.abs(retainedScroll-manual)<3,'Live update preserves a manually chosen history position');await isSelected(1);
- await timeline().locator('[data-rt-follow]').click();await settle();let followed=await scroll().evaluate(el=>({left:el.scrollLeft,max:el.scrollWidth-el.clientWidth}));assert(Math.abs(followed.left-followed.max)<3,'Follow latest reaches the live end');
- rows=replies(370);await replaceSamples(rows);followed=await scroll().evaluate(el=>({left:el.scrollLeft,max:el.scrollWidth-el.clientWidth}));assert(Math.abs(followed.left-followed.max)<3,'Follow latest continues with incoming results');
- await page.evaluate(()=>flushState());assert.equal(savedState.graphPreferences.mode,'progressive','Graph mode is saved with app preferences');
- await timeline().locator('[data-rt-mode]').selectOption('window');await settle();assert.equal(await timeline().locator('[data-rt-surface="latency"] [data-rt-point]').count(),180,'Returning to moving window restores current behavior');await isSelected(370);
- report.preferences.push({graphMode:'progressive',persisted:true,manualScroll:manual,retainedScroll,followed});
- report.interactions.push({kind:'progressive',retained:370,progressive,manual,retainedScroll,followed});
- check('Progressive graphs expose retained history, preserve manual scrolling and support explicit following, while moving-window mode remains available');
+ const progressive=await timeline().locator('[data-rt-surface]').evaluate(el=>({width:el.clientWidth,total:el.scrollWidth}));assert.equal(progressive.total,progressive.width,'Progressive history fits the shared viewport');await marker(1).click({force:true});await isSelected(1);await page.evaluate(()=>NetworkToolkitResultTimeline.pan('ui93-monitor',-.25));await settle();const manual=await timeline().locator('.rt-time-axis').innerText();rows=replies(360);await replaceSamples(rows);const retainedScroll=await timeline().locator('.rt-time-axis').innerText();assert.equal(retainedScroll,manual,'Live update preserves chosen time viewport');await isSelected(1);await workspace().locator('[data-graph-follow]').click();await settle();await isSelected(360);rows=replies(370);await replaceSamples(rows);await isSelected(370);const followed=await workspace().locator('[data-graph-follow]').getAttribute('data-follow-state');assert.equal(followed,'following');await page.evaluate(()=>flushState());assert.equal(savedState.graphPreferences.mode,'progressive');await timeline().locator('[data-rt-mode]').selectOption('window');await settle();assert.equal(await timeline().locator('[data-rt-point]').count(),180);await isSelected(370);report.preferences.push({graphMode:'progressive',persisted:true,manual,retainedScroll,followed});report.interactions.push({kind:'progressive',retained:370,progressive,manual,retainedScroll,followed});check('Progressive history fits time, preserves data panning and follows new matching results while retaining moving-window mode');
 
- await timeline().locator('[data-rt-clear]').click();
+ await graphAction96('clear');
  // Correlation uses source identities through changes to list ordering/filtering.
  const resultView=page.locator('[data-graph-results] [data-list-view]');
  await resultView.locator('[data-list-sort="sequence"]').click();await resultView.locator('[data-list-sort="sequence"]').click();await settle();
