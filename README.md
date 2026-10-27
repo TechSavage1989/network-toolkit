@@ -82,3 +82,5 @@ The application uses Go with an embedded web interface. Use the toolchain specif
 See [VALIDATION.txt](docs/VALIDATION.txt) for recorded results and [THIRD_PARTY_NOTICES.txt](docs/THIRD_PARTY_NOTICES.txt) for dependency notices. Cross-compilation, browser fixtures and update staging are not proof of native Windows/WebView2 interaction or an actual install/restart.
 
 </details>
+
+Development review: [1.17.98 graph navigator build](RELEASE_NOTES_1.17.98.txt). Published downloads remain at 1.17.97 until publication is authorized.

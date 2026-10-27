@@ -10,7 +10,7 @@ function harness(){
  const document=makeDocument('');document.body=document;document.activeElement=document;
  let observer,selected=null;
  const context={document,console,Intl,Date,NetworkToolkitResultTime:{format:value=>value==null||value===''?'Not recorded':'LOCAL '+value},MutationObserver:class{constructor(fn){observer=fn;}observe(){}}};
- context.window=context;vm.createContext(context);vm.runInContext(fs.readFileSync(require.resolve('../web/assets/graph-history.js'),'utf8'),context);vm.runInContext(fs.readFileSync(require.resolve('../web/assets/result-timeline.js'),'utf8'),context);
+ context.window=context;context.CustomEvent=class{constructor(type,{detail}){this.type=type;this.detail=detail;}};document.dispatchEvent=event=>document.emit(event.type,document,{detail:event.detail});vm.createContext(context);vm.runInContext(fs.readFileSync(require.resolve('../web/assets/graph-history.js'),'utf8'),context);vm.runInContext(fs.readFileSync(require.resolve('../web/assets/graph-navigator.js'),'utf8'),context);vm.runInContext(fs.readFileSync(require.resolve('../web/assets/result-timeline.js'),'utf8'),context);
  const api=context.NetworkToolkitResultTimeline;
  context.NetworkToolkitResultDetails={showGraphSelection:value=>{selected=value;let box=document.querySelector('.mock-entry-details');if(!box){box=document.createElement('aside');box.className='mock-entry-details';box.innerHTML='<div class="mock-point-details"></div><p class="mock-selection-context"></p>';document.append(box);}const content=api.pointDetails(value.point),detail=box.querySelector('.mock-point-details'),note=box.querySelector('.mock-selection-context');if(detail._source!==content){detail.innerHTML=content;detail._source=content;}if(note.textContent!==value.message)note.textContent=value.message;},clearGraphSelection:()=>{selected=null;document.querySelector('.mock-entry-details')?.remove();}};
 
@@ -122,9 +122,9 @@ test('sample identities support sorted and paginated result rows and reciprocal 
  assert.equal(h.api.sampleKey(samples()[3],3),h.api.sampleKey(samples()[3],0),'Sequence/time identity ignores sorted row position');
 });
 
-test('older retained row hover reports an honest moving-window limit and progressive hover reveals its point',()=>{
+test('retained row hover reveals the original timestamp in window and progressive views',()=>{
  const h=harness(),rows=Array.from({length:400},(_,i)=>reply(i+1,i%20,stamp(i)));h.render(rows);let row=h.document.createElement('tr');row.dataset.resultGraphId='job';row.dataset.resultSampleKey=h.api.sampleKey(rows[0],0);h.document.append(row);
- h.document.emit('pointermove',row);assert.match(h.document.querySelector('[data-rt-tooltip]').textContent,/outside the displayed graph range/i);assert.match(h.document.querySelector('[data-rt-tooltip]').textContent,/Sample 1/);
+ h.document.emit('pointermove',row);assert(h.document.querySelector('[data-rt-point][data-rt-sequence="1"]'));assert.match(h.document.querySelector('[data-rt-tooltip]').textContent,/Sample 1/);
  h.api.setPreferences({mode:'progressive'},{persist:false});h.render(rows);row=h.document.createElement('tr');row.dataset.resultGraphId='job';row.dataset.resultSampleKey=h.api.sampleKey(rows[0],0);h.document.append(row);h.observe();h.document.emit('pointermove',row);
  assert(h.document.querySelector('[data-rt-surface="latency"] [data-rt-point="0"]').classList.contains('rt-point-hovered'));assert.equal(h.document.querySelector('[data-rt-scroll]'),null);
  h.api.setPreferences({mode:'window'},{persist:false});
@@ -142,7 +142,7 @@ test('progressive axis follows the selected time scope and data panning rather t
 
 test('time zoom changes range, hit testing and axis accurately and resets without changing recorded rows',()=>{
  const h=harness(),rows=Array.from({length:400},(_,i)=>reply(i+1,10,stamp(i))),original=JSON.stringify(rows);h.render(rows);assert.equal(h.document.querySelectorAll('[data-rt-point]').length,180);h.api.zoom('job','in');assert.equal(h.document.querySelectorAll('[data-rt-point]').length,90);
- let surface=h.document.querySelector('[data-rt-surface]');surface.getBoundingClientRect=()=>({left:10,width:820});h.document.emit('pointermove',surface,{clientX:19});assert.match(h.document.querySelector('[data-rt-tooltip]').textContent,/Sample 311/);h.api.zoom('job','out');assert.equal(h.document.querySelectorAll('[data-rt-point]').length,180);h.api.zoom('job','out');assert.equal(h.document.querySelectorAll('[data-rt-point]').length,359);h.api.zoom('job','reset');assert.equal(h.document.querySelectorAll('[data-rt-point]').length,180);assert.equal(JSON.stringify(rows),original);
+ let surface=h.document.querySelector('[data-rt-surface]');surface.getBoundingClientRect=()=>({left:10,width:820});h.document.emit('pointermove',surface,{clientX:19});assert.match(h.document.querySelector('[data-rt-tooltip]').textContent,/Sample 311/);h.api.zoom('job','out');assert.equal(h.document.querySelectorAll('[data-rt-point]').length,180);h.api.zoom('job','out');assert.equal(h.document.querySelectorAll('[data-rt-point]').length,359);h.api.zoom('job','reset');assert.equal(h.document.querySelectorAll('[data-rt-point]').length,400);assert.equal(JSON.stringify(rows),original);
 });
 
 test('progressive zoom uses time domains at bounded scales without a wide scrolling SVG',()=>{

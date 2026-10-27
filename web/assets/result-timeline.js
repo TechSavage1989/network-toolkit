@@ -67,7 +67,7 @@
     if(!displayed)return '<p class="rt-selected-context">Selected sample '+escape(selectedPoint(model)?.sequence)+' is outside the moving window. Its recorded details remain selected; switch to progressive history to locate it.</p>';
     return '<p class="rt-selected-context">Sample '+escape(selectedPoint(model)?.sequence)+' stays selected until you select another point, click outside the graph or clear the selection.</p>';
   }
-  const zoomValue=value=>Math.max(minZoom,Math.min(maxZoom,Number.isFinite(Number(value))?Number(value):1));
+  const zoomValue=value=>Math.max(1e-18,Math.min(1e24,Number.isFinite(Number(value))?Number(value):1));
   const stepFor=model=>spacing*zoomValue(model.zoom);
   function filterState(model){try{return root.NetworkToolkitResultFilters?.current?.(model.id)||{active:false};}catch{return {active:false};}}
   function pointMatches(model,point){if(point.members)return point.members.some(item=>pointMatches(model,item));try{return root.NetworkToolkitResultFilters?.graphMatches?.(model.id,point.source||point)!==false;}catch{return true;}}
@@ -85,14 +85,14 @@
   function selectPoints(model){
     const history=root.NetworkToolkitGraphHistory,pref=history?.preferences?.();
     let candidates=model.allPoints;
-    if(model.mode==='window'&&!(pref?.durationMs>0)&&(pref?.anchor||'latest')==='latest'){
+    if(model.mode==='window'&&!pref?.allHistory&&!(pref?.durationMs>0)&&(pref?.anchor||'latest')==='latest'){
       const end=model.follow?latestPoint(model):model.allPoints.find(p=>p.key===model.windowEndKey)||model.allPoints.at(-1),index=end?model.allPoints.indexOf(end):model.allPoints.length-1;
       candidates=model.allPoints.slice(Math.max(0,index-limit+1),index+1);
     }
     if(history){
       let scope=history.range(candidates,pref,model.heldEnd||(filterState(model).active?latestPoint(model)?.time||'':''));
-      if(model.panSpanNs&&history.instant(scope.end)!==null)scope={...scope,start:history.timestamp(history.instant(scope.end)-BigInt(model.panSpanNs))};scope=history.viewport(scope,model.zoom,model.viewEnd||'');model.timeScope=scope;
-      const timed=Number.isFinite(scope.from)&&Number.isFinite(scope.to),visible=timed?history.select(model.mode==='window'&&!pref.durationMs&&pref.anchor==='latest'&&model.zoom>=1&&!model.viewEnd?candidates:model.allPoints,scope):candidates,indices=new Set(visible.map(point=>point.index));
+      if(model.panSpanNs&&history.instant(scope.end)!==null)scope={...scope,start:history.timestamp(history.instant(scope.end)-BigInt(model.panSpanNs))};model.baseScope=scope;scope=model.manualScope?{...scope,...root.NetworkToolkitGraphNavigator.scope(model.manualScope.start,model.manualScope.end)}:history.viewport(scope,model.zoom,model.viewEnd||'');model.timeScope=scope;
+      const timed=Number.isFinite(scope.from)&&Number.isFinite(scope.to),visible=timed?history.select(model.mode==='window'&&!pref.allHistory&&!pref.durationMs&&pref.anchor==='latest'&&model.zoom>=1&&!model.viewEnd&&!model.manualScope?candidates:model.allPoints,scope):candidates,indices=new Set(visible.map(point=>point.index));
       model.rawVisiblePoints=visible.map(point=>({...point,jitter:indices.has(point.index-1)?point.jitter:null}));
       const groups=model.mode==='condensed'?history.condense(model.rawVisiblePoints,{end:scope.end,recentMs:pref.recentMs}):model.rawVisiblePoints.map(point=>({items:[point],aggregate:false}));
       return groups.map(aggregate);
@@ -112,7 +112,7 @@
   function zoomText(model){return root.NetworkToolkitGraphHistory?.scaleLabel?.(model.zoom)||String(model.zoom);}
   function visibleInterval(model){const history=root.NetworkToolkitGraphHistory,a=history?.instant?.(model.timeScope?.start),b=history?.instant?.(model.timeScope?.end);if(a==null||b==null)return 'Time not recorded';const ms=Number(b-a)/1000000;for(const [unit,size] of [['d',86400000],['h',3600000],['min',60000],['s',1000],['ms',1],['µs',.001],['ns',.000001]])if(ms>=size)return history.scaleLabel(ms/size)+' '+unit+' visible';return 'Single instant';}
   function referenceState(model){const filter=filterState(model),scale=model.plot==='jitter'?model.jitterScale:model.rttScale,relevant=model.plot==='jitter'?filter.statistic==='jitter':filter.statistic==='average',value=filter.reference;if(!relevant||!Number.isFinite(value)||value>=scale.lower&&value<=scale.upper)return {label:'',description:''};const direction=value>scale.upper?'above':'below';return {label:' · Ref '+(direction==='above'?'↑':'↓'),description:'Reference '+number(value)+' is '+direction+' the visible scale'};}
-  function zoomControls(model){return '<div class="rt-zoom-controls graph-inline-zoom" role="group" aria-label="Graph time zoom"><button class="btn small ghost" type="button" data-rt-zoom="out" aria-label="Zoom out" title="Zoom out" '+(model.zoom<=minZoom?'disabled':'')+'>−</button><span data-rt-zoom-level title="'+escape(visibleInterval(model))+'">'+zoomText(model)+'×</span><button class="btn small ghost" type="button" data-rt-zoom="in" aria-label="Zoom in" title="Zoom in" '+(model.zoom>=maxZoom?'disabled':'')+'>+</button><button class="btn small ghost" type="button" data-rt-zoom="reset" aria-label="Reset zoom to fit the selected timeframe" title="Fit selected timeframe">Fit</button></div>';}
+  function zoomControls(model){return '<div class="rt-zoom-controls graph-inline-zoom" role="group" aria-label="Graph time zoom"><button class="btn small ghost" type="button" data-rt-zoom="out" aria-label="Zoom out" title="Zoom out" '+(model.zoom<=minZoom?'disabled':'')+'>−</button><span data-rt-zoom-level title="'+escape(visibleInterval(model))+'">'+zoomText(model)+'×</span><button class="btn small ghost" type="button" data-rt-zoom="in" aria-label="Zoom in" title="Zoom in" '+(model.zoom>=maxZoom?'disabled':'')+'>+</button><button class="btn small ghost" type="button" data-rt-zoom="reset" aria-label="Fit all retained history" title="Fit all retained history">Fit</button></div>';}
 
   function plotContent(model,metric,maximum,average){
     const geometry=plotGeometry(model),viewWidth=geometry.viewport,scale=metric==='rtt'?model.rttScale:model.jitterScale,segments=[],marks=[];let segment=[],previousPoint=null;
@@ -145,6 +145,18 @@
     const name=metric==='rtt'?'latency':'jitter';
     return '<div class="rt-plot rt-'+name+'" id="rt-active-'+encodeURIComponent(model.id)+'" role="tabpanel" aria-label="'+(metric==='rtt'?'Response time (RTT)':'RTT variability')+'"><div class="rt-axis-label" title="'+escape(visibleInterval(model)+' · '+(model.timeScope?.start||'')+' to '+(model.timeScope?.end||'')+' · '+referenceState(model).description)+'">'+(metric==='rtt'?'Response time':'Absolute change')+' · ms · '+escape(visibleInterval(model))+' · '+zoomText(model)+'×'+referenceState(model).label+((metric==='rtt'?model.rttScale:model.jitterScale).empty?' · Not measured':'')+'</div><svg data-rt-surface="'+name+'" data-rt-lower="'+(metric==='rtt'?model.rttScale:model.jitterScale).lower+'" data-rt-upper="'+(metric==='rtt'?model.rttScale:model.jitterScale).upper+'" data-rt-minimum="'+((metric==='rtt'?model.rttScale:model.jitterScale).minimum??'')+'" data-rt-maximum="'+((metric==='rtt'?model.rttScale:model.jitterScale).maximum??'')+'" data-rt-left="'+plotGeometry(model).left+'" tabindex="0" role="group" aria-label="'+(metric==='rtt'?'Response time':'Absolute RTT change between consecutive measured replies')+'. Drag to pan time. Use arrows to inspect, Enter to select, Escape to clear." viewBox="0 0 '+(model.viewportWidth||width)+' '+(model.viewportHeight||height)+'" preserveAspectRatio="xMidYMid meet">'+plotContent(model,metric,maximum,average)+'</svg></div>';
   }
+  function navigatorHTML(model){
+    const nav=root.NetworkToolkitGraphNavigator;if(!nav)return '';model.fullScope=nav.extent(model.allPoints);
+    // Cache the bounded preview independently of viewport changes. Its Y range
+    // uses the full recording, while each main plot fits its visible records.
+    const stamp=[model.samples,model.plot,JSON.stringify(filterState(model))];
+    if(!model.navigatorCache||stamp.some((v,i)=>v!==model.navigatorCache.stamp[i])){const preview=nav.geometry(model.fullScope,model.allPoints.map(p=>({time:p.time,value:p[model.plot],level:severity(p,model),match:pointMatches(model,p)})));model.navigatorCache={stamp,preview};}
+    return nav.html('result:'+model.id,model.fullScope,model.timeScope,model.navigatorCache.preview,{label:'Full history',note:model.plot==='jitter'?'RTT variability; original consecutive sample pairs':'Response time; original retained measurements'});
+  }
+  function navigateWindow(model,scope){
+    const h=root.NetworkToolkitGraphHistory,a=h.instant(scope.start),b=h.instant(scope.end),base=model.panSpanNs?BigInt(model.panSpanNs):h.instant(model.baseScope.end)-h.instant(model.baseScope.start);if(a===null||b===null||b<=a)return false;
+    model.panSpanNs=String(base>0n?base:1000000000n);model.zoom=Number(BigInt(model.panSpanNs))/Number(b-a);model.manualScope={start:scope.start,end:scope.end};model.viewEnd=scope.end;model.follow=false;clearHover();const container=findContainer(model.id);if(container)rebuild(container,model);else refreshModel(model);return true;
+  }
   function captureScroll(){} // Retained API call sites; history navigation now pans data.
 
   function latency(samples,context={}){
@@ -153,14 +165,14 @@
     let model=models.get(id);
     if(!model)model={id,pinned:null,pinnedSnapshot:null,hovered:null,follow:true,scrollLeft:0,viewportWidth:width,viewportHeight:height,zoom:1};
     else captureScroll(model);
-    const oldMode=model.mode;model.allPoints=normalize(samples,{mode:'progressive'});model.samples=samples;model.title=String(context.title||'Response time');model.tool=context.tool||context.job?.tool||model.tool||'monitor';model.context={...context,id,title:model.title};model.mode=mode;model.plot=plotName(plotPreferences()[model.tool]||model.plot);model.zoom=zoomValue(model.zoom);refreshModel(model);
+    const oldMode=model.mode;if(!model.renderingViewport)model.allPoints=normalize(samples,{mode:'progressive'});model.samples=samples;model.title=String(context.title||'Response time');model.tool=context.tool||context.job?.tool||model.tool||'monitor';model.context={...context,id,title:model.title};model.mode=mode;model.plot=plotName(plotPreferences()[model.tool]||model.plot);model.zoom=zoomValue(model.zoom);refreshModel(model);
     if(oldMode!==mode)model.scrollLeft=0;
     if(model.hovered&&!model.allPoints.some(point=>point.key===model.hovered)&&!model.points.some(point=>point.key===model.hovered))model.hovered=null;
     if(model.pinned){const refreshed=model.allPoints.find(point=>point.key===model.pinned);if(refreshed)model.pinnedSnapshot={...refreshed};}
     models.delete(id);models.set(id,model);while(models.size>64)models.delete(models.keys().next().value);
-    refreshModel(model);const stats=model.stats;
-    const scope=mode==='condensed'?'Condensed · nonlinear time axis; older intervals compressed':model.mode==='window'&&!root.NetworkToolkitGraphHistory?.preferences?.().durationMs?'Moving window · '+model.points.length+' samples':root.NetworkToolkitGraphHistory?.label?.()||'Retained measurements',metric=model.plot;
-    return '<section class="rt-timeline" data-rt-id="'+escape(id)+'" data-rt-scope-start="'+escape(model.timeScope?.start||'')+'" data-rt-scope-end="'+escape(model.timeScope?.end||'')+'" data-rt-mode-active="'+mode+'" data-rt-plot-active="'+metric+'" aria-label="'+escape(model.title)+' timeline"><div class="rt-heading"><div class="rt-view-controls"><label class="rt-mode-control"><span class="sr-only">Graph view</span><select data-rt-mode aria-label="Graph view"><option value="window"'+(mode==='window'?' selected':'')+'>Window</option><option value="progressive"'+(mode==='progressive'?' selected':'')+'>Progressive</option><option value="condensed"'+(mode==='condensed'?' selected':'')+'>Condensed</option></select></label>'+(root.NetworkToolkitGraphHistory?.controlHTML?.()||'')+zoomControls(model)+'<button type="button" class="btn small ghost" data-rt-options aria-label="Graph zoom, pan and selection options" title="Zoom, pan and selection">Options · '+zoomText(model)+'×</button><span class="sr-only" data-rt-selection-status></span></div></div>'+plot(model,metric,metric==='rtt'?model.maximum:model.maxJitter,metric==='rtt'?stats.average:stats.jitter)+'<div class="rt-time-axis" style="margin-left:'+plotGeometry(model).left+'px" aria-label="'+escape(timeLabel())+' horizontal time axis">'+axisHTML(model)+'</div><div class="rt-plot-caption" title="'+escape(scope+' · '+(filterState(model).active?'Matching samples emphasized. ':'')+stats.count+' samples; dashed line: displayed average. Unmeasured values use the top status lane. Drag plot to pan time.')+'">'+escape(scope)+' · '+escape(root.NetworkToolkitResultTime?.zoneLabel?.()||'Local time')+'</div><span class="sr-only rt-selection-announcement" role="status"></span></section>';
+    const stats=model.stats;
+    const scope=mode==='condensed'?'Condensed · nonlinear time axis; older intervals compressed':model.mode==='window'&&!root.NetworkToolkitGraphHistory?.preferences?.().allHistory&&!root.NetworkToolkitGraphHistory?.preferences?.().durationMs?'Moving window · '+model.points.length+' samples':root.NetworkToolkitGraphHistory?.label?.()||'Retained measurements',metric=model.plot;
+    return '<section class="rt-timeline" data-rt-id="'+escape(id)+'" data-rt-scope-start="'+escape(model.timeScope?.start||'')+'" data-rt-scope-end="'+escape(model.timeScope?.end||'')+'" data-rt-mode-active="'+mode+'" data-rt-plot-active="'+metric+'" aria-label="'+escape(model.title)+' timeline"><div class="rt-heading"><div class="rt-view-controls"><label class="rt-mode-control"><span class="sr-only">Graph view</span><select data-rt-mode aria-label="Graph view"><option value="window"'+(mode==='window'?' selected':'')+'>Window</option><option value="progressive"'+(mode==='progressive'?' selected':'')+'>Progressive</option><option value="condensed"'+(mode==='condensed'?' selected':'')+'>Condensed</option></select></label>'+(root.NetworkToolkitGraphHistory?.controlHTML?.()||'')+zoomControls(model)+'<button type="button" class="btn small ghost" data-rt-options aria-label="Graph zoom, pan and selection options" title="Zoom, pan and selection">Options · '+zoomText(model)+'×</button><span class="sr-only" data-rt-selection-status></span></div></div>'+plot(model,metric,metric==='rtt'?model.maximum:model.maxJitter,metric==='rtt'?stats.average:stats.jitter)+'<div class="rt-time-axis" style="margin-left:'+plotGeometry(model).left+'px" aria-label="'+escape(timeLabel())+' horizontal time axis">'+axisHTML(model)+'</div>'+navigatorHTML(model)+'<div class="rt-plot-caption" title="'+escape(scope+' · '+(filterState(model).active?'Matching samples emphasized. ':'')+stats.count+' samples; dashed line: displayed average. Unmeasured values use the top status lane. Drag plot to pan time.')+'">'+escape(scope)+' · '+escape(root.NetworkToolkitResultTime?.zoneLabel?.()||'Local time')+'</div><span class="sr-only rt-selection-announcement" role="status"></span></section>';
   }
 
   function findContainer(id){return [...(root.document?.querySelectorAll?.('.rt-timeline')||[])].find(item=>item.dataset.rtId===id)||null;}
@@ -171,13 +183,13 @@
     return model&&container?{row,container,model,point:model.allPoints.find(point=>point.key===row.dataset.resultSampleKey)||null}:null;
   }
   function updateHighlights(context){
-    const {container,model}=context,filter=filterState(model);
-    for(const mark of container.querySelectorAll('[data-rt-point]')){const point=model.points[Number(mark.dataset.rtPoint)],selected=model.pinned||model.liveDetails&&latestPoint(model)?.key;mark.classList.toggle('rt-point-selected',!!point&&(point.key===selected||!!point.members?.some(p=>p.key===selected)));mark.classList.toggle('rt-point-hovered',!!point&&point.key===model.hovered);mark.classList.toggle('rt-point-filtered',!!point&&filter.active===true&&pointMatches(model,point));mark.classList.toggle('rt-point-filter-dimmed',!!point&&filter.active===true&&!pointMatches(model,point));}
+    const {container,model}=context,filter=filterState(model),heldMembers=new Set(selectedPoint(model)?.members?.map(p=>p.key)||[]);
+    for(const mark of container.querySelectorAll('[data-rt-point]')){const point=model.points[Number(mark.dataset.rtPoint)],selected=model.pinned||model.liveDetails&&latestPoint(model)?.key;mark.classList.toggle('rt-point-selected',!!point&&(point.key===selected||heldMembers.has(point.key)||!!point.members?.some(p=>p.key===selected||heldMembers.has(p.key))));mark.classList.toggle('rt-point-hovered',!!point&&point.key===model.hovered);mark.classList.toggle('rt-point-filtered',!!point&&filter.active===true&&pointMatches(model,point));mark.classList.toggle('rt-point-filter-dimmed',!!point&&filter.active===true&&!pointMatches(model,point));}
     for(const row of root.document?.querySelectorAll?.('[data-result-graph-id][data-result-sample-key]')||[]){if(row.dataset.resultGraphId!==model.id)continue;row.classList.toggle('result-graph-selected',row.dataset.resultSampleKey===(model.pinned||model.liveDetails&&latestPoint(model)?.key)||!!selectedPoint(model)?.members?.some(p=>p.key===row.dataset.resultSampleKey));row.classList.toggle('result-graph-hovered',row.dataset.resultSampleKey===model.hovered);}
   }
   function presentSelection(model,point,following=false,force=false){
     if(!point)return;
-    const retained=point.members?point.members.every(p=>model.allPoints.some(q=>q.key===p.key)):model.allPoints.some(p=>p.key===point.key),displayed=model.points.some(p=>p.key===point.key||p.members?.some(q=>q.key===point.key)),matches=pointMatches(model,point);
+    const retained=point.members?point.members.every(p=>model.allPoints.some(q=>q.key===p.key)):model.allPoints.some(p=>p.key===point.key),displayed=point.members?point.members.some(p=>root.NetworkToolkitGraphHistory.contains(p.time,model.timeScope)):model.points.some(p=>p.key===point.key||p.members?.some(q=>q.key===point.key)),matches=pointMatches(model,point);
     const message=(!retained?'This selection is retained as a snapshot. ':'')+(!displayed?'This result is outside the displayed graph range. ':'')+(!matches?'This result is outside the active result filters. ':'')+(following?'Following the latest matching result.':'Selection held. New results continue recording. Choose Follow latest to follow again.');
     root.NetworkToolkitResultDetails?.showGraphSelection?.({id:model.id,point,job:model.context?.job,message,following,force});
   }
@@ -218,25 +230,24 @@
   function clearPin(model,container,{close=true}={}){model.pinned=null;model.pinnedSnapshot=null;model.keyboardInspect=false;model.heldEnd='';model.liveDetails=false;model.follow=(root.NetworkToolkitGraphHistory?.preferences?.().anchor||'latest')==='latest'&&!model.viewEnd;root.NetworkToolkitGraphWorkspace?.hold?.(model.id,false);if(close)root.NetworkToolkitResultDetails?.clearGraphSelection?.(model.id);inspection(model,model.hovered!=null);refreshModel(model);if(container)renderSelection({container,model});}
   function jumpLatest(id){
     const model=models.get(String(id)),container=model&&findContainer(model.id);if(!model)return false;
-    clearHover();clearPin(model,container,{close:false});model.liveDetails=true;model.follow=true;model.viewEnd='';model.panSpanNs='';model.windowEndKey=null;
+    clearHover();clearPin(model,container,{close:false});model.liveDetails=true;model.follow=true;model.viewEnd='';model.manualScope=null;model.windowEndKey=null;
     if(root.NetworkToolkitGraphHistory?.preferences?.().anchor!=='latest'&&root.NetworkToolkitGraphHistory)root.NetworkToolkitGraphHistory.setPreferences({anchor:'latest'},{persist:true});refreshModel(model);
     if(container?.isConnected)rebuild(container,model);root.NetworkToolkitGraphWorkspace?.latest?.(model.id,{linked:false});presentSelection(model,latestPoint(model),true,true);return !!latestPoint(model);
   }
   function zoom(id,action,{anchorShare,scope:anchorScope}={}){
     const model=models.get(String(id)),container=model&&findContainer(model.id),history=root.NetworkToolkitGraphHistory;if(!model)return null;
-    const next=zoomValue(action==='in'?model.zoom*2:action==='out'?model.zoom/2:action==='reset'?1:action);if(next===model.zoom&&action!=='reset')return next;
-    if(Number.isFinite(anchorShare)&&history){const scope=anchorScope||model.timeScope,end=history.anchoredEnd(scope,model.zoom,next,anchorShare,model.mode);if(end){const span=history.instant(scope.end)-history.instant(scope.start);model.panSpanNs=String(BigInt(Math.max(1,Math.round(Number(span)*model.zoom))));model.viewEnd=end;model.follow=false;}}
-    if(action==='reset'){model.viewEnd='';model.panSpanNs='';model.heldEnd=model.pinned?model.heldEnd:'';if(!model.pinned)model.follow=(history?.preferences?.().anchor||'latest')==='latest';}
-    model.zoom=next;refreshModel(model);if(container)rebuild(container,model);return next;
+    if(action==='reset'){root.NetworkToolkitGraphNavigator.fit();return 1;}
+    const next=Math.max(Math.min(minZoom,model.zoom),Math.min(Math.max(maxZoom,model.zoom),zoomValue(action==='in'?Math.min(Math.max(maxZoom,model.zoom),model.zoom*2):action==='out'?Math.max(minZoom,model.zoom/2):action)));if(next===model.zoom)return next;
+    if(model.manualScope||Number.isFinite(anchorShare)){const scope=anchorScope||model.timeScope,end=Number.isFinite(anchorShare)?history.anchoredEnd(scope,model.zoom,next,anchorShare,model.mode):scope.end,span=history.instant(scope.end)-history.instant(scope.start),length=BigInt(Math.max(1,Math.round(Number(span)*model.zoom/next)));navigateWindow(model,{start:history.timestamp(history.instant(end)-length),end});}
+    else{model.zoom=next;refreshModel(model);if(container)rebuild(container,model);}return model.zoom;
   }
   function pan(id,amount){
-    const model=models.get(String(id)),history=root.NetworkToolkitGraphHistory,container=model&&findContainer(model.id);if(!model||!history||!model.timeScope)return false;
-    const span=history.instant(model.timeScope.end)-history.instant(model.timeScope.start);if(span<=0n)return false;
-    model.panSpanNs=String(BigInt(Math.max(1,Math.round(Number(span)*model.zoom))));model.viewEnd=history.timestamp(history.instant(model.timeScope.end)+BigInt(Math.round(Number(span)*amount)));model.follow=false;model.heldEnd=model.viewEnd;refreshModel(model);if(container)rebuild(container,model);return true;
+    const model=models.get(String(id)),h=root.NetworkToolkitGraphHistory;if(!model||!h||!model.timeScope)return false;
+    const a=h.instant(model.timeScope.start),b=h.instant(model.timeScope.end);if(a===null||b===null||b<=a)return false;const shift=BigInt(Math.round(Number(b-a)*amount));return navigateWindow(model,{start:h.timestamp(a+shift),end:h.timestamp(b+shift)});
   }
   function revealPoint(context,point){
     const {model}=context,history=root.NetworkToolkitGraphHistory;if(!history||!Number.isFinite(history.epoch(point.time))||history.contains(point.time,model.timeScope))return;
-    const span=history.instant(model.timeScope.end)-history.instant(model.timeScope.start);model.viewEnd=history.timestamp(history.instant(point.time)+span/2n);model.heldEnd=model.viewEnd;refreshModel(model);const current=findContainer(model.id);if(current)rebuild(current,model);
+    const span=history.instant(model.timeScope.end)-history.instant(model.timeScope.start),end=history.instant(point.time)+span/2n;navigateWindow(model,{start:history.timestamp(end-span),end:history.timestamp(end)});
   }
   function openOptions(model){
     if(typeof openModal!=='function')return;
@@ -248,8 +259,8 @@
   function clearSelection(id){const model=models.get(String(id)),container=model&&findContainer(model.id);if(!model)return false;clearHover();clearPin(model,container);model.skipCaptureOnce=true;if(container)rebuild(container,model);return true;}
   function isHeld(id){return !!models.get(String(id))?.pinned;}
   function rebuild(container,model){
-    const holder=root.document.createElement('div');holder.innerHTML=latency(model.samples,model.context||{id:model.id,title:model.title});const replacement=holder.firstElementChild;if(!replacement)return;
-    container.before(replacement);container.remove();restore();
+    const holder=root.document.createElement('div');model.renderingViewport=true;try{holder.innerHTML=latency(model.samples,model.context||{id:model.id,title:model.title});}finally{model.renderingViewport=false;}const replacement=holder.firstElementChild;if(!replacement)return;
+    if(!root.NetworkToolkitGraphNavigator?.preserve?.(container,replacement)){container.before(replacement);container.remove();}restore();
   }
   function restoreContainer(container,model){
     const svg=container.querySelector('[data-rt-surface]'),measured=svg?.getBoundingClientRect?.();
@@ -261,6 +272,7 @@
     }
     const axis=container.querySelector('.rt-time-axis'),ticks=axisHTML(model);if(axis){axis.style.marginLeft=plotGeometry(model).left+'px';if(axis.innerHTML!==ticks)axis.innerHTML=ticks;}
     const slot=container.closest('[data-graph-workspace]')?.querySelector('[data-graph-tabs-slot]'),tabs=tabsHTML(model.id);if(slot&&slot.innerHTML!==tabs)slot.innerHTML=tabs;
+    root.NetworkToolkitGraphNavigator?.attach?.(container.querySelector('[data-graph-navigator]'),{full:model.fullScope,view:model.timeScope,change:scope=>navigateWindow(model,scope),begin:()=>{model.navigatorDragging=true;clearHover();},end:()=>{model.navigatorDragging=false;}});
     renderSelection({container,model});if(activeHover===model.id&&model.hovered&&hoverPointer){const point=model.allPoints.find(p=>p.key===model.hovered)||model.points.find(p=>p.key===model.hovered);if(point)showTooltip(point,hoverPointer,model);}
   }
 
@@ -279,7 +291,7 @@
     const document=root.document;if(initialized||!document?.addEventListener)return;initialized=true;
     document.addEventListener('pointermove',event=>{
       const row=rowContext(event.target),context=row||contextFor(event.target),point=row?.point||pointerPoint(event,context);
-      if(!point||!context?.model){clearHover();return;}
+      if(!point||!context?.model||context.model.navigatorDragging){clearHover();return;}
       if(activeHover&&activeHover!==context.model.id)clearHover();activeHover=context.model.id;hoverPointer={target:event.target,clientX:event.clientX,clientY:event.clientY};
       const changed=context.model.hovered!==point.key;context.model.hovered=point.key;context.model.hoverOrigin=row?'row':'graph';inspection(context.model,true);
       if(row){context.model.rowUnavailable=null;if(!context.model.pinned)revealPoint(context,point);}else if(changed&&!context.model.pinned)context.model.rowUnavailable=root.NetworkToolkitGraphWorkspace?.revealSample?.(context.model.id,point.key)===false?point.key:null;
@@ -319,18 +331,23 @@
     document.addEventListener('pointercancel',()=>{panning=null;});
     document.addEventListener('keydown',event=>{const tab=event.target.closest?.('[data-rt-tab]'),context=contextFor(tab);if(!context?.model||!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const next=event.key==='Home'?'rtt':event.key==='End'?'jitter':context.model.plot==='rtt'?'jitter':'rtt';setPlot(context.model.id,next);findContainer(context.model.id)?.closest('[data-graph-workspace]')?.querySelector('[data-rt-tab="'+next+'"]')?.focus({preventScroll:true});});
     document.addEventListener('wheel',event=>{
-      const surface=event.target.closest?.('[data-rt-surface]'),context=contextFor(surface);if(!surface||!context?.model)return;const model=context.model,history=root.NetworkToolkitGraphHistory;if(!history)return;const pending=wheelFrames.get(model.id),next=history.wheelLevel(event,pending?.next??model.zoom,minZoom,maxZoom);if(next===(pending?.next??model.zoom))return;event.preventDefault();const bounds=surface.getBoundingClientRect(),geometry=plotGeometry(model),share=Math.max(0,Math.min(1,(event.clientX-bounds.left-geometry.left)/(geometry.right-geometry.left)));
+      const surface=event.target.closest?.('[data-rt-surface]'),context=contextFor(surface);if(!surface||!context?.model)return;const model=context.model,history=root.NetworkToolkitGraphHistory;if(!history)return;const pending=wheelFrames.get(model.id),next=history.wheelLevel(event,pending?.next??model.zoom,Math.min(minZoom,model.zoom),Math.max(maxZoom,model.zoom));if(next===(pending?.next??model.zoom))return;event.preventDefault();const bounds=surface.getBoundingClientRect(),geometry=plotGeometry(model),share=Math.max(0,Math.min(1,(event.clientX-bounds.left-geometry.left)/(geometry.right-geometry.left)));
       if(pending){pending.next=next;return;}const frame={next,share,scope:{...model.timeScope}};wheelFrames.set(model.id,frame);const apply=()=>{wheelFrames.delete(model.id);if(findContainer(model.id))zoom(model.id,frame.next,{anchorShare:frame.share,scope:frame.scope});};if(root.requestAnimationFrame)root.requestAnimationFrame(apply);else apply();
     },{passive:false});
     document.addEventListener('focusin',event=>{const surface=event.target.closest?.('[data-rt-surface]'),context=contextFor(event.target);if(surface&&context)lastFocus={node:surface,id:context.model.id,surface:surface.dataset.rtSurface};else lastFocus=null;});
     document.addEventListener('focusout',event=>{const context=contextFor(event.target);if(context&&event.target.closest?.('[data-rt-surface]')&&event.relatedTarget){context.model.keyboardInspect=false;inspection(context.model,context.model.hovered!=null);}if(lastFocus&&event.target===lastFocus.node&&event.relatedTarget)lastFocus=null;});
     document.addEventListener('toggle',event=>{if(!event.target.matches?.('.rt-variability'))return;const context=contextFor(event.target);if(context?.model)context.model.variabilityOpen=event.target.open===true;},true);
-    document.addEventListener('networkToolkitGraphTimeChange',event=>{for(const [key,model] of [...models]){model.viewEnd='';model.panSpanNs='';if(event.detail?.fit)model.zoom=1;if(!model.pinned){model.follow=root.NetworkToolkitGraphHistory.preferences().anchor==='latest';if(!model.follow){model.liveDetails=false;root.NetworkToolkitResultDetails?.clearGraphSelection?.(key);}}const container=findContainer(key);if(container){model.skipCaptureOnce=true;rebuild(container,model);}}});
+    document.addEventListener('networkToolkitGraphTimeChange',event=>{for(const [key,model] of [...models]){
+      const wasFollowing=model.follow&&!model.pinned;model.viewEnd='';model.panSpanNs='';model.manualScope=null;if(event.detail?.fit)model.zoom=1;
+      if(event.detail?.fitAll){model.heldEnd='';model.follow=wasFollowing;if(!wasFollowing){const full=root.NetworkToolkitGraphNavigator.extent(model.allPoints);if(root.NetworkToolkitGraphHistory.instant(full.start)!==null)model.manualScope=full;}}
+      else if(!model.pinned){model.follow=root.NetworkToolkitGraphHistory.preferences().anchor==='latest';if(!model.follow){model.liveDetails=false;root.NetworkToolkitResultDetails?.clearGraphSelection?.(key);}}
+      const container=findContainer(key);if(container){model.skipCaptureOnce=true;rebuild(container,model);}
+    }});
     document.addEventListener('networkToolkitResultFilterChange',event=>{const id=event.detail?.jobId;for(const [key,model] of [...models]){if(id!=null&&String(id)!==key)continue;const container=findContainer(key);if(container){refreshModel(model);model.skipCaptureOnce=true;rebuild(container,model);}}});
     root.addEventListener?.('resize',()=>{hideTooltip();restore();});
     if(typeof root.ResizeObserver==='function')resizeObserver=new root.ResizeObserver(restore);
     if(typeof root.MutationObserver==='function')new root.MutationObserver(restore).observe(document.documentElement||document,{subtree:true,childList:true});
   }
-  const api=Object.freeze({latency,normalize,summary,pointDetails,sampleKey,preferences,normalizePreferences,setPreferences,mergePreferences,tabsHTML,setPlot,tracking,pan,zoom,jumpLatest,selectResult,clearSelection,isHeld,restore,initialize});
+  const api=Object.freeze({latency,normalize,summary,pointDetails,sampleKey,preferences,normalizePreferences,setPreferences,mergePreferences,tabsHTML,setPlot,tracking,pan,zoom,jumpLatest,navigate:(id,scope)=>{const model=models.get(String(id));return model?navigateWindow(model,scope):false;},selectResult,clearSelection,isHeld,restore,initialize});
   if(typeof module==='object'&&module.exports)module.exports=api;root.NetworkToolkitResultTimeline=api;initialize();
 })(typeof window!=='undefined'?window:globalThis);

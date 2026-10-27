@@ -3,6 +3,10 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
+Current development review: 1.17.98, based on main 8a3c876.
+The user authorized implementation/build delivery, not publication.
+Read the current handoff section for validation progress.
+
 Current verified published version: 1.17.97.
 Source/tag: c57ad0e52da1d40cda8a6d268e4161928a686a61
 Tree: e670de6d771d9ee18663960a586b4898176c1fd5

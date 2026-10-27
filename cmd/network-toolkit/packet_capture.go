@@ -54,13 +54,14 @@ type packetCaptureInfo struct {
 	Error       string          `json:"error,omitempty"`
 }
 type packetCaptureSession struct {
-	info    packetCaptureInfo
-	packets []*capture.Packet
-	stop    chan struct{}
-	once    sync.Once
-	done    chan struct{}
-	first   time.Time
-	next    uint64
+	navigator packetNavigatorCache
+	info      packetCaptureInfo
+	packets   []*capture.Packet
+	stop      chan struct{}
+	once      sync.Once
+	done      chan struct{}
+	first     time.Time
+	next      uint64
 }
 type packetCaptureManager struct {
 	ctx      context.Context

@@ -1,0 +1,24 @@
+/* The selected window is exact time coverage; hit targets do not widen it. */
+.graph-navigator{min-width:0;min-height:0;height:46px;display:grid;grid-template-rows:30px 14px;gap:1px;overflow:visible;color:var(--muted);user-select:none}
+.gn-track{position:relative;min-width:0;margin:0 7px;border:1px solid var(--border);border-radius:3px;background:var(--panel2);touch-action:none}
+.gn-overview{position:absolute;inset:1px 0;width:100%;height:calc(100% - 2px);overflow:hidden;pointer-events:none}
+.gn-series{fill:none;stroke:var(--diag-latency,var(--accent));stroke-width:1;vector-effect:non-scaling-stroke}
+.gn-series.gn-bad,.gn-series.gn-error{stroke:var(--diag-bad,var(--bad))}.gn-series.gn-warn{stroke:var(--diag-warn,var(--warn))}.gn-series.gn-info,.gn-series.gn-note{stroke:var(--diag-info,var(--accent))}.gn-series.gn-good,.gn-series.gn-normal{stroke:var(--diag-good,var(--good))}.gn-series.gn-dim{opacity:.25}.gn-overview circle{fill:currentColor;stroke:none}
+.gn-shade{position:absolute;top:0;bottom:0;background:color-mix(in srgb,var(--panel) 68%,transparent);pointer-events:none}.gn-shade-before{left:0}.gn-shade-after{right:0}
+.gn-window{position:absolute;top:0;bottom:0;outline:1px solid var(--accent);outline-offset:-1px;background:color-mix(in srgb,var(--accent) 10%,transparent);pointer-events:none;box-sizing:border-box;min-width:0}
+.gn-window-hit{position:absolute;top:0;bottom:0;cursor:grab;min-width:0;outline:none;touch-action:none}.gn-window-hit:focus-visible{box-shadow:inset 0 0 0 2px var(--accent)}
+.gn-start-hit,.gn-end-hit{position:absolute;top:-2px;bottom:-2px;width:14px;transform:translateX(-50%);display:grid;place-items:center;cursor:ew-resize;touch-action:none;outline:none;z-index:2}
+.gn-start-hit span,.gn-end-hit span{display:block;width:5px;height:19px;border:1px solid var(--accent);border-radius:2px;background:var(--panel);box-shadow:0 0 0 1px var(--panel)}
+.gn-start-hit:focus-visible span,.gn-end-hit:focus-visible span,.gn-start-hit:hover span,.gn-end-hit:hover span{background:var(--accent);outline:2px solid var(--panel);outline-offset:1px}
+.gn-window-hit:hover,.gn-dragging .gn-window{background:color-mix(in srgb,var(--accent) 17%,transparent)}.gn-dragging .gn-window-hit{cursor:grabbing}
+[data-gn-part][aria-disabled="true"]{cursor:default;pointer-events:none}
+.gn-labels{display:flex;justify-content:space-between;gap:6px;min-width:0;font:9px var(--mono);line-height:14px;padding:0 7px;white-space:nowrap;overflow:hidden}.gn-labels>span{min-width:0;overflow:hidden;text-overflow:ellipsis}.gn-context{text-align:center;font-family:var(--font);flex:1}
+.rt-timeline{grid-template-rows:auto minmax(38px,1fr) 20px 46px 14px;height:265px;min-height:180px}
+.packet-traffic-section{grid-template-rows:auto minmax(35px,1fr) 20px 46px 14px;height:245px}
+.graph-workspace{--graph-min-height:185px}
+@media(max-height:720px){.graph-workspace{--graph-min-height:157px}.graph-workspace-graph>.rt-timeline{grid-template-rows:auto minmax(30px,1fr) 18px 40px}.graph-navigator{height:40px;grid-template-rows:26px 13px}.graph-workspace-graph>.rt-timeline{min-height:0}}
+@media(max-width:600px){.graph-workspace,.diagnostic-page:has(.result-graph-entry) .graph-workspace{--graph-min-height:168px}.graph-workspace-graph>.rt-timeline,.diagnostic-page:has(.result-graph-entry) .graph-workspace-graph>.rt-timeline{grid-template-rows:auto minmax(30px,1fr) 18px 40px;min-height:0}.graph-workspace-graph .rt-plot-caption{display:none}.graph-navigator{height:40px;grid-template-rows:26px 13px}.gn-context{font-size:0}.gn-context:after{content:'History';font-size:9px}}
+
+.graph-navigator[data-gn-tiny="true"] .gn-start-hit{bottom:50%;top:-2px}.graph-navigator[data-gn-tiny="true"] .gn-end-hit{top:50%;bottom:-2px}.graph-navigator[data-gn-tiny="true"] .gn-start-hit span,.graph-navigator[data-gn-tiny="true"] .gn-end-hit span{height:9px}
+
+.graph-inline-zoom [data-rt-zoom-level],.graph-inline-zoom [data-packet-zoom-value]{max-width:45px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}@container(max-width:420px){.graph-inline-zoom [data-rt-zoom-level],.graph-inline-zoom [data-packet-zoom-value]{max-width:32px}}

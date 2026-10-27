@@ -105,6 +105,11 @@ jobs:
           if ! PLAYWRIGHT_MODULE="$RUNNER_TEMP/ntk-browser-tests/node_modules/playwright" node -e 'require(process.env.PLAYWRIGHT_MODULE).chromium.launch({headless:true}).then(browser=>browser.close()).catch(error=>{console.error(error.message);process.exitCode=1})'; then
             node "$RUNNER_TEMP/ntk-browser-tests/node_modules/playwright/cli.js" install --with-deps chromium
           fi
+      - name: Check full-history Fit and proportional timeline navigators
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
+        run: node scripts/features-98.browser.cjs
       - name: Check smooth graph compression, direct controls and visible-value scaling
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright

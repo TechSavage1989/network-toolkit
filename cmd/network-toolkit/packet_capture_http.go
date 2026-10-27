@@ -143,6 +143,39 @@ func (a *application) handlePacketCapture(w http.ResponseWriter, r *http.Request
 		jsonResponse(w, 200, map[string]any{"capture": info, "total": total, "offset": start, "packets": page, "newestIndex": total - 1})
 		return
 	}
+	if len(parts) == 2 && parts[1] == "graph" {
+		q := r.URL.Query()
+		options, _, err := packetGraphOptions(q)
+		if err != nil {
+			jsonError(w, 400, err.Error())
+			return
+		}
+		revision := uint64(0)
+		if raw := q.Get("graph_revision"); raw != "" {
+			revision, err = strconv.ParseUint(raw, 10, 64)
+			if err != nil {
+				jsonError(w, 400, "Choose a valid recording revision.")
+				return
+			}
+		}
+		view, err := m.graphViewport(id, q.Get("filter"), q.Get("query"), q.Get("protocol"), options, revision)
+		if err != nil {
+			jsonError(w, 400, err.Error())
+			return
+		}
+		jsonResponse(w, 200, view)
+		return
+	}
+	if len(parts) == 2 && parts[1] == "graph-overview" {
+		q := r.URL.Query()
+		overview, err := m.navigator(id, q.Get("filter"), q.Get("query"), q.Get("protocol"))
+		if err != nil {
+			jsonError(w, 400, err.Error())
+			return
+		}
+		jsonResponse(w, 200, overview)
+		return
+	}
 	info, packets, e := m.snapshot(id)
 	if e != nil {
 		jsonError(w, 404, e.Error())

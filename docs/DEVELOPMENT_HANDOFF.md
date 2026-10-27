@@ -45,6 +45,38 @@ For the subsequently authorized 1.17.90 build, the 1.17.89 note has also been
 moved unchanged into the archive. Current `RELEASE_NOTES_1.17.90.txt` alone stays
 at root, and the archive index identifies 1.17.90 as current and 1.17.89 as previous.
 
+## 1.17.98 review development: full-history Fit and timeline navigator
+
+The user authorized implementation, build delivery, validation and handoff updates.
+Development starts from main 8a3c87648a2c991051e8b05e19232afee1b1b3bb on
+review/hosts-editor-1.17.98. Publication is not authorized by this request.
+Main, its public update feed, existing tags and assets stay at published 1.17.97.
+
+Fit selects All retained history, resets temporal positioning/zoom and fits
+full retained timestamps without clearing held selections, tabs, mode or filters.
+The compact linear-time navigator represents the actual displayed interval;
+its draggable body preserves duration and each handle changes its own boundary.
+Shared view state keeps presets, advanced ranges, plot/wheel zoom, data panning,
+measurement tabs and Condensed history synchronized. Manual views hold absolute
+nanosecond boundaries during live updates; Follow latest releases held entries
+and resumes linked tracking while preserving viewing duration and zoom.
+
+Full-history previews use bounded extrema/status display summaries and preserve
+gaps. The main plot fits original visible contributors. Packet capture uses a
+bounded full-extent overview and chronological contributor indexes cached by
+capture revision and filters, plus a lightweight graph viewport endpoint.
+Dragging does not retrieve all packets or rebuild conversation statistics.
+Viewport responses are coalesced and stale results discarded. Existing full
+statistics and export endpoints retain their original scope and data.
+
+The navigator supports captured pointer drags, keyboard movement and boundary
+resizing, focus retention, configured clock/timezone descriptions, tiny-window
+hit areas, explicit out-of-history context and graph collapse/restore.
+Responsive pane sizing keeps results/footer visible beside the added overview.
+
+Validation is in progress. Do not interpret this section as completed CI,
+package verification, native WebView2 execution or a public release record.
+
 ## 1.17.97 published smooth history, direct controls and visible-value scaling
 
 The user explicitly authorized publication of the completed 1.17.97 update.

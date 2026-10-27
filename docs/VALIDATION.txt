@@ -1,3 +1,12 @@
+NETWORK TOOLKIT 1.17.98 REVIEW DEVELOPMENT
+
+Base: main 8a3c87648a2c991051e8b05e19232afee1b1b3bb.
+The requested Fit and timeline navigator changes are being validated.
+Public main/update feed and 1.17.97 release assets remain unchanged.
+No installation/restart or complete native WebView2 execution is claimed.
+
+Previous verified release evidence follows.
+
 NETWORK TOOLKIT 1.17.97 VERIFIED PUBLISHED BUILD
 
 The user explicitly authorized publication of the completed 1.17.97 update.

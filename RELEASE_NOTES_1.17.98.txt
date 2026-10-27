@@ -1,0 +1,8 @@
+Network Toolkit 1.17.98 review build
+
+Fit now selects All retained history and restores the full recorded timeline without clearing held entries, graph modes, measurement tabs, filters or sorting.
+A compact full-history navigator beneath the graph shows an exact, proportional time window. Drag the window to pan, or drag either handle to resize the displayed interval. Keyboard controls and timestamp descriptions follow the configured clock and timezone.
+The linear navigator stays synchronized with presets, historical intervals, plot zoom, wheel zoom, panning and Follow latest, including nonlinear Condensed history. Manual inspection holds absolute boundaries while new results extend the overview.
+The main plot fits original visible measurements; the overview retains full-history context, genuine gaps, extrema, status information and recorded zeros. Held details remain available outside the displayed range.
+Packet capture uses a revision/filter cache and a lightweight indexed viewport endpoint so navigation does not repeatedly load or analyze the entire recording. Original capture statistics, exports and timestamps remain unchanged.
+Responsive layouts retain shared plot tabs, statistics, collapse/expand, adjustable panes and independently scrolling results and details. Updater behavior and the published 1.17.97 feed are unchanged. This is an unpublished review build.
