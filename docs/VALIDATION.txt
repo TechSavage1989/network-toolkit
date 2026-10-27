@@ -48,10 +48,10 @@ suite settling helper. No CI job/assertion was disabled or weakened.
 
 Release 40489248759 PASSED. Main was advanced non-forcibly with an expected-head
 lease to the exact reviewed source. Tag/main provenance and latest feed verified.
-Duplicate main Checks 40489248768 is still running: application 122138723499 and
-Windows 122138723323 pass; browser 122138723495 is pending completion. This is
-not claimed as a completed all-green duplicate run. Observation is only to close
-its record; it does not delay this fully reviewed and verified release.
+Duplicate main Checks 40489248768 also PASSED on the exact published source:
+application 122138723499, Windows 122138723323 and browser 122138723495.
+All retained browser cases and the real five-minute updater poll passed again.
+No optional rerun or post-publication application change was needed.
 
 All four public assets were downloaded and their GitHub digests, outer/inner
 checksums, ZIP CRCs, PE x64 GUI/version resources, exact four-member binary-only

@@ -8,8 +8,7 @@ Current published version: 1.17.100. Source/tag:
 Full exact-source review Checks 40486961204 and Release 40489248759 passed.
 All four public assets, updater inventory, PE/version, matching executable and
 810 packaged source files verify. Source and executable match the reviewed build.
-Duplicate main Checks 40489248768 has passed application and Windows jobs;
-its browser job is still running. Do not claim that duplicate run is all green yet.
+Duplicate main Checks 40489248768 also passed all jobs on the published source.
 See docs/DEVELOPMENT_HANDOFF.md for implementation, hashes and honest limits.
 
 Publication was authorized and is complete. Future builds/publication require
