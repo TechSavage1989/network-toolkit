@@ -45,6 +45,19 @@ For the subsequently authorized 1.17.90 build, the 1.17.89 note has also been
 moved unchanged into the archive. Current `RELEASE_NOTES_1.17.90.txt` alone stays
 at root, and the archive index identifies 1.17.90 as current and 1.17.89 as previous.
 
+## 1.17.97 authorized publication
+
+The user explicitly requested publishing the completed 1.17.97 build.
+The validated runtime is f3604b7823f26e687cb9774cc8c74cc56e3984cc from full
+Checks 40455898670. Publication changes release labels and documentation
+only, preserving the prepared executable and application behavior.
+
+Publication and public updater verification are in progress. Replace this
+paragraph with the final release/source/asset and updater evidence.
+
+The completed review evidence below records the state before this subsequent
+publication authorization.
+
 ## 1.17.97 review build — smooth history, direct controls and visible-value scaling
 
 The user authorized implementation, validation, build delivery and handoff updates.

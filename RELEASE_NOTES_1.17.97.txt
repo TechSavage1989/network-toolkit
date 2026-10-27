@@ -1,4 +1,4 @@
-Network Toolkit 1.17.97 — review build
+Network Toolkit 1.17.97
 
 Condensed history uses smoothly widening age intervals while preserving original measurements, true extrema, exact group boundaries and contributor details.
 A visible Timeframe dropdown and direct zoom/fit controls make common ranges easy to select. Mouse-wheel and trackpad zoom keep the time under the pointer stable.

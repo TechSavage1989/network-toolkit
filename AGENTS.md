@@ -3,18 +3,14 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-Completed authorized review build: 1.17.97 on review/hosts-editor-1.17.97.
-Build source: f3604b7823f26e687cb9774cc8c74cc56e3984cc
-Tree: 739ea59bbaca48999317684a70083d76be5ba1aa
-Full Checks 40455898670 passes: 659 JavaScript tests, 35 safeguards and
-required Go/native Windows/browser suites, including all 7 updater timer cases.
-UI97: 4 groups, 8 scale cases, 72 diagnostic layouts and 17 packet cases.
-Review/local EXE and portable files match; all 799 source files, 54 historical
-notes and 14 editor-library digests verify. See handoff for full evidence.
-The request authorized implementation, validation and build delivery. Keep
-this completed review on its branch; public main/update baseline remains 1.17.96.
-Future publication needs user authorization because a main push can auto-publish.
-This final three-file documentation record uses [skip ci].
+Authorized publication in progress: 1.17.97.
+The user explicitly requested publication of the prepared build. Its runtime
+source is f3604b7823f26e687cb9774cc8c74cc56e3984cc, validated by full Checks
+40455898670. Publication changes only release labels and documentation.
+Preserve the application, version, updater and original release assets.
+Use main network-toolkit as the sole source/update feed; the retired feed
+must remain untouched. Finish public asset/feed verification and record
+the published source, release, checks and updater proof in the handoff.
 
 Current verified published version: 1.17.96.
 Source/tag: 8c5e64e4b2bdab0aa9219650c72eeb58d77bb374

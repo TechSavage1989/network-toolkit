@@ -1,3 +1,12 @@
+NETWORK TOOLKIT 1.17.97 AUTHORIZED PUBLICATION
+
+The user authorized publication of the completed review build. Release labels
+and documentation are being refreshed; application sources and version remain
+unchanged. Full runtime Checks 40455898670 passed on f3604b7823f26e687cb9774cc8c74cc56e3984cc.
+Public asset/feed and installed-version updater verification are in progress.
+
+The following is the original completed review evidence.
+
 NETWORK TOOLKIT 1.17.97 VERIFIED REVIEW BUILD
 
 Build source: f3604b7823f26e687cb9774cc8c74cc56e3984cc
