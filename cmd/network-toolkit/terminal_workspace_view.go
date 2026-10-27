@@ -371,7 +371,9 @@ func (a *application) terminalCanConnect(r *http.Request) bool {
 func (a *application) connectTerminalForRequest(r *http.Request, request terminal.ConnectRequest) (terminal.SessionInfo, error) {
 	var err error
 	request, err = a.resolveTerminalCredential(r.Context(), request)
-	if err != nil { return terminal.SessionInfo{}, err }
+	if err != nil {
+		return terminal.SessionInfo{}, err
+	}
 	id := terminalRequestView(r)
 	if id == "" {
 		return a.connectHomeTerminal(request)

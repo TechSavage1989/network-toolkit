@@ -35,20 +35,20 @@ var (
 // WebView must be created, resized, focused, and closed on the caller's STA UI
 // thread. The Win32 window owner supplies the message pump and COM apartment.
 type WebView struct {
-	parent           uintptr
-	cfg              WebViewConfig
-	ready            func(*WebView, error)
-	readySent        bool
-	closed           bool
-	webRuntime       *installedWebViewRuntime
-	environment      uintptr
-	controller       uintptr
-	core             uintptr
-	core4            uintptr
-	bounds           Rect
-	registrations    []eventRegistration
-	downloads        map[uintptr]eventRegistration
-	pendingDownloads map[*pendingDownload]bool
+	parent            uintptr
+	cfg               WebViewConfig
+	ready             func(*WebView, error)
+	readySent         bool
+	closed            bool
+	webRuntime        *installedWebViewRuntime
+	environment       uintptr
+	controller        uintptr
+	core              uintptr
+	core4             uintptr
+	bounds            Rect
+	registrations     []eventRegistration
+	downloads         map[uintptr]eventRegistration
+	pendingDownloads  map[*pendingDownload]bool
 	bootstrapScriptID string
 }
 
@@ -219,13 +219,23 @@ func (w *WebView) initializeController() error {
 		}
 		return err
 	}
+	observeNavigation := func(kind, uri string, args uintptr, blocked bool) {
+		observation := nativeNavigationObservation{Kind: kind, URI: uri, Blocked: blocked}
+		if blocked {
+			observation.CancelResult = uint32(comCall(args, 8, 1))
+		}
+		if w.cfg.navigationObserver != nil {
+			var cancelled int32
+			observation.CancelReadResult = uint32(comCall(args, 7, uintptr(unsafe.Pointer(&cancelled))))
+			observation.Cancelled = cancelled != 0
+			w.cfg.navigationObserver(observation)
+		}
+	}
 	navigation := func(_ uintptr, args uintptr) uintptr {
 		uri, err := comGetString(args, 3)
-		// Ordinary page/frame navigation stays on the exact HTTP app origin.
+		// Ordinary page navigation stays on the exact native document.
 		// Blob reports are accepted only by the separate DownloadStarting path.
-		if w.closed || err != nil || !sameNativeDocument(w.cfg.AppURL, uri) {
-			comCall(args, 8, 1)
-		}
+		observeNavigation("top", uri, args, w.closed || err != nil || !sameNativeDocument(w.cfg.AppURL, uri))
 		return hresultOK
 	}
 	if err = add(w.core, 7, 8, iidNavigationStarting, navigation); err != nil {
@@ -233,7 +243,11 @@ func (w *WebView) initializeController() error {
 	}
 	// The application has no document frames. Do not grant a nested document
 	// the parent's capability, even on the same origin.
-	if err = add(w.core, 17, 18, iidNavigationStarting, func(_ uintptr, args uintptr) uintptr { comCall(args, 8, 1); return hresultOK }); err != nil {
+	if err = add(w.core, 17, 18, iidNavigationStarting, func(_ uintptr, args uintptr) uintptr {
+		uri, _ := comGetString(args, 3)
+		observeNavigation("frame", uri, args, true)
+		return hresultOK
+	}); err != nil {
 		return err
 	}
 	if err = add(w.core, 44, 45, iidNewWindowRequested, func(_ uintptr, args uintptr) uintptr { comCall(args, 6, 1); return hresultOK }); err != nil {

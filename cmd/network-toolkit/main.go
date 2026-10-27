@@ -24,8 +24,8 @@ import (
 	"time"
 
 	resources "networktoolkit"
-	"networktoolkit/internal/diag"
 	"networktoolkit/internal/desktop"
+	"networktoolkit/internal/diag"
 	"networktoolkit/internal/identity"
 	"networktoolkit/internal/macros"
 	"networktoolkit/internal/model"
@@ -44,76 +44,76 @@ const maxLiveHosts = 1024
 var allowedTools = map[string]bool{"quick": true, "ping": true, "trace": true, "dns": true, "smtp": true, "sftp": true, "tftp": true, "ftp": true, "tcp": true, "http": true, "tls": true, "discover": true, "identify": true, "monitor": true, "wol": true, "routes": true, "arp": true, "connections": true, "wifi": true, "ipconfig": true}
 
 type Job struct {
-	ID               string         `json:"id"`
-	Tool             string         `json:"tool"`
-	Target           string         `json:"target"`
-	Options          map[string]any `json:"options"`
-	Status           string         `json:"status"`
-	Started          string         `json:"started"`
-	Finished         string         `json:"finished,omitempty"`
-	Events           []model.Event  `json:"events"`
-	EventSequence    uint64         `json:"eventSequence"`
-	LiveHosts        map[string]any `json:"liveHosts,omitempty"`
-	SampleStatistics any            `json:"sampleStatistics,omitempty"`
+	ID               string              `json:"id"`
+	Tool             string              `json:"tool"`
+	Target           string              `json:"target"`
+	Options          map[string]any      `json:"options"`
+	Status           string              `json:"status"`
+	Started          string              `json:"started"`
+	Finished         string              `json:"finished,omitempty"`
+	Events           []model.Event       `json:"events"`
+	EventSequence    uint64              `json:"eventSequence"`
+	LiveHosts        map[string]any      `json:"liveHosts,omitempty"`
+	SampleStatistics any                 `json:"sampleStatistics,omitempty"`
 	SampleHistory    *diag.SampleHistory `json:"sampleHistory,omitempty"`
-	Result           *model.Result  `json:"result,omitempty"`
-	Error            string         `json:"error,omitempty"`
+	Result           *model.Result       `json:"result,omitempty"`
+	Error            string              `json:"error,omitempty"`
 	cancel           context.CancelFunc
 }
 
 type application struct {
-	ctx                context.Context
-	stop               context.CancelFunc
-	mu                 sync.RWMutex
-	jobs               map[string]*Job
-	started            time.Time
-	token              string
-	host               string
-	extraHost          string
-	uiHost             string
-	dataPath           string
-	stateMu            sync.Mutex
-	systemMu           sync.Mutex
-	system             map[string]any
-	systemAt           time.Time
-	storageWritable    bool
-	storageError       string
-	state              json.RawMessage
-	terminals          *terminal.Manager
-	terminalAutomation *macros.Engine
-	terminalError      string
-	windowMode         string
-	windowInstanceID   string
-	windowActivationToken string
-	windowActivate     chan struct{}
-	windowInbox        terminalWindowInbox
-	windowLaunchMu     sync.Mutex
-	shutdownRequested  atomic.Bool
-	openTerminalWindow func(context.Context, *terminalWindowPreset) (bool, error)
-	views              *terminalViewRegistry
-	launchTerminalView func(context.Context, terminalViewLaunch) (<-chan error, error)
-	headless           bool
-	primaryMu          sync.Mutex
-	primaryCancel      context.CancelFunc
-	primaryWake        chan struct{}
-	storage            *appStorageManager
-	localTools         *localToolsManager
-	publicIP           *publicIPManager
-	credentials        *credentialVault
-	credentialChanges sync.Mutex
+	ctx                          context.Context
+	stop                         context.CancelFunc
+	mu                           sync.RWMutex
+	jobs                         map[string]*Job
+	started                      time.Time
+	token                        string
+	host                         string
+	extraHost                    string
+	uiHost                       string
+	dataPath                     string
+	stateMu                      sync.Mutex
+	systemMu                     sync.Mutex
+	system                       map[string]any
+	systemAt                     time.Time
+	storageWritable              bool
+	storageError                 string
+	state                        json.RawMessage
+	terminals                    *terminal.Manager
+	terminalAutomation           *macros.Engine
+	terminalError                string
+	windowMode                   string
+	windowInstanceID             string
+	windowActivationToken        string
+	windowActivate               chan struct{}
+	windowInbox                  terminalWindowInbox
+	windowLaunchMu               sync.Mutex
+	shutdownRequested            atomic.Bool
+	openTerminalWindow           func(context.Context, *terminalWindowPreset) (bool, error)
+	views                        *terminalViewRegistry
+	launchTerminalView           func(context.Context, terminalViewLaunch) (<-chan error, error)
+	headless                     bool
+	primaryMu                    sync.Mutex
+	primaryCancel                context.CancelFunc
+	primaryWake                  chan struct{}
+	storage                      *appStorageManager
+	localTools                   *localToolsManager
+	publicIP                     *publicIPManager
+	credentials                  *credentialVault
+	credentialChanges            sync.Mutex
 	confirmCredentialDestination func(context.Context, desktop.CredentialDestinationConfirmation) (bool, error)
-	inspectCredentialDestination func(context.Context,credentialBinding)(string,error)
-	packetCaptures     *packetCaptureManager
-	transfers          *transferHostManager
-	browserMu          sync.Mutex
-	browserConnections map[string]*browserFileConnection
-	browserConnecting  int
-	dragMu             sync.Mutex
-	dragTickets        map[string]remoteDragTicket
-	httpGate           sync.RWMutex
-	updater            appUpdater
-	updateHealthDir    string
-	updateFinalizing   atomic.Bool
+	inspectCredentialDestination func(context.Context, credentialBinding) (string, error)
+	packetCaptures               *packetCaptureManager
+	transfers                    *transferHostManager
+	browserMu                    sync.Mutex
+	browserConnections           map[string]*browserFileConnection
+	browserConnecting            int
+	dragMu                       sync.Mutex
+	dragTickets                  map[string]remoteDragTicket
+	httpGate                     sync.RWMutex
+	updater                      appUpdater
+	updateHealthDir              string
+	updateFinalizing             atomic.Bool
 }
 
 func randomHex(n int) string {
@@ -813,8 +813,12 @@ func (a *application) recordJobEvent(j *Job, event model.Event) {
 						encoded, err := json.Marshal(row)
 						var sample platform.PingReply
 						if err == nil && json.Unmarshal(encoded, &sample) == nil {
-							if sample.Time == "" { sample.Time = old.Time }
-							if j.SampleHistory == nil { j.SampleHistory = &diag.SampleHistory{} }
+							if sample.Time == "" {
+								sample.Time = old.Time
+							}
+							if j.SampleHistory == nil {
+								j.SampleHistory = &diag.SampleHistory{}
+							}
 							j.SampleHistory.Add(sample)
 						}
 					}

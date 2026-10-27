@@ -18,14 +18,14 @@ func runLifecycle(ctx context.Context, url, sessionToken string, stop context.Ca
 	}
 	defer stop()
 	err := desktop.Run(ctx, desktop.Config{
-		Title:     title,
-		URL:       url,
+		Title:        title,
+		URL:          url,
 		SessionToken: sessionToken,
-		DataDir:   dataDir,
-		Stop:      stop,
-		Activate:  activate,
-		OnClosing: onClosing,
-		OnReady:   onReady,
+		DataDir:      dataDir,
+		Stop:         stop,
+		Activate:     activate,
+		OnClosing:    onClosing,
+		OnReady:      onReady,
 	})
 	if err != nil {
 		platform.NotifyFatal("Unable to open Network Toolkit.\n\n" + err.Error())

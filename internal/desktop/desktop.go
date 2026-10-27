@@ -24,6 +24,18 @@ type Config struct {
 	// and the native main window is verified visible. An error screen does not
 	// qualify. The callback must return promptly.
 	OnReady func()
+	// Package-private native acceptance instrumentation. It observes decisions
+	// but cannot alter the document policy or supply a capability.
+	navigationObserver func(nativeNavigationObservation)
+}
+
+type nativeNavigationObservation struct {
+	Kind             string
+	URI              string
+	Blocked          bool
+	CancelResult     uint32
+	CancelReadResult uint32
+	Cancelled        bool
 }
 
 // Rect has the layout of a Win32 RECT. Coordinates are physical screen pixels
@@ -45,4 +57,5 @@ type WebViewConfig struct {
 	SaveDownload func(suggestedName string) (path string, ok bool)
 	Post         func(func()) bool
 	OnError      func(error)
+	navigationObserver func(nativeNavigationObservation)
 }

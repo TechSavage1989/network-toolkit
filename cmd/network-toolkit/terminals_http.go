@@ -282,8 +282,8 @@ func decodeTerminalBody(w http.ResponseWriter, r *http.Request, limit int64, out
 }
 
 func terminalHTTPError(w http.ResponseWriter, err error) {
-	if errors.Is(err,terminal.ErrAuthenticationRequired) {
-		jsonResponse(w,http.StatusConflict,map[string]any{"error":err.Error(),"code":"authentication_required"})
+	if errors.Is(err, terminal.ErrAuthenticationRequired) {
+		jsonResponse(w, http.StatusConflict, map[string]any{"error": err.Error(), "code": "authentication_required"})
 		return
 	}
 	status := http.StatusBadRequest

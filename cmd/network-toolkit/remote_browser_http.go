@@ -25,7 +25,7 @@ type remoteBrowserRequest struct {
 	SessionID        string `json:"sessionId,omitempty"`
 	ConnectionID     string `json:"connectionId,omitempty"`
 	ProfileID        string `json:"profileId,omitempty"`
-	CredentialID string `json:"credentialId,omitempty"`
+	CredentialID     string `json:"credentialId,omitempty"`
 	TimeoutMs        int    `json:"timeoutMs,omitempty"`
 	Action           string `json:"action"`
 	Host             string `json:"host"`
@@ -95,7 +95,9 @@ func (a *application) remoteBrowserSessions() []map[string]any {
 func (a *application) runRemoteBrowserOperation(ctx context.Context, r remoteBrowserRequest) (model.Result, error) {
 	var err error
 	r, err = a.resolveRemoteCredential(ctx, r)
-	if err != nil { return model.Result{}, err }
+	if err != nil {
+		return model.Result{}, err
+	}
 	if r.ConnectionID != "" {
 		entry, err := a.browserConnection(r.ConnectionID)
 		if err != nil {

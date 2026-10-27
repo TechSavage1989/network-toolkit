@@ -346,6 +346,7 @@ func Run(ctx context.Context, cfg Config) error {
 
 	w.view, err = StartWebView(hwnd, WebViewConfig{
 		AppURL: cfg.URL, SessionToken: cfg.SessionToken, UserDataPath: profile,
+		navigationObserver: cfg.navigationObserver,
 		Post: w.post,
 		SaveDownload: func(suggested string) (string, bool) {
 			filename, cancelled, err := saveDownloadPath(hwnd, suggested)

@@ -34,7 +34,11 @@ func credentialConfirmationText(request CredentialDestinationConfirmation) (stri
 	if request.Protocol == "ssh" && request.Fingerprint == "" {
 		return "", errors.New("SSH credential destination approval requires a verified server fingerprint")
 	}
-	for _, field := range []struct{ value string; maximum int; required bool }{
+	for _, field := range []struct {
+		value    string
+		maximum  int
+		required bool
+	}{
 		{request.CredentialName, 120, true}, {request.Protocol, 32, true},
 		{request.Host, 512, true}, {request.Username, 256, false}, {request.Fingerprint, 128, false},
 	} {
@@ -70,29 +74,47 @@ func validateCredentialConfirmationContext(ctx context.Context) error {
 var credentialConfirmationSlot = make(chan struct{}, 1)
 
 func confirmCredentialDestination(ctx context.Context, request CredentialDestinationConfirmation, prompt func(string) (bool, error)) (bool, error) {
-	if err := validateCredentialConfirmationContext(ctx); err != nil { return false, err }
+	if err := validateCredentialConfirmationContext(ctx); err != nil {
+		return false, err
+	}
 	text, err := credentialConfirmationText(request)
-	if err != nil { return false, err }
-	if prompt == nil { return false, errors.New("Native credential confirmation is unavailable") }
+	if err != nil {
+		return false, err
+	}
+	if prompt == nil {
+		return false, errors.New("Native credential confirmation is unavailable")
+	}
 	select {
 	case credentialConfirmationSlot <- struct{}{}:
 	default:
 		return false, errors.New("Another native credential confirmation is already open")
 	}
-	type decision struct { allowed bool; err error }
+	type decision struct {
+		allowed bool
+		err     error
+	}
 	done := make(chan decision, 1)
 	go func() {
 		result := decision{}
 		defer func() { <-credentialConfirmationSlot; done <- result }()
-		if err := ctx.Err(); err != nil { result = decision{err: err}; return }
+		if err := ctx.Err(); err != nil {
+			result = decision{err: err}
+			return
+		}
 		allowed, err := prompt(text)
-		if cancelled := ctx.Err(); cancelled != nil { result = decision{err: cancelled}; return }
+		if cancelled := ctx.Err(); cancelled != nil {
+			result = decision{err: cancelled}
+			return
+		}
 		result = decision{allowed: allowed && err == nil, err: err}
 	}()
 	select {
-	case <-ctx.Done(): return false, ctx.Err()
+	case <-ctx.Done():
+		return false, ctx.Err()
 	case result := <-done:
-		if err := ctx.Err(); err != nil { return false, err }
+		if err := ctx.Err(); err != nil {
+			return false, err
+		}
 		return result.allowed, result.err
 	}
 }

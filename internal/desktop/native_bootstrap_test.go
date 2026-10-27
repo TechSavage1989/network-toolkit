@@ -15,7 +15,7 @@ func TestNativeBootstrapAcceptsOnlyCanonicalDocumentsAndCapabilities(t *testing.
 		if !sameNativeDocument(address, address) || !sameNativeDocument(address, address+"#terminal") {
 			t.Fatal("same-document navigation was rejected")
 		}
-		for _, target := range []string{address+"?x=1", "http://127.0.0.1:1234/api/state", "http://127.0.0.1:1235/", "http://localhost:1234/", "http://user@127.0.0.1:1234/", "about:blank", "blob:http://127.0.0.1:1234/id", "file:///C:/test.html"} {
+		for _, target := range []string{address + "?x=1", "http://127.0.0.1:1234/api/state", "http://127.0.0.1:1235/", "http://localhost:1234/", "http://user@127.0.0.1:1234/", "about:blank", "blob:http://127.0.0.1:1234/id", "file:///C:/test.html"} {
 			if sameNativeDocument(address, target) {
 				t.Fatalf("different capability document was accepted: %q", target)
 			}

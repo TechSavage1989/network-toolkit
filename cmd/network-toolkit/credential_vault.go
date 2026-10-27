@@ -20,22 +20,22 @@ const maxCredentialEntries = 200
 const maxCredentialSecretBytes = 256 << 10
 
 type credentialRecord struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Username  string `json:"username,omitempty"`
-	Secret    string `json:"secret"`
-	Kind      string `json:"kind"`
-	UpdatedAt string `json:"updatedAt"`
-	Bindings []credentialBinding `json:"bindings"`
+	ID        string              `json:"id"`
+	Name      string              `json:"name"`
+	Username  string              `json:"username,omitempty"`
+	Secret    string              `json:"secret"`
+	Kind      string              `json:"kind"`
+	UpdatedAt string              `json:"updatedAt"`
+	Bindings  []credentialBinding `json:"bindings"`
 }
 
 type credentialMetadata struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Username  string `json:"username,omitempty"`
-	Kind      string `json:"kind"`
-	UpdatedAt string `json:"updatedAt"`
-	Bindings []credentialBinding `json:"bindings"`
+	ID        string              `json:"id"`
+	Name      string              `json:"name"`
+	Username  string              `json:"username,omitempty"`
+	Kind      string              `json:"kind"`
+	UpdatedAt string              `json:"updatedAt"`
+	Bindings  []credentialBinding `json:"bindings"`
 }
 
 type credentialVaultFile struct {
@@ -44,10 +44,10 @@ type credentialVaultFile struct {
 }
 
 type credentialVault struct {
-	mu      sync.Mutex
-	path    string
-	entries map[string]credentialRecord
-	protect func([]byte) ([]byte, error)
+	mu        sync.Mutex
+	path      string
+	entries   map[string]credentialRecord
+	protect   func([]byte) ([]byte, error)
 	unprotect func([]byte) ([]byte, error)
 }
 
@@ -61,7 +61,9 @@ func newCredentialVault(root string) (*credentialVault, error) {
 // Protection is injectable only by Go callers for isolated synthetic tests. There
 // is no command-line, environment or HTTP switch that enables plaintext storage.
 func newCredentialVaultWithProtection(root string, protect, unprotect func([]byte) ([]byte, error)) (*credentialVault, error) {
-	if protect == nil || unprotect == nil { return nil, errors.New("Credential protection is unavailable.") }
+	if protect == nil || unprotect == nil {
+		return nil, errors.New("Credential protection is unavailable.")
+	}
 	vault := &credentialVault{path: filepath.Join(root, credentialVaultFilename), entries: map[string]credentialRecord{}, protect: protect, unprotect: unprotect}
 	if err := vault.load(); err != nil {
 		return nil, err
@@ -90,7 +92,7 @@ func sanitizeCredentialRecord(record credentialRecord, existingID string) (crede
 		return credentialRecord{}, errors.New("Credential ID is invalid.")
 	}
 	record.Name = strings.TrimSpace(record.Name)
-	if record.Name == "" || strings.IndexFunc(record.Name,unicode.IsControl)>=0 {
+	if record.Name == "" || strings.IndexFunc(record.Name, unicode.IsControl) >= 0 {
 		return credentialRecord{}, errors.New("Enter a credential name.")
 	}
 	if len(record.Name) > 120 {
@@ -113,7 +115,9 @@ func sanitizeCredentialRecord(record credentialRecord, existingID string) (crede
 		return credentialRecord{}, errors.New("Enter a password or passphrase.")
 	}
 	bindings, err := normalizeCredentialBindings(record.Bindings)
-	if err != nil { return credentialRecord{}, err }
+	if err != nil {
+		return credentialRecord{}, err
+	}
 	record.Bindings = bindings
 	record.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 	return record, nil
@@ -121,17 +125,31 @@ func sanitizeCredentialRecord(record credentialRecord, existingID string) (crede
 
 func (v *credentialVault) load() error {
 	before, err := os.Lstat(v.path)
-	if errors.Is(err, os.ErrNotExist) { return nil }
-	if err != nil { return fmt.Errorf("inspect credential vault: %w",err) }
-	if !before.Mode().IsRegular() || storageIsLink(before) { return errors.New("Credential vault must be a regular file, not a link or device.") }
-	if before.Size() > 2<<20 { return errors.New("Credential vault is larger than the supported 2 MiB limit.") }
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("inspect credential vault: %w", err)
+	}
+	if !before.Mode().IsRegular() || storageIsLink(before) {
+		return errors.New("Credential vault must be a regular file, not a link or device.")
+	}
+	if before.Size() > 2<<20 {
+		return errors.New("Credential vault is larger than the supported 2 MiB limit.")
+	}
 	fileHandle, err := os.Open(v.path)
-	if err != nil { return fmt.Errorf("open credential vault: %w",err) }
+	if err != nil {
+		return fmt.Errorf("open credential vault: %w", err)
+	}
 	defer fileHandle.Close()
 	after, err := fileHandle.Stat()
-	if err != nil || !after.Mode().IsRegular() || !os.SameFile(before,after) { return errors.New("Credential vault changed while it was being opened.") }
-	raw, err := io.ReadAll(io.LimitReader(fileHandle,(2<<20)+1))
-	if err != nil { return fmt.Errorf("read credential vault: %w",err) }
+	if err != nil || !after.Mode().IsRegular() || !os.SameFile(before, after) {
+		return errors.New("Credential vault changed while it was being opened.")
+	}
+	raw, err := io.ReadAll(io.LimitReader(fileHandle, (2<<20)+1))
+	if err != nil {
+		return fmt.Errorf("read credential vault: %w", err)
+	}
 	if len(raw) > 2<<20 {
 		return errors.New("Credential vault is larger than the supported 2 MiB limit.")
 	}
@@ -149,7 +167,9 @@ func (v *credentialVault) load() error {
 			continue
 		}
 		bindings, err := normalizeCredentialBindings(item.Bindings)
-		if err != nil { return errors.New("Credential destination bindings are invalid.") }
+		if err != nil {
+			return errors.New("Credential destination bindings are invalid.")
+		}
 		item.Bindings = bindings
 		v.entries[item.ID] = item
 	}
@@ -171,7 +191,9 @@ func (v *credentialVault) saveLocked() error {
 	if err != nil {
 		return fmt.Errorf("protect credential vault: %w", err)
 	}
-	if len(encrypted)>2<<20 { return errors.New("Credential vault would exceed its supported 2 MiB limit. Remove or shorten an existing entry first.") }
+	if len(encrypted) > 2<<20 {
+		return errors.New("Credential vault would exceed its supported 2 MiB limit. Remove or shorten an existing entry first.")
+	}
 	if err := os.MkdirAll(filepath.Dir(v.path), 0700); err != nil {
 		return err
 	}

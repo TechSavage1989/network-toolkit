@@ -56,7 +56,9 @@ func (a *application) browserConnection(id string) (*browserFileConnection, erro
 func (a *application) openBrowserConnection(request *http.Request, r remoteBrowserRequest) (string, error) {
 	var resolveErr error
 	r, resolveErr = a.resolveRemoteCredential(request.Context(), r)
-	if resolveErr != nil { return "", resolveErr }
+	if resolveErr != nil {
+		return "", resolveErr
+	}
 	if !a.browserHomeAvailable(request) {
 		return "", terminal.ErrClosed
 	}
@@ -75,8 +77,10 @@ func (a *application) openBrowserConnection(request *http.Request, r remoteBrows
 	lifetime, cancel := context.WithCancel(parent)
 	stop := context.AfterFunc(request.Context(), cancel)
 	defer stop()
-	req := terminal.ConnectRequest{Type: "ssh", ProfileID: r.ProfileID, CredentialID:r.CredentialID, Host: r.Host, Port: r.Port, Username: r.Username, AuthMethod: r.AuthMode, Password: r.Password, PrivateKey: r.PrivateKey, Passphrase: r.Passphrase, SSHCompatibility: r.SSHCompatibility, Cols: 80, Rows: 24, TimeoutMs: r.TimeoutMs}
-	if r.CredentialID != "" { req.ExpectedHostFingerprint = r.Fingerprint }
+	req := terminal.ConnectRequest{Type: "ssh", ProfileID: r.ProfileID, CredentialID: r.CredentialID, Host: r.Host, Port: r.Port, Username: r.Username, AuthMethod: r.AuthMode, Password: r.Password, PrivateKey: r.PrivateKey, Passphrase: r.Passphrase, SSHCompatibility: r.SSHCompatibility, Cols: 80, Rows: 24, TimeoutMs: r.TimeoutMs}
+	if r.CredentialID != "" {
+		req.ExpectedHostFingerprint = r.Fingerprint
+	}
 	if req.AuthMethod == "key" && req.PrivateKey == "" && r.KeyPath != "" {
 		file, err := os.Open(r.KeyPath)
 		if err != nil {
