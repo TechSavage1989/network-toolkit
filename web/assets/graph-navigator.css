@@ -17,7 +17,7 @@
 .packet-traffic-section{grid-template-rows:auto minmax(35px,1fr) 20px 46px 14px;height:245px}
 .graph-workspace{--graph-min-height:230px}
 @media(max-height:720px){.graph-workspace{--graph-min-height:135px}.graph-workspace-graph>.rt-timeline{grid-template-rows:auto minmax(30px,1fr) 18px 40px}.graph-navigator{height:40px;grid-template-rows:26px 13px}.graph-workspace-graph>.rt-timeline{min-height:0}}
-@media(max-width:600px){.graph-workspace,.diagnostic-page:has(.result-graph-entry) .graph-workspace{--graph-min-height:190px}.graph-workspace-graph>.rt-timeline,.diagnostic-page:has(.result-graph-entry) .graph-workspace-graph>.rt-timeline{grid-template-rows:auto minmax(30px,1fr) 18px 40px;min-height:0}.graph-workspace-graph .rt-plot-caption{display:none}.graph-navigator{height:40px;grid-template-rows:26px 13px}.gn-context{font-size:0}.gn-context:after{content:'History';font-size:9px}}
+@media(max-width:600px){.graph-workspace,.diagnostic-page:has(.result-graph-entry) .graph-workspace{--graph-min-height:186px}.graph-workspace-graph>.rt-timeline,.diagnostic-page:has(.result-graph-entry) .graph-workspace-graph>.rt-timeline{grid-template-rows:auto minmax(30px,1fr) 18px 40px;min-height:0}.graph-workspace-graph .rt-plot-caption{display:none}.graph-navigator{height:40px;grid-template-rows:26px 13px}.gn-context{font-size:0}.gn-context:after{content:'History';font-size:9px}}
 
 .graph-navigator[data-gn-tiny="true"] .gn-start-hit{bottom:50%;top:-2px}.graph-navigator[data-gn-tiny="true"] .gn-end-hit{top:50%;bottom:-2px}.graph-navigator[data-gn-tiny="true"] .gn-start-hit span,.graph-navigator[data-gn-tiny="true"] .gn-end-hit span{height:9px}
 
