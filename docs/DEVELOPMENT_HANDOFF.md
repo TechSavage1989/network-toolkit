@@ -60,8 +60,51 @@ inside the visible interval, while whole-capture statistics and exports retain
 their original scope. Existing shared tabs, held selections, follow state,
 clock/timezone settings and independent results/details scrolling are preserved.
 
-Implementation and full validation are in progress. Final review build evidence
-will replace this pending paragraph before delivery.
+Build source: f3604b7823f26e687cb9774cc8c74cc56e3984cc
+Tree: 739ea59bbaca48999317684a70083d76be5ba1aa
+Full Checks: https://github.com/TechSavage1989/network-toolkit/actions/runs/40455898670
+Application 122029024729, native Windows 122029024861 and browser
+122029024985 all pass on this exact source. The required Go suites,
+659 JavaScript tests and 35 release safeguards pass. Native Windows shell,
+installer-progress and timestamp/statistics checks also pass.
+
+UI97 passes all 4 groups: 8 scale cases, all 9 visible timeframe presets plus
+custom/historical controls, 72 diagnostic layouts (48 base and 24 selected),
+pointer-anchored wheel zoom in all 3 modes, and 17 packet cases including
+12 layouts, held-frame wheel zoom, renewed live following and complete export.
+The layouts cover all modes, both measurement plots, desktop/narrow/short
+windows and both themes. They check circular geometry, visible controls,
+independent scrolling and absence of graph overflow. Tight/equal/tiny/large
+values, recorded zero, failures, off-screen spikes, condensed extrema and
+out-of-range references retain honest fitted scales and readable labels.
+
+Retained UI96 passes 3 groups / 48 base, 24 selected and 12 packet layouts,
+with 48 time-axis cases. UI95 passes 2 groups / 16 base and 8 selected layouts.
+UI94/93/92 and the retained Local Network, editor, copy, Hosts, SMTP,
+client/server, saved-folder and terminal regressions pass. All 7 native
+Chromium updater cases pass, including the real five-minute periodic poll
+and the released regression control. No installation/restart or complete
+native WebView2 interaction is claimed.
+
+The local EXE and portable archive match the GitHub review artifact byte for
+byte. Artifact 12711524526 belongs to this source and Checks run. All
+799 packaged source files, 54 historical release notes and
+14 editor-library digests verify against the source commit. The prior
+1.17.96 note is archived unchanged. ZIP integrity, PE GUI/version resources,
+manifest digests and the binary-only updater allowlist pass.
+
+EXE SHA256: 3a0d2dd07b5e22bd1921f84beaa93b5662028456002ddeb2c513b921f3128bd7
+Portable SHA256: 09fea1b00b810e02c1bfc23b03b07ae34108228ab19607c2d08ebece6b1c1c02
+Update ZIP SHA256: 780cf7630a98578622b3b5147ad921493d6bacbaf580d4cbf565a227dde4921b
+
+The public source/update baseline remains main
+d03f9bf005fb08e8d94237cd6c0b850349480b01 and v1.17.96 release 425027266.
+Its original tag and four asset IDs/digests remain unchanged. This request
+was implementation, validation, build delivery and handoff work; no main
+advance, release/tag creation, retired-feed write or access change was made.
+Future publication requires user authorization. This final documentation
+record is a three-file [skip ci] child on the review branch. The delivered
+build and packaged source snapshot remain the fully validated source above.
 
 ## 1.17.96 published shared graph plots, fitted time axes and unified following
 
