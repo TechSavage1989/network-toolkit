@@ -3,17 +3,15 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-Current published version: 1.17.100. Source/tag:
-783981434a615307b09eeb7f83ef2671b04b3d44
-Full exact-source review Checks 40486961204 and Release 40489248759 passed.
-All four public assets, updater inventory, PE/version, matching executable and
-810 packaged source files verify. Source and executable match the reviewed build.
-Duplicate main Checks 40489248768 also passed all jobs on the published source.
-See docs/DEVELOPMENT_HANDOFF.md for implementation, hashes and honest limits.
+Current development version: 1.17.101; published baseline: 1.17.100.
+The user authorized this focused pinned Local Network filters build/publication.
+Exact-source required Checks must pass before expected-head nonforce promotion.
+Release and four-asset/updater/source identity must verify before delivery.
+See docs/DEVELOPMENT_HANDOFF.md for scope, baseline, evidence and honest limits.
 
-Publication was authorized and is complete. Future builds/publication require
-separate authorization. Never replace old tags/assets, change access or write
-the retired update feed. Final handoff-only records use [skip ci].
+Do not include the separately discussed Condensed recent-spacing follow-on.
+Never replace old tags/assets, change access or write the retired update feed.
+Final handoff-only records use [skip ci].
 
 ## Release-note organization
 

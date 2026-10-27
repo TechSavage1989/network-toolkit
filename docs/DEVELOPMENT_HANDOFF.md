@@ -1,5 +1,34 @@
 # Network Toolkit development handoff
 
+## 1.17.101 authorized pinned Local Network filters build
+
+The user requested Status and Type stay beside the search filter while Local
+Network results scroll, then explicitly authorized publication when complete.
+Baseline is published 1.17.100 and main b6cbf307157705b2115e82bd6cd7dc7eea5b666b.
+Fresh main, releases, active branches and CI were checked; no competing source
+was found. The duplicate 1.17.100 main Checks run 40489248768 finished green.
+
+Cause: nongraph result filters were siblings after the sticky list toolbar.
+Local Network list filters now live inside that same toolbar. Scoped CSS keeps
+all controls visible at the scrollport top, wraps them on narrow layouts and
+positions table headings using the existing measured toolbar height. Existing
+horizontal anchoring, saved filter preferences, keyboard controls and list
+refresh remain intact. Other tools and graph/details scrollers are unchanged.
+
+Local checks: 19 focused filter tests, JavaScript syntax and inline-script parse
+pass. Release metadata/layout safeguards run before the review push. The existing
+Local Network browser suite now covers actual vertical/horizontal list scrolling,
+wide/narrow/short layouts, keyboard changes and preserved filters on rerender.
+Local Go and browser execution are unavailable; required hosted application,
+Windows and browser Checks remain unchanged and must pass before promotion.
+No native installation/restart or full WebView2 session is claimed.
+
+Publication is pending exact-source review, expected-head nonforce promotion,
+Release and four-asset/updater/source-identity verification. No old tags/assets,
+retired feed, repository access or unrelated graph behavior may be changed.
+The newly discussed fixed recent-point spacing in Condensed is a separate,
+unapproved follow-on and is deliberately not included in this release.
+
 ## 1.17.100 published Linear/Condensed graph cleanup
 
 User-authorized publication is complete:

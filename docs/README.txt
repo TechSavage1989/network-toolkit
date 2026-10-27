@@ -1,11 +1,14 @@
-NETWORK TOOLKIT 1.17.100
+NETWORK TOOLKIT 1.17.101
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.100
+CURRENT RELEASE - 1.17.101
 
-Release details: RELEASE_NOTES_1.17.100.txt
-Previous release: docs/releases/RELEASE_NOTES_1.17.99.txt
+Release details: RELEASE_NOTES_1.17.101.txt
+Previous release: docs/releases/RELEASE_NOTES_1.17.100.txt
 Full release-note archive: docs/releases/README.md
+
+Local Network Status and Type stay beside the search filter while results scroll.
+The pinned controls wrap on narrow windows without hiding table headings.
 
 Graphs offer Linear and Condensed, with Timeframe, zoom and navigation controlling
 the range. Old mode preferences migrate to Linear. Run details are in entry details.

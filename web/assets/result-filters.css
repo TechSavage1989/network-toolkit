@@ -35,3 +35,12 @@ tr[class*="result-filter-row-"]>:first-child{border-inline-start:2px solid var(-
 tr[class*="result-filter-row-"].result-graph-hovered{outline:1px solid var(--text);outline-offset:-1px}
 tr[class*="result-filter-row-"].result-graph-selected{outline:2px solid var(--accent);outline-offset:-2px}
 @media(max-width:600px){.result-filter-controls{gap:5px 8px}.result-filter-controls>label{flex-basis:120px}}
+
+/* Local snapshots keep all filters in the existing sticky toolbar. Its measured
+   wrapped height also positions table headers, without another scroll container. */
+.data-list-tools[data-local-filter-toolbar] .result-filter-controls{flex:1 1 280px;border:0;padding:0;background:transparent;gap:6px 10px}
+.data-list-tools[data-local-filter-toolbar] .result-filter-controls>label{flex:1 1 110px}
+.data-list-tools[data-local-filter-toolbar] .result-filter-controls select{width:100%;max-width:100%}
+
+#toolResultsScroll .data-list-tools[data-local-filter-toolbar]{top:0}
+#toolResultsScroll .data-list-tools[data-local-filter-toolbar]~[data-list-content] .table-wrap thead th{top:var(--result-toolbar-height,0px)}

@@ -1,0 +1,5 @@
+Network Toolkit 1.17.101
+
+Local Network result-list Status and Type dropdowns now stay beside the search filter in the existing pinned toolbar while the results scroll.
+The controls wrap together for narrow windows, remain reachable during horizontal scrolling, and keep table headings below the complete toolbar. Keyboard selection, saved filter values and live result refresh behavior are preserved.
+Existing local configuration views, graph and entry-details panes, recorded data, and updater behavior are unchanged.
