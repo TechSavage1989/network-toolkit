@@ -1,4 +1,123 @@
-# 1.17.104 combined candidate — implementation and validation in progress
+# 1.17.104 security release — completed
+
+## 1.17.104 published and independently verified
+
+Published 2026-10-27:
+https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.104
+Release ID: 425987316
+Exact reviewed/published source and tag: 554f360613aa960a28ee459a44018da39a0bbcff
+Tree: da4e0a4193a7454e54c8cd12b19e3fc364fc0d47
+Expected main baseline: 8d0a8724f5b2bfea607b8ca32982f2abad5ee5ac.
+Explicit user approval of that exact promotion resolved an approval-review stop;
+the single non-force expected-head retry succeeded. No access change or bypass.
+This later handoff-only commit does not move the tag, rebuild or replace assets.
+
+Completed combined scope:
+- Authenticated master-password vault with optional offline recovery and native
+  setup/unlock/rotation/recovery. Remember defaults on, as expressly requested,
+  across app restarts and reboots; only a CurrentUser DPAPI-protected random key
+  is remembered, never the master password. All credential metadata is encrypted.
+- Backend-only, destination-bound saved credential IDs, native destination consent,
+  SSH/FTPS server identity checks, no saved-secret GET or plaintext reconnect
+  cache, fail-closed non-Windows storage and native-only capability bootstrap.
+- Condensed All-mode newest spacing approximately Linear 30 seconds, progressively
+  compressing older history; supplied canonical icon and embedded resources.
+- Screenshot-matched pager suffix recognition, repeated/manual paging and accurate
+  last-command/last-paste selection; Auto pager on and Ctrl+C copy-selection only
+  for new/unset values, preserving explicit existing choices.
+
+Required exact-source Checks40581168624 completed SUCCESS, all five jobs:
+- Application122460611320: full Go lifecycle/crypto tests, 751 JavaScript tests,
+  42 Python guards, Windows x64 GUI build and review portable package.
+- Dependency122460611297: checksum-verified canonical vendor exact match; Linux
+  and Windows govulncheck report zero reachable/imported-package vulnerabilities.
+  Unused/unvendored OpenPGP module advisory GO-2026-5932 remains disclosed; this
+  is not a blanket vulnerability-free claim or an independent security audit.
+- Security/pager browser122460611322: synthetic success, denial, missing/locked
+  status, metadata-only/write-only editor and paging/selection/default flows.
+- Windows122460611443: real DPAPI/DACL/bootstrap and native vault lifecycle,
+  input-boundary, cancellation, recovery, stale-instance and reset tests.
+- Full browser122460611132: graph/layout/session regressions and actual native
+  five-minute updater timer (301764 ms), plus historical negative control.
+
+Actual final setup/unlock/recovery dialog pixels, normal/narrow vault and pager
+screens, and normal/narrow million-history graph captures were inspected.
+Graph newest gaps: 24.83 vs Linear30 25.40 px normally; 7.56 vs 7.73 px narrowly,
+under 3% difference and stable from two through 1,010,000 arrivals. The million
+case retains 65 recent arrivals and one 1,009,935-count historical cluster.
+Earlier capture and saved-session fixture failures were repaired without relaxing
+security assertions; the final exact-source run above passed every required gate.
+
+Release40583930470 completed SUCCESS (build122470300491, publish122471235829).
+All four public assets were downloaded independently using the release API's exact
+URLs. GitHub digests/sizes, inner/outer manifests, ZIP safety/CRCs, x64 GUI PE/version,
+updater allowlist and all 883 packaged source files were verified. Public EXE and
+portable ZIP exactly match the reviewed build. Latest release/feed points to104;
+prior103 release425758158, body, asset IDs and digests remain unchanged.
+
+Public SHA256:
+- Network_Toolkit.exe: 064e5467fab0c9c2008ea5cadb36529692cbbafc83537e3967453b7be60da9a2
+- Network_Toolkit_1.17.104_Portable.zip: 7d663cc8998c7d832afbb99ef28d538b2ba12f856357e636bfba105f912111ad
+- Network_Toolkit_1.17.104_Update.zip: 1be73563cb918e55e7a9e6b54521fad6bac6ff9ab280127dbadc949e825ea804
+- SHA256SUMS: 512a30b27f36783391466c4beb943625ab64911201ad39673f1231fb74b3044e
+Updater contains only Network_Toolkit_1.17.104_Windows_x64.exe, SHA256SUMS,
+THIRD_PARTY_NOTICES.txt and UPDATING.txt under Network_Toolkit_1.17.104/.
+
+Automatic duplicate-main Checks40583930478 completed SUCCESS at 21:23:23 UTC:
+application122470299484, dependency122470299834, security browser122470299903,
+full browser122470299954 and Windows122470300064 all passed. No optional rerun
+or additional application change was needed.
+
+First-use and security limits:
+- Existing legacy vaults are not automatically opened/migrated. Use Password
+  manager's explicit native setup. Cancellation/failure before verified activation
+  preserves the old copy; corrupt v2 never silently falls back to legacy.
+- The old DPAPI-only file remains a weaker-protected backup. After verifying the
+  migration and recovery, the user may separately confirm legacy cleanup. Backups
+  elsewhere and deleted disk blocks are not guaranteed securely erased.
+- Remembered unlock remains accessible to software running as the same Windows
+  account. Uncheck Remember for session-only unlock. Optional recovery is another
+  secret to keep separately; there is no vendor recovery if all unlock means fail.
+- Manual Lock and forget keeps established sessions but blocks subsequent saved
+  credential use/reconnect. Already resolved/in-flight authentication may finish.
+  Config reset/deletion forgets unlock, not the encrypted vault; deleting one
+  connection never deletes the whole vault. Whole-directory rollback is not
+  cryptographically prevented. Remote credential revocation is a server action.
+- WebView2 API minimum is 122.0.2365.46, not a recommended old security baseline.
+  Use the latest patched Evergreen x64 runtime from Microsoft's official page:
+  https://developer.microsoft.com/microsoft-edge/webview2/#download
+  Unsupported runtimes fail with a clear download/update message; no automatic
+  installation or weaker filtering fallback. Windows 10/11 x64 remains required.
+- The renderer retains legitimate local-shell capability; this is not a strong
+  boundary against renderer compromise, same-user malware or administrators.
+  Memory/paging/dumps and terminal exports can retain secrets. See
+  CREDENTIAL_SECURITY.md for precise implementation, threat model and limits.
+- All tests were synthetic. No actual user credentials/settings were accessed,
+  migrated or deleted. No actual-user installation/reboot or live device-fleet
+  validation is claimed. Pager patterns and history retention are bounded, not
+  universal device support or unlimited raw output retention.
+
+No optional rerun, unrelated feature, access change, retired-feed write or old
+release replacement was performed. Future implementation needs new user scope.
+
+## Final review artifact evidence
+
+Verified downloads from Checks40581168624:
+- Review portable12769922182: adee4b3b69974298d75084d2aecc38bdf83fcfd38ef0bacd11df5da7388fdb5e
+- Security/pager12770350800: 64d4b84417d0e68487550b846fe4683026070664673aba9aabbf75f8179c0bf1
+- Native12769452444: 1364ab0c80102ae09f850b459dbb33a4c73c8e0d3705f48bae3ee62f5bc3e3fb
+- Dependency12769727287: 69523dc293ef200b10bf5a1ebc44781e84e7d0997ed9ebe8f2a7131df5b04d95
+- Full browser12769423933: edde0e001cd8497b7cb8d2aed50cb401850cf8854ee34a1cda3ce0d6e85fb56d
+Artifacts have finite GitHub retention; public release assets are the durable
+user downloads. The source archive intentionally contains its pre-publication
+validation note, not this later docs-only closure.
+
+All decision holds and pending gates below are historical, not current blockers.
+They are retained to distinguish early evidence from final-source verification.
+
+---
+
+# Historical candidate record (superseded by the publication above)
 
 2026-10-27 update: the user confirmed master password with remembered unlock
 across app restarts and Windows reboots after explicit same-user risk disclosure.
