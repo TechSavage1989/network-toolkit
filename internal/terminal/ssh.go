@@ -42,10 +42,13 @@ func openSSH(ctx context.Context, req ConnectRequest, cb transportCallbacks, kno
 }
 
 func openSSHWithTiming(parent context.Context, req ConnectRequest, cb transportCallbacks, known *knownHostStore, timing sshTiming) (transport, error) {
-	base, err := openSSHConnection(parent, req, cb, known, timing, "")
+	base, err := openSSHConnection(parent, req, cb, known, timing, req.ExpectedHostFingerprint)
 	if err != nil {
 		return nil, err
 	}
+	// Shell setup uses an already-authenticated transport and must not carry
+	// password/private-key strings into its asynchronous setup goroutines.
+	req = reconnectSettings(req)
 	// Ordinary Terminal owns the whole socket during setup, so retain its
 	// network deadline as well as the channel timeout for blocked socket writes.
 	if err := base.conn.SetDeadline(time.Now().Add(time.Duration(req.TimeoutMs) * time.Millisecond)); err != nil {
@@ -313,6 +316,13 @@ func openSSHConnection(parent context.Context, req ConnectRequest, cb transportC
 			return lifetime.Err()
 		}}
 	clientConnection, channels, requests, err := ssh.NewClientConn(connection, endpoint, config)
+	// NewClientConn completes user authentication synchronously. Its internal
+	// shallow ClientConfig copy can outlive the handshake through the rekeying
+	// transport, so clear the shared Auth backing array, not only config.Auth.
+	// Rekeying retains the host-key callback but never repeats user authentication.
+	releaseSSHAuthentication(config)
+	signer = nil
+	req.Password, req.PrivateKey, req.Passphrase = "", "", ""
 	if err != nil {
 		return nil, diagnoseSSHHandshake(fmt.Errorf("SSH handshake: %w", err), req.SSHCompatibility)
 	}
@@ -340,6 +350,14 @@ func openSSHConnection(parent context.Context, req ConnectRequest, cb transportC
 		close(t.done)
 	}()
 	return t, nil
+}
+
+func releaseSSHAuthentication(config *ssh.ClientConfig) {
+	if config == nil {
+		return
+	}
+	clear(config.Auth)
+	config.Auth = nil
 }
 
 func parseSSHSigner(ctx context.Context, req ConnectRequest, prompt func(context.Context, Prompt) (PromptReply, error)) (ssh.Signer, error) {

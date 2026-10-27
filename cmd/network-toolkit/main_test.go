@@ -131,11 +131,11 @@ func TestEmbeddedUIContainsSessionAndNoRemoteDependencies(t *testing.T) {
 	if r.Code != 200 {
 		t.Fatal(r.Code)
 	}
-	if !strings.Contains(r.Body.String(), a.token) {
-		t.Fatal("Session token missing from interface")
+	if !strings.Contains(r.Body.String(), httpBootstrapToken(a.token)) {
+		t.Fatal("Expected platform-specific interface bootstrap was missing")
 	}
-	if strings.Contains(r.Body.String(), "__SESSION_TOKEN__") {
-		t.Fatal("Unreplaced session token")
+	if httpBootstrapToken(a.token) != a.token && strings.Contains(r.Body.String(), a.token) {
+		t.Fatal("Native capability was exposed in HTTP interface HTML")
 	}
 	if strings.Contains(r.Body.String(), "__WINDOW_MODE__") || !strings.Contains(r.Body.String(), "WINDOW_MODE='main'") {
 		t.Fatal("Main-window bootstrap mode was not replaced")

@@ -94,7 +94,7 @@ func (a *application) handleRemoteDragTicket(w http.ResponseWriter, request *htt
 		return
 	}
 	if r.Protocol == "local" {
-		if r.ConnectionID != "" || r.SessionID != "" || r.Host != "" || r.Username != "" || r.Password != "" || r.PrivateKey != "" || r.KeyPath != "" || r.Passphrase != "" || r.Fingerprint != "" || r.Port != 0 {
+		if r.CredentialID != "" || r.ConnectionID != "" || r.SessionID != "" || r.Host != "" || r.Username != "" || r.Password != "" || r.PrivateKey != "" || r.KeyPath != "" || r.Passphrase != "" || r.Fingerprint != "" || r.Port != 0 {
 			jsonError(w, 400, "Local drags cannot include remote connection details")
 			return
 		}
@@ -126,7 +126,7 @@ func (a *application) handleRemoteDragTicket(w http.ResponseWriter, request *htt
 		}
 		r.Protocol = "sftp"
 	} else if r.SessionID != "" {
-		if r.Protocol == "ftp" || r.Host != "" || r.Username != "" || r.Password != "" || r.PrivateKey != "" || r.Fingerprint != "" {
+		if r.Protocol == "ftp" || r.CredentialID != "" || r.Host != "" || r.Username != "" || r.Password != "" || r.PrivateKey != "" || r.Fingerprint != "" {
 			jsonError(w, 400, "Terminal mode cannot include credentials")
 			return
 		}
@@ -144,7 +144,7 @@ func (a *application) handleRemoteDragTicket(w http.ResponseWriter, request *htt
 			jsonError(w, 400, "Server login is required")
 			return
 		}
-		if r.Protocol != "ftp" && r.Fingerprint == "" {
+		if r.Protocol != "ftp" && r.CredentialID == "" && r.Fingerprint == "" {
 			jsonError(w, 400, "SSH server fingerprint must be verified")
 			return
 		}
@@ -156,6 +156,10 @@ func (a *application) handleRemoteDragTicket(w http.ResponseWriter, request *htt
 		} else {
 			r.Protocol = "sftp"
 		}
+	}
+	if r.Password != "" || r.PrivateKey != "" || r.Passphrase != "" || r.KeyPath != "" {
+		jsonError(w, 400, "Drag-out requires an authenticated connection or approved saved credential. Use Download for a manual sign-in.")
+		return
 	}
 	// Assert the remote path exists and is a regular file before offering it as
 	// an OS-level drag source. The full transfer waits until the actual drop.

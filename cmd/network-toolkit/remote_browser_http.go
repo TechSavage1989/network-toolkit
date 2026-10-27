@@ -1,8 +1,8 @@
 package main
 
 // Remote browser commands are deliberately separate from diagnostic history.
-// Authentication is supplied only in this HTTPS-equivalent loopback app
-// session request and is neither retained in jobs nor persisted in settings.
+// Saved authentication is resolved in the backend from an approved credential
+// reference. Manual input is transient; loopback HTTP is not HTTPS.
 import (
 	"context"
 	"encoding/json"
@@ -25,6 +25,7 @@ type remoteBrowserRequest struct {
 	SessionID        string `json:"sessionId,omitempty"`
 	ConnectionID     string `json:"connectionId,omitempty"`
 	ProfileID        string `json:"profileId,omitempty"`
+	CredentialID string `json:"credentialId,omitempty"`
 	TimeoutMs        int    `json:"timeoutMs,omitempty"`
 	Action           string `json:"action"`
 	Host             string `json:"host"`
@@ -92,6 +93,9 @@ func (a *application) remoteBrowserSessions() []map[string]any {
 }
 
 func (a *application) runRemoteBrowserOperation(ctx context.Context, r remoteBrowserRequest) (model.Result, error) {
+	var err error
+	r, err = a.resolveRemoteCredential(ctx, r)
+	if err != nil { return model.Result{}, err }
 	if r.ConnectionID != "" {
 		entry, err := a.browserConnection(r.ConnectionID)
 		if err != nil {
@@ -164,7 +168,7 @@ func (a *application) handleRemoteBrowser(w http.ResponseWriter, request *http.R
 	if r.SessionID != "" {
 		// Terminal-owned SSH connections have already authenticated and
 		// verified the server key. Reject mixed or forged credential fields.
-		if r.Protocol == "ftp" || r.Action == "fingerprint" || r.Host != "" || r.Username != "" || r.Password != "" || r.KeyPath != "" || r.PrivateKey != "" || r.Passphrase != "" || r.Fingerprint != "" {
+		if r.Protocol == "ftp" || r.CredentialID != "" || r.Action == "fingerprint" || r.Host != "" || r.Username != "" || r.Password != "" || r.KeyPath != "" || r.PrivateKey != "" || r.Passphrase != "" || r.Fingerprint != "" {
 			jsonError(w, 400, "Terminal session mode requires only a session ID and file operation")
 			return
 		}
@@ -191,7 +195,7 @@ func (a *application) handleRemoteBrowser(w http.ResponseWriter, request *http.R
 		if r.Security == "" {
 			r.Security = "ssh"
 		}
-		if r.SessionID == "" && r.ConnectionID == "" && strings.TrimSpace(r.Fingerprint) == "" && r.Action != "fingerprint" {
+		if r.SessionID == "" && r.ConnectionID == "" && r.CredentialID == "" && strings.TrimSpace(r.Fingerprint) == "" && r.Action != "fingerprint" {
 			jsonError(w, 400, "Verify and enter the SSH server fingerprint before browsing files")
 			return
 		}

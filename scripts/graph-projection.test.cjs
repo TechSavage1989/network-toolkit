@@ -10,7 +10,7 @@ test('zoom scales actual time while preserving raw nanosecond endpoints and sele
  const before=JSON.stringify(scope),zoomed=history.viewport(scope,2);assert.equal(zoomed.start,'2026-10-27T00:00:05.000000001Z');assert.equal(zoomed.end,scope.end);assert.equal(JSON.stringify(scope),before);const panned=history.viewport(scope,2,'2026-10-27T00:00:07.000000001Z');assert.equal(panned.start,'2026-10-27T00:00:02.000000001Z');assert.equal(panned.end,'2026-10-27T00:00:07.000000001Z');
 });
 test('condensed projection labels its nonlinear distribution by the inverse mapping',()=>{
- const s={start:'2026-10-20T00:00:00Z',end:'2026-10-27T00:00:00Z'};for(const share of [0,.1,.25,.5,.75,.9,1]){const stamp=history.at(share,s,'condensed',60000);assert(Math.abs(history.fraction(stamp,s,'condensed',60000)-share)<1e-10);}assert.equal(history.at(0,s,'condensed'), '2026-10-26T23:57:00.000000000Z');assert.equal(history.at(1,s,'condensed'),'2026-10-27T00:00:00.000000000Z');
+ const s={start:'2026-10-20T00:00:00Z',end:'2026-10-27T00:00:00Z'};for(const share of [0,.1,.25,.5,.75,.9,1]){const stamp=history.at(share,s,'condensed',60000);assert(Math.abs(history.fraction(stamp,s,'condensed',60000)-share)<1e-10);}assert.equal(history.at(0,s,'condensed'), history.timestamp(history.instant(s.end)-BigInt(Math.round(90000/Math.log(4)*1000000))));assert.equal(history.at(1,s,'condensed'),'2026-10-27T00:00:00.000000000Z');
 });
 test('sub-millisecond capture intervals project distinct adjacent nanoseconds without rounding source instants',()=>{
  const s={start:'2026-10-27T00:00:00.123456780Z',end:'2026-10-27T00:00:00.123456790Z'};assert.equal(history.fraction('2026-10-27T00:00:00.123456781Z',s),.1);assert.equal(history.at(.1,s),'2026-10-27T00:00:00.123456781Z');assert.equal(history.viewport(s,2).start,'2026-10-27T00:00:00.123456785Z');assert.match(history.axisHTML(s,400),/123456780/);assert.match(history.axisHTML(s,400),/123456790/);
@@ -27,18 +27,18 @@ test('compressed time ticks increase displayed precision instead of repeating in
 });
 
 test('Condensed has fixed recent pixel spacing from sparse startup through unlimited summary growth',()=>{
- const end=history.instant(scope.end),atAge=seconds=>history.timestamp(end-BigInt(Math.round(seconds*1e9))),ages=[0,.25,1,5,15,30,59,60,120,179];let reference;
+ const end=history.instant(scope.end),atAge=seconds=>history.timestamp(end-BigInt(Math.round(seconds*1e9))),ages=[0,.25,1,5,15,30,59,60,64];let reference;
  for(const seconds of [0,1,10,60,179,180,181,706,1401,7201,1000000]){
   const s={start:atAge(seconds),end:scope.end},positions=ages.map(age=>history.fraction(atAge(age),s,'condensed'));
   assert.equal(positions[0],1);assert.equal(history.fraction(atAge(180),s,'condensed'),0);assert.equal(history.fraction(atAge(1000000),s,'condensed'),0,'All older history occupies exactly one boundary');
-  if(seconds<180)assert(history.fraction(s.start,s,'condensed')>0,'Sparse startup leaves honest blank space');
+  if(seconds<90000/Math.log(4)/1000)assert(history.fraction(s.start,s,'condensed')>0,'Sparse startup leaves honest blank space');
   if(reference)for(const width of [280,760])positions.forEach((x,i)=>assert(Math.abs((x-reference[i])*width)<1e-9));else reference=positions;
   for(const [i,stamp] of ages.map(atAge).entries())assert.equal(history.at(positions[i],s,'condensed'),stamp);
  }
 });
 test('fixed finite curve is smooth with progressively compressed older intervals and no warm-up change',()=>{
  const end=history.instant(scope.end),atAge=seconds=>history.timestamp(end-BigInt(Math.round(seconds*1e9))),s={start:atAge(1000000),end:scope.end},x=age=>history.fraction(atAge(age),s,'condensed');let previous=Infinity;
- for(const age of [0,1,30,59,60,61,120,179]){const slope=(x(age)-x(age+.001))/.001;assert(slope>0&&slope<=previous);previous=slope;}
+ for(const age of [0,1,15,30,45,59,60,61,64]){const slope=(x(age)-x(age+.001))/.001;assert(slope>0&&slope<=previous);previous=slope;}
  for(const age of [1,30,60,100,179])assert.equal(history.fraction(atAge(age),{start:atAge(179.999),end:scope.end},'condensed'),history.fraction(atAge(age),{start:atAge(180.001),end:scope.end},'condensed'));
 });
 test('inverse plot drag and explicit zoom preserve grabbed instant using the same fixed horizon',()=>{
@@ -51,4 +51,11 @@ test('inverse plot drag and explicit zoom preserve grabbed instant using the sam
 });
 test('packet interval scope keeps its published full-span nonlinear projection',()=>{
  const s={...scope,legacyCondensed:true};for(const share of [0,.1,.5,.9,1])assert(Math.abs(history.fraction(history.at(share,s,'condensed'),s,'condensed')-share)<1e-9);assert.equal(history.fraction(scope.start,s,'condensed'),0);assert.equal(history.fraction(scope.end,s,'condensed'),1);
+});
+
+test('default Condensed newest slope matches 30-second Linear without re-spacing genuine cadence',()=>{
+ const end=history.instant(scope.end),s={start:history.timestamp(end-1000000000000000n),end:scope.end},reference={start:history.timestamp(end-30000000000n),end:scope.end};
+ assert.equal(history.clusterDefaultHorizon(60000),90000/Math.log(4));
+ for(const delta of [.001,.1,1,2]){const stamp=history.timestamp(end-BigInt(Math.round(delta*1e9))),linear=1-history.fraction(stamp,reference,'linear'),condensed=1-history.fraction(stamp,s,'condensed');assert(Math.abs(condensed/linear-1)<(delta<=1?.03:.05));assert.equal(history.fraction(stamp,s,'condensed'),history.fraction(stamp,{...s,start:stamp},'condensed'));}
+ const stamps=[0,.1,.1,.35,1,2].map(age=>history.timestamp(end-BigInt(Math.round(age*1e9)))),positions=stamps.map(stamp=>history.fraction(stamp,s,'condensed'));assert.equal(positions[1],positions[2]);assert(positions[0]-positions[1]<positions[3]-positions[4]);assert.equal(history.clusterDefaultHorizon(120000),2*history.clusterDefaultHorizon(60000),'Saved custom detail keeps proportional control');
 });

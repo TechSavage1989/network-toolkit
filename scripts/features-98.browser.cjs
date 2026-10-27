@@ -315,18 +315,18 @@ function dayRows98(){return Array.from({length:1441},(_,i)=>({sequence:i+1,time:
  // a million summarized originals without allocating a million raw records.
  await page.evaluate(()=>NetworkToolkitResultTimeline.clearSelection('ui95-monitor'));
  for(const viewport of [{width:1440,height:1000},{width:390,height:1000}]){
-  await page.setViewportSize(viewport);let newestGap;
-  for(const count of [2,60,179,180,181,706,10000,10001,1010000]){
+  await page.setViewportSize(viewport);await replaceSamples(growthRows.slice(-300));await graph97().locator('[data-rt-mode]').selectOption('linear');await graph97().locator('[data-graph-time-preset]').selectOption('30000');await view97();const linearReference=await scale97(),linearThirtyGap=linearReference.points.at(-1).x-linearReference.points.at(-2).x;assert(Math.abs(linearThirtyGap-(linearReference.width-12-linearReference.left)/30)<=.02,'Actual 30-second Linear reference remains timestamp-proportional');await graph97().locator('[data-rt-mode]').selectOption('condensed');await fitAll98();let newestGap;
+  for(const count of [2,60,64,65,66,179,180,181,706,10000,10001,1010000]){
    const retained=Math.min(count,10000),first=count-retained,raw=Array.from({length:retained},(_,i)=>({sequence:first+i+1,time:recorded(first+i),address:'192.0.2.20',success:true,status:'reply',rttMs:count%2?1e10:.000002})),omitted=count-retained,prefix=omitted?{count:omitted,received:omitted-1,lost:1,measured:omitted-1,minMs:0,maxMs:9999,sumMs:Math.max(0,omitted-1)*42,firstTime:recorded(0),lastTime:recorded(first-1),firstSequence:1,lastSequence:first}:null;
    await replaceSamples(raw,prefix);await fitAll98();await view97();
    const g=await scale97(),geometry=await graph97().locator('[data-rt-surface]').evaluate(svg=>{const plot=svg.querySelector('[data-rt-plot-bounds]'),marks=[...svg.querySelectorAll('[data-rt-marker]')],groups=[...svg.querySelectorAll('[data-rt-aggregate]')];return {left:Number(plot.getAttribute('x')),right:Number(plot.getAttribute('x'))+Number(plot.getAttribute('width')),first:Number(marks[0].getAttribute('cx')),last:Number(marks.at(-1).getAttribute('cx')),count:groups.length,represented:groups.reduce((n,g)=>n+Number(g.dataset.rtAggregate),0)+marks.length-groups.length,grid:svg.querySelector('.rt-grid').getAttribute('d')};}),gap=g.points.at(-1).x-g.points.at(-2).x;
-   if(newestGap!=null)assert(Math.abs(gap-newestGap)<=.02,'Arrivals and Y labels cannot renormalize recent pixels');newestGap=gap;
-   assert(Math.abs(geometry.last-geometry.right)<=.02);assert.equal(geometry.count,count>180?1:0);assert.equal(geometry.represented,count);assert(geometry.grid.includes('M'+geometry.left+' '));
-   if(count>180)assert(Math.abs(geometry.first-geometry.left)<=.01);else assert(geometry.first>geometry.left,'Sparse startup leaves truthful unused older space');
-   report.compression.push({kind:'fixedClusterArrivals',...viewport,total:count,retained,newestGap,...geometry});
-   if(out&&[2,1010000].includes(count))await page.screenshot({path:path.join(out,'ui103-cluster-'+viewport.width+'-'+count+'.png')});
+   if(newestGap!=null)assert(Math.abs(gap-newestGap)<=.02,'Arrivals and Y labels cannot renormalize recent pixels');newestGap=gap;assert(Math.abs(gap/linearThirtyGap-1)<.03,'Newest Condensed gap matches the actual 30-second Linear reference within 3%');
+   assert(Math.abs(geometry.last-geometry.right)<=.02);assert.equal(geometry.count,count>65?1:0);assert.equal(geometry.represented,count);assert(geometry.grid.includes('M'+geometry.left+' '));
+   if(count>65)assert(Math.abs(geometry.first-geometry.left)<=.01);else assert(geometry.first>geometry.left,'Sparse startup leaves truthful unused older space');
+   report.compression.push({kind:'fixedClusterArrivals',...viewport,total:count,retained,newestGap,linearThirtyGap,...geometry});
+   if(out&&[2,1010000].includes(count))await page.screenshot({path:path.join(out,'ui104-cluster-'+viewport.width+'-'+count+'.png')});
   }
-  await graph97().locator('[data-rt-aggregate]').click({force:true});await leaveInspection();assert((await page.locator('#resultEntryBody').innerText()).includes('1000000 summarized only'));assert((await page.locator('#resultEntryTitle').innerText()).includes('1009820 samples'));assert((await page.locator('#resultEntryBody').innerText()).includes('Historical cluster'));
+  await graph97().locator('[data-rt-aggregate]').click({force:true});await leaveInspection();assert((await page.locator('#resultEntryBody').innerText()).includes('1000000 summarized only'));assert((await page.locator('#resultEntryTitle').innerText()).includes('1009935 samples'));assert((await page.locator('#resultEntryBody').innerText()).includes('Historical cluster'));
   await page.evaluate(()=>NetworkToolkitResultTimeline.clearSelection('ui95-monitor'));
  }
  // CSS accent repaint is observed on the same live SVG; no app/run restart.

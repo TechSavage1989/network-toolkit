@@ -3,7 +3,7 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),fs=requir
 const source=fs.readFileSync(require.resolve('../web/assets/remote-browser.js'),'utf8');
 function harness(){const calls=[],ui=[],editors=[],state={activePage:'sftp',remoteBrowserSettings:{},terminalProfiles:[]};let serial=0,resolves=0;
  const root={state,document:{addEventListener(){},getElementById(){return null;},querySelector(){return null;}},console,Map,Set,Date,Math,JSON,Number,String,esc:String,icon:name=>'<i>'+name+'</i>',saveState(){},toast(){},openModal(){},
-  NetworkToolkitTransfers:{mode:()=> 'client'},NetworkToolkitCredentials:{resolve:async()=>{resolves++;return {username:'operator',authMethod:'password',password:'vault-password'};}},
+  NetworkToolkitTransfers:{mode:()=> 'client'},NetworkToolkitCredentials:{prepare:async config=>{resolves++;return {credentialId:config.credentialId,username:'operator',authMethod:'password'};}},
   NetworkToolkitFileEditor:{open:async value=>editors.push(value)},
   api:async(path,method,body)=>{calls.push({path,method,body});if(body?.action==='connect')return {connectionId:'connection-'+(++serial),path:'/',entries:[]};return {path:'/',entries:[]};},
   receiveTerminalViewState:value=>ui.push(['viewState',value]),upsertTerminalSession:info=>{ui.push(['upsert',info.id]);return {info,config:{}};},safeTerminalConfig:value=>({...value}),navigate:page=>ui.push(['navigate',page]),selectTerminal:id=>ui.push(['select',id]),startTerminalFeed:()=>ui.push(['feed']),scheduleTerminalFit(){}};
@@ -12,7 +12,7 @@ function harness(){const calls=[],ui=[],editors=[],state={activePage:'sftp',remo
 test('standalone SFTP authenticates once and sends only its connection ID for later file operations',async()=>{
  const h=harness();h.browser.configurations.ssh.credentialId='vault-id';h.browser.configurations.ssh.password='';await h.browser.connect('ssh');
  assert.equal(h.browser.get('ssh').connectionId,'connection-1');assert.equal(h.resolves(),1);
- const first=h.calls.find(x=>x.body?.action==='connect').body;assert.equal(first.password,'vault-password');assert.equal(first.fingerprint,'SHA256:verified');
+ const first=h.calls.find(x=>x.body?.action==='connect').body;assert.equal(first.credentialId,'vault-id');assert.equal(Object.hasOwn(first,'password'),false);assert.equal(first.fingerprint,'SHA256:verified');
  for(const action of ['list','read-text','stat','download','write-text','mkdir','rename','remove'])await h.browser.request('ssh',action,{path:'/config.txt'});
  for(const call of h.calls.filter(x=>x.body?.action!=='connect')){assert.equal(call.body.connectionId,'connection-1');for(const field of ['host','username','password','privateKey','passphrase','fingerprint','port'])assert.equal(Object.hasOwn(call.body,field),false);}
  assert.equal(h.resolves(),1);assert(!JSON.stringify(h.state).includes('vault-password'));

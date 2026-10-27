@@ -10,6 +10,7 @@ import (
 type ConnectRequest struct {
 	Type             string `json:"type"`
 	ProfileID        string `json:"profileId,omitempty"`
+	CredentialID     string `json:"credentialId,omitempty"`
 	LineEnding       string `json:"lineEnding,omitempty"`
 	SSHCompatibility string `json:"sshCompatibility,omitempty"`
 	Host             string `json:"host,omitempty"`
@@ -31,6 +32,10 @@ type ConnectRequest struct {
 	FlowControl      string `json:"flowControl,omitempty"`
 	SerialDTR        *bool  `json:"dtr,omitempty"`
 	SerialRTS        *bool  `json:"rts,omitempty"`
+
+	// ExpectedHostFingerprint is an authenticated backend trust decision, never
+	// a client-supplied pin. Saved credentials use it before user authentication.
+	ExpectedHostFingerprint string `json:"-"`
 }
 
 type SessionInfo struct {
@@ -137,6 +142,12 @@ type transportCallbacks struct {
 }
 
 type transportOpener func(context.Context, ConnectRequest, transportCallbacks) (transport, error)
+
+// CredentialResolver resolves a saved credential for a fresh authentication.
+// The input contains only connection settings and a credential ID, never a
+// previously used secret. Implementations must authorize the exact destination
+// and return the same endpoint, username and credential ID.
+type CredentialResolver func(context.Context, ConnectRequest) (ConnectRequest, error)
 
 const (
 	SSHCompatibilityModern = "modern"

@@ -101,7 +101,7 @@ func TestTerminalLiveViewOwnershipAndScope(t *testing.T) {
 		t.Fatal("invalid isolated launch capability")
 	}
 	page := requestApp(a, "GET", "/terminal-view/"+launched.ViewID, "", false)
-	if page.Code != 200 || !strings.Contains(page.Body.String(), launched.ViewToken) || strings.Contains(page.Body.String(), a.token) {
+	if page.Code != 200 || !strings.Contains(page.Body.String(), httpBootstrapToken(launched.ViewToken)) || strings.Contains(page.Body.String(), a.token) || (httpBootstrapToken(launched.ViewToken) != launched.ViewToken && strings.Contains(page.Body.String(), launched.ViewToken)) {
 		t.Fatal("detached page did not isolate its token")
 	}
 	if !strings.Contains(page.Body.String(), `src="/assets/Network_Toolkit_Icon.svg"`) || strings.Contains(page.Body.String(), `"../assets/`) {

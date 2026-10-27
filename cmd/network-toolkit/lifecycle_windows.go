@@ -11,7 +11,7 @@ import (
 	"networktoolkit/internal/platform"
 )
 
-func runLifecycle(ctx context.Context, url string, stop context.CancelFunc, noBrowser bool, dataDir, title string, activate <-chan struct{}, onClosing, onReady func()) {
+func runLifecycle(ctx context.Context, url, sessionToken string, stop context.CancelFunc, noBrowser bool, dataDir, title string, activate <-chan struct{}, onClosing, onReady func()) {
 	if noBrowser {
 		<-ctx.Done()
 		return
@@ -20,6 +20,7 @@ func runLifecycle(ctx context.Context, url string, stop context.CancelFunc, noBr
 	err := desktop.Run(ctx, desktop.Config{
 		Title:     title,
 		URL:       url,
+		SessionToken: sessionToken,
 		DataDir:   dataDir,
 		Stop:      stop,
 		Activate:  activate,

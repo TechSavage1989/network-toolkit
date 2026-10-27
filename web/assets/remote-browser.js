@@ -33,25 +33,20 @@ async function requestPayload(k,action,extra={}){const c=configurations[k],m=get
  if(k==='ssh'&&!['connect','fingerprint'].includes(action))throw new Error('Connect to an SSH/SFTP session before using remote files.');
  const details={protocol:k,action,host:c.host.trim(),port:Number(c.port),username:c.username.trim(),password:c.password,keyPath:c.keyPath,privateKey:c.privateKey||'',passphrase:c.passphrase,authMode:c.authMode,fingerprint:c.fingerprint.trim(),sshCompatibility:c.sshCompatibility,security:c.security,...extra};
  if(k==='ssh'&&action==='connect'&&(state.terminalProfiles||[]).some(row=>row.id===m.profileId&&row.type==='ssh'))details.profileId=m.profileId;
- // Saved terminal profile credentials are resolved only for the live request.
- // They never enter saved browser preferences or the rendered password field.
- if(k==='ftp'&&c.credentialId&&!c.password&&action!=='fingerprint'){
-  const entry=await api('/credentials/'+encodeURIComponent(c.credentialId));
-  if(entry.kind!=='password')throw new Error('FTP/FTPS requires a saved password credential.');
-  details.password=entry.secret;
-  if(!details.username&&entry.username)details.username=entry.username;
- }
+ // Only credential references enter the browser request. The engine resolves
+ // saved secrets after destination authorization and host verification.
+ let credentialId=k==='ftp'&&!c.password?c.credentialId:'';
  if(k==='ssh'&&m.profileId&&action!=='fingerprint'){
-  const profile=sshRecord(m.profileId);
-  if(profile?.timeoutMs)details.timeoutMs=Number(profile.timeoutMs);
+  const profile=sshRecord(m.profileId);if(profile?.timeoutMs)details.timeoutMs=Number(profile.timeoutMs);
   if(!profile||profile.host!==c.host||Number(profile.port)!==Number(c.port))throw new Error('Saved SSH profile changed. Choose the profile again.');
-  if((c.credentialId||profile.credentialId)&&!m.profileManualAuth){const secrets=await window.NetworkToolkitCredentials.resolve({...profile,credentialId:c.credentialId||profile.credentialId});
-   if(!secrets)throw new Error('Saved SSH credential is unavailable. Update the terminal profile.');
-   details.username=secrets.username||details.username;details.authMode=secrets.authMethod;
-   details.password=secrets.password||'';details.privateKey=secrets.privateKey||'';details.passphrase=secrets.passphrase||'';
-  }
+  if(!m.profileManualAuth)credentialId=c.credentialId||profile.credentialId||'';
+ }else if(k==='ssh'&&!m.profileManualAuth)credentialId=c.credentialId||'';
+ if(credentialId&&action!=='fingerprint'){
+  const credential=await root.NetworkToolkitCredentials.prepare({...details,credentialId});
+  details.credentialId=credential.credentialId;details.username=credential.username;details.authMode=credential.authMethod;
+  for(const field of ['password','privateKey','passphrase','keyPath'])delete details[field];
  }
- if(k==='ssh'&&!m.profileId&&c.credentialId&&!m.profileManualAuth&&action!=='fingerprint'){const secrets=await root.NetworkToolkitCredentials.resolve({credentialId:c.credentialId,username:c.username});if(!secrets)throw new Error('The saved credential is unavailable.');Object.assign(details,{username:secrets.username||details.username,authMode:secrets.authMethod,password:secrets.password||'',privateKey:secrets.privateKey||'',passphrase:secrets.passphrase||''});}
+ if(action==='fingerprint')for(const field of ['password','privateKey','passphrase','keyPath','credentialId'])delete details[field];
  return details;
 }
 async function request(k,action,extra={}){const m=get(k),identity=connectionIdentity(k);try{return await api('/remote-browser','POST',await requestPayload(k,action,extra));}catch(error){if(k==='ssh'&&m.connected&&!['connect','fingerprint','open-terminal'].includes(action)&&identity===connectionIdentity(k)&&/SFTP connection (?:is |was )?(?:closed|not found|not connected)|SSH terminal is not available|SSH terminal is not connected|SSH connection (?:is )?closed|^EOF$|unexpected EOF|connection reset by peer|use of closed network connection|broken pipe/i.test(error.message||'')){invalidateConnection(k);restoreConnectionControls(k);paint(k,'remote','Connection closed. Use Reconnect to connect again.');note(k,'The SSH/SFTP connection closed. Use Reconnect to connect again.','error');}throw error;}}
@@ -101,12 +96,13 @@ function showFTPProfiles(){const entries=ftpProfiles();openModal('FTP / FTPS con
 async function storeConnectionCredential(k){const c=configurations[k],m=get(k);if(!c.username.trim()){note(k,'Enter the username before saving a credential.','error');return;}
  try{let privateKey=c.privateKey||'';if(k==='ssh'&&c.authMode==='key'&&!privateKey&&c.keyPath){const data=await api('/file-editor/local','POST',{action:'read-text',path:c.keyPath});privateKey=data.content||'';}
  const identity=connectionIdentity(k),profileId=m.profileId||m.editingProfileId;
- const entry=await root.NetworkToolkitCredentials.saveConnection({credentialId:c.credentialId||'',name:c.profileName||c.host,host:c.host,username:c.username,authMethod:k==='ssh'&&c.authMode==='key'?'key':'password',password:c.password,privateKey,passphrase:c.passphrase});
+ const entry=await root.NetworkToolkitCredentials.saveConnection({protocol:k,security:c.security,fingerprint:c.fingerprint,port:c.port,credentialId:c.credentialId||'',name:c.profileName||c.host,host:c.host,username:c.username,authMethod:k==='ssh'&&c.authMode==='key'?'key':'password',password:c.password,privateKey,passphrase:c.passphrase});
  if(identity!==connectionIdentity(k))throw new Error('Connection settings changed. Select the saved credential for this connection.');
  c.credentialId=entry.id;c.password='';c.privateKey='';c.passphrase='';m.profileManualAuth=false;
  const profile=(k==='ssh'?state.terminalProfiles||[]:state.ftpProfiles||[]).find(row=>row.id===profileId);if(profile)profile.credentialId=entry.id;
  remember(k);render(k);root.NetworkToolkitSessionSidebar?.render?.();note(k,'Credential saved and linked to this connection'+(profile?' and its saved profile.':'. Save the profile to reuse these settings.'),'success');
  }catch(error){note(k,error.message,'error');}}
+async function approveConnectionCredential(k){const c=configurations[k],identity=connectionIdentity(k);try{await root.NetworkToolkitCredentials.approveConnection({...c,protocol:k});if(identity!==connectionIdentity(k))return;note(k,'Credential destination approved. Connect when ready.','success');}catch(error){if(identity===connectionIdentity(k))note(k,error.message,'error');}}
 async function storeFTPPassword(){return storeConnectionCredential('ftp');}
 
 function savedProfilePicker(k){
@@ -194,7 +190,7 @@ async function useSavedSSHProfile(id){
   if(!profileReadyForAuthentication(profile))return;
   if(!c.fingerprint){await showSSHProfileVerification(profile);return;}
   if(profile.credentialId&&!m.profileManualAuth){
-   try{const found=await root.NetworkToolkitCredentials.resolve(profile);if(!found)throw Error('The linked credential was not found.');}catch(error){showSSHProfileSignIn(profile,'Saved credential unavailable: '+error.message);return;}
+   try{await root.NetworkToolkitCredentials.prepare({...profile,protocol:'ssh'});}catch(error){m.showSettings=true;render('ssh');note('ssh',error.message,'error');return;}
    await connect('ssh');return;
   }
   if(c.authMode==='key'?(!!c.privateKey||!!c.keyPath):!!c.password){await connect('ssh');return;}
@@ -341,7 +337,7 @@ function connectionUI(k){const c=configurations[k],m=get(k),expanded=true;
  '<label>Username<input data-rb-setting="username" value="'+escape(c.username)+'" autocomplete="username"></label>'+
  (k==='ssh'?'<label>Authentication<select data-rb-setting="authMode">'+options([['password','Password'],['key','SSH private key']],c.authMode)+'</select></label>':'<label>Security<select data-rb-setting="security">'+options([['explicit','Explicit FTPS (TLS)'],['implicit','Implicit FTPS (TLS)'],['plain','Plain FTP (unencrypted)']],c.security)+'</select></label>')+
  '<label>'+(k==='ssh'&&c.authMode==='key'?'Key passphrase':'Password')+'<input type="password" data-rb-setting="'+(k==='ssh'&&c.authMode==='key'?'passphrase':'password')+'" value="'+escape(k==='ssh'&&c.authMode==='key'?c.passphrase:c.password)+'" autocomplete="off"></label>'+
- '<label>Saved credential<select data-rb-credential'+(k==='ftp'?' data-rb-ftp-credential':'')+'>'+ (root.NetworkToolkitCredentials?.options?.(c.credentialId||'',k==='ftp'?'password':'')||'<option value="">Do not use a saved credential</option>') +'</select></label><div class="rb-credential-controls"><button type="button" class="btn small ghost" data-rb-action="saveCredential">Save / update credential</button><button type="button" class="btn small ghost" data-rb-action="passwordManager">Password manager</button></div>'+
+ '<label>Saved credential<select data-rb-credential'+(k==='ftp'?' data-rb-ftp-credential':'')+'>'+ (root.NetworkToolkitCredentials?.options?.(c.credentialId||'',k==='ftp'?'password':'')||'<option value="">Do not use a saved credential</option>') +'</select></label><div class="rb-credential-controls"><button type="button" class="btn small ghost" data-rb-action="saveCredential">Save / update credential</button><button type="button" class="btn small ghost" data-rb-action="approveCredential">Approve destination</button><button type="button" class="btn small ghost" data-rb-action="passwordManager">Password manager</button></div>'+
  (k==='ssh'?'<label>SSH compatibility<select data-rb-setting="sshCompatibility" title="Matches the terminal SSH profile. Legacy is optional and allows older key exchanges and ciphers.">'+options([['modern','Modern (default)'],['legacy','Legacy (explicit opt-in)']],c.sshCompatibility)+'</select></label>':'')+
  (k==='ssh'&&c.authMode==='key'?'<label class="rb-long">SSH private key<textarea data-rb-setting="privateKey" spellcheck="false" autocomplete="off" placeholder="Paste an OpenSSH or PEM private key">'+escape(c.privateKey||'')+'</textarea></label><div class="rb-credential-controls"><button type="button" class="btn small ghost" data-rb-action="chooseKey">Choose key file</button><input type="file" data-rb-key-file hidden></div>':'')+
  (k==='ssh'?'<label>SSH private key path<input data-rb-setting="keyPath" value="'+escape(c.keyPath)+'" placeholder="C:\\Users\\...\\id_ed25519" '+(c.authMode==='key'?'':'disabled')+'></label>':'')+
@@ -356,6 +352,7 @@ function render(k){if(!TYPES.has(k))return;loadSaved(k);const host=document.getE
  for(const side of ['local','remote']){const pane=m[side];if(side==='remote'&&!m.connected){paint(k,side,m.connecting?'Connecting...':'Connect to a server to browse its files.');continue;}if(pane.loading)paint(k,side,'Loading...');else if(pane.initialized)paint(k,side);else void load(k,side,pane.path, true);}
  drawActivity(k);restoreConnectionControls(k);note(k,m.lastError,m.lastError?'error':'info');void ftpCredentialsRefresh(k);if(k==='ssh'){void refreshTerminalChoices(k);if(m.autoTerminal){const id=m.autoTerminal;m.autoTerminal='';void connectTerminal(k,id,{preserveFolder:true})}}}
 function connectionIdentity(k){const m=get(k),c=configurations[k];return [m.connectionEpoch,c.host,c.port,c.username,c.security].join('|');}
+function canNativeDrag(k,side){if(side==='local')return true;const c=configurations[k],m=get(k);return k==='ssh'?!!(m.connectionId||m.sessionId):!!c.credentialId&&!c.password&&c.security!=='plain';}
 function dragIdentity(k){const m=get(k);return connectionIdentity(k)+'|'+(m.connectionId||m.sessionId||'');}
 function acceptListing(k,side,data,skipHistory=false){const p=get(k)[side];
  p.path=data.path||'';if(!p.home)p.home=p.path;p.parent=data.parent||'';p.entries=(data.entries||[]).filter(x=>simpleName(x.name)).map(x=>({name:x.name,path:x.path,directory:!!x.directory,size:x.size,modified:x.modified}));p.selected.clear();p.anchor=-1;p.initialized=true;
@@ -552,7 +549,7 @@ function saveSharedSSHProfile(nameOverride){const c=configurations.ssh,m=get('ss
  const profile={id,name:name.trim().slice(0,100),folder:root.NetworkToolkitSessionFolders.normalize(existing?.folder),type:'ssh',host:host.slice(0,512),port,username:username.slice(0,256),authMethod:c.authMode==='key'?'key':'password',sshCompatibility:c.sshCompatibility==='legacy'?'legacy':'modern',timeoutMs:10000,credentialId:c.credentialId||''};
  state.terminalProfiles=[profile,...(state.terminalProfiles||[]).filter(x=>x.id!==id)].slice(0,100);m.profileId=id;m.editingProfileId='';c.profileName=name.trim();m.sourceChoice='profile:'+id;remember('ssh');root.NetworkToolkitSessionSidebar?.render?.();render('ssh');
  note('ssh','SSH profile saved and available in both Terminal and SFTP. Passwords and private keys are not stored in the profile. Manage credentials through the protected credential manager.','success');}
-function dispatch(k,name){const m=get(k);if(name==='disconnect'){void disconnect(k);return;}if(name==='reconnect'){void reconnect(k);return;}if(name==='openTerminal'){void openTerminal(k);return;}if(name==='refreshSession'){if(m.connected){void load(k,'local',m.local.path,true);void load(k,'remote',m.remote.path,true);}return;}if(name==='connectionSettings'){rootNode(k)?.clientSidebarSelect?.('settings');return;}if(name==='saveCredential'){void storeConnectionCredential(k);return;}if(name==='chooseKey'){rootNode(k)?.querySelector('[data-rb-key-file]')?.click();return;}if(name==='saveProfile'){const value=configurations[k].profileName?.trim();if(value){if(k==='ssh')saveSharedSSHProfile(value);else saveFTPProfile(value);}else saveConnectionDialog(k);return;}if(name==='librarySaved'){showLibrary(k,'saved');return;}if(name==='libraryRecent'){showLibrary(k,'recent');return;}if(name==='manageProfiles'&&k==='ftp'){showFTPProfiles();return;}if(name==='savePassword'&&k==='ftp'){void storeFTPPassword();return;}if(name==='passwordManager'){void root.NetworkToolkitCredentials?.show?.();return;}if(name==='manageProfiles'&&k==='ssh'){if(typeof showTerminalProfiles==='function')showTerminalProfiles();else root.NetworkToolkitCredentials?.show?.();return;}
+function dispatch(k,name){const m=get(k);if(name==='disconnect'){void disconnect(k);return;}if(name==='reconnect'){void reconnect(k);return;}if(name==='openTerminal'){void openTerminal(k);return;}if(name==='refreshSession'){if(m.connected){void load(k,'local',m.local.path,true);void load(k,'remote',m.remote.path,true);}return;}if(name==='connectionSettings'){rootNode(k)?.clientSidebarSelect?.('settings');return;}if(name==='saveCredential'){void storeConnectionCredential(k);return;}if(name==='approveCredential'){void approveConnectionCredential(k);return;}if(name==='chooseKey'){rootNode(k)?.querySelector('[data-rb-key-file]')?.click();return;}if(name==='saveProfile'){const value=configurations[k].profileName?.trim();if(value){if(k==='ssh')saveSharedSSHProfile(value);else saveFTPProfile(value);}else saveConnectionDialog(k);return;}if(name==='librarySaved'){showLibrary(k,'saved');return;}if(name==='libraryRecent'){showLibrary(k,'recent');return;}if(name==='manageProfiles'&&k==='ftp'){showFTPProfiles();return;}if(name==='savePassword'&&k==='ftp'){void storeFTPPassword();return;}if(name==='passwordManager'){void root.NetworkToolkitCredentials?.show?.();return;}if(name==='manageProfiles'&&k==='ssh'){if(typeof showTerminalProfiles==='function')showTerminalProfiles();else root.NetworkToolkitCredentials?.show?.();return;}
  if(name==='toggleSettings'&&rootNode(k)?.clientSidebarSelect){rootNode(k).clientSidebarSelect('settings',true);return;}if(name==='toggleSettings'){m.showSettings=!m.showSettings;const root=rootNode(k);root?.querySelector('.rb-connection-details')?.toggleAttribute('hidden',!m.showSettings);const btn=root?.querySelector('[data-rb-action="toggleSettings"]');if(btn){btn.textContent=m.showSettings?'Hide settings':'Connection settings';btn.setAttribute('aria-expanded',String(m.showSettings));}return;}
  if(name==='selectSource'){
   const picked=rootNode(k)?.querySelector('[data-rb-connection-source]')?.value||'manual';m.sourceChoice=picked;
@@ -613,12 +610,13 @@ function events(){document.addEventListener('click',event=>{
  const actions={F2:'rename',Delete:'delete',F5:'refresh',Backspace:'up'};const op=actions[event.key];if(op){event.preventDefault();if(op==='refresh'||op==='up')nav(k,side,op);else dispatch(k,op)}
  },true);
  document.addEventListener('pointerover',event=>{const row=event.target.closest?.('[data-rb-item]');if(!row||row.dataset.rbDir==='true')return;const k=row.closest('[data-rb-root]')?.dataset.rbRoot;if(!TYPES.has(k)||!pageActive(k))return;const side=row.dataset.rbSide,entry=get(k)[side].entries.find(x=>x.path===row.dataset.rbItem);if(!entry||entry.directory)return;const key=k+':'+side+':'+entry.path+(side==='remote'?':'+dragIdentity(k):'');
+ if(!canNativeDrag(k,side)){row.title='Use Download for this manually authenticated connection, or choose an approved saved credential.';return;}
  const payload=()=>side==='local'?{protocol:'local',action:'stat',path:entry.path}:requestPayload(k,'stat',{path:entry.path});
  root.NetworkToolkitNativeDrag?.hover?.(row,key,payload);
  },true);
  document.addEventListener('dragstart',event=>{const row=event.target.closest('[data-rb-item]');if(!row)return;const k=row.closest('[data-rb-root]')?.dataset.rbRoot;if(!TYPES.has(k))return;const side=row.dataset.rbSide,m=get(k);if(!m[side].selected.has(row.dataset.rbItem))rowSelect(k,side,row.dataset.rbItem,{});
   const files=chosen(k,side);event.dataTransfer?.setData('application/x-networktoolkit-remote-browser',JSON.stringify({k,side,files}));event.dataTransfer.effectAllowed='copy';
-  if(files.length===1&&!files[0].directory){const entry=files[0],key=k+':'+side+':'+entry.path+(side==='remote'?':'+dragIdentity(k):'');root.NetworkToolkitNativeDrag?.apply(event,key);}
+  if(files.length===1&&!files[0].directory){const entry=files[0],key=k+':'+side+':'+entry.path+(side==='remote'?':'+dragIdentity(k):'');if(canNativeDrag(k,side))root.NetworkToolkitNativeDrag?.apply(event,key);else note(k,'Drag within the file browser, or use Download. Windows drag-out requires an active SSH connection or an approved saved credential.','info');}
  },true);
  document.addEventListener('dragover',event=>{const pane=event.target.closest('[data-rb-pane]');if(!pane)return;const k=pane.closest('[data-rb-root]')?.dataset.rbRoot;if(!TYPES.has(k))return;event.preventDefault();pane.classList.add('rb-drag-target');if(event.dataTransfer)event.dataTransfer.dropEffect='copy';},true);
  document.addEventListener('dragleave',event=>{event.target.closest('[data-rb-pane]')?.classList.remove('rb-drag-target')},true);
@@ -685,5 +683,5 @@ async function openLibraryEntry(k,kind,id){if(!TYPES.has(k))return;
 }
 document.addEventListener('credentials-updated',()=>{for(const k of TYPES)syncCredentials(k);});
 document.addEventListener('change',event=>{const input=event.target.closest?.('[data-rb-key-file]');if(!input?.files?.length)return;const k=input.closest('[data-rb-root]')?.dataset.rbRoot;if(k!=='ssh')return;const file=input.files[0];if(file.size>1048576){note(k,'Private key file exceeds 1 MiB.','error');return;}void file.text().then(text=>{configurations.ssh.privateKey=text;get('ssh').profileManualAuth=true;render('ssh');}).catch(error=>note(k,error.message,'error'));},true);
-events();root.NetworkToolkitRemoteBrowser={render,get,load,request,configurations,resetLayout,useTerminalSession,connectTerminal,loadProfile,revisionFor,dropFiles,dropTransfer,edit,requestPayload,useSavedSSHProfile,openLibraryEntry,libraryRows,connect,disconnect,reconnect,openTerminal,sessionTools,positionSessionTools,invalidateConnection,connectionIdentity,dragIdentity,storeConnectionCredential,saveSharedSSHProfile,saveFTPProfile};
+events();root.NetworkToolkitRemoteBrowser={render,get,load,request,configurations,resetLayout,useTerminalSession,connectTerminal,loadProfile,revisionFor,dropFiles,dropTransfer,edit,requestPayload,useSavedSSHProfile,openLibraryEntry,libraryRows,connect,disconnect,reconnect,openTerminal,sessionTools,positionSessionTools,invalidateConnection,connectionIdentity,dragIdentity,canNativeDrag,storeConnectionCredential,approveConnectionCredential,saveSharedSSHProfile,saveFTPProfile};
 })(globalThis);

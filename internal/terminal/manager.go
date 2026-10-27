@@ -21,12 +21,14 @@ import (
 )
 
 var (
-	ErrNotFound     = errors.New("terminal session not found")
-	ErrBusy         = errors.New("terminal session is busy")
-	ErrQueueFull    = errors.New("terminal input queue is full; retry without discarding input")
-	ErrLimit        = errors.New("at most eight terminal sessions may be active or shutting down")
-	ErrClosed       = errors.New("terminal manager is closed")
-	ErrNotConnected = errors.New("terminal session is not connected")
+	ErrNotFound               = errors.New("terminal session not found")
+	ErrBusy                   = errors.New("terminal session is busy")
+	ErrQueueFull              = errors.New("terminal input queue is full; retry without discarding input")
+	ErrLimit                  = errors.New("at most eight terminal sessions may be active or shutting down")
+	ErrClosed                 = errors.New("terminal manager is closed")
+	ErrNotConnected           = errors.New("terminal session is not connected")
+	ErrAuthenticationRequired = errors.New("enter authentication again to reconnect; connection secrets are not retained")
+	ErrCredentialUnavailable  = errors.New("the saved credential is unavailable for reconnect")
 )
 
 type storedEvent struct {
@@ -36,7 +38,7 @@ type storedEvent struct {
 
 type liveSession struct {
 	info            SessionInfo
-	request         ConnectRequest // Memory only, retained for explicit reconnects.
+	request         ConnectRequest // Nonsecret settings and optional credential ID only.
 	done            chan struct{}
 	reconnecting    bool
 	reconnectCancel context.CancelFunc
@@ -56,23 +58,24 @@ type liveSession struct {
 }
 
 type Manager struct {
-	mu          sync.Mutex
-	ctx         context.Context
-	cancel      context.CancelFunc
-	sessions    map[string]*liveSession
-	openers     map[string]transportOpener
-	known       *knownHostStore
-	closed      bool
-	live        int
-	wg          sync.WaitGroup
-	ring        []storedEvent
-	ringStart   int
-	ringBytes   int
-	eventBudget int
-	seq         uint64
-	generation  uint64
-	changed     chan struct{}
-	closeDone   chan struct{}
+	mu                sync.Mutex
+	ctx               context.Context
+	cancel            context.CancelFunc
+	sessions          map[string]*liveSession
+	openers           map[string]transportOpener
+	resolveCredential CredentialResolver
+	known             *knownHostStore
+	closed            bool
+	live              int
+	wg                sync.WaitGroup
+	ring              []storedEvent
+	ringStart         int
+	ringBytes         int
+	eventBudget       int
+	seq               uint64
+	generation        uint64
+	changed           chan struct{}
+	closeDone         chan struct{}
 }
 
 // NewManager always returns a usable manager. A trust-file error disables SSH
@@ -102,9 +105,18 @@ func newManager(parent context.Context, known *knownHostStore, openers map[strin
 }
 
 func normalizeRequest(req ConnectRequest) (ConnectRequest, error) {
+	return normalizeConnectionRequest(req, false)
+}
+
+// alreadyAuthenticated is used only when adopting an existing SSH transport.
+// Opening a new connection must still provide all required authentication.
+func normalizeConnectionRequest(req ConnectRequest, alreadyAuthenticated bool) (ConnectRequest, error) {
 	req.Type = strings.ToLower(strings.TrimSpace(req.Type))
 	if len(req.ProfileID) > 80 || strings.IndexFunc(req.ProfileID, unicode.IsControl) >= 0 {
 		return req, errors.New("profile ID must be at most 80 bytes without control characters")
+	}
+	if len(req.CredentialID) > 120 || strings.ContainsAny(req.CredentialID, "/\\") || strings.IndexFunc(req.CredentialID, unicode.IsControl) >= 0 {
+		return req, errors.New("credential ID must be at most 120 bytes without path separators or control characters")
 	}
 	switch req.LineEnding {
 	case "":
@@ -157,6 +169,7 @@ func normalizeRequest(req ConnectRequest) (ConnectRequest, error) {
 	}
 	if req.Type == "serial" {
 		req.Username, req.Password, req.PrivateKey, req.Passphrase = "", "", "", ""
+		req.CredentialID = ""
 		return normalizeSerialRequest(req)
 	}
 	host, err := normalizeHost(req.Host)
@@ -176,6 +189,7 @@ func normalizeRequest(req ConnectRequest) (ConnectRequest, error) {
 	}
 	if req.Type == "telnet" {
 		req.Username, req.Password, req.PrivateKey, req.Passphrase = "", "", "", ""
+		req.CredentialID = ""
 		return req, nil
 	}
 	if req.Username == "" || len(req.Username) > 256 || strings.IndexFunc(req.Username, unicode.IsControl) >= 0 {
@@ -194,7 +208,7 @@ func normalizeRequest(req ConnectRequest) (ConnectRequest, error) {
 	if req.AuthMethod != "password" && req.AuthMethod != "key" && req.AuthMethod != "keyboard" {
 		return req, errors.New("SSH authentication must be password, key, or keyboard")
 	}
-	if req.AuthMethod == "key" && strings.TrimSpace(req.PrivateKey) == "" {
+	if !alreadyAuthenticated && req.AuthMethod == "key" && strings.TrimSpace(req.PrivateKey) == "" {
 		return req, errors.New("select an OpenSSH or PEM private key")
 	}
 	return req, nil
@@ -239,8 +253,17 @@ func (m *Manager) Connect(request ConnectRequest) (SessionInfo, error) {
 	return m.connectWithOpener(request, nil)
 }
 
+// SetCredentialResolver configures backend-only saved-credential lookup for
+// reconnect. Initial connection requests are resolved by the application before
+// Connect. A missing resolver fails closed rather than reusing an old secret.
+func (m *Manager) SetCredentialResolver(resolve CredentialResolver) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.resolveCredential = resolve
+}
+
 func (m *Manager) connectWithOpener(request ConnectRequest, override transportOpener) (SessionInfo, error) {
-	req, err := normalizeRequest(request)
+	req, err := normalizeConnectionRequest(request, override != nil)
 	if err != nil {
 		return SessionInfo{}, err
 	}
@@ -311,15 +334,15 @@ func newLiveSession(parent context.Context, id string, req ConnectRequest) *live
 	} else if req.Type == "powershell" {
 		label = "PowerShell (local)"
 	}
-	return &liveSession{automation: make(map[*AutomationSubscription]struct{}), ctx: ctx, cancel: cancel, request: cloneConnectRequest(req), done: make(chan struct{}), input: make(chan []byte, 64), resize: make(chan struct{}, 1), controls: make(chan ControlRequest, 16),
+	return &liveSession{automation: make(map[*AutomationSubscription]struct{}), ctx: ctx, cancel: cancel, request: reconnectSettings(req), done: make(chan struct{}), input: make(chan []byte, 64), resize: make(chan struct{}, 1), controls: make(chan ControlRequest, 16),
 		info: SessionInfo{ID: id, ProfileID: req.ProfileID, LineEnding: req.LineEnding, Type: req.Type, Label: label, Host: req.Host, Port: req.Port, Username: req.Username,
 			SSHCompatibility: req.SSHCompatibility,
 			SerialPort:       req.SerialPort, State: "connecting", CreatedAt: now, UpdatedAt: now, Cols: req.Cols, Rows: req.Rows}}
 }
 
 // Reconnect replaces only the transport. The session ID, owning window and
-// retained display remain the same. Original authentication stays in memory
-// until the session is removed, evicted or the manager closes.
+// retained display remain the same. Saved credentials are resolved afresh;
+// manual password/private-key authentication is never retained for reconnect.
 func (m *Manager) Reconnect(ctx context.Context, id string) (SessionInfo, error) {
 	if err := ctx.Err(); err != nil {
 		return SessionInfo{}, err
@@ -340,6 +363,15 @@ func (m *Manager) Reconnect(ctx context.Context, id string) (SessionInfo, error)
 	}
 	req := cloneConnectRequest(s.request)
 	req.Cols, req.Rows = s.info.Cols, s.info.Rows
+	resolve := m.resolveCredential
+	if req.Type == "ssh" && req.CredentialID == "" && req.AuthMethod != "keyboard" {
+		m.mu.Unlock()
+		return SessionInfo{}, ErrAuthenticationRequired
+	}
+	if req.CredentialID != "" && resolve == nil {
+		m.mu.Unlock()
+		return SessionInfo{}, ErrCredentialUnavailable
+	}
 	opener := m.openers[req.Type]
 	if opener == nil || s.done == nil {
 		m.mu.Unlock()
@@ -352,14 +384,46 @@ func (m *Manager) Reconnect(ctx context.Context, id string) (SessionInfo, error)
 		}
 	}
 	waitCtx, cancel := context.WithCancel(ctx)
-	s.reconnecting, s.reconnectCancel, s.disconnected = true, cancel, true
+	s.reconnecting, s.reconnectCancel = true, cancel
 	m.mu.Unlock()
+	stopManagerCancellation := context.AfterFunc(m.ctx, cancel)
 	defer func() {
+		stopManagerCancellation()
 		cancel()
 		m.mu.Lock()
 		s.reconnecting, s.reconnectCancel = false, nil
 		m.mu.Unlock()
 	}()
+	if req.CredentialID != "" {
+		resolved, err := resolve(waitCtx, cloneConnectRequest(req))
+		if err != nil {
+			return SessionInfo{}, err
+		}
+		if resolved.Type != req.Type || resolved.Host != req.Host || resolved.Port != req.Port || resolved.Username != req.Username || resolved.CredentialID != req.CredentialID {
+			return SessionInfo{}, errors.New("saved credential resolution cannot change the reconnect destination or user")
+		}
+		req.AuthMethod, req.Password, req.PrivateKey, req.Passphrase = resolved.AuthMethod, resolved.Password, resolved.PrivateKey, resolved.Passphrase
+		// The resolver supplies the current authenticated vault binding, including
+		// a pin that may have been explicitly renewed since the previous session.
+		req.ExpectedHostFingerprint = resolved.ExpectedHostFingerprint
+		resolved.Password, resolved.PrivateKey, resolved.Passphrase = "", "", ""
+		if req.AuthMethod != "password" && req.AuthMethod != "key" || req.AuthMethod == "password" && req.Password == "" {
+			return SessionInfo{}, ErrCredentialUnavailable
+		}
+		if _, err := normalizeRequest(req); err != nil {
+			return SessionInfo{}, ErrCredentialUnavailable
+		}
+	}
+	if err := waitCtx.Err(); err != nil {
+		return SessionInfo{}, err
+	}
+	m.mu.Lock()
+	if m.closed || m.ctx.Err() != nil || m.sessions[id] != s {
+		m.mu.Unlock()
+		return SessionInfo{}, ErrClosed
+	}
+	s.disconnected = true
+	m.mu.Unlock()
 	m.finish(s, nil)
 	select {
 	case <-s.done:
@@ -415,8 +479,8 @@ func (m *Manager) runSession(s *liveSession, req ConnectRequest, opener transpor
 		Prompt: func(ctx context.Context, prompt Prompt) (PromptReply, error) { return m.ask(s, ctx, prompt) },
 	}
 	conn, err := opener(s.ctx, req, callbacks)
-	// Release the opener's copy. The session's private, memory-only request
-	// remains available for an explicit reconnect and is never returned by APIs.
+	// Release the opener's copy. The retained session request contains only safe
+	// connection settings and an optional backend credential reference.
 	req.Password, req.PrivateKey, req.Passphrase = "", "", ""
 	if err != nil {
 		m.finish(s, err)
@@ -1085,6 +1149,12 @@ func cloneControl(c ControlRequest) ControlRequest {
 func cloneConnectRequest(req ConnectRequest) ConnectRequest {
 	lines := cloneControl(ControlRequest{DTR: req.SerialDTR, RTS: req.SerialRTS})
 	req.SerialDTR, req.SerialRTS = lines.DTR, lines.RTS
+	return req
+}
+
+func reconnectSettings(req ConnectRequest) ConnectRequest {
+	req = cloneConnectRequest(req)
+	req.Password, req.PrivateKey, req.Passphrase = "", "", ""
 	return req
 }
 func eventSize(e Event) int {

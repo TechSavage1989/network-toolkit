@@ -270,6 +270,7 @@ func (f *fileSSHFixture) open(t *testing.T) *FileConnection {
 	if err != nil {
 		t.Fatal(err)
 	}
+	assertNoRetainedAuthentication(t, file.request)
 	t.Cleanup(func() { file.Close() })
 	return file
 }
@@ -494,6 +495,7 @@ func TestFileConnectionUsesSharedInteractiveAuthentication(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer file.Close()
+		assertNoRetainedAuthentication(t, file.request)
 		if calls != 1 {
 			t.Fatalf("challenge count: %d", calls)
 		}
@@ -530,8 +532,31 @@ func TestFileConnectionUsesSharedInteractiveAuthentication(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer file.Close()
+		assertNoRetainedAuthentication(t, file.request)
 		if calls != 1 {
 			t.Fatalf("passphrase prompt count: %d", calls)
+		}
+		// Promotion uses the established SSH channel, not retained private-key
+		// material. A subsequent fresh authentication must request sign-in again.
+		m, err := NewManager(context.Background(), t.TempDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer m.Close()
+		info, err := m.AdoptFileConnection(file, ConnectRequest{Cols: 100, Rows: 30})
+		if err != nil {
+			t.Fatalf("promotion required discarded authentication: %v", err)
+		}
+		waitFileState(t, m, info.ID, "connected")
+		m.mu.Lock()
+		retained := m.sessions[info.ID].request
+		m.mu.Unlock()
+		assertNoRetainedAuthentication(t, retained)
+		if retained.AuthMethod != "key" {
+			t.Fatal("promotion changed the authentication method")
+		}
+		if _, err := m.Reconnect(context.Background(), info.ID); !errors.Is(err, ErrAuthenticationRequired) {
+			t.Fatalf("promoted manual key reconnect = %v", err)
 		}
 	})
 }

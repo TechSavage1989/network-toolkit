@@ -2,7 +2,10 @@
 
 package main
 
-// The shipped application is Windows-only. Development and unit-test builds on
-// other systems use an identity transform so the vault API can be exercised.
-func protectCredentialBlob(value []byte) ([]byte, error) { return append([]byte(nil), value...), nil }
-func unprotectCredentialBlob(value []byte) ([]byte, error) { return append([]byte(nil), value...), nil }
+import "errors"
+
+// Production and development executables fail closed outside Windows. Unit tests
+// inject a synthetic encrypted provider into their own temporary vault only.
+func credentialProtectionAvailable() bool { return false }
+func protectCredentialBlob([]byte) ([]byte, error) { return nil, errors.New("Windows credential protection is unavailable") }
+func unprotectCredentialBlob([]byte) ([]byte, error) { return nil, errors.New("Windows credential protection is unavailable") }

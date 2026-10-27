@@ -204,7 +204,7 @@ func openFTP(ctx context.Context, host string, port int, security, username, pas
 	}
 	if code != 230 {
 		conn.Close()
-		return nil, certHash, fmt.Errorf("FTP login failed: %s", msg)
+		return nil, certHash, errors.New("FTP authentication failed. Check the username and password; the server reply was omitted to protect credentials.")
 	}
 	if _, e = f.must(200, "TYPE I"); e != nil {
 		conn.Close()

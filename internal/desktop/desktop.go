@@ -10,6 +10,9 @@ type Config struct {
 	URL     string
 	DataDir string
 	Stop    context.CancelFunc
+	// SessionToken is an in-memory capability, delivered only to this native
+	// WebView. Never put it in the URL, process arguments, profile or HTTP HTML.
+	SessionToken string
 	// Activate requests that an existing window be restored and brought forward.
 	// Sends may be coalesced; closing the channel disables further requests.
 	Activate <-chan struct{}
@@ -37,6 +40,7 @@ type Rect struct {
 // goroutine and returns false once the window starts shutting down.
 type WebViewConfig struct {
 	AppURL       string
+	SessionToken string
 	UserDataPath string
 	SaveDownload func(suggestedName string) (path string, ok bool)
 	Post         func(func()) bool

@@ -21,6 +21,8 @@ var (
     localFreeCred    = kernel32CredDLL.NewProc("LocalFree")
 )
 
+func credentialProtectionAvailable() bool { return true }
+
 const cryptProtectUIForbidden = 0x1
 
 func blobFromBytes(value []byte) dataBlob {
@@ -68,5 +70,6 @@ func unprotectCredentialBlob(value []byte) ([]byte, error) {
         return nil, callErr
     }
     defer localFreeCred.Call(uintptr(unsafe.Pointer(out.Data)))
+    if out.Data != nil && out.Size > 0 { defer clear(unsafe.Slice(out.Data, int(out.Size))) }
     return bytesFromBlob(out), nil
 }

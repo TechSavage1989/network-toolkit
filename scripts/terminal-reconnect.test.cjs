@@ -8,7 +8,7 @@ function setup(){
  const pane=['session-one','other','',''],requests=[],notices=[],status={dataset:{},innerHTML:'',classList:{toggle(name,value){this[name]=value;}}},outputBar={dataset:{},innerHTML:'',classList:{toggle(name,value){this[name]=value;}}};
  const c={entry,pane,requests,notices,status,online:true,OFFLINE:false,terminalSessions:new Map([[entry.info.id,entry]]),terminalWorkspaceTransferBusy:false,terminalDetachedReturning:false,terminalAssetsReady:()=>true,terminalEntryShown:()=>true,terminalOwnerCanMutate:()=>true,currentTerminal:()=>c.focus||entry,renderTerminalChrome:()=>{},scheduleTerminalFit:()=>{},startTerminalFeed:()=>{},receiveTerminalViewState:s=>{c.viewState=s;},upsertTerminalSession:s=>{entry.info={...s};return entry;},NetworkToolkitTerminalExtras:{finalize:e=>{e.finalized=true;},scrollBottom:e=>{e.followResumed=true;}},toast:(...m)=>notices.push(m),setTimeout,clearTimeout,Uint8Array,TextEncoder,bytesToBase64:bytes=>Buffer.from(bytes).toString('base64'),icon:()=>'',esc:s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;'),$:()=>status,openTerminalConnect:()=>assert.fail('Reconnect opened a connection form')};
  c.api=async(...args)=>{requests.push(args);return {session:{...entry.info,state:'connecting',updatedAt:'2026-10-22T00:01:00Z'},viewState:{revision:1}};};
- c.outputBar=outputBar;c.$=selector=>selector==='[data-terminal-connection-output]'?outputBar:status;c.DETACHED_TERMINAL=false;c.DETACHED_WORKSPACE=false;c.window={};
+ c.document={querySelector:()=>null};c.safeTerminalConfig=value=>{const clean={};for(const field of ['type','host','port','username','authMethod','credentialId'])if(value[field]!==undefined)clean[field]=value[field];return clean;};c.outputBar=outputBar;c.$=selector=>selector==='[data-terminal-connection-output]'?outputBar:status;c.DETACHED_TERMINAL=false;c.DETACHED_WORKSPACE=false;c.window={};
  vm.createContext(c);for(const name of ['terminalConnectionButtonsHTML','terminalReconnectAllowed','renderTerminalConnectionState','setTerminalConnectionScreen','notifyTerminalMacroConnected','reconnectTerminal','drainTerminalInput'])vm.runInContext(source(name),c);
  return c;
 }
@@ -61,4 +61,13 @@ test('Reconnect appends below the last entry without restoring an old saved curs
   // Repeated reconnects append after the most recent command as well.
   const again=buffer.baseY+buffer.cursorY;await write(reconnect+'router# ');assert.equal(buffer.getLine(again).translateToString(true),'router# ');assert.equal(buffer.getLine(again+1).translateToString(true),'[Network Toolkit: Reconnecting using previous settings.]');assert.equal(buffer.getLine(again+2).translateToString(true),'router# ');term.dispose();
  }
+});
+
+test('manual reconnect requests fresh authentication using only safe connection fields',async()=>{
+ const c=setup(),forms=[];c.entry.config.password='must-not-survive';c.entry.config.privateKey='must-not-survive';c.openTerminalConnect=(...args)=>forms.push(args);
+ c.api=async()=>{const error=Error('Authentication required');error.status=409;error.code='authentication_required';throw error;};
+ await c.reconnectTerminal(c.entry);assert.equal(forms.length,1);assert.equal(forms[0][0].host,'192.0.2.10');assert(!JSON.stringify(forms).includes('must-not-survive'));assert.equal(c.entry.reconnectBusy,false);assert.match(c.entry.reconnectError,/Sign in again/);
+});
+test('late reauthentication requirement does not replace a newer connection dialog',async()=>{
+ const c=setup();c.document.querySelector=()=>({});c.api=async()=>{throw Object.assign(Error('Sign in'),{code:'authentication_required',status:409});};await c.reconnectTerminal(c.entry);assert.equal(c.entry.reconnectBusy,false);
 });

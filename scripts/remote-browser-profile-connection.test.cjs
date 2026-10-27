@@ -13,7 +13,7 @@ function harness({profile=saved('test'),trusted=true}={}){
      if(path==='/remote-browser'&&body?.action==='fingerprint')return {fingerprint:'SHA256:observed'};
      return {connectionId:'owned-connection',path:'/',entries:[]};
    },openModal:(title,body,footer)=>dialogs.push({title,body,footer}),toast:(msg)=>notifications.push(msg),
-   NetworkToolkitCredentials:{resolve:async record=>{if(record.credentialId==='vault-fails')throw Error('credential missing');return {authMethod:'password',username:'operator',password:'protected-vault-password'};}}
+   NetworkToolkitCredentials:{prepare:async record=>{if(record.credentialId==='vault-fails')throw Error('credential missing');return {credentialId:record.credentialId,authMethod:'password',username:'operator'};}}
  };
  root.window=root;root.globalThis=root;
  vm.createContext(root);vm.runInContext(source,root);
@@ -28,7 +28,7 @@ test('Use connection completes saved SSH profile connection with linked vault pa
  assert.equal(h.browser.get('ssh').connecting,false);
  const sent=h.events.find(x=>x.path==='/remote-browser'&&x.body?.action==='connect').body;
  assert.equal(sent.host,'192.0.2.100');assert.equal(sent.port,22);
- assert.equal(sent.fingerprint,'SHA256:known');assert.equal(sent.password,'protected-vault-password');
+ assert.equal(sent.fingerprint,'SHA256:known');assert.equal(sent.credentialId,'vault-password');assert.equal(Object.hasOwn(sent,'password'),false);
  assert.equal(h.dialogs.length,0);
  assert(!JSON.stringify(h.state).includes('protected-vault-password'));
  assert(h.writes.every(x=>!x.includes('protected-vault-password')));

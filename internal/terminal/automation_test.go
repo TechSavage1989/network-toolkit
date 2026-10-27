@@ -52,6 +52,7 @@ func TestAutomationReconnectChangesGenerationAndRejectsStaleWrites(t *testing.T)
 	})
 	req := terminalRequest()
 	req.ProfileID, req.LineEnding = "fixture-profile", "lf"
+	req.AuthMethod, req.Password = "keyboard", ""
 	info, err := m.Connect(req)
 	if err != nil {
 		t.Fatal(err)

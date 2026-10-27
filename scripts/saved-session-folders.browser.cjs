@@ -5,7 +5,7 @@ const root=path.resolve(__dirname,'..'),version=require('../package.json').versi
 const profile=(id,name,extra={})=>({id,name,type:'ssh',host:id+'.test',port:22,username:'operator',credentialId:'vault-reference',...extra});
 (async()=>{
  let saved={appUpdatePreferences:{enabled:false},terminalProfiles:[profile('core','Core',{folder:'MDF'}),profile('access','Access',{type:'telnet',folder:'IDF',port:23,credentialId:''}),profile('console','Console',{type:'serial',serialPort:'COM4',baudRate:9600,credentialId:''})],ftpProfiles:[{id:'files',name:'Files',host:'files.test',port:990,username:'operator',security:'implicit',folder:'MDF',credentialId:'ftp-vault'}],terminalRecent:[profile('recent','Recent host')],terminalSidebarTab:'saved'};
- const browser=await chromium.launch({headless:true,args:['--no-sandbox']}),page=await browser.newPage({viewport:{width:1280,height:900}}),errors=[],requests=[];
+ const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE||undefined,args:['--no-sandbox']}),page=await browser.newPage({viewport:{width:1280,height:900}}),errors=[],requests=[];
  page.on('pageerror',error=>errors.push(error.message));
  await page.route('http://toolkit.local/**',async route=>{
   const request=route.request(),p=new URL(request.url()).pathname;
@@ -15,8 +15,8 @@ const profile=(id,name,extra={})=>({id,name,type:'ssh',host:id+'.test',port:22,u
    if(p==='/api/state'){if(request.method()==='GET')data=saved;else saved=request.postDataJSON();}
    if(p==='/api/jobs')data=[];
    if(p==='/api/terminals')data=request.method()==='POST'?{session:{id:'opened-core',type:'ssh',host:'edited-core.test',username:'operator',port:22,state:'connected',profileId:'core'}}:{sessions:[]};
-   if(p==='/api/credentials')data={entries:[]};
-   if(p==='/api/credentials/vault-reference')data={id:'vault-reference',kind:'password',username:'operator',secret:'fixture-only-secret'};
+   if(p==='/api/credentials')data={entries:[{id:'vault-reference',name:'Core credential',kind:'password',username:'operator',bindings:[{protocol:'ssh',host:'edited-core.test',port:22,username:'operator'}]}]};
+   if(p==='/api/credentials/vault-reference')throw Error('The browser must never retrieve a saved secret.');
    if(p.includes('/events')){await new Promise(resolve=>setTimeout(resolve,100));data={events:[],sessions:[],after:0};}
    return route.fulfill({contentType:'application/json',body:JSON.stringify(data)});
   }
@@ -83,7 +83,7 @@ const profile=(id,name,extra={})=>({id,name,type:'ssh',host:id+'.test',port:22,u
   }
   await page.setViewportSize({width:1280,height:900});await page.evaluate(()=>{setTheme('light');state.terminalSidebarSide='right';NetworkToolkitSessionSidebar.render();});
   await page.locator('[data-session-id="core"] [data-session-entry]').dblclick();await page.waitForFunction(()=>terminalSessions.has('opened-core'));
-  const opened=requests.filter(row=>row.path==='/api/terminals'&&row.method==='POST');assert.equal(opened.length,1);assert.equal(opened[0].body.profileId,'core');assert.equal(opened[0].body.host,'edited-core.test');assert.equal(opened[0].body.password,'fixture-only-secret');assert.equal(Object.hasOwn(opened[0].body,'folder'),false);
+  const opened=requests.filter(row=>row.path==='/api/terminals'&&row.method==='POST');assert.equal(opened.length,1);assert.equal(opened[0].body.profileId,'core');assert.equal(opened[0].body.host,'edited-core.test');assert.equal(opened[0].body.credentialId,'vault-reference');assert.equal(Object.hasOwn(opened[0].body,'password'),false);assert.equal(Object.hasOwn(opened[0].body,'folder'),false);
   await page.evaluate(()=>flushState());assert(!JSON.stringify(saved).includes('fixture-only-secret'));
   assert.equal(requests.filter(row=>row.path.includes('macro')&&row.method==='PUT').length,0);assert.deepEqual(errors,[]);
   const result={passed:true,createAssignMove:true,unfiled:true,searchAndFilter:true,duplicateAndEdit:true,ftpAndSftpPreserveFolders:true,reloadPersistence:true,credentialLinkPreserved:true,folderExcludedFromConnection:true,renderedCases:cases.length,layouts:cases,errors};

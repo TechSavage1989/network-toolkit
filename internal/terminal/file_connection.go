@@ -14,7 +14,7 @@ import (
 
 // FileConnection retains one authenticated SSH transport. Each operation opens
 // an independent SFTP channel, exactly as BrowseSFTP does for a live terminal.
-// It retains reconnect settings only in process memory.
+// It retains only nonsecret reconnect settings and an optional credential ID.
 type FileConnection struct {
 	mu         sync.Mutex
 	transport  *sshTransport
@@ -40,6 +40,12 @@ func OpenFileConnectionWithPrompts(ctx context.Context, request ConnectRequest, 
 		return nil, err
 	}
 	fingerprint = strings.TrimSpace(fingerprint)
+	if req.ExpectedHostFingerprint != "" {
+		if fingerprint != "" && fingerprint != req.ExpectedHostFingerprint {
+			return nil, errors.New("SSH fingerprint does not match the saved credential destination")
+		}
+		fingerprint = req.ExpectedHostFingerprint
+	}
 	if !strings.HasPrefix(fingerprint, "SHA256:") || len(fingerprint) < 25 || len(fingerprint) > 100 {
 		return nil, errors.New("verify the SSH server fingerprint before connecting")
 	}
@@ -54,7 +60,9 @@ func OpenFileConnectionWithPrompts(ctx context.Context, request ConnectRequest, 
 	if err != nil {
 		return nil, err
 	}
-	return &FileConnection{transport: base, request: req}, nil
+	safe := reconnectSettings(req)
+	req.Password, req.PrivateKey, req.Passphrase = "", "", ""
+	return &FileConnection{transport: base, request: safe}, nil
 }
 
 func (f *FileConnection) Browse(ctx context.Context, req model.Request) (model.Result, error) {

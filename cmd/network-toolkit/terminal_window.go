@@ -428,7 +428,7 @@ func readTerminalWindowInstance(dir string) (terminalWindowInstance, error) {
 	portNumber, portErr := strconv.Atoi(port)
 	token, tokenErr := hex.DecodeString(record.Token)
 	id, idErr := hex.DecodeString(record.InstanceID)
-	if record.Version != 1 || splitErr != nil || host != "127.0.0.1" || portErr != nil || portNumber < 1 || portNumber > 65535 || record.Host != net.JoinHostPort(host, strconv.Itoa(portNumber)) || tokenErr != nil || len(token) != 32 || idErr != nil || len(id) != 16 || record.PID < 1 {
+	if record.Version != 2 || splitErr != nil || host != "127.0.0.1" || portErr != nil || portNumber < 1 || portNumber > 65535 || record.Host != net.JoinHostPort(host, strconv.Itoa(portNumber)) || tokenErr != nil || len(token) != 32 || idErr != nil || len(id) != 16 || record.PID < 1 {
 		return record, errors.New("Invalid terminal instance endpoint or identity.")
 	}
 	return record, nil
@@ -450,7 +450,7 @@ func activateTerminalWindow(ctx context.Context, dir string, preset *terminalWin
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Session-Token", record.Token)
+	req.Header.Set("X-Window-Activation-Token", record.Token)
 	transport := &http.Transport{Proxy: nil, DialContext: (&net.Dialer{Timeout: time.Second}).DialContext, DisableKeepAlives: true, MaxResponseHeaderBytes: 16384}
 	defer transport.CloseIdleConnections()
 	client := &http.Client{Transport: transport, CheckRedirect: func(*http.Request, []*http.Request) error {
@@ -522,7 +522,12 @@ func prepareTerminalWindow(root string, preset *terminalWindowPreset) (dir strin
 }
 
 func (a *application) registerTerminalWindow(dir string) (func(), error) {
-	record := terminalWindowInstance{Version: 1, Host: a.host, Token: a.token, InstanceID: a.windowInstanceID, PID: os.Getpid()}
+	// The persisted instance record can only raise this window and supply a
+	// nonsecret connection preset. It must never contain the general API token.
+	if a.windowActivationToken == "" {
+		return nil, errors.New("The terminal activation capability is unavailable.")
+	}
+	record := terminalWindowInstance{Version: 2, Host: a.host, Token: a.windowActivationToken, InstanceID: a.windowInstanceID, PID: os.Getpid()}
 	b, err := json.Marshal(record)
 	if err != nil {
 		return nil, err

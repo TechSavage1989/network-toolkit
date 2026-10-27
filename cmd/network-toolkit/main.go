@@ -25,6 +25,7 @@ import (
 
 	resources "networktoolkit"
 	"networktoolkit/internal/diag"
+	"networktoolkit/internal/desktop"
 	"networktoolkit/internal/identity"
 	"networktoolkit/internal/macros"
 	"networktoolkit/internal/model"
@@ -83,6 +84,7 @@ type application struct {
 	terminalError      string
 	windowMode         string
 	windowInstanceID   string
+	windowActivationToken string
 	windowActivate     chan struct{}
 	windowInbox        terminalWindowInbox
 	windowLaunchMu     sync.Mutex
@@ -98,6 +100,9 @@ type application struct {
 	localTools         *localToolsManager
 	publicIP           *publicIPManager
 	credentials        *credentialVault
+	credentialChanges sync.Mutex
+	confirmCredentialDestination func(context.Context, desktop.CredentialDestinationConfirmation) (bool, error)
+	inspectCredentialDestination func(context.Context,credentialBinding)(string,error)
 	packetCaptures     *packetCaptureManager
 	transfers          *transferHostManager
 	browserMu          sync.Mutex
@@ -363,7 +368,9 @@ func main() {
 
 func newApplication(parent context.Context, dataPath string) *application {
 	ctx, cancel := context.WithCancel(parent)
-	a := &application{ctx: ctx, stop: cancel, jobs: make(map[string]*Job), started: time.Now(), token: randomHex(32), uiHost: "browser", dataPath: dataPath, state: json.RawMessage(`{}`), windowMode: "main", windowInstanceID: randomHex(16), windowActivate: make(chan struct{}, 1), primaryWake: make(chan struct{}, 1)}
+	a := &application{ctx: ctx, stop: cancel, jobs: make(map[string]*Job), started: time.Now(), token: randomHex(32), uiHost: "browser", dataPath: dataPath, state: json.RawMessage(`{}`), windowMode: "main", windowInstanceID: randomHex(16), windowActivationToken: randomHex(32), windowActivate: make(chan struct{}, 1), primaryWake: make(chan struct{}, 1)}
+	a.confirmCredentialDestination = desktop.ConfirmCredentialDestination
+	a.inspectCredentialDestination = inspectCredentialDestination
 	a.localTools = newLocalToolsManager(ctx)
 	a.packetCaptures = newPacketCaptureManager(ctx)
 	a.transfers = newTransferHostManager(ctx, filepath.Dir(dataPath))
@@ -378,6 +385,7 @@ func newApplication(parent context.Context, dataPath string) *application {
 	if terminalErr != nil {
 		a.terminalError = terminalErr.Error()
 	} else {
+		a.terminals.SetCredentialResolver(a.resolveTerminalCredential)
 		a.terminalAutomation = macros.NewEngine(ctx, a.terminals)
 	}
 	a.views = newTerminalViewRegistry(a)
@@ -449,12 +457,12 @@ func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		html := strings.ReplaceAll(string(b), "__SESSION_TOKEN__", a.token)
+		html := strings.ReplaceAll(string(b), "__SESSION_TOKEN__", httpBootstrapToken(a.token))
 		html = strings.ReplaceAll(html, "__WINDOW_MODE__", a.windowMode)
 		html = strings.ReplaceAll(html, "__TERMINAL_VIEW__", "null")
 		html = embeddedAssetPaths(html)
 		if a.updateFinalizing.Load() {
-			html = updateFinalizingHTML(html, a.token)
+			html = updateFinalizingHTML(html, httpBootstrapToken(a.token))
 		}
 		_, _ = io.WriteString(w, html)
 		return
@@ -476,7 +484,8 @@ func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	requestView := ""
-	if subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Session-Token")), []byte(a.token)) != 1 {
+	activationOnly := a.windowMode == "terminal" && r.Method == http.MethodPost && r.URL.Path == "/api/terminal-window" && a.windowActivationToken != "" && subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Window-Activation-Token")), []byte(a.windowActivationToken)) == 1
+	if !activationOnly && subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Session-Token")), []byte(a.token)) != 1 {
 		var found bool
 		requestView, found = a.views.authenticate(r.Header.Get("X-Session-Token"))
 		if !found {
@@ -490,6 +499,10 @@ func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.Header.Get("Sec-Fetch-Site") == "cross-site" {
 		jsonError(w, http.StatusForbidden, "Cross-site requests are not allowed.")
+		return
+	}
+	if activationOnly {
+		a.handleTerminalWindow(w, r)
 		return
 	}
 	if requestView != "" {

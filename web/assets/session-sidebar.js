@@ -215,12 +215,12 @@ async function connect(config,name,destination,secrets=null){
  let request;
  try{
   let c=safeTerminalConfig(config);
-  if(secrets===null&&c.type==='ssh'&&c.credentialId){secrets=await root.NetworkToolkitCredentials.resolve(c);if(!secrets)throw new Error('The saved credential could not be opened. Edit this connection to choose another credential.');c={...c,username:secrets.username||c.username,authMethod:secrets.authMethod||c.authMethod};}
+  if(secrets===null&&c.type==='ssh'&&c.credentialId){const credential=await root.NetworkToolkitCredentials.prepare(c);if(!credential)throw new Error('The saved credential is unavailable. Edit this connection to choose another credential.');c={...c,...credential};}else if(secrets!==null)delete c.credentialId;
   c=validateTerminalConfig(c);
-  if(secrets===null&&c.type==='ssh'&&['password','key'].includes(c.authMethod)){authDialog({...c,profileId:config.profileId||''},name,destination);return;}
+  if(secrets===null&&!c.credentialId&&c.type==='ssh'&&['password','key'].includes(c.authMethod)){authDialog({...c,profileId:config.profileId||''},name,destination);return;}
   request=terminalConnectPayload(c,secrets||{});
   if(config.profileId)request.profileId=config.profileId;
-  if(c.type==='ssh'&&c.authMethod==='key'&&!request.privateKey.trim())throw new Error('Enter a private key to open this session.');
+  if(c.type==='ssh'&&!c.credentialId&&c.authMethod==='key'&&!request.privateKey.trim())throw new Error('Enter a private key to open this session.');
   const response=await api('/terminals','POST',request);
   if(!response.session?.id)throw new Error('The app did not return a terminal session.');
   if(response.viewState)receiveTerminalViewState(response.viewState);

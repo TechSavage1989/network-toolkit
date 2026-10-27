@@ -23,7 +23,7 @@ const current=key=>{const value=ready.get(key);if(value&&Date.now()-value.time<T
 function prepare(key,payload){
  if(current(key))return Promise.resolve(true);
  if(pending.has(key))return pending.get(key);
- const run=Promise.resolve().then(payload).then(body=>api('/remote-browser/drag-ticket','POST',body)).then(result=>{
+ const run=Promise.resolve().then(payload).then(body=>{if(['password','privateKey','passphrase','keyPath'].some(field=>body[field]))throw Error('Native drag-out cannot retain manual credentials. Use Download, or use an approved saved credential.');return api('/remote-browser/drag-ticket','POST',body);}).then(result=>{
    if(!/^[0-9a-f]{48}$/i.test(result.ticket||'')||!/^[^\\/\r\n]+$/.test(result.filename||''))throw Error('Invalid drag ticket from local service');
    ready.set(key,{ticket:result.ticket,filename:result.filename,time:Date.now()});
    for(const [id,value] of ready){if(ready.size<=MAX)break;ready.delete(id);}

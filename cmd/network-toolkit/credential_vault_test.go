@@ -10,7 +10,7 @@ import (
 )
 
 func TestCredentialAPISeparatesSecretsFromSettings(t *testing.T) {
-	a := testApplication(t)
+	a := credentialTestApplication(t)
 	secret := "vault-secret-canary"
 	body := `{"name":"Core switch","username":"admin","kind":"password","secret":"` + secret + `"}`
 	saved := requestApp(a, http.MethodPost, "/api/credentials", body, true)
@@ -36,8 +36,8 @@ func TestCredentialAPISeparatesSecretsFromSettings(t *testing.T) {
 		t.Fatal("ordinary settings file contains the credential secret")
 	}
 	fetched := requestApp(a, http.MethodGet, "/api/credentials/"+response.Entry.ID, "", true)
-	if fetched.Code != http.StatusOK || !strings.Contains(fetched.Body.String(), secret) {
-		t.Fatalf("explicit credential retrieval failed: %d %s", fetched.Code, fetched.Body.String())
+	if fetched.Code != http.StatusOK || strings.Contains(fetched.Body.String(), secret) {
+		t.Fatalf("metadata-only credential retrieval failed: %d %s", fetched.Code, fetched.Body.String())
 	}
 }
 

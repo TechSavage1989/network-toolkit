@@ -38,7 +38,7 @@ func (a *application) serveTerminalView(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	bootstrap, _ := json.Marshal(a.terminalViewBootstrap(info))
-	html := strings.ReplaceAll(string(b), "__SESSION_TOKEN__", token)
+	html := strings.ReplaceAll(string(b), "__SESSION_TOKEN__", httpBootstrapToken(token))
 	html = strings.ReplaceAll(html, "__WINDOW_MODE__", "detached")
 	html = strings.ReplaceAll(html, "__TERMINAL_VIEW__", string(bootstrap))
 	html = embeddedAssetPaths(html)

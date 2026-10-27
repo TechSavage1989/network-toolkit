@@ -49,6 +49,7 @@ type WebView struct {
 	registrations    []eventRegistration
 	downloads        map[uintptr]eventRegistration
 	pendingDownloads map[*pendingDownload]bool
+	bootstrapScriptID string
 }
 
 type pendingDownload struct {
@@ -70,6 +71,9 @@ func StartWebView(parent uintptr, cfg WebViewConfig, ready func(*WebView, error)
 	}
 	if !sameAppOrigin(cfg.AppURL, cfg.AppURL, false) {
 		return nil, errors.New("The desktop interface URL must use the app's exact local IPv4 HTTP origin")
+	}
+	if _, err := nativeSessionBootstrap(cfg.AppURL, cfg.SessionToken); err != nil {
+		return nil, err
 	}
 	if !filepath.IsAbs(cfg.UserDataPath) {
 		return nil, errors.New("WebView2 requires an absolute application profile path")
@@ -219,7 +223,7 @@ func (w *WebView) initializeController() error {
 		uri, err := comGetString(args, 3)
 		// Ordinary page/frame navigation stays on the exact HTTP app origin.
 		// Blob reports are accepted only by the separate DownloadStarting path.
-		if w.closed || err != nil || !sameAppOrigin(w.cfg.AppURL, uri, false) {
+		if w.closed || err != nil || !sameNativeDocument(w.cfg.AppURL, uri) {
 			comCall(args, 8, 1)
 		}
 		return hresultOK
@@ -227,7 +231,9 @@ func (w *WebView) initializeController() error {
 	if err = add(w.core, 7, 8, iidNavigationStarting, navigation); err != nil {
 		return err
 	}
-	if err = add(w.core, 17, 18, iidNavigationStarting, navigation); err != nil {
+	// The application has no document frames. Do not grant a nested document
+	// the parent's capability, even on the same origin.
+	if err = add(w.core, 17, 18, iidNavigationStarting, func(_ uintptr, args uintptr) uintptr { comCall(args, 8, 1); return hresultOK }); err != nil {
 		return err
 	}
 	if err = add(w.core, 44, 45, iidNewWindowRequested, func(_ uintptr, args uintptr) uintptr { comCall(args, 6, 1); return hresultOK }); err != nil {
@@ -278,7 +284,7 @@ func (w *WebView) initializeController() error {
 		return err
 	}
 	w.Resize(w.bounds)
-	return comPutString(w.core, 5, w.cfg.AppURL)
+	return w.installNativeBootstrap()
 }
 
 func (w *WebView) fail(err error) {
@@ -534,6 +540,11 @@ func (w *WebView) Close() {
 		return
 	}
 	w.closed = true
+	if w.bootstrapScriptID != "" && w.core != 0 {
+		_ = comPutString(w.core, 28, w.bootstrapScriptID)
+		w.bootstrapScriptID = ""
+	}
+	w.cfg.SessionToken = ""
 	for pending := range w.pendingDownloads {
 		w.finishDownload(pending, true)
 	}

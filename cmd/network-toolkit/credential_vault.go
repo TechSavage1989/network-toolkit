@@ -4,12 +4,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 )
 
 const credentialVaultFilename = "Network_Toolkit.credentials.vault"
@@ -24,6 +26,7 @@ type credentialRecord struct {
 	Secret    string `json:"secret"`
 	Kind      string `json:"kind"`
 	UpdatedAt string `json:"updatedAt"`
+	Bindings []credentialBinding `json:"bindings"`
 }
 
 type credentialMetadata struct {
@@ -32,6 +35,7 @@ type credentialMetadata struct {
 	Username  string `json:"username,omitempty"`
 	Kind      string `json:"kind"`
 	UpdatedAt string `json:"updatedAt"`
+	Bindings []credentialBinding `json:"bindings"`
 }
 
 type credentialVaultFile struct {
@@ -43,10 +47,22 @@ type credentialVault struct {
 	mu      sync.Mutex
 	path    string
 	entries map[string]credentialRecord
+	protect func([]byte) ([]byte, error)
+	unprotect func([]byte) ([]byte, error)
 }
 
 func newCredentialVault(root string) (*credentialVault, error) {
-	vault := &credentialVault{path: filepath.Join(root, credentialVaultFilename), entries: map[string]credentialRecord{}}
+	if !credentialProtectionAvailable() {
+		return nil, errors.New("Saved credentials are unavailable: this build has no supported operating-system protection provider.")
+	}
+	return newCredentialVaultWithProtection(root, protectCredentialBlob, unprotectCredentialBlob)
+}
+
+// Protection is injectable only by Go callers for isolated synthetic tests. There
+// is no command-line, environment or HTTP switch that enables plaintext storage.
+func newCredentialVaultWithProtection(root string, protect, unprotect func([]byte) ([]byte, error)) (*credentialVault, error) {
+	if protect == nil || unprotect == nil { return nil, errors.New("Credential protection is unavailable.") }
+	vault := &credentialVault{path: filepath.Join(root, credentialVaultFilename), entries: map[string]credentialRecord{}, protect: protect, unprotect: unprotect}
 	if err := vault.load(); err != nil {
 		return nil, err
 	}
@@ -74,7 +90,7 @@ func sanitizeCredentialRecord(record credentialRecord, existingID string) (crede
 		return credentialRecord{}, errors.New("Credential ID is invalid.")
 	}
 	record.Name = strings.TrimSpace(record.Name)
-	if record.Name == "" {
+	if record.Name == "" || strings.IndexFunc(record.Name,unicode.IsControl)>=0 {
 		return credentialRecord{}, errors.New("Enter a credential name.")
 	}
 	if len(record.Name) > 120 {
@@ -96,25 +112,34 @@ func sanitizeCredentialRecord(record credentialRecord, existingID string) (crede
 	if record.Secret == "" {
 		return credentialRecord{}, errors.New("Enter a password or passphrase.")
 	}
+	bindings, err := normalizeCredentialBindings(record.Bindings)
+	if err != nil { return credentialRecord{}, err }
+	record.Bindings = bindings
 	record.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 	return record, nil
 }
 
 func (v *credentialVault) load() error {
-	raw, err := os.ReadFile(v.path)
-	if errors.Is(err, os.ErrNotExist) {
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("read credential vault: %w", err)
-	}
+	before, err := os.Lstat(v.path)
+	if errors.Is(err, os.ErrNotExist) { return nil }
+	if err != nil { return fmt.Errorf("inspect credential vault: %w",err) }
+	if !before.Mode().IsRegular() || storageIsLink(before) { return errors.New("Credential vault must be a regular file, not a link or device.") }
+	if before.Size() > 2<<20 { return errors.New("Credential vault is larger than the supported 2 MiB limit.") }
+	fileHandle, err := os.Open(v.path)
+	if err != nil { return fmt.Errorf("open credential vault: %w",err) }
+	defer fileHandle.Close()
+	after, err := fileHandle.Stat()
+	if err != nil || !after.Mode().IsRegular() || !os.SameFile(before,after) { return errors.New("Credential vault changed while it was being opened.") }
+	raw, err := io.ReadAll(io.LimitReader(fileHandle,(2<<20)+1))
+	if err != nil { return fmt.Errorf("read credential vault: %w",err) }
 	if len(raw) > 2<<20 {
 		return errors.New("Credential vault is larger than the supported 2 MiB limit.")
 	}
-	plain, err := unprotectCredentialBlob(raw)
+	plain, err := v.unprotect(raw)
 	if err != nil {
 		return fmt.Errorf("unlock credential vault: %w", err)
 	}
+	defer clear(plain)
 	var file credentialVaultFile
 	if err := json.Unmarshal(plain, &file); err != nil || file.Version != credentialVaultVersion {
 		return errors.New("Credential vault is unreadable or uses an unsupported format.")
@@ -123,6 +148,9 @@ func (v *credentialVault) load() error {
 		if len(v.entries) >= maxCredentialEntries || item.ID == "" || item.Secret == "" || !validCredentialKind(item.Kind) {
 			continue
 		}
+		bindings, err := normalizeCredentialBindings(item.Bindings)
+		if err != nil { return errors.New("Credential destination bindings are invalid.") }
+		item.Bindings = bindings
 		v.entries[item.ID] = item
 	}
 	return nil
@@ -138,10 +166,12 @@ func (v *credentialVault) saveLocked() error {
 	if err != nil {
 		return err
 	}
-	encrypted, err := protectCredentialBlob(plain)
+	defer clear(plain)
+	encrypted, err := v.protect(plain)
 	if err != nil {
 		return fmt.Errorf("protect credential vault: %w", err)
 	}
+	if len(encrypted)>2<<20 { return errors.New("Credential vault would exceed its supported 2 MiB limit. Remove or shorten an existing entry first.") }
 	if err := os.MkdirAll(filepath.Dir(v.path), 0700); err != nil {
 		return err
 	}
@@ -151,7 +181,7 @@ func (v *credentialVault) saveLocked() error {
 	}
 	temp := file.Name()
 	defer os.Remove(temp)
-	if err = file.Chmod(0600); err == nil {
+	if err = secureCredentialTempFile(file); err == nil {
 		_, err = file.Write(encrypted)
 	}
 	if err == nil {
@@ -171,7 +201,7 @@ func (v *credentialVault) list() []credentialMetadata {
 	defer v.mu.Unlock()
 	result := make([]credentialMetadata, 0, len(v.entries))
 	for _, item := range v.entries {
-		result = append(result, credentialMetadata{ID: item.ID, Name: item.Name, Username: item.Username, Kind: item.Kind, UpdatedAt: item.UpdatedAt})
+		result = append(result, credentialMetadataFor(item))
 	}
 	sort.Slice(result, func(i, j int) bool { return strings.ToLower(result[i].Name) < strings.ToLower(result[j].Name) })
 	return result
@@ -181,13 +211,15 @@ func (v *credentialVault) get(id string) (credentialRecord, bool) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	item, ok := v.entries[id]
+	item.Bindings = append([]credentialBinding{}, item.Bindings...)
 	return item, ok
 }
 
 func (v *credentialVault) put(record credentialRecord) (credentialMetadata, error) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
-	if record.ID == "" && len(v.entries) >= maxCredentialEntries {
+	_, exists := v.entries[record.ID]
+	if !exists && len(v.entries) >= maxCredentialEntries {
 		return credentialMetadata{}, fmt.Errorf("The password manager is limited to %d saved credentials.", maxCredentialEntries)
 	}
 	currentID := record.ID
@@ -205,7 +237,7 @@ func (v *credentialVault) put(record credentialRecord) (credentialMetadata, erro
 		}
 		return credentialMetadata{}, err
 	}
-	return credentialMetadata{ID: clean.ID, Name: clean.Name, Username: clean.Username, Kind: clean.Kind, UpdatedAt: clean.UpdatedAt}, nil
+	return credentialMetadataFor(clean), nil
 }
 
 func (v *credentialVault) delete(id string) error {

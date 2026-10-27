@@ -3,7 +3,8 @@
 ## Fixed recent-time geometry
 
 Condensed RTT diagnostics use a fixed age horizon `H`: the explicit range duration,
-the chosen Timeframe duration, or `3 × recentMs` for All (default 180 seconds),
+the chosen Timeframe duration, or `3 × recentMs / (2 × ln(4))` for All
+(default approximately 64.921 seconds when the history-detail scale is 60 seconds),
 divided by the existing zoom factor. `H` never depends on total sample count or
 run duration. Given age `a` from the displayed right timestamp, for `0 <= a < H`:
 
@@ -95,3 +96,14 @@ live activity trimming, metadata/statistical integrity, snapshot immutability,
 JSON restoration and run reset. Existing graph/navigation/packet and release
 gates remain enforced. See DEVELOPMENT_HANDOFF.md for exact completed versus
 pending evidence, source and release status.
+
+## 1.17.104 newest-point reference
+
+For All at 1×, the default Condensed newest slope equals a time-proportional
+30-second Linear view on the same usable plot width. A finite one-second gap
+is about 2.24% smaller because the mapping continuously compresses toward the
+left. Explicit timeframes/ranges and zoom keep their existing duration behavior.
+The history-detail setting is not a promised recent-window width. Duplicate or
+irregular timestamps preserve their actual timing; no minimum pixel spacing is
+fabricated. Actual browser normal/narrow rendered comparison remains a required
+release gate, alongside growth, retention rollover and archive-cluster checks.

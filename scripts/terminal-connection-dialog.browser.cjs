@@ -9,7 +9,7 @@ const root=path.resolve(__dirname,'..'),version=require('../package.json').versi
   {id:'serial',name:'Console',folder:'MDF',type:'serial',serialPort:'COM4',baudRate:115200,dataBits:8,stopBits:'1',parity:'none',flowControl:'none',lineEnding:'cr',localEcho:true}
  ]},rejectNext=false,sessionNumber=0;
  const detachedViews=[],detachmentSides=[];
- const browser=await chromium.launch({headless:true,args:['--no-sandbox']}),page=await browser.newPage({viewport:{width:1280,height:900}}),errors=[],requests=[];
+ const browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE||undefined,args:['--no-sandbox']}),page=await browser.newPage({viewport:{width:1280,height:900}}),errors=[],requests=[];
  page.on('pageerror',error=>errors.push(error.message));
  await page.route('http://toolkit.local/**',async route=>{
   const request=route.request(),p=new URL(request.url()).pathname;
@@ -31,8 +31,8 @@ const root=path.resolve(__dirname,'..'),version=require('../package.json').versi
     }else data={sessions:[]};
    }
    if(p==='/api/terminals/serial-ports')data={ports:[{name:'COM4',description:'Fixture console'}]};
-   if(p==='/api/credentials')data={entries:[{id:'vault-reference',name:'Core credential',kind:'password',username:'operator'}]};
-   if(p==='/api/credentials/vault-reference')data={id:'vault-reference',kind:'password',username:'operator',secret:'dialog-fixture-secret'};
+   if(p==='/api/credentials')data={entries:[{id:'vault-reference',name:'Core credential',kind:'password',username:'operator',bindings:[{protocol:'ssh',host:'core.test',port:2222,username:'operator'},{protocol:'ssh',host:'updated-core.test',port:2222,username:'operator'}]}]};
+   if(p==='/api/credentials/vault-reference')throw Error('The browser must never retrieve a saved secret.');
    if(p.includes('/events')){await new Promise(resolve=>setTimeout(resolve,100));data={events:[],sessions:[],after:0};}
    return route.fulfill({contentType:'application/json',body:JSON.stringify(data)});
   }
@@ -96,7 +96,7 @@ const root=path.resolve(__dirname,'..'),version=require('../package.json').versi
   await page.locator('[data-session-id="core"] [data-session-entry]').click({button:'right'});await page.locator('[data-session-menu="edit"]').click();await dialog();assert.equal(await page.locator('#modalTitle').textContent(),'Connection: Core switch');
   rejectNext=true;await page.locator('#terminalConnectButton').click();await page.waitForFunction(()=>document.querySelector('#terminalConnectError')?.textContent.includes('Fixture connection rejected'));await dialog();assert.equal(await page.locator('#terminalPassword').inputValue(),'');
   await page.locator('#terminalConnectButton').click();await page.waitForFunction(()=>terminalSessions.has('dialog-session-1'));assert.equal(await page.locator('#terminalConnectForm').count(),0);assert.equal(posts().length,2);
-  assert.equal(posts()[1].body.host,'updated-core.test');assert.equal(posts()[1].body.profileId,'core');assert.equal(posts()[1].body.password,'dialog-fixture-secret');assert.equal(Object.hasOwn(posts()[1].body,'folder'),false);
+  assert.equal(posts()[1].body.host,'updated-core.test');assert.equal(posts()[1].body.profileId,'core');assert.equal(posts()[1].body.credentialId,'vault-reference');assert.equal(Object.hasOwn(posts()[1].body,'password'),false);assert.equal(Object.hasOwn(posts()[1].body,'folder'),false);
   await page.locator('[data-session-action="new"]').click();await dialog();await page.locator('#terminalConnectProfileSelect').selectOption('telnet');await page.locator('#terminalConnectButton').click();await page.waitForFunction(()=>terminalSessions.has('dialog-session-2'));assert.equal(posts().at(-1).body.type,'telnet');assert.equal(posts().at(-1).body.port,23);
   await page.locator('[data-session-action="new"]').click();await dialog();await page.locator('#terminalConnectProfileSelect').selectOption('serial');await page.locator('#terminalConnectButton').click();await page.waitForFunction(()=>terminalSessions.has('dialog-session-3'));assert.equal(posts().at(-1).body.type,'serial');assert.equal(posts().at(-1).body.serialPort,'COM4');assert.equal(posts().at(-1).body.baudRate,115200);
 

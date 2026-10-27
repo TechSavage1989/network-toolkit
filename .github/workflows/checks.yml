@@ -74,6 +74,15 @@ jobs:
         env:
           GOTOOLCHAIN: local
         run: go test -mod=vendor ./internal/terminal -run 'TestWindowsLocalShell|TestLocalShell' -count=1 -v
+      - name: Test native credential protection and capability isolation
+        env:
+          GOTOOLCHAIN: local
+        run: go test -mod=vendor ./cmd/network-toolkit -run 'TestWindowsCredential|TestCredential|TestPublicBootstrap|TestTerminalActivationRecord|TestEmbeddedUI|TestTerminalWindow|TestTerminalView' -count=1 -v
+      - name: Verify real WebView2 private bootstrap
+        env:
+          GOTOOLCHAIN: local
+          NETWORK_TOOLKIT_NATIVE_SECURITY_TEST: '1'
+        run: go test -mod=vendor ./internal/desktop -run 'TestNativeBootstrap|TestCredentialConfirmation' -count=1 -v
       - name: Test visible Windows installer progress
         env:
           GOTOOLCHAIN: local
@@ -260,3 +269,33 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  browser-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install isolated security browser tools
+        run: |
+          npm install --prefix "$RUNNER_TEMP/ntk-security-browser-tests" --no-audit --no-fund playwright@1.62.1
+          node "$RUNNER_TEMP/ntk-security-browser-tests/node_modules/playwright/cli.js" install chromium
+          if ! PLAYWRIGHT_MODULE="$RUNNER_TEMP/ntk-security-browser-tests/node_modules/playwright" node -e 'require(process.env.PLAYWRIGHT_MODULE).chromium.launch({headless:true}).then(browser=>browser.close()).catch(error=>{console.error(error.message);process.exitCode=1})'; then
+            node "$RUNNER_TEMP/ntk-security-browser-tests/node_modules/playwright/cli.js" install --with-deps chromium
+          fi
+      - name: Check credential UI boundaries with synthetic fixtures
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-security-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-security-browser-results
+        run: node scripts/credential-security.browser.cjs
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: credential-security-browser-checks
+          path: ${{ runner.temp }}/ntk-security-browser-results
+          if-no-files-found: ignore
+          retention-days: 7

@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-func TestReconnectRetainsIdentitySettingsAndCredentials(t *testing.T) {
+func TestReconnectRetainsIdentitySettingsAndResolvesCredentials(t *testing.T) {
 	for _, kind := range []string{"password", "key", "keyboard", "telnet", "serial"} {
 		t.Run(kind, func(t *testing.T) {
 			requests := make(chan ConnectRequest, 4)
@@ -30,11 +30,13 @@ func TestReconnectRetainsIdentitySettingsAndCredentials(t *testing.T) {
 			req.SSHCompatibility, req.TimeoutMs, req.Port = "legacy", 17000, 2222
 			switch kind {
 			case "password":
+				req.CredentialID = "credential-fixture-password"
 			case "key":
 				req.AuthMethod, req.Password = "key", ""
+				req.CredentialID = "credential-fixture-key"
 				req.PrivateKey, req.Passphrase = "private-key-reconnect-canary", "passphrase-reconnect-canary"
 			case "keyboard":
-				req.AuthMethod = "keyboard"
+				req.AuthMethod, req.Password = "keyboard", ""
 			case "telnet":
 				req.Type = "telnet"
 			case "serial":
@@ -44,12 +46,25 @@ func TestReconnectRetainsIdentitySettingsAndCredentials(t *testing.T) {
 				}
 				req.DataBits, req.StopBits, req.Parity, req.FlowControl = 7, "2", "even", "none"
 			}
+			m.SetCredentialResolver(func(_ context.Context, safe ConnectRequest) (ConnectRequest, error) {
+				if safe.Password != "" || safe.PrivateKey != "" || safe.Passphrase != "" {
+					t.Error("credential resolver received retained authentication")
+				}
+				safe.AuthMethod, safe.Password, safe.PrivateKey, safe.Passphrase = req.AuthMethod, req.Password, req.PrivateKey, req.Passphrase
+				return safe, nil
+			})
 			info, err := m.Connect(req)
 			if err != nil {
 				t.Fatal(err)
 			}
 			awaitSession(t, m, info.ID, func(s SessionInfo) bool { return s.State == "connected" })
 			original, first := <-requests, <-transports
+			m.mu.Lock()
+			retainedRequest := m.sessions[info.ID].request
+			m.mu.Unlock()
+			if retainedRequest.Password != "" || retainedRequest.PrivateKey != "" || retainedRequest.Passphrase != "" {
+				t.Fatal("session retained plaintext authentication")
+			}
 			if err := m.Resize(info.ID, 132, 38); err != nil {
 				t.Fatal(err)
 			}
@@ -124,7 +139,9 @@ func TestReconnectCancellationAndDuplicateRequests(t *testing.T) {
 		return nil, ctx.Err()
 	})
 	defer close(release)
-	info, err := m.Connect(terminalRequest())
+	req := terminalRequest()
+	req.AuthMethod, req.Password = "keyboard", ""
+	info, err := m.Connect(req)
 	if err != nil {
 		t.Fatal(err)
 	}
