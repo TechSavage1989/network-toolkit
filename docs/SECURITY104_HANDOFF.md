@@ -17,6 +17,36 @@ new v2 code. First combined hosted checkpoint is pending; local JS/Python,
 formatting and source review are preliminary only. Native Windows dialogs and
 new DPAPI/lifecycle tests must run and their captured pixels must be inspected.
 
+## First combined hosted checkpoint and focused repairs
+
+Review source 729ccfa59dde8b70debf6593b39c573e9702c8b4, tree
+e44646258677d070ad97f09ddbee0ad58e37a251 (local19af31d) ran Checks40577022470.
+Windows122446077053, security/pager browser122446076819 and dependency122446077494
+passed. Crypto/lifecycle native tests included pending-authentication isolation,
+configuration-bound remembered restart/reset, stale-instance protection, native
+Unicode/overlimit input, recovery re-entry and default-No/cancellation behavior.
+Canonical vendor comparison was empty; both scans reported zero reachable and
+imported-package vulnerabilities, retaining the documented unused OpenPGP notice.
+Security/pager artifact12767677719 SHA256
+8e3d631e2879d5cf3b837ea781e96460ee589c6df816d59fe35c770df92f5be0
+was downloaded/verified; normal/narrow vault and pager screenshots were reviewed.
+
+Application122446077092 exposed a preexisting test assumption of exactly one
+settings-directory file. The new permanent transaction lock is intentional and
+must not be unlinked. The repair asserts the two exact regular filenames, not a
+relaxed count or wildcard. Other Go packages, including authenticated crypto,
+passed. Actual first setup PNG was black in the client area despite passing
+control tests: capture ran during WM_INITDIALOG. Test-only post-paint capture
+and stronger blank-client rejection must pass and its real pixels be inspected
+before final acceptance. Unlock and recovery screenshots were correctly rendered.
+These findings are not represented as final combined-source success.
+
+A tool-catalog interruption and later automated approval stop occurred during
+blob upload. Completed objects were checked by exact SHA before continuation.
+The user's explicit renewed public-source/publication approval (2026-10-27)
+resolved the denied operations on one retry each; no alternative route or bypass
+was used. Main/latest remained103. No user credential data was involved.
+
 ## Historical independent checkpoint (before confirmed choices)
 
 Recorded 2026-10-27. This is an isolated development branch, not a released

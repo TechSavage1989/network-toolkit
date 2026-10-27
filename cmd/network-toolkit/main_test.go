@@ -83,8 +83,16 @@ func TestStatePersistenceAndReplacement(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(files) != 1 {
-		t.Fatalf("Unexpected temporary files remain: %d", len(files))
+	// The cross-process credential transaction guard is deliberately persistent;
+	// unlinking it would let concurrent instances lock different file objects.
+	want := map[string]bool{filepath.Base(a.dataPath): true, credentialTransactionFilename: true}
+	if len(files) != len(want) {
+		t.Fatalf("Unexpected files remain after state replacement: %v", files)
+	}
+	for _, file := range files {
+		if !want[file.Name()] || !file.Type().IsRegular() {
+			t.Fatalf("Unexpected temporary or nonregular file remains: %s", file.Name())
+		}
 	}
 }
 

@@ -1,10 +1,10 @@
-# Credential security — 1.17.104 development checkpoint
+# Credential security — 1.17.104
 
-This document describes the changes being developed and their verification
-requirements. It is not a claim that the current published 1.17.103 binary has
-these protections, nor a high-assurance certification.
+This document describes the 1.17.104 implementation and its verification
+requirements. Older 1.17.103 binaries do not acquire these changes. This is not
+a high-assurance certification.
 
-## Implemented in the development branch
+## Implemented protections
 
 - Windows HTTP pages no longer disclose full application/view capabilities.
   The native host injects an in-memory capability before navigating to its exact
@@ -63,7 +63,10 @@ usable remembered record exists. Unchecking Remember gives session-only unlock.
 No automatic idle/workstation-lock prompt is enabled. Manual Lock and forget
 clears current key access, removes remembrance and invalidates other instances
 on their next credential use/status check. It preserves established authenticated
-connections but blocks new saved-credential uses and reconnects.
+connections but blocks new saved-credential uses and reconnects. Authentication
+already resolved/in flight may finish; locking is not remote revocation. If another
+operation prevents cross-instance invalidation, the app reports that failure and
+requires retry rather than claiming every instance has been locked.
 
 Master passwords and optional recovery keys are entered in native Windows
 controls, not web inputs or HTTP request bodies. Setup/rotation can offer a fresh
@@ -82,6 +85,7 @@ Files are under the selected application-data directory, alongside app settings:
 - `Network_Toolkit.credentials.v2.vault`: authenticated master-password envelope.
 - `Network_Toolkit.credentials.remember`: optional DPAPI-protected remembered key.
 - `Network_Toolkit.credentials.vault`: retained legacy DPAPI-only vault, if any.
+- `Network_Toolkit.credentials.lock`: persistent transaction lock, no secrets.
 
 A persistent private lock file serializes credential transactions across app
 instances. Expected-file checks reject stale updates rather than overwriting a
