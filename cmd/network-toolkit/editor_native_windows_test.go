@@ -440,7 +440,17 @@ func nativeEditorDoc(state nativeEditorSnapshot, uid string) (nativeEditorDocume
 func nativeEditorEquivalent(before, after nativeEditorDocument) error {
 	before.Frozen, before.Staged, after.Frozen, after.Staged = false, false, false, false
 	if !reflect.DeepEqual(before, after) {
-		return fmt.Errorf("transferred document differs (text/dirty/history/selection/metadata): before=%+v after=%+v", before, after)
+		// Report the actual differing fields (including selection values, not
+		// pointer addresses) so hosted failures identify the preserved-state gap.
+		a, b := reflect.ValueOf(before), reflect.ValueOf(after)
+		differences := map[string]any{}
+		for i := 0; i < a.NumField(); i++ {
+			if !reflect.DeepEqual(a.Field(i).Interface(), b.Field(i).Interface()) {
+				differences[a.Type().Field(i).Name] = map[string]any{"before": a.Field(i).Interface(), "after": b.Field(i).Interface()}
+			}
+		}
+		data, _ := json.Marshal(differences)
+		return fmt.Errorf("transferred document differs (text/dirty/history/selection/metadata): %s", data)
 	}
 	return nil
 }
