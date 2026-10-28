@@ -1,11 +1,15 @@
-NETWORK TOOLKIT 1.17.110
+NETWORK TOOLKIT 1.17.111
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.110
+CURRENT RELEASE - 1.17.111
 
-Release details: RELEASE_NOTES_1.17.110.txt
-Previous release: docs/releases/RELEASE_NOTES_1.17.109.txt
+Release details: RELEASE_NOTES_1.17.111.txt
+Previous release: docs/releases/RELEASE_NOTES_1.17.110.txt
 Full release-note archive: docs/releases/README.md
+
+Comparison uses separate Left and Right maps, visible Fit/zoom levels and
+wheel/click/drag navigation. Compact controls reclaim document space; Options
+holds comparison settings and More holds secondary editing actions.
 
 Editor tabs can be reordered with pointer dragging or Alt+Shift+Arrow keys.
 Detach editor/Open separately sits beside Compare and Move / merge; a deliberate

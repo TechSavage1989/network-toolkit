@@ -18,7 +18,7 @@ const settle=()=>page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requ
  const text=Array.from({length:220},(_,i)=>'Write-Output "line '+i+' '+('long text '.repeat(i%4===0?32:2))+'" # sample').join('\n');
  async function open(id,content=text){await page.evaluate(async({id,content})=>NetworkToolkitFileEditor.open({id,path:id+'.ps1',source:'Local computer',create:true,initialContent:content,read:async()=>({content}),write:async data=>{globalThis.__savedEditorFile=data;return {hash:'saved'};}}),{id,content});}
  const ta=page.locator('[data-ed-text]'),action=name=>page.locator('[data-ed="'+name+'"]');
- await open('review');await page.waitForFunction(()=>NetworkToolkitFileEditor.active.syntaxCache);
+ await open('review');await page.waitForFunction(()=>NetworkToolkitFileEditor.active.syntaxCache);await page.locator('.nt-editor-more summary').click();
  for(const name of ['upper','lower','comment','duplicate','trim','sortLines','undo','redo']){
   await ta.evaluate(el=>{const start=el.value.indexOf('line 60');el.setSelectionRange(start,start+7);el.scrollTop=700;el.scrollLeft=25;});const before=await ta.evaluate(el=>({top:el.scrollTop,left:el.scrollLeft}));await action(name).click();await settle();assert.deepEqual(await ta.evaluate(el=>({top:el.scrollTop,left:el.scrollLeft})),before,name);
  }

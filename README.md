@@ -97,4 +97,6 @@ See [editor tabs, comparison and change map](docs/EDITOR_WORKFLOWS108.md),
 
 Published and verified: [1.17.109 vertical workspace improvements](docs/RELEASE109_HANDOFF.md). All six exact-source gates passed; public assets, source, version/icons and updater feed are verified.
 
-Published and verified: [1.17.110 graph and editor corrections](docs/RELEASE110_HANDOFF.md). All six exact-source gates, temporal/native evidence, public assets and updater feed passed verification.
+Release candidate: [1.17.111 compact controls and comparison maps](docs/EDITOR_LAYOUT_MAP.md).
+
+Previous published and verified: [1.17.110 graph and editor corrections](docs/RELEASE110_HANDOFF.md). All six exact-source gates, temporal/native evidence, public assets and updater feed passed verification.

@@ -29,3 +29,19 @@
  #appNavigationFooterSlot .iconbtn{width:28px;height:28px;padding:4px}
 }
 @media print{#appNavigationSlot,.app-utility-actions{display:none!important}}
+
+/* Working-context rules shared across tools. Identity already lives in navigation;
+   keep the actual actions and mobile navigation button in the reclaimed header. */
+:root{--tool-control-height:28px;--tool-control-gap:6px;--tool-control-padding:5px 8px}
+.app-chrome-ready .page-heading>div:has(>#pageTitle){display:none}
+.app-chrome-ready .page-heading{justify-content:flex-start;gap:var(--tool-control-gap);margin-bottom:5px;min-height:0}
+.app-chrome-ready #pageActions{margin-left:0;flex-wrap:wrap}
+@media(min-width:1101px){.app-chrome-ready .page-heading:has(#pageActions:empty){display:none}}
+.app-chrome-ready :is(.local-config-toolbar,.he-toolbar,.nt-editor-toolbar,.nt-compare-tools,.packet-commandbar,.packet-viewbar,.rb-toolbar){gap:var(--tool-control-gap);padding:var(--tool-control-padding);justify-content:flex-start}
+.app-chrome-ready :is(.local-config-toolbar,.he-toolbar,.nt-editor-toolbar,.nt-compare-tools,.packet-commandbar,.packet-viewbar,.rb-toolbar,.terminal-command-start,#toolRunBar) .btn{min-height:var(--tool-control-height);padding:4px 8px;font-size:11px}
+.app-chrome-ready .rb-overwrite{margin-left:0}
+.app-chrome-ready .packet-commandbar>strong{display:none}
+.app-chrome-ready .local-config-toolbar>.grow{flex:0 1 auto}
+.app-chrome-ready .local-tool-controls{justify-content:flex-start;gap:var(--tool-control-gap)}
+.app-chrome-ready.diagnostic-page #toolConfigHeading{justify-content:flex-start;gap:var(--tool-control-gap)}
+body.editor-window .page-heading{display:none!important}

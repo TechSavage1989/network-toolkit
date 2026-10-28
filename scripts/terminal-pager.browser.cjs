@@ -107,7 +107,7 @@ async function shot(name){if(!out)return;const file=path.join(out,'terminal-page
  for(let i=0;i<lines.length;i+=35){await receive(lines.slice(i,i+35).map(s=>'\x1b[32m'+s+'\x1b[0m').join('\r\n')+'\r\n'+prompt);await page.keyboard.press(i%70?'Enter':'Space');await receive('\r\x1b[2K\x1b[1A\x1b[2K');}
  await receive('switch# ');assert.equal(await count(),1);assert.equal(await capture(),lines.join('\n'));assert.equal(await page.evaluate(()=>entry._ntOutputHistory[0].start.isDisposed),true);
  assert.equal(await page.evaluate(()=>NetworkToolkitTerminalExtras.select(entry)),true);assert.equal(await page.locator('#terminalSelectedOutput').inputValue(),lines.join('\n'));assert.deepEqual(await page.locator('#terminalSelectedOutput').evaluate(el=>[el.selectionStart,el.selectionEnd]),[0,lines.join('\n').length]);
- await page.evaluate(()=>NetworkToolkitTerminalExtras.copy(entry));assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),lines.join('\n'));await shot('retained-output-selection');
+ await page.evaluate(()=>NetworkToolkitTerminalExtras.copy(entry));assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),lines.join(process.platform==='win32'?'\r\n':'\n'));await shot('retained-output-selection');
  await page.evaluate(()=>closeModal());await page.evaluate(()=>NetworkToolkitTerminalExtras.jump(entry,'end'));assert.equal(await page.locator('#terminalSelectedOutput').evaluate(el=>el.value.slice(el.selectionStart,el.selectionEnd)),lines.at(-1));
  pass('Narrow wrapped ANSI output survives scrollback trimming, manual paging, complete selection/copy and accurate end navigation');
 

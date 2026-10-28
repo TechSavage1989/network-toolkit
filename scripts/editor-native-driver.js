@@ -57,7 +57,7 @@
     if (command.action === 'seed') {
       for (const text of command.texts) {
         const count = editor().documents.size;
-        document.querySelector('.nt-editor-toolbar [data-ed="new"]').click();
+        document.querySelector('.nt-editor-tabs [data-ed="new"]').click();
         await wait(() => editor().documents.size === count + 1, 'New document creates exactly one tab');
         const ta = textarea();
         ta.focus();

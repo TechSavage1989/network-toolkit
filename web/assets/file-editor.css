@@ -175,6 +175,37 @@ body:has(.nt-editor-embedded) #toolWorkspace>#pageContent{grid-row:1!important;g
 .nt-compare-measure>div{padding:0;margin:0;border:0;min-height:1em}
 [data-compare-map-marks] rect{stroke:none}
 
+/* Compact shared document controls: optional actions expand only on request. */
+.nt-editor-more>summary,.nt-compare-settings>summary{list-style:none;cursor:pointer}
+.nt-editor-more>summary::-webkit-details-marker,.nt-compare-settings>summary::-webkit-details-marker{display:none}
+.nt-editor-more>summary::after,.nt-compare-settings>summary::after{content:' ▾'}
+.nt-editor-more[open],.nt-compare-settings[open]{flex-basis:100%;order:10}
+.nt-editor-more-actions,.nt-compare-settings>div{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding-top:5px}
+.nt-editor.is-comparing [data-ed="compare"]{display:none}
+.nt-editor.is-comparing :is([data-ed="find"],[data-ed="replace"],[data-ed="goto"]){display:none}
+.nt-editor-toolbar,.nt-editor.is-comparing .nt-editor-toolbar{max-height:none;overflow:visible;min-height:0;padding:5px 8px}
+.nt-compare-tools{padding:5px 8px;justify-content:flex-start;max-height:none;overflow:visible}
+.nt-compare-tools .nt-compare-selector{flex:0 1 190px;min-width:120px}
+.nt-compare-selector select{width:100%;min-width:0;flex:1}
+.nt-compare-settings .nt-compare-legend{padding:0}
+.nt-compare-summary{padding:3px 8px;min-height:22px}
+.nt-compare-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 72px}
+.nt-compare-map-panel{display:flex;flex-direction:column;min-height:0;min-width:0;background:var(--panel2)}
+.nt-compare-map-labels{display:grid;grid-template-columns:1fr 1fr;font-size:10px;text-align:center;color:var(--muted);line-height:20px;flex:none}
+.nt-compare-map{flex:1;min-height:0}
+[data-compare-map-content]{display:flex;min-height:0}
+.nt-compare-track{position:relative;flex:1;min-width:0;height:100%;border-right:1px solid var(--border);touch-action:none}
+.nt-compare-track:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+[data-compare-map-marks] .equal{fill:var(--muted);opacity:.32}
+[data-compare-map-marks] .gap{fill:var(--panel2)}
+[data-compare-map-viewport]{border-width:1px}
+@media(max-width:680px){
+ .nt-compare-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 58px}
+ .nt-compare-tools .nt-compare-selector{flex:1 1 40%;min-width:0}
+ .nt-compare-tools{padding:4px;gap:4px}
+ .nt-compare-legend span:last-child{display:inline}
+}
+
 .nt-compare-syntax-notice{font-size:10px;padding:3px 7px;color:var(--warn);max-height:45px;overflow:auto;flex-shrink:0}
 
 .nt-editor-label-compact{display:none}

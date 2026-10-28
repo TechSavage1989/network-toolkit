@@ -1,3 +1,9 @@
+NETWORK TOOLKIT 1.17.111 RELEASE CANDIDATE
+
+Authorized compact UI/two-track comparison update. Local validation and limits:
+docs/EDITOR_LAYOUT_MAP.md. Hosted exact-source checks and release asset verification
+are pending; do not infer completion from prior release records below.
+
 NETWORK TOOLKIT 1.17.110 PUBLISHED AND VERIFIED
 
 1.17.110 published and independently verified

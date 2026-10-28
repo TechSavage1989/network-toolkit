@@ -1,0 +1,22 @@
+NETWORK TOOLKIT 1.17.111
+
+COMPACT CONTROLS AND TWO-DOCUMENT COMPARISON MAPS
+
+- Reclaim document and result space with compact, consistent working controls
+  and fewer repeated tool headings. Keep actions grouped on the left.
+- Remove the redundant editor title row. Keep New in the tab strip and file
+  actions in the normal toolbar; put secondary editing actions under More.
+- Use compact comparison selectors with Compare, Swap sides and Previous/Next.
+  Options holds synchronized scrolling, Map zoom and the change legend.
+- Show separate Left and Right map tracks, including unchanged regions, additions,
+  removals, modifications, blank alignment gaps and each document's viewport.
+- Fit shows the entire comparison; 1.5x, 2x, 3x and 5x zoom visibly expand the map
+  without changing the editor font. Wheel, click, drag and keyboard navigation
+  follow the selected document and honor synchronized or independent scrolling.
+- Preserve unsaved documents, undo/redo, saving, tab reorder, acknowledged window
+  transfers, merging, detached full-width layout and existing security boundaries.
+
+At 1440x1000, comparison document height increases by about 134 pixels embedded
+and 171 pixels detached compared with 1.17.110. Measurements use synthetic files.
+Physical trackpad/multi-monitor DPI, private files, live devices and installation
+are not claimed tested. Existing bounded comparison and transfer limits remain.

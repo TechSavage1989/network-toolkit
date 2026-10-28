@@ -1,5 +1,20 @@
 # Network Toolkit development handoff
 
+## Authorized 1.17.111 preparation (2026-10-28)
+
+Based on verified main `4747873292eca9f09577ac2803756113557d0bcf` and published v1.17.110.
+Read [EDITOR_LAYOUT_MAP.md](EDITOR_LAYOUT_MAP.md) for the shared layout rules,
+left-aligned controls, two-document map/zoom contract, measured height gains,
+regression gates and limits. The redundant editor title and duplicate comparison
+file controls are removed without changing document ownership, save protections,
+settings or native security. Both map tracks now navigate their own documents;
+Fit and zoom have distinct wheel behavior. The user explicitly authorized source
+publication and release as1.17.111, with hosted CI and downloaded-asset verification.
+Run visual/native UI tests only in isolated hosted runners: local desktop input,
+test windows or interaction now require advance user approval and scheduling.
+Do not stop normal app sessions or discard unsaved work. Backend behavior is unchanged.
+
+
 ## 1.17.110 published and independently verified
 
 Published 2026-10-28T18:34:59Z:

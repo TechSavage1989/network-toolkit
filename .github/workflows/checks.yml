@@ -629,6 +629,20 @@ jobs:
           NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
           NTK_GRAPH_BASELINE_DIR: ${{ runner.temp }}/ntk-graph-baseline109
         run: node scripts/graph-temporal110.browser.cjs
+      - name: Prepare published110 editor baseline
+        if: success() || failure()
+        run: |
+          git fetch --no-tags --depth=1 origin a71f98c4f418077cfeefa5546cfb77de1d8e7742
+          test "$(git rev-parse FETCH_HEAD)" = a71f98c4f418077cfeefa5546cfb77de1d8e7742
+          mkdir -p "$RUNNER_TEMP/ntk-layout-baseline110"
+          git archive a71f98c4f418077cfeefa5546cfb77de1d8e7742 | tar -xf - -C "$RUNNER_TEMP/ntk-layout-baseline110"
+      - name: Check compact editor and two-document map with real pointer input
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_LAYOUT_BASELINE110_DIR: ${{ runner.temp }}/ntk-layout-baseline110
+        run: node scripts/editor-layout-map.browser.cjs
       - uses: actions/upload-artifact@v7
         if: always()
         with:
