@@ -25,6 +25,8 @@ function create(options={}){
   if(tabs.length&&zone.style){const box=host.getBoundingClientRect();zone.style.top=(Math.max(...tabs.map(r=>r.bottom))-box.top+12)+'px';}
  }
  function cancel(g){if(!g||g.cancelled)return;g.cancelled=true;if(g.native&&g.started)void windows().cancelDrag(g.ticket).catch(()=>{});}
+ function retainScroll(g=gesture){for(const view of g?.scroll||[]){if(view.el.isConnected===false)continue;view.el.scrollTop=view.top;view.el.scrollLeft=view.left;}}
+ function scroll(event){if(gesture?.started&&gesture.scroll?.some(view=>view.el===event.target))retainScroll();}
  function begin(event){
   if(event.isTrusted===false||event.button!==0||event.target.closest?.('[data-ed-close-tab],[data-ed="new"]'))return;
   const tab=event.target.closest?.('[data-ed-uid]');if(!tab||!eligible())return;
@@ -34,6 +36,9 @@ function create(options={}){
  function start(event){
   const tab=event.target.closest?.('[data-ed-uid]'),g=gesture;
   if(event.isTrusted===false||!g||g.cancelled||!tab||tab.dataset.edUid!==g.uid||!eligible()||!event.dataTransfer){event.preventDefault();return;}
+  // A tab move must not inherit Chromium's text-area edge autoscroll while the
+  // pointer crosses a pane on the way to a window/drop target.
+  const host=tab.closest?.('.nt-editor-window');g.scroll=[...(host?.querySelectorAll?.('[data-ed-text],[data-compare-text]')||[])].map(el=>({el,top:el.scrollTop,left:el.scrollLeft}));
   g.started=true;tab.addEventListener?.('dragend',end,{once:true});event.dataTransfer.clearData();event.dataTransfer.setData(MIME,g.ticket);event.dataTransfer.effectAllowed='move';
   // Registration starts only for a real drag, never an ordinary tab click.
   // The receiver coordinator retries only a not-yet-registered ticket briefly;
@@ -64,7 +69,7 @@ function create(options={}){
   if(g?.started&&g.ticket===ticket){
    const detach=!!event.target.closest?.('[data-editor-drag-detach]');
    if(!detach&&!event.target.closest?.('[data-ed-tabs]')){event.dataTransfer.dropEffect='none';clearVisual();return;}
-   g.dropSeen=true;event.dataTransfer.dropEffect='move';clearVisual();
+   g.dropSeen=true;event.dataTransfer.dropEffect='move';retainScroll(g);clearVisual();
    if(detach){if(!g.native||g.cancelled)return;try{await windows().detachDrag(ticket);}catch(error){tell(error.message||String(error));cancel(g);}}
    else{const before=beforeUID(event),view=event.target.closest?.('[data-ed-view]')?.dataset.edView;await g.promise;if(!g.cancelled){if(['left','right'].includes(view))editor().moveDocumentToView?.(g.uid,view);editor().reorderDocument(g.uid,before);}cancel(g);if(gesture===g)gesture=null;}
    return;
@@ -74,10 +79,11 @@ function create(options={}){
   try{await windows().claimDrag(ticket);}catch(error){tell('The tab was not moved. '+(error.message||String(error)));}
  }
  function leave(event){if(types(event.dataTransfer)&&!event.relatedTarget?.closest?.('.nt-editor-window'))document?.querySelectorAll?.('.nt-editor-drag-over').forEach(el=>el.classList.remove('nt-editor-drag-over'));}
- function end(event){const g=gesture;clearVisual();if(!g)return;gesture=null;if(g.started){suppressClick=true;(options.setTimeout||root.setTimeout)(()=>{suppressClick=false;},0);}if(!g.dropSeen&&event.dataTransfer?.dropEffect!=='move'){cancel(g);if(g.started)tell('Original tab kept. Drop on another editor window or the in-app detach target to move it.');}}
+ function end(event){const g=gesture;clearVisual();if(!g)return;retainScroll(g);gesture=null;if(g.started){suppressClick=true;(options.setTimeout||root.setTimeout)(()=>{suppressClick=false;},0);}if(!g.dropSeen&&event.dataTransfer?.dropEffect!=='move'){cancel(g);if(g.started)tell('Original tab kept. Drop on another editor window or the in-app detach target to move it.');}}
  function up(){if(gesture&&!gesture.started){cancel(gesture);gesture=null;}}
- function escape(event){if(event.key==='Escape'&&gesture){cancel(gesture);clearVisual();}}
+ function escape(event){if(event.key==='Escape'&&gesture){retainScroll();cancel(gesture);clearVisual();}}
  function install(){if(installed||!document)return;installed=true;document.addEventListener('pointerdown',begin,true);document.addEventListener('pointerup',up,true);document.addEventListener('pointercancel',up,true);document.addEventListener('dragstart',start,true);document.addEventListener('dragover',over,true);document.addEventListener('dragleave',leave,true);document.addEventListener('drop',event=>{void drop(event);},true);document.addEventListener('dragend',end,true);document.addEventListener('keydown',escape,true);document.addEventListener('click',event=>{if(suppressClick&&event.target.closest?.('[data-ed-uid]')){event.preventDefault();event.stopImmediatePropagation();}},true);}
+ document?.addEventListener('scroll',scroll,true);
  install();return Object.freeze({mount,begin,start,over,drop,end,leave,up,escape,read,get state(){return {armed:!!gesture,started:!!gesture?.started,ready:!!gesture?.ready,uid:gesture?.uid||''};}});
 }
 root.NetworkToolkitEditorDrag=create();if(typeof module==='object'&&module.exports)module.exports={create,MIME};

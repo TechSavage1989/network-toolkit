@@ -67,3 +67,12 @@ test('the detach target follows visible tab rows and cannot cover a compact view
  const f=fixture();let bottom=116;f.host.getBoundingClientRect=()=>({top:10,height:600});f.host.querySelectorAll=()=>[{getBoundingClientRect:()=>({width:500,height:36,bottom})},{getBoundingClientRect:()=>({width:0,height:0,bottom:0})}];
  f.drag.mount();assert.equal(f.zone.style.top,'118px');bottom=220;f.drag.mount();assert.equal(f.zone.style.top,'222px');
 });
+
+test('tab detach and cancelled native gestures preserve pane scroll despite browser edge autoscroll',async()=>{
+ for(const cancel of [false,true]){
+  const f=fixture(),ta={scrollTop:100,scrollLeft:17,isConnected:true};f.host.querySelectorAll=selector=>selector==='[data-ed-text],[data-compare-text]'?[ta]:[];
+  const dt=f.data();f.drag.begin(f.event(f.a));f.drag.start(f.event(f.a,dt));await flush();ta.scrollTop=82;ta.scrollLeft=0;
+  if(cancel)f.drag.escape({key:'Escape'});else await f.drag.drop(f.event(f.zone,dt));
+  assert.equal(ta.scrollTop,100);assert.equal(ta.scrollLeft,17);ta.scrollTop=80;f.drag.end(f.event(f.a,dt));assert.equal(ta.scrollTop,100);
+ }
+});
