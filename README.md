@@ -16,6 +16,10 @@
 
 ## Features
 
+The text editor supports independent left/right tab groups, comparison, tab context
+menus and a resizable Windows/SFTP file sidebar. See the
+[editor views guide](docs/EDITOR_VIEWS112.md) for file actions and detached access.
+
 Compact sidebar controls and optional editor opening panels leave more room for
 the active tool and document. See [layout guide](docs/APP_CHROME109.md).
 

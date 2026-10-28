@@ -1,3 +1,26 @@
+NETWORK TOOLKIT 1.17.112 RELEASE CANDIDATE
+
+This source is prepared before publication. Final acceptance requires every
+exact-source hosted Checks job: application, dependency-security, browser,
+browser-security, browser-workflows107, browser-editor112 and windows-terminal.
+The new isolated browser gate exercises main/detached/modal editors, independent
+tab groups, comparison, context menus, actual pointer movement between groups,
+empty-pane typing, layout snapshots, local/SFTP operations and responsive themes.
+Backend tests use temporary local folders and a local synthetic SFTP server.
+They cover explicit explorer approval/revocation, connection pinning, document
+leases, unrelated capability denial and file-operation reservations.
+
+No local desktop automation, test windows or user-app shutdown is authorized.
+Screenshots and document fixtures contain synthetic data only. Actual user
+credentials, settings and devices are not used for acceptance.
+
+Published downloads must independently match manifests, reviewed build bytes,
+source commit, metadata and native icons. All historic tags/assets stay immutable.
+See docs/EDITOR_VIEWS112.md for behavior, permissions and practical limits.
+The final publication receipt is recorded on main after public assets are checked.
+
+Historical verification records follow; they do not certify this candidate.
+
 NETWORK TOOLKIT 1.17.111 PUBLISHED AND VERIFIED
 
 # Network Toolkit 1.17.111 published and independently verified
