@@ -1,12 +1,13 @@
 'use strict';
 const fs=require('node:fs'),vm=require('node:vm'),{test}=require('node:test'),assert=require('node:assert/strict');
 const {document:makeDocument,Element}=require('./terminal-dom-fixture.cjs');
+Element.prototype.after=function(node){const parent=this.parentElement;node.remove();node.parentElement=parent;parent.children.splice(parent.children.indexOf(this)+1,0,node);};
 Element.prototype.replaceChildren=function(...children){this.children=[];this.append(...children);};
 Object.defineProperty(Element.prototype,'options',{get(){return this.children;}});
 Element.prototype.focus=function(){let top=this;while(top.parentElement)top=top.parentElement;top.activeElement=this;};
 const source=fs.readFileSync(require.resolve('../web/assets/editor-windows.js'),'utf8');
 function fixture(){
- const document=makeDocument('<div class="nt-editor-window"><div class="nt-editor-toolbar"></div></div>');
+ const document=makeDocument('<div class="nt-editor-window"><div class="nt-editor-toolbar"><button data-ed="compare">Compare documents</button></div></div>');
  const calls=[],docs=[{uid:'11111111-1111-4111-8111-111111111111',content:'synthetic retained draft',dirty:true}],events=[];let transfer='',viewName='Other window';
  const ctx={document,console,Uint8Array,AbortController,crypto:require('node:crypto').webcrypto,setTimeout:()=>1,clearTimeout(){}};vm.createContext(ctx);vm.runInContext(source,ctx);
  const adapter={documents:()=>docs,active:()=>docs[0]?.uid,canTransfer:()=>'',snapshot(ids){events.push('freeze');docs[0].frozen=true;return {documents:docs.map(d=>({...d})),active:docs[0].uid};},rollback(){docs[0].frozen=false;events.push('rollback');},release(){events.push('release');docs.splice(0);}};
@@ -14,7 +15,7 @@ function fixture(){
  return {document,controller,calls,docs,events,adapter,setName:v=>viewName=v,button:()=>document.querySelector('[data-editor-window-toggle]'),box:()=>document.querySelector('[data-editor-window-controls]')};
 }
 test('compact window action adds no row and opens a keyboard dialog without transfer side effects',async()=>{
- const f=fixture();await f.controller.poll();const button=f.button(),box=f.box();assert.equal(button.parentElement.className,'nt-editor-toolbar');assert.equal(box.hidden,true);assert.equal(button.getAttribute('aria-expanded'),'false');assert.equal(box.getAttribute('role'),'dialog');assert.equal(box.getAttribute('aria-modal'),'true');assert.equal(f.calls.filter(x=>x.method==='POST').length,0);
+ const f=fixture();await f.controller.poll();const button=f.button(),box=f.box();assert.equal(button.parentElement.className,'nt-editor-toolbar');assert.equal(button.parentElement.children[button.parentElement.children.indexOf(button)-1].dataset.ed,'compare','move access must remain in the first compact toolbar rows');assert.equal(box.hidden,true);assert.equal(button.getAttribute('aria-expanded'),'false');assert.equal(box.getAttribute('role'),'dialog');assert.equal(box.getAttribute('aria-modal'),'true');assert.equal(f.calls.filter(x=>x.method==='POST').length,0);
  button.emit('click',button);assert.equal(box.hidden,false);assert.equal(button.getAttribute('aria-expanded'),'true');assert.equal(f.document.activeElement,box.querySelector('select'));assert.equal(f.calls.filter(x=>x.method==='POST').length,0);
  const firstOption=box.querySelector('select').children[0];await f.controller.poll();assert.equal(box.querySelector('select').children[0],firstOption,'unchanged polling must not rebuild the live destination chooser');
  box.emit('keydown',box.querySelector('select'),{key:'Escape'});assert.equal(box.hidden,true);assert.equal(f.document.activeElement,button);assert.equal(f.docs[0].content,'synthetic retained draft');f.controller.stop();

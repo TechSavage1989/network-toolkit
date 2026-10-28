@@ -25,3 +25,8 @@ test('shell removes the redundant header and retains one original control of eac
 test('short local workspaces use the existing footer only while their command bar is hidden',()=>{
  const {document:d,api}=harness({short:true});api.init();d.classList.add('diagnostic-page');d.getElementById('toolCommandBar').classList.add('hidden');assert.equal(api.navigationHost().id,'appNavigationFooterSlot');d.getElementById('toolCommandBar').classList.remove('hidden');assert.equal(api.navigationHost().id,'toolCommandBar');
 });
+
+
+test('collapsed utility icons fit one rail row without shrinking accessible targets',()=>{
+ const css=fs.readFileSync(require.resolve('../web/assets/app-chrome.css'),'utf8');assert.match(css,/\.app-utility-actions \.iconbtn\{width:26px;height:26px/);assert.match(css,/\.app-nav-collapsed \.app-utility-actions\{[^}]*gap:3px/);assert.equal(2*26+3,64-1-2*4,'Two26px targets and gap fit the bordered/padded64px rail');
+});

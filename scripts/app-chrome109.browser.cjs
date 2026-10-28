@@ -37,8 +37,11 @@ async function make(repo,viewport,mode='main',dpr=1){
 }
 async function geometry(p){return p.evaluate(()=>{
  const rect=e=>{const r=e?.getBoundingClientRect();return r?{x:r.x,y:r.y,width:r.width,height:r.height,bottom:r.bottom,right:r.right}:null;};
- const workspace=document.querySelector('#workspaceScroll'),target=document.querySelector('body.terminal-page #terminalStage')||document.querySelector('#pageContent'),w=rect(workspace),t=rect(target),top=rect(document.querySelector('.topbar'));
- return{workspace:w,target:t,availableHeight:w.bottom-t.y,topbar:top,documentWidth:document.documentElement.scrollWidth,windowWidth:innerWidth,main:rect(document.querySelector('.main'))};
+ const workspace=document.querySelector('#workspaceScroll');
+ const target=[document.querySelector('body.terminal-page #terminalStage'),document.querySelector('#pageContent'),document.querySelector('#toolConfiguration')].find(element=>{const r=element?.getBoundingClientRect();return r&&r.width>0&&r.height>0&&getComputedStyle(element).visibility!=='hidden';});
+ if(!target)throw new Error('No visible tool pane is available for geometry measurement');
+ const w=rect(workspace),t=rect(target),top=rect(document.querySelector('.topbar'));
+ return{workspace:w,target:t,targetID:target.id,availableHeight:w.bottom-t.y,topbar:top,documentWidth:document.documentElement.scrollWidth,windowWidth:innerWidth,main:rect(document.querySelector('.main'))};
 });}
 async function shot(p,name){if(!out)return;const file='app-chrome109-'+name+'.png';await p.screenshot({path:path.join(out,file),fullPage:true});report.screenshots.push(file);}
 async function safeNavigation(p){
@@ -55,7 +58,7 @@ async function safeNavigation(p){
    for(const tool of pages){
     await Promise.all([old.p,now.p].map(async p=>{await p.evaluate(tool=>navigate(tool),tool);await settle(p);}));
     const before=await geometry(old.p),after=await geometry(now.p),gain=after.availableHeight-before.availableHeight;report.geometry.push({viewport,theme,tool,before,after,gain});
-    assert.equal(after.topbar,null,'No replacement topbar layout box');assert(after.documentWidth<=viewport.width+1,JSON.stringify({tool,viewport,theme,overflow:after.documentWidth}));assert(gain>0,JSON.stringify({tool,viewport,theme,before,after,gain}));
+    assert.equal(after.targetID,before.targetID,'Compare the same visible pane in108 and109');assert.equal(after.topbar,null,'No replacement topbar layout box');assert(after.documentWidth<=viewport.width+1,JSON.stringify({tool,viewport,theme,overflow:after.documentWidth}));assert(gain>0,JSON.stringify({tool,viewport,theme,before,after,gain}));
     if(viewport.width<=1100)await safeNavigation(now.p);
     if(['monitor','terminal','editor'].includes(tool))await shot(now.p,tool+'-'+viewport.width+'-'+theme);
    }
@@ -68,7 +71,7 @@ async function safeNavigation(p){
   await now.p.evaluate(()=>{jobs=[{id:'synthetic-job',tool:'ping',status:'running',target:'192.0.2.109',events:[]}];updateEngine();});assert.equal(await now.p.locator('#runningCount').getAttribute('aria-label'),'1 running diagnostic jobs');
   if(viewport.width<=1100&&await now.p.locator('#sidebar').getAttribute('aria-hidden')==='true')await now.p.locator('#mobileMenu').click();await now.p.waitForFunction(()=>document.querySelector('#sidebar').getBoundingClientRect().left>=0);await settle(now.p);
   await shot(now.p,'navigation-footer-'+viewport.width);await now.p.evaluate(()=>{jobs=[];updateEngine();});assert.equal(await now.p.locator('#runningCount').isVisible(),false);
-  if(viewport.width>1100){await now.p.evaluate(()=>{state.navigationCollapsed=true;NetworkToolkitNavigation.sync();});await now.p.locator('#themeButton').focus();assert(await now.p.locator('#themeButton').evaluate(e=>document.activeElement===e));await now.p.locator('#settingsButton').focus();assert(await now.p.locator('#settingsButton').evaluate(e=>document.activeElement===e));assert.equal(await now.p.locator('#sidebar .brand-mark').getAttribute('aria-label'),'Network Toolkit. System: '+hostname);await shot(now.p,'collapsed-rail');}
+  if(viewport.width>1100){await now.p.evaluate(()=>{state.navigationCollapsed=true;NetworkToolkitNavigation.sync();});await now.p.locator('#themeButton').focus();assert(await now.p.locator('#themeButton').evaluate(e=>document.activeElement===e));await now.p.locator('#settingsButton').focus();assert(await now.p.locator('#settingsButton').evaluate(e=>document.activeElement===e));assert.equal(await now.p.locator('#sidebar .brand-mark').getAttribute('aria-label'),'Network Toolkit. System: '+hostname);await settle(now.p);const a=await now.p.locator('#themeButton').boundingBox(),b=await now.p.locator('#settingsButton').boundingBox(),rail=await now.p.locator('#sidebar').boundingBox();assert(a.width>=24&&a.height>=24&&b.width>=24&&b.height>=24&&Math.abs(a.y-b.y)<=1,'Collapsed utility targets retain usable size on one row');assert(a.x>=rail.x&&b.x+b.width<=rail.x+rail.width,'Collapsed controls remain inside the rail');await shot(now.p,'collapsed-rail');}
   await old.context.close();await now.context.close();
  }
  pass('System identity, engine footer, keyboard theme/settings and live running counts remain accessible without duplicated controls');

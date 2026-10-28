@@ -11,6 +11,8 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
+	"syscall"
 	"testing"
 	"time"
 	"unsafe"
@@ -148,6 +150,68 @@ type nativeVaultCaptureResult struct {
 	err           error
 }
 
+// This barrier is test-only. WM_INITDIALOG has not necessarily returned when
+// its observer starts the capture goroutine. ABORTIFHUNG can reject that new
+// dialog immediately based on the UI thread's earlier message-pump history;
+// use the actual bounded message deadline instead. ERRORONEXIT still refuses
+// a destroyed target. A successful barrier is not proof of client painting.
+func waitNativeVaultCaptureInitialization(hwnd uintptr, send func(uintptr, uintptr, uintptr) (bool, error)) error {
+	const flags = uintptr(0x0001 | 0x0020) // SMTO_BLOCK | SMTO_ERRORONEXIT, never SMTO_ABORTIFHUNG.
+	const timeoutMillis = uintptr(1000)
+	started := time.Now()
+	if ok, err := send(hwnd, flags, timeoutMillis); !ok {
+		var code syscall.Errno
+		errors.As(err, &code)
+		return fmt.Errorf("native fixture initialization did not complete: hwnd=%#x flags=%#x timeout=%dms elapsed=%s win32=%d (%v)", hwnd, flags, timeoutMillis, time.Since(started), uint32(code), err)
+	}
+	return nil
+}
+
+func sendNativeVaultCaptureBarrier(hwnd, flags, timeoutMillis uintptr) (bool, error) {
+	var ignored uintptr
+	send := wndUser32.NewProc("SendMessageTimeoutW")
+	if err := send.Find(); err != nil {
+		return false, err
+	}
+	// SendMessageTimeout does not set last-error on every failure. Clear it so
+	// a generic failure is not attributed to a stale error from another call.
+	wndKernel.NewProc("SetLastError").Call(0)
+	ok, _, err := send.Call(hwnd, 0, 0, 0, flags, timeoutMillis, uintptr(unsafe.Pointer(&ignored)))
+	return ok != 0, err
+}
+
+func TestVaultDialogCaptureInitializationWaitIsBoundedAndDiagnosed(t *testing.T) {
+	for _, success := range []bool{false, true} {
+		t.Run(fmt.Sprint(success), func(t *testing.T) {
+			calls := 0
+			err := waitNativeVaultCaptureInitialization(0x1234, func(hwnd, flags, timeoutMillis uintptr) (bool, error) {
+				calls++
+				if hwnd != 0x1234 || flags != 0x21 || flags&0x02 != 0 || timeoutMillis != 1000 {
+					t.Fatalf("unexpected readiness barrier: hwnd=%#x flags=%#x timeout=%d", hwnd, flags, timeoutMillis)
+				}
+				return success, syscall.Errno(1460)
+			})
+			if calls != 1 {
+				t.Fatalf("readiness barrier was retried %d times", calls)
+			}
+			if success {
+				if err != nil {
+					t.Fatal("successful barrier rejected a non-authoritative last error:", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatal("failed readiness barrier accepted")
+			}
+			for _, want := range []string{"hwnd=0x1234", "flags=0x21", "timeout=1000ms", "elapsed=", "win32=1460"} {
+				if !strings.Contains(err.Error(), want) {
+					t.Fatalf("missing readiness diagnostic %q: %v", want, err)
+				}
+			}
+		})
+	}
+}
+
 func observePaintedNativeVault(ctx context.Context, filename string, result chan<- nativeVaultCaptureResult) func(*nativeVaultDialog) {
 	return func(d *nativeVaultDialog) {
 		// The observer runs inside WM_INITDIALOG. Return before asking the UI
@@ -163,11 +227,10 @@ func observePaintedNativeVault(ctx context.Context, filename string, result chan
 			}()
 			runtime.LockOSThread()
 			defer runtime.UnlockOSThread()
-			var ignored uintptr
 			// Cross-thread WM_NULL completes after the initialization callback
 			// returns; abort instead of hanging if the synthetic UI cannot pump.
-			if ok, _, _ := wndUser32.NewProc("SendMessageTimeoutW").Call(hwnd, 0, 0, 0, 3, 1000, uintptr(unsafe.Pointer(&ignored))); ok == 0 {
-				captured.err = errors.New("native fixture initialization did not complete")
+			if err := waitNativeVaultCaptureInitialization(hwnd, sendNativeVaultCaptureBarrier); err != nil {
+				captured.err = err
 				return
 			}
 			deadline := time.Now().Add(2 * time.Second)

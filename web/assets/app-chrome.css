@@ -14,7 +14,7 @@
 @media(min-width:1101px){
  .app-nav-collapsed .sidebar-foot{padding:9px 4px}
  .app-nav-collapsed .engine-label{margin-left:14px}
- .app-nav-collapsed .app-utility-actions{justify-content:center;gap:4px;flex-wrap:wrap}
+ .app-nav-collapsed .app-utility-actions{justify-content:center;gap:3px;flex-wrap:wrap}
  .app-nav-collapsed #runningCount{margin:0;font-size:0;min-width:22px;text-align:center}
  .app-nav-collapsed #runningCount::before{content:attr(data-count);font-size:10px}
 }
