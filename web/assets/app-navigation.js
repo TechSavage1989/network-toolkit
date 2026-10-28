@@ -23,6 +23,8 @@
   function sync({restoreFocus = true} = {}) {
     if (!initialized || !sidebar || terminalOnly()) return;
     const small = compact();
+    const host = small ? root.NetworkToolkitAppChrome?.navigationHost() : null;
+    if (host && toggleAnchor.parentElement !== host) { if (host.firstElementChild) host.firstElementChild.before(toggleAnchor); else host.append(toggleAnchor); }
     if (small && toggleButton.parentElement !== toggleAnchor.parentElement) toggleAnchor.before(toggleButton);
     const leading = small ? drawerClose : toggleButton;
     if (brandHeader.firstElementChild !== leading) brandHeader.firstElementChild.before(leading);
@@ -62,6 +64,7 @@
     if (nextMode !== layoutMode) { layoutMode = nextMode; layoutChanged(); }
     if (returnFocus) toggleButton.focus({preventScroll:true});
     root.NetworkToolkitSidebarActivity?.sync();
+    root.NetworkToolkitAppChrome?.sync();
   }
 
   function closeDrawer(restoreFocus = true) {
@@ -147,6 +150,10 @@
       else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
     }, true);
     document.addEventListener('click', event => {
+      // Settings opens a modal outside the navigation. Return focus to the
+      // persistent tool opener first, so modal dismissal cannot target an inert
+      // off-canvas footer button and the drawer cannot cover the workspace.
+      if (compact() && event.target.closest?.('#sidebar [data-action="settings"]')) { lastRailClick = null; closeDrawer(); return; }
       const button = event.target.closest?.('#sidebar .nav-item[data-page]');
       if (!button || event.button !== 0 || button.disabled) { lastRailClick = null; return; }
       const small = compact(), page = button.dataset.page;

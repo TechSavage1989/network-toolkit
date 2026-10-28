@@ -1,11 +1,18 @@
-NETWORK TOOLKIT 1.17.108
+NETWORK TOOLKIT 1.17.109
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.108
+CURRENT RELEASE - 1.17.109
 
-Release details: RELEASE_NOTES_1.17.108.txt
-Previous release: docs/releases/RELEASE_NOTES_1.17.107.txt
+Release details: RELEASE_NOTES_1.17.109.txt
+Previous release: docs/releases/RELEASE_NOTES_1.17.108.txt
 Full release-note archive: docs/releases/README.md
+
+The redundant top bar is removed: computer identity is in the sidebar brand,
+and Theme/App settings are in its footer. Text Editor uses compact Move / merge
+access instead of a permanent destination row. Open local file and Connected
+session controls independently expand when needed; main-window choices persist,
+while detached-window choices remain in that window for its lifetime. Collapsing
+forms returns space to the actual editing and comparison surfaces.
 
 Copy server/client file locations in explicitly labeled network, remote-relative
 or local-disk formats; listener addresses and endpoints are copyable without
@@ -1504,8 +1511,9 @@ Reattach activates or reopens the home window. The engine exits after its final
 window closes. An independent Terminal workspace has its own engine. Window
 placement and size are stored under the selected app-data folder.
 
-The app frame stays within the window. Navigation and the top bar remain
-accessible. Diagnostic tools place configuration beside the
+The app frame stays within the window. Navigation, system identity, theme and
+settings remain accessible in the sidebar without a separate top bar. Diagnostic
+tools place configuration beside the
 results, with separate scrolling for each area. Other pages scroll inside
 their workspace. Long terminal output, authentication prompts and dialog forms
 scroll within their own areas. Terminal tabs, pane controls and the command
@@ -1520,9 +1528,10 @@ Scrollbars appear only where content overflows. Focus a scroll area and use Page
 
 TOOL WORKSPACE
 
-Use the navigation button in the top bar to collapse the primary sidebar to
+Use the navigation button beside the sidebar brand to collapse the sidebar to
 icons or restore labels. The preference is remembered on wide windows. On
-narrow windows, the same button opens a navigation drawer. Escape, its Close
+narrow windows, the same button moves into existing tool controls and opens a
+navigation drawer. Escape, its Close
 button, or a click outside the drawer closes it and returns focus.
 
 Tool configuration keeps the target, source interface, primary options and a

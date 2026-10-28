@@ -46,7 +46,7 @@ const text='# START OF DOCUMENT\n'+Array.from({length:300},(_,i)=>'Line '+(i+2)+
    await page.setViewportSize({width,height:900});await page.evaluate(({theme,mode})=>{setTheme(theme);navigate(mode==='embedded'?'editor':'overview');},{theme,mode});
    const file='C:\\fixture\\'+width+'-'+theme+'-'+mode+'.txt';
    if(mode==='embedded'){
-    await page.fill('#ntEditorLocalPath',file);await page.locator('[data-ed-page="openPath"]').click();await page.waitForFunction(file=>NetworkToolkitFileEditor.active?.path===file&&!NetworkToolkitFileEditor.active.loading,file);await atStart(file);
+    if(await page.locator('[data-ed-panel-toggle="local"]').getAttribute('aria-expanded')!=='true')await page.locator('[data-ed-panel-toggle="local"]').click();await page.fill('#ntEditorLocalPath',file);await page.locator('[data-ed-page="openPath"]').click();await page.waitForFunction(file=>NetworkToolkitFileEditor.active?.path===file&&!NetworkToolkitFileEditor.active.loading,file);await atStart(file);
    }else await openLocal(file);
    assert.equal(await input().inputValue(),text);assert.equal(await page.evaluate(()=>NetworkToolkitFileEditor.active.dirty),false);
    assert((await input().evaluate(el=>el.scrollHeight>el.clientHeight)),'Fixture must overflow the editor');
@@ -61,7 +61,7 @@ const text='# START OF DOCUMENT\n'+Array.from({length:300},(_,i)=>'Line '+(i+2)+
   await page.setViewportSize({width:1280,height:900});await page.evaluate(()=>navigate('editor'));
   // Connected SSH uses the same load path through its actual selector/reader.
   await page.waitForFunction(()=>document.querySelector('#ntEditorRemoteSource option[value="terminal:ssh-fixture"]'));
-  await page.selectOption('#ntEditorRemoteSource','terminal:ssh-fixture');await page.fill('#ntEditorRemotePath','/etc/fixture.conf');await page.locator('[data-ed-page="openRemotePath"]').click();await page.waitForFunction(()=>NetworkToolkitFileEditor.active?.path==='/etc/fixture.conf'&&!NetworkToolkitFileEditor.active.loading);await atStart('connected SSH');assert.equal(await input().inputValue(),text);
+  if(await page.locator('[data-ed-panel-toggle="remote"]').getAttribute('aria-expanded')!=='true')await page.locator('[data-ed-panel-toggle="remote"]').click();await page.selectOption('#ntEditorRemoteSource','terminal:ssh-fixture');await page.fill('#ntEditorRemotePath','/etc/fixture.conf');await page.locator('[data-ed-page="openRemotePath"]').click();await page.waitForFunction(()=>NetworkToolkitFileEditor.active?.path==='/etc/fixture.conf'&&!NetworkToolkitFileEditor.active.loading);await atStart('connected SSH');assert.equal(await input().inputValue(),text);
   await bottom();
   // Desktop imports enter through the populated create path, retaining CRLF/BOM.
   await page.evaluate(async text=>{await NetworkToolkitFileEditor.importFiles([new File([new Uint8Array([239,187,191]),text.replaceAll('\n','\r\n')],'desktop.txt',{type:'text/plain'})]);},text);

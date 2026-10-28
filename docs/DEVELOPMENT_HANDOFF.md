@@ -1,5 +1,11 @@
 # Network Toolkit development handoff
 
+## 1.17.109 candidate integration
+
+Authorized vertical-space improvements are in progress. Read RELEASE109_HANDOFF.md.
+Final hosted/browser/native/public verification is pending;108 below remains the
+latest published release and must stay immutable.
+
 ## 1.17.108 published and independently verified
 
 Published 2026-10-28:

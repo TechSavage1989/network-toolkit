@@ -3,6 +3,11 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
+Active authorized candidate: 1.17.109. Read docs/RELEASE109_HANDOFF.md.
+The user approved vertical-space improvements to the global shell and editor.
+Do not mix broader features into this batch; preserve108 and all prior safeguards.
+Final exact-source hosted/native/pixel/public acceptance remains pending.
+
 Current published version: 1.17.108. The authorized activity/bookmark/graph/editor
 batch is published and independently verified. Source/tag:
 59a82b13bb31899206d383ea58166ec9a4f4faf0; tree

@@ -40,11 +40,11 @@ async function render(page,item){
 async function inspect(page,item,viewport,theme,terminalWindow=false){
  const data=await page.evaluate(()=>{
   const node=selector=>document.querySelector(selector),box=element=>element?.getBoundingClientRect().toJSON(),style=selector=>getComputedStyle(node(selector));
-  const content=style('.content'),scroll=style('#workspaceScroll'),topbar=style('.topbar');
+  const content=style('.content'),scroll=style('#workspaceScroll'),topbar=node('.topbar');
   const visible=element=>!!element&&element.getBoundingClientRect().width>0&&element.getBoundingClientRect().height>0&&getComputedStyle(element).visibility!=='hidden';
   const root=node('.terminal-page')?node('#terminalWorkspace'):node('#toolWorkspace');
-  const controls=[...document.querySelectorAll('.topbar button,.page-heading button')].filter(visible).map(element=>({label:element.getAttribute('aria-label')||element.title||element.textContent.trim(),box:box(element)}));
-  return {contentPadding:[content.paddingTop,content.paddingRight,content.paddingBottom,content.paddingLeft].map(parseFloat),maxWidth:content.maxWidth,content:box(node('.content')),main:box(node('.main')),workspace:box(node('#workspaceScroll')),root:box(root),scrollPadding:[scroll.paddingTop,scroll.paddingRight,scroll.paddingBottom,scroll.paddingLeft].map(parseFloat),scrollbarGutter:scroll.scrollbarGutter,topbarPadding:[parseFloat(topbar.paddingLeft),parseFloat(topbar.paddingRight)],documentWidth:document.documentElement.scrollWidth,windowWidth:innerWidth,controls};
+  const controls=[...document.querySelectorAll('.page-heading button,#toolCommandBar>#mobileMenu,#terminalCommandBar #mobileMenu')].filter(visible).map(element=>({label:element.getAttribute('aria-label')||element.title||element.textContent.trim(),box:box(element)}));
+  return {contentPadding:[content.paddingTop,content.paddingRight,content.paddingBottom,content.paddingLeft].map(parseFloat),maxWidth:content.maxWidth,content:box(node('.content')),main:box(node('.main')),workspace:box(node('#workspaceScroll')),root:box(root),scrollPadding:[scroll.paddingTop,scroll.paddingRight,scroll.paddingBottom,scroll.paddingLeft].map(parseFloat),scrollbarGutter:scroll.scrollbarGutter,topbar:box(topbar),documentWidth:document.documentElement.scrollWidth,windowWidth:innerWidth,controls};
  });
  const context={item,viewport,theme,terminalWindow},x=terminalWindow?0:viewport.width<=600?5:10,y=terminalWindow?0:viewport.width<=600?5:8;
  check(data.contentPadding.every((value,index)=>close(value,index%2?x:y)),'Content padding differs from shared workspace gutter',{...context,data});
@@ -53,7 +53,7 @@ async function inspect(page,item,viewport,theme,terminalWindow=false){
  check(data.scrollPadding.every(value=>value===0)&&data.scrollbarGutter==='auto','Workspace adds a second edge inset',{...context,data});
  check(close(data.workspace.x,data.content.x+x)&&close(data.workspace.right,data.content.right-x),'Workspace horizontal edges differ from shared gutter',{...context,data});
  check(data.documentWidth<=data.windowWidth+1,'Application overflows the window horizontally',{...context,data});
- if(!terminalWindow)check(data.topbarPadding.every(value=>close(value,x)),'Topbar and workspace use different horizontal gutters',{...context,data});
+ check(!data.topbar||data.topbar.height===0,'Redundant topbar consumes tool workspace height',{...context,data});
  for(const control of data.controls)check(control.box.left>=data.main.left-1&&control.box.right<=data.main.right+1,'Page or application header control extends outside its allocated space',{...context,control});
  results.push({...context,...data});
 }

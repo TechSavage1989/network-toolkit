@@ -500,6 +500,12 @@ jobs:
           mkdir -p "$RUNNER_TEMP/ntk-workflow107-tests"
           npm install --prefix "$RUNNER_TEMP/ntk-workflow107-tests" playwright@1.62.1
           "$RUNNER_TEMP/ntk-workflow107-tests/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Prepare exact published108 UI for measured before-after layouts
+        run: |
+          git fetch --no-tags --depth=1 origin 59a82b13bb31899206d383ea58166ec9a4f4faf0
+          test "$(git rev-parse FETCH_HEAD)" = 59a82b13bb31899206d383ea58166ec9a4f4faf0
+          mkdir -p "$RUNNER_TEMP/ntk-layout-baseline108"
+          git archive 59a82b13bb31899206d383ea58166ec9a4f4faf0 | tar -xf - -C "$RUNNER_TEMP/ntk-layout-baseline108"
       - name: Check exact saved sessions, persistent filter controls and recorded sources
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
@@ -587,6 +593,22 @@ jobs:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
           NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
         run: node scripts/editor-windows108.browser.cjs
+      - name: Check reclaimed app workspace and reachable compact navigation
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_LAYOUT_BASELINE_DIR: ${{ runner.temp }}/ntk-layout-baseline108
+        run: node scripts/app-chrome109.browser.cjs
+      - name: Check compact editor controls and measured document height gains
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_LAYOUT_BASELINE_DIR: ${{ runner.temp }}/ntk-layout-baseline108
+        run: node scripts/editor-height109.browser.cjs
       - uses: actions/upload-artifact@v7
         if: always()
         with:

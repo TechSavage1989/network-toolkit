@@ -148,3 +148,21 @@ test('navigation captures view before the mounted editor is hidden and restores 
  const h=harness();h.c.OFFLINE=true;h.document.body.appendChild=h.document.body.append;const ta=await h.first(),mount=h.document.createElement('div');h.document.append(mount);h.api.renderPage(mount);ta.setSelectionRange(600,609);ta.scrollTop=620;ta.scrollLeft=35;const doc=h.api.active;
  h.api.detachPage();assert.equal(doc.view.top,620);assert.equal(doc.view.left,35);ta.scrollTop=0;ta.scrollLeft=0;h.api.renderPage(mount);assert.equal(h.api.active,doc);assert.equal(ta.scrollTop,620);assert.equal(ta.scrollLeft,35);assert.equal(ta.selectionStart,600);assert.equal(ta.selectionEnd,609);
 });
+
+test('file disclosures default closed, preserve explicit choices and never persist document text',async()=>{
+ const h=harness();h.c.OFFLINE=true;h.document.body.appendChild=h.document.body.append;await h.first();const mount=h.document.createElement('div');h.document.append(mount);h.api.renderPage(mount);
+ const button=name=>h.document.querySelector('[data-ed-panel-toggle="'+name+'"]');
+ assert.equal(button('local').getAttribute('aria-expanded'),'false');assert.equal(button('remote').getAttribute('aria-expanded'),'false');
+ const doc=h.api.active,ta=h.document.querySelector('[data-ed-text]');ta.setSelectionRange(34,55);ta.scrollTop=123;h.click('upper');const before={text:doc.content,undo:[...doc.undo],revision:doc.editRevision};
+ h.document.emit('click',button('local'));assert.equal(button('local').getAttribute('aria-expanded'),'true');assert.equal(h.c.state.editorPreferences.localPanelOpen,true);assert.equal(h.c.state.editorPreferences.remotePanelOpen,false);assert.equal(h.document.querySelector('[data-ed-page-panel="local"]').hidden,false);
+ h.document.emit('click',button('remote'));h.document.emit('click',button('local'));assert.equal(h.c.state.editorPreferences.localPanelOpen,false);assert.equal(h.c.state.editorPreferences.remotePanelOpen,true);
+ const root=h.document.getElementById('networkToolkitFileEditor'),wrap=root.querySelector('[data-ed-wrap]');wrap.checked=true;h.c.getComputedStyle=()=>({lineHeight:'20px',font:'13px monospace',paddingLeft:'0',paddingRight:'0'});root.emit('change',wrap);
+ assert.equal(h.c.state.editorPreferences.localPanelOpen,false);assert.equal(h.c.state.editorPreferences.remotePanelOpen,true);assert(!JSON.stringify(h.c.state).includes('Line 299'));
+ h.api.detachPage();h.api.renderPage(mount);assert.equal(button('local').getAttribute('aria-expanded'),'false');assert.equal(button('remote').getAttribute('aria-expanded'),'true');assert.equal(doc.content,before.text);assert.deepEqual([...doc.undo],before.undo);assert.equal(doc.editRevision,before.revision);assert.equal(ta.selectionStart,34);assert.equal(ta.scrollTop,123);
+});
+test('stored open and closed disclosure booleans load strictly without enabling a remote operation',async()=>{
+ for(const value of [{localPanelOpen:true,remotePanelOpen:false},{localPanelOpen:false,remotePanelOpen:true},{localPanelOpen:'true',remotePanelOpen:1}]){
+  const h=harness();h.c.OFFLINE=true;h.c.state.editorPreferences=value;await h.first();const mount=h.document.createElement('div');h.document.append(mount);h.api.renderPage(mount);
+  assert.equal(h.document.querySelector('[data-ed-panel-toggle="local"]').getAttribute('aria-expanded'),String(value.localPanelOpen===true));assert.equal(h.document.querySelector('[data-ed-panel-toggle="remote"]').getAttribute('aria-expanded'),String(value.remotePanelOpen===true));assert.equal(h.api.active.loading,false);
+ }
+});

@@ -85,3 +85,14 @@ test('an intervening control click breaks a tool-tab double-click sequence',()=>
  h.click(ping);h.click(h.document.getElementById('workspaceScroll'),0,100);h.click(ping,0,100);
  assert.equal(h.state.navigationCollapsed,false);
 });
+
+test('compact tool changes relocate the same navigation opener without losing drawer focus or duplicating it',()=>{
+ const h=harness({small:true}),one=h.document.createElement('div'),two=h.document.createElement('div');one.id='appNavigationSlot';two.id='terminalCommandStart';h.main.append(one,two);let host=one;
+ h.c.NetworkToolkitAppChrome={navigationHost:()=>host,sync(){}};h.api.sync();assert.equal(h.toggle.parentElement,one);h.click(h.toggle);h.click(h.drawerClose);assert.equal(h.document.activeElement,h.toggle);
+ host=two;h.api.sync();assert.equal(h.toggle.parentElement,two);assert.equal(h.document.querySelectorAll('#mobileMenu').length,1);h.click(h.toggle);assert(h.main.inert);h.resize(false);assert.equal(h.brand.firstElementChild,h.toggle);assert.equal(h.main.inert,undefined);h.resize(true);assert.equal(h.toggle.parentElement,two);assert.equal(h.document.querySelectorAll('#mobileMenu').length,1);
+});
+
+
+test('compact footer settings closes navigation first and preserves a usable modal return focus',()=>{
+ const h=harness({small:true}),settings=h.document.createElement('button');settings.dataset.action='settings';h.sidebar.append(settings);h.click(h.toggle);assert(h.main.inert);h.click(settings);assert(!h.sidebar.classList.contains('open'));assert.equal(h.main.inert,undefined);assert.equal(h.document.activeElement,h.toggle);
+});

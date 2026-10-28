@@ -1,3 +1,8 @@
+NETWORK TOOLKIT 1.17.109 CANDIDATE
+
+Required final-source geometry, hosted/native and public verification is pending.
+See RELEASE109_HANDOFF.md. The108 record below is historical, not109 acceptance.
+
 NETWORK TOOLKIT 1.17.108 PUBLISHED AND VERIFIED
 
 1.17.108 published and independently verified

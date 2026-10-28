@@ -1,4 +1,5 @@
 'use strict';
+const {openAppSettings}=require('./browser-settings-navigation.cjs');
 // Full application assets with isolated API fixtures. No devices or system files are changed.
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),assert=require('node:assert/strict');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
@@ -95,7 +96,7 @@ async function copy(button,expected,keyboard=false){
    const downloadPromise=page.waitForEvent('download');await page.locator('[data-hosts-action="export"]').click();const download=await downloadPromise;assert.equal(fs.readFileSync(await download.path(),'utf8'),hosts);
   }else{await page.keyboard.press('Escape');assert.equal(await page.locator('.he-more').getAttribute('open'),null);assert.equal(await summary.evaluate(el=>document.activeElement===el),true);}
   if(out&&(width===1600||width===390)){
-   await page.locator('#settingsButton').click();await page.locator('#modalTitle').filter({hasText:'App settings'}).waitFor();await settle(page);
+   await openAppSettings(page);await page.locator('#modalTitle').filter({hasText:'App settings'}).waitFor();await settle(page);
    await page.screenshot({path:path.join(out,'ui-settings-gear-'+theme+'-'+width+'.png')});await page.keyboard.press('Escape');
   }
  }

@@ -29,7 +29,7 @@ const childID='c'.repeat(32),instance='e'.repeat(32),text='SYNTHETIC EDITOR WIND
  });}
  await wire(main,'');await wire(child,childID);
  async function idle(page){await page.waitForFunction(()=>NetworkToolkitEditorWindows.state.enabled&&!NetworkToolkitEditorWindows.state.running);}
- async function move(page,all,destination){await idle(page);await page.locator('[data-editor-window-controls] select').selectOption(destination);await page.locator('[data-editor-window-move="'+(all?'all':'tab')+'"]').click();}
+ async function move(page,all,destination){await idle(page);await page.locator('[data-editor-window-toggle]').click();await page.locator('[data-editor-window-controls] select').selectOption(destination);await page.locator('[data-editor-window-move="'+(all?'all':'tab')+'"]').click();}
  try{
   await main.goto('https://toolkit.local/');await main.waitForFunction(()=>window.__networkToolkitStartupState===1&&online);await main.evaluate(()=>navigate('editor'));
   await child.goto('https://toolkit.local/editor-view/'+childID);await child.waitForFunction(()=>window.__networkToolkitStartupState===1&&online);

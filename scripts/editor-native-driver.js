@@ -58,7 +58,9 @@
       return snapshot();
     }
     if (command.action === 'move') {
-      const box = await wait(() => document.querySelector('[data-editor-window-controls]'), 'native move controls');
+      const trigger = await wait(() => document.querySelector('[data-editor-window-toggle]'), 'compact move menu');
+      trigger.click();
+      const box = await wait(() => { const menu = document.querySelector('[data-editor-window-controls]'); return menu && !menu.hidden && menu.getBoundingClientRect().height > 0 && menu; }, 'visible native move controls');
       await wait(() => !box.querySelector('[data-editor-window-move="' + command.mode + '"]').disabled, 'move button enabled');
       const select = box.querySelector('select');
       if (![...select.options].some(option => option.value === command.destination)) throw Error('Destination not offered by real coordinator');
@@ -68,6 +70,8 @@
       return snapshot();
     }
     if (command.action === 'cancel') {
+      const trigger = await wait(() => document.querySelector('[data-editor-window-toggle]'), 'compact cancel access');
+      trigger.click();
       const button = await wait(() => {
         const el = document.querySelector('[data-editor-window-cancel]');
         return el && !el.hidden && !el.disabled && el;

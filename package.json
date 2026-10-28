@@ -1,7 +1,7 @@
 {
   "name": "network-toolkit-local-preview",
   "private": true,
-  "version": "1.17.108",
+  "version": "1.17.109",
   "scripts": {
     "dev": "sh scripts/preview.sh"
   }

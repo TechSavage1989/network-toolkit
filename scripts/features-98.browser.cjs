@@ -1,4 +1,5 @@
 'use strict';
+const {openAppSettings}=require('./browser-settings-navigation.cjs');
 // Shipped UI with isolated API fixtures. No devices, user files or installations are changed.
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const history95=require('../web/assets/graph-history.js');const resultTime95=require('../web/assets/result-time.js');
@@ -106,7 +107,7 @@ async function popupBounds(locator,label){
 }
 
 async function chooseTimestamp({hourFormat='24',zoneMode='local',timeZone='UTC'}){
- await page.locator('#settingsButton').click();
+ await openAppSettings(page);
  await page.locator('#settingsTimeFormat').selectOption(hourFormat);
  await page.locator('#settingsTimeZoneMode').selectOption(zoneMode);
  if(zoneMode==='named'){

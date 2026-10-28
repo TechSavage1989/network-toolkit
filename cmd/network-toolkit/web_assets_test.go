@@ -187,6 +187,8 @@ func TestDiscoveryAssetsAreEmbeddedAndRooted(t *testing.T) {
 		{"/assets/scan-routes.css", "text/css"},
 		{"/assets/app-navigation.js", "text/javascript"},
 		{"/assets/app-navigation.css", "text/css"},
+		{"/assets/app-chrome.js", "text/javascript"},
+		{"/assets/app-chrome.css", "text/css"},
 		{"/assets/sidebar-activity.js", "text/javascript"},
 		{"/assets/sidebar-activity.css", "text/css"},
 		{"/assets/network-config-language.js", "text/javascript"},

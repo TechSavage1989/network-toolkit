@@ -16,6 +16,9 @@
 
 ## Features
 
+Compact sidebar controls and optional editor opening panels leave more room for
+the active tool and document. See [layout guide](docs/APP_CHROME109.md).
+
 - **Investigate connectivity:** inspect local adapters, run Ping, Trace route, DNS and TCP-port checks, discover IPv4 hosts, and monitor connections.
 - **Work with devices:** open SSH, Telnet and serial terminals; organize saved sessions and macros; detach terminals into their own windows.
 - **Transfer files:** use SFTP, FTP/FTPS and TFTP client/server tools, with a built-in text editor.
@@ -91,3 +94,5 @@ Current published version: [1.17.108 — activity indicators, inline bookmarks, 
 See [editor tabs, comparison and change map](docs/EDITOR_WORKFLOWS108.md),
 [acknowledged editor window moves and limits](docs/EDITOR_WINDOWS.md), and
 [offline network configuration syntax support](docs/NETWORK_CONFIG_EDITOR.md).
+
+Candidate development: [1.17.109 vertical workspace improvements](docs/RELEASE109_HANDOFF.md). Published108 remains available until the new checks and release verification complete.
