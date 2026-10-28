@@ -143,3 +143,8 @@ test('new-window appearance snapshots carry an allowlisted app theme for Follow 
  const h=harness();await h.first();h.api.active.binding={kind:'local'};h.c.state.theme='light';const adapter=h.api.windowAdapter,batch=adapter.checkpoint();assert.equal(batch.preferences.palette,'auto');assert.equal(batch.preferences.appTheme,'light');const applied=[];h.c.setTheme=value=>applied.push(value);adapter.applyPreferences(batch.preferences);assert.deepEqual(applied,['light']);adapter.applyPreferences({...batch.preferences,appTheme:'unrecognized'});assert.deepEqual(applied,['light']);
  h.c.state.theme='unrecognized';assert.equal(adapter.checkpoint().preferences.appTheme,'dark');
 });
+
+test('navigation captures view before the mounted editor is hidden and restores it after DOM scroll reset',async()=>{
+ const h=harness();h.c.OFFLINE=true;h.document.body.appendChild=h.document.body.append;const ta=await h.first(),mount=h.document.createElement('div');h.document.append(mount);h.api.renderPage(mount);ta.setSelectionRange(600,609);ta.scrollTop=620;ta.scrollLeft=35;const doc=h.api.active;
+ h.api.detachPage();assert.equal(doc.view.top,620);assert.equal(doc.view.left,35);ta.scrollTop=0;ta.scrollLeft=0;h.api.renderPage(mount);assert.equal(h.api.active,doc);assert.equal(ta.scrollTop,620);assert.equal(ta.scrollLeft,35);assert.equal(ta.selectionStart,600);assert.equal(ta.selectionEnd,609);
+});

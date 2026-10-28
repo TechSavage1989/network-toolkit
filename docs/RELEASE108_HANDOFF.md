@@ -69,14 +69,27 @@ text stays generic; binary/opaque exports are not decoded. Public tests/screensh
 use synthetic configurations only. Private reference inputs stay outside source,
 artifacts, logs and package manifests.
 
-## Current verification checkpoint (not release acceptance)
+## Corrected review checkpoint (not release acceptance)
 
-Combined JavaScript tests passed 954/954 before the final binding/lifecycle followups;
-42 Python checks and version metadata validation passed. A combined Go run exposed
-missing exact static asset allowlist entries; these were corrected and all main,
-terminal-child and editor-child HTML dependencies now pass the real asset route test.
-Unrelated diagnostic source-route/neighbor tests cannot use this sandbox's netlink
-interfaces (`operation not permitted`); they remain required, unskipped hosted gates.
-Local browser execution was blocked before any page ran; no alternate launch or
-permission bypass was attempted. Final exact-source Go/Windows/browser checks,
-actual pixels, reviewed package and public publication verification remain pending.
+First exact-source review2e7540183fb47ae4b7733c3c5cf8500a4b5dc27c / Checks40699835168
+passed application, dependency, Windows and security jobs. Actual installed WebView2
+editor close and two-host ownership tests passed, as did the existing native vault,
+bootstrap and capture-boundary checks. The long browser's real updater timer passed.
+The two browser jobs nevertheless failed; that source was not promoted or released.
+
+Corrections preserve the original assertions: dense graph hits now resolve the
+nearest timestamp rather than an overlapping transparent hit circle; status-color
+oracles use the selected diagnostic palette rather than the old accent-only rule.
+Editor navigation captures viewport state before hiding its DOM, and comparison
+layers override inherited generic pre clipping. Browser fixtures now use rooted
+assets and the existing responsive details Hide control instead of clicking through
+its overlay. Visible gutter/palette/hit-test assertions were strengthened.
+
+Corrected combined JavaScript tests passed968/968 and42 Python checks passed.
+All required gates must run again on the corrected exact source, with actual
+normal/narrow pixels and native proof rechecked. No first-run green is substituted
+for this final acceptance. Unrelated diagnostic source-route/neighbor tests cannot
+use this local sandbox's netlink interfaces; those required hosted checks remain
+unskipped and passed in review1. Local browser launch was blocked before a page
+ran; no alternate launch or permission bypass was attempted. Final package and
+public asset/source/version/feed verification remain pending.

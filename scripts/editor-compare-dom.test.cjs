@@ -10,7 +10,7 @@ function harness(){
  const context={document,console,setTimeout:fn=>{timers.set(++seq,fn);return seq;},clearTimeout:id=>timers.delete(id),requestAnimationFrame:fn=>rafs.push(fn),getComputedStyle:()=>({lineHeight:'20px',font:'13px monospace',paddingTop:'10px',paddingLeft:'10px',paddingRight:'10px'})};vm.createContext(context);vm.runInContext(source,context);
  const docs=['a','b'].map(id=>({id,uid:id+'-original',content:'old\n'.repeat(600),editRevision:1,path:id,source:'Synthetic'}));
  const api=context.NTKEditorCompare.create({container:host,documents:()=>docs,active:()=>docs[0],wordWrap:()=>true,syntax:()=>false,activate(){},edit(){},undo(){},save(){}});
- return {api,docs,rafs,timers,start(){const next=[...timers.values()][0];timers.clear();return next();},async frames(){for(let i=0;i<12&&rafs.length;i++){for(const fn of rafs.splice(0))fn();await Promise.resolve();}}};
+ return {api,docs,rafs,timers,host,start(){const next=[...timers.values()][0];timers.clear();return next();},async frames(){for(let i=0;i<12&&rafs.length;i++){for(const fn of rafs.splice(0))fn();await Promise.resolve();}}};
 }
 test('same-path reopened documents cannot reuse the prior UID wrapped geometry',async()=>{
  const h=harness(),first=h.start();await h.frames();await first;assert.equal(h.api.debug.pixelReady,true);assert.equal(h.api.debug.offsets.left.length-1,601);
@@ -19,4 +19,9 @@ test('same-path reopened documents cannot reuse the prior UID wrapped geometry',
 test('an edit invalidates old asynchronous wrap measurements before their next frame',async()=>{
  const h=harness(),first=h.start();assert.equal(h.rafs.length,2);h.docs[0].content='new';h.docs[0].editRevision++;h.api.refresh();assert.equal(h.api.debug.pixelReady,false);await h.frames();await first;
  assert.equal(h.api.debug.pixelReady,false,'old geometry must remain unusable until the replacement completes');assert.equal(h.timers.size,1);const replacement=h.start();await h.frames();await replacement;assert.equal(h.api.debug.pixelReady,true);assert.equal(h.api.result.lineCounts.left,1);assert.equal(h.api.debug.offsets.left.length-1,1);
+});
+
+test('recomputed wrapped geometry resynchronizes the other pane when Sync scroll is enabled',async()=>{
+ const h=harness(),first=h.start();await h.frames();await first;const left=h.host.querySelector('[data-compare-text="left"]'),right=h.host.querySelector('[data-compare-text="right"]');h.host.querySelector('[data-compare-sync]').checked=true;left.scrollTop=310;right.scrollTop=90;h.api.refresh(true);await h.start();assert.equal(right.scrollTop,310);
+ h.host.querySelector('[data-compare-sync]').checked=false;left.scrollTop=410;right.scrollTop=70;h.api.refresh(true);await h.start();assert.equal(right.scrollTop,70,'Independent scrolling is preserved when the user disables Sync');
 });

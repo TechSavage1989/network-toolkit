@@ -375,3 +375,17 @@ test('a vertical drag is not a selection and a real horizontal drag still pans',
  h.document.emit('pointerdown',svg,{button:0,pointerId:9,clientX:400,clientY:40});h.document.emit('pointerup',svg,{pointerId:9,clientX:400,clientY:70});h.document.emit('click',svg,{button:0,clientX:400,clientY:70});assert.equal(h.api.isHeld('job'),false);assert.equal(h.document.querySelector('.rt-timeline').dataset.rtScopeEnd,end);
  h.document.emit('pointerdown',svg,{button:0,pointerId:9,clientX:400,clientY:40});h.document.emit('pointerup',svg,{pointerId:9,clientX:450,clientY:40});h.document.emit('click',h.document.querySelector('[data-rt-surface]'),{button:0,clientX:450,clientY:40});assert.equal(h.api.isHeld('job'),false);assert.notEqual(h.document.querySelector('.rt-timeline').dataset.rtScopeEnd,end);
 });
+
+test('overlapping transparent hit circles resolve the visible X sample, not DOM stacking order',()=>{
+ for(const width of [820,320]){
+  const h=harness(),rows=Array.from({length:402},(_,i)=>reply(i+1,10+i%9));h.api.setPreferences({mode:'linear'},{persist:false});h.render(rows);const svg=h.document.querySelector('[data-rt-surface]');svg.getBoundingClientRect=()=>({left:0,top:0,width,height:110,right:width,bottom:110});h.api.restore();
+  const marker=h.mark(397).querySelector('[data-rt-marker]'),x=Number(marker.getAttribute('cx')),y=Number(marker.getAttribute('cy')),cover=h.mark(400).querySelector('.rt-point-hit');assert(Math.abs(x-Number(cover.getAttribute('cx')))<9,'A later transparent hit circle covers the intended visible sample');
+  h.document.emit('pointermove',cover,{clientX:x,clientY:y});assert.match(h.detail(),/Sample 398/,'Hover follows nearest timestamp despite the later hit target');
+  h.document.emit('pointerdown',cover,{button:0,pointerId:1,clientX:x,clientY:y});h.document.emit('pointerup',cover,{pointerId:1,clientX:x,clientY:y});h.document.emit('click',cover,{button:0,clientX:x,clientY:y});assert.match(h.detail(),/Sample398/,'Press/release selects the visible X-aligned identity');
+ }
+});
+
+test('same-timestamp marker ties retain explicit marker identity and stable off-marker hover',()=>{
+ const h=harness();h.render([reply(1,10,stamp(1)),reply(2,100,stamp(1)),reply(3,20,stamp(2))]);const svg=h.document.querySelector('[data-rt-surface]');svg.getBoundingClientRect=()=>({left:0,top:0,width:820,height:110,right:820,bottom:110});h.api.restore();const marker=h.mark(1).querySelector('[data-rt-marker]'),x=Number(marker.getAttribute('cx')),y=Number(marker.getAttribute('cy'));
+ h.document.emit('pointermove',h.mark(1).querySelector('.rt-point-hit'),{clientX:x,clientY:y});assert.match(h.detail(),/Sample 2/,'An explicit same-X marker is not replaced by array order');h.document.emit('pointermove',svg,{clientX:x,clientY:98});assert.match(h.detail(),/Sample 2/,'Moving vertically at the same timestamp retains the highlighted identity');
+});

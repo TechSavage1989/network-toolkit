@@ -212,8 +212,12 @@
     // the visibly highlighted timestamp just because its measurement is closer.
     // Keep the value-axis gutter and space outside the SVG non-interactive.
     if(!mark&&(x<geometry.left||x>geometry.right||y!==null&&(y<0||y>(context.model.viewportHeight||height))))return null;
-    if(mark)return context.model.points[Number(mark.dataset.rtPoint)]||null;
-    let closest=null,distance=Infinity;for(const point of context.model.points){const delta=Math.abs((point.plotX??coordinate(point.index,context.model,geometry))-x);if(delta<distance){distance=delta;closest=point;}else if(delta===distance&&point.key===context.model.hovered)closest=point;}return closest;
+    // Transparent hit circles overlap in dense plots. DOM stacking is not a
+    // timestamp: use the nearest X even when a later sample owns the hit area.
+    // An explicit marker breaks only a same-X tie; otherwise keep an existing
+    // highlighted duplicate timestamp stable while moving vertically.
+    const hit=mark&&context.model.points[Number(mark.dataset.rtPoint)];
+    let closest=null,distance=Infinity;for(const point of context.model.points){const delta=Math.abs((point.plotX??coordinate(point.index,context.model,geometry))-x);if(delta<distance){distance=delta;closest=point;}else if(delta===distance&&(point.key===hit?.key||closest?.key!==hit?.key&&point.key===context.model.hovered))closest=point;}return closest;
   }
 
   function hideTooltip(){if(tooltip){tooltip.hidden=true;tooltip.setAttribute('aria-hidden','true');}}
