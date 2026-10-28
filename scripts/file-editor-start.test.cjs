@@ -176,3 +176,12 @@ test('keyboard reorder is distinct from tab switching and pending/stale requests
 });
 
 test('native drag preparation may be inspected without weakening actual reorder or other guards',async()=>{const h=harness();await h.first();const d=h.api.active;h.c.NetworkToolkitEditorWindows={state:{dragPreparing:true}};assert.match(h.api.canReorderDocuments(),/pending/);assert.equal(h.api.canReorderDocuments({ignoreDragPreparation:true}),'');assert.equal(h.api.reorderDocument(d.uid,null),false);for(const field of ['closing','outgoing','incoming','detaching']){h.c.NetworkToolkitEditorWindows.state[field]=true;assert.match(h.api.canReorderDocuments({ignoreDragPreparation:true}),/pending/,field);h.c.NetworkToolkitEditorWindows.state[field]=false;}for(const field of ['saving','loading','reloading','formatting','frozen']){d[field]=true;assert.match(h.api.canReorderDocuments({ignoreDragPreparation:true}),/pending/,field);d[field]=false;}h.c.NetworkToolkitEditorWindows.state.dragPreparing=false;assert.equal(h.api.reorderDocument(d.uid,null),true);});
+
+
+test('an empty split cannot reuse or edit the current document when creation reaches the tab limit',async()=>{
+ const h=harness(),ta=await h.first();while(h.api.documents.size<12)await h.api.newDocument();
+ let options;h.c.NTKEditorCompare={create:value=>{options=value;return {textarea:ta,refresh(){},showDocument(){},snapshot(){return {};},dispose(){}};}};
+ h.api.openSplit();const current=h.api.active,before=[...h.api.documents.values()].map(d=>({uid:d.uid,content:d.content,dirty:d.dirty,undo:[...d.undo]})),groups=JSON.stringify(h.api.viewGroups);
+ assert.equal(await options.createInView('right'),null);assert.equal(h.api.active,current);assert.equal(h.api.documents.size,12);assert.equal(JSON.stringify(h.api.viewGroups),groups);
+ assert.deepEqual([...h.api.documents.values()].map(d=>({uid:d.uid,content:d.content,dirty:d.dirty,undo:[...d.undo]})),before);
+});
