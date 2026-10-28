@@ -4,7 +4,7 @@
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const root=path.resolve(__dirname,'..'),baseline=process.env.NTK_LAYOUT_BASELINE_DIR,out=process.env.NTK_BROWSER_OUTPUT_DIR||process.env.TOOLKIT_TEST_OUTPUT;
-const report={passed:false,baselineVersion:'1.17.108',checks:[],geometry:[],errors:[],assetFailures:[],screenshots:[],scope:'Actual production DOM/CSS in synthetic browser contexts. DPR2 is not native Windows DPI certification. No live devices or native capabilities exercised.'};
+const report={passed:false,navigation:[],baselineVersion:'1.17.108',checks:[],geometry:[],errors:[],assetFailures:[],screenshots:[],scope:'Actual production DOM/CSS in synthetic browser contexts. DPR2 is not native Windows DPI certification. No live devices or native capabilities exercised.'};
 const hostname='SYNTHETIC-WORKSTATION-WITH-A-LONG-NAME';let browser,current;
 const pass=x=>report.checks.push(x),settle=p=>p.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(()=>requestAnimationFrame(r)))));
 async function make(repo,viewport,mode='main',dpr=1){
@@ -45,7 +45,7 @@ async function geometry(p){return p.evaluate(()=>{
 });}
 async function shot(p,name){if(!out)return;const file='app-chrome109-'+name+'.png';await p.screenshot({path:path.join(out,file),fullPage:true});report.screenshots.push(file);}
 async function safeNavigation(p){
- assert.equal(await p.locator('#mobileMenu').count(),1);const box=await p.locator('#mobileMenu').boundingBox();assert(box&&box.width>0&&box.height>0&&box.x>=0&&box.y>=0&&box.x+box.width<=p.viewportSize().width+1&&box.y+box.height<=p.viewportSize().height+1,'Navigation opener must be visible inside the actual tool');
+ assert.equal(await p.locator('#mobileMenu').count(),1);const placement=await p.locator('#mobileMenu').evaluate(e=>({page:state.activePage,parent:e.parentElement.id||e.parentElement.className,classes:document.body.className}));const box=await p.locator('#mobileMenu').boundingBox();report.navigation.push({...placement,box,viewport:p.viewportSize()});assert(box&&box.width>0&&box.height>0&&box.x>=0&&box.y>=0&&box.x+box.width<=p.viewportSize().width+1&&box.y+box.height<=p.viewportSize().height+1,'Navigation opener must be visible inside the actual tool: '+JSON.stringify({placement,box}));
  await p.locator('#mobileMenu').click();await p.waitForFunction(()=>document.querySelector('#sidebar').classList.contains('open'));await p.keyboard.press('Escape');await p.waitForFunction(()=>!document.querySelector('#sidebar').classList.contains('open')&&document.querySelector('#sidebar').getBoundingClientRect().right<=1);await settle(p);assert(await p.locator('#mobileMenu').evaluate(e=>document.activeElement===e));
 }
 (async()=>{
@@ -62,6 +62,11 @@ async function safeNavigation(p){
     if(viewport.width<=1100)await safeNavigation(now.p);
     if(['monitor','terminal','editor'].includes(tool))await shot(now.p,tool+'-'+viewport.width+'-'+theme);
    }
+   for(const tool of ['sftp','ftp','tftp'])for(const mode of ['server','client']){
+    await Promise.all([old.p,now.p].map(async p=>{await p.evaluate(({tool,mode})=>{state.transferModes={...state.transferModes,[tool]:mode};navigate(tool);},{tool,mode});await settle(p);}));
+    const before=await geometry(old.p),after=await geometry(now.p);assert.equal(after.targetID,before.targetID);assert(after.availableHeight>before.availableHeight,JSON.stringify({tool,mode,viewport,theme,before,after}));report.geometry.push({viewport,theme,tool,mode,before,after,gain:after.availableHeight-before.availableHeight});if(viewport.width<=1100)await safeNavigation(now.p);
+    if(viewport.width===390&&theme==='dark'&&tool==='sftp')await shot(now.p,'sftp-'+mode+'-390-dark');
+   }
   }
   pass('Every main tool gains measured usable height versus actual108 at '+viewport.width+'px in light and dark; compact navigation survives tool changes');
   await now.p.evaluate(()=>navigate('overview'));if(viewport.width<=1100)await now.p.locator('#mobileMenu').click();await now.p.waitForFunction(()=>document.querySelector('#sidebar').getBoundingClientRect().left>=0);
@@ -75,7 +80,7 @@ async function safeNavigation(p){
   await old.context.close();await now.context.close();
  }
  pass('System identity, engine footer, keyboard theme/settings and live running counts remain accessible without duplicated controls');
- const shortBefore=await make(baseline,{width:820,height:540}),short=await make(root,{width:820,height:540});current=short.p;for(const tool of ['monitor','terminal','editor','capture']){await Promise.all([shortBefore.p,current].map(async p=>{await p.evaluate(tool=>navigate(tool),tool);await settle(p);}));const before=await geometry(shortBefore.p),after=await geometry(current);assert(after.availableHeight>before.availableHeight,JSON.stringify({short:true,tool,before,after}));report.geometry.push({short:true,tool,before,after});await safeNavigation(current);}await shot(current,'short-window');await shortBefore.context.close();await short.context.close();
+ const shortBefore=await make(baseline,{width:820,height:540}),short=await make(root,{width:820,height:540});current=short.p;for(const item of [{tool:'monitor'},{tool:'terminal'},{tool:'editor'},{tool:'capture'},...['sftp','ftp','tftp'].flatMap(tool=>['server','client'].map(mode=>({tool,mode})))]){await Promise.all([shortBefore.p,current].map(async p=>{await p.evaluate(({tool,mode})=>{if(mode)state.transferModes={...state.transferModes,[tool]:mode};navigate(tool);},item);await settle(p);}));const before=await geometry(shortBefore.p),after=await geometry(current);assert.equal(after.targetID,before.targetID);assert(after.availableHeight>before.availableHeight,JSON.stringify({short:true,...item,before,after}));report.geometry.push({short:true,...item,before,after});await safeNavigation(current);}await shot(current,'short-window');await shortBefore.context.close();await short.context.close();
  pass('Short windows keep the navigation opener in existing visible tool controls, including Terminal');
  for(const mode of ['terminal','editor']){
   const old=await make(baseline,{width:1024,height:720},mode),now=await make(root,{width:1024,height:720},mode);current=now.p;const before=await geometry(old.p),after=await geometry(now.p);assert(after.availableHeight>=before.availableHeight-1,JSON.stringify({mode,before,after}));assert.equal(await now.p.locator('#settingsButton').isVisible(),false,'Scoped windows must not expose broader global settings');report.geometry.push({mode,before,after});await shot(now.p,'detached-'+mode);await old.context.close();await now.context.close();

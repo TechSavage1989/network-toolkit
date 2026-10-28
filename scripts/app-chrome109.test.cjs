@@ -2,7 +2,7 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),{test}=require('node:test');
 const {document:makeDocument}=require('./terminal-dom-fixture.cjs');
 function harness({short=false}={}){
- const document=makeDocument('<aside id="sidebar"><div class="brand-mark"></div><span id="hostTop">SYNTHETIC-LONG-HOST</span><div class="app-utility-actions"><button id="themeButton"></button><button id="settingsButton"></button><span id="runningCount">3 running</span></div></aside><main><span id="appNavigationSlot"></span><span id="appNavigationFooterSlot"></span><div id="toolCommandBar"></div><div id="terminalCommandBar"><div class="terminal-command-start"></div></div></main>');document.body=document;const c={document,matchMedia:()=>({matches:short,addEventListener(){}})};c.globalThis=c;vm.createContext(c);vm.runInContext(fs.readFileSync(require.resolve('../web/assets/app-chrome.js'),'utf8'),c);return{document,api:c.NetworkToolkitAppChrome};
+ const document=makeDocument('<aside id="sidebar"><div class="brand-mark"></div><span id="hostTop">SYNTHETIC-LONG-HOST</span><div class="app-utility-actions"><button id="themeButton"></button><button id="settingsButton"></button><span id="runningCount">3 running</span></div></aside><main><span id="appNavigationSlot"></span><span id="appNavigationFooterSlot"></span><div id="toolCommandBar"></div><div id="terminalCommandBar"><div class="terminal-command-start"></div></div></main>');document.body=document;document.getElementById('toolCommandBar').getBoundingClientRect=()=>({width:100,height:30});const c={document,getComputedStyle:el=>({display:el.id==='toolCommandBar'&&(document.classList.contains('transfer-server-mode')||document.classList.contains('remote-browser-mode'))?'none':'flex',visibility:'visible'}),matchMedia:()=>({matches:short,addEventListener(){}})};c.globalThis=c;vm.createContext(c);vm.runInContext(fs.readFileSync(require.resolve('../web/assets/app-chrome.js'),'utf8'),c);return{document,api:c.NetworkToolkitAppChrome};
 }
 test('identity and running counts remain explicit accessible text without duplicating actions',()=>{
  const {document:d,api}=harness();api.init();api.sync();assert(d.classList.contains('app-chrome-ready'));
@@ -29,4 +29,11 @@ test('short local workspaces use the existing footer only while their command ba
 
 test('collapsed utility icons fit one rail row without shrinking accessible targets',()=>{
  const css=fs.readFileSync(require.resolve('../web/assets/app-chrome.css'),'utf8');assert.match(css,/\.app-utility-actions \.iconbtn\{width:26px;height:26px/);assert.match(css,/\.app-nav-collapsed \.app-utility-actions\{[^}]*gap:3px/);assert.equal(2*26+3,64-1-2*4,'Two26px targets and gap fit the bordered/padded64px rail');
+});
+
+
+test('CSS-hidden transfer server and client command bars never capture the compact navigation opener',()=>{
+ for(const short of [false,true])for(const mode of ['transfer-server-mode','remote-browser-mode']){
+  const {document:d,api}=harness({short});api.init();d.classList.add('diagnostic-page',mode);assert(!d.getElementById('toolCommandBar').classList.contains('hidden'));assert.equal(api.navigationHost().id,short?'appNavigationFooterSlot':'appNavigationSlot');d.classList.remove(mode);assert.equal(api.navigationHost().id,'toolCommandBar');
+ }
 });

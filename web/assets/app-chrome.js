@@ -2,12 +2,21 @@
   'use strict';
   let initialized = false, shortWindow = null;
 
+  function visibleHost(element) {
+    if (!element || element.classList.contains('hidden')) return false;
+    const style = root.getComputedStyle(element), box = element.getBoundingClientRect();
+    return style.display !== 'none' && style.visibility !== 'hidden' && box.width > 0 && box.height > 0;
+  }
+
   // Reuse each existing control; no duplicate handlers, state or capabilities.
   function navigationHost() {
     if (document.body.classList.contains('terminal-window') || document.body.classList.contains('editor-window')) return null;
     if (document.body.classList.contains('terminal-page')) return document.querySelector('#terminalCommandBar .terminal-command-start');
     const command = document.getElementById('toolCommandBar');
-    if (document.body.classList.contains('diagnostic-page') && command && !command.classList.contains('hidden')) return command;
+    // Transfer server/client layouts suppress this shared bar in CSS even when
+    // split-tool configuration leaves its class unchanged. Never park the only
+    // navigation opener inside a non-rendered host.
+    if (document.body.classList.contains('diagnostic-page') && visibleHost(command)) return command;
     if (shortWindow?.matches && document.body.classList.contains('diagnostic-page')) return document.getElementById('appNavigationFooterSlot');
     return document.getElementById('appNavigationSlot');
   }
