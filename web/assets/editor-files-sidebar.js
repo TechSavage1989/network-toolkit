@@ -22,7 +22,7 @@ function toggle(editor){
 function mount(host){
  for(const tab of host.querySelectorAll('[data-editor-files-side]')){const selected=tab.dataset.editorFilesSide===side;tab.setAttribute('aria-selected',String(selected));tab.classList.toggle('primary',selected);tab.classList.toggle('ghost',!selected);}
  if(detached()){void checkAccess(host);return;}
- root.NetworkToolkitRemoteBrowser.mountSidebar(host.querySelector('[data-editor-file-browser]'),side);if(requests.length){const button=document.createElement('button');button.className='btn small ghost';button.textContent='Editor window access';button.onclick=manageAccess;host.querySelector('[data-editor-file-browser]').append(button);}
+ root.NetworkToolkitRemoteBrowser.mountSidebar(host.querySelector('[data-editor-file-browser]'),side);syncAccessButton();
 }
 async function checkAccess(host){
  clearTimeout(accessTimer);if(host.hidden)return;
@@ -34,8 +34,12 @@ async function checkAccess(host){
   if(access.pending)accessTimer=setTimeout(()=>void checkAccess(host),1500);
  }catch(error){body.textContent=error.message;}
 }
+function syncAccessButton(){
+ const host=document.querySelector('[data-ed-files-sidebar]');if(!host||host.hidden)return;const body=host.querySelector('[data-editor-file-browser]');let button=body?.querySelector('[data-editor-files-manage]');
+ if(!requests.length){button?.remove();return;}if(!button&&body){button=document.createElement('button');button.className='btn small ghost';button.dataset.editorFilesManage='';button.textContent='Editor window access';button.onclick=manageAccess;body.append(button);}
+}
 function syncRequests(rows){
- if(detached())return;requests=Array.isArray(rows)?rows:[];
+ if(detached())return;requests=Array.isArray(rows)?rows:[];syncAccessButton();
  let banner=document.querySelector('[data-editor-files-access-banner]');
  if(!requests.some(row=>row.pending)){banner?.remove();return;}
  if(!banner){banner=document.createElement('div');banner.className='nt-editor-files-access-banner';banner.dataset.editorFilesAccessBanner='';banner.innerHTML='<span>An editor window requests file explorer access.</span><button type="button" class="btn small primary">Review</button>';banner.querySelector('button').onclick=manageAccess;document.body.append(banner);}
