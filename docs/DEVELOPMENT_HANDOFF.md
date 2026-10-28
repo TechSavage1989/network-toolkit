@@ -1,5 +1,15 @@
 # Network Toolkit development handoff
 
+## Authorized 1.17.106 candidate
+
+The user explicitly approved implementation, build and publication of copyable
+server/client file locations and listener data, macro Library-tab preservation,
+and recording Pause/Stop & review reliability. Baseline is completed 105 closure
+main30ecbf2a992beef6f0045272db3cc36acd0b27bb, tree 458ec195bc5b4c9595fc292267e41be78cb07ca3.
+See RELEASE106_HANDOFF.md for scope, evidence and current gates. 105 remains the
+published version until exact-source acceptance and controlled promotion complete.
+
+
 ## 1.17.105 published and independently verified
 
 Published 2026-10-27:

@@ -134,3 +134,56 @@ test('a library refresh started before a folder move cannot undo the completed m
  const refresh=h.module.refresh(true);await settle();h.click('[data-macro-action="move-folder"]');h.document.querySelector('#terminalMacroMoveFolder').value='Moved';h.click('[data-macro-action="move-folder-confirm"]');await settle();
  release(old);await refresh;assert.equal(h.library.macros[0].folder,'Moved');assert(h.document.querySelector('#terminalMacroFolder option[value="folder:Moved"]'));h.dispose();
 });
+
+test('starting and polling a macro preserves Library through pending, progress and terminal states',async()=>{
+ const h=harness();await settle();h.module.toggle(true);
+ const selected=()=>h.document.querySelector('#terminalMacroLibraryTab').getAttribute('aria-selected');
+ const list=h.document.querySelector('#terminalMacroList'),search=h.document.querySelector('#terminalMacroSearch');search.value='Check';h.document.emit('input',search);
+ const original=h.c.api;let release;
+ h.c.api=(url,method,body)=>url==='/terminal-automation/runs'&&method==='POST'?new Promise(resolve=>{release=async()=>{const result=await original(url,method,body);result.run.state='running';result.run.targets[0].state='running';resolve(result);};}):original(url,method,body);
+ h.module.requestRun(h.library.macros[0]);h.click('[data-macro-action="run-preview"]');await settle();assert.equal(typeof release,'function');assert.equal(selected(),'true','The pending request does not navigate');
+ await h.module.refresh();assert.equal(selected(),'true','Refresh while starting does not navigate');
+ await release();await settle();assert.equal(selected(),'true','An accepted run does not navigate');assert.equal(h.document.querySelector('#terminalMacroRunsView').classList.contains('hidden'),true);assert.equal(h.document.querySelector('#terminalMacroRunCount').textContent,'1 run');
+ for(const status of ['running','paused','completed','failed']){h.runs[0].state=status;h.runs[0].targets[0].state=status;h.runs[0].targets[0].step++;await h.module.refresh();h.module.sync();assert.equal(selected(),'true',status+' does not navigate');assert.match(h.document.querySelector('[data-macro-run-id="run-1"]').textContent,new RegExp(status));}
+ assert.equal(h.document.querySelector('#terminalMacroList'),list);assert.equal(h.document.querySelector('#terminalMacroSearch'),search);assert.equal(search.value,'Check');assert(h.document.querySelector('[data-macro-action="output"][data-run="run-1"]'));h.dispose();
+});
+
+test('manual Runs selection remains functional and pending run acceptance respects the latest chosen tab',async()=>{
+ const h=harness();await settle();h.module.toggle(true);h.change('#terminalMacroConfirmation','never');
+ const selected=tab=>h.document.querySelector('#terminalMacro'+tab+'Tab').getAttribute('aria-selected'),original=h.c.api;let release;
+ h.c.api=(url,method,body)=>url==='/terminal-automation/runs'&&method==='POST'?new Promise(resolve=>{release=async()=>resolve(await original(url,method,body));}):original(url,method,body);
+ h.module.requestRun(h.library.macros[0]);await settle();h.click('#terminalMacroRunsTab');assert.equal(selected('Runs'),'true');await release();await settle();await h.module.refresh();assert.equal(selected('Runs'),'true','Starting/polling must not force Library after a manual Runs choice');
+ h.module.requestRun(h.library.macros[0]);await settle();h.click('#terminalMacroLibraryTab');await release();await settle();assert.equal(selected('Library'),'true','Accepting a request must not restore its stale starting tab');
+ h.click('#terminalMacroRunsTab');assert.equal(selected('Runs'),'true');assert.equal(h.document.querySelectorAll('.macro-run').length,2);assert.equal(h.document.querySelector('#terminalMacroRunsView').classList.contains('hidden'),false);h.dispose();
+});
+
+test('failed macro start and retry preserve Library and continue to expose run errors and output',async()=>{
+ const h=harness();await settle();h.module.toggle(true);const original=h.c.api;let fail=true;
+ h.c.api=(url,method,body)=>url==='/terminal-automation/runs'&&method==='POST'&&fail?Promise.reject(new Error('Synthetic start failure')):original(url,method,body);
+ h.module.requestRun(h.library.macros[0]);h.click('[data-macro-action="run-preview"]');await settle();assert.equal(h.document.querySelector('#terminalMacroLibraryTab').getAttribute('aria-selected'),'true');assert.match(h.document.querySelector('[data-macro-error]').textContent,/Synthetic start failure/);assert.equal(h.runs.length,0);
+ fail=false;h.click('[data-macro-action="run-preview"]');await settle();assert.equal(h.document.querySelector('#terminalMacroLibraryTab').getAttribute('aria-selected'),'true');assert.equal(h.runs.length,1);h.runs[0].state='failed';h.runs[0].targets[0].state='failed';h.runs[0].targets[0].error='Synthetic target error';await h.module.refresh();
+ h.click('#terminalMacroRunsTab');assert.match(h.document.querySelector('[data-macro-run-id="run-1"]').textContent,/Synthetic target error/);h.click('[data-macro-action="output"][data-run="run-1"]');await settle();assert.equal(h.document.querySelector('#terminalMacroOutput').value,'complete output\nFINAL LINE');assert.equal(h.document.querySelector('#terminalMacroRunsTab').getAttribute('aria-selected'),'true');h.dispose();
+});
+
+test('recording controls keep node identity through sync, polling and input; Pause only pauses capture',async()=>{
+ const h=harness({macros:[]});await settle();h.module.record();
+ const pause=h.document.querySelector('[data-macro-action="record-pause"]'),stop=h.document.querySelector('[data-macro-action="record-stop"]');
+ h.module.onInput(h.active,'show clock\r','user');
+ for(let i=0;i<4;i++){h.module.sync();await h.module.refresh();assert.equal(h.document.querySelector('[data-macro-action="record-pause"]'),pause);assert.equal(h.document.querySelector('[data-macro-action="record-stop"]'),stop);}
+ h.click(pause);assert.equal(pause.textContent,'Resume');h.module.onInput(h.active,'not recorded\r','user');assert.match(h.document.querySelector('[data-macro-recording-status]').textContent,/Paused · 1 steps/);
+ h.click(pause);assert.equal(pause.textContent,'Pause');h.module.onInput(h.active,'show version\r','user');h.module.onInput({info:{id:'two'}},'other session\r','user');assert.match(h.document.querySelector('[data-macro-recording-status]').textContent,/Recording · 2 steps/);
+ // Changing/disconnecting the active pane must not disable local review.
+ h.setActive({info:{id:'two',state:'error'}});h.click(stop);assert.equal(h.document.querySelector('[data-macro-edit="commands"]').value,'show clock\nshow version');assert(h.document.querySelector('#terminalMacroRecording').classList.contains('hidden'));
+ const editor=h.document.querySelector('.modal');h.click(stop);assert.equal(h.document.querySelector('.modal'),editor,'Repeated Stop must not replace a successful review');assert(!h.calls.some(call=>call.method==='POST'),'Recording controls never execute or send commands');h.dispose();
+});
+
+test('recording review failures remain visible and preserve captured steps for retry',async()=>{
+ const h=harness({macros:[]});await settle();h.module.record();h.module.onInput(h.active,'show first\r','user');const open=h.c.openModal;
+ h.c.openModal=()=>{throw new Error('Synthetic review dialog unavailable');};h.click('[data-macro-action="record-stop"]');assert(h.notices.some(notice=>notice.text==='Synthetic review dialog unavailable'));assert.equal(h.document.querySelector('#terminalMacroRecording').classList.contains('hidden'),false);assert.match(h.document.querySelector('[data-macro-recording-status]').textContent,/1 steps/);
+ h.c.openModal=()=>{};h.click('[data-macro-action="record-stop"]');assert(h.notices.some(notice=>/recording was kept/.test(notice.text)));assert.equal(h.document.querySelector('#terminalMacroRecording').classList.contains('hidden'),false);h.module.onInput(h.active,'show second\r','user');h.c.openModal=open;h.click('[data-macro-action="record-stop"]');assert.equal(h.document.querySelector('[data-macro-edit="commands"]').value,'show first\nshow second');assert(h.document.querySelector('#terminalMacroRecording').classList.contains('hidden'));h.dispose();
+});
+
+test('empty Stop and discard are idempotent and new recordings reuse live controls without old steps',async()=>{
+ const h=harness({macros:[]});await settle();h.module.record();const stop=h.document.querySelector('[data-macro-action="record-stop"]'),pause=h.document.querySelector('[data-macro-action="record-pause"]');h.click(stop);assert(h.notices.some(notice=>notice.text==='No commands were recorded.'));h.click(stop);assert.equal(h.document.querySelector('.modal'),null);
+ h.module.record();h.module.onInput(h.active,'discard me\r','user');h.click('[data-macro-action="record-discard"]');h.module.record();assert.equal(h.document.querySelector('[data-macro-action="record-stop"]'),stop);assert.equal(h.document.querySelector('[data-macro-action="record-pause"]'),pause);assert.equal(pause.textContent,'Pause');assert.match(h.document.querySelector('[data-macro-recording-status]').textContent,/Recording · 0 steps/);h.module.onInput(h.active,'keep me\r','user');h.click(stop);assert.equal(h.document.querySelector('[data-macro-edit="commands"]').value,'keep me');h.dispose();
+});

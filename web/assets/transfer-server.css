@@ -206,3 +206,13 @@ body.transfer-server-mode #toolWorkspace>#pageContent{overflow:hidden!important;
  .transfer-server-app.transfer-server-layout .fm-file-manager .fm-explorer{min-height:240px;}
  .fm-explorer .fm-pane-quick,.fm-explorer .fm-footnote,.fm-explorer .fm-pane-head small,.fm-explorer .fm-toolbar-help{display:none;}
 }
+
+/* Explicit, read-only location copies; never enhance credential fields. */
+.transfer-locations{min-width:0}
+.transfer-location-row{display:flex;align-items:center;gap:12px;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line)}
+.transfer-location-row>div{min-width:0;flex:1}
+.transfer-location-row>button{flex:none}
+.transfer-location-value{white-space:pre-wrap;overflow-wrap:anywhere;margin-top:4px;user-select:text}
+.transfer-locations select{width:100%;min-width:0}
+.transfer-manager-path{flex-wrap:wrap}
+@media(max-width:520px){.transfer-location-row{align-items:flex-start;gap:8px}.transfer-location-row>button{padding-left:8px;padding-right:8px}}

@@ -3,6 +3,13 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
+Authorized development target: 1.17.106. The user explicitly approved the combined
+server/client location-copy improvements and macro Library/recording fixes for
+implementation, build and publication. See docs/RELEASE106_HANDOFF.md. Start from
+105 closure main 30ecbf2a992beef6f0045272db3cc36acd0b27bb, preserve all existing
+security/release safeguards, and keep 105 published tags/assets immutable.
+No live user device, credential, settings or macro execution is authorized.
+
 Current published version: 1.17.105. The user-authorized SSH banner alignment,
 multi-item discovery filtering and explicit TCP-port actions are published and
 independently verified. Exact source/tag:

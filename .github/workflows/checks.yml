@@ -386,6 +386,18 @@ jobs:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-security-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-security-browser-results
         run: node scripts/discovery-port-actions.browser.cjs
+      - name: Check macro recording controls and selected sidebar view
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-security-browser-tests/node_modules/playwright
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-security-browser-results
+        run: node scripts/terminal-macro-recording.browser.cjs
+      - name: Check explicit transfer location copies and clipboard
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-security-browser-tests/node_modules/playwright
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-security-browser-results
+        run: node scripts/transfer-locations.browser.cjs
       - uses: actions/upload-artifact@v7
         if: always()
         with:

@@ -1,0 +1,15 @@
+Network Toolkit 1.17.106
+
+Explicit file-location and listener copies
+- Copy shared server files as network locations, server-relative paths or local disk paths with distinct labels. Copy listening addresses and endpoints; supported client modes expose appropriate remote/network or local paths without initiating a transfer.
+- Wildcard listeners require a concrete active-interface choice instead of advertising 0.0.0.0 or :: as a reachable destination. Loopback and stopped/configured states remain explicit. Nondefault ports, bracketed IPv6 and URL path encoding are handled according to the selected format.
+- No passwords, stored credentials or authentication tokens are included. Copy actions do not start transfers, servers, browser/client launches or diagnostic connections. Existing generic sensitive-data copy exclusions remain unchanged.
+
+Macro Library and recording controls
+- Starting a macro no longer automatically switches the sidebar from Library to Runs. A deliberate manual tab change is respected during pending requests and later run updates.
+- Pause/Resume and Stop & review controls remain stable during terminal input, polling and status refresh instead of losing clicks or focus when their DOM nodes are replaced.
+- Pausing recording does not block ordinary terminal input. Stop & review retains captured steps when the review cannot be opened, allowing a visible retry rather than losing the recording.
+
+Compatibility and limits
+- Preserves 1.17.105 banner formatting, discovery filters/port actions and earlier vault, pager, defaults, graph, icon and output-archive safeguards.
+- Validation uses synthetic fixtures and hosted browser/native checks. No actual user switch, credentials, settings or live macro execution is used. Available interfaces do not guarantee remote reachability through firewalls or routing.

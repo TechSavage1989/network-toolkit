@@ -1,3 +1,12 @@
+1.17.106 CANDIDATE - validation in progress
+
+Authorized scope: explicit server/client file-location and listener copies;
+macro Library-tab preservation and recording-control reliability. Based on
+completed 105 closure main 30ecbf2a. Local/hosted validation is pending for the
+combined candidate; earlier 105 results below are historical, not 106 acceptance.
+See RELEASE106_HANDOFF.md. No live user devices, settings, credentials or actual
+network macro execution are used. All existing required gates remain intact.
+
 NETWORK TOOLKIT 1.17.105 PUBLISHED AND VERIFIED
 
 1.17.105 published and independently verified

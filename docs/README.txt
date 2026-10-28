@@ -1,11 +1,20 @@
-NETWORK TOOLKIT 1.17.105
+NETWORK TOOLKIT 1.17.106
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.105
+CURRENT RELEASE - 1.17.106
 
-Release details: RELEASE_NOTES_1.17.105.txt
-Previous release: docs/releases/RELEASE_NOTES_1.17.104.txt
+Release details: RELEASE_NOTES_1.17.106.txt
+Previous release: docs/releases/RELEASE_NOTES_1.17.105.txt
 Full release-note archive: docs/releases/README.md
+
+Copy server/client file locations in explicitly labeled network, remote-relative
+or local-disk formats; listener addresses and endpoints are copyable without
+starting a transfer. Wildcard listeners require a concrete interface choice,
+not an assertion that every address is remotely reachable. Copy values never
+include passwords, saved credentials or authentication tokens.
+Macros keep the selected Library/Runs tab when starting. Recording Pause and
+Stop & review stay actionable during input/status refresh, and review failures
+retain captured steps for retry. No actual user device testing is claimed.
 
 SSH login banners with bare line feeds are aligned without changing normal PTY
 output, terminal controls or paging. Discovery filters accept lists separated by
