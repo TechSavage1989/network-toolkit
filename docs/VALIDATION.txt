@@ -1,8 +1,93 @@
-NETWORK TOOLKIT 1.17.108 CANDIDATE
+NETWORK TOOLKIT 1.17.108 PUBLISHED AND VERIFIED
 
-Required exact-source hosted/browser/native/public verification is pending.
-See RELEASE108_HANDOFF.md for scope and validation limits.
-The107 record below remains historical, not proof of108 acceptance.
+1.17.108 published and independently verified
+
+Published 2026-10-28:
+https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.108
+Release ID: 426796126
+Exact reviewed/published source and tag: 59a82b13bb31899206d383ea58166ec9a4f4faf0
+Tree: c2e0b5db0b51ef4501bf4e72d5ccd61db671483e
+Baseline: 107 closure main ab0d0daeff5e2ea8f5d4da457544fc96b8202fab.
+All six exact-source gates and bounded artifact/pixel reviews passed before the
+expected-head, non-force main promotion. The user explicitly approved source and
+release publication in this existing public repository; visibility was unchanged.
+This subsequent documentation-only handoff does not rebuild or replace assets.
+
+Completed scope:
+- Backend-authoritative sidebar activity for live terminal/retained SSH clients,
+  listening servers, running jobs and capture. Cross-window counts clear on the
+  last end/disconnect; saved profiles, queued/failed work and old results do not
+  imply activity. Snapshots contain counts only and do not probe or elevate.
+- Saved SSH/Telnet profile bookmarks inside existing matching port/address and
+  details controls, with exact normalized IP/scope/protocol/port and ID-only review.
+  No extra result column or automatic connection; copy/select/filter/sort remain.
+- Status-colored graph samples, theme-accent lines, stable hover/redraw and
+  x-aligned selection retaining press-time identity across moving results.
+- First paste/typing creates an in-memory Untitled editor document with Undo;
+  navigation preserves unsaved content/view. Accessible tabs, editable comparison,
+  differences navigation, synchronized soft wrap and a zoomable/scrollable change
+  map share each document's state. Theme and wrap render correctly.
+- Actual native editor/document move and merge controls use acknowledged exclusive
+  ownership, scoped child capabilities and protected close/cancel/failed-launch
+  paths. Offline conservative vendor syntax keeps manual/plain overrides and exact
+  text; private reference configurations are not in source or release artifacts.
+
+Exact-source Checks40705014224 completed SUCCESS, all six jobs:
+- Application122874969386: all required Go packages, 968 JavaScript tests,
+  42 Python guards, Windows GUI build and reviewed portable package.
+- Dependency122874969463: canonical vendor match; zero reachable or imported-
+  package vulnerability findings on Linux/Windows. Unused module-level OpenPGP
+  advisory GO-2026-5932 remains disclosed, with no fixed version reported.
+- Windows122874969522: existing vault/DPAPI/bootstrap/capture/Explorer boundaries,
+  actual native dirty-close consent (8.93s) and production-child two-host editor
+  moves/merges (41.40s), including cancellation and real failed launch retention.
+- Security browser122874969341: all credential/pager/banner/discovery/macro/copy
+  reports passed with existing secret, permission and stale-response guards.
+- Feature browser122874970151: all12 feature-test steps passed; actual normal/
+  narrow pixels were inspected for activity, bookmarks, graph, editor and107
+  workflows. Editor paste negative control reproduces the exact107 bug.
+- Long browser122874969499: all legacy graph/clipboard/terminal/editor/layout gates
+  passed, including31 graph93–98 check groups. Genuine native updater timer scenario
+  302,799ms, observed poll interval about300,170ms, unchanged timer functions and
+  at most one active check. Released64 negative control reproduced its expected
+  error. Existing geometry/timing assertions were retained, not relaxed/skipped.
+
+Automatic Release40708819013 succeeded: build122888158643 and
+publish122889310737. All four public downloads were fetched and verified against
+GitHub metadata and manifests. Portable/source CRC/inventory and981 exact source
+files match the reviewed tree; public EXE and portable equal the reviewed bytes.
+Actual AMD64 GUI PE resources contain version1.17.108, all9 canonical icon frames
+and the expected manifest. Update.zip contains exactly the four allowed updater
+files, no source/settings/credentials. Latest release feed, tag and notes match;
+prior107 tag, body and all four immutable asset metadata remain unchanged.
+
+Public assets (bytes; SHA-256):
+- Network_Toolkit.exe: 19962368; ed90b5a03391ba4c275f8bad2da8b2c08f7cc9cc261f111dd3b61ac82dc5c359
+- Network_Toolkit_1.17.108_Portable.zip: 12787684; 231a4fd8ab1c4e42d6b6d25036388bfa27cae6da11f4eb93a35fe73b346728a2
+- Network_Toolkit_1.17.108_Update.zip: 7676731; d8fc6f7de3c80eda59107c01f73833df9b5b7f14e965c1e4a515f2584fecbe30
+- SHA256SUMS: 292; 977c92a1d217a7e30f55948d0f83241cffff5e46f95fcba57daa09c19538c5b5
+
+The already-triggered duplicate main Checks40708819012 also completed SUCCESS
+on2026-10-28 at15:01:10UTC, all six jobs, including the genuine updater timer.
+No optional rerun was requested. Final closure changes only five documentation
+files with [skip ci]; released source, tag, binaries and repository access remain
+unchanged.
+
+Limits: tests use synthetic documents/profiles and hosted Windows/browser fixtures,
+not production devices, user vaults/files, real capture/UAC approval, user reboot or
+an actual installation. Browser DPR is not native multi-DPI certification. Native
+editor transfer uses the production child CLI/registry, not the entire main CLI/
+storage lifecycle. FTP/FTPS activity is per operation, not idle form state; external
+browser/RDP launches are not tracked. Bookmarks do not guess DNS names or add a new
+FTP-profile matching domain. Editor moves refuse nontransferable browser handles
+and per-request FTP credentials; bounded last-acknowledged in-memory recovery is
+not OS/engine-crash durability. Vendor recognition is lexical, not semantic
+validation or binary export decoding. The old timer-only fixture does not serve
+icon assets; icon acceptance instead uses real embedded/new-feature assets and
+parsed PE resources. No security-audit or universal device compatibility claim.
+
+The frozen package's pre-publication checkpoints are historical; this handoff
+records acceptance after publication. Keep published tags/assets immutable.
 
 NETWORK TOOLKIT 1.17.107 PUBLISHED AND VERIFIED
 

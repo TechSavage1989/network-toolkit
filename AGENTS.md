@@ -3,13 +3,18 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-Active authorized candidate: 1.17.108. Read docs/RELEASE108_HANDOFF.md. The user
-approved activity indicators, inline saved-profile/results/detail access, graph
-interaction fixes, and editor tabs/comparison/change-map controls as one build.
-Required exact-source hosted checks and public verification are still pending.
-Do not mistake authored tests or implementation checkpoints for release acceptance.
+Current published version: 1.17.108. The authorized activity/bookmark/graph/editor
+batch is published and independently verified. Source/tag:
+59a82b13bb31899206d383ea58166ec9a4f4faf0; tree
+c2e0b5db0b51ef4501bf4e72d5ccd61db671483e. All six exact-source Checks and automatic
+Release passed; actual hosted editor windows/close consent, normal/narrow pixels,
+four public assets,981 exact source files, reviewed binary/package identity and
+latest feed verified. Read docs/RELEASE108_HANDOFF.md and
+DEVELOPMENT_HANDOFF.md for evidence, limits and duplicate-main closure. This
+handoff-only change is not a new build. Preserve all published tags/assets,
+repository access and existing credential/native/host-key/pager safeguards.
 
-Current published version: 1.17.107. The authorized discovery/appearance/capture/
+Previous published version: 1.17.107. The authorized discovery/appearance/capture/
 file-workflow batch is published and independently verified. Source/tag:
 bafabd88f9dd728acf45862226995e654821082d; tree
 68f7aafdec7652507134ef1ae358bb96ad8298b7. All six exact-source Checks and automatic

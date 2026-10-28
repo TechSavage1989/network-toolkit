@@ -84,7 +84,7 @@ See [VALIDATION.txt](docs/VALIDATION.txt) for recorded results and [THIRD_PARTY_
 
 </details>
 
-Current development version: [1.17.108 activity, inline bookmarks, graphs and editor comparison](RELEASE_NOTES_1.17.108.txt). The latest published baseline remains 1.17.107 until the required108 checks and release verification complete.
+Current published version: [1.17.108 — activity indicators, inline bookmarks, graphs and editor workflows](https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.108). See the [verified release handoff](docs/RELEASE108_HANDOFF.md) for evidence and compatibility limits.
 
 ### Editor documents and windows
 
