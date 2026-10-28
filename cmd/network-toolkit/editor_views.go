@@ -124,6 +124,7 @@ type editorWindow struct {
 	lastPulse time.Time
 }
 type editorDocumentGrant struct {
+	filePath string
 	snapshot editorDocumentSnapshot
 	owner    string
 	lease    uint64

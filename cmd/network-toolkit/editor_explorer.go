@@ -245,7 +245,7 @@ func (a *application) reserveExplorerMutation(targets ...editorExplorerTarget) (
 	defer m.mu.Unlock()
 	for _, target := range targets {
 		for _, d := range m.documents {
-			if explorerTargetContains(target, d.snapshot.Binding, d.snapshot.Path) {
+			if explorerTargetContains(target, d.snapshot.Binding, d.snapshot.Path) || (d.filePath != "" && explorerTargetContains(target, d.snapshot.Binding, d.filePath)) {
 				return nil, errors.New("Close the open editor document before changing its file or containing folder from the explorer. Unsaved work remains open.")
 			}
 		}

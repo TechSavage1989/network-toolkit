@@ -371,6 +371,9 @@ func (m *editorViewRegistry) file(w http.ResponseWriter, r *http.Request, caller
 		return
 	}
 	d.busy++
+	if request.Action == "write-text" {
+		d.filePath = request.Path
+	}
 	binding := d.snapshot.Binding
 	m.mu.Unlock()
 	response := &editorResponseStatus{ResponseWriter: w}
@@ -381,6 +384,7 @@ func (m *editorViewRegistry) file(w http.ResponseWriter, r *http.Request, caller
 		if request.Action == "write-text" && response.status >= 200 && response.status < 300 {
 			d.snapshot.Path = request.Path
 		}
+		d.filePath = ""
 		d.busy--
 		recover := d.orphan && d.busy == 0
 		if recover {

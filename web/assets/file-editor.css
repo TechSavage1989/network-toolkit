@@ -276,3 +276,19 @@ body:has(.nt-editor:not([hidden]) [data-ed-files-sidebar]:not([hidden])) .rb-con
 body:has(.nt-editor:not([hidden]) [data-ed-files-sidebar]:not([hidden])) .toast-stack{z-index:420}
 .nt-editor-files-access{padding:10px;font-size:11px;line-height:1.5}
 .nt-editor-files-access-banner{position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:430;display:flex;align-items:center;gap:8px;max-width:calc(100vw - 20px);padding:6px 10px;border:1px solid var(--border);border-radius:7px;box-shadow:var(--shadow);background:var(--panel);color:var(--text);font-size:11px}
+.is-editor-sidebar[data-sidebar-side=local] .rb-session-tools{display:none}
+.is-editor-sidebar .rb-session-tools .terminal-active-position,.is-editor-sidebar .rb-session-tools .terminal-active-title{display:none}
+.is-editor-sidebar .rb-session-tools{padding:4px;flex:none}
+.is-editor-sidebar .rb-explorer{min-height:360px}
+.is-editor-sidebar .rb-panes{min-height:220px;grid-template-rows:minmax(0,1fr);margin:0;gap:0;overflow:hidden}
+.is-editor-sidebar .rb-scroll{min-height:55px}
+.is-editor-sidebar .rb-pane-footer{font-size:9px}
+.nt-editor-files-actions{position:relative;overflow:visible;z-index:12;border:0}
+.nt-editor-files-actions .rb-toolbar{position:absolute;left:0;right:0;top:100%;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));max-height:min(420px,65vh);padding:5px;background:var(--panel);border:1px solid var(--border);border-radius:6px;box-shadow:var(--shadow)}
+.nt-editor-files-actions .rb-divider,.nt-editor-files-actions [data-rb-action=mkdir],.nt-editor-files-actions [data-rb-action=newFile],.nt-editor-files-actions [data-rb-action=edit]{display:none}
+.nt-editor-files-actions .rb-toolbar .btn{white-space:normal;justify-content:flex-start}
+.nt-editor-files-activity{margin:0;flex:none;min-width:0}
+.nt-editor-files-activity>summary{padding:5px 7px;font-size:11px}
+.nt-editor-files-activity .rb-activity{padding:5px;max-height:165px;border:0;margin:0}
+.nt-editor-files-activity .rb-activity-list{max-height:105px}
+.nt-editor-files-activity .rb-activity>.row{flex-wrap:wrap}
