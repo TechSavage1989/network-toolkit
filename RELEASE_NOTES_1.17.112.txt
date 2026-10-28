@@ -1,0 +1,13 @@
+Network Toolkit 1.17.112
+
+Editor views and file explorer
+- Align More and Options controls with their toolbar buttons.
+- Place document tabs directly above the text in each view.
+- Add independent left/right tab groups and normal split editing. New documents stay on the left until moved; comparison moves only its selected pair.
+- Add tab context menus, keyboard actions and same-window drag between views. Keep document history and view placement when moving editor windows.
+- Add a resizable Windows files and SFTP sidebar with navigation, filtering, sorting, file actions, upload/download, activity feedback and confirmed deletion using the established file manager.
+- Detached editor file management requires approval in the main window. It uses only the existing SFTP transports approved at that time. Saved credentials and terminal control remain in the main window.
+- Protect open editor files from conflicting explorer mutations. Existing Save, revision checks and document ownership remain in force.
+
+Validation
+Hosted browser/native and release checks are required before publication. Synthetic fixtures only; no user desktop automation or private configuration included.

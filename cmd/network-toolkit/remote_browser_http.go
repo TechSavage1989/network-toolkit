@@ -260,6 +260,26 @@ func (a *application) handleRemoteBrowser(w http.ResponseWriter, request *http.R
 		jsonResponse(w, 200, map[string]any{"session": session, "viewState": a.terminalViewStateForRequest(request)})
 		return
 	}
+	targets := []editorExplorerTarget{}
+	binding := editorBinding{Kind: "sshConnection", ConnectionID: r.ConnectionID}
+	if r.SessionID != "" {
+		binding = editorBinding{Kind: "terminal", SessionID: r.SessionID}
+	}
+	switch r.Action {
+	case "upload", "remove", "rmdir", "rename", "mkdir", "chmod":
+		targets = append(targets, editorExplorerTarget{Binding: binding, Path: r.Path})
+	case "download":
+		targets = append(targets, editorExplorerTarget{Binding: editorBinding{Kind: "local"}, Path: r.LocalPath})
+	}
+	if r.Action == "rename" || r.Action == "copy" {
+		targets = append(targets, editorExplorerTarget{Binding: binding, Path: r.NewPath})
+	}
+	release, err := a.reserveExplorerMutation(targets...)
+	if err != nil {
+		jsonError(w, 409, err.Error())
+		return
+	}
+	defer release()
 	if r.Action == "copy" {
 		a.handleRemoteCopy(w, request, r)
 		return

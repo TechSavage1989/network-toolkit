@@ -62,7 +62,7 @@ function create(options={}){
    if(!detach&&!event.target.closest?.('[data-ed-tabs]')){event.dataTransfer.dropEffect='none';clearVisual();return;}
    g.dropSeen=true;event.dataTransfer.dropEffect='move';clearVisual();
    if(detach){if(!g.native||g.cancelled)return;try{await windows().detachDrag(ticket);}catch(error){tell(error.message||String(error));cancel(g);}}
-   else{const before=beforeUID(event);await g.promise;if(!g.cancelled)editor().reorderDocument(g.uid,before);cancel(g);if(gesture===g)gesture=null;}
+   else{const before=beforeUID(event),view=event.target.closest?.('[data-ed-view]')?.dataset.edView;await g.promise;if(!g.cancelled){if(['left','right'].includes(view))editor().moveDocumentToView?.(g.uid,view);editor().reorderDocument(g.uid,before);}cancel(g);if(gesture===g)gesture=null;}
    return;
   }
   clearVisual();if(!native()){event.dataTransfer.dropEffect='none';return;}

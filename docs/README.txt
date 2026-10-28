@@ -1,11 +1,16 @@
-NETWORK TOOLKIT 1.17.111
+NETWORK TOOLKIT 1.17.112
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.111
+CURRENT RELEASE - 1.17.112
 
-Release details: RELEASE_NOTES_1.17.111.txt
-Previous release: docs/releases/RELEASE_NOTES_1.17.110.txt
+Release details: RELEASE_NOTES_1.17.112.txt
+Previous release: docs/releases/RELEASE_NOTES_1.17.111.txt
 Full release-note archive: docs/releases/README.md
+
+The editor has independent left/right tab groups and a normal split view. Tabs
+sit above their own text pane. Files opens a resizable Windows/SFTP browser.
+A detached editor requests file explorer approval in the main window; only the
+existing approved SFTP transports are shared, without saved credentials.
 
 Comparison uses separate Left and Right maps, visible Fit/zoom levels and
 wheel/click/drag navigation. Compact controls reclaim document space; Options

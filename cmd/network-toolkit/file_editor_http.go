@@ -467,6 +467,14 @@ func (a *application) handleRemoteDropUpload(w http.ResponseWriter, r *http.Requ
 	forwarded.Method = http.MethodPost
 	forwarded.Body = io.NopCloser(bytes.NewReader(body))
 	forwarded.ContentLength = int64(len(body))
+	if editorRequestView(r) != "" {
+		forwarded.URL = r.URL.JoinPath("..")
+		forwarded.URL.Path = "/api/remote-browser"
+		if !a.serveApprovedEditorExplorer(w, forwarded) {
+			jsonError(w, 403, "File explorer access is no longer approved.")
+		}
+		return
+	}
 	a.handleRemoteBrowser(w, forwarded)
 }
 

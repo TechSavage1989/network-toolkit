@@ -99,6 +99,19 @@ func (a *application) handleTransferLocalFiles(w http.ResponseWriter, r *http.Re
 		jsonError(w, 400, "Invalid local file operation.")
 		return
 	}
+	targets := []editorExplorerTarget{}
+	if req.Action == "rename" || req.Action == "delete" || req.Action == "mkdir" {
+		targets = append(targets, editorExplorerTarget{Binding: editorBinding{Kind: "local"}, Path: req.Path})
+	}
+	if req.Action == "rename" || req.Action == "copy" {
+		targets = append(targets, editorExplorerTarget{Binding: editorBinding{Kind: "local"}, Path: req.NewPath})
+	}
+	release, err := a.reserveExplorerMutation(targets...)
+	if err != nil {
+		jsonError(w, 409, err.Error())
+		return
+	}
+	defer release()
 	if err := localExplorerAction(req.Action, req.Path, req.NewPath, req.Overwrite, req.Confirm); err != nil {
 		jsonError(w, 400, err.Error())
 		return

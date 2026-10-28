@@ -14,6 +14,34 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  browser-editor112:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install isolated editor test browser
+        run: |
+          npm install --prefix "$RUNNER_TEMP/ntk-editor112" --no-audit --no-fund playwright@1.62.1
+          node "$RUNNER_TEMP/ntk-editor112/node_modules/playwright/cli.js" install chromium
+      - name: Exercise independent views and the full file sidebar
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results
+        run: node scripts/editor-views112.browser.cjs
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: editor112-browser-checks
+          path: ${{ runner.temp }}/ntk-editor112-results
+          if-no-files-found: error
+          retention-days: 14
+
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -166,6 +194,8 @@ jobs:
           go test -mod=vendor ./cmd/network-toolkit -run 'TestExplorerDrop|TestSFTPDropRename|TestRemoteBrowserPersistent' -count=1 -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           go test -mod=vendor ./internal/diag -run TestSFTPStaged -count=1 -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          go test -mod=vendor ./cmd/network-toolkit -run 'TestEditorExplorer|TestEditorLayout' -count=1 -v
       - name: Verify real Windows Explorer file drops into native WebView2
         env:
           GOTOOLCHAIN: local

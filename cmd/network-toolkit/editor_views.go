@@ -76,6 +76,19 @@ type editorCompare struct {
 	Scale float64 `json:"scale"`
 	Sync  bool    `json:"sync"`
 }
+
+// View membership contains document identities only, never another file grant.
+type editorLayout struct {
+	Split      bool             `json:"split"`
+	ActiveSide string           `json:"activeSide"`
+	Left       string           `json:"left"`
+	Right      string           `json:"right"`
+	Groups     []editorTabGroup `json:"groups"`
+}
+type editorTabGroup struct {
+	UID  string `json:"uid"`
+	Side string `json:"side"`
+}
 type editorPreferences struct {
 	WordWrap bool              `json:"wordWrap"`
 	Syntax   bool              `json:"syntax"`
@@ -89,6 +102,7 @@ type editorBatch struct {
 	Documents   []editorDocumentSnapshot `json:"documents"`
 	Active      string                   `json:"active"`
 	Compare     *editorCompare           `json:"compare"`
+	Layout      *editorLayout            `json:"layout,omitempty"`
 	Preferences *editorPreferences       `json:"preferences,omitempty"`
 }
 type editorTransferRequest struct {
@@ -104,6 +118,7 @@ type editorViewInfo struct {
 	Name  string `json:"name"`
 }
 type editorWindow struct {
+	explorer  *editorExplorerAccess
 	info      editorViewInfo
 	token     string
 	lastPulse time.Time
@@ -127,6 +142,7 @@ type editorTransfer struct {
 	acked                                           bool
 }
 type editorViewRegistry struct {
+	explorerOperations       map[string][]editorExplorerTarget
 	mu                       sync.Mutex
 	app                      *application
 	views                    map[string]*editorWindow
@@ -433,6 +449,21 @@ func validateEditorBatch(batch editorBatch) error {
 			return errors.New("Invalid editor comparison.")
 		}
 	}
+	if layout := batch.Layout; layout != nil {
+		if len(layout.Groups) != len(batch.Documents) || (layout.ActiveSide != "left" && layout.ActiveSide != "right") {
+			return errors.New("Invalid editor view layout.")
+		}
+		membership := map[string]string{}
+		for _, group := range layout.Groups {
+			if !uids[group.UID] || membership[group.UID] != "" || (group.Side != "left" && group.Side != "right") {
+				return errors.New("Invalid editor tab group.")
+			}
+			membership[group.UID] = group.Side
+		}
+		if (layout.Left != "" && membership[layout.Left] != "left") || (layout.Right != "" && membership[layout.Right] != "right") {
+			return errors.New("The selected tab is not in its editor view.")
+		}
+	}
 	raw, e := json.Marshal(batch)
 	if e != nil || len(raw) > editorTransferLimit {
 		return errors.New("Editor transfer exceeds the 32 MiB total limit.")
@@ -468,7 +499,21 @@ func (m *editorViewRegistry) makeGrant(caller string, d editorDocumentSnapshot) 
 	// Only the home capability can delegate an existing authenticated transport.
 	// Child windows cannot introduce a guessed connection/session identifier.
 	if caller != "" {
-		return nil, errors.New("A new remote file binding must originate in the main workspace.")
+		m.mu.Lock()
+		v := m.views[caller]
+		var original *editorDocumentGrant
+		if v != nil && v.explorer != nil && v.explorer.Allowed {
+			original = v.explorer.Remotes[explorerBindingKey(b)]
+		}
+		m.mu.Unlock()
+		if original != nil {
+			if original.valid() && editorSameBinding(original.snapshot.Binding, b) {
+				grant.run = original.run
+				grant.valid = original.valid
+				return grant, nil
+			}
+		}
+		return nil, errors.New("A new remote file binding must originate in the main workspace or an approved file explorer.")
 	}
 	if b.Kind == "sshConnection" {
 		entry, err := m.app.browserConnection(b.ConnectionID)
@@ -587,7 +632,7 @@ func (m *editorViewRegistry) state(caller string) map[string]any {
 			}
 		}
 	}
-	return map[string]any{"available": m.app.launchEditorView != nil, "self": caller, "views": views, "incoming": incoming, "outgoing": outgoing, "owned": owned, "recovery": recovery, "ownerInstanceId": m.app.windowInstanceID, "dragRequests": m.dragRequestsLocked(caller)}
+	return map[string]any{"available": m.app.launchEditorView != nil, "self": caller, "views": views, "incoming": incoming, "outgoing": outgoing, "owned": owned, "recovery": recovery, "ownerInstanceId": m.app.windowInstanceID, "dragRequests": m.dragRequestsLocked(caller), "explorerRequests": m.explorerRequestsLocked(caller)}
 }
 func (m *editorViewRegistry) offer(caller string, req editorTransferRequest) (map[string]any, error) {
 	if !editorHexID.MatchString(req.ID) {
@@ -676,6 +721,10 @@ func (m *editorViewRegistry) offer(caller string, req editorTransferRequest) (ma
 		total += d.bytes
 	}
 	for _, snapshot := range req.Batch.Documents {
+		if m.explorerConflictLocked(snapshot.Binding, snapshot.Path) {
+			m.mu.Unlock()
+			return nil, errors.New("A file explorer operation is changing this path.")
+		}
 		d := m.documents[snapshot.UID]
 		if d == nil {
 			d = grants[snapshot.UID]

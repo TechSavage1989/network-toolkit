@@ -36,6 +36,9 @@ func (a *application) serveEditorAPI(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	if a.serveApprovedEditorExplorer(w, r) {
+		return
+	}
 	switch {
 	case r.URL.Path == "/api/status" && r.Method == http.MethodGet:
 		jsonResponse(w, 200, map[string]any{"editorWindowAvailable": a.launchEditorView != nil, "version": model.Version, "os": runtime.GOOS, "arch": runtime.GOARCH})
@@ -75,6 +78,9 @@ func (a *application) handleEditorViews(w http.ResponseWriter, r *http.Request) 
 	}
 	caller := editorRequestView(r)
 	path := strings.TrimPrefix(r.URL.Path, "/api/editor-views")
+	if m.handleExplorerAccess(w, r, caller, path) {
+		return
+	}
 	if r.Method == http.MethodGet && (path == "" || path == "/current") {
 		jsonResponse(w, 200, m.state(caller))
 		return
@@ -258,6 +264,9 @@ func (m *editorViewRegistry) checkpoint(caller string, batch editorBatch, leases
 		}
 	}
 	for _, snapshot := range batch.Documents {
+		if m.explorerConflictLocked(snapshot.Binding, snapshot.Path) {
+			return nil, errors.New("A file explorer operation is changing this path.")
+		}
 		d := m.documents[snapshot.UID]
 		if d == nil {
 			if grants[snapshot.UID] == nil || leases[snapshot.UID] != 0 {
@@ -279,6 +288,9 @@ func (m *editorViewRegistry) checkpoint(caller string, batch editorBatch, leases
 	batch = editorCloneBatch(batch)
 	out := map[string]uint64{}
 	for _, snapshot := range batch.Documents {
+		if m.explorerConflictLocked(snapshot.Binding, snapshot.Path) {
+			return nil, errors.New("A file explorer operation is changing this path.")
+		}
 		d := m.documents[snapshot.UID]
 		if d == nil {
 			d = grants[snapshot.UID]
@@ -348,7 +360,7 @@ func (m *editorViewRegistry) file(w http.ResponseWriter, r *http.Request, caller
 	}
 	m.mu.Lock()
 	d := m.documents[uid]
-	if !m.callerLocked(caller) || d == nil || d.owner != caller || d.lease != request.Lease || d.pending != "" || d.busy != 0 {
+	if !m.callerLocked(caller) || d == nil || d.owner != caller || d.lease != request.Lease || d.pending != "" || d.busy != 0 || m.explorerConflictLocked(d.snapshot.Binding, request.Path) {
 		m.mu.Unlock()
 		jsonError(w, 409, errEditorLease.Error())
 		return

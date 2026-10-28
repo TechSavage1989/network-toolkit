@@ -46,7 +46,7 @@ test('brace indentation preserves PowerShell here-strings and C raw strings/macr
 });
 function editorHarness(){const document=makeDocument('');document.body=document;const create=document.createElement;document.createElement=tag=>{const el=create(tag);el.style.setProperty=(k,v)=>el.style[k]=v;el.style.removeProperty=k=>delete el.style[k];return el;};let complete;
  const c={document,console,Map,Set,TextDecoder,TextEncoder,Uint8Array,DataView,Blob,URL,setTimeout,clearTimeout,state:{},saveState(){},confirm:()=>true,esc:s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;'),addEventListener(){},NTKEditorLanguageService:{highlight:async text=>({html:text}),format:()=>new Promise(resolve=>complete=resolve),dispose(){}}};
- load(c,['editor-vendor/languages.js','network-config-language.js','editor-languages.js','file-editor.js']);const api=c.NetworkToolkitFileEditor;
+ load(c,['editor-vendor/languages.js','network-config-language.js','editor-languages.js','editor-tab-groups.js','file-editor.js']);const api=c.NetworkToolkitFileEditor;
  const root=()=>document.getElementById('networkToolkitFileEditor');const ta=()=>document.querySelector('[data-ed-text]');
  return {api,c,document,ta,root,complete:result=>complete(result),async open(id,text){await api.open({id,path:id,create:true,initialContent:text,read:async()=>({content:text}),write:async()=>({})});},click:action=>root().emit('click',root().querySelector('[data-ed="'+action+'"]')),settle:()=>new Promise(resolve=>setImmediate(resolve))};
 }

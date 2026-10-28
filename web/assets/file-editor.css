@@ -210,3 +210,69 @@ body:has(.nt-editor-embedded) #toolWorkspace>#pageContent{grid-row:1!important;g
 
 .nt-editor-label-compact{display:none}
 @media(max-width:680px){.nt-editor-toolbar .nt-editor-label-wide{display:none}.nt-editor-toolbar .nt-editor-label-compact{display:inline}}
+
+/* Shared controls stay above view-local tabs and their editing surfaces. */
+.nt-editor-workspace{display:flex;flex:1 1 0;min-height:0;min-width:0;overflow:hidden}
+.nt-editor-document-area{display:flex;flex-direction:column;flex:1 1 0;min-width:0;min-height:0;overflow:hidden}
+.nt-editor.is-split .nt-editor-code{display:none}
+.nt-editor-tabs[hidden]{display:none}
+.nt-compare-pane>.nt-editor-tabs{border-bottom:1px solid var(--border);padding:3px 4px;min-height:32px;max-height:45px;overflow:auto;scrollbar-gutter:auto}
+.nt-compare-pane.is-active-view>.nt-editor-tabs{box-shadow:inset 0 -2px var(--accent)}
+.nt-editor-compare.is-split-view>.nt-compare-tools,.nt-editor-compare.is-split-view>.nt-compare-summary,.nt-editor-compare.is-split-view .nt-compare-map-panel{display:none}
+.nt-editor-compare.is-split-view .nt-compare-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+.nt-editor-more,.nt-compare-settings{margin:0;padding:0;line-height:1;align-self:center}
+.nt-editor-more>summary.btn,.nt-compare-settings>summary.btn{display:flex;align-items:center;justify-content:center;box-sizing:border-box;height:28px;min-height:28px;margin:0;padding:4px 8px;line-height:normal;vertical-align:top}
+.nt-editor-more-actions,.nt-compare-settings>div{line-height:normal}
+.nt-editor-tab-menu{position:fixed;z-index:40;min-width:220px;max-width:calc(100vw - 12px);max-height:calc(100dvh - 12px);overflow:auto;display:flex;flex-direction:column;gap:2px;padding:5px;border:1px solid var(--border);border-radius:7px;background:var(--panel);box-shadow:var(--shadow);font-size:11px}
+.nt-editor-tab-menu button{display:block;width:100%;border:0;border-radius:4px;background:transparent;text-align:left;min-height:28px;padding:5px 8px;color:var(--text);font:inherit;cursor:pointer}
+.nt-editor-tab-menu button:hover,.nt-editor-tab-menu button:focus-visible{background:var(--accentBg);outline:1px solid var(--accent);outline-offset:-1px}
+.nt-editor-tab-menu button:disabled{opacity:.45;cursor:default}
+.nt-editor-tab-menu [role=separator]{border-top:1px solid var(--border);margin:3px 0}
+.nt-editor-files-sidebar{flex:0 0 300px;width:300px;min-width:220px;max-width:45%;min-height:0;overflow:hidden;border-right:1px solid var(--border);background:var(--panel)}
+.nt-editor-files-sidebar[hidden]{display:none}
+@media(max-width:680px){.nt-editor-files-sidebar{flex-basis:260px;width:260px;max-width:75%}.nt-editor-workspace{position:relative}.nt-editor-files-sidebar:not([hidden]){position:absolute;inset:0 auto 0 0;z-index:8;box-shadow:var(--shadow)}}
+.nt-editor-files-sidebar{position:relative;display:flex;flex-direction:column;padding-right:5px}
+.nt-editor-files-heading{display:flex;align-items:center;justify-content:space-between;gap:4px;padding:5px;border-bottom:1px solid var(--border);flex:none}
+.nt-editor-files-heading [role=tablist]{display:flex;gap:4px;min-width:0}
+.nt-editor-files-heading .btn,.nt-editor-files-sidebar .btn{min-height:28px;padding:4px 7px;font-size:11px}
+.nt-editor-files-body{display:flex;flex-direction:column;flex:1;min-height:0;overflow:auto}
+.nt-editor-files-resize{position:absolute;inset:0 0 0 auto;width:5px;background:var(--border);cursor:col-resize;touch-action:none}
+.nt-editor-files-resize:hover,.nt-editor-files-resize:focus-visible{background:var(--accent)}
+.is-editor-sidebar.rb-app{height:100%;min-height:0;gap:5px;padding:5px}
+.is-editor-sidebar.rb-app>.panel{padding:0;border:0;box-shadow:none;border-radius:0}
+.is-editor-sidebar .rb-explorer{flex:1 1 0;min-height:240px;gap:4px;overflow:visible}
+.is-editor-sidebar .rb-panes{grid-template-columns:minmax(0,1fr);flex:1 1 0;min-height:150px}
+.is-editor-sidebar .rb-splitter,.is-editor-sidebar[data-sidebar-side=local] [data-rb-pane=remote],.is-editor-sidebar[data-sidebar-side=remote] [data-rb-pane=local]{display:none}
+.is-editor-sidebar .rb-pane{border-radius:5px}
+.is-editor-sidebar .rb-pane-heading{padding:5px 6px;font-size:11px}
+.is-editor-sidebar .rb-navigation{flex-wrap:wrap;gap:4px;padding:5px}
+.is-editor-sidebar .rb-navigation input{order:1;flex:1 1 calc(100% - 45px);width:calc(100% - 45px)}
+.is-editor-sidebar .rb-navigation [data-rb-nav=go]{order:2}
+.is-editor-sidebar .rb-filter{gap:4px;padding:5px}
+.is-editor-sidebar .rb-scroll table{font-size:11px;min-width:280px}
+.is-editor-sidebar .rb-file-name{max-width:210px;min-width:90px}
+.is-editor-sidebar .rb-scroll th,.is-editor-sidebar .rb-scroll td{padding:4px 6px!important}
+.is-editor-sidebar .rb-pane-footer{white-space:normal;font-size:10px;padding:4px 6px}
+.is-editor-sidebar .rb-activity{max-height:115px;flex:none}
+.is-editor-sidebar .rb-activity-list{max-height:70px}
+.is-editor-sidebar .rb-activity h2{font-size:11px}
+.is-editor-sidebar .rb-connection-fields{grid-template-columns:minmax(0,1fr);gap:5px;margin:5px 0}
+.is-editor-sidebar .rb-connection-fields label.rb-long{grid-column:auto}
+.is-editor-sidebar .rb-connection-fields input,.is-editor-sidebar .rb-connection-fields select{min-height:28px;font-size:11px}
+.is-editor-sidebar .rb-connect{padding:5px;min-width:0}
+.is-editor-sidebar .rb-connect .row{flex-wrap:wrap}
+.is-editor-sidebar [data-rb-action=fullEditor]{display:none}
+.nt-editor-files-connection,.nt-editor-files-actions{margin:0;padding:0;flex:none;min-width:0}
+.nt-editor-files-connection>summary,.nt-editor-files-actions>summary{display:flex;align-items:center;list-style:none;cursor:pointer;margin:0;min-height:28px}
+.nt-editor-files-connection>summary::after,.nt-editor-files-actions>summary::after{content:' ▾'}
+.nt-editor-files-connection>summary::-webkit-details-marker,.nt-editor-files-actions>summary::-webkit-details-marker{display:none}
+.nt-editor-files-actions .rb-toolbar{gap:4px;padding:5px 0;max-height:200px;overflow:auto}
+.nt-editor-files-quick{display:flex;flex-wrap:wrap;gap:4px}
+.nt-editor-files-connection[open]{max-height:55%;overflow:auto}
+.is-editor-sidebar[data-sidebar-side=local]>.nt-editor-files-connection{display:none}
+.is-editor-sidebar[data-delegated] [data-rb-action=openTerminal],.is-editor-sidebar[data-delegated] [data-rb-action=reconnect],.is-editor-sidebar[data-delegated] [data-rb-action=disconnect],.is-editor-sidebar[data-delegated] [data-rb-action=connectionSettings]{display:none}
+body:has(.nt-editor:not([hidden]) [data-ed-files-sidebar]:not([hidden])) .modal-backdrop{z-index:400}
+body:has(.nt-editor:not([hidden]) [data-ed-files-sidebar]:not([hidden])) .rb-context-menu{z-index:410}
+body:has(.nt-editor:not([hidden]) [data-ed-files-sidebar]:not([hidden])) .toast-stack{z-index:420}
+.nt-editor-files-access{padding:10px;font-size:11px;line-height:1.5}
+.nt-editor-files-access-banner{position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:430;display:flex;align-items:center;gap:8px;max-width:calc(100vw - 20px);padding:6px 10px;border:1px solid var(--border);border-radius:7px;box-shadow:var(--shadow);background:var(--panel);color:var(--text);font-size:11px}

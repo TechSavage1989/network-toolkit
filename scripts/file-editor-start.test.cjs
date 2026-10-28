@@ -9,7 +9,7 @@ function harness(){
  const document=makeDocument('');document.body=document;
  const create=document.createElement;document.createElement=tag=>{const el=create(tag);el.style.setProperty=(k,v)=>el.style[k]=v;el.style.removeProperty=k=>delete el.style[k];return el;};
  const c={document,console,Map,Set,Date,Math,TextDecoder,TextEncoder,Uint8Array,DataView,Blob,URL,setTimeout,clearTimeout,state:{},saveState(){},confirm:()=>true,esc:x=>String(x).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;'),addEventListener(){}};
- vm.createContext(c);vm.runInContext(source,c);const api=c.NetworkToolkitFileEditor;
+ vm.createContext(c);vm.runInContext(fs.readFileSync(require.resolve('../web/assets/editor-tab-groups.js'),'utf8'),c);vm.runInContext(source,c);const api=c.NetworkToolkitFileEditor;
  async function first(){
   const pending=deferred(),running=api.open({id:'first',path:'first.txt',source:'Local computer',read:()=>pending.promise,write:async()=>({})}),ta=document.querySelector('[data-ed-text]');
   let value=ta.value||'';
