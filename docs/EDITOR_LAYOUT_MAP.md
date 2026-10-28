@@ -3,7 +3,8 @@
 Local implementation based on main `4747873292eca9f09577ac2803756113557d0bcf`
 and confirmed published `v1.17.110` (`a71f98c4f418077cfeefa5546cfb77de1d8e7742`).
 Publication of this usability change as v1.17.111 was explicitly authorized on
-2026-10-28. Hosted checks and asset verification are required before completion.
+2026-10-28. Hosted review/main checks, automatic Release and public download
+verification completed successfully; see [RELEASE111_HANDOFF.md](RELEASE111_HANDOFF.md).
 
 ## Shared layout rules
 

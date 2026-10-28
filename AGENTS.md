@@ -3,7 +3,18 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-Current published version: 1.17.110. The focused graph/editor correction batch
+Current published version: 1.17.111. Compact interface and two-document comparison
+maps are published and independently verified. Source/tag: bf414aec01a63a4b492cdfc62f32fa52910f3b69;
+tree 250294f0ece6dcc3397a9f9ed899770015da3523. All six review Checks, automatic Release and
+all six duplicate main Checks passed. Four public assets,1,008 exact source files,
+reviewed EXE/portable identity, PE icons and latest feed are verified. Read
+docs/RELEASE111_HANDOFF.md and docs/EDITOR_LAYOUT_MAP.md for behavior and limits.
+This docs-only record is not another build. Preserve all old tags/assets.
+The user prohibits local desktop automation or test windows without advance
+approval for a scheduled session. Run visual/native tests in isolated environments;
+never stop normal app sessions or discard unsaved work.
+
+Previous published version: 1.17.110. The focused graph/editor correction batch
 is published and independently verified. Source/tag:
 a71f98c4f418077cfeefa5546cfb77de1d8e7742; tree
 c0f4ee07ab4687d50c5d4b2e5afc2bdf6a1f545b. All six exact-source Checks and automatic
