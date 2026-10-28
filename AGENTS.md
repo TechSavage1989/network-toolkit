@@ -3,12 +3,20 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-Active authorized candidate: 1.17.109. Read docs/RELEASE109_HANDOFF.md.
-The user approved vertical-space improvements to the global shell and editor.
-Do not mix broader features into this batch; preserve108 and all prior safeguards.
-Final exact-source hosted/native/pixel/public acceptance remains pending.
+Current published version: 1.17.109. The authorized vertical-space layout batch
+is published and independently verified. Source/tag:
+d3494a879604fb2523e0867ad1fb175a2f9abbf5; tree
+9dda3650d5c794a4fc1c734976619819ce87fbfa. All six exact-source Checks and automatic
+Release passed; actual normal/narrow/native editor evidence, four public assets,
+992 exact source files, reviewed package/binary identity, PE icons and latest feed
+were verified. Read docs/RELEASE109_HANDOFF.md and DEVELOPMENT_HANDOFF.md for
+measured gains, limits and duplicate-main closure. This docs-only handoff is not
+a new build. Preserve every published tag/asset and all existing safeguards.
+Post-release graph-outline flicker and unsupported editor tab dragging are open
+follow-up issues; see the109 handoff. Do not treat synthetic checks as user-runtime
+acceptance or mix a later fix into the immutable109 source/tag/assets.
 
-Current published version: 1.17.108. The authorized activity/bookmark/graph/editor
+Previous published version: 1.17.108. The authorized activity/bookmark/graph/editor
 batch is published and independently verified. Source/tag:
 59a82b13bb31899206d383ea58166ec9a4f4faf0; tree
 c2e0b5db0b51ef4501bf4e72d5ccd61db671483e. All six exact-source Checks and automatic
