@@ -7,4 +7,11 @@ function stableCapture(before,after){
  const start=before.frames.at(-1),frames=after.frames.filter(frame=>frame.t>=start.t);
  return frames.length>0&&frames.every(frame=>same(start,frame))&&same(start,after.frames.at(-1));
 }
-module.exports={settled,stableCapture};
+// Match terminalEventQuery's empty-event long-poll contract, not a fast poll.
+function emptyEventWait(value){
+ if(value==null||value==='')return 15000;
+ if(!/^[+-]?\d+$/.test(value)||!Number.isSafeInteger(Number(value))||Number(value)<0||Number(value)>20000)throw new Error('Invalid synthetic terminal event wait');
+ return Number(value);
+}
+function waitForEmptyEvents(ms,pending){return new Promise(resolve=>{const finish=value=>{clearTimeout(timer);pending.delete(cancel);resolve(value);},cancel=()=>finish(false),timer=setTimeout(()=>finish(true),ms);pending.add(cancel);});}
+module.exports={settled,stableCapture,emptyEventWait,waitForEmptyEvents};

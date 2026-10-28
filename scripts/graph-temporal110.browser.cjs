@@ -2,10 +2,10 @@
 // Real bundled baseline/candidate UIs, native timers, synthetic intercepted jobs only.
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),assert=require('node:assert/strict');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
-const {settled,stableCapture}=require('./graph-temporal110-capture.cjs');
+const {settled,stableCapture,emptyEventWait,waitForEmptyEvents}=require('./graph-temporal110-capture.cjs');
 const current=path.resolve(__dirname,'..'),baseline=process.env.NTK_GRAPH_BASELINE_DIR,out=process.env.NTK_BROWSER_OUTPUT_DIR||process.env.TOOLKIT_TEST_OUTPUT;
 const baselineHash='b95b6bd5fd9262a74134d94cc2b466ae215caaba744ba4b8bae0a4e91da9382b';
-const report={passed:false,checks:[],cases:[],errors:[],assetFailures:[],requests:[],baseline:{source:'d3494a879604fb2523e0867ad1fb175a2f9abbf5',timelineSHA256:baselineHash}},contexts=[];
+const report={passed:false,checks:[],cases:[],errors:[],assetFailures:[],requests:[],baseline:{source:'d3494a879604fb2523e0867ad1fb175a2f9abbf5',timelineSHA256:baselineHash}},contexts=[],engines=[];
 const hash=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 const origin='https://temporal110.toolkit.test',jobID='graph110-synthetic';let browser,lastPage;
 const stamp=n=>new Date(Date.parse('2026-10-28T11:00:00Z')+n*1000).toISOString();
@@ -14,7 +14,7 @@ function makeJob(status,mode){const rows=Array.from({length:mode==='condensed'?3
 const settle=page=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
 async function start(root,label){
  const context=await browser.newContext({viewport:{width:1440,height:1000},serviceWorkers:'block'});contexts.push(context);const page=await context.newPage();lastPage=page;page.setDefaultTimeout(15000);
- const cdp=await context.newCDPSession(page);const engine={page,cdp,label,root,job:makeJob('completed','linear'),saved:{activePage:'overview',appUpdatePreferences:{enabled:false}},requests:[]};
+ const cdp=await context.newCDPSession(page);const engine={page,cdp,label,root,job:makeJob('completed','linear'),saved:{activePage:'overview',appUpdatePreferences:{enabled:false}},requests:[],pendingWaits:new Set(),closing:false};engines.push(engine);
  page.on('pageerror',error=>report.errors.push({label,error:error.message}));page.on('response',response=>{if(response.url().includes('/assets/')&&response.status()>=400)report.assetFailures.push({label,url:response.url(),status:response.status()});});
  await context.route('**/*',async route=>{try{const req=route.request(),url=new URL(req.url()),p=url.pathname;assert.equal(url.origin,origin,'External/device requests are forbidden');
   if(p.startsWith('/api/')){const request={label,path:p,method:req.method(),at:Date.now()};engine.requests.push(request);report.requests.push(request);let data={};
@@ -25,13 +25,13 @@ async function start(root,label){
    if(p==='/api/terminals')data={sessions:[]};if(p==='/api/terminal-views')data={available:false,owners:{},views:[]};if(p==='/api/activity')data={tools:{ping:engine.job.status==='running'?{operations:1}:{}}};
    if(p.startsWith('/api/public-ip'))data={provider:'fixture',checkedAt:stamp(0),expiresAt:stamp(99999),ipv4:{status:'unavailable'},ipv6:{status:'unavailable'}};
    if(p==='/api/scan-networks')data={interfaces:[]};if(p==='/api/local-tools/ip')data={available:true,adapters:[]};
-   if(p.includes('/events')){await new Promise(resolve=>setTimeout(resolve,60));data={events:[],sessions:[],after:0};}
-   return route.fulfill({contentType:'application/json',body:JSON.stringify(data)});
+   if(p==='/api/terminals/events'){const wait=emptyEventWait(url.searchParams.get('wait'));request.waitMs=wait;if(!await waitForEmptyEvents(wait,engine.pendingWaits)||engine.closing)return route.abort().catch(()=>{});data={events:[],sessions:[],after:0};}
+   return await route.fulfill({contentType:'application/json',body:JSON.stringify(data)});
   }
   let file=path.join(root,'web',p==='/'?'index.html':p);if(!fs.existsSync(file))file=path.join(root,p);let body=fs.readFileSync(file);
   if(p==='/')body=body.toString().replaceAll('__SESSION_TOKEN__','synthetic-temporal110').replaceAll('__WINDOW_MODE__','main');
-  return route.fulfill({body,contentType:p==='/'?'text/html':p.endsWith('.js')?'application/javascript':p.endsWith('.css')?'text/css':p.endsWith('.svg')?'image/svg+xml':'application/octet-stream'});
- }catch(error){report.errors.push({label,route:route.request().url(),error:error.message});return route.fulfill({status:500,body:'Synthetic fixture refused request'});}});
+  return await route.fulfill({body,contentType:p==='/'?'text/html':p.endsWith('.js')?'application/javascript':p.endsWith('.css')?'text/css':p.endsWith('.svg')?'image/svg+xml':'application/octet-stream'});
+ }catch(error){if(engine.closing)return route.abort().catch(()=>{});report.errors.push({label,route:route.request().url(),error:error.message});return await route.fulfill({status:500,body:'Synthetic fixture refused request'});}});
  await page.goto(origin);await page.waitForFunction(()=>__networkToolkitStartupState===1&&online);return engine;
 }
 async function target(page,selector){return page.locator(selector).first().evaluate(el=>{const marker=el.querySelector('[data-rt-marker]'),r=marker.getBoundingClientRect(),s=el.closest('svg').getBoundingClientRect();return {x:r.x+r.width/2,y:s.bottom-4,key:el.dataset.rtKey,sequence:Number(el.dataset.rtSequence||0)};});}
@@ -59,14 +59,14 @@ async function observe(engine,c,expected){
    if(!known.has(signature)){known.set(signature,state.states.length);state.states.push(value);}state.frames.push({t:performance.now()-state.started,state:known.get(signature),childMutations:state.childMutations,classMutations:state.classMutations});requestAnimationFrame(frame);
   }requestAnimationFrame(frame);
  });
- const captures=[],captured=new Set();const until=Date.now()+7800,deadline=Date.now()+16000;
- while(Date.now()<until||engine.requests.filter(r=>r.path==='/api/jobs'&&r.at>=started).length<3||captures.length<(label==='candidate'?1:2)){
+ const captures=[],captureAttempts=[],captured=new Set();const until=Date.now()+7800,deadline=Date.now()+16000;
+ try{while(Date.now()<until||engine.requests.filter(r=>r.path==='/api/jobs'&&r.at>=started).length<3||captures.length<(label==='candidate'?1:2)){
   assert(Date.now()<deadline,'Native polls and phase-verified screenshots must complete within the bounded observation window');await page.waitForTimeout(100);
   const before=await page.evaluate(()=>({frames:graph110Frames.frames.slice(-2),classMutations:graph110Frames.classMutations,childMutations:graph110Frames.childMutations})),frame=before.frames.at(-1);
-  if(frame&&settled(before)&&!captured.has(frame.state)&&captured.size<2&&out){const file='graph-temporal110-'+name+'-state'+frame.state+'.png',capture=await engine.cdp.send('Page.captureScreenshot',{format:'png',fromSurface:true,captureBeyondViewport:false,clip:{...clip,scale:1}}),bytes=Buffer.from(capture.data,'base64'),after=await page.evaluate(t=>({frames:graph110Frames.frames.filter(f=>f.t>=t),classMutations:graph110Frames.classMutations,childMutations:graph110Frames.childMutations}),frame.t);if(stableCapture(before,after)){fs.writeFileSync(path.join(out,file),bytes);captured.add(frame.state);captures.push({file,method:'Chromium compositor PNG via Page.captureScreenshot',before:frame,after:after.frames.at(-1),precedingFrames:before.frames,interveningFrames:after.frames,beforeCounters:{classMutations:before.classMutations,childMutations:before.childMutations},afterCounters:{classMutations:after.classMutations,childMutations:after.childMutations}});}}
- }
+  if(frame&&settled(before)&&!captured.has(frame.state)&&captured.size<2&&out){const file='graph-temporal110-'+name+'-state'+frame.state+'.png',capture=await engine.cdp.send('Page.captureScreenshot',{format:'png',fromSurface:true,captureBeyondViewport:false,clip:{...clip,scale:1}}),bytes=Buffer.from(capture.data,'base64'),after=await page.evaluate(t=>({frames:graph110Frames.frames.filter(f=>f.t>=t),classMutations:graph110Frames.classMutations,childMutations:graph110Frames.childMutations}),frame.t);const accepted=stableCapture(before,after);captureAttempts.push({before,after,accepted});if(accepted){fs.writeFileSync(path.join(out,file),bytes);captured.add(frame.state);captures.push({file,method:'Chromium compositor PNG via Page.captureScreenshot',before:frame,after:after.frames.at(-1),precedingFrames:before.frames,interveningFrames:after.frames,beforeCounters:{classMutations:before.classMutations,childMutations:before.childMutations},afterCounters:{classMutations:after.classMutations,childMutations:after.childMutations}});}}
+ }}catch(error){const data=await page.evaluate(()=>{graph110Frames.active=false;graph110Observer.disconnect();return graph110Frames;});const partial={...c,label,name,expected,polls:engine.requests.filter(r=>r.path==='/api/jobs'&&r.at>=started).map(r=>r.at-started),captures,captureAttempts,data,partial:true,failure:error.message};report.cases.push(partial);if(out)fs.writeFileSync(path.join(out,'graph-temporal110-'+name+'.json'),JSON.stringify(partial));throw error;}
  const data=await page.evaluate(()=>{graph110Frames.active=false;graph110Observer.disconnect();return graph110Frames;});
- const polls=engine.requests.filter(r=>r.path==='/api/jobs'&&r.at>=started).map(r=>r.at-started),result={...c,label,name,expected,polls,captures,data};report.cases.push(result);
+ const polls=engine.requests.filter(r=>r.path==='/api/jobs'&&r.at>=started).map(r=>r.at-started),result={...c,label,name,expected,polls,captures,captureAttempts,data};report.cases.push(result);
  if(out)fs.writeFileSync(path.join(out,'graph-temporal110-'+name+'.json'),JSON.stringify(result));
  assert(captures.length>=(label==='candidate'?1:2),'Actual stable-state PNGs must accompany each candidate/control observation');assert(data.frames.length>=20,'Actual requestAnimationFrame samples are required');assert(polls.length>=3,'Several native running/stopped polls are required');assert.equal(data.visibility,'visible');
  assert(data.states.every(s=>s.held===c.selected),'Background refresh cannot change selection ownership');
@@ -85,7 +85,7 @@ async function observe(engine,c,expected){
  assert.equal(JSON.parse(fs.readFileSync(path.join(baseline,'package.json'),'utf8')).version,'1.17.109');assert.equal(hash(fs.readFileSync(path.join(baseline,'web/assets/result-timeline.js'))),baselineHash,'Baseline is immutable published109, not a reconstructed control');report.candidateTimelineSHA256=hash(fs.readFileSync(path.join(current,'web/assets/result-timeline.js')));assert.notEqual(report.candidateTimelineSHA256,baselineHash);
  browser=await chromium.launch({headless:true,args:['--no-sandbox']});const before=await start(baseline,'baseline109'),after=await start(current,'candidate');
  for(const mode of ['linear','condensed'])for(const status of ['running','completed'])for(const theme of ['dark','light'])for(const selected of [false,true])for(const pointer of ['outside','hover']){
-  const c={mode,status,theme,selected,pointer},expectations=await Promise.all([configure(before,c),configure(after,c)]);await Promise.all([observe(before,c,expectations[0]),observe(after,c,expectations[1])]);
+  const c={mode,status,theme,selected,pointer},expectations=await Promise.all([configure(before,c),configure(after,c)]);const observations=await Promise.allSettled([observe(before,c,expectations[0]),observe(after,c,expectations[1])]),failure=observations.find(result=>result.status==='rejected');if(failure)throw failure.reason;
  }
  assert.equal(report.cases.length,64);assert.deepEqual(report.errors,[]);assert.deepEqual(report.assetFailures,[]);report.checks.push('Exact109 negative control reproduces outline changes while candidate is stable across32 real-timer states','Running/stopped, stationary/off-plot, selected/unselected, ordinary/aggregate and light/dark frames preserve status colors, theme lines, selection and node identities');report.passed=true;
-})().catch(async error=>{report.failure=error.stack;console.error(error);if(lastPage&&!lastPage.isClosed()&&out)await lastPage.screenshot({path:path.join(out,'graph-temporal110-failure.png')}).catch(()=>{});process.exitCode=1;}).finally(async()=>{if(out)fs.writeFileSync(path.join(out,'graph-temporal110-results.json'),JSON.stringify(report,null,2));for(const c of contexts)await c.close().catch(()=>{});await browser?.close();});
+})().catch(async error=>{report.failure=error.stack;console.error(error);if(lastPage&&!lastPage.isClosed()&&out)await lastPage.screenshot({path:path.join(out,'graph-temporal110-failure.png')}).catch(()=>{});process.exitCode=1;}).finally(async()=>{if(out)fs.writeFileSync(path.join(out,'graph-temporal110-results.json'),JSON.stringify(report,null,2));for(const engine of engines){engine.closing=true;for(const cancel of engine.pendingWaits)cancel();}for(const c of contexts)await c.close().catch(()=>{});await browser?.close();});
