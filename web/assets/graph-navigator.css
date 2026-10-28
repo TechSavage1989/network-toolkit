@@ -25,5 +25,5 @@
 /* Compact height reserves a real plot and complete rows, with 26px handle hits. */
 @media(max-height:720px){.graph-workspace{--graph-min-height:136px}.graph-workspace-graph>.rt-timeline{grid-template-rows:auto minmax(44px,1fr) 18px 34px}.graph-navigator{height:34px;grid-template-rows:22px 11px}.graph-navigator .gn-labels{line-height:11px}.packet-traffic-section{grid-template-rows:auto minmax(35px,1fr) 20px 34px 14px}}
 
-.rt-timeline[data-rt-plot-active="rtt"] .gn-series.gn-good,.rt-timeline[data-rt-plot-active="rtt"] .gn-series.gn-info{stroke:var(--accent)}
-.rt-timeline[data-rt-plot-active="jitter"] .gn-series.gn-good,.rt-timeline[data-rt-plot-active="jitter"] .gn-series.gn-info{stroke:var(--diag-warn,var(--warn))}
+/* The latency overview is a connecting trace, not a result-status marker. */
+.rt-timeline .gn-series:not(.gn-unmeasured){stroke:var(--accent)}

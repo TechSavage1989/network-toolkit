@@ -246,6 +246,9 @@ func (a *application) updateBusy() []string {
 		busy = append(busy, "Remote file connections")
 	}
 	a.browserMu.Unlock()
+	if a.editorViews != nil && a.editorViews.hasLiveViews() {
+		busy = append(busy, "Detached editor documents or window transfers")
+	}
 	return busy
 }
 func (a *application) updateStatusLocked() map[string]any {

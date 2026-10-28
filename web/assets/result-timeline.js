@@ -51,7 +51,7 @@
     return {count,received,lost,measured,zeroCount:values.filter(value=>value===0).length+(p.zeroCount||0),untimedCount:p.untimedCount||0,lossPercent:count?lost/count*100:0,min:extrema.length?Math.min(...extrema):null,max:extrema.length?Math.max(...extrema):null,average:measured?sum/measured:null,jitter:jitterPairs?(changes.reduce((a,b)=>a+b,0)+(p.jitterSumMs||0))/jitterPairs:null,jitterPairs,jitterMin:jitterExtrema.length?Math.min(...jitterExtrema):null,jitterMax:jitterExtrema.length?Math.max(...jitterExtrema):null,archived:p.count||0};
   }
   function pointDetails(point,{compact=false}={}){
-    if(!point)return '<span class="rt-instruction">Hover over a point for details. Click to keep it selected. Focus a chart and use the arrow keys to move between samples; Escape clears the selection.</span>';
+    if(!point)return '<span class="rt-instruction">Hover in line with a sample time for details. Click anywhere vertically in the plot to keep that sample selected. Focus a chart and use the arrow keys to move between samples; Escape clears the selection.</span>';
     if(point.members)return '<dl class="rt-detail-values">'+[['Grouped samples',point.stats.count],...(point.historical?[['History cluster',point.archiveInsideHorizon?'Raw retention limit: earlier results summarized before the display horizon':'Older results; one fixed boundary marker'],['Raw availability',point.members.length+' retained; '+point.stats.archived+' summarized only'],...(point.stats.untimedCount?[['Untimed archived samples',point.stats.untimedCount]]:[])]:[]),['Interval start',localTime(point.time)],['Interval end',localTime(point.endTime)],['Unsuccessful',point.stats.lost],['Minimum RTT',number(point.stats.min)],['Average RTT (aggregate)',number(point.stats.average)],['Maximum RTT',number(point.stats.max)]].map(([name,value])=>'<div><dt>'+escape(name)+'</dt><dd>'+escape(value)+'</dd></div>').join('')+'</dl>';
     const clipped=(text,max)=>compact&&text.length>max?text.slice(0,max)+'…':text;
     const fields=[[timeLabel(),localTime(point.time)],['Sample',String(point.sequence)],['Result',clipped(point.status,160)],['Response time',number(point.rtt)],['RTT change',point.jitter==null?'No consecutive measured pair':number(point.jitter)]];
@@ -144,7 +144,7 @@
   function axisHTML(model){return root.NetworkToolkitGraphHistory?.axisHTML?.(model.timeScope,Math.max(1,plotGeometry(model).right-plotGeometry(model).left),model.mode)||'';}
   function plot(model,metric,maximum,average){
     const name=metric==='rtt'?'latency':'jitter';
-    return '<div class="rt-plot rt-'+name+'" id="rt-active-'+encodeURIComponent(model.id)+'" role="tabpanel" aria-label="'+(metric==='rtt'?'Response time (RTT)':'RTT variability')+'"><div class="rt-axis-label" title="'+escape(visibleInterval(model)+' · '+(model.timeScope?.start||'')+' to '+(model.timeScope?.end||'')+' · '+referenceState(model).description)+'">'+(metric==='rtt'?'Response time':'Absolute change')+' · ms · '+escape(visibleInterval(model))+' · '+zoomText(model)+'×'+referenceState(model).label+((metric==='rtt'?model.rttScale:model.jitterScale).empty?' · Not measured':'')+'</div><svg data-rt-surface="'+name+'" data-rt-lower="'+(metric==='rtt'?model.rttScale:model.jitterScale).lower+'" data-rt-upper="'+(metric==='rtt'?model.rttScale:model.jitterScale).upper+'" data-rt-minimum="'+((metric==='rtt'?model.rttScale:model.jitterScale).minimum??'')+'" data-rt-maximum="'+((metric==='rtt'?model.rttScale:model.jitterScale).maximum??'')+'" data-rt-left="'+plotGeometry(model).left+'" data-rt-right="'+plotGeometry(model).right+'" data-rt-horizon-ms="'+(model.timeScope?.condensedMs||'')+'" tabindex="0" role="group" aria-label="'+(metric==='rtt'?'Response time':'Absolute RTT change between consecutive measured replies')+'. Drag to pan time. Use arrows to inspect, Enter to select, Escape to clear." viewBox="0 0 '+(model.viewportWidth||width)+' '+(model.viewportHeight||height)+'" preserveAspectRatio="xMidYMid meet">'+plotContent(model,metric,maximum,average)+'</svg></div>';
+    return '<div class="rt-plot rt-'+name+'" id="rt-active-'+encodeURIComponent(model.id)+'" role="tabpanel" aria-label="'+(metric==='rtt'?'Response time (RTT)':'RTT variability')+'"><div class="rt-axis-label" title="'+escape(visibleInterval(model)+' · '+(model.timeScope?.start||'')+' to '+(model.timeScope?.end||'')+' · '+referenceState(model).description)+'">'+(metric==='rtt'?'Response time':'Absolute change')+' · ms · '+escape(visibleInterval(model))+' · '+zoomText(model)+'×'+referenceState(model).label+((metric==='rtt'?model.rttScale:model.jitterScale).empty?' · Not measured':'')+'</div><svg data-rt-surface="'+name+'" data-rt-lower="'+(metric==='rtt'?model.rttScale:model.jitterScale).lower+'" data-rt-upper="'+(metric==='rtt'?model.rttScale:model.jitterScale).upper+'" data-rt-minimum="'+((metric==='rtt'?model.rttScale:model.jitterScale).minimum??'')+'" data-rt-maximum="'+((metric==='rtt'?model.rttScale:model.jitterScale).maximum??'')+'" data-rt-left="'+plotGeometry(model).left+'" data-rt-right="'+plotGeometry(model).right+'" data-rt-horizon-ms="'+(model.timeScope?.condensedMs||'')+'" tabindex="0" role="group" aria-label="'+(metric==='rtt'?'Response time':'Absolute RTT change between consecutive measured replies')+'. Hover or click by sample time anywhere vertically in the plot. Drag to pan time. Use arrows to inspect, Enter to select, Escape to clear." viewBox="0 0 '+(model.viewportWidth||width)+' '+(model.viewportHeight||height)+'" preserveAspectRatio="xMidYMid meet">'+plotContent(model,metric,maximum,average)+'</svg></div>';
   }
   function navigatorHTML(model){
     const nav=root.NetworkToolkitGraphNavigator;if(!nav)return '';model.fullScope=nav.extent(model.mode==='condensed'&&model.prefix?[{time:model.prefix.firstTime},...model.allPoints]:model.allPoints);
@@ -208,7 +208,12 @@
     const mark=event.target.closest?.('[data-rt-point]'),bounds=surface.getBoundingClientRect(),actualWidth=bounds.width||bounds.right-bounds.left;
     if(!actualWidth||!Number.isFinite(event.clientX)||mark&&(event.clientX<bounds.left||event.clientX>bounds.left+actualWidth))return mark?context.model.points[Number(mark.dataset.rtPoint)]||null:null;
     const geometry=plotGeometry(context.model),x=(event.clientX-bounds.left)/actualWidth*geometry.viewport,h=bounds.height||bounds.bottom-bounds.top,y=Number.isFinite(event.clientY)&&h>0?(event.clientY-bounds.top)/h*(context.model.viewportHeight||height):null;
-    let closest=null,distance=Infinity;for(const point of context.model.points){const dx=(point.plotX??coordinate(point.index,context.model,geometry))-x,dy=y==null?0:(point.plotY??0)-y,delta=dx*dx+dy*dy;if(delta<distance){distance=delta;closest=point;}}return closest;
+    // Time is the hit dimension. A low-Y neighboring sample must not win over
+    // the visibly highlighted timestamp just because its measurement is closer.
+    // Keep the value-axis gutter and space outside the SVG non-interactive.
+    if(!mark&&(x<geometry.left||x>geometry.right||y!==null&&(y<0||y>(context.model.viewportHeight||height))))return null;
+    if(mark)return context.model.points[Number(mark.dataset.rtPoint)]||null;
+    let closest=null,distance=Infinity;for(const point of context.model.points){const delta=Math.abs((point.plotX??coordinate(point.index,context.model,geometry))-x);if(delta<distance){distance=delta;closest=point;}else if(delta===distance&&point.key===context.model.hovered)closest=point;}return closest;
   }
 
   function hideTooltip(){if(tooltip){tooltip.hidden=true;tooltip.setAttribute('aria-hidden','true');}}
@@ -264,7 +269,7 @@
     if(svg&&resizeObserver&&!observedScrollers.has(svg)){resizeObserver.observe(svg);observedScrollers.add(svg);}
     if(svg&&measured?.width>0&&measured?.height>0){
       model.viewportWidth=measured.width;model.viewportHeight=measured.height;
-      const metric=model.plot,stamp=[model.viewportWidth,model.viewportHeight,model.points.length,model.points.at(-1)?.key,model.timeScope?.start,model.timeScope?.end,model.zoom,model.pinned,model.hovered,metric,JSON.stringify(model.rttScale),JSON.stringify(model.jitterScale),JSON.stringify(filterState(model))].join('|');
+      const metric=model.plot,stamp=[model.viewportWidth,model.viewportHeight,model.points.length,model.points.at(-1)?.key,model.timeScope?.start,model.timeScope?.end,model.zoom,metric,JSON.stringify(model.rttScale),JSON.stringify(model.jitterScale),JSON.stringify(filterState(model))].join('|');
       if(svg.dataset.rtWindow!==stamp){const scale=metric==='rtt'?model.rttScale:model.jitterScale;for(const [name,value]of Object.entries({lower:scale.lower,upper:scale.upper,minimum:scale.minimum??'',maximum:scale.maximum??'',left:plotGeometry(model).left,right:plotGeometry(model).right,'horizon-ms':model.timeScope?.condensedMs||''}))svg.setAttribute('data-rt-'+name,String(value));svg.setAttribute('viewBox','0 0 '+model.viewportWidth+' '+model.viewportHeight);svg.innerHTML=plotContent(model,metric,metric==='rtt'?model.maximum:model.maxJitter,metric==='rtt'?model.stats.average:model.stats.jitter);svg.dataset.rtWindow=stamp;}
     }
     const axis=container.querySelector('.rt-time-axis'),ticks=axisHTML(model);if(axis){axis.style.marginLeft=plotGeometry(model).left+'px';axis.style.marginRight=(plotGeometry(model).viewport-plotGeometry(model).right)+'px';if(axis.innerHTML!==ticks)axis.innerHTML=ticks;}
@@ -286,7 +291,9 @@
   }
   function initialize(){
     const document=root.document;if(initialized||!document?.addEventListener)return;initialized=true;
+    let panning=null,completedPress=null;
     document.addEventListener('pointermove',event=>{
+      if(panning&&Math.hypot(event.clientX-panning.x,(event.clientY??panning.y)-panning.y)>8){clearHover();return;}
       const row=rowContext(event.target),context=row||contextFor(event.target),point=row?.point||pointerPoint(event,context);
       if(!point||!context?.model||context.model.navigatorDragging){clearHover();return;}
       // Revealing an offscreen row pans/rebuilds the plot and clears transient
@@ -298,12 +305,17 @@
       if(changed||row)renderSelection(context);showTooltip(point,event,context.model);
     });
     document.addEventListener('pointerout',event=>{
+      // Replacement nodes can emit pointerout even though the pointer has not
+      // left the plot. restore() separately clears hover when a view is gone.
+      if(event.target?.isConnected===false)return;
       const context=rowContext(event.target)||contextFor(event.target);if(!context)return;
       const related=event.relatedTarget;
       if(related&&(related.closest?.('[data-rt-surface]')===event.target.closest?.('[data-rt-surface]')&&event.target.closest?.('[data-rt-surface]')||rowContext(related)?.row===rowContext(event.target)?.row&&rowContext(event.target)?.row))return;
       clearHover();
     });
     document.addEventListener('click',event=>{
+      if(completedPress){completedPress=null;return;}
+      if(event.button!==undefined&&event.button!==0||event.ctrlKey||event.metaKey||event.altKey||event.shiftKey)return;
       const context=contextFor(event.target);
       if(activeHover&&activeHover!==context?.model?.id)clearHover();
 
@@ -313,7 +325,7 @@
       if(event.target.closest?.('[data-rt-clear]')){clearHover();clearPin(context.model,context.container);return;}
       const zoomControl=event.target.closest?.('[data-rt-zoom]');if(zoomControl){const action=zoomControl.dataset.rtZoom;zoom(context.model.id,action);findContainer(context.model.id)?.querySelector('[data-rt-zoom="'+action+'"]')?.focus?.({preventScroll:true});return;}
       if(event.target.closest?.('[data-rt-latest]')||event.target.closest?.('[data-rt-follow]')){jumpLatest(context.model.id);return;}
-      if(context.model.dragged){context.model.dragged=false;return;}const point=event.target.closest?.('[data-rt-point]')?pointerPoint(event,context):null;if(point)pinPoint(context,point);else if(event.target.matches?.('[data-rt-surface]'))clearSelection(context.model.id);
+      if(context.model.dragged){context.model.dragged=false;return;}const point=pointerPoint(event,context);if(point)pinPoint(context,point);
     });
     document.addEventListener('change',event=>{if(!event.target.matches?.('[data-rt-mode]'))return;setPreferences({mode:event.target.value});for(const container of [...document.querySelectorAll('.rt-timeline')]){const model=models.get(container.dataset.rtId);if(model)rebuild(container,model);}hideTooltip();});
     document.addEventListener('keydown',event=>{
@@ -323,10 +335,28 @@
       const points=context.model.points,current=points.findIndex(point=>point.key===(context.model.pinned||context.model.hovered)),index=event.key==='Home'?0:event.key==='End'?points.length-1:event.key==='ArrowLeft'?Math.max(0,(current<0?points.length:current)-1):event.key==='ArrowRight'?Math.min(points.length-1,current+1):Math.max(0,current);
       if(!points[index])return;context.model.keyboardInspect=true;inspection(context.model,true);pinPoint(context,points[index]);revealPoint(context,points[index]);
     });
-    let panning=null;
-    document.addEventListener('pointerdown',event=>{const surface=event.target.closest?.('[data-rt-surface]'),context=contextFor(surface);if(!surface||!context?.model||event.button!==0)return;const geometry=plotGeometry(context.model),bounds=surface.getBoundingClientRect(),left=bounds.left+geometry.left,width=geometry.right-geometry.left;panning={context,surface,id:event.pointerId,x:event.clientX,left,width,share:(event.clientX-left)/width,scope:{...context.model.timeScope},mode:context.model.mode};});
-    document.addEventListener('pointerup',event=>{if(!panning||panning.id!==event.pointerId)return;const p=panning;panning=null;const distance=event.clientX-p.x;if(Math.abs(distance)>8&&p.width>0){p.context.model.dragged=true;clearHover();navigateWindow(p.context.model,root.NetworkToolkitGraphHistory.panScope(p.scope,p.share,(event.clientX-p.left)/p.width,p.mode));root.setTimeout?.(()=>{p.context.model.dragged=false;},0);}});
-    document.addEventListener('pointercancel',()=>{panning=null;});
+    document.addEventListener('pointerdown',event=>{
+      completedPress=null;const surface=event.target.closest?.('[data-rt-surface]'),context=contextFor(surface);
+      if(!surface||!context?.model||event.button!==0||event.ctrlKey||event.metaKey||event.altKey||event.shiftKey)return;
+      const candidate=pointerPoint(event,context);if(!candidate)return;
+      const geometry=plotGeometry(context.model),bounds=surface.getBoundingClientRect(),left=bounds.left+geometry.left,width=geometry.right-geometry.left;
+      const stationary=activeHover===context.model.id&&context.model.hoverOrigin==='graph'&&hoverPointer&&Math.abs(event.clientX-hoverPointer.clientX)<1&&Math.abs((event.clientY??0)-(hoverPointer.clientY??0))<1;
+      const highlighted=stationary&&(context.model.points.find(point=>point.key===context.model.hovered)||context.model.allPoints.find(point=>point.key===context.model.hovered));
+      // Record identity, not an array index or an x coordinate. Polling can move
+      // the plot (or replace its DOM) between press and release.
+      panning={context,surface,id:event.pointerId,x:event.clientX,y:event.clientY??0,left,width,share:(event.clientX-left)/width,scope:{...context.model.timeScope},mode:context.model.mode,point:{...(highlighted||candidate)}};
+    });
+    document.addEventListener('pointerup',event=>{
+      if(!panning||panning.id!==event.pointerId)return;const p=panning;panning=null;const distance=event.clientX-p.x,moved=Math.hypot(distance,(event.clientY??p.y)-p.y)>8;
+      completedPress={id:p.context.model.id};const token=completedPress;root.setTimeout?.(()=>{if(completedPress===token)completedPress=null;},0);
+      if(moved){p.context.model.dragged=true;clearHover();if(Math.abs(distance)>8&&p.width>0)navigateWindow(p.context.model,root.NetworkToolkitGraphHistory.panScope(p.scope,p.share,(event.clientX-p.left)/p.width,p.mode));root.setTimeout?.(()=>{p.context.model.dragged=false;},0);return;}
+      const current=contextFor(event.target);if(current?.model!==p.context.model||!pointerPoint(event,current)||event.ctrlKey||event.metaKey||event.altKey||event.shiftKey)return;
+      // Select on release so a replaced press target cannot retarget the click
+      // to a different sample. Consume only its immediately following click.
+      pinPoint(current,p.point);
+    });
+    document.addEventListener('pointercancel',()=>{panning=null;completedPress=null;});
+    root.addEventListener?.('blur',()=>{panning=null;completedPress=null;clearHover();});
     document.addEventListener('keydown',event=>{const tab=event.target.closest?.('[data-rt-tab]'),context=contextFor(tab);if(!context?.model||!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const next=event.key==='Home'?'rtt':event.key==='End'?'jitter':context.model.plot==='rtt'?'jitter':'rtt';setPlot(context.model.id,next);findContainer(context.model.id)?.closest('[data-graph-workspace]')?.querySelector('[data-rt-tab="'+next+'"]')?.focus({preventScroll:true});});
     document.addEventListener('wheel',event=>{
       const surface=event.target.closest?.('[data-rt-surface]'),context=contextFor(surface);if(!surface||!context?.model)return;const model=context.model,history=root.NetworkToolkitGraphHistory;if(!history)return;const pending=wheelFrames.get(model.id),next=history.wheelLevel(event,pending?.next??model.zoom,Math.min(minZoom,model.zoom),Math.max(maxZoom,model.zoom));if(next===(pending?.next??model.zoom))return;event.preventDefault();const bounds=surface.getBoundingClientRect(),geometry=plotGeometry(model),share=Math.max(0,Math.min(1,(event.clientX-bounds.left-geometry.left)/(geometry.right-geometry.left)));

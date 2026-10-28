@@ -5,6 +5,7 @@
 const overrides={markup:'Markup',html:'HTML',xml:'XML',bash:'Shell / Bash',batch:'Batch / Command Prompt',cpp:'C++',csharp:'C#',fsharp:'F#',objectivec:'Objective-C',jsx:'JavaScript (JSX)',tsx:'TypeScript (TSX)',jsonc:'JSON with comments',jsonlines:'JSON Lines',network:'Network config',text:'Plain text',registry:'Windows registry',vue:'Vue'};
 const extra=[['html','HTML'],['xml','XML'],['jsonc','JSON with comments'],['jsonlines','JSON Lines'],['network','Network config'],['registry','Windows registry'],['vue','Vue'],['text','Plain text']];
 const all=new Map((root.NTKEditorLanguageData||[]).map(row=>[row.id,{...row,label:overrides[row.id]||row.label}]));
+for(const row of root.NTKNetworkConfig?.languages||[])all.set(row.id,row);
 for(const [id,label] of extra)if(!all.has(id))all.set(id,{id,label,aliases:[]});
 const languages=Object.freeze([...all.values()].sort((a,b)=>a.label.localeCompare(b.label,'en')));
 const extensions={
@@ -34,6 +35,8 @@ function detect(path,content=''){
  if(/^(?:dockerfile|containerfile)\./.test(name))return 'docker';
  if(/^\.env(?:\.|$)/.test(name))return 'bash';
  const ext=name.includes('.')?name.split('.').pop():'';
+ // Content signatures override only ambiguous config/text associations, not code.
+ if(!ext||['txt','cfg','conf','config','cli','ios','aoscx','procurve','fortios','xml','exp'].includes(ext)||!byExtension.has(ext)){const network=root.NTKNetworkConfig?.detect(String(content));if(network)return network;}
  if(ext==='h'&&/\b(?:namespace|template|class)\b/.test(head))return 'cpp';
  if(ext==='m'&&!/^\s*(?:#\s*(?:import|include)|@(?:interface|implementation|import))\b/m.test(head))return 'matlab';
  if(['config','conf','cfg'].includes(ext)&&/^\s*<\?xml\b/i.test(head))return 'xml';
@@ -52,7 +55,7 @@ const parsers={javascript:'babel',jsx:'babel',typescript:'typescript',tsx:'types
 const braceLanguages=new Set(['c','cpp','csharp','java','objectivec','powershell','go','rust','swift','d','kotlin','scala','groovy','hcl','bicep']);
 function formatKind(id){return parsers[id]?'format':braceLanguages.has(id)?'indent':'';}
 const hashComment=new Set(['powershell','python','bash','ruby','perl','yaml','toml','ini','r','nim','julia','docker','makefile','cmake','hcl','nginx','apacheconf','network','properties','systemd','git','ignore','editorconfig','gherkin','elixir','graphql','nix']);
-function commentStyle(id){if(['html','xml','markup','vue'].includes(id))return ['<!--','-->'];if(['css','scss','less','jsonc'].includes(id))return ['/*','*/'];if(['sql','plsql','lua','haskell','ada'].includes(id))return ['--'];if(['batch'].includes(id))return ['REM'];if(['visual-basic','vbnet'].includes(id))return ["'"];if(['lisp','scheme','clojure','racket','nasm','armasm'].includes(id))return [';'];if(hashComment.has(id))return ['#'];if(id==='text'||id==='json'||id==='jsonlines')return null;return ['//'];}
+function commentStyle(id){if(id.startsWith('network-'))return id==='network-panos-xml'?['<!--','-->']:null;if(['html','xml','markup','vue'].includes(id))return ['<!--','-->'];if(['css','scss','less','jsonc'].includes(id))return ['/*','*/'];if(['sql','plsql','lua','haskell','ada'].includes(id))return ['--'];if(['batch'].includes(id))return ['REM'];if(['visual-basic','vbnet'].includes(id))return ["'"];if(['lisp','scheme','clojure','racket','nasm','armasm'].includes(id))return [';'];if(hashComment.has(id))return ['#'];if(id==='text'||id==='json'||id==='jsonlines')return null;return ['//'];}
 function toggleComment(text,id){const style=commentStyle(id);if(!style)return null;const lines=String(text).split('\n'),[open,close]=style;
  const escape=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
  if(close){const re=new RegExp('^(\\s*)'+escape(open)+' ?([\\s\\S]*?) ?'+escape(close)+'(\\s*)$');return lines.every(line=>!line.trim()||re.test(line))?lines.map(line=>line.trim()?line.replace(re,'$1$2$3'):line).join('\n'):lines.map(line=>line.trim()?line.replace(/^(\s*)(.*)$/,(_,indent,body)=>indent+open+' '+body+' '+close):line).join('\n');}

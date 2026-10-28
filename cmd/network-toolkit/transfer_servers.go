@@ -34,6 +34,9 @@ type transferHost struct {
 	port                               int
 	overwrite                          bool
 	started                            time.Time
+	ctx                                context.Context
+	done                               chan struct{}
+	doneOnce                           sync.Once
 	cancel                             context.CancelFunc
 	listener                           io.Closer
 	sshFingerprint                     string
@@ -154,11 +157,49 @@ func (s *transferHost) log(peer, op, file string, n uint64, err error) {
 	}
 }
 func (s *transferHost) activity(delta int) { s.mu.Lock(); s.active += delta; s.mu.Unlock() }
+
+// A retained manager entry is not proof that its socket is still listening.
+// Listener loops signal exit without taking the manager lock. The watcher below
+// removes only this instance, never a replacement that reused its protocol key.
+func (s *transferHost) servingStopped() {
+	s.doneOnce.Do(func() {
+		if s.cancel != nil {
+			s.cancel()
+		}
+		if s.done != nil {
+			close(s.done)
+		}
+	})
+}
+
+func (s *transferHost) isServing() bool {
+	if s.ctx != nil && s.ctx.Err() != nil {
+		return false
+	}
+	select {
+	case <-s.done:
+		return false
+	default:
+		return true
+	}
+}
+
+func (m *transferHostManager) forgetStopped(proto string, s *transferHost) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.servers[proto] != s {
+		return
+	}
+	delete(m.servers, proto)
+	s.log("local", "STOP", "Listener stopped", 0, nil)
+	m.recent[proto] = s.snapshot()["transfers"].([]transferLog)
+}
+
 func (s *transferHost) snapshot() map[string]any {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	records := append([]transferLog(nil), s.history...)
-	return map[string]any{"running": true, "protocol": s.proto, "bind": s.bind, "port": s.port, "address": s.address, "root": s.root, "access": s.access, "overwrite": s.overwrite, "started": s.started.UTC().Format(time.RFC3339), "active": s.active, "bytes": s.total, "transfers": records, "fingerprint": s.sshFingerprint, "security": s.security}
+	return map[string]any{"running": s.isServing(), "protocol": s.proto, "bind": s.bind, "port": s.port, "address": s.address, "root": s.root, "access": s.access, "overwrite": s.overwrite, "started": s.started.UTC().Format(time.RFC3339), "active": s.active, "bytes": s.total, "transfers": records, "fingerprint": s.sshFingerprint, "security": s.security}
 }
 func (m *transferHostManager) status(p string) map[string]any {
 	m.mu.Lock()
@@ -235,11 +276,14 @@ func (m *transferHostManager) start(c transferServerConfig) (map[string]any, err
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.ctx.Err() != nil {
+		return nil, errors.New("server manager is closed")
+	}
 	if m.servers[c.Protocol] != nil {
 		return nil, errors.New("server is already running; stop it before changing settings")
 	}
 	ctx, cancel := context.WithCancel(m.ctx)
-	s := &transferHost{proto: c.Protocol, root: root, bind: c.Bind, address: address, port: c.Port, access: c.Access, overwrite: c.Overwrite, started: time.Now(), cancel: cancel, history: make([]transferLog, 0), security: c.Security}
+	s := &transferHost{proto: c.Protocol, root: root, bind: c.Bind, address: address, port: c.Port, access: c.Access, overwrite: c.Overwrite, started: time.Now(), ctx: ctx, cancel: cancel, done: make(chan struct{}), history: make([]transferLog, 0), security: c.Security}
 	if s.bind == "" {
 		s.bind = "127.0.0.1"
 	}
@@ -269,6 +313,10 @@ func (m *transferHostManager) start(c transferServerConfig) (map[string]any, err
 	s.log("local", "START", fmt.Sprintf("%s (%s)", s.address, s.security), 0, nil)
 	m.servers[c.Protocol] = s
 	m.roots[c.Protocol] = root
+	go func() {
+		<-s.done
+		m.forgetStopped(c.Protocol, s)
+	}()
 	return s.snapshot(), nil
 }
 func (m *transferHostManager) stop(proto string) error {
@@ -282,7 +330,13 @@ func (m *transferHostManager) stop(proto string) error {
 	s.log("local", "STOP", s.address, 0, nil)
 	s.cancel()
 	m.recent[proto] = s.snapshot()["transfers"].([]transferLog)
-	return s.listener.Close()
+	// Cancellation also closes the listener in its owning goroutine. Whichever
+	// close wins, an already-closed socket is a successful stopped state.
+	err := s.listener.Close()
+	if errors.Is(err, net.ErrClosed) {
+		return nil
+	}
+	return err
 }
 func (a *application) handleTransferServer(w http.ResponseWriter, r *http.Request) {
 	if a.transfers == nil {

@@ -61,6 +61,7 @@
     const nextMode = small ? 'drawer' : collapsed ? 'rail' : 'full';
     if (nextMode !== layoutMode) { layoutMode = nextMode; layoutChanged(); }
     if (returnFocus) toggleButton.focus({preventScroll:true});
+    root.NetworkToolkitSidebarActivity?.sync();
   }
 
   function closeDrawer(restoreFocus = true) {

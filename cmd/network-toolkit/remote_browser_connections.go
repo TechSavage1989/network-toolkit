@@ -167,10 +167,18 @@ func (a *application) closeBrowserConnection(id string) {
 	}
 }
 func (a *application) closeBrowserConnections() {
+	a.closeBrowserConnectionsExcept(nil)
+}
+
+// Called with a registry snapshot, never while holding an ownership lock.
+// Individual closes retain the existing promotion/identity serialization.
+func (a *application) closeBrowserConnectionsExcept(keep map[string]bool) {
 	a.browserMu.Lock()
 	ids := make([]string, 0, len(a.browserConnections))
 	for id := range a.browserConnections {
-		ids = append(ids, id)
+		if !keep[id] {
+			ids = append(ids, id)
+		}
 	}
 	a.browserMu.Unlock()
 	for _, id := range ids {

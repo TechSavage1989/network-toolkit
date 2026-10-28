@@ -17,7 +17,8 @@
  }
  function button(row,port,key){
   const hint=service(row,port),action=hint.protocol?'Open '+names[hint.protocol]:'Choose a connection tool',host=deviceTarget(row),available=!!host&&!!key;
-  return '<button type="button" class="network-port-badge network-port-connect" data-network-port="'+port+'" data-network-port-key="'+esc(key||'')+'"'+(!available?' disabled':'')+' title="'+esc('TCP '+port+' open · '+hint.basis+'. '+action+' for '+(host||'this device')+' on port '+port+'.')+'" aria-label="'+esc(action+' for '+(host||'device')+' TCP port '+port)+'"><span class="network-port-number">'+port+'</span>'+(hint.label?'<span class="network-port-service">'+esc(hint.label)+'</span>':'')+'</button>';
+  const title='TCP '+port+' open · '+hint.basis+'. '+action+' for '+(host||'this device')+' on port '+port+'.',label=action+' for '+(host||'device')+' TCP port '+port,saved=root.NetworkToolkitSavedSessions?.portData?.(row,key,port);
+  return '<button type="button" class="network-port-badge network-port-connect" data-network-port="'+port+'" data-network-port-key="'+esc(key||'')+'"'+(!available?' disabled':'')+' data-saved-port-title="'+esc(title)+'" data-saved-port-label="'+esc(label)+'" title="'+esc(title+(saved?.caption?' '+saved.caption:''))+'" aria-label="'+esc(label+(saved?.caption?' '+saved.caption:''))+'"><span class="network-port-number">'+port+'</span>'+(hint.label?'<span class="network-port-service">'+esc(hint.label)+'</span>':'')+(saved?.html||'')+'</button>';
  }
  function render(row,key){const list=ports(row);if(!list.length)return '<span class="network-ports-empty">None reported</span>';return '<div class="network-open-ports" data-copy-value="'+esc(list.join(', '))+'" data-copy-label="Open TCP ports"><span class="network-port-list">'+list.map(port=>button(row,port,key)).join('')+'</span></div>';}
  function selected(key,port){const row=deviceRecords.get(key),n=portNumber(port);if(!row||!n||!ports(row).includes(n)||!deviceTarget(row))return null;return {...row,host:deviceTarget(row),address:deviceTarget(row),endpointPort:n,endpointProtocol:'tcp',endpointSelected:true,endpointRole:'Selected discovery TCP port'};}
@@ -28,6 +29,7 @@
   if(!Object.hasOwn(names,protocol))return;
   if(['ssh','telnet'].includes(protocol)){
    if(!deviceApplicability(row,protocol).ok)return;
+   if(root.NetworkToolkitSavedSessions?.openPort?.(key,port,protocol))return;
    closeModal();navigate('terminal');
    // Do not inherit another destination's saved identity or authentication.
    openTerminalConnect(safeTerminalConfig({type:protocol,host:row.host,port:row.endpointPort,credentialId:'',username:'',authMethod:'password',sshCompatibility:'modern'}));return;
@@ -39,7 +41,7 @@
   const actionKey=key+'|connect-tcp|'+row.endpointPort;
   deviceRecords.set(actionKey,row);await openDeviceConnection(actionKey,protocol);
  }
- async function activate(key,port,choice){const row=selected(key,port);if(!row){toast('This recorded device or open TCP port is no longer available.','error');return;}const protocol=choice||service(row,Number(port)).protocol;if(!protocol){choose(key,Number(port),row);return;}await launch(key,Number(port),protocol);}
+ async function activate(key,port,choice){const row=selected(key,port);if(!row){toast('This recorded device or open TCP port is no longer available.','error');return;}if(!choice&&online&&root.NetworkToolkitSavedSessions?.openPort?.(key,port))return;const protocol=choice||service(row,Number(port)).protocol;if(!protocol){choose(key,Number(port),row);return;}await launch(key,Number(port),protocol);}
  document.addEventListener('click',event=>{const button=event.target.closest?.('[data-network-port]');if(!button)return;event.preventDefault();event.stopImmediatePropagation();if(!button.disabled)void activate(button.dataset.networkPortKey,button.dataset.networkPort,button.dataset.networkPortChoice);},true);
  root.NetworkToolkitDiscoveryPorts={ports,service,render,button,selected,activate,launch};
 })(globalThis);

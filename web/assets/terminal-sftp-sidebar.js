@@ -94,7 +94,7 @@ function render(panel,entry){
 async function editor(create=false){const m=current(active()),entry=m?.entries.find(x=>x.path===m.selected);if(!m)return;if(!create&&(!entry||entry.directory)){message('Select one text file.');return;}
  const filename=create?prompt('New UTF-8 text file name:','new-file.txt'):entry.name;if(filename===null)return;if(!safeName(filename)){message('Enter a valid file name.',true);return;}
  const path=create?join(m.folder,filename):entry.path;
- try{await root.NetworkToolkitFileEditor.open({source:'SSH terminal',path,id:'terminal:'+m.id+':'+path,create,
+ try{await root.NetworkToolkitFileEditor.open({source:'SSH terminal',path,id:'terminal:'+m.id+':'+path,create,binding:{kind:'terminal',sessionId:m.id,revision:terminalSessionRevision(m.id)},
   read:async path=>request(m.id,'read-text',{path}),write:async data=>request(m.id,'write-text',data),afterSave:()=>load(m.id,m.folder)});
  }catch(e){message('Cannot edit: '+e.message,true);}}
 async function osUpload(m,files){if(!files.length||m.busy)return;m.busy=true;paint();let done=0,failed=0;

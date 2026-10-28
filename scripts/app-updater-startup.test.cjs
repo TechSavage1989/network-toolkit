@@ -11,7 +11,7 @@ function ui(options={}){
   const document=makeDocument('<button id="mobileMenu"></button><button id="settingsButton"></button><div id="appUpdateNotice"></div><div id="modalRoot"><div id="existingDialog">Existing work</div></div>');
   const calls=[],timers=new Map(),saved=[],toasts=[],listeners={};let timerId=0,now=1792872000000,data=structuredClone(available);
   class TestDate extends Date{constructor(value=now){super(value)}static now(){return now}}
-  const c={document,AbortController,Date:TestDate,online:true,OFFLINE:false,shutDown:false,TERMINAL_ONLY:false,DETACHED_TERMINAL:false,status:{version:'1.17.61'},VERSION:'1.17.61',state:{appUpdatePreferences:{enabled:true,...options.preferences}},
+  const c={document,AbortController,Date:TestDate,online:true,OFFLINE:false,shutDown:false,TERMINAL_ONLY:false,DETACHED_TERMINAL:false,EDITOR_WINDOW:false,status:{version:'1.17.61'},VERSION:'1.17.61',state:{appUpdatePreferences:{enabled:true,...options.preferences}},
     addEventListener:(name,fn)=>(listeners[name]??=[]).push(fn),
     setTimeout:(fn,delay)=>{timers.set(++timerId,{fn,delay});return timerId},clearTimeout:id=>timers.delete(id),
     saveState:()=>saved.push(structuredClone(c.state.appUpdatePreferences)),flushState:async()=>true,toast:message=>toasts.push(message),
@@ -34,7 +34,7 @@ function ui(options={}){
 }
 function init(h){
   const c=h.c,nothing=()=>{};
-  for(const name of ['NetworkToolkitSource','NetworkToolkitWorkspace','NetworkToolkitResultDetails','NetworkToolkitScanRoutes','NetworkToolkitConfiguration','NetworkToolkitNavigation','NetworkToolkitTerminalInteraction','NetworkToolkitCredentials'])c[name]={init:nothing};
+  for(const name of ['NetworkToolkitSource','NetworkToolkitWorkspace','NetworkToolkitResultDetails','NetworkToolkitScanRoutes','NetworkToolkitConfiguration','NetworkToolkitNavigation','NetworkToolkitSidebarActivity','NetworkToolkitTerminalInteraction','NetworkToolkitCredentials'])c[name]={init:nothing};
   Object.assign(c,{$:selector=>c.document.querySelector(selector),$$:selector=>c.document.querySelectorAll(selector),icon:()=>'',initToolWorkspace:nothing,configureWindowMode:nothing,defaults:nothing,renderPage:nothing,setTheme:nothing,updateEngine:nothing,startTerminalFeed:nothing,startTerminalWindowRequests:nothing,startTerminalViews:nothing,pollSoon:nothing,system:{},jobs:[],fullVersions:new Map(),jobVersions:new Map(),fullVersion:()=>'',mergeState:s=>{const {appUpdatePreferences,...other}=s;Object.assign(c.state,other);c.NetworkToolkitUpdater.mergePreferences(appUpdatePreferences)}});
   vm.runInContext(fs.readFileSync(require.resolve('../web/assets/color-picker.js'),'utf8'),c);
   vm.runInContext(initSource,c);
@@ -139,7 +139,7 @@ test('unrelated edits after failed initial state read are retained without overw
 });
 
 test('full-state writer refuses startup defaults until saved settings are loaded',async()=>{
-  const calls=[],c={stateLoaded:false,state:{profiles:[]},stateRevision:0,savedStateRevision:-1,stateWrites:Promise.resolve(true),shutDown:false,OFFLINE:false,online:true,clearTimeout:()=>{},saveTimer:null,api:async(...args)=>calls.push(args),storageError:()=>{},lastStorageError:''};
+  const calls=[],c={stateLoaded:false,EDITOR_WINDOW:false,state:{profiles:[]},stateRevision:0,savedStateRevision:-1,stateWrites:Promise.resolve(true),shutDown:false,OFFLINE:false,online:true,clearTimeout:()=>{},saveTimer:null,api:async(...args)=>calls.push(args),storageError:()=>{},lastStorageError:''};
   vm.createContext(c);vm.runInContext(pageSource.slice(pageSource.indexOf('function flushState('),pageSource.indexOf('\nfunction closeApp(')),c);
   assert.equal(await c.flushState(),false);assert.equal(calls.length,0);c.stateLoaded=true;assert.equal(await c.flushState(),true);assert.equal(calls.length,1);
 });

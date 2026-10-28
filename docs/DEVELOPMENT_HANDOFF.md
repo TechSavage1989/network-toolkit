@@ -1,5 +1,13 @@
 # Network Toolkit development handoff
 
+## 1.17.108 candidate integration
+
+The user authorized activity indicators, compact saved-profile bookmarks and
+details access, graph status/color/selection fixes, and editor tabs/comparison
+with a configurable scrollable change map. Read RELEASE108_HANDOFF.md.
+Implementation and focused checks are in progress; final hosted/native/public
+acceptance is not yet complete. The107 release below remains immutable.
+
 ## 1.17.107 published and independently verified
 
 Published 2026-10-28:

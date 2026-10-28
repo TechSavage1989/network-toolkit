@@ -25,6 +25,15 @@
 
   function copyCompatibleControl(control, element) {
     if (control.matches('.network-address-details[data-select-device]')) return true;
+    // Only our text-free saved bookmark is copy-compatible. Its metadata stays
+    // in attributes; never admit arbitrary buttons or their labels as values.
+    if (control.matches('button.saved-session-indicator[data-saved-session-open]')) {
+      const slot = control.parentElement, glyph = control.firstElementChild, path = glyph?.firstElementChild;
+      return !!slot?.matches('.saved-session-slot[data-saved-session-slot]') && slot.dataset.savedSessionSlot === control.dataset.savedSessionOpen &&
+        control.children.length === 1 && !control.textContent.trim() && glyph?.namespaceURI === 'http://www.w3.org/2000/svg' &&
+        glyph.matches('svg.saved-session-bookmark[aria-hidden="true"][focusable="false"]') && glyph.children.length === 1 &&
+        path?.matches('path') && path.getAttribute('d') === 'M4 2.25h8v11.5L8 11l-4 2.75z';
+    }
     // Discovery's explicit numeric aggregate still needs its separate copy
     // action now that each port is a connection button. Do not enable copying
     // arbitrary controls, their labels, editable fields or credential groups.

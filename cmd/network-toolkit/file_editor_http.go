@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"networktoolkit/internal/model"
 	"os"
 	"path"
 	"path/filepath"
@@ -262,10 +263,16 @@ func (a *application) handleLocalTextEditor(w http.ResponseWriter, r *http.Reque
 	}
 }
 func (a *application) handleRemoteTextEditor(w http.ResponseWriter, r *http.Request, req remoteBrowserRequest) {
+	a.handleRemoteTextEditorWithOperation(w, r, req, a.runRemoteBrowserOperation)
+}
+
+// The detached-editor capability supplies one already-authorized, pinned transport.
+// The existing hash, encoding, size and staging checks are identical for both paths.
+func (a *application) handleRemoteTextEditorWithOperation(w http.ResponseWriter, r *http.Request, req remoteBrowserRequest, run func(context.Context, remoteBrowserRequest) (model.Result, error)) {
 	if req.Action == "read-text" && req.Protocol != "ftp" {
 		ctx, cancel := context.WithTimeout(r.Context(), 120*time.Second)
 		defer cancel()
-		result, err := a.runRemoteBrowserOperation(ctx, req)
+		result, err := run(ctx, req)
 		if err != nil {
 			jsonError(w, 400, err.Error())
 			return
@@ -296,7 +303,7 @@ func (a *application) handleRemoteTextEditor(w http.ResponseWriter, r *http.Requ
 	if req.Action == "read-text" || req.ExpectedHash != "" {
 		probe := req
 		probe.Action = "stat"
-		result, e := a.runRemoteBrowserOperation(ctx, probe)
+		result, e := run(ctx, probe)
 		if e != nil {
 			jsonError(w, 400, e.Error())
 			return
@@ -323,7 +330,7 @@ func (a *application) handleRemoteTextEditor(w http.ResponseWriter, r *http.Requ
 		probe.Action = "download"
 		probe.LocalPath = tempPath
 		probe.Overwrite = false
-		if _, e = a.runRemoteBrowserOperation(ctx, probe); e != nil {
+		if _, e = run(ctx, probe); e != nil {
 			jsonError(w, 400, e.Error())
 			return
 		}
@@ -365,7 +372,7 @@ func (a *application) handleRemoteTextEditor(w http.ResponseWriter, r *http.Requ
 	upload.Action = "upload"
 	upload.LocalPath = tempPath
 	upload.Overwrite = req.ExpectedHash != ""
-	if _, e := a.runRemoteBrowserOperation(ctx, upload); e != nil {
+	if _, e := run(ctx, upload); e != nil {
 		jsonError(w, 409, "Save failed: "+e.Error())
 		return
 	}

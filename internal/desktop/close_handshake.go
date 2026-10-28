@@ -6,23 +6,29 @@ const (
 	waitForClose closeDecision = iota
 	requestRendererClose
 	closeWindowNow
+	closeNotApproved
 )
 
 // closeHandshake serializes user close requests and late renderer completions.
-// Cancellation, startup failure and the deadline can always finish a close;
-// a repeated title-bar click cannot start another state-save request.
+// Default hosts retain their bounded fallback. Approval-required ready hosts
+// never infer consent from invocation or a deadline; repeated title-bar clicks
+// cannot start another state-save request.
 type closeHandshake struct {
-	pending  bool
-	finished bool
+	approvalRequired bool
+	pending          bool
+	finished         bool
 }
 
 func (c *closeHandshake) request(rendererReady, contextCancelled bool) closeDecision {
 	if c.finished {
 		return waitForClose
 	}
-	if contextCancelled || !rendererReady {
+	if contextCancelled || (!rendererReady && !c.approvalRequired) {
 		c.finished = true
 		return closeWindowNow
+	}
+	if !rendererReady {
+		return closeNotApproved
 	}
 	if c.pending {
 		return waitForClose
@@ -35,6 +41,10 @@ func (c *closeHandshake) completed(handled bool) closeDecision {
 	if c.finished || !c.pending || handled {
 		return waitForClose
 	}
+	if c.approvalRequired {
+		c.pending = false
+		return closeNotApproved
+	}
 	c.finished = true
 	return closeWindowNow
 }
@@ -42,6 +52,10 @@ func (c *closeHandshake) completed(handled bool) closeDecision {
 func (c *closeHandshake) expired() closeDecision {
 	if c.finished || !c.pending {
 		return waitForClose
+	}
+	if c.approvalRequired {
+		c.pending = false
+		return closeNotApproved
 	}
 	c.finished = true
 	return closeWindowNow

@@ -9,6 +9,9 @@ import (
 // workspace, so closing the home window must not cancel a detached connection.
 func (a *application) runPrimaryLifecycle(url string, noBrowser bool, dataDir, title string) {
 	for a.ctx.Err() == nil {
+		if a.editorViews != nil {
+			a.editorViews.setHomePresent(true)
+		}
 		viewContext, cancel := context.WithCancel(a.ctx)
 		a.primaryMu.Lock()
 		a.primaryCancel = cancel
@@ -34,8 +37,12 @@ func (a *application) runPrimaryLifecycle(url string, noBrowser bool, dataDir, t
 			return
 		}
 		for a.ctx.Err() == nil {
-			if a.views.hasReturned() {
+			if a.views.hasReturned() || (a.editorViews != nil && a.editorViews.hasRecovery()) {
 				break
+			}
+			if !a.hasSecondaryViews() {
+				a.stop()
+				return
 			}
 			select {
 			case <-a.ctx.Done():
@@ -50,9 +57,11 @@ func (a *application) runPrimaryLifecycle(url string, noBrowser bool, dataDir, t
 }
 
 func (a *application) beginPrimaryClose() {
+	// Registry methods may acquire transport locks; never call them with views.mu held.
+	editorLive := a.editorViews != nil && a.editorViews.hasLiveViews()
 	a.views.mu.Lock()
 	a.views.homeClosing = true
-	if len(a.views.views) == 0 {
+	if len(a.views.views) == 0 && !editorLive {
 		a.shutdownRequested.Store(true)
 	}
 	a.views.notifyLocked()
@@ -65,18 +74,38 @@ func (a *application) closePrimary() {
 	a.primaryMu.Unlock()
 	if cancel != nil {
 		cancel()
-	} else if a.views.count() == 0 {
+	} else if !a.hasSecondaryViews() {
 		a.stop()
 	}
+}
+
+// A native editor process, recovery checkpoint or in-flight orphan operation is
+// an owner too. Process-exit notifications wake the primary wait loop; a missed
+// renderer heartbeat must never cause this predicate to discard its documents.
+func (a *application) hasSecondaryViews() bool {
+	editorLive := a.editorViews != nil && a.editorViews.hasLiveViews()
+	return a.views.count() > 0 || editorLive
 }
 
 // Returns whether a reserved, detached, or returning view still needs its
 // owner. Home-only connections and diagnostics close with their home window.
 func (a *application) finishPrimaryClose() bool {
+	keepEditors, keepBrowsers := map[string]bool{}, map[string]bool{}
+	editorLive := false
+	if a.editorViews != nil {
+		// The primary close has been confirmed. Retain only document-bound
+		// transports, not every connection ever opened by the home window.
+		a.editorViews.setHomePresent(false)
+		keepEditors, keepBrowsers = a.editorViews.retainedTransports()
+		editorLive = a.editorViews.hasLiveViews()
+	}
 	a.views.mu.Lock()
 	a.views.homePresent, a.views.homeClosing = false, false
 	hasViews := len(a.views.views) > 0
-	keep := make(map[string]bool, len(a.views.views))
+	keep := make(map[string]bool, len(a.views.views)+len(keepEditors))
+	for sessionID := range keepEditors {
+		keep[sessionID] = true
+	}
 	for _, view := range a.views.views {
 		for _, sessionID := range view.sessionIDs() {
 			keep[sessionID] = true
@@ -94,8 +123,8 @@ func (a *application) finishPrimaryClose() bool {
 	}
 	a.views.notifyLocked()
 	a.views.mu.Unlock()
-	a.closeBrowserConnections()
-	if !hasViews {
+	a.closeBrowserConnectionsExcept(keepBrowsers)
+	if !hasViews && !editorLive {
 		return false
 	}
 	for _, session := range homeSessions {

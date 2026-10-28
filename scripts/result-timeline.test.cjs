@@ -92,8 +92,8 @@ test('plot tabs show only the chosen surface and preserve held entry and keyboar
 test('plot coordinate hover chooses the nearest actual point when no marker is hit',()=>{
  const h=harness();h.render();const surface=h.document.querySelector('[data-rt-surface="latency"]');
  surface.getBoundingClientRect=()=>({left:10,width:820});
- h.document.emit('pointermove',surface,{clientX:10});assert.match(h.detail(),/Sample1/);
- h.document.emit('pointermove',surface,{clientX:830});assert.match(h.detail(),/Sample5/);
+ h.document.emit('pointermove',surface,{clientX:74});assert.match(h.detail(),/Sample1/);
+ h.document.emit('pointermove',surface,{clientX:818});assert.match(h.detail(),/Sample5/);
  h.api.clearSelection('job');assert.match(h.detail(),/Hover over a point/);
 });
 
@@ -145,7 +145,7 @@ test('linear axis follows the selected time scope and data panning rather than a
 
 test('time zoom changes range, hit testing and axis accurately and resets without changing recorded rows',()=>{
  const h=harness(),rows=Array.from({length:400},(_,i)=>reply(i+1,10,stamp(i))),original=JSON.stringify(rows);h.render(rows);assert.equal(h.document.querySelectorAll('[data-rt-point]').length,400);h.api.zoom('job','in');assert.equal(h.document.querySelectorAll('[data-rt-point]').length,200);
- let surface=h.document.querySelector('[data-rt-surface]');surface.getBoundingClientRect=()=>({left:10,width:820});h.document.emit('pointermove',surface,{clientX:19});assert.match(h.document.querySelector('[data-rt-tooltip]').textContent,/Sample 201/);h.api.zoom('job','out');assert.equal(h.document.querySelectorAll('[data-rt-point]').length,400);h.api.zoom('job','out');assert.equal(h.document.querySelectorAll('[data-rt-point]').length,400);h.api.zoom('job','reset');assert.equal(h.document.querySelectorAll('[data-rt-point]').length,400);assert.equal(JSON.stringify(rows),original);
+ let surface=h.document.querySelector('[data-rt-surface]');surface.getBoundingClientRect=()=>({left:10,width:820});h.document.emit('pointermove',surface,{clientX:74});assert.match(h.document.querySelector('[data-rt-tooltip]').textContent,/Sample 201/);h.api.zoom('job','out');assert.equal(h.document.querySelectorAll('[data-rt-point]').length,400);h.api.zoom('job','out');assert.equal(h.document.querySelectorAll('[data-rt-point]').length,400);h.api.zoom('job','reset');assert.equal(h.document.querySelectorAll('[data-rt-point]').length,400);assert.equal(JSON.stringify(rows),original);
 });
 
 test('linear zoom uses time domains at bounded scales without a wide scrolling SVG',()=>{
@@ -339,4 +339,39 @@ test('Fit includes whole archive prefix before a long horizon and pairs only the
 
 test('rendered Condensed newest gap matches a 30-second Linear view at normal and narrow widths',()=>{
  for(const width of [820,320]){const h=harness(),rows=Array.from({length:301},(_,i)=>reply(i+1,42,stamp(i)));h.api.setPreferences({mode:'linear'},{persist:false});h.context.NetworkToolkitGraphHistory.setPreferences({durationMs:30000},{persist:false});h.render(rows);{const svg=h.document.querySelector('[data-rt-surface]');svg.getBoundingClientRect=()=>({left:0,top:0,width,height:100});h.api.restore();}const gap=()=>{const markers=h.document.querySelector('[data-rt-surface]').querySelectorAll('[data-rt-marker]');return Number(markers.at(-1).getAttribute('cx'))-Number(markers.at(-2).getAttribute('cx'));},reference=gap();h.api.setPreferences({mode:'condensed'},{persist:false});h.context.NetworkToolkitGraphHistory.setPreferences({durationMs:0,recentMs:60000},{persist:false});h.render(rows);{const svg=h.document.querySelector('[data-rt-surface]');svg.getBoundingClientRect=()=>({left:0,top:0,width,height:100});h.api.restore();}const actual=gap();assert(Math.abs(actual/reference-1)<.03);assert(actual>reference*.97);}
+});
+
+test('highlight-only restoration keeps the same SVG marker nodes instead of rebuilding under the pointer',()=>{
+ const h=harness();h.render();const svg=h.document.querySelector('[data-rt-surface]');svg.getBoundingClientRect=()=>({left:0,top:0,width:820,height:110,right:820,bottom:110});h.api.restore();const mark=h.mark(1);
+ h.document.emit('pointermove',mark);h.observe();assert.equal(h.mark(1)===mark,true,'Hover must not replace the hit target');
+ h.document.emit('click',mark);h.observe();assert.equal(h.mark(1)===mark,true,'Selection must not replace the hit target');
+ for(let i=0;i<5;i++)h.observe();assert.equal(h.mark(1)===mark,true,'Unchanged completed graph stays stable through repeated observer passes');
+});
+
+test('vertical alignment selects nearest timestamp independent of measured Y, only inside the plot',()=>{
+ const h=harness();h.render(Array.from({length:21},(_,i)=>reply(i+1,i%2?0:100)));const svg=h.document.querySelector('[data-rt-surface]');svg.getBoundingClientRect=()=>({left:0,top:0,width:820,height:110,right:820,bottom:110});h.api.restore();const x=Number(h.mark(10).querySelector('[data-rt-marker]').getAttribute('cx'));
+ h.document.emit('pointermove',svg,{clientX:x,clientY:98});assert.match(h.detail(),/Sample 11/,'X-aligned high point wins over lower neighboring points');
+ h.document.emit('click',svg,{button:0,clientX:x,clientY:98});assert.equal(h.api.isHeld('job'),true);assert.match(h.detail(),/Sample11/);
+ h.api.clearSelection('job');h.document.emit('pointermove',h.document.querySelector('[data-rt-surface]'),{clientX:3,clientY:40});assert.equal(h.document.querySelector('[data-rt-tooltip]').hidden,true,'Y-axis gutter is not an implied point');
+});
+
+test('a press snapshots the highlighted sample while fresh samples move under the same coordinate',()=>{
+ const h=harness();h.render();let svg=h.document.querySelector('[data-rt-surface]');svg.getBoundingClientRect=()=>({left:0,top:0,width:820,height:110,right:820,bottom:110});h.api.restore();const x=Number(h.mark(1).querySelector('[data-rt-marker]').getAttribute('cx'));
+ h.document.emit('pointermove',svg,{clientX:x,clientY:95});h.document.emit('pointerdown',svg,{button:0,pointerId:8,clientX:x,clientY:95});
+ h.render([...samples(),reply(6,20),reply(7,20)]);svg=h.document.querySelector('[data-rt-surface]');svg.getBoundingClientRect=()=>({left:0,top:0,width:820,height:110,right:820,bottom:110});h.api.restore();
+ h.document.emit('pointerup',svg,{pointerId:8,clientX:x,clientY:95});h.document.emit('click',svg,{button:0,clientX:x,clientY:95});assert.match(h.detail(),/Sample2/,'Held selection uses press-time identity, not the next sample at this x');
+});
+
+test('axis gutters, modified clicks, cancelled presses and cross-job releases cannot select an unrelated result',()=>{
+ const h=harness();h.render();let svg=h.document.querySelector('[data-rt-surface]');svg.getBoundingClientRect=()=>({left:0,top:0,width:820,height:110,right:820,bottom:110});h.api.restore();
+ for(const modifiers of [{ctrlKey:true},{metaKey:true},{altKey:true},{shiftKey:true}]){h.document.emit('pointerdown',svg,{button:0,pointerId:5,clientX:400,clientY:60,...modifiers});h.document.emit('pointerup',svg,{pointerId:5,clientX:400,clientY:60,...modifiers});h.document.emit('click',svg,{button:0,clientX:400,clientY:60,...modifiers});assert.equal(h.api.isHeld('job'),false);}
+ h.document.emit('pointerdown',svg,{button:0,pointerId:5,clientX:400,clientY:60});h.document.emit('pointercancel',svg,{pointerId:5});h.document.emit('pointerup',svg,{pointerId:5,clientX:400,clientY:60});assert.equal(h.api.isHeld('job'),false);
+ h.document.emit('pointerdown',svg,{button:0,pointerId:5,clientX:400,clientY:60});h.render(samples(),'different-job');svg=h.document.querySelector('[data-rt-surface]');svg.getBoundingClientRect=()=>({left:0,top:0,width:820,height:110,right:820,bottom:110});h.api.restore();h.document.emit('pointerup',svg,{pointerId:5,clientX:400,clientY:60});h.document.emit('click',svg,{button:0,clientX:400,clientY:60});assert.equal(h.api.isHeld('different-job'),false);
+ h.document.emit('click',svg,{button:0,clientX:2,clientY:60});assert.equal(h.api.isHeld('different-job'),false);
+});
+
+test('a vertical drag is not a selection and a real horizontal drag still pans',()=>{
+ const h=harness();h.render();let svg=h.document.querySelector('[data-rt-surface]');svg.getBoundingClientRect=()=>({left:0,top:0,width:820,height:110,right:820,bottom:110});h.api.restore();const end=h.document.querySelector('.rt-timeline').dataset.rtScopeEnd;
+ h.document.emit('pointerdown',svg,{button:0,pointerId:9,clientX:400,clientY:40});h.document.emit('pointerup',svg,{pointerId:9,clientX:400,clientY:70});h.document.emit('click',svg,{button:0,clientX:400,clientY:70});assert.equal(h.api.isHeld('job'),false);assert.equal(h.document.querySelector('.rt-timeline').dataset.rtScopeEnd,end);
+ h.document.emit('pointerdown',svg,{button:0,pointerId:9,clientX:400,clientY:40});h.document.emit('pointerup',svg,{pointerId:9,clientX:450,clientY:40});h.document.emit('click',h.document.querySelector('[data-rt-surface]'),{button:0,clientX:450,clientY:40});assert.equal(h.api.isHeld('job'),false);assert.notEqual(h.document.querySelector('.rt-timeline').dataset.rtScopeEnd,end);
 });

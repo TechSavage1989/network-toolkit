@@ -1,12 +1,13 @@
 /* Parsing runs outside the UI thread. All imports are bundled local assets.
  * No file is executed, evaluated or transmitted to a language service. */
 'use strict';
-importScripts('editor-vendor/languages.js','editor-languages.js','editor-vendor/prism.js');
+importScripts('editor-vendor/languages.js','network-config-language.js','editor-languages.js','editor-vendor/prism.js');
 Prism.languages.jsonc=Prism.languages.extend('json',{'comment':{pattern:/\/\/[^\n]*|\/\*[\s\S]*?(?:\*\/|$)/,greedy:true}});
 Prism.languages.jsonlines=Prism.languages.json;
 Prism.languages.vue=Prism.languages.markup;
-Prism.languages.network={comment:/^[\t ]*[!#;].*/m,string:/"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/,keyword:/\b(?:interface|vlan|switchport|router|hostname|ip|ipv6|address|description|set|edit|next|end|config|firewall|policy|route|dhcp|enable|disable|exit|save|commit|show|no|permit|deny|port|trunk|bridge)\b/i,number:/\b\d+(?:\.\d+)*\b/};
+Prism.languages.network={}; // Rendered by the position-aware local lexer below.
 Prism.languages.registry={comment:/^[\t ]*;.*/m,keyword:/^Windows Registry Editor Version[^\n]*/m,property:/^\[[^\n]*\]/m,string:/"(?:\\.|[^"\\])*"/,number:/\b(?:dword|hex)(?:\([a-f\d]+\))?:[a-f\d,\\\s]+/i};
+for(const row of NTKNetworkConfig.languages)Prism.languages[row.id]={};
 const escape=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const tokenKind={comment:'comment',prolog:'comment',doctype:'comment',cdata:'string',string:'string',char:'string','template-string':'string','raw-string':'string',regex:'string','attr-value':'string',url:'string',keyword:'keyword',boolean:'keyword',builtin:'keyword',tag:'keyword',important:'keyword',number:'number',property:'property','attr-name':'property',variable:'variable',parameter:'property',function:'function','class-name':'type',namespace:'type',operator:'operator',punctuation:'punctuation',selector:'property',constant:'number',symbol:'number',deleted:'comment',inserted:'string',title:'keyword'};
 function render(tokens){return tokens.map(token=>{if(typeof token==='string')return escape(token);const inner=Array.isArray(token.content)?render(token.content):escape(token.content),kind=tokenKind[token.type]||[token.alias||[]].flat().map(alias=>tokenKind[alias]).find(Boolean);return kind?'<span class="nt-ed-'+kind+'">'+inner+'</span>':inner;}).join('');}
@@ -36,6 +37,6 @@ async function format(text,id,options){const parser=NTKEditorLanguages.parser(id
  const formatted=await prettier.format(text,{parser,plugins:Object.values(prettierPlugins),tabWidth:width,useTabs,printWidth:100,endOfLine:'lf',embeddedLanguageFormatting:'auto'});return {text:formatted,mode:'format'};
 }
 self.onmessage=async event=>{const {id,action,language,text,options={}}=event.data||{};
- try{if(typeof text!=='string'||text.length>250000)throw Error('Language tools support documents up to 250,000 characters.');if(action==='highlight')self.postMessage({id,html:render(tokenize(text,language))});else if(action==='format')self.postMessage({id,...await format(text,language,options)});else throw Error('Unknown editor operation.');}
+ try{const network=action==='highlight'&&NTKNetworkConfig.supports(language);if(typeof text!=='string'||text.length>(network?NTKNetworkConfig.MAX_PAINT:250000))throw Error(network?'Network syntax supports documents up to 1,000,000 characters.':'Language tools support documents up to 250,000 characters.');if(action==='highlight')self.postMessage(network?{id,...NTKNetworkConfig.paint(text,language)}:{id,html:render(tokenize(text,language))});else if(action==='format')self.postMessage({id,...await format(text,language,options)});else throw Error('Unknown editor operation.');}
  catch(error){self.postMessage({id,error:String(error.message||error)});}
 };

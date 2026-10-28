@@ -99,6 +99,8 @@ func (a *application) runRemoteBrowserOperation(ctx context.Context, r remoteBro
 	if err != nil {
 		return model.Result{}, err
 	}
+	finishActivity := a.activity.begin(ctx, r.Protocol)
+	defer finishActivity()
 	if r.ConnectionID != "" {
 		entry, err := a.browserConnection(r.ConnectionID)
 		if err != nil {

@@ -1,5 +1,13 @@
-.saved-session-slot{display:inline-flex;max-width:100%;vertical-align:middle}.saved-session-slot:empty{display:none}
-.saved-session-indicator{display:inline-flex;align-items:center;max-width:100%;margin:3px 0;padding:3px 6px;border:1px solid var(--accent);border-radius:5px;background:var(--accentBg);color:var(--text);font:inherit;font-size:10px;line-height:1.4;white-space:normal;overflow-wrap:anywhere;text-align:left;cursor:pointer}
-.saved-session-indicator:hover{background:var(--hover)}.saved-session-indicator:focus-visible,.saved-session-choice:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* Saved configuration bookmarks are not live-activity indicators. */
+.saved-session-slot{display:inline-flex;position:relative;width:20px;max-width:20px;height:20px;vertical-align:middle;flex:none}
+.saved-session-slot:empty{visibility:hidden}
+.saved-session-indicator{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;margin:0;padding:2px;border:1px solid transparent;border-radius:4px;background:transparent;color:var(--accent);cursor:pointer;vertical-align:middle}
+.saved-session-bookmark{display:block;width:13px;height:13px;fill:var(--accentBg);stroke:currentColor;stroke-width:1.5;stroke-linejoin:round;pointer-events:none;flex:none}
+.saved-session-indicator:hover{background:var(--accentBg);border-color:var(--accent)}
+.saved-session-indicator:focus-visible,.saved-session-choice:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .saved-session-choices{display:grid;gap:8px}.saved-session-choice{display:flex;flex-direction:column;align-items:flex-start;gap:4px;white-space:normal;overflow-wrap:anywhere;text-align:left;min-width:0}.saved-session-choice span{font-size:11px}
-.network-row-actions:has(.saved-session-slot){flex-wrap:wrap}
+.network-port-connect{position:relative}.saved-session-port-slot{position:absolute;left:3px;top:50%;transform:translateY(-50%);color:var(--accent);pointer-events:none}
+.saved-session-port-slot .saved-session-bookmark{width:11px;height:13px}.network-port-connect:has(.saved-session-bookmark)::before{visibility:hidden}
+.network-address-inline{position:relative;display:flex;align-items:center;min-width:0}.network-address-inline>.saved-session-slot{position:absolute;left:0;top:50%;transform:translateY(-50%);width:24px;height:24px;align-items:center;justify-content:center;background:var(--panel);border-radius:4px}
+.network-address-inline:has(.saved-session-indicator) .device-kind-icon{visibility:hidden}
+.saved-address-inline{display:inline-flex;align-items:center;gap:2px;max-width:100%;min-width:0}.saved-address-inline>.saved-address-value{min-width:0;overflow-wrap:anywhere}

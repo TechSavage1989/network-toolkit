@@ -84,4 +84,10 @@ See [VALIDATION.txt](docs/VALIDATION.txt) for recorded results and [THIRD_PARTY_
 
 </details>
 
-Current published version: [1.17.107 discovery, appearance and file workflows](RELEASE_NOTES_1.17.107.txt). See the [release verification record](docs/RELEASE107_HANDOFF.md) for completed checks and explicit protocol/testing limits.
+Current development version: [1.17.108 activity, inline bookmarks, graphs and editor comparison](RELEASE_NOTES_1.17.108.txt). The latest published baseline remains 1.17.107 until the required108 checks and release verification complete.
+
+### Editor documents and windows
+
+See [editor tabs, comparison and change map](docs/EDITOR_WORKFLOWS108.md),
+[acknowledged editor window moves and limits](docs/EDITOR_WINDOWS.md), and
+[offline network configuration syntax support](docs/NETWORK_CONFIG_EDITOR.md).

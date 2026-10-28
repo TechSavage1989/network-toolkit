@@ -121,7 +121,7 @@ jobs:
 
   windows-terminal:
     runs-on: windows-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
         with:
@@ -177,6 +177,22 @@ jobs:
         with:
           name: native-explorer107-checks
           path: ${{ runner.temp }}/network-toolkit-native107
+          if-no-files-found: error
+          retention-days: 7
+      - name: Verify native editor dirty-close consent and acknowledged two-window moves
+        env:
+          GOTOOLCHAIN: local
+          NETWORK_TOOLKIT_NATIVE_EDITOR_TEST: '1'
+          TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/network-toolkit-native-editor108
+        run: |
+          go test -mod=vendor ./internal/desktop -run '^TestNativeEditorCloseApprovalInstalledWebView2$' -count=1 -timeout=3m -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          go test -mod=vendor ./cmd/network-toolkit -run '^TestNativeEditorTransferInstalledWebView2$' -count=1 -timeout=6m -v
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: native-editor108-checks
+          path: ${{ runner.temp }}/network-toolkit-native-editor108
           if-no-files-found: error
           retention-days: 7
       - name: Test visible Windows installer progress
@@ -470,7 +486,7 @@ jobs:
 
   browser-workflows107:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
         with:
@@ -518,6 +534,59 @@ jobs:
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results
           NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
         run: node scripts/transfer-drop.browser.cjs
+      - name: Check authoritative sidebar activity, cross-window state and responsive indicators
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
+        run: node scripts/sidebar-activity108.browser.cjs
+      - name: Check inline saved bookmarks, details access and independent copying
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
+        run: node scripts/saved-bookmarks.browser.cjs
+      - name: Check stable status-colored graphs and time-aligned pointer selection
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
+        run: node scripts/graph-interaction108.browser.cjs
+      - name: Check first paste creates an unsaved document and survives navigation
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
+        run: node scripts/editor-empty-paste.browser.cjs
+      - name: Reproduce the pinned 107 empty-editor regression as a negative control
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
+          TOOLKIT_EXPECT_EMPTY_PASTE_BUG: '1'
+        run: |
+          git fetch --no-tags --depth=1 origin ab0d0daeff5e2ea8f5d4da457544fc96b8202fab
+          git show ab0d0daeff5e2ea8f5d4da457544fc96b8202fab:web/assets/file-editor.js > "$RUNNER_TEMP/ntk-editor-107.js"
+          printf '5a6d23f20146b44c39a2d057a2d113f6721be0ef0c511752d7666b2d505faeb9  %s\n' "$RUNNER_TEMP/ntk-editor-107.js" | sha256sum --check
+          TOOLKIT_EDITOR_SOURCE="$RUNNER_TEMP/ntk-editor-107.js" node scripts/editor-empty-paste.browser.cjs
+      - name: Check editor tabs, local comparison, change-map geometry and appearance
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
+        run: node scripts/editor-workflows108.browser.cjs
+      - name: Check acknowledged editor window moves and scoped startup
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
+        run: node scripts/editor-windows108.browser.cjs
       - uses: actions/upload-artifact@v7
         if: always()
         with:

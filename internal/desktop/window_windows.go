@@ -197,6 +197,7 @@ type hostWindow struct {
 	initializing     bool
 	closeFlow        closeHandshake
 	closeTimer       uintptr
+	closeAttempt     uint64
 	closingNotified  bool // UI thread only; set before invoking OnClosing.
 	stopOnce         sync.Once
 	queueMu          sync.Mutex
@@ -556,15 +557,24 @@ func (w *hostWindow) shutdown() {
 
 func (w *hostWindow) requestClose() {
 	ready := w.ready && w.view != nil && !w.view.closed
+	w.closeFlow.approvalRequired = w.cfg.RequireCloseApproval && w.ready
 	decision := w.closeFlow.request(ready, w.ctx.Err() != nil)
 	if decision == closeWindowNow {
 		w.closeNow()
 		return
 	}
+	if decision == closeNotApproved {
+		w.closeApprovalBlocked()
+		return
+	}
 	if decision != requestRendererClose {
 		return
 	}
-	w.notifyClosing()
+	if !w.closeFlow.approvalRequired {
+		w.notifyClosing()
+	}
+	w.closeAttempt++
+	attempt := w.closeAttempt
 	// WM_TIMER bounds a stalled renderer or final save. It is handled by the
 	// same UI message loop as the close request and is removed during shutdown.
 	timer, _, _ := wndSetTimer.Call(w.hwnd, windowCloseTimer, 5000, 0)
@@ -573,7 +583,11 @@ func (w *hostWindow) requestClose() {
 		return
 	}
 	w.closeTimer = timer
-	if err := w.view.RequestClose(w.finishCloseRequest); err != nil {
+	if err := w.view.RequestClose(func(handled bool) {
+		if attempt == w.closeAttempt {
+			w.finishCloseRequest(handled)
+		}
+	}); err != nil {
 		w.finishCloseRequest(false)
 	}
 }
@@ -581,9 +595,21 @@ func (w *hostWindow) requestClose() {
 func (w *hostWindow) finishCloseRequest(handled bool) {
 	// RequestClose posts this callback to the UI queue after its COM callback
 	// returns, so destroying the controller here cannot reenter that callback.
-	if w.closeFlow.completed(handled) == closeWindowNow {
+	switch w.closeFlow.completed(handled) {
+	case closeWindowNow:
 		w.closeNow()
+	case closeNotApproved:
+		w.closeApprovalBlocked()
 	}
+}
+
+func (w *hostWindow) closeApprovalBlocked() {
+	w.closeAttempt++ // A late callback cannot complete a newer close attempt.
+	if w.closeTimer != 0 {
+		wndKillTimer.Call(w.hwnd, w.closeTimer)
+		w.closeTimer = 0
+	}
+	w.showMessage("Close not approved", "This window remains open because closing was not approved. Finish or cancel any open save or document-transfer dialog, then try again. The timeout does not approve discarding documents.")
 }
 
 func (w *hostWindow) closeNow() {
@@ -760,8 +786,11 @@ func windowProcedure(hwnd uintptr, message uint32, wparam, lparam uintptr) uintp
 			return 0
 		}
 		if w.closeTimer != 0 && wparam == w.closeTimer {
-			if w.closeFlow.expired() == closeWindowNow {
+			switch w.closeFlow.expired() {
+			case closeWindowNow:
 				w.closeNow()
+			case closeNotApproved:
+				w.closeApprovalBlocked()
 			}
 			return 0
 		}

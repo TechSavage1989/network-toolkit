@@ -73,3 +73,8 @@ test('SFTP sidebar follows the selected SSH session and invalidates disconnected
  h.selected(h.entry);assert.equal(h.api.available(h.entry),true);h.api.render(panel,h.entry);
  assert.equal(panel.dataset.tsftpSession,'ssh-one');
 });
+
+test('sidebar editor carries only its captured terminal ownership binding',async()=>{
+ const h=harness(),opened=[];h.root.NetworkToolkitFileEditor={open:async value=>opened.push(value)};const panel=h.document.getElementById('terminalSidebarSFTP');h.api.sync(h.entry);await settle();h.api.render(panel,h.entry);await settle();h.document.emit('click',panel.querySelector('[data-tsftp-item="./startup.cfg"]'));await h.api.editor();assert.equal(opened.length,1);
+ assert.deepEqual(JSON.parse(JSON.stringify(opened[0].binding)),{kind:'terminal',sessionId:'ssh-one',revision:1});h.revision();assert.equal(opened[0].binding.revision,1,'A later ownership epoch must not silently retarget the captured descriptor');assert.equal(Object.hasOwn(opened[0].binding,'host'),false);assert.equal(Object.hasOwn(opened[0].binding,'password'),false);
+});

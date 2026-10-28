@@ -29,6 +29,9 @@ func nativeDocumentURL(raw string) (*url.URL, error) {
 	}
 	if u.Path != "/" {
 		id := strings.TrimPrefix(u.Path, "/terminal-view/")
+		if id == u.Path {
+			id = strings.TrimPrefix(u.Path, "/editor-view/")
+		}
 		decoded, err := hex.DecodeString(id)
 		if id == u.Path || err != nil || len(decoded) != 16 || strings.ToLower(id) != id {
 			return nil, errors.New("The native interface document is not an application workspace")

@@ -51,3 +51,34 @@ func TestCloseHandshakeEventOrdering(t *testing.T) {
 		})
 	}
 }
+
+func TestApprovalRequiredCloseNeverInfersConsentFromInvocationOrTimeout(t *testing.T) {
+	for _, end := range []string{"timeout", "missing"} {
+		c := closeHandshake{approvalRequired: true}
+		if c.request(true, false) != requestRendererClose {
+			t.Fatal("no first request")
+		}
+		if c.completed(true) != waitForClose {
+			t.Fatal("invocation is not consent")
+		}
+		var decision closeDecision
+		if end == "timeout" {
+			decision = c.expired()
+		} else {
+			decision = c.completed(false)
+		}
+		if decision != closeNotApproved || c.finished || c.pending {
+			t.Fatal("unapproved close destroyed or stuck renderer")
+		}
+		if c.request(true, false) != requestRendererClose {
+			t.Fatal("retry unavailable")
+		}
+		if c.request(true, true) != closeWindowNow {
+			t.Fatal("explicit shutdown did not close")
+		}
+	}
+	c := closeHandshake{approvalRequired: true}
+	if c.request(false, false) != closeNotApproved {
+		t.Fatal("lost ready renderer forced closed")
+	}
+}

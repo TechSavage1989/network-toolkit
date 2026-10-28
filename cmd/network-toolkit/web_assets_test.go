@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"html"
 	"mime"
 	"net/http"
@@ -70,7 +71,9 @@ func TestEveryHTMLDependencyIsServedFromMainAndDetachedRoutes(t *testing.T) {
 	// An empty linked workspace exercises the real detached page route without
 	// connecting a terminal or launching an external application.
 	view, _ := workspaceTestCreate(t, a, terminalWorkspaceSnapshot{})
-	for _, route := range []string{"/", "/terminal-view/" + view.ID} {
+	a.launchEditorView = func(context.Context, editorViewLaunch) (<-chan error, error) { return nil, nil }
+	_, _, editorID := editorFixtureOffer(t, a.editorViews)
+	for _, route := range []string{"/", "/terminal-view/" + view.ID, "/editor-view/" + editorID} {
 		t.Run(route, func(t *testing.T) {
 			page := requestApp(a, http.MethodGet, route, "", false)
 			if page.Code != http.StatusOK || !strings.HasPrefix(page.Header().Get("Content-Type"), "text/html") {
@@ -184,6 +187,12 @@ func TestDiscoveryAssetsAreEmbeddedAndRooted(t *testing.T) {
 		{"/assets/scan-routes.css", "text/css"},
 		{"/assets/app-navigation.js", "text/javascript"},
 		{"/assets/app-navigation.css", "text/css"},
+		{"/assets/sidebar-activity.js", "text/javascript"},
+		{"/assets/sidebar-activity.css", "text/css"},
+		{"/assets/network-config-language.js", "text/javascript"},
+		{"/assets/editor-compare.js", "text/javascript"},
+		{"/assets/editor-windows.js", "text/javascript"},
+		{"/assets/editor-windows.css", "text/css"},
 		{"/assets/configuration-layout.js", "text/javascript"},
 		{"/assets/configuration-layout.css", "text/css"},
 		{"/assets/configuration-surfaces.css", "text/css"},

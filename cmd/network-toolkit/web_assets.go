@@ -18,6 +18,10 @@ func serveWebAsset(w http.ResponseWriter, r *http.Request) {
 	contentType := ""
 	embeddedPath := "web" + r.URL.Path
 	switch r.URL.Path {
+	case "/assets/sidebar-activity.js", "/assets/network-config-language.js", "/assets/editor-compare.js", "/assets/editor-windows.js":
+		contentType = "text/javascript; charset=utf-8"
+	case "/assets/sidebar-activity.css", "/assets/editor-windows.css":
+		contentType = "text/css; charset=utf-8"
 	case "/assets/terminal-shell-syntax.js", "/assets/editor-languages.js", "/assets/editor-language-service.js", "/assets/editor-language-worker.js",
 		"/assets/editor-vendor/languages.js", "/assets/editor-vendor/prism.js", "/assets/editor-vendor/prettier.js",
 		"/assets/editor-vendor/prettier-babel.js", "/assets/editor-vendor/prettier-estree.js", "/assets/editor-vendor/prettier-typescript.js",

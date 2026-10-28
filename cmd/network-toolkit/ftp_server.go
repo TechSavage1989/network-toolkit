@@ -711,6 +711,8 @@ func startFTPServer(ctx context.Context, s *transferHost, base, username, passwo
 	s.authPassword = password
 	go func() { <-ctx.Done(); _ = l.Close() }()
 	go func() {
+		defer s.servingStopped()
+		defer l.Close()
 		for {
 			conn, e := l.Accept()
 			if e != nil {

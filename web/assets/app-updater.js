@@ -4,6 +4,10 @@
   const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const notesView=typeof module==='object'&&module.exports?require('./app-update-notes.js'):root.NetworkToolkitUpdateNotes;
   function releaseNotes(data,version){return notesView.html({version,currentVersion:data?.currentVersion,notes:data?.latest?.version===version?data.latest.notes:''});}
+  function editorInstallBlockReason(editor=root.NetworkToolkitFileEditor,windows=root.NetworkToolkitEditorWindows){
+    const state=windows?.state;
+    return editor?.documents?.size||editor?.windowAdapter?.hasPendingWindowClose?.()||state?.closing||state?.outgoing||state?.incoming?'Save your work and close all Text Editor documents and editor windows before installing. Finish or cancel any pending editor move or close; installation was not started.':'';
+  }
   function createController(env){
     let data=null,busy=false,error='',message='',backgroundError='',revision=0,checkAfter=0,progress=null;
     const changed=()=>env.changed?.(snapshot());
@@ -54,16 +58,19 @@
       finally{stop();busy=false;render();changed();}
     }
     async function install(version){
+      const guardEditor=()=>{const reason=env.editorInstallBlockReason?.();if(reason)throw new Error(reason);};
       if(busy||data?.installing)return;
       if(!data?.staged||data.staged.version!==version){error='The staged update changed. Refresh update status and try again.';render();return;}
+      try{guardEditor();}catch(e){error=e.message;message='';render();return;}
       busy=true;error='';progress={phase:'saving',version};message='Saving settings before restart…';render();
       try{
         if(!await env.save())throw new Error('Settings could not be saved. Installation was not started.');
-        const current=await env.api('/updates/status');data=current;
+        guardEditor();
+        const current=await env.api('/updates/status');data=current;guardEditor();
         if(!current.staged||current.staged.version!==version)throw new Error('The staged update changed. Refresh update status and try again.');
         if(current.busy?.length)throw new Error('Finish or stop active operations first: '+current.busy.join(', '));
         progress={phase:'installing',version};message='Requesting installation. Do not close the app until it restarts.';render();
-        const result=await env.api('/updates/install','POST',{confirm:true,version});
+        guardEditor();const result=await env.api('/updates/install','POST',{confirm:true,version});
         if(!result?.restarting)throw new Error('The app did not confirm a restart. Refresh status before trying again.');
         data={...data,installing:true};progress={phase:'restarting',version};message='Installation requested. The app will close and restart. Settings are kept.';
         env.restarting();
@@ -158,7 +165,7 @@
     const item=notice(state,preferences,now);if(!item)return '';
     return '<div class="notice info row wrap gap6" role="status" aria-live="polite"><span style="flex:1;min-width:180px">Network Toolkit '+escape(item.version)+(item.kind==='install'?' is downloaded and verified. Save your work before restarting.':' is available. See what’s new before updating.')+'</span><button type="button" class="btn small primary" data-app-update="'+(item.kind==='install'?'confirm':'download')+'" data-version="'+escape(item.version)+'" '+(state.busy?'disabled':'')+'>'+(item.kind==='install'?'Install and restart':"See what's new")+'</button><button type="button" class="btn small ghost" data-app-update="later">Remind me tomorrow</button>'+(state.error?'<span style="flex-basis:100%" role="alert">'+escape(state.error)+'</span>':'')+(state.busy&&state.message?'<span style="flex-basis:100%">'+escape(state.message)+'</span>':'')+(state.busy?progressHTML(state):'')+'</div>';
   }
-  if(typeof module==='object'&&module.exports)module.exports={createController,createScheduler,notice,noticeHTML,progressHTML,html};
+  if(typeof module==='object'&&module.exports)module.exports={createController,createScheduler,notice,noticeHTML,progressHTML,html,editorInstallBlockReason};
   if(!root.document)return;
   let controller,scheduler,updateWelcomeShown=false,namingWarningShown=false;
   let preferencesLoaded=true,preferencesPending=false,preferencesError='',preferenceWritesPending=false,pendingManualResult='';
@@ -230,7 +237,7 @@
   function getController(){
     if(controller)return controller;
     controller=createController({
-      api:(...args)=>boundedAPI(...args),setTimeout:(...args)=>root.setTimeout(...args),clearTimeout:(...args)=>root.clearTimeout(...args),save:()=>flushState({closing:true}),
+      api:(...args)=>boundedAPI(...args),setTimeout:(...args)=>root.setTimeout(...args),clearTimeout:(...args)=>root.clearTimeout(...args),save:()=>flushState({closing:true}),editorInstallBlockReason:()=>editorInstallBlockReason(),
       upload:async(file,checksums)=>{
         const form=new FormData();form.append('package',file);form.append('checksums',checksums);
         const response=await fetch('/api/updates/import',{method:'POST',headers:{'X-Session-Token':SESSION},body:form});

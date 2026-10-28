@@ -124,3 +124,14 @@ test('measured and unknown download sizes render accessible honest progress',()=
  const unknown=progressHTML({busy:true,progress:{phase:'download',received:1024,total:0}});assert.match(unknown,/1 KiB received/);assert.doesNotMatch(unknown,/<progress[^>]*value=/);
  const installing=progressHTML({progress:{phase:'restarting'}});assert.match(installing,/Installing and restarting/);assert.doesNotMatch(installing,/<progress[^>]*value=/);
 });
+
+test('install refuses open editor documents or pending close/move without saving or restarting',async()=>{
+ const {editorInstallBlockReason}=require('../web/assets/app-updater.js');
+ for(const [editor,windows] of [[{documents:new Map([['doc',{}]])},null],[{documents:new Map(),windowAdapter:{hasPendingWindowClose:()=>true}},null],[null,{state:{closing:true}}],[null,{state:{outgoing:1}}],[null,{state:{incoming:1}}]]){
+  let saves=0;const h=harness({editorInstallBlockReason:()=>editorInstallBlockReason(editor,windows),save:async()=>{saves++;return true;}});await h.c.load();await h.c.install('1.17.59');assert.match(h.c.snapshot().error,/close all Text Editor documents/);assert.equal(saves,0);assert.equal(h.calls.some(call=>call[0]==='/updates/install'),false);assert.equal(h.c.snapshot().data.installing,false);
+ }
+ assert.equal(editorInstallBlockReason({documents:new Map()},{state:{outgoing:0,incoming:0,closing:false}}),'');
+});
+test('install rechecks newly opened documents after settings save and status awaits',async()=>{
+ for(const boundary of ['save','status']){let blocked=false,statusReads=0,posts=0;const h=harness({editorInstallBlockReason:()=>blocked?'Close the new editor document first.':'',save:async()=>{if(boundary==='save')blocked=true;return true;},api:async path=>{if(path==='/updates/install'){posts++;return {restarting:true};}if(++statusReads>1&&boundary==='status')blocked=true;return structuredClone(staged);}});await h.c.load();await h.c.install('1.17.59');assert.match(h.c.snapshot().error,/new editor document/);assert.equal(posts,0);assert.equal(h.c.snapshot().busy,false);assert.equal(h.c.snapshot().data.installing,false);}
+});

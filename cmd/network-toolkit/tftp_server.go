@@ -124,6 +124,7 @@ func startTFTPServer(ctx context.Context, s *transferHost) (*net.UDPConn, error)
 		return nil, fmt.Errorf("listen on UDP %s: %w", s.address, e)
 	}
 	go func() {
+		defer s.servingStopped()
 		defer conn.Close()
 		buf := make([]byte, 2048)
 		for {
@@ -170,8 +171,8 @@ func handleTFTPRequest(ctx context.Context, s *transferHost, peer *net.UDPAddr, 
 	if op == tftpWRQ {
 		action = "upload"
 	}
-	s.log(peer.String(),"REQUEST",filename,0,nil)
- if (op == tftpRRQ && s.access == "write") || (op == tftpWRQ && s.access == "read") {
+	s.log(peer.String(), "REQUEST", filename, 0, nil)
+	if (op == tftpRRQ && s.access == "write") || (op == tftpWRQ && s.access == "read") {
 		err = errors.New("operation disabled by server permissions")
 		sendInitialTFTPError(bindIP, peer, 2, err.Error())
 		s.log(peer.String(), action, filename, 0, err)

@@ -1,10 +1,10 @@
-NETWORK TOOLKIT 1.17.107
+NETWORK TOOLKIT 1.17.108
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.107
+CURRENT RELEASE - 1.17.108
 
-Release details: RELEASE_NOTES_1.17.107.txt
-Previous release: docs/releases/RELEASE_NOTES_1.17.105.txt
+Release details: RELEASE_NOTES_1.17.108.txt
+Previous release: docs/releases/RELEASE_NOTES_1.17.107.txt
 Full release-note archive: docs/releases/README.md
 
 Copy server/client file locations in explicitly labeled network, remote-relative

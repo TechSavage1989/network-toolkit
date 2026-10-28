@@ -12,7 +12,6 @@
 .rt-plot svg:focus-visible{outline:2px solid var(--accent)}
 .rt-grid{fill:none;stroke:var(--line);stroke-width:1;pointer-events:none}
 .rt-series polyline{fill:none;stroke:var(--accent);stroke-width:2;pointer-events:none}
-.rt-jitter .rt-series polyline{stroke:var(--diag-warn,var(--warn))}
 .rt-average{stroke:var(--muted);stroke-width:1;stroke-dasharray:5 4;pointer-events:none}
 .rt-point{fill:var(--accent);stroke:var(--panel);stroke-width:1;cursor:pointer}
 .rt-point .rt-point-hit{fill:transparent;stroke:none;pointer-events:all}
@@ -23,8 +22,8 @@
 .rt-point.rt-severity-info{fill:var(--diag-info,var(--accent))}
 .rt-point-filter-dimmed{opacity:.2}
 .rt-point-filtered [data-rt-marker]{stroke-width:2}
-.rt-point.rt-point-hovered{opacity:1;stroke:var(--text);stroke-width:2.5}
-.rt-point.rt-point-selected{opacity:1;stroke:var(--text);stroke-width:3}
+.rt-point.rt-point-hovered{opacity:1;stroke:var(--accent);stroke-width:2.5}
+.rt-point.rt-point-selected{opacity:1;stroke:var(--accent);stroke-width:3}
 .rt-point.rt-point-selected.rt-point-hovered{stroke-width:4}
 .rt-unmeasured [data-rt-marker]{stroke-dasharray:2 1}
 .rt-aggregate-range{stroke:var(--muted);stroke-width:2;pointer-events:none}
@@ -78,6 +77,8 @@
 @container (max-width:420px){.rt-view-controls .graph-range-advanced{padding:3px 4px;min-height:26px;font-size:10px}}
 @container (max-width:650px){.rt-view-controls .rt-mode-control{flex:0 1 85px;min-width:75px;max-width:85px}.rt-view-controls .graph-timeframe{padding:0;display:block;flex:0 0 54px;width:54px}.rt-view-controls .graph-timeframe>span{display:none}.rt-view-controls .graph-timeframe select{width:54px}.rt-view-controls .graph-range-advanced{padding:3px 4px;min-height:26px;font-size:10px}}
 
-/* Reserve a fixed label gutter outside the grid; changing RTT values cannot move x. */
-.rt-latency .rt-point.rt-severity-good,.rt-latency .rt-point.rt-severity-info{fill:var(--accent)}
-.rt-jitter .rt-point.rt-severity-good,.rt-jitter .rt-point.rt-severity-info{fill:var(--diag-warn,var(--warn))}
+/* Status belongs to each result; both measurement lines use the theme accent. */
+.rt-aggregate-range.rt-severity-good{stroke:var(--diag-good,var(--good))}
+.rt-aggregate-range.rt-severity-bad{stroke:var(--diag-bad,var(--bad))}
+.rt-aggregate-range.rt-severity-warn{stroke:var(--diag-warn,var(--warn))}
+.rt-aggregate-range.rt-severity-info{stroke:var(--diag-info,var(--accent))}

@@ -2,7 +2,7 @@
 const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict'),{test}=require('node:test'),{document:makeDocument,Element}=require('./terminal-dom-fixture.cjs');
 const source=fs.readFileSync(require.resolve('../web/assets/value-copy.js'),'utf8');
 function harness(html,observe=false){
- const doc=makeDocument(html);doc.body=doc;const copied=[],frames=[],selection={isCollapsed:false,toString:()=> 'selected text'},context={document:doc,copyText:value=>copied.push(value),getSelection:()=>selection,setTimeout:fn=>frames.push(fn),requestAnimationFrame:fn=>frames.push(fn)};let observeCallback;
+ const doc=makeDocument(html);doc.body=doc;for(const svg of doc.querySelectorAll('svg'))svg.namespaceURI='http://www.w3.org/2000/svg';const copied=[],frames=[],selection={isCollapsed:false,toString:()=> 'selected text'},context={document:doc,copyText:value=>copied.push(value),getSelection:()=>selection,setTimeout:fn=>frames.push(fn),requestAnimationFrame:fn=>frames.push(fn)};let observeCallback;
  if(observe)context.MutationObserver=class{constructor(callback){observeCallback=callback;}observe(){}};
  vm.runInNewContext(source,context);return {doc,copied,frames,selection,api:context.NetworkToolkitValueCopy,mutate:records=>observeCallback(records),flush:()=>{for(const fn of frames.splice(0))fn();}};
 }
@@ -78,4 +78,15 @@ test('numeric discovery copy exception never enables arbitrary buttons, secret g
   '<div data-secret><div class="network-open-ports" data-copy-value="22" data-copy-label="Open TCP ports">'+port+'</div></div>',
   '<div class="network-open-ports" data-copy-value="22" data-copy-label="Open TCP ports">'+port+'<input value="secret-canary"></div>'
  ]){const h=harness(html);assert.equal(h.doc.querySelectorAll('[data-value-copy-control]').length,0,html);}
+});
+const savedBookmark='<span class="saved-session-slot" data-saved-session-slot="device"><button type="button" class="saved-session-indicator" data-saved-session-open="device" title="Named profile · SSH · 192.0.2.1:22" aria-label="Review saved connection"><svg class="saved-session-bookmark" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M4 2.25h8v11.5L8 11l-4 2.75z"/></svg></button></span>';
+test('exact text-free bookmark preserves result and details IP copy without copying profile labels or invoking actions',()=>{
+ const h=harness('<table><thead><tr><th>IP address</th></tr></thead><tbody><tr><td><div class="network-address-inline"><button class="network-address-details" data-select-device="device"><span class="mono">192.0.2.1</span><span>Device details</span></button>'+savedBookmark+'</div></td></tr></tbody></table><dl class="device-data-grid"><div><dt>IP address</dt><dd><span class="saved-address-inline"><span>192.0.2.1</span>'+savedBookmark+'</span></dd></div></dl>');
+ assert.equal(h.doc.querySelectorAll('[data-value-copy-control]').length,2);for(const copy of h.doc.querySelectorAll('[data-value-copy-control]'))h.doc.emit('click',copy);assert.deepEqual(h.copied,['192.0.2.1','192.0.2.1']);for(const bookmark of h.doc.querySelectorAll('[data-saved-session-open]'))h.doc.emit('click',bookmark);assert.equal(h.copied.length,2);assert.equal(h.doc.querySelectorAll('[data-saved-session-open]').length,2);
+});
+test('saved bookmark copy exception rejects unexpected structure, labels, arbitrary controls and existing sensitive groups',()=>{
+ const invalid=[savedBookmark.replace('data-saved-session-open="device"','data-saved-session-open="other"'),savedBookmark.replace('<svg','unexpected label<svg'),savedBookmark.replace('saved-session-slot','untrusted-slot'),savedBookmark.replace('M4 2.25h8v11.5L8 11l-4 2.75z','M0 0'),savedBookmark.replace('saved-session-bookmark','unexpected-glyph'),savedBookmark+'<button>Other action</button>',savedBookmark+'<input value="secret-canary">'];
+ for(const mark of invalid){const h=harness('<dl class="device-data-grid"><div><dt>IP address</dt><dd>192.0.2.1'+mark+'</dd></div></dl>');assert.equal(h.doc.querySelectorAll('[data-value-copy-control]').length,0,mark);}
+ for(const wrap of ['data-secret','data-sensitive','class="terminal-workspace"']){const h=harness('<div '+wrap+'><dl class="device-data-grid"><div><dt>IP address</dt><dd>192.0.2.1'+savedBookmark+'</dd></div></dl></div>');assert.equal(h.doc.querySelectorAll('[data-value-copy-control]').length,0);}
+ const h=harness('<dl class="device-data-grid"><div><dt>Password</dt><dd>secret-canary'+savedBookmark+'</dd></div></dl>');assert.equal(h.doc.querySelectorAll('[data-value-copy-control]').length,0);
 });

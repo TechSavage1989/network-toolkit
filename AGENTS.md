@@ -3,6 +3,12 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
+Active authorized candidate: 1.17.108. Read docs/RELEASE108_HANDOFF.md. The user
+approved activity indicators, inline saved-profile/results/detail access, graph
+interaction fixes, and editor tabs/comparison/change-map controls as one build.
+Required exact-source hosted checks and public verification are still pending.
+Do not mistake authored tests or implementation checkpoints for release acceptance.
+
 Current published version: 1.17.107. The authorized discovery/appearance/capture/
 file-workflow batch is published and independently verified. Source/tag:
 bafabd88f9dd728acf45862226995e654821082d; tree

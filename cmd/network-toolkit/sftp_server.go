@@ -795,6 +795,7 @@ func startSFTPServer(ctx context.Context, s *transferHost, base, username, passw
 		return nil, fmt.Errorf("SFTP TCP listener: %w", e)
 	}
 	go func() {
+		defer s.servingStopped()
 		defer ln.Close()
 		for {
 			connection, err := ln.Accept()

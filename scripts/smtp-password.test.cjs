@@ -7,7 +7,7 @@ const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve
 function harness(respond){
  const document=makeDocument('<aside id="sidebar"></aside><div id="workspaceScroll"></div><div id="options"></div><button id="runButton"></button>');
  const calls=[],saved=[],messages=[],state={activePage:'smtp',forms:{smtp:{}}};
- const c={document,state,console,online:true,shutDown:false,TERMINAL_ONLY:false,jobs:[],selected:{},fullVersions:new Map(),jobVersions:new Map(),lastRender:'',
+ const c={document,state,console,online:true,shutDown:false,TERMINAL_ONLY:false,EDITOR_WINDOW:false,jobs:[],selected:{},fullVersions:new Map(),jobVersions:new Map(),lastRender:'',
   $:selector=>document.querySelector(selector),esc:value=>String(value??'').replaceAll('&','&amp;').replaceAll('"','&quot;').replaceAll('<','&lt;'),
   activeTool:()=>state.activePage==='smtp'?'smtp':null,runningToolJob:()=>null,currentTarget:()=> 'smtp.example.test',LOCAL_TOOLS:[],SUBNET_TOOLS:[],
   networkMode:()=>false,parseSubnet:()=>{throw Error('Not a CIDR')},NetworkToolkitSource:{validation:()=>'',requestOptions:()=>({})},

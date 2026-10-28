@@ -13,12 +13,17 @@ type Config struct {
 	// SessionToken is an in-memory capability, delivered only to this native
 	// WebView. Never put it in the URL, process arguments, profile or HTTP HTML.
 	SessionToken string
+	// RequireCloseApproval never treats a ready renderer invocation or timeout
+	// as approval to discard editor work. Only context cancellation closes it.
+	// The default terminal close behavior remains unchanged.
+	RequireCloseApproval bool
 	// Activate requests that an existing window be restored and brought forward.
 	// Sends may be coalesced; closing the channel disables further requests.
 	Activate <-chan struct{}
 	// OnClosing is called once on the UI thread when the window starts its
-	// close handshake or immediate shutdown. It must return promptly. The
-	// notification does not cancel the context or shorten the final save wait.
+	// close handshake or immediate shutdown. Approval-required hosts defer it
+	// until approved shutdown. It must return promptly and cannot shorten
+	// the final save wait.
 	OnClosing func()
 	// OnReady is called once on the UI thread after interface startup succeeds
 	// and the native main window is verified visible. An error screen does not

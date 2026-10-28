@@ -24,7 +24,7 @@
 .nt-editor-code{display:flex;flex:1 1 0;min-height:110px;min-width:0;overflow:hidden;background:var(--input);font:12px/1.55 Consolas,'Cascadia Code',monospace;}
 .nt-editor-gutter{flex:0 0 55px;min-width:45px;overflow:hidden;white-space:pre;text-align:right;color:var(--faint);border-right:1px solid var(--border);padding:10px 9px 20px 0;line-height:1.55;user-select:none;box-sizing:border-box}
 .nt-editor-surface{flex:1;min-width:0;min-height:0;position:relative;overflow:hidden}
-.nt-editor-highlight,.nt-editor-surface textarea{position:absolute;inset:0;width:100%;height:100%;margin:0;padding:10px 12px 20px;border:0;border-radius:0;background:transparent;font:inherit;line-height:1.55;letter-spacing:0;tab-size:4;white-space:pre;overflow:auto;resize:none;box-shadow:none;overflow-wrap:normal;}
+.nt-editor-highlight,.nt-editor-surface textarea{position:absolute;inset:0;width:100%;height:100%;margin:0;padding:10px 12px 20px;border:0;border-radius:0;background:transparent;font:inherit;line-height:1.55;letter-spacing:0;tab-size:var(--nt-editor-tab,4);white-space:pre;overflow:auto;resize:none;box-shadow:none;overflow-wrap:normal;}
 .nt-editor-highlight{height:auto;min-height:100%;width:max-content;min-width:100%;overflow:visible;pointer-events:none;color:var(--text)}
 .nt-editor-surface textarea{z-index:1;color:var(--text);caret-color:var(--text);outline:0!important;}
 .nt-editor-surface textarea.highlight-active{color:transparent!important;-webkit-text-fill-color:transparent;caret-color:var(--text)!important}
@@ -128,3 +128,41 @@ body:has(.nt-editor-embedded) #toolWorkspace>#pageContent{grid-row:1!important;g
 
 [data-ed-gutter-lines]{will-change:transform;white-space:pre;overflow:visible}
 [data-ed-gutter-lines]>div{margin:0;padding:0;border:0}
+
+/* Accessible document tabs and local, editable side-by-side comparison. */
+.nt-editor-tabs{flex:0 0 auto;scrollbar-gutter:stable}
+.nt-editor-new-tab{flex:0 0 28px;border:0;background:var(--panel2);border-radius:5px;font-size:18px;line-height:1;padding:3px 7px;align-self:center;color:var(--text)}
+.nt-editor-tab button:focus-visible,.nt-editor-new-tab:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.nt-editor.is-comparing .nt-editor-code,.nt-editor.is-comparing .nt-editor-find{display:none}
+.nt-editor-compare{display:flex;flex:1 1 0;flex-direction:column;min-height:220px;min-width:0;overflow:hidden;border-top:1px solid var(--border)}
+.nt-compare-tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 10px;flex:0 0 auto;border-bottom:1px solid var(--border);font-size:11px}
+.nt-compare-tools label{display:flex;gap:4px;align-items:center}.nt-compare-tools input{width:14px;height:14px;margin:0}.nt-compare-tools select{width:auto;min-height:27px;padding:3px 5px;font-size:11px}.nt-compare-tools strong{margin-right:auto}.nt-compare-tools button{font-size:11px;min-height:27px;padding:3px 7px}
+.nt-compare-summary{font-size:11px;padding:5px 10px;color:var(--text);overflow-wrap:anywhere;flex-shrink:0}
+.nt-compare-legend{display:flex;gap:9px;flex-wrap:wrap;font-size:10px;padding:0 10px 5px;color:var(--muted);flex-shrink:0}
+.nt-compare-legend .added{color:var(--good)}.nt-compare-legend .removed{color:var(--bad)}.nt-compare-legend .changed{color:var(--warn)}
+.nt-compare-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 52px;flex:1 1 0;min-height:140px;min-width:0;border-top:1px solid var(--border);overflow:hidden}
+.nt-compare-pane{display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;border-right:1px solid var(--border)}
+.nt-compare-pane>label{display:flex;gap:5px;align-items:center;padding:5px 7px;flex:0 0 auto;color:var(--muted);font-size:10px;min-width:0}.nt-compare-pane select{min-width:0;width:100%;font-size:11px;padding:4px;min-height:28px}
+.nt-compare-surface{position:relative;flex:1 1 0;min-height:80px;min-width:0;overflow:hidden;background:var(--nt-code-bg,var(--input));font:var(--nt-editor-font,13px)/1.55 var(--mono,Consolas,monospace)}
+.nt-compare-surface textarea{position:absolute;inset:0;width:100%;height:100%;resize:none;white-space:pre;overflow-wrap:normal;overflow:auto;border:0;border-radius:0;background:transparent;color:var(--nt-code-fg,var(--text));font:inherit;line-height:inherit;padding:10px 10px 20px calc(var(--nt-compare-gutter,4ch) + 16px);margin:0;outline-offset:-2px;tab-size:var(--nt-editor-tab,4);}
+.nt-compare-surface pre{position:absolute;inset:0 0 auto;margin:0;padding:10px 0 20px;font:inherit;line-height:inherit;pointer-events:none;min-height:100%;color:var(--muted)}
+.nt-compare-line{display:block;height:1.55em;padding:0 5px;box-sizing:border-box;font-size:inherit;line-height:inherit;white-space:pre}
+.nt-compare-line.added{background:color-mix(in srgb,var(--good) 15%,transparent);box-shadow:inset 3px 0 var(--good)}.nt-compare-line.removed{background:color-mix(in srgb,var(--bad) 15%,transparent);box-shadow:inset 3px 0 var(--bad)}.nt-compare-line.changed{background:color-mix(in srgb,var(--warn) 16%,transparent);box-shadow:inset 3px 0 var(--warn)}
+.nt-compare-document-state{padding:4px 7px;font-size:10px;color:var(--muted);overflow-wrap:anywhere;max-height:44px;overflow:auto;flex-shrink:0}
+.nt-compare-map{position:relative;overflow-y:auto;overflow-x:hidden;background:var(--panel2);touch-action:none;overscroll-behavior:contain;cursor:crosshair;min-height:0;scrollbar-width:thin}
+.nt-compare-map:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}.nt-compare-map[aria-disabled=true]{cursor:default}
+[data-compare-map-content]{position:relative;min-height:100%;width:100%}[data-compare-map-marks]{position:absolute;inset:0;width:100%;height:100%;fill:var(--muted)}
+[data-compare-map-marks] .added{fill:var(--good)}[data-compare-map-marks] .removed{fill:var(--bad)}[data-compare-map-marks] .changed{fill:var(--warn)}
+[data-compare-map-viewport]{position:absolute;left:1px;right:1px;border:2px solid var(--accent);background:color-mix(in srgb,var(--accent) 13%,transparent);min-height:4px;pointer-events:none;box-sizing:border-box}
+@media(max-width:680px){.nt-compare-tools{max-height:135px;overflow:auto;padding:5px}.nt-compare-tools strong{width:100%}.nt-compare-legend span:last-child{display:none}.nt-compare-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr) 35px}.nt-compare-pane>label{flex-direction:column;align-items:stretch;gap:1px;padding:3px}.nt-compare-document-state{max-height:35px}.nt-compare-surface{font-size:11px}.nt-editor.is-comparing .nt-editor-toolbar{max-height:66px}}
+
+.nt-compare-surface textarea.is-wrapped{white-space:pre-wrap;overflow-wrap:anywhere;word-break:normal}
+.nt-compare-surface .nt-compare-highlight{padding:10px 10px 20px calc(var(--nt-compare-gutter,4ch) + 16px);white-space:pre;min-width:100%;width:max-content;color:var(--nt-code-fg,var(--text));font:inherit;line-height:inherit;overflow:visible;tab-size:4}
+.nt-compare-surface .nt-compare-highlight.is-wrapped{white-space:pre-wrap;overflow-wrap:anywhere;word-break:normal;min-width:0;box-sizing:border-box}
+.nt-compare-surface textarea.highlight-active{color:transparent!important;-webkit-text-fill-color:transparent;caret-color:var(--nt-code-fg,var(--text))}
+.nt-compare-surface textarea.highlight-active::selection{background:var(--accentBg);-webkit-text-fill-color:var(--nt-code-fg,var(--text));color:var(--nt-code-fg,var(--text))}
+.nt-compare-measure{position:fixed;left:-100000px;top:0;visibility:hidden;pointer-events:none;white-space:pre-wrap;overflow-wrap:anywhere;word-break:normal;padding:0;border:0}
+.nt-compare-measure>div{padding:0;margin:0;border:0;min-height:1em}
+[data-compare-map-marks] rect{stroke:none}
+
+.nt-compare-syntax-notice{font-size:10px;padding:3px 7px;color:var(--warn);max-height:45px;overflow:auto;flex-shrink:0}

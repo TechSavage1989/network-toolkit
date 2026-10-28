@@ -484,9 +484,9 @@ async function edit(k,newFile=false,side=get(k).active,pathOverride=''){
  if(!newFile&&!pathOverride&&(items.length!==1||file.directory)){toast('Select one text file to edit.','info');return;}
  if(newFile&&!pathOverride){const name=prompt('New UTF-8 text file name:','new-file.txt');if(name===null)return;if(!simpleName(name)){toast('Enter a valid file name.','error');return;}path=side==='remote'?joinRemote(m.remote.path,name):joinLocal(m.local.path,name);}
  if(typeof path!=='string'||!path.trim()||path.length>4096)throw Error('Enter a valid file path.');
- const r=path,identity=connectionIdentity(k);
+ const r=path,identity=connectionIdentity(k),binding=side==='local'?{kind:'local'}:k==='ssh'&&m.connectionId?{kind:'sshConnection',connectionId:m.connectionId}:k==='ssh'&&m.sessionId&&typeof terminalSessionRevision==='function'?{kind:'terminal',sessionId:m.sessionId,revision:terminalSessionRevision(m.sessionId)}:null;
  const check=()=>{const now=get(k),cfg=configurations[k];if(!now.connected||connectionIdentity(k)!==identity)throw Error('Connection changed or disconnected. Reopen this file to prevent saving to another server.');};
- try{await root.NetworkToolkitFileEditor.open({source:(side==='local'?'Local ':k.toUpperCase()+' ')+ (side==='remote'&&m.sessionId?'terminal':'files'),path:r,id:k+':'+side+':'+connectionIdentity(k)+':'+r,create:newFile,
+ try{await root.NetworkToolkitFileEditor.open({source:(side==='local'?'Local ':k.toUpperCase()+' ')+ (side==='remote'&&m.sessionId?'terminal':'files'),path:r,id:k+':'+side+':'+connectionIdentity(k)+':'+r,create:newFile,binding,
   read:async path=>{if(side==='local')return api('/file-editor/local','POST',{action:'read-text',path});check();return request(k,'read-text',{path});},
   write:async data=>{if(side==='local')return api('/file-editor/local','POST',{action:'write-text',...data});check();return request(k,'write-text',data);},
   afterSave:()=>void load(k,side,get(k)[side].path,true)});

@@ -23,7 +23,7 @@ func TestNativeBootstrapInstalledWebView2(t *testing.T) {
 	if os.Getenv("NETWORK_TOOLKIT_NATIVE_SECURITY_TEST") != "1" {
 		t.Skip("set NETWORK_TOOLKIT_NATIVE_SECURITY_TEST=1 on Windows with WebView2 for native security acceptance")
 	}
-	for _, document := range []string{"/", "/terminal-view/" + strings.Repeat("ab", 16)} {
+	for _, document := range []string{"/", "/terminal-view/" + strings.Repeat("ab", 16), "/editor-view/" + strings.Repeat("cd", 16)} {
 		t.Run(document, func(t *testing.T) {
 			token := strings.Repeat("cd", 32)
 			var validProbe, ready, forbiddenExecuted atomic.Bool

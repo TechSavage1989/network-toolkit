@@ -86,3 +86,10 @@ test('late SSH success does not erase a newly entered unrelated draft secret',as
  h.browser.configurations.ssh.password='new-draft-not-used-in-authentication';finish({connectionId:'authenticated',path:'/',entries:[]});await pending;
  assert.equal(h.browser.configurations.ssh.password,'new-draft-not-used-in-authentication');
 });
+
+test('existing file-browser editors carry exact local or ID-only SSH bindings, never FTP credentials',async()=>{
+ const h=harness();await h.browser.connect('ssh');await h.browser.edit('ssh',false,'remote','/configuration.txt');const retained=h.editors.at(-1);assert.deepEqual(JSON.parse(JSON.stringify(retained.binding)),{kind:'sshConnection',connectionId:'connection-1'});
+ await h.browser.edit('ssh',false,'local','C:\\Synthetic\\configuration.txt');assert.deepEqual(JSON.parse(JSON.stringify(h.editors.at(-1).binding)),{kind:'local'});
+ h.root.terminalSessionRevision=()=>7;Object.assign(h.browser.get('ssh'),{connected:true,connectionId:'',sessionId:'terminal-binding'});await h.browser.edit('ssh',false,'remote','/terminal.txt');const terminal=h.editors.at(-1);assert.deepEqual(JSON.parse(JSON.stringify(terminal.binding)),{kind:'terminal',sessionId:'terminal-binding',revision:7});h.root.terminalSessionRevision=()=>8;assert.equal(terminal.binding.revision,7);
+ Object.assign(h.browser.get('ftp'),{connected:true});await h.browser.edit('ftp',false,'remote','/ftp.txt');assert.equal(h.editors.at(-1).binding,null);for(const editor of [retained,terminal])for(const secret of ['password','privateKey','passphrase','credentialId','host'])assert.equal(Object.hasOwn(editor.binding,secret),false);
+});

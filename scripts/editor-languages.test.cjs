@@ -3,7 +3,7 @@ const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),asse
 const {document:makeDocument}=require('./terminal-dom-fixture.cjs'),assets=path.resolve(__dirname,'../web/assets');
 const read=name=>fs.readFileSync(path.join(assets,name),'utf8');
 function load(context,names){vm.createContext(context);for(const name of names)vm.runInContext(read(name),context,{filename:name});return context;}
-const context=load({},['editor-vendor/languages.js','editor-languages.js']),languages=context.NTKEditorLanguages;
+const context=load({},['editor-vendor/languages.js','network-config-language.js','editor-languages.js']),languages=context.NTKEditorLanguages;
 function worker(){let reply;const c={console,TextEncoder,TextDecoder};c.window=c;c.self=c;c.postMessage=value=>reply=value;c.importScripts=(...names)=>names.forEach(name=>vm.runInContext(read(name),c,{filename:name}));load(c,['editor-language-worker.js']);return {c,async request(action,language,text,options={}){reply=null;await c.onmessage({data:{id:1,action,language,text,options}});assert(reply);return reply;}};}
 test('bundled language assets match their provenance and every offered language has a grammar',()=>{
  const source=JSON.parse(read('editor-vendor/SOURCE.json'));assert(source.grammars>=290);
@@ -46,7 +46,7 @@ test('brace indentation preserves PowerShell here-strings and C raw strings/macr
 });
 function editorHarness(){const document=makeDocument('');document.body=document;const create=document.createElement;document.createElement=tag=>{const el=create(tag);el.style.setProperty=(k,v)=>el.style[k]=v;el.style.removeProperty=k=>delete el.style[k];return el;};let complete;
  const c={document,console,Map,Set,TextDecoder,TextEncoder,Uint8Array,DataView,Blob,URL,setTimeout,clearTimeout,state:{},saveState(){},confirm:()=>true,esc:s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;'),addEventListener(){},NTKEditorLanguageService:{highlight:async text=>({html:text}),format:()=>new Promise(resolve=>complete=resolve),dispose(){}}};
- load(c,['editor-vendor/languages.js','editor-languages.js','file-editor.js']);const api=c.NetworkToolkitFileEditor;
+ load(c,['editor-vendor/languages.js','network-config-language.js','editor-languages.js','file-editor.js']);const api=c.NetworkToolkitFileEditor;
  const root=()=>document.getElementById('networkToolkitFileEditor');const ta=()=>document.querySelector('[data-ed-text]');
  return {api,c,document,ta,root,complete:result=>complete(result),async open(id,text){await api.open({id,path:id,create:true,initialContent:text,read:async()=>({content:text}),write:async()=>({})});},click:action=>root().emit('click',root().querySelector('[data-ed="'+action+'"]')),settle:()=>new Promise(resolve=>setImmediate(resolve))};
 }

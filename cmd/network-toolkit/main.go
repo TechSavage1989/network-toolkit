@@ -59,9 +59,11 @@ type Job struct {
 	Result           *model.Result       `json:"result,omitempty"`
 	Error            string              `json:"error,omitempty"`
 	cancel           context.CancelFunc
+	activityContext  context.Context
 }
 
 type application struct {
+	activity                     activityOperations
 	ctx                          context.Context
 	stop                         context.CancelFunc
 	mu                           sync.RWMutex
@@ -91,6 +93,8 @@ type application struct {
 	shutdownRequested            atomic.Bool
 	openTerminalWindow           func(context.Context, *terminalWindowPreset) (bool, error)
 	views                        *terminalViewRegistry
+	editorViews                  *editorViewRegistry
+	launchEditorView             func(context.Context, editorViewLaunch) (<-chan error, error)
 	launchTerminalView           func(context.Context, terminalViewLaunch) (<-chan error, error)
 	headless                     bool
 	primaryMu                    sync.Mutex
@@ -147,6 +151,7 @@ func main() {
 	terminalOnly := flag.Bool("terminal", false, "Open the independent Terminal application window")
 	terminalPreset := flag.String("terminal-preset", "", "Encoded nonsecret settings for a Terminal connection form")
 	terminalView := flag.Bool("terminal-view", false, "Open a live terminal view using its private stdin bootstrap")
+	editorView := flag.Bool("editor-view", false, "Open an editor view using its private stdin bootstrap")
 	localHelper := flag.String("local-tools-helper", "", "Private local configuration helper pipe")
 	localParent := flag.Uint("local-tools-parent", 0, "Expected local configuration helper parent process")
 	packetHelper := flag.String("packet-capture-helper", "", "Private packet capture helper pipe")
@@ -192,6 +197,12 @@ func main() {
 	}
 	if *printVersion {
 		fmt.Println(appName, model.Version, runtime.GOOS, runtime.GOARCH)
+		return
+	}
+	if *editorView {
+		if err := runDetachedEditorView(os.Stdin, *noBrowser); err != nil {
+			platform.NotifyFatal("Unable to open the detached editor: " + err.Error())
+		}
 		return
 	}
 	if *terminalView {
@@ -270,6 +281,7 @@ func main() {
 	a.headless = *noBrowser
 	if runtime.GOOS == "windows" || *noBrowser {
 		a.launchTerminalView = launchDetachedTerminal
+		a.launchEditorView = launchDetachedEditor
 	}
 	title := appName
 	if *terminalOnly {
@@ -398,6 +410,7 @@ func newApplication(parent context.Context, dataPath string) *application {
 		a.terminalAutomation = macros.NewEngine(ctx, a.terminals)
 	}
 	a.views = newTerminalViewRegistry(a)
+	a.editorViews = newEditorViewRegistry(a)
 	if b, err := os.ReadFile(dataPath); err == nil {
 		if len(b) <= 2<<20 && json.Valid(b) && len(strings.TrimSpace(string(b))) > 0 && strings.HasPrefix(strings.TrimSpace(string(b)), "{") {
 			var state map[string]any
@@ -471,11 +484,16 @@ func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		html := strings.ReplaceAll(string(b), "__SESSION_TOKEN__", httpBootstrapToken(a.token))
 		html = strings.ReplaceAll(html, "__WINDOW_MODE__", a.windowMode)
 		html = strings.ReplaceAll(html, "__TERMINAL_VIEW__", "null")
+		html = strings.ReplaceAll(html, "__EDITOR_VIEW__", "null")
 		html = embeddedAssetPaths(html)
 		if a.updateFinalizing.Load() {
 			html = updateFinalizingHTML(html, httpBootstrapToken(a.token))
 		}
 		_, _ = io.WriteString(w, html)
+		return
+	}
+	if strings.HasPrefix(r.URL.Path, "/editor-view/") {
+		a.serveEditorView(w, r)
 		return
 	}
 	if strings.HasPrefix(r.URL.Path, "/terminal-view/") {
@@ -495,10 +513,14 @@ func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	requestView := ""
+	requestEditorView := ""
 	activationOnly := a.windowMode == "terminal" && r.Method == http.MethodPost && r.URL.Path == "/api/terminal-window" && a.windowActivationToken != "" && subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Window-Activation-Token")), []byte(a.windowActivationToken)) == 1
 	if !activationOnly && subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Session-Token")), []byte(a.token)) != 1 {
 		var found bool
 		requestView, found = a.views.authenticate(r.Header.Get("X-Session-Token"))
+		if !found && a.editorViews != nil {
+			requestEditorView, found = a.editorViews.authenticate(r.Header.Get("X-Session-Token"))
+		}
 		if !found {
 			jsonError(w, http.StatusUnauthorized, "The app session is unavailable. Reopen the interface from Network Toolkit.")
 			return
@@ -516,14 +538,22 @@ func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		a.handleTerminalWindow(w, r)
 		return
 	}
+	if requestEditorView != "" {
+		a.serveEditorAPI(w, withEditorRequestView(r, requestEditorView))
+		return
+	}
 	if requestView != "" {
 		r = r.WithContext(context.WithValue(r.Context(), terminalViewContextKey{}, requestView))
 		a.serveDetachedAPI(w, r, requestView)
 		return
 	}
 	switch {
+	case r.URL.Path == "/api/editor-views" || strings.HasPrefix(r.URL.Path, "/api/editor-views/"):
+		a.handleEditorViews(w, r)
 	case strings.HasPrefix(r.URL.Path, "/api/updates/"):
 		a.handleUpdates(w, r)
+	case r.URL.Path == "/api/activity":
+		a.handleActivity(w, r)
 	case r.URL.Path == "/api/status":
 		if r.Method != http.MethodGet {
 			methodError(w)
@@ -537,7 +567,7 @@ func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		a.stateMu.Lock()
 		writable, storageErr := a.storageWritable, a.storageError
 		a.stateMu.Unlock()
-		jsonResponse(w, 200, map[string]any{"name": appName, "version": model.Version, "os": runtime.GOOS, "arch": runtime.GOARCH, "uiHost": a.uiHost, "windowMode": a.windowMode, "localShellAvailable": terminal.LocalShellAvailable(), "terminalWindowAvailable": a.windowMode == "terminal" || a.openTerminalWindow != nil, "terminalDetachAvailable": a.launchTerminalView != nil, "connectionLaunchAvailable": runtime.GOOS == "windows", "started": a.started.UTC().Format(time.RFC3339), "portable": true, "storagePath": a.dataPath, "storageWritable": writable, "storageError": storageErr, "capabilities": capabilities, "limits": map[string]int{"maxJobs": maxConcurrent, "maxHistory": maxRetained}, "system": a.getSystem(false)})
+		jsonResponse(w, 200, map[string]any{"name": appName, "version": model.Version, "os": runtime.GOOS, "arch": runtime.GOARCH, "uiHost": a.uiHost, "windowMode": a.windowMode, "localShellAvailable": terminal.LocalShellAvailable(), "terminalWindowAvailable": a.windowMode == "terminal" || a.openTerminalWindow != nil, "terminalDetachAvailable": a.launchTerminalView != nil, "editorWindowAvailable": a.launchEditorView != nil && a.editorViews != nil, "connectionLaunchAvailable": runtime.GOOS == "windows", "started": a.started.UTC().Format(time.RFC3339), "portable": true, "storagePath": a.dataPath, "storageWritable": writable, "storageError": storageErr, "capabilities": capabilities, "limits": map[string]int{"maxJobs": maxConcurrent, "maxHistory": maxRetained}, "system": a.getSystem(false)})
 	case r.URL.Path == "/api/terminal-views" || strings.HasPrefix(r.URL.Path, "/api/terminal-views/"):
 		a.handleTerminalViews(w, r)
 	case strings.HasPrefix(r.URL.Path, "/api/terminal-automation/"):
@@ -629,10 +659,20 @@ func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			methodError(w)
 			return
 		}
+		if a.editorViews != nil {
+			if err := a.editorViews.beginHomeClose(); err != nil {
+				jsonError(w, http.StatusConflict, err.Error())
+				return
+			}
+			if err := a.editorViews.approveHomeClose(); err != nil {
+				jsonError(w, http.StatusConflict, err.Error())
+				return
+			}
+		}
 		// Stop accepting window activations before acknowledging shutdown.
 		// The short response grace must not make a closing host look reusable.
 		a.beginPrimaryClose()
-		jsonResponse(w, 200, map[string]bool{"ok": true, "detached": a.views.count() > 0})
+		jsonResponse(w, 200, map[string]bool{"ok": true, "detached": a.views.count() > 0 || (a.editorViews != nil && a.editorViews.hasLiveViews())})
 		go func() { time.Sleep(200 * time.Millisecond); a.closePrimary() }()
 	default:
 		http.NotFound(w, r)
@@ -739,7 +779,7 @@ func (a *application) createJob(w http.ResponseWriter, r *http.Request) {
 			safeOptions[key] = value
 		}
 	}
-	j := &Job{ID: randomHex(12), Tool: req.Tool, Target: req.Target, Options: safeOptions, Status: "running", Started: time.Now().UTC().Format(time.RFC3339Nano), Events: []model.Event{}, cancel: cancel}
+	j := &Job{ID: randomHex(12), Tool: req.Tool, Target: req.Target, Options: safeOptions, Status: "running", Started: time.Now().UTC().Format(time.RFC3339Nano), Events: []model.Event{}, cancel: cancel, activityContext: ctx}
 	a.jobs[j.ID] = j
 	b, _ := json.Marshal(j)
 	a.mu.Unlock()

@@ -6,7 +6,7 @@ import (
 )
 
 func TestNativeBootstrapInitialDocumentPermit(t *testing.T) {
-	for _, document := range []string{"/", "/terminal-view/" + strings.Repeat("ab", 16)} {
+	for _, document := range []string{"/", "/terminal-view/" + strings.Repeat("ab", 16), "/editor-view/" + strings.Repeat("cd", 16)} {
 		app := "http://127.0.0.1:1234" + document
 		var missing nativeDocumentRequestPermit
 		if missing.consume(app, app) || missing.allowNavigation(app, app) || missing.pending || missing.navigationPending {
@@ -66,5 +66,20 @@ func TestNativeBootstrapAcceptsOnlyCanonicalDocumentsAndCapabilities(t *testing.
 		if _, err := nativeSessionBootstrap("http://127.0.0.1:1234/", invalid); err == nil {
 			t.Fatal("invalid capability accepted")
 		}
+	}
+}
+
+func TestEditorNativeDocumentRemainsExact(t *testing.T) {
+	good := "http://127.0.0.1:1234/editor-view/" + strings.Repeat("cd", 16)
+	if _, err := nativeDocumentURL(good); err != nil {
+		t.Fatal(err)
+	}
+	for _, bad := range []string{good + "?x=1", good + "/extra", strings.Replace(good, "cd", "CD", 1), strings.Replace(good, "/editor-view/", "/editor-view/%2f", 1), strings.Replace(good, "127.0.0.1", "localhost", 1)} {
+		if _, err := nativeDocumentURL(bad); err == nil {
+			t.Fatal("noncanonical editor document allowed", bad)
+		}
+	}
+	if sameNativeDocument(good, strings.Replace(good, "editor-view", "terminal-view", 1)) {
+		t.Fatal("editor capability applies to terminal document")
 	}
 }

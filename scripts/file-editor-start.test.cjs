@@ -72,3 +72,74 @@ test('confirmation Enter on Cancel preserves edits, Escape dismisses, and accept
 test('a new local document acquires a real reader after Save As and reopens under its canonical file ID',async()=>{
  const h=harness();await h.first();let contents='';h.c.api=async(_path,_method,body)=>{if(body.action==='write-text'){contents=body.content;return {hash:'written'};}assert.equal(body.action,'read-text');return {content:contents+'\nRead from disk',hash:'reloaded'};};h.click('new');await settle();const root=h.document.getElementById('networkToolkitFileEditor'),ta=h.document.querySelector('[data-ed-text]');ta.value='new file contents';root.emit('input',ta);h.click('save');root.querySelector('[data-ed-dialog-input]').value='C:\\Review\\new.txt';root.emit('click',root.querySelector('[data-ed-dialog-action="accept"]'));await settle();assert.equal(h.api.active.source,'Local computer');assert.equal(h.api.active.id,'local:C:\\Review\\new.txt');h.click('reload');await settle();assert.equal(h.api.active.content,'new file contents\nRead from disk');assert.equal(h.api.active.dirty,false);
 });
+
+
+test('first paste after the final tab closes creates an unsaved document, binds tools and survives navigation',async()=>{
+ const h=harness();h.c.OFFLINE=true;h.document.body.appendChild=h.document.body.append;await h.first();await h.api.closeAll();const mount=h.document.createElement('div');h.document.append(mount);h.api.renderPage(mount);const root=h.document.getElementById('networkToolkitFileEditor'),ta=root.querySelector('[data-ed-text]');
+ assert.equal(h.api.documents.size,0);ta.value='pasted first line\nsecond line';ta.setSelectionRange(5,12);ta.scrollTop=12;root.emit('input',ta);await settle();
+ assert.equal(h.api.documents.size,1,'first input must enter the document model');assert.equal(h.api.active.content,'pasted first line\nsecond line');assert.equal(h.api.active.dirty,true);assert.deepEqual(Array.from(h.api.active.undo),['']);assert.equal(ta.selectionStart,5);assert.equal(ta.selectionEnd,12);
+ h.click('undo');assert.equal(h.api.active.content,'');h.click('redo');assert.equal(h.api.active.content,'pasted first line\nsecond line');
+ h.api.detachPage();h.api.renderPage(mount);assert.equal(root.querySelector('[data-ed-text]').value,'pasted first line\nsecond line');assert.equal(h.api.active.dirty,true);
+});
+
+test('tab keyboard switching retains per-document views and pending saves block destructive closes',async()=>{
+ const h=harness(),ta=await h.first();ta.setSelectionRange(40,49);ta.scrollTop=230;ta.scrollLeft=11;await h.api.open({id:'second',source:'Local computer',path:'second.txt',create:true,initialContent:'second',read:async()=>({content:''}),write:async()=>({})});
+ const root=h.document.getElementById('networkToolkitFileEditor');root.emit('keydown',root.querySelector('[data-ed-open="second"]'),{key:'ArrowLeft'});assert.equal(h.api.active.id,'first');assert.equal(ta.selectionStart,40);assert.equal(ta.scrollTop,230);assert.equal(ta.scrollLeft,11);
+ const pending=deferred();h.api.active.write=()=>pending.promise;h.click('save');assert(h.api.active.saving);assert.equal(await h.api.closeAll(),false);assert.equal(h.api.documents.size,2);pending.resolve({hash:'saved'});await settle();assert.equal(h.api.active.saving,false);
+});
+
+
+test('window snapshots freeze atomically, preserve undo and views, and rollback without losing the draft',async()=>{
+ const h=harness(),ta=await h.first();h.api.active.binding={kind:'local'};ta.setSelectionRange(3,7);ta.scrollTop=150;ta.scrollLeft=10;h.click('upper');const doc=h.api.active,uid=doc.uid,contents=doc.content,undo=Array.from(doc.undo),adapter=h.api.windowAdapter;
+ assert.equal(adapter.canTransfer([uid]),'');const snapshot=adapter.snapshot([uid]);assert(doc.frozen);assert.equal(snapshot.documents[0].content,contents);assert.deepEqual(Array.from(snapshot.documents[0].undo),undo);assert.equal(snapshot.documents[0].view.top,150);ta.value='should not become owner';h.document.getElementById('networkToolkitFileEditor').emit('input',ta);assert.equal(doc.content,contents);assert.equal(ta.value,contents);assert.equal(await h.api.closeAll(),false);
+ adapter.rollback([uid]);assert.equal(doc.frozen,false);assert.equal(adapter.canTransfer([uid]),'');
+ const dest=harness();await dest.first();await dest.api.closeAll();const destination=dest.api.windowAdapter;await destination.stage(snapshot,()=>({read:async()=>({content:contents}),write:async()=>({hash:'new'})}));assert.equal(dest.api.documents.size,1);assert(dest.api.active.frozen);destination.activate([uid]);assert.equal(dest.api.active.frozen,false);assert.equal(dest.api.active.uid,uid);assert.deepEqual(Array.from(dest.api.active.undo),undo);assert.equal(dest.api.active.view.top,150);
+ adapter.snapshot([uid]);adapter.release([uid]);assert.equal(h.api.documents.size,0);assert.equal(dest.api.active.content,contents);
+});
+test('unsupported file access and oversized/duplicate destination batches never discard source documents',async()=>{
+ const h=harness();await h.first();const d=h.api.active,a=h.api.windowAdapter;d.binding={kind:'desktopHandle'};assert.match(a.canTransfer([d.uid]),/cannot move/);assert.throws(()=>a.snapshot([d.uid]),/cannot move/);assert.equal(d.frozen,undefined);d.binding={kind:'local'};const snap=a.snapshot([d.uid]);a.rollback([d.uid]);await assert.rejects(()=>a.stage(snap,()=>({read(){},write(){}})),/already owns/);assert.equal(h.api.documents.size,1);assert.equal(d.frozen,false);
+});
+
+test('Save As reserves its destination while pending so another tab cannot be overwritten',async()=>{
+ const h=harness();await h.first();const d=h.api.active,pending=deferred();d.write=()=>pending.promise;h.click('saveAs');const root=h.document.getElementById('networkToolkitFileEditor');root.querySelector('[data-ed-dialog-input]').value='C:\\Review\\reserved.txt';root.emit('click',root.querySelector('[data-ed-dialog-action="accept"]'));await settle();
+ assert(d.saving);await assert.rejects(()=>h.api.open({id:'other',path:'C:\\Review\\reserved.txt',source:'Local computer',create:true,initialContent:'must not replace',read:async()=>({}),write:async()=>({})}),/pending Save As/);assert.equal(h.api.documents.size,1);
+ pending.resolve({hash:'written'});await settle();assert.equal(d.id,'local:C:\\Review\\reserved.txt');assert.equal(h.api.documents.get(d.id),d);assert.equal(d.saving,false);
+});
+test('window checkpoints deep-copy without freezing and native preparation wraps new and Save-As documents',async()=>{
+ const h=harness();let prepared=[];h.c.NetworkToolkitEditorWindows={mount(){},prepareDocument(d){prepared.push(d.uid);}};await h.first();const d=h.api.active,a=h.api.windowAdapter;d.binding={kind:'local'};const checkpoint=a.checkpoint();assert.equal(d.frozen,undefined);assert.equal(checkpoint.documents[0].uid,d.uid);checkpoint.documents[0].undo.push('external');assert.equal(d.undo.length,0);assert.equal(checkpoint.preferences.wordWrap,false);
+ d.saving=true;assert.throws(()=>a.checkpoint(),/saving/);const single=a.snapshotDocument(d);assert.equal(single.uid,d.uid);d.saving=false;assert(prepared.includes(d.uid));
+ const pending=deferred();d.write=()=>pending.promise;h.click('saveAs');const root=h.document.getElementById('networkToolkitFileEditor');root.querySelector('[data-ed-dialog-input]').value='C:\\Review\\prepared.txt';root.emit('click',root.querySelector('[data-ed-dialog-action="accept"]'));await settle();pending.resolve({});await settle();assert.equal(prepared.filter(uid=>uid===d.uid).length,2);
+});
+
+test('window snapshots preflight combined history size and strip nested transient fields',async()=>{
+ const h=harness();await h.first();const d=h.api.active,a=h.api.windowAdapter;d.binding={kind:'terminal',sessionId:'synthetic-session',revision:2,secret:'must-not-transfer'};d.view={start:1,end:2,top:3,left:4,direction:'forward',extra:'must-not-transfer'};const snap=a.checkpoint();assert.equal(Object.hasOwn(snap.documents[0].binding,'secret'),false);assert.equal(Object.hasOwn(snap.documents[0].view,'extra'),false);
+ d.undo=Array(10).fill('x'.repeat(4*1024*1024));assert.throws(()=>a.snapshot([d.uid]),/32 MiB/);assert.equal(d.frozen,undefined);assert.equal(d.undo.length,10);
+ d.undo=Array(6).fill('\u0001'.repeat(1024*1024));assert.throws(()=>a.snapshot([d.uid]),/32 MiB/);assert.equal(d.frozen,undefined,'Escaped controls count their actual serialized size before freezing');
+});
+
+test('closing the last loading tab re-enables the empty input and ignores its late read',async()=>{
+ const h=harness();h.c.OFFLINE=true;h.document.body.appendChild=h.document.body.append;const pending=deferred(),loading=h.api.open({id:'loading',source:'Local computer',path:'loading.txt',read:()=>pending.promise,write:async()=>({})}),root=h.document.getElementById('networkToolkitFileEditor'),ta=root.querySelector('[data-ed-text]');assert.equal(ta.disabled,true);
+ root.emit('click',root.querySelector('[data-ed-close-tab="loading"]'));await settle();assert.equal(h.api.documents.size,0);assert.equal(ta.disabled,false);ta.value='new unsaved draft';root.emit('input',ta);await settle();const draft=h.api.active;pending.resolve({content:'old late read'});await loading;assert.equal(h.api.active,draft);assert.equal(draft.content,'new unsaved draft');assert.equal(ta.value,'new unsaved draft');
+});
+
+test('native close consent never discards before shutdown confirmation and rollback retains edits',async()=>{
+ const h=harness(),ta=await h.first(),d=h.api.active,a=h.api.windowAdapter,root=h.document.getElementById('networkToolkitFileEditor');ta.value='unsaved native close';root.emit('input',ta);const contents=d.content;
+ let pending=a.prepareWindowClose();root.emit('click',root.querySelector('[data-ed-dialog-action="cancel"]'));assert.equal(await pending,false);assert.equal(h.api.active,d);assert.equal(d.content,contents);assert.equal(d.frozen,undefined);
+ pending=a.prepareWindowClose();root.emit('click',root.querySelector('[data-ed-dialog-action="accept"]'));assert.equal(await pending,true);assert.equal(h.api.documents.size,1);assert.equal(d.frozen,true);assert.equal(d.content,contents);await assert.rejects(()=>h.api.newDocument(),/close confirmation/);
+ a.cancelWindowClose();assert.equal(d.frozen,false);assert.equal(d.content,contents);assert(d.dirty);assert.equal(h.api.documents.size,1);
+ pending=a.prepareWindowClose();root.emit('click',root.querySelector('[data-ed-dialog-action="accept"]'));assert.equal(await pending,true);assert.equal(h.api.documents.size,1);a.commitWindowClose();assert.equal(h.api.documents.size,0);assert.equal(ta.value,'');
+});
+test('native close refuses changed documents or pending operations instead of freezing stale consent',async()=>{
+ const h=harness(),ta=await h.first(),d=h.api.active,a=h.api.windowAdapter,root=h.document.getElementById('networkToolkitFileEditor');ta.value='first edit';root.emit('input',ta);let pending=a.prepareWindowClose();ta.value='newer edit';root.emit('input',ta);root.emit('click',root.querySelector('[data-ed-dialog-action="accept"]'));assert.equal(await pending,false);assert.equal(d.content,'newer edit');assert.equal(d.frozen,undefined);
+ for(const key of ['loading','reloading','saving','formatting','frozen']){d[key]=true;assert.equal(await a.prepareWindowClose(),false,key);d[key]=false;}assert.equal(h.api.documents.size,1);
+});
+
+test('subset checkpoints use a selected active UID and omit an unsupported active document',async()=>{
+ const h=harness();await h.first();const eligible=h.api.active;eligible.binding={kind:'local'};const desktop=await h.api.open({id:'desktop-active',source:'Desktop',path:'desktop.txt',binding:{kind:'desktopHandle'},create:true,initialContent:'desktop remains here',read:async()=>({}),write:async()=>({})});const snapshot=h.api.windowAdapter.checkpoint([eligible.uid]);assert.equal(snapshot.active,eligible.uid);assert.equal(snapshot.documents.length,1);assert.equal(snapshot.documents[0].uid,eligible.uid);assert.equal(h.api.active,desktop);assert.equal(desktop.frozen,undefined);assert.equal(eligible.frozen,undefined);
+ assert.match(h.api.windowAdapter.canTransfer([eligible.uid,desktop.uid]),/cannot move/,'Explicit Move-all still refuses unsupported bindings');
+});
+
+test('new-window appearance snapshots carry an allowlisted app theme for Follow app colors',async()=>{
+ const h=harness();await h.first();h.api.active.binding={kind:'local'};h.c.state.theme='light';const adapter=h.api.windowAdapter,batch=adapter.checkpoint();assert.equal(batch.preferences.palette,'auto');assert.equal(batch.preferences.appTheme,'light');const applied=[];h.c.setTheme=value=>applied.push(value);adapter.applyPreferences(batch.preferences);assert.deepEqual(applied,['light']);adapter.applyPreferences({...batch.preferences,appTheme:'unrecognized'});assert.deepEqual(applied,['light']);
+ h.c.state.theme='unrecognized';assert.equal(adapter.checkpoint().preferences.appTheme,'dark');
+});
