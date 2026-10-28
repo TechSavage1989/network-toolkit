@@ -20,6 +20,7 @@
   const windows = () => globalThis.NetworkToolkitEditorWindows;
   const textarea = () => document.querySelector('[data-ed-text]');
   const fields = ['id', 'uid', 'path', 'source', 'binding', 'hash', 'content', 'original', 'saved', 'savedEol', 'savedBOM', 'savedEncoding', 'dirty', 'undo', 'redo', 'view', 'compareView', 'eol', 'encoding', 'bom', 'language', 'untitled', 'editRevision', 'frozen', 'staged'];
+  const rect = el => { if (!el) return null; const r=el.getBoundingClientRect(); return {left:r.left,top:r.top,width:r.width,height:r.height}; };
   function snapshot() {
     const docs = [...editor().documents.values()];
     // Let the real adapter capture the live selection without manufacturing it.
@@ -35,6 +36,8 @@
       startup: globalThis.__networkToolkitStartupState,
       nativeCapability: /^[a-f0-9]{64}$/.test(globalThis.__networkToolkitNativeSession || ''),
       location: location.pathname,
+      geometry: {width:innerWidth,height:innerHeight,main:rect(document.querySelector('.main')),editor:rect(document.querySelector('.nt-editor-window')),tabs:[...document.querySelectorAll('[data-ed-uid]')].map(tab=>({uid:tab.dataset.edUid,...rect(tab.querySelector('[data-ed-open]'))}))},
+      drag: globalThis.NetworkToolkitEditorDrag?.state,
       errors: [...errors]
     };
   }

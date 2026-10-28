@@ -4,6 +4,9 @@
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 let playwright;try{playwright=require(process.env.PLAYWRIGHT_MODULE||'playwright')}catch{playwright=require('/opt/codex/cua_node/lib/node_modules/playwright')}
 const root=path.resolve(__dirname,'..'),available={currentVersion:'1.17.61',supported:true,hasUpdate:true,busy:[],installing:false,latest:{version:'1.17.62',notes:"What's new\n- Faster startup checks.\n- Clear update notes.\n- Settings are preserved.\n- Update when you choose.\n- More details.\n<script>window.notesExecuted=true</script>"}};
+const {waitForAutomaticCompletion}=require('./browser-updater-readiness.cjs');
+const output=process.env.TOOLKIT_TEST_OUTPUT||'/tmp/ntk-updater-browser';
+fs.mkdirSync(output,{recursive:true});
 const pause=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve}};
 (async()=>{
   const browser=await playwright.chromium.launch({headless:true,...(process.env.CHROMIUM_PATH?{executablePath:process.env.CHROMIUM_PATH}:fs.existsSync('/usr/bin/chromium')?{executablePath:'/usr/bin/chromium'}:{}),args:['--no-sandbox']});
@@ -11,30 +14,46 @@ const pause=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {pro
     async function scenario(name,options={},verify){
       const page=await browser.newPage(),errors=[],requests=[],installBodies=[];let checks=0,latest=options.staged?{...available,staged:{version:'1.17.62',sha256:'verified'}}:{...available,hasUpdate:false,latest:null};
       const stateGate=options.holdState?pause():null,unrelatedGate=options.holdUnrelated?pause():null;
+      const report={name,passed:false,requestTrace:[],barriers:[]};let pendingUpdateRequests=0,activeChecks=0,maxActiveChecks=0,statusReads=0;
+      const readUpdater=async()=>({...await page.evaluate(()=>{
+        const template=document.createElement('template');template.innerHTML=window.NetworkToolkitUpdater?.html?.()||'';
+        return {virtualNow:Date.now(),hidden:document.hidden,online:navigator.onLine,schedule:template.content.querySelector('[data-app-update-schedule]')?.textContent||'',checkDisabled:template.content.querySelector('[data-app-update="check"]')?.disabled??null};
+      }),checks,pendingUpdateRequests,activeChecks,maxActiveChecks});
       page.on('pageerror',error=>errors.push(error.message));
       await page.clock.install();
       await page.route('http://toolkit.local/**',async route=>{
         const url=new URL(route.request().url()),p=url.pathname;
         if(p.startsWith('/api/')){
           requests.push(p);let data={};
+          const tracked=p.startsWith('/api/updates/'),check=p==='/api/updates/check';
+          const trace=tracked?{path:p,method:route.request().method(),started:Date.now()}:null;
+          if(tracked){report.requestTrace.push(trace);pendingUpdateRequests++;}
+          if(check){activeChecks++;maxActiveChecks=Math.max(maxActiveChecks,activeChecks);}
+          try{
           if(p==='/api/status')data={version:'1.17.61',os:'windows',arch:'amd64'};
           if(p==='/api/state'){if(route.request().method()==='GET'){if(stateGate)await stateGate.promise;data={appUpdatePreferences:options.preferences||{}};}}
           if(p==='/api/system'||p==='/api/jobs'){if(unrelatedGate)await unrelatedGate.promise;data=p==='/api/jobs'?[]:{}}
           if(p==='/api/jobs'&&url.search)data=[];
           if(p.includes('/events')){await new Promise(resolve=>setTimeout(resolve,100));data={events:[],sessions:[],after:0};}
-          if(p==='/api/updates/status')data=latest;
+          if(p==='/api/updates/status'){
+            // Deliberately exceed the old50ms settling assumption for the focus
+            // check. Only the local synthetic response is delayed.
+            if(++statusReads===2&&options.delayFocusStatus)await new Promise(resolve=>setTimeout(resolve,350));
+            data=latest;
+          }
           if(p==='/api/updates/check'){
             checks++;
             if(options.rateAfterFirst&&checks===2){
               latest={...latest,checkAfter:await page.evaluate(()=>Date.now()+600000)};
-              return route.fulfill({status:429,contentType:'application/json',body:JSON.stringify({error:'GitHub rate limit; wait before checking again',checkAfter:latest.checkAfter})});
+              return await route.fulfill({status:429,contentType:'application/json',body:JSON.stringify({error:'GitHub rate limit; wait before checking again',checkAfter:latest.checkAfter})});
             }
-            if(options.failFirst&&checks===1)return route.fulfill({status:502,contentType:'application/json',body:JSON.stringify({error:'Temporary network interruption'})});
+            if(options.failFirst&&checks===1)return await route.fulfill({status:502,contentType:'application/json',body:JSON.stringify({error:'Temporary network interruption'})});
             latest=options.staleFirst&&checks===1?{...available,hasUpdate:false,latest:{version:'1.17.61'}}:options.staged?{...available,staged:{version:'1.17.62',sha256:'verified'}}:options.release||available;data=latest;
           }
           if(p==='/api/updates/download'){assert.equal(options.installFlow,true,'Unapproved download');assert.equal(route.request().postDataJSON().version,'1.17.62');latest={...available,staged:{version:'1.17.62',sha256:'verified'}};data=latest;}
           if(p==='/api/updates/install'){assert.equal(options.installFlow,true,'Unapproved install');installBodies.push(route.request().postDataJSON());data={restarting:true};}
-          return route.fulfill({contentType:'application/json',body:JSON.stringify(data)});
+          return await route.fulfill({contentType:'application/json',body:JSON.stringify(data)});
+          }finally{if(tracked){pendingUpdateRequests--;trace.completed=Date.now();}if(check)activeChecks--;}
         }
         try{
           let body=fs.readFileSync(p==='/'?path.join(root,'web/index.html'):path.join(root,'web',p));
@@ -49,12 +68,21 @@ const pause=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {pro
         await page.waitForTimeout(50);
         const h={page,requests,installBodies,get checks(){return checks},stateGate,unrelatedGate,
           advance:async ms=>{await page.clock.runFor(ms);await page.waitForTimeout(50)},
+          completed:async expected=>{const state=await waitForAutomaticCompletion(readUpdater,expected);report.barriers.push(state);return state;},
           settings:async()=>{await page.evaluate(()=>appSettings());await page.waitForTimeout(50)},
           notice:()=>page.locator('#appUpdateNotice').innerText()};
         await verify(h);
         assert.deepEqual(errors,[]);if(!options.installFlow)assert.equal(requests.some(p=>p==='/api/updates/download'||p==='/api/updates/install'),false);
+        assert.ok(maxActiveChecks<=1,'Overlapping release-feed checks');report.passed=true;
         console.log('PASS '+name+' ('+checks+' release checks)');
-      }finally{stateGate?.resolve();unrelatedGate?.resolve();await page.close()}
+      }catch(error){report.failure=error.stack||String(error);throw error;}finally{
+        report.errors=errors;report.checks=checks;report.maxActiveChecks=maxActiveChecks;
+        report.final=await readUpdater().catch(error=>({unavailable:error.message}));
+        const file='startup-'+name.replace(/[^a-z0-9]+/gi,'-').toLowerCase();
+        if(!report.passed)await page.screenshot({path:path.join(output,file+'-failure.png')}).catch(()=>{});
+        fs.writeFileSync(path.join(output,file+'.json'),JSON.stringify(report,null,2));
+        stateGate?.resolve();unrelatedGate?.resolve();await page.close();
+      }
     }
     await scenario('startup independent of slow system/jobs; dialog and navigation preserved',{holdUnrelated:true},async h=>{
       await h.page.evaluate(()=>openModal('Keep my work','<input id="testDraft" value="not lost">'));
@@ -80,14 +108,17 @@ const pause=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {pro
       await h.advance(100);const previous=h.checks;await h.settings();await h.page.locator('[data-app-update="check"]').click();await h.page.waitForFunction(()=>document.querySelector('#appUpdateNotice').textContent.includes('1.17.62'));
       await h.advance(6000);assert.equal(h.checks,previous+1);assert.match(await h.notice(),/1.17.62 is available/);
     });
-    await scenario('five-minute checks and focus freshness preserve opt-in and no automatic install',{},async h=>{
-      await h.advance(100);assert.equal(h.checks,1);
+    await scenario('five-minute checks and focus freshness preserve opt-in and no automatic install',{delayFocusStatus:true},async h=>{
+      await h.advance(100);await h.completed(1);assert.equal(h.checks,1);
       await h.page.evaluate(()=>{window.dispatchEvent(new Event('focus'));window.dispatchEvent(new Event('online'));});
-      await h.advance(100);assert.equal(h.checks,1);
+      await h.advance(100);await h.completed(1);assert.equal(h.checks,1);
+      // Never fast-forward timeout timers across an unfinished fetch.
+      // The completion barrier observes the actual rendered scheduler state,
+      // not just a POST received by the route or a fixed settling delay.
       await h.advance(120000);
       await h.page.evaluate(()=>{window.dispatchEvent(new Event('focus'));document.dispatchEvent(new Event('visibilitychange'));window.dispatchEvent(new Event('online'));});
-      await h.advance(100);assert.equal(h.checks,2);
-      await h.advance(300100);assert.equal(h.checks,3);
+      await h.advance(100);await h.completed(2);assert.equal(h.checks,2);
+      await h.advance(300100);await h.completed(3);assert.equal(h.checks,3);
       await h.settings();await h.page.locator('[data-app-update-auto]').uncheck();
       await h.advance(100);
       await h.page.evaluate(()=>window.dispatchEvent(new Event('focus')));

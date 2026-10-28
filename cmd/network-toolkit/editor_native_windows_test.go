@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -104,6 +105,9 @@ func TestNativeEditorTransferInstalledWebView2(t *testing.T) {
 			return
 		}
 		err := h.exercise()
+		if err == nil {
+			err = h.exerciseDrag()
+		}
 		if err != nil && ctx.Err() == nil {
 			_ = h.capture("", "failure-owner")
 			h.mu.Lock()
@@ -160,10 +164,10 @@ type nativeEditorSnapshot struct {
 	Documents []nativeEditorDocument
 	Active    string
 	Window    struct {
-		Enabled, Running   bool
-		Self, Error        string
-		Owned              map[string]uint64
-		Outgoing, Incoming int
+		Enabled, Running, DragPreparing bool
+		Self, Error                     string
+		Owned                           map[string]uint64
+		Outgoing, Incoming              int
 	}
 	Textarea struct {
 		Value      string
@@ -172,10 +176,25 @@ type nativeEditorSnapshot struct {
 		Direction  string
 		Top, Left  float64
 	}
+	Geometry nativeEditorGeometry
+	Drag     struct {
+		Armed, Started, Ready bool
+		UID                   string
+	}
 	Startup          int
 	NativeCapability bool
 	Location         string
 	Errors           []string
+}
+type nativeEditorRect struct{ Left, Top, Width, Height float64 }
+type nativeEditorTabRect struct {
+	UID string
+	nativeEditorRect
+}
+type nativeEditorGeometry struct {
+	Width, Height float64
+	Main, Editor  nativeEditorRect
+	Tabs          []nativeEditorTabRect
 }
 type nativeEditorReply struct {
 	Kind, Error string
@@ -203,6 +222,9 @@ type nativeEditorFixture struct {
 	sequence                  atomic.Uint64
 	failLaunch                atomic.Bool
 	failedLaunches            atomic.Int32
+	pointerDrags              atomic.Int32
+	dragComplete              bool
+	gestures                  []json.RawMessage
 }
 
 func (h *nativeEditorFixture) queue(view string) chan nativeEditorCommand {
@@ -442,9 +464,15 @@ func (h *nativeEditorFixture) holdAcceptance() func() {
 }
 
 func (h *nativeEditorFixture) transfer(source, destination, mode string, expected []nativeEditorDocument, active string) (string, nativeEditorSnapshot, error) {
+	return h.transferAction(source, destination, expected, active, func() error {
+		_, err := h.command(source, nativeEditorCommand{Action: "move", Mode: mode, Destination: destination})
+		return err
+	})
+}
+func (h *nativeEditorFixture) transferAction(source, destination string, expected []nativeEditorDocument, active string, action func() error) (string, nativeEditorSnapshot, error) {
 	release := h.holdAcceptance()
 	defer release()
-	if _, err := h.command(source, nativeEditorCommand{Action: "move", Mode: mode, Destination: destination}); err != nil {
+	if err := action(); err != nil {
 		return "", nativeEditorSnapshot{}, err
 	}
 	actualDestination := destination
@@ -729,12 +757,13 @@ func (h *nativeEditorFixture) exercise() error {
 func (h *nativeEditorFixture) writeReport(err error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	report := map[string]any{"passed": err == nil, "actualNativeWebView2": true, "productionChildCLI": true, "realApplicationBackendAndRegistry": true, "productionAuthenticationAndOriginChecks": true, "testOnlyDOMAutomation": true, "productionBridgeChanges": false, "syntheticUnsavedDocumentsOnly": true, "scope": "Real parent native host and separately built production --editor-view children; fixture chooses child executable and decorates test HTTP document with DOM automation only; no main CLI/storage lifecycle assertion", "phases": h.phases, "nativeCaptures": h.captures, "childProcesses": len(h.children), "realFailedLaunches": h.failedLaunches.Load(), "blockedUnexpectedOperations": h.blocked, "driverFailures": h.failures}
+	report := map[string]any{"passed": err == nil, "actualTabPointerDrags": h.dragComplete, "pointerDragCount": h.pointerDrags.Load(), "tabGestureEvidence": h.gestures, "tabGestureScope": "Win32 mouse input into actual installed WebView2; DOM fixture creates synthetic text and observes state, never dispatches drag events", "actualNativeWebView2": true, "productionChildCLI": true, "realApplicationBackendAndRegistry": true, "productionAuthenticationAndOriginChecks": true, "testOnlyDOMAutomation": true, "productionBridgeChanges": false, "syntheticUnsavedDocumentsOnly": true, "scope": "Real parent native host and separately built production --editor-view children; fixture chooses child executable and decorates test HTTP document with DOM automation only; no main CLI/storage lifecycle assertion", "phases": h.phases, "nativeCaptures": h.captures, "childProcesses": len(h.children), "realFailedLaunches": h.failedLaunches.Load(), "blockedUnexpectedOperations": h.blocked, "driverFailures": h.failures}
 	if err != nil {
 		report["error"] = err.Error()
 	}
 	raw, _ := json.MarshalIndent(report, "", "  ")
 	_ = os.WriteFile(filepath.Join(h.output, "native-editor108-report.json"), raw, 0600)
+	_ = os.WriteFile(filepath.Join(h.output, "native-editor110-drag-report.json"), raw, 0600)
 }
 
 func (h *nativeEditorFixture) cleanup() {
@@ -755,4 +784,253 @@ func (h *nativeEditorFixture) cleanup() {
 			}
 		}
 	}
+}
+
+// The 110 extension uses actual Win32 mouse down/move/up, and native maximize /
+// restore. The DOM driver only observes real rectangles/state; it never creates
+// DataTransfer, dispatches drag events, or calls the transfer helper for gestures.
+func (h *nativeEditorFixture) identity(view string) (int, string, error) {
+	if view == "" {
+		executable, err := os.Executable()
+		return os.Getpid(), executable, err
+	}
+	h.mu.Lock()
+	child := h.children[view]
+	h.mu.Unlock()
+	if child == nil {
+		return 0, "", errors.New("native gesture destination process absent")
+	}
+	return child.command.Process.Pid, h.executable, nil
+}
+func (h *nativeEditorFixture) nativeInput(action, mode, source, target string, from, to nativeEditorSnapshot, point, end nativeEditorRect) error {
+	pid, executable, err := h.identity(source)
+	if err != nil {
+		return err
+	}
+	args := []string{"-NoProfile", "-NonInteractive", "-File", filepath.Join(h.root, "scripts", "native-editor-drag.ps1"), "-Action", action, "-OwnerProcessID", strconv.Itoa(pid), "-ExecutablePath", executable, "-Mode", mode}
+	if source != target {
+		targetPID, targetEXE, e := h.identity(target)
+		if e != nil {
+			return e
+		}
+		args = append(args, "-TargetProcessID", strconv.Itoa(targetPID), "-TargetExecutablePath", targetEXE)
+	}
+	if action == "Drag" {
+		for _, pair := range []struct {
+			name  string
+			value float64
+		}{{"FromX", point.Left}, {"FromY", point.Top}, {"FromWidth", from.Geometry.Width}, {"FromHeight", from.Geometry.Height}, {"ToX", end.Left}, {"ToY", end.Top}, {"ToWidth", to.Geometry.Width}, {"ToHeight", to.Geometry.Height}} {
+			args = append(args, "-"+pair.name, strconv.FormatFloat(pair.value, 'f', 3, 64))
+		}
+	}
+	command := exec.CommandContext(h.ctx, "powershell.exe", args...)
+	output, err := command.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("actual native %s/%s: %w: %s", action, mode, err, output)
+	}
+	if !json.Valid(bytes.TrimSpace(output)) {
+		return fmt.Errorf("native gesture evidence was not JSON: %s", output)
+	}
+	h.mu.Lock()
+	h.gestures = append(h.gestures, json.RawMessage(bytes.TrimSpace(output)))
+	h.mu.Unlock()
+	if action == "Drag" {
+		h.pointerDrags.Add(1)
+	}
+	return nil
+}
+func nativeEditorPoint(state nativeEditorSnapshot, uid string, after bool) (nativeEditorRect, error) {
+	for _, tab := range state.Geometry.Tabs {
+		if tab.UID == uid && tab.Width > 10 && tab.Height > 10 {
+			x := tab.Left + math.Min(30, tab.Width/2)
+			if after {
+				x = tab.Left + tab.Width - 3
+			}
+			return nativeEditorRect{Left: x, Top: tab.Top + tab.Height/2}, nil
+		}
+	}
+	return nativeEditorRect{}, fmt.Errorf("visible source/target tab absent for captured UID %s", uid)
+}
+func (h *nativeEditorFixture) idle(view string) (nativeEditorSnapshot, error) {
+	return h.waitState(view, "idle registered editor before/after actual pointer gesture", func(s nativeEditorSnapshot) bool {
+		return !s.Window.Running && !s.Window.DragPreparing && s.Window.Outgoing == 0 && s.Window.Incoming == 0 && !s.Drag.Armed
+	})
+}
+func nativeEditorSameDocuments(before, after nativeEditorSnapshot) error {
+	if before.Active != after.Active || len(before.Documents) != len(after.Documents) {
+		return errors.New("native gesture changed active identity or document count")
+	}
+	for _, d := range before.Documents {
+		got, ok := nativeEditorDoc(after, d.UID)
+		if !ok {
+			return errors.New("native gesture lost a captured document UID")
+		}
+		if err := nativeEditorEquivalent(d, got); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+func (h *nativeEditorFixture) exerciseDrag() error {
+	h.failLaunch.Store(false)
+	empty := nativeEditorSnapshot{}
+	point := nativeEditorRect{}
+	if err := h.nativeInput("Arrange", "Tab", "", "", empty, empty, point, point); err != nil {
+		return err
+	}
+	before, err := h.idle("")
+	if err != nil {
+		return err
+	}
+	if len(before.Documents) != 2 {
+		return errors.New("actual tab-drag acceptance needs two retained synthetic documents")
+	}
+	first, last := before.Documents[0].UID, before.Documents[1].UID
+	from, err := nativeEditorPoint(before, first, false)
+	if err != nil {
+		return err
+	}
+	to, err := nativeEditorPoint(before, last, true)
+	if err != nil {
+		return err
+	}
+	if err = h.nativeInput("Drag", "Tab", "", "", before, before, from, to); err != nil {
+		return err
+	}
+	reordered, err := h.waitState("", "actual mouse reorders the captured tab UID", func(s nativeEditorSnapshot) bool {
+		return len(s.Documents) == 2 && s.Documents[0].UID == last && s.Documents[1].UID == first && !s.Window.DragPreparing && !s.Drag.Armed
+	})
+	if err != nil {
+		return err
+	}
+	if err = nativeEditorSameDocuments(before, reordered); err != nil {
+		return err
+	}
+	if err = h.capture("", "drag110-reordered"); err != nil {
+		return err
+	}
+	h.phases = append(h.phases, "110 actual mouse reorder preserves active UID, dirty text, undo/redo and selection/scroll")
+	// Escape and an unsupported outside-window release cannot manufacture detach.
+	for _, mode := range []string{"Escape", "Outside"} {
+		before, err = h.idle("")
+		if err != nil {
+			return err
+		}
+		from, err = nativeEditorPoint(before, before.Active, false)
+		if err != nil {
+			return err
+		}
+		to, err = nativeEditorPoint(before, first, false)
+		if err != nil {
+			return err
+		}
+		if err = h.nativeInput("Drag", mode, "", "", before, before, from, to); err != nil {
+			return err
+		}
+		retained, e := h.idle("")
+		if e != nil {
+			return e
+		}
+		if err = nativeEditorSameDocuments(before, retained); err != nil {
+			return err
+		}
+		h.mu.Lock()
+		children := len(h.children)
+		h.mu.Unlock()
+		if children != 2 {
+			return errors.New("cancelled/unsupported actual drag launched a new window")
+		}
+	}
+	h.phases = append(h.phases, "110 actual Escape and unsupported outside release retain source ownership; no inferred desktop detach")
+	before, err = h.idle("")
+	if err != nil {
+		return err
+	}
+	selected, _ := nativeEditorDoc(before, before.Active)
+	from, err = nativeEditorPoint(before, selected.UID, false)
+	if err != nil {
+		return err
+	}
+	child, _, err := h.transferAction("", "new", []nativeEditorDocument{selected}, selected.UID, func() error { return h.nativeInput("Drag", "Detach", "", "", before, before, from, point) })
+	if err != nil {
+		return fmt.Errorf("actual mouse explicit in-app detach target: %w", err)
+	}
+	h.phases = append(h.phases, "110 actual tab-to-detach-target mouse gesture launches production child; source frozen and destination staged until existing ACK")
+	if err = h.capture(child, "drag110-detached"); err != nil {
+		return err
+	}
+	// Native maximize, not a browser viewport simulation. Capture the actual HWND
+	// and assert its CSS main grid starts at zero and fills the client viewport.
+	if err = h.nativeInput("Arrange", "Tab", child, child, empty, empty, point, point); err != nil {
+		return err
+	}
+	restored, err := h.idle(child)
+	if err != nil {
+		return err
+	}
+	if err = h.nativeInput("Maximize", "Tab", child, child, empty, empty, point, point); err != nil {
+		return err
+	}
+	maximized, err := h.waitState(child, "native maximized editor fills wide client without inherited grid column", func(s nativeEditorSnapshot) bool {
+		return s.Geometry.Width >= 1000 && s.Geometry.Width > restored.Geometry.Width+100 && math.Abs(s.Geometry.Main.Left) <= 1 && math.Abs(s.Geometry.Main.Width-s.Geometry.Width) <= 1
+	})
+	if err != nil {
+		return err
+	}
+	if maximized.Geometry.Editor.Width < maximized.Geometry.Width-80 {
+		return errors.New("maximized native editor leaves a wide blank column")
+	}
+	if err = h.capture(child, "drag110-maximized"); err != nil {
+		return err
+	}
+	if err = h.nativeInput("Restore", "Tab", child, child, empty, empty, point, point); err != nil {
+		return err
+	}
+	if _, err = h.waitState(child, "native restore retains full-width grid", func(s nativeEditorSnapshot) bool {
+		return math.Abs(s.Geometry.Width-restored.Geometry.Width) <= 2 && math.Abs(s.Geometry.Main.Left) <= 1 && math.Abs(s.Geometry.Main.Width-s.Geometry.Width) <= 1
+	}); err != nil {
+		return err
+	}
+	if err = h.capture(child, "drag110-restored"); err != nil {
+		return err
+	}
+	h.phases = append(h.phases, "110 actual native maximize/restore: main.left=0, main.width=innerWidth, wide editor fills viewport; actual HWND PNGs")
+	// Arrange both exact native processes so a real pointer can cross from child
+	// to the exposed left side of the main editor, then verify the same ACK gate.
+	if err = h.nativeInput("Arrange", "Cross", "", child, empty, empty, point, point); err != nil {
+		return err
+	}
+	source, err := h.idle(child)
+	if err != nil {
+		return err
+	}
+	destination, err := h.idle("")
+	if err != nil {
+		return err
+	}
+	from, err = nativeEditorPoint(source, selected.UID, false)
+	if err != nil {
+		return err
+	}
+	to = nativeEditorRect{Left: destination.Geometry.Editor.Left + 20, Top: destination.Geometry.Editor.Top + 120}
+	selected, _ = nativeEditorDoc(source, selected.UID)
+	_, merged, err := h.transferAction(child, "main", []nativeEditorDocument{selected}, selected.UID, func() error { return h.nativeInput("Drag", "Cross", child, "", source, destination, from, to) })
+	if err != nil {
+		return fmt.Errorf("actual mouse drag between two production WebViews: %w", err)
+	}
+	if len(merged.Documents) != 2 {
+		return errors.New("native cross-window merge lost untouched document")
+	}
+	if err = h.capture("", "drag110-cross-window-merged"); err != nil {
+		return err
+	}
+	if err = h.closeEmpty(child); err != nil {
+		return err
+	}
+	h.phases = append(h.phases, "110 actual cross-WebView mouse drag merges through opaque broker ticket and original offer/accept ACK; exact source UID/history/view retained and child releases only after ACK")
+	if h.pointerDrags.Load() != 5 {
+		return fmt.Errorf("expected five real pointer drag scenarios, got %d", h.pointerDrags.Load())
+	}
+	h.dragComplete = true
+	return nil
 }

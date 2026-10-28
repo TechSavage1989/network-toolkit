@@ -10,5 +10,10 @@
 [data-editor-window-indicator]{color:var(--accent);font-weight:700}
 body.editor-window #sidebar,body.editor-window .topbar,body.editor-window #sidebarBackdrop{display:none!important}
 body.editor-window .app{grid-template-columns:minmax(0,1fr)}
-body.editor-window .main{min-width:0}
+body.editor-window .main{grid-column:1;min-width:0}
 @media(max-width:600px){.nt-editor-window-controls{padding:7px}.nt-editor-window-menu{padding:10px}}
+
+.nt-editor-drag-detach{position:absolute;inset:90px 12px auto;z-index:8;min-height:54px;padding:12px;border:2px dashed var(--accent);border-radius:8px;background:var(--panel);color:var(--text);font-weight:600;text-align:center;box-shadow:var(--shadow)}
+.nt-editor-drag-detach[hidden]{display:none}
+.nt-editor-drag-over{outline:2px solid var(--accent);outline-offset:-3px}
+.nt-editor-tab[data-editor-drop-before]{box-shadow:inset 3px 0 var(--accent)}

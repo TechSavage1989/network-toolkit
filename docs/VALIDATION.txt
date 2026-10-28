@@ -1,3 +1,10 @@
+NETWORK TOOLKIT 1.17.110 CANDIDATE — FINAL ACCEPTANCE PENDING
+
+See docs/RELEASE110_HANDOFF.md for the focused graph/editor scope and required
+exact-source native/browser/package/publication checks. The historical109 record
+below includes its failed duplicate accelerated-updater fixture; it is not a
+claim that110 has already passed. Published109 assets and source stay immutable.
+
 NETWORK TOOLKIT 1.17.109 PUBLISHED AND VERIFIED
 
 1.17.109 published and independently verified

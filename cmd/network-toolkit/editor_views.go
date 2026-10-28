@@ -96,6 +96,7 @@ type editorTransferRequest struct {
 	Destination string            `json:"destination"`
 	Batch       editorBatch       `json:"batch"`
 	Leases      map[string]uint64 `json:"leases"`
+	DragTicket  string            `json:"dragTicket,omitempty"`
 }
 type editorViewInfo struct {
 	ID    string `json:"id"`
@@ -131,6 +132,7 @@ type editorViewRegistry struct {
 	views                    map[string]*editorWindow
 	documents                map[string]*editorDocumentGrant
 	transfers                map[string]*editorTransfer
+	drags                    map[string]*editorDrag
 	order                    []string
 	recovery                 map[string]bool
 	homePresent, homeClosing bool
@@ -526,6 +528,7 @@ func (m *editorViewRegistry) expireLocked() {
 			m.failLocked(t, "failed", "The destination did not acknowledge the transfer. The source still owns the documents.")
 		}
 	}
+	m.expireDragsLocked()
 }
 func (m *editorViewRegistry) failLocked(t *editorTransfer, state, note string) {
 	if t.state != "offered" {
@@ -584,11 +587,14 @@ func (m *editorViewRegistry) state(caller string) map[string]any {
 			}
 		}
 	}
-	return map[string]any{"available": m.app.launchEditorView != nil, "self": caller, "views": views, "incoming": incoming, "outgoing": outgoing, "owned": owned, "recovery": recovery, "ownerInstanceId": m.app.windowInstanceID}
+	return map[string]any{"available": m.app.launchEditorView != nil, "self": caller, "views": views, "incoming": incoming, "outgoing": outgoing, "owned": owned, "recovery": recovery, "ownerInstanceId": m.app.windowInstanceID, "dragRequests": m.dragRequestsLocked(caller)}
 }
 func (m *editorViewRegistry) offer(caller string, req editorTransferRequest) (map[string]any, error) {
 	if !editorHexID.MatchString(req.ID) {
 		return nil, errors.New("Invalid transfer identifier.")
+	}
+	if req.DragTicket != "" && (!editorHexID.MatchString(req.DragTicket) || req.DragTicket != req.ID) {
+		return nil, errEditorDrag
 	}
 	if err := validateEditorBatch(req.Batch); err != nil {
 		return nil, err
@@ -637,6 +643,11 @@ func (m *editorViewRegistry) offer(caller string, req editorTransferRequest) (ma
 	if !m.callerLocked(caller) {
 		m.mu.Unlock()
 		return nil, errEditorLease
+	}
+	drag, dragErr := m.editorDragOfferLocked(caller, req)
+	if dragErr != nil {
+		m.mu.Unlock()
+		return nil, dragErr
 	}
 	destination := req.Destination
 	if destination == "" && m.homeClosing {
@@ -721,6 +732,11 @@ func (m *editorViewRegistry) offer(caller string, req editorTransferRequest) (ma
 	}
 	m.transfers[t.id] = t
 	m.order = append(m.order, t.id)
+	if drag != nil {
+		// Consume only together with the existing transfer. No new ownership,
+		// launch or release path is introduced by a drag claim.
+		drag.state = "consumed"
+	}
 	out := editorTransferInfo(t)
 	m.mu.Unlock()
 	if launch != nil {

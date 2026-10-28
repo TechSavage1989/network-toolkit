@@ -96,3 +96,5 @@ See [editor tabs, comparison and change map](docs/EDITOR_WORKFLOWS108.md),
 [offline network configuration syntax support](docs/NETWORK_CONFIG_EDITOR.md).
 
 Published and verified: [1.17.109 vertical workspace improvements](docs/RELEASE109_HANDOFF.md). All six exact-source gates passed; public assets, source, version/icons and updater feed are verified.
+
+Candidate development: [1.17.110 graph and editor corrections](docs/RELEASE110_HANDOFF.md). Published109 remains unchanged while exact-source checks are pending.

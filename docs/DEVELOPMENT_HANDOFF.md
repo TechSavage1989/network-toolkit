@@ -1,5 +1,14 @@
 # Network Toolkit development handoff
 
+## Active 1.17.110 candidate — final acceptance pending
+
+The user approved the focused post109 graph/editor correction batch on
+2026-10-28 at16:38:45UTC. Read RELEASE110_HANDOFF.md for scope, exact baseline,
+required temporal/native evidence and current limits. Published109 remains
+unchanged. Its duplicate accelerated-updater test failure below is preserved;
+this candidate repairs fixture synchronization without changing production timers.
+Do not treat local focused checks or authored native tests as release acceptance.
+
 ## 1.17.109 published and independently verified
 
 Published 2026-10-28T16:23:24Z:

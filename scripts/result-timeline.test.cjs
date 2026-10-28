@@ -34,6 +34,38 @@ test('window statistics retain only measured RTTs and never bridge losses for ji
  assert.equal(timeline.normalize([reply(1,0),reply(2,0)])[1].jitter,0,'A measured zero remains a legitimate measurement');
 });
 
+test('repeated restoration assigns Boolean hover state instead of toggling unrelated ordinary points',()=>{
+ for(const selected of [false,true])for(const hovered of [false,true]){
+  const h=harness();h.render();
+  if(selected)h.document.emit('click',h.mark(0));
+  if(hovered)h.document.emit('pointermove',h.mark(3));
+  const original=[...h.document.querySelectorAll('[data-rt-point]')];
+  for(const mark of original){const toggle=mark.classList.toggle;mark.classList.toggle=(name,force)=>{if(name==='rt-point-hovered')assert.equal(typeof force,'boolean','Every hover assignment has an explicit Boolean force');return toggle(name,force);};}
+  for(let cycle=0;cycle<8;cycle++){
+   h.observe();const marks=[...h.document.querySelectorAll('[data-rt-point]')];
+   assert(marks.every((mark,index)=>mark===original[index]),'Class updates preserve the same point nodes');
+   assert.deepEqual(marks.filter(mark=>mark.classList.contains('rt-point-hovered')).map(mark=>mark.dataset.rtKey),hovered?[original[3].dataset.rtKey]:[]);
+   assert.deepEqual(marks.filter(mark=>mark.classList.contains('rt-point-selected')).map(mark=>mark.dataset.rtKey),selected?[original[0].dataset.rtKey]:[]);
+  }
+  if(hovered)h.document.emit('pointerout',original[3],{relatedTarget:null});
+  for(let cycle=0;cycle<8;cycle++){h.api.restore();assert.equal(h.document.querySelectorAll('.rt-point-hovered').length,0,'Pointer leave remains clear across later restores');}
+ }
+});
+
+test('condensed aggregate and ordinary membership stay stable on restore, including row-origin hover',()=>{
+ const h=harness(),rows=Array.from({length:301},(_,i)=>reply(i+1,10,stamp(i)));
+ h.api.setPreferences({mode:'condensed'},{persist:false});h.render(rows);
+ const cluster=h.document.querySelector('[data-rt-aggregate]'),recent=h.document.querySelector('[data-rt-sequence="301"]');assert(cluster);assert(recent);
+ const check=(hovered,selected)=>{const original=[...h.document.querySelectorAll('[data-rt-point]')];for(let cycle=0;cycle<8;cycle++){h.observe();const marks=[...h.document.querySelectorAll('[data-rt-point]')];assert(marks.every((mark,index)=>mark===original[index]));assert.deepEqual(marks.filter(mark=>mark.classList.contains('rt-point-hovered')).map(mark=>mark.dataset.rtKey),hovered.map(mark=>mark.dataset.rtKey));assert.deepEqual(marks.filter(mark=>mark.classList.contains('rt-point-selected')).map(mark=>mark.dataset.rtKey),selected.map(mark=>mark.dataset.rtKey));}};
+ check([],[]);h.document.emit('pointermove',cluster);check([cluster],[]);
+ h.document.emit('click',cluster);check([cluster],[cluster]);
+ h.document.emit('pointermove',recent);check([recent],[cluster]);
+ h.document.emit('pointerout',recent,{relatedTarget:null});check([],[cluster]);
+ const row=h.document.createElement('tr');row.dataset.resultGraphId='job';row.dataset.resultSampleKey=h.api.sampleKey(rows[0],0);h.document.append(row);
+ h.document.emit('pointermove',row);check([cluster],[cluster]);assert(row.classList.contains('result-graph-hovered'));
+ h.document.emit('pointerout',row,{relatedTarget:null});check([],[cluster]);assert(!row.classList.contains('result-graph-hovered'));
+});
+
 test('linear defaults retain all samples up to the existing retention bound without changing source identities',()=>{
  const rows=Array.from({length:220},(_,i)=>reply(i+1,i+1,'2026-10-26T16:00:00Z'));
  const points=timeline.normalize(rows);

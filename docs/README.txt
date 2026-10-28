@@ -1,11 +1,19 @@
-NETWORK TOOLKIT 1.17.109
+NETWORK TOOLKIT 1.17.110
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.109
+CURRENT RELEASE - 1.17.110
 
-Release details: RELEASE_NOTES_1.17.109.txt
-Previous release: docs/releases/RELEASE_NOTES_1.17.108.txt
+Release details: RELEASE_NOTES_1.17.110.txt
+Previous release: docs/releases/RELEASE_NOTES_1.17.109.txt
 Full release-note archive: docs/releases/README.md
+
+Editor tabs can be reordered with pointer dragging or Alt+Shift+Arrow keys.
+Detach editor/Open separately sits beside Compare and Move / merge; a deliberate
+in-app drop target also opens a separate editor. Cross-window moves keep one
+acknowledged editable owner. Dropping on the bare desktop is not an inferred
+detach, and unsupported file bindings remain safely in their original window.
+Detached editors fill their own window, including maximize/restore. Graph point
+outlines are stable through background refreshes, including stopped scans.
 
 The redundant top bar is removed: computer identity is in the sidebar brand,
 and Theme/App settings are in its footer. Text Editor uses compact Move / merge

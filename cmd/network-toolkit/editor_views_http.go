@@ -83,6 +83,10 @@ func (a *application) handleEditorViews(w http.ResponseWriter, r *http.Request) 
 		methodError(w)
 		return
 	}
+	if path == "/drags" || strings.HasPrefix(path, "/drags/") {
+		m.handleDrag(w, r, caller, path)
+		return
+	}
 	if path == "/current/prepare-close" || path == "/current/cancel-close" {
 		if caller != "" {
 			jsonError(w, 403, "Only the main workspace can prepare its close.")

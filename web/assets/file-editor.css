@@ -176,3 +176,6 @@ body:has(.nt-editor-embedded) #toolWorkspace>#pageContent{grid-row:1!important;g
 [data-compare-map-marks] rect{stroke:none}
 
 .nt-compare-syntax-notice{font-size:10px;padding:3px 7px;color:var(--warn);max-height:45px;overflow:auto;flex-shrink:0}
+
+.nt-editor-label-compact{display:none}
+@media(max-width:680px){.nt-editor-toolbar .nt-editor-label-wide{display:none}.nt-editor-toolbar .nt-editor-label-compact{display:inline}}

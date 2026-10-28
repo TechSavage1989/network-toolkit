@@ -1,0 +1,21 @@
+NETWORK TOOLKIT 1.17.110
+
+STABLE GRAPH HIGHLIGHTS AND INDEPENDENT EDITOR WINDOWS
+
+- Keep graph point hover/selection outlines stable across background refreshes,
+  both while a scan runs and after it stops. Status-colored points, theme-colored
+  lines and x-aligned point selection remain intact.
+- Let detached editors fill the whole native window when resized or maximized,
+  without reserving an empty sidebar column.
+- Put an explicit Detach editor action in the existing compact toolbar. With no
+  document open, create a normal blank Untitled draft and move it safely.
+- Reorder document tabs without changing identity, text, history or view state.
+  Move tabs between Toolkit editor windows through acknowledged ownership;
+  explicit Detach and Move / merge remain available as reliable alternatives.
+- A Detach drop target is deliberate. Dropping on the bare desktop is not treated
+  as a successful move because cancelled/rejected OS drags can look identical.
+
+All document moves retain the existing binding, size and ownership restrictions.
+Private configuration files, credentials and user screenshots are not public
+fixtures. Verification uses synthetic documents and actual hosted browser/native
+Windows tests; no live-device or user-desktop testing is claimed.

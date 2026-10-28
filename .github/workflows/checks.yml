@@ -506,6 +506,12 @@ jobs:
           test "$(git rev-parse FETCH_HEAD)" = 59a82b13bb31899206d383ea58166ec9a4f4faf0
           mkdir -p "$RUNNER_TEMP/ntk-layout-baseline108"
           git archive 59a82b13bb31899206d383ea58166ec9a4f4faf0 | tar -xf - -C "$RUNNER_TEMP/ntk-layout-baseline108"
+      - name: Prepare exact published109 UI for temporal graph comparison
+        run: |
+          git fetch --no-tags --depth=1 origin d3494a879604fb2523e0867ad1fb175a2f9abbf5
+          test "$(git rev-parse FETCH_HEAD)" = d3494a879604fb2523e0867ad1fb175a2f9abbf5
+          mkdir -p "$RUNNER_TEMP/ntk-graph-baseline109"
+          git archive d3494a879604fb2523e0867ad1fb175a2f9abbf5 | tar -xf - -C "$RUNNER_TEMP/ntk-graph-baseline109"
       - name: Check exact saved sessions, persistent filter controls and recorded sources
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
@@ -609,6 +615,20 @@ jobs:
           NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
           NTK_LAYOUT_BASELINE_DIR: ${{ runner.temp }}/ntk-layout-baseline108
         run: node scripts/editor-height109.browser.cjs
+      - name: Check full-width detached editor and direct detach controls against109
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_EDITOR_BASELINE109_DIR: ${{ runner.temp }}/ntk-graph-baseline109
+        run: node scripts/editor-window110.browser.cjs
+      - name: Check real temporal graph outlines against the published109 negative control
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_GRAPH_BASELINE_DIR: ${{ runner.temp }}/ntk-graph-baseline109
+        run: node scripts/graph-temporal110.browser.cjs
       - uses: actions/upload-artifact@v7
         if: always()
         with:
