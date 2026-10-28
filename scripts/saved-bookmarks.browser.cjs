@@ -4,7 +4,7 @@
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const root=path.resolve(__dirname,'..'),out=process.env.TOOLKIT_TEST_OUTPUT||process.env.NTK_BROWSER_OUTPUT_DIR;
-const report={passed:false,checks:[],layouts:[],drawerDismissals:0,mutations:[],errors:[],assetFailures:[]};let browser,page;
+const report={passed:false,checks:[],layouts:[],drawerDismissals:0,stickyScrolls:[],mutations:[],errors:[],assetFailures:[]};let browser,page;
 const stamp='2026-10-28T12:00:00Z';
 const host=(address,openPorts=[],extra={})=>({address,hostname:'Synthetic '+address,mac:'02:00:00:00:00:01',responded:true,completed:true,status:'responded',time:stamp,openPorts,ports:openPorts.map(port=>({port,state:'open',latencyMs:1})),...extra});
 const hosts=[host('192.0.2.1',[22,23,80,2222,8022]),host('192.0.2.10',[22]),host('192.0.2.30'),host('fe80::1%12',[22]),host('fe80::1%13',[22]),host('fe80::1',[22]),host('192.0.2.40',[22],{ports:[{port:22,state:'open',service:'HTTP',serviceVerified:true}]}),host('192.0.2.50',[22])];
@@ -33,6 +33,20 @@ async function revealResults(){
 }
 async function select(address){await revealResults();await row(address).locator('[data-select-device]').click();await settle();assert.equal(await page.locator('#selectedDevicePane').isVisible(),true,'Selecting a result reopens its details');assert((await page.locator('#selectedDeviceContent').innerText()).includes(address));}
 async function bounds(control){return control.evaluate(el=>{const r=el.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height,pointerReachable:!!hit&&(hit===el||el.contains(hit))};});}
+async function revealResultControl(control){
+ await control.scrollIntoViewIfNeeded();await control.focus();await settle();
+ // Native scrollIntoView/focus can align a row behind the sticky filter/header.
+ // A real wheel scroll exposes the target in the remaining list viewport; no
+ // force click, fabricated event or relaxed hit-test hides an occlusion.
+ const geometry=await control.evaluate(el=>{const r=el.getBoundingClientRect(),area=el.closest('#toolResultsScroll'),a=area.getBoundingClientRect(),heads=[...el.closest('table').querySelectorAll('thead th')],top=Math.max(a.top,...heads.map(head=>head.getBoundingClientRect().bottom)),bottom=Math.min(a.bottom,innerHeight);return {top:r.top,bottom:r.bottom,height:r.height,usableTop:top,usableBottom:bottom,x:Math.min(a.right,innerWidth)-15,y:(top+bottom)/2,delta:(r.top+r.bottom-top-bottom)/2};});
+ if(geometry.top<geometry.usableTop||geometry.bottom>geometry.usableBottom){
+  assert(geometry.usableBottom-geometry.usableTop>=geometry.height+4,'The existing list viewport must leave room for the bookmark beneath its sticky header');
+  report.stickyScrolls.push(geometry);await page.mouse.move(geometry.x,geometry.y);await page.mouse.wheel(0,geometry.delta);
+  await page.waitForFunction(el=>{if(!el?.isConnected)return false;const r=el.getBoundingClientRect(),area=el.closest('#toolResultsScroll').getBoundingClientRect(),top=Math.max(area.top,...[...el.closest('table').querySelectorAll('thead th')].map(head=>head.getBoundingClientRect().bottom)),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return r.top>=top&&r.bottom<=Math.min(area.bottom,innerHeight)&&!!hit&&(hit===el||el.contains(hit));},await control.elementHandle());
+  await control.evaluate(el=>el.focus({preventScroll:true}));await settle();
+ }
+}
+
 async function close(){await page.locator('[data-action="close-modal"]').last().click();await settle();}
 async function reviewed(id,address,number){
  await page.locator('#terminalConnectForm').waitFor();assert.equal(await page.inputValue('#con-host'),address);assert.equal(await page.inputValue('#con-port'),String(number));assert.equal(await page.evaluate(()=>terminalProfileID),id);assert.equal(await page.evaluate(()=>terminalDraft.credentialId),'credential-canary-'+id);assert.equal(await page.inputValue('#terminalPassword'),'');await close();
@@ -91,11 +105,11 @@ async function dimensions(){return page.evaluate(()=>{const rect=el=>{const r=el
   await page.setViewportSize({width,height:1000});await page.waitForFunction(()=>{const sidebar=document.querySelector('.sidebar');return matchMedia('(max-width:1100px)').matches?sidebar.getBoundingClientRect().right<=1:sidebar.getBoundingClientRect().left>=0;});await settle();await page.evaluate(theme=>setTheme(theme),theme);await show();await select('192.0.2.30');await detailBookmark().scrollIntoViewIfNeeded();await detailBookmark().focus();await settle();
   const details=await bounds(detailBookmark());assert(details.pointerReachable,'Selected details bookmark is not covered by another pane/control');
   if(out){await page.waitForFunction(()=>document.querySelector('#toastStack')?.childElementCount===0);await page.screenshot({path:path.join(out,'bookmarks108-address-details-'+width+'-'+theme+'.png')});}
-  const drawerDismissed=await revealResults(),addressBookmark=row('192.0.2.30').locator('[data-saved-session-open]');await addressBookmark.scrollIntoViewIfNeeded();await addressBookmark.focus();await settle();
+  const drawerDismissed=await revealResults(),addressBookmark=row('192.0.2.30').locator('[data-saved-session-open]');await revealResultControl(addressBookmark);
   const address=await bounds(addressBookmark),layout=await page.evaluate(()=>{const row=[...document.querySelectorAll('#toolResultsScroll tr[data-entry-key]')].find(el=>el.querySelector('[data-select-device]')?.getAttribute('aria-label').startsWith('Select 192.0.2.30 '));return {window:innerWidth,pageWidth:document.documentElement.scrollWidth,columnCount:row.children.length,farRight:document.querySelectorAll('.network-row-actions [data-saved-session-open]').length};});
   assert(address.pointerReachable,'Result bookmark is reachable after the actual details drawer is dismissed');assert(layout.pageWidth<=width+1);assert.equal(layout.farRight,0);for(const mark of [address,details]){assert(mark.left>=0&&mark.right<=width+1,'Inline bookmarks are reachable without scrolling to a separate action column');assert(mark.width>=18&&mark.height>=18);}
   report.layouts.push({width,theme,...layout,row:address,details,drawerDismissed});if(out&&drawerDismissed)await page.screenshot({path:path.join(out,'bookmarks108-address-results-'+width+'-'+theme+'.png')});
-  await page.keyboard.press('Enter');await reviewed('address-only','192.0.2.30',2200);await show();await select('192.0.2.1');await revealResults();await port('192.0.2.1',22).scrollIntoViewIfNeeded();await port('192.0.2.1',22).focus();assert((await bounds(port('192.0.2.1',22))).pointerReachable,'Matching port remains pointer reachable in the results region');if(out)await page.screenshot({path:path.join(out,'bookmarks108-port-'+width+'-'+theme+'.png')});await port('192.0.2.1',22).click();assert.equal(await page.locator('[data-saved-session-review]').count(),2);await close();
+  await page.keyboard.press('Enter');await reviewed('address-only','192.0.2.30',2200);await show();await select('192.0.2.1');await revealResults();await revealResultControl(port('192.0.2.1',22));assert((await bounds(port('192.0.2.1',22))).pointerReachable,'Matching port remains pointer reachable in the results region');if(out)await page.screenshot({path:path.join(out,'bookmarks108-port-'+width+'-'+theme+'.png')});await port('192.0.2.1',22).click();assert.equal(await page.locator('[data-saved-session-review]').count(),2);await close();
  }
  check('Normal/narrow dark/light screenshots show compact keyboard bookmarks in existing address/port footprints and selected details, with no redundant panel or results column');
  assert.deepEqual(report.errors,[]);assert.deepEqual(report.assetFailures,[]);assert(report.mutations.every(value=>value.path==='/api/state'));report.passed=true;
