@@ -2,6 +2,7 @@
 // Real bundled baseline/candidate UIs, native timers, synthetic intercepted jobs only.
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),assert=require('node:assert/strict');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
+const {settled,stableCapture}=require('./graph-temporal110-capture.cjs');
 const current=path.resolve(__dirname,'..'),baseline=process.env.NTK_GRAPH_BASELINE_DIR,out=process.env.NTK_BROWSER_OUTPUT_DIR||process.env.TOOLKIT_TEST_OUTPUT;
 const baselineHash='b95b6bd5fd9262a74134d94cc2b466ae215caaba744ba4b8bae0a4e91da9382b';
 const report={passed:false,checks:[],cases:[],errors:[],assetFailures:[],requests:[],baseline:{source:'d3494a879604fb2523e0867ad1fb175a2f9abbf5',timelineSHA256:baselineHash}},contexts=[];
@@ -13,7 +14,7 @@ function makeJob(status,mode){const rows=Array.from({length:mode==='condensed'?3
 const settle=page=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
 async function start(root,label){
  const context=await browser.newContext({viewport:{width:1440,height:1000},serviceWorkers:'block'});contexts.push(context);const page=await context.newPage();lastPage=page;page.setDefaultTimeout(15000);
- const engine={page,label,root,job:makeJob('completed','linear'),saved:{activePage:'overview',appUpdatePreferences:{enabled:false}},requests:[]};
+ const cdp=await context.newCDPSession(page);const engine={page,cdp,label,root,job:makeJob('completed','linear'),saved:{activePage:'overview',appUpdatePreferences:{enabled:false}},requests:[]};
  page.on('pageerror',error=>report.errors.push({label,error:error.message}));page.on('response',response=>{if(response.url().includes('/assets/')&&response.status()>=400)report.assetFailures.push({label,url:response.url(),status:response.status()});});
  await context.route('**/*',async route=>{try{const req=route.request(),url=new URL(req.url()),p=url.pathname;assert.equal(url.origin,origin,'External/device requests are forbidden');
   if(p.startsWith('/api/')){const request={label,path:p,method:req.method(),at:Date.now()};engine.requests.push(request);report.requests.push(request);let data={};
@@ -45,7 +46,7 @@ async function configure(engine,c){
 }
 async function observe(engine,c,expected){
  const {page}=engine,label=engine.label,name=[c.status,c.theme,c.mode,c.selected?'selected':'unselected',c.pointer,label].join('-');
- const started=Date.now();await page.evaluate(()=>{
+ const clip=await page.locator('.rt-timeline').boundingBox();assert(clip&&clip.width>0&&clip.height>0);const started=Date.now();await page.evaluate(()=>{
   const ids=new WeakMap();let nextID=1;const nodeID=n=>{if(!ids.has(n))ids.set(n,nextID++);return ids.get(n);};
   const surface=document.querySelector('[data-rt-surface]'),palette=document.createElement('span');palette.hidden=true;document.querySelector('#pageContent').append(palette);
   const resolve=value=>{palette.style.color=value;return getComputedStyle(palette).color;};
@@ -59,9 +60,10 @@ async function observe(engine,c,expected){
   }requestAnimationFrame(frame);
  });
  const captures=[],captured=new Set();const until=Date.now()+7800,deadline=Date.now()+16000;
- while(Date.now()<until||engine.requests.filter(r=>r.path==='/api/jobs'&&r.at>=started).length<3){
-  assert(Date.now()<deadline,'Three native job polls must occur within the observation window');await page.waitForTimeout(100);
-  const frame=await page.evaluate(()=>graph110Frames.frames.at(-1));if(frame&&!captured.has(frame.state)&&captured.size<2&&out){const file='graph-temporal110-'+name+'-state'+frame.state+'.png',before=await page.evaluate(()=>graph110Frames.frames.at(-1));await page.screenshot({path:path.join(out,file),clip:await page.locator('.rt-timeline').boundingBox()});const after=await page.evaluate(()=>graph110Frames.frames.at(-1));if(before.state===after.state){captured.add(after.state);captures.push({file,before,after});}}
+ while(Date.now()<until||engine.requests.filter(r=>r.path==='/api/jobs'&&r.at>=started).length<3||captures.length<(label==='candidate'?1:2)){
+  assert(Date.now()<deadline,'Native polls and phase-verified screenshots must complete within the bounded observation window');await page.waitForTimeout(100);
+  const before=await page.evaluate(()=>({frames:graph110Frames.frames.slice(-2),classMutations:graph110Frames.classMutations,childMutations:graph110Frames.childMutations})),frame=before.frames.at(-1);
+  if(frame&&settled(before)&&!captured.has(frame.state)&&captured.size<2&&out){const file='graph-temporal110-'+name+'-state'+frame.state+'.png',capture=await engine.cdp.send('Page.captureScreenshot',{format:'png',fromSurface:true,captureBeyondViewport:false,clip:{...clip,scale:1}}),bytes=Buffer.from(capture.data,'base64'),after=await page.evaluate(t=>({frames:graph110Frames.frames.filter(f=>f.t>=t),classMutations:graph110Frames.classMutations,childMutations:graph110Frames.childMutations}),frame.t);if(stableCapture(before,after)){fs.writeFileSync(path.join(out,file),bytes);captured.add(frame.state);captures.push({file,method:'Chromium compositor PNG via Page.captureScreenshot',before:frame,after:after.frames.at(-1),precedingFrames:before.frames,interveningFrames:after.frames,beforeCounters:{classMutations:before.classMutations,childMutations:before.childMutations},afterCounters:{classMutations:after.classMutations,childMutations:after.childMutations}});}}
  }
  const data=await page.evaluate(()=>{graph110Frames.active=false;graph110Observer.disconnect();return graph110Frames;});
  const polls=engine.requests.filter(r=>r.path==='/api/jobs'&&r.at>=started).map(r=>r.at-started),result={...c,label,name,expected,polls,captures,data};report.cases.push(result);

@@ -21,6 +21,17 @@
   const textarea = () => document.querySelector('[data-ed-text]');
   const fields = ['id', 'uid', 'path', 'source', 'binding', 'hash', 'content', 'original', 'saved', 'savedEol', 'savedBOM', 'savedEncoding', 'dirty', 'undo', 'redo', 'view', 'compareView', 'eol', 'encoding', 'bom', 'language', 'untitled', 'editRevision', 'frozen', 'staged'];
   const rect = el => { if (!el) return null; const r=el.getBoundingClientRect(); return {left:r.left,top:r.top,width:r.width,height:r.height}; };
+  function detachPoint() {
+    // Test-only pre-drag geometry: do not display a hidden target or synthesize
+    // events. An actual drag must still show it and hit-test its real drop zone.
+    globalThis.NetworkToolkitEditorDrag?.mount();
+    const host=document.querySelector('.nt-editor-window'),zone=host?.querySelector('[data-editor-drag-detach]');
+    if(!host||!zone)return null;
+    const r=host.getBoundingClientRect(),style=getComputedStyle(zone),left=parseFloat(style.left),right=parseFloat(style.right),top=parseFloat(style.top),height=parseFloat(style.minHeight);
+    const x=r.left+left+(r.width-left-right)/2,y=r.top+top+height/2;
+    if(![x,y,left,right,top,height].every(Number.isFinite)||height<=0||x<=r.left||x>=r.right||y<=r.top||y>=r.bottom||x<0||y<0||x>=innerWidth||y>=innerHeight)return null;
+    return {left:x,top:y};
+  }
   function snapshot() {
     const docs = [...editor().documents.values()];
     // Let the real adapter capture the live selection without manufacturing it.
@@ -36,7 +47,7 @@
       startup: globalThis.__networkToolkitStartupState,
       nativeCapability: /^[a-f0-9]{64}$/.test(globalThis.__networkToolkitNativeSession || ''),
       location: location.pathname,
-      geometry: {width:innerWidth,height:innerHeight,main:rect(document.querySelector('.main')),editor:rect(document.querySelector('.nt-editor-window')),tabs:[...document.querySelectorAll('[data-ed-uid]')].map(tab=>({uid:tab.dataset.edUid,...rect(tab.querySelector('[data-ed-open]'))}))},
+      geometry: {width:innerWidth,height:innerHeight,detachPoint:detachPoint(),main:rect(document.querySelector('.main')),editor:rect(document.querySelector('.nt-editor-window')),tabs:[...document.querySelectorAll('[data-ed-uid]')].map(tab=>({uid:tab.dataset.edUid,...rect(tab.querySelector('[data-ed-open]'))}))},
       drag: globalThis.NetworkToolkitEditorDrag?.state,
       errors: [...errors]
     };

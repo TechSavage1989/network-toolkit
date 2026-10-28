@@ -192,9 +192,9 @@ type nativeEditorTabRect struct {
 	nativeEditorRect
 }
 type nativeEditorGeometry struct {
-	Width, Height float64
-	Main, Editor  nativeEditorRect
-	Tabs          []nativeEditorTabRect
+	Width, Height             float64
+	Main, Editor, DetachPoint nativeEditorRect
+	Tabs                      []nativeEditorTabRect
 }
 type nativeEditorReply struct {
 	Kind, Error string
@@ -951,7 +951,11 @@ func (h *nativeEditorFixture) exerciseDrag() error {
 	if err != nil {
 		return err
 	}
-	child, _, err := h.transferAction("", "new", []nativeEditorDocument{selected}, selected.UID, func() error { return h.nativeInput("Drag", "Detach", "", "", before, before, from, point) })
+	detachPoint := before.Geometry.DetachPoint
+	if math.IsNaN(detachPoint.Left) || math.IsNaN(detachPoint.Top) || math.IsInf(detachPoint.Left, 0) || math.IsInf(detachPoint.Top, 0) || detachPoint.Left <= 0 || detachPoint.Top <= 0 || detachPoint.Left >= before.Geometry.Width || detachPoint.Top >= before.Geometry.Height {
+		return errors.New("computed-style detach point is not inside the actual native client viewport")
+	}
+	child, _, err := h.transferAction("", "new", []nativeEditorDocument{selected}, selected.UID, func() error { return h.nativeInput("Drag", "Detach", "", "", before, before, from, detachPoint) })
 	if err != nil {
 		return fmt.Errorf("actual mouse explicit in-app detach target: %w", err)
 	}
