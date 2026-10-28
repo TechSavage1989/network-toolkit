@@ -3,12 +3,17 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-Active authorized candidate: 1.17.107. Read docs/RELEASE107_HANDOFF.md and
-docs/WORKFLOWS107.md. Its required hosted/native/public verification is still
-pending; do not treat local tests or authored fixtures as completed acceptance.
-Keep the published106 baseline immutable.
+Current published version: 1.17.107. The authorized discovery/appearance/capture/
+file-workflow batch is published and independently verified. Source/tag:
+bafabd88f9dd728acf45862226995e654821082d; tree
+68f7aafdec7652507134ef1ae358bb96ad8298b7. All six exact-source Checks and automatic
+Release passed; actual hosted Explorer/OLE, new-feature/legacy pixels, four public
+assets, 937 source files, reviewed binary/package identity and latest feed verified.
+Read docs/RELEASE107_HANDOFF.md and docs/WORKFLOWS107.md for scope, compatibility
+limits and duplicate-main closure. This later [skip ci] handoff is not a new build.
+Keep every published release immutable; this record authorizes no new feature.
 
-Current published version: 1.17.106. The authorized transfer-location/listener
+Previous published version: 1.17.106. The authorized transfer-location/listener
 copy controls and macro Library/recording fixes are published and independently
 verified. Source/tag: b8be5353877911fa422e69880f6b7363cda47509;
 tree da3fd8490a74aa5d80be4b6708b98e3bedeabc26. All five exact-source required

@@ -84,4 +84,4 @@ See [VALIDATION.txt](docs/VALIDATION.txt) for recorded results and [THIRD_PARTY_
 
 </details>
 
-Current development version: [1.17.107 discovery, appearance and file workflows](RELEASE_NOTES_1.17.107.txt). The latest published baseline is 1.17.106 until the required 107 checks and release complete.
+Current published version: [1.17.107 discovery, appearance and file workflows](RELEASE_NOTES_1.17.107.txt). See the [release verification record](docs/RELEASE107_HANDOFF.md) for completed checks and explicit protocol/testing limits.

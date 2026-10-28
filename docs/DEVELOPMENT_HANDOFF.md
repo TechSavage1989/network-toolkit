@@ -1,13 +1,97 @@
 # Network Toolkit development handoff
 
-## 1.17.107 candidate integration
+## 1.17.107 published and independently verified
 
-The user authorized the ten-section discovery/appearance/capture/file workflow
-batch. All requested areas are integrated on an isolated branch. Required hosted
-Go/browser/native Explorer acceptance and publication verification remain pending.
-Read [RELEASE107_HANDOFF.md](RELEASE107_HANDOFF.md) for exact scope, protocol limits
-and the unchanged106 baseline; [WORKFLOWS107.md](WORKFLOWS107.md) is the user guide.
-This section does not claim 107 is published or that authored tests have run.
+Published 2026-10-28:
+https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.107
+Release ID: 426199324
+Exact reviewed/published source and tag: bafabd88f9dd728acf45862226995e654821082d
+Tree: 68f7aafdec7652507134ef1ae358bb96ad8298b7
+Baseline: 106 closure main a3a611681eb6194263cdb15facfd540826398735.
+All six exact-source required gates and bounded independent reviews completed
+before the authorized expected-head, non-force main promotion. This subsequent
+handoff-only closure does not rebuild, move tags or replace published assets.
+
+Completed scope:
+- Exact saved terminal-profile IP/protocol/port badges, explicit profile chooser
+  and connection review; named tool-scoped filters preserve existing multi-value
+  query/status/type semantics. Neither feature connects or scans automatically.
+- Only the shared Source for this run header control is removed. Sidebar controls
+  and immutable recorded-source information remain, in existing entry Run details
+  for fitted graphs and a separate disclosure for ordinary result lists.
+- Conservative known-content terminal highlighting respects device ANSI and
+  ordinary prose; installed monospace choices/fallback and guarded font refitting;
+  shared transactional HEX/RGB(A)/HSV picker, presets/recent/saved colors and
+  Apply/Cancel/reset preserve explicit user themes without font installation.
+- Packet capture navigation and adapter refresh use ordinary unelevated inventory.
+  Only explicit Start enters the restricted capture path. Missing/ambiguous chosen
+  adapters fail closed; cancellation is visible, with no automatic retry.
+- Shared/local and remote explorers have clearer navigation and reviewed multi-file
+  drops. Local confined staging and SFTP owned staging preserve no-clobber rules,
+  collision choices, explicit remote confirmation, progress and partial errors.
+  Existing copy locations and explicit Add by local path remain available.
+
+Exact-source Checks 40618956778 completed SUCCESS, all six jobs:
+- Application 122588000702: Go lifecycle/assets, 864 JavaScript tests, 42 Python
+  release/layout guards, Windows GUI build and reviewed portable package.
+- Dependency 122588000332: vendor exact match; zero reachable and imported-package
+  findings on Linux/Windows. Unused OpenPGP module advisory GO-2026-5932 remains
+  disclosed; these checks are not a comprehensive independent security audit.
+- Windows 122588000584: 114 top-level tests across existing vault/DPAPI/bootstrap,
+  capture launch boundaries, local/SFTP staged publication and actual native
+  Explorer mouse/OLE drag into installed WebView2 (12.45 seconds).
+- Security browser 122588000476: all seven credential/pager/banner/discovery/macro/
+  copy reports passed; existing ID-only/no-secret-read and stale-result guards hold.
+- Workflow browser 122588000507: saved/filter/source, shared colors, terminal
+  main/separate/detached and browser-DPR cases, capture navigation/cancellation,
+  and local/remote drop review/collision/cancel/partial-result workflows passed.
+- Full browser 122588000585: all existing graph/layout, actual app clipboard and
+  loopback terminal-selection gates passed; genuine five-minute updater scenario 302,585 ms (observed poll interval
+  about 300,037 ms),
+  backoff/cancellation cases and the expected historical negative control passed.
+  Required timing/geometry assertions were retained, not relaxed or skipped.
+
+Actual normal/narrow feature, source-details/graph, terminal and native screenshots
+were inspected. Native Explorer copied one isolated synthetic 44-byte file only
+following explicit Copy, verified unchanged source/exact destination, and rejected
+mixed file/folder drops without partial import. Strict detached resize acceptance
+confirmed the repeated-identical-fit deadline fix. The earlier failed review1/2
+runs and their diagnoses remain historical below, not release acceptance evidence.
+
+Automatic Release 40620995888 completed SUCCESS: build 122594717704 and publish
+122595350684. All four public downloads match GitHub sizes/digests, manifests,
+safe ZIP/CRC checks, x64 GUI 1.17.107 PE/version and all nine canonical icon payloads.
+All 937 packaged source files match the exact reviewed tree. Public EXE and portable
+are byte-identical to reviewed artifact 12786696184. The updater contains exactly
+Network_Toolkit_1.17.107_Windows_x64.exe, SHA256SUMS, THIRD_PARTY_NOTICES.txt and
+UPDATING.txt under Network_Toolkit_1.17.107/. Latest feed, tag and release-note body
+match 107. Prior106 tag, release body and four asset IDs/sizes/hashes were compared
+before promotion and again after publication; all remain unchanged.
+
+Public SHA256:
+- Network_Toolkit.exe: c963ae814691394e93b146626eaf47e92d105705f25253187fe8c3913ab7b78e
+- Network_Toolkit_1.17.107_Portable.zip: b2a7e10b47320a6b9738be888fbb1f236ba6f06d806a6f34595272b073b39f39
+- Network_Toolkit_1.17.107_Update.zip: 994382a377ff25007ca082412b733177ab3076d44d5967634c11682eee959188
+- SHA256SUMS: 5c62fce20679f9cf621c455b3b497a907debdf84412a6d97e8053f9f691b4619
+
+Automatic duplicate-main Checks 40620995876 completed SUCCESS at 02:43:54 UTC:
+application 122594717455, dependency 122594717436, Windows 122594717467,
+security browser 122594717413, new workflows 122594717553 and full browser
+122594717245 all passed. No optional rerun or application edit followed release.
+This [skip ci] closure changes only AGENTS.md, README.md, DEVELOPMENT_HANDOFF.md,
+RELEASE107_HANDOFF.md and VALIDATION.txt. Published source/tag/assets remain fixed.
+
+Limits: FTP/FTPS remote Explorer drops intentionally remain unavailable because
+portable atomic no-clobber publication cannot be guaranteed; existing manual FTP
+and confined shared-server local copies remain available. SFTP explicit overwrite
+requires its negotiated atomic-replace extension; unsupported capabilities fail
+closed. Folder/shortcut drops are rejected; batches are bounded to 100 files and
+512 MiB per file. Actual native proof is this hosted Windows/WebView2 environment;
+DPR 1/1.25/1.5/2 browser emulation does not certify Windows OS scaling changes.
+No user device/file/vault/settings, live capture, real UAC interaction, silent font
+installation or security-setting change was used. Existing credential/host-key,
+pager/archive/banner, macro, copy/port, graph/icon and updater safeguards remain.
+See WORKFLOWS107.md and PACKET_CAPTURE_PRIVILEGES.md for operational behavior.
 
 ## 1.17.106 published and independently verified
 
