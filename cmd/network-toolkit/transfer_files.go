@@ -72,6 +72,9 @@ func transferFileAction(root, action, sub, target, local string, overwrite, conf
 	}
 	switch action {
 	case "mkdir":
+		if !validExplorerName(filepath.Base(strings.ReplaceAll(sub, "\\", "/"))) {
+			return "", errors.New("choose a valid folder name without reserved characters or trailing dots/spaces")
+		}
 		path, e = transferPath(root, sub, false)
 		if e != nil {
 			return "", e

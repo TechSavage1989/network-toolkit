@@ -2,6 +2,7 @@ package main
 
 import (
 	"regexp"
+	"strconv"
 	"strings"
 
 	"networktoolkit/internal/capture"
@@ -77,4 +78,53 @@ func packetConfigurableAdapters(snapshot localIPSnapshot) []packetSystemAdapter 
 		adapters = append(adapters, packetSystemAdapter{ID: adapter.ID, Name: adapter.Name, Description: adapter.Description, MAC: adapter.MAC})
 	}
 	return adapters
+}
+
+// Ordinary adapter identity is independent of privileged Packet Monitor source
+// IDs. Resolve it against the full source inventory only after explicit Start;
+// filtering the inventory first could hide ambiguous shared driver/MAC matches.
+func packetAdapterSelectionID(id string) string {
+	return "adapter:" + strings.ToLower(id)
+}
+
+func packetOrdinaryInterfaces(adapters []packetSystemAdapter) []capture.Interface {
+	counts := map[string]int{}
+	for _, adapter := range adapters {
+		counts[packetAdapterSelectionID(adapter.ID)]++
+	}
+	views := []capture.Interface{}
+	for _, adapter := range adapters {
+		id := packetAdapterSelectionID(adapter.ID)
+		if !validAdapterID(adapter.ID) || counts[id] != 1 || strings.TrimSpace(adapter.Name) == "" {
+			continue
+		}
+		views = append(views, packetAdapterView(capture.Interface{ID: id, Engine: "auto"}, adapter))
+	}
+	if len(views) > 0 {
+		views = append([]capture.Interface{{ID: "nics", Name: "All configurable network adapters", Engine: "auto"}}, views...)
+	}
+	return views
+}
+
+func packetValidInterfaceSelection(selection string) bool {
+	if selection == "nics" {
+		return true
+	}
+	if strings.HasPrefix(selection, "adapter:") {
+		return validAdapterID(strings.TrimPrefix(selection, "adapter:"))
+	}
+	if strings.HasPrefix(selection, "live:") {
+		id := strings.TrimPrefix(selection, "live:")
+		return len(id) == 24 && strings.IndexFunc(id, func(r rune) bool { return !(r >= '0' && r <= '9' || r >= 'a' && r <= 'f') }) == -1
+	}
+	if strings.HasPrefix(selection, "file:") {
+		id := strings.TrimPrefix(selection, "file:")
+		value, err := strconv.ParseUint(id, 10, 32)
+		return err == nil && value > 0 && strconv.FormatUint(value, 10) == id
+	}
+	return false
+}
+
+func packetCaptureSourceSelected(selection, sourceID, adapterID string) bool {
+	return selection == "nics" || selection == sourceID || validAdapterID(adapterID) && strings.EqualFold(selection, packetAdapterSelectionID(adapterID))
 }

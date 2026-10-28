@@ -73,8 +73,9 @@ func (a *packetNativeAPI) release(name string, handle uintptr) {
 }
 
 type packetNativeSource struct {
-	view    capture.Interface
-	pointer uintptr
+	view      capture.Interface
+	pointer   uintptr
+	adapterID string
 }
 
 func packetSourceName(buffer []byte, address uintptr) (string, error) {
@@ -129,7 +130,7 @@ func (a *packetNativeAPI) sources(handle uintptr, adapters []packetSystemAdapter
 			}
 			sum := sha256.Sum256([]byte(name + "\x00" + adapter.ID))
 			view := packetAdapterView(capture.Interface{ID: fmt.Sprintf("live:%x", sum[:12]), Engine: "live"}, adapter)
-			sources = append(sources, packetNativeSource{view: view, pointer: address})
+			sources = append(sources, packetNativeSource{view: view, pointer: address, adapterID: adapter.ID})
 		}
 		return sources, buffer, nil
 	}
@@ -149,7 +150,7 @@ func packetCaptureSupport() packetCaptureCapabilities {
 		support.File = true
 	}
 	support.Available = support.Live || support.File
-	support.Note = "Uses Windows Packet Monitor. Administrator approval is requested when starting capture or loading adapters. Live capture supports up to 9000 bytes per packet. File mode shows packet details after Stop."
+	support.Note = "Uses Windows Packet Monitor. Opening this tool and refreshing adapters do not request administrator approval. Start capture requests approval; driver/component availability is checked only then. Live capture supports up to 9000 bytes per packet. File mode shows packet details after Stop."
 	if !support.Available {
 		support.Note = "Windows Packet Monitor is unavailable. Import PCAP or PCAPNG files to inspect existing captures."
 	}
@@ -181,56 +182,26 @@ func packetCaptureCommand(ctx context.Context, args ...string) (string, error) {
 
 var packetComponentRow = regexp.MustCompile(`(?m)^\s*(\d+)\s+(.+)$`)
 
-func packetFileInterfaces(ctx context.Context, adapters []packetSystemAdapter) ([]capture.Interface, error) {
+type packetFileSource struct {
+	view      capture.Interface
+	adapterID string
+}
+
+func packetFileInterfaces(ctx context.Context, adapters []packetSystemAdapter) ([]packetFileSource, error) {
 	text, e := packetCaptureCommand(ctx, "list")
 	if e != nil {
 		return nil, e
 	}
-	out := []capture.Interface{}
+	out := []packetFileSource{}
 	for _, match := range packetComponentRow.FindAllStringSubmatch(text, -1) {
 		id, e := strconv.ParseUint(match[1], 10, 32)
 		if e == nil && id > 0 {
 			if adapter, matched := packetMatchAdapter(match[2], adapters); matched {
-				out = append(out, packetAdapterView(capture.Interface{ID: "file:" + match[1], Engine: "file"}, adapter))
+				out = append(out, packetFileSource{view: packetAdapterView(capture.Interface{ID: "file:" + match[1], Engine: "file"}, adapter), adapterID: adapter.ID})
 			}
 		}
 	}
 	return out, nil
-}
-func packetCapturePerformList(ctx context.Context, emit func(packetCaptureMessage) error) error {
-	adapters, e := packetReadSystemAdapters(ctx)
-	if e != nil {
-		return fmt.Errorf("Read configurable capture adapters: %w", e)
-	}
-	views := []capture.Interface{}
-	var liveError error
-	if api, e := openPacketNative(); e == nil {
-		defer api.close()
-		var handle uintptr
-		if e = api.call("PacketMonitorInitialize", 0x10000, 0, uintptr(unsafe.Pointer(&handle))); e == nil {
-			defer api.release("PacketMonitorUninitialize", handle)
-			sources, buffer, sourceError := api.sources(handle, adapters)
-			liveError = sourceError
-			for _, s := range sources {
-				views = append(views, s.view)
-			}
-			runtime.KeepAlive(buffer)
-		} else {
-			liveError = e
-		}
-	}
-	if found, e := packetFileInterfaces(ctx, adapters); e == nil {
-		views = append(views, found...)
-	} else if len(views) == 0 {
-		if liveError != nil {
-			return liveError
-		}
-		return e
-	}
-	if len(views) > 0 {
-		views = append([]capture.Interface{{ID: "nics", Name: "All configurable network adapters", Engine: "auto"}}, views...)
-	}
-	return emit(packetCaptureMessage{Version: 1, Type: "interfaces", Interfaces: views})
 }
 
 type packetStreamConfiguration struct {
@@ -389,7 +360,7 @@ func packetCaptureLive(ctx context.Context, o capture.Options, emit func(packetC
 	}
 	found := false
 	for _, source := range sources {
-		if o.Interface == "nics" || source.view.ID == o.Interface {
+		if packetCaptureSourceSelected(o.Interface, source.view.ID, source.adapterID) {
 			if e = api.call("PacketMonitorAddSingleDataSourceToSession", session, source.pointer); e != nil {
 				return e
 			}
@@ -511,8 +482,8 @@ func packetCaptureFile(ctx context.Context, o capture.Options, emit func(packetC
 	}
 	components := []string{}
 	for _, adapter := range interfaces {
-		if o.Interface == "nics" || adapter.ID == o.Interface {
-			components = append(components, strings.TrimPrefix(adapter.ID, "file:"))
+		if packetCaptureSourceSelected(o.Interface, adapter.view.ID, adapter.adapterID) {
+			components = append(components, strings.TrimPrefix(adapter.view.ID, "file:"))
 		}
 	}
 	if len(components) == 0 {

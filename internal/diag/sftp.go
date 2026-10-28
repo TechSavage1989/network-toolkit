@@ -6,8 +6,10 @@ package diag
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/subtle"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
@@ -53,11 +55,12 @@ const (
 )
 
 type wireSFTP struct {
-	in      io.Reader
-	out     io.Writer
-	id      uint32
-	conn    net.Conn
-	timeout time.Duration
+	posixRename bool
+	in          io.Reader
+	out         io.Writer
+	id          uint32
+	conn        net.Conn
+	timeout     time.Duration
 }
 type sftpFileInfo struct {
 	Name     string `json:"name"`
@@ -159,6 +162,20 @@ func (c *wireSFTP) init() error {
 	v := binary.BigEndian.Uint32(p[:4])
 	if v != 3 {
 		return fmt.Errorf("SFTP version %d is unsupported; this client uses version 3", v)
+	}
+	p = p[4:]
+	for len(p) > 0 {
+		name, err := sfGetString(&p)
+		if err != nil {
+			return err
+		}
+		value, err := sfGetString(&p)
+		if err != nil {
+			return err
+		}
+		if name == "posix-rename@openssh.com" && value == "1" {
+			c.posixRename = true
+		}
 	}
 	return nil
 }
@@ -482,7 +499,7 @@ func (c *wireSFTP) download(ctx context.Context, remote, local string, overwrite
 	}
 	return total, nil
 }
-func (c *wireSFTP) upload(ctx context.Context, local, remote string, overwrite bool, report func(uint64, uint64)) (uint64, error) {
+func (c *wireSFTP) upload(ctx context.Context, local, remote string, overwrite bool, report func(uint64, uint64), onCreated ...func()) (uint64, error) {
 	file, e := os.Open(local)
 	if e != nil {
 		return 0, e
@@ -503,7 +520,17 @@ func (c *wireSFTP) upload(ctx context.Context, local, remote string, overwrite b
 	if e != nil {
 		return 0, e
 	}
-	defer c.closeHandle(h)
+	// Ownership exists only after the server acknowledged our exclusive OPEN.
+	// An unacknowledged/failed creation must never authorize pathname cleanup.
+	if len(onCreated) > 0 && onCreated[0] != nil {
+		onCreated[0]()
+	}
+	closed := false
+	defer func() {
+		if !closed {
+			_ = c.closeHandle(h)
+		}
+	}()
 	buf := make([]byte, 32768)
 	var total uint64
 	for {
@@ -530,6 +557,68 @@ func (c *wireSFTP) upload(ctx context.Context, local, remote string, overwrite b
 			return total, er
 		}
 	}
+	closed = true
+	if e = c.closeHandle(h); e != nil {
+		return total, fmt.Errorf("remote file close/flush failed: %w", e)
+	}
+	return total, nil
+}
+
+// Protocol references: SFTP v3 section 6.5 forbids an existing RENAME target:
+// https://www.openssh.org/txt/draft-ietf-secsh-filexfer-02.txt
+// POSIX replacement requires negotiated extension version 1 (OpenSSH PROTOCOL 4.3):
+// https://github.com/openssh/openssh-portable/blob/master/PROTOCOL
+// uploadStaged is opt-in for browser-granted drops. Never truncate the original.
+// SFTP v3 RENAME refuses an existing target; an overwrite requires the advertised
+// atomic POSIX rename extension. Unsupported servers fail before any file bytes.
+func (c *wireSFTP) uploadStaged(ctx context.Context, local, remote string, overwrite bool, report func(uint64, uint64)) (total uint64, err error) {
+	if overwrite && !c.posixRename {
+		return 0, errors.New("server does not advertise atomic overwrite; choose Skip or Rename")
+	}
+	if ctx.Err() != nil {
+		return 0, ctx.Err()
+	}
+	var random [16]byte
+	if _, err = rand.Read(random[:]); err != nil {
+		return 0, err
+	}
+	stage := path.Join(path.Dir(remote), ".ntk-upload-"+hex.EncodeToString(random[:])+".tmp")
+	published, stageOwned := false, false
+	defer func() {
+		if stageOwned && !published {
+			cleanup := c.remove(fxRemove, stage)
+			if cleanup != nil {
+				var missing sftpWireError
+				if !errors.As(cleanup, &missing) || missing.code != 2 {
+					err = fmt.Errorf("%w; staging cleanup not confirmed for %s (inspect remote folder before retrying)", err, stage)
+				}
+			}
+		}
+	}()
+	total, err = c.upload(ctx, local, stage, false, report, func() { stageOwned = true })
+	if err != nil {
+		return total, err
+	}
+	if err = ctx.Err(); err != nil {
+		return total, err
+	}
+	var kind byte
+	if overwrite {
+		kind, _, err = c.request(200, sfString("posix-rename@openssh.com"), sfString(stage), sfString(remote))
+	} else {
+		kind, _, err = c.request(fxRename, sfString(stage), sfString(remote))
+	}
+	if err != nil {
+		var status sftpWireError
+		if !errors.As(err, &status) {
+			err = fmt.Errorf("publication result is uncertain for %s: %w; refresh before retrying", remote, err)
+		}
+		return total, err
+	}
+	if kind != fxStatus {
+		return total, errors.New("invalid SFTP publication acknowledgement; refresh destination before retrying")
+	}
+	published = true
 	return total, nil
 }
 
@@ -848,7 +937,11 @@ func runSFTPChannel(ctx context.Context, req model.Request, emit model.Emit, cli
 		summary = "SFTP download completed"
 	case "upload":
 		var n uint64
-		n, e = protocol.upload(ctx, local, remote, boolOption(req.Options, "overwrite", false), progress)
+		if boolOption(req.Options, "stagedUpload", false) {
+			n, e = protocol.uploadStaged(ctx, local, remote, boolOption(req.Options, "overwrite", false), progress)
+		} else {
+			n, e = protocol.upload(ctx, local, remote, boolOption(req.Options, "overwrite", false), progress)
+		}
 		data["bytesTransferred"] = n
 		summary = "SFTP upload completed"
 	}

@@ -1,0 +1,20 @@
+Network Toolkit 1.17.107
+
+Discovery and reusable filters
+- Saved terminal profile indicators distinguish device addresses, protocols and ports and open the existing connection review rather than automatically connecting.
+- Named, tool-scoped saved filters retain queries and applicable filter options. Existing multi-item discovery matching remains available.
+- The redundant source control is removed from result headers; the sidebar selection remains, and recorded run source details are available below results.
+
+Terminal and appearance
+- Conservative terminal highlighting avoids interpreting ordinary login-banner prose as configuration. Device ANSI, cursor/selection behavior and output archives remain intact.
+- Expanded installed monospace font choices and font-ready resizing preserve explicit appearance settings without downloading or installing fonts.
+- Shared color editing adds validated HEX/RGB, previews, palettes, recent/saved colors and explicit Apply/Cancel. Alpha is offered only by settings that support transparency.
+
+Packet capture and file workflows
+- Opening Packet Capture and refreshing ordinary adapters do not request elevation. Starting an operation requiring capture privileges still requests Windows approval; cancellation does not trigger an automatic retry.
+- File panels gain clearer navigation and explicit review for supported file drops. Originals are copied, not moved; destination checks, collision choices, progress, cancellation and per-file failures remain explicit.
+- Shared-server drops and supported SFTP remote drops use staged uploads. FTP/FTPS remote Explorer drops are unavailable because FTP has no portable atomic no-clobber guarantee; existing manual FTP transfers remain available. Folder drops are explicitly rejected where safe structured import is unsupported.
+
+Compatibility and validation
+- Preserves the 1.17.106 master-password vault/native approvals, saved-host identity checks, terminal paging/banner/output archives, macros, copy locations, port actions, icons and updater behavior.
+- Verification uses synthetic fixtures, hosted browser/native Windows checks and public artifact checks. No user files, real devices or live packet capture are used. Browser DPR emulation is not real Windows display-scaling validation; the native runner covers its current environment only. Detailed results and limits are retained in the release handoff.

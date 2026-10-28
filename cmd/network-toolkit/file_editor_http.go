@@ -395,7 +395,7 @@ func (a *application) handleRemoteDropUpload(w http.ResponseWriter, r *http.Requ
 	}
 	defer file.Close()
 	name := head.Filename
-	if name == "" || name == "." || name == ".." || strings.ContainsAny(name, "/\\\x00\r\n") || len(name) > 255 {
+	if validateExplorerDropName(name) != nil {
 		jsonError(w, 400, "Unsafe uploaded filename")
 		return
 	}
@@ -404,13 +404,39 @@ func (a *application) handleRemoteDropUpload(w http.ResponseWriter, r *http.Requ
 		jsonError(w, 400, "Invalid connection selection")
 		return
 	}
+	if len(r.MultipartForm.File) != 1 || len(r.MultipartForm.File["file"]) != 1 {
+		jsonError(w, 400, "Choose one regular file, not a folder batch")
+		return
+	}
+	if chosen := r.FormValue("name"); chosen != "" {
+		if err := validateExplorerDropName(chosen); err != nil {
+			jsonError(w, 400, err.Error())
+			return
+		}
+		name = chosen
+	}
+	if req.Protocol == "ftp" {
+		jsonError(w, 400, "Windows FTP uploads are unavailable: FTP cannot guarantee atomic no-overwrite publication. Use SFTP or the existing explicit FTP transfer controls.")
+		return
+	}
 	targetDir := req.Path
+	if strings.ContainsAny(targetDir, "\\\x00\r\n") {
+		jsonError(w, 400, "Unsafe remote folder")
+		return
+	}
+	for _, segment := range strings.Split(targetDir, "/") {
+		if segment == ".." {
+			jsonError(w, 400, "Parent traversal is not allowed in a drop destination")
+			return
+		}
+	}
 	if len(targetDir) > 4096-len(name)-1 {
 		jsonError(w, 400, "Remote path is too long")
 		return
 	}
 	req.Path = path.Join(targetDir, name)
 	req.Action = "upload"
+	req.StagedUpload = true
 	tmp, e := os.CreateTemp("", "nt-dropped-*")
 	if e != nil {
 		jsonError(w, 500, "Cannot stage the uploaded file")
@@ -418,7 +444,7 @@ func (a *application) handleRemoteDropUpload(w http.ResponseWriter, r *http.Requ
 	}
 	tempPath := tmp.Name()
 	defer os.Remove(tempPath)
-	_, e = io.Copy(tmp, io.LimitReader(file, (512<<20)+1))
+	_, e = io.Copy(tmp, io.LimitReader(&explorerContextReader{ctx: r.Context(), reader: file}, (512<<20)+1))
 	closeErr := tmp.Close()
 	if e != nil || closeErr != nil {
 		jsonError(w, 500, "Cannot stage file")

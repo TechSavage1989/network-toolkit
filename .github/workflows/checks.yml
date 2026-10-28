@@ -155,6 +155,30 @@ jobs:
           path: ${{ runner.temp }}/network-toolkit-native-dialogs
           if-no-files-found: ignore
           retention-days: 7
+      - name: Verify capture navigation never requests administrator approval
+        env:
+          GOTOOLCHAIN: local
+        run: go test -mod=vendor ./cmd/network-toolkit -run 'TestPacketCapturePrivilegeBoundaryNavigationAndExplicitCancel|TestPacketNative|TestColorPickerPreferencesSurviveStateAndNarrowTerminalDisplays' -count=1 -v
+      - name: Test confined local and SFTP staged publication on Windows
+        env:
+          GOTOOLCHAIN: local
+        run: |
+          go test -mod=vendor ./cmd/network-toolkit -run 'TestExplorerDrop|TestSFTPDropRename|TestRemoteBrowserPersistent' -count=1 -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          go test -mod=vendor ./internal/diag -run TestSFTPStaged -count=1 -v
+      - name: Verify real Windows Explorer file drops into native WebView2
+        env:
+          GOTOOLCHAIN: local
+          NETWORK_TOOLKIT_NATIVE_EXPLORER_TEST: '1'
+          TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/network-toolkit-native107
+        run: go test -mod=vendor ./internal/desktop -run TestNativeExplorerDropInstalledWebView2 -count=1 -v
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: native-explorer107-checks
+          path: ${{ runner.temp }}/network-toolkit-native107
+          if-no-files-found: error
+          retention-days: 7
       - name: Test visible Windows installer progress
         env:
           GOTOOLCHAIN: local
@@ -404,4 +428,63 @@ jobs:
           name: credential-security-browser-checks
           path: ${{ runner.temp }}/ntk-security-browser-results
           if-no-files-found: ignore
+          retention-days: 7
+
+
+  browser-workflows107:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install isolated browser test tools
+        run: |
+          mkdir -p "$RUNNER_TEMP/ntk-workflow107-tests"
+          npm install --prefix "$RUNNER_TEMP/ntk-workflow107-tests" playwright@1.62.1
+          "$RUNNER_TEMP/ntk-workflow107-tests/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Check exact saved sessions, persistent filter controls and recorded sources
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
+        run: node scripts/discovery-saved.browser.cjs
+      - name: Check transactional shared color controls and normal/narrow layouts
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
+        run: node scripts/color-picker.browser.cjs
+      - name: Check conservative terminal highlights, local font fallback and resize
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
+        run: node scripts/terminal-style107.browser.cjs
+      - name: Check ordinary capture navigation and explicit cancelled Start
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
+        run: node scripts/packet-capture-privilege.browser.cjs
+      - name: Check reviewed file drops, destination validation and cancellation
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
+        run: node scripts/transfer-drop.browser.cjs
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: workflow107-browser-checks
+          path: ${{ runner.temp }}/ntk-workflow107-results
+          if-no-files-found: error
           retention-days: 7

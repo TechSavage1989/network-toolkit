@@ -276,3 +276,59 @@ test('local command output colors ipconfig fields, addresses and statuses withou
   h.controller.setAppearance({language,theme:'light',shellColors:{outputAddress:'#aa33dd'}});h.flush();assert(h.decorations.some(d=>!d.disposed&&d.options.foregroundColor==='#aa33dd'));assert.deepEqual(Array.from({length:h.term.buffer.normal.length},(_,i)=>h.term.buffer.normal.getLine(i).translateToString(false)),rows);h.dispose();
  }
 });
+test('screenshot-shaped HPE copyright and login prose stays plain except explicit formats',()=>{
+ const h=harness(),plain=[
+  '(C) Copyright 2017-2026 Hewlett Packard Enterprise Development LP',
+  'RESTRICTED RIGHTS LEGEND',
+  'Confidential computer software. Valid license from Hewlett Packard Enterprise',
+  'Development LP required for possession, use, or copying. License found at',
+  'By using the software, you acknowledge that you have read and understand',
+  'the license, represent you are authorized to accept this license, and agree',
+  'to be bound by its terms. If you do not agree to these terms, do not use the',
+  'software. Consistent with FAR 12.211 and 12.212, Commercial Computer Software,',
+  'Computer Software Documentation, and Technical Data for Commercial Items are',
+  'licensed to the U.S. Government under vendor\'s standard commercial license.',
+  'We\'d like to keep you up to date about:',
+  ' * Software feature updates',' * New product announcements',' * Special events',
+  'User "admin" has logged in 4 times in the past 30 days',
+  'Idle session timeout reached, logging out.',
+  '[Network Toolkit: Reconnecting using previous settings.]',
+  'ordinary SSH and HTTP documentation is not a command',
+  'to access ports, set the user name and read this release notice',
+  'User access is down the hall. Status reporting is useful.',
+  'Read connection refused and permission denied troubleshooting advice.',
+  'Error handling is described in this manual.','SUCCESS STORIES ARE HERE','THIS IS AN ERROR','100%','50% complete',
+  'set up your device','copy all files to the backup directory','show your support','interface status is described below',
+  'Description of this software is provided below.','description of this software is provided below.',
+  'download.example.invalid shutdown-port1 /tmp/down/eth0 friend192.0.2.1',
+  'Version 1.2.3.4 build 5.6.7.8'
+ ];
+ for(const line of plain)assert.deepEqual(Array.from(h.analyze(line)),[],line);
+ for(const [line,want]of [
+  [' https://www.hpe.com/software/SWLicensing.',[['https://www.hpe.com/software/SWLicensing','url']]],
+  ['Please register your products now at: https://networkingsupport.hpe.com',[['https://networkingsupport.hpe.com','url']]],
+  ['Last login: 2026-10-27 22:33:21 from 172.16.18.26',[['Last login','field'],['172.16.18.26','address']]],
+  ['6100#',[['6100#','prompt']]]
+ ])assert.deepEqual(Array.from(h.analyze(line),hit=>[line.slice(hit.start,hit.end),hit.kind]),want,line);
+ h.dispose();
+});
+test('bounded formats and explicit precedence do not expose URL or description fragments',()=>{
+ const h=harness();
+ for(const line of ['999.2.3.4','192.168.001.2','2001:db8:::1','192.0.2.1/33','aa:bb:cc:dd:ee:ff:00','hostname-eth0','not192.0.2.1','https://999.2.3.4/path','https://example.invalid:99999/path'])assert.equal(h.analyze(line).length,0,line);
+ const line='router# show interface Gi1/0/1 192.0.2.1 00:11:22:33:44:55 https://down.example.invalid/port1';
+ const hits=Array.from(h.analyze(line));assert(hits.some(hit=>hit.kind==='prompt'));assert(hits.some(hit=>hit.kind==='mac'));assert(hits.some(hit=>hit.kind==='url'));
+ for(let i=1;i<hits.length;i++)assert(hits[i-1].end<=hits[i].start,'no overlap');
+ assert.deepEqual(Array.from(h.analyze(line)),hits,'stable repeat');
+ assert.equal(h.analyze('https://down.example.invalid/port1',undefined,{url:false}).length,0,'disabled URL still blocks nested interface/status');
+ const comment='set description "192.0.2.1 https://down.example.invalid/port1 ERROR"';assert(h.analyze(comment).some(hit=>hit.kind==='comment'));assert(!h.analyze(comment).some(hit=>['address','url','error'].includes(hit.kind)));
+ for(const [text,kind]of [['status: down','error'],['Gi1/0/1 is up','success'],['ERROR: invalid command','error'],['ssh: connect to host 192.0.2.1 port 22: Connection refused','error'],['switch(config)# show interfaces','prompt'],['<switch>','prompt'],['[2001:db8::1]','address']])assert(h.analyze(text).some(hit=>hit.kind===kind),text);
+ h.dispose();
+});
+test('rule toggles and reset preserve ANSI attributes, cursor and raw output',async()=>{
+ const h=harness({rules:{url:false},colors:{address:'#123456'}},{cols:120,rows:8});
+ const text='User "admin" has logged in 4 times\r\n\x1b[33mCopyright 2026 Example Vendor\x1b[0m\r\n192.0.2.1 https://example.invalid\r\n\x1b[31m192.0.2.2\x1b[0m\r\n┌─┐ café é 日本語\r\nswitch# ';
+ await h.write(text);const buffer=()=>Array.from({length:h.term.buffer.active.length},(_,i)=>h.term.buffer.active.getLine(i).translateToString(false)),before=buffer(),cursor=[h.term.buffer.active.cursorX,h.term.buffer.active.cursorY];
+ assert.equal(h.controller.tokensAtRow(0).length,0);assert.equal(h.controller.tokensAtRow(1).length,0);assert.equal(h.term.buffer.active.getLine(1).getCell(0).getFgColor(),3);
+ h.controller.setAppearance({rules:{address:false,url:true},colors:{address:'#123456'}});h.flush();assert(!h.controller.tokensAtRow(2).some(hit=>hit.kind==='address'));assert(h.controller.tokensAtRow(2).some(hit=>hit.kind==='url'));
+ h.controller.setAppearance({rules:{},colors:{address:'#123456'}});h.flush();assert(h.decorations.some(mark=>!mark.disposed&&mark.options.foregroundColor==='#123456'));assert.equal(h.term.buffer.active.getLine(3).getCell(0).getFgColor(),1);assert.deepEqual(buffer(),before);assert.deepEqual([h.term.buffer.active.cursorX,h.term.buffer.active.cursorY],cursor);h.dispose();
+});

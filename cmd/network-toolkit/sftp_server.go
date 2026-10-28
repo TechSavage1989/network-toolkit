@@ -548,12 +548,20 @@ func (s *sftpSession) handleRequest(t byte, id uint32, b []byte) error {
 		if src == s.root || dst == s.root {
 			return s.status(id, sftpDenied, "Cannot rename root folder")
 		}
-		if !s.overwrite {
-			if _, e = os.Stat(dst); e == nil {
+		// SFTP v3 RENAME is no-replace even when ordinary uploads allow overwrite.
+		// Regular-file publication uses an atomic exclusive link, not Stat+Rename.
+		if info, err := os.Lstat(src); err != nil {
+			return fail(err)
+		} else if info.Mode().IsRegular() {
+			e = renameSFTPFileNoReplace(src, dst)
+		} else {
+			if _, err := os.Lstat(dst); err == nil {
 				return s.status(id, sftpDenied, "Destination exists")
+			} else if !os.IsNotExist(err) {
+				return fail(err)
 			}
+			e = os.Rename(src, dst)
 		}
-		e = os.Rename(src, dst)
 		if e != nil {
 			return fail(e)
 		}
@@ -807,16 +815,19 @@ func startSFTPServer(ctx context.Context, s *transferHost, base, username, passw
 }
 func serveSFTPConnection(ctx context.Context, s *transferHost, conn net.Conn, config *ssh.ServerConfig) {
 	s.activity(1)
-    s.log(conn.RemoteAddr().String(),"CONNECT","",0,nil)
+	s.log(conn.RemoteAddr().String(), "CONNECT", "", 0, nil)
 	defer s.activity(-1)
-    defer s.log(conn.RemoteAddr().String(),"DISCONNECT","",0,nil)
+	defer s.log(conn.RemoteAddr().String(), "DISCONNECT", "", 0, nil)
 	defer conn.Close()
 	stop := context.AfterFunc(ctx, func() { _ = conn.Close() })
 	defer stop()
 	_ = conn.SetDeadline(time.Now().Add(20 * time.Second))
 	server, channels, requests, e := ssh.NewServerConn(conn, config)
-	if e != nil {s.log(conn.RemoteAddr().String(),"AUTH", "", 0,errors.New("SSH handshake or authentication rejected"));return}
-    s.log(conn.RemoteAddr().String(),"LOGIN",server.User(),0,nil)
+	if e != nil {
+		s.log(conn.RemoteAddr().String(), "AUTH", "", 0, errors.New("SSH handshake or authentication rejected"))
+		return
+	}
+	s.log(conn.RemoteAddr().String(), "LOGIN", server.User(), 0, nil)
 	defer server.Close()
 	_ = conn.SetDeadline(time.Time{})
 	go ssh.DiscardRequests(requests)
@@ -856,4 +867,16 @@ func serveSFTPConnection(ctx context.Context, s *transferHost, conn net.Conn, co
 			}
 		}()
 	}
+}
+
+// The link fails atomically if another client created the destination. Filesystems
+// without hard-link support fail closed; do not fall back to destructive rename.
+func renameSFTPFileNoReplace(src, dst string) error {
+	if err := os.Link(src, dst); err != nil {
+		return err
+	}
+	if err := os.Remove(src); err != nil {
+		return fmt.Errorf("destination was published, but source cleanup failed for %s: %w", src, err)
+	}
+	return nil
 }

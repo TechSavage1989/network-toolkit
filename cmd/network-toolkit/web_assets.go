@@ -24,6 +24,10 @@ func serveWebAsset(w http.ResponseWriter, r *http.Request) {
 		"/assets/editor-vendor/prettier-html.js", "/assets/editor-vendor/prettier-postcss.js", "/assets/editor-vendor/prettier-markdown.js",
 		"/assets/editor-vendor/prettier-yaml.js", "/assets/editor-vendor/prettier-graphql.js":
 		contentType = "text/javascript; charset=utf-8"
+	case "/assets/transfer-drop.js", "/assets/saved-result-filters.js", "/assets/saved-session-indicators.js", "/assets/color-picker.js":
+		contentType = "text/javascript; charset=utf-8"
+	case "/assets/transfer-drop.css", "/assets/saved-result-filters.css", "/assets/saved-session-indicators.css", "/assets/color-picker.css":
+		contentType = "text/css; charset=utf-8"
 	case "/assets/graph-navigator.js", "/assets/graph-history.js", "/assets/result-filters.js", "/assets/graph-workspace.js", "/assets/result-time.js", "/assets/result-timeline.js", "/assets/hosts-editor-model.js", "/assets/hosts-editor.js", "/assets/transfer-client-layout.js", "/assets/panel-controls.js", "/assets/input-clear.js", "/assets/value-copy.js":
 		contentType = "text/javascript; charset=utf-8"
 	case "/assets/graph-navigator.css", "/assets/result-filters.css", "/assets/graph-workspace.css", "/assets/result-timeline.css", "/assets/result-typography.css", "/assets/hosts-editor.css", "/assets/workspace-layout.css", "/assets/transfer-client-layout.css", "/assets/panel-controls.css", "/assets/input-clear.css", "/assets/value-copy.css", "/assets/responsive-controls.css", "/assets/text-containment.css":

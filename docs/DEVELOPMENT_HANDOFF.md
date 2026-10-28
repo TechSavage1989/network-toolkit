@@ -1,5 +1,14 @@
 # Network Toolkit development handoff
 
+## 1.17.107 candidate integration
+
+The user authorized the ten-section discovery/appearance/capture/file workflow
+batch. All requested areas are integrated on an isolated branch. Required hosted
+Go/browser/native Explorer acceptance and publication verification remain pending.
+Read [RELEASE107_HANDOFF.md](RELEASE107_HANDOFF.md) for exact scope, protocol limits
+and the unchanged106 baseline; [WORKFLOWS107.md](WORKFLOWS107.md) is the user guide.
+This section does not claim 107 is published or that authored tests have run.
+
 ## 1.17.106 published and independently verified
 
 Published 2026-10-28:

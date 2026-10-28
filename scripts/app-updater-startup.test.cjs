@@ -36,6 +36,7 @@ function init(h){
   const c=h.c,nothing=()=>{};
   for(const name of ['NetworkToolkitSource','NetworkToolkitWorkspace','NetworkToolkitResultDetails','NetworkToolkitScanRoutes','NetworkToolkitConfiguration','NetworkToolkitNavigation','NetworkToolkitTerminalInteraction','NetworkToolkitCredentials'])c[name]={init:nothing};
   Object.assign(c,{$:selector=>c.document.querySelector(selector),$$:selector=>c.document.querySelectorAll(selector),icon:()=>'',initToolWorkspace:nothing,configureWindowMode:nothing,defaults:nothing,renderPage:nothing,setTheme:nothing,updateEngine:nothing,startTerminalFeed:nothing,startTerminalWindowRequests:nothing,startTerminalViews:nothing,pollSoon:nothing,system:{},jobs:[],fullVersions:new Map(),jobVersions:new Map(),fullVersion:()=>'',mergeState:s=>{const {appUpdatePreferences,...other}=s;Object.assign(c.state,other);c.NetworkToolkitUpdater.mergePreferences(appUpdatePreferences)}});
+  vm.runInContext(fs.readFileSync(require.resolve('../web/assets/color-picker.js'),'utf8'),c);
   vm.runInContext(initSource,c);
   return c.init();
 }

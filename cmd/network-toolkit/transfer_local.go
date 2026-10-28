@@ -73,10 +73,10 @@ func (a *application) handleTransferLocal(w http.ResponseWriter, r *http.Request
 		jsonError(w, 400, "Cannot resolve the local file path.")
 		return
 	}
-	if info, statErr := os.Stat(full); statErr == nil && !info.IsDir() {
-		full = filepath.Dir(full)
-	}
-	if _, statErr := os.Stat(full); os.IsNotExist(statErr) {
+	if info, statErr := os.Stat(full); statErr != nil {
+		jsonError(w, 400, "Cannot open that local folder: "+statErr.Error())
+		return
+	} else if !info.IsDir() {
 		full = filepath.Dir(full)
 	}
 	entries, err := os.ReadDir(full)
@@ -90,6 +90,9 @@ func (a *application) handleTransferLocal(w http.ResponseWriter, r *http.Request
 	}
 	result := make([]localTransferEntry, 0, len(entries))
 	for _, item := range entries {
+		if item.Type()&(os.ModeSymlink|os.ModeIrregular) != 0 {
+			continue
+		}
 		entry := localTransferEntry{Name: item.Name(), Path: filepath.Join(full, item.Name()), Directory: item.IsDir()}
 		if info, e := item.Info(); e == nil {
 			if info.Mode().IsRegular() {

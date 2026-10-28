@@ -3,6 +3,11 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
+Active authorized candidate: 1.17.107. Read docs/RELEASE107_HANDOFF.md and
+docs/WORKFLOWS107.md. Its required hosted/native/public verification is still
+pending; do not treat local tests or authored fixtures as completed acceptance.
+Keep the published106 baseline immutable.
+
 Current published version: 1.17.106. The authorized transfer-location/listener
 copy controls and macro Library/recording fixes are published and independently
 verified. Source/tag: b8be5353877911fa422e69880f6b7363cda47509;

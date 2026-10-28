@@ -13,7 +13,7 @@ import (
 func TestTerminalAppearanceAndActionsPositionPersistAndTransfer(t *testing.T) {
 	a := testApplication(t)
 	a.dataPath = filepath.Join(filepath.Dir(a.dataPath), "Network_Toolkit.settings.json")
-	body := `{"terminalConfirmClose":false,"terminalActiveActionsPosition":"bottom","terminalAppearance":{"fontFamily":"Cascadia Mono","fontWeight":"bold","lineHeight":1.3,"scheme":"custom","highlightUnderlines":false,"highlightColors":{"address":"#AABBCC","command":"#112233","field":"#223344","protocol":"#334455","value":"#445566","number":"#556677","comment":"#667788","error":"url(secret-canary)","unknown":"secret-canary"},"colors":{"background":"#112233","foreground":"#FAFAFA","brightRed":"#FF8888","selectionBackground":"#12345688","command":"secret-canary"},"shells":{"powershell":{"enabled":false,"colors":{"command":"#AABBCC","outputAddress":"#CC99EE","string":"url(secret-canary)","unknown":"#ffffff"}},"cmd":{"enabled":true,"colors":{"variable":"#112233"}},"unknown":"secret-canary"},"password":"secret-canary"}}`
+	body := `{"terminalConfirmClose":false,"terminalActiveActionsPosition":"bottom","terminalAppearance":{"fontFamily":"Cascadia Mono","fontWeight":"bold","lineHeight":1.3,"scheme":"custom","highlightUnderlines":false,"highlightRules":{"url":false,"prompt":true,"address":false,"error":"false","unknown":false},"highlightColors":{"address":"#AABBCC","url":"#123abc","prompt":"#456def","command":"#112233","field":"#223344","protocol":"#334455","value":"#445566","number":"#556677","comment":"#667788","error":"url(secret-canary)","unknown":"secret-canary"},"colors":{"background":"#112233","foreground":"#FAFAFA","brightRed":"#FF8888","selectionBackground":"#12345688","command":"secret-canary"},"shells":{"powershell":{"enabled":false,"colors":{"command":"#AABBCC","outputAddress":"#CC99EE","string":"url(secret-canary)","unknown":"#ffffff"}},"cmd":{"enabled":true,"colors":{"variable":"#112233"}},"unknown":"secret-canary"},"password":"secret-canary"}}`
 	r := requestApp(a, http.MethodPut, "/api/state", body, true)
 	if r.Code != http.StatusOK {
 		t.Fatalf("save terminal appearance: %d %s", r.Code, r.Body.String())
@@ -46,8 +46,12 @@ func TestTerminalAppearanceAndActionsPositionPersistAndTransfer(t *testing.T) {
 		if !reflect.DeepEqual(shells, want) {
 			t.Fatalf("shell preferences did not survive persistence/transfer: %#v", shells)
 		}
+		rules := appearance["highlightRules"].(map[string]any)
+		if len(rules) != len(terminalHighlightKinds) || rules["url"] != false || rules["address"] != false || rules["prompt"] != true || rules["error"] != true {
+			t.Fatalf("rule switches were not safely preserved: %#v", rules)
+		}
 		highlights := appearance["highlightColors"].(map[string]any)
-		for key, color := range map[string]string{"command": "#112233", "field": "#223344", "protocol": "#334455", "value": "#445566", "number": "#556677", "comment": "#667788"} {
+		for key, color := range map[string]string{"url": "#123abc", "prompt": "#456def", "command": "#112233", "field": "#223344", "protocol": "#334455", "value": "#445566", "number": "#556677", "comment": "#667788"} {
 			if highlights[key] != color {
 				t.Fatalf("configuration highlight color was lost: %s=%v", key, highlights[key])
 			}
@@ -109,6 +113,20 @@ func TestLocalShellSettingsUseSafeIndependentDefaults(t *testing.T) {
 		sanitizeTerminalSettings(state)
 		if _, exists := state["terminalConfirmClose"]; exists {
 			t.Fatalf("nonboolean close preference survived: %#v", state)
+		}
+	}
+}
+
+func TestTerminalHighlightRulesDefaultWithoutResettingExistingCustomSettings(t *testing.T) {
+	for _, rules := range []any{nil, false, "false", []any{false}, map[string]any{"url": "false", "address": 0, "unknown": false}} {
+		clean := safeTerminalAppearance(map[string]any{"fontFamily": "JetBrains Mono", "highlightUnderlines": false, "highlightColors": map[string]any{"address": "#AaBbCc"}, "highlightRules": rules})
+		if clean["fontFamily"] != "JetBrains Mono" || clean["highlightUnderlines"] != false || clean["highlightColors"].(map[string]any)["address"] != "#aabbcc" {
+			t.Fatal("existing settings were reset")
+		}
+		for kind, enabled := range clean["highlightRules"].(map[string]any) {
+			if enabled != true {
+				t.Fatalf("invalid/unset %s did not use default: %v", kind, enabled)
+			}
 		}
 	}
 }

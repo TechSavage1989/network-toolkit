@@ -306,7 +306,7 @@ func seedTerminalWorkspace(root, dest string) error {
 		if readErr == nil {
 			var original map[string]any
 			if json.Unmarshal(b, &original) == nil {
-				for _, key := range []string{"terminalProfiles", "terminalRecent", "terminalSidebarCollapsed", "terminalSidebarTab", "terminalSidebarWidth", "terminalComposerCollapsed", "terminalMacroConfirmation", "terminalConfirmClose", "terminalRecentCollapsed", "terminalSavedCollapsed", "terminalSessionConfirmDelete", "terminalConnection", "terminalLayout", "terminalInteraction", "terminalActiveActionsPosition", "terminalAppearance"} {
+				for _, key := range []string{"colorPickerPreferences", "terminalProfiles", "terminalRecent", "terminalSidebarCollapsed", "terminalSidebarTab", "terminalSidebarWidth", "terminalComposerCollapsed", "terminalMacroConfirmation", "terminalConfirmClose", "terminalRecentCollapsed", "terminalSavedCollapsed", "terminalSessionConfirmDelete", "terminalConnection", "terminalLayout", "terminalInteraction", "terminalActiveActionsPosition", "terminalAppearance"} {
 					if value, ok := original[key]; ok {
 						state[key] = value
 					}
@@ -325,6 +325,7 @@ func seedTerminalWorkspace(root, dest string) error {
 			return fmt.Errorf("read the initial terminal preferences: %w", readErr)
 		}
 		sanitizeTerminalSettings(state)
+		sanitizeColorPickerPreferences(state)
 		b, err = json.MarshalIndent(state, "", "  ")
 		if err != nil {
 			return err

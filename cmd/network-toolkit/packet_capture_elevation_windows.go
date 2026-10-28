@@ -15,31 +15,47 @@ import (
 	"networktoolkit/internal/capture"
 )
 
+// Test seams stay inside the native boundary; production uses ordinary Windows
+// adapter reads and the existing fixed-role, parent-checked elevation launcher.
+var packetCaptureReadAdapters = packetReadSystemAdapters
+var packetCaptureLaunch = func(id string, parent uint32) (syscall.Handle, error) {
+	return localLaunchElevatedMode(id, parent, true)
+}
+
 func packetCaptureInterfaces(ctx context.Context) ([]capture.Interface, error) {
-	var interfaces []capture.Interface
-	e := packetCaptureRoundTrip(ctx, packetCaptureRequest{Version: 1, Operation: "interfaces"}, nil, func(message packetCaptureMessage) error {
-		if message.Type == "interfaces" {
-			interfaces = message.Interfaces
-		}
-		return nil
-	})
-	return interfaces, e
+	adapters, err := packetCaptureReadAdapters(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return packetOrdinaryInterfaces(adapters), nil
 }
 func packetCaptureRun(ctx context.Context, o capture.Options, stop <-chan struct{}, emit func(packetCaptureMessage) error) error {
 	return packetCaptureRoundTrip(ctx, packetCaptureRequest{Version: 1, Operation: "capture", Options: o}, stop, emit)
 }
 func validatePacketCaptureRequest(request *packetCaptureRequest) error {
-	if request.Version != 1 || request.Operation != "interfaces" && request.Operation != "capture" {
+	// Enumeration is deliberately not a privileged helper operation anymore.
+	if request.Version != 1 || request.Operation != "capture" {
 		return errors.New("Invalid packet capture helper request.")
 	}
-	if request.Operation == "capture" {
-		return request.Options.Normalize()
+	if err := request.Options.Normalize(); err != nil {
+		return err
+	}
+	if !packetValidInterfaceSelection(request.Options.Interface) {
+		return errors.New("Choose a valid capture adapter, then explicitly start capture.")
 	}
 	return nil
 }
 func packetCaptureRoundTrip(ctx context.Context, request packetCaptureRequest, stop <-chan struct{}, emit func(packetCaptureMessage) error) error {
 	if e := validatePacketCaptureRequest(&request); e != nil {
 		return e
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	select {
+	case <-stop:
+		return nil
+	default:
 	}
 	id := randomHex(16)
 	pipe, e := localCreatePipe(id)
@@ -62,7 +78,7 @@ func packetCaptureRoundTrip(ctx context.Context, request packetCaptureRequest, s
 	}
 	result := make(chan launched)
 	go func() {
-		h, e := localLaunchElevatedMode(id, uint32(os.Getpid()), true)
+		h, e := packetCaptureLaunch(id, uint32(os.Getpid()))
 		select {
 		case result <- launched{h, e}:
 		case <-launchCtx.Done():
@@ -198,11 +214,7 @@ func runPacketCaptureHelper(id string, parent uint32) error {
 		stop()
 	}()
 	defer func() { endMonitor(); <-monitorDone }()
-	if request.Operation == "interfaces" {
-		e = packetCapturePerformList(workCtx, emit)
-	} else {
-		e = packetCapturePerform(workCtx, request.Options, emit)
-	}
+	e = packetCapturePerform(workCtx, request.Options, emit)
 	runtime.KeepAlive(request)
 	if e != nil {
 		_ = emit(packetCaptureMessage{Type: "error", Error: fmt.Sprint(e)})

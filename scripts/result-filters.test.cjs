@@ -127,6 +127,7 @@ test('non-graph filter summaries and explanatory notes remain available',()=>{
 
 test('Local Network snapshot status and type share the sticky search toolbar without changing other list layouts',()=>{
  const {document:makeDocument}=require('./terminal-dom-fixture.cjs'),h=harness();Object.assign(h.context,{LOCAL_TOOLS:['ipconfig','routes','arp','connections','wifi'],safeFile:value=>String(value).replace(/[^a-z0-9]/gi,'-'),esc:value=>String(value),dataListRows:c=>c.rows});
+ vm.runInContext(fs.readFileSync(require.resolve('../web/assets/saved-result-filters.js'),'utf8'),h.context);
  for(const name of ['dataListResetButton','dataListToolbar']){const a=html.indexOf('function '+name+'('),b=html.indexOf('\nfunction ',a+10);vm.runInContext(html.slice(a,b),h.context);}
  for(const tool of ['ipconfig','routes','arp','connections','wifi','dns','ping']){
   const graph=tool==='ping',c=h.api.register(config([{status:'up',protocol:'TCP'},{status:'down',protocol:'UDP'}],{graphId:graph?'run':undefined,job:{id:tool,tool},id:tool,view:'result:'+tool+':rows'})),doc=makeDocument(h.context.dataListToolbar(c)),toolbar=doc.querySelector('.data-list-tools'),controls=doc.querySelector('[data-result-filter-controls]');

@@ -20,6 +20,7 @@
 - **Work with devices:** open SSH, Telnet and serial terminals; organize saved sessions and macros; detach terminals into their own windows.
 - **Transfer files:** use SFTP, FTP/FTPS and TFTP client/server tools, with a built-in text editor.
 - **Review and export results:** inspect individual records, copy useful values and save diagnostic reports.
+- **Keep routine work consistent:** use saved-session indicators, named filters, installed terminal fonts, shared color palettes and reviewed file drops. See [workflow guide](docs/WORKFLOWS107.md) for behavior and protocol limits.
 - **Manage local network settings:** use IP configuration and the Hosts editor with explicit review and Windows approval for protected changes.
 
 ## Download
@@ -83,4 +84,4 @@ See [VALIDATION.txt](docs/VALIDATION.txt) for recorded results and [THIRD_PARTY_
 
 </details>
 
-Current version: [1.17.106 transfer locations and macro controls](RELEASE_NOTES_1.17.106.txt).
+Current development version: [1.17.107 discovery, appearance and file workflows](RELEASE_NOTES_1.17.107.txt). The latest published baseline is 1.17.106 until the required 107 checks and release complete.

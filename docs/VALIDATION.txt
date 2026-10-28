@@ -1,3 +1,9 @@
+NETWORK TOOLKIT 1.17.107 CANDIDATE
+
+Required exact-source hosted/browser/native/public verification is pending.
+See RELEASE107_HANDOFF.md for the candidate scope and explicit limits.
+The completed106 record below remains historical, not proof of107 acceptance.
+
 NETWORK TOOLKIT 1.17.106 PUBLISHED AND VERIFIED
 
 1.17.106 published and independently verified

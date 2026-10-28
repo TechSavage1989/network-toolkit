@@ -405,6 +405,8 @@ func newApplication(parent context.Context, dataPath string) *application {
 				sanitizeTerminalSettings(state)
 				sanitizeFTPProfiles(state)
 				sanitizeTransferClientSettings(state)
+				sanitizeSavedResultFilters(state)
+				sanitizeColorPickerPreferences(state)
 				a.state, _ = json.Marshal(state)
 			}
 		} else {
@@ -552,6 +554,8 @@ func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		a.handleTransferLocalFiles(w, r)
 	case r.URL.Path == "/api/transfer/server":
 		a.handleTransferServer(w, r)
+	case r.URL.Path == "/api/transfer/drop-upload":
+		a.handleTransferDropUpload(w, r)
 	case r.URL.Path == "/api/transfer/files":
 		a.handleTransferFiles(w, r)
 	case r.URL.Path == "/api/transfer/open-root":
@@ -946,6 +950,8 @@ func (a *application) handleState(w http.ResponseWriter, r *http.Request) {
 		sanitizeFTPProfiles(state)
 		sanitizeTransferClientSettings(state)
 		sanitizeListPreferences(state)
+		sanitizeSavedResultFilters(state)
+		sanitizeColorPickerPreferences(state)
 		b, err := json.MarshalIndent(state, "", "  ")
 		if err != nil {
 			jsonError(w, 400, "Invalid settings.")

@@ -57,7 +57,7 @@ check('result metadata uses its recorded source, then live event, then requested
   const final = {...live, status: 'invalid', error: 'Adapter removed'};
   const job = {id: 'fixture', tool: 'trace', options, events: [{data: {type: 'source', value: live}}], result: {data: {source: final}}};
   assert.equal(source.jobSource(job), final);
-  assert.match(source.resultHTML(job), /Source: Ethernet 5 \/ 192.0.2.20 \(unavailable\)/);
+  assert.match(source.resultHTML(job), /Recorded source: Ethernet 5 \/ 192.0.2.20 \(unavailable\)/);
   delete job.result; assert.equal(source.jobSource(job), live);
   delete job.events; assert.equal(source.jobSource(job).status, 'pending');
   assert.equal(source.jobSource(job).interfaceName, 'VPN');
@@ -71,5 +71,18 @@ check('labels and imported source errors are escaped and source selections norma
   assert.equal(source.normalize({interfaceIndex: '7', address: '192.0.2.20'}), null);
   assert.equal(source.normalize({interfaceIndex: 7, address: 'not-an-ip'}), null);
   assert.equal(source.normalize(selected).address, selected.address);
+});
+check('recorded source is a read-only body disclosure, not a duplicate header control', () => {
+  const html = source.resultHTML({id:'fixture',tool:'ping',result:{data:{source:{...selected,mode:'selected',status:'validated'}}}});
+  assert.match(html, /<details[^>]+data-detail="recorded-source"/);
+  assert.match(html, /Recorded source: Ethernet 5/);
+  assert.match(html, /Source IP/);
+  assert.doesNotMatch(html, /<button|data-source-job|<select/);
+  const page=require('node:fs').readFileSync(require('node:path').join(__dirname,'../web/index.html'),'utf8');
+  const context=page.slice(page.indexOf('function renderRunContext('),page.indexOf('function renderJob('));
+  assert.doesNotMatch(context, /NetworkToolkitSource.resultHTML/);
+  const job=page.slice(page.indexOf('function renderJob('),page.indexOf('\nfunction ',page.indexOf('function renderJob(')+1));
+  assert.match(job, /renderDiagnosticData\(j\)\+NetworkToolkitSource.resultHTML\(j\)/);
+  assert.match(source.controlHTML(selected,adapters,'ping',false), /data-diagnostic-source/);
 });
 process.stdout.write(passed + ' source-interface checks passed.\n');

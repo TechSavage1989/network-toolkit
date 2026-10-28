@@ -1,9 +1,9 @@
-NETWORK TOOLKIT 1.17.106
+NETWORK TOOLKIT 1.17.107
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.106
+CURRENT RELEASE - 1.17.107
 
-Release details: RELEASE_NOTES_1.17.106.txt
+Release details: RELEASE_NOTES_1.17.107.txt
 Previous release: docs/releases/RELEASE_NOTES_1.17.105.txt
 Full release-note archive: docs/releases/README.md
 

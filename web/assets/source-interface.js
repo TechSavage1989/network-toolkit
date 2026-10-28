@@ -125,9 +125,12 @@
   function resultHTML(job) {
     const source = jobSource(job);
     if (!source) return '';
-    return '<button type="button" class="job-source-label' + (source.status === 'invalid' ? ' bad' : '') +
-      '" data-source-job="' + esc(job.id) + '" title="' + esc(sourceFields(job).map(pair => pair.join(': ')).join('\n')) +
-      '" aria-label="Source details: ' + esc(summary(source, true)) + '">Source: ' + esc(summary(source)) + '</button>';
+    // Keep the immutable run context available without duplicating the sidebar
+    // selection in the shared results header. This disclosure is read-only.
+    return '<details class="recorded-diagnostic-source" data-detail="recorded-source"><summary>Recorded source: ' +
+      esc(summary(source)) + '</summary><div class="data-grid">' + sourceFields(job).map(([name, value]) =>
+        '<div class="data-item"><div class="key">' + esc(name) + '</div><div class="val">' + esc(value) + '</div></div>').join('') +
+      '</div><p class="help-line">Recorded for this diagnostic. The sidebar source selection applies to future runs.</p></details>';
   }
 
   function controlHTML(source, adapters, tool, subnet, id) {

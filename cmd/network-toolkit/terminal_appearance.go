@@ -8,6 +8,8 @@ import (
 )
 
 var terminalColorPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
+var terminalHighlightKinds = []string{"address", "mac", "url", "prompt", "interface", "command", "field", "protocol", "value", "number", "comment", "warning", "error", "success"}
+
 var terminalSelectionPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$`)
 
 func safeTerminalAppearance(value any) map[string]any {
@@ -18,13 +20,20 @@ func safeTerminalAppearance(value any) map[string]any {
 	}
 	highlights := map[string]any{}
 	if requested, ok := source["highlightColors"].(map[string]any); ok {
-		for _, key := range []string{"address", "mac", "interface", "command", "field", "protocol", "value", "number", "comment", "warning", "error", "success"} {
+		for _, key := range terminalHighlightKinds {
 			if color, ok := requested[key].(string); ok && terminalColorPattern.MatchString(color) {
 				highlights[key] = strings.ToLower(color)
 			}
 		}
 	}
 	clean["highlightColors"] = highlights
+	// Only known boolean switches persist; new/unset rules default enabled.
+	requestedRules, _ := source["highlightRules"].(map[string]any)
+	rules := map[string]any{}
+	for _, kind := range terminalHighlightKinds {
+		rules[kind] = requestedRules[kind] != false
+	}
+	clean["highlightRules"] = rules
 	clean["shells"] = safeTerminalShellAppearance(source["shells"])
 	if family, ok := source["fontFamily"].(string); ok {
 		family = strings.TrimSpace(family)

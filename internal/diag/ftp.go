@@ -384,6 +384,9 @@ func ftpTest(ctx context.Context, req model.Request, emit model.Emit) (model.Res
 		return model.Result{}, e
 	}
 	opt := req.Options
+	if boolOption(opt, "stagedUpload", false) {
+		return model.Result{}, errors.New("FTP does not guarantee atomic no-overwrite uploads; use SFTP or explicit manual transfer")
+	}
 	port, e := intOption(opt, "port", 21, 1, 65535)
 	if e != nil {
 		return model.Result{}, e

@@ -44,6 +44,7 @@ type remoteBrowserRequest struct {
 	LocalPath        string `json:"localPath"`
 	Confirm          bool   `json:"confirm"`
 	Overwrite        bool   `json:"overwrite"`
+	StagedUpload     bool   `json:"stagedUpload,omitempty"`
 	Content          string `json:"content,omitempty"`
 	ExpectedHash     string `json:"expectedHash,omitempty"`
 	BOM              bool   `json:"bom,omitempty"`
@@ -53,7 +54,7 @@ type remoteBrowserRequest struct {
 
 func (r remoteBrowserRequest) opts() map[string]any {
 	return map[string]any{
-		"port": r.Port, "username": r.Username, "password": r.Password, "keyPath": r.KeyPath, "privateKey": r.PrivateKey, "passphrase": r.Passphrase, "authMode": r.AuthMode, "fingerprint": r.Fingerprint, "sshCompatibility": r.SSHCompatibility, "security": r.Security, "operation": r.Action, "remotePath": r.Path, "newPath": r.NewPath, "localPath": r.LocalPath, "confirmDelete": r.Confirm, "overwrite": r.Overwrite, "permissions": r.Permissions, "timeoutMs": 15000,
+		"port": r.Port, "username": r.Username, "password": r.Password, "keyPath": r.KeyPath, "privateKey": r.PrivateKey, "passphrase": r.Passphrase, "authMode": r.AuthMode, "fingerprint": r.Fingerprint, "sshCompatibility": r.SSHCompatibility, "security": r.Security, "operation": r.Action, "remotePath": r.Path, "newPath": r.NewPath, "localPath": r.LocalPath, "confirmDelete": r.Confirm, "overwrite": r.Overwrite, "stagedUpload": r.StagedUpload, "permissions": r.Permissions, "timeoutMs": 15000,
 	}
 }
 func (r remoteBrowserRequest) request() model.Request {

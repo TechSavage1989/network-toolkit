@@ -29,6 +29,9 @@ func localExplorerAction(action, source, target string, overwrite, confirm bool)
 	}
 	switch action {
 	case "mkdir":
+		if !validExplorerName(filepath.Base(path)) {
+			return errors.New("choose a valid folder name without reserved characters or trailing dots/spaces")
+		}
 		return os.Mkdir(path, 0700)
 	case "rename", "copy":
 		dest, err := absoluteExplorerPath(target)

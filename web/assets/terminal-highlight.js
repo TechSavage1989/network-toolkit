@@ -19,17 +19,17 @@
 
   const LIMITS = Object.freeze({ text: 4096, token: 128, matches: 256,
     decorations: 8192, rows: 300, columns: 1000, wrapRows: 64, frameRows: 40, frameMs: 6, delay: 40 });
-  const LABELS = Object.freeze({ address: 'IP / CIDR', mac: 'MAC address',
+  const LABELS = Object.freeze({ address: 'IP / CIDR', mac: 'MAC address', url: 'URL', prompt: 'Device prompt',
     interface: 'Interface label', command: 'Command / config verb', field: 'Setting / field name',
     protocol: 'Protocol / service', value: 'Mode / named value', number: 'Number / unit', comment: 'Comment / description',
     warning: 'Warning / pending', error: 'Error / down', success: 'Up / success' });
-  const MARKS = Object.freeze({ address: ['solid', 2], mac: ['dotted', 2],
+  const MARKS = Object.freeze({ address: ['solid', 2], mac: ['dotted', 2], url: ['solid', 1], prompt: ['solid', 1],
     interface: ['dashed', 1], command: ['solid', 1], field: ['dotted', 1], protocol: ['dashed', 1],
     value: ['solid', 1], number: ['dotted', 1], comment: ['dotted', 1],
     warning: ['dashed', 2], error: ['double', 3], success: ['solid', 2] });
   const COLORS = Object.freeze({
-    dark: Object.freeze({ address: '#69c7ff', mac: '#7ed4d8', interface: '#c6a6ff', command: '#f0a3d0', field: '#a6b8f8', protocol: '#e9bd81', value: '#d0cb93', number: '#bddf86', comment: '#9ba7b8', warning: '#f4c365', error: '#ff9b9b', success: '#91d8ae' }),
-    light: Object.freeze({ address: '#165aa0', mac: '#007a79', interface: '#7748a9', command: '#a02678', field: '#3f55ab', protocol: '#99501a', value: '#626300', number: '#386712', comment: '#596579', warning: '#8b5b00', error: '#a82033', success: '#177344' })
+    dark: Object.freeze({ address: '#69c7ff', mac: '#7ed4d8', url: '#69c7ff', prompt: '#c6a6ff', interface: '#c6a6ff', command: '#f0a3d0', field: '#a6b8f8', protocol: '#e9bd81', value: '#d0cb93', number: '#bddf86', comment: '#9ba7b8', warning: '#f4c365', error: '#ff9b9b', success: '#91d8ae' }),
+    light: Object.freeze({ address: '#165aa0', mac: '#007a79', url: '#165aa0', prompt: '#7748a9', interface: '#7748a9', command: '#a02678', field: '#3f55ab', protocol: '#99501a', value: '#626300', number: '#386712', comment: '#596579', warning: '#8b5b00', error: '#a82033', success: '#177344' })
   });
 
   // Syntax roles are based on the published FortiOS, IOS/IOS XE, AOS-CX,
@@ -40,6 +40,7 @@
   const PROTOCOLS = new Set(('ip ipv4 ipv6 tcp udp icmp icmpv6 icmp6 sctp arp rarp ndp ospf ospfv3 ospf6 bgp rip ripng isis is-is stp rstp mstp pvst rapid-pvst lacp lldp cdp vrrp hsrp dhcp dhcpv6 dns ntp sntp snmp snmpv3 syslog ssh ssh2 telnet http https ftp ftps tftp sftp scp smtp smtps imap imaps pop3 pop3s ldap ldaps radius radius-acct tacacs tacacs+ dot1x 802.1x eap peap tls ssl ike ikev1 ikev2 ipsec esp ah gre gretap vxlan geneve mpls ppp pppoe pppoa pptp l2tp bfd pim igmp mld ripng fgfm fabric ftm ping probe-response netconf restconf'.split(' ')));
   const VALUES = new Set(('static dynamic manual auto automatic enable disable enabled disabled yes no true false on off physical aggregate redundant tunnel vlan vdom-link loopback virtual-switch hard-switch soft-switch software-switch switch access trunk tagged untagged native-untagged routed transparent wire-mode tap-mode l2bridge l3 full half full-duplex half-duplex up down connected disconnected active inactive accept allow permit deny reject drop all any none always default unicast multicast broadcast passthrough proxy flow flow-based proxy-based server client root lan wan dmz mgmt internal external trusted untrusted local remote standalone primary secondary master backup slave passive').split(' '));
 
+  function rules(value) { return Object.fromEntries(Object.keys(LABELS).map(kind => [kind, value?.[kind] !== false])); }
   function themeName(theme) { return theme === 'light' ? 'light' : 'dark'; }
   function customColors(value) {
     const result = {};
@@ -113,7 +114,7 @@
   function legend(theme, options = {}) {
     if (global.NTKTerminalShellSyntax?.supported(options.language)) return global.NTKTerminalShellSyntax.legend(options.terminalTheme, theme, options.shellColors);
     const colors = palette(theme, options.colors);
-    return Object.keys(LABELS).map(kind => ({ kind, label: LABELS[kind], color: colors[kind],
+    return Object.keys(LABELS).filter(kind => options.rules?.[kind] !== false).map(kind => ({ kind, label: LABELS[kind], color: colors[kind],
       borderStyle: options.underlines === false ? 'none' : MARKS[kind][0], borderWidth: options.underlines === false ? 0 : MARKS[kind][1] }));
   }
   function ipv4(value) {
@@ -159,11 +160,12 @@
   function interfaceLabel(value, contextual = false) {
     if (/^(?:(?:en|wl|ww)(?:o\d+(?:n\d+)?|s\d+(?:f\d+)?(?:d\d+)?|p\d+s\d+(?:f\d+)?(?:d\d+)?|x[0-9a-f]{12})|(?:eth|wlan|wwan|tun|tap|wg|utun|bond|br|virbr|docker|vnet|vmnet|vxlan)\d+|veth[0-9a-f]{4,16})(?:\.\d{1,4})?$/i.test(value)) return true;
     if (/^(?:GigabitEthernet|TenGigabitEthernet|TwentyFiveGigE|FortyGigabitEthernet|HundredGigE|FastEthernet|Ethernet|Eth|Gi|Te|Fa|Fo|Hu)\d+(?:\/\d+){1,3}(?:\.\d{1,4})?$/i.test(value)) return true;
-    if (/^(?:(?:ge|xe|et|fe|at|gr|ip|lt|mt|ms)-\d+\/\d+\/\d+(?::\d+)?(?:\.\d+)?|(?:ae|reth|irb|lo|st|em|fxp|vme)(?:\d+)(?:\.\d+)?|(?:Vlan|Loopback|Port-channel|Bundle-Ether|Tunnel|port|lag|trk|ether|bridge)\d+(?:\.\d+)?|X\d+(?::V\d+)?|Port[A-Z](?:\.\d+)?)$/i.test(value)) return true;
-    return contextual && /^(?:\d{1,2}\/\d{1,2}\/\d{1,3}(?:[.:]\d+)?|[A-P]\d{1,2}(?:-[A-P]?\d{1,2})?(?:-Trk\d+)?|wan\d*|lan\d*|internal\d*|dmz|mgmt|fortilink|(?:ssl|naf|l2)\.root)$/i.test(value);
+    if (/^(?:(?:ge|xe|et|fe|at|gr|ip|lt|mt|ms)-\d+\/\d+\/\d+(?::\d+)?(?:\.\d+)?|(?:ae|reth|irb|lo|st|em|fxp|vme)(?:\d+)(?:\.\d+)?|(?:Vlan|Loopback|Port-channel|Bundle-Ether|Tunnel|port|lag|trk|ether|bridge)\d+(?:\.\d+)?|X\d+(?::V\d+)?)$/i.test(value)) return true;
+    return contextual && /^(?:Port[A-Z](?:\.\d+)?|\d{1,2}\/\d{1,2}\/\d{1,3}(?:[.:]\d+)?|[A-P]\d{1,2}(?:-[A-P]?\d{1,2})?(?:-Trk\d+)?|wan\d*|lan\d*|internal\d*|dmz|mgmt|fortilink|(?:ssl|naf|l2)\.root)$/i.test(value);
   }
   function syntaxContext(text) {
-    const prompt = /^\s*(?:[A-Za-z0-9_.:@/~()\[\]-]+(?:\s+\([^()]{1,64}\))?\s*[#>$%]|<[^<>]{1,120}>)\s+/.exec(text);
+    let prompt = /^\s*(?:[A-Za-z0-9_.:@/~()\[\]-]+(?:\s+\([^()]{1,64}\))?\s*[#>$%]|<[A-Za-z0-9_.-]{1,120}>)(?:\s+|$)/.exec(text);
+    if (prompt && /^\s*[0-9.]+\s*[%$]\s*$/.test(prompt[0])) prompt = null;
     const offset = prompt ? prompt[0].length : 0, tokens = [];
     const pattern = /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s{}\[\];=]+/g;
     let match;
@@ -172,19 +174,29 @@
       const raw = match[0], quoted = /^["']/.test(raw), value = quoted ? raw.slice(1, -1) : raw.replace(/[,;:]$/, '');
       if (value) tokens.push({ start: match.index, end: match.index + raw.length, value, word: value.toLowerCase(), quoted });
     }
-    const first = tokens[0], verb = !first?.quoted && COMMANDS.has(first?.word) && (first?.word !== 'no' || offset > 0 || FIELDS.has(tokens[1]?.word)), field = !first?.quoted && FIELDS.has(first?.word);
+    const first = tokens[0], second = tokens[1];
+    // Bare natural-language words (User, to, software, from...) are not a
+    // configuration grammar. Require a prompt, a known command shape, or a
+    // specific root directive followed by a typed/recognized argument.
+    const argument = second && (second.quoted || FIELDS.has(second.word) || PROTOCOLS.has(second.word) || VALUES.has(second.word) || /^\d/.test(second.value) || interfaceLabel(second.value, true));
+    const rootDirective = /^(?:interface|interfaces|switchport|vlan|tagged|untagged|trunk|router|ip|ipv6|address-object|object-group|hostname|host-name|description|comment|comments|remark|remarks|shutdown)$/.test(first?.word || '');
+    const exactLower = first && first.value === first.word;
+    const proseTail = tokens.some(token => !token.quoted && /^(?:the|this|these|those|your|you|we|our|are|is|was|were|will|would|have|has|its|about)$/.test(token.word));
+    const commandShape = !second || (FIELDS.has(second.word) && !/^(?:up|down|to|from|then|all|any|none)$/.test(second.word) || second.quoted || /^[a-z][a-z0-9]*-[a-z0-9-]+$/.test(second.value)) && /^(?:set|unset|append|select|unselect|edit|config|configure|conf)$/.test(first?.word || '') || argument && !VALUES.has(second?.word) && /^(?:show|sh|get|diagnose|diag|display|no|default)$/.test(first?.word || '');
+    const verb = !!first && !first.quoted && COMMANDS.has(first.word) && (offset > 0 || exactLower && commandShape && !proseTail) && (first.word !== 'no' || offset > 0 || FIELDS.has(second?.word));
+    const field = !!first && !first.quoted && exactLower && rootDirective && !proseTail && (argument || !second && first.word === 'shutdown' || /^(?:description|comment|comments|remark|remarks)$/.test(first.word));
     const hasAddress = /(?:^|\s)(?:\d{1,3}\.){3}\d{1,3}(?=\s|up\b|down\b|$)/i.test(text.slice(offset));
     const hasState = /(?:\b|\d)(?:up|down|connected|notconnect|disabled|active|inactive)(?=\s|$)/i.test(text.slice(offset));
     const namedTable = tokens.length >= 4 && /^(?:static|dhcp|pppoe|manual|auto)$/i.test(tokens[1]?.word) && hasAddress && hasState;
     const interfaceTable = !!first && hasState && (interfaceLabel(first.value, true) || namedTable);
-    const isConfig = !!(verb || field && !/^(?:is|are|was|were)$/i.test(tokens[1]?.word || '') || /\{\s*$/.test(text));
+    const isConfig = !!(verb || field && !/^(?:is|are|was|were)$/i.test(second?.word || '') || exactLower && FIELDS.has(first?.word) && /^\s*[a-z][a-z0-9-]*(?:\s+[a-z0-9_.-]+)?\s*\{\s*$/.test(text));
     const comments = [];
     if (/^\s*[!#]/.test(text.slice(offset))) comments.push({ start: offset, end: text.length });
     else {
       const index = verb && /^(?:set|append)$/.test(first.word) ? 1 : 0;
-      if (/^(?:description|comment|comments|remark|remarks)$/.test(tokens[index]?.word || '') && tokens[index + 1]) comments.push({ start: tokens[index + 1].start, end: text.length });
+      if (isConfig && /^(?:description|comment|comments|remark|remarks)$/.test(tokens[index]?.word || '') && tokens[index + 1]) comments.push({ start: tokens[index + 1].start, end: text.length });
     }
-    return { tokens, verb, isConfig, namedTable, interfaceTable, comments,
+    return { tokens, verb, isConfig, namedTable, interfaceTable, comments, prompt: prompt ? {start: prompt[0].search(/\S/), end: prompt[0].trimEnd().length} : null,
       quoted: (start, end) => tokens.some(token => token.quoted && start >= token.start && end <= token.end) };
   }
   function versionContext(text, start) {
@@ -201,10 +213,10 @@
     const after = text.slice(end, end + 50);
     if (!before.trim() && !after.trim()) return true;
     if (syntax?.interfaceTable && /\s$/.test(before) && /^(?:\s|$)/.test(after)) return true;
-    if (/(?:\b(?:state|status|link|protocol|operstate|carrier)\s*(?::|=|is)?\s*|\bis\s+(?:administratively\s+)?)$/i.test(before)) return true;
+    if (/\b(?:state|status|link|protocol|operstate|carrier)\s*(?::|=|is)\s*(?:administratively\s+)?$/i.test(before)) return true;
+    if (syntax?.tokens[0] && interfaceLabel(syntax.tokens[0].value, true) && /\bis\s+(?:administratively\s+)?$/i.test(before)) return true;
     if (/(?:^|[\s])(?:administratively\s+)$/.test(before)) return true;
-    if ((/\s{2,}$/.test(before) || !before.trim()) && (/^\s{2,}/.test(after) || !after.trim())) return true;
-    if (/\b(?:up|down)\/$/i.test(before) || /^\/(?:up|down)\b/i.test(after)) return true;
+    if ((syntax?.interfaceTable || /^(?:up|down)\/(?:up|down)$/i.test(text.trim())) && (/\b(?:up|down)\/$/i.test(before) || /^\/(?:up|down)\b/i.test(after))) return true;
     return /[<,]$/.test(before) && /^[,>]/.test(after);
   }
   function stateBoundary(text, start, end) {
@@ -223,17 +235,40 @@
     return !/[A-Za-z0-9_./-]/.test(text[start - 1] || '') && !/[A-Za-z0-9_./-]/.test(text[end] || '');
   }
 
-  function analyze(input, language) {
+  function urlCandidate(value) {
+    const authority = /^(?:https?|ftps?|sftp|ssh):\/\/([^/?#]+)(?:[/?#]|$)/i.exec(value);
+    if (!authority || value.length > LIMITS.text) return false;
+    const endpoint = authority[1].replace(/^[^@]*@/, '');
+    const parts = /^(?:\[([^\]]+)\]|([^:]+))(?::([0-9]{1,5}))?$/.exec(endpoint);
+    if (!parts || parts[3] !== undefined && Number(parts[3]) > 65535) return false;
+    if (parts[1]) return ipv6(parts[1]);
+    const host = parts[2];
+    if (/^[0-9.]+$/.test(host)) return ipv4(host);
+    return host.length <= 253 && host.split('.').every(label => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(label));
+  }
+  function analyze(input, language, selectedRules) {
     if (global.NTKTerminalShellSyntax?.supported(language)) {const shell=global.NTKTerminalShellSyntax;if(shell.isPrompt(input,language))return shell.analyze(input,language);return shell.analyzeOutput(input,{address:addressKind,mac});}
     const text = typeof input === 'string' ? input : '';
     if (!text || text.length > LIMITS.text) return [];
-    const found = [];
+    const found = [], enabledRules = rules(selectedRules);
     const add = (start, end, kind) => {
       if (found.length >= LIMITS.matches || end <= start || found.some(hit => start < hit.end && end > hit.start)) return;
       found.push({ start, end, kind });
     };
     const syntax = syntaxContext(text);
+    // Deterministic precedence: comments/descriptions > whole URLs > prompts >
+    // addresses/MAC/interfaces > contextual status > config roles > known fields.
+    // Disabled rules still reserve their spans; toggling a URL off must not
+    // expose a lower-priority 'down' or 'port1' match inside that URL.
     for (const comment of syntax.comments) add(comment.start, comment.end, 'comment');
+    const urls = /\b(?:https?|ftps?|sftp|ssh):\/\/[^\s<>"']+/gi;
+    let url;
+    while ((url = urls.exec(text))) {
+      let value = url[0].replace(/[.,;:!?]+$/, '');
+      while (/[)\]}]$/.test(value) && (value.match(/[)\]}]/g) || []).length > (value.match(/[(\[{]/g) || []).length) value = value.slice(0, -1);
+      if (!/[A-Za-z0-9_.:+/-]/.test(text[url.index - 1] || '') && urlCandidate(value)) add(url.index, url.index + value.length, 'url');
+    }
+    if (syntax.prompt) add(syntax.prompt.start, syntax.prompt.end, 'prompt');
     // Take complete candidates instead of accepting a valid suffix from an
     // invalid IP, version, identifier or longer hardware address.
     const candidates = /[A-Za-z0-9_.:%/~\-]+/g;
@@ -259,14 +294,14 @@
     }
     const phrases = /\b(?:permission denied|access denied|authentication (?:failed|failure)|login failed|connection (?:refused|reset|failed|timed out)|request timed out|destination (?:host |network |port )?unreachable|no route to host|host unreachable|network unreachable)\b/gi;
     while ((match = phrases.exec(text))) {
-      if (!syntax.quoted(match.index, match.index + match[0].length) && identifierBoundary(text, match.index, match.index + match[0].length) && !negatedOrZero(text, match.index, match.index + match[0].length)) add(match.index, match.index + match[0].length, 'error');
+      if ((/^\s*(?:%\s*)?$/.test(text.slice(0, match.index)) || /(?:[:\]]\s*)$/.test(text.slice(0, match.index)) || /^From\s+[0-9a-f:.]+\s+(?:icmp_seq[= ]\d+\s+)?$/i.test(text.slice(0, match.index))) && !syntax.quoted(match.index, match.index + match[0].length) && identifierBoundary(text, match.index, match.index + match[0].length) && !negatedOrZero(text, match.index, match.index + match[0].length)) add(match.index, match.index + match[0].length, 'error');
     }
     const labels = /\b(?:fatal|critical|errors?|warning|warn|failed|failure|success|successful|passed)\b/gi;
     while ((match = labels.exec(text))) {
       const start = match.index, end = start + match[0].length;
       if (syntax.quoted(start, end) || !identifierBoundary(text, start, end) || negatedOrZero(text, start, end)) continue;
       const before = text.slice(Math.max(0, start - 60), start), after = text.slice(end, end + 24);
-      if (!(!before.trim() || /[\[(:]\s*$/.test(before) || /^\s*[:\])!]/.test(after) || match[0] === match[0].toUpperCase())) continue;
+      if (!(/^\s*$/.test(before) && (!after.trim() || /^\s*[:\])!]/.test(after)) || /[\[(:]\s*$/.test(before) && /^\s*[:\])!]/.test(after))) continue;
       const word = match[0].toLowerCase();
       add(start, end, /^(?:warn|warning)$/.test(word) ? 'warning' : /^(?:success|successful|passed)$/.test(word) ? 'success' : 'error');
     }
@@ -301,9 +336,9 @@
     }
     syntaxHighlights(text, syntax, found, add);
     // Structured status labels may share a line in remote login banners.
-    const fields = /(?:^|\s{2,})([A-Za-z][A-Za-z /-]{1,35}):(?=\s|$)/g;
+    const fields = /(?:^|\s{2,})(Last login|Login time|IPv[46] Address|MAC Address|Link state|Admin state|State|Status|Interface|MTU|Speed|Duplex):(?=\s|$)/gi;
     while ((match = fields.exec(text))) { const start=match.index+match[0].indexOf(match[1]); add(start,start+match[1].length,'field'); }
-    return found.sort((a, b) => a.start - b.start || a.end - b.end);
+    return found.filter(hit => enabledRules[hit.kind]).sort((a, b) => a.start - b.start || a.end - b.end);
   }
 
   function syntaxHighlights(text, syntax, found, add) {
@@ -330,14 +365,14 @@
       if (parameter && previous && namedInterfaceFields.test(previous.word) && !FIELDS.has(word) && !PROTOCOLS.has(word)) add(token.start, token.end, 'interface');
       const pathField = /^(?:vlan|access|trunk|native|tagged|untagged|aggregate)$/.test(word) && !/^(?:mode|type)$/.test(previous?.word || '') && next && (FIELDS.has(next.word) || /^\d/.test(next.value));
       if (syntax.isConfig && !token.quoted && (i === 0 && !syntax.verb || pathField || FIELDS.has(word) && !VALUES.has(word) && !PROTOCOLS.has(word) || i === 1 && /^(?:set|unset|append|select|unselect|config|configure|conf)$/.test(first.word))) add(token.start, token.start + token.value.length, 'field');
-      if (!token.quoted && PROTOCOLS.has(word)) add(token.start, token.start + token.value.length, 'protocol');
+      if (!token.quoted && (syntax.isConfig || syntax.interfaceTable) && PROTOCOLS.has(word)) add(token.start, token.start + token.value.length, 'protocol');
       if (!token.quoted && (syntax.isConfig || syntax.interfaceTable) && /^(?:[+-]?\d+(?:\.\d+)?(?:[-,:]\d+)*)(?:ms|s|sec|kbps|mbps|gbps|[kmgt]?(?:bit|bits|bps|byte|bytes)|[kmgt]|%)?$/i.test(word)) add(token.start, token.end, 'number');
       if (token.quoted && syntax.isConfig || parameter && (!FIELDS.has(word) || VALUES.has(word)) || syntax.interfaceTable && VALUES.has(word)) fill(token.start, token.end, 'value');
     }
     // Colon/equal-labelled operational output uses the same field palette.
     const properties = /\b([A-Za-z][A-Za-z0-9_-]*)\s*[:=]\s*/g;
     let property;
-    while ((property = properties.exec(text))) if (FIELDS.has(property[1].toLowerCase()) && !syntax.quoted(property.index, property.index + property[1].length)) add(property.index, property.index + property[1].length, 'field');
+    while ((property = properties.exec(text))) if ((syntax.isConfig || /^(?:status|state|link|mtu|speed|duplex|operstate|carrier|protocol|address|netmask|gateway)$/i.test(property[1])) && FIELDS.has(property[1].toLowerCase()) && !syntax.quoted(property.index, property.index + property[1].length)) add(property.index, property.index + property[1].length, 'field');
   }
 
   function attach(term, options) {
@@ -348,6 +383,7 @@
     let requestedShellColors = cleanShellColors(opts.shellColors);
     const appearanceColors = (mode, custom) => ({ ...palette(mode, custom), ...(shell() ? global.NTKTerminalShellSyntax.palette(term.options?.theme, mode, requestedShellColors) : {}) });
     let enabled = opts.enabled !== false, theme = themeName(opts.theme), disposed = false;
+    let selectedRules = rules(opts.rules);
     let requestedColors = customColors(opts.colors), colors = appearanceColors(theme, requestedColors), underlines = opts.underlines !== false;
     let timer = null, active = false, suspended = '', limited = false, count = 0;
     let lastState = '', geometry = '', unsupported = false, scrollView = null;
@@ -549,7 +585,7 @@
         updateRow(y, [], current);
         return 1;
       }
-      const matches = analyze(group.text, language);
+      const matches = analyze(group.text, language, selectedRules);
       if (matches.length === LIMITS.matches) limited = true;
       // Never decorate invisible SGR 8 cells or disclose their token shape.
       const safe = matches.filter(hit => !group.rows.some(row => {
@@ -620,7 +656,7 @@
         if (y < current.first || y > current.last) return [];
         const group = collect(current.buffer, y);
         if (!group) return [];
-        const matches = analyze(group.text, language), result = [];
+        const matches = analyze(group.text, language, selectedRules), result = [];
         for (const hit of matches) {
           let hidden = false;
           const spans = [];
@@ -695,8 +731,9 @@
       if (value.language !== undefined) language = value.language;
       if (Object.prototype.hasOwnProperty.call(value, 'shellColors')) requestedShellColors = cleanShellColors(value.shellColors);
       const nextTheme = themeName(value.theme), nextRequested = customColors(value.colors), nextColors = appearanceColors(nextTheme, nextRequested);
-      const changed = [...new Set([...Object.keys(colors), ...Object.keys(nextColors)])].some(kind => colors[kind] !== nextColors[kind]);
-      theme = nextTheme; requestedColors = nextRequested; colors = nextColors; underlines = value.underlines !== false;
+      const nextRules = rules(value.rules);
+      const changed = JSON.stringify(selectedRules) !== JSON.stringify(nextRules) || [...new Set([...Object.keys(colors), ...Object.keys(nextColors)])].some(kind => colors[kind] !== nextColors[kind]);
+      selectedRules = nextRules; theme = nextTheme; requestedColors = nextRequested; colors = nextColors; underlines = value.underlines !== false;
       // Foreground options are immutable in xterm's public API. Underline-only
       // edits restyle existing elements without replacing their decorations.
       if (changed) clear();
@@ -720,7 +757,7 @@
         else refresh();
       },
       setTheme(value) {
-        setAppearance({ theme: value, colors: requestedColors, underlines });
+        setAppearance({ theme: value, colors: requestedColors, underlines, rules: selectedRules });
       },
       setAppearance,
       refresh,
@@ -738,5 +775,5 @@
     return controller;
   }
 
-  global.NTTerminalHighlight = Object.freeze({ attach, analyze, legend, limits: LIMITS });
+  global.NTTerminalHighlight = Object.freeze({ attach, analyze, legend, rules, limits: LIMITS });
 })(typeof globalThis !== 'undefined' ? globalThis : window);

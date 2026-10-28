@@ -65,3 +65,45 @@ func TestPacketAdapterInventoryIncludesDisconnectedAndVirtualConfigurableNICs(t 
 		t.Fatal(got)
 	}
 }
+
+func TestPacketOrdinaryInventoryUsesStableGUIDsWithoutClaimingEngineSupport(t *testing.T) {
+	one := packetSystemAdapter{ID: "{A0000000-0000-0000-0000-000000000001}", Name: "Ethernet", Description: "Synthetic adapter", MAC: "AA:BB:CC:DD:EE:01"}
+	two := one
+	two.ID = "{00000000-0000-0000-0000-000000000002}"
+	two.Name = "Wi-Fi"
+	views := packetOrdinaryInterfaces([]packetSystemAdapter{one, two})
+	if len(views) != 3 || views[0].ID != "nics" || views[1].ID != "adapter:{a0000000-0000-0000-0000-000000000001}" || views[1].Engine != "auto" {
+		t.Fatal(views)
+	}
+	duplicate := one
+	duplicate.ID = "{a0000000-0000-0000-0000-000000000001}"
+	if got := packetOrdinaryInterfaces([]packetSystemAdapter{one, duplicate}); len(got) != 0 {
+		t.Fatal("duplicate identities must not be offered", got)
+	}
+	if got := packetOrdinaryInterfaces([]packetSystemAdapter{{ID: "driver.sys", Name: "Not an adapter"}}); len(got) != 0 {
+		t.Fatal(got)
+	}
+}
+
+func TestPacketCaptureSelectionNeverFallsBackToAnotherAdapter(t *testing.T) {
+	id := "{00000000-0000-0000-0000-000000000001}"
+	other := "{00000000-0000-0000-0000-000000000002}"
+	for _, legacy := range []string{"live:0123456789abcdef01234567", "file:23"} {
+		if !packetCaptureSourceSelected(packetAdapterSelectionID(id), legacy, id) || packetCaptureSourceSelected(packetAdapterSelectionID(id), legacy, other) {
+			t.Fatal("explicit GUID mapping changed destination")
+		}
+		if !packetCaptureSourceSelected(legacy, legacy, id) || !packetCaptureSourceSelected("nics", legacy, id) {
+			t.Fatal("existing explicit source/all-adapter choices were lost")
+		}
+	}
+	for _, valid := range []string{"nics", packetAdapterSelectionID(id), "live:0123456789abcdef01234567", "file:23"} {
+		if !packetValidInterfaceSelection(valid) {
+			t.Fatal(valid)
+		}
+	}
+	for _, invalid := range []string{"", "all", "adapter:driver.sys", "adapter:" + id + "extra", "live:x", "file:0", "file:01", "file:-1", "file:4294967296", "file:1 --capture", "nics\n"} {
+		if packetValidInterfaceSelection(invalid) {
+			t.Fatal("invalid source accepted", invalid)
+		}
+	}
+}
