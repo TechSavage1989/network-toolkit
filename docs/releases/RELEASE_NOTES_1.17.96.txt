@@ -1,7 +1,0 @@
-Network Toolkit 1.17.96
-
-A single Follow latest control links the graph, sorted filtered results and entry details, while keeping held selections and view settings clear.
-All graph modes fit the displayed timestamp interval across the plot, including short Progressive history ranges. Adaptive time ticks respect the configured clock and timezone.
-Response time (RTT) and RTT variability share one plotting pane with a saved tab choice. Circular sample and aggregate markers keep their geometry as the window changes.
-The graph pane fits its compact controls and axes without scrolling. Zoom, reset and data panning remain available in Graph options; statistics stay above independently scrolling results.
-Redundant graph activity content and duplicate latest actions are removed. Recorded events, result records, raw readers, copy/export, saved settings and updater safeguards are preserved.

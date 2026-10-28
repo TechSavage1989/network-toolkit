@@ -1,5 +1,0 @@
-Network Toolkit 1.17.92
-
-Diagnostic result entries show actual recorded local times where applicable, including ping, connection monitoring and packet capture.
-Graphs expose local timestamps, measurements and context on hover, click and keyboard focus.
-Additional measured statistics are shown visually where supported, preserving existing scan data and controls.

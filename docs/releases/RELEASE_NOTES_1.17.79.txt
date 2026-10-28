@@ -1,6 +1,0 @@
-Network Toolkit 1.17.79
-
-What's new
-- Remove the unwanted divider below the target entry row on the Overview page.
-
-Target entry, source interface selection, spacing and run controls are retained.

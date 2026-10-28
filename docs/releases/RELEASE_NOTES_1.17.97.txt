@@ -1,7 +1,0 @@
-Network Toolkit 1.17.97
-
-Condensed history uses smoothly widening age intervals while preserving original measurements, true extrema, exact group boundaries and contributor details.
-A visible Timeframe dropdown and direct zoom/fit controls make common ranges easy to select. Mouse-wheel and trackpad zoom keep the time under the pointer stable.
-Response-time and RTT-variability scales fit the genuine minimum and maximum measurements inside the visible interval, including condensed extrema, valid zero values and small ranges.
-Packet graphs use precise visible-frame grouping for zoom and panning while retaining full statistics, original frames, exports and held interval details.
-Responsive controls, shared plot tabs, Follow latest, independent results/details scrolling, saved preferences and updater safeguards are retained.

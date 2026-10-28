@@ -1,6 +1,0 @@
-Network Toolkit 1.17.94
-
-Graphs support zoom, reset and latest controls, with scan statistics kept above a collapsible graph and more space for independently scrolling results.
-Statistics filter related results and highlight contributing graph measurements. Detailed status and type filters combine with existing searches and sorting, with consistent configured status colors.
-Lists follow the newest matching result after hover inspection ends. Clicking outside a graph clears its point selection while preserving active filters and sorting.
-Existing graph popups, linked highlighting, history modes, timestamp preferences, copy actions, raw recorded data, saved settings and updater safeguards are preserved.

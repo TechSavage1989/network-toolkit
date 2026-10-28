@@ -1,0 +1,24 @@
+name: Authorized icon download upload only
+on:
+  push:
+    branches: [icon-download-2026-10-28]
+permissions:
+  contents: read
+concurrency:
+  group: authorized-icon-download-v1.17.109
+  cancel-in-progress: false
+jobs:
+  upload-icons:
+    if: github.repository == 'TechSavage1989/network-toolkit' && github.ref == 'refs/heads/icon-download-2026-10-28' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # verified v7 commit
+        with:
+          persist-credentials: false
+      - name: Verify exact ZIP and existing release, append without replacement, verify public bytes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 scripts/upload_icons.py

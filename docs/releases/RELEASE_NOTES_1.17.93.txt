@@ -1,6 +1,0 @@
-Network Toolkit 1.17.93
-
-Graph selections remain pinned while new results arrive. Hovering shows a point-detail popup and links the graph with the associated result rows.
-Graphs offer the existing moving-window view and a progressive view with scrollable retained history.
-Timestamp display supports 12-hour and 24-hour clocks, computer local time, UTC and named time zones.
-Relevant tools keep graph information visible above independently scrollable result lists, with usable adjustable space and consistent styling.

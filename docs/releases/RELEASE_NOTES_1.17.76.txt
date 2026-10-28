@@ -1,8 +1,0 @@
-Network Toolkit 1.17.76
-
-What's new
-- Match the selected server Settings tab to the client sidebar tab appearance.
-- Use consistent highlight, spacing, icon size, hover and keyboard focus styles.
-
-Applies to SFTP, TFTP and FTP/FTPS server modes in both themes. Existing tab
-labels, settings, collapse/expand actions, resizing and transfers are retained.

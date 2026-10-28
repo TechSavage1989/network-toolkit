@@ -1,6 +1,0 @@
-Network Toolkit 1.17.99
-
-Graph controls are directly accessible without an Options menu. Timeframe, custom Range, zoom and Fit stay together; Run data is in the shared header. Clear selection stays with entry details, and the full-history navigator handles panning and resizing without duplicate menu actions.
-Recent 180 and Full history clarify the distinct diagnostic defaults formerly called Window and Progressive. Condensed history remains available. Existing saved mode values, chosen timeframes and preferences are preserved.
-The plot reserves an explicit endpoint gutter so the first and last visible markers, including their selection highlights, remain fully inside the graph at every displayed timeframe and zoom. The time axis, pointer zoom and selection use the same plotting bounds.
-Shared measurement tabs, held entries, Follow latest, proportional full-history navigation, filters, scrolling, recorded data and updater behavior are preserved.

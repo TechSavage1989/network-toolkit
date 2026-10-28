@@ -1,6 +1,0 @@
-Network Toolkit 1.17.103
-
-Condensed RTT graphs use a fixed nonlinear recent-time scale from startup. Adding older history no longer renormalizes recent points. Older measurements merge into one fixed-size historical cluster at the visible left plot boundary, while the newest point stays on the right boundary. Sparse startup leaves unused history space rather than stretching the curve.
-The cluster uses bounded summaries accumulated before live-event and completed-sample retention rollover. Counts, recorded range, RTT extrema/average, zeros and unsuccessful samples survive without keeping an unlimited raw archive. Details distinguish retained originals from summarized-only data; legacy runs without summaries and partial archived ranges remain explicit.
-Graph/grid/hit geometry shares stable plot boundaries, with rendering room outside the plot for endpoint markers. RTT lines and successful matching markers follow the selected accent immediately; failure, warning and non-RTT colors stay distinct.
-Linear, deliberate time navigation, held selections, the proportional overview, recorded exports, pinned Local Network filters and updater behavior are preserved.

@@ -1,7 +1,0 @@
-Network Toolkit 1.17.100
-
-Graphs now offer just Linear and Condensed. Linear uses proportional recorded time with all retained history available; Timeframe, zoom, Fit and navigation determine the displayed range. Saved Window and Progressive preferences migrate safely to Linear without discarding history, held selections or other settings.
-Condensed uses a smooth nonlinear scale that consistently compresses older points toward the left and spreads newer points toward the right, including short Fit intervals. Modest diagnostic histories keep original points rather than unevenly spaced aggregates; larger histories retain bounded aggregation and original contributors, extrema and loss counts.
-Fit retains the complete recorded extent with contained endpoint markers. Axis labels, pointer-anchored zoom and hit testing use the same forward/inverse mapping. Explicit time ranges retain their actual boundaries and gaps.
-The extra Run details heading control and Run data graph-toolbar button are removed. Unique run context, activity log and raw result data are together under Run details in the existing entry details pane; empty runs retain access beside their empty-result message.
-Shared measurement tabs, retained selections, Follow latest, full-history navigation, packet capture, recorded source data and updater behavior remain intact.

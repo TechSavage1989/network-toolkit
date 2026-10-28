@@ -1,6 +1,0 @@
-.panel-visibility-toggle{align-items:center;justify-content:center;gap:5px;min-width:26px;min-height:26px;padding:4px;flex-shrink:0;border:1px solid transparent;border-radius:5px;background:transparent;color:var(--muted);cursor:pointer}
-.panel-visibility-toggle:hover{background:var(--hover);color:var(--text);border-color:var(--border)}
-.panel-visibility-toggle:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
-.panel-visibility-toggle .panel-visibility-icon{width:16px;height:16px;flex:0 0 16px;pointer-events:none;transform:none!important}
-.panel-visibility-toggle:disabled{opacity:.45;cursor:default}
-.panel-reveal-surface{cursor:pointer}

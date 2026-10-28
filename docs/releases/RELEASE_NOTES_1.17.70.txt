@@ -1,8 +1,0 @@
-Network Toolkit 1.17.70
-
-What's new
-- App settings now labels the update section Network Toolkit updates.
-
-This small visible change provides a newer release for testing the update flow
-from 1.17.69. After restarting, confirm Installed version: 1.17.70 and the new
-heading in App settings. The single final Install and restart action is retained.

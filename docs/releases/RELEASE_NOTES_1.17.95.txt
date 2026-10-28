@@ -1,7 +1,0 @@
-Network Toolkit 1.17.95
-
-Condensed history combines older measurements into clearly identified intervals while preserving retained source results and access to their contributors.
-Graph time controls support saved durations, a chosen end time and explicit start/end ranges, using the configured timezone and clock display.
-Graph points and result rows share a held selection in the entry details sidebar, including response time and recorded context. Hovering or new results do not replace that selection.
-Latest releases the hold and resumes linked graph, result-list and sidebar following while preserving the chosen duration, zoom, filters and sorting.
-Existing statistics, graph modes, palette, scrolling, copy/export, saved settings and updater safeguards remain available.

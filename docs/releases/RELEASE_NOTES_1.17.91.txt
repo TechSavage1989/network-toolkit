@@ -1,5 +1,0 @@
-Network Toolkit 1.17.91
-
-The main navigation divider matches the other sidebar divider controls, without draggable resizing.
-Navigation icons remain in place when the main sidebar collapses or expands.
-The subnet calculator Possible networks list grows dynamically to display every generated row.

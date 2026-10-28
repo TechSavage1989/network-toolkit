@@ -1,7 +1,0 @@
-Network Toolkit 1.17.88
-
-Remote editor explorer uses aligned sortable table columns, sort indicators and folders first.
-Public IP appears within Local Network IP configuration and on Overview, sharing cached results.
-Possible networks is compact and directly below the calculator, beside subnet details.
-Double-click sidebar icons to expand the collapsed main navigation; divider is more visible.
-Local Network tool tabs use larger text with proportionally sized icons.

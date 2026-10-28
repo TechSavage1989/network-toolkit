@@ -1,4 +1,0 @@
-Network Toolkit 1.17.89
-
-Local Network now keeps the same compact layout on initial entry and tab selection. Status colors remains available in the page heading.
-Selecting Routing table, ARP / neighbors or Connections automatically refreshes its snapshot. Pending and running refreshes are not duplicated.

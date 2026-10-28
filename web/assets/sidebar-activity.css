@@ -1,5 +1,0 @@
-/* The existing icon slot owns this overlay; neither labels nor row width move. */
-#navigation .nav-item{position:relative}
-#navigation .sidebar-activity-dot{position:absolute;left:24px;top:5px;width:9px;height:9px;min-width:9px;min-height:9px;margin:0;padding:0;border:1.5px solid var(--panel);border-radius:50%;background:#25b96b;box-shadow:0 0 0 1px #147542;pointer-events:none}
-[data-theme="light"] #navigation .sidebar-activity-dot{background:#13864a;box-shadow:0 0 0 1px #106e3d}
-@media(forced-colors:active){#navigation .sidebar-activity-dot{background:Highlight;border-color:Canvas;outline:1px solid Highlight}}

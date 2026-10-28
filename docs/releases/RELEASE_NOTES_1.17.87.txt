@@ -1,4 +1,0 @@
-Network Toolkit 1.17.87
-
-Color empty CMD output labels and structured remote shell banner fields. Preserve native ANSI colors.
-Remote editor browser now has sortable Name, Type, Size and Modified columns.

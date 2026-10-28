@@ -1,9 +1,0 @@
-{
-  "sourceCommit": "27feb4ffeed91d93bed1d94b54f73ad715cd6e5a",
-  "windowsJob": 121396949969,
-  "description": "Actual built-in cmd / Windows PowerShell ConPTY startup and typing. The sample commands were not executed. Captured on a hosted Windows runner.",
-  "captures": {
-    "cmd": "G1s/OTAwMWgbWz8xMDA0aBtbPzI1bBtbMkobW20bW0hNaWNyb3NvZnQgV2luZG93cyBbVmVyc2lvbiAxMC4wLjI2MTAwLjMzNjUwXRtdMDtDOlxXaW5kb3dzXHN5c3RlbTMyXGNtZC5leGUHG1s/MjVoG1s/MjVsDQooYykgTWljcm9zb2Z0IENvcnBvcmF0aW9uLiBBbGwgcmlnaHRzIHJlc2VydmVkLhtbNDsxSEM6XFVzZXJzXHJ1bm5lcmFkbWluPhtdMDtBZG1pbmlzdHJhdG9yOiBDOlxXaW5kb3dzXHN5c3RlbTMyXGNtZC5leGUHG1s/MjVoZWNobyAlVEVNUCUgJiYgZGlyIC9hIFJFTV9OVEtfQ09MT1JfU0FNUExF",
-    "powershell": "G1s/OTAwMWgbWz8xMDA0aBtbPzI1bBtbMkobW20bW0gbXTA7QWRtaW5pc3RyYXRvcjogQzpcV2luZG93c1xzeXN0ZW0zMlxXaW5kb3dzUG93ZXJTaGVsbFx2MS4wXHBvd2Vyc2hlbGwuZXhlBxtbPzI1aFBTIEM6XFVzZXJzXHJ1bm5lcmFkbWluPiAbWz8yNWwbWzkzbUcbWz8yNWgbW20bWz8yNWwbWzkzbQhHZXQtQ2hpbGRJdGVtIBtbOTBtLVBhdGggG1szNm0iG1s5Mm0kZW52OlRFTVAbWzM2bSIgG1szN218IBtbOTNtU2VsZWN0LU9iamVjdCAbWzkwbS1GaXJzdCAbWzk3bTIgG1szMm0jIE5US19DT0xPUl9TQU1QTEUbWz8yNWg="
-  }
-}
