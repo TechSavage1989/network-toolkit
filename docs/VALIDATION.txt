@@ -1,11 +1,84 @@
-1.17.106 CANDIDATE - validation in progress
+NETWORK TOOLKIT 1.17.106 PUBLISHED AND VERIFIED
 
-Authorized scope: explicit server/client file-location and listener copies;
-macro Library-tab preservation and recording-control reliability. Based on
-completed 105 closure main 30ecbf2a. Local/hosted validation is pending for the
-combined candidate; earlier 105 results below are historical, not 106 acceptance.
-See RELEASE106_HANDOFF.md. No live user devices, settings, credentials or actual
-network macro execution are used. All existing required gates remain intact.
+1.17.106 published and independently verified
+
+Published 2026-10-28:
+https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.106
+Release ID: 426132432
+Exact reviewed/published source and tag: b8be5353877911fa422e69880f6b7363cda47509
+Tree: da3fd8490a74aa5d80be4b6708b98e3bedeabc26
+Baseline: 105 closure main 30ecbf2a992beef6f0045272db3cc36acd0b27bb.
+User-authorized expected-head non-force promotion followed exact-source acceptance.
+This later docs-only closure does not rebuild, move tags or replace public assets.
+
+Completed scope:
+- Explicit Copy location controls for TFTP/SFTP/FTP shared server files, server
+  listener addresses/endpoints, SFTP/FTP client files and TFTP send/receive setup.
+  Network locations, protocol URLs where unambiguous, server-relative/remote paths
+  and local disk paths have distinct labels; copies never launch or transfer.
+- Wildcard listeners require an explicit concrete active-adapter choice. Loopback
+  and configured/stopped states remain clear; unscoped IPv6 link-local destinations
+  are rejected rather than guessed. Actual ports and IPv6 brackets are preserved.
+  FTP-client/FTPS ambiguous URLs are omitted; TFTP complete filenames, including
+  nested/leading slashes and Unicode, round-trip through URL encoding correctly.
+- Narrow allowlisted immutable snapshots contain no credentials/tokens. Selection
+  or destination changes do not alter an open copy dialog/context action. Clipboard
+  denial and failed fallback preserve the previous value and show an honest error.
+- Starting macros preserves the user's Library/Runs selection, including manual
+  changes during pending requests. Pause/Stop controls retain DOM identity through
+  input/poll/chrome updates. Pause stops capture only, not terminal input delivery.
+  Failed/missing review construction keeps captured steps for a visible retry.
+
+Required exact-source Checks 40606459967 completed SUCCESS, all five jobs:
+- Application 122547061967: Go lifecycle/asset tests, 809 JavaScript tests, 42 Python
+  guards, Windows x64 GUI build and reviewed portable package.
+- Dependency 122547061816: canonical vendor exact match, zero reachable/imported-
+  package vulnerabilities on Linux/Windows; unused/unvendored OpenPGP advisory
+  GO-2026-5932 remains disclosed. This is not an independent security audit.
+- Security/new-feature browser 122547061479: existing credential/pager/banner/
+  discovery regressions plus native clipboard success/denial, all supported copy
+  routes, frozen snapshots, keyboard/cancel, and main/separate/detached macro UI.
+- Windows 122547061732: existing native vault/DPAPI/bootstrap and transport gates.
+- Full browser 122547061674: existing graph, copy, server/client responsive, terminal
+  and session regressions; actual five-minute updater timer 301,991 ms and historical
+  negative control. No required assertion or real-time gate was bypassed.
+
+Actual normal/narrow transfer copy dialogs, main/separate/detached recorder and
+retained review/Library screenshots, existing server/client layouts, native vault,
+credential and pager pixels were inspected. New feature reports have errors=[].
+The supplied shared-file screenshot was inspected before implementation. User-
+reported recorder timing/window is unconfirmed; tests reproduce the identified
+control-replacement failure synthetically, not on a real user device.
+
+Release 40608363956 completed SUCCESS (build 122553457399, publish 122554167193).
+All four public downloads were independently checked against GitHub digests/sizes,
+inner/outer manifests, safe ZIP inventories/CRCs, x64 GUI 1.17.106 PE/version and
+all 903 packaged source files. Public EXE and portable ZIP exactly match reviewed
+artifact 12781520240. Updater contains only the versioned executable, SHA256SUMS,
+THIRD_PARTY_NOTICES.txt and UPDATING.txt under Network_Toolkit_1.17.106/.
+Latest release/update feed and tag point to 106. Prior 105 release 426056352, tag,
+body and all four original asset IDs/sizes/SHA256s were independently reconciled.
+No access change, retired-feed write or old release replacement occurred.
+
+Public SHA256:
+- Network_Toolkit.exe: d363b33ddf1ea0af5e66a7090e743c3a3d367c8495bbcff57eba08ed35b54813
+- Network_Toolkit_1.17.106_Portable.zip: df9becf4d841b086e8f0dbcd2636e806a1b608bd93e756db38bd3e9c368b99bf
+- Network_Toolkit_1.17.106_Update.zip: 25ab2f7ea60414d31cff14cbbe1269a12bf15296c662748d0498186febd8c9e1
+- SHA256SUMS: 6f01044fd12c3886a55db9dc64392350ea9aa37ab3077c6b6e88d8b97f0465b5
+
+Automatic duplicate-main Checks 40608337579 completed SUCCESS at 00:39:32 UTC:
+application 122553366729, dependency 122553366719, full browser 122553366353,
+security/new-feature browser 122553366657 and Windows 122553366698 all passed.
+No optional rerun or application change followed publication. This [skip ci]
+closure changes only AGENTS.md, DEVELOPMENT_HANDOFF.md, RELEASE106_HANDOFF.md
+and VALIDATION.txt; published source/tag/assets remain immutable.
+
+Limits: all browser/device/clipboard fixtures are synthetic; no user switch,
+credentials, settings, migration, native installation/reboot or live macro run
+was accessed. Active adapters do not prove remote firewall/routing reachability.
+Existing 105 and 104 security, paging/archive, defaults, graph and icon safeguards
+remain intact. No credential backend, native launcher or transfer execution path
+was broadened. Future changes require new user scope.
 
 NETWORK TOOLKIT 1.17.105 PUBLISHED AND VERIFIED
 

@@ -3,25 +3,18 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-Authorized development target: 1.17.106. The user explicitly approved the combined
-server/client location-copy improvements and macro Library/recording fixes for
-implementation, build and publication. See docs/RELEASE106_HANDOFF.md. Start from
-105 closure main 30ecbf2a992beef6f0045272db3cc36acd0b27bb, preserve all existing
-security/release safeguards, and keep 105 published tags/assets immutable.
-No live user device, credential, settings or macro execution is authorized.
+Current published version: 1.17.106. The authorized transfer-location/listener
+copy controls and macro Library/recording fixes are published and independently
+verified. Source/tag: b8be5353877911fa422e69880f6b7363cda47509;
+tree da3fd8490a74aa5d80be4b6708b98e3bedeabc26. All five exact-source required
+Checks and automatic Release passed. Four public assets, 903 source files,
+reviewed EXE/portable identity and latest update feed verified. Read
+RELEASE106_HANDOFF.md and DEVELOPMENT_HANDOFF.md under docs/ for full evidence,
+limits and duplicate-main closure. This handoff-only commit is not another build.
 
-Current published version: 1.17.105. The user-authorized SSH banner alignment,
-multi-item discovery filtering and explicit TCP-port actions are published and
-independently verified. Exact source/tag:
-1d716c1916833d9fb14dee44016bf0f75e568305 (tree 31fafbe7e2b327254e68b95cb2bb3bfa46f0a8cc).
-All five exact-source required Checks and Release passed; four public assets,
-source bytes, reviewed binary/portable identity and latest update feed verified.
-Read docs/RELEASE105_HANDOFF.md and docs/DEVELOPMENT_HANDOFF.md for evidence,
-limits and duplicate-main closure. This docs-only closure is not another build.
-
-Published 104 credential security, graph, canonical icon, terminal pager/defaults
-and output archives remain intact. Read docs/SECURITY104_HANDOFF.md,
-docs/CREDENTIAL_SECURITY.md and docs/CONDENSED_GRAPH_SCALING.md as applicable.
+Published 105 banner/discovery fixes and 104 vault, pager/defaults/archives, graph
+and canonical icon safeguards remain intact. Read docs/CREDENTIAL_SECURITY.md,
+docs/SECURITY104_HANDOFF.md and docs/CONDENSED_GRAPH_SCALING.md as applicable.
 No new feature/release or live user devices/credentials access is authorized by
 this historical handoff. Keep every published tag/asset immutable.
 
