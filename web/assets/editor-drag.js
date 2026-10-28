@@ -19,6 +19,10 @@ function create(options={}){
  function mount(){
   const host=document?.querySelector?.('.nt-editor-window');if(!host)return;
   if(!zone||!host.contains(zone)){zone=document.createElement('div');zone.className='nt-editor-drag-detach';zone.dataset.editorDragDetach='';zone.hidden=true;zone.textContent='Drop tab here to open a new editor window';zone.setAttribute('aria-label',zone.textContent);host.append(zone);}
+  // Per-view tabs can sit higher in compact/detached windows. Keep this
+  // separate-window target inside the text area, below every visible tab strip.
+  const tabs=[...(host.querySelectorAll?.('[data-ed-tabs]')||[])].map(el=>el.getBoundingClientRect()).filter(r=>r.width>0&&r.height>0);
+  if(tabs.length&&zone.style){const box=host.getBoundingClientRect();zone.style.top=(Math.max(...tabs.map(r=>r.bottom))-box.top+12)+'px';}
  }
  function cancel(g){if(!g||g.cancelled)return;g.cancelled=true;if(g.native&&g.started)void windows().cancelDrag(g.ticket).catch(()=>{});}
  function begin(event){

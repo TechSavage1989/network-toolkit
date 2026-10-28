@@ -4,7 +4,7 @@ const {create,MIME}=require('../web/assets/editor-drag.js');
 const flush=()=>new Promise(resolve=>setImmediate(resolve));
 function fixture({native=true,pending=false,reject=false}={}){
  const calls=[],messages=[],nodes=[],classes=()=>({values:new Set(),add(v){this.values.add(v)},remove(v){this.values.delete(v)}});
- const node=(kind,uid)=>{const n={kind,dataset:uid?{edUid:uid}:{},classList:classes(),hidden:false,setAttribute(k,v){this[k]=v},removeAttribute(k){delete this[k]},contains(x){return nodes.includes(x)},append(x){nodes.push(x)},getBoundingClientRect(){return {left:uid==='a'?0:100,width:100}},closest(selector){if(selector==='[data-ed-uid]')return kind==='tab'?this:null;if(selector==='[data-ed-tabs]')return ['tab','strip'].includes(kind)?strip:null;if(selector==='[data-editor-drag-detach]')return kind==='zone'?this:null;if(selector==='.nt-editor-window')return kind==='outside'?null:host;return null;}};nodes.push(n);return n;};
+ const node=(kind,uid)=>{const n={kind,style:{},dataset:uid?{edUid:uid}:{},classList:classes(),hidden:false,setAttribute(k,v){this[k]=v},removeAttribute(k){delete this[k]},contains(x){return nodes.includes(x)},append(x){nodes.push(x)},getBoundingClientRect(){return {left:uid==='a'?0:100,width:100}},closest(selector){if(selector==='[data-ed-uid]')return kind==='tab'?this:null;if(selector==='[data-ed-tabs]')return ['tab','strip'].includes(kind)?strip:null;if(selector==='[data-editor-drag-detach]')return kind==='zone'?this:null;if(selector==='.nt-editor-window')return kind==='outside'?null:host;return null;}};nodes.push(n);return n;};
  const host=node('host'),strip=node('strip'),a=node('tab','a'),b=node('tab','b'),outside=node('outside');a.nextElementSibling=b;b.nextElementSibling=null;
  host.querySelector=selector=>selector.includes('"a"')?a:selector.includes('"b"')?b:null;
  const document={querySelector:selector=>selector==='.nt-editor-window'?host:null,querySelectorAll:selector=>selector==='[data-editor-drop-before]'?nodes.filter(x=>Object.hasOwn(x,selector.slice(1,-1))):[host],createElement:()=>node('zone'),addEventListener(){}};
@@ -60,4 +60,10 @@ test('pending registration detach is submitted at the actual drop, not after reg
 });
 test('leaving a prospective receiver clears only its drop highlight',async()=>{
  const f=fixture(),dt=f.data();dt.setData(MIME,'ab'.repeat(16));f.drag.over(f.event(f.host,dt));assert(f.host.classList.values.has('nt-editor-drag-over'));f.drag.leave(f.event(f.outside,dt,{relatedTarget:null}));assert(!f.host.classList.values.has('nt-editor-drag-over'));assert.deepEqual(f.calls,[]);
+});
+
+
+test('the detach target follows visible tab rows and cannot cover a compact view tab strip',()=>{
+ const f=fixture();let bottom=116;f.host.getBoundingClientRect=()=>({top:10,height:600});f.host.querySelectorAll=()=>[{getBoundingClientRect:()=>({width:500,height:36,bottom})},{getBoundingClientRect:()=>({width:0,height:0,bottom:0})}];
+ f.drag.mount();assert.equal(f.zone.style.top,'118px');bottom=220;f.drag.mount();assert.equal(f.zone.style.top,'222px');
 });
