@@ -3,7 +3,17 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-Current published version: 1.17.111. Compact interface and two-document comparison
+Current published version: 1.17.112. Independent editor views and the Windows/SFTP
+sidebar are published and independently verified. Source/tag: 4d05f6a5a4eb1c315d0a19ccf2eb8daedf2dcb1c;
+tree 3f9278fe6a5a3b1781d71efbd9354e4decf7ac8e. All seven review Checks, automatic Release and
+all seven duplicate main Checks passed. Four public assets,1,017 exact source files,
+reviewed EXE/portable identity, PE icons and latest feed are verified. Read
+docs/RELEASE112_HANDOFF.md and docs/EDITOR_VIEWS112.md for behavior and limits.
+This docs-only record is not another build. Preserve every old tag and asset.
+The user prohibits local desktop automation or test windows without advance
+approval for a scheduled session. Never stop normal app sessions or lose unsaved work.
+
+Previous published version: 1.17.111. Compact interface and two-document comparison
 maps are published and independently verified. Source/tag: bf414aec01a63a4b492cdfc62f32fa52910f3b69;
 tree 250294f0ece6dcc3397a9f9ed899770015da3523. All six review Checks, automatic Release and
 all six duplicate main Checks passed. Four public assets,1,008 exact source files,

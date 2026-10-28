@@ -74,6 +74,8 @@ Automatic checks run at startup and periodically while the app is visible and on
 - A previous executable is retained for recovery. See [UPDATING.txt](docs/UPDATING.txt) before restoring it or handling an older update-feed migration.
 - Builds are not Authenticode signed. Windows may show an unknown-publisher warning. Use the official release assets; SHA-256 checks detect corruption, not a compromised publisher.
 
+Published and verified: [1.17.112 editor views and file sidebar](docs/RELEASE112_HANDOFF.md). All seven hosted review/main checks, automatic Release and four public assets passed verification.
+
 ## Development
 
 <details>
