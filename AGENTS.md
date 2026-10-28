@@ -3,12 +3,17 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-Active authorized candidate: 1.17.110. Read docs/RELEASE110_HANDOFF.md.
-The user approved the focused graph/editor correction batch2026-10-28 at16:38:45UTC.
-Preserve109 immutable assets and all existing security/ownership protections.
-Final exact-source hosted/native/pixel/public acceptance remains pending.
+Current published version: 1.17.110. The focused graph/editor correction batch
+is published and independently verified. Source/tag:
+a71f98c4f418077cfeefa5546cfb77de1d8e7742; tree
+c0f4ee07ab4687d50c5d4b2e5afc2bdf6a1f545b. All six exact-source Checks and automatic
+Release passed; actual temporal frames/native drag/maximize, four public assets,
+1,005 source files, reviewed binary/package identity, PE icons and latest feed
+verified. Read docs/RELEASE110_HANDOFF.md and DEVELOPMENT_HANDOFF.md for limits
+and duplicate-main closure. This docs-only record is not another build. Preserve
+all tags/assets, including the separately authorized109 Toolkit-Icons.zip extra.
 
-Current published version: 1.17.109. The authorized vertical-space layout batch
+Previous published version: 1.17.109. The authorized vertical-space layout batch
 is published and independently verified. Source/tag:
 d3494a879604fb2523e0867ad1fb175a2f9abbf5; tree
 9dda3650d5c794a4fc1c734976619819ce87fbfa. All six exact-source Checks and automatic
