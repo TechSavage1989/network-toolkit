@@ -9,6 +9,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -201,17 +202,38 @@ type editorExplorerTarget struct {
 }
 
 func canonicalExplorerPath(b editorBinding, p string) string {
+	if p == "" {
+		return ""
+	}
 	if b.Kind == "local" || b.Kind == "localDraft" {
 		p = filepath.Clean(p)
+		if absolute, err := filepath.Abs(p); err == nil {
+			p = absolute
+		}
 		if resolved, err := filepath.EvalSymlinks(p); err == nil {
 			p = resolved
+		} else {
+			// A new Save As destination may not exist yet. Resolve its existing
+			// parent so a junction/symlink does not hide a reserved destination.
+			parent, suffix := filepath.Dir(p), filepath.Base(p)
+			for parent != filepath.Dir(parent) {
+				if resolved, err := filepath.EvalSymlinks(parent); err == nil {
+					p = filepath.Join(resolved, suffix)
+					break
+				}
+				suffix = filepath.Join(filepath.Base(parent), suffix)
+				parent = filepath.Dir(parent)
+			}
 		}
 		p = filepath.ToSlash(p)
 		if runtime.GOOS == "windows" {
 			p = strings.ToLower(p)
 		}
+	} else {
+		// SFTP paths always use slash separators, independently of this host.
+		p = path.Clean(p)
 	}
-	return strings.TrimRight(p, "/")
+	return p
 }
 func sameExplorerBinding(a, b editorBinding) bool {
 	if (a.Kind == "local" || a.Kind == "localDraft") && (b.Kind == "local" || b.Kind == "localDraft") {
@@ -224,7 +246,13 @@ func explorerTargetContains(target editorExplorerTarget, b editorBinding, p stri
 		return false
 	}
 	base, current := canonicalExplorerPath(b, target.Path), canonicalExplorerPath(b, p)
-	return base != "" && (current == base || strings.HasPrefix(current, base+"/"))
+	if base == "" || current == "" {
+		return false
+	}
+	if base == "." {
+		return !path.IsAbs(current) && current != ".." && !strings.HasPrefix(current, "../")
+	}
+	return current == base || strings.HasPrefix(current, strings.TrimRight(base, "/")+"/")
 }
 func (m *editorViewRegistry) explorerConflictLocked(b editorBinding, p string) bool {
 	for _, targets := range m.explorerOperations {

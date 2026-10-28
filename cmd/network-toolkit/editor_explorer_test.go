@@ -178,3 +178,30 @@ func TestEditorLayoutValidationAndTransferRoundTrip(t *testing.T) {
 		t.Fatal("layout conferred file authority")
 	}
 }
+
+func TestEditorExplorerCanonicalPathConflicts(t *testing.T) {
+	b := editorBinding{Kind: "sshConnection", ConnectionID: "synthetic"}
+	for _, test := range []struct {
+		target, document string
+		want             bool
+	}{
+		{"./startup.cfg", "startup.cfg", true},
+		{"configs/../startup.cfg", "startup.cfg", true},
+		{"/configs/./", "/configs/sub/../open.cfg", true},
+		{"/", "/configs/open.cfg", true},
+		{".", "configs/open.cfg", true},
+		{".", "../outside.cfg", false},
+		{"/configs", "/configs-other/open.cfg", false},
+		{"", "startup.cfg", false},
+		{".", "", false},
+	} {
+		if got := explorerTargetContains(editorExplorerTarget{Binding: b, Path: test.target}, b, test.document); got != test.want {
+			t.Errorf("target %q, document %q: got %v, want %v", test.target, test.document, got, test.want)
+		}
+	}
+	other := b
+	other.ConnectionID = "other-connection"
+	if explorerTargetContains(editorExplorerTarget{Binding: b, Path: "/"}, other, "/open.cfg") {
+		t.Fatal("unrelated remote connection was blocked")
+	}
+}

@@ -399,6 +399,7 @@ function paintSelection(k,side){
  });
  const counter=area.querySelector('[data-rb-selection="'+side+'"]');
  if(counter)counter.textContent=pane.selected.size?pane.selected.size+' selected':'';
+ updateSidebarActions(k);
 }
 function rowSelect(k,side,path,event){const m=get(k),pane=m[side],entries=sortedItems(pane),at=entries.findIndex(x=>x.path===path);if(at<0)return;m.active=side;
  if(event.shiftKey&&pane.anchor>=0){if(!event.ctrlKey)pane.selected.clear();for(let i=Math.min(at,pane.anchor);i<=Math.max(at,pane.anchor);i++)pane.selected.add(entries[i].path)}else if(event.ctrlKey||event.metaKey){if(pane.selected.has(path))pane.selected.delete(path);else pane.selected.add(path);pane.anchor=at}else{pane.selected=new Set([path]);pane.anchor=at}paintSelection(k,side)}

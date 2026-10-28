@@ -31,6 +31,9 @@ folders. Close the document first; dirty-close confirmation still applies. A
 reservation prevents a new document lease or Save As from claiming a destination
 while an explorer operation is changing it. Existing filesystem checks, staged
 uploads, overwrite confirmations, revision hashes and pinned SSH transports remain.
+Paths normalize dot segments; local checks resolve existing filesystem links.
+These checks do not certify remote symlink aliases or local hard-link identity;
+external filesystem changes still use the editor's existing revision conflict check.
 Local OS/native shell drag support remains platform dependent; no file contents
 or credentials are added to native document-tab drag data.
 
