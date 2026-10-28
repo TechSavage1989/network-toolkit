@@ -13,12 +13,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync/atomic"
-	"syscall"
 	"testing"
 	"time"
-	"unsafe"
 )
 
 // This exercises Explorer's real OLE drag into the installed native WebView2,
@@ -141,15 +140,33 @@ const helper=NetworkToolkitTransferDrop;document.addEventListener('dragover',eve
 		}
 	})
 	err = Run(ctx, Config{Title: title, URL: server.URL + "/", SessionToken: token, DataDir: profile, Stop: cancel, OnReady: func() {
+		// OnReady runs on the host UI thread after visibility/startup checks.
+		// Bind the driver to this exact synthetic host, not a desktop title
+		// search or PowerShell's null-string/PInvoke class conversion.
+		var hwnd uintptr
+		matches := 0
+		wndWindows.Range(func(key, value any) bool {
+			w, ok := value.(*hostWindow)
+			if ok && w.cfg.DataDir == profile && w.cfg.URL == server.URL+"/" && w.cfg.Title == title && w.ready && w.mainShown && w.hwnd == key.(uintptr) {
+				hwnd = w.hwnd
+				matches++
+			}
+			return true
+		})
+		if matches != 1 || hwnd == 0 {
+			result <- fmt.Errorf("expected one ready synthetic fixture HWND, found %d", matches)
+			cancel()
+			return
+		}
 		go func() {
-			cmd := exec.CommandContext(ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-File", script, "-SourceDirectory", source, "-WindowTitle", title)
+			cmd := exec.CommandContext(ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-File", script, "-SourceDirectory", source, "-WindowHandle", strconv.FormatUint(uint64(hwnd), 10), "-OwnerProcessID", strconv.Itoa(os.Getpid()))
 			output, runErr := cmd.CombinedOutput()
 			if runErr != nil {
 				if out := os.Getenv("TOOLKIT_NATIVE_TEST_OUTPUT"); out != "" {
-					wide, _ := syscall.UTF16PtrFromString(title)
-					hwnd, _, _ := wndUser32.NewProc("FindWindowW").Call(0, uintptr(unsafe.Pointer(wide)))
-					_, _, _ = captureNativeVaultDialog(hwnd, filepath.Join(out, "native-explorer107-failure.png"))
 					_ = os.MkdirAll(out, 0700)
+					if _, _, captureErr := captureNativeVaultDialog(hwnd, filepath.Join(out, "native-explorer107-failure.png")); captureErr != nil {
+						output = append(output, []byte(fmt.Sprintf("\nFailure capture: %v\n", captureErr))...)
+					}
 					_ = os.WriteFile(filepath.Join(out, "native-explorer107-failure.txt"), output, 0600)
 				}
 				result <- fmt.Errorf("actual Explorer drag: %w: %s", runErr, output)
@@ -157,8 +174,6 @@ const helper=NetworkToolkitTransferDrop;document.addEventListener('dragover',eve
 				return
 			}
 			if out := os.Getenv("TOOLKIT_NATIVE_TEST_OUTPUT"); out != "" {
-				wide, _ := syscall.UTF16PtrFromString(title)
-				hwnd, _, _ := wndUser32.NewProc("FindWindowW").Call(0, uintptr(unsafe.Pointer(wide)))
 				if _, _, e := captureNativeVaultDialog(hwnd, filepath.Join(out, "native-explorer107-copy.png")); e != nil {
 					result <- e
 					cancel()

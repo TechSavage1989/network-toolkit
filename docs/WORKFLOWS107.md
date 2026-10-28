@@ -32,8 +32,12 @@ credentials, scan options or connection actions. Limits are 20 per scope and
 are not converted into unnamed presets or replaced during upgrade.
 
 The sidebar still selects the source for future diagnostics. **Recorded
-source** below a result shows that run's recorded source, even after the sidebar
-selection changes. The redundant source button is no longer in the header.
+source** below ordinary results shows that run's recorded source, even after the
+sidebar selection changes. In a fitted ping/monitor graph, select an entry and
+expand its existing **Run details** to see the recorded source without taking
+space from the graph or sample rows. Before the first sample, Run details is
+available in the empty result area. The redundant source button is no longer
+in the header.
 
 ## Terminal appearance
 

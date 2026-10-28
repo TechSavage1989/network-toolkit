@@ -17,7 +17,8 @@ assets, repository access and the existing update feed/workflow.
    results, explicit chooser/review, live profile updates, protocol/port and
    scoped-IP validation. No saved-credential/active-session inference or connect.
 2. Shared header source button removed. Sidebar controls, validation/settings
-   and immutable recorded-source disclosure below results remain.
+   and immutable recorded-source details remain (inside existing entry Run details
+   for fitted graphs, below results elsewhere).
 3. Named tool-scoped filter CRUD with explicit duplicate/replace/delete handling,
    bounded sanitized persistence, existing multi-value query/status/type semantics
    and no scan/connection side effects.
@@ -55,7 +56,7 @@ Color contrast notices are advisory, not an accessibility certification.
 
 ## Gates at candidate preparation
 
-Final local aggregate: 859/859 JavaScript tests and 42/42 Python release/layout
+Final local aggregate: 864/864 JavaScript tests and 42/42 Python release/layout
 guards passed; all five new browser fixture syntax checks, release version/resource
 validation and diff checks passed. Independent bounded review closed the missing-
 adapter fallback, nested local destination replacement and unowned remote staging
@@ -70,7 +71,15 @@ publication: new browser checks exposed keyboard focus and cramped graph-toolbar
 issues, plus fixture endpoint selection, image routes, Windows canonical-root and
 pending-request timing errors. Corrections preserve the original assertions and
 require a new exact-source run. Detached fit acceptance remains under diagnosis;
-real Explorer was not reached after its Windows prerequisite failed. Independent
+real Explorer was not reached after its Windows prerequisite failed. Review2
+bc1fcac (Checks40616713099) passed discovery/color/capture/drop browser flows,
+Windows staged publication, unchanged security gates and the real updater timer;
+it remained rejected for detached resize starvation, native fixture HWND lookup,
+and graph rows clipped by the extra recorded-source footer. Source keeps the
+original fit/row assertions, deduplicates identical pending resize deadlines,
+uses the exact validated native test HWND, and relocates source details into the
+existing selected-entry Run details. Two legacy header-caption tests now require
+the explicitly requested header removal and preserved run metadata. Independent
 legacy browser scripts now continue collecting evidence after an earlier failure
 without changing the job result or removing any assertion/timer.
 

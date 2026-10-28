@@ -1,25 +1,42 @@
-param([Parameter(Mandatory=$true)][string]$SourceDirectory,[Parameter(Mandatory=$true)][string]$WindowTitle)
+param([Parameter(Mandatory=$true)][string]$SourceDirectory,[Parameter(Mandatory=$true)][long]$WindowHandle,[Parameter(Mandatory=$true)][uint32]$OwnerProcessID)
 # Hosted test only: operates on one caller-created synthetic Explorer folder and
-# one explicitly named native fixture HWND. No clipboard or arbitrary UI access.
+# the caller's exact native fixture HWND. No clipboard or arbitrary UI access.
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName UIAutomationClient
 Add-Type -AssemblyName UIAutomationTypes
 Add-Type @'
 using System;
 using System.Runtime.InteropServices;
+using System.Text;
 public static class ExplorerDropMouse {
- [DllImport("user32.dll",CharSet=CharSet.Unicode)] public static extern IntPtr FindWindow(string c,string title);
+ [DllImport("user32.dll")] public static extern bool IsWindow(IntPtr h);
+ [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
+ [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h,out uint process);
+ [DllImport("user32.dll",CharSet=CharSet.Unicode)] public static extern int GetClassName(IntPtr h,StringBuilder text,int count);
+ [DllImport("user32.dll",CharSet=CharSet.Unicode)] public static extern int GetWindowText(IntPtr h,StringBuilder text,int count);
  [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h,IntPtr after,int x,int y,int w,int z,uint flags);
  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
  [DllImport("user32.dll")] public static extern bool SetCursorPos(int x,int y);
  [DllImport("user32.dll")] public static extern void mouse_event(uint flags,uint dx,uint dy,uint data,UIntPtr extra);
 }
 '@
-$native=[ExplorerDropMouse]::FindWindow($null,$WindowTitle)
-if($native -eq [IntPtr]::Zero){throw 'Native fixture HWND not found'}
+$native=[IntPtr]$WindowHandle
+[uint32]$nativeProcess=0
+[void][ExplorerDropMouse]::GetWindowThreadProcessId($native,[ref]$nativeProcess)
+$nativeClass=New-Object System.Text.StringBuilder(256)
+[void][ExplorerDropMouse]::GetClassName($native,$nativeClass,$nativeClass.Capacity)
+if(!$WindowHandle -or ![ExplorerDropMouse]::IsWindow($native) -or ![ExplorerDropMouse]::IsWindowVisible($native) -or $nativeProcess -ne $OwnerProcessID -or $nativeClass.ToString() -ne 'NetworkToolkit.WebView2.Window'){throw 'Native fixture HWND identity/visibility validation failed'}
+$nativeCaption=New-Object System.Text.StringBuilder(256)
+[void][ExplorerDropMouse]::GetWindowText($native,$nativeCaption,$nativeCaption.Capacity)
+Write-Output ('Exact ready fixture HWND '+$WindowHandle+' owner '+$nativeProcess+' caption ['+$nativeCaption.ToString()+']')
 [void][ExplorerDropMouse]::SetWindowPos($native,[IntPtr]::Zero,0,0,500,720,0x0040)
 $shell=New-Object -ComObject Shell.Application
 $folder=(Get-Item -LiteralPath $SourceDirectory).FullName
+# Compare the same Shell namespace representation on both sides: hosted Temp
+# paths can contain an 8.3 alias while Explorer exposes the long pathname.
+$sourceNamespace=$shell.NameSpace($folder)
+if(!$sourceNamespace -or !$sourceNamespace.Self.IsFolder){throw 'Synthetic Explorer source folder could not be resolved'}
+$folder=$sourceNamespace.Self.Path
 Start-Process explorer.exe -ArgumentList @('/n,',('"'+$folder+'"'))
 $window=$null
 $until=[DateTime]::UtcNow.AddSeconds(20)

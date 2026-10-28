@@ -82,7 +82,23 @@ check('recorded source is a read-only body disclosure, not a duplicate header co
   const context=page.slice(page.indexOf('function renderRunContext('),page.indexOf('function renderJob('));
   assert.doesNotMatch(context, /NetworkToolkitSource.resultHTML/);
   const job=page.slice(page.indexOf('function renderJob('),page.indexOf('\nfunction ',page.indexOf('function renderJob(')+1));
-  assert.match(job, /renderDiagnosticData\(j\)\+NetworkToolkitSource.resultHTML\(j\)/);
+  assert.match(job, /renderDiagnosticData\(j\)\+\(!graphAuxiliary\?NetworkToolkitSource.resultHTML\(j\):''\)/);
+  assert.match(page, /const recordedRunContext=renderRunContext\(j\)\+NetworkToolkitSource.resultHTML\(j\)/);
+  assert.match(page, /details:recordedRunContext\+resolved\+samplingNote\+runDetails/);
+  const details=require('node:fs').readFileSync(require('node:path').join(__dirname,'../web/assets/result-details.js'),'utf8');
+  assert.match(details, /data-run-details><summary>Run details<\/summary>/);
+  assert.match(details, /NetworkToolkitGraphWorkspace\?\.recordsHTML/);
   assert.match(source.controlHTML(selected,adapters,'ping',false), /data-diagnostic-source/);
+});
+check('subnet ping keeps recorded source while actual fitted graphs use entry Run details', () => {
+  const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path'),page=fs.readFileSync(path.join(__dirname,'../web/index.html'),'utf8');
+  const start=page.indexOf('function renderJob('),end=page.indexOf('\nfunction ',start+1);
+  const context={jobs:[],NetworkToolkitGraphWorkspace:{},NetworkToolkitSource:source,eventValues:(job,type)=>(job.events||[]).filter(event=>event.data?.type===type),renderRunContext:()=>'',esc:value=>String(value??''),jobTitle:job=>job.tool,pill:()=>'',icon:()=>'',isRunning:()=>false,splitToolPage:()=>false,renderDiagnosticData:()=>'<div>Fixture results</div>',renderActivityLog:()=>''};
+  vm.createContext(context);vm.runInContext(page.slice(start,end)+';globalThis.fixtureRenderJob=renderJob',context);
+  assert.doesNotMatch(context.fixtureRenderJob({id:'graph',tool:'ping',status:'completed'}),/data-detail="recorded-source"/);
+  for(const details of [{options:{scope:'subnet'}},{result:{data:{scope:'subnet'}}},{events:[{data:{type:'subnet-host',value:{address:'192.0.2.1'}}}]}]){
+    const html=context.fixtureRenderJob({id:'subnet',tool:'ping',status:'completed',...details});
+    assert.equal((html.match(/data-detail="recorded-source"/g)||[]).length,1);assert.doesNotMatch(html,/graph-run-panel/);
+  }
 });
 process.stdout.write(passed + ' source-interface checks passed.\n');
