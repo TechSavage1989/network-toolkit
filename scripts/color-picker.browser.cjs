@@ -6,7 +6,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const root=path.resolve(__dirname,'..'),out=process.env.NTK_BROWSER_OUTPUT_DIR||process.env.TOOLKIT_TEST_OUTPUT,origin='https://colors107.toolkit.test';
 const customAppearance={scheme:'custom',fontFamily:'Consolas',colors:{background:'#122334',foreground:'#eeddcc',selectionBackground:'#33445566'},highlightColors:{address:'#bb88dd'},shells:{powershell:{enabled:false,colors:{command:'#998877'}},cmd:{enabled:true,colors:{}}}};
 let stored={appUpdatePreferences:{enabled:false},theme:'dark',accentColor:'#8bdac0',terminalAppearance:customAppearance,colorPickerPreferences:{recent:['#aabbcc80'],saved:['#12345680']},diagnosticColors:{bad:'#ff8790',warn:'#f4c56b',good:'#5dd6a0',info:'#6eabff',latency:'#438ef5'}};
-const report={passed:false,checks:[],errors:[],screenshots:[],scope:'Synthetic production-asset browser acceptance. Real Chromium clipboard, focus and viewport checks; no native Windows or user settings acceptance.'},writes=[];
+const report={passed:false,checks:[],errors:[],screenshots:[],failedImages:[],scope:'Synthetic production-asset browser acceptance. Real Chromium clipboard, focus and viewport checks; no native Windows or user settings acceptance.'},writes=[];
 let browser,page;
 const pass=text=>{report.checks.push(text);console.log('PASS '+text);};
 const picker=()=>page.locator('[data-color-picker]'),hex=()=>page.locator('[data-color-value="hex"]');
@@ -14,11 +14,13 @@ async function shot(name){if(!out)return;const file='color-picker-'+name+'.png';
 async function flush(){await page.evaluate(async()=>{saveState();await flushState();await stateWrites;});}
 async function openAccent(){await page.evaluate(()=>appSettings());await page.locator('#appAccentColor').click();await picker().waitFor();}
 async function dismiss(){await page.keyboard.press('Escape');await picker().waitFor({state:'detached'});}
-async function startup(){await page.goto(origin+'/');await page.waitForFunction(()=>__networkToolkitStartupState===1&&online);assert(await page.evaluate(()=>!!window.NetworkToolkitColorPicker),'Final app must load shared picker');}
+async function startup(){await page.goto(origin+'/');await page.waitForFunction(()=>__networkToolkitStartupState===1&&online);await page.waitForFunction(()=>[...document.images].every(image=>image.complete&&image.naturalWidth>0));assert(await page.evaluate(()=>!!window.NetworkToolkitColorPicker),'Final app must load shared picker');}
 async function noOverflow(){const bounds=await picker().evaluate(el=>{const r=el.getBoundingClientRect(),body=el.querySelector('.ntk-color-body');return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:innerWidth,height:innerHeight,overflow:body.scrollWidth>body.clientWidth+1};});assert(bounds.left>=0&&bounds.right<=bounds.width+1&&bounds.top>=0&&bounds.bottom<=bounds.height+1,JSON.stringify(bounds));assert.equal(bounds.overflow,false,'Dialog body must not overflow horizontally');}
 (async()=>{
  if(out)fs.mkdirSync(out,{recursive:true});
  browser=await chromium.launch({headless:true,args:['--no-sandbox']});page=await browser.newPage({viewport:{width:1440,height:1000},serviceWorkers:'block',permissions:['clipboard-read','clipboard-write']});page.setDefaultTimeout(15000);page.on('pageerror',error=>report.errors.push(error.message));
+ page.on('response',response=>{if(response.status()>=400&&(response.request().resourceType()==='image'||/Network_Toolkit_Icon|favicon\.ico/.test(response.url())))report.failedImages.push({url:response.url(),status:response.status()});});
+ page.on('requestfailed',request=>{if(request.resourceType()==='image')report.failedImages.push({url:request.url(),failure:request.failure()?.errorText});});
  await page.route('**/*',async route=>{
   const req=route.request(),url=new URL(req.url()),p=url.pathname;assert.equal(url.origin,origin,'No external requests are allowed');
   if(p.startsWith('/api/')){const method=req.method();let data={};
@@ -34,7 +36,7 @@ async function noOverflow(){const bounds=await picker().evaluate(el=>{const r=el
    if(p.includes('/events')){await new Promise(resolve=>setTimeout(resolve,80));data={events:[],sessions:[],after:0};}
    return route.fulfill({contentType:'application/json',body:JSON.stringify(data)});
   }
-  try{const file=path.join(root,'web',p==='/'?'index.html':p);let body=fs.readFileSync(file);if(p==='/')body=body.toString().replaceAll('__SESSION_TOKEN__','colors107-fixture').replaceAll('__WINDOW_MODE__','main');return route.fulfill({body,contentType:p==='/'?'text/html':p.endsWith('.js')?'application/javascript':p.endsWith('.css')?'text/css':p.endsWith('.svg')?'image/svg+xml':'application/octet-stream'});}catch{return route.fulfill({status:404,body:''});}
+  try{const icon=/^\/assets\/Network_Toolkit_Icon\.(svg|ico)$/.test(p)||p==='/favicon.ico',file=icon?path.join(root,'assets',p==='/favicon.ico'?'Network_Toolkit_Icon.ico':path.basename(p)):path.join(root,'web',p==='/'?'index.html':p);let body=fs.readFileSync(file);if(p==='/')body=body.toString().replaceAll('__SESSION_TOKEN__','colors107-fixture').replaceAll('__WINDOW_MODE__','main');return route.fulfill({body,contentType:p==='/'?'text/html':p.endsWith('.js')?'application/javascript':p.endsWith('.css')?'text/css':p.endsWith('.svg')?'image/svg+xml':p.endsWith('.ico')?'image/x-icon':'application/octet-stream'});}catch{return route.fulfill({status:404,body:''});}
  });
  await startup();const preserved=await page.evaluate(()=>JSON.parse(JSON.stringify(state.terminalAppearance)));
  await openAccent();assert.equal(await hex().inputValue(),'#8bdac0');assert.equal(await page.locator('[data-color-channel="a"]').count(),0);assert.equal(await page.locator('[data-color-swatch="#12345680"]').count(),0);
@@ -51,7 +53,8 @@ async function noOverflow(){const bounds=await picker().evaluate(el=>{const r=el
  await page.locator('[data-color-copy="hex"]').click();await page.waitForFunction(()=>document.querySelector('[data-color-status]')?.textContent.includes('Copy is unavailable'));assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),beforeCopy);assert(!await page.locator('[data-color-status]').textContent().then(text=>text.includes('Copied')));
  await page.evaluate(()=>{Object.defineProperty(navigator.clipboard,'writeText',{configurable:true,value:window.fixtureColorWrite});delete window.fixtureColorWrite;});
  const hue=page.locator('[data-color-channel="h"]');await hue.focus();const priorHue=Number(await hue.inputValue());await page.keyboard.press('ArrowRight');assert.equal(Number(await hue.inputValue()),priorHue+1);await hex().fill('#224466');
- for(let i=0;i<55;i++){await page.keyboard.press('Tab');assert(await page.evaluate(()=>!!document.activeElement.closest('[data-color-picker]')),'Native modal focus remains contained');}
+ for(const key of ['Tab','Shift+Tab'])for(let i=0;i<55;i++){await page.keyboard.press(key);const focus=await page.evaluate(()=>({contained:!!document.activeElement.closest('[data-color-picker]'),tag:document.activeElement.tagName,id:document.activeElement.id,text:document.activeElement.textContent.slice(0,80)}));assert(focus.contained,'Picker focus remains contained at '+key+' '+i+': '+JSON.stringify(focus));}
+ assert(await page.locator('[data-color-apply]').evaluate(button=>{const style=getComputedStyle(button);return NetworkToolkitColorPicker.contrastRatio(style.backgroundColor,style.color)>=4.5;}),'Apply stays readable even while previewing a low-contrast accent');
  await page.locator('[data-color-save]').click();await shot('normal-dark');await noOverflow();await page.locator('[data-color-apply]').click();await picker().waitFor({state:'detached'});await flush();assert.equal(stored.accentColor,'#224466');assert(stored.colorPickerPreferences.saved.includes('#224466'));assert.equal(stored.colorPickerPreferences.recent[0],'#224466');
  pass('Native HEX/RGB clipboard success and denial, keyboard hue selection, native modal focus trap and applied recent/saved color');
 
@@ -79,5 +82,5 @@ async function noOverflow(){const bounds=await picker().evaluate(el=>{const r=el
  await dismiss();await page.locator('#appAccentColor').click();await hex().fill('#556677');await page.evaluate(()=>navigate('overview'));assert.equal(await picker().count(),0);assert.equal(await page.evaluate(()=>state.accentColor),'');assert.equal(await page.evaluate(()=>document.documentElement.style.getPropertyValue('--accent')),'');
  pass('Normal/narrow screenshots, no horizontal clipping, visible keyboard focus, and navigation cancels pending preview');
 
- assert(writes.length>0);assert.deepEqual(report.errors,[]);report.passed=true;
+ assert(writes.length>0);assert.deepEqual(report.failedImages,[],'Canonical production icons must load in the captured fixture');assert.deepEqual(report.errors,[]);report.passed=true;
 })().catch(error=>{report.errors.push(error.stack||String(error));console.error(error.stack||String(error));process.exitCode=1;}).finally(async()=>{if(out){fs.writeFileSync(path.join(out,'color-picker-report.json'),JSON.stringify(report,null,2)+'\n');if(page&&!report.passed)await page.screenshot({path:path.join(out,'color-picker-failure.png'),fullPage:true}).catch(()=>{});}await browser?.close();});

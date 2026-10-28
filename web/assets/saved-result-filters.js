@@ -60,7 +60,7 @@
   persist(next);return id;
  }
  function register(context){contexts.set(context.id,context);while(contexts.size>240)contexts.delete(contexts.keys().next().value);return context;}
- function button(context){register(context);return '<button type="button" class="btn small ghost saved-filter-button" data-saved-filter-open="'+esc(context.id)+'" title="Save and reuse query and filter options for this tool only">Saved filters <span data-saved-filter-count="'+esc(context.scope)+'">('+entries(context.scope).length+')</span></button>';}
+ function button(context){const compact=!!context.config?.graphId,count=entries(context.scope).length;register(context);return '<button type="button" class="btn small ghost saved-filter-button'+(compact?' saved-filter-compact':'')+'" data-saved-filter-open="'+esc(context.id)+'" aria-label="Saved filters for '+esc(context.scope)+' ('+count+')" title="Save and reuse query and filter options for this tool only">'+(compact?'Saved':'Saved filters')+' <span data-saved-filter-count="'+esc(context.scope)+'">('+count+')</span></button>';}
  function networkControl(job){return safeScope('network:'+job?.tool)?button({id:'network:'+job.id,scope:'network:'+job.tool,kind:'network',job}):'';}
  function resultControl(config){return config?.job&&safeScope(config.view)&&(config.view==='result:'+config.job.tool||config.view.startsWith('result:'+config.job.tool+':'))&&Array.isArray(config.rows)&&Array.isArray(config.columns)&&(!config.card||config.job.tool==='quick')?button({id:'result:'+config.id,scope:config.view,kind:'result',config}):'';}
  function capture(context){
@@ -95,7 +95,7 @@
   return selected;
  }
  function summary(filter,scope){if(!filter)return '';return '<dl class="saved-filter-summary"><dt>Query</dt><dd class="saved-filter-query">'+esc(filter.query||'(empty: all text)')+'</dd>'+Object.entries(filter).filter(([key])=>key!=='query').map(([key,value])=>'<dt>'+esc(({legacyStatus:'List status',status:scope.startsWith('network:')?'Outcome':'Detailed status',type:'Type',statistic:'Statistic',respondedOnly:'Responded / resolved only'})[key])+'</dt><dd>'+esc(typeof value==='boolean'?(value?'Yes':'No'):value||'None')+'</dd>').join('')+'</dl>';}
- function refreshCounts(){for(const el of root.document?.querySelectorAll?.('[data-saved-filter-count]')||[])el.textContent='('+entries(el.dataset.savedFilterCount).length+')';}
+ function refreshCounts(){for(const el of root.document?.querySelectorAll?.('[data-saved-filter-count]')||[]){const count=entries(el.dataset.savedFilterCount).length;el.textContent='('+count+')';el.closest?.('.saved-filter-button')?.setAttribute('aria-label','Saved filters for '+el.dataset.savedFilterCount+' ('+count+')');}}
  function draw(message='',error=false){
   const context=contexts.get(dialog?.context);if(!context)return;
   const rows=entries(context.scope),selected=rows.find(value=>value.id===dialog.selected),pending=dialog.pending;

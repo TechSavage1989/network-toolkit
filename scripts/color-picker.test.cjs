@@ -68,6 +68,15 @@ test('picker input shields underlying popup click-away and shortcuts without blo
  for(const type of ['pointerdown','click','keydown']){let stopped=0,prevented=0;h.dialog().emit(type,h.get('[data-color-value="hex"]'),{key:'ArrowRight',stopPropagation(){stopped++},preventDefault(){prevented++}});assert(stopped>0,type+' propagation must stop');assert.equal(prevented,0,type+' must preserve native text/range/focus behavior');}
  h.api.cancel();
 });
+test('Tab wraps both picker edges and excludes disabled controls without suppressing ordinary traversal',()=>{
+ const h=harness();h.open();const first=h.get('[data-color-close]'),last=h.get('[data-color-apply]');
+ let prevented=0;last.focus();h.dialog().emit('keydown',last,{key:'Tab',preventDefault(){prevented++}});assert.equal(h.document.activeElement,first);assert.equal(prevented,1);
+ h.dialog().emit('keydown',first,{key:'Tab',shiftKey:true,preventDefault(){prevented++}});assert.equal(h.document.activeElement,last);assert.equal(prevented,2);
+ h.get('[data-color-value="hex"]').focus();h.dialog().emit('keydown',h.document.activeElement,{key:'Tab',preventDefault(){prevented++}});assert.equal(prevented,2,'Middle controls retain normal native traversal');
+ h.input('[data-color-value="hex"]','invalid');first.focus();h.dialog().emit('keydown',first,{key:'Tab',shiftKey:true,preventDefault(){prevented++}});assert.equal(h.document.activeElement,h.get('[data-color-cancel]'),'Invalid Apply is not a focus stop');
+ const source=fs.readFileSync(require.resolve('../web/assets/color-picker.css'),'utf8');assert.match(source,/\.ntk-color-dialog \.btn\.primary[^\n]*background:var\(--text\)[^\n]*color:var\(--panel\)/,'Picker Apply must remain readable independently of a low-contrast accent preview');
+ h.api.cancel();
+});
 test('copy success and denial are explicit, with no false copied status or fallback writes',async()=>{
  const copied=[];let h=harness(undefined,async value=>copied.push(value));h.open();h.click('[data-color-copy="rgb"]');await new Promise(setImmediate);assert.deepEqual(copied,['rgb(17, 34, 51)']);assert.match(h.get('[data-color-status]').textContent,/Copied RGB/);h.api.cancel();
  h=harness(undefined,async()=>{throw Error('Denied')});h.open();h.click('[data-color-copy="hex"]');await new Promise(setImmediate);assert.match(h.get('[data-color-status]').textContent,/Copy is unavailable/);assert.equal(h.document.activeElement,h.get('[data-color-value="hex"]'));assert.equal(h.document.activeElement.selectionEnd,7);assert.equal(h.saves,0);h.api.cancel();

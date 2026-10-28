@@ -20,11 +20,27 @@ const transcript=[
  'switch# '
 ].join('\r\n');
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-let browser,page;
+let browser,page,activeCase='',activeCalls=[];
 async function shot(name){if(!out)return;const file='terminal-style107-'+name+'.png';await page.screenshot({path:path.join(out,file),fullPage:true});report.screenshots.push(file);}
 async function settle(){await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));}
 async function display(){if(await page.locator('#terminalSessionPanel.hidden').count())await page.locator('#terminalSessionToggle').click();await page.locator('#terminalAppearanceEditor').waitFor({state:'visible'});}
-async function fitted(){await page.waitForFunction(()=>{const e=currentTerminal(),t=e?.xterm,p=e?.fit?.proposeDimensions();return !!t&&!!p&&t.cols===terminalDimensions(p).cols&&t.rows===terminalDimensions(p).rows&&!e.desiredResize&&!e.resizeSending&&e.lastResize===t.cols+'x'+t.rows;});await settle();}
+async function fitted(){
+ try{
+  // Keep the full acceptance predicate: matching DOM cell geometry AND an
+  // acknowledged backend size, with no in-flight or pending resize.
+  await page.waitForFunction(()=>{const e=currentTerminal(),t=e?.xterm,p=e?.fit?.proposeDimensions();return !!t&&!!p&&t.cols===terminalDimensions(p).cols&&t.rows===terminalDimensions(p).rows&&!e.desiredResize&&!e.resizeSending&&e.lastResize===t.cols+'x'+t.rows;});await settle();
+ }catch(error){
+  const state=await page.evaluate(()=>{
+   const e=currentTerminal(),t=e?.xterm,p=e?.fit?.proposeDimensions(),parent=t?.element?.parentElement,rect=parent?.getBoundingClientRect(),style=parent?getComputedStyle(parent):null;
+   return {actual:t?{cols:t.cols,rows:t.rows}:null,proposed:p||null,normalized:p?terminalDimensions(p):null,lastResize:e?.lastResize,desiredResize:e?.desiredResize||null,resizeSending:!!e?.resizeSending,inputEpoch:e?.inputEpoch||0,sessionState:e?.info.state,online,activePage:state.activePage,visible:!!e&&terminalEntryVisible(e),owner:e?terminalSessionOwner(e.info.id):null,canMutate:!!e&&terminalOwnerCanMutate(e),detachedReady:terminalDetachedReady,transferBusy:!!e?.transferBusy,restoring:!!e?.restoring,awaitingAcceptance:!!e?.awaitingAcceptance,checkpointBusy:terminalCheckpointBusy,feedPaused:terminalFeedPaused,font:t?{family:t.options.fontFamily,size:t.options.fontSize,lineHeight:t.options.lineHeight}:null,parent:rect?{width:rect.width,height:rect.height,cssWidth:style.width,cssHeight:style.height}:null};
+  }).catch(failure=>({diagnosticError:String(failure)}));
+  // Route records contain synthetic fixture data only; retain bounded resize
+  // and ownership request metadata, never full settings or terminal output.
+  const calls=activeCalls.filter(call=>call.p.endsWith('/resize')||call.p.startsWith('/api/terminal-views')).slice(-20).map(call=>({path:call.p,method:call.method,...(call.p.endsWith('/resize')?{size:{cols:call.body?.cols,rows:call.body?.rows}}:{})}));
+  (report.fitFailures??=[]).push({case:activeCase,state,calls});
+  console.error('Terminal fit diagnostics: '+JSON.stringify({case:activeCase,state,calls}));throw error;
+ }
+}
 async function replay(){await page.evaluate(async text=>{const e=currentTerminal();e.xterm.reset();appendTerminalOutput(e,new TextEncoder().encode(text));await terminalDisplayBarrier(e);e.xterm.scrollToBottom();e.highlighter.refresh();},transcript);await settle();}
 async function snapshot(){return page.evaluate(()=>{const t=currentTerminal().xterm,b=t.buffer.active,logical=[];for(let y=0;y<b.length;y++){const l=b.getLine(y),text=l.translateToString(true);if(l.isWrapped&&logical.length)logical[logical.length-1]+=text;else logical.push(text);}return{logical:logical.filter(Boolean),cols:t.cols,rows:t.rows,cursorX:b.cursorX,cursorY:b.cursorY,baseY:b.baseY};});}
 async function evidence(name){
@@ -35,10 +51,10 @@ async function evidence(name){
 (async()=>{
  if(out)fs.mkdirSync(out,{recursive:true});browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE||undefined,args:['--no-sandbox']});
  for(const variant of [{mode:'main',scale:1},{mode:'terminal',scale:1},{mode:'detached',scale:1},{mode:'main',scale:1.25},{mode:'main',scale:1.5},{mode:'main',scale:2}]){
-  const {mode,scale}=variant,name=mode+'-scale'+scale;
+  const {mode,scale}=variant,name=mode+'-scale'+scale;activeCase=name;
   const context=await browser.newContext({viewport:{width:1280,height:1000},deviceScaleFactor:scale,serviceWorkers:'block'});page=await context.newPage();page.setDefaultTimeout(15000);page.on('pageerror',error=>report.errors.push(name+': '+error.message));
   const session={id:'style-fixture',label:'Synthetic style terminal',type:'ssh',host:'style.test',port:22,state:'connected',cols:80,rows:24},view={id:'style-view',sessionId:session.id,state:'detached',revision:0};
-  const calls=[];let saved={appUpdatePreferences:{enabled:false},activePage:'terminal',terminalSidebarCollapsed:true,terminalSidebarTab:'saved',terminalAppearance:{fontFamily:'Consolas',highlightColors:{address:'#22aaff'},highlightUnderlines:false},terminalInteraction:{autoPager:false,copyOnSelect:false,copyOnClick:false}},assetErrors=[];
+  const calls=[];activeCalls=calls;let saved={appUpdatePreferences:{enabled:false},activePage:'terminal',terminalSidebarCollapsed:true,terminalSidebarTab:'saved',terminalAppearance:{fontFamily:'Consolas',highlightColors:{address:'#22aaff'},highlightUnderlines:false},terminalInteraction:{autoPager:false,copyOnSelect:false,copyOnClick:false}},assetErrors=[];
   page.on('response',response=>{if(response.url().includes('/assets/')&&response.status()>=400)assetErrors.push(response.url());});
   await page.route('**/*',async route=>{
    const request=route.request(),url=new URL(request.url()),p=url.pathname,method=request.method(),body=request.postData()?request.postDataJSON():null;

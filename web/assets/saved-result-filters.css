@@ -1,3 +1,10 @@
 .saved-filter-button{flex:0 1 auto;min-width:0;white-space:normal}.saved-filter-actions{display:flex;flex-wrap:wrap;gap:7px;width:100%}.saved-filter-actions .btn{flex:0 1 auto;white-space:normal}
 .saved-filter-summary{display:grid;grid-template-columns:minmax(90px,1fr) minmax(0,2fr);gap:5px 12px;font-size:12px;margin:10px 0}.saved-filter-summary dt{color:var(--muted)}.saved-filter-summary dd{margin:0;overflow-wrap:anywhere;min-width:0}.saved-filter-query{white-space:pre-wrap;max-height:130px;overflow:auto}.saved-filter-current,.saved-filter-selected{margin:12px 0;padding:8px;border:1px solid var(--line);border-radius:6px}.saved-filter-message{font-size:12px;overflow-wrap:anywhere}.saved-filter-message.bad{color:var(--bad)}
 @media(max-width:600px){.saved-filter-summary{grid-template-columns:1fr}.saved-filter-actions .btn{flex:1 1 90px}}
+/* Graph readers have a fixed height shared with selected-result details. Keep
+   these toolbar actions on one line rather than turning each count character
+   into another row; the full saved-filter name remains the accessible label. */
+#toolResultsScroll .graph-workspace-results .data-list-tools>.saved-filter-compact,
+#toolResultsScroll .graph-workspace-results .data-list-tools>[data-list-reset],
+#toolResultsScroll .graph-workspace-results .data-list-tools>[data-list-clear]{flex:0 0 auto;white-space:nowrap;gap:3px;padding-left:6px;padding-right:6px}
+.saved-filter-compact [data-saved-filter-count]{white-space:nowrap;flex:0 0 auto}

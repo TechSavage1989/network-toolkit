@@ -55,7 +55,7 @@ Color contrast notices are advisory, not an accessibility certification.
 
 ## Gates at candidate preparation
 
-Final local aggregate: 857/857 JavaScript tests and 42/42 Python release/layout
+Final local aggregate: 859/859 JavaScript tests and 42/42 Python release/layout
 guards passed; all five new browser fixture syntax checks, release version/resource
 validation and diff checks passed. Independent bounded review closed the missing-
 adapter fallback, nested local destination replacement and unowned remote staging
@@ -63,6 +63,16 @@ cleanup edges; dedicated regressions are included. Exact hosted source/run IDs
 will be recorded after source freeze. The local environment
 has no usable required Go1.26.10 compiler; Go/native/browser execution is assigned
 to hosted checks. Known local Chromium restrictions were not bypassed.
+
+First hosted review a9f4e080 (Checks40615764044) built successfully and passed
+application, dependency and unchanged security-browser gates, but is rejected for
+publication: new browser checks exposed keyboard focus and cramped graph-toolbar
+issues, plus fixture endpoint selection, image routes, Windows canonical-root and
+pending-request timing errors. Corrections preserve the original assertions and
+require a new exact-source run. Detached fit acceptance remains under diagnosis;
+real Explorer was not reached after its Windows prerequisite failed. Independent
+legacy browser scripts now continue collecting evidence after an earlier failure
+without changing the job result or removing any assertion/timer.
 
 Required hosted Checks retain application, dependency, Windows, security browser
 and full browser/updater gates, with a sixth browser-workflows107 job for the new

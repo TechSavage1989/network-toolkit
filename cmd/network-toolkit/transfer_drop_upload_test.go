@@ -137,6 +137,9 @@ func TestExplorerDropHTTPBoundary(t *testing.T) {
 	if _, e := a.transfers.setRoot("tftp", root); e != nil {
 		t.Fatal(e)
 	}
+	// The API returns its canonical configured root (Windows TEMP may use an
+	// 8.3 alias). A real browser snapshots that exact listing value, not TempDir.
+	root = a.transfers.root("tftp")
 	for _, tc := range []struct {
 		name, origin string
 		auth, extra  bool

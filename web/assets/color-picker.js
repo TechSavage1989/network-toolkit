@@ -143,7 +143,21 @@
       if(button.dataset.colorCopy){const value=draft[button.dataset.colorCopy];try{if(typeof configuration.copy==='function'){const result=await configuration.copy(value);if(result===false)throw new Error('Clipboard denied');}else{if(!root.navigator?.clipboard?.writeText)throw new Error('Clipboard unavailable');await root.navigator.clipboard.writeText(value);}if(!closed)status('Copied '+button.dataset.colorCopy.toUpperCase()+' color.');}catch{if(!closed){const input=find('[data-color-value="'+button.dataset.colorCopy+'"]');input.focus();input.select();status('Copy is unavailable. The value is selected for manual copying.');}}return;}
       if(button.hasAttribute('data-color-apply')&&!invalid){const latest=normalizePreferences(configuration.getPreferences?.()),removed=initialSaved.filter(color=>!preferences.saved.includes(color)),added=preferences.saved.filter(color=>!initialSaved.includes(color)),merged=latest.saved.filter(color=>!removed.includes(color));for(const color of added)if(!merged.includes(color))merged.push(color);if(merged.length>LIMITS.saved){status('The saved palette changed elsewhere and is now full. Cancel and reopen to review it.');return;}preferences.saved=merged;preferences.recent=[draft.hex,...latest.recent.filter(color=>color!==draft.hex)].slice(0,LIMITS.recent);try{configuration.setPreferences?.(normalizePreferences(preferences));}catch{status('Could not save the color palette. Your preview has not been applied.');return;}finish(true);}
     });
-    dialog.addEventListener('keydown',event=>{event.stopPropagation();if(event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();finish(false);}});
+    dialog.addEventListener('keydown',event=>{
+      event.stopPropagation();
+      if(event.key==='Escape'){event.preventDefault();event.stopImmediatePropagation();finish(false);return;}
+      if(event.key==='Tab'){
+        // Chromium can move focus to its chrome after the last native-dialog
+        // control. Explicitly wrap both edges so this editor stays keyboard
+        // usable even when hosted inside another application's focus trap.
+        const controls=[...dialog.querySelectorAll('button,input,select,textarea,a[href],[tabindex]')].filter(element=>!element.disabled&&element.tabIndex!==-1&&!element.hidden&&(!element.getClientRects||element.getClientRects().length));
+        const first=controls[0],last=controls.at(-1),focused=doc.activeElement;
+        if(!first)return;
+        if(!dialog.contains(focused)||focused===dialog||(event.shiftKey?focused===first:focused===last)){
+          event.preventDefault();(event.shiftKey?last:first).focus();
+        }
+      }
+    });
     dialog.addEventListener('cancel',event=>{event.preventDefault();finish(false);});dialog.addEventListener('close',()=>finish(false));
     // Range inputs offer the keyboard equivalent of this pointer-only visual plane.
     const plane=find('[data-color-plane]');let pointer=null;

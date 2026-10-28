@@ -211,81 +211,97 @@ jobs:
             node "$RUNNER_TEMP/ntk-browser-tests/node_modules/playwright/cli.js" install --with-deps chromium
           fi
       - name: Check stable Local Network layout and automatic snapshots
+        if: success() || failure()
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
         run: node scripts/features-89.browser.cjs
       - name: Check full-history Fit and proportional timeline navigators
+        if: success() || failure()
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
         run: node scripts/features-98.browser.cjs
       - name: Check smooth graph compression, direct controls and visible-value scaling
+        if: success() || failure()
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
         run: node scripts/features-97.browser.cjs
       - name: Check fitted graph tabs, shared following and responsive time axes
+        if: success() || failure()
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
         run: node scripts/features-96.browser.cjs
       - name: Check condensed history, time navigation and held entry selections
+        if: success() || failure()
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
         run: node scripts/features-95.browser.cjs
       - name: Check graph zoom, statistics filters and latest tracking
+        if: success() || failure()
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
         run: node scripts/features-94.browser.cjs
       - name: Check macro folders, local terminal UI, scan sizing, copy controls and update progress
+        if: success() || failure()
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
         run: node scripts/features-83.browser.cjs
       - name: Check editor languages, local formatting and shell colors
+        if: success() || failure()
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
         run: node scripts/features-84.browser.cjs
       - name: Check local shell colors, close preferences and collapsed tool navigation
+        if: success() || failure()
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
         run: node scripts/features-85.browser.cjs
       - name: Check editor actions, in-app dialogs, wrapped syntax and shell output
+        if: success() || failure()
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
         run: node scripts/editor-source-review.browser.cjs
       - name: Check remote picker columns, public IP placement and compact network layouts
+        if: success() || failure()
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
         run: node scripts/features-88.browser.cjs
       - name: Check proportional headers, shared controls and sidebar toggles
+        if: success() || failure()
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
         run: node scripts/features-90.browser.cjs
       - name: Check stationary navigation icons and full generated subnet list
+        if: success() || failure()
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
         run: node scripts/features-91.browser.cjs
       - name: Check recorded local times and interactive result graphs
+        if: success() || failure()
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
         run: node scripts/features-92.browser.cjs
       - name: Check persistent graph interactions, timestamp preferences and split results
+        if: success() || failure()
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
         run: node scripts/features-93.browser.cjs
       - name: Check application layout and consistent copy controls
+        if: success() || failure()
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
@@ -295,6 +311,7 @@ jobs:
           go-version-file: go.mod
           cache: false
       - name: Check real diagnostic copy actions and clipboard
+        if: success() || failure()
         env:
           GOTOOLCHAIN: local
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
@@ -304,55 +321,66 @@ jobs:
           CGO_ENABLED=0 go build -mod=vendor -o "$NTK_APP_EXECUTABLE" ./cmd/network-toolkit
           node scripts/value-copy-live.cjs
       - name: Check terminal selection deletion with trailing empty cells
+        if: success() || failure()
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
           NTK_APP_EXECUTABLE: ${{ runner.temp }}/Network_Toolkit_UI_Test
           NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-browser-results
         run: node scripts/terminal-selection-live.cjs
       - name: Check Hosts editor interactions and responsive layouts
+        if: success() || failure()
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
         run: node scripts/hosts-editor.browser.cjs
       - name: Check server selectors, saved addresses and responsive layouts
+        if: success() || failure()
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
         run: node scripts/transfer-server-layout.browser.cjs
       - name: Check client connection controls and activity layout
+        if: success() || failure()
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
         run: node scripts/transfer-client-layout.browser.cjs
       - name: Check SMTP password retention and navigation clearing
+        if: success() || failure()
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
         run: node scripts/smtp-password.browser.cjs
       - name: Check saved session folders and persistence
+        if: success() || failure()
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
         run: node scripts/saved-session-folders.browser.cjs
       - name: Check terminal command input without scrollbar tracks
+        if: success() || failure()
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
         run: node scripts/terminal-commandbar.browser.cjs
       - name: Check restored terminal connection dialog and sidebar
+        if: success() || failure()
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
         run: node scripts/terminal-connection-dialog.browser.cjs
       - name: Check files open at the start in the text editor
+        if: success() || failure()
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
         run: node scripts/file-editor-start.browser.cjs
       - name: Check automatic update startup and release notes
+        if: success() || failure()
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
         run: node scripts/app-updater-startup.browser.cjs
       - name: Check native Chromium update timers and released regression control
+        if: success() || failure()
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
