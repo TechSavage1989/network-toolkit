@@ -1,0 +1,7 @@
+/* Match the existing Files/remote-browser resize rail without consuming a row. */
+.nt-editor-compare .nt-compare-grid{grid-template-columns:minmax(0,var(--nt-editor-left-pane,1fr)) 6px minmax(0,var(--nt-editor-right-pane,1fr)) 72px}
+.nt-editor-compare.is-split-view .nt-compare-grid{grid-template-columns:minmax(0,var(--nt-editor-left-pane,1fr)) 6px minmax(0,var(--nt-editor-right-pane,1fr))}
+.nt-editor-pane-resize{min-width:0;min-height:0;background:var(--border);cursor:col-resize;touch-action:none;user-select:none;outline-offset:-2px}
+.nt-editor-pane-resize:hover,.nt-editor-pane-resize:focus-visible,.nt-editor-pane-resize.is-resizing{background:var(--accent)}
+.nt-editor-pane-resize:focus-visible{outline:2px solid var(--text)}
+@media(max-width:680px){.nt-editor-compare:not(.is-split-view) .nt-compare-grid{grid-template-columns:minmax(0,var(--nt-editor-left-pane,1fr)) 6px minmax(0,var(--nt-editor-right-pane,1fr)) 58px}}

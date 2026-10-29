@@ -1,0 +1,24 @@
+Network Toolkit 1.17.113
+
+Compact editor controls and saved connections
+- Keep More compact in the main editor toolbar when expanded. Extra editing
+  tools can occupy the row below without another full-width More heading.
+- Move Connected session into the main toolbar and remove the redundant Open
+  local file disclosure. Existing local open/create actions remain available.
+- Offer active and saved file-capable connections from the editor. Connections
+  require explicit action and retain existing host verification, credential
+  unlock, authentication and certificate checks.
+- Separate editors retain the existing main-window approval boundary. Saved SSH
+  connection requests are reviewed in the main window; new transport access
+  requires renewed approval. Credentials are not delegated to editor windows.
+- Add Compare to from a document tab menu, choosing another open document
+  in the same editor window without losing unsaved text or tab groups.
+- Resize normal split and comparison panes with a shared accessible divider.
+- Align editable comparison content with visual-only spacer blocks, clear
+  added/removed/modified colors, intraline highlights and a compact key.
+  Spacer blocks never become document text or advance source line numbers.
+- Preserve split views, per-view tabs, two-document maps, file explorer access,
+  unsaved documents, history and acknowledged window ownership.
+
+Verification uses synthetic files and hosted browser/native tests only. No user
+computer, private configuration, credentials or production devices are tested.

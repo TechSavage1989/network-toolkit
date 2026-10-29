@@ -32,7 +32,7 @@ function create(options={}){
  async function poll(){if(closing)return;if(running||detaching||dragPreparing||!supported()){if(enabled)schedule();return;}enabled=true;running=true;let claimedDrag=null;render();try{
    const state=await call('');if(!state||state.available!==true||!state.owned||!Array.isArray(state.incoming)||!Array.isArray(state.outgoing))throw Error('Editor window ownership is unavailable.');
    if(instance&&instance!==state.ownerInstanceId)throw Error('The local engine restarted. Keep these documents open and use Save copy before closing; ownership cannot be assumed.');
-   instance=state.ownerInstanceId||instance;self=state.self||'';owned={...state.owned};views=Array.isArray(state.views)?state.views:[];root.NetworkToolkitEditorFiles?.syncRequests?.(state.explorerRequests);
+   instance=state.ownerInstanceId||instance;self=state.self||'';owned={...state.owned};views=Array.isArray(state.views)?state.views:[];root.NetworkToolkitEditorFiles?.syncRequests?.(state.explorerRequests);root.NetworkToolkitEditorSavedConnections?.syncRequests?.(state.savedConnectionRequests);
    for(const [ticket,at]of handledDrags)if(Date.now()-at>35000)handledDrags.delete(ticket);
    if(!outgoing.size&&!incoming.size&&Array.isArray(state.dragRequests))claimedDrag=state.dragRequests.find(t=>/^[a-f0-9]{32}$/.test(t.ticket||'')&&!handledDrags.has(t.ticket)&&typeof t.uid==='string'&&Number.isSafeInteger(t.lease)&&t.lease>0&&owned[t.uid]===t.lease&&typeof t.destination==='string')||null;
    for(const t of state.outgoing)acceptMetadata(t);

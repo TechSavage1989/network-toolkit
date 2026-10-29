@@ -46,7 +46,7 @@ const text='# START OF DOCUMENT\n'+Array.from({length:300},(_,i)=>'Line '+(i+2)+
    await page.setViewportSize({width,height:900});await page.evaluate(({theme,mode})=>{setTheme(theme);navigate(mode==='embedded'?'editor':'overview');},{theme,mode});
    const file='C:\\fixture\\'+width+'-'+theme+'-'+mode+'.txt';
    if(mode==='embedded'){
-    if(await page.locator('[data-ed-panel-toggle="local"]').getAttribute('aria-expanded')!=='true')await page.locator('[data-ed-panel-toggle="local"]').click();await page.fill('#ntEditorLocalPath',file);await page.locator('[data-ed-page="openPath"]').click();await page.waitForFunction(file=>NetworkToolkitFileEditor.active?.path===file&&!NetworkToolkitFileEditor.active.loading,file);await atStart(file);
+    if(!await page.locator('.nt-editor-more').evaluate(el=>el.open))await page.locator('.nt-editor-more summary').click();await page.locator('[data-ed="openLocalPath"]').click();await page.locator('[data-ed-dialog-input]').fill(file);await page.locator('[data-ed-dialog-action="accept"]').click();await page.locator('.nt-editor-more summary').click();await page.waitForFunction(file=>NetworkToolkitFileEditor.active?.path===file&&!NetworkToolkitFileEditor.active.loading,file);await atStart(file);
    }else await openLocal(file);
    assert.equal(await input().inputValue(),text);assert.equal(await page.evaluate(()=>NetworkToolkitFileEditor.active.dirty),false);
    assert((await input().evaluate(el=>el.scrollHeight>el.clientHeight)),'Fixture must overflow the editor');

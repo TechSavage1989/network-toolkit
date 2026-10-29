@@ -36,6 +36,7 @@ async function geometry(page,compare){return page.evaluate(compare=>{const el=do
 async function selectionCheckpoint(page,label,expected){const actual=await snapshot(page);(report.selectionTransitions||=[]).push({label,start:actual.start,end:actual.end,top:actual.top,dirty:actual.dirty,revision:actual.revision});assert.deepEqual(actual,expected,label);}
 async function snapshot(page){return page.evaluate(()=>{const d=NetworkToolkitFileEditor.active,ta=document.querySelector('[data-ed-text]');return {uid:d.uid,text:d.content,dirty:d.dirty,undo:[...d.undo],revision:d.editRevision,start:ta.selectionStart,end:ta.selectionEnd,top:ta.scrollTop,left:ta.scrollLeft};});}
 
+async function compareText(page,side){return page.evaluate(side=>NetworkToolkitFileEditor.documents.get(NetworkToolkitFileEditor.comparison.selection[side]).content,side);}
 async function ready(p){await p.waitForFunction(()=>document.querySelector('[data-compare-map]')?.getAttribute('aria-disabled')==='false');await settle(p);}
 async function compareOpen(p){await p.locator('[data-ed="compare"]').click();await ready(p);}
 (async()=>{
@@ -62,20 +63,20 @@ async function compareOpen(p){await p.locator('[data-ed="compare"]').click();awa
    await p.locator('.nt-compare-settings summary').click();await p.uncheck('[data-compare-sync]');
    for(const side of ['left','right']){
     const own=side==='left'?left:right,other=side==='left'?right:left;
-    await track(side).press('Home');const otherBefore=await other.evaluate(e=>e.scrollTop);await track(side).hover();await p.mouse.wheel(0,160);await p.waitForTimeout(80);
-    assert(await own.evaluate(e=>e.scrollTop)>0);assert.equal(await other.evaluate(e=>e.scrollTop),otherBefore);
+    await track(side).press('Home');const otherBefore=await other.evaluate(e=>e.closest('.cm-editor').querySelector('.cm-scroller').scrollTop);await track(side).hover();await p.mouse.wheel(0,160);await p.waitForTimeout(80);
+    assert(await own.evaluate(e=>e.closest('.cm-editor').querySelector('.cm-scroller').scrollTop)>0);assert.equal(await other.evaluate(e=>e.closest('.cm-editor').querySelector('.cm-scroller').scrollTop),otherBefore);
     const box=await track(side).boundingBox();await p.mouse.move(box.x+box.width/2,box.y+box.height*.2);await p.mouse.down();await p.mouse.move(box.x+box.width/2,box.y+box.height*.7,{steps:10});await p.mouse.up();
-    assert(await own.evaluate(e=>e.scrollTop)>1000);assert.equal(await other.evaluate(e=>e.scrollTop),otherBefore);
+    assert(await own.evaluate(e=>e.closest('.cm-editor').querySelector('.cm-scroller').scrollTop)>1000);assert.equal(await other.evaluate(e=>e.closest('.cm-editor').querySelector('.cm-scroller').scrollTop),otherBefore);
    }
    check('Fit wheel and click-drag on either track navigate only the selected document with sync off');
    const font=await left.evaluate(e=>getComputedStyle(e).fontSize);
    for(const scale of ['0.5','1','2','4']){await p.selectOption('[data-compare-scale]',scale);const sizes=await map.evaluate(e=>({view:e.clientHeight,content:e.firstElementChild.offsetHeight}));assert(Math.abs(sizes.content/sizes.view-(1+Number(scale)))<.02);}
-   const fixed=await left.evaluate(e=>e.scrollTop);await track('right').hover();await p.mouse.wheel(0,-110);await p.waitForTimeout(80);assert.equal(await left.evaluate(e=>e.scrollTop),fixed);assert.equal(await left.evaluate(e=>getComputedStyle(e).fontSize),font);
+   const fixed=await left.evaluate(e=>e.closest('.cm-editor').querySelector('.cm-scroller').scrollTop);await track('right').hover();await p.mouse.wheel(0,-110);await p.waitForTimeout(80);assert.equal(await left.evaluate(e=>e.closest('.cm-editor').querySelector('.cm-scroller').scrollTop),fixed);assert.equal(await left.evaluate(e=>getComputedStyle(e).fontSize),font);
    check('all zoom choices visibly expand map, wheel pans/navigates without changing font or other document');
-   await p.check('[data-compare-sync]');await p.selectOption('[data-compare-scale]','0');await track('left').press('Home');await track('right').hover();await p.mouse.wheel(0,123.5);await p.waitForTimeout(100);assert(Math.abs(await left.evaluate(e=>e.scrollTop)-await right.evaluate(e=>e.scrollTop))<2);
-   await p.check('[data-ed-wrap]');await ready(p);await p.setViewportSize({width:700,height:650});await ready(p);await track('right').press('End');assert(await right.evaluate(e=>e.scrollTop)>0);
+   await p.check('[data-compare-sync]');await p.selectOption('[data-compare-scale]','0');await track('left').press('Home');await track('right').hover();await p.mouse.wheel(0,123.5);await p.waitForTimeout(100);assert(Math.abs(await left.evaluate(e=>e.closest('.cm-editor').querySelector('.cm-scroller').scrollTop)-await right.evaluate(e=>e.closest('.cm-editor').querySelector('.cm-scroller').scrollTop))<2);
+   await p.check('[data-ed-wrap]');await ready(p);await p.setViewportSize({width:700,height:650});await ready(p);await track('right').press('End');assert(await right.evaluate(e=>e.closest('.cm-editor').querySelector('.cm-scroller').scrollTop)>0);
    const old=await p.evaluate(()=>NetworkToolkitFileEditor.comparison.selection);await p.locator('[data-compare="swap"]').click();await ready(p);assert.deepEqual(await p.evaluate(()=>NetworkToolkitFileEditor.comparison.selection),{left:old.right,right:old.left});
-   await right.focus();await right.press('Control+Home');const original=await right.inputValue();await right.press('X');await ready(p);await right.press('Control+z');await ready(p);assert.equal(await right.inputValue(),original);
+   await right.focus();await right.press('Control+Home');const original=await compareText(p,'right');await right.press('X');await ready(p);await right.press('Control+z');await ready(p);assert.equal(await compareText(p,'right'),original);
    check('sync, fractional wheel input, wrap, resize, swap and comparison undo retain document identity');
    // Unequal documents include blank alignment rows on only the absent side.
    await p.evaluate(()=>{const c=NetworkToolkitFileEditor.comparison;const a=NetworkToolkitFileEditor.documents.get(c.selection.left),b=NetworkToolkitFileEditor.documents.get(c.selection.right);a.content='first\nlast';b.content='first\nextra\nextra2\nlast';a.editRevision++;b.editRevision++;c.refresh(true);});await ready(p);
@@ -88,7 +89,7 @@ async function compareOpen(p){await p.locator('[data-ed="compare"]').click();awa
    await p.selectOption('[data-compare-scale]','0');await track('left').press('Home');
    if(output)await p.screenshot({path:path.join(output,'map-fit-all-change-types.png')});
    await p.selectOption('[data-compare-scale]','4');await track('left').press('PageDown');
-   const geometryCheck=await p.evaluate(()=>{const c=NetworkToolkitFileEditor.comparison,rows=c.result.rows.length,map=document.querySelector('[data-compare-map-content]');return ['left','right'].map(side=>{const ta=document.querySelector('[data-compare-text="'+side+'"]'),style=getComputedStyle(ta),line=Math.max(0,(ta.scrollTop-parseFloat(style.paddingTop))/parseFloat(style.lineHeight)),expected=NTKEditorCompare.rowAtLine(c.result.positions[side],line)/rows*map.offsetHeight,marker=document.querySelector('[data-compare-map-viewport="'+side+'"]');return {side,expected,actual:parseFloat(marker.style.top)};});});
+   const geometryCheck=await p.evaluate(()=>{const c=NetworkToolkitFileEditor.comparison,rows=c.result.rows.length,map=document.querySelector('[data-compare-map-content]');return ['left','right'].map(side=>{const editor=document.querySelector('[data-compare-text="'+side+'"]'),scroller=editor.closest('.cm-editor').querySelector('.cm-scroller'),view=scroller.getBoundingClientRect(),line=[...editor.querySelectorAll('.cm-line[data-source-line]')].find(el=>el.getBoundingClientRect().bottom>view.top),sourceLine=Number(line.dataset.sourceLine)-1,row=c.result.rows.findIndex(item=>item[side]===sourceLine),lineHeight=parseFloat(getComputedStyle(line).lineHeight),visualRow=Math.max(0,row+(view.top-line.getBoundingClientRect().top)/lineHeight),expected=visualRow/rows*map.offsetHeight,marker=document.querySelector('[data-compare-map-viewport="'+side+'"]');return {side,expected,actual:parseFloat(marker.style.top)};});});
    for(const g of geometryCheck)assert(Math.abs(g.expected-g.actual)<1,JSON.stringify(g));
    if(output)await p.screenshot({path:path.join(output,'map-zoom-5x.png')});
    check('separate additions/removals/modifications/gaps and pixel-accurate per-document viewport markers');

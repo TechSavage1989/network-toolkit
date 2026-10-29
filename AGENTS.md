@@ -3,6 +3,10 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
+Active authorized candidate:1.17.113. Read docs/RELEASE113_HANDOFF.md.
+The user approved the narrow editor toolbar/saved-connection build/publication.
+Preserve all112 features and its completed closure; final113 evidence pending.
+
 Current published version: 1.17.112. Independent editor views and the Windows/SFTP
 sidebar are published and independently verified. Source/tag: 4d05f6a5a4eb1c315d0a19ccf2eb8daedf2dcb1c;
 tree 3f9278fe6a5a3b1781d71efbd9354e4decf7ac8e. All seven review Checks, automatic Release and

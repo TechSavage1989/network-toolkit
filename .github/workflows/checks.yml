@@ -16,7 +16,7 @@ concurrency:
 jobs:
   browser-editor112:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
         with:
@@ -34,6 +34,38 @@ jobs:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results
         run: node scripts/editor-views112.browser.cjs
+      - name: Prepare exact published112 toolbar baseline
+        if: success() || failure()
+        run: |
+          git fetch --no-tags --depth=1 origin 4d05f6a5a4eb1c315d0a19ccf2eb8daedf2dcb1c
+          test "$(git rev-parse FETCH_HEAD)" = 4d05f6a5a4eb1c315d0a19ccf2eb8daedf2dcb1c
+          mkdir -p "$RUNNER_TEMP/ntk-toolbar-baseline112"
+          git archive 4d05f6a5a4eb1c315d0a19ccf2eb8daedf2dcb1c | tar -xf - -C "$RUNNER_TEMP/ntk-toolbar-baseline112"
+      - name: Check compact113 toolbar and preserved editor operations
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results
+          NTK_TOOLBAR_BASELINE_DIR: ${{ runner.temp }}/ntk-toolbar-baseline112
+        run: node scripts/editor-toolbar113.browser.cjs
+      - name: Check explicit saved connections and editor approval boundaries
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results
+        run: node scripts/editor-saved-connections113.browser.cjs
+      - name: Check adjustable split and comparison dividers
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results
+        run: node scripts/editor-divider113.browser.cjs
+      - name: Check editable aligned comparison and source preservation
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results
+        run: node scripts/editor-alignment113.browser.cjs
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -100,6 +132,18 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Reproduce and audit pinned offline comparison view
+        run: |
+          set -o pipefail
+          cd scripts/vendor/codemirror
+          npm ci --ignore-scripts --no-audit --no-fund --registry=https://registry.npmjs.org
+          npm run verify 2>&1 | tee "$RUNNER_TEMP/network-toolkit-codemirror-rebuild.txt"
+          npm audit --audit-level=low --json --registry=https://registry.npmjs.org > "$RUNNER_TEMP/network-toolkit-codemirror-audit-full.json"
+          npm audit --omit=dev --audit-level=low --json --registry=https://registry.npmjs.org > "$RUNNER_TEMP/network-toolkit-codemirror-audit-runtime.json"
       - name: Verify pinned module checksums and vendored source
         run: |
           go mod download
@@ -137,6 +181,7 @@ jobs:
           path: |
             ${{ runner.temp }}/network-toolkit-vendor-review.patch
             ${{ runner.temp }}/network-toolkit-vuln-*.txt
+            ${{ runner.temp }}/network-toolkit-codemirror-*
           if-no-files-found: error
           retention-days: 7
       - uses: actions/upload-artifact@v7

@@ -1,0 +1,50 @@
+{
+  "checkedAt": "2026-10-28T23:27:54Z",
+  "registry": "https://registry.npmjs.org/",
+  "note": "Historical audit snapshot of this exact lock; not a security audit. Re-run the commands in README.md for current advisories.",
+  "full": {
+    "auditReportVersion": 2,
+    "vulnerabilities": {},
+    "metadata": {
+      "vulnerabilities": {
+        "info": 0,
+        "low": 0,
+        "moderate": 0,
+        "high": 0,
+        "critical": 0,
+        "total": 0
+      },
+      "dependencies": {
+        "prod": 7,
+        "dev": 27,
+        "optional": 26,
+        "peer": 0,
+        "peerOptional": 0,
+        "total": 33
+      }
+    }
+  },
+  "runtime": {
+    "auditReportVersion": 2,
+    "vulnerabilities": {},
+    "metadata": {
+      "vulnerabilities": {
+        "info": 0,
+        "low": 0,
+        "moderate": 0,
+        "high": 0,
+        "critical": 0,
+        "total": 0
+      },
+      "dependencies": {
+        "prod": 7,
+        "dev": 27,
+        "optional": 26,
+        "peer": 0,
+        "peerOptional": 0,
+        "total": 33
+      }
+    }
+  },
+  "lockSHA256": "b60a0c192ead9aa192c7b85738fca76b810d6bcdaf9054270b91c06489653c6f"
+}

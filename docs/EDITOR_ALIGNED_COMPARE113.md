@@ -1,0 +1,14 @@
+# Editable aligned comparison (113)
+
+Comparison mode uses the pinned, offline CodeMirror state/view core. Ordinary single and split editing retain the existing textareas. The existing bounded line-comparison algorithm and document/undo objects remain authoritative; this is a presentation adapter, not a new merge algorithm or document format.
+
+- Real source text, UTF-16 selections and source line numbers never include visual alignment gaps. Empty block decorations add measured height at zero-length source positions. Added/removed rows and changed tokens use the same semantic hues as the two overview tracks; a compact visible key explains them.
+- Both panes remain editable. Native contenteditable input/copy/cut/paste/selection belongs to CodeMirror; explicit undo/redo calls the application's existing document history. The source facade used by Find/Replace and save controls returns the exact source, not rendered text. Existing newline/encoding metadata remains owned by the editor.
+- Each logical row uses the greater of the two measured wrapped heights, followed by source-free padding on the shorter side. Missing rows pause the corresponding source line count. The shared pixel model drives hunk navigation and both map viewports after wrapping, font or divider changes.
+- Layout/highlight results require the same document object, source revision/text and generation. Composition defers redecoration/rebinding; parent document/window controls refuse destructive switching/closing until composition finishes. No persistence, connection, credential, transfer-schema or backend permission is added.
+- Existing comparison limits remain 2,097,152 characters and 30,000 source lines per side, and 2,000,000 line-diff cells. Exceeding them keeps editable source with an explicit comparison-limit notice. Intraline matching adds a bounded 40,000-cell per-line / 1,000,000 shared-work budget with Unicode-safe prefix/suffix fallback. Syntax painting keeps its existing limits.
+- Missing aligned components produce a visible local-component warning and retain usable unaligned source editors; they do not count as successful aligned comparison acceptance.
+
+Focused local tests cover the real core-state/source-facade contract, source/history/Unicode preservation, frozen state and stale/IME presentation guards. They do not substitute for rendered browser input/clipboard, wrapped-gap/map geometry or native-window acceptance. Those are required hosted fixtures, using synthetic text only.
+
+CodeMirror's MIT notices and exact pinned provenance are shipped under `web/assets/vendor/codemirror`; no runtime downloads or network document processing are involved. Official presentation reference: https://github.com/codemirror/merge/blob/main/src/deco.ts (zero-source-length block decorations). The application does not bundle or use the merge package.

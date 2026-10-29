@@ -1,0 +1,101 @@
+{
+  "description": "Offline, core-only CodeMirror state/view bundle. No merge/diff, file access, credentials, CDN or runtime module loading.",
+  "global": "NetworkToolkitCodeMirror",
+  "exports": [
+    "Annotation",
+    "Compartment",
+    "Decoration",
+    "EditorSelection",
+    "EditorState",
+    "EditorView",
+    "RangeSetBuilder",
+    "StateEffect",
+    "StateField",
+    "Transaction",
+    "WidgetType",
+    "drawSelection",
+    "dropCursor",
+    "keymap",
+    "lineNumbers"
+  ],
+  "bundler": {
+    "name": "esbuild",
+    "version": "0.28.2",
+    "format": "iife",
+    "platform": "browser",
+    "target": "es2020",
+    "minify": true,
+    "sourcemap": false
+  },
+  "inputs": {
+    "entrySHA256": "bb92d33fbaef5768867113d1ce5ce5e9db2d62e947fb4e6a8c1886f5483c1f42",
+    "lockSHA256": "b60a0c192ead9aa192c7b85738fca76b810d6bcdaf9054270b91c06489653c6f",
+    "buildScriptSHA256": "aa455e050283eaaed0c898d01a4c1f97542c522fb82212ae3f2d74c115cc7e72"
+  },
+  "packages": [
+    {
+      "name": "@codemirror/state",
+      "version": "6.7.6",
+      "license": "MIT",
+      "repository": "git+https://code.haverbeke.berlin/codemirror/state.git",
+      "tarball": "https://registry.npmjs.org/@codemirror/state/-/state-6.7.6.tgz",
+      "integrity": "sha512-kAz+AncRtKuIknedxT1bq4XwXv4UowhbkHU1myPrtVb/jZtImWuV5BXzv5vK6i3kYACsdiZiQKFQQ5Mq7elW8w==",
+      "licenseSHA256": "05c6130cda97e7600ca91427a41e8a065efcf82365fc0293e7de80faec494c07"
+    },
+    {
+      "name": "@codemirror/view",
+      "version": "6.43.15",
+      "license": "MIT",
+      "repository": "git+https://code.haverbeke.berlin/codemirror/view.git",
+      "tarball": "https://registry.npmjs.org/@codemirror/view/-/view-6.43.15.tgz",
+      "integrity": "sha512-HHsfpqFeHyXLs983pSRe38Xajs0vFWZQ2BuX0m7Ki8w3jZ5iD8cuR3lBz2/5/X53Dhf32SBHKh6rtSTB6tKeGw==",
+      "licenseSHA256": "05c6130cda97e7600ca91427a41e8a065efcf82365fc0293e7de80faec494c07"
+    },
+    {
+      "name": "@marijn/find-cluster-break",
+      "version": "1.0.4",
+      "license": "MIT",
+      "repository": "git+https://code.haverbeke.berlin/marijn/find-cluster-break.git",
+      "tarball": "https://registry.npmjs.org/@marijn/find-cluster-break/-/find-cluster-break-1.0.4.tgz",
+      "integrity": "sha512-Wy0V7+SGUjnF9/TkiM1hKVDPj7jKXduPNboMVtHTA8dySMURWqfg/JZ9E2Sq8JgSJmkl7k7Qe9FLeMSrSraWmQ==",
+      "licenseSHA256": "9360b00fdd091f05c783b568bdd46c679c41b72415599252de98949462ea1acb"
+    },
+    {
+      "name": "crelt",
+      "version": "1.0.7",
+      "license": "MIT",
+      "repository": "git+https://code.haverbeke.berlin/marijn/crelt.git",
+      "tarball": "https://registry.npmjs.org/crelt/-/crelt-1.0.7.tgz",
+      "integrity": "sha512-aK6BbWfhf4U/wCcLHKPJl/xa6VkVstRaPywWtMKGwuOLc/wZTyQYuoxgvZnNsBvv7Kg3YTBQYYBCggcviQczuA==",
+      "licenseSHA256": "23852ebf6aef7fadffc92514b3c5df163a8651f2c3ed0dbb494cb49d93bd5de5"
+    },
+    {
+      "name": "style-mod",
+      "version": "4.1.4",
+      "license": "MIT",
+      "repository": "git+https://code.haverbeke.berlin/marijn/style-mod.git",
+      "tarball": "https://registry.npmjs.org/style-mod/-/style-mod-4.1.4.tgz",
+      "integrity": "sha512-XXWIQt633/EpAFx8aZDOTjBzrCaGmhvEQlQo6MVPfa2OzO2cWo+4hV9h+6UkHYlXGfy+ODXKUdP7Pthmcu5ATw==",
+      "licenseSHA256": "cb4474e26547397169061d3586c00022cda5330a1b64fa13e872319f3b63aff1"
+    },
+    {
+      "name": "w3c-keyname",
+      "version": "2.2.8",
+      "license": "MIT",
+      "repository": "git+https://github.com/marijnh/w3c-keyname.git",
+      "tarball": "https://registry.npmjs.org/w3c-keyname/-/w3c-keyname-2.2.8.tgz",
+      "integrity": "sha512-dpojBhNsCNN7T82Tm7k26A6G9ML3NkhDsnw9n/eoxSRlVBB4CEtIQ/KTCLI2Fwf3ataSXRhYFkQi3SlnFwPvPQ==",
+      "licenseSHA256": "869c30f368eb08735e779027b9f4bc9fea2f39624351856aebe42741f0bc0884"
+    }
+  ],
+  "artifacts": {
+    "codemirror.js": {
+      "bytes": 221682,
+      "sha256": "c307ad0c160960f0927f5107a8a8102ba123bfecb4f6ea73711b9e2985a6be0d"
+    },
+    "LICENSES.txt": {
+      "bytes": 6889,
+      "sha256": "5c9c97bfbb6cbea2323abaf70567cd5373ec6051f4ad5db3c57f09eee1b1acb7"
+    }
+  }
+}

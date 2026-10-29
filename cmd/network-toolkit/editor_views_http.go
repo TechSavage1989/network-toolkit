@@ -78,6 +78,9 @@ func (a *application) handleEditorViews(w http.ResponseWriter, r *http.Request) 
 	}
 	caller := editorRequestView(r)
 	path := strings.TrimPrefix(r.URL.Path, "/api/editor-views")
+	if m.handleSavedConnections(w, r, caller, path) {
+		return
+	}
 	if m.handleExplorerAccess(w, r, caller, path) {
 		return
 	}

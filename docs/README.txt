@@ -1,10 +1,10 @@
-NETWORK TOOLKIT 1.17.112
+NETWORK TOOLKIT 1.17.113
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.112
+CURRENT RELEASE - 1.17.113
 
-Release details: RELEASE_NOTES_1.17.112.txt
-Previous release: docs/releases/RELEASE_NOTES_1.17.111.txt
+Release details: RELEASE_NOTES_1.17.113.txt
+Previous release: docs/releases/RELEASE_NOTES_1.17.112.txt
 Full release-note archive: docs/releases/README.md
 
 The editor has independent left/right tab groups and a normal split view. Tabs
@@ -26,10 +26,10 @@ outlines are stable through background refreshes, including stopped scans.
 
 The redundant top bar is removed: computer identity is in the sidebar brand,
 and Theme/App settings are in its footer. Text Editor uses compact Move / merge
-access instead of a permanent destination row. Open local file and Connected
-session controls independently expand when needed; main-window choices persist,
-while detached-window choices remain in that window for its lifetime. Collapsing
-forms returns space to the actual editing and comparison surfaces.
+access instead of a permanent destination row. More and Connected session stay
+compact in the main toolbar; only their contents expand below. Local open/create
+actions remain available without a redundant disclosure. Collapsing forms returns
+space to the actual editing and comparison surfaces.
 
 Copy server/client file locations in explicitly labeled network, remote-relative
 or local-disk formats; listener addresses and endpoints are copyable without

@@ -1,0 +1,37 @@
+/* The editable comparison shares the editor palette; spacers are not source text. */
+.nt-compare-aligned .nt-compare-summary{display:flex;align-items:center;flex-wrap:wrap;gap:4px 10px}
+.nt-compare-aligned .nt-compare-legend{padding:0;gap:7px;line-height:1.4;align-items:center}
+.nt-compare-aligned .nt-compare-legend .gap{color:var(--muted)}
+.nt-compare-aligned .nt-compare-pane>.nt-editor-tabs{height:34px;min-height:34px;max-height:34px;flex-wrap:nowrap}
+.nt-compare-aligned .nt-compare-surface{display:flex;flex-direction:column}
+.nt-compare-aligned .cm-editor{height:100%;min-height:0;flex:1;min-width:0;background:var(--nt-code-bg,var(--input));color:var(--nt-code-fg,var(--text));font:var(--nt-editor-font,13px)/1.55 var(--mono,Consolas,monospace)}
+.nt-compare-aligned .cm-editor.cm-focused{outline:none}
+.nt-compare-aligned .cm-editor .cm-scroller{overflow:auto;min-width:0;min-height:0;font:inherit;line-height:inherit;overscroll-behavior:contain}
+.nt-compare-aligned .cm-editor .cm-content{padding:10px 0 20px;min-height:100%;font:inherit;line-height:inherit;caret-color:var(--nt-code-fg,var(--text));tab-size:var(--nt-editor-tab,4)}
+.nt-compare-aligned .cm-editor .cm-line{padding:0 10px;line-height:inherit}
+.nt-compare-aligned .cm-editor .cm-content.cm-lineWrapping{white-space:pre-wrap;overflow-wrap:anywhere;word-break:normal}
+.nt-compare-aligned .cm-editor .cm-gutters{background:var(--nt-code-bg,var(--input));color:var(--muted);border-right:1px solid var(--border);font:inherit}
+.nt-compare-aligned .cm-editor .cm-lineNumbers .cm-gutterElement{padding:0 6px 0 5px;min-width:calc(3ch + 11px);font:inherit}
+.nt-compare-aligned .cm-editor .cm-cursor{border-left-color:var(--nt-code-fg,var(--text))}
+.nt-compare-aligned .cm-editor .cm-selectionBackground{background:var(--accentBg)!important}
+.nt-compare-aligned .cm-editor .cm-content ::selection{background:var(--accentBg)}
+.nt-compare-aligned .nt-ed-comment{color:var(--nt-code-comment,#97c8aa)}
+.nt-compare-aligned .nt-ed-string{color:var(--nt-code-string,#edcb98)}
+.nt-compare-aligned .nt-ed-keyword{color:var(--nt-code-keyword,#a8bbff)}
+.nt-compare-aligned .nt-ed-number{color:var(--nt-code-number,#ddb8f2)}
+.nt-compare-aligned .nt-ed-property{color:var(--nt-code-property,#99dbe7)}
+.nt-compare-aligned .nt-compare-source-line.added{background:color-mix(in srgb,var(--good) 28%,transparent);box-shadow:inset 3px 0 var(--good)}
+.nt-compare-aligned .nt-compare-source-line.removed{background:color-mix(in srgb,var(--bad) 28%,transparent);box-shadow:inset 3px 0 var(--bad)}
+.nt-compare-aligned .nt-compare-source-line.changed{background:color-mix(in srgb,var(--warn) 28%,transparent);box-shadow:inset 3px 0 var(--warn)}
+.nt-compare-aligned .nt-compare-intraline{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:2px;border-radius:2px}
+.nt-compare-aligned .nt-compare-intraline.added{background:color-mix(in srgb,var(--good) 55%,transparent)}
+.nt-compare-aligned .nt-compare-intraline.removed{background:color-mix(in srgb,var(--bad) 55%,transparent)}
+.nt-compare-aligned .nt-compare-intraline.changed{background:color-mix(in srgb,var(--warn) 55%,transparent)}
+.nt-compare-aligned .nt-compare-gap{background:repeating-linear-gradient(135deg,color-mix(in srgb,var(--muted) 12%,transparent) 0 4px,color-mix(in srgb,var(--muted) 5%,transparent) 4px 8px);box-sizing:border-box;pointer-events:auto}
+.nt-compare-aligned-measure{white-space:pre-wrap;overflow-wrap:anywhere;word-break:normal}
+.nt-compare-aligned-measure>div{box-sizing:border-box;padding:0 var(--line-right,10px) 0 var(--line-left,10px);font:inherit;line-height:inherit}
+@media(forced-colors:active){.nt-compare-aligned .nt-compare-source-line:not(.equal){outline:1px dotted CanvasText;outline-offset:-1px}.nt-compare-aligned .nt-compare-gap{background:Canvas;outline:1px dashed GrayText;outline-offset:-1px}.nt-compare-aligned .nt-compare-intraline{outline:1px solid Highlight}}
+
+.nt-compare-aligned .nt-ed-variable,.nt-compare-aligned .nt-ed-type{color:var(--nt-code-property,#78d7dc)}
+.nt-compare-aligned .nt-ed-function{color:var(--nt-code-keyword,#91b7ff)}
+.nt-compare-aligned .nt-ed-operator,.nt-compare-aligned .nt-ed-punctuation{color:var(--nt-code-fg,var(--text))}

@@ -179,7 +179,10 @@ body:has(.nt-editor-embedded) #toolWorkspace>#pageContent{grid-row:1!important;g
 .nt-editor-more>summary,.nt-compare-settings>summary{list-style:none;cursor:pointer}
 .nt-editor-more>summary::-webkit-details-marker,.nt-compare-settings>summary::-webkit-details-marker{display:none}
 .nt-editor-more>summary::after,.nt-compare-settings>summary::after{content:' ▾'}
-.nt-editor-more[open],.nt-compare-settings[open]{flex-basis:100%;order:10}
+.nt-compare-settings[open]{flex-basis:100%;order:10}
+.nt-editor-more,.nt-editor-more[open]{flex:0 0 auto;order:0}
+.nt-editor-more-actions{flex:0 0 auto;padding:5px 8px!important;border-bottom:1px solid var(--line);max-height:35vh;overflow:auto}
+.nt-editor-more-actions .btn{min-height:28px;padding:4px 8px;font-size:11px}
 .nt-editor-more-actions,.nt-compare-settings>div{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding-top:5px}
 .nt-editor.is-comparing [data-ed="compare"]{display:none}
 .nt-editor.is-comparing :is([data-ed="find"],[data-ed="replace"],[data-ed="goto"]){display:none}
@@ -292,3 +295,8 @@ body:has(.nt-editor:not([hidden]) [data-ed-files-sidebar]:not([hidden])) .toast-
 .nt-editor-files-activity .rb-activity{padding:5px;max-height:165px;border:0;margin:0}
 .nt-editor-files-activity .rb-activity-list{max-height:105px}
 .nt-editor-files-activity .rb-activity>.row{flex-wrap:wrap}
+
+.nt-editor-compare-menu{width:min(420px,calc(100vw - 16px))}
+.nt-editor-compare-menu-title{padding:5px 9px;font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.nt-editor-compare-menu button{display:flex;flex-direction:column;align-items:flex-start;white-space:normal;overflow-wrap:anywhere;text-align:left}
+.nt-editor-compare-menu button small{font-size:10px;color:var(--muted)}

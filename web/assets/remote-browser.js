@@ -30,13 +30,14 @@ function pageActive(k){return !!sidebarMount(k)||(state.activePage===k||state.ac
 const sidebarMounts=new Map();
 function sidebarMount(k){const value=sidebarMounts.get(k),editor=value?.host?.closest?.('#networkToolkitFileEditor');return value?.host?.isConnected&&!value.host.closest('[data-ed-files-sidebar]')?.hidden&&editor&&!editor.hidden?value:null;}
 function rootNode(k){const mount=sidebarMount(k);return mount?mount.host.querySelector('[data-rb-root="'+k+'"]'):document.querySelector('#pageContent [data-rb-root="'+k+'"]')}
-function mountSidebar(host,side='local'){sidebarMounts.set('ssh',{host,side:side==='remote'?'remote':'local'});get('ssh').active=side==='remote'?'remote':'local';render('ssh');}
-function unmountSidebar(host){const value=sidebarMounts.get('ssh');if(value?.host===host){sidebarMounts.delete('ssh');host.replaceChildren();if((state.activePage==='sftp'||state.activePage==='ssh')&&root.NetworkToolkitTransfers?.mode(state.activePage)==='client')render('ssh');}}
+function mountSidebar(host,side='local',protocol='ssh'){if(!TYPES.has(protocol)||detachedEditor()&&protocol!=='ssh')throw Error('This editor may use approved SFTP connections only.');for(const [k,value] of sidebarMounts)if(value.host===host)sidebarMounts.delete(k);sidebarMounts.set(protocol,{host,side:side==='remote'?'remote':'local'});get(protocol).active=side==='remote'?'remote':'local';render(protocol);}
+function unmountSidebar(host){for(const [k,value] of sidebarMounts)if(value.host===host){sidebarMounts.delete(k);host.replaceChildren();if((state.activePage===k||k==='ssh'&&state.activePage==='sftp')&&root.NetworkToolkitTransfers?.mode(state.activePage)==='client')render(k);}}
 
-async function requestPayload(k,action,extra={}){const c=configurations[k],m=get(k);
+async function requestPayload(k,action,extra={}){const c=configurations[k],m=get(k);const editorCheck=m.editorProfileCheck&&(!m.connected||['connect','fingerprint'].includes(action))?m.editorProfileCheck:null;
  if(k==='ssh'&&!['connect','fingerprint'].includes(action)&&m.connectionId)return {protocol:'ssh',action,connectionId:m.connectionId,...extra};
  if(k==='ssh'&&!['connect','fingerprint'].includes(action)&&m.sessionId)return {protocol:'ssh',action,sessionId:m.sessionId,...extra};
  if(k==='ssh'&&!['connect','fingerprint'].includes(action))throw new Error('Connect to an SSH/SFTP session before using remote files.');
+ editorCheck?.();
  const details={protocol:k,action,host:c.host.trim(),port:Number(c.port),username:c.username.trim(),password:c.password,keyPath:c.keyPath,privateKey:c.privateKey||'',passphrase:c.passphrase,authMode:c.authMode,fingerprint:c.fingerprint.trim(),sshCompatibility:c.sshCompatibility,security:c.security,...extra};
  if(k==='ssh'&&action==='connect'&&(state.terminalProfiles||[]).some(row=>row.id===m.profileId&&row.type==='ssh'))details.profileId=m.profileId;
  // Only credential references enter the browser request. The engine resolves
@@ -49,6 +50,7 @@ async function requestPayload(k,action,extra={}){const c=configurations[k],m=get
  }else if(k==='ssh'&&!m.profileManualAuth)credentialId=c.credentialId||'';
  if(credentialId&&action!=='fingerprint'){
   const credential=await root.NetworkToolkitCredentials.prepare({...details,credentialId});
+  editorCheck?.();
   details.credentialId=credential.credentialId;details.username=credential.username;details.authMode=credential.authMethod;
   for(const field of ['password','privateKey','passphrase','keyPath'])delete details[field];
  }
@@ -183,7 +185,7 @@ async function matchingTerminalSession(profile){
   return sessions.find(x=>String(x.host).toLowerCase()===String(profile.host).toLowerCase()&&Number(x.port)===Number(profile.port)&&String(x.username||'')===String(profile.username||''));
  }catch(_error){return null;}
 }
-async function useSavedSSHProfile(id){
+async function useSavedSSHProfile(id,check=null){
  const m=get('ssh'),c=configurations.ssh,profile=sshProfileById(id);
  if(!profile){note('ssh','The selected SSH profile was deleted. Refresh and choose an existing profile.','error');return;}
  if(m.connecting||m.profileSelectionPending)return;
@@ -192,13 +194,16 @@ async function useSavedSSHProfile(id){
   // The terminal has already authenticated and verified the host key. A
   if(m.connected&&m.connectionId&&!m.profileManualAuth&&m.profileId===id&&profile.host===c.host&&Number(profile.port)===Number(c.port)&&profile.username===c.username){note('ssh','Using the connected SSH/SFTP session.','success');return;}
   // matching active session is the authoritative SSH connection for SFTP.
-  const active=await matchingTerminalSession(profile);
+  const selectedEpoch=m.connectionEpoch;const active=await matchingTerminalSession(profile);
+  check?.();if(check&&selectedEpoch!==m.connectionEpoch)throw Error('The connection selection changed while choosing the saved profile.');
   if(active){await connectTerminal('ssh',active.id);return;}
   if(!profileReadyForAuthentication(profile))await loadProfile('ssh',id);
+  check?.();
   if(!profileReadyForAuthentication(profile))return;
   if(!c.fingerprint){await showSSHProfileVerification(profile);return;}
   if(profile.credentialId&&!m.profileManualAuth){
-   try{await root.NetworkToolkitCredentials.prepare({...profile,protocol:'ssh'});}catch(error){m.showSettings=true;render('ssh');note('ssh',error.message,'error');return;}
+   const selectedIdentity=connectionIdentity('ssh');
+   try{await root.NetworkToolkitCredentials.prepare({...profile,protocol:'ssh'});check?.();if(check&&(selectedIdentity!==connectionIdentity('ssh')||!profileReadyForAuthentication(profile)))throw Error('The connection settings changed during credential approval. Choose the profile again.');}catch(error){m.showSettings=true;render('ssh');note('ssh',error.message,'error');return;}
    await connect('ssh');return;
   }
   if(c.authMode==='key'?(!!c.privateKey||!!c.keyPath):!!c.password){await connect('ssh');return;}
@@ -357,7 +362,7 @@ function connectionUI(k){const c=configurations[k],m=get(k),expanded=true;if(det
  '<div class="rb-notice" data-rb-feedback hidden></div></section>';}
 function controls(k,side){const title=side==='local'?'This computer':'Remote '+(k==='ssh'?'SFTP':'FTP')+' server';return '<section class="rb-pane" data-rb-pane="'+side+'"><div class="rb-pane-heading"><strong>'+title+'</strong><span data-rb-count="'+side+'">0 items</span></div><div class="rb-navigation"><button class="btn small ghost" title="Back" data-rb-nav="back" data-rb-side="'+side+'">'+icon('arrowLeft')+'</button><button class="btn small ghost" title="Forward" data-rb-nav="forward" data-rb-side="'+side+'">'+icon('arrowRight')+'</button><button class="btn small ghost" title="Parent folder" data-rb-nav="up" data-rb-side="'+side+'">'+icon('arrowUp')+'</button><button class="btn small ghost" title="Home directory" aria-label="Home directory" data-rb-nav="home" data-rb-side="'+side+'">'+icon('home')+'</button><button class="btn small ghost" title="Root directory" aria-label="Root directory" data-rb-nav="root" data-rb-side="'+side+'">/</button><button class="btn small ghost" title="Refresh" data-rb-nav="refresh" data-rb-side="'+side+'">'+icon('refresh')+'</button><input class="mono" data-rb-path="'+side+'" aria-label="'+title+' folder path"><button class="btn small ghost" data-rb-nav="go" data-rb-side="'+side+'">Go</button></div><nav class="transfer-breadcrumbs" data-rb-breadcrumbs="'+side+'" aria-label="'+title+' breadcrumbs"></nav>'+(side==='remote'?'<p class="transfer-drop-hint" data-rb-drop-destination>Connect before dropping files. Every drop requires upload confirmation.</p>':'')+'<div class="rb-filter"><input data-rb-filter="'+side+'" aria-label="Filter '+title+' files" placeholder="Filter names..."><small data-rb-selection="'+side+'"></small></div><div class="rb-scroll" data-rb-scroll="'+side+'" tabindex="0" aria-label="'+title+' file list"><table><thead><tr>'+['name','size','modified'].map(s=>'<th data-rb-sort="'+s+'" data-rb-side="'+side+'">'+{name:'Name',size:'Size',modified:'Modified'}[s]+'</th>').join('')+'</tr></thead><tbody data-rb-rows="'+side+'"></tbody></table></div><div class="rb-pane-footer">Drag single files into Explorer · Hover briefly to prepare · F2 rename · Right-click for actions</div></section>'}
 function explorerUI(k){return '<section class="panel rb-explorer"><div class="rb-toolbar"><button class="btn small primary" data-rb-action="upload">'+icon('arrowRight')+' Upload</button><button class="btn small ghost" data-rb-action="download">'+icon('arrowLeft')+' Download</button><span class="rb-divider"></span><button class="btn small ghost" data-rb-action="mkdir">'+icon('plus')+' New folder</button><button class="btn small ghost" data-rb-action="rename">'+icon('edit')+' Rename / move</button><button class="btn small ghost" data-rb-action="delete">'+icon('trash')+' Delete</button><button class="btn small ghost" data-rb-action="edit">'+icon('edit')+' Edit</button>'+'<button class="btn small ghost" data-rb-action="fullEditor" title="Open the Text Editor in Tools">'+icon('fileEdit')+' Text Editor</button><button class="btn small ghost" data-rb-action="preview">'+icon('file')+' Preview</button><button class="btn small ghost" data-rb-action="copyPath">'+icon('copy')+' Copy path</button><button type="button" class="btn small ghost" data-rb-action="copyLocation">Copy location</button><button class="btn small ghost" data-rb-action="copyFiles">Copy</button><button class="btn small ghost" data-rb-action="pasteFiles">Paste</button><button class="btn small ghost" data-rb-action="newFile">+ File</button><button class="btn small ghost" data-rb-action="uploadOS">Upload files</button><input data-rb-os-files type="file" multiple hidden><label class="rb-overwrite"><input type="checkbox" data-rb-overwrite> Overwrite</label></div>'+sessionTools(k)+'<div class="rb-panes" data-rb-panes style="--rb-left:'+get(k).split+'%">'+controls(k,'local')+'<div class="rb-splitter" data-rb-splitter role="separator" tabindex="0" aria-label="Resize browser columns"></div>'+controls(k,'remote')+'</div></section><section class="panel rb-activity"><div class="row between"><h2>Transfer queue and activity</h2><div class="row gap6"><button class="btn small ghost" data-rb-action="stopPending">Stop pending</button><button class="btn small ghost" data-rb-action="clearActivity">Clear</button></div></div><div class="rb-queue-status" data-rb-queue>Ready</div><div class="rb-activity-list" data-rb-activity></div></section>'}
-function render(k){if(!TYPES.has(k))return;loadSaved(k);const mount=sidebarMount(k),host=mount?.host||document.getElementById('pageContent');if(!host)return;host.innerHTML='<div class="rb-app'+(mount?' is-editor-sidebar':'')+'" data-rb-root="'+k+'"'+(mount?' data-sidebar-side="'+mount.side+'"':'')+'>'+(mount?'<details class="nt-editor-files-connection"><summary class="btn small ghost">SFTP connection</summary>'+connectionUI(k)+'</details>':connectionUI(k))+explorerUI(k)+'</div>';const m=get(k),app=rootNode(k);
+function render(k){if(!TYPES.has(k))return;loadSaved(k);const mount=sidebarMount(k);if(!mount&&!pageActive(k))return;const host=mount?.host||document.getElementById('pageContent');if(!host)return;host.innerHTML='<div class="rb-app'+(mount?' is-editor-sidebar':'')+'" data-rb-root="'+k+'"'+(mount?' data-sidebar-side="'+mount.side+'"':'')+'>'+(mount?'<details class="nt-editor-files-connection"><summary class="btn small ghost">'+(k==='ssh'?'SFTP':'FTP / FTPS')+' connection</summary>'+connectionUI(k)+'</details>':connectionUI(k))+explorerUI(k)+'</div>';const m=get(k),app=rootNode(k);
  if(mount){if(detachedEditor())app.dataset.delegated='true';const feedback=app.querySelector('[data-rb-feedback]');app.prepend(feedback);m.active=mount.side;const toolbar=app.querySelector('.rb-toolbar'),details=document.createElement('details');details.className='nt-editor-files-actions';details.innerHTML='<summary class="btn small ghost">Actions</summary>';toolbar.before(details);details.append(toolbar);const quick=document.createElement('div');quick.className='nt-editor-files-quick';quick.innerHTML='<button type="button" class="btn small ghost" data-rb-action="edit">Open</button><button type="button" class="btn small ghost" data-rb-action="newFile">New file</button><button type="button" class="btn small ghost" data-rb-action="mkdir">New folder</button>';details.before(quick);const activity=app.querySelector('.rb-activity'),activityBox=document.createElement('details');activityBox.className='nt-editor-files-activity';activityBox.innerHTML='<summary>Activity</summary>';activity.before(activityBox);activityBox.append(activity);}
 
  if(!mount)root.NetworkToolkitTransferClientLayout?.mount(k,{app,settings:app.querySelector('.rb-connect'),library:app.querySelector('.rb-session-library'),libraryHTML:tab=>{m.libraryTab=tab;m.libraryOpen=true;return libraryHTML(k);}});
@@ -729,6 +734,29 @@ function prepareDeviceConnection(protocol,host,port){
 }
 function resetLayout(k){if(!TYPES.has(k))return;const m=get(k);m.split=50;for(const side of ['local','remote']){m[side].sort='name';m[side].reverse=false;m[side].filter='';m[side].selected.clear();m[side].anchor=-1}remember(k);if(pageActive(k))render(k)}
 function revisionFor(sessionId){return get('ssh').sessionOptions.find(x=>x.id===sessionId)?.revision??(typeof terminalSessionRevision==='function'?terminalSessionRevision(sessionId):0)}
+
+// The editor reuses this existing connection UI, never a second credential path.
+async function useSavedEditorProfile(k,id,expected){
+ if(detachedEditor()||!TYPES.has(k))throw Error('Saved connections must be opened in the main window.');
+ const m=get(k),lookup=()=>k==='ssh'?(state.terminalProfiles||[]).find(p=>p.id===id&&p.type==='ssh'):ftpProfileRow(id),profile=lookup();
+ if(!profile)throw Error('The saved profile no longer exists. Refresh the list.');
+ const protocol=k==='ssh'?'ssh':['explicit','implicit'].includes(profile.security)?'ftps':'ftp';
+ if(expected&&(profile.name!==expected.name||profile.host!==expected.host||Number(profile.port)!==expected.port||protocol!==expected.protocol))throw Error('The saved profile changed. Refresh and review it again.');
+ if(m.connecting||m.busy||m.profileSelectionPending||m.pendingProfileLoad||m.pendingCredentialSave||m.pendingClose||m.pendingKeyRead||m.remote.loading||document.querySelector('#rbSSHProfileAuthForm,#rbSSHProfileVerifyForm,#rbSSHKeyChangeForm'))throw Error('Finish or cancel the existing connection operation first.');
+ if(m.connected||m.connectionId||m.sessionId){
+  const c=configurations[k];if(m.connected&&m.profileId===id&&c.host===profile.host&&Number(c.port)===Number(profile.port)&&c.username===profile.username&&(k==='ssh'||c.security===profile.security))return {source:'client:'+k,pending:false};
+  throw Error('The file client already has another active connection. Use that connected session, or save its open documents and disconnect it explicitly first.');
+ }
+ const signature=JSON.stringify(profile),check=()=>{if(JSON.stringify(lookup())!==signature)throw Error('The saved profile changed during connection approval. Cancel and choose it again.');};
+ m.autoTerminal='';root.NetworkToolkitEditorFiles.showConnection(k);
+ m.editorProfileCheck=()=>{if(m.profileId!==id){if(m.editorConnectionPending)throw Error('The connection selection changed during approval.');return;}check();const c=configurations[k];if(c.host!==profile.host||Number(c.port)!==Number(profile.port)||c.username!==profile.username)throw Error('The saved connection destination changed. Choose the profile again.');};
+ m.editorConnectionPending=true;try{if(k==='ssh')await useSavedSSHProfile(id,check);else await useLibraryItem(k,'saved',id);
+ check();if(m.lastError)throw Error(m.lastError);
+ rootNode(k)?.querySelector('.nt-editor-files-connection')?.setAttribute('open','');
+ if(!m.connected)rootNode(k)?.clientSidebarSelect?.('settings');
+ return {source:m.connected?'client:'+k:'',pending:!m.connected};
+ }finally{m.editorConnectionPending=false;rootNode(k)?.querySelector('.nt-editor-files-connection')?.setAttribute('open','');}
+}
 async function openLibraryEntry(k,kind,id){if(!TYPES.has(k))return;
  state.transferModes=state.transferModes||{};state.transferModes[k==='ssh'?'sftp':'ftp']='client';state.fileTransferProtocol=k==='ssh'?'sftp':'ftp';
  if(typeof navigate==='function')navigate(k==='ssh'?'sftp':'ftp');
@@ -736,5 +764,5 @@ async function openLibraryEntry(k,kind,id){if(!TYPES.has(k))return;
 }
 document.addEventListener('credentials-updated',()=>{for(const k of TYPES)syncCredentials(k);});
 document.addEventListener('change',event=>{const input=event.target.closest?.('[data-rb-key-file]');if(!input?.files?.length)return;const k=input.closest('[data-rb-root]')?.dataset.rbRoot;if(k!=='ssh')return;const file=input.files[0];if(file.size>1048576){note(k,'Private key file exceeds 1 MiB.','error');return;}const m=get(k);m.pendingKeyRead=(m.pendingKeyRead||0)+1;void file.text().then(text=>{configurations.ssh.privateKey=text;m.profileManualAuth=true;render('ssh');}).catch(error=>note(k,error.message,'error')).finally(()=>{m.pendingKeyRead--;});},true);
-events();root.NetworkToolkitRemoteBrowser={mountSidebar,unmountSidebar,render,get,load,request,configurations,resetLayout,useTerminalSession,connectTerminal,loadProfile,revisionFor,dropFiles,dropTransfer,edit,requestPayload,useSavedSSHProfile,openLibraryEntry,libraryRows,connect,disconnect,reconnect,openTerminal,sessionTools,positionSessionTools,invalidateConnection,connectionIdentity,dragIdentity,canNativeDrag,storeConnectionCredential,approveConnectionCredential,saveSharedSSHProfile,saveFTPProfile,prepareDeviceConnection,locationSnapshot,copyLocation};
+events();root.NetworkToolkitRemoteBrowser={useSavedEditorProfile,mountSidebar,unmountSidebar,render,get,load,request,configurations,resetLayout,useTerminalSession,connectTerminal,loadProfile,revisionFor,dropFiles,dropTransfer,edit,requestPayload,useSavedSSHProfile,openLibraryEntry,libraryRows,connect,disconnect,reconnect,openTerminal,sessionTools,positionSessionTools,invalidateConnection,connectionIdentity,dragIdentity,canNativeDrag,storeConnectionCredential,approveConnectionCredential,saveSharedSSHProfile,saveFTPProfile,prepareDeviceConnection,locationSnapshot,copyLocation};
 })(globalThis);

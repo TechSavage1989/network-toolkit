@@ -1,0 +1,10 @@
+{
+  "name": "network-toolkit-codemirror-vendor",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Offline, reproducible CodeMirror state/view bundle for Network Toolkit comparison panes",
+  "license": "UNLICENSED",
+  "scripts": {"build": "node build.mjs", "verify": "node build.mjs --check"},
+  "dependencies": {"@codemirror/state": "6.7.6", "@codemirror/view": "6.43.15"},
+  "devDependencies": {"esbuild": "0.28.2"}
+}

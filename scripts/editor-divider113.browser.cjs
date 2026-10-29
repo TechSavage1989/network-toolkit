@@ -1,0 +1,68 @@
+'use strict';
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),{chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
+const current=path.resolve(__dirname,'..'),output=process.env.NTK_BROWSER_OUTPUT_DIR||process.env.TOOLKIT_TEST_OUTPUT;
+const report={passed:false,checks:[],layouts:[],errors:[],assetErrors:[]},contexts=[];let browser,lastPage;
+const marker='SYNTHETIC_DIVIDER113_DOCUMENT',text=marker+'\n'+Array.from({length:180},(_,i)=>'const sample'+i+' = "'+('synthetic wrapped content '.repeat(i%9===0?18:2))+'";').join('\n'),childID='c'.repeat(32);
+const check=message=>{report.checks.push(message);console.log('PASS '+message);};
+async function settle(page){await page.waitForFunction(()=>{const side=document.querySelector('#sidebar');return !side||document.body.classList.contains('editor-window')||innerWidth>800||side.getBoundingClientRect().right<=1;});await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))));}
+async function start(root,mode,label,initialSaved){
+ const context=await browser.newContext({viewport:{width:1440,height:1000}});contexts.push(context);const page=await context.newPage();lastPage=page;page.setDefaultTimeout(20000);
+ const owned={},requests=[];let saved=initialSaved?structuredClone(initialSaved):{activePage:'editor',appUpdatePreferences:{enabled:false},editorPreferences:{wordWrap:true,syntax:true,fontSize:13,palette:'auto'}};
+ page.on('pageerror',e=>report.errors.push(label+': '+e.message));
+ await context.route('https://divider113.toolkit.test/**',async route=>{try{const req=route.request(),url=new URL(req.url()),p=url.pathname,body=req.postData()?req.postDataJSON():null;requests.push({method:req.method(),path:p});if(p.startsWith('/api/')){
+  let data={};if(p==='/api/status')data={version:require(path.join(root,'package.json')).version,os:'windows',arch:'amd64',editorWindowAvailable:true};
+  else if(p==='/api/state'){if(req.method()==='GET')data=saved;else{assert(!JSON.stringify(body).includes(marker),'Document bytes must not enter persisted settings');saved=structuredClone(body);data={ok:true};}}
+  else if(p==='/api/jobs')data=[];
+  else if(p==='/api/terminals'||p==='/api/remote-browser')data={sessions:[]};
+  else if(p==='/api/activity')data={tools:{}};
+  else if(p==='/api/terminal-views')data={available:false,views:[],owners:{}};
+  else if(p==='/api/editor-views'||p==='/api/editor-views/current')data={available:true,ownerInstanceId:'synthetic-layout-engine',self:mode==='detached'?childID:'',views:[],incoming:[],outgoing:[],owned,recovery:[]};
+  else if(p==='/api/editor-views/current/state'){for(const d of body.batch.documents)owned[d.uid]=1;data={owned};}
+  else if(p.includes('/events')){await new Promise(resolve=>setTimeout(resolve,60));data={events:[],sessions:[],after:0};}
+  else if(req.method()!=='GET')throw Error('Unexpected operation in presentation-only fixture: '+req.method()+' '+p);
+  return route.fulfill({contentType:'application/json',body:JSON.stringify(data)});
+ }
+ const html=p==='/'||p==='/editor-view/'+childID;let file=path.join(root,'web',html?'index.html':p);if(!fs.existsSync(file))file=path.join(root,p);try{let bytes=fs.readFileSync(file);if(html)bytes=bytes.toString().replaceAll('__SESSION_TOKEN__','synthetic-divider113').replaceAll('__WINDOW_MODE__',mode==='detached'?'editor':'main').replaceAll('__EDITOR_VIEW__',mode==='detached'?JSON.stringify({id:childID,ownerInstanceId:'synthetic-layout-engine'}):'null').replaceAll('__TERMINAL_VIEW__','null').replaceAll('src="assets/','src="/assets/').replaceAll('href="assets/','href="/assets/').replaceAll('src="../assets/','src="/assets/').replaceAll('href="../assets/','href="/assets/');return route.fulfill({body:bytes,contentType:html?'text/html':p.endsWith('.js')?'application/javascript':p.endsWith('.css')?'text/css':p.endsWith('.svg')?'image/svg+xml':'application/octet-stream'});}catch{report.assetErrors.push(label+': '+p);return route.fulfill({status:404,body:''});}
+ }catch(error){report.errors.push(label+': '+error.message);await route.fulfill({status:500,contentType:'application/json',body:JSON.stringify({error:'Synthetic fixture rejected an unexpected operation'})}).catch(()=>{});}
+ });
+ await page.goto('https://divider113.toolkit.test/'+(mode==='detached'?'editor-view/'+childID:''));await page.waitForFunction(()=>window.__networkToolkitStartupState===1&&online);await page.evaluate(mode=>navigate(mode==='modal'?'terminal':'editor'),mode);
+ await page.evaluate(async text=>{await NetworkToolkitFileEditor.open({id:'layout-left',path:'layout-left.js',source:'Synthetic local',binding:{kind:'local'},create:true,initialContent:text,read:async()=>({content:text}),write:async()=>{throw Error('No save expected');}});},text);
+ await page.locator('[data-ed-text]').press('Control+Home');await page.locator('[data-ed-text]').press('X');
+ await page.evaluate(async text=>{await NetworkToolkitFileEditor.open({id:'layout-right',path:'layout-right.js',source:'Synthetic local',binding:{kind:'local'},create:true,initialContent:text.replace('sample90 =','changed90 ='),read:async()=>({content:text}),write:async()=>{throw Error('No save expected');}});},text);
+ await page.locator('[data-ed-text]').press('Control+Home');await page.locator('[data-ed-text]').press('X');
+ await page.waitForFunction(()=>NetworkToolkitEditorWindows.state.enabled&&!NetworkToolkitEditorWindows.state.running);return {page,context,requests,get saved(){return saved;}};
+}
+async function ready(page,comparing){await settle(page);if(comparing)await page.waitForFunction(()=>document.querySelector('[data-compare-map]')?.getAttribute('aria-disabled')==='false');await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));}
+async function geometry(page){return page.evaluate(()=>{const rect=selector=>{const r=document.querySelector(selector).getBoundingClientRect();return {x:r.x,y:r.y,width:r.width,height:r.height,right:r.right,bottom:r.bottom}};const grid=rect('.nt-compare-grid'),left=rect('[data-compare-pane=left]'),right=rect('[data-compare-pane=right]'),divider=rect('[data-compare-divider]'),map=rect('.nt-compare-map-panel');return {grid,left,right,divider,map,ratio:left.width/(left.width+right.width),value:Number(document.querySelector('[data-compare-divider]').getAttribute('aria-valuenow')),overflow:Math.max(0,document.documentElement.scrollWidth-innerWidth)};});}
+async function retained(page){assert(await page.evaluate(()=>{
+ const ed=NetworkToolkitFileEditor;
+ return [...ed.documents.values()].every((d,i)=>d===dividerOriginal.documents[i].ref&&d.content===dividerOriginal.documents[i].text&&d.dirty===dividerOriginal.documents[i].dirty&&d.editRevision===dividerOriginal.documents[i].revision&&JSON.stringify(d.undo)===dividerOriginal.documents[i].undo&&JSON.stringify(d.redo)===dividerOriginal.documents[i].redo)&&JSON.stringify(ed.viewGroups)===dividerOriginal.groups&&['left','right'].every(side=>{const ta=NetworkToolkitFileEditor.comparison?NetworkToolkitFileEditor.comparison.sourceView(side):document.querySelector('[data-compare-text='+side+']');return ta.selectionStart===dividerOriginal.selection[side][0]&&ta.selectionEnd===dividerOriginal.selection[side][1];});
+ }),'Resize must preserve documents, edit history, selection and view membership');}
+async function baseline(page){await page.evaluate(()=>{
+ for(const [i,side] of ['left','right'].entries()){const ta=NetworkToolkitFileEditor.comparison?NetworkToolkitFileEditor.comparison.sourceView(side):document.querySelector('[data-compare-text='+side+']');ta.setSelectionRange(15+i*10,25+i*10);}
+ window.dividerOriginal={documents:[...NetworkToolkitFileEditor.documents.values()].map(d=>({ref:d,text:d.content,dirty:d.dirty,revision:d.editRevision,undo:JSON.stringify(d.undo),redo:JSON.stringify(d.redo)})),groups:JSON.stringify(NetworkToolkitFileEditor.viewGroups),selection:Object.fromEntries(['left','right'].map(side=>{const ta=NetworkToolkitFileEditor.comparison?NetworkToolkitFileEditor.comparison.sourceView(side):document.querySelector('[data-compare-text='+side+']');return [side,[ta.selectionStart,ta.selectionEnd]];}))};
+ });}
+async function assertGeometry(page,comparing){const g=await geometry(page),total=g.left.width+g.right.width,bounds=await page.evaluate(width=>NTKEditorCompare.splitBounds(width),total);assert(g.overflow<=1,JSON.stringify(g));assert.equal(Math.round(g.divider.width),6);assert(Math.abs(g.left.right-g.divider.x)<1.1&&Math.abs(g.divider.right-g.right.x)<1.1);assert(g.left.width>=total*bounds.min-1.5&&g.right.width>=total*bounds.min-1.5);assert(g.ratio>=bounds.min-.01&&g.ratio<=bounds.max+.01);assert(Math.abs(g.ratio*100-g.value)<=1);if(comparing)assert(Math.abs(g.right.right-g.map.x)<1.1);return g;}
+(async()=>{
+ assert(output,'Set isolated TOOLKIT_TEST_OUTPUT');fs.mkdirSync(output,{recursive:true});assert(fs.readFileSync(path.join(current,'web/index.html'),'utf8').includes('editor-splitters.css'),'Product must include the shared divider CSS');browser=await chromium.launch({headless:true});
+ for(const mode of ['main','detached','modal']){
+  const f=await start(current,mode,'divider-'+mode),page=f.page;await page.locator('[data-ed=split]').click();await page.locator('.is-split-view').waitFor();
+  for(const comparing of [false,true]){
+   if(comparing){await page.locator('[data-compare-divider]').press('ArrowRight');await ready(page,false);const ratio=Number(await page.locator('[data-compare-divider]').getAttribute('aria-valuenow'));assert(ratio>50);await page.locator('[data-ed=compare]').click();await ready(page,true);assert.equal(Number(await page.locator('[data-compare-divider]').getAttribute('aria-valuenow')),ratio,'Same editor preserves ratio when switching modes');}
+   for(const width of [1440,820,390])for(const theme of ['light','dark']){
+    await page.setViewportSize({width,height:1000});await page.evaluate(theme=>setTheme(theme),theme);await ready(page,comparing);await baseline(page);
+    const handle=page.locator('[data-compare-divider]');await handle.focus();await handle.press('Enter');await ready(page,comparing);let g=await assertGeometry(page,comparing);assert(Math.abs(g.ratio-.5)<.01);
+    const dragY=g.divider.y+Math.min(90,g.divider.height/2);await page.mouse.move(g.divider.x+g.divider.width/2,dragY);await page.mouse.down();await page.mouse.move(g.grid.x+(g.left.width+g.right.width)*.67+g.divider.width/2,dragY,{steps:12});await page.mouse.up();await ready(page,comparing);g=await assertGeometry(page,comparing);assert(g.ratio>.57,'Real pointer must resize both panes');await retained(page);
+    const moved=g.left.width;await handle.press('ArrowLeft');await ready(page,comparing);g=await assertGeometry(page,comparing);assert(Math.abs(moved-g.left.width-20)<2,'ArrowLeft uses existing20px splitter step');
+    await handle.press('Home');await ready(page,comparing);assert.equal(await handle.getAttribute('aria-valuenow'),await handle.getAttribute('aria-valuemin'));await assertGeometry(page,comparing);
+    await handle.press('End');await ready(page,comparing);assert.equal(await handle.getAttribute('aria-valuenow'),await handle.getAttribute('aria-valuemax'));await assertGeometry(page,comparing);
+    await handle.press('Enter');await ready(page,comparing);await retained(page);g=await assertGeometry(page,comparing);assert(Math.abs(g.ratio-.5)<.01);
+    if(comparing){await page.locator('[data-compare-pane=left] .cm-scroller').evaluate(el=>{el.scrollTop=700;});await page.waitForFunction(()=>Math.abs(Number(document.querySelector('[data-compare-track=left]').getAttribute('aria-valuenow'))-Number(document.querySelector('[data-compare-track=right]').getAttribute('aria-valuenow')))<=1);const map=await page.evaluate(()=>['left','right'].map(side=>{const marker=document.querySelector('[data-compare-map-viewport='+side+']'),track=document.querySelector('[data-compare-track='+side+']');return {line:Number(track.getAttribute('aria-valuenow')),top:parseFloat(marker.style.top),height:parseFloat(marker.style.height),total:track.clientHeight,hidden:marker.hidden};}));assert(map.every(x=>x.line>0&&!x.hidden&&x.top>=0&&x.height>0&&x.top+x.height<=x.total+2),JSON.stringify(map));report.layouts.push({mode,comparing,width,theme,...g,map});}else report.layouts.push({mode,comparing,width,theme,...g});
+    if((width===1440&&theme==='light')||(width===390&&theme==='dark'))await page.screenshot({path:path.join(output,'editor-divider113-'+mode+'-'+(comparing?'compare':'split')+'-'+width+'-'+theme+'.png')});
+   }
+   check(mode+' '+(comparing?'comparison':'split')+' real pointer and keyboard resize, minimums, themes, narrow bounds and dirty-selection retention');
+  }
+  assert(!f.requests.some(r=>r.method==='POST'&&!['/api/state','/api/editor-views/current/state'].includes(r.path)),'Resizing must not read, save, connect or transfer');await f.context.close();
+ }
+ assert.equal(report.layouts.length,36);assert.deepEqual(report.errors,[]);assert.deepEqual(report.assetErrors,[]);report.passed=true;
+})().catch(async error=>{report.failure=error.stack||String(error);console.error(report.failure);if(lastPage&&!lastPage.isClosed())await lastPage.screenshot({path:path.join(output,'editor-divider113-failure.png')}).catch(()=>{});process.exitCode=1;}).finally(async()=>{fs.writeFileSync(path.join(output,'editor-divider113-results.json'),JSON.stringify(report,null,2));for(const context of contexts)await context.close().catch(()=>{});await browser?.close();});

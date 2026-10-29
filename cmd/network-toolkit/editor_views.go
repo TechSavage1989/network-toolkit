@@ -118,10 +118,11 @@ type editorViewInfo struct {
 	Name  string `json:"name"`
 }
 type editorWindow struct {
-	explorer  *editorExplorerAccess
-	info      editorViewInfo
-	token     string
-	lastPulse time.Time
+	savedConnection *editorSavedConnectionRequest
+	explorer        *editorExplorerAccess
+	info            editorViewInfo
+	token           string
+	lastPulse       time.Time
 }
 type editorDocumentGrant struct {
 	filePath string
@@ -633,7 +634,7 @@ func (m *editorViewRegistry) state(caller string) map[string]any {
 			}
 		}
 	}
-	return map[string]any{"available": m.app.launchEditorView != nil, "self": caller, "views": views, "incoming": incoming, "outgoing": outgoing, "owned": owned, "recovery": recovery, "ownerInstanceId": m.app.windowInstanceID, "dragRequests": m.dragRequestsLocked(caller), "explorerRequests": m.explorerRequestsLocked(caller)}
+	return map[string]any{"available": m.app.launchEditorView != nil, "self": caller, "views": views, "incoming": incoming, "outgoing": outgoing, "owned": owned, "recovery": recovery, "ownerInstanceId": m.app.windowInstanceID, "dragRequests": m.dragRequestsLocked(caller), "explorerRequests": m.explorerRequestsLocked(caller), "savedConnectionRequests": m.savedConnectionRequestsLocked(caller)}
 }
 func (m *editorViewRegistry) offer(caller string, req editorTransferRequest) (map[string]any, error) {
 	if !editorHexID.MatchString(req.ID) {

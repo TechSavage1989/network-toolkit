@@ -149,22 +149,41 @@ test('navigation captures view before the mounted editor is hidden and restores 
  h.api.detachPage();assert.equal(doc.view.top,620);assert.equal(doc.view.left,35);ta.scrollTop=0;ta.scrollLeft=0;h.api.renderPage(mount);assert.equal(h.api.active,doc);assert.equal(ta.scrollTop,620);assert.equal(ta.scrollLeft,35);assert.equal(ta.selectionStart,600);assert.equal(ta.selectionEnd,609);
 });
 
-test('file disclosures default closed, preserve explicit choices and never persist document text',async()=>{
+test('compact Connected disclosure preserves explicit choice without recreating documents or storing content',async()=>{
  const h=harness();h.c.OFFLINE=true;h.document.body.appendChild=h.document.body.append;await h.first();const mount=h.document.createElement('div');h.document.append(mount);h.api.renderPage(mount);
- const button=name=>h.document.querySelector('[data-ed-panel-toggle="'+name+'"]');
- assert.equal(button('local').getAttribute('aria-expanded'),'false');assert.equal(button('remote').getAttribute('aria-expanded'),'false');
+ const button=h.document.querySelector('[data-ed-panel-toggle="remote"]');assert.equal(h.document.querySelector('[data-ed-panel-toggle="local"]'),null);assert.equal(h.document.querySelector('#ntEditorLocalPath'),null);assert.equal(button.getAttribute('aria-expanded'),'false');assert(button.closest('.nt-editor-toolbar'));
  const doc=h.api.active,ta=h.document.querySelector('[data-ed-text]');ta.setSelectionRange(34,55);ta.scrollTop=123;h.click('upper');const before={text:doc.content,undo:[...doc.undo],revision:doc.editRevision};
- h.document.emit('click',button('local'));assert.equal(button('local').getAttribute('aria-expanded'),'true');assert.equal(h.c.state.editorPreferences.localPanelOpen,true);assert.equal(h.c.state.editorPreferences.remotePanelOpen,false);assert.equal(h.document.querySelector('[data-ed-page-panel="local"]').hidden,false);
- h.document.emit('click',button('remote'));h.document.emit('click',button('local'));assert.equal(h.c.state.editorPreferences.localPanelOpen,false);assert.equal(h.c.state.editorPreferences.remotePanelOpen,true);
+ h.document.emit('click',button);assert.equal(button.getAttribute('aria-expanded'),'true');assert.equal(h.c.state.editorPreferences.remotePanelOpen,true);assert.equal(h.document.querySelector('[data-ed-page-panel="remote"]').hidden,false);
  const root=h.document.getElementById('networkToolkitFileEditor'),wrap=root.querySelector('[data-ed-wrap]');wrap.checked=true;h.c.getComputedStyle=()=>({lineHeight:'20px',font:'13px monospace',paddingLeft:'0',paddingRight:'0'});root.emit('change',wrap);
- assert.equal(h.c.state.editorPreferences.localPanelOpen,false);assert.equal(h.c.state.editorPreferences.remotePanelOpen,true);assert(!JSON.stringify(h.c.state).includes('Line 299'));
- h.api.detachPage();h.api.renderPage(mount);assert.equal(button('local').getAttribute('aria-expanded'),'false');assert.equal(button('remote').getAttribute('aria-expanded'),'true');assert.equal(doc.content,before.text);assert.deepEqual([...doc.undo],before.undo);assert.equal(doc.editRevision,before.revision);assert.equal(ta.selectionStart,34);assert.equal(ta.scrollTop,123);
+ assert.equal(h.c.state.editorPreferences.remotePanelOpen,true);assert(!JSON.stringify(h.c.state).includes('Line 299'));
+ h.api.detachPage();h.api.renderPage(mount);assert.equal(h.document.querySelector('[data-ed-panel-toggle="remote"]'),button);assert.equal(button.getAttribute('aria-expanded'),'true');assert.equal(doc.content,before.text);assert.deepEqual([...doc.undo],before.undo);assert.equal(doc.editRevision,before.revision);assert.equal(ta.selectionStart,34);assert.equal(ta.scrollTop,123);
 });
-test('stored open and closed disclosure booleans load strictly without enabling a remote operation',async()=>{
+test('retired local preference is preserved while only strict remote booleans control visible UI',async()=>{
  for(const value of [{localPanelOpen:true,remotePanelOpen:false},{localPanelOpen:false,remotePanelOpen:true},{localPanelOpen:'true',remotePanelOpen:1}]){
   const h=harness();h.c.OFFLINE=true;h.c.state.editorPreferences=value;await h.first();const mount=h.document.createElement('div');h.document.append(mount);h.api.renderPage(mount);
-  assert.equal(h.document.querySelector('[data-ed-panel-toggle="local"]').getAttribute('aria-expanded'),String(value.localPanelOpen===true));assert.equal(h.document.querySelector('[data-ed-panel-toggle="remote"]').getAttribute('aria-expanded'),String(value.remotePanelOpen===true));assert.equal(h.api.active.loading,false);
+  assert.equal(h.document.querySelector('[data-ed-panel-toggle="local"]'),null);const button=h.document.querySelector('[data-ed-panel-toggle="remote"]');assert.equal(button.getAttribute('aria-expanded'),String(value.remotePanelOpen===true));assert.equal(h.api.active.loading,false);
+  h.document.emit('click',button);assert.equal(h.c.state.editorPreferences.localPanelOpen,value.localPanelOpen===true);
  }
+});
+test('More stays in the toolbar while its separate action row toggles and restores keyboard focus',async()=>{
+ const h=harness(),ta=await h.first(),root=h.document.getElementById('networkToolkitFileEditor'),more=root.querySelector('.nt-editor-more'),actions=root.querySelector('#ntEditorMoreActions'),summary=more.querySelector('summary');
+ assert(more.closest('.nt-editor-toolbar'));assert(!actions.closest('.nt-editor-toolbar'));assert(actions.hasAttribute('hidden'));const doc=h.api.active;ta.setSelectionRange(8,16);ta.scrollTop=40;
+ more.open=true;more.emit('toggle',more);assert.equal(actions.hidden,false);assert.equal(summary.getAttribute('aria-expanded'),'true');assert(actions.querySelector('[data-ed="openLocalPath"]'));assert(actions.querySelector('[data-ed="newLocalPath"]'));
+ h.document.activeElement=actions.querySelector('[data-ed="trim"]');summary.focus=()=>{h.document.activeElement=summary;};more.open=false;more.emit('toggle',more);assert.equal(actions.hidden,true);assert(h.document.activeElement===summary);assert.equal(h.api.active,doc);assert.equal(ta.selectionStart,8);assert.equal(ta.scrollTop,40);
+});
+test('replacement local path actions cancel safely, read only on acceptance and defer new-file writes to Save',async()=>{
+ const h=harness();await h.first();const requests=[];h.c.api=async(path,method,body)=>{requests.push({path,method,body});return {content:'synthetic opened text',hash:'read-hash'};};const root=h.document.getElementById('networkToolkitFileEditor'),original=h.api.active;
+ h.click('openLocalPath');root.emit('click',root.querySelector('[data-ed-dialog-action="cancel"]'));await settle();assert.equal(h.api.active,original);assert.equal(requests.length,0);
+ h.click('openLocalPath');root.querySelector('[data-ed-dialog-input]').value='C:\\synthetic\\opened.txt';root.emit('click',root.querySelector('[data-ed-dialog-action="accept"]'));await settle();assert.equal(h.api.active.content,'synthetic opened text');assert.equal(requests.length,1);assert.equal(requests[0].body.action,'read-text');
+ h.click('newLocalPath');root.querySelector('[data-ed-dialog-input]').value='C:\\synthetic\\new.txt';root.emit('click',root.querySelector('[data-ed-dialog-action="accept"]'));await settle();assert.equal(h.api.active.path,'C:\\synthetic\\new.txt');assert.equal(requests.length,1);assert.equal(h.api.active.content,'');assert.equal(h.api.active.binding.kind,'local');
+});
+test('saved connection listing and selection never connect; explicit action is single-flight and ignores stale completion',async()=>{
+ const h=harness();h.c.OFFLINE=true;await h.first();const pending=deferred(),calls=[];h.c.NetworkToolkitEditorSavedConnections={list:async()=>({profiles:[{id:'ssh:one',name:'Synthetic one',protocol:'ssh',host:'fixture.test',port:22},{id:'ssh:two',name:'Synthetic two',protocol:'ssh',host:'other.test',port:2222}],detached:false}),connect:id=>{calls.push(id);return pending.promise;}};
+ await h.api.refreshConnectedSources();const picker=h.document.getElementById('ntEditorRemoteSource'),connect=h.document.getElementById('ntEditorConnectSaved');picker.value='saved:ssh:one';h.document.emit('change',picker);assert.equal(calls.length,0);assert.equal(connect.hidden,false);assert.equal(connect.textContent,'Connect');assert.equal(h.document.getElementById('ntEditorOpenRemote').disabled,true);
+ h.document.emit('click',connect);h.document.emit('click',connect);assert.deepEqual(calls,['ssh:one']);assert.equal(connect.disabled,true);picker.value='saved:ssh:two';h.document.emit('change',picker);pending.resolve({pending:true,source:'client:ssh',message:'Old completion'});await settle();assert.equal(picker.value,'saved:ssh:two');assert(!h.document.getElementById('ntEditorRemoteHint').textContent.includes('Old completion'));assert.equal(connect.disabled,false);
+});
+test('detached saved selection labels explicit request and preserves approval guidance without a file operation',async()=>{
+ const h=harness();h.c.OFFLINE=true;await h.first();let calls=0;h.c.NetworkToolkitEditorSavedConnections={list:async()=>({profiles:[{id:'ssh:one',name:'Synthetic',protocol:'ssh',host:'fixture.test',port:22}],detached:true}),connect:async()=>{calls++;return {requested:true,message:'Await main approval; nothing connected.'};}};await h.api.refreshConnectedSources();const picker=h.document.getElementById('ntEditorRemoteSource'),connect=h.document.getElementById('ntEditorConnectSaved');picker.value='saved:ssh:one';h.document.emit('change',picker);assert.equal(connect.textContent,'Request connection');assert.equal(calls,0);h.document.emit('click',connect);await settle();assert.equal(calls,1);assert.equal(h.document.getElementById('ntEditorRemoteHint').textContent,'Await main approval; nothing connected.');assert.equal(h.document.getElementById('ntEditorOpenRemote').disabled,true);
 });
 
 
@@ -184,4 +203,36 @@ test('an empty split cannot reuse or edit the current document when creation rea
  h.api.openSplit();const current=h.api.active,before=[...h.api.documents.values()].map(d=>({uid:d.uid,content:d.content,dirty:d.dirty,undo:[...d.undo]})),groups=JSON.stringify(h.api.viewGroups);
  assert.equal(await options.createInView('right'),null);assert.equal(h.api.active,current);assert.equal(h.api.documents.size,12);assert.equal(JSON.stringify(h.api.viewGroups),groups);
  assert.deepEqual([...h.api.documents.values()].map(d=>({uid:d.uid,content:d.content,dirty:d.dirty,undo:[...d.undo]})),before);
+});
+
+function compareHarness(h){const instances=[];h.c.innerWidth=1440;h.c.innerHeight=1000;h.c.NTKEditorCompare={create:options=>{options.container.innerHTML='<div data-ed-tabs data-ed-view="left"></div><div data-ed-tabs data-ed-view="right"></div>';const instance={options,textarea:h.document.querySelector('[data-ed-text]'),refresh(){this.selection=options.selection();},snapshot(){return {...options.selection(),scale:0,sync:true};},restore(value){options.choose('left',value.left);options.choose('right',value.right);this.refresh();},showDocument(){this.refresh();},dispose(){}};instances.push(instance);instance.refresh();return instance;}};return instances;}
+function contextTab(h,d){const root=h.document.getElementById('networkToolkitFileEditor');root.emit('contextmenu',root.querySelector('[data-ed-uid="'+d.uid+'"]'),{clientX:120,clientY:160});return root;}
+test('Compare to captures clicked UID as left, excludes self, disambiguates names and restores split membership',async()=>{
+ const h=harness(),ta=await h.first(),left=h.api.active,instances=compareHarness(h);left.path='/left/same.txt';left.dirty=true;const other=await h.api.open({id:'other',path:'/right/same.txt',source:'Synthetic remote',create:true,initialContent:'other unsaved',read:async()=>({}),write:async()=>({})});other.dirty=true;other.undo=['previous'];
+ const third=await h.api.newDocument();h.api.openSplit();h.api.moveDocumentToView(other.uid,'right');const groups=JSON.stringify(h.api.viewGroups.groups),state=[...h.api.documents.values()].map(d=>({uid:d.uid,text:d.content,dirty:d.dirty,undo:[...d.undo],redo:[...d.redo]}));
+ const root=contextTab(h,other);root.emit('click',root.querySelector('[data-ed-context-action="compareTo"]'));const menu=root.querySelector('.nt-editor-compare-menu');assert(menu);assert.equal(menu.querySelector('[data-ed-compare-target="'+other.uid+'"]'),null);assert(menu.textContent.includes('/left/same.txt'));assert(menu.textContent.includes('Untitled'));assert(menu.textContent.includes('Unsaved'));assert(menu.textContent.includes('Tab 1'));
+ root.emit('click',menu.querySelector('[data-ed-compare-target="'+left.uid+'"]'));assert.equal(h.api.comparison.selection.left,other.id);assert.equal(h.api.comparison.selection.right,left.id);assert.equal(h.api.active,other);assert.equal(h.api.documents.size,3);assert.deepEqual([...h.api.documents.values()].map(d=>({uid:d.uid,text:d.content,dirty:d.dirty,undo:[...d.undo],redo:[...d.redo]})),state);
+ h.api.closeComparison();assert.equal(JSON.stringify(h.api.viewGroups.groups),groups);assert.equal(h.api.viewGroups.split,true);assert.equal(h.api.documents.get(third.id),third);assert(instances.length>=3);
+});
+test('Compare to is disabled without another document and cancellation or stale/pending selection does not change state',async()=>{
+ const h=harness();await h.first();const first=h.api.active,instances=compareHarness(h);let root=contextTab(h,first);assert(root.querySelector('[data-ed-context-action="compareTo"]').hasAttribute('disabled'));root.emit('keydown',root.querySelector('.nt-editor-tab-menu'),{key:'Escape'});assert.equal(root.querySelector('.nt-editor-tab-menu'),null);
+ const other=await h.api.newDocument(),groups=JSON.stringify(h.api.viewGroups.groups);root=contextTab(h,first);root.emit('click',root.querySelector('[data-ed-context-action="compareTo"]'));root.emit('click',root.querySelector('[data-ed-compare-cancel]'));assert.equal(root.querySelector('.nt-editor-tab-menu'),null);assert.equal(instances.length,0);assert.equal(JSON.stringify(h.api.viewGroups.groups),groups);
+ root=contextTab(h,first);root.emit('click',root.querySelector('[data-ed-context-action="compareTo"]'));first.saving=true;root.emit('click',root.querySelector('[data-ed-compare-target="'+other.uid+'"]'));assert.equal(instances.length,0);first.saving=false;
+ root=contextTab(h,first);root.emit('click',root.querySelector('[data-ed-context-action="compareTo"]'));const target=root.querySelector('[data-ed-compare-target="'+other.uid+'"]');h.api.documents.delete(other.id);root.emit('click',target);assert.equal(instances.length,0);assert.equal(h.api.active,first);assert.equal(h.api.documents.size,1);
+});
+
+test('unfinished comparison input blocks rearrangement, transfer and close without discarding source state',async()=>{
+ const h=harness(),ta=await h.first(),doc=h.api.active,instances=compareHarness(h);doc.binding={kind:'local'};h.api.openComparison();const view=instances.at(-1),adapter=h.api.windowAdapter,original=doc.content;
+ assert.equal(typeof view.options.selectionChanged,'function');ta.setSelectionRange(8,8);view.options.selectionChanged();assert.match(h.document.querySelector('[data-ed-position]').textContent,/Col 9/);
+ view.composing=true;assert.match(h.api.canReorderDocuments(),/pending/);assert.match(adapter.canTransfer([doc.uid]),/composition/);assert.equal(await adapter.prepareWindowClose(),false);assert.equal(doc.frozen,undefined);assert.equal(doc.content,original);
+ view.composing=false;assert.equal(h.api.canReorderDocuments(),'');assert.equal(adapter.canTransfer([doc.uid]),'');doc.dirty=true;
+ const pending=adapter.prepareWindowClose();view.composing=true;const root=h.document.getElementById('networkToolkitFileEditor');root.emit('click',root.querySelector('[data-ed-dialog-action="accept"]'));assert.equal(await pending,false);assert.equal(doc.frozen,undefined);assert.equal(doc.content,original);assert.equal(adapter.hasPendingWindowClose(),false);
+ view.composing=false;assert.equal(adapter.canTransfer([doc.uid]),'');
+});
+
+test('ordinary tab, editor and comparison disposal refuse unfinished source composition',async()=>{
+ const h=harness();await h.first();const doc=h.api.active,instances=compareHarness(h);h.api.openComparison();const view=instances.at(-1),root=h.document.getElementById('networkToolkitFileEditor'),count=h.api.documents.size,original=doc.content;
+ const other=await h.api.newDocument();h.api.activateDocument(doc.id);view.composing=true;assert.equal(h.api.activateDocument(other.id),false);assert.equal(h.api.active,doc);h.api.documents.delete(other.id);view.composing=true;root.emit('click',root.querySelector('[data-ed-close-tab="'+doc.id+'"]'));await settle();assert.equal(h.api.documents.size,count);assert.equal(await h.api.closeAll(),false);assert.equal(h.api.closeComparison(),false);assert.equal(h.api.openSplit(),false);assert.equal(h.api.comparison,view);assert.equal(doc.content,original);
+ view.composing=false;doc.dirty=true;root.emit('click',root.querySelector('[data-ed-close-tab="'+doc.id+'"]'));view.composing=true;root.emit('click',root.querySelector('[data-ed-dialog-action="accept"]'));await settle();assert.equal(h.api.documents.get(doc.id),doc);
+ view.composing=false;const closing=h.api.closeAll();view.composing=true;root.emit('click',root.querySelector('[data-ed-dialog-action="accept"]'));assert.equal(await closing,false);assert.equal(h.api.documents.get(doc.id),doc);assert.equal(h.api.comparison,view);assert.equal(doc.content,original);
 });

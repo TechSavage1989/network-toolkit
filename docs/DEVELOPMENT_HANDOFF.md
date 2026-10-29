@@ -1,5 +1,11 @@
 # Network Toolkit development handoff
 
+## 1.17.113 CANDIDATE — FINAL ACCEPTANCE PENDING
+
+Read docs/RELEASE113_HANDOFF.md. Based on published112 with its completed
+closure retained below. Existing features/security/ownership gates remain;
+local/hosted/public113 evidence is not yet complete.
+
 ## 1.17.112 published and independently verified
 
 Published 2026-10-28T22:23:34Z:

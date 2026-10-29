@@ -1,0 +1,54 @@
+{
+  "verifiedAt": "2026-10-28T23:26:05Z",
+  "registry": "https://registry.npmjs.org/",
+  "directPackages": [
+    {
+      "name": "@codemirror/state",
+      "version": "6.7.6",
+      "publishedAt": "2026-09-22T07:21:29.712Z",
+      "license": "MIT",
+      "repository": {
+        "url": "git+https://code.haverbeke.berlin/codemirror/state.git",
+        "type": "git"
+      },
+      "registryMetadata": "https://registry.npmjs.org/@codemirror%2fstate/6.7.6",
+      "dist": {
+        "tarball": "https://registry.npmjs.org/@codemirror/state/-/state-6.7.6.tgz",
+        "integrity": "sha512-kAz+AncRtKuIknedxT1bq4XwXv4UowhbkHU1myPrtVb/jZtImWuV5BXzv5vK6i3kYACsdiZiQKFQQ5Mq7elW8w==",
+        "shasum": "48af761fae3947745f17fa143cc5b5084225388d"
+      }
+    },
+    {
+      "name": "@codemirror/view",
+      "version": "6.43.15",
+      "publishedAt": "2026-10-19T17:37:46.811Z",
+      "license": "MIT",
+      "repository": {
+        "url": "git+https://code.haverbeke.berlin/codemirror/view.git",
+        "type": "git"
+      },
+      "registryMetadata": "https://registry.npmjs.org/@codemirror%2fview/6.43.15",
+      "dist": {
+        "tarball": "https://registry.npmjs.org/@codemirror/view/-/view-6.43.15.tgz",
+        "integrity": "sha512-HHsfpqFeHyXLs983pSRe38Xajs0vFWZQ2BuX0m7Ki8w3jZ5iD8cuR3lBz2/5/X53Dhf32SBHKh6rtSTB6tKeGw==",
+        "shasum": "3da2515b3919e199b68520a5b6e559c2a4cfbe9e"
+      }
+    },
+    {
+      "name": "esbuild",
+      "version": "0.28.2",
+      "publishedAt": "2026-08-08T20:00:55.454Z",
+      "license": "MIT",
+      "repository": {
+        "url": "git+https://github.com/evanw/esbuild.git",
+        "type": "git"
+      },
+      "registryMetadata": "https://registry.npmjs.org/esbuild/0.28.2",
+      "dist": {
+        "tarball": "https://registry.npmjs.org/esbuild/-/esbuild-0.28.2.tgz",
+        "integrity": "sha512-HKVLS8dvII+xoKW9kmqxbRKrnWEXfJJr/FZhhJmiqIB0e053QNYFqOBouTMO/k5sID4MvCiUCvv8b9M4h32wIA==",
+        "shasum": "0f43bd1bad955b72d24e2261e3abe5957ccf0816"
+      }
+    }
+  ]
+}
