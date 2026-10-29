@@ -8,6 +8,7 @@ class Element {
  get innerHTML(){return this.children.map(c=>c.outerHTML).join('');}set innerHTML(html){this.children=[];for(const child of parse(html))this.append(child);}
  get outerHTML(){if(this.tagName==='#TEXT')return this.text||'';return '<'+this.tagName.toLowerCase()+Object.entries(this.attrs).map(([k,v])=>' '+k+'="'+v+'"').join('')+'>'+this.innerHTML+'</'+this.tagName.toLowerCase()+'>';}
  append(...nodes){for(const node of nodes){node.remove();node.parentElement=this;this.children.push(node);}}
+ after(node){const p=this.parentElement;node.remove();node.parentElement=p;p.children.splice(p.children.indexOf(this)+1,0,node);}
  before(node){const p=this.parentElement;node.remove();node.parentElement=p;p.children.splice(p.children.indexOf(this),0,node);}
  remove(){if(this.parentElement){const p=this.parentElement;p.children.splice(p.children.indexOf(this),1);this.parentElement=null;}}
  insertAdjacentHTML(where,html){const nodes=parse(html);if(where==='beforebegin'){for(const node of nodes)this.before(node);}else if(where==='afterbegin'){for(const node of nodes.reverse()){node.parentElement=this;this.children.unshift(node);}}else this.append(...nodes);}

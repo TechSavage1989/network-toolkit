@@ -694,3 +694,27 @@ func TestEditorRegistryUnreceivedACKSurvivesFullLedger(t *testing.T) {
 		t.Fatal("pending offer receipt accepted")
 	}
 }
+
+func TestEditorComparisonPreferencesOptionalBooleans(t *testing.T) {
+	for _, value := range []bool{false, true} {
+		batch := editorFixtureBatch()
+		batch.Preferences = &editorPreferences{FontSize: 13, Indent: 4, Palette: "auto", Syntax: true, CompareHorizontalSync: value, CompareUnderline: &value, CompareIntralineHighlight: &value}
+		if err := validateEditorBatch(batch); err != nil {
+			t.Fatal(err)
+		}
+		clone := editorCloneBatch(batch)
+		if clone.Preferences.CompareHorizontalSync != value || clone.Preferences.CompareUnderline == nil || *clone.Preferences.CompareUnderline != value || clone.Preferences.CompareIntralineHighlight == nil || *clone.Preferences.CompareIntralineHighlight != value {
+			t.Fatal("comparison preference lost")
+		}
+	}
+	var old editorPreferences
+	if err := json.Unmarshal([]byte(`{"fontSize":13,"palette":"auto"}`), &old); err != nil || old.CompareUnderline != nil || old.CompareIntralineHighlight != nil || old.CompareHorizontalSync {
+		t.Fatal("legacy omitted defaults changed", err)
+	}
+	for _, field := range []string{"compareHorizontalSync", "compareUnderline", "compareIntralineHighlight"} {
+		var bad editorPreferences
+		if err := json.Unmarshal([]byte(`{"`+field+`":"false"}`), &bad); err == nil {
+			t.Fatal("non-boolean accepted", field)
+		}
+	}
+}

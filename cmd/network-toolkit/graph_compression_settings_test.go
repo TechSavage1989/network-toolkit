@@ -9,7 +9,7 @@ import (
 
 func TestGraphCompressionPreferencesSurviveApplicationRestart(t *testing.T) {
 	a := testApplication(t)
-	body := `{"graphTimeRange":{"durationMs":10000,"anchor":"latest","start":"","end":"","recentMs":60000,"compression":{"count":37,"strength":0.75,"curve":0.2}}}`
+	body := `{"graphTimeRange":{"durationMs":10000,"anchor":"latest","start":"","end":"","recentMs":60000,"invertWheelZoom":true,"compression":{"count":37,"strength":0.75,"curve":0.2}}}`
 	response := requestApp(a, "PUT", "/api/state", body, true)
 	if response.Code != 200 {
 		t.Fatalf("state write: %d %s", response.Code, response.Body.String())

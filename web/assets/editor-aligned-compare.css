@@ -35,3 +35,12 @@
 .nt-compare-aligned .nt-ed-variable,.nt-compare-aligned .nt-ed-type{color:var(--nt-code-property,#78d7dc)}
 .nt-compare-aligned .nt-ed-function{color:var(--nt-code-keyword,#91b7ff)}
 .nt-compare-aligned .nt-ed-operator,.nt-compare-aligned .nt-ed-punctuation{color:var(--nt-code-fg,var(--text))}
+
+/* Difference symbols use CodeMirror's native gutter block geometry, not fake text. */
+.nt-compare-aligned .nt-compare-diff-gutter .cm-gutterElement{padding:0 2px;min-width:1.3em;text-align:center}
+.nt-compare-diff-icon{display:inline-block;width:1em;font-weight:700;text-align:center}
+.nt-compare-diff-icon.added{color:var(--good)}.nt-compare-diff-icon.removed{color:var(--bad)}.nt-compare-diff-icon.changed{color:var(--warn)}
+.nt-compare-aligned.no-intraline-underline .nt-compare-intraline{text-decoration:none}
+.nt-compare-aligned.no-intraline-highlight .nt-compare-intraline{background:transparent}
+
+@media(forced-colors:active){.nt-compare-aligned.no-intraline-highlight .nt-compare-intraline{outline:none}}

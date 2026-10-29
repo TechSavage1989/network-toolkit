@@ -8,6 +8,7 @@
     "EditorSelection",
     "EditorState",
     "EditorView",
+    "GutterMarker",
     "RangeSetBuilder",
     "StateEffect",
     "StateField",
@@ -15,6 +16,7 @@
     "WidgetType",
     "drawSelection",
     "dropCursor",
+    "gutter",
     "keymap",
     "lineNumbers"
   ],
@@ -28,9 +30,9 @@
     "sourcemap": false
   },
   "inputs": {
-    "entrySHA256": "bb92d33fbaef5768867113d1ce5ce5e9db2d62e947fb4e6a8c1886f5483c1f42",
+    "entrySHA256": "6b0d5337b772a6fdc028f8215055b723789647741ec982f59da1ea892b90e063",
     "lockSHA256": "b60a0c192ead9aa192c7b85738fca76b810d6bcdaf9054270b91c06489653c6f",
-    "buildScriptSHA256": "aa455e050283eaaed0c898d01a4c1f97542c522fb82212ae3f2d74c115cc7e72"
+    "buildScriptSHA256": "f9c054263629df8a8150cbdb9d9c8c84552aa7596cc60546fd989a4fd9b07dd9"
   },
   "packages": [
     {
@@ -90,8 +92,8 @@
   ],
   "artifacts": {
     "codemirror.js": {
-      "bytes": 221682,
-      "sha256": "c307ad0c160960f0927f5107a8a8102ba123bfecb4f6ea73711b9e2985a6be0d"
+      "bytes": 221968,
+      "sha256": "44e0b46d718b4e765ca09787873c832007252fcedb3dbbc9e311cf7cfc66ef3e"
     },
     "LICENSES.txt": {
       "bytes": 6889,

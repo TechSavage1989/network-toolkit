@@ -14,3 +14,20 @@ test('fit and zoom map coordinates include independent map scrolling',()=>{asser
 test('mixed wrapped line heights map pixels to the same logical difference row',()=>{const left=[0,20,100,120,140],right=[0,40,60,120,140];assert.equal(c.lineAtOffset(left,60),1.5);assert.equal(c.offsetAtLine(right,1.5),50);assert.equal(c.offsetAtLine(left,c.lineAtOffset(left,105)),105);assert.equal(c.lineAtOffset(left,999),4);});
 
 test('zoom visibly expands even one-line documents without changing the line count',()=>{for(const rows of [1,10,30000])for(const scale of [.5,1,2,4])assert.equal(c.mapHeight(rows,400,scale),400*(1+scale));});
+
+test('horizontal synchronization follows either real source continuously and clamps only its peer',()=>{
+ const values={left:{left:0,width:2200,client:200},right:{left:0,width:800,client:200}},writes=[];let enabled=true;
+ const sync=c.createHorizontalSync(side=>values[side],(side,left)=>{values[side].left=left;writes.push({side,left});},()=>enabled);
+ for(const x of [25,50,250,650,900]){sync.input('left');values.left.left=x;sync.scroll('left');assert.equal(values.right.left,Math.min(x,600));sync.scroll('right');assert.equal(values.left.left,x,'clamped peer cannot pull source back');}
+ sync.input('right');values.right.left=120;sync.scroll('right');assert.equal(values.left.left,120);sync.scroll('left');assert.equal(values.right.left,120);
+ enabled=false;sync.input('right');values.right.left=50;sync.scroll('right');assert.equal(values.left.left,120);enabled=true;sync.sync('right');assert.equal(values.left.left,50);
+ const count=writes.length;sync.scroll('left');sync.scroll('right');assert.equal(writes.length,count,'programmatic peer and vertical-only scroll do not loop');
+});
+test('horizontal disabled/wrapped mode preserves preference and handles no overflow safely',()=>{
+ const values={left:{left:120,width:500,client:100},right:{left:0,width:100,client:100}};let wrapped=true,preference=true;
+ const sync=c.createHorizontalSync(side=>values[side],(side,left)=>values[side].left=left,()=>preference&&!wrapped);sync.input('left');sync.scroll('left');assert.equal(values.right.left,0);wrapped=false;sync.sync('left');assert.equal(values.left.left,120);assert.equal(values.right.left,0);preference=false;values.right.left=0;sync.input('right');sync.scroll('right');assert.equal(values.left.left,120);
+});
+
+test('horizontal restores and peer geometry changes cannot become unsolicited user gestures',()=>{const values={left:{left:1000,width:2000,client:200},right:{left:500,width:700,client:200}},writes=[];const sync=c.createHorizontalSync(side=>values[side],(side,left)=>{values[side].left=left;writes.push(side)},()=>true);sync.scroll('right');sync.scroll('left');assert.equal(writes.length,0);sync.input('left');values.left.left=1100;sync.scroll('left');assert.equal(values.right.left,500);sync.reset();values.right.left=100;sync.scroll('right');assert.equal(values.left.left,1100);assert.equal(writes.length,0);});
+
+test('peer width clamping before its acknowledgement cannot seize horizontal source ownership',()=>{const values={left:{left:1200,width:2000,client:500},right:{left:0,width:1000,client:500}},writes=[];const sync=c.createHorizontalSync(side=>values[side],(side,left)=>{values[side].left=left;writes.push({side,left})},()=>true);sync.input('left');sync.scroll('left');assert.equal(values.right.left,500);values.right.width=800;values.right.left=300;sync.scroll('right');assert.equal(values.left.left,1200);assert.equal(writes.length,1);sync.input('right');values.right.left=250;sync.scroll('right');assert.equal(values.left.left,250,'real new peer gesture takes ownership');});

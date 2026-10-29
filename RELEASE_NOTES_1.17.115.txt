@@ -1,0 +1,16 @@
+NETWORK TOOLKIT 1.17.115
+
+Candidate changes
+
+- Compact named local-drive buttons and a persistent, collapsible editor sidebar
+  separate Files browsing from Connections setup and session controls.
+- Compare Options stays in its toolbar. Optional horizontal synchronization,
+  difference-type gutter symbols and independent changed-text underline and
+  highlight settings preserve the original document data and line numbers.
+- Graph wheel zoom defaults to down-to-zoom-in, offers inversion and uses safe
+  sample/time limits while retaining startup behavior and timeline panning.
+- Editor tabs use intentional pointer drag-away detaching, with reorder, cancel
+  and explicit cross-window Move/merge controls preserving acknowledged ownership.
+
+Verification and publication are pending. Final supported interactions and
+measured evidence will be recorded before any authorized release promotion.

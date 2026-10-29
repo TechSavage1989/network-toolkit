@@ -942,8 +942,8 @@ func (h *nativeEditorFixture) exerciseDrag() error {
 		return err
 	}
 	h.phases = append(h.phases, "110 actual mouse reorder preserves active UID, dirty text, undo/redo and selection/scroll")
-	// Escape and an unsupported outside-window release cannot manufacture detach.
-	for _, mode := range []string{"Escape", "Outside"} {
+	// Escape cancels captured-pointer drag; a failed Alt/OLE release never infers detach.
+	for _, mode := range []string{"Escape", "OutsideCancel"} {
 		before, err = h.idle("")
 		if err != nil {
 			return err
@@ -973,7 +973,7 @@ func (h *nativeEditorFixture) exerciseDrag() error {
 			return errors.New("cancelled/unsupported actual drag launched a new window")
 		}
 	}
-	h.phases = append(h.phases, "110 actual Escape and unsupported outside release retain source ownership; no inferred desktop detach")
+	h.phases = append(h.phases, "115 actual Escape and failed Alt/OLE outside release retain source ownership; no inferred failed-drop detach")
 	before, err = h.idle("")
 	if err != nil {
 		return err
@@ -983,15 +983,11 @@ func (h *nativeEditorFixture) exerciseDrag() error {
 	if err != nil {
 		return err
 	}
-	detachPoint := before.Geometry.DetachPoint
-	if math.IsNaN(detachPoint.Left) || math.IsNaN(detachPoint.Top) || math.IsInf(detachPoint.Left, 0) || math.IsInf(detachPoint.Top, 0) || detachPoint.Left <= 0 || detachPoint.Top <= 0 || detachPoint.Left >= before.Geometry.Width || detachPoint.Top >= before.Geometry.Height {
-		return errors.New("computed-style detach point is not inside the actual native client viewport")
-	}
-	child, _, err := h.transferAction("", "new", []nativeEditorDocument{selected}, selected.UID, func() error { return h.nativeInput("Drag", "Detach", "", "", before, before, from, detachPoint) })
+	child, _, err := h.transferAction("", "new", []nativeEditorDocument{selected}, selected.UID, func() error { return h.nativeInput("Drag", "Outside", "", "", before, before, from, point) })
 	if err != nil {
-		return fmt.Errorf("actual mouse explicit in-app detach target: %w", err)
+		return fmt.Errorf("actual captured-pointer release outside source window: %w", err)
 	}
-	h.phases = append(h.phases, "110 actual tab-to-detach-target mouse gesture launches production child; source frozen and destination staged until existing ACK")
+	h.phases = append(h.phases, "115 actual ordinary tab drag away and outside source HWND launches production child without a drop box; source frozen and destination staged until existing ACK")
 	if err = h.capture(child, "drag110-detached"); err != nil {
 		return err
 	}
@@ -1052,7 +1048,7 @@ func (h *nativeEditorFixture) exerciseDrag() error {
 	selected, _ = nativeEditorDoc(source, selected.UID)
 	_, merged, err := h.transferAction(child, "main", []nativeEditorDocument{selected}, selected.UID, func() error { return h.nativeInput("Drag", "Cross", child, "", source, destination, from, to) })
 	if err != nil {
-		return fmt.Errorf("actual mouse drag between two production WebViews: %w", err)
+		return fmt.Errorf("actual Alt-mouse drag between two production WebViews: %w", err)
 	}
 	if len(merged.Documents) != 2 {
 		return errors.New("native cross-window merge lost untouched document")
@@ -1063,7 +1059,7 @@ func (h *nativeEditorFixture) exerciseDrag() error {
 	if err = h.closeEmpty(child); err != nil {
 		return err
 	}
-	h.phases = append(h.phases, "110 actual cross-WebView mouse drag merges through opaque broker ticket and original offer/accept ACK; exact source UID/history/view retained and child releases only after ACK")
+	h.phases = append(h.phases, "115 actual Alt-cross-WebView mouse drag merges through opaque broker ticket and original offer/accept ACK; exact source UID/history/view retained and child releases only after ACK")
 	if h.pointerDrags.Load() != 5 {
 		return fmt.Errorf("expected five real pointer drag scenarios, got %d", h.pointerDrags.Load())
 	}

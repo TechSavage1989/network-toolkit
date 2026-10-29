@@ -1,7 +1,8 @@
 package main
 
-// Inventory reads mounted names only. It never opens a removable/network volume
-// while rendering a drive picker; selecting one uses the normal checked listing.
+// Inventory contains presentation metadata only. Volume-label lookup is bounded
+// and cached; network volumes are never probed for labels. Selecting a destination
+// still uses the normal checked listing.
 type localTransferDrive struct {
 	Path  string `json:"path"`
 	Label string `json:"label"`

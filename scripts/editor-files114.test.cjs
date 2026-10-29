@@ -10,7 +10,7 @@ test('Files moves the existing connection chooser rather than cloning controls o
  const h=harness(),panel=h.editor.querySelector('#ntEditorRemotePanel');h.api.toggle(h.editor);assert.equal(h.host.hidden,false);assert.equal(h.host.querySelector('#ntEditorRemotePanel'),panel);assert.equal(panel.hidden,true);assert.equal(h.editor.querySelectorAll('#ntEditorRemotePanel').length,1);assert(!h.calls.some(x=>x[0]==='connect'));h.api.toggle(h.editor);assert.equal(h.host.hidden,true);
 });
 test('listing/mounting is not a connection; explicit source choice reuses only requested active SSH',async()=>{
- const h=harness();h.api.toggle(h.editor);await h.api.useSource('terminal:active-fixture');assert.deepEqual(h.calls.filter(x=>x[0]==='connect'),[['connect','ssh','active-fixture']]);assert.equal(h.host.querySelector('#ntEditorRemotePanel').hidden,false);await h.api.useSource('terminal:active-fixture');assert.equal(h.calls.filter(x=>x[0]==='connect').length,1);
+ const h=harness();h.api.toggle(h.editor);await h.api.useSource('terminal:active-fixture');assert.deepEqual(h.calls.filter(x=>x[0]==='connect'),[['connect','ssh','active-fixture']]);assert.equal(h.host.querySelector('#ntEditorRemotePanel').hidden,true);assert.equal(h.host.dataset.editorSidebarPanel,'files');await h.api.useSource('terminal:active-fixture');assert.equal(h.calls.filter(x=>x[0]==='connect').length,1);
 });
 test('unrelated live or busy clients are not replaced by a Files selection',async()=>{
  for(const value of [{connected:true,sessionId:'original'},{busy:true},{connecting:true},{pendingClose:1}]){const h=harness();h.api.toggle(h.editor);Object.assign(h.models.ssh,value);await assert.rejects(h.api.useSource('terminal:new'),/Disconnect|operation/);assert(!h.calls.some(x=>x[0]==='connect'));}
@@ -38,4 +38,35 @@ test('credential refresh is main-only for both sidebar protocols',async()=>{
   const calls=[],root={detachedEditor:()=>child,root:{NetworkToolkitCredentials:{refresh:async()=>calls.push('refresh')}},syncCredentials:k=>calls.push('sync:'+k),note:()=>calls.push('note')};
   vm.runInNewContext(source.slice(start,end),root);await root.ftpCredentialsRefresh(protocol);assert.deepEqual(calls,child?[]:['refresh','sync:'+protocol]);
  }
+});
+
+
+test('main sidebar preferences use the app lexical state, retain tabs and collapse without unmounting',()=>{
+ const h=harness();vm.runInNewContext("let state={editorFilesPreferences:{width:360,panel:'connections',side:'remote',collapsed:false}};globalThis.savedCount=0;globalThis.saveState=()=>savedCount++;",h.root);
+ h.api.initialize(h.editor);assert.equal(h.host.hidden,false);assert.equal(h.host.style.width,'360px');assert.equal(h.host.dataset.editorSidebarPanel,'connections');const browser=h.host.querySelector('[data-editor-file-browser]'),sessions=h.host.querySelector('#ntEditorRemotePanel');
+ h.api.selectPanel('files');assert.equal(h.host.querySelector('[data-editor-file-browser]'),browser);assert.equal(h.host.querySelector('#ntEditorRemotePanel'),sessions);assert.equal(sessions.hidden,true);h.api.toggle(h.editor);assert.equal(h.host.hidden,true);assert(!h.calls.some(c=>c[0]==='unmount'));assert.equal(vm.runInNewContext('state.editorFilesPreferences.collapsed',h.root),true);assert(h.root.savedCount>0);
+});
+test('drive buttons always identify roots and preserve real labels safely',()=>{
+ const source=fs.readFileSync(require.resolve('../web/assets/remote-browser.js'),'utf8'),start=source.indexOf('function driveButtonLabel('),end=source.indexOf('function paint(k,',start),root={};vm.runInNewContext(source.slice(start,end),root);
+ assert.equal(root.driveButtonLabel({path:'C:/',label:'Windows'}),'C: Windows');assert.equal(root.driveButtonLabel({path:'D:/',label:'Local drive'}),'D: · Local drive');assert.equal(root.driveButtonLabel({path:'Z:/',label:'Z: Offline mapping'}),'Z: Offline mapping');assert.equal(root.driveButtonLabel({path:'/',label:'Filesystem'}),'/ Filesystem');
+ const doc=makeDocument('<nav data-rb-drives></nav>');root.escape=v=>String(v).replaceAll('&','&amp;').replaceAll('"','&quot;').replaceAll('<','&lt;');root.paintDrives(doc,{path:'D:/folder',drives:[{path:'C:/',label:'Windows'},{path:'D:/',label:'Data <unsafe>'}]});assert.equal(doc.querySelectorAll('[data-rb-drive]').length,2);assert.equal(doc.querySelector('[aria-pressed="true"]').dataset.rbDrive,'D:/');assert(!doc.querySelector('unsafe'));
+});
+
+test('Files and Connections visibility changes reuse the mounted form and never dispatch a transport',()=>{
+ const source=fs.readFileSync(require.resolve('../web/assets/remote-browser.js'),'utf8'),start=source.indexOf('function mountSidebar('),end=source.indexOf('function unmountSidebar(',start),document=makeDocument('<div id="host"></div>'),host=document.querySelector('#host'),models={ssh:{}},calls=[];
+ const root={TYPES:new Set(['ssh','ftp']),detachedEditor:()=>false,sidebarMounts:new Map(),get:k=>models[k],render:k=>{calls.push('render');host.innerHTML='<div data-rb-root="ssh"><input data-rb-setting="password"></div>';},restoreConnectionControls:()=>calls.push('controls'),updateSidebarActions:()=>calls.push('actions')};vm.runInNewContext(source.slice(start,end),root);
+ root.mountSidebar(host,'local','ssh',{panel:'files'});const input=host.querySelector('input');input.value='synthetic';root.mountSidebar(host,'remote','ssh',{panel:'connections'});assert.equal(host.querySelector('input'),input);assert.equal(input.value,'synthetic');assert.equal(host.querySelector('[data-rb-root]').dataset.sidebarPanel,'connections');assert.equal(calls.filter(v=>v==='render').length,1);
+ root.sidebarMounts.get('ssh').dirty=true;root.mountSidebar(host,'remote','ssh',{panel:'files'});assert.equal(calls.filter(v=>v==='render').length,2,'a model update while collapsed is repainted on reopen');
+});
+
+test('older detached access rejection cannot erase a newer approved Connections panel',async()=>{
+ const h=harness(true),pending=[];h.root.api=()=>new Promise((resolve,reject)=>pending.push({resolve,reject}));h.root.NetworkToolkitRemoteBrowser.mountSidebar=host=>{host.innerHTML='<p>New authorized browser</p>';};
+ h.api.toggle(h.editor);h.api.selectPanel('connections');assert.equal(pending.length,2);pending[1].resolve({allowed:true});await new Promise(resolve=>setImmediate(resolve));pending[0].reject(Error('old request failed'));await new Promise(resolve=>setImmediate(resolve));assert.equal(h.host.querySelector('[data-editor-file-browser]').textContent,'New authorized browser');
+});
+test('older access-request rejection cannot overwrite a panel changed after the click',async()=>{
+ const h=harness(true);let rejectPost;h.root.api=(_path,method)=>method==='POST'?new Promise((_resolve,reject)=>{rejectPost=reject;}):Promise.resolve({allowed:false,pending:false});
+ h.api.toggle(h.editor);await new Promise(resolve=>setImmediate(resolve));const body=h.host.querySelector('[data-editor-file-browser]'),button=body.querySelector('button'),pending=button.onclick();h.root.api=async()=>({allowed:true});h.root.NetworkToolkitRemoteBrowser.mountSidebar=host=>{host.innerHTML='<p>New authorized browser</p>';};h.api.selectPanel('connections');await new Promise(resolve=>setImmediate(resolve));rejectPost(Error('old request failed'));await pending;assert.equal(body.textContent,'New authorized browser');
+});
+test('standalone client rendering marks a retained hidden editor form stale before returning',()=>{
+ const source=fs.readFileSync(require.resolve('../web/assets/remote-browser.js'),'utf8'),start=source.indexOf('function render(k)'),end=source.indexOf('function connectionIdentity(',start),stored={host:{}},root={TYPES:new Set(['ssh']),loadSaved:()=>{},sidebarMount:()=>null,sidebarMounts:new Map([['ssh',stored]]),pageActive:()=>true,document:{getElementById:()=>null}};vm.runInNewContext(source.slice(start,end),root);root.render('ssh');assert.equal(stored.dirty,true);
 });

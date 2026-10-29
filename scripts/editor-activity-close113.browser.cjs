@@ -51,7 +51,7 @@ async function start(width,detached=false){
 async function retained(page){assert(await page.evaluate(()=>NetworkToolkitFileEditor.active===saved113Doc&&document.querySelector('#networkToolkitFileEditor')===saved113Editor&&NetworkToolkitFileEditor.active.content.includes('UNSAVED_SYNTHETIC_113')&&NetworkToolkitFileEditor.active.dirty));}
 async function choose(page,id){
  const files=page.locator('[data-ed="files"]');if(await files.getAttribute('aria-expanded')!=='true')await files.click();
- await page.locator('[data-editor-files-side="remote"]').click();
+ await page.locator('[data-editor-files-panel="connections"]').click();
  await page.locator('[data-ed-page="refreshRemote"]').click();await page.waitForFunction(id=>[...document.querySelector('#ntEditorRemoteSource').options].some(o=>o.value==='saved:'+id),id);
  await page.locator('#ntEditorRemoteSource').selectOption('saved:'+id);await page.locator('[data-ed-page="connectSaved"]').click();
 }
