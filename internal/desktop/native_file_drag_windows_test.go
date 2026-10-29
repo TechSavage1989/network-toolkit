@@ -107,3 +107,39 @@ func TestNativeFileDragStopsReconciliationWithOwningWindow(t *testing.T) {
 		t.Fatal("owning HWND close did not cancel native receipts")
 	}
 }
+
+func TestNativeFileDragSourceOwnerCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	o := &nativeFileCOM{source: true, ctx: ctx}
+	p := uintptr(unsafe.Pointer(o))
+	nativeFileCOMObjects.Store(p, o)
+	defer nativeFileCOMObjects.Delete(p)
+	cancel()
+	if fileCOMContinue(p, 0, 1) != 0x40101 {
+		t.Fatal("owner cancellation did not cancel OLE source")
+	}
+}
+
+func TestNativeFileDragCancellationRejectsReusedOrInactiveHWND(t *testing.T) {
+	hwnd := uintptr(0xf114)
+	window := &hostWindow{}
+	source := &nativeFileCOM{}
+	source.active.Store(true)
+	owner := &nativeFileDragOwner{window: window, active: &source.active}
+	wndWindows.Store(hwnd, window)
+	nativeFileDragOwners.Store(hwnd, owner)
+	defer wndWindows.Delete(hwnd)
+	defer nativeFileDragOwners.Delete(hwnd)
+	if !nativeFileDragCancellationTarget(hwnd) {
+		t.Fatal("current owning drag not recognized")
+	}
+	wndWindows.Store(hwnd, &hostWindow{})
+	if nativeFileDragCancellationTarget(hwnd) {
+		t.Fatal("reused HWND accepted")
+	}
+	wndWindows.Store(hwnd, window)
+	source.active.Store(false)
+	if nativeFileDragCancellationTarget(hwnd) {
+		t.Fatal("inactive gesture affected")
+	}
+}

@@ -144,7 +144,7 @@ func (w *hostWindow) runNativeFileDrag(done <-chan struct{}) {
 		if !w.post(func() {
 			defer close(finished)
 			if !w.isClosing() && nativeFileDragHeld(hwnd) {
-				effect, err := runNativeFileCopyDrag(job.Paths)
+				effect, err := runNativeFileCopyDrag(ctx, hwnd, job.Paths)
 				if err != nil {
 					outcome = "failed"
 				} else if effect&1 != 0 {
@@ -207,10 +207,32 @@ type nativeFileCOM struct {
 	refs   atomic.Int32
 	base   uintptr
 	source bool
+	ctx    context.Context
 	active atomic.Bool
 }
 
 var nativeFileCOMObjects sync.Map
+var nativeFileDragOwners sync.Map
+
+type nativeFileDragOwner struct {
+	window *hostWindow
+	active *atomic.Bool
+}
+
+func nativeFileDragCancellationTarget(hwnd uintptr) bool {
+	raw, ok := nativeFileDragOwners.Load(hwnd)
+	if !ok {
+		return false
+	}
+	owner := raw.(*nativeFileDragOwner)
+	current, ok := wndWindows.Load(hwnd)
+	return ok && current == owner.window && owner.active.Load()
+}
+func cancelNativeFileDrag(hwnd uintptr) {
+	if nativeFileDragCancellationTarget(hwnd) {
+		wndPostMessage.Call(hwnd, 0x001f, 0, 0)
+	}
+}
 
 func nativeFileObject(p uintptr) *nativeFileCOM {
 	v, _ := nativeFileCOMObjects.Load(p)
@@ -279,11 +301,21 @@ func fileCOMSet(p, a, b, c uintptr) uintptr       { return 0x80004001 }
 func fileCOMAdvise(p, a, b, c, d uintptr) uintptr { return 0x80040003 }
 func fileCOMUnadvise(p, a uintptr) uintptr        { return 0x80040003 }
 func fileCOMContinue(p, escape, key uintptr) uintptr {
+	o := nativeFileObject(p)
+	if o != nil && o.ctx != nil && o.ctx.Err() != nil {
+		return 0x40101
+	}
 	if escape != 0 {
 		return 0x40101
 	}
 	if key&1 == 0 {
 		return 0x40100
+	}
+	if o != nil && o.ctx != nil {
+		pressed, _, _ := fileDragKey.Call(1)
+		if pressed&0x8000 == 0 {
+			return 0x40100
+		}
 	}
 	return 0
 }
@@ -292,7 +324,7 @@ func fileCOMFeedback(p, effect uintptr) uintptr { return 0x40102 }
 var fileCOMDataTable = [12]uintptr{syscall.NewCallback(fileCOMQuery), syscall.NewCallback(fileCOMAdd), syscall.NewCallback(fileCOMRelease), syscall.NewCallback(fileCOMGet), syscall.NewCallback(fileCOMNotImpl), syscall.NewCallback(fileCOMQueryData), syscall.NewCallback(fileCOMNotImpl), syscall.NewCallback(fileCOMSet), syscall.NewCallback(fileCOMEnum), syscall.NewCallback(fileCOMAdvise), syscall.NewCallback(fileCOMUnadvise), syscall.NewCallback(fileCOMNotImpl)}
 var fileCOMSourceTable = [12]uintptr{syscall.NewCallback(fileCOMQuery), syscall.NewCallback(fileCOMAdd), syscall.NewCallback(fileCOMRelease), syscall.NewCallback(fileCOMContinue), syscall.NewCallback(fileCOMFeedback)}
 
-func runNativeFileCopyDrag(paths []string) (uint32, error) {
+func runNativeFileCopyDrag(ctx context.Context, hwnd uintptr, paths []string) (uint32, error) {
 	hrInit, _, _ := fileDragOle.NewProc("OleInitialize").Call(0)
 	if err := hresultError("Initialize Windows file drag", hrInit); err != nil {
 		return 0, err
@@ -337,7 +369,8 @@ func runNativeFileCopyDrag(paths []string) (uint32, error) {
 	wrapper := &nativeFileCOM{vtable: &fileCOMDataTable, base: data}
 	wrapper.refs.Store(1)
 	wrapper.active.Store(true)
-	source := &nativeFileCOM{vtable: &fileCOMSourceTable, source: true}
+	source := &nativeFileCOM{vtable: &fileCOMSourceTable, source: true, ctx: ctx}
+	source.active.Store(true)
 	source.refs.Store(1)
 	wp, sp := uintptr(unsafe.Pointer(wrapper)), uintptr(unsafe.Pointer(source))
 	nativeFileCOMObjects.Store(wp, wrapper)
@@ -345,6 +378,23 @@ func runNativeFileCopyDrag(paths []string) (uint32, error) {
 	defer fileCOMRelease(wp)
 	defer fileCOMRelease(sp)
 	defer wrapper.active.Store(false)
+	if current, ok := wndWindows.Load(hwnd); ok {
+		owner := &nativeFileDragOwner{window: current.(*hostWindow), active: &source.active}
+		nativeFileDragOwners.Store(hwnd, owner)
+		defer nativeFileDragOwners.CompareAndDelete(hwnd, owner)
+	}
+	dragEnded := make(chan struct{})
+	defer close(dragEnded)
+	defer source.active.Store(false)
+	// WM_CANCELMODE is delivered only to our own window. Its default handler
+	// releases this UI thread's capture; no global key/mouse input is injected.
+	go func() {
+		select {
+		case <-ctx.Done():
+			cancelNativeFileDrag(hwnd)
+		case <-dragEnded:
+		}
+	}()
 	var effect uint32
 	hr, _, _ = fileDragDo.Call(wp, sp, 1, uintptr(unsafe.Pointer(&effect)))
 	runtime.KeepAlive(wrapper)

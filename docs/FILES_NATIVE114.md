@@ -60,3 +60,14 @@ input, file+folder output, quick-release negative, Escape cancellation and a
 synthetic NTFS junction negative. If WebView follows the junction target, folder
 input must not be released as safe. This fixture uses synthetic temporary data;
 it does not establish arbitrary device-fleet or user-desktop compatibility.
+
+### Active native cancellation
+
+An active OLE gesture owns Escape; the page does not remove its modal or cancel
+staging underneath it. Rejected/uncertain HTTP cancellation leaves the review
+visible. IDropSource cancels when its owning context ends. A context cancellation
+posts [WM_CANCELMODE](https://learn.microsoft.com/en-us/windows/win32/winmsg/wm-cancelmode)
+only to that Toolkit HWND; the default Win32 handler releases the owning UI
+thread's capture. No keyboard/mouse input is injected into production, and no
+global hook is installed. The hosted fixture requires actual Escape and a real
+held drag followed by owner-context cancellation to return within two seconds.

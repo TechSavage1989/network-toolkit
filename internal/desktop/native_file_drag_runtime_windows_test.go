@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -27,6 +28,8 @@ func TestNativeExplorerFiles114(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Second)
 	defer cancel()
+	driverCtx, driverCancel := context.WithTimeout(context.Background(), 170*time.Second)
+	defer driverCancel()
 	temp := t.TempDir()
 	source := filepath.Join(temp, "source")
 	dest := filepath.Join(temp, "destination")
@@ -58,11 +61,14 @@ func TestNativeExplorerFiles114(t *testing.T) {
 	finishedIDs := map[string]bool{}
 	var trace []string
 	var mu sync.Mutex
+	var hostHWND atomic.Uintptr
 	state := "idle"
 	armed := false
 	var gesture, revoked uint64
 	starts := 0
 	quickStarts, quickChecks := 0, 0
+	ownerCancelArmed, ownerCancelled := false, false
+	var ownerCancelledAt time.Time
 	imports := 0
 	linkNegatives := 0
 	finishes := 0
@@ -90,12 +96,26 @@ func TestNativeExplorerFiles114(t *testing.T) {
 		}
 		if r.URL.Path == "/" {
 			w.Header().Set("Content-Type", "text/html")
-			io.WriteString(w, `<!doctype html><meta charset="utf-8"><title>Files114 actual Explorer fixture</title><style>body{font:14px Segoe UI;background:#edf4ff;padding:12px}#target{border:3px dashed #185abb;height:180px;padding:16px}button{padding:12px;font:inherit}#modal{background:white;padding:12px}progress{max-width:100px}.transfer-drop-row{display:block}input,select{max-width:200px}</style><h1>Files114 native acceptance</h1><div id="target">Drop synthetic incoming folder here</div><button id="prepare">Prepare Explorer copy</button><div id="modal"></div><button id="quickBaseline">Record quick release</button><button id="quickCheck">Check quick release</button><p id="status">Ready</p><script>const SESSION=window.__networkToolkitNativeSession;window.__networkToolkitStartupState=/^[a-f0-9]{64}$/.test(SESSION||'')?1:-1;window.api=async(path,method='GET',body)=>{const r=await fetch('/api'+path,{method,headers:{'X-Session-Token':SESSION,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});if(!r.ok)throw Error(await r.text());return r.status===204?{}:r.json()};window.toast=m=>document.getElementById('status').textContent=m;window.openModal=(title,body,footer)=>{document.getElementById('target').hidden=true;document.getElementById('modal').innerHTML='<h2>'+title+'</h2>'+body+footer;};window.closeModal=()=>{document.getElementById('modal').replaceChildren();document.getElementById('target').hidden=false;};</script><script src="/assets/transfer-drop.js"></script><script src="/assets/remote-drag.js"></script><script>
-document.getElementById('quickBaseline').onclick=()=>api('/quick-baseline','POST',{}).then(()=>toast('Quick baseline recorded'));document.getElementById('quickCheck').onclick=()=>api('/quick-check','POST',{}).then(()=>toast('Quick release did not arm ordinary click')).catch(toast);const helper=NetworkToolkitTransferDrop;document.getElementById('prepare').onclick=()=>NetworkToolkitNativeDrag.prepareCopy({binding:{kind:'local'},paths:['synthetic-selection']}).catch(toast);document.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='copy'});document.addEventListener('drop',async e=>{e.preventDefault();const linkTest=Array.from(e.dataTransfer.items).some(item=>item.webkitGetAsEntry?.()?.name==='junction-tree');try{const files=await helper.fromDropTree(e.dataTransfer);if(linkTest){if(files.some(row=>row.items?.some(item=>item.file)))throw Error('UNSAFE_LINK_TRAVERSAL');await api('/link-negative','POST',{});toast('Link target not traversed');return;}helper.show({files,entries:[],local:true,label:'Synthetic incoming destination',check(){},send:async row=>{if(!row.file.directory)throw Error('Expected a folder');for(const entry of row.file.items){if(entry.directory)continue;const form=new FormData();form.set('file',entry.file,entry.file.name);form.set('path',entry.path);await helper.upload('/incoming',form,{});}},done:async report=>{if(report.copied!==1||report.failed)throw Error('Import failed');document.getElementById('status').textContent='Incoming folder bytes verified';}});}catch(error){if(linkTest&&error.message!=='UNSAFE_LINK_TRAVERSAL'){await api('/link-negative','POST',{});toast('Link target not traversed');}else toast(error.message)}});</script>`)
+			io.WriteString(w, `<!doctype html><meta charset="utf-8"><title>Files114 actual Explorer fixture</title><style>body{font:14px Segoe UI;background:#edf4ff;padding:12px}#target{border:3px dashed #185abb;height:180px;padding:16px}button{padding:12px;font:inherit}#modal{background:white;padding:12px}progress{max-width:100px}.transfer-drop-row{display:block}input,select{max-width:200px}</style><h1>Files114 native acceptance</h1><div id="target">Drop synthetic incoming folder here</div><button id="prepare">Prepare Explorer copy</button><div id="modal"></div><button id="quickBaseline">Record quick release</button><button id="quickCheck">Check quick release</button><button id="ownerCancel">Cancel owner during next drag</button><p id="status">Ready</p><script>const SESSION=window.__networkToolkitNativeSession;window.__networkToolkitStartupState=/^[a-f0-9]{64}$/.test(SESSION||'')?1:-1;window.api=async(path,method='GET',body)=>{const r=await fetch('/api'+path,{method,headers:{'X-Session-Token':SESSION,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined});if(!r.ok)throw Error(await r.text());return r.status===204?{}:r.json()};window.toast=m=>document.getElementById('status').textContent=m;window.openModal=(title,body,footer)=>{document.getElementById('target').hidden=true;document.getElementById('modal').innerHTML='<h2>'+title+'</h2>'+body+footer;};window.closeModal=()=>{document.getElementById('modal').replaceChildren();document.getElementById('target').hidden=false;};</script><script src="/assets/transfer-drop.js"></script><script src="/assets/remote-drag.js"></script><script>
+document.getElementById('ownerCancel').onclick=()=>api('/owner-cancel','POST',{}).then(()=>toast('Owner cancellation armed'));document.getElementById('quickBaseline').onclick=()=>api('/quick-baseline','POST',{}).then(()=>toast('Quick baseline recorded'));document.getElementById('quickCheck').onclick=()=>api('/quick-check','POST',{}).then(()=>toast('Quick release did not arm ordinary click')).catch(toast);const helper=NetworkToolkitTransferDrop;document.getElementById('prepare').onclick=()=>NetworkToolkitNativeDrag.prepareCopy({binding:{kind:'local'},paths:['synthetic-selection']}).catch(toast);document.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='copy'});document.addEventListener('drop',async e=>{e.preventDefault();const linkTest=Array.from(e.dataTransfer.items).some(item=>item.webkitGetAsEntry?.()?.name==='junction-tree');try{const files=await helper.fromDropTree(e.dataTransfer);if(linkTest){if(files.some(row=>row.items?.some(item=>item.file)))throw Error('UNSAFE_LINK_TRAVERSAL');await api('/link-negative','POST',{});toast('Link target not traversed');return;}helper.show({files,entries:[],local:true,label:'Synthetic incoming destination',check(){},send:async row=>{if(!row.file.directory)throw Error('Expected a folder');for(const entry of row.file.items){if(entry.directory)continue;const form=new FormData();form.set('file',entry.file,entry.file.name);form.set('path',entry.path);await helper.upload('/incoming',form,{});}},done:async report=>{if(report.copied!==1||report.failed)throw Error('Import failed');document.getElementById('status').textContent='Incoming folder bytes verified';}});}catch(error){if(linkTest&&error.message!=='UNSAFE_LINK_TRAVERSAL'){await api('/link-negative','POST',{});toast('Link target not traversed');}else toast(error.message)}});</script>`)
 			return
 		}
 		if r.Header.Get("X-Session-Token") != token {
 			http.Error(w, "unauthorized", 401)
+			return
+		}
+		if r.URL.Path == "/api/owner-cancel" && r.Method == "POST" {
+			if out := os.Getenv("TOOLKIT_NATIVE_TEST_OUTPUT"); out != "" {
+				os.MkdirAll(out, 0700)
+				if _, _, err := captureNativeVaultDialog(hostHWND.Load(), filepath.Join(out, "native-files114-before-owner-cancel.png")); err != nil {
+					http.Error(w, "native pre-close capture failed", 500)
+					return
+				}
+			}
+			mu.Lock()
+			ownerCancelArmed = true
+			mu.Unlock()
+			io.WriteString(w, `{"ok":true}`)
 			return
 		}
 		if r.URL.Path == "/api/quick-baseline" && r.Method == "POST" {
@@ -205,6 +225,30 @@ document.getElementById('quickBaseline').onclick=()=>api('/quick-baseline','POST
 					starts++
 				}
 				state = "dragging"
+				if ownerCancelArmed && !ownerCancelled {
+					go func() {
+						deadline := time.Now().Add(3 * time.Second)
+						for time.Now().Before(deadline) {
+							active := false
+							nativeFileCOMObjects.Range(func(_, value any) bool {
+								if o, ok := value.(*nativeFileCOM); ok && o.source && o.active.Load() {
+									active = true
+								}
+								return true
+							})
+							if active {
+								time.Sleep(100 * time.Millisecond) // keep the real gesture held inside OLE before cancelling its owner
+								mu.Lock()
+								ownerCancelled = true
+								ownerCancelledAt = time.Now()
+								mu.Unlock()
+								cancel()
+								return
+							}
+							time.Sleep(10 * time.Millisecond)
+						}
+					}()
+				}
 				armed = false
 			case "disarm":
 				if body.Gesture > revoked {
@@ -221,6 +265,10 @@ document.getElementById('quickBaseline').onclick=()=>api('/quick-baseline','POST
 				}
 				state = "finished"
 			case "cancel":
+				if state == "dragging" {
+					http.Error(w, "Release the drag or press Escape before closing", 409)
+					return
+				}
 				state = "cancelled"
 			default:
 				http.Error(w, "bad action", 400)
@@ -263,14 +311,18 @@ document.getElementById('quickBaseline').onclick=()=>api('/quick-baseline','POST
 			cancel()
 			return
 		}
+		hostHWND.Store(hwnd)
 		go func() {
-			cmd := exec.CommandContext(ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-File", script, "-SourceDirectory", source, "-DestinationDirectory", dest, "-WindowHandle", strconv.FormatUint(uint64(hwnd), 10), "-OwnerProcessID", strconv.Itoa(os.Getpid()))
+			cmd := exec.CommandContext(driverCtx, "powershell.exe", "-NoProfile", "-NonInteractive", "-File", script, "-SourceDirectory", source, "-DestinationDirectory", dest, "-WindowHandle", strconv.FormatUint(uint64(hwnd), 10), "-OwnerProcessID", strconv.Itoa(os.Getpid()))
 			output, e := cmd.CombinedOutput()
 			out := os.Getenv("TOOLKIT_NATIVE_TEST_OUTPUT")
 			if out != "" {
 				os.MkdirAll(out, 0700)
 				_, _, ce := captureNativeVaultDialog(hwnd, filepath.Join(out, "native-files114.png"))
-				if ce != nil && e == nil {
+				mu.Lock()
+				wasOwnerCancelled := ownerCancelled
+				mu.Unlock()
+				if ce != nil && e == nil && !wasOwnerCancelled {
 					e = ce
 				}
 				os.WriteFile(filepath.Join(out, "native-files114-driver.txt"), output, 0600)
@@ -281,7 +333,7 @@ document.getElementById('quickBaseline').onclick=()=>api('/quick-baseline','POST
 				treeBytes, _ := os.ReadFile(filepath.Join(dest, "outgoing-folder", "nested", "out.txt"))
 				emptyInfo, emptyErr := os.Stat(filepath.Join(dest, "outgoing-folder", "empty"))
 				mu.Lock()
-				checkpoints := map[string]any{"complete": e == nil, "incomingBytesVerified": imports == 1, "junctionTargetNotTraversed": linkNegatives == 1, "quickReleaseNegative": quickChecks == 1, "outgoingFileBytesVerified": string(fileBytes) == "SYNTHETIC OUTGOING FILE114\r\n", "outgoingFolderBytesVerified": string(treeBytes) == "SYNTHETIC OUTGOING TREE114\r\n", "emptyFolderVerified": emptyErr == nil && emptyInfo.IsDir(), "nativeStarts": starts, "nativeFinishes": finishes}
+				checkpoints := map[string]any{"complete": e == nil, "incomingBytesVerified": imports == 1, "junctionTargetNotTraversed": linkNegatives == 1, "quickReleaseNegative": quickChecks == 1, "outgoingFileBytesVerified": string(fileBytes) == "SYNTHETIC OUTGOING FILE114\r\n", "outgoingFolderBytesVerified": string(treeBytes) == "SYNTHETIC OUTGOING TREE114\r\n", "emptyFolderVerified": emptyErr == nil && emptyInfo.IsDir(), "nativeStarts": starts, "nativeFinishes": finishes, "ownerCancelled": ownerCancelled}
 				mu.Unlock()
 				raw, _ := json.MarshalIndent(checkpoints, "", "  ")
 				os.WriteFile(filepath.Join(out, "native-files114-checkpoints.json"), raw, 0600)
@@ -297,17 +349,24 @@ document.getElementById('quickBaseline').onclick=()=>api('/quick-baseline','POST
 	if err != nil {
 		t.Fatal(err)
 	}
+	mu.Lock()
+	cancelledAt := ownerCancelledAt
+	mu.Unlock()
+	ownerReturnDelay := time.Since(cancelledAt)
+	if cancelledAt.IsZero() || ownerReturnDelay > 2*time.Second {
+		t.Errorf("owning native context cancellation did not return promptly: %v", ownerReturnDelay)
+	}
 	select {
 	case err := <-result:
 		if err != nil {
 			t.Fatal(err)
 		}
-	default:
+	case <-time.After(5 * time.Second):
 		t.Fatal("native driver unfinished")
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	if imports != 1 || finishes != starts || starts < 2 || starts > 3 || quickChecks != 1 || linkNegatives != 1 {
+	if imports != 1 || finishes != starts-1 || starts < 3 || starts > 4 || !ownerCancelled || quickChecks != 1 || linkNegatives != 1 {
 		t.Fatalf("actual imported=%d finished/cancelled drags=%d", imports, finishes)
 	}
 	for _, rel := range []string{"outgoing-file.txt", filepath.Join("outgoing-folder", "nested", "out.txt")} {
@@ -321,7 +380,7 @@ document.getElementById('quickBaseline').onclick=()=>api('/quick-baseline','POST
 		t.Fatal("empty folder lost")
 	}
 	if out := os.Getenv("TOOLKIT_NATIVE_TEST_OUTPUT"); out != "" {
-		b, _ := json.MarshalIndent(map[string]any{"passed": true, "actualExplorer": true, "importedFolders": imports, "junctionTargetNotTraversed": linkNegatives == 1, "nativeDragsIncludingCancel": finishes, "copyOnly": true, "releasedGestureDidNotArmLaterClick": quickChecks == 1, "scope": "synthetic hosted FileSystemEntry + native OLE bridge; remote staging separately tested"}, "", "  ")
+		b, _ := json.MarshalIndent(map[string]any{"passed": true, "actualExplorer": true, "importedFolders": imports, "junctionTargetNotTraversed": linkNegatives == 1, "nativeDragsIncludingCancel": finishes, "copyOnly": true, "ownerContextCancellationMs": float64(ownerReturnDelay.Microseconds()) / 1000, "releasedGestureDidNotArmLaterClick": quickChecks == 1, "scope": "synthetic hosted FileSystemEntry + native OLE bridge; remote staging separately tested"}, "", "  ")
 		os.WriteFile(filepath.Join(out, "native-files114-report.json"), b, 0600)
 	}
 }

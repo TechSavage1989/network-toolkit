@@ -68,7 +68,7 @@ try {
   try {
    [void][ExplorerDropMouse]::SetCursorPos($x+8,$y+2);Start-Sleep -Milliseconds 450
    for($i=1;$i -le 24;$i++){[void][ExplorerDropMouse]::SetCursorPos([int]($x+($toX-$x)*$i/24),[int]($y+($toY-$y)*$i/24));Start-Sleep -Milliseconds 30}
-   if($cancel){[ExplorerDropMouse]::keybd_event(27,0,0,[UIntPtr]::Zero);[ExplorerDropMouse]::keybd_event(27,0,2,[UIntPtr]::Zero);Start-Sleep -Milliseconds 150}
+   if($cancel){[ExplorerDropMouse]::keybd_event(27,0,0,[UIntPtr]::Zero);Start-Sleep -Milliseconds 100;[ExplorerDropMouse]::keybd_event(27,0,2,[UIntPtr]::Zero);Start-Sleep -Milliseconds 150}
   } finally {[ExplorerDropMouse]::mouse_event(4,0,0,0,[UIntPtr]::Zero)}
  }
  # Real OS folder -> WebView FileSystemEntry enumeration, then explicit copy.
@@ -122,5 +122,14 @@ try {
  Drag-Point ([int]($r.Left+$r.Width/2)) ([int]($r.Top+$r.Height/2)) 750 460 $true
  Start-Sleep -Milliseconds 400
  Close-Copy
- Write-Output 'Actual Windows Explorer folder import, file+folder export and Escape cancellation completed'
+ # One final real held drag is cancelled by its owning native context, not input injection.
+ Invoke-Button 'Prepare Explorer copy'
+ $until=[DateTime]::UtcNow.AddSeconds(15)
+ do{$button=Find-Element $native 'Drag prepared files and folders to Windows Explorer';if(!$button.Current.IsEnabled){Start-Sleep -Milliseconds 100}}while(!$button.Current.IsEnabled -and [DateTime]::UtcNow -lt $until)
+ if(!$button.Current.IsEnabled){throw 'Owner-cancellation preparation timed out'}
+ $r=$button.Current.BoundingRectangle
+ Invoke-Button 'Cancel owner during next drag';[void](Find-Element $native 'Owner cancellation armed')
+ [void][ExplorerDropMouse]::SetCursorPos([int]($r.Left+$r.Width/2),[int]($r.Top+$r.Height/2));[ExplorerDropMouse]::mouse_event(2,0,0,0,[UIntPtr]::Zero)
+ try{[void][ExplorerDropMouse]::SetCursorPos([int]($r.Left+$r.Width/2+8),[int]($r.Top+$r.Height/2+2));Start-Sleep -Milliseconds 1000}finally{[ExplorerDropMouse]::mouse_event(4,0,0,0,[UIntPtr]::Zero)}
+ Write-Output 'Actual Windows Explorer folder import, file+folder export, Escape and owner-context cancellation completed'
 } finally {$window.Quit()}
