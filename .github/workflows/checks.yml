@@ -615,6 +615,19 @@ jobs:
           if ! PLAYWRIGHT_MODULE="$RUNNER_TEMP/ntk-security-browser-tests/node_modules/playwright" node -e 'require(process.env.PLAYWRIGHT_MODULE).chromium.launch({headless:true}).then(browser=>browser.close()).catch(error=>{console.error(error.message);process.exitCode=1})'; then
             node "$RUNNER_TEMP/ntk-security-browser-tests/node_modules/playwright/cli.js" install --with-deps chromium
           fi
+      - name: Check real Terminal tab selection close and retained drag behavior
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-security-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-terminal-click116-results
+        run: node scripts/terminal-tab-click116.browser.cjs
+      - name: Retain focused Terminal hotfix evidence
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: terminal-tab-click116-checks
+          path: ${{ runner.temp }}/ntk-terminal-click116-results
+          if-no-files-found: error
+          retention-days: 14
       - name: Check credential UI boundaries with synthetic fixtures
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-security-browser-tests/node_modules/playwright

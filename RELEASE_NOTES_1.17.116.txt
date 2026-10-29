@@ -1,0 +1,14 @@
+NETWORK TOOLKIT 1.17.116
+
+TERMINAL TAB HOTFIX
+
+- Restores ordinary Terminal tab clicks while retaining drag reorder and
+  intentional detach. Clicking a tab selects it without reconnecting.
+- A fresh intentional close click is no longer swallowed by the previous
+  drag's trailing-click guard. The drag's own trailing click remains blocked.
+- Existing close confirmation, session ownership and revision checks remain.
+  Saved profiles, output and unrelated windows are not changed by selection.
+
+This is a targeted Terminal interaction update only. All1.17.115 editor, Files,
+comparison, graph, credential and updater behavior is preserved. The separately
+requested explorer design changes are not included in this hotfix.

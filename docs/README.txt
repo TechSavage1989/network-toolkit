@@ -1,13 +1,16 @@
-NETWORK TOOLKIT 1.17.115
+NETWORK TOOLKIT 1.17.116
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.115
+CURRENT RELEASE - 1.17.116
 
-Release details: RELEASE_NOTES_1.17.115.txt
-Previous release: docs/releases/RELEASE_NOTES_1.17.114.txt
+Release details: RELEASE_NOTES_1.17.116.txt
+Previous release: docs/releases/RELEASE_NOTES_1.17.115.txt
 Full release-note archive: docs/releases/README.md
 
-New115: named drive buttons and a persistent Files/Connections sidebar; compact
+New116 is a Terminal-only interaction hotfix: ordinary tab selection and close
+clicks work without losing drag reorder/detach or existing close safeguards.
+
+Previous115: named drive buttons and a persistent Files/Connections sidebar; compact
 comparison Options, optional horizontal sync and difference gutter symbols;
 independent changed-text emphasis; reversible wheel zoom with safe data/time
 limits; intentional pointer drag-away editor detaching. See EDITOR_FILES115.md,
