@@ -186,7 +186,9 @@ body:has(.nt-editor-embedded) #toolWorkspace>#pageContent{grid-row:1!important;g
 .nt-editor-more-actions,.nt-compare-settings>div{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding-top:5px}
 .nt-editor.is-comparing [data-ed="compare"]{display:none}
 .nt-editor.is-comparing :is([data-ed="find"],[data-ed="replace"],[data-ed="goto"]){display:none}
-.nt-editor-toolbar,.nt-editor.is-comparing .nt-editor-toolbar{max-height:none;overflow:visible;min-height:0;padding:5px 8px}
+/* Embedded tools retain the same natural toolbar wrapping at narrow widths. */
+.nt-editor-toolbar,.nt-editor-embedded .nt-editor-toolbar,.nt-editor.is-comparing .nt-editor-toolbar{max-height:none;overflow:visible;min-height:0;padding:5px 8px}
+@media(max-width:680px){.nt-editor-toolbar{row-gap:4px}}
 .nt-compare-tools{padding:5px 8px;justify-content:flex-start;max-height:none;overflow:visible}
 .nt-compare-tools .nt-compare-selector{flex:0 1 190px;min-width:120px}
 .nt-compare-selector select{width:100%;min-width:0;flex:1}

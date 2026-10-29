@@ -90,3 +90,15 @@ test('editor saved profile can reuse an existing matching authenticated terminal
  const h=harness(),original=h.root.api;h.root.api=async(path,method,body)=>path==='/remote-browser'&&!method?{sessions:[{id:'existing',host:h.profile.host,port:22,username:'operator'}]}:original(path,method,body);
  const result=await h.browser.useSavedEditorProfile('ssh','test');assert.equal(result.source,'client:ssh');assert.equal(h.browser.get('ssh').sessionId,'existing');assert(!h.events.some(e=>e.body?.action==='connect'));assert(h.events.filter(e=>e.body?.action==='list').every(e=>e.body.sessionId==='existing'&&!e.body.password));
 });
+
+
+test('editor connection summary retains the actual file protocol when controls refresh',()=>{
+ const start=source.indexOf('function restoreConnectionControls(k)'),end=source.indexOf('\nfunction connectionPicker(k)',start);assert(start>=0&&end>start);
+ for(const k of ['ssh','ftp'])for(const connected of [false,true]){
+  const summary={},endpoint={},m={connected,sessionId:'',sessionOptions:[]};
+  const root={get:()=>m,rootNode:()=>({querySelector:s=>s==='.nt-editor-files-connection>summary'?summary:s==='[data-rb-endpoint]'?endpoint:null}),configurations:{[k]:{host:'files.invalid',username:'fixture',port:k==='ssh'?22:21}}};
+  vm.createContext(root);vm.runInContext(source.slice(start,end)+'\nrestoreConnectionControls('+JSON.stringify(k)+');',root);
+  const protocol=k==='ssh'?'SFTP':'FTP / FTPS';assert.equal(summary.textContent,connected?protocol+' · files.invalid':protocol+' connection');
+  assert.equal(summary.title,connected?'fixture@files.invalid:'+(k==='ssh'?22:21):'Choose or connect to an '+protocol+' server');
+ }
+});
