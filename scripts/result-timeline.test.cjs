@@ -468,3 +468,16 @@ test('actual delegated wheel path reaches and stays at the data floor from eithe
   const svg=h.document.querySelector('[data-rt-surface]');svg.getBoundingClientRect=()=>({left:0,top:0,width:180,height:110,right:180,bottom:110});h.document.emit('wheel',svg,{deltaY:240,clientX:180*share,clientY:70});assert.equal(h.document.querySelector('.rt-timeline').dataset.rtScopeStart,previous);assert(h.document.querySelector('[data-rt-zoom="in"]').disabled);let prevented=0;h.document.emit('wheel',h.document.querySelector('[data-rt-surface]'),{deltaY:240,clientX:90,clientY:60,preventDefault(){prevented++;}});assert.equal(prevented,1,'The graph consumes repeated limit input rather than scrolling its parent');
  }
 });
+
+test('inverted outward wheel can leave the exact five-sample floor after applying Range',()=>{
+ for(const mode of ['linear','condensed'])for(const delta of [8,120]){
+  const h=harness(),rows=Array.from({length:401},(_,i)=>reply(i+1,10,stamp(i)));h.api.setPreferences({mode},{persist:false});h.render(rows);
+  const wheel=delta=>{const svg=h.document.querySelector('[data-rt-surface]');svg.getBoundingClientRect=()=>({left:0,top:0,width:820,height:110,right:820,bottom:110});h.document.emit('wheel',svg,{deltaY:delta,clientX:574,clientY:66});};
+  for(let i=0;i<30;i++)wheel(240);
+  h.context.NetworkToolkitGraphHistory.setPreferences({invertWheelZoom:true},{persist:false});
+  const factor=()=>Number(h.document.querySelector('[data-rt-zoom-level]').dataset.rtZoomFactor),before=factor();
+  wheel(delta);assert(factor()<before,`${mode} first outward wheel must leave floor: ${before} -> ${factor()}`);
+  for(let i=0;i<64;i++)wheel(delta);
+  assert(h.document.querySelectorAll('[data-rt-point]').filter(m=>!m.hasAttribute('data-rt-aggregate')).length>5,mode+' repeated outward input must reach additional real samples');
+ }
+});

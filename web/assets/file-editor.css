@@ -393,3 +393,13 @@ body:has(.nt-editor:not([hidden]) [data-ed-files-sidebar]:not([hidden])) .toast-
 
 [data-editor-file-paths]{flex:none;padding:0 5px 4px;max-height:35%;overflow:auto}
 .nt-editor-files-sidebar[data-editor-sidebar-panel=connections] [data-editor-file-paths],.nt-editor-files-sidebar[data-editor-sidebar-side=local] [data-editor-file-paths]{display:none}
+
+/* At compact widths Files is an explicitly opened drawer, not an overlay left
+   behind on the editing surface after a desktop-to-narrow resize. It uses the
+   editor's full available height so browsing is not squeezed by toolbar rows. */
+@media(max-width:680px){
+ .nt-editor-window{position:relative}
+ .nt-editor-workspace{position:static}
+ .nt-editor-files-sidebar:not([hidden]){inset:0 auto 0 0;width:min(360px,calc(100% - 28px))!important;max-width:calc(100% - 28px);min-width:0;z-index:20}
+ .nt-editor-files-sidebar .nt-editor-files-resize{display:none}
+}

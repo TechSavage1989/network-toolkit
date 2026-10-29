@@ -81,7 +81,10 @@
   last=Math.max(need-1,Math.min(times.length-1,last));first=Math.max(0,last-need+1);
   while(first>0&&times[last]-times[first]<floor)first--;
   while(last<times.length-1&&times[last]-times[first]<floor)last++;
-  const start=a<times[first]?a:times[first],end=b>times[last]?b:times[last];return {...scope,start:timestamp(start),end:timestamp(end),from:epoch(timestamp(start)),to:epoch(timestamp(end))};
+  // A request at/below the data floor settles on exact real endpoints. Keep
+  // wider fractional intervals so outward wheel steps can accumulate until
+  // another sample enters; snapping every five-point view would trap zoom out.
+  const atFloor=b-a<=times[last]-times[first],start=atFloor?times[first]:a<times[first]?a:times[first],end=atFloor?times[last]:b>times[last]?b:times[last];return {...scope,start:timestamp(start),end:timestamp(end),from:epoch(timestamp(start)),to:epoch(timestamp(end))};
  }
  function sampleReferenceFloor(items){const stamps=items.map(item=>item.time).filter(valid).sort(compare);if(stamps.length<5)return 0;const b=instant(stamps.at(-1)),fifth=instant(stamps[stamps.length-5]);return Math.max(2000,Number(b-fifth)/1000000+.000001);}
  function anchoredEnd(scope,oldZoom,nextZoom,share,mode='linear'){

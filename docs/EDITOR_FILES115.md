@@ -9,7 +9,11 @@ transport, reconstruct the existing browser form or change an open document.
 Existing explicit saved-profile and detached-access approval flows remain.
 
 The sidebar starts expanded on a wide new workspace and collapsed on a narrow
-new workspace. Its Files rail and existing toolbar button reopen it. Main-window
+new workspace. Moving from a wide to narrow window collapses it without changing
+the saved wide-window preference; widening restores that preference. Explicitly
+opening it on a narrow screen uses a full-editor-height drawer, leaving the
+directory usable instead of squeezing it below the editor's wrapped toolbar.
+Collapse or Escape returns to editing without unmounting the retained form. Its Files rail and existing toolbar button reopen it. Main-window
 width, collapse, primary tab and file-location choices persist in normal app
 settings. A detached window retains these non-secret UI choices in its own
 session storage; it gains no application-settings write capability. Existing

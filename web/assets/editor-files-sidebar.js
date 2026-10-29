@@ -1,9 +1,9 @@
 (function(root){
 'use strict';
-let side='local',panel='files',protocol='ssh',width=300,accessTimer=null,requests=[],sourceBusy=false,navigationRevision=0,preferencesLoaded=false;
+let side='local',panel='files',protocol='ssh',width=300,accessTimer=null,requests=[],sourceBusy=false,navigationRevision=0,preferencesLoaded=false,wideCollapsed=false,compactOpen=false,compactLayout=null;
 const detached=()=>typeof EDITOR_WINDOW!=='undefined'&&EDITOR_WINDOW;
-function readPreferences(){if(preferencesLoaded)return;preferencesLoaded=true;let v={};if(detached()){try{v=JSON.parse(root.sessionStorage?.getItem('ntk.editor.files')||'{}');}catch{}}else v=typeof state==='undefined'?{}:state.editorFilesPreferences||{};side=v.side==='remote'?'remote':'local';panel=v.panel==='connections'?'connections':'files';width=Number.isFinite(v.width)?Math.max(220,Math.min(600,v.width)):300;return v;}
-function remember(host){const value={side,panel,width,collapsed:host.hidden};if(detached()){try{root.sessionStorage?.setItem('ntk.editor.files',JSON.stringify(value));}catch{}}else if(typeof state!=='undefined'){state.editorFilesPreferences=value;if(typeof saveState==='function')saveState();}}
+function readPreferences(){if(preferencesLoaded)return;preferencesLoaded=true;let v={};if(detached()){try{v=JSON.parse(root.sessionStorage?.getItem('ntk.editor.files')||'{}');}catch{}}else v=typeof state==='undefined'?{}:state.editorFilesPreferences||{};side=v.side==='remote'?'remote':'local';panel=v.panel==='connections'?'connections':'files';width=Number.isFinite(v.width)?Math.max(220,Math.min(600,v.width)):300;wideCollapsed=v.collapsed===true;return v;}
+function remember(host){const value={side,panel,width,collapsed:wideCollapsed};if(detached()){try{root.sessionStorage?.setItem('ntk.editor.files',JSON.stringify(value));}catch{}}else if(typeof state!=='undefined'){state.editorFilesPreferences=value;if(typeof saveState==='function')saveState();}}
 function setup(editor){
  const host=editor?.querySelector('[data-ed-files-sidebar]');if(!host)return null;
  if(host.querySelector('[data-editor-file-browser]'))return host;
@@ -12,18 +12,21 @@ function setup(editor){
  const paths=sessions?.querySelector('.nt-editor-file-path-actions');if(paths)host.querySelector('[data-editor-file-paths]').append(paths);
  let rail=editor.querySelector('[data-editor-files-reopen]');if(!rail){rail=document.createElement('button');rail.type='button';rail.className='nt-editor-files-rail btn ghost';rail.dataset.editorFilesReopen='';rail.setAttribute('aria-label','Expand editor sidebar');rail.title='Expand Files and Connections';rail.textContent='Files ›';host.before(rail);rail.onclick=()=>toggle(editor);}
  host.addEventListener('click',event=>{if(event.target.closest('[data-editor-files-close]')){toggle(editor);return;}const primary=event.target.closest('[data-editor-files-panel]'),tab=event.target.closest('[data-editor-files-side]');if(primary){selectPanel(primary.dataset.editorFilesPanel);return;}if(tab){navigationRevision++;side=tab.dataset.editorFilesSide;if(side==='local'&&protocol!=='ftp')protocol='ssh';mount(host);remember(host);}});
- host.addEventListener('keydown',event=>{const tab=event.target.closest('[role="tab"]');if(!tab||!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;const tabs=[...tab.parentElement.querySelectorAll('[role="tab"]')],at=tabs.indexOf(tab),next=event.key==='Home'?0:event.key==='End'?tabs.length-1:(at+(event.key==='ArrowLeft'?-1:1)+tabs.length)%tabs.length;event.preventDefault();tabs[next].click();tabs[next].focus();});
+ host.addEventListener('keydown',event=>{if(event.key==='Escape'&&isCompact()&&!host.hidden){event.preventDefault();event.stopPropagation();toggle(editor);return;}const tab=event.target.closest('[role="tab"]');if(!tab||!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;const tabs=[...tab.parentElement.querySelectorAll('[role="tab"]')],at=tabs.indexOf(tab),next=event.key==='Home'?0:event.key==='End'?tabs.length-1:(at+(event.key==='ArrowLeft'?-1:1)+tabs.length)%tabs.length;event.preventDefault();tabs[next].click();tabs[next].focus();});
  const handle=host.querySelector('.nt-editor-files-resize');let drag=null;
- const resize=value=>{width=Math.max(220,Math.min(600,Math.max(220,editor.clientWidth*.65),value));host.style.flexBasis=width+'px';host.style.width=width+'px';handle.setAttribute('aria-valuenow',String(Math.round(width)));};
+ const resize=value=>{width=Math.max(220,Math.min(600,value));host.style.flexBasis=width+'px';host.style.width=width+'px';handle.setAttribute('aria-valuenow',String(Math.round(width)));};
  handle.addEventListener('pointerdown',event=>{if(event.button!==0)return;event.preventDefault();drag={id:event.pointerId,left:host.getBoundingClientRect().left};handle.setPointerCapture(event.pointerId);});
  handle.addEventListener('pointermove',event=>{if(drag?.id===event.pointerId)resize(event.clientX-drag.left);});
  const stop=event=>{if(drag?.id!==event.pointerId)return;drag=null;if(handle.hasPointerCapture(event.pointerId))handle.releasePointerCapture(event.pointerId);remember(host);};handle.addEventListener('pointerup',stop);handle.addEventListener('pointercancel',stop);handle.addEventListener('lostpointercapture',()=>{drag=null;});
  handle.addEventListener('keydown',event=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(event.key)){event.preventDefault();resize(event.key==='Home'?220:event.key==='End'?600:width+(event.key==='ArrowLeft'?-20:20));remember(host);}});resize(width);return host;
 }
 function visibility(editor,host,show){host.hidden=!show;editor.querySelector('[data-ed="files"]')?.setAttribute('aria-expanded',String(show));const rail=editor.querySelector('[data-editor-files-reopen]');if(rail)rail.hidden=show;if(!show)clearTimeout(accessTimer);else mount(host);}
-function initialize(editor){const first=!preferencesLoaded,v=readPreferences(),host=setup(editor);if(!host)return;if(first)visibility(editor,host,typeof v?.collapsed==='boolean'?!v.collapsed:(root.innerWidth||900)>680);else if(!host.hidden)mount(host);}
-function toggle(editor){readPreferences();const host=setup(editor);if(!host)return;navigationRevision++;visibility(editor,host,host.hidden);remember(host);(host.hidden?editor.querySelector('[data-editor-files-reopen]'):host.querySelector('[data-editor-files-panel][aria-selected="true"]'))?.focus?.({preventScroll:true});}
-function selectPanel(value){const host=document.querySelector('[data-ed-files-sidebar]');if(!host)return;navigationRevision++;panel=value==='connections'?'connections':'files';if(host.hidden)visibility(host.closest('#networkToolkitFileEditor'),host,true);else mount(host);remember(host);}
+function isCompact(){return (root.innerWidth||900)<=680;}
+function expandedIntent(show){compactLayout=isCompact();if(compactLayout)compactOpen=show;else wideCollapsed=!show;}
+function responsive(editor,host){const compact=isCompact();if(compactLayout!==compact){compactOpen=false;compactLayout=compact;}const show=compact?compactOpen:!wideCollapsed,focused=!show&&host.contains(document.activeElement);if(host.hidden===show)navigationRevision++;visibility(editor,host,show);if(focused)editor.querySelector('[data-editor-files-reopen]')?.focus?.({preventScroll:true});}
+function initialize(editor){readPreferences();const host=setup(editor);if(host)responsive(editor,host);}
+function toggle(editor){readPreferences();const host=setup(editor);if(!host)return;navigationRevision++;expandedIntent(host.hidden);visibility(editor,host,host.hidden);remember(host);(host.hidden?editor.querySelector('[data-editor-files-reopen]'):host.querySelector('[data-editor-files-panel][aria-selected="true"]'))?.focus?.({preventScroll:true});}
+function selectPanel(value){const host=document.querySelector('[data-ed-files-sidebar]');if(!host)return;navigationRevision++;panel=value==='connections'?'connections':'files';if(host.hidden){expandedIntent(true);visibility(host.closest('#networkToolkitFileEditor'),host,true);}else mount(host);remember(host);}
 function mount(host){
  host.dataset.editorSidebarPanel=panel;host.dataset.editorSidebarSide=side;host.querySelector('[data-editor-file-browser]')?.setAttribute('aria-labelledby',panel==='connections'?'ntEditorConnectionsTab':'ntEditorFilesTab');
  const sessions=host.querySelector('#ntEditorRemotePanel');if(sessions){sessions.hidden=panel!=='connections';if(panel==='connections')void root.NetworkToolkitFileEditor?.refreshConnectedSources?.();}
@@ -73,5 +76,6 @@ async function useSource(source){
  protocol=kind;side='remote';panel='files';mount(host);remember(host);
  }finally{sourceBusy=false;}
 }
+root.addEventListener?.('resize',()=>{if(!preferencesLoaded)return;const editor=document.querySelector('#networkToolkitFileEditor'),host=editor?.querySelector('[data-ed-files-sidebar]');if(editor&&!editor.hidden&&host&&isCompact()!==compactLayout)responsive(editor,host);});
 root.NetworkToolkitEditorFiles=Object.freeze({initialize,selectPanel,useSource,showConnection,toggle,syncRequests,manageAccess,detached});
 })(globalThis);

@@ -111,10 +111,6 @@
         // interval contains no retained raw sample from which to build a curve.
         const p=model.visiblePrefix;model.timeScope=history.projectScope(scope,{kind:'linear',start:p.firstTime,end:p.lastTime,span:Number(history.instant(p.lastTime)-history.instant(p.firstTime)),filled:true});model.timeScope.historyCluster=true;groups=[{items:[],prefix:p,aggregate:true,historical:true,id:model.id}];
       }
-      // Projection snaps manual intervals to real sample endpoints. Keep the
-      // gesture scale on that same interval, otherwise repeated wheel events at
-      // the floor can advance by one sample while the reported factor lags.
-      if(model.manualScope&&projection&&visible.length){const edge=history.minimumSampleWindow(model.allPoints,{start:last,end:last}),floor=history.instant(edge.end)-history.instant(edge.start);if(span>0&&span<=Number(floor)){model.manualScope={start:model.timeScope.start,end:model.timeScope.end};model.viewEnd=model.timeScope.end;if(model.panSpanNs)model.zoom=Number(BigInt(model.panSpanNs))/span;}}
       return groups.map(aggregate);
     }
     model.timeScope=null;model.rawVisiblePoints=candidates;return candidates.map((p,index)=>({...p,index}));
@@ -274,7 +270,9 @@
     const model=models.get(String(id)),container=model&&findContainer(model.id),history=root.NetworkToolkitGraphHistory;if(!model)return null;
     if(action==='reset'){root.NetworkToolkitGraphNavigator.fit();return 1;}if(!['in','out'].includes(action)&&!Number.isFinite(Number(action)))return model.zoom;
     const ceiling=maximumZoom(model),minimum=Math.min(minZoom,model.zoom),next=Math.max(minimum,Math.min(action==='out'?Math.max(ceiling,model.zoom):ceiling,zoomValue(action==='in'?model.zoom*2:action==='out'?Math.max(minimum,model.zoom/2):action)));if(next===model.zoom||next>model.zoom&&model.allPoints.filter(p=>history.instant(p.time)!==null).length<5)return model.zoom;
-    if(model.manualScope||Number.isFinite(anchorShare)){const scope=anchorScope||model.timeScope,end=Number.isFinite(anchorShare)?history.anchoredEnd(scope,model.zoom,next,anchorShare,model.mode):scope.end,span=history.instant(scope.end)-history.instant(scope.start),length=BigInt(Math.max(1,Math.round(Number(span)*model.zoom/next)));navigateWindow(model,{start:history.timestamp(history.instant(end)-length),end});}
+    // Retain the requested scale between discrete samples. Using the snapped
+    // visible span here would discard small outward wheel steps at the floor.
+    if(model.manualScope||Number.isFinite(anchorShare)){const scope=anchorScope||model.timeScope,span=history.instant(scope.end)-history.instant(scope.start),base=model.panSpanNs?Number(BigInt(model.panSpanNs)):Number(span)*model.zoom,length=BigInt(Math.max(1,Math.round(base/next))),end=Number.isFinite(anchorShare)?history.anchoredEnd(scope,base/Number(span),next,anchorShare,model.mode):scope.end;navigateWindow(model,{start:history.timestamp(history.instant(end)-length),end});}
     else{model.zoom=next;refreshModel(model);if(container)rebuild(container,model);}return model.zoom;
   }
   function pan(id,amount){

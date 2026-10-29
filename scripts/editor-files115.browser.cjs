@@ -1,7 +1,7 @@
 'use strict';
 // Isolated browser fixtures only: synthetic profiles/files, no device or vault.
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),{chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
-const root=path.resolve(__dirname,'..'),out=process.env.TOOLKIT_TEST_OUTPUT,report={passed:false,checks:[],errors:[]},child='c'.repeat(32),hash='a'.repeat(64);let browser;
+const root=path.resolve(__dirname,'..'),out=process.env.TOOLKIT_TEST_OUTPUT,report={passed:false,checks:[],errors:[]},child='c'.repeat(32),hash='a'.repeat(64);let browser,activePage;
 const profiles=[{id:'verify',type:'ssh',name:'SSH verification',host:'verify.invalid',port:22,username:'fixture',authMethod:'password',credentialId:''},{id:'manual',type:'ssh',name:'SSH sign-in',host:'manual.invalid',port:22,username:'fixture',authMethod:'password',credentialId:''},{id:'locked',type:'ssh',name:'Locked vault',host:'locked.invalid',port:22,username:'fixture',authMethod:'password',credentialId:'synthetic-vault'}];
 const ftp={id:'ftp',name:'Manual FTPS',host:'ftp.invalid',port:21,username:'fixture',security:'explicit',credentialId:''};
 const catalog=[...profiles.map(p=>({id:'ssh:'+p.id,name:p.name,protocol:'ssh',host:p.host,port:p.port})),{id:'ftp:ftp',name:ftp.name,protocol:'ftps',host:ftp.host,port:ftp.port}];
@@ -58,10 +58,10 @@ async function choose(page,id){
 (async()=>{assert(out,'TOOLKIT_TEST_OUTPUT required');fs.mkdirSync(out,{recursive:true});const timeout=setTimeout(()=>{report.failure='Files115 exceeded four minutes';save();process.exit(1)},240000);
  try{browser=await chromium.launch({headless:true});
  for(const detached of [false,true])for(const width of [1440,390]){
-  const f=await start(width,detached),{page}=f,mode=detached?'detached':'main';
+  const f=await start(width,detached),{page}=f,mode=detached?'detached':'main';activePage=page;
   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   const sidebar=page.locator('[data-ed-files-sidebar]'),toggle=page.locator('[data-ed="files"]');
-  if(await toggle.getAttribute('aria-expanded')!=='true')await page.locator('[data-editor-files-reopen]').click();
+  if(width===390){assert.equal(await sidebar.isVisible(),false,'initial compact Files is collapsed');assert.equal(await page.locator('[data-editor-files-reopen]').isVisible(),true);}if(await toggle.getAttribute('aria-expanded')!=='true')await page.locator('[data-editor-files-reopen]').click();
   if(detached){await page.locator('[data-editor-files-request]').waitFor({state:'visible'});assert(!f.calls.some(c=>c.path==='/api/transfer/local'));f.allow(true);await page.locator('[data-editor-files-panel="connections"]').click();await page.locator('[data-editor-files-panel="files"]').click();}
   await page.locator('[data-rb-drive="D:/"]').waitFor({state:'visible'});
   const names=await page.locator('[data-rb-drive]').allTextContents();assert.equal(new Set(names).size,4);assert(names.every(n=>/[A-Z]:/.test(n)));await page.locator('[data-rb-drive="D:/"]').click();await page.waitForFunction(()=>document.querySelector('[data-rb-path="local"]').value==='D:/');assert.equal(await page.locator('[data-rb-drive="D:/"]').getAttribute('aria-pressed'),'true');
@@ -75,9 +75,19 @@ async function choose(page,id){
   const before=await page.locator('.nt-editor-document-area').boundingBox();await page.locator('[data-editor-files-close]').click();assert.equal(await sidebar.isVisible(),false);const after=await page.locator('.nt-editor-document-area').boundingBox();if(width>680)assert(after.width>=before.width+200);await page.locator('[data-editor-files-reopen]').click();await page.locator('[data-rb-scroll="local"]').waitFor({state:'visible'});await retained(page);assert(!f.calls.some(c=>c.body?.action==='connect'));
   await page.evaluate(theme=>setTheme(theme),width===390?'dark':'light');await page.waitForFunction(()=>[...document.images].every(i=>i.complete&&i.naturalWidth>0));await page.screenshot({path:path.join(out,'editor-files115-'+mode+'-'+width+'.png')});
   await page.locator('[data-editor-files-panel="connections"]').click();await page.screenshot({path:path.join(out,'editor-connections115-'+mode+'-'+width+'.png')});
+  if(width===1440){
+   await page.setViewportSize({width:390,height:950});await sidebar.waitFor({state:'hidden'});await retained(page);assert(await page.evaluate(()=>document.querySelector('[data-rb-root]')===files115Original&&document.querySelector('[data-rb-setting="password"]')===files115Input));
+   await page.waitForFunction(()=>{const area=document.querySelector('.nt-editor-document-area'),r=area.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return hit&&area.contains(hit)&&!hit.closest('[data-ed-files-sidebar]');});
+   await page.setViewportSize({width:1440,height:950});await sidebar.waitFor({state:'visible'});assert.equal(await page.locator('[data-editor-files-panel="connections"]').getAttribute('aria-selected'),'true');assert(await page.evaluate(()=>document.querySelector('[data-rb-root]')===files115Original));
+   await page.setViewportSize({width:390,height:950});await sidebar.waitFor({state:'hidden'});await page.locator('[data-editor-files-reopen]').click();await page.locator('[data-editor-files-panel="files"]').click();
+   const resized=await page.locator('[data-rb-scroll="local"]').evaluate(el=>({height:el.getBoundingClientRect().height,sidebarHeight:el.closest('[data-ed-files-sidebar]').getBoundingClientRect().height}));assert(resized.height>=200,JSON.stringify(resized));(report.resizes??=[]).push({mode,...resized});await page.screenshot({path:path.join(out,'editor-files115-'+mode+'-resized-390.png')});
+   await page.locator('[data-editor-files-close]').focus();await page.keyboard.press('Escape');await sidebar.waitFor({state:'hidden'});await page.setViewportSize({width:1440,height:950});await sidebar.waitFor({state:'visible'});await page.locator('[data-editor-files-panel="connections"]').click();
+   check(mode+' wide→390→wide auto-collapse, explicit full-height drawer and form/dirty identity');
+  }
+
   if(detached)assert(!f.calls.some(c=>c.path==='/api/state'||c.path==='/api/credentials'));else{assert(await page.evaluate(()=>state.editorFilesPreferences.panel==='connections'));}
   check(mode+' '+width+' named drives, unavailable fallback, persistent tabs/forms, directory height, collapse and dirty retention');await f.ctx.close();
  }
  assert.deepEqual(report.errors,[]);report.passed=true;save();
- }catch(e){report.failure=e.stack;save();throw e;}finally{clearTimeout(timeout);await browser?.close();}
+ }catch(e){report.failure=e.stack;save();if(activePage&&!activePage.isClosed())await activePage.screenshot({path:path.join(out,'editor-files115-failure.png')}).catch(()=>{});throw e;}finally{clearTimeout(timeout);await browser?.close();}
 })();
