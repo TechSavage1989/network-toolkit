@@ -16,12 +16,24 @@ function nativePixelFromAligned(view,offsets,heights,pixel){const total=offsets.
 // One latest-intent coordinator owns scroll reconciliation. Layout invalidation
 // pauses (rather than drops) an intent; only current measured geometry may write.
 function createScrollReconciler(schedule,read,write,complete=()=>{}){
- const key={};let intent=null,version=0,passes=0,stable=0,running=false;
- function queue(token){running=true;schedule({key,read(){return token===version&&intent?read(intent):null},write(value){if(token!==version||!intent)return;if(value===null){running=false;return;}const changed=write(value);passes++;stable=changed?0:stable+1;if(stable>=2||passes>=8){running=false;complete(stable>=2);return;}queue(token)}});}
+ const key={};let intent=null,epoch=0,revision=0,passes=0,stable=0,running=false;
+ function queue(){if(running||!intent)return;running=true;const token=epoch;
+  schedule({key,read(){if(token!==epoch||!intent)return null;return {revision,value:read(intent)}},write(measured){
+   if(token!==epoch)return;running=false;if(!intent)return;
+   // Input may arrive between measurement phases. Do not write old geometry;
+   // retain a single pending job for the newest intent instead of cancelling
+   // every frame before it can ever synchronize the other pane.
+   if(!measured||measured.revision!==revision){queue();return;}
+   if(measured.value===null)return;
+   const current=revision,changed=write(measured.value);if(token!==epoch||!intent)return;
+   if(current!==revision){queue();return;}
+   passes++;stable=changed?0:stable+1;if(stable>=2||passes>=8){complete(stable>=2);return;}queue();
+  }},intent);
+ }
  // Native virtual heights may refine after an initially stable measurement.
- // Keep the latest intent, but coalesce refinement notifications into the same
- // bounded queue. New input, invalidation and disposal still invalidate tokens.
- return {request(value){intent=value;passes=stable=0;queue(++version)},pause(){version++;passes=stable=0;running=false},resume(){if(intent){passes=stable=0;queue(++version)}},refine(){if(intent&&!running){passes=stable=0;queue(++version)}},cancel(){intent=null;version++;passes=stable=0;running=false}};
+ // Keep the latest intent and coalesce input/refinement into the same bounded
+ // queue. Explicit invalidation, new owners and disposal invalidate its epoch.
+ return {request(value){intent=value;revision++;passes=stable=0;queue()},pause(){epoch++;passes=stable=0;running=false},resume(){if(intent){passes=stable=0;queue()}},refine(){if(intent&&!running){passes=stable=0;queue()}},cancel(){intent=null;epoch++;revision++;passes=stable=0;running=false}};
 }
 // Native gutters cache their own viewport pass. Refresh that public extension
 // only when the measured block signature changes, never by editing gutter DOM.
@@ -40,7 +52,7 @@ function create(options){
  let disposed=false,reflecting=0,inUpdate=0,pendingRefresh=false,timer=null,generation=0,pixelReady=false,result=null,geometry=null,sourceHeights=null,lastSide='left',scale=0,selected=-1,mapDrag=null,syncing=false,independentReveal=false,scrollSource=null,mapFrame=null,lastSignature='';
  const map=q('[data-compare-map]'),mapContent=q('[data-compare-map-content]'),tracks=Object.fromEntries(sides.map(side=>[side,q('[data-compare-track="'+side+'"]')]));
  const docs=()=>options.documents(),doc=side=>docs().find(d=>d.id===ids[side]),isComposing=()=>sides.some(side=>composition[side]||views[side]?.composing),editable=side=>!!bound[side]&&!bound[side].loading&&!bound[side].frozen;
- const scrollReconciler=createScrollReconciler(job=>root.requestAnimationFrame(()=>{if(!disposed)views.left.requestMeasure(job)}),intent=>{
+ const scrollReconciler=createScrollReconciler((job,intent)=>{if(!disposed)views[intent.side].requestMeasure(job)},intent=>{
   if(disposed||!pixelReady||!geometry||!sourceHeights||isComposing())return null;
   const origin=views[intent.side],pixel=intent.kind==='source'?alignedPixelFromNative(origin,geometry.sourceOffsets[intent.side],sourceHeights[intent.side],Math.max(0,origin.scrollDOM.scrollTop-origin.documentPadding.top)):E.offsetAtLine(geometry.rowOffsets,intent.row);
   const targets=intent.kind==='source'?(q('[data-compare-sync]').checked?[intent.side==='left'?'right':'left']:[]):intent.both?sides:[intent.side];
@@ -57,7 +69,7 @@ function create(options){
   config[side]=new Compartment();gutterConfig[side]=new Compartment();
   views[side]=new EditorView({parent:q('[data-compare-mount="'+side+'"]'),state:EditorState.create({doc:'',extensions:[decorationField,gutterConfig[side].of(lineNumbers({formatNumber:line=>String(line)})),drawSelection(),dropCursor(),config[side].of([EditorView.editable.of(false),EditorState.readOnly.of(true)]),EditorView.contentAttributes.of({id:'ntCompare-'+side,'data-compare-editor':side,'data-compare-text':side,'data-input-clear':'off','aria-label':'Edit '+side+' comparison document',spellcheck:'false'}),EditorState.changeFilter.of(()=>reflecting>0||editable(side)),keymap.of([{key:'Mod-Home',run:view=>moveToDocumentEdge(view,false,false,EditorView.scrollIntoView)},{key:'Mod-End',run:view=>moveToDocumentEdge(view,true,false,EditorView.scrollIntoView)},{key:'Mod-Shift-Home',run:view=>moveToDocumentEdge(view,false,true,EditorView.scrollIntoView)},{key:'Mod-Shift-End',run:view=>moveToDocumentEdge(view,true,true,EditorView.scrollIntoView)},{key:'Tab',run:view=>{if(!editable(side))return true;const selected=view.state.selection.main;view.dispatch({changes:{from:selected.from,to:selected.to,insert:'\t'},selection:{anchor:selected.from+1}});return true}},{key:'Escape',run:view=>{view.setTabFocusMode(3000);return false}},{key:'Mod-z',run:()=>{ownedUndo(side);return true}},{key:'Mod-Shift-z',run:()=>{ownedUndo(side,true);return true}},{key:'Mod-y',run:()=>{ownedUndo(side,true);return true}}]),EditorView.domEventHandlers({focus(){lastSide=side;const d=bound[side];if(d)options.activate(d,side);notifySelection(side);return false},compositionstart(){composition[side]=true;return false},compositionend(){composition[side]=false;queueMicrotask(()=>refresh(true));return false},beforeinput(event){if(event.inputType==='historyUndo'||event.inputType==='historyRedo'){event.preventDefault();ownedUndo(side,event.inputType==='historyRedo');return true}return false}}),EditorView.updateListener.of(update=>{if(disposed)return;inUpdate++;try{const d=bound[side];if(update.docChanged&&!reflecting&&d){generation++;invalidatePixels();options.edit(d,update.state.doc.toString());}if(update.selectionSet||update.docChanged){notifySelection(side);}if(update.geometryChanged||update.viewportChanged)updateMap();if(update.geometryChanged&&pixelReady&&!isComposing()){scrollReconciler.refine();gutterRefresh[side]?.request();}}finally{inUpdate--;if(pendingRefresh&&!isComposing())queueMicrotask(()=>refresh(true));}})]})});
   gutterRefresh[side]=createMeasuredRefresh(job=>root.requestAnimationFrame(()=>{if(!disposed)views[side].requestMeasure(job)}),()=>{if(disposed||!pixelReady||isComposing())return null;return {signature:generation+':'+nativeGutterSignature(views[side]),epoch:generation,stamp:Object.fromEntries(sides.map(key=>[key,{d:doc(key),text:doc(key)?.content,revision:doc(key)?.editRevision}]))};},()=>views[side].dispatch({effects:gutterConfig[side].reconfigure(lineNumbers({formatNumber:line=>String(line)}))}),value=>pixelReady&&stable(value.epoch,value.stamp));
-  for(const event of ['wheel','pointerdown','touchstart','keydown'])views[side].scrollDOM.addEventListener(event,()=>{scrollSource=side;independentReveal=false;scrollReconciler.cancel();},{passive:true});
+  for(const event of ['wheel','pointerdown','touchstart','keydown'])views[side].scrollDOM.addEventListener(event,()=>{if(scrollSource!==side||independentReveal)scrollReconciler.cancel();scrollSource=side;independentReveal=false;},{passive:true});
   views[side].scrollDOM.addEventListener('scroll',()=>{if(disposed)return;remember(side);if(!syncing){if(!independentReveal&&scrollSource===side){lastSide=side;scrollReconciler.request({kind:'source',side});}updateMap();revealMap(side);options.selectionChanged?.();}});
   facades[side]=createSourceView(views[side],()=>bound[side],text=>{const d=bound[side];if(d&&d.content!==text&&editable(side))options.edit(d,text)},()=>syncDocument(side),()=>editable(side));
  }

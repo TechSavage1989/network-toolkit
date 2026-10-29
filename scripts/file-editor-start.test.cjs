@@ -113,8 +113,8 @@ test('window checkpoints deep-copy without freezing and native preparation wraps
 
 test('window snapshots preflight combined history size and strip nested transient fields',async()=>{
  const h=harness();await h.first();const d=h.api.active,a=h.api.windowAdapter;d.binding={kind:'terminal',sessionId:'synthetic-session',revision:2,secret:'must-not-transfer'};d.view={start:1,end:2,top:3,left:4,direction:'forward',extra:'must-not-transfer'};const snap=a.checkpoint();assert.equal(Object.hasOwn(snap.documents[0].binding,'secret'),false);assert.equal(Object.hasOwn(snap.documents[0].view,'extra'),false);
- d.undo=Array(10).fill('x'.repeat(4*1024*1024));assert.throws(()=>a.snapshot([d.uid]),/32 MiB/);assert.equal(d.frozen,undefined);assert.equal(d.undo.length,10);
- d.undo=Array(6).fill('\u0001'.repeat(1024*1024));assert.throws(()=>a.snapshot([d.uid]),/32 MiB/);assert.equal(d.frozen,undefined,'Escaped controls count their actual serialized size before freezing');
+ d.undo=Array(65).fill('x'.repeat(4*1024*1024));assert.throws(()=>a.snapshot([d.uid]),/256 MiB/);assert.equal(d.frozen,undefined);assert.equal(d.undo.length,65);
+ d.undo=Array(44).fill('\u0001'.repeat(1024*1024));assert.throws(()=>a.snapshot([d.uid]),/256 MiB/);assert.equal(d.frozen,undefined,'Escaped controls count their actual serialized size before freezing');
 });
 
 test('closing the last loading tab re-enables the empty input and ignores its late read',async()=>{
@@ -149,20 +149,16 @@ test('navigation captures view before the mounted editor is hidden and restores 
  h.api.detachPage();assert.equal(doc.view.top,620);assert.equal(doc.view.left,35);ta.scrollTop=0;ta.scrollLeft=0;h.api.renderPage(mount);assert.equal(h.api.active,doc);assert.equal(ta.scrollTop,620);assert.equal(ta.scrollLeft,35);assert.equal(ta.selectionStart,600);assert.equal(ta.selectionEnd,609);
 });
 
-test('compact Connected disclosure preserves explicit choice without recreating documents or storing content',async()=>{
+test('Files replaces redundant connection toolbar without recreating documents or storing content',async()=>{
  const h=harness();h.c.OFFLINE=true;h.document.body.appendChild=h.document.body.append;await h.first();const mount=h.document.createElement('div');h.document.append(mount);h.api.renderPage(mount);
- const button=h.document.querySelector('[data-ed-panel-toggle="remote"]');assert.equal(h.document.querySelector('[data-ed-panel-toggle="local"]'),null);assert.equal(h.document.querySelector('#ntEditorLocalPath'),null);assert.equal(button.getAttribute('aria-expanded'),'false');assert(button.closest('.nt-editor-toolbar'));
+ assert.equal(h.document.querySelector('[data-ed-panel-toggle="remote"]'),null);assert.equal(h.document.querySelector('[data-ed-panel-toggle="local"]'),null);assert(h.document.querySelector('[data-ed="files"]'));
  const doc=h.api.active,ta=h.document.querySelector('[data-ed-text]');ta.setSelectionRange(34,55);ta.scrollTop=123;h.click('upper');const before={text:doc.content,undo:[...doc.undo],revision:doc.editRevision};
- h.document.emit('click',button);assert.equal(button.getAttribute('aria-expanded'),'true');assert.equal(h.c.state.editorPreferences.remotePanelOpen,true);assert.equal(h.document.querySelector('[data-ed-page-panel="remote"]').hidden,false);
- const root=h.document.getElementById('networkToolkitFileEditor'),wrap=root.querySelector('[data-ed-wrap]');wrap.checked=true;h.c.getComputedStyle=()=>({lineHeight:'20px',font:'13px monospace',paddingLeft:'0',paddingRight:'0'});root.emit('change',wrap);
- assert.equal(h.c.state.editorPreferences.remotePanelOpen,true);assert(!JSON.stringify(h.c.state).includes('Line 299'));
- h.api.detachPage();h.api.renderPage(mount);assert.equal(h.document.querySelector('[data-ed-panel-toggle="remote"]'),button);assert.equal(button.getAttribute('aria-expanded'),'true');assert.equal(doc.content,before.text);assert.deepEqual([...doc.undo],before.undo);assert.equal(doc.editRevision,before.revision);assert.equal(ta.selectionStart,34);assert.equal(ta.scrollTop,123);
+ h.api.detachPage();h.api.renderPage(mount);assert.equal(doc.content,before.text);assert.deepEqual([...doc.undo],before.undo);assert.equal(doc.editRevision,before.revision);assert.equal(ta.selectionStart,34);assert.equal(ta.scrollTop,123);assert(!JSON.stringify(h.c.state).includes('Line 299'));
 });
-test('retired local preference is preserved while only strict remote booleans control visible UI',async()=>{
+test('legacy disclosure preferences cannot restore a redundant toolbar or expose an orphaned form',async()=>{
  for(const value of [{localPanelOpen:true,remotePanelOpen:false},{localPanelOpen:false,remotePanelOpen:true},{localPanelOpen:'true',remotePanelOpen:1}]){
   const h=harness();h.c.OFFLINE=true;h.c.state.editorPreferences=value;await h.first();const mount=h.document.createElement('div');h.document.append(mount);h.api.renderPage(mount);
-  assert.equal(h.document.querySelector('[data-ed-panel-toggle="local"]'),null);const button=h.document.querySelector('[data-ed-panel-toggle="remote"]');assert.equal(button.getAttribute('aria-expanded'),String(value.remotePanelOpen===true));assert.equal(h.api.active.loading,false);
-  h.document.emit('click',button);assert.equal(h.c.state.editorPreferences.localPanelOpen,value.localPanelOpen===true);
+  assert.equal(h.document.querySelector('[data-ed-panel-toggle="local"]'),null);assert.equal(h.document.querySelector('[data-ed-panel-toggle="remote"]'),null);assert(h.document.querySelector('#ntEditorRemotePanel').hasAttribute('hidden'));assert.equal(h.api.active.loading,false);
  }
 });
 test('compact Compare action retains its full accessible name and explanatory title',async()=>{
@@ -171,14 +167,13 @@ test('compact Compare action retains its full accessible name and explanatory ti
 test('More stays in the toolbar while its separate action row toggles and restores keyboard focus',async()=>{
  const h=harness(),ta=await h.first(),root=h.document.getElementById('networkToolkitFileEditor'),more=root.querySelector('.nt-editor-more'),actions=root.querySelector('#ntEditorMoreActions'),summary=more.querySelector('summary');
  assert(more.closest('.nt-editor-toolbar'));assert(!actions.closest('.nt-editor-toolbar'));assert(actions.hasAttribute('hidden'));const doc=h.api.active;ta.setSelectionRange(8,16);ta.scrollTop=40;
- more.open=true;more.emit('toggle',more);assert.equal(actions.hidden,false);assert.equal(summary.getAttribute('aria-expanded'),'true');assert(actions.querySelector('[data-ed="openLocalPath"]'));assert(actions.querySelector('[data-ed="newLocalPath"]'));
+ more.open=true;more.emit('toggle',more);assert.equal(actions.hidden,false);assert.equal(summary.getAttribute('aria-expanded'),'true');assert.equal(actions.querySelector('[data-ed="openLocalPath"]'),null);assert.equal(actions.querySelector('[data-ed="newLocalPath"]'),null);assert.equal(root.querySelector('[data-ed-panel-toggle="remote"]'),null);
  h.document.activeElement=actions.querySelector('[data-ed="trim"]');summary.focus=()=>{h.document.activeElement=summary;};more.open=false;more.emit('toggle',more);assert.equal(actions.hidden,true);assert(h.document.activeElement===summary);assert.equal(h.api.active,doc);assert.equal(ta.selectionStart,8);assert.equal(ta.scrollTop,40);
 });
-test('replacement local path actions cancel safely, read only on acceptance and defer new-file writes to Save',async()=>{
- const h=harness();await h.first();const requests=[];h.c.api=async(path,method,body)=>{requests.push({path,method,body});return {content:'synthetic opened text',hash:'read-hash'};};const root=h.document.getElementById('networkToolkitFileEditor'),original=h.api.active;
- h.click('openLocalPath');root.emit('click',root.querySelector('[data-ed-dialog-action="cancel"]'));await settle();assert.equal(h.api.active,original);assert.equal(requests.length,0);
- h.click('openLocalPath');root.querySelector('[data-ed-dialog-input]').value='C:\\synthetic\\opened.txt';root.emit('click',root.querySelector('[data-ed-dialog-action="accept"]'));await settle();assert.equal(h.api.active.content,'synthetic opened text');assert.equal(requests.length,1);assert.equal(requests[0].body.action,'read-text');
- h.click('newLocalPath');root.querySelector('[data-ed-dialog-input]').value='C:\\synthetic\\new.txt';root.emit('click',root.querySelector('[data-ed-dialog-action="accept"]'));await settle();assert.equal(h.api.active.path,'C:\\synthetic\\new.txt');assert.equal(requests.length,1);assert.equal(h.api.active.content,'');assert.equal(h.api.active.binding.kind,'local');
+test('local file APIs remain available to Files while More contains no duplicate path commands',async()=>{
+ const h=harness();await h.first();const requests=[];h.c.api=async(path,method,body)=>{requests.push({path,method,body});return {content:'synthetic opened text',hash:'read-hash'};};
+ await h.api.openLocalPath('C:\\synthetic\\opened.txt');assert.equal(h.api.active.content,'synthetic opened text');assert.equal(requests.length,1);assert.equal(requests[0].body.action,'read-text');
+ await h.api.openLocalPath('C:\\synthetic\\new.txt',true);assert.equal(h.api.active.path,'C:\\synthetic\\new.txt');assert.equal(requests.length,1);assert.equal(h.api.active.content,'');assert.equal(h.api.active.binding.kind,'local');
 });
 test('saved connection listing and selection never connect; explicit action is single-flight and ignores stale completion',async()=>{
  const h=harness();h.c.OFFLINE=true;await h.first();const pending=deferred(),calls=[];h.c.NetworkToolkitEditorSavedConnections={list:async()=>({profiles:[{id:'ssh:one',name:'Synthetic one',protocol:'ssh',host:'fixture.test',port:22},{id:'ssh:two',name:'Synthetic two',protocol:'ssh',host:'other.test',port:2222}],detached:false}),connect:id=>{calls.push(id);return pending.promise;}};
@@ -260,4 +255,18 @@ test('disabled native prepare stays nondestructive until commit and child policy
 test('activity metadata includes saved empty files and touched drafts, never untouched blank or text',async()=>{
  const h=harness();await h.api.newDocument();const d=h.api.active,a=h.api.windowAdapter;assert.deepEqual(JSON.parse(JSON.stringify(a.activityDocuments())),[{uid:d.uid,loaded:false}]);d.content='typed';d.dirty=true;d.editRevision++;assert.equal(a.activityDocuments()[0].loaded,true);d.content='';d.dirty=false;d.editRevision++;assert.equal(a.activityDocuments()[0].loaded,true);d.staged=true;assert.equal(a.activityDocuments().length,0);d.staged=false;h.c.state.editorPreferences={askSaveBeforeClose:false};assert(await h.api.closeAll());assert.equal(a.activityDocuments().length,0);
  await h.api.open({id:'saved-empty',path:'empty.txt',source:'Local computer',read:async()=>({content:''}),write:async()=>({})});const row=a.activityDocuments()[0];assert.equal(row.loaded,true);assert.deepEqual(Object.keys(row).sort(),['loaded','uid']);
+});
+
+test('capacity snapshots clone mutable containers without duplicating immutable source text and revision tokens observe views',async()=>{
+ const h=harness();await h.first();const d=h.api.active,a=h.api.windowAdapter;d.binding={kind:'local'};d.undo=['before'];d.view={start:1,end:2,direction:'none',top:5,left:0};const one=a.checkpointVersion([d.uid]);assert.equal(a.checkpointVersion([d.uid]),one);d.saveFailed=true;assert.notEqual(a.checkpointVersion([d.uid]),one);const snap=a.checkpoint([d.uid]);snap.documents[0].undo[0]='changed';snap.documents[0].binding.kind='bad';snap.documents[0].view.top=123;assert.equal(d.undo[0],'before');assert.equal(d.binding.kind,'local');assert.notEqual(d.view.top,123);assert.equal(snap.documents[0].content,d.content);
+});
+
+test('large-file mode preserves wrap preference, bounds future history and never prunes on a move',async()=>{
+ const h=harness();h.c.getComputedStyle=()=>({lineHeight:'20px',paddingTop:'10px'});await h.first();const root=h.document.getElementById('networkToolkitFileEditor');
+ const wrap=root.querySelector('[data-ed-wrap]');wrap.checked=true;root.emit('change',wrap);
+ const large='x'.repeat(2*1024*1024+1);await h.api.open({id:'large',path:'large.txt',source:'Local computer',binding:{kind:'local'},create:true,initialContent:large,read:async()=>({content:large}),write:async()=>({})});
+ const ta=root.querySelector('[data-ed-text]');assert.equal(ta.wrap,'off');assert.equal(wrap.checked,true);assert.equal(wrap.disabled,true);assert.match(root.querySelector('[data-ed-size]').textContent,/Large-file mode/);
+ h.api.active.undo=Array(40).fill(large);ta.value=large+'x';root.emit('input',ta);assert(h.api.active.undo.reduce((sum,value)=>sum+value.length*2,0)<=128*1024*1024);
+ const count=h.api.active.undo.length,snapshot=h.api.windowAdapter.snapshot([h.api.active.uid]);assert.equal(snapshot.documents[0].undo.length,count);h.api.windowAdapter.rollback([h.api.active.uid]);assert.equal(h.api.active.undo.length,count);
+ await h.api.open({id:'small-again',path:'small.txt',source:'Local computer',create:true,initialContent:'small',read:async()=>({content:'small'}),write:async()=>({})});assert.equal(ta.wrap,'soft');assert.equal(wrap.checked,true);assert.equal(wrap.disabled,false);
 });

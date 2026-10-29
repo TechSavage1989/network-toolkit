@@ -1,13 +1,18 @@
-NETWORK TOOLKIT 1.17.113
+NETWORK TOOLKIT 1.17.114
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.113
+CURRENT RELEASE - 1.17.114
 
-Release details: RELEASE_NOTES_1.17.113.txt
-Previous release: docs/releases/RELEASE_NOTES_1.17.112.txt
+Release details: RELEASE_NOTES_1.17.114.txt
+Previous release: docs/releases/RELEASE_NOTES_1.17.113.txt
 Full release-note archive: docs/releases/README.md
 
-Published113 source/tag31f27994b9a3f7bae4442c255f63a65c8e21e0c8 is verified.
+114 consolidates editor Files controls, expands bounded local/SFTP editing,
+adds scoped native Explorer copies and Terminal tab actions, and improves
+comparison and graph navigation. See EDITOR_CAPACITY114.md, FILES_NATIVE114.md,
+TERMINAL_NATIVE114.md and GRAPH_NAVIGATION114.md for explicit limits.
+
+Historical published113 source/tag31f27994b9a3f7bae4442c255f63a65c8e21e0c8 is verified.
 Read docs/RELEASE113_HANDOFF.md for exact gates, public hashes and limitations.
 This later documentation record does not rebuild or replace published downloads.
 

@@ -309,6 +309,70 @@
     }
     return changes;
   }
+  // Public xterm selection APIs only. Coordinates stay in the transient,
+  // already bounded emulator checkpoint; no additional output text is copied.
+  function selectionHash(value) {
+    let a=2166136261,b=5381;
+    for(let i=0;i<value.length;i++){a=Math.imul(a^value.charCodeAt(i),16777619);b=Math.imul(b,33)^value.charCodeAt(i);}
+    return [a>>>0,b>>>0];
+  }
+  function validateSelection(value,cols,length) {
+    if(value==null)return null;
+    object(value,'selection');
+    const point=p=>{object(p,'selection point');return {x:int(p.x,0,cols,'selection column'),y:int(p.y,0,length-1,'selection row')};};
+    const start=point(value.start),end=point(value.end),hash=array(value.hash,2,'selection hash').map(v=>u32(v,'selection hash'));
+    requireValue(hash.length===2&&(end.y>start.y||end.y===start.y&&end.x>start.x),'selection extent');
+    return {start,end,hash,length:int(value.length,1,LIMITS.dataBytes,'selected text length')};
+  }
+  function captureSelection(term) {
+    const position=term.getSelectionPosition?.();if(!position)return null;
+    const selected=term.getSelection?.()||'';if(!selected)return null;
+    return validateSelection({...position,hash:selectionHash(selected),length:selected.length},term.cols,term.buffer.active.length);
+  }
+  function applySelection(term,value,expected) {
+    if(!value){term.clearSelection?.();return;}
+    requireValue(typeof term.select==='function'&&typeof term.getSelection==='function','public selection API');
+    term.select(value.start.x,value.start.y,(value.end.y-value.start.y)*term.cols+value.end.x-value.start.x);
+    const selected=term.getSelection(),hash=selectionHash(selected);
+    const matches=selected.length===value.length&&hash[0]===value.hash[0]&&hash[1]===value.hash[1]&&(expected===undefined||selected===expected);
+    if(!matches)term.clearSelection();
+    requireValue(matches,'restored selected output');
+  }
+  function selectionLineWidth(buffer,y,cols) {
+    const line=buffer.getLine(y),next=buffer.getLine(y+1);
+    // A wide character moved to the next wrapped row leaves one empty pad.
+    return next?.isWrapped&&next.getCell(0)?.getWidth()===2&&line?.getCell(cols-1)?.getCode()===0?cols-1:cols;
+  }
+  function selectionOffset(buffer,start,point,cols) {
+    let count=0;
+    for(let y=start;y<=point.y;y++){const line=buffer.getLine(y),end=y===point.y?point.x:selectionLineWidth(buffer,y,cols);for(let x=0;x<end;x++){const cell=line?.getCell(x);if(cell?.getWidth()!==0)count+=(cell?.getChars()||' ').length;}}
+    return count;
+  }
+  function beforeResize(term) {
+    const selection=captureSelection(term);if(!selection)return null;
+    const buffer=term.buffer.active;if(buffer!==term.buffer.normal)return {selection,alternate:true,buffer,text:term.getSelection()};
+    const anchors=[];
+    try{for(const point of [selection.start,selection.end]){let y=point.y;while(y>0&&buffer.getLine(y)?.isWrapped)y--;const marker=term.registerMarker(y-buffer.baseY-buffer.cursorY);requireValue(marker&&!marker.isDisposed,'selection resize anchor');anchors.push({marker,offset:selectionOffset(buffer,y,point,term.cols)});}return {selection,anchors,buffer,text:term.getSelection()};}
+    catch(error){for(const a of anchors)a.marker.dispose();throw error;}
+  }
+  function selectionPoint(buffer,anchor,cols) {
+    requireValue(!anchor.marker.isDisposed&&anchor.marker.line>=0,'retained selection anchor');
+    let remaining=anchor.offset,y=anchor.marker.line;
+    for(;y<buffer.length;y++){
+      const line=buffer.getLine(y),width=selectionLineWidth(buffer,y,cols);
+      for(let x=0;x<width;x++){if(remaining===0)return {x,y};const cell=line.getCell(x);if(cell?.getWidth()!==0)remaining-=(cell?.getChars()||' ').length;requireValue(remaining>=0,'selection character boundary');}
+      if(remaining===0)return {x:width,y};
+      requireValue(buffer.getLine(y+1)?.isWrapped,'selection logical line');
+    }
+    fail('selection','The selected output was trimmed during terminal resizing.');
+  }
+  function afterResize(term,position) {
+    if(!position)return;
+    try{requireValue(term.buffer.active===position.buffer,'same selection buffer');const value=position.alternate?position.selection:{...position.selection,start:selectionPoint(term.buffer.active,position.anchors[0],term.cols),end:selectionPoint(term.buffer.active,position.anchors[1],term.cols)};applySelection(term,value,position.text);}
+    catch(error){term.clearSelection?.();throw error;}
+    finally{for(const a of position.anchors||[])a.marker.dispose();}
+  }
+
   function capture(term, serializeAddon) {
     if (restores.has(term)) fail('busy', 'This terminal display is still being restored.');
     const r = inspect(term); drained(r); safeBoundary(r);
@@ -328,7 +392,7 @@
         windows: r.input._windowTitleStack.slice(), icons: r.input._iconNameStack.slice() },
       palette: paletteState(r.theme), scrollback: int(term.options.scrollback, 0, LIMITS.scrollback, 'scrollback'),
       convertEol: bool(term.options.convertEol, 'line ending mode'),
-      userScrolling: bool(r.core._bufferService.isUserScrolling, 'scroll follow state') };
+      userScrolling: bool(r.core._bufferService.isUserScrolling, 'scroll follow state'), selection: captureSelection(term) };
     // Validate the bounded adjunct before allocating the serialized screen.
     validateEmulator(emulator, cols, rows);
     const data = serializeAddon.serialize({ excludeModes: true });
@@ -429,7 +493,8 @@
         icons: array(titles.icons, 10, 'icon title stack').map(v => text(v, LIMITS.title, 'icon title')) },
       palette, scrollback: int(value.scrollback, 0, LIMITS.scrollback, 'scrollback'),
       convertEol: bool(value.convertEol, 'line ending mode'),
-      userScrolling: bool(value.userScrolling, 'scroll follow state') };
+      userScrolling: bool(value.userScrolling, 'scroll follow state'),
+      selection: validateSelection(value.selection,cols,(value.active==='normal'?normal:alternate).length) };
     requireValue(normal.length <= rows + result.scrollback, 'scrollback capacity');
     bytesFit(JSON.stringify(result), LIMITS.emulatorBytes, '256 KiB emulator');
     return result;
@@ -489,6 +554,22 @@
       catch (error) { global.clearTimeout(timer); reject(error); }
     });
   }
+  // The pinned browser terminal keeps a separate absolute scrollbar position.
+  // Public scrollToLine computes a relative delta from buffer.ydisp, which is
+  // stale with respect to that scrollbar immediately after restore/row resize.
+  function restoreViewport(term,row) {
+    const buffer=term?.buffer?.active;
+    int(row,0,buffer?.baseY,'viewport restore row');
+    const viewport=term._core?._viewport;
+    if(!viewport){requireValue(!term.element,'browser viewport');term.scrollToLine(row);return;}
+    requireValue(typeof viewport._sync==='function'&&typeof viewport.scrollToLine==='function'&&typeof viewport.queueSync==='function'&&typeof term._core._bufferService?.scrollLines==='function','pinned viewport API');
+    // The resize may also have moved ydisp while the scrollbar stayed put.
+    term._core._bufferService.scrollLines(row-buffer.viewportY,false);
+    viewport._sync(row); // Update dimensions before applying the absolute row.
+    viewport.scrollToLine(row,true); // Immediate: never animate an ownership restore.
+    viewport.queueSync(row); // A queued resize refresh must use the same anchor.
+  }
+
   async function restore(term, snapshot) {
     const clean = validate(snapshot), state = clean.emulator;
     let r = inspect(term); drained(r);
@@ -534,7 +615,8 @@
       r.parser.currentState = parser.state;
       r.input._utf8Decoder.interim.set(parser.utf8); r.input._stringDecoder._interim = parser.utf16;
       term.options.convertEol = state.convertEol;
-      term.scrollToLine(clean.viewportY);
+      restoreViewport(term,clean.viewportY);
+      applySelection(term,state.selection);
       r.core._bufferService.isUserScrolling = state.userScrolling;
       term.refresh(0, clean.rows - 1);
       restored = true;
@@ -547,5 +629,5 @@
     }
   }
 
-  global.NetworkToolkitTerminalState = Object.freeze({ capture, restore, validate, limits: LIMITS, version: VERSION });
+  global.NetworkToolkitTerminalState = Object.freeze({ capture, restore, validate, captureSelection, beforeResize, afterResize, restoreViewport, limits: LIMITS, version: VERSION });
 })(typeof globalThis !== 'undefined' ? globalThis : window);

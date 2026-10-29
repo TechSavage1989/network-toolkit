@@ -10,3 +10,14 @@ test('linear startup fills naturally and full history pins exact recorded endpoi
 test('curve control is compact and has a real draggable/keyboard-accessible point and meaningful direction',()=>{assert.match(h.compressionControlHTML(),/data-graph-compression-open/);const html=h.compressionPreview(h.defaults.compression);assert.match(html,/data-graph-curve-handle/);assert.match(html,/role="slider"/);assert.match(html,/Older \/ compressed/);assert.match(html,/Newest \/ normal/);});
 test('irregular cadence counts actual newest points and huge gaps reduce effective count without reversal',()=>{for(const values of [[0,1,2,3,15,16],[0,10,20],[0,0,0,1,1,2]])for(const referenceMs of [1000,30000]){const items=values.map(n=>({time:stamp(n)})),p=h.sampleProjection(items,{}, {mode:'condensed',width:300,referenceMs,compression:{count:4,strength:.5,curve:.5}});assert(p.recentShare<=.65);assert(Math.abs(h.projectionDistance(p.recent,p)-p.recentShare)<1e-12);assert(h.projectionDistance(p.recent+1,p)>=p.recentShare);const end=h.instant(p.end),linear=items.filter(r=>Number(end-h.instant(r.time))<=p.recent);assert(linear.length>=Math.min(p.count,items.length),'coincident timestamps stay coincident');if(p.count<=items.length)assert.equal(p.recent,Number(end-h.instant(items[items.length-p.count].time)));let last=-Infinity;for(let n=0;n<=200;n++){const d=h.projectionDistance(n*p.horizon/200,p);assert(d>=last);last=d;}}});
 test('configured curve wheel/drag inverse uses its actual mapping rather than the retired logarithmic curve',()=>{const p=h.sampleProjection(rows(500),{}, {mode:'condensed',compression:{count:17,strength:.9,curve:.1}}),scope=h.projectScope({},p);for(const share of [.1,.4,.8]){const anchor=h.instant(h.at(share,scope,'condensed'));for(const zoom of [.5,2,8]){const end=h.anchoredEnd(scope,1,zoom,share,'condensed'),next=h.viewport(scope,zoom,end),t=h.instant(h.at(share,next,'condensed'));assert(t>=anchor-1n&&t<=anchor+1n);}const pan=h.panScope(scope,share,share+.05,'condensed');assert.equal(h.instant(h.at(share+.05,pan,'condensed')),anchor);}});
+
+test('default curve matches a 10-second normal timeframe at each width and cadence without growth decay',()=>{
+ for(const width of [220,744,1400])for(const cadence of [.1,.5,1,2]){
+  let gap;
+  for(const count of [120,720,7201]){
+   const items=Array.from({length:count},(_,i)=>({time:stamp(i*cadence)})),p=h.sampleProjection(items,{}, {mode:'condensed',width}),scope=h.projectScope({},p),last=items.at(-1),previous=items.at(-2),distance=(h.fraction(last.time,scope,'condensed')-h.fraction(previous.time,scope,'condensed'))*width;
+   assert(Math.abs(distance-width*cadence/10)<1e-6,'Recent spacing equals 10-second linear reference');if(gap!==undefined)assert(Math.abs(distance-gap)<1e-7);gap=distance;
+   assert.equal(h.fraction(last.time,scope,'condensed'),1);assert(p.widthLimited===false||p.count<p.requestedCount);
+  }
+ }
+});

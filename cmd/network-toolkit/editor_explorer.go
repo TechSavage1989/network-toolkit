@@ -132,9 +132,16 @@ func (a *application) serveApprovedEditorExplorer(w http.ResponseWriter, r *http
 	if access == nil {
 		return false
 	}
+	if strings.HasPrefix(r.URL.Path, "/api/explorer-transfer") {
+		a.handleExplorerTransfer(w, r)
+		return true
+	}
 	switch r.URL.Path {
 	case "/api/remote-browser/drop-upload":
 		a.handleRemoteDropUpload(w, r)
+		return true
+	case "/api/transfer/local-drop":
+		a.handleLocalExplorerDrop(w, r)
 		return true
 	case "/api/transfer/local":
 		a.handleTransferLocal(w, r)

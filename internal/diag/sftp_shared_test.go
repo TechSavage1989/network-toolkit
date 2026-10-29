@@ -137,7 +137,7 @@ func TestSFTPOnExistingSSHConnection(t *testing.T) {
 		t.Fatal("opening one editor file used more than one SFTP subsystem")
 	}
 	filesMu.Lock()
-	files["/too-large.txt"] = make([]byte, (8<<20)+1)
+	files["/too-large.txt"] = make([]byte, (16<<20)+1)
 	filesMu.Unlock()
 	if _, err = run("read-text", "/too-large.txt", ""); err == nil {
 		t.Fatal("editor accepted an oversized remote file")

@@ -22,8 +22,8 @@ import (
 	"networktoolkit/internal/model"
 )
 
-const editorTransferLimit = 32 << 20
-const editorDocumentLimit = 8 << 20
+const editorTransferLimit = 256 << 20
+const editorDocumentLimit = 32 << 20
 const editorViewLimit = 8
 const editorDocumentCountLimit = 64
 
@@ -402,7 +402,7 @@ func validateEditorBatch(batch editorBatch) error {
 		}
 		for _, s := range []string{d.Content, d.Original, d.Saved} {
 			if !validEditorText(s, editorDocumentLimit) {
-				return errors.New("Editor contents exceed the 8 MiB document limit or contain invalid text.")
+				return errors.New("Editor contents exceed the 32 MiB decoded document limit or contain invalid text.")
 			}
 		}
 		for _, s := range []string{d.EOL, d.SavedEOL} {
@@ -473,7 +473,7 @@ func validateEditorBatch(batch editorBatch) error {
 	}
 	raw, e := json.Marshal(batch)
 	if e != nil || len(raw) > editorTransferLimit {
-		return errors.New("Editor transfer exceeds the 32 MiB total limit.")
+		return errors.New("Editor transfer exceeds the 256 MiB total limit.")
 	}
 	return nil
 }
@@ -492,9 +492,48 @@ func validateEditorLeases(batch editorBatch, leases map[string]uint64) error {
 }
 func editorSnapshotBytes(d editorDocumentSnapshot) int { b, _ := json.Marshal(d); return len(b) }
 func editorCloneBatch(b editorBatch) editorBatch {
-	raw, _ := json.Marshal(b)
-	var copy editorBatch
-	_ = json.Unmarshal(raw, &copy)
+	// Strings are immutable; copy mutable containers rather than serializing all
+	// document text and undo history twice while the registry lock is held.
+	copy := b
+	copy.Documents = append([]editorDocumentSnapshot(nil), b.Documents...)
+	for i := range copy.Documents {
+		d := &copy.Documents[i]
+		if d.Undo != nil {
+			d.Undo = append([]string{}, d.Undo...)
+		}
+		if d.Redo != nil {
+			d.Redo = append([]string{}, d.Redo...)
+		}
+		if d.View != nil {
+			v := *d.View
+			d.View = &v
+		}
+		if d.CompareView != nil {
+			v := *d.CompareView
+			d.CompareView = &v
+		}
+	}
+	if b.Compare != nil {
+		v := *b.Compare
+		copy.Compare = &v
+	}
+	if b.Layout != nil {
+		v := *b.Layout
+		if b.Layout.Groups != nil {
+			v.Groups = append([]editorTabGroup{}, b.Layout.Groups...)
+		}
+		copy.Layout = &v
+	}
+	if b.Preferences != nil {
+		v := *b.Preferences
+		if b.Preferences.Colors != nil {
+			v.Colors = make(map[string]string, len(b.Preferences.Colors))
+			for k, c := range b.Preferences.Colors {
+				v.Colors[k] = c
+			}
+		}
+		copy.Preferences = &v
+	}
 	return copy
 }
 func (m *editorViewRegistry) makeGrant(caller string, d editorDocumentSnapshot) (*editorDocumentGrant, error) {

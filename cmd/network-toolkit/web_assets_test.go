@@ -211,6 +211,7 @@ func TestDiscoveryAssetsAreEmbeddedAndRooted(t *testing.T) {
 		{"/assets/terminal-copy.css", "text/css"},
 		{"/assets/terminal-output-archive.js", "text/javascript"},
 		{"/assets/terminal-tabs.js", "text/javascript"},
+		{"/assets/terminal-tab-drag.js", "text/javascript"},
 		{"/assets/packet-capture.js", "text/javascript"},
 		{"/assets/packet-capture.css", "text/css"},
 		{"/assets/input-clear.js", "text/javascript"},

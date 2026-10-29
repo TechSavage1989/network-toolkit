@@ -10,7 +10,7 @@ inward to make room for a radius. Genuine missing values, sequence gaps and larg
 recording-time gaps are not joined by a line.
 
 Condensed **Recent scale** sets recent time spacing, rather than dropping older
-history. Its default matches approximately 30-second Linear spacing. The newest
+history. Since114 its default matches 10-second Linear spacing. Existing explicit timeframe and custom detail settings retain proportional control. The newest
 configured number of points remain uncompressed; older time follows a monotonic
 curve into one left-edge history cluster. The full-history overview remains
 explicitly linear and shows coverage; the main graph and its labeled time axis

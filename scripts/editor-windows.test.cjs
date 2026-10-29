@@ -67,3 +67,10 @@ test('editor activity requires explicit authenticated online availability and re
 test('fresh online renderer sends one empty activity snapshot then coalesces unchanged empty state',async()=>{
  const f=fixture({available:false,request:async(p,m,b)=>{assert.equal(p,'/editor-views/current/activity');assert.deepEqual(b,{documents:[]});return {ok:true};}});f.adapter.activityDocuments=()=>[];f.controller.configure({activityAvailable:()=>true});assert.equal(f.controller.reportActivity(),true);assert.equal(f.controller.reportActivity(),false);await new Promise(r=>setImmediate(r));assert.equal(f.calls.length,1);assert.equal(f.controller.reportActivity(),false);assert.equal(f.calls.length,1);f.controller.stop();
 });
+
+test('unchanged revision checkpoint skips full text cloning and serialization but changed revision is sent',async()=>{
+ const f=fixture();let version=1,snapshots=0;f.adapter.checkpointVersion=()=>version;f.adapter.checkpoint=()=>{snapshots++;return {documents:f.documents,active:uid};};f.setState({...f.state,owned:{[uid]:1}});await f.controller.poll();assert.equal(snapshots,1);await f.controller.poll();assert.equal(snapshots,1);version++;await f.controller.poll();assert.equal(snapshots,2);f.controller.stop();
+});
+test('missing authoritative ownership bypasses unchanged checkpoint revision',async()=>{
+ const f=fixture();let snapshots=0;f.adapter.checkpointVersion=()=>1;f.adapter.checkpoint=()=>{snapshots++;return {documents:f.documents,active:uid};};await f.controller.poll();await f.controller.poll();assert.equal(snapshots,2);f.controller.stop();
+});

@@ -56,10 +56,25 @@
       errors: [...errors]
     };
   }
+  function performanceState() {
+    const state=snapshot();
+    for(const doc of state.documents){for(const key of ['content','original','saved'])doc[key]='length:'+doc[key].length;doc.undo=doc.undo.map(text=>'length:'+text.length);doc.redo=doc.redo.map(text=>'length:'+text.length);}
+    if(state.textarea)state.textarea.value='length:'+state.textarea.value.length;
+    return state;
+  }
+  async function performanceDigest() {
+    const state=snapshot(),cache=new Map(),digest=async text=>{if(!cache.has(text)){const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));cache.set(text,[...new Uint8Array(bytes)].map(n=>n.toString(16).padStart(2,'0')).join(''));}return cache.get(text);};
+    for(const doc of state.documents){for(const key of ['content','original','saved'])doc[key]=await digest(doc[key]);doc.undo=await Promise.all(doc.undo.map(digest));doc.redo=await Promise.all(doc.redo.map(digest));}
+    if(state.textarea)state.textarea.value=await digest(state.textarea.value);
+    return state;
+  }
   async function execute(command) {
     if (command.action === 'snapshot') return snapshot();
-    if (command.action === 'seed') {
-      for (const text of command.texts) {
+    if (command.action === 'performance-state') return performanceState();
+    if (command.action === 'performance-digest') return performanceDigest();
+    if (command.action === 'seed' || command.action === 'performance-seed') {
+      const texts=command.action==='performance-seed'?[('SYNTHETIC PERFORMANCE114 ONLY\n'+'x'.repeat(1000)+'\n').repeat(Math.ceil(command.size/1030)).slice(0,command.size)]:command.texts;
+      for (const text of texts) {
         const count = editor().documents.size;
         document.querySelector('.nt-editor-tabs [data-ed="new"]').click();
         await wait(() => editor().documents.size === count + 1, 'New document creates exactly one tab');
@@ -73,9 +88,9 @@
       textarea().setSelectionRange(11, 29, 'backward');
       textarea().scrollTop = 120;
       textarea().dispatchEvent(new Event('scroll', {bubbles: true}));
-      return snapshot();
+      return command.action==='performance-seed'?performanceState():snapshot();
     }
-    if (command.action === 'move') {
+    if (command.action === 'move' || command.action === 'performance-move') {
       const trigger = await wait(() => document.querySelector('[data-editor-window-toggle]'), 'compact move menu');
       trigger.click();
       const box = await wait(() => { const menu = document.querySelector('[data-editor-window-controls]'); return menu && !menu.hidden && menu.getBoundingClientRect().height > 0 && menu; }, 'visible native move controls');
@@ -85,7 +100,7 @@
       select.value = command.destination;
       select.dispatchEvent(new Event('change', {bubbles: true}));
       box.querySelector('[data-editor-window-move="' + command.mode + '"]').click();
-      return snapshot();
+      return command.action==='performance-move'?performanceState():snapshot();
     }
     if (command.action === 'cancel') {
       const trigger = await wait(() => document.querySelector('[data-editor-window-toggle]'), 'compact cancel access');

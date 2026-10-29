@@ -107,7 +107,7 @@ function preview(entry,item,which='select',includeCommands=prefs(entry).pasteInc
 function nativeFollow(entry,enabled){const service=entry?.xterm?._core?._bufferService;if(service)service.isUserScrolling=!enabled;}
 function followCurrent(entry){if(!entry?.xterm)return;const follow=prefs(entry).autoScroll;nativeFollow(entry,follow);if(follow)entry.xterm.scrollToBottom();}
 function beforeFit(entry){if(!entry?.xterm)return null;const follow=prefs(entry).autoScroll;nativeFollow(entry,follow);return {epoch:entry._ntScrollEpoch||0,anchor:!follow&&normal(entry)?marker(entry,entry.xterm.buffer.normal.viewportY):null};}
-function afterFit(entry,position){try{if(!entry?.xterm||!position)return;const follow=prefs(entry).autoScroll;nativeFollow(entry,follow);if(position.epoch!==(entry._ntScrollEpoch||0))return;if(follow)entry.xterm.scrollToBottom();else if(normal(entry)&&live(position.anchor))entry.xterm.scrollToLine(position.anchor.line);}finally{position?.anchor?.dispose();}}
+function afterFit(entry,position){try{if(!entry?.xterm||!position)return;const follow=prefs(entry).autoScroll;nativeFollow(entry,follow);if(position.epoch!==(entry._ntScrollEpoch||0))return;if(follow)entry.xterm.scrollToBottom();else if(normal(entry)&&live(position.anchor)){if(root.NetworkToolkitTerminalState?.restoreViewport)root.NetworkToolkitTerminalState.restoreViewport(entry.xterm,Math.min(position.anchor.line,entry.xterm.buffer.normal.baseY));else entry.xterm.scrollToLine(position.anchor.line);}}finally{position?.anchor?.dispose();}}
 function setFollow(entry,enabled){if(!entry)return;entry._ntScrollEpoch=(entry._ntScrollEpoch||0)+1;entry._ntSessionPrefs={...entry._ntSessionPrefs,autoScroll:!!enabled};nativeFollow(entry,enabled);touch(entry);}
 function pauseFollow(entry){setFollow(entry,false);sync();}
 function followInput(entry,data){if(!entry||!data)return;if(data.startsWith('\x1b')&&!/^\x1b(?:\[(?:[ABCDHF]|[1-8](?:;\d+)?[~ABCDHF])|O[ABCDHF]|\[200~)/.test(data))return;if(/^[\x00\x05\x11\x13]$/.test(data))return;setFollow(entry,true);entry.xterm.scrollToBottom();sync();}
@@ -268,7 +268,7 @@ function sync(){
  }
  const entry=currentTerminal(),p=prefs(entry),choice=entry?._ntOutputChoice||'last-command';
  const actions=document.querySelector('#terminalActiveActions');
- const position=state.terminalActiveActionsPosition==='bottom'?'bottom':'top',anchor=document.querySelector(position==='bottom'?'#terminalConsoleBar':'#terminalStage');
+ const position=state.terminalActiveActionsPosition==='bottom'?'bottom':'top',anchor=position==='bottom'?document.querySelector('#terminalConsoleBar'):(document.querySelector('#terminalTabs')||document.querySelector('#terminalStage'));
  if(anchor&&[...anchor.parentElement.children][[...anchor.parentElement.children].indexOf(anchor)-1]!==actions)anchor.before(actions);
  actions.dataset.position=position;
  const positionPicker=document.querySelector('#terminalActiveActionsPosition');if(positionPicker&&document.activeElement!==positionPicker)positionPicker.value=position;

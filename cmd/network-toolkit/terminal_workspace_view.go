@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"networktoolkit/internal/terminal"
@@ -29,7 +30,7 @@ type terminalWorkspaceSnapshot struct {
 
 func terminalWorkspaceDisplay(input map[string]any) map[string]any {
 	clean := map[string]any{"activePage": "terminal"}
-	for _, key := range []string{"colorPickerPreferences", "theme", "terminalFontSize", "terminalHighlight", "terminalInteraction", "terminalActiveActionsPosition", "terminalAppearance", "terminalLayout", "terminalConnection", "terminalProfiles", "terminalRecent", "terminalSidebarCollapsed", "terminalSidebarTab", "terminalSidebarSide", "terminalSidebarWidth", "terminalComposerCollapsed", "terminalMacroConfirmation", "terminalConfirmClose", "terminalRecentCollapsed", "terminalSavedCollapsed", "terminalSessionConfirmDelete"} {
+	for _, key := range []string{"terminalTabOrder", "colorPickerPreferences", "theme", "terminalFontSize", "terminalHighlight", "terminalInteraction", "terminalActiveActionsPosition", "terminalAppearance", "terminalLayout", "terminalConnection", "terminalProfiles", "terminalRecent", "terminalSidebarCollapsed", "terminalSidebarTab", "terminalSidebarSide", "terminalSidebarWidth", "terminalComposerCollapsed", "terminalMacroConfirmation", "terminalConfirmClose", "terminalRecentCollapsed", "terminalSavedCollapsed", "terminalSessionConfirmDelete"} {
 		if value, ok := input[key]; ok {
 			clean[key] = value
 		}
@@ -39,6 +40,31 @@ func terminalWorkspaceDisplay(input map[string]any) map[string]any {
 		if !ok || (theme != "dark" && theme != "light" && theme != "system") {
 			delete(clean, "theme")
 		}
+	}
+	if value, exists := clean["terminalTabOrder"]; exists {
+		var values []string
+		switch items := value.(type) {
+		case []any:
+			for _, item := range items {
+				if id, ok := item.(string); ok {
+					values = append(values, id)
+				}
+			}
+		case []string:
+			values = items
+		}
+		ids := []string{}
+		seen := map[string]bool{}
+		for _, id := range values {
+			if id != "" && len(id) <= 100 && strings.IndexFunc(id, func(r rune) bool { return r < 32 || r == 127 }) < 0 && !seen[id] {
+				ids = append(ids, id)
+				seen[id] = true
+				if len(ids) >= 128 {
+					break
+				}
+			}
+		}
+		clean["terminalTabOrder"] = ids
 	}
 	sanitizeTerminalSettings(clean)
 	sanitizeColorPickerPreferences(clean)
@@ -370,6 +396,7 @@ func (a *application) terminalCanConnect(r *http.Request) bool {
 }
 
 func (a *application) connectTerminalForRequest(r *http.Request, request terminal.ConnectRequest) (terminal.SessionInfo, error) {
+	request.DisplayName = a.terminalProfileLabel(request.ProfileID)
 	var err error
 	request, err = a.resolveTerminalCredential(r.Context(), request)
 	if err != nil {

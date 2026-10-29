@@ -88,6 +88,18 @@ jobs:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results
         run: node scripts/editor-activity-close113.browser.cjs
+      - name: Check continuous two-pane and map motion throughout all gestures
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results/motion114
+        run: node scripts/editor-motion114.browser.cjs
+      - name: Check bounded16MiB normal and narrow editing search save undo and child transfer
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results/capacity114
+        run: node scripts/editor-capacity114.browser.cjs
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -258,7 +270,7 @@ jobs:
         env:
           GOTOOLCHAIN: local
         run: |
-          go test -mod=vendor ./cmd/network-toolkit -run 'TestExplorerDrop|TestSFTPDropRename|TestRemoteBrowserPersistent' -count=1 -v
+          go test -mod=vendor ./cmd/network-toolkit -run 'TestExplorer|TestSFTPDropRename|TestRemoteBrowserPersistent|TestEditorCapacity114' -count=1 -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           go test -mod=vendor ./internal/diag -run TestSFTPStaged -count=1 -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -290,6 +302,43 @@ jobs:
         with:
           name: native-editor108-checks
           path: ${{ runner.temp }}/network-toolkit-native-editor108
+          if-no-files-found: error
+          retention-days: 7
+      - name: Verify actual Explorer files folders cancellation and junction confinement
+        env:
+          GOTOOLCHAIN: local
+          NETWORK_TOOLKIT_NATIVE_EXPLORER_TEST: '1'
+          TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/network-toolkit-native-files114
+        run: go test -mod=vendor ./internal/desktop -run 'TestNativeExplorerFiles114|TestNativeFileDrag' -count=1 -timeout=6m -v
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: native-files114-checks
+          path: ${{ runner.temp }}/network-toolkit-native-files114
+          if-no-files-found: error
+          retention-days: 7
+      - name: Verify native Terminal names gestures bulk scope selection and transport
+        env:
+          GOTOOLCHAIN: local
+          NETWORK_TOOLKIT_NATIVE_TERMINAL_TEST: '1'
+          NETWORK_TOOLKIT_NATIVE_TERMINAL_GESTURES: '1'
+          NETWORK_TOOLKIT_NATIVE_TERMINAL_SELECTION: '1'
+          TOOLKIT_NATIVE_TIMING_LABEL: '114-final'
+          TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/network-toolkit-native-transfer114/terminal
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestNativeTerminalTransferInstalledWebView2$' -count=1 -timeout=6m -v
+      - name: Verify native4MiB editor handoff state and timings
+        env:
+          GOTOOLCHAIN: local
+          NETWORK_TOOLKIT_NATIVE_EDITOR_TEST: '1'
+          NETWORK_TOOLKIT_NATIVE_PERFORMANCE114: '1'
+          NETWORK_TOOLKIT_NATIVE_PERFORMANCE_BYTES: '4194304'
+          TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/network-toolkit-native-transfer114/editor
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestNativeEditorTransferInstalledWebView2$' -count=1 -timeout=6m -v
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: native-transfer114-checks
+          path: ${{ runner.temp }}/network-toolkit-native-transfer114
           if-no-files-found: error
           retention-days: 7
       - name: Test visible Windows installer progress
@@ -772,6 +821,12 @@ jobs:
           NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
           NTK_LAYOUT_BASELINE110_DIR: ${{ runner.temp }}/ntk-layout-baseline110
         run: node scripts/editor-layout-map.browser.cjs
+      - name: Check ten-second graph density elapsed labels and timeline wheel navigation
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results/navigation114
+        run: node scripts/graph-navigation114.browser.cjs
       - uses: actions/upload-artifact@v7
         if: always()
         with:

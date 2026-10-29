@@ -5,7 +5,7 @@ function appFunction(name){const tail=html.slice(html.search(new RegExp('^functi
 function harness(options={}){
  let saves=0,fits=0;let entry,clipboard='',inputBlocked=false;const window={Terminal,addEventListener(){},NetworkToolkitTerminalCopy:{suppressesInput:()=>inputBlocked},NetworkToolkitTerminalInteraction:{preferences:()=>({}),suppressesInput:()=>false,copyValue:async text=>{clipboard=text;return true;},noteInput:(e,data)=>window.NetworkToolkitTerminalExtras.noteManualInput(e,data)}};
  const c={window,root:window,TextEncoder,TextDecoder,Date,Math,state:{terminalFontSize:13},saveState(){saves++;},scheduleTerminalFit(){fits++;},TERMINAL_ONLY:options.terminalOnly===true,icon:()=>'',esc:String,setTimeout:()=>0,clearTimeout(){},toast(){},terminalEntryAcceptsInput:e=>!!e&&e.info.state==='connected',terminalLive:e=>e?.info.state==='connected',terminalOwnerCanMutate:()=>true,terminalReconnectAllowed:e=>!!e,terminalSessions:new Map(),currentTerminal:()=>entry,online:true,innerHeight:800,innerWidth:1200};
- c.NetworkToolkitTerminalInteraction=window.NetworkToolkitTerminalInteraction;vm.createContext(c);vm.runInContext(appFunction('terminalToolsHTML'),c);c.document=makeDocument('<div class="terminal-panel"><div id="terminalCommandBar"><div class="terminal-quick-tools"><button id="terminalToolsToggle">Tools</button></div></div>'+c.terminalToolsHTML()+'<div id="terminalStage"><div id="retainedConsole">Retained console</div></div><div class="terminal-statusbar"></div></div>');vm.runInContext(appFunction('enqueueTerminalInput'),c);vm.runInContext(fs.readFileSync(path.join(__dirname,'../web/assets/terminal-output-archive.js'),'utf8'),c);vm.runInContext(fs.readFileSync(path.join(__dirname,'../web/assets/terminal-extras.js'),'utf8'),c);
+ c.NetworkToolkitTerminalInteraction=window.NetworkToolkitTerminalInteraction;vm.createContext(c);vm.runInContext(appFunction('terminalToolsHTML'),c);c.document=makeDocument('<div class="terminal-panel"><div id="terminalCommandBar"><div class="terminal-quick-tools"><button id="terminalToolsToggle">Tools</button></div></div>'+c.terminalToolsHTML()+(options.tabs?'<div id="terminalTabs" class="terminal-tabs"><button>Retained tab</button></div>':'')+'<div id="terminalStage"><div id="retainedConsole">Retained console</div></div><div class="terminal-statusbar"></div></div>');vm.runInContext(appFunction('enqueueTerminalInput'),c);vm.runInContext(fs.readFileSync(path.join(__dirname,'../web/assets/terminal-output-archive.js'),'utf8'),c);vm.runInContext(fs.readFileSync(path.join(__dirname,'../web/assets/terminal-extras.js'),'utf8'),c);
  const term=new Terminal({cols:40,rows:6,allowProposedApi:true,scrollback:100});term.focus=()=>{};let selection;term.selectLines=(start,end)=>{selection={start,end};};const scroll=[];const nativeScroll=term.scrollToLine.bind(term);term.scrollToLine=line=>{scroll.push(line);nativeScroll(line);};
  entry={info:{id:'one',state:'connected',type:'ssh'},xterm:term,element:new Element(),disposables:[],inputChunks:[],inputBytes:0};c.terminalSessions.set('one',entry);term.onData(data=>c.enqueueTerminalInput(entry,data));const api=window.NetworkToolkitTerminalExtras;api.sync();
  const input=text=>{term.input(text,true);entry.inputChunks=[];entry.inputBytes=0;};const write=async text=>{const pos=api.beforeOutput(entry);api.observeOutput(entry,text);await new Promise(resolve=>term.write(text,resolve));api.afterOutput(entry,pos);await api.flush(entry);};
@@ -196,4 +196,18 @@ test('restored paused pagers keep manual continuation in the original output arc
  const snapshot=JSON.parse(JSON.stringify(a.api.snapshot(a.entry))),b=harness();await b.write('switch# show long\r\nFIRST\r\n--More--');b.api.restore(b.entry,snapshot);await b.api.flush(b.entry);
  assert.equal(b.api.pagerInput(b.entry,' '),true);b.input(' ');assert.equal(b.entry._ntInputDraft,null);assert.equal(b.api.current(b.entry).closed,false);
  await b.write('\r\x1b[2KSECOND\r\nswitch# ');assert.equal(b.entry._ntOutputHistory.length,1);assert.equal(b.api.output(b.entry,b.api.current(b.entry)).text,'FIRST\nSECOND');a.dispose();b.dispose();
+});
+
+test('session tabs stay directly above console while top and bottom actions retain identity',()=>{
+ const h=harness({tabs:true}),d=h.document,tabs=d.querySelector('#terminalTabs'),stage=d.querySelector('#terminalStage'),row=d.querySelector('#terminalActiveActions'),picker=d.querySelector('#terminalActiveActionsPosition'),console=d.querySelector('#retainedConsole');
+ const previous=node=>node.parentElement.children[node.parentElement.children.indexOf(node)-1];
+ assert.equal(previous(stage),tabs);assert.equal(previous(tabs),row);
+ for(const position of ['bottom','top','bottom','top']){picker.value=position;d.emit('change',picker);h.api.sync();assert.equal(previous(stage),tabs);assert.equal(d.querySelector('#retainedConsole'),console);assert.equal(d.querySelector('#terminalActiveActions'),row);}
+ h.dispose();
+});
+test('terminal workspace puts tabs after notices, prompts and search directly above panes',()=>{
+ const source=appFunction('renderTerminalWorkspace'),tabs=source.indexOf('id="terminalTabs"'),stage=source.indexOf('id="terminalStage"');
+ assert(tabs>source.indexOf('id="terminalSearch"'));assert(tabs>source.indexOf('id="terminalPrompt"'));assert(tabs>source.indexOf('id="terminalNotices"'));
+ assert.match(source.slice(tabs,stage),/Terminal sessions"><\/div><div $/);
+ const macros=fs.readFileSync(path.join(__dirname,'../web/assets/terminal-macros.js'),'utf8');assert(macros.includes("($('#terminalTabs')||stage).before(el)"));
 });

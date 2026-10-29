@@ -64,6 +64,7 @@ type Job struct {
 
 type application struct {
 	activity                     activityOperations
+	explorerTransfers            explorerTransferManager
 	ctx                          context.Context
 	stop                         context.CancelFunc
 	mu                           sync.RWMutex
@@ -548,6 +549,10 @@ func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch {
+	case r.URL.Path == "/api/explorer-transfer" || strings.HasPrefix(r.URL.Path, "/api/explorer-transfer/"):
+		a.handleExplorerTransfer(w, r)
+	case r.URL.Path == "/api/transfer/local-drop":
+		a.handleLocalExplorerDrop(w, r)
 	case r.URL.Path == "/api/editor-views" || strings.HasPrefix(r.URL.Path, "/api/editor-views/"):
 		a.handleEditorViews(w, r)
 	case strings.HasPrefix(r.URL.Path, "/api/updates/"):

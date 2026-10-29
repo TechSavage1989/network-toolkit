@@ -1,3 +1,12 @@
+NETWORK TOOLKIT 1.17.114 VALIDATION CANDIDATE
+
+114 is an authorized development candidate. Final exact-source release gates,
+actual native/browser acceptance and public asset verification are still pending.
+Do not treat earlier113 evidence below as114 acceptance. The current development
+handoff and114 feature guides record scoped behavior and explicit limits.
+
+--- Historical113 validation ---
+
 NETWORK TOOLKIT 1.17.113 PUBLISHED AND VERIFIED
 
 # Network Toolkit 1.17.113 published and verified

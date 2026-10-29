@@ -288,7 +288,7 @@ async function packetAction96(name,action){if(name==='zoom'){await page.locator(
  const pointCount=()=>timeline().locator('[data-rt-surface="latency"] [data-rt-point]').count();
  assert.equal(await pointCount(),360,'Unzoomed Linear view retains all360 samples');
  for(const [action,expectedZoom,expectedCount]of [['in','2x',180],['out','1x',360],['out','0.5x',360],['reset','1x',360]]){
-  await graphAction96('zoom',action);await settle();assert.equal(await timeline().locator('[data-rt-zoom-level]').evaluate(el=>(/([\d.]+)×/.exec(el.textContent)||[])[1]+'x'),expectedZoom);assert.equal(await pointCount(),expectedCount,'Zoom changes the visible chronological range');
+  await graphAction96('zoom',action);await settle();assert.equal(await timeline().locator('[data-rt-zoom-level]').evaluate(el=>el.dataset.rtZoomFactor+'x'),expectedZoom);assert.equal(await pointCount(),expectedCount,'Zoom changes the visible chronological range');
   await marker(360).hover({force:true});const tip=await popupBounds(popup(),'Zoom '+expectedZoom+' point popup');assert(tip.text.includes('360'),'Zoom hit testing returns the actual latest sample');assert((await pointDetails()).Sample==='360');const axis=await timeline().locator('.rt-time-axis').innerText();assert(!/NaN|Invalid Date|Infinity/.test(axis),'Zoom axes remain valid timestamps');
   report.zoom.push({kind:'linear',action,zoom:expectedZoom,points:expectedCount,last:360,popup:tip.text,axis});await leaveInspection();
  }

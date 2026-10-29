@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -102,16 +101,11 @@ func (a *application) handleTransferLocal(w http.ResponseWriter, r *http.Request
 		}
 		result = append(result, entry)
 	}
-	roots := []string{}
-	if runtime.GOOS == "windows" {
-		for letter := 'A'; letter <= 'Z'; letter++ {
-			drive := string(letter) + ":\\"
-			if info, e := os.Stat(drive); e == nil && info.IsDir() {
-				roots = append(roots, drive)
-			}
-		}
-	} else {
-		roots = append(roots, "/")
+	drives := localTransferDrives()
+	roots := make([]string, 0, len(drives))
+	for _, drive := range drives {
+		roots = append(roots, drive.Path)
 	}
-	jsonResponse(w, 200, map[string]any{"path": full, "parent": filepath.Dir(full), "separator": string(os.PathSeparator), "roots": roots, "entries": result})
+
+	jsonResponse(w, 200, map[string]any{"path": full, "parent": filepath.Dir(full), "separator": string(os.PathSeparator), "roots": roots, "drives": drives, "entries": result})
 }

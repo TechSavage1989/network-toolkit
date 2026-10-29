@@ -78,6 +78,15 @@ func (a *application) handleEditorViews(w http.ResponseWriter, r *http.Request) 
 	}
 	caller := editorRequestView(r)
 	path := strings.TrimPrefix(r.URL.Path, "/api/editor-views")
+	if (r.Method == http.MethodGet && (path == "" || path == "/current")) || (r.Method == http.MethodPost && (path == "/transfers" || path == "/current/state" || (strings.HasPrefix(path, "/documents/") && strings.HasSuffix(path, "/file")))) {
+		var release func()
+		var admitted bool
+		r, release, admitted = admitEditorMemory(w, r)
+		if !admitted {
+			return
+		}
+		defer release()
+	}
 	if m.handleSavedConnections(w, r, caller, path) {
 		return
 	}
@@ -358,7 +367,7 @@ func (w *editorResponseStatus) Write(data []byte) (int, error) {
 
 func (m *editorViewRegistry) file(w http.ResponseWriter, r *http.Request, caller, uid string) {
 	var request editorFileRequest
-	if err := decodeEditorBody(w, r, 12<<20, &request); err != nil {
+	if err := decodeEditorBody(w, r, textEditorRequestLimit, &request); err != nil {
 		jsonError(w, 400, err.Error())
 		return
 	}

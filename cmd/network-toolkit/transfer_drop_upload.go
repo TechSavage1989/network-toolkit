@@ -87,6 +87,12 @@ func writeExplorerDrop(ctx context.Context, root, sub, name string, overwrite bo
 	if err != nil || !os.SameFile(rootInfo, openedInfo) {
 		return 0, errors.New("shared root changed while opening destination")
 	}
+	return writeExplorerDropRoot(ctx, confined, root, rootInfo, sub, name, overwrite, source, beforeCommit)
+}
+func writeExplorerDropRoot(ctx context.Context, confined *os.Root, root string, rootInfo os.FileInfo, sub, name string, overwrite bool, source io.Reader, beforeCommit func() (func(), error)) (int64, error) {
+	if err := validateExplorerDropName(name); err != nil {
+		return 0, err
+	}
 	directory := filepath.Clean(filepath.FromSlash(sub))
 	dir, err := confined.OpenRoot(directory)
 	if err != nil {
