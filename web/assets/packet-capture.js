@@ -628,6 +628,10 @@ function syncPacketDetailMap(scroll){
   const current=Number(lane.scrollTop)||0,maxTop=Math.max(0,model.total*mapLineHeight()-laneHeight);
   const destination=clamp(position.top<current?position.top:position.top+position.height>current+laneHeight?position.top+position.height-laneHeight:current,0,maxTop);
   if(Math.abs(current-destination)>0.5){model.mapExpectedTop=destination;lane.scrollTop=destination;}
+  // A larger reader can make the browser clamp the map before this sync runs.
+  // Acknowledge only that impossible old offset at the new maximum; an ordinary
+  // wheel offset must still reach the native scroll handler below.
+  else if(model.mapExpectedTop>maxTop&&Math.abs(current-maxTop)<0.5)model.mapExpectedTop=current;
  }
  overlay.style.transform='translate3d(0,'+position.top+'px,0)';
  overlay.style.height=position.height+'px';
@@ -680,6 +684,8 @@ function syncOverviewMap(scroll){
   const current=Number(bar.scrollTop)||0,maxTop=Math.max(0,model.total*scale-laneHeight);
   const destination=clamp(position.top<current?position.top:position.top+position.height>current+laneHeight?position.top+position.height-laneHeight:current,0,maxTop);
   if(Math.abs(destination-current)>0.5){model.overviewMapExpectedTop=destination;bar.scrollTop=destination;}
+  // As with the fine map, a layout clamp is not a new navigation gesture.
+  else if(model.overviewMapExpectedTop>maxTop&&Math.abs(current-maxTop)<0.5)model.overviewMapExpectedTop=current;
  }
  overlay.style.transform='translate3d(0,'+position.top+'px,0)';overlay.style.height=position.height+'px';
  renderPacketOverviewLines();

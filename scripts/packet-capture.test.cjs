@@ -797,3 +797,33 @@ test('late explicit packet detail completion does not override newer scroll, fil
   complete({packet:{number:1,protocol:'TCP',expert:[]},layers:[],data:''});await h.settle();assert.equal(reader.scrollTop,action==='scroll'?50:0,action+' intent must not be displaced by late inspector layout');
  }
 });
+
+
+test('native map clamp after docking is acknowledged without converting it into packet navigation',async()=>{
+ for(const kind of ['fine','overview']){
+  const n=402,packets=Array.from({length:n},(_,i)=>({number:i+1,relative:i/100,source:'192.0.2.1',destination:'192.0.2.2',protocol:'UDP',length:60,captured:60,info:String(i),expert:[]}));
+  const h=harness({id:'d'.repeat(24),name:'Synthetic map clamp',state:'completed',count:n,revision:1},{packets,total:n,paginate:true});await h.settle();h.doc.emit('click',h.doc.querySelector('[data-packet-view="packets"]'));await h.settle();
+  if(kind==='overview'){h.c.state.packetMapSettings.overviewScale=1;h.api.refreshTimeDisplay();}
+  const reader=h.doc.getElementById('packetTableScroll'),map=h.doc.getElementById(kind==='fine'?'packetDetailMap':'packetOverviewMap'),expected=kind==='fine'?'mapExpectedTop':'overviewMapExpectedTop';
+  h.api.model.measuredRowHeight=21;h.api.model.measuredHeaderHeight=29.5;
+  reader.scrollHeight=n*21+29.5;reader.clientHeight=244;reader.scrollTop=8228;map.clientHeight=244;
+  // Actual native trace: the old 140px-high map ended at262; docking enlarges
+  // it to244px and the browser clamps it to158 before sending scroll events.
+  map.scrollTop=158;h.api.model[expected]=262;
+  h.doc.emit('scroll',reader);assert.equal(h.api.model[expected],158,kind+' acknowledges only the proven geometry clamp');
+  h.doc.emit('scroll',map);assert.equal(reader.scrollTop,8228,kind+' native clamp must not recenter selected frame402');
+  map.scrollTop=100;h.doc.emit('scroll',map);assert.notEqual(reader.scrollTop,8228,kind+' next genuine wheel scroll still navigates');
+  await h.settle();
+ }
+});
+test('map synchronization does not swallow a real wheel offset merely because the old expected offset became invalid',async()=>{
+ for(const kind of ['fine','overview']){
+  const h=harness({id:'e'.repeat(24),name:'Synthetic real wheel',state:'completed',count:402,revision:1},{total:402});await h.settle();h.doc.emit('click',h.doc.querySelector('[data-packet-view="packets"]'));await h.settle();
+  if(kind==='overview'){h.c.state.packetMapSettings.overviewScale=1;h.api.refreshTimeDisplay();}
+  const reader=h.doc.getElementById('packetTableScroll'),map=h.doc.getElementById(kind==='fine'?'packetDetailMap':'packetOverviewMap'),expected=kind==='fine'?'mapExpectedTop':'overviewMapExpectedTop';
+  h.api.model.measuredRowHeight=21;h.api.model.measuredHeaderHeight=29.5;
+  reader.scrollHeight=402*21+29.5;reader.clientHeight=244;reader.scrollTop=21*150+29.5;map.clientHeight=244;map.scrollTop=100;h.api.model[expected]=262;
+  h.doc.emit('scroll',reader);assert.equal(h.api.model[expected],262,kind+' interior offset is not evidence of a native clamp');
+  const before=reader.scrollTop;h.doc.emit('scroll',map);assert.notEqual(reader.scrollTop,before,kind+' genuine interior wheel is processed');await h.settle();
+ }
+});
