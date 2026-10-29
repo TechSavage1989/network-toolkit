@@ -67,7 +67,11 @@ An active OLE gesture owns Escape; the page does not remove its modal or cancel
 staging underneath it. Rejected/uncertain HTTP cancellation leaves the review
 visible. IDropSource cancels when its owning context ends. A context cancellation
 posts [WM_CANCELMODE](https://learn.microsoft.com/en-us/windows/win32/winmsg/wm-cancelmode)
-only to that Toolkit HWND; the default Win32 handler releases the owning UI
-thread's capture. No keyboard/mouse input is injected into production, and no
+only to the capture HWND obtained for the recorded owning UI thread, after
+checking its thread/process and the still-active host identity. OLE can capture
+through its own helper HWND rather than the visible Toolkit window. The
+[GetGUIThreadInfo](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getguithreadinfo)
+query always names that exact thread (never the foreground thread). The default
+Win32 handler releases its mouse capture. No keyboard/mouse input is injected into production, and no
 global hook is installed. The hosted fixture requires actual Escape and a real
 held drag followed by owner-context cancellation to return within two seconds.

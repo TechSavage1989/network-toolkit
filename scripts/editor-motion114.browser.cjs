@@ -49,7 +49,11 @@ function beginCapture({label,side,kind}){
   const visible=[...input.querySelectorAll('.cm-line[data-source-line]')].map(el=>{const b=el.getBoundingClientRect();return {row:rowByLine[side].get(Number(el.dataset.sourceLine)),line:Number(el.dataset.sourceLine),y:b.top-r.top,h:b.height,visible:Math.min(b.bottom,r.bottom)-Math.max(b.top,r.top)}}).filter(x=>x.visible>1);
   const first=visible[0],position=first?first.row+Math.max(0,Math.min(1,-first.y/Math.max(1,first.h))):null;
   return {side,top:s.scrollTop,position,visible,map:Number(document.querySelector('[data-compare-track='+side+']').getAttribute('aria-valuenow'))};
- });const common=panes[0].visible.map(a=>{const b=panes[1].visible.find(b=>b.row===a.row);return b?{row:a.row,delta:a.y-b.y}:null}).find(Boolean);record.frames.push({at:performance.now(),panes,delta:common?.delta??null});requestAnimationFrame(capture)}requestAnimationFrame(capture);
+ });const common=panes[0].visible.map(a=>{const b=panes[1].visible.find(b=>b.row===a.row);return b?{row:a.row,delta:a.y-b.y}:null}).find(Boolean);record.frames.push({at:performance.now(),panes,delta:common?.delta??null});requestAnimationFrame(capture)}
+ // Establish the pre-input DOM position now. Otherwise the first delivered
+ // event can move before our first RAF and its response disappears from the
+ // delta series, incorrectly borrowing the next input's later movement.
+ capture();
 }
 async function finishCapture(page){await page.evaluate(()=>new Promise(resolve=>{let left=5;const step=()=>--left?requestAnimationFrame(step):resolve();requestAnimationFrame(step)}));return page.evaluate(()=>{motion114.running=false;window.motion114Cleanup?.();delete window.motion114Cleanup;return motion114;});}
 function summarize(record,side){const s=side==='right'?1:0,p=1-s,frames=record.frames,movementFrames=[],movementTimes=frames.length?[frames[0].at]:[];let moving=0,together=0,stall=0,maxStall=0;for(let i=1;i<frames.length;i++){

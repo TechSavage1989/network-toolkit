@@ -143,3 +143,51 @@ func TestNativeFileDragCancellationRejectsReusedOrInactiveHWND(t *testing.T) {
 		t.Fatal("inactive gesture affected")
 	}
 }
+
+func TestNativeFileDragCaptureOnlyExactOwningThread(t *testing.T) {
+	const host, captured = uintptr(0xf115), uintptr(0xf116)
+	window := &hostWindow{}
+	source := &nativeFileCOM{}
+	source.active.Store(true)
+	owner := &nativeFileDragOwner{window: window, active: &source.active, threadID: 42}
+	wndWindows.Store(host, window)
+	nativeFileDragOwners.Store(host, owner)
+	defer wndWindows.Delete(host)
+	defer nativeFileDragOwners.Delete(host)
+	for _, tc := range []struct {
+		name                                  string
+		hostThread, captureThread, capturePID uint32
+		captureOK, replace, want              bool
+	}{
+		{"same exact UI thread", 42, 42, uint32(os.Getpid()), true, false, true},
+		{"foreign capture thread", 42, 43, uint32(os.Getpid()), true, false, false},
+		{"foreign capture process", 42, 42, uint32(os.Getpid() + 1), true, false, false},
+		{"reused host thread", 43, 42, uint32(os.Getpid()), true, false, false},
+		{"missing capture", 42, 42, uint32(os.Getpid()), false, false, false},
+		{"owner changed during lookup", 42, 42, uint32(os.Getpid()), true, true, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			wndWindows.Store(host, window)
+			got := nativeFileDragCaptureTarget(host, func(hwnd uintptr) (uint32, uint32) {
+				if hwnd == host {
+					return tc.hostThread, uint32(os.Getpid())
+				}
+				if hwnd != captured {
+					t.Fatal("unrelated window inspected")
+				}
+				return tc.captureThread, tc.capturePID
+			}, func(tid uint32) (uintptr, bool) {
+				if tid != 42 {
+					t.Fatal("non-owner or foreground lookup")
+				}
+				if tc.replace {
+					wndWindows.Store(host, &hostWindow{})
+				}
+				return captured, tc.captureOK
+			})
+			if (got == captured) != tc.want {
+				t.Fatalf("capture target=%x, want allowed=%t", got, tc.want)
+			}
+		})
+	}
+}

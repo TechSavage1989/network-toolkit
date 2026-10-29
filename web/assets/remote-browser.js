@@ -521,10 +521,10 @@ async function edit(k,newFile=false,side=get(k).active,pathOverride=''){
  }catch(e){note(k,'Cannot open editor: '+e.message,'error');if(pathOverride)throw e;}
 }
 async function dropFiles(k,files,folder,side='remote'){if(side==='remote'&&k==='ftp'){note(k,'Explorer uploads to FTP/FTPS cannot guarantee safe atomic collision handling. Use SFTP or the existing explicit FTP transfer controls.','error');return;}const m=get(k),helper=root.NetworkToolkitTransferDrop;if(side==='remote'&&!m.connected){note(k,'Connect to a remote server before uploading files.','error');return;}if(m.busy){note(k,'Finish or cancel the current operation first.','error');return;}
- const identity=connectionIdentity(k),connection=dragIdentity(k),originalFolder=m[side].path;
+ const identity=connectionIdentity(k),connection=dragIdentity(k),snapshot=side==='remote'?locationSnapshot(k,'remote',folder):null,originalFolder=m[side].path;
  const check=()=>{if(side==='remote'&&(!m.connected||identity!==connectionIdentity(k)||connection!==dragIdentity(k))||m[side].path!==originalFolder||!pageActive(k))throw Error('Connection or destination changed. Drop the selection again; nothing else will be sent.');};
  const join=side==='local'?joinLocal:joinRemote;
- helper.show({files,entries:m[side].entries,remote:side==='remote',local:side==='local',label:(side==='local'?'Local':'SFTP')+' — '+folder,check,busy:value=>{m.busy=value;drawActivity(k);},send:async(row,onProgress,signal)=>{
+ helper.show({files,entries:m[side].entries,remote:side==='remote',local:side==='local',label:(side==='local'?'Local':'SFTP '+snapshot.host+':'+snapshot.port)+' — '+folder,check,busy:value=>{m.busy=value;drawActivity(k);},send:async(row,onProgress,signal)=>{
   let importID="";
   const sendFile=async(file,directory,name,overwrite)=>{check();if(signal.aborted)throw Object.assign(Error('Cancelled before sending; completed files remain in the new folder.'),{name:'AbortError'});const form=new FormData(),headers={};
    if(side==='local'){form.set('destination',JSON.stringify({path:directory,name,overwrite,...(importID?{id:importID}:{})}));form.set('file',file,file.name);return helper.upload('/api/transfer/local-drop',form,{signal,onProgress});}

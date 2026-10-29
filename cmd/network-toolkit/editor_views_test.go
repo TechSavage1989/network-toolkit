@@ -547,7 +547,13 @@ func TestEditorRegistryBoundedRecoveryAndPreferences(t *testing.T) {
 		t.Fatal("oversize document accepted")
 	}
 	batch = editorFixtureBatch()
-	batch.Documents[0].Content = strings.Repeat("\t", editorDocumentLimit)
+	// Three independently serialized fields use six JSON bytes per control character.
+	// Exceed the aggregate without also exceeding any individual document bound.
+	escapedCount := editorTransferLimit/(3*6) + 1
+	if escapedCount > editorDocumentLimit {
+		t.Fatal("aggregate fixture exceeds individual document bound")
+	}
+	batch.Documents[0].Content = strings.Repeat("\x01", escapedCount)
 	batch.Documents[0].Saved = batch.Documents[0].Content
 	batch.Documents[0].Original = batch.Documents[0].Content
 	if err := validateEditorBatch(batch); err == nil {

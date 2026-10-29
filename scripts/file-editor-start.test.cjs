@@ -270,3 +270,23 @@ test('large-file mode preserves wrap preference, bounds future history and never
  const count=h.api.active.undo.length,snapshot=h.api.windowAdapter.snapshot([h.api.active.uid]);assert.equal(snapshot.documents[0].undo.length,count);h.api.windowAdapter.rollback([h.api.active.uid]);assert.equal(h.api.active.undo.length,count);
  await h.api.open({id:'small-again',path:'small.txt',source:'Local computer',create:true,initialContent:'small',read:async()=>({content:'small'}),write:async()=>({})});assert.equal(ta.wrap,'soft');assert.equal(wrap.checked,true);assert.equal(wrap.disabled,false);
 });
+
+
+test('desktop encoded file bounds include BOM and UTF16 before opening a writable stream',async()=>{
+ const h=harness();h.c.crypto=require('node:crypto').webcrypto;await h.first();let writableCalls=0;const bytes=new TextEncoder().encode('original synthetic file'),file={name:'synthetic.txt',size:bytes.length,arrayBuffer:async()=>bytes.buffer},handle={getFile:async()=>file,createWritable:async()=>{writableCalls++;throw Error('oversize must not open stream');}};
+ await h.api.importFiles([file],[handle]);const d=h.api.active;assert.equal(d.binding.kind,'desktopHandle');
+ const limit=16*1024*1024;
+ for(const data of [{encoding:'UTF-8',content:'x'.repeat(limit+1),bom:false},{encoding:'UTF-8',content:'x'.repeat(limit-2),bom:true},{encoding:'UTF-16LE',content:'x'.repeat(limit/2+1),bom:false},{encoding:'UTF-16BE',content:'x'.repeat(limit/2),bom:true}]){
+  await assert.rejects(d.write({...data,expectedHash:d.hash}),/16 MiB.*unchanged/);assert.equal(writableCalls,0);assert.equal(d.content,'original synthetic file');
+ }
+});
+test('desktop codec accepts exact encoded boundary including BOM and preserves supplementary Unicode',()=>{
+ const start=source.indexOf('function encodeDesktopText(data)'),end=source.indexOf('async function importFiles',start),context={TextEncoder,Uint8Array,DataView,EDITOR_FILE_BYTES:16*1024*1024};vm.createContext(context);vm.runInContext(source.slice(start,end)+';globalThis.encode=encodeDesktopText;',context);const limit=context.EDITOR_FILE_BYTES;
+ for(const data of [{encoding:'UTF-8',content:'x'.repeat(limit),bom:false},{encoding:'UTF-8',content:'x'.repeat(limit-3),bom:true},{encoding:'UTF-16LE',content:'x'.repeat(limit/2),bom:false},{encoding:'UTF-16BE',content:'x'.repeat(limit/2-1),bom:true}])assert.equal(context.encode(data).length,limit);
+ for(const encoding of ['UTF-8','UTF-16LE','UTF-16BE'])for(const bom of [false,true]){const content='Synthetic 日本語 😀\r\n',encoded=context.encode({content,encoding,bom}),decoded=new TextDecoder(encoding.toLowerCase()).decode(encoded);assert.equal(decoded,content);}
+});
+
+test('oversized Save copy surfaces the encoded limit without creating a download or changing the draft',async()=>{
+ const h=harness();await h.first();const d=h.api.active;d.content='x'.repeat(16*1024*1024+1);d.dirty=true;h.c.URL={createObjectURL(){throw Error('oversize must not create download');}};
+ h.click('download');assert.equal(d.content.length,16*1024*1024+1);assert.equal(d.dirty,true);assert.match(h.document.querySelector('[data-ed-message]').textContent,/16 MiB/);
+});

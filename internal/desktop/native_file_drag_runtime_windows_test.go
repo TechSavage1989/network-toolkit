@@ -238,7 +238,11 @@ document.getElementById('ownerCancel').onclick=()=>api('/owner-cancel','POST',{}
 							})
 							if active {
 								time.Sleep(100 * time.Millisecond) // keep the real gesture held inside OLE before cancelling its owner
+								ownerThread, ownerPID := nativeFileWindowIdentity(hostHWND.Load())
+								captureHWND, captureOK := nativeFileThreadCapture(ownerThread)
+								captureThread, capturePID := nativeFileWindowIdentity(captureHWND)
 								mu.Lock()
+								trace = append(trace, fmt.Sprintf("%s owner-cancel host=%x tid=%d pid=%d capture=%x captureOK=%t captureTID=%d capturePID=%d", time.Now().UTC().Format(time.RFC3339Nano), hostHWND.Load(), ownerThread, ownerPID, captureHWND, captureOK, captureThread, capturePID))
 								ownerCancelled = true
 								ownerCancelledAt = time.Now()
 								mu.Unlock()
@@ -384,7 +388,7 @@ document.getElementById('ownerCancel').onclick=()=>api('/owner-cancel','POST',{}
 		t.Fatal("empty folder lost")
 	}
 	if out := os.Getenv("TOOLKIT_NATIVE_TEST_OUTPUT"); out != "" {
-		b, _ := json.MarshalIndent(map[string]any{"passed": true, "actualExplorer": true, "importedFolders": imports, "junctionTargetNotTraversed": linkNegatives == 1, "nativeDragsIncludingCancel": finishes, "copyOnly": true, "ownerContextCancellationMs": float64(ownerReturnDelay.Microseconds()) / 1000, "ownerReturnedWhileMouseHeld": heldAtReturn&0x8000 != 0, "releasedGestureDidNotArmLaterClick": quickChecks == 1, "scope": "synthetic hosted FileSystemEntry + native OLE bridge; remote staging separately tested"}, "", "  ")
+		b, _ := json.MarshalIndent(map[string]any{"passed": !t.Failed(), "actualExplorer": true, "importedFolders": imports, "junctionTargetNotTraversed": linkNegatives == 1, "nativeDragsIncludingCancel": finishes, "copyOnly": true, "ownerContextCancellationMs": float64(ownerReturnDelay.Microseconds()) / 1000, "ownerReturnedWhileMouseHeld": heldAtReturn&0x8000 != 0, "releasedGestureDidNotArmLaterClick": quickChecks == 1, "scope": "synthetic hosted FileSystemEntry + native OLE bridge; remote staging separately tested"}, "", "  ")
 		os.WriteFile(filepath.Join(out, "native-files114-report.json"), b, 0600)
 	}
 }
