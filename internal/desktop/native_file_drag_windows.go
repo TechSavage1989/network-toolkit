@@ -10,6 +10,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -27,6 +28,9 @@ import (
 var fileDragUser = syscall.NewLazyDLL("user32.dll")
 var fileDragKey = fileDragUser.NewProc("GetAsyncKeyState")
 var fileDragForeground = fileDragUser.NewProc("GetForegroundWindow")
+var fileDragWindowThread = fileDragUser.NewProc("GetWindowThreadProcessId")
+var fileDragThreadInfo = fileDragUser.NewProc("GetGUIThreadInfo")
+var fileDragCurrentThread = syscall.NewLazyDLL("kernel32.dll").NewProc("GetCurrentThreadId")
 var fileDragOle = syscall.NewLazyDLL("ole32.dll")
 var fileDragDo = fileDragOle.NewProc("DoDragDrop")
 var fileDragShell = syscall.NewLazyDLL("shell32.dll")
@@ -208,15 +212,47 @@ type nativeFileCOM struct {
 	base   uintptr
 	source bool
 	ctx    context.Context
+	hwnd   uintptr
 	active atomic.Bool
 }
 
 var nativeFileCOMObjects sync.Map
 var nativeFileDragOwners sync.Map
 
+// Populated only by the in-package synthetic native fixture. No web/API hook,
+// production logging, file paths or connection data are exposed.
+var nativeFileDragObservers sync.Map
+
+func observeNativeFileDrag(hwnd uintptr, event string) {
+	if value, ok := nativeFileDragObservers.Load(hwnd); ok {
+		value.(func(string))(event)
+	}
+}
+
 type nativeFileDragOwner struct {
-	window *hostWindow
-	active *atomic.Bool
+	window   *hostWindow
+	active   *atomic.Bool
+	threadID uint32
+}
+
+type nativeFileGUIThreadInfo struct {
+	Size, Flags                                        uint32
+	Active, Focus, Capture, MenuOwner, MoveSize, Caret uintptr
+	CaretRect                                          Rect
+}
+
+func nativeFileWindowIdentity(hwnd uintptr) (uint32, uint32) {
+	var pid uint32
+	tid, _, _ := fileDragWindowThread.Call(hwnd, uintptr(unsafe.Pointer(&pid)))
+	return uint32(tid), pid
+}
+func nativeFileThreadCapture(tid uint32) (uintptr, bool) {
+	if tid == 0 {
+		return 0, false
+	}
+	info := nativeFileGUIThreadInfo{Size: uint32(unsafe.Sizeof(nativeFileGUIThreadInfo{}))}
+	ok, _, _ := fileDragThreadInfo.Call(uintptr(tid), uintptr(unsafe.Pointer(&info)))
+	return info.Capture, ok != 0
 }
 
 func nativeFileDragCancellationTarget(hwnd uintptr) bool {
@@ -228,9 +264,37 @@ func nativeFileDragCancellationTarget(hwnd uintptr) bool {
 	current, ok := wndWindows.Load(hwnd)
 	return ok && current == owner.window && owner.active.Load()
 }
+
+// OLE may capture through its own helper HWND, not the visible host. Resolve
+// only the recorded active owner's exact UI thread; never the foreground thread.
+func nativeFileDragCaptureTarget(hwnd uintptr, identity func(uintptr) (uint32, uint32), capture func(uint32) (uintptr, bool)) uintptr {
+	raw, ok := nativeFileDragOwners.Load(hwnd)
+	if !ok || !nativeFileDragCancellationTarget(hwnd) {
+		return 0
+	}
+	owner := raw.(*nativeFileDragOwner)
+	tid, pid := identity(hwnd)
+	if tid == 0 || tid != owner.threadID || pid != uint32(os.Getpid()) {
+		return 0
+	}
+	target, ok := capture(tid)
+	if !ok || target == 0 {
+		return 0
+	}
+	targetThread, targetProcess := identity(target)
+	if targetThread != tid || targetProcess != pid {
+		return 0
+	}
+	current, ok := nativeFileDragOwners.Load(hwnd)
+	if !ok || current != raw || !nativeFileDragCancellationTarget(hwnd) {
+		return 0
+	}
+	return target
+}
 func cancelNativeFileDrag(hwnd uintptr) {
-	if nativeFileDragCancellationTarget(hwnd) {
-		wndPostMessage.Call(hwnd, 0x001f, 0, 0)
+	if target := nativeFileDragCaptureTarget(hwnd, nativeFileWindowIdentity, nativeFileThreadCapture); target != 0 {
+		ok, _, err := wndPostMessage.Call(target, 0x001f, 0, 0)
+		observeNativeFileDrag(hwnd, fmt.Sprintf("cancelmode-post target=%x ok=%d error=%v", target, ok, err))
 	}
 }
 
@@ -303,6 +367,7 @@ func fileCOMUnadvise(p, a uintptr) uintptr        { return 0x80040003 }
 func fileCOMContinue(p, escape, key uintptr) uintptr {
 	o := nativeFileObject(p)
 	if o != nil && o.ctx != nil && o.ctx.Err() != nil {
+		observeNativeFileDrag(o.hwnd, "query-continue-cancel")
 		return 0x40101
 	}
 	if escape != 0 {
@@ -369,7 +434,7 @@ func runNativeFileCopyDrag(ctx context.Context, hwnd uintptr, paths []string) (u
 	wrapper := &nativeFileCOM{vtable: &fileCOMDataTable, base: data}
 	wrapper.refs.Store(1)
 	wrapper.active.Store(true)
-	source := &nativeFileCOM{vtable: &fileCOMSourceTable, source: true, ctx: ctx}
+	source := &nativeFileCOM{vtable: &fileCOMSourceTable, source: true, ctx: ctx, hwnd: hwnd}
 	source.active.Store(true)
 	source.refs.Store(1)
 	wp, sp := uintptr(unsafe.Pointer(wrapper)), uintptr(unsafe.Pointer(source))
@@ -379,24 +444,28 @@ func runNativeFileCopyDrag(ctx context.Context, hwnd uintptr, paths []string) (u
 	defer fileCOMRelease(sp)
 	defer wrapper.active.Store(false)
 	if current, ok := wndWindows.Load(hwnd); ok {
-		owner := &nativeFileDragOwner{window: current.(*hostWindow), active: &source.active}
+		threadID, _, _ := fileDragCurrentThread.Call()
+		owner := &nativeFileDragOwner{window: current.(*hostWindow), active: &source.active, threadID: uint32(threadID)}
 		nativeFileDragOwners.Store(hwnd, owner)
 		defer nativeFileDragOwners.CompareAndDelete(hwnd, owner)
 	}
 	dragEnded := make(chan struct{})
 	defer close(dragEnded)
 	defer source.active.Store(false)
-	// WM_CANCELMODE is delivered only to our own window. Its default handler
-	// releases this UI thread's capture; no global key/mouse input is injected.
+	// WM_CANCELMODE targets only this exact owner's same-thread capture HWND.
+	// No global key/mouse input is injected; active staging remains held until return.
 	go func() {
 		select {
 		case <-ctx.Done():
+			observeNativeFileDrag(hwnd, "drag-context-cancelled")
 			cancelNativeFileDrag(hwnd)
 		case <-dragEnded:
 		}
 	}()
 	var effect uint32
+	observeNativeFileDrag(hwnd, "ole-enter")
 	hr, _, _ = fileDragDo.Call(wp, sp, 1, uintptr(unsafe.Pointer(&effect)))
+	observeNativeFileDrag(hwnd, fmt.Sprintf("ole-return hr=%x effect=%d", hr, effect))
 	runtime.KeepAlive(wrapper)
 	runtime.KeepAlive(source)
 	runtime.KeepAlive(children)

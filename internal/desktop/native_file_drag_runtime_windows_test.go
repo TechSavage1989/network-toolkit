@@ -62,6 +62,7 @@ func TestNativeExplorerFiles114(t *testing.T) {
 	var trace []string
 	var mu sync.Mutex
 	var hostHWND atomic.Uintptr
+	defer func() { nativeFileDragObservers.Delete(hostHWND.Load()) }()
 	state := "idle"
 	armed := false
 	var gesture, revoked uint64
@@ -238,7 +239,11 @@ document.getElementById('ownerCancel').onclick=()=>api('/owner-cancel','POST',{}
 							})
 							if active {
 								time.Sleep(100 * time.Millisecond) // keep the real gesture held inside OLE before cancelling its owner
+								ownerThread, ownerPID := nativeFileWindowIdentity(hostHWND.Load())
+								captureHWND, captureOK := nativeFileThreadCapture(ownerThread)
+								captureThread, capturePID := nativeFileWindowIdentity(captureHWND)
 								mu.Lock()
+								trace = append(trace, fmt.Sprintf("%s owner-cancel host=%x tid=%d pid=%d capture=%x captureOK=%t captureTID=%d capturePID=%d", time.Now().UTC().Format(time.RFC3339Nano), hostHWND.Load(), ownerThread, ownerPID, captureHWND, captureOK, captureThread, capturePID))
 								ownerCancelled = true
 								ownerCancelledAt = time.Now()
 								mu.Unlock()
@@ -312,6 +317,11 @@ document.getElementById('ownerCancel').onclick=()=>api('/owner-cancel','POST',{}
 			return
 		}
 		hostHWND.Store(hwnd)
+		nativeFileDragObservers.Store(hwnd, func(event string) {
+			mu.Lock()
+			trace = append(trace, time.Now().UTC().Format(time.RFC3339Nano)+" native="+event)
+			mu.Unlock()
+		})
 		go func() {
 			cmd := exec.CommandContext(driverCtx, "powershell.exe", "-NoProfile", "-NonInteractive", "-File", script, "-SourceDirectory", source, "-DestinationDirectory", dest, "-WindowHandle", strconv.FormatUint(uint64(hwnd), 10), "-OwnerProcessID", strconv.Itoa(os.Getpid()))
 			output, e := cmd.CombinedOutput()
@@ -349,10 +359,15 @@ document.getElementById('ownerCancel').onclick=()=>api('/owner-cancel','POST',{}
 	if err != nil {
 		t.Fatal(err)
 	}
+	observeNativeFileDrag(hostHWND.Load(), "run-return")
 	mu.Lock()
 	cancelledAt := ownerCancelledAt
 	mu.Unlock()
 	ownerReturnDelay := time.Since(cancelledAt)
+	heldAtReturn, _, _ := fileDragKey.Call(1)
+	if heldAtReturn&0x8000 == 0 {
+		t.Error("owner cancellation was not proven before physical mouse release")
+	}
 	if cancelledAt.IsZero() || ownerReturnDelay > 2*time.Second {
 		t.Errorf("owning native context cancellation did not return promptly: %v", ownerReturnDelay)
 	}
@@ -380,7 +395,8 @@ document.getElementById('ownerCancel').onclick=()=>api('/owner-cancel','POST',{}
 		t.Fatal("empty folder lost")
 	}
 	if out := os.Getenv("TOOLKIT_NATIVE_TEST_OUTPUT"); out != "" {
-		b, _ := json.MarshalIndent(map[string]any{"passed": true, "actualExplorer": true, "importedFolders": imports, "junctionTargetNotTraversed": linkNegatives == 1, "nativeDragsIncludingCancel": finishes, "copyOnly": true, "ownerContextCancellationMs": float64(ownerReturnDelay.Microseconds()) / 1000, "releasedGestureDidNotArmLaterClick": quickChecks == 1, "scope": "synthetic hosted FileSystemEntry + native OLE bridge; remote staging separately tested"}, "", "  ")
+		os.WriteFile(filepath.Join(out, "native-files114-events.txt"), []byte(strings.Join(trace, "\n")), 0600)
+		b, _ := json.MarshalIndent(map[string]any{"passed": !t.Failed(), "actualExplorer": true, "importedFolders": imports, "junctionTargetNotTraversed": linkNegatives == 1, "nativeDragsIncludingCancel": finishes, "copyOnly": true, "ownerContextCancellationMs": float64(ownerReturnDelay.Microseconds()) / 1000, "ownerReturnedWhileMouseHeld": heldAtReturn&0x8000 != 0, "releasedGestureDidNotArmLaterClick": quickChecks == 1, "scope": "synthetic hosted FileSystemEntry + native OLE bridge; remote staging separately tested"}, "", "  ")
 		os.WriteFile(filepath.Join(out, "native-files114-report.json"), b, 0600)
 	}
 }

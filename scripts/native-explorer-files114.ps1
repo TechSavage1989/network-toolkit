@@ -55,12 +55,21 @@ try {
   if(!$element){throw ('UIA element absent: '+$name)};return $element
  }
  function Invoke-Button($name){$element=Find-Element $native $name;$element.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()}
+ function Wait-Copy-Finished {
+  # File existence/mouse release can precede the native finish POST. Wait for
+  # the actual page's reconciled terminal state before invoking Close once.
+  $finishedName='finished '+[char]0xB7+' 5 items '+[char]0xB7+' 56 B'
+  $condition=New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NameProperty,$finishedName)
+  $until=[DateTime]::UtcNow.AddSeconds(15)
+  do{$finished=[System.Windows.Automation.AutomationElement]::FromHandle($native).FindFirst([System.Windows.Automation.TreeScope]::Descendants,$condition);if(!$finished){Start-Sleep -Milliseconds 100}}while(!$finished -and [DateTime]::UtcNow -lt $until)
+  if(!$finished){throw 'Native drag completion did not reach the rendered finished status'}
+ }
  function Close-Copy {
   Invoke-Button 'Cancel / Close'
   $condition=New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NameProperty,'Drag prepared files and folders to Windows Explorer')
   $until=[DateTime]::UtcNow.AddSeconds(15)
   do{$old=[System.Windows.Automation.AutomationElement]::FromHandle($native).FindFirst([System.Windows.Automation.TreeScope]::Descendants,$condition);if($old){Start-Sleep -Milliseconds 100}}while($old -and [DateTime]::UtcNow -lt $until)
-  if($old){throw 'Copy modal did not close after its acknowledged cancellation'}
+  if($old){throw 'Copy modal did not close after its Close request'}
  }
 
  function Drag-Point($x,$y,$toX,$toY,$cancel){
@@ -113,6 +122,7 @@ try {
  do{Start-Sleep -Milliseconds 100}while(!(Test-Path -LiteralPath (Join-Path $DestinationDirectory 'outgoing-folder\nested\out.txt')) -and [DateTime]::UtcNow -lt $until)
  if(!(Test-Path -LiteralPath (Join-Path $DestinationDirectory 'outgoing-file.txt'))){throw 'Real file export missing'}
  if(!(Test-Path -LiteralPath (Join-Path $DestinationDirectory 'outgoing-folder\nested\out.txt'))){throw 'Real folder export missing'}
+ Wait-Copy-Finished
  Close-Copy
  [void][ExplorerDropMouse]::SetForegroundWindow($native);Invoke-Button 'Prepare Explorer copy'
  $until=[DateTime]::UtcNow.AddSeconds(15)
@@ -120,7 +130,7 @@ try {
  if(!$button.Current.IsEnabled){throw 'Second copy preparation timed out'}
  $r=$button.Current.BoundingRectangle
  Drag-Point ([int]($r.Left+$r.Width/2)) ([int]($r.Top+$r.Height/2)) 750 460 $true
- Start-Sleep -Milliseconds 400
+ Wait-Copy-Finished
  Close-Copy
  # One final real held drag is cancelled by its owning native context, not input injection.
  Invoke-Button 'Prepare Explorer copy'
@@ -130,6 +140,6 @@ try {
  $r=$button.Current.BoundingRectangle
  Invoke-Button 'Cancel owner during next drag';[void](Find-Element $native 'Owner cancellation armed')
  [void][ExplorerDropMouse]::SetCursorPos([int]($r.Left+$r.Width/2),[int]($r.Top+$r.Height/2));[ExplorerDropMouse]::mouse_event(2,0,0,0,[UIntPtr]::Zero)
- try{[void][ExplorerDropMouse]::SetCursorPos([int]($r.Left+$r.Width/2+8),[int]($r.Top+$r.Height/2+2));Start-Sleep -Milliseconds 1000}finally{[ExplorerDropMouse]::mouse_event(4,0,0,0,[UIntPtr]::Zero)}
+ try{[void][ExplorerDropMouse]::SetCursorPos([int]($r.Left+$r.Width/2+8),[int]($r.Top+$r.Height/2+2));Start-Sleep -Milliseconds 3500}finally{[ExplorerDropMouse]::mouse_event(4,0,0,0,[UIntPtr]::Zero)}
  Write-Output 'Actual Windows Explorer folder import, file+folder export, Escape and owner-context cancellation completed'
 } finally {$window.Quit()}
