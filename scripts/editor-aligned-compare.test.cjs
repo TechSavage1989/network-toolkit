@@ -136,3 +136,19 @@ test('wheel idle ends without scrollend at a boundary, extends continuous input,
  idle.begin();idle.end();assert.equal(events.at(-1),false,'window blur clears the active wheel immediately');const count=events.length;idle.begin();const late=queued.values().next().value;idle.cancel();late();assert.equal(events.length,count+1,'disposal emits no late callback');
  const source=fs.readFileSync(require.resolve('../web/assets/editor-aligned-compare.js'),'utf8');assert(source.includes("'lostpointercapture','touchend','touchcancel','keyup','blur'"));assert(source.includes("if(event.type==='blur')mapDrag=null"));assert(source.includes('wheelIdle[side].cancel();gutterRefresh[side].cancel()'));
 });
+
+test('native rebuild retains selected hunk target instead of adopting a transient following source row',()=>{
+ let actual=22,fallbacks=0,resets=0;const q=scrollQueue(intent=>({target:intent.row}),value=>{const changed=actual!==value.target;actual=value.target;return changed;});
+ q.sync.request({kind:'aligned',side:'left',row:21,both:true});const stale=q.queued.shift(),measured=stale.read();
+ q.sync.rebuild(()=>{resets++;actual=22;},()=>{fallbacks++;q.sync.request({kind:'aligned',row:22});});stale.write(measured);assert.equal(actual,22,'old native measurements are invalidated');q.flush();assert.equal(actual,21,'explicit Next/Previous target wins over the currently visible following line');assert.equal(fallbacks,0);assert.equal(resets,1);
+ q.sync.rebuild(()=>{actual=22;},()=>fallbacks++);q.flush();assert.equal(actual,21,'retained aligned target survives even after earlier native convergence');assert.equal(fallbacks,0);
+});
+test('native rebuild source fallback never resurrects cancelled or replaced navigation',()=>{
+ let actual=0,fallbacks=0;const q=scrollQueue(intent=>({target:intent.row}),value=>{const changed=actual!==value.target;actual=value.target;return changed;});
+ q.sync.request({kind:'source',side:'right'});q.sync.rebuild(()=>{},()=>{fallbacks++;q.sync.request({kind:'aligned',row:33});});q.flush();assert.equal(actual,33);assert.equal(fallbacks,1,'no aligned intent uses captured logical source/fraction');
+ q.sync.rebuild(()=>q.sync.request({kind:'aligned',row:60}),()=>fallbacks++);q.flush();assert.equal(actual,60,'new intent cannot be overwritten by earlier snapshot');
+ q.sync.rebuild(()=>q.sync.cancel(),()=>fallbacks++);q.flush();assert.equal(actual,60);assert.equal(fallbacks,1,'document replacement/disposal cancellation remains final');
+ q.sync.rebuild(()=>q.sync.cancel(),()=>fallbacks++);q.flush();assert.equal(fallbacks,1,'explicit cancellation with an already-null intent must not invoke fallback');
+ q.sync.rebuild(()=>q.sync.pause(),()=>fallbacks++);q.flush();assert.equal(fallbacks,1,'a newer geometry invalidation also stays authoritative');
+ const source=fs.readFileSync(require.resolve('../web/assets/editor-aligned-compare.js'),'utf8');assert(source.includes('scrollReconciler.rebuild(()=>resetNativeOrigin(views[side]),()=>setScroll(side,pixel))'));
+});

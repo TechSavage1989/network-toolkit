@@ -781,3 +781,19 @@ test('a disappearing selected adapter is retained as unavailable, never silently
  picker().value=other;h.doc.emit('change',picker());assert.equal(picker().value,other);assert.equal(h.doc.querySelector('[data-packet-action="start"]').disabled,false);
  picker().value='nics';h.doc.emit('change',picker());assert.equal(picker().value,'nics');assert.equal(h.api.model.interfaceSelection,'nics');
 });
+
+test('explicit packet selection re-reveals its row after Auto docking changes geometry, including cached details',async()=>{
+ const capture={id:'c'.repeat(24),name:'Synthetic docking selection',state:'completed',count:1,revision:1},h=harness(capture);await h.settle();h.doc.emit('click',h.doc.querySelector('[data-packet-view="packets"]'));await h.settle();
+ const area=h.doc.getElementById('packetCaptureAnalysis'),reader=h.doc.getElementById('packetTableScroll'),row=reader.querySelector('[data-packet-number="1"]');area.getBoundingClientRect=()=>({width:800,height:400});h.doc.getElementById('packetGraphDock').hidden=true;reader.clientHeight=100;reader.scrollTop=0;reader.getBoundingClientRect=()=>({top:100,bottom:200,height:100,width:400});row.getBoundingClientRect=()=>{const top=(area.classList.contains('packet-details-bottom')?130:600)-reader.scrollTop;return {top,bottom:top+21,height:21,width:400};};
+ h.api.layoutDetails();assert.equal(area.classList.contains('packet-details-bottom'),true);h.doc.emit('click',row);await h.settle();assert.equal(area.classList.contains('packet-details-bottom'),false);assert.equal(h.api.model.detail.packet.number,1);assert.equal(reader.scrollTop,421);assert.equal(row.getBoundingClientRect().bottom,200,'same selected row remains fully visible after the dock switch');
+ h.api.model.graphHold=false;h.api.refreshTimeDisplay();const cachedRow=reader.querySelector('[data-packet-number="1"]');cachedRow.getBoundingClientRect=row.getBoundingClientRect;reader.scrollTop=0;h.doc.emit('click',cachedRow);await h.settle();assert.equal(reader.scrollTop,421,'the cached-details branch restores the same post-layout row');
+ reader.scrollTop=20;h.api.refreshTimeDisplay();assert.equal(reader.scrollTop,20,'ordinary background detail rendering does not re-reveal a held row');
+});
+test('late explicit packet detail completion does not override newer scroll, filter or page intent',async()=>{
+ for(const action of ['scroll','filter','page']){
+  let complete;const capture={id:'b'.repeat(24),name:'Synthetic late selection',state:'completed',count:1,revision:1},h=harness(capture,{detail:()=>new Promise(resolve=>complete=resolve)});await h.settle();h.doc.emit('click',h.doc.querySelector('[data-packet-view="packets"]'));await h.settle();
+  const area=h.doc.getElementById('packetCaptureAnalysis'),reader=h.doc.getElementById('packetTableScroll'),row=reader.querySelector('[data-packet-number="1"]');area.getBoundingClientRect=()=>({width:800,height:400});h.doc.getElementById('packetGraphDock').hidden=true;reader.clientHeight=100;reader.scrollTop=0;reader.getBoundingClientRect=()=>({top:100,bottom:200,height:100,width:400});row.getBoundingClientRect=()=>({top:600-reader.scrollTop,bottom:621-reader.scrollTop,height:21,width:400});h.api.layoutDetails();h.doc.emit('click',row);await h.settle();
+  if(action==='scroll')reader.scrollTop=50;else if(action==='filter')h.api.model.sequence++;else h.c.state.activePage='ping';
+  complete({packet:{number:1,protocol:'TCP',expert:[]},layers:[],data:''});await h.settle();assert.equal(reader.scrollTop,action==='scroll'?50:0,action+' intent must not be displaced by late inspector layout');
+ }
+});

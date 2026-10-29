@@ -864,11 +864,19 @@ async function selectPacket(number,{hold=true}={}){
  if(hold){model.graphSelectionVersion=(model.graphSelectionVersion||0)+1;model.graphHold=true;model.liveDetails=false;model.heldPacketNumber=number;model.intervalSelection=null;model.graphHeldEnd=model.statistics?.graphFinished||model.statistics?.finished||'';packetTimelineState().follow=false;preferences().hidden=false;}
  const relative=model.loaded.findIndex(p=>p.number===number);
  if(relative>=0){model.selectedIndex=model.windowStart+relative;updateMapSelection();}
- const id=model.selected,requestID=++model.detailRequest;
- if(model.detail?.packet?.number===number){renderDetail();return;}
+ const id=model.selected,requestID=++model.detailRequest,sequence=model.sequence,reader=node('packetTableScroll'),scrollTop=Number(reader?.scrollTop)||0;
+ const renderSelection=()=>{
+  // Opening a deliberately selected packet can move Auto details from bottom
+  // to right. Reveal that same row after the synchronous layout, but do not
+  // override a newer scroll, capture, filter, selection or navigation intent.
+  const reveal=hold&&visible()&&model.view==='packets'&&model.selected===id&&model.sequence===sequence&&model.detailRequest===requestID&&model.heldPacketNumber===number&&model.graphHold&&reader===node('packetTableScroll')&&Math.abs((Number(reader?.scrollTop)||0)-scrollTop)<.5;
+  renderDetail();
+  if(reveal){ensurePacketRowVisible(number);updateMapViewport();}
+ };
+ if(model.detail?.packet?.number===number){renderSelection();return;}
  try{const value=await request('/'+id+'/packet/'+number);if(!visible()||model.selected!==id||requestID!==model.detailRequest)return;model.detail=value;model.range=null;const bucketIndex=packetBucketForPacket(value.packet),selection=packetTimelineState();if(hold&&bucketIndex>=0){selection.pinned=true;selection.index=bucketIndex;selection.pin={...model.statistics.timeline[bucketIndex],_includesEnd:model.statistics.timeline[bucketIndex].endInclusive===true||bucketIndex===model.statistics.timeline.length-1};}updatePacketTimeline();
   for(const row of document.querySelectorAll('#packetTableScroll [data-packet-number]')){const selected=Number(row.dataset.packetNumber)===number;row.classList.toggle('selected',selected);row.setAttribute('aria-selected',String(selected));}
-  renderDetail();
+  renderSelection();
  }catch(e){if(requestID===model.detailRequest)error(e.message);}
 }
 function plainPacketHTML(p){
