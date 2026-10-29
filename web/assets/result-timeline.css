@@ -96,6 +96,10 @@
  .rt-view-controls .graph-range-advanced{font-size:0;width:22px;padding:3px 2px}
  .rt-view-controls .graph-range-advanced:after{content:'…';font-size:14px}
  .rt-view-controls .graph-inline-zoom [data-rt-zoom-level]{min-width:3.2em;max-width:none;white-space:nowrap}
- .rt-view-controls [data-graph-compression-open]{font-size:0;width:34px;min-width:34px;padding:3px 2px}
- .rt-view-controls [data-graph-compression-open]:after{content:'Curve';font-size:9px}
+ .rt-view-controls:has([data-graph-compression-open]) .rt-mode-control{min-width:85px;flex-basis:85px;max-width:85px}
+ .rt-view-controls:has([data-graph-compression-open]) .graph-timeframe,.rt-view-controls:has([data-graph-compression-open]) .graph-timeframe select{width:54px;flex-basis:54px}
+ .rt-view-controls .graph-inline-zoom .btn{width:20px;min-width:20px}
+ .rt-view-controls .graph-inline-zoom [data-rt-zoom="reset"]{width:24px;min-width:24px}
+ .rt-view-controls [data-graph-compression-open]{font-size:0;width:22px;min-width:22px;padding:3px 2px}
+ .rt-view-controls [data-graph-compression-open]:after{content:'∿';font-size:16px}
 }

@@ -17,7 +17,7 @@ Future edits in this mode retain at most 80 undo entries and an estimated 128 Mi
 
 The backend copies mutable snapshot containers instead of repeatedly JSON-encoding/decoding immutable text. The renderer checkpoints unchanged documents using a metadata/version key instead of serializing full text every second. Changes, missing ownership and transfers still send complete bounded snapshots. Pending transfers are polled at 100 ms; idle polling remains 1 s. Source release still requires the destination's authoritative lease/ACK; timeout or lost responses never create competing editable copies.
 
-The same pending-only scheduling applies to Terminal, and an explicit Return request wakes its existing poll immediately. Session ownership and reconnect/authentication behavior are unchanged.
+Terminal polls at250ms while a detached child is open (to discover child-initiated Return),100ms during pending transitions and1s with no child. An explicit main-window Return request wakes its existing poll immediately. Session ownership and reconnect/authentication behavior are unchanged.
 
 ## Evidence and limits
 

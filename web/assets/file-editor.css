@@ -320,6 +320,9 @@ body:has(.nt-editor:not([hidden]) [data-ed-files-sidebar]:not([hidden])) .toast-
 .nt-editor-tab-status{flex:none;width:7px;color:var(--accent);font-size:9px}
 .nt-editor-tab>.tab-close{border:0;background:transparent;flex:0 0 28px;padding:5px 8px;color:var(--faint);font-size:14px}
 .nt-editor-new-tab{min-width:42px;border:0;border-radius:0;background:transparent;color:var(--accent)}
+/* The modal has no reclaimed page-header row. Keep the shared Terminal-height
+   tabs without spending document height on extra primary-toolbar padding. */
+.nt-editor:not(.nt-editor-embedded) .nt-editor-window>.nt-editor-toolbar{padding-block:1px}
 @media(max-width:720px){.nt-editor-tab{min-width:135px}}
 /* Connection choice stays at the top of Files, not in the document toolbar. */
 .nt-editor-file-sessions{flex:none;min-width:0;padding:5px;border-bottom:1px solid var(--border);background:var(--panel)}

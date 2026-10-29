@@ -1,0 +1,46 @@
+Network Toolkit 1.17.114
+
+Continuous comparison and focused editing
+- Synchronize both comparison panes during wheel and map gestures, preserving
+  visual gaps, source gutters, exact document text and the two-document map.
+- Use consistent compact Terminal-style editor tabs and consolidate active/saved
+  SFTP connections, local paths and creation in the Files sidebar. Remove the
+  redundant Sessions toolbar and local path actions from More.
+- List accessible Windows drives and mounted volumes. Unavailable destinations
+  remain visibly unavailable; no elevation or credential changes are introduced.
+- Raise local and SFTP editor files to 32 MiB encoded, with bounded decoded text
+  and transfer snapshots. Large-file mode pauses syntax/wrap and virtualizes
+  gutters; undo memory is capped at 128 MiB/80 entries. Comparison and formatting
+  retain their separately explained limits rather than silently truncating text.
+- Reduce avoidable snapshot copies and wake acknowledged window transfers sooner.
+  Terminal transports, editor dirty text, history, selection and ownership stay
+  protected; no reconnection or premature source release is used for speed.
+
+Terminal tabs
+- Put tabs directly above terminal panes and retain named saved-session labels.
+- Reorder tabs by dragging or Alt+Shift+Left/Right. An intentional captured mouse
+  drag away detaches through the existing ownership handshake; Escape cancels.
+- Add clearly scoped Disconnect all sessions and Close all tabs actions. Both
+  require confirmation before interrupting live work; other windows and saved
+  profiles are not changed. Disconnect retains the tabs and their output.
+
+Files and Windows Explorer
+- Copy files/folders into local Files or connected SFTP after explicit review.
+  Copy out through Copy to Windows Explorer, visible preparation/progress and
+  a prepared native drag handle. Remote bytes are downloaded before that drag.
+- New native drag modes cover local and SFTP, not FTP/FTPS; existing explicit
+  FTP/FTPS transfers remain available. Browser-only use retains Download.
+- Folder collisions require Rename or Skip, not silent merging. Copy is the
+  default; links, destination changes and unsafe publication are refused.
+  Cancellation can retain already completed files in a newly created folder;
+  original files are not deleted. Detached Files still needs explicit approval.
+
+Graph navigation
+- Use a ten-second reference for recent uncompressed spacing; older history
+  compresses without progressively thinning the recent right-hand region.
+- Preserve natural startup fill, endpoint pinning and clipped history clusters.
+- Follow latest navigates without opening Details. Timeline wheel input pans,
+  and zoom labels show actual visible seconds/minutes/hours instead of multipliers.
+
+Existing vault/host-key checks, updater verification, terminal pager/output
+archives, macro protections, copy controls and previous releases are preserved.

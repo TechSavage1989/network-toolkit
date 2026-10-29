@@ -1,3 +1,22 @@
+# 1.17.114 authorized candidate (2026-10-29)
+
+User approved the attached combined prompt at13:16:20UTC, plus named Terminal
+profiles, reorder, intentional drag-away and window-scoped bulk actions. Baseline
+main89590bca9649f337fc8966ce798977a3ca1ca9e1 remains unchanged remotely.
+Development is isolated; no114 publication or final gate success is claimed yet.
+The113 release note was archived byte-for-byte (SHA256
+728b985a9be341bcba506fa93b80d0db766b4d50c11d99b5cd97af726273bd2d).
+
+Read EDITOR_FILES114.md, EDITOR_CAPACITY114.md, FILES_NATIVE114.md,
+TERMINAL_NATIVE114.md and GRAPH_NAVIGATION114.md. Required acceptance includes
+continuous paired motion,32MiB interaction, real native ownership/timing and
+Explorer file/folder/junction tests, plus every existing release gate. Native
+copy modes are local/SFTP only; FTP/FTPS retain explicit manual transfers.
+No user desktop, real device, private configuration or credential is used in
+fixtures. Public repository visibility/access and historical assets stay unchanged.
+
+--- Prior verified handoff ---
+
 # Network Toolkit development handoff
 
 ## 1.17.113 published and verified
