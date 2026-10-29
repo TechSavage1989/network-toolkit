@@ -182,7 +182,7 @@ test('time zoom changes range, hit testing and axis accurately and resets withou
 });
 
 test('linear zoom uses time domains at bounded scales without a wide scrolling SVG',()=>{
- const h=harness(),rows=Array.from({length:400},(_,i)=>reply(i+1,10,stamp(i)));h.api.setPreferences({mode:'linear'},{persist:false});h.render(rows);h.api.zoom('job',2);assert.equal(h.document.querySelectorAll('[data-rt-point]').length,200);assert.equal(h.api.zoom('job',999),16);assert(h.document.querySelectorAll('[data-rt-point]').length<30);assert.equal(h.document.querySelector('[data-rt-scroll]'),null);assert.equal(h.api.zoom('job','reset'),1);assert.equal(h.document.querySelectorAll('[data-rt-point]').length,400);
+ const h=harness(),rows=Array.from({length:400},(_,i)=>reply(i+1,10,stamp(i)));h.api.setPreferences({mode:'linear'},{persist:false});h.render(rows);h.api.zoom('job',2);assert.equal(h.document.querySelectorAll('[data-rt-point]').length,200);assert.equal(h.api.zoom('job',999),399/4);assert.equal(h.document.querySelectorAll('[data-rt-point]').length,5);assert.equal(h.document.querySelector('[data-rt-scroll]'),null);assert.equal(h.api.zoom('job','reset'),1);assert.equal(h.document.querySelectorAll('[data-rt-point]').length,400);
 });
 
 test('outside controls preserve a held pin and filters until explicit deselection',()=>{
@@ -269,7 +269,7 @@ test('fixed time navigation stays anchored during live updates while Latest rest
 });
 
 test('chosen time range never includes an RTT change whose previous source sample is outside it',()=>{
- const h=harness(),rows=Array.from({length:5},(_,i)=>reply(i+1,[1,5,100,104,108][i],'2026-10-26T16:00:0'+i+'Z'));h.context.NetworkToolkitGraphHistory.setPreferences({anchor:'range',start:rows[2].time,end:rows[4].time},{persist:false});h.render(rows);h.api.setPlot('job','jitter');assert(h.document.querySelector('[data-rt-surface="jitter"]'));h.api.setPlot('job','rtt');h.document.emit('click',h.mark(0));assert.match(h.detail(),/Response time100 ms/);h.document.emit('click',h.mark(1));assert.match(h.detail(),/RTT change4 ms/);
+ const h=harness(),rows=Array.from({length:7},(_,i)=>reply(i+1,[1,5,100,104,108,112,116][i],'2026-10-26T16:00:0'+i+'Z'));h.context.NetworkToolkitGraphHistory.setPreferences({anchor:'range',start:rows[2].time,end:rows[6].time},{persist:false});h.render(rows);h.api.setPlot('job','jitter');assert(h.document.querySelector('[data-rt-surface="jitter"]'));h.api.setPlot('job','rtt');h.document.emit('click',h.mark(0));assert.match(h.detail(),/Response time100 ms/);h.document.emit('click',h.mark(1));assert.match(h.detail(),/RTT change4 ms/);
 });
 
 test('a held aggregate can open an original contributor after it leaves retained graph history',()=>{
@@ -404,7 +404,7 @@ test('axis gutters, modified clicks, cancelled presses and cross-job releases ca
 });
 
 test('a vertical drag is not a selection and a real horizontal drag still pans',()=>{
- const h=harness();h.render();let svg=h.document.querySelector('[data-rt-surface]');svg.getBoundingClientRect=()=>({left:0,top:0,width:820,height:110,right:820,bottom:110});h.api.restore();const end=h.document.querySelector('.rt-timeline').dataset.rtScopeEnd;
+ const h=harness();h.render(Array.from({length:40},(_,i)=>reply(i+1,10,stamp(i))));h.api.zoom('job',2);let svg=h.document.querySelector('[data-rt-surface]');svg.getBoundingClientRect=()=>({left:0,top:0,width:820,height:110,right:820,bottom:110});h.api.restore();const end=h.document.querySelector('.rt-timeline').dataset.rtScopeEnd;
  h.document.emit('pointerdown',svg,{button:0,pointerId:9,clientX:400,clientY:40});h.document.emit('pointerup',svg,{pointerId:9,clientX:400,clientY:70});h.document.emit('click',svg,{button:0,clientX:400,clientY:70});assert.equal(h.api.isHeld('job'),false);assert.equal(h.document.querySelector('.rt-timeline').dataset.rtScopeEnd,end);
  h.document.emit('pointerdown',svg,{button:0,pointerId:9,clientX:400,clientY:40});h.document.emit('pointerup',svg,{pointerId:9,clientX:450,clientY:40});h.document.emit('click',h.document.querySelector('[data-rt-surface]'),{button:0,clientX:450,clientY:40});assert.equal(h.api.isHeld('job'),false);assert.notEqual(h.document.querySelector('.rt-timeline').dataset.rtScopeEnd,end);
 });
@@ -450,4 +450,34 @@ test('Follow latest never calls Details while releasing held selection or during
 test('visible span readout shows actual elapsed scope and includes the full condensed history cluster',()=>{
  const h=harness(),rows=Array.from({length:7201},(_,i)=>reply(i+1,10,stamp(i)));h.api.setPreferences({mode:'condensed'},{persist:false});h.render(rows);const label=h.document.querySelector('[data-rt-zoom-level]');assert.equal(label.textContent,'2 h');assert.match(label.title,/nonlinear.*history cluster/);assert.doesNotMatch(label.textContent,/×/);
  h.api.setPreferences({mode:'linear'},{persist:false});h.context.NetworkToolkitGraphHistory.setPreferences({durationMs:10000},{persist:false,fit:true});h.render(rows);assert.equal(h.document.querySelector('[data-rt-zoom-level]').textContent,'10 s');h.api.zoom('job',2);assert.equal(h.document.querySelector('[data-rt-zoom-level]').textContent,'5 s');
+});
+
+test('repeated maximum zoom keeps five actual samples and two seconds in linear and condensed views',()=>{
+ for(const mode of ['linear','condensed'])for(const cadence of [.1,1,20]){
+  const h=harness(),rows=Array.from({length:401},(_,i)=>reply(i+1,10,stamp(i*cadence))),before=JSON.stringify(rows);h.api.setPreferences({mode},{persist:false});h.context.NetworkToolkitGraphHistory.setPreferences({durationMs:10000},{persist:false});h.render(rows);
+  for(let i=0;i<30;i++){h.api.zoom('job','in');const marks=h.document.querySelectorAll('[data-rt-sequence]'),raw=marks.filter(m=>!m.hasAttribute('data-rt-aggregate'));assert(raw.length>=5,mode+' '+cadence+' has five raw markers');const times=raw.map(m=>rows.find(r=>String(r.sequence)===m.dataset.rtSequence)?.time).filter(Boolean),hist=h.context.NetworkToolkitGraphHistory;assert(hist.instant(times.at(-1))-hist.instant(times[0])>=2000000000n,mode+' '+cadence+' actual sample span');}
+  const first=h.document.querySelector('.rt-timeline').dataset.rtScopeStart,end=h.document.querySelector('.rt-timeline').dataset.rtScopeEnd;h.api.zoom('job',Infinity);assert.equal(h.document.querySelector('.rt-timeline').dataset.rtScopeStart,first);assert.equal(h.document.querySelector('.rt-timeline').dataset.rtScopeEnd,end);assert.equal(JSON.stringify(rows),before);
+ }
+});
+test('startup zoom cannot stretch or discard an incomplete three-sample run',()=>{for(const mode of ['linear','condensed']){const h=harness(),rows=Array.from({length:3},(_,i)=>reply(i+1,10,stamp(i)));h.api.setPreferences({mode},{persist:false});h.render(rows);const original=h.document.querySelector('[data-rt-surface]').innerHTML;for(let i=0;i<10;i++)assert.equal(h.api.zoom('job','in'),1);assert.equal(h.document.querySelector('[data-rt-surface]').innerHTML,original);}});
+
+test('actual delegated wheel path reaches and stays at the data floor from either pointer anchor after resize',()=>{
+ for(const mode of ['linear','condensed'])for(const share of [.1,.9]){
+  const h=harness(),rows=Array.from({length:201},(_,i)=>reply(i+1,10,stamp(i*.1)));h.api.setPreferences({mode},{persist:false});h.render(rows);let previous;
+  for(let i=0;i<30;i++){const svg=h.document.querySelector('[data-rt-surface]');svg.getBoundingClientRect=()=>({left:0,top:0,width:i<15?820:180,height:110,right:i<15?820:180,bottom:110});h.api.restore();h.document.emit('wheel',svg,{deltaY:240,clientX:(i<15?820:180)*share,clientY:70});const marks=h.document.querySelectorAll('[data-rt-point]').filter(m=>!m.hasAttribute('data-rt-aggregate')),times=marks.map(m=>rows[Number(m.dataset.rtSequence)-1].time),g=h.context.NetworkToolkitGraphHistory;assert(marks.length>=5);assert(g.instant(times.at(-1))-g.instant(times[0])>=2000000000n);if(i===29)previous=h.document.querySelector('.rt-timeline').dataset.rtScopeStart;}
+  const svg=h.document.querySelector('[data-rt-surface]');svg.getBoundingClientRect=()=>({left:0,top:0,width:180,height:110,right:180,bottom:110});h.document.emit('wheel',svg,{deltaY:240,clientX:180*share,clientY:70});assert.equal(h.document.querySelector('.rt-timeline').dataset.rtScopeStart,previous);assert(h.document.querySelector('[data-rt-zoom="in"]').disabled);let prevented=0;h.document.emit('wheel',h.document.querySelector('[data-rt-surface]'),{deltaY:240,clientX:90,clientY:60,preventDefault(){prevented++;}});assert.equal(prevented,1,'The graph consumes repeated limit input rather than scrolling its parent');
+ }
+});
+
+test('inverted outward wheel can leave the exact five-sample floor after applying Range',()=>{
+ for(const mode of ['linear','condensed'])for(const delta of [8,120]){
+  const h=harness(),rows=Array.from({length:401},(_,i)=>reply(i+1,10,stamp(i)));h.api.setPreferences({mode},{persist:false});h.render(rows);
+  const wheel=delta=>{const svg=h.document.querySelector('[data-rt-surface]');svg.getBoundingClientRect=()=>({left:0,top:0,width:820,height:110,right:820,bottom:110});h.document.emit('wheel',svg,{deltaY:delta,clientX:574,clientY:66});};
+  for(let i=0;i<30;i++)wheel(240);
+  h.context.NetworkToolkitGraphHistory.setPreferences({invertWheelZoom:true},{persist:false});
+  const factor=()=>Number(h.document.querySelector('[data-rt-zoom-level]').dataset.rtZoomFactor),before=factor();
+  wheel(delta);assert(factor()<before,`${mode} first outward wheel must leave floor: ${before} -> ${factor()}`);
+  for(let i=0;i<64;i++)wheel(delta);
+  assert(h.document.querySelectorAll('[data-rt-point]').filter(m=>!m.hasAttribute('data-rt-aggregate')).length>5,mode+' repeated outward input must reach additional real samples');
+ }
 });

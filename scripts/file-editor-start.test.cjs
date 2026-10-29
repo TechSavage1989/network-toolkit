@@ -5,10 +5,10 @@ const source=fs.readFileSync(process.env.TOOLKIT_EDITOR_SOURCE||require.resolve(
 const text=Array.from({length:300},(_,i)=>'Line '+(i+1)+' '+ 'x'.repeat(100)).join('\n');
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};};
 const settle=()=>new Promise(resolve=>setImmediate(resolve));
-function harness(){
+function harness(preferences={}){
  const document=makeDocument('');document.body=document;
  const create=document.createElement;document.createElement=tag=>{const el=create(tag);el.style.setProperty=(k,v)=>el.style[k]=v;el.style.removeProperty=k=>delete el.style[k];return el;};
- const c={document,console,Map,Set,Date,Math,TextDecoder,TextEncoder,Uint8Array,DataView,Blob,URL,setTimeout,clearTimeout,state:{},saveState(){},confirm:()=>true,esc:x=>String(x).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;'),addEventListener(){}};
+ const c={document,console,Map,Set,Date,Math,TextDecoder,TextEncoder,Uint8Array,DataView,Blob,URL,setTimeout,clearTimeout,state:{editorPreferences:preferences},saveState(){},confirm:()=>true,esc:x=>String(x).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;'),addEventListener(){}};
  vm.createContext(c);vm.runInContext(fs.readFileSync(require.resolve('../web/assets/editor-tab-groups.js'),'utf8'),c);vm.runInContext(source,c);const api=c.NetworkToolkitFileEditor;
  async function first(){
   const pending=deferred(),running=api.open({id:'first',path:'first.txt',source:'Local computer',read:()=>pending.promise,write:async()=>({})}),ta=document.querySelector('[data-ed-text]');
@@ -290,3 +290,5 @@ test('oversized Save copy surfaces the encoded limit without creating a download
  const h=harness();await h.first();const d=h.api.active;d.content='x'.repeat(16*1024*1024+1);d.dirty=true;h.c.URL={createObjectURL(){throw Error('oversize must not create download');}};
  h.click('download');assert.equal(d.content.length,16*1024*1024+1);assert.equal(d.dirty,true);assert.match(h.document.querySelector('[data-ed-message]').textContent,/16 MiB/);
 });
+
+test('comparison preferences retain false values through other settings and detached snapshots',async()=>{const h=harness({compareHorizontalSync:true,compareUnderline:false,compareIntralineHighlight:false,customOther:'retain'});await h.first();const prefs=h.api.windowAdapter.checkpoint([]).preferences;assert.equal(prefs.compareHorizontalSync,true);assert.equal(prefs.compareUnderline,false);assert.equal(prefs.compareIntralineHighlight,false);h.api.windowAdapter.applyPreferences({...prefs,compareHorizontalSync:false,compareUnderline:true});const next=h.api.windowAdapter.checkpoint([]).preferences;assert.equal(next.compareHorizontalSync,false);assert.equal(next.compareUnderline,true);assert.equal(next.compareIntralineHighlight,false);h.api.windowAdapter.applyPreferences({wordWrap:false,syntax:true,fontSize:13,palette:'auto'});const legacy=h.api.windowAdapter.checkpoint([]).preferences;assert.equal(legacy.compareHorizontalSync,false);assert.equal(legacy.compareUnderline,true);assert.equal(legacy.compareIntralineHighlight,true);});

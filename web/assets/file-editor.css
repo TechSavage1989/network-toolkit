@@ -179,11 +179,11 @@ body:has(.nt-editor-embedded) #toolWorkspace>#pageContent{grid-row:1!important;g
 .nt-editor-more>summary,.nt-compare-settings>summary{list-style:none;cursor:pointer}
 .nt-editor-more>summary::-webkit-details-marker,.nt-compare-settings>summary::-webkit-details-marker{display:none}
 .nt-editor-more>summary::after,.nt-compare-settings>summary::after{content:' ▾'}
-.nt-compare-settings[open]{flex-basis:100%;order:10}
+.nt-compare-settings,.nt-compare-settings[open]{flex:0 0 auto;order:0}
 .nt-editor-more,.nt-editor-more[open]{flex:0 0 auto;order:0}
 .nt-editor-more-actions{flex:0 0 auto;padding:5px 8px!important;border-bottom:1px solid var(--line);max-height:35vh;overflow:auto}
 .nt-editor-more-actions .btn{min-height:28px;padding:4px 8px;font-size:11px}
-.nt-editor-more-actions,.nt-compare-settings>div{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding-top:5px}
+.nt-editor-more-actions,.nt-compare-settings-actions{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding-top:5px}
 .nt-editor.is-comparing [data-ed="compare"]{display:none}
 .nt-editor.is-comparing :is([data-ed="find"],[data-ed="replace"],[data-ed="goto"]){display:none}
 /* Embedded tools retain the same natural toolbar wrapping at narrow widths. */
@@ -229,7 +229,7 @@ body:has(.nt-editor-embedded) #toolWorkspace>#pageContent{grid-row:1!important;g
 .nt-editor-compare.is-split-view .nt-compare-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
 .nt-editor-more,.nt-compare-settings{margin:0;padding:0;line-height:1;align-self:center}
 .nt-editor-more>summary.btn,.nt-compare-settings>summary.btn{display:flex;align-items:center;justify-content:center;box-sizing:border-box;height:28px;min-height:28px;margin:0;padding:4px 8px;line-height:normal;vertical-align:top}
-.nt-editor-more-actions,.nt-compare-settings>div{line-height:normal}
+.nt-editor-more-actions,.nt-compare-settings-actions{line-height:normal}
 .nt-editor-tab-menu{position:fixed;z-index:40;min-width:220px;max-width:calc(100vw - 12px);max-height:calc(100dvh - 12px);overflow:auto;display:flex;flex-direction:column;gap:2px;padding:5px;border:1px solid var(--border);border-radius:7px;background:var(--panel);box-shadow:var(--shadow);font-size:11px}
 .nt-editor-tab-menu button{display:block;width:100%;border:0;border-radius:4px;background:transparent;text-align:left;min-height:28px;padding:5px 8px;color:var(--text);font:inherit;cursor:pointer}
 .nt-editor-tab-menu button:hover,.nt-editor-tab-menu button:focus-visible{background:var(--accentBg);outline:1px solid var(--accent);outline-offset:-1px}
@@ -362,3 +362,44 @@ body:has(.nt-editor:not([hidden]) [data-ed-files-sidebar]:not([hidden])) .toast-
 .nt-editor-files-session-menu>summary::-webkit-details-marker{display:none}
 .nt-editor-files-session-menu>div{position:absolute;right:0;top:100%;z-index:15;display:flex;flex-direction:column;min-width:145px;padding:4px;border:1px solid var(--border);border-radius:6px;background:var(--panel);box-shadow:var(--shadow)}
 .nt-editor-files-session-menu>div .btn{justify-content:flex-start;white-space:nowrap}
+
+.nt-compare-settings-actions{flex:0 0 auto;padding:4px 8px;border-bottom:1px solid var(--line);max-height:30vh;overflow:auto;justify-content:flex-start}.nt-compare-settings-actions[hidden]{display:none}.nt-compare-settings-actions label{display:inline-flex;align-items:center;gap:4px;font-size:11px;white-space:nowrap}
+.nt-compare-settings-actions input[type=checkbox]{width:14px;height:14px;margin:0;flex:0 0 auto}.nt-compare-settings-actions select{width:auto;min-height:27px;padding:3px 5px;font-size:11px}
+/* Editor Files/Connections use persistent tab panels; switching does not remount auth fields. */
+.nt-editor-files-locations{display:flex;align-items:center;gap:4px;padding:4px 5px;flex:none;border-bottom:1px solid var(--border)}
+.nt-editor-files-locations[hidden]{display:none}
+.nt-editor-files-heading [role=tab]{border-radius:5px;white-space:nowrap}
+.nt-editor-files-heading [role=tab][aria-selected=true]{box-shadow:inset 0 -2px var(--accent)}
+.nt-editor-files-rail{align-self:stretch;flex:0 0 27px;width:27px;min-width:27px;padding:5px 3px!important;writing-mode:vertical-rl;border-radius:0!important;border-right:1px solid var(--border);font-size:11px}
+.nt-editor-files-rail[hidden]{display:none}
+[data-editor-file-sessions]{flex:none;min-height:0;max-height:30%;overflow:auto}
+.nt-editor-files-sidebar[data-editor-sidebar-panel=files] [data-editor-file-sessions]{display:none}
+.nt-editor-files-sidebar[data-editor-sidebar-panel=connections] .nt-editor-file-sessions{padding:6px}
+.is-editor-sidebar[data-sidebar-panel=files]{overflow:hidden}
+.is-editor-sidebar[data-sidebar-panel=files]>.nt-editor-files-connection{display:none}
+.is-editor-sidebar[data-sidebar-panel=connections]{overflow:auto}
+.is-editor-sidebar[data-sidebar-panel=connections]>.nt-editor-files-connection{display:block;max-height:none;overflow:visible}
+.is-editor-sidebar[data-sidebar-panel=connections]>.rb-explorer,.is-editor-sidebar[data-sidebar-panel=connections]>.nt-editor-files-activity,.is-editor-sidebar[data-sidebar-panel=connections]>.nt-editor-files-current{display:none}
+.is-editor-sidebar[data-sidebar-panel=files] .rb-explorer{flex:1 1 0;min-height:0;overflow:hidden}
+.is-editor-sidebar[data-sidebar-panel=files] .rb-panes{flex:1;min-height:0}
+.is-editor-sidebar[data-sidebar-panel=files] .rb-pane{min-height:0}
+.is-editor-sidebar[data-sidebar-panel=files] .rb-scroll{flex:1;min-height:48px;overflow:auto}
+.nt-editor-files-current{display:flex;flex:none;align-items:center;justify-content:space-between;min-width:0;width:100%;font-size:10px!important}
+.nt-editor-files-current>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.is-editor-sidebar[data-sidebar-side=local]>.nt-editor-files-current{display:none}
+.rb-local-drives{display:flex;align-items:center;gap:4px;flex:none;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;max-width:100%;padding:4px 5px;border-bottom:1px solid var(--border);scrollbar-width:thin}
+.rb-local-drives .btn{flex:none;max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;padding:4px 7px}
+.rb-local-drives>span{font-size:11px;white-space:nowrap}
+
+[data-editor-file-paths]{flex:none;padding:0 5px 4px;max-height:35%;overflow:auto}
+.nt-editor-files-sidebar[data-editor-sidebar-panel=connections] [data-editor-file-paths],.nt-editor-files-sidebar[data-editor-sidebar-side=local] [data-editor-file-paths]{display:none}
+
+/* At compact widths Files is an explicitly opened drawer, not an overlay left
+   behind on the editing surface after a desktop-to-narrow resize. It uses the
+   editor's full available height so browsing is not squeezed by toolbar rows. */
+@media(max-width:680px){
+ .nt-editor-window{position:relative}
+ .nt-editor-workspace{position:static}
+ .nt-editor-files-sidebar:not([hidden]){inset:0 auto 0 0;width:min(360px,calc(100% - 28px))!important;max-width:calc(100% - 28px);min-width:0;z-index:20}
+ .nt-editor-files-sidebar .nt-editor-files-resize{display:none}
+}

@@ -2,4 +2,4 @@
 export {EditorState, EditorSelection, StateEffect, StateField, Compartment,
   Annotation, Transaction, RangeSetBuilder} from '@codemirror/state';
 export {EditorView, Decoration, WidgetType, keymap, lineNumbers, drawSelection,
-  dropCursor} from '@codemirror/view';
+  dropCursor, gutter, GutterMarker} from '@codemirror/view';

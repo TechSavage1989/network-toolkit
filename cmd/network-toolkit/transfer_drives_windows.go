@@ -3,9 +3,11 @@
 package main
 
 import (
+	"runtime"
 	"sort"
 	"strings"
 	"syscall"
+	"time"
 	"unsafe"
 )
 
@@ -15,6 +17,31 @@ var driveType = driveKernel.NewProc("GetDriveTypeW")
 var driveFirstVolume = driveKernel.NewProc("FindFirstVolumeW")
 var driveNextVolume = driveKernel.NewProc("FindNextVolumeW")
 var driveCloseVolume = driveKernel.NewProc("FindVolumeClose")
+var driveVolumeInformation = driveKernel.NewProc("GetVolumeInformationW")
+var driveGetThreadErrorMode = driveKernel.NewProc("GetThreadErrorMode")
+var driveSetThreadErrorMode = driveKernel.NewProc("SetThreadErrorMode")
+var driveLabels = newDriveLabelCache(readDriveLabel)
+
+func readDriveLabel(path string) string {
+	p, err := syscall.UTF16PtrFromString(path)
+	if err != nil {
+		return ""
+	}
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+	var previous uint32
+	current, _, _ := driveGetThreadErrorMode.Call()
+	if ok, _, _ := driveSetThreadErrorMode.Call(current|1, uintptr(unsafe.Pointer(&previous))); ok == 0 {
+		return ""
+	}
+	defer driveSetThreadErrorMode.Call(uintptr(previous), 0)
+	label := make([]uint16, 261)
+	if ok, _, _ := driveVolumeInformation.Call(uintptr(unsafe.Pointer(p)), uintptr(unsafe.Pointer(&label[0])), uintptr(len(label)), 0, 0, 0, 0, 0); ok != 0 {
+		return syscall.UTF16ToString(label)
+	}
+	return ""
+}
+
 var driveVolumePaths = driveKernel.NewProc("GetVolumePathNamesForVolumeNameW")
 
 func splitDriveMultiString(b []uint16) []string {
@@ -85,6 +112,7 @@ func localTransferDrives() []localTransferDrive {
 		}
 		out = append(out, localTransferDrive{p, label, name})
 	}
+	driveLabels.enrich(out, 75*time.Millisecond)
 	sort.Slice(out, func(i, j int) bool { return strings.ToLower(out[i].Path) < strings.ToLower(out[j].Path) })
 	return out
 }

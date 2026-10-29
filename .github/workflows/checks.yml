@@ -29,7 +29,40 @@ jobs:
         run: |
           npm install --prefix "$RUNNER_TEMP/ntk-editor112" --no-audit --no-fund playwright@1.62.1
           node "$RUNNER_TEMP/ntk-editor112/node_modules/playwright/cli.js" install chromium
+      - name: Check persistent Files and Connections tabs and named drive buttons
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results
+        run: node scripts/editor-files115.browser.cjs
+      - name: Check compact comparison options horizontal sync and difference symbols
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results
+        run: node scripts/editor-compare115.browser.cjs
+      - name: Check editor pointer drag away reorder and cancelled moves
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results
+        run: node scripts/editor-drag115.browser.cjs
+      - name: Check graph wheel inversion and data-aware hard zoom stops
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results
+        run: node scripts/graph-zoom115.browser.cjs
+      - name: Retain focused115 visual evidence before existing regressions
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: editor115-focused-checks
+          path: ${{ runner.temp }}/ntk-editor112-results
+          if-no-files-found: error
+          retention-days: 14
       - name: Exercise independent views and the full file sidebar
+        if: success() || failure()
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results
@@ -270,7 +303,7 @@ jobs:
         env:
           GOTOOLCHAIN: local
         run: |
-          go test -mod=vendor ./cmd/network-toolkit -run 'TestExplorer|TestSFTPDropRename|TestRemoteBrowserPersistent|TestEditorCapacity114' -count=1 -v
+          go test -mod=vendor ./cmd/network-toolkit -run 'TestExplorer|TestSFTPDropRename|TestRemoteBrowserPersistent|TestEditorCapacity114|TestLocalDriveNames115' -count=1 -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           go test -mod=vendor ./internal/diag -run TestSFTPStaged -count=1 -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -294,7 +327,7 @@ jobs:
           NETWORK_TOOLKIT_NATIVE_EDITOR_TEST: '1'
           TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/network-toolkit-native-editor108
         run: |
-          go test -mod=vendor ./internal/desktop -run '^TestNativeEditorCloseApprovalInstalledWebView2$' -count=1 -timeout=3m -v
+          go test -mod=vendor ./internal/desktop -run '^TestNativeEditorClose(ApprovalInstalledWebView2|ScriptUsesExplicitAction)$' -count=1 -timeout=3m -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           go test -mod=vendor ./cmd/network-toolkit -run '^TestNativeEditorTransferInstalledWebView2$' -count=1 -timeout=6m -v
       - uses: actions/upload-artifact@v7

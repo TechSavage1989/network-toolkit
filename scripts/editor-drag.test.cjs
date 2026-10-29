@@ -13,7 +13,7 @@ function fixture({native=true,pending=false,reject=false}={}){
  const editor={active:{uid:'b'},canReorderDocuments:()=>reason,reorderDocument:(uid,before)=>{calls.push(['reorder',uid,before]);return true;}};
  const drag=create({document,windows:()=>coordinator,editor:()=>editor,crypto:{getRandomValues:bytes=>bytes.fill(0xab)},message:m=>messages.push(m),setTimeout:fn=>fn()});
  const data=()=>({values:new Map(),types:[],effectAllowed:'',dropEffect:'none',clearData(){this.values.clear();this.types=[]},setData(type,value){this.values.set(type,value);this.types=[...this.values.keys()]},getData(type){return this.values.get(type)||''}});
- const event=(target,dt=data(),extra={})=>({target,dataTransfer:dt,button:0,isTrusted:true,clientX:10,prevented:false,preventDefault(){this.prevented=true},stopPropagation(){this.stopped=true},...extra});
+ const event=(target,dt=data(),extra={})=>({target,dataTransfer:dt,button:0,isTrusted:true,altKey:true,clientX:10,prevented:false,preventDefault(){this.prevented=true},stopPropagation(){this.stopped=true},...extra});
  return {drag,calls,messages,a,b,host,strip,outside,data,event,get zone(){return nodes.find(x=>x.kind==='zone')},setReason:r=>reason=r,resolve:()=>resolve?.()};
 }
 test('native gesture carries only an opaque ticket, never active-tab identity, paths, text or capabilities',async()=>{
@@ -64,15 +64,47 @@ test('leaving a prospective receiver clears only its drop highlight',async()=>{
 
 
 test('the detach target follows visible tab rows and cannot cover a compact view tab strip',()=>{
- const f=fixture();let bottom=116;f.host.getBoundingClientRect=()=>({top:10,height:600});f.host.querySelectorAll=()=>[{getBoundingClientRect:()=>({width:500,height:36,bottom})},{getBoundingClientRect:()=>({width:0,height:0,bottom:0})}];
+ const f=fixture();let bottom=116;f.host.getBoundingClientRect=()=>({top:10,height:600});f.host.querySelectorAll=()=>[{setAttribute(){},getBoundingClientRect:()=>({width:500,height:36,bottom})},{setAttribute(){},getBoundingClientRect:()=>({width:0,height:0,bottom:0})}];
  f.drag.mount();assert.equal(f.zone.style.top,'118px');bottom=220;f.drag.mount();assert.equal(f.zone.style.top,'222px');
 });
 
 test('tab detach and cancelled native gestures preserve pane scroll despite browser edge autoscroll',async()=>{
  for(const cancel of [false,true]){
-  const f=fixture(),ta={scrollTop:100,scrollLeft:17,isConnected:true};f.host.querySelectorAll=selector=>selector==='[data-ed-text],[data-compare-text]'?[ta]:[];
+  const f=fixture(),ta={scrollTop:100,scrollLeft:17,isConnected:true};f.host.querySelectorAll=selector=>selector==='[data-ed-text],[data-compare-text],.cm-scroller'?[ta]:[];
   const dt=f.data();f.drag.begin(f.event(f.a));f.drag.start(f.event(f.a,dt));await flush();ta.scrollTop=82;ta.scrollLeft=0;
   if(cancel)f.drag.escape({key:'Escape'});else await f.drag.drop(f.event(f.zone,dt));
   assert.equal(ta.scrollTop,100);assert.equal(ta.scrollLeft,17);ta.scrollTop=80;f.drag.end(f.event(f.a,dt));assert.equal(ta.scrollTop,100);
  }
 });
+
+function pointerFixture(){
+ const calls=[],timers=[],classes=()=>({add(){},remove(){}}),all=[];let blocked='',capture=null;
+ const docs=new Map([['a',{uid:'a',content:'DIRTY_A',dirty:true,undo:['BEFORE_A']}],['b',{uid:'b',content:'DIRTY_B',dirty:true,undo:['BEFORE_B']}] ]),owned={a:1,b:2};
+ const host={contains:()=>true,querySelectorAll:()=>[],classList:classes()},strip={isConnected:true,classList:classes(),setAttribute(){},getBoundingClientRect:()=>({left:0,right:200,top:30,bottom:60,width:200,height:30}),setPointerCapture:id=>capture=id,hasPointerCapture:id=>capture===id,releasePointerCapture:()=>capture=null,closest:s=>s==='.nt-editor-window'?host:s==='[data-ed-view]'?{dataset:{edView:'left'}}:null};
+ const tab=(uid,x)=>({isConnected:true,draggable:true,dataset:{edUid:uid},classList:classes(),setAttribute(k,v){this[k]=v},removeAttribute(k){delete this[k]},getBoundingClientRect:()=>({left:x,right:x+100,width:100,top:30,bottom:60}),closest(s){return s==='[data-ed-uid]'?this:s==='[data-ed-tabs]'?strip:s==='[data-ed-view]'?{dataset:{edView:'left'}}:s==='.nt-editor-window'?host:null;}});
+ const a=tab('a',0),b=tab('b',100);a.nextElementSibling=b;b.nextElementSibling=null;all.push(a,b);strip.querySelectorAll=()=>all;
+ let hit=strip;strip.closest=s=>s==='[data-ed-tabs]'?strip:s==='.nt-editor-window'?host:s==='[data-ed-view]'?{dataset:{edView:'left'}}:null;
+ const listeners={},body={append(){}},document={body,querySelector:s=>s==='.nt-editor-window'?host:null,querySelectorAll:()=>all,elementFromPoint:()=>hit,createElement:()=>({style:{},dataset:{},setAttribute(){},remove(){}}),addEventListener(name,callback){listeners[name]=callback;}};host.append=()=>{};
+ const coordinator={state:{enabled:true,owned},move:async(ids,dest)=>calls.push(['move',ids,dest]),beginDrag:async()=>calls.push(['begin']),cancelDrag:async()=>calls.push(['cancel'])};
+ const editor={documents:docs,active:docs.get('b'),canReorderDocuments:()=>blocked,reorderDocument:(uid,before)=>calls.push(['reorder',uid,before]),moveDocumentToView:(uid,view)=>calls.push(['view',uid,view])};
+ const drag=create({document,windows:()=>coordinator,editor:()=>editor,setTimeout:fn=>timers.push(fn),message:msg=>calls.push(['message',msg]),crypto:{getRandomValues:b=>b.fill(1)}});
+ const event=(target=a,x=10,y=40,extra={})=>({target,pointerId:1,pointerType:'mouse',button:0,isPrimary:true,isTrusted:true,clientX:x,clientY:y,preventDefault(){this.prevented=true},stopPropagation(){this.stopped=true},...extra});
+ return {drag,a,b,strip,host,docs,owned,calls,event,coordinator,listeners,setBlocked:v=>blocked=v,setHit:v=>hit=v,get capture(){return capture},timers};
+}
+test('ordinary captured-pointer clicks never register, move, or reorder',()=>{const f=pointerFixture();f.drag.begin(f.event());assert.equal(f.capture,1);assert.equal(f.a.draggable,false);f.drag.up(f.event());assert.equal(f.capture,null);assert.equal(f.a.draggable,true);assert.deepEqual(f.calls,[]);});
+test('same-view inactive-tab pointer reorder uses fixed UID and never activates or rebuilds its view',()=>{const f=pointerFixture();f.drag.begin(f.event());f.drag.pointerMove(f.event(f.b,180,40));assert.deepEqual(f.calls,[]);f.drag.up(f.event(f.b,180,40));assert.deepEqual(f.calls,[['reorder','a',null]]);assert.equal(f.drag.state.armed,false);assert.equal(f.capture,null);});
+test('ordinary drag-away needs moved genuine pointer release; no broker or drop box',async()=>{const f=pointerFixture();const before=JSON.stringify([...f.docs]);f.drag.begin(f.event());f.drag.pointerMove(f.event(f.a,350,150));assert.deepEqual(f.calls,[]);f.drag.up(f.event(f.a,350,150));await flush();assert.deepEqual(f.calls,[['move',['a'],'new']]);assert.equal(JSON.stringify([...f.docs]),before);});
+test('Escape, pointer cancellation, lost capture and wrong pointer never detach',async()=>{
+ for(const mode of ['escape','cancel','lostcapture','wrong-pointer']){const f=pointerFixture();f.drag.begin(f.event());f.drag.pointerMove(f.event(f.a,350,150));if(mode==='escape')f.drag.escape({key:'Escape'});else if(mode==='cancel')f.listeners.pointercancel(f.event());else if(mode==='lostcapture')f.listeners.lostpointercapture(f.event());else f.drag.up(f.event(f.a,350,150,{pointerId:2}));if(mode==='wrong-pointer')f.drag.abortPointer();f.drag.up(f.event(f.a,350,150));await flush();assert(!f.calls.some(c=>c[0]==='move'));assert.equal(f.capture,null);}
+});
+test('document replacement, lease change or busy guard during drag retain original',async()=>{
+ for(const change of [f=>f.docs.set('a',{...f.docs.get('a')}),f=>f.owned.a++,f=>f.setBlocked('Move pending')]){const f=pointerFixture();f.drag.begin(f.event());f.drag.pointerMove(f.event(f.a,350,150));change(f);f.drag.up(f.event(f.a,350,150));await flush();assert(!f.calls.some(c=>['move','reorder'].includes(c[0])));}
+});
+test('microtask ownership change after release cannot move a replacement document',async()=>{const f=pointerFixture();f.drag.begin(f.event());f.drag.pointerMove(f.event(f.a,350,150));f.drag.up(f.event(f.a,350,150));f.docs.set('a',{...f.docs.get('a')});await flush();assert(!f.calls.some(c=>c[0]==='move'));assert(f.calls.some(c=>c[0]==='message'));});
+test('ordinary pointer mode prevents HTML5 dragstart and keeps captured release semantics',async()=>{const f=pointerFixture();f.drag.begin(f.event());const e=f.event(f.a,20,40,{dataTransfer:{}});f.drag.start(e);assert.equal(e.prevented,true);f.drag.pointerMove(f.event(f.a,350,150));f.drag.up(f.event(f.a,350,150));await flush();assert.deepEqual(f.calls,[['move',['a'],'new']]);});
+test('touch, manufactured and control/meta-modified gestures do not arm or make API calls',()=>{for(const extra of [{pointerType:'touch'},{isTrusted:false},{ctrlKey:true},{metaKey:true},{isPrimary:false}]){const f=pointerFixture();f.drag.begin(f.event(f.a,10,40,extra));assert.equal(f.drag.state.armed,false);assert.deepEqual(f.calls,[]);}});
+test('no native capability means ordinary reorder works and detach is safely explained',async()=>{const f=pointerFixture();f.coordinator.state.enabled=false;f.drag.begin(f.event());f.drag.pointerMove(f.event(f.a,350,150));f.drag.up(f.event(f.a,350,150));await flush();assert(!f.calls.some(c=>c[0]==='move'));assert(f.calls.some(c=>c[0]==='message'));});
+
+test('pointer drop into a different editor view invokes the existing view move once',()=>{const f=pointerFixture(),other={getBoundingClientRect:()=>({left:250,right:450,top:30,bottom:60,width:200,height:30}),querySelectorAll:()=>[],closest(s){return s==='[data-ed-tabs]'?this:s==='[data-ed-view]'?{dataset:{edView:'right'}}:s==='.nt-editor-window'?f.host:null;}};f.setHit(other);f.drag.begin(f.event());f.drag.pointerMove(f.event(f.a,270,40));f.drag.up(f.event(f.a,270,40));assert.deepEqual(f.calls,[['view','a','right'],['reorder','a',null]]);});
+
+test('initial checkpoint lease arriving during a gesture cancels instead of assuming unchanged ownership',async()=>{const f=pointerFixture();delete f.owned.a;f.drag.begin(f.event());f.drag.pointerMove(f.event(f.a,180,40));f.owned.a=1;f.drag.up(f.event(f.a,180,40));await flush();assert(!f.calls.some(c=>['reorder','move'].includes(c[0])));assert.equal(f.drag.state.armed,false);});

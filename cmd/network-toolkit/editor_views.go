@@ -91,13 +91,16 @@ type editorTabGroup struct {
 	Side string `json:"side"`
 }
 type editorPreferences struct {
-	WordWrap bool              `json:"wordWrap"`
-	Syntax   bool              `json:"syntax"`
-	Indent   int               `json:"indent"`
-	FontSize int               `json:"fontSize"`
-	Palette  string            `json:"palette"`
-	AppTheme string            `json:"appTheme,omitempty"`
-	Colors   map[string]string `json:"colors"`
+	CompareHorizontalSync     bool              `json:"compareHorizontalSync,omitempty"`
+	CompareUnderline          *bool             `json:"compareUnderline,omitempty"`
+	CompareIntralineHighlight *bool             `json:"compareIntralineHighlight,omitempty"`
+	WordWrap                  bool              `json:"wordWrap"`
+	Syntax                    bool              `json:"syntax"`
+	Indent                    int               `json:"indent"`
+	FontSize                  int               `json:"fontSize"`
+	Palette                   string            `json:"palette"`
+	AppTheme                  string            `json:"appTheme,omitempty"`
+	Colors                    map[string]string `json:"colors"`
 }
 type editorBatch struct {
 	Documents   []editorDocumentSnapshot `json:"documents"`

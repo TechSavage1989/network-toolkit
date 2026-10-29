@@ -5,7 +5,7 @@ param(
  [uint32]$TargetProcessID=0,[string]$TargetExecutablePath='',
  [double]$FromX=0,[double]$FromY=0,[double]$FromWidth=0,[double]$FromHeight=0,
  [double]$ToX=0,[double]$ToY=0,[double]$ToWidth=0,[double]$ToHeight=0,
- [ValidateSet('Tab','Detach','Cross','Escape','Outside')][string]$Mode='Tab'
+ [ValidateSet('Tab','Detach','Cross','Escape','Outside','OutsideCancel')][string]$Mode='Tab'
 )
 # Hosted synthetic acceptance only. Input goes to exact supplied fixture PIDs and
 # executable identities. No clipboard, synthetic DOM drag, debug port, security
@@ -71,24 +71,27 @@ if($Action -eq 'Maximize' -or $Action -eq 'Restore'){
 }
 $from=Client-Point $owner $FromX $FromY $FromWidth $FromHeight
 $to=$null
-if($Mode -eq 'Outside'){$to=New-Object EditorDragInput+POINT;$to.X=$work.Right-4;$to.Y=$work.Bottom-4;if([EditorDragInput]::GetAncestor([EditorDragInput]::WindowFromPoint($to),2) -eq $owner){throw 'No safe outside-fixture cancellation point'}}
+if($Mode -eq 'Outside' -or $Mode -eq 'OutsideCancel'){$to=New-Object EditorDragInput+POINT;$to.X=$work.Right-4;$to.Y=$work.Bottom-4;if([EditorDragInput]::GetAncestor([EditorDragInput]::WindowFromPoint($to),2) -eq $owner){throw 'No safe outside-fixture pointer release point'}}
 else{$to=Client-Point $target $ToX $ToY $ToWidth $ToHeight}
 [void][EditorDragInput]::SetForegroundWindow($owner);Start-Sleep -Milliseconds 100;Visible-Point $owner $from
 [void][EditorDragInput]::SetCursorPos($from.X,$from.Y)
+# Alt explicitly selects the legacy cross-window OLE path; ordinary drags use
+# production pointer capture, including release outside the source HWND.
+$alt=$Mode -eq 'Cross' -or $Mode -eq 'OutsideCancel'
+if($alt){[EditorDragInput]::keybd_event(18,0,0,[UIntPtr]::Zero)}
 [EditorDragInput]::mouse_event(0x0002,0,0,0,[UIntPtr]::Zero)
 try{
- # Pointerdown captures the UID locally; actual dragstart begins registration.
+ # Pointerdown captures the UID locally. Only Alt-drag starts broker registration.
  # This is real OS input, not a fast-drop timing claim; deferred unit tests
  # separately exercise registration ordering and cancellation tombstones.
  Start-Sleep -Milliseconds 350
  [void][EditorDragInput]::SetCursorPos($from.X+12,$from.Y+2);Start-Sleep -Milliseconds 150
- # Detach uses a validated interior point derived before press from the
- # production zone's computed styles and real editor/client bounds. No UIA COM
- # query runs while OLE holds the mouse; real production hit-test/ACK must pass.
- # The fixture never displays a hidden zone or dispatches a synthetic drag.
+ # Outside release uses the validated work-area point beyond the source HWND.
+ # No UIA COM query runs during a held native drag; production pointer capture
+ # or Alt/OLE hit-testing and the original ACK gate must succeed.
  if($Mode -eq 'Cross'){Visible-Point $target $to}
  for($i=1;$i -le 28;$i++){[void][EditorDragInput]::SetCursorPos([int]($from.X+($to.X-$from.X)*$i/28),[int]($from.Y+($to.Y-$from.Y)*$i/28));Start-Sleep -Milliseconds 25}
  if($Mode -eq 'Escape'){[EditorDragInput]::keybd_event(27,0,0,[UIntPtr]::Zero);[EditorDragInput]::keybd_event(27,0,2,[UIntPtr]::Zero);Start-Sleep -Milliseconds 100}
-}finally{[EditorDragInput]::mouse_event(0x0004,0,0,0,[UIntPtr]::Zero)}
+}finally{[EditorDragInput]::mouse_event(0x0004,0,0,0,[UIntPtr]::Zero);if($alt){[EditorDragInput]::keybd_event(18,0,2,[UIntPtr]::Zero)}}
 Start-Sleep -Milliseconds 150
-@{action=$Action;mode=$Mode;sourcePID=$OwnerProcessID;targetPID=$TargetProcessID;actualMouseDrag=$true;targetGeometry='Observed tab/client rectangles; detach uses validated pre-drag computed-style interior point, not a hidden visible rectangle';from=@($from.X,$from.Y);to=@($to.X,$to.Y)}|ConvertTo-Json -Compress
+@{action=$Action;mode=$Mode;sourcePID=$OwnerProcessID;targetPID=$TargetProcessID;actualMouseDrag=$true;altCrossWindowPath=$alt;targetGeometry='Observed tab/client rectangles; outside modes use a validated work-area release point beyond the source HWND';from=@($from.X,$from.Y);to=@($to.X,$to.Y)}|ConvertTo-Json -Compress
