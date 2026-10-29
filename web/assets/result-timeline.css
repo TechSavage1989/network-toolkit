@@ -86,3 +86,16 @@
 /* Condensed controls occupy a modal only; the graph retains its full default height. */
 .graph-compression-editor{display:grid;gap:10px;max-width:500px}.graph-compression-editor label{display:grid;gap:5px;min-width:0}.graph-compression-editor input[type=number]{max-width:110px}.graph-compression-editor svg{display:block;width:100%;height:auto;aspect-ratio:320/148;max-height:220px;touch-action:none;overflow:hidden}.gc-guide{fill:none;stroke:var(--border)}.gc-line{fill:none;stroke:var(--accent);stroke-width:2.5}.gc-boundary{stroke:var(--muted);stroke-dasharray:3 3}.gc-handle{fill:var(--accent);stroke:var(--panel);stroke-width:2;cursor:move}.gc-handle:focus{outline:none;stroke:var(--text);stroke-width:3}.graph-compression-editor svg text{fill:var(--muted);stroke:none;font-size:11px}.gc-equivalents{display:grid;grid-template-columns:1fr 1fr;gap:12px}.gc-presets{flex-wrap:wrap}@media(max-width:480px){.gc-equivalents{grid-template-columns:1fr}}
 @container (max-width:420px){.rt-view-controls:has([data-graph-compression-open]){gap:2px}.rt-view-controls:has([data-graph-compression-open]) [data-rt-zoom-level]{max-width:24px}.rt-view-controls:has([data-graph-compression-open]) .rt-mode-control{min-width:55px;flex-basis:60px}.rt-view-controls:has([data-graph-compression-open]) .graph-timeframe,.rt-view-controls:has([data-graph-compression-open]) .graph-timeframe select{width:44px;flex-basis:44px}.rt-view-controls:has([data-graph-compression-open]) .graph-range-advanced{font-size:0;width:22px;padding:3px 2px}.rt-view-controls:has([data-graph-compression-open]) .graph-range-advanced:after{content:'…';font-size:14px}.rt-view-controls [data-graph-compression-open]{padding:3px;font-size:10px}}
+
+/* Elapsed-time labels are wider than the old zoom multiplier. Keep every
+   control usable inside a narrow pane; only wrap when its actual contents
+   cannot fit, rather than clipping the last action behind the plot edge. */
+@container (max-width:420px){
+ .rt-view-controls{flex-wrap:wrap;align-items:center}
+ .rt-view-controls .rt-mode-control{min-width:55px;flex-basis:75px;max-width:75px}
+ .rt-view-controls .graph-range-advanced{font-size:0;width:22px;padding:3px 2px}
+ .rt-view-controls .graph-range-advanced:after{content:'…';font-size:14px}
+ .rt-view-controls .graph-inline-zoom [data-rt-zoom-level]{min-width:3.2em;max-width:none;white-space:nowrap}
+ .rt-view-controls [data-graph-compression-open]{font-size:0;width:34px;min-width:34px;padding:3px 2px}
+ .rt-view-controls [data-graph-compression-open]:after{content:'Curve';font-size:9px}
+}

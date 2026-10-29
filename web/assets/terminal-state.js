@@ -554,6 +554,22 @@
       catch (error) { global.clearTimeout(timer); reject(error); }
     });
   }
+  // The pinned browser terminal keeps a separate absolute scrollbar position.
+  // Public scrollToLine computes a relative delta from buffer.ydisp, which is
+  // stale with respect to that scrollbar immediately after restore/row resize.
+  function restoreViewport(term,row) {
+    const buffer=term?.buffer?.active;
+    int(row,0,buffer?.baseY,'viewport restore row');
+    const viewport=term._core?._viewport;
+    if(!viewport){requireValue(!term.element,'browser viewport');term.scrollToLine(row);return;}
+    requireValue(typeof viewport._sync==='function'&&typeof viewport.scrollToLine==='function'&&typeof viewport.queueSync==='function'&&typeof term._core._bufferService?.scrollLines==='function','pinned viewport API');
+    // The resize may also have moved ydisp while the scrollbar stayed put.
+    term._core._bufferService.scrollLines(row-buffer.viewportY,false);
+    viewport._sync(row); // Update dimensions before applying the absolute row.
+    viewport.scrollToLine(row,true); // Immediate: never animate an ownership restore.
+    viewport.queueSync(row); // A queued resize refresh must use the same anchor.
+  }
+
   async function restore(term, snapshot) {
     const clean = validate(snapshot), state = clean.emulator;
     let r = inspect(term); drained(r);
@@ -599,7 +615,7 @@
       r.parser.currentState = parser.state;
       r.input._utf8Decoder.interim.set(parser.utf8); r.input._stringDecoder._interim = parser.utf16;
       term.options.convertEol = state.convertEol;
-      term.scrollToLine(clean.viewportY);
+      restoreViewport(term,clean.viewportY);
       applySelection(term,state.selection);
       r.core._bufferService.isUserScrolling = state.userScrolling;
       term.refresh(0, clean.rows - 1);
@@ -613,5 +629,5 @@
     }
   }
 
-  global.NetworkToolkitTerminalState = Object.freeze({ capture, restore, validate, captureSelection, beforeResize, afterResize, limits: LIMITS, version: VERSION });
+  global.NetworkToolkitTerminalState = Object.freeze({ capture, restore, validate, captureSelection, beforeResize, afterResize, restoreViewport, limits: LIMITS, version: VERSION });
 })(typeof globalThis !== 'undefined' ? globalThis : window);

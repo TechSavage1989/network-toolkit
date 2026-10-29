@@ -14,6 +14,14 @@ async function geometry(){return page.evaluate(()=>{const s=document.querySelect
 const nav=()=>page.locator('[data-graph-navigator="result:navigation114"]');
 const navState=()=>nav().evaluate(n=>({start:n.dataset.viewStart,end:n.dataset.viewEnd,fullStart:n.dataset.fullStart,fullEnd:n.dataset.fullEnd}));
 const noDetails=async()=>{assert.equal(await page.locator('#resultEntryPane').count(),0,'Navigation must not create an entry Details pane');};
+// Inventory all control layouts before motion checks, so a narrow failure does
+// not conceal the equivalent condensed/theme cases in the evidence report.
+report.controlLayouts=[];
+for(const mode of ['linear','condensed'])for(const width of [1440,390])for(const theme of ['light','dark']){
+ await show(900,mode,theme,width);const g=await geometry();report.controlLayouts.push({mode,width,theme,controlOverflow:g.controlOverflow,controls:g.controls,label:g.label,labelBox:g.labelBox});
+ await page.screenshot({path:path.join(out,`graph-navigation114-controls-${mode}-${width}-${theme}.png`)});
+}
+assert(report.controlLayouts.every(g=>g.controlOverflow<=1&&g.controls.every(c=>c.within)&&g.labelBox.scrollWidth<=g.labelBox.clientWidth+1),'All eight control layouts contain every action and the complete elapsed label');
 for(const mode of ['linear','condensed'])for(const width of [1440,390])for(const theme of ['light','dark']){
  await show(900,mode,theme,width);let g=await geometry();assert(Math.abs(g.points[0].x-g.left)<.02);assert(Math.abs(g.points.at(-1).x-g.right)<.02);assert(g.controlOverflow<=1&&g.controls.every(c=>c.within));assert(!g.label.includes('×'));assert.match(g.label,/\d.*(?:s|min|h)$/);assert(g.labelBox.scrollWidth<=g.labelBox.clientWidth+1,'Elapsed label is not clipped');if(mode==='condensed'){assert.match(g.labelTitle,/nonlinear.*includes history cluster/);assert.match(g.labelTitle,/2026-10-29T00:00:00/);}
  await page.evaluate(({start,end})=>NetworkToolkitResultTimeline.navigate('navigation114',{start,end}),{start:stamp(200),end:stamp(260)});await settle();let state=await navState();const motion=[];

@@ -498,8 +498,12 @@ func editorCloneBatch(b editorBatch) editorBatch {
 	copy.Documents = append([]editorDocumentSnapshot(nil), b.Documents...)
 	for i := range copy.Documents {
 		d := &copy.Documents[i]
-		d.Undo = append([]string(nil), d.Undo...)
-		d.Redo = append([]string(nil), d.Redo...)
+		if d.Undo != nil {
+			d.Undo = append([]string{}, d.Undo...)
+		}
+		if d.Redo != nil {
+			d.Redo = append([]string{}, d.Redo...)
+		}
 		if d.View != nil {
 			v := *d.View
 			d.View = &v
@@ -515,7 +519,9 @@ func editorCloneBatch(b editorBatch) editorBatch {
 	}
 	if b.Layout != nil {
 		v := *b.Layout
-		v.Groups = append([]editorTabGroup(nil), b.Layout.Groups...)
+		if b.Layout.Groups != nil {
+			v.Groups = append([]editorTabGroup{}, b.Layout.Groups...)
+		}
 		copy.Layout = &v
 	}
 	if b.Preferences != nil {

@@ -333,8 +333,10 @@ body:has(.nt-editor:not([hidden]) [data-ed-files-sidebar]:not([hidden])) .toast-
 .nt-editor-file-path-actions input{min-width:0;width:100%;font-size:11px;min-height:28px}
 .nt-editor-file-sessions .nt-editor-remote-hint{font-size:10px;line-height:1.35;margin-top:4px;max-height:3.9em;overflow:auto}
 .nt-editor-files-body{overflow:hidden}
-.is-editor-sidebar.rb-app{overflow:hidden}
-.is-editor-sidebar .rb-explorer{min-height:0;overflow:visible}
+.is-editor-sidebar.rb-app{overflow-x:hidden;overflow-y:auto}
+/* Authentication can consume the short Files viewport. Scroll the body instead
+   of shrinking fixed navigation underneath Activity; the chooser stays above it. */
+.is-editor-sidebar .rb-explorer{flex:1 0 320px;min-height:320px;overflow:visible}
 .is-editor-sidebar .rb-panes{min-height:70px}
 .nt-editor-files-connection{flex:none;max-height:55%;overflow:auto}
 .nt-editor-files-connection .rb-session-tools{margin:0}

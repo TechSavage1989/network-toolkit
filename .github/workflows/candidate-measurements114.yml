@@ -24,6 +24,10 @@ jobs:
           test "$(git rev-parse FETCH_HEAD)" = 31f27994b9a3f7bae4442c255f63a65c8e21e0c8
           mkdir -p "$RUNNER_TEMP/baseline113"
           git archive FETCH_HEAD | tar -xf - -C "$RUNNER_TEMP/baseline113"
+          git fetch --no-tags --depth=1 origin 4d05f6a5a4eb1c315d0a19ccf2eb8daedf2dcb1c
+          test "$(git rev-parse FETCH_HEAD)" = 4d05f6a5a4eb1c315d0a19ccf2eb8daedf2dcb1c
+          mkdir -p "$RUNNER_TEMP/toolbar112"
+          git archive FETCH_HEAD | tar -xf - -C "$RUNNER_TEMP/toolbar112"
       - name: Actual16 and32MiB editor interaction and baseline4MiB
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/browser114/node_modules/playwright
@@ -35,6 +39,7 @@ jobs:
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/browser114/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/candidate114/toolbar
+          NTK_TOOLBAR_BASELINE_DIR: ${{ runner.temp }}/toolbar112
         run: node scripts/editor-toolbar113.browser.cjs
       - name: Saved Files connections actual main and child layouts
         if: success() || failure()

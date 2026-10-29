@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -151,6 +152,8 @@ func TestNativeTerminalTransferInstalledWebView2(t *testing.T) {
 }
 
 type nativeTerminalSnapshot struct {
+	ViewportDOM                                                            float64
+	GeometryFits                                                           bool
 	Viewport                                                               int
 	Startup                                                                int
 	NativeCapability                                                       bool
@@ -353,7 +356,7 @@ func (h *nativeTerminalFixture) exercise(accepted *atomic.Int32) error {
 		return e
 	}
 	initial, e = h.wait("", func(s nativeTerminalSnapshot) bool {
-		return s.Editable && strings.Contains(s.Transcript, "SYNTHETIC 079")
+		return s.Editable && s.GeometryFits && strings.Contains(s.Transcript, "SYNTHETIC 079")
 	})
 	if e != nil {
 		return e
@@ -363,7 +366,7 @@ func (h *nativeTerminalFixture) exercise(accepted *atomic.Int32) error {
 		if e != nil {
 			return e
 		}
-		if initial.Selection == "" || initial.Viewport != 10 {
+		if initial.Selection == "" || initial.Viewport != 10 || math.Abs(initial.ViewportDOM-10) > .01 {
 			return errors.New("synthetic selected output and scroll position were not established")
 		}
 	}
@@ -395,7 +398,7 @@ func (h *nativeTerminalFixture) exercise(accepted *atomic.Int32) error {
 			return errors.New("detach did not create native child")
 		}
 		child, e := h.wait(view, func(s nativeTerminalSnapshot) bool {
-			return s.Session == h.session && s.Editable && s.Transcript == expected
+			return s.Session == h.session && s.Editable && s.GeometryFits && s.Transcript == expected
 		})
 		if e != nil {
 			return e
@@ -407,8 +410,8 @@ func (h *nativeTerminalFixture) exercise(accepted *atomic.Int32) error {
 		if source.Editable {
 			return errors.New("source remains editable after child accepts")
 		}
-		if os.Getenv("NETWORK_TOOLKIT_NATIVE_TERMINAL_SELECTION") == "1" && (child.Selection != initial.Selection || child.Viewport != initial.Viewport) {
-			return fmt.Errorf("detached selection/scroll changed: selected=%q viewport=%d wanted=%q/%d", child.Selection, child.Viewport, initial.Selection, initial.Viewport)
+		if os.Getenv("NETWORK_TOOLKIT_NATIVE_TERMINAL_SELECTION") == "1" && (child.Selection != initial.Selection || child.Viewport != initial.Viewport || math.Abs(child.ViewportDOM-float64(initial.Viewport)) > .01) {
+			return fmt.Errorf("detached selection/scroll changed: selected=%q viewport=%d DOM=%g wanted=%q/%d", child.Selection, child.Viewport, child.ViewportDOM, initial.Selection, initial.Viewport)
 		}
 		owner := h.app.views.state().Owners[h.session]
 		if owner.ViewID != view || !owner.Ready {
@@ -428,13 +431,13 @@ func (h *nativeTerminalFixture) exercise(accepted *atomic.Int32) error {
 			return e
 		}
 		home, e := h.wait("", func(s nativeTerminalSnapshot) bool {
-			return s.Session == h.session && s.Editable && s.Transcript == expected && s.ReadyAt >= action.ActionAt
+			return s.Session == h.session && s.Editable && s.GeometryFits && s.Transcript == expected && s.ReadyAt >= action.ActionAt
 		})
 		if e != nil {
 			return e
 		}
-		if os.Getenv("NETWORK_TOOLKIT_NATIVE_TERMINAL_SELECTION") == "1" && (home.Selection != initial.Selection || home.Viewport != initial.Viewport) {
-			return fmt.Errorf("returned selection/scroll changed: selected=%q viewport=%d wanted=%q/%d", home.Selection, home.Viewport, initial.Selection, initial.Viewport)
+		if os.Getenv("NETWORK_TOOLKIT_NATIVE_TERMINAL_SELECTION") == "1" && (home.Selection != initial.Selection || home.Viewport != initial.Viewport || math.Abs(home.ViewportDOM-float64(initial.Viewport)) > .01) {
+			return fmt.Errorf("returned selection/scroll changed: selected=%q viewport=%d DOM=%g wanted=%q/%d", home.Selection, home.Viewport, home.ViewportDOM, initial.Selection, initial.Viewport)
 		}
 		owner = h.app.views.state().Owners[h.session]
 		if owner.ViewID != "" || !owner.Ready {

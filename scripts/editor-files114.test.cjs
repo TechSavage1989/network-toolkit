@@ -30,3 +30,12 @@ test('closing Files during a pending explicit Use never reopens it, and repeated
  const h=harness();h.api.toggle(h.editor);let release;h.root.NetworkToolkitRemoteBrowser.connectTerminal=(kind,id)=>new Promise(resolve=>{release=()=>{Object.assign(h.models[kind],{connected:true,sessionId:id});resolve();};});
  const pending=h.api.useSource('terminal:fixture');await assert.rejects(h.api.useSource('terminal:fixture'),/current file connection action/);h.api.toggle(h.editor);const mounts=h.calls.filter(x=>x[0]==='mount').length;release();await pending;assert.equal(h.host.hidden,true);assert.equal(h.calls.filter(x=>x[0]==='mount').length,mounts);
 });
+
+// Rendering an approved child explorer must never probe the main credential API.
+test('credential refresh is main-only for both sidebar protocols',async()=>{
+ const source=fs.readFileSync(require.resolve('../web/assets/remote-browser.js'),'utf8'),start=source.indexOf("async function ftpCredentialsRefresh("),end=source.indexOf('function ftpProfilePicker(',start);
+ for(const child of [true,false])for(const protocol of ['ssh','ftp']){
+  const calls=[],root={detachedEditor:()=>child,root:{NetworkToolkitCredentials:{refresh:async()=>calls.push('refresh')}},syncCredentials:k=>calls.push('sync:'+k),note:()=>calls.push('note')};
+  vm.runInNewContext(source.slice(start,end),root);await root.ftpCredentialsRefresh(protocol);assert.deepEqual(calls,child?[]:['refresh','sync:'+protocol]);
+ }
+});

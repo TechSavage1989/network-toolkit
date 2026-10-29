@@ -92,7 +92,9 @@ func (h *nativeEditorFixture) exercisePerformance114() (failure error) {
 					break
 				}
 				if time.Now().After(deadline) {
-					return fmt.Errorf("native %s ownership timed out", direction)
+					report["sourceLastState"] = sourceState
+					report["destinationLastState"] = state
+					return fmt.Errorf("native %s ownership timed out: source=%s destination=%s", direction, sourceState.Window.Error, state.Window.Error)
 				}
 				time.Sleep(20 * time.Millisecond)
 			}

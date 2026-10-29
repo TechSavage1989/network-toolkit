@@ -202,3 +202,17 @@ func TestEditorCapacity114OversizeWriteDoesNotCreate(t *testing.T) {
 		t.Fatal("oversize write changed destination", err)
 	}
 }
+
+func TestEditorCapacity114ClonePreservesEmptyArrays(t *testing.T) {
+	for _, history := range [][]string{nil, {}, {"synthetic"}} {
+		b := editorFixtureBatch()
+		b.Documents[0].Undo = history
+		b.Documents[0].Redo = history
+		b.Layout = &editorLayout{Groups: []editorTabGroup{}}
+		before, _ := json.Marshal(b)
+		after, _ := json.Marshal(editorCloneBatch(b))
+		if !bytes.Equal(before, after) {
+			t.Fatalf("snapshot wire shape changed: before=%s after=%s", before, after)
+		}
+	}
+}
