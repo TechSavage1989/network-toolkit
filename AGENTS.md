@@ -3,7 +3,17 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-Current published version:1.17.113. The authorized combined editor/graph/activity/
+Current published version:1.17.114. The authorized comparison/Files/Terminal/graph
+batch is published and verified. Source/tag fd6cbbf287738320b51957d176dd2e63c63eece9,
+tree 0f5bd938f3bb54b6ef6892e3fc4d4eaae33a5293. All seven exact-source review Checks
+and automatic Release passed; public assets,1,109 source files, PE icons and
+latest feed are verified. Read docs/RELEASE114_HANDOFF.md for exact evidence,
+limits and duplicate-main closure. The duplicate main run recorded one motion
+latency-bound failure; its cause is unresolved and is not labelled fixture-only. Preserve all published tags/assets, repository
+access and existing credential/native/pager safeguards. This docs-only record
+is not another build or authorization for unrelated work.
+
+Previous published version:1.17.113. The authorized combined editor/graph/activity/
 concise-interface batch is published and verified. Source/tag31f27994b9a3f7bae4442c255f63a65c8e21e0c8,
 treea95bbbce6715f42b73c919c8e1a91aaa6c9b4619. All seven exact-source review
 Checks and automatic Release passed; actual sustained comparison/gutter/native

@@ -12,6 +12,11 @@ adds scoped native Explorer copies and Terminal tab actions, and improves
 comparison and graph navigation. See EDITOR_CAPACITY114.md, FILES_NATIVE114.md,
 TERMINAL_NATIVE114.md and GRAPH_NAVIGATION114.md for explicit limits.
 
+Published114 source/tagfd6cbbf287738320b51957d176dd2e63c63eece9 is verified.
+All seven exact-source review checks and automatic Release passed. Public assets,
+source/package identity, updater allowlist and latest feed are verified.
+Read docs/RELEASE114_HANDOFF.md for evidence, explicit limits and duplicate-main closure.
+
 Historical published113 source/tag31f27994b9a3f7bae4442c255f63a65c8e21e0c8 is verified.
 Read docs/RELEASE113_HANDOFF.md for exact gates, public hashes and limitations.
 This later documentation record does not rebuild or replace published downloads.
