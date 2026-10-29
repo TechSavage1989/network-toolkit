@@ -953,6 +953,7 @@ func (m *editorViewRegistry) processExited(id string) {
 		}
 	}
 	m.mu.Unlock()
+	m.app.finishExplorerOwner(id) // exact process exit, outside the registry lock
 	if m.app.views != nil {
 		m.app.views.mu.Lock()
 		m.app.views.notifyLocked()

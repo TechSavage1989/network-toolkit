@@ -25,6 +25,7 @@ func (a *application) runPrimaryLifecycle(url string, noBrowser bool, dataDir, t
 		a.views.notifyLocked()
 		a.views.mu.Unlock()
 		runLifecycle(viewContext, url, a.token, cancel, noBrowser, dataDir, title, a.windowActivate, a.beginPrimaryClose, a.updateStartupReady)
+		a.finishExplorerOwner("") // confirmed native host return; no active OLE remains
 		cancel()
 		a.primaryMu.Lock()
 		a.primaryCancel = nil

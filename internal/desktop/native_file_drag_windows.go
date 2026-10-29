@@ -144,11 +144,13 @@ func (w *hostWindow) runNativeFileDrag(done <-chan struct{}) {
 			continue
 		}
 		finished := make(chan struct{})
+		dragCtx, cancelDrag := context.WithCancel(ctx)
+		go monitorNativeFileDragLease(dragCtx, cancelDrag, finished, client, endpoint, w.cfg.SessionToken, job.ID)
 		outcome := "cancelled"
 		if !w.post(func() {
 			defer close(finished)
 			if !w.isClosing() && nativeFileDragHeld(hwnd) {
-				effect, err := runNativeFileCopyDrag(ctx, hwnd, job.Paths)
+				effect, err := runNativeFileCopyDrag(dragCtx, hwnd, job.Paths)
 				if err != nil {
 					outcome = "failed"
 				} else if effect&1 != 0 {
@@ -158,14 +160,19 @@ func (w *hostWindow) runNativeFileDrag(done <-chan struct{}) {
 		}) {
 			close(finished)
 		}
+		// A canceled owner cannot reclaim bytes underneath the active OLE call.
+		// Wait for genuine input to let its source report cancellation, then send
+		// only the existing idempotent cleanup receipt with unchanged credentials.
 		select {
 		case <-finished:
 		case <-done:
-			return
-		case <-ctx.Done():
-			return
 		}
-		if !nativeFileDragTransition(ctx, client, endpoint, w.cfg.SessionToken, job.ID, job.Gesture, "finish", outcome) {
+		cancelDrag()
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 3*time.Second)
+		confirmed := nativeFileDragTransition(cleanupCtx, client, endpoint, w.cfg.SessionToken, job.ID, job.Gesture, "finish", outcome)
+		cleanupCancel()
+		observeNativeFileDrag(hwnd, fmt.Sprintf("finish-receipt confirmed=%t outcome=%s", confirmed, outcome))
+		if !confirmed || ctx.Err() != nil {
 			return
 		}
 
@@ -230,9 +237,10 @@ func observeNativeFileDrag(hwnd uintptr, event string) {
 }
 
 type nativeFileDragOwner struct {
-	window   *hostWindow
-	active   *atomic.Bool
-	threadID uint32
+	window       *hostWindow
+	active       *atomic.Bool
+	threadID     uint32
+	closePending atomic.Bool
 }
 
 type nativeFileGUIThreadInfo struct {
@@ -291,11 +299,27 @@ func nativeFileDragCaptureTarget(hwnd uintptr, identity func(uintptr) (uint32, u
 	}
 	return target
 }
-func cancelNativeFileDrag(hwnd uintptr) {
-	if target := nativeFileDragCaptureTarget(hwnd, nativeFileWindowIdentity, nativeFileThreadCapture); target != 0 {
-		ok, _, err := wndPostMessage.Call(target, 0x001f, 0, 0)
-		observeNativeFileDrag(hwnd, fmt.Sprintf("cancelmode-post target=%x ok=%d error=%v", target, ok, err))
+
+// Window teardown waits for the active OLE callback to return. OLE asks its
+// source whether to cancel on the next genuine input-state change.
+func deferNativeFileDragClose(hwnd uintptr) bool {
+	raw, ok := nativeFileDragOwners.Load(hwnd)
+	if !ok || !nativeFileDragCancellationTarget(hwnd) {
+		return false
 	}
+	owner := raw.(*nativeFileDragOwner)
+	if !owner.requestClose() || !nativeFileDragCancellationTarget(hwnd) {
+		return false
+	}
+	observeNativeFileDrag(hwnd, "close-deferred-until-ole-return")
+	return true
+}
+
+// If OLE completed before the pending flag became visible, the caller must
+// post the ordinary close itself. Atomic ordering prevents a lost close.
+func (owner *nativeFileDragOwner) requestClose() bool {
+	owner.closePending.Store(true)
+	return owner.active.Load()
 }
 
 func nativeFileObject(p uintptr) *nativeFileCOM {
@@ -447,21 +471,17 @@ func runNativeFileCopyDrag(ctx context.Context, hwnd uintptr, paths []string) (u
 		threadID, _, _ := fileDragCurrentThread.Call()
 		owner := &nativeFileDragOwner{window: current.(*hostWindow), active: &source.active, threadID: uint32(threadID)}
 		nativeFileDragOwners.Store(hwnd, owner)
-		defer nativeFileDragOwners.CompareAndDelete(hwnd, owner)
+		defer func() {
+			source.active.Store(false)
+			nativeFileDragOwners.CompareAndDelete(hwnd, owner)
+			if owner.closePending.Load() {
+				if current, ok := wndWindows.Load(hwnd); ok && current == owner.window {
+					wndPostMessage.Call(hwnd, wmClose, 0, 0)
+				}
+			}
+		}()
 	}
-	dragEnded := make(chan struct{})
-	defer close(dragEnded)
 	defer source.active.Store(false)
-	// WM_CANCELMODE targets only this exact owner's same-thread capture HWND.
-	// No global key/mouse input is injected; active staging remains held until return.
-	go func() {
-		select {
-		case <-ctx.Done():
-			observeNativeFileDrag(hwnd, "drag-context-cancelled")
-			cancelNativeFileDrag(hwnd)
-		case <-dragEnded:
-		}
-	}()
 	var effect uint32
 	observeNativeFileDrag(hwnd, "ole-enter")
 	hr, _, _ = fileDragDo.Call(wp, sp, 1, uintptr(unsafe.Pointer(&effect)))
@@ -471,4 +491,45 @@ func runNativeFileCopyDrag(ctx context.Context, hwnd uintptr, paths []string) (u
 	runtime.KeepAlive(children)
 	runtime.KeepAlive(parent)
 	return effect, hresultError("Windows Explorer copy", hr)
+}
+
+// The lease status read is coalesced and limited to this already-started job.
+// Denial, unknown status or owner transport loss cancels rather than granting
+// another operation. No network device is contacted by this check.
+func monitorNativeFileDragLease(ctx context.Context, cancel context.CancelFunc, finished <-chan struct{}, client *http.Client, endpoint, token, id string) {
+	tick := time.NewTicker(200 * time.Millisecond)
+	defer tick.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-finished:
+			return
+		case <-tick.C:
+		}
+		requestCtx, stop := context.WithTimeout(ctx, time.Second)
+		req, err := http.NewRequestWithContext(requestCtx, "GET", endpoint+"?id="+url.QueryEscape(id), nil)
+		if err != nil {
+			stop()
+			cancel()
+			return
+		}
+		req.Header.Set("X-Session-Token", token)
+		res, err := client.Do(req)
+		valid := false
+		if err == nil {
+			var state struct {
+				State           string `json:"state"`
+				CancelRequested bool   `json:"cancelRequested"`
+			}
+			decodeErr := json.NewDecoder(io.LimitReader(res.Body, 64<<10)).Decode(&state)
+			res.Body.Close()
+			valid = res.StatusCode == 200 && decodeErr == nil && state.State == "dragging" && !state.CancelRequested
+		}
+		stop()
+		if !valid {
+			cancel()
+			return
+		}
+	}
 }

@@ -321,16 +321,18 @@ func Run(ctx context.Context, cfg Config) error {
 	}
 
 	done := make(chan struct{})
-	defer close(done)
-	go w.runNativeFileDrag(done)
+	nativeDragDone := make(chan struct{})
+	defer func() { close(done); <-nativeDragDone }()
+	go func() { defer close(nativeDragDone); w.runNativeFileDrag(done) }()
 	go func() {
 		activate := cfg.Activate
 		for {
 			select {
 			case <-ctx.Done():
 				if h := w.postedHandle.Load(); h != 0 {
-					cancelNativeFileDrag(h) // release this window's active OLE capture before teardown
-					wndPostMessage.Call(h, wmClose, 0, 0)
+					if !deferNativeFileDragClose(h) {
+						wndPostMessage.Call(h, wmClose, 0, 0)
+					}
 				}
 				return
 			case <-done:

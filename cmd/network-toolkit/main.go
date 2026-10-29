@@ -336,6 +336,7 @@ func main() {
 		a.views.homeClosing = true
 		a.views.mu.Unlock()
 		a.views.children.Wait()
+		a.finishInactiveExplorerCopies() // editor children can survive for Save Copy
 	}()
 	listenHost := "127.0.0.1"
 	// Only the Unix development binary supports the supervised preview proxy.

@@ -37,6 +37,7 @@ type explorerTransferJob struct {
 	gesture, revoked              uint64
 	cancel                        context.CancelFunc
 	valid                         func() bool
+	cancelRequested               bool
 }
 type explorerTransferRequest struct {
 	Action  string        `json:"action"`
@@ -60,7 +61,7 @@ func (a *application) explorerCallerValid(owner string) bool {
 	return a.editorViews.callerLocked(owner) && v != nil && v.explorer != nil && v.explorer.Allowed
 }
 func exportJobStatus(j *explorerTransferJob) map[string]any {
-	return map[string]any{"id": j.id, "state": j.state, "names": j.names, "entries": j.entries, "bytes": j.bytes, "message": j.note}
+	return map[string]any{"id": j.id, "state": j.state, "names": j.names, "entries": j.entries, "bytes": j.bytes, "message": j.note, "cancelRequested": j.cancelRequested}
 }
 func (a *application) handleExplorerTransfer(w http.ResponseWriter, r *http.Request) {
 	owner := editorRequestView(r)
@@ -550,8 +551,8 @@ func (a *application) stageExplorerRemote(ctx context.Context, j *explorerTransf
 	return err
 }
 
-// A confirmed owner/approval loss removes staged copies, including an orphaned
-// native drag. A time limit alone never deletes bytes under an active OLE read.
+// Revocation requests cancellation but never removes bytes under an active OLE
+// reader. Completion or a confirmed native owner exit owns the final cleanup.
 func (a *application) watchExplorerCopy(ctx context.Context, j *explorerTransferJob) {
 	tick := time.NewTicker(time.Second)
 	defer tick.Stop()
@@ -563,7 +564,13 @@ func (a *application) watchExplorerCopy(ctx context.Context, j *explorerTransfer
 			m.mu.Unlock()
 			return
 		}
-		if !valid || ctx.Err() != nil && j.state != "dragging" {
+		if (!valid || ctx.Err() != nil) && j.state == "dragging" {
+			j.cancelRequested = true
+			j.note = "Cancellation pending. Press Escape or release the mouse to end the Windows drag. Original files are unchanged."
+			m.mu.Unlock()
+			continue
+		}
+		if !valid || ctx.Err() != nil {
 			j.cancel()
 			j.state = "cancelled"
 			j.note = "Copy preparation expired or access was withdrawn. Original files are unchanged."
@@ -583,5 +590,41 @@ func expireExplorerClaim(j *explorerTransferJob) {
 	if j.state == "claimed" && !time.Now().Before(j.armed) {
 		j.state = "ready"
 		j.armed = time.Time{}
+	}
+}
+
+// Called only after the native main host returned, or its exact child process
+// exited. A missed heartbeat, timeout or withdrawn approval is not this proof.
+func (a *application) finishExplorerOwner(owner string) {
+	m := &a.explorerTransfers
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for id, j := range m.jobs {
+		if j.owner != owner {
+			continue
+		}
+		j.cancel()
+		if j.stage != "" {
+			os.RemoveAll(j.stage)
+		}
+		delete(m.jobs, id)
+	}
+}
+
+// Whole-app shutdown must not reclaim another still-live editor child's active
+// OLE source. An interrupted backend can leave that private stage for cleanup.
+func (a *application) finishInactiveExplorerCopies() {
+	m := &a.explorerTransfers
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for id, j := range m.jobs {
+		if j.state == "dragging" {
+			continue
+		}
+		j.cancel()
+		if j.stage != "" {
+			os.RemoveAll(j.stage)
+		}
+		delete(m.jobs, id)
 	}
 }

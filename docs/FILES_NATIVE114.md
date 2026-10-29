@@ -63,15 +63,34 @@ it does not establish arbitrary device-fleet or user-desktop compatibility.
 
 ### Active native cancellation
 
-An active OLE gesture owns Escape; the page does not remove its modal or cancel
-staging underneath it. Rejected/uncertain HTTP cancellation leaves the review
-visible. IDropSource cancels when its owning context ends. A context cancellation
-posts [WM_CANCELMODE](https://learn.microsoft.com/en-us/windows/win32/winmsg/wm-cancelmode)
-only to the capture HWND obtained for the recorded owning UI thread, after
-checking its thread/process and the still-active host identity. OLE can capture
-through its own helper HWND rather than the visible Toolkit window. The
-[GetGUIThreadInfo](https://learn.microsoft.com/en-us/windows/win32/api/winuser/nf-winuser-getguithreadinfo)
-query always names that exact thread (never the foreground thread). The default
-Win32 handler releases its mouse capture. No keyboard/mouse input is injected into production, and no
-global hook is installed. The hosted fixture requires actual Escape and a real
-held drag followed by owner-context cancellation to return within two seconds.
+An active OLE gesture owns Escape; the page does not remove its modal or delete
+staging underneath it. Rejected/uncertain cancellation leaves the review visible.
+A window close or revoked lease requests cancellation, but a stationary held
+mouse can keep the native OLE loop active. Release the mouse or press Escape to
+finish it. On the next real input-state change, `QueryContinueDrag` checks the
+canceled context before any drop decision. The native owner and staging remain
+alive until OLE returns; no synthetic input or global hook forces the gesture.
+Microsoft documents this input-driven contract in
+[QueryContinueDrag](https://learn.microsoft.com/en-us/windows/win32/api/oleidl/nf-oleidl-idropsource-querycontinuedrag).
+
+During a started drag, one coalesced authenticated read of that exact job runs
+at the existing 200ms status cadence with a one-second request bound. Denied,
+missing, revoked or unavailable status cancels the source; it never reconnects
+or probes a device. Revocation takes effect when OLE next processes real input,
+not by claiming an instantaneous stationary-mouse wake-up.
+
+After OLE/COM release, the host attempts the existing idempotent finish receipt
+with the same token/job under a three-second cleanup-only context. No authentication
+exception is added. Confirmed main-window return or child-process exit also
+cleans that owner's jobs while its backend is alive. Shutdown does not reclaim
+another surviving editor child's active staging. If the backend is interrupted
+or no longer accepts the receipt, the private temporary prepared copy may remain;
+it is not silently deleted by a new native filesystem capability. Original files
+are unchanged. Native MOVE and deletion of original sources are never offered.
+
+The hosted fixture retains the real owner and stage during a stationary hold,
+then moves/releases over a separate empty Explorer destination. It requires a
+cancelled outcome, no destination output, unchanged originals, authenticated
+stage cleanup and bounded owner completion after input resumes. The earlier
+immediate-close-while-stationary assumption was not an OS contract and is not
+claimed as delivered behavior.
