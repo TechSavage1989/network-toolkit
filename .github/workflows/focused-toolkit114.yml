@@ -1,0 +1,51 @@
+name: Focused Toolkit114 measurements (no app build)
+on:
+  push:
+    branches: ['investigate/toolkit114-motion']
+permissions:
+  contents: read
+concurrency:
+  group: focused-toolkit114-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  compare-motion:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Focused comparison source tests
+        run: node --test scripts/editor-aligned-compare.test.cjs scripts/editor-alignment-model.test.cjs
+      - name: Prepare isolated browser and immutable113 baseline
+        run: |
+          npm install --prefix "$RUNNER_TEMP/motion114" --no-audit --no-fund playwright@1.62.1
+          node "$RUNNER_TEMP/motion114/node_modules/playwright/cli.js" install --with-deps chromium
+          git fetch --no-tags --depth=1 origin 31f27994b9a3f7bae4442c255f63a65c8e21e0c8
+          test "$(git rev-parse FETCH_HEAD)" = 31f27994b9a3f7bae4442c255f63a65c8e21e0c8
+          mkdir -p "$RUNNER_TEMP/baseline113"
+          git archive 31f27994b9a3f7bae4442c255f63a65c8e21e0c8 | tar -xf - -C "$RUNNER_TEMP/baseline113"
+      - name: Observe published113 motion throughout gestures
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/motion114/node_modules/playwright
+          TOOLKIT_TEST_ROOT: ${{ runner.temp }}/baseline113
+          TOOLKIT_MOTION_OBSERVE_ONLY: '1'
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/motion-results/baseline
+        run: node scripts/editor-motion114.browser.cjs
+      - name: Measure candidate motion throughout gestures
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/motion114/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/motion-results/candidate
+        run: node scripts/editor-motion114.browser.cjs
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: focused-motion114
+          path: ${{ runner.temp }}/motion-results
+          if-no-files-found: error
+          retention-days: 7
