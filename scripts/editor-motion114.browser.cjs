@@ -46,21 +46,25 @@ function beginCapture(label){
 }
 async function finishCapture(page){await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));return page.evaluate(()=>{motion114.running=false;return motion114;});}
 function summarize(record,side){const s=side==='right'?1:0,p=1-s,frames=record.frames;let moving=0,together=0,stall=0,maxStall=0;for(let i=1;i<frames.length;i++){
- const a=frames[i],b=frames[i-1],sourceMoved=Math.abs(a.panes[s].position-b.panes[s].position)>.005,peerMoved=Math.abs(a.panes[p].position-b.panes[p].position)>.005;
+ // Actual scrollDOM pixels are authoritative for painted motion. Native virtual
+ // block indices can refine a frame later without any pixel displacement.
+ const a=frames[i],b=frames[i-1],sourceMoved=Math.abs(a.panes[s].top-b.panes[s].top)>1,peerMoved=Math.abs(a.panes[p].top-b.panes[p].top)>1;
  if(sourceMoved){moving++;if(peerMoved){together++;stall=0}else{stall++;maxStall=Math.max(maxStall,stall)}}else if(peerMoved)stall=0;
  }const deltas=frames.filter(f=>f.delta!==null).map(f=>Math.abs(f.delta)).sort((a,b)=>a-b);return {label:record.label,frames:frames.length,moving,together,maxStall,p95PeerOffset:deltas[Math.floor(deltas.length*.95)]??null,maxPeerOffset:deltas.at(-1)??null,first:frames[0]?.panes.map(p=>p.position),last:frames.at(-1)?.panes.map(p=>p.position)};}
 async function captureGesture(page,label,side,action){await page.evaluate(beginCapture,label);await action();const record=await finishCapture(page),summary=summarize(record,side);report.motion.push({...summary,record});return summary;}
 function validateMotion(summary){
  assert(summary.frames>=15,summary.label+' must observe at least15 animation frames during input');
- assert(summary.moving>=10,summary.label+' must actually move the source during the gesture');
+ assert(summary.moving>=24,summary.label+' must visibly respond during at least24 of40 input steps, not accumulate a few large catch-up jumps: '+JSON.stringify(summary));
  assert(summary.maxStall<=4,summary.label+' must not leave its peer stopped while source continues: '+JSON.stringify(summary));
  assert(summary.together/summary.moving>=.65,summary.label+' must move its peer throughout input, not after stopping: '+JSON.stringify(summary));
+ const wheel=summary.label.includes('-wheel-');
+ assert(summary.p95PeerOffset!==null&&summary.p95PeerOffset<=(wheel?72:2),summary.label+' actual common source rows must remain aligned throughout input within at most two wheel increments: '+JSON.stringify(summary));
 }
 async function converged(page){await page.waitForFunction(()=>{const c=NetworkToolkitFileEditor.comparison;if(!c?.result||c.result.limited||document.querySelector('[data-compare-map]')?.getAttribute('aria-disabled')!=='false')return false;const a=document.querySelector('[data-compare-map-viewport=left]'),b=document.querySelector('[data-compare-map-viewport=right]');return Math.abs(parseFloat(a.style.top)-parseFloat(b.style.top))<1;});await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));}
 (async()=>{
- assert(output,'Set isolated TOOLKIT_TEST_OUTPUT');fs.mkdirSync(output,{recursive:true});report.motion=[];report.sourceHash=require('node:crypto').createHash('sha256').update(fs.readFileSync(path.join(current,'web/assets/editor-aligned-compare.js'))).digest('hex');browser=await chromium.launch({headless:true});
+ assert(output,'Set isolated TOOLKIT_TEST_OUTPUT');fs.mkdirSync(output,{recursive:true});report.motion=[];report.observationOnly=!!process.env.TOOLKIT_MOTION_OBSERVE_ONLY;report.sourceHash=require('node:crypto').createHash('sha256').update(fs.readFileSync(path.join(current,'web/assets/editor-aligned-compare.js'))).digest('hex');browser=await chromium.launch({headless:true});
  for(const mode of ['main','detached'])for(const width of [1440,390]){
-  const theme=width===390?'dark':'light',f=await start(current,mode,'motion-'+mode+'-'+width),page=f.page;await page.setViewportSize({width,height:1000});await page.evaluate(theme=>setTheme(theme),theme);await settle(page);await page.locator('[data-ed=compare]').click();await page.selectOption('[data-compare-select=left]','layout-left');await page.selectOption('[data-compare-select=right]','layout-right');await converged(page);
+  const theme=width===390?'dark':'light',f=await start(current,mode,'motion-'+mode+'-'+width),page=f.page;await page.setViewportSize({width,height:1000});await page.evaluate(theme=>setTheme(theme),theme);await settle(page);await page.locator('[data-ed-wrap]').check();await page.locator('[data-ed=compare]').click();await page.selectOption('[data-compare-select=left]','layout-left');await page.selectOption('[data-compare-select=right]','layout-right');await converged(page);assert(await page.locator('[data-ed-wrap]').isChecked(),'Each renderer must use actual wrapped text, including child defaults');
   const original=await page.evaluate(()=>[...NetworkToolkitFileEditor.documents.values()].map(d=>({uid:d.uid,content:d.content,undo:JSON.stringify(d.undo),redo:JSON.stringify(d.redo),revision:d.editRevision})));
   for(const side of ['left','right'])for(const direction of [1,-1]){
    const scroller=page.locator('[data-compare-pane='+side+'] .cm-scroller');await scroller.hover();const label=mode+'-'+width+'-'+side+'-wheel-'+direction;
@@ -68,15 +72,15 @@ async function converged(page){await page.waitForFunction(()=>{const c=NetworkTo
   }
   for(const scale of ['0','2']){
    await page.locator('.nt-compare-settings summary').click();await page.selectOption('[data-compare-scale]',scale);await page.locator('.nt-compare-settings summary').click();await converged(page);
-   for(const side of ['left','right']){
-    const track=page.locator('[data-compare-track='+side+']'),map=page.locator('[data-compare-map]'),rect=await map.boundingBox(),box=await track.boundingBox(),x=box.x+box.width/2,y=rect.y+rect.height*.25;await page.mouse.move(x,y);await page.mouse.down();
-    const summary=await captureGesture(page,mode+'-'+width+'-'+side+'-map-'+scale,side,async()=>{for(let step=0;step<40;step++){await page.mouse.move(x,y+rect.height*.4*(step+1)/40);await page.waitForTimeout(12);}});await page.mouse.up();if(!process.env.TOOLKIT_MOTION_OBSERVE_ONLY)validateMotion(summary);await converged(page);
+   for(const side of ['left','right'])for(const direction of [1,-1]){
+    const track=page.locator('[data-compare-track='+side+']'),map=page.locator('[data-compare-map]'),rect=await map.boundingBox(),box=await track.boundingBox(),x=box.x+box.width/2,y=rect.y+rect.height*(direction>0?.25:.65);await page.mouse.move(x,y);await page.mouse.down();
+    const summary=await captureGesture(page,mode+'-'+width+'-'+side+'-map-'+scale+'-'+direction,side,async()=>{for(let step=0;step<40;step++){await page.mouse.move(x,y+direction*rect.height*.4*(step+1)/40);await page.waitForTimeout(12);}});await page.mouse.up();if(!process.env.TOOLKIT_MOTION_OBSERVE_ONLY)validateMotion(summary);await converged(page);
     // Real wheel over both fit and zoomed map remains functional.
     const before=await page.evaluate(side=>NetworkToolkitFileEditor.comparison.sourceView(side).scrollTop,side);await track.hover();await page.mouse.wheel(0,-120);await page.waitForFunction(({side,before})=>Math.abs(NetworkToolkitFileEditor.comparison.sourceView(side).scrollTop-before)>1,{side,before});await converged(page);
    }
   }
   assert.deepEqual(await page.evaluate(()=>[...NetworkToolkitFileEditor.documents.values()].map(d=>({uid:d.uid,content:d.content,undo:JSON.stringify(d.undo),redo:JSON.stringify(d.redo),revision:d.editRevision}))),original,'Scroll gestures must not change source/undo/dirty ownership');
-  await page.screenshot({path:path.join(output,'editor-motion114-'+mode+'-'+width+'-'+theme+'.png')});report.layouts.push({mode,width,theme});check(mode+' '+width+' continuous left/right wheel and both maps, fit/zoom, unequal wrapped source bytes retained');await f.context.close();
+  await page.screenshot({path:path.join(output,'editor-motion114-'+mode+'-'+width+'-'+theme+'.png')});report.layouts.push({mode,width,theme});check(mode+' '+width+' '+(report.observationOnly?'baseline observation only (candidate motion assertions omitted); ':'candidate continuous motion accepted; ')+'left/right wheel and both maps, fit/zoom, unequal wrapped source bytes retained');await f.context.close();
  }
  assert.deepEqual(report.errors,[]);assert.deepEqual(report.assetErrors,[]);report.passed=true;
 })().catch(async error=>{report.failure=error.stack||String(error);console.error(report.failure);if(lastPage&&!lastPage.isClosed())await lastPage.screenshot({path:path.join(output,'editor-motion114-failure.png')}).catch(()=>{});process.exitCode=1;}).finally(async()=>{if(output)fs.writeFileSync(path.join(output,'editor-motion114-results.json'),JSON.stringify(report,null,2));for(const context of contexts)await context.close().catch(()=>{});await browser?.close();});
