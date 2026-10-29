@@ -161,3 +161,17 @@ test('alignment measurement retains fractional native width and row height at wr
  assert.equal(api.measurementMetrics({...view,defaultLineHeight:0},20.15).height,20.15);
  assert.equal(api.measurementMetrics({...view,contentDOM:{getBoundingClientRect:()=>({width:0})}}).width,1);
 });
+
+
+test('rendered source origins override virtual estimates without resetting source or view',()=>{
+ const doc=C.EditorState.create({doc:'wrapped source'}).doc,block={from:0,to:14,top:500,height:1530.6875,bottom:2030.6875};let rendered=true,reads=0;
+ const view={state:{doc},documentTop:100,elementAtHeight:()=>block,lineBlockAt:()=>block,contentDOM:{querySelector(selector){reads++;assert.equal(selector,'.cm-line[data-source-line="1"]');return rendered?{getBoundingClientRect:()=>({top:603.96875,height:1530.6875})}:null}}};
+ const target=api.nativePixelFromAligned(view,[0,1530.6875],[1530.6875],765.34375);assert.equal(target,1269.3125);assert.equal(api.alignedPixelFromNative(view,[0,1530.6875],[1530.6875],target),765.34375);
+ rendered=false;assert.equal(api.nativePixelFromAligned(view,[0,1530.6875],[1530.6875],765.34375),1265.34375,'unrendered target retains native estimate until remeasured');assert.equal(doc.toString(),'wrapped source');assert(reads>=3);
+});
+test('rendered alignment widget is matched by exact source and aligned offset, including native getter',()=>{
+ const widget={side:'left',offset:7,alignedStart:20,height:30},block=Object.assign(Object.create({get widget(){return widget;}}),{from:7,to:7,top:100,height:30,bottom:130});
+ const fake=(alignedStart,top)=>({dataset:{compareGap:'left',sourceOffset:'7',alignedStart:String(alignedStart)},getBoundingClientRect:()=>({top,height:30})});
+ const view={documentTop:50,contentDOM:{querySelectorAll:()=>[fake(0,999),fake(20,153.5)]}},actual=api.renderedBlockGeometry(view,block);
+ assert.equal(actual.top,103.5);assert.equal(actual.bottom,133.5);assert.equal(actual.widget,widget);assert.equal(widget.alignedStart,20);
+});

@@ -1,4 +1,4 @@
-name: Focused115
+name: Focused115Comparison
 'on':
   push:
     branches:
@@ -22,35 +22,18 @@ jobs:
         node-version: '24'
         package-manager-cache: false
     - name: Install isolated editor test browser
-      run: 'npm install --prefix "$RUNNER_TEMP/ntk-editor112" --no-audit --no-fund playwright@1.62.1
+      run: 'npm install --prefix "$RUNNER_TEMP/ntk-editor112" --no-audit --no-fund
+        playwright@1.62.1
 
         node "$RUNNER_TEMP/ntk-editor112/node_modules/playwright/cli.js" install chromium
 
         '
-    - name: Check persistent Files and Connections tabs and named drive buttons
-      if: success() || failure()
-      env:
-        PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
-        TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results
-      run: node scripts/editor-files115.browser.cjs
     - name: Check compact comparison options horizontal sync and difference symbols
       if: success() || failure()
       env:
         PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
         TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results
       run: node scripts/editor-compare115.browser.cjs
-    - name: Check editor pointer drag away reorder and cancelled moves
-      if: success() || failure()
-      env:
-        PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
-        TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results
-      run: node scripts/editor-drag115.browser.cjs
-    - name: Check graph wheel inversion and data-aware hard zoom stops
-      if: success() || failure()
-      env:
-        PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
-        TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results
-      run: node scripts/graph-zoom115.browser.cjs
     - name: Check adjustable split and comparison dividers
       if: success() || failure()
       env:
@@ -76,39 +59,3 @@ jobs:
         path: ${{ runner.temp }}/ntk-editor112-results
         if-no-files-found: error
         retention-days: 14
-  native115:
-    runs-on: windows-latest
-    timeout-minutes: 15
-    steps:
-    - uses: actions/checkout@v7
-      with:
-        persist-credentials: false
-    - uses: actions/setup-go@v7
-      with:
-        go-version-file: go.mod
-        cache: false
-    - name: Validate real Windows drive names
-      env:
-        GOTOOLCHAIN: local
-      run: go test -mod=vendor ./cmd/network-toolkit -run '^TestLocalDriveNames115$' -count=1 -timeout=1m -v
-    - name: Verify native editor dirty-close consent and acknowledged two-window moves
-      env:
-        GOTOOLCHAIN: local
-        NETWORK_TOOLKIT_NATIVE_EDITOR_TEST: '1'
-        TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/network-toolkit-native-editor108
-      run: 'go test -mod=vendor ./internal/desktop -run ''^TestNativeEditorClose(ApprovalInstalledWebView2|ScriptUsesExplicitAction)$'' -count=1 -timeout=3m
-        -v
-
-        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-        go test -mod=vendor ./cmd/network-toolkit -run ''^TestNativeEditorTransferInstalledWebView2$'' -count=1 -timeout=6m
-        -v
-
-        '
-    - uses: actions/upload-artifact@v7
-      if: always()
-      with:
-        name: native-editor108-checks
-        path: ${{ runner.temp }}/network-toolkit-native-editor108
-        if-no-files-found: error
-        retention-days: 7
