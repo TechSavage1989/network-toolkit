@@ -481,3 +481,19 @@ test('inverted outward wheel can leave the exact five-sample floor after applyin
   assert(h.document.querySelectorAll('[data-rt-point]').filter(m=>!m.hasAttribute('data-rt-aggregate')).length>5,mode+' repeated outward input must reach additional real samples');
  }
 });
+
+test('automatic data floors preserve unit Fit scale and later linear zoom after filtering or growth',()=>{
+ const h=harness();let active=true;h.context.NetworkToolkitResultFilters={current:()=>({active}),graphMatches:(_,row)=>row.sequence===2};h.render(Array.from({length:12},(_,i)=>reply(i+1,10,stamp(i))));
+ assert.equal(h.document.querySelector('[data-rt-zoom-level]').dataset.rtZoomFactor,'1','A filtered end cannot silently rewrite ordinary zoom');active=false;h.document.emit('networkToolkitResultFilterChange',h.document,{detail:{jobId:'job'}});
+ h.render(Array.from({length:360},(_,i)=>reply(i+1,10,stamp(i))));assert.equal(h.document.querySelectorAll('[data-rt-point]').length,360);assert.equal(h.api.zoom('job','in'),2);assert.equal(h.document.querySelectorAll('[data-rt-point]').length,180);
+});
+test('sparse Fit retains every timestamp and held identity at unit scale in both modes',()=>{
+ for(const mode of ['linear','condensed']){
+  const h=harness(),rows=Array.from({length:1441},(_,i)=>reply(i+1,10,stamp(i*60))),source=JSON.stringify(rows);h.api.setPreferences({mode},{persist:false});h.render(rows);h.api.selectResult('job',h.api.sampleKey(rows[1000]));h.api.zoom('job','reset');const nav=h.document.querySelector('[data-graph-navigator]');
+  assert.equal(h.document.querySelector('[data-rt-zoom-level]').dataset.rtZoomFactor,'1',mode+' Fit unit scale');assert.equal(nav.dataset.viewStart,nav.dataset.fullStart);assert.equal(nav.dataset.viewEnd,nav.dataset.fullEnd);assert(h.detail().includes('Sample1001'));assert.equal(JSON.stringify(rows),source);
+  h.context.NetworkToolkitGraphHistory.setPreferences({durationMs:10000},{persist:false,fit:true});assert.equal(h.document.querySelector('[data-rt-zoom-level]').dataset.rtZoomFactor,'1',mode+' feasible preset base');assert(h.document.querySelectorAll('[data-rt-point]').filter(p=>!p.hasAttribute('data-rt-aggregate')).length>=5);assert(h.document.querySelector('[data-rt-zoom="in"]').disabled);
+ }
+});
+test('sub-two-second source recordings retain exact nanoseconds when a narrower interval hits the floor',()=>{
+ const h=harness(),g=h.context.NetworkToolkitGraphHistory,start=g.instant(stamp(0)),rows=Array.from({length:11},(_,i)=>reply(i+1,42,g.timestamp(start+BigInt(i)))),before=JSON.stringify(rows);h.render(rows);h.api.zoom('job','reset');h.api.navigate('job',{start:rows[5].time,end:rows[6].time});const n=h.document.querySelector('[data-graph-navigator]');assert.equal(g.instant(n.dataset.viewEnd)-g.instant(n.dataset.viewStart),10n);assert.equal(h.document.querySelectorAll('[data-rt-point]').length,11);assert.equal(g.instant(n.dataset.viewStart),start);assert.equal(JSON.stringify(rows),before);
+});

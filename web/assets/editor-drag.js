@@ -29,7 +29,7 @@ function create(options={}){
  function scroll(event){if(gesture?.started&&gesture.scroll?.some(view=>view.el===event.target))retainScroll();}
  function documentFor(uid){return [...(editor()?.documents?.values?.()||[])].find(d=>d.uid===uid);}
  function pointerValid(g){return !!g&&!g.cancelled&&g.tab?.isConnected!==false&&g.strip?.isConnected!==false&&eligible(g)&&documentFor(g.uid)===g.document&&windows()?.state?.owned?.[g.uid]===g.lease;}
- function releaseCapture(g){if(g?.tab)g.tab.draggable=true;try{if(g?.strip?.hasPointerCapture?.(g.pointer))g.strip.releasePointerCapture(g.pointer);}catch{}}
+ function releaseCapture(g){if(g?.tab)g.tab.draggable=true;try{if(g?.capture?.hasPointerCapture?.(g.pointer))g.capture.releasePointerCapture(g.pointer);}catch{}}
  function keepClickSuppressed(){suppressClick=true;(options.setTimeout||root.setTimeout)(()=>{suppressClick=false;},500);}
  function begin(event){
   if(event.isTrusted===false||event.button!==0||event.isPrimary===false||event.pointerType==='touch'||event.ctrlKey||event.metaKey||event.target.closest?.('[data-ed-close-tab],[data-ed="new"]'))return;
@@ -40,7 +40,12 @@ function create(options={}){
   if(mode==='pointer'){
    tab.draggable=false;
    if(!g.document||!g.strip){gesture=null;releaseCapture(g);return;}
-   try{g.strip.setPointerCapture?.(g.pointer);}catch{cancel(g);gesture=null;releaseCapture(g);}
+   // A captured pointerup also directs the following native click to its
+   // capture target, even when capture is released during pointerup. Capture
+   // the actual open button, not the strip, so an ordinary click still reaches
+   // the editor's existing delegated activation handler. No synthetic click.
+   g.capture=event.target.closest?.('[data-ed-open]')||tab;
+   try{g.capture.setPointerCapture?.(g.pointer);}catch{cancel(g);gesture=null;releaseCapture(g);}
   }
  }
  function pointerDestination(event,g){

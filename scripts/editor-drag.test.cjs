@@ -81,7 +81,7 @@ function pointerFixture(){
  const calls=[],timers=[],classes=()=>({add(){},remove(){}}),all=[];let blocked='',capture=null;
  const docs=new Map([['a',{uid:'a',content:'DIRTY_A',dirty:true,undo:['BEFORE_A']}],['b',{uid:'b',content:'DIRTY_B',dirty:true,undo:['BEFORE_B']}] ]),owned={a:1,b:2};
  const host={contains:()=>true,querySelectorAll:()=>[],classList:classes()},strip={isConnected:true,classList:classes(),setAttribute(){},getBoundingClientRect:()=>({left:0,right:200,top:30,bottom:60,width:200,height:30}),setPointerCapture:id=>capture=id,hasPointerCapture:id=>capture===id,releasePointerCapture:()=>capture=null,closest:s=>s==='.nt-editor-window'?host:s==='[data-ed-view]'?{dataset:{edView:'left'}}:null};
- const tab=(uid,x)=>({isConnected:true,draggable:true,dataset:{edUid:uid},classList:classes(),setAttribute(k,v){this[k]=v},removeAttribute(k){delete this[k]},getBoundingClientRect:()=>({left:x,right:x+100,width:100,top:30,bottom:60}),closest(s){return s==='[data-ed-uid]'?this:s==='[data-ed-tabs]'?strip:s==='[data-ed-view]'?{dataset:{edView:'left'}}:s==='.nt-editor-window'?host:null;}});
+ const tab=(uid,x)=>({isConnected:true,draggable:true,dataset:{edUid:uid},classList:classes(),setAttribute(k,v){this[k]=v},removeAttribute(k){delete this[k]},setPointerCapture:id=>capture=id,hasPointerCapture:id=>capture===id,releasePointerCapture:()=>capture=null,getBoundingClientRect:()=>({left:x,right:x+100,width:100,top:30,bottom:60}),closest(s){return s==='[data-ed-uid]'?this:s==='[data-ed-tabs]'?strip:s==='[data-ed-view]'?{dataset:{edView:'left'}}:s==='.nt-editor-window'?host:null;}});
  const a=tab('a',0),b=tab('b',100);a.nextElementSibling=b;b.nextElementSibling=null;all.push(a,b);strip.querySelectorAll=()=>all;
  let hit=strip;strip.closest=s=>s==='[data-ed-tabs]'?strip:s==='.nt-editor-window'?host:s==='[data-ed-view]'?{dataset:{edView:'left'}}:null;
  const listeners={},body={append(){}},document={body,querySelector:s=>s==='.nt-editor-window'?host:null,querySelectorAll:()=>all,elementFromPoint:()=>hit,createElement:()=>({style:{},dataset:{},setAttribute(){},remove(){}}),addEventListener(name,callback){listeners[name]=callback;}};host.append=()=>{};
@@ -92,6 +92,16 @@ function pointerFixture(){
  return {drag,a,b,strip,host,docs,owned,calls,event,coordinator,listeners,setBlocked:v=>blocked=v,setHit:v=>hit=v,get capture(){return capture},timers};
 }
 test('ordinary captured-pointer clicks never register, move, or reorder',()=>{const f=pointerFixture();f.drag.begin(f.event());assert.equal(f.capture,1);assert.equal(f.a.draggable,false);f.drag.up(f.event());assert.equal(f.capture,null);assert.equal(f.a.draggable,true);assert.deepEqual(f.calls,[]);});
+test('ordinary clicks capture the nested open button so native click keeps its activation target',()=>{
+ const f=pointerFixture();let captureTarget=null,released=false;
+ const button={dataset:{edOpen:'a'},setPointerCapture(){captureTarget=this;},hasPointerCapture(){return captureTarget===this;},releasePointerCapture(){released=true;},closest(s){return s==='[data-ed-open]'?this:f.a.closest(s);}};
+ const name={closest:s=>button.closest(s)};f.strip.setPointerCapture=()=>{throw Error('The parent strip must not capture ordinary clicks');};
+ f.drag.begin(f.event(name));assert.equal(captureTarget,button);assert.equal(f.drag.state.started,false);
+ const up=f.event(button);f.drag.up(up);assert.equal(released,true);assert.equal(up.prevented,undefined);assert.equal(up.stopped,undefined);
+ // Pointer Events click targeting retains the pointerup capture target even
+ // after lostpointercapture; the delegated editor handler finds this button.
+ const click=f.event(captureTarget);f.listeners.click(click);assert.equal(click.target.closest('[data-ed-open]').dataset.edOpen,'a');assert.equal(click.prevented,undefined);assert.deepEqual(f.calls,[]);
+});
 test('same-view inactive-tab pointer reorder uses fixed UID and never activates or rebuilds its view',()=>{const f=pointerFixture();f.drag.begin(f.event());f.drag.pointerMove(f.event(f.b,180,40));assert.deepEqual(f.calls,[]);f.drag.up(f.event(f.b,180,40));assert.deepEqual(f.calls,[['reorder','a',null]]);assert.equal(f.drag.state.armed,false);assert.equal(f.capture,null);});
 test('ordinary drag-away needs moved genuine pointer release; no broker or drop box',async()=>{const f=pointerFixture();const before=JSON.stringify([...f.docs]);f.drag.begin(f.event());f.drag.pointerMove(f.event(f.a,350,150));assert.deepEqual(f.calls,[]);f.drag.up(f.event(f.a,350,150));await flush();assert.deepEqual(f.calls,[['move',['a'],'new']]);assert.equal(JSON.stringify([...f.docs]),before);});
 test('Escape, pointer cancellation, lost capture and wrong pointer never detach',async()=>{
