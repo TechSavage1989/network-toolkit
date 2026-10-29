@@ -10,14 +10,23 @@ public static class EditorCloseFixture {
  [DllImport("user32.dll")] public static extern IntPtr GetParent(IntPtr h);
  [DllImport("user32.dll")] public static extern IntPtr GetLastActivePopup(IntPtr h);
  [DllImport("user32.dll")] public static extern IntPtr GetWindow(IntPtr h,uint relation);
- [DllImport("user32.dll")] public static extern IntPtr GetDlgItem(IntPtr h,int id);
  [DllImport("user32.dll",CharSet=CharSet.Unicode)] public static extern int GetWindowText(IntPtr h,StringBuilder s,int n);
  [DllImport("user32.dll",SetLastError=true)] public static extern bool PostMessage(IntPtr h,uint m,IntPtr w,IntPtr l);
  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h,out uint p);
  [DllImport("user32.dll",CharSet=CharSet.Unicode)] public static extern int GetClassName(IntPtr h,StringBuilder s,int n);
- [DllImport("user32.dll")] static extern int GetDlgCtrlID(IntPtr h);
+ [DllImport("user32.dll")] public static extern int GetDlgCtrlID(IntPtr h);
  delegate bool EnumChild(IntPtr h,IntPtr p);
  [DllImport("user32.dll")] static extern bool EnumChildWindows(IntPtr h,EnumChild callback,IntPtr p);
+ public static IntPtr OnlyReadyButton(IntPtr dialog) {
+  IntPtr found=IntPtr.Zero;int buttons=0,children=0;bool limit=false;
+  EnumChildWindows(dialog,delegate(IntPtr child,IntPtr unused) {
+   if(++children>20){limit=true;return false;}
+   var cls=new StringBuilder(100);GetClassName(child,cls,cls.Capacity);
+   if(GetParent(child)==dialog && cls.ToString()=="Button" && IsWindowVisible(child) && IsWindowEnabled(child)){found=child;buttons++;}
+   return true;
+  },IntPtr.Zero);
+  return !limit && buttons==1 ? found : IntPtr.Zero;
+ }
  public static string DescribeChildren(IntPtr dialog) {
   var result=new StringBuilder();int count=0;
   EnumChildWindows(dialog,delegate(IntPtr child,IntPtr unused) {
@@ -48,28 +57,31 @@ if($Action -eq 'WaitWarning'){
   if($button -eq [IntPtr]::Zero -or [EditorCloseFixture]::GetParent($button) -ne $dialog){return $false}
   [uint32]$buttonProcess=0;[void][EditorCloseFixture]::GetWindowThreadProcessId($button,[ref]$buttonProcess)
   $buttonClass=New-Object System.Text.StringBuilder(100);[void][EditorCloseFixture]::GetClassName($button,$buttonClass,100)
-  return $buttonProcess -eq $OwnerProcessID -and $buttonClass.ToString() -eq 'Button' -and [EditorCloseFixture]::IsWindowVisible($button) -and [EditorCloseFixture]::IsWindowEnabled($button)
+  $caption=New-Object System.Text.StringBuilder(100);[void][EditorCloseFixture]::GetWindowText($button,$caption,100)
+  return $buttonProcess -eq $OwnerProcessID -and $buttonClass.ToString() -eq 'Button' -and $caption.ToString() -ceq 'OK' -and [EditorCloseFixture]::IsWindowVisible($button) -and [EditorCloseFixture]::IsWindowEnabled($button)
  }
  $until=[DateTime]::UtcNow.AddSeconds(12);$popup=[IntPtr]::Zero;$ok=[IntPtr]::Zero;$lastOwned=[IntPtr]::Zero
  do {
   $candidate=[EditorCloseFixture]::GetLastActivePopup($handle)
   if(Test-OwnedWarning $candidate){
-   $lastOwned=$candidate;$button=[EditorCloseFixture]::GetDlgItem($candidate,1)
-   # A visible dialog shell is not evidence that its expected child is ready.
+   $lastOwned=$candidate;$button=[EditorCloseFixture]::OnlyReadyButton($candidate)
+   # The actual hosted warning's sole OK button uses control ID2, not IDOK1.
+   # Identify its exact caption/identity instead of assuming any numeric ID.
    if(Test-ReadyOK $candidate $button){$popup=$candidate;$ok=$button;break}
   }
   Start-Sleep -Milliseconds 50
  }while([DateTime]::UtcNow -lt $until)
  if($popup -eq [IntPtr]::Zero){
   $diagnostic='no exact owned dialog';if(Test-OwnedWarning $lastOwned){$diagnostic=[EditorCloseFixture]::DescribeChildren($lastOwned)}
-  throw ('Exact owned close-warning dialog and ready IDOK did not appear: '+$diagnostic)
+  throw ('Exact owned close-warning dialog and unique ready OK button did not appear: '+$diagnostic)
  }
- if(!(Test-OwnedWarning $popup) -or [EditorCloseFixture]::GetDlgItem($popup,1) -ne $ok -or !(Test-ReadyOK $popup $ok)){throw 'Owned close warning or expected OK identity changed before acknowledgment'}
- if(![EditorCloseFixture]::PostMessage($popup,0x0111,[IntPtr]1,[IntPtr]::Zero)){throw 'Could not acknowledge owned informational close warning'}
+ if(!(Test-OwnedWarning $popup) -or [EditorCloseFixture]::OnlyReadyButton($popup) -ne $ok -or !(Test-ReadyOK $popup $ok)){throw 'Owned close warning or expected OK identity changed before acknowledgment'}
+ $controlID=[EditorCloseFixture]::GetDlgCtrlID($ok)
+ if(![EditorCloseFixture]::PostMessage($ok,0x00F5,[IntPtr]::Zero,[IntPtr]::Zero)){throw 'Could not invoke the exact owned informational OK button'}
  $until=[DateTime]::UtcNow.AddSeconds(5)
  while([EditorCloseFixture]::IsWindowVisible($popup) -and [DateTime]::UtcNow -lt $until){Start-Sleep -Milliseconds 50}
  if([EditorCloseFixture]::IsWindowVisible($popup)){throw 'Owned close warning did not dismiss'}
- @{action='Acknowledge close warning';hwnd=$WindowHandle;popup=$popup.ToInt64();pid=$OwnerProcessID;class='#32770';title='Close not approved'}|ConvertTo-Json -Compress
+ @{action='Acknowledge close warning';hwnd=$WindowHandle;popup=$popup.ToInt64();button=$ok.ToInt64();controlID=$controlID;caption='OK';pid=$OwnerProcessID;class='#32770';title='Close not approved'}|ConvertTo-Json -Compress
  exit 0
 }
 if($Action -eq 'RequestClose'){
