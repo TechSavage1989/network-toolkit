@@ -79,7 +79,20 @@ func nativeFileDragHeld(hwnd uintptr) bool {
 	front, _, _ := fileDragForeground.Call()
 	return pressed&0x8000 != 0 && front == hwnd
 }
+func nativeFileDragContext(parent context.Context, done <-chan struct{}) (context.Context, context.CancelFunc) {
+	ctx, cancel := context.WithCancel(parent)
+	go func() {
+		select {
+		case <-done:
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
+	return ctx, cancel
+}
 func (w *hostWindow) runNativeFileDrag(done <-chan struct{}) {
+	ctx, cancel := nativeFileDragContext(w.ctx, done)
+	defer cancel()
 	endpoint, ok := nativeFileDragEndpoint(w.cfg.URL)
 	if !ok {
 		return
@@ -91,7 +104,7 @@ func (w *hostWindow) runNativeFileDrag(done <-chan struct{}) {
 		select {
 		case <-done:
 			return
-		case <-w.ctx.Done():
+		case <-ctx.Done():
 			return
 		case <-tick.C:
 		}
@@ -99,7 +112,7 @@ func (w *hostWindow) runNativeFileDrag(done <-chan struct{}) {
 		if hwnd == 0 || !nativeFileDragHeld(hwnd) {
 			continue
 		}
-		req, e := http.NewRequestWithContext(w.ctx, http.MethodGet, endpoint+"/native", nil)
+		req, e := http.NewRequestWithContext(ctx, http.MethodGet, endpoint+"/native", nil)
 		if e != nil {
 			return
 		}
@@ -123,7 +136,7 @@ func (w *hostWindow) runNativeFileDrag(done <-chan struct{}) {
 		}
 		// A known start acknowledgement is required before OLE; ambiguous HTTP
 		// outcomes are reconciled on the same ID, never by starting a second drag.
-		if !nativeFileDragTransition(w.ctx, client, endpoint, w.cfg.SessionToken, job.ID, job.Gesture, "start", "") {
+		if !nativeFileDragTransition(ctx, client, endpoint, w.cfg.SessionToken, job.ID, job.Gesture, "start", "") {
 			continue
 		}
 		finished := make(chan struct{})
@@ -145,10 +158,10 @@ func (w *hostWindow) runNativeFileDrag(done <-chan struct{}) {
 		case <-finished:
 		case <-done:
 			return
-		case <-w.ctx.Done():
+		case <-ctx.Done():
 			return
 		}
-		if !nativeFileDragTransition(w.ctx, client, endpoint, w.cfg.SessionToken, job.ID, job.Gesture, "finish", outcome) {
+		if !nativeFileDragTransition(ctx, client, endpoint, w.cfg.SessionToken, job.ID, job.Gesture, "finish", outcome) {
 			return
 		}
 

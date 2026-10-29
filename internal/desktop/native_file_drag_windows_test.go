@@ -95,3 +95,15 @@ func TestNativeFileDragReconcilesLostTransitionResponses(t *testing.T) {
 		t.Fatal("known rejection retried")
 	}
 }
+
+func TestNativeFileDragStopsReconciliationWithOwningWindow(t *testing.T) {
+	done := make(chan struct{})
+	ctx, cancel := nativeFileDragContext(context.Background(), done)
+	defer cancel()
+	close(done)
+	select {
+	case <-ctx.Done():
+	case <-time.After(time.Second):
+		t.Fatal("owning HWND close did not cancel native receipts")
+	}
+}

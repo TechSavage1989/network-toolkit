@@ -381,10 +381,26 @@ func TestExplorerLocalRecursiveRootAndAncestorSwap(t *testing.T) {
 	j.mu.Unlock()
 	// Replacing the selected root itself also cannot redirect its retained handle.
 	moved := root + "-moved"
-	os.Remove(filepath.Join(root, "copy"))
-	os.Rename(root, moved)
+	if err := os.Remove(filepath.Join(root, "copy")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(root, moved); err != nil {
+		// Windows may deny renaming a directory held by os.Root. That is itself
+		// prevention, not an actual swap; never assert against a swap we did not do.
+		info, e := os.Lstat(root)
+		if e != nil || !os.SameFile(j.info, info) {
+			t.Fatal("failed root rename changed identity", err, e)
+		}
+		if _, e := os.Stat(filepath.Join(outside, "new")); !os.IsNotExist(e) {
+			t.Fatal("outside root changed")
+		}
+		t.Logf("OS prevented selected-root replacement while its handle is held: %v", err)
+		return
+	}
 	defer os.RemoveAll(moved)
-	os.Symlink(outside, root)
+	if err := os.Symlink(outside, root); err != nil {
+		t.Fatal("root replacement setup failed", err)
+	}
 	defer os.Remove(root)
 	if mkdir("new").Code == 200 {
 		t.Fatal("root replacement accepted")

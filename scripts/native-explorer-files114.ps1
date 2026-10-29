@@ -55,6 +55,14 @@ try {
   if(!$element){throw ('UIA element absent: '+$name)};return $element
  }
  function Invoke-Button($name){$element=Find-Element $native $name;$element.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()}
+ function Close-Copy {
+  Invoke-Button 'Cancel / Close'
+  $condition=New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NameProperty,'Drag prepared files and folders to Windows Explorer')
+  $until=[DateTime]::UtcNow.AddSeconds(15)
+  do{$old=[System.Windows.Automation.AutomationElement]::FromHandle($native).FindFirst([System.Windows.Automation.TreeScope]::Descendants,$condition);if($old){Start-Sleep -Milliseconds 100}}while($old -and [DateTime]::UtcNow -lt $until)
+  if($old){throw 'Copy modal did not close after its acknowledged cancellation'}
+ }
+
  function Drag-Point($x,$y,$toX,$toY,$cancel){
   [void][ExplorerDropMouse]::SetCursorPos($x,$y);[ExplorerDropMouse]::mouse_event(2,0,0,0,[UIntPtr]::Zero)
   try {
@@ -94,7 +102,7 @@ try {
  [void][ExplorerDropMouse]::SetCursorPos(20,680);[ExplorerDropMouse]::mouse_event(2,0,0,0,[UIntPtr]::Zero);Start-Sleep -Milliseconds 250;[ExplorerDropMouse]::mouse_event(4,0,0,0,[UIntPtr]::Zero)
  Start-Sleep -Milliseconds 300
  Invoke-Button 'Check quick release';[void](Find-Element $native 'Quick release did not arm ordinary click')
- Invoke-Button 'Cancel / Close';Invoke-Button 'Prepare Explorer copy'
+ Close-Copy;Invoke-Button 'Prepare Explorer copy'
  $until=[DateTime]::UtcNow.AddSeconds(15)
  do{$button=Find-Element $native 'Drag prepared files and folders to Windows Explorer';if(!$button.Current.IsEnabled){Start-Sleep -Milliseconds 100}}while(!$button.Current.IsEnabled -and [DateTime]::UtcNow -lt $until)
  if(!$button.Current.IsEnabled){throw 'Copy re-preparation after quick gesture timed out'}
@@ -105,7 +113,7 @@ try {
  do{Start-Sleep -Milliseconds 100}while(!(Test-Path -LiteralPath (Join-Path $DestinationDirectory 'outgoing-folder\nested\out.txt')) -and [DateTime]::UtcNow -lt $until)
  if(!(Test-Path -LiteralPath (Join-Path $DestinationDirectory 'outgoing-file.txt'))){throw 'Real file export missing'}
  if(!(Test-Path -LiteralPath (Join-Path $DestinationDirectory 'outgoing-folder\nested\out.txt'))){throw 'Real folder export missing'}
- Invoke-Button 'Cancel / Close'
+ Close-Copy
  [void][ExplorerDropMouse]::SetForegroundWindow($native);Invoke-Button 'Prepare Explorer copy'
  $until=[DateTime]::UtcNow.AddSeconds(15)
  do{$button=Find-Element $native 'Drag prepared files and folders to Windows Explorer';if(!$button.Current.IsEnabled){Start-Sleep -Milliseconds 100}}while(!$button.Current.IsEnabled -and [DateTime]::UtcNow -lt $until)
@@ -113,6 +121,6 @@ try {
  $r=$button.Current.BoundingRectangle
  Drag-Point ([int]($r.Left+$r.Width/2)) ([int]($r.Top+$r.Height/2)) 750 460 $true
  Start-Sleep -Milliseconds 400
- Invoke-Button 'Cancel / Close'
+ Close-Copy
  Write-Output 'Actual Windows Explorer folder import, file+folder export and Escape cancellation completed'
 } finally {$window.Quit()}

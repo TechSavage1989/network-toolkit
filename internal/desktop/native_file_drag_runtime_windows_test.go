@@ -54,6 +54,9 @@ func TestNativeExplorerFiles114(t *testing.T) {
 	os.WriteFile(filepath.Join(stage, "outgoing-file.txt"), []byte("SYNTHETIC OUTGOING FILE114\r\n"), 0600)
 	token := strings.Repeat("b7", 32)
 	id := strings.Repeat("a1", 16)
+	generation := 0
+	finishedIDs := map[string]bool{}
+	var trace []string
 	var mu sync.Mutex
 	state := "idle"
 	armed := false
@@ -162,11 +165,27 @@ document.getElementById('quickBaseline').onclick=()=>api('/quick-baseline','POST
 		if r.Method == "POST" {
 			var body struct {
 				Action  string `json:"action"`
+				ID      string `json:"id"`
 				Gesture uint64 `json:"gesture"`
 			}
 			json.NewDecoder(r.Body).Decode(&body)
+			trace = append(trace, fmt.Sprintf("%s action=%s job=%s gesture=%d state=%s", time.Now().UTC().Format(time.RFC3339Nano), body.Action, body.ID, body.Gesture, state))
+			if body.Action != "prepare" && body.ID != id {
+				if body.Action == "finish" {
+					if !finishedIDs[body.ID] {
+						finishedIDs[body.ID] = true
+						finishes++
+					}
+					json.NewEncoder(w).Encode(map[string]any{"id": body.ID, "state": "finished"})
+					return
+				}
+				http.Error(w, "stale fixture job", 409)
+				return
+			}
 			switch body.Action {
 			case "prepare":
+				generation++
+				id = fmt.Sprintf("%032x", generation)
 				state = "ready"
 				gesture = 0
 				revoked = 0
@@ -196,7 +215,10 @@ document.getElementById('quickBaseline').onclick=()=>api('/quick-baseline','POST
 				}
 				armed = false
 			case "finish":
-				finishes++
+				if !finishedIDs[body.ID] {
+					finishedIDs[body.ID] = true
+					finishes++
+				}
 				state = "finished"
 			case "cancel":
 				state = "cancelled"
@@ -252,6 +274,17 @@ document.getElementById('quickBaseline').onclick=()=>api('/quick-baseline','POST
 					e = ce
 				}
 				os.WriteFile(filepath.Join(out, "native-files114-driver.txt"), output, 0600)
+				mu.Lock()
+				os.WriteFile(filepath.Join(out, "native-files114-events.txt"), []byte(strings.Join(trace, "\n")), 0600)
+				mu.Unlock()
+				fileBytes, _ := os.ReadFile(filepath.Join(dest, "outgoing-file.txt"))
+				treeBytes, _ := os.ReadFile(filepath.Join(dest, "outgoing-folder", "nested", "out.txt"))
+				emptyInfo, emptyErr := os.Stat(filepath.Join(dest, "outgoing-folder", "empty"))
+				mu.Lock()
+				checkpoints := map[string]any{"complete": e == nil, "incomingBytesVerified": imports == 1, "junctionTargetNotTraversed": linkNegatives == 1, "quickReleaseNegative": quickChecks == 1, "outgoingFileBytesVerified": string(fileBytes) == "SYNTHETIC OUTGOING FILE114\r\n", "outgoingFolderBytesVerified": string(treeBytes) == "SYNTHETIC OUTGOING TREE114\r\n", "emptyFolderVerified": emptyErr == nil && emptyInfo.IsDir(), "nativeStarts": starts, "nativeFinishes": finishes}
+				mu.Unlock()
+				raw, _ := json.MarshalIndent(checkpoints, "", "  ")
+				os.WriteFile(filepath.Join(out, "native-files114-checkpoints.json"), raw, 0600)
 			}
 			if e != nil {
 				result <- fmt.Errorf("actual Explorer gestures: %w: %s", e, output)

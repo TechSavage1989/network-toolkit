@@ -21,7 +21,9 @@ jobs:
           GOMEMLIMIT: 512MiB
         run: |
           go test -mod=vendor ./cmd/network-toolkit -run 'TestExplorer|TestLocalExplorer' -count=1 -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           node --test scripts/files-tree114.test.cjs scripts/native-copy114.test.cjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Actual Windows Explorer bidirectional files folders cancellation and junction boundary
         env:
           GOTOOLCHAIN: local
