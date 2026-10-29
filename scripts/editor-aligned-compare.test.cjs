@@ -119,3 +119,12 @@ test('public native reset preserves exact immutable source state, selection, ext
  view.hasFocus=false;let focusCalls=0;view.focus=()=>focusCalls++;api.resetNativeOrigin(view);assert.equal(focusCalls,0,'never steal focus from another pane/control');
  const source=fs.readFileSync(require.resolve('../web/assets/editor-aligned-compare.js'),'utf8');assert(source.includes('mapDrag!==null||sides.some(side=>Object.values(inputBusy[side]).some(Boolean))'),'input on either pane blocks both native repairs');assert(source.includes('!!mismatch&&!interacting(side)&&!bound[side]?.frozen&&!bound[side]?.loading'));assert(source.includes('value=>pixelReady&&stable(value.epoch,value.stamp)'),'same source/revision and no composition checked again at deferred dispatch');assert(source.includes('geometry.sourceOffsets[side][mismatch.line-1]+mismatch.fraction*sourceHeights[side][mismatch.line-1]'),'restore captured logical source/fraction through the existing reconciler');assert(!source.includes("querySelectorAll('.cm-gutterElement')"),'no gutter DOM workaround');
 });
+
+test('map wheel, map keyboard and divider gestures share the same deferred-repair exclusion',()=>{
+ const source=fs.readFileSync(require.resolve('../web/assets/editor-aligned-compare.js'),'utf8');
+ assert(source.includes("if(!pixelReady)return;inputBusy[side].wheel=true;"));
+ assert(source.includes("if(!pixelReady||!geometry||!sourceHeights)return;inputBusy[side].key=true;"));
+ assert(source.includes("divider.addEventListener(event,()=>{inputBusy.left[event==='keydown'?'key':'pointer']=true;"));
+ assert(source.includes("addEventListener('scrollend',()=>{inputBusy[side].wheel=false;"));
+ assert(source.includes("root.removeEventListener(event,endInteraction)"));
+});
