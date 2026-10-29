@@ -33,7 +33,16 @@ async function start(root,mode,label,initialSaved){
  await page.locator('[data-ed-text]').press('Control+Home');await page.locator('[data-ed-text]').press('X');
  await page.waitForFunction(()=>NetworkToolkitEditorWindows.state.enabled&&!NetworkToolkitEditorWindows.state.running);return {page,context,requests,get saved(){return saved;}};
 }
-async function geometry(page,compare){return page.evaluate(compare=>{const el=document.querySelector(compare?'.nt-compare-surface':'.nt-editor-surface'),r=el.getBoundingClientRect();let top=Math.max(0,r.top),bottom=Math.min(innerHeight,r.bottom);for(let parent=el.parentElement;parent;parent=parent.parentElement){if(/hidden|auto|scroll|clip/.test(getComputedStyle(parent).overflowY)){const p=parent.getBoundingClientRect();top=Math.max(top,p.top);bottom=Math.min(bottom,p.bottom);}}return {x:r.x,y:r.y,width:r.width,height:r.height,visibleHeight:Math.max(0,bottom-top),viewportWidth:innerWidth,viewportHeight:innerHeight,overflow:Math.max(0,document.documentElement.scrollWidth-innerWidth)};},compare);}
+// Historical toolbar-height measurements must use the same sidebar state.
+// v115 intentionally opens the permanent Files sidebar by default; v112 did
+// not. Its default-open browsing layout is covered separately by files115.
+async function collapseFiles(page){
+ const close=page.locator('[data-editor-files-close]');
+ if(await close.isVisible())await close.click();
+ await page.waitForFunction(()=>{const sidebar=document.querySelector('[data-ed-files-sidebar]');return !sidebar||sidebar.hidden;});
+ await settle(page);
+}
+async function geometry(page,compare){return page.evaluate(compare=>{const el=document.querySelector(compare?'.nt-compare-surface':'.nt-editor-surface'),r=el.getBoundingClientRect();let top=Math.max(0,r.top),bottom=Math.min(innerHeight,r.bottom);for(let parent=el.parentElement;parent;parent=parent.parentElement){if(/hidden|auto|scroll|clip/.test(getComputedStyle(parent).overflowY)){const p=parent.getBoundingClientRect();top=Math.max(top,p.top);bottom=Math.min(bottom,p.bottom);}}const area=document.querySelector('.nt-editor-document-area'),rail=document.querySelector('[data-editor-files-reopen]'),sidebar=document.querySelector('[data-ed-files-sidebar]');return {x:r.x,y:r.y,width:r.width,height:r.height,visibleHeight:Math.max(0,bottom-top),documentAreaWidth:area.getBoundingClientRect().width,sidebarRailWidth:rail&&!rail.hidden?rail.getBoundingClientRect().width:0,sidebarCollapsed:!sidebar||sidebar.hidden,viewportWidth:innerWidth,viewportHeight:innerHeight,overflow:Math.max(0,document.documentElement.scrollWidth-innerWidth)};},compare);}
 async function selectionCheckpoint(page,label,expected){const actual=await snapshot(page);(report.selectionTransitions||=[]).push({label,start:actual.start,end:actual.end,top:actual.top,dirty:actual.dirty,revision:actual.revision});assert.deepEqual(actual,expected,label);}
 async function snapshot(page){return page.evaluate(()=>{const d=NetworkToolkitFileEditor.active,ta=document.querySelector('[data-ed-text]');return {uid:d.uid,text:d.content,dirty:d.dirty,undo:[...d.undo],revision:d.editRevision,start:ta.selectionStart,end:ta.selectionEnd,top:ta.scrollTop,left:ta.scrollLeft};});}
 async function imagesReady(page){await page.waitForFunction(()=>[...document.images].every(image=>image.complete&&image.naturalWidth>0));}
@@ -63,9 +72,12 @@ async function compareTabScenario(page,mode){
   for(const compare of [false,true]){
    if(compare)for(const fixture of [before,after]){await fixture.page.locator('[data-ed="compare"]').click();await fixture.page.selectOption('[data-compare-select="left"]','layout-left');await fixture.page.selectOption('[data-compare-select="right"]','layout-right');await fixture.page.waitForFunction(()=>document.querySelector('[data-compare-map]')?.getAttribute('aria-disabled')==='false');}
    for(const width of [1440,820,390])for(const theme of ['light','dark']){
-    for(const fixture of [before,after]){await fixture.page.setViewportSize({width,height:1000});await fixture.page.evaluate(theme=>setTheme(theme),theme);await settle(fixture.page);await imagesReady(fixture.page);if(compare)await fixture.page.waitForFunction(()=>document.querySelector('[data-compare-map]')?.getAttribute('aria-disabled')==='false');}
+    for(const fixture of [before,after]){await fixture.page.setViewportSize({width,height:1000});await fixture.page.evaluate(theme=>setTheme(theme),theme);await settle(fixture.page);await collapseFiles(fixture.page);await imagesReady(fixture.page);if(compare)await fixture.page.waitForFunction(()=>document.querySelector('[data-compare-map]')?.getAttribute('aria-disabled')==='false');}
     lastPage=after.page;const old=await geometry(before.page,compare),now=await geometry(after.page,compare);report.currentLayout={mode,compare,width,theme,before:old,after:now,gain:now.visibleHeight-old.visibleHeight};
     const layoutCheck=(condition,label,details)=>{if(!condition){const violation={...report.currentLayout,label,details};report.layoutViolations.push(violation);console.error('LAYOUT VIOLATION '+JSON.stringify(violation));}};
+    layoutCheck(old.sidebarCollapsed&&now.sidebarCollapsed,'Historical toolbar benchmark uses collapsed Files on both versions',{before:old,after:now});
+    layoutCheck(Math.abs((now.documentAreaWidth+now.sidebarRailWidth)-(old.documentAreaWidth+old.sidebarRailWidth))<=1,'Matched document workspace width apart from the intentional collapsed Files rail',{before:old,after:now});
+    layoutCheck(now.sidebarRailWidth<=28,'Collapsed Files remains a compact rail',now);
     layoutCheck(now.overflow<=1,'No horizontal overflow',now);layoutCheck(now.visibleHeight>=old.visibleHeight-1,'Toolbar cleanup must not reduce the actual editable viewport');
     if(mode!=='modal'&&width===1440)layoutCheck(now.visibleHeight-old.visibleHeight>=20,'Removing redundant disclosure row must return usable document height');
     layoutCheck(await after.page.locator('[data-ed-panel-toggle="local"]').count()===0,'No redundant local disclosure toggle');layoutCheck(await after.page.locator('#ntEditorLocalPanel').count()===0,'No redundant local disclosure panel');layoutCheck(await after.page.locator('.nt-editor-toolbar [data-ed-panel-toggle="remote"]').count()===0,'Connections belong in Files, not the primary toolbar');
