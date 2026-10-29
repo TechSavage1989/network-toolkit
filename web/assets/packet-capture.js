@@ -628,6 +628,10 @@ function syncPacketDetailMap(scroll){
   const current=Number(lane.scrollTop)||0,maxTop=Math.max(0,model.total*mapLineHeight()-laneHeight);
   const destination=clamp(position.top<current?position.top:position.top+position.height>current+laneHeight?position.top+position.height-laneHeight:current,0,maxTop);
   if(Math.abs(current-destination)>0.5){model.mapExpectedTop=destination;lane.scrollTop=destination;}
+  // A larger reader can make the browser clamp the map before this sync runs.
+  // Acknowledge only that impossible old offset at the new maximum; an ordinary
+  // wheel offset must still reach the native scroll handler below.
+  else if(model.mapExpectedTop>maxTop&&Math.abs(current-maxTop)<0.5)model.mapExpectedTop=current;
  }
  overlay.style.transform='translate3d(0,'+position.top+'px,0)';
  overlay.style.height=position.height+'px';
@@ -680,6 +684,8 @@ function syncOverviewMap(scroll){
   const current=Number(bar.scrollTop)||0,maxTop=Math.max(0,model.total*scale-laneHeight);
   const destination=clamp(position.top<current?position.top:position.top+position.height>current+laneHeight?position.top+position.height-laneHeight:current,0,maxTop);
   if(Math.abs(destination-current)>0.5){model.overviewMapExpectedTop=destination;bar.scrollTop=destination;}
+  // As with the fine map, a layout clamp is not a new navigation gesture.
+  else if(model.overviewMapExpectedTop>maxTop&&Math.abs(current-maxTop)<0.5)model.overviewMapExpectedTop=current;
  }
  overlay.style.transform='translate3d(0,'+position.top+'px,0)';overlay.style.height=position.height+'px';
  renderPacketOverviewLines();
@@ -864,11 +870,19 @@ async function selectPacket(number,{hold=true}={}){
  if(hold){model.graphSelectionVersion=(model.graphSelectionVersion||0)+1;model.graphHold=true;model.liveDetails=false;model.heldPacketNumber=number;model.intervalSelection=null;model.graphHeldEnd=model.statistics?.graphFinished||model.statistics?.finished||'';packetTimelineState().follow=false;preferences().hidden=false;}
  const relative=model.loaded.findIndex(p=>p.number===number);
  if(relative>=0){model.selectedIndex=model.windowStart+relative;updateMapSelection();}
- const id=model.selected,requestID=++model.detailRequest;
- if(model.detail?.packet?.number===number){renderDetail();return;}
+ const id=model.selected,requestID=++model.detailRequest,sequence=model.sequence,reader=node('packetTableScroll'),scrollTop=Number(reader?.scrollTop)||0;
+ const renderSelection=()=>{
+  // Opening a deliberately selected packet can move Auto details from bottom
+  // to right. Reveal that same row after the synchronous layout, but do not
+  // override a newer scroll, capture, filter, selection or navigation intent.
+  const reveal=hold&&visible()&&model.view==='packets'&&model.selected===id&&model.sequence===sequence&&model.detailRequest===requestID&&model.heldPacketNumber===number&&model.graphHold&&reader===node('packetTableScroll')&&Math.abs((Number(reader?.scrollTop)||0)-scrollTop)<.5;
+  renderDetail();
+  if(reveal){ensurePacketRowVisible(number);updateMapViewport();}
+ };
+ if(model.detail?.packet?.number===number){renderSelection();return;}
  try{const value=await request('/'+id+'/packet/'+number);if(!visible()||model.selected!==id||requestID!==model.detailRequest)return;model.detail=value;model.range=null;const bucketIndex=packetBucketForPacket(value.packet),selection=packetTimelineState();if(hold&&bucketIndex>=0){selection.pinned=true;selection.index=bucketIndex;selection.pin={...model.statistics.timeline[bucketIndex],_includesEnd:model.statistics.timeline[bucketIndex].endInclusive===true||bucketIndex===model.statistics.timeline.length-1};}updatePacketTimeline();
   for(const row of document.querySelectorAll('#packetTableScroll [data-packet-number]')){const selected=Number(row.dataset.packetNumber)===number;row.classList.toggle('selected',selected);row.setAttribute('aria-selected',String(selected));}
-  renderDetail();
+  renderSelection();
  }catch(e){if(requestID===model.detailRequest)error(e.message);}
 }
 function plainPacketHTML(p){

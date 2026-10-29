@@ -781,3 +781,49 @@ test('a disappearing selected adapter is retained as unavailable, never silently
  picker().value=other;h.doc.emit('change',picker());assert.equal(picker().value,other);assert.equal(h.doc.querySelector('[data-packet-action="start"]').disabled,false);
  picker().value='nics';h.doc.emit('change',picker());assert.equal(picker().value,'nics');assert.equal(h.api.model.interfaceSelection,'nics');
 });
+
+test('explicit packet selection re-reveals its row after Auto docking changes geometry, including cached details',async()=>{
+ const capture={id:'c'.repeat(24),name:'Synthetic docking selection',state:'completed',count:1,revision:1},h=harness(capture);await h.settle();h.doc.emit('click',h.doc.querySelector('[data-packet-view="packets"]'));await h.settle();
+ const area=h.doc.getElementById('packetCaptureAnalysis'),reader=h.doc.getElementById('packetTableScroll'),row=reader.querySelector('[data-packet-number="1"]');area.getBoundingClientRect=()=>({width:800,height:400});h.doc.getElementById('packetGraphDock').hidden=true;reader.clientHeight=100;reader.scrollTop=0;reader.getBoundingClientRect=()=>({top:100,bottom:200,height:100,width:400});row.getBoundingClientRect=()=>{const top=(area.classList.contains('packet-details-bottom')?130:600)-reader.scrollTop;return {top,bottom:top+21,height:21,width:400};};
+ h.api.layoutDetails();assert.equal(area.classList.contains('packet-details-bottom'),true);h.doc.emit('click',row);await h.settle();assert.equal(area.classList.contains('packet-details-bottom'),false);assert.equal(h.api.model.detail.packet.number,1);assert.equal(reader.scrollTop,421);assert.equal(row.getBoundingClientRect().bottom,200,'same selected row remains fully visible after the dock switch');
+ h.api.model.graphHold=false;h.api.refreshTimeDisplay();const cachedRow=reader.querySelector('[data-packet-number="1"]');cachedRow.getBoundingClientRect=row.getBoundingClientRect;reader.scrollTop=0;h.doc.emit('click',cachedRow);await h.settle();assert.equal(reader.scrollTop,421,'the cached-details branch restores the same post-layout row');
+ reader.scrollTop=20;h.api.refreshTimeDisplay();assert.equal(reader.scrollTop,20,'ordinary background detail rendering does not re-reveal a held row');
+});
+test('late explicit packet detail completion does not override newer scroll, filter or page intent',async()=>{
+ for(const action of ['scroll','filter','page']){
+  let complete;const capture={id:'b'.repeat(24),name:'Synthetic late selection',state:'completed',count:1,revision:1},h=harness(capture,{detail:()=>new Promise(resolve=>complete=resolve)});await h.settle();h.doc.emit('click',h.doc.querySelector('[data-packet-view="packets"]'));await h.settle();
+  const area=h.doc.getElementById('packetCaptureAnalysis'),reader=h.doc.getElementById('packetTableScroll'),row=reader.querySelector('[data-packet-number="1"]');area.getBoundingClientRect=()=>({width:800,height:400});h.doc.getElementById('packetGraphDock').hidden=true;reader.clientHeight=100;reader.scrollTop=0;reader.getBoundingClientRect=()=>({top:100,bottom:200,height:100,width:400});row.getBoundingClientRect=()=>({top:600-reader.scrollTop,bottom:621-reader.scrollTop,height:21,width:400});h.api.layoutDetails();h.doc.emit('click',row);await h.settle();
+  if(action==='scroll')reader.scrollTop=50;else if(action==='filter')h.api.model.sequence++;else h.c.state.activePage='ping';
+  complete({packet:{number:1,protocol:'TCP',expert:[]},layers:[],data:''});await h.settle();assert.equal(reader.scrollTop,action==='scroll'?50:0,action+' intent must not be displaced by late inspector layout');
+ }
+});
+
+
+test('native map clamp after docking is acknowledged without converting it into packet navigation',async()=>{
+ for(const kind of ['fine','overview']){
+  const n=402,packets=Array.from({length:n},(_,i)=>({number:i+1,relative:i/100,source:'192.0.2.1',destination:'192.0.2.2',protocol:'UDP',length:60,captured:60,info:String(i),expert:[]}));
+  const h=harness({id:'d'.repeat(24),name:'Synthetic map clamp',state:'completed',count:n,revision:1},{packets,total:n,paginate:true});await h.settle();h.doc.emit('click',h.doc.querySelector('[data-packet-view="packets"]'));await h.settle();
+  if(kind==='overview'){h.c.state.packetMapSettings.overviewScale=1;h.api.refreshTimeDisplay();}
+  const reader=h.doc.getElementById('packetTableScroll'),map=h.doc.getElementById(kind==='fine'?'packetDetailMap':'packetOverviewMap'),expected=kind==='fine'?'mapExpectedTop':'overviewMapExpectedTop';
+  h.api.model.measuredRowHeight=21;h.api.model.measuredHeaderHeight=29.5;
+  reader.scrollHeight=n*21+29.5;reader.clientHeight=244;reader.scrollTop=8228;map.clientHeight=244;
+  // Actual native trace: the old 140px-high map ended at262; docking enlarges
+  // it to244px and the browser clamps it to158 before sending scroll events.
+  map.scrollTop=158;h.api.model[expected]=262;
+  h.doc.emit('scroll',reader);assert.equal(h.api.model[expected],158,kind+' acknowledges only the proven geometry clamp');
+  h.doc.emit('scroll',map);assert.equal(reader.scrollTop,8228,kind+' native clamp must not recenter selected frame402');
+  map.scrollTop=100;h.doc.emit('scroll',map);assert.notEqual(reader.scrollTop,8228,kind+' next genuine wheel scroll still navigates');
+  await h.settle();
+ }
+});
+test('map synchronization does not swallow a real wheel offset merely because the old expected offset became invalid',async()=>{
+ for(const kind of ['fine','overview']){
+  const h=harness({id:'e'.repeat(24),name:'Synthetic real wheel',state:'completed',count:402,revision:1},{total:402});await h.settle();h.doc.emit('click',h.doc.querySelector('[data-packet-view="packets"]'));await h.settle();
+  if(kind==='overview'){h.c.state.packetMapSettings.overviewScale=1;h.api.refreshTimeDisplay();}
+  const reader=h.doc.getElementById('packetTableScroll'),map=h.doc.getElementById(kind==='fine'?'packetDetailMap':'packetOverviewMap'),expected=kind==='fine'?'mapExpectedTop':'overviewMapExpectedTop';
+  h.api.model.measuredRowHeight=21;h.api.model.measuredHeaderHeight=29.5;
+  reader.scrollHeight=402*21+29.5;reader.clientHeight=244;reader.scrollTop=21*150+29.5;map.clientHeight=244;map.scrollTop=100;h.api.model[expected]=262;
+  h.doc.emit('scroll',reader);assert.equal(h.api.model[expected],262,kind+' interior offset is not evidence of a native clamp');
+  const before=reader.scrollTop;h.doc.emit('scroll',map);assert.notEqual(reader.scrollTop,before,kind+' genuine interior wheel is processed');await h.settle();
+ }
+});
