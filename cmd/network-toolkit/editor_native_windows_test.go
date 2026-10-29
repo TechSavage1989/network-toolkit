@@ -108,6 +108,9 @@ func TestNativeEditorTransferInstalledWebView2(t *testing.T) {
 		if err == nil {
 			err = h.exerciseDrag()
 		}
+		if err == nil {
+			err = h.exerciseClose113()
+		}
 		if err != nil && ctx.Err() == nil {
 			_ = h.capture("", "failure-owner")
 			h.mu.Lock()
@@ -150,11 +153,12 @@ type nativeEditorCommand struct {
 	Mode        string   `json:"mode,omitempty"`
 	Destination string   `json:"destination,omitempty"`
 	Texts       []string `json:"texts,omitempty"`
+	Enabled     bool     `json:"enabled"`
 }
 type nativeEditorDocument struct {
 	ID, UID, Path, Source, Hash, Content, Original, Saved, EOL, Encoding, Language string
 	SavedEOL, SavedEncoding                                                        string
-	Dirty, BOM, SavedBOM, Untitled, Frozen, Staged                                 bool
+	Dirty, BOM, SavedBOM, Untitled, Frozen, Staged, Saving, SaveFailed             bool
 	Undo, Redo                                                                     []string
 	View, CompareView                                                              *editorSelection
 	Binding                                                                        editorBinding
@@ -164,10 +168,10 @@ type nativeEditorSnapshot struct {
 	Documents []nativeEditorDocument
 	Active    string
 	Window    struct {
-		Enabled, Running, DragPreparing bool
-		Self, Error                     string
-		Owned                           map[string]uint64
-		Outgoing, Incoming              int
+		Enabled, Running, DragPreparing, Closing bool
+		Self, Error                              string
+		Owned                                    map[string]uint64
+		Outgoing, Incoming                       int
 	}
 	Textarea struct {
 		Value      string
@@ -181,10 +185,12 @@ type nativeEditorSnapshot struct {
 		Armed, Started, Ready bool
 		UID                   string
 	}
-	Startup          int
-	NativeCapability bool
-	Location         string
-	Errors           []string
+	CloseDialog, AskSaveBeforeClose bool
+	Message                         string
+	Startup                         int
+	NativeCapability                bool
+	Location                        string
+	Errors                          []string
 }
 type nativeEditorRect struct{ Left, Top, Width, Height float64 }
 type nativeEditorTabRect struct {
@@ -224,6 +230,7 @@ type nativeEditorFixture struct {
 	failedLaunches            atomic.Int32
 	pointerDrags              atomic.Int32
 	dragComplete              bool
+	closePreferenceComplete   bool
 	gestures                  []json.RawMessage
 }
 
@@ -479,7 +486,7 @@ func (h *nativeEditorFixture) transfer(source, destination, mode string, expecte
 		return err
 	})
 }
-func (h *nativeEditorFixture) transferAction(source, destination string, expected []nativeEditorDocument, active string, action func() error) (string, nativeEditorSnapshot, error) {
+func (h *nativeEditorFixture) transferAction(source, destination string, expected []nativeEditorDocument, active string, action func() error, checks ...nativeEditorCloseTransferCheck) (string, nativeEditorSnapshot, error) {
 	release := h.holdAcceptance()
 	defer release()
 	if err := action(); err != nil {
@@ -544,6 +551,11 @@ func (h *nativeEditorFixture) transferAction(source, destination string, expecte
 	if protected.Active == active && !protected.Textarea.Disabled {
 		return actualDestination, staged, errors.New("source active textarea remained editable during move")
 	}
+	if len(checks) > 0 && checks[0].BeforeACK != nil {
+		if err := checks[0].BeforeACK(actualDestination); err != nil {
+			return actualDestination, staged, err
+		}
+	}
 	release()
 	accepted, err := h.waitState(actualDestination, "destination becomes sole editable owner after ACK", func(state nativeEditorSnapshot) bool {
 		for _, d := range expected {
@@ -569,6 +581,9 @@ func (h *nativeEditorFixture) transferAction(source, destination string, expecte
 		if !valid {
 			return actualDestination, accepted, errors.New("ACK did not grant exclusive backend ownership")
 		}
+	}
+	if len(checks) > 0 && checks[0].SourceExits {
+		return actualDestination, accepted, h.waitClosed113(source)
 	}
 	if _, err = h.waitState(source, "source releases moved documents only after ACK", func(state nativeEditorSnapshot) bool {
 		for _, d := range expected {
@@ -767,13 +782,14 @@ func (h *nativeEditorFixture) exercise() error {
 func (h *nativeEditorFixture) writeReport(err error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	report := map[string]any{"passed": err == nil, "actualTabPointerDrags": h.dragComplete, "pointerDragCount": h.pointerDrags.Load(), "tabGestureEvidence": h.gestures, "tabGestureScope": "Win32 mouse input into actual installed WebView2; DOM fixture creates synthetic text and observes state, never dispatches drag events", "actualNativeWebView2": true, "productionChildCLI": true, "realApplicationBackendAndRegistry": true, "productionAuthenticationAndOriginChecks": true, "testOnlyDOMAutomation": true, "productionBridgeChanges": false, "syntheticUnsavedDocumentsOnly": true, "scope": "Real parent native host and separately built production --editor-view children; fixture chooses child executable and decorates test HTTP document with DOM automation only; no main CLI/storage lifecycle assertion", "phases": h.phases, "nativeCaptures": h.captures, "childProcesses": len(h.children), "realFailedLaunches": h.failedLaunches.Load(), "blockedUnexpectedOperations": h.blocked, "driverFailures": h.failures}
+	report := map[string]any{"passed": err == nil, "actualTabPointerDrags": h.dragComplete, "pointerDragCount": h.pointerDrags.Load(), "tabGestureEvidence": h.gestures, "tabGestureScope": "Win32 mouse input into actual installed WebView2; DOM fixture creates synthetic text and observes state, never dispatches drag events", "actualNativeWebView2": true, "productionChildCLI": true, "realApplicationBackendAndRegistry": true, "productionAuthenticationAndOriginChecks": true, "testOnlyDOMAutomation": true, "productionBridgeChanges": false, "syntheticUnsavedDocumentsOnly": true, "scope": "Real parent native host and separately built production --editor-view children; fixture chooses child executable and decorates test HTTP document with DOM automation only; no main CLI/storage lifecycle assertion", "closePreference113": h.closePreferenceComplete, "phases": h.phases, "nativeCaptures": h.captures, "childProcesses": len(h.children), "realFailedLaunches": h.failedLaunches.Load(), "blockedUnexpectedOperations": h.blocked, "driverFailures": h.failures}
 	if err != nil {
 		report["error"] = err.Error()
 	}
 	raw, _ := json.MarshalIndent(report, "", "  ")
 	_ = os.WriteFile(filepath.Join(h.output, "native-editor108-report.json"), raw, 0600)
 	_ = os.WriteFile(filepath.Join(h.output, "native-editor110-drag-report.json"), raw, 0600)
+	_ = os.WriteFile(filepath.Join(h.output, "native-editor113-close-report.json"), raw, 0600)
 }
 
 func (h *nativeEditorFixture) cleanup() {

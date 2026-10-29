@@ -66,6 +66,12 @@ jobs:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results
         run: node scripts/editor-alignment113.browser.cjs
+      - name: Check loaded editor activity and guarded close preferences
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results
+        run: node scripts/editor-activity-close113.browser.cjs
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -587,6 +593,27 @@ jobs:
           test "$(git rev-parse FETCH_HEAD)" = d3494a879604fb2523e0867ad1fb175a2f9abbf5
           mkdir -p "$RUNNER_TEMP/ntk-graph-baseline109"
           git archive d3494a879604fb2523e0867ad1fb175a2f9abbf5 | tar -xf - -C "$RUNNER_TEMP/ntk-graph-baseline109"
+      - name: Prepare exact published112 UI for graph and reader comparisons
+        if: success() || failure()
+        run: |
+          git fetch --no-tags --depth=1 origin 4d05f6a5a4eb1c315d0a19ccf2eb8daedf2dcb1c
+          test "$(git rev-parse FETCH_HEAD)" = 4d05f6a5a4eb1c315d0a19ccf2eb8daedf2dcb1c
+          mkdir -p "$RUNNER_TEMP/ntk-ui-baseline112"
+          git archive 4d05f6a5a4eb1c315d0a19ccf2eb8daedf2dcb1c | tar -xf - -C "$RUNNER_TEMP/ntk-ui-baseline112"
+      - name: Check pinned graph endpoints and interactive compression curves
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_UI_BASELINE_DIR: ${{ runner.temp }}/ntk-ui-baseline112
+        run: node scripts/graph-curve113.browser.cjs
+      - name: Check concise result readers and preserved technical fields
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_UI_BASELINE_DIR: ${{ runner.temp }}/ntk-ui-baseline112
+        run: node scripts/result-readers113.browser.cjs
       - name: Check exact saved sessions, persistent filter controls and recorded sources
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright

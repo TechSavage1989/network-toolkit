@@ -6,6 +6,8 @@ function create(options={}){
  let requestTail=Promise.resolve();
  let request=options.request,adapter=options.adapter,available=options.available||(()=>false),self=options.self||'',enabled=false,stopped=false,timer=null,running=false,error='',instance='',owned={},views=[],lastCheckpoint='',closing=false,detaching=false,dragPreparing=false,closeAfterReturn=false,receivedAny=false,closeCancellationPending=false;
  const outgoing=new Map(),incoming=new Map(),receipts=new Set(),handledDrags=new Map();
+ let activityPending=null,lastActivity=null,activityAvailable=options.activityAvailable||(()=>false);
+ const activityReadable=()=>{try{return !stopped&&!closing&&typeof request==='function'&&activityAvailable()===true&&(!self||supported());}catch{return false;}};
  const getAdapter=()=>typeof adapter==='function'?adapter():adapter;
  const docs=()=>getAdapter()?.documents?.()||[];
  const id=()=>{const bytes=new Uint8Array(16);if(!root.crypto?.getRandomValues)throw Error('Secure window identity is unavailable.');root.crypto.getRandomValues(bytes);return [...bytes].map(x=>x.toString(16).padStart(2,'0')).join('');};
@@ -26,13 +28,22 @@ function create(options={}){
   try{const result=await call('/transfers/'+t.id+'/accept','POST',{});if(result.state==='accepted'){owned={...owned,...result.leases};activate(t.id);}}catch(e){note('Waiting to confirm document ownership. The staged tabs remain read-only. '+e.message);}
  }
  function activate(id){const pending=incoming.get(id);if(!pending)return;getAdapter().activate(pending.ids);if(pending.applyPreferences)getAdapter().applyPreferences?.(pending.batch.preferences);getAdapter().restoreLayout?.(pending.batch.layout,{merge:!pending.applyPreferences});receivedAny=true;getAdapter().restoreCompare?.(pending.batch.compare);incoming.delete(id);lastCheckpoint='';note('Documents received with editing history and position intact.');}
+ function reportActivity(){
+  if(!activityReadable()||!getAdapter()?.activityDocuments)return false;
+  const rows=getAdapter().activityDocuments().map(d=>({uid:d.uid,lease:owned[d.uid]||0,loaded:d.loaded===true})),signature=JSON.stringify(rows);
+  if(signature===lastActivity||activityPending)return false;
+  const deadline=Date.now()+1000;
+  // Fire-and-forget metadata must never delay the read-only activity endpoint.
+  // The existing serialized channel and dispatch deadline bound queued work.
+  activityPending=call('/current/activity','POST',{documents:rows},()=>{if(!activityReadable()||Date.now()>deadline)throw Error('Editor activity update superseded.');}).then(()=>{lastActivity=signature;},()=>{}).finally(()=>{activityPending=null;});return true;
+ }
  async function checkpoint(){if(!getAdapter()?.checkpoint||outgoing.size||incoming.size||closing)return;const current=docs();for(const uid of Object.keys(owned)){if(!current.some(d=>d.uid===uid)){await call('/documents/'+encodeURIComponent(uid)+'/release','POST',{lease:owned[uid]});delete owned[uid];}}
   if(!current.length)return;const eligible=current.filter(d=>!getAdapter().canTransfer([d.uid])).map(d=>d.uid);if(!eligible.length)return;let batch;try{batch=getAdapter().checkpoint(eligible);}catch{return;}const serialized=JSON.stringify(batch);if(serialized===lastCheckpoint)return;const response=await call('/current/state','POST',{batch,leases:leases(idsOf(batch))});if(response?.owned)owned={...response.owned};lastCheckpoint=serialized;
  }
  async function poll(){if(closing)return;if(running||detaching||dragPreparing||!supported()){if(enabled)schedule();return;}enabled=true;running=true;let claimedDrag=null;render();try{
    const state=await call('');if(!state||state.available!==true||!state.owned||!Array.isArray(state.incoming)||!Array.isArray(state.outgoing))throw Error('Editor window ownership is unavailable.');
    if(instance&&instance!==state.ownerInstanceId)throw Error('The local engine restarted. Keep these documents open and use Save copy before closing; ownership cannot be assumed.');
-   instance=state.ownerInstanceId||instance;self=state.self||'';owned={...state.owned};views=Array.isArray(state.views)?state.views:[];root.NetworkToolkitEditorFiles?.syncRequests?.(state.explorerRequests);root.NetworkToolkitEditorSavedConnections?.syncRequests?.(state.savedConnectionRequests);
+   instance=state.ownerInstanceId||instance;self=state.self||'';if(self)getAdapter()?.setClosePolicy?.(state.askSaveBeforeClose);owned={...state.owned};views=Array.isArray(state.views)?state.views:[];root.NetworkToolkitEditorFiles?.syncRequests?.(state.explorerRequests);root.NetworkToolkitEditorSavedConnections?.syncRequests?.(state.savedConnectionRequests);
    for(const [ticket,at]of handledDrags)if(Date.now()-at>35000)handledDrags.delete(ticket);
    if(!outgoing.size&&!incoming.size&&Array.isArray(state.dragRequests))claimedDrag=state.dragRequests.find(t=>/^[a-f0-9]{32}$/.test(t.ticket||'')&&!handledDrags.has(t.ticket)&&typeof t.uid==='string'&&Number.isSafeInteger(t.lease)&&t.lease>0&&owned[t.uid]===t.lease&&typeof t.destination==='string')||null;
    for(const t of state.outgoing)acceptMetadata(t);
@@ -42,8 +53,8 @@ function create(options={}){
    for(const [key,pending]of outgoing){if(!state.outgoing.some(t=>t.id===key)){try{acceptMetadata(await call('/transfers','POST',pending.request));}catch(e){note('The move is awaiting an authoritative response; original tabs stay protected. '+e.message);}}}
    for(const t of state.incoming)await receive(t);
    if(Array.isArray(state.recovery)&&state.recovery.length){const missing=state.recovery.filter(d=>!docs().some(old=>old.uid===d.uid));if(missing.length){const batch={documents:missing,active:missing[0].uid,compare:null};const ids=await getAdapter().stage(batch,resolveBinding);getAdapter().activate(ids);note('Recovered the last acknowledged document state after an editor process exited. Newer unacknowledged edits may not be present.');}}
-   await completeReceipts();await checkpoint();if(closeAfterReturn&&!outgoing.size&&!incoming.size&&!docs().length){await call('/current/release','POST',{});closing=true;closeAfterReturn=false;}
-  }catch(e){claimedDrag=null;note('Editor windows: '+e.message);}finally{running=false;render();schedule();}
+   await completeReceipts();await checkpoint();reportActivity();if(closeAfterReturn&&!outgoing.size&&!incoming.size&&!docs().length){await call('/current/release','POST',{});closing=true;closeAfterReturn=false;}
+  }catch(e){if(self)getAdapter()?.setClosePolicy?.(undefined);claimedDrag=null;note('Editor windows: '+e.message);}finally{running=false;render();schedule();}
   if(claimedDrag&&!busy()&&supported()){handledDrags.set(claimedDrag.ticket,Date.now());try{await move([claimedDrag.uid],claimedDrag.destination,{id:claimedDrag.ticket,dragTicket:claimedDrag.ticket});}catch(e){note('The dropped tab could not move. Original documents remain here. '+e.message);}}
  }
 
@@ -96,10 +107,10 @@ function create(options={}){
   }
   render();schedule(0);
  }
- function configure(value={}){request=value.request||request;adapter=value.adapter||adapter;available=value.available||available;if(value.self!==undefined)self=value.self==='main'?'':value.self;mount();}
+ function configure(value={}){activityAvailable=value.activityAvailable||activityAvailable;request=value.request||request;adapter=value.adapter||adapter;available=value.available||available;if(value.self!==undefined)self=value.self==='main'?'':value.self;mount();}
  function start(){if(!supported())return;enabled=true;mount();schedule(0);}
  function stop(){stopped=true;if(timer!==null)root.clearTimeout(timer);timer=null;}
- return Object.freeze({configure,start,mount,dismissMenu,poll,move,detachEditor,beginDrag,claimDrag:ticket=>dragAction('claim',ticket),detachDrag:ticket=>dragAction('detach',ticket),cancelDrag:ticket=>dragAction('cancel',ticket),cancel,beforeClose,prepareMainClose,cancelMainClose,commitMainClose,stop,prepareDocument,notifyChanged(){lastCheckpoint='';if(enabled)schedule(200);},get state(){return {enabled,self,running,closing,detaching,dragPreparing,owned:{...owned},outgoing:outgoing.size,incoming:incoming.size,pendingReceipts:receipts.size,error};}});
+ return Object.freeze({reportActivity,configure,start,mount,dismissMenu,poll,move,detachEditor,beginDrag,claimDrag:ticket=>dragAction('claim',ticket),detachDrag:ticket=>dragAction('detach',ticket),cancelDrag:ticket=>dragAction('cancel',ticket),cancel,beforeClose,prepareMainClose,cancelMainClose,commitMainClose,stop,prepareDocument,notifyChanged(){lastCheckpoint='';if(enabled)schedule(200);},get state(){return {enabled,self,running,closing,detaching,dragPreparing,owned:{...owned},outgoing:outgoing.size,incoming:incoming.size,pendingReceipts:receipts.size,error};}});
 }
 const controller=create();root.NetworkToolkitEditorWindows=controller;
 if(typeof module==='object'&&module.exports)module.exports={create};

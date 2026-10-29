@@ -93,7 +93,7 @@ check('recorded source is a read-only body disclosure, not a duplicate header co
 check('subnet ping keeps recorded source while actual fitted graphs use entry Run details', () => {
   const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path'),page=fs.readFileSync(path.join(__dirname,'../web/index.html'),'utf8');
   const start=page.indexOf('function renderJob('),end=page.indexOf('\nfunction ',start+1);
-  const context={jobs:[],NetworkToolkitGraphWorkspace:{},NetworkToolkitSource:source,eventValues:(job,type)=>(job.events||[]).filter(event=>event.data?.type===type),renderRunContext:()=>'',esc:value=>String(value??''),jobTitle:job=>job.tool,pill:()=>'',icon:()=>'',isRunning:()=>false,splitToolPage:()=>false,renderDiagnosticData:()=>'<div>Fixture results</div>',renderActivityLog:()=>''};
+  const context={jobs:[],NetworkToolkitGraphWorkspace:{},NetworkToolkitSource:source,eventValues:(job,type)=>(job.events||[]).filter(event=>event.data?.type===type),renderRunContext:()=>'',esc:value=>String(value??''),jobTitle:job=>job.tool,pill:()=>'',icon:()=>'',isRunning:()=>false,splitToolPage:()=>false,renderDiagnosticData:()=>'<div>Fixture results</div>',renderActivityLog:()=>'',renderResultExtras:()=>''};
   vm.createContext(context);vm.runInContext(page.slice(start,end)+';globalThis.fixtureRenderJob=renderJob',context);
   assert.doesNotMatch(context.fixtureRenderJob({id:'graph',tool:'ping',status:'completed'}),/data-detail="recorded-source"/);
   for(const details of [{options:{scope:'subnet'}},{result:{data:{scope:'subnet'}}},{events:[{data:{type:'subnet-host',value:{address:'192.0.2.1'}}}]}]){

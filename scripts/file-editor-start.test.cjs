@@ -165,6 +165,9 @@ test('retired local preference is preserved while only strict remote booleans co
   h.document.emit('click',button);assert.equal(h.c.state.editorPreferences.localPanelOpen,value.localPanelOpen===true);
  }
 });
+test('compact Compare action retains its full accessible name and explanatory title',async()=>{
+ const h=harness();await h.first();const button=h.document.querySelector('[data-ed="compare"]');assert.equal(button.getAttribute('aria-label'),'Compare documents');assert.equal(button.getAttribute('title'),'Compare documents');assert.equal(button.querySelector('.nt-editor-label-compact').textContent,'Compare');
+});
 test('More stays in the toolbar while its separate action row toggles and restores keyboard focus',async()=>{
  const h=harness(),ta=await h.first(),root=h.document.getElementById('networkToolkitFileEditor'),more=root.querySelector('.nt-editor-more'),actions=root.querySelector('#ntEditorMoreActions'),summary=more.querySelector('summary');
  assert(more.closest('.nt-editor-toolbar'));assert(!actions.closest('.nt-editor-toolbar'));assert(actions.hasAttribute('hidden'));const doc=h.api.active;ta.setSelectionRange(8,16);ta.scrollTop=40;
@@ -235,4 +238,26 @@ test('ordinary tab, editor and comparison disposal refuse unfinished source comp
  const other=await h.api.newDocument();h.api.activateDocument(doc.id);view.composing=true;assert.equal(h.api.activateDocument(other.id),false);assert.equal(h.api.active,doc);h.api.documents.delete(other.id);view.composing=true;root.emit('click',root.querySelector('[data-ed-close-tab="'+doc.id+'"]'));await settle();assert.equal(h.api.documents.size,count);assert.equal(await h.api.closeAll(),false);assert.equal(h.api.closeComparison(),false);assert.equal(h.api.openSplit(),false);assert.equal(h.api.comparison,view);assert.equal(doc.content,original);
  view.composing=false;doc.dirty=true;root.emit('click',root.querySelector('[data-ed-close-tab="'+doc.id+'"]'));view.composing=true;root.emit('click',root.querySelector('[data-ed-dialog-action="accept"]'));await settle();assert.equal(h.api.documents.get(doc.id),doc);
  view.composing=false;const closing=h.api.closeAll();view.composing=true;root.emit('click',root.querySelector('[data-ed-dialog-action="accept"]'));assert.equal(await closing,false);assert.equal(h.api.documents.get(doc.id),doc);assert.equal(h.api.comparison,view);assert.equal(doc.content,original);
+});
+
+test('close preference defaults on, requires explicit warning to disable and preserves explicit false',async()=>{
+ const h=harness();await h.first();const root=h.document.getElementById('networkToolkitFileEditor'),box=root.querySelector('[data-ed-ask-save-close]');assert.equal(box.checked,true);
+ box.checked=false;root.emit('change',box);assert.match(root.querySelector('.nt-editor-dialog').textContent,/discard|Discard/);root.emit('click',root.querySelector('[data-ed-dialog-action="cancel"]'));await settle();assert.equal(box.checked,true);assert.notEqual(h.c.state.editorPreferences?.askSaveBeforeClose,false);
+ box.checked=false;root.emit('change',box);root.emit('click',root.querySelector('[data-ed-dialog-action="accept"]'));await settle();assert.equal(h.c.state.editorPreferences.askSaveBeforeClose,false);assert.equal(box.checked,false);
+ const wrap=root.querySelector('[data-ed-wrap]');wrap.checked=false;root.emit('change',wrap);assert.equal(h.c.state.editorPreferences.askSaveBeforeClose,false);
+});
+test('disabled close prompt skips only dirty confirmation and keeps save failure and active operation guards',async()=>{
+ const h=harness();await h.first();h.c.state.editorPreferences={askSaveBeforeClose:false};const root=h.document.getElementById('networkToolkitFileEditor'),d=h.api.active;d.content='unsaved';d.dirty=true;
+ for(const flag of ['saving','frozen']){d[flag]=true;assert.equal(await h.api.closeAll(),false,flag);assert.equal(await h.api.windowAdapter.prepareWindowClose(),false,flag);assert.equal(h.api.documents.size,1);d[flag]=false;}for(const flag of ['loading','formatting','reloading']){d[flag]=true;assert.equal(await h.api.windowAdapter.prepareWindowClose(),false,flag);d[flag]=false;}
+ d.write=async()=>{throw Error('Synthetic save failure')};h.click('save');await settle();assert.equal(d.saveFailed,true);assert.match(root.querySelector('[data-ed-message]').textContent,/Save failed/);
+ const pending=h.api.closeAll();assert.match(root.querySelector('.nt-editor-dialog').textContent,/previous save failed/);root.emit('click',root.querySelector('[data-ed-dialog-action="cancel"]'));assert.equal(await pending,false);assert.equal(h.api.documents.size,1);
+ d.write=async()=>({hash:'good'});h.click('save');await settle();assert.equal(d.saveFailed,false);d.dirty=true;assert.equal(await h.api.closeAll(),true);assert.equal(h.api.documents.size,0);
+});
+test('disabled native prepare stays nondestructive until commit and child policy is readonly, unknown safe',async()=>{
+ const h=harness();await h.first();h.c.state.editorPreferences={askSaveBeforeClose:false};const d=h.api.active,a=h.api.windowAdapter;d.dirty=true;assert.equal(await a.prepareWindowClose(),true);assert.equal(d.frozen,true);assert.equal(h.api.documents.size,1);a.cancelWindowClose();assert.equal(d.frozen,false);assert.equal(h.api.documents.size,1);
+ h.c.EDITOR_VIEW={id:'child'};a.setClosePolicy(false);const root=h.document.getElementById('networkToolkitFileEditor'),box=root.querySelector('[data-ed-ask-save-close]');assert.equal(box.checked,false);assert.equal(box.disabled,true);assert.equal(await a.prepareWindowClose(),true);a.cancelWindowClose();a.setClosePolicy(undefined);assert.equal(box.checked,true);const pending=a.prepareWindowClose();root.emit('click',root.querySelector('[data-ed-dialog-action="cancel"]'));assert.equal(await pending,false);
+});
+test('activity metadata includes saved empty files and touched drafts, never untouched blank or text',async()=>{
+ const h=harness();await h.api.newDocument();const d=h.api.active,a=h.api.windowAdapter;assert.deepEqual(JSON.parse(JSON.stringify(a.activityDocuments())),[{uid:d.uid,loaded:false}]);d.content='typed';d.dirty=true;d.editRevision++;assert.equal(a.activityDocuments()[0].loaded,true);d.content='';d.dirty=false;d.editRevision++;assert.equal(a.activityDocuments()[0].loaded,true);d.staged=true;assert.equal(a.activityDocuments().length,0);d.staged=false;h.c.state.editorPreferences={askSaveBeforeClose:false};assert(await h.api.closeAll());assert.equal(a.activityDocuments().length,0);
+ await h.api.open({id:'saved-empty',path:'empty.txt',source:'Local computer',read:async()=>({content:''}),write:async()=>({})});const row=a.activityDocuments()[0];assert.equal(row.loaded,true);assert.deepEqual(Object.keys(row).sort(),['loaded','uid']);
 });

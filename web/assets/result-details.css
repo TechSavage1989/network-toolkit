@@ -13,10 +13,10 @@ tr[data-result-row]:focus-visible{outline:2px solid var(--accent);outline-offset
 .result-record-grid>div:nth-child(odd){border-right:1px solid var(--line)}
 .result-record-grid dt{font-size:10px;color:var(--muted);margin-bottom:5px}
 .result-record-grid dd{margin:0;font-size:12px;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere}
-.result-record-nested,.result-record-json{margin-top:12px;border:1px solid var(--line);border-radius:7px;padding:10px 12px}
-.result-record-nested>summary,.result-record-json>summary{cursor:pointer;font-size:12px;font-weight:600;color:var(--text)}
-.result-record-nested[open]>summary,.result-record-json[open]>summary{margin-bottom:12px}
-.result-record-nested pre,.result-record-json pre,.result-record-value{max-height:320px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px}
+.result-record-nested{margin-top:12px;border:1px solid var(--line);border-radius:7px;padding:10px 12px}
+.result-record-nested>summary{cursor:pointer;font-size:12px;font-weight:600;color:var(--text)}
+.result-record-nested[open]>summary{margin-bottom:12px}
+.result-record-nested pre,.result-record-value{max-height:320px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px}
 .result-detail-tools{border-top:1px solid var(--line);margin-top:16px;padding-top:14px}
 .result-detail-tools>h3{margin-bottom:10px}
 .result-detail-tools>.btn{margin:5px 7px 5px 0}
@@ -82,3 +82,6 @@ tr.result-entry-selected{background:var(--accentBg);box-shadow:inset 3px 0 var(-
 }
 
 @media(max-height:720px),(max-width:600px){.diagnostic-page #toolResult:has(.result-graph-entry)>.graph-run-panel>.result-heading>.grow{display:block}.diagnostic-page #toolResult:has(.result-graph-entry)>.graph-run-panel>.result-heading>.row{width:100%}}
+
+/* Compact labeled result readers; structured exports remain explicit actions. */
+.result-row-detail .result-detail-copy{margin-bottom:8px}.result-row-detail .result-record-grid>div{padding:6px 8px}.result-row-detail .result-record-grid dt{margin-bottom:3px}.result-row-detail [data-run-details]{margin-top:8px}.result-object-entry{margin:8px 0}.result-object-entry>h4{font-size:11px;color:var(--muted);margin:0 0 5px}.result-value-list{padding-left:20px;overflow-wrap:anywhere}.result-record-value{white-space:pre-wrap;overflow-wrap:anywhere}

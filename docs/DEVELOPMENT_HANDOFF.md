@@ -5,6 +5,10 @@
 Read docs/RELEASE113_HANDOFF.md. Based on published112 with its completed
 closure retained below. Existing features/security/ownership gates remain;
 local/hosted/public113 evidence is not yet complete.
+The user merged the graph-compression, editor-activity/close-preference and
+app-wide concise-interface additions into113 on 2026-10-29 at02:12 UTC. See the
+candidate handoff for the complete scope; do not publish the earlier editor-only
+review tree or treat historical green gates as final combined acceptance.
 
 ## 1.17.112 published and independently verified
 

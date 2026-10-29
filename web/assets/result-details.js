@@ -82,11 +82,35 @@
     return '';
   }
 
-  function fieldsHTML(record) {
-    if (!record || typeof record !== 'object' || Array.isArray(record)) return '<pre class="result-record-value">' + esc(typeof record === 'object' ? JSON.stringify(record, null, 2) : scalar(record)) + '</pre>';
-    const entries = Object.entries(record), simple = entries.filter(([,value]) => value == null || typeof value !== 'object'), nested = entries.filter(([,value]) => value != null && typeof value === 'object');
-    const values = simple.length ? '<dl class="result-record-grid">' + simple.map(([key,value]) => '<div><dt>' + esc(root.NetworkToolkitResultTime?.isKey(key)?(root.NetworkToolkitResultTime.columnLabel?.()||'Recorded (local)'):label(key)) + '</dt><dd>' + (root.NetworkToolkitResultTime?.isKey(key)?root.NetworkToolkitResultTime.cell(value):esc(scalar(value))) + '</dd></div>').join('') + '</dl>' : '';
-    return values + nested.map(([key,value]) => '<details class="result-record-nested"><summary>' + esc(label(key)) + (Array.isArray(value) ? ' (' + value.length + ' ' + (value.length === 1 ? 'entry' : 'entries') + ')' : '') + '</summary>' + renderStaticObject(value, 1) + '</details>').join('');
+  function detailEntries(record,skip=new Set()) {
+    if(!record||typeof record!=='object'||Array.isArray(record))return [];
+    const entries=typeof displayObjectEntries==='function'?displayObjectEntries(record,skip):Object.entries(record).filter(([key])=>!skip.has(key)&&!key.startsWith('_'));
+    return entries;
+  }
+  function fieldsHTML(record,skip=new Set()) {
+    if(!record||typeof record!=='object'||Array.isArray(record))return '<div class="result-record-fields">'+renderStaticObject(record)+'</div>';
+    const entries=detailEntries(record,skip),simple=entries.filter(([,value])=>value==null||typeof value!=='object'),nested=entries.filter(([,value])=>value!=null&&typeof value==='object');
+    const names={sequence:'Sample',rttMs:'Response time (ms)',ttl:'TTL / hop limit',latencyMs:'Connect time (ms)',status:'Result'};
+    return '<div class="result-record-fields">'+(simple.length?'<dl class="result-record-grid">'+simple.map(([key,value])=>'<div><dt>'+esc(root.NetworkToolkitResultTime?.isKey(key)?(root.NetworkToolkitResultTime.columnLabel?.()||'Recorded (local)'):names[key]||label(key))+'</dt><dd>'+(root.NetworkToolkitResultTime?.isKey(key)?root.NetworkToolkitResultTime.cell(value):esc(scalar(value)))+'</dd></div>').join('')+'</dl>':'')+nested.map(([key,value])=>'<details class="result-record-nested"><summary>'+esc(label(key))+(Array.isArray(value)?' ('+value.length+')':'')+'</summary>'+renderStaticObject(value,1)+'</details>').join('')+'</div>';
+  }
+
+  // Copy the captured record, not rendered innerText: closed disclosures are still data.
+  function readableRecord(record) {
+    const ancestors=new Set();
+    function visit(value,depth=0){
+      if(value===null||typeof value!=='object')return scalar(value);
+      if(ancestors.has(value))return '[Circular reference]';
+      if(depth>64)return '[Further nested fields: use Copy JSON for the complete record]';
+      ancestors.add(value);
+      const entries=Array.isArray(value)?value.map((item,index)=>[String(index+1),item]):detailEntries(value);
+      const text=entries.map(([key,item])=>{
+        const name=Array.isArray(value)?'Entry '+key:label(key);
+        if(item!==null&&typeof item==='object')return name+':\n'+visit(item,depth+1).split('\n').map(line=>'  '+line).join('\n');
+        const field=root.NetworkToolkitResultTime?.isKey(key)?root.NetworkToolkitResultTime.format(item)+' ('+String(item??'Not recorded')+')':scalar(item);
+        return name+': '+field;
+      }).join('\n');ancestors.delete(value);return text;
+    }
+    return visit(record);
   }
 
   function launchButtons(key, record) {
@@ -123,7 +147,7 @@
     if(!detail.graph)return '';const g=detail.graph,point=g.point,members=point.members||[],page=Math.max(0,Math.min(Math.ceil(members.length/50)-1,detail.contributorPage||0)),start=page*50;
     const controls='<div class="result-detail-actions"><button type="button" class="btn small ghost" data-result-graph-clear="'+esc(g.id)+'">Clear selection</button></div>';
     const contributors=members.length?'<section class="result-graph-contributors"><strong>Contributing recorded results ('+members.length+')</strong><p>Choose an individual result to inspect its exact recorded fields.</p>'+members.slice(start,start+50).map(p=>'<button type="button" class="btn small ghost" data-result-graph-source="'+esc(p.key)+'" data-result-graph-id="'+esc(g.id)+'">#'+esc(p.sequence)+' · '+esc(root.NetworkToolkitResultTime?.format?.(p.time)||p.time)+' · '+esc(p.status)+' · '+(p.rtt==null?'Not measured':esc(p.rtt)+' ms')+'</button>').join('')+(members.length>50?'<div class="result-detail-actions"><button type="button" class="btn small ghost" data-result-graph-page="'+(page-1)+'" '+(page===0?'disabled':'')+'>Previous</button><span>'+(start+1)+'-'+Math.min(start+50,members.length)+' of '+members.length+'</span><button type="button" class="btn small ghost" data-result-graph-page="'+(page+1)+'" '+(start+50>=members.length?'disabled':'')+'>Next</button></div>':'')+'</section>':'';
-    return '<section class="result-graph-summary"><p class="help-line">'+esc(g.message)+'</p>'+controls+(root.NetworkToolkitResultTimeline?.pointDetails?.(point)||'')+contributors+'</section>';
+    return '<section class="result-graph-summary"><p class="help-line">'+esc(g.message)+'</p>'+controls+contributors+'</section>';
   }
   function showGraphSelection(graph){
     const area=document.getElementById('toolResult');if(!area||!graph?.point)return false;
@@ -139,9 +163,16 @@
   function clearGraphSelection(id){if(sideDetail?.graph?.id===id)closeSide();}
 
   function detailBody(detail) {
-    const json=JSON.stringify(detail.record,null,2),context=detail.context,records=detail.graph?root.NetworkToolkitGraphWorkspace?.recordsHTML?.(detail.graph.id)||'':'',runDetails=records?'<details data-run-details><summary>Run details</summary>'+records+'</details>':'';
-    const run=context?'<section class="result-run-context"><dl class="result-record-grid">'+[['Tool',titleFor(context.tool)],['Target',context.target],['Run started',context.started],['Method',context.mode],['Port',context.port],['Source interface',context.source]].filter(([,value])=>value!==undefined&&value!=='').map(([key,value])=>'<div><dt>'+esc(key)+'</dt><dd>'+(key==='Run started'&&root.NetworkToolkitResultTime?root.NetworkToolkitResultTime.cell(value,{label:'Run started'}):esc(scalar(value)))+'</dd></div>').join('')+'</dl></section>':'';
-    return '<div class="result-row-detail"><p class="result-detail-caption">Recorded '+esc(String(detail.name).replace(/\./g,' '))+' entry</p><div class="result-detail-actions result-detail-copy"><button class="btn small ghost" data-result-copy="text">'+icon('copy')+'Copy details</button><button class="btn small ghost" data-result-copy="json">Copy JSON</button></div>'+graphExtras(detail)+run+runDetails+fieldsHTML(detail.record)+toolsHTML(detail)+'<details class="result-record-json"><summary>Raw record JSON</summary><pre>'+esc(json)+'</pre></details></div>';
+    const context=detail.context,records=detail.graph?root.NetworkToolkitGraphWorkspace?.recordsHTML?.(detail.graph.id)||'':'',point=detail.graph?.point;
+    const skip=new Set();
+    // The graph reader already presents these exact sample facts. Keep unique fields such as TTL.
+    if(point&&!point.members&&root.NetworkToolkitResultTimeline?.pointDetails)for(const key of ['time','timestamp','recordedAt','sequence','status','success','rttMs','address','error'])skip.add(key);
+    else if(detail.record?.status!==undefined)skip.add('success');
+    const items=context?[['Tool',titleFor(context.tool)],['Target',context.target],['Run started',context.started],['Method',context.mode],['Port',context.port],['Source interface',context.source]]:[];
+    const unique=items.filter(([key,value])=>value!==undefined&&value!==''&&(!records||['Method','Port'].includes(key))&&!(key==='Target'&&[detail.record?.address,detail.record?.host,detail.record?.target].includes(value)));
+    const run=unique.length?'<section class="result-run-context"><dl class="result-record-grid">'+unique.map(([key,value])=>'<div><dt>'+esc(key)+'</dt><dd>'+(key==='Run started'&&root.NetworkToolkitResultTime?root.NetworkToolkitResultTime.cell(value,{label:'Run started'}):esc(scalar(value)))+'</dd></div>').join('')+'</dl></section>':'';
+    const runDetails=records?'<details data-run-details><summary>Run details</summary>'+run+records+'</details>':run;
+    return '<div class="result-row-detail"><div class="result-detail-actions result-detail-copy"><button class="btn small ghost" data-result-copy="text">'+icon('copy')+'Copy details</button><button class="btn small ghost" data-result-copy="json">Copy JSON</button></div><div class="result-record-readable">'+(point?root.NetworkToolkitResultTimeline?.pointDetails?.(point)||'':'')+fieldsHTML(detail.record,skip)+'</div>'+graphExtras(detail)+runDetails+toolsHTML(detail)+'</div>';
   }
 
   function closeSide(focus=false) {
@@ -241,7 +272,7 @@
       const detailForCopy=copy?.closest('#resultEntryPane')?sideDetail:activeDetail;
       if (copy && detailForCopy && copy.closest('.result-row-detail')) {
         event.preventDefault(); event.stopImmediatePropagation();
-        const record = detailForCopy.record, text = copy.dataset.resultCopy === 'json' || !record || typeof record !== 'object' ? JSON.stringify(record,null,2) : Object.entries(record).map(([key,value]) => label(key) + ': ' + (value != null && typeof value === 'object' ? JSON.stringify(value, null, 2) : root.NetworkToolkitResultTime?.isKey(key)?root.NetworkToolkitResultTime.format(value)+' ('+String(value??'Not recorded')+')':scalar(value))).join('\n');
+        const record = detailForCopy.record, text = copy.dataset.resultCopy === 'json' ? JSON.stringify(record,null,2) : readableRecord(record);
         void copyText(text); return;
       }
       if (event.target.closest('[data-result-back]')) { event.preventDefault(); event.stopImmediatePropagation(); returnToPrevious(); return; }

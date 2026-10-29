@@ -1,4 +1,5 @@
 'use strict';
+const {handleEditorActivityMetadata}=require('./editor-activity-fixture.cjs');
 // Real bundled baseline/candidate UIs, native timers, synthetic intercepted jobs only.
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),assert=require('node:assert/strict');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
@@ -16,7 +17,7 @@ async function start(root,label){
  const context=await browser.newContext({viewport:{width:1440,height:1000},serviceWorkers:'block'});contexts.push(context);const page=await context.newPage();lastPage=page;page.setDefaultTimeout(15000);
  const cdp=await context.newCDPSession(page);const engine={page,cdp,label,root,job:makeJob('completed','linear'),saved:{activePage:'overview',appUpdatePreferences:{enabled:false}},requests:[],pendingWaits:new Set(),closing:false};engines.push(engine);
  page.on('pageerror',error=>report.errors.push({label,error:error.message}));page.on('response',response=>{if(response.url().includes('/assets/')&&response.status()>=400)report.assetFailures.push({label,url:response.url(),status:response.status()});});
- await context.route('**/*',async route=>{try{const req=route.request(),url=new URL(req.url()),p=url.pathname;assert.equal(url.origin,origin,'External/device requests are forbidden');
+ await context.route('**/*',async route=>{try{if(await handleEditorActivityMetadata(route,origin,report))return;const req=route.request(),url=new URL(req.url()),p=url.pathname;assert.equal(url.origin,origin,'External/device requests are forbidden');
   if(p.startsWith('/api/')){const request={label,path:p,method:req.method(),at:Date.now()};engine.requests.push(request);report.requests.push(request);let data={};
    if(req.method()!=='GET'){assert.equal(p,'/api/state','No scan, capture, connection or other operation may start');assert.equal(req.method(),'PUT');engine.saved=req.postDataJSON();}
    if(p==='/api/state')data=engine.saved;

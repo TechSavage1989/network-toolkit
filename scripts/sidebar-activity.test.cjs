@@ -56,3 +56,7 @@ test('activity CSS overlays the existing icon instead of reserving space or hidi
  const css=fs.readFileSync(require.resolve('../web/assets/sidebar-activity.css'),'utf8');assert.match(css,/position:absolute/);assert.match(css,/pointer-events:none/);assert.match(css,/forced-colors:active/);assert(!/padding-(?:left|right)|app-nav-collapsed[^}]*display:none/.test(css));
  const nav=fs.readFileSync(require.resolve('../web/assets/app-navigation.js'),'utf8');assert.match(nav,/NetworkToolkitSidebarActivity\?\.sync\(\)/);
 });
+
+test('editor loaded documents use the existing dot, accessible count and clear after last close',async()=>{
+ const h=harness();h.document.getElementById('navigation').innerHTML+='<button class="nav-item" data-page="editor" aria-label="Text Editor"><svg></svg><span class="nav-item-text">Text Editor</span></button>';h.enabled=true;h.init();await flush();await h.respond({tools:{editor:{documents:2,path:'secret',content:'secret'}}});const b=h.button('editor');assert(b.querySelector('.sidebar-activity-dot'));assert.equal(b.getAttribute('aria-label'),'Text Editor, 2 loaded documents');assert(!b.getAttribute('title').includes('secret'));await h.tick(1000);await h.respond({tools:{editor:{documents:0}}});assert(!b.querySelector('.sidebar-activity-dot'));assert.equal(b.getAttribute('aria-label'),'Text Editor');h.api.stop();
+});

@@ -62,6 +62,7 @@ type editorDocumentSnapshot struct {
 	SavedEncoding string           `json:"savedEncoding"`
 	EOL           string           `json:"eol"`
 	Dirty         bool             `json:"dirty"`
+	SaveFailed    bool             `json:"saveFailed,omitempty"`
 	Undo          []string         `json:"undo"`
 	Redo          []string         `json:"redo"`
 	Language      string           `json:"language"`
@@ -144,6 +145,7 @@ type editorTransfer struct {
 	acked                                           bool
 }
 type editorViewRegistry struct {
+	loaded                   map[string]map[string]editorLoadedDocument
 	explorerOperations       map[string][]editorExplorerTarget
 	mu                       sync.Mutex
 	app                      *application
@@ -274,6 +276,9 @@ func (m *editorViewRegistry) retainedTransports() (map[string]bool, map[string]b
 func (m *editorViewRegistry) setHomePresent(present bool) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if !present {
+		delete(m.loaded, "")
+	}
 	m.homePresent = present
 	m.homeClosing = false
 	if present {
@@ -598,6 +603,7 @@ func editorTransferInfo(t *editorTransfer) map[string]any {
 	return map[string]any{"id": t.id, "source": t.source, "destination": t.destination, "state": t.state, "error": t.failure, "leases": leases}
 }
 func (m *editorViewRegistry) state(caller string) map[string]any {
+	askSaveBeforeClose := m.app.editorAskSaveBeforeClose()
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.expireLocked()
@@ -634,7 +640,7 @@ func (m *editorViewRegistry) state(caller string) map[string]any {
 			}
 		}
 	}
-	return map[string]any{"available": m.app.launchEditorView != nil, "self": caller, "views": views, "incoming": incoming, "outgoing": outgoing, "owned": owned, "recovery": recovery, "ownerInstanceId": m.app.windowInstanceID, "dragRequests": m.dragRequestsLocked(caller), "explorerRequests": m.explorerRequestsLocked(caller), "savedConnectionRequests": m.savedConnectionRequestsLocked(caller)}
+	return map[string]any{"available": m.app.launchEditorView != nil, "askSaveBeforeClose": askSaveBeforeClose, "self": caller, "views": views, "incoming": incoming, "outgoing": outgoing, "owned": owned, "recovery": recovery, "ownerInstanceId": m.app.windowInstanceID, "dragRequests": m.dragRequestsLocked(caller), "explorerRequests": m.explorerRequestsLocked(caller), "savedConnectionRequests": m.savedConnectionRequestsLocked(caller)}
 }
 func (m *editorViewRegistry) offer(caller string, req editorTransferRequest) (map[string]any, error) {
 	if !editorHexID.MatchString(req.ID) {
@@ -774,6 +780,7 @@ func (m *editorViewRegistry) offer(caller string, req editorTransferRequest) (ma
 		d := m.documents[snapshot.UID]
 		if d == nil {
 			d = grants[snapshot.UID]
+			m.registerLoadedLocked(snapshot.UID)
 			m.documents[snapshot.UID] = d
 		}
 		d.snapshot = snapshot
@@ -886,6 +893,7 @@ func (m *editorViewRegistry) processExited(id string) {
 		m.mu.Unlock()
 		return
 	}
+	delete(m.loaded, id)
 	v.info.State = "closed"
 	v.token = ""
 	delete(m.views, id)
@@ -935,6 +943,7 @@ func (m *editorViewRegistry) release(caller string) error {
 	if v == nil {
 		return errEditorLease
 	}
+	delete(m.loaded, caller)
 	v.info.State = "returned"
 	return nil
 }

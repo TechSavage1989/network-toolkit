@@ -1,4 +1,5 @@
 'use strict';
+const {handleEditorActivityMetadata}=require('./editor-activity-fixture.cjs');
 // Full published-108 assets and the candidate are rendered at identical sizes.
 // Synthetic local API only: no devices, capture start, files or native launches.
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
@@ -10,7 +11,7 @@ const pass=x=>report.checks.push(x),settle=p=>p.evaluate(()=>new Promise(r=>requ
 async function make(repo,viewport,mode='main',dpr=1){
  const context=await browser.newContext({viewport,deviceScaleFactor:dpr,serviceWorkers:'block'}),p=await context.newPage(),version=JSON.parse(fs.readFileSync(path.join(repo,'package.json'))).version;
  p.setDefaultTimeout(15000);p.on('pageerror',e=>report.errors.push({repo:path.basename(repo),error:e.message}));p.on('response',r=>{if(r.status()>=400&&!new URL(r.url()).pathname.startsWith('/api/'))report.assetFailures.push(r.url());});
- await context.route('**/*',async route=>{
+ await context.route('**/*',async route=>{if(await handleEditorActivityMetadata(route,'https://chrome109.toolkit.test',report))return;
   const request=route.request(),url=new URL(request.url()),name=url.pathname,method=request.method();assert.equal(url.origin,'https://chrome109.toolkit.test');
   if(name.startsWith('/api/')){
    assert(method==='GET'||(name==='/api/state'&&method==='PUT')||(name==='/api/packet-captures/interfaces'&&method==='POST'),'Unexpected operation: '+method+' '+name);let data={};

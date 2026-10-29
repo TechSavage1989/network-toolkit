@@ -18,10 +18,27 @@ Further addition23:13UTC: clearly colored editable comparisons, intraline marks,
 visual-only alignment gaps with source line counts, and a compact difference key.
 Only the comparison renderer uses pinned offline CodeMirror state/view; existing
 diff algorithm, document history/leases and ordinary/split textareas remain.
+On 2026-10-29 at 02:12 UTC the user explicitly merged the previously queued
+next-build prompt into this same113 candidate. Its older instruction to wait for
+a separate build is superseded. Additional acceptance scope:
+- Shared graph/timeline endpoint mapping after natural startup, across modes,
+  timeframes and widths, with clipping and genuine sample/cluster identity.
+- A compact interactive compression-curve editor, persistent uncompressed-point
+  count, stable recent spacing, explicit width limits, presets and reset.
+- A counts-only editor sidebar indicator for loaded documents across windows,
+  excluding untouched placeholders and avoiding transfer double counts.
+- Default-enabled save-before-close prompting, configurable with an explicit
+  discard warning; pending saves, transfers and native ownership guards remain.
+- Concise normal-interface Details/results throughout the app, without raw debug
+  dumps or duplicated facts; useful fields and intentional technical exports stay.
+These additions remain unverified until their integrated hosted gates pass.
 Read [EDITOR_TOOLBAR113.md](EDITOR_TOOLBAR113.md) for the compact controls,
 context comparison and divider behavior.
 Read [EDITOR_SAVED_CONNECTIONS113.md](EDITOR_SAVED_CONNECTIONS113.md) for the
 main/child authentication and explicit renewed-access boundaries.
+Read [GRAPH_CURVE113.md](GRAPH_CURVE113.md),
+[EDITOR_ACTIVITY_CLOSE113.md](EDITOR_ACTIVITY_CLOSE113.md) and
+[RESULT_READERS113.md](RESULT_READERS113.md) for the merged scope and exact limits.
 
 Required: focused layout/connection/approval/race regressions, all current hosted
 Checks (including browser-editor112), actual before/after main/detached/modal

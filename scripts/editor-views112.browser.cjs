@@ -1,4 +1,5 @@
 'use strict';
+const {handleEditorActivityMetadata}=require('./editor-activity-fixture.cjs');
 // Run only on an isolated hosted runner. Every path and document is synthetic.
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),{chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const root=path.resolve(__dirname,'..'),output=process.env.TOOLKIT_TEST_OUTPUT,report={passed:false,checks:[],errors:[],layouts:[]};let browser,page;
@@ -14,7 +15,7 @@ async function start(mode){
  const write=b=>{files.set(b.path,b.content);return {hash,ok:true};};
  const action=b=>{if(b.action==='mkdir'){assert(!files.has(b.path),'folder exists');files.set(b.path,null);}else if(b.action==='rename'){assert(files.has(b.path));assert(!files.has(b.newPath));files.set(b.newPath,files.get(b.path));files.delete(b.path);}else if(b.action==='copy'){assert(files.has(b.path));assert(!files.has(b.newPath));files.set(b.newPath,files.get(b.path));}else if(b.action==='delete'||b.action==='remove'){assert.equal(b.confirm,true);files.delete(b.path);}else if(b.action==='upload'){files.set(b.path,files.get(b.localPath));}else if(b.action==='download'){files.set(b.localPath,files.get(b.path));}else throw Error('Unexpected fixture mutation '+b.action);return {ok:true};};
  page.on('pageerror',e=>report.errors.push(mode+': '+e.message));
- await context.route('https://editor112.toolkit.test/**',async route=>{const req=route.request(),url=new URL(req.url()),p=url.pathname,b=req.postData()?req.postDataJSON():null;try{
+ await context.route('https://editor112.toolkit.test/**',async route=>{if(await handleEditorActivityMetadata(route,'https://editor112.toolkit.test',report))return;const req=route.request(),url=new URL(req.url()),p=url.pathname,b=req.postData()?req.postDataJSON():null;try{
   if(p.startsWith('/api/')){calls.push({path:p,method:req.method(),action:b?.action});let data={};
    if(p==='/api/status')data={version:'1.17.112',os:'windows',arch:'amd64',editorWindowAvailable:true};
    else if(p==='/api/state'){if(req.method()==='GET')data=saved;else{assert(!JSON.stringify(b).includes('SYNTHETIC_112'),'document content persisted');saved=b;data={ok:true};}}

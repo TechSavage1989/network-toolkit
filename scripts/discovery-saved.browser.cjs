@@ -1,4 +1,5 @@
 'use strict';
+const {handleEditorActivityMetadata}=require('./editor-activity-fixture.cjs');
 // Real bundled UI and browser input; all profiles, jobs and APIs are synthetic.
 // Any attempt to scan, connect, launch, unlock or transfer fails this test.
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
@@ -27,7 +28,7 @@ async function choose(name){await page.locator('#savedFilterChoice').selectOptio
 async function flush(){assert.equal(await page.evaluate(()=>flushState()),true);}
 (async()=>{
  if(out)fs.mkdirSync(out,{recursive:true});browser=await chromium.launch({headless:true,args:['--no-sandbox']});page=await browser.newPage({viewport:{width:1440,height:1000},serviceWorkers:'block'});page.setDefaultTimeout(15000);page.on('pageerror',error=>report.errors.push(error.message));page.on('response',response=>{if(response.url().includes('/assets/')&&response.status()>=400)report.assetFailures.push(response.url());});
- await page.route('**/*',async route=>{const req=route.request(),url=new URL(req.url()),p=url.pathname,method=req.method();assert.equal(url.origin,'https://saved107.toolkit.test','No external or device requests');
+ await page.route('**/*',async route=>{if(await handleEditorActivityMetadata(route,'https://saved107.toolkit.test',report))return;const req=route.request(),url=new URL(req.url()),p=url.pathname,method=req.method();assert.equal(url.origin,'https://saved107.toolkit.test','No external or device requests');
   if(p.startsWith('/api/')){let data={};if(method!=='GET'){report.mutations.push({path:p,method});assert.equal(p,'/api/state','Only preference persistence may mutate');assert.equal(method,'PUT');saved=req.postDataJSON();}
    if(p==='/api/state')data=saved;
    if(p==='/api/status')data={version:require('../package.json').version,os:'windows',arch:'amd64',system:{hostname:'Synthetic saved filters',interfaces:adapters}};

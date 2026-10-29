@@ -1,4 +1,5 @@
 'use strict';
+const {handleEditorActivityMetadata}=require('./editor-activity-fixture.cjs');
 // Production application assets, intercepted synthetic settings, native Chromium
 // focus/clipboard. No real settings, files, connections, capture or credentials.
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
@@ -21,7 +22,7 @@ async function noOverflow(){const bounds=await picker().evaluate(el=>{const r=el
  browser=await chromium.launch({headless:true,args:['--no-sandbox']});page=await browser.newPage({viewport:{width:1440,height:1000},serviceWorkers:'block',permissions:['clipboard-read','clipboard-write']});page.setDefaultTimeout(15000);page.on('pageerror',error=>report.errors.push(error.message));
  page.on('response',response=>{if(response.status()>=400&&(response.request().resourceType()==='image'||/Network_Toolkit_Icon|favicon\.ico/.test(response.url())))report.failedImages.push({url:response.url(),status:response.status()});});
  page.on('requestfailed',request=>{if(request.resourceType()==='image')report.failedImages.push({url:request.url(),failure:request.failure()?.errorText});});
- await page.route('**/*',async route=>{
+ await page.route('**/*',async route=>{if(await handleEditorActivityMetadata(route,origin,report))return;
   const req=route.request(),url=new URL(req.url()),p=url.pathname;assert.equal(url.origin,origin,'No external requests are allowed');
   if(p.startsWith('/api/')){const method=req.method();let data={};
    if(method!=='GET'){assert.equal(p,'/api/state','Color changes must not start connections, jobs, captures, uploads or credential operations');const body=req.postDataJSON();writes.push(JSON.parse(JSON.stringify(body)));stored=body;}

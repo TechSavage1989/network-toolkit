@@ -16,6 +16,7 @@ async function start(width,detached=false){
    else if(p==='/api/jobs')data=[];
    else if(p==='/api/terminals')data={sessions:[]};
    else if(p==='/api/activity')data={tools:{}};
+   else if(p==='/api/editor-views/current/activity'){assert.deepEqual(Object.keys(b),['documents']);assert(b.documents.every(d=>Object.keys(d).sort().join(',')==='lease,loaded,uid'));data={ok:true};}
    else if(p==='/api/terminal-views')data={available:false,views:[],owners:{}};
    else if(p==='/api/editor-views'||p==='/api/editor-views/current')data={available:true,self:detached?child:'',ownerInstanceId:'synthetic113',views:[],incoming:[],outgoing:[],owned,recovery:[],explorerRequests:[],savedConnectionRequests:reviewRows};
    else if(p==='/api/editor-views/current/state'){for(const d of b.batch.documents)owned[d.uid]=1;data={owned};}

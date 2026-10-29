@@ -1,4 +1,5 @@
 'use strict';
+const {handleEditorActivityMetadata}=require('./editor-activity-fixture.cjs');
 // Production browser navigation with synthetic API responses. Windows native
 // launcher-spy tests cover the actual privilege boundary; this never captures.
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
@@ -11,7 +12,7 @@ const pass=text=>report.checks.push(text);
 async function waitForStart(){const deadline=Date.now()+15000;while(!releaseStart){if(Date.now()>deadline)throw Error('Explicit Start request did not arrive');await new Promise(resolve=>setTimeout(resolve,10));}}
 (async()=>{
  if(out)fs.mkdirSync(out,{recursive:true});browser=await chromium.launch({headless:true,args:['--no-sandbox']});page=await browser.newPage({viewport:{width:1440,height:1000},serviceWorkers:'block'});page.setDefaultTimeout(15000);page.on('pageerror',e=>report.errors.push(e.message));page.on('response',r=>{if(r.request().resourceType()==='image'&&r.status()>=400)report.assetFailures.push(r.url()+' HTTP '+r.status());});page.on('requestfailed',r=>{if(r.resourceType()==='image')report.assetFailures.push(r.url()+' '+r.failure()?.errorText);});
- await page.route('**/*',async route=>{const req=route.request(),u=new URL(req.url()),p=u.pathname,method=req.method();assert.equal(u.origin,origin,'No external requests');
+ await page.route('**/*',async route=>{if(await handleEditorActivityMetadata(route,origin,report))return;const req=route.request(),u=new URL(req.url()),p=u.pathname,method=req.method();assert.equal(u.origin,origin,'No external requests');
   if(p.startsWith('/api/')){let data={};if(method!=='GET')assert(['/api/state','/api/packet-captures/interfaces','/api/packet-captures'].includes(p),'Unexpected mutation '+p);
    if(p==='/api/status')data={version:require('../package.json').version,os:'windows',arch:'amd64',system:{hostname:'Synthetic capture fixture',interfaces:[]}};
    if(p==='/api/system')data={hostname:'Synthetic capture fixture',interfaces:[]};if(p==='/api/state'&&method==='GET')data={appUpdatePreferences:{enabled:false}};

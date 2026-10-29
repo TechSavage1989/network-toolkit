@@ -1,4 +1,5 @@
 'use strict';
+const {handleEditorActivityMetadata}=require('./editor-activity-fixture.cjs');
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),{chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const current=path.resolve(__dirname,'..'),baseline=process.env.NTK_LAYOUT_BASELINE110_DIR,output=process.env.NTK_BROWSER_OUTPUT_DIR||process.env.TOOLKIT_TEST_OUTPUT;
 const report={passed:false,checks:[],layouts:[],errors:[],assetErrors:[]},contexts=[];let browser,lastPage;
@@ -9,7 +10,7 @@ async function start(root,mode,label,initialSaved){
  const context=await browser.newContext({viewport:{width:1440,height:1000},deviceScaleFactor:Number(process.env.NTK_TEST_DPR)||1});contexts.push(context);const page=await context.newPage();lastPage=page;page.setDefaultTimeout(20000);
  const owned={},requests=[];let saved=initialSaved?structuredClone(initialSaved):{activePage:'editor',appUpdatePreferences:{enabled:false},editorPreferences:{wordWrap:true,syntax:true,fontSize:13,palette:'auto'}};
  page.on('pageerror',e=>report.errors.push(label+': '+e.message));
- await context.route('https://layout109.toolkit.test/**',async route=>{try{const req=route.request(),url=new URL(req.url()),p=url.pathname,body=req.postData()?req.postDataJSON():null;requests.push({method:req.method(),path:p});if(p.startsWith('/api/')){
+ await context.route('https://layout109.toolkit.test/**',async route=>{try{if(await handleEditorActivityMetadata(route,'https://layout109.toolkit.test',report))return;const req=route.request(),url=new URL(req.url()),p=url.pathname,body=req.postData()?req.postDataJSON():null;requests.push({method:req.method(),path:p});if(p.startsWith('/api/')){
   let data={};if(p==='/api/status')data={version:require(path.join(root,'package.json')).version,os:'windows',arch:'amd64',editorWindowAvailable:true};
   else if(p==='/api/state'){if(req.method()==='GET')data=saved;else{assert(!JSON.stringify(body).includes(marker),'Document bytes must not enter persisted settings');saved=structuredClone(body);data={ok:true};}}
   else if(p==='/api/jobs')data=[];

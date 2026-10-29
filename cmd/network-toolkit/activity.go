@@ -10,6 +10,7 @@ import (
 // Never return connection metadata, job input, credentials, or historical results.
 // Components are sampled under their own locks, without network or helper calls.
 type activityCounts struct {
+	Documents   int `json:"documents,omitempty"`
 	Connections int `json:"connections,omitempty"`
 	Servers     int `json:"servers,omitempty"`
 	Operations  int `json:"operations,omitempty"`
@@ -42,6 +43,7 @@ func (s *activitySnapshot) add(page string, counts activityCounts) {
 	previous.Servers += counts.Servers
 	previous.Operations += counts.Operations
 	previous.Captures += counts.Captures
+	previous.Documents += counts.Documents
 	s.Tools[page] = previous
 }
 
@@ -93,6 +95,9 @@ func (a *application) activitySnapshot() activitySnapshot {
 	snapshot := activitySnapshot{Tools: make(map[string]activityCounts)}
 	if a.shutdownRequested.Load() || (a.ctx != nil && a.ctx.Err() != nil) {
 		return snapshot
+	}
+	if a.editorViews != nil {
+		snapshot.add("editor", activityCounts{Documents: a.editorViews.loadedCount()})
 	}
 	if a.terminals != nil {
 		snapshot.add("terminal", activityCounts{Connections: a.terminals.ConnectedCount()})

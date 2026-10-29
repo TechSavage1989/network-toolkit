@@ -1,8 +1,8 @@
 /* Read-only live activity. Saved profiles, tabs and cached results are not sources. */
 (function(root){
  'use strict';
- const pages=new Set(['quick','ping','trace','dns','smtp','tcp','http','tls','identify','discover','monitor','capture','local','hosts','wol','terminal','sftp','tftp']);
- const kinds=['connections','servers','operations','captures'];
+ const pages=new Set(['quick','ping','trace','dns','smtp','tcp','http','tls','identify','discover','monitor','capture','local','hosts','wol','terminal','sftp','tftp','editor']);
+ const kinds=['connections','servers','operations','captures','documents'];
  const interval=1000,timeout=2500,freshness=4000;
  let initialized=false,running=false,request=null,available=()=>false,lastAvailable=false;
  let generation=0,pending=null,pollTimer=null,expiryTimer=null,lastSuccess=0,snapshot=null;
@@ -21,6 +21,7 @@
  function summary(counts){
   if(!counts)return '';
   const parts=[];
+  if(counts.documents)parts.push(counts.documents+' loaded document'+(counts.documents===1?'':'s'));
   if(counts.connections)parts.push(counts.connections+' connected session'+(counts.connections===1?'':'s'));
   if(counts.servers)parts.push(counts.servers===1?'Server running':counts.servers+' servers running');
   if(counts.operations)parts.push(counts.operations===1?'Operation running':counts.operations+' operations running');

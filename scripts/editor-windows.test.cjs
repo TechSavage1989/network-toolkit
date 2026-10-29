@@ -50,3 +50,20 @@ test('cancel before delayed checkpoint completes precedes registration and canno
 test('a retry delayed behind another request cannot start after the drop deadline',async()=>{let cancellation;const ticket='6'.repeat(32),f=fixture({request:async(p)=>{if(p.endsWith('/claim')){setImmediate(()=>{cancellation=f.controller.cancelDrag(ticket);});throw Object.assign(Error('not registered yet'),{status:404});}if(p.endsWith('/cancel')){await new Promise(resolve=>setTimeout(resolve,1600));return {state:'cancelled'};}throw Error('unexpected request');}});await assert.rejects(f.controller.claimDrag(ticket),e=>e.status===404);assert.equal((await cancellation).state,'cancelled');assert.deepEqual(f.calls.map(c=>c.path),['/editor-views/drags/claim','/editor-views/drags/cancel']);assert.equal(f.events.length,0);f.controller.stop();});
 
 test('an initial drop delayed in the request queue expires without sending a late claim',async()=>{const ticket='7'.repeat(32),f=fixture({request:async(p)=>{assert(p.endsWith('/cancel'));await new Promise(resolve=>setTimeout(resolve,1600));return {state:'cancelled'};}});const cancellation=f.controller.cancelDrag('8'.repeat(32));await assert.rejects(f.controller.claimDrag(ticket),/drop expired before it could be sent/);assert.equal((await cancellation).state,'cancelled');assert.deepEqual(f.calls.map(c=>c.path),['/editor-views/drags/cancel']);assert.equal(f.events.length,0);f.controller.stop();});
+
+test('editor activity metadata is coalesced, nonblocking and contains no file or text fields',async()=>{
+ let finish;const waiting=new Promise(r=>finish=r),f=fixture({available:false,request:async(p,m,b)=>{assert.equal(p,'/editor-views/current/activity');await waiting;return {ok:true};}});f.adapter.activityDocuments=()=>[{uid,loaded:true,content:'must not leak',path:'private'}];f.controller.configure({activityAvailable:()=>true});assert.equal(f.controller.reportActivity(),true);assert.equal(f.controller.reportActivity(),false);await new Promise(r=>setImmediate(r));assert.deepEqual(f.calls[0].body,{documents:[{uid,lease:0,loaded:true}]});finish();await new Promise(r=>setImmediate(r));assert.equal(f.controller.reportActivity(),false);f.controller.stop();
+});
+test('child close policy is read-only metadata and unknown transport failure returns to safe default',async()=>{
+ let failed=false;const values=[],f=fixture({self:'child',request:async(p,m,b,s)=>{if(failed)throw Error('offline');return {...s,askSaveBeforeClose:false};}});f.adapter.setClosePolicy=v=>values.push(v);await f.controller.poll();assert.deepEqual(values,[false]);failed=true;await f.controller.poll();assert.deepEqual(values,[false,undefined]);assert(!f.calls.some(c=>c.path==='/state'));f.controller.stop();
+});
+
+
+test('editor activity requires explicit authenticated online availability and rechecks queued dispatch',async()=>{
+ let available=false;const f=fixture({available:false});f.adapter.activityDocuments=()=>[{uid,loaded:true}];assert.equal(f.controller.reportActivity(),false);f.controller.configure({activityAvailable:()=>available});assert.equal(f.controller.reportActivity(),false);available=true;assert.equal(f.controller.reportActivity(),true);available=false;await new Promise(r=>setImmediate(r));assert.equal(f.calls.length,0);available=true;assert.equal(f.controller.reportActivity(),true);await new Promise(r=>setImmediate(r));assert.equal(f.calls.length,1);f.controller.stop();
+});
+
+
+test('fresh online renderer sends one empty activity snapshot then coalesces unchanged empty state',async()=>{
+ const f=fixture({available:false,request:async(p,m,b)=>{assert.equal(p,'/editor-views/current/activity');assert.deepEqual(b,{documents:[]});return {ok:true};}});f.adapter.activityDocuments=()=>[];f.controller.configure({activityAvailable:()=>true});assert.equal(f.controller.reportActivity(),true);assert.equal(f.controller.reportActivity(),false);await new Promise(r=>setImmediate(r));assert.equal(f.calls.length,1);assert.equal(f.controller.reportActivity(),false);assert.equal(f.calls.length,1);f.controller.stop();
+});

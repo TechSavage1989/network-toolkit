@@ -1,4 +1,5 @@
 'use strict';
+const {handleEditorActivityMetadata}=require('./editor-activity-fixture.cjs');
 // Full production UI with intercepted APIs and the browser's native clipboard.
 // No transfer, server start, file mutation, connection or credential use occurs.
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
@@ -22,7 +23,7 @@ async function clientView(kind){await page.evaluate(({kind,filename,address,disk
  },{kind,filename,address,disk});await page.locator('[data-rb-pane="remote"] [data-rb-item]').first().waitFor();}
 (async()=>{
  if(out)fs.mkdirSync(out,{recursive:true});browser=await chromium.launch({headless:true,args:['--no-sandbox']});page=await browser.newPage({viewport:{width:1440,height:1000},serviceWorkers:'block',permissions:['clipboard-read','clipboard-write']});page.setDefaultTimeout(15000);page.on('pageerror',e=>report.errors.push(e.message));
- await page.route('**/*',async route=>{
+ await page.route('**/*',async route=>{if(await handleEditorActivityMetadata(route,origin,report))return;
   const req=route.request(),url=new URL(req.url()),p=url.pathname;assert.equal(url.origin,origin,'No external requests permitted');
   if(p.startsWith('/api/')){const method=req.method(),body=req.postData()?req.postDataJSON():null;let data={};if(method!=='GET'){posts.push({p,method,body});assert.equal(p,'/api/state','Copying must not launch, transfer, modify files or use credentials');}
    if(p==='/api/status')data={version:require('../package.json').version,os:'windows',arch:'amd64',system:{hostname:'Location fixture',interfaces:adapters}};

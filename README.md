@@ -17,7 +17,10 @@
 ## Features
 
 The text editor supports independent left/right tab groups, comparison, tab context
-menus and a resizable Windows/SFTP file sidebar. See the
+menus and a resizable Windows/SFTP file sidebar. Use **Compare to** from a tab menu,
+drag either split divider, and use **Connected session** for active or saved file
+connections. See the [compact editor guide](docs/EDITOR_TOOLBAR113.md),
+[saved connections](docs/EDITOR_SAVED_CONNECTIONS113.md) and
 [editor views guide](docs/EDITOR_VIEWS112.md) for file actions and detached access.
 
 Compact sidebar controls and optional editor opening panels leave more room for
@@ -27,6 +30,8 @@ the active tool and document. See [layout guide](docs/APP_CHROME109.md).
 - **Work with devices:** open SSH, Telnet and serial terminals; organize saved sessions and macros; detach terminals into their own windows.
 - **Transfer files:** use SFTP, FTP/FTPS and TFTP client/server tools, with a built-in text editor.
 - **Review and export results:** inspect individual records, copy useful values and save diagnostic reports.
+- **Explore history:** keep graph endpoints and timestamps aligned, and shape older
+  history with the compact [compression curve controls](docs/GRAPH_CURVE113.md).
 - **Keep routine work consistent:** use saved-session indicators, named filters, installed terminal fonts, shared color palettes and reviewed file drops. See [workflow guide](docs/WORKFLOWS107.md) for behavior and protocol limits.
 - **Manage local network settings:** use IP configuration and the Hosts editor with explicit review and Windows approval for protected changes.
 
@@ -62,12 +67,20 @@ Download **`Network_Toolkit.exe`** from [the latest release](https://github.com/
 | Packet recording and analysis | [Packet troubleshooting](docs/PACKET_TROUBLESHOOTING.txt) |
 | Reusable terminal commands | [Terminal macros](docs/TERMINAL_MACROS.txt) |
 | Terminal appearance and matching rules | [Terminal highlighting](docs/TERMINAL_HIGHLIGHTING.txt) |
+| Loaded editor documents and close confirmation | [Editor activity and close policy](docs/EDITOR_ACTIVITY_CLOSE113.md) |
+| Concise result details and retained exports | [Result readers](docs/RESULT_READERS113.md) |
 
 ## Updates and settings
 
 Open **App settings → Network Toolkit updates** to check for updates. Choose **Download update**, review the release notes and save your work, then confirm **Install and restart**. Downloading alone does not install anything.
 
 Automatic checks run at startup and periodically while the app is visible and online. You can disable them in App settings; **Later** hides a reminder for 24 hours. Active jobs, terminal sessions, transfers and configuration changes block installation. Close other app windows first.
+
+Editor **More → Ask to save unsaved changes before closing** is enabled by default.
+Disabling it requires a warning confirmation and allows unsaved document content
+to be discarded; active saves, failed-save warnings and ownership transfers remain
+protected. Detached windows follow the main window's setting. Moving or merging
+documents always preserves their contents.
 
 - Updates use this repository's stable releases and verify the binary-only **`Update.zip`** and its checksums. **Do not import the source-containing `Portable.zip` as an update.**
 - Settings and saved profiles are retained. App settings lets you choose the data folder; `--data-dir` is an explicit per-run override. Keep the same data folder and launch options when replacing the executable manually.

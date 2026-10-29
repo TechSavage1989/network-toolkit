@@ -161,6 +161,10 @@ func (a *application) handleEditorViews(w http.ResponseWriter, r *http.Request) 
 		jsonResponse(w, 200, info)
 		return
 	}
+	if path == "/current/activity" {
+		m.handleLoaded(w, r, caller)
+		return
+	}
 	if path == "/current/state" {
 		var request struct {
 			Batch  editorBatch       `json:"batch"`
@@ -297,6 +301,7 @@ func (m *editorViewRegistry) checkpoint(caller string, batch editorBatch, leases
 		d := m.documents[snapshot.UID]
 		if d == nil {
 			d = grants[snapshot.UID]
+			m.registerLoadedLocked(snapshot.UID)
 			m.documents[snapshot.UID] = d
 		}
 		d.snapshot = snapshot

@@ -1,4 +1,5 @@
 'use strict';
+const {handleEditorActivityMetadata}=require('./editor-activity-fixture.cjs');
 // Real production sidebar, synthetic read-only engine snapshots. No device,
 // capture, native elevation, or actual authenticated connection is started.
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
@@ -14,7 +15,7 @@ async function geometry(){return page.evaluate(()=>({sidebar:{width:document.get
 function monitor(p){p.on('pageerror',e=>report.errors.push(e.message));p.on('response',r=>{if(r.request().resourceType()==='image'&&r.status()>=400)report.assetFailures.push(r.url()+' HTTP '+r.status());});p.on('requestfailed',r=>{if(r.resourceType()==='image')report.assetFailures.push(r.url()+' '+r.failure()?.errorText);});}
 (async()=>{
  if(out)fs.mkdirSync(out,{recursive:true});browser=await chromium.launch({headless:true,args:['--no-sandbox']});context=await browser.newContext({viewport:{width:1440,height:1280},serviceWorkers:'block'});
- const routeHandler=async route=>{
+ const routeHandler=async route=>{if(await handleEditorActivityMetadata(route,origin,report))return;
   const req=route.request(),url=new URL(req.url()),p=url.pathname,method=req.method();assert.equal(url.origin,origin,'No external requests');
   if(p.startsWith('/api/')){
    calls.push({path:p,method});let data={};

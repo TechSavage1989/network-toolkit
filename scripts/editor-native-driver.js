@@ -5,6 +5,7 @@
   const endpoint = '/__native_editor_fixture';
   const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   const errors = [];
+  let rejectSyntheticSave = null;
   addEventListener('error', event => errors.push(String(event.message)));
   addEventListener('unhandledrejection', event => errors.push(String(event.reason?.message || event.reason)));
   async function wait(predicate, description, timeout = 15000) {
@@ -19,7 +20,7 @@
   const editor = () => globalThis.NetworkToolkitFileEditor;
   const windows = () => globalThis.NetworkToolkitEditorWindows;
   const textarea = () => document.querySelector('[data-ed-text]');
-  const fields = ['id', 'uid', 'path', 'source', 'binding', 'hash', 'content', 'original', 'saved', 'savedEol', 'savedBOM', 'savedEncoding', 'dirty', 'undo', 'redo', 'view', 'compareView', 'eol', 'encoding', 'bom', 'language', 'untitled', 'editRevision', 'frozen', 'staged'];
+  const fields = ['id', 'uid', 'path', 'source', 'binding', 'hash', 'content', 'original', 'saved', 'savedEol', 'savedBOM', 'savedEncoding', 'dirty', 'saving', 'saveFailed', 'undo', 'redo', 'view', 'compareView', 'eol', 'encoding', 'bom', 'language', 'untitled', 'editRevision', 'frozen', 'staged'];
   const rect = el => { if (!el) return null; const r=el.getBoundingClientRect(); return {left:r.left,top:r.top,width:r.width,height:r.height}; };
   function detachPoint() {
     // Test-only pre-drag geometry: do not display a hidden target or synthesize
@@ -35,7 +36,7 @@
   function snapshot() {
     const docs = [...editor().documents.values()];
     // Let the real adapter capture the live selection without manufacturing it.
-    if (docs.length && docs.every(doc => !doc.frozen)) {
+    if (docs.length && !editor().windowAdapter.canTransfer(docs.map(doc => doc.uid))) {
       editor().windowAdapter.checkpoint();
     }
     const ta = textarea();
@@ -44,6 +45,9 @@
       active: editor().active?.uid || '',
       window: windows().state,
       textarea: ta && {value: ta.value, disabled: ta.disabled, start: ta.selectionStart, end: ta.selectionEnd, direction: ta.selectionDirection, top: ta.scrollTop, left: ta.scrollLeft},
+      closeDialog: !!document.querySelector('.nt-editor-dialog'),
+      askSaveBeforeClose: document.querySelector('[data-ed-ask-save-close]')?.checked !== false,
+      message: document.querySelector('[data-ed-message]')?.textContent || '',
       startup: globalThis.__networkToolkitStartupState,
       nativeCapability: /^[a-f0-9]{64}$/.test(globalThis.__networkToolkitNativeSession || ''),
       location: location.pathname,
@@ -107,6 +111,52 @@
       textarea().setSelectionRange(13, 35, 'backward');
       textarea().scrollTop = 100;
       textarea().dispatchEvent(new Event('scroll', {bubbles: true}));
+      return snapshot();
+    }
+    if (command.action === 'close-preference') {
+      const more = document.querySelector('.nt-editor-more');
+      if (!more.open) more.querySelector('summary').click();
+      const control = await wait(() => document.querySelector('[data-ed-ask-save-close]'), 'close preference');
+      if (control.disabled) throw Error('Main close preference is unexpectedly read-only');
+      if (control.checked !== command.enabled) control.click();
+      if (!command.enabled) {
+        const confirm = await wait(() => document.querySelector('.nt-editor-dialog [data-ed-dialog-action="accept"]'), 'explicit allow-discard confirmation');
+        if (confirm.textContent.trim() !== 'Allow discard') throw Error('Unexpected preference consent');
+        confirm.click();
+      }
+      await wait(() => control.checked === command.enabled && !document.querySelector('.nt-editor-dialog'), 'preference committed');
+      more.querySelector('summary').click();
+      return snapshot();
+    }
+    if (command.action === 'close-tab') {
+      const d = editor().active, count = editor().documents.size;
+      const button = [...document.querySelectorAll('[data-ed-close-tab]')].find(el => el.dataset.edCloseTab === d.id);
+      if (!button) throw Error('Active tab close control missing');
+      button.click();
+      await wait(() => editor().documents.size < count || document.querySelector('.nt-editor-dialog') || /Finish|pending|saving|move/i.test(document.querySelector('[data-ed-message]')?.textContent || ''), 'tab close outcome');
+      return snapshot();
+    }
+    if (command.action === 'answer-close') {
+      const button = await wait(() => document.querySelector('.nt-editor-dialog [data-ed-dialog-action="' + command.mode + '"]'), 'explicit close answer');
+      button.click();
+      await wait(() => !document.querySelector('.nt-editor-dialog') && !windows().state.closing, 'close answer completed without shutdown');
+      return snapshot();
+    }
+    if (command.action === 'start-synthetic-save') {
+      // In-memory test binding only. The actual Save button and pending-save
+      // lifecycle execute; no host file or remote connection is accessed.
+      await editor().open({id:'native-close113-save', source:'Synthetic test binding', path:'synthetic-save113.txt',
+        read:async()=>({content:'SYNTHETIC ORIGINAL',hash:'synthetic',encoding:'UTF-8'}),
+        write:()=>new Promise((resolve,reject)=>{rejectSyntheticSave=reject;})});
+      const ta=textarea();ta.value+='\nSYNTHETIC UNSAVED SAVE FAILURE';ta.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:'synthetic'}));
+      document.querySelector('[data-ed="save"]').click();
+      await wait(() => editor().active.saving && rejectSyntheticSave, 'actual Save waits on synthetic binding');
+      return snapshot();
+    }
+    if (command.action === 'fail-synthetic-save') {
+      if (!rejectSyntheticSave) throw Error('No synthetic pending save');
+      rejectSyntheticSave(Error('Synthetic native fixture write failure'));rejectSyntheticSave=null;
+      await wait(() => !editor().active.saving && /Save failed: Synthetic native fixture write failure/.test(document.querySelector('[data-ed-message]')?.textContent || ''), 'visible failed save');
       return snapshot();
     }
     if (command.action === 'release-empty') {

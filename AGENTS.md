@@ -4,7 +4,9 @@ Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest m
 and preserve working features, settings and previous release safeguards.
 
 Active authorized candidate:1.17.113. Read docs/RELEASE113_HANDOFF.md.
-The user approved the narrow editor toolbar/saved-connection build/publication.
+The user approved the editor toolbar/saved-connection build/publication and
+explicitly merged the graph, editor-activity/close-preference and interface-polish
+additions into this same candidate on 2026-10-29 at 02:12 UTC.
 Preserve all112 features and its completed closure; final113 evidence pending.
 
 Current published version: 1.17.112. Independent editor views and the Windows/SFTP

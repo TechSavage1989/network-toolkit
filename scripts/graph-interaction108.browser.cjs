@@ -1,4 +1,5 @@
 'use strict';
+const {handleEditorActivityMetadata}=require('./editor-activity-fixture.cjs');
 // Real bundled UI; synthetic results only. No probe, capture or device action.
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
@@ -19,7 +20,7 @@ async function screenshot(name){if(out)await page.screenshot({path:path.join(out
 (async()=>{
  if(out)fs.mkdirSync(out,{recursive:true});browser=await chromium.launch({headless:true,args:['--no-sandbox']});page=await browser.newPage({viewport:{width:1440,height:1000},serviceWorkers:'block'});page.setDefaultTimeout(15000);
  page.on('pageerror',error=>report.errors.push(error.message));page.on('response',response=>{if(response.url().includes('/assets/')&&response.status()>=400)report.assetFailures.push(response.url());});
- await page.route('**/*',async route=>{const req=route.request(),url=new URL(req.url()),p=url.pathname;assert.equal(url.origin,'https://graph108.toolkit.test','No external/device request');
+ await page.route('**/*',async route=>{if(await handleEditorActivityMetadata(route,'https://graph108.toolkit.test',report))return;const req=route.request(),url=new URL(req.url()),p=url.pathname;assert.equal(url.origin,'https://graph108.toolkit.test','No external/device request');
   if(p.startsWith('/api/')){let data={};if(req.method()!=='GET'){report.mutations.push({path:p,method:req.method()});assert.equal(p,'/api/state','Only preferences may mutate');assert.equal(req.method(),'PUT');saved=req.postDataJSON();}
    if(p==='/api/state')data=saved;if(p==='/api/status')data={version:require('../package.json').version,os:'windows',arch:'amd64',system:{hostname:'Synthetic graph108',interfaces:[]}};
    if(p==='/api/system')data={hostname:'Synthetic graph108',interfaces:[]};if(p==='/api/jobs')data=[job];if(p==='/api/jobs/'+job.id)data=job;

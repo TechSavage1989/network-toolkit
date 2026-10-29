@@ -1,6 +1,6 @@
 Network Toolkit 1.17.113
 
-Compact editor controls and saved connections
+Editor workflow, graph controls and concise results
 - Keep More compact in the main editor toolbar when expanded. Extra editing
   tools can occupy the row below without another full-width More heading.
 - Move Connected session into the main toolbar and remove the redundant Open
@@ -19,6 +19,24 @@ Compact editor controls and saved connections
   Spacer blocks never become document text or advance source line numbers.
 - Preserve split views, per-view tabs, two-document maps, file explorer access,
   unsaved documents, history and acknowledged window ownership.
+
+Graph history and compression
+- Keep graph points and time-axis positions on one mapping, with visible endpoint
+  markers at the plotting edges after natural startup fills the view.
+- Configure condensed history with an interactive compression curve and a
+  separate recent-point count, using a compact toolbar disclosure.
+- Preserve recent spacing, underlying history, selected results and clipped
+  plotting boundaries; report width limits without changing saved preferences.
+
+Editor activity and closing
+- Indicate loaded documents in the editor sidebar across linked windows without
+  counting untouched placeholders or counting a transferred document twice.
+- Add a default-enabled close-prompt preference with a clear unsaved-discard
+  warning. Active saves, transfers and window ownership safeguards remain.
+
+Concise interface
+- Remove duplicate Details facts and raw debug panels from ordinary workflows.
+  Retain useful technical fields, errors, copy actions and explicit exports.
 
 Verification uses synthetic files and hosted browser/native tests only. No user
 computer, private configuration, credentials or production devices are tested.

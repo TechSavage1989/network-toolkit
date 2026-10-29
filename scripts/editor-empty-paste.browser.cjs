@@ -1,4 +1,5 @@
 'use strict';
+const {handleEditorActivityMetadata}=require('./editor-activity-fixture.cjs');
 // Independent regression for first input before New/Open, and after the last tab
 // closes. Uses a trusted clipboard paste; never reads/writes a real document.
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),assert=require('node:assert/strict');
@@ -24,7 +25,7 @@ async function controlsWork(label){
 (async()=>{
  if(out)fs.mkdirSync(out,{recursive:true});browser=await chromium.launch({headless:true,args:['--no-sandbox']});page=await browser.newPage({viewport:{width:1440,height:1000},permissions:['clipboard-read','clipboard-write'],serviceWorkers:'block'});page.setDefaultTimeout(15000);
  page.on('pageerror',error=>report.errors.push(error.message));page.on('response',response=>{if(response.url().includes('/assets/')&&response.status()>=400)report.assetFailures.push(response.url());});page.on('dialog',dialog=>dialog.dismiss());
- await page.route('**/*',async route=>{
+ await page.route('**/*',async route=>{if(await handleEditorActivityMetadata(route,'https://editor-empty108.toolkit.test',report))return;
   const req=route.request(),url=new URL(req.url()),p=url.pathname,method=req.method();assert.equal(url.origin,'https://editor-empty108.toolkit.test','No external or device requests');
   if(p.startsWith('/api/')){let data={};if(method!=='GET'){report.mutations.push({path:p,method});assert.equal(p,'/api/state','No local/remote document write, connect, scan or helper is permitted');assert.equal(method,'PUT');saved=req.postDataJSON();assert(!JSON.stringify(saved).includes(canary),'Unsaved content remains memory-only, never settings persistence');}
    if(p==='/api/state')data=saved;if(p==='/api/status')data={version:require('../package.json').version,os:'windows',arch:'amd64',system:{hostname:'Synthetic editor regression',interfaces:[]}};if(p==='/api/system')data={hostname:'Synthetic editor regression',interfaces:[]};if(p==='/api/jobs')data=[];

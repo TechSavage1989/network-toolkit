@@ -214,8 +214,9 @@ body:has(.nt-editor-embedded) #toolWorkspace>#pageContent{grid-row:1!important;g
 
 .nt-compare-syntax-notice{font-size:10px;padding:3px 7px;color:var(--warn);max-height:45px;overflow:auto;flex-shrink:0}
 
-.nt-editor-label-compact{display:none}
-@media(max-width:680px){.nt-editor-toolbar .nt-editor-label-wide{display:none}.nt-editor-toolbar .nt-editor-label-compact{display:inline}}
+/* Keep the primary action concise at every width; its accessible name stays explicit. */
+.nt-editor-toolbar .nt-editor-label-wide{display:none}
+.nt-editor-toolbar .nt-editor-label-compact{display:inline}
 
 /* Shared controls stay above view-local tabs and their editing surfaces. */
 .nt-editor-workspace{display:flex;flex:1 1 0;min-height:0;min-width:0;overflow:hidden}
@@ -303,3 +304,5 @@ body:has(.nt-editor:not([hidden]) [data-ed-files-sidebar]:not([hidden])) .toast-
 .nt-editor-compare-menu-title{padding:5px 9px;font-size:11px;color:var(--muted);overflow-wrap:anywhere}
 .nt-editor-compare-menu button{display:flex;flex-direction:column;align-items:flex-start;white-space:normal;overflow-wrap:anywhere;text-align:left}
 .nt-editor-compare-menu button small{font-size:10px;color:var(--muted)}
+
+.nt-editor-close-preference{display:flex;align-items:center;gap:6px;white-space:normal;font-size:12px}
