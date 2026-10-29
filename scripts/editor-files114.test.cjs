@@ -110,3 +110,11 @@ test('unhandled rail shortcuts reach existing editor save/find handlers and nati
  assert.deepEqual(calls,['save:false','draw','focus','save:false','draw','focus']);
  for(const props of [{key:'k',ctrlKey:true},{key:'k',metaKey:true},{key:'Tab'},{key:'Enter'},{key:' '}]){let stopped=false,prevented=false;shell.emit('keydown',files,{...props,preventDefault(){prevented=true;},stopPropagation(){stopped=true;}});assert.equal(stopped,false);assert.equal(prevented,false);assert.equal(h.host.hidden,false);assert.equal(h.host.dataset.editorSidebarPanel,'files');}
 });
+
+
+test('shared editor rail is exempt from ordinary button containment without changing other controls',()=>{
+ const css=fs.readFileSync(require.resolve('../web/assets/text-containment.css'),'utf8'),rule=css.split('\n').find(line=>line.startsWith(':where(.main,.modal) :is(button,.btn)'));
+ assert(rule.includes(',.nt-editor-files-shell .terminal-sidebar-tab,'));
+ assert.equal(rule.replace(',.nt-editor-files-shell .terminal-sidebar-tab',''),':where(.main,.modal) :is(button,.btn):not(:where(.iconbtn,.value-copy-control,.input-clear-control,.panel-visibility-toggle,#terminalWorkspace *, .terminal-workspace *,.xterm *)){white-space:normal;overflow-wrap:anywhere;word-break:normal;max-width:100%;height:auto;min-height:29px;line-height:1.4}');
+ const editorCSS=fs.readFileSync(require.resolve('../web/assets/file-editor.css'),'utf8');assert(!/\.nt-editor-files-shell\s+\.terminal-sidebar-tab\s*\{/.test(editorCSS),'editor must use shared tab dimensions, not copy them');
+});

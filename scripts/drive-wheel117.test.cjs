@@ -12,3 +12,11 @@ test('horizontal touchpad, Shift-wheel and zoom modifiers retain native behavior
  for(const e of [{deltaX:60,deltaY:20},{deltaX:30,deltaY:30},{deltaX:25,deltaY:0},{ctrlKey:true},{metaKey:true},{shiftKey:true},{deltaY:0}]){const s={clientWidth:200,scrollWidth:900,scrollLeft:20};assert(!wheel(s,e).defaultPrevented);assert.equal(s.scrollLeft,20);}
  assert(source.includes("document.addEventListener('wheel',scrollDriveStrip,{passive:false})"));
 });
+
+
+test('file-pane shortcuts do not cancel native drive buttons, but Enter still edits a focused file list',()=>{
+ const {document:makeDocument}=require('./terminal-dom-fixture.cjs'),document=makeDocument('<div data-rb-root="ssh"><section data-rb-pane="local"><nav data-rb-drives><button data-rb-drive="D:/">D:</button></nav><div data-rb-scroll="local"></div></section></div>'),drive=document.querySelector('[data-rb-drive]'),list=document.querySelector('[data-rb-scroll]'),calls=[],model={local:{}};
+ const start=source.indexOf("document.addEventListener('keydown',event=>{const input=event.target.closest('[data-rb-path]');"),end=source.indexOf(' // Export preparation',start),sandbox={document,TYPES:new Set(['ssh']),get:()=>model,dispatch:(...args)=>calls.push(args)};assert(start>0&&end>start);vm.runInNewContext(source.slice(start,end),sandbox);
+ for(const key of ['Enter',' ','ArrowDown','Home','Delete']){let prevented=false;document.emit('keydown',drive,{key,preventDefault(){prevented=true;}});assert.equal(prevented,false,key+' must retain native drive behavior');assert.equal(calls.length,0);}
+ let prevented=false;document.emit('keydown',list,{key:'Enter',preventDefault(){prevented=true;}});assert(prevented);assert.deepEqual(calls,[['ssh','edit']]);
+});

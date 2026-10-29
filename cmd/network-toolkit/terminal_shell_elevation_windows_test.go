@@ -8,6 +8,8 @@ import (
 	"networktoolkit/internal/terminal"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -120,9 +122,13 @@ func TestTerminalShellNativeHelper(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 			defer cancel()
 			dir := t.TempDir()
+			canonical, err := filepath.EvalSymlinks(dir)
+			if err != nil {
+				t.Fatal(err)
+			}
 			var mu sync.Mutex
 			var output strings.Builder
-			tr, err := openElevatedTerminalShell(ctx, terminal.LocalShellOptions{Type: kind, WorkingDirectory: dir, Cols: 120, Rows: 25}, func(b []byte) {
+			tr, err := openElevatedTerminalShell(ctx, terminal.LocalShellOptions{Type: kind, WorkingDirectory: dir, Cols: 500, Rows: 25}, func(b []byte) {
 				mu.Lock()
 				defer mu.Unlock()
 				if output.Len() < 128<<10 {
@@ -133,9 +139,21 @@ func TestTerminalShellNativeHelper(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer tr.Close()
-			if !tr.LocalShellState().Elevated || tr.LocalShellState().WorkingDirectory != dir {
+			if !tr.LocalShellState().Elevated || tr.LocalShellState().WorkingDirectory != canonical {
 				t.Fatal(tr.LocalShellState())
 			}
+			control := regexp.MustCompile(`\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1b\\))`)
+			readOutput := func() string { mu.Lock(); defer mu.Unlock(); return control.ReplaceAllString(output.String(), "") }
+			for !strings.Contains(readOutput(), ">") {
+				select {
+				case <-ctx.Done():
+					t.Fatalf("initial helper prompt absent; requested=%q canonical=%q state=%+v output=%q", dir, canonical, tr.LocalShellState(), readOutput())
+				case <-time.After(20 * time.Millisecond):
+				}
+			}
+			mu.Lock()
+			from := output.Len()
+			mu.Unlock()
 			command := "echo NTK_SHELL117_CWD=%CD%\r"
 			if kind == "powershell" {
 				command = "Write-Output ('NTK_SHELL117_CWD='+(Get-Location).Path)\r"
@@ -145,14 +163,14 @@ func TestTerminalShellNativeHelper(t *testing.T) {
 			}
 			for {
 				mu.Lock()
-				found := strings.Contains(output.String(), "NTK_SHELL117_CWD="+dir)
+				found := strings.Contains(control.ReplaceAllString(output.String()[from:], ""), "NTK_SHELL117_CWD="+canonical)
 				mu.Unlock()
 				if found {
 					break
 				}
 				select {
 				case <-ctx.Done():
-					t.Fatal("synthetic cwd output absent")
+					t.Fatalf("synthetic cwd output absent; requested=%q canonical=%q state=%+v output=%q", dir, canonical, tr.LocalShellState(), readOutput())
 				case <-time.After(20 * time.Millisecond):
 				}
 			}

@@ -233,11 +233,15 @@ func TestWindowsLocalShellExplicitDirectoryAndToken(t *testing.T) {
 			if err := os.Mkdir(dir, 0700); err != nil {
 				t.Fatal(err)
 			}
+			canonical, err := filepath.EvalSymlinks(dir)
+			if err != nil {
+				t.Fatal(err)
+			}
 			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 			defer cancel()
 			var mu sync.Mutex
 			var out strings.Builder
-			conn, err := OpenLocalShellProcess(ctx, LocalShellOptions{Type: kind, WorkingDirectory: dir, Cols: 120, Rows: 25}, func(data []byte) {
+			conn, err := OpenLocalShellProcess(ctx, LocalShellOptions{Type: kind, WorkingDirectory: dir, Cols: 500, Rows: 25}, func(data []byte) {
 				mu.Lock()
 				defer mu.Unlock()
 				if out.Len() < 128<<10 {
@@ -248,25 +252,39 @@ func TestWindowsLocalShellExplicitDirectoryAndToken(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer conn.Close()
+			control := regexp.MustCompile(`\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1b\\))`)
+			readOutput := func() string { mu.Lock(); defer mu.Unlock(); return control.ReplaceAllString(out.String(), "") }
+			for !strings.Contains(readOutput(), ">") {
+				select {
+				case <-ctx.Done():
+					t.Fatalf("initial prompt absent; expected=%q actualState=%+v output=%q", canonical, conn.LocalShellState(), readOutput())
+				case <-time.After(20 * time.Millisecond):
+				}
+			}
+			mu.Lock()
+			from := out.Len()
+			mu.Unlock()
 			command := "echo NTK_LOCAL117_CWD=%CD%\r"
 			if kind == "powershell" {
 				command = "Write-Output ('NTK_LOCAL117_CWD='+(Get-Location).Path)\r"
 			}
-			conn.Write([]byte(command))
+			if _, err = conn.Write([]byte(command)); err != nil {
+				t.Fatal(err)
+			}
 			for {
 				mu.Lock()
-				found := strings.Contains(out.String(), "NTK_LOCAL117_CWD="+dir)
+				found := strings.Contains(control.ReplaceAllString(out.String()[from:], ""), "NTK_LOCAL117_CWD="+canonical)
 				mu.Unlock()
 				if found {
 					break
 				}
 				select {
 				case <-ctx.Done():
-					t.Fatal("literal working directory not reported")
+					t.Fatalf("literal working directory not reported; requested=%q canonical=%q actualState=%+v output=%q", dir, canonical, conn.LocalShellState(), readOutput())
 				case <-time.After(20 * time.Millisecond):
 				}
 			}
-			if conn.LocalShellState().WorkingDirectory != dir {
+			if conn.LocalShellState().WorkingDirectory != canonical {
 				t.Fatal(conn.LocalShellState())
 			}
 			current, _ := syscall.GetCurrentProcess()

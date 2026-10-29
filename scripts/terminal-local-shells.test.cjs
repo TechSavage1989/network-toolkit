@@ -22,3 +22,19 @@ test('local directory is literal nonsecret data, admin defaults off and remote t
  const remote=h.terminalConnectPayload({type:'ssh',host:'example.test',workingDirectory:directory,runAsAdministrator:true});
  assert(!('workingDirectory' in remote));assert(!('runAsAdministrator' in remote));
 });
+
+test('retained local startup dialog prevents background initial-pane assignment; closing restores normal initialization',()=>{
+ const context={terminalInitialized:true,terminalAssetsReady:()=>true,DETACHED_WORKSPACE:false,terminalSessions:new Map(),terminalInitialPanesFilled:false,terminalConnectBusy:false,terminalPanes:['','','',''],terminalPaneFocus:0,terminalActive:'',terminalFeedAfter:0,terminalPaneCount:()=>1,renderTerminalChrome(){},terminalTabExists:id=>context.terminalSessions.has(id),terminalPaneContext:0,terminalDraftTabs:new Map(),terminalPaneMaximized:-1,form:{},$:selector=>selector==='#terminalConnectForm'?context.form:null};
+ context.upsertTerminalSession=info=>context.terminalSessions.set(info.id,{info});
+ vm.createContext(context);
+ const start=html.indexOf('function processTerminalBatch('),end=html.indexOf('\nfunction startTerminalFeed(',start);assert(start>=0&&end>start);vm.runInContext(html.slice(start,end),context);
+ vm.runInContext(html.split('\n').find(s=>s.startsWith('function placeConnectedTerminal(')),context);
+ const destination={pane:0,prior:'',draftId:'',context:0,panes:['','','','']};
+ context.processTerminalBatch({sessions:[{id:'cancelled',state:'error'}],events:[],next:1});
+ assert.equal(context.terminalPanes[0],'');assert.equal(context.terminalInitialPanesFilled,false);
+ context.processTerminalBatch({sessions:[{id:'cancelled',state:'error'},{id:'retry',state:'connected'}],events:[],next:2});
+ assert.equal(context.placeConnectedTerminal(context.terminalSessions.get('retry'),destination),0);assert.equal(context.terminalPanes[0],'retry');assert.equal(context.terminalActive,'retry');
+ // A genuine explicit pane change still wins; the retry cannot steal it.
+ context.terminalPanes[0]='cancelled';assert.equal(context.placeConnectedTerminal(context.terminalSessions.get('retry'),destination),-1);assert.equal(context.terminalPanes[0],'cancelled');
+ context.form=null;context.terminalInitialPanesFilled=false;context.terminalPanes=['','','',''];context.processTerminalBatch({sessions:[],events:[],next:3});assert.equal(context.terminalInitialPanesFilled,true);assert.equal(context.terminalPanes[0],'cancelled');
+});

@@ -33,7 +33,9 @@ func TestLocalShellWorkingDirectoryAndElevationDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if req.WorkingDirectory != dir || !req.RunAsAdministrator {
+	original, originalErr := os.Stat(dir)
+	actual, actualErr := os.Stat(req.WorkingDirectory)
+	if originalErr != nil || actualErr != nil || !os.SameFile(original, actual) || !req.RunAsAdministrator {
 		t.Fatal("lost local settings", req)
 	}
 	s := newLiveSession(context.Background(), "requested-only", req)
