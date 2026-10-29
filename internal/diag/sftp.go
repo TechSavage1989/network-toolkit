@@ -426,10 +426,14 @@ func (c *wireSFTP) readText(ctx context.Context, remote string) ([]byte, error) 
 		contents.Write(chunk)
 	}
 }
-func (c *wireSFTP) download(ctx context.Context, remote, local string, overwrite bool, report func(uint64, uint64)) (uint64, error) {
+func (c *wireSFTP) download(ctx context.Context, remote, local string, overwrite bool, report func(uint64, uint64), safeExport ...int64) (uint64, error) {
 	attrs, e := c.stat(remote)
 	if e != nil {
 		return 0, e
+	}
+	bounded := len(safeExport) > 0 && safeExport[0] != -1
+	if bounded && (!attrs.modeKnown || attrs.mode&0170000 != 0100000 || attrs.size > 2<<30 || attrs.size != uint64(safeExport[0])) {
+		return 0, errors.New("prepared export requires a known regular file no larger than 2 GiB")
 	}
 	if attrs.mode&0170000 == 0040000 {
 		return 0, errors.New("remote path is a directory; choose a file")
@@ -477,11 +481,17 @@ func (c *wireSFTP) download(ctx context.Context, remote, local string, overwrite
 		if len(chunk) == 0 {
 			break
 		}
+		if bounded && (total+uint64(len(chunk)) > attrs.size || total+uint64(len(chunk)) > 2<<30) {
+			return total, errors.New("remote file changed size or exceeds the prepared-copy limit")
+		}
 		if _, er = temp.Write(chunk); er != nil {
 			return total, er
 		}
 		total += uint64(len(chunk))
 		report(total, attrs.size)
+	}
+	if bounded && total != attrs.size {
+		return total, errors.New("remote file changed size during prepared copy")
 	}
 	if e = temp.Sync(); e != nil {
 		return total, e
@@ -888,6 +898,10 @@ func runSFTPChannel(ctx context.Context, req model.Request, emit model.Emit, cli
 			data["sizeBytes"] = a.size
 			if a.mode&0170000 == 0040000 {
 				data["kind"] = "directory"
+			} else if a.modeKnown && a.mode&0170000 == 0120000 {
+				data["kind"] = "link"
+			} else if a.modeKnown && a.mode&0170000 != 0100000 {
+				data["kind"] = "special"
 			} else {
 				data["kind"] = "file"
 			}
@@ -932,7 +946,16 @@ func runSFTPChannel(ctx context.Context, req model.Request, emit model.Emit, cli
 		summary = "Remote permissions updated"
 	case "download":
 		var n uint64
-		n, e = protocol.download(ctx, remote, local, boolOption(req.Options, "overwrite", false), progress)
+		n, e = protocol.download(ctx, remote, local, boolOption(req.Options, "overwrite", false), progress, func() int64 {
+			if !boolOption(req.Options, "safeExport", false) {
+				return -1
+			}
+			n, err := intOption(req.Options, "exportSize", -2, 0, 2<<30)
+			if err != nil {
+				return -2
+			}
+			return int64(n)
+		}())
 		data["bytesTransferred"] = n
 		summary = "SFTP download completed"
 	case "upload":

@@ -22,6 +22,8 @@ import (
 )
 
 type remoteBrowserRequest struct {
+	SafeExport       bool   `json:"-"`
+	ExportSize       int64  `json:"-"`
 	Protocol         string `json:"protocol"`
 	SessionID        string `json:"sessionId,omitempty"`
 	ConnectionID     string `json:"connectionId,omitempty"`
@@ -55,7 +57,7 @@ type remoteBrowserRequest struct {
 
 func (r remoteBrowserRequest) opts() map[string]any {
 	return map[string]any{
-		"port": r.Port, "username": r.Username, "password": r.Password, "keyPath": r.KeyPath, "privateKey": r.PrivateKey, "passphrase": r.Passphrase, "authMode": r.AuthMode, "fingerprint": r.Fingerprint, "sshCompatibility": r.SSHCompatibility, "security": r.Security, "operation": r.Action, "remotePath": r.Path, "newPath": r.NewPath, "localPath": r.LocalPath, "confirmDelete": r.Confirm, "overwrite": r.Overwrite, "stagedUpload": r.StagedUpload, "permissions": r.Permissions, "timeoutMs": 15000,
+		"port": r.Port, "username": r.Username, "password": r.Password, "keyPath": r.KeyPath, "privateKey": r.PrivateKey, "passphrase": r.Passphrase, "authMode": r.AuthMode, "fingerprint": r.Fingerprint, "sshCompatibility": r.SSHCompatibility, "security": r.Security, "operation": r.Action, "remotePath": r.Path, "newPath": r.NewPath, "localPath": r.LocalPath, "confirmDelete": r.Confirm, "overwrite": r.Overwrite, "stagedUpload": r.StagedUpload, "safeExport": r.SafeExport, "exportSize": int(r.ExportSize), "permissions": r.Permissions, "timeoutMs": 15000,
 	}
 }
 func (r remoteBrowserRequest) request() model.Request {

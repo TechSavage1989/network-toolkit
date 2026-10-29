@@ -1,0 +1,37 @@
+name: Focused Toolkit114 native Files acceptance
+on:
+  push:
+    branches: ['investigate/toolkit114-files']
+permissions:
+  contents: read
+jobs:
+  native-files:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+        with: {persist-credentials: false}
+      - uses: actions/setup-go@v7
+        with: {go-version-file: go.mod, cache: false}
+      - uses: actions/setup-node@v7
+        with: {node-version: '24', package-manager-cache: false}
+      - name: Focused recursive transfer and scoped native boundary regressions
+        env:
+          GOTOOLCHAIN: local
+          GOMEMLIMIT: 512MiB
+        run: |
+          go test -mod=vendor ./cmd/network-toolkit -run 'TestExplorer|TestLocalExplorer' -count=1 -v
+          node --test scripts/files-tree114.test.cjs scripts/native-copy114.test.cjs
+      - name: Actual Windows Explorer bidirectional files folders cancellation and junction boundary
+        env:
+          GOTOOLCHAIN: local
+          NETWORK_TOOLKIT_NATIVE_EXPLORER_TEST: '1'
+          TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/files-native114
+        run: go test -mod=vendor ./internal/desktop -run 'TestNativeExplorerFiles114|TestNativeFileDrag' -count=1 -timeout=6m -v
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: files-native114
+          path: ${{ runner.temp }}/files-native114
+          if-no-files-found: error
+          retention-days: 7

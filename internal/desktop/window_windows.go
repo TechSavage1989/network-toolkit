@@ -322,6 +322,7 @@ func Run(ctx context.Context, cfg Config) error {
 
 	done := make(chan struct{})
 	defer close(done)
+	go w.runNativeFileDrag(done)
 	go func() {
 		activate := cfg.Activate
 		for {
