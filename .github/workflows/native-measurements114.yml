@@ -1,0 +1,32 @@
+name: Focused Toolkit114 terminal measurements
+on:
+  push:
+    branches: ['investigate/toolkit114-terminal-baseline']
+permissions:
+  contents: read
+jobs:
+  native-terminal-baseline:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Measure113 retained terminal transport detach and return
+        env:
+          GOTOOLCHAIN: local
+          NETWORK_TOOLKIT_NATIVE_TERMINAL_TEST: '1'
+          TOOLKIT_NATIVE_TIMING_LABEL: '113-baseline'
+          TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/terminal-baseline114
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestNativeTerminalTransferInstalledWebView2$' -count=1 -timeout=6m -v
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: focused-terminal-baseline114
+          path: ${{ runner.temp }}/terminal-baseline114
+          if-no-files-found: error
+          retention-days: 7

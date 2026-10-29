@@ -1,0 +1,17 @@
+/* Test-only driver inserted by terminal_native_windows_test.go. Never embedded. */
+(async function(){
+ 'use strict';
+ const errors=[],readyAt=new Map(),sleep=ms=>new Promise(r=>setTimeout(r,ms));
+ addEventListener('error',e=>errors.push(String(e.message)));addEventListener('unhandledrejection',e=>errors.push(String(e.reason?.message||e.reason)));
+ async function wait(fn,description,ms=30000){const until=Date.now()+ms;while(Date.now()<until){const v=fn();if(v)return v;await sleep(25);}throw Error('Native terminal fixture timed out: '+description);}
+ const entry=()=>currentTerminal();
+ function editable(e){return !!(e?.xterm&&terminalOwnerCanMutate(e)&&!e.transferBusy&&!e.restoring&&!e.awaitingAcceptance&&!e.xterm.options.disableStdin&&online);}
+ const rect=n=>{const r=n?.getBoundingClientRect();return r&&{left:r.left,top:r.top,width:r.width,height:r.height};};
+ function observe(){for(const e of terminalSessions.values()){if(editable(e)){if(!readyAt.has(e.info.id))readyAt.set(e.info.id,Date.now());}else readyAt.delete(e.info.id);}}
+ function snapshot(){observe();const e=entry();return {startup:__networkToolkitStartupState,nativeCapability:/^[a-f0-9]{64}$/.test(globalThis.__networkToolkitNativeSession||''),location:location.pathname,view:DETACHED_TERMINAL?TERMINAL_VIEW.id:'',session:e?.info.id||'',state:e?.info.state||'',editable:editable(e),readyAt:readyAt.get(e?.info.id)||0,transcript:e?.xterm?terminalBufferText(e.xterm.buffer.normal).trimEnd():'',selection:e?.xterm?.getSelection()||'',outputBlocks:e?.xterm?NetworkToolkitTerminalExtras.snapshot(e):null,owner:e?terminalSessionOwner(e.info.id):null,geometry:{width:innerWidth,height:innerHeight,tabs:[...document.querySelectorAll('[data-terminal-tab]')].map(n=>({uid:n.dataset.terminalTab,...rect(n)}))},errors:[...errors]};}
+ async function execute(c){if(c.action==='snapshot')return snapshot();if(c.action==='select'){selectTerminal(c.destination);await wait(()=>entry()?.info.id===c.destination&&editable(entry()),'selected connected terminal');await terminalDisplayBarrier(entry());return snapshot();}if(c.action==='detach'){const e=entry();if(!editable(e))throw Error('Source not editable before detach');const actionAt=Date.now();void detachTerminal(e);return {...snapshot(),actionAt};}if(c.action==='reattach'){if(!DETACHED_TERMINAL||!editable(entry()))throw Error('Child not editable before return');const actionAt=Date.now();void returnDetachedTerminal();return {...snapshot(),actionAt};}throw Error('Unknown fixed terminal fixture action');}
+ const headers={'Content-Type':'application/json','X-Session-Token':globalThis.__networkToolkitNativeSession};
+ async function exchange(body){const r=await fetch('/__native_terminal_fixture',{method:'POST',headers,body:JSON.stringify(body)});if(!r.ok)throw Error('Terminal fixture channel HTTP '+r.status);return r.json();}
+ try{await wait(()=>globalThis.__networkToolkitStartupState===1&&typeof terminalSessions!=='undefined','native startup',35000);if(!DETACHED_TERMINAL){document.querySelector('#navigation [data-page="terminal"]').click();}await wait(()=>entry()?.xterm&&editable(entry()),'editable initial terminal');setInterval(observe,20);for(;;){const c=await exchange({kind:'next'});if(!c.id)continue;let result;try{result={id:c.id,state:await execute(c)};}catch(e){result={id:c.id,error:String(e.stack||e),state:snapshot()};}await exchange({kind:'result',...result});}}
+ catch(e){try{await exchange({kind:'fatal',error:String(e.stack||e)});}catch{}}
+})();
