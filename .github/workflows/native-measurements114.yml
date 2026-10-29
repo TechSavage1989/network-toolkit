@@ -1,0 +1,33 @@
+name: Focused Toolkit114 native measurements
+on:
+  push:
+    branches: ['investigate/toolkit114-native-baseline']
+permissions:
+  contents: read
+jobs:
+  native-editor-baseline:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Measure113 separate-process editor transfers with4MiB synthetic text
+        env:
+          GOTOOLCHAIN: local
+          NETWORK_TOOLKIT_NATIVE_EDITOR_TEST: '1'
+          NETWORK_TOOLKIT_NATIVE_PERFORMANCE114: '1'
+          NETWORK_TOOLKIT_NATIVE_PERFORMANCE_BYTES: '4194304'
+          TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/native-baseline114
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestNativeEditorTransferInstalledWebView2$' -count=1 -timeout=6m -v
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: focused-native-baseline114
+          path: ${{ runner.temp }}/native-baseline114
+          if-no-files-found: error
+          retention-days: 7
