@@ -30,7 +30,7 @@ async function start(width,detached=false){
    else if(p==='/api/terminals/known-hosts')data={hosts:profiles.filter(x=>x.id!=='verify').map(x=>({host:x.host+':22',fingerprint:'SHA256:known'}))};
    else if(p==='/api/credentials'){assert(!detached);data={vault:{available:true,state:'locked'},entries:[]};}
    else if(p==='/api/credential-vault'){assert(!detached);assert.deepEqual(b,{action:'unlock'});return route.fulfill({status:409,contentType:'application/json',body:JSON.stringify({error:'Native unlock cancelled (synthetic fixture).'})});}
-   else if(p==='/api/transfer/local')data={path:'C:/Synthetic',parent:'C:/',entries:[]};
+   else if(p==='/api/transfer/local'){const folder=url.searchParams.get('path')||'C:/Synthetic';if(folder==='Z:/')return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'Synthetic disconnected drive is unavailable.'})});data={path:folder,parent:folder.startsWith('D:')?'D:/':'C:/',roots:['C:/','D:/','Z:/'],drives:[{path:'C:/',label:'C: Local disk',kind:'local'},{path:'D:/',label:'D: Synthetic removable',kind:'removable'},{path:'C:/Mounted/',label:'Mounted synthetic volume',kind:'local'},{path:'Z:/',label:'Z: Offline mapping',kind:'network'}],entries:Array.from({length:80},(_,i)=>({name:'synthetic-'+i+'.txt',path:folder+'/synthetic-'+i+'.txt',directory:false,size:30,modified:'2026-10-29T00:00:00Z'}))};}
    else if(p==='/api/remote-browser'){
     if(request.method()==='GET')data={sessions:[],connections:[]};else if(b.action==='fingerprint'){assert(!detached);data={fingerprint:'SHA256:observed'};}else throw Error('Unexpected network connection/file action '+b.action);
    }else if(p.includes('/events')){await new Promise(r=>setTimeout(r,100));data={events:[],sessions:[],after:0};}
@@ -49,14 +49,21 @@ async function start(width,detached=false){
 }
 async function retained(page){assert(await page.evaluate(()=>NetworkToolkitFileEditor.active===saved113Doc&&document.querySelector('#networkToolkitFileEditor')===saved113Editor&&NetworkToolkitFileEditor.active.content.includes('UNSAVED_SYNTHETIC_113')&&NetworkToolkitFileEditor.active.dirty));}
 async function choose(page,id){
- const close=page.locator('[data-editor-files-close]');if(await close.isVisible())await close.click();
- const toggle=page.locator('[data-ed-panel-toggle="remote"]');if(await toggle.getAttribute('aria-expanded')!=='true')await toggle.click();
+ const files=page.locator('[data-ed="files"]');if(await files.getAttribute('aria-expanded')!=='true')await files.click();
+ await page.locator('[data-editor-files-side="remote"]').click();
  await page.locator('[data-ed-page="refreshRemote"]').click();await page.waitForFunction(id=>[...document.querySelector('#ntEditorRemoteSource').options].some(o=>o.value==='saved:'+id),id);
  await page.locator('#ntEditorRemoteSource').selectOption('saved:'+id);await page.locator('[data-ed-page="connectSaved"]').click();
 }
 (async()=>{assert(out,'Set isolated TOOLKIT_TEST_OUTPUT');fs.mkdirSync(out,{recursive:true});const watchdog=setTimeout(()=>{report.failure='Saved connections browser fixture exceeded five minutes';save();process.exit(1)},300000);
  try{browser=await chromium.launch({headless:true});
  for(const width of [1440,390]){const f=await start(width),{page}=f;
+  assert.equal(await page.locator('.nt-editor-toolbar [data-ed-panel-toggle],#ntEditorMoreActions [data-ed="openLocalPath"],#ntEditorMoreActions [data-ed="newLocalPath"]').count(),0);
+  const tab=page.locator('.nt-editor-tab').first(),tabStyle=await tab.evaluate(el=>{const s=getComputedStyle(el),button=el.querySelector('[role=tab]');return {radius:s.borderRadius,border:s.borderBottomWidth,color:s.borderBottomColor,font:getComputedStyle(button).fontSize,dirty:button.getAttribute('aria-label'),close:!!el.querySelector('.tab-close')};});assert.equal(tabStyle.radius,'0px');assert.equal(tabStyle.border,'2px');assert.equal(tabStyle.font,'11px');assert(tabStyle.dirty.includes('unsaved changes')&&tabStyle.close);(report.tabStyles??=[]).push({width,...tabStyle});
+  await page.locator('[data-ed="files"]').click();const drives=page.locator('[data-rb-drive]');await page.waitForFunction(()=>document.querySelector('[data-rb-drive] option[value="D:/"]'));assert.equal(await drives.locator('option').count(),5);await drives.selectOption('D:/');await page.waitForFunction(()=>document.querySelector('[data-rb-path="local"]').value==='D:/');await retained(page);
+  const headingBefore=await drives.boundingBox();await page.locator('[data-rb-scroll="local"]').evaluate(el=>el.scrollTop=600);const headingAfter=await drives.boundingBox();assert(Math.abs(headingBefore.y-headingAfter.y)<=1,'Drive selection stays visible while file list scrolls');await drives.selectOption('Z:/');await page.getByText('Synthetic disconnected drive is unavailable.',{exact:false}).first().waitFor();await retained(page);await drives.selectOption('C:/');await page.waitForFunction(()=>document.querySelector('[data-rb-path="local"]').value==='C:/');
+  await page.evaluate(theme=>setTheme(theme),width===390?'dark':'light');await page.screenshot({path:path.join(out,'editor-files114-drives-'+width+'.png')});check(width+' Files drive picker includes removable/mounted/network roots; unavailable drive is visible and dirty document retained');
+  await page.locator('[data-editor-files-close]').click();
+
   await choose(page,'ssh:verify');await page.locator('#rbSSHProfileVerifiedFingerprint').waitFor({state:'visible'});await retained(page);await page.screenshot({path:path.join(out,'saved113-ssh-verify-'+width+'.png')});await page.locator('#modalRoot [data-action="close-modal"]').last().click();assert(!f.calls.some(c=>c.body?.action==='connect'));check(width+' SSH verification visible; cancel retains original dirty document');
   await choose(page,'ssh:manual');await page.locator('#rbSSHProfilePassword').waitFor({state:'visible'});await page.locator('#modalRoot [data-action="close-modal"]').last().click();await retained(page);check(width+' manual SSH sign-in cancelled without network authentication');
   await choose(page,'ssh:locked');await page.waitForFunction(()=>document.querySelector('#ntEditorRemoteHint').textContent.includes('locked'));

@@ -1,0 +1,128 @@
+name: Focused Toolkit114 candidate acceptance
+on:
+  push:
+    branches: ['investigate/toolkit114-candidate']
+permissions:
+  contents: read
+concurrency:
+  group: focused-candidate114-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  focused-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with: {persist-credentials: false}
+      - uses: actions/setup-node@v7
+        with: {node-version: '24', package-manager-cache: false}
+      - name: Prepare browser and immutable baseline
+        run: |
+          npm install --prefix "$RUNNER_TEMP/browser114" --no-audit --no-fund playwright@1.62.1
+          node "$RUNNER_TEMP/browser114/node_modules/playwright/cli.js" install --with-deps chromium
+          git fetch --no-tags --depth=1 origin 31f27994b9a3f7bae4442c255f63a65c8e21e0c8
+          test "$(git rev-parse FETCH_HEAD)" = 31f27994b9a3f7bae4442c255f63a65c8e21e0c8
+          mkdir -p "$RUNNER_TEMP/baseline113"
+          git archive FETCH_HEAD | tar -xf - -C "$RUNNER_TEMP/baseline113"
+      - name: Actual16 and32MiB editor interaction and baseline4MiB
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/browser114/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/candidate114/capacity
+          NTK_CAPACITY_BASELINE_DIR: ${{ runner.temp }}/baseline113
+        run: node scripts/editor-capacity114.browser.cjs
+      - name: Files-only compact toolbar actual main and child layouts
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/browser114/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/candidate114/toolbar
+        run: node scripts/editor-toolbar113.browser.cjs
+      - name: Saved Files connections actual main and child layouts
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/browser114/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/candidate114/saved
+        run: node scripts/editor-saved-connections113.browser.cjs
+      - name: Graph ten-second density elapsed labels and timeline navigation
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/browser114/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/candidate114/graph
+        run: node scripts/graph-navigation114.browser.cjs
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: candidate114-browser
+          path: ${{ runner.temp }}/candidate114
+          if-no-files-found: error
+          retention-days: 7
+  native-before-after:
+    runs-on: windows-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v7
+        with: {persist-credentials: false}
+      - uses: actions/setup-go@v7
+        with: {go-version-file: go.mod, cache: false}
+      - name: Prepare immutable113 with test-only timing fixtures
+        shell: pwsh
+        run: |
+          git fetch --no-tags --depth=1 origin 31f27994b9a3f7bae4442c255f63a65c8e21e0c8
+          if ((git rev-parse FETCH_HEAD) -ne '31f27994b9a3f7bae4442c255f63a65c8e21e0c8') { throw 'Wrong baseline' }
+          git worktree add --detach "$env:RUNNER_TEMP/baseline113" FETCH_HEAD
+          git fetch --no-tags --depth=1 origin 3532651b76498c4e0cb21cf20a80d912a3fbd752
+          git -C "$env:RUNNER_TEMP/baseline113" checkout 3532651b76498c4e0cb21cf20a80d912a3fbd752 -- cmd/network-toolkit/editor_native_windows_test.go cmd/network-toolkit/editor_performance114_windows_test.go scripts/editor-native-driver.js
+          git fetch --no-tags --depth=1 origin 1af7ff27d5d09f2dd82143a2bf65ab864902bae8
+          git -C "$env:RUNNER_TEMP/baseline113" checkout 1af7ff27d5d09f2dd82143a2bf65ab864902bae8 -- cmd/network-toolkit/terminal_native_windows_test.go scripts/terminal-native-driver.js
+      - name: Same-runner113 editor4MiB baseline
+        working-directory: ${{ runner.temp }}/baseline113
+        env:
+          GOTOOLCHAIN: local
+          NETWORK_TOOLKIT_NATIVE_EDITOR_TEST: '1'
+          NETWORK_TOOLKIT_NATIVE_PERFORMANCE114: '1'
+          NETWORK_TOOLKIT_NATIVE_PERFORMANCE_BYTES: '4194304'
+          TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/native114/editor-baseline
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestNativeEditorTransferInstalledWebView2$' -count=1 -timeout=6m -v
+      - name: Same-runner113 terminal baseline
+        if: success() || failure()
+        working-directory: ${{ runner.temp }}/baseline113
+        env:
+          GOTOOLCHAIN: local
+          NETWORK_TOOLKIT_NATIVE_TERMINAL_TEST: '1'
+          TOOLKIT_NATIVE_TIMING_LABEL: '113-baseline'
+          TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/native114/terminal-baseline
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestNativeTerminalTransferInstalledWebView2$' -count=1 -timeout=6m -v
+      - name: Candidate editor4MiB transfer timing and state
+        if: success() || failure()
+        env:
+          GOTOOLCHAIN: local
+          NETWORK_TOOLKIT_NATIVE_EDITOR_TEST: '1'
+          NETWORK_TOOLKIT_NATIVE_PERFORMANCE114: '1'
+          NETWORK_TOOLKIT_NATIVE_PERFORMANCE_BYTES: '4194304'
+          TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/native114/editor-candidate4
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestNativeEditorTransferInstalledWebView2$' -count=1 -timeout=6m -v
+      - name: Candidate editor16MiB transfer and state
+        if: success() || failure()
+        env:
+          GOTOOLCHAIN: local
+          NETWORK_TOOLKIT_NATIVE_EDITOR_TEST: '1'
+          NETWORK_TOOLKIT_NATIVE_PERFORMANCE114: '1'
+          NETWORK_TOOLKIT_NATIVE_PERFORMANCE_BYTES: '16777216'
+          TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/native114/editor-candidate16
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestNativeEditorTransferInstalledWebView2$' -count=1 -timeout=6m -v
+      - name: Candidate Terminal real pointer gestures selection and retained transport
+        if: success() || failure()
+        env:
+          GOTOOLCHAIN: local
+          NETWORK_TOOLKIT_NATIVE_TERMINAL_TEST: '1'
+          NETWORK_TOOLKIT_NATIVE_TERMINAL_GESTURES: '1'
+          NETWORK_TOOLKIT_NATIVE_TERMINAL_SELECTION: '1'
+          TOOLKIT_NATIVE_TIMING_LABEL: '114-candidate'
+          TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/native114/terminal-candidate
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestNativeTerminalTransferInstalledWebView2$' -count=1 -timeout=6m -v
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: candidate114-native
+          path: ${{ runner.temp }}/native114
+          if-no-files-found: error
+          retention-days: 7

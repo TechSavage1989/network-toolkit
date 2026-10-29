@@ -47,3 +47,20 @@ test('disabled close confirmation closes eligible active and disconnected sessio
  await h.api.run('close-others',h.api.token('one'));
  assert.deepEqual(h.calls,[['delete','two',true],['delete','closed',false],['draft-close','draft']]);assert(h.entries.has('unowned'));assert(h.entries.has('busy'));assert(h.entries.has('one'));
 });
+
+test('Disconnect all confirms current-window scope and retains tabs/output',async()=>{
+ const h=harness(),one=h.entries.get('one'),two=h.entries.get('two');h.context.terminalEntryShown=e=>e!==two;
+ await h.api.run('disconnect-all',h.api.token('one'));assert.deepEqual(h.calls,[['modal','Disconnect all sessions in this window']]);assert.equal(h.entries.size,2);
+ await h.api.confirmWindowBulk();assert.deepEqual(h.calls,[['modal','Disconnect all sessions in this window'],['disconnect','one']]);assert.equal(h.entries.get('one'),one);assert.equal(h.entries.get('two'),two);
+});
+test('Close all tabs confirms even when single-tab close confirmation is disabled, skips stale/busy and other windows',async()=>{
+ const h=harness();h.context.state.terminalConfirmClose=false;const busy={info:{id:'busy',state:'connected'},transferBusy:true},remote={info:{id:'remote',state:'connected'}};h.entries.set('busy',busy);h.entries.set('remote',remote);h.context.terminalEntryShown=e=>e!==remote;h.context.terminalDraftTabs.set('draft',{id:'draft',label:'Untitled'});
+ await h.api.run('close-all',h.api.token('one'));assert.deepEqual(h.calls,[['modal','Close all tabs in this window']]);h.revisions.set('two',1);await h.api.confirmWindowBulk();
+ assert.deepEqual(h.calls,[['modal','Close all tabs in this window'],['delete','one',true],['draft-close','draft']]);assert(h.entries.has('two'));assert(h.entries.has('remote'));assert(h.entries.has('busy'));
+});
+test('bulk cancellation has no side effect and a pending ownership transfer disables all-window actions',async()=>{
+ const h=harness();await h.api.run('close-all',h.api.token('one'));h.context.closeModal();assert.equal(h.entries.size,2);assert.equal(h.calls.length,1);h.context.terminalWorkspaceTransferBusy=true;assert.equal(h.api.enabled('close-all',h.api.token('one')),false);assert.equal(h.api.enabled('disconnect-all',h.api.token('one')),false);
+});
+
+test('cancelled or replaced bulk confirmation cannot execute retained targets',async()=>{const h=harness();await h.api.run('close-all',h.api.token('one'));h.context.closeModal();await h.api.confirmWindowBulk();assert.equal(h.entries.size,2);assert.deepEqual(h.calls,[['modal','Close all tabs in this window']]);});
+test('a transfer becoming busy during bulk disconnect protects later draft tabs',async()=>{const h=harness();h.context.terminalDraftTabs.set('draft',{id:'draft'});h.context.deleteTerminalTab=async e=>{h.calls.push(['delete',e.info.id]);h.context.terminalWorkspaceTransferBusy=true;};await h.api.run('close-all',h.api.token('one'));await h.api.confirmWindowBulk();assert(h.context.terminalDraftTabs.has('draft'));assert.deepEqual(h.calls,[['modal','Close all tabs in this window'],['delete','one']]);});

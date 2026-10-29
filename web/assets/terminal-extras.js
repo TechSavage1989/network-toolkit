@@ -268,7 +268,7 @@ function sync(){
  }
  const entry=currentTerminal(),p=prefs(entry),choice=entry?._ntOutputChoice||'last-command';
  const actions=document.querySelector('#terminalActiveActions');
- const position=state.terminalActiveActionsPosition==='bottom'?'bottom':'top',anchor=document.querySelector(position==='bottom'?'#terminalConsoleBar':'#terminalStage');
+ const position=state.terminalActiveActionsPosition==='bottom'?'bottom':'top',anchor=position==='bottom'?document.querySelector('#terminalConsoleBar'):(document.querySelector('#terminalTabs')||document.querySelector('#terminalStage'));
  if(anchor&&[...anchor.parentElement.children][[...anchor.parentElement.children].indexOf(anchor)-1]!==actions)anchor.before(actions);
  actions.dataset.position=position;
  const positionPicker=document.querySelector('#terminalActiveActionsPosition');if(positionPicker&&document.activeElement!==positionPicker)positionPicker.value=position;

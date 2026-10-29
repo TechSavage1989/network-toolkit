@@ -23,7 +23,9 @@ import (
 	"unicode/utf8"
 )
 
-const textEditorLimit = 8 << 20 // 8 MiB, bounded editor; large/binary files stay downloadable.
+const textEditorLimit = 32 << 20 // 32 MiB encoded files; larger/binary files stay downloadable.
+// JSON may escape one control byte as six ASCII bytes; metadata remains bounded.
+const textEditorRequestLimit = textEditorLimit*6 + 16384
 
 func editorDigest(b []byte) string { sum := sha256.Sum256(b); return hex.EncodeToString(sum[:]) }
 
@@ -145,7 +147,7 @@ func editableFile(path string) ([]byte, os.FileMode, error) {
 		return nil, 0, errors.New("text editor requires a regular file")
 	}
 	if info.Size() > textEditorLimit {
-		return nil, 0, errors.New("text file exceeds the 8 MiB editor limit")
+		return nil, 0, errors.New("text file exceeds the 32 MiB editor limit")
 	}
 	f, err := os.Open(path)
 	if err != nil {
@@ -170,7 +172,7 @@ func readEditableFile(path string) (map[string]any, error) {
 }
 func saveEditableLocal(path string, content []byte, expectedHash string) (map[string]any, error) {
 	if len(content) > textEditorLimit {
-		return nil, errors.New("text exceeds the 8 MiB editor limit")
+		return nil, errors.New("text exceeds the 32 MiB editor limit")
 	}
 	if _, e := readTextBytes(content); e != nil {
 		return nil, e
@@ -213,6 +215,13 @@ func saveEditableLocal(path string, content []byte, expectedHash string) (map[st
 	return map[string]any{"ok": true, "hash": editorDigest(content), "bytes": len(content)}, nil
 }
 func (a *application) handleLocalTextEditor(w http.ResponseWriter, r *http.Request) {
+	var release func()
+	var admitted bool
+	r, release, admitted = admitEditorMemory(w, r)
+	if !admitted {
+		return
+	}
+	defer release()
 	if r.Method != http.MethodPost {
 		methodError(w)
 		return
@@ -225,7 +234,7 @@ func (a *application) handleLocalTextEditor(w http.ResponseWriter, r *http.Reque
 		BOM          bool   `json:"bom"`
 		Encoding     string `json:"encoding"`
 	}
-	if e := json.NewDecoder(http.MaxBytesReader(w, r.Body, 12<<20)).Decode(&req); e != nil {
+	if e := json.NewDecoder(http.MaxBytesReader(w, r.Body, textEditorRequestLimit)).Decode(&req); e != nil {
 		jsonError(w, 400, "Invalid text editor request")
 		return
 	}
@@ -312,17 +321,17 @@ func (a *application) handleRemoteTextEditorWithOperation(w http.ResponseWriter,
 			switch n := info["sizeBytes"].(type) {
 			case uint64:
 				if n > textEditorLimit {
-					jsonError(w, 400, "Text file exceeds the 8 MiB editor limit")
+					jsonError(w, 400, "Text file exceeds the 32 MiB editor limit")
 					return
 				}
 			case int64:
 				if n > textEditorLimit {
-					jsonError(w, 400, "Text file exceeds the 8 MiB editor limit")
+					jsonError(w, 400, "Text file exceeds the 32 MiB editor limit")
 					return
 				}
 			case float64:
 				if n > textEditorLimit {
-					jsonError(w, 400, "Text file exceeds the 8 MiB editor limit")
+					jsonError(w, 400, "Text file exceeds the 32 MiB editor limit")
 					return
 				}
 			}

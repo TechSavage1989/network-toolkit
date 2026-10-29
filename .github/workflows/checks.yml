@@ -2,7 +2,7 @@ name: Checks
 
 on:
   push:
-    branches: ['**']
+    branches: ['**', '!investigate/toolkit114-*']
   pull_request:
   workflow_dispatch:
 

@@ -480,6 +480,17 @@ test('backend alert severity drives matching packet row and fine map colors; ind
  assert(h.saved.length>=3,'each visibility toggle is persisted');
 });
 
+test('packet Follow latest never reads or opens Details and preserves the explicit inspector snapshot',async()=>{
+ const capture={id:'e'.repeat(24),name:'Synthetic frames',state:'running',count:2,bytes:108,revision:1},packets=[1,2].map(number=>({number,relative:number,source:'192.0.2.1',destination:'198.51.100.2',protocol:'TCP',length:54,captured:54,info:'Synthetic frame '+number,expert:[]}));
+ const h=harness(capture,{packets});await h.settle();h.doc.emit('click',h.doc.querySelector('[data-packet-view="packets"]'));await h.settle();
+ h.c.state.packetDetails.hidden=true;const reads=()=>h.calls.filter(c=>/\/packet\/\d+$/.test(c.path)).length;
+ await h.api.resumeLatest();await h.settle();assert.equal(reads(),0);assert.equal(h.c.state.packetDetails.hidden,true);assert.equal(h.api.model.liveDetails,false);
+ h.doc.emit('click',h.doc.querySelector('[data-packet-number="1"]'));await h.settle();assert.equal(h.c.state.packetDetails.hidden,false);assert.equal(reads(),1);const detail=h.api.model.detail;
+ await h.api.resumeLatest();await h.settle();assert.equal(h.api.model.detail,detail,'Follow preserves the deliberately selected inspector snapshot');assert.equal(h.api.model.detail.packet.number,1);assert.equal(h.c.state.packetDetails.hidden,false);assert.equal(reads(),1,'Following does not fetch newest packet details');
+ h.c.state.packetDetails.hidden=true;await h.api.resumeLatest();await h.api.refresh(true);await h.settle();assert.equal(h.c.state.packetDetails.hidden,true);assert.equal(h.api.model.detail,detail);assert.equal(reads(),1);
+ const interval={capture:capture.id,bucket:{time:'2026-10-29T00:00:00Z',endTime:'2026-10-29T00:00:01Z'},rows:[],total:0,offset:0};h.api.model.intervalSelection=interval;await h.api.resumeLatest();assert.equal(h.api.model.intervalSelection,interval,'A manually opened aggregate inspector is not erased by Follow');assert.equal(h.c.state.packetDetails.hidden,true);
+});
+
 test('Follow new packets changes the real scroller and requests the newest live packet window',async()=>{
  const packetCount=1250,packets=Array.from({length:1400},(_,i)=>({number:i+1,relative:i/50,source:'192.0.2.2',destination:'198.51.100.1',protocol:'TCP',length:74,captured:74,info:'Sequence '+(i+1),expert:[]}));
  const config={packets,total:packetCount,paginate:true,overview:{packetMarks:'B'.repeat(1400),bins:[],signals:[],counts:{},interesting:0}};

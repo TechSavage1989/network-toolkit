@@ -1,3 +1,7 @@
+> Current114 calibration: the default condensed recent spacing now matches the
+> 10-second normal timeframe. See [Graph navigation114](GRAPH_NAVIGATION114.md).
+> Earlier calibration measurements below remain historical release evidence.
+
 # Condensed RTT history and theme policy
 
 ## Fixed recent-time geometry

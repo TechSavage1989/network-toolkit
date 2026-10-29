@@ -8,6 +8,8 @@ import (
 )
 
 type ConnectRequest struct {
+	// DisplayName is resolved by the authenticated application from saved metadata.
+	DisplayName      string `json:"-"`
 	Type             string `json:"type"`
 	ProfileID        string `json:"profileId,omitempty"`
 	CredentialID     string `json:"credentialId,omitempty"`

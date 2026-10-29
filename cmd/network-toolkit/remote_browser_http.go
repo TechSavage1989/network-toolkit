@@ -4,6 +4,7 @@ package main
 // Saved authentication is resolved in the backend from an approved credential
 // reference. Manual input is transient; loopback HTTP is not HTTPS.
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -123,10 +124,39 @@ func (a *application) handleRemoteBrowser(w http.ResponseWriter, request *http.R
 		methodError(w)
 		return
 	}
-	var r remoteBrowserRequest
-	if e := json.NewDecoder(http.MaxBytesReader(w, request.Body, 12<<20)).Decode(&r); e != nil {
+	// Inspect only a small bounded body before admission so an explicit
+	// disconnect can cancel a long operation that currently owns the slot.
+	originalBody := request.Body
+	defer originalBody.Close()
+	prefix, readError := io.ReadAll(io.LimitReader(originalBody, (64<<10)+1))
+	if readError != nil {
 		jsonError(w, 400, "Invalid remote file request")
 		return
+	}
+	small := len(prefix) <= 64<<10
+	var r remoteBrowserRequest
+	if small {
+		if e := json.Unmarshal(prefix, &r); e != nil {
+			jsonError(w, 400, "Invalid remote file request")
+			return
+		}
+	} else {
+		request.Body = io.NopCloser(io.MultiReader(bytes.NewReader(prefix), originalBody))
+	}
+	if !small || r.Action != "disconnect" || r.Content != "" {
+		var release func()
+		var admitted bool
+		request, release, admitted = admitEditorMemory(w, request)
+		if !admitted {
+			return
+		}
+		defer release()
+	}
+	if !small {
+		if e := json.NewDecoder(http.MaxBytesReader(w, request.Body, textEditorRequestLimit)).Decode(&r); e != nil {
+			jsonError(w, 400, "Invalid remote file request")
+			return
+		}
 	}
 	if r.SSHCompatibility != "" && r.SSHCompatibility != "modern" && r.SSHCompatibility != "legacy" {
 		jsonError(w, 400, "Unsupported SSH compatibility policy")

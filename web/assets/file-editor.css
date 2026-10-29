@@ -309,3 +309,51 @@ body:has(.nt-editor:not([hidden]) [data-ed-files-sidebar]:not([hidden])) .toast-
 
 .nt-editor-connection-compact{display:none}
 @media(max-width:680px){.nt-editor-connection-wide{display:none}.nt-editor-connection-compact{display:inline}}
+/* Editor114: view-local tabs follow the Terminal tab strip, without another header. */
+.nt-editor-tabs,.nt-compare-pane>.nt-editor-tabs{gap:0;padding:0;min-height:38px;max-height:46px;align-items:stretch;border-bottom:1px solid var(--border);background:var(--panel2);scrollbar-width:thin;scrollbar-gutter:auto}
+.nt-editor-tab{gap:0;min-width:150px;max-width:255px;border-radius:0;border-right:1px solid var(--line,var(--border));border-bottom:2px solid transparent;background:transparent;font-size:11px;overflow:hidden}
+.nt-editor-tab:has([aria-selected=true]){background:var(--panel);border-bottom-color:var(--accent);box-shadow:none}
+.nt-editor-tab>button:first-child{display:flex;align-items:center;gap:7px;flex:1;min-width:0;padding:10px;border:0;background:transparent;color:var(--muted);font-size:11px;text-align:left}
+.nt-editor-tab>button[aria-selected=true]{color:var(--text)}
+.nt-editor-tab>button:hover,.nt-editor-tab>.tab-close:hover{background:var(--accentBg);color:var(--text)}
+.nt-editor-tab-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nt-editor-tab-status{flex:none;width:7px;color:var(--accent);font-size:9px}
+.nt-editor-tab>.tab-close{border:0;background:transparent;flex:0 0 28px;padding:5px 8px;color:var(--faint);font-size:14px}
+.nt-editor-new-tab{min-width:42px;border:0;border-radius:0;background:transparent;color:var(--accent)}
+@media(max-width:720px){.nt-editor-tab{min-width:135px}}
+/* Connection choice stays at the top of Files, not in the document toolbar. */
+.nt-editor-file-sessions{flex:none;min-width:0;padding:5px;border-bottom:1px solid var(--border);background:var(--panel)}
+.nt-editor-file-sessions[hidden]{display:none}
+.nt-editor-file-session-row{display:flex;align-items:center;gap:4px;min-width:0}
+.nt-editor-file-session-row select{min-width:0;flex:1;width:0;min-height:28px;font-size:11px;padding:4px}
+.nt-editor-file-session-row button{flex:none}
+.nt-editor-file-path-actions{margin-top:4px;position:relative}
+.nt-editor-file-path-actions>summary{font-size:10px;min-height:24px!important}
+.nt-editor-file-path-actions label{display:flex;flex-direction:column;gap:3px;font-size:11px;margin:4px 0}
+.nt-editor-file-path-actions input{min-width:0;width:100%;font-size:11px;min-height:28px}
+.nt-editor-file-sessions .nt-editor-remote-hint{font-size:10px;line-height:1.35;margin-top:4px;max-height:3.9em;overflow:auto}
+.nt-editor-files-body{overflow:hidden}
+.is-editor-sidebar.rb-app{overflow:hidden}
+.is-editor-sidebar .rb-explorer{min-height:0;overflow:visible}
+.is-editor-sidebar .rb-panes{min-height:70px}
+.nt-editor-files-connection{flex:none;max-height:55%;overflow:auto}
+.nt-editor-files-connection .rb-session-tools{margin:0}
+.nt-editor-files-connection .rb-session-tools h3,.nt-editor-files-connection .rb-connect-head strong{display:none}
+.nt-editor-files-connection .rb-session-tools .terminal-toolgroup{gap:4px}
+.is-editor-sidebar .rb-source{display:none}
+.is-editor-sidebar .rb-session-tools .terminal-active-position{display:none}
+.is-editor-sidebar .rb-local-drives{display:flex;align-items:center;gap:5px;padding:4px 5px;font-size:11px;border-bottom:1px solid var(--border)}
+.is-editor-sidebar .rb-local-drives select{flex:1;min-width:0;min-height:28px;padding:4px;font-size:11px}
+.is-editor-sidebar .nt-editor-files-session-tools{display:flex;align-items:center;gap:4px;flex-wrap:nowrap;padding:2px 0;border:0;background:transparent}
+.is-editor-sidebar .nt-editor-files-session-tools .rb-session-endpoint{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:10px}
+.is-editor-sidebar .nt-editor-files-session-tools button{flex:none;min-width:28px;padding:4px}
+.is-editor-sidebar .nt-editor-files-session-tools svg{width:14px;height:14px}
+.is-editor-sidebar .rb-connect-head{flex-wrap:wrap}
+/* Core session actions stay visible; the full manual/credential form is secondary. */
+.nt-editor-files-connection>summary{font-size:10px}
+.nt-editor-tab>.tab-close svg{width:14px;height:14px;display:block}
+.nt-editor-files-session-menu{position:relative;flex:none}
+.nt-editor-files-session-menu>summary{list-style:none;cursor:pointer}
+.nt-editor-files-session-menu>summary::-webkit-details-marker{display:none}
+.nt-editor-files-session-menu>div{position:absolute;right:0;top:100%;z-index:15;display:flex;flex-direction:column;min-width:145px;padding:4px;border:1px solid var(--border);border-radius:6px;background:var(--panel);box-shadow:var(--shadow)}
+.nt-editor-files-session-menu>div .btn{justify-content:flex-start;white-space:nowrap}

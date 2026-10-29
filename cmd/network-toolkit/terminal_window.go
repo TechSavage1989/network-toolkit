@@ -28,6 +28,7 @@ const terminalWindowRequestLimit = 16
 // This is deliberately a separate schema from ConnectRequest. Window launch
 // can carry only connection settings, never authentication or terminal input.
 type terminalWindowPreset struct {
+	ProfileID        string `json:"profileId,omitempty"`
 	Type             string `json:"type"`
 	Host             string `json:"host"`
 	Port             int    `json:"port"`
@@ -80,6 +81,10 @@ func (p *terminalWindowPreset) normalize() error {
 	if p == nil {
 		return nil
 	}
+	p.ProfileID = strings.TrimSpace(p.ProfileID)
+	if len(p.ProfileID) > 80 || strings.IndexFunc(p.ProfileID, func(r rune) bool { return r < 32 || r == 127 }) >= 0 {
+		return errors.New("The saved terminal profile identifier is invalid.")
+	}
 	p.Type = strings.ToLower(strings.TrimSpace(p.Type))
 	if p.Type == "" {
 		p.Type = "ssh"
@@ -88,7 +93,7 @@ func (p *terminalWindowPreset) normalize() error {
 		return errors.New("Choose SSH, Telnet, Serial, Command Prompt, or PowerShell for the terminal window.")
 	}
 	if p.Type == "cmd" || p.Type == "powershell" {
-		*p = terminalWindowPreset{Type: p.Type, TimeoutMs: 10000, SSHCompatibility: "modern", AuthMethod: "password", Port: 22, BaudRate: 9600, DataBits: 8, StopBits: "1", Parity: "none", FlowControl: "none"}
+		*p = terminalWindowPreset{ProfileID: p.ProfileID, Type: p.Type, TimeoutMs: 10000, SSHCompatibility: "modern", AuthMethod: "password", Port: 22, BaudRate: 9600, DataBits: 8, StopBits: "1", Parity: "none", FlowControl: "none"}
 		return nil
 	}
 	if p.SSHCompatibility == "" {

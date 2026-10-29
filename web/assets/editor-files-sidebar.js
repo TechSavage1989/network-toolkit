@@ -1,14 +1,15 @@
 (function(root){
 'use strict';
-let side='local',protocol='ssh',width=300,accessTimer=null,requests=[];
+let side='local',protocol='ssh',width=300,accessTimer=null,requests=[],sourceBusy=false,navigationRevision=0;
 const detached=()=>typeof EDITOR_WINDOW!=='undefined'&&EDITOR_WINDOW;
 function toggle(editor){
  const host=editor?.querySelector('[data-ed-files-sidebar]'),button=editor?.querySelector('[data-ed="files"]');if(!host)return;
- const show=host.hidden;host.hidden=!show;button?.setAttribute('aria-expanded',String(show));
+ const show=host.hidden;navigationRevision++;host.hidden=!show;button?.setAttribute('aria-expanded',String(show));
  if(!show){clearTimeout(accessTimer);root.NetworkToolkitRemoteBrowser?.unmountSidebar(host.querySelector('[data-editor-file-browser]'));return;}
  if(!host.querySelector('[data-editor-file-browser]')){
-  host.innerHTML='<div class="nt-editor-files-heading"><div role="tablist" aria-label="File locations"><button type="button" class="btn small ghost" role="tab" data-editor-files-side="local">Windows files</button><button type="button" class="btn small ghost" role="tab" data-editor-files-side="remote">SFTP</button></div><button type="button" class="btn small ghost" data-editor-files-close aria-label="Close file browser">×</button></div><div class="nt-editor-files-body" data-editor-file-browser></div><div class="nt-editor-files-resize" role="separator" tabindex="0" aria-label="Resize file browser" aria-orientation="vertical"></div>';
-  host.addEventListener('click',event=>{if(event.target.closest('[data-editor-files-close]')){toggle(editor);return;}const tab=event.target.closest('[data-editor-files-side]');if(tab){side=tab.dataset.editorFilesSide;if(side==='local')protocol='ssh';mount(host);}});
+  host.innerHTML='<div class="nt-editor-files-heading"><div role="tablist" aria-label="File locations"><button type="button" class="btn small ghost" role="tab" data-editor-files-side="local">Windows files</button><button type="button" class="btn small ghost" role="tab" data-editor-files-side="remote">SFTP</button></div><button type="button" class="btn small ghost" data-editor-files-close aria-label="Close file browser">×</button></div><div data-editor-file-sessions></div><div class="nt-editor-files-body" data-editor-file-browser></div><div class="nt-editor-files-resize" role="separator" tabindex="0" aria-label="Resize file browser" aria-orientation="vertical"></div>';
+  const sessions=editor.querySelector('#ntEditorRemotePanel');if(sessions)host.querySelector('[data-editor-file-sessions]').append(sessions);
+  host.addEventListener('click',event=>{if(event.target.closest('[data-editor-files-close]')){toggle(editor);return;}const tab=event.target.closest('[data-editor-files-side]');if(tab){navigationRevision++;side=tab.dataset.editorFilesSide;if(side==='local')protocol='ssh';mount(host);}});
   const handle=host.querySelector('.nt-editor-files-resize');let drag=null;
   const resize=value=>{width=Math.max(220,Math.min(600,editor.clientWidth*.65,value));host.style.flexBasis=width+'px';host.style.width=width+'px';handle.setAttribute('aria-valuenow',String(Math.round(width)));};
   handle.addEventListener('pointerdown',event=>{if(event.button!==0)return;event.preventDefault();drag={id:event.pointerId,left:host.getBoundingClientRect().left};handle.setPointerCapture(event.pointerId);});
@@ -20,6 +21,7 @@ function toggle(editor){
  mount(host);
 }
 function mount(host){
+ const sessions=host.querySelector('#ntEditorRemotePanel');if(sessions){sessions.hidden=side!=='remote';if(side==='remote')void root.NetworkToolkitFileEditor?.refreshConnectedSources?.();}
  const remoteTab=host.querySelector('[data-editor-files-side="remote"]');if(remoteTab)remoteTab.textContent=protocol==='ftp'?'FTP / FTPS':'SFTP';
  for(const tab of host.querySelectorAll('[data-editor-files-side]')){const selected=tab.dataset.editorFilesSide===side;tab.setAttribute('aria-selected',String(selected));tab.classList.toggle('primary',selected);tab.classList.toggle('ghost',!selected);}
  if(detached()){void checkAccess(host);return;}
@@ -49,6 +51,20 @@ function manageAccess(){
  openModal('Editor file explorer access','<p>Allow a separate editor window to browse and manage local files, and use the SFTP connections currently open in the main window. This does not share saved passwords or terminal control. Open editor files remain protected from explorer changes.</p>'+requests.map(row=>'<div class="setting-row"><span>'+esc(row.name||'Editor window')+'</span><div class="row gap6">'+(row.pending?'<button type="button" class="btn small primary" data-editor-files-allow="'+esc(row.viewId)+'">Allow</button>':'')+'<button type="button" class="btn small ghost" data-editor-files-deny="'+esc(row.viewId)+'">'+(row.pending?'Decline':'Revoke')+'</button></div></div>').join(''),'<button type="button" class="btn ghost" data-action="close-modal">Close</button>');
  const modal=document.querySelector('#modalRoot');modal.onclick=async function answer(event){const button=event.target.closest('[data-editor-files-allow],[data-editor-files-deny]');if(!button)return;const id=button.dataset.editorFilesAllow||button.dataset.editorFilesDeny,row=requests.find(row=>row.viewId===id);if(!row)return;button.disabled=true;try{await api('/editor-views/explorer/'+id,'POST',{requestId:row.requestId,allow:!!button.dataset.editorFilesAllow});modal.onclick=null;closeModal();syncRequests(requests.filter(item=>item!==row));}catch(error){button.disabled=false;toast(error.message,'error');}};
 }
-function showConnection(kind){if(detached()||!['ssh','ftp'].includes(kind))throw Error('Open saved connections in the main window.');const editor=document.querySelector('#networkToolkitFileEditor'),host=editor?.querySelector('[data-ed-files-sidebar]');if(!editor||editor.hidden||!host)throw Error('Open the editor before connecting a saved profile.');protocol=kind;side='remote';if(host.hidden)toggle(editor);else mount(host);host.querySelector('.nt-editor-files-connection')?.setAttribute('open','');}
-root.NetworkToolkitEditorFiles=Object.freeze({showConnection,toggle,syncRequests,manageAccess,detached});
+function showConnection(kind){if(detached()||!['ssh','ftp'].includes(kind))throw Error('Open saved connections in the main window.');const editor=document.querySelector('#networkToolkitFileEditor'),host=editor?.querySelector('[data-ed-files-sidebar]');if(!editor||editor.hidden||!host)throw Error('Open the editor before connecting a saved profile.');navigationRevision++;protocol=kind;side='remote';if(host.hidden)toggle(editor);else mount(host);host.querySelector('.nt-editor-files-connection')?.setAttribute('open','');}
+async function useSource(source){
+ if(sourceBusy)throw Error('Finish the current file connection action first.');
+ const browser=root.NetworkToolkitRemoteBrowser;if(!browser)throw Error('The file browser is unavailable.');
+ if(!/^(client:(ssh|ftp)|terminal:.+)$/.test(source||''))throw Error('Choose an active file connection first.');
+ const kind=source==='client:ftp'?'ftp':'ssh';if(detached()&&kind!=='ssh')throw Error('This editor may use approved SFTP connections only.');
+ const editor=document.querySelector('#networkToolkitFileEditor'),host=editor?.querySelector('[data-ed-files-sidebar]');if(!host||host.hidden||editor.hidden)throw Error('Open the editor Files sidebar first.');
+ const revision=navigationRevision;sourceBusy=true;try{
+ const model=browser.get(kind);if(source.startsWith('client:')){if(!model.connected)throw Error('This file connection has closed. Refresh the list.');}
+ else{const id=source.slice(9);if(model.connecting||model.busy||model.pendingClose)throw Error('Finish the current file operation first.');if(model.connected&&model.sessionId!==id)throw Error('Disconnect the current file browser before choosing another connection. Open documents remain unchanged.');if(!model.connected)await browser.connectTerminal(kind,id);if(!model.connected||model.sessionId!==id)throw Error('The SSH connection is no longer available. Refresh the list.');}
+ if(revision!==navigationRevision||host.hidden||editor.hidden||!host.isConnected)return;
+ const selected=document.querySelector('#ntEditorRemoteSource');if(selected&&selected.value!==source)return;
+ protocol=kind;side='remote';mount(host);
+ }finally{sourceBusy=false;}
+}
+root.NetworkToolkitEditorFiles=Object.freeze({useSource,showConnection,toggle,syncRequests,manageAccess,detached});
 })(globalThis);

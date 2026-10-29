@@ -380,7 +380,7 @@ func (c *wireSFTP) open(remote string, flags uint32) ([]byte, error) {
 // Read small editor files directly, with one authenticated connection and one
 // subsystem. Enforce the limit again while reading in case the file grows.
 func (c *wireSFTP) readText(ctx context.Context, remote string) ([]byte, error) {
-	const limit = 8 << 20
+	const limit = 32 << 20
 	attrs, err := c.stat(remote)
 	if err != nil {
 		return nil, err
@@ -389,7 +389,7 @@ func (c *wireSFTP) readText(ctx context.Context, remote string) ([]byte, error) 
 		return nil, errors.New("remote path is a directory; choose a file")
 	}
 	if attrs.size > limit {
-		return nil, errors.New("Text file exceeds the 8 MiB editor limit")
+		return nil, errors.New("Text file exceeds the 32 MiB editor limit")
 	}
 	handle, err := c.open(remote, sftpRead)
 	if err != nil {
@@ -421,7 +421,7 @@ func (c *wireSFTP) readText(ctx context.Context, remote string) ([]byte, error) 
 			return contents.Bytes(), nil
 		}
 		if contents.Len()+len(chunk) > limit {
-			return nil, errors.New("Text file exceeds the 8 MiB editor limit")
+			return nil, errors.New("Text file exceeds the 32 MiB editor limit")
 		}
 		contents.Write(chunk)
 	}

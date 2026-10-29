@@ -104,11 +104,16 @@ func TestNativeEditorTransferInstalledWebView2(t *testing.T) {
 			result <- errors.New("native owner did not reach visible startup readiness")
 			return
 		}
-		err := h.exercise()
-		if err == nil {
+		var err error
+		if os.Getenv("NETWORK_TOOLKIT_NATIVE_PERFORMANCE114") == "1" {
+			err = h.exercisePerformance114()
+		} else {
+			err = h.exercise()
+		}
+		if err == nil && os.Getenv("NETWORK_TOOLKIT_NATIVE_PERFORMANCE114") != "1" {
 			err = h.exerciseDrag()
 		}
-		if err == nil {
+		if err == nil && os.Getenv("NETWORK_TOOLKIT_NATIVE_PERFORMANCE114") != "1" {
 			err = h.exerciseClose113()
 		}
 		if err != nil && ctx.Err() == nil {
@@ -154,6 +159,7 @@ type nativeEditorCommand struct {
 	Destination string   `json:"destination,omitempty"`
 	Texts       []string `json:"texts,omitempty"`
 	Enabled     bool     `json:"enabled"`
+	Size        int      `json:"size,omitempty"`
 }
 type nativeEditorDocument struct {
 	ID, UID, Path, Source, Hash, Content, Original, Saved, EOL, Encoding, Language string

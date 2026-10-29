@@ -112,6 +112,10 @@ func normalizeRequest(req ConnectRequest) (ConnectRequest, error) {
 // Opening a new connection must still provide all required authentication.
 func normalizeConnectionRequest(req ConnectRequest, alreadyAuthenticated bool) (ConnectRequest, error) {
 	req.Type = strings.ToLower(strings.TrimSpace(req.Type))
+	req.DisplayName = strings.TrimSpace(req.DisplayName)
+	if len([]rune(req.DisplayName)) > 100 || strings.IndexFunc(req.DisplayName, unicode.IsControl) >= 0 {
+		return req, errors.New("display name must be at most 100 characters without control characters")
+	}
 	if len(req.ProfileID) > 80 || strings.IndexFunc(req.ProfileID, unicode.IsControl) >= 0 {
 		return req, errors.New("profile ID must be at most 80 bytes without control characters")
 	}
@@ -165,7 +169,7 @@ func normalizeConnectionRequest(req ConnectRequest, alreadyAuthenticated bool) (
 	}
 	if req.Type == "cmd" || req.Type == "powershell" {
 		// Local shells never inherit hidden remote credentials or device fields.
-		return ConnectRequest{Type: req.Type, ProfileID: req.ProfileID, Cols: req.Cols, Rows: req.Rows, Terminal: req.Terminal, TimeoutMs: req.TimeoutMs, LineEnding: "cr", SSHCompatibility: SSHCompatibilityModern}, nil
+		return ConnectRequest{Type: req.Type, ProfileID: req.ProfileID, DisplayName: req.DisplayName, Cols: req.Cols, Rows: req.Rows, Terminal: req.Terminal, TimeoutMs: req.TimeoutMs, LineEnding: "cr", SSHCompatibility: SSHCompatibilityModern}, nil
 	}
 	if req.Type == "serial" {
 		req.Username, req.Password, req.PrivateKey, req.Passphrase = "", "", "", ""
@@ -333,6 +337,9 @@ func newLiveSession(parent context.Context, id string, req ConnectRequest) *live
 		label = "Command Prompt (local)"
 	} else if req.Type == "powershell" {
 		label = "PowerShell (local)"
+	}
+	if req.DisplayName != "" {
+		label = req.DisplayName
 	}
 	return &liveSession{automation: make(map[*AutomationSubscription]struct{}), ctx: ctx, cancel: cancel, request: reconnectSettings(req), done: make(chan struct{}), input: make(chan []byte, 64), resize: make(chan struct{}, 1), controls: make(chan ControlRequest, 16),
 		info: SessionInfo{ID: id, ProfileID: req.ProfileID, LineEnding: req.LineEnding, Type: req.Type, Label: label, Host: req.Host, Port: req.Port, Username: req.Username,

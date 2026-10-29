@@ -73,3 +73,28 @@ test('native gutter refresh never dispatches from a measurement write or after s
 test('native gutter signature tracks current viewport and block geometry, not cached DOM labels',()=>{
  const view={viewport:{from:0,to:8},contentDOM:{clientWidth:120},documentPadding:{top:10},viewportLineBlocks:[{from:0,to:3,top:0,height:20,type:0},{from:4,to:8,top:20,height:40,type:0}]};const before=api.nativeGutterSignature(view);assert.equal(api.nativeGutterSignature(view),before);view.viewportLineBlocks[1].height=60;assert.notEqual(api.nativeGutterSignature(view),before);const source=fs.readFileSync(require.resolve('../web/assets/editor-aligned-compare.js'),'utf8');assert(source.includes('gutterConfig[side].reconfigure(lineNumbers({formatNumber:line=>String(line)}))'));assert(source.includes('gutterRefresh[side].cancel()'));assert(!source.includes("querySelectorAll('.cm-gutterElement')"));
 });
+
+test('continuous same-owner input coalesces before measurement without starving every pending frame',()=>{
+ let actual=0,writes=0;const q=scrollQueue(intent=>({target:intent.pixel}),value=>{writes++;actual=value.target;return true;});
+ for(let frame=1;frame<=60;frame++){
+  q.sync.request({kind:'source',side:'right',pixel:frame*10});
+  q.sync.request({kind:'source',side:'right',pixel:frame*10+3});
+  assert.equal(q.queued.length,1,'only one measurement may be outstanding during a continuous gesture');
+  q.step();assert.equal(actual,frame*10+3,'peer progresses during each frame, not only after input ends');
+ }
+ assert.equal(writes,60);q.sync.cancel();q.flush();
+});
+test('repeated map targets use the latest fractional aligned intent without accumulated stale jobs',()=>{
+ let actual=0;const scheduled=[],q=scrollQueue(intent=>({target:intent.row}),value=>{actual=value.target;return false;});
+ for(let frame=0;frame<40;frame++){
+  for(let sample=0;sample<8;sample++)q.sync.request({kind:'aligned',side:'left',row:frame+sample/8});
+  assert.equal(q.queued.length,1);q.step();assert.equal(actual,frame+7/8);scheduled.push(actual);
+ }
+ assert(scheduled.every((value,i)=>!i||value>scheduled[i-1]));q.sync.cancel();q.flush();
+});
+test('real input adopts its pane once, not a cancellation for every wheel tick',()=>{
+ const source=fs.readFileSync(require.resolve('../web/assets/editor-aligned-compare.js'),'utf8');
+ assert(source.includes('if(scrollSource!==side||independentReveal)scrollReconciler.cancel()'));
+ assert(source.includes('views[intent.side].requestMeasure(job)'),'measurement belongs to the active source rather than always the left pane');
+ assert(!source.includes('createScrollReconciler(job=>root.requestAnimationFrame'),'do not add a redundant frame before the native scheduled measurement');
+});

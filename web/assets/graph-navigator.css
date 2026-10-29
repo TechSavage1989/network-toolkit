@@ -21,7 +21,7 @@
 
 .graph-navigator[data-gn-tiny="true"] .gn-start-hit{bottom:50%;top:-2px}.graph-navigator[data-gn-tiny="true"] .gn-end-hit{top:50%;bottom:-2px}.graph-navigator[data-gn-tiny="true"] .gn-start-hit span,.graph-navigator[data-gn-tiny="true"] .gn-end-hit span{height:9px}
 
-.graph-inline-zoom [data-rt-zoom-level],.graph-inline-zoom [data-packet-zoom-value]{max-width:45px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}@container(max-width:420px){.graph-inline-zoom [data-rt-zoom-level],.graph-inline-zoom [data-packet-zoom-value]{max-width:32px}}
+.graph-inline-zoom [data-rt-zoom-level],.graph-inline-zoom [data-packet-zoom-value]{min-width:3.2em;max-width:6em;white-space:nowrap;font-variant-numeric:tabular-nums}@container(max-width:420px){.graph-inline-zoom [data-rt-zoom-level],.graph-inline-zoom [data-packet-zoom-value]{max-width:5.5em}}
 /* Compact height reserves a real plot and complete rows, with 26px handle hits. */
 @media(max-height:720px){.graph-workspace{--graph-min-height:136px}.graph-workspace-graph>.rt-timeline{grid-template-rows:auto minmax(44px,1fr) 18px 34px}.graph-navigator{height:34px;grid-template-rows:22px 11px}.graph-navigator .gn-labels{line-height:11px}.packet-traffic-section{grid-template-rows:auto minmax(35px,1fr) 20px 34px 14px}}
 
