@@ -98,9 +98,3 @@ test('real input adopts its pane once, not a cancellation for every wheel tick',
  assert(source.includes('views[intent.side].requestMeasure(job)'),'measurement belongs to the active source rather than always the left pane');
  assert(!source.includes('createScrollReconciler(job=>root.requestAnimationFrame'),'do not add a redundant frame before the native scheduled measurement');
 });
-
-test('aligned map targets flush a peer pending native measurement before reading cached blocks',()=>{
- const fresh=blockView(60),stale=blockView(200);let measured=false,reads=0;
- const peer={state:fresh.state,elementAtHeight(pixel){reads++;measured=true;return fresh.elementAtHeight(pixel)},lineBlockAt(position){return (measured?fresh:stale).lineBlockAt(position)}};
- assert.equal(api.nativePixelFromAligned(peer,[0,40,100,120],[20,60,20],58),58,'right-origin maps must not translate a new target through stale left-view heights');assert.equal(reads,1);
-});

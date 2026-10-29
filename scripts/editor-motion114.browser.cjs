@@ -39,9 +39,13 @@ function beginCapture(label){
  window.motion114={label,frames:[],running:true};const record=window.motion114,c=NetworkToolkitFileEditor.comparison;
  const rowByLine=Object.fromEntries(['left','right'].map(side=>[side,new Map(c.result.rows.flatMap((row,i)=>row[side]===null?[]:[[row[side]+1,i]]))]));
  function capture(){if(!record.running)return;const panes=['left','right'].map(side=>{
-  const facade=c.sourceView(side),view=NetworkToolkitCodeMirror.EditorView.findFromDOM(facade.inputElement),s=view.scrollDOM,r=s.getBoundingClientRect(),pixel=Math.max(0,s.scrollTop-view.documentPadding.top),block=view.elementAtHeight(pixel),line=view.state.doc.lineAt(block.from).number;
-  const visible=[...view.contentDOM.querySelectorAll('.cm-line[data-source-line]')].map(el=>{const b=el.getBoundingClientRect();return {row:rowByLine[side].get(Number(el.dataset.sourceLine)),line:Number(el.dataset.sourceLine),y:b.top-r.top,h:b.height,visible:Math.min(b.bottom,r.bottom)-Math.max(b.top,r.top)}}).filter(x=>x.visible>1);
-  return {side,top:s.scrollTop,position:(rowByLine[side].get(line)||0)+Math.max(0,Math.min(1,(pixel-block.top)/Math.max(1,block.height))),gap:!!block.widget,visible,map:Number(document.querySelector('[data-compare-track='+side+']').getAttribute('aria-valuenow'))};
+  // Never call a CodeMirror layout reader here: elementAtHeight can flush a
+  // pending measure and synchronize both panes midway through this snapshot.
+  // Read only painted DOM rectangles and scroll offsets in one synchronous turn.
+  const facade=c.sourceView(side),input=facade.inputElement,s=facade.scrollElement,r=s.getBoundingClientRect();
+  const visible=[...input.querySelectorAll('.cm-line[data-source-line]')].map(el=>{const b=el.getBoundingClientRect();return {row:rowByLine[side].get(Number(el.dataset.sourceLine)),line:Number(el.dataset.sourceLine),y:b.top-r.top,h:b.height,visible:Math.min(b.bottom,r.bottom)-Math.max(b.top,r.top)}}).filter(x=>x.visible>1);
+  const first=visible[0],position=first?first.row+Math.max(0,Math.min(1,-first.y/Math.max(1,first.h))):null;
+  return {side,top:s.scrollTop,position,visible,map:Number(document.querySelector('[data-compare-track='+side+']').getAttribute('aria-valuenow'))};
  });const common=panes[0].visible.map(a=>{const b=panes[1].visible.find(b=>b.row===a.row);return b?{row:a.row,delta:a.y-b.y}:null}).find(Boolean);record.frames.push({at:performance.now(),panes,delta:common?.delta??null});requestAnimationFrame(capture)}requestAnimationFrame(capture);
 }
 async function finishCapture(page){await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));return page.evaluate(()=>{motion114.running=false;return motion114;});}
