@@ -1,13 +1,15 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const source=fs.readFileSync(path.join(__dirname,'editor-divider113.browser.cjs'),'utf8');
-const start=source.indexOf('function nativePairIssues('),end=source.indexOf('\nasync function nativeFrame',start);
+const start=source.indexOf('function nativePairAnchor('),end=source.indexOf('\nasync function nativeFrame',start);
 assert(start>=0&&end>start);
 const {issues,stable}=vm.runInNewContext(source.slice(start,end)+';({issues:nativePairIssues,stable:nativeStabilityIssues})');
-function pair(){return ['left','right'].map(side=>({side,mapLine:178,firstSource:{line:179,relativeTop:-63,height:161,sourceTextMatches:true,gutter:{line:179,relativeTop:-63,height:161}}}));}
-test('native alignment accepts a matching partially clipped source and gutter',()=>{assert.equal(issues(pair()).length,0);});
-test('map equality cannot hide late native source or offset divergence',()=>{for(const change of [p=>p[1].firstSource.line=175,p=>p[1].firstSource.relativeTop+=40]){const p=pair();change(p);assert(issues(p).length>0);}});
-test('native alignment rejects stale rendered source, wrong gutter and wrong map',()=>{for(const change of [p=>p[1].firstSource.sourceTextMatches=false,p=>p[1].firstSource.gutter.line=175,p=>p[1].firstSource.gutter.relativeTop+=20,p=>p[1].mapLine=174]){const p=pair();change(p);assert(issues(p).length>0);}});
-test('native alignment requires both real source rows',()=>{assert(issues([]).length>0);const p=pair();p[0].firstSource=null;assert(issues(p).length>0);});
-test('native settling rejects common-mode source drift after transient convergence',()=>{const anchor=pair(),p=pair();for(const pane of p){pane.firstSource.relativeTop-=20;pane.firstSource.gutter.relativeTop-=20;}assert.equal(issues(p).length,0);assert(stable(p,anchor).length>0);assert.equal(stable(pair(),anchor).length,0);});
+function row(line,top,height=161){return {line,relativeTop:top,height,visibleHeight:Math.min(height,height+top),sourceTextMatches:true,gutter:{line,relativeTop:top,height}};}
+function pair(){return ['left','right'].map(side=>({side,mapLine:178,visibleSources:[row(179,-63),row(180,98),row(181,259)]}));}
+test('native alignment accepts matching partially clipped source and gutters',()=>{assert.equal(issues(pair()).length,0);});
+test('map equality cannot hide four-line or real pixel divergence',()=>{const offset=pair();offset[1].visibleSources=[row(175,-63),row(176,98),row(177,259)];assert(issues(offset).length>0);const pixels=pair();pixels[1].visibleSources[0].relativeTop+=40;assert(issues(pixels).length>0);});
+test('native alignment rejects stale text, wrong or missing visible gutter and wrong map',()=>{for(const change of [p=>p[1].visibleSources[0].sourceTextMatches=false,p=>p[1].visibleSources[0].gutter.line=175,p=>p[1].visibleSources[0].gutter.relativeTop+=20,p=>p[1].visibleSources[1].gutter=null,p=>p[1].mapLine=174]){const p=pair();change(p);assert(issues(p).length>0);}});
+test('native alignment requires both actual source rows',()=>{assert(issues([]).length>0);const p=pair();p[0].visibleSources=[];assert(issues(p).length>0);});
+test('actual subpixel clipping permits only the adjacent boundary rows',()=>{const p=['left','right'].map((side,i)=>{const top=i?.421875:.515625;return {side,mapLine:i?171:172,visibleSources:[row(172,top-40.28125,40.28125),row(173,top,281.96875),row(174,top+281.96875,40.28125)]};});assert.equal(issues(p).length,0);assert.equal(stable(p,p).length,0);p[0].visibleSources[1].relativeTop=1.1;assert(issues(p).some(x=>x.includes('clipping boundary')));});
+test('native settling rejects common-mode source drift after transient convergence',()=>{const anchor=pair(),p=pair();for(const pane of p)for(const row of pane.visibleSources){row.relativeTop-=20;row.gutter.relativeTop-=20;}assert.equal(issues(p).length,0);assert(stable(p,anchor).length>0);assert.equal(stable(pair(),anchor).length,0);});
 test('divider acceptance observes actual frames before and after screenshots',()=>{assert.match(source,/stableNativeFrames\(page,12,'before screenshot',converged\)/);assert.match(source,/nativeStability\.afterScreenshot=await nativeGeometry\(page\)/);assert.match(source,/stableNativeFrames\(page,6,'after screenshot',nativeStability\.converged\)/);assert.match(source,/requestAnimationFrame\(resolve\)/);assert.match(source,/assert\.equal\(report\.layouts\.length,36\)/);assert.match(source,/assert\.deepEqual\(report\.violations,\[\]/);});

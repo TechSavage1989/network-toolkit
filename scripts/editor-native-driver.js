@@ -146,9 +146,19 @@
       // In-memory test binding only. The actual Save button and pending-save
       // lifecycle execute; no host file or remote connection is accessed.
       await editor().open({id:'native-close113-save', source:'Synthetic test binding', path:'synthetic-save113.txt',
-        read:async()=>({content:'SYNTHETIC ORIGINAL',hash:'synthetic',encoding:'UTF-8'}),
+        read:async()=>({content:'SYNTHETIC ORIGINAL\n'+Array.from({length:60},(_,i)=>'Synthetic retained save line '+(i+1)).join('\n'),hash:'synthetic',encoding:'UTF-8'}),
         write:()=>new Promise((resolve,reject)=>{rejectSyntheticSave=reject;})});
       const ta=textarea();ta.value+='\nSYNTHETIC UNSAVED SAVE FAILURE';ta.dispatchEvent(new InputEvent('input',{bubbles:true,inputType:'insertText',data:'synthetic'}));
+      // This intentionally nontransferable in-memory binding cannot use the
+      // adapter checkpoint to initialize view metadata. Capture real selection
+      // and scroll via the ordinary active-tab action before entering Save.
+      ta.setSelectionRange(9,31,'backward');ta.scrollTop=Math.min(120,ta.scrollHeight-ta.clientHeight);
+      ta.dispatchEvent(new Event('select',{bubbles:true}));ta.dispatchEvent(new Event('scroll'));
+      const uid=editor().active.uid;
+      document.querySelector('[data-ed-uid="'+uid+'"] [data-ed-open]').click();
+      await wait(()=>{const d=editor().active,t=textarea(),v=d.view;return d.uid===uid&&v&&v.start===9&&v.end===31&&v.direction==='backward'&&v.top>0&&v.start===t.selectionStart&&v.end===t.selectionEnd&&v.direction===t.selectionDirection&&v.top===t.scrollTop&&v.left===t.scrollLeft;},'ordinary tab action captures exact nontrivial selection and scroll before Save');
+      const observed=snapshot(),captured=observed.documents.find(d=>d.uid===uid);
+      if(!captured?.view||['start','end','direction','top','left'].some(key=>captured.view[key]!==observed.textarea[key]))throw Error('Synthetic Save precondition did not retain the actual editor view');
       document.querySelector('[data-ed="save"]').click();
       await wait(() => editor().active.saving && rejectSyntheticSave, 'actual Save waits on synthetic binding');
       return snapshot();

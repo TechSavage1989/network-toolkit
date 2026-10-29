@@ -55,5 +55,21 @@ test('late refinements cannot resurrect cancelled intent or overwrite a newer re
  let actual=0;const q=scrollQueue(intent=>({target:intent.pixel}),value=>{const changed=actual!==value.target;actual=value.target;return changed});
  q.sync.request({pixel:40});q.flush();q.sync.refine();const stale=q.queued.shift(),value=stale.read();q.sync.request({pixel:80});stale.write(value);q.flush();assert.equal(actual,80);
  q.sync.cancel();q.sync.refine();assert.equal(q.queued.length,0,'document replacement and disposal remain final');
- const source=fs.readFileSync(require.resolve('../web/assets/editor-aligned-compare.js'),'utf8');assert(source.includes('if(update.geometryChanged&&pixelReady&&!isComposing())scrollReconciler.refine()'),'wake only on actual native geometry changes while ready, not every viewport scroll');
+ const source=fs.readFileSync(require.resolve('../web/assets/editor-aligned-compare.js'),'utf8');assert(source.includes('if(update.geometryChanged&&pixelReady&&!isComposing()){scrollReconciler.refine()'),'wake only on actual native geometry changes while ready, not every viewport scroll');
+});
+
+test('native gutter refresh is coalesced and idempotent for unchanged measured viewport blocks',()=>{
+ const jobs=[],deferred=[],writes=[];let signature='current',ready=true;const refresh=api.createMeasuredRefresh(job=>jobs.push(job),()=>ready?{signature}:null,value=>writes.push(value.signature),()=>true,fn=>deferred.push(fn));
+ const flush=()=>{while(jobs.length){const job=jobs.shift();job.write(job.read());}while(deferred.length)deferred.shift()();};
+ refresh.request();refresh.request();assert.equal(jobs.length,1);flush();assert.deepEqual(writes,['current']);refresh.request();flush();assert.deepEqual(writes,['current'],'config refresh must not trigger itself');
+ signature='late height refinement';refresh.request();flush();assert.deepEqual(writes,['current','late height refinement']);ready=false;refresh.request();flush();assert.equal(writes.length,2);
+});
+test('native gutter refresh never dispatches from a measurement write or after stale source/disposal',()=>{
+ const jobs=[],deferred=[];let writes=0,valid=true;const refresh=api.createMeasuredRefresh(job=>jobs.push(job),()=>({signature:String(jobs.length)+':geometry'}),()=>writes++,()=>valid,fn=>deferred.push(fn));
+ refresh.request();let job=jobs.shift();job.write(job.read());assert.equal(writes,0,'defer public reconfiguration until the native update has completed');valid=false;deferred.shift()();assert.equal(writes,0);
+ refresh.cancel();valid=true;refresh.request();job=jobs.shift();job.write(job.read());refresh.cancel();deferred.shift()();assert.equal(writes,0,'disposal cancels an already measured refresh');
+ refresh.request();job=jobs.shift();const old=job.read();refresh.cancel();job.write(old);assert.equal(deferred.length,0,'stale measured geometry cannot queue a write');
+});
+test('native gutter signature tracks current viewport and block geometry, not cached DOM labels',()=>{
+ const view={viewport:{from:0,to:8},contentDOM:{clientWidth:120},documentPadding:{top:10},viewportLineBlocks:[{from:0,to:3,top:0,height:20,type:0},{from:4,to:8,top:20,height:40,type:0}]};const before=api.nativeGutterSignature(view);assert.equal(api.nativeGutterSignature(view),before);view.viewportLineBlocks[1].height=60;assert.notEqual(api.nativeGutterSignature(view),before);const source=fs.readFileSync(require.resolve('../web/assets/editor-aligned-compare.js'),'utf8');assert(source.includes('gutterConfig[side].reconfigure(lineNumbers({formatNumber:line=>String(line)}))'));assert(source.includes('gutterRefresh[side].cancel()'));assert(!source.includes("querySelectorAll('.cm-gutterElement')"));
 });
