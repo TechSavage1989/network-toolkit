@@ -449,3 +449,49 @@ func TestExplorerLocalDropRevocationBeforePublication(t *testing.T) {
 		t.Fatal("revoked copy left published/staged file", entries)
 	}
 }
+
+func TestExplorerCopyRevocationRetainsActiveStageUntilConfirmedOwnerExit(t *testing.T) {
+	for _, owner := range []string{"", strings.Repeat("ab", 16)} {
+		t.Run("owner-"+owner, func(t *testing.T) {
+			a := &application{}
+			stage := t.TempDir()
+			os.WriteFile(filepath.Join(stage, "source.txt"), []byte("SYNTHETIC"), 0600)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			j := &explorerTransferJob{id: strings.Repeat("a1", 16), owner: owner, state: "dragging", stage: stage, cancel: cancel, valid: func() bool { return false }}
+			other := &explorerTransferJob{id: strings.Repeat("a2", 16), owner: "other", state: "dragging", stage: t.TempDir(), cancel: func() {}}
+			a.explorerTransfers.jobs = map[string]*explorerTransferJob{j.id: j, other.id: other}
+			go a.watchExplorerCopy(ctx, j)
+			deadline := time.Now().Add(2 * time.Second)
+			requested := false
+			for time.Now().Before(deadline) {
+				a.explorerTransfers.mu.Lock()
+				requested = j.cancelRequested
+				a.explorerTransfers.mu.Unlock()
+				if requested {
+					break
+				}
+				time.Sleep(5 * time.Millisecond)
+			}
+			if !requested {
+				t.Fatal("revocation was not communicated")
+			}
+			if _, err := os.Stat(filepath.Join(stage, "source.txt")); err != nil {
+				t.Fatal("active stage removed", err)
+			}
+			a.finishInactiveExplorerCopies()
+			if _, err := os.Stat(stage); err != nil {
+				t.Fatal("whole-app cleanup removed active stage")
+			}
+			a.finishExplorerOwner(owner)
+			a.finishExplorerOwner(owner)
+			if _, err := os.Stat(stage); !os.IsNotExist(err) {
+				t.Fatal("confirmed owner exit did not clean stage")
+			}
+			if _, err := os.Stat(other.stage); err != nil {
+				t.Fatal("unrelated owner stage was removed")
+			}
+			a.finishExplorerOwner("other")
+		})
+	}
+}

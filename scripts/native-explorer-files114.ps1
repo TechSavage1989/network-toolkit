@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][string]$SourceDirectory,[Parameter(Mandatory=$true)][long]$WindowHandle,[Parameter(Mandatory=$true)][uint32]$OwnerProcessID,[Parameter(Mandatory=$true)][string]$DestinationDirectory)
+param([Parameter(Mandatory=$true)][string]$SourceDirectory,[Parameter(Mandatory=$true)][long]$WindowHandle,[Parameter(Mandatory=$true)][uint32]$OwnerProcessID,[Parameter(Mandatory=$true)][string]$DestinationDirectory,[Parameter(Mandatory=$true)][string]$CancelDestinationDirectory)
 # Hosted test only: operates on one caller-created synthetic Explorer folder and
 # the caller's exact native fixture HWND. No clipboard or arbitrary UI access.
 $ErrorActionPreference='Stop'
@@ -132,7 +132,12 @@ try {
  Drag-Point ([int]($r.Left+$r.Width/2)) ([int]($r.Top+$r.Height/2)) 750 460 $true
  Wait-Copy-Finished
  Close-Copy
- # One final real held drag is cancelled by its owning native context, not input injection.
+ # A canceled owner remains alive while the physical gesture is stationary.
+ # Its next genuine movement/release must cancel, not drop into this empty target.
+ $cancelDest=$shell.NameSpace((Get-Item -LiteralPath $CancelDestinationDirectory).FullName).Self.Path
+ $window.Navigate2($cancelDest);$until=[DateTime]::UtcNow.AddSeconds(15)
+ do{Start-Sleep -Milliseconds 100}while($window.Document.Folder.Self.Path -ne $cancelDest -and [DateTime]::UtcNow -lt $until)
+ if($window.Document.Folder.Self.Path -ne $cancelDest){throw 'Cancelled-copy destination did not load'}
  Invoke-Button 'Prepare Explorer copy'
  $until=[DateTime]::UtcNow.AddSeconds(15)
  do{$button=Find-Element $native 'Drag prepared files and folders to Windows Explorer';if(!$button.Current.IsEnabled){Start-Sleep -Milliseconds 100}}while(!$button.Current.IsEnabled -and [DateTime]::UtcNow -lt $until)
@@ -140,6 +145,7 @@ try {
  $r=$button.Current.BoundingRectangle
  Invoke-Button 'Cancel owner during next drag';[void](Find-Element $native 'Owner cancellation armed')
  [void][ExplorerDropMouse]::SetCursorPos([int]($r.Left+$r.Width/2),[int]($r.Top+$r.Height/2));[ExplorerDropMouse]::mouse_event(2,0,0,0,[UIntPtr]::Zero)
- try{[void][ExplorerDropMouse]::SetCursorPos([int]($r.Left+$r.Width/2+8),[int]($r.Top+$r.Height/2+2));Start-Sleep -Milliseconds 3500}finally{[ExplorerDropMouse]::mouse_event(4,0,0,0,[UIntPtr]::Zero)}
+ try{[void][ExplorerDropMouse]::SetCursorPos([int]($r.Left+$r.Width/2+8),[int]($r.Top+$r.Height/2+2));Start-Sleep -Milliseconds 3000;[void][ExplorerDropMouse]::SetCursorPos(760,460);Start-Sleep -Milliseconds 300}finally{[ExplorerDropMouse]::mouse_event(4,0,0,0,[UIntPtr]::Zero)}
+ if(@(Get-ChildItem -LiteralPath $CancelDestinationDirectory -Force).Count -ne 0){throw 'Cancelled owner drag created destination output'}
  Write-Output 'Actual Windows Explorer folder import, file+folder export, Escape and owner-context cancellation completed'
 } finally {$window.Quit()}

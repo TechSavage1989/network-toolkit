@@ -33,6 +33,8 @@ func TestNativeExplorerFiles114(t *testing.T) {
 	temp := t.TempDir()
 	source := filepath.Join(temp, "source")
 	dest := filepath.Join(temp, "destination")
+	cancelledDest := filepath.Join(temp, "cancelled-destination")
+	os.MkdirAll(cancelledDest, 0700)
 	incoming := filepath.Join(source, "incoming-folder")
 	os.MkdirAll(filepath.Join(incoming, "empty"), 0700)
 	os.MkdirAll(dest, 0700)
@@ -62,13 +64,15 @@ func TestNativeExplorerFiles114(t *testing.T) {
 	var trace []string
 	var mu sync.Mutex
 	var hostHWND atomic.Uintptr
+	defer func() { nativeFileDragObservers.Delete(hostHWND.Load()) }()
 	state := "idle"
 	armed := false
 	var gesture, revoked uint64
 	starts := 0
 	quickStarts, quickChecks := 0, 0
 	ownerCancelArmed, ownerCancelled := false, false
-	var ownerCancelledAt time.Time
+	var ownerCancelledAt, ownerInputAt time.Time
+	heldOwnerRetained, heldStageRetained, cancelledOutcome, cleanupConfirmed := false, false, false, false
 	imports := 0
 	linkNegatives := 0
 	finishes := 0
@@ -187,6 +191,7 @@ document.getElementById('ownerCancel').onclick=()=>api('/owner-cancel','POST',{}
 				Action  string `json:"action"`
 				ID      string `json:"id"`
 				Gesture uint64 `json:"gesture"`
+				Outcome string `json:"outcome"`
 			}
 			json.NewDecoder(r.Body).Decode(&body)
 			trace = append(trace, fmt.Sprintf("%s action=%s job=%s gesture=%d state=%s", time.Now().UTC().Format(time.RFC3339Nano), body.Action, body.ID, body.Gesture, state))
@@ -247,6 +252,15 @@ document.getElementById('ownerCancel').onclick=()=>api('/owner-cancel','POST',{}
 								ownerCancelledAt = time.Now()
 								mu.Unlock()
 								cancel()
+								time.Sleep(300 * time.Millisecond)
+								_, stageErr := os.Stat(stage)
+								_, ownerLive := wndWindows.Load(hostHWND.Load())
+								held, _, _ := fileDragKey.Call(1)
+								mu.Lock()
+								heldOwnerRetained = ownerLive && held&0x8000 != 0
+								heldStageRetained = stageErr == nil && held&0x8000 != 0
+								trace = append(trace, fmt.Sprintf("%s held-owner-retained=%t held-stage-retained=%t", time.Now().UTC().Format(time.RFC3339Nano), heldOwnerRetained, heldStageRetained))
+								mu.Unlock()
 								return
 							}
 							time.Sleep(10 * time.Millisecond)
@@ -268,6 +282,12 @@ document.getElementById('ownerCancel').onclick=()=>api('/owner-cancel','POST',{}
 					finishes++
 				}
 				state = "finished"
+				if ownerCancelled {
+					cancelledOutcome = body.Outcome == "cancelled"
+					if cancelledOutcome {
+						cleanupConfirmed = os.RemoveAll(stage) == nil
+					}
+				}
 			case "cancel":
 				if state == "dragging" {
 					http.Error(w, "Release the drag or press Escape before closing", 409)
@@ -316,8 +336,16 @@ document.getElementById('ownerCancel').onclick=()=>api('/owner-cancel','POST',{}
 			return
 		}
 		hostHWND.Store(hwnd)
+		nativeFileDragObservers.Store(hwnd, func(event string) {
+			mu.Lock()
+			trace = append(trace, time.Now().UTC().Format(time.RFC3339Nano)+" native="+event)
+			if ownerCancelled && event == "query-continue-cancel" {
+				ownerInputAt = time.Now()
+			}
+			mu.Unlock()
+		})
 		go func() {
-			cmd := exec.CommandContext(driverCtx, "powershell.exe", "-NoProfile", "-NonInteractive", "-File", script, "-SourceDirectory", source, "-DestinationDirectory", dest, "-WindowHandle", strconv.FormatUint(uint64(hwnd), 10), "-OwnerProcessID", strconv.Itoa(os.Getpid()))
+			cmd := exec.CommandContext(driverCtx, "powershell.exe", "-NoProfile", "-NonInteractive", "-File", script, "-SourceDirectory", source, "-DestinationDirectory", dest, "-CancelDestinationDirectory", cancelledDest, "-WindowHandle", strconv.FormatUint(uint64(hwnd), 10), "-OwnerProcessID", strconv.Itoa(os.Getpid()))
 			output, e := cmd.CombinedOutput()
 			out := os.Getenv("TOOLKIT_NATIVE_TEST_OUTPUT")
 			if out != "" {
@@ -353,17 +381,19 @@ document.getElementById('ownerCancel').onclick=()=>api('/owner-cancel','POST',{}
 	if err != nil {
 		t.Fatal(err)
 	}
+	observeNativeFileDrag(hostHWND.Load(), "run-return")
 	mu.Lock()
-	cancelledAt := ownerCancelledAt
+	inputAt := ownerInputAt
+	retainedOwner, retainedStage := heldOwnerRetained, heldStageRetained
 	mu.Unlock()
-	ownerReturnDelay := time.Since(cancelledAt)
-	heldAtReturn, _, _ := fileDragKey.Call(1)
-	if heldAtReturn&0x8000 == 0 {
-		t.Error("owner cancellation was not proven before physical mouse release")
+	postInputReturnDelay := time.Since(inputAt)
+	if !retainedOwner || !retainedStage {
+		t.Error("pending cancellation did not retain native owner and staging while mouse stayed held")
 	}
-	if cancelledAt.IsZero() || ownerReturnDelay > 2*time.Second {
-		t.Errorf("owning native context cancellation did not return promptly: %v", ownerReturnDelay)
+	if inputAt.IsZero() || postInputReturnDelay > 2*time.Second {
+		t.Errorf("native owner did not settle promptly after real input resumed: %v", postInputReturnDelay)
 	}
+
 	select {
 	case err := <-result:
 		if err != nil {
@@ -374,21 +404,34 @@ document.getElementById('ownerCancel').onclick=()=>api('/owner-cancel','POST',{}
 	}
 	mu.Lock()
 	defer mu.Unlock()
-	if imports != 1 || finishes != starts-1 || starts < 3 || starts > 4 || !ownerCancelled || quickChecks != 1 || linkNegatives != 1 {
+	if imports != 1 || finishes != starts || starts < 3 || starts > 4 || !ownerCancelled || !cancelledOutcome || !cleanupConfirmed || quickChecks != 1 || linkNegatives != 1 {
 		t.Fatalf("actual imported=%d finished/cancelled drags=%d", imports, finishes)
 	}
 	for _, rel := range []string{"outgoing-file.txt", filepath.Join("outgoing-folder", "nested", "out.txt")} {
-		want, e := os.ReadFile(filepath.Join(stage, rel))
+		want := []byte("SYNTHETIC OUTGOING FILE114\r\n")
+		if rel != "outgoing-file.txt" {
+			want = []byte("SYNTHETIC OUTGOING TREE114\r\n")
+		}
 		got, ge := os.ReadFile(filepath.Join(dest, rel))
-		if e != nil || ge != nil || string(want) != string(got) {
+		if ge != nil || string(want) != string(got) {
 			t.Fatalf("OS destination bytes differ: %s", rel)
 		}
 	}
 	if info, e := os.Stat(filepath.Join(dest, "outgoing-folder", "empty")); e != nil || !info.IsDir() {
 		t.Fatal("empty folder lost")
 	}
+	if entries, e := os.ReadDir(cancelledDest); e != nil || len(entries) != 0 {
+		t.Error("cancelled owner drag copied output into the real Explorer destination")
+	}
+	if _, e := os.Stat(stage); !os.IsNotExist(e) {
+		t.Error("authenticated finish did not clean the prepared stage")
+	}
+	if bytes, e := os.ReadFile(filepath.Join(incoming, "in.txt")); e != nil || string(bytes) != "SYNTHETIC INCOMING114\r\n" {
+		t.Error("original source changed")
+	}
 	if out := os.Getenv("TOOLKIT_NATIVE_TEST_OUTPUT"); out != "" {
-		b, _ := json.MarshalIndent(map[string]any{"passed": !t.Failed(), "actualExplorer": true, "importedFolders": imports, "junctionTargetNotTraversed": linkNegatives == 1, "nativeDragsIncludingCancel": finishes, "copyOnly": true, "ownerContextCancellationMs": float64(ownerReturnDelay.Microseconds()) / 1000, "ownerReturnedWhileMouseHeld": heldAtReturn&0x8000 != 0, "releasedGestureDidNotArmLaterClick": quickChecks == 1, "scope": "synthetic hosted FileSystemEntry + native OLE bridge; remote staging separately tested"}, "", "  ")
+		os.WriteFile(filepath.Join(out, "native-files114-events.txt"), []byte(strings.Join(trace, "\n")), 0600)
+		b, _ := json.MarshalIndent(map[string]any{"passed": !t.Failed(), "actualExplorer": true, "ownerCancellationRequestedAt": ownerCancelledAt.UTC().Format(time.RFC3339Nano), "importedFolders": imports, "junctionTargetNotTraversed": linkNegatives == 1, "nativeDragsIncludingCancel": finishes, "copyOnly": true, "ownerCompletionAfterInputMs": float64(postInputReturnDelay.Microseconds()) / 1000, "heldOwnerRetained": heldOwnerRetained, "heldStageRetained": heldStageRetained, "cancelledDrop": cancelledOutcome, "finishCleanupConfirmed": cleanupConfirmed, "releasedGestureDidNotArmLaterClick": quickChecks == 1, "scope": "synthetic hosted FileSystemEntry + native OLE bridge; remote staging separately tested"}, "", "  ")
 		os.WriteFile(filepath.Join(out, "native-files114-report.json"), b, 0600)
 	}
 }

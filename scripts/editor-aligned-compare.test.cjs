@@ -98,3 +98,41 @@ test('real input adopts its pane once, not a cancellation for every wheel tick',
  assert(source.includes('views[intent.side].requestMeasure(job)'),'measurement belongs to the active source rather than always the left pane');
  assert(!source.includes('createScrollReconciler(job=>root.requestAnimationFrame'),'do not add a redundant frame before the native scheduled measurement');
 });
+
+test('native virtual-gap origin contradiction uses actual visible text and preserves its fractional source anchor',()=>{
+ const state=C.EditorState.create({doc:'first\nsecond\nthird'}),rect={top:-2.828125,bottom:17.3125,height:20.140625},view={state,documentTop:-25,scrollDOM:{getBoundingClientRect:()=>({top:0,bottom:100})},contentDOM:{querySelector:()=>({}),querySelectorAll:()=>[{dataset:{sourceLine:'2'},getBoundingClientRect:()=>rect}]},lineBlockAt:()=>({top:19.34375})};
+ const mismatch=api.nativeOriginMismatch(view);assert.equal(mismatch.line,2);assert.equal(mismatch.delta,2.828125);assert.equal(mismatch.fraction,2.828125/20.140625);
+ rect.top-=.828125;assert.equal(api.nativeOriginMismatch(view),null,'at most 2px follows existing rendered geometry tolerance');
+ rect.top=-2.828125;view.contentDOM.querySelector=()=>null;assert.equal(api.nativeOriginMismatch(view),null,'never rebuild a nonvirtual native document');
+});
+test('native origin recovery is bounded once per side/layout generation and never consumes a busy gesture',()=>{
+ const guard=api.createOriginRepairGuard();let resets=0;const reset=()=>resets++;
+ for(let i=0;i<40;i++)assert.equal(guard.attempt('right',7,false,reset),false);
+ assert.equal(resets,0,'continuous map/wheel/composition/transfer refusal is not a repaint timer');
+ assert.equal(guard.attempt('right',7,true,reset),true);assert.equal(resets,1);
+ for(let i=0;i<40;i++)assert.equal(guard.attempt('right',7,true,reset),false);
+ assert.equal(guard.attempt('left',7,true,reset),true);assert.equal(guard.attempt('right',8,true,reset),true);assert.equal(resets,3);
+});
+test('public native reset preserves exact immutable source state, selection, external undo and focus',()=>{
+ const state=C.EditorState.create({doc:'alpha\n😀 beta\nlast',selection:{anchor:3,head:10}}),undo=['previous text'],document={content:state.doc.toString(),undo,dirty:true,editRevision:12},view={state,hasFocus:true,scrollDOM:{scrollLeft:29},setState(value){assert.equal(value,state);this.state=value;this.scrollDOM.scrollLeft=0;this.hasFocus=false;},focus(){this.hasFocus=true;}};
+ assert.equal(api.resetNativeOrigin(view),state);assert.equal(view.state,state);assert.equal(view.state.doc,state.doc);assert.equal(view.state.selection,state.selection);assert.equal(view.scrollDOM.scrollLeft,29);assert.equal(view.hasFocus,true);assert.equal(document.undo,undo);assert.equal(document.content,state.doc.toString());assert.equal(document.editRevision,12);assert.equal(document.dirty,true);
+ view.hasFocus=false;let focusCalls=0;view.focus=()=>focusCalls++;api.resetNativeOrigin(view);assert.equal(focusCalls,0,'never steal focus from another pane/control');
+ const source=fs.readFileSync(require.resolve('../web/assets/editor-aligned-compare.js'),'utf8');assert(source.includes('mapDrag!==null||sides.some(side=>Object.values(inputBusy[side]).some(Boolean))'),'input on either pane blocks both native repairs');assert(source.includes('!!mismatch&&!interacting(side)&&!bound[side]?.frozen&&!bound[side]?.loading'));assert(source.includes('value=>pixelReady&&stable(value.epoch,value.stamp)'),'same source/revision and no composition checked again at deferred dispatch');assert(source.includes('geometry.sourceOffsets[side][mismatch.line-1]+mismatch.fraction*sourceHeights[side][mismatch.line-1]'),'restore captured logical source/fraction through the existing reconciler');assert(!source.includes("querySelectorAll('.cm-gutterElement')"),'no gutter DOM workaround');
+});
+
+test('map wheel, map keyboard and divider gestures share the same deferred-repair exclusion',()=>{
+ const source=fs.readFileSync(require.resolve('../web/assets/editor-aligned-compare.js'),'utf8');
+ assert(source.includes("if(!pixelReady)return;wheelIdle[side].begin();"));
+ assert(source.includes("if(!pixelReady||!geometry||!sourceHeights)return;inputBusy[side].key=true;"));
+ assert(source.includes("divider.addEventListener(event,()=>{inputBusy.left[event==='keydown'?'key':'pointer']=true;"));
+ assert(!source.includes("addEventListener('scrollend',()=>{inputBusy[side].wheel=false;"));
+ assert(source.includes("root.removeEventListener(event,endInteraction)"));
+});
+
+test('wheel idle ends without scrollend at a boundary, extends continuous input, and cancels on blur/disposal',()=>{
+ const queued=new Map(),events=[];let id=0;const clock={schedule(fn,ms){assert.equal(ms,200);queued.set(++id,fn);return id;},cancel(key){queued.delete(key);}},idle=api.createWheelIdle(value=>events.push(value),clock.schedule,clock.cancel);
+ idle.begin();const stale=queued.get(1);for(let i=0;i<40;i++){idle.begin();assert.equal(queued.size,1);assert.equal(events.at(-1),true);}stale();assert.equal(events.at(-1),true,'late cancelled timer never ends a continued gesture');
+ {const [key,callback]=queued.entries().next().value;queued.delete(key);callback();}assert.equal(events.at(-1),false,'boundary wheel ends even when no scroll event was produced');
+ idle.begin();idle.end();assert.equal(events.at(-1),false,'window blur clears the active wheel immediately');const count=events.length;idle.begin();const late=queued.values().next().value;idle.cancel();late();assert.equal(events.length,count+1,'disposal emits no late callback');
+ const source=fs.readFileSync(require.resolve('../web/assets/editor-aligned-compare.js'),'utf8');assert(source.includes("'lostpointercapture','touchend','touchcancel','keyup','blur'"));assert(source.includes("if(event.type==='blur')mapDrag=null"));assert(source.includes('wheelIdle[side].cancel();gutterRefresh[side].cancel()'));
+});

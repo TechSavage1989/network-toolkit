@@ -191,3 +191,65 @@ func TestNativeFileDragCaptureOnlyExactOwningThread(t *testing.T) {
 		})
 	}
 }
+
+func TestNativeFileDragCloseDeferralCannotLoseCompletionRace(t *testing.T) {
+	source := &nativeFileCOM{}
+	owner := &nativeFileDragOwner{active: &source.active}
+	source.active.Store(true)
+	// OLE completes after the caller's first active check but before marking.
+	source.active.Store(false)
+	if owner.requestClose() {
+		t.Fatal("completed drag swallowed the caller's close")
+	}
+	for n := 0; n < 1000; n++ {
+		owner.closePending.Store(false)
+		source.active.Store(true)
+		request := make(chan bool, 1)
+		completed := make(chan bool, 1)
+		go func() { request <- owner.requestClose() }()
+		go func() { source.active.Store(false); completed <- owner.closePending.Load() }()
+		if deferred, willClose := <-request, <-completed; deferred && !willClose {
+			t.Fatal("close lost between request and completion")
+		}
+	}
+}
+
+func TestNativeFileDragLeaseDenialCancelsWithoutNewAction(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		status int
+		body   string
+	}{
+		{"revoked", 403, `{}`}, {"missing", 404, `{}`}, {"gone", 410, `{}`},
+		{"requested", 200, `{"state":"dragging","cancelRequested":true}`},
+		{"unknown", 200, `{"state":"ready"}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != "GET" || r.URL.Query().Get("id") != "only-job" || r.Header.Get("X-Session-Token") != "same-token" {
+					t.Error("lease read changed authority")
+				}
+				w.WriteHeader(tc.status)
+				w.Write([]byte(tc.body))
+			}))
+			defer server.Close()
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			done := make(chan struct{})
+			go monitorNativeFileDragLease(ctx, cancel, done, server.Client(), server.URL, "same-token", "only-job")
+			select {
+			case <-ctx.Done():
+			case <-time.After(2 * time.Second):
+				t.Fatal("revoked native lease was not cancelled")
+			}
+		})
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	done := make(chan struct{})
+	close(done)
+	monitorNativeFileDragLease(ctx, cancel, done, &http.Client{}, "http://127.0.0.1:1", "same-token", "only-job")
+	if ctx.Err() != nil {
+		t.Fatal("finished gesture was changed")
+	}
+}

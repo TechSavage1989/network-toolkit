@@ -34,6 +34,10 @@ Files and Windows Explorer
   default; links, destination changes and unsafe publication are refused.
   Cancellation can retain already completed files in a newly created folder;
   original files are not deleted. Detached Files still needs explicit approval.
+- A pending native drag cancellation finishes when Windows next processes
+  Escape, movement or mouse release; its source staging stays retained until
+  the gesture ends. An unexpectedly stopped backend can leave a private staged
+  temporary copy rather than risking deletion while Windows still uses it.
 
 Graph navigation
 - Use a ten-second reference for recent uncompressed spacing; older history

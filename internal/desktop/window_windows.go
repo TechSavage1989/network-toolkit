@@ -321,16 +321,18 @@ func Run(ctx context.Context, cfg Config) error {
 	}
 
 	done := make(chan struct{})
-	defer close(done)
-	go w.runNativeFileDrag(done)
+	nativeDragDone := make(chan struct{})
+	defer func() { close(done); <-nativeDragDone }()
+	go func() { defer close(nativeDragDone); w.runNativeFileDrag(done) }()
 	go func() {
 		activate := cfg.Activate
 		for {
 			select {
 			case <-ctx.Done():
 				if h := w.postedHandle.Load(); h != 0 {
-					cancelNativeFileDrag(h) // release this window's active OLE capture before teardown
-					wndPostMessage.Call(h, wmClose, 0, 0)
+					if !deferNativeFileDragClose(h) {
+						wndPostMessage.Call(h, wmClose, 0, 0)
+					}
 				}
 				return
 			case <-done:
@@ -552,7 +554,9 @@ func (w *hostWindow) shutdown() {
 		}
 	})
 	if w.view != nil {
+		observeNativeFileDrag(w.hwnd, "webview-close-enter")
 		w.view.Close()
+		observeNativeFileDrag(w.hwnd, "webview-close-return")
 		w.view = nil
 	}
 }
@@ -615,8 +619,10 @@ func (w *hostWindow) closeApprovalBlocked() {
 }
 
 func (w *hostWindow) closeNow() {
+	observeNativeFileDrag(w.hwnd, "close-now-enter")
 	w.shutdown()
 	wndDestroyWindow.Call(w.hwnd)
+	observeNativeFileDrag(w.hwnd, "close-now-return")
 }
 
 func (w *hostWindow) captureBounds() {
@@ -696,7 +702,9 @@ func (w *hostWindow) showStartupError(err error) {
 	w.statusTitle = "The application window is unavailable"
 	w.statusText = err.Error() + "\n\nClose this window after reviewing the error."
 	if w.view != nil {
+		observeNativeFileDrag(w.hwnd, "webview-close-enter")
 		w.view.Close()
+		observeNativeFileDrag(w.hwnd, "webview-close-return")
 		w.view = nil
 	}
 	w.showMainWindow()
@@ -764,9 +772,11 @@ func windowProcedure(hwnd uintptr, message uint32, wparam, lparam uintptr) uintp
 	w := value.(*hostWindow)
 	switch message {
 	case wmClose:
+		observeNativeFileDrag(hwnd, "wm-close-received")
 		w.requestClose()
 		return 0
 	case wmDestroy:
+		observeNativeFileDrag(hwnd, "wm-destroy-received")
 		w.shutdown()
 		wndPostQuitMessage.Call(0)
 		return 0
