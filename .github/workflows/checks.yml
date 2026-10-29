@@ -96,7 +96,7 @@ jobs:
         GOTOOLCHAIN: local
         NETWORK_TOOLKIT_NATIVE_EDITOR_TEST: '1'
         TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/network-toolkit-native-editor108
-      run: 'go test -mod=vendor ./internal/desktop -run ''^TestNativeEditorCloseApprovalInstalledWebView2$'' -count=1 -timeout=3m
+      run: 'go test -mod=vendor ./internal/desktop -run ''^TestNativeEditorClose(ApprovalInstalledWebView2|ScriptUsesExplicitAction)$'' -count=1 -timeout=3m
         -v
 
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

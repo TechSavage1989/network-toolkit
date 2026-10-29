@@ -7,7 +7,7 @@ const ftp={id:'ftp',name:'Manual FTPS',host:'ftp.invalid',port:21,username:'fixt
 const catalog=[...profiles.map(p=>({id:'ssh:'+p.id,name:p.name,protocol:'ssh',host:p.host,port:p.port})),{id:'ftp:ftp',name:ftp.name,protocol:'ftps',host:ftp.host,port:ftp.port}];
 const save=()=>fs.writeFileSync(path.join(out,'editor-files115-results.json'),JSON.stringify(report,null,2)),check=name=>{report.checks.push(name);console.log('PASS '+name);save();};
 async function start(width,detached=false){
- const ctx=await browser.newContext({viewport:{width,height:950}}),page=await ctx.newPage(),calls=[];page.setDefaultTimeout(15000);let allowed=!detached,pending='',owned={},saved={activePage:'editor',appUpdatePreferences:{enabled:false},terminalProfiles:profiles,ftpProfiles:[ftp],theme:'light'},reviewRows=[];
+ const ctx=await browser.newContext({viewport:{width,height:950}}),page=await ctx.newPage(),calls=[];activePage=page;page.setDefaultTimeout(15000);let allowed=!detached,pending='',owned={},saved={activePage:'editor',appUpdatePreferences:{enabled:false},terminalProfiles:profiles,ftpProfiles:[ftp],theme:'light'},reviewRows=[];
  page.on('pageerror',e=>report.errors.push(e.message));
  await ctx.route('https://saved113.toolkit.test/**',async route=>{const request=route.request(),url=new URL(request.url()),p=url.pathname,b=request.postData()?request.postDataJSON():null;try{
   if(p.startsWith('/api/')){calls.push({path:p,method:request.method(),body:b});let data={};
@@ -48,46 +48,51 @@ async function start(width,detached=false){
  return {page,ctx,calls,allow:value=>{allowed=value},request:()=>{reviewRows=[{viewId:child,name:'Fixture child',requestId:'b'.repeat(32),profile:catalog[0]}]}};
 }
 async function retained(page){assert(await page.evaluate(()=>NetworkToolkitFileEditor.active===saved113Doc&&document.querySelector('#networkToolkitFileEditor')===saved113Editor&&NetworkToolkitFileEditor.active.content.includes('UNSAVED_SYNTHETIC_113')&&NetworkToolkitFileEditor.active.dirty));}
-async function choose(page,id){
- const files=page.locator('[data-ed="files"]');if(await files.getAttribute('aria-expanded')!=='true')await files.click();
- await page.locator('[data-editor-files-side="remote"]').click();
- await page.locator('[data-ed-page="refreshRemote"]').click();await page.waitForFunction(id=>[...document.querySelector('#ntEditorRemoteSource').options].some(o=>o.value==='saved:'+id),id);
- await page.locator('#ntEditorRemoteSource').selectOption('saved:'+id);await page.locator('[data-ed-page="connectSaved"]').click();
+async function settleTabs(page){
+ await page.evaluate(async()=>{const tabs=[...document.querySelectorAll('[data-ed-files-sidebar] [role="tab"]')];for(const tab of tabs)getComputedStyle(tab).backgroundColor;await Promise.all(tabs.flatMap(tab=>tab.getAnimations()).filter(animation=>Number.isFinite(animation.effect?.getComputedTiming().endTime)).map(animation=>animation.finished.catch(()=>{})));await new Promise(resolve=>requestAnimationFrame(resolve));});
+}
+async function selectPanel(page,name){
+ await page.locator('[data-editor-files-panel="'+name+'"]').click();
+ await page.waitForFunction(name=>{const host=document.querySelector('[data-ed-files-sidebar]'),app=host?.querySelector('[data-rb-root]');return host?.dataset.editorSidebarPanel===name&&app?.dataset.sidebarPanel===name;},name);
+ await settleTabs(page);
 }
 
 (async()=>{assert(out,'TOOLKIT_TEST_OUTPUT required');fs.mkdirSync(out,{recursive:true});const timeout=setTimeout(()=>{report.failure='Files115 exceeded four minutes';save();process.exit(1)},240000);
  try{browser=await chromium.launch({headless:true});
- for(const detached of [false,true])for(const width of [1440,390]){
-  const f=await start(width,detached),{page}=f,mode=detached?'detached':'main';activePage=page;
+ for(const detached of [false,true])for(const scenario of [{width:1440,name:'normal'},{width:390,name:'normal'},{width:1440,name:'resize'}]){
+  const {width}=scenario,mode=detached?'detached':'main',caseId=mode+'-'+width+'-'+scenario.name;let f;const errorStart=report.errors.length;
+  try{f=await start(width,detached);const {page}=f;activePage=page;
   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   const sidebar=page.locator('[data-ed-files-sidebar]'),toggle=page.locator('[data-ed="files"]');
   if(width===390){assert.equal(await sidebar.isVisible(),false,'initial compact Files is collapsed');assert.equal(await page.locator('[data-editor-files-reopen]').isVisible(),true);}if(await toggle.getAttribute('aria-expanded')!=='true')await page.locator('[data-editor-files-reopen]').click();
-  if(detached){await page.locator('[data-editor-files-request]').waitFor({state:'visible'});assert(!f.calls.some(c=>c.path==='/api/transfer/local'));f.allow(true);await page.locator('[data-editor-files-panel="connections"]').click();await page.locator('[data-editor-files-panel="files"]').click();}
+  if(detached){await page.locator('[data-editor-files-request]').waitFor({state:'visible'});assert(!f.calls.some(c=>c.path==='/api/transfer/local'));f.allow(true);await selectPanel(page,'connections');await selectPanel(page,'files');}
   await page.locator('[data-rb-drive="D:/"]').waitFor({state:'visible'});
   const names=await page.locator('[data-rb-drive]').allTextContents();assert.equal(new Set(names).size,4);assert(names.every(n=>/[A-Z]:/.test(n)));await page.locator('[data-rb-drive="D:/"]').click();await page.waitForFunction(()=>document.querySelector('[data-rb-path="local"]').value==='D:/');assert.equal(await page.locator('[data-rb-drive="D:/"]').getAttribute('aria-pressed'),'true');
   await page.locator('[data-rb-drive="Z:/"]').click();await page.getByText('Synthetic disconnected drive is unavailable.',{exact:false}).first().waitFor();assert.equal(await page.locator('[data-rb-drive="D:/"]').getAttribute('aria-pressed'),'true');await page.locator('[data-rb-drive="C:/"]').click();await page.waitForFunction(()=>document.querySelector('[data-rb-path="local"]').value==='C:/');
   await page.locator('[data-rb-scroll="local"]').evaluate(el=>el.scrollTop=320);const original=await page.evaluate(()=>{window.files115Original=document.querySelector('[data-rb-root]');window.files115Input=document.querySelector('[data-rb-setting="password"]');return NetworkToolkitRemoteBrowser.get('ssh').local.path;});
-  await page.locator('[data-editor-files-panel="connections"]').click();assert.equal(await page.locator('[data-rb-pane="local"]').isVisible(),false);assert.equal(await page.locator('#ntEditorRemoteSource').isVisible(),true);
+  await selectPanel(page,'connections');assert.equal(await page.locator('[data-rb-pane="local"]').isVisible(),false);assert.equal(await page.locator('#ntEditorRemoteSource').isVisible(),true);
   if(!detached){const password=page.locator('[data-rb-setting="password"]');await password.fill('SYNTHETIC_TEMPORARY_INPUT');await password.dispatchEvent('input');}
-  await page.locator('[data-editor-files-panel="files"]').click();assert.equal(await page.locator('.nt-editor-files-connection').isVisible(),false);assert.equal(await page.locator('#ntEditorRemoteSource').isVisible(),false);assert(await page.evaluate(()=>document.querySelector('[data-rb-root]')===files115Original&&document.querySelector('[data-rb-setting="password"]')===files115Input));assert.equal(await page.locator('[data-rb-path="local"]').inputValue(),original);
-  await page.locator('[data-editor-files-panel="connections"]').click();if(!detached){assert.equal(await page.locator('[data-rb-setting="password"]').inputValue(),'SYNTHETIC_TEMPORARY_INPUT');await page.locator('[data-rb-setting="password"]').fill('');await page.locator('[data-rb-setting="password"]').dispatchEvent('input');}
-  await page.locator('[data-editor-files-panel="files"]').click();const g=await page.locator('[data-rb-scroll="local"]').evaluate(el=>{const r=el.getBoundingClientRect(),side=el.closest('[data-ed-files-sidebar]').getBoundingClientRect();return {height:r.height,sidebarHeight:side.height,right:r.right,outer:document.documentElement.scrollWidth-innerWidth};});assert(g.height>=200,JSON.stringify(g));assert(g.outer<=1,JSON.stringify(g));(report.geometry??=[]).push({mode,width,...g});
+  await selectPanel(page,'files');assert.equal(await page.locator('.nt-editor-files-connection').isVisible(),false);assert.equal(await page.locator('#ntEditorRemoteSource').isVisible(),false);assert(await page.evaluate(()=>document.querySelector('[data-rb-root]')===files115Original&&document.querySelector('[data-rb-setting="password"]')===files115Input));assert.equal(await page.locator('[data-rb-path="local"]').inputValue(),original);
+  await selectPanel(page,'connections');if(!detached){assert.equal(await page.locator('[data-rb-setting="password"]').inputValue(),'SYNTHETIC_TEMPORARY_INPUT');await page.locator('[data-rb-setting="password"]').fill('');await page.locator('[data-rb-setting="password"]').dispatchEvent('input');}
+  await selectPanel(page,'files');const g=await page.locator('[data-rb-scroll="local"]').evaluate(el=>{const r=el.getBoundingClientRect(),side=el.closest('[data-ed-files-sidebar]').getBoundingClientRect();return {height:r.height,sidebarHeight:side.height,right:r.right,outer:document.documentElement.scrollWidth-innerWidth};});assert(g.height>=200,JSON.stringify(g));assert(g.outer<=1,JSON.stringify(g));(report.geometry??=[]).push({caseId,mode,width,...g});
   const before=await page.locator('.nt-editor-document-area').boundingBox();await page.locator('[data-editor-files-close]').click();assert.equal(await sidebar.isVisible(),false);const after=await page.locator('.nt-editor-document-area').boundingBox();if(width>680)assert(after.width>=before.width+200);await page.locator('[data-editor-files-reopen]').click();await page.locator('[data-rb-scroll="local"]').waitFor({state:'visible'});await retained(page);assert(!f.calls.some(c=>c.body?.action==='connect'));
-  await page.evaluate(theme=>setTheme(theme),width===390?'dark':'light');await page.waitForFunction(()=>[...document.images].every(i=>i.complete&&i.naturalWidth>0));await page.screenshot({path:path.join(out,'editor-files115-'+mode+'-'+width+'.png')});
-  await page.locator('[data-editor-files-panel="connections"]').click();await page.screenshot({path:path.join(out,'editor-connections115-'+mode+'-'+width+'.png')});
-  if(width===1440){
+  await page.evaluate(theme=>setTheme(theme),width===390?'dark':'light');await page.waitForFunction(()=>[...document.images].every(i=>i.complete&&i.naturalWidth>0));await settleTabs(page);await page.screenshot({path:path.join(out,'editor-files115-'+caseId+'.png')});
+  await selectPanel(page,'connections');await page.screenshot({path:path.join(out,'editor-connections115-'+caseId+'.png')});
+  if(scenario.name==='resize'){
    await page.setViewportSize({width:390,height:950});await sidebar.waitFor({state:'hidden'});await retained(page);assert(await page.evaluate(()=>document.querySelector('[data-rb-root]')===files115Original&&document.querySelector('[data-rb-setting="password"]')===files115Input));
    await page.waitForFunction(()=>{const area=document.querySelector('.nt-editor-document-area'),r=area.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return hit&&area.contains(hit)&&!hit.closest('[data-ed-files-sidebar]');});
    await page.setViewportSize({width:1440,height:950});await sidebar.waitFor({state:'visible'});assert.equal(await page.locator('[data-editor-files-panel="connections"]').getAttribute('aria-selected'),'true');assert(await page.evaluate(()=>document.querySelector('[data-rb-root]')===files115Original));
-   await page.setViewportSize({width:390,height:950});await sidebar.waitFor({state:'hidden'});await page.locator('[data-editor-files-reopen]').click();await page.locator('[data-editor-files-panel="files"]').click();
-   const resized=await page.locator('[data-rb-scroll="local"]').evaluate(el=>({height:el.getBoundingClientRect().height,sidebarHeight:el.closest('[data-ed-files-sidebar]').getBoundingClientRect().height}));assert(resized.height>=200,JSON.stringify(resized));(report.resizes??=[]).push({mode,...resized});await page.screenshot({path:path.join(out,'editor-files115-'+mode+'-resized-390.png')});
-   await page.locator('[data-editor-files-close]').focus();await page.keyboard.press('Escape');await sidebar.waitFor({state:'hidden'});await page.setViewportSize({width:1440,height:950});await sidebar.waitFor({state:'visible'});await page.locator('[data-editor-files-panel="connections"]').click();
+   await page.setViewportSize({width:390,height:950});await sidebar.waitFor({state:'hidden'});await page.locator('[data-editor-files-reopen]').click();await selectPanel(page,'files');
+   const resized=await page.locator('[data-rb-scroll="local"]').evaluate(el=>({height:el.getBoundingClientRect().height,sidebarHeight:el.closest('[data-ed-files-sidebar]').getBoundingClientRect().height}));assert(resized.height>=200,JSON.stringify(resized));(report.resizes??=[]).push({caseId,mode,...resized});await page.screenshot({path:path.join(out,'editor-files115-'+mode+'-resized-390.png')});
+   await page.locator('[data-editor-files-close]').focus();await page.keyboard.press('Escape');await sidebar.waitFor({state:'hidden'});await page.setViewportSize({width:1440,height:950});await sidebar.waitFor({state:'visible'});await selectPanel(page,'connections');
    check(mode+' wide→390→wide auto-collapse, explicit full-height drawer and form/dirty identity');
   }
 
   if(detached)assert(!f.calls.some(c=>c.path==='/api/state'||c.path==='/api/credentials'));else{assert(await page.evaluate(()=>state.editorFilesPreferences.panel==='connections'));}
-  check(mode+' '+width+' named drives, unavailable fallback, persistent tabs/forms, directory height, collapse and dirty retention');await f.ctx.close();
+  check(caseId+' named drives, unavailable fallback, persistent tabs/forms, directory height, collapse and dirty retention');(report.cases??=[]).push({caseId,passed:true});
+  }catch(error){const filename='editor-files115-'+caseId+'-failure.png';(report.cases??=[]).push({caseId,passed:false,failure:error.stack,pageErrors:report.errors.slice(errorStart),screenshot:filename});const failedPage=f?.page||activePage;if(failedPage&&!failedPage.isClosed())await failedPage.screenshot({path:path.join(out,filename)}).catch(()=>{});save();
+  }finally{if(f)await f.ctx.close();else if(activePage)await activePage.context().close();activePage=null;}
  }
- assert.deepEqual(report.errors,[]);report.passed=true;save();
+ assert.deepEqual(report.errors,[]);assert(report.cases?.every(c=>c.passed),JSON.stringify(report.cases?.filter(c=>!c.passed)));report.passed=true;save();
  }catch(e){report.failure=e.stack;save();if(activePage&&!activePage.isClosed())await activePage.screenshot({path:path.join(out,'editor-files115-failure.png')}).catch(()=>{});throw e;}finally{clearTimeout(timeout);await browser?.close();}
 })();

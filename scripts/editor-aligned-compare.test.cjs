@@ -152,3 +152,12 @@ test('native rebuild source fallback never resurrects cancelled or replaced navi
  q.sync.rebuild(()=>q.sync.pause(),()=>fallbacks++);q.flush();assert.equal(fallbacks,1,'a newer geometry invalidation also stays authoritative');
  const source=fs.readFileSync(require.resolve('../web/assets/editor-aligned-compare.js'),'utf8');assert(source.includes('scrollReconciler.rebuild(()=>resetNativeOrigin(views[side]),()=>setScroll(side,pixel))'));
 });
+
+
+test('alignment measurement retains fractional native width and row height at wrap thresholds',()=>{
+ const view={contentDOM:{clientWidth:482,getBoundingClientRect:()=>({width:481.53125})},defaultLineHeight:20.140625};
+ const metrics=api.measurementMetrics(view,20.15);assert.deepEqual(metrics,{width:481.53125,height:20.140625});
+ assert.equal(metrics.height*13,261.828125,'thirteen native wrapped rows must not accumulate computed-style rounding');
+ assert.equal(api.measurementMetrics({...view,defaultLineHeight:0},20.15).height,20.15);
+ assert.equal(api.measurementMetrics({...view,contentDOM:{getBoundingClientRect:()=>({width:0})}}).width,1);
+});

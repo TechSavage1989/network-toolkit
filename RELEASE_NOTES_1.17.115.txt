@@ -1,16 +1,43 @@
 NETWORK TOOLKIT 1.17.115
 
-Candidate changes
+EDITOR WORKSPACE
 
-- Compact named local-drive buttons and a persistent, collapsible editor sidebar
-  separate Files browsing from Connections setup and session controls.
-- Compare Options stays in its toolbar. Optional horizontal synchronization,
-  difference-type gutter symbols and independent changed-text underline and
-  highlight settings preserve the original document data and line numbers.
-- Graph wheel zoom defaults to down-to-zoom-in, offers inversion and uses safe
-  sample/time limits while retaining startup behavior and timeline panning.
-- Editor tabs use intentional pointer drag-away detaching, with reorder, cancel
-  and explicit cross-window Move/merge controls preserving acknowledged ownership.
+- Named local-drive buttons show drive letters or mount paths with available
+  volume labels and clear fallbacks. The editor's persistent, collapsible
+  sidebar separates Files browsing from Connections setup and saved/active
+  session controls. Narrow windows collapse the sidebar automatically; opening
+  its drawer is explicit and does not discard documents or connection forms.
+- Compare Options remains in the original toolbar. Optional horizontal scroll
+  synchronization works with word wrap off and can be disabled independently
+  of vertical synchronization. Added, removed and changed gutter symbols match
+  the legend without changing source line numbers or copied/saved text.
+- Changed-text underline and extra highlight are separately configurable; basic
+  line difference colors remain. Alignment measurements use the editor's actual
+  fractional widths and line heights, including resized wrapped comparisons.
+- Ordinary tab dragging reorders within a strip; intentional captured-pointer
+  dragging away and releasing outside the window detaches through the existing
+  acknowledged ownership handoff. Escape cancels. Alt+drag retains cross-window
+  tab movement; explicit Detach and Move / merge remain available. Unsupported
+  file bindings are not silently detached or copied into competing editors.
 
-Verification and publication are pending. Final supported interactions and
-measured evidence will be recorded before any authorized release promotion.
+GRAPH NAVIGATION
+
+- Mouse-wheel down zooms in by default; a compact setting reverses direction.
+  Timeline wheel gestures still pan rather than zoom.
+- Zoom stops at a meaningful data/time range: at least five source samples and
+  two seconds when available. Short startup history is shown honestly rather
+  than inventing samples. Repeated inward input cannot collapse the graph;
+  outward input remains usable at the limit. Existing recent-point density,
+  compression curve, history clustering and plot clipping are preserved.
+
+PRESERVED SAFEGUARDS AND LIMITS
+
+Existing credential vault, host verification, detached access approval, dirty
+and failed-save protection, undo, source bytes, terminal sessions, pager output,
+icons, settings and updater safeguards remain. Editor file capacity remains
+16 MiB encoded, with the existing bounded large-file and comparison modes.
+Native local/SFTP file and folder copies retain explicit review, staging,
+collision choices and cancellation; FTP/FTPS uses existing manual transfers.
+Detached file access still requires main-window approval and receives no
+credentials. No production devices or private user configurations are used in
+the synthetic hosted verification fixtures.

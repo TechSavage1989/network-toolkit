@@ -7,9 +7,12 @@ Release details: RELEASE_NOTES_1.17.115.txt
 Previous release: docs/releases/RELEASE_NOTES_1.17.114.txt
 Full release-note archive: docs/releases/README.md
 
-115 is in preparation. Publication and exact-source acceptance are pending.
-The update refines the editor sidebar, comparison controls and graph zoom.
-Do not describe this candidate as a published download.
+New115: named drive buttons and a persistent Files/Connections sidebar; compact
+comparison Options, optional horizontal sync and difference gutter symbols;
+independent changed-text emphasis; reversible wheel zoom with safe data/time
+limits; intentional pointer drag-away editor detaching. See EDITOR_FILES115.md,
+EDITOR_COMPARE115.md, EDITOR_DRAG115.md and GRAPH_ZOOM115.md for behavior.
+Exact release verification and publication status are recorded in the handoff.
 
 Previous114 consolidates editor Files controls, expands bounded local/SFTP editing,
 adds scoped native Explorer copies and Terminal tab actions, and improves
@@ -41,19 +44,21 @@ wheel/click/drag navigation. Compact controls reclaim document space; Options
 holds comparison settings and More holds secondary editing actions.
 
 Editor tabs can be reordered with pointer dragging or Alt+Shift+Arrow keys.
-Detach editor/Open separately sits beside Compare and Move / merge; a deliberate
-in-app drop target also opens a separate editor. Cross-window moves keep one
-acknowledged editable owner. Dropping on the bare desktop is not an inferred
-detach, and unsupported file bindings remain safely in their original window.
+A deliberate captured-pointer drag away and release outside the window detaches;
+Escape cancels. Alt+drag or Move / merge transfers tabs between editor windows.
+Explicit Detach editor/Open separately remains available. Cross-window moves
+keep one acknowledged editable owner, and unsupported file bindings remain
+safely in their original window.
 Detached editors fill their own window, including maximize/restore. Graph point
 outlines are stable through background refreshes, including stopped scans.
 
 The redundant top bar is removed: computer identity is in the sidebar brand,
 and Theme/App settings are in its footer. Text Editor uses compact Move / merge
-access instead of a permanent destination row. More and Connected session stay
-compact in the main toolbar; only their contents expand below. Local open/create
-actions remain available without a redundant disclosure. Collapsing forms returns
-space to the actual editing and comparison surfaces.
+access instead of a permanent destination row. More and comparison Options stay
+compact in their original toolbars; only their contents expand below. Local
+open/create and saved/active connection actions live in the Files/Connections
+sidebar without redundant toolbar disclosures. Collapsing it returns space to
+the actual editing and comparison surfaces.
 
 Copy server/client file locations in explicitly labeled network, remote-relative
 or local-disk formats; listener addresses and endpoints are copyable without

@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"syscall"
 	"testing"
@@ -25,6 +26,37 @@ func TestNativeEditorCloseApprovalInstalledWebView2(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 35*time.Second)
 	defer cancel()
+	started := time.Now()
+	var traceMu sync.Mutex
+	var trace []string
+	traceClosed := false
+	defer func() {
+		traceMu.Lock()
+		traceClosed = true
+		traceMu.Unlock()
+	}()
+	outputDir := os.Getenv("TOOLKIT_NATIVE_TEST_OUTPUT")
+	if outputDir != "" {
+		if err := os.MkdirAll(outputDir, 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	checkpoint := func(stage string) {
+		traceMu.Lock()
+		defer traceMu.Unlock()
+		if traceClosed {
+			return
+		}
+		line := fmt.Sprintf("%s elapsed=%s %s", time.Now().UTC().Format(time.RFC3339Nano), time.Since(started).Round(time.Millisecond), stage)
+		trace = append(trace, line)
+		t.Log(line)
+		if outputDir != "" {
+			if err := os.WriteFile(filepath.Join(outputDir, "native-editor-close115-stages.txt"), []byte(strings.Join(trace, "\n")+"\n"), 0600); err != nil {
+				t.Errorf("write synthetic close fixture diagnostics: %v", err)
+			}
+		}
+	}
+	checkpoint("fixture start; total deadline=35s")
 	token := strings.Repeat("ae", 32)
 	var closing, continued atomic.Int32
 	var ready atomic.Bool
@@ -74,6 +106,7 @@ document.getElementById('edit').onclick=async()=>{if(pending||!cancelled)throw E
 	})
 	err = Run(ctx, Config{Title: "Network Toolkit editor close acceptance", URL: server.URL + "/", SessionToken: token, DataDir: profile, RequireCloseApproval: true, Stop: cancel, OnClosing: func() { closing.Add(1) }, OnReady: func() {
 		ready.Store(true)
+		checkpoint("native renderer ready")
 		var host *hostWindow
 		wndWindows.Range(func(_, value any) bool {
 			if h, ok := value.(*hostWindow); ok && h.cfg.DataDir == profile && h.ready {
@@ -87,6 +120,7 @@ document.getElementById('edit').onclick=async()=>{if(pending||!cancelled)throw E
 			return
 		}
 		go func() {
+			checkpoint("post exact native WM_CLOSE; begin 6.2s consent hold")
 			wndPostMessage.Call(host.hwnd, wmClose, 0, 0)
 			// Wait beyond the production five-second fallback. No automatic close or
 			// irreversible primary-workspace notification may occur.
@@ -111,24 +145,32 @@ document.getElementById('edit').onclick=async()=>{if(pending||!cancelled)throw E
 				cancel()
 				return
 			}
-			wndPostMessage.Call(popup, 0x0111, 1, 0) // IDOK, only this owned warning.
+			checkpoint("6.2s consent hold passed; dirty host visible, no OnClosing, owned warning present")
 			script, scriptErr := filepath.Abs(filepath.Join("..", "..", "scripts", "native-editor-close.ps1"))
 			if scriptErr != nil {
 				result <- scriptErr
 				cancel()
 				return
 			}
-			output, runErr := runNativeEditorCloseScript(ctx, script, host.hwnd)
-			if runErr != nil {
-				result <- fmt.Errorf("native Cancel/edit interaction: %w: %s", runErr, output)
-				cancel()
-				return
+			// Use the existing exact-owned, caption-validated OK control and verify
+			// dismissal before UIA. An unchecked assumed control ID does not prove
+			// the modal warning closed and can leave UIA blocked until our deadline.
+			for _, action := range []string{"WaitWarning", "CancelEdit"} {
+				checkpoint("PowerShell " + action + " begin")
+				output, runErr := runNativeEditorCloseScript(ctx, script, host.hwnd, action)
+				checkpoint(fmt.Sprintf("PowerShell %s end; error=%v context=%v output=%s", action, runErr, ctx.Err(), strings.TrimSpace(string(output))))
+				if runErr != nil {
+					result <- fmt.Errorf("native %s interaction (context=%v): %w: %s", action, ctx.Err(), runErr, output)
+					cancel()
+					return
+				}
 			}
 			if continued.Load() != 1 || closing.Load() != 0 {
 				result <- fmt.Errorf("cancelled host lost editability or notified closing")
 				cancel()
 				return
 			}
+			checkpoint("real Cancel/edit completed; continued=1 and OnClosing=0")
 			if dir := os.Getenv("TOOLKIT_NATIVE_TEST_OUTPUT"); dir != "" {
 				_ = os.MkdirAll(dir, 0700)
 				if _, _, e := captureNativeVaultDialog(host.hwnd, filepath.Join(dir, "native-editor-close108.png")); e != nil {
@@ -138,9 +180,11 @@ document.getElementById('edit').onclick=async()=>{if(pending||!cancelled)throw E
 				}
 			}
 			result <- nil
+			checkpoint("all native consent/editability assertions passed; begin fixture cleanup")
 			cancel()
 		}()
 	}})
+	checkpoint(fmt.Sprintf("native Run returned; error=%v context=%v ready=%t continued=%d closing=%d", err, ctx.Err(), ready.Load(), continued.Load(), closing.Load()))
 	if err != nil {
 		t.Fatal(err)
 	}
