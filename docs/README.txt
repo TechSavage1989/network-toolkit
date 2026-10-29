@@ -10,6 +10,17 @@ Full release-note archive: docs/releases/README.md
 New116 is a Terminal-only interaction hotfix: ordinary tab selection and close
 clicks work without losing drag reorder/detach or existing close safeguards.
 
+Published2026-10-29T21:17:18Z, sourcef13c4df906a0ed8124308f8f95db571a7a9be532.
+Focused actual Terminal and required core checks passed under the expedited
+validation plan for the approved publication; public assets/source/updater/feed were verified. Unrelated
+background comparison tests found intermittent narrow detached wrapped-map
+misalignment on unchanged115 code. No data mismatch was observed in those tests,
+but the cause is unresolved and this hotfix does not fix it. Duplicate native
+editor validation also failed. Review and duplicate each ended six SUCCESS/one
+FAILURE; see RELEASE116_HANDOFF.md for exact outcomes.
+Do not interpret publication as all seven background checks passing.
+The deferred115 handoff is included in this116 documentation-only closure.
+
 Previous115: named drive buttons and a persistent Files/Connections sidebar; compact
 comparison Options, optional horizontal sync and difference gutter symbols;
 independent changed-text emphasis; reversible wheel zoom with safe data/time

@@ -1,3 +1,30 @@
+NETWORK TOOLKIT 1.17.116 PUBLISHED - EXPEDITED TERMINAL HOTFIX
+
+# Network Toolkit 1.17.116 published: Terminal interaction hotfix
+
+Published2026-10-29T21:17:18Z; public verification21:18:18.695Z.
+Source/tag f13c4df906a0ed8124308f8f95db571a7a9be532,
+tree c0127280d174967bc15170537d4f2fe05f8ef7c3; release428404389.
+The user approved Terminal-only publication. Under the expedited validation plan,
+four actual click/close/reorder cases and Windows/application/security/dependency/
+package checks passed before promotion; three unrelated browser jobs continued.
+The background editor motion check then failed two narrow detached wrapped-map
+alignment cases on unchanged115 code. Root cause remains unproven; no source or
+history mismatch was observed in those tests. Do not claim all seven jobs passed
+or call this fixture-only. Duplicate-main Windows native editor also failed;
+review and duplicate each finished six SUCCESS/one FAILURE. Exact job inventories
+and limits are recorded in RELEASE116_HANDOFF.md.
+Public four-file hashes,1,124 source files, PE/icons, updater allowlist and latest
+feed were verified; prior115 remains unchanged. No new comparison fix is included.
+
+This six-file docs-only closure also includes the deferred historical115 handoff
+(all seven115 review and duplicate-main jobs passed), without claiming a separate
+115 docs push occurred. Read RELEASE116_HANDOFF.md and RELEASE115_HANDOFF.md;
+preserve all published sources/tags/assets and repository access. No rebuilding,
+rerunning failed jobs, live devices or new feature work is authorized by this note.
+
+---
+
 NETWORK TOOLKIT 1.17.114 PUBLISHED AND VERIFIED
 
 # Network Toolkit 1.17.114 published and verified

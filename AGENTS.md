@@ -3,7 +3,22 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-Current published version:1.17.114. The authorized comparison/Files/Terminal/graph
+Current published version:1.17.116. The expedited Terminal-only interaction
+hotfix is published and public assets/feed verified. Source/tag
+f13c4df906a0ed8124308f8f95db571a7a9be532; treec0127280d174967bc15170537d4f2fe05f8ef7c3.
+Focused actual Terminal/Windows/application/security/dependency/package gates
+passed before promotion under the expedited validation plan for the approved
+publication. The unchanged seven
+workflow jobs continued; background editor motion failed two detached narrow
+wrapped-map alignment cases. Root cause is not established; do not call them
+fixture-only or claim all seven jobs passed. Duplicate-main Windows native editor
+also failed. Both runs ended six SUCCESS/one FAILURE; read
+docs/RELEASE116_HANDOFF.md for exact terminal outcomes and limits.
+No comparison fix, repository-access change or asset replacement is included.
+The deferred115 historical handoff is included in this six-doc closure; its
+review and duplicate jobs all passed. No separate115 docs push is claimed.
+
+Earlier published version:1.17.114. The authorized comparison/Files/Terminal/graph
 batch is published and verified. Source/tag fd6cbbf287738320b51957d176dd2e63c63eece9,
 tree 0f5bd938f3bb54b6ef6892e3fc4d4eaae33a5293. All seven exact-source review Checks
 and automatic Release passed; public assets,1,109 source files, PE icons and
