@@ -348,7 +348,7 @@ func (a *application) serveDetachedAPI(w http.ResponseWriter, r *http.Request, i
 			return
 		}
 		a.handleTerminals(w, r)
-	case info.Workspace && r.URL.Path == "/api/terminals/serial-ports" && r.Method == http.MethodGet:
+	case info.Workspace && (r.URL.Path == "/api/terminals/serial-ports" || r.URL.Path == "/api/terminals/local-directories") && r.Method == http.MethodGet:
 		a.handleTerminals(w, r)
 	case terminalViewPermitsSessionPath(info, r.URL.Path):
 		if info.State != "detached" && info.State != "return_requested" {

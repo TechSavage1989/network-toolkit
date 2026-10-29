@@ -2,6 +2,8 @@ package terminal
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -21,6 +23,50 @@ func TestLocalShellRequestDiscardsRemoteFields(t *testing.T) {
 		defer session.cancel()
 		if session.info.Host != "" || session.info.Port != 0 || session.info.Label == "" {
 			t.Fatalf("local endpoint: %#v", session.info)
+		}
+	}
+}
+
+func TestLocalShellWorkingDirectoryAndElevationDefaults(t *testing.T) {
+	dir := t.TempDir()
+	req, err := normalizeRequest(ConnectRequest{Type: "cmd", WorkingDirectory: dir, RunAsAdministrator: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if req.WorkingDirectory != dir || !req.RunAsAdministrator {
+		t.Fatal("lost local settings", req)
+	}
+	s := newLiveSession(context.Background(), "requested-only", req)
+	defer s.cancel()
+	if s.info.Elevated {
+		t.Fatal("request checkbox presented as actual elevation")
+	}
+	for _, path := range []string{"relative", "bad\x00path", dir + "/missing"} {
+		if _, err = normalizeRequest(ConnectRequest{Type: "cmd", WorkingDirectory: path}); err == nil {
+			t.Fatal("accepted invalid directory", path)
+		}
+	}
+	file := filepath.Join(dir, "file")
+	if err = os.WriteFile(file, []byte("synthetic"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = ValidateLocalWorkingDirectory(file); err == nil {
+		t.Fatal("accepted file as directory")
+	}
+	for _, kind := range []string{"cmd", "powershell"} {
+		req, err = normalizeRequest(ConnectRequest{Type: kind})
+		if err != nil || req.RunAsAdministrator || req.WorkingDirectory != "" {
+			t.Fatal("bad safe default", req, err)
+		}
+	}
+}
+
+func TestLocalShellOptionsRejectedForRemoteTypes(t *testing.T) {
+	for _, kind := range []string{"ssh", "telnet", "serial"} {
+		for _, req := range []ConnectRequest{{Type: kind, WorkingDirectory: t.TempDir()}, {Type: kind, RunAsAdministrator: true}} {
+			if _, err := normalizeRequest(req); err == nil {
+				t.Fatal("remote protocol accepted local-only options", kind)
+			}
 		}
 	}
 }

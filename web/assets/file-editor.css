@@ -235,16 +235,18 @@ body:has(.nt-editor-embedded) #toolWorkspace>#pageContent{grid-row:1!important;g
 .nt-editor-tab-menu button:hover,.nt-editor-tab-menu button:focus-visible{background:var(--accentBg);outline:1px solid var(--accent);outline-offset:-1px}
 .nt-editor-tab-menu button:disabled{opacity:.45;cursor:default}
 .nt-editor-tab-menu [role=separator]{border-top:1px solid var(--border);margin:3px 0}
-.nt-editor-files-sidebar{flex:0 0 300px;width:300px;min-width:220px;max-width:45%;min-height:0;overflow:hidden;border-right:1px solid var(--border);background:var(--panel)}
+/* Files uses the same persistent icon rail as Terminal and transfer clients. */
+.nt-editor-files-shell{display:flex;position:relative;flex:0 0 300px;width:300px;min-width:220px;max-width:45%;min-height:0;overflow:hidden;border-right:1px solid var(--line);background:var(--panel)}
+.nt-editor-files-shell.is-collapsed{flex-basis:44px!important;width:44px!important;min-width:44px;max-width:44px}
+.nt-editor-files-shell.is-collapsed>.terminal-sidebar-rail{border-right:0}
+.nt-editor-files-sidebar{display:flex;position:relative;flex:1 1 0;flex-direction:column;min-width:0;min-height:0;overflow:hidden;padding-right:5px}
 .nt-editor-files-sidebar[hidden]{display:none}
-@media(max-width:680px){.nt-editor-files-sidebar{flex-basis:260px;width:260px;max-width:75%}.nt-editor-workspace{position:relative}.nt-editor-files-sidebar:not([hidden]){position:absolute;inset:0 auto 0 0;z-index:8;box-shadow:var(--shadow)}}
-.nt-editor-files-sidebar{position:relative;display:flex;flex-direction:column;padding-right:5px}
-.nt-editor-files-heading{display:flex;align-items:center;justify-content:space-between;gap:4px;padding:5px;border-bottom:1px solid var(--border);flex:none}
-.nt-editor-files-heading [role=tablist]{display:flex;gap:4px;min-width:0}
-.nt-editor-files-heading .btn,.nt-editor-files-sidebar .btn{min-height:28px;padding:4px 7px;font-size:11px}
+.nt-editor-files-sidebar .btn{min-height:28px;padding:4px 7px;font-size:11px}
 .nt-editor-files-body{display:flex;flex-direction:column;flex:1;min-height:0;overflow:auto}
-.nt-editor-files-resize{position:absolute;inset:0 0 0 auto;width:5px;background:var(--border);cursor:col-resize;touch-action:none}
-.nt-editor-files-resize:hover,.nt-editor-files-resize:focus-visible{background:var(--accent)}
+.nt-editor-files-resize{position:absolute;inset:0 0 0 auto;width:5px;background:var(--line);cursor:col-resize;touch-action:none}
+.nt-editor-files-resize:after{content:'';position:absolute;left:1px;right:1px;top:calc(50% - 16px);height:32px;border-radius:2px;background:var(--faint)}
+.nt-editor-files-resize:hover,.nt-editor-files-resize:focus-visible{background:var(--accentBg)}
+.nt-editor-files-resize:focus-visible:after{background:var(--accent)}
 .is-editor-sidebar.rb-app{height:100%;min-height:0;gap:5px;padding:5px}
 .is-editor-sidebar.rb-app>.panel{padding:0;border:0;box-shadow:none;border-radius:0}
 .is-editor-sidebar .rb-explorer{flex:1 1 0;min-height:240px;gap:4px;overflow:visible}
@@ -368,10 +370,6 @@ body:has(.nt-editor:not([hidden]) [data-ed-files-sidebar]:not([hidden])) .toast-
 /* Editor Files/Connections use persistent tab panels; switching does not remount auth fields. */
 .nt-editor-files-locations{display:flex;align-items:center;gap:4px;padding:4px 5px;flex:none;border-bottom:1px solid var(--border)}
 .nt-editor-files-locations[hidden]{display:none}
-.nt-editor-files-heading [role=tab]{border-radius:5px;white-space:nowrap}
-.nt-editor-files-heading [role=tab][aria-selected=true]{box-shadow:inset 0 -2px var(--accent)}
-.nt-editor-files-rail{align-self:stretch;flex:0 0 27px;width:27px;min-width:27px;padding:5px 3px!important;writing-mode:vertical-rl;border-radius:0!important;border-right:1px solid var(--border);font-size:11px}
-.nt-editor-files-rail[hidden]{display:none}
 [data-editor-file-sessions]{flex:none;min-height:0;max-height:30%;overflow:auto}
 .nt-editor-files-sidebar[data-editor-sidebar-panel=files] [data-editor-file-sessions]{display:none}
 .nt-editor-files-sidebar[data-editor-sidebar-panel=connections] .nt-editor-file-sessions{padding:6px}
@@ -400,6 +398,6 @@ body:has(.nt-editor:not([hidden]) [data-ed-files-sidebar]:not([hidden])) .toast-
 @media(max-width:680px){
  .nt-editor-window{position:relative}
  .nt-editor-workspace{position:static}
- .nt-editor-files-sidebar:not([hidden]){inset:0 auto 0 0;width:min(360px,calc(100% - 28px))!important;max-width:calc(100% - 28px);min-width:0;z-index:20}
+ .nt-editor-files-shell:not(.is-collapsed){position:absolute;inset:0 auto 0 0;width:min(360px,calc(100% - 28px))!important;max-width:calc(100% - 28px);min-width:0;z-index:20;box-shadow:var(--shadow)}
  .nt-editor-files-sidebar .nt-editor-files-resize{display:none}
 }

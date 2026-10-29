@@ -58,24 +58,25 @@ type liveSession struct {
 }
 
 type Manager struct {
-	mu                sync.Mutex
-	ctx               context.Context
-	cancel            context.CancelFunc
-	sessions          map[string]*liveSession
-	openers           map[string]transportOpener
-	resolveCredential CredentialResolver
-	known             *knownHostStore
-	closed            bool
-	live              int
-	wg                sync.WaitGroup
-	ring              []storedEvent
-	ringStart         int
-	ringBytes         int
-	eventBudget       int
-	seq               uint64
-	generation        uint64
-	changed           chan struct{}
-	closeDone         chan struct{}
+	mu                 sync.Mutex
+	ctx                context.Context
+	cancel             context.CancelFunc
+	sessions           map[string]*liveSession
+	openers            map[string]transportOpener
+	resolveCredential  CredentialResolver
+	elevatedLocalShell ElevatedLocalShellOpener
+	known              *knownHostStore
+	closed             bool
+	live               int
+	wg                 sync.WaitGroup
+	ring               []storedEvent
+	ringStart          int
+	ringBytes          int
+	eventBudget        int
+	seq                uint64
+	generation         uint64
+	changed            chan struct{}
+	closeDone          chan struct{}
 }
 
 // NewManager always returns a usable manager. A trust-file error disables SSH
@@ -90,8 +91,8 @@ func NewManager(parent context.Context, dataDir string) (*Manager, error) {
 		},
 		"telnet":     openTelnet,
 		"serial":     openSerial,
-		"cmd":        openLocalShell,
-		"powershell": openLocalShell,
+		"cmd":        m.openManagedLocalShell,
+		"powershell": m.openManagedLocalShell,
 	}
 	return m, err
 }
@@ -136,6 +137,9 @@ func normalizeConnectionRequest(req ConnectRequest, alreadyAuthenticated bool) (
 	if req.Type != "ssh" && req.Type != "telnet" && req.Type != "serial" && req.Type != "cmd" && req.Type != "powershell" {
 		return req, errors.New("terminal type must be ssh, telnet, serial, cmd, or powershell")
 	}
+	if req.Type != "cmd" && req.Type != "powershell" && (req.WorkingDirectory != "" || req.RunAsAdministrator) {
+		return req, errors.New("starting directory and administrator mode apply only to local CMD or PowerShell")
+	}
 	switch req.SSHCompatibility {
 	case "":
 		req.SSHCompatibility = SSHCompatibilityModern
@@ -169,7 +173,14 @@ func normalizeConnectionRequest(req ConnectRequest, alreadyAuthenticated bool) (
 	}
 	if req.Type == "cmd" || req.Type == "powershell" {
 		// Local shells never inherit hidden remote credentials or device fields.
-		return ConnectRequest{Type: req.Type, ProfileID: req.ProfileID, DisplayName: req.DisplayName, Cols: req.Cols, Rows: req.Rows, Terminal: req.Terminal, TimeoutMs: req.TimeoutMs, LineEnding: "cr", SSHCompatibility: SSHCompatibilityModern}, nil
+		if req.Type == "cmd" && strings.HasPrefix(req.WorkingDirectory, `\\`) {
+			return req, errors.New("Command Prompt requires a local drive starting directory, not UNC")
+		}
+		directory, err := ValidateLocalWorkingDirectory(req.WorkingDirectory)
+		if err != nil {
+			return req, err
+		}
+		return ConnectRequest{Type: req.Type, WorkingDirectory: directory, RunAsAdministrator: req.RunAsAdministrator, ProfileID: req.ProfileID, DisplayName: req.DisplayName, Cols: req.Cols, Rows: req.Rows, Terminal: req.Terminal, TimeoutMs: req.TimeoutMs, LineEnding: "cr", SSHCompatibility: SSHCompatibilityModern}, nil
 	}
 	if req.Type == "serial" {
 		req.Username, req.Password, req.PrivateKey, req.Passphrase = "", "", "", ""
@@ -513,6 +524,10 @@ func (m *Manager) runSession(s *liveSession, req ConnectRequest, opener transpor
 		}
 	}
 	s.conn = conn
+	if local, ok := conn.(interface{ LocalShellState() LocalShellState }); ok {
+		state := local.LocalShellState()
+		s.info.WorkingDirectory, s.info.Elevated = state.WorkingDirectory, state.Elevated
+	}
 	s.info.State = "connected"
 	m.statusLocked(s, "Connected")
 	m.mu.Unlock()

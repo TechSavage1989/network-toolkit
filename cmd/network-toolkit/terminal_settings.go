@@ -235,6 +235,14 @@ func safeTerminalProfile(value any, named bool) map[string]any {
 	// Unknown/imported values keep the modern policy and other transports ignore it.
 	clean["sshCompatibility"] = "modern"
 	kind, _ := profile["type"].(string)
+	if kind == "cmd" || kind == "powershell" {
+		if directory, ok := profile["workingDirectory"].(string); ok && len(directory) <= 32760 && !strings.ContainsRune(directory, 0) {
+			clean["workingDirectory"] = directory
+		}
+		if elevated, ok := profile["runAsAdministrator"].(bool); ok {
+			clean["runAsAdministrator"] = elevated
+		}
+	}
 	if (kind == "" || kind == "ssh") && profile["sshCompatibility"] == "legacy" {
 		clean["sshCompatibility"] = "legacy"
 	}

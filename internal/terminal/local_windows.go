@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"sync"
 	"syscall"
 	"unsafe"
@@ -59,6 +60,7 @@ type localShellTransport struct {
 	closeOnce     sync.Once
 	closed        chan struct{}
 	done          chan error
+	state         LocalShellState
 }
 
 func localShellExecutable(kind string) (string, string, error) {
@@ -169,9 +171,17 @@ func openLocalShell(ctx context.Context, req ConnectRequest, cb transportCallbac
 	if err != nil {
 		return nil, err
 	}
-	home, err := os.UserHomeDir()
+	home := req.WorkingDirectory
+	if home == "" {
+		home, err = os.UserHomeDir()
+	} else {
+		home, err = ValidateLocalWorkingDirectory(home)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("locate your home directory: %w", err)
+	}
+	if req.Type == "cmd" && strings.HasPrefix(home, `\\`) {
+		return nil, errors.New("Command Prompt does not support a UNC starting directory; choose a local drive folder")
 	}
 	directory, err := syscall.UTF16PtrFromString(home)
 	if err != nil {
@@ -191,13 +201,17 @@ func openLocalShell(ctx context.Context, req ConnectRequest, cb transportCallbac
 	inputRead = 0
 	_ = syscall.CloseHandle(outputWrite)
 	outputWrite = 0
+	elevated, err := localProcessElevated(process.Process)
+	if err != nil {
+		return nil, err
+	}
 	resumed, _, callErr := localResumeThread.Call(uintptr(process.Thread))
 	if uint32(resumed) == 0xffffffff {
 		return nil, fmt.Errorf("resume local shell: %w", callErr)
 	}
 	_ = syscall.CloseHandle(process.Thread)
 	process.Thread = 0
-	t := &localShellTransport{pty: pty, input: os.NewFile(uintptr(inputWrite), "local-terminal-input"), output: os.NewFile(uintptr(outputRead), "local-terminal-output"), job: job, process: process.Process, closed: make(chan struct{}), done: make(chan error, 1)}
+	t := &localShellTransport{pty: pty, input: os.NewFile(uintptr(inputWrite), "local-terminal-input"), output: os.NewFile(uintptr(outputRead), "local-terminal-output"), job: job, process: process.Process, closed: make(chan struct{}), done: make(chan error, 1), state: LocalShellState{WorkingDirectory: home, Elevated: elevated}}
 	success = true
 	readDone := make(chan struct{})
 	go func() {
@@ -271,4 +285,21 @@ func (t *localShellTransport) Close() error {
 		go func() { _ = t.input.Close(); localClosePTY.Call(pty); _ = t.output.Close(); close(t.closed) }()
 	})
 	return nil
+}
+
+func (t *localShellTransport) LocalShellState() LocalShellState { return t.state }
+func localProcessElevated(process syscall.Handle) (bool, error) {
+	var token syscall.Token
+	advapi := syscall.NewLazyDLL("advapi32.dll")
+	ok, _, err := advapi.NewProc("OpenProcessToken").Call(uintptr(process), 8, uintptr(unsafe.Pointer(&token)))
+	if ok == 0 {
+		return false, fmt.Errorf("read local shell token: %w", err)
+	}
+	defer token.Close()
+	var elevated, size uint32
+	ok, _, err = advapi.NewProc("GetTokenInformation").Call(uintptr(token), 20, uintptr(unsafe.Pointer(&elevated)), 4, uintptr(unsafe.Pointer(&size)))
+	if ok == 0 || size != 4 {
+		return false, fmt.Errorf("read local shell elevation: %w", err)
+	}
+	return elevated != 0, nil
 }

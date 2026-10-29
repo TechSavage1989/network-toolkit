@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -219,6 +221,65 @@ func TestWindowsLocalShellInteractiveLifecycle(t *testing.T) {
 			}
 			if err = tr.Close(); err != nil {
 				t.Fatal(fmt.Sprint(err))
+			}
+		})
+	}
+}
+
+func TestWindowsLocalShellExplicitDirectoryAndToken(t *testing.T) {
+	for _, kind := range []string{"cmd", "powershell"} {
+		t.Run(kind, func(t *testing.T) {
+			dir := filepath.Join(t.TempDir(), "folder & parentheses (117) 日本語")
+			if err := os.Mkdir(dir, 0700); err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+			defer cancel()
+			var mu sync.Mutex
+			var out strings.Builder
+			conn, err := OpenLocalShellProcess(ctx, LocalShellOptions{Type: kind, WorkingDirectory: dir, Cols: 120, Rows: 25}, func(data []byte) {
+				mu.Lock()
+				defer mu.Unlock()
+				if out.Len() < 128<<10 {
+					out.Write(data)
+				}
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer conn.Close()
+			command := "echo NTK_LOCAL117_CWD=%CD%\r"
+			if kind == "powershell" {
+				command = "Write-Output ('NTK_LOCAL117_CWD='+(Get-Location).Path)\r"
+			}
+			conn.Write([]byte(command))
+			for {
+				mu.Lock()
+				found := strings.Contains(out.String(), "NTK_LOCAL117_CWD="+dir)
+				mu.Unlock()
+				if found {
+					break
+				}
+				select {
+				case <-ctx.Done():
+					t.Fatal("literal working directory not reported")
+				case <-time.After(20 * time.Millisecond):
+				}
+			}
+			if conn.LocalShellState().WorkingDirectory != dir {
+				t.Fatal(conn.LocalShellState())
+			}
+			current, _ := syscall.GetCurrentProcess()
+			elevated, err := localProcessElevated(current)
+			if err != nil || conn.LocalShellState().Elevated != elevated {
+				t.Fatal("ordinary child must inherit actual parent token", err)
+			}
+			t.Logf("shell=%s parentElevated=%t childElevated=%t literalDirectory=true", kind, elevated, conn.LocalShellState().Elevated)
+			cancel()
+			select {
+			case <-conn.Done():
+			case <-time.After(8 * time.Second):
+				t.Fatal("shell cleanup timed out")
 			}
 		})
 	}

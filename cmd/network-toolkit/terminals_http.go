@@ -78,6 +78,9 @@ func (a *application) handleTerminals(w http.ResponseWriter, r *http.Request) {
 			ViewState terminalViewState `json:"viewState"`
 		}{a.terminalBatchForRequest(r, batch), a.terminalViewStateForRequest(r)})
 		return
+	case "/local-directories":
+		a.handleTerminalLocalDirectories(w, r)
+		return
 	case "/serial-ports":
 		if r.Method != http.MethodGet {
 			methodError(w)

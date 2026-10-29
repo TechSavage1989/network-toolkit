@@ -7,7 +7,18 @@ for(const type of ['cmd','powershell'])test(type+' local session shares terminal
  assert.equal(config.type,type);assert.equal(config.host,'');assert.equal(config.port,0);assert.equal(config.username,'');assert.equal(config.serialPort,'');assert(!config.credentialId);assert.equal(config.lineEnding,'cr');assert.equal(config.localEcho,false);
  assert.equal(h.validateTerminalConfig(config),config);
  const body=JSON.parse(JSON.stringify(h.terminalConnectPayload(config,{password:'secret',privateKey:'secret'})));
- assert.deepEqual(body,{type,cols:80,rows:24,terminal:'xterm-256color',timeoutMs:10000});
+ assert.deepEqual(body,{type,cols:80,rows:24,terminal:'xterm-256color',timeoutMs:10000,workingDirectory:'',runAsAdministrator:false});
  assert.match(h.terminalProtocolLabel(config),/\(local\)/);assert.match(h.terminalConnectionButtonsHTML(0),new RegExp('data-terminal-new-type="'+type+'"'));
  const unsupported=harness(false);assert.doesNotMatch(unsupported.terminalConnectionButtonsHTML(0),new RegExp('data-terminal-new-type="'+type+'"'));assert.throws(()=>unsupported.validateTerminalConfig(config),/require Windows/);
+});
+
+test('local directory is literal nonsecret data, admin defaults off and remote types ignore it',()=>{
+ const h=harness(),directory='C:\\Lab & tools\\日本語';
+ assert.equal(h.safeTerminalConfig({type:'cmd'}).runAsAdministrator,false);
+ const config=h.safeTerminalConfig({type:'powershell',workingDirectory:directory,runAsAdministrator:true});
+ const body=JSON.parse(JSON.stringify(h.terminalConnectPayload(config)));
+ assert.equal(body.workingDirectory,directory);assert.equal(body.runAsAdministrator,true);
+ assert.equal(h.safeTerminalConfig({type:'cmd',runAsAdministrator:'true'}).runAsAdministrator,false);
+ const remote=h.terminalConnectPayload({type:'ssh',host:'example.test',workingDirectory:directory,runAsAdministrator:true});
+ assert(!('workingDirectory' in remote));assert(!('runAsAdministrator' in remote));
 });

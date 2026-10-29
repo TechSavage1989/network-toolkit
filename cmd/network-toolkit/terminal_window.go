@@ -28,22 +28,24 @@ const terminalWindowRequestLimit = 16
 // This is deliberately a separate schema from ConnectRequest. Window launch
 // can carry only connection settings, never authentication or terminal input.
 type terminalWindowPreset struct {
-	ProfileID        string `json:"profileId,omitempty"`
-	Type             string `json:"type"`
-	Host             string `json:"host"`
-	Port             int    `json:"port"`
-	Username         string `json:"username"`
-	AuthMethod       string `json:"authMethod"`
-	SSHCompatibility string `json:"sshCompatibility"`
-	TimeoutMs        int    `json:"timeoutMs"`
-	SerialPort       string `json:"serialPort"`
-	BaudRate         int    `json:"baudRate"`
-	DataBits         int    `json:"dataBits"`
-	StopBits         string `json:"stopBits"`
-	Parity           string `json:"parity"`
-	FlowControl      string `json:"flowControl"`
-	LocalEcho        bool   `json:"localEcho"`
-	LineEnding       string `json:"lineEnding"`
+	ProfileID          string `json:"profileId,omitempty"`
+	Type               string `json:"type"`
+	WorkingDirectory   string `json:"workingDirectory,omitempty"`
+	RunAsAdministrator bool   `json:"runAsAdministrator,omitempty"`
+	Host               string `json:"host"`
+	Port               int    `json:"port"`
+	Username           string `json:"username"`
+	AuthMethod         string `json:"authMethod"`
+	SSHCompatibility   string `json:"sshCompatibility"`
+	TimeoutMs          int    `json:"timeoutMs"`
+	SerialPort         string `json:"serialPort"`
+	BaudRate           int    `json:"baudRate"`
+	DataBits           int    `json:"dataBits"`
+	StopBits           string `json:"stopBits"`
+	Parity             string `json:"parity"`
+	FlowControl        string `json:"flowControl"`
+	LocalEcho          bool   `json:"localEcho"`
+	LineEnding         string `json:"lineEnding"`
 }
 
 type terminalWindowEnvelope struct {
@@ -92,8 +94,14 @@ func (p *terminalWindowPreset) normalize() error {
 	if p.Type != "ssh" && p.Type != "telnet" && p.Type != "serial" && p.Type != "cmd" && p.Type != "powershell" {
 		return errors.New("Choose SSH, Telnet, Serial, Command Prompt, or PowerShell for the terminal window.")
 	}
+	if len(p.WorkingDirectory) > 32760 || strings.IndexFunc(p.WorkingDirectory, func(r rune) bool { return r < 32 || r == 127 }) >= 0 {
+		return errors.New("The local starting directory is invalid.")
+	}
+	if p.Type != "cmd" && p.Type != "powershell" && (p.WorkingDirectory != "" || p.RunAsAdministrator) {
+		return errors.New("Starting directory and administrator mode apply only to local shells.")
+	}
 	if p.Type == "cmd" || p.Type == "powershell" {
-		*p = terminalWindowPreset{ProfileID: p.ProfileID, Type: p.Type, TimeoutMs: 10000, SSHCompatibility: "modern", AuthMethod: "password", Port: 22, BaudRate: 9600, DataBits: 8, StopBits: "1", Parity: "none", FlowControl: "none"}
+		*p = terminalWindowPreset{ProfileID: p.ProfileID, Type: p.Type, WorkingDirectory: p.WorkingDirectory, RunAsAdministrator: p.RunAsAdministrator, TimeoutMs: 10000, SSHCompatibility: "modern", AuthMethod: "password", Port: 22, BaudRate: 9600, DataBits: 8, StopBits: "1", Parity: "none", FlowControl: "none"}
 		return nil
 	}
 	if p.SSHCompatibility == "" {

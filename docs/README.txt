@@ -1,13 +1,18 @@
-NETWORK TOOLKIT 1.17.116
+NETWORK TOOLKIT 1.17.117
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.116
+CURRENT RELEASE - 1.17.117
 
-Release details: RELEASE_NOTES_1.17.116.txt
-Previous release: docs/releases/RELEASE_NOTES_1.17.115.txt
+Release details: RELEASE_NOTES_1.17.117.txt
+Previous release: docs/releases/RELEASE_NOTES_1.17.116.txt
 Full release-note archive: docs/releases/README.md
 
-New116 is a Terminal-only interaction hotfix: ordinary tab selection and close
+New117 uses the shared vertical Files/Connections rail and scoped drive-wheel
+scrolling. CMD/PowerShell starting directories and explicit per-session
+administrator launches retain normal Windows consent and actual-token badges.
+See EDITOR_SIDEBAR117.md and TERMINAL_LOCAL117.md for behavior and limits.
+
+Previous116 is a Terminal-only interaction hotfix: ordinary tab selection and close
 clicks work without losing drag reorder/detach or existing close safeguards.
 
 Published2026-10-29T21:17:18Z, sourcef13c4df906a0ed8124308f8f95db571a7a9be532.

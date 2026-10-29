@@ -52,7 +52,7 @@ async function settleTabs(page){
  await page.evaluate(async()=>{const tabs=[...document.querySelectorAll('[data-ed-files-sidebar] [role="tab"]')];for(const tab of tabs)getComputedStyle(tab).backgroundColor;await Promise.all(tabs.flatMap(tab=>tab.getAnimations()).filter(animation=>Number.isFinite(animation.effect?.getComputedTiming().endTime)).map(animation=>animation.finished.catch(()=>{})));await new Promise(resolve=>requestAnimationFrame(resolve));});
 }
 async function selectPanel(page,name){
- await page.locator('[data-editor-files-panel="'+name+'"]').click();
+ const tab=page.locator('[data-editor-files-panel="'+name+'"]');if(await tab.getAttribute('aria-selected')!=='true'||await page.locator('[data-ed-files-sidebar]').isVisible()===false)await tab.click();
  await page.waitForFunction(name=>{const host=document.querySelector('[data-ed-files-sidebar]'),app=host?.querySelector('[data-rb-root]');return host?.dataset.editorSidebarPanel===name&&app?.dataset.sidebarPanel===name;},name);
  await settleTabs(page);
 }

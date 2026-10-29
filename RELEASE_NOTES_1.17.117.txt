@@ -1,0 +1,23 @@
+NETWORK TOOLKIT 1.17.117
+
+EDITOR SIDEBAR AND LOCAL TERMINAL OPTIONS
+
+- Files and Connections use the same compact vertical side-tab rail as Terminal,
+  instead of taking a separate row above the file explorer. Existing browsing,
+  connection, collapse, resize and detached access controls remain available.
+- The mouse wheel scrolls overflowing drive buttons while over that strip;
+  normal file-list scrolling, horizontal trackpads and browser zoom are retained.
+- CMD and PowerShell can choose a starting folder through a literal path or
+  read-only directory browser. Invalid folders fail visibly rather than silently
+  selecting another location. CMD UNC starting folders are not supported.
+- Optional Run as administrator is off by default. An explicit connection uses
+  normal Windows UAC and a separate per-session shell helper; the option does not
+  elevate Toolkit itself or change system security settings. The Admin indicator
+  reflects the actual shell process token. Cancel does not automatically retry.
+- The Terminal tab selection, close and retained-drag fixes from116 remain.
+
+Administrator-only unreadable folders can be refused before UAC by normal-user
+validation. The hosted high-token helper test is not proof of an interactive UAC
+consent transition. See TERMINAL_LOCAL117.md for the boundary and test limits.
+This update does not change comparison behavior or claim to fix the intermittent
+narrow wrapped-map alignment or Alt-drag findings recorded in RELEASE116_HANDOFF.md.

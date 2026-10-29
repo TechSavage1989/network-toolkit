@@ -206,6 +206,17 @@ func localLaunchElevated(id string, parent uint32) (syscall.Handle, error) {
 }
 
 func localLaunchElevatedMode(id string, parent uint32, packetCapture bool) (syscall.Handle, error) {
+	role := "local-tools"
+	if packetCapture {
+		role = "packet-capture"
+	}
+	return localLaunchElevatedRole(id, parent, role)
+}
+
+func localLaunchElevatedRole(id string, parent uint32, role string) (syscall.Handle, error) {
+	if role != "local-tools" && role != "packet-capture" && role != "terminal-shell" {
+		return 0, errors.New("Invalid private helper role.")
+	}
 	if !validLocalHelperID(id) || parent == 0 {
 		return 0, errors.New("Invalid local configuration helper invocation.")
 	}
@@ -229,10 +240,7 @@ func localLaunchElevatedMode(id string, parent uint32, packetCapture bool) (sysc
 	defer ole.NewProc("CoUninitialize").Call()
 	verb, _ := syscall.UTF16PtrFromString("runas")
 	file, _ := syscall.UTF16PtrFromString(executable)
-	flags := "--local-tools-helper " + id + " --local-tools-parent " + strconv.FormatUint(uint64(parent), 10)
-	if packetCapture {
-		flags = "--packet-capture-helper " + id + " --packet-capture-parent " + strconv.FormatUint(uint64(parent), 10)
-	}
+	flags := "--" + role + "-helper " + id + " --" + role + "-parent " + strconv.FormatUint(uint64(parent), 10)
 	parameters, _ := syscall.UTF16PtrFromString(flags)
 	directory, _ := syscall.UTF16PtrFromString(filepath.Dir(executable))
 	info := externalShellExecuteInfo{Mask: 0x40 | 0x100 | 0x400, Verb: verb, File: file, Parameters: parameters, Directory: directory, Show: 0}
