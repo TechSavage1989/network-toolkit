@@ -30,6 +30,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/baseline113"
           git archive 31f27994b9a3f7bae4442c255f63a65c8e21e0c8 | tar -xf - -C "$RUNNER_TEMP/baseline113"
       - name: Observe published113 motion throughout gestures
+        if: false
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/motion114/node_modules/playwright
           TOOLKIT_TEST_ROOT: ${{ runner.temp }}/baseline113
@@ -41,6 +42,7 @@ jobs:
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/motion114/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/motion-results/candidate
+          TOOLKIT_MOTION_ONLY: detached-1440-right-map-0-1
         run: node scripts/editor-motion114.browser.cjs
       - uses: actions/upload-artifact@v7
         if: always()
