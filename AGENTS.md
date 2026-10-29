@@ -3,13 +3,16 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-Active authorized candidate:1.17.113. Read docs/RELEASE113_HANDOFF.md.
-The user approved the editor toolbar/saved-connection build/publication and
-explicitly merged the graph, editor-activity/close-preference and interface-polish
-additions into this same candidate on 2026-10-29 at 02:12 UTC.
-Preserve all112 features and its completed closure; final113 evidence pending.
+Current published version:1.17.113. The authorized combined editor/graph/activity/
+concise-interface batch is published and verified. Source/tag31f27994b9a3f7bae4442c255f63a65c8e21e0c8,
+treea95bbbce6715f42b73c919c8e1a91aaa6c9b4619. All seven exact-source review
+Checks and automatic Release passed; actual sustained comparison/gutter/native
+close evidence, four public assets,1,070 exact source files, reviewed binary
+identity, icons and latest feed are verified. Read docs/RELEASE113_HANDOFF.md for
+behavior, limits and duplicate-main closure. This docs-only handoff is not a new
+build and authorizes no additional feature. Keep published tags/assets immutable.
 
-Current published version: 1.17.112. Independent editor views and the Windows/SFTP
+Previous published version: 1.17.112. Independent editor views and the Windows/SFTP
 sidebar are published and independently verified. Source/tag: 4d05f6a5a4eb1c315d0a19ccf2eb8daedf2dcb1c;
 tree 3f9278fe6a5a3b1781d71efbd9354e4decf7ac8e. All seven review Checks, automatic Release and
 all seven duplicate main Checks passed. Four public assets,1,017 exact source files,

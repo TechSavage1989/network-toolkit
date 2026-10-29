@@ -7,6 +7,16 @@ Release details: RELEASE_NOTES_1.17.113.txt
 Previous release: docs/releases/RELEASE_NOTES_1.17.112.txt
 Full release-note archive: docs/releases/README.md
 
+Published113 source/tag31f27994b9a3f7bae4442c255f63a65c8e21e0c8 is verified.
+Read docs/RELEASE113_HANDOFF.md for exact gates, public hashes and limitations.
+This later documentation record does not rebuild or replace published downloads.
+
+New113: compact More/Sessions, saved file connections through existing approval,
+tab Compare to, resizable editable aligned comparisons, configurable graph
+compression, loaded-editor activity and default-on configurable close prompts.
+Ordinary Details/results are concise while useful copy/export actions remain.
+Turning prompts off does not bypass failed saves, active saves or ownership.
+
 The editor has independent left/right tab groups and a normal split view. Tabs
 sit above their own text pane. Files opens a resizable Windows/SFTP browser.
 A detached editor requests file explorer approval in the main window; only the
