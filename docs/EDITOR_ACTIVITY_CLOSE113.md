@@ -27,8 +27,7 @@ until confirmed lifecycle cleanup; heartbeat silence is not proof of destruction
 
 ## Ask before discarding unsaved changes
 
-The existing editor More disclosure contains **Ask to save unsaved changes before
-closing**, enabled by default. Main-window changes persist with the existing
+The existing editor More disclosure contains **Confirm unsaved close** (accessible name: **Ask to save unsaved changes before closing**), enabled by default. Main-window changes persist with the existing
 editor preferences; unrelated wrap/font/theme changes preserve explicit false.
 Turning it off requires an explicit **Allow discard** warning. Detached editors
 receive a read-only policy mirror from the main window; they cannot write app

@@ -27,6 +27,10 @@ func (h *nativeEditorFixture) requestClose113(view, phase string) error {
 	if err := h.capture(view, phase); err != nil {
 		return err
 	}
+	return h.closeAction113(view, "RequestClose")
+}
+
+func (h *nativeEditorFixture) closeAction113(view, action string) error {
 	h.mu.Lock()
 	raw := append([]byte(nil), h.captures[len(h.captures)-1]...)
 	h.mu.Unlock()
@@ -45,7 +49,7 @@ func (h *nativeEditorFixture) requestClose113(view, phase string) error {
 	if window.HWND == 0 || window.PID != pid || window.Class != "NetworkToolkit.WebView2.Window" {
 		return errors.New("captured close target does not match exact fixture host")
 	}
-	command := exec.CommandContext(h.ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-File", filepath.Join(h.root, "scripts", "native-editor-close.ps1"), "-WindowHandle", strconv.FormatUint(window.HWND, 10), "-OwnerProcessID", strconv.Itoa(pid), "-Action", "RequestClose")
+	command := exec.CommandContext(h.ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-File", filepath.Join(h.root, "scripts", "native-editor-close.ps1"), "-WindowHandle", strconv.FormatUint(window.HWND, 10), "-OwnerProcessID", strconv.Itoa(pid), "-Action", action)
 	output, err := command.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("exact native close request: %w: %s", err, output)
@@ -134,6 +138,11 @@ func (h *nativeEditorFixture) exerciseClose113() error {
 	if err = h.homeRemainsOpen113(); err != nil {
 		return err
 	}
+	// RequestClose reports invocation, not the JS Promise result. Honor the
+	// existing native timeout/warning before attempting another native close.
+	if err = h.closeAction113("", "WaitWarning"); err != nil {
+		return err
+	}
 	// A real additional edit and existing Undo/Redo prove the cancelled native
 	// window remains usable, rather than merely retaining a static document.
 	if _, err = h.command("", nativeEditorCommand{Action: "edit-history"}); err != nil {
@@ -199,6 +208,9 @@ func (h *nativeEditorFixture) exerciseClose113() error {
 	if err = h.homeRemainsOpen113(); err != nil {
 		return err
 	}
+	if err = h.closeAction113("", "WaitWarning"); err != nil {
+		return err
+	}
 	failed, err := h.command("", nativeEditorCommand{Action: "fail-synthetic-save"})
 	if err != nil {
 		return err
@@ -255,7 +267,10 @@ func (h *nativeEditorFixture) exerciseClose113() error {
 		if len(protected.Documents) != 1 || !protected.Documents[0].Frozen {
 			return errors.New("pending transfer close discarded or unfroze source")
 		}
-		return h.homeRemainsOpen113()
+		if e = h.homeRemainsOpen113(); e != nil {
+			return e
+		}
+		return h.closeAction113("", "WaitWarning")
 	}})
 	if err != nil {
 		return fmt.Errorf("disabled close during native transfer: %w", err)

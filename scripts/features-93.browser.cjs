@@ -48,7 +48,7 @@ async function openContext(timezone){
  await page.goto('https://ui93.toolkit.test/');await page.waitForFunction(()=>__networkToolkitStartupState===1&&online);return context;
 }
 async function assertNoPageOverflow(label){const value=await page.evaluate(()=>({window:innerWidth,scroll:document.documentElement.scrollWidth,frame:document.querySelector('.main').getBoundingClientRect().bottom,height:innerHeight}));assert(value.scroll<=value.window+1,label+' horizontal page overflow '+JSON.stringify(value));assert(value.frame<=value.height+2,label+' app frame exceeds window');return value;}
-async function pointDetails(){const sidebar=page.locator('#resultEntryBody .result-graph-summary'),target=await sidebar.count()?sidebar:page.locator('[data-rt-tooltip]');return target.first().evaluate(el=>Object.fromEntries([...el.querySelectorAll('dl>div')].map(row=>[row.querySelector('dt').textContent,row.querySelector('dd').textContent])));}
+async function pointDetails(){const sidebar=page.locator('#resultEntryBody .result-record-readable'),target=await sidebar.count()?sidebar:page.locator('[data-rt-tooltip]');return target.first().evaluate(el=>Object.fromEntries([...el.querySelectorAll('dl>div')].map(row=>[row.querySelector('dt').textContent,row.querySelector('dd').textContent])));}
 
 const timeline=()=>page.locator('.rt-timeline[data-rt-id="ui93-monitor"]');
 const marker=sequence=>timeline().locator('[data-rt-surface="latency"] [data-rt-sequence="'+sequence+'"]');

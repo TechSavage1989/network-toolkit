@@ -1,4 +1,5 @@
 'use strict';
+const {handleEditorActivityMetadata}=require('./editor-activity-fixture.cjs');
 // Bundled UI and actual browser input. Only isolated preferences may be written;
 // no scan, terminal, vault unlock, native launch or production device is allowed.
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
@@ -60,6 +61,7 @@ async function dimensions(){return page.evaluate(()=>{const rect=el=>{const r=el
  page.on('pageerror',error=>report.errors.push(error.message));page.on('response',response=>{if(response.url().includes('/assets/')&&response.status()>=400)report.assetFailures.push(response.url());});
  await page.route('**/*',async route=>{
   const req=route.request(),url=new URL(req.url()),p=url.pathname,method=req.method();assert.equal(url.origin,'https://bookmarks108.toolkit.test','No external or production device requests');
+  if(await handleEditorActivityMetadata(route,'https://bookmarks108.toolkit.test',report))return;
   if(p.startsWith('/api/')){let data={};if(method!=='GET'){report.mutations.push({path:p,method});assert.equal(p,'/api/state','Only isolated settings persistence may mutate');assert.equal(method,'PUT');saved=req.postDataJSON();}
    if(p==='/api/state')data=saved;if(p==='/api/status')data={version:require('../package.json').version,os:'windows',arch:'amd64',system:{hostname:'Synthetic bookmarks',interfaces:[]}};if(p==='/api/system')data={hostname:'Synthetic bookmarks',interfaces:[]};
    if(p==='/api/jobs')data=fixtures;const full=p.match(/^\/api\/jobs\/([^/]+)$/);if(full)data=fixtures.find(job=>job.id===full[1])||{};

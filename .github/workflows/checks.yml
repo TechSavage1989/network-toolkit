@@ -48,6 +48,14 @@ jobs:
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results
           NTK_TOOLBAR_BASELINE_DIR: ${{ runner.temp }}/ntk-toolbar-baseline112
         run: node scripts/editor-toolbar113.browser.cjs
+      - name: Retain complete toolbar matrix before later UI checks
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: editor-toolbar113-early-checks
+          path: ${{ runner.temp }}/ntk-editor112-results/editor-toolbar113-*
+          if-no-files-found: error
+          retention-days: 7
       - name: Check explicit saved connections and editor approval boundaries
         if: success() || failure()
         env:
@@ -60,6 +68,14 @@ jobs:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results
         run: node scripts/editor-divider113.browser.cjs
+      - name: Retain complete divider diagnostics before later UI checks
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: editor-divider113-early-checks
+          path: ${{ runner.temp }}/ntk-editor112-results/editor-divider113-*
+          if-no-files-found: error
+          retention-days: 7
       - name: Check editable aligned comparison and source preservation
         if: success() || failure()
         env:
@@ -614,6 +630,16 @@ jobs:
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results
           NTK_UI_BASELINE_DIR: ${{ runner.temp }}/ntk-ui-baseline112
         run: node scripts/result-readers113.browser.cjs
+      - name: Retain new graph and reader evidence before legacy workflows
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: graph-readers113-early-checks
+          path: |
+            ${{ runner.temp }}/ntk-workflow107-results/graph-curve113-*
+            ${{ runner.temp }}/ntk-workflow107-results/result-readers113-*
+          if-no-files-found: error
+          retention-days: 7
       - name: Check exact saved sessions, persistent filter controls and recorded sources
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
@@ -726,6 +752,7 @@ jobs:
         run: node scripts/editor-window110.browser.cjs
       - name: Check real temporal graph outlines against the published109 negative control
         if: success() || failure()
+        timeout-minutes: 10
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
           NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results

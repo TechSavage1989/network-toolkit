@@ -77,7 +77,7 @@ async function assertRecordedSourceDetails(){
  assert((await source.innerText()).includes('The sidebar source selection applies to future runs.'),'Recorded source remains distinct from future-run selection');
  await source.locator(':scope > summary').click();await run.locator(':scope > summary').click();
 }
-async function pointDetails(){const sidebar=page.locator('#resultEntryBody .result-graph-summary'),target=await sidebar.count()?sidebar:page.locator('[data-rt-tooltip]');return target.first().evaluate(el=>Object.fromEntries([...el.querySelectorAll('dl>div')].map(row=>[row.querySelector('dt').textContent,row.querySelector('dd').textContent])));}
+async function pointDetails(){const sidebar=page.locator('#resultEntryBody .result-record-readable'),target=await sidebar.count()?sidebar:page.locator('[data-rt-tooltip]');return target.first().evaluate(el=>Object.fromEntries([...el.querySelectorAll('dl>div')].map(row=>[row.querySelector('dt').textContent,row.querySelector('dd').textContent])));}
 (async()=>{
  if(out)fs.mkdirSync(out,{recursive:true});browser=await chromium.launch({headless:true,args:['--no-sandbox']});
  for(const timezone of ['America/New_York','UTC']){

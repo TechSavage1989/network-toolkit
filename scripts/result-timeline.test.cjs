@@ -432,3 +432,9 @@ test('navigator preserves both archived bounds when a range contains only the hi
  h.api.setPreferences({mode:'condensed'},{persist:false});h.context.NetworkToolkitGraphHistory.setPreferences({anchor:'range',start:stamp(-600),end:stamp(-.5)},{persist:false});h.render(rows,'prefix-only',{history:prefix});
  const nav=h.document.querySelector('[data-graph-navigator]');const instant=h.context.NetworkToolkitGraphHistory.instant;assert.equal(instant(nav.dataset.viewStart),instant(prefix.firstTime));assert.equal(instant(nav.dataset.viewEnd),instant(prefix.lastTime));assert.equal(h.document.querySelectorAll('[data-rt-point]').length,1);assert.equal(Number(h.document.querySelector('[data-rt-aggregate]').dataset.rtAggregate),500);
 });
+
+
+test('condensed curve labels are idempotent under child-list observer restoration',()=>{
+ const h=harness();h.api.setPreferences({mode:'condensed'},{persist:false});h.render(Array.from({length:301},(_,i)=>reply(i+1,10,stamp(i))));const button=h.document.querySelector('[data-graph-compression-open]');assert(button);let writes=0;const descriptor=Object.getOwnPropertyDescriptor(Object.getPrototypeOf(button),'textContent');Object.defineProperty(button,'textContent',{get(){return descriptor.get.call(this);},set(value){writes++;descriptor.set.call(this,value);}});
+ for(let i=0;i<12;i++)h.observe();assert.equal(writes,0,'Unchanged restore must not create another childList mutation');assert.equal(h.document.querySelector('[data-graph-compression-open]'),button);
+});

@@ -306,3 +306,6 @@ body:has(.nt-editor:not([hidden]) [data-ed-files-sidebar]:not([hidden])) .toast-
 .nt-editor-compare-menu button small{font-size:10px;color:var(--muted)}
 
 .nt-editor-close-preference{display:flex;align-items:center;gap:6px;white-space:normal;font-size:12px}
+
+.nt-editor-connection-compact{display:none}
+@media(max-width:680px){.nt-editor-connection-wide{display:none}.nt-editor-connection-compact{display:inline}}

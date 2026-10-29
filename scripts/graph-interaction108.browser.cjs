@@ -15,7 +15,7 @@ const surface=()=>page.locator('.rt-timeline [data-rt-surface]');
 async function show(){await page.evaluate(value=>{jobs=[value];selected.ping=value.id;navigate('ping');renderCurrentResult(true);},job);await settle();const tab=page.locator('#toolResultsTab');if(await tab.isVisible()&&await tab.getAttribute('aria-selected')!=='true')await tab.click();await surface().waitFor();await settle();}
 async function render(){await page.evaluate(value=>{jobs=[value];renderCurrentResult(true);},job);await settle();}
 async function point(sequence){return page.locator('[data-rt-sequence="'+sequence+'"] [data-rt-marker]').evaluate(el=>{const r=el.getBoundingClientRect(),svg=el.closest('svg'),s=svg.getBoundingClientRect();return {x:r.x+r.width/2,y:r.y+r.height/2,bottom:s.bottom-4,top:s.top+4,key:el.parentElement.dataset.rtKey};});}
-async function held(){return page.evaluate(()=>document.querySelector('#resultEntryBody .result-graph-summary')?.textContent||'');}
+async function held(){return page.evaluate(()=>document.querySelector('#resultEntryBody .result-record-readable')?.textContent||'');}
 async function screenshot(name){if(out)await page.screenshot({path:path.join(out,name+'.png')});}
 (async()=>{
  if(out)fs.mkdirSync(out,{recursive:true});browser=await chromium.launch({headless:true,args:['--no-sandbox']});page=await browser.newPage({viewport:{width:1440,height:1000},serviceWorkers:'block'});page.setDefaultTimeout(15000);

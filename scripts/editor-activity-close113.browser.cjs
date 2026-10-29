@@ -60,8 +60,8 @@ async function choose(page,id){
  for(const width of [1440,390]){const f=await start(width),{page}=f;
   const indicator=page.locator('#navigation [data-page="editor"]');await page.waitForFunction(()=>document.querySelector('#navigation [data-page="editor"]')?.getAttribute('data-activity-summary')==='1 loaded document');
   assert((await indicator.getAttribute('aria-label')).includes('1 loaded document'));await page.locator('.nt-editor-more>summary').click();const box=page.locator('[data-ed-ask-save-close]');assert(await box.isChecked());
-  await box.uncheck();await page.locator('[data-ed-dialog-action="cancel"]').click();assert(await box.isChecked());await retained(page);
-  await box.uncheck();await page.locator('[data-ed-dialog-action="accept"]').click();assert(!await box.isChecked());await page.waitForFunction(()=>state.editorPreferences.askSaveBeforeClose===false);await retained(page);
+  await box.click();await page.locator('.nt-editor-dialog').waitFor({state:'visible'});assert(await box.isChecked(),'Policy remains enabled until disabling is explicitly confirmed');await page.locator('[data-ed-dialog-action="cancel"]').click();assert(await box.isChecked());await retained(page);
+  await box.click();await page.locator('.nt-editor-dialog').waitFor({state:'visible'});assert(await box.isChecked());assert.equal(await page.locator('[data-ed-dialog-action="accept"]').textContent(),'Allow discard');await page.locator('[data-ed-dialog-action="accept"]').click();await page.waitForFunction(()=>state.editorPreferences.askSaveBeforeClose===false);assert(!await box.isChecked());await retained(page);
   await page.screenshot({path:path.join(out,'editor-close113-preference-'+width+'.png')});
   const original=await page.evaluate(()=>NetworkToolkitFileEditor.active.content);
   for(const flag of ['saving','frozen']){assert.equal(await page.evaluate(async flag=>{const d=NetworkToolkitFileEditor.active;d[flag]=true;try{return await NetworkToolkitFileEditor.closeAll()}finally{d[flag]=false}},flag),false);}

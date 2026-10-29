@@ -47,7 +47,7 @@ async function configure(engine,c){
 }
 async function observe(engine,c,expected){
  const {page}=engine,label=engine.label,name=[c.status,c.theme,c.mode,c.selected?'selected':'unselected',c.pointer,label].join('-');
- const clip=await page.locator('.rt-timeline').boundingBox();assert(clip&&clip.width>0&&clip.height>0);const started=Date.now();await page.evaluate(()=>{
+ const clip=await page.locator('.rt-timeline').boundingBox();assert(clip&&clip.width>0&&clip.height>0);const started=Date.now(),detailSelector=label==='candidate'?'#resultEntryBody .result-record-readable':'#resultEntryBody .result-graph-summary';if(c.selected)assert.equal(await page.locator(detailSelector).count(),1,'Selected observation requires its exact-version visible fact reader');await page.evaluate(detailSelector=>{
   const ids=new WeakMap();let nextID=1;const nodeID=n=>{if(!ids.has(n))ids.set(n,nextID++);return ids.get(n);};
   const surface=document.querySelector('[data-rt-surface]'),palette=document.createElement('span');palette.hidden=true;document.querySelector('#pageContent').append(palette);
   const resolve=value=>{palette.style.color=value;return getComputedStyle(palette).color;};
@@ -56,10 +56,10 @@ async function observe(engine,c,expected){
   window.graph110Observer=new MutationObserver(records=>{for(const r of records)if(r.type==='childList')state.childMutations++;else state.classMutations++;});graph110Observer.observe(surface,{subtree:true,childList:true,attributes:true,attributeFilter:['class','style','stroke','stroke-width']});
   function frame(){if(!state.active)return;const svg=document.querySelector('[data-rt-surface]');
    const marks=[...svg.querySelectorAll('[data-rt-point]')].map(n=>{const m=n.querySelector('[data-rt-marker]'),s=getComputedStyle(m),r=m.getBoundingClientRect();return {key:n.dataset.rtKey,sequence:Number(n.dataset.rtSequence||0),aggregate:Number(n.dataset.rtAggregate||0),node:nodeID(n),class:n.getAttribute('class'),stroke:s.stroke,width:s.strokeWidth,fill:s.fill,opacity:s.opacity,x:r.x,y:r.y};});
-   const value={marks,line:getComputedStyle(svg.querySelector('.rt-series polyline')).stroke,held:NetworkToolkitResultTimeline.isHeld('graph110-synthetic'),details:document.querySelector('#resultEntryBody .result-graph-summary')?.textContent||''},signature=JSON.stringify(value);
+   const value={marks,line:getComputedStyle(svg.querySelector('.rt-series polyline')).stroke,held:NetworkToolkitResultTimeline.isHeld('graph110-synthetic'),details:document.querySelector(detailSelector)?.textContent||''},signature=JSON.stringify(value);
    if(!known.has(signature)){known.set(signature,state.states.length);state.states.push(value);}state.frames.push({t:performance.now()-state.started,state:known.get(signature),childMutations:state.childMutations,classMutations:state.classMutations});requestAnimationFrame(frame);
   }requestAnimationFrame(frame);
- });
+ },detailSelector);
  const captures=[],captureAttempts=[],captured=new Set();const until=Date.now()+7800,deadline=Date.now()+16000;
  try{while(Date.now()<until||engine.requests.filter(r=>r.path==='/api/jobs'&&r.at>=started).length<3||captures.length<(label==='candidate'?1:2)){
   assert(Date.now()<deadline,'Native polls and phase-verified screenshots must complete within the bounded observation window');await page.waitForTimeout(100);
