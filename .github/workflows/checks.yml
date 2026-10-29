@@ -20,19 +20,11 @@ jobs:
         run: |
           npm install --prefix "$RUNNER_TEMP/regression114" --no-audit --no-fund playwright@1.62.1
           node "$RUNNER_TEMP/regression114/node_modules/playwright/cli.js" install --with-deps chromium
-      - name: Explicit graph selection after adaptive docking
-        if: success() || failure()
+      - name: Exact-dataset graph startup and ten-second navigation
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/regression114/node_modules/playwright
-          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/regression114-results/graph95
-          TOOLKIT_PACKET_SELECTION_TRACE: '1'
-        run: node scripts/features-95.browser.cjs
-      - name: Held selections navigation and recorded timestamps
-        if: success() || failure()
-        env:
-          PLAYWRIGHT_MODULE: ${{ runner.temp }}/regression114/node_modules/playwright
-          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/regression114-results/graph93
-        run: node scripts/features-93.browser.cjs
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/regression114-results/navigation114
+        run: node scripts/graph-navigation114.browser.cjs
       - uses: actions/upload-artifact@v7
         if: always()
         with:
