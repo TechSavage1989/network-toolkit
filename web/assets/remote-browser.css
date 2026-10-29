@@ -135,3 +135,7 @@ body.remote-browser-mode #toolWorkspace>#pageContent{grid-column:1!important;gri
 .rb-client-layout>.rb-client-primary>.rb-explorer{padding:0;}
 .rb-explorer>.rb-toolbar{padding:6px 8px;}
 .rb-explorer>.rb-panes{margin:6px 8px 8px;}
+
+/* The editor sidebar has one explicit form column. A two-column credential
+   control span would create an implicit track and squeeze the login fields. */
+.is-editor-sidebar .rb-connection-fields>.rb-credential-controls{grid-column:1/-1}
