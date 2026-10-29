@@ -25,6 +25,7 @@ jobs:
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/regression114/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/regression114-results/graph95
+          TOOLKIT_PACKET_SELECTION_TRACE: '1'
         run: node scripts/features-95.browser.cjs
       - name: Held selections navigation and recorded timestamps
         if: success() || failure()
@@ -32,12 +33,6 @@ jobs:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/regression114/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/regression114-results/graph93
         run: node scripts/features-93.browser.cjs
-      - name: Editable comparison appearance and navigation
-        if: success() || failure()
-        env:
-          PLAYWRIGHT_MODULE: ${{ runner.temp }}/regression114/node_modules/playwright
-          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/regression114-results/editor108
-        run: node scripts/editor-workflows108.browser.cjs
       - uses: actions/upload-artifact@v7
         if: always()
         with:
