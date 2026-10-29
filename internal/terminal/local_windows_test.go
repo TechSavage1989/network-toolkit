@@ -264,7 +264,7 @@ func TestWindowsLocalShellExplicitDirectoryAndToken(t *testing.T) {
 			mu.Lock()
 			from := out.Len()
 			mu.Unlock()
-			command := "echo NTK_LOCAL117_CWD=%CD%\r"
+			command := "echo \"NTK_LOCAL117_CWD=%CD%\"\r"
 			if kind == "powershell" {
 				command = "Write-Output ('NTK_LOCAL117_CWD='+(Get-Location).Path)\r"
 			}

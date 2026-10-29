@@ -154,7 +154,7 @@ func TestTerminalShellNativeHelper(t *testing.T) {
 			mu.Lock()
 			from := output.Len()
 			mu.Unlock()
-			command := "echo NTK_SHELL117_CWD=%CD%\r"
+			command := "echo \"NTK_SHELL117_CWD=%CD%\"\r"
 			if kind == "powershell" {
 				command = "Write-Output ('NTK_SHELL117_CWD='+(Get-Location).Path)\r"
 			}
