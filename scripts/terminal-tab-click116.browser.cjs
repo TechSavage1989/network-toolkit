@@ -15,6 +15,7 @@ async function setup(mode,width){
   else if(p==='/api/terminal-views')data={available:false,views:[],owners:{}};
   else if(p==='/api/terminals/events'){await new Promise(r=>setTimeout(r,80));data={sessions,events:[],after:0};}
   else if(p==='/api/activity')data={tools:{}};
+  else if(p==='/api/remote-browser'&&method==='POST'){const body=req.postDataJSON();assert.deepEqual(Object.keys(body).sort(),['action','protocol','sessionId']);assert.equal(body.protocol,'ssh');assert.equal(body.action,'probe');assert(['click116-one','click116-two'].includes(body.sessionId));data={supported:false};}
   else if(p.match(/^\/api\/terminals\/click116-(one|two)\/resize$/)){assert.equal(method,'POST');}
   else if(p.match(/^\/api\/terminals\/click116-(one|two)\/disconnect$/)){assert.equal(method,'POST');const id=p.split('/')[3];sessions=sessions.map(s=>s.id===id?{...s,state:'closed'}:s);}
   else if(p.match(/^\/api\/terminals\/click116-(one|two)$/)){assert.equal(method,'DELETE');sessions=sessions.filter(s=>s.id!==p.split('/')[3]);}

@@ -21,3 +21,13 @@ test('ordinary terminal click captures actual tab button and does not suppress s
 test('close X without a drag is not captured or suppressed',()=>{const f=domFixture();f.listeners.pointerdown(f.event(f.close));assert.equal(f.captured,null);f.listeners.pointerup(f.event(f.close));const click=f.event(f.close);f.listeners.click(click);assert.equal(click.prevented,undefined);});
 test('trailing drag click stays suppressed but a fresh immediate X or tab press is allowed',()=>{for(const name of ['close','button']){const f=domFixture();f.listeners.pointerdown(f.event());f.listeners.pointermove(f.event(f.button,{clientX:400,clientY:200}));f.listeners.pointerup(f.event());const trailing=f.event();f.listeners.click(trailing);assert.equal(trailing.prevented,true);f.listeners.pointerdown(f.event(f[name]));f.listeners.pointerup(f.event(f[name]));const intentional=f.event(f[name]);f.listeners.click(intentional);assert.equal(intentional.prevented,undefined);}});
 test('synthetic pointerdown cannot clear trailing-drag click suppression',()=>{const f=domFixture();f.listeners.pointerdown(f.event());f.listeners.pointermove(f.event(f.button,{clientX:400,clientY:200}));f.listeners.pointerup(f.event());f.listeners.pointerdown(f.event(f.close,{isTrusted:false}));const click=f.event(f.close);f.listeners.click(click);assert.equal(click.prevented,true);});
+
+test('unchanged output refresh preserves captured tab DOM rather than moving rows',()=>{
+ const vm=require('node:vm'),fs=require('node:fs');let moves=0;const rows=['a','b'].map(id=>({querySelector:()=>({dataset:{terminalTab:id}})}));
+ const bar={children:rows.slice(),append(row){moves++;this.children=this.children.filter(item=>item!==row);this.children.push(row);},setAttribute(){}};
+ const root={document:{querySelector:()=>bar,addEventListener(){}},addEventListener(){}};
+ vm.runInNewContext(fs.readFileSync(require.resolve('../web/assets/terminal-tab-drag.js'),'utf8'),{window:root});
+ for(let n=0;n<100;n++)root.NetworkToolkitTerminalTabDrag.syncOrder();assert.equal(moves,0,'output refresh must not remove the captured button');
+ root.NetworkToolkitTerminalTabDrag.setOrder(['b','a']);assert.deepEqual(bar.children,[rows[1],rows[0]]);assert.equal(moves,2);
+ for(let n=0;n<100;n++)root.NetworkToolkitTerminalTabDrag.syncOrder();assert.equal(moves,2,'settled new order remains stable');
+});
