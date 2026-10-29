@@ -7,6 +7,16 @@ Release details: RELEASE_NOTES_1.17.117.txt
 Previous release: docs/releases/RELEASE_NOTES_1.17.116.txt
 Full release-note archive: docs/releases/README.md
 
+117 published 2026-10-29T23:33:10Z; public assets/source/feed verified 23:35:30.794Z.
+Source/tag 51aa026f07e201979b3adb44d048c66c06508826. New feature/native/core checks
+passed. Normal review finished five SUCCESS/two FAILURE (existing comparison
+alignment and Hosts-entry focus); publication retains both disclosed caveats,
+not an all-seven-green or fixed claim. Actual high-token helper proof did not
+exercise visible UAC consent/cross-account elevation. See RELEASE117_HANDOFF.md.
+Duplicate main Checks 40973657061 ended five SUCCESS/two FAILURE at 23:48:49Z
+(Windows Alt-editor transfer and comparison motion); Hosts/long browser passed.
+No comparison/Hosts fix or all-seven-green result is claimed.
+
 New117 uses the shared vertical Files/Connections rail and scoped drive-wheel
 scrolling. CMD/PowerShell starting directories and explicit per-session
 administrator launches retain normal Windows consent and actual-token badges.

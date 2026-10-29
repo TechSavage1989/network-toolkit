@@ -3,7 +3,22 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-Current published version:1.17.116. The expedited Terminal-only interaction
+Current published version: 1.17.117. Vertical Files/Connections rail, drive-wheel
+scrolling and literal local-shell folders/explicit per-session administrator
+launch are published and public assets/feed verified. Source/tag
+51aa026f07e201979b3adb44d048c66c06508826; tree 793cc319121ed3586654a580a20738852b442a83.
+New-feature/native/core gates passed. Normal review 40970618456 ended five SUCCESS/
+two FAILURE: existing comparison alignment and Hosts-entry focus. Scoped
+publication retains both disclosed caveats; no all-seven-green or fixed claim.
+Real high-token helper passed on an already-elevated runner, not a visible UAC
+transition/cross-account test. Read docs/RELEASE117_HANDOFF.md for exact evidence.
+Duplicate main 40973657061 also ended five SUCCESS/two FAILURE at 23:48:49Z:
+Windows Alt-editor transfer and editor motion failed; Hosts/long browser passed.
+No unrelated fix or
+future publication is authorized by this record. Preserve all 116/historical
+failures, published tags/assets, repository access and credential/ownership guards.
+
+Previous published version:1.17.116. The expedited Terminal-only interaction
 hotfix is published and public assets/feed verified. Source/tag
 f13c4df906a0ed8124308f8f95db571a7a9be532; treec0127280d174967bc15170537d4f2fe05f8ef7c3.
 Focused actual Terminal/Windows/application/security/dependency/package gates

@@ -1,3 +1,43 @@
+# Network Toolkit 1.17.117 published and verified
+
+Published 2026-10-29T23:33:10Z; public verification 23:35:30.794Z.
+Release 428498861: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.117
+Source/tag 51aa026f07e201979b3adb44d048c66c06508826;
+tree 793cc319121ed3586654a580a20738852b442a83.
+The user approved this scoped publication at 21:49:53 UTC and the exact interrupted
+source-upload retry at 22:57:44 UTC on 2026-10-29; neither is a future blanket grant.
+Review 40970618456 ended five SUCCESS/two FAILURE: existing editor continuous-
+motion alignment and Hosts-entry initial focus. Both are genuine failed checks;
+scoped publication retained both disclosed caveats without changing the workflow,
+calling them fixture-only, or claiming all seven passed. No comparison/Hosts fix
+is included. Main promotion was expected-head/non-force, verified 23:30:56.340Z.
+
+The vertical Files/Connections rail and scoped drive-wheel behavior passed all
+eight main/detached 1440/390 light/dark cases (24 groups), gaining 39 px of explorer
+height. Local CMD/PowerShell directory/admin controls passed four synthetic
+browser cases and actual literal-cwd/token/helper tests. The helper ran on an
+already-elevated isolated runner: UACInvoked=false. This is not visible UAC
+consent, cross-account elevation or user-desktop validation. The option does not
+elevate Toolkit itself; default-off and existing credential/ownership guards remain.
+
+Automatic Release 40973657237 succeeded. All four public downloads were rehashed;
+1,139 source files/1,146 portable members, both manifests, PE 117/9 icons/12 resources,
+reviewed EXE/portable identity, updater exact four-file allowlist and latest feed/
+tag/main were verified. Prior 116 tag/body/four assets remain unchanged. Details,
+exact hashes and failure evidence are in RELEASE117_HANDOFF.md.
+
+Automatic main Checks 40973657061 ended FAILURE at 2026-10-29T23:48:49Z:
+five SUCCESS/two FAILURE (Windows native Alt-editor transfer and editor motion).
+The long browser, including Hosts and real five-minute timer, passed. Exact
+inventories and distinct pre-release/duplicate measurements are in the handoff.
+Neither review nor duplicate was all-seven-green; no rerun/rebuild hid failures.
+The five-document closure does not rebuild or replace any asset, move tags,
+change access or authorize unrelated fixes. Preserve 116's unresolved narrow-map
+and Alt-drag records and 114's separate latency observation. Historical records
+follow intact; later successes do not erase earlier failures or diagnose them.
+
+---
+
 NETWORK TOOLKIT 1.17.116 PUBLISHED - EXPEDITED TERMINAL HOTFIX
 
 # Network Toolkit 1.17.116 published: Terminal interaction hotfix
