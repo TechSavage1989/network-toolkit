@@ -54,11 +54,19 @@ async function renderGeometry(page,label){
  })));
  (report.renderGeometry||=[]).push({label,value});return value;
 }
+async function revealSourceRow(page,side,line){
+ await page.evaluate(({side,line})=>{const compare=NetworkToolkitFileEditor.comparison;compare.jump(compare.result.rows.findIndex(row=>row[side]===line-1),false,side,true);},{side,line});await ready(page);
+}
 async function assertAlignment(page,label){
  await renderGeometry(page,label+' before');
- await input(page,'left').press('Control+Home');await ready(page);await page.evaluate(()=>{const compare=NetworkToolkitFileEditor.comparison;compare.jump(compare.result.rows.findIndex(row=>row.left===5),false,'left',true);});await ready(page);const first=await anchorGeometry(page,'ANCHOR_ONE');assert(first.left.visible&&first.right.visible,JSON.stringify(first));assert(Math.abs(first.left.top-first.right.top)<=2,label+' first matching lines must align: '+JSON.stringify(first));
+ await input(page,'left').press('Control+Home');await ready(page);
+ // A narrow resized pane may wrap its first source line across the entire
+ // viewport. Explicitly reveal the rows whose rendering is being inspected;
+ // do not assume Home mounts every later source line in a virtualized editor.
+ await revealSourceRow(page,'left',3);
  const colors=await colorGeometry(page);for(const side of ['left','right']){const color=colors[side];assert.equal(color.text,side==='left'?'old':'new','Only the changed token must be marked');assert.equal(color.row,color.rowExpected);assert(color.inline.length&&color.inline.every(value=>value===color.inlineExpected));assert.equal(color.map,color.mapExpected);assert.notEqual(color.row,color.inline[0]);}
- const startPalette=await semanticColors(page);
+ const startPalette=await semanticColors(page);await revealSourceRow(page,'left',4);startPalette.push(...await semanticColors(page));await revealSourceRow(page,'right',6);startPalette.push(...await semanticColors(page));
+ await revealSourceRow(page,'left',6);const first=await anchorGeometry(page,'ANCHOR_ONE');assert(first.left.visible&&first.right.visible,JSON.stringify(first));assert(Math.abs(first.left.top-first.right.top)<=2,label+' first matching lines must align: '+JSON.stringify(first));
  const initial=await page.evaluate(()=>['left','right'].map(side=>{const host=document.querySelector('[data-compare-pane="'+side+'"]');return {side,gaps:[...host.querySelectorAll('[data-compare-gap]')].map(el=>({text:el.textContent,offset:Number(el.dataset.sourceOffset),height:el.getBoundingClientRect().height})),numbers:[...host.querySelectorAll('.cm-lineNumbers .cm-gutterElement')].map(el=>el.textContent.trim()).filter(x=>/^\d+$/.test(x)).map(Number),marks:host.querySelectorAll('.nt-compare-intraline').length};}));
  await input(page,'left').press('Control+End');await ready(page);const last=await anchorGeometry(page,'ANCHOR_TWO');await renderGeometry(page,label+' bottom');assert(last.left.visible&&last.right.visible,JSON.stringify(last));assert(Math.abs(last.left.top-last.right.top)<=2,label+' matching lines after unequal wrapping must align: '+JSON.stringify(last));
  const end=await page.evaluate(()=>['left','right'].map(side=>{const host=document.querySelector('[data-compare-pane="'+side+'"]');return {side,gaps:[...host.querySelectorAll('[data-compare-gap]')].map(el=>({text:el.textContent,offset:Number(el.dataset.sourceOffset),height:el.getBoundingClientRect().height})),numbers:[...host.querySelectorAll('.cm-lineNumbers .cm-gutterElement')].map(el=>el.textContent.trim()).filter(x=>/^\d+$/.test(x)).map(Number)};}));
