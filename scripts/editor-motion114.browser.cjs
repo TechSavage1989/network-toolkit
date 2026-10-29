@@ -53,12 +53,14 @@ function summarize(record,side){const s=side==='right'?1:0,p=1-s,frames=record.f
  }const deltas=frames.filter(f=>f.delta!==null).map(f=>Math.abs(f.delta)).sort((a,b)=>a-b);return {label:record.label,frames:frames.length,moving,together,maxStall,p95PeerOffset:deltas[Math.floor(deltas.length*.95)]??null,maxPeerOffset:deltas.at(-1)??null,first:frames[0]?.panes.map(p=>p.position),last:frames.at(-1)?.panes.map(p=>p.position)};}
 async function captureGesture(page,label,side,action){await page.evaluate(beginCapture,label);await action();const record=await finishCapture(page),summary=summarize(record,side);report.motion.push({...summary,record});return summary;}
 function validateMotion(summary){
+ try{
  assert(summary.frames>=15,summary.label+' must observe at least15 animation frames during input');
  assert(summary.moving>=24,summary.label+' must visibly respond during at least24 of40 input steps, not accumulate a few large catch-up jumps: '+JSON.stringify(summary));
  assert(summary.maxStall<=4,summary.label+' must not leave its peer stopped while source continues: '+JSON.stringify(summary));
  assert(summary.together/summary.moving>=.65,summary.label+' must move its peer throughout input, not after stopping: '+JSON.stringify(summary));
  const wheel=summary.label.includes('-wheel-');
  assert(summary.p95PeerOffset!==null&&summary.p95PeerOffset<=(wheel?72:2),summary.label+' actual common source rows must remain aligned throughout input within at most two wheel increments: '+JSON.stringify(summary));
+ }catch(error){report.violations.push({label:summary.label,message:error.message,summary});console.error('MOTION VIOLATION '+error.message);}
 }
 async function converged(page){await page.waitForFunction(()=>{const c=NetworkToolkitFileEditor.comparison;if(!c?.result||c.result.limited||document.querySelector('[data-compare-map]')?.getAttribute('aria-disabled')!=='false')return false;const a=document.querySelector('[data-compare-map-viewport=left]'),b=document.querySelector('[data-compare-map-viewport=right]');return Math.abs(parseFloat(a.style.top)-parseFloat(b.style.top))<1;});await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));}
 (async()=>{
@@ -82,5 +84,5 @@ async function converged(page){await page.waitForFunction(()=>{const c=NetworkTo
   assert.deepEqual(await page.evaluate(()=>[...NetworkToolkitFileEditor.documents.values()].map(d=>({uid:d.uid,content:d.content,undo:JSON.stringify(d.undo),redo:JSON.stringify(d.redo),revision:d.editRevision}))),original,'Scroll gestures must not change source/undo/dirty ownership');
   await page.screenshot({path:path.join(output,'editor-motion114-'+mode+'-'+width+'-'+theme+'.png')});report.layouts.push({mode,width,theme});check(mode+' '+width+' '+(report.observationOnly?'baseline observation only (candidate motion assertions omitted); ':'candidate continuous motion accepted; ')+'left/right wheel and both maps, fit/zoom, unequal wrapped source bytes retained');await f.context.close();
  }
- assert.deepEqual(report.errors,[]);assert.deepEqual(report.assetErrors,[]);report.passed=true;
+ assert.deepEqual(report.errors,[]);assert.deepEqual(report.assetErrors,[]);assert.deepEqual(report.violations,[],'All continuous gesture cases must pass');report.passed=true;
 })().catch(async error=>{report.failure=error.stack||String(error);console.error(report.failure);if(lastPage&&!lastPage.isClosed())await lastPage.screenshot({path:path.join(output,'editor-motion114-failure.png')}).catch(()=>{});process.exitCode=1;}).finally(async()=>{if(output)fs.writeFileSync(path.join(output,'editor-motion114-results.json'),JSON.stringify(report,null,2));for(const context of contexts)await context.close().catch(()=>{});await browser?.close();});
