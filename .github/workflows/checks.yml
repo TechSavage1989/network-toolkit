@@ -347,14 +347,6 @@ jobs:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
         run: node scripts/features-96.browser.cjs
-      - name: Retain early fitted-graph acceptance evidence
-        uses: actions/upload-artifact@v7
-        if: always()
-        with:
-          name: graph-viewport107-checks
-          path: ${{ runner.temp }}/ntk-browser-results/ui96*
-          if-no-files-found: ignore
-          retention-days: 7
       - name: Check condensed history, time navigation and held entry selections
         if: success() || failure()
         env:
@@ -367,6 +359,14 @@ jobs:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
         run: node scripts/features-94.browser.cjs
+      - name: Retain complete early graph acceptance evidence
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: graph-viewport107-checks
+          path: ${{ runner.temp }}/ntk-browser-results/ui9[4-8]*
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Check macro folders, local terminal UI, scan sizing, copy controls and update progress
         if: success() || failure()
         env:

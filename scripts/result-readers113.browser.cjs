@@ -15,7 +15,7 @@ async function start(root,label){const context=await browser.newContext({viewpor
 async function select(p,record=job){
  page=p;await p.evaluate(({id,tool})=>{NetworkToolkitResultTimeline.clearSelection(id);selected[tool]=id;navigate(tool);renderCurrentResult(true);},record);await settle(p);
  const results=p.locator('#toolResultsTab');if(await results.isVisible()&&await results.getAttribute('aria-selected')!=='true')await results.click();
- const row=p.locator('[data-result-graph-id="'+record.id+'"][data-result-sequence="'+sample.sequence+'"]');await row.waitFor({state:'visible'});await row.click();
+ const row=p.locator('[data-result-graph-id="'+record.id+'"][data-result-sequence="'+sample.sequence+'"]');await row.waitFor({state:'visible'});await row.focus();assert.equal(await row.evaluate(el=>document.activeElement===el),true,'The result row, not an embedded copy control, owns keyboard activation');await row.press('Enter');
  await p.locator('#resultEntryPane').waitFor({state:'visible'});await p.waitForFunction(id=>NetworkToolkitResultTimeline.tracking(id).held,record.id);
  assert.equal(await p.evaluate(({id,tool})=>selectedJob(tool)?.id===id,record),true,'Details belongs to the actual selected job');
 }

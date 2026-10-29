@@ -167,7 +167,13 @@
     const skip=new Set();
     // The graph reader already presents these exact sample facts. Keep unique fields such as TTL.
     if(point&&!point.members&&root.NetworkToolkitResultTimeline?.pointDetails)for(const key of ['time','timestamp','recordedAt','sequence','status','success','rttMs','address','error'])skip.add(key);
-    else if(detail.record?.status!==undefined)skip.add('success');
+    else if(Array.isArray(point?.members)&&point.stats&&typeof root.NetworkToolkitResultTimeline?.pointDetails==='function'){
+      // Suppress only aliases whose exact source value is already represented by
+      // the aggregate reader. Conflicts and unique statistics remain visible.
+      const stats=point.stats,aliases=[['time',point.time],['recordedAt',point.endTime],['samples',stats.count],['lost',stats.lost],['minimumRttMs',stats.min],['averageRttMs',stats.average],['maximumRttMs',stats.max]];
+      if(point.historical){aliases.push(['retainedRawSamples',point.members.length],['summarizedOnlySamples',stats.archived]);if(stats.untimedCount)aliases.push(['untimedArchivedSamples',stats.untimedCount]);}
+      for(const [key,value]of aliases)if(value!==undefined&&Object.hasOwn(detail.record,key)&&Object.is(detail.record[key],value))skip.add(key);
+    }else if(detail.record?.status!==undefined)skip.add('success');
     const items=context?[['Tool',titleFor(context.tool)],['Target',context.target],['Run started',context.started],['Method',context.mode],['Port',context.port],['Source interface',context.source]]:[];
     const unique=items.filter(([key,value])=>value!==undefined&&value!==''&&(!records||['Method','Port'].includes(key))&&!(key==='Target'&&[detail.record?.address,detail.record?.host,detail.record?.target].includes(value)));
     const run=unique.length?'<section class="result-run-context"><dl class="result-record-grid">'+unique.map(([key,value])=>'<div><dt>'+esc(key)+'</dt><dd>'+(key==='Run started'&&root.NetworkToolkitResultTime?root.NetworkToolkitResultTime.cell(value,{label:'Run started'}):esc(scalar(value)))+'</dd></div>').join('')+'</dl></section>':'';
