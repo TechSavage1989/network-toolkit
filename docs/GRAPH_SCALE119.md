@@ -25,3 +25,7 @@ It records exact intervals and normalized point positions in normal/narrow,
 light/dark layouts, actual Follow clicks with all Details visibility states,
 left-handle pointer movement through a new sample, keyboard resize and paused
 navigation. Local source tests do not substitute for its hosted rendered result.
+
+### Exact-source review correction
+
+The first hosted four-layout acceptance passed interval, proportional-shape, Details-preservation and left-handle behavior. Pixel review found narrow preset text clipped by duplicate native-select arrow padding; the bounded control-width trade keeps the same row footprint while exposing the full preset and Custom labels. A paused Fit stores an internal fixed viewport but is still All, not Custom. Legacy assertions requiring Follow to close Details or fractional Condensed windows to snap to sample endpoints were replaced with the newly requested visibility/exact-window contract; Linear endpoint assertions remain. All stored-source, minimum-point/time and temporal-render safeguards remain in force. Corrected hosted pixel/legacy acceptance is required before claiming these follow-ups passed.

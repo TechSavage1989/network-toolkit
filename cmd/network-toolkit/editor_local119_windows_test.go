@@ -137,8 +137,9 @@ func TestNativeEditorLocal119InstalledWebView2(t *testing.T) {
 			err = fmt.Errorf("saved source bytes differ: %q", got)
 		}
 	}
-	if err == nil {
-		err = h.capture(child, "editor-local119-child-no-main")
+	// Retain the real child pixels even when a workflow assertion fails.
+	if captureErr := h.capture(child, "editor-local119-child-no-main"); err == nil {
+		err = captureErr
 	}
 	a.editorViews.mu.Lock()
 	remoteApproved := a.editorViews.views[child].explorer != nil && a.editorViews.views[child].explorer.Allowed
@@ -147,7 +148,7 @@ func TestNativeEditorLocal119InstalledWebView2(t *testing.T) {
 	if remoteApproved || homePresent {
 		err = fmt.Errorf("local access acquired remote approval or required main")
 	}
-	report := map[string]any{"passed": err == nil, "actualProductionChild": true, "actualWebView2": true, "mainWindowCreated": false, "mainMarkedClosed": !homePresent, "remoteApproved": remoteApproved, "realLocalReadAndLeaseSave": err == nil, "syntheticTemporaryFilesOnly": true, "captures": h.captures, "errors": result.Errors, "scope": "Separate production editor child, actual application backend with home closed; test-only DOM actions; no standalone backend-process-loss claim"}
+	report := map[string]any{"passed": err == nil, "actualProductionChild": true, "actualWebView2": true, "mainWindowCreated": false, "mainMarkedClosed": !homePresent, "remoteApproved": remoteApproved, "realLocalReadAndLeaseSave": err == nil, "syntheticTemporaryFilesOnly": true, "captures": h.captures, "errors": result.Errors, "finalDocuments": result.Documents, "scope": "Separate production editor child, actual application backend with home closed; test-only DOM actions; no standalone backend-process-loss claim"}
 	if err != nil {
 		report["error"] = err.Error()
 	}

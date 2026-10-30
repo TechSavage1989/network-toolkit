@@ -489,7 +489,7 @@ test('automatic data floors preserve unit Fit scale and later linear zoom after 
 test('sparse Fit retains every timestamp and held identity at unit scale in both modes',()=>{
  for(const mode of ['linear','condensed']){
   const h=harness(),rows=Array.from({length:1441},(_,i)=>reply(i+1,10,stamp(i*60))),source=JSON.stringify(rows);h.api.setPreferences({mode},{persist:false});h.render(rows);h.api.selectResult('job',h.api.sampleKey(rows[1000]));h.api.zoom('job','reset');const nav=h.document.querySelector('[data-graph-navigator]');
-  assert.equal(h.document.querySelector('[data-rt-zoom-level]').dataset.rtZoomFactor,'1',mode+' Fit unit scale');assert.equal(nav.dataset.viewStart,nav.dataset.fullStart);assert.equal(nav.dataset.viewEnd,nav.dataset.fullEnd);assert(h.detail().includes('Sample1001'));assert.equal(JSON.stringify(rows),source);
+  assert.equal(h.document.querySelector('[data-rt-zoom-level]').dataset.rtZoomFactor,'1',mode+' Fit unit scale');assert.equal(h.document.querySelector('[data-graph-time-preset] option[value="custom"]'),null,mode+' paused Fit remains All, not a custom adjustment');assert.equal(nav.dataset.viewStart,nav.dataset.fullStart);assert.equal(nav.dataset.viewEnd,nav.dataset.fullEnd);assert(h.detail().includes('Sample1001'));assert.equal(JSON.stringify(rows),source);
   h.context.NetworkToolkitGraphHistory.setPreferences({durationMs:10000},{persist:false,fit:true});assert.equal(h.document.querySelector('[data-rt-zoom-level]').dataset.rtZoomFactor,'1',mode+' feasible preset base');assert(h.document.querySelectorAll('[data-rt-point]').filter(p=>!p.hasAttribute('data-rt-aggregate')).length>=5);assert(h.document.querySelector('[data-rt-zoom="in"]').disabled);
  }
 });

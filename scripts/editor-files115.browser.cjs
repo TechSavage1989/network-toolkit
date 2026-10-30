@@ -7,7 +7,7 @@ const ftp={id:'ftp',name:'Manual FTPS',host:'ftp.invalid',port:21,username:'fixt
 const catalog=[...profiles.map(p=>({id:'ssh:'+p.id,name:p.name,protocol:'ssh',host:p.host,port:p.port})),{id:'ftp:ftp',name:ftp.name,protocol:'ftps',host:ftp.host,port:ftp.port}];
 const save=()=>fs.writeFileSync(path.join(out,'editor-files115-results.json'),JSON.stringify(report,null,2)),check=name=>{report.checks.push(name);console.log('PASS '+name);save();};
 async function start(width,detached=false){
- const ctx=await browser.newContext({viewport:{width,height:950}}),page=await ctx.newPage(),calls=[];activePage=page;page.setDefaultTimeout(15000);let allowed=!detached,pending='',owned={},saved={activePage:'editor',appUpdatePreferences:{enabled:false},terminalProfiles:profiles,ftpProfiles:[ftp],theme:'light'},reviewRows=[];
+ const ctx=await browser.newContext({viewport:{width,height:950}}),page=await ctx.newPage(),calls=[];activePage=page;page.setDefaultTimeout(15000);let allowed=!detached,explorerPending=false,pending='',owned={},saved={activePage:'editor',appUpdatePreferences:{enabled:false},terminalProfiles:profiles,ftpProfiles:[ftp],theme:'light'},reviewRows=[];
  page.on('pageerror',e=>report.errors.push(e.message));
  await ctx.route('https://saved113.toolkit.test/**',async route=>{const request=route.request(),url=new URL(request.url()),p=url.pathname,b=request.postData()?request.postDataJSON():null;try{
   if(p.startsWith('/api/')){calls.push({path:p,method:request.method(),body:b});let data={};
@@ -20,7 +20,7 @@ async function start(width,detached=false){
    else if(p==='/api/terminal-views')data={available:false,views:[],owners:{}};
    else if(p==='/api/editor-views'||p==='/api/editor-views/current')data={available:true,self:detached?child:'',ownerInstanceId:'synthetic113',views:[],incoming:[],outgoing:[],owned,recovery:[],explorerRequests:[],savedConnectionRequests:reviewRows};
    else if(p==='/api/editor-views/current/state'){for(const d of b.batch.documents)owned[d.uid]=1;data={owned};}
-   else if(p==='/api/editor-views/current/explorer')data={allowed,pending:false};
+   else if(p==='/api/editor-views/current/explorer'){if(request.method()==='POST'){assert.deepEqual(b,{});explorerPending=true;}data={allowed,pending:explorerPending};}
    else if(p==='/api/editor-views/saved-connections'){
     if(!allowed)return route.fulfill({status:403,contentType:'application/json',body:JSON.stringify({error:'Request file explorer access in the main window first.'})});
     data={profiles:catalog.filter(x=>!detached||x.protocol==='ssh'),pendingRequest:pending,detached};
