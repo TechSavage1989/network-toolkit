@@ -1,0 +1,17 @@
+NETWORK TOOLKIT 1.17.118
+
+CONSISTENT CONNECT SIDEBARS
+
+- Connect is now above Files in the Text Editor's vertical sidebar. The selected
+  panel and existing sidebar preferences remain unchanged.
+- Every existing Connect sidebar tab uses one distinct connection-plug icon:
+  Editor, transfer clients and transfer servers. Existing icon sizing, colors,
+  labels, keyboard navigation, active states and connection controls are retained.
+- Terminal Saved, Recent, Macros and SFTP tabs keep their own distinct symbols;
+  unrelated serial/port-scan and settings icons are not repurposed.
+
+This is a presentation-only update. It does not change connection, credential,
+UAC, shell, transfer or document-ownership behavior. The Terminal tab click fixes
+and CMD/PowerShell folder/admin controls remain unchanged. Existing narrow
+comparison alignment, Hosts initial-focus and Alt-cross-window findings remain
+recorded in docs/RELEASE117_HANDOFF.md; this update does not claim to fix them.

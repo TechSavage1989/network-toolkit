@@ -1,11 +1,15 @@
-NETWORK TOOLKIT 1.17.117
+NETWORK TOOLKIT 1.17.118
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.117
+CURRENT RELEASE - 1.17.118
 
-Release details: RELEASE_NOTES_1.17.117.txt
-Previous release: docs/releases/RELEASE_NOTES_1.17.116.txt
+Release details: RELEASE_NOTES_1.17.118.txt
+Previous release: docs/releases/RELEASE_NOTES_1.17.117.txt
 Full release-note archive: docs/releases/README.md
+
+118 places Editor Connect above Files and gives existing Connect sidebars one
+dedicated connection icon. Selected panels, handlers and security remain unchanged.
+Historical validation caveats below remain unresolved; this is not a related fix.
 
 117 published 2026-10-29T23:33:10Z; public assets/source/feed verified 23:35:30.794Z.
 Source/tag 51aa026f07e201979b3adb44d048c66c06508826. New feature/native/core checks
