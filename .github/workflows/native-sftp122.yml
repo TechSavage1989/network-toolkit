@@ -1,0 +1,46 @@
+name: Focused native SFTP drag diagnostics
+
+on:
+  push:
+    branches: ['diagnostic/native-sftp122-*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: native-sftp122-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native-drag:
+    runs-on: windows-latest
+    timeout-minutes: 16
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Test caller-bound native drag and deferred-copy safeguards
+        env:
+          GOTOOLCHAIN: local
+        run: go test -mod=vendor ./cmd/network-toolkit ./internal/desktop -run '^TestExplorerDirect121|^TestNativeDeferred121|^TestNativeFileDrag|^TestNativeDragTrace122' -count=1 -v
+      - name: Measure repeated real main and child Windows gestures
+        if: success() || failure()
+        env:
+          GOTOOLCHAIN: local
+          NETWORK_TOOLKIT_NATIVE_SFTP121_TEST: '1'
+          NETWORK_TOOLKIT_NATIVE_DRAG122_DIAGNOSTIC: '1'
+          NETWORK_TOOLKIT_NATIVE_DRAG122_PHASE: baseline121
+          TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/native-sftp122
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestNativeSFTPDirect121InstalledWebView2$' -count=1 -timeout=12m -v
+      - name: Retain exact-source native input and outcome evidence
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: native-sftp122-diagnostics
+          path: ${{ runner.temp }}/native-sftp122
+          if-no-files-found: error
+          retention-days: 14

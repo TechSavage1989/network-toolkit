@@ -21,6 +21,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
@@ -35,7 +36,16 @@ func TestNativeSFTPDirect121InstalledWebView2(t *testing.T) {
 	if os.Getenv("NETWORK_TOOLKIT_NATIVE_SFTP121_TEST") != "1" {
 		t.Skip("explicit hosted synthetic full-app SFTP/Explorer acceptance only")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Minute)
+	diagnostic122 := os.Getenv("NETWORK_TOOLKIT_NATIVE_DRAG122_DIAGNOSTIC") == "1"
+	phase122 := os.Getenv("NETWORK_TOOLKIT_NATIVE_DRAG122_PHASE")
+	if diagnostic122 && phase122 != "baseline121" && phase122 != "candidate122" {
+		t.Fatal("explicit baseline121 or candidate122 phase required")
+	}
+	timeout := 6 * time.Minute
+	if diagnostic122 {
+		timeout = 10 * time.Minute
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 	root, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {
@@ -46,6 +56,14 @@ func TestNativeSFTPDirect121InstalledWebView2(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(private)
+	traceDir122 := filepath.Join(private, "child-trace122")
+	if diagnostic122 {
+		if err = os.Mkdir(traceDir122, 0700); err != nil {
+			t.Fatal(err)
+		}
+		t.Setenv("NETWORK_TOOLKIT_NATIVE_SFTP122_TEST", "1")
+		t.Setenv("NETWORK_TOOLKIT_NATIVE_DRAG_TRACE122", traceDir122)
+	}
 	source := filepath.Join(private, "source")
 	local := filepath.Join(private, "local")
 	for _, p := range []string{source, local, filepath.Join(source, "tree", "empty"), filepath.Join(source, "tree", "nested")} {
@@ -83,7 +101,12 @@ func TestNativeSFTPDirect121InstalledWebView2(t *testing.T) {
 		t.Fatal("real retained SFTP preflight bytes differ")
 	}
 	executable := filepath.Join(private, "Network_Toolkit.sftp121.exe")
-	build := exec.CommandContext(ctx, "go", "build", "-trimpath", "-ldflags=-H=windowsgui", "-o", executable, "./cmd/network-toolkit")
+	buildArgs := []string{"build", "-trimpath", "-ldflags=-H=windowsgui", "-o", executable}
+	if diagnostic122 {
+		buildArgs = append(buildArgs, "-tags", "toolkit_native_drag_trace122")
+	}
+	buildArgs = append(buildArgs, "./cmd/network-toolkit")
+	build := exec.CommandContext(ctx, "go", buildArgs...)
 	build.Dir = root
 	if out, e := build.CombinedOutput(); e != nil {
 		t.Fatalf("production child build: %v %s", e, out)
@@ -106,6 +129,8 @@ func TestNativeSFTPDirect121InstalledWebView2(t *testing.T) {
 	finishFile.Store("")
 	var mu sync.Mutex
 	var actions []string
+	var activeCase atomic.Value
+	activeCase.Store("")
 	var transitions []map[string]any
 	var nativeTrace []desktop.NativeFileDragObservation
 	var materialized atomic.Int32
@@ -157,7 +182,7 @@ func TestNativeSFTPDirect121InstalledWebView2(t *testing.T) {
 				r.Body = io.NopCloser(bytes.NewReader(body))
 				mu.Lock()
 				actions = append(actions, request.Action)
-				transitions = append(transitions, map[string]any{"phase": "request", "action": request.Action, "outcome": request.Outcome, "gesture": request.Gesture})
+				transitions = append(transitions, map[string]any{"tickMS": sftp122TickMS(), "case": activeCase.Load(), "phase": "request", "action": request.Action, "outcome": request.Outcome, "gesture": request.Gesture})
 				mu.Unlock()
 				if request.Action == "prepare" {
 					http.Error(w, "fixture forbids prerequisite Prepare copy", 403)
@@ -169,7 +194,7 @@ func TestNativeSFTPDirect121InstalledWebView2(t *testing.T) {
 			}
 			a.ServeHTTP(w, r)
 			if request.Action != "" {
-				detail := map[string]any{"phase": "response", "action": request.Action, "outcome": request.Outcome}
+				detail := map[string]any{"tickMS": sftp122TickMS(), "case": activeCase.Load(), "phase": "response", "action": request.Action, "outcome": request.Outcome}
 				a.explorerTransfers.mu.Lock()
 				if j := a.explorerTransfers.jobs[request.ID]; j != nil {
 					detail["state"] = j.state
@@ -198,7 +223,22 @@ func TestNativeSFTPDirect121InstalledWebView2(t *testing.T) {
 	defer server.Close()
 	a.host = strings.TrimPrefix(server.URL, "http://")
 	report := map[string]any{"passed": false, "fullProductionPage": true, "actualRetainedLoopbackSFTP": true, "preflightRetainedRead": true, "actualWindowsExplorer": true, "syntheticTemporaryFilesOnly": true, "nativeInput": "Win32 pointer down/move/up; no DOM drag event substitution"}
+	report["diagnostic122"] = diagnostic122
+	report["phase122"] = phase122
+	if diagnostic122 {
+		for _, what := range []string{"HEAD", "HEAD^{tree}"} {
+			cmd := exec.CommandContext(ctx, "git", "rev-parse", what)
+			cmd.Dir = root
+			if out, e := cmd.Output(); e == nil {
+				report["source_"+what] = strings.TrimSpace(string(out))
+			} else {
+				t.Fatal(e)
+			}
+		}
+		report["childInstrumentation"] = "toolkit_native_drag_trace122 build tag; typed path-free observer only; production admission decisions unchanged"
+	}
 	activeView := ""
+	var caseFailures []string
 	var cases []map[string]any
 	var attempts []map[string]any
 	ready := make(chan struct{})
@@ -276,111 +316,156 @@ func TestNativeSFTPDirect121InstalledWebView2(t *testing.T) {
 				if e := h.capture(view, "sftp-direct121-"+label+"-ready"); e != nil {
 					return e
 				}
-				for _, test := range []struct{ name, path, expected, mode string }{{"file", "/one.txt", "one.txt", "Copy"}, {"folder", "/tree", "tree/nested/two.txt", "Copy"}, {"cancel-before", "/one.txt", "", "CancelBefore"}, {"cancel-during", "/slow.bin", "", "CancelDuring"}} {
-					name := label + "-" + test.name
-					dest := filepath.Join(private, "dest-"+name)
-					if e := os.MkdirAll(dest, 0700); e != nil {
-						return e
-					}
-					finished := filepath.Join(private, name+".finished")
-					started := filepath.Join(private, name+".materializing")
-					finishFile.Store(finished)
-					marker.Store(started)
-					slow.Store(test.mode == "CancelDuring")
-					before := materialized.Load()
-					mu.Lock()
-					transitionStart := len(transitions)
-					mu.Unlock()
-					state, e := h.command(view, nativeEditorCommand{Action: "row", Destination: test.path})
-					if e != nil {
-						return e
-					}
-					point, e := sftpDirect121RowPoint(state, test.path)
-					if e != nil {
-						return e
-					}
-					pid, exe, e := h.identity(view)
-					if e != nil {
-						return e
-					}
-					args := []string{"-NoProfile", "-NonInteractive", "-File", filepath.Join(root, "scripts", "native-sftp-direct121.ps1"), "-OwnerProcessID", strconv.Itoa(pid), "-ExecutablePath", exe, "-DestinationDirectory", dest, "-FinishedFile", finished, "-MaterializingFile", started, "-Mode", test.mode, "-FromX", fmt.Sprint(point.Left), "-FromY", fmt.Sprint(point.Top), "-FromWidth", fmt.Sprint(state.Geometry.Width), "-FromHeight", fmt.Sprint(state.Geometry.Height)}
-					if test.expected != "" {
-						args = append(args, "-ExpectedPath", filepath.Join(dest, filepath.FromSlash(test.expected)))
-					}
-					cmd := exec.CommandContext(ctx, "powershell.exe", args...)
-					out, e := cmd.CombinedOutput()
-					attempt := map[string]any{"name": name, "sourceGeometry": state.Geometry, "sourceHitTested": true}
-					if b, readErr := os.ReadFile(finished + ".input.json"); readErr == nil {
-						var v any
-						if json.Unmarshal(bytes.TrimPrefix(b, []byte{0xef, 0xbb, 0xbf}), &v) == nil {
-							attempt["destinationInput"] = v
+				type gestureCase struct{ name, kind, path, expected, mode, speed string }
+				tests := []gestureCase{{"file", "file", "/one.txt", "one.txt", "Copy", "Normal"}, {"folder", "folder", "/tree", "tree/nested/two.txt", "Copy", "Normal"}, {"cancel-before", "cancel-before", "/one.txt", "", "CancelBefore", "Normal"}, {"cancel-during", "cancel-during", "/slow.bin", "", "CancelDuring", "Normal"}}
+				if diagnostic122 {
+					tests = nil
+					for repeat := 1; repeat <= 2; repeat++ {
+						for _, speed := range []string{"Fast", "Normal", "Slow"} {
+							tests = append(tests, gestureCase{fmt.Sprintf("file-%s-%d", strings.ToLower(speed), repeat), "file", "/one.txt", "one.txt", "Copy", speed})
 						}
 					}
-					attempts = append(attempts, attempt)
-					slow.Store(false)
-					if e != nil {
-						return fmt.Errorf("actual %s gesture: %w %s", name, e, out)
-					}
-					if !json.Valid(bytes.TrimSpace(out)) {
-						return fmt.Errorf("native evidence not JSON: %s", out)
-					}
-					terminalState, terminalNote := "", ""
-					mu.Lock()
-					for _, transition := range transitions[transitionStart:] {
-						if transition["phase"] == "response" && transition["action"] == "finish" {
-							terminalState, _ = transition["state"].(string)
-							terminalNote, _ = transition["note"].(string)
-						}
-					}
-					mu.Unlock()
-					if test.mode == "CancelDuring" && (terminalState != "cancelled" || !strings.Contains(terminalNote, "cancelled")) {
-						return fmt.Errorf("explicit materialization cancellation ended with state %q: %s", terminalState, terminalNote)
-					}
-					if test.mode == "Copy" {
-						for rel, want := range contents {
-							if test.name == "file" && rel != "one.txt" || test.name == "folder" && !strings.HasPrefix(rel, "tree/") {
-								continue
-							}
-							got, e := os.ReadFile(filepath.Join(dest, filepath.FromSlash(rel)))
-							if e != nil || !bytes.Equal(got, want) {
-								return fmt.Errorf("Explorer destination bytes differ for %s: %v", name, e)
-							}
-						}
-						if test.name == "folder" {
-							if info, e := os.Stat(filepath.Join(dest, "tree", "empty")); e != nil || !info.IsDir() {
-								return errors.New("empty remote directory lost")
-							}
-						}
-					} else {
-						entries, e := os.ReadDir(dest)
-						if e != nil || len(entries) != 0 {
-							return errors.New("cancelled destination is not empty")
-						}
-					}
-					if test.mode == "CancelBefore" && materialized.Load() != before {
-						return errors.New("Escape before drop read remote source bytes")
-					}
-					if test.mode == "CancelDuring" {
-						if _, e = os.Stat(started); e != nil {
-							return errors.New("during-copy cancellation never observed real bulk SFTP response")
-						}
-					}
-					a.explorerTransfers.mu.Lock()
-					pending := false
-					for _, j := range a.explorerTransfers.jobs {
-						if j.owner == view && (j.state == "dragging" || j.stage != "" || len(j.paths) > 0) {
-							pending = true
-						}
-					}
-					a.explorerTransfers.mu.Unlock()
-					if pending {
-						return errors.New("finished native copy retained active stage or paths")
-					}
-					if _, e = h.command(view, nativeEditorCommand{Action: "verify-dirty"}); e != nil {
-						return e
-					}
-					cases = append(cases, map[string]any{"name": name, "passed": true, "materializeRequests": materialized.Load() - before, "terminalState": terminalState, "terminalNote": terminalNote, "sourceHitTested": true, "sourceGeometry": state.Geometry, "input": json.RawMessage(bytes.TrimSpace(out))})
+					tests = append(tests, gestureCase{"folder", "folder", "/tree", "tree/nested/two.txt", "Copy", "Normal"}, gestureCase{"cancel-before", "cancel-before", "/one.txt", "", "CancelBefore", "Normal"}, gestureCase{"cancel-during", "cancel-during", "/slow.bin", "", "CancelDuring", "Normal"})
 				}
+				capturedFailure := false
+				for _, test := range tests {
+					name := label + "-" + test.name
+					activeCase.Store(name)
+					caseStart := sftp122TickMS()
+					runCase := func() error {
+						dest := filepath.Join(private, "dest-"+name)
+						if e := os.MkdirAll(dest, 0700); e != nil {
+							return e
+						}
+						finished := filepath.Join(private, name+".finished")
+						started := filepath.Join(private, name+".materializing")
+						finishFile.Store(finished)
+						marker.Store(started)
+						slow.Store(test.mode == "CancelDuring")
+						before := materialized.Load()
+						mu.Lock()
+						transitionStart := len(transitions)
+						mu.Unlock()
+						state, e := h.command(view, nativeEditorCommand{Action: "row", Destination: test.path})
+						if e != nil {
+							return e
+						}
+						point, e := sftpDirect121RowPoint(state, test.path)
+						if e != nil {
+							return e
+						}
+						pid, exe, e := h.identity(view)
+						if e != nil {
+							return e
+						}
+						args := []string{"-NoProfile", "-NonInteractive", "-File", filepath.Join(root, "scripts", "native-sftp-direct121.ps1"), "-OwnerProcessID", strconv.Itoa(pid), "-ExecutablePath", exe, "-DestinationDirectory", dest, "-FinishedFile", finished, "-MaterializingFile", started, "-Mode", test.mode, "-Speed", test.speed, "-FromX", fmt.Sprint(point.Left), "-FromY", fmt.Sprint(point.Top), "-FromWidth", fmt.Sprint(state.Geometry.Width), "-FromHeight", fmt.Sprint(state.Geometry.Height)}
+						if test.expected != "" {
+							args = append(args, "-ExpectedPath", filepath.Join(dest, filepath.FromSlash(test.expected)))
+						}
+						cmd := exec.CommandContext(ctx, "powershell.exe", args...)
+						out, e := cmd.CombinedOutput()
+						attempt := map[string]any{"name": name, "sourcePID": pid, "caseStartTickMS": caseStart, "commandEndTickMS": sftp122TickMS(), "speed": test.speed, "sourceGeometry": state.Geometry, "sourceHitTested": true}
+						if b, readErr := os.ReadFile(finished + ".input.json"); readErr == nil {
+							var v any
+							if json.Unmarshal(bytes.TrimPrefix(b, []byte{0xef, 0xbb, 0xbf}), &v) == nil {
+								attempt["destinationInput"] = v
+							}
+						}
+						attempts = append(attempts, attempt)
+						slow.Store(false)
+						if e != nil {
+							return fmt.Errorf("actual %s gesture: %w %s", name, e, out)
+						}
+						if !json.Valid(bytes.TrimSpace(out)) {
+							return fmt.Errorf("native evidence not JSON: %s", out)
+						}
+						terminalState, terminalNote := "", ""
+						mu.Lock()
+						for _, transition := range transitions[transitionStart:] {
+							if transition["phase"] == "response" && transition["action"] == "finish" {
+								terminalState, _ = transition["state"].(string)
+								terminalNote, _ = transition["note"].(string)
+							}
+						}
+						mu.Unlock()
+						if test.mode == "CancelDuring" && (terminalState != "cancelled" || !strings.Contains(terminalNote, "cancelled")) {
+							return fmt.Errorf("explicit materialization cancellation ended with state %q: %s", terminalState, terminalNote)
+						}
+						if test.mode == "Copy" {
+							for rel, want := range contents {
+								if test.kind == "file" && rel != "one.txt" || test.kind == "folder" && !strings.HasPrefix(rel, "tree/") {
+									continue
+								}
+								got, e := os.ReadFile(filepath.Join(dest, filepath.FromSlash(rel)))
+								if e != nil || !bytes.Equal(got, want) {
+									return fmt.Errorf("Explorer destination bytes differ for %s: %v", name, e)
+								}
+							}
+							if test.kind == "folder" {
+								if info, e := os.Stat(filepath.Join(dest, "tree", "empty")); e != nil || !info.IsDir() {
+									return errors.New("empty remote directory lost")
+								}
+							}
+						} else {
+							entries, e := os.ReadDir(dest)
+							if e != nil || len(entries) != 0 {
+								return errors.New("cancelled destination is not empty")
+							}
+						}
+						if test.mode == "CancelBefore" && materialized.Load() != before {
+							return errors.New("Escape before drop read remote source bytes")
+						}
+						if test.mode == "CancelDuring" {
+							if _, e = os.Stat(started); e != nil {
+								return errors.New("during-copy cancellation never observed real bulk SFTP response")
+							}
+						}
+						a.explorerTransfers.mu.Lock()
+						pending := false
+						for _, j := range a.explorerTransfers.jobs {
+							if j.owner == view && (j.state == "dragging" || j.stage != "" || len(j.paths) > 0) {
+								pending = true
+							}
+						}
+						a.explorerTransfers.mu.Unlock()
+						if pending {
+							return errors.New("finished native copy retained active stage or paths")
+						}
+						if _, e = h.command(view, nativeEditorCommand{Action: "verify-dirty"}); e != nil {
+							return e
+						}
+						cases = append(cases, map[string]any{"name": name, "speed": test.speed, "passed": true, "materializeRequests": materialized.Load() - before, "terminalState": terminalState, "terminalNote": terminalNote, "sourceHitTested": true, "sourceGeometry": state.Geometry, "input": json.RawMessage(bytes.TrimSpace(out))})
+						return nil
+					}
+					if err := runCase(); err != nil {
+						cases = append(cases, map[string]any{"name": name, "speed": test.speed, "passed": false, "error": err.Error()})
+						if !diagnostic122 || test.mode != "Copy" {
+							return err
+						}
+						// Continue observations only after the genuine native gesture has ended;
+						// never cancel/reclaim a live transfer to make the matrix proceed.
+						a.explorerTransfers.mu.Lock()
+						pending := false
+						for _, j := range a.explorerTransfers.jobs {
+							if j.owner == view && (j.state == "preparing" || j.state == "ready" || j.state == "claimed" || j.state == "dragging" || j.stage != "" || len(j.paths) > 0) {
+								pending = true
+							}
+						}
+						a.explorerTransfers.mu.Unlock()
+						if pending {
+							return fmt.Errorf("diagnostic copy failed with live transfer; stopping without reclamation: %w", err)
+						}
+						caseFailures = append(caseFailures, name+": "+err.Error())
+						if !capturedFailure {
+							_ = h.capture(view, "sftp-direct121-"+label+"-first-failure")
+							capturedFailure = true
+						}
+						if _, e := h.command(view, nativeEditorCommand{Action: "verify-dirty"}); e != nil {
+							return e
+						}
+					}
+				}
+				activeCase.Store(label + "-row-to-editor")
 				state, e := h.command(view, nativeEditorCommand{Action: "row", Destination: "/one.txt"})
 				if e != nil {
 					return e
@@ -407,6 +492,9 @@ func TestNativeSFTPDirect121InstalledWebView2(t *testing.T) {
 					return errors.New("original SFTP source changed")
 				}
 			}
+			if len(caseFailures) > 0 {
+				return fmt.Errorf("%d diagnostic copy gestures failed; see bounded cases", len(caseFailures))
+			}
 			return nil
 		}
 		e := run()
@@ -416,6 +504,49 @@ func TestNativeSFTPDirect121InstalledWebView2(t *testing.T) {
 		report["passed"] = e == nil
 		report["cases"] = cases
 		report["attempts"] = attempts
+		report["caseFailures"] = caseFailures
+		if diagnostic122 {
+			childTraces := map[string][]json.RawMessage{}
+			childEventCount := 0
+			childAdmissionEvents := 0
+			var childDropped uint32
+			files, _ := filepath.Glob(filepath.Join(traceDir122, "native-drag122-*.jsonl"))
+			for _, file := range files {
+				b, e := os.ReadFile(file)
+				if e != nil || len(b) > 4<<20 {
+					continue
+				}
+				var events []json.RawMessage
+				for _, line := range bytes.Split(b, []byte("\n")) {
+					if len(line) > 0 && json.Valid(line) && len(events) < 4160 {
+						var typed desktop.NativeFileDragObservation
+						if json.Unmarshal(line, &typed) != nil || typed.Kind == "" || typed.TickMS == 0 {
+							continue
+						}
+						if typed.Dropped > childDropped {
+							childDropped = typed.Dropped
+						}
+						if typed.Kind == "claim-received" || typed.Kind == "dispatch-enter" || typed.Kind == "ole-enter" {
+							childAdmissionEvents++
+						}
+						events = append(events, append(json.RawMessage{}, line...))
+					}
+				}
+				childTraces[filepath.Base(file)] = events
+				childEventCount += len(events)
+			}
+			report["childNativeTrace"] = childTraces
+			report["childTraceEventCount"] = childEventCount
+			report["childTraceAdmissionEvents"] = childAdmissionEvents
+			report["childTraceDropped"] = childDropped
+			if (childEventCount == 0 || childAdmissionEvents == 0 || childDropped > 0) && report["childApprovedConnectionVisible"] == true {
+				report["childTraceMissing"] = true
+				if e == nil {
+					e = errors.New("diagnostic child observer trace missing or dropped events")
+					report["passed"] = false
+				}
+			}
+		}
 		report["captures"] = h.captures
 		mu.Lock()
 		report["actions"] = append([]string{}, actions...)
@@ -432,7 +563,7 @@ func TestNativeSFTPDirect121InstalledWebView2(t *testing.T) {
 	}()
 	err = desktop.Run(ctx, desktop.Config{Title: "Network Toolkit synthetic SFTP121 acceptance", URL: server.URL + "/", SessionToken: a.token, DataDir: filepath.Join(private, "webview"), Stop: cancel, NativeFileDragObserver: func(event desktop.NativeFileDragObservation) {
 		mu.Lock()
-		if len(nativeTrace) < 1024 {
+		if len(nativeTrace) < 4096 {
 			nativeTrace = append(nativeTrace, event)
 		}
 		mu.Unlock()
@@ -585,3 +716,7 @@ func sftpDirect121Server(t *testing.T, ctx context.Context, root string, slow *a
 	}
 	return listener.Addr().(*net.TCPAddr).Port, ssh.FingerprintSHA256(signer.PublicKey()), cleanup
 }
+
+var sftp122TickProc = syscall.NewLazyDLL("kernel32.dll").NewProc("GetTickCount64")
+
+func sftp122TickMS() uint64 { tick, _, _ := sftp122TickProc.Call(); return uint64(tick) }

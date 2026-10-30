@@ -2,7 +2,9 @@ name: Checks
 
 on:
   push:
-    branches: ['**']
+    # Disposable focused diagnostic branches run native-sftp122.yml instead.
+    # Restore the ordinary release trigger before promoting a release candidate.
+    branches: ['**', '!diagnostic/native-sftp122-*']
   pull_request:
   workflow_dispatch:
 

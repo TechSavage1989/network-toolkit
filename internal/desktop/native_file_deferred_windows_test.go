@@ -188,3 +188,40 @@ func TestNativeDeferred121DiagnosticTraceBounded(t *testing.T) {
 	var absent *nativeFileTrace
 	absent.emit(NativeFileDragObservation{Kind: "ole-enter"})
 }
+
+func TestNativeDeferred122TraceCorrelatesAndDeduplicates(t *testing.T) {
+	var seen []NativeFileDragObservation
+	trace := &nativeFileTrace{sequence: 7, callback: func(event NativeFileDragObservation) { seen = append(seen, event) }}
+	format := nativeFormat{Format: 15, Aspect: 1, Index: -1, Medium: 1}
+	for i := 0; i < 400; i++ {
+		trace.format("get-data", uintptr(unsafe.Pointer(&format)), 0x80040064)
+	}
+	trace.emit(NativeFileDragObservation{Kind: "drop-key-release"})
+	trace.format("get-data", uintptr(unsafe.Pointer(&format)), 0)
+	trace.emit(NativeFileDragObservation{Kind: "ole-return", HRESULT: 0x40100, Effect: 1})
+	if len(seen) != 4 {
+		t.Fatalf("target probes exhausted decisions: %d", len(seen))
+	}
+	for _, event := range seen {
+		if event.TickMS == 0 || event.Sequence != 7 {
+			t.Fatalf("uncorrelated event: %+v", event)
+		}
+	}
+	ctx := context.WithValue(context.Background(), nativeFileTraceContextKey{}, trace)
+	if nativeTraceFromContext(ctx) != trace || nativeTraceFromContext(context.Background()) != nil {
+		t.Fatal("trace context changed identity")
+	}
+}
+
+func TestNativeDeferred122FormatDedupeStorageIsBounded(t *testing.T) {
+	trace := &nativeFileTrace{callback: func(NativeFileDragObservation) {}}
+	for i := 1; i < 1000; i++ {
+		f := nativeFormat{Format: uint16(i), Aspect: 1, Medium: 1}
+		trace.format("get-data", uintptr(unsafe.Pointer(&f)), 0)
+	}
+	count := 0
+	trace.formats.Range(func(_, _ any) bool { count++; return true })
+	if count > 127 {
+		t.Fatalf("unbounded diagnostic format storage: %d", count)
+	}
+}

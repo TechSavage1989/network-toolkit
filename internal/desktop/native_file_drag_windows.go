@@ -142,17 +142,27 @@ func (w *hostWindow) runNativeFileDrag(done <-chan struct{}) {
 		if e != nil || !validNativeFileDrag(job) {
 			continue
 		}
+		trace := newNativeFileTrace(hwnd)
+		jobCtx := ctx
+		if trace != nil {
+			jobCtx = context.WithValue(ctx, nativeFileTraceContextKey{}, trace)
+			trace.emit(NativeFileDragObservation{Kind: "claim-received", Flags: nativeFileAdmissionFlags(ctx, hwnd, w.isClosing())})
+		}
 		// A known start acknowledgement is required before OLE; ambiguous HTTP
 		// outcomes are reconciled on the same ID, never by starting a second drag.
-		if !nativeFileDragTransition(ctx, client, endpoint, w.cfg.SessionToken, job.ID, job.Gesture, "start", "") {
+		if !nativeFileDragTransition(jobCtx, client, endpoint, w.cfg.SessionToken, job.ID, job.Gesture, "start", "") {
 			continue
 		}
 		finished := make(chan struct{})
-		dragCtx, cancelDrag := context.WithCancel(ctx)
+		dragCtx, cancelDrag := context.WithCancel(jobCtx)
 		go monitorNativeFileDragLease(dragCtx, cancelDrag, finished, client, endpoint, w.cfg.SessionToken, job.ID)
 		outcome := "cancelled"
+		trace.emit(NativeFileDragObservation{Kind: "dispatch-posted"})
 		if !w.post(func() {
 			defer close(finished)
+			if trace != nil {
+				trace.emit(NativeFileDragObservation{Kind: "dispatch-enter", Flags: nativeFileAdmissionFlags(dragCtx, hwnd, w.isClosing())})
+			}
 			if !w.isClosing() && nativeFileDragHeld(hwnd) {
 				var effect uint32
 				var err error
@@ -167,9 +177,10 @@ func (w *hostWindow) runNativeFileDrag(done <-chan struct{}) {
 					outcome = "copied"
 				}
 			} else {
-				newNativeFileTrace(hwnd).emit(NativeFileDragObservation{Kind: "dispatch-not-held-or-closing"})
+				trace.emit(NativeFileDragObservation{Kind: "dispatch-not-held-or-closing"})
 			}
 		}) {
+			trace.emit(NativeFileDragObservation{Kind: "dispatch-post-failed"})
 			close(finished)
 		}
 		// A canceled owner cannot reclaim bytes underneath the active OLE call.
@@ -181,6 +192,9 @@ func (w *hostWindow) runNativeFileDrag(done <-chan struct{}) {
 		}
 		cancelDrag()
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 3*time.Second)
+		if trace != nil {
+			cleanupCtx = context.WithValue(cleanupCtx, nativeFileTraceContextKey{}, trace)
+		}
 		confirmed := nativeFileDragTransition(cleanupCtx, client, endpoint, w.cfg.SessionToken, job.ID, job.Gesture, "finish", outcome)
 		cleanupCancel()
 		observeNativeFileDrag(hwnd, fmt.Sprintf("finish-receipt confirmed=%t outcome=%s", confirmed, outcome))
@@ -196,6 +210,8 @@ func (w *hostWindow) runNativeFileDrag(done <-chan struct{}) {
 func nativeFileDragTransition(ctx context.Context, client *http.Client, endpoint, token, id string, gesture uint64, action, outcome string) bool {
 	body, _ := json.Marshal(map[string]any{"action": action, "id": id, "gesture": gesture, "outcome": outcome})
 	for ctx.Err() == nil {
+		trace := nativeTraceFromContext(ctx)
+		trace.emit(NativeFileDragObservation{Kind: action + "-request"})
 		req, e := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
 		if e != nil {
 			return false
@@ -203,6 +219,11 @@ func nativeFileDragTransition(ctx context.Context, client *http.Client, endpoint
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("X-Session-Token", token)
 		res, e := client.Do(req)
+		status := uint32(0)
+		if res != nil {
+			status = uint32(res.StatusCode)
+		}
+		trace.emit(NativeFileDragObservation{Kind: action + "-response", Status: status})
 		if e == nil {
 			io.Copy(io.Discard, io.LimitReader(res.Body, 4096))
 			res.Body.Close()
@@ -241,28 +262,85 @@ type nativeFileTrace struct {
 	callback func(NativeFileDragObservation)
 	count    atomic.Uint32
 	feedback atomic.Uint32
+	sequence uint64
+	formats  sync.Map
 }
 
+type nativeFileTraceContextKey struct{}
+
+var nativeFileTraceSequence atomic.Uint64
+var nativeFileTraceTick = syscall.NewLazyDLL("kernel32.dll").NewProc("GetTickCount64")
+
 func newNativeFileTrace(hwnd uintptr) *nativeFileTrace {
-	if value, ok := wndWindows.Load(hwnd); ok {
-		if callback := value.(*hostWindow).cfg.NativeFileDragObserver; callback != nil {
-			return &nativeFileTrace{callback: callback}
+	callback := nativeFileTraceDiagnosticSink()
+	if value, ok := wndWindows.Load(hwnd); ok && value.(*hostWindow).cfg.NativeFileDragObserver != nil {
+		callback = value.(*hostWindow).cfg.NativeFileDragObserver
+	}
+	if callback == nil {
+		return nil
+	}
+	return &nativeFileTrace{callback: callback, sequence: nativeFileTraceSequence.Add(1)}
+}
+func nativeTraceFromContext(ctx context.Context) *nativeFileTrace {
+	t, _ := ctx.Value(nativeFileTraceContextKey{}).(*nativeFileTrace)
+	return t
+}
+func nativeFileAdmissionFlags(ctx context.Context, hwnd uintptr, closing bool) uint32 {
+	var flags uint32
+	pressed, _, _ := fileDragKey.Call(1)
+	if pressed&0x8000 != 0 {
+		flags |= 1
+	}
+	front, _, _ := fileDragForeground.Call()
+	if front == hwnd {
+		flags |= 2
+	}
+	if closing {
+		flags |= 4
+	}
+	if ctx.Err() != nil {
+		flags |= 8
+	}
+	tid, pid := nativeFileWindowIdentity(hwnd)
+	if captured, ok := nativeFileThreadCapture(tid); ok && captured != 0 {
+		flags |= 16
+		capturedThread, capturedProcess := nativeFileWindowIdentity(captured)
+		if capturedThread == tid && capturedProcess == pid {
+			flags |= 32
+		}
+		ancestor, _, _ := fileDragUser.NewProc("GetAncestor").Call(captured, 2)
+		if ancestor == hwnd {
+			flags |= 64
 		}
 	}
-	return nil
+	return flags
 }
 func (t *nativeFileTrace) emit(event NativeFileDragObservation) {
 	if t != nil && t.callback != nil && (event.Kind == "ole-return" || t.count.Add(1) <= 127) {
+		tick, _, _ := nativeFileTraceTick.Call()
+		event.TickMS = uint64(tick)
+		event.Sequence = t.sequence
 		t.callback(event)
 	}
 }
 func (t *nativeFileTrace) format(kind string, raw, result uintptr) {
+	if t == nil || t.callback == nil || t.count.Load() >= 127 {
+		return
+	}
 	event := NativeFileDragObservation{Kind: kind, HRESULT: uint32(result)}
 	if raw != 0 {
 		f := (*nativeFormat)(unsafe.Pointer(raw))
 		event.Format = uint32(f.Format)
 		event.Aspect = f.Aspect
 		event.Medium = f.Medium
+	}
+	// Repeated target probes must not exhaust the bounded trace before DROP.
+	key := struct {
+		kind                           string
+		format, aspect, medium, result uint32
+	}{kind, event.Format, event.Aspect, event.Medium, event.HRESULT}
+	if _, seen := t.formats.LoadOrStore(key, struct{}{}); seen {
+		return
 	}
 	t.emit(event)
 }
@@ -543,7 +621,10 @@ func runNativeFileCopyDrag(ctx context.Context, hwnd uintptr, paths []string) (u
 	return effect, err
 }
 func runNativeFileDataDrag(ctx context.Context, hwnd uintptr, wrapper *nativeFileCOM) (uint32, error) {
-	wrapper.trace = newNativeFileTrace(hwnd)
+	wrapper.trace = nativeTraceFromContext(ctx)
+	if wrapper.trace == nil {
+		wrapper.trace = newNativeFileTrace(hwnd)
+	}
 	wrapper.refs.Store(1)
 	wrapper.active.Store(true)
 	source := &nativeFileCOM{vtable: &fileCOMSourceTable, source: true, ctx: ctx, hwnd: hwnd, delayed: wrapper.delayed, trace: wrapper.trace}
@@ -572,10 +653,14 @@ func runNativeFileDataDrag(ctx context.Context, hwnd uintptr, wrapper *nativeFil
 	defer source.active.Store(false)
 	var effect uint32
 	observeNativeFileDrag(hwnd, "ole-enter")
-	wrapper.trace.emit(NativeFileDragObservation{Kind: "ole-enter"})
+	if wrapper.trace != nil {
+		wrapper.trace.emit(NativeFileDragObservation{Kind: "ole-enter", Flags: nativeFileAdmissionFlags(ctx, hwnd, false)})
+	}
 	hr, _, _ := fileDragDo.Call(wp, sp, 1, uintptr(unsafe.Pointer(&effect)))
 	observeNativeFileDrag(hwnd, fmt.Sprintf("ole-return hr=%x effect=%d", hr, effect))
-	wrapper.trace.emit(NativeFileDragObservation{Kind: "ole-return", HRESULT: uint32(hr), Effect: effect})
+	if wrapper.trace != nil {
+		wrapper.trace.emit(NativeFileDragObservation{Kind: "ole-return", HRESULT: uint32(hr), Effect: effect, Flags: nativeFileAdmissionFlags(ctx, hwnd, false)})
+	}
 	runtime.KeepAlive(wrapper)
 	runtime.KeepAlive(source)
 	return effect, hresultError("Windows Explorer copy", hr)
@@ -616,6 +701,11 @@ func monitorNativeFileDragLease(ctx context.Context, cancel context.CancelFunc, 
 		}
 		stop()
 		if !valid {
+			status := uint32(0)
+			if res != nil {
+				status = uint32(res.StatusCode)
+			}
+			nativeTraceFromContext(ctx).emit(NativeFileDragObservation{Kind: "lease-check-rejected", Status: status})
 			cancel()
 			return
 		}

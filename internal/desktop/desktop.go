@@ -74,10 +74,15 @@ type WebViewConfig struct {
 
 // NativeFileDragObservation describes a native drag decision without user data.
 type NativeFileDragObservation struct {
-	Kind    string `json:"kind"`
-	Format  uint32 `json:"format,omitempty"`
-	Aspect  uint32 `json:"aspect,omitempty"`
-	Medium  uint32 `json:"medium,omitempty"`
-	HRESULT uint32 `json:"hresult,omitempty"`
-	Effect  uint32 `json:"effect,omitempty"`
+	Kind     string `json:"kind"`
+	TickMS   uint64 `json:"tickMS,omitempty"`
+	Sequence uint64 `json:"sequence,omitempty"`
+	Flags    uint32 `json:"flags,omitempty"`
+	Status   uint32 `json:"status,omitempty"`
+	Dropped  uint32 `json:"dropped,omitempty"`
+	Format   uint32 `json:"format,omitempty"`
+	Aspect   uint32 `json:"aspect,omitempty"`
+	Medium   uint32 `json:"medium,omitempty"`
+	HRESULT  uint32 `json:"hresult,omitempty"`
+	Effect   uint32 `json:"effect,omitempty"`
 }

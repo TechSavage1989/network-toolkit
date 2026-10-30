@@ -6,7 +6,8 @@ param(
  [string]$MaterializingFile='', [string]$ExpectedPath='',
  [double]$FromX,[double]$FromY,
  [double]$FromWidth,[double]$FromHeight,
- [ValidateSet('Arrange','Copy','CancelBefore','CancelDuring')][string]$Mode='Copy'
+ [ValidateSet('Arrange','Copy','CancelBefore','CancelDuring')][string]$Mode='Copy',
+ [ValidateSet('Fast','Normal','Slow')][string]$Speed='Normal'
 )
 # Hosted synthetic acceptance only. Input goes to exact supplied fixture PIDs and
 # executable identities. No clipboard, synthetic DOM drag, debug port, security
@@ -23,6 +24,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 public static class SFTPDirectInput {
  public delegate bool EnumWindow(IntPtr h,IntPtr p);
+ [DllImport("kernel32.dll")] public static extern ulong GetTickCount64();
  [DllImport("user32.dll")] public static extern bool EnumWindows(EnumWindow callback,IntPtr p);
  [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr h);
  [DllImport("user32.dll")] public static extern bool IsZoomed(IntPtr h);
@@ -74,6 +76,12 @@ if($Mode -eq 'Arrange'){
 }
 if(!$DestinationDirectory -or !$FinishedFile){throw 'Synthetic copy needs owned destination and finish marker'}
 $source=Client-Point $owner $FromX $FromY $FromWidth $FromHeight
+$timeline=New-Object System.Collections.Generic.List[object]
+function Mark-Input([string]$kind){$timeline.Add(@{kind=$kind;tickMS=[SFTPDirectInput]::GetTickCount64()})}
+$timing=@{press=150;threshold=200;steps=28;step=25;dwell=500}
+if($Speed -eq 'Fast'){$timing=@{press=60;threshold=40;steps=12;step=12;dwell=40}}
+if($Speed -eq 'Slow'){$timing=@{press=250;threshold=300;steps=40;step=30;dwell=750}}
+$inputEvidence=$null
 $shell=New-Object -ComObject Shell.Application
 $namespace=$shell.NameSpace((Get-Item -LiteralPath $DestinationDirectory).FullName)
 if(!$namespace -or !$namespace.Self.IsFolder){throw 'Synthetic Explorer destination not found'}
@@ -103,25 +111,28 @@ try{
  for($depth=0;$hit -and $depth -lt 12;$depth++){if($hit.Current.ClassName -eq 'UIItemsView'){$targetVerified=$true;break};$hit=[System.Windows.Automation.TreeWalker]::ControlViewWalker.GetParent($hit)}
  if(!$targetVerified){throw 'Drop point is not in actual Explorer Items View'}
  [uint32]$explorerPID=0;[void][SFTPDirectInput]::GetWindowThreadProcessId($explorer,[ref]$explorerPID)
- @{sourceToken=[SFTPDirectInput]::TokenFacts($OwnerProcessID);targetToken=[SFTPDirectInput]::TokenFacts($explorerPID);tokenFactFields=@('elevated','integrityRID','error');source=@($source.X,$source.Y);target=@($to.X,$to.Y);targetClass='UIItemsView';targetBounds=@($bounds.Left,$bounds.Top,$bounds.Width,$bounds.Height);targetVerified=$true;mode=$Mode}|ConvertTo-Json -Compress|Set-Content -LiteralPath ($FinishedFile+'.input.json') -Encoding UTF8
- [void][SFTPDirectInput]::SetCursorPos($source.X,$source.Y);[SFTPDirectInput]::mouse_event(2,0,0,0,[UIntPtr]::Zero)
+ $inputEvidence=@{sourceToken=[SFTPDirectInput]::TokenFacts($OwnerProcessID);targetToken=[SFTPDirectInput]::TokenFacts($explorerPID);tokenFactFields=@('elevated','integrityRID','error');source=@($source.X,$source.Y);target=@($to.X,$to.Y);targetClass='UIItemsView';targetBounds=@($bounds.Left,$bounds.Top,$bounds.Width,$bounds.Height);targetVerified=$true;mode=$Mode;speed=$Speed;timing=$timing;clock='Windows GetTickCount64 milliseconds since boot'}
+ $inputEvidence|ConvertTo-Json -Depth 8 -Compress|Set-Content -LiteralPath ($FinishedFile+'.input.json') -Encoding UTF8
+ [void][SFTPDirectInput]::SetCursorPos($source.X,$source.Y);Mark-Input 'press-before';[SFTPDirectInput]::mouse_event(2,0,0,0,[UIntPtr]::Zero);Mark-Input 'press-after'
  try{
-  Start-Sleep -Milliseconds 150
-  [void][SFTPDirectInput]::SetCursorPos($source.X+10,$source.Y+2);Start-Sleep -Milliseconds 200
-  for($i=1;$i -le 28;$i++){[void][SFTPDirectInput]::SetCursorPos([int]($source.X+($to.X-$source.X)*$i/28),[int]($source.Y+($to.Y-$source.Y)*$i/28));Start-Sleep -Milliseconds 25}
-  Start-Sleep -Milliseconds 500
-  if($Mode -eq 'CancelBefore'){[SFTPDirectInput]::keybd_event(27,0,0,[UIntPtr]::Zero);Start-Sleep -Milliseconds 150;[SFTPDirectInput]::keybd_event(27,0,2,[UIntPtr]::Zero)}
- }finally{[SFTPDirectInput]::mouse_event(4,0,0,0,[UIntPtr]::Zero)}
+  Start-Sleep -Milliseconds $timing.press
+  Mark-Input 'threshold-before';[void][SFTPDirectInput]::SetCursorPos($source.X+10,$source.Y+2);Mark-Input 'threshold-after';Start-Sleep -Milliseconds $timing.threshold
+  Mark-Input 'travel-start'
+  for($i=1;$i -le $timing.steps;$i++){[void][SFTPDirectInput]::SetCursorPos([int]($source.X+($to.X-$source.X)*$i/$timing.steps),[int]($source.Y+($to.Y-$source.Y)*$i/$timing.steps));Mark-Input ('move-'+$i);Start-Sleep -Milliseconds $timing.step}
+  Mark-Input 'target-arrival';Start-Sleep -Milliseconds $timing.dwell
+  if($Mode -eq 'CancelBefore'){Mark-Input 'escape-before';[SFTPDirectInput]::keybd_event(27,0,0,[UIntPtr]::Zero);Start-Sleep -Milliseconds 150;[SFTPDirectInput]::keybd_event(27,0,2,[UIntPtr]::Zero)}
+ }finally{Mark-Input 'release-before';[SFTPDirectInput]::mouse_event(4,0,0,0,[UIntPtr]::Zero);Mark-Input 'release-after'}
  if($Mode -eq 'CancelDuring'){
   $until=[DateTime]::UtcNow.AddSeconds(15);while(!(Test-Path -LiteralPath $MaterializingFile) -and [DateTime]::UtcNow -lt $until){Start-Sleep -Milliseconds 20}
   if(!(Test-Path -LiteralPath $MaterializingFile)){throw 'Actual loopback bulk response never began materializing'}
-  [SFTPDirectInput]::keybd_event(27,0,0,[UIntPtr]::Zero);Start-Sleep -Milliseconds 200;[SFTPDirectInput]::keybd_event(27,0,2,[UIntPtr]::Zero)
+  Mark-Input 'escape-during';[SFTPDirectInput]::keybd_event(27,0,0,[UIntPtr]::Zero);Start-Sleep -Milliseconds 200;[SFTPDirectInput]::keybd_event(27,0,2,[UIntPtr]::Zero)
  }
  $until=[DateTime]::UtcNow.AddSeconds(25);while(!(Test-Path -LiteralPath $FinishedFile) -and [DateTime]::UtcNow -lt $until){Start-Sleep -Milliseconds 50}
  if(!(Test-Path -LiteralPath $FinishedFile)){throw 'Native copy gesture never sent its authenticated terminal finish'}
+ Mark-Input 'finish-marker-observed'
  if($Mode -eq 'Copy'){
   $until=[DateTime]::UtcNow.AddSeconds(15);while(!(Test-Path -LiteralPath $ExpectedPath) -and [DateTime]::UtcNow -lt $until){Start-Sleep -Milliseconds 50}
   if(!(Test-Path -LiteralPath $ExpectedPath)){throw 'Actual Explorer destination file did not arrive'}
  }else{if(@(Get-ChildItem -LiteralPath $DestinationDirectory -Force).Count -ne 0){throw 'Cancelled gesture published files into destination'}}
  @{mode=$Mode;sourcePID=$OwnerProcessID;actualMouseDrag=$true;actualExplorer=$true;from=@($source.X,$source.Y);to=@($to.X,$to.Y);materializationObserved=([bool]$MaterializingFile -and (Test-Path -LiteralPath $MaterializingFile));finished=$true}|ConvertTo-Json -Compress
-}finally{[SFTPDirectInput]::mouse_event(4,0,0,0,[UIntPtr]::Zero);try{$window.Quit()}catch{}}
+}finally{Mark-Input 'script-finally';[SFTPDirectInput]::mouse_event(4,0,0,0,[UIntPtr]::Zero);if($inputEvidence){$inputEvidence.timeline=$timeline.ToArray();$inputEvidence|ConvertTo-Json -Depth 8 -Compress|Set-Content -LiteralPath ($FinishedFile+'.input.json') -Encoding UTF8};try{$window.Quit()}catch{}}
