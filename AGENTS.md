@@ -3,7 +3,21 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-Current published version:1.17.125. Published2026-10-30T18:24:37Z;
+Current published version: 1.17.126. Published 2026-10-30T19:14:20Z;
+actual downloads/source/feed verified 19:15:13Z, independently 19:15:42Z.
+Source/tag ed90d1e5d4769fc4bbc97484bf7e263d1794fd4e;
+tree 58e9852b3b8b74c580f6d29a0cf71c59abbb7e91.
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.126
+Actual Windows administrative inventory is repaired by separate JSON/diagnostic
+streams and bounded cold-start budgets. Published125 failed its actual query;
+corrected read-only cold inventory, authenticated GET and preflight passed.
+Unknown state, identity/revision, UAC and cancellation safeguards remain. No live
+NIC changes or visible UAC transition were tested. Core/security/Windows, seven
+synthetic UI groups and 1,201-source/1,208-member public package/feed proof passed.
+Read RELEASE126_HANDOFF.md for exact terminal outcomes and retained limitations.
+No unrelated fixes or permission changes are implied by this historical closure.
+
+Previous published version:1.17.125. Published2026-10-30T18:24:37Z;
 actual downloads/source/feed verified18:25:29Z, independently18:25:56Z.
 Source/tag0f5b46718ad133d2ae740112b797bbd46eea3449;
 tree94cb3eaa9ea575a4107973c22518691d9b3cf535.

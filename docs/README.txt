@@ -8,9 +8,12 @@ Previous release: docs/releases/RELEASE_NOTES_1.17.125.txt
 Full release-note archive: docs/releases/README.md
 
 126 repairs the read-only Windows administrative inventory: JSON and diagnostic
-streams are separated, module progress suppressed, and bounded cold-start budgets
-are applied consistently. Unknown states remain blocked; no live NIC mutation
-was used in validation. See RELEASE126_HANDOFF.md for exact-source evidence.
+streams are separated and bounded cold-start time is allowed. Actual Windows
+inventory, authenticated refresh and read-only action preflight passed, alongside
+mocked action guards and synthetic UI checks. Unknown state remains blocked;
+no live adapter changes or visible UAC transition were tested. Published 19:14:20Z,
+public bytes/feed verified 19:15:13Z and independently 19:15:42Z. Prior 125 unchanged.
+Read RELEASE126_HANDOFF.md for exact evidence and historical regression limits.
 
 Known 125 post-release issue: unknown administrative state can leave both new
 actions unavailable. Actual read-only query diagnosis and repair are tracked
