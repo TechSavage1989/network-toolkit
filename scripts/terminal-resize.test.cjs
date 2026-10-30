@@ -33,3 +33,19 @@ test('A new size queued during an in-flight request is sent after its acknowledg
  const c=setup();let accept;c.api=async(url,method,size)=>{c.requests.push({url,method,size:{...size}});if(c.requests.length===1)await new Promise(resolve=>accept=resolve);return {};};
  c.queueTerminalResize(c.entry,{cols:80,rows:24});await c.advance(120);assert.equal(c.entry.resizeSending,true);c.queueTerminalResize(c.entry,{cols:100,rows:32});await c.advance(80);c.queueTerminalResize(c.entry,{cols:100,rows:32});await c.advance(40);assert.equal(c.requests.length,1);accept();await new Promise(setImmediate);assert.deepEqual(c.requests.map(r=>r.size),[{cols:80,rows:24},{cols:100,rows:32}]);assert.equal(c.entry.lastResize,'100x32');assert.equal(c.entry.desiredResize,null);
 });
+
+test('Acknowledged identical 80ms fits preserve real xterm prompt stability without extra requests',async()=>{
+ global.self=global;const {Terminal}=require('../web/assets/xterm.js');
+ const c=setup(),entry=c.entry;entry.info={...entry.info,type:'ssh',host:'192.0.2.5',port:22,username:'operator'};entry.config={...entry.info};entry.xterm=new Terminal({cols:90,rows:12,allowProposedApi:true});entry.outputRevision=1;entry.lastResize='90x12';c.saveState=()=>{};
+ try{await new Promise(resolve=>entry.xterm.write('EDGE-SW01(config-if)# ',resolve));c.NetworkToolkitTerminalPromptLabels.observe(entry);
+ for(let i=0;i<12;i++){c.queueTerminalResize(entry,{cols:90,rows:12});await c.advance(80);}
+ assert.equal(entry._ntPromptName,'EDGE-SW01');assert.equal(entry.outputRevision,1);assert.equal(c.requests.length,0);assert.equal(entry.desiredResize,undefined);
+ }finally{entry.xterm.dispose();}
+});
+test('Returning to an acknowledged size while another resize is in flight must still be sent',async()=>{
+ const c=setup();c.entry.lastResize='80x24';let accept;
+ c.api=async(url,method,size)=>{c.requests.push({url,method,size:{...size}});if(c.requests.length===1)await new Promise(resolve=>accept=resolve);return {};};
+ c.queueTerminalResize(c.entry,{cols:100,rows:32});await c.advance(120);assert.equal(c.entry.resizeSending,true);
+ c.queueTerminalResize(c.entry,{cols:80,rows:24});assert.equal(c.entry.desiredResize.cols,80);assert.equal(c.entry.desiredResize.rows,24);accept();await new Promise(setImmediate);
+ assert.deepEqual(c.requests.map(r=>r.size),[{cols:100,rows:32},{cols:80,rows:24}]);assert.equal(c.entry.lastResize,'80x24');
+});

@@ -1649,6 +1649,9 @@ function scheduleTerminalFit(){sizeTerminalStage();if(state.activePage!=='termin
 function queueTerminalResize(entry,size){
 if(entry.transferBusy||entry.restoring||!terminalOwnerCanMutate(entry))return;if(!Number.isFinite(size.cols)||!Number.isFinite(size.rows))return;
 const next=terminalDimensions(size),same=entry.desiredResize?.cols===next.cols&&entry.desiredResize?.rows===next.rows,now=Date.now();
+// An acknowledged unchanged fit is not output and must not restart prompt stability.
+// Pending/in-flight resize work may still change the backend size, so retain it.
+if(entry.info.state==='connected'&&!entry.reconnectBusy&&!entry.resizeSending&&!entry.desiredResize&&entry.lastResize===next.cols+'x'+next.rows)return;
 // Repeated fits of the same pending geometry must not keep postponing its
 // transport acknowledgement. A genuinely new size still gets the debounce.
 const delay=same&&Number.isFinite(entry.resizeDueAt)?Math.max(0,entry.resizeDueAt-now):120;
