@@ -210,6 +210,14 @@ func TestNativeSFTPDirect121InstalledWebView2(t *testing.T) {
 						return e
 					}
 				}
+				pid, exe, e := h.identity(view)
+				if e != nil {
+					return e
+				}
+				arrange := exec.CommandContext(ctx, "powershell.exe", "-NoProfile", "-NonInteractive", "-File", filepath.Join(root, "scripts", "native-sftp-direct121.ps1"), "-Mode", "Arrange", "-OwnerProcessID", strconv.Itoa(pid), "-ExecutablePath", exe)
+				if out, e := arrange.CombinedOutput(); e != nil {
+					return fmt.Errorf("visible fixture window arrangement: %w %s", e, out)
+				}
 				if _, e := h.command(view, nativeEditorCommand{Action: "setup-sftp", Destination: connection}); e != nil {
 					return e
 				}
@@ -296,7 +304,7 @@ func TestNativeSFTPDirect121InstalledWebView2(t *testing.T) {
 					if _, e = h.command(view, nativeEditorCommand{Action: "verify-dirty"}); e != nil {
 						return e
 					}
-					cases = append(cases, map[string]any{"name": name, "passed": true, "materializeRequests": materialized.Load() - before, "input": json.RawMessage(bytes.TrimSpace(out))})
+					cases = append(cases, map[string]any{"name": name, "passed": true, "materializeRequests": materialized.Load() - before, "sourceHitTested": true, "sourceGeometry": state.Geometry, "input": json.RawMessage(bytes.TrimSpace(out))})
 				}
 				state, e := h.command(view, nativeEditorCommand{Action: "row", Destination: "/one.txt"})
 				if e != nil {
@@ -362,7 +370,7 @@ func TestNativeSFTPDirect121InstalledWebView2(t *testing.T) {
 func sftpDirect121RowPoint(s nativeEditorSnapshot, path string) (nativeEditorRect, error) {
 	for _, r := range s.Geometry.Tabs {
 		if r.UID == path && r.Width > 0 && r.Height > 0 {
-			return nativeEditorRect{Left: r.Left + min(r.Width*.4, 70), Top: r.Top + r.Height/2}, nil
+			return nativeEditorRect{Left: r.Left, Top: r.Top}, nil
 		}
 	}
 	return nativeEditorRect{}, fmt.Errorf("visible real file row absent: %s", path)

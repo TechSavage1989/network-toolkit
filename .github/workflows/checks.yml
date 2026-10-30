@@ -59,6 +59,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
       - name: Prepare exact published119 file-drag negative control
+        if: success() || failure()
         run: |
           git fetch --no-tags --depth=1 origin a4b8c56f4c8692d4676d508381ec4c5a2b504aee
           test "$(git rev-parse FETCH_HEAD)" = a4b8c56f4c8692d4676d508381ec4c5a2b504aee

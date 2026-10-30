@@ -2,9 +2,9 @@
 (async()=>{'use strict';const errors=[],sleep=ms=>new Promise(r=>setTimeout(r,ms));addEventListener('error',e=>errors.push(e.message));addEventListener('unhandledrejection',e=>errors.push(String(e.reason?.message||e.reason)));
 const wait=async(fn,label)=>{const end=Date.now()+18000;while(Date.now()<end){const value=fn();if(value)return value;await sleep(30);}throw Error('SFTP121 timeout: '+label);};
 const ed=()=>NetworkToolkitFileEditor,win=()=>NetworkToolkitEditorWindows,browser=()=>NetworkToolkitRemoteBrowser,rect=e=>{const r=e.getBoundingClientRect();return {left:r.left,top:r.top,width:r.width,height:r.height};};
-let original=null;
+let original=null,lastSourceHit=null;
 const fields=['uid','id','path','source','content','original','saved','dirty','undo','redo','view','compareView','frozen','saving','binding'];
-function snapshot(){const host=document.querySelector('[data-ed-text]'),rows=[...document.querySelectorAll('[data-rb-rows="remote"] [data-rb-item]')];return {documents:[...ed().documents.values()].map(d=>Object.fromEntries(fields.map(k=>[k,d[k]]))),active:ed().active?.uid||'',window:win().state,startup:globalThis.__networkToolkitStartupState,nativeCapability:/^[a-f0-9]{64}$/.test(globalThis.__networkToolkitNativeSession||''),location:location.pathname,geometry:{width:innerWidth,height:innerHeight,editor:host?rect(host):null,tabs:rows.filter(r=>r.getClientRects().length).map(r=>({uid:r.dataset.rbItem,...rect(r.querySelector('td')||r)}))},errors:[...errors]};}
+function snapshot(){const host=document.querySelector('[data-ed-text]'),rows=[...document.querySelectorAll('[data-rb-rows="remote"] [data-rb-item]')];return {documents:[...ed().documents.values()].map(d=>Object.fromEntries(fields.map(k=>[k,d[k]]))),active:ed().active?.uid||'',window:win().state,startup:globalThis.__networkToolkitStartupState,nativeCapability:/^[a-f0-9]{64}$/.test(globalThis.__networkToolkitNativeSession||''),location:location.pathname,geometry:{width:innerWidth,height:innerHeight,editor:host?rect(host):null,tabs:rows.filter(r=>r.getClientRects().length).map(r=>({uid:r.dataset.rbItem,...rect(r.querySelector('td')||r)}))},errors:[...errors],sourceHit:lastSourceHit};}
 async function execute(c){
  if(c.action==='snapshot')return snapshot();
  if(c.action==='setup-sftp'){
@@ -14,7 +14,12 @@ async function execute(c){
   NetworkToolkitEditorFiles.selectPanel('files');document.querySelector('[data-editor-files-side="remote"]').click();await browser().load('ssh','remote','/',true);await wait(()=>document.querySelector('[data-rb-item="/one.txt"]'),'actual loopback listing');return snapshot();
  }
  if(c.action==='row'){
-  NetworkToolkitEditorFiles.selectPanel('files');const row=await wait(()=>document.querySelector('[data-rb-item="'+CSS.escape(c.destination)+'"]'),'requested real row');row.scrollIntoView({block:'nearest'});await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));return snapshot();
+  NetworkToolkitEditorFiles.selectPanel('files');const row=await wait(()=>document.querySelector('[data-rb-item="'+CSS.escape(c.destination)+'"]'),'requested real row');row.scrollIntoView({block:'center',inline:'nearest'});await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+  const cell=row.querySelector('td')||row,r=cell.getBoundingClientRect();let clip={left:Math.max(0,r.left),top:Math.max(0,r.top),right:Math.min(innerWidth,r.right),bottom:Math.min(innerHeight,r.bottom)};
+  for(let a=cell.parentElement;a;a=a.parentElement){const cs=getComputedStyle(a),q=a.getBoundingClientRect();if(/auto|scroll|hidden|clip/.test(cs.overflowX)){clip.left=Math.max(clip.left,q.left);clip.right=Math.min(clip.right,q.right);}if(/auto|scroll|hidden|clip/.test(cs.overflowY)){clip.top=Math.max(clip.top,q.top);clip.bottom=Math.min(clip.bottom,q.bottom);}}
+  let point=null;for(let y=clip.top+2;y<clip.bottom-1&&!point;y+=2)for(let x=clip.left+8;x<Math.min(clip.right-2,clip.left+120);x+=8){const hit=document.elementFromPoint(x,y);if(hit?.closest('[data-rb-item]')===row){point={x,y};break;}}
+  lastSourceHit={path:c.destination,row:rect(row),clip,point,hit:point?document.elementFromPoint(point.x,point.y)?.closest('[data-rb-item]')?.dataset.rbItem:null};if(!point)throw Error('SFTP121 source row has no actual hit-testable clipped point: '+JSON.stringify(lastSourceHit));
+  const out=snapshot();out.geometry.tabs=[{uid:c.destination,left:point.x,top:point.y,width:1,height:1}];return out;
  }
  if(c.action==='verify-dirty'){
   if(!original||ed().documents.get(original.doc.id)!==original.doc||original.doc.content!==original.content||!original.doc.dirty||JSON.stringify(original.doc.undo)!==original.undo)throw Error('File drag mutated pre-existing dirty document/undo');return snapshot();

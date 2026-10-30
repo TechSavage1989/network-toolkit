@@ -1,12 +1,12 @@
 param(
  [Parameter(Mandatory=$true)][uint32]$OwnerProcessID,
  [Parameter(Mandatory=$true)][string]$ExecutablePath,
- [Parameter(Mandatory=$true)][string]$DestinationDirectory,
- [Parameter(Mandatory=$true)][string]$FinishedFile,
+ [string]$DestinationDirectory,
+ [string]$FinishedFile,
  [string]$MaterializingFile='', [string]$ExpectedPath='',
- [Parameter(Mandatory=$true)][double]$FromX,[Parameter(Mandatory=$true)][double]$FromY,
- [Parameter(Mandatory=$true)][double]$FromWidth,[Parameter(Mandatory=$true)][double]$FromHeight,
- [ValidateSet('Copy','CancelBefore','CancelDuring')][string]$Mode='Copy'
+ [double]$FromX,[double]$FromY,
+ [double]$FromWidth,[double]$FromHeight,
+ [ValidateSet('Arrange','Copy','CancelBefore','CancelDuring')][string]$Mode='Copy'
 )
 # Hosted synthetic acceptance only. Input goes to exact supplied fixture PIDs and
 # executable identities. No clipboard, synthetic DOM drag, debug port, security
@@ -53,6 +53,15 @@ function Client-Point($handle,[double]$x,[double]$y,[double]$width,[double]$heig
 }
 function Visible-Point($handle,$point){if([SFTPDirectInput]::GetAncestor([SFTPDirectInput]::WindowFromPoint($point),2) -ne $handle){throw 'Expected fixture point is covered by another HWND'}}
 $owner=Fixture-Window $OwnerProcessID $ExecutablePath
+$work=[Windows.Forms.Screen]::PrimaryScreen.WorkingArea
+if($Mode -eq 'Arrange'){
+ [void][SFTPDirectInput]::ShowWindow($owner,9)
+ $width=[Math]::Min(1100,$work.Width-220);$height=[Math]::Min(900,$work.Height-36)
+ [void][SFTPDirectInput]::SetWindowPos($owner,[IntPtr]::Zero,$work.Left,$work.Top,$width,$height,0x0040)
+ Start-Sleep -Milliseconds 350
+ @{mode=$Mode;sourcePID=$OwnerProcessID;width=$width;height=$height;actualWindowResize=$true}|ConvertTo-Json -Compress;exit
+}
+if(!$DestinationDirectory -or !$FinishedFile){throw 'Synthetic copy needs owned destination and finish marker'}
 $source=Client-Point $owner $FromX $FromY $FromWidth $FromHeight
 $shell=New-Object -ComObject Shell.Application
 $namespace=$shell.NameSpace((Get-Item -LiteralPath $DestinationDirectory).FullName)
@@ -66,7 +75,7 @@ try{
  $explorer=[IntPtr]([long]$window.HWND);$work=[Windows.Forms.Screen]::PrimaryScreen.WorkingArea
  [void][SFTPDirectInput]::SetWindowPos($explorer,[IntPtr]::Zero,$work.Right-420,$work.Top,420,[Math]::Min(720,$work.Height-20),0x0040)
  Start-Sleep -Milliseconds 300
- $to=New-Object SFTPDirectInput+POINT;$to.X=$work.Right-180;$to.Y=$work.Top+430
+ $to=New-Object SFTPDirectInput+POINT;$to.X=$work.Right-80;$to.Y=$work.Top+430
  [void][SFTPDirectInput]::SetForegroundWindow($owner);Start-Sleep -Milliseconds 100;Visible-Point $owner $source;Visible-Point $explorer $to
  [void][SFTPDirectInput]::SetCursorPos($source.X,$source.Y);[SFTPDirectInput]::mouse_event(2,0,0,0,[UIntPtr]::Zero)
  try{
