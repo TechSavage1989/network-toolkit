@@ -3,7 +3,31 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-Current published version: 1.17.120. The shared non-tab dragstart cancellation
+Current published version: 1.17.121. Published 2026-10-30T05:45:41Z; actual public verification 05:48:05.062831Z.
+Release 428692620: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.121
+Source a3a96b0e649c1560b919184e8ca336fda2dcc11b;
+tree e2336287ecc5abab564e94e15a7b4ac1858192e0. Compact sidebar, validated internal
+file opens and ordinary local/authorized-SFTP native copy retain security and
+ownership bounds. All 22 focused cases and exact core/security/dependency/full
+Windows checks passed; three legacy browsers were running at promotion.
+Review 41009283786: six SUCCESS/one FAILURE (comparison motion), last job completed 05:54:57Z.
+Duplicate 41010025845: five SUCCESS/one Windows FAILURE/one browser CANCELLED, last job completed 06:04:03Z.
+Public package/feed/prior 120 proof:
+All four actual public downloads match the reviewed bytes; 1,170 exact source
+files/1,177 portable members, manifests, PE 121/nine canonical icons/12 resources,
+update four-file allowlist and latest feed/tag/main/notes are verified. Prior 120
+release/tag/body/original four assets remain unchanged.
+Same-source duplicate first child-file native drag failed after main five passed;
+detached delivery reliability remains unresolved. No materialization/write occurred,
+but cause is unknown, not proven fixture-only or premature release. Original ten
+passes do not erase it; no rerun/rebuild/repair is claimed.
+Read docs/RELEASE121_HANDOFF.md for exact run history and limits. Explorer folder
+destinations are tested, not a separate Desktop Shell surface/cross-integrity/
+arbitrary-app promise. Remote approval/owner backend, 2 GiB export and 16 MiB text
+limits remain. Retain comparison/Hosts/Alt-transfer/UAC caveats and failed
+observations; this docs-only record grants no unrelated work or future release.
+
+Previous published version: 1.17.120. The shared non-tab dragstart cancellation
 and Condensed long-window baseline-density defects are corrected in the scoped
 published source/tag 45ee25b15c1c88fdb7c77b2f06057d38ae6b5357;
 tree 6e2206995eac69d43f356aea62cce14c332a4321. Public assets/source/feed verified

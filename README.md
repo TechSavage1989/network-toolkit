@@ -14,14 +14,47 @@
   <a href="#development">Development</a>
 </p>
 
+## Latest update — 1.17.121
+
+Published 2026-10-30T05:45:41Z; actual public verification 05:48:05.062831Z.
+Release 428692620: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.121
+Compact Files/Connect controls reclaim file-list height. Local and already-authorized
+SFTP files/folders can be dragged directly to Windows Explorer; file drops inside
+the editor preserve dirty documents. Copy-only transfer, cancellation and existing
+approval/size bounds remain. Actual Explorer folders were tested; separate Desktop
+Shell/cross-integrity/arbitrary-app delivery and visible UAC transitions were not.
+FTP/FTPS native export is not included.
+
+**Known reliability issue:** the same-source duplicate Windows run failed its
+first detached-child SFTP file drag after all five main-window cases passed.
+No data was requested/materialized and no destination was written. The cause is
+unknown; matching geometry/approved metadata does not establish a fixture-only
+or premature-release explanation. Original ten-case success is retained, not a
+guarantee of reliable detached delivery. No rerun, rebuild or repair is claimed.
+
+The original review passed all 22 new rendered/native cases and core/security/
+dependency/Windows checks; the later duplicate failure above remains unresolved.
+Review 41009283786: six SUCCESS/one FAILURE (comparison motion), last job completed 05:54:57Z.
+Duplicate 41010025845: five SUCCESS/one Windows FAILURE/one browser CANCELLED, last job completed 06:04:03Z.
+The duplicate real-five-minute case did not log PASS before cancellation;
+its timer stage is not a pass, and cancellation cause/actor are unestablished.
+All four actual public downloads match the reviewed bytes; 1,170 exact source
+files/1,177 portable members, manifests, PE 121/nine canonical icons/12 resources,
+update four-file allowlist and latest feed/tag/main/notes are verified. Prior 120
+release/tag/body/original four assets remain unchanged.
+See [release 121 handoff](docs/RELEASE121_HANDOFF.md) for exact evidence, hashes,
+known comparison/Hosts/Alt-transfer caveats and retained earlier failed checks.
+
 ## Features
 
 The text editor supports independent left/right tab groups, comparison, tab context
 menus and a resizable Windows/SFTP file sidebar. Use **Compare to** from a tab menu,
-drag either split divider, and use **Connected session** for active or saved file
-connections. See the [compact editor guide](docs/EDITOR_TOOLBAR113.md),
+drag either split divider, and use the sidebar’s **Connect** tab for active or saved
+connections and **Files** for Windows/SFTP browsing. Drag a supported file onto
+the editor to open it without replacing dirty documents. See
+[file drops](docs/EDITOR_FILE_DROP121.md),
 [saved connections](docs/EDITOR_SAVED_CONNECTIONS113.md) and
-[editor views guide](docs/EDITOR_VIEWS112.md) for file actions and detached access.
+[detached local access](docs/EDITOR_LOCAL119.md) for behavior and permission limits.
 
 Compact sidebar controls and optional editor opening panels leave more room for
 the active tool and document. See [layout guide](docs/APP_CHROME109.md).

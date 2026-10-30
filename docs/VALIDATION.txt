@@ -1,3 +1,61 @@
+# Network Toolkit 1.17.121 — compact sidebar and direct file dragging
+
+Published 2026-10-30T05:45:41Z; actual public verification 05:48:05.062831Z.
+Release 428692620: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.121
+Reviewed/promoted source a3a96b0e649c1560b919184e8ca336fda2dcc11b;
+tree e2336287ecc5abab564e94e15a7b4ac1858192e0. Expected-head/non-force main
+promotion was verified 2026-10-30T05:43:43.316Z. The user approved 121 source/build/
+publication at 04:16:35 UTC and direct authorized SFTP export at 04:18:20 UTC.
+
+The Files/Connect sidebar removes redundant connection/success/upload text while
+retaining actionable errors and progress. Its accessible 7px active badge and
+aligned functional More/main settings controls reclaim measured file-list height:
+168 px/150 px in main 1440/390 and 102 px/84 px in child 1440/390. The child's settings
+gear stays capability-hidden; no new settings or credential authority is granted.
+
+Same-window local/SFTP row drops open through the validated editor read pipeline,
+activating an already-open file without losing dirty text/UID/undo. Ordinary native
+local/authorized-SFTP file/folder drags use Windows OLE copy without Prepare.
+Real Explorer folder tests passed all 10 main/child SFTP file/folder, cancel-before,
+cancel-during and internal-editor cases; exact bytes/hierarchy, no partial output,
+staging cleanup and retained dirty/undo state were checked. Four genuine HTML
+drop cases and all eight actual sidebar layouts also passed with pixels reviewed.
+Separate Desktop Shell, cross-integrity and arbitrary external-app drops were
+not tested. Existing 2 GiB/1,500-entry/32-depth export and 16 MiB text bounds remain.
+FTP/FTPS native export is not included. Child remote approval and the owner
+backend remain required; this is not automatic login, privilege or delegation.
+
+Two final production corrections refresh already-approved connection metadata
+when reusing Connect and report explicit cancelled transfers as cancelled rather
+than EOF failure. Neither auto-connects or grants a transport. Final 1,345 JS/42 Python,
+initial full Go-race, final focused Go-race 3.067 s/Windows compilation and exact
+core/security/dependency/full Windows checks passed. All 22 new cases passed.
+At promotion the four required jobs were SUCCESS and three legacy browser jobs
+were still running; no all-seven-complete claim was made.
+Review 41009283786 terminal: six SUCCESS/one FAILURE (comparison motion), last job completed 05:54:57Z.
+Duplicate 41010025845 terminal: five SUCCESS/one Windows FAILURE/one browser CANCELLED, last job completed 06:04:03Z.
+The duplicate real-five-minute case did not log PASS before cancellation;
+its timer stage is not a pass, and cancellation cause/actor are unestablished.
+
+Public package/feed/prior 120 proof:
+All four actual public downloads match the reviewed bytes; 1,170 exact source
+files/1,177 portable members, manifests, PE 121/nine canonical icons/12 resources,
+update four-file allowlist and latest feed/tag/main/notes are verified. Prior 120
+release/tag/body/original four assets remain unchanged.
+The same-source duplicate first child-file native drag failed after all five main
+cases passed. No materialization/write occurred; the cause is unknown, not proven
+fixture-only or premature release. Detached native-copy reliability remains an
+open risk despite the original ten-case success. No rerun/rebuild/repair is claimed.
+Read RELEASE121_HANDOFF.md for exact receipts, asset hashes and historical failures.
+Final review retained the same narrow wrapped-map case/max offset seen in review 2:
+maximum 4.609375 px/p95 4.140625 px, all 40 inputs answered, maximum response 70 ms/two
+frames, zero stall. Unchanged comparison logic/fixture do not establish the cause
+or make it fixture-only; the entire file-editor asset is not claimed unchanged. Prior Hosts/Alt-transfer/UAC caveats remain.
+Visible UAC transition and live user files/devices were not tested. This five-doc
+closure changes no application source, package, tag, release body or access.
+
+---
+
 # Network Toolkit 1.17.120 published and verified
 
 Published 2026-10-30T04:07:44Z; public verification 04:09:16.444676Z.
