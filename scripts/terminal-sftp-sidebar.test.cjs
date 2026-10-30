@@ -136,3 +136,16 @@ test('detached read-only sidebar rejects write requests and incoming file drops 
  for(const action of ['download','upload','copy','rename','remove','mkdir','write-text'])await assert.rejects(h.api.request(h.entry.info.id,action,{path:'./startup.cfg',localPath:'C:\\synthetic'}),/read-only/);
  h.document.emit('dragover',list);assert.equal(list.classList.contains('tsftp-drop-target'),false);h.document.emit('drop',list,{dataTransfer:{files:[{name:'synthetic.txt'}]}});await settle();assert.equal(h.calls.length,before);
 });
+test('ordinary Terminal selection and repeated refreshes retain exact row elements and selected accessibility state',async()=>{
+ const h=await ready(),list=h.panel.querySelector('[data-tsftp-list]'),structure=list._tsftpHTML;
+ for(const row of [h.row,h.folder,h.row]){h.document.emit('click',row);for(let i=0;i<4;i++)h.api.render(h.panel,h.entry);assert.equal(h.panel.querySelector('[data-tsftp-item="./startup.cfg"]'),h.row);assert.equal(h.panel.querySelector('[data-tsftp-item="./configs"]'),h.folder);assert.equal(list._tsftpHTML,structure);assert.equal(h.row.getAttribute('aria-pressed'),String(row===h.row));assert.equal(h.folder.getAttribute('aria-pressed'),String(row===h.folder));assert.equal(row.classList.contains('selected'),true);}
+});
+test('routine main and detached Terminal redraws preserve file/folder capture before threshold and after metadata registration',async()=>{
+ for(const detached of [false,true])for(const folder of [false,true]){const h=await ready({native:true,bridge:true,detached}),row=folder?h.folder:h.row;let released=0;row.releasePointerCapture=()=>released++;h.emit('pointerdown',row);
+ const redraw=()=>{for(let i=0;i<4;i++)h.api.render(h.panel,h.entry);assert.equal(h.panel.querySelector('[data-tsftp-item="'+row.dataset.tsftpItem+'"]'),row);assert.equal(row.draggable,false);assert.equal(released,0);assert.equal(row.getAttribute('aria-pressed'),'true');};
+ redraw();h.emit('pointermove',row,{clientX:100});await settle();assert.deepEqual(h.calls.filter(x=>x[0].startsWith('/explorer-transfer')).map(x=>x[2]?.action),['direct']);redraw();h.emit('pointermove',row,{clientX:1005});await settle();assert.deepEqual(h.calls.filter(x=>x[0].startsWith('/explorer-transfer')&&x[2]).map(x=>x[2].action),['direct','arm']);assert.equal(h.root.NetworkToolkitNativeDrag.releaseFileRowCapture('a'.repeat(32),1),true);assert.equal(released,1);}
+});
+test('selection-stable cache still rebuilds real filter, listing and folder changes',async()=>{
+ const h=await ready(),filter=h.panel.querySelector('[data-tsftp-filter]'),snapshot=h.api.capturePointerFileDrag(h.pointer('pointerdown',h.row));filter.value='configs';h.document.emit('input',filter);assert.equal(h.panel.querySelector('[data-tsftp-item="./startup.cfg"]'),null);assert.notEqual(h.panel.querySelector('[data-tsftp-item="./configs"]'),h.folder);
+ filter.value='';h.document.emit('input',filter);assert.notEqual(h.panel.querySelector('[data-tsftp-item="./startup.cfg"]'),h.row);await h.api.load(h.entry.info.id,'/another-folder');assert.equal(h.api.validPointerFileDrag(snapshot),false);assert.equal(h.panel.querySelector('[data-tsftp-address]').value,'/another-folder');assert.equal(h.panel.querySelector('[data-tsftp-item="./startup.cfg"]').getAttribute('aria-pressed'),'false');
+});

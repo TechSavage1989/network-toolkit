@@ -20,6 +20,8 @@ test('Terminal123 native copy cases retain source, exact hierarchy, cancellation
   assert.match(go, /input\.SaveDialogCount != 0 \|\| input\.FixtureHostWindowCount != 1/);
   assert.match(driver, /current\(\) !== original\.entry/);
   assert.match(go, /len\(cases\) != 8/);
+  assert.match(go, /row\["afterFailedGesture"\] = observed/);
+  assert.match(go, /observed, observeErr := h\.command\(view, "snapshot"\)/);
 });
 test('negative control only cancels the exact fixture native Save dialog and checks original122 tree', () => {
   assert.match(go, /60b02cae25c1bfaf14d0c15a038706d193c99a37/);

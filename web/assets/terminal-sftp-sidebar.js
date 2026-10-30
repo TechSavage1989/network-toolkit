@@ -61,10 +61,12 @@ function paint(){
  const label=area.querySelector('[data-tsftp-address]');if(label&&document.activeElement!==label)label.value=m.folder;
  const list=area.querySelector('[data-tsftp-list]');if(!list)return;
  const values=m.entries.filter(item=>!m.filter||item.name.toLowerCase().includes(m.filter.toLowerCase()));
- const html=m.loading?'<p class="tsftp-empty">Loading folder...</p>':values.length?values.map(item=>'<button type="button" class="tsftp-item'+(m.selected===item.path?' selected':'')+'" data-tsftp-item="'+escaped(item.path)+'" draggable="true" aria-pressed="'+(m.selected===item.path)+'" title="'+escaped(item.path)+'"><span class="tsftp-file-icon">'+icon(item.directory?'folder':'file')+'</span><span class="tsftp-name">'+escaped(item.name)+'</span><small>'+escaped(item.directory?'':shownBytes(item.size))+'</small></button>').join(''):'<p class="tsftp-empty">'+(m.filter?'No matching files.':'This folder is empty.')+'</p>';
+ // Selection is painted in place: a routine Terminal refresh must not replace
+ // the row holding pointer capture just because pointerdown selected it.
+ const html=m.loading?'<p class="tsftp-empty">Loading folder...</p>':values.length?values.map(item=>'<button type="button" class="tsftp-item" data-tsftp-item="'+escaped(item.path)+'" draggable="true" aria-pressed="false" title="'+escaped(item.path)+'"><span class="tsftp-file-icon">'+icon(item.directory?'folder':'file')+'</span><span class="tsftp-name">'+escaped(item.name)+'</span><small>'+escaped(item.directory?'':shownBytes(item.size))+'</small></button>').join(''):'<p class="tsftp-empty">'+(m.filter?'No matching files.':'This folder is empty.')+'</p>';
  if(list._tsftpHTML!==html){list.innerHTML=html;list._tsftpHTML=html;}
+ paintSelection(m);
  const status=area.querySelector('[data-tsftp-status]');if(status)status.textContent=m.busy?'Working...':m.entries.length+' item'+(m.entries.length===1?'':'s');
- for(const btn of area.querySelectorAll('[data-tsftp-needs-file]'))btn.disabled=!m.selected||m.busy;
  for(const btn of area.querySelectorAll('[data-tsftp-needs-free]'))btn.disabled=m.busy;
  message(m.error||'',!!m.error);
 }

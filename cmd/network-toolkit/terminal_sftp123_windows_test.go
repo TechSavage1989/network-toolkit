@@ -317,6 +317,13 @@ func TestNativeTerminalSFTP123InstalledWebView2(t *testing.T) {
 					}
 					if inputErr != nil {
 						row["error"] = fmt.Sprintf("%v %s", inputErr, out)
+						// The physical script has released the mouse before returning.
+						// Read only the existing test channel; never replace/retry the gesture.
+						observed, observeErr := h.command(view, "snapshot")
+						row["afterFailedGesture"] = observed
+						if observeErr != nil {
+							row["afterFailedGestureError"] = observeErr.Error()
+						}
 						cases = append(cases, row)
 						return fmt.Errorf("actual %s: %w %s", name, inputErr, out)
 					}
