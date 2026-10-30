@@ -428,10 +428,12 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           go test -mod=vendor ./cmd/network-toolkit -run 'TestEditorExplorer|TestEditorLayout' -count=1 -v
       - name: Test delayed file data and caller-bound copy cancellation on Windows
+        if: success() || failure()
         env:
           GOTOOLCHAIN: local
         run: go test -mod=vendor ./cmd/network-toolkit ./internal/desktop -run '^TestExplorerDirect121|^TestNativeDeferred121' -count=1 -v
       - name: Verify direct SFTP row copies to real Windows Explorer
+        if: success() || failure()
         env:
           GOTOOLCHAIN: local
           NETWORK_TOOLKIT_NATIVE_SFTP121_TEST: '1'
