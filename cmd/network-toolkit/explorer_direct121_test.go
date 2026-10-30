@@ -117,8 +117,8 @@ func TestExplorerDirect121CancelAndLateGestureNeverRead(t *testing.T) {
 				if w := directAction121(a, id, "cancel"); w.Code != 200 {
 					t.Fatal(w.Code)
 				}
-				if w := directAction121(a, id, "arm"); w.Code != 409 {
-					t.Fatal("cancelled gesture resurrected")
+				if w := directAction121(a, id, "arm"); w.Code != 404 {
+					t.Fatal("retired never-armed gesture resurrected")
 				}
 			case "released-before-start":
 				directAction121(a, id, "arm")
@@ -159,5 +159,34 @@ func TestExplorerDirect121ExplicitCancelWinsInterruptedReadError(t *testing.T) {
 		if j.stage != "" || len(j.paths) > 0 || j.rendered {
 			t.Fatal("failed/cancelled read published staged paths")
 		}
+	}
+}
+
+func TestExplorerDirect122NeverArmedMetadataRetiresWithoutCapacityLeak(t *testing.T) {
+	a := &application{}
+	defer a.finishExplorerOwner("")
+	source := filepath.Join(t.TempDir(), "never-read-missing.txt")
+	for i := 0; i < 64; i++ {
+		id := direct121(t, a, []string{source})
+		j := a.explorerTransfers.jobs[id]
+		if w := exportRequest(a, "", "GET", "/api/explorer-transfer/native", nil); w.Code != 204 {
+			t.Fatal("metadata alone became eligible", w.Code)
+		}
+		if w := directAction121(a, id, "cancel"); w.Code != 200 || !strings.Contains(w.Body.String(), `"state":"cancelled"`) {
+			t.Fatal(w.Code, w.Body.String())
+		}
+		if len(a.explorerTransfers.jobs) != 0 || j.expiryTimer != nil || j.renderStarted || j.stage != "" || j.entries != 0 {
+			t.Fatal("unarmed metadata retained capacity/timer or read source")
+		}
+		if w := directAction121(a, id, "arm"); w.Code != 404 {
+			t.Fatal("retired ID was rearmed", w.Code)
+		}
+	}
+	id := direct121(t, a, []string{source})
+	directAction121(a, id, "arm")
+	directAction121(a, id, "disarm")
+	directAction121(a, id, "cancel")
+	if a.explorerTransfers.jobs[id] == nil {
+		t.Fatal("armed gesture tombstone was removed")
 	}
 }

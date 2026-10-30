@@ -97,9 +97,9 @@ func (w *hostWindow) releaseNativeFileCapture(ctx context.Context, hwnd uintptr,
 	return accepted
 }
 
-// Capture has moved out of WebView after its acknowledgement. Keep observing
-// the same physical press until the UI queue actually enters OLE; a lost press
-// irreversibly cancels this context, even if another press follows.
+// The page acknowledgement clears the DOM pending override; the UI dispatch
+// still must verify the native capture transfer. Observe the same press until
+// actual OLE admission: a lost press cancels irreversibly despite a later press.
 func monitorNativeFileAdmission(ctx context.Context, cancel context.CancelFunc, entered <-chan struct{}, state *atomic.Uint32, held func() bool) {
 	tick := time.NewTicker(8 * time.Millisecond)
 	defer tick.Stop()

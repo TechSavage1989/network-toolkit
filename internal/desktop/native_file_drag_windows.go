@@ -269,15 +269,16 @@ func nativeFileDragTransition(ctx context.Context, client *http.Client, endpoint
 // shell capability. Explorer must finish reading staged files before DoDragDrop
 // returns and the owner removes them. No move effect is ever offered.
 type nativeFileCOM struct {
-	vtable  *[12]uintptr
-	refs    atomic.Int32
-	base    uintptr
-	source  bool
-	ctx     context.Context
-	hwnd    uintptr
-	active  atomic.Bool
-	delayed *nativeDeferredCopy
-	trace   *nativeFileTrace
+	vtable    *[12]uintptr
+	refs      atomic.Int32
+	base      uintptr
+	source    bool
+	continued atomic.Bool
+	ctx       context.Context
+	hwnd      uintptr
+	active    atomic.Bool
+	delayed   *nativeDeferredCopy
+	trace     *nativeFileTrace
 }
 
 type nativeFileTrace struct {
@@ -549,6 +550,9 @@ func fileCOMAdvise(p, a, b, c, d uintptr) uintptr { return 0x80040003 }
 func fileCOMUnadvise(p, a uintptr) uintptr        { return 0x80040003 }
 func fileCOMContinue(p, escape, key uintptr) uintptr {
 	o := nativeFileObject(p)
+	if o != nil && o.trace != nil && o.continued.CompareAndSwap(false, true) {
+		o.trace.emit(NativeFileDragObservation{Kind: "continue-initial", Keys: uint32(key), Status: uint32(escape), Flags: nativeFileAdmissionFlags(o.ctx, o.hwnd, false)})
+	}
 	if o != nil && o.ctx != nil && o.ctx.Err() != nil {
 		observeNativeFileDrag(o.hwnd, "query-continue-cancel")
 		o.trace.emit(NativeFileDragObservation{Kind: "lease-cancel"})
@@ -676,6 +680,10 @@ func runNativeFileDataDrag(ctx context.Context, hwnd uintptr, wrapper *nativeFil
 	var effect uint32
 	observeNativeFileDrag(hwnd, "ole-enter")
 	if wrapper.trace != nil {
+		var cursor struct{ X, Y int32 }
+		ok, _, _ := fileDragUser.NewProc("GetCursorPos").Call(uintptr(unsafe.Pointer(&cursor)))
+		message, _, _ := fileDragUser.NewProc("GetMessagePos").Call()
+		wrapper.trace.emit(NativeFileDragObservation{Kind: "ole-position", Status: uint32(ok), DeltaX: cursor.X - int32(int16(message&0xffff)), DeltaY: cursor.Y - int32(int16((message>>16)&0xffff))})
 		wrapper.trace.emit(NativeFileDragObservation{Kind: "ole-enter", Flags: nativeFileAdmissionFlags(ctx, hwnd, false)})
 	}
 	hr, _, _ := fileDragDo.Call(wp, sp, 1, uintptr(unsafe.Pointer(&effect)))

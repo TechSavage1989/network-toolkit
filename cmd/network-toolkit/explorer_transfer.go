@@ -40,6 +40,7 @@ type explorerTransferJob struct {
 	cancelRequested                 bool
 	direct, renderStarted, rendered bool
 	render                          func()
+	expiryTimer                     *time.Timer
 }
 type explorerTransferRequest struct {
 	Action  string        `json:"action"`
@@ -211,6 +212,15 @@ func (a *application) handleExplorerTransfer(w http.ResponseWriter, r *http.Requ
 			j.stage = ""
 		}
 		j.paths = nil
+		if j.direct && j.gesture == 0 && !j.renderStarted {
+			// Never-armed metadata has no native reader or tombstone to preserve.
+			// Internal pointer drags must not consume the 24 export-job slots.
+			if j.expiryTimer != nil {
+				j.expiryTimer.Stop()
+				j.expiryTimer = nil
+			}
+			delete(m.jobs, j.id)
+		}
 	case "finish":
 		if j.state == "finished" || j.state == "cancelled" || j.state == "failed" {
 			break
@@ -364,7 +374,8 @@ func (a *application) prepareExplorerTransfer(w http.ResponseWriter, r *http.Req
 		go a.stageExplorerExport(ctx, j, req.Binding, req.Paths, grant)
 	}
 	go a.watchExplorerCopy(ctx, j)
-	time.AfterFunc(15*time.Minute, func() {
+	m.mu.Lock()
+	j.expiryTimer = time.AfterFunc(15*time.Minute, func() {
 		m.mu.Lock()
 		defer m.mu.Unlock()
 		if m.jobs[j.id] != j || j.state == "dragging" {
@@ -376,6 +387,7 @@ func (a *application) prepareExplorerTransfer(w http.ResponseWriter, r *http.Req
 		}
 		delete(m.jobs, j.id)
 	})
+	m.mu.Unlock()
 	jsonResponse(w, 202, response)
 }
 func (a *application) stageExplorerExport(ctx context.Context, j *explorerTransferJob, b editorBinding, sources []string, g *editorDocumentGrant) {

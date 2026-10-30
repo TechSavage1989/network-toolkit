@@ -26,7 +26,7 @@ jobs:
       - name: Test caller-bound native drag and deferred-copy safeguards
         env:
           GOTOOLCHAIN: local
-        run: go test -mod=vendor ./cmd/network-toolkit ./internal/desktop -run '^TestExplorerDirect121|^TestNativeDeferred121|^TestNativeFileDrag|^TestNativeDragTrace122|^TestNativeHandoff122' -count=1 -v
+        run: go test -mod=vendor ./cmd/network-toolkit ./internal/desktop -run '^TestExplorerDirect12[12]|^TestNativeDeferred121|^TestNativeFileDrag|^TestNativeDragTrace122|^TestNativeHandoff122' -count=1 -v
       - name: Measure corrected main and child Windows gestures, first process set
         if: success() || failure()
         env:

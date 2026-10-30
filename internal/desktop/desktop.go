@@ -80,6 +80,9 @@ type NativeFileDragObservation struct {
 	Flags    uint32 `json:"flags,omitempty"`
 	Status   uint32 `json:"status,omitempty"`
 	Dropped  uint32 `json:"dropped,omitempty"`
+	Keys     uint32 `json:"keys,omitempty"`
+	DeltaX   int32  `json:"deltaX,omitempty"`
+	DeltaY   int32  `json:"deltaY,omitempty"`
 	Format   uint32 `json:"format,omitempty"`
 	Aspect   uint32 `json:"aspect,omitempty"`
 	Medium   uint32 `json:"medium,omitempty"`
