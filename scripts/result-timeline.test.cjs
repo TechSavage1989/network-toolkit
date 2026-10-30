@@ -528,3 +528,20 @@ test('120 selected-window zoom reaches its interval floor independently of the F
  for(const factor of [2,4,8,16,32,64,75]){h.api.zoom('job',factor);assert.equal(Number(h.document.querySelector('[data-rt-zoom-level]').dataset.rtZoomFactor),factor);}
  const n=h.document.querySelector('.rt-timeline'),surface=h.document.querySelector('[data-rt-surface]');assert.equal(g.instant(n.dataset.rtScopeEnd)-g.instant(n.dataset.rtScopeStart),4000000000n);assert.equal(surface.querySelectorAll('[data-rt-marker]').length,5);assert(h.document.querySelector('[data-rt-zoom="in"]').disabled);h.api.zoom('job','out');assert.equal(g.instant(h.document.querySelector('.rt-timeline').dataset.rtScopeEnd)-g.instant(h.document.querySelector('.rt-timeline').dataset.rtScopeStart),8000000000n);
 });
+
+test('124 mature Recent10s pins actual endpoints through advancing irregular and missing arrivals',()=>{
+ const h=harness(),g=h.context.NetworkToolkitGraphHistory;h.api.setPreferences({mode:'condensed'},{persist:false});g.setPreferences({durationMs:10000},{persist:false,fit:true});
+ const rows=Array.from({length:54},(_,i)=>reply(i+1,10+i%4,stamp(i*1.017))),original=JSON.stringify(rows),frames=[];
+ for(let cycle=0;cycle<12;cycle++){
+  if(cycle){const previous=Date.parse(rows.at(-1).time),delta=[713,1317,2003,887][cycle%4];rows.push({...reply(rows.at(-1).sequence+(cycle===4?2:1),10+cycle%3,new Date(previous+delta).toISOString()),...(cycle===6?{success:false,rttMs:null,status:'Timed out'}:{})});}
+  const source=JSON.stringify(rows);h.render(rows);const t=h.document.querySelector('.rt-timeline'),svg=h.document.querySelector('[data-rt-surface]'),marks=svg.querySelectorAll('[data-rt-marker]'),scope={start:t.dataset.rtScopeStart,end:t.dataset.rtScopeEnd},selected=rows.filter(r=>g.contains(r.time,scope));
+  assert.equal(g.instant(scope.end)-g.instant(scope.start),10000000000n);assert.equal(Number(marks[0].getAttribute('cx')),Number(svg.dataset.rtLeft),'First real sample pins left in cycle '+cycle);assert.equal(Number(marks.at(-1).getAttribute('cx')),Number(svg.dataset.rtRight));assert.equal(marks.length,selected.length);assert(marks.every(m=>Number(m.getAttribute('cx'))>=Number(svg.dataset.rtLeft)&&Number(m.getAttribute('cx'))<=Number(svg.dataset.rtRight)));
+  assert.equal(h.document.querySelector('[data-graph-navigator]').dataset.viewStart,scope.start);assert.equal(h.document.querySelector('[data-rt-zoom-level]').textContent,'10 s');assert.match(h.document.querySelector('[data-rt-zoom-level]').title,/10 s selected.*recorded/);assert.equal(JSON.stringify(rows),source);frames.push(scope.end);
+ }
+ assert.equal(new Set(frames).size,12);assert.equal(JSON.stringify(rows.slice(0,54)),original);
+ const before=JSON.stringify(rows);h.api.navigate('job',{start:stamp(40.25),end:stamp(50.25)});const t=h.document.querySelector('.rt-timeline'),svg=h.document.querySelector('[data-rt-surface]'),marks=svg.querySelectorAll('[data-rt-marker]');assert.equal(g.instant(t.dataset.rtScopeStart),g.instant(stamp(40.25)));assert.equal(g.instant(t.dataset.rtScopeEnd),g.instant(stamp(50.25)));assert.equal(Number(marks[0].getAttribute('cx')),Number(svg.dataset.rtLeft));assert.equal(Number(marks.at(-1).getAttribute('cx')),Number(svg.dataset.rtRight));assert.equal(h.api.tracking('job').following,false);assert.equal(JSON.stringify(rows),before);
+});
+
+test('124 sparse Recent10s startup does not stretch to fill early',()=>{
+ const h=harness(),g=h.context.NetworkToolkitGraphHistory;h.api.setPreferences({mode:'condensed'},{persist:false});g.setPreferences({durationMs:10000},{persist:false,fit:true});h.render([0,1.1,2.15].map((n,i)=>reply(i+1,10,stamp(n))));const svg=h.document.querySelector('[data-rt-surface]'),marks=svg.querySelectorAll('[data-rt-marker]');assert(Number(marks[0].getAttribute('cx'))>Number(svg.dataset.rtLeft));assert.equal(Number(marks.at(-1).getAttribute('cx')),Number(svg.dataset.rtRight));assert.equal(marks.length,3);
+});

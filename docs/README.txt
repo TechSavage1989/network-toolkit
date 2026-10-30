@@ -1,11 +1,17 @@
-NETWORK TOOLKIT 1.17.123
+NETWORK TOOLKIT 1.17.124
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.123
+CURRENT RELEASE - 1.17.124
 
-Release details: RELEASE_NOTES_1.17.123.txt
-Previous release: docs/releases/RELEASE_NOTES_1.17.122.txt
+Release details: RELEASE_NOTES_1.17.124.txt
+Previous release: docs/releases/RELEASE_NOTES_1.17.123.txt
 Full release-note archive: docs/releases/README.md
+
+124 corrects mature Condensed Recent graph endpoints and adds reviewed DHCP,
+DNS, adapter restart and Winsock maintenance actions. TCP Ports has a distinct
+inspection icon. Network actions are validated with isolated mocks/UI, not live
+network changes; review each action's scope and disruption warning before use.
+See RELEASE124_HANDOFF.md for exact validation status and retained limitations.
 
 123 gives Terminal SFTP rows the same direct native Windows-copy gesture as
 the SFTP tool and Editor. Detached workspace browsing/export is scoped to its

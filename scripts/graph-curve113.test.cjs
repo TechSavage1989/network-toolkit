@@ -41,3 +41,16 @@ test('120 selected durations never compress same-age Fit spacing and short spans
 test('120 selected startup retains natural baseline fill until sufficient actual history exists',()=>{
  const items=rows(3),base=h.sampleProjection(items,{}, {mode:'condensed',width:1262}),p=h.scaleProjection(base,{start:stamp(0),end:stamp(2)},{fill:false}),s=h.projectScope({},p);assert.equal(p.distanceScale,1);assert(h.fraction(items[0].time,s,'condensed')>0);assert.equal(h.fraction(items.at(-1).time,s,'condensed'),1);
 });
+
+test('124 mature selected curves pin actual irregular endpoints without changing the requested interval',()=>{
+ for(const width of [220,744,1262])for(const seconds of [10,30,300]){
+  const items=[0,1,2,3,4.15,5,6.4,7,8,9.3,10.2].map((n,i)=>({time:stamp(n),sequence:i+1})),first=items[1].time,last=items.at(-1).time,scope={start:stamp(10.25-seconds),end:stamp(10.25)},selected=items.filter(r=>h.contains(r.time,scope)),base=h.sampleProjection(selected,scope,{mode:'condensed',width}),p=h.scaleProjection(base,scope,{first:selected[0].time,last}),s=h.projectScope(scope,p);
+  assert.equal(s.start,scope.start);assert.equal(s.end,scope.end);assert.equal(h.fraction(last,s,'condensed'),1);assert(Math.abs(h.fraction(selected[0].time,s,'condensed'))<1e-9);
+  assert.equal(p.curve,base.curve);assert.equal(p.recent,base.recent);assert.equal(p.requestedCount,base.requestedCount);assert(p.distanceScale>=1);
+  assert.equal(h.instant(h.at(0,s,'condensed')),h.instant(selected[0].time));assert.equal(h.instant(h.at(1,s,'condensed')),h.instant(last));
+  for(const r of selected){const x=h.fraction(r.time,s,'condensed');assert(x>=-1e-9&&x<=1);assert(h.instant(h.at(x,s,'condensed'))>=h.instant(r.time)-1n&&h.instant(h.at(x,s,'condensed'))<=h.instant(r.time)+1n);}
+  const startup=h.scaleProjection(base,scope,{fill:false,first,last});assert.equal(startup.distanceScale,1);assert.equal(startup.end,scope.end);assert.equal(startup.recordedStart,'');
+ }
+ const items=rows(400),scope={start:stamp(90.25),end:stamp(399.4)},base=h.sampleProjection(items,scope,{mode:'condensed',compression:{count:3,strength:.55,curve:.5}}),p=h.scaleProjection(base,scope,{first:stamp(91),last:stamp(399)});assert.equal(p.distanceScale,1,'Long populated windows must not rescale recent density');assert.equal(h.projectionDistance(1e9,p),h.projectionDistance(1e9,base));
+ const linear=h.sampleProjection(items,scope,{mode:'linear'}),selected=h.scaleProjection(linear,scope,{first:stamp(91),last:stamp(399)});assert.equal(selected.start,scope.start);assert.equal(selected.end,scope.end,'Linear remains time proportional');
+});

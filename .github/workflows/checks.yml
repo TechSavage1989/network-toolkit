@@ -105,7 +105,9 @@ jobs:
         if: always()
         with:
           name: connect-sidebar118-checks
-          path: ${{ runner.temp }}/ntk-editor112-results/connect-sidebar118-*
+          path: |
+            ${{ runner.temp }}/ntk-editor112-results/connect-sidebar118-*
+            ${{ runner.temp }}/ntk-editor112-results/tcp-icon124-*
           if-no-files-found: error
           retention-days: 14
       - name: Prepare exact published116 sidebar baseline
@@ -385,6 +387,8 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
+      - name: Test typed network maintenance with mocked runners only
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestLocalNetwork' -count=1 -v
       - name: Test Windows terminal transports and local shells
         env:
           GOTOOLCHAIN: local
@@ -891,6 +895,24 @@ jobs:
           mkdir -p "$RUNNER_TEMP/ntk-workflow107-tests"
           npm install --prefix "$RUNNER_TEMP/ntk-workflow107-tests" playwright@1.62.1
           "$RUNNER_TEMP/ntk-workflow107-tests/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Prepare exact123 graph negative control
+        run: |
+          git fetch --no-tags --depth=1 origin c0530bbb710e1023c68b835a565fbf89e19d74a8
+          test "$(git rev-parse FETCH_HEAD)" = c0530bbb710e1023c68b835a565fbf89e19d74a8
+          mkdir -p "$RUNNER_TEMP/ntk-graph-baseline123"
+          git archive c0530bbb710e1023c68b835a565fbf89e19d74a8 | tar -xf - -C "$RUNNER_TEMP/ntk-graph-baseline123"
+      - name: Reproduce published123 mature Recent left-gap before correction
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results/negative124
+          GRAPH_SCALE_SOURCE_ROOT: ${{ runner.temp }}/ntk-graph-baseline123
+        run: |
+          set +e
+          node scripts/graph-scale119.browser.cjs
+          result=$?
+          set -e
+          test "$result" -ne 0
+          node -e 'const r=require(process.env.TOOLKIT_TEST_OUTPUT+"/graph-scale119-report.json"); if(r.passed || !r.errors.some(e=>/Mature10s actual left endpoint, cycle 0/.test(e)))process.exit(1)'
       - name: Check stable graph density time windows follow anchors and elapsed clocks
         if: success() || failure()
         env:
@@ -905,6 +927,21 @@ jobs:
           path: |
             ${{ runner.temp }}/ntk-workflow107-results/graph-scale119-*
             ${{ runner.temp }}/ntk-workflow107-results/graph-scale120-*
+            ${{ runner.temp }}/ntk-workflow107-results/negative124/**
+          if-no-files-found: error
+          retention-days: 14
+      - name: Check network maintenance reviews and states without native actions
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results
+        run: node scripts/local-network-actions124.browser.cjs
+      - name: Retain isolated network maintenance UI evidence
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: local-network-actions124-checks
+          path: ${{ runner.temp }}/ntk-workflow107-results/local-network-actions124-*
           if-no-files-found: error
           retention-days: 14
       - name: Prepare exact published108 UI for measured before-after layouts

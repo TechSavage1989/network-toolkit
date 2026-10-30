@@ -99,13 +99,14 @@ type localHostsRequest struct {
 	Content  string `json:"content"`
 }
 
-// Mutation requests accept only these two fixed actions. Paths, programs,
+// Mutation requests accept only fixed, typed local actions. Paths, programs,
 // commands, shell text and arbitrary flags are never part of their protocol.
 // Wi-Fi key reads have a separate one-profile request and response.
 type localToolsRequest struct {
-	Kind  string             `json:"kind"`
-	IP    *localIPRequest    `json:"ip,omitempty"`
-	Hosts *localHostsRequest `json:"hosts,omitempty"`
+	Kind    string               `json:"kind"`
+	IP      *localIPRequest      `json:"ip,omitempty"`
+	Hosts   *localHostsRequest   `json:"hosts,omitempty"`
+	Network *localNetworkRequest `json:"network,omitempty"`
 }
 
 type localToolsResult struct {
@@ -114,12 +115,17 @@ type localToolsResult struct {
 }
 
 type localApplyResult struct {
-	Message    string           `json:"message,omitempty"`
-	Error      string           `json:"error,omitempty"`
-	ErrorCode  string           `json:"errorCode,omitempty"`
-	Partial    bool             `json:"partial"`
-	BackupPath string           `json:"backupPath,omitempty"`
-	Result     localToolsResult `json:"result"`
+	NetworkAction  string           `json:"networkAction,omitempty"`
+	NetworkScope   string           `json:"networkScope,omitempty"`
+	NetworkTarget  string           `json:"networkTarget,omitempty"`
+	Output         string           `json:"output,omitempty"`
+	RebootRequired bool             `json:"rebootRequired,omitempty"`
+	Message        string           `json:"message,omitempty"`
+	Error          string           `json:"error,omitempty"`
+	ErrorCode      string           `json:"errorCode,omitempty"`
+	Partial        bool             `json:"partial"`
+	BackupPath     string           `json:"backupPath,omitempty"`
+	Result         localToolsResult `json:"result"`
 }
 
 type localToolsOperation struct {
@@ -309,6 +315,10 @@ func (m *localToolsManager) prepare(ctx context.Context, request localToolsReque
 	if e != nil {
 		return e
 	}
+	if request.Kind == "network" {
+		_, e = planLocalNetworkAction(s, *request.Network)
+		return e
+	}
 	_, _, e = planLocalIP(s, *request.IP)
 	return e
 }
@@ -323,6 +333,14 @@ func (m *localToolsManager) start(request localToolsRequest) (localToolsOperatio
 	}
 	m.busy = true
 	op := localToolsOperation{ID: randomHex(16), Kind: request.Kind, Status: "running", Started: time.Now().UTC().Format(time.RFC3339), localApplyResult: localApplyResult{Message: "Applying the reviewed change. Approve the Windows administrator prompt if requested."}}
+	if request.Kind == "network" {
+		op.NetworkAction, op.NetworkScope = string(request.Network.Action), request.Network.Scope
+		op.NetworkTarget = "This computer — all adapters/applications"
+		if localNetworkScoped(request.Network.Action) {
+			op.NetworkTarget = request.Network.AdapterID
+		}
+		op.Message = "Running " + localNetworkActionLabel(request.Network.Action) + ". Approve Windows administrator access if requested; wait for confirmation before retrying."
+	}
 	for len(m.order) >= 16 {
 		delete(m.operations, m.order[0])
 		m.order = m.order[1:]
@@ -386,11 +404,15 @@ func (a *application) handleLocalToolsWithManager(w http.ResponseWriter, r *http
 		jsonResponse(w, 200, map[string]any{"operation": op})
 		return
 	}
-	if path != "ip" && path != "hosts" {
+	if path != "ip" && path != "hosts" && path != "network" {
 		http.NotFound(w, r)
 		return
 	}
 	if r.Method == http.MethodGet {
+		if path == "network" {
+			methodError(w)
+			return
+		}
 		ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
 		defer cancel()
 		if path == "ip" {
@@ -420,6 +442,9 @@ func (a *application) handleLocalToolsWithManager(w http.ResponseWriter, r *http
 	if path == "ip" {
 		request.IP = &localIPRequest{}
 		err = decodeLocalJSON(w, r, request.IP, 16<<10)
+	} else if path == "network" {
+		request.Network = &localNetworkRequest{}
+		err = decodeLocalJSON(w, r, request.Network, 4096)
 	} else {
 		request.Hosts = &localHostsRequest{}
 		err = decodeLocalJSON(w, r, request.Hosts, 6*localHostsLimit+4096)
@@ -457,16 +482,21 @@ func (a *application) handleLocalToolsWithManager(w http.ResponseWriter, r *http
 func validateLocalToolsRequest(r localToolsRequest) error {
 	switch r.Kind {
 	case "hosts":
-		if r.Hosts == nil || r.IP != nil || !validLocalRevision(r.Hosts.Revision) {
+		if r.Hosts == nil || r.IP != nil || r.Network != nil || !validLocalRevision(r.Hosts.Revision) {
 			return errors.New("Reload the hosts file before saving.")
 		}
 		_, err := validateHostsText(r.Hosts.Content)
 		return err
 	case "ip":
-		if r.IP == nil || r.Hosts != nil {
+		if r.IP == nil || r.Hosts != nil || r.Network != nil {
 			return errors.New("Specify one adapter configuration.")
 		}
 		return validateLocalIPRequest(*r.IP)
+	case "network":
+		if r.Network == nil || r.IP != nil || r.Hosts != nil {
+			return errors.New("Specify exactly one network action.")
+		}
+		return validateLocalNetworkRequest(*r.Network)
 	default:
 		return errors.New("Unsupported local configuration action.")
 	}

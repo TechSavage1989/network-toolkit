@@ -41,11 +41,14 @@
  // A selected interval limits membership, not the baseline time-to-pixel slope.
  // Keep older selected history in the left cluster. Only a shorter-than-baseline
  // window expands spatial distances to fill the plot; curve ages/count stay real.
- function scaleProjection(projection,scope,{fill=true}={}){
+ function scaleProjection(projection,scope,{fill=true,first='',last=''}={}){
   const a=instant(scope?.start),b=instant(scope?.end);if(!projection||a===null||b===null||b<=a)return projection;
   const span=Number(b-a);if(projection.kind==='linear')return {...projection,start:scope.start,end:scope.end,span,filled:true};
-  const baseline={...projection,horizon:projection.baseHorizon||projection.horizon,distanceScale:1},horizon=fill?Math.min(span,baseline.horizon):baseline.horizon,distance=projectionDistance(horizon,baseline);
-  return {...baseline,start:timestamp(b-BigInt(Math.round(horizon))),end:scope.end,horizon,baseHorizon:baseline.horizon,windowStart:scope.start,distanceScale:fill?Math.max(1,1/distance):1,filled:fill,windowed:true,startup:!fill};
+  // Requested bounds need not coincide with arrivals. Mature selected views
+  // pin real endpoint samples, while retaining the exact selection separately.
+  const firstTime=instant(first),lastTime=instant(last),pin=fill&&firstTime!==null&&lastTime!==null&&firstTime>=a&&lastTime<=b&&lastTime>firstTime,end=pin?last:scope.end,finish=pin?lastTime:b,extent=pin?Number(lastTime-firstTime):span;
+  const baseline={...projection,horizon:projection.baseHorizon||projection.horizon,distanceScale:1},horizon=fill?Math.min(extent,baseline.horizon):baseline.horizon,distance=projectionDistance(horizon,baseline);
+  return {...baseline,start:timestamp(finish-BigInt(Math.round(horizon))),end,horizon,baseHorizon:baseline.horizon,windowStart:scope.start,windowEnd:scope.end,recordedStart:pin?first:'',recordedEnd:pin?last:'',distanceScale:fill?Math.max(1,1/distance):1,filled:fill,windowed:true,startup:!fill};
  }
  function curveDistance(u,curve){const x=Math.max(0,Math.min(1,u))*256,i=Math.min(255,Math.floor(x));return curve.table[i]+(curve.table[i+1]-curve.table[i])*(x-i);}
  function curveInverse(y,curve){const v=Math.max(0,Math.min(1,y));let lo=0,hi=256;while(hi-lo>1){const m=(hi+lo)>>1;if(curve.table[m]<v)lo=m;else hi=m;}const span=curve.table[hi]-curve.table[lo];return (lo+(span?(v-curve.table[lo])/span:0))/256;}
@@ -60,7 +63,7 @@
  }
  function projectionDistance(age,p){if(p.kind==='linear')return p.span>0?age/p.span:0;const distance=age<=p.recent?Math.max(0,age)*p.slope:p.recentShare+(1-p.recentShare)*curveDistance((age-p.recent)/p.tail,p.curve);return distance*(p.distanceScale||1);}
  function projectionAge(distance,p){if(p.kind==='linear')return Math.max(0,distance)*p.span;distance/=p.distanceScale||1;return distance<=p.recentShare?Math.max(0,distance)/p.slope:p.recent+p.tail*curveInverse((distance-p.recentShare)/(1-p.recentShare),p.curve);}
- function projectScope(scope,projection){return projection?{...scope,start:projection.windowStart||projection.start,end:projection.end,from:epoch(projection.windowStart||projection.start),to:epoch(projection.end),projection}:scope;}
+ function projectScope(scope,projection){return projection?{...scope,start:projection.windowStart||projection.start,end:projection.windowEnd||projection.end,from:epoch(projection.windowStart||projection.start),to:epoch(projection.windowEnd||projection.end),projection}:scope;}
  function parseTime(value){
   const text=String(value||'').trim();if(valid(text))return text;
   const match=text.match(/^(\d{4})-(\d\d)-(\d\d)[T ](\d{1,2}):(\d\d)(?::(\d\d)(?:\.(\d{1,9}))?)?\s*(AM|PM)?$/i);if(!match)throw Error('Enter a date and time, or an ISO timestamp with its UTC offset.');

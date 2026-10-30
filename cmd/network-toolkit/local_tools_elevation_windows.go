@@ -282,9 +282,22 @@ func localElevatedApply(ctx context.Context, request localToolsRequest) (result 
 				result.Result.Hosts = &s
 			}
 		}
-		if request.Kind == "ip" && result.Result.IP == nil {
+		if (request.Kind == "ip" || request.Kind == "network") && result.Result.IP == nil {
 			if s, e := readLocalIP(refreshCtx); e == nil {
 				result.Result.IP = &s
+			}
+		}
+		if request.Kind == "network" {
+			result.NetworkAction = string(request.Network.Action)
+			result.NetworkScope = request.Network.Scope
+			if result.NetworkTarget == "" {
+				result.NetworkTarget = "This computer — all adapters/applications"
+				if localNetworkScoped(request.Network.Action) {
+					result.NetworkTarget = request.Network.AdapterID
+				}
+			}
+			if result.Partial && request.Network.Action == localWinsockReset {
+				result.RebootRequired = true
 			}
 		}
 		if result.Result.Hosts != nil {
@@ -323,7 +336,11 @@ func localHelperRoundTrip(ctx context.Context, envelope localHelperRequest) (loc
 		// cancelled netsh command before exit; no new step can start afterward.
 		syscall.CloseHandle(pipe)
 		if process != 0 {
-			syscall.WaitForSingleObject(process, 2000)
+			wait := uint32(2000)
+			if localNetworkMustDrainHelper(envelope.Request, sent) {
+				wait = syscall.INFINITE
+			}
+			syscall.WaitForSingleObject(process, wait)
 			syscall.CloseHandle(process)
 		}
 	}()

@@ -658,12 +658,21 @@ func localPerformTools(ctx context.Context, request localToolsRequest) localAppl
 	if request.Kind == "hosts" {
 		return localPerformHosts(ctx, *request.Hosts)
 	}
+	if request.Kind == "network" {
+		return executeLocalNetworkAction(ctx, *request.Network, localNetworkActionOps{read: readLocalIP, run: localRunNetworkAction})
+	}
 	return executeLocalIP(ctx, *request.IP, localIPApplyOps{read: readLocalIP, run: localRunNetsh})
 }
 
 func applyLocalTools(ctx context.Context, request localToolsRequest) localApplyResult {
 	if err := validateLocalToolsRequest(request); err != nil {
 		return localApplyResult{Error: err.Error(), ErrorCode: "validation"}
+	}
+	if request.Kind == "network" {
+		if localElevated() {
+			return localPerformTools(ctx, request)
+		}
+		return localElevatedApply(ctx, request)
 	}
 	if localElevated() {
 		return localPerformTools(ctx, request)

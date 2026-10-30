@@ -1,0 +1,23 @@
+NETWORK TOOLKIT 1.17.124
+
+RECENT GRAPH ENDPOINTS AND NETWORK MAINTENANCE
+
+- Pin the first and last actual points in a mature Condensed Recent range to
+  the plot edges, including fractional boundaries and irregular samples.
+  Preserve startup behavior, selected timeframe, real timestamps and long-range
+  baseline density; no measurements or timestamps are invented.
+- Add reviewed Local Network actions: adapter-scoped DHCP IPv4 release/renew
+  and adapter restart, plus computer-wide Flush DNS, Register DNS and Reset
+  Winsock. Each action shows its scope and disruption warning before execution.
+- Keep normal Windows administrator approval when needed, current adapter
+  identity/stale-state checks, serialized operations and copyable results.
+  Winsock reset does not reset TCP/IP/static addressing or restart the computer;
+  a required reboot is reported for the user to perform manually.
+- Give TCP Ports a distinct port-inspection icon instead of the connection plug.
+
+Network-action validation uses mocks, command construction and intercepted UI
+fixtures only: no live DHCP/DNS/reset/restart or visible UAC transition was tested.
+Real actions can interrupt connectivity and require explicit in-app confirmation.
+Existing file-transfer, credentials and comparison safeguards remain. Previously
+recorded comparison/Alt-editor-transfer/Hosts/gear-keyboard limitations are not
+fixed by this focused update. Older releases and repository access are unchanged.

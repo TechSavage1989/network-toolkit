@@ -51,6 +51,15 @@ function noConnect(calls,detached=false){
  assert(!calls.some(c=>c.body?.action==='connect'||c.body?.runAsAdministrator===true));
  if(detached)assert(!calls.some(c=>['/api/state','/api/credentials','/api/credential-vault'].includes(c.path)));
 }
+async function tcpIconCheck(page,id,width){
+ const button=page.locator('#navigation [data-page="tcp"]'),toggle=page.locator('#mobileMenu'),original=await page.evaluate(()=>document.body.classList.contains('app-nav-collapsed')),read=async()=>button.evaluate(el=>{const s=el.querySelector('svg'),r=s.getBoundingClientRect(),style=getComputedStyle(s);return {label:el.getAttribute('aria-label'),title:el.title,path:s.querySelector('path').getAttribute('d'),width:r.width,height:r.height,stroke:style.stroke,viewBox:s.getAttribute('viewBox')};});
+ if(width<=800)await toggle.click();else if(original)await toggle.click();await button.waitFor({state:'visible'});await button.scrollIntoViewIfNeeded();await settle(page);
+ const expanded=await read();assert.equal(expanded.label,'TCP ports');assert.match(expanded.title,/^TCP ports/);assert.equal(expanded.path,await page.evaluate(()=>paths.tcpPorts));assert.notEqual(expanded.path,connectPath);assert.equal(expanded.viewBox,'0 0 24 24');assert(expanded.width>0&&expanded.height>0&&expanded.stroke!=='none');
+ await button.screenshot({path:path.join(out,'tcp-icon124-'+id+'-expanded.png')});let collapsed=null;
+ if(width>800){await toggle.click();await settle(page);collapsed=await read();assert.equal(collapsed.path,expanded.path);assert.equal(collapsed.label,'TCP ports');assert.match(collapsed.title,/^TCP ports/);assert(collapsed.width>0);await button.screenshot({path:path.join(out,'tcp-icon124-'+id+'-collapsed.png')});if(!original)await toggle.click();}
+ else{await page.keyboard.press('Escape');await page.waitForFunction(()=>!document.body.classList.contains('app-nav-drawer-open'));}
+ (report.tcpIcons||(report.tcpIcons=[])).push({id,expanded,collapsed});
+}
 async function editorCase(detached,width,theme){
  const id=(detached?'detached':'main')+'-'+width+'-'+theme,preference=theme==='dark'?{panel:'connections',side:'remote',width:360,collapsed:false}:undefined,f=await start({detached,width,theme,preference}),{page}=f;
  try{
@@ -66,6 +75,7 @@ async function editorCase(detached,width,theme){
   await files.click();assert(!await host.isVisible());await files.press('Enter');assert(await host.isVisible());await files.press('Space');assert(!await host.isVisible());await connect.click();assert(await host.isVisible());assert.equal(await connect.getAttribute('aria-selected'),'true');
   assert(await page.evaluate(()=>NetworkToolkitFileEditor.active===connect118Document&&NetworkToolkitFileEditor.active.dirty&&NetworkToolkitFileEditor.active.content==='UNSAVED_SYNTHETIC_118'));
   const stored=await page.evaluate(detached=>detached?JSON.parse(sessionStorage.getItem('ntk.editor.files')):state.editorFilesPreferences,detached);assert.equal(stored.panel,'connections');assert.equal(stored.width,preference?360:300);
+  if(!detached)await tcpIconCheck(page,id,width);
   noConnect(f.calls,detached);report.cases.push({id,kind:'editor',initialSelection:selected,geometry,passed:true});report.checks.push(id+' Connect-first order, shared SVG, default/saved selection, native rail keyboard/collapse, dirty retention and no connection/UAC');save();
  }finally{await f.context.close();}
 }

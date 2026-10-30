@@ -8,10 +8,11 @@ releases, tags and downloadable assets are unchanged.
 
 ## Current version
 
-- [1.17.123](../../RELEASE_NOTES_1.17.123.txt)
+- [1.17.124](../../RELEASE_NOTES_1.17.124.txt)
 
 ## Previous versions
 
+- [1.17.123](RELEASE_NOTES_1.17.123.txt)
 - [1.17.122](RELEASE_NOTES_1.17.122.txt)
 - [1.17.121](RELEASE_NOTES_1.17.121.txt)
 - [1.17.120](RELEASE_NOTES_1.17.120.txt)

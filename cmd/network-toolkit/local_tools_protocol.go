@@ -27,7 +27,7 @@ func validateLocalHelperRequest(r localHelperRequest) error {
 		return errors.New("Unsupported local configuration helper protocol.")
 	}
 	if r.WiFi != nil {
-		if r.Request.Kind != "" || r.Request.IP != nil || r.Request.Hosts != nil {
+		if r.Request.Kind != "" || r.Request.IP != nil || r.Request.Hosts != nil || r.Request.Network != nil {
 			return errors.New("The helper accepts exactly one local operation.")
 		}
 		return validateLocalWiFiHelper(r.WiFi)
