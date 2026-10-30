@@ -7,7 +7,8 @@ function setup(){
  const c={entry,requests,online:true,owned:true,Date:{now:()=>now},terminalOwnerCanMutate:()=>c.owned,renderTerminalChrome(){},toast:()=>assert.fail('Unexpected resize error'),setTimeout(fn,delay){const id=++sequence;timers.set(id,{fn,at:now+delay});return id;},clearTimeout:id=>timers.delete(id)};
  c.api=async(url,method,size)=>{requests.push({at:now,url,method,size:{...size}});return {};};
  c.advance=async(ms)=>{const end=now+ms;for(;;){const next=[...timers].filter(([,timer])=>timer.at<=end).sort((a,b)=>a[1].at-b[1].at||a[0]-b[0])[0];if(!next)break;now=next[1].at;timers.delete(next[0]);next[1].fn();await Promise.resolve();await Promise.resolve();}now=end;};
- vm.createContext(c);for(const name of ['terminalDimensions','queueTerminalResize','drainTerminalResize'])vm.runInContext(source(name),c);return c;
+ // Use the real optional display observer; resize-only entries intentionally have no xterm.
+ c.window=c;c.state={terminalPromptNames:[]};vm.createContext(c);vm.runInContext(fs.readFileSync(path.join(__dirname,'../web/assets/terminal-prompt-labels.js'),'utf8'),c);for(const name of ['terminalDimensions','queueTerminalResize','drainTerminalResize'])vm.runInContext(source(name),c);return c;
 }
 test('Repeated identical fits cannot starve the pending backend resize',async()=>{
  const c=setup(),size={cols:154,rows:45};c.queueTerminalResize(c.entry,size);
