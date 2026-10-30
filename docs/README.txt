@@ -10,7 +10,12 @@ Full release-note archive: docs/releases/README.md
 123 gives Terminal SFTP rows the same direct native Windows-copy gesture as
 the SFTP tool and Editor. Detached workspace browsing/export is scoped to its
 own existing session; unsupported remote-write controls are not offered.
-See RELEASE123_HANDOFF.md for exact validation status and limits.
+Published13:39:16Z; actual public bytes/source/feed verified13:41:28.278568Z.
+Eight real main/workspace Terminal cases and ten existing SFTP/Editor cases passed;
+full Windows/core/security/dependency/package and prior122 invariance verified.
+Review41063349840: all seven SUCCESS; last job completed 2026-10-30T13:46:46Z. Duplicate41064715467:
+six SUCCESS/one FAILURE (known Windows Alt-editor transfer); last job completed 2026-10-30T13:56:30Z. Existing Alt-editor transfer and historical comparison/
+Hosts/gear-keyboard/UAC limits are not fixed. See RELEASE123_HANDOFF.md.
 
 122 improves ordinary native local/authorized-SFTP file and folder drag-out.
 The exact active gesture transfers capture safely before copy admission; late or

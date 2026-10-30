@@ -3,7 +3,24 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-Current published version: 1.17.122. Published 2026-10-30T12:27:30Z;
+Current published version: 1.17.123. Published 2026-10-30T13:39:16Z;
+public downloads/source/feed verified 13:41:28.278568Z.
+Source/tag c0530bbb710e1023c68b835a565fbf89e19d74a8;
+tree 71d2000215acbb2d027df22d47c090b31720c5f9.
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.123
+Terminal SFTP direct native copies passed eight main/workspace cases and ten
+existing SFTP/Editor cases, with a real122 Save-dialog negative control. Full
+Windows/core/security/dependency/package passed; public source/manifests/PE/feed
+and prior122 immutable assets verified. Review41063349840: all seven SUCCESS; last job completed 2026-10-30T13:46:46Z.
+Duplicate41064715467: six SUCCESS/one FAILURE (known Windows Alt-editor transfer); last job completed 2026-10-30T13:56:30Z.
+Duplicate scoped Terminal8/Editor10 passed; later known Alt-editor transfer failed.
+Preserve earlier gear-keyboard/comparison/Hosts/Alt-transfer observations and UAC
+limits; no unrelated fix or universal native reliability claim. Detached workspace
+files are own-session read/export only; single-session child sidebar is unchanged.
+Read docs/RELEASE123_HANDOFF.md and DEVELOPMENT_HANDOFF.md. No future authority
+or repository-access changes are granted by this historical record.
+
+Previous published version: 1.17.122. Published 2026-10-30T12:27:30Z;
 public downloads/source/feed verified 12:30:55.984763Z.
 Source/tag 60b02cae25c1bfaf14d0c15a038706d193c99a37;
 tree 5913c34e268e2ecbdae773854ded61f14206d5bb.
