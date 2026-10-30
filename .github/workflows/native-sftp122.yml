@@ -33,7 +33,7 @@ jobs:
           GOTOOLCHAIN: local
           NETWORK_TOOLKIT_NATIVE_SFTP121_TEST: '1'
           NETWORK_TOOLKIT_NATIVE_DRAG122_DIAGNOSTIC: '1'
-          NETWORK_TOOLKIT_NATIVE_DRAG122_PHASE: candidate122-round1
+          NETWORK_TOOLKIT_NATIVE_DRAG122_PHASE: candidate122
           TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/native-sftp122/round1
         run: go test -mod=vendor ./cmd/network-toolkit -run '^TestNativeSFTPDirect121InstalledWebView2$' -count=1 -timeout=12m -v
       - name: Confirm corrected gestures with fresh main and child processes
@@ -41,7 +41,7 @@ jobs:
           GOTOOLCHAIN: local
           NETWORK_TOOLKIT_NATIVE_SFTP121_TEST: '1'
           NETWORK_TOOLKIT_NATIVE_DRAG122_DIAGNOSTIC: '1'
-          NETWORK_TOOLKIT_NATIVE_DRAG122_PHASE: candidate122-round2
+          NETWORK_TOOLKIT_NATIVE_DRAG122_PHASE: candidate122
           TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/native-sftp122/round2
         run: go test -mod=vendor ./cmd/network-toolkit -run '^TestNativeSFTPDirect121InstalledWebView2$' -count=1 -timeout=12m -v
       - name: Retain exact-source native input and outcome evidence
