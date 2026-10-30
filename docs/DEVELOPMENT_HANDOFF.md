@@ -1,3 +1,55 @@
+# Network Toolkit 1.17.120 published and verified
+
+Published 2026-10-30T04:07:44Z; public verification 04:09:16.444676Z.
+Release 428643711: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.120
+Source/tag 45ee25b15c1c88fdb7c77b2f06057d38ae6b5357;
+tree 6e2206995eac69d43f356aea62cce14c332a4321.
+The user approved this combined focused build/publication at 03:46:00 UTC after
+clarifying that mature short graph windows should fill to the left edge.
+
+The one-line non-tab dragstart pass-through fixes the shared Editor tab handler
+cancelling file/folder drag starts. Genuine tab validation/registration/ACK and
+file-transfer checks are retained. Hosted full-app actual pointer input reproduced
+four cancelled starts on published 119 versus 14 non-cancelled candidate starts,
+four trusted internal drops and six safe copy operations; dirty/source identity,
+no-overwrite and Escape cancellation were checked. Five actual PNGs were viewed.
+This is not a new native Explorer drag-out capability: outward copies still need
+the existing explicit prepared-copy flow, with protocol/approval safeguards.
+
+Condensed long Recent windows preserve the configured Fit curve and baseline
+recent spacing instead of shrinking it with duration. Mature short windows expand
+to fill both edges; initial short history still grows naturally. Actual four-layout
+rendered tests and six PNGs verify 762 px plots with 76.2 px newest gaps and 232 px
+plots with 23.2 px gaps, identical between Fit and 5m. A separate 1,262 px model case
+has 126.2 px gaps; it is not misrepresented as browser evidence. Four-second mature
+windows contain five real points and fill; 30-second startup retains natural fill.
+Follow/Details, navigator anchors, source times and safety floors remain intact.
+
+Local checks passed 1,321 JavaScript/42 Python tests, 149 focused graph and 65 focused
+drag tests. Exact-source new-feature/core/security/dependency/full Windows/package
+checks passed before promotion; five review jobs were SUCCESS and two still
+running, so an all-seven-complete claim was not made. Review 40999859524 terminal:
+all seven SUCCESS, last job completed 04:12:48Z.
+Duplicate main 41000889198 terminal: six SUCCESS/one FAILURE (Windows Alt-editor transfer), last job completed 04:24:00Z.
+Its Windows Alt-editor transfer failed 49.45 s at the known no-pending-transfer
+checkpoint after new local Files 20.59 s and dirty-close 9.29 s passed. The genuine-tab
+branches/backend/coordinator/fixture are unchanged, but editor-drag.js as a whole
+is NOT byte-identical because of the scoped fix. Causality remains unestablished;
+no fixture-only, proven-unrelated, rerun or repair claim is made for that failure.
+
+Release 41000889096 build/publish passed. All four actual downloads, 1,156 exact
+source files/1,163 portable members, manifests, reviewed EXE/portable identity,
+PE 120/nine canonical icons/12 resources, updater allowlist and latest feed/tag/
+main/notes were verified. Prior 119 tag/body/four assets remain unchanged.
+Read RELEASE120_HANDOFF.md for hashes, terminal inventories and exact limits.
+Historical 119 comparison and graph/file-drag findings remain documented; this
+release fixes only the scoped file-start and baseline-density defects, not every
+comparison/Hosts/native Alt-drag observation. Visible UAC transitions/cross-account
+consent and live user files/devices were not tested. This five-document closure
+changes no application source, asset, tag, release body or repository access.
+
+---
+
 # Network Toolkit 1.17.119 published and verified
 
 Published 2026-10-30T03:21:18Z; public verification 03:22:27.122867Z.

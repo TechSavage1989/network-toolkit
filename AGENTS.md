@@ -3,7 +3,21 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-Current published version: 1.17.119. Graph time windows/follow controls, elapsed
+Current published version: 1.17.120. The shared non-tab dragstart cancellation
+and Condensed long-window baseline-density defects are corrected in the scoped
+published source/tag 45ee25b15c1c88fdb7c77b2f06057d38ae6b5357;
+tree 6e2206995eac69d43f356aea62cce14c332a4321. Public assets/source/feed verified
+2026-10-30T04:09:16.444676Z; prior 119 remains unchanged. Actual file-row/graph
+acceptance and exact-source core/security/dependency/full Windows/package passed.
+Review 40999859524 terminal: all seven SUCCESS, last job completed 04:12:48Z.
+Duplicate 41000889198 terminal: six SUCCESS/one FAILURE (Windows Alt-editor transfer), last job completed 04:24:00Z.
+The duplicate Windows Alt-transfer failure is unresolved; do not call the whole
+editor-drag asset unchanged or the failure fixture-only. Read RELEASE120_HANDOFF.md
+under docs/ for exact scope, evidence and retained comparison/Hosts/UAC limits.
+Native Explorer outward copies retain their prepared-copy workflow. No new
+transfer/authentication privilege or future publication is granted by this record.
+
+Previous published version: 1.17.119. Graph time windows/follow controls, elapsed
 HH:MM:SS/12-hour defaults and direct detached-local Files are published. Source/tag
 a4b8c56f4c8692d4676d508381ec4c5a2b504aee; tree 9bd09a18eab01de56176e072bb0a06b4c969ba81.
 Four public assets/source/feed verified 2026-10-30T03:22:27.122867Z; prior118 unchanged.

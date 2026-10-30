@@ -12,6 +12,17 @@ out of other tools' drag events. Transfer and document safeguards are unchanged.
 Condensed Recent scaling preserves the baseline recent spacing and curve for
 long intervals; short populated intervals expand only as needed to fill the plot.
 
+120 published 2026-10-30T04:07:44Z; actual downloads/source/feed verified
+04:09:16.444676Z. Source/tag45ee25b15c1c88fdb7c77b2f06057d38ae6b5357.
+Actual file-row baseline/candidate and four graph layouts, core/security/dependency,
+full Windows and package checks passed. Review 40999859524: all seven SUCCESS, last job completed 04:12:48Z.
+Duplicate 41000889198: six SUCCESS/one FAILURE (Windows Alt-editor transfer), last job completed 04:24:00Z.
+The duplicate native Alt-transfer failure remains unresolved; historical comparison,
+Hosts and visible-UAC limits are not fixed by this focused update. Outward Windows
+Explorer copies still use explicit preparation; this restores ordinary application
+drag starts without adding a new transfer capability. Prior 119 assets are unchanged.
+See RELEASE120_HANDOFF.md for exact evidence, public hashes and limitations.
+
 119 corrects selected Condensed time windows, preserves Details visibility on
 Follow latest, and keeps the right anchor when only the history start is resized.
 Total elapsed uses HH:MM:SS; clock defaults are 12-hour unless explicitly saved.
