@@ -1,11 +1,16 @@
-NETWORK TOOLKIT 1.17.119
+NETWORK TOOLKIT 1.17.120
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.119
+CURRENT RELEASE - 1.17.120
 
-Release details: RELEASE_NOTES_1.17.119.txt
-Previous release: docs/releases/RELEASE_NOTES_1.17.118.txt
+Release details: RELEASE_NOTES_1.17.120.txt
+Previous release: docs/releases/RELEASE_NOTES_1.17.119.txt
 Full release-note archive: docs/releases/README.md
+
+120 restores file/folder drag starts by keeping the editor-tab drag listener
+out of other tools' drag events. Transfer and document safeguards are unchanged.
+Condensed Recent scaling preserves the baseline recent spacing and curve for
+long intervals; short populated intervals expand only as needed to fill the plot.
 
 119 corrects selected Condensed time windows, preserves Details visibility on
 Follow latest, and keeps the right anchor when only the history start is resized.

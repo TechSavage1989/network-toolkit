@@ -77,6 +77,7 @@ function create(options={}){
  }
  function start(event){
   const tab=event.target.closest?.('[data-ed-uid]'),g=gesture;
+  if(!tab)return; // This document-wide listener must not cancel other tools' drags.
   if(event.isTrusted===false||!g||g.mode!=='native'||g.cancelled||!tab||tab.dataset.edUid!==g.uid||!eligible()||!event.dataTransfer){event.preventDefault();return;}
   // A tab move must not inherit Chromium's text-area edge autoscroll while the
   // pointer crosses a pane on the way to a window/drop target.

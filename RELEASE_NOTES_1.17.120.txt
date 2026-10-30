@@ -1,0 +1,21 @@
+NETWORK TOOLKIT 1.17.120
+
+FILE-ROW DRAG START AND CONDENSED SPACING REPAIRS
+
+- Restore ordinary file and folder drag starts throughout Toolkit's file managers
+  and editor/Terminal file sidebars. The editor-tab drag listener now ignores
+  drag sources that are not editor tabs instead of cancelling their events.
+- Preserve editor tab reorder, drag-away detach, Alt cross-window moves, close
+  safeguards and existing file-transfer validation, approval and cancellation.
+- Preserve the configured Condensed curve and baseline recent-point spacing
+  when selecting longer Recent timeframes instead of shrinking the recent
+  points to fit the entire history. Older selected history remains clustered.
+- Short populated timeframes may expand spacing to fill the graph rather than
+  leaving unused space on the left; the original short-history startup behavior
+  and minimum time/point safeguards remain. Selected-span labels stay accurate.
+
+These are focused drag-start and graph-scaling repairs, not new transfer capabilities.
+Windows Explorer outbound copies still use the existing prepared-copy workflow;
+remote transfers retain their current protocol and approval requirements.
+No unrelated comparison, Hosts, access or credential behavior is changed.
+Historical validation caveats remain recorded in the release handoffs.

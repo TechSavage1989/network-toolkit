@@ -21,3 +21,23 @@ test('default curve matches a 10-second normal timeframe at each width and caden
   }
  }
 });
+
+
+test('120 selected durations never compress same-age Fit spacing and short spans only expand',()=>{
+ for(const width of [220,744,1262])for(const strength of [0,.55,1])for(const curve of [0,.5,1]){
+  const items=rows(303),base=h.sampleProjection(items,{}, {mode:'condensed',width,compression:{count:3,strength,curve}}),end=h.instant(base.end),before=JSON.stringify(base);
+  for(const seconds of [4,10,30,300,900]){
+   const scope={start:h.timestamp(end-BigInt(seconds)*1000000000n),end:base.end},p=h.scaleProjection(base,scope),s=h.projectScope(scope,p);
+   assert.equal(s.start,scope.start);assert.equal(s.end,scope.end);assert.equal(p.recent,base.recent);assert.equal(p.tail,base.tail);assert.equal(p.slope,base.slope);assert.equal(p.count,base.count);assert.equal(p.curve,base.curve);
+   const gap=(1-h.fraction(h.timestamp(end-1000000000n),s,'condensed'))*width,baseline=width/10;assert(gap>=baseline-1e-7);
+   if(seconds*1e9>=base.horizon)assert(Math.abs(gap-baseline)<1e-7);else assert(Math.abs(h.fraction(scope.start,s,'condensed'))<1e-9,'Short window fills the left edge');
+   let previous=-Infinity;for(let i=0;i<=200;i++){const x=i/200,t=h.at(x,s,'condensed'),again=h.fraction(t,s,'condensed');assert(Math.abs(again-x)<1e-8);assert(h.instant(t)>=previous);previous=h.instant(t);}
+   for(const zoom of [.5,2])for(const share of [.2,.8]){const anchor=h.instant(h.at(share,s,'condensed')),next=h.viewport(s,zoom,h.anchoredEnd(s,1,zoom,share,'condensed'));assert(h.instant(h.at(share,next,'condensed'))>=anchor-1n&&h.instant(h.at(share,next,'condensed'))<=anchor+1n);}
+  }
+  assert.equal(JSON.stringify(base),before);
+ }
+ const items=rows(303),base=h.sampleProjection(items,{}, {mode:'condensed',width:1262,compression:{count:3,strength:.55,curve:.5}}),p=h.scaleProjection(base,{start:stamp(2),end:stamp(302)});assert(Math.abs(h.projectionDistance(1e9,p)*1262-126.2)<1e-7,'Regression: 5m must not reduce the 126.2px Fit gap to8.6px');
+});
+test('120 selected startup retains natural baseline fill until sufficient actual history exists',()=>{
+ const items=rows(3),base=h.sampleProjection(items,{}, {mode:'condensed',width:1262}),p=h.scaleProjection(base,{start:stamp(0),end:stamp(2)},{fill:false}),s=h.projectScope({},p);assert.equal(p.distanceScale,1);assert(h.fraction(items[0].time,s,'condensed')>0);assert.equal(h.fraction(items.at(-1).time,s,'condensed'),1);
+});

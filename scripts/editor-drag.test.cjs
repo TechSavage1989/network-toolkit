@@ -7,15 +7,36 @@ function fixture({native=true,pending=false,reject=false}={}){
  const node=(kind,uid)=>{const n={kind,style:{},dataset:uid?{edUid:uid}:{},classList:classes(),hidden:false,setAttribute(k,v){this[k]=v},removeAttribute(k){delete this[k]},contains(x){return nodes.includes(x)},append(x){nodes.push(x)},getBoundingClientRect(){return {left:uid==='a'?0:100,width:100}},closest(selector){if(selector==='[data-ed-uid]')return kind==='tab'?this:null;if(selector==='[data-ed-tabs]')return ['tab','strip'].includes(kind)?strip:null;if(selector==='[data-editor-drag-detach]')return kind==='zone'?this:null;if(selector==='.nt-editor-window')return kind==='outside'?null:host;return null;}};nodes.push(n);return n;};
  const host=node('host'),strip=node('strip'),a=node('tab','a'),b=node('tab','b'),outside=node('outside');a.nextElementSibling=b;b.nextElementSibling=null;
  host.querySelector=selector=>selector.includes('"a"')?a:selector.includes('"b"')?b:null;
- const document={querySelector:selector=>selector==='.nt-editor-window'?host:null,querySelectorAll:selector=>selector==='[data-editor-drop-before]'?nodes.filter(x=>Object.hasOwn(x,selector.slice(1,-1))):[host],createElement:()=>node('zone'),addEventListener(){}};
+ const listeners={};
+ const document={querySelector:selector=>selector==='.nt-editor-window'?host:null,querySelectorAll:selector=>selector==='[data-editor-drop-before]'?nodes.filter(x=>Object.hasOwn(x,selector.slice(1,-1))):[host],createElement:()=>node('zone'),addEventListener(name,callback,capture){listeners[name]={callback,capture};}};
  let reason='',resolve;
  const coordinator={state:{enabled:native},beginDrag:(uid,ticket)=>{calls.push(['begin',uid,ticket]);return reject?Promise.reject(Error('ownership unavailable')):pending?new Promise(r=>resolve=r):Promise.resolve();},cancelDrag:ticket=>{calls.push(['cancel',ticket]);return Promise.resolve({state:'cancelled'});},claimDrag:ticket=>{calls.push(['claim',ticket]);return Promise.resolve({state:'claimed'});},detachDrag:ticket=>{calls.push(['detach',ticket]);return Promise.resolve({state:'claimed'});}};
  const editor={active:{uid:'b'},canReorderDocuments:()=>reason,reorderDocument:(uid,before)=>{calls.push(['reorder',uid,before]);return true;}};
  const drag=create({document,windows:()=>coordinator,editor:()=>editor,crypto:{getRandomValues:bytes=>bytes.fill(0xab)},message:m=>messages.push(m),setTimeout:fn=>fn()});
  const data=()=>({values:new Map(),types:[],effectAllowed:'',dropEffect:'none',clearData(){this.values.clear();this.types=[]},setData(type,value){this.values.set(type,value);this.types=[...this.values.keys()]},getData(type){return this.values.get(type)||''}});
  const event=(target,dt=data(),extra={})=>({target,dataTransfer:dt,button:0,isTrusted:true,altKey:true,clientX:10,prevented:false,preventDefault(){this.prevented=true},stopPropagation(){this.stopped=true},...extra});
- return {drag,calls,messages,a,b,host,strip,outside,data,event,get zone(){return nodes.find(x=>x.kind==='zone')},setReason:r=>reason=r,resolve:()=>resolve?.()};
+ return {drag,calls,messages,a,b,host,strip,outside,data,event,listeners,get zone(){return nodes.find(x=>x.kind==='zone')},setReason:r=>reason=r,resolve:()=>resolve?.()};
 }
+test('installed tab capture listener leaves file/folder/text and unrelated drags untouched',()=>{
+ for(const armed of [false,true])for(const kind of ['local-file-row','local-folder-row','sftp-file-row','sftp-folder-row','selected-editor-text','unrelated-tool-draggable']){
+  const f=fixture(),dt=f.data(),target={kind,closest:()=>null};
+  if(armed)f.drag.begin(f.event(f.a));
+  dt.setData('text/plain','SYNTHETIC_FILE_DRAG');dt.effectAllowed='copy';
+  const before=[...dt.values],state={...f.drag.state},e=f.event(target,dt);
+  assert.equal(f.listeners.dragstart.capture,true);
+  f.listeners.dragstart.callback(e);
+  assert.equal(e.prevented,false,kind+' must reach its own drag handler');
+  assert.equal(e.stopped,undefined);assert.deepEqual([...dt.values],before);assert.equal(dt.effectAllowed,'copy');
+  assert.deepEqual(f.drag.state,state);assert.deepEqual(f.calls,[]);
+ }
+});
+test('installed capture listener still rejects an unarmed or mismatched actual editor tab',()=>{
+ for(const armed of [false,true]){
+  const f=fixture(),dt=f.data();if(armed)f.drag.begin(f.event(f.a));
+  dt.setData('text/plain','UNCHANGED_INVALID_TAB_PAYLOAD');const before=[...dt.values],e=f.event(f.b,dt);
+  f.listeners.dragstart.callback(e);assert.equal(e.prevented,true);assert.deepEqual([...dt.values],before);assert.deepEqual(f.calls,[]);
+ }
+});
 test('native gesture carries only an opaque ticket, never active-tab identity, paths, text or capabilities',async()=>{
  const f=fixture(),dt=f.data();f.drag.begin(f.event(f.a));await flush();f.drag.start(f.event(f.a,dt));await flush();
  assert.equal(f.drag.state.uid,'a');assert.deepEqual([...dt.values.keys()],[MIME]);assert.match(dt.getData(MIME),/^[a-f0-9]{32}$/);assert.equal(dt.effectAllowed,'move');assert.deepEqual(f.calls[0].slice(0,2),['begin','a']);
