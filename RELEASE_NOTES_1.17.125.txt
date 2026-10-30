@@ -1,0 +1,17 @@
+NETWORK TOOLKIT 1.17.125
+
+ENABLE OR DISABLE THE SELECTED NETWORK ADAPTER
+
+- Add explicit Enable adapter and Disable adapter in Local Network > IP
+  configuration > Network actions. Existing Restart adapter remains available.
+- Keep disabled adapters discoverable and selectable for re-enabling. Show
+  administrative state separately from an unplugged/disconnected link.
+- Review the exact selected adapter and connection-loss warning before disabling;
+  it stays disabled until explicitly enabled. Preserve stored IP/DNS settings.
+- Reuse current GUID/index/revision checks, serialized operations and normal
+  one-action Windows administrator approval. Unknown state fails closed.
+
+Focused validation uses mocks, command construction and intercepted UI only.
+No active user/CI network adapter was disabled or enabled, and no visible UAC
+transition was tested. Existing comparison and other documented limitations
+are unchanged. Prior releases, settings and repository access are preserved.

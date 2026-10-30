@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -83,13 +82,7 @@ func localRunNetworkAction(ctx context.Context, r localNetworkRequest, a localIP
 	cmd.Dir = localSystemDirectory
 	cmd.Stdin = strings.NewReader(plan.Input)
 	// Do not load user-writable modules under the helper's elevated token.
-	cmd.Env = []string{}
-	for _, entry := range os.Environ() {
-		if !strings.HasPrefix(strings.ToLower(entry), "psmodulepath=") {
-			cmd.Env = append(cmd.Env, entry)
-		}
-	}
-	cmd.Env = append(cmd.Env, "PSModulePath="+filepath.Join(localSystemDirectory, "WindowsPowerShell", "v1.0", "Modules"))
+	cmd.Env = localTrustedPowerShellEnvironment()
 	var output localOutputBuffer
 	cmd.Stdout, cmd.Stderr = &output, &output
 	err = cmd.Run()

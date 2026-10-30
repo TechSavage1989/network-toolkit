@@ -20,6 +20,8 @@ const (
 	localDHCPRelease    localNetworkAction = "dhcp-release"
 	localDHCPRenew      localNetworkAction = "dhcp-renew"
 	localAdapterRestart localNetworkAction = "adapter-restart"
+	localAdapterEnable  localNetworkAction = "adapter-enable"
+	localAdapterDisable localNetworkAction = "adapter-disable"
 	localDNSFlush       localNetworkAction = "dns-flush"
 	localDNSRegister    localNetworkAction = "dns-register"
 	localWinsockReset   localNetworkAction = "winsock-reset"
@@ -35,11 +37,11 @@ type localNetworkRequest struct {
 }
 
 func localNetworkScoped(action localNetworkAction) bool {
-	return action == localDHCPRelease || action == localDHCPRenew || action == localAdapterRestart
+	return action == localDHCPRelease || action == localDHCPRenew || action == localAdapterRestart || localNetworkToggle(action)
 }
 func validateLocalNetworkRequest(r localNetworkRequest) error {
 	switch r.Action {
-	case localDHCPRelease, localDHCPRenew, localAdapterRestart, localDNSFlush, localDNSRegister, localWinsockReset:
+	case localDHCPRelease, localDHCPRenew, localAdapterRestart, localAdapterEnable, localAdapterDisable, localDNSFlush, localDNSRegister, localWinsockReset:
 	default:
 		return errors.New("Unsupported network maintenance action.")
 	}
@@ -65,6 +67,31 @@ func planLocalNetworkAction(snapshot localIPSnapshot, r localNetworkRequest) (lo
 	a, found := localFindAdapter(snapshot, r.AdapterID, r.Index)
 	if !found || a.Revision != r.Revision {
 		return localIPAdapter{}, errLocalConfigConflict
+	}
+	if localNetworkToggle(r.Action) {
+		idMatches, indexMatches := 0, 0
+		for _, current := range snapshot.Adapters {
+			if strings.EqualFold(current.ID, r.AdapterID) {
+				idMatches++
+			}
+			if current.Index == r.Index {
+				indexMatches++
+			}
+		}
+		if idMatches != 1 || indexMatches != 1 {
+			return localIPAdapter{}, errLocalConfigConflict
+		}
+		if !a.AdminEditable || a.AdminStatus == "unknown" {
+			return localIPAdapter{}, errors.New("The adapter's administrative state is unavailable; reload before trying Enable/Disable.")
+		}
+		expected := "enabled"
+		if r.Action == localAdapterEnable {
+			expected = "disabled"
+		}
+		if a.AdminStatus != expected {
+			return localIPAdapter{}, errors.New("The adapter is already in the requested administrative state. Reload before continuing.")
+		}
+		return a, nil
 	}
 	if !a.Editable {
 		return localIPAdapter{}, errors.New("The selected interface does not support this action.")
@@ -145,6 +172,26 @@ func executeLocalNetworkAction(ctx context.Context, r localNetworkRequest, ops l
 	} else {
 		result.Message += " Adapter refresh failed; use Reload to inspect the current state."
 	}
+	if localNetworkToggle(r.Action) && result.Error == "" {
+		desired := "disabled"
+		if r.Action == localAdapterEnable {
+			desired = "enabled"
+		}
+		matched := 0
+		verified := false
+		for _, current := range fresh.Adapters {
+			if strings.EqualFold(current.ID, r.AdapterID) {
+				matched++
+				verified = current.AdminStatus == desired
+			}
+		}
+		if refreshErr != nil || matched != 1 || !verified {
+			result.Error = "Windows completed the command, but the requested administrative state could not be confirmed. Reload the adapter list before retrying."
+			result.ErrorCode = "unconfirmed"
+			result.Message = "The command was attempted; the adapter state is not confirmed. Do not retry automatically."
+			result.Partial = true
+		}
+	}
 	return
 }
 func localNetworkSuccess(action localNetworkAction) string {
@@ -153,6 +200,10 @@ func localNetworkSuccess(action localNetworkAction) string {
 		return "The selected adapter's DHCP IPv4 lease was released. Its IPv4 connections are interrupted until a lease is obtained. Select Renew DHCP IPv4 when ready."
 	case localDHCPRenew:
 		return "Windows completed DHCP IPv4 renewal for the selected adapter. Review its current address; this does not verify Internet connectivity."
+	case localAdapterEnable:
+		return "The selected adapter is administratively enabled. Stored IP/DNS settings were not edited; link or Internet connectivity is not guaranteed."
+	case localAdapterDisable:
+		return "The selected adapter is administratively disabled. Its connections are stopped until you explicitly enable it. Stored IP/DNS settings were not edited."
 	case localAdapterRestart:
 		return "Windows completed the selected adapter restart (disable and re-enable). Stored IP/DNS settings were not edited. Connectivity may take time to return."
 	case localDNSFlush:
@@ -200,6 +251,13 @@ func localNetworkCommandPlan(r localNetworkRequest) (localNetworkCommand, error)
 		return localNetworkCommand{Program: "ipconfig.exe", Arguments: []string{"/registerdns"}}, nil
 	case localWinsockReset:
 		return localNetworkCommand{Program: "netsh.exe", Arguments: []string{"winsock", "reset"}}, nil
+	case localAdapterEnable, localAdapterDisable:
+		input, err := json.Marshal(struct {
+			AdapterID string             `json:"adapterId"`
+			Index     uint32             `json:"index"`
+			Action    localNetworkAction `json:"action"`
+		}{r.AdapterID, r.Index, r.Action})
+		return localPowerShellPlan(localToggleAdapterScript, string(input)), err
 	case localAdapterRestart:
 		units := utf16.Encode([]rune(localRestartAdapterScript))
 		data := make([]byte, len(units)*2)
@@ -274,6 +332,10 @@ func localNetworkActionLabel(action localNetworkAction) string {
 		return "Release DHCP IPv4"
 	case localDHCPRenew:
 		return "Renew DHCP IPv4"
+	case localAdapterEnable:
+		return "Enable adapter"
+	case localAdapterDisable:
+		return "Disable adapter"
 	case localAdapterRestart:
 		return "Restart adapter"
 	case localDNSFlush:
@@ -284,4 +346,16 @@ func localNetworkActionLabel(action localNetworkAction) string {
 		return "Reset Winsock (computer-wide)"
 	}
 	return "network action"
+}
+
+func localNetworkToggle(action localNetworkAction) bool {
+	return action == localAdapterEnable || action == localAdapterDisable
+}
+func localPowerShellPlan(script, input string) localNetworkCommand {
+	units := utf16.Encode([]rune(script))
+	data := make([]byte, len(units)*2)
+	for i, u := range units {
+		binary.LittleEndian.PutUint16(data[i*2:], u)
+	}
+	return localNetworkCommand{Program: "WindowsPowerShell/v1.0/powershell.exe", Arguments: []string{"-NoLogo", "-NoProfile", "-NonInteractive", "-EncodedCommand", base64.StdEncoding.EncodeToString(data)}, Input: input}
 }

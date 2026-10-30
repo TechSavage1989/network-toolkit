@@ -330,7 +330,7 @@ func localReadAdapterRegistry(id string) (localAdapterRegistry, error) {
 	return result, nil
 }
 
-func readLocalIP(ctx context.Context) (snapshot localIPSnapshot, resultErr error) {
+func readLocalIPConfiguration(ctx context.Context) (snapshot localIPSnapshot, resultErr error) {
 	snapshot = localIPSnapshot{Available: true, Elevated: localElevated(), Adapters: []localIPAdapter{}}
 	defer func() {
 		if resultErr == nil {

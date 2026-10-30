@@ -1,11 +1,17 @@
-NETWORK TOOLKIT 1.17.124
+NETWORK TOOLKIT 1.17.125
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.124
+CURRENT RELEASE - 1.17.125
 
-Release details: RELEASE_NOTES_1.17.124.txt
-Previous release: docs/releases/RELEASE_NOTES_1.17.123.txt
+Release details: RELEASE_NOTES_1.17.125.txt
+Previous release: docs/releases/RELEASE_NOTES_1.17.124.txt
 Full release-note archive: docs/releases/README.md
+
+125 adds explicit Enable adapter / Disable adapter to Network actions. Disabled
+adapters remain selectable, administrative state is separate from link status,
+and existing Restart / IP / DNS settings are preserved. Actions require review
+and normal Windows administrator approval when needed. Validation is isolated
+and mocked: no live adapter changes or visible UAC were tested.
 
 124 corrects mature Condensed Recent graph endpoints and adds reviewed DHCP,
 DNS, adapter restart and Winsock maintenance actions. TCP Ports has a distinct

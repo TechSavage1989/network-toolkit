@@ -895,6 +895,20 @@ jobs:
           mkdir -p "$RUNNER_TEMP/ntk-workflow107-tests"
           npm install --prefix "$RUNNER_TEMP/ntk-workflow107-tests" playwright@1.62.1
           "$RUNNER_TEMP/ntk-workflow107-tests/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Check network maintenance reviews and states without native actions
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results
+        run: node scripts/local-network-actions124.browser.cjs
+      - name: Retain isolated network maintenance UI evidence
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: local-network-actions124-checks
+          path: ${{ runner.temp }}/ntk-workflow107-results/local-network-actions124-*
+          if-no-files-found: error
+          retention-days: 14
       - name: Prepare exact123 graph negative control
         run: |
           git fetch --no-tags --depth=1 origin c0530bbb710e1023c68b835a565fbf89e19d74a8
@@ -928,20 +942,6 @@ jobs:
             ${{ runner.temp }}/ntk-workflow107-results/graph-scale119-*
             ${{ runner.temp }}/ntk-workflow107-results/graph-scale120-*
             ${{ runner.temp }}/ntk-workflow107-results/negative124/**
-          if-no-files-found: error
-          retention-days: 14
-      - name: Check network maintenance reviews and states without native actions
-        if: success() || failure()
-        env:
-          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
-          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results
-        run: node scripts/local-network-actions124.browser.cjs
-      - name: Retain isolated network maintenance UI evidence
-        uses: actions/upload-artifact@v7
-        if: always()
-        with:
-          name: local-network-actions124-checks
-          path: ${{ runner.temp }}/ntk-workflow107-results/local-network-actions124-*
           if-no-files-found: error
           retention-days: 14
       - name: Prepare exact published108 UI for measured before-after layouts

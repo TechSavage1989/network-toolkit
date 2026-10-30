@@ -42,6 +42,8 @@ type localIPAdapter struct {
 	Status          string           `json:"status"`
 	MAC             string           `json:"mac"`
 	DHCP            bool             `json:"dhcp"`
+	AdminStatus     string           `json:"adminStatus"`
+	AdminEditable   bool             `json:"adminEditable"`
 	DHCPServer      string           `json:"dhcpServer,omitempty"`
 	Addresses       []localIPAddress `json:"addresses"`
 	Gateways        []string         `json:"gateways"`
@@ -217,7 +219,9 @@ func localAdapterRevision(a localIPAdapter) string {
 		DNSAutomatic                bool
 		Registration, Configuration string
 		GatewayMetric               *uint32
-	}{strings.ToLower(a.ID), a.Index, a.DHCP, a.Addresses, a.Gateways, a.DNSServers, a.DNSAutomatic, a.dnsRegistration, a.configuration, a.gatewayMetric})
+		AdminStatus                 string
+		AdminEditable               bool
+	}{strings.ToLower(a.ID), a.Index, a.DHCP, a.Addresses, a.Gateways, a.DNSServers, a.DNSAutomatic, a.dnsRegistration, a.configuration, a.gatewayMetric, a.AdminStatus, a.AdminEditable})
 }
 
 func localErrorCode(err error) string {
