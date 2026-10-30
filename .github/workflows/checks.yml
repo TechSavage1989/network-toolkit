@@ -615,6 +615,12 @@ jobs:
         run: |
           npm install --prefix "$RUNNER_TEMP/ntk-browser-tests" --no-audit --no-fund playwright@1.62.1
           node "$RUNNER_TEMP/ntk-browser-tests/node_modules/playwright/cli.js" install chromium
+          # Hosted images normally provide Chromium's shared libraries. Avoid
+          # downloading unrelated font/library upgrades from a slow apt mirror;
+          # retain the full dependency installer when a browser cannot launch.
+          if ! PLAYWRIGHT_MODULE="$RUNNER_TEMP/ntk-browser-tests/node_modules/playwright" node -e 'require(process.env.PLAYWRIGHT_MODULE).chromium.launch({headless:true}).then(browser=>browser.close()).catch(error=>{console.error(error.message);process.exitCode=1})'; then
+            node "$RUNNER_TEMP/ntk-browser-tests/node_modules/playwright/cli.js" install --with-deps chromium
+          fi
       - name: Check learned terminal names and endpoint-only fallback
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
@@ -641,12 +647,6 @@ jobs:
           path: ${{ runner.temp }}/ntk-paced-paste127-results
           if-no-files-found: error
           retention-days: 14
-          # Hosted images normally provide Chromium's shared libraries. Avoid
-          # downloading unrelated font/library upgrades from a slow apt mirror;
-          # retain the full dependency installer when a browser cannot launch.
-          if ! PLAYWRIGHT_MODULE="$RUNNER_TEMP/ntk-browser-tests/node_modules/playwright" node -e 'require(process.env.PLAYWRIGHT_MODULE).chromium.launch({headless:true}).then(browser=>browser.close()).catch(error=>{console.error(error.message);process.exitCode=1})'; then
-            node "$RUNNER_TEMP/ntk-browser-tests/node_modules/playwright/cli.js" install --with-deps chromium
-          fi
       - name: Check stable Local Network layout and automatic snapshots
         if: success() || failure()
         env:
