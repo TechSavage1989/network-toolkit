@@ -945,12 +945,14 @@ jobs:
           if-no-files-found: error
           retention-days: 14
       - name: Prepare exact published108 UI for measured before-after layouts
+        if: success() || failure()
         run: |
           git fetch --no-tags --depth=1 origin 59a82b13bb31899206d383ea58166ec9a4f4faf0
           test "$(git rev-parse FETCH_HEAD)" = 59a82b13bb31899206d383ea58166ec9a4f4faf0
           mkdir -p "$RUNNER_TEMP/ntk-layout-baseline108"
           git archive 59a82b13bb31899206d383ea58166ec9a4f4faf0 | tar -xf - -C "$RUNNER_TEMP/ntk-layout-baseline108"
       - name: Prepare exact published109 UI for temporal graph comparison
+        if: success() || failure()
         run: |
           git fetch --no-tags --depth=1 origin d3494a879604fb2523e0867ad1fb175a2f9abbf5
           test "$(git rev-parse FETCH_HEAD)" = d3494a879604fb2523e0867ad1fb175a2f9abbf5

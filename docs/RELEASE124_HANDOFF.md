@@ -57,3 +57,16 @@ Retain known comparison/gutter/motion, Alt-editor tab-transfer, Hosts focus and
 gear-keyboard observations and visible UAC limitations from previous releases.
 This build does not repair or hide those findings. Synthetic tests do not prove
 live DHCP/DNS/reset behavior, arbitrary device compatibility or visible UAC.
+
+First exact hosted review41089891246 passed all48 new graph frames with zero
+endpoint gap; published123 reproduced38.43px. TCP icon/Connect14 cases and six
+actual icon images passed. Core1382JS/42Python/eight ordinary Go packages,
+security/dependency, mocked Windows network cases and package verification passed.
+The new network browser stopped before its first action on a selector matching
+both Close and Cancel, plus an omitted ordinary editor-count metadata response.
+The legacy curve fixture expected the old word visible instead of the intended
+selected/recorded title. These test-only corrections retain stricter semantic and
+mutation assertions. Baseline preparation now runs independently after a failed
+check, preventing unrelated layout checks from failing merely on absent fixtures.
+No production files changed after that first candidate; corrected hosted results
+remain pending at this record. No live network/UAC action was tested.
