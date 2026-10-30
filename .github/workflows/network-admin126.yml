@@ -1,0 +1,33 @@
+name: Read-only Windows adapter inventory diagnostic
+on:
+  push:
+    branches: ['diagnostic/network-admin126-*']
+permissions:
+  contents: read
+jobs:
+  readonly-inventory:
+    runs-on: windows-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Query actual Windows administrative state without changing adapters
+        env:
+          GOTOOLCHAIN: local
+          NTK_NETWORK_ADMIN_READONLY_DIAGNOSTIC: '1'
+        shell: pwsh
+        run: |
+          go test -mod=vendor ./cmd/network-toolkit -run '^TestLocalNetworkAdminReadOnlyWindowsDiagnostic$' -count=1 -v -timeout 2m 2>&1 | Tee-Object -FilePath "$env:RUNNER_TEMP/network-admin126.log"
+          exit $LASTEXITCODE
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: readonly-network-admin126
+          path: ${{ runner.temp }}/network-admin126.log
+          if-no-files-found: error
+          retention-days: 14
