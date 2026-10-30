@@ -14,6 +14,48 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  browser-terminal127:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install isolated terminal test browser
+        run: |
+          npm install --prefix "$RUNNER_TEMP/ntk-browser-tests" --no-audit --no-fund playwright@1.62.1
+          node "$RUNNER_TEMP/ntk-browser-tests/node_modules/playwright/cli.js" install --with-deps chromium
+      - name: Check learned terminal names and endpoint-only fallback
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-prompt-labels127-results
+        run: node scripts/terminal-prompt-labels127.browser.cjs
+      - name: Retain prompt labels127 browser evidence
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: terminal-prompt-labels127-checks
+          path: ${{ runner.temp }}/ntk-prompt-labels127-results
+          if-no-files-found: error
+          retention-days: 14
+      - name: Check paced multiline paste review and retained raw paste
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-paced-paste127-results
+        run: node scripts/terminal-paced-paste127.browser.cjs
+      - name: Retain paced paste127 browser evidence
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: terminal-paced-paste127-checks
+          path: ${{ runner.temp }}/ntk-paced-paste127-results
+          if-no-files-found: error
+          retention-days: 14
   browser-editor112:
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -621,32 +663,6 @@ jobs:
           if ! PLAYWRIGHT_MODULE="$RUNNER_TEMP/ntk-browser-tests/node_modules/playwright" node -e 'require(process.env.PLAYWRIGHT_MODULE).chromium.launch({headless:true}).then(browser=>browser.close()).catch(error=>{console.error(error.message);process.exitCode=1})'; then
             node "$RUNNER_TEMP/ntk-browser-tests/node_modules/playwright/cli.js" install --with-deps chromium
           fi
-      - name: Check learned terminal names and endpoint-only fallback
-        env:
-          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
-          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-prompt-labels127-results
-        run: node scripts/terminal-prompt-labels127.browser.cjs
-      - name: Retain prompt labels127 browser evidence
-        uses: actions/upload-artifact@v7
-        if: always()
-        with:
-          name: terminal-prompt-labels127-checks
-          path: ${{ runner.temp }}/ntk-prompt-labels127-results
-          if-no-files-found: error
-          retention-days: 14
-      - name: Check paced multiline paste review and retained raw paste
-        env:
-          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
-          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-paced-paste127-results
-        run: node scripts/terminal-paced-paste127.browser.cjs
-      - name: Retain paced paste127 browser evidence
-        uses: actions/upload-artifact@v7
-        if: always()
-        with:
-          name: terminal-paced-paste127-checks
-          path: ${{ runner.temp }}/ntk-paced-paste127-results
-          if-no-files-found: error
-          retention-days: 14
       - name: Check stable Local Network layout and automatic snapshots
         if: success() || failure()
         env:
