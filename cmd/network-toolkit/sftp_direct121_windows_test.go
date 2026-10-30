@@ -73,6 +73,15 @@ func TestNativeSFTPDirect121InstalledWebView2(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	preflight, err := a.runRemoteBrowserOperation(ctx, remoteBrowserRequest{Protocol: "ssh", ConnectionID: connection, Action: "read-text", Path: "/one.txt"})
+	if err != nil {
+		t.Fatalf("real retained SFTP preflight read: %v", err)
+	}
+	data, _ := preflight.Data.(map[string]any)
+	bytesRead, _ := data["contentBytes"].([]byte)
+	if !bytes.Equal(bytesRead, contents["one.txt"]) {
+		t.Fatal("real retained SFTP preflight bytes differ")
+	}
 	executable := filepath.Join(private, "Network_Toolkit.sftp121.exe")
 	build := exec.CommandContext(ctx, "go", "build", "-trimpath", "-ldflags=-H=windowsgui", "-o", executable, "./cmd/network-toolkit")
 	build.Dir = root
@@ -188,7 +197,7 @@ func TestNativeSFTPDirect121InstalledWebView2(t *testing.T) {
 	}))
 	defer server.Close()
 	a.host = strings.TrimPrefix(server.URL, "http://")
-	report := map[string]any{"passed": false, "fullProductionPage": true, "actualRetainedLoopbackSFTP": true, "actualWindowsExplorer": true, "syntheticTemporaryFilesOnly": true, "nativeInput": "Win32 pointer down/move/up; no DOM drag event substitution"}
+	report := map[string]any{"passed": false, "fullProductionPage": true, "actualRetainedLoopbackSFTP": true, "preflightRetainedRead": true, "actualWindowsExplorer": true, "syntheticTemporaryFilesOnly": true, "nativeInput": "Win32 pointer down/move/up; no DOM drag event substitution"}
 	var cases []map[string]any
 	var attempts []map[string]any
 	ready := make(chan struct{})
@@ -437,6 +446,13 @@ func (c *sftpDirect121Channel) Write(p []byte) (int, error) {
 }
 func sftpDirect121Server(t *testing.T, ctx context.Context, root string, slow *atomic.Bool, marker *atomic.Value) (int, string, func()) {
 	t.Helper()
+	// Match production server startup. Windows Temp may use an 8.3 alias;
+	// the confinement guard correctly compares resolved paths to this root.
+	canonical, err := transferRoot(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root = canonical
 	_, key, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		t.Fatal(err)
