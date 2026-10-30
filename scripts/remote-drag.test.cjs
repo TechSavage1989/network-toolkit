@@ -19,7 +19,7 @@ test('drag ticket payload is made lazily and cache reduces duplicate requests',a
 test('quick clicks and pointer movement cancel drag preparation before remote I/O',async()=>{
  const timers=new Map(),listeners={},calls=[];
  let serial=0;
- const context={location:{origin:'http://127.0.0.1:52007'},document:{addEventListener:(name,fn)=>listeners[name]=fn},
+ const context={location:{origin:'http://127.0.0.1:52007'},document:{addEventListener:(name,fn)=>{const prior=listeners[name];listeners[name]=event=>{prior?.(event);fn(event);};}},
   setTimeout:fn=>{const id=++serial;timers.set(id,fn);return id;},clearTimeout:id=>timers.delete(id),
   api:async(url,verb,payload)=>{calls.push({url,verb,payload});return {ticket:'ab'.repeat(24),filename:'config.txt'};}};
  context.globalThis=context;vm.runInNewContext(source,context);

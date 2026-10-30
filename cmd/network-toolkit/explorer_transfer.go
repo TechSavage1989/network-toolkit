@@ -29,15 +29,17 @@ type explorerTransferManager struct {
 	imports map[string]*explorerImport
 }
 type explorerTransferJob struct {
-	id, owner, state, note, stage string
-	names, paths                  []string
-	entries                       int
-	bytes, planned                int64
-	expires, armed                time.Time
-	gesture, revoked              uint64
-	cancel                        context.CancelFunc
-	valid                         func() bool
-	cancelRequested               bool
+	id, owner, state, note, stage   string
+	names, paths                    []string
+	entries                         int
+	bytes, planned                  int64
+	expires, armed                  time.Time
+	gesture, revoked                uint64
+	cancel                          context.CancelFunc
+	valid                           func() bool
+	cancelRequested                 bool
+	direct, renderStarted, rendered bool
+	render                          func()
 }
 type explorerTransferRequest struct {
 	Action  string        `json:"action"`
@@ -77,11 +79,24 @@ func (a *application) handleExplorerTransfer(w http.ResponseWriter, r *http.Requ
 		}
 		m.mu.Lock()
 		defer m.mu.Unlock()
+		if id := r.URL.Query().Get("id"); id != "" {
+			j := m.jobs[id]
+			if j == nil || j.owner != owner || !j.direct || j.state != "dragging" || !j.valid() || j.cancelRequested {
+				jsonError(w, 409, "The copy is no longer available.")
+				return
+			}
+			if !j.rendered {
+				jsonResponse(w, 202, exportJobStatus(j))
+				return
+			}
+			jsonResponse(w, 200, map[string]any{"id": j.id, "paths": j.paths, "gesture": j.gesture})
+			return
+		}
 		for _, j := range m.jobs {
 			expireExplorerClaim(j)
 			if j.owner == owner && (j.state == "ready" || j.state == "claimed") && !j.armed.IsZero() && time.Now().Before(j.armed) && time.Now().Before(j.expires) && j.valid() {
 				j.state = "claimed"
-				jsonResponse(w, 200, map[string]any{"id": j.id, "paths": j.paths, "gesture": j.gesture})
+				jsonResponse(w, 200, map[string]any{"id": j.id, "paths": j.paths, "gesture": j.gesture, "direct": j.direct})
 				return
 			}
 		}
@@ -109,7 +124,7 @@ func (a *application) handleExplorerTransfer(w http.ResponseWriter, r *http.Requ
 		jsonError(w, 400, "Invalid file copy request.")
 		return
 	}
-	if req.Action == "prepare" {
+	if req.Action == "prepare" || req.Action == "direct" {
 		a.prepareExplorerTransfer(w, r, req)
 		return
 	}
@@ -126,6 +141,17 @@ func (a *application) handleExplorerTransfer(w http.ResponseWriter, r *http.Requ
 	}
 	expireExplorerClaim(j)
 	switch req.Action {
+	case "materialize":
+		if !j.direct || j.state != "dragging" || !j.valid() || j.cancelRequested {
+			m.mu.Unlock()
+			jsonError(w, 409, "The copy is no longer available.")
+			return
+		}
+		if !j.renderStarted {
+			j.renderStarted = true
+			j.note = "Copying to Windows Explorer… Press Escape to cancel."
+			go j.render()
+		}
 	case "start":
 		if req.Gesture == j.gesture && j.state == "dragging" {
 			break
@@ -166,6 +192,12 @@ func (a *application) handleExplorerTransfer(w http.ResponseWriter, r *http.Requ
 			}
 		}
 	case "cancel":
+		if j.state == "dragging" && j.direct {
+			j.cancelRequested = true
+			j.cancel()
+			j.note = "Cancelling the Windows copy…"
+			break
+		}
 		if j.state == "dragging" {
 			m.mu.Unlock()
 			jsonError(w, 409, "Release the drag or press Escape in Windows to cancel.")
@@ -317,7 +349,20 @@ func (a *application) prepareExplorerTransfer(w http.ResponseWriter, r *http.Req
 	m.jobs[j.id] = j
 	response := exportJobStatus(j)
 	m.mu.Unlock()
-	go a.stageExplorerExport(ctx, j, req.Binding, req.Paths, grant)
+	if req.Action == "direct" {
+		// This registration retains only the existing pinned grant and selected
+		// source names. No source bytes are read until the native drop receiver
+		// asks for the copy after the physical button is released.
+		m.mu.Lock()
+		j.direct = true
+		j.state = "ready"
+		j.note = "Drag to Windows Explorer to copy."
+		j.render = func() { a.stageExplorerExport(ctx, j, req.Binding, req.Paths, grant) }
+		response = exportJobStatus(j)
+		m.mu.Unlock()
+	} else {
+		go a.stageExplorerExport(ctx, j, req.Binding, req.Paths, grant)
+	}
 	go a.watchExplorerCopy(ctx, j)
 	time.AfterFunc(15*time.Minute, func() {
 		m.mu.Lock()
@@ -371,6 +416,11 @@ func (a *application) stageExplorerExport(ctx context.Context, j *explorerTransf
 	}
 	j.stage = stage
 	j.paths = paths
+	if j.direct {
+		j.rendered = true
+		j.note = "Copying to Windows Explorer…"
+		return
+	}
 	j.state = "ready"
 	j.note = "Ready. Drag the prepared copy to Windows Explorer. Windows asks before replacing existing items."
 }

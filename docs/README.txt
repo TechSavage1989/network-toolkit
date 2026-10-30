@@ -1,11 +1,14 @@
-NETWORK TOOLKIT 1.17.120
+NETWORK TOOLKIT 1.17.121
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.120
+CURRENT RELEASE - 1.17.121
 
-Release details: RELEASE_NOTES_1.17.120.txt
-Previous release: docs/releases/RELEASE_NOTES_1.17.119.txt
+Release details: RELEASE_NOTES_1.17.121.txt
+Previous release: docs/releases/RELEASE_NOTES_1.17.120.txt
 Full release-note archive: docs/releases/README.md
+
+121 compacts the Editor Files sidebar and improves its file-drag workflows.
+See the current release notes for supported behavior and validation limits.
 
 120 restores file/folder drag starts by keeping the editor-tab drag listener
 out of other tools' drag events. Transfer and document safeguards are unchanged.

@@ -1,0 +1,488 @@
+//go:build windows
+
+package main
+
+import (
+	"bytes"
+	"context"
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"golang.org/x/crypto/ssh"
+	"networktoolkit/internal/desktop"
+)
+
+// The only sources/destinations are temporary synthetic files. Full production
+// index/scripts, the real backend, a retained loopback SSH transport and genuine
+// Windows mouse/OLE input run together; no DOM drag events or debug port.
+func TestNativeSFTPDirect121InstalledWebView2(t *testing.T) {
+	if os.Getenv("NETWORK_TOOLKIT_NATIVE_SFTP121_TEST") != "1" {
+		t.Skip("explicit hosted synthetic full-app SFTP/Explorer acceptance only")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Minute)
+	defer cancel()
+	root, err := filepath.Abs(filepath.Join("..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	private, err := os.MkdirTemp("", "network-toolkit-sftp121-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.RemoveAll(private)
+	source := filepath.Join(private, "source")
+	local := filepath.Join(private, "local")
+	for _, p := range []string{source, local, filepath.Join(source, "tree", "empty"), filepath.Join(source, "tree", "nested")} {
+		if err = os.MkdirAll(p, 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	contents := map[string][]byte{"one.txt": []byte("SYNTHETIC DIRECT121 FILE\n"), "tree/nested/two.txt": []byte("SYNTHETIC DIRECT121 TREE\n"), "slow.bin": bytes.Repeat([]byte("SYNTHETIC DIRECT121 SLOW\n"), 400000)}
+	for name, data := range contents {
+		if err = os.WriteFile(filepath.Join(source, filepath.FromSlash(name)), data, 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	a := newApplication(ctx, filepath.Join(private, "owner-data", "Network_Toolkit.settings.json"))
+	defer a.stop()
+	defer a.closeBrowserConnections()
+	a.uiHost = "webview2"
+	a.state = json.RawMessage(`{"activePage":"editor","appUpdatePreferences":{"enabled":false},"editorFilesPreferences":{"width":300,"panel":"files","side":"remote","collapsed":false}}`)
+	var slow atomic.Bool
+	var marker atomic.Value
+	marker.Store("")
+	port, fingerprint, closeSSH := sftpDirect121Server(t, ctx, source, &slow, &marker)
+	defer closeSSH()
+	connection, err := a.openBrowserConnection(httptest.NewRequest("POST", "/api/remote-browser", nil), remoteBrowserRequest{Protocol: "ssh", Host: "127.0.0.1", Port: port, Username: "synthetic121", Password: "SYNTHETIC_NOT_A_SECRET", AuthMode: "password", Fingerprint: fingerprint})
+	if err != nil {
+		t.Fatal(err)
+	}
+	executable := filepath.Join(private, "Network_Toolkit.sftp121.exe")
+	build := exec.CommandContext(ctx, "go", "build", "-trimpath", "-ldflags=-H=windowsgui", "-o", executable, "./cmd/network-toolkit")
+	build.Dir = root
+	if out, e := build.CombinedOutput(); e != nil {
+		t.Fatalf("production child build: %v %s", e, out)
+	}
+	driver, err := os.ReadFile(filepath.Join(root, "scripts", "sftp-direct121-native-driver.js"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	output := os.Getenv("TOOLKIT_NATIVE_TEST_OUTPUT")
+	if output == "" {
+		output = filepath.Join(private, "evidence")
+	}
+	if err = os.MkdirAll(output, 0700); err != nil {
+		t.Fatal(err)
+	}
+	h := &nativeEditorFixture{ctx: ctx, app: a, root: root, executable: executable, output: output, driver: driver, queues: map[string]chan nativeEditorCommand{}, replies: map[uint64]chan nativeEditorReply{}, tokens: map[string]string{}, children: map[string]*nativeEditorChild{}}
+	a.launchEditorView = h.launch
+	defer h.cleanup()
+	var finishFile atomic.Value
+	finishFile.Store("")
+	var mu sync.Mutex
+	var actions []string
+	var materialized atomic.Int32
+	within := func(p string) bool {
+		rel, e := filepath.Rel(local, p)
+		return e == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/transfer/local" {
+			q := r.URL.Query()
+			p := q.Get("path")
+			if p == "" {
+				p = local
+				q.Set("path", p)
+				r.URL.RawQuery = q.Encode()
+			}
+			if r.Method != "GET" || !within(p) {
+				http.Error(w, "outside synthetic local fixture", 403)
+				return
+			}
+			a.ServeHTTP(w, r)
+			return
+		}
+		if r.URL.Path == "/api/remote-browser" && r.Method == "POST" {
+			body, e := io.ReadAll(io.LimitReader(r.Body, 64<<10))
+			var req remoteBrowserRequest
+			if e != nil || json.Unmarshal(body, &req) != nil || req.ConnectionID != connection || browserRequestHasLogin(req) {
+				http.Error(w, "outside retained loopback connection", 403)
+				return
+			}
+			switch req.Action {
+			case "list", "stat", "probe", "read-text", "download":
+			default:
+				http.Error(w, "outside synthetic read-only operation", 403)
+				return
+			}
+			r.Body = io.NopCloser(bytes.NewReader(body))
+			a.ServeHTTP(w, r)
+			return
+		}
+		if r.URL.Path == "/api/explorer-transfer" || r.URL.Path == "/api/explorer-transfer/native" {
+			var request explorerTransferRequest
+			if r.Method == "POST" {
+				body, e := io.ReadAll(io.LimitReader(r.Body, 64<<10))
+				if e != nil || json.Unmarshal(body, &request) != nil {
+					http.Error(w, "bad synthetic request", 400)
+					return
+				}
+				r.Body = io.NopCloser(bytes.NewReader(body))
+				mu.Lock()
+				actions = append(actions, request.Action)
+				mu.Unlock()
+				if request.Action == "prepare" {
+					http.Error(w, "fixture forbids prerequisite Prepare copy", 403)
+					return
+				}
+				if request.Action == "materialize" {
+					materialized.Add(1)
+				}
+			}
+			a.ServeHTTP(w, r)
+			if request.Action == "finish" {
+				if p := finishFile.Load().(string); p != "" {
+					_ = os.WriteFile(p, []byte("finished"), 0600)
+				}
+			}
+			return
+		}
+		h.serve(w, r)
+	}))
+	defer server.Close()
+	a.host = strings.TrimPrefix(server.URL, "http://")
+	report := map[string]any{"passed": false, "fullProductionPage": true, "actualRetainedLoopbackSFTP": true, "actualWindowsExplorer": true, "syntheticTemporaryFilesOnly": true, "nativeInput": "Win32 pointer down/move/up; no DOM drag event substitution"}
+	var cases []map[string]any
+	ready := make(chan struct{})
+	result := make(chan error, 1)
+	go func() {
+		select {
+		case <-ready:
+		case <-ctx.Done():
+			result <- ctx.Err()
+			return
+		}
+		run := func() error {
+			if e := h.nativeInput("Arrange", "Tab", "", "", nativeEditorSnapshot{}, nativeEditorSnapshot{}, nativeEditorRect{}, nativeEditorRect{}); e != nil {
+				return e
+			}
+			for _, childMode := range []bool{false, true} {
+				view, label := "", "main"
+				if childMode {
+					req := editorTransferRequest{ID: randomHex(16), Destination: "new", Batch: editorFixtureBatch()}
+					out, e := a.editorViews.offer("", req)
+					if e != nil {
+						return e
+					}
+					view = out["destination"].(string)
+					label = "child"
+					if _, e = h.waitState(view, "real child acknowledged", func(s nativeEditorSnapshot) bool { return s.Window.Owned[editorFixtureUID] >= 2 && !s.Window.Running }); e != nil {
+						return e
+					}
+					if e = a.editorViews.complete("", req.ID); e != nil {
+						return e
+					}
+					token := a.editorViews.views[view].token
+					if r := editorHTTP(a, token, "/api/editor-views/current/explorer", map[string]any{}); r.Code != 200 {
+						return fmt.Errorf("synthetic child access request: %d %s", r.Code, r.Body.String())
+					}
+					nonce := a.editorViews.views[view].explorer.RequestID
+					if r := editorHTTP(a, a.token, "/api/editor-views/explorer/"+view, map[string]any{"requestId": nonce, "allow": true}); r.Code != 200 {
+						return fmt.Errorf("explicit fixture approval: %d %s", r.Code, r.Body.String())
+					}
+					if e = h.nativeInput("Arrange", "Tab", view, view, nativeEditorSnapshot{}, nativeEditorSnapshot{}, nativeEditorRect{}, nativeEditorRect{}); e != nil {
+						return e
+					}
+				}
+				if _, e := h.command(view, nativeEditorCommand{Action: "setup-sftp", Destination: connection}); e != nil {
+					return e
+				}
+				if e := h.capture(view, "sftp-direct121-"+label+"-ready"); e != nil {
+					return e
+				}
+				for _, test := range []struct{ name, path, expected, mode string }{{"file", "/one.txt", "one.txt", "Copy"}, {"folder", "/tree", "tree/nested/two.txt", "Copy"}, {"cancel-before", "/one.txt", "", "CancelBefore"}, {"cancel-during", "/slow.bin", "", "CancelDuring"}} {
+					name := label + "-" + test.name
+					dest := filepath.Join(private, "dest-"+name)
+					if e := os.MkdirAll(dest, 0700); e != nil {
+						return e
+					}
+					finished := filepath.Join(private, name+".finished")
+					started := filepath.Join(private, name+".materializing")
+					finishFile.Store(finished)
+					marker.Store(started)
+					slow.Store(test.mode == "CancelDuring")
+					before := materialized.Load()
+					state, e := h.command(view, nativeEditorCommand{Action: "row", Destination: test.path})
+					if e != nil {
+						return e
+					}
+					point, e := sftpDirect121RowPoint(state, test.path)
+					if e != nil {
+						return e
+					}
+					pid, exe, e := h.identity(view)
+					if e != nil {
+						return e
+					}
+					args := []string{"-NoProfile", "-NonInteractive", "-File", filepath.Join(root, "scripts", "native-sftp-direct121.ps1"), "-OwnerProcessID", strconv.Itoa(pid), "-ExecutablePath", exe, "-DestinationDirectory", dest, "-FinishedFile", finished, "-MaterializingFile", started, "-Mode", test.mode, "-FromX", fmt.Sprint(point.Left), "-FromY", fmt.Sprint(point.Top), "-FromWidth", fmt.Sprint(state.Geometry.Width), "-FromHeight", fmt.Sprint(state.Geometry.Height)}
+					if test.expected != "" {
+						args = append(args, "-ExpectedPath", filepath.Join(dest, filepath.FromSlash(test.expected)))
+					}
+					cmd := exec.CommandContext(ctx, "powershell.exe", args...)
+					out, e := cmd.CombinedOutput()
+					slow.Store(false)
+					if e != nil {
+						return fmt.Errorf("actual %s gesture: %w %s", name, e, out)
+					}
+					if !json.Valid(bytes.TrimSpace(out)) {
+						return fmt.Errorf("native evidence not JSON: %s", out)
+					}
+					if test.mode == "Copy" {
+						for rel, want := range contents {
+							if test.name == "file" && rel != "one.txt" || test.name == "folder" && !strings.HasPrefix(rel, "tree/") {
+								continue
+							}
+							got, e := os.ReadFile(filepath.Join(dest, filepath.FromSlash(rel)))
+							if e != nil || !bytes.Equal(got, want) {
+								return fmt.Errorf("Explorer destination bytes differ for %s: %v", name, e)
+							}
+						}
+						if test.name == "folder" {
+							if info, e := os.Stat(filepath.Join(dest, "tree", "empty")); e != nil || !info.IsDir() {
+								return errors.New("empty remote directory lost")
+							}
+						}
+					} else {
+						entries, e := os.ReadDir(dest)
+						if e != nil || len(entries) != 0 {
+							return errors.New("cancelled destination is not empty")
+						}
+					}
+					if test.mode == "CancelBefore" && materialized.Load() != before {
+						return errors.New("Escape before drop read remote source bytes")
+					}
+					if test.mode == "CancelDuring" {
+						if _, e = os.Stat(started); e != nil {
+							return errors.New("during-copy cancellation never observed real bulk SFTP response")
+						}
+					}
+					a.explorerTransfers.mu.Lock()
+					pending := false
+					for _, j := range a.explorerTransfers.jobs {
+						if j.owner == view && (j.state == "dragging" || j.stage != "" || len(j.paths) > 0) {
+							pending = true
+						}
+					}
+					a.explorerTransfers.mu.Unlock()
+					if pending {
+						return errors.New("finished native copy retained active stage or paths")
+					}
+					if _, e = h.command(view, nativeEditorCommand{Action: "verify-dirty"}); e != nil {
+						return e
+					}
+					cases = append(cases, map[string]any{"name": name, "passed": true, "materializeRequests": materialized.Load() - before, "input": json.RawMessage(bytes.TrimSpace(out))})
+				}
+				state, e := h.command(view, nativeEditorCommand{Action: "row", Destination: "/one.txt"})
+				if e != nil {
+					return e
+				}
+				point, e := sftpDirect121RowPoint(state, "/one.txt")
+				if e != nil {
+					return e
+				}
+				target := nativeEditorRect{Left: state.Geometry.Editor.Left + state.Geometry.Editor.Width*.65, Top: state.Geometry.Editor.Top + state.Geometry.Editor.Height*.45}
+				if e = h.nativeInput("Drag", "Tab", view, view, state, state, point, target); e != nil {
+					return e
+				}
+				if _, e = h.command(view, nativeEditorCommand{Action: "wait-open"}); e != nil {
+					return e
+				}
+				cases = append(cases, map[string]any{"name": label + "-row-to-editor", "passed": true, "dirtyAndUndoRetained": true})
+				if e = h.capture(view, "sftp-direct121-"+label+"-opened"); e != nil {
+					return e
+				}
+			}
+			for rel, want := range contents {
+				got, e := os.ReadFile(filepath.Join(source, filepath.FromSlash(rel)))
+				if e != nil || !bytes.Equal(got, want) {
+					return errors.New("original SFTP source changed")
+				}
+			}
+			return nil
+		}
+		e := run()
+		if e != nil {
+			_ = h.capture("", "sftp-direct121-failure")
+		}
+		report["passed"] = e == nil
+		report["cases"] = cases
+		report["captures"] = h.captures
+		mu.Lock()
+		report["actions"] = append([]string{}, actions...)
+		mu.Unlock()
+		if e != nil {
+			report["error"] = e.Error()
+		}
+		raw, _ := json.MarshalIndent(report, "", "  ")
+		_ = os.WriteFile(filepath.Join(output, "native-sftp-direct121-results.json"), raw, 0600)
+		result <- e
+		cancel()
+	}()
+	err = desktop.Run(ctx, desktop.Config{Title: "Network Toolkit synthetic SFTP121 acceptance", URL: server.URL + "/", SessionToken: a.token, DataDir: filepath.Join(private, "webview"), Stop: cancel, OnReady: func() { close(ready) }})
+	if err != nil {
+		t.Errorf("native full app: %v", err)
+		cancel()
+	}
+	select {
+	case e := <-result:
+		if e != nil {
+			t.Fatal(e)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("native SFTP fixture driver unfinished")
+	}
+}
+
+func sftpDirect121RowPoint(s nativeEditorSnapshot, path string) (nativeEditorRect, error) {
+	for _, r := range s.Geometry.Tabs {
+		if r.UID == path && r.Width > 0 && r.Height > 0 {
+			return nativeEditorRect{Left: r.Left + min(r.Width*.4, 70), Top: r.Top + r.Height/2}, nil
+		}
+	}
+	return nativeEditorRect{}, fmt.Errorf("visible real file row absent: %s", path)
+}
+
+type sftpDirect121Channel struct {
+	ssh.Channel
+	slow   *atomic.Bool
+	marker *atomic.Value
+	ctx    context.Context
+}
+
+func (c *sftpDirect121Channel) Write(p []byte) (int, error) {
+	if c.slow.Load() && len(p) > 1024 {
+		if name := c.marker.Load().(string); name != "" {
+			_ = os.WriteFile(name, []byte("actual SFTP bulk response"), 0600)
+		}
+		select {
+		case <-time.After(35 * time.Millisecond):
+		case <-c.ctx.Done():
+			return 0, c.ctx.Err()
+		}
+	}
+	return c.Channel.Write(p)
+}
+func sftpDirect121Server(t *testing.T, ctx context.Context, root string, slow *atomic.Bool, marker *atomic.Value) (int, string, func()) {
+	t.Helper()
+	_, key, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatal(err)
+	}
+	signer, err := ssh.NewSignerFromKey(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	config := &ssh.ServerConfig{PasswordCallback: func(m ssh.ConnMetadata, password []byte) (*ssh.Permissions, error) {
+		if m.User() != "synthetic121" || string(password) != "SYNTHETIC_NOT_A_SECRET" {
+			return nil, io.EOF
+		}
+		return nil, nil
+	}}
+	config.AddHostKey(signer)
+	listener, err := net.Listen("tcp4", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var mu sync.Mutex
+	opened := map[net.Conn]bool{}
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for {
+			tcp, e := listener.Accept()
+			if e != nil {
+				return
+			}
+			mu.Lock()
+			opened[tcp] = true
+			mu.Unlock()
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				defer func() { tcp.Close(); mu.Lock(); delete(opened, tcp); mu.Unlock() }()
+				server, channels, requests, e := ssh.NewServerConn(tcp, config)
+				if e != nil {
+					return
+				}
+				defer server.Close()
+				go func() {
+					for req := range requests {
+						if req.WantReply {
+							_ = req.Reply(true, nil)
+						}
+					}
+				}()
+				for request := range channels {
+					if request.ChannelType() != "session" {
+						_ = request.Reject(ssh.UnknownChannelType, "session only")
+						continue
+					}
+					channel, reqs, e := request.Accept()
+					if e != nil {
+						continue
+					}
+					wg.Add(1)
+					go func() {
+						defer wg.Done()
+						defer channel.Close()
+						for req := range reqs {
+							var sub struct{ Name string }
+							if req.Type != "subsystem" || ssh.Unmarshal(req.Payload, &sub) != nil || sub.Name != "sftp" {
+								_ = req.Reply(false, nil)
+								continue
+							}
+							_ = req.Reply(true, nil)
+							wrapped := &sftpDirect121Channel{Channel: channel, slow: slow, marker: marker, ctx: ctx}
+							host := &transferHost{root: root, access: "readwrite", overwrite: false}
+							(&sftpSession{channel: wrapped, server: host, root: root, access: "readwrite", handles: map[string]*sftpHandleState{}}).serve()
+							return
+						}
+					}()
+				}
+			}()
+		}
+	}()
+	cleanup := func() {
+		listener.Close()
+		mu.Lock()
+		for c := range opened {
+			c.Close()
+		}
+		mu.Unlock()
+		done := make(chan struct{})
+		go func() { wg.Wait(); close(done) }()
+		select {
+		case <-done:
+		case <-time.After(5 * time.Second):
+			t.Error("synthetic SFTP workers did not stop")
+		}
+	}
+	return listener.Addr().(*net.TCPAddr).Port, ssh.FingerprintSHA256(signer.PublicKey()), cleanup
+}

@@ -1,0 +1,23 @@
+NETWORK TOOLKIT 1.17.121
+
+EDITOR FILE SIDEBAR AND FILE-DRAG WORKFLOWS
+
+- Reclaim file-list height by removing redundant connection and upload guidance.
+  An accessible compact badge indicates an active connection; actionable errors
+  and transfer progress remain visible.
+- Align More connection actions with its neighboring controls and keep its menu
+  visible. The connection settings action reveals the existing settings.
+- Open supported local and SFTP files dragged from the sidebar into the editor
+  through the existing validated file-open workflow without replacing dirty text.
+
+- Drag local or already-authorized SFTP files and folders directly out of the
+  native file list into Windows Explorer or the Desktop. No prepared-copy
+  dialog is required for the ordinary drag gesture. Copies leave originals
+  untouched; Windows handles destination conflicts. Transfer progress and
+  cancellation remain available.
+
+Direct native export retains the existing 2 GiB/1,500-entry safeguards and
+requires the owner backend and the authorized SFTP connection to remain alive.
+FTP/FTPS native export and arbitrary external-app destinations are not included.
+The text editor's existing text-size, encoding and binary-file checks remain.
+No unrelated graph, comparison, Hosts or credential behavior is changed.

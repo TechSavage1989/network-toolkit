@@ -29,6 +29,35 @@ jobs:
         run: |
           npm install --prefix "$RUNNER_TEMP/ntk-editor112" --no-audit --no-fund playwright@1.62.1
           node "$RUNNER_TEMP/ntk-editor112/node_modules/playwright/cli.js" install chromium
+      - name: Prepare exact published120 compact sidebar baseline
+        run: |
+          git fetch --no-tags --depth=1 origin 45ee25b15c1c88fdb7c77b2f06057d38ae6b5357
+          test "$(git rev-parse FETCH_HEAD)" = 45ee25b15c1c88fdb7c77b2f06057d38ae6b5357
+          mkdir -p "$RUNNER_TEMP/ntk-sidebar-baseline120"
+          git archive 45ee25b15c1c88fdb7c77b2f06057d38ae6b5357 | tar -xf - -C "$RUNNER_TEMP/ntk-sidebar-baseline120"
+      - name: Check compact sidebar controls and reclaimed file-list height
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results
+          NTK_SIDEBAR121_BASELINE_DIR: ${{ runner.temp }}/ntk-sidebar-baseline120
+        run: node scripts/editor-sidebar121.browser.cjs
+      - name: Check real sidebar file drops into dirty editor documents
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results
+        run: node scripts/editor-file-drop121.browser.cjs
+      - name: Retain focused121 sidebar and document-drop evidence
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: editor-sidebar121-checks
+          path: |
+            ${{ runner.temp }}/ntk-editor112-results/editor-sidebar121-*
+            ${{ runner.temp }}/ntk-editor112-results/editor-file-drop121-*
+          if-no-files-found: error
+          retention-days: 14
       - name: Prepare exact published119 file-drag negative control
         run: |
           git fetch --no-tags --depth=1 origin a4b8c56f4c8692d4676d508381ec4c5a2b504aee
@@ -397,6 +426,24 @@ jobs:
           go test -mod=vendor ./internal/diag -run TestSFTPStaged -count=1 -v
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           go test -mod=vendor ./cmd/network-toolkit -run 'TestEditorExplorer|TestEditorLayout' -count=1 -v
+      - name: Test delayed file data and caller-bound copy cancellation on Windows
+        env:
+          GOTOOLCHAIN: local
+        run: go test -mod=vendor ./cmd/network-toolkit ./internal/desktop -run '^TestExplorerDirect121|^TestNativeDeferred121' -count=1 -v
+      - name: Verify direct SFTP row copies to real Windows Explorer
+        env:
+          GOTOOLCHAIN: local
+          NETWORK_TOOLKIT_NATIVE_SFTP121_TEST: '1'
+          TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/network-toolkit-native-sftp121
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestNativeSFTPDirect121InstalledWebView2$' -count=1 -timeout=8m -v
+      - name: Retain focused121 native SFTP copy evidence
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: native-sftp121-checks
+          path: ${{ runner.temp }}/network-toolkit-native-sftp121
+          if-no-files-found: error
+          retention-days: 14
       - name: Verify native detached editor local files with no main window
         env:
           GOTOOLCHAIN: local

@@ -45,6 +45,7 @@ type nativeFileDragJob struct {
 	ID      string   `json:"id"`
 	Gesture uint64   `json:"gesture"`
 	Paths   []string `json:"paths"`
+	Direct  bool     `json:"direct,omitempty"`
 }
 
 func nativeFileDragEndpoint(raw string) (string, bool) {
@@ -55,6 +56,9 @@ func nativeFileDragEndpoint(raw string) (string, bool) {
 	return u.Scheme + "://" + u.Host + "/api/explorer-transfer", true
 }
 func validNativeFileDrag(j nativeFileDragJob) bool {
+	if j.Direct {
+		return len(j.ID) == 32 && strings.Trim(j.ID, "0123456789abcdef") == "" && j.Gesture > 0 && len(j.Paths) == 0
+	}
 	if len(j.ID) != 32 || strings.Trim(j.ID, "0123456789abcdef") != "" || len(j.Paths) < 1 || len(j.Paths) > 100 {
 		return false
 	}
@@ -150,7 +154,13 @@ func (w *hostWindow) runNativeFileDrag(done <-chan struct{}) {
 		if !w.post(func() {
 			defer close(finished)
 			if !w.isClosing() && nativeFileDragHeld(hwnd) {
-				effect, err := runNativeFileCopyDrag(dragCtx, hwnd, job.Paths)
+				var effect uint32
+				var err error
+				if job.Direct {
+					effect, err = runNativeDeferredFileCopyDrag(dragCtx, hwnd, client, endpoint, w.cfg.SessionToken, job)
+				} else {
+					effect, err = runNativeFileCopyDrag(dragCtx, hwnd, job.Paths)
+				}
 				if err != nil {
 					outcome = "failed"
 				} else if effect&1 != 0 {
@@ -214,13 +224,14 @@ func nativeFileDragTransition(ctx context.Context, client *http.Client, endpoint
 // shell capability. Explorer must finish reading staged files before DoDragDrop
 // returns and the owner removes them. No move effect is ever offered.
 type nativeFileCOM struct {
-	vtable *[12]uintptr
-	refs   atomic.Int32
-	base   uintptr
-	source bool
-	ctx    context.Context
-	hwnd   uintptr
-	active atomic.Bool
+	vtable  *[12]uintptr
+	refs    atomic.Int32
+	base    uintptr
+	source  bool
+	ctx     context.Context
+	hwnd    uintptr
+	active  atomic.Bool
+	delayed *nativeDeferredCopy
 }
 
 var nativeFileCOMObjects sync.Map
@@ -368,6 +379,9 @@ func fileCOMGet(p, f, m uintptr) uintptr {
 	if o == nil || !o.active.Load() {
 		return hresultPointer
 	}
+	if o.delayed != nil {
+		return o.delayed.get(f, m)
+	}
 	return comCall(o.base, 3, f, m)
 }
 func fileCOMQueryData(p, f uintptr) uintptr {
@@ -375,12 +389,18 @@ func fileCOMQueryData(p, f uintptr) uintptr {
 	if o == nil || !o.active.Load() {
 		return hresultPointer
 	}
+	if o.delayed != nil {
+		return o.delayed.query(f)
+	}
 	return comCall(o.base, 5, f)
 }
 func fileCOMEnum(p, d, out uintptr) uintptr {
 	o := nativeFileObject(p)
 	if o == nil || !o.active.Load() {
 		return hresultPointer
+	}
+	if o.delayed != nil {
+		return o.delayed.enumerate(d, out)
 	}
 	return comCall(o.base, 8, d, out)
 }
@@ -395,14 +415,23 @@ func fileCOMContinue(p, escape, key uintptr) uintptr {
 		return 0x40101
 	}
 	if escape != 0 {
+		if o != nil && o.delayed != nil && o.delayed.cancel != nil {
+			o.delayed.cancel()
+		}
 		return 0x40101
 	}
 	if key&1 == 0 {
+		if o != nil && o.delayed != nil {
+			o.delayed.dropAllowed.Store(true)
+		}
 		return 0x40100
 	}
 	if o != nil && o.ctx != nil {
 		pressed, _, _ := fileDragKey.Call(1)
 		if pressed&0x8000 == 0 {
+			if o.delayed != nil {
+				o.delayed.dropAllowed.Store(true)
+			}
 			return 0x40100
 		}
 	}
@@ -456,9 +485,15 @@ func runNativeFileCopyDrag(ctx context.Context, hwnd uintptr, paths []string) (u
 	}
 
 	wrapper := &nativeFileCOM{vtable: &fileCOMDataTable, base: data}
+	effect, err := runNativeFileDataDrag(ctx, hwnd, wrapper)
+	runtime.KeepAlive(children)
+	runtime.KeepAlive(parent)
+	return effect, err
+}
+func runNativeFileDataDrag(ctx context.Context, hwnd uintptr, wrapper *nativeFileCOM) (uint32, error) {
 	wrapper.refs.Store(1)
 	wrapper.active.Store(true)
-	source := &nativeFileCOM{vtable: &fileCOMSourceTable, source: true, ctx: ctx, hwnd: hwnd}
+	source := &nativeFileCOM{vtable: &fileCOMSourceTable, source: true, ctx: ctx, hwnd: hwnd, delayed: wrapper.delayed}
 	source.active.Store(true)
 	source.refs.Store(1)
 	wp, sp := uintptr(unsafe.Pointer(wrapper)), uintptr(unsafe.Pointer(source))
@@ -484,12 +519,10 @@ func runNativeFileCopyDrag(ctx context.Context, hwnd uintptr, paths []string) (u
 	defer source.active.Store(false)
 	var effect uint32
 	observeNativeFileDrag(hwnd, "ole-enter")
-	hr, _, _ = fileDragDo.Call(wp, sp, 1, uintptr(unsafe.Pointer(&effect)))
+	hr, _, _ := fileDragDo.Call(wp, sp, 1, uintptr(unsafe.Pointer(&effect)))
 	observeNativeFileDrag(hwnd, fmt.Sprintf("ole-return hr=%x effect=%d", hr, effect))
 	runtime.KeepAlive(wrapper)
 	runtime.KeepAlive(source)
-	runtime.KeepAlive(children)
-	runtime.KeepAlive(parent)
 	return effect, hresultError("Windows Explorer copy", hr)
 }
 

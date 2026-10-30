@@ -39,6 +39,90 @@ function keepPreferences(){if(typeof state==='undefined')return;state.editorPref
 const lineMode=s=>s.includes('\r\n')?'CRLF':s.includes('\r')?'CR':'LF';
 const normalize=s=>String(s).replace(/\r\n|\r/g,'\n');
 const outgoing=(d)=>d.content.replace(/\n/g,d.eol==='CRLF'?'\r\n':d.eol==='CR'?'\r':'\n');
+// File-manager drags carry paths, not editor text. Only a trusted drag that began
+// in this renderer may use them; revalidate its listing and transport on every use.
+const sidebarFileMIME='application/x-networktoolkit-remote-browser';
+let sidebarFileDrag=null,sidebarPointerDrag=null,sidebarDropBusy=false,sidebarDragMessage='';
+function captureSidebarFileDrag(event){
+ sidebarFileDrag=null;sidebarDragMessage='';
+ if(!event.isTrusted)return;
+ const row=event.target.closest?.('[data-rb-item]'),host=row?.closest('[data-rb-root]'),browser=root.NetworkToolkitRemoteBrowser,k=host?.dataset.rbRoot,side=row?.dataset.rbSide;
+ if(!browser||!['ssh','ftp'].includes(k)||!['local','remote'].includes(side))return;
+ const model=browser.get(k),pane=model[side],entry=pane?.entries.find(file=>file.path===row.dataset.rbItem);
+ if(!entry)return;
+ const files=(pane.selected.has(entry.path)?pane.entries.filter(file=>pane.selected.has(file.path)):[entry]).map(file=>({path:file.path,directory:!!file.directory}));
+ sidebarFileDrag={host,k,side,pane,entries:pane.entries,files,identity:browser.dragIdentity(k)};
+}
+function validateSidebarFileSource(drag){
+ const browser=root.NetworkToolkitRemoteBrowser;
+ if(!drag||!browser)throw Error('Drag files from this window’s Files sidebar to open them.');
+ const model=browser.get(drag.k),pane=model[drag.side];
+ if(!drag.host.isConnected||pane!==drag.pane||pane.entries!==drag.entries||drag.files.some(file=>!pane.entries.some(entry=>entry.path===file.path&&!!entry.directory===file.directory)))throw Error('The source folder changed. Drag the file again.');
+ if(model.busy||model.connecting)throw Error('Finish the current file operation before opening a dropped file.');
+ if(drag.side==='remote'&&(drag.k!=='ssh'||!model.connected||browser.dragIdentity(drag.k)!==drag.identity))throw Error('The SFTP connection changed or is unavailable. Drag the file again from the current connection.');
+ if(!drag.files.length||drag.files.length>12||drag.files.some(file=>file.directory))throw Error('Drop text files to open them. Folders cannot be opened as text documents.');
+ if(sidebarDropBusy||windowCloseState)throw Error('Wait for the current editor operation to finish before dropping files.');
+ const editorGuard=canReorderDocuments();if(editorGuard)throw Error(editorGuard);
+ return drag;
+}
+function sidebarDropSource(event){
+ if(!Array.from(event.dataTransfer?.types||[]).includes(sidebarFileMIME))return null;
+ if(!event.isTrusted)throw Error('Drag files from this window’s Files sidebar to open them.');
+ return validateSidebarFileSource(sidebarFileDrag);
+}
+function editorFileDragOver(event){
+ if(!event.target.closest?.('.nt-editor-document-area'))return;
+ if(!Array.from(event.dataTransfer?.types||[]).includes(sidebarFileMIME))return;
+ event.preventDefault();event.stopPropagation();let message;
+ try{const drag=sidebarDropSource(event);event.dataTransfer.dropEffect='copy';message='Drop to open '+drag.files.length+' file'+(drag.files.length===1?'':'s')+' in editor tabs.';}
+ catch(error){event.dataTransfer.dropEffect='none';message=error.message;}
+ if(sidebarDragMessage!==message){sidebarDragMessage=message;setMessage(message,event.dataTransfer.dropEffect==='none');}
+}
+async function openSidebarFileSelection(captured,validate){
+ let acquired=false;
+ try{
+  const drag=validate();
+  sidebarDropBusy=true;acquired=true;sidebarFileDrag=null;
+  for(const file of drag.files){
+   const browser=root.NetworkToolkitRemoteBrowser,model=browser.get(drag.k);
+   if(!drag.host.isConnected||model[drag.side].entries!==drag.entries||drag.side==='remote'&&(!model.connected||browser.dragIdentity(drag.k)!==drag.identity))throw Error('The source folder or SFTP connection changed. Remaining files were not opened.');
+   await browser.edit(drag.k,false,drag.side,file.path);
+  }
+ }catch(error){setMessage(error.message,true);if(typeof toast==='function')toast(error.message,'error');}
+ finally{if(acquired)sidebarDropBusy=false;if(sidebarFileDrag===captured)sidebarFileDrag=null;if(!sidebarFileDrag)sidebarDragMessage='';}
+ return true;
+}
+async function openSidebarFileDrop(event){
+ if(!event.target.closest?.('.nt-editor-document-area')||!Array.from(event.dataTransfer?.types||[]).includes(sidebarFileMIME))return false;
+ event.preventDefault();event.stopPropagation();
+ return openSidebarFileSelection(sidebarFileDrag,()=>{
+  const drag=sidebarDropSource(event),payload=JSON.parse(event.dataTransfer.getData(sidebarFileMIME));
+  if(payload.k!==drag.k||payload.side!==drag.side||!Array.isArray(payload.files)||payload.files.length!==drag.files.length||payload.files.some((file,index)=>file.path!==drag.files[index].path||!!file.directory!==drag.files[index].directory))throw Error('The dragged file selection changed. Drag the files again.');
+  return drag;
+ });
+}
+// Native file gestures cannot run a competing HTML OLE drag. These methods
+// accept only actual pointer events, never caller-provided paths or targets.
+function beginSidebarPointerDrag(event){
+ cancelSidebarPointerDrag();
+ if(typeof root.PointerEvent!=='function'||!(event instanceof root.PointerEvent)||!event.isTrusted||event.type!=='pointerdown'||event.button!==0)return false;
+ captureSidebarFileDrag(event);if(!sidebarFileDrag)return false;
+ sidebarPointerDrag={source:sidebarFileDrag,id:event.pointerId,x:event.clientX,y:event.clientY};return true;
+}
+function cancelSidebarPointerDrag(){const pointer=sidebarPointerDrag;sidebarPointerDrag=null;if(pointer&&sidebarFileDrag===pointer.source)sidebarFileDrag=null;}
+function finishSidebarPointerDrop(event){
+ const pointer=sidebarPointerDrag;sidebarPointerDrag=null;
+ if(!pointer)return false;
+ if(typeof root.PointerEvent!=='function'||!(event instanceof root.PointerEvent)||!event.isTrusted||event.type!=='pointerup'||event.pointerId!==pointer.id||Math.hypot(event.clientX-pointer.x,event.clientY-pointer.y)<6){if(sidebarFileDrag===pointer.source)sidebarFileDrag=null;return false;}
+ const target=document.elementFromPoint(event.clientX,event.clientY);
+ if(!target?.closest?.('.nt-editor-document-area')){if(sidebarFileDrag===pointer.source)sidebarFileDrag=null;return false;}
+ event.preventDefault();event.stopPropagation();
+ void openSidebarFileSelection(pointer.source,()=>validateSidebarFileSource(pointer.source));
+ return true;
+}
+document.addEventListener('dragstart',captureSidebarFileDrag,true);
+document.addEventListener('dragend',()=>{sidebarFileDrag=null;sidebarDragMessage='';},true);
+document.addEventListener('keydown',event=>{if(event.key==='Escape'){cancelSidebarPointerDrag();sidebarFileDrag=null;sidebarDragMessage='';}},true);
 function skin(){if(overlay)return;readPreferences();
  overlay=document.createElement('div');overlay.id='networkToolkitFileEditor';overlay.className='nt-editor';overlay.hidden=true;
  overlay.innerHTML='<div class="nt-editor-window" role="dialog" aria-modal="true" aria-label="Network Toolkit text editor">'+
@@ -52,6 +136,8 @@ function skin(){if(overlay)return;readPreferences();
  document.body.append(overlay);syncClosePreference();
  const more=overlay.querySelector('.nt-editor-more');more.addEventListener('toggle',()=>{const actions=findEl('#ntEditorMoreActions');actions.hidden=!more.open;more.querySelector('summary').setAttribute('aria-expanded',String(more.open));if(!more.open&&actions.contains(document.activeElement))more.querySelector('summary').focus({preventScroll:true});});
  findEl('[data-ed-color-panel]').innerHTML=colorPickerHTML();
+ overlay.addEventListener('dragover',editorFileDragOver,true);
+ overlay.addEventListener('drop',event=>{if(event.target.closest?.('.nt-editor-document-area')&&Array.from(event.dataTransfer?.types||[]).includes(sidebarFileMIME))void openSidebarFileDrop(event);},true);
  overlay.addEventListener('dragover',event=>{if(event.dataTransfer?.types?.includes('Files')){event.preventDefault();event.dataTransfer.dropEffect='copy';}});
  overlay.addEventListener('drop',event=>{const files=[...(event.dataTransfer?.files||[])];if(files.length){event.preventDefault();event.stopPropagation();void importFiles(files);}});
  if(typeof ResizeObserver==='function')new ResizeObserver(()=>{const d=current();if(d)paintText(d);}).observe(findEl('[data-ed-text]'));
@@ -471,5 +557,5 @@ function compareTabTarget(uid){
 function tabMenuKey(event){if(!tabMenu)return;const items=[...tabMenu.querySelectorAll('button:not(:disabled)')],at=items.indexOf(document.activeElement);if(['ArrowDown','ArrowUp','Home','End'].includes(event.key)){event.preventDefault();event.stopPropagation();const next=event.key==='Home'?0:event.key==='End'?items.length-1:(at+(event.key==='ArrowUp'?-1:1)+items.length)%items.length;items[next]?.focus();}else if(['Escape','Tab'].includes(event.key)){event.preventDefault();event.stopPropagation();closeTabMenu();}}
 async function runTabMenu(action){const uid=tabMenu?.dataset.documentUID,d=[...documents.values()].find(d=>d.uid===uid);if(action==='compareTo'&&d){openCompareTabMenu(d);return;}closeTabMenu(false);if(!d)return;activateDocument(d.id);try{if(action==='save')await save();else if(action==='saveAs')await save(true);else if(action==='reload')await reload();else if(action==='move')moveDocumentToView(uid);else if(action==='detach')await root.NetworkToolkitEditorWindows.move([uid],'new');else if(action==='copyName'||action==='copyPath')await root.copyText(action==='copyName'?nameOf(d.path):d.path);else{const list=paneWorkspace()?groups.list(groups.sideOf(uid)):[...documents.values()],at=list.indexOf(d);if(action==='first')reorderDocument(uid,list[0]?.uid||null);else if(action==='last'){const after=[...documents.values()].find((other,index,all)=>index>all.indexOf(list.at(-1)));reorderDocument(uid,after?.uid||null);}else{const chosen=action==='close'?[d]:action==='others'?list.filter(x=>x!==d):action==='following'?list.slice(at+1):[];for(const item of chosen)if(!await closeTab(item.id))break;}}}catch(error){setMessage(error.message,true);}}
 
-root.NetworkToolkitFileEditor={requestName:(title,message,value)=>{skin();return askEditor({title,message,value,accept:'Create',validate:value=>value.trim()?'':'Enter a name.'});},moveDocumentToView,openSplit,get viewGroups(){return groups.snapshot();},windowAdapter,canReorderDocuments,reorderDocument,open,openDesktopFile,importFiles,openLocalPath,newDocument,renderPage,detachPage,closeAll,preferConnection,refreshConnectedSources,openRemotePath,showRemoteFilePicker,get documents(){return documents;},activateDocument,openComparison,closeComparison,get comparison(){return comparison;},get active(){return current();}};
+root.NetworkToolkitFileEditor={beginSidebarPointerDrag,finishSidebarPointerDrop,cancelSidebarPointerDrag,requestName:(title,message,value)=>{skin();return askEditor({title,message,value,accept:'Create',validate:value=>value.trim()?'':'Enter a name.'});},moveDocumentToView,openSplit,get viewGroups(){return groups.snapshot();},windowAdapter,canReorderDocuments,reorderDocument,open,openDesktopFile,importFiles,openLocalPath,newDocument,renderPage,detachPage,closeAll,preferConnection,refreshConnectedSources,openRemotePath,showRemoteFilePicker,get documents(){return documents;},activateDocument,openComparison,closeComparison,get comparison(){return comparison;},get active(){return current();}};
 })(globalThis);

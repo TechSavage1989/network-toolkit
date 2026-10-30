@@ -65,3 +65,54 @@ async function cancel(){const job=active;if(!job)return;try{await api('/explorer
 if(typeof document!=='undefined'){document.addEventListener('click',event=>{if(active&&event.target.closest?.('[data-native-copy-cancel],[data-action="close-modal"],[data-action="modal-backdrop"]')&&!event.target.closest?.('.modal-body')){event.preventDefault();event.stopImmediatePropagation();void cancel();}},true);document.addEventListener('keydown',event=>{if(event.key==='Escape'&&active){event.stopImmediatePropagation();if(active.nativePending||['claimed','dragging'].includes(active.state))return;void cancel();}},true);}
 root.NetworkToolkitNativeDrag=Object.freeze({...old,prepareCopy});
 })(globalThis);
+
+// Native file-row pointer bridge. HTML drag remains unchanged in browser mode.
+// Inside this window the original validated manager/editor routes are used;
+// outside it one copy-only native OLE loop takes over, never a second HTML drag.
+(function(root){'use strict';
+if(!root.document)return;
+let gesture=null,operation=null,suppress=false;
+const browser=()=>root.NetworkToolkitRemoteBrowser;
+const native=()=>typeof root.__networkToolkitNativeSession==='string';
+function release(g){if(!g)return;g.row.draggable=true;try{if(g.row.hasPointerCapture?.(g.pointer))g.row.releasePointerCapture(g.pointer);}catch{};g.indicator?.remove();}
+function suppressClick(){suppress=true;setTimeout(()=>{suppress=false;},500);}
+function cancel(){const g=gesture;gesture=null;root.NetworkToolkitFileEditor?.cancelSidebarPointerDrag?.();release(g);if(g?.started)suppressClick();if(g?.id)void api('/explorer-transfer','POST',{action:'cancel',id:g.id}).catch(()=>{});}
+function begin(event){if(!native()||event.isTrusted===false||event.button!==0||event.isPrimary===false||event.pointerType==='touch'||event.altKey||event.ctrlKey||event.metaKey||event.shiftKey||operation)return;
+ const row=event.target.closest?.('[data-rb-item]');if(!row)return;const source=browser()?.capturePointerFileDrag?.(event);if(!source)return;
+ cancel();const g={source,row,pointer:event.pointerId,x:event.clientX,y:event.clientY,started:false,handoff:false};gesture=g;row.draggable=false;root.NetworkToolkitFileEditor?.beginSidebarPointerDrag?.(event);try{row.setPointerCapture(event.pointerId);}catch{cancel();}
+}
+function valid(g){return g===gesture&&!g.handoff&&browser()?.validPointerFileDrag?.(g.source)&&g.row.isConnected;}
+function outside(event){return event.clientX<0||event.clientY<0||event.clientX>=root.innerWidth||event.clientY>=root.innerHeight;}
+function draw(g,event){if(!g.indicator){g.indicator=document.createElement('div');g.indicator.className='terminal-tab-drag-indicator';g.indicator.setAttribute('role','status');g.indicator.style.pointerEvents='none';document.body.append(g.indicator);}g.indicator.textContent='Copy files · Drop into editor or folder · Esc cancels';g.indicator.style.left=Math.max(4,Math.min(root.innerWidth-300,event.clientX+12))+'px';g.indicator.style.top=Math.max(4,Math.min(root.innerHeight-50,event.clientY+14))+'px';}
+async function handoff(g){if(g.handoff)return;g.handoff=true;root.NetworkToolkitFileEditor?.cancelSidebarPointerDrag?.();
+ try {const state=await api('/explorer-transfer','POST',{action:'direct',...browser().pointerFileDragPayload(g.source)});g.id=state.id;
+  if(gesture!==g||!browser().validPointerFileDrag(g.source)){await api('/explorer-transfer','POST',{action:'cancel',id:g.id});return;}
+  await api('/explorer-transfer','POST',{action:'arm',id:g.id,gesture:1});
+  if(gesture!==g){const ended=await api('/explorer-transfer','POST',{action:'disarm',id:g.id,gesture:1});if(ended.state!=='dragging'){await api('/explorer-transfer','POST',{action:'cancel',id:g.id}).catch(()=>{});return;}}
+  operation={id:g.id,started:Date.now()};poll(operation);g.indicator?.remove();
+ }catch(error){if(gesture===g){gesture=null;release(g);suppressClick();}root.toast?.(error.message,'error');}
+}
+function progress(job,state){
+ if(!job.status){const box=document.createElement('div');box.className='terminal-tab-drag-indicator';box.dataset.nativeDirectProgress='';box.setAttribute('role','status');Object.assign(box.style,{left:'8px',top:'auto',bottom:'16px',maxWidth:'calc(100vw - 16px)',pointerEvents:'auto',display:'flex',gap:'8px',alignItems:'center'});const text=document.createElement('span'),button=document.createElement('button');button.type='button';button.className='btn small';button.textContent='Cancel';button.setAttribute('aria-label','Cancel copy to Windows Explorer');button.onclick=()=>{button.disabled=true;void api('/explorer-transfer','POST',{action:'cancel',id:job.id}).catch(error=>{button.disabled=false;root.toast?.(error.message,'error');});};box.append(text,button);document.body.append(box);job.status=box;job.text=text;}
+ job.text.textContent=(state.message||'Copying to Windows Explorer…')+' · '+(state.entries||0)+' items · '+(state.bytes||0).toLocaleString()+' B';
+}
+async function poll(job){try{const state=await api('/explorer-transfer?id='+encodeURIComponent(job.id));if(operation!==job)return;
+ if(['finished','failed','cancelled'].includes(state.state)){operation=null;job.status?.remove();root.toast?.(state.message,state.state==='failed'?'error':'info');return;}
+ if(state.state==='dragging'&&gesture?.id===job.id){const g=gesture;gesture=null;release(g);suppressClick();}
+ if(state.state==='dragging')progress(job,state);
+ if(state.state==='ready'&&Date.now()-job.started>2500){const ended=await api('/explorer-transfer','POST',{action:'disarm',id:job.id,gesture:1});if(ended.state!=='dragging'){await api('/explorer-transfer','POST',{action:'cancel',id:job.id});operation=null;job.status?.remove();if(gesture?.id===job.id){const g=gesture;gesture=null;release(g);}return;}}
+ setTimeout(()=>poll(job),250);}catch(error){operation=null;job.status?.remove();root.toast?.(error.message,'error');}}
+function move(event){const g=gesture;if(!g||event.pointerId!==g.pointer||g.handoff)return;if(!valid(g)||!(event.buttons&1)){cancel();return;}if(!g.started&&Math.hypot(event.clientX-g.x,event.clientY-g.y)<6)return;g.started=true;event.preventDefault();draw(g,event);if(outside(event))void handoff(g);}
+function up(event){const g=gesture;if(!g||event.pointerId!==g.pointer)return;
+ if(g.handoff){gesture=null;release(g);suppressClick();if(g.id)void api('/explorer-transfer','POST',{action:'disarm',id:g.id,gesture:1}).then(state=>{if(state.state!=='dragging')return api('/explorer-transfer','POST',{action:'cancel',id:g.id});}).catch(()=>{});return;}
+ const okay=valid(g),moved=g.started;gesture=null;release(g);if(!moved){root.NetworkToolkitFileEditor?.cancelSidebarPointerDrag?.();return;}
+ suppressClick();event.preventDefault();if(!okay){root.NetworkToolkitFileEditor?.cancelSidebarPointerDrag?.();return;}
+ if(root.NetworkToolkitFileEditor?.finishSidebarPointerDrop?.(event))return;
+ root.NetworkToolkitFileEditor?.cancelSidebarPointerDrag?.();browser().finishPointerFileDrag(event,g.source);
+}
+document.addEventListener('pointerdown',begin,true);document.addEventListener('pointermove',move,true);document.addEventListener('pointerup',up,true);
+document.addEventListener('pointercancel',()=>{if(gesture&&!gesture.handoff)cancel();},true);
+document.addEventListener('lostpointercapture',event=>{if(gesture&&event.pointerId===gesture.pointer&&!gesture.handoff)cancel();},true);
+document.addEventListener('keydown',event=>{if(event.key!=='Escape')return;if(gesture){event.preventDefault();cancel();}else if(operation)void api('/explorer-transfer','POST',{action:'cancel',id:operation.id}).catch(()=>{});},true);
+document.addEventListener('click',event=>{if(suppress&&event.target.closest?.('[data-rb-item]')){event.preventDefault();event.stopImmediatePropagation();}},true);
+})(globalThis);

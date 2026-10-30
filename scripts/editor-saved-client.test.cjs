@@ -95,9 +95,10 @@ test('editor saved profile can reuse an existing matching authenticated terminal
 test('editor connection summary retains the actual file protocol when controls refresh',()=>{
  const start=source.indexOf('function restoreConnectionControls(k)'),end=source.indexOf('\nfunction connectionPicker(k)',start);assert(start>=0&&end>start);
  for(const k of ['ssh','ftp'])for(const connected of [false,true]){
-  const summary={},endpoint={},m={connected,sessionId:'',sessionOptions:[]};
+  const summary={},endpoint={dataset:{},setAttribute(name,value){this[name]=value;}},m={connected,sessionId:'',sessionOptions:[]};
   const root={get:()=>m,rootNode:()=>({querySelector:s=>s==='.nt-editor-files-connection>summary'?summary:s==='[data-rb-endpoint]'?endpoint:null}),configurations:{[k]:{host:'files.invalid',username:'fixture',port:k==='ssh'?22:21}}};
   vm.createContext(root);vm.runInContext(source.slice(start,end)+'\nrestoreConnectionControls('+JSON.stringify(k)+');',root);
+  assert.equal(endpoint.dataset.connected,String(connected));assert.equal(endpoint['aria-label'],(connected?'Connected: ':'')+endpoint.textContent);
   const protocol=k==='ssh'?'SFTP':'FTP / FTPS';assert.equal(summary.textContent,connected?protocol+' · files.invalid':protocol+' connection');
   assert.equal(summary.title,connected?'fixture@files.invalid:'+(k==='ssh'?22:21):'Choose or connect to an '+protocol+' server');
  }
