@@ -106,7 +106,8 @@ func (w *hostWindow) runNativeFileDrag(done <-chan struct{}) {
 		return
 	}
 	client := &http.Client{Timeout: 2 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	tick := time.NewTicker(100 * time.Millisecond)
+	interval := 100 * time.Millisecond
+	tick := time.NewTicker(interval)
 	defer tick.Stop()
 	for {
 		select {
@@ -118,7 +119,17 @@ func (w *hostWindow) runNativeFileDrag(done <-chan struct{}) {
 		}
 		hwnd := w.postedHandle.Load()
 		if hwnd == 0 || !nativeFileDragHeld(hwnd) {
+			if interval != 100*time.Millisecond {
+				interval = 100 * time.Millisecond
+				tick.Reset(interval)
+			}
 			continue
+		}
+		// Only a held foreground gesture needs low-latency admission. Idle windows
+		// retain the original polling cadence and issue no HTTP requests.
+		if interval != 8*time.Millisecond {
+			interval = 8 * time.Millisecond
+			tick.Reset(interval)
 		}
 		req, e := http.NewRequestWithContext(ctx, http.MethodGet, endpoint+"/native", nil)
 		if e != nil {
@@ -157,13 +168,23 @@ func (w *hostWindow) runNativeFileDrag(done <-chan struct{}) {
 		dragCtx, cancelDrag := context.WithCancel(jobCtx)
 		go monitorNativeFileDragLease(dragCtx, cancelDrag, finished, client, endpoint, w.cfg.SessionToken, job.ID)
 		outcome := "cancelled"
+		admissionDone := make(chan struct{})
+		var admissionOnce sync.Once
+		var admissionState atomic.Uint32 // 0 waiting, 1 OLE admitted, 2 ended/cancelled
+		endAdmission := func() { admissionState.CompareAndSwap(0, 2); admissionOnce.Do(func() { close(admissionDone) }) }
+		if job.Direct {
+			go monitorNativeFileAdmission(dragCtx, cancelDrag, admissionDone, &admissionState, func() bool { return !w.isClosing() && nativeFileDragHeld(hwnd) })
+		}
+		admitted := !job.Direct || w.releaseNativeFileCapture(dragCtx, hwnd, job, trace)
 		trace.emit(NativeFileDragObservation{Kind: "dispatch-posted"})
-		if !w.post(func() {
+		if !admitted || !w.post(func() {
 			defer close(finished)
+			defer endAdmission()
 			if trace != nil {
 				trace.emit(NativeFileDragObservation{Kind: "dispatch-enter", Flags: nativeFileAdmissionFlags(dragCtx, hwnd, w.isClosing())})
 			}
-			if !w.isClosing() && nativeFileDragHeld(hwnd) {
+			if dragCtx.Err() == nil && !w.isClosing() && nativeFileDragHeld(hwnd) && (!job.Direct || admissionState.CompareAndSwap(0, 1)) {
+				endAdmission() // OLE now owns physical release/cancellation observation.
 				var effect uint32
 				var err error
 				if job.Direct {
@@ -181,6 +202,7 @@ func (w *hostWindow) runNativeFileDrag(done <-chan struct{}) {
 			}
 		}) {
 			trace.emit(NativeFileDragObservation{Kind: "dispatch-post-failed"})
+			endAdmission()
 			close(finished)
 		}
 		// A canceled owner cannot reclaim bytes underneath the active OLE call.

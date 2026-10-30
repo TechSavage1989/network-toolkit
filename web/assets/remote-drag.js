@@ -88,7 +88,7 @@ async function handoff(g){if(g.handoff)return;g.handoff=true;root.NetworkToolkit
  try {const state=await api('/explorer-transfer','POST',{action:'direct',...browser().pointerFileDragPayload(g.source)});g.id=state.id;
   if(gesture!==g||!browser().validPointerFileDrag(g.source)){await api('/explorer-transfer','POST',{action:'cancel',id:g.id});return;}
   await api('/explorer-transfer','POST',{action:'arm',id:g.id,gesture:1});
-  if(gesture!==g){const ended=await api('/explorer-transfer','POST',{action:'disarm',id:g.id,gesture:1});if(ended.state!=='dragging'){await api('/explorer-transfer','POST',{action:'cancel',id:g.id}).catch(()=>{});return;}}
+  if(gesture!==g&&!g.nativeAdmitted){const ended=await api('/explorer-transfer','POST',{action:'disarm',id:g.id,gesture:1});if(ended.state!=='dragging'){await api('/explorer-transfer','POST',{action:'cancel',id:g.id}).catch(()=>{});return;}}
   operation={id:g.id,started:Date.now()};poll(operation);g.indicator?.remove();
  }catch(error){if(gesture===g){gesture=null;release(g);suppressClick();}root.toast?.(error.message,'error');}
 }
@@ -97,8 +97,7 @@ function progress(job,state){
  job.text.textContent=(state.message||'Copying to Windows Explorer…')+' · '+(state.entries||0)+' items · '+(state.bytes||0).toLocaleString()+' B';
 }
 async function poll(job){try{const state=await api('/explorer-transfer?id='+encodeURIComponent(job.id));if(operation!==job)return;
- if(['finished','failed','cancelled'].includes(state.state)){operation=null;job.status?.remove();root.toast?.(state.message,state.state==='failed'?'error':'info');return;}
- if(state.state==='dragging'&&gesture?.id===job.id){const g=gesture;gesture=null;release(g);suppressClick();}
+ if(['finished','failed','cancelled'].includes(state.state)){operation=null;if(gesture?.id===job.id){const g=gesture;gesture=null;release(g);suppressClick();}job.status?.remove();root.toast?.(state.message,state.state==='failed'?'error':'info');return;}
  if(state.state==='dragging')progress(job,state);
  if(state.state==='ready'&&Date.now()-job.started>2500){const ended=await api('/explorer-transfer','POST',{action:'disarm',id:job.id,gesture:1});if(ended.state!=='dragging'){await api('/explorer-transfer','POST',{action:'cancel',id:job.id});operation=null;job.status?.remove();if(gesture?.id===job.id){const g=gesture;gesture=null;release(g);}return;}}
  setTimeout(()=>poll(job),250);}catch(error){operation=null;job.status?.remove();root.toast?.(error.message,'error');}}
@@ -110,6 +109,13 @@ function up(event){const g=gesture;if(!g||event.pointerId!==g.pointer)return;
  if(root.NetworkToolkitFileEditor?.finishSidebarPointerDrop?.(event))return;
  root.NetworkToolkitFileEditor?.cancelSidebarPointerDrag?.();browser().finishPointerFileDrag(event,g.source);
 }
+// Called only after the native host has claimed and acknowledged this exact job.
+// Releasing here (not on an HTTP state poll) gives OLE sole capture ownership.
+function releaseFileRowCapture(id,serial){const g=gesture;
+ if(!g||!g.handoff||!g.started||g.id!==id||serial!==1||g.nativeAdmitted||!g.row.isConnected||!browser()?.validPointerFileDrag?.(g.source))return false;
+ g.nativeAdmitted=true;gesture=null;release(g);suppressClick();return true;
+}
+root.NetworkToolkitNativeDrag=Object.freeze({...root.NetworkToolkitNativeDrag,releaseFileRowCapture});
 document.addEventListener('pointerdown',begin,true);document.addEventListener('pointermove',move,true);document.addEventListener('pointerup',up,true);
 document.addEventListener('pointercancel',()=>{if(gesture&&!gesture.handoff)cancel();},true);
 document.addEventListener('lostpointercapture',event=>{if(gesture&&event.pointerId===gesture.pointer&&!gesture.handoff)cancel();},true);

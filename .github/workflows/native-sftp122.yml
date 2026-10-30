@@ -26,15 +26,23 @@ jobs:
       - name: Test caller-bound native drag and deferred-copy safeguards
         env:
           GOTOOLCHAIN: local
-        run: go test -mod=vendor ./cmd/network-toolkit ./internal/desktop -run '^TestExplorerDirect121|^TestNativeDeferred121|^TestNativeFileDrag|^TestNativeDragTrace122' -count=1 -v
-      - name: Measure repeated real main and child Windows gestures
+        run: go test -mod=vendor ./cmd/network-toolkit ./internal/desktop -run '^TestExplorerDirect121|^TestNativeDeferred121|^TestNativeFileDrag|^TestNativeDragTrace122|^TestNativeHandoff122' -count=1 -v
+      - name: Measure corrected main and child Windows gestures, first process set
         if: success() || failure()
         env:
           GOTOOLCHAIN: local
           NETWORK_TOOLKIT_NATIVE_SFTP121_TEST: '1'
           NETWORK_TOOLKIT_NATIVE_DRAG122_DIAGNOSTIC: '1'
-          NETWORK_TOOLKIT_NATIVE_DRAG122_PHASE: baseline121
-          TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/native-sftp122
+          NETWORK_TOOLKIT_NATIVE_DRAG122_PHASE: candidate122-round1
+          TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/native-sftp122/round1
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestNativeSFTPDirect121InstalledWebView2$' -count=1 -timeout=12m -v
+      - name: Confirm corrected gestures with fresh main and child processes
+        env:
+          GOTOOLCHAIN: local
+          NETWORK_TOOLKIT_NATIVE_SFTP121_TEST: '1'
+          NETWORK_TOOLKIT_NATIVE_DRAG122_DIAGNOSTIC: '1'
+          NETWORK_TOOLKIT_NATIVE_DRAG122_PHASE: candidate122-round2
+          TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/native-sftp122/round2
         run: go test -mod=vendor ./cmd/network-toolkit -run '^TestNativeSFTPDirect121InstalledWebView2$' -count=1 -timeout=12m -v
       - name: Retain exact-source native input and outcome evidence
         uses: actions/upload-artifact@v7
