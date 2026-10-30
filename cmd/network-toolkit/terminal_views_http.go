@@ -322,6 +322,10 @@ func (a *application) serveDetachedAPI(w http.ResponseWriter, r *http.Request, i
 		return
 	}
 	switch {
+	case info.Workspace && r.URL.Path == "/api/remote-browser":
+		a.handleTerminalSFTPRead(w, r)
+	case info.Workspace && (r.URL.Path == "/api/explorer-transfer" || r.URL.Path == "/api/explorer-transfer/native"):
+		a.handleExplorerTransfer(w, r)
 	case r.URL.Path == "/api/status":
 		if r.Method != http.MethodGet {
 			methodError(w)

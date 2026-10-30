@@ -52,6 +52,16 @@ type explorerTransferRequest struct {
 }
 
 func (a *application) explorerCallerValid(owner string) bool {
+	if strings.HasPrefix(owner, terminalExplorerOwnerPrefix) {
+		if a.views == nil {
+			return false
+		}
+		a.views.mu.Lock()
+		defer a.views.mu.Unlock()
+		// Returned views may finish/cancel their existing native job. The pinned
+		// grant separately rejects any new read, arm or materialization.
+		return a.views.views[strings.TrimPrefix(owner, terminalExplorerOwnerPrefix)] != nil
+	}
 	if a.editorViews == nil {
 		return owner == "" && !a.shutdownRequested.Load()
 	}
@@ -67,7 +77,7 @@ func exportJobStatus(j *explorerTransferJob) map[string]any {
 	return map[string]any{"id": j.id, "state": j.state, "names": j.names, "entries": j.entries, "bytes": j.bytes, "message": j.note, "cancelRequested": j.cancelRequested}
 }
 func (a *application) handleExplorerTransfer(w http.ResponseWriter, r *http.Request) {
-	owner := editorRequestView(r)
+	owner := explorerRequestOwner(r)
 	if !a.explorerCallerValid(owner) {
 		jsonError(w, 403, "File explorer access is no longer available.")
 		return
@@ -260,7 +270,7 @@ func (a *application) prepareExplorerTransfer(w http.ResponseWriter, r *http.Req
 		jsonError(w, 400, "Select 1–100 files or folders.")
 		return
 	}
-	owner := editorRequestView(r)
+	owner := explorerRequestOwner(r)
 	local := req.Binding.Kind == "local"
 	if local && (req.Binding.SessionID != "" || req.Binding.ConnectionID != "" || req.Binding.Revision != 0) {
 		jsonError(w, 400, "Local copy cannot include a remote binding.")
@@ -272,12 +282,20 @@ func (a *application) prepareExplorerTransfer(w http.ResponseWriter, r *http.Req
 	}
 	var grant *editorDocumentGrant
 	var err error
+	terminalView := terminalRequestView(r)
+	if terminalView != "" && req.Binding.Kind != "terminal" {
+		jsonError(w, 403, "This window can copy only its own SSH terminal files.")
+		return
+	}
 	if !local {
-		if a.editorViews == nil {
+		if req.Binding.Kind == "terminal" && editorRequestView(r) == "" {
+			grant, err = a.terminalSFTPGrant(terminalView, req.Binding)
+		} else if a.editorViews == nil {
 			jsonError(w, 503, "File service unavailable.")
 			return
+		} else {
+			grant, err = a.editorViews.makeGrant(owner, editorDocumentSnapshot{Binding: req.Binding})
 		}
-		grant, err = a.editorViews.makeGrant(owner, editorDocumentSnapshot{Binding: req.Binding})
 		if err != nil {
 			jsonError(w, 403, err.Error())
 			return
@@ -305,7 +323,7 @@ func (a *application) prepareExplorerTransfer(w http.ResponseWriter, r *http.Req
 	ctx, cancel := context.WithTimeout(parent, 15*time.Minute)
 	j := &explorerTransferJob{id: randomHex(16), owner: owner, state: "preparing", names: names, note: "Preparing a private copy for Windows Explorer…", cancel: cancel, expires: time.Now().Add(15 * time.Minute)}
 	var approved *editorExplorerAccess
-	if owner != "" && !local {
+	if owner != "" && terminalView == "" && !local {
 		a.editorViews.mu.Lock()
 		if v := a.editorViews.views[owner]; v != nil {
 			approved = v.explorer
@@ -320,7 +338,7 @@ func (a *application) prepareExplorerTransfer(w http.ResponseWriter, r *http.Req
 		if !a.explorerCallerValid(owner) {
 			return false
 		}
-		if owner != "" && !local {
+		if owner != "" && terminalView == "" && !local {
 			a.editorViews.mu.Lock()
 			v := a.editorViews.views[owner]
 			current := approved != nil && approved.Allowed && v != nil && v.explorer == approved

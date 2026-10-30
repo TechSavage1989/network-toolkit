@@ -352,6 +352,8 @@ func (v *terminalViewRegistry) createFromWorkspace(sourceID, sessionID string, s
 		go func() {
 			defer v.children.Done()
 			<-done
+			// Only confirmed native process exit can reclaim an active OLE source.
+			a.finishExplorerOwner(terminalExplorerOwnerPrefix + id)
 			v.returnLast(id, "The detached window closed before its final screen was saved. Restored its last display checkpoint; the session was not reconnected.")
 		}()
 	} else {

@@ -16,12 +16,12 @@ import (
 )
 
 func TestNativeFileDragEndpointAndStagingBoundary(t *testing.T) {
-	for _, good := range []string{"http://127.0.0.1:1234/", "http://127.0.0.1:1234/editor-view/" + strings.Repeat("a", 32)} {
+	for _, good := range []string{"http://127.0.0.1:1234/", "http://127.0.0.1:1234/editor-view/" + strings.Repeat("a", 32), "http://127.0.0.1:1234/terminal-view/" + strings.Repeat("a", 32)} {
 		if _, ok := nativeFileDragEndpoint(good); !ok {
 			t.Fatal(good)
 		}
 	}
-	for _, bad := range []string{"https://remote.test/", "http://127.0.0.1:1234/terminal-view/" + strings.Repeat("a", 32), "http://127.0.0.1:1234/editor-view/notvalid", "http://127.0.0.1:1234/editor-view/" + strings.Repeat("a", 32) + "/other"} {
+	for _, bad := range []string{"https://remote.test/", "http://127.0.0.1:1234/terminal-view/" + strings.Repeat("a", 32) + "/other", "http://127.0.0.1:1234/terminal-view/notvalid", "http://127.0.0.1:1234/terminal-view/" + strings.Repeat("a", 32) + "?x=1", "http://127.0.0.1:1234/editor-view/notvalid", "http://127.0.0.1:1234/editor-view/" + strings.Repeat("a", 32) + "/other"} {
 		if _, ok := nativeFileDragEndpoint(bad); ok {
 			t.Fatal("broad native surface", bad)
 		}

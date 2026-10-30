@@ -50,7 +50,15 @@ type nativeFileDragJob struct {
 
 func nativeFileDragEndpoint(raw string) (string, bool) {
 	u, e := url.Parse(raw)
-	if e != nil || !sameAppOrigin(raw, raw, false) || (u.Path != "/" && !(strings.HasPrefix(u.Path, "/editor-view/") && len(strings.TrimPrefix(u.Path, "/editor-view/")) == 32 && strings.Trim(strings.TrimPrefix(u.Path, "/editor-view/"), "0123456789abcdef") == "")) {
+	if e != nil || !sameAppOrigin(raw, raw, false) || u.RawQuery != "" || u.Fragment != "" || u.RawPath != "" {
+		return "", false
+	}
+	allowed := u.Path == "/"
+	for _, prefix := range []string{"/editor-view/", "/terminal-view/"} {
+		id := strings.TrimPrefix(u.Path, prefix)
+		allowed = allowed || strings.HasPrefix(u.Path, prefix) && len(id) == 32 && strings.Trim(id, "0123456789abcdef") == ""
+	}
+	if !allowed {
 		return "", false
 	}
 	return u.Scheme + "://" + u.Host + "/api/explorer-transfer", true

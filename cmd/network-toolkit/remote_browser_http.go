@@ -97,6 +97,9 @@ func (a *application) remoteBrowserSessions() []map[string]any {
 }
 
 func (a *application) runRemoteBrowserOperation(ctx context.Context, r remoteBrowserRequest) (model.Result, error) {
+	if run, ok := ctx.Value(terminalSFTPContextKey{}).(terminalSFTPOperation); ok {
+		return run(ctx, r)
+	}
 	var err error
 	r, err = a.resolveRemoteCredential(ctx, r)
 	if err != nil {
@@ -424,6 +427,9 @@ func (a *application) handleRemoteBrowser(w http.ResponseWriter, request *http.R
 	switch r.Action {
 	case "probe":
 		response["supported"] = data["supported"] == true
+		if request.Context().Value(terminalSFTPContextKey{}) != nil {
+			response["readOnly"] = true
+		}
 	case "fingerprint":
 		if r.Protocol == "ftp" {
 			response["fingerprint"] = data["certificateFingerprint"]

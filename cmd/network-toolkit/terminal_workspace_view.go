@@ -323,6 +323,8 @@ func (v *terminalViewRegistry) createWorkspace(snapshot terminalWorkspaceSnapsho
 		go func() {
 			defer v.children.Done()
 			<-done
+			// Only confirmed native process exit can reclaim an active OLE source.
+			a.finishExplorerOwner(terminalExplorerOwnerPrefix + id)
 			v.returnLast(id, "The detached workspace closed before its final screen was saved. Restored its last checkpoints without reconnecting the sessions.")
 		}()
 	} else {

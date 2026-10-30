@@ -1,11 +1,16 @@
-NETWORK TOOLKIT 1.17.122
+NETWORK TOOLKIT 1.17.123
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.122
+CURRENT RELEASE - 1.17.123
 
-Release details: RELEASE_NOTES_1.17.122.txt
-Previous release: docs/releases/RELEASE_NOTES_1.17.121.txt
+Release details: RELEASE_NOTES_1.17.123.txt
+Previous release: docs/releases/RELEASE_NOTES_1.17.122.txt
 Full release-note archive: docs/releases/README.md
+
+123 gives Terminal SFTP rows the same direct native Windows-copy gesture as
+the SFTP tool and Editor. Detached workspace browsing/export is scoped to its
+own existing session; unsupported remote-write controls are not offered.
+See RELEASE123_HANDOFF.md for exact validation status and limits.
 
 122 improves ordinary native local/authorized-SFTP file and folder drag-out.
 The exact active gesture transfers capture safely before copy admission; late or

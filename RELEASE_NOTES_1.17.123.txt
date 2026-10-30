@@ -1,0 +1,18 @@
+NETWORK TOOLKIT 1.17.123
+
+CONSISTENT TERMINAL SFTP FILE DRAGGING
+
+- Use the same direct Windows Explorer copy gesture for Terminal's SFTP sidebar
+  as the SFTP tool and Text Editor, instead of opening an export Save dialog.
+- Support files and folders in the main Terminal and detached Terminal workspace
+  using only that window's existing authorized SSH session.
+- Keep ordinary browsing, navigation, cancellation and copy-source protection;
+  main-window manual download and file-management actions remain available.
+
+Detached Terminal file access is scoped to read/navigation and native export;
+no new login, saved-credential, general local-filesystem or remote write authority
+is granted. Single-session detached windows retain their existing sidebar scope.
+The native drag handoff retains the 122 physical-input, ownership and cancellation
+checks. FTP/FTPS native export, arbitrary external apps and cross-integrity drops
+are not added. Existing export/text limits and known comparison/Alt-editor-transfer
+validation limitations remain; this release does not fix unrelated features.

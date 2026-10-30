@@ -432,6 +432,53 @@ jobs:
         env:
           GOTOOLCHAIN: local
         run: go test -mod=vendor ./cmd/network-toolkit ./internal/desktop -run '^TestExplorerDirect121|^TestNativeDeferred121' -count=1 -v
+      - name: Reproduce published122 Terminal export Save dialog safely
+        if: success() || failure()
+        env:
+          GOTOOLCHAIN: local
+          NETWORK_TOOLKIT_NATIVE_TERMINAL_SFTP123_TEST: '1'
+          NETWORK_TOOLKIT_NATIVE_TERMINAL_SFTP123_PHASE: baseline122
+          TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/network-toolkit-terminal-sftp123-baseline
+        run: |
+          $tokens = $null; $parseErrors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path scripts/native-terminal-sftp123.ps1), [ref]$tokens, [ref]$parseErrors) | Out-Null
+          if ($parseErrors.Count) { $parseErrors | Format-List; exit 1 }
+          git fetch --no-tags --depth=1 origin 60b02cae25c1bfaf14d0c15a038706d193c99a37
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((git rev-parse FETCH_HEAD).Trim() -ne '60b02cae25c1bfaf14d0c15a038706d193c99a37') { throw 'Published122 baseline changed' }
+          $baseline = Join-Path $env:RUNNER_TEMP 'network-toolkit-terminal-sftp122-baseline'
+          git worktree add --detach $baseline 60b02cae25c1bfaf14d0c15a038706d193c99a37
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          foreach ($file in @('cmd/network-toolkit/terminal_sftp123_windows_test.go', 'scripts/native-terminal-sftp123.ps1', 'scripts/terminal-sftp123-native-driver.js')) {
+            Copy-Item -LiteralPath $file -Destination (Join-Path $baseline $file)
+          }
+          Push-Location $baseline
+          try {
+            go test -mod=vendor ./cmd/network-toolkit -run '^TestNativeTerminalSFTP123InstalledWebView2$' -count=1 -timeout=8m -v
+            $testExit = $LASTEXITCODE
+          } finally { Pop-Location }
+          exit $testExit
+      - name: Verify Terminal own-session copy boundaries and real main/workspace file drags
+        if: success() || failure()
+        env:
+          GOTOOLCHAIN: local
+          NETWORK_TOOLKIT_NATIVE_TERMINAL_SFTP123_TEST: '1'
+          NETWORK_TOOLKIT_NATIVE_TERMINAL_SFTP123_PHASE: candidate123
+          TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/network-toolkit-terminal-sftp123-candidate
+        run: |
+          go test -mod=vendor ./cmd/network-toolkit -run '^TestTerminalSFTP123' -count=1 -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          go test -mod=vendor ./cmd/network-toolkit -run '^TestNativeTerminalSFTP123InstalledWebView2$' -count=1 -timeout=8m -v
+      - name: Retain focused123 Terminal SFTP native evidence
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: terminal-sftp123-native-checks
+          path: |
+            ${{ runner.temp }}/network-toolkit-terminal-sftp123-baseline
+            ${{ runner.temp }}/network-toolkit-terminal-sftp123-candidate
+          if-no-files-found: error
+          retention-days: 14
       - name: Verify direct SFTP row copies to real Windows Explorer
         if: success() || failure()
         env:
