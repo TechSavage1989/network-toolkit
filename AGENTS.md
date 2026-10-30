@@ -3,7 +3,28 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-Current published version: 1.17.121. Published 2026-10-30T05:45:41Z; actual public verification 05:48:05.062831Z.
+Current published version: 1.17.122. Published 2026-10-30T12:27:30Z;
+public downloads/source/feed verified 12:30:55.984763Z.
+Source/tag 60b02cae25c1bfaf14d0c15a038706d193c99a37;
+tree 5913c34e268e2ecbdae773854ded61f14206d5bb.
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.122
+Focused native file-drag repair passed 40 repeated actual Windows cases and ten
+final-version cases, retaining cancellation/source/dirty/undo/approval guards.
+Review 41021649359: five SUCCESS/two FAILURE (Alt-editor transfer and comparison
+gutter alignment); later skipped native stages are not passes. Neither issue is
+called fixture-only or fixed. Release build/publish and public proof passed:
+1,178 exact source files, reviewed EXE/portable identity, manifests, PE/resources,
+updater allowlist and prior 121 immutability. The local broad app race was killed,
+not passed. Duplicate 41055236523: five SUCCESS/two FAILURE
+(Windows Alt-editor transfer and comparison motion), last job completed
+2026-10-30T12:44:55Z.
+Read docs/RELEASE122_HANDOFF.md and DEVELOPMENT_HANDOFF.md for exact limits.
+Finite synthetic Explorer-folder evidence is not universal timing, Desktop Shell,
+cross-integrity, visible UAC or live-user-device proof. Preserve all old releases,
+remote approval/owner backend and existing export/text limits. This historical
+record is not authorization for unrelated work or access changes.
+
+Previous published version: 1.17.121. Published 2026-10-30T05:45:41Z; actual public verification 05:48:05.062831Z.
 Release 428692620: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.121
 Source a3a96b0e649c1560b919184e8ca336fda2dcc11b;
 tree e2336287ecc5abab564e94e15a7b4ac1858192e0. Compact sidebar, validated internal

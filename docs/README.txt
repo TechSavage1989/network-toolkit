@@ -4,8 +4,22 @@ Portable network diagnostics and device terminals in a native app window
 CURRENT RELEASE - 1.17.122
 
 Release details: RELEASE_NOTES_1.17.122.txt
-Previous release: docs/releases/RELEASE_NOTES_1.17.120.txt
+Previous release: docs/releases/RELEASE_NOTES_1.17.121.txt
 Full release-note archive: docs/releases/README.md
+
+122 improves ordinary native local/authorized-SFTP file and folder drag-out.
+The exact active gesture transfers capture safely before copy admission; late or
+cancelled gestures do not revive. Source files, dirty text/undo, Windows conflict
+handling and existing approval/limits remain protected. No Prepare dialog is
+required for the supported native workflow introduced in121.
+Published 12:27:30Z; actual public bytes/source/feed verified 12:30:55.984763Z.
+Forty repeated and ten final-version real Windows scenarios passed. Review
+41021649359 ended five SUCCESS/two FAILURE: Alt-editor tab transfer and comparison
+gutter alignment remain documented, not fixed by this release. Release/package
+verification passed; prior121 remains unchanged. Duplicate main41055236523:
+five SUCCESS/two FAILURE
+(Windows Alt-editor transfer and comparison motion), last job completed
+2026-10-30T12:44:55Z. See RELEASE122_HANDOFF.md for exact scope and limitations.
 
 121 compacts the Editor Files sidebar and improves its file-drag workflows.
 See the current release notes for supported behavior and validation limits.
