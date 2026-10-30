@@ -9,3 +9,21 @@ test('registry accepts only bounded display data and keeps credentials out',()=>
 test('actual xterm learns stable prompts per session without command/config secrets or rename',async()=>{const h=harness();const entries=[5,6].map(n=>({info:{...config,id:'session-'+n,host:'192.0.2.'+n,state:'connected',label:'Custom'},config:{...config,host:'192.0.2.'+n},xterm:new Terminal({cols:100,rows:10,allowProposedApi:true}),outputRevision:1}));const write=(e,s)=>new Promise(r=>e.xterm.write(s,r));for(const [i,e] of entries.entries()){await write(e,'Synthetic ordinary output\r\n\x1b[32mEDGE-'+i+'(config-if)#\x1b[0m ');h.api.observe(e);}h.flush();assert.equal(entries[0]._ntPromptName,'EDGE-0');assert.equal(entries[1]._ntPromptName,'EDGE-1');assert.equal(h.saves,2);assert.equal(entries[0].info.label,'Custom');await write(entries[0],'show secret#');entries[0].outputRevision++;h.api.observe(entries[0]);h.flush();assert.equal(entries[0]._ntPromptName,'EDGE-0');assert(!JSON.stringify(h.state).includes('secret'));const reloaded=h.api.normalize(JSON.parse(JSON.stringify(h.state.terminalPromptNames)));assert.equal(reloaded.length,2);h.state.terminalPromptNames=reloaded;assert.equal(h.api.labels(entries[0].config).name,'EDGE-0');for(const e of entries)e.xterm.dispose();});
 test('pending output/input, alternate screen, disconnect and stale revision never learn',async()=>{for(const guard of ['output','input','closed','revision','alternate']){const h=harness(),e={info:{...config,state:'connected'},config,xterm:new Terminal({cols:80,rows:6,allowProposedApi:true}),outputRevision:1};await new Promise(r=>e.xterm.write('EDGE-SW01# ',r));h.api.observe(e);if(guard==='output')e.renderPendingBytes=1;if(guard==='input')e.inputBytes=1;if(guard==='closed')e.info.state='closed';if(guard==='revision')e.outputRevision++;if(guard==='alternate')await new Promise(r=>e.xterm.write('\x1b[?1049h',r));h.flush();assert.equal(h.saves,0,guard);e.xterm.dispose();}});
 test('single-session snapshot carries only a validated name and restores against actual endpoint',()=>{const h=harness(),entry={info:{...config,id:'one'}};h.state.terminalPromptNames=[{...config,name:'EDGE-SW01'},{...config,host:'192.0.2.6',name:'PRIVATE-OTHER'}];assert.equal(h.api.snapshot(entry),'EDGE-SW01');const detached=harness(),returned={info:{...config,id:'one'}};detached.api.restore(returned,h.api.snapshot(entry));assert.equal(detached.state.terminalPromptNames.length,1);assert.equal(detached.state.terminalPromptNames[0].host,config.host);assert(!JSON.stringify(detached.state).includes('PRIVATE-OTHER'));detached.api.restore(returned,'<script>');assert.equal(returned._ntPromptName,'EDGE-SW01');});
+
+test('actual resize completion reobserves a stable xterm prompt without bypassing input or alternate-screen guards',async()=>{
+ const html=fs.readFileSync(require.resolve('../web/index.html'),'utf8'),drain=html.split('\n').find(line=>line.startsWith('async function drainTerminalResize('));assert(drain);
+ for(const guard of ['none','input','alternate','disconnected','ownership','epoch']){
+  const h=harness(),entry={info:{...config,state:'connected',id:'resize-test'},config,xterm:new Terminal({cols:100,rows:10,allowProposedApi:true}),outputRevision:1,inputEpoch:0,desiredResize:{cols:90,rows:12}};
+  await new Promise(resolve=>entry.xterm.write('Synthetic output\r\nEDGE-SW01(config-if)# ',resolve));
+  h.api.observe(entry);entry.xterm.resize(90,12);entry.outputRevision++;
+  h.flush();assert.equal(entry._ntPromptName,undefined,'stale pre-resize observation must still be rejected');
+  Object.assign(h.c,{online:true,terminalOwnerCanMutate:()=>guard!=='ownership',api:async()=>{if(guard==='epoch')entry.inputEpoch++;},toast:()=>{}});
+  vm.runInNewContext(drain,h.c);
+  if(guard==='input')entry.inputBytes=1;
+  if(guard==='alternate')await new Promise(resolve=>entry.xterm.write('\x1b[?1049h',resolve));
+  if(guard==='disconnected')entry.info.state='closed';
+  await h.c.drainTerminalResize(entry);h.flush();
+  assert.equal(entry._ntPromptName,guard==='none'?'EDGE-SW01':undefined,guard);
+  entry.xterm.dispose();
+ }
+});
