@@ -1,8 +1,11 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
+	"io"
 	"net/http/httptest"
+	"networktoolkit/internal/model"
 	"os"
 	"path/filepath"
 	"strings"
@@ -137,5 +140,24 @@ func TestExplorerDirect121CancelAndLateGestureNeverRead(t *testing.T) {
 				t.Fatal("cancelled operation touched source")
 			}
 		})
+	}
+}
+
+func TestExplorerDirect121ExplicitCancelWinsInterruptedReadError(t *testing.T) {
+	for _, cancelled := range []bool{false, true} {
+		a := &application{}
+		j := &explorerTransferJob{direct: true, cancelRequested: cancelled, state: "dragging", names: []string{"synthetic.txt"}, valid: func() bool { return true }}
+		g := &editorDocumentGrant{run: func(context.Context, remoteBrowserRequest) (model.Result, error) { return model.Result{}, io.EOF }}
+		a.stageExplorerExport(context.Background(), j, editorBinding{Kind: "sshConnection"}, []string{"/synthetic.txt"}, g)
+		if cancelled {
+			if j.state != "cancelled" || !strings.Contains(j.note, "cancelled") {
+				t.Fatalf("explicit cancellation misreported: %s %s", j.state, j.note)
+			}
+		} else if j.state != "failed" || j.note != "EOF" {
+			t.Fatalf("real read failure hidden: %s %s", j.state, j.note)
+		}
+		if j.stage != "" || len(j.paths) > 0 || j.rendered {
+			t.Fatal("failed/cancelled read published staged paths")
+		}
 	}
 }

@@ -54,8 +54,8 @@ test('drive buttons always identify roots and preserve real labels safely',()=>{
 
 test('Files and Connections visibility changes reuse the mounted form and never dispatch a transport',()=>{
  const source=fs.readFileSync(require.resolve('../web/assets/remote-browser.js'),'utf8'),start=source.indexOf('function mountSidebar('),end=source.indexOf('function unmountSidebar(',start),document=makeDocument('<div id="host"></div>'),host=document.querySelector('#host'),models={ssh:{}},calls=[];
- const root={TYPES:new Set(['ssh','ftp']),detachedEditor:()=>false,sidebarMounts:new Map(),get:k=>models[k],render:k=>{calls.push('render');host.innerHTML='<div data-rb-root="ssh"><input data-rb-setting="password"></div>';},restoreConnectionControls:()=>calls.push('controls'),updateSidebarActions:()=>calls.push('actions')};vm.runInNewContext(source.slice(start,end),root);
- root.mountSidebar(host,'local','ssh',{panel:'files'});const input=host.querySelector('input');input.value='synthetic';root.mountSidebar(host,'remote','ssh',{panel:'connections'});assert.equal(host.querySelector('input'),input);assert.equal(input.value,'synthetic');assert.equal(host.querySelector('[data-rb-root]').dataset.sidebarPanel,'connections');assert.equal(calls.filter(v=>v==='render').length,1);
+ const root={TYPES:new Set(['ssh','ftp']),detachedEditor:()=>false,sidebarMounts:new Map(),get:k=>models[k],render:k=>{calls.push('render');host.innerHTML='<div data-rb-root="ssh"><input data-rb-setting="password"></div>';},restoreConnectionControls:()=>calls.push('controls'),updateSidebarActions:()=>calls.push('actions'),refreshTerminalChoices:k=>calls.push('metadata:'+k)};vm.runInNewContext(source.slice(start,end),root);
+ root.mountSidebar(host,'local','ssh',{panel:'files'});const input=host.querySelector('input');input.value='synthetic';root.mountSidebar(host,'remote','ssh',{panel:'connections'});assert.equal(host.querySelector('input'),input);assert.equal(input.value,'synthetic');assert.equal(host.querySelector('[data-rb-root]').dataset.sidebarPanel,'connections');assert.equal(calls.filter(v=>v==='render').length,1);assert.deepEqual(calls.filter(v=>v.startsWith('metadata:')),['metadata:ssh'],'Connect refreshes authorized metadata on the existing mount without reconnecting');
  root.sidebarMounts.get('ssh').dirty=true;root.mountSidebar(host,'remote','ssh',{panel:'files'});assert.equal(calls.filter(v=>v==='render').length,2,'a model update while collapsed is repainted on reopen');
 });
 
@@ -122,3 +122,12 @@ test('shared editor rail is exempt from ordinary button containment without chan
  test('detached local Files mounts directly without access request, while Connections remains approved',async()=>{
  const h=harness(true),requests=[];h.root.api=async(...args)=>{requests.push(args);return {allowed:false,pending:false};};h.api.initialize(h.editor);await new Promise(resolve=>setImmediate(resolve));assert.equal(requests.length,0);assert.equal(h.calls.at(-1)[0],'mount');assert.equal(h.calls.at(-1)[2],'local');h.api.selectPanel('connections');await new Promise(resolve=>setImmediate(resolve));assert.equal(requests.length,1);assert.equal(requests[0][0],'/editor-views/current/explorer');assert(h.host.querySelector('[data-editor-files-request]'));h.api.selectPanel('files');assert.equal(h.calls.at(-1)[0],'mount');assert.equal(requests.length,1);
  });
+
+
+test('approved child Connect remount refreshes choices after earlier local-only denial',()=>{
+ const source=fs.readFileSync(require.resolve('../web/assets/remote-browser.js'),'utf8'),start=source.indexOf('function mountSidebar('),end=source.indexOf('function unmountSidebar(',start),document=makeDocument('<div id="host"></div>'),host=document.querySelector('#host');let approved=false;const choices=[],calls=[];
+ const root={TYPES:new Set(['ssh','ftp']),detachedEditor:()=>true,sidebarMounts:new Map(),get:()=>({}),render:()=>{calls.push('render');host.innerHTML='<div data-rb-root="ssh"><select data-rb-connection-source></select></div>';},restoreConnectionControls(){},updateSidebarActions(){},refreshTerminalChoices:k=>{calls.push('metadata:'+k);if(approved)choices.push('same-pinned-connection');}};vm.runInNewContext(source.slice(start,end),root);
+ root.mountSidebar(host,'local','ssh',{panel:'files'});const select=host.querySelector('select');assert.equal(choices.length,0);approved=true;
+ root.mountSidebar(host,'local','ssh',{panel:'connections'});assert.equal(host.querySelector('select'),select);assert.deepEqual(choices,['same-pinned-connection']);assert.equal(calls.filter(v=>v==='render').length,1);
+ root.mountSidebar(host,'local','ssh',{panel:'files'});assert.equal(calls.filter(v=>v==='metadata:ssh').length,1,'Files return does not cause a metadata request');
+});

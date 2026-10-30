@@ -408,7 +408,10 @@ func (a *application) stageExplorerExport(ctx context.Context, j *explorerTransf
 		if stage != "" {
 			os.RemoveAll(stage)
 		}
-		if j.state != "cancelled" {
+		if j.direct && j.cancelRequested {
+			j.state = "cancelled"
+			j.note = "Windows copy cancelled. Original files are unchanged."
+		} else if j.state != "cancelled" {
 			j.state = "failed"
 			j.note = err.Error()
 		}

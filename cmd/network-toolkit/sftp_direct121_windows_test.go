@@ -198,6 +198,7 @@ func TestNativeSFTPDirect121InstalledWebView2(t *testing.T) {
 	defer server.Close()
 	a.host = strings.TrimPrefix(server.URL, "http://")
 	report := map[string]any{"passed": false, "fullProductionPage": true, "actualRetainedLoopbackSFTP": true, "preflightRetainedRead": true, "actualWindowsExplorer": true, "syntheticTemporaryFilesOnly": true, "nativeInput": "Win32 pointer down/move/up; no DOM drag event substitution"}
+	activeView := ""
 	var cases []map[string]any
 	var attempts []map[string]any
 	ready := make(chan struct{})
@@ -237,10 +238,30 @@ func TestNativeSFTPDirect121InstalledWebView2(t *testing.T) {
 					if r := editorHTTP(a, a.token, "/api/editor-views/explorer/"+view, map[string]any{"requestId": nonce, "allow": true}); r.Code != 200 {
 						return fmt.Errorf("explicit fixture approval: %d %s", r.Code, r.Body.String())
 					}
+					choices := editorGET(a, token, "/api/remote-browser")
+					var approved struct {
+						Connections []struct {
+							ID string `json:"id"`
+						} `json:"connections"`
+					}
+					if choices.Code != 200 || json.Unmarshal(choices.Body.Bytes(), &approved) != nil {
+						return fmt.Errorf("authenticated child approved-transport metadata: %d %s", choices.Code, choices.Body.String())
+					}
+					found := false
+					for _, item := range approved.Connections {
+						if item.ID == connection {
+							found = true
+						}
+					}
+					if !found {
+						return errors.New("authenticated child grant omitted retained synthetic SFTP connection")
+					}
+					report["childApprovedConnectionVisible"] = true
 					if e = h.nativeInput("Arrange", "Tab", view, view, nativeEditorSnapshot{}, nativeEditorSnapshot{}, nativeEditorRect{}, nativeEditorRect{}); e != nil {
 						return e
 					}
 				}
+				activeView = view
 				pid, exe, e := h.identity(view)
 				if e != nil {
 					return e
@@ -267,6 +288,9 @@ func TestNativeSFTPDirect121InstalledWebView2(t *testing.T) {
 					marker.Store(started)
 					slow.Store(test.mode == "CancelDuring")
 					before := materialized.Load()
+					mu.Lock()
+					transitionStart := len(transitions)
+					mu.Unlock()
 					state, e := h.command(view, nativeEditorCommand{Action: "row", Destination: test.path})
 					if e != nil {
 						return e
@@ -299,6 +323,18 @@ func TestNativeSFTPDirect121InstalledWebView2(t *testing.T) {
 					}
 					if !json.Valid(bytes.TrimSpace(out)) {
 						return fmt.Errorf("native evidence not JSON: %s", out)
+					}
+					terminalState, terminalNote := "", ""
+					mu.Lock()
+					for _, transition := range transitions[transitionStart:] {
+						if transition["phase"] == "response" && transition["action"] == "finish" {
+							terminalState, _ = transition["state"].(string)
+							terminalNote, _ = transition["note"].(string)
+						}
+					}
+					mu.Unlock()
+					if test.mode == "CancelDuring" && (terminalState != "cancelled" || !strings.Contains(terminalNote, "cancelled")) {
+						return fmt.Errorf("explicit materialization cancellation ended with state %q: %s", terminalState, terminalNote)
 					}
 					if test.mode == "Copy" {
 						for rel, want := range contents {
@@ -343,7 +379,7 @@ func TestNativeSFTPDirect121InstalledWebView2(t *testing.T) {
 					if _, e = h.command(view, nativeEditorCommand{Action: "verify-dirty"}); e != nil {
 						return e
 					}
-					cases = append(cases, map[string]any{"name": name, "passed": true, "materializeRequests": materialized.Load() - before, "sourceHitTested": true, "sourceGeometry": state.Geometry, "input": json.RawMessage(bytes.TrimSpace(out))})
+					cases = append(cases, map[string]any{"name": name, "passed": true, "materializeRequests": materialized.Load() - before, "terminalState": terminalState, "terminalNote": terminalNote, "sourceHitTested": true, "sourceGeometry": state.Geometry, "input": json.RawMessage(bytes.TrimSpace(out))})
 				}
 				state, e := h.command(view, nativeEditorCommand{Action: "row", Destination: "/one.txt"})
 				if e != nil {
@@ -375,7 +411,7 @@ func TestNativeSFTPDirect121InstalledWebView2(t *testing.T) {
 		}
 		e := run()
 		if e != nil {
-			_ = h.capture("", "sftp-direct121-failure")
+			_ = h.capture(activeView, "sftp-direct121-failure")
 		}
 		report["passed"] = e == nil
 		report["cases"] = cases
