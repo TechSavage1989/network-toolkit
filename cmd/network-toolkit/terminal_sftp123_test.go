@@ -21,9 +21,22 @@ type terminalSFTP123Fixture struct {
 	exited   chan error
 }
 
+func newTerminalSFTP123ShellFixture(t *testing.T) *persistentBrowserFixture {
+	t.Helper()
+	f := newShellSFTPBrowserFixture(t)
+	// Match production startup before any client/channel can use this root.
+	// Windows Temp can contain an 8.3 alias; confinement compares resolved paths.
+	root, err := transferRoot(f.root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.root = root
+	return f
+}
+
 func newTerminalSFTP123Fixture(t *testing.T, detached bool) *terminalSFTP123Fixture {
 	t.Helper()
-	f := &terminalSFTP123Fixture{persistentBrowserFixture: newShellSFTPBrowserFixture(t)}
+	f := &terminalSFTP123Fixture{persistentBrowserFixture: newTerminalSFTP123ShellFixture(t)}
 	id := f.connect(t, nil)
 	code, result := f.operations(t, id, "open-terminal", nil)
 	if code != 200 {
@@ -380,7 +393,7 @@ func TestTerminalSFTP123SingleViewHasNoNewFileCapability(t *testing.T) {
 }
 
 func TestTerminalSFTP123SameIDReplacementCannotRetargetGrant(t *testing.T) {
-	f := newShellSFTPBrowserFixture(t)
+	f := newTerminalSFTP123ShellFixture(t)
 	req := terminal.ConnectRequest{Type: "ssh", Host: "127.0.0.1", Port: f.credentials["port"].(int), Username: "tester", AuthMethod: "password", Password: "persistent-test-password", CredentialID: "synthetic-fixture", ExpectedHostFingerprint: f.credentials["fingerprint"].(string)}
 	session, err := f.app.terminals.Connect(req)
 	if err != nil {
