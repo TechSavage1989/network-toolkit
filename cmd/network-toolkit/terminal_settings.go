@@ -9,6 +9,9 @@ import (
 // portable settings file. This independently enforces the same nonsecret
 // profile schema as the interface, including for imported settings.
 func sanitizeTerminalSettings(state map[string]any) {
+	if value, present := state["terminalPromptNames"]; present {
+		state["terminalPromptNames"] = safeTerminalPromptNames(value)
+	}
 	// Earlier releases could launch third-party terminal applications. The
 	// built-in transports are now the only terminal destination; remove old
 	// application selections and executable paths when loading or saving.

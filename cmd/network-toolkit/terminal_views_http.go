@@ -419,7 +419,7 @@ func (a *application) handleDetachedState(w http.ResponseWriter, r *http.Request
 		state := terminalWorkspaceDisplay(original)
 		if !info.Workspace {
 			// Single-session views retain their narrow presentation-only scope.
-			for _, key := range []string{"terminalConnection", "terminalProfiles", "terminalRecent", "terminalRecentCollapsed", "terminalSavedCollapsed", "terminalSessionConfirmDelete", "terminalLayout"} {
+			for _, key := range []string{"terminalPromptNames", "terminalConnection", "terminalProfiles", "terminalRecent", "terminalRecentCollapsed", "terminalSavedCollapsed", "terminalSessionConfirmDelete", "terminalLayout"} {
 				delete(state, key)
 			}
 		}

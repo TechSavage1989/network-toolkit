@@ -103,13 +103,15 @@ type task struct {
 	permits        int
 	stepping       bool
 	captureClosing bool
+	outputRevision uint64 // Includes ANSI-only output for literal-paste stability.
 }
 type execution struct {
-	view       Run
-	definition Definition
-	tasks      []*task
-	secrets    []string
-	paused     bool
+	view         Run
+	definition   Definition
+	tasks        []*task
+	secrets      []string
+	paused       bool
+	literalPaste bool
 }
 
 // Engine runs independently of browser focus and tab ownership. Captured output
@@ -183,7 +185,14 @@ func (e *Engine) Start(req StartRequest) (Run, error) {
 	if err != nil {
 		return Run{}, err
 	}
-	if err = validateRefs(req.Targets); err != nil {
+	return e.startPrepared(req, def, false)
+}
+
+// startPrepared shares lifecycle, generation fencing and cancellation between
+// validated macro definitions and the separately validated literal paste path.
+// literal is internal only; it cannot be enabled by a saved/API macro.
+func (e *Engine) startPrepared(req StartRequest, def Definition, literal bool) (Run, error) {
+	if err := validateRefs(req.Targets); err != nil {
 		return Run{}, err
 	}
 	values, secrets, err := runtimeValues(def, req.Values)
@@ -198,7 +207,7 @@ func (e *Engine) Start(req StartRequest) (Run, error) {
 	if _, err = rand.Read(idBytes); err != nil {
 		return Run{}, err
 	}
-	run := &execution{view: Run{ID: hex.EncodeToString(idBytes), MacroID: def.ID, Name: def.Name, State: "running", StartedAt: now()}, definition: def, secrets: secrets}
+	run := &execution{view: Run{ID: hex.EncodeToString(idBytes), MacroID: def.ID, Name: def.Name, State: "running", StartedAt: now()}, definition: def, secrets: secrets, literalPaste: literal}
 	type preparedTask struct {
 		task  *task
 		steps []Step
@@ -228,6 +237,10 @@ func (e *Engine) Start(req StartRequest) (Run, error) {
 			fail(terminal.ErrTransportChanged.Error())
 			continue
 		}
+		if literal && target.Type != "ssh" {
+			fail("prompt-paced paste is available only for SSH terminals")
+			continue
+		}
 		if previous := e.active[ref.ID]; previous != nil {
 			if previous.target.Generation == target.Generation {
 				fail("a macro is already running in this terminal")
@@ -246,6 +259,10 @@ func (e *Engine) Start(req StartRequest) (Run, error) {
 		steps := make([]Step, 0, total)
 		for _, step := range def.Steps {
 			if step.Disabled {
+				continue
+			}
+			if literal {
+				steps = append(steps, step)
 				continue
 			}
 			for _, name := range DetectParams(step.Text) {
@@ -723,9 +740,15 @@ func (e *Engine) execute(run *execution, t *task, steps []Step) {
 			}
 			cursor, failure = e.writeTask(run, t, []byte(text))
 			if failure == nil && step.Kind == "command" && run.definition.WaitForPrompt {
-				failure = e.waitPattern(run, t, run.definition.Prompt, cursor, time.Duration(timeout)*time.Millisecond)
+				if run.literalPaste {
+					failure = e.waitPastePrompt(run, t, cursor, time.Duration(timeout)*time.Millisecond)
+				} else {
+					failure = e.waitPattern(run, t, run.definition.Prompt, cursor, time.Duration(timeout)*time.Millisecond)
+				}
 			}
-			if failure == nil && run.definition.PacingMs > 0 {
+			// Literal paste folds its minimum pacing into the prompt-stability
+			// window, so later output cannot invalidate a blindly delayed send.
+			if failure == nil && !run.literalPaste && run.definition.PacingMs > 0 {
 				failure = e.delay(run, t, time.Duration(run.definition.PacingMs)*time.Millisecond)
 			}
 		case "wait":
@@ -793,6 +816,7 @@ func (e *Engine) readOutput(t *task) {
 		output, err := t.source.Read(t.ctx)
 		e.mu.Lock()
 		if len(output.Data) > 0 {
+			t.outputRevision++
 			plain := t.decoder.decode(output.Data)
 			if plain != "" {
 				t.chunks = append(t.chunks, capturedChunk{seq: output.Seq, text: plain})

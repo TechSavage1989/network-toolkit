@@ -82,3 +82,10 @@
 .terminal-sidebar-side-button svg{width:14px;height:14px;}
 .terminal-workspace-columns.sidebar-left .terminal-sidebar-rail{order:0;border-right:1px solid var(--line);border-left:0;}
 .terminal-workspace-columns.sidebar-left .terminal-window .terminal-session-sidebar{border-right:1px solid var(--line);border-left:0;}
+
+/* Compact learned CLI identity; connection controls retain their own flex space. */
+.terminal-device-label{display:flex;flex-direction:column;min-width:0;gap:2px;line-height:1.2;text-align:left}
+.terminal-device-label>span,.terminal-device-label>small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.terminal-device-label>small{font-size:10px;font-weight:400;color:var(--muted)}
+.terminal-tab-name{min-width:0;max-width:240px}
+.terminal-tab .tab-close,.terminal-tab .dot{flex-shrink:0}

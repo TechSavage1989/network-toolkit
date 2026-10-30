@@ -1,0 +1,21 @@
+Network Toolkit 1.17.127 — paced SSH paste and clearer device labels
+
+Terminal paste review offers an explicit one-line-at-a-time mode for complete SSH
+command lists. It waits for a fresh, settled prompt before continuing instead of
+bursting the whole configuration into the device. Literal command text is retained;
+raw paste, ordinary single-line paste and bracketed paste remain available.
+
+The selected connection and ownership revision stay fixed. Pause and Stop remain
+available in run controls, but cannot undo commands already sent. Paced mode has
+bounded input and prompt timeouts and does not automatically answer pagers.
+
+Terminal tabs, Saved and Recent show a recognized CLI device name above a smaller
+endpoint, or the endpoint alone when no name is recognized. Stored custom labels,
+connection addresses and credentials remain unchanged. Config-mode suffixes are
+not included in the display name.
+
+This mitigates prompt/echo interleaving during a large SSH configuration paste.
+The original remote byte stream was not captured; no font or renderer root cause,
+remote command-success guarantee or universal switch compatibility is claimed.
+Only synthetic test data was used; no live client configuration was sent.
+Existing unrelated editor-transfer/comparison limitations remain.

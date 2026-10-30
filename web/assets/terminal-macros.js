@@ -153,6 +153,16 @@ async function send(execute){
  try{if(execute)prepareRunView(targets);const result=await call('/send','POST',{targets:targetRefs(targets),text,execute});const statuses=result.targets||result.results||result.statuses||[],failures=statuses.filter(s=>s.error||s.ok===false||s.state==='failed');const message=failures.length?failures.map(s=>(s.label||s.id)+': '+(s.error||s.message||'Not sent')).join(' · '):(execute?'Sent to ':'Inserted in ')+targets.map(targetName).join(', ');$('#terminalMacroSendResult').innerHTML=result.run?button('output',failures.length?'!':'✓','data-run="'+html(result.run.id)+'" title="'+html(message)+' · View output" aria-label="'+html(message)+'; view output"','iconbtn'):'<span title="'+html(message)+'" aria-label="'+html(message)+'">'+(failures.length?'!':'✓')+'</span>';if(result.run){S.runs=[result.run,...S.runs.filter(r=>r.id!==result.run.id)];renderRuns();}if(failures.length)notify('Some terminals did not accept the command. Open terminal recipients or run output for details.','error');else if(execute){entry.value='';S.composerExpanded=false;renderComposer();}}
  catch(err){notify(err.message,'error');}finally{renderTargets();}
 }
+// The paste review captures one exact generation, independent of composer
+// recipient settings. Never refresh or substitute this target during submission.
+function pasteTarget(id){const t=S.targets.find(t=>t.id===id);return t&&Number.isSafeInteger(t.generation)?{id:t.id,generation:t.generation}:null;}
+async function startPacedPaste(target,text,revision){
+ const result=await api(BASE+'/paste','POST',{target:{id:target.id,generation:target.generation},text},false,undefined,revision);
+ if(!result?.run?.id)throw new Error('The paced paste response was not confirmed. Check Runs before sending again.');
+ S.runs=[result.run,...S.runs.filter(r=>r.id!==result.run.id)];renderRuns();schedule();
+ if(result.run.state==='failed'){const error=new Error((result.run.targets||[]).map(t=>t.error).filter(Boolean).join(' · ')||'Paced paste was not started. Review Runs for details.');error.status=409;throw error;}
+ openView('runs');notify('Paced paste started. Pause or Stop is available in Runs.');return result.run;
+}
 function findMacro(id){return S.library.macros.find(m=>m.id===id);}
 function moveMacroFolder(id){
  const macro=findMacro(id);if(!macro)return;
@@ -299,5 +309,5 @@ async function onClick(event){
 }
 function ownsPager(entry){return S.runs.some(run=>running(run)&&(run.targets||[]).some(t=>t.id===entry?.info?.id&&['running','paused'].includes(t.state)));}
 function dispose(){S.disposed=true;if(S.timer)clearTimeout(S.timer);S.timer=null;removeMenu();if(S.mounted){document.removeEventListener('click',onClick);document.removeEventListener('change',onChange);document.removeEventListener('input',onInputEvent);document.removeEventListener('keydown',onKeyDown,true);document.removeEventListener('contextmenu',onContextMenu);document.removeEventListener('terminal-sidebar-tab-change',onSidebarChange);}S.mounted=false;}
-root.NetworkToolkitTerminalMacros={mount,sync,toggle,onInput,onOutput,onConnected,saveLast,record,dispose,requestRun:preview,refresh,ownsPager};
+root.NetworkToolkitTerminalMacros={mount,sync,toggle,onInput,onOutput,onConnected,saveLast,record,dispose,requestRun:preview,refresh,ownsPager,pasteTarget,startPacedPaste};
 })(typeof window!=='undefined'?window:globalThis);

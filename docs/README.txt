@@ -1,3 +1,15 @@
+NETWORK TOOLKIT 1.17.127
+======================
+
+CURRENT RELEASE - 1.17.127 (candidate; not yet published)
+
+Release details: RELEASE_NOTES_1.17.127.txt
+Adds reviewed paced SSH paste and compact learned-name/endpoint session labels.
+Raw paste remains available. Hosted release validation is still pending.
+See docs/RELEASE127_HANDOFF.md for scope, evidence and remaining limits.
+
+PREVIOUS RELEASE INFORMATION (retained)
+
 NETWORK TOOLKIT 1.17.126
 Portable network diagnostics and device terminals in a native app window
 

@@ -14,7 +14,16 @@
   <a href="#development">Development</a>
 </p>
 
-## Latest update — 1.17.121
+## Current candidate — 1.17.127
+
+Safer paced multiline paste adds an explicit one-line-at-a-time option in paste
+review, waiting for a fresh prompt before continuing. Raw paste remains available.
+Tabs, Saved and Recent show a learned CLI name above a smaller endpoint, or just
+the endpoint when no name is recognized. Existing connection identity is retained.
+Validation and publication are pending. See [127 handoff](docs/RELEASE127_HANDOFF.md)
+for exact evidence and limits; this is not a claim that every rendering issue is fixed.
+
+## Previous 1.17.121 release record (retained)
 
 Published 2026-10-30T05:45:41Z; actual public verification 05:48:05.062831Z.
 Release 428692620: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.121

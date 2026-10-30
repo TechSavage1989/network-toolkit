@@ -319,7 +319,7 @@ func seedTerminalWorkspace(root, dest string) error {
 		if readErr == nil {
 			var original map[string]any
 			if json.Unmarshal(b, &original) == nil {
-				for _, key := range []string{"colorPickerPreferences", "terminalProfiles", "terminalRecent", "terminalSidebarCollapsed", "terminalSidebarTab", "terminalSidebarWidth", "terminalComposerCollapsed", "terminalMacroConfirmation", "terminalConfirmClose", "terminalRecentCollapsed", "terminalSavedCollapsed", "terminalSessionConfirmDelete", "terminalConnection", "terminalLayout", "terminalInteraction", "terminalActiveActionsPosition", "terminalAppearance"} {
+				for _, key := range []string{"colorPickerPreferences", "terminalPromptNames", "terminalProfiles", "terminalRecent", "terminalSidebarCollapsed", "terminalSidebarTab", "terminalSidebarWidth", "terminalComposerCollapsed", "terminalMacroConfirmation", "terminalConfirmClose", "terminalRecentCollapsed", "terminalSavedCollapsed", "terminalSessionConfirmDelete", "terminalConnection", "terminalLayout", "terminalInteraction", "terminalActiveActionsPosition", "terminalAppearance"} {
 					if value, ok := original[key]; ok {
 						state[key] = value
 					}

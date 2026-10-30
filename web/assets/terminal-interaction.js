@@ -31,7 +31,7 @@
     {id:'move',label:'Detach / reattach',icon:'external',group:'session'}
   ];
   const DEFAULT_MENU = ['copy','copy-line','copy-token','paste','scroll-top','scroll-bottom','paste-start','copy-paste-output','select-all','search','export','zoom-in','zoom-out','control-c','move'];
-  const bound = new WeakMap(), liveBindings = new Set();
+  const bound = new WeakMap(), liveBindings = new Set(), pasteStarts = new Map();
   let initialized = false, observed = null, focusEpoch = 0, pasteSequence = 0, pendingNativePaste = null;
   let review = null, approvedPaste = false, menu = null, menuDestination = null, modalObserver = null;
   let copyQueue = Promise.resolve(false), copySequence = 0, latestCopy = 0;
@@ -89,32 +89,62 @@
     const field = review?.form.querySelector('#terminalPasteText');
     return field ? field.value === review.editorOriginal ? review.original : field.value : '';
   }
+  // Paced paste is an explicit command-list operation, never a replacement for
+  // bracketed/raw paste into editors, shells or an unfinished command.
+  function pacedPasteReason(token, text, target) {
+    const entry=token?.entry, term=token?.xterm;
+    if (!target || target.id!==token?.id || !Number.isSafeInteger(target.generation)) return 'Waiting for this connection. Reopen paste review when it is ready.';
+    if (entry?.info.type!=='ssh' || !term || term.buffer.active!==term.buffer.normal || term.modes?.bracketedPasteMode) return 'Use raw paste for this terminal mode.';
+    if (entry.inputSending || entry.inputBytes || entry.inputError || entry.renderPendingBytes || term.hasSelection?.()) return 'Finish pending input/output and clear the selection first, or use raw paste.';
+    const b=term.buffer.active, line=b.getLine(b.baseY+b.cursorY)?.translateToString(false)||'';
+    if (!/^[^\r\n]{0,160}[#>$%][ \t]*$/.test(line.slice(0,b.cursorX)) || line.slice(b.cursorX).trim()) return 'Start at an empty command prompt, or use raw paste.';
+    if (byteLength(text)>65536) return 'Paced paste supports up to 64 KiB; use raw paste or a smaller list.';
+    if (/[\x00-\x09\x0b\x0c\x0e-\x1f\x7f-\x9f]/.test(text)) return 'Control characters need raw paste; no commands have been changed.';
+    const lines=text.replace(/\r\n?/g,'\n').split('\n');
+    if (lines.pop()!=='') return 'End the last command with a line break, or use raw paste without adding Enter.';
+    if (lines.length<2 || lines.length>1024) return 'Paced paste needs 2–1,024 complete lines.';
+    return '';
+  }
   function updateReview() {
     if (!review) return;
     if (!review.form.isConnected) { review = null; return; }
     if (!validDestination(review.destination)) review.invalid = true;
-    const value = reviewText(), stats = pasteStats(value), blocked = review.invalid || stats.bytes > MAX_PASTE_BYTES || !value;
+    const start=pasteStarts.get(review.destination.id);
+    review.pending=!!(start&&start.generation===review.target?.generation&&start.pending);review.uncertain=!!(start&&start.generation===review.target?.generation&&start.uncertain);
+    const value = reviewText(), stats = pasteStats(value), mode=review.form.querySelector('#terminalPasteMode'), paced=mode?.value==='paced', reason=pacedPasteReason(review.destination,value,review.target), blocked = review.invalid || review.pending || review.uncertain || stats.bytes > MAX_PASTE_BYTES || !value || paced && !!reason;
     const status = review.form.querySelector('#terminalPasteStatus');
     const count = review.form.querySelector('#terminalPasteStats');
     const submit = document.querySelector('#terminalPasteConfirm');
     count.textContent = stats.lines + (stats.lines === 1 ? ' line' : ' lines') + ' · ' + stats.breaks + (stats.breaks === 1 ? ' line break' : ' line breaks') + ' · ' + stats.bytes.toLocaleString() + ' bytes' + (stats.trailing ? ' · Ends with a line break' : '');
     status.textContent = review.invalid ? 'This destination is no longer ready or the focused pane changed. Nothing has been sent. Cancel and paste again in the intended console.' : stats.bytes > MAX_PASTE_BYTES ? 'This paste exceeds the 1 MiB limit. Reduce the text before sending.' : stats.breaks ? 'Line breaks may execute commands on the device. Review or edit every line before sending.' : 'The edited text contains no line breaks. It will be pasted without pressing Enter.';
     status.classList.toggle('terminal-paste-invalid', blocked && !!value);
-    if (submit) submit.disabled = blocked;
+    const hint=review.form.querySelector('#terminalPasteModeHint');
+    if(hint)hint.textContent=review.error || (paced ? reason || 'Sends each complete line literally, then waits for a fresh prompt (30-second timeout, 100 ms stable output). Blank lines are kept. No auto pager. Stop or pause in Runs; stopping cannot undo commands already sent.' : 'Sends all text at once using the original paste behavior. Large command lists may overwhelm a device’s command echo.');
+    if(review.pending)status.textContent='Start request sent. Closing this review does not stop commands. Check Runs for Pause or Stop; do not submit again.';
+    if(review.uncertain)status.textContent='Start was not confirmed. Check Runs before sending anything again; some commands may have run.';
+    const resolve=review.form.querySelector('#terminalPasteResolve');if(resolve)resolve.hidden=!review.uncertain;
+    const dismiss=document.querySelector('#terminalPasteDismiss');if(dismiss)dismiss.textContent=review.pending||review.uncertain?'Close':'Cancel';
+    if(mode)mode.disabled=!!review.pending||!!review.uncertain;
+    const field=review.form.querySelector('#terminalPasteText');if(field)field.readOnly=!!review.pending||!!review.uncertain;
+    if (submit) { submit.disabled = !!blocked; submit.textContent=paced?'Send lines · wait for prompt':'Paste all at once'; }
   }
   function openReview(token, text) {
     closeMenu(false);
     setTerminalToolsOpen(false,false);
     openModal('Review paste to ' + token.label,
-      '<form id="terminalPasteForm" class="terminal-paste-review" data-terminal-id="' + esc(token.id) + '"><div class="terminal-paste-destination">' + icon('terminal') + '<span>Destination: <strong>' + esc(token.label) + '</strong></span></div><p id="terminalPasteStatus" class="terminal-paste-warning" role="status"></p><div class="field"><label for="terminalPasteText">Text to send</label><textarea id="terminalPasteText" class="mono" spellcheck="false" autocomplete="off" autocapitalize="off" aria-describedby="terminalPasteStats terminalPasteStatus"></textarea></div><div id="terminalPasteStats" class="terminal-paste-stats" aria-live="polite"></div></form>',
-      '<button type="button" class="btn ghost" data-action="close-modal">Cancel</button><button id="terminalPasteConfirm" class="btn primary" type="submit" form="terminalPasteForm">Send to this console</button>',true);
+      '<form id="terminalPasteForm" class="terminal-paste-review" data-terminal-id="' + esc(token.id) + '"><div class="terminal-paste-destination">' + icon('terminal') + '<span>Destination: <strong>' + esc(token.label) + '</strong></span></div><p id="terminalPasteStatus" class="terminal-paste-warning" role="status"></p><div class="field"><label for="terminalPasteText">Text to send</label><textarea id="terminalPasteText" class="mono" spellcheck="false" autocomplete="off" autocapitalize="off" aria-describedby="terminalPasteStats terminalPasteStatus"></textarea></div><div id="terminalPasteStats" class="terminal-paste-stats" aria-live="polite"></div><div class="field mt"><label for="terminalPasteMode">Send method</label><select id="terminalPasteMode" aria-describedby="terminalPasteModeHint"><option value="paced">One line at a time · wait for prompt</option><option value="raw">Raw paste · all at once</option></select><p id="terminalPasteModeHint" class="help-line" role="status"></p><button id="terminalPasteResolve" type="button" class="btn small ghost" hidden>I checked Runs · allow a new paste</button></div></form>',
+      '<button id="terminalPasteDismiss" type="button" class="btn ghost" data-action="close-modal">Cancel</button><button id="terminalPasteConfirm" class="btn primary" type="submit" form="terminalPasteForm">Send to this console</button>',true);
     const form = document.querySelector('#terminalPasteForm'), field = form.querySelector('#terminalPasteText');
     field.value = text;
-    review = {destination:token,original:text,editorOriginal:field.value,form,invalid:false};
+    const target=root.NetworkToolkitTerminalMacros?.pasteTarget?.(token.id);
+    review = {destination:token,original:text,editorOriginal:field.value,form,invalid:false,target,pending:false,uncertain:false,error:''};
+    form.querySelector('#terminalPasteMode').value=pacedPasteReason(token,text,target)?'raw':'paced';
     updateReview();
     requestAnimationFrame(()=>{ if (review?.form === form) { field.focus({preventScroll:true}); field.setSelectionRange(0,0); } });
   }
   function sendPaste(token, text) {
+    const start=pasteStarts.get(token?.id),target=root.NetworkToolkitTerminalMacros?.pasteTarget?.(token?.id);
+    if(start&&(start.pending||start.uncertain)&&(!target||start.generation===target.generation)){toast('Check the pending paced paste in Runs before pasting again.','error');return false;}
     if (!validDestination(token)) { changedDestination(); return false; }
     const binding = bound.get(token.entry);
     if (!binding || binding.xterm !== token.xterm || binding.disposed) return false;
@@ -172,13 +202,36 @@
     if (!review || review.form !== form) return false;
     updateReview();
     const value = reviewText(), token = review.destination;
-    if (review.invalid || !value || byteLength(value) > MAX_PASTE_BYTES) return false;
+    if (review.invalid || review.pending || review.uncertain || !value || byteLength(value) > MAX_PASTE_BYTES) return false;
+    if(form.querySelector('#terminalPasteMode')?.value==='paced') {
+      if(pacedPasteReason(token,value,review.target))return false;
+      void submitPacedPaste(review,value);return true;
+    }
     if (!sendPaste(token,value)) return false;
     form.querySelector('#terminalPasteText').value = '';
     closeModal();
     token.xterm.focus();
     review = null;
     return true;
+  }
+  async function submitPacedPaste(pending, text) {
+    if(review!==pending || !validDestination(pending.destination))return;
+    const start={generation:pending.target.generation,pending:true,uncertain:false};pasteStarts.set(pending.destination.id,start);
+    pending.pending=true;pending.error='';updateReview();
+    try {
+      await root.NetworkToolkitTerminalMacros.startPacedPaste(pending.target,text,pending.destination.revision);
+      if(pasteStarts.get(pending.destination.id)===start)pasteStarts.delete(pending.destination.id);
+      // Never close a different dialog or send again after navigation/transfer.
+      if(review===pending && pending.form.isConnected) {
+        pending.form.querySelector('#terminalPasteText').value='';review=null;closeModal();
+      }
+    } catch(error) {
+      pending.error=error.message||'Could not start paced paste.';
+      pending.uncertain=!Number.isInteger(error.status) || error.status>=500;
+      start.uncertain=pending.uncertain;
+      if(!pending.uncertain&&pasteStarts.get(pending.destination.id)===start)pasteStarts.delete(pending.destination.id);
+      if(review!==pending || !pending.form.isConnected)toast(pending.uncertain?'Paced paste start was not confirmed. Check Runs before sending again.':pending.error,'error');
+    } finally {start.pending=false;pending.pending=false;if(review?.destination.id===pending.destination.id)updateReview();}
   }
   function suppressesInput() { return !!review && !approvedPaste; }
 
@@ -465,7 +518,8 @@
   }
   function init() {
     if (initialized) return; initialized = true;
-    document.addEventListener('change',settingsChanged);
+    document.addEventListener('click',event=>{if(event.target.id!=='terminalPasteResolve'||!review?.uncertain)return;const start=pasteStarts.get(review.destination.id);if(start?.pending)return;pasteStarts.delete(review.destination.id);review.pending=false;review.uncertain=false;review.error='';updateReview();});
+    document.addEventListener('change',event=>{settingsChanged(event);if(event.target.id==='terminalPasteMode')updateReview();});
     document.addEventListener('input',event=>{ if (event.target.id === 'terminalPasteText') updateReview(); });
     document.addEventListener('submit',event=>{ if (event.target.id === 'terminalPasteForm') { event.preventDefault(); event.stopImmediatePropagation(); submitPaste(event.target); } },true);
     document.addEventListener('pointerup',()=>{ for (const binding of liveBindings) if (binding.selecting) { binding.selecting = false; scheduleSelectionCopy(binding); } });

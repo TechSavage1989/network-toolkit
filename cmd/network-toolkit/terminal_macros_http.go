@@ -256,6 +256,32 @@ func (a *application) handleTerminalAutomation(w http.ResponseWriter, r *http.Re
 			methodError(w)
 		}
 		return
+	case "paste":
+		if r.Method != http.MethodPost {
+			methodError(w)
+			return
+		}
+		var request macros.PasteRequest
+		if err := decodeTerminalBody(w, r, 512<<10, &request); err != nil {
+			jsonError(w, 400, err.Error())
+			return
+		}
+		if !terminalMacroRefsAllowed([]macros.TargetRef{request.Target}, scope) {
+			jsonError(w, 403, "The destination is not assigned to this terminal window.")
+			return
+		}
+		var run macros.Run
+		err := a.withTerminalOwner(r, request.Target.ID, "input", func() error {
+			var startErr error
+			run, startErr = engine.StartPaste(request)
+			return startErr
+		})
+		if err != nil {
+			jsonError(w, 409, err.Error())
+			return
+		}
+		jsonResponse(w, 201, map[string]any{"run": run})
+		return
 	case "send":
 		if r.Method != http.MethodPost {
 			methodError(w)

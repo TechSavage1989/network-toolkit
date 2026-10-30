@@ -140,7 +140,7 @@ func TestTerminalWorkspaceSeedsOnlyNonsecretStateAndDoesNotOverwrite(t *testing.
 	if err := os.MkdirAll(dest, 0700); err != nil {
 		t.Fatal(err)
 	}
-	parent := `{"theme":"light","terminalFontSize":16,"terminalHighlight":false,"terminalSidebarWidth":372,"activePage":"discover","reportNotes":"private-report-marker","terminalConnection":{"type":"ssh","host":"192.0.2.1","password":"private-password-marker"},"terminalProfiles":[{"id":"one","name":"Lab","host":"192.0.2.1","privateKey":"private-key-marker","passphrase":"private-passphrase-marker"}]}`
+	parent := `{"theme":"light","terminalFontSize":16,"terminalHighlight":false,"terminalSidebarWidth":372,"terminalPromptNames":[{"type":"ssh","host":"192.0.2.1","port":22,"username":"operator","name":"EDGE-SW01","password":"private-prompt-marker"}],"activePage":"discover","reportNotes":"private-report-marker","terminalConnection":{"type":"ssh","host":"192.0.2.1","password":"private-password-marker"},"terminalProfiles":[{"id":"one","name":"Lab","host":"192.0.2.1","privateKey":"private-key-marker","passphrase":"private-passphrase-marker"}]}`
 	if err := os.WriteFile(filepath.Join(root, "Network_Toolkit.settings.json"), []byte(parent), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -153,14 +153,14 @@ func TestTerminalWorkspaceSeedsOnlyNonsecretStateAndDoesNotOverwrite(t *testing.
 	}
 	settingsPath := filepath.Join(dest, "Network_Toolkit.settings.json")
 	b, err := os.ReadFile(settingsPath)
-	if err != nil || strings.Contains(string(b), "private-") || !strings.Contains(string(b), `"activePage": "terminal"`) || !strings.Contains(string(b), "Lab") || !strings.Contains(string(b), `"terminalSidebarWidth": 372`) {
+	if err != nil || strings.Contains(string(b), "private-") || !strings.Contains(string(b), `"activePage": "terminal"`) || !strings.Contains(string(b), "Lab") || !strings.Contains(string(b), `"terminalSidebarWidth": 372`) || !strings.Contains(string(b), `"name": "EDGE-SW01"`) {
 		t.Fatalf("Unsafe or incomplete seeded state: %s %v", b, err)
 	}
 	childTrust, err := os.ReadFile(filepath.Join(dest, "Network_Toolkit.ssh_known_hosts.json"))
 	if err != nil || string(childTrust) != string(trust) {
 		t.Fatal("Public trust was not copied exactly")
 	}
-	child := []byte(`{"theme":"dark","terminalProfiles":[]}`)
+	child := []byte(`{"theme":"dark","terminalProfiles":[],"terminalPromptNames":[{"type":"ssh","host":"192.0.2.1","port":22,"username":"operator","name":"INDEPENDENT-SW"}]}`)
 	if err := os.WriteFile(settingsPath, child, 0600); err != nil {
 		t.Fatal(err)
 	}

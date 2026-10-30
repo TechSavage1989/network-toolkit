@@ -3,6 +3,19 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
+Current development: 1.17.127 safer paced multiline paste. Validation and release
+are pending; do not confuse this candidate with the published126 evidence below.
+
+## Source and release destination
+
+TechSavage1989/network-toolkit is public and must remain public. The owner
+explicitly authorized this 1.17.127 task's application source, synthetic tests,
+build assets, handoff and release publication to the existing destination on
+2026-10-30. This record is not a blanket future approval rule; future actions
+must satisfy the applicable authorization requirements. Never change repository
+access/visibility, expose client inputs, secrets or credentials, or replace an
+already-published tag/asset without specific authorization.
+
 Current published version: 1.17.126. Published 2026-10-30T19:14:20Z;
 actual downloads/source/feed verified 19:15:13Z, independently 19:15:42Z.
 Source/tag ed90d1e5d4769fc4bbc97484bf7e263d1794fd4e;

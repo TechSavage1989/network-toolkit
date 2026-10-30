@@ -283,7 +283,7 @@ jobs:
       - name: Test release publication guards
         run: python3 -m unittest discover -s scripts -p '*_test.py' -v
       - name: Test application and terminal lifecycle
-        run: go test -mod=vendor ./cmd/network-toolkit ./internal/terminal ./internal/desktop ./internal/vaultcrypto ./internal/diag ./internal/deviceinfo ./internal/platform ./internal/capture
+        run: go test -mod=vendor ./cmd/network-toolkit ./internal/terminal ./internal/macros ./internal/desktop ./internal/vaultcrypto ./internal/diag ./internal/deviceinfo ./internal/platform ./internal/capture
       - name: Test JavaScript behavior
         run: node --test scripts/*.test.cjs
       - name: Embed Windows icon and version resources
@@ -387,6 +387,14 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
+      - name: Test paced paste literal commands and generation cancellation on Windows
+        env:
+          GOTOOLCHAIN: local
+        run: go test -mod=vendor ./internal/macros -count=1 -v
+      - name: Test paced paste HTTP scope and display-only names on Windows
+        env:
+          GOTOOLCHAIN: local
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestTerminal(Paste127|PromptLabels127)' -count=1 -v
       - name: Verify actual read-only Windows adapter administrative inventory
         env:
           GOTOOLCHAIN: local
@@ -607,6 +615,32 @@ jobs:
         run: |
           npm install --prefix "$RUNNER_TEMP/ntk-browser-tests" --no-audit --no-fund playwright@1.62.1
           node "$RUNNER_TEMP/ntk-browser-tests/node_modules/playwright/cli.js" install chromium
+      - name: Check learned terminal names and endpoint-only fallback
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-prompt-labels127-results
+        run: node scripts/terminal-prompt-labels127.browser.cjs
+      - name: Retain prompt labels127 browser evidence
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: terminal-prompt-labels127-checks
+          path: ${{ runner.temp }}/ntk-prompt-labels127-results
+          if-no-files-found: error
+          retention-days: 14
+      - name: Check paced multiline paste review and retained raw paste
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-paced-paste127-results
+        run: node scripts/terminal-paced-paste127.browser.cjs
+      - name: Retain paced paste127 browser evidence
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: terminal-paced-paste127-checks
+          path: ${{ runner.temp }}/ntk-paced-paste127-results
+          if-no-files-found: error
+          retention-days: 14
           # Hosted images normally provide Chromium's shared libraries. Avoid
           # downloading unrelated font/library upgrades from a slow apt mirror;
           # retain the full dependency installer when a browser cannot launch.

@@ -23,6 +23,7 @@ const maxTerminalEmulatorState = 256 << 10
 const terminalViewBodyLimit = 16 << 20
 
 type terminalScreenSnapshot struct {
+	PromptName   string                `json:"promptName,omitempty"`
 	OutputBlocks *terminalOutputBlocks `json:"outputBlocks,omitempty"`
 	Fresh        bool                  `json:"fresh,omitempty"`
 	Data         string                `json:"data"`
@@ -35,6 +36,9 @@ type terminalScreenSnapshot struct {
 }
 
 func (s *terminalScreenSnapshot) validate(latest uint64) error {
+	if s.PromptName != "" && !validTerminalPromptName(s.PromptName) {
+		return errors.New("The transferred terminal prompt name is invalid.")
+	}
 	if len(s.Data) > maxTerminalSnapshot || !utf8.ValidString(s.Data) {
 		return errors.New("The terminal screen exceeds the 8 MiB transfer limit or is not valid UTF-8.")
 	}

@@ -87,7 +87,7 @@ jobs:
           package-manager-cache: false
       - name: Test application and terminal lifecycle
         if: steps.release.outputs.publish == 'true'
-        run: go test -mod=vendor ./cmd/network-toolkit ./internal/terminal ./internal/desktop
+        run: go test -mod=vendor ./cmd/network-toolkit ./internal/terminal ./internal/macros ./internal/desktop
       - name: Test JavaScript behavior
         if: steps.release.outputs.publish == 'true'
         run: node --test scripts/*.test.cjs
