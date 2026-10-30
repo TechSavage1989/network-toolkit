@@ -14,6 +14,34 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  native-terminal127:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Verify127 native learned labels and preserved terminal transfers
+        env:
+          GOTOOLCHAIN: local
+          NETWORK_TOOLKIT_NATIVE_TERMINAL_TEST: '1'
+          NETWORK_TOOLKIT_NATIVE_TERMINAL_GESTURES: '1'
+          NETWORK_TOOLKIT_NATIVE_TERMINAL_SELECTION: '1'
+          TOOLKIT_NATIVE_TIMING_LABEL: 127-focused
+          TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/network-toolkit-native127
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestNativeTerminalTransferInstalledWebView2$' -count=1 -timeout=6m -v
+      - name: Retain native127 terminal acceptance evidence
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: native-terminal127-checks
+          path: ${{ runner.temp }}/network-toolkit-native127
+          if-no-files-found: error
+          retention-days: 14
   browser-terminal127:
     runs-on: ubuntu-latest
     timeout-minutes: 10

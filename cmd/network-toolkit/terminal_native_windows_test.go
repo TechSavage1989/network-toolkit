@@ -159,7 +159,7 @@ func TestNativeTerminalTransferInstalledWebView2(t *testing.T) {
 
 type nativeTerminalSnapshot struct {
 	TabPrimary, TabAddress, SavedProfileName string
-	NameAboveIP, SmallerIP bool
+	NameAboveIP, SmallerIP, TabVisible, SingleSessionChild bool
 	ViewportDOM                                                            float64
 	GeometryFits                                                           bool
 	Viewport                                                               int
@@ -371,12 +371,12 @@ func (h *nativeTerminalFixture) exercise(accepted *atomic.Int32) error {
 	if e != nil {
 		return e
 	}
-	if initial.Label != "Native saved <west>" || initial.SavedProfileName != "Native saved <west>" || initial.TabPrimary != "127.0.0.1" || initial.TabAddress != "" {
+	if !initial.TabVisible || initial.Label != "Native saved <west>" || initial.SavedProfileName != "Native saved <west>" || initial.TabPrimary != "127.0.0.1" || initial.TabAddress != "" {
 		return fmt.Errorf("IP-only fallback or saved name preservation failed: %+v", initial)
 	}
 	close(h.promptReady)
 	initial, e = h.wait("", func(s nativeTerminalSnapshot) bool {
-		return s.TabPrimary == "FIXTURE-SW127" && s.TabAddress == "127.0.0.1" && s.NameAboveIP && s.SmallerIP && s.GeometryFits
+		return s.TabPrimary == "FIXTURE-SW127" && s.TabAddress == "127.0.0.1" && s.TabVisible && s.NameAboveIP && s.SmallerIP && s.GeometryFits
 	})
 	if e != nil {
 		return e
@@ -428,8 +428,8 @@ func (h *nativeTerminalFixture) exercise(accepted *atomic.Int32) error {
 		if e != nil {
 			return e
 		}
-		if child.TabPrimary != "FIXTURE-SW127" || child.TabAddress != "127.0.0.1" || !child.NameAboveIP || !child.SmallerIP || child.Label != "Native saved <west>" {
-			return fmt.Errorf("detached learned name/IP display changed: %+v", child)
+		if child.TabPrimary != "FIXTURE-SW127" || child.TabAddress != "127.0.0.1" || !child.SingleSessionChild || child.TabVisible || child.Label != "Native saved <west>" {
+			return fmt.Errorf("single-session child hidden tab metadata changed: %+v", child)
 		}
 		if source.Editable {
 			return errors.New("source remains editable after child accepts")
@@ -463,7 +463,7 @@ func (h *nativeTerminalFixture) exercise(accepted *atomic.Int32) error {
 		if os.Getenv("NETWORK_TOOLKIT_NATIVE_TERMINAL_SELECTION") == "1" && (home.Selection != initial.Selection || home.Viewport != initial.Viewport || math.Abs(home.ViewportDOM-float64(initial.Viewport)) > .01) {
 			return fmt.Errorf("returned selection/scroll changed: selected=%q viewport=%d DOM=%g wanted=%q/%d", home.Selection, home.Viewport, home.ViewportDOM, initial.Selection, initial.Viewport)
 		}
-		if home.TabPrimary != "FIXTURE-SW127" || home.TabAddress != "127.0.0.1" || !home.NameAboveIP || !home.SmallerIP || home.SavedProfileName != "Native saved <west>" {
+		if home.TabPrimary != "FIXTURE-SW127" || home.TabAddress != "127.0.0.1" || !home.TabVisible || !home.NameAboveIP || !home.SmallerIP || home.SavedProfileName != "Native saved <west>" {
 			return fmt.Errorf("returned learned display or saved name changed: %+v", home)
 		}
 		owner = h.app.views.state().Owners[h.session]
