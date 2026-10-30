@@ -1,0 +1,22 @@
+NETWORK TOOLKIT 1.17.122
+
+NATIVE FILE-DRAG RELIABILITY
+
+- Improve ordinary local and authorized SFTP file/folder dragging from the main
+  and detached editor into Windows Explorer. Prepare unarmed metadata during
+  the actual drag instead of waiting until the pointer leaves the window.
+- Complete the exact gesture's WebView-to-Windows capture handoff before native
+  copy begins, with faster admission only while the original button is held.
+- Cancel delayed or replaced gestures safely; discard unused unarmed metadata
+  and its timer without changing active transfer ownership or receipts.
+
+Copy remains copy-only. Original files, Windows conflict handling, explicit
+remote access approval, cancellation and staging cleanup remain protected.
+Internal editor drops retain dirty text and undo. No connection/credential or
+filesystem privilege is added. Existing export/text limits and FTP/FTPS native
+export restrictions remain.
+
+The focused repeated Windows checks cover actual Explorer folder destinations
+with synthetic local-loopback SFTP data, not every Windows configuration or a
+separate Desktop Shell surface. Prior comparison/Hosts/native Alt-tab/UAC test
+limitations are unchanged; this update does not include unrelated fixes.
