@@ -79,7 +79,7 @@ func TestNativeTerminalTransferInstalledWebView2(t *testing.T) {
 	if err = os.MkdirAll(output, 0700); err != nil {
 		t.Fatal(err)
 	}
-	h := &nativeTerminalFixture{nativeEditorFixture: &nativeEditorFixture{ctx: ctx, app: a, root: root, executable: executable, output: output, driver: driver, tokens: map[string]string{}, children: map[string]*nativeEditorChild{}}, commands: map[string]chan nativeEditorCommand{}, results: map[uint64]chan nativeTerminalReply{}}
+	h := &nativeTerminalFixture{nativeEditorFixture: &nativeEditorFixture{ctx: ctx, app: a, root: root, executable: executable, output: output, driver: driver, tokens: map[string]string{}, children: map[string]*nativeEditorChild{}}, commands: map[string]chan nativeEditorCommand{}, results: map[uint64]chan nativeTerminalReply{}, promptReady: make(chan struct{})}
 	a.launchTerminalView = h.launch
 	listener, err := net.Listen("tcp4", "127.0.0.1:0")
 	if err != nil {
@@ -101,8 +101,14 @@ func TestNativeTerminalTransferInstalledWebView2(t *testing.T) {
 				for i := 0; i < 80; i++ {
 					fmt.Fprintf(&transcript, "SYNTHETIC %03d\r\n", i)
 				}
-				transcript.WriteString("fixture> ")
+				transcript.WriteString("Synthetic prompt pending\r\n")
 				_, _ = io.WriteString(c, transcript.String())
+				select {
+				case <-h.promptReady:
+					_, _ = io.WriteString(c, "FIXTURE-SW127(config-if)# ")
+				case <-ctx.Done():
+					return
+				}
 				_, _ = io.Copy(io.Discard, c)
 			}()
 		}
@@ -152,6 +158,8 @@ func TestNativeTerminalTransferInstalledWebView2(t *testing.T) {
 }
 
 type nativeTerminalSnapshot struct {
+	TabPrimary, TabAddress, SavedProfileName string
+	NameAboveIP, SmallerIP bool
 	ViewportDOM                                                            float64
 	GeometryFits                                                           bool
 	Viewport                                                               int
@@ -184,6 +192,8 @@ type nativeTerminalFixture struct {
 	commands  map[string]chan nativeEditorCommand
 	results   map[uint64]chan nativeTerminalReply
 	session   string
+	promptReady chan struct{}
+	labelsVerified bool
 	allowBulk atomic.Bool
 	timings   []nativeTerminalTiming
 }
@@ -361,6 +371,16 @@ func (h *nativeTerminalFixture) exercise(accepted *atomic.Int32) error {
 	if e != nil {
 		return e
 	}
+	if initial.Label != "Native saved <west>" || initial.SavedProfileName != "Native saved <west>" || initial.TabPrimary != "127.0.0.1" || initial.TabAddress != "" {
+		return fmt.Errorf("IP-only fallback or saved name preservation failed: %+v", initial)
+	}
+	close(h.promptReady)
+	initial, e = h.wait("", func(s nativeTerminalSnapshot) bool {
+		return s.TabPrimary == "FIXTURE-SW127" && s.TabAddress == "127.0.0.1" && s.NameAboveIP && s.SmallerIP && s.GeometryFits
+	})
+	if e != nil {
+		return e
+	}
 	if os.Getenv("NETWORK_TOOLKIT_NATIVE_TERMINAL_SELECTION") == "1" {
 		initial, e = h.command("", "selection")
 		if e != nil {
@@ -370,9 +390,10 @@ func (h *nativeTerminalFixture) exercise(accepted *atomic.Int32) error {
 			return errors.New("synthetic selected output and scroll position were not established")
 		}
 	}
-	if initial.Label != "Native saved <west>" || initial.TabLabel != initial.Label {
-		return fmt.Errorf("saved profile label missing from rendered tab: %q/%q", initial.Label, initial.TabLabel)
+	if initial.Label != "Native saved <west>" || initial.SavedProfileName != "Native saved <west>" {
+		return fmt.Errorf("saved profile name was changed by learned display: %q/%q", initial.Label, initial.SavedProfileName)
 	}
+	h.labelsVerified = true
 	expected := initial.Transcript
 	digest := fmt.Sprintf("%x", sha256.Sum256([]byte(expected)))
 	for cycle := 1; cycle <= 3; cycle++ {
@@ -407,6 +428,9 @@ func (h *nativeTerminalFixture) exercise(accepted *atomic.Int32) error {
 		if e != nil {
 			return e
 		}
+		if child.TabPrimary != "FIXTURE-SW127" || child.TabAddress != "127.0.0.1" || !child.NameAboveIP || !child.SmallerIP || child.Label != "Native saved <west>" {
+			return fmt.Errorf("detached learned name/IP display changed: %+v", child)
+		}
 		if source.Editable {
 			return errors.New("source remains editable after child accepts")
 		}
@@ -439,6 +463,9 @@ func (h *nativeTerminalFixture) exercise(accepted *atomic.Int32) error {
 		if os.Getenv("NETWORK_TOOLKIT_NATIVE_TERMINAL_SELECTION") == "1" && (home.Selection != initial.Selection || home.Viewport != initial.Viewport || math.Abs(home.ViewportDOM-float64(initial.Viewport)) > .01) {
 			return fmt.Errorf("returned selection/scroll changed: selected=%q viewport=%d DOM=%g wanted=%q/%d", home.Selection, home.Viewport, home.ViewportDOM, initial.Selection, initial.Viewport)
 		}
+		if home.TabPrimary != "FIXTURE-SW127" || home.TabAddress != "127.0.0.1" || !home.NameAboveIP || !home.SmallerIP || home.SavedProfileName != "Native saved <west>" {
+			return fmt.Errorf("returned learned display or saved name changed: %+v", home)
+		}
 		owner = h.app.views.state().Owners[h.session]
 		if owner.ViewID != "" || !owner.Ready {
 			return errors.New("backend did not accept home ownership")
@@ -461,6 +488,6 @@ func (h *nativeTerminalFixture) writeTerminalReport(err error, accepted int32) {
 	if err != nil {
 		failure = err.Error()
 	}
-	raw, _ := json.MarshalIndent(map[string]any{"passed": err == nil, "error": failure, "label": os.Getenv("TOOLKIT_NATIVE_TIMING_LABEL"), "loopbackAcceptCount": accepted, "savedLabelVerified": true, "selectionScrollRequired": os.Getenv("NETWORK_TOOLKIT_NATIVE_TERMINAL_SELECTION") == "1", "sessionID": h.session, "timings": h.timings, "gestures": h.gestures, "phases": h.phases, "captures": h.captures, "blocked": h.blocked, "failures": h.failures, "limitations": []string{"Hosted synthetic loopback text only; no actual network device or shell", "Selection/scroll are asserted only with NETWORK_TOOLKIT_NATIVE_TERMINAL_SELECTION=1; nonempty command/pager archives remain covered separately", "Timings include actual process/WebView startup; no cross-machine performance guarantee"}}, "", "  ")
+	raw, _ := json.MarshalIndent(map[string]any{"passed": err == nil, "error": failure, "label": os.Getenv("TOOLKIT_NATIVE_TIMING_LABEL"), "loopbackAcceptCount": accepted, "savedLabelVerified": h.labelsVerified, "ipOnlyFallbackAndLearnedNameAboveSmallerIPVerified": h.labelsVerified, "selectionScrollRequired": os.Getenv("NETWORK_TOOLKIT_NATIVE_TERMINAL_SELECTION") == "1", "sessionID": h.session, "timings": h.timings, "gestures": h.gestures, "phases": h.phases, "captures": h.captures, "blocked": h.blocked, "failures": h.failures, "limitations": []string{"Hosted synthetic loopback text only; no actual network device or shell", "Selection/scroll are asserted only with NETWORK_TOOLKIT_NATIVE_TERMINAL_SELECTION=1; nonempty command/pager archives remain covered separately", "Timings include actual process/WebView startup; no cross-machine performance guarantee"}}, "", "  ")
 	_ = os.WriteFile(filepath.Join(h.output, "native-terminal114-report.json"), raw, 0600)
 }
