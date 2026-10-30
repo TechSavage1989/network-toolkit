@@ -183,7 +183,7 @@ func (w *hostWindow) runNativeFileDrag(done <-chan struct{}) {
 			if trace != nil {
 				trace.emit(NativeFileDragObservation{Kind: "dispatch-enter", Flags: nativeFileAdmissionFlags(dragCtx, hwnd, w.isClosing())})
 			}
-			if dragCtx.Err() == nil && !w.isClosing() && nativeFileDragHeld(hwnd) && (!job.Direct || admissionState.CompareAndSwap(0, 1)) {
+			if dragCtx.Err() == nil && !w.isClosing() && nativeFileDragHeld(hwnd) && (!job.Direct || w.transferNativeFileCapture(dragCtx, hwnd, trace) && admissionState.CompareAndSwap(0, 1)) {
 				endAdmission() // OLE now owns physical release/cancellation observation.
 				var effect uint32
 				var err error

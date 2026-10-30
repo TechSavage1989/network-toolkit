@@ -183,3 +183,79 @@ func TestNativeHandoff122GuardCannotCancelAfterAtomicAdmission(t *testing.T) {
 		t.Fatal("retired monitor cancelled an admitted OLE operation")
 	}
 }
+
+func TestNativeHandoff122CaptureTransferIsOwnerScoped(t *testing.T) {
+	for _, name := range []string{"descendant", "owner", "none", "foreign-root", "foreign-thread", "unheld", "unknown-capture", "set-failed", "release-failed", "capture-returned", "released-during-transfer"} {
+		t.Run(name, func(t *testing.T) {
+			const owner uintptr = 100
+			captured := uintptr(200)
+			held := true
+			setCalls, releaseCalls := 0, 0
+			ops := nativeFileCaptureOps{
+				currentThread: func() uint32 {
+					if name == "foreign-thread" {
+						return 9
+					}
+					return 7
+				}, identity: func(uintptr) (uint32, uint32) { return 7, 1 },
+				capture: func(uint32) (uintptr, bool) { return captured, name != "unknown-capture" }, root: func(uintptr) uintptr {
+					if name == "foreign-root" {
+						return 999
+					}
+					return owner
+				},
+				set: func(window uintptr) {
+					setCalls++
+					if window != owner {
+						t.Fatal("attempted foreign capture")
+					}
+					if name != "set-failed" {
+						captured = window
+					}
+					if name == "released-during-transfer" {
+						held = false
+					}
+				},
+				release: func() bool {
+					releaseCalls++
+					if captured != owner {
+						t.Fatal("released unowned capture")
+					}
+					if name == "release-failed" {
+						return false
+					}
+					captured = 0
+					if name == "capture-returned" {
+						captured = 200
+					}
+					return true
+				},
+			}
+			if name == "owner" {
+				captured = owner
+			}
+			if name == "none" {
+				captured = 0
+			}
+			if name == "unheld" {
+				held = false
+			}
+			got := transferNativeFileCapture(owner, func() bool { return held }, ops)
+			want := name == "descendant" || name == "owner" || name == "none"
+			if got != want {
+				t.Fatalf("accepted=%v want%v", got, want)
+			}
+			if name == "foreign-root" || name == "foreign-thread" || name == "unheld" || name == "unknown-capture" || name == "none" {
+				if setCalls != 0 || releaseCalls != 0 {
+					t.Fatal("mutated capture outside the admitted owner")
+				}
+			}
+			if name == "descendant" && (setCalls != 1 || releaseCalls != 1) {
+				t.Fatal("did not complete own-thread capture transfer")
+			}
+			if name == "released-during-transfer" && releaseCalls != 1 {
+				t.Fatal("left owned capture after cancellation")
+			}
+		})
+	}
+}

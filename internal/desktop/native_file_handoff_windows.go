@@ -127,3 +127,70 @@ func monitorNativeFileAdmission(ctx context.Context, cancel context.CancelFunc, 
 		}
 	}
 }
+
+// DOM releasePointerCapture clears a pending override, which WebView may not
+// apply until another pointer event. Complete that ownership transition with
+// documented Win32 capture APIs on our own foreground UI-thread HWND. Never
+// release or capture a foreign top-level window, and never synthesize input.
+type nativeFileCaptureOps struct {
+	currentThread func() uint32
+	identity      func(uintptr) (uint32, uint32)
+	capture       func(uint32) (uintptr, bool)
+	root          func(uintptr) uintptr
+	set           func(uintptr)
+	release       func() bool
+}
+
+func transferNativeFileCapture(hwnd uintptr, held func() bool, ops nativeFileCaptureOps) bool {
+	if hwnd == 0 || !held() {
+		return false
+	}
+	thread, pid := ops.identity(hwnd)
+	if thread == 0 || pid == 0 || ops.currentThread() != thread {
+		return false
+	}
+	captured, ok := ops.capture(thread)
+	if !ok {
+		return false
+	}
+	if captured == 0 {
+		return held()
+	}
+	if captured != hwnd && ops.root(captured) != hwnd {
+		return false
+	}
+	if !held() {
+		return false
+	}
+	if captured != hwnd {
+		ops.set(hwnd)
+		captured, ok = ops.capture(thread)
+		if !ok || captured != hwnd {
+			return false
+		}
+	}
+	// Even if the press ends here, relinquish only the capture we just verified
+	// as ours; physical/context checks below still prohibit OLE admission.
+	if !ops.release() {
+		return false
+	}
+	captured, ok = ops.capture(thread)
+	return ok && captured == 0 && held()
+}
+func (w *hostWindow) transferNativeFileCapture(ctx context.Context, hwnd uintptr, trace *nativeFileTrace) bool {
+	set := fileDragUser.NewProc("SetCapture")
+	release := fileDragUser.NewProc("ReleaseCapture")
+	ancestor := fileDragUser.NewProc("GetAncestor")
+	accepted := transferNativeFileCapture(hwnd, func() bool { return ctx.Err() == nil && !w.isClosing() && nativeFileDragHeld(hwnd) }, nativeFileCaptureOps{
+		currentThread: func() uint32 { v, _, _ := fileDragCurrentThread.Call(); return uint32(v) },
+		identity:      nativeFileWindowIdentity, capture: nativeFileThreadCapture,
+		root: func(window uintptr) uintptr { v, _, _ := ancestor.Call(window, 2); return v },
+		set:  func(window uintptr) { set.Call(window) }, release: func() bool { v, _, _ := release.Call(); return v != 0 },
+	})
+	status := uint32(0)
+	if accepted {
+		status = 1
+	}
+	trace.emit(NativeFileDragObservation{Kind: "capture-native-transfer", Status: status, Flags: nativeFileAdmissionFlags(ctx, hwnd, w.isClosing())})
+	return accepted
+}
