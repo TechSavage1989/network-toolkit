@@ -92,7 +92,7 @@
 @container (max-width:650px){
  .rt-view-controls select{padding-left:3px;padding-right:3px}
  .rt-view-controls .rt-mode-control{min-width:75px;flex-basis:75px;max-width:75px}
- .rt-view-controls .graph-timeframe,.rt-view-controls .graph-timeframe select{width:64px;flex-basis:64px}
+ .rt-view-controls .graph-timeframe,.rt-view-controls .graph-timeframe select{width:70px;flex-basis:70px}
  .rt-view-controls:has([data-graph-compression-open]) .rt-mode-control{min-width:90px;flex-basis:90px;max-width:90px}
  .rt-view-controls .graph-range-advanced{font-size:0;width:22px;padding:3px 2px}
  .rt-view-controls .graph-range-advanced:after{content:'…';font-size:14px}
@@ -106,12 +106,12 @@
  /* The native select already reserves its arrow; do not reserve it twice. */
  .rt-view-controls select{padding-right:3px}
  .rt-view-controls .rt-mode-control{min-width:55px;flex-basis:65px;max-width:65px}
- .rt-view-controls .graph-timeframe,.rt-view-controls .graph-timeframe select{width:64px;flex-basis:64px}
+ .rt-view-controls .graph-timeframe,.rt-view-controls .graph-timeframe select{width:70px;flex-basis:70px}
  .rt-view-controls .graph-range-advanced{font-size:0;width:22px;padding:3px 2px}
  .rt-view-controls .graph-range-advanced:after{content:'…';font-size:14px}
  .rt-view-controls .graph-inline-zoom [data-rt-zoom-level]{min-width:3.2em;max-width:none;white-space:nowrap}
  .rt-view-controls:has([data-graph-compression-open]) .rt-mode-control{min-width:90px;flex-basis:90px;max-width:90px}
- .rt-view-controls:has([data-graph-compression-open]) .graph-timeframe,.rt-view-controls:has([data-graph-compression-open]) .graph-timeframe select{width:64px;flex-basis:64px}
+ .rt-view-controls:has([data-graph-compression-open]) .graph-timeframe,.rt-view-controls:has([data-graph-compression-open]) .graph-timeframe select{width:70px;flex-basis:70px}
  .rt-view-controls .graph-inline-zoom .btn{width:20px;min-width:20px}
  .rt-view-controls .graph-inline-zoom [data-rt-zoom="reset"]{width:24px;min-width:24px}
  .rt-view-controls [data-graph-compression-open]{font-size:0;width:22px;min-width:22px;padding:3px 2px}
