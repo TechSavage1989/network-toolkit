@@ -417,7 +417,7 @@ func (a *application) handleLocalToolsWithManager(w http.ResponseWriter, r *http
 			methodError(w)
 			return
 		}
-		ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
+		ctx, cancel := context.WithTimeout(r.Context(), localToolsReadTimeout(path))
 		defer cancel()
 		if path == "ip" {
 			value, err := m.backend.readIP(ctx)
@@ -454,7 +454,7 @@ func (a *application) handleLocalToolsWithManager(w http.ResponseWriter, r *http
 		err = decodeLocalJSON(w, r, request.Hosts, 6*localHostsLimit+4096)
 	}
 	if err == nil {
-		ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
+		ctx, cancel := context.WithTimeout(r.Context(), localToolsReadTimeout(path))
 		err = m.prepare(ctx, request)
 		cancel()
 	}

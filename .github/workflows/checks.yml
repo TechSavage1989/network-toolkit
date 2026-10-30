@@ -387,6 +387,11 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
+      - name: Verify actual read-only Windows adapter administrative inventory
+        env:
+          GOTOOLCHAIN: local
+          NTK_NETWORK_ADMIN_READONLY_DIAGNOSTIC: '1'
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestLocalNetworkAdminReadOnlyWindowsDiagnostic$' -count=1 -v -timeout 2m
       - name: Test typed network maintenance with mocked runners only
         run: go test -mod=vendor ./cmd/network-toolkit -run '^TestLocalNetwork' -count=1 -v
       - name: Test Windows terminal transports and local shells

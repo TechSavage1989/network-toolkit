@@ -1,0 +1,10 @@
+Network Toolkit 1.17.126 — reliable adapter administrative-state discovery
+
+Focused repair for Enable/Disable remaining unavailable despite a selected Windows adapter.
+The original read-only Windows query was reproduced timing out, and its diagnostic stream
+could contaminate valid JSON. Unknown, conflicting, locked or unsupported state remains
+fail-closed; this update does not bypass adapter identity checks or Windows UAC.
+
+Read-only production inventory and mocked action/error paths are verified separately.
+No live network adapter was enabled/disabled during development, and no new visible UAC
+transition is claimed. Existing unrelated editor-transfer/comparison limitations remain.

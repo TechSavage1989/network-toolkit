@@ -164,7 +164,11 @@ func executeLocalNetworkAction(ctx context.Context, r localNetworkRequest, ops l
 		result.Partial = true
 		result.Message = "Confirmation was interrupted after dispatch. Windows may still have applied the action; review the current state before retrying."
 	}
-	refreshCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	refreshTimeout := 3 * time.Second
+	if localNetworkToggle(r.Action) && ctx.Err() == nil {
+		refreshTimeout = localIPInventoryTimeout
+	}
+	refreshCtx, cancel := context.WithTimeout(context.Background(), refreshTimeout)
 	defer cancel()
 	fresh, refreshErr := ops.read(refreshCtx)
 	if refreshErr == nil {

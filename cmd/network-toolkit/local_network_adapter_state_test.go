@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 func localAdminFixture(state uint32) localAdapterAdminRecord {
@@ -272,6 +274,120 @@ func TestLocalNetworkToggleExecutionOnlyMocks(t *testing.T) {
 					t.Fatal("static settings mutated")
 				}
 			})
+		}
+	}
+}
+
+func TestLocalNetworkAdminReadStreamsAndBounds(t *testing.T) {
+	data, _ := json.Marshal([]localAdapterAdminRecord{localAdminFixture(1)})
+	progress := []byte("#< CLIXML\n<Objs><Obj>Preparing modules for first use.</Obj></Objs>")
+	if _, err := localDecodeAdapterAdmin(append(append([]byte{}, progress...), data...)); err == nil {
+		t.Fatal("negative control accepted mixed stream JSON")
+	}
+	rows, err := localCollectAdapterAdmin(func(stdout, stderr io.Writer) error {
+		if stdout == stderr {
+			t.Fatal("stdout/stderr share a JSON buffer")
+		}
+		_, _ = stderr.Write(progress)
+		_, _ = stdout.Write(data)
+		_, _ = stderr.Write([]byte("other nonfatal diagnostics"))
+		return nil
+	})
+	if err != nil || len(rows) != 1 || rows[0].Admin != 1 {
+		t.Fatal(rows, err)
+	}
+	for _, failure := range []error{context.Canceled, context.DeadlineExceeded, errors.New("mock command failure")} {
+		rows, err := localCollectAdapterAdmin(func(stdout, stderr io.Writer) error { _, _ = stdout.Write(data); return failure })
+		if !errors.Is(err, failure) || len(rows) != 0 {
+			t.Fatal("partial output bypassed command failure", rows, err)
+		}
+	}
+	if localAdapterAdminReadTimeout != 20*time.Second || localIPInventoryTimeout != 25*time.Second || localAdapterAdminReadTimeout >= localIPInventoryTimeout || localIPInventoryTimeout >= 30*time.Second {
+		t.Fatal("inventory deadlines no longer fit the existing HTTP write bound")
+	}
+	if !strings.Contains(localReadAdapterAdminScript, "$ProgressPreference = 'SilentlyContinue'") {
+		t.Fatal("read-only discovery progress suppression missing")
+	}
+	for _, kind := range []string{"ip", "network", "hosts"} {
+		want := 25 * time.Second
+		if kind == "hosts" {
+			want = 8 * time.Second
+		}
+		if localToolsReadTimeout(kind) != want {
+			t.Fatal(kind, localToolsReadTimeout(kind))
+		}
+	}
+}
+func TestLocalNetworkAdminHTTPReadDeadlineOnlyMocks(t *testing.T) {
+	a := testApplication(t)
+	adapter := localTestAdapter()
+	adapter.AdminStatus = "enabled"
+	adapter.AdminEditable = true
+	adapter.Revision = localAdapterRevision(adapter)
+	reads := 0
+	a.localTools = newLocalToolsManagerWithBackend(a.ctx, localToolsBackend{available: true, readIP: func(ctx context.Context) (localIPSnapshot, error) {
+		reads++
+		deadline, ok := ctx.Deadline()
+		remaining := time.Until(deadline)
+		if !ok || remaining < 24*time.Second || remaining > 25*time.Second {
+			t.Errorf("IP inventory context has %s remaining", remaining)
+		}
+		return localIPSnapshot{Available: true, Adapters: []localIPAdapter{adapter}}, nil
+	}, apply: func(context.Context, localToolsRequest) localApplyResult {
+		return localApplyResult{Message: "mock only"}
+	}})
+	if response := requestApp(a, "GET", "/api/local-tools/ip", "", true); response.Code != 200 {
+		t.Fatal(response.Code)
+	}
+	request := localNetworkTestRequest(localAdapterDisable, adapter)
+	body, _ := json.Marshal(request)
+	if response := requestApp(a, "POST", "/api/local-tools/network", string(body), true); response.Code != 202 {
+		t.Fatal(response.Code)
+	}
+	if reads != 2 {
+		t.Fatal(reads)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if err := a.localTools.Close(ctx); err != nil {
+		t.Fatal(err)
+	}
+}
+func TestLocalNetworkToggleRefreshDeadlineOnlyMocks(t *testing.T) {
+	for _, cancelled := range []bool{false, true} {
+		ctx, cancel := context.WithCancel(context.Background())
+		adapter := localTestAdapter()
+		adapter.AdminStatus = "enabled"
+		adapter.AdminEditable = true
+		adapter.Revision = localAdapterRevision(adapter)
+		reads := 0
+		result := executeLocalNetworkAction(ctx, localNetworkTestRequest(localAdapterDisable, adapter), localNetworkActionOps{
+			read: func(ctx context.Context) (localIPSnapshot, error) {
+				reads++
+				if reads > 1 {
+					deadline, ok := ctx.Deadline()
+					remaining := time.Until(deadline)
+					want := 25 * time.Second
+					if cancelled {
+						want = 3 * time.Second
+					}
+					if !ok || remaining < want-time.Second || remaining > want {
+						t.Errorf("refresh context has %s remaining, want %s", remaining, want)
+					}
+					adapter.AdminStatus = "disabled"
+				}
+				return localIPSnapshot{Adapters: []localIPAdapter{adapter}}, nil
+			},
+			run: func(context.Context, localNetworkRequest, localIPAdapter) (string, bool, error) {
+				if cancelled {
+					cancel()
+				}
+				return "mock only", false, nil
+			},
+		})
+		cancel()
+		if reads != 2 || (!cancelled && result.Error != "") || (cancelled && !result.Partial) {
+			t.Fatal(result, reads)
 		}
 	}
 }

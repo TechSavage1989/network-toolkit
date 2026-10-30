@@ -3,7 +3,24 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-Current published version: 1.17.124. Published 2026-10-30T16:50:53Z;
+Current published version:1.17.125. Published2026-10-30T18:24:37Z;
+actual downloads/source/feed verified18:25:29Z, independently18:25:56Z.
+Source/tag0f5b46718ad133d2ae740112b797bbd46eea3449;
+tree94cb3eaa9ea575a4107973c22518691d9b3cf535.
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.125
+Post-release user evidence shows administrative-state detection can leave both
+new actions unavailable. A separate 126 investigation reproduced a query timeout
+and stderr-contamination risk. Do not infer real-device success from mocks.
+Only selected-adapter Enable/Disable is added, retaining Restart, disabled-adapter
+selection, administrative/link distinction, current identity and one-action UAC.
+Seven rendered groups/12 simulated requests,12 Windows mock groups, core/security/
+package acceptance passed. No live NIC mutation or visible UAC was tested.
+Public1,198-source/1,205-member/PE/manifests/feed and prior124 immutable assets
+verified. Read docs/RELEASE125_HANDOFF.md for exact original/duplicate terminal
+outcomes and the retained detached keyboard-resize/other historical observations.
+No unrelated fix or broad permission is implied; this closure changes no binaries.
+
+Previous published version: 1.17.124. Published 2026-10-30T16:50:53Z;
 actual public downloads/source/feed verified 16:51:36.213209Z, independently 16:51:49Z.
 Source/tag 043851be8c8a23fa4711699855d74aa4c01afce1;
 tree e88776b3f1748f1b47b6f338c5c40e1542d4d2b6.

@@ -1,17 +1,30 @@
-NETWORK TOOLKIT 1.17.125
+NETWORK TOOLKIT 1.17.126
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.125
+CURRENT RELEASE - 1.17.126
 
-Release details: RELEASE_NOTES_1.17.125.txt
-Previous release: docs/releases/RELEASE_NOTES_1.17.124.txt
+Release details: RELEASE_NOTES_1.17.126.txt
+Previous release: docs/releases/RELEASE_NOTES_1.17.125.txt
 Full release-note archive: docs/releases/README.md
+
+126 repairs the read-only Windows administrative inventory: JSON and diagnostic
+streams are separated, module progress suppressed, and bounded cold-start budgets
+are applied consistently. Unknown states remain blocked; no live NIC mutation
+was used in validation. See RELEASE126_HANDOFF.md for exact-source evidence.
+
+Known 125 post-release issue: unknown administrative state can leave both new
+actions unavailable. Actual read-only query diagnosis and repair are tracked
+separately in 126; mocked validation did not prove this discovery path.
 
 125 adds explicit Enable adapter / Disable adapter to Network actions. Disabled
 adapters remain selectable, administrative state is separate from link status,
-and existing Restart / IP / DNS settings are preserved. Actions require review
-and normal Windows administrator approval when needed. Validation is isolated
-and mocked: no live adapter changes or visible UAC were tested.
+and existing Restart / IP / DNS settings are preserved. Review the connection-loss
+warning before disabling; normal Windows administrator approval is used if needed.
+Published18:24:37Z; public downloads/source/feed verified18:25:29Z and independently
+18:25:56Z. New UI/Windows mock/core/security/package checks passed. No live NIC
+changes or visible UAC were tested. All four public files and prior124 immutability
+verified. Read RELEASE125_HANDOFF.md for exact original/duplicate CI outcomes and
+unchanged historical editor resize/comparison/other limitations.
 
 124 corrects mature Condensed Recent graph endpoints and adds reviewed DHCP,
 DNS, adapter restart and Winsock maintenance actions. TCP Ports has a distinct

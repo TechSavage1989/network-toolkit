@@ -4,9 +4,32 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"strings"
 	"time"
 )
+
+// PowerShell module initialization is read-only but can exceed five seconds on
+// a cold Windows host. Keep the query inside the HTTP server's 30-second limit.
+const localAdapterAdminReadTimeout = 20 * time.Second
+const localIPInventoryTimeout = 25 * time.Second
+
+func localToolsReadTimeout(kind string) time.Duration {
+	if kind == "ip" || kind == "network" {
+		return localIPInventoryTimeout
+	}
+	return 8 * time.Second
+}
+
+// Stderr may contain PowerShell CLIXML progress despite a successful process.
+// Never combine it with the JSON document. Drain both bounded streams.
+func localCollectAdapterAdmin(run func(io.Writer, io.Writer) error) ([]localAdapterAdminRecord, error) {
+	var stdout, stderr localOutputBuffer
+	if err := run(&stdout, &stderr); err != nil {
+		return nil, err
+	}
+	return localDecodeAdapterAdmin(stdout.data)
+}
 
 // Administrative Up/Down is independent of cable/media operational status.
 // https://learn.microsoft.com/en-us/previous-versions/windows/desktop/legacy/hh968170(v=vs.85)
@@ -111,6 +134,7 @@ func localMergeAdapterAdmin(adapters []localIPAdapter, records []localAdapterAdm
 // Get-NetAdapter includes disabled/hidden interfaces that may be absent from
 // GetAdaptersAddresses. This fixed read-only script never requests elevation.
 const localReadAdapterAdminScript = `$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
 try {
  [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
  Import-Module (Join-Path $PSHOME 'Modules\NetAdapter\NetAdapter.psd1') -ErrorAction Stop
