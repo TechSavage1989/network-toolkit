@@ -174,3 +174,17 @@ func TestNativeDeferred121OnlyAcceptedOLEDropAllowsRendering(t *testing.T) {
 		cancel()
 	}
 }
+
+func TestNativeDeferred121DiagnosticTraceBounded(t *testing.T) {
+	var seen []NativeFileDragObservation
+	trace := &nativeFileTrace{callback: func(event NativeFileDragObservation) { seen = append(seen, event) }}
+	for i := 0; i < 300; i++ {
+		trace.emit(NativeFileDragObservation{Kind: "query-data", Format: 15})
+	}
+	trace.emit(NativeFileDragObservation{Kind: "ole-return", HRESULT: 0x40100, Effect: 1})
+	if len(seen) != 128 || seen[127].Kind != "ole-return" {
+		t.Fatalf("bounded trace lost terminal result: count=%d", len(seen))
+	}
+	var absent *nativeFileTrace
+	absent.emit(NativeFileDragObservation{Kind: "ole-enter"})
+}

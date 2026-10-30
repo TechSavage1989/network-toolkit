@@ -13,6 +13,9 @@ param(
 # setting, unrelated window activation, or full-desktop screenshot is used.
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName UIAutomationClient
+Add-Type -AssemblyName UIAutomationTypes
+Add-Type -AssemblyName WindowsBase
 Add-Type @'
 using System;
 using System.Collections.Generic;
@@ -25,6 +28,7 @@ public static class SFTPDirectInput {
  [DllImport("user32.dll")] public static extern bool IsZoomed(IntPtr h);
  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr h,out uint p);
  [DllImport("user32.dll",CharSet=CharSet.Unicode)] public static extern int GetClassName(IntPtr h,StringBuilder s,int n);
+ [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr h,out RECT r);
  [DllImport("user32.dll")] public static extern bool GetClientRect(IntPtr h,out RECT r);
  [DllImport("user32.dll")] public static extern bool ClientToScreen(IntPtr h,ref POINT p);
  [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h,IntPtr after,int x,int y,int w,int z,uint flags);
@@ -37,6 +41,13 @@ public static class SFTPDirectInput {
  [DllImport("user32.dll")] public static extern IntPtr GetAncestor(IntPtr h,uint flags);
  [StructLayout(LayoutKind.Sequential)] public struct RECT {public int Left,Top,Right,Bottom;}
  [StructLayout(LayoutKind.Sequential)] public struct POINT {public int X,Y;}
+ [DllImport("kernel32.dll",SetLastError=true)] public static extern IntPtr OpenProcess(uint access,bool inherit,uint pid);
+ [DllImport("kernel32.dll")] public static extern bool CloseHandle(IntPtr h);
+ [DllImport("advapi32.dll",SetLastError=true)] public static extern bool OpenProcessToken(IntPtr process,uint access,out IntPtr token);
+ [DllImport("advapi32.dll",SetLastError=true)] public static extern bool GetTokenInformation(IntPtr token,int type,IntPtr data,int size,out int need);
+ [DllImport("advapi32.dll")] public static extern IntPtr GetSidSubAuthorityCount(IntPtr sid);
+ [DllImport("advapi32.dll")] public static extern IntPtr GetSidSubAuthority(IntPtr sid,uint n);
+ public static int[] TokenFacts(uint pid){var facts=new int[]{-1,-1,0};IntPtr p=OpenProcess(0x1000,false,pid),t=IntPtr.Zero,b=IntPtr.Zero;try{if(p==IntPtr.Zero||!OpenProcessToken(p,8,out t)){facts[2]=Marshal.GetLastWin32Error();return facts;}int n;b=Marshal.AllocHGlobal(4);if(GetTokenInformation(t,20,b,4,out n))facts[0]=Marshal.ReadInt32(b);Marshal.FreeHGlobal(b);b=IntPtr.Zero;GetTokenInformation(t,25,IntPtr.Zero,0,out n);if(n>0&&n<65536){b=Marshal.AllocHGlobal(n);if(GetTokenInformation(t,25,b,n,out n)){var sid=Marshal.ReadIntPtr(b);byte count=Marshal.ReadByte(GetSidSubAuthorityCount(sid));if(count>0)facts[1]=Marshal.ReadInt32(GetSidSubAuthority(sid,(uint)(count-1)));}}return facts;}finally{if(b!=IntPtr.Zero)Marshal.FreeHGlobal(b);if(t!=IntPtr.Zero)CloseHandle(t);if(p!=IntPtr.Zero)CloseHandle(p);}}
  public static IntPtr[] Find(uint pid){var found=new List<IntPtr>();EnumWindows((h,p)=>{uint owner;GetWindowThreadProcessId(h,out owner);var s=new StringBuilder(256);GetClassName(h,s,256);if(owner==pid&&IsWindowVisible(h)&&s.ToString()=="NetworkToolkit.WebView2.Window")found.Add(h);return true;},IntPtr.Zero);return found.ToArray();}
 }
 '@
@@ -75,8 +86,24 @@ try{
  $explorer=[IntPtr]([long]$window.HWND);$work=[Windows.Forms.Screen]::PrimaryScreen.WorkingArea
  [void][SFTPDirectInput]::SetWindowPos($explorer,[IntPtr]::Zero,$work.Right-420,$work.Top,420,[Math]::Min(720,$work.Height-20),0x0040)
  Start-Sleep -Milliseconds 300
- $to=New-Object SFTPDirectInput+POINT;$to.X=$work.Right-80;$to.Y=$work.Top+430
+ # Resolve the actual Explorer Items View before OLE; the destination must be
+ # its content area, outside the source client, not merely any child HWND.
+ $condition=New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ClassNameProperty,'UIItemsView')
+ $items=$null;$until=[DateTime]::UtcNow.AddSeconds(15)
+ do{$items=[System.Windows.Automation.AutomationElement]::FromHandle($explorer).FindFirst([System.Windows.Automation.TreeScope]::Descendants,$condition);if(!$items){Start-Sleep -Milliseconds 100}}while(!$items -and [DateTime]::UtcNow -lt $until)
+ if(!$items){throw 'Actual Explorer Items View is absent'}
+ $bounds=$items.Current.BoundingRectangle;$ownerBounds=New-Object SFTPDirectInput+RECT
+ if(![SFTPDirectInput]::GetWindowRect($owner,[ref]$ownerBounds)){throw 'Cannot locate source owner bounds'}
+ $left=[Math]::Max($bounds.Left+20,$ownerBounds.Right+20);$right=$bounds.Right-20
+ if($right-$left -lt 12 -or $bounds.Height -lt 50){throw 'Explorer file content has no exposed drop area outside source'}
+ $to=New-Object SFTPDirectInput+POINT;$to.X=[int](($left+$right)/2);$to.Y=[int]($bounds.Top+$bounds.Height*.55)
  [void][SFTPDirectInput]::SetForegroundWindow($owner);Start-Sleep -Milliseconds 100;Visible-Point $owner $source;Visible-Point $explorer $to
+ $hit=[System.Windows.Automation.AutomationElement]::FromPoint((New-Object System.Windows.Point($to.X,$to.Y)))
+ $targetVerified=$false
+ for($depth=0;$hit -and $depth -lt 12;$depth++){if($hit.Current.ClassName -eq 'UIItemsView'){$targetVerified=$true;break};$hit=[System.Windows.Automation.TreeWalker]::ControlViewWalker.GetParent($hit)}
+ if(!$targetVerified){throw 'Drop point is not in actual Explorer Items View'}
+ [uint32]$explorerPID=0;[void][SFTPDirectInput]::GetWindowThreadProcessId($explorer,[ref]$explorerPID)
+ @{sourceToken=[SFTPDirectInput]::TokenFacts($OwnerProcessID);targetToken=[SFTPDirectInput]::TokenFacts($explorerPID);tokenFactFields=@('elevated','integrityRID','error');source=@($source.X,$source.Y);target=@($to.X,$to.Y);targetClass='UIItemsView';targetBounds=@($bounds.Left,$bounds.Top,$bounds.Width,$bounds.Height);targetVerified=$true;mode=$Mode}|ConvertTo-Json -Compress|Set-Content -LiteralPath ($FinishedFile+'.input.json') -Encoding UTF8
  [void][SFTPDirectInput]::SetCursorPos($source.X,$source.Y);[SFTPDirectInput]::mouse_event(2,0,0,0,[UIntPtr]::Zero)
  try{
   Start-Sleep -Milliseconds 150

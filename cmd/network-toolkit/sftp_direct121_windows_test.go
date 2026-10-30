@@ -97,6 +97,8 @@ func TestNativeSFTPDirect121InstalledWebView2(t *testing.T) {
 	finishFile.Store("")
 	var mu sync.Mutex
 	var actions []string
+	var transitions []map[string]any
+	var nativeTrace []desktop.NativeFileDragObservation
 	var materialized atomic.Int32
 	within := func(p string) bool {
 		rel, e := filepath.Rel(local, p)
@@ -146,6 +148,7 @@ func TestNativeSFTPDirect121InstalledWebView2(t *testing.T) {
 				r.Body = io.NopCloser(bytes.NewReader(body))
 				mu.Lock()
 				actions = append(actions, request.Action)
+				transitions = append(transitions, map[string]any{"phase": "request", "action": request.Action, "outcome": request.Outcome, "gesture": request.Gesture})
 				mu.Unlock()
 				if request.Action == "prepare" {
 					http.Error(w, "fixture forbids prerequisite Prepare copy", 403)
@@ -156,6 +159,24 @@ func TestNativeSFTPDirect121InstalledWebView2(t *testing.T) {
 				}
 			}
 			a.ServeHTTP(w, r)
+			if request.Action != "" {
+				detail := map[string]any{"phase": "response", "action": request.Action, "outcome": request.Outcome}
+				a.explorerTransfers.mu.Lock()
+				if j := a.explorerTransfers.jobs[request.ID]; j != nil {
+					detail["state"] = j.state
+					detail["note"] = j.note
+					detail["items"] = j.entries
+					detail["bytes"] = j.bytes
+					detail["renderStarted"] = j.renderStarted
+					detail["rendered"] = j.rendered
+					detail["cancelRequested"] = j.cancelRequested
+					detail["stagePresent"] = j.stage != ""
+				}
+				a.explorerTransfers.mu.Unlock()
+				mu.Lock()
+				transitions = append(transitions, detail)
+				mu.Unlock()
+			}
 			if request.Action == "finish" {
 				if p := finishFile.Load().(string); p != "" {
 					_ = os.WriteFile(p, []byte("finished"), 0600)
@@ -169,6 +190,7 @@ func TestNativeSFTPDirect121InstalledWebView2(t *testing.T) {
 	a.host = strings.TrimPrefix(server.URL, "http://")
 	report := map[string]any{"passed": false, "fullProductionPage": true, "actualRetainedLoopbackSFTP": true, "actualWindowsExplorer": true, "syntheticTemporaryFilesOnly": true, "nativeInput": "Win32 pointer down/move/up; no DOM drag event substitution"}
 	var cases []map[string]any
+	var attempts []map[string]any
 	ready := make(chan struct{})
 	result := make(chan error, 1)
 	go func() {
@@ -254,6 +276,14 @@ func TestNativeSFTPDirect121InstalledWebView2(t *testing.T) {
 					}
 					cmd := exec.CommandContext(ctx, "powershell.exe", args...)
 					out, e := cmd.CombinedOutput()
+					attempt := map[string]any{"name": name, "sourceGeometry": state.Geometry, "sourceHitTested": true}
+					if b, readErr := os.ReadFile(finished + ".input.json"); readErr == nil {
+						var v any
+						if json.Unmarshal(bytes.TrimPrefix(b, []byte{0xef, 0xbb, 0xbf}), &v) == nil {
+							attempt["destinationInput"] = v
+						}
+					}
+					attempts = append(attempts, attempt)
 					slow.Store(false)
 					if e != nil {
 						return fmt.Errorf("actual %s gesture: %w %s", name, e, out)
@@ -340,9 +370,12 @@ func TestNativeSFTPDirect121InstalledWebView2(t *testing.T) {
 		}
 		report["passed"] = e == nil
 		report["cases"] = cases
+		report["attempts"] = attempts
 		report["captures"] = h.captures
 		mu.Lock()
 		report["actions"] = append([]string{}, actions...)
+		report["transitions"] = append([]map[string]any{}, transitions...)
+		report["nativeTrace"] = append([]desktop.NativeFileDragObservation{}, nativeTrace...)
 		mu.Unlock()
 		if e != nil {
 			report["error"] = e.Error()
@@ -352,7 +385,13 @@ func TestNativeSFTPDirect121InstalledWebView2(t *testing.T) {
 		result <- e
 		cancel()
 	}()
-	err = desktop.Run(ctx, desktop.Config{Title: "Network Toolkit synthetic SFTP121 acceptance", URL: server.URL + "/", SessionToken: a.token, DataDir: filepath.Join(private, "webview"), Stop: cancel, OnReady: func() { close(ready) }})
+	err = desktop.Run(ctx, desktop.Config{Title: "Network Toolkit synthetic SFTP121 acceptance", URL: server.URL + "/", SessionToken: a.token, DataDir: filepath.Join(private, "webview"), Stop: cancel, NativeFileDragObserver: func(event desktop.NativeFileDragObservation) {
+		mu.Lock()
+		if len(nativeTrace) < 1024 {
+			nativeTrace = append(nativeTrace, event)
+		}
+		mu.Unlock()
+	}, OnReady: func() { close(ready) }})
 	if err != nil {
 		t.Errorf("native full app: %v", err)
 		cancel()

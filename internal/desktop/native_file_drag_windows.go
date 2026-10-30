@@ -166,6 +166,8 @@ func (w *hostWindow) runNativeFileDrag(done <-chan struct{}) {
 				} else if effect&1 != 0 {
 					outcome = "copied"
 				}
+			} else {
+				newNativeFileTrace(hwnd).emit(NativeFileDragObservation{Kind: "dispatch-not-held-or-closing"})
 			}
 		}) {
 			close(finished)
@@ -232,6 +234,37 @@ type nativeFileCOM struct {
 	hwnd    uintptr
 	active  atomic.Bool
 	delayed *nativeDeferredCopy
+	trace   *nativeFileTrace
+}
+
+type nativeFileTrace struct {
+	callback func(NativeFileDragObservation)
+	count    atomic.Uint32
+	feedback atomic.Uint32
+}
+
+func newNativeFileTrace(hwnd uintptr) *nativeFileTrace {
+	if value, ok := wndWindows.Load(hwnd); ok {
+		if callback := value.(*hostWindow).cfg.NativeFileDragObserver; callback != nil {
+			return &nativeFileTrace{callback: callback}
+		}
+	}
+	return nil
+}
+func (t *nativeFileTrace) emit(event NativeFileDragObservation) {
+	if t != nil && t.callback != nil && (event.Kind == "ole-return" || t.count.Add(1) <= 127) {
+		t.callback(event)
+	}
+}
+func (t *nativeFileTrace) format(kind string, raw, result uintptr) {
+	event := NativeFileDragObservation{Kind: kind, HRESULT: uint32(result)}
+	if raw != 0 {
+		f := (*nativeFormat)(unsafe.Pointer(raw))
+		event.Format = uint32(f.Format)
+		event.Aspect = f.Aspect
+		event.Medium = f.Medium
+	}
+	t.emit(event)
 }
 
 var nativeFileCOMObjects sync.Map
@@ -380,7 +413,9 @@ func fileCOMGet(p, f, m uintptr) uintptr {
 		return hresultPointer
 	}
 	if o.delayed != nil {
-		return o.delayed.get(f, m)
+		result := o.delayed.get(f, m)
+		o.trace.format("get-data", f, result)
+		return result
 	}
 	return comCall(o.base, 3, f, m)
 }
@@ -390,7 +425,9 @@ func fileCOMQueryData(p, f uintptr) uintptr {
 		return hresultPointer
 	}
 	if o.delayed != nil {
-		return o.delayed.query(f)
+		result := o.delayed.query(f)
+		o.trace.format("query-data", f, result)
+		return result
 	}
 	return comCall(o.base, 5, f)
 }
@@ -400,7 +437,9 @@ func fileCOMEnum(p, d, out uintptr) uintptr {
 		return hresultPointer
 	}
 	if o.delayed != nil {
-		return o.delayed.enumerate(d, out)
+		result := o.delayed.enumerate(d, out)
+		o.trace.emit(NativeFileDragObservation{Kind: "enum-format", Medium: uint32(d), HRESULT: uint32(result)})
+		return result
 	}
 	return comCall(o.base, 8, d, out)
 }
@@ -412,15 +451,22 @@ func fileCOMContinue(p, escape, key uintptr) uintptr {
 	o := nativeFileObject(p)
 	if o != nil && o.ctx != nil && o.ctx.Err() != nil {
 		observeNativeFileDrag(o.hwnd, "query-continue-cancel")
+		o.trace.emit(NativeFileDragObservation{Kind: "lease-cancel"})
 		return 0x40101
 	}
 	if escape != 0 {
+		if o != nil {
+			o.trace.emit(NativeFileDragObservation{Kind: "escape-cancel"})
+		}
 		if o != nil && o.delayed != nil && o.delayed.cancel != nil {
 			o.delayed.cancel()
 		}
 		return 0x40101
 	}
 	if key&1 == 0 {
+		if o != nil {
+			o.trace.emit(NativeFileDragObservation{Kind: "drop-key-release"})
+		}
 		if o != nil && o.delayed != nil {
 			o.delayed.dropAllowed.Store(true)
 		}
@@ -429,6 +475,7 @@ func fileCOMContinue(p, escape, key uintptr) uintptr {
 	if o != nil && o.ctx != nil {
 		pressed, _, _ := fileDragKey.Call(1)
 		if pressed&0x8000 == 0 {
+			o.trace.emit(NativeFileDragObservation{Kind: "drop-physical-release"})
 			if o.delayed != nil {
 				o.delayed.dropAllowed.Store(true)
 			}
@@ -437,7 +484,12 @@ func fileCOMContinue(p, escape, key uintptr) uintptr {
 	}
 	return 0
 }
-func fileCOMFeedback(p, effect uintptr) uintptr { return 0x40102 }
+func fileCOMFeedback(p, effect uintptr) uintptr {
+	if o := nativeFileObject(p); o != nil && o.trace != nil && o.trace.feedback.Swap(uint32(effect)+1) != uint32(effect)+1 {
+		o.trace.emit(NativeFileDragObservation{Kind: "feedback", Effect: uint32(effect)})
+	}
+	return 0x40102
+}
 
 var fileCOMDataTable = [12]uintptr{syscall.NewCallback(fileCOMQuery), syscall.NewCallback(fileCOMAdd), syscall.NewCallback(fileCOMRelease), syscall.NewCallback(fileCOMGet), syscall.NewCallback(fileCOMNotImpl), syscall.NewCallback(fileCOMQueryData), syscall.NewCallback(fileCOMNotImpl), syscall.NewCallback(fileCOMSet), syscall.NewCallback(fileCOMEnum), syscall.NewCallback(fileCOMAdvise), syscall.NewCallback(fileCOMUnadvise), syscall.NewCallback(fileCOMNotImpl)}
 var fileCOMSourceTable = [12]uintptr{syscall.NewCallback(fileCOMQuery), syscall.NewCallback(fileCOMAdd), syscall.NewCallback(fileCOMRelease), syscall.NewCallback(fileCOMContinue), syscall.NewCallback(fileCOMFeedback)}
@@ -491,9 +543,10 @@ func runNativeFileCopyDrag(ctx context.Context, hwnd uintptr, paths []string) (u
 	return effect, err
 }
 func runNativeFileDataDrag(ctx context.Context, hwnd uintptr, wrapper *nativeFileCOM) (uint32, error) {
+	wrapper.trace = newNativeFileTrace(hwnd)
 	wrapper.refs.Store(1)
 	wrapper.active.Store(true)
-	source := &nativeFileCOM{vtable: &fileCOMSourceTable, source: true, ctx: ctx, hwnd: hwnd, delayed: wrapper.delayed}
+	source := &nativeFileCOM{vtable: &fileCOMSourceTable, source: true, ctx: ctx, hwnd: hwnd, delayed: wrapper.delayed, trace: wrapper.trace}
 	source.active.Store(true)
 	source.refs.Store(1)
 	wp, sp := uintptr(unsafe.Pointer(wrapper)), uintptr(unsafe.Pointer(source))
@@ -519,8 +572,10 @@ func runNativeFileDataDrag(ctx context.Context, hwnd uintptr, wrapper *nativeFil
 	defer source.active.Store(false)
 	var effect uint32
 	observeNativeFileDrag(hwnd, "ole-enter")
+	wrapper.trace.emit(NativeFileDragObservation{Kind: "ole-enter"})
 	hr, _, _ := fileDragDo.Call(wp, sp, 1, uintptr(unsafe.Pointer(&effect)))
 	observeNativeFileDrag(hwnd, fmt.Sprintf("ole-return hr=%x effect=%d", hr, effect))
+	wrapper.trace.emit(NativeFileDragObservation{Kind: "ole-return", HRESULT: uint32(hr), Effect: effect})
 	runtime.KeepAlive(wrapper)
 	runtime.KeepAlive(source)
 	return effect, hresultError("Windows Explorer copy", hr)

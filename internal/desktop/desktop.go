@@ -29,6 +29,10 @@ type Config struct {
 	// and the native main window is verified visible. An error screen does not
 	// qualify. The callback must return promptly.
 	OnReady func()
+	// NativeFileDragObserver is an optional in-process diagnostic sink. Events
+	// contain only fixed kinds and numeric COM metadata, never source contents,
+	// paths or capabilities. The native host bounds each drag to 128 events.
+	NativeFileDragObserver func(NativeFileDragObservation)
 	// Package-private native acceptance instrumentation. It observes decisions
 	// but cannot alter the document policy or supply a capability.
 	navigationObserver func(nativeNavigationObservation)
@@ -66,4 +70,14 @@ type WebViewConfig struct {
 	Post               func(func()) bool
 	OnError            func(error)
 	navigationObserver func(nativeNavigationObservation)
+}
+
+// NativeFileDragObservation describes a native drag decision without user data.
+type NativeFileDragObservation struct {
+	Kind    string `json:"kind"`
+	Format  uint32 `json:"format,omitempty"`
+	Aspect  uint32 `json:"aspect,omitempty"`
+	Medium  uint32 `json:"medium,omitempty"`
+	HRESULT uint32 `json:"hresult,omitempty"`
+	Effect  uint32 `json:"effect,omitempty"`
 }
