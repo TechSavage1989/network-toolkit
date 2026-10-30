@@ -3,7 +3,19 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-Current published version: 1.17.117. Vertical Files/Connections rail, drive-wheel
+Current published version: 1.17.118. Editor Connect is first and existing
+Connect sidebars share a distinct plug icon; selected-panel preferences and
+connection/security/ownership handlers are unchanged. Source/tag
+2be7a62d18865275bd323c26b07f1520b689b560; tree e4fbfeaed734c5f556cbbab4e4ed3a1ce9202d52.
+Public assets/source/feed were verified at 2026-10-30T01:08:14.010Z. All 14 focused
+rendered cases and exact-source core/full-Windows/package checks passed. First
+review ended five SUCCESS/two FAILURE; same-source package review all seven
+SUCCESS does not erase the earlier native Alt-transfer and resize-keyboard
+failures. Duplicate-main outcome: six SUCCESS/one FAILURE (native Alt-editor transfer), last job completed 01:11:35Z. Read RELEASE118_HANDOFF.md
+under docs/ for exact outcomes and unchanged UAC/legacy limits. No unrelated
+fix, access change or future publication is authorized by this historical record.
+
+Previous published version: 1.17.117. Vertical Files/Connections rail, drive-wheel
 scrolling and literal local-shell folders/explicit per-session administrator
 launch are published and public assets/feed verified. Source/tag
 51aa026f07e201979b3adb44d048c66c06508826; tree 793cc319121ed3586654a580a20738852b442a83.

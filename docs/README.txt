@@ -11,6 +11,14 @@ Full release-note archive: docs/releases/README.md
 dedicated connection icon. Selected panels, handlers and security remain unchanged.
 Historical validation caveats below remain unresolved; this is not a related fix.
 
+Published 2026-10-30T00:56:56Z; four actual downloads/source/feed verified
+01:08:14.010Z. Source/tag 2be7a62d18865275bd323c26b07f1520b689b560. All 14 focused
+rendered cases and exact-source core/full-Windows/package checks passed.
+First review: five SUCCESS/two FAILURE (native Alt-transfer and resize keyboard).
+Same-source package review: all seven SUCCESS; earlier failures remain unresolved.
+Duplicate main: six SUCCESS/one FAILURE (native Alt-editor transfer), last job completed 01:11:35Z. See RELEASE118_HANDOFF.md for honest
+run-by-run outcomes, hashes and native/UAC limits. Prior 117 assets are unchanged.
+
 117 published 2026-10-29T23:33:10Z; public assets/source/feed verified 23:35:30.794Z.
 Source/tag 51aa026f07e201979b3adb44d048c66c06508826. New feature/native/core checks
 passed. Normal review finished five SUCCESS/two FAILURE (existing comparison

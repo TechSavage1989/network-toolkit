@@ -1,3 +1,42 @@
+# Network Toolkit 1.17.118 published and verified
+
+Published 2026-10-30T00:56:56Z; public verification 01:08:14.010Z.
+Release 428544757: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.118
+Source/tag 2be7a62d18865275bd323c26b07f1520b689b560;
+tree e4fbfeaed734c5f556cbbab4e4ed3a1ce9202d52.
+This scoped update changes four presentation lines: Editor Connect is above
+Files, and existing Connect sidebar tabs share one distinct plug icon. The
+selected-panel preference, keyboard actions, connection/security/ownership logic,
+Terminal click fix and local-shell behavior are unchanged. No unrelated
+comparison, Hosts, native-transfer or resize fix is included.
+
+All 14 focused rendered cases passed and their actual screenshots were reviewed:
+eight main/detached, normal/narrow, light/dark Editor cases plus six transfer
+client/server surfaces. Application, security, dependency, full Windows native
+and reviewed-package checks passed on the exact published source. Local aggregate
+checks passed 1,303 JavaScript tests and 42 Python tests.
+
+First review 40981423089 ended five SUCCESS/two FAILURE (native Alt-editor
+transfer and a responsive sidebar-resize keyboard assertion). Same-source
+package review 40981780134 ended all seven SUCCESS. It used the existing
+review/hosts-editor-* branch required by the package-proof workflow guard;
+no source change or workflow suppression was used. The later pass does not
+erase or diagnose the earlier intermittent failures. Duplicate-main outcome:
+six SUCCESS/one FAILURE (native Alt-editor transfer), last job completed 01:11:35Z. See RELEASE118_HANDOFF.md for exact inventories and limits.
+
+Automatic Release 40982593497 succeeded. All four actual public downloads were
+rehashed; 1,143 source files/1,150 portable members, both manifests, PE 118 with
+nine canonical icons/12 resources, reviewed EXE/portable identity, updater
+allowlist and latest feed/tag/main were verified. Prior 117 tag/body/four assets
+remain unchanged. Actual native helper proof still ran on an already-elevated
+runner (UACInvoked=false), not a visible consent/cross-account transition.
+
+This five-document closure is not a rebuild, asset replacement, tag movement,
+access change or authorization for unrelated work. Historical caveats remain
+intact below, including 116/117 comparison/Hosts/native-transfer observations.
+
+---
+
 # Network Toolkit 1.17.117 published and verified
 
 Published 2026-10-29T23:33:10Z; public verification 23:35:30.794Z.
