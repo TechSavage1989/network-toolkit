@@ -28,4 +28,26 @@ navigation. Local source tests do not substitute for its hosted rendered result.
 
 ### Exact-source review correction
 
-The first hosted four-layout acceptance passed interval, proportional-shape, Details-preservation and left-handle behavior. Pixel review found narrow preset text clipped by duplicate native-select arrow padding; the bounded control-width trade keeps the same row footprint while exposing the full preset and Custom labels. A paused Fit stores an internal fixed viewport but is still All, not Custom. Legacy assertions requiring Follow to close Details or fractional Condensed windows to snap to sample endpoints were replaced with the newly requested visibility/exact-window contract; Linear endpoint assertions remain. All stored-source, minimum-point/time and temporal-render safeguards remain in force. Corrected hosted pixel/legacy acceptance is required before claiming these follow-ups passed.
+The first hosted four-layout acceptance passed interval, proportional-shape,
+Details-preservation and left-handle behavior. Pixel review found narrow preset
+text clipped by duplicate native-select arrow padding; the bounded control-width
+adjustment exposes the full preset and Custom labels. At 390 px, Custom may wrap
+Curve into the existing responsive controls' second row; controls remain
+readable and reachable, but unchanged toolbar height is not claimed. A paused
+Fit stores an internal fixed viewport but is still All, not Custom. Legacy
+assertions requiring Follow to close Details or fractional Condensed windows to
+snap to sample endpoints were replaced with the newly requested
+visibility/exact-window contract; Linear endpoint assertions remain. All stored-
+source, minimum-point/time and temporal-render safeguards remain in force. Final
+exact-source review 40995231720 passed all four focused layouts and the affected
+legacy graph checks; current actual pixels were reviewed. This does not change
+the separate comparison-motion caveat recorded in RELEASE119_HANDOFF.md.
+
+### Post-release baseline-spacing finding
+
+The user subsequently clarified that Recent must preserve Fit's baseline pixel/
+time spacing and configured uncompressed count, not merely normalized shape.
+The119 scale projection changes that spacing: the inspected Fit/5m reference
+pair showed about126 px versus8.6 px one-second gaps at the same plot width.
+This remains an open119 regression; the earlier four-layout acceptance did not
+assert this invariant. See RELEASE119_HANDOFF.md. No correction is claimed here.

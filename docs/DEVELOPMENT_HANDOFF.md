@@ -1,3 +1,53 @@
+# Network Toolkit 1.17.119 published and verified
+
+Published 2026-10-30T03:21:18Z; public verification 03:22:27.122867Z.
+Release 428620405: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.119
+Source/tag a4b8c56f4c8692d4676d508381ec4c5a2b504aee;
+tree 9bd09a18eab01de56176e072bb0a06b4c969ba81.
+Condensed Recent presets now describe the actual proportional time window;
+Follow latest preserves Details visibility; left-only history resizing preserves
+the right anchor/follow state. Total elapsed is HH:MM:SS without a 24-hour wrap.
+Clocks default to 12-hour AM/PM while explicit saved formats remain unchanged.
+Detached Editors access local Files without main-window approval, under the
+same Windows account. Their owner backend must remain alive. SFTP/credentials,
+UID/lease/hash saves, open-document and transfer safeguards remain protected.
+
+All four focused graph layouts and four detached-local browser layouts passed
+with actual pixels reviewed. The production native child opened/saved a temporary
+file with no main GUI (25.60 s). Core, security, dependency and full Windows gates
+passed. Final exact-source review 40995231720 ended six SUCCESS/one FAILURE at
+03:22:34Z: known narrow wrapped-map comparison alignment, not an all-green run.
+Its failing main-390 right-map case reached 4.546875 px; all 40 inputs were
+answered (maximum 27.9 ms). No source/history mismatch was observed in that test.
+No comparison repair or fixture-only diagnosis is claimed. At promotion the
+unrelated long browser was still running; it subsequently passed.
+
+Automatic Release 40996639911 build/publish passed. Actual four downloads,
+1,153 exact source files/1,160 portable members, manifests, reviewed EXE/portable
+identity, PE 119/nine canonical icons/12 resources, updater allowlist and latest
+feed/tag/main/notes were verified. Prior 118 tag/body/four assets are unchanged.
+Duplicate-main 40996639878: five SUCCESS/one FAILURE (native Alt-editor transfer)/one CANCELLED (long browser), last job completed 03:38:53Z.
+The real-five-minute case logged PASS before cancellation; the timer stage/job
+is not SUCCESS and subsequent assertions are unknown. The cancellation cause
+was not proven. Read RELEASE119_HANDOFF.md for inventories and limits.
+
+Important post-release finding: the user reported file-item dragging not working
+at approximately 03:24 UTC. Read-only handler reproduction found the unchanged
+shared editor-tab dragstart capture cancelling non-tab file/text drags. This is
+a genuine open defect, not fixed in 119; the minimal repair belongs to separate
+120 work. Existing explicit staged Copy to Windows Explorer is not equivalent
+to ordinary file-row dragging. No actual OS-gesture fix is claimed here.
+
+At 390 px, Custom may wrap Curve into the existing responsive controls' second
+row; the controls are readable/reachable, not guaranteed unchanged in height.
+Visible UAC transitions, cross-account elevation and live user devices/files were
+not tested. Historical comparison, Hosts, Alt-transfer and resize caveats remain.
+This six-file documentation-only closure does not rebuild, replace assets, move
+tags, change repository access or authorize unrelated work. Private references,
+configuration contents and evidence screenshots are not published in these docs.
+
+---
+
 # Network Toolkit 1.17.118 published and verified
 
 Published 2026-10-30T00:56:56Z; public verification 01:08:14.010Z.

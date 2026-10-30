@@ -13,6 +13,18 @@ Total elapsed uses HH:MM:SS; clock defaults are 12-hour unless explicitly saved.
 Detached Editor local files are available without a main-window approval step;
 remote connection and credential permissions remain separately protected.
 
+119 published 2026-10-30T03:21:18Z; actual public downloads/source/feed verified
+03:22:27.122867Z. Source/tag a4b8c56f4c8692d4676d508381ec4c5a2b504aee.
+Four focused graph and four detached-local browser layouts, actual native
+no-main-GUI local read/lease-save, core/security/dependency/package passed.
+Final review: six SUCCESS/one FAILURE (known narrow wrapped-map alignment).
+Duplicate main: five SUCCESS/one FAILURE (native Alt-editor transfer)/one CANCELLED (long browser), last job completed 03:38:53Z.
+No all-seven-green or comparison repair claim. Prior118 remains unchanged.
+A user-reported file-row drag defect was reproduced after publication: the
+unchanged editor-tab handler cancels non-tab dragstart. It is OPEN in119 and
+tracked for separate120 repair; explicit staged Explorer copying is distinct.
+Read RELEASE119_HANDOFF.md for exact results and security/native limits.
+
 118 places Editor Connect above Files and gives existing Connect sidebars one
 dedicated connection icon. Selected panels, handlers and security remain unchanged.
 Historical validation caveats below remain unresolved; this is not a related fix.
@@ -83,8 +95,9 @@ Turning prompts off does not bypass failed saves, active saves or ownership.
 
 The editor has independent left/right tab groups and a normal split view. Tabs
 sit above their own text pane. Files opens a resizable Windows/SFTP browser.
-A detached editor requests file explorer approval in the main window; only the
-existing approved SFTP transports are shared, without saved credentials.
+From119, a detached editor accesses local Files directly while its owner backend
+remains alive. Only remote SFTP explorer access requires main-window approval;
+existing approved transports are shared without saved credentials.
 
 Comparison uses separate Left and Right maps, visible Fit/zoom levels and
 wheel/click/drag navigation. Compact controls reclaim document space; Options

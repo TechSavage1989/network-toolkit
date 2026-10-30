@@ -3,7 +3,22 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-Current published version: 1.17.118. Editor Connect is first and existing
+Current published version: 1.17.119. Graph time windows/follow controls, elapsed
+HH:MM:SS/12-hour defaults and direct detached-local Files are published. Source/tag
+a4b8c56f4c8692d4676d508381ec4c5a2b504aee; tree 9bd09a18eab01de56176e072bb0a06b4c969ba81.
+Four public assets/source/feed verified 2026-10-30T03:22:27.122867Z; prior118 unchanged.
+New graph/local/native, core/security/dependency/package checks passed. Final
+review ended six SUCCESS/one FAILURE (known narrow wrapped-map comparison).
+Duplicate-main 40996639878: five SUCCESS/one FAILURE (native Alt-editor transfer)/one CANCELLED (long browser), last job completed 03:38:53Z.
+Read docs/RELEASE119_HANDOFF.md for exact failures and limits. A genuine
+post-release non-tab dragstart cancellation defect was reproduced read-only;
+119 does not fix it, and separate120 work must not be confused with this source.
+The owner backend remains required for detached-local Files; remote approvals,
+credential/lease guards and Windows permissions remain. At narrow widths Custom
+may wrap Curve within existing responsive controls, not preserve toolbar height.
+This docs-only record authorizes no unrelated fix or future publication.
+
+Previous published version: 1.17.118. Editor Connect is first and existing
 Connect sidebars share a distinct plug icon; selected-panel preferences and
 connection/security/ownership handlers are unchanged. Source/tag
 2be7a62d18865275bd323c26b07f1520b689b560; tree e4fbfeaed734c5f556cbbab4e4ed3a1ce9202d52.
