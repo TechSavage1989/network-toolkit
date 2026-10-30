@@ -3,7 +3,24 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-Current published version: 1.17.123. Published 2026-10-30T13:39:16Z;
+Current published version: 1.17.124. Published 2026-10-30T16:50:53Z;
+actual public downloads/source/feed verified 16:51:36.213209Z, independently 16:51:49Z.
+Source/tag 043851be8c8a23fa4711699855d74aa4c01afce1;
+tree e88776b3f1748f1b47b6f338c5c40e1542d4d2b6.
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.124
+Mature Recent graph endpoints passed 48 advancing frames plus legacy curve checks;
+TCP Ports has a distinct icon. Six network maintenance actions preserve strict
+scope/current identity and JIT UAC, with static/unsaved/disruption safeguards.
+No live DHCP/DNS/restart/reset or visible UAC testing was performed: network
+validation is mocked/construction and intercepted UI only. Final core 1,384 JS,
+42 Python / eight Go packages and security/Windows/package gates passed; see exact
+terminal CI outcomes in docs/RELEASE124_HANDOFF.md: review all seven passed;
+duplicate six passed/one existing comparison-motion failure remains. Public 1,193-source /
+1,200-member/manifests/PE/feed and prior 123 immutability verified. Preserve all
+historical comparison/Alt-transfer/Hosts/gear/UAC observations; no unrelated fix
+or broad permission is implied. This source-only closure changes no release bytes.
+
+Previous published version: 1.17.123. Published 2026-10-30T13:39:16Z;
 public downloads/source/feed verified 13:41:28.278568Z.
 Source/tag c0530bbb710e1023c68b835a565fbf89e19d74a8;
 tree 71d2000215acbb2d027df22d47c090b31720c5f9.

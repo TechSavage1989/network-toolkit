@@ -11,7 +11,12 @@ Full release-note archive: docs/releases/README.md
 DNS, adapter restart and Winsock maintenance actions. TCP Ports has a distinct
 inspection icon. Network actions are validated with isolated mocks/UI, not live
 network changes; review each action's scope and disruption warning before use.
-See RELEASE124_HANDOFF.md for exact validation status and retained limitations.
+Published 16:50:53Z; actual public bytes/source/feed verified 16:51:36Z and
+independently 16:51:49Z. Graph 48-frame/legacy, network simulated actions/errors,
+icon/full/collapsed/narrow, core/security/Windows/package acceptance passed.
+Four public files and prior 123 immutability verified. See RELEASE124_HANDOFF.md
+for exact closure: review all seven passed; duplicate six passed/one comparison
+motion failure. Historical limitations remain unresolved.
 
 123 gives Terminal SFTP rows the same direct native Windows-copy gesture as
 the SFTP tool and Editor. Detached workspace browsing/export is scoped to its
