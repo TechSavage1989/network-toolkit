@@ -22,7 +22,7 @@ func approveEditorExplorer(t *testing.T, a *application, id string) string {
 	}
 	return nonce
 }
-func TestEditorExplorerApprovalRevocationAndUnrelatedCapabilities(t *testing.T) {
+func TestEditorLocalExplorerIndependentOfRemoteApprovalAndUnrelatedCapabilities(t *testing.T) {
 	a, m, _ := editorFixture(t)
 	req, _, id := editorFixtureOffer(t, m)
 	if _, err := m.accept(id, req.ID); err != nil {
@@ -32,16 +32,13 @@ func TestEditorExplorerApprovalRevocationAndUnrelatedCapabilities(t *testing.T) 
 	dir := t.TempDir()
 	target := filepath.Join(dir, "created")
 	body := map[string]any{"action": "mkdir", "path": target}
-	if r := editorHTTP(a, token, "/api/transfer/local-files", body); r.Code != 403 {
-		t.Fatal("unapproved child mutation", r.Code)
+	if r := editorHTTP(a, token, "/api/transfer/local-files", body); r.Code != 200 {
+		t.Fatal("live child local mutation needs no remote approval", r.Code)
 	}
 	if r := editorHTTP(a, token, "/api/editor-views/explorer/"+id, map[string]any{"allow": true}); r.Code != 403 {
 		t.Fatal("child self-approved", r.Code)
 	}
 	nonce := approveEditorExplorer(t, a, id)
-	if r := editorHTTP(a, token, "/api/transfer/local-files", body); r.Code != 200 {
-		t.Fatal(r.Code, r.Body.String())
-	}
 	if _, err := os.Stat(target); err != nil {
 		t.Fatal(err)
 	}
@@ -56,11 +53,11 @@ func TestEditorExplorerApprovalRevocationAndUnrelatedCapabilities(t *testing.T) 
 	if r := editorHTTP(a, a.token, "/api/editor-views/explorer/"+id, map[string]any{"requestId": nonce, "allow": false}); r.Code != 200 {
 		t.Fatal(r.Body.String())
 	}
-	if r := editorHTTP(a, token, "/api/transfer/local-files", map[string]any{"action": "delete", "path": target, "confirm": true}); r.Code != 403 {
-		t.Fatal("revoked access usable", r.Code)
+	if r := editorHTTP(a, token, "/api/transfer/local-files", map[string]any{"action": "delete", "path": target, "confirm": true}); r.Code != 200 {
+		t.Fatal("remote revocation incorrectly denied local files", r.Code)
 	}
-	if _, err := os.Stat(target); err != nil {
-		t.Fatal("revocation changed files", err)
+	if _, err := os.Stat(target); !os.IsNotExist(err) {
+		t.Fatal("explicit local delete failed", err)
 	}
 }
 func TestEditorExplorerPinsSFTPAndRequiresDocumentLeaseForSaving(t *testing.T) {
@@ -174,8 +171,8 @@ func TestEditorLayoutValidationAndTransferRoundTrip(t *testing.T) {
 			t.Fatal("invalid layout accepted")
 		}
 	}
-	if r := editorGET(a, m.views[out["destination"].(string)].token, "/api/transfer/local"); r.Code != http.StatusForbidden {
-		t.Fatal("layout conferred file authority")
+	if r := editorGET(a, m.views[out["destination"].(string)].token, "/api/credentials"); r.Code != http.StatusForbidden {
+		t.Fatal("layout conferred credential authority")
 	}
 }
 

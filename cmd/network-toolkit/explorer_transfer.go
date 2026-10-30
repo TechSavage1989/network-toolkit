@@ -58,7 +58,7 @@ func (a *application) explorerCallerValid(owner string) bool {
 		return a.editorViews.callerLocked("")
 	}
 	v := a.editorViews.views[owner]
-	return a.editorViews.callerLocked(owner) && v != nil && v.explorer != nil && v.explorer.Allowed
+	return a.editorViews.callerLocked(owner) && v != nil
 }
 func exportJobStatus(j *explorerTransferJob) map[string]any {
 	return map[string]any{"id": j.id, "state": j.state, "names": j.names, "entries": j.entries, "bytes": j.bytes, "message": j.note, "cancelRequested": j.cancelRequested}
@@ -263,21 +263,25 @@ func (a *application) prepareExplorerTransfer(w http.ResponseWriter, r *http.Req
 	ctx, cancel := context.WithTimeout(parent, 15*time.Minute)
 	j := &explorerTransferJob{id: randomHex(16), owner: owner, state: "preparing", names: names, note: "Preparing a private copy for Windows Explorer…", cancel: cancel, expires: time.Now().Add(15 * time.Minute)}
 	var approved *editorExplorerAccess
-	if owner != "" {
+	if owner != "" && !local {
 		a.editorViews.mu.Lock()
 		if v := a.editorViews.views[owner]; v != nil {
 			approved = v.explorer
 		}
 		a.editorViews.mu.Unlock()
 	}
+	localValid := a.localExplorerGuard(owner)
 	j.valid = func() bool {
+		if local && !localValid() {
+			return false
+		}
 		if !a.explorerCallerValid(owner) {
 			return false
 		}
-		if owner != "" {
+		if owner != "" && !local {
 			a.editorViews.mu.Lock()
 			v := a.editorViews.views[owner]
-			current := v != nil && v.explorer == approved
+			current := approved != nil && approved.Allowed && v != nil && v.explorer == approved
 			a.editorViews.mu.Unlock()
 			if !current {
 				return false

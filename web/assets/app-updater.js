@@ -41,7 +41,7 @@
     }
     async function check(background=false){
       if(busy||data?.installing)return 'skip';
-      if(checkAfter>(env.now?.()??Date.now())){if(!background){error='Update checks are paused until '+new Date(checkAfter).toLocaleString()+'. Please try again then.';render();}return 'retry';}
+      if(checkAfter>(env.now?.()??Date.now())){if(!background){error='Update checks are paused until '+(globalThis.NetworkToolkitResultTime?.format(new Date(checkAfter),{milliseconds:false})||new Date(checkAfter).toLocaleString(undefined,{hour12:true}))+'. Please try again then.';render();}return 'retry';}
       busy=true;if(!background){error='';message='Checking the official release feed…';}render();
       let outcome='retry';
       try{data=await env.api('/updates/check','POST',{});checkAfter=Number(data.checkAfter)||0;backgroundError='';if(!background){message=data.hasUpdate?'Update available: '+data.latest.version+'.':'No newer update was found at the last successful check.';env.reveal?.();}outcome='ok';}
@@ -172,7 +172,7 @@
   const preferenceChanges={};
   const preferences=()=>state.appUpdatePreferences||{};
   function automaticStatusText(){
-    const info=scheduler?.snapshot(),stamp=value=>new Date(value).toLocaleString();
+    const info=scheduler?.snapshot(),stamp=value=>globalThis.NetworkToolkitResultTime?.format(new Date(value),{milliseconds:false})||new Date(value).toLocaleString(undefined,{hour12:true});
     let text='';
     if(preferencesPending)text='Automatic checks are waiting for your saved update preferences.';
     else if(preferences().enabled===false&&preferencesLoaded)text='Automatic checks are turned off. You can still check manually.';

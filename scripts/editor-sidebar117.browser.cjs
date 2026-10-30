@@ -45,7 +45,7 @@ async function start(root,width,detached=false){
  await page.goto('https://saved113.toolkit.test/'+(detached?'editor-view/'+child:''));await page.waitForFunction(()=>window.__networkToolkitStartupState===1&&online);
  await page.evaluate(async()=>{navigate('editor');await NetworkToolkitFileEditor.newDocument();const d=NetworkToolkitFileEditor.active;window.saved113Doc=d;window.saved113Editor=document.querySelector('#networkToolkitFileEditor');});
  const text=page.locator('[data-ed-text]');await text.fill('UNSAVED_SYNTHETIC_113\nretain this text');await text.dispatchEvent('input');
- return {page,ctx,calls,allow:value=>{allowed=value},request:()=>{reviewRows=[{viewId:child,name:'Fixture child',requestId:'b'.repeat(32),profile:catalog[0]}]}};
+ return {page,ctx,calls,legacyLocalApproval:root===baseline,allow:value=>{allowed=value},request:()=>{reviewRows=[{viewId:child,name:'Fixture child',requestId:'b'.repeat(32),profile:catalog[0]}]}};
 }
 async function retained(page){assert(await page.evaluate(()=>NetworkToolkitFileEditor.active===saved113Doc&&document.querySelector('#networkToolkitFileEditor')===saved113Editor&&NetworkToolkitFileEditor.active.content.includes('UNSAVED_SYNTHETIC_113')&&NetworkToolkitFileEditor.active.dirty));}
 async function settleTabs(page){
@@ -60,7 +60,8 @@ async function selectPanel(page,name){
 const settle=page=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
 async function ready(f,detached){
  const {page}=f;if(await page.locator('[data-ed="files"]').getAttribute('aria-expanded')!=='true')await page.locator('[data-editor-files-reopen]').click();
- if(detached){await page.locator('[data-editor-files-request]').waitFor({state:'visible'});assert(!f.calls.some(c=>c.path==='/api/transfer/local'));await page.locator('[data-editor-files-request]').click();await page.waitForFunction(()=>document.querySelector('[data-editor-files-request]')?.disabled);assert(!f.calls.some(c=>c.path==='/api/transfer/local'));f.allow(true);await selectPanel(page,'connections');await selectPanel(page,'files');}
+ if(detached&&f.legacyLocalApproval){await page.locator('[data-editor-files-request]').waitFor({state:'visible'});assert(!f.calls.some(c=>c.path==='/api/transfer/local'));await page.locator('[data-editor-files-request]').click();await page.waitForFunction(()=>document.querySelector('[data-editor-files-request]')?.disabled);assert(!f.calls.some(c=>c.path==='/api/transfer/local'));f.allow(true);await selectPanel(page,'connections');await selectPanel(page,'files');}
+ else if(detached){await page.locator('[data-rb-drive="C:/"]').waitFor();assert(f.calls.some(c=>c.path==='/api/transfer/local'));const connect=page.locator('[data-editor-files-panel="connections"]');if(await connect.getAttribute('aria-selected')!=='true')await connect.click();await page.locator('[data-editor-files-request]').waitFor({state:'visible'});await page.locator('[data-editor-files-request]').click();await page.waitForFunction(()=>document.querySelector('[data-editor-files-request]')?.disabled);f.allow(true);await page.locator('[data-editor-files-panel="files"]').click();await selectPanel(page,'connections');await selectPanel(page,'files');}
  await page.locator('[data-rb-drive="C:/"]').waitFor();await settle(page);
 }
 async function geometry(page){return page.evaluate(()=>{

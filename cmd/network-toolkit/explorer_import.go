@@ -107,34 +107,10 @@ func (a *application) handleExplorerImportAction(w http.ResponseWriter, r *http.
 			jsonError(w, 409, "Destination changed")
 			return
 		}
-		var approval *editorExplorerAccess
-		if owner != "" {
-			a.editorViews.mu.Lock()
-			view := a.editorViews.views[owner]
-			if view == nil || !a.editorViews.callerLocked(owner) || view.explorer == nil || !view.explorer.Allowed {
-				a.editorViews.mu.Unlock()
-				root.Close()
-				jsonError(w, 403, "File explorer approval was withdrawn")
-				return
-			}
-			approval = view.explorer
-			a.editorViews.mu.Unlock()
-		}
-		valid := func() bool {
-			if !a.explorerCallerValid(owner) {
-				return false
-			}
-			if owner != "" {
-				a.editorViews.mu.Lock()
-				defer a.editorViews.mu.Unlock()
-				v := a.editorViews.views[owner]
-				return v != nil && v.explorer == approval
-			}
-			return true
-		}
+		valid := a.localExplorerGuard(owner)
 		if !valid() {
 			root.Close()
-			jsonError(w, 403, "File explorer approval changed")
+			jsonError(w, 403, "Local file explorer is no longer available")
 			return
 		}
 		j := &explorerImport{owner: owner, path: req.Path, root: root, info: info, dirs: map[string]os.FileInfo{".": info}, valid: valid, expires: time.Now().Add(15 * time.Minute)}

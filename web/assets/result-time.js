@@ -4,7 +4,7 @@
  const iso=/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/i;
  const escape=value=>String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
  const formatters=new Map(),zoneChecks=new Map();let localSettings=null,settingsChecked=-Infinity,configured=null,availableZones=null;
- const defaults=Object.freeze({hourFormat:'24',zoneMode:'local',timeZone:'UTC'});
+ const defaults=Object.freeze({hourFormat:'12',zoneMode:'local',timeZone:'UTC'});
  function isTimeZone(value){
   if(typeof value!=='string'||!value||value.length>100||!/^[-A-Za-z0-9_+/]+$/.test(value))return false;
   if(value==='UTC')return true;
@@ -14,7 +14,7 @@
  }
  function normalizePreferences(value){
   const input=value&&typeof value==='object'&&!Array.isArray(value)?value:{};
-  const hourFormat=input.hourFormat==='12'?'12':'24',requestedMode=['local','utc','named'].includes(input.zoneMode)?input.zoneMode:'local';
+  const hourFormat=input.hourFormat==='24'?'24':'12',requestedMode=['local','utc','named'].includes(input.zoneMode)?input.zoneMode:'local';
   const candidate=typeof input.timeZone==='string'?input.timeZone.trim():'UTC',valid=isTimeZone(candidate);
   return {hourFormat,zoneMode:requestedMode==='named'&&!valid?'local':requestedMode,timeZone:valid?candidate:'UTC'};
  }
@@ -73,6 +73,15 @@
   if(!formatter){if(zone)options.timeZone=zone;formatter=new Intl.DateTimeFormat(local.locale,options);if(formatters.size>=16)formatters.delete(formatters.keys().next().value);formatters.set(key,formatter);}
   return formatter.format(new Date(number));
  }
+ // A duration is not a wall clock: no timezone/DST conversion and no 24-hour wrap.
+ // Only a live job may use the render clock; stopped legacy jobs without a
+ // recorded finish stay unknown instead of appearing to continue running.
+ function elapsed(job,now=Date.now()){
+  const start=epoch(job?.started),finished=epoch(job?.finished),end=Number.isFinite(finished)?finished:['running','queued'].includes(job?.status)?epoch(now):NaN;
+  if(!Number.isFinite(start)||!Number.isFinite(end)||end<start)return unknown;
+  const seconds=Math.floor((end-start)/1000),hours=Math.floor(seconds/3600),minutes=Math.floor(seconds/60)%60;
+  return [hours,minutes,seconds%60].map(value=>String(value).padStart(2,'0')).join(':');
+ }
  function value(row){
   if(!row||typeof row!=='object')return undefined;
   for(const key of ['time','timestamp','observedAt','recordedAt','snapshotTime','captured','checkedAt'])if(Number.isFinite(epoch(row[key])))return row[key];
@@ -90,7 +99,7 @@
   const name=columnLabel(snapshot(job)?'Snapshot':'Recorded');
   return {id:'time',name,type:'date',value:row=>recorded(row,job),render:row=>cell(recorded(row,job),{label:name})};
  }
- const api=Object.freeze({epoch,compareInstants,format,cell,value,isKey,recorded,column,snapshot,unknown,defaults,preferences,normalizePreferences,configure,zoneLabel,timeLabel,columnLabel,timeZones,isTimeZone});
+ const api=Object.freeze({epoch,compareInstants,format,elapsed,cell,value,isKey,recorded,column,snapshot,unknown,defaults,preferences,normalizePreferences,configure,zoneLabel,timeLabel,columnLabel,timeZones,isTimeZone});
  if(typeof module==='object'&&module.exports)module.exports=api;
  if(root)root.NetworkToolkitResultTime=api;
 })(typeof window!=='undefined'?window:typeof globalThis!=='undefined'?globalThis:this);

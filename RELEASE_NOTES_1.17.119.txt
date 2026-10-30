@@ -1,0 +1,22 @@
+NETWORK TOOLKIT 1.17.119
+
+GRAPH TIME WINDOWS AND DETACHED LOCAL FILES
+
+- Condensed Recent scale selects the actual displayed time window using the
+  existing proportional compression curve. The selected duration, plotted time
+  bounds and visible-span label agree; manual navigation indicates a custom view.
+- Follow latest preserves the Details sidebar's open or closed state. Adjusting
+  only the history navigator's left handle retains the right anchor and follow
+  state; moving the whole interval or its right handle can pause following.
+- Total run elapsed time is shown as hours:minutes:seconds in the existing graph
+  statistics. Clock timestamps default to 12-hour AM/PM while explicit saved
+  12-hour or 24-hour preferences remain unchanged.
+- Detached Editor windows browse and manage local files directly under the
+  current Windows account, without requesting main-window explorer approval.
+  Remote SFTP connections and saved credentials retain their separate approval
+  and verification boundaries. Existing document and transfer safeguards remain.
+
+This update does not change repository access, elevate Toolkit, modify source
+measurement times or repair unrelated comparison, Hosts-focus or cross-window
+Alt-drag findings recorded in the release handoffs. Machine-readable timestamps
+remain unchanged, and elapsed durations do not wrap at 24 hours.

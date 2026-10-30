@@ -136,7 +136,7 @@ async function latencyGeometry(label){
  assert(['auto','scroll'].includes(geometry.overflow),label+' result list owns its vertical scrollbar');
  const minimumRows=frame.height<800?2:3;report.lastMonitorGeometry={label,...geometry};
  assert(geometry.tableBody.completeRows>=minimumRows,label+' has at least'+minimumRows+' complete visible sample rows after toolbar, headers and footer '+JSON.stringify(geometry.tableBody));
- assert.equal(geometry.stats.length,7,label+' keeps every run statistic available');
+ assert.equal(geometry.stats.length,8,label+' keeps elapsed and every run statistic available');
  for(const item of geometry.stats)for(const text of item.text)assert(text.left>=item.card.left-1&&text.right<=item.card.right+1,label+' statistic text remains inside its tile');
  const before=geometry.graph;
  await list().evaluate(el=>{el.scrollTop=el.scrollHeight;});await settle();

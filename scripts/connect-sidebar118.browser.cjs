@@ -28,7 +28,7 @@ async function start({width=1440,theme='light',detached=false,preference}={}){
    else if(p==='/api/terminals/known-hosts')data={hosts:[]};
    else if(p==='/api/credentials'){assert(!detached);assert.equal(method,'GET');data={vault:{available:true,state:'locked'},entries:[]};}
    else if(p==='/api/transfer/server'){assert.equal(method,'GET','no server start permitted');data={protocol:url.searchParams.get('protocol'),running:false,root:'',transfers:[]};}
-   else if(p==='/api/transfer/local'){assert(!detached,'unapproved child must not browse files');assert.equal(method,'GET');data={path:'C:/Synthetic',parent:'C:/',roots:['C:/'],drives:[{path:'C:/',label:'C: Synthetic',kind:'local'}],entries:[{name:'example.txt',path:'C:/Synthetic/example.txt',directory:false,size:24}]};}
+   else if(p==='/api/transfer/local'){assert.equal(method,'GET');data={path:'C:/Synthetic',parent:'C:/',roots:['C:/'],drives:[{path:'C:/',label:'C: Synthetic',kind:'local'}],entries:[{name:'example.txt',path:'C:/Synthetic/example.txt',directory:false,size:24}]};}
    else if(p.includes('/events'))data={events:[],sessions:[],after:0};
    else if(p.startsWith('/api/editor-views/documents/')&&p.endsWith('/release'))data={ok:true};
    else assert.equal(method,'GET','unexpected mutation '+p);
@@ -49,7 +49,7 @@ function noConnect(calls,detached=false){
  const permitted=new Set(['/api/state','/api/editor-views/current/state','/api/editor-views/current/activity']);
  assert(calls.every(c=>c.method==='GET'||permitted.has(c.path)||/^\/api\/editor-views\/documents\/[^/]+\/release$/.test(c.path)),'unexpected action, connect, listener or elevation request');
  assert(!calls.some(c=>c.body?.action==='connect'||c.body?.runAsAdministrator===true));
- if(detached)assert(!calls.some(c=>['/api/state','/api/credentials','/api/credential-vault','/api/transfer/local'].includes(c.path)));
+ if(detached)assert(!calls.some(c=>['/api/state','/api/credentials','/api/credential-vault'].includes(c.path)));
 }
 async function editorCase(detached,width,theme){
  const id=(detached?'detached':'main')+'-'+width+'-'+theme,preference=theme==='dark'?{panel:'connections',side:'remote',width:360,collapsed:false}:undefined,f=await start({detached,width,theme,preference}),{page}=f;

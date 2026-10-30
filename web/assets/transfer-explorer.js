@@ -10,7 +10,7 @@ const joinServer=(base,name)=>[base,name].filter(Boolean).join('/');
 const parentServer=value=>{const path=String(value||'').replace(/\\/g,'/');return path.includes('/')?path.slice(0,path.lastIndexOf('/')):''};
 const basename=value=>String(value||'').split(/[\\/]/).pop();
 const bytes=value=>{if(value===0)return '0 B';if(!Number.isFinite(value)||value<0)return '-';let num=value;for(const unit of ['B','KB','MB','GB','TB']){if(num<1024||unit==='TB')return num.toLocaleString(undefined,{maximumFractionDigits:unit==='B'?0:1})+' '+unit;num/=1024}return '-'};
-const humanDate=value=>{if(!value)return '-';const d=new Date(value);return Number.isNaN(d.getTime())?'-':d.toLocaleString()};
+const humanDate=value=>{if(!value)return '-';const d=new Date(value);return Number.isNaN(d.getTime())?'-':(globalThis.NetworkToolkitResultTime?.format(d,{milliseconds:false})||d.toLocaleString(undefined,{hour12:true}))};
 const safe=value=>esc(value);
 function freshPane(){return {path:'',parent:'',entries:[],roots:[],separator:'/',history:[],at:-1,selected:new Set(),anchor:-1,filter:'',sort:'name',reverse:false,hidden:false,loading:false,seq:0};}
 function get(p){if(!model[p])model[p]={root:'',local:freshPane(),server:freshPane(),busy:false,cancelPending:false,queue:[],single:false,split:49,statusKey:'',active:'server'};return model[p]}

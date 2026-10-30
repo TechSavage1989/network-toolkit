@@ -1,11 +1,17 @@
-NETWORK TOOLKIT 1.17.118
+NETWORK TOOLKIT 1.17.119
 Portable network diagnostics and device terminals in a native app window
 
-CURRENT RELEASE - 1.17.118
+CURRENT RELEASE - 1.17.119
 
-Release details: RELEASE_NOTES_1.17.118.txt
-Previous release: docs/releases/RELEASE_NOTES_1.17.117.txt
+Release details: RELEASE_NOTES_1.17.119.txt
+Previous release: docs/releases/RELEASE_NOTES_1.17.118.txt
 Full release-note archive: docs/releases/README.md
+
+119 corrects selected Condensed time windows, preserves Details visibility on
+Follow latest, and keeps the right anchor when only the history start is resized.
+Total elapsed uses HH:MM:SS; clock defaults are 12-hour unless explicitly saved.
+Detached Editor local files are available without a main-window approval step;
+remote connection and credential permissions remain separately protected.
 
 118 places Editor Connect above Files and gives existing Connect sidebars one
 dedicated connection icon. Selected panels, handlers and security remain unchanged.

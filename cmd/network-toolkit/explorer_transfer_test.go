@@ -150,8 +150,8 @@ func TestExplorerCopyRejectsForeignGrantAndAuthPayload(t *testing.T) {
 			t.Fatal("accepted credentials/guessed session")
 		}
 	}
-	if w := exportRequest(a, child, "POST", "/api/explorer-transfer", explorerTransferRequest{Action: "prepare", Binding: editorBinding{Kind: "local"}, Paths: []string{t.TempDir()}}); w.Code != 403 {
-		t.Fatal("unapproved child gained filesystem access")
+	if w := exportRequest(a, child, "POST", "/api/explorer-transfer", explorerTransferRequest{Action: "prepare", Binding: editorBinding{Kind: "sshConnection", ConnectionID: "guessed"}, Paths: []string{"/file"}}); w.Code != 403 {
+		t.Fatal("unapproved child gained remote access")
 	}
 	if w := exportRequest(a, "", "DELETE", "/api/explorer-transfer", nil); w.Code != 405 {
 		t.Fatal("method guard")
@@ -422,7 +422,7 @@ func (r *explorerRevokingReader) Read(b []byte) (int, error) {
 	}
 	return r.Reader.Read(b)
 }
-func TestExplorerLocalDropRevocationBeforePublication(t *testing.T) {
+func TestExplorerLocalDropClosedRendererBeforePublication(t *testing.T) {
 	a, m, _ := editorFixture(t)
 	_, _, child := editorFixtureOffer(t, m)
 	m.mu.Lock()
@@ -436,13 +436,13 @@ func TestExplorerLocalDropRevocationBeforePublication(t *testing.T) {
 	file, _ := mw.CreateFormFile("file", "source.txt")
 	io.WriteString(file, "SYNTHETIC")
 	mw.Close()
-	reader := &explorerRevokingReader{Reader: &body, revoke: func() { m.mu.Lock(); m.views[child].explorer = &editorExplorerAccess{Allowed: true}; m.mu.Unlock() }}
+	reader := &explorerRevokingReader{Reader: &body, revoke: func() { m.mu.Lock(); m.views[child].info.State = "closed"; m.mu.Unlock() }}
 	r := withEditorRequestView(httptest.NewRequest("POST", "/api/transfer/local-drop", reader), child)
 	r.Header.Set("Content-Type", mw.FormDataContentType())
 	w := httptest.NewRecorder()
 	a.handleLocalExplorerDrop(w, r)
 	if w.Code == 200 {
-		t.Fatal("old approval published under replacement approval")
+		t.Fatal("closed renderer published local copy")
 	}
 	entries, _ := os.ReadDir(root)
 	if len(entries) != 0 {

@@ -1,5 +1,9 @@
 # Editor views and Files sidebar
 
+> Version119 update: detached Windows Files access is now independent of main-window
+> approval. The historical approval description below remains applicable only to
+> remote SFTP transports. See [Detached local Files](EDITOR_LOCAL119.md).
+
 Version112 places menus, actions and settings above the tabs. Each text pane owns
 its own tab strip. Split view is independent of comparison: Move to left/right
 view, tab context menus and deliberate same-window drops move the document itself.

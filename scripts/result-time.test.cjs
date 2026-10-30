@@ -69,7 +69,7 @@ test('named timezone preferences follow DST and invalid restored zones fall back
   assert.equal(time.zoneLabel(),'America/New_York');assert.equal(time.timeLabel(),'Time (America/New_York)');
   assert.equal(time.column({tool:'connections'}).name,'Snapshot (America/New_York)');
   assert.equal(time.isTimeZone('Mars/Invalid'),false);assert.equal(time.isTimeZone('UTC'),true);assert.equal(time.isTimeZone('America/New_York'),true);
-  for(const value of [null,[],{hourFormat:'99',zoneMode:'bad',timeZone:'<invalid>'},{zoneMode:'named',timeZone:'Mars/Invalid'}])assert.deepEqual(time.normalizePreferences(value),{hourFormat:'24',zoneMode:'local',timeZone:'UTC'});
+  for(const value of [null,[],{hourFormat:'99',zoneMode:'bad',timeZone:'<invalid>'},{zoneMode:'named',timeZone:'Mars/Invalid'}])assert.deepEqual(time.normalizePreferences(value),{hourFormat:'12',zoneMode:'local',timeZone:'UTC'});
   const zones=time.timeZones();assert(zones.includes('UTC'));assert(zones.includes('America/New_York'));zones.push('fake');assert(!time.timeZones().includes('fake'));
  }finally{time.configure(null);}
 });

@@ -36,7 +36,7 @@ func (a *application) serveEditorAPI(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	if a.serveApprovedEditorExplorer(w, r) {
+	if a.serveEditorExplorer(w, r) {
 		return
 	}
 	switch {

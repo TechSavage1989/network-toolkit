@@ -86,7 +86,7 @@ function record(entry,name=''){
  saveState();render();
 }
 function rowHTML(kind,item){
- const detail=description(item),used=kind==='recent'&&item.lastUsed?'Last opened: '+new Date(item.lastUsed).toLocaleString():'';
+ const detail=description(item),used=kind==='recent'&&item.lastUsed?'Last opened: '+(globalThis.NetworkToolkitResultTime?.format(new Date(item.lastUsed),{milliseconds:false})||new Date(item.lastUsed).toLocaleString(undefined,{hour12:true})):'';
  return '<div class="session-library-row" data-session-kind="'+kind+'" data-session-id="'+esc(item.id)+'"><button type="button" class="session-library-entry" data-session-entry title="'+esc([detail,used,'Double-click or press Enter to open'].filter(Boolean).join('\n'))+'"><span class="session-library-icon">'+icon(item.type==='serial'?'plug':'terminal')+'</span><span class="session-library-text"><strong>'+esc(item.name||label(item))+'</strong><small>'+esc(detail)+'</small>'+(kind==='saved'&&item.folder?'<small class="session-library-folder" title="'+esc(item.folder)+'">'+esc(item.folder)+'</small>':'')+'</span></button>'+(kind==='saved'?folderButton('terminal',item):'')+'<button type="button" class="iconbtn session-library-delete" data-session-remove aria-label="Remove '+esc(item.name||label(item))+' from '+(kind==='saved'?'Saved':'Recent')+'" title="Remove from '+(kind==='saved'?'Saved':'Recent')+'">'+icon('close')+'</button></div>';
 }
 function folderButton(type,item){return '<button type="button" class="iconbtn session-library-folder-action" data-session-folder="'+type+'" data-session-folder-id="'+esc(item.id)+'" aria-label="Move '+esc(item.name||item.host)+' to folder" title="Move to folder">'+icon('folder')+'</button>';}

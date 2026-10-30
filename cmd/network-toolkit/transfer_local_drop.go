@@ -21,28 +21,9 @@ func (a *application) handleLocalExplorerDrop(w http.ResponseWriter, r *http.Req
 		return
 	}
 	owner := editorRequestView(r)
-	var approved *editorExplorerAccess
-	if owner != "" && a.editorViews != nil {
-		a.editorViews.mu.Lock()
-		if v := a.editorViews.views[owner]; v != nil {
-			approved = v.explorer
-		}
-		a.editorViews.mu.Unlock()
-	}
-	valid := func() bool {
-		if !a.explorerCallerValid(owner) {
-			return false
-		}
-		if owner != "" {
-			a.editorViews.mu.Lock()
-			defer a.editorViews.mu.Unlock()
-			v := a.editorViews.views[owner]
-			return approved != nil && v != nil && v.explorer == approved
-		}
-		return true
-	}
+	valid := a.localExplorerGuard(owner)
 	if !valid() {
-		jsonError(w, 403, "File explorer approval unavailable")
+		jsonError(w, 403, "Local file explorer is no longer available")
 		return
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, maxExplorerDropBytes+(64<<10))

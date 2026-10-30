@@ -1,8 +1,8 @@
 package main
 
-// A detached editor keeps its document-only capability until the main window
-// explicitly approves file management. Approval captures existing transports;
-// it never delegates passwords, credential storage or terminal control.
+// A live detached editor can manage local files with the same OS permissions as
+// Toolkit. Only remote explorer access needs explicit main-window approval; it
+// captures existing transports, never passwords, credentials or terminal control.
 import (
 	"bytes"
 	"encoding/json"
@@ -62,11 +62,11 @@ func (m *editorViewRegistry) handleExplorerAccess(w http.ResponseWriter, r *http
 			methodError(w)
 			return true
 		}
-		jsonResponse(w, 200, map[string]any{"allowed": v.explorer != nil && v.explorer.Allowed, "pending": v.explorer != nil && v.explorer.Pending})
+		jsonResponse(w, 200, map[string]any{"localAllowed": true, "allowed": v.explorer != nil && v.explorer.Allowed, "pending": v.explorer != nil && v.explorer.Pending})
 		return true
 	}
 	if caller != "" {
-		jsonError(w, 403, "Only the main window can approve file explorer access.")
+		jsonError(w, 403, "Only the main window can approve remote file explorer access.")
 		return true
 	}
 	if r.Method != http.MethodPost {
@@ -120,26 +120,22 @@ func (m *editorViewRegistry) handleExplorerAccess(w http.ResponseWriter, r *http
 	return true
 }
 
-func (a *application) serveApprovedEditorExplorer(w http.ResponseWriter, r *http.Request) bool {
+func (a *application) serveEditorExplorer(w http.ResponseWriter, r *http.Request) bool {
 	m := a.editorViews
 	m.mu.Lock()
 	v := m.views[editorRequestView(r)]
+	live := v != nil && m.callerLocked(v.info.ID)
 	var access *editorExplorerAccess
 	if v != nil && m.callerLocked(v.info.ID) && v.explorer != nil && v.explorer.Allowed {
 		access = v.explorer
 	}
 	m.mu.Unlock()
-	if access == nil {
+	if !live {
 		return false
 	}
-	if strings.HasPrefix(r.URL.Path, "/api/explorer-transfer") {
-		a.handleExplorerTransfer(w, r)
-		return true
-	}
+	// Exact local-only routes do not delegate remote transports or generic writes.
+	// Export requests independently validate their binding and current owner.
 	switch r.URL.Path {
-	case "/api/remote-browser/drop-upload":
-		a.handleRemoteDropUpload(w, r)
-		return true
 	case "/api/transfer/local-drop":
 		a.handleLocalExplorerDrop(w, r)
 		return true
@@ -148,6 +144,18 @@ func (a *application) serveApprovedEditorExplorer(w http.ResponseWriter, r *http
 		return true
 	case "/api/transfer/local-files":
 		a.handleTransferLocalFiles(w, r)
+		return true
+	}
+	if r.URL.Path == "/api/explorer-transfer" || r.URL.Path == "/api/explorer-transfer/native" {
+		a.handleExplorerTransfer(w, r)
+		return true
+	}
+	if access == nil {
+		return false
+	}
+	switch r.URL.Path {
+	case "/api/remote-browser/drop-upload":
+		a.handleRemoteDropUpload(w, r)
 		return true
 	case "/api/remote-browser":
 		if r.Method == http.MethodGet {
@@ -201,6 +209,26 @@ func (a *application) serveApprovedEditorExplorer(w http.ResponseWriter, r *http
 		return true
 	}
 	return false
+}
+
+// Pin the live renderer identity for an in-flight local copy. Closing/returning
+// the editor invalidates publication; changing remote approvals does not.
+func (a *application) localExplorerGuard(owner string) func() bool {
+	if owner == "" {
+		return func() bool { return a.explorerCallerValid(owner) }
+	}
+	m := a.editorViews
+	if m == nil {
+		return func() bool { return false }
+	}
+	m.mu.Lock()
+	view := m.views[owner]
+	m.mu.Unlock()
+	return func() bool {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		return view != nil && m.views[owner] == view && m.callerLocked(owner)
+	}
 }
 
 type editorExplorerTarget struct {
