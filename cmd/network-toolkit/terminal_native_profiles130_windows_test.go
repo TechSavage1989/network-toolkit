@@ -21,6 +21,8 @@ type nativeProfile130Badge struct {
 }
 type nativeProfiles130Snapshot struct {
 	PreferencesReads                     int
+	StorageError                         bool
+	ErrorToastCount                      int
 	BootAt                               int64
 	StoredName, ProfileID                string
 	Explicit, Pending, IdentityUnchanged bool
@@ -256,6 +258,32 @@ func (h *nativeTerminalFixture) exerciseProfiles130(accepted *atomic.Int32) (res
 	if initial.Session != h.session {
 		return errors.New("profile acceptance changed session identity")
 	}
-	phases = append(phases, "Explicit reconnect retains original session/profile identity and configuration")
+	h.app.stateMu.Lock()
+	var reconnected struct {
+		Recent []map[string]any `json:"terminalRecent"`
+	}
+	decodeErr = json.Unmarshal(h.app.state, &reconnected)
+	h.app.stateMu.Unlock()
+	if decodeErr != nil {
+		return decodeErr
+	}
+	persistedRecent := false
+	for _, row := range reconnected.Recent {
+		if row["host"] == identity["host"] && row["port"] == identity["port"] && row["type"] == identity["type"] {
+			revision, valid := row["nameRevision"].(float64)
+			persistedRecent = valid && revision > 0 && row["nameExplicit"] == false && row["name"] != "7300" && row["name"] != ""
+		}
+	}
+	if !persistedRecent {
+		return errors.New("reconnected Recent automatic provenance was not persisted")
+	}
+	final, err := h.command("", "snapshot")
+	if err != nil {
+		return err
+	}
+	if final.Profiles130 == nil || final.Profiles130.StorageError || final.Profiles130.ErrorToastCount != 0 {
+		return errors.New("native profile flow emitted asynchronous save error")
+	}
+	phases = append(phases, "Explicit reconnect retains original session/profile identity and configuration; normal state save and persisted Recent provenance acknowledged without error toasts")
 	return h.capture("", "profiles130-final")
 }

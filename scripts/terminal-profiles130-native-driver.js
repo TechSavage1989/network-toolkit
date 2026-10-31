@@ -5,7 +5,7 @@ const profile=()=>state.terminalProfiles.find(p=>p.id==='native-profile114');
 const baseline=new Map(),bootAt=Date.now();let preferencesReads=0;
 const identity=p=>JSON.stringify(Object.fromEntries(Object.entries(safeTerminalConfig(p)).sort(([a],[b])=>a.localeCompare(b))));
 function badge(node){const b=node?.querySelector('.terminal-protocol-badge'),r=b?.getBoundingClientRect();return {text:b?.textContent||'',visible:!!(r&&r.width>0&&r.height>0),noninteractive:!!b&&b.tagName==='SPAN'&&!b.hasAttribute('tabindex')};}
-window.__nativeProfiles130Snapshot=function(e){const p=profile(),tab=document.querySelector('#terminalTabs [data-terminal-tab="'+e?.info.id+'"]'),saved=document.querySelector('[data-session-kind="saved"][data-session-id="native-profile114"]'),recent=[...document.querySelectorAll('[data-session-kind="recent"]')].find(n=>n.querySelector('.terminal-protocol-badge')?.textContent==='Telnet');return {bootAt,preferencesReads,storedName:p?.name||'',explicit:p?.nameExplicit===true,pending:!!p?._namePending,profileId:p?.id||'',identityUnchanged:!baseline.has('profile')||identity(p)===baseline.get('profile'),tabBadge:badge(tab),savedBadge:badge(saved),recentBadge:badge(recent)};};
+window.__nativeProfiles130Snapshot=function(e){const p=profile(),tab=document.querySelector('#terminalTabs [data-terminal-tab="'+e?.info.id+'"]'),saved=document.querySelector('[data-session-kind="saved"][data-session-id="native-profile114"]'),recent=[...document.querySelectorAll('[data-session-kind="recent"]')].find(n=>n.querySelector('.terminal-protocol-badge')?.textContent==='Telnet');return {bootAt,preferencesReads,storageError:!!lastStorageError,errorToastCount:document.querySelectorAll('#toastStack .toast.error').length,storedName:p?.name||'',explicit:p?.nameExplicit===true,pending:!!p?._namePending,profileId:p?.id||'',identityUnchanged:!baseline.has('profile')||identity(p)===baseline.get('profile'),tabBadge:badge(tab),savedBadge:badge(saved),recentBadge:badge(recent)};};
 window.__nativeProfiles130=async function(c,snapshot,entry,wait){
  const action=c.action.slice('profiles130:'.length);
  if(action==='baseline'){baseline.set('profile',identity(profile()));NetworkToolkitSessionSidebar.activateTab('saved',{expand:true});}
@@ -25,6 +25,11 @@ window.__nativeProfiles130=async function(c,snapshot,entry,wait){
  else if(action==='reconnect'){
   const e=entry(),disconnect=[...document.querySelectorAll('[data-terminal-action="disconnect"]')].find(n=>!n.disabled&&n.getBoundingClientRect().width>0);if(!disconnect)throw Error('Visible enabled disconnect absent');disconnect.click();await wait(()=>['closed','error'].includes(e.info.state),'explicit disconnect');
   const b=[...document.querySelectorAll('[data-terminal-action="reconnect"]')].find(n=>!n.disabled&&n.getBoundingClientRect().width>0);if(!b)throw Error('Visible enabled reconnect absent');b.click();await wait(()=>e.info.state==='connected'&&!e.reconnectBusy,'same-session reconnect');
+  // Transport readiness is not persistence acknowledgement: drain the normal serialized save.
+  const persisted=await flushState();await stateWrites;
+  if(!persisted||savedStateRevision!==stateRevision||lastStorageError||document.querySelectorAll('#toastStack .toast.error').length)throw Error('Reconnect preferences did not persist cleanly');
+  const saved=await api('/state'),local=state.terminalRecent.find(p=>p.type===e.info.type&&p.host===e.info.host&&Number(p.port)===Number(e.info.port)),stored=saved.terminalRecent?.find(p=>p.id===local?.id);
+  if(!local||!stored||stored.nameRevision!==local.nameRevision||stored.nameExplicit!==false||stored.name!==local.name||!Number.isSafeInteger(stored.nameRevision)||stored.nameRevision<1||identity(stored)!==identity(local))throw Error('Reconnect Recent persistence/provenance mismatch');
  }
  else throw Error('Unknown profile130 fixture action');
  return snapshot();

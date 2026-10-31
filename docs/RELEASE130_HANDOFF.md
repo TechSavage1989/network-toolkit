@@ -100,3 +100,30 @@ Original failed evidence remains; fresh corrected hosted acceptance is pending.
 
 Combined second correction: all 1,470 JavaScript tests and Windows AMD64 test
 cross-compilation passed locally. Hosted runtime/package proof remains pending.
+
+## Asynchronous persistence defect found in pixel review
+
+Candidate54822b5 passed both new runtime jobs, but its push final screenshot showed
+a settings-save rejection after reconnect. The fixture had captured success before
+the debounced write finished. A new Recent record inherited a saved profile's
+revision, and polling could raise a new record's revision before its own first
+acknowledgement. Backend rejection of nonzero new-record revisions was correct.
+
+New records now remain revision zero until a positive acknowledgement for their
+own ID; existing Recent records retain their own revision. The transient creation
+marker is excluded from persisted settings by the existing backend whitelist.
+Pending rename/clear and legacy revision-zero records remain distinct. Backend
+conflict guards are unchanged. Native130 now awaits successful normal persistence,
+checks backend Recent identity/provenance, and rejects storage/error-toast failures.
+Original green-job/failed-pixel evidence is retained, not counted as acceptance.
+
+The wider readable tabs also exposed a native127 gesture fixture error: its third
+draft target lay beyond the clipped tab strip over the sidebar, correctly causing
+a detach. Three prior detach/return cycles had passed. The fixture must expose
+its reorder target and verify the pointer lies within the visible strip before
+performing the real gesture; ownership assertions and production behavior stay.
+
+Integrated creation-race and native fixture candidate: 1,477 JavaScript tests,
+42 Python tests, complete application Go tests, focused race tests and Windows
+AMD64 test cross-compilation all passed locally. Fresh hosted acceptance remains
+required; the earlier package is superseded, not promoted.

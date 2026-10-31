@@ -80,7 +80,7 @@ function record(entry,name=''){
  if(!label(config))return;
  const old=recent().find(item=>key(item)===key(config));
  const named=(state.terminalProfiles||[]).find(p=>p.id===entry.info.profileId)||old;
- const item={id:old?.id||'recent-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8),name:String(name||named?.name||entry.info.manualName||entry.info.label||label(config)).slice(0,100),nameExplicit:!!root.NetworkToolkitTerminalPromptLabels?.manual(named||{...config,name:name||entry.info.manualName||entry.info.label,nameExplicit:entry.info.nameExplicit,labelSource:entry.info.labelSource}),nameRevision:root.NetworkToolkitTerminalPromptLabels?.revision(named||entry.info)||0,lastUsed:Date.now(),...config};
+ const item={id:old?.id||'recent-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8),name:String(name||named?.name||entry.info.manualName||entry.info.label||label(config)).slice(0,100),nameExplicit:!!root.NetworkToolkitTerminalPromptLabels?.manual(named||{...config,name:name||entry.info.manualName||entry.info.label,nameExplicit:entry.info.nameExplicit,labelSource:entry.info.labelSource}),nameRevision:root.NetworkToolkitTerminalPromptLabels?.revision(old)||0,...(!old||old._nameNew?{_nameNew:true}:{}),...(old?._namePending?{_namePending:true}:{}),lastUsed:Date.now(),...config};
  state.terminalRecent=[item,...recent().filter(other=>other.id!==item.id)].slice(0,50);
  bindings.set(item.id,entry.info.id);
  const retained=new Set(recent().map(item=>item.id));for(const id of bindings.keys())if(!retained.has(id))bindings.delete(id);
@@ -291,7 +291,7 @@ document.addEventListener('submit',event=>{
   if(pending.target&&!itemFor(pending.target)){toast('This session changed. Open its actions again.');closeModal();return;}
   const folder=folders.normalize(byId('sessionLibrarySaveFolder')?.value);
   if(pending.mode==='rename'){const item=itemFor(pending.target);item.name=name;item.nameExplicit=true;item._namePending=true;item.folder=folder;}
-  else{if(profiles().length>=100){toast('Remove a saved session before adding another. The limit is 100.');return;}state.terminalProfiles=[{id:'terminal-profile-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8),name:(name||(root.NetworkToolkitTerminalPromptLabels?.fallback(pending.config)||label(pending.config))).slice(0,100),nameExplicit:!!name,nameRevision:0,_namePending:true,folder,...pending.config},...profiles()];}
+  else{if(profiles().length>=100){toast('Remove a saved session before adding another. The limit is 100.');return;}state.terminalProfiles=[{id:'terminal-profile-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8),name:(name||(root.NetworkToolkitTerminalPromptLabels?.fallback(pending.config)||label(pending.config))).slice(0,100),nameExplicit:!!name,nameRevision:0,_nameNew:true,_namePending:true,folder,...pending.config},...profiles()];}
   pendingName=null;closeModal();changed();
  }else if(event.target.id==='sessionLibraryFolderForm'){
   event.preventDefault();event.stopImmediatePropagation();const pending=pendingFolder;if(!pending)return;

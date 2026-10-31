@@ -24,6 +24,9 @@ func (h *nativeTerminalFixture) exerciseTerminalGestures(accepted *atomic.Int32)
 	if len(before.Geometry.Tabs) != 3 {
 		return fmt.Errorf("expected live+two draft tabs, got%d", len(before.Geometry.Tabs))
 	}
+	if !before.ReorderPointsVisible {
+		return errors.New("native reorder source or target is outside clipped visible terminal strip")
+	}
 	convert := func(s nativeTerminalSnapshot) nativeEditorSnapshot { return nativeEditorSnapshot{Geometry: s.Geometry} }
 	from, err := nativeEditorPoint(convert(before), h.session, false)
 	if err != nil {

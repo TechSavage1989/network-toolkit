@@ -209,6 +209,7 @@ type nativeTerminalSnapshot struct {
 	NameExplicit, SavedNameExplicit, SavedNameAboveIP, SavedSmallerIP      bool
 	NameRevision, SavedNameRevision                                        uint64
 	ViewportDOM                                                            float64
+	ReorderPointsVisible                                                   bool
 	GeometryFits                                                           bool
 	Viewport                                                               int
 	Startup                                                                int
