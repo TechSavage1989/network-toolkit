@@ -252,3 +252,31 @@ test('Reconnect stays primary with a separate accessible arrow and Reconnect all
  assert.equal(closed,1);
  h.dispose();
 });
+
+
+test('Disconnect split group sits immediately beside Reconnect and exposes a separately enabled Disconnect all',()=>{
+ const h=harness(),d=h.document,row=d.querySelector('#terminalActiveActions');
+ const disconnect=row.querySelector('.terminal-disconnect-split'),reconnect=row.querySelector('.terminal-reconnect-split');
+ assert(disconnect&&reconnect);
+ assert.equal(disconnect.parentElement,reconnect.parentElement);
+ const children=[...disconnect.parentElement.children];
+ assert.equal(children.indexOf(reconnect),children.indexOf(disconnect)+1,'Reconnect must be directly next to Disconnect');
+ const primary=disconnect.querySelector('[data-terminal-action="disconnect"]');
+ const arrow=disconnect.querySelector('#terminalDisconnectMore');
+ const secondary=disconnect.querySelector('#terminalDisconnectOptions [data-terminal-action="disconnect-all"]');
+ assert(primary&&arrow&&secondary);
+ assert.equal(primary.textContent,'Disconnect');
+ assert.equal(secondary.textContent,'Disconnect all');
+ assert.equal(arrow.getAttribute('aria-label'),'More disconnect options');
+ assert.equal(arrow.getAttribute('aria-controls'),'terminalDisconnectOptions');
+ assert.equal(arrow.getAttribute('aria-expanded'),'false');
+ assert(disconnect.querySelector('#terminalDisconnectOptions').classList.contains('hidden'));
+ let closed=0;
+ h.c.window.NetworkToolkitTerminalTabs={disconnectAllAvailable:()=>true,reconnectAllAvailable:()=>true,reconnectAllBusy:()=>false,windowBulkBusy:()=>false,setDisconnectOptions:()=>{closed++;}};
+ h.api.sync();
+ assert.equal(arrow.disabled,false);assert.equal(secondary.disabled,false);
+ h.c.window.NetworkToolkitTerminalTabs.disconnectAllAvailable=()=>false;
+ h.api.sync();
+ assert.equal(arrow.disabled,true);assert.equal(secondary.disabled,true);assert.equal(closed,1);
+ h.dispose();
+});

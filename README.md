@@ -14,17 +14,18 @@
   <a href="#development">Development</a>
 </p>
 
-## Latest update - 1.17.132
+## Latest update - 1.17.133
 
-The Terminal now has a Reconnect all action in the tab right-click menu and
-a small dropdown beside the existing Reconnect button. The action asks for
-confirmation before restarting eligible sessions in the current window.
+Disconnect and Reconnect are now next to one another in the active Terminal
+controls, each with a small dropdown for its corresponding all-sessions action.
+You can choose whether Reconnect all, Disconnect all or Close all tabs asks for
+confirmation. The choices are independent and can be restored in Terminal
+display settings.
 
-The updater now separates a plain-language What's New summary from the
-technical Additional details section, making releases easier to scan.
-See [release notes](RELEASE_NOTES_1.17.132.txt) and
-[release validation](docs/RELEASE132_HANDOFF.md).
-Official downloads: [GitHub Releases](https://github.com/TechSavage1989/network-toolkit/releases/latest).
+See [release notes](RELEASE_NOTES_1.17.133.txt) and
+[release validation](docs/RELEASE133_HANDOFF.md).
+The Windows portable download and updater use the same official
+[GitHub Releases](https://github.com/TechSavage1989/network-toolkit/releases/latest).
 
 ## Historical 1.17.128 candidate (subsumed by published 1.17.129)
 

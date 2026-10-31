@@ -76,3 +76,24 @@ test('shared color picker previews never enter saved state; cancel and apply pre
  h.document.emit('click',h.document.getElementById('terminalColor-selectionBackground'));assert.equal(picker.allowAlpha,true);picker.onPreview('#12345688');assert.equal(entry.xterm.options.theme.selectionBackground,'#12345688');assert.equal(JSON.stringify(h.state.terminalAppearance),original);h.state.terminalAppearance.fontFamily='Fira Code';picker.onApply('#12345688');assert.equal(h.state.terminalAppearance.fontFamily,'Fira Code');assert.equal(h.state.terminalAppearance.colors.selectionBackground,'#12345688');assert.equal(h.state.terminalAppearance.colors.background,'#112233');assert.equal(h.saves,1);
  h.document.emit('click',h.document.getElementById('terminalHighlightColor-error'));picker.onApply('#ff9b9b',{reset:true});assert(!Object.hasOwn(h.state.terminalAppearance.highlightColors,'error'));assert.equal(h.state.terminalAppearance.colors.background,'#112233');assert.equal(h.document.querySelectorAll('input[type="color"]').length,0);assert.equal(h.document.querySelectorAll('[data-terminal-hex],[data-terminal-shell-hex]').length,0);
 });
+
+
+test('Reconnect all, Disconnect all and Close all confirmation preferences are independent and can be restored in settings',()=>{
+ const h=harness(),d=h.document;
+ const ids=['terminalConfirmReconnectAll','terminalConfirmDisconnectAll','terminalConfirmCloseAll'];
+ for(const id of ids){const control=d.getElementById(id);assert(control,id);assert.equal(control.checked,true,id+' defaults to confirming');}
+ const disconnect=d.getElementById('terminalConfirmDisconnectAll');disconnect.checked=false;d.emit('change',disconnect);
+ assert.equal(h.state.terminalConfirmDisconnectAll,false);assert.equal(h.saves,1);
+ assert.equal(d.getElementById('terminalConfirmReconnectAll').checked,true);
+ assert.equal(d.getElementById('terminalConfirmCloseAll').checked,true);
+ h.state.terminalConfirmReconnectAll=false;h.state.terminalConfirmCloseAll=false;h.api.sync();
+ assert.equal(d.getElementById('terminalConfirmReconnectAll').checked,false);
+ assert.equal(d.getElementById('terminalConfirmCloseAll').checked,false);
+ const reconnect=d.getElementById('terminalConfirmReconnectAll');reconnect.checked=true;d.emit('change',reconnect);
+ assert.equal(h.state.terminalConfirmReconnectAll,true);
+ assert.equal(h.state.terminalConfirmDisconnectAll,false);
+ assert.equal(h.state.terminalConfirmCloseAll,false);
+ const close=d.getElementById('terminalConfirmCloseAll');close.checked=true;d.emit('change',close);
+ assert.equal(h.state.terminalConfirmCloseAll,true);
+ assert.equal(h.state.terminalConfirmClose,undefined,'bulk choices do not affect single-session close preference');
+});
