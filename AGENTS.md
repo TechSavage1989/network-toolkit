@@ -1,5 +1,11 @@
 # Network Toolkit development
 
+Current candidate: 1.17.131 terminal Ctrl+A input selection and multi-session
+rendering. Publication pending. Read docs/RELEASE131_HANDOFF.md for the exact
+scope and unresolved legacy Editor gear-focus observation. Preserve previous
+published tags, source, assets, identity/credential safeguards and settings.
+
+
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
