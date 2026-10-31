@@ -6,7 +6,7 @@ const html=fs.readFileSync(path.join(__dirname,'../web/index.html'),'utf8');
 function source(name){
  const start=html.search(new RegExp('^function '+name+'\\(','m'));
  assert(start>=0,'Missing '+name);
- const tail=html.slice(start),stop=tail.slice(1).search(/\\n(?:async )?function /);
+ const tail=html.slice(start),stop=tail.slice(1).search(/\n(?:async )?function /);
  assert(stop>=0,'Function not terminated: '+name);
  return tail.slice(0,stop+1);
 }
@@ -57,8 +57,8 @@ function harness(ids=['ssh','telnet','serial','powershell']){
 test('a multi-terminal output burst preserves every byte and collapses parser writes by session',()=>{
  const h=harness(),ids=['ssh','telnet','serial','powershell'],chunks=[],expected=new Map(ids.map(id=>[id,[]]));
  for(let i=0;i<80;i++)for(const id of ids){
-  // Explicitly split ANSI escapes and UTF-8 bytes across the input events.
-  const bytes=Buffer.from((i%2?'m':'\\x1b[32')+id+':'+i+':'+'.'.repeat(160));
+  // Every chunk must arrive in order even while multiple sessions stream.
+  const bytes=Buffer.from((i%2?'m':'\x1b[32')+id+':'+i+':'+'.'.repeat(160));
   chunks.push([id,bytes]);expected.get(id).push(bytes);
  }
  h.batch(chunks);
