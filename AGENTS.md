@@ -1,3 +1,24 @@
+# Network Toolkit 1.17.142 Beta 6 - published application-wide reliability
+
+Published 2026-10-31T21:49:07Z as prerelease 430206177.
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.142
+Tagged and merged PR #17 source: 4a2d215ac6fe3b8014a3b386ed436f370035d34c
+Exact release workflow 41245081790: build SUCCESS, publish SUCCESS.
+Four official assets have GitHub SHA-256 digests. Beta is opt-in;
+GitHub stable releases/latest remains v1.17.136.
+This release continues the multi-phase plan: Beta 4 performance,
+Beta 5 interface, Beta 6 reliability. It reduces unrelated graph
+reflows during concurrent tools, releases detached graph DOM and
+resize observers, cancels stale divider drags, and improves Editor
+comparison layout recovery. No profile, credential, permission,
+transport or updater consent semantics are changed.
+Known limitation: hosted narrow Editor aligned-comparison and
+continuous map-motion CI intermittently fails. This is an opt-in
+beta, not a claim of full Editor regression closure or physical
+Windows/live-device soak acceptance. Read docs/RELEASE142_HANDOFF.md
+and docs/BETA6_RELIABILITY_AUDIT.md before further changes.
+Do not replace any existing release tag, asset or checksum.
+
 # Network Toolkit v1.17.142 Beta 6 - application-wide reliability candidate, NOT PUBLISHED
 
 Development PR #17: https://github.com/TechSavage1989/network-toolkit/pull/17

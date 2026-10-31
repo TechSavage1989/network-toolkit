@@ -1,16 +1,16 @@
 NETWORK TOOLKIT 1.17.142
 ======================
 
-CURRENT RELEASE - 1.17.142 (BETA 6 CANDIDATE)
+CURRENT RELEASE - 1.17.142 (BETA 6)
 
 This beta focuses on Editor comparison line-number alignment in wrapped
 text and source-free visual gaps. The native gutter includes blank rows
 for those gaps without changing source text, saved files or undo history.
 
-This candidate is not yet published. Latest published beta: 1.17.141;
-latest stable: 1.17.136. Beta updates remain opt-in, and installations
-require explicit approval. Existing credentials, permissions, diagnostics,
-terminal sessions and the portable executable name are preserved.
+Published as an opt-in prerelease October 31, 2026. Latest stable:
+1.17.136. Installation requires explicit approval. Existing credentials,
+permissions, diagnostics, terminal sessions and the portable executable name
+are preserved. Narrow Editor motion CI failures remain tracked.
 
 Details: RELEASE_NOTES_1.17.142.txt and docs/RELEASE142_HANDOFF.md.
 Previous release descriptions follow.

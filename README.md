@@ -14,18 +14,19 @@
   <a href="#development">Development</a>
 </p>
 
-## Beta 6 - reliability and final optimization candidate
+## Latest beta - 1.17.142 Beta 6
 
-This phase addresses reliability during extended and simultaneous tool use.
-It reduces cross-tool graph redraws during Terminal and Packet Capture activity,
-releases abandoned graph DOM references and stale drags, and continues Editor
-comparison alignment recovery. It preserves source data, saved settings and
-window ownership. This is an opt-in beta candidate, not a stable promotion.
+Published October 31, 2026 as an opt-in prerelease. Beta 6 reduces unrelated
+graph redraws during simultaneous Terminal and Packet Capture activity, releases
+detached graph resources and stale drags, and improves Editor comparison recovery.
+Previously observed narrow Editor aligned-comparison and map-motion CI failures
+remain documented. Beta 6 is not a stable promotion.
 
-[Development PR](https://github.com/TechSavage1989/network-toolkit/pull/17) ·
+[Download Beta 6](https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.142) ·
+[Release notes](RELEASE_NOTES_1.17.142.txt) ·
 [Validation and handoff](docs/RELEASE142_HANDOFF.md)
 
-## Latest published beta - 1.17.141 Beta 5
+## Previous beta - 1.17.141 Beta 5
 
 Published October 31, 2026 as an **opt-in prerelease**. Editor connection
 settings and comparison-map navigation have been refined; the TFTP/SFTP
