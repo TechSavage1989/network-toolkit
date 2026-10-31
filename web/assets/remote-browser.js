@@ -79,7 +79,7 @@ function focusSidebarConnectionSettings(k){
  // A narrow sidebar can settle after the control is activated. Retry once
  // only while this same sidebar still owns focus; never steal later input.
  const original=document.activeElement;
- root.requestAnimationFrame?.(()=>{if(rootNode(k)===app&&(document.activeElement===original||!document.activeElement?.isConnected)&&!app.querySelector('.rb-connect')?.contains(document.activeElement))focus();});
+ root.requestAnimationFrame?.(()=>{if(rootNode(k)===app&&(document.activeElement===original||document.activeElement===null||document.activeElement?.isConnected===false)&&!app.querySelector('.rb-connect')?.contains(document.activeElement))focus();});
 }
 function options(values,current){return values.map(([v,label])=>'<option value="'+escape(v)+'"'+(v===current?' selected':'')+'>'+escape(label)+'</option>').join('')}
 function sshKnownRecords(){return [...(state.terminalProfiles||[]).filter(x=>x?.type==='ssh'&&x.host),...(state.terminalRecent||[]).filter(x=>x?.type==='ssh'&&x.host),...(state.sftpRecent||[]).filter(x=>x?.type==='ssh'&&x.host)];}
