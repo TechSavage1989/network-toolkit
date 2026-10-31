@@ -1,0 +1,17 @@
+Network Toolkit 1.17.134
+
+## What's New
+
+- Last paste now captures all output from SSH commands pasted one line at a time.
+- Last command now recognizes the final submitted command and its output.
+- Copy, Select and Save as macro use the corrected paced-paste history.
+
+## Additional Details
+
+- The corrected capture applies to the SSH Terminal's prompt-paced "One line at a time" mode. Raw pastes, manual input, other transports and macro execution continue with their existing behavior.
+- The backend records each accepted input line, including empty lines, and groups its output by original transport sequence boundaries. Unsent commands are not reported as executed.
+- Last paste shows the complete submitted run. Last command shows the last nonblank submitted line. Include commands preserves recognized device echoes or labels lines when a reliable echo is unavailable.
+- The macro library's Last command and Last paste buttons use commands confirmed by the completed run. Stop, disconnect and interrupted operations retain output captured up to that point.
+- The verified capture is scoped to the existing authorized run and terminal session and remains transient. Transferred windows continue using the existing bounded history limit.
+- Command sending, prompt waits, pacing, cancel/stop behavior, session ownership and generation, saved credentials/profiles, settings storage, updater package and stable Network_Toolkit.exe name are unchanged.
+- Tests use synthetic CLI sessions. Compatibility and timing on physical devices require real-world validation.

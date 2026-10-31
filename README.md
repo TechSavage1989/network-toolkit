@@ -14,18 +14,23 @@
   <a href="#development">Development</a>
 </p>
 
-## Latest update - 1.17.133
+## Latest update - 1.17.134
 
-Disconnect and Reconnect are now next to one another in the active Terminal
-controls, each with a small dropdown for its corresponding all-sessions action.
-You can choose whether Reconnect all, Disconnect all or Close all tabs asks for
-confirmation. The choices are independent and can be restored in Terminal
-display settings.
+When SSH multiline commands are pasted one line at a time, Last paste now
+includes all submitted commands and output. Last command identifies the
+final submitted command and its output. The console's Copy/Select and macro
+library's Save Last command/Last paste use the same completed capture.
 
-See [release notes](RELEASE_NOTES_1.17.133.txt) and
-[release validation](docs/RELEASE133_HANDOFF.md).
+See [release notes](RELEASE_NOTES_1.17.134.txt) and
+[release validation](docs/RELEASE134_HANDOFF.md).
 The Windows portable download and updater use the same official
 [GitHub Releases](https://github.com/TechSavage1989/network-toolkit/releases/latest).
+
+## Previous update - 1.17.133
+
+Disconnect and Reconnect are adjacent in the active Terminal controls.
+The confirmation preferences for bulk actions can be managed independently.
+See [release notes](docs/releases/RELEASE_NOTES_1.17.133.txt).
 
 ## Historical 1.17.128 candidate (subsumed by published 1.17.129)
 
