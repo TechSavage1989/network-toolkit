@@ -143,14 +143,17 @@
       if (!value.length) return '<p class="muted">No entries recorded.</p>';
       if (value.every(primitive)) return '<ul class="value-list">' + value.map(v => '<li>' + esc(scalar(v)) + '</li>').join('') + '</ul>';
       if (!value.every(record)) return '<ol class="record-list">' + value.map(v => '<li>' + renderValue(v, depth + 1) + '</li>').join('') + '</ol>';
-      const keys = [...new Set(value.flatMap(row => Object.keys(row)))];
+      // Keep key insertion order while avoiding one temporary key array per result.
+      const keySet = new Set();
+      for (const row of value) for (const key of Object.keys(row)) keySet.add(key);
+      const keys = [...keySet];
       const simpleKeys = keys.filter(k => value.every(row => !own(row, k) || simple(row[k])));
       const ordered = [...preferredColumns.filter(k => simpleKeys.includes(k)), ...simpleKeys.filter(k => !preferredColumns.includes(k))];
-      const columns = ordered.slice(0, 6);
+      const columns = ordered.slice(0, 6), selected = new Set(columns);
       if (!columns.length) return '<ol class="record-list">' + value.map(row => '<li>' + renderValue(row, depth + 1) + '</li>').join('') + '</ol>';
       const rows = value.map((row, index) => {
         const cells = columns.map(key => key === 'status' || key === 'state' ? badge(row[key]) : esc(scalar(row[key], key)));
-        const extra = Object.fromEntries(Object.entries(row).filter(([key]) => !columns.includes(key)));
+        const extra = Object.fromEntries(Object.entries(row).filter(([key]) => !selected.has(key)));
         return '<tr>' + cells.map(cell => '<td>' + cell + '</td>').join('') + '</tr>' +
           (Object.keys(extra).length ? '<tr class="expanded-record"><td colspan="' + columns.length +
             '"><details class="row-details"><summary>Additional details for entry ' + (index + 1) +

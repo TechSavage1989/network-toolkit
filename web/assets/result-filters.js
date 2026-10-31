@@ -55,7 +55,9 @@
   let cached=contexts.get(config);if(cached)return cached;
   const rows=config.rows,tool=config.job?.tool||'',measured=rows.map(row=>measurement(row,tool)),values=measured.filter(value=>value!==null),pairs=new Set(),pairKeys=new Set();let previous=-1;
   for(let i=0;i<rows.length;i++){if(measured[i]===null){previous=-1;continue;}if(previous>=0){const before=Number(rows[previous].sequence),after=Number(rows[i].sequence),consecutive=rows[previous].sequence==null||rows[i].sequence==null||Number.isFinite(before)&&Number.isFinite(after)&&after===before+1;if(consecutive){pairs.add(rows[previous]);pairs.add(rows[i]);for(const row of [rows[previous],rows[i]]){const key=identity(row);if(key)pairKeys.add(key);}}}previous=i;}
-  const stats=config.statistics||config.job?.result?.data?.statistics||config.job?.sampleStatistics||{},retained={minMs:values.length?Math.min(...values):null,maxMs:values.length?Math.max(...values):null,avgMs:values.length?values.reduce((a,b)=>a+b,0)/values.length:null};
+  // Avoid passing an unbounded monitoring history as function arguments.
+  let min=Infinity,max=-Infinity,total=0;for(const value of values){if(value<min)min=value;if(value>max)max=value;total+=value;}
+  const stats=config.statistics||config.job?.result?.data?.statistics||config.job?.sampleStatistics||{},retained={minMs:values.length?min:null,maxMs:values.length?max:null,avgMs:values.length?total/values.length:null};
   const metric=key=>{if(Object.prototype.hasOwnProperty.call(stats,key)){const raw=stats[key];return {value:raw!==null&&raw!==undefined&&Number.isFinite(Number(raw))?Number(raw):null,kind:'run'};}return {value:retained[key]??null,kind:'retained'};};
   cached={measured,pairs,pairKeys,metric,values};contexts.set(config,cached);return cached;
  }
@@ -80,7 +82,7 @@
   if(['minimum','maximum'].includes(p.statistic)&&ref.value!==null&&!config.rows.some(row=>measurement(row,config.job.tool)===ref.value))message='The '+ref.kind+' '+p.statistic+' is not present in retained samples. No different measurement is substituted.';
   return {...p,active:p.status!=='all'||p.type!=='all'||!!p.statistic||!!query||legacyStatus!=='all',reference:ref.value,referenceKind:ref.kind,message,jobId:String(config.job.id),view:config.view};
  }
- function choices(config,kind){const values=new Set(config.rows.map(row=>kind==='status'?status(row,config.job.tool):type(row,config)).filter(Boolean));return [...values].sort((a,b)=>label(a).localeCompare(label(b)));}
+ function choices(config,kind){const values=new Set();for(const row of config.rows){const value=kind==='status'?status(row,config.job.tool):type(row,config);if(value)values.add(value);}return [...values].sort((a,b)=>label(a).localeCompare(label(b)));}
  function controls(config){
   if(!eligible(config))return '';const p=preferences(config.view),statuses=choices(config,'status'),types=choices(config,'type');if(!statuses.length&&!types.length&&!p.statistic&&p.status==='all'&&p.type==='all')return '';
   const select=(kind,values,selected)=>'<label><span>'+ (kind==='status'?'Status':'Type')+'</span><select data-result-filter-'+kind+'="'+escape(config.id)+'" aria-label="Filter '+escape(config.name||'results')+' by detailed '+kind+'"><option value="all"'+(selected==='all'?' selected':'')+'>All '+(kind==='status'?'statuses':'types')+'</option>'+[...new Set([...values,...(selected!=='all'?[selected]:[])])].map(value=>'<option value="'+escape(value)+'"'+(value===selected?' selected':'')+'>'+escape(label(value)+(values.includes(value)?'':' (not in current results)'))+'</option>').join('')+'</select></label>';

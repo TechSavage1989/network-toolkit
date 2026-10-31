@@ -11,8 +11,21 @@
   <a href="#features">Features</a> ·
   <a href="#updates-and-settings">Updates</a> ·
   <a href="docs/releases">Release history</a> ·
+  <a href="docs/DEVELOPMENT_ROADMAP.md">Development roadmap</a> ·
   <a href="#development">Development</a>
 </p>
+
+## Beta 8 candidate - v1.17.144 (application-wide performance)
+
+The next opt-in beta applies measured improvements across shared network
+diagnostics, discovery, monitoring and report results, and common interface
+status controls. It preserves previous source files, connection settings,
+transfer permissions and portable Windows update behavior. This is a
+development candidate, not yet the latest published beta.
+
+[Development roadmap](docs/DEVELOPMENT_ROADMAP.md) ·
+[Beta 8 performance audit](docs/BETA8_APPWIDE_AUDIT.md) ·
+[Release candidate and handoff](docs/RELEASE144_HANDOFF.md)
 
 ## Latest beta - 1.17.143 Beta 7
 

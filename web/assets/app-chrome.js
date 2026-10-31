@@ -9,6 +9,9 @@
   }
 
   // Reuse each existing control; no duplicate handlers, state or capabilities.
+  const attribute=(node,name,value)=>{if(node.getAttribute(name)!==value)node.setAttribute(name,value);};
+  const title=(node,value)=>{if(node.title!==value)node.title=value;};
+  const tabIndex=(node,value)=>{if(node.tabIndex!==value)node.tabIndex=value;};
   function navigationHost() {
     if (document.body.classList.contains('terminal-window') || document.body.classList.contains('editor-window')) return null;
     if (document.body.classList.contains('terminal-page')) return document.querySelector('#terminalCommandBar .terminal-command-start');
@@ -25,22 +28,23 @@
     const host = document.getElementById('hostTop'), brand = document.querySelector('#sidebar .brand-mark');
     if (host) {
       const name = host.textContent.trim() || 'Local diagnostics';
-      host.title = name;
-      host.setAttribute('aria-label', 'System: ' + name);
+      title(host,name);
+      attribute(host,'aria-label', 'System: ' + name);
       if (brand) {
-        brand.title = 'Network Toolkit — ' + name;
-        brand.setAttribute('aria-label', 'Network Toolkit. System: ' + name);
-        brand.setAttribute('role', 'img');
-        brand.tabIndex = document.body.classList.contains('app-nav-collapsed') ? 0 : -1;
+        title(brand,'Network Toolkit — ' + name);
+        attribute(brand,'aria-label', 'Network Toolkit. System: ' + name);
+        attribute(brand,'role', 'img');
+        tabIndex(brand,document.body.classList.contains('app-nav-collapsed') ? 0 : -1);
       }
     }
     const count = document.getElementById('runningCount');
     if (count) {
       const text = count.textContent.trim();
-      count.dataset.count = /^\d+/.exec(text)?.[0] || '0';
-      count.title = text + ' diagnostic jobs';
-      count.setAttribute('aria-label', text + ' diagnostic jobs');
-      count.tabIndex = count.hidden ? -1 : 0;
+      const total=/^\d+/.exec(text)?.[0] || '0';
+      if(count.dataset.count!==total)count.dataset.count=total;
+      title(count,text + ' diagnostic jobs');
+      attribute(count,'aria-label',text + ' diagnostic jobs');
+      tabIndex(count,count.hidden ? -1 : 0);
     }
   }
 

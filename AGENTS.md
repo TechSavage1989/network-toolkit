@@ -1,3 +1,28 @@
+# Network Toolkit v1.17.144 Beta 8 - measured application-wide optimization candidate
+
+**Permanent approved plan:** docs/DEVELOPMENT_ROADMAP.md. Future chats
+must read that file first, plus docs/DEVELOPMENT_HANDOFF.md and the newest
+release handoff. Beta 8 follows the original eleven-area performance and
+polishing roadmap, not an Editor-only or Terminal-only roadmap.
+Branch: beta/1.17.144-application-wide-performance. Not published.
+Full candidate, local evidence, per-area audit and release gates:
+docs/RELEASE144_HANDOFF.md and docs/BETA8_APPWIDE_AUDIT.md.
+Latest published beta remains v1.17.143, stable v1.17.136.
+Preserve the reported 390px Editor motion CI failure, historic SFTP
+cancellation limitations, no physical Windows endurance certification,
+stable Network_Toolkit.exe, settings, credentials and updater consent.
+
+# v1.17.144 Beta 8 - authoritative persistent roadmap
+
+**Read docs/DEVELOPMENT_ROADMAP.md first.** The approved plan includes
+eleven application areas and the full multi-phase performance, interface,
+reliability and stable acceptance roadmap. Continue this plan across chats.
+Beta 8 audits all eleven areas and implements measured cross-tool improvements.
+Read docs/RELEASE144_HANDOFF.md for source, CI, scope and handoff.
+Published baseline remains v1.17.143 Beta 7; this branch is not yet released.
+Keep exact output semantics, settings, credentials, permissions, installer
+consent, portable executable name and all older release assets unchanged.
+
 # Network Toolkit v1.17.143 Beta 7 - published opt-in comparison reliability
 
 Published 2026-10-31T22:21:57Z as GitHub prerelease 430220837.
