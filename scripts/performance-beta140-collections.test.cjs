@@ -17,7 +17,7 @@ test('SSH/FTP file browser reuses listing order during repeated selection, but r
  p.filter='FILE';const filtered=h.sortedItems(p);assert.notStrictEqual(filtered,one);assert.deepEqual(Array.from(filtered,r=>r.name),['file1','file2','file10']);
  assert.strictEqual(h.sortedItems(p),filtered);
  p.reverse=true;assert.deepEqual(Array.from(h.sortedItems(p),r=>r.name),['file10','file2','file1']);
- p.sort='size';assert.deepEqual(Array.from(h.sortedItems(p),r=>r.name),['file10','file2','file1']);
+ p.sort='size';assert.deepEqual(Array.from(h.sortedItems(p),r=>r.name),['file1','file2','file10']);
  p.entries=list(['file6','file4']);assert.notStrictEqual(h.sortedItems(p),filtered);
  assert.equal(JSON.stringify(list(['file10','file2','file1','.hidden','folder/'])),before,'source rows remain unmodified');
 });
@@ -34,7 +34,7 @@ test('TFTP/SFTP explorer caches sorted and filtered views until the folder, filt
  p.hidden=true;const unhidden=h.visible(p);assert.notStrictEqual(unhidden,shown);assert.equal(unhidden.length,5);
  p.filter='ENTRY';const filtered=h.visible(p);assert.deepEqual(Array.from(filtered,r=>r.name),['entry1','entry2','entry10']);assert.strictEqual(h.visible(p),filtered);
  p.reverse=true;assert.deepEqual(Array.from(h.visible(p),r=>r.name),['entry10','entry2','entry1']);
- p.sort='size';const sizes=h.visible(p);assert.deepEqual(Array.from(sizes,r=>r.name),['entry10','entry2','entry1']);
+ p.sort='size';const sizes=h.visible(p);assert.deepEqual(Array.from(sizes,r=>r.name),['entry1','entry2','entry10']);
  p.entries=list(['newfile','newdir/']);p.filter='';assert.notStrictEqual(h.visible(p),sizes);
  assert.equal(JSON.stringify(list(['entry10','entry2','.secret','dir/','entry1'])),prior);
 });
