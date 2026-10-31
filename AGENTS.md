@@ -1,5 +1,19 @@
 # Network Toolkit development
 
+Current published prerelease: v1.17.138 Beta 2, published
+2026-10-31T07:38:31Z. Source/tag: 8e9052eb14ab9a5a5fc9363b0ac710a36203a133.
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.138
+Phase 1 Beta 2 adds frame-coalesced pane splitter dragging, clips
+unfitted xterm canvas content within its pane, and preserves a
+scrollback viewport fallback during resize. Exact-source release
+build/publish passed, four assets exist and stable latest remains
+v1.17.136. Beta updates are opt-in; installation is user confirmed.
+The 1.17.137 prior prerelease assets and tag remain unchanged.
+Read docs/RELEASE138_HANDOFF.md and docs/DEVELOPMENT_HANDOFF.md before editing.
+Broad Windows/browser CI pending observations and historical failures
+are not claimed fixed; no physical-device performance measurements
+were performed.
+
 Current candidate: v1.17.138 Beta 2 continues Phase 1 terminal responsiveness,
 based on v1.17.137 Beta 1. The change coalesces pointer-driven divider layout,
 clips unfitted canvases to their own panes and retains scrolled-back viewport
