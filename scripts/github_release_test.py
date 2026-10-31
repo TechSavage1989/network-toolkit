@@ -109,6 +109,18 @@ class ReleaseGuards(unittest.TestCase):
         self.assertNotIn('--clobber', command)
         self.assertIn(str(Path(self.temporary.name) / f'Network_Toolkit_{self.current}_Update.zip'), command)
 
+    def test_beta_channel_is_published_as_github_prerelease(self):
+        with mock.patch.object(release, 'release_channel', return_value='beta'):
+            command = self.publish_with()
+        self.assertIn('--prerelease', command)
+        self.assertEqual(command[command.index('--title') + 1], 'Network Toolkit ' + self.current + ' Beta')
+        self.assertNotIn('--clobber', command)
+
+    def test_stable_channel_never_uses_prerelease_flag(self):
+        with mock.patch.object(release, 'release_channel', return_value='stable'):
+            command = self.publish_with()
+        self.assertNotIn('--prerelease', command)
+
     def test_publisher_refuses_existing_release(self):
         with self.assertRaisesRegex(ValueError, 'refusing to replace'):
             self.publish_with(existing_release={'id': 1})
