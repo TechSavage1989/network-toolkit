@@ -35,6 +35,7 @@ async function setup(width){
      data={session:sessions[i]};inflight--;
     }else if(pathname.match(/^\/api\/terminals\/synthetic-(one|two)\/resize$/)&&method==='POST')data={};
     else if(pathname==='/api/state'&&method==='PUT')data={};
+    else if(pathname==='/api/editor-views/current/activity'&&method==='POST')data={};
     else if(method!=='GET')throw Error('Unexpected mutation '+method+' '+pathname);
     return route.fulfill({contentType:'application/json',body:JSON.stringify(data)});
    }
