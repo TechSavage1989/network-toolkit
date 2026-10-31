@@ -119,13 +119,24 @@ test('native virtual-gap origin contradiction uses actual visible text and prese
  rect.top-=.828125;assert.equal(api.nativeOriginMismatch(view),null,'at most 2px follows existing rendered geometry tolerance');
  rect.top=-2.828125;view.contentDOM.querySelector=()=>null;assert.equal(api.nativeOriginMismatch(view),null,'never rebuild a nonvirtual native document');
 });
-test('native origin recovery is bounded once per side/layout generation and never consumes a busy gesture',()=>{
+test('native origin recovery allows at most three attempts per side and layout generation',()=>{
  const guard=api.createOriginRepairGuard();let resets=0;const reset=()=>resets++;
  for(let i=0;i<40;i++)assert.equal(guard.attempt('right',7,false,reset),false);
- assert.equal(resets,0,'continuous map/wheel/composition/transfer refusal is not a repaint timer');
- assert.equal(guard.attempt('right',7,true,reset),true);assert.equal(resets,1);
+ assert.equal(resets,0,'busy gestures and composition do not consume an attempt');
+ for(let i=0;i<3;i++)assert.equal(guard.attempt('right',7,true,reset),true);
  for(let i=0;i<40;i++)assert.equal(guard.attempt('right',7,true,reset),false);
- assert.equal(guard.attempt('left',7,true,reset),true);assert.equal(guard.attempt('right',8,true,reset),true);assert.equal(resets,3);
+ assert.equal(resets,3,'a persistent native viewport defect has a finite retry budget');
+ assert.equal(guard.attempt('left',7,true,reset),true);
+ assert.equal(guard.attempt('right',8,true,reset),true);
+ assert.equal(resets,5,'other sides and newer measured generations have independent budgets');
+});
+test('gross native virtual-height overestimate captures a source anchor for bounded recovery',()=>{
+ const state=C.EditorState.create({doc:'first\nsecond\nthird'}),rect={top:-2.828125,bottom:17.3125,height:20.140625};
+ const view={state,contentHeight:86548,scrollDOM:{getBoundingClientRect:()=>({top:0,bottom:100})},contentDOM:{querySelectorAll:()=>[{dataset:{sourceLine:'2'},getBoundingClientRect:()=>rect}]}};
+ const mismatch=api.nativeHeightMismatch(view,27864);assert.equal(mismatch.line,2);assert.equal(mismatch.oversized,true);assert(Math.abs(mismatch.fraction-2.828125/20.140625)<1e-8);
+ view.contentHeight=27864*1.24;assert.equal(api.nativeHeightMismatch(view,27864),null,'ordinary unsettled virtual heights are not resets');
+ view.contentHeight=86548;assert.equal(api.nativeHeightMismatch(view,0),null,'unmeasured aligned layout cannot trigger repair');
+ view.contentDOM.querySelectorAll=()=>[];assert.equal(api.nativeHeightMismatch(view,27864),null,'no visible source means no safe anchor');
 });
 test('public native reset preserves exact immutable source state, selection, external undo and focus',()=>{
  const state=C.EditorState.create({doc:'alpha\n😀 beta\nlast',selection:{anchor:3,head:10}}),undo=['previous text'],document={content:state.doc.toString(),undo,dirty:true,editRevision:12},view={state,hasFocus:true,scrollDOM:{scrollLeft:29},setState(value){assert.equal(value,state);this.state=value;this.scrollDOM.scrollLeft=0;this.hasFocus=false;},focus(){this.hasFocus=true;}};
