@@ -681,6 +681,13 @@
       if (!term || typeof term.registerMarker !== 'function' || typeof term.registerDecoration !== 'function' || !term.buffer || !term.buffer.active) throw new Error('Unsupported terminal API');
       scrollView = { type: term.buffer.active.type, base: term.buffer.active.baseY, first: term.buffer.active.viewportY };
       subscribe(term.onWriteParsed, () => {
+        // Hidden tabs can continue receiving output. Avoid scanning every mark
+        // until the tab becomes visible; the existing pane activation refresh
+        // reconciles its current buffer without changing any terminal bytes.
+        if(term.element?.classList?.contains?.('hidden')){
+          if(records.size||dirty.size)flush();
+          return;
+        }
         // Keep the existing immediate reconciliation of old marks: changed
         // ANSI/invisible attributes must take precedence before the next paint,
         // including marked rows beyond this turn's new-row scanning budget.
