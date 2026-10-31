@@ -14,16 +14,17 @@
   <a href="#development">Development</a>
 </p>
 
-## Beta 7 candidate - 1.17.143
+## Latest beta - 1.17.143 Beta 7
 
-The next reliability beta refines synchronized Editor comparison scrolling in
-narrow, wrapped layouts. Small rendered-row offsets are corrected only during
-synchronized gestures, while independent scrolling and all source/history data
-remain unchanged. Its browser regressions also await actual virtualized source
-rows before inspecting colors and native geometry. This is an opt-in prerelease
-candidate, not a stable promotion.
+Published October 31, 2026 as an opt-in prerelease. Beta 7 improves narrow
+Editor source alignment and synchronized comparison-map scrolling, with
+changed comparison rows correctly matched across inserted or removed lines.
+The original narrow continuous-motion test retains intermittent brief
+3-5px offset failures. This is a beta limitation, not a stable promotion.
 
-[Development handoff](docs/RELEASE143_HANDOFF.md)
+[Download Beta 7](https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.143) ·
+[Release notes](RELEASE_NOTES_1.17.143.txt) ·
+[Validation and handoff](docs/RELEASE143_HANDOFF.md)
 
 ## Previous beta - 1.17.142 Beta 6
 
@@ -34,7 +35,7 @@ Previously observed narrow Editor aligned-comparison and map-motion CI failures
 remain documented. Beta 6 is not a stable promotion.
 
 [Download Beta 6](https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.142) ·
-[Release notes](RELEASE_NOTES_1.17.142.txt) ·
+[Release notes](docs/releases/RELEASE_NOTES_1.17.142.txt) ·
 [Validation and handoff](docs/RELEASE142_HANDOFF.md)
 
 ## Previous beta - 1.17.141 Beta 5
@@ -45,7 +46,7 @@ file explorer now supports keyboard sizing and cancel-safe dragging.
 Previous release tags and updater safeguards remain intact.
 
 [Download Beta 5](https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.141) ·
-[Release notes](RELEASE_NOTES_1.17.141.txt) ·
+[Release notes](docs/releases/RELEASE_NOTES_1.17.141.txt) ·
 [Validation and handoff](docs/RELEASE141_HANDOFF.md)
 
 ## Previous beta - 1.17.140 Beta 4

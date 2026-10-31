@@ -1,3 +1,21 @@
+# Network Toolkit v1.17.143 Beta 7 - published opt-in comparison reliability
+
+Published 2026-10-31T22:21:57Z as GitHub prerelease 430220837.
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.143
+Tag and merged PR #18 source: cdef07de894b68b472f083bf3082fb905c7ffa9e.
+Release workflow 41247610887: build SUCCESS and publish SUCCESS.
+Four official assets with SHA-256 digests; stable releases/latest remains v1.17.136.
+Beta7 improves narrow Editor comparison source rendering and synchronized
+row motion; exact browser alignment, divider, Windows, security and core
+release checks passed. Full browser-editor112 CI retained a narrow map-motion
+failure: brief 3-5 CSS pixel peer drift during 390px gestures, exceeding the
+existing 2px threshold; this is not claimed repaired or waived.
+No stable promotion, physical Windows endurance/real-device certification,
+credential/permission change or implicit update installation. Read
+docs/RELEASE143_HANDOFF.md and docs/DEVELOPMENT_HANDOFF.md for the complete
+known-failure record and continue future changes in a later beta.
+Previous published tags and asset bytes are immutable.
+
 # Network Toolkit v1.17.143 Beta 7 - comparison reliability candidate
 
 Based on published v1.17.142 Beta 6 and main post-release documentation

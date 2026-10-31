@@ -1,3 +1,61 @@
+# Network Toolkit v1.17.143 Beta 7 - published, limitations preserved
+
+Published at 2026-10-31T22:21:57Z, prerelease=true, draft=false,
+GitHub release ID 430220837.
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.143
+Source/tag/merged PR #18: cdef07de894b68b472f083bf3082fb905c7ffa9e.
+Exact source Release run 41247610887 passed both build and publish jobs.
+
+## Delivered and protected
+
+- Comparison map synchronizes native scroll geometry using bounded painted
+  offsets from visible matched comparison rows, including unequal source
+  line indices caused by insertions or removals.
+- Editor browser source-geometry tests wait for mounted virtual source rows
+  without raising or waiving the existing visual tolerances.
+- Original source text, selections, history, saved connections, credential
+  storage, transport authorization, desktop icon, update consent, and stable
+  Network_Toolkit.exe filename are unchanged.
+- Release build passed application Go tests, JavaScript regression tests,
+  Python release guards, Windows x64 PE resources/build, portable source ZIP
+  and strict binary-only update ZIP verification.
+
+GitHub-reported release asset metadata:
+- Network_Toolkit.exe: 21,109,248 bytes;
+  SHA-256 aa896aa49615d6258afb06f565978134127d7b3e2424fae02a759b2de62d3f72
+- Network_Toolkit_1.17.143_Portable.zip: 14,440,778 bytes;
+  SHA-256 edac84b3ffb6aecf06e9f915ef35885016ae9416de6bb8ad6544482e00fa1543
+- Network_Toolkit_1.17.143_Update.zip: 8,066,191 bytes;
+  SHA-256 0afa573eeec7348898b2e8411ed410f63201ee3f930cb5e0afb3655db68ee0a1
+- SHA256SUMS: 292 bytes;
+  SHA-256 3e3d8684c755a1c98fa5fca44d89c6b855b772bc93987bb32c26030a6f1b8db0
+
+Tag, release target and merge commit agree; latest listed prerelease
+is v1.17.143, normal stable latest remains v1.17.136. Asset sizes and
+digests are GitHub metadata, not an independent public-download rehash.
+
+## Unresolved hosted CI
+
+Checks run 41246461674 passed twelve job groups, including Windows native,
+security, core app/JavaScript and source-alignment browser tests; the
+browser-editor112 job failed the existing continuous comparison-map motion
+test. Three 390px scenarios reported brief 3-5 CSS px common-row offsets
+(p95 approximately 3.31 to 4.45), above the unchanged 2px threshold,
+although the panes converged after the movement. No source loss was shown.
+The independent broad browser job had not completed when last checked.
+Do not call all 14 jobs passed, do not waive these observations, and do
+not claim full Editor regression closure from a successful release build.
+
+Real hardware, sustained multi-hour Windows load, memory-growth soak,
+live SSH/Telnet/Serial concurrency and native SFTP cancellation remain
+separate acceptance work. Beta 7 is not a stable certification.
+
+This post-publication documentation closure changes no published source,
+tag, binary, asset or release body. The candidate notes following this
+section are retained as historical context, not a pending publication.
+
+---
+
 # Network Toolkit v1.17.143 Beta 7 - development candidate, NOT PUBLISHED
 
 Branch beta/1.17.143-editor-reliability, starting from main 0730b532cba6619d4025a3bb4ae45bf3d77112da.

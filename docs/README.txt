@@ -12,8 +12,12 @@ The included Editor browser regression checks wait for requested source
 lines to be rendered before inspecting native colors and geometry. The
 original position and color assertions are not relaxed.
 
-Stable remains 1.17.136. Beta 7 is not a stable promotion. Long-running
-physical Windows and live network-device validation remains necessary.
+Published as opt-in GitHub prerelease October 31, 2026. Stable remains
+1.17.136. The release build and publication passed; source alignment and
+divider integration checks passed, but the narrow continuous-map motion CI
+retains intermittent 3-5px offsets against the existing 2px expectation.
+Beta 7 is not a stable promotion; physical Windows endurance and live
+network-device validation remain necessary.
 
 Details: RELEASE_NOTES_1.17.143.txt and docs/RELEASE143_HANDOFF.md.
 Previous release descriptions follow.
