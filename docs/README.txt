@@ -1,7 +1,7 @@
-NETWORK TOOLKIT 1.17.137 BETA 1
-=============================
+NETWORK TOOLKIT 1.17.137
+======================
 
-CURRENT PRERELEASE - 1.17.137
+CURRENT RELEASE - 1.17.137 (BETA 1)
 
 The first Phase 1 responsiveness beta reduces redundant layout work
 during rapid terminal pane resizing. It skips repeated stage measurements
