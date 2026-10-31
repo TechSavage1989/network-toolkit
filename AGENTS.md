@@ -13,6 +13,13 @@ assets and tags remain unchanged.
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
+For every future release, follow docs/RELEASE_NOTES_STYLE.md. In-app "What's New"
+must briefly explain practical user-visible benefits, not engineering jargon;
+"Additional Details" must provide accurate specific technical behavior, scope,
+compatibility and limitations. Use the exact two headings in release notes.
+The GitHub release body is shown by the updater, so validate both disclosure
+sections before publishing. Preserve historical published release notes.
+
 Previous published version: 1.17.130. Published 2026-10-31T03:13:29Z;
 actual public download/source/feed proof 03:14:21.181667Z, independent 03:15:04.117528Z.
 Source/tag 77ceeec0b9b258dc7e3a1dfc29f9992ad3d5d884;
