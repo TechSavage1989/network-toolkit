@@ -1,3 +1,22 @@
+NETWORK TOOLKIT 1.17.137 BETA 1
+=============================
+
+CURRENT PRERELEASE - 1.17.137
+
+The first Phase 1 responsiveness beta reduces redundant layout work
+during rapid terminal pane resizing. It skips repeated stage measurements
+while every visible pane already has a scheduled fit, avoids unnecessary
+highlight refreshes when terminal dimensions have not changed, and defers
+cosmetic chrome redraws while resizing in real browser windows.
+Terminal cell fitting, remote PTY resize, prompt pacing, output and
+input guards remain in place.
+
+This release is an opt-in GitHub prerelease. Install stable 1.17.136 first,
+then enable Beta updates in App settings > Updates and check/download.
+A later stable version must be newer than this beta to switch back without
+downgrading. Current beta release details: RELEASE_NOTES_1.17.137.txt.
+Previous stable releases follow.
+
 NETWORK TOOLKIT 1.17.136
 =====================
 
