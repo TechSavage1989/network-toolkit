@@ -1,13 +1,15 @@
-# Network Toolkit v1.17.142 Beta 6 - gutter alignment candidate (not published)
+# Network Toolkit v1.17.142 Beta 6 - candidate, NOT PUBLISHED
 
-Development branch: beta/1.17.142-gutter-alignment, based on published
-v1.17.141 Beta 5 plus its documentation-only handoff commit. Read
-docs/RELEASE142_HANDOFF.md and docs/DEVELOPMENT_HANDOFF.md before further
-changes. Keep source-free comparison gaps after their source lines, verify
-actual native gutter geometry at narrow widths and preserve all prior
-credentials, settings, transports, updater safeguards and release assets.
-Do not call this candidate published, stable or browser validated before
-its exact-source tests finish. Stable latest remains v1.17.136.
+Development PR #17: https://github.com/TechSavage1989/network-toolkit/pull/17
+Based on published v1.17.141 Beta 5 and its documentation-only main handoff.
+Read docs/RELEASE142_HANDOFF.md and docs/DEVELOPMENT_HANDOFF.md.
+The revised fix leaves comparison gaps in their original source-free positions
+and gives native CodeMirror line-number gutters blank markers for those gaps.
+The initial change moving block widgets after source lines was superseded
+after divider and motion CI failures. Preserve source, selection, saved
+settings, credentials, network/transfer permissions, opt-in beta updates
+and stable Network_Toolkit.exe. Do not publish without exact-source browser,
+native, core, package and security checks. Stable remains v1.17.136.
 
 # Network Toolkit v1.17.141 Beta 5 - published Editor and file explorer polish
 

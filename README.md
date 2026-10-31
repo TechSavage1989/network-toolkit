@@ -14,7 +14,16 @@
   <a href="#development">Development</a>
 </p>
 
-## Latest beta - 1.17.141 Beta 5
+## Beta 6 candidate - 1.17.142
+
+This beta improves Editor line-number alignment in two-document comparisons
+when wrapped lines and blank visual gaps are present. It keeps file content,
+editor history and window ownership unchanged. The candidate is under review.
+
+[Development PR](https://github.com/TechSavage1989/network-toolkit/pull/17) ·
+[Validation and handoff](docs/RELEASE142_HANDOFF.md)
+
+## Latest published beta - 1.17.141 Beta 5
 
 Published October 31, 2026 as an **opt-in prerelease**. Editor connection
 settings and comparison-map navigation have been refined; the TFTP/SFTP

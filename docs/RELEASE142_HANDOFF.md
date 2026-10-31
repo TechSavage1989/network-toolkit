@@ -1,29 +1,54 @@
 # Network Toolkit v1.17.142 Beta 6 - comparison gutter alignment candidate
 
-Status: development candidate, NOT PUBLISHED.
-Base: published v1.17.141 Beta 5 (tag e2b8facd51834cfa93e2f587e01cd9d1c2696a89) plus the documentation-only main handoff commit 57d52c5bc3832239e2eeee1e2c30968111196491.
-Branch: beta/1.17.142-gutter-alignment.
+Status: UNPUBLISHED candidate on beta/1.17.142-gutter-alignment, PR #17.
+Based on published v1.17.141 (e2b8facd51834cfa93e2f587e01cd9d1c2696a89)
+and documentation-only main commit 57d52c5bc3832239e2eeee1e2c30968111196491.
 
-## Evidence and scope
+## Root cause and rejected first approach
 
-- After v1.17.141 publication, main Checks workflow 41232846183 finished with 13/14 jobs successful. The browser-editor112 job failed its existing editor-divider113.browser.cjs gate.
-- In main comparison at 820px, dark theme, the right native line-number gutter was persistently about 2.265625 CSS pixels above visible source lines 138-144. Rendered source content and map positions were otherwise consistent. The divider gate records the failure instead of waiving the 2px alignment threshold.
-- The patch anchors each visual, source-free after-line alignment gap at the preceding CodeMirror source line end with block widget side +1, instead of inserting it before the next line at its source start. This avoids making the next native gutter row a compound leading-widget/source block.
-- The aligned-to-native pixel mapping now finds the trailing gap at that same preceding line end. Leading gaps and final-line gaps retain source-free behavior.
-- Focused tests model the preceding-line boundary, fractional gap pixels, and aligned/native round trips. Existing rendered acceptance still determines whether the correction works.
+- The v1.17.141 post-release Checks 41232846183 failed existing
+  editor-divider113.browser.cjs in an 820px dark comparison view: the
+  right native line-number gutter lagged actual source rows by 2.265625
+  CSS pixels. The test's 2px threshold was not relaxed.
+- The first v1.17.142 candidate moved source-free after-line spacer
+  widgets before newline boundaries and revised map coordinate lookup.
+  PR Checks 41237848219 demonstrated larger false scroll heights and
+  failures in the divider and continuous motion gates. That code
+  was superseded; do not represent that revision as validated or released.
 
-## Preservation requirements
+## Revised candidate
 
-Keep document text, UTF-16 offsets, undo/redo, dirty state, source ownership, credentials, transfer destinations, authorized native SFTP, saved settings, terminal transports, diagnostics, packet capture, beta opt-in and installation confirmation unchanged. Do not adjust gutter DOM element positions manually or relax native geometry assertions.
+- Keep the original source-free visual gap placement, comparison model,
+  fractional map translation and content/selection transactions unchanged.
+- Use an explicit native CodeMirror line-number gutter with the same
+  numbered source line markers as before, and empty gutter markers
+  for actual block gap widgets. CodeMirror now includes those fractional
+  source-free heights in its normal gutter layout.
+- Keep the existing diff-symbol gutter independent. No manual gutter
+  DOM positioning, text insertion, viewport-copy workaround or source
+  line count change.
+- Focused regression tests cover gap markers, source line identities,
+  spacer widths and current gutter refresh. Browser acceptance must
+  establish correct rendered behavior; unit tests alone are insufficient.
 
-## Validation before release
+## Acceptance and safeguards
 
-- Run focused source tests, full JavaScript/Go/Python checks and browser/native Windows CI.
-- Observe editor-divider113.browser.cjs for all main/detached/modal, split/comparison, 1440/820/390 widths and both themes; inspect fractional gutter alignment and screenshot stability.
-- Keep editor-alignment113.browser.cjs, editor-motion114.browser.cjs, editor-compare115.browser.cjs, browser security and native editor tests in scope.
-- Any failure requires investigation, not a waived threshold or a claim that earlier native SFTP cancellation issues are solved.
-- If all release checks eventually pass, coordinate version 1.17.142 in Go/web/Windows resources and release notes, publish opt-in prerelease only under separate release authorization, verify four assets and digests, and keep stable v1.17.136 and all earlier tags/assets unchanged.
-
-No physical Windows end-user, real SSH/serial hardware, or network-device benchmark is claimed.
+- Run full Node/Go/Python, security, Windows, and browser suites against
+  the exact versioned candidate; preserve the original divider gate
+  across main/detached/modal, 1440/820/390 widths and both themes.
+- Verify the continuous comparison motion gate, visible gutter geometry,
+  native editing, source bytes, undo/redo, window ownership and rendering.
+  Document any failures rather than waiving geometry thresholds.
+- Windows version resources, the 1.17.142 Go and UI version, stable
+  Network_Toolkit.exe, ZIP source allowlist and binary-only updater
+  package must match exactly.
+- Publish only as opt-in GitHub prerelease after reviewed CI succeeds.
+  Verify release tag, four assets/digests, updater beta discovery and
+  unchanged stable v1.17.136 feed and older release assets.
+- No new stored credentials, network permissions, transfer destinations,
+  packet capture behavior, automatic installation or source ownership.
+  Historical SFTP cancellation issues are separate.
+- No physical customer-device Windows, SSH, Telnet or serial measurements
+  are claimed.
 
 PUBLICATION PENDING.
