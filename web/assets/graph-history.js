@@ -13,11 +13,33 @@
  function setPreferences(value,{persist=true,fit=false,fitAll=false,compressionOnly=false}={}){fallback=normalize({...preferences(),...value});try{if(typeof state!=='undefined')state.graphTimeRange=fallback;if(persist&&typeof saveState==='function')saveState();}catch{}if(root.document?.dispatchEvent&&typeof root.CustomEvent==='function')root.document.dispatchEvent(new root.CustomEvent('networkToolkitGraphTimeChange',{detail:{...fallback,...(fit?{fit:true}:{}),...(fitAll?{fitAll:true}:{}),...(compressionOnly?{compressionOnly:true}:{})}}));return {...fallback};}
  function shift(stamp,delta){const ms=epoch(stamp)+delta;if(!Number.isFinite(ms)||!Number.isFinite(new Date(ms).getTime()))return '';const nano=String(stamp).match(/\.(\d{1,9})(?:Z|[+-]\d\d:\d\d)$/i)?.[1]?.padEnd(9,'0');return new Date(ms).toISOString().replace(/\.(\d{3})Z$/,(_,m)=>'.'+m+(nano? nano.slice(3):'')+'Z');}
  function range(items,pref=preferences(),heldEnd='',getStamp=item=>item.time){
-  const stamps=items.map(getStamp).filter(valid).sort(compare),first=stamps[0]??'',last=stamps.at(-1)??'',end=pref.anchor==='latest'?(valid(heldEnd)?heldEnd:last):pref.end,start=pref.anchor==='range'?pref.start:pref.durationMs&&valid(end)?shift(end,-pref.durationMs):first;
-  return {start,end,from:valid(start)?epoch(start):-Infinity,to:valid(end)?epoch(end):Infinity,enabled:pref.durationMs>0||pref.anchor!=='latest',unknown:items.length-stamps.length,first,last};
+  // A range only needs its actual earliest and latest stamps. Avoid sorting
+  // every live/history sample on each graph refresh.
+  let first='',last='',known=0;
+  for(const item of items){
+   const stamp=getStamp(item);
+   if(!valid(stamp))continue;
+   if(known++===0){first=stamp;last=stamp;continue;}
+   if(compare(stamp,first)<0)first=stamp;
+   // The last equal stamp wins, matching the original stable sort.
+   if(compare(stamp,last)>=0)last=stamp;
+  }
+  const end=pref.anchor==='latest'?(valid(heldEnd)?heldEnd:last):pref.end,start=pref.anchor==='range'?pref.start:pref.durationMs&&valid(end)?shift(end,-pref.durationMs):first;
+  return {start,end,from:valid(start)?epoch(start):-Infinity,to:valid(end)?epoch(end):Infinity,enabled:pref.durationMs>0||pref.anchor!=='latest',unknown:items.length-known,first,last};
  }
  function contains(stamp,scope){return valid(stamp)&&(!valid(scope.start)||compare(stamp,scope.start)>=0)&&(!valid(scope.end)||compare(stamp,scope.end)<=0);}
- function select(items,scope,getStamp=item=>item.time){return items.filter(item=>contains(getStamp(item),scope)).sort((a,b)=>compare(getStamp(a),getStamp(b)));}
+ function select(items,scope,getStamp=item=>item.time){
+  const matches=[];let previous='',hasPrevious=false,chronological=true;
+  for(const item of items){
+   const stamp=getStamp(item);
+   if(!contains(stamp,scope))continue;
+   if(hasPrevious&&compare(previous,stamp)>0)chronological=false;
+   matches.push(item);previous=stamp;hasPrevious=true;
+  }
+  // Recorded live samples normally arrive in order. Keep the same stable
+  // time sort for imported, reversed or otherwise out-of-order records.
+  return chronological?matches:matches.sort((a,b)=>compare(getStamp(a),getStamp(b)));
+ }
  function condense(items,{end,recentMs=60000,preserveRaw=false,getStamp=item=>item.time}={}){
   const sorted=items.filter(item=>valid(getStamp(item))).slice().sort((a,b)=>compare(getStamp(a),getStamp(b))),last=epoch(end??getStamp(sorted.at(-1)||{})),bins=new Map(),result=[],gaps=[];
   // Modest visible histories need no aggregation: preserve their true time spacing.

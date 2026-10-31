@@ -70,8 +70,25 @@ async function load(p,side,dir='',opts={}){if(!currentPage(p))return;const m=get
   draw(p,side);remember(p);
  }catch(e){v.loading=false;if(seq!==v.seq)return;setMessage(p,side,e.message);toastError(e)}}
 function extension(row){if(row.directory)return 'Folder';const name=row.name||'',suffix=name.lastIndexOf('.');return suffix>0?name.slice(suffix+1).toUpperCase()+' file':'File'}
-function ordered(v){const locale={numeric:true,sensitivity:'base'},key=v.sort;return v.entries.slice().sort((a,b)=>{if(a.directory!==b.directory)return a.directory?-1:1;let cmp=0;if(key==='size')cmp=(a.size||0)-(b.size||0);else if(key==='modified')cmp=(Date.parse(a.modified)||0)-(Date.parse(b.modified)||0);else if(key==='type')cmp=extension(a).localeCompare(extension(b),undefined,locale);else cmp=a.name.localeCompare(b.name,undefined,locale);return (v.reverse?-1:1)*cmp||a.name.localeCompare(b.name,undefined,locale)})}
-function visible(v){const filter=v.filter.trim().toLowerCase();return ordered(v).filter(row=>(v.hidden||!row.name.startsWith('.'))&&(!filter||row.name.toLowerCase().includes(filter)))}
+// Sorting a directory can be expensive. Selection and visibility changes
+// reuse this view until the directory array or relevant preferences change.
+const transferSortCache=new WeakMap();
+const transferNameSort=new Intl.Collator(undefined,{numeric:true,sensitivity:'base'});
+function ordered(v){
+ const entries=v.entries,key=v.sort,reverse=!!v.reverse,cached=transferSortCache.get(v);
+ if(cached&&cached.entries===entries&&cached.sort===key&&cached.reverse===reverse)return cached.rows;
+ const rows=entries.slice(),types=key==='type'?new Map(rows.map(row=>[row,extension(row)])):null,dates=key==='modified'?new Map(rows.map(row=>[row,Date.parse(row.modified)||0])):null;
+ rows.sort((a,b)=>{if(a.directory!==b.directory)return a.directory?-1:1;let cmp=0;if(key==='size')cmp=(a.size||0)-(b.size||0);else if(key==='modified')cmp=dates.get(a)-dates.get(b);else if(key==='type')cmp=transferNameSort.compare(types.get(a),types.get(b));else cmp=transferNameSort.compare(a.name,b.name);return (reverse?-1:1)*cmp||transferNameSort.compare(a.name,b.name)});
+ transferSortCache.set(v,{entries,sort:key,reverse,rows});
+ return rows;
+}
+function visible(v){
+ const rows=ordered(v),filter=String(v.filter||'').trim().toLowerCase(),hidden=!!v.hidden,cached=transferSortCache.get(v);
+ if(cached?.visible&&cached.visibleSource===rows&&cached.filter===filter&&cached.hidden===hidden)return cached.visible;
+ const shown=rows.filter(row=>(hidden||!row.name.startsWith('.'))&&(!filter||row.name.toLowerCase().includes(filter)));
+ cached.visibleSource=rows;cached.filter=filter;cached.hidden=hidden;cached.visible=shown;
+ return shown;
+}
 function paint(p,side){const m=get(p),v=m[side];if(!currentPage(p))return;const pane=document.querySelector('[data-fm-pane="'+side+'"]');if(!pane)return;pane.classList.toggle('fm-focused',m.active===side);for(const tr of pane.querySelectorAll('[data-fm-row]')){const marked=v.selected.has(tr.dataset.fmPath);tr.classList.toggle('fm-selected',marked);tr.setAttribute('aria-selected',String(marked))}
  const count=pane.querySelector('[data-fm-count]');if(count)count.textContent=v.entries.length+' items';const foot=pane.querySelector('[data-fm-foot]');if(foot){const selected=v.entries.filter(e=>v.selected.has(e.path));const total=selected.reduce((n,e)=>n+(e.directory?0:e.size||0),0);foot.textContent=selected.length?selected.length+' selected'+(total?' · '+bytes(total):''):v.entries.length+' items in folder';}
 }
