@@ -53,6 +53,7 @@
       location: location.pathname,
       geometry: {width:innerWidth,height:innerHeight,detachPoint:detachPoint(),main:rect(document.querySelector('.main')),editor:rect(document.querySelector('.nt-editor-window')),tabs:[...document.querySelectorAll('[data-ed-uid]')].map(tab=>({uid:tab.dataset.edUid,...rect(tab.querySelector('[data-ed-open]'))}))},
       drag: globalThis.NetworkToolkitEditorDrag?.state,
+      diagnostic: globalThis.__nativeEditorTrace128?.(),
       errors: [...errors]
     };
   }

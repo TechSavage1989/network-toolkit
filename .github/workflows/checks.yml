@@ -14,6 +14,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  native-editor128-diagnostic:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Observe actual native editor gestures and original ACK gates
+        env:
+          GOTOOLCHAIN: local
+          NETWORK_TOOLKIT_NATIVE_EDITOR_TEST: '1'
+          TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/network-toolkit-editor128-diagnostic
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestNativeEditor(TransferInstalledWebView2|Diagnostic128SanitizedBrokerObserver)$' -count=1 -timeout=6m -v
+      - name: Retain bounded sanitized native editor diagnostics
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: native-editor128-diagnostic
+          path: ${{ runner.temp }}/network-toolkit-editor128-diagnostic
+          if-no-files-found: error
+          retention-days: 14
   native-terminal129:
     runs-on: windows-latest
     timeout-minutes: 12
