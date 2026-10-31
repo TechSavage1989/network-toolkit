@@ -14,15 +14,18 @@
   <a href="#development">Development</a>
 </p>
 
-## Beta 5 candidate - 1.17.141
+## Latest beta - 1.17.141 Beta 5
 
-The next beta polishes Editor connection controls, comparison map
-navigation and file explorer divider resizing. It is under review,
-not yet available in the update feed. See
-[the development pull request](https://github.com/TechSavage1989/network-toolkit/pull/16)
-and [Beta 5 handoff](docs/RELEASE141_HANDOFF.md).
+Published October 31, 2026 as an **opt-in prerelease**. Editor connection
+settings and comparison-map navigation have been refined; the TFTP/SFTP
+file explorer now supports keyboard sizing and cancel-safe dragging.
+Previous release tags and updater safeguards remain intact.
 
-## Latest published beta - 1.17.140 Beta 4
+[Download Beta 5](https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.141) ·
+[Release notes](RELEASE_NOTES_1.17.141.txt) ·
+[Validation and handoff](docs/RELEASE141_HANDOFF.md)
+
+## Previous beta - 1.17.140 Beta 4
 
 Published October 31, 2026 as an **opt-in prerelease**. Graph history
 and SFTP, FTP/FTPS and file-server directory views perform less repeated

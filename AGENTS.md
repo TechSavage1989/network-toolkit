@@ -1,13 +1,15 @@
-# Network Toolkit v1.17.141 Beta 5 - interface-polish candidate
+# Network Toolkit v1.17.141 Beta 5 - published Editor and file explorer polish
 
-Development PR #16: https://github.com/TechSavage1989/network-toolkit/pull/16
-Based on v1.17.140 Beta 4. Read docs/RELEASE141_HANDOFF.md and
-docs/DEVELOPMENT_HANDOFF.md before changes. Preserve published tags,
-stable v1.17.136, opt-in beta update safeguards and credentials.
-The current candidate focuses on Editor sidebar focus, comparison map
-scrolling and TFTP/SFTP server file explorer resizing.
-Do not claim historical Editor or native SFTP failures resolved from
-unit tests alone. This is not yet published.
+Published 2026-10-31T19:06:59Z as GitHub prerelease 430129340.
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.141
+Tag/exact-source/merged PR #16: e2b8facd51834cfa93e2f587e01cd9d1c2696a89
+Release workflow 41232480174: build SUCCESS, publish SUCCESS.
+All four assets have SHA-256 digests and the beta feed lists v1.17.141.
+Normal stable releases/latest remains v1.17.136. Installation still
+requires explicit user approval under App settings > Updates.
+Read docs/RELEASE141_HANDOFF.md and docs/DEVELOPMENT_HANDOFF.md.
+Earlier tags and release assets remain immutable. Broad Editor and native
+Windows CI observations do not imply universal physical device success.
 
 # Network Toolkit v1.17.140 Beta 4 - published application-wide optimization
 

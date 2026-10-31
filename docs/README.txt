@@ -1,17 +1,17 @@
 NETWORK TOOLKIT 1.17.141
 ======================
 
-CURRENT RELEASE - 1.17.141 (BETA 5 CANDIDATE)
+CURRENT RELEASE - 1.17.141 (BETA 5)
 
 This beta improves the Editor Files/Connections controls, more precise
 comparison-map scrolling, and TFTP/SFTP file explorer divider interaction.
 The file explorer supports keyboard resizing and reset in addition to
 dragging. Cancellation restores the previous divider position.
 
-This is a development candidate, not yet a published download. The
-latest published beta is 1.17.140; the latest stable version is 1.17.136.
-Existing credentials, network permissions, saved settings and the stable
-portable executable name are preserved. Validation is pending.
+Published as a prerelease on October 31, 2026. Enable Beta updates
+in App settings > Updates to receive this build. Previous beta: 1.17.140;
+latest stable: 1.17.136. Credentials, network permissions, saved settings
+and the stable portable executable name remain unchanged.
 
 Details: RELEASE_NOTES_1.17.141.txt and docs/RELEASE141_HANDOFF.md.
 Previous release descriptions follow.
