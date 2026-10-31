@@ -1,8 +1,10 @@
 'use strict';
 // Real bundled UI/xterm, synthetic HTTP data only. No SSH connection or user data.
-const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),vm=require('node:vm');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const root=path.resolve(__dirname,'..'),out=process.env.TOOLKIT_TEST_OUTPUT,version=require('../package.json').version;
+// Match the backend's legacy-name inference, not just its optional stored flag.
+const fixtureLabelPolicy=(()=>{const scope={window:{}};vm.runInNewContext(fs.readFileSync(path.join(root,'web/assets/terminal-prompt-labels.js'),'utf8'),scope);return scope.window.NetworkToolkitTerminalPromptLabels;})();
 (async()=>{if(out)fs.mkdirSync(out,{recursive:true});const browser=await chromium.launch({headless:true,args:['--no-sandbox']}),page=await browser.newPage({viewport:{width:1440,height:950}}),errors=[],checks=[];page.on('pageerror',e=>errors.push(e.message));
  const base={type:'ssh',host:'192.0.2.5',port:22,username:'operator'},sessions=[
   {...base,id:'synthetic-label-one',profileId:'profile-one',label:'Custom West',state:'connected',cols:90,rows:24},
@@ -19,7 +21,7 @@ const root=path.resolve(__dirname,'..'),out=process.env.TOOLKIT_TEST_OUTPUT,vers
   Object.assign(session,{label:explicit?label:'SSH '+session.host+':'+session.port,manualName:explicit?label:'',nameExplicit:explicit,labelSource:explicit?'manual':'default',nameRevision:revision});
   for(const item of [...saved.terminalProfiles,...saved.terminalRecent])if(item.id===session.profileId||sameEndpoint(item,session)){if(explicit)item.name=label;item.nameExplicit=explicit;item.nameRevision=revision;}
  }
- function namesReply(){const fields=p=>({id:p.id,name:p.name,nameExplicit:p.nameExplicit===true,nameRevision:p.nameRevision||0});return {ok:true,terminalNames:{profiles:saved.terminalProfiles.map(fields),recent:saved.terminalRecent.map(fields)}};}
+ function namesReply(){const fields=p=>({id:p.id,name:p.name,nameExplicit:fixtureLabelPolicy.manual(p)!=='',nameRevision:p.nameRevision||0});return {ok:true,terminalNames:{profiles:saved.terminalProfiles.map(fields),recent:saved.terminalRecent.map(fields)}};}
  function putState(incoming){
   const old=saved;saved=incoming;
   for(const profile of saved.terminalProfiles||[]){const prior=old.terminalProfiles.find(x=>x.id===profile.id);if(prior&&(prior.nameRevision||0)>(profile.nameRevision||0)){Object.assign(profile,{name:prior.name,nameExplicit:prior.nameExplicit,nameRevision:prior.nameRevision});continue;}if(prior&&(profile.name!==prior.name||profile.nameExplicit!==prior.nameExplicit)){
@@ -30,6 +32,10 @@ const root=path.resolve(__dirname,'..'),out=process.env.TOOLKIT_TEST_OUTPUT,vers
  await page.route('http://toolkit.local/**',async route=>{const r=route.request(),u=new URL(r.url()),p=u.pathname;let data={};if(p.startsWith('/api/')){if(p==='/api/status')data={version,os:'windows',arch:'amd64'};if(p==='/api/state'){if(r.method()==='GET')data=saved;else data=putState(r.postDataJSON());}if(p.endsWith('/rename')&&r.method()==='POST'){const session=sessions.find(s=>p==='/api/terminals/'+s.id+'/rename');assert(session);const request=r.postDataJSON();assert(request.label||request.clear===true,'empty name requires explicit clear');renameServer(session,request.label,request.clear===true);data={session};}if(p==='/api/jobs')data=[];if(p==='/api/terminals')data={sessions};if(p==='/api/terminal-views')data={available:true,views:[],owners:{}};if(p==='/api/terminal-automation/targets')data={targets:sessions.map(s=>({...s,generation:1}))};if(p==='/api/terminal-automation/runs')data={runs:[]};if(p==='/api/terminal-automation/library')data={macros:[],bindings:[],revision:'synthetic'};if(p.includes('/events')){await new Promise(r=>setTimeout(r,80));if(staleEvents.length){data={sessions:staleEvents.shift(),events:[],next:0};staleDeliveries++;}else{if(holdLatest)await new Promise(resolve=>heldFeeds.push(resolve));data={sessions,events:[],next:0};}}return route.fulfill({contentType:'application/json',body:JSON.stringify(data)});}try{const file=path.join(root,'web',p==='/'?'index.html':p);let content=fs.readFileSync(fs.existsSync(file)?file:path.join(root,p));if(p==='/')content=content.toString().replaceAll('__SESSION_TOKEN__','synthetic-labels').replaceAll('__WINDOW_MODE__','main').replaceAll('__TERMINAL_VIEW__','null');return route.fulfill({body:content,contentType:p==='/'?'text/html':p.endsWith('.js')?'application/javascript':p.endsWith('.css')?'text/css':p.endsWith('.svg')?'image/svg+xml':'application/octet-stream'});}catch{return route.fulfill({status:404,body:''});}});
  try{
  await page.goto('http://toolkit.local/');await page.waitForFunction(()=>window.__networkToolkitStartupState===1&&online);await page.evaluate(()=>navigate('terminal'));await page.waitForFunction(()=>terminalSessions.get('synthetic-label-one')?.xterm);
+ // Force an unrelated startup save/ack before output learns a prompt; timing must
+ // not decide whether a legacy custom name is mistaken for an explicit clear.
+ await page.evaluate(()=>flushState());
+ assert.deepEqual(await page.evaluate(()=>state.terminalProfiles.map(p=>p.nameExplicit)),[true,false,false]);
  assert.equal(await page.locator('[data-terminal-tab="synthetic-label-one"] .terminal-device-label').innerText(),'Custom West\n192.0.2.5');
  assert.equal(await page.locator('[data-terminal-tab="synthetic-label-two"] .terminal-device-label').innerText(),'192.0.2.6');
  await page.evaluate(()=>{for(const [id,text] of [['synthetic-label-one','Ordinary synthetic output\r\n\x1b[32mEDGE-SW01(config-if)#\x1b[0m '],['synthetic-label-two','7300# '],['synthetic-label-three','\x1b[32moperator@LAB-PRINTER:~$\x1b[0m '],['synthetic-label-four','Unrecognized ordinary output\r\n']])appendTerminalOutput(terminalSessions.get(id),new TextEncoder().encode(text));});
