@@ -14,6 +14,61 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  native-terminal130:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Verify real native automatic profile saves protocol labels and persistence
+        env:
+          GOTOOLCHAIN: local
+          NETWORK_TOOLKIT_NATIVE_PROFILE130: '1'
+          NETWORK_TOOLKIT_NATIVE_TERMINAL_SELECTION: '1'
+          TOOLKIT_NATIVE_TIMING_LABEL: 130-profiles
+          TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/network-toolkit-native130
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestNativeTerminalProfiles130InstalledWebView2$' -count=1 -timeout=6m -v
+      - name: Retain native130 automatic profile evidence
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: native-terminal130-checks
+          path: ${{ runner.temp }}/network-toolkit-native130
+          if-no-files-found: error
+          retention-days: 14
+  browser-terminal130:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install isolated terminal profile browser
+        run: |
+          npm install --prefix "$RUNNER_TEMP/ntk-types130" --no-audit --no-fund playwright@1.62.1
+          node "$RUNNER_TEMP/ntk-types130/node_modules/playwright/cli.js" install --with-deps chromium
+      - name: Check automatic serial labels and protocol badges across tabs Saved and Recent
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-types130/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-types130-results
+        run: node scripts/terminal-types130.browser.cjs
+      - name: Retain type130 responsive browser evidence
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: terminal-types130-checks
+          path: ${{ runner.temp }}/ntk-types130-results
+          if-no-files-found: error
+          retention-days: 14
   native-editor128-diagnostic:
     runs-on: windows-latest
     timeout-minutes: 10

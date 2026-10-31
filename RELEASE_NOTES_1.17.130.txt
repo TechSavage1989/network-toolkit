@@ -1,0 +1,15 @@
+Network Toolkit 1.17.130 — automatic profile names and connection-type badges
+
+Blank profile display names use automatic naming rather than becoming a manual
+override: a recognized CLI device name is preferred, then the connection endpoint
+(IP/configured host or serial COM port). A currently learned name must not be
+frozen as a manual label when the profile is saved blank. Explicit manual names
+remain available and take precedence until the override is cleared.
+
+Compact SSH, Telnet, Serial, CMD and PowerShell type badges distinguish tabs,
+Saved and Recent entries without replacing the primary name/endpoint display.
+Display labels and badges are separate from connection addresses, credentials,
+session identity and ownership. Existing paste and resize safeguards remain.
+
+Candidate implementation and final validation are tracked in RELEASE130_HANDOFF.md.
+Synthetic fixtures do not establish universal prompt or live-device compatibility.

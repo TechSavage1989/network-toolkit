@@ -88,7 +88,7 @@ function record(entry,name=''){
 }
 function rowHTML(kind,item){
  const display=root.NetworkToolkitTerminalPromptLabels?.labels(item),detail=description(item),used=kind==='recent'&&item.lastUsed?'Last opened: '+(globalThis.NetworkToolkitResultTime?.format(new Date(item.lastUsed),{milliseconds:false})||new Date(item.lastUsed).toLocaleString(undefined,{hour12:true})):'';
- return '<div class="session-library-row" data-session-kind="'+kind+'" data-session-id="'+esc(item.id)+'"><button type="button" class="session-library-entry" data-session-entry title="'+esc([root.NetworkToolkitTerminalPromptLabels?.title(item),detail,used,'Double-click or press Enter to open'].filter(Boolean).join('\n'))+'"><span class="session-library-icon">'+icon(item.type==='serial'?'plug':'terminal')+'</span><span class="session-library-text"><strong>'+esc(display?.network?display.name:item.name||label(item))+'</strong>'+((display?.network?display.address:detail)?'<small>'+esc(display?.network?display.address:detail)+'</small>':'')+(kind==='saved'&&item.folder?'<small class="session-library-folder" title="'+esc(item.folder)+'">'+esc(item.folder)+'</small>':'')+'</span></button>'+(kind==='saved'?folderButton('terminal',item):'')+'<button type="button" class="iconbtn session-library-delete" data-session-remove aria-label="Remove '+esc(item.name||label(item))+' from '+(kind==='saved'?'Saved':'Recent')+'" title="Remove from '+(kind==='saved'?'Saved':'Recent')+'">'+icon('close')+'</button></div>';
+return '<div class="session-library-row" data-session-kind="'+kind+'" data-session-id="'+esc(item.id)+'"><button type="button" class="session-library-entry" data-session-entry title="'+esc([root.NetworkToolkitTerminalPromptLabels?.title(item),detail,used,'Double-click or press Enter to open'].filter(Boolean).join('\n'))+'"><span class="session-library-icon">'+icon(item.type==='serial'?'plug':'terminal')+'</span><span class="session-library-text"><strong>'+esc(display?display.name:item.name||label(item))+'</strong>'+((display&&(display.network||item.type==='serial')?display.address:detail)?'<small>'+esc(display&&(display.network||item.type==='serial')?display.address:detail)+'</small>':'')+(kind==='saved'&&item.folder?'<small class="session-library-folder" title="'+esc(item.folder)+'">'+esc(item.folder)+'</small>':'')+'</span>'+(root.NetworkToolkitTerminalPromptLabels?.protocolHTML(item)||'')+'</button>'+(kind==='saved'?folderButton('terminal',item):'')+'<button type="button" class="iconbtn session-library-delete" data-session-remove aria-label="Remove '+esc(item.name||label(item))+' from '+(kind==='saved'?'Saved':'Recent')+'" title="Remove from '+(kind==='saved'?'Saved':'Recent')+'">'+icon('close')+'</button></div>';
 }
 function folderButton(type,item){return '<button type="button" class="iconbtn session-library-folder-action" data-session-folder="'+type+'" data-session-folder-id="'+esc(item.id)+'" aria-label="Move '+esc(item.name||item.host)+' to folder" title="Move to folder">'+icon('folder')+'</button>';}
 function transferItems(kind){const key=kind==='saved'?'ftpProfiles':'ftpRecent';return (Array.isArray(state[key])?state[key]:[]).filter(x=>x&&x.id&&x.host);}
@@ -185,14 +185,15 @@ function commitDelete(targets){
 }
 function nameDialog(mode,target,config,name){
  pendingName={mode,target,config:safeTerminalConfig(config)};
- openModal(mode==='rename'?'Rename saved session':mode==='duplicate'?'Duplicate saved session':'Save session','<form id="sessionLibraryNameForm"><div class="field"><label for="sessionLibraryName">Session name</label><input id="sessionLibraryName" maxlength="100" value="'+esc(name||label(config))+'" required autocomplete="off"></div>'+folders.inputHTML('sessionLibrarySaveFolder',config.folder,folders.names(profiles(),transferItems('saved')))+'<p class="help-line">'+esc(description(config))+'</p></form>','<button class="btn ghost" data-action="close-modal">Cancel</button><button type="submit" form="sessionLibraryNameForm" class="btn primary">'+(mode==='rename'?'Rename':'Save session')+'</button>',true);
+ const manual=root.NetworkToolkitTerminalPromptLabels?.manual(config)||'',initial=mode==='rename'?name||label(config):manual?(mode==='duplicate'?manual+' copy':manual):'';
+ openModal(mode==='rename'?'Rename saved session':mode==='duplicate'?'Duplicate saved session':'Save session','<form id="sessionLibraryNameForm"><div class="field"><label for="sessionLibraryName">Session name'+(mode==='rename'?'':' (optional)')+'</label><input id="sessionLibraryName" maxlength="100" value="'+esc(initial)+'" '+(mode==='rename'?'required':'')+' placeholder="Automatic device name / address" autocomplete="off"></div>'+folders.inputHTML('sessionLibrarySaveFolder',config.folder,folders.names(profiles(),transferItems('saved')))+'<p class="help-line">'+esc(description(config))+'</p></form>','<button class="btn ghost" data-action="close-modal">Cancel</button><button type="submit" form="sessionLibraryNameForm" class="btn primary">'+(mode==='rename'?'Rename':'Save session')+'</button>',true);
 }
 function folderDialog(type,id){
  const item=(type==='ftp'?transferItems('saved'):profiles()).find(row=>row.id===id);if(!item)return;
  closeMenu();pendingFolder={type,id,signature:signature(item)};
  openModal('Move saved session','<form id="sessionLibraryFolderForm"><p>'+esc(item.name||item.host)+'</p>'+folders.inputHTML('sessionLibraryMoveFolder',item.folder,folders.names(profiles(),transferItems('saved')))+'</form>','<button class="btn ghost" data-action="close-modal">Cancel</button><button type="submit" form="sessionLibraryFolderForm" class="btn primary">Move session</button>',true);
 }
-function save(entry){if(entry?.config)nameDialog('save',null,entry.config,entry.info.label);}
+function save(entry){if(entry?.config){const profile=profiles().find(item=>item.id===entry.info.profileId);nameDialog('save',null,{...entry.config,...(profile?{name:profile.name,nameExplicit:profile.nameExplicit}:{manualName:entry.info.manualName,label:entry.info.label,nameExplicit:entry.info.nameExplicit,labelSource:entry.info.labelSource})},entry.info.label);}}
 async function open(target,newTab=false){
  const item=itemFor(target);if(!item)return;
  if(!canOpen()){toast('Wait for the terminal workspace and local engine to be ready.');return;}
@@ -245,7 +246,7 @@ async function run(action,target){
   case'open':await open(target);break;case'new-tab':await open(target,true);break;
   case'edit':openTerminalConnect(item,target.kind==='saved'?item.id:'');break;
   case'rename':nameDialog('rename',target,item,item.name);break;
-  case'clear-name':if(['ssh','telnet'].includes(item.type)){item.nameExplicit=false;item._namePending=true;changed();}break;
+  case'clear-name':if(['ssh','telnet','serial','cmd','powershell'].includes(item.type)){item.nameExplicit=false;item._namePending=true;changed();}break;
   case'duplicate':nameDialog('duplicate',target,item,item.name+' copy');break;
   case'folder':if(target.kind==='saved')folderDialog('terminal',item.id);break;
   case'save':nameDialog('save',target,item,item.name);break;
@@ -286,11 +287,11 @@ document.addEventListener('click',event=>{
 document.addEventListener('submit',event=>{
  if(event.target.id==='sessionLibraryNameForm'){
   event.preventDefault();event.stopImmediatePropagation();
-  const pending=pendingName,name=byId('sessionLibraryName')?.value.trim();if(!pending||!name||name.length>100)return;
+  const pending=pendingName,name=byId('sessionLibraryName')?.value.trim();if(!pending||name===undefined||name.length>100||pending.mode==='rename'&&!name)return;
   if(pending.target&&!itemFor(pending.target)){toast('This session changed. Open its actions again.');closeModal();return;}
   const folder=folders.normalize(byId('sessionLibrarySaveFolder')?.value);
   if(pending.mode==='rename'){const item=itemFor(pending.target);item.name=name;item.nameExplicit=true;item._namePending=true;item.folder=folder;}
-  else{if(profiles().length>=100){toast('Remove a saved session before adding another. The limit is 100.');return;}state.terminalProfiles=[{id:'terminal-profile-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8),name,nameExplicit:true,nameRevision:0,_namePending:true,folder,...pending.config},...profiles()];}
+  else{if(profiles().length>=100){toast('Remove a saved session before adding another. The limit is 100.');return;}state.terminalProfiles=[{id:'terminal-profile-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8),name:(name||(root.NetworkToolkitTerminalPromptLabels?.fallback(pending.config)||label(pending.config))).slice(0,100),nameExplicit:!!name,nameRevision:0,_namePending:true,folder,...pending.config},...profiles()];}
   pendingName=null;closeModal();changed();
  }else if(event.target.id==='sessionLibraryFolderForm'){
   event.preventDefault();event.stopImmediatePropagation();const pending=pendingFolder;if(!pending)return;

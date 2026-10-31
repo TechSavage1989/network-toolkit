@@ -1,14 +1,31 @@
+NETWORK TOOLKIT 1.17.130
+======================
+
+CURRENT RELEASE - 1.17.130 (candidate; not yet published)
+Blank profile names are intended to remain automatic: learned CLI name first,
+then IP/configured host or COM port, without freezing a learned name as manual.
+Subtle SSH/Telnet/Serial/CMD/PowerShell badges distinguish tabs, Saved and Recent.
+Implementation and exact-source runtime/release acceptance are pending.
+See docs/RELEASE130_HANDOFF.md and RELEASE_NOTES_1.17.130.txt.
+
+PUBLISHED129 CLOSURE (retained)
+
 NETWORK TOOLKIT 1.17.129
 ======================
 
-CURRENT RELEASE - 1.17.129 (candidate; not yet published)
-Bounded terminal fitting during continuous pane/window resizing, per-view size
-observation and latest-geometry PTY coalescing. Existing ownership, selection,
-scroll and paced-paste safeguards remain. Actual runtime/release validation is
-pending; remote applications remain responsible for redraw.
-See docs/RELEASE129_HANDOFF.md and RELEASE_NOTES_1.17.129.txt.
+CURRENT RELEASE - 1.17.129
+Published 2026-10-31T01:59:27Z; actual public downloads/source/updater feed verified
+02:01:35Z, independently 02:02:26Z. Includes bounded terminal pane/PTY resize
+scheduling plus manual-name precedence, explicit clear/revision handling and
+bounded CLI-prompt recognition. Saved connection addresses/credentials unchanged.
+Version 128 is subsumed and was not separately published/tagged. Full accepted
+PR checks passed; duplicate run outcomes and runtime limits remain documented.
+No live SSH or universal remote-program compatibility claim.
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.129
+Post-merge duplicate checks completed02:15:36Z:11 passed/1 retained legacy editor-
+motion failure. See docs/RELEASE129_HANDOFF.md; no unrelated fix is claimed.
 
-PREVIOUS128 CANDIDATE RECORD (retained; publication unverified)
+HISTORICAL128 CANDIDATE RECORD (subsumed by published129, not separately released)
 
 NETWORK TOOLKIT 1.17.128
 ======================

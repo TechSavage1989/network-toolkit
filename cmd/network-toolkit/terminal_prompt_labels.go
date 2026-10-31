@@ -31,6 +31,22 @@ func safeTerminalPromptNames(value any) []map[string]any {
 			continue
 		}
 		kind, _ := item["type"].(string)
+		if kind == "serial" {
+			serialPort, _ := item["serialPort"].(string)
+			serialPort = terminalDisplaySerialPort(serialPort)
+			name, _ := item["name"].(string)
+			if serialPort == "" || !validTerminalPromptName(name) {
+				continue
+			}
+			key := "serial\x00" + serialPort
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			out = append(out, map[string]any{"type": "serial", "serialPort": serialPort, "name": name})
+			continue
+		}
+
 		host, _ := item["host"].(string)
 		name, _ := item["name"].(string)
 		user, userOK := item["username"].(string)

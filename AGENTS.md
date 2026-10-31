@@ -3,7 +3,30 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-Current published version: 1.17.127. Published 2026-10-30T23:12:03Z;
+Current development:1.17.130 automatic blank profile naming and subtle connection-
+type badges (SSH/Telnet/Serial/CMD/PowerShell) across tabs, Saved and Recent.
+Implementation/tests/publication pending; see docs/RELEASE130_HANDOFF.md.
+Blank-save must not freeze a learned name as a manual override. Preserve explicit
+manual names, connection identity/credentials, revisions and session safeguards.
+The129 closure below is verified history, not130 acceptance. No standalone129
+closure release is intended; this source record is incorporated into130 work.
+
+Current published version:1.17.129. Published 2026-10-31T01:59:27Z;
+actual public downloads/source/feed verified 02:01:35.447379Z and independently
+02:02:26.029257Z. Source/tag0de3c5708ce7885ae105ff5ee3601b18336941d4;
+tree 00ab469d2ef3f2bff8da7d8ecf94474b2a1bdbee.
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.129
+Includes manual/learned-name corrections and bounded pane/PTY resize scheduling.
+Version 128 remains untagged/unpublished, subsumed by129; no128 failure was waived.
+Local 1,451JS/42Python, all 12 accepted PR jobs, actual browser/native runtime and
+1,233-source/1,240-member public package/feed proof passed. Prior 127 unchanged.
+Original failed runs remain. Post-merge duplicate41157694962 completed02:15:36Z:
+11 passed/1 legacy editor-motion failure (p95 offset4.140625px); no all-main pass
+or unrelated fix claimed. See docs/RELEASE129_HANDOFF.md before proceeding.
+Native fixtures use synthetic loopback Telnet, not live SSH/universal TUI proof.
+This source-only closure changes no published bytes, tags or access.
+
+Previous published version: 1.17.127. Published 2026-10-30T23:12:03Z;
 actual public downloads/source/feed verified 23:13:27.407082Z,
 independently rechecked against fresh public receipts at 23:14:28Z.
 Source/tag 3085e0729be9f7cbbe372f9959c8985f5255b220;
@@ -19,11 +42,6 @@ failed duplicate observations remain; see docs/RELEASE127_HANDOFF.md, including
 the final duplicate main cancellation metadata. This source-only closure changes
 no release bytes, access or general authorization requirements.
 
-Current development:1.17.129 bounded terminal pane/window fitting and PTY resize
-coalescing. Local/runtime/CI/package/release acceptance remains pending; see
-RELEASE129_HANDOFF.md. Based on the128 naming candidate, whose publication/final
-CI acceptance is not established here. Reconcile128 status only with actual proof.
-Preserve all published tags/assets and original failed observations.
 
 ## Source and release destination
 

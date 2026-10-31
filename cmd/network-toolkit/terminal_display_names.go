@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"unicode"
@@ -23,6 +24,26 @@ type terminalDisplayNameRecord struct {
 	Host         string `json:"host"`
 	Port         int    `json:"port"`
 	Username     string `json:"username"`
+	SerialPort   string `json:"serialPort"`
+}
+
+var terminalDisplayCOMPort130 = regexp.MustCompile(`(?i)^COM[0-9]+$`)
+
+// Identity/display metadata only. This neither resolves nor opens a device.
+func terminalDisplaySerialPort(value string) string {
+	port := strings.TrimSpace(value)
+	if port == "" || len(port) > 256 {
+		return ""
+	}
+	for _, r := range port {
+		if r < 0x21 || r > 0x7e {
+			return ""
+		}
+	}
+	if terminalDisplayCOMPort130.MatchString(port) {
+		return strings.ToUpper(port)
+	}
+	return port
 }
 
 func terminalDisplayPort(kind string, port int) int {
@@ -39,6 +60,15 @@ func (p terminalDisplayNameRecord) matches(s terminal.SessionInfo) bool {
 	kind := p.Type
 	if kind == "" {
 		kind = "ssh"
+	}
+	if kind == "serial" {
+		port := terminalDisplaySerialPort(p.SerialPort)
+		return s.Type == "serial" && port != "" && port == terminalDisplaySerialPort(s.SerialPort)
+	}
+	// Local sessions do not expose a complete working-directory/elevation identity
+	// here; never merge unrelated local names by an empty network endpoint.
+	if kind != "ssh" && kind != "telnet" {
+		return false
 	}
 	return kind == s.Type && p.Host == s.Host && p.Username == s.Username && terminalDisplayPort(kind, p.Port) == terminalDisplayPort(s.Type, s.Port)
 }
@@ -58,6 +88,21 @@ func (p terminalDisplayNameRecord) manual() string {
 	if kind == "" {
 		kind = "ssh"
 	}
+	if kind == "serial" {
+		port := terminalDisplaySerialPort(p.SerialPort)
+		for _, generated := range []string{port, "Serial " + port, "serial", "Terminal"} {
+			if strings.EqualFold(name, generated) {
+				return ""
+			}
+		}
+		return name
+	}
+	if kind == "cmd" && (strings.EqualFold(name, "Command Prompt (local)") || strings.EqualFold(name, "Command Prompt")) {
+		return ""
+	}
+	if kind == "powershell" && (strings.EqualFold(name, "PowerShell (local)") || strings.EqualFold(name, "PowerShell")) {
+		return ""
+	}
 	address := net.JoinHostPort(p.Host, strconv.Itoa(terminalDisplayPort(kind, p.Port)))
 	for _, generated := range []string{p.Host, address, p.Host + ":" + strconv.Itoa(terminalDisplayPort(kind, p.Port)), kind, kind + " " + address, "Terminal"} {
 		if strings.EqualFold(name, generated) {
@@ -71,7 +116,7 @@ func (p terminalDisplayNameRecord) manual() string {
 // transport, mutate settings, carry credentials, or disclose the profile list.
 // It keeps already detached windows current after a saved-session rename.
 func (a *application) terminalDisplaySession(s terminal.SessionInfo) terminal.SessionInfo {
-	if s.Type != "ssh" && s.Type != "telnet" {
+	if s.Type != "ssh" && s.Type != "telnet" && s.Type != "serial" && s.Type != "cmd" && s.Type != "powershell" {
 		return s
 	}
 	a.stateMu.Lock()
@@ -96,6 +141,14 @@ func (a *application) terminalDisplaySession(s terminal.SessionInfo) terminal.Se
 			s.Label = name
 		} else {
 			s.Label = strings.ToUpper(s.Type) + " " + net.JoinHostPort(s.Host, strconv.Itoa(s.Port))
+			switch s.Type {
+			case "serial":
+				s.Label = "Serial " + s.SerialPort
+			case "cmd":
+				s.Label = "Command Prompt (local)"
+			case "powershell":
+				s.Label = "PowerShell (local)"
+			}
 		}
 		return s
 	}
@@ -275,7 +328,7 @@ func reconcileTerminalDisplayNames(incoming, current map[string]any) error {
 	}
 	for _, changed := range changes {
 		p := terminalNameRecord(changed)
-		s := terminal.SessionInfo{Type: p.Type, Host: p.Host, Port: p.Port, Username: p.Username}
+		s := terminal.SessionInfo{Type: p.Type, Host: p.Host, Port: p.Port, Username: p.Username, SerialPort: p.SerialPort}
 		count := 0
 		for _, row := range terminalNameRows(incoming, "terminalProfiles") {
 			if terminalNameRecord(row).matches(s) {

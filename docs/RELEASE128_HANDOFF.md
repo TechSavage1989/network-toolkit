@@ -1,3 +1,16 @@
+# Version 128 status — subsumed by published129; not separately released
+
+As verified 2026-10-31T02:02:26.029257Z, no128 tag or release exists. Its manual-name
+and broader bounded-prompt features are included in129 source 0de3c5708ce7885ae105ff5ee3601b18336941d4
+through ancestor 60a183. PR2 closed merged through129, not through a128 publication.
+The original128 review and its bounded browser retry both retained the motion
+sampling failure (4.546875 offset at row 256); no fix or128 acceptance is claimed.
+Accepted129 PR 41155467693 passed all 12 jobs after one bounded startup retry.
+See RELEASE129_HANDOFF.md for actual public proof, features and retained failures.
+The archived128 release notes remain byte-identical; the snapshot below is historical.
+
+--- Historical128 candidate record (retained) ---
+
 # Network Toolkit 1.17.128 — manual names and documented prompt families (candidate)
 
 Not yet published. Final local, hosted browser/Windows, security and exact-source

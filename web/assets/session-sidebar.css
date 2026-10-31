@@ -89,3 +89,8 @@
 .terminal-device-label>small{font-size:10px;font-weight:400;color:var(--muted)}
 .terminal-tab-name{min-width:0;max-width:240px}
 .terminal-tab .tab-close,.terminal-tab .dot{flex-shrink:0}
+/* Type is separate from the copyable two-line identity and never steals a control hit area. */
+.terminal-protocol-badge{display:inline-flex;align-items:center;flex:0 0 auto;max-width:100%;font-size:9px;font-weight:600;line-height:1.35;color:var(--muted);background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:1px 4px;white-space:nowrap;pointer-events:none}
+.terminal-tab-name{display:flex;align-items:center;gap:6px}
+.terminal-tab-name>.terminal-device-label{flex:1 1 auto}
+.session-library-entry>.terminal-protocol-badge{margin-left:auto}

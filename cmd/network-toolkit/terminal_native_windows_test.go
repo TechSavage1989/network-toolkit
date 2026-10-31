@@ -35,6 +35,7 @@ func TestNativeTerminalTransferInstalledWebView2(t *testing.T) {
 		t.Skip("explicit hosted Windows native Terminal acceptance only")
 	}
 	budget := 4 * time.Minute
+	profile130 := os.Getenv("NETWORK_TOOLKIT_NATIVE_PROFILE130") == "1"
 	if os.Getenv("NETWORK_TOOLKIT_NATIVE_RESIZE129") == "1" {
 		budget = 6 * time.Minute
 	}
@@ -92,6 +93,14 @@ func TestNativeTerminalTransferInstalledWebView2(t *testing.T) {
 		h.driver = append(append(extra, '\n'), h.driver...)
 		h.resize129 = &nativeTerminalResize129Evidence{}
 	}
+	if profile130 {
+		extra, readErr := os.ReadFile(filepath.Join(root, "scripts", "terminal-profiles130-native-driver.js"))
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		h.driver = append(append(extra, '\n'), h.driver...)
+		h.profile130 = true
+	}
 	a.launchTerminalView = h.launch
 	listener, err := net.Listen("tcp4", "127.0.0.1:0")
 	if err != nil {
@@ -135,6 +144,10 @@ func TestNativeTerminalTransferInstalledWebView2(t *testing.T) {
 	}()
 	// Match the actual synthetic endpoint so Saved label propagation is exercised too.
 	a.state = json.RawMessage(fmt.Sprintf(`{"activePage":"terminal","theme":"dark","appUpdatePreferences":{"enabled":false},"terminalProfiles":[{"id":"native-profile114","name":"Native saved <west>","type":"telnet","host":"127.0.0.1","port":%d}]}`, listener.Addr().(*net.TCPAddr).Port))
+	if profile130 {
+		a.state = bytes.Replace(a.state, []byte(`"name":"Native saved <west>"`), []byte(`"name":"127.0.0.1","nameExplicit":false`), 1)
+		a.state = bytes.Replace(a.state, []byte(`"terminalProfiles":`), []byte(fmt.Sprintf(`"terminalRecent":[{"id":"native-recent130","name":"127.0.0.1","nameExplicit":false,"type":"telnet","host":"127.0.0.1","port":%d}],"terminalProfiles":`, listener.Addr().(*net.TCPAddr).Port)), 1)
+	}
 	session, err := a.connectTerminalForRequest(httptest.NewRequest(http.MethodPost, "http://fixture.invalid/api/terminals", nil), terminal.ConnectRequest{Type: "telnet", ProfileID: "native-profile114", Host: "127.0.0.1", Port: listener.Addr().(*net.TCPAddr).Port})
 	if err != nil {
 		t.Fatal(err)
@@ -153,11 +166,16 @@ func TestNativeTerminalTransferInstalledWebView2(t *testing.T) {
 			done <- ctx.Err()
 			return
 		}
-		e := h.exercise(&accepted)
-		if e == nil && h.resize129 != nil {
+		var e error
+		if profile130 {
+			e = h.exerciseProfiles130(&accepted)
+		} else {
+			e = h.exercise(&accepted)
+		}
+		if e == nil && !profile130 && h.resize129 != nil {
 			e = h.exerciseResize129(&accepted)
 		}
-		if e == nil && os.Getenv("NETWORK_TOOLKIT_NATIVE_TERMINAL_GESTURES") == "1" {
+		if e == nil && !profile130 && os.Getenv("NETWORK_TOOLKIT_NATIVE_TERMINAL_GESTURES") == "1" {
 			e = h.exerciseTerminalGestures(&accepted)
 		}
 		if e != nil && ctx.Err() == nil {
@@ -183,6 +201,7 @@ func TestNativeTerminalTransferInstalledWebView2(t *testing.T) {
 }
 
 type nativeTerminalSnapshot struct {
+	Profiles130                                                            *nativeProfiles130Snapshot       `json:"profiles130"`
 	Resize129                                                              *nativeTerminalResize129Snapshot `json:"resize129"`
 	TabPrimary, TabAddress, SavedProfileName, LearnedName                  string
 	SavedPrimary, SavedAddress, ManualName                                 string
@@ -223,6 +242,7 @@ type nativeTerminalFixture struct {
 	session        string
 	promptReady    chan struct{}
 	labelsVerified bool
+	profile130     bool
 	resize129      *nativeTerminalResize129Evidence
 	allowBulk      atomic.Bool
 	timings        []nativeTerminalTiming
@@ -245,7 +265,7 @@ func (h *nativeTerminalFixture) serve(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 503, "External lookup disabled in synthetic native fixture.")
 		return
 	}
-	if r.Method != http.MethodGet && r.Method != http.MethodHead && r.URL.Path != "/api/state" && !strings.HasPrefix(r.URL.Path, "/api/terminal-views") && !(strings.HasPrefix(r.URL.Path, "/api/terminals/") && strings.HasSuffix(r.URL.Path, "/resize")) && !(r.Method == http.MethodPost && r.URL.Path == "/api/terminals/"+h.session+"/rename") && r.URL.Path != "/api/editor-views/current/activity" && !(h.allowBulk.Load() && (r.Method == http.MethodPost && r.URL.Path == "/api/terminals/"+h.session+"/disconnect" || r.Method == http.MethodDelete && r.URL.Path == "/api/terminals/"+h.session)) {
+	if !(h.profile130 && r.Method == http.MethodPost && (r.URL.Path == "/api/terminals/"+h.session+"/disconnect" || r.URL.Path == "/api/terminals/"+h.session+"/reconnect")) && r.Method != http.MethodGet && r.Method != http.MethodHead && r.URL.Path != "/api/state" && !strings.HasPrefix(r.URL.Path, "/api/terminal-views") && !(strings.HasPrefix(r.URL.Path, "/api/terminals/") && strings.HasSuffix(r.URL.Path, "/resize")) && !(r.Method == http.MethodPost && r.URL.Path == "/api/terminals/"+h.session+"/rename") && r.URL.Path != "/api/editor-views/current/activity" && !(h.allowBulk.Load() && (r.Method == http.MethodPost && r.URL.Path == "/api/terminals/"+h.session+"/disconnect" || r.Method == http.MethodDelete && r.URL.Path == "/api/terminals/"+h.session)) {
 		h.mu.Lock()
 		h.blocked = append(h.blocked, r.Method+" "+r.URL.Path)
 		h.mu.Unlock()
