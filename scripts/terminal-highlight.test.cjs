@@ -332,3 +332,24 @@ test('rule toggles and reset preserve ANSI attributes, cursor and raw output',as
  h.controller.setAppearance({rules:{address:false,url:true},colors:{address:'#123456'}});h.flush();assert(!h.controller.tokensAtRow(2).some(hit=>hit.kind==='address'));assert(h.controller.tokensAtRow(2).some(hit=>hit.kind==='url'));
  h.controller.setAppearance({rules:{},colors:{address:'#123456'}});h.flush();assert(h.decorations.some(mark=>!mark.disposed&&mark.options.foregroundColor==='#123456'));assert.equal(h.term.buffer.active.getLine(3).getCell(0).getFgColor(),1);assert.deepEqual(buffer(),before);assert.deepEqual([h.term.buffer.active.cursorX,h.term.buffer.active.cursorY],cursor);h.dispose();
 });
+
+test('hidden terminals skip repeated highlight reconciliation and resume after showing',async()=>{
+ const h=harness({underlines:false},{cols:80,rows:8});h.flush();
+ await h.write('set interface-name "Before hide"\r\n');
+ assert(h.decorations.some(d=>!d.disposed),'visible output must be highlighted');
+ let hidden=true;
+ h.term.element.classList={contains:name=>name==='hidden'&&hidden};
+ h.term.element.getClientRects=()=>hidden?[]:[{}];
+ await h.writeParsed('set interface-name "Hidden one"\r\n');
+ assert.equal(h.controller.getState().suspended,'hidden');
+ const disposedAt=h.decorations.length;
+ for(let i=0;i<20;i++)await h.writeParsed('set interface-name "Hidden '+i+'"\r\n');
+ assert.equal(h.decorations.length,disposedAt,'hidden output must not allocate decorations');
+ assert.equal(h.decorations.filter(d=>!d.disposed).length,0,'hidden marks must be cleared');
+ hidden=false;
+ h.controller.refresh();h.flush();
+ assert.equal(h.controller.getState().active,true,'visible tab must resume highlighting');
+ await h.write('set interface-name "After show"');
+ assert(h.decorations.some(d=>!d.disposed),'new visible output must be highlighted again');
+ h.dispose();
+});
