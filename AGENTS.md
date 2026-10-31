@@ -1,5 +1,12 @@
 # Network Toolkit development
 
+1.17.132 candidate includes current-window Reconnect all from tab menus and
+a split Reconnect button, and user-focused What's New / technical Additional
+Details presentation. See docs/RELEASE132_HANDOFF.md and
+docs/RELEASE_NOTES_STYLE.md. Until verified publication, 1.17.131 remains
+the actual public release. Preserve all previous published tags, downloads,
+credentials and settings.
+
 Current published version: 1.17.131. Published 2026-10-31T04:12:11Z;
 source/tag 9152e41f278f35719cff18993730f25a25050237,
 tree 9d29bdb49a7819e3e434448bf3ebc70e2a51d0b5.

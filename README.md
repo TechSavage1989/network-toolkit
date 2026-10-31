@@ -14,19 +14,17 @@
   <a href="#development">Development</a>
 </p>
 
-## Latest update - 1.17.131
+## Latest update - 1.17.132
 
-Ctrl+A selects the current recognized, echoed terminal command without
-including its prompt or prior output, even when the command wraps. Unsafe,
-uncertain, password or full-screen input keeps the original device control key.
-Multi-terminal performance changes coalesce cosmetic toolbar/status redraws,
-avoid hidden-tab highlighting work, skip unchanged full chrome redraws and update
-splitter CSS during dragging. Existing session transports, secrets, settings
-and portable updater remain unchanged. Actual user-device speed is unmeasured.
+The Terminal now has a Reconnect all action in the tab right-click menu and
+a small dropdown beside the existing Reconnect button. The action asks for
+confirmation before restarting eligible sessions in the current window.
 
-See [release notes](RELEASE_NOTES_1.17.131.txt) and
-[verification handoff](docs/RELEASE131_HANDOFF.md). Official portable Windows
-downloads: [GitHub Releases](https://github.com/TechSavage1989/network-toolkit/releases/latest).
+The updater now separates a plain-language What's New summary from the
+technical Additional details section, making releases easier to scan.
+See [release notes](RELEASE_NOTES_1.17.132.txt) and
+[release validation](docs/RELEASE132_HANDOFF.md).
+Official downloads: [GitHub Releases](https://github.com/TechSavage1989/network-toolkit/releases/latest).
 
 ## Historical 1.17.128 candidate (subsumed by published 1.17.129)
 
