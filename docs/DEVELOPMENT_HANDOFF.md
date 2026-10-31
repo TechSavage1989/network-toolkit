@@ -1,3 +1,20 @@
+# Network Toolkit v1.17.142 Beta 6 - development candidate, NOT PUBLISHED
+
+Branch: beta/1.17.142-gutter-alignment. Start from main at
+57d52c5bc3832239e2eeee1e2c30968111196491, which follows the
+published v1.17.141 tag with a documentation-only handoff commit.
+Read docs/RELEASE142_HANDOFF.md before editing or merging.
+The scope is source-free comparison gap attachment and map geometry:
+move after-line block widgets from the next line start to the preceding
+line end, keeping CodeMirror native gutter rows and fractional map offsets
+consistent. The focused test models this source boundary. The source change
+is not yet proven by hosted browser/native acceptance. Do not waive the
+existing 2px rendered alignment threshold or claim the historical SFTP
+cancellation issue fixed. Keep stable v1.17.136, opt-in beta updater,
+credentials and all published tags/assets unchanged.
+
+---
+
 # Network Toolkit v1.17.141 Beta 5 - published interface and workflow polish
 
 Published: 2026-10-31T19:06:59Z, prerelease=true, draft=false, GitHub release 430129340.
