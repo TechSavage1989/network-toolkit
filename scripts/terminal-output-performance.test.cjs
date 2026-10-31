@@ -11,7 +11,7 @@ function harness(){
   cancelAnimationFrame(key){frames.delete(key);},
   NetworkToolkitTerminalInteraction:{preferences:()=>({autoScroll:false})}
  };
- const document={querySelector(){queries++;return null;}};
+ const document={querySelector(selector){if(selector==='#terminalCommandBar')queries++;return null;}};
  const ctx={window,document,currentTerminal:()=>active};
  vm.runInNewContext(source,ctx);
  const api=window.NetworkToolkitTerminalExtras;
