@@ -134,8 +134,9 @@ test('deduplication ignores presentation markers and whitespace but retains extr
 });
 
 
+
 test('structured release notes reserve main highlights for user-facing benefits',()=>{
-  const doc=render('# Network Toolkit 1.17.64\\n\\n## What\\'s New\\n- Find the important changes quickly.\\n- Open the full explanation when needed.\\n\\n## Additional Details\\n- Technical parser uses explicit section boundaries.\\n- Legacy release bodies still use the original parsing method.\\n\\n### Compatibility\\n- Saved profiles are unchanged.');
+  const doc=render("# Network Toolkit 1.17.64\n\n## What's New\n- Find the important changes quickly.\n- Open the full explanation when needed.\n\n## Additional Details\n- Technical parser uses explicit section boundaries.\n- Legacy release bodies still use the original parsing method.\n\n### Compatibility\n- Saved profiles are unchanged.");
   assert.deepEqual(doc.querySelectorAll('.nt-update-notes-highlights li').map(node=>node.textContent),[
     'Find the important changes quickly.',
     'Open the full explanation when needed.'
@@ -144,13 +145,13 @@ test('structured release notes reserve main highlights for user-facing benefits'
   const full=doc.querySelector('.nt-update-notes-full').textContent;
   assert.match(full,/Technical parser uses explicit section boundaries/);
   assert.match(full,/Legacy release bodies still use the original parsing method/);
-  assert.match(full,/Compatibility\\n• Saved profiles are unchanged/);
-  assert.doesNotMatch(full,/Find the important changes|Open the full explanation|Network Toolkit 1\\.17\\.64|What\\'s New|Additional Details/);
+  assert.match(full,/Compatibility\n• Saved profiles are unchanged/);
+  assert.doesNotMatch(full,/Find the important changes|Open the full explanation|Network Toolkit 1\.17\.64|What's New|Additional Details/);
   assert.doesNotMatch(doc.querySelector('.nt-update-notes-highlights').textContent,/Technical parser|Legacy release|Compatibility/);
 });
 
 test('structured release notes retain overflow without promoting technical details to highlights',()=>{
-  const doc=render('## What\\'s New\\n- One\\n- Two\\n- Three\\n- Four\\n- Five\\n\\n## Additional Details\\n- Expert diagnostic log explains the new behavior.');
+  const doc=render("## What's New\n- One\n- Two\n- Three\n- Four\n- Five\n\n## Additional Details\n- Expert diagnostic log explains the new behavior.");
   assert.deepEqual(doc.querySelectorAll('.nt-update-notes-highlights li').map(node=>node.textContent),['One','Two','Three','Four']);
   const full=doc.querySelector('.nt-update-notes-full').textContent;
   assert.match(full,/• Five/);
@@ -159,15 +160,15 @@ test('structured release notes retain overflow without promoting technical detai
 });
 
 test('structured benefit-only notes do not create empty technical disclosures',()=>{
-  const doc=render('## What\\'s New\\n- More readable release notes.\\n\\n## Additional Details');
+  const doc=render("## What's New\n- More readable release notes.\n\n## Additional Details");
   assert.deepEqual(doc.querySelectorAll('li').map(node=>node.textContent),['More readable release notes.']);
   assert.equal(doc.querySelectorAll('details').length,0);
 });
 
 test('structured technical text remains escaped and non-executable',()=>{
-  const htmlSource=html({version:'1.17.132',notes:'## What\\'s New\\n- Clear summaries.\\n\\n## Additional Details\\n- <img src=x onerror=alert(1)>\\n- <script>alert(2)</script>'});
+  const htmlSource=html({version:'1.17.132',notes:"## What's New\n- Clear summaries.\n\n## Additional Details\n- <img src=x onerror=alert(1)>\n- <script>alert(2)</script>"});
   const doc=makeDocument(htmlSource);
   assert.equal(doc.querySelectorAll('img,script').length,0);
-  assert.match(htmlSource,/&lt;img src=x onerror=alert\\(1\\)&gt;/);
+  assert.match(htmlSource,/&lt;img src=x onerror=alert\(1\)&gt;/);
   assert.match(doc.querySelector('.nt-update-notes-full').textContent,/&lt;script&gt;/);
 });
