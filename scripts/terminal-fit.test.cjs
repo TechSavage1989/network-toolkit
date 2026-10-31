@@ -24,3 +24,23 @@ test('unchanged dimensions skip redundant full chrome redraws',()=>{
  c.scheduleTerminalFit();c.advance(100);
  assert.equal(renders,2,'a real geometry change still updates status and controls');
 });
+
+test('continuous splitter movement updates CSS tracks without rebuilding all terminal panes',()=>{
+ let renders=0,fits=0,saves=0,tracks=[],aria=[];
+ const grid={dataset:{layout:'columns'},style:{setProperty:(name,value)=>tracks.push([name,value])}};
+ const divider={setAttribute:(name,value)=>aria.push([name,value])};
+ const c={state:{terminalLayout:{kind:'columns',columnRatio:.5,rowRatio:.5}},
+  safeTerminalLayout:value=>({...value}),
+  $:(selector)=>selector==='#terminalPaneGrid'?grid:selector==='[data-split-axis="column"]'?divider:null,
+  renderTerminalPanes:()=>{renders++;},scheduleTerminalFit:()=>{fits++;},saveState:()=>{saves++;}
+ };
+ vm.createContext(c);vm.runInContext(source('updateTerminalPaneRatio'),c);
+ for(let i=1;i<=100;i++)c.updateTerminalPaneRatio('column',.5+i*.002);
+ assert.equal(renders,0,'pointer motion must avoid full control-panel rebuilds');
+ assert.equal(fits,100,'pane fitting still follows each geometric change');
+ assert.deepEqual(tracks.at(-1),['--terminal-column','70%']);
+ assert.deepEqual(aria.at(-1),['aria-valuenow','70']);
+ c.updateTerminalPaneRatio('column',.8,true);
+ assert.equal(renders,1,'keyboard and committed changes retain full state synchronization');
+ assert.equal(saves,1);
+});
