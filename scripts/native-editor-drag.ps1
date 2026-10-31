@@ -94,7 +94,22 @@ try{
  # or Alt/OLE hit-testing and the original ACK gate must succeed.
  if($Mode -eq 'Cross'){Visible-Point $target $to}
  for($i=1;$i -le 28;$i++){[void][EditorDragInput]::SetCursorPos([int]($from.X+($to.X-$from.X)*$i/28),[int]($from.Y+($to.Y-$from.Y)*$i/28));Start-Sleep -Milliseconds 25}
+ # Let the final real pointer position reach the destination OLE loop before
+ # releasing. This is Cross-only: cancellation/ordinary pointer timings remain.
+ if($Mode -eq 'Cross'){
+  Start-Sleep -Milliseconds 120
+  $inputState.targetClientX=$ToX;$inputState.targetClientY=$ToY
+  $inputState.finalTargetSettledAt=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+  $inputState.altBeforeMouseUp=([EditorDragInput]::GetAsyncKeyState(18) -lt 0)
+ }
  if($Mode -eq 'Escape'){[EditorDragInput]::keybd_event(27,0,0,[UIntPtr]::Zero);[EditorDragInput]::keybd_event(27,0,2,[UIntPtr]::Zero);Start-Sleep -Milliseconds 100}
-}finally{[EditorDragInput]::mouse_event(0x0004,0,0,0,[UIntPtr]::Zero);if($alt){[EditorDragInput]::keybd_event(18,0,2,[UIntPtr]::Zero)}}
+}finally{
+ $inputState.mouseUpAt=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds()
+ [EditorDragInput]::mouse_event(0x0004,0,0,0,[UIntPtr]::Zero)
+ # Keep the initiating modifier held while the real mouse-up/drop is processed.
+ # Never retry a drop or infer success: the original broker/ACK checks decide.
+ try{if($Mode -eq 'Cross'){Start-Sleep -Milliseconds 150}}
+ finally{if($alt){$inputState.altUpAt=[DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();[EditorDragInput]::keybd_event(18,0,2,[UIntPtr]::Zero)}}
+}
 Start-Sleep -Milliseconds 150
 @{action=$Action;mode=$Mode;sourcePID=$OwnerProcessID;targetPID=$TargetProcessID;actualMouseDrag=$true;inputState=$inputState;altCrossWindowPath=$alt;targetGeometry='Observed tab/client rectangles; outside modes use a validated work-area release point beyond the source HWND';from=@($from.X,$from.Y);to=@($to.X,$to.Y)}|ConvertTo-Json -Compress
