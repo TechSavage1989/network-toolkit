@@ -1,15 +1,19 @@
 # Network Toolkit development
 
-Current candidate: 1.17.131 terminal Ctrl+A input selection and multi-session
-rendering. Publication pending. Read docs/RELEASE131_HANDOFF.md for the exact
-scope and unresolved legacy Editor gear-focus observation. Preserve previous
-published tags, source, assets, identity/credential safeguards and settings.
-
+Current published version: 1.17.131. Published 2026-10-31T04:12:11Z;
+source/tag 9152e41f278f35719cff18993730f25a25050237,
+tree 9d29bdb49a7819e3e434448bf3ebc70e2a51d0b5.
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.131
+The exact release build and GitHub publication succeeded, 4 assets exist,
+and latest release/feed resolves 131. Review CI:13 pass/1 retained existing
+narrow Editor comparison-motion failure. No live device speed measurement.
+Read docs/RELEASE131_HANDOFF.md before further work. All 130 release bytes,
+assets and tags remain unchanged.
 
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-Current published version: 1.17.130. Published 2026-10-31T03:13:29Z;
+Previous published version: 1.17.130. Published 2026-10-31T03:13:29Z;
 actual public download/source/feed proof 03:14:21.181667Z, independent 03:15:04.117528Z.
 Source/tag 77ceeec0b9b258dc7e3a1dfc29f9992ad3d5d884;
 tree 6b88d9a83a666f2363c496b21e7ec45cb2c6fd9a.
