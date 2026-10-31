@@ -1,3 +1,28 @@
+NETWORK TOOLKIT 1.17.138
+======================
+
+CURRENT RELEASE - 1.17.138 (BETA 2)
+
+Beta 2 improves terminal pane resizing. Rapid splitter pointer movements
+are frame-coalesced, changing window/sidebar geometry is respected during
+dragging, and the final pointer position is applied when released.
+A cancelled drag restores its previous ratio, including pointer-capture
+loss. Oversized terminal canvas content is clipped to the assigned pane
+while xterm refits.
+
+When scrolling is paused, a saved viewport row is used as a bounded
+fallback if the xterm scrollback marker is discarded during reflow.
+A user's later scroll/Follower Latest choice still takes priority.
+Existing SSH/Telnet/Serial/local shell, terminal output, selection, input,
+prompt pacing, remote PTY resize and saved settings behavior is retained.
+
+This is an opt-in prerelease. Enable Beta updates under App settings >
+Updates and check for updates from v1.17.137 or the stable v1.17.136 bridge.
+The latest normal stable release remains v1.17.136.
+
+Details: RELEASE_NOTES_1.17.138.txt and docs/RELEASE138_HANDOFF.md.
+Prior release descriptions follow.
+
 NETWORK TOOLKIT 1.17.137
 ======================
 

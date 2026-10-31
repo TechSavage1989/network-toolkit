@@ -1,3 +1,14 @@
+PHASE 1 BETA 2 (v1.17.138)
+
+Beta 2 is distributed as a GitHub prerelease. From your installed
+v1.17.137 beta, keep Beta updates enabled in App settings > Updates,
+select Check for updates, Download update and Install and restart after
+saving active work. A user on stable v1.17.136 must opt in first.
+No beta is automatically downloaded or installed. Stable-only users
+stay on the latest stable v1.17.136 until a newer stable version exists.
+The existing checksum validation, settings folder and stable EXE name
+are preserved. Turning beta updates off never forces a downgrade.
+
 FIRST PHASE 1 BETA (v1.17.137)
 
 v1.17.137 is a GitHub prerelease, not the latest stable release.

@@ -14,18 +14,23 @@
   <a href="#development">Development</a>
 </p>
 
-## Latest update - 1.17.137 Beta (Phase 1)
+## Latest update - 1.17.138 Beta 2 (Phase 1)
 
-This optional prerelease begins the terminal responsiveness refinement.
-Rapid pane-resize events now avoid unnecessary layout measurement and
-unchanged-size highlight redraws. Noncritical chrome updates are deferred
-while terminal cells resize immediately, preserving prompt pacing and
-the existing terminal session safeguards.
+Beta 2 smooths multi-pane terminal resizing. Splitter movements are applied
+once per animation frame and commit the final pointer position; content is
+clipped within its pane while the display refits. Terminals scrolled back in
+history retain a fallback viewport position if their resize marker is lost.
 
-This release appears only after stable v1.17.136 is installed and
-Beta updates (opt in) is enabled in App settings > Updates.
-See [beta release notes](RELEASE_NOTES_1.17.137.txt) and
-[Phase 1 handoff](docs/RELEASE137_HANDOFF.md).
+This is an **opt-in prerelease**, not the stable update. In App settings >
+Updates, enable Beta updates to receive the verified v1.17.138 package.
+See [beta release notes](RELEASE_NOTES_1.17.138.txt) and
+[Beta 2 validation](docs/RELEASE138_HANDOFF.md).
+
+## Previous beta - 1.17.137
+
+Beta 1 reduced unnecessary layout measurement, highlight redraws, and
+cosmetic chrome updates during pane resizing.
+See [Beta 1 release notes](docs/releases/RELEASE_NOTES_1.17.137.txt).
 
 ## Previous stable update - 1.17.136
 
