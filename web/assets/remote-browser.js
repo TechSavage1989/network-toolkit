@@ -66,9 +66,20 @@ function connectionNote(k,message){note(k,sidebarMount(k)&&get(k).connected?'':m
 function focusSidebarConnectionSettings(k){
  root.NetworkToolkitEditorFiles?.selectPanel?.('connections');
  if(detachedEditor())return;
- const app=rootNode(k),fields=[...(app?.querySelectorAll('[data-rb-setting="host"]')||[]),document.querySelector('#ntEditorRemoteSource')];
- const target=fields.find(field=>field&&!field.disabled&&field.getClientRects().length);
- if(target){target.scrollIntoView({block:'nearest',inline:'nearest'});target.focus({preventScroll:true});}
+ const app=rootNode(k);if(!app)return;
+ const focus=()=>{
+  if(app.isConnected===false||app.closest?.('[data-ed-files-sidebar]')?.hidden)return false;
+  const fields=[...(app.querySelectorAll?.('[data-rb-setting="host"]')||[]),document.querySelector?.('#ntEditorRemoteSource'),app.querySelector?.('[data-rb-connection-source]')];
+  const target=fields.find(field=>field&&!field.disabled&&field.getClientRects().length);
+  if(!target)return false;
+  target.scrollIntoView?.({block:'nearest',inline:'nearest'});target.focus?.({preventScroll:true});
+  return document.activeElement===target;
+ };
+ focus();
+ // A narrow sidebar can settle after the control is activated. Retry once
+ // only while this same sidebar still owns focus; never steal later input.
+ const original=document.activeElement;
+ root.requestAnimationFrame?.(()=>{if(rootNode(k)===app&&(document.activeElement===original||document.activeElement===null||document.activeElement?.isConnected===false)&&!app.querySelector('.rb-connect')?.contains(document.activeElement))focus();});
 }
 function options(values,current){return values.map(([v,label])=>'<option value="'+escape(v)+'"'+(v===current?' selected':'')+'>'+escape(label)+'</option>').join('')}
 function sshKnownRecords(){return [...(state.terminalProfiles||[]).filter(x=>x?.type==='ssh'&&x.host),...(state.terminalRecent||[]).filter(x=>x?.type==='ssh'&&x.host),...(state.sftpRecent||[]).filter(x=>x?.type==='ssh'&&x.host)];}

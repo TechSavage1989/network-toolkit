@@ -33,7 +33,11 @@ function expandedIntent(show){compactLayout=isCompact();if(compactLayout)compact
 function responsive(editor,host){const compact=isCompact();if(compactLayout!==compact){compactOpen=false;compactLayout=compact;}const show=compact?compactOpen:!wideCollapsed,focused=!show&&host.contains(document.activeElement);if(host.hidden===show)navigationRevision++;visibility(editor,host,show);if(focused)editor.querySelector('[data-editor-files-reopen]')?.focus?.({preventScroll:true});}
 function initialize(editor){readPreferences();const host=setup(editor);if(host)responsive(editor,host);}
 function toggle(editor){readPreferences();const host=setup(editor);if(!host)return;navigationRevision++;expandedIntent(host.hidden);visibility(editor,host,host.hidden);remember(host);(host.hidden?editor.querySelector('[data-editor-files-reopen]'):editor.querySelector('[data-editor-files-panel][aria-selected="true"]'))?.focus?.({preventScroll:true});}
-function selectPanel(value){const host=document.querySelector('[data-ed-files-sidebar]');if(!host)return;navigationRevision++;panel=value==='connections'?'connections':'files';if(host.hidden){expandedIntent(true);visibility(host.closest('#networkToolkitFileEditor'),host,true);}else mount(host);remember(host);}
+function selectPanel(value){const host=document.querySelector('[data-ed-files-sidebar]');if(!host)return;const next=value==='connections'?'connections':'files';
+ // Preserve the active connection toolbar and keyboard focus when already open.
+ navigationRevision++;
+ if(panel===next&&!host.hidden){if(detached())mount(host);return;}
+ panel=next;if(host.hidden){expandedIntent(true);visibility(host.closest('#networkToolkitFileEditor'),host,true);}else mount(host);remember(host);}
 function mount(host){
  syncRail(host);host.dataset.editorSidebarPanel=panel;host.dataset.editorSidebarSide=side;host.querySelector('[data-editor-file-browser]')?.setAttribute('aria-labelledby',panel==='connections'?'ntEditorConnectionsTab':'ntEditorFilesTab');
  const sessions=host.querySelector('#ntEditorRemotePanel');if(sessions){sessions.hidden=panel!=='connections';if(panel==='connections')void root.NetworkToolkitFileEditor?.refreshConnectedSources?.();}

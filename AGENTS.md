@@ -1,3 +1,14 @@
+# Network Toolkit v1.17.141 Beta 5 - interface-polish candidate
+
+Development PR #16: https://github.com/TechSavage1989/network-toolkit/pull/16
+Based on v1.17.140 Beta 4. Read docs/RELEASE141_HANDOFF.md and
+docs/DEVELOPMENT_HANDOFF.md before changes. Preserve published tags,
+stable v1.17.136, opt-in beta update safeguards and credentials.
+The current candidate focuses on Editor sidebar focus, comparison map
+scrolling and TFTP/SFTP server file explorer resizing.
+Do not claim historical Editor or native SFTP failures resolved from
+unit tests alone. This is not yet published.
+
 # Network Toolkit v1.17.140 Beta 4 - published application-wide optimization
 
 Published 2026-10-31T18:35:55Z as GitHub prerelease 430114376.
