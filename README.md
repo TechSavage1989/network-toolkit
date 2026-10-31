@@ -14,7 +14,15 @@
   <a href="#development">Development</a>
 </p>
 
-## Latest beta - 1.17.139 Beta 3 (Phase 1)
+## Beta 4 development candidate - 1.17.140
+
+The next beta improves graph time-range processing and large directory
+listing interactions in SFTP, FTP/FTPS and file-server tools. This is a
+development candidate, not yet a public download. Follow
+[PR #15](https://github.com/TechSavage1989/network-toolkit/pull/15)
+and the [application-wide performance audit](docs/PERFORMANCE_AUDIT_140.md).
+
+## Latest published beta - 1.17.139 Beta 3 (Phase 1)
 
 Published October 31, 2026 as an **opt-in prerelease**. Heavy terminal
 output is handled in bounded per-session batches, reducing repeated

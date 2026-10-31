@@ -1,3 +1,23 @@
+NETWORK TOOLKIT 1.17.140
+======================
+
+CURRENT RELEASE - 1.17.140 (BETA 4 CANDIDATE)
+
+Beta 4 improves performance beyond Terminal. SFTP, FTP and server file
+browsers avoid sorting unchanged directories repeatedly during selection
+and navigation. Time-range graphs calculate the first and last recorded
+samples without sorting the entire history; already ordered data retains
+the existing display order.
+
+This is a development candidate and is not yet published or installed.
+It retains existing credentials, settings, network diagnostic and transfer
+behavior, the Windows portable executable name and opt-in beta update
+channel. The latest published beta is v1.17.139; stable is v1.17.136.
+Live Windows performance measurements are not yet available.
+
+Details: RELEASE_NOTES_1.17.140.txt and docs/RELEASE140_HANDOFF.md.
+Previous release descriptions follow.
+
 NETWORK TOOLKIT 1.17.139
 ======================
 

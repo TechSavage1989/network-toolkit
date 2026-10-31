@@ -1,0 +1,17 @@
+Network Toolkit 1.17.140 Beta 4
+
+## What's New
+
+- Browsing large SFTP and FTP folders involves less repeated sorting while selecting files.
+- File explorer filtering and sorting reuse results when folder contents have not changed.
+- Time-range graphs process growing sample histories with less repeated work.
+
+## Additional Details
+
+- Beta 4 is an opt-in application-wide performance prerelease. It is not a stable update; the stable updater channel remains v1.17.136.
+- Time-range graph bounds use a linear earliest/latest scan. Already chronological samples avoid an unnecessary sort, while out-of-order samples retain the existing ordering and exact timestamp semantics.
+- SFTP and FTP/FTPS client file browsers reuse sorted views for unchanged directory listings. Changing a listing, filter, sort field or sort direction invalidates the cached view.
+- TFTP/SFTP server file explorer retains sorted and filtered directory views until listing or options change. Modified-date and file-type ordering compute each row's sort key once per listing instead of during every comparison.
+- This update does not modify connection authentication, permission boundaries, network-scan concurrency, packet capture, transfer backends, saved profiles, Terminal behavior, credential storage or automatic installation rules.
+- Previously reported Editor narrow-window/sidebar and comparison alignment failures are outside these changes and are not claimed fixed.
+- New tests cover sorting semantics, large out-of-order graph histories, invalid timestamps, cache invalidation and retained source data. No physical Windows benchmark or universal speedup is claimed.
