@@ -43,7 +43,7 @@ function shell(p){return '<div class="fm-explorer" data-fm-explorer="'+p+'"><div
  '<button class="btn small ghost" data-fm-action="preview" title="Preview selected text file">'+icon('file')+' Preview</button>'+
  '<button class="btn small ghost" data-fm-action="path" title="Copy selected file path or current folder path">'+icon('copy')+' Path</button>'+
  '</div><div class="fm-toolbar-end"><button class="btn small ghost" data-fm-action="single" title="Show or hide computer pane">'+icon('grid')+' <span data-fm-single-label>Two panes</span></button><span class="fm-toolbar-help">Ctrl/Shift select · Double-click to open</span></div></div>'+ 
- '<div class="fm-split" data-fm-split>'+paneHTML(p,'local')+'<div class="fm-gutter" data-fm-gutter role="separator" tabindex="0" aria-label="Resize file browser panels" aria-orientation="vertical" title="Drag to resize the panes"></div>'+paneHTML(p,'server')+'</div>'+ 
+ '<div class="fm-split" data-fm-split>'+paneHTML(p,'local')+'<div class="fm-gutter" data-fm-gutter role="separator" tabindex="0" aria-label="Resize file browser panels" aria-orientation="vertical" aria-valuemin="25" aria-valuemax="75" aria-valuenow="49" title="Drag to resize. Left and Right arrows adjust, Shift makes larger steps, Home or End selects a limit. Double-click resets."></div>'+paneHTML(p,'server')+'</div>'+ 
  '<div class="fm-operation" data-fm-operation hidden></div><p class="fm-footnote">The server pane is the local folder exposed to incoming '+p.toUpperCase()+' connections. Moving files between panes copies them on this computer, even when the server is stopped. '+(p==='tftp'?'TFTP clients cannot browse remote directories.':'Remote SFTP clients can browse the server root after authenticating.')+'</p></div>'}
 function mount(p,rootPath,status){if(!PROTOCOLS.has(p))return;const host=document.querySelector('.transfer-file-manager');if(!host)return;
  const m=get(p);restore(p);if(rootPath!==m.root){m.root=rootPath;m.server=freshPane();m.server.path='';m.statusKey=''}
@@ -57,7 +57,7 @@ function mount(p,rootPath,status){if(!PROTOCOLS.has(p))return;const host=documen
   else setMessage(p,'server','Select a server root folder to browse shared files.');
  }
 }
-function applyLayout(p){const m=get(p),el=document.querySelector('[data-fm-explorer="'+p+'"]');if(!el)return;el.style.setProperty('--fm-left',m.split+'%');el.classList.toggle('fm-single',m.single);const tag=el.querySelector('[data-fm-single-label]');if(tag)tag.textContent=m.single?'Server pane only':'Two panes'}
+function applyLayout(p){const m=get(p),el=document.querySelector('[data-fm-explorer="'+p+'"]');if(!el)return;el.style.setProperty('--fm-left',m.split+'%');el.classList.toggle('fm-single',m.single);const tag=el.querySelector('[data-fm-single-label]');if(tag)tag.textContent=m.single?'Server pane only':'Two panes';const gutter=el.querySelector('[data-fm-gutter]');if(gutter){gutter.setAttribute('aria-valuenow',String(Math.round(m.split)));gutter.setAttribute('aria-valuetext',Math.round(m.split)+'% computer pane, '+Math.round(100-m.split)+'% server pane');gutter.setAttribute('aria-disabled',String(!!m.single));gutter.tabIndex=m.single?-1:0;}}
 function setMessage(p,side,text){const node=document.querySelector('[data-fm-rows="'+side+'"]');if(node&&currentPage(p))node.innerHTML='<tr><td colspan="4" class="fm-empty">'+safe(text)+'</td></tr>'}
 function rememberHistory(p,side,path,skip=false){const v=get(p)[side];if(skip){if(v.at<0){v.history=[path];v.at=0}return;}if(v.history[v.at]!==path){v.history=v.history.slice(0,v.at+1).concat([path]).slice(-80);v.at=v.history.length-1}}
 async function load(p,side,dir='',opts={}){if(!currentPage(p))return;const m=get(p),v=m[side];if(side==='server'&&!m.root){setMessage(p,side,'Choose the root folder first.');return}
@@ -177,6 +177,27 @@ function action(p,op,side){const m=get(p);if(op==='stopQueue'){m.cancelPending=t
 }
 function resetLayout(p){const m=get(p);m.split=49;m.single=false;applyLayout(p);remember(p);}
 function notice(p,status){const m=get(p);if(!status?.running)return;const entries=status.transfers||[];const key=entries.length+'|'+(entries[0]?.time||'')+'|'+(entries[0]?.file||'');if(key!==m.statusKey){const changed=!!m.statusKey;m.statusKey=key;if(changed&&currentPage(p))void load(p,'server',m.server.path,{skipHistory:true})}}
+let paneResize=null;
+function setPaneRatio(p,value,persist=false){
+ const m=get(p);if(m.single)return false;
+ const next=Math.min(75,Math.max(25,Number(value)||49));
+ if(next===m.split)return false;
+ m.split=next;applyLayout(p);if(persist)remember(p);return true;
+}
+function applyPanePointer(d,clientX){
+ if(!d.node?.isConnected)return false;
+ const bounds=d.node.getBoundingClientRect();
+ return bounds.width>0?setPaneRatio(d.protocol,((clientX-bounds.left)/bounds.width)*100):false;
+}
+function finishPaneResize(event,commit){
+ const d=paneResize;if(!d||event?.pointerId!=null&&event.pointerId!==d.pointerId)return;
+ paneResize=null;
+ if(d.frame!==null)root.cancelAnimationFrame?.(d.frame);
+ if(commit&&d.node.isConnected)applyPanePointer(d,event.clientX??d.lastX);
+ else{get(d.protocol).split=d.initial;applyLayout(d.protocol);}
+ try{if(d.gutter.hasPointerCapture?.(d.pointerId))d.gutter.releasePointerCapture(d.pointerId);}catch{}
+ if(commit&&get(d.protocol).split!==d.initial)remember(d.protocol);
+}
 function handlers(){
  document.addEventListener('click',event=>{const el=event.target.closest('[data-fm-action],[data-fm-sort],[data-fm-row]');if(!el)return;const wrap=el.closest('[data-fm-explorer]'),p=wrap?.dataset.fmExplorer||state.activePage;if(!PROTOCOLS.has(p)||!currentPage(p))return;const side=el.dataset.fmSide||el.dataset.fmRow;
  if(el.dataset.fmRow){selectRow(p,side,el.dataset.fmPath,event);return}
@@ -189,6 +210,12 @@ function handlers(){
  document.addEventListener('input',event=>{const filter=event.target.closest('[data-fm-filter]');if(!filter)return;const p=state.activePage,side=filter.dataset.fmFilter;if(!PROTOCOLS.has(p))return;const v=get(p)[side];v.filter=filter.value;const body=filter.closest('.fm-pane')?.querySelector('[data-fm-rows]');if(body){const rows=visible(v),matches=new Set(rows.map(r=>r.path));for(const tr of body.querySelectorAll('[data-fm-row]'))tr.hidden=!matches.has(tr.dataset.fmPath)}},true);
  document.addEventListener('focusin',event=>{const node=event.target.closest('[data-fm-pane]');if(node&&PROTOCOLS.has(state.activePage)){get(state.activePage).active=node.dataset.fmPane;paint(state.activePage,'server');paint(state.activePage,'local')}},true);
  document.addEventListener('keydown',event=>{const p=state.activePage;if(!PROTOCOLS.has(p)||!currentPage(p)||document.querySelector('.modal'))return;
+  const gutter=event.target.closest('[data-fm-gutter]');if(gutter){
+   if(get(p).single||!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+   event.preventDefault();event.stopPropagation();
+   const m=get(p),step=event.shiftKey?10:2,ratio=event.key==='Home'?25:event.key==='End'?75:m.split+(event.key==='ArrowLeft'?-step:step);
+   setPaneRatio(p,ratio,true);return;
+  }
   const address=event.target.closest('[data-fm-address]');if(address){if(event.key==='Enter'){event.preventDefault();nav(p,address.dataset.fmAddress,'go')}return}
   if(event.target.closest('input,textarea,select')&&!event.target.closest('[data-fm-scroll]'))return;
   const pane=event.target.closest('[data-fm-pane]'),m=get(p),side=pane?.dataset.fmPane||m.active;
@@ -202,7 +229,13 @@ function handlers(){
  document.addEventListener('dragstart',event=>{const tr=event.target.closest('[data-fm-row]');if(!tr)return;const p=state.activePage,side=tr.dataset.fmRow;if(!PROTOCOLS.has(p))return;const m=get(p);if(!m[side].selected.has(tr.dataset.fmPath))selectRow(p,side,tr.dataset.fmPath,{});event.dataTransfer?.setData('application/x-networktoolkit-file-pane',side);if(event.dataTransfer)event.dataTransfer.effectAllowed='copy'},true);
  document.addEventListener('dragover',event=>{const pane=event.target.closest('[data-fm-pane]');if(!pane)return;const p=state.activePage,side=pane.dataset.fmPane;if(!PROTOCOLS.has(p))return;if(side==='local'||side==='server'){event.preventDefault();event.dataTransfer.dropEffect='copy'}},true);
  document.addEventListener('drop',event=>{const pane=event.target.closest('[data-fm-pane]');if(!pane)return;const p=state.activePage;if(!PROTOCOLS.has(p))return;const from=event.dataTransfer?.getData('application/x-networktoolkit-file-pane'),to=pane.dataset.fmPane;if(from&&from!==to){event.preventDefault();get(p).active=from;ask(p,from==='local'?'upload':'download')}},true);
- document.addEventListener('pointerdown',event=>{const gutter=event.target.closest('[data-fm-gutter]');if(!gutter)return;const p=state.activePage;if(!PROTOCOLS.has(p))return;const bounds=gutter.parentElement.getBoundingClientRect(),m=get(p);const drag=e=>{m.split=Math.min(75,Math.max(25,((e.clientX-bounds.left)/bounds.width)*100));applyLayout(p)};const done=()=>{window.removeEventListener('pointermove',drag);window.removeEventListener('pointerup',done);remember(p)};window.addEventListener('pointermove',drag);window.addEventListener('pointerup',done);event.preventDefault()},true);
+ document.addEventListener('pointerdown',event=>{const gutter=event.target.closest?.('[data-fm-gutter]'),p=gutter?.closest('[data-fm-explorer]')?.dataset.fmExplorer||state.activePage;if(!gutter||event.button!==0||!PROTOCOLS.has(p)||!currentPage(p)||get(p).single)return;finishPaneResize(null,false);paneResize={protocol:p,pointerId:event.pointerId,gutter,node:gutter.parentElement,initial:get(p).split,lastX:event.clientX,frame:null};event.preventDefault();try{gutter.setPointerCapture?.(event.pointerId);}catch{}},true);
+ document.addEventListener('pointermove',event=>{const d=paneResize;if(!d||event.pointerId!==d.pointerId)return;d.lastX=event.clientX;if(d.frame!==null)return;if(typeof root.requestAnimationFrame!=='function'){applyPanePointer(d,d.lastX);return;}d.frame=root.requestAnimationFrame(()=>{d.frame=null;if(paneResize===d)applyPanePointer(d,d.lastX);});},true);
+ document.addEventListener('pointerup',event=>finishPaneResize(event,true),true);
+ document.addEventListener('pointercancel',event=>finishPaneResize(event,false),true);
+ document.addEventListener('lostpointercapture',event=>finishPaneResize(event,false),true);
+ root.addEventListener?.('blur',()=>finishPaneResize(null,false));
+ document.addEventListener('dblclick',event=>{const gutter=event.target.closest?.('[data-fm-gutter]'),p=gutter?.closest('[data-fm-explorer]')?.dataset.fmExplorer||state.activePage;if(!gutter||!PROTOCOLS.has(p)||!currentPage(p))return;event.preventDefault();setPaneRatio(p,49,true);},true);
 }
 handlers();root.NetworkToolkitTransferExplorer=Object.freeze({mount,notice,load,resetLayout,model:get});
 })(globalThis);
