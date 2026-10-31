@@ -14,17 +14,23 @@
   <a href="#development">Development</a>
 </p>
 
-## Latest update - 1.17.134
+## Latest update - 1.17.135
 
-When SSH multiline commands are pasted one line at a time, Last paste now
-includes all submitted commands and output. Last command identifies the
-final submitted command and its output. The console's Copy/Select and macro
-library's Save Last command/Last paste use the same completed capture.
+Last paste and Last command now copy and select prompt-paced SSH output
+without extra "Command N:" headings or repeated device echoes.
+Enable Include commands to see the original submitted commands once;
+disable it to copy the responses without command lines.
 
-See [release notes](RELEASE_NOTES_1.17.134.txt) and
-[release validation](docs/RELEASE134_HANDOFF.md).
+See [release notes](RELEASE_NOTES_1.17.135.txt) and
+[release validation](docs/RELEASE135_HANDOFF.md).
 The Windows portable download and updater use the same official
 [GitHub Releases](https://github.com/TechSavage1989/network-toolkit/releases/latest).
+
+## Previous update - 1.17.134
+
+Paced SSH multiline pastes were added to Last command and Last paste
+history, including the captured output and saved macro shortcuts.
+See [release notes](docs/releases/RELEASE_NOTES_1.17.134.txt).
 
 ## Previous update - 1.17.133
 

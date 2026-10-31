@@ -1,5 +1,13 @@
 # Network Toolkit development
 
+Current candidate: 1.17.135 fixes the user-visible formatting of Last paste
+and Last command after a prompt-paced multiline SSH paste. Include commands
+shows exact submitted commands once, without "Command N:" headings or
+duplicate device echoes; disabling it shows only captured device output.
+See docs/RELEASE135_HANDOFF.md. Until publication is verified, the stable
+published release remains 1.17.134. Do not overwrite earlier releases or
+weaken existing input pacing, ownership, credential or updater safeguards.
+
 Current published version: 1.17.134. Published 2026-10-31T06:12:51Z.
 Source/tag: 71750e8b48512735716a6f86146dd9722deff30a.
 Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.134
