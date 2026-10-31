@@ -53,7 +53,7 @@
     }
     async function download(version){
       if(busy||data?.installing)return;
-      if(!data?.latest||data.latest.version!==version||(data.channel&&data.channel!==channel())){error='The available release or update channel changed. Check again before downloading.';render();return;}
+      if(!data?.latest||data.latest.version!==version||(data.channel&&data.channel!==channel())){error='The available release changed or the update channel changed. Check again before downloading.';render();return;}
       const turn=++revision;busy=true;error='';progress={phase:'checksums',version};message='Downloading and verifying the update. The installed app is unchanged.';render();const stop=watchProgress(turn);
       try{data=await env.api('/updates/download','POST',channel()==='beta'?{version,channel:'beta'}:{version});if(!data.staged)throw new Error('No staged package was returned. Refresh update status before retrying.');progress={phase:'ready',version};message='Update downloaded, verified and staged. Ready to install when you choose.';}
       catch(e){progress=null;error='The update could not be downloaded: '+e.message;message='';}
