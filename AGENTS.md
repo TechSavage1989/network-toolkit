@@ -1,12 +1,16 @@
 # Network Toolkit development
 
-Current candidate: 1.17.135 fixes the user-visible formatting of Last paste
-and Last command after a prompt-paced multiline SSH paste. Include commands
-shows exact submitted commands once, without "Command N:" headings or
-duplicate device echoes; disabling it shows only captured device output.
-See docs/RELEASE135_HANDOFF.md. Until publication is verified, the stable
-published release remains 1.17.134. Do not overwrite earlier releases or
-weaken existing input pacing, ownership, credential or updater safeguards.
+Current published version: 1.17.135. Published 2026-10-31T06:37:53Z.
+Source/tag: 2cf90ac3216ee5f3e3ce59d9b0959bb4109faba6.
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.135
+Fixes Copy/Select for Last paste and Last command: Include commands shows
+each submitted paced-paste command once without synthetic numbering or
+duplicate device echoes; disabling it retains captured device output only.
+The release build and publication passed, with four official assets,
+unchanged v1.17.134 assets and a consistent latest updater feed.
+Separate browser/Windows CI observations are retained without claiming
+unrelated failures were fixed. Read docs/RELEASE135_HANDOFF.md and
+docs/DEVELOPMENT_HANDOFF.md before continuing development.
 
 Current published version: 1.17.134. Published 2026-10-31T06:12:51Z.
 Source/tag: 71750e8b48512735716a6f86146dd9722deff30a.
