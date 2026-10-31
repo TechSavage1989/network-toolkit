@@ -32,7 +32,7 @@ test('paced Last paste shows every accepted command output and Last command show
   assert.equal(h.api.completePacedPaste(e,block,capture),false);
   assert.equal(h.api.output(e,h.api.current(e,'last-paste'),false).text,'FIRST\nSECOND');
   assert.equal(h.api.output(e,h.api.current(e,'last-command'),false).text,'SECOND');
-  assert.match(h.api.output(e,h.api.current(e,'last-paste'),true).text,/switch# show one\nFIRST\nCommand 2: \[Enter\]\nswitch# show two\nSECOND/);
+  assert.equal(h.api.output(e,h.api.current(e,'last-paste'),true).text,'show one\nFIRST\n\nshow two\nSECOND');
   assert.equal(e._ntOutputHistory.filter(i=>i.kind==='command').length,1);
   assert.equal(await h.api.copy(e,false,'last-paste'),true);
   assert.equal(h.clipboard,'FIRST\nSECOND');
@@ -80,4 +80,98 @@ test('macro Last command and Last paste update from verified run, not initial in
  assert.equal(S.last.get('A').paste,'show one\nshow two');
  assert.equal(S.last.get('A').commands.at(-1),'show two');
  await c.collectPacedCaptures([{...run,state:'completed'}]);assert.equal(fetches.length,1);
+});
+
+test('paced output uses submitted commands without numbering or duplicate device echoes',async()=>{
+ const h=harness(),e=h.entry('paced');try{
+  await h.write(e,'switch# ');
+  const block=h.api.notePaste(e,'  vlan trunk native 10\nexit\nshow version\n');
+  block.pacedRunId='run-formatted';
+  assert(h.api.completePacedPaste(e,block,{
+   runId:'run-formatted',sessionId:'paced',state:'completed',steps:[
+    {index:439,command:'  vlan trunk native 10',output:'  vlan trunk native 10\r\nApplied trunk settings\r\nswitch(config-if)# '},
+    {index:440,command:'exit',output:'switch(config-if)# exit\r\nswitch# '},
+    {index:441,command:'show version',output:'switch# show version\r\nSystem version 10.14\r\nshow version\r\nswitch# '}
+   ]
+  }));
+  const paste=h.api.current(e,'last-paste'),last=h.api.current(e,'last-command');
+  assert.equal(h.api.output(e,paste,true).text,'  vlan trunk native 10\nApplied trunk settings\nexit\nshow version\nSystem version 10.14\nshow version');
+  assert.equal(h.api.output(e,paste,false).text,'Applied trunk settings\nSystem version 10.14\nshow version');
+  assert.equal(h.api.output(e,last,true).text,'show version\nSystem version 10.14\nshow version');
+  assert.equal(h.api.output(e,last,false).text,'System version 10.14\nshow version');
+  assert(!h.api.output(e,paste,true).text.includes('Command 439:'));
+  assert.equal(await h.api.copy(e,false,'last-paste'),true);
+  assert.equal(h.clipboard,'Applied trunk settings\nSystem version 10.14\nshow version');
+  assert.equal(await h.api.copy(e,true,'last-paste'),true);
+  assert.equal(h.clipboard,'  vlan trunk native 10\nApplied trunk settings\nexit\nshow version\nSystem version 10.14\nshow version');
+  assert.equal(await h.api.copy(e,false,'last-command'),true);
+  assert.equal(h.clipboard,'System version 10.14\nshow version');
+ }finally{e.xterm.dispose();}
+});
+test('paced output preserves every device response across 458 commands without echo or headings',async()=>{
+ const h=harness(),e=h.entry('large');try{
+  await h.write(e,'switch# ');
+  const block=h.api.notePaste(e,'fixture command list\n');block.pacedRunId='large-run';
+  const steps=Array.from({length:458},(_,i)=>{
+   const command=i%4===0?'  vlan trunk allowed 4,10':i%4===1?'qos trust cos':i%4===2?'spanning-tree bpdu-guard':'exit';
+   const echo=i%3===0?command:'switch(config-if)# '+command;
+   return {index:i+1,command,output:echo+'\r\nRESULT-'+(i+1)+'\r\nextra data '+(i+1)+'\r\nswitch(config-if)# '};
+  });
+  assert(h.api.completePacedPaste(e,block,{runId:'large-run',sessionId:'large',state:'completed',steps}));
+  const on=h.api.output(e,h.api.current(e,'last-paste'),true).text;
+  const off=h.api.output(e,h.api.current(e,'last-paste'),false).text;
+  assert(!on.includes('Command '));assert(!on.includes('switch(config-if)#'));
+  assert(!off.includes('vlan trunk allowed'));assert(!off.includes('qos trust cos'));
+  assert(!off.includes('spanning-tree bpdu-guard'));assert(!off.includes('\nexit\n'));
+  for(let i=1;i<=458;i++){
+   assert(on.includes('RESULT-'+i+'\nextra data '+i), 'missing included output '+i);
+   assert(off.includes('RESULT-'+i+'\nextra data '+i), 'missing output '+i);
+  }
+  assert.equal(off.split('\n').filter(line=>/^RESULT-\d+$/.test(line)).length,458);
+  assert.equal(on.split('\n').filter(line=>/^RESULT-\d+$/.test(line)).length,458);
+  assert.equal(on.split('\n').filter(line=>line==='  vlan trunk allowed 4,10').length,115);
+ }finally{e.xterm.dispose();}
+});
+test('paced output keeps non-echo lines, internal blanks, and truncated capture status',()=>{
+ const output={pacedCapture:{truncated:true,steps:[
+  {index:1,command:'show something',output:'Result line\n\nshow something\nEnd\nswitch# '},
+  {index:2,command:'  description TEST',output:'\n  description TEST\nError: invalid command\nswitch# '},
+  {index:3,command:'  no shutdown',output:'\nConfiguration accepted\r\nswitch# '}
+ ]}};
+ const r=harness().api;
+ const off=r.output(null,output,false),on=r.output(null,output,true);
+ assert.equal(off.truncated,true);
+ assert.equal(off.text,'Result line\n\nshow something\nEnd\nError: invalid command\nConfiguration accepted');
+ assert.equal(on.text,'show something\nResult line\n\nshow something\nEnd\n  description TEST\nError: invalid command\n  no shutdown\nConfiguration accepted');
+});
+
+test('Select output uses the same include-commands filter for last paste and last command',()=>{
+ const selected={value:'',focused:false,selected:false,focus(){this.focused=true;},select(){this.selected=true;}};
+ const document={querySelector:selector=>selector==='#terminalSelectedOutput'?selected:null};
+ const window={NetworkToolkitTerminalInteraction:{preferences:()=>({pasteIncludeCommands:false})}};
+ const modals=[];
+ const ctx={window,document,TextDecoder,TextEncoder,Date,Math,setTimeout,clearTimeout,toast(){},
+   terminalEntryAcceptsInput:()=>true,currentTerminal:()=>null,
+   openModal:(...args)=>modals.push(args),icon:()=>'',console};
+ vm.runInNewContext(extras,ctx);const api=window.NetworkToolkitTerminalExtras;
+ const steps=[
+  {index:439,command:'  vlan trunk native 10',output:'  vlan trunk native 10\r\ntrunk updated\r\nswitch# '},
+  {index:440,command:'show interfaces',output:'switch# show interfaces\r\nPORT STATUS\r\nswitch# '}
+ ];
+ const item={kind:'paste',echo:[],pacedCapture:{steps}},last={kind:'command',echo:[],pacedCapture:{steps:[steps[1]]}};
+ const entry={info:{id:'test',state:'connected'},_ntOutputHistory:[item,last],
+   xterm:new Terminal({cols:80,rows:12,allowProposedApi:true})};
+ try{
+  assert.equal(api.select(entry,false,'last-paste'),true);
+  assert.equal(selected.value,'trunk updated\nPORT STATUS');
+  assert(selected.selected&&selected.focused);
+  assert.equal(api.select(entry,true,'last-paste'),true);
+  assert.equal(selected.value,'  vlan trunk native 10\ntrunk updated\nshow interfaces\nPORT STATUS');
+  assert.equal(api.select(entry,false,'last-command'),true);
+  assert.equal(selected.value,'PORT STATUS');
+  assert.equal(api.select(entry,true,'last-command'),true);
+  assert.equal(selected.value,'show interfaces\nPORT STATUS');
+  assert.equal(modals.length,4);
+  assert(!selected.value.includes('Command 440:'));
+ }finally{entry.xterm.dispose();}
 });

@@ -1,3 +1,17 @@
+NETWORK TOOLKIT 1.17.135
+=====================
+
+CURRENT RELEASE - 1.17.135
+
+Copy and Select from Last paste or Last command now list each submitted SSH
+paced-paste command once, with no artificial "Command N:" heading.
+With Include commands off, command lines and recognized initial echoes
+are excluded while all captured device responses remain available.
+The change does not affect command execution, pacing or captured history.
+
+Details: RELEASE_NOTES_1.17.135.txt and docs/RELEASE135_HANDOFF.md.
+Previous published releases are retained below.
+
 NETWORK TOOLKIT 1.17.134
 =====================
 

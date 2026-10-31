@@ -1,0 +1,15 @@
+Network Toolkit 1.17.135
+
+## What's New
+
+- Copy or select output from Last paste and Last command without extra command headings or duplicate echoes.
+- Include commands now shows each submitted command once. Turn it off to keep just the device responses.
+
+## Additional Details
+
+- Applies to the SSH Terminal's prompt-paced "One line at a time" multiline paste. The corrected formatting is shared by Last paste, Last command, Copy output and Select output.
+- With Include commands enabled, each accepted command appears exactly as submitted, including indentation, followed by its captured response. No "Command N:" prefix or fabricated "[Enter]" label is added. A blank submitted line remains blank.
+- With Include commands disabled, submitted command lines and recognizable initial device echoes are omitted. The entire accepted paste remains in scope; output from later commands, including internal blank lines and command-like text within responses, is retained.
+- Echo detection covers both prompt-prefixed echoes and bare echoes. It is limited to the first matching line of each recorded step and does not remove later matching device output.
+- The underlying per-command capture, prompt-paced send behavior, cancellation safeguards, ownership, credentials, storage, update packages and stable Network_Toolkit.exe name are unchanged.
+- Automated regression tests use synthetic device output, including large command lists. Physical SSH devices may use different echo behavior and have not been universally validated.

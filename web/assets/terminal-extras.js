@@ -67,25 +67,39 @@ function discardPacedPaste(entry,item){
  if(entry._ntOutputChoice==='last-paste'&&!list.some(i=>i.kind==='paste'))entry._ntOutputChoice='last-command';
  touch(entry);sync();return true;
 }
+// A paced step has one known command and a separate device-output stream.
+// Always use the submitted text for Include commands; device echoes may be
+// prompt-prefixed or bare (for example, Aruba CX indented config commands).
+// Suppress only the initial matching echo, never a later output line that
+// happens to contain the same words.
 function pacedOutput(item,includeCommands){
  const capture=item?.pacedCapture;if(!capture)return null;
  const parts=[];
  for(const step of capture.steps){
-  const command=String(step.command??''),name='Command '+step.index+': '+(command||'[Enter]');
+  const command=String(step.command??''),cmd=command.trim();
   const lines=String(step.output??'').replace(/\r\n?/g,'\n').split('\n');
-  const shown=[];let echoFound=false;
+  const shown=[];let outputStarted=false;
   for(const line of lines){
    if(matchPagerLine(line))continue;
-   const t=line.trimEnd(),cmd=command.trim(),at=t.length-cmd.length,prefix=at>=0?t.slice(0,at):'';
-   const echo=!echoFound&&!!cmd&&at>0&&t.endsWith(cmd)&&/^[^\r\n]{1,160}[#>$%]\s*$/.test(prefix);
-   if(echo){echoFound=true;if(includeCommands)shown.push(line);continue;}
+   if(!outputStarted){
+    // Initial empty lines and the previous idle prompt delimit the command,
+    // not its output. Preserve all blank lines once the response has begun.
+    if(!line.trim()||idlePrompt(line))continue;
+    outputStarted=true;
+    const printed=line.trimEnd(),candidate=printed.trim();
+    const at=printed.length-cmd.length,prefix=at>=0?printed.slice(0,at):'';
+    const echoed=!!cmd&&(candidate===cmd||
+      at>0&&printed.endsWith(cmd)&&/^[^\r\n]{1,160}[#>$%]\s*$/.test(prefix));
+    if(echoed)continue;
+   }
    shown.push(line);
   }
   while(shown.length&&!shown.at(-1).trim())shown.pop();
   if(shown.length&&idlePrompt(shown.at(-1)))shown.pop();
   while(shown.length&&!shown.at(-1).trim())shown.pop();
-  while(shown.length&&!shown[0].trim())shown.shift();
-  if(includeCommands&&!echoFound)parts.push(name);
+  // The submitted command appears exactly once, without artificial
+  // "Command N:" headings and without a second device echo.
+  if(includeCommands)parts.push(command);
   if(shown.length)parts.push(shown.join('\n'));
  }
  return {text:parts.join('\n'),truncated:!!capture.truncated,archived:true};
