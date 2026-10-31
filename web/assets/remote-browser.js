@@ -385,7 +385,18 @@ function acceptListing(k,side,data,skipHistory=false){const p=get(k)[side];
  if(skipHistory&&p.index<0){p.history=[p.path];p.index=0}else if(!skipHistory&&p.history[p.index]!==p.path){p.history=p.history.slice(0,p.index+1).concat(p.path).slice(-80);p.index=p.history.length-1}
  p.loading=false;paint(k,side);remember(k);
 } 
-function sortedItems(pane){let rows=pane.entries.filter(item=>!pane.filter||item.name.toLowerCase().includes(pane.filter.toLowerCase()));return rows.sort((a,b)=>{if(a.directory!==b.directory)return a.directory?-1:1;let x;if(pane.sort==='size')x=Number(a.size||0)-Number(b.size||0);else if(pane.sort==='modified')x=String(a.modified||'').localeCompare(String(b.modified||''));else x=a.name.localeCompare(b.name,undefined,{sensitivity:'base',numeric:true});return pane.reverse?-x:x})}
+// A listing is replaced, not mutated, by acceptListing. Reuse the sorted
+// view during selection/keyboard work; invalidate on listing or sort/filter edits.
+const remoteFileSortCache=new WeakMap();
+const remoteNameSort=new Intl.Collator(undefined,{sensitivity:'base',numeric:true});
+function sortedItems(pane){
+ const entries=pane.entries,filter=String(pane.filter||'').toLowerCase(),sort=pane.sort,reverse=!!pane.reverse,cached=remoteFileSortCache.get(pane);
+ if(cached&&cached.entries===entries&&cached.filter===filter&&cached.sort===sort&&cached.reverse===reverse)return cached.rows;
+ const rows=entries.filter(item=>!filter||item.name.toLowerCase().includes(filter));
+ rows.sort((a,b)=>{if(a.directory!==b.directory)return a.directory?-1:1;let x;if(sort==='size')x=Number(a.size||0)-Number(b.size||0);else if(sort==='modified')x=String(a.modified||'').localeCompare(String(b.modified||''));else x=remoteNameSort.compare(a.name,b.name);return reverse?-x:x});
+ remoteFileSortCache.set(pane,{entries,filter,sort,reverse,rows});
+ return rows;
+}
 function localDriveChoices(data){
  const entries=Array.isArray(data?.drives)?data.drives:(Array.isArray(data?.roots)?data.roots:[]).map(path=>({path,label:path,kind:'other'})),seen=new Set();
  return entries.slice(0,128).filter(row=>row&&typeof row.path==='string'&&row.path.length>0&&row.path.length<=4096&&!/[\x00-\x1f]/.test(row.path)).filter(row=>{const key=row.path.replace(/\\/g,'/').toLowerCase();if(seen.has(key))return false;seen.add(key);return true;}).map(row=>({path:row.path,label:typeof row.label==='string'?row.label.slice(0,256):row.path,kind:['local','network','removable','optical','memory','other'].includes(row.kind)?row.kind:'other'}));
