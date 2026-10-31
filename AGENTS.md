@@ -1,5 +1,13 @@
 # Network Toolkit development
 
+Current candidate v1.17.136 is a stable beta-channel compatibility bridge
+from the published 1.17.135 release. It adds an off-by-default opt-in for
+future GitHub prereleases and preserves the normal stable-only updater,
+release checksums, Windows EXE and saved application settings. The first
+Phase 1 beta will follow separately as v1.17.137, flagged prerelease.
+See docs/RELEASE136_HANDOFF.md and docs/DEVELOPMENT_HANDOFF.md.
+Do not call the bridge published until release/feed/assets verify.
+
 Current published version: 1.17.135. Published 2026-10-31T06:37:53Z.
 Source/tag: 2cf90ac3216ee5f3e3ce59d9b0959bb4109faba6.
 Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.135

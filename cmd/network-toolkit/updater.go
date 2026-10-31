@@ -27,11 +27,13 @@ import (
 const updateMaxPackage = 128 << 20
 const updateMaxEXE = 96 << 20
 const updateReleasesURL = "https://github.com/TechSavage1989/network-toolkit/releases/latest"
+const updateBuildChannel = "stable" // Release build channel; beta release changes this to "beta".
 
 var updateVersionPattern = regexp.MustCompile(`^(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})$`)
 
 type stagedUpdate struct {
 	Version string `json:"version"`
+	Beta    bool   `json:"beta"`
 	SHA256  string `json:"sha256"`
 	Size    int    `json:"size"`
 	dir     string
@@ -42,6 +44,7 @@ type appUpdater struct {
 	staged      *stagedUpdate
 	installing  bool
 	latest      *updateRelease
+	channel     string
 	checked     bool
 	networkBusy bool
 	progress    *updateProgress
@@ -252,7 +255,7 @@ func (a *application) updateBusy() []string {
 	return busy
 }
 func (a *application) updateStatusLocked() map[string]any {
-	return map[string]any{"currentVersion": model.Version, "executable": updateNamingStatus(), "restartedAfterUpdate": a.updateHealthDir != "", "finalizing": a.updateFinalizing.Load(), "supported": runtime.GOOS == "windows" && runtime.GOARCH == "amd64" && a.windowMode == "main", "mode": "direct", "latest": a.updater.latest, "checked": a.updater.checked, "checkAfter": a.updater.feed.checkAfterMillis(), "hasUpdate": a.updater.latest != nil && updateNewer(a.updater.latest.Version, model.Version), "releasesUrl": updateReleasesURL, "staged": a.updater.staged, "installing": a.updater.installing, "networkBusy": a.updater.networkBusy, "progress": a.updater.progress, "busy": a.updateBusy()}
+	return map[string]any{"currentVersion": model.Version, "executable": updateNamingStatus(), "restartedAfterUpdate": a.updateHealthDir != "", "finalizing": a.updateFinalizing.Load(), "supported": runtime.GOOS == "windows" && runtime.GOARCH == "amd64" && a.windowMode == "main", "mode": "direct", "currentChannel": updateBuildChannel, "channel": func() string {if a.updater.channel == "beta" {return "beta"};return "stable"}(), "latest": a.updater.latest, "checked": a.updater.checked, "checkAfter": a.updater.feed.checkAfterMillis(), "hasUpdate": a.updater.latest != nil && updateNewer(a.updater.latest.Version, model.Version), "releasesUrl": updateReleasesURL, "staged": a.updater.staged, "installing": a.updater.installing, "networkBusy": a.updater.networkBusy, "progress": a.updater.progress, "busy": a.updateBusy()}
 }
 func (a *application) handleUpdates(w http.ResponseWriter, r *http.Request) {
 	a.updater.mu.Lock()

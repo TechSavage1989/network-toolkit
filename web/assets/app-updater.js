@@ -11,7 +11,9 @@
   function createController(env){
     let data=null,busy=false,error='',message='',backgroundError='',revision=0,checkAfter=0,progress=null;
     const changed=()=>env.changed?.(snapshot());
-    const snapshot=()=>({data,busy,error,message,backgroundError,checkAfter,progress});
+    const channel=()=>env.channel?.()==='beta'?'beta':'stable';
+    const visibleData=()=>data?.channel&&data.channel!==channel()?{...data,latest:null,hasUpdate:false}:data;
+    const snapshot=()=>({data:visibleData(),busy,error,message,backgroundError,checkAfter,progress});
     const render=()=>env.render(snapshot());
     function watchProgress(turn){
       let active=true,timer=null;
@@ -44,16 +46,16 @@
       if(checkAfter>(env.now?.()??Date.now())){if(!background){error='Update checks are paused until '+(globalThis.NetworkToolkitResultTime?.format(new Date(checkAfter),{milliseconds:false})||new Date(checkAfter).toLocaleString(undefined,{hour12:true}))+'. Please try again then.';render();}return 'retry';}
       busy=true;if(!background){error='';message='Checking the official release feed…';}render();
       let outcome='retry';
-      try{data=await env.api('/updates/check','POST',{});checkAfter=Number(data.checkAfter)||0;backgroundError='';if(!background){message=data.hasUpdate?'Update available: '+data.latest.version+'.':'No newer update was found at the last successful check.';env.reveal?.();}outcome='ok';}
+      try{data=await env.api('/updates/check','POST',channel()==='beta'?{channel:'beta'}:{});checkAfter=Number(data.checkAfter)||0;backgroundError='';if(!background){message=data.hasUpdate?'Update available: '+data.latest.version+'.':'No newer update was found at the last successful check.';env.reveal?.();}outcome='ok';}
       catch(e){checkAfter=Math.max(checkAfter,Number(e.checkAfter)||0);if(background){backgroundError='Automatic update check could not complete: '+e.message;message='';}else{error='Could not check for updates: '+e.message;message='';}}
       finally{busy=false;render();changed();}
       return outcome;
     }
     async function download(version){
       if(busy||data?.installing)return;
-      if(!data?.latest||data.latest.version!==version){error='The available release changed. Check again before downloading.';render();return;}
+      if(!data?.latest||data.latest.version!==version||(data.channel&&data.channel!==channel())){error='The available release changed or the update channel changed. Check again before downloading.';render();return;}
       const turn=++revision;busy=true;error='';progress={phase:'checksums',version};message='Downloading and verifying the update. The installed app is unchanged.';render();const stop=watchProgress(turn);
-      try{data=await env.api('/updates/download','POST',{version});if(!data.staged)throw new Error('No staged package was returned. Refresh update status before retrying.');progress={phase:'ready',version};message='Update downloaded, verified and staged. Ready to install when you choose.';}
+      try{data=await env.api('/updates/download','POST',channel()==='beta'?{version,channel:'beta'}:{version});if(!data.staged)throw new Error('No staged package was returned. Refresh update status before retrying.');progress={phase:'ready',version};message='Update downloaded, verified and staged. Ready to install when you choose.';}
       catch(e){progress=null;error='The update could not be downloaded: '+e.message;message='';}
       finally{stop();busy=false;render();changed();}
     }
@@ -61,6 +63,7 @@
       const guardEditor=()=>{const reason=env.editorInstallBlockReason?.();if(reason)throw new Error(reason);};
       if(busy||data?.installing)return;
       if(!data?.staged||data.staged.version!==version){error='The staged update changed. Refresh update status and try again.';render();return;}
+      if(data.staged.beta&&channel()!=='beta'){error='This beta update was staged while beta updates were enabled. Enable beta updates to install it.';render();return;}
       try{guardEditor();}catch(e){error=e.message;message='';render();return;}
       busy=true;error='';progress={phase:'saving',version};message='Saving settings before restart…';render();
       try{
@@ -88,17 +91,17 @@
     const detail=p.phase==='download'?(known?bytes(received)+' of '+bytes(total)+' ('+Math.floor(received/total*100)+'%)':bytes(received)+' received'):'',label=phases[p.phase];
     return '<div class="app-update-progress"><div class="row between gap6"><span>'+escape(label)+'</span>'+(detail?'<span>'+escape(detail)+'</span>':'')+'</div><progress aria-label="'+escape(label)+'" '+(p.phase==='ready'?'value="1" max="1"':known?'value="'+received+'" max="'+total+'"':'')+'></progress>'+(p.phase==='restarting'?'<small>The installer keeps a progress window open until the updated app starts.</small>':'')+'</div>';
   }
-  function html(state,available,currentVersion){
-    const {data,busy,error,message,backgroundError}=state,disabled=!available||busy||data?.installing||data?.supported===false,staged=data?.staged;
+  function html(state,available,currentVersion,preferences={}){
+    const {data,busy,error,message,backgroundError}=state,disabled=!available||busy||data?.installing||data?.supported===false,staged=data?.staged,betaEnabled=preferences.beta===true;
     return '<h3>Network Toolkit updates</h3><p class="help-line">Installed version: '+escape(data?.currentVersion||currentVersion)+'</p>'+
       (data?.executable?'<p class="help-line" style="overflow-wrap:anywhere">Running file: '+escape(data.executable.currentPath)+'</p>'+(data.executable.canonicalPath&&data.executable.canonicalPath!==data.executable.currentPath?'<p class="help-line" style="overflow-wrap:anywhere">Stable executable: '+escape(data.executable.canonicalPath)+'. Pinned shortcuts, shared shortcuts, and shortcuts elsewhere may need to be pointed to Network_Toolkit.exe manually.</p>':'')+(data.executable.warning?'<div class="notice warn">'+escape(data.executable.warning)+'</div>':''):'')+
-      '<p class="help-line">Check the official public binary-release feed. Downloads are verified before installation; the public main repository provides a binary-only update package. Nothing installs until you confirm.</p>'+
+      '<p class="help-line">Update channel: '+(betaEnabled?'Beta (opted in)':'Stable')+'. Check the official public binary-release feed. Downloads are verified before installation; the public main repository provides a binary-only update package. Nothing installs until you confirm.</p>'+
       '<div class="row gap6 wrap"><button type="button" class="btn small primary" data-app-update="check" '+(disabled?'disabled':'')+'>Check for updates</button><button type="button" class="btn small ghost" data-app-update="releases" '+(disabled?'disabled':'')+'>Open release notes in browser</button></div>'+
-      (data?.latest?'<div class="notice info mt">Latest release: '+escape(data.latest.version)+'</div>'+releaseNotes(data,data.latest.version)+(data.hasUpdate===true?'<button type="button" class="btn small" data-app-update="download" data-version="'+escape(data.latest.version)+'" '+(disabled?'disabled':'')+'>Download update</button>':'<p class="help-line">'+'No newer update was found at the last successful check.'+'</p>'):'')+
+      (data?.latest?'<div class="notice info mt">Latest release: '+escape(data.latest.version)+(data.latest.beta?' (Beta)':' (Stable)')+'</div>'+releaseNotes(data,data.latest.version)+(data.hasUpdate===true?'<button type="button" class="btn small" data-app-update="download" data-version="'+escape(data.latest.version)+'" '+(disabled?'disabled':'')+'>Download update</button>':'<p class="help-line">'+'No newer update was found at the last successful check.'+'</p>'):'')+
       '<details class="mt"><summary>Import a downloaded update instead</summary><p class="help-line">Select the binary-only Update.zip and SHA256SUMS from the same official release. No GitHub credentials are needed.</p><p class="help-line" style="overflow-wrap:anywhere">Official feed: '+RELEASES+'</p>'+
       (!available?'<p class="help-line">Open the executable to import and install updates.</p>':data?.supported===false?'<p class="help-line">In-app installation is supported only by the Windows x64 executable.</p>':'<div class="form-stack mt"><div class="field"><label for="appUpdatePackage">Official binary-only Update ZIP</label><input type="file" id="appUpdatePackage" accept=".zip" '+(disabled?'disabled':'')+'></div><div class="field"><label for="appUpdateChecksums">SHA256SUMS from the same release</label><input type="file" id="appUpdateChecksums" '+(disabled?'disabled':'')+'></div><div><button type="button" class="btn small" data-app-update="import" '+(disabled?'disabled':'')+'>Verify and stage update</button></div></div>')+
       '</details><p class="help-line">SHA-256 checks detect corruption, not publisher identity. Use files only from the official release page. Only the app executable is replaced; your app data folder is not changed.</p>'+
-      (staged?'<div class="notice info mt"><span>Ready to install version '+escape(staged.version)+'. Save your work before restarting.</span></div><p class="help-line" style="overflow-wrap:anywhere">Executable SHA-256: '+escape(staged.sha256)+'</p><button type="button" class="btn primary" data-app-update="confirm" data-version="'+escape(staged.version)+'" '+(disabled?'disabled':'')+'>Install and restart</button>':'')+
+      (staged?'<div class="notice info mt"><span>Ready to install version '+escape(staged.version)+(staged.beta?' (Beta)':'')+'. Save your work before restarting.</span></div><p class="help-line" style="overflow-wrap:anywhere">Executable SHA-256: '+escape(staged.sha256)+'</p>'+(staged.beta&&!betaEnabled?'<p class="help-line">Enable beta updates to install this staged beta.</p>':'<button type="button" class="btn primary" data-app-update="confirm" data-version="'+escape(staged.version)+'" '+(disabled?'disabled':'')+'>Install and restart</button>'):'')+
       (data?.busy?.length?'<p class="help-line">Active operations: '+escape(data.busy.join(', '))+'. Finish or stop them before installing.</p>':'')+
       progressHTML(state)+'<div role="status" aria-live="polite">'+(message?'<p class="help-line">'+escape(message)+'</p>':'')+(busy&&!message?'<p class="help-line">Reading update status…</p>':'')+(backgroundError?'<p class="help-line">'+escape(backgroundError)+' Use Check for updates to retry.</p>':'')+(error?'<div class="notice warn mt">'+escape(error)+'</div>':'')+'</div>';
   }
@@ -155,6 +158,7 @@
   }
   function notice(state,preferences={},now=Date.now()){
     const data=state.data;if(!data||data.supported===false||data.installing)return null;
+    if((data.latest?.beta&&preferences.beta!==true&&!data.staged)||(data.staged?.beta&&preferences.beta!==true))return null;
     const staged=data.staged,version=staged?.version||(data.hasUpdate?data.latest?.version:null);
     if(!version)return null;
     const kind=staged?'install':'download',key=kind+':'+version;
@@ -187,11 +191,12 @@
   }
   function automaticStatusHTML(){return '<p class="help-line" data-app-update-schedule role="status" aria-live="polite">'+escape(automaticStatusText())+'</p>';}
   function renderAutomaticStatus(){const host=document.querySelector('[data-app-update-schedule]');if(host)host.textContent=automaticStatusText();}
-  function preferenceHTML(){return '<div class="setting-row"><div><div class="setting-title">Automatic update checks</div><div class="setting-desc">Check after startup, every five minutes while active, and when you return to the app. Temporary failures and service limits may delay checks. Downloads and installation always need your approval. Remind me tomorrow hides that version for 24 hours, including after reopening; App settings stays available.</div></div><input type="checkbox" aria-label="Automatically check for updates" data-app-update-auto '+(preferences().enabled!==false?'checked':'')+' '+(!preferencesLoaded?'disabled':'')+'></div>'+automaticStatusHTML();}
+  function preferenceHTML(){return '<div class="setting-row"><div><div class="setting-title">Automatic update checks</div><div class="setting-desc">Check after startup, every five minutes while active, and when you return to the app. Temporary failures and service limits may delay checks. Downloads and installation always need your approval. Remind me tomorrow hides that version for 24 hours, including after reopening; App settings stays available.</div></div><input type="checkbox" aria-label="Automatically check for updates" data-app-update-auto '+(preferences().enabled!==false?'checked':'')+' '+(!preferencesLoaded?'disabled':'')+'></div>'+
+    '<div class="setting-row"><div><div class="setting-title">Beta updates (opt in)</div><div class="setting-desc">Off by default. Check for both stable and prerelease builds. Betas may contain bugs. Download and Install and restart still need your approval. Turning this off resumes stable-only checks; an installed beta stays installed until a newer stable version is available.</div></div><input type="checkbox" aria-label="Allow beta updates" data-app-update-beta '+(preferences().beta===true?'checked':'')+' '+(!preferencesLoaded?'disabled':'')+'></div>'+automaticStatusHTML();}
   function setPreferences(changes){Object.assign(preferenceChanges,changes);state.appUpdatePreferences={...preferences(),...changes};if(preferencesLoaded)saveState();else preferenceWritesPending=true;}
   function mergePreferences(value){
     const p=value&&typeof value==='object'&&!Array.isArray(value)?value:{};
-    state.appUpdatePreferences={enabled:p.enabled!==false,dismissed:typeof p.dismissed==='string'?p.dismissed.slice(0,80):'',until:Number.isFinite(p.until)?Math.min(p.until,Date.now()+86400000):0,...preferenceChanges};
+    state.appUpdatePreferences={enabled:p.enabled!==false,beta:p.beta===true,dismissed:typeof p.dismissed==='string'?p.dismissed.slice(0,80):'',until:Number.isFinite(p.until)?Math.min(p.until,Date.now()+86400000):0,...preferenceChanges};
   }
   function preferencesReady(canSave=true){preferencesLoaded=true;preferencesPending=false;preferencesError='';if(preferenceWritesPending){preferenceWritesPending=false;if(canSave)saveState();}render();}
   function dismiss(){const item=notice(getController().snapshot(),preferences());if(!item)return;setPreferences({dismissed:item.key,until:Date.now()+24*60*60*1000});render();}
@@ -237,7 +242,7 @@
   function getController(){
     if(controller)return controller;
     controller=createController({
-      api:(...args)=>boundedAPI(...args),setTimeout:(...args)=>root.setTimeout(...args),clearTimeout:(...args)=>root.clearTimeout(...args),save:()=>flushState({closing:true}),editorInstallBlockReason:()=>editorInstallBlockReason(),
+      api:(...args)=>boundedAPI(...args),channel:()=>preferences().beta===true?'beta':'stable',setTimeout:(...args)=>root.setTimeout(...args),clearTimeout:(...args)=>root.clearTimeout(...args),save:()=>flushState({closing:true}),editorInstallBlockReason:()=>editorInstallBlockReason(),
       upload:async(file,checksums)=>{
         const form=new FormData();form.append('package',file);form.append('checksums',checksums);
         const response=await fetch('/api/updates/import',{method:'POST',headers:{'X-Session-Token':SESSION},body:form});
@@ -248,7 +253,7 @@
       restarting:()=>{toast('Installing update. The app will close, then reopen. Allow up to 90 seconds.');}
     });return controller;
   }
-  function render(){for(const host of document.querySelectorAll('[data-app-update-progress-host]'))host.innerHTML=progressHTML(getController().snapshot());const section=document.getElementById('appUpdateSettings');if(section)section.innerHTML=preferenceHTML()+html(getController().snapshot(),online&&!OFFLINE,status.version||VERSION);renderNotice();}
+  function render(){for(const host of document.querySelectorAll('[data-app-update-progress-host]'))host.innerHTML=progressHTML(getController().snapshot());const section=document.getElementById('appUpdateSettings');if(section)section.innerHTML=preferenceHTML()+html(getController().snapshot(),online&&!OFFLINE,status.version||VERSION,preferences());renderNotice();}
   function reviewDownload(version){
     const current=getController().snapshot();
     if(current.busy||!current.data?.hasUpdate||current.data.latest?.version!==version)return;
@@ -288,8 +293,9 @@
     }
   });
   document.addEventListener('change',event=>{
-    if(!event.target.matches?.('[data-app-update-auto]'))return;
-    if(!preferencesLoaded)return;setPreferences({enabled:event.target.checked});scheduler?.reset();render();
+    const input=event.target;if(!preferencesLoaded)return;
+    if(input.matches?.('[data-app-update-auto]')){setPreferences({enabled:input.checked});scheduler?.reset();render();}
+    else if(input.matches?.('[data-app-update-beta]')){setPreferences({beta:input.checked,dismissed:'',until:0});scheduler?.reset();render();}
   });
-  root.NetworkToolkitUpdater={html:()=>preferenceHTML()+html(getController().snapshot(),online&&!OFFLINE,status.version||VERSION),load:()=>getController().load(),start,mergePreferences,request:boundedAPI};
+  root.NetworkToolkitUpdater={html:()=>preferenceHTML()+html(getController().snapshot(),online&&!OFFLINE,status.version||VERSION,preferences()),load:()=>getController().load(),start,mergePreferences,request:boundedAPI};
 })(typeof window==='object'?window:globalThis);

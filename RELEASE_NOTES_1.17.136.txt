@@ -1,0 +1,15 @@
+Network Toolkit 1.17.136
+
+## What's New
+
+- Opt in to beta updates under App settings > Updates, or leave the default stable-only setting in place.
+- Check for stable and beta releases while keeping the same verified download and installation steps.
+
+## Additional Details
+
+- This is a stable compatibility update that adds a Beta updates (opt in) setting for future prerelease versions. The default remains off and the preference persists in the existing settings folder.
+- The normal Stable channel continues using the official stable-only release feed. The opted-in Beta channel checks the official repository's release list and chooses the newest valid numeric version, including newer stable releases.
+- The backend validates prerelease flags, matching version/asset names, exact canonical GitHub download URLs, allowed asset sizes and release checksums. Stable/beta feed cache entries are isolated. Only newer versions can be installed.
+- Download and Install and restart remain separate actions requiring user confirmation. Existing staged files, credentials, settings, shortcut names and recovery safeguards remain.
+- Turning beta updates off stops offering prereleases. It does not downgrade an installed beta: the next stable release must have a newer version.
+- The first Phase 1 responsiveness beta is a separate release that becomes available only after this stable bridge is installed and the user enables beta updates. No terminal or editor layout changes are included in this bridge.

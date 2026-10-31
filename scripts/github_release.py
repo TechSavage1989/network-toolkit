@@ -33,6 +33,14 @@ def sha(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def release_channel():
+    """Choose publication metadata from reviewed source, never from tag text."""
+    path = ROOT / 'docs/RELEASE_CHANNEL.txt'
+    channel = path.read_text(encoding='utf-8').strip() if path.is_file() else 'stable'
+    require(channel in ('stable', 'beta'), 'Invalid release channel marker')
+    return channel
+
+
 def version():
     match = re.search(r'^const Version = "(' + VERSION_PATTERN + r')"$',
                       (ROOT / 'internal/model/model.go').read_text(), re.M)
@@ -42,6 +50,10 @@ def version():
 
 def validate(tag=None):
     current = version()
+    channel = release_channel()
+    updater = (ROOT / 'cmd/network-toolkit/updater.go').read_text()
+    require('const updateBuildChannel = "' + channel + '"' in updater,
+            'The application release channel and publication marker differ')
     require(all(int(part) < 65536 for part in current.split('.')), 'Version exceeds Windows resource limits')
     if tag:
         require(tag == 'v' + current, f'Tag {tag!r} must match application version v{current}')
@@ -295,11 +307,15 @@ def publish(output, repo, tag):
     require(tag_commit is None or tag_commit == local_commit, 'Published tag differs from the validated source checkout')
     require(gh_json(f'repos/{repo}/releases/tags/{tag}', missing=True) is None,
             'This release already exists; refusing to replace it')
-    subprocess.run(['gh', 'release', 'create', tag, '--repo', repo, '--target', local_commit,
-                    '--title', 'Network Toolkit ' + current, '--notes-file', str(ROOT / f'RELEASE_NOTES_{current}.txt'),
-                    str(output / STABLE_EXE), str(output / f'Network_Toolkit_{current}_Portable.zip'),
+    command = ['gh', 'release', 'create', tag, '--repo', repo, '--target', local_commit,
+               '--title', 'Network Toolkit ' + current + (' Beta' if release_channel() == 'beta' else ''),
+               '--notes-file', str(ROOT / f'RELEASE_NOTES_{current}.txt')]
+    if release_channel() == 'beta':
+        command.append('--prerelease')
+    command.extend([str(output / STABLE_EXE), str(output / f'Network_Toolkit_{current}_Portable.zip'),
                     str(output / f'Network_Toolkit_{current}_Update.zip'),
-                    str(output / 'SHA256SUMS')], check=True)
+                    str(output / 'SHA256SUMS')])
+    subprocess.run(command, check=True)
 
 
 def main():

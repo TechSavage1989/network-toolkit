@@ -1,3 +1,15 @@
+BETA UPDATE CHANNEL (1.17.136 AND LATER)
+
+Network Toolkit 1.17.135 is stable-only. First update normally to stable
+v1.17.136. Then open App settings > Updates and enable Beta updates (opt in)
+to check for official prereleases. Check for updates, select Download update,
+then choose Install and restart after saving work. No download or install
+happens automatically. Turning the option off returns to stable-only checks;
+it never downgrades an installed beta, so a newer stable version must exist.
+The Beta channel uses the same public repository and checksum safeguards.
+Release tags continue to use numeric versions; GitHub marks beta releases
+as Pre-release and the app labels them Beta.
+
 NETWORK TOOLKIT UPDATES
 
 ONE-TIME FEED MIGRATION IN REVISED 1.17.63

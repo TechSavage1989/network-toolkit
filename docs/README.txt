@@ -1,3 +1,20 @@
+NETWORK TOOLKIT 1.17.136
+=====================
+
+CURRENT RELEASE - 1.17.136
+
+App settings > Updates now offers Beta updates (opt in). It is off by
+default, so existing users continue receiving only stable releases.
+When enabled, Check for updates searches both stable and official GitHub
+prereleases. Every downloaded package is verified and only installed after
+the existing Install and restart confirmation. Turning the option off
+returns to stable-only checks; installed betas are not downgraded and will
+receive the next newer stable release.
+
+This stable update is the bridge from v1.17.135 to Phase 1 beta builds.
+Details: RELEASE_NOTES_1.17.136.txt and docs/RELEASE136_HANDOFF.md.
+Previous published releases follow.
+
 NETWORK TOOLKIT 1.17.135
 =====================
 
