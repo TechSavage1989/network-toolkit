@@ -43,6 +43,7 @@ function harness(ids=['ssh','telnet','serial','powershell']){
   clearTimeout:id=>timers.delete(id),
   renderTerminalChrome(){renders++;if(ctx.terminalOutputChromeTimer!==null){ctx.clearTimeout(ctx.terminalOutputChromeTimer);ctx.terminalOutputChromeTimer=null;}}
  };
+ ctx.window.NetworkToolkitTerminalExtras=ctx.NetworkToolkitTerminalExtras;
  vm.createContext(ctx);
  for(const name of functions)vm.runInContext(source(name),ctx);
  let seq=0;
