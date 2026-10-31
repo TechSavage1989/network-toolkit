@@ -3,7 +3,7 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),fs=requir
 const read=name=>fs.readFileSync(path.join(__dirname,'../web/assets/',name),'utf8');
 function between(source,first,last){const a=source.indexOf(first),b=source.indexOf(last,a+first.length);assert(a>=0&&b>a,first+' not found');return source.slice(a,b);}
 test('Editor Files switching to the already-selected panel does not remount controls or steal focus',()=>{
- const src=read('editor-files-sidebar.js'),host={hidden:false},calls=[],ctx={panel:'connections',navigationRevision:5,document:{querySelector:()=>host},mount:h=>calls.push(['mount',h]),remember:h=>calls.push(['save',h]),expandedIntent(){throw Error('unexpected reveal')},visibility(){throw Error('unexpected visibility')}};
+ const src=read('editor-files-sidebar.js'),host={hidden:false},calls=[],ctx={panel:'connections',navigationRevision:5,detached:()=>false,document:{querySelector:()=>host},mount:h=>calls.push(['mount',h]),remember:h=>calls.push(['save',h]),expandedIntent(){throw Error('unexpected reveal')},visibility(){throw Error('unexpected visibility')}};
  vm.createContext(ctx);vm.runInContext(between(src,'function selectPanel(value){','\nfunction mount(host){'),ctx);
  ctx.selectPanel('connections');assert.deepEqual(calls,[]);assert.equal(ctx.navigationRevision,6,'same-tab selection still invalidates stale async requests');
  ctx.selectPanel('files');assert.deepEqual(calls.map(x=>x[0]),['mount','save']);assert.equal(ctx.navigationRevision,7);
@@ -11,7 +11,7 @@ test('Editor Files switching to the already-selected panel does not remount cont
 test('Editor connection settings explicitly focus a current visible field without stale second-frame focus',()=>{
  const src=read('remote-browser.js'),frames=[],selected=[],document={activeElement:null,querySelector:()=>null},side={hidden:false};
  const host={isConnected:true,disabled:false,getClientRects:()=>[{}],scrollIntoView(){},focus(){document.activeElement=this;}};
- const app={querySelector:selector=>selector==='[data-rb-setting="host"]'?host:selector==='.rb-connect'?{contains:el=>el===host}:null,closest:()=>side};
+ const app={querySelectorAll:selector=>selector==='[data-rb-setting="host"]'?[host]:[],querySelector:selector=>selector==='[data-rb-setting="host"]'?host:selector==='.rb-connect'?{contains:el=>el===host}:null,closest:()=>side};
  let current=app;
  const root={NetworkToolkitEditorFiles:{selectPanel:page=>selected.push(page)},requestAnimationFrame:fn=>frames.push(fn)},ctx={root,document,detachedEditor:()=>false,rootNode:()=>current};
  vm.createContext(ctx);vm.runInContext(between(src,'function focusSidebarConnectionSettings(k){','\nfunction options('),ctx);
