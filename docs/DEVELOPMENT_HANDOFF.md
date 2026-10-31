@@ -1,3 +1,23 @@
+# Network Toolkit v1.17.142 Beta 6 - publication candidate, NOT PUBLISHED
+
+Development PR #17, branch beta/1.17.142-gutter-alignment.
+Based on v1.17.141 Beta 5 and the documentation-only 57d52c5 handoff.
+Read docs/RELEASE142_HANDOFF.md for original failures, revised scope
+and exact acceptance criteria. The initial after-line spacer placement
+change was superseded. The current source preserves the original
+source-free block positions and uses native gutter rows with blank
+markers for gaps, without DOM position hacks, source changes or
+a second editing model. A grossly oversized virtual height map now
+triggers a native reset with source-relative anchor preservation; up
+to three guarded attempts per pane/layout generation repair residual
+wrapped gutter drift without user interaction. Local synthetic Chromium
+acceptance passed all 36 divider cases. Hosted CI is still required. Keep the published v1.17.141 and stable
+v1.17.136 releases immutable; opt-in beta installation requires consent.
+Do not claim native SFTP cancellation or physical Windows benchmarks fixed.
+Version 1.17.142 is only ready after its exact-source CI succeeds.
+
+---
+
 # Network Toolkit v1.17.141 Beta 5 - published interface and workflow polish
 
 Published: 2026-10-31T19:06:59Z, prerelease=true, draft=false, GitHub release 430129340.

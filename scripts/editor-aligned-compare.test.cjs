@@ -31,6 +31,20 @@ test('hunk navigation reveals the source line start rather than trusting estimat
 
 function blockView(middleHeight){const doc=C.EditorState.create({doc:'a\nb\nc'}).doc,gap={alignedStart:20,height:20},blocks=[{from:0,to:1,top:0,height:20},{from:2,to:2,top:20,height:20,widget:gap},{from:2,to:3,top:40,height:middleHeight},{from:4,to:5,top:40+middleHeight,height:20}];for(const block of blocks){block.bottom=block.top+block.height;block.type=block.widget?1:0;}return {state:{doc},elementAtHeight(pixel){return blocks.find(b=>pixel<b.bottom)||blocks.at(-1)},lineBlockAt(position){const line=doc.lineAt(position).number;if(line===1)return blocks[0];if(line===2)return {type:[blocks[1],blocks[2]]};return blocks[3];}};}
 test('shared source geometry never copies unequal virtual native scroll offsets',()=>{const left=blockView(200),right=blockView(60),offsets=[0,40,100,120],heights=[20,60,20];const aligned=api.alignedPixelFromNative(left,offsets,heights,100);assert.equal(aligned,58);assert.equal(api.nativePixelFromAligned(right,offsets,heights,aligned),58);assert.equal(api.nativePixelFromAligned(left,offsets,heights,aligned),100);assert.equal(api.alignedPixelFromNative(right,offsets,heights,58),58);assert.notEqual(api.nativePixelFromAligned(right,offsets,heights,aligned),100);});
+test('native line-number gutter includes every source-free alignment block without shifting real line identities',()=>{
+ let config=null;const extension=api.createNativeLineNumberGutter(options=>{config=options;return options},C.GutterMarker,widget=>widget?.sourceFree===true);
+ assert.equal(extension,config);assert.equal(config.class,'cm-lineNumbers');assert.equal(config.renderEmptyElements,true);
+ const doc=C.EditorState.create({doc:'one\ntwo\nthree'}).doc,view={state:{doc}};
+ assert.equal(config.lineMarker(view,{from:0}).value,'1');assert.equal(config.lineMarker(view,{from:doc.line(2).from}).value,'2');
+ const spacer={sourceFree:true,height:.453125},gap=config.widgetMarker(view,spacer,{from:doc.line(2).from,to:doc.line(2).from,height:.453125});
+ assert(gap instanceof C.GutterMarker);assert.equal(gap.value,'','visual gap gets a blank gutter marker, not a source number');
+ assert.equal(config.widgetMarker(view,{sourceFree:false}),null);assert.equal(config.initialSpacer(view).value,'9');
+ assert.equal(config.updateSpacer(null,{view:{state:{doc:C.EditorState.create({doc:Array.from({length:103},()=>"x").join('\n')}).doc}}}).value,'999');
+ const source=fs.readFileSync(require.resolve('../web/assets/editor-aligned-compare.js'),'utf8');
+ assert(source.includes('gutterConfig[side].of(nativeLineNumbers())'));assert(source.includes('gutterConfig[side].reconfigure(nativeLineNumbers())'));
+ assert(source.includes("widget=>widget instanceof Gap"),'only local visual spacer widgets receive empty line-number rows');
+ assert(source.includes("renderEmptyElements:true"),'do not silently skip fractional source-free block heights');
+});
 test('source geometry maps actual blank widgets without inventing numbered source lines',()=>{const view=blockView(200),offsets=[0,40,100,120],heights=[20,60,20];for(const pixel of [0,10,20,25,39,40,50,99,100,110,120]){const native=api.nativePixelFromAligned(view,offsets,heights,pixel);assert(Math.abs(api.alignedPixelFromNative(view,offsets,heights,native)-pixel)<.001);}assert.equal(api.nativePixelFromAligned(view,offsets,heights,30),30);assert.equal(view.state.doc.toString(),'a\nb\nc');});
 test('leading and trailing source-free gaps retain continuous map coordinates',()=>{const doc=C.EditorState.create({doc:'one'}).doc,blocks=[{from:0,to:0,top:0,height:30,widget:{alignedStart:0,height:30}},{from:0,to:3,top:30,height:80},{from:3,to:3,top:110,height:30,widget:{alignedStart:70,height:30}}];for(const b of blocks){b.bottom=b.top+b.height;b.type=b.widget?1:0;}const view={state:{doc},elementAtHeight:y=>blocks.find(b=>y<b.bottom)||blocks.at(-1),lineBlockAt:()=>({type:blocks})};for(const p of [0,15,29,30,50,69,70,85,100]){const native=api.nativePixelFromAligned(view,[30,100],[40],p);assert(Math.abs(api.alignedPixelFromNative(view,[30,100],[40],native)-p)<.001);}assert.equal(doc.toString(),'one');});
 
@@ -71,7 +85,7 @@ test('native gutter refresh never dispatches from a measurement write or after s
  refresh.request();job=jobs.shift();const old=job.read();refresh.cancel();job.write(old);assert.equal(deferred.length,0,'stale measured geometry cannot queue a write');
 });
 test('native gutter signature tracks current viewport and block geometry, not cached DOM labels',()=>{
- const view={viewport:{from:0,to:8},contentDOM:{clientWidth:120},documentPadding:{top:10},viewportLineBlocks:[{from:0,to:3,top:0,height:20,type:0},{from:4,to:8,top:20,height:40,type:0}]};const before=api.nativeGutterSignature(view);assert.equal(api.nativeGutterSignature(view),before);view.viewportLineBlocks[1].height=60;assert.notEqual(api.nativeGutterSignature(view),before);const source=fs.readFileSync(require.resolve('../web/assets/editor-aligned-compare.js'),'utf8');assert(source.includes('gutterConfig[side].reconfigure(lineNumbers({formatNumber:line=>String(line)}))'));assert(source.includes('gutterRefresh[side].cancel()'));assert(!source.includes("querySelectorAll('.cm-gutterElement')"));
+ const view={viewport:{from:0,to:8},contentDOM:{clientWidth:120},documentPadding:{top:10},viewportLineBlocks:[{from:0,to:3,top:0,height:20,type:0},{from:4,to:8,top:20,height:40,type:0}]};const before=api.nativeGutterSignature(view);assert.equal(api.nativeGutterSignature(view),before);view.viewportLineBlocks[1].height=60;assert.notEqual(api.nativeGutterSignature(view),before);const source=fs.readFileSync(require.resolve('../web/assets/editor-aligned-compare.js'),'utf8');assert(source.includes('gutterConfig[side].reconfigure(nativeLineNumbers())'));assert(source.includes('gutterRefresh[side].cancel()'));assert(!source.includes("querySelectorAll('.cm-gutterElement')"));
 });
 
 test('continuous same-owner input coalesces before measurement without starving every pending frame',()=>{
@@ -105,13 +119,24 @@ test('native virtual-gap origin contradiction uses actual visible text and prese
  rect.top-=.828125;assert.equal(api.nativeOriginMismatch(view),null,'at most 2px follows existing rendered geometry tolerance');
  rect.top=-2.828125;view.contentDOM.querySelector=()=>null;assert.equal(api.nativeOriginMismatch(view),null,'never rebuild a nonvirtual native document');
 });
-test('native origin recovery is bounded once per side/layout generation and never consumes a busy gesture',()=>{
+test('native origin recovery allows at most three attempts per side and layout generation',()=>{
  const guard=api.createOriginRepairGuard();let resets=0;const reset=()=>resets++;
  for(let i=0;i<40;i++)assert.equal(guard.attempt('right',7,false,reset),false);
- assert.equal(resets,0,'continuous map/wheel/composition/transfer refusal is not a repaint timer');
- assert.equal(guard.attempt('right',7,true,reset),true);assert.equal(resets,1);
+ assert.equal(resets,0,'busy gestures and composition do not consume an attempt');
+ for(let i=0;i<3;i++)assert.equal(guard.attempt('right',7,true,reset),true);
  for(let i=0;i<40;i++)assert.equal(guard.attempt('right',7,true,reset),false);
- assert.equal(guard.attempt('left',7,true,reset),true);assert.equal(guard.attempt('right',8,true,reset),true);assert.equal(resets,3);
+ assert.equal(resets,3,'a persistent native viewport defect has a finite retry budget');
+ assert.equal(guard.attempt('left',7,true,reset),true);
+ assert.equal(guard.attempt('right',8,true,reset),true);
+ assert.equal(resets,5,'other sides and newer measured generations have independent budgets');
+});
+test('gross native virtual-height overestimate captures a source anchor for bounded recovery',()=>{
+ const state=C.EditorState.create({doc:'first\nsecond\nthird'}),rect={top:-2.828125,bottom:17.3125,height:20.140625};
+ const view={state,contentHeight:86548,scrollDOM:{getBoundingClientRect:()=>({top:0,bottom:100})},contentDOM:{querySelectorAll:()=>[{dataset:{sourceLine:'2'},getBoundingClientRect:()=>rect}]}};
+ const mismatch=api.nativeHeightMismatch(view,27864);assert.equal(mismatch.line,2);assert.equal(mismatch.oversized,true);assert(Math.abs(mismatch.fraction-2.828125/20.140625)<1e-8);
+ view.contentHeight=27864*1.24;assert.equal(api.nativeHeightMismatch(view,27864),null,'ordinary unsettled virtual heights are not resets');
+ view.contentHeight=86548;assert.equal(api.nativeHeightMismatch(view,0),null,'unmeasured aligned layout cannot trigger repair');
+ view.contentDOM.querySelectorAll=()=>[];assert.equal(api.nativeHeightMismatch(view,27864),null,'no visible source means no safe anchor');
 });
 test('public native reset preserves exact immutable source state, selection, external undo and focus',()=>{
  const state=C.EditorState.create({doc:'alpha\n😀 beta\nlast',selection:{anchor:3,head:10}}),undo=['previous text'],document={content:state.doc.toString(),undo,dirty:true,editRevision:12},view={state,hasFocus:true,scrollDOM:{scrollLeft:29},setState(value){assert.equal(value,state);this.state=value;this.scrollDOM.scrollLeft=0;this.hasFocus=false;},focus(){this.hasFocus=true;}};

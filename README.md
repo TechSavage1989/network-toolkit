@@ -14,7 +14,18 @@
   <a href="#development">Development</a>
 </p>
 
-## Latest beta - 1.17.141 Beta 5
+## Beta 6 - reliability and final optimization candidate
+
+This phase addresses reliability during extended and simultaneous tool use.
+It reduces cross-tool graph redraws during Terminal and Packet Capture activity,
+releases abandoned graph DOM references and stale drags, and continues Editor
+comparison alignment recovery. It preserves source data, saved settings and
+window ownership. This is an opt-in beta candidate, not a stable promotion.
+
+[Development PR](https://github.com/TechSavage1989/network-toolkit/pull/17) ·
+[Validation and handoff](docs/RELEASE142_HANDOFF.md)
+
+## Latest published beta - 1.17.141 Beta 5
 
 Published October 31, 2026 as an **opt-in prerelease**. Editor connection
 settings and comparison-map navigation have been refined; the TFTP/SFTP
