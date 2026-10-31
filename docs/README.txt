@@ -1,3 +1,23 @@
+NETWORK TOOLKIT 1.17.143
+======================
+
+CURRENT RELEASE - 1.17.143 (BETA 7)
+
+This opt-in beta improves synchronous scrolling while comparing wrapped
+source files in narrow Editor windows. It uses visible matching source
+rows to adjust small native layout differences, while keeping all
+source bytes, independent scroll behavior, credentials and history intact.
+
+The included Editor browser regression checks wait for requested source
+lines to be rendered before inspecting native colors and geometry. The
+original position and color assertions are not relaxed.
+
+Stable remains 1.17.136. Beta 7 is not a stable promotion. Long-running
+physical Windows and live network-device validation remains necessary.
+
+Details: RELEASE_NOTES_1.17.143.txt and docs/RELEASE143_HANDOFF.md.
+Previous release descriptions follow.
+
 NETWORK TOOLKIT 1.17.142
 ======================
 

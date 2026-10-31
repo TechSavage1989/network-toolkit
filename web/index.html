@@ -632,7 +632,7 @@ html,body{height:auto!important;min-height:0!important;overflow:visible!importan
 'use strict';
 const SESSION=/^[a-f0-9]{64}$/.test(window.__networkToolkitNativeSession||'')?window.__networkToolkitNativeSession:'__SESSION_TOKEN__';
 const OFFLINE=location.protocol==='file:' || !/^https?:$/.test(location.protocol) || SESSION==='__SESSION_'+'TOKEN__';
-const VERSION='1.17.142';
+const VERSION='1.17.143';
 const WINDOW_MODE='__WINDOW_MODE__';
 const TERMINAL_VIEW=(()=>{try{return JSON.parse('__TERMINAL_VIEW__')}catch{return null}})();
 const EDITOR_VIEW=(()=>{try{return JSON.parse('__EDITOR_VIEW__')}catch{return null}})();

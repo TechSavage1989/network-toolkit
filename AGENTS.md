@@ -1,3 +1,20 @@
+# Network Toolkit v1.17.143 Beta 7 - comparison reliability candidate
+
+Based on published v1.17.142 Beta 6 and main post-release documentation
+commit 0730b532cba6619d4025a3bb4ae45bf3d77112da.
+Development branch beta/1.17.143-editor-reliability.
+Read docs/RELEASE143_HANDOFF.md and docs/DEVELOPMENT_HANDOFF.md.
+Synchronized Editor comparisons use bounded painted-row calibration when
+native wrapped scrolling differs by a few pixels. Different source line
+numbers are matched by comparison row identity, not line number.
+Focused regression tests preserve independent scrolling, source text,
+document ownership, undo/redo, saved settings, credentials, network permissions
+and updater consent. Browser tests await mounted source lines without
+relaxing rendered geometry assertions. No published tag or asset may be
+overwritten. Stable releases/latest stays v1.17.136. This candidate must
+not be marked published or free of historical Editor CI failures before
+exact-source validation and GitHub release checks complete.
+
 # Network Toolkit 1.17.142 Beta 6 - published application-wide reliability
 
 Published 2026-10-31T21:49:07Z as prerelease 430206177.
