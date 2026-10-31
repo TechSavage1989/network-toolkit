@@ -14,7 +14,15 @@
   <a href="#development">Development</a>
 </p>
 
-## Latest update - 1.17.138 Beta 2 (Phase 1)
+## Beta 3 in development - 1.17.139 (Phase 1)
+
+The next beta reduces repeated terminal display writes when several sessions
+receive large output bursts. Input, saved sessions and the opt-in updater
+remain unchanged. This is a **development candidate**, not a published
+download. Review [PR #14](https://github.com/TechSavage1989/network-toolkit/pull/14)
+and the [Beta 3 development handoff](docs/RELEASE139_HANDOFF.md).
+
+## Latest published beta - 1.17.138 Beta 2 (Phase 1)
 
 Beta 2 smooths multi-pane terminal resizing. Splitter movements are applied
 once per animation frame and commit the final pointer position; content is
@@ -23,7 +31,7 @@ history retain a fallback viewport position if their resize marker is lost.
 
 This is an **opt-in prerelease**, not the stable update. In App settings >
 Updates, enable Beta updates to receive the verified v1.17.138 package.
-See [beta release notes](RELEASE_NOTES_1.17.138.txt) and
+See [beta release notes](docs/releases/RELEASE_NOTES_1.17.138.txt) and
 [Beta 2 validation](docs/RELEASE138_HANDOFF.md).
 
 ## Previous beta - 1.17.137

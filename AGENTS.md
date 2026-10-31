@@ -1,3 +1,15 @@
+# Network Toolkit v1.17.139 Beta 3 - high-output rendering candidate
+
+## Baseline and scope
+
+Based on published v1.17.138 Beta 2 (tag 8e9052eb14ab9a5a5fc9363b0ac710a36203a133).
+Current development PR: https://github.com/TechSavage1989/network-toolkit/pull/14
+Stable v1.17.136 and prerelease v1.17.138 remain unchanged.
+This is a candidate, not a published beta.
+
+- Coalesce output-only event bursts separately by session into bounded 64 KiB xterm parser calls.
+Read docs/RELEASE139_HANDOFF.md and docs/DEVELOPMENT_HANDOFF.md before editing.
+
 # Network Toolkit development
 
 Current published prerelease: v1.17.138 Beta 2, published

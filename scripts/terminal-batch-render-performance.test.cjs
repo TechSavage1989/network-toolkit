@@ -19,7 +19,7 @@ function harness(){
   terminalInitialized:true,terminalInitialPanesFilled:true,terminalFeedAfter:0,
   terminalOutputChromeTimer:null,DETACHED_WORKSPACE:false,shutDown:false,
   upsertTerminalSession(info){const entry=entries.get(info.id);if(entry)entry.info={...info};return entry;},
-  terminalEntryShown:()=>true,appendTerminalOutput:()=>{outputs++;},base64ToBytes:value=>value,
+  terminalEntryShown:()=>true,appendTerminalOutput:()=>{outputs++;},flushTerminalOutputBatch:()=>{},base64ToBytes:value=>value,
   setTimeout(fn,delay){const key=++timer;timers.set(key,{fn,delay});return key;},
   clearTimeout:key=>timers.delete(key),
   renderTerminalChrome(){

@@ -1,0 +1,16 @@
+Network Toolkit 1.17.139 Beta 3
+
+## What's New
+
+- Large bursts of terminal output are displayed in fewer updates.
+- Multiple active terminals can process incoming output with less repeated display work.
+- Initial terminal output is handled in batches when a session view opens.
+
+## Additional Details
+
+- Beta 3 is an opt-in prerelease, not a stable update. The stable updater channel remains on v1.17.136 until a separate stable release is authorized and published.
+- Output-only event batches combine consecutive byte sequences separately for each terminal into xterm writes no larger than 64 KiB, except for an individual incoming chunk that already exceeds that size. The original event byte order and contents are maintained.
+- Existing macro recording and output history continue to observe each original event. The terminal scroll/follow behavior and prompt observation occur after the corresponding combined write is parsed.
+- The existing 1 MiB pending-render limit and explicit output-loss warning remain in place. Batching reduces parser call overhead but does not guarantee lossless display under sustained output exceeding the renderer's capacity.
+- Connection protocols, authentication, paste pacing, network operations, detached workspace ownership, saved settings, Windows executable name, and updater behavior are unchanged.
+- Validation uses synthetic concurrent-output fixtures. No universal device compatibility or physical Windows/SSH throughput improvement is claimed.
