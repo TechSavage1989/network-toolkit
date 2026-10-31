@@ -39,9 +39,11 @@ browser-editor112: detached 390px comparison motion p95/max peer offset
 3.65625px with 40 input events, zero stalls and zero unanswered inputs.
 No Editor comparison implementation or test threshold was changed; root
 cause remains unresolved and no repair is claimed. Source push run
-41168977300 passed the Editor browser job independently. The long
-Chromium updater-timer browser check was still in progress at publication
-and is not claimed as passed here. Retain its later result separately.
+41168977300 passed the Editor browser job independently. The final PR run 41168981266 completed 13 SUCCESS / 1 FAILURE;
+its long Chromium updater-timer browser check passed after publication.
+The exact same-source push run 41168977300 completed all 14 jobs SUCCESS.
+The PR's narrow Editor motion failure remains recorded and is not resolved
+or erased by the successful source push.
 These mocks do not establish compatibility with every physical device,
 full native user workflow, or independently measured speed improvement.
 
