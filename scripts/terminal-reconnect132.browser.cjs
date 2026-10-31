@@ -25,7 +25,7 @@ async function setup(width){
     else if(pathname==='/api/jobs')data=[];
     else if(pathname==='/api/terminals')data={sessions};
     else if(pathname==='/api/terminal-views')data={available:false,views:[],owners:{}};
-    else if(pathname==='/api/terminals/events')data={sessions,events:[],after:0};
+    else if(pathname==='/api/terminals/events'){await new Promise(resolve=>setTimeout(resolve,80));data={sessions,events:[],after:0};}
     else if(pathname==='/api/remote-browser'&&method==='POST')data={supported:false};
     else if(pathname.match(/^\/api\/terminals\/synthetic-(one|two)\/reconnect$/)&&method==='POST'){
      const id=pathname.split('/')[3];calls.push(id);inflight++;maxInflight=Math.max(maxInflight,inflight);
