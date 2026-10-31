@@ -1,8 +1,16 @@
-# Network Toolkit v1.17.142 Beta 6 - candidate, NOT PUBLISHED
+# Network Toolkit v1.17.142 Beta 6 - application-wide reliability candidate, NOT PUBLISHED
 
 Development PR #17: https://github.com/TechSavage1989/network-toolkit/pull/17
 Based on published v1.17.141 Beta 5 and its documentation-only main handoff.
 Read docs/RELEASE142_HANDOFF.md and docs/DEVELOPMENT_HANDOFF.md.
+
+Phase 6 scope: simultaneous workflows, long-running refresh, memory use,
+cancellation, recovery and cross-tool interaction. Graph workspace now ignores
+unrelated mutations, releases detached DOM/observers and stale divider drags,
+and preserves scroll/row state across legitimate workspace replacements.
+See docs/RELEASE142_HANDOFF.md. Narrow Editor comparison-motion failures from
+prior CI remain documented and must not be described as resolved.
+
 The revised fix leaves comparison gaps in their original source-free positions
 and gives native CodeMirror line-number gutters blank markers for those gaps.
 A bounded native height-map recovery detects grossly inflated virtual height and

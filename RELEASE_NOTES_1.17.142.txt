@@ -2,13 +2,17 @@ Network Toolkit 1.17.142 Beta 6
 
 ## What's New
 
-- Editor comparison line numbers stay aligned with wrapped text and visual gaps during scrolling and resizing.
+- Editor comparison line numbers have improved alignment and recovery during scrolling and resizing.
+- Live Terminal and Packet Capture updates no longer trigger unrelated graph layout work, reducing unnecessary redraws during simultaneous use.
+- Graph workspaces release detached display references and cancel stale divider interactions when navigating between tools.
 
 ## Additional Details
 
+- Phase 6 reliability work limits graph workspace reconciliation to relevant mutations, clears detached graph DOM references, and retains valid graph and result-list scroll positions across workspace replacements. Focused long-operation and cancellation tests cover this behavior.
 - The comparison line-number gutter now includes empty native rows for source-free alignment gaps, retaining fractional heights without adding text or false line numbers.
 - Large virtual-height inconsistencies after pane resizing trigger bounded native layout recovery, retaining the current source position and avoiding interference with active gestures.
 - Both sides of a comparison remain editable. Existing differences, map positions, selection, source bytes, undo/redo, document ownership and save behavior are preserved.
 - This is an opt-in prerelease. Stable updates remain at v1.17.136 and download/install still require explicit confirmation.
 - Existing terminal connections, credentials, file transfer permissions, scan and capture behavior, settings, shortcut compatibility and the stable Network_Toolkit.exe filename are unchanged.
-- Browser and native CI check the correction, but real network-device sessions and physical Windows performance remain unmeasured. Unrelated historical SFTP cancellation cases are not claimed repaired.
+- The Editor divider regression passes in targeted browser tests, but narrow-window aligned comparison and continuous map-motion checks remain historically intermittent in hosted CI. Beta 6 is not a stable promotion.
+- Automated synthetic, browser and native tests cover selected operation, cancellation and recovery paths; a sustained multi-hour physical Windows soak and live network-device testing remain outstanding. Historical SFTP cancellation cases are not claimed repaired.

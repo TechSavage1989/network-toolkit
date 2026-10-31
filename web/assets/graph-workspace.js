@@ -70,8 +70,42 @@
   // explanation without consuming another permanent row above the graph.
   const context=node.querySelector('[data-graph-stat-context]');if(context){context.classList.add('sr-only');const message=current.statistic?current.message||'Statistics filter: '+current.statistic:'';if(context.textContent!==message)context.textContent=message;}
  }
+ // Release DOM references when a result view is removed or replaced. The bounded
+ // model retains only the user's scroll and follow preferences, not detached rows.
+ function releaseDetached(liveNodes){
+  const live=new Set(liveNodes),liveKeys=new Set(liveNodes.map(node=>node.dataset.graphWorkspace));let released=0;
+  for(const [key,item] of models){
+   if(!item.node||live.has(item.node))continue;
+   resizeObserver?.unobserve(item.node);
+   const oldResults=item.node.querySelector?.('[data-graph-results]');
+   if(oldResults)resizeObserver?.unobserve(oldResults);
+   item.node=null;item.graph=null;item.owner=null;item.hoverRow=null;
+   // A live replacement must retain the held row anchor until restore().
+   // An actually removed run cannot keep old DOM inspection state alive.
+   if(!liveKeys.has(key)){item.rowAnchor=null;item.rowInspectionKey=null;item.inspections.delete('row');item.followPending=true;}
+   released++;
+  }
+  if(drag&&!live.has(drag.node)){
+   drag.node.classList.remove('graph-workspace-dragging');drag=null;
+  }
+  return released;
+ }
+ // Child mutations from a different tool (Capture, Terminal or Editor) do not
+ // require graph reconciliation. Replacements that remove or contain a graph
+ // workspace do, including replacement of an entire parent panel.
+ function workspaceMutation(records){
+  for(const record of records||[]){
+   if(record.target?.closest?.('[data-graph-workspace]'))return true;
+   for(const node of [...(record.addedNodes||[]),...(record.removedNodes||[])]){
+    if(node?.nodeType===1&&(node.matches?.('[data-graph-workspace]')||node.querySelector?.('[data-graph-workspace]')))return true;
+   }
+  }
+  return false;
+ }
  function restore(){
-  scheduled=false;for(const node of root.document?.querySelectorAll?.('[data-graph-workspace]')||[]){const item=model(node.dataset.graphWorkspace),graph=node.querySelector('[data-graph-pane]'),results=resultScroller(node);
+  scheduled=false;const liveNodes=[...(root.document?.querySelectorAll?.('[data-graph-workspace]')||[])];
+  releaseDetached(liveNodes);
+  for(const node of liveNodes){const item=model(node.dataset.graphWorkspace),graph=node.querySelector('[data-graph-pane]'),results=resultScroller(node);
    if(item.node!==node){if(item.node){resizeObserver?.unobserve(item.node);const oldResults=item.node.querySelector('[data-graph-results]');if(oldResults)resizeObserver?.unobserve(oldResults);}item.node=node;node.scrollTop=item.workspaceTop||0;node.scrollLeft=item.workspaceLeft||0;resizeObserver?.observe(node);const region=node.querySelector('[data-graph-results]');if(region)resizeObserver?.observe(region);}
    if(item.graph!==graph){item.graph=graph;if(graph){graph.scrollTop=item.graphTop;graph.scrollLeft=item.graphLeft;}}
    if(item.owner!==results){item.owner=results;if(results){results.scrollTop=item.resultTop;results.scrollLeft=item.resultLeft;}}
@@ -81,7 +115,7 @@
   }
  }
  function itemId(node){return node.dataset.graphWorkspace;}
- function schedule(){if(scheduled)return;scheduled=true;if(typeof root.requestAnimationFrame==='function')root.requestAnimationFrame(restore);else restore();}
+ function schedule(){if(scheduled||!root.document?.querySelector?.('[data-graph-workspace]')&&![...models.values()].some(item=>item.node))return;scheduled=true;if(typeof root.requestAnimationFrame==='function')root.requestAnimationFrame(restore);else restore();}
  function finish(event){if(!drag||event?.pointerId!=null&&event.pointerId!==drag.pointer)return;drag.node.classList.remove('graph-workspace-dragging');drag=null;persist();}
  function displayedRatio(node){const graphHeight=node.querySelector('[data-graph-pane]')?.getBoundingClientRect().height,resultHeight=node.querySelector('[data-graph-results]')?.getBoundingClientRect().height;return graphHeight>0&&resultHeight>0?graphHeight/(graphHeight+resultHeight):preferences().ratio;}
  function initialize(){const document=root.document;if(initialized||!document?.addEventListener)return;initialized=true;
@@ -97,7 +131,7 @@
   document.addEventListener('focusout',event=>{const node=event.target.closest?.('[data-graph-workspace]');if(node){model(node.dataset.graphWorkspace).followPending=true;schedule();}});
   document.addEventListener('selectionchange',schedule);
   document.addEventListener('networkToolkitResultFilterChange',event=>{const id=event.detail?.jobId;if(id){model(id).followPending=true;schedule();}});
-  if(typeof root.MutationObserver==='function')new root.MutationObserver(schedule).observe(document.documentElement||document,{subtree:true,childList:true});root.addEventListener?.('resize',schedule);schedule();
+  if(typeof root.MutationObserver==='function')new root.MutationObserver(records=>{if(!Array.isArray(records)||workspaceMutation(records))schedule();}).observe(document.documentElement||document,{subtree:true,childList:true});root.addEventListener?.('resize',schedule);schedule();
  }
- const api=Object.freeze({html,normalize,preferences,mergePreferences,restore,recordsHTML,openRecords,refreshFollowState,revealSample,resultScroller,inspection,latest,newestMatching,toggle,hold,initialize});if(typeof module==='object'&&module.exports)module.exports=api;root.NetworkToolkitGraphWorkspace=api;initialize();
+ const api=Object.freeze({html,normalize,preferences,mergePreferences,restore,recordsHTML,openRecords,refreshFollowState,revealSample,resultScroller,inspection,latest,newestMatching,toggle,hold,workspaceMutation,releaseDetached,initialize});if(typeof module==='object'&&module.exports)module.exports=api;root.NetworkToolkitGraphWorkspace=api;initialize();
 })(typeof window!=='undefined'?window:globalThis);

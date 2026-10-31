@@ -9,7 +9,7 @@ function harness(){
  function render(id='job',content='<table><tbody><tr><td>Sample</td></tr></tbody></table>',options={}){
   const html=api.html(id,'<div>Graph and point details</div>',content,options);document.innerHTML=html;api.restore();return document.querySelector('[data-graph-workspace]');
  }
- return {context,document,api,render,saved:()=>saved,observe:()=>observer?.()};
+ return {context,document,api,render,saved:()=>saved,observe:records=>observer?.(records)};
 }
 test('layout preferences normalize invalid restoration and bound both pane shares',()=>{
  for(const value of [undefined,null,[],{ratio:null},{ratio:''},{ratio:'0.7'},{ratio:NaN},{ratio:Infinity}])assert.deepEqual(workspace.normalize(value),{ratio:.4,collapsedTools:{}});
@@ -171,4 +171,39 @@ test('row inspection keeps its source key and exact pixel position through a liv
  h.document.emit('pointerout',old,{clientX:50,clientY:180,relatedTarget:node.querySelector('[data-result-sample-key="s3"]')});h.document.emit('pointerover',node.querySelector('[data-result-sample-key="s3"]'),{clientX:50,clientY:180});
  h.api.html('job','Graph',content);rows.push({sequence:5,key:'s5'});insertions++;h.api.restore();assert.equal(owner.scrollTop,86,'Queued layout hit-test events cannot replace the independently recorded source key');assert.equal(inspected.getBoundingClientRect().top,170);h.api.restore();assert.equal(owner.scrollTop,86,'The captured pixel anchor is consumed once');
  h.document.elementFromPoint=()=>null;h.document.emit('pointerout',inspected,{clientX:50,clientY:350});assert.equal(owner.scrollTop,0,'Actual pointer departure releases inspection and follows the latest source');
+});
+
+
+test('Beta 6 prolonged cross-tool updates do not remeasure an unrelated graph workspace',()=>{
+ const h=harness();h.render('monitor');let frames=0;
+ h.context.requestAnimationFrame=callback=>{frames++;callback();};
+ const capture=h.document.createElement('div');capture.setAttribute('id','packetCaptureWorkspace');
+ const terminal=h.document.createElement('div');terminal.setAttribute('id','terminalTabs');
+ const records=Array.from({length:1200},(_,i)=>({target:i%2?capture:terminal,addedNodes:[],removedNodes:[]}));
+ assert.equal(h.api.workspaceMutation(records),false);
+ for(let i=0;i<30;i++)h.observe(records);
+ assert.equal(frames,0,'packet capture and terminal DOM output must not trigger graph reflows');
+ const actual=h.document.querySelector('[data-graph-workspace]');
+ assert.equal(h.api.workspaceMutation([{target:actual,addedNodes:[],removedNodes:[]}]),true);
+ h.observe([{target:actual,addedNodes:[],removedNodes:[]}]);
+ assert.equal(frames,1,'real graph updates schedule exactly one workspace restoration');
+ const replacement=h.document.createElement('section');replacement.innerHTML='<div data-graph-workspace="other"></div>';replacement.nodeType=1;
+ assert.equal(h.api.workspaceMutation([{target:h.document,addedNodes:[replacement],removedNodes:[]}]),true,'whole-panel replacements must still wake the graph');
+});
+
+test('Beta 6 releases detached graph DOM and cancels stale drag without losing legitimate scroll restoration',()=>{
+ const h=harness();let node=h.render('monitored');const pane=node.querySelector('[data-graph-pane]');
+ pane.scrollTop=211;pane.scrollLeft=19;h.document.emit('scroll',pane);
+ const divider=node.querySelector('[data-graph-divider]');node.getBoundingClientRect=()=>({top:0,height:500});
+ h.document.emit('pointerdown',divider,{button:0,pointerId:987,clientY:250});
+ assert.equal(node.classList.contains('graph-workspace-dragging'),true);
+ h.document.innerHTML='<div id="packetCaptureWorkspace">Capture analysis</div>';
+ assert.equal(h.api.releaseDetached([]),1);
+ assert.equal(node.classList.contains('graph-workspace-dragging'),false,'a removed pane cannot remain dragging');
+ assert.equal(h.api.releaseDetached([]),0,'detachment cleanup is idempotent');
+ h.document.emit('pointermove',divider,{pointerId:987,clientY:400});
+ assert.equal(h.context.state.graphWorkspacePreferences,undefined,'stale gestures cannot change graph settings');
+ node=h.render('monitored');const restored=node.querySelector('[data-graph-pane]');
+ assert.equal(restored.scrollTop,211);assert.equal(restored.scrollLeft,19);
+ assert.equal(h.api.releaseDetached([node]),0,'mounted workspace remains owned');
 });

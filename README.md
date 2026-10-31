@@ -14,11 +14,13 @@
   <a href="#development">Development</a>
 </p>
 
-## Beta 6 candidate - 1.17.142
+## Beta 6 - reliability and final optimization candidate
 
-This beta improves Editor line-number alignment in two-document comparisons
-when wrapped lines and blank visual gaps are present. It keeps file content,
-editor history and window ownership unchanged. The candidate is under review.
+This phase addresses reliability during extended and simultaneous tool use.
+It reduces cross-tool graph redraws during Terminal and Packet Capture activity,
+releases abandoned graph DOM references and stale drags, and continues Editor
+comparison alignment recovery. It preserves source data, saved settings and
+window ownership. This is an opt-in beta candidate, not a stable promotion.
 
 [Development PR](https://github.com/TechSavage1989/network-toolkit/pull/17) ·
 [Validation and handoff](docs/RELEASE142_HANDOFF.md)
