@@ -12,3 +12,15 @@ test('individual view observer survives reparenting and disconnects on display d
 test('backwards wall clock cannot push a fit beyond its frame-sized budget',()=>{const c=setup();c.scheduleTerminalFit();c.Date.now=()=>-3600000;c.scheduleTerminalFit();c.advance(16);assert.equal(c.fits.length,1);});
 
 test('reentrant chrome updates cannot cancel later panes awaiting their first fit',()=>{const c=setup(),entries=Array.from({length:4},(_,i)=>({...c.entry,info:{state:'connected'},xterm:{cols:120,rows:40,resize(cols,rows){this.cols=cols;this.rows=rows;c.fits.push({pane:i,cols,rows});}}}));c.terminalVisibleEntries=()=>entries;c.renderTerminalChrome=()=>{c.elapse(10);c.scheduleTerminalFit();};c.scheduleTerminalFit();c.advance(200);assert.deepEqual([...new Set(c.fits.map(f=>f.pane))],[0,1,2,3]);});
+
+test('unchanged dimensions skip redundant full chrome redraws',()=>{
+ const c=setup();let renders=0;c.renderTerminalChrome=()=>{renders++;};
+ c.scheduleTerminalFit();c.advance(100);
+ assert.equal(renders,1);
+ c.scheduleTerminalFit();c.advance(100);
+ c.scheduleTerminalFit();c.advance(100);
+ assert.equal(renders,1,'unchanged geometry should not trigger full panel rendering');
+ c.entry.fit.proposeDimensions=()=>({cols:61,rows:20});
+ c.scheduleTerminalFit();c.advance(100);
+ assert.equal(renders,2,'a real geometry change still updates status and controls');
+});
