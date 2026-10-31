@@ -30,3 +30,7 @@ establish universal measured speedups. Do not publish or change existing
 release assets until exact-source checks, package and release guard verification.
 
 PUBLICATION PENDING.
+
+## Versioned candidate status
+
+The Go, web, native Windows version resources, root release notes and README now identify 1.17.140. The original v1.17.139 root release notes are archived without editing. Full exact-source CI, Windows build and publication remain pending. No live-device performance measurements have been performed.
