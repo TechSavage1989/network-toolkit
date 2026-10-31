@@ -1,3 +1,17 @@
+# v1.17.144 Beta 8 - multi-phase development handoff
+
+**Permanent approved plan: docs/DEVELOPMENT_ROADMAP.md.** New chats must
+read AGENTS.md, that roadmap, this handoff, and the newest release handoff.
+The roadmap covers eleven areas: interface, diagnostics, discovery, graphs,
+capture, transfers, Editor, Terminal, reports, configuration and updater.
+Beta 8 is application-wide measured performance and polish. Beta 9 will
+focus on extended simultaneous operation and stress testing.
+Continue without replacing the plan with an Editor-only regression effort.
+Current candidate: beta/1.17.144-application-wide-performance; not published.
+Detailed work and validation: docs/RELEASE144_HANDOFF.md.
+
+---
+
 # Network Toolkit v1.17.143 Beta 7 - published, limitations preserved
 
 Published at 2026-10-31T22:21:57Z, prerelease=true, draft=false,

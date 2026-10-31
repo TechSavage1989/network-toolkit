@@ -1,3 +1,14 @@
+# v1.17.144 Beta 8 - authoritative persistent roadmap
+
+**Read docs/DEVELOPMENT_ROADMAP.md first.** The approved plan includes
+eleven application areas and the full multi-phase performance, interface,
+reliability and stable acceptance roadmap. Continue this plan across chats.
+Beta 8 audits all eleven areas and implements measured cross-tool improvements.
+Read docs/RELEASE144_HANDOFF.md for source, CI, scope and handoff.
+Published baseline remains v1.17.143 Beta 7; this branch is not yet released.
+Keep exact output semantics, settings, credentials, permissions, installer
+consent, portable executable name and all older release assets unchanged.
+
 # Network Toolkit v1.17.143 Beta 7 - published opt-in comparison reliability
 
 Published 2026-10-31T22:21:57Z as GitHub prerelease 430220837.

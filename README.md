@@ -11,6 +11,7 @@
   <a href="#features">Features</a> ·
   <a href="#updates-and-settings">Updates</a> ·
   <a href="docs/releases">Release history</a> ·
+  <a href="docs/DEVELOPMENT_ROADMAP.md">Development roadmap</a> ·
   <a href="#development">Development</a>
 </p>
 
