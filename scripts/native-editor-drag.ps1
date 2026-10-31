@@ -29,6 +29,8 @@ public static class EditorDragInput {
  [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr h,IntPtr after,int x,int y,int w,int z,uint flags);
  [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr h,int show);
  [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+ [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();
+ [DllImport("user32.dll")] public static extern short GetAsyncKeyState(int key);
  [DllImport("user32.dll")] public static extern bool SetCursorPos(int x,int y);
  [DllImport("user32.dll")] public static extern void mouse_event(uint flags,uint dx,uint dy,uint data,UIntPtr extra);
  [DllImport("user32.dll")] public static extern void keybd_event(byte key,byte scan,uint flags,UIntPtr extra);
@@ -79,6 +81,7 @@ else{$to=Client-Point $target $ToX $ToY $ToWidth $ToHeight}
 # production pointer capture, including release outside the source HWND.
 $alt=$Mode -eq 'Cross' -or $Mode -eq 'OutsideCancel'
 if($alt){[EditorDragInput]::keybd_event(18,0,0,[UIntPtr]::Zero)}
+$inputState=@{sourceForeground=([EditorDragInput]::GetForegroundWindow() -eq $owner);altDown=([EditorDragInput]::GetAsyncKeyState(18) -lt 0)}
 [EditorDragInput]::mouse_event(0x0002,0,0,0,[UIntPtr]::Zero)
 try{
  # Pointerdown captures the UID locally. Only Alt-drag starts broker registration.
@@ -94,4 +97,4 @@ try{
  if($Mode -eq 'Escape'){[EditorDragInput]::keybd_event(27,0,0,[UIntPtr]::Zero);[EditorDragInput]::keybd_event(27,0,2,[UIntPtr]::Zero);Start-Sleep -Milliseconds 100}
 }finally{[EditorDragInput]::mouse_event(0x0004,0,0,0,[UIntPtr]::Zero);if($alt){[EditorDragInput]::keybd_event(18,0,2,[UIntPtr]::Zero)}}
 Start-Sleep -Milliseconds 150
-@{action=$Action;mode=$Mode;sourcePID=$OwnerProcessID;targetPID=$TargetProcessID;actualMouseDrag=$true;altCrossWindowPath=$alt;targetGeometry='Observed tab/client rectangles; outside modes use a validated work-area release point beyond the source HWND';from=@($from.X,$from.Y);to=@($to.X,$to.Y)}|ConvertTo-Json -Compress
+@{action=$Action;mode=$Mode;sourcePID=$OwnerProcessID;targetPID=$TargetProcessID;actualMouseDrag=$true;inputState=$inputState;altCrossWindowPath=$alt;targetGeometry='Observed tab/client rectangles; outside modes use a validated work-area release point beyond the source HWND';from=@($from.X,$from.Y);to=@($to.X,$to.Y)}|ConvertTo-Json -Compress

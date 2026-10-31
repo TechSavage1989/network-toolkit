@@ -66,6 +66,11 @@ func TestNativeEditorTransferInstalledWebView2(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	trace, err := os.ReadFile(filepath.Join(root, "scripts", "editor-native-trace128.js"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	driver = append(append(trace, []byte("\n")...), driver...)
 	data := filepath.Join(private, "owner-data")
 	if err := os.MkdirAll(data, 0700); err != nil {
 		t.Fatal(err)
@@ -132,6 +137,7 @@ func TestNativeEditorTransferInstalledWebView2(t *testing.T) {
 				}
 			}
 		}
+		h.collectDiagnostics128()
 		h.writeReport(err)
 		result <- err
 		cancel()
@@ -186,8 +192,9 @@ type nativeEditorSnapshot struct {
 		Direction  string
 		Top, Left  float64
 	}
-	Geometry nativeEditorGeometry
-	Drag     struct {
+	Diagnostic json.RawMessage
+	Geometry   nativeEditorGeometry
+	Drag       struct {
 		Armed, Started, Ready bool
 		UID                   string
 	}
@@ -238,6 +245,8 @@ type nativeEditorFixture struct {
 	dragComplete              bool
 	closePreferenceComplete   bool
 	gestures                  []json.RawMessage
+	brokerTrace128            []map[string]any
+	finalTrace128             []map[string]any
 }
 
 func (h *nativeEditorFixture) queue(view string) chan nativeEditorCommand {
@@ -253,6 +262,17 @@ func (h *nativeEditorFixture) serve(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/__native_editor_fixture" {
 		h.automation(w, r)
 		return
+	}
+	if action := nativeEditorBrokerAction128(r.URL.Path); action != "" {
+		status := &nativeEditorStatus128{ResponseWriter: w, status: 200}
+		w = status
+		defer func() {
+			h.mu.Lock()
+			defer h.mu.Unlock()
+			if len(h.brokerTrace128) < 256 {
+				h.brokerTrace128 = append(h.brokerTrace128, map[string]any{"at": time.Now().UnixMilli(), "action": action, "method": r.Method, "status": status.status})
+			}
+		}()
 	}
 	// No public-address lookup, update check, scan, terminal connection, native
 	// helper, credential read/write or real file operation is needed by this test.
@@ -788,7 +808,7 @@ func (h *nativeEditorFixture) exercise() error {
 func (h *nativeEditorFixture) writeReport(err error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	report := map[string]any{"passed": err == nil, "actualTabPointerDrags": h.dragComplete, "pointerDragCount": h.pointerDrags.Load(), "tabGestureEvidence": h.gestures, "tabGestureScope": "Win32 mouse input into actual installed WebView2; DOM fixture creates synthetic text and observes state, never dispatches drag events", "actualNativeWebView2": true, "productionChildCLI": true, "realApplicationBackendAndRegistry": true, "productionAuthenticationAndOriginChecks": true, "testOnlyDOMAutomation": true, "productionBridgeChanges": false, "syntheticUnsavedDocumentsOnly": true, "scope": "Real parent native host and separately built production --editor-view children; fixture chooses child executable and decorates test HTTP document with DOM automation only; no main CLI/storage lifecycle assertion", "closePreference113": h.closePreferenceComplete, "phases": h.phases, "nativeCaptures": h.captures, "childProcesses": len(h.children), "realFailedLaunches": h.failedLaunches.Load(), "blockedUnexpectedOperations": h.blocked, "driverFailures": h.failures}
+	report := map[string]any{"diagnostic128Broker": h.brokerTrace128, "diagnostic128Views": h.finalTrace128, "passed": err == nil, "actualTabPointerDrags": h.dragComplete, "pointerDragCount": h.pointerDrags.Load(), "tabGestureEvidence": h.gestures, "tabGestureScope": "Win32 mouse input into actual installed WebView2; DOM fixture creates synthetic text and observes state, never dispatches drag events", "actualNativeWebView2": true, "productionChildCLI": true, "realApplicationBackendAndRegistry": true, "productionAuthenticationAndOriginChecks": true, "testOnlyDOMAutomation": true, "productionBridgeChanges": false, "syntheticUnsavedDocumentsOnly": true, "scope": "Real parent native host and separately built production --editor-view children; fixture chooses child executable and decorates test HTTP document with DOM automation only; no main CLI/storage lifecycle assertion", "closePreference113": h.closePreferenceComplete, "phases": h.phases, "nativeCaptures": h.captures, "childProcesses": len(h.children), "realFailedLaunches": h.failedLaunches.Load(), "blockedUnexpectedOperations": h.blocked, "driverFailures": h.failures}
 	if err != nil {
 		report["error"] = err.Error()
 	}
@@ -1065,4 +1085,77 @@ func (h *nativeEditorFixture) exerciseDrag() error {
 	}
 	h.dragComplete = true
 	return nil
+}
+
+// Passive fixture-only response observer: forwards original bytes/status intact.
+type nativeEditorStatus128 struct {
+	http.ResponseWriter
+	status int
+}
+
+func (w *nativeEditorStatus128) WriteHeader(code int) {
+	w.status = code
+	w.ResponseWriter.WriteHeader(code)
+}
+func nativeEditorBrokerAction128(path string) string {
+	switch path {
+	case "/api/editor-views/drags":
+		return "register"
+	case "/api/editor-views/drags/claim":
+		return "claim"
+	case "/api/editor-views/drags/cancel":
+		return "cancel"
+	case "/api/editor-views/drags/detach":
+		return "detach"
+	case "/api/editor-views/transfers":
+		return "transfer"
+	}
+	return ""
+}
+func (h *nativeEditorFixture) collectDiagnostics128() {
+	views := []string{""}
+	h.mu.Lock()
+	for id, c := range h.children {
+		select {
+		case <-c.done:
+		default:
+			views = append(views, id)
+		}
+	}
+	h.mu.Unlock()
+	for _, view := range views {
+		s, err := h.command(view, nativeEditorCommand{Action: "snapshot"})
+		kind := "child"
+		if view == "" {
+			kind = "main"
+		}
+		row := map[string]any{"view": kind, "snapshotAvailable": err == nil}
+		if err == nil {
+			row["events"] = s.Diagnostic
+			row["documentCount"] = len(s.Documents)
+			row["window"] = map[string]any{"enabled": s.Window.Enabled, "running": s.Window.Running, "preparing": s.Window.DragPreparing, "closing": s.Window.Closing, "outgoing": s.Window.Outgoing, "incoming": s.Window.Incoming, "hasError": s.Window.Error != ""}
+			row["drag"] = map[string]any{"armed": s.Drag.Armed, "started": s.Drag.Started, "ready": s.Drag.Ready}
+			row["hasMessage"] = s.Message != ""
+			row["errorCount"] = len(s.Errors)
+		}
+		h.finalTrace128 = append(h.finalTrace128, row)
+	}
+}
+
+func TestNativeEditorDiagnostic128SanitizedBrokerObserver(t *testing.T) {
+	for path, want := range map[string]string{
+		"/api/editor-views/drags": "register", "/api/editor-views/drags/claim": "claim", "/api/editor-views/drags/cancel": "cancel", "/api/editor-views/drags/detach": "detach", "/api/editor-views/transfers": "transfer",
+		"/api/editor-views/drags/private-ticket": "", "/private/path": "",
+	} {
+		if got := nativeEditorBrokerAction128(path); got != want {
+			t.Fatalf("action classification got %q want %q", got, want)
+		}
+	}
+	recorder := httptest.NewRecorder()
+	observer := &nativeEditorStatus128{ResponseWriter: recorder, status: 200}
+	observer.WriteHeader(409)
+	_, _ = observer.Write([]byte("unchanged response"))
+	if observer.status != 409 || recorder.Code != 409 || recorder.Body.String() != "unchanged response" {
+		t.Fatal("passive observer changed original response")
+	}
 }
