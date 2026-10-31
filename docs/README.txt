@@ -1,3 +1,17 @@
+NETWORK TOOLKIT 1.17.133
+======================
+
+CURRENT RELEASE - 1.17.133
+
+Disconnect and Reconnect now appear side by side in the Terminal active
+commands. Each has an arrow for Disconnect all or Reconnect all.
+The confirmations for Reconnect all, Disconnect all and Close all tabs are
+independent, optional and enabled by default. Turn them back on in the
+Terminal display settings, or turn them off from their individual prompts.
+
+Details: RELEASE_NOTES_1.17.133.txt and docs/RELEASE133_HANDOFF.md.
+Previous published releases are retained below.
+
 NETWORK TOOLKIT 1.17.132
 ======================
 

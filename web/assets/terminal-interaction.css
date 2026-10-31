@@ -128,3 +128,14 @@
 .terminal-active-actions .terminal-reconnect-options button{display:flex;align-items:center;gap:7px;justify-content:flex-start;width:100%;min-height:29px;padding:5px 8px;text-align:left;border:0;border-radius:4px;background:transparent;color:inherit;font-size:11px}
 .terminal-reconnect-options button svg{width:14px;height:14px;flex:none}
 .terminal-reconnect-options button:hover:not(:disabled),.terminal-reconnect-options button:focus-visible{background:var(--accentBg);color:var(--accent);outline:2px solid var(--accent);outline-offset:-2px}
+
+/* Disconnect and Reconnect are adjacent split actions in the active toolbar. */
+.terminal-disconnect-split{position:relative;display:inline-flex;align-items:stretch;flex:0 0 auto;white-space:nowrap}
+.terminal-active-actions .terminal-disconnect-main{border-radius:6px 0 0 6px;margin:0}
+.terminal-active-actions .terminal-disconnect-toggle{display:inline-flex;align-items:center;justify-content:center;min-width:26px;width:26px;min-height:27px;padding:3px 4px;border-left:0;border-radius:0 6px 6px 0;margin:0}
+.terminal-disconnect-toggle svg{width:13px;height:13px;flex:none}
+.terminal-disconnect-toggle[aria-expanded="true"]{background:var(--accentBg);color:var(--accent)}
+.terminal-disconnect-options{position:absolute;z-index:180;right:0;top:calc(100% + 4px);min-width:152px;padding:5px;border:1px solid var(--border);border-radius:7px;background:var(--panel);color:var(--text);box-shadow:0 12px 28px #0005}
+.terminal-active-actions .terminal-disconnect-options button{display:flex;align-items:center;gap:7px;justify-content:flex-start;width:100%;min-height:29px;padding:5px 8px;text-align:left;border:0;border-radius:4px;background:transparent;color:inherit;font-size:11px}
+.terminal-disconnect-options button svg{width:14px;height:14px;flex:none}
+.terminal-disconnect-options button:hover:not(:disabled),.terminal-disconnect-options button:focus-visible{background:var(--accentBg);color:var(--accent);outline:2px solid var(--accent);outline-offset:-2px}

@@ -1,5 +1,11 @@
 # Network Toolkit development
 
+Current candidate: v1.17.133 adds adjacent Disconnect and Reconnect split
+buttons plus independent optional confirmations for Reconnect all,
+Disconnect all and Close all tabs. Read docs/RELEASE133_HANDOFF.md.
+Published release remains v1.17.132 until GitHub workflow and updater feed
+are verified. Preserve prior releases and existing credentials/settings.
+
 Current published version: 1.17.132, released 2026-10-31T04:50:09Z.
 Source/tag db432733d9b5065d782fbd0685c5fcf78a6011e4;
 tree 2e66bdbddc63ee594047b124708a083c394a15b4.

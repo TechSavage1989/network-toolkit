@@ -306,6 +306,11 @@ function sync(){
  const allEnabled=tabs?.reconnectAllAvailable?.()===true;
  for(const button of actions.querySelectorAll('[data-terminal-action="reconnect-options"],[data-terminal-action="reconnect-all"]'))button.disabled=!allEnabled;
  if(!allEnabled)tabs?.setReconnectOptions?.(false);
+ const disconnectBulkBusy=tabs?.windowBulkBusy?.()===true;
+ for(const button of actions.querySelectorAll('[data-terminal-action="disconnect"]'))button.disabled=disconnectBulkBusy||button.disabled;
+ const disconnectAllEnabled=tabs?.disconnectAllAvailable?.()===true;
+ for(const button of actions.querySelectorAll('[data-terminal-action="disconnect-options"],[data-terminal-action="disconnect-all"]'))button.disabled=!disconnectAllEnabled;
+ if(!disconnectAllEnabled)tabs?.setDisconnectOptions?.(false);
 }
 function changed(event){const entry=currentTerminal(),el=event.target;if(el.id==='terminalActiveActionsPosition'){state.terminalActiveActionsPosition=el.value==='bottom'?'bottom':'top';saveState();sync();scheduleTerminalFit();return;}
  const fields={terminalQuickPager:'autoPager',terminalQuickFollow:'autoScroll',terminalQuickReview:'pasteReview',terminalIncludeInput:'pasteIncludeCommands',terminalQuickPagerKey:'pagerKey'},key=fields[el.id];if(!key||!entry)return;

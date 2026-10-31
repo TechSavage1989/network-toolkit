@@ -156,3 +156,93 @@ test('bulk reconnection is serialized, guarded from duplicate starts and pauses 
  assert.deepEqual(calls.filter(c=>c[0]==='reconnect-auth'),[['reconnect-auth','one']]);
  assert.equal(h.api.reconnectAllBusy(),false);
 });
+
+test('Reconnect all can remember a scoped confirmation opt-out and restore the prompt independently',async()=>{
+ const h=harness();
+ assert.equal(h.api.requestReconnectAll(),true);
+ assert.deepEqual(h.calls,[['modal','Reconnect all terminal sessions']]);
+ assert.equal(h.context.state.terminalConfirmReconnectAll,undefined);
+ const skip=h.document.getElementById('terminalReconnectAllDontAsk');assert(skip);skip.checked=true;
+ await h.api.confirmReconnectAll();
+ assert.equal(h.context.state.terminalConfirmReconnectAll,false);
+ assert.equal(h.calls.filter(x=>x[0]==='save').length,1);
+ assert.deepEqual(h.calls.filter(x=>x[0]==='reconnect').map(x=>x[1]),['one','two']);
+ assert.equal(h.api.requestReconnectAll(),true);
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(h.calls.filter(x=>x[0]==='modal').length,1);
+ assert.deepEqual(h.calls.filter(x=>x[0]==='reconnect').map(x=>x[1]),['one','two','one','two']);
+ h.context.state.terminalConfirmReconnectAll=true;
+ assert.equal(h.api.requestReconnectAll(),true);
+ assert.equal(h.calls.filter(x=>x[0]==='modal').length,2);
+ assert.equal(h.context.state.terminalConfirmDisconnectAll,undefined);
+});
+
+test('Disconnect all exposes a confirmation choice independent of Close all and Reconnect all',async()=>{
+ const h=harness();
+ assert.equal(h.api.disconnectAllAvailable(),true);
+ assert.equal(h.api.bulkWindow('disconnect-all'),true);
+ assert.deepEqual(h.calls,[['modal','Disconnect all sessions in this window']]);
+ assert.equal(h.context.state.terminalConfirmDisconnectAll,undefined);
+ const skip=h.document.getElementById('terminalWindowBulkDontAsk');assert(skip);skip.checked=true;
+ await h.api.confirmWindowBulk();
+ assert.equal(h.context.state.terminalConfirmDisconnectAll,false);
+ assert.equal(h.calls.filter(x=>x[0]==='save').length,1);
+ assert.deepEqual(h.calls.filter(x=>x[0]==='disconnect').map(x=>x[1]),['one','two']);
+ assert.equal(h.api.bulkWindow('disconnect-all'),true);
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(h.calls.filter(x=>x[0]==='modal').length,1);
+ assert.deepEqual(h.calls.filter(x=>x[0]==='disconnect').map(x=>x[1]),['one','two','one','two']);
+ assert.equal(h.context.state.terminalConfirmCloseAll,undefined);
+ h.context.state.terminalConfirmDisconnectAll=true;
+ assert.equal(h.api.bulkWindow('disconnect-all'),true);
+ assert.equal(h.calls.filter(x=>x[0]==='modal').length,2);
+});
+
+test('Close all optional confirmation does not disable single active tab close confirmation',async()=>{
+ const h=harness();
+ assert.equal(h.api.bulkWindow('close-all'),true);
+ assert.deepEqual(h.calls,[['modal','Close all tabs in this window']]);
+ const opt=h.document.getElementById('terminalWindowBulkDontAsk');assert(opt);opt.checked=true;
+ await h.api.confirmWindowBulk();
+ assert.equal(h.context.state.terminalConfirmCloseAll,false);
+ assert.notEqual(h.context.state.terminalConfirmClose,false);
+ assert.equal(h.entries.size,0);
+ h.entries.set('three',{info:{id:'three',state:'connected',label:'three'}});
+ assert.equal(h.api.bulkWindow('close-all'),true);
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(h.calls.filter(x=>x[0]==='modal').length,1);
+ assert.equal(h.entries.has('three'),false);
+ h.entries.set('four',{info:{id:'four',state:'connected',label:'four'}});
+ h.context.state.terminalConfirmCloseAll=true;
+ assert.equal(h.api.bulkWindow('close-all'),true);
+ assert.equal(h.calls.filter(x=>x[0]==='modal').length,2);
+});
+
+test('skipped Disconnect all confirmation still respects ownership changes and blocks duplicate batches',async()=>{
+ const h=harness();
+ h.context.state.terminalConfirmDisconnectAll=false;
+ let release;
+ h.context.disconnectTerminal=async entry=>{h.calls.push(['disconnect',entry.info.id]);if(entry.info.id==='one')await new Promise(resolve=>release=resolve);};
+ assert.equal(h.api.bulkWindow('disconnect-all'),true);
+ assert.equal(h.api.windowBulkBusy(),true);
+ assert.equal(h.api.disconnectAllAvailable(),false);
+ assert.equal(h.api.bulkWindow('disconnect-all'),false);
+ h.revisions.set('two',1);
+ release();
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(h.api.windowBulkBusy(),false);
+ assert.deepEqual(h.calls,[['disconnect','one']]);
+ assert.equal(h.calls.filter(x=>x[0]==='modal').length,0);
+});
+
+test('Disconnect all remains unavailable when offline or while a workspace moves',()=>{
+ const h=harness();h.context.online=false;
+ assert.equal(h.api.disconnectAllAvailable(),false);
+ assert.equal(h.api.bulkWindow('disconnect-all'),false);
+ h.context.online=true;h.context.terminalWorkspaceTransferBusy=true;
+ assert.equal(h.api.disconnectAllAvailable(),false);
+ assert.equal(h.api.bulkWindow('disconnect-all'),false);
+ h.context.terminalWorkspaceTransferBusy=false;
+ h.entries.get('one').info.state='closed';h.entries.get('two').info.state='error';
+ assert.equal(h.api.disconnectAllAvailable(),false);
+});
