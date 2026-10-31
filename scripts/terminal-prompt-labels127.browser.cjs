@@ -102,11 +102,12 @@ const root=path.resolve(__dirname,'..'),out=process.env.TOOLKIT_TEST_OUTPUT,vers
   ['root@F5-LAB(cfg-sync Standalone)(Active)(/Common)(tmos)#','F5-LAB'],
   ['* Slot-1 STACK-LAB.3 #','STACK-LAB'],
   ['[root@ESXI-LAB:~]','ESXI-LAB'],
-  ['[SERVER-LAB]: PS C:\tools>','SERVER-LAB'],
+  [String.raw`[SERVER-LAB]: PS C:\tools>`,'SERVER-LAB'],
   ['CLUSTER-LAB::>','CLUSTER-LAB']
  ];
  await page.evaluate(()=>selectTerminal('synthetic-label-four'));
  for(const [prompt,want] of families){
+  assert(!/[\x00-\x1f\x7f-\x9f]/.test(prompt),'Prompt-family fixtures must contain literal printable text, not escaped controls');
   await page.evaluate(prompt=>appendTerminalOutput(terminalSessions.get('synthetic-label-four'),new TextEncoder().encode('\r\n'+prompt)),prompt);
   await page.waitForFunction(prompt=>{const e=terminalSessions.get('synthetic-label-four'),b=e?.xterm?.buffer.active;return b?.getLine(b.baseY+b.cursorY)?.translateToString(true)===prompt&&!e.renderPendingBytes;},prompt);
   await page.waitForFunction(want=>terminalSessions.get('synthetic-label-four')?._ntPromptName===want,want);
