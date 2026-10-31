@@ -1,15 +1,14 @@
-# Network Toolkit v1.17.140 Beta 4 - application-wide performance candidate
+# Network Toolkit v1.17.140 Beta 4 - published application-wide optimization
 
-Starting from released Beta 3 v1.17.139. Development PR #15:
-https://github.com/TechSavage1989/network-toolkit/pull/15
-Review docs/PERFORMANCE_AUDIT_140.md and docs/RELEASE140_HANDOFF.md.
-This candidate improves graph time-range work, SFTP/FTP/FTPS client
-directory interactions and TFTP/SFTP server file explorer performance.
-Stable v1.17.136 and prior Beta 3 tags/assets remain unchanged.
-Do not describe this version as published until source, Windows resources,
-release assets, prerelease flags and beta update feed are verified.
-Known Editor narrow-sidebar and comparison-motion CI failures remain tracked
-and are not claimed fixed by this scoped performance change.
+Published 2026-10-31T18:35:55Z as GitHub prerelease 430114376.
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.140
+Exact tagged source/merged PR #15: 9dc5a75696d2e816da8ef13409d4e267f490fdcb.
+Release workflow 41229976291: build SUCCESS, publish SUCCESS.
+Four assets uploaded with SHA-256 hashes; stable latest remains v1.17.136.
+Beta updates are opt-in. Do not replace prior tags or asset bytes.
+Read docs/RELEASE140_HANDOFF.md and docs/PERFORMANCE_AUDIT_140.md.
+No physical Windows benchmark has been performed. Historical Editor and
+detached native SFTP CI failures are not claimed fixed.
 
 # Network Toolkit v1.17.139 Beta 3 - published high-output batching
 

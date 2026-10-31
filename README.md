@@ -14,15 +14,19 @@
   <a href="#development">Development</a>
 </p>
 
-## Beta 4 development candidate - 1.17.140
+## Latest beta - 1.17.140 Beta 4
 
-The next beta improves graph time-range processing and large directory
-listing interactions in SFTP, FTP/FTPS and file-server tools. This is a
-development candidate, not yet a public download. Follow
-[PR #15](https://github.com/TechSavage1989/network-toolkit/pull/15)
-and the [application-wide performance audit](docs/PERFORMANCE_AUDIT_140.md).
+Published October 31, 2026 as an **opt-in prerelease**. Graph history
+and SFTP, FTP/FTPS and file-server directory views perform less repeated
+sorting while preserving existing sample and file display behavior.
+This is a beta build, not the normal stable update.
 
-## Latest published beta - 1.17.139 Beta 3 (Phase 1)
+[Beta 4 download](https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.140) ·
+[Release notes](RELEASE_NOTES_1.17.140.txt) ·
+[Validation handoff](docs/RELEASE140_HANDOFF.md) ·
+[Application-wide audit](docs/PERFORMANCE_AUDIT_140.md)
+
+## Previous beta - 1.17.139 Beta 3 (Phase 1)
 
 Published October 31, 2026 as an **opt-in prerelease**. Heavy terminal
 output is handled in bounded per-session batches, reducing repeated
