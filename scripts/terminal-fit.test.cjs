@@ -44,3 +44,31 @@ test('continuous splitter movement updates CSS tracks without rebuilding all ter
  assert.equal(renders,1,'keyboard and committed changes retain full state synchronization');
  assert.equal(saves,1);
 });
+
+test('phase1 beta: repeated observer events skip redundant stage measurement while fit is pending',()=>{
+ const c=setup();let measurements=0;c.sizeTerminalStage=()=>{measurements++;};
+ for(let i=0;i<300;i++)c.scheduleTerminalFit();
+ assert.equal(measurements,1,'one pending fit should not cause 300 synchronous layout reads');
+ c.advance(16);assert.equal(c.fits.length,1);
+ for(let i=0;i<200;i++)c.scheduleTerminalFit();
+ assert.equal(measurements,2,'the next frame may measure the latest layout again');
+ c.advance(16);assert.equal(c.fits.length,1,'unchanged columns still avoid xterm reflow');
+});
+test('phase1 beta: visible resize refreshes highlights once and defers cosmetic chrome redraw',()=>{
+ const c=setup();let refreshes=0,immediate=0,cosmetic=0;
+ c.entry.highlighter={refresh(){refreshes++;}};
+ c.window.requestAnimationFrame=()=>0;
+ c.scheduleTerminalOutputChrome=()=>{cosmetic++;};
+ c.renderTerminalChrome=()=>{immediate++;};
+ c.scheduleTerminalFit();c.advance(16);
+ assert.equal(c.fits.length,1);
+ assert.equal(refreshes,1);
+ assert.equal(cosmetic,1);
+ assert.equal(immediate,0,'full chrome repaint should be deferred while dragging');
+ c.scheduleTerminalFit();c.advance(16);
+ assert.equal(refreshes,1,'unchanged grid must not repaint highlight decorations');
+ assert.equal(cosmetic,1);
+ c.entry.fit.proposeDimensions=()=>({cols:70,rows:20});
+ c.scheduleTerminalFit();c.advance(16);
+ assert.equal(refreshes,2);assert.equal(cosmetic,2);
+});

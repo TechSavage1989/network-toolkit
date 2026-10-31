@@ -14,16 +14,24 @@
   <a href="#development">Development</a>
 </p>
 
-## Latest update - 1.17.136
+## Latest update - 1.17.137 Beta (Phase 1)
 
-You can now opt in to Beta updates under App settings > Updates.
-The option is disabled by default. When enabled, Check for updates
-considers both stable releases and official prereleases, while retaining
-the existing download verification and Install and restart confirmation.
+This optional prerelease begins the terminal responsiveness refinement.
+Rapid pane-resize events now avoid unnecessary layout measurement and
+unchanged-size highlight redraws. Noncritical chrome updates are deferred
+while terminal cells resize immediately, preserving prompt pacing and
+the existing terminal session safeguards.
 
-This stable release is the upgrade bridge from v1.17.135 to the optional
-Phase 1 responsiveness beta. See [release notes](RELEASE_NOTES_1.17.136.txt)
-and [development handoff](docs/RELEASE136_HANDOFF.md).
+This release appears only after stable v1.17.136 is installed and
+Beta updates (opt in) is enabled in App settings > Updates.
+See [beta release notes](RELEASE_NOTES_1.17.137.txt) and
+[Phase 1 handoff](docs/RELEASE137_HANDOFF.md).
+
+## Previous stable update - 1.17.136
+
+Added the off-by-default Beta updates setting, trusted release
+channel selection and the existing explicit download/install workflow.
+See [release notes](docs/releases/RELEASE_NOTES_1.17.136.txt).
 
 ## Previous update - 1.17.135
 

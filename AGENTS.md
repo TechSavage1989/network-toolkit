@@ -1,5 +1,13 @@
 # Network Toolkit development
 
+Current candidate: v1.17.137 Beta 1 begins Phase 1 responsiveness work,
+based on the v1.17.136 beta-channel bridge. This prerelease is opt-in only
+through App settings > Updates. It coalesces redundant terminal pane resize
+layout work without altering session behavior or the native updater.
+Read docs/RELEASE137_HANDOFF.md and docs/DEVELOPMENT_HANDOFF.md.
+Do not describe this beta as stable or published before the GitHub
+--prerelease flag, assets, hashes and update feed are verified.
+
 Current candidate v1.17.136 is a stable beta-channel compatibility bridge
 from the published 1.17.135 release. It adds an off-by-default opt-in for
 future GitHub prereleases and preserves the normal stable-only updater,

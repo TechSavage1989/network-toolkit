@@ -526,7 +526,7 @@ html,body{height:auto!important;min-height:0!important;overflow:visible!importan
   <aside class="sidebar" id="sidebar" aria-label="Primary navigation">
     <div class="brand"><div class="brand-mark"><img src="../assets/Network_Toolkit_Icon.svg" width="36" height="36" alt="" draggable="false"></div><div><div class="brand-name">Network Toolkit</div><div class="brand-sub">Diagnostics workbench</div><span class="app-system-name" id="hostTop" tabindex="0">Local diagnostics</span></div></div>
     <div class="nav-scroll" id="navigation"></div>
-    <div class="sidebar-foot"><div class="engine-label" id="engineLabel"><span class="dot warn pulse"></span><span>Connecting to app</span></div><div class="engine-sub" id="engineSub">Portable edition · v1.17.136</div><div class="app-utility-actions"><button class="iconbtn" id="themeButton" data-action="theme" aria-label="Switch color theme" title="Switch color theme"></button><button class="iconbtn" id="settingsButton" data-action="settings" aria-label="App settings" title="App settings"></button><span class="pill" id="runningCount" hidden>0 running</span></div></div>
+    <div class="sidebar-foot"><div class="engine-label" id="engineLabel"><span class="dot warn pulse"></span><span>Connecting to app</span></div><div class="engine-sub" id="engineSub">Portable edition · v1.17.137</div><div class="app-utility-actions"><button class="iconbtn" id="themeButton" data-action="theme" aria-label="Switch color theme" title="Switch color theme"></button><button class="iconbtn" id="settingsButton" data-action="settings" aria-label="App settings" title="App settings"></button><span class="pill" id="runningCount" hidden>0 running</span></div></div>
   </aside>
   <main class="main">
     <span id="crumb" hidden>Overview</span>
@@ -545,7 +545,7 @@ html,body{height:auto!important;min-height:0!important;overflow:visible!importan
       </div>
       <div id="terminalWorkspace" class="hidden" role="region" aria-label="Terminal connections and output" tabindex="0"></div>
       </div>
-      <div class="app-foot"><span class="app-version">Network Toolkit 1.17.136 · Local, portable diagnostics</span><span id="footerStatus">No diagnostic has run.</span><span id="appNavigationFooterSlot"></span></div>
+      <div class="app-foot"><span class="app-version">Network Toolkit 1.17.137 · Local, portable diagnostics</span><span id="footerStatus">No diagnostic has run.</span><span id="appNavigationFooterSlot"></span></div>
     </div>
   </main>
 </div>
@@ -632,7 +632,7 @@ html,body{height:auto!important;min-height:0!important;overflow:visible!importan
 'use strict';
 const SESSION=/^[a-f0-9]{64}$/.test(window.__networkToolkitNativeSession||'')?window.__networkToolkitNativeSession:'__SESSION_TOKEN__';
 const OFFLINE=location.protocol==='file:' || !/^https?:$/.test(location.protocol) || SESSION==='__SESSION_'+'TOKEN__';
-const VERSION='1.17.136';
+const VERSION='1.17.137';
 const WINDOW_MODE='__WINDOW_MODE__';
 const TERMINAL_VIEW=(()=>{try{return JSON.parse('__TERMINAL_VIEW__')}catch{return null}})();
 const EDITOR_VIEW=(()=>{try{return JSON.parse('__EDITOR_VIEW__')}catch{return null}})();
@@ -1681,7 +1681,9 @@ function cancelTerminalResizeTimer(entry){clearTimeout(entry.resizeTimer);entry.
 function observeTerminalGeometry(entry){if(typeof ResizeObserver!=='function'||!entry.element)return;const observer=new ResizeObserver(()=>scheduleTerminalFit());observer.observe(entry.element);entry.disposables.push({dispose:()=>observer.disconnect()});}
 // Coalesce events to a bounded frame-sized deadline, not a trailing debounce.
 // Continuous splitter/window movement must keep reflowing the visible grids.
-function scheduleTerminalFit(){sizeTerminalStage();if(state.activePage!=='terminal')return;for(const entry of terminalVisibleEntries()){if(!entry.xterm)continue;if(entry.fitTimer!=null)continue;const delay=16;entry.fitDueAt=Date.now()+delay;entry.fitTimer=setTimeout(()=>{entry.fitTimer=null;entry.fitDueAt=null;if(state.activePage!=='terminal'||!terminalEntryVisible(entry)||entry.transferBusy||entry.restoring||entry.awaitingAcceptance||!terminalOwnerCanMutate(entry))return;try{if(entry.element&&(entry.element.clientWidth<=0||entry.element.clientHeight<=0))return;const proposed=entry.fit.proposeDimensions();let resized=false;if(proposed&&Number.isFinite(proposed.cols)&&Number.isFinite(proposed.rows)&&proposed.cols>=2&&proposed.rows>=2){const size=terminalDimensions(proposed);if(entry.xterm.cols!==size.cols||entry.xterm.rows!==size.rows){resized=true;const position=NetworkToolkitTerminalExtras.beforeFit(entry);let selection;try{selection=window.NetworkToolkitTerminalState?.beforeResize(entry.xterm);entry.xterm.resize(size.cols,size.rows);}finally{try{NetworkToolkitTerminalExtras.afterFit(entry,position);}finally{window.NetworkToolkitTerminalState?.afterResize(entry.xterm,selection);}}}else if(entry.info.state==='connected')queueTerminalResize(entry,size);}entry.highlighter?.refresh();if(resized)renderTerminalChrome()}catch{}},delay);}}
+// During fast splitter motion, repeated ResizeObserver callbacks must not
+// remeasure the stage when every visible pane already has a fit scheduled.
+function scheduleTerminalFit(){if(state.activePage!=='terminal')return;const visible=terminalVisibleEntries();if(!visible.some(entry=>entry.xterm&&entry.fitTimer==null))return;sizeTerminalStage();for(const entry of visible){if(!entry.xterm)continue;if(entry.fitTimer!=null)continue;const delay=16;entry.fitDueAt=Date.now()+delay;entry.fitTimer=setTimeout(()=>{entry.fitTimer=null;entry.fitDueAt=null;if(state.activePage!=='terminal'||!terminalEntryVisible(entry)||entry.transferBusy||entry.restoring||entry.awaitingAcceptance||!terminalOwnerCanMutate(entry))return;try{if(entry.element&&(entry.element.clientWidth<=0||entry.element.clientHeight<=0))return;const proposed=entry.fit.proposeDimensions();let resized=false;if(proposed&&Number.isFinite(proposed.cols)&&Number.isFinite(proposed.rows)&&proposed.cols>=2&&proposed.rows>=2){const size=terminalDimensions(proposed);if(entry.xterm.cols!==size.cols||entry.xterm.rows!==size.rows){resized=true;const position=NetworkToolkitTerminalExtras.beforeFit(entry);let selection;try{selection=window.NetworkToolkitTerminalState?.beforeResize(entry.xterm);entry.xterm.resize(size.cols,size.rows);}finally{try{NetworkToolkitTerminalExtras.afterFit(entry,position);}finally{window.NetworkToolkitTerminalState?.afterResize(entry.xterm,selection);}}}else if(entry.info.state==='connected')queueTerminalResize(entry,size);}if(resized){entry.highlighter?.refresh();if(typeof window.requestAnimationFrame==='function'&&typeof scheduleTerminalOutputChrome==='function')scheduleTerminalOutputChrome();else renderTerminalChrome()}}catch{}},delay);}}
 function queueTerminalResize(entry,size){
 if(entry.transferBusy||entry.restoring||!terminalOwnerCanMutate(entry))return;if(!Number.isFinite(size.cols)||!Number.isFinite(size.rows))return;
 const next=terminalDimensions(size),now=Date.now();

@@ -1,3 +1,15 @@
+FIRST PHASE 1 BETA (v1.17.137)
+
+v1.17.137 is a GitHub prerelease, not the latest stable release.
+Install the stable 1.17.136 bridge normally from 1.17.135. Open
+App settings > Updates, enable Beta updates (opt in), and Check for
+updates. Once beta 1.17.137 is offered, Download update, then confirm
+Install and restart. This remains a user-controlled installation and
+preserves the existing Settings folder and shortcut-safe executable.
+To stop receiving beta updates, turn the opt-in off. An installed beta
+will remain until a newer stable release is published; no downgrade
+occurs automatically.
+
 BETA UPDATE CHANNEL (1.17.136 AND LATER)
 
 Network Toolkit 1.17.135 is stable-only. First update normally to stable

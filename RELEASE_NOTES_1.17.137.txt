@@ -1,0 +1,16 @@
+Network Toolkit 1.17.137 Beta 1
+
+## What's New
+
+- Terminal panes avoid unnecessary redraws when you resize a window or drag a divider.
+- Status and highlight updates do less redundant work while terminal content remains in view.
+- This is an optional Phase 1 beta. Install it only after enabling Beta updates in App settings.
+
+## Additional Details
+
+- This prerelease is the first, limited Phase 1 responsiveness pass, following the stable 1.17.136 beta-channel bridge. It is published as a GitHub prerelease so stable-only installations do not receive it.
+- Terminal resize events now skip repeated stage measurements while the visible panes already have a fit scheduled. During sustained dragging, fits continue at the existing frame-sized deadline using the latest pane geometry.
+- Terminal highlighting refreshes only when local terminal columns or rows change. In supported browser windows, noncritical terminal chrome redraws are coalesced instead of synchronously rebuilding controls after each pane fit. Terminal cell resizing still happens immediately.
+- Existing remote PTY resize timing, scrollbar behavior, typed/pasted input, prompt detection, terminal session ownership, output capture, saved settings and stable Network_Toolkit.exe updater safeguards remain unchanged.
+- The update is opt-in, requires verified download and an explicit Install and restart confirmation. Turning off beta updates stops future prereleases but does not automatically downgrade an installed beta.
+- Regression tests cover continuous motion, multiple panes, hidden/transferring windows, invalid geometry, output preservation, deferred UI work and unchanged-size refresh suppression. No physical-device responsiveness benchmark or universal performance gain is claimed.
