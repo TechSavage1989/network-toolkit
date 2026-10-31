@@ -16,6 +16,7 @@ import (
 
 const updateRepository = "TechSavage1989/network-toolkit"
 const updateAPIURL = "https://api.github.com/repos/" + updateRepository + "/releases/latest"
+const updateBetaAPIURL = "https://api.github.com/repos/" + updateRepository + "/releases?per_page=30"
 
 const updateFeedMaxBody = 2 << 20
 
@@ -28,6 +29,7 @@ type updateFeedCache struct {
 	etag       string
 	payload    []byte
 	checkAfter time.Time
+	channel    string // Keep stable and beta ETags/payloads isolated.
 }
 
 func (cache updateFeedCache) checkAfterMillis() int64 {
@@ -98,10 +100,30 @@ func updateFeedCheckAfter(header http.Header, status int, now time.Time) time.Ti
 // The returned cache retains all previous validated data on errors, but records
 // cooldown headers even when the response body or status cannot be accepted.
 func updateFetchRelease(ctx context.Context, client *http.Client, cache updateFeedCache) (*updateRelease, updateFeedCache, error) {
+	return updateFetchReleaseChannel(ctx, client, cache, "stable")
+}
+func updateFetchReleaseChannel(ctx context.Context, client *http.Client, cache updateFeedCache, channel string) (*updateRelease, updateFeedCache, error) {
+	if channel != "stable" && channel != "beta" {
+		return nil, cache, errors.New("Unsupported update channel")
+	}
+	oldChannel := cache.channel
+	if oldChannel == "" {
+		oldChannel = "stable"
+	}
+	if oldChannel != channel {
+		// A cached stable response must never be interpreted as a beta feed
+		// and vice versa. Preserve the service cooldown across the switch.
+		cache.etag, cache.payload = "", nil
+	}
+	cache.channel = channel
 	if time.Now().Before(cache.checkAfter) {
 		return nil, cache, errUpdateFeedCooldown
 	}
-	r, err := http.NewRequestWithContext(ctx, http.MethodGet, updateAPIURL, nil)
+	endpoint := updateAPIURL
+	if channel == "beta" {
+		endpoint = updateBetaAPIURL
+	}
+	r, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, cache, err
 	}
@@ -125,7 +147,7 @@ func updateFetchRelease(ctx context.Context, client *http.Client, cache updateFe
 		}
 		// Do not promote a 304 into a trusted release without the same asset,
 		// stable-version, size and repository validation used for a fresh 200.
-		latest, err := updateParseRelease(cache.payload)
+		latest, err := updateParseReleaseFeed(cache.payload, channel)
 		if err == nil {
 			if etag := updateFeedETag(response.Header.Get("ETag")); etag != "" {
 				cache.etag = etag
@@ -152,7 +174,7 @@ func updateFetchRelease(ctx context.Context, client *http.Client, cache updateFe
 	if len(data) > updateFeedMaxBody {
 		return nil, cache, errors.New("Update response exceeds its size limit")
 	}
-	latest, err := updateParseRelease(data)
+	latest, err := updateParseReleaseFeed(data, channel)
 	if err != nil {
 		return nil, cache, err
 	}
@@ -164,6 +186,7 @@ func updateFetchRelease(ctx context.Context, client *http.Client, cache updateFe
 type updateRelease struct {
 	Version     string `json:"version"`
 	Notes       string `json:"notes"`
+	Beta        bool   `json:"beta"`
 	packageName string
 	packageURL  string
 	sumsURL     string
@@ -259,6 +282,9 @@ func updateFetchProgress(ctx context.Context, client *http.Client, raw string, l
 	return b, nil
 }
 func updateParseRelease(data []byte) (*updateRelease, error) {
+	return updateParseReleaseCandidate(data, false)
+}
+func updateParseReleaseCandidate(data []byte, acceptBeta bool) (*updateRelease, error) {
 	var item struct {
 		Tag        string `json:"tag_name"`
 		Body       string `json:"body"`
@@ -274,10 +300,10 @@ func updateParseRelease(data []byte) (*updateRelease, error) {
 		return nil, errors.New("GitHub returned invalid release metadata")
 	}
 	version := strings.TrimPrefix(item.Tag, "v")
-	if item.Tag != "v"+version || !updateVersionPattern.MatchString(version) || item.Draft || item.Prerelease {
+	if item.Tag != "v"+version || !updateVersionPattern.MatchString(version) || item.Draft || (item.Prerelease && !acceptBeta) {
 		return nil, errors.New("Update feed did not provide a stable version")
 	}
-	result := &updateRelease{Version: version, Notes: item.Body, packageName: "Network_Toolkit_" + version + "_Update.zip"}
+	result := &updateRelease{Version: version, Notes: item.Body, Beta: item.Prerelease, packageName: "Network_Toolkit_" + version + "_Update.zip"}
 	if len(result.Notes) > 16000 {
 		result.Notes = result.Notes[:16000]
 	}
@@ -306,6 +332,45 @@ func updateParseRelease(data []byte) (*updateRelease, error) {
 	}
 	return result, nil
 }
+// Beta opt-in queries the official release list, not the stable-only "latest"
+ // endpoint. Only validated, published, non-draft releases are eligible.
+ // The newest numeric version wins; a newer stable release can supersede a beta.
+func updateParseReleaseFeed(data []byte, channel string) (*updateRelease, error) {
+	if channel != "beta" {
+		return updateParseRelease(data)
+	}
+	var entries []json.RawMessage
+	if err := json.Unmarshal(data, &entries); err != nil || len(entries) == 0 || len(entries) > 30 {
+		return nil, errors.New("GitHub returned an invalid beta release listing")
+	}
+	var best *updateRelease
+	for _, raw := range entries {
+		var meta struct {
+			Tag string `json:"tag_name"`
+			Draft bool `json:"draft"`
+		}
+		if err := json.Unmarshal(raw, &meta); err != nil {
+			return nil, errors.New("GitHub returned malformed beta release metadata")
+		}
+		version := strings.TrimPrefix(meta.Tag, "v")
+		if meta.Draft || meta.Tag != "v"+version || !updateVersionPattern.MatchString(version) {
+			continue
+		}
+		candidate, err := updateParseReleaseCandidate(raw, true)
+		if err != nil {
+			// A candidate claiming an official version with invalid assets
+			// is not silently trusted or substituted.
+			return nil, err
+		}
+		if best == nil || updateNewer(candidate.Version, best.Version) {
+			best = candidate
+		}
+	}
+	if best == nil {
+		return nil, errors.New("No compatible stable or beta release is available")
+	}
+	return best, nil
+}
 func (a *application) handleUpdateFeedLocked(w http.ResponseWriter, r *http.Request) bool {
 	if r.URL.Path != "/api/updates/check" && r.URL.Path != "/api/updates/download" {
 		return false
@@ -325,7 +390,20 @@ func (a *application) handleUpdateFeedLocked(w http.ResponseWriter, r *http.Requ
 	defer cancel()
 	client := updateHTTPClient()
 	if r.URL.Path == "/api/updates/check" {
-		latest, e := a.updateReleaseUnlocked(ctx, client)
+		var request struct { Channel string `json:"channel"` }
+		if err := decodeBody(w, r, 1024, &request); err != nil {
+			jsonError(w, 400, err.Error())
+			return true
+		}
+		channel := request.Channel
+		if channel == "" {
+			channel = "stable"
+		}
+		if channel != "stable" && channel != "beta" {
+			jsonError(w, 400, "Choose the Stable or Beta update channel.")
+			return true
+		}
+		latest, e := a.updateReleaseUnlocked(ctx, client, channel)
 		if e != nil {
 			status := http.StatusBadGateway
 			if errors.Is(e, errUpdateFeedCooldown) {
@@ -335,19 +413,29 @@ func (a *application) handleUpdateFeedLocked(w http.ResponseWriter, r *http.Requ
 			return true
 		}
 		a.updater.latest = latest
+		a.updater.channel = channel
 		a.updater.checked = true
 		jsonResponse(w, 200, a.updateStatusLocked())
 		return true
 	}
 	var request struct {
 		Version string `json:"version"`
+		Channel string `json:"channel"`
 	}
 	if e := decodeBody(w, r, 4096, &request); e != nil {
 		jsonError(w, 400, e.Error())
 		return true
 	}
 	latest := a.updater.latest
-	if latest == nil || request.Version != latest.Version || !updateNewer(latest.Version, model.Version) {
+	channel := request.Channel
+	if channel == "" {
+		channel = "stable"
+	}
+	checkedChannel := a.updater.channel
+	if checkedChannel == "" {
+		checkedChannel = "stable"
+	}
+	if channel != checkedChannel || latest == nil || request.Version != latest.Version || !updateNewer(latest.Version, model.Version) {
 		jsonError(w, 409, "Check for a newer update before downloading.")
 		return true
 	}
@@ -382,6 +470,9 @@ func (a *application) handleUpdateFeedLocked(w http.ResponseWriter, r *http.Requ
 		jsonError(w, 409, e.Error())
 		return true
 	}
+	if a.updater.staged != nil {
+		a.updater.staged.Beta = latest.Beta
+	}
 	finished = true
 	a.updater.progress.Phase = "ready"
 	jsonResponse(w, 200, a.updateStatusLocked())
@@ -390,14 +481,14 @@ func (a *application) handleUpdateFeedLocked(w http.ResponseWriter, r *http.Requ
 
 // Caller holds updater.mu and has reserved networkBusy. Release the mutex for
 // the network round trip, then publish cache/cooldown state under the same lock.
-func (a *application) updateReleaseUnlocked(ctx context.Context, client *http.Client) (*updateRelease, error) {
+func (a *application) updateReleaseUnlocked(ctx context.Context, client *http.Client, channel string) (*updateRelease, error) {
 	cache := a.updater.feed
 	a.updater.mu.Unlock()
 	defer func() {
 		a.updater.mu.Lock()
 		a.updater.feed = cache
 	}()
-	latest, cache, err := updateFetchRelease(ctx, client, cache)
+	latest, cache, err := updateFetchReleaseChannel(ctx, client, cache, channel)
 	return latest, err
 }
 
