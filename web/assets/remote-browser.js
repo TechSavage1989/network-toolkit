@@ -69,7 +69,7 @@ function focusSidebarConnectionSettings(k){
  const app=rootNode(k);if(!app)return;
  const focus=()=>{
   if(app.isConnected===false||app.closest?.('[data-ed-files-sidebar]')?.hidden)return false;
-  const fields=[...(app.querySelectorAll?.('[data-rb-setting="host"]')||[]),document.querySelector?.('#ntEditorRemoteSource'),app.querySelector?.('[data-rb-connection-source'])];
+  const fields=[...(app.querySelectorAll?.('[data-rb-setting="host"]')||[]),document.querySelector?.('#ntEditorRemoteSource'),app.querySelector?.('[data-rb-connection-source]')];
   const target=fields.find(field=>field&&!field.disabled&&field.getClientRects().length);
   if(!target)return false;
   target.scrollIntoView?.({block:'nearest',inline:'nearest'});target.focus?.({preventScroll:true});
