@@ -7,7 +7,11 @@ and exact acceptance criteria. The initial after-line spacer placement
 change was superseded. The current source preserves the original
 source-free block positions and uses native gutter rows with blank
 markers for gaps, without DOM position hacks, source changes or
-a second editing model. Keep the published v1.17.141 and stable
+a second editing model. A grossly oversized virtual height map now
+triggers a native reset with source-relative anchor preservation; up
+to three guarded attempts per pane/layout generation repair residual
+wrapped gutter drift without user interaction. Local synthetic Chromium
+acceptance passed all 36 divider cases. Hosted CI is still required. Keep the published v1.17.141 and stable
 v1.17.136 releases immutable; opt-in beta installation requires consent.
 Do not claim native SFTP cancellation or physical Windows benchmarks fixed.
 Version 1.17.142 is only ready after its exact-source CI succeeds.

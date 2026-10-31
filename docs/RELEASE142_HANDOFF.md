@@ -27,9 +27,21 @@ and documentation-only main commit 57d52c5bc3832239e2eeee1e2c30968111196491.
 - Keep the existing diff-symbol gutter independent. No manual gutter
   DOM positioning, text insertion, viewport-copy workaround or source
   line count change.
+- Added detection of grossly inflated CodeMirror virtual heights after
+  wrapping or pane-width changes. Recovery captures the actual visible
+  source line/fraction, then rebuilds the same immutable native editor
+  state through the existing source-aligned reconciler. Native origin
+  mismatch recovery permits at most three guarded attempts per pane and
+  layout generation, only outside active gestures or composition.
+  There are no manual gutter DOM position edits or document/history changes.
 - Focused regression tests cover gap markers, source line identities,
-  spacer widths and current gutter refresh. Browser acceptance must
-  establish correct rendered behavior; unit tests alone are insufficient.
+  spacer widths, native height mismatch and guarded recovery attempts.
+  The full real-Chromium synthetic divider matrix passed 36/36 locally,
+  with zero reported geometry violations across main, detached and modal
+  Editor windows at 1440/820/390 pixels and both themes. The local fixture
+  loads the application's real HTML/JS/CSS but mocks network APIs; it
+  is not physical Windows/WebView2 or live customer-device validation.
+  Hosted exact-source CI remains a publication requirement.
 
 ## Acceptance and safeguards
 

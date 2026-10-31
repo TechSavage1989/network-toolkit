@@ -7,6 +7,7 @@ Network Toolkit 1.17.142 Beta 6
 ## Additional Details
 
 - The comparison line-number gutter now includes empty native rows for source-free alignment gaps, retaining fractional heights without adding text or false line numbers.
+- Large virtual-height inconsistencies after pane resizing trigger bounded native layout recovery, retaining the current source position and avoiding interference with active gestures.
 - Both sides of a comparison remain editable. Existing differences, map positions, selection, source bytes, undo/redo, document ownership and save behavior are preserved.
 - This is an opt-in prerelease. Stable updates remain at v1.17.136 and download/install still require explicit confirmation.
 - Existing terminal connections, credentials, file transfer permissions, scan and capture behavior, settings, shortcut compatibility and the stable Network_Toolkit.exe filename are unchanged.

@@ -5,6 +5,10 @@ Based on published v1.17.141 Beta 5 and its documentation-only main handoff.
 Read docs/RELEASE142_HANDOFF.md and docs/DEVELOPMENT_HANDOFF.md.
 The revised fix leaves comparison gaps in their original source-free positions
 and gives native CodeMirror line-number gutters blank markers for those gaps.
+A bounded native height-map recovery detects grossly inflated virtual height and
+allows at most three source-anchored rebuilds per pane/layout generation when
+alignment still diverges. The full synthetic Chromium divider matrix passed
+36/36 locally; hosted CI is still required before publication.
 The initial change moving block widgets after source lines was superseded
 after divider and motion CI failures. Preserve source, selection, saved
 settings, credentials, network/transfer permissions, opt-in beta updates
