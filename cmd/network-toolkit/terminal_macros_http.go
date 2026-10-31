@@ -364,6 +364,15 @@ func (a *application) handleTerminalAutomation(w http.ResponseWriter, r *http.Re
 		jsonResponse(w, 200, map[string]any{"run": run})
 		return
 	}
+	if len(parts) == 3 && parts[2] == "capture" && r.Method == http.MethodGet {
+		capture, err := engine.PasteCapture(run.ID, r.URL.Query().Get("sessionId"))
+		if err != nil {
+			jsonError(w, 404, err.Error())
+			return
+		}
+		jsonResponse(w, 200, map[string]any{"capture": capture})
+		return
+	}
 	if len(parts) == 3 && parts[2] == "output" && r.Method == http.MethodGet {
 		output, err := engine.Output(run.ID, r.URL.Query().Get("sessionId"))
 		if err != nil {
