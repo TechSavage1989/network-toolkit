@@ -95,3 +95,6 @@
 .terminal-tab-name>.terminal-device-label{flex:1 1 auto}
 .terminal-tab:has(.terminal-protocol-badge){min-width:200px}
 .session-library-entry>.terminal-protocol-badge{margin-left:auto}
+/* 52px actions + 12px padding + 16px icon + 16px gaps + 67px longest badge
+   leaves at least 81px for the two-line identity. Narrow lists already scroll. */
+.session-library-row:has(.terminal-protocol-badge){min-width:244px}

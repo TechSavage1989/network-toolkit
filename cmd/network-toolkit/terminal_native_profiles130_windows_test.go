@@ -195,7 +195,7 @@ func (h *nativeTerminalFixture) exerciseProfiles130(accepted *atomic.Int32) (res
 		return errors.New("profile130 actual child missing")
 	}
 	child, err := h.wait(view, func(s nativeTerminalSnapshot) bool {
-		return s.Editable && s.TabPrimary == "7300" && s.Profiles130 != nil && s.Profiles130.BootAt != oldBoot && !s.Profiles130.Explicit && s.Profiles130.StoredName == before.Profiles130.StoredName && s.Transcript == before.Transcript && s.Selection == before.Selection && s.Viewport == before.Viewport && s.ViewportDOM == float64(before.Viewport)
+		return s.Editable && s.TabPrimary == "7300" && s.Profiles130 != nil && s.Profiles130.BootAt != oldBoot && s.Profiles130.ProfileID == "" && s.Profiles130.StoredName == "" && !s.NameExplicit && s.ManualName == "" && s.NameRevision == before.NameRevision && s.Transcript == before.Transcript && s.Selection == before.Selection && s.Viewport == before.Viewport && s.ViewportDOM == float64(before.Viewport)
 	})
 	if err != nil {
 		return err
@@ -207,14 +207,32 @@ func (h *nativeTerminalFixture) exerciseProfiles130(accepted *atomic.Int32) (res
 		return err
 	}
 	if _, err = h.wait("", func(s nativeTerminalSnapshot) bool {
-		return s.Editable && s.TabVisible && s.TabPrimary == "7300" && s.Transcript == before.Transcript && s.Selection == before.Selection && s.Viewport == before.Viewport && s.ViewportDOM == float64(before.Viewport)
+		return s.Editable && s.TabVisible && s.TabPrimary == "7300" && s.Profiles130 != nil && s.Profiles130.ProfileID == "native-profile114" && !s.Profiles130.Explicit && s.Profiles130.StoredName == before.Profiles130.StoredName && s.NameRevision == before.NameRevision && s.Transcript == before.Transcript && s.Selection == before.Selection && s.Viewport == before.Viewport && s.ViewportDOM == float64(before.Viewport)
 	}); err != nil {
 		return err
 	}
-	if accepted.Load() != 1 {
-		return errors.New("detach/reload unexpectedly reconnected")
+	h.app.stateMu.Lock()
+	var persisted struct {
+		Profiles []map[string]any `json:"terminalProfiles"`
 	}
-	phases = append(phases, "Fresh native detached child bootstrap and return preserve stored automatic provenance and transcript without reconnect; not a whole-application restart")
+	decodeErr := json.Unmarshal(h.app.state, &persisted)
+	h.app.stateMu.Unlock()
+	if decodeErr != nil {
+		return decodeErr
+	}
+	persistedMatch := false
+	for _, p := range persisted.Profiles {
+		if p["id"] == "native-profile114" {
+			persistedMatch = p["name"] == before.Profiles130.StoredName && p["nameExplicit"] == false && p["nameRevision"] == float64(before.NameRevision)
+		}
+	}
+	if !persistedMatch {
+		return errors.New("parent persisted profile provenance changed across narrow child bootstrap/return")
+	}
+	if accepted.Load() != 1 {
+		return errors.New("detach/preferences read unexpectedly reconnected")
+	}
+	phases = append(phases, "Fresh native detached child bootstrap and return preserve session automatic provenance, parent stored profile and transcript without reconnect; not a whole-application restart")
 	if _, err = h.command("", "profiles130:reconnect"); err != nil {
 		return err
 	}

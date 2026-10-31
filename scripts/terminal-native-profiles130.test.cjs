@@ -12,3 +12,10 @@ test('profile native flow uses actual Save, authenticated preferences read, reco
  const go=fs.readFileSync(path.join(__dirname,'../cmd/network-toolkit/terminal_native_profiles130_windows_test.go'),'utf8');
  assert.match(go,/accepted\.Load\(\) != 1/);assert.match(go,/accepted\.Load\(\) != 2/);assert.match(go,/s\.Selection == before\.Selection/);assert.match(go,/reflect\.DeepEqual\(identity, after\)/);assert.match(go,/s\.Profiles130\.BootAt != oldBoot/);assert.match(go,/s\.Profiles130\.PreferencesReads > oldReads/);
 });
+
+test('single-session native child asserts scoped session metadata, never global saved-profile exposure',()=>{
+ const go=fs.readFileSync(path.join(__dirname,'../cmd/network-toolkit/terminal_native_profiles130_windows_test.go'),'utf8');
+ assert.match(go,/s\.Profiles130\.ProfileID == "" && s\.Profiles130\.StoredName == ""/);
+ assert.match(go,/!s\.NameExplicit && s\.ManualName == "" && s\.NameRevision == before\.NameRevision/);
+ assert.match(go,/parent persisted profile provenance changed across narrow child bootstrap\/return/);
+});

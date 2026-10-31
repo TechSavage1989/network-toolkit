@@ -82,3 +82,21 @@ Corrected local candidate: 1,468 JavaScript tests passed, including the narrow-t
 minimum-space regression; Windows test cross-compilation passed. Production Go
 and Python sources are unchanged from the earlier full passes. Hosted checks on
 the corrected source remain pending; original failed runs are retained.
+
+## Second hosted correction (7747237 retained)
+
+The corrected browser run passed every 390px tab, then exposed zero remaining
+Saved-row identity width in the narrow sidebar. Protocol-bearing Saved/Recent
+rows now reserve 244px within the existing horizontally scrollable list; labels,
+badges and folder/delete controls remain independent. Strict visual assertions
+are unchanged. No global sidebar resizing or hidden controls are introduced.
+
+Native130 progressed through authenticated persistence to a real detached child.
+That child correctly receives only narrow presentation preferences, not the
+parent's global saved-profile list. The fixture must assert that absence, check
+revisioned automatic session metadata, and verify the persisted parent profile
+on return. It must not require or introduce global profile disclosure to children.
+Original failed evidence remains; fresh corrected hosted acceptance is pending.
+
+Combined second correction: all 1,470 JavaScript tests and Windows AMD64 test
+cross-compilation passed locally. Hosted runtime/package proof remains pending.
