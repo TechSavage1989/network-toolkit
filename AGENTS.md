@@ -1,13 +1,15 @@
 # Network Toolkit development
 
-1.17.132 candidate includes current-window Reconnect all from tab menus and
-a split Reconnect button, and user-focused What's New / technical Additional
-Details presentation. See docs/RELEASE132_HANDOFF.md and
-docs/RELEASE_NOTES_STYLE.md. Until verified publication, 1.17.131 remains
-the actual public release. Preserve all previous published tags, downloads,
-credentials and settings.
+Current published version: 1.17.132, released 2026-10-31T04:50:09Z.
+Source/tag db432733d9b5065d782fbd0685c5fcf78a6011e4;
+tree 2e66bdbddc63ee594047b124708a083c394a15b4.
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.132
+Includes current-window Reconnect all and user-benefit What's New summaries
+with expandable technical Additional Details. Read docs/RELEASE132_HANDOFF.md.
+Review PR #7 retained one unrelated narrow Editor comparison-motion failure;
+do not claim Editor alignment was fixed. Prior 131 assets remain unchanged.
 
-Current published version: 1.17.131. Published 2026-10-31T04:12:11Z;
+Previous published version: 1.17.131. Published 2026-10-31T04:12:11Z;
 source/tag 9152e41f278f35719cff18993730f25a25050237,
 tree 9d29bdb49a7819e3e434448bf3ebc70e2a51d0b5.
 Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.131
