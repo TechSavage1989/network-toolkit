@@ -3,7 +3,7 @@ Network Toolkit 1.17.143 Beta 7
 ## What's New
 
 - Comparison maps maintain closer visual alignment between panes during active scrolling and dragging, including narrow windows with wrapped lines.
-- Editor comparison navigation waits for the actual source rows to render before geometry checks, improving reliability during layout changes.
+- Synchronized comparisons remain more consistent when the files have added or removed lines, rather than identical source-line numbering.
 
 ## Additional Details
 
