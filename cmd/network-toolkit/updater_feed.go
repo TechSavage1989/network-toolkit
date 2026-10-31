@@ -391,9 +391,13 @@ func (a *application) handleUpdateFeedLocked(w http.ResponseWriter, r *http.Requ
 	client := updateHTTPClient()
 	if r.URL.Path == "/api/updates/check" {
 		var request struct { Channel string `json:"channel"` }
-		if err := decodeBody(w, r, 1024, &request); err != nil {
-			jsonError(w, 400, err.Error())
-			return true
+		// Older installed clients and Go fixtures submit an empty request
+		// body, which is the stable channel. New clients send explicit JSON.
+		if r.ContentLength != 0 {
+			if err := decodeBody(w, r, 1024, &request); err != nil {
+				jsonError(w, 400, err.Error())
+				return true
+			}
 		}
 		channel := request.Channel
 		if channel == "" {
