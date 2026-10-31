@@ -652,16 +652,24 @@ func (e *Engine) PasteCapture(id, sessionID string) (PasteCapture, error) {
 	secrets := append([]string(nil), run.secrets...)
 	e.mu.Unlock()
 	result := PasteCapture{RunID: id, SessionID: sessionID, State: state, Steps: make([]PasteCaptureStep, 0, len(commands))}
+	// Sequence IDs are monotonic for transport output. Walk them once instead
+	// of rescanning the entire (potentially huge) output for every pasted line.
+	// Synthetic run headings have seq=0 and are not device output.
+	stream := make([]capturedChunk, 0, len(chunks))
+	for _, chunk := range chunks {
+		if chunk.seq > 0 {
+			stream = append(stream, chunk)
+		}
+	}
+	cursorIndex := 0
 	for index, command := range commands {
+		for cursorIndex < len(stream) && stream[cursorIndex].seq <= command.cursor {
+			cursorIndex++
+		}
 		var output strings.Builder
-		for _, chunk := range chunks {
-			if chunk.seq <= command.cursor {
-				continue
-			}
-			if index+1 < len(commands) && chunk.seq > commands[index+1].cursor {
-				continue
-			}
-			output.WriteString(chunk.text)
+		for cursorIndex < len(stream) && (index+1 == len(commands) || stream[cursorIndex].seq <= commands[index+1].cursor) {
+			output.WriteString(stream[cursorIndex].text)
+			cursorIndex++
 		}
 		result.Steps = append(result.Steps, PasteCaptureStep{Index: command.index, Command: redact(command.command, secrets), Output: maskSecrets(output.String(), secrets)})
 	}
