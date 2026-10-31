@@ -1,3 +1,14 @@
+# Network Toolkit v1.17.142 Beta 6 - gutter alignment candidate (not published)
+
+Development branch: beta/1.17.142-gutter-alignment, based on published
+v1.17.141 Beta 5 plus its documentation-only handoff commit. Read
+docs/RELEASE142_HANDOFF.md and docs/DEVELOPMENT_HANDOFF.md before further
+changes. Keep source-free comparison gaps after their source lines, verify
+actual native gutter geometry at narrow widths and preserve all prior
+credentials, settings, transports, updater safeguards and release assets.
+Do not call this candidate published, stable or browser validated before
+its exact-source tests finish. Stable latest remains v1.17.136.
+
 # Network Toolkit v1.17.141 Beta 5 - published Editor and file explorer polish
 
 Published 2026-10-31T19:06:59Z as GitHub prerelease 430129340.
