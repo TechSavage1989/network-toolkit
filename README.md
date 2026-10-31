@@ -14,7 +14,15 @@
   <a href="#development">Development</a>
 </p>
 
-## Latest beta - 1.17.140 Beta 4
+## Beta 5 candidate - 1.17.141
+
+The next beta polishes Editor connection controls, comparison map
+navigation and file explorer divider resizing. It is under review,
+not yet available in the update feed. See
+[the development pull request](https://github.com/TechSavage1989/network-toolkit/pull/16)
+and [Beta 5 handoff](docs/RELEASE141_HANDOFF.md).
+
+## Latest published beta - 1.17.140 Beta 4
 
 Published October 31, 2026 as an **opt-in prerelease**. Graph history
 and SFTP, FTP/FTPS and file-server directory views perform less repeated
