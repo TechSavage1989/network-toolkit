@@ -1,5 +1,22 @@
 # Network Toolkit development
 
+Current published prerelease: v1.17.137 Beta 1, published
+2026-10-31T07:15:09Z.
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.137
+Tag/source: 928443966903e7b3c81ffd161f8a72c38ce2efa7.
+Current latest stable: v1.17.136, published 2026-10-31T07:04:53Z.
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.136
+Source: 1069e8bbcc1ef97d96ac9d81d93e4d318b341934.
+Opt-in to beta updates is OFF by default. Users on v1.17.135
+must update to stable v1.17.136 first, then enable Beta updates
+under App settings > Updates. Beta v1.17.137 begins Phase 1
+responsiveness with scoped terminal fit/layout work. The exact
+prerelease build and publication passed with all four assets,
+and stable releases/latest remains v1.17.136. Separate pending
+browser/Windows CI and historical failures are not claimed fixed.
+Read docs/RELEASE137_HANDOFF.md, docs/RELEASE136_HANDOFF.md
+and docs/DEVELOPMENT_HANDOFF.md before making new changes.
+
 Current candidate: v1.17.137 Beta 1 begins Phase 1 responsiveness work,
 based on the v1.17.136 beta-channel bridge. This prerelease is opt-in only
 through App settings > Updates. It coalesces redundant terminal pane resize

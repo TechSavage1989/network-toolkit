@@ -1,3 +1,118 @@
+# Network Toolkit 1.17.137 Beta 1 - published Phase 1 responsiveness
+
+## Publication and channel proof
+Published 2026-10-31T07:15:09Z as GitHub release ID 429781469,
+a prerelease (prerelease=true, draft=false).
+https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.137
+Tag/source: 928443966903e7b3c81ffd161f8a72c38ce2efa7
+Tree: 35dea75bb4a99827f1d6cf584b28a51c58718fd6
+The source build and publish jobs of workflow 41179423624 succeeded.
+GitHub releases/latest still resolves stable v1.17.136, source
+1069e8bbcc1ef97d96ac9d81d93e4d318b341934, release 429777651.
+The official releases listing includes v1.17.137 with prerelease=true.
+The stable bridge was published first. This beta uses the same
+official repository and strict binary-only update package.
+
+## Implemented
+This first beta optimizes only responsiveness during rapid terminal
+pane resizing. Repeated ResizeObserver events avoid redundant stage
+measurement when all visible xterm panes have a fit scheduled. A fit
+still runs against the latest layout at the existing bounded deadline.
+Highlighter decoration refresh is skipped when xterm rows/columns do
+not actually change. Supported browser windows defer noncritical
+chrome redraws through the existing coalescing path. The user-facing
+layout, remote PTY resize, input pacing, SSH sessions, output history,
+credentials, workspace transfer and updater protections are unchanged.
+
+A user on v1.17.135 must first install stable v1.17.136, then opt
+in through App settings > Updates > Beta updates. This preference
+is off by default and never triggers download or install on its own.
+With beta enabled, Check for updates can select v1.17.137; Download
+update and Install and restart require explicit confirmation. Turning
+the beta preference off resumes stable-only checks, without an
+automatic version downgrade.
+
+## Exact release validation and published asset metadata
+The exact-source release workflow passed application Go tests,
+1,516 JavaScript tests (zero failures), 44 Python tests,
+Windows x64 GUI compilation and version/resource regeneration.
+Its source-inclusive portable package verified 1,275 safe members.
+The binary-only update ZIP retained the strict updater format.
+GitHub reports four assets and SHA-256 digests:
+- Network_Toolkit.exe: 21,092,352 bytes;
+  75ef8df29a7e1f346893727b1a7960ccba1f7062533d386da23ba3c89a95e796
+- Network_Toolkit_1.17.137_Portable.zip: 14,369,865 bytes;
+  7a3312ba1fb794c421f3b4183f27d8572d982e3068960f840e107245e431b595
+- Network_Toolkit_1.17.137_Update.zip: 8,061,759 bytes;
+  adbb23ad23acb198eeae41efa5a7487b597f381727b67320493f0df916796a31
+- SHA256SUMS: 292 bytes;
+  b01ee01a0fc4a0c47d17ae23d57de01cc65018d10dc053892c202980c2ef64cb
+
+The reported asset digests, source/tag and stable/latest feed are
+verified through GitHub. No separate external byte-by-byte public
+download and rehash was completed. Synthetic JS/Go validation is
+not physical-device timing evidence and does not establish a measured
+performance improvement on every system.
+
+## Preserved failures and limitations
+The initial 137 release attempt 41179289940 did not publish:
+TestBeta136DownloadRequiresMatchingOptedChannel used a same-version
+stable fixture. The updater correctly rejected a same-version
+download, and the fixture was changed to a genuinely newer version.
+The corrected exact-release build 41179423624 passed and published.
+This history is retained rather than mislabeling the original run
+as successful.
+
+At release verification, the separate post-merge Checks workflow
+41179423608 remained partially in progress. Passed checks do not
+convert pending jobs into success. Earlier Editor comparison motion,
+PowerShell echo, native Explorer/SFTP drag and detached window CI
+failures remain historically recorded and are not claimed fixed.
+No live SSH hardware or physical serial devices were tested.
+
+This is a post-publication documentation-only record. It changes
+no v1.17.137 tag, release content, asset bytes or updater feed.
+
+---
+
+# Network Toolkit 1.17.136 - published stable beta opt-in bridge
+
+Published 2026-10-31T07:04:53Z, stable release ID 429777651,
+draft=false, prerelease=false.
+https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.136
+Exact source/tag: 1069e8bbcc1ef97d96ac9d81d93e4d318b341934.
+Release workflow 41178922281: build and publish SUCCESS.
+GitHub latest stable feed resolves v1.17.136 even after the
+subsequent v1.17.137 prerelease was published.
+
+The stable release adds a saved, off-by-default Beta updates option
+under App settings > Updates. Stable-only checks still target the
+official releases/latest feed. Opted-in checks enumerate official
+releases and validate numeric tags, supported stable/prerelease
+metadata, canonical asset URLs, sizes and strict checksums. Per-channel
+cache validators remain isolated. Downloads and installation always
+need the existing explicit approvals and installation guards.
+Disabling beta updates does not downgrade an installed beta.
+The stable 1.17.136 bridge can be installed by the old 1.17.135
+stable-only updater, enabling subsequent opt-in beta updates.
+
+Published GitHub assets and SHA-256 digests:
+- Network_Toolkit.exe: 21,091,840 bytes;
+  1fa7e9861b6e1547de30fad6061e6eec41c41957a67c75ddb159ae4ae3d736f4
+- Network_Toolkit_1.17.136_Portable.zip: 14,364,783 bytes;
+  0097262fbea2b32bdcf0cb6efb4848020909bf6f853b0ae9204602249870ce72
+- Network_Toolkit_1.17.136_Update.zip: 8,061,554 bytes;
+  41dfb54aecbe964dcf2886ac3f78c17e4010554ee9e967d4e589ea5a6f02607d
+- SHA256SUMS: 292 bytes;
+  a6b7fe3f321b37f390104abb30b3f22fa95f19e6600933cd6f9d1956224d557c
+
+The earlier stable v1.17.135 release and its original four asset
+IDs, sizes and digests were retained. The release workflow verified
+source and packages; no independent public download rehash was made.
+This documentation record does not alter published source or assets.
+
+---
+
 # Network Toolkit 1.17.137 Beta 1 - initial Phase 1 responsiveness (candidate)
 
 ## Baseline and scope
