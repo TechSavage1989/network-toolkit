@@ -74,3 +74,13 @@ The next proposed Beta 9 is extended multi-tool reliability and stress:
 simultaneous monitoring, discovery, capture, SSH/Telnet/serial, file transfers,
 memory/CPU sampling, cancellation, repeated navigation, window cleanup,
 export consistency, and updater recovery. See DEVELOPMENT_ROADMAP.md.
+
+## Publication closure
+
+Published as opt-in v1.17.144 Beta 8 on 2026-10-31T22:56:54Z,
+merged/tagged SHA 866b64ef49cfd2ef40d7b4c8a5fa2aa24f1f3397.
+Exact Release workflow 41250238391: build and publish passed.
+The measured synthetic optimization results and per-area deferred work
+above remain valid. These are not physical Windows CPU/memory benchmarks.
+Next phase is extended concurrent-tool stress and reliability testing;
+full original roadmap remains docs/DEVELOPMENT_ROADMAP.md.

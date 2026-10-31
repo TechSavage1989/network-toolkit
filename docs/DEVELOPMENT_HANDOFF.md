@@ -1,3 +1,84 @@
+# Network Toolkit v1.17.144 Beta 8 - publication verified
+
+Published 2026-10-31T22:56:54Z, GitHub prerelease ID 430235856.
+GitHub release:
+https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.144
+Source tag/PR #19 merge: 866b64ef49cfd2ef40d7b4c8a5fa2aa24f1f3397.
+Release workflow 41250238391: build SUCCESS and publish SUCCESS.
+
+## Actual release scope
+
+- Preserved the original eleven-area roadmap, recorded in the permanent
+  docs/DEVELOPMENT_ROADMAP.md, linked from AGENTS.md, README.md and
+  docs/DEVELOPMENT_HANDOFF.md for all future chats.
+- Shared diagnostic, discovery and results tables derive one column value
+  per sorted row and reuse one filtered/sorted row set per initial paint
+  or refresh; original ordering, pagination, sort direction and labels
+  remain unchanged.
+- Empty-query discovery skips unnecessary search-field preparation;
+  nonempty IP, MAC and text searches retain exact original behavior.
+- Long Ping/Monitor histories use bounded summary reductions, avoiding
+  excessive Math.min/Math.max argument arrays.
+- Report HTML uses fewer temporary collections and retains byte-identical
+  output in synthetic 3/250/1500-host regression tests.
+- Application status chrome avoids repeated unchanged accessibility
+  property and status DOM writes.
+
+## Validation and published assets
+
+Exact tagged source successfully passed the Release workflow's Go
+application/Terminal lifecycle tests, JavaScript regression suite,
+Python publication guards, Windows x64 resource generator and GUI
+compile, portable source ZIP package, binary-only updater ZIP policy,
+and publication verification. Local JavaScript tests: 1,555 passed.
+Local Python release tests: 44 passed. Local synthetic benchmark
+evidence and per-area deferred work: docs/BETA8_APPWIDE_AUDIT.md.
+
+GitHub-reported release assets:
+- Network_Toolkit.exe: 21,110,272 bytes
+  SHA-256 1f0cff429eba6dd5c6f4f3c61dd1fccec9d481fb705404da072407a0805e6c7e
+- Network_Toolkit_1.17.144_Portable.zip: 14,462,030 bytes
+  SHA-256 ff5244886a1986e59c449881b19a4adbe3ac66e3a202812f88c6afa6598a5caf
+- Network_Toolkit_1.17.144_Update.zip: 8,066,978 bytes
+  SHA-256 bc39aabbf75b3b076300f2f91d6a66566f019093e1b5cb01ddead05075cf2ebc
+- SHA256SUMS: 292 bytes
+  SHA-256 10a771348d30a79d167d90885c6b288d17bdf875a8b93a1e9c43f6df941c57fe
+
+The release target, Git tag and merged source all agree. The official
+release list includes v1.17.144 as the latest opt-in beta; stable
+releases/latest remains v1.17.136. Hashes above are GitHub metadata
+and are not an independent public-byte download and rehash.
+
+## CI qualifications and remaining roadmap
+
+PR #19 Checks run 41250019191 had 10 of 14 job groups passed and
+four browser/Windows integration groups in progress at last check.
+Do not relabel those pending jobs as passing. The known Editor 390px
+comparison-map motion offset (transient 3-5 CSS px over its original
+2px threshold) is retained from earlier release CI. No Editor source
+fix was included in Beta 8; it is not claimed resolved. Historical
+native SFTP cancellation and multi-hour physical Windows/live-device
+stress acceptance also remain outside these results.
+
+A successful release workflow is not evidence that every optional
+browser test has finished. This is an opt-in beta, not stable.
+
+## New chat and subsequent work
+
+Read AGENTS.md, docs/DEVELOPMENT_ROADMAP.md,
+docs/DEVELOPMENT_HANDOFF.md, this handoff and
+docs/BETA8_APPWIDE_AUDIT.md. Check live GitHub main/release/PR/CI
+state before modifying anything. Continue the full eleven-area
+roadmap, not only the Editor. Next proposed Beta 9 (v1.17.145)
+focuses on extended simultaneous workloads, memory/CPU instrumentation,
+cancel/recover, cross-tool UI behavior, native Windows and device tests.
+Version may change if evidence requires further beta releases.
+
+This is a documentation-only post-publication closure. The tagged
+source, executable and all published assets remain unchanged.
+
+---
+
 # Network Toolkit v1.17.144 Beta 8 - application-wide source and continuation
 
 **Read docs/DEVELOPMENT_ROADMAP.md first** for the full eleven-area

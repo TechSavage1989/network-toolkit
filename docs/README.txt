@@ -1,7 +1,7 @@
 NETWORK TOOLKIT 1.17.144
 ======================
 
-CURRENT RELEASE - 1.17.144 (BETA 8 CANDIDATE)
+CURRENT RELEASE - 1.17.144 (BETA 8)
 
 Beta 8 continues the full application-wide performance and polishing
 roadmap. Diagnostic/discovery lists use one derived key per sort row,
@@ -11,7 +11,7 @@ Unfiltered discovery avoids unused search-field construction. Large
 reports use fewer temporary allocations, and unchanged UI status text
 does not trigger redundant accessibility writes.
 
-This is an opt-in prerelease candidate, not yet published. Stable remains
+Published October 31, 2026 as an opt-in prerelease. Stable remains
 1.17.136. Credentials, network permissions, settings and Network_Toolkit.exe
 stay unchanged. The historical narrow Editor map-motion CI issue and
 physical Windows stress acceptance remain open and are not declared fixed.

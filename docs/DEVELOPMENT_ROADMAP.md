@@ -2,12 +2,29 @@
 
 This is the **authoritative, ongoing development plan**. Preserve it across beta releases and future chats. The eleven areas and three-phase sequence originated in the approved application-wide optimization plan. Do not replace them with an Editor-only scope or assume a published beta certifies all its planned work.
 
+## Latest publication and continuation (v1.17.144)
+
+Published v1.17.144 Beta 8 as an opt-in prerelease on
+2026-10-31T22:56:54Z. Source/tag/PR #19:
+866b64ef49cfd2ef40d7b4c8a5fa2aa24f1f3397.
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.144
+Release build/publish workflow 41250238391 completed successfully.
+Detailed measured changes and deferrals: docs/BETA8_APPWIDE_AUDIT.md.
+Published binary metadata and open validation gaps:
+docs/RELEASE144_HANDOFF.md.
+
+**Next proposed development:** v1.17.145 Beta 9, extended simultaneous
+operation, memory/CPU and multi-tool stress/cancellation testing, followed
+by further betas or release candidate only as evidence supports. Preserve
+the original eleven-area roadmap, historical 390px Editor motion CI
+failure and physical Windows/native SFTP acceptance gaps.
+
 ## Current baseline
 
 - Repository: https://github.com/TechSavage1989/network-toolkit
-- Latest published beta when created: v1.17.143 Beta 7.
+- Latest published beta when created: v1.17.143 Beta 7. Published since: v1.17.144 Beta 8 on 2026-10-31.
 - Latest stable when created: v1.17.136.
-- Next: v1.17.144 Beta 8, complete unfinished application-wide performance and interface polishing across tools.
+- Completed next phase: v1.17.144 Beta 8, published as opt-in prerelease, with measured shared-results/discovery/monitoring/report/UI improvements; full eleven-area and live-Windows certification remains incomplete.
 - Proposed next: v1.17.145 Beta 9, extended concurrent operation, reliability and stress testing.
 - Release candidate and stable promotion are determined by validation, not a fixed release schedule. Additional betas are acceptable.
 - In every new chat, **recheck** GitHub branch, release, CI, version metadata and newest handoff. Versions above are a snapshot, not permanent claims.
@@ -38,7 +55,7 @@ All eleven remain in scope. A beta may implement targeted changes, but its hando
 | Phase 2: Interface and workflow polishing | v1.17.141 Beta 5 | Published. Editor Files/Connections and transfer-browser divider improved; general cross-tool visual/progress/notification consistency still requires review |
 | Phase 3: Reliability and final optimization | v1.17.142 Beta 6 | Published. Some concurrent UI work and graph cleanup improved; full simultaneous-tool, memory, cancellation and native Windows soak remain unfinished |
 | Additional regression work | v1.17.143 Beta 7 | Published. Improved editor rendering; intermittent 390px comparison map motion drift remains recorded |
-| Phase completion / broad optimization | v1.17.144 Beta 8 | Candidate. Audit all eleven areas, implement measured improvements across several tools, preserve original layout/functionality |
+| Phase completion / broad optimization | v1.17.144 Beta 8 | Published opt-in prerelease; measured improvements across shared diagnostics/results, discovery, Ping/Monitor, report export and app chrome. Remaining areas are tracked, not marked certified |
 | Extended reliability and stress | v1.17.145 Beta 9 (proposed) | Pending. Long-running and simultaneous tools, memory/CPU, cancellation, network interruption and recovery |
 | Release candidate | TBD | Pending. Complete native Windows and live-device acceptance and release-blocking regression fixes |
 | Stable | TBD | Pending. Promote only after required acceptance; never just because a beta number was reached |

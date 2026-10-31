@@ -1,3 +1,25 @@
+# Network Toolkit v1.17.144 Beta 8 - published application-wide optimization
+
+Published 2026-10-31T22:56:54Z as opt-in GitHub prerelease ID 430235856
+(draft=false, prerelease=true).
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.144
+Tagged source/merged PR #19: 866b64ef49cfd2ef40d7b4c8a5fa2aa24f1f3397.
+Release workflow 41250238391 completed with build SUCCESS, publish SUCCESS.
+Four assets were uploaded with SHA-256 digests; normal stable
+releases/latest remains v1.17.136.
+
+**Persistent plan:** docs/DEVELOPMENT_ROADMAP.md. It preserves the
+original eleven-area performance/interface/reliability strategy and the
+next proposed Beta 9 for extended concurrent-operation and stress tests.
+Beta 8 optimized shared diagnostic/discovery sorts and repeated result
+renders, long-history RTT calculations, report generation and repeated
+app-chrome status DOM writes without changing network permissions or
+settings. Detailed measurements and per-area coverage:
+docs/BETA8_APPWIDE_AUDIT.md and docs/RELEASE144_HANDOFF.md.
+The known 390px Editor motion regression, native SFTP cancellation
+review and physical Windows soak remain open; this is not a stable
+certification. No previous tag, release asset or checksum was changed.
+
 # Network Toolkit v1.17.144 Beta 8 - measured application-wide optimization candidate
 
 **Permanent approved plan:** docs/DEVELOPMENT_ROADMAP.md. Future chats

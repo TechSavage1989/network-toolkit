@@ -15,19 +15,22 @@
   <a href="#development">Development</a>
 </p>
 
-## Beta 8 candidate - v1.17.144 (application-wide performance)
+## Latest beta - v1.17.144 Beta 8
 
-The next opt-in beta applies measured improvements across shared network
-diagnostics, discovery, monitoring and report results, and common interface
-status controls. It preserves previous source files, connection settings,
-transfer permissions and portable Windows update behavior. This is a
-development candidate, not yet the latest published beta.
+Published October 31, 2026 as an opt-in prerelease. Beta 8
+improves shared diagnostics and discovery sorting/filtering, long
+monitoring histories, large report rendering, and application status
+controls. This continues the original eleven-area roadmap.
+The stable channel remains v1.17.136; extended live Windows acceptance
+and the historical narrow Editor motion regression remain open.
 
+[Download Beta 8](https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.144) ·
+[Release notes](RELEASE_NOTES_1.17.144.txt) ·
+[Performance audit](docs/BETA8_APPWIDE_AUDIT.md) ·
 [Development roadmap](docs/DEVELOPMENT_ROADMAP.md) ·
-[Beta 8 performance audit](docs/BETA8_APPWIDE_AUDIT.md) ·
-[Release candidate and handoff](docs/RELEASE144_HANDOFF.md)
+[Handoff](docs/RELEASE144_HANDOFF.md)
 
-## Latest beta - 1.17.143 Beta 7
+## Previous beta - 1.17.143 Beta 7
 
 Published October 31, 2026 as an opt-in prerelease. Beta 7 improves narrow
 Editor source alignment and synchronized comparison-map scrolling, with
@@ -36,7 +39,7 @@ The original narrow continuous-motion test retains intermittent brief
 3-5px offset failures. This is a beta limitation, not a stable promotion.
 
 [Download Beta 7](https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.143) ·
-[Release notes](RELEASE_NOTES_1.17.143.txt) ·
+[Release notes](docs/releases/RELEASE_NOTES_1.17.143.txt) ·
 [Validation and handoff](docs/RELEASE143_HANDOFF.md)
 
 ## Previous beta - 1.17.142 Beta 6
