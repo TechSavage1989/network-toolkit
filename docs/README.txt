@@ -42,7 +42,7 @@ This is an opt-in prerelease. Enable Beta updates under App settings >
 Updates and check for updates from v1.17.137 or the stable v1.17.136 bridge.
 The latest normal stable release remains v1.17.136.
 
-Details: RELEASE_NOTES_1.17.138.txt and docs/RELEASE138_HANDOFF.md.
+Details: docs/releases/RELEASE_NOTES_1.17.138.txt and docs/RELEASE138_HANDOFF.md.
 Prior release descriptions follow.
 
 NETWORK TOOLKIT 1.17.137
