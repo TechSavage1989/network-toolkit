@@ -144,3 +144,34 @@ test('paced output keeps non-echo lines, internal blanks, and truncated capture 
  assert.equal(off.text,'Result line\n\nshow something\nEnd\nError: invalid command\nConfiguration accepted');
  assert.equal(on.text,'show something\nResult line\n\nshow something\nEnd\n  description TEST\nError: invalid command\n  no shutdown\nConfiguration accepted');
 });
+
+test('Select output uses the same include-commands filter for last paste and last command',()=>{
+ const selected={value:'',focused:false,selected:false,focus(){this.focused=true;},select(){this.selected=true;}};
+ const document={querySelector:selector=>selector==='#terminalSelectedOutput'?selected:null};
+ const window={NetworkToolkitTerminalInteraction:{preferences:()=>({pasteIncludeCommands:false})}};
+ const modals=[];
+ const ctx={window,document,TextDecoder,TextEncoder,Date,Math,setTimeout,clearTimeout,toast(){},
+   terminalEntryAcceptsInput:()=>true,currentTerminal:()=>null,
+   openModal:(...args)=>modals.push(args),icon:()=>'',console};
+ vm.runInNewContext(extras,ctx);const api=window.NetworkToolkitTerminalExtras;
+ const steps=[
+  {index:439,command:'  vlan trunk native 10',output:'  vlan trunk native 10\r\ntrunk updated\r\nswitch# '},
+  {index:440,command:'show interfaces',output:'switch# show interfaces\r\nPORT STATUS\r\nswitch# '}
+ ];
+ const item={kind:'paste',echo:[],pacedCapture:{steps}},last={kind:'command',echo:[],pacedCapture:{steps:[steps[1]]}};
+ const entry={info:{id:'test',state:'connected'},_ntOutputHistory:[item,last],
+   xterm:new Terminal({cols:80,rows:12,allowProposedApi:true})};
+ try{
+  assert.equal(api.select(entry,false,'last-paste'),true);
+  assert.equal(selected.value,'trunk updated\nPORT STATUS');
+  assert(selected.selected&&selected.focused);
+  assert.equal(api.select(entry,true,'last-paste'),true);
+  assert.equal(selected.value,'  vlan trunk native 10\ntrunk updated\nshow interfaces\nPORT STATUS');
+  assert.equal(api.select(entry,false,'last-command'),true);
+  assert.equal(selected.value,'PORT STATUS');
+  assert.equal(api.select(entry,true,'last-command'),true);
+  assert.equal(selected.value,'show interfaces\nPORT STATUS');
+  assert.equal(modals.length,4);
+  assert(!selected.value.includes('Command 440:'));
+ }finally{entry.xterm.dispose();}
+});
