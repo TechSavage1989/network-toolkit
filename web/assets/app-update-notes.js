@@ -28,6 +28,23 @@
     }
     flush();
     const key=text=>text.replace(/\s+/g,' ').trim();
+    // New releases explicitly separate user-facing changes from technical
+    // details. Do not promote the technical section into the main highlights
+    // merely because the summary contains fewer than four bullets.
+    const whatsNew=blocks.findIndex(block=>block.type==='heading'&&/^what['’]s new$/i.test(key(block.text)));
+    const additional=blocks.findIndex((block,index)=>index>whatsNew&&block.type==='heading'&&/^additional details$/i.test(key(block.text)));
+    if(whatsNew>=0&&additional>whatsNew){
+      const changes=blocks.slice(whatsNew+1,additional).filter(block=>['bullet','paragraph'].includes(block.type)).map(block=>block.text);
+      const highlights=[...new Map(changes.map(text=>[key(text),text])).values()].slice(0,4);
+      const shown=new Set(highlights.filter(text=>short(text)===text).map(key));
+      const detail=blocks.filter((block,index)=>{
+        if(index===whatsNew||index===additional)return false;
+        if(index<whatsNew&&block.type==='heading'&&block.text.toLowerCase()==='network toolkit '+String(version??'').trim().toLowerCase())return false;
+        if(index>whatsNew&&index<additional&&shown.has(key(block.text)))return false;
+        return true;
+      });
+      return {highlights,full:detail.map(block=>(block.type==='bullet'?'• ':'')+block.text).join('\n').trim()};
+    }
     const highlights=[...new Map((bullets.length?bullets:paragraphs).map(text=>[key(text),text])).values()].slice(0,4);
     // Only remove content already shown in full. Long, shortened highlights keep
     // their complete text available so no substantive release information is lost.
@@ -57,7 +74,7 @@
       '<div class="nt-update-notes-header" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px;'+wrap+'"><h4 style="margin:0;font-size:12px;line-height:1.5;font-weight:650">What\'s new</h4><div class="nt-update-notes-versions" style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;'+wrap+'">'+versions+'</div></div>'+
       (parsed.highlights.length?'<ul class="nt-update-notes-highlights" style="margin:10px 0 0;padding-left:18px;font-size:12px;line-height:1.6;'+wrap+'">'+parsed.highlights.map(text=>'<li style="padding-left:2px;margin:3px 0;'+wrap+'">'+escape(short(text))+'</li>').join('')+'</ul>':
         '<p class="nt-update-notes-empty" style="margin:9px 0 0;color:var(--muted,#a5afbf);font-size:12px;line-height:1.6">Release notes are not available for this update.</p>')+
-      (parsed.full?'<details class="nt-update-notes-details" style="margin-top:9px;'+wrap+'"><summary style="cursor:pointer;padding:5px 0;font-size:11px;line-height:1.5;color:var(--accent,#3caaf5);'+wrap+'">Read more</summary><div class="nt-update-notes-full" role="region" aria-label="Additional release notes" tabindex="0" style="margin-top:7px;padding:10px;border:1px solid var(--border,#506078);border-radius:6px;background:var(--panel,#111925);font-size:12px;line-height:1.65;white-space:pre-wrap;max-height:16rem;overflow:auto;overscroll-behavior:contain;'+wrap+'">'+escape(parsed.full)+'</div></details>':'')+
+      (parsed.full?'<details class="nt-update-notes-details" style="margin-top:9px;'+wrap+'"><summary style="cursor:pointer;padding:5px 0;font-size:11px;line-height:1.5;color:var(--accent,#3caaf5);'+wrap+'">Additional details</summary><div class="nt-update-notes-full" role="region" aria-label="Additional release notes" tabindex="0" style="margin-top:7px;padding:10px;border:1px solid var(--border,#506078);border-radius:6px;background:var(--panel,#111925);font-size:12px;line-height:1.65;white-space:pre-wrap;max-height:16rem;overflow:auto;overscroll-behavior:contain;'+wrap+'">'+escape(parsed.full)+'</div></details>':'')+
       '</section>';
   }
   const api={html};
