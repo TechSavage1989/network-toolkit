@@ -1,5 +1,6 @@
 /* Per-session output blocks and frequently used terminal controls.
- * History is transient. Only positions in retained terminal output are transferred.
+ * History is transient. Ordinary blocks transfer markers; completed paced
+ * captures transfer a bounded, memory-only copy of the run's output.
  */
 (function(root){
 'use strict';
@@ -17,7 +18,7 @@ function disposeItem(item){for(const m of [item.start,item.end,...(item.echo||[]
 function touch(entry){entry.outputRevision=(entry.outputRevision||0)+1;}
 function finalize(entry){const item=history(entry).at(-1);if(item&&!item.closed){item.end=marker(entry);item.closed=true;root.NetworkToolkitTerminalOutputArchive?.close(entry,item);}}
 function add(entry,kind,start,expected=[]){const list=history(entry);const item={id:'block-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7),kind,start,end:null,closed:false,at:Date.now(),echo:[],expected,submitted:kind==='command'};list.push(item);while(list.length>MAX_HISTORY){const old=list.shift();root.NetworkToolkitTerminalOutputArchive?.dispose(entry,old);disposeItem(old);}entry._ntOutputChoice=kind==='paste'?'last-paste':'last-command';touch(entry);sync();return item;}
-function notePaste(entry,text){if(!normal(entry)||!text)return;if(pagerInput(entry,text)&&/^[ \r\nqQ\x03]+$/.test(text)){consumePagerInput(entry);return;}entry._ntInputDraft?.start?.dispose();entry._ntInputDraft=null;finalize(entry);const expected=String(text).replace(/\r\n?/g,'\n').split('\n').map(s=>s.trim()).filter(Boolean);const item=add(entry,'paste',marker(entry),expected);root.NetworkToolkitTerminalOutputArchive?.begin(entry,item,inputLine(entry,entry.xterm.buffer.normal.baseY+entry.xterm.buffer.normal.cursorY).text,expected);item.submitted=/[\r\n]/.test(text);entry._ntPendingPaste=item.submitted?null:item;}
+function notePaste(entry,text){if(!normal(entry)||!text)return;if(pagerInput(entry,text)&&/^[ \r\nqQ\x03]+$/.test(text)){consumePagerInput(entry);return;}entry._ntInputDraft?.start?.dispose();entry._ntInputDraft=null;finalize(entry);const expected=String(text).replace(/\r\n?/g,'\n').split('\n').map(s=>s.trim()).filter(Boolean);const item=add(entry,'paste',marker(entry),expected);root.NetworkToolkitTerminalOutputArchive?.begin(entry,item,inputLine(entry,entry.xterm.buffer.normal.baseY+entry.xterm.buffer.normal.cursorY).text,expected);item.submitted=/[\r\n]/.test(text);entry._ntPendingPaste=item.submitted?null:item;return item;}
 function lineText(buffer,row){
  const line=buffer.getLine(row),next=buffer.getLine(row+1);if(!line)return '';
  const wrapped=next?.isWrapped,last=line.getCell(line.length-1);
@@ -55,6 +56,59 @@ function noteManualInput(entry,data){
    if(line.text.trim())item.echo.push({start:marker(entry,line.start),end:marker(entry,line.end),text:line.text,prefix:idlePrompt(line.text)});
    entry._ntInputDraft=null;
  }
+}
+// Structured backend captures represent only lines accepted by this run.
+// Do not infer command boundaries from delayed browser output or a displayed
+// prompt. The live console block remains available while the run is active.
+function discardPacedPaste(entry,item){
+ const list=history(entry),at=list.indexOf(item);if(at<0||item.pacedCapture)return false;
+ root.NetworkToolkitTerminalOutputArchive?.dispose(entry,item);disposeItem(item);list.splice(at,1);
+ if(entry._ntPendingPaste===item)entry._ntPendingPaste=null;
+ if(entry._ntOutputChoice==='last-paste'&&!list.some(i=>i.kind==='paste'))entry._ntOutputChoice='last-command';
+ touch(entry);sync();return true;
+}
+function pacedOutput(item,includeCommands){
+ const capture=item?.pacedCapture;if(!capture)return null;
+ const parts=[];
+ for(const step of capture.steps){
+  const command=String(step.command??''),name='Command '+step.index+': '+(command||'[Enter]');
+  const lines=String(step.output??'').replace(/\r\n?/g,'\n').split('\n');
+  const shown=[];let echoFound=false;
+  for(const line of lines){
+   if(matchPagerLine(line))continue;
+   const t=line.trimEnd(),cmd=command.trim(),at=t.length-cmd.length,prefix=at>=0?t.slice(0,at):'';
+   const echo=!echoFound&&!!cmd&&at>0&&t.endsWith(cmd)&&/^[^\r\n]{1,160}[#>$%]\s*$/.test(prefix);
+   if(echo){echoFound=true;if(includeCommands)shown.push(line);continue;}
+   shown.push(line);
+  }
+  while(shown.length&&!shown.at(-1).trim())shown.pop();
+  if(shown.length&&idlePrompt(shown.at(-1)))shown.pop();
+  while(shown.length&&!shown.at(-1).trim())shown.pop();
+  while(shown.length&&!shown[0].trim())shown.shift();
+  if(includeCommands&&!echoFound)parts.push(name);
+  if(shown.length)parts.push(shown.join('\n'));
+ }
+ return {text:parts.join('\n'),truncated:!!capture.truncated,archived:true};
+}
+function completePacedPaste(entry,item,capture){
+ const list=history(entry),at=list.indexOf(item);
+ if(at<0||item.pacedCapture||item.kind!=='paste'||!capture||capture.runId!==item.pacedRunId||
+    capture.sessionId!==entry?.info?.id||!Array.isArray(capture.steps))return false;
+ const steps=capture.steps.filter(s=>s&&Number.isSafeInteger(s.index)&&s.index>0&&typeof s.command==='string'&&typeof s.output==='string')
+   .map(s=>({index:s.index,command:s.command,output:s.output}));
+ if(!steps.length){discardPacedPaste(entry,item);return true;}
+ item.pacedCapture={steps,state:capture.state||'completed',truncated:!!capture.truncated};
+ if(!item.closed){item.end=marker(entry);item.closed=true;root.NetworkToolkitTerminalOutputArchive?.close(entry,item);}
+ const last=[...steps].reverse().find(s=>s.command.trim());
+ if(last){
+  const commandItem={id:'block-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,7),
+   kind:'command',start:null,end:null,closed:true,at:Date.now(),echo:[],expected:[],
+   pacedCapture:{steps:[last],state:item.pacedCapture.state,truncated:item.pacedCapture.truncated}};
+  // Insert beside the paste, not after later manually executed commands.
+  list.splice(list.indexOf(item)+1,0,commandItem);
+  while(list.length>MAX_HISTORY){const old=list.shift();root.NetworkToolkitTerminalOutputArchive?.dispose(entry,old);disposeItem(old);}
+ }
+ touch(entry);sync();return true;
 }
 function current(entry,choice=entry?._ntOutputChoice||'last-command'){
  const list=history(entry);if(choice==='last-command')return [...list].reverse().find(i=>i.kind==='command')||null;
@@ -96,8 +150,8 @@ function screenOutput(entry,item,includeCommands=false){
  while(lines.length&&!lines.at(-1).text.trim())lines=lines.slice(0,-1);
  return {...range,lines,text:lines.map(l=>l.text).join('\n')};
 }
-function output(entry,item,includeCommands=false){return root.NetworkToolkitTerminalOutputArchive?.read(entry,item,includeCommands)||screenOutput(entry,item,includeCommands);}
-function available(entry,item){return root.NetworkToolkitTerminalOutputArchive?.has(entry,item)??!!screenOutput(entry,item,true)?.text;}
+function output(entry,item,includeCommands=false){return pacedOutput(item,includeCommands)||root.NetworkToolkitTerminalOutputArchive?.read(entry,item,includeCommands)||screenOutput(entry,item,includeCommands);}
+function available(entry,item){if(item?.pacedCapture)return !!pacedOutput(item,true)?.text;return root.NetworkToolkitTerminalOutputArchive?.has(entry,item)??!!screenOutput(entry,item,true)?.text;}
 function afterCapture(entry,item,action){
  const archive=root.NetworkToolkitTerminalOutputArchive;
  if(!archive?.pending(entry,item))return action();
@@ -230,15 +284,16 @@ function beforeOutput(entry){if(!entry?.xterm)return null;nativeFollow(entry,pre
 function afterOutput(entry,position){if(!entry?.xterm||!position)return;const follow=prefs(entry).autoScroll;nativeFollow(entry,follow);if(follow&&position.epoch===(entry._ntScrollEpoch||0))entry.xterm.scrollToBottom();scheduleOutputSync(entry);}
 function clear(entry){if(!entry)return;cancelPagerTimer(entry);entry._ntPagerState?.reset();root.NetworkToolkitTerminalInput?.clear(entry);for(const item of history(entry)){root.NetworkToolkitTerminalOutputArchive?.dispose(entry,item);disposeItem(item);}entry._ntOutputHistory=[];entry._ntInputDraft?.start?.dispose();entry._ntInputDraft=null;entry._ntPendingPaste=null;touch(entry);sync();}
 function snapshot(entry){
- const list=history(entry);for(const item of list)rows(entry,item);let budget=4*1024*1024;const saved=new Map();
+ const list=history(entry);for(const item of list)rows(entry,item);let budget=4*1024*1024;const saved=new Map(),pacedSaved=new Map();
  for(const item of [...list].reverse()){const value=root.NetworkToolkitTerminalOutputArchive?.snapshot(entry,item);if(!value)continue;const bytes=new TextEncoder().encode(value.screen).length;if(bytes<=budget){saved.set(item,value);budget-=bytes;}}
- return {version:1,input:root.NetworkToolkitTerminalInput?.snapshot(entry),choice:entry._ntOutputChoice||'last-command',settings:{...entry._ntSessionPrefs},blocks:list.filter(i=>live(i.start)&&(!i.closed||live(i.end))||saved.has(i)).map(i=>({id:i.id,kind:i.kind,start:live(i.start)?i.start.line:-1,end:i.closed&&live(i.end)?i.end.line:-1,closed:i.closed,at:i.at,archive:saved.get(i),echo:i.echo.filter(e=>live(e.start)&&live(e.end)).slice(0,1024).map(e=>({start:e.start.line,end:e.end.line}))}))};
+ for(const item of [...list].reverse()){if(!item.pacedCapture)continue;const bytes=new TextEncoder().encode(JSON.stringify(item.pacedCapture)).length;if(bytes<=budget){pacedSaved.set(item,item.pacedCapture);budget-=bytes;}}
+ return {version:1,input:root.NetworkToolkitTerminalInput?.snapshot(entry),choice:entry._ntOutputChoice||'last-command',settings:{...entry._ntSessionPrefs},blocks:list.filter(i=>live(i.start)&&(!i.closed||live(i.end))||saved.has(i)||pacedSaved.has(i)).map(i=>({id:i.id,kind:i.kind,start:live(i.start)?i.start.line:-1,end:i.closed&&live(i.end)?i.end.line:-1,closed:i.closed,at:i.at,archive:saved.get(i),pacedRunId:i.pacedRunId||undefined,pacedCapture:pacedSaved.get(i),echo:i.echo.filter(e=>live(e.start)&&live(e.end)).slice(0,1024).map(e=>({start:e.start.line,end:e.end.line}))}))};
 }
 function restore(entry,value){clear(entry);entry._ntSessionPrefs={};if(!value||value.version!==1)return;
  for(const k of ['autoPager','autoScroll','pasteReview','pasteIncludeCommands'])if(typeof value.settings?.[k]==='boolean')entry._ntSessionPrefs[k]=value.settings[k];
  if(['auto','space','enter'].includes(value.settings?.pagerKey))entry._ntSessionPrefs.pagerKey=value.settings.pagerKey;
- for(const i of (value.blocks||[]).slice(-MAX_HISTORY)){if(!['paste','command'].includes(i.kind)||!Number.isInteger(i.start)||i.start<0&&!i.archive||i.start>=entry.xterm.buffer.normal.length)continue;
- history(entry).push({...i,start:i.start>=0?marker(entry,i.start):null,end:i.closed&&i.end>=0?marker(entry,i.end):null,echo:(i.echo||[]).filter(e=>e.start>=0&&e.end>=e.start&&e.end<entry.xterm.buffer.normal.length).map(e=>({start:marker(entry,e.start),end:marker(entry,e.end)})),expected:[]});root.NetworkToolkitTerminalOutputArchive?.restore(entry,history(entry).at(-1),i.archive);}
+ for(const i of (value.blocks||[]).slice(-MAX_HISTORY)){if(!['paste','command'].includes(i.kind)||!Number.isInteger(i.start)||i.start<0&&!i.archive&&!i.pacedCapture&&!i.pacedRunId||i.start>=entry.xterm.buffer.normal.length)continue;
+ history(entry).push({...i,start:i.start>=0?marker(entry,i.start):null,end:i.closed&&i.end>=0?marker(entry,i.end):null,echo:(i.echo||[]).filter(e=>e.start>=0&&e.end>=e.start&&e.end<entry.xterm.buffer.normal.length).map(e=>({start:marker(entry,e.start),end:marker(entry,e.end)})),expected:[],pacedRunId:typeof i.pacedRunId==='string'?i.pacedRunId:'',pacedCapture:i.pacedCapture&&Array.isArray(i.pacedCapture.steps)?i.pacedCapture:null});root.NetworkToolkitTerminalOutputArchive?.restore(entry,history(entry).at(-1),i.archive);}
  entry._ntOutputChoice=value.choice||'last-command';root.NetworkToolkitTerminalInput?.restore(entry,value.input);
  // A restored screen can already be paused at a pager with no new bytes due.
  // Recognize manual responses, but do not replay an automatic key that the old
@@ -332,5 +387,5 @@ function bind(entry){if(!entry?.xterm||bindings.has(entry))return;bindings.add(e
  const scrolled=entry.xterm.onScroll?.(()=>{if(!prefs(entry).autoScroll)nativeFollow(entry,false);});const parsed=entry.xterm.onWriteParsed?.(()=>scheduleOutputSync(entry));
  entry.disposables.push({dispose(){entry.element?.removeEventListener('wheel',wheel,true);entry.element?.removeEventListener('pointerdown',pointer,true);entry.element?.removeEventListener('keydown',key,true);scrolled?.dispose();parsed?.dispose();clear(entry);}});
 }
-root.NetworkToolkitTerminalExtras=Object.freeze({notePaste,noteManualInput,observeOutput,beforeOutput,afterOutput,beforeFit,afterFit,followCurrent,scrollTop,scrollBottom,jump,step,select,copy,sync,finalize,prefs,clear,snapshot,restore,current,output,rows,lineText,screenOutput,followInput,pauseFollow,flush:entry=>root.NetworkToolkitTerminalOutputArchive?.flush(entry),pagerPrompt,matchPagerLine,idlePrompt,echoMatches,createPagerRecognizer,pagerInput,pasteChoice});
+root.NetworkToolkitTerminalExtras=Object.freeze({notePaste,discardPacedPaste,completePacedPaste,noteManualInput,observeOutput,beforeOutput,afterOutput,beforeFit,afterFit,followCurrent,scrollTop,scrollBottom,jump,step,select,copy,sync,finalize,prefs,clear,snapshot,restore,current,output,rows,lineText,screenOutput,followInput,pauseFollow,flush:entry=>root.NetworkToolkitTerminalOutputArchive?.flush(entry),pagerPrompt,matchPagerLine,idlePrompt,echoMatches,createPagerRecognizer,pagerInput,pasteChoice});
 })(window);
