@@ -211,3 +211,15 @@ test('terminal workspace puts tabs after notices, prompts and search directly ab
  assert.match(source.slice(tabs,stage),/Terminal sessions"><\/div><div $/);
  const macros=fs.readFileSync(path.join(__dirname,'../web/assets/terminal-macros.js'),'utf8');assert(macros.includes("($('#terminalTabs')||stage).before(el)"));
 });
+test('repeated narrow/wide pane fits reflow normal history without moving a paused logical anchor',async()=>{
+ const h=harness();await h.write(Array.from({length:35},(_,i)=>'ROW-'+String(i).padStart(2,'0')+' synthetic terminal history').join('\r\n'));
+ h.api.pauseFollow(h.entry);h.entry.xterm.scrollToLine(8);const original=h.entry.xterm.buffer.normal.getLine(8).translateToString(true);
+ for(const [cols,rows] of [[20,8],[40,4],[22,9],[40,6]]){const pos=h.api.beforeFit(h.entry);h.entry.xterm.resize(cols,rows);h.api.afterFit(h.entry,pos);const b=h.entry.xterm.buffer.normal;let text=b.getLine(b.viewportY).translateToString(true);for(let y=b.viewportY+1;b.getLine(y)?.isWrapped;y++)text+=b.getLine(y).translateToString(true);assert.equal(text,original);assert.equal(h.api.prefs(h.entry).autoScroll,false);}
+ h.api.scrollBottom(h.entry);for(const cols of [20,40,24,40]){const pos=h.api.beforeFit(h.entry);h.entry.xterm.resize(cols,6);h.api.afterFit(h.entry,pos);assert.equal(h.entry.xterm.buffer.normal.viewportY,h.entry.xterm.buffer.normal.baseY);}
+ h.dispose();
+});
+test('alternate screen fits retain buffer mode and signal geometry without fabricating remote redraw',async()=>{
+ const h=harness();await h.write('normal history\r\n\x1b[?1049h\x1b[2J\x1b[HREMOTE TUI');const sizes=[];h.entry.xterm.onResize(size=>sizes.push(size));
+ for(const [cols,rows] of [[20,8],[60,12],[40,6]]){const pos=h.api.beforeFit(h.entry);assert.equal(pos.anchor,null);h.entry.xterm.resize(cols,rows);h.api.afterFit(h.entry,pos);assert.equal(h.entry.xterm.buffer.active.type,'alternate');assert.equal(h.entry.xterm.cols,cols);assert.equal(h.entry.xterm.rows,rows);}
+ assert.equal(sizes.length,3);await h.write('\x1b[2J\x1b[HREDRAW AT NEW SIZE');assert.equal(h.entry.xterm.buffer.active.getLine(0).translateToString(true),'REDRAW AT NEW SIZE');await h.write('\x1b[?1049l');assert.equal(h.entry.xterm.buffer.active.type,'normal');assert.match(h.entry.xterm.buffer.normal.getLine(0).translateToString(true),/normal history/);h.dispose();
+});

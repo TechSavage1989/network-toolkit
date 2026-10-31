@@ -5,7 +5,7 @@ param(
  [uint32]$TargetProcessID=0,[string]$TargetExecutablePath='',
  [double]$FromX=0,[double]$FromY=0,[double]$FromWidth=0,[double]$FromHeight=0,
  [double]$ToX=0,[double]$ToY=0,[double]$ToWidth=0,[double]$ToHeight=0,
- [ValidateSet('Tab','Detach','Cross','Escape','Outside','OutsideCancel')][string]$Mode='Tab'
+ [ValidateSet('Tab','Detach','Cross','Escape','Outside','OutsideCancel','Resize')][string]$Mode='Tab'
 )
 # Hosted synthetic acceptance only. Input goes to exact supplied fixture PIDs and
 # executable identities. No clipboard, synthetic DOM drag, debug port, security
@@ -84,13 +84,13 @@ try{
  # Pointerdown captures the UID locally. Only Alt-drag starts broker registration.
  # This is real OS input, not a fast-drop timing claim; deferred unit tests
  # separately exercise registration ordering and cancellation tombstones.
- Start-Sleep -Milliseconds 350
- [void][EditorDragInput]::SetCursorPos($from.X+12,$from.Y+2);Start-Sleep -Milliseconds 150
+ if($Mode -ne 'Resize'){Start-Sleep -Milliseconds 350;[void][EditorDragInput]::SetCursorPos($from.X+12,$from.Y+2);Start-Sleep -Milliseconds 150}
  # Outside release uses the validated work-area point beyond the source HWND.
  # No UIA COM query runs during a held native drag; production pointer capture
  # or Alt/OLE hit-testing and the original ACK gate must succeed.
  if($Mode -eq 'Cross'){Visible-Point $target $to}
- for($i=1;$i -le 28;$i++){[void][EditorDragInput]::SetCursorPos([int]($from.X+($to.X-$from.X)*$i/28),[int]($from.Y+($to.Y-$from.Y)*$i/28));Start-Sleep -Milliseconds 25}
+ $steps=28;$delay=25;if($Mode -eq 'Resize'){$steps=80;$delay=10}
+ for($i=1;$i -le $steps;$i++){[void][EditorDragInput]::SetCursorPos([int]($from.X+($to.X-$from.X)*$i/$steps),[int]($from.Y+($to.Y-$from.Y)*$i/$steps));Start-Sleep -Milliseconds $delay}
  if($Mode -eq 'Escape'){[EditorDragInput]::keybd_event(27,0,0,[UIntPtr]::Zero);[EditorDragInput]::keybd_event(27,0,2,[UIntPtr]::Zero);Start-Sleep -Milliseconds 100}
 }finally{[EditorDragInput]::mouse_event(0x0004,0,0,0,[UIntPtr]::Zero);if($alt){[EditorDragInput]::keybd_event(18,0,2,[UIntPtr]::Zero)}}
 Start-Sleep -Milliseconds 150

@@ -1,3 +1,15 @@
+NETWORK TOOLKIT 1.17.129
+======================
+
+CURRENT RELEASE - 1.17.129 (candidate; not yet published)
+Bounded terminal fitting during continuous pane/window resizing, per-view size
+observation and latest-geometry PTY coalescing. Existing ownership, selection,
+scroll and paced-paste safeguards remain. Actual runtime/release validation is
+pending; remote applications remain responsible for redraw.
+See docs/RELEASE129_HANDOFF.md and RELEASE_NOTES_1.17.129.txt.
+
+PREVIOUS128 CANDIDATE RECORD (retained; publication unverified)
+
 NETWORK TOOLKIT 1.17.128
 ======================
 

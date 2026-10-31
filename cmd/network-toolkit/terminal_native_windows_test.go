@@ -34,7 +34,11 @@ func TestNativeTerminalTransferInstalledWebView2(t *testing.T) {
 	if os.Getenv("NETWORK_TOOLKIT_NATIVE_TERMINAL_TEST") != "1" {
 		t.Skip("explicit hosted Windows native Terminal acceptance only")
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)
+	budget := 4 * time.Minute
+	if os.Getenv("NETWORK_TOOLKIT_NATIVE_RESIZE129") == "1" {
+		budget = 6 * time.Minute
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), budget)
 	defer cancel()
 	root, err := filepath.Abs(filepath.Join("..", ".."))
 	if err != nil {
@@ -80,6 +84,14 @@ func TestNativeTerminalTransferInstalledWebView2(t *testing.T) {
 		t.Fatal(err)
 	}
 	h := &nativeTerminalFixture{nativeEditorFixture: &nativeEditorFixture{ctx: ctx, app: a, root: root, executable: executable, output: output, driver: driver, tokens: map[string]string{}, children: map[string]*nativeEditorChild{}}, commands: map[string]chan nativeEditorCommand{}, results: map[uint64]chan nativeTerminalReply{}, promptReady: make(chan struct{})}
+	if os.Getenv("NETWORK_TOOLKIT_NATIVE_RESIZE129") == "1" {
+		extra, readErr := os.ReadFile(filepath.Join(root, "scripts", "terminal-resize129-native-driver.js"))
+		if readErr != nil {
+			t.Fatal(readErr)
+		}
+		h.driver = append(append(extra, '\n'), h.driver...)
+		h.resize129 = &nativeTerminalResize129Evidence{}
+	}
 	a.launchTerminalView = h.launch
 	listener, err := net.Listen("tcp4", "127.0.0.1:0")
 	if err != nil {
@@ -96,7 +108,11 @@ func TestNativeTerminalTransferInstalledWebView2(t *testing.T) {
 			accepted.Add(1)
 			go func() {
 				defer c.Close()
-				_ = c.SetDeadline(time.Now().Add(4 * time.Minute))
+				_ = c.SetDeadline(time.Now().Add(budget))
+				if h.resize129 != nil {
+					h.resize129.attach(c)
+					_, _ = c.Write([]byte{255, 253, 31}) // IAC DO NAWS; real Telnet size protocol.
+				}
 				var transcript strings.Builder
 				for i := 0; i < 80; i++ {
 					fmt.Fprintf(&transcript, "SYNTHETIC %03d\r\n", i)
@@ -109,7 +125,11 @@ func TestNativeTerminalTransferInstalledWebView2(t *testing.T) {
 				case <-ctx.Done():
 					return
 				}
-				_, _ = io.Copy(io.Discard, c)
+				if h.resize129 != nil {
+					h.resize129.read(c)
+				} else {
+					_, _ = io.Copy(io.Discard, c)
+				}
 			}()
 		}
 	}()
@@ -134,6 +154,9 @@ func TestNativeTerminalTransferInstalledWebView2(t *testing.T) {
 			return
 		}
 		e := h.exercise(&accepted)
+		if e == nil && h.resize129 != nil {
+			e = h.exerciseResize129(&accepted)
+		}
 		if e == nil && os.Getenv("NETWORK_TOOLKIT_NATIVE_TERMINAL_GESTURES") == "1" {
 			e = h.exerciseTerminalGestures(&accepted)
 		}
@@ -160,6 +183,7 @@ func TestNativeTerminalTransferInstalledWebView2(t *testing.T) {
 }
 
 type nativeTerminalSnapshot struct {
+	Resize129                                                              *nativeTerminalResize129Snapshot `json:"resize129"`
 	TabPrimary, TabAddress, SavedProfileName, LearnedName                  string
 	SavedPrimary, SavedAddress, ManualName                                 string
 	NameAboveIP, SmallerIP, TabVisible, SingleSessionChild                 bool
@@ -199,6 +223,7 @@ type nativeTerminalFixture struct {
 	session        string
 	promptReady    chan struct{}
 	labelsVerified bool
+	resize129      *nativeTerminalResize129Evidence
 	allowBulk      atomic.Bool
 	timings        []nativeTerminalTiming
 }

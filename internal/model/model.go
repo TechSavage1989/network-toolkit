@@ -2,7 +2,7 @@ package model
 
 import "time"
 
-const Version = "1.17.128"
+const Version = "1.17.129"
 
 type Request struct {
 	Tool    string         `json:"tool"`

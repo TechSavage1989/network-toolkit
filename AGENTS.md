@@ -19,14 +19,17 @@ failed duplicate observations remain; see docs/RELEASE127_HANDOFF.md, including
 the final duplicate main cancellation metadata. This source-only closure changes
 no release bytes, access or general authorization requirements.
 
-Current development: 1.17.128 manual-name precedence and broader documented
-CLI prompt recognition. Not yet published; validation remains pending. Preserve
-the immutable published127 source/tag/assets and its retained observations.
+Current development:1.17.129 bounded terminal pane/window fitting and PTY resize
+coalescing. Local/runtime/CI/package/release acceptance remains pending; see
+RELEASE129_HANDOFF.md. Based on the128 naming candidate, whose publication/final
+CI acceptance is not established here. Reconcile128 status only with actual proof.
+Preserve all published tags/assets and original failed observations.
 
 ## Source and release destination
 
 TechSavage1989/network-toolkit is public and must remain public. The owner
-requested the 1.17.128 naming correction and documented prompt-format survey on 2026-10-30, following the published127 task. Requested completed Toolkit
+requested the128 naming correction/prompt survey and then the129 pane-resize
+correction, following the published127 task. Requested completed Toolkit
 updates use the existing source/release destination under the applicable current
 authorization requirements. This record is not a blanket future approval rule;
 future actions

@@ -1,0 +1,16 @@
+Network Toolkit 1.17.129 — terminal pane resize scheduling
+
+Terminal pane fitting is coalesced to a bounded 16ms deadline so continuous
+window/divider movement no longer postpones local text reflow until dragging ends.
+Each terminal view is observed directly, including changes that leave its outer
+stage unchanged. Invalid or hidden zero-size geometry is ignored.
+
+PTY resize transport keeps the first pending 120ms deadline and sends the latest
+valid geometry, rather than restarting the delay for every movement. Existing
+single-flight, acknowledgment, ownership and session-epoch safeguards remain.
+Remote terminal applications still control their own redraw; no input or fake
+remote output is generated. This does not universally reformat static text.
+
+Selection, scroll, prompt-paced paste and learned/manual-name behavior remain
+protected. Candidate runtime and release acceptance are recorded in the handoff;
+synthetic checks alone do not establish live SSH/TUI compatibility.

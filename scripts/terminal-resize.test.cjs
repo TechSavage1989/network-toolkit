@@ -18,9 +18,9 @@ test('Repeated identical fits cannot starve the pending backend resize',async()=
  assert.equal(c.requests.length,1);assert.equal(c.requests[0].at,120);assert.deepEqual(c.requests[0].size,size);
  await c.advance(120);assert.equal(c.entry.desiredResize,null);assert.equal(c.entry.lastResize,'154x45');assert.equal(c.entry.resizeSending,false);
 });
-test('A different pending size still debounces and latest dimensions win',async()=>{
- const c=setup();c.queueTerminalResize(c.entry,{cols:80,rows:24});await c.advance(60);c.queueTerminalResize(c.entry,{cols:120,rows:35});await c.advance(40);c.queueTerminalResize(c.entry,{cols:120,rows:35});await c.advance(79);assert.equal(c.requests.length,0);await c.advance(1);
- assert.deepEqual(c.requests,[{at:180,url:'/terminals/resize-fixture/resize',method:'POST',size:{cols:120,rows:35}}]);
+test('A different pending size retains the first bounded deadline and latest dimensions win',async()=>{
+ const c=setup();c.queueTerminalResize(c.entry,{cols:80,rows:24});await c.advance(60);c.queueTerminalResize(c.entry,{cols:120,rows:35});await c.advance(40);c.queueTerminalResize(c.entry,{cols:120,rows:35});await c.advance(19);assert.equal(c.requests.length,0);await c.advance(1);
+ assert.deepEqual(c.requests,[{at:120,url:'/terminals/resize-fixture/resize',method:'POST',size:{cols:120,rows:35}}]);
 });
 test('Resize guards remain fail-closed and a later identical fit can resume',async()=>{
  const c=setup();c.entry.transferBusy=true;c.queueTerminalResize(c.entry,{cols:154,rows:45});assert.equal(c.entry.desiredResize,undefined);c.entry.transferBusy=false;c.entry.restoring=true;c.queueTerminalResize(c.entry,{cols:154,rows:45});assert.equal(c.entry.desiredResize,undefined);c.entry.restoring=false;
@@ -49,3 +49,17 @@ test('Returning to an acknowledged size while another resize is in flight must s
  c.queueTerminalResize(c.entry,{cols:80,rows:24});assert.equal(c.entry.desiredResize.cols,80);assert.equal(c.entry.desiredResize.rows,24);accept();await new Promise(setImmediate);
  assert.deepEqual(c.requests.map(r=>r.size),[{cols:100,rows:32},{cols:80,rows:24}]);assert.equal(c.entry.lastResize,'80x24');
 });
+test('continuously changing pane geometry reaches the backend before dragging stops',async()=>{
+ const c=setup();for(let i=0;i<24;i++){c.queueTerminalResize(c.entry,{cols:80+i,rows:24+i%3});await c.advance(20);}
+ assert(c.requests.length>=3,'continuous changes must not starve remote PTY resize');assert.equal(c.requests[0].at,120);assert.deepEqual(c.requests[0].size,{cols:85,rows:26});await c.advance(120);assert.equal(c.entry.lastResize,'103x26');assert.equal(c.entry.desiredResize,null);
+});
+test('continuous changes during a slow acknowledgement remain single-flight and send only the latest pending size',async()=>{
+ const c=setup();let accept,active=0,maxActive=0;c.api=async(url,method,size)=>{active++;maxActive=Math.max(maxActive,active);c.requests.push({size:{...size}});if(c.requests.length===1)await new Promise(resolve=>accept=resolve);active--;return {};};
+ c.queueTerminalResize(c.entry,{cols:80,rows:24});await c.advance(120);for(let i=0;i<20;i++){c.queueTerminalResize(c.entry,{cols:90+i,rows:30});await c.advance(20);}assert.equal(c.requests.length,1);accept();await new Promise(setImmediate);assert.equal(maxActive,1);assert.deepEqual(c.requests.map(r=>r.size),[{cols:80,rows:24},{cols:109,rows:30}]);assert.equal(c.entry.lastResize,'109x30');
+});
+test('old input epoch acknowledgement cannot overwrite new epoch geometry or send while ownership is lost',async()=>{
+ const c=setup();let accept;c.api=async(url,method,size)=>{c.requests.push({size:{...size}});if(c.requests.length===1)await new Promise(resolve=>accept=resolve);return {};};c.queueTerminalResize(c.entry,{cols:80,rows:24});await c.advance(120);
+ c.entry.inputEpoch++;c.owned=false;c.entry.lastResize='';accept();await new Promise(setImmediate);assert.equal(c.entry.lastResize,'');assert.equal(c.entry.info.cols,undefined);c.queueTerminalResize(c.entry,{cols:100,rows:30});await c.advance(200);assert.equal(c.requests.length,1);c.owned=true;c.queueTerminalResize(c.entry,{cols:100,rows:30});await c.advance(120);assert.equal(c.requests.length,2);assert.equal(c.entry.lastResize,'100x30');
+});
+
+test('backwards wall clock cannot push a pending resize beyond its transport budget',async()=>{const c=setup();c.queueTerminalResize(c.entry,{cols:80,rows:24});c.Date.now=()=>-3600000;c.queueTerminalResize(c.entry,{cols:90,rows:30});await c.advance(120);assert.equal(c.requests.length,1);assert.equal(c.entry.lastResize,'90x30');});

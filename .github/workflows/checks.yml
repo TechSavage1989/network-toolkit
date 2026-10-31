@@ -14,6 +14,63 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  native-terminal129:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Verify continuous native pane resize and real Telnet window-size packets
+        env:
+          GOTOOLCHAIN: local
+          NETWORK_TOOLKIT_NATIVE_TERMINAL_TEST: '1'
+          NETWORK_TOOLKIT_NATIVE_TERMINAL_GESTURES: '1'
+          NETWORK_TOOLKIT_NATIVE_TERMINAL_SELECTION: '1'
+          NETWORK_TOOLKIT_NATIVE_RESIZE129: '1'
+          TOOLKIT_NATIVE_TIMING_LABEL: 129-resize
+          TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/network-toolkit-native129
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestNativeTerminalTransferInstalledWebView2$' -count=1 -timeout=8m -v
+      - name: Retain native129 pane geometry and transport evidence
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: native-terminal129-checks
+          path: ${{ runner.temp }}/network-toolkit-native129
+          if-no-files-found: error
+          retention-days: 14
+  browser-terminal129:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install isolated terminal resize browser
+        run: |
+          npm install --prefix "$RUNNER_TEMP/ntk-resize129" --no-audit --no-fund playwright@1.62.1
+          node "$RUNNER_TEMP/ntk-resize129/node_modules/playwright/cli.js" install --with-deps chromium
+      - name: Check real xterm pane geometry selection continuous drag and settling
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-resize129/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-resize129-results
+        run: node scripts/terminal-resize129.browser.cjs
+      - name: Retain resize129 browser evidence
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: terminal-resize129-checks
+          path: ${{ runner.temp }}/ntk-resize129-results
+          if-no-files-found: error
+          retention-days: 14
   native-terminal127:
     runs-on: windows-latest
     timeout-minutes: 10
