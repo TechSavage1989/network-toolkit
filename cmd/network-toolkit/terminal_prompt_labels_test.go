@@ -47,3 +47,25 @@ func TestTerminalPromptLabels127WorkspaceDisplayIsIdempotent(t *testing.T) {
 		t.Fatal("unexpected metadata field survived")
 	}
 }
+
+func TestTerminalPromptLabels128NumericAndShellHostMetadata(t *testing.T) {
+	for _, value := range []string{"7300", "7400", "LAB-PRINTER", "lab.example.test"} {
+		if !validTerminalPromptName(value) {
+			t.Fatalf("valid numeric or shell hostname rejected: %q", value)
+		}
+		input := map[string]any{"terminalPromptNames": []any{map[string]any{"type": "ssh", "host": "192.0.2.73", "port": float64(22), "username": "operator", "name": value, "password": "discard"}}}
+		first := terminalWorkspaceDisplay(input)
+		got := first["terminalPromptNames"].([]map[string]any)
+		if len(got) != 1 || got[0]["name"] != value || len(got[0]) != 5 {
+			t.Fatalf("invalid scoped learned metadata: %+v", got)
+		}
+		if !reflect.DeepEqual(first, terminalWorkspaceDisplay(first)) {
+			t.Fatal("learned hostname lost during repeated workspace sanitation")
+		}
+	}
+	for _, value := range []string{"192.0.2.73", "127.0.0.1", "1.2", "2001:db8::1", "operator@LAB-PRINTER", "LAB-PRINTER:~", "7300#", "password", "7300\n", "loader", "LOADER-A", "auditor", "console", "bash-5.2", "sh-4.4", "edit"} {
+		if validTerminalPromptName(value) {
+			t.Fatalf("invalid learned name accepted: %q", value)
+		}
+	}
+}

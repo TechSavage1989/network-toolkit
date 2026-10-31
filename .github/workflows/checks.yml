@@ -672,7 +672,9 @@ jobs:
 
   browser:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # Keep the real five-minute updater timer and all existing acceptance checks.
+    # Allow cleanup headroom beyond the observed 20-minute job boundary.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
         with:

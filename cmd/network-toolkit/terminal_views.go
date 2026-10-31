@@ -219,7 +219,7 @@ func (a *application) terminalSession(id string) (terminal.SessionInfo, bool) {
 	}
 	for _, s := range a.terminals.List() {
 		if s.ID == id {
-			return s, true
+			return a.terminalDisplaySession(s), true
 		}
 	}
 	return terminal.SessionInfo{}, false

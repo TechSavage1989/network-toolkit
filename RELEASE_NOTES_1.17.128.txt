@@ -1,0 +1,15 @@
+Network Toolkit 1.17.128 — manual names and broader CLI prompt recognition
+
+Manually assigned connection names take precedence over learned device names.
+Tabs, Saved and Recent show the chosen name above the endpoint; without either
+name they show the endpoint alone. Connection addresses and credentials remain
+unchanged, and display naming is separate from connection identity.
+
+Recognition covers numeric device names, common user@hostname shell prompts and
+additional documented network-device prompt families. Mode, username and path
+components are not used as the device name. Ambiguous or customized prompts can
+retain a known name or use the endpoint; arbitrary prompts cannot all be inferred.
+
+This is display metadata only. Prompt-paced command readiness, ownership checks,
+Pause/Stop and uncertain-start safeguards are unchanged. Synthetic tests do not
+establish command acceptance or universal live-device compatibility.

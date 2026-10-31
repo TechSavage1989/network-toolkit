@@ -180,7 +180,7 @@ func normalizeConnectionRequest(req ConnectRequest, alreadyAuthenticated bool) (
 		if err != nil {
 			return req, err
 		}
-		return ConnectRequest{Type: req.Type, WorkingDirectory: directory, RunAsAdministrator: req.RunAsAdministrator, ProfileID: req.ProfileID, DisplayName: req.DisplayName, Cols: req.Cols, Rows: req.Rows, Terminal: req.Terminal, TimeoutMs: req.TimeoutMs, LineEnding: "cr", SSHCompatibility: SSHCompatibilityModern}, nil
+		return ConnectRequest{Type: req.Type, WorkingDirectory: directory, RunAsAdministrator: req.RunAsAdministrator, ProfileID: req.ProfileID, DisplayName: req.DisplayName, DisplayNameExplicit: req.DisplayNameExplicit, Cols: req.Cols, Rows: req.Rows, Terminal: req.Terminal, TimeoutMs: req.TimeoutMs, LineEnding: "cr", SSHCompatibility: SSHCompatibilityModern}, nil
 	}
 	if req.Type == "serial" {
 		req.Username, req.Password, req.PrivateKey, req.Passphrase = "", "", "", ""
@@ -349,11 +349,13 @@ func newLiveSession(parent context.Context, id string, req ConnectRequest) *live
 	} else if req.Type == "powershell" {
 		label = "PowerShell (local)"
 	}
+	labelSource := "default"
 	if req.DisplayName != "" {
 		label = req.DisplayName
+		labelSource = "profile"
 	}
 	return &liveSession{automation: make(map[*AutomationSubscription]struct{}), ctx: ctx, cancel: cancel, request: reconnectSettings(req), done: make(chan struct{}), input: make(chan []byte, 64), resize: make(chan struct{}, 1), controls: make(chan ControlRequest, 16),
-		info: SessionInfo{ID: id, ProfileID: req.ProfileID, LineEnding: req.LineEnding, Type: req.Type, Label: label, Host: req.Host, Port: req.Port, Username: req.Username,
+		info: SessionInfo{ID: id, ProfileID: req.ProfileID, LineEnding: req.LineEnding, Type: req.Type, Label: label, ManualName: req.DisplayName, NameExplicit: req.DisplayNameExplicit, LabelSource: labelSource, Host: req.Host, Port: req.Port, Username: req.Username,
 			SSHCompatibility: req.SSHCompatibility,
 			SerialPort:       req.SerialPort, State: "connecting", CreatedAt: now, UpdatedAt: now, Cols: req.Cols, Rows: req.Rows}}
 }
@@ -467,6 +469,13 @@ func (m *Manager) Reconnect(ctx context.Context, id string) (SessionInfo, error)
 	next := newLiveSession(m.ctx, id, req)
 	m.generation++
 	next.generation = m.generation
+	if s.info.LabelSource == "manual" || s.info.NameRevision > 0 {
+		next.info.Label = s.info.Label
+		next.info.ManualName = s.info.ManualName
+		next.info.NameExplicit = s.info.NameExplicit
+		next.info.LabelSource = s.info.LabelSource
+		next.info.NameRevision = s.info.NameRevision
+	}
 	next.info.CreatedAt = s.info.CreatedAt
 	next.info.BytesReceived, next.info.BytesSent = s.info.BytesReceived, s.info.BytesSent
 	m.sessions[id] = next
@@ -735,9 +744,16 @@ func (m *Manager) Control(id string, req ControlRequest) error {
 }
 
 func (m *Manager) Rename(id, label string) error {
+	return m.RenameDisplay(id, label, false, nil)
+}
+
+// RenameDisplay commits persistent display metadata before changing the live
+// session. The callback must not call back into Manager. No transport settings
+// or ownership are changed, and a persistence failure leaves the session intact.
+func (m *Manager) RenameDisplay(id, label string, clear bool, persist func(SessionInfo) (uint64, error)) error {
 	label = strings.TrimSpace(label)
-	if label == "" || len([]rune(label)) > 100 || strings.IndexFunc(label, unicode.IsControl) >= 0 {
-		return errors.New("Use a terminal name of 1 through 100 characters without control characters.")
+	if (!clear && label == "") || (clear && label != "") || len([]rune(label)) > 100 || strings.IndexFunc(label, unicode.IsControl) >= 0 {
+		return errors.New("Use a terminal name of 1 through 100 characters, or explicitly clear the name.")
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -748,7 +764,29 @@ func (m *Manager) Rename(id, label string) error {
 	if m.closed {
 		return ErrClosed
 	}
-	s.info.Label = label
+	next := cloneSession(s.info)
+	next.ManualName, next.NameExplicit = label, !clear
+	next.Label, next.LabelSource = label, "manual"
+	if clear {
+		next.Label = strings.ToUpper(next.Type) + " " + net.JoinHostPort(next.Host, fmt.Sprint(next.Port))
+		next.LabelSource = "default"
+		switch next.Type {
+		case "serial":
+			next.Label = "Serial " + next.SerialPort
+		case "cmd":
+			next.Label = "Command Prompt (local)"
+		case "powershell":
+			next.Label = "PowerShell (local)"
+		}
+	}
+	if persist != nil {
+		revision, err := persist(next)
+		if err != nil {
+			return err
+		}
+		next.NameRevision = revision
+	}
+	s.info = next
 	m.statusLocked(s, "")
 	return nil
 }

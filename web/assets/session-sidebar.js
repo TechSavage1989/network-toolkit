@@ -70,16 +70,17 @@ function preferences(value={}){
  state.terminalSavedCollapsed=value.terminalSavedCollapsed===true;
  state.terminalSessionConfirmDelete=value.terminalSessionConfirmDelete!==false;
  const seen=new Set();
- state.terminalRecent=(Array.isArray(value.terminalRecent)?value.terminalRecent:[]).filter(item=>item&&typeof item==='object'&&typeof item.id==='string'&&typeof item.name==='string').slice(0,50).map(item=>({id:item.id.slice(0,80),name:item.name.slice(0,100),lastUsed:Number.isSafeInteger(item.lastUsed)&&item.lastUsed>=0?item.lastUsed:0,...safeTerminalConfig(item)})).filter(item=>{if(!item.id||seen.has(item.id))return false;seen.add(item.id);return true;});
+ state.terminalRecent=(Array.isArray(value.terminalRecent)?value.terminalRecent:[]).filter(item=>item&&typeof item==='object'&&typeof item.id==='string'&&typeof item.name==='string').slice(0,50).map(item=>({id:item.id.slice(0,80),name:item.name.slice(0,100),...(typeof item.nameExplicit==='boolean'?{nameExplicit:item.nameExplicit}:{}),nameRevision:root.NetworkToolkitTerminalPromptLabels?.revision(item)||0,lastUsed:Number.isSafeInteger(item.lastUsed)&&item.lastUsed>=0?item.lastUsed:0,...safeTerminalConfig(item)})).filter(item=>{if(!item.id||seen.has(item.id))return false;seen.add(item.id);return true;});
  if(byId('terminalSessionSidebar')){render();notifySidebarChange(before);}
 }
-function displayPreferences(){return {terminalRecent:recent().map(item=>({id:item.id,name:item.name,lastUsed:item.lastUsed,...safeTerminalConfig(item)})),terminalSidebarTab:activeTab(),terminalSidebarSide:sidebarSide(),terminalSidebarWidth:safeSidebarWidth(state.terminalSidebarWidth),terminalSidebarCollapsed:state.terminalSidebarCollapsed===true,terminalRecentCollapsed:state.terminalRecentCollapsed===true,terminalSavedCollapsed:state.terminalSavedCollapsed===true,terminalSessionConfirmDelete:state.terminalSessionConfirmDelete!==false};}
+function displayPreferences(){return {terminalRecent:recent().map(item=>({id:item.id,name:item.name,...(typeof item.nameExplicit==='boolean'?{nameExplicit:item.nameExplicit}:{}),nameRevision:root.NetworkToolkitTerminalPromptLabels?.revision(item)||0,lastUsed:item.lastUsed,...safeTerminalConfig(item)})),terminalSidebarTab:activeTab(),terminalSidebarSide:sidebarSide(),terminalSidebarWidth:safeSidebarWidth(state.terminalSidebarWidth),terminalSidebarCollapsed:state.terminalSidebarCollapsed===true,terminalRecentCollapsed:state.terminalRecentCollapsed===true,terminalSavedCollapsed:state.terminalSavedCollapsed===true,terminalSessionConfirmDelete:state.terminalSessionConfirmDelete!==false};}
 function record(entry,name=''){
  if(!entry?.info?.id)return;
  const config=safeTerminalConfig(entry.config||entry.info);
  if(!label(config))return;
  const old=recent().find(item=>key(item)===key(config));
- const item={id:old?.id||'recent-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8),name:String(name||old?.name||entry.info.label||label(config)).slice(0,100),lastUsed:Date.now(),...config};
+ const named=(state.terminalProfiles||[]).find(p=>p.id===entry.info.profileId)||old;
+ const item={id:old?.id||'recent-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8),name:String(name||named?.name||entry.info.manualName||entry.info.label||label(config)).slice(0,100),nameExplicit:!!root.NetworkToolkitTerminalPromptLabels?.manual(named||{...config,name:name||entry.info.manualName||entry.info.label,nameExplicit:entry.info.nameExplicit,labelSource:entry.info.labelSource}),nameRevision:root.NetworkToolkitTerminalPromptLabels?.revision(named||entry.info)||0,lastUsed:Date.now(),...config};
  state.terminalRecent=[item,...recent().filter(other=>other.id!==item.id)].slice(0,50);
  bindings.set(item.id,entry.info.id);
  const retained=new Set(recent().map(item=>item.id));for(const id of bindings.keys())if(!retained.has(id))bindings.delete(id);
@@ -153,9 +154,9 @@ function render(){
  }
  const clear=sidebar.querySelector('[data-session-action="clear-recent"]');if(clear)clear.disabled=!recent().length;
 }
-function changed(){saveState();render();renderTerminalProfiles();if(typeof terminalProfileListConfig==='function'&&typeof dataListViews!=='undefined'){const config=terminalProfileListConfig();dataListViews.set(config.id,config);refreshDataList(config.id);}}
+function changed(){saveState();render();renderTerminalProfiles();renderTerminalChrome();if(typeof terminalProfileListConfig==='function'&&typeof dataListViews!=='undefined'){const config=terminalProfileListConfig();dataListViews.set(config.id,config);refreshDataList(config.id);}}
 function closeMenu(focus=false){const old=menuTarget;menu?.remove();menu=null;menuTarget=null;if(focus&&itemFor(old))document.querySelector('[data-session-kind="'+old.kind+'"][data-session-id="'+CSS.escape(old.id)+'"] [data-session-entry]')?.focus({preventScroll:true});}
-function menuItems(kind){return kind==='saved'?[['open','Open','play'],['new-tab','Open in new tab','plus'],['edit','Edit connection...','settings'],['rename','Rename...','edit'],['folder','Move to folder...','folder'],['duplicate','Duplicate...','copy'],['copy','Copy connection details','copy'],['remove','Remove from Saved...','trash']]:[['open','Open / reconnect','play'],['new-tab','Open in new tab','plus'],['save','Save connection...','save'],['edit','Edit and open...','settings'],['copy','Copy connection details','copy'],['remove','Remove from Recent...','trash']];}
+function menuItems(kind){return kind==='saved'?[['open','Open','play'],['new-tab','Open in new tab','plus'],['edit','Edit connection...','settings'],['rename','Rename...','edit'],['clear-name','Use device name / IP','terminal'],['folder','Move to folder...','folder'],['duplicate','Duplicate...','copy'],['copy','Copy connection details','copy'],['remove','Remove from Saved...','trash']]:[['open','Open / reconnect','play'],['new-tab','Open in new tab','plus'],['save','Save connection...','save'],['edit','Edit and open...','settings'],['copy','Copy connection details','copy'],['remove','Remove from Recent...','trash']];}
 function openMenu(target,x,y){
  closeMenu();const item=itemFor(target);if(!item)return;
  menuTarget=target;menu=document.createElement('div');menu.id='sessionLibraryContextMenu';menu.className='terminal-context-menu';menu.setAttribute('role','menu');menu.setAttribute('aria-label','Session actions');
@@ -205,7 +206,7 @@ async function open(target,newTab=false){
  await connect({...item,profileId:target.kind==='saved'?item.id:''},item.name,destination);
 }
 function authDialog(config,name,destination){
- pendingOpen={config:{...safeTerminalConfig(config),profileId:config.profileId||''},name,destination};
+ pendingOpen={config:{...safeTerminalConfig(config),profileId:config.profileId||'',nameExplicit:config.nameExplicit},name,destination};
  const key=config.authMethod==='key';
  openModal('Sign in: '+name,'<form id="sessionLibraryAuthForm" autocomplete="off"><p>'+esc(description(config))+'</p>'+ (key?'<div class="field"><label for="sessionLibraryKey">Private key</label><textarea id="sessionLibraryKey" required spellcheck="false" autocomplete="off" data-terminal-secret></textarea></div><div class="field mt"><label for="sessionLibraryPassphrase">Key passphrase (optional)</label><input type="password" id="sessionLibraryPassphrase" autocomplete="new-password" data-terminal-secret></div>':'<div class="field"><label for="sessionLibraryPassword">Password</label><input type="password" id="sessionLibraryPassword" autocomplete="new-password" maxlength="4096" data-terminal-secret></div>')+'<p class="help-line">Link a saved credential in Edit connection to open without this prompt.</p></form>','<button class="btn ghost" data-action="close-modal">Cancel</button><button type="submit" class="btn primary" form="sessionLibraryAuthForm">Connect</button>',true);
 }
@@ -217,7 +218,7 @@ async function connect(config,name,destination,secrets=null){
   let c=safeTerminalConfig(config);
   if(secrets===null&&c.type==='ssh'&&c.credentialId){const credential=await root.NetworkToolkitCredentials.prepare(c);if(!credential)throw new Error('The saved credential is unavailable. Edit this connection to choose another credential.');c={...c,...credential};}else if(secrets!==null)delete c.credentialId;
   c=validateTerminalConfig(c);
-  if(secrets===null&&!c.credentialId&&c.type==='ssh'&&['password','key'].includes(c.authMethod)){authDialog({...c,profileId:config.profileId||''},name,destination);return;}
+  if(secrets===null&&!c.credentialId&&c.type==='ssh'&&['password','key'].includes(c.authMethod)){authDialog({...c,profileId:config.profileId||'',nameExplicit:config.nameExplicit},name,destination);return;}
   request=terminalConnectPayload(c,secrets||{});
   if(config.profileId)request.profileId=config.profileId;
   if(c.type==='ssh'&&!c.credentialId&&c.authMethod==='key'&&!request.privateKey.trim())throw new Error('Enter a private key to open this session.');
@@ -244,6 +245,7 @@ async function run(action,target){
   case'open':await open(target);break;case'new-tab':await open(target,true);break;
   case'edit':openTerminalConnect(item,target.kind==='saved'?item.id:'');break;
   case'rename':nameDialog('rename',target,item,item.name);break;
+  case'clear-name':if(['ssh','telnet'].includes(item.type)){item.nameExplicit=false;item._namePending=true;changed();}break;
   case'duplicate':nameDialog('duplicate',target,item,item.name+' copy');break;
   case'folder':if(target.kind==='saved')folderDialog('terminal',item.id);break;
   case'save':nameDialog('save',target,item,item.name);break;
@@ -287,8 +289,8 @@ document.addEventListener('submit',event=>{
   const pending=pendingName,name=byId('sessionLibraryName')?.value.trim();if(!pending||!name||name.length>100)return;
   if(pending.target&&!itemFor(pending.target)){toast('This session changed. Open its actions again.');closeModal();return;}
   const folder=folders.normalize(byId('sessionLibrarySaveFolder')?.value);
-  if(pending.mode==='rename'){const item=itemFor(pending.target);item.name=name;item.folder=folder;}
-  else{if(profiles().length>=100){toast('Remove a saved session before adding another. The limit is 100.');return;}state.terminalProfiles=[{id:'terminal-profile-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8),name,folder,...pending.config},...profiles()];}
+  if(pending.mode==='rename'){const item=itemFor(pending.target);item.name=name;item.nameExplicit=true;item._namePending=true;item.folder=folder;}
+  else{if(profiles().length>=100){toast('Remove a saved session before adding another. The limit is 100.');return;}state.terminalProfiles=[{id:'terminal-profile-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8),name,nameExplicit:true,nameRevision:0,_namePending:true,folder,...pending.config},...profiles()];}
   pendingName=null;closeModal();changed();
  }else if(event.target.id==='sessionLibraryFolderForm'){
   event.preventDefault();event.stopImmediatePropagation();const pending=pendingFolder;if(!pending)return;

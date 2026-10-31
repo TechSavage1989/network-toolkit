@@ -241,7 +241,7 @@ func (a *application) workspaceSessions(ids []string) []terminal.SessionInfo {
 	if a.terminals != nil {
 		for _, session := range a.terminals.List() {
 			if wanted[session.ID] {
-				sessions = append(sessions, session)
+				sessions = append(sessions, a.terminalDisplaySession(session))
 			}
 		}
 	}
@@ -399,6 +399,7 @@ func (a *application) terminalCanConnect(r *http.Request) bool {
 
 func (a *application) connectTerminalForRequest(r *http.Request, request terminal.ConnectRequest) (terminal.SessionInfo, error) {
 	request.DisplayName = a.terminalProfileLabel(request.ProfileID)
+	request.DisplayNameExplicit = a.terminalProfileNameExplicit(request.ProfileID)
 	var err error
 	request, err = a.resolveTerminalCredential(r.Context(), request)
 	if err != nil {

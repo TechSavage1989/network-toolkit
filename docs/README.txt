@@ -1,12 +1,29 @@
+NETWORK TOOLKIT 1.17.128
+======================
+
+CURRENT RELEASE - 1.17.128 (candidate) (not yet published)
+Manual names take precedence over recognized device names, with endpoint below.
+Documented numeric/network/shell prompt support is expanded. Ambiguous custom
+prompts use a known name or endpoint fallback; command readiness is unchanged.
+Validation pending. See docs/RELEASE128_HANDOFF.md and RELEASE_NOTES_1.17.128.txt.
+
+PUBLISHED127 RECORD (retained)
+
 NETWORK TOOLKIT 1.17.127
 ======================
 
-CURRENT RELEASE - 1.17.127 (candidate; not yet published)
+CURRENT RELEASE - 1.17.127
 
 Release details: RELEASE_NOTES_1.17.127.txt
-Adds reviewed paced SSH paste and compact learned-name/endpoint session labels.
-Raw paste remains available. Hosted release validation is still pending.
-See docs/RELEASE127_HANDOFF.md for scope, evidence and remaining limits.
+Adds explicit prompt-paced multiline paste with literal indentation/blank lines,
+Pause/Stop and uncertain-start duplicate protection. Tabs, Saved and Recent show
+a learned CLI name over a smaller endpoint, or only the endpoint when unknown.
+Saved names, addresses and credentials remain unchanged. Raw paste is available.
+Published2026-10-30T23:12:03Z; actual public downloads, checksums, portable source,
+binary-only updater and latest feed verified23:13:27Z. Exact-source browser/native
+Windows/package validation passed. No live SSH device was tested; retained
+failures and duplicate-run status are in docs/RELEASE127_HANDOFF.md.
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.127
 
 PREVIOUS RELEASE INFORMATION (retained)
 

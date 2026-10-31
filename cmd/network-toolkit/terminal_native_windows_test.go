@@ -105,7 +105,7 @@ func TestNativeTerminalTransferInstalledWebView2(t *testing.T) {
 				_, _ = io.WriteString(c, transcript.String())
 				select {
 				case <-h.promptReady:
-					_, _ = io.WriteString(c, "FIXTURE-SW127(config-if)# ")
+					_, _ = io.WriteString(c, "7300(config-if)# ")
 				case <-ctx.Done():
 					return
 				}
@@ -113,6 +113,8 @@ func TestNativeTerminalTransferInstalledWebView2(t *testing.T) {
 			}()
 		}
 	}()
+	// Match the actual synthetic endpoint so Saved label propagation is exercised too.
+	a.state = json.RawMessage(fmt.Sprintf(`{"activePage":"terminal","theme":"dark","appUpdatePreferences":{"enabled":false},"terminalProfiles":[{"id":"native-profile114","name":"Native saved <west>","type":"telnet","host":"127.0.0.1","port":%d}]}`, listener.Addr().(*net.TCPAddr).Port))
 	session, err := a.connectTerminalForRequest(httptest.NewRequest(http.MethodPost, "http://fixture.invalid/api/terminals", nil), terminal.ConnectRequest{Type: "telnet", ProfileID: "native-profile114", Host: "127.0.0.1", Port: listener.Addr().(*net.TCPAddr).Port})
 	if err != nil {
 		t.Fatal(err)
@@ -158,8 +160,11 @@ func TestNativeTerminalTransferInstalledWebView2(t *testing.T) {
 }
 
 type nativeTerminalSnapshot struct {
-	TabPrimary, TabAddress, SavedProfileName string
-	NameAboveIP, SmallerIP, TabVisible, SingleSessionChild bool
+	TabPrimary, TabAddress, SavedProfileName, LearnedName                  string
+	SavedPrimary, SavedAddress, ManualName                                 string
+	NameAboveIP, SmallerIP, TabVisible, SingleSessionChild                 bool
+	NameExplicit, SavedNameExplicit, SavedNameAboveIP, SavedSmallerIP      bool
+	NameRevision, SavedNameRevision                                        uint64
 	ViewportDOM                                                            float64
 	GeometryFits                                                           bool
 	Viewport                                                               int
@@ -188,14 +193,14 @@ type nativeTerminalTiming struct {
 }
 type nativeTerminalFixture struct {
 	*nativeEditorFixture
-	commandMu sync.Mutex
-	commands  map[string]chan nativeEditorCommand
-	results   map[uint64]chan nativeTerminalReply
-	session   string
-	promptReady chan struct{}
+	commandMu      sync.Mutex
+	commands       map[string]chan nativeEditorCommand
+	results        map[uint64]chan nativeTerminalReply
+	session        string
+	promptReady    chan struct{}
 	labelsVerified bool
-	allowBulk atomic.Bool
-	timings   []nativeTerminalTiming
+	allowBulk      atomic.Bool
+	timings        []nativeTerminalTiming
 }
 
 func (h *nativeTerminalFixture) terminalQueue(view string) chan nativeEditorCommand {
@@ -215,7 +220,7 @@ func (h *nativeTerminalFixture) serve(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 503, "External lookup disabled in synthetic native fixture.")
 		return
 	}
-	if r.Method != http.MethodGet && r.Method != http.MethodHead && r.URL.Path != "/api/state" && !strings.HasPrefix(r.URL.Path, "/api/terminal-views") && !(strings.HasPrefix(r.URL.Path, "/api/terminals/") && strings.HasSuffix(r.URL.Path, "/resize")) && r.URL.Path != "/api/editor-views/current/activity" && !(h.allowBulk.Load() && (r.Method == http.MethodPost && r.URL.Path == "/api/terminals/"+h.session+"/disconnect" || r.Method == http.MethodDelete && r.URL.Path == "/api/terminals/"+h.session)) {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead && r.URL.Path != "/api/state" && !strings.HasPrefix(r.URL.Path, "/api/terminal-views") && !(strings.HasPrefix(r.URL.Path, "/api/terminals/") && strings.HasSuffix(r.URL.Path, "/resize")) && !(r.Method == http.MethodPost && r.URL.Path == "/api/terminals/"+h.session+"/rename") && r.URL.Path != "/api/editor-views/current/activity" && !(h.allowBulk.Load() && (r.Method == http.MethodPost && r.URL.Path == "/api/terminals/"+h.session+"/disconnect" || r.Method == http.MethodDelete && r.URL.Path == "/api/terminals/"+h.session)) {
 		h.mu.Lock()
 		h.blocked = append(h.blocked, r.Method+" "+r.URL.Path)
 		h.mu.Unlock()
@@ -371,12 +376,12 @@ func (h *nativeTerminalFixture) exercise(accepted *atomic.Int32) error {
 	if e != nil {
 		return e
 	}
-	if !initial.TabVisible || initial.Label != "Native saved <west>" || initial.SavedProfileName != "Native saved <west>" || initial.TabPrimary != "127.0.0.1" || initial.TabAddress != "" {
-		return fmt.Errorf("IP-only fallback or saved name preservation failed: %+v", initial)
+	if !initial.TabVisible || initial.Label != "Native saved <west>" || initial.SavedProfileName != "Native saved <west>" || initial.TabPrimary != "Native saved <west>" || initial.TabAddress != "127.0.0.1" || !initial.NameAboveIP || !initial.SmallerIP {
+		return fmt.Errorf("Initial manual name precedence or geometry failed: %+v", initial)
 	}
 	close(h.promptReady)
 	initial, e = h.wait("", func(s nativeTerminalSnapshot) bool {
-		return s.TabPrimary == "FIXTURE-SW127" && s.TabAddress == "127.0.0.1" && s.TabVisible && s.NameAboveIP && s.SmallerIP && s.GeometryFits
+		return s.LearnedName == "7300" && s.TabPrimary == "Native saved <west>" && s.TabAddress == "127.0.0.1" && s.TabVisible && s.NameAboveIP && s.SmallerIP && s.GeometryFits
 	})
 	if e != nil {
 		return e
@@ -393,9 +398,10 @@ func (h *nativeTerminalFixture) exercise(accepted *atomic.Int32) error {
 	if initial.Label != "Native saved <west>" || initial.SavedProfileName != "Native saved <west>" {
 		return fmt.Errorf("saved profile name was changed by learned display: %q/%q", initial.Label, initial.SavedProfileName)
 	}
-	h.labelsVerified = true
 	expected := initial.Transcript
 	digest := fmt.Sprintf("%x", sha256.Sum256([]byte(expected)))
+	manualName := "Native saved <west>"
+	storedName := manualName
 	for cycle := 1; cycle <= 3; cycle++ {
 		action, e := h.command("", "detach")
 		if e != nil {
@@ -428,7 +434,7 @@ func (h *nativeTerminalFixture) exercise(accepted *atomic.Int32) error {
 		if e != nil {
 			return e
 		}
-		if child.TabPrimary != "FIXTURE-SW127" || child.TabAddress != "127.0.0.1" || !child.SingleSessionChild || child.TabVisible || child.Label != "Native saved <west>" {
+		if child.TabPrimary != manualName || child.LearnedName != "7300" || child.TabAddress != "127.0.0.1" || !child.SingleSessionChild || child.TabVisible || child.Label != manualName {
 			return fmt.Errorf("single-session child hidden tab metadata changed: %+v", child)
 		}
 		if source.Editable {
@@ -450,6 +456,50 @@ func (h *nativeTerminalFixture) exercise(accepted *atomic.Int32) error {
 				return e
 			}
 		}
+		// Mutate names while ownership stays in the other window, reproducing the
+		// stale-profile race rather than renaming only after returning home.
+		previousRevision := child.NameRevision
+		explicit := true
+		switch cycle {
+		case 1:
+			_, e = h.command(view, "rename")
+			manualName, storedName = "Native renamed <east>", "Native renamed <east>"
+		case 2:
+			_, e = h.command("", "profile-rename")
+			manualName, storedName = "Native profile C", "Native profile C"
+		case 3:
+			_, e = h.command(view, "clear-name")
+			manualName, explicit = "7300", false
+		}
+		if e != nil {
+			return e
+		}
+		wantManual := manualName
+		if !explicit {
+			wantManual = ""
+		}
+		child, e = h.wait(view, func(s nativeTerminalSnapshot) bool {
+			return s.Editable && s.Transcript == expected && s.TabPrimary == manualName && s.LearnedName == "7300" && s.TabAddress == "127.0.0.1" && s.NameExplicit == explicit && s.ManualName == wantManual && s.NameRevision > previousRevision && s.SingleSessionChild && !s.TabVisible
+		})
+		if e != nil {
+			return e
+		}
+		if _, e = h.command("", "show-saved"); e != nil {
+			return e
+		}
+		source, e = h.wait("", func(s nativeTerminalSnapshot) bool {
+			return !s.Editable && s.SavedProfileName == storedName && s.SavedNameExplicit == explicit && s.SavedNameRevision == child.NameRevision && s.SavedPrimary == manualName && s.SavedAddress == "127.0.0.1" && s.SavedNameAboveIP && s.SavedSmallerIP
+		})
+		if e != nil {
+			return e
+		}
+		if os.Getenv("NETWORK_TOOLKIT_NATIVE_TERMINAL_SELECTION") == "1" && (child.Selection != initial.Selection || child.Viewport != initial.Viewport || math.Abs(child.ViewportDOM-float64(initial.Viewport)) > .01) {
+			return errors.New("cross-window naming changed child selection or scroll")
+		}
+		if currentOwner := h.app.views.state().Owners[h.session]; currentOwner.ViewID != view || !currentOwner.Ready {
+			return errors.New("cross-window naming changed terminal ownership")
+		}
+
 		action, e = h.command(view, "reattach")
 		if e != nil {
 			return e
@@ -463,8 +513,8 @@ func (h *nativeTerminalFixture) exercise(accepted *atomic.Int32) error {
 		if os.Getenv("NETWORK_TOOLKIT_NATIVE_TERMINAL_SELECTION") == "1" && (home.Selection != initial.Selection || home.Viewport != initial.Viewport || math.Abs(home.ViewportDOM-float64(initial.Viewport)) > .01) {
 			return fmt.Errorf("returned selection/scroll changed: selected=%q viewport=%d DOM=%g wanted=%q/%d", home.Selection, home.Viewport, home.ViewportDOM, initial.Selection, initial.Viewport)
 		}
-		if home.TabPrimary != "FIXTURE-SW127" || home.TabAddress != "127.0.0.1" || !home.TabVisible || !home.NameAboveIP || !home.SmallerIP || home.SavedProfileName != "Native saved <west>" {
-			return fmt.Errorf("returned learned display or saved name changed: %+v", home)
+		if home.TabPrimary != manualName || home.LearnedName != "7300" || home.TabAddress != "127.0.0.1" || !home.TabVisible || !home.NameAboveIP || !home.SmallerIP || home.SavedProfileName != storedName || home.NameExplicit != explicit || home.SavedNameExplicit != explicit || home.NameRevision != child.NameRevision || home.SavedNameRevision != child.NameRevision || home.ManualName != wantManual {
+			return fmt.Errorf("returned manual display, learned metadata or saved name changed: %+v", home)
 		}
 		owner = h.app.views.state().Owners[h.session]
 		if owner.ViewID != "" || !owner.Ready {
@@ -479,6 +529,7 @@ func (h *nativeTerminalFixture) exercise(accepted *atomic.Int32) error {
 			return errors.New("original terminal transport no longer connected")
 		}
 	}
+	h.labelsVerified = true
 	return h.capture("", "terminal114-returned")
 }
 func (h *nativeTerminalFixture) writeTerminalReport(err error, accepted int32) {
@@ -488,6 +539,6 @@ func (h *nativeTerminalFixture) writeTerminalReport(err error, accepted int32) {
 	if err != nil {
 		failure = err.Error()
 	}
-	raw, _ := json.MarshalIndent(map[string]any{"passed": err == nil, "error": failure, "label": os.Getenv("TOOLKIT_NATIVE_TIMING_LABEL"), "loopbackAcceptCount": accepted, "savedLabelVerified": h.labelsVerified, "ipOnlyFallbackAndLearnedNameAboveSmallerIPVerified": h.labelsVerified, "selectionScrollRequired": os.Getenv("NETWORK_TOOLKIT_NATIVE_TERMINAL_SELECTION") == "1", "sessionID": h.session, "timings": h.timings, "gestures": h.gestures, "phases": h.phases, "captures": h.captures, "blocked": h.blocked, "failures": h.failures, "limitations": []string{"Hosted synthetic loopback text only; no actual network device or shell", "Selection/scroll are asserted only with NETWORK_TOOLKIT_NATIVE_TERMINAL_SELECTION=1; nonempty command/pager archives remain covered separately", "Timings include actual process/WebView startup; no cross-machine performance guarantee"}}, "", "  ")
+	raw, _ := json.MarshalIndent(map[string]any{"passed": err == nil, "error": failure, "label": os.Getenv("TOOLKIT_NATIVE_TIMING_LABEL"), "loopbackAcceptCount": accepted, "savedLabelVerified": h.labelsVerified, "manualPrecedenceNumericLearningRenameClearRevisionAndTwoLineIPVerified": h.labelsVerified, "selectionScrollRequired": os.Getenv("NETWORK_TOOLKIT_NATIVE_TERMINAL_SELECTION") == "1", "sessionID": h.session, "timings": h.timings, "gestures": h.gestures, "phases": h.phases, "captures": h.captures, "blocked": h.blocked, "failures": h.failures, "limitations": []string{"Hosted synthetic loopback text only; no actual network device or shell", "Selection/scroll are asserted only with NETWORK_TOOLKIT_NATIVE_TERMINAL_SELECTION=1; nonempty command/pager archives remain covered separately", "Timings include actual process/WebView startup; no cross-machine performance guarantee"}}, "", "  ")
 	_ = os.WriteFile(filepath.Join(h.output, "native-terminal114-report.json"), raw, 0600)
 }

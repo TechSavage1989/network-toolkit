@@ -14,14 +14,19 @@
   <a href="#development">Development</a>
 </p>
 
-## Current candidate — 1.17.127
+## Current candidate — 1.17.128
 
-Safer paced multiline paste adds an explicit one-line-at-a-time option in paste
-review, waiting for a fresh prompt before continuing. Raw paste remains available.
-Tabs, Saved and Recent show a learned CLI name above a smaller endpoint, or just
-the endpoint when no name is recognized. Existing connection identity is retained.
-Validation and publication are pending. See [127 handoff](docs/RELEASE127_HANDOFF.md)
-for exact evidence and limits; this is not a claim that every rendering issue is fixed.
+Manual names take precedence over learned CLI device names, with the endpoint
+below. Recognition includes numeric names and documented shell/network prompt
+families. Ambiguous custom prompts retain safe name/endpoint fallbacks; prompt
+recognition is not a command-success guarantee. Validation/publication pending.
+
+## Published 1.17.127
+
+Published 2026-10-30T23:12:03Z. Actual public downloads, source, manifests, updater
+feed and prior126 immutability verified; see [127 handoff](docs/RELEASE127_HANDOFF.md).
+Adds explicit paced multiline paste and learned name/endpoint labels. User follow-up
+identified numeric/Linux recognition gaps and manual-name precedence for128.
 
 ## Previous 1.17.121 release record (retained)
 

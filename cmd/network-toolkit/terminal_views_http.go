@@ -443,6 +443,9 @@ func (a *application) terminalListForRequest(r *http.Request) []terminal.Session
 	sessions := a.terminals.List()
 	id := terminalRequestView(r)
 	if id == "" {
+		for i := range sessions {
+			sessions[i] = a.terminalDisplaySession(sessions[i])
+		}
 		return sessions
 	}
 	info, ok := a.views.info(id)
@@ -453,7 +456,7 @@ func (a *application) terminalListForRequest(r *http.Request) []terminal.Session
 	filtered := []terminal.SessionInfo{}
 	for _, session := range sessions {
 		if wanted[session.ID] {
-			filtered = append(filtered, session)
+			filtered = append(filtered, a.terminalDisplaySession(session))
 		}
 	}
 	return filtered
@@ -474,7 +477,7 @@ func terminalViewSessionSet(info terminalViewInfo) map[string]bool {
 func (a *application) terminalBatchForRequest(r *http.Request, batch terminal.Batch) terminal.Batch {
 	id := terminalRequestView(r)
 	if id == "" {
-		return batch
+		return a.terminalDisplayBatch(batch)
 	}
 	info, ok := a.views.info(id)
 	wanted := map[string]bool{}
@@ -495,7 +498,7 @@ func (a *application) terminalBatchForRequest(r *http.Request, batch terminal.Ba
 	}
 	batch.Events = events
 	batch.Sessions = sessions
-	return batch
+	return a.terminalDisplayBatch(batch)
 }
 
 func (a *application) terminalViewStateForRequest(r *http.Request) terminalViewState {

@@ -8,7 +8,8 @@ import (
 )
 
 var terminalPromptName127 = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$`)
-var terminalPromptNameLetter127 = regexp.MustCompile(`[A-Za-z]`)
+var terminalPromptNameDottedNumeric128 = regexp.MustCompile(`^[0-9]+(?:\.[0-9]+)+$`)
+var terminalGenericPrompt128 = regexp.MustCompile(`^(?:loader(?:-[a-z])?|bash(?:-[0-9.]+)?|zsh(?:-[0-9.]+)?|sh(?:-[0-9.]+)?|fish(?:-[0-9.]+)?)$`)
 
 // Display metadata only: never part of connection/authentication identity.
 func safeTerminalPromptNames(value any) []map[string]any {
@@ -63,12 +64,12 @@ func safeTerminalPromptNames(value any) []map[string]any {
 }
 
 func validTerminalPromptName(name string) bool {
-	if !terminalPromptName127.MatchString(name) || !terminalPromptNameLetter127.MatchString(name) {
+	if !terminalPromptName127.MatchString(name) || terminalPromptNameDottedNumeric128.MatchString(name) {
 		return false
 	}
 	switch strings.ToLower(name) {
-	case "password", "username", "login", "error", "warning", "failed", "success", "yes", "no":
+	case "password", "username", "login", "error", "warning", "failed", "success", "yes", "no", "auditor", "console", "ps", "edit":
 		return false
 	}
-	return true
+	return !terminalGenericPrompt128.MatchString(strings.ToLower(name))
 }

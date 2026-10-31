@@ -53,7 +53,7 @@ func (a *application) handleTerminals(w http.ResponseWriter, r *http.Request) {
 				terminalHTTPError(w, err)
 				return
 			}
-			jsonResponse(w, http.StatusCreated, map[string]any{"session": session, "viewState": a.terminalViewStateForRequest(r)})
+			jsonResponse(w, http.StatusCreated, map[string]any{"session": a.terminalDisplaySession(session), "viewState": a.terminalViewStateForRequest(r)})
 		default:
 			methodError(w)
 		}
@@ -164,9 +164,10 @@ func (a *application) handleTerminals(w http.ResponseWriter, r *http.Request) {
 	case "rename":
 		var req struct {
 			Label string `json:"label"`
+			Clear bool   `json:"clear"`
 		}
 		if err = decodeTerminalBody(w, r, 2048, &req); err == nil {
-			err = a.withTerminalOwner(r, id, action, func() error { return a.terminals.Rename(id, req.Label) })
+			err = a.withTerminalOwner(r, id, action, func() error { return a.terminals.RenameDisplay(id, req.Label, req.Clear, a.persistTerminalDisplayName) })
 		}
 	case "input":
 		var req struct {
@@ -241,8 +242,17 @@ func (a *application) handleTerminals(w http.ResponseWriter, r *http.Request) {
 		terminalHTTPError(w, err)
 		return
 	}
+	if action == "rename" {
+		session, ok := a.terminalSession(id)
+		if !ok {
+			terminalHTTPError(w, terminal.ErrNotFound)
+			return
+		}
+		jsonResponse(w, http.StatusOK, map[string]any{"session": session})
+		return
+	}
 	if action == "reconnect" {
-		jsonResponse(w, http.StatusOK, map[string]any{"session": reconnected, "viewState": a.terminalViewStateForRequest(r)})
+		jsonResponse(w, http.StatusOK, map[string]any{"session": a.terminalDisplaySession(reconnected), "viewState": a.terminalViewStateForRequest(r)})
 		return
 	}
 	jsonResponse(w, http.StatusOK, map[string]bool{"ok": true})

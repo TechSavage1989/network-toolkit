@@ -59,3 +59,34 @@ func TestTerminalWorkspaceOrderIsBoundedNonsecretMetadata(t *testing.T) {
 		t.Fatal("unbounded order")
 	}
 }
+
+func TestTerminalExplicitNameMetadata128(t *testing.T) {
+	for _, explicit := range []any{true, false, "true", map[string]any{"password": "never"}} {
+		profile := map[string]any{"id": "saved", "name": "192.0.2.23", "type": "ssh", "host": "192.0.2.23", "port": float64(22), "nameExplicit": explicit, "credentialId": "reference-only", "password": "never"}
+		clean := safeTerminalProfile(profile, true)
+		if value, ok := explicit.(bool); ok {
+			if clean["nameExplicit"] != value {
+				t.Fatal("boolean provenance lost")
+			}
+		} else if _, ok := clean["nameExplicit"]; ok {
+			t.Fatal("invalid provenance retained")
+		}
+		if clean["credentialId"] != "reference-only" || clean["host"] != profile["host"] {
+			t.Fatal("credential reference or address changed")
+		}
+		if _, ok := clean["password"]; ok {
+			t.Fatal("password retained")
+		}
+		if _, ok := safeTerminalProfile(profile, false)["nameExplicit"]; ok {
+			t.Fatal("name provenance leaked into connection config")
+		}
+	}
+	a := &application{state: []byte(`{"terminalProfiles":[{"id":"saved","name":"192.0.2.23","nameExplicit":true}]}`)}
+	if !a.terminalProfileNameExplicit("saved") || a.terminalProfileNameExplicit("missing") {
+		t.Fatal("explicit profile lookup mismatch")
+	}
+	a.state = []byte(`{"terminalProfiles":[{"id":"saved","nameExplicit":true},{"id":"saved","nameExplicit":true}]}`)
+	if a.terminalProfileNameExplicit("saved") {
+		t.Fatal("ambiguous profile provenance accepted")
+	}
+}

@@ -3,20 +3,38 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-Current development: 1.17.127 safer paced multiline paste. Validation and release
-are pending; do not confuse this candidate with the published126 evidence below.
+Current published version: 1.17.127. Published 2026-10-30T23:12:03Z;
+actual public downloads/source/feed verified 23:13:27.407082Z,
+independently rechecked against fresh public receipts at 23:14:28Z.
+Source/tag 3085e0729be9f7cbbe372f9959c8985f5255b220;
+tree ca4095f5bad98c1f2b3c64232a5582062a3fa9d1.
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.127
+Paced paste preserves literal commands with Pause/Stop and uncertain-start
+protection. Learned CLI names appear above smaller endpoints, with endpoint-only
+fallback and saved identity/authentication unchanged. All nine exact-source review
+jobs passed, plus 1,407 local JS and 42 Python tests. Actual browser/native WebView2
+and 1,213-source/1,220-member public package/feed proof passed; prior126 unchanged.
+Native coverage uses synthetic loopback Telnet, not a live SSH device. Original
+failed duplicate observations remain; see docs/RELEASE127_HANDOFF.md, including
+the final duplicate main cancellation metadata. This source-only closure changes
+no release bytes, access or general authorization requirements.
+
+Current development: 1.17.128 manual-name precedence and broader documented
+CLI prompt recognition. Not yet published; validation remains pending. Preserve
+the immutable published127 source/tag/assets and its retained observations.
 
 ## Source and release destination
 
 TechSavage1989/network-toolkit is public and must remain public. The owner
-explicitly authorized this 1.17.127 task's application source, synthetic tests,
-build assets, handoff and release publication to the existing destination on
-2026-10-30. This record is not a blanket future approval rule; future actions
+requested the 1.17.128 naming correction and documented prompt-format survey on 2026-10-30, following the published127 task. Requested completed Toolkit
+updates use the existing source/release destination under the applicable current
+authorization requirements. This record is not a blanket future approval rule;
+future actions
 must satisfy the applicable authorization requirements. Never change repository
 access/visibility, expose client inputs, secrets or credentials, or replace an
 already-published tag/asset without specific authorization.
 
-Current published version: 1.17.126. Published 2026-10-30T19:14:20Z;
+Previous published version: 1.17.126. Published 2026-10-30T19:14:20Z;
 actual downloads/source/feed verified 19:15:13Z, independently 19:15:42Z.
 Source/tag ed90d1e5d4769fc4bbc97484bf7e263d1794fd4e;
 tree 58e9852b3b8b74c580f6d29a0cf71c59abbb7e91.

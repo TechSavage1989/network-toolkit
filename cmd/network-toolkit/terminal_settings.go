@@ -216,6 +216,12 @@ func safeTerminalProfile(value any, named bool) map[string]any {
 	}
 	stringFields := []string{"type", "host", "username", "authMethod", "credentialId", "serialPort", "stopBits", "parity", "flowControl", "lineEnding"}
 	if named {
+		if revision, ok := terminalNameRevision(profile["nameRevision"]); ok {
+			clean["nameRevision"] = revision
+		}
+		if explicit, ok := profile["nameExplicit"].(bool); ok {
+			clean["nameExplicit"] = explicit
+		}
 		stringFields = append(stringFields, "id", "name")
 		if folder, present := profile["folder"]; present {
 			clean["folder"] = safeSessionFolder(folder)

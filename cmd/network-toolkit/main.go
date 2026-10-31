@@ -1012,7 +1012,17 @@ func (a *application) handleState(w http.ResponseWriter, r *http.Request) {
 		if id := credentialConfigID(a.dataPath); id != "" {
 			state[credentialConfigIdentityField] = id
 		}
+		if err := validateTerminalDisplayRevisions(state); err != nil {
+			jsonError(w, http.StatusBadRequest, err.Error())
+			return
+		}
 		sanitizeTerminalSettings(state)
+		currentNames := map[string]any{}
+		_ = json.Unmarshal(a.state, &currentNames)
+		if err := reconcileTerminalDisplayNames(state, currentNames); err != nil {
+			jsonError(w, http.StatusConflict, err.Error())
+			return
+		}
 		sanitizeFTPProfiles(state)
 		sanitizeTransferClientSettings(state)
 		sanitizeListPreferences(state)
@@ -1036,7 +1046,7 @@ func (a *application) handleState(w http.ResponseWriter, r *http.Request) {
 		a.state = b
 		a.storageWritable = true
 		a.storageError = ""
-		jsonResponse(w, 200, map[string]bool{"ok": true})
+		jsonResponse(w, 200, map[string]any{"ok": true, "terminalNames": terminalDisplayNamesResponse(state)})
 	default:
 		methodError(w)
 	}
