@@ -298,10 +298,14 @@ function sync(){
  const old=tools.querySelector('#terminalPasteTools');if(old)old.remove();
  if(!initialized){initialized=true;document.addEventListener('pointerdown',e=>{if(e.target.closest('[data-terminal-extra="output-start"],[data-terminal-extra="output-end"],[data-terminal-extra="select-output"],[data-terminal-extra="copy-output"],[data-terminal-extra="scroll-top"],[data-terminal-extra="scroll-bottom"]'))e.preventDefault();},true);document.addEventListener('change',changed);document.addEventListener('click',clicked);document.addEventListener('keydown',e=>{if(e.key==='Escape'&&sessionOpen&&!document.querySelector('.modal')){e.preventDefault();setSessionOpen(false);document.querySelector('#terminalSessionToggle')?.focus();}});document.addEventListener('pointerdown',e=>{if(sessionOpen&&!e.target.closest('#terminalSessionPanel,#terminalSessionToggle'))setSessionOpen(false);});root.addEventListener('resize',()=>{if(sessionOpen)setSessionOpen(false);});}
  bind(entry);
+ const tabs=root.NetworkToolkitTerminalTabs,bulkBusy=tabs?.reconnectAllBusy?.()===true;
  for(const button of document.querySelectorAll('[data-terminal-action="reconnect"]')){
    const target=button.dataset.terminalId?terminalSessions.get(button.dataset.terminalId):entry;
-   button.disabled=!terminalReconnectAllowed(target);
+   button.disabled=bulkBusy||!terminalReconnectAllowed(target);
  }
+ const allEnabled=tabs?.reconnectAllAvailable?.()===true;
+ for(const button of actions.querySelectorAll('[data-terminal-action="reconnect-options"],[data-terminal-action="reconnect-all"]'))button.disabled=!allEnabled;
+ if(!allEnabled)tabs?.setReconnectOptions?.(false);
 }
 function changed(event){const entry=currentTerminal(),el=event.target;if(el.id==='terminalActiveActionsPosition'){state.terminalActiveActionsPosition=el.value==='bottom'?'bottom':'top';saveState();sync();scheduleTerminalFit();return;}
  const fields={terminalQuickPager:'autoPager',terminalQuickFollow:'autoScroll',terminalQuickReview:'pasteReview',terminalIncludeInput:'pasteIncludeCommands',terminalQuickPagerKey:'pagerKey'},key=fields[el.id];if(!key||!entry)return;
