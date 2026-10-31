@@ -1,3 +1,26 @@
+NETWORK TOOLKIT 1.17.144
+======================
+
+CURRENT RELEASE - 1.17.144 (BETA 8 CANDIDATE)
+
+Beta 8 continues the full application-wide performance and polishing
+roadmap. Diagnostic/discovery lists use one derived key per sort row,
+and list counts and visible content reuse one filtered result per refresh.
+Long Ping and Monitor histories avoid unbounded RTT argument arrays.
+Unfiltered discovery avoids unused search-field construction. Large
+reports use fewer temporary allocations, and unchanged UI status text
+does not trigger redundant accessibility writes.
+
+This is an opt-in prerelease candidate, not yet published. Stable remains
+1.17.136. Credentials, network permissions, settings and Network_Toolkit.exe
+stay unchanged. The historical narrow Editor map-motion CI issue and
+physical Windows stress acceptance remain open and are not declared fixed.
+
+Read docs/DEVELOPMENT_ROADMAP.md, docs/BETA8_APPWIDE_AUDIT.md and
+docs/RELEASE144_HANDOFF.md.
+Details: RELEASE_NOTES_1.17.144.txt.
+Previous release descriptions follow.
+
 NETWORK TOOLKIT 1.17.143
 ======================
 

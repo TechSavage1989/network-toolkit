@@ -1,3 +1,19 @@
+# Network Toolkit v1.17.144 Beta 8 - application-wide source and continuation
+
+**Read docs/DEVELOPMENT_ROADMAP.md first** for the full eleven-area
+roadmap, Beta 4/5/6 history, Beta 8 optimization, proposed Beta 9
+concurrent stress testing, RC and stable acceptance.
+Candidate branch: beta/1.17.144-application-wide-performance.
+Detailed measures, changed code paths, test evidence, known failures and
+next new-chat procedure: docs/RELEASE144_HANDOFF.md and
+docs/BETA8_APPWIDE_AUDIT.md. This candidate is not yet published.
+Measured work covers shared diagnostics/results, discovery, monitoring
+statistics, report export and common app status UI. Other areas remain
+in the roadmap and require stress/real-device checks. Terminal is not
+the main feature scope. Preserve original security/update boundaries.
+
+---
+
 # v1.17.144 Beta 8 - multi-phase development handoff
 
 **Permanent approved plan: docs/DEVELOPMENT_ROADMAP.md.** New chats must
