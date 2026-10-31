@@ -246,3 +246,28 @@ test('Disconnect all remains unavailable when offline or while a workspace moves
  h.entries.get('one').info.state='closed';h.entries.get('two').info.state='error';
  assert.equal(h.api.disconnectAllAvailable(),false);
 });
+
+
+test('Reconnect all and Disconnect all cannot overlap or interleave with Close all',async()=>{
+ const h=harness();let finishReconnect,finishDisconnect;
+ h.context.reconnectTerminal=async entry=>{h.calls.push(['reconnect',entry.info.id]);if(entry.info.id==='one')await new Promise(resolve=>finishReconnect=resolve);};
+ h.context.disconnectTerminal=async entry=>{h.calls.push(['disconnect',entry.info.id]);if(entry.info.id==='one')await new Promise(resolve=>finishDisconnect=resolve);};
+ h.context.state.terminalConfirmReconnectAll=false;
+ h.context.state.terminalConfirmDisconnectAll=false;
+ assert.equal(h.api.requestReconnectAll(),true);
+ assert.equal(h.api.reconnectAllBusy(),true);
+ assert.equal(h.api.disconnectAllAvailable(),false);
+ assert.equal(h.api.bulkWindow('disconnect-all'),false);
+ assert.equal(h.api.enabled('close-all',h.api.token('one')),false);
+ finishReconnect();await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(h.api.reconnectAllBusy(),false);
+ assert.equal(h.api.bulkWindow('disconnect-all'),true);
+ assert.equal(h.api.windowBulkBusy(),true);
+ assert.equal(h.api.requestReconnectAll(),false);
+ assert.equal(h.api.reconnectAllAvailable(),false);
+ assert.equal(h.api.enabled('reconnect',h.api.token('one')),false);
+ finishDisconnect();await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(h.api.windowBulkBusy(),false);
+ assert.deepEqual(h.calls.filter(x=>x[0]==='reconnect').map(x=>x[1]),['one','two']);
+ assert.deepEqual(h.calls.filter(x=>x[0]==='disconnect').map(x=>x[1]),['one','two']);
+});

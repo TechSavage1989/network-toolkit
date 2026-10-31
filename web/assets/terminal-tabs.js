@@ -7,15 +7,15 @@ function valid(t){return !!t&&(t.entry?terminalSessions.get(t.id)===t.entry&&ter
 function enabled(action,t){if(!valid(t))return false;const entry=t.entry,owned=entry&&terminalOwnerCanMutate(entry)&&!entry.transferBusy;
  if(action==='reconnect-all')return reconnectAllAvailable();
  if(action==='disconnect-all')return disconnectAllAvailable();
- if(action==='close-all')return !windowBulkBusy&&windowTargets().length>0;
+ if(action==='close-all')return !windowBulkBusy&&!reconnectAllBusy&&windowTargets().length>0;
  if(action==='close')return !!t.draft||!!owned;
  if(action==='close-others')return [...terminalSessions.values()].some(e=>e!==entry&&terminalOwnerCanMutate(e)&&!e.transferBusy)||[...terminalDraftTabs.keys()].some(id=>id!==t.id);
  if(action==='close-disconnected')return [...terminalSessions.values()].some(e=>['closed','error'].includes(e.info.state)&&terminalOwnerCanMutate(e)&&!e.transferBusy);
  if(action==='rename')return !!t.draft||!!owned;
  if(action==='duplicate')return !(DETACHED_TERMINAL&&!DETACHED_WORKSPACE)&&!terminalConnectBusy&&!terminalWorkspaceTransferBusy;
  if(!entry)return action==='workspace'&&terminalViewRegistry.available;
- if(action==='reconnect')return !reconnectAllBusy&&terminalReconnectAllowed(entry);
- if(action==='disconnect')return !windowBulkBusy&&owned&&terminalLive(entry)&&entry.info.state!=='disconnecting'&&online;
+ if(action==='reconnect')return !reconnectAllBusy&&!windowBulkBusy&&terminalReconnectAllowed(entry);
+ if(action==='disconnect')return !reconnectAllBusy&&!windowBulkBusy&&owned&&terminalLive(entry)&&entry.info.state!=='disconnecting'&&online;
  if(['browse','editor'].includes(action))return !TERMINAL_ONLY&&entry.info.type==='ssh'&&entry.info.state==='connected'&&online;
  if(['paste','control-c'].includes(action))return owned&&entry.info.state==='connected'&&online;
  if(action==='copy')return !!entry.xterm?.hasSelection();
@@ -28,7 +28,7 @@ function close(focus=false){setReconnectOptions(false);setDisconnectOptions(fals
 function open(id,x,y){close();const t=token(id);if(!t)return;target=t;menu=document.createElement('div');menu.id='terminalTabContextMenu';menu.className='terminal-context-menu terminal-tab-context-menu';menu.setAttribute('role','menu');menu.setAttribute('aria-label','Terminal tab actions');const title=t.entry?.info.label||t.draft?.label||'Terminal';menu.innerHTML='<div class="terminal-context-label">'+esc(title)+'</div>'+items.map(([action,label,ico])=>'<button role="menuitem" type="button" data-terminal-tab-action="'+action+'" '+(enabled(action,t)?'':'disabled')+'>'+icon(ico)+'<span>'+label+'</span></button>').join('');document.body.append(menu);const rect=menu.getBoundingClientRect();menu.style.left=Math.max(6,Math.min(x,innerWidth-rect.width-6))+'px';menu.style.top=Math.max(6,Math.min(y,innerHeight-rect.height-6))+'px';menu.querySelector('button:not(:disabled)')?.focus({preventScroll:true});}
 function activate(entry){if(entry)selectTerminal(entry.info.id,true);}
 function reconnectTargets(){
- if(reconnectAllBusy||terminalWorkspaceTransferBusy||typeof terminalDetachedReturning!=='undefined'&&terminalDetachedReturning)return [];
+ if(reconnectAllBusy||windowBulkBusy||terminalWorkspaceTransferBusy||typeof terminalDetachedReturning!=='undefined'&&terminalDetachedReturning)return [];
  return [...terminalSessions.values()].filter(entry=>terminalReconnectAllowed(entry)).map(entry=>token(entry.info.id)).filter(Boolean);
 }
 function reconnectAllAvailable(){return reconnectTargets().length>0;}
@@ -79,7 +79,7 @@ function requestReconnectAll(){
  return true;
 }
 async function executeReconnectAll(batch){
- if(!batch||reconnectAllBusy)return false;
+ if(!batch||reconnectAllBusy||windowBulkBusy)return false;
  reconnectAllBusy=true;renderTerminalChrome();
  let attempted=0,halted=false;
  try{
@@ -109,14 +109,14 @@ function windowTargets(){
  return [...terminalSessions.values()].filter(e=>shown(e)&&terminalOwnerCanMutate(e)&&!e.transferBusy&&!e.reconnectBusy).map(e=>token(e.info.id)).concat([...terminalDraftTabs.keys()].map(token)).filter(Boolean);
 }
 function disconnectTargets(){
- if(windowBulkBusy||!online||terminalConnectBusy||terminalWorkspaceTransferBusy||typeof terminalDetachedReturning!=='undefined'&&terminalDetachedReturning)return [];
+ if(windowBulkBusy||reconnectAllBusy||!online||terminalConnectBusy||terminalWorkspaceTransferBusy||typeof terminalDetachedReturning!=='undefined'&&terminalDetachedReturning)return [];
  return windowTargets().filter(t=>t.entry&&terminalLive(t.entry)&&t.entry.info.state!=='disconnecting');
 }
 function disconnectAllAvailable(){return disconnectTargets().length>0;}
 function bulkConfirmationKey(action){return action==='disconnect-all'?'terminalConfirmDisconnectAll':'terminalConfirmCloseAll';}
 function bulkWindow(action){
  setDisconnectOptions(false);
- if(!['disconnect-all','close-all'].includes(action)||windowBulkBusy)return false;
+ if(!['disconnect-all','close-all'].includes(action)||windowBulkBusy||reconnectAllBusy)return false;
  const targets=action==='disconnect-all'?disconnectTargets():windowTargets();
  if(!targets.length)return false;
  const batch={action,targets,sequence:++bulkSequence};
@@ -136,7 +136,7 @@ function bulkWindow(action){
  return true;
 }
 async function executeWindowBulk(batch){
- if(!batch||windowBulkBusy)return false;
+ if(!batch||windowBulkBusy||reconnectAllBusy)return false;
  windowBulkBusy=true;renderTerminalChrome();
  let attempted=0;
  try{
