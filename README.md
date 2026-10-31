@@ -31,7 +31,7 @@ history retain a fallback viewport position if their resize marker is lost.
 
 This is an **opt-in prerelease**, not the stable update. In App settings >
 Updates, enable Beta updates to receive the verified v1.17.138 package.
-See [beta release notes](RELEASE_NOTES_1.17.138.txt) and
+See [beta release notes](docs/releases/RELEASE_NOTES_1.17.138.txt) and
 [Beta 2 validation](docs/RELEASE138_HANDOFF.md).
 
 ## Previous beta - 1.17.137
