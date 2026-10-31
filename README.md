@@ -14,12 +14,21 @@
   <a href="#development">Development</a>
 </p>
 
-## Current candidate — 1.17.128
+## Latest update - 1.17.131
 
-Manual names take precedence over learned CLI device names, with the endpoint
-below. Recognition includes numeric names and documented shell/network prompt
-families. Ambiguous custom prompts retain safe name/endpoint fallbacks; prompt
-recognition is not a command-success guarantee. Validation/publication pending.
+Ctrl+A selects the current recognized, echoed terminal command without
+including its prompt or prior output, even when the command wraps. Unsafe,
+uncertain, password or full-screen input keeps the original device control key.
+Multi-terminal performance changes coalesce cosmetic toolbar/status redraws,
+avoid hidden-tab highlighting work, skip unchanged full chrome redraws and update
+splitter CSS during dragging. Existing session transports, secrets, settings
+and portable updater remain unchanged. Actual user-device speed is unmeasured.
+
+See [release notes](RELEASE_NOTES_1.17.131.txt) and
+[verification handoff](docs/RELEASE131_HANDOFF.md). Official portable Windows
+downloads: [GitHub Releases](https://github.com/TechSavage1989/network-toolkit/releases/latest).
+
+## Historical 1.17.128 candidate (subsumed by published 1.17.129)
 
 ## Published 1.17.127
 

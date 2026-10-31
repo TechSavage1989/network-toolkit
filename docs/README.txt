@@ -1,3 +1,20 @@
+NETWORK TOOLKIT 1.17.131
+======================
+
+CURRENT RELEASE - 1.17.131
+
+Ctrl+A selects the current recognized, echoed terminal command without
+including its prompt or prior output, even when the command wraps. Unsafe,
+uncertain, password or full-screen input keeps the original device control key.
+Multi-terminal performance changes coalesce cosmetic toolbar/status redraws,
+avoid hidden-tab highlighting work, skip unchanged full chrome redraws and update
+splitter CSS during dragging. Existing session transports, secrets, settings
+and portable updater remain unchanged. Actual user-device speed is unmeasured.
+
+Release details: RELEASE_NOTES_1.17.131.txt and docs/RELEASE131_HANDOFF.md.
+
+PUBLISHED130 CLOSURE (retained)
+
 NETWORK TOOLKIT 1.17.130
 ======================
 

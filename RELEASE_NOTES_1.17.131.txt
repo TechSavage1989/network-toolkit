@@ -1,0 +1,26 @@
+NETWORK TOOLKIT 1.17.131 - TERMINAL INPUT AND RESPONSIVENESS
+
+Terminal Ctrl+A selects only the reliably identified editable command, including
+wrapped rows, without selecting the prompt or previous output. A successful
+selection sends no command or control byte. Password prompts, full-screen apps,
+uncertain input and blocked/unknown sessions retain their prior device behavior.
+Ordinary native input fields continue to use their normal Select All shortcut.
+
+Multiple terminal streams now share bounded cosmetic refresh scheduling.
+Active-session toolbar updates are combined per animation frame; inactive tabs
+skip toolbar redraws. Output-only batches defer full interface refresh briefly
+without delaying authentication/status changes. Hidden highlighting work is
+reduced, unchanged terminal fits skip full chrome redraw, and splitter drags
+change CSS layout tracks directly instead of rebuilding session controls.
+
+Connection transports, prompt-paced sending, saved profiles, authentication,
+file transfers, editor ownership, settings locations, release shortcuts, stable
+Network_Toolkit.exe and in-app update safeguards are retained.
+
+Added focused tests cover wrapped selection and unsafe fallbacks, four synthetic
+simultaneous sessions, drag resizing, hidden output and no-op fitting. These
+do not benchmark user hardware or certify all physical SSH/Telnet/serial devices.
+
+A same-source review run once timed out waiting for an unrelated compact Editor
+sidebar gear-focus action. Cause remains unresolved, not claimed fixed. Retain
+the original failed observation alongside successful independent runs.
