@@ -56,6 +56,13 @@ async function renderGeometry(page,label){
 }
 async function revealSourceRow(page,side,line){
  await page.evaluate(({side,line})=>{const compare=NetworkToolkitFileEditor.comparison;compare.jump(compare.result.rows.findIndex(row=>row[side]===line-1),false,side,true);},{side,line});await ready(page);
+ // A ready overview map does not establish that CodeMirror has mounted both
+ // requested source lines after wrapped virtual-height reconciliation.
+ // Keep the original rendered color/geometry assertions unchanged.
+ await page.waitForFunction(({side,line})=>{
+  const compare=NetworkToolkitFileEditor.comparison,row=compare?.result?.rows?.find(row=>row[side]===line-1);
+  return !!row&&['left','right'].every(key=>row[key]===null||document.querySelector('[data-compare-pane="'+key+'"] .cm-line[data-source-line="'+(row[key]+1)+'"]'));
+ },{side,line});
 }
 async function assertAlignment(page,label){
  await renderGeometry(page,label+' before');

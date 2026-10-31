@@ -45,6 +45,32 @@ test('native line-number gutter includes every source-free alignment block witho
  assert(source.includes("widget=>widget instanceof Gap"),'only local visual spacer widgets receive empty line-number rows');
  assert(source.includes("renderEmptyElements:true"),'do not silently skip fractional source-free block heights');
 });
+test('Beta 7 visual peer calibration matches real comparison rows through additions',()=>{
+ const rows=[{left:0,right:0},{left:1,right:null},{left:2,right:1},{left:null,right:2},{left:3,right:3}];
+ const lookup=api.sourceRowLookup(rows);
+ assert.deepEqual([lookup.left[1],lookup.left[2],lookup.left[3],lookup.left[4]],[0,1,2,4]);
+ assert.deepEqual([lookup.right[1],lookup.right[2],lookup.right[3],lookup.right[4]],[0,2,3,4]);
+ const line=(number,top,height=20)=>({dataset:{sourceLine:String(number)},getBoundingClientRect:()=>({top,bottom:top+height,height})});
+ const view=elements=>({scrollDOM:{getBoundingClientRect:()=>({top:0,bottom:280})},contentDOM:{querySelectorAll:()=>elements}});
+ const left=view([line(1,-100),line(2,100),line(3,142),line(4,185)]);
+ const right=view([line(1,-100),line(2,146.25),line(3,165),line(4,185)]);
+ assert.equal(api.renderedPeerOffset({left,right},lookup,'left'),4.25,'right line 2 corresponds to left line 3, never left line 2');
+ assert.equal(api.renderedPeerOffset({left,right},lookup,'right'),-4.25,'correction follows the user gesture source');
+ assert.equal(api.renderedPeerOffset({left:view([line(2,100)]),right},lookup,'left'),null,'unmatched insertion has no fabricated partner');
+ assert.equal(api.renderedPeerOffset({left:view([line(3,-200)]),right},lookup,'left'),null,'offscreen rows cannot create a correction');
+});
+test('Beta 7 bounded painted row corrections preserve user-owned scroll intent',()=>{
+ assert.equal(api.nextPaintedOffset(0,4.5),4.5);
+ assert.equal(api.nextPaintedOffset(4.5,-4.5),0,'real native settling removes an obsolete correction');
+ assert.equal(api.nextPaintedOffset(4.5,100),4.5,'large hunk or layout gaps must use the original shared model');
+ assert.equal(api.nextPaintedOffset(4.5,null),4.5);
+ assert.equal(api.nextPaintedOffset(4.5,.7),4.5,'subpixel noise cannot cause oscillation');
+ assert.equal(api.nextPaintedOffset(11,4),12,'correction is bounded even during long gestures');
+ const code=fs.readFileSync(require.resolve('../web/assets/editor-aligned-compare.js'),'utf8');
+ assert(code.includes('rowLookup=sourceRowLookup(result.rows)'));
+ assert(code.includes('paintedOffsets={left:0,right:0};rowLookup={left:[],right:[]}'));
+ assert(code.includes("targets.includes(peer)&&q('[data-compare-sync]').checked"),'never alter independently scrolled panes');
+});
 test('source geometry maps actual blank widgets without inventing numbered source lines',()=>{const view=blockView(200),offsets=[0,40,100,120],heights=[20,60,20];for(const pixel of [0,10,20,25,39,40,50,99,100,110,120]){const native=api.nativePixelFromAligned(view,offsets,heights,pixel);assert(Math.abs(api.alignedPixelFromNative(view,offsets,heights,native)-pixel)<.001);}assert.equal(api.nativePixelFromAligned(view,offsets,heights,30),30);assert.equal(view.state.doc.toString(),'a\nb\nc');});
 test('leading and trailing source-free gaps retain continuous map coordinates',()=>{const doc=C.EditorState.create({doc:'one'}).doc,blocks=[{from:0,to:0,top:0,height:30,widget:{alignedStart:0,height:30}},{from:0,to:3,top:30,height:80},{from:3,to:3,top:110,height:30,widget:{alignedStart:70,height:30}}];for(const b of blocks){b.bottom=b.top+b.height;b.type=b.widget?1:0;}const view={state:{doc},elementAtHeight:y=>blocks.find(b=>y<b.bottom)||blocks.at(-1),lineBlockAt:()=>({type:blocks})};for(const p of [0,15,29,30,50,69,70,85,100]){const native=api.nativePixelFromAligned(view,[30,100],[40],p);assert(Math.abs(api.alignedPixelFromNative(view,[30,100],[40],native)-p)<.001);}assert.equal(doc.toString(),'one');});
 

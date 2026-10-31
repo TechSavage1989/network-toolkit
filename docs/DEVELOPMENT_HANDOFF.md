@@ -1,3 +1,23 @@
+# Network Toolkit v1.17.143 Beta 7 - development candidate, NOT PUBLISHED
+
+Branch beta/1.17.143-editor-reliability, starting from main 0730b532cba6619d4025a3bb4ae45bf3d77112da.
+Read docs/RELEASE143_HANDOFF.md before further work. This beta continues
+Phase 6 reliability and final optimization without changing the stable
+channel, user credentials, source ownership, authorization or updater consent.
+
+Editor map motion now calibrates small painted row offsets using actual
+visible matching comparison rows and bounded corrections. It excludes rows
+without a peer and resets calibration when source/layout geometry changes.
+Hosted source alignment fixture waits for real CodeMirror row mounting
+before inspecting colors/coordinates, keeping original assertions intact.
+Local full 1,547 JavaScript tests and 44 Python resource/release tests
+passed. Full hosted browser/Windows integration tests are required.
+Previous intermittent narrow Editor comparison and map-motion failures
+remain historical evidence and are not declared fixed until the new
+exact-source CI proves it.
+
+---
+
 # Network Toolkit 1.17.142 Beta 6 - publication verified
 
 Published 2026-10-31T21:49:07Z as GitHub prerelease ID 430206177

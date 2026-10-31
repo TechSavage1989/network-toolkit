@@ -1,0 +1,14 @@
+Network Toolkit 1.17.143 Beta 7
+
+## What's New
+
+- Comparison maps maintain closer visual alignment between panes during active scrolling and dragging, including narrow windows with wrapped lines.
+- Synchronized comparisons remain more consistent when the files have added or removed lines, rather than identical source-line numbering.
+
+## Additional Details
+
+- During synchronized comparison movement, the Editor measures visible matching comparison rows and applies a bounded correction for small native scroll-estimate differences. Added or removed source lines do not count as matching rows. Larger offsets continue to use the existing source alignment model.
+- Corrections are limited to 12 CSS pixels, reset on layout or document changes, and do not affect independent scrolling, document text, save operations, selection, history, credentials, file transfers or application preferences.
+- Browser regression tests now check that relevant CodeMirror source rows are mounted before evaluating their rendered colors and geometry, while preserving the existing visual assertions.
+- This opt-in beta retains the stable Network_Toolkit.exe name and user-confirmed updates. The stable channel remains at v1.17.136. No automatic installation or downgrade is introduced.
+- Automated tests cannot substitute for prolonged physical Windows and simultaneous live-device testing. Previous intermittent Editor CI issues remain tracked until the exact hosted tests pass.

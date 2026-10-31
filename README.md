@@ -14,7 +14,18 @@
   <a href="#development">Development</a>
 </p>
 
-## Latest beta - 1.17.142 Beta 6
+## Beta 7 candidate - 1.17.143
+
+The next reliability beta refines synchronized Editor comparison scrolling in
+narrow, wrapped layouts. Small rendered-row offsets are corrected only during
+synchronized gestures, while independent scrolling and all source/history data
+remain unchanged. Its browser regressions also await actual virtualized source
+rows before inspecting colors and native geometry. This is an opt-in prerelease
+candidate, not a stable promotion.
+
+[Development handoff](docs/RELEASE143_HANDOFF.md)
+
+## Previous beta - 1.17.142 Beta 6
 
 Published October 31, 2026 as an opt-in prerelease. Beta 6 reduces unrelated
 graph redraws during simultaneous Terminal and Packet Capture activity, releases
