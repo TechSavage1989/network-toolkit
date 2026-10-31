@@ -1,5 +1,14 @@
 # Network Toolkit development
 
+Current candidate: v1.17.138 Beta 2 continues Phase 1 terminal responsiveness,
+based on v1.17.137 Beta 1. The change coalesces pointer-driven divider layout,
+clips unfitted canvases to their own panes and retains scrolled-back viewport
+anchors when xterm discards a resize marker. It does not change transport,
+prompt pacing, credentials, settings, stable executable name or beta opt-in.
+Read docs/RELEASE138_HANDOFF.md and docs/DEVELOPMENT_HANDOFF.md before editing.
+The stable v1.17.136 and published beta v1.17.137 remain untouched until
+exact-source release checks and the new prerelease publication succeed.
+
 Current published prerelease: v1.17.137 Beta 1, published
 2026-10-31T07:15:09Z.
 Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.137

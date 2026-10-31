@@ -1,0 +1,16 @@
+Network Toolkit 1.17.138 Beta 2
+
+## What's New
+
+- Terminal pane dividers respond more smoothly when you drag them, even during rapid movement.
+- Terminal content stays within its pane while resizing.
+- Scrolled-back terminal output is better preserved when resizing changes the visible rows.
+
+## Additional Details
+
+- Beta 2 is an optional Phase 1 prerelease, published through the existing Beta updates opt-in. It is not promoted to the stable releases/latest feed, and the normal stable update remains v1.17.136.
+- Divider pointer movements are coalesced to at most one visual layout update per animation frame. The last pointer position is committed when the drag ends, and a cancelled drag restores its previous ratio. Resizing the surrounding window/sidebar during a drag uses the current divider geometry rather than stale dimensions.
+- Terminal pane bodies and inner terminal views clip any oversized canvas while a new row/column fit is pending, preventing content from visually extending into another pane.
+- When automatic scrolling is disabled, the terminal retains a bounded viewport-row fallback if its xterm marker is disposed during reflow or scrollback trimming. An explicit new scroll or Follow Latest action takes priority over a stale resize.
+- Existing row/column fitting, remote terminal resize, selection anchoring, keyboard divider controls, output processing, input pacing, session ownership, detached windows, settings and updater safeguards remain unchanged.
+- Regression tests cover pointer bursts, live geometry changes, pointer release/cancel/capture loss, four-pane fits, scroll anchor fallback, Follow Latest priority and clipping rules. They do not represent a measured physical-device benchmark or establish a fix for all known Editor layout issues.

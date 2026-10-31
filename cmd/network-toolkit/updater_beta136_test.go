@@ -6,7 +6,10 @@ import (
  "encoding/json"
  "io"
  "net/http"
+ "strconv"
  "strings"
+
+ "networktoolkit/internal/model"
  "testing"
 )
 
@@ -75,7 +78,13 @@ func TestBeta136DownloadRequiresMatchingOptedChannel(t *testing.T){
   reply:=updatePollHandle(a,"/api/updates/download",body)
   if reply.Code!=409 {t.Fatalf("cross-channel accepted: %d %s",reply.Code,reply.Body.String())}
  }
- stable,_:=updateParseRelease(feedFixture("1.17.138"))
+ // Use a genuinely newer stable example, independent of future beta
+ // version bumps, so the same-version rejection guard stays meaningful.
+ parts:=strings.Split(model.Version,".")
+ currentPatch,parseErr:=strconv.Atoi(parts[2])
+ if parseErr!=nil {t.Fatal(parseErr)}
+ laterVersion:=strings.Join([]string{parts[0],parts[1],strconv.Itoa(currentPatch+1)},".")
+ stable,_:=updateParseRelease(feedFixture(laterVersion))
  a.updater.latest=stable
  a.updater.channel="stable"
  updatePollTransport(t,updateRoundTrip(func(r *http.Request)(*http.Response,error){
@@ -83,7 +92,7 @@ func TestBeta136DownloadRequiresMatchingOptedChannel(t *testing.T){
  }))
  // Existing stable clients continue to omit a channel field; the request
  // reaches the network and its mocked 403, not the channel-mismatch 409.
- reply:=updatePollHandle(a,"/api/updates/download",`{"version":"1.17.138"}`)
+ reply:=updatePollHandle(a,"/api/updates/download",`{"version":"`+laterVersion+`"}`)
  if reply.Code==409 {t.Fatalf("stable default unexpectedly blocked: %s",reply.Body.String())}
 }
 func TestBeta136FeedRejectsInvalidChannelAndPreservesCooldown(t *testing.T){
