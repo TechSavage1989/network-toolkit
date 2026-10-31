@@ -14,17 +14,22 @@
   <a href="#development">Development</a>
 </p>
 
-## Latest update - 1.17.135
+## Latest update - 1.17.136
 
-Last paste and Last command now copy and select prompt-paced SSH output
-without extra "Command N:" headings or repeated device echoes.
-Enable Include commands to see the original submitted commands once;
-disable it to copy the responses without command lines.
+You can now opt in to Beta updates under App settings > Updates.
+The option is disabled by default. When enabled, Check for updates
+considers both stable releases and official prereleases, while retaining
+the existing download verification and Install and restart confirmation.
 
-See [release notes](RELEASE_NOTES_1.17.135.txt) and
-[release validation](docs/RELEASE135_HANDOFF.md).
-The Windows portable download and updater use the same official
-[GitHub Releases](https://github.com/TechSavage1989/network-toolkit/releases/latest).
+This stable release is the upgrade bridge from v1.17.135 to the optional
+Phase 1 responsiveness beta. See [release notes](RELEASE_NOTES_1.17.136.txt)
+and [development handoff](docs/RELEASE136_HANDOFF.md).
+
+## Previous update - 1.17.135
+
+Last paste and Last command now show submitted commands once when enabled,
+without numbered headings or duplicate device echoes. See
+[release notes](docs/releases/RELEASE_NOTES_1.17.135.txt).
 
 ## Previous update - 1.17.134
 
