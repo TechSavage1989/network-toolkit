@@ -1,3 +1,25 @@
+NETWORK TOOLKIT 1.17.139
+======================
+
+CURRENT RELEASE - 1.17.139 (BETA 3 CANDIDATE)
+
+Beta 3 reduces terminal display overhead during high-volume output by
+combining output-only event bursts per session into bounded parser writes.
+Original byte ordering and per-event history and macro capture remain
+unchanged. Previously buffered output also uses batched display writes
+when opening a terminal view.
+
+Connection status and authentication prompts stay immediate. The
+existing output-loss warning, 1 MiB pending-render cap, input pacing,
+session isolation, credentials and opt-in Beta updates are preserved.
+
+This version is still under development. It is not a published download,
+and no physical network-device throughput benchmark has been run.
+Published Beta 2 remains v1.17.138; stable stays v1.17.136.
+
+Details: RELEASE_NOTES_1.17.139.txt and docs/RELEASE139_HANDOFF.md.
+Prior release descriptions follow.
+
 NETWORK TOOLKIT 1.17.138
 ======================
 
