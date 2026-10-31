@@ -3,17 +3,22 @@
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
 
-Current development:1.17.130 automatic blank profile naming and subtle connection-
-type badges (SSH/Telnet/Serial/CMD/PowerShell) across tabs, Saved and Recent.
-Initial local1,467JS/42Python/Go/race/Windows compile passed; hosted45f7d49 failed
-focused browser/native checks. Scoped readability/fixture corrections and fresh
-validation are pending; see docs/RELEASE130_HANDOFF.md.
-Blank-save must not freeze a learned name as a manual override. Preserve explicit
-manual names, connection identity/credentials, revisions and session safeguards.
-The129 closure below is verified history, not130 acceptance. No standalone129
-closure release is intended; this source record is incorporated into130 work.
+Current published version: 1.17.130. Published 2026-10-31T03:13:29Z;
+actual public download/source/feed proof 03:14:21.181667Z, independent 03:15:04.117528Z.
+Source/tag 77ceeec0b9b258dc7e3a1dfc29f9992ad3d5d884;
+tree 6b88d9a83a666f2363c496b21e7ec45cb2c6fd9a.
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.130
+Automatic blank-profile naming, five type badges and new-Recent revision protection
+passed 1,477 JS / 42 Python, full Go/race/compile, all 14 accepted PR jobs and actual
+browser/native checks. Public 1,244-source/1,251-member bytes/feed verified; prior 129
+unchanged. Synthetic Telnet/serial fixtures are not live SSH/physical COM/full restart.
+Narrow 390px sidebar can horizontally overflow; no simultaneous-control claim.
+Original failed jobs/error pixels retained; final review push legacy editor transfer
+failed. Final main duplicate 41163257051 passed all 14 jobs; API updated 03:31:00Z,
+confirmed 03:31:50Z. Earlier failed observations remain retained.
+See docs/RELEASE130_HANDOFF.md. This source-only closure changes no release bytes.
 
-Current published version:1.17.129. Published 2026-10-31T01:59:27Z;
+Previous published version:1.17.129. Published 2026-10-31T01:59:27Z;
 actual public downloads/source/feed verified 02:01:35.447379Z and independently
 02:02:26.029257Z. Source/tag0de3c5708ce7885ae105ff5ee3601b18336941d4;
 tree 00ab469d2ef3f2bff8da7d8ecf94474b2a1bdbee.

@@ -1,12 +1,17 @@
 NETWORK TOOLKIT 1.17.130
 ======================
 
-CURRENT RELEASE - 1.17.130 (candidate; not yet published)
-Blank profile names are intended to remain automatic: learned CLI name first,
-then IP/configured host or COM port, without freezing a learned name as manual.
-Subtle SSH/Telnet/Serial/CMD/PowerShell badges distinguish tabs, Saved and Recent.
-Implementation and exact-source runtime/release acceptance are pending.
-See docs/RELEASE130_HANDOFF.md and RELEASE_NOTES_1.17.130.txt.
+CURRENT RELEASE - 1.17.130
+Published 2026-10-31T03:13:29Z; actual public downloads/source/updater feed verified
+03:14:21Z and independently 03:15:04Z. Blank profile names remain automatic:
+manual override first when explicitly assigned, otherwise learned name then
+IP/configured host or COM endpoint. SSH/Telnet/Serial/CMD/PowerShell badges show
+type across tabs, Saved and Recent. New-Recent revision races are guarded.
+All 14 accepted PR checks passed; previous failed observations are retained.
+Narrow sidebar rows can require horizontal scrolling. No live-device/full restart
+claim. Final main duplicate checks passed all 14 jobs at 03:31 UTC; earlier failed
+observations remain documented in RELEASE130_HANDOFF.md.
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.130
 
 PUBLISHED129 CLOSURE (retained)
 
