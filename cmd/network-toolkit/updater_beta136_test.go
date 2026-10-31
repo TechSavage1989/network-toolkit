@@ -75,7 +75,7 @@ func TestBeta136DownloadRequiresMatchingOptedChannel(t *testing.T){
   reply:=updatePollHandle(a,"/api/updates/download",body)
   if reply.Code!=409 {t.Fatalf("cross-channel accepted: %d %s",reply.Code,reply.Body.String())}
  }
- stable,_:=updateParseRelease(feedFixture("1.17.138"))
+ stable,_:=updateParseRelease(feedFixture("1.17.139"))
  a.updater.latest=stable
  a.updater.channel="stable"
  updatePollTransport(t,updateRoundTrip(func(r *http.Request)(*http.Response,error){
@@ -83,7 +83,7 @@ func TestBeta136DownloadRequiresMatchingOptedChannel(t *testing.T){
  }))
  // Existing stable clients continue to omit a channel field; the request
  // reaches the network and its mocked 403, not the channel-mismatch 409.
- reply:=updatePollHandle(a,"/api/updates/download",`{"version":"1.17.138"}`)
+ reply:=updatePollHandle(a,"/api/updates/download",`{"version":"1.17.139"}`)
  if reply.Code==409 {t.Fatalf("stable default unexpectedly blocked: %s",reply.Body.String())}
 }
 func TestBeta136FeedRejectsInvalidChannelAndPreservesCooldown(t *testing.T){
