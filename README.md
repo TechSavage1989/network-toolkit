@@ -14,15 +14,18 @@
   <a href="#development">Development</a>
 </p>
 
-## Beta 3 in development - 1.17.139 (Phase 1)
+## Latest beta - 1.17.139 Beta 3 (Phase 1)
 
-The next beta reduces repeated terminal display writes when several sessions
-receive large output bursts. Input, saved sessions and the opt-in updater
-remain unchanged. This is a **development candidate**, not a published
-download. Review [PR #14](https://github.com/TechSavage1989/network-toolkit/pull/14)
-and the [Beta 3 development handoff](docs/RELEASE139_HANDOFF.md).
+Published October 31, 2026 as an **opt-in prerelease**. Heavy terminal
+output is handled in bounded per-session batches, reducing repeated
+display work while preserving per-event history, input and connection
+behavior. Enable Beta updates under App settings > Updates to receive it.
 
-## Latest published beta - 1.17.138 Beta 2 (Phase 1)
+[Download Beta 3](https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.139) ·
+[Release notes](RELEASE_NOTES_1.17.139.txt) ·
+[Validation and handoff](docs/RELEASE139_HANDOFF.md)
+
+## Previous beta - 1.17.138 Beta 2 (Phase 1)
 
 Beta 2 smooths multi-pane terminal resizing. Splitter movements are applied
 once per animation frame and commit the final pointer position; content is

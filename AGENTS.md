@@ -1,14 +1,14 @@
-# Network Toolkit v1.17.139 Beta 3 - high-output rendering candidate
+# Network Toolkit v1.17.139 Beta 3 - published high-output batching
 
-## Baseline and scope
-
-Based on published v1.17.138 Beta 2 (tag 8e9052eb14ab9a5a5fc9363b0ac710a36203a133).
-Current development PR: https://github.com/TechSavage1989/network-toolkit/pull/14
-Stable v1.17.136 and prerelease v1.17.138 remain unchanged.
-This is a candidate, not a published beta.
-
-- Coalesce output-only event bursts separately by session into bounded 64 KiB xterm parser calls.
+Published 2026-10-31T15:12:33Z as GitHub prerelease 430009298.
+Source/tag: 28d51f149b3246a8b824a90e515f79064b3298b4.
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.139
+Exact-source build and publish workflow 41213506790 passed. Four assets uploaded.
+Opt-in beta feed resolves 1.17.139; stable releases/latest remains 1.17.136.
 Read docs/RELEASE139_HANDOFF.md and docs/DEVELOPMENT_HANDOFF.md before editing.
+The binary update retains the stable Network_Toolkit.exe name and does not
+auto-install. Earlier Editor comparison-motion and physical-device limitations
+are not claimed fixed by the beta.
 
 # Network Toolkit development
 
