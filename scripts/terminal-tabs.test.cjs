@@ -4,11 +4,11 @@ function harness(){
  const calls=[],revisions=new Map([['one',0],['two',0]]),entries=new Map();for(const id of ['one','two'])entries.set(id,{info:{id,label:id,state:'connected'},xterm:{hasSelection:()=>true,selectAll:()=>calls.push(['select',id])}});
  const document=makeDocument('<div id="terminalTabs"><div class="terminal-tab"><button data-terminal-tab="one">one</button></div><div class="terminal-tab"><button data-terminal-tab="two">two</button></div></div>');document.body=document;
  const window={addEventListener(){},NetworkToolkitTerminalCopy:{withInputSuppressed:(_e,fn)=>fn()}},extras={current:()=>({}),output:()=>({text:'retained output'}),copy:async e=>calls.push(['copy-output',e.info.id]),select:e=>calls.push(['select-output',e.info.id]),scrollBottom:e=>calls.push(['bottom',e.info.id]),scrollTop(){},clear(){}};
- const context={window,document,terminalSessions:entries,terminalDraftTabs:new Map(),terminalSessionRevision:id=>revisions.get(id),terminalOwnerCanMutate:e=>!e.unowned,terminalReconnectAllowed:e=>e.info.state==='closed',terminalLive:e=>e?.info.state==='connected',terminalConnectBusy:false,terminalWorkspaceTransferBusy:false,terminalViewRegistry:{available:true},terminalWorkspaceView:()=>null,terminalViewForSession:()=>null,requestTerminalReattach:async e=>calls.push(['reattach',e.info.id]),terminalSingleDetachReason:()=>'',DETACHED_TERMINAL:false,DETACHED_WORKSPACE:false,TERMINAL_ONLY:false,online:true,CSS:{escape:String},innerHeight:900,innerWidth:1400,esc:String,icon:()=>'',selectTerminal:id=>calls.push(['activate',id]),enqueueTerminalInput:(e,data)=>calls.push(['input',e.info.id,data]),reconnectTerminal:async e=>calls.push(['reconnect',e.info.id]),disconnectTerminal:async e=>calls.push(['disconnect',e.info.id]),NetworkToolkitTerminalExtras:extras,NetworkToolkitTerminalInteraction:{copy:async e=>calls.push(['copy',e.info.id]),paste:async e=>calls.push(['paste',e.info.id])},detachTerminal:async e=>calls.push(['detach',e.info.id]),renderTerminalChrome(){},toast(){},openModal(title,body,foot){calls.push(['modal',title]);const modal=new Element('section',{id:'fixtureModal'});modal.innerHTML=body+foot;document.append(modal);},closeModal(){document.getElementById('fixtureModal')?.remove();},saveState(){calls.push(['save']);},deleteTerminalTab:async(entry,disconnect)=>{calls.push(['delete',entry.info.id,disconnect]);entries.delete(entry.info.id);},closeTerminalDraft:id=>{calls.push(['draft-close',id]);context.terminalDraftTabs.delete(id);},state:{}};
+ const context={window,document,terminalSessions:entries,terminalDraftTabs:new Map(),terminalSessionRevision:id=>revisions.get(id),terminalOwnerCanMutate:e=>!e.unowned,terminalReconnectAllowed:e=>!!e&&['connected','closed','error'].includes(e.info.state)&&!e.unowned&&!e.transferBusy&&!e.reconnectBusy&&context.online&&!context.terminalWorkspaceTransferBusy&&context.terminalEntryShown(e),terminalEntryShown:()=>true,terminalLive:e=>e?.info.state==='connected',terminalConnectBusy:false,terminalWorkspaceTransferBusy:false,terminalViewRegistry:{available:true},terminalWorkspaceView:()=>null,terminalViewForSession:()=>null,requestTerminalReattach:async e=>calls.push(['reattach',e.info.id]),terminalSingleDetachReason:()=>'',DETACHED_TERMINAL:false,DETACHED_WORKSPACE:false,TERMINAL_ONLY:false,online:true,CSS:{escape:String},innerHeight:900,innerWidth:1400,esc:String,icon:()=>'',selectTerminal:id=>calls.push(['activate',id]),enqueueTerminalInput:(e,data)=>calls.push(['input',e.info.id,data]),reconnectTerminal:async e=>calls.push(['reconnect',e.info.id]),disconnectTerminal:async e=>calls.push(['disconnect',e.info.id]),NetworkToolkitTerminalExtras:extras,NetworkToolkitTerminalInteraction:{copy:async e=>calls.push(['copy',e.info.id]),paste:async e=>calls.push(['paste',e.info.id])},detachTerminal:async e=>calls.push(['detach',e.info.id]),renderTerminalChrome(){},toast(){},openModal(title,body,foot){calls.push(['modal',title]);const modal=new Element('section',{id:'fixtureModal'});modal.innerHTML=body+foot;document.append(modal);},closeModal(){document.getElementById('fixtureModal')?.remove();},saveState(){calls.push(['save']);},deleteTerminalTab:async(entry,disconnect)=>{calls.push(['delete',entry.info.id,disconnect]);entries.delete(entry.info.id);},closeTerminalDraft:id=>{calls.push(['draft-close',id]);context.terminalDraftTabs.delete(id);},state:{}};
  vm.runInNewContext(fs.readFileSync(require.resolve('../web/assets/terminal-tabs.js'),'utf8'),context);return {api:window.NetworkToolkitTerminalTabs,document,entries,revisions,calls,context};
 }
 test('right clicking an inactive terminal tab opens all tab actions without changing the active terminal',async()=>{
- const h=harness(),tab=h.document.querySelector('[data-terminal-tab="two"]');h.document.emit('contextmenu',tab,{clientX:80,clientY:90});const menu=h.document.querySelector('#terminalTabContextMenu');assert(menu);for(const action of ['rename','duplicate','move','workspace','reconnect','disconnect','close','close-others','close-disconnected','clear','copy-output'])assert(menu.querySelector('[data-terminal-tab-action="'+action+'"]'),action);assert.deepEqual(h.calls,[]);await h.api.run('control-c',h.api.token('two'));assert.deepEqual(h.calls,[['activate','two'],['input','two','\x03']]);
+ const h=harness(),tab=h.document.querySelector('[data-terminal-tab="two"]');h.document.emit('contextmenu',tab,{clientX:80,clientY:90});const menu=h.document.querySelector('#terminalTabContextMenu');assert(menu);for(const action of ['rename','duplicate','move','workspace','reconnect','reconnect-all','disconnect','close','close-others','close-disconnected','clear','copy-output'])assert(menu.querySelector('[data-terminal-tab-action="'+action+'"]'),action);assert.deepEqual(h.calls,[]);await h.api.run('control-c',h.api.token('two'));assert.deepEqual(h.calls,[['activate','two'],['input','two','\x03']]);
 });
 test('tab actions retain their target and reject stale ownership or disconnected input',async()=>{
  const h=harness(),t=h.api.token('two');h.revisions.set('two',1);await h.api.run('disconnect',t);assert.deepEqual(h.calls,[]);const e=h.entries.get('two');e.info.state='closed';const current=h.api.token('two');assert.equal(h.api.enabled('paste',current),false);assert.equal(h.api.enabled('reconnect',current),true);await h.api.run('reconnect',current);assert.deepEqual(h.calls,[['reconnect','two']]);e.unowned=true;assert.equal(h.api.enabled('close',h.api.token('two')),false);assert.equal(h.api.enabled('disconnect',h.api.token('two')),false);
@@ -74,4 +74,85 @@ test('128 manual rename waits for authoritative response, blocks duplicate submi
 test('128 clear override is an explicit action, not an empty ordinary rename',async()=>{
  const h=harness(),entry=h.entries.get('one');entry.info.type='ssh';const requests=[];h.context.api=async(path,method,body)=>{requests.push({path,method,body});return {session:{...entry.info,label:'SSH 192.0.2.23:22',manualName:'',nameExplicit:false,nameRevision:8,labelSource:'default'}};};h.context.upsertTerminalSession=info=>{entry.info=info;};h.context.startTerminalFeed=()=>{};
  await h.api.run('rename',h.api.token('one'));const form=h.document.getElementById('terminalTabRenameForm');h.document.getElementById('terminalTabName').value='';h.document.emit('submit',form);assert.equal(requests.length,0);h.document.emit('click',h.document.querySelector('[data-terminal-clear-name]'));await new Promise(resolve=>setImmediate(resolve));assert.equal(requests.length,1);assert.equal(requests[0].body.label,'');assert.equal(requests[0].body.clear,true);assert.equal(entry.info.nameExplicit,false);assert.equal(entry.info.nameRevision,8);
+});
+
+
+test('tab right-click Reconnect all asks before reconnecting every eligible window session',async()=>{
+ const h=harness();
+ h.entries.get('one').info.state='closed';
+ h.entries.get('two').info.state='error';
+ const menuTab=h.document.querySelector('[data-terminal-tab="one"]');
+ h.document.emit('contextmenu',menuTab,{clientX:90,clientY:90});
+ const button=h.document.querySelector('[data-terminal-tab-action="reconnect-all"]');
+ assert(button&&!button.disabled);
+ await h.api.run('reconnect-all',h.api.token('one'));
+ assert.deepEqual(h.calls,[['modal','Reconnect all terminal sessions']]);
+ assert.equal(h.document.querySelector('[data-terminal-reconnect-all-confirm]').disabled,false);
+ await h.api.confirmReconnectAll();
+ assert.deepEqual(h.calls,[['modal','Reconnect all terminal sessions'],['reconnect','one'],['reconnect','two']]);
+ assert.equal(h.entries.get('one').info.state,'closed','bulk reconnect does not remove retained tabs');
+});
+
+test('Reconnect all includes connected sessions but excludes other windows and busy or unowned sessions',async()=>{
+ const h=harness();
+ const connected=h.entries.get('one'),closed=h.entries.get('two');
+ closed.info.state='closed';
+ const detached={info:{id:'detached',state:'closed'}};
+ const unowned={info:{id:'unowned',state:'connected'},unowned:true};
+ const transfer={info:{id:'transfer',state:'closed'},transferBusy:true};
+ const pending={info:{id:'pending',state:'awaiting_input'}};
+ h.entries.set('detached',detached);h.entries.set('unowned',unowned);h.entries.set('transfer',transfer);h.entries.set('pending',pending);
+ h.context.terminalEntryShown=entry=>entry!==detached;
+ assert.deepEqual(Array.from(h.api.reconnectTargets(),t=>t.id),['one','two']);
+ assert.equal(h.api.reconnectAllAvailable(),true);
+ assert.equal(h.api.requestReconnectAll(),true);
+ const modal=h.document.querySelector('#fixtureModal');
+ assert.match(modal.textContent,/1 currently connected session/);
+ h.revisions.set('two',1);
+ await h.api.confirmReconnectAll();
+ assert.deepEqual(h.calls,[['modal','Reconnect all terminal sessions'],['reconnect','one']]);
+ assert.equal(connected.info.state,'connected');
+ assert(h.entries.has('detached'));
+});
+
+test('Reconnect all cancellation and ownership transfer do not send any reconnect requests',async()=>{
+ const h=harness();
+ h.api.requestReconnectAll();
+ h.context.closeModal();
+ assert.equal(await h.api.confirmReconnectAll(),false);
+ assert.deepEqual(h.calls,[['modal','Reconnect all terminal sessions']]);
+ h.context.terminalWorkspaceTransferBusy=true;
+ assert.equal(h.api.reconnectAllAvailable(),false);
+ assert.equal(h.api.requestReconnectAll(),false);
+ h.context.terminalWorkspaceTransferBusy=false;
+ h.api.requestReconnectAll();
+ h.entries.get('one').unowned=true;h.entries.get('two').transferBusy=true;
+ assert.equal(await h.api.confirmReconnectAll(),false);
+ assert.equal(h.calls.filter(c=>c[0]==='reconnect').length,0);
+});
+
+test('bulk reconnection is serialized, guarded from duplicate starts and pauses for authentication',async()=>{
+ const h=harness();let releaseFirst;const calls=h.calls;
+ h.context.reconnectTerminal=async entry=>{
+  calls.push(['reconnect',entry.info.id]);
+  if(entry.info.id==='one')await new Promise(resolve=>releaseFirst=resolve);
+ };
+ h.api.requestReconnectAll();
+ const task=h.api.confirmReconnectAll();
+ assert.equal(h.api.reconnectAllBusy(),true);
+ assert.equal(h.api.reconnectAllAvailable(),false);
+ assert.equal(h.api.requestReconnectAll(),false);
+ releaseFirst();
+ await task;
+ assert.deepEqual(calls.filter(c=>c[0]==='reconnect'),[['reconnect','one'],['reconnect','two']]);
+ h.context.reconnectTerminal=async entry=>{
+  calls.push(['reconnect-auth',entry.info.id]);
+  if(entry.info.id==='one'){
+   const form=new Element('form',{id:'terminalConnectForm'});h.document.append(form);
+  }
+ };
+ h.api.requestReconnectAll();
+ await h.api.confirmReconnectAll();
+ assert.deepEqual(calls.filter(c=>c[0]==='reconnect-auth'),[['reconnect-auth','one']]);
+ assert.equal(h.api.reconnectAllBusy(),false);
 });

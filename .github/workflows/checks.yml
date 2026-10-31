@@ -61,6 +61,11 @@ jobs:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-types130/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-types130-results
         run: node scripts/terminal-types130.browser.cjs
+      - name: Verify split Reconnect and guarded current-window Reconnect all
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-types130/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-types130-results
+        run: node scripts/terminal-reconnect132.browser.cjs
       - name: Retain type130 responsive browser evidence
         uses: actions/upload-artifact@v7
         if: always()

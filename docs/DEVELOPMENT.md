@@ -40,6 +40,18 @@ Use `./cmd/network-toolkit` in direct application build/run/test commands.
 The [Checks workflow](../.github/workflows/checks.yml) also runs native Windows
 and browser checks. Cross-compilation is not native runtime acceptance.
 
+## Release note writing
+
+Follow [the release notes standard](RELEASE_NOTES_STYLE.md) for each new
+version. The in-app "What's New" panel is a short, user-focused summary of
+the effects of the changes. The expandable "Additional Details" section is
+for technical behavior, safeguards, limitations and compatibility.
+Use the exact headings "## What's New" and "## Additional Details" in the
+new root release note, and verify the rendered preview and disclosure.
+Keep detailed CI results, implementation traces and source identifiers in
+release handoffs rather than the user-facing summary. Preserve previous
+published notes without rewriting them.
+
 ## Packaging and publication
 
 Stage/commit all intended source paths before packaging: the packager uses

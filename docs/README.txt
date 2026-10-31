@@ -1,3 +1,19 @@
+NETWORK TOOLKIT 1.17.132
+======================
+
+CURRENT RELEASE - 1.17.132
+
+Reconnect one terminal as before, or use the new Reconnect all action from
+a tab's right-click menu or the small arrow beside the main Reconnect button.
+The new action confirms before restarting eligible sessions in this window.
+The updater now shows practical improvements under What's New, with technical
+information available under Additional details.
+
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.132
+Details: RELEASE_NOTES_1.17.132.txt and docs/RELEASE132_HANDOFF.md.
+
+PREVIOUS PUBLISHED RELEASE - 1.17.131
+
 NETWORK TOOLKIT 1.17.131
 ======================
 

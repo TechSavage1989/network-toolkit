@@ -1,0 +1,18 @@
+Network Toolkit 1.17.132
+
+## What's New
+
+- Reconnect eligible terminal sessions together from the tab right-click menu or the arrow beside Reconnect.
+- Keep the existing one-session Reconnect button, with an additional option that stays out of the way until needed.
+- Update notes are easier to scan, with the main improvements up front and more technical details available separately.
+
+## Additional Details
+
+- The main Reconnect button keeps its original function. A separate small arrow opens a secondary Reconnect all button below it. Escape and outside clicks close this secondary menu.
+- Reconnect all also appears in each terminal tab's context menu, including keyboard-opened menus. It is available only when at least one session in the current window can be reconnected.
+- The operation requests confirmation. Already-connected sessions can be interrupted and any queued input can be cleared by the normal reconnect process. Tabs and retained output are preserved.
+- Only eligible sessions owned by the current terminal window are included. Sessions in other detached windows, those being moved, and sessions with unavailable or pending connection states are excluded. Eligibility and session revision are checked again before each request.
+- Reconnect requests run sequentially and are protected against duplicate bulk starts. If sign-in or an authentication prompt is required, the batch pauses instead of continuing silently.
+- Published release notes now use explicit What's New and Additional Details sections. The first shows up to four short user-facing benefit statements; the expandable section retains specific technical information. Historical release note formats remain supported and all displayed text stays escaped.
+- Existing saved connections, credentials, window ownership protections, updater safeguards, settings folders, shortcuts and the stable Network_Toolkit.exe name are retained.
+- Automated tests cover bulk reconnection safeguards, the split-button control, narrow layouts and legacy release notes. The browser and synthetic tests do not establish compatibility with every physical device.

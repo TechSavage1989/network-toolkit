@@ -223,3 +223,32 @@ test('alternate screen fits retain buffer mode and signal geometry without fabri
  for(const [cols,rows] of [[20,8],[60,12],[40,6]]){const pos=h.api.beforeFit(h.entry);assert.equal(pos.anchor,null);h.entry.xterm.resize(cols,rows);h.api.afterFit(h.entry,pos);assert.equal(h.entry.xterm.buffer.active.type,'alternate');assert.equal(h.entry.xterm.cols,cols);assert.equal(h.entry.xterm.rows,rows);}
  assert.equal(sizes.length,3);await h.write('\x1b[2J\x1b[HREDRAW AT NEW SIZE');assert.equal(h.entry.xterm.buffer.active.getLine(0).translateToString(true),'REDRAW AT NEW SIZE');await h.write('\x1b[?1049l');assert.equal(h.entry.xterm.buffer.active.type,'normal');assert.match(h.entry.xterm.buffer.normal.getLine(0).translateToString(true),/normal history/);h.dispose();
 });
+
+
+test('Reconnect stays primary with a separate accessible arrow and Reconnect all below',()=>{
+ const h=harness(),d=h.document,row=d.querySelector('#terminalActiveActions'),group=row.querySelector('.terminal-reconnect-split');
+ assert(group,'split reconnect group should be rendered in the active session bar');
+ const primary=group.querySelector('[data-terminal-action="reconnect"]');
+ const arrow=group.querySelector('#terminalReconnectMore');
+ const secondary=group.querySelector('#terminalReconnectOptions [data-terminal-action="reconnect-all"]');
+ assert(primary&&arrow&&secondary,'primary button, arrow and secondary button must exist');
+ assert.equal(primary.textContent,'Reconnect');
+ assert.equal(secondary.textContent,'Reconnect all');
+ assert.equal(arrow.getAttribute('aria-label'),'More reconnect options');
+ assert.equal(arrow.getAttribute('aria-controls'),'terminalReconnectOptions');
+ assert.equal(arrow.getAttribute('aria-expanded'),'false');
+ assert(group.querySelector('#terminalReconnectOptions').classList.contains('hidden'));
+ assert.equal(primary.parentElement,arrow.parentElement);
+ assert.equal(arrow.parentElement,secondary.parentElement.parentElement);
+ let closed=0;
+ h.c.window.NetworkToolkitTerminalTabs={reconnectAllAvailable:()=>true,reconnectAllBusy:()=>false,setReconnectOptions:()=>{closed++;}};
+ h.api.sync();
+ assert.equal(arrow.disabled,false);
+ assert.equal(secondary.disabled,false);
+ h.c.window.NetworkToolkitTerminalTabs.reconnectAllAvailable=()=>false;
+ h.api.sync();
+ assert.equal(arrow.disabled,true);
+ assert.equal(secondary.disabled,true);
+ assert.equal(closed,1);
+ h.dispose();
+});

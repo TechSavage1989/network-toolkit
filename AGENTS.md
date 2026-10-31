@@ -1,5 +1,12 @@
 # Network Toolkit development
 
+1.17.132 candidate includes current-window Reconnect all from tab menus and
+a split Reconnect button, and user-focused What's New / technical Additional
+Details presentation. See docs/RELEASE132_HANDOFF.md and
+docs/RELEASE_NOTES_STYLE.md. Until verified publication, 1.17.131 remains
+the actual public release. Preserve all previous published tags, downloads,
+credentials and settings.
+
 Current published version: 1.17.131. Published 2026-10-31T04:12:11Z;
 source/tag 9152e41f278f35719cff18993730f25a25050237,
 tree 9d29bdb49a7819e3e434448bf3ebc70e2a51d0b5.
@@ -12,6 +19,13 @@ assets and tags remain unchanged.
 
 Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
 and preserve working features, settings and previous release safeguards.
+
+For every future release, follow docs/RELEASE_NOTES_STYLE.md. In-app "What's New"
+must briefly explain practical user-visible benefits, not engineering jargon;
+"Additional Details" must provide accurate specific technical behavior, scope,
+compatibility and limitations. Use the exact two headings in release notes.
+The GitHub release body is shown by the updater, so validate both disclosure
+sections before publishing. Preserve historical published release notes.
 
 Previous published version: 1.17.130. Published 2026-10-31T03:13:29Z;
 actual public download/source/feed proof 03:14:21.181667Z, independent 03:15:04.117528Z.

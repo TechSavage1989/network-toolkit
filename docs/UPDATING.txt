@@ -17,7 +17,8 @@ importer also accepts only newer versions, so it cannot replace same-version
 1.17.63. Do not import source-containing Portable.zip as an updater package.
 
 Future updates: open App settings > Updates, choose Check for updates,
-then Download update. Once verified, the final Install and restart prompt opens
+then Download update. The What's New section summarizes user-visible changes;
+expand Additional details for specific technical behavior and compatibility. Once verified, the final Install and restart prompt opens
 directly. Its Install and restart button is the final confirmation and starts
 installation. There is no extra review action. Export diagnostic results, save
 open editor files, and close other Network Toolkit windows first. Active
