@@ -218,8 +218,12 @@
     if(review!==pending || !validDestination(pending.destination))return;
     const start={generation:pending.target.generation,pending:true,uncertain:false};pasteStarts.set(pending.destination.id,start);
     pending.pending=true;pending.error='';updateReview();
+    // Create the history boundary before the backend can send the first line.
+    // This is input metadata only; it does not send or execute any command.
+    const block=root.NetworkToolkitTerminalExtras?.notePaste?.(pending.destination.entry,text);
     try {
-      await root.NetworkToolkitTerminalMacros.startPacedPaste(pending.target,text,pending.destination.revision);
+      const run=await root.NetworkToolkitTerminalMacros.startPacedPaste(pending.target,text,pending.destination.revision);
+      if(block)root.NetworkToolkitTerminalMacros?.trackPacedPaste?.(pending.destination.entry,block,run);
       if(pasteStarts.get(pending.destination.id)===start)pasteStarts.delete(pending.destination.id);
       // Never close a different dialog or send again after navigation/transfer.
       if(review===pending && pending.form.isConnected) {
@@ -229,7 +233,10 @@
       pending.error=error.message||'Could not start paced paste.';
       pending.uncertain=!Number.isInteger(error.status) || error.status>=500;
       start.uncertain=pending.uncertain;
-      if(!pending.uncertain&&pasteStarts.get(pending.destination.id)===start)pasteStarts.delete(pending.destination.id);
+      if(!pending.uncertain){
+        if(block)root.NetworkToolkitTerminalExtras?.discardPacedPaste?.(pending.destination.entry,block);
+        if(pasteStarts.get(pending.destination.id)===start)pasteStarts.delete(pending.destination.id);
+      }
       if(review!==pending || !pending.form.isConnected)toast(pending.uncertain?'Paced paste start was not confirmed. Check Runs before sending again.':pending.error,'error');
     } finally {start.pending=false;pending.pending=false;if(review?.destination.id===pending.destination.id)updateReview();}
   }

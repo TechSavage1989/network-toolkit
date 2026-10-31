@@ -1,5 +1,12 @@
 # Network Toolkit development
 
+Current candidate: v1.17.134 corrects Last command and Last paste for
+prompt-paced multiline SSH pastes, without changing transport, prompt
+waiting, credentials, ownership, settings or the portable updater.
+Read docs/RELEASE134_HANDOFF.md. Published release remains 1.17.133
+until exact-source build and GitHub release/feed verification succeed.
+Do not replace published release assets or discard retained CI failures.
+
 Current published version: 1.17.133. Published 2026-10-31T05:27:14Z.
 Source/tag: 2b320d7e89f47d3bb1652e273f37277059957671.
 Tree: c0ae209c5a127c6bdd1006d3a5a772826f6e8c7b.

@@ -7,6 +7,7 @@ const KEYS=['Enter','Tab','Escape','Ctrl+C','Ctrl+Z','Ctrl+D','Up','Down','Left'
 const KINDS={command:'Command + Enter',text:'Insert text',key:'Key',wait:'Wait for text / pattern',delay:'Delay',pause:'Pause for review'};
 const BUILTINS=['host','username','session'];
 const S={mounted:false,open:false,view:'library',composerExpanded:false,library:{macros:[],bindings:[],revision:''},targets:[],runs:[],runsEpoch:0,clearing:false,mode:'current',selected:new Set(),query:'',folder:'',loaded:false,libraryCheckedAt:0,polling:false,timer:null,editor:null,folderMove:null,preview:null,output:null,recording:null,last:new Map(),menu:null,menuReturn:null,disposed:false,startup:new Map()};
+const pacedPending=new Set();
 const $=(selector,scope=document)=>scope.querySelector(selector);
 const $$=(selector,scope=document)=>Array.from(scope.querySelectorAll(selector));
 const html=value=>typeof esc==='function'?esc(String(value??'')):String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -87,7 +88,7 @@ async function refresh(library=false){
  const requests=[call('/targets'),call('/runs')];if(library||!S.loaded||Date.now()-S.libraryCheckedAt>5000)requests.push(call('/library'));
  const results=await Promise.allSettled(requests);S.polling=false;if(S.disposed)return;
  if(results[0].status==='fulfilled')S.targets=results[0].value.targets||[];
- if(results[1].status==='fulfilled'&&runsEpoch===S.runsEpoch){const next=results[1].value.runs||[];discardRunLinks(S.runs.filter(run=>!next.some(item=>item.id===run.id)).map(run=>run.id));S.runs=next;}
+ if(results[1].status==='fulfilled'&&runsEpoch===S.runsEpoch){const next=results[1].value.runs||[];discardRunLinks(S.runs.filter(run=>!next.some(item=>item.id===run.id)).map(run=>run.id));S.runs=next;void collectPacedCaptures(next);}
  if(results[2]?.status==='fulfilled'&&S.library.revision===libraryRevision){S.library={macros:(results[2].value.macros||[]).map(m=>model().normalize(m)),bindings:results[2].value.bindings||[],revision:results[2].value.revision};S.loaded=true;S.libraryCheckedAt=Date.now();}
  if(library&&results.some(r=>r.status==='rejected'))notify(results.find(r=>r.status==='rejected').reason.message,'error');
  render();schedule();
@@ -162,6 +163,49 @@ async function startPacedPaste(target,text,revision){
  S.runs=[result.run,...S.runs.filter(r=>r.id!==result.run.id)];renderRuns();schedule();
  if(result.run.state==='failed'){const error=new Error((result.run.targets||[]).map(t=>t.error).filter(Boolean).join(' · ')||'Paced paste was not started. Review Runs for details.');error.status=409;throw error;}
  openView('runs');notify('Paced paste started. Pause or Stop is available in Runs.');return result.run;
+}
+// The backend owns execution and output capture for one-line-at-a-time pastes.
+// A browser tab keeps the original paste boundary, but only accepted steps from
+// the verified run are added to Last command, Last paste and macro shortcuts.
+function trackPacedPaste(entry,item,run){
+ if(!entry||!item||item.kind!=='paste'||!run?.id||run.macroId!=='literal-paste')return false;
+ const target=(run.targets||[]).find(t=>t.id===entry.info?.id);
+ if(!target||!Number.isSafeInteger(target.generation))return false;
+ if(!entry._ntOutputHistory?.includes(item))return false;
+ item.pacedRunId=run.id;item.pacedGeneration=target.generation;
+ void collectPacedCaptures([run]);return true;
+}
+async function collectPacedCaptures(runs){
+ if(typeof terminalSessions==='undefined'||!terminalSessions?.get)return;
+ for(const run of runs){
+  if(!run||run.macroId!=='literal-paste'||running(run))continue;
+  for(const target of run.targets||[]){
+   const entry=terminalSessions.get(target.id);
+   const block=entry?._ntOutputHistory?.find(i=>i.pacedRunId===run.id&&!i.pacedCapture);
+   if(!block||block.pacedGeneration!==undefined&&block.pacedGeneration!==target.generation)continue;
+   const key=run.id+'\\x00'+target.id;
+   if(pacedPending.has(key))continue;
+   pacedPending.add(key);
+   try{
+    const response=await call('/runs/'+encodeURIComponent(run.id)+'/capture?sessionId='+encodeURIComponent(target.id));
+    const capture=response?.capture;
+    if(!capture||capture.runId!==run.id||capture.sessionId!==target.id||
+       terminalSessions.get(target.id)!==entry||!entry._ntOutputHistory?.includes(block))continue;
+    if(!root.NetworkToolkitTerminalExtras?.completePacedPaste?.(entry,block,capture))continue;
+    const steps=capture.steps||[],last=[...steps].reverse().find(s=>s.command?.trim());
+    const history=S.last.get(target.id)||{draft:'',cursor:0,commands:[],paste:''};
+    const currentPaste=root.NetworkToolkitTerminalExtras?.current?.(entry,'last-paste');
+    const currentCommand=root.NetworkToolkitTerminalExtras?.current?.(entry,'last-command');
+    if(currentPaste===block)history.paste=redact(steps.map(s=>s.command).join('\n'));
+    if(last&&currentCommand?.pacedCapture?.steps?.[0]?.index===last.index&&currentCommand?.pacedCapture?.steps?.[0]?.command===last.command){
+     history.commands.push(redact(last.command).trim());
+     if(history.commands.length>50)history.commands.splice(0,history.commands.length-50);
+    }
+    S.last.set(target.id,history);
+   }catch(e){/* Preserve the run and retry after another normal refresh. */}
+   finally{pacedPending.delete(key);}
+  }
+ }
 }
 function findMacro(id){return S.library.macros.find(m=>m.id===id);}
 function moveMacroFolder(id){
@@ -308,6 +352,6 @@ async function onClick(event){
  }}catch(err){error(err.message);}
 }
 function ownsPager(entry){return S.runs.some(run=>running(run)&&(run.targets||[]).some(t=>t.id===entry?.info?.id&&['running','paused'].includes(t.state)));}
-function dispose(){S.disposed=true;if(S.timer)clearTimeout(S.timer);S.timer=null;removeMenu();if(S.mounted){document.removeEventListener('click',onClick);document.removeEventListener('change',onChange);document.removeEventListener('input',onInputEvent);document.removeEventListener('keydown',onKeyDown,true);document.removeEventListener('contextmenu',onContextMenu);document.removeEventListener('terminal-sidebar-tab-change',onSidebarChange);}S.mounted=false;}
-root.NetworkToolkitTerminalMacros={mount,sync,toggle,onInput,onOutput,onConnected,saveLast,record,dispose,requestRun:preview,refresh,ownsPager,pasteTarget,startPacedPaste};
+function dispose(){S.disposed=true;pacedPending.clear();if(S.timer)clearTimeout(S.timer);S.timer=null;removeMenu();if(S.mounted){document.removeEventListener('click',onClick);document.removeEventListener('change',onChange);document.removeEventListener('input',onInputEvent);document.removeEventListener('keydown',onKeyDown,true);document.removeEventListener('contextmenu',onContextMenu);document.removeEventListener('terminal-sidebar-tab-change',onSidebarChange);}S.mounted=false;}
+root.NetworkToolkitTerminalMacros={mount,sync,toggle,onInput,onOutput,onConnected,saveLast,record,dispose,requestRun:preview,refresh,ownsPager,pasteTarget,startPacedPaste,trackPacedPaste};
 })(typeof window!=='undefined'?window:globalThis);

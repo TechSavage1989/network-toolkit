@@ -86,6 +86,22 @@ type capturedChunk struct {
 	seq  uint64
 	text string
 }
+type sentPasteCommand struct {
+	index int
+	command string
+	cursor uint64
+}
+type PasteCaptureStep struct {
+	Index int `json:"index"`
+	Command string `json:"command"`
+	Output string `json:"output"`
+}
+type PasteCapture struct {
+	RunID string `json:"runId"`
+	SessionID string `json:"sessionId"`
+	State string `json:"state"`
+	Steps []PasteCaptureStep `json:"steps"`
+}
 type task struct {
 	target         Target
 	view           RunTarget
@@ -94,6 +110,7 @@ type task struct {
 	cancel         context.CancelFunc
 	changed        chan struct{}
 	chunks         []capturedChunk
+	sentPaste      []sentPasteCommand
 	decoder        ansiDecoder
 	ended          bool
 	done           bool
@@ -605,6 +622,60 @@ func lineEnding(target Target) string {
 func normalizeLines(text, ending string) string {
 	return strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(text, "\r\n", "\n"), "\r", "\n"), "\n", ending)
 }
+// PasteCapture uses the original transport's sequence cursor at each accepted
+// input write. Unlike browser polling, it cannot skip fast steps or label an
+// unsent line as executed. It is memory-only and scoped by the HTTP caller.
+func (e *Engine) PasteCapture(id, sessionID string) (PasteCapture, error) {
+	if sessionID == "" {
+		return PasteCapture{}, errors.New("choose a paste run session")
+	}
+	e.mu.Lock()
+	run := e.runs[id]
+	if run == nil || !run.literalPaste {
+		e.mu.Unlock()
+		return PasteCapture{}, errors.New("literal paste run not found")
+	}
+	var target *task
+	for _, t := range run.tasks {
+		if t.target.ID == sessionID {
+			target = t
+			break
+		}
+	}
+	if target == nil {
+		e.mu.Unlock()
+		return PasteCapture{}, errors.New("paste run session not found")
+	}
+	commands := append([]sentPasteCommand(nil), target.sentPaste...)
+	chunks := append([]capturedChunk(nil), target.chunks...)
+	state := target.view.State
+	secrets := append([]string(nil), run.secrets...)
+	e.mu.Unlock()
+	result := PasteCapture{RunID: id, SessionID: sessionID, State: state, Steps: make([]PasteCaptureStep, 0, len(commands))}
+	// Sequence IDs are monotonic for transport output. Walk them once instead
+	// of rescanning the entire (potentially huge) output for every pasted line.
+	// Synthetic run headings have seq=0 and are not device output.
+	stream := make([]capturedChunk, 0, len(chunks))
+	for _, chunk := range chunks {
+		if chunk.seq > 0 {
+			stream = append(stream, chunk)
+		}
+	}
+	cursorIndex := 0
+	for index, command := range commands {
+		for cursorIndex < len(stream) && stream[cursorIndex].seq <= command.cursor {
+			cursorIndex++
+		}
+		var output strings.Builder
+		for cursorIndex < len(stream) && (index+1 == len(commands) || stream[cursorIndex].seq <= commands[index+1].cursor) {
+			output.WriteString(stream[cursorIndex].text)
+			cursorIndex++
+		}
+		result.Steps = append(result.Steps, PasteCaptureStep{Index: command.index, Command: redact(command.command, secrets), Output: maskSecrets(output.String(), secrets)})
+	}
+	return result, nil
+}
+
 func (e *Engine) Output(id, sessionID string) ([]byte, error) {
 	// Copy immutable chunk references under the mutex, then assemble large
 	// downloads without blocking input, output capture or run controls.
@@ -739,6 +810,11 @@ func (e *Engine) execute(run *execution, t *task, steps []Step) {
 				}
 			}
 			cursor, failure = e.writeTask(run, t, []byte(text))
+			if failure == nil && run.literalPaste && step.Kind == "command" {
+				e.mu.Lock()
+				t.sentPaste = append(t.sentPaste, sentPasteCommand{index: index + 1, command: step.Text, cursor: cursor})
+				e.mu.Unlock()
+			}
 			if failure == nil && step.Kind == "command" && run.definition.WaitForPrompt {
 				if run.literalPaste {
 					failure = e.waitPastePrompt(run, t, cursor, time.Duration(timeout)*time.Millisecond)

@@ -1,3 +1,16 @@
+NETWORK TOOLKIT 1.17.134
+=====================
+
+CURRENT RELEASE - 1.17.134
+
+SSH one-line-at-a-time pastes now populate Last paste and Last command with
+accepted commands and their output. The console's Copy/Select actions and
+the macro library's Last paste/Last command controls use this history.
+Stopped, interrupted or rejected runs do not include unsent commands.
+
+Details: RELEASE_NOTES_1.17.134.txt and docs/RELEASE134_HANDOFF.md.
+Previous published releases are retained below.
+
 NETWORK TOOLKIT 1.17.133
 ======================
 
