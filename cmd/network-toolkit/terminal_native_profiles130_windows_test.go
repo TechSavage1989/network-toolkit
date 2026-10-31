@@ -20,6 +20,7 @@ type nativeProfile130Badge struct {
 	Visible, Noninteractive bool
 }
 type nativeProfiles130Snapshot struct {
+	PreferencesReads                     int
 	BootAt                               int64
 	StoredName, ProfileID                string
 	Explicit, Pending, IdentityUnchanged bool
@@ -116,6 +117,12 @@ func (h *nativeTerminalFixture) exerciseProfiles130(accepted *atomic.Int32) (res
 	if _, err = check("Native manual130", true); err != nil {
 		return err
 	}
+	if _, err = h.command("", "profiles130:reload-preferences"); err != nil {
+		return err
+	}
+	if _, err = check("Native manual130", true); err != nil {
+		return err
+	}
 	if _, err = h.command("", "clear-name"); err != nil {
 		return err
 	}
@@ -145,15 +152,16 @@ func (h *nativeTerminalFixture) exerciseProfiles130(accepted *atomic.Int32) (res
 	}
 	phases = append(phases, "Actual tab, Saved and Recent render noninteractive Telnet badges")
 	oldBoot := s.Profiles130.BootAt
+	oldReads := s.Profiles130.PreferencesReads
 	if _, err = h.command("", "profiles130:reload-preferences"); err != nil {
 		return err
 	}
 	if _, err = h.wait("", func(s nativeTerminalSnapshot) bool {
-		return s.Profiles130 != nil && s.Profiles130.BootAt != oldBoot && s.Editable && s.TabPrimary == "7300"
+		return s.Profiles130 != nil && s.Profiles130.BootAt == oldBoot && s.Profiles130.PreferencesReads > oldReads && !s.Profiles130.Explicit && s.Editable && s.TabPrimary == "7300"
 	}); err != nil {
 		return err
 	}
-	phases = append(phases, "Actual page reload restores automatic naming from persisted settings")
+	phases = append(phases, "Authenticated persisted preferences read and normal merge restore automatic naming without forbidden native navigation")
 	if _, err = h.command("", "selection"); err != nil {
 		return err
 	}
@@ -187,7 +195,7 @@ func (h *nativeTerminalFixture) exerciseProfiles130(accepted *atomic.Int32) (res
 		return errors.New("profile130 actual child missing")
 	}
 	child, err := h.wait(view, func(s nativeTerminalSnapshot) bool {
-		return s.Editable && s.TabPrimary == "7300" && s.Profiles130 != nil && !s.Profiles130.Explicit && s.Transcript == before.Transcript && s.Selection == before.Selection && s.Viewport == before.Viewport && s.ViewportDOM == float64(before.Viewport)
+		return s.Editable && s.TabPrimary == "7300" && s.Profiles130 != nil && s.Profiles130.BootAt != oldBoot && !s.Profiles130.Explicit && s.Profiles130.StoredName == before.Profiles130.StoredName && s.Transcript == before.Transcript && s.Selection == before.Selection && s.Viewport == before.Viewport && s.ViewportDOM == float64(before.Viewport)
 	})
 	if err != nil {
 		return err
@@ -206,7 +214,7 @@ func (h *nativeTerminalFixture) exerciseProfiles130(accepted *atomic.Int32) (res
 	if accepted.Load() != 1 {
 		return errors.New("detach/reload unexpectedly reconnected")
 	}
-	phases = append(phases, "Actual detached child/return preserve automatic metadata and transcript without reconnect")
+	phases = append(phases, "Fresh native detached child bootstrap and return preserve stored automatic provenance and transcript without reconnect; not a whole-application restart")
 	if _, err = h.command("", "profiles130:reconnect"); err != nil {
 		return err
 	}

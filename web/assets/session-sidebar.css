@@ -93,4 +93,5 @@
 .terminal-protocol-badge{display:inline-flex;align-items:center;flex:0 0 auto;max-width:100%;font-size:9px;font-weight:600;line-height:1.35;color:var(--muted);background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:1px 4px;white-space:nowrap;pointer-events:none}
 .terminal-tab-name{display:flex;align-items:center;gap:6px}
 .terminal-tab-name>.terminal-device-label{flex:1 1 auto}
+.terminal-tab:has(.terminal-protocol-badge){min-width:200px}
 .session-library-entry>.terminal-protocol-badge{margin-left:auto}

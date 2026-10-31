@@ -5,7 +5,9 @@ and preserve working features, settings and previous release safeguards.
 
 Current development:1.17.130 automatic blank profile naming and subtle connection-
 type badges (SSH/Telnet/Serial/CMD/PowerShell) across tabs, Saved and Recent.
-Implementation/tests/publication pending; see docs/RELEASE130_HANDOFF.md.
+Initial local1,467JS/42Python/Go/race/Windows compile passed; hosted45f7d49 failed
+focused browser/native checks. Scoped readability/fixture corrections and fresh
+validation are pending; see docs/RELEASE130_HANDOFF.md.
 Blank-save must not freeze a learned name as a manual override. Preserve explicit
 manual names, connection identity/credentials, revisions and session safeguards.
 The129 closure below is verified history, not130 acceptance. No standalone129

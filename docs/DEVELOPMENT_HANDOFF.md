@@ -1,8 +1,8 @@
 # Network Toolkit 1.17.130 — automatic profile names and type badges (candidate)
 
-Not yet published. Requested2026-10-31 02:05 UTC; implementation, final local
-checks, hosted browser/native/security/package acceptance and actual public
-verification are pending. Published129 evidence below is historical, not proof
+Not yet published. Requested2026-10-31 02:05 UTC. Initial implementation/local
+checks completed, but scoped fixes follow failed initial hosted browser/native
+checks. New exact-source validation and actual public verification are pending. Published129 evidence below is historical, not proof
 that130 is accepted. Version128 remains untagged/unpublished and subsumed by129.
 
 ## Requested behavior and acceptance boundaries
@@ -48,6 +48,27 @@ public downloads and hashes, tag/source/latest updater feed and immutable129
 release/assets. Archive129 notes byte-identically. Do not rewrite published bytes,
 change repository visibility/access or silently treat a prior passing run as130
 acceptance. Final130 release metadata/hash/feed fields remain pending.
+
+## Initial hosted observations and scoped corrections (02:27 UTC)
+
+Initial local source1ffe8c4/tree9258a80 passed 1,467 JavaScript tests,42 Python
+tests, full application Go, focused race checks and Windows test cross-compilation.
+Its hosted candidate45f7d49 failed the new focused browser/native checks; these
+failures remain retained and are not superseded by the local passes.
+
+Actual390px browser rendering gave the PowerShell tab name zero width while the
+badge occupied66px and close control30px. The scoped correction sets a200px minimum
+tab width in the existing scroll strip so name, badge and close remain readable.
+The strict visibility assertion remains; fresh exact-source runtime proof is pending.
+
+Native blank-save before/after learning, explicit manual save, clear and all three
+badge-surface assertions passed before the fixture attempted location.reload.
+Native bootstrap security intentionally blocks that navigation. The fixture is
+being corrected to verify authenticated persisted-state restoration and a fresh
+detached-child bootstrap, without weakening that security boundary. This must
+not be described as native page-reload or full-application-restart coverage.
+New candidate aggregate tests and actual hosted/browser/native/package/public
+acceptance are pending. No live SSH/device compatibility is established.
 
 ## Published129 closure (retained)
 
