@@ -5,8 +5,8 @@ function between(source,first,last){const a=source.indexOf(first),b=source.index
 test('Editor Files switching to the already-selected panel does not remount controls or steal focus',()=>{
  const src=read('editor-files-sidebar.js'),host={hidden:false},calls=[],ctx={panel:'connections',navigationRevision:5,document:{querySelector:()=>host},mount:h=>calls.push(['mount',h]),remember:h=>calls.push(['save',h]),expandedIntent(){throw Error('unexpected reveal')},visibility(){throw Error('unexpected visibility')}};
  vm.createContext(ctx);vm.runInContext(between(src,'function selectPanel(value){','\nfunction mount(host){'),ctx);
- ctx.selectPanel('connections');assert.deepEqual(calls,[]);assert.equal(ctx.navigationRevision,5);
- ctx.selectPanel('files');assert.deepEqual(calls.map(x=>x[0]),['mount','save']);assert.equal(ctx.navigationRevision,6);
+ ctx.selectPanel('connections');assert.deepEqual(calls,[]);assert.equal(ctx.navigationRevision,6,'same-tab selection still invalidates stale async requests');
+ ctx.selectPanel('files');assert.deepEqual(calls.map(x=>x[0]),['mount','save']);assert.equal(ctx.navigationRevision,7);
 });
 test('Editor connection settings explicitly focus a current visible field without stale second-frame focus',()=>{
  const src=read('remote-browser.js'),frames=[],selected=[],document={activeElement:null,querySelector:()=>null},side={hidden:false};
@@ -22,7 +22,7 @@ test('Editor connection settings explicitly focus a current visible field withou
 });
 test('comparison map preserves fractional target positions rather than rounding each drag to an aligned row',()=>{
  const src=read('editor-aligned-compare.js'),sent=[],geometry={rowOffsets:[0,20,40,60]},ctx={pixelReady:true,geometry,sourceHeights:{},q:()=>({checked:true}),lastSide:'left',independentReveal:false,scrollSource:'left',scrollReconciler:{request:v=>sent.push(v)},E:{lineAtOffset:(rows,pixel)=>Math.floor(pixel/20)},clamp:(n,a,b)=>Math.min(b,Math.max(a,n))};
- vm.createContext(ctx);vm.runInContext(between(src,'function setScroll(side,pixel,','\nfunction jump('),ctx);
+ vm.createContext(ctx);vm.runInContext(between(src,'function setScroll(side,pixel,','\n function jump('),ctx);
  ctx.setScroll('right',27.625,true);ctx.setScroll('left',-40,false);ctx.setScroll('left',1000);
  assert.deepEqual(sent.map(x=>x.pixel),[27.625,0,60]);assert.deepEqual(sent.map(x=>x.both),[true,false,true]);assert(sent.every(x=>x.kind==='aligned'));
  assert(src.includes('Number.isFinite(intent.pixel)?clamp(intent.pixel'),'reconciler must use exact pixel before row fallback');
