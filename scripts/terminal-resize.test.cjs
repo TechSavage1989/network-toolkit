@@ -8,7 +8,7 @@ function setup(){
  c.api=async(url,method,size)=>{requests.push({at:now,url,method,size:{...size}});return {};};
  c.advance=async(ms)=>{const end=now+ms;for(;;){const next=[...timers].filter(([,timer])=>timer.at<=end).sort((a,b)=>a[1].at-b[1].at||a[0]-b[0])[0];if(!next)break;now=next[1].at;timers.delete(next[0]);next[1].fn();await Promise.resolve();await Promise.resolve();}now=end;};
  // Use the real optional display observer; resize-only entries intentionally have no xterm.
- c.window=c;c.state={terminalPromptNames:[]};vm.createContext(c);vm.runInContext(fs.readFileSync(path.join(__dirname,'../web/assets/terminal-prompt-labels.js'),'utf8'),c);for(const name of ['terminalDimensions','queueTerminalResize','drainTerminalResize'])vm.runInContext(source(name),c);return c;
+ c.window=c;c.state={terminalPromptNames:[]};vm.createContext(c);vm.runInContext(fs.readFileSync(path.join(__dirname,'../web/assets/terminal-prompt-labels.js'),'utf8'),c);for(const name of ['terminalDimensions','queueTerminalResize','drainTerminalResize','cancelTerminalFit','cancelTerminalResizeTimer'])vm.runInContext(source(name),c);return c;
 }
 test('Repeated identical fits cannot starve the pending backend resize',async()=>{
  const c=setup(),size={cols:154,rows:45};c.queueTerminalResize(c.entry,size);
@@ -27,7 +27,7 @@ test('Resize guards remain fail-closed and a later identical fit can resume',asy
  c.queueTerminalResize(c.entry,{cols:154,rows:45});c.owned=false;await c.advance(200);assert.equal(c.requests.length,0);assert(c.entry.desiredResize);c.owned=true;c.queueTerminalResize(c.entry,{cols:154,rows:45});await c.advance(120);assert.equal(c.requests.length,1);assert.equal(c.entry.lastResize,'154x45');
 });
 test('Clearing an outgoing timer does not strand a later identical resize',async()=>{
- const c=setup();c.queueTerminalResize(c.entry,{cols:90,rows:30});await c.advance(40);c.clearTimeout(c.entry.resizeTimer);await c.advance(160);c.queueTerminalResize(c.entry,{cols:90,rows:30});await c.advance(120);assert.equal(c.requests.length,1);assert.equal(c.entry.desiredResize,null);
+ const c=setup();c.queueTerminalResize(c.entry,{cols:90,rows:30});await c.advance(40);c.cancelTerminalResizeTimer(c.entry);await c.advance(160);c.queueTerminalResize(c.entry,{cols:90,rows:30});await c.advance(120);assert.equal(c.requests.length,1);assert.equal(c.entry.desiredResize,null);
 });
 test('A new size queued during an in-flight request is sent after its acknowledgement',async()=>{
  const c=setup();let accept;c.api=async(url,method,size)=>{c.requests.push({url,method,size:{...size}});if(c.requests.length===1)await new Promise(resolve=>accept=resolve);return {};};
@@ -63,3 +63,9 @@ test('old input epoch acknowledgement cannot overwrite new epoch geometry or sen
 });
 
 test('backwards wall clock cannot push a pending resize beyond its transport budget',async()=>{const c=setup();c.queueTerminalResize(c.entry,{cols:80,rows:24});c.Date.now=()=>-3600000;c.queueTerminalResize(c.entry,{cols:90,rows:30});await c.advance(120);assert.equal(c.requests.length,1);assert.equal(c.entry.lastResize,'90x30');});
+test('four panes retain pending transport timer identity through reentrant acknowledgements',async()=>{
+ const c=setup(),entries=Array.from({length:4},(_,i)=>({...c.entry,info:{id:'pane-'+i,state:'connected'}}));let reentered=false,handles;
+ c.api=async(url,method,size)=>{c.requests.push({url,size:{...size}});if(!reentered){reentered=true;for(let i=1;i<4;i++){c.queueTerminalResize(entries[i],{cols:100+i,rows:30});assert.equal(entries[i].resizeTimer,handles[i],'ready pending timer must not be replaced by another pane callback');}}return {};};
+ for(const entry of entries)c.queueTerminalResize(entry,{cols:80,rows:24});handles=entries.map(e=>e.resizeTimer);await c.advance(120);assert.equal(c.requests.length,4);assert.deepEqual(c.requests.map(r=>r.size.cols),[80,101,102,103]);assert(entries.every(e=>e.resizeTimer===null&&!e.desiredResize&&!e.resizeSending));
+});
+test('explicit lifecycle cancellation clears all pending timer identities and permits fresh work',async()=>{const c=setup();c.queueTerminalResize(c.entry,{cols:80,rows:24});c.cancelTerminalResizeTimer(c.entry);assert.equal(c.entry.resizeTimer,null);assert.equal(c.entry.resizeDueAt,null);await c.advance(200);assert.equal(c.requests.length,0);c.queueTerminalResize(c.entry,{cols:90,rows:30});await c.advance(120);assert.equal(c.requests.length,1);assert.equal(c.entry.lastResize,'90x30');});
