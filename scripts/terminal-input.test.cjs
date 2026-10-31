@@ -136,3 +136,48 @@ test('typing replaces selected input while multiline paste cancellation sends no
 test('input position transfers without keystrokes and Enter or Clear ends editing',async()=>{
  const h=harness();await h.write('sw# ');await h.type('show secret');const snapshot=JSON.parse(JSON.stringify(h.api.snapshot(h.entry)));assert.deepEqual(snapshot,{line:0,offset:4});assert(!JSON.stringify(snapshot).includes('secret'));const other=harness();await other.write('sw# show secret');other.api.restore(other.entry,snapshot);assert.equal(other.api.move(other.entry,other.event(7)),true);assert.equal(other.drain(),'\x1b[D'.repeat(8));other.dispose();h.term.input('\r',true);h.drain();assert.equal(h.api.move(h.entry,h.event(7)),false);h.api.restore(h.entry,snapshot);h.api.clear(h.entry);assert.equal(h.api.move(h.entry,h.event(7)),false);h.dispose();
 });
+
+test('Ctrl+A selects the current echoed input only and sends no control byte',async()=>{
+ for(const [prompt,cols,command,column,row] of [
+  ['switch# ',40,'show version',8,0],
+  ['sw# ',20,'show interfaces description',4,0],
+  ['abcdefghijklmnopqrstuvwx#  ',20,'show interfaces description',7,1]
+ ]){
+  const h=harness(cols),calls=[];await h.write(prompt);await h.type(command);
+  h.term.select=(x,y,length)=>{calls.push({x,y,length});h.select(x,y,(x+length)%cols,y+Math.floor((x+length)/cols));};
+  const e={type:'keydown',key:'a',ctrlKey:true,shiftKey:false,altKey:false,metaKey:false,preventDefault(){this.prevented=true;},stopPropagation(){this.stopped=true;}};
+  assert.equal(h.c.keyHandler(h.entry,e),false);
+  assert.deepEqual(calls,[{x:column,y:row,length:command.length}]);
+  assert.deepEqual(h.selected.start,{x:column,y:row});
+  assert.equal(h.drain(),'');
+  assert(e.prevented&&e.stopped);
+  assert.equal(h.copied,1,'programmatic selection must cancel an old automatic copy');
+  h.dispose();
+ }
+});
+test('Ctrl+A leaves unsafe, unknown and full-screen terminal input to the device',async()=>{
+ for(const scenario of ['no-input','pending-input','alternate-screen','input-suppressed','closed']){
+  const h=harness(),calls=[];
+  h.term.select=(...args)=>calls.push(args);
+  await h.write('switch# ');
+  if(scenario!=='no-input')await h.type('show version');
+  if(scenario==='pending-input')h.entry.inputBytes=1;
+  if(scenario==='alternate-screen')await h.write('\x1b[?1049h');
+  if(scenario==='input-suppressed')h.c.window.NetworkToolkitTerminalInteraction.suppressesInput=()=>true;
+  if(scenario==='closed')h.entry.info.state='closed';
+  const e={type:'keydown',key:'a',ctrlKey:true,shiftKey:false,altKey:false,metaKey:false,preventDefault(){this.prevented=true;},stopPropagation(){this.stopped=true;}};
+  assert.equal(h.c.keyHandler(h.entry,e),false);
+  assert.deepEqual(calls,[],scenario);
+  assert.equal(h.drain(),['input-suppressed','closed'].includes(scenario)?'':'\x01',scenario);
+  h.dispose();
+ }
+});
+test('Ctrl+Shift+A preserves the existing control-key behavior',async()=>{
+ const h=harness();await h.write('switch# ');await h.type('show version');
+ let selected=false;h.term.select=()=>{selected=true;};
+ const e={type:'keydown',key:'A',ctrlKey:true,shiftKey:true,altKey:false,metaKey:false,preventDefault(){},stopPropagation(){}};
+ assert.equal(h.c.keyHandler(h.entry,e),false);
+ assert.equal(selected,false);
+ assert.equal(h.drain(),'\x01');
+ h.dispose();
+});

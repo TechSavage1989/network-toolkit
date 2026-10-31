@@ -83,6 +83,19 @@ function deleteSelection(entry,reserveBytes=0){
  root.NetworkToolkitTerminalInteraction?.cancelSelectionCopy?.(entry);
  entry.xterm.clearSelection();return true;
 }
+// Select only the visible, echoed command, never its prompt or earlier output.
+// A password, full-screen app or uncertain/unacknowledged input retains
+// the terminal's original Ctrl+A behavior.
+function selectInput(entry){
+ const value=range(entry);
+ if(!value||!ready(entry))return false;
+ const length=value.end-value.start;
+ if(length<=0)return false;
+ root.NetworkToolkitTerminalInteraction?.cancelSelectionCopy?.(entry);
+ entry.xterm.select(value.start%value.cols,value.line+Math.floor(value.start/value.cols),length);
+ entry.xterm.focus();
+ return true;
+}
 function point(entry,event){
  const value=range(entry),screen=entry?.element?.querySelector('.xterm-screen'),rect=screen?.getBoundingClientRect();
  if(!value||!rect?.width||!rect.height||event.clientX<rect.left||event.clientX>=rect.right||event.clientY<rect.top||event.clientY>=rect.bottom)return null;
@@ -123,5 +136,5 @@ function bind(entry){
  });
  entry.disposables.push({dispose(){clear(entry);parsed.dispose();entry.element.removeEventListener('pointerdown',down,true);entry.element.removeEventListener('click',click,true);}});
 }
-root.NetworkToolkitTerminalInput=Object.freeze({bind,noteInput,contains,move,selection,deleteSelection,clear,snapshot,restore});
+root.NetworkToolkitTerminalInput=Object.freeze({bind,noteInput,contains,move,selection,selectInput,deleteSelection,clear,snapshot,restore});
 })(window);

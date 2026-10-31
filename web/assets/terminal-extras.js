@@ -4,7 +4,7 @@
 (function(root){
 'use strict';
 const MAX_HISTORY=50, bindings=new WeakSet();
-let sessionOpen=false, initialized=false;
+let sessionOpen=false, initialized=false, outputSyncFrame=null;
 function withoutInput(entry,callback){return root.NetworkToolkitTerminalCopy?.withInputSuppressed?root.NetworkToolkitTerminalCopy.withInputSuppressed(entry,callback):callback();}
 function prefs(entry){return {...(root.NetworkToolkitTerminalInteraction?.preferences?.()||{}),autoScroll:true,...entry?._ntSessionPrefs};}
 function history(entry){return entry?(entry._ntOutputHistory||(entry._ntOutputHistory=[])):[];}
@@ -227,7 +227,7 @@ function observeOutput(entry,bytes){
  schedulePager(entry);
 }
 function beforeOutput(entry){if(!entry?.xterm)return null;nativeFollow(entry,prefs(entry).autoScroll);return {epoch:entry._ntScrollEpoch||0};}
-function afterOutput(entry,position){if(!entry?.xterm||!position)return;const follow=prefs(entry).autoScroll;nativeFollow(entry,follow);if(follow&&position.epoch===(entry._ntScrollEpoch||0))entry.xterm.scrollToBottom();sync();}
+function afterOutput(entry,position){if(!entry?.xterm||!position)return;const follow=prefs(entry).autoScroll;nativeFollow(entry,follow);if(follow&&position.epoch===(entry._ntScrollEpoch||0))entry.xterm.scrollToBottom();scheduleOutputSync(entry);}
 function clear(entry){if(!entry)return;cancelPagerTimer(entry);entry._ntPagerState?.reset();root.NetworkToolkitTerminalInput?.clear(entry);for(const item of history(entry)){root.NetworkToolkitTerminalOutputArchive?.dispose(entry,item);disposeItem(item);}entry._ntOutputHistory=[];entry._ntInputDraft?.start?.dispose();entry._ntInputDraft=null;entry._ntPendingPaste=null;touch(entry);sync();}
 function snapshot(entry){
  const list=history(entry);for(const item of list)rows(entry,item);let budget=4*1024*1024;const saved=new Map();
@@ -247,7 +247,19 @@ function restore(entry,value){clear(entry);entry._ntSessionPrefs={};if(!value||v
  sync();}
 function bottomHTML(){return '<div id="terminalConsoleBar" class="terminal-consolebar" aria-label="Console output controls"><div class="terminal-output-actions" role="group" aria-label="Command and paste output"><div id="terminalOutputBlock" class="terminal-output-switch" role="group" aria-label="Output source"><button type="button" class="btn small ghost" data-terminal-output-kind="last-command" aria-pressed="true" title="Use the latest typed command output">Last command</button><button type="button" class="btn small ghost" data-terminal-output-kind="last-paste" aria-pressed="false" title="Use the latest pasted input output">Last paste</button></div><button class="iconbtn" data-terminal-extra="output-start" aria-label="Jump to selected output start" title="Jump to selected output start">'+icon('outputStart')+'</button><button class="iconbtn" data-terminal-extra="output-end" aria-label="Jump to selected output end" title="Jump to selected output end">'+icon('outputEnd')+'</button><button class="btn small ghost" data-terminal-extra="select-output" title="Select the chosen command or paste output">Select output</button><button class="btn small ghost" data-terminal-extra="copy-output" title="Copy the chosen command or paste output">'+icon('copy')+'Copy output</button><label class="terminal-quick-check" title="Include recognized command echoes when selecting or copying"><input type="checkbox" id="terminalIncludeInput">Include commands</label></div><div class="terminal-live-actions" role="group" aria-label="Active session controls"><label class="terminal-quick-check" title="Automatically continue --More-- prompts for manually entered commands. Macros use their own automatic paging setting."><input type="checkbox" id="terminalQuickPager">Auto pager</label><label class="sr-only" for="terminalQuickPagerKey">Pager key</label><select id="terminalQuickPagerKey" title="Pager advance key for this session"><option value="auto">Auto key</option><option value="space">Space</option><option value="enter">Enter</option></select><label class="terminal-quick-check" title="Follow new output in this session. Jumping to earlier output pauses this."><input type="checkbox" id="terminalQuickFollow">Auto scroll</label><label class="terminal-quick-check" title="Review and edit multiline pastes before sending in this session"><input type="checkbox" id="terminalQuickReview">Review paste</label><div class="terminal-scroll-actions" role="group" aria-label="Scroll console"><button class="iconbtn" data-terminal-extra="scroll-top" aria-label="Scroll to top" title="Scroll to top">'+icon('arrowUp')+'</button><button class="iconbtn" data-terminal-extra="scroll-bottom" aria-label="Scroll to bottom" title="Scroll to bottom">'+icon('arrowDown')+'</button></div></div></div>';}
 function setSessionOpen(open){sessionOpen=!!open;const panel=document.querySelector('#terminalSessionPanel'),button=document.querySelector('#terminalSessionToggle');if(!panel||!button)return;panel.classList.toggle('hidden',!sessionOpen);button.setAttribute('aria-expanded',String(sessionOpen));const r=button.getBoundingClientRect(),width=panel.getBoundingClientRect().width;panel.style.top=Math.min(innerHeight-100,r.bottom+5)+'px';panel.style.right=Math.max(6,Math.min(innerWidth-width-6,innerWidth-r.right))+'px';panel.style.maxHeight=Math.max(100,innerHeight-r.bottom-12)+'px';if(sessionOpen)panel.querySelector('button,select,input')?.focus({preventScroll:true});}
+// Parsing and output callbacks can arrive many times per frame across sessions.
+// Draw the active session's controls once; inactive sessions do not own the toolbar.
+function scheduleOutputSync(entry){
+ if(!entry||currentTerminal()!==entry)return;
+ if(typeof root.requestAnimationFrame!=='function'){sync();return;}
+ if(outputSyncFrame!==null)return;
+ outputSyncFrame=root.requestAnimationFrame(()=>{
+  outputSyncFrame=null;
+  if(currentTerminal())sync();
+ });
+}
 function sync(){
+ if(outputSyncFrame!==null){root.cancelAnimationFrame?.(outputSyncFrame);outputSyncFrame=null;}
  const bar=document.querySelector('#terminalCommandBar'),tools=document.querySelector('#terminalToolsPanel');if(!bar||!tools)return;
  if(!document.querySelector('#terminalConsoleBar')){
    document.querySelector('.terminal-statusbar').insertAdjacentHTML('beforebegin',bottomHTML());
@@ -308,7 +320,7 @@ function bind(entry){if(!entry?.xterm||bindings.has(entry))return;bindings.add(e
  const pointer=e=>{const target=e.target;if(target?.closest?.('.scrollbar,.slider')||target?.classList?.contains('xterm-viewport')&&e.clientX>=target.getBoundingClientRect().right-Math.max(16,target.offsetWidth-target.clientWidth))pauseFollow(entry);};
  const key=e=>{if(e.shiftKey&&['PageUp','PageDown','Home'].includes(e.key))pauseFollow(entry);if(e.shiftKey&&e.key==='End')scrollBottom(entry);};
  entry.element.addEventListener('wheel',wheel,{capture:true,passive:true});entry.element.addEventListener('pointerdown',pointer,true);entry.element.addEventListener('keydown',key,true);
- const scrolled=entry.xterm.onScroll?.(()=>{if(!prefs(entry).autoScroll)nativeFollow(entry,false);});const parsed=entry.xterm.onWriteParsed?.(()=>{if(currentTerminal()===entry)sync();});
+ const scrolled=entry.xterm.onScroll?.(()=>{if(!prefs(entry).autoScroll)nativeFollow(entry,false);});const parsed=entry.xterm.onWriteParsed?.(()=>scheduleOutputSync(entry));
  entry.disposables.push({dispose(){entry.element?.removeEventListener('wheel',wheel,true);entry.element?.removeEventListener('pointerdown',pointer,true);entry.element?.removeEventListener('keydown',key,true);scrolled?.dispose();parsed?.dispose();clear(entry);}});
 }
 root.NetworkToolkitTerminalExtras=Object.freeze({notePaste,noteManualInput,observeOutput,beforeOutput,afterOutput,beforeFit,afterFit,followCurrent,scrollTop,scrollBottom,jump,step,select,copy,sync,finalize,prefs,clear,snapshot,restore,current,output,rows,lineText,screenOutput,followInput,pauseFollow,flush:entry=>root.NetworkToolkitTerminalOutputArchive?.flush(entry),pagerPrompt,matchPagerLine,idlePrompt,echoMatches,createPagerRecognizer,pagerInput,pasteChoice});
