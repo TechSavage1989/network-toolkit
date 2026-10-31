@@ -103,7 +103,7 @@ test('Reconnect all includes connected sessions but excludes other windows and b
  const pending={info:{id:'pending',state:'awaiting_input'}};
  h.entries.set('detached',detached);h.entries.set('unowned',unowned);h.entries.set('transfer',transfer);h.entries.set('pending',pending);
  h.context.terminalEntryShown=entry=>entry!==detached;
- assert.deepEqual(h.api.reconnectTargets().map(t=>t.id),['one','two']);
+ assert.deepEqual(Array.from(h.api.reconnectTargets(),t=>t.id),['one','two']);
  assert.equal(h.api.reconnectAllAvailable(),true);
  assert.equal(h.api.requestReconnectAll(),true);
  const modal=h.document.querySelector('#fixtureModal');
