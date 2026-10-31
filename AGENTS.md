@@ -1,12 +1,26 @@
 # Network Toolkit development
 
-Current candidate: v1.17.133 adds adjacent Disconnect and Reconnect split
-buttons plus independent optional confirmations for Reconnect all,
-Disconnect all and Close all tabs. Read docs/RELEASE133_HANDOFF.md.
-Published release remains v1.17.132 until GitHub workflow and updater feed
-are verified. Preserve prior releases and existing credentials/settings.
+Current published version: 1.17.133. Published 2026-10-31T05:27:14Z.
+Source/tag: 2b320d7e89f47d3bb1652e273f37277059957671.
+Tree: c0ae209c5a127c6bdd1006d3a5a772826f6e8c7b.
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.133
+Adds adjacent Disconnect/Reconnect split actions and independent optional
+confirmations for Reconnect all, Disconnect all and Close all tabs. Defaults
+remain on; each can be restored in Terminal display settings. Profiles,
+credentials, window ownership and updater safeguards are unchanged.
+The exact release build and publish workflow succeeded; all four official
+assets exist, latest feed/tag/source agree. Source CI passed all 14 jobs.
+Duplicate PR CI retained a Windows PowerShell echo failure, and post-merge
+main CI retained an unrelated Editor browser failure. Do not call either fixed.
+See docs/RELEASE133_HANDOFF.md. The prior 132 release remains unchanged.
 
-Current published version: 1.17.132, released 2026-10-31T04:50:09Z.
+Read docs/DEVELOPMENT_HANDOFF.md before editing or building. Start from latest main
+and preserve working features, settings and previous release safeguards.
+For all future releases follow docs/RELEASE_NOTES_STYLE.md: What's New must
+describe concise user-visible benefits; Additional Details gives specific
+technical behavior, scope, safeguards and limitations.
+
+Previous published version: 1.17.132, released 2026-10-31T04:50:09Z.
 Source/tag db432733d9b5065d782fbd0685c5fcf78a6011e4;
 tree 2e66bdbddc63ee594047b124708a083c394a15b4.
 Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.132
