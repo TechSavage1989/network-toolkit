@@ -1,0 +1,19 @@
+Network Toolkit 1.17.144 Beta 8
+
+## What's New
+
+- Large diagnostic, discovery, and result tables avoid repeated work during sorting, filtering, refresh, and count updates.
+- Ping and monitoring statistics support long histories without unbounded function argument lists.
+- Network discovery skips costly search-field construction when the user has not entered a query.
+- Large HTML report rendering uses less temporary key-list allocation while retaining the original output and data ordering.
+- Shared application status controls no longer rewrite unchanged accessibility labels on every update.
+
+## Additional Details
+
+- Column values are derived once per row before a sort, retaining the original missing-value handling, numeric/IP/date comparison, sort direction, and stable tie order.
+- A list refresh now shares one filtered and sorted row set between the toolbar, visible page, and matching count. Changes to list preferences, live result data, and page controls are still reflected on each refresh.
+- RTT summaries and statistics filters compute extrema in bounded loops, avoiding the argument-count limit on extended sessions.
+- Exact HTML/text output checks cover recorded reports with up to 1,500 synthetic hosts.
+- These changes do not alter requested scan concurrency, network targets, privileges, file transfer protocols, stored credentials, saved settings, updater consent, or window layouts.
+- This is an opt-in application-wide optimization beta; stable remains v1.17.136. The original eleven-area roadmap continues in docs/DEVELOPMENT_ROADMAP.md.
+- The historical 390px Editor comparison-map transient 3-5px CI drift, interrupted SFTP acceptance, and prolonged physical Windows stress/memory benchmarks remain open until independently validated. No stable promotion is claimed.
