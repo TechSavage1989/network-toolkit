@@ -8,7 +8,7 @@ Use Network Toolkit to test reachability, routes, name resolution and TCP connec
 3. Use **DNS** to check name lookup and records.
 4. Use **TCP ports** to test whether a particular service is reachable.
 
-Each tool currently has its own input. A target-first shared workspace is a Phase 1 audit proposal, not existing functionality.
+Each tool currently has its own input. The owner-approved target-first shared workspace is planned for Phase 6, not yet implemented. Search or press Ctrl+Shift+P to find all diagnostic tools by name.
 
 ## Other diagnostics
 Network discovery, monitoring, wireless information, routes, ARP and connections are available as separate tools. Network tests operate only on networks and equipment you are authorized to inspect.
