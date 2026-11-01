@@ -1,0 +1,15 @@
+Network Toolkit 1.17.149 Beta 13
+
+## What's New
+
+- SFTP file browsing is less likely to remain stuck when a connected device stops responding.
+- An unresponsive SFTP operation can close without disconnecting your existing SSH terminal.
+
+## Additional Details
+
+- SFTP operations that reuse an authenticated terminal now enforce their configured per-response timeout by closing only the operation's subsystem channel. The interactive SSH transport is not given a new socket deadline.
+- The timeout resets for each protocol request. Large transfers are not restricted by one overall transfer duration.
+- Added an isolated SSH server regression that stalls a directory listing, checks the timeout and channel closure, then verifies the terminal and another SFTP request still work.
+- Existing SFTP host-key trust, credentials, file permissions, overwrite confirmation, transfer cancellation and protocol selection remain unchanged.
+- The original narrow 390px Editor comparison-motion regression, real-device SFTP interruption acceptance and physical Windows endurance testing remain open. This beta does not certify them.
+- This is an opt-in beta. Updates still require user approval and the Windows executable keeps the Network_Toolkit.exe filename.
