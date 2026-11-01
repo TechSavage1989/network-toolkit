@@ -1,3 +1,22 @@
+NETWORK TOOLKIT 1.17.148
+======================
+
+CURRENT RELEASE - 1.17.148 (BETA 12)
+
+SFTP browsing and transfers now preserve accurate cancellation status when
+a connection request is interrupted. Closing a borrowed SFTP operation
+does not close the active SSH terminal. Repeated synthetic multi-tool
+interruption checks have been extended.
+
+This is an opt-in beta, not stable certification. The Editor narrow-window
+motion regression, physical Windows endurance and real-device SFTP testing
+remain open. Existing credentials, settings, network permissions and
+explicit updater consent remain unchanged.
+
+See RELEASE_NOTES_1.17.148.txt and docs/RELEASE148_HANDOFF.md.
+Stable release remains v1.17.136.
+Previous release descriptions follow unchanged.
+
 NETWORK TOOLKIT 1.17.147
 ======================
 

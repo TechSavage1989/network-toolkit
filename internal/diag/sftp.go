@@ -850,6 +850,11 @@ func RunSFTPOnClient(ctx context.Context, client *ssh.Client, req model.Request,
 }
 
 func runSFTPChannel(ctx context.Context, req model.Request, emit model.Emit, client *ssh.Client, conn net.Conn, timeout time.Duration, data map[string]any, started time.Time, operation, remote, local, newRemote string) (model.Result, error) {
+	// Cancelled operations must not allocate a new channel on an existing
+	// authenticated terminal connection.
+	if err := ctx.Err(); err != nil {
+		return model.Result{}, err
+	}
 	sess, e := client.NewSession()
 	if e != nil {
 		return model.Result{}, fmt.Errorf("SFTP session: %w", e)
@@ -866,11 +871,20 @@ func runSFTPChannel(ctx context.Context, req model.Request, emit model.Emit, cli
 		return model.Result{}, e
 	}
 	if e = sess.RequestSubsystem("sftp"); e != nil {
+		if ctx.Err() != nil {
+			return model.Result{}, ctx.Err()
+		}
 		return model.Result{}, fmt.Errorf("server rejected SFTP subsystem: %w", e)
 	}
 	protocol := wireSFTP{in: stdout, out: stdin, conn: conn, timeout: timeout}
 	if e = protocol.init(); e != nil {
+		if ctx.Err() != nil {
+			return model.Result{}, ctx.Err()
+		}
 		return model.Result{}, e
+	}
+	if err := ctx.Err(); err != nil {
+		return model.Result{}, err
 	}
 	// Availability detection is intentionally read-only: successful SFTP
 	// subsystem negotiation and version exchange suffice. No directory listing.
@@ -982,6 +996,12 @@ func runSFTPChannel(ctx context.Context, req model.Request, emit model.Emit, cli
 		}
 		data["bytesTransferred"] = n
 		summary = "SFTP upload completed"
+	}
+	// Session.Close may turn a blocked read into EOF after the user cancels.
+	// Preserve the cancellation reason rather than reporting an unrelated
+	// transport error, or a late success after the browser request closed.
+	if err := ctx.Err(); err != nil {
+		return model.Result{Summary: "SFTP operation could not complete", Data: data}, err
 	}
 	if e != nil {
 		return model.Result{Summary: "SFTP operation could not complete", Data: data}, e
