@@ -1,3 +1,20 @@
+NETWORK TOOLKIT 1.17.150
+======================
+
+CURRENT RELEASE - 1.17.150 (BETA 14)
+
+An SFTP timeout can no longer close an operation after its response has already
+completed. This improves reliability when browsing files over an active SSH
+terminal. No changes to existing credentials, permissions, saved settings,
+file transfer confirmation or Windows portable updater behavior.
+
+This beta does not resolve the narrow 390px Editor comparison-motion
+regression. Physical Windows endurance and live-device SFTP interruption
+acceptance remain open. This is an opt-in beta, not stable certification.
+See RELEASE_NOTES_1.17.150.txt and docs/RELEASE150_HANDOFF.md.
+Stable release remains v1.17.136.
+Previous release descriptions follow unchanged.
+
 NETWORK TOOLKIT 1.17.149
 ======================
 
