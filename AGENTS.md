@@ -1,3 +1,15 @@
+# v1.17.148 Beta 12 candidate - NOT PUBLISHED
+
+Read docs/DEVELOPMENT_ROADMAP.md, docs/DEVELOPMENT_HANDOFF.md,
+docs/RELEASE148_HANDOFF.md and docs/BETA12_RELIABILITY_AUDIT.md first.
+This beta strengthens scoped SFTP cancellation for borrowed SSH terminal
+connections and tests repeated six-tool recovery/resource retention.
+Keep the full original eleven-area performance/interface/reliability plan.
+Preserve saved settings, credentials, network permissions, terminal ownership,
+source documents and stable Windows portable updater with explicit consent.
+Historical 390px Editor-motion and live SFTP/physical Windows acceptance remain open.
+No Work mode, no user desktop and no previous release/tag changes.
+
 # v1.17.147 Beta 11 - published; continue eleven-area roadmap
 
 Published v1.17.147 Beta 11 on 2026-11-01T04:17:17Z as opt-in prerelease ID 430357367.
