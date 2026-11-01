@@ -82,14 +82,14 @@ test('transient failure retries promptly and quietly, then returns to the five-m
   let checks=0;const h=ui({api:async path=>{if(path==='/updates/check'&&++checks===1)throw Error('Network briefly unavailable');return {...available,hasUpdate:path==='/updates/check'};}});
   h.c.NetworkToolkitUpdater.start();await h.tick();assert.equal(h.nextDelay(),30000);assert.equal(h.noticeText(),'');assert.equal(h.toasts.length,0);
   await h.settings();assert.match(h.scheduleText(),/Network briefly unavailable/);assert.match(h.scheduleText(),/Next automatic retry/);
-  await h.tick();assert.equal(checks,2);assert.equal(h.nextDelay(),300000);assert.match(h.noticeText(),/1.17.62 is available/);
+  await h.tick();assert.equal(checks,2);assert.equal(h.nextDelay(),21600000);assert.match(h.noticeText(),/1.17.62 is available/);
   assert.equal(h.calls.some(c=>['/updates/download','/updates/install'].includes(c[0])),false);
 });
 
 test('manual check before startup timer reveals a snoozed release without a duplicate check',async()=>{
   const h=ui({preferences:{dismissed:'download:1.17.62',until:Date.now()+86400000}});
   h.c.NetworkToolkitUpdater.start();await h.settings();await h.click('check');
-  assert.equal(h.calls.filter(c=>c[0]==='/updates/check').length,1);assert.equal(h.nextDelay(),300000);assert.equal(h.timers.size,1);assert.match(h.noticeText(),/available/);
+  assert.equal(h.calls.filter(c=>c[0]==='/updates/check').length,1);assert.equal(h.nextDelay(),21600000);assert.equal(h.timers.size,1);assert.match(h.noticeText(),/available/);
 });
 
 test('manual check while initial preferences load preserves the explicit reveal and does not overwrite saved opt-out',async()=>{
@@ -183,15 +183,15 @@ test('actual initializer preserves Window receiver for startup, manual replaceme
   const h=ui({brandTimers:true,api:async path=>path==='/state'?{appUpdatePreferences:{enabled:true}}:path==='/jobs'?[]:available});
   await init(h);await settle();assert.equal(h.timers.size,1);assert.equal(h.nextDelay(),0);
   await h.tick();assert.equal(h.calls.filter(c=>c[0]==='/updates/check').length,1);
-  assert.equal(h.timers.size,1);assert.equal(h.nextDelay(),300000);
+  assert.equal(h.timers.size,1);assert.equal(h.nextDelay(),21600000);
   await h.settings();assert.match(h.scheduleText(),/Last automatic attempt:.*Update available/);
   await h.click('check');assert.equal(h.calls.filter(c=>c[0]==='/updates/check').length,2);
-  assert.equal(h.timers.size,1);assert.equal(h.nextDelay(),300000);
+  assert.equal(h.timers.size,1);assert.equal(h.nextDelay(),21600000);
   for(const enabled of [false,true]){
     const box=h.document.querySelector('[data-app-update-auto]');box.checked=enabled;
     for(const handler of h.document.listeners.change||[])await handler({target:box});
     assert.equal(h.timers.size,1);assert.equal(h.nextDelay(),0);
-    await h.tick();assert.equal(h.timers.size,1);assert.equal(h.nextDelay(),enabled?300000:21600000);
+    await h.tick();assert.equal(h.timers.size,1);assert.equal(h.nextDelay(),enabled?21600000:21600000);
   }
   assert.equal(h.calls.filter(c=>c[0]==='/updates/check').length,3);
   assert.equal(h.calls.some(c=>/updates\/(download|install)/.test(c[0])),false);
@@ -208,16 +208,16 @@ test('Window-bound timer cancellation retains bounded retry and no duplicate tim
   await init(h);await settle();await h.tick();
   assert.equal(attempts,1);assert.equal(h.timers.size,1);assert.equal(h.nextDelay(),30000);
   await h.settings();assert.match(h.scheduleText(),/Next automatic retry/);
-  await h.click('check');assert.equal(attempts,2);assert.equal(h.timers.size,1);assert.equal(h.nextDelay(),300000);
+  await h.click('check');assert.equal(attempts,2);assert.equal(h.timers.size,1);assert.equal(h.nextDelay(),21600000);
   await h.tick();assert.equal(attempts,3);assert.equal(h.timers.size,1);
 });
 
 test('native-bound focus, visibility and online handlers share freshness and one automatic timer',async()=>{
   const h=ui({brandTimers:true,context:{navigator:{onLine:true}}});h.c.NetworkToolkitUpdater.start();await h.tick();
   assert.equal(h.listeners.focus.length,1);assert.equal(h.listeners.online.length,1);
-  h.advance(120000);for(const fn of h.listeners.focus)fn();for(const fn of h.document.listeners.visibilitychange)fn();for(const fn of h.listeners.online)fn();
+  h.advance(21600000);for(const fn of h.listeners.focus)fn();for(const fn of h.document.listeners.visibilitychange)fn();for(const fn of h.listeners.online)fn();
   assert.equal(h.timers.size,1);assert.equal(h.nextDelay(),0);await h.tick();assert.equal(h.calls.filter(c=>c[0]==='/updates/check').length,2);
-  h.c.document.hidden=true;await h.tick();assert.equal(h.calls.filter(c=>c[0]==='/updates/check').length,2);assert.equal(h.nextDelay(),300000);
+  h.c.document.hidden=true;await h.tick();assert.equal(h.calls.filter(c=>c[0]==='/updates/check').length,2);assert.equal(h.nextDelay(),21600000);
   h.c.document.hidden=false;for(const fn of h.document.listeners.visibilitychange)fn();await h.tick();assert.equal(h.calls.filter(c=>c[0]==='/updates/check').length,3);
   h.c.navigator.onLine=false;await h.tick();assert.equal(h.calls.filter(c=>c[0]==='/updates/check').length,3);
   h.c.navigator.onLine=true;for(const fn of h.listeners.online)fn();await h.tick();assert.equal(h.calls.filter(c=>c[0]==='/updates/check').length,4);
