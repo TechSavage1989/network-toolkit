@@ -1,4 +1,13 @@
-## Latest beta - v1.17.149 Beta 13
+## Latest beta - v1.17.150 Beta 14
+
+[Download the opt-in Beta 14](https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.150).
+SFTP browsing through an active SSH terminal no longer risks closing a completed operation when an old response timeout expires. Existing settings, credentials, SSH terminal sessions, network permissions and user-approved portable updates are preserved.
+Stable latest remains v1.17.136. The 390px Text Editor comparison-motion regression, live-device SFTP interruption and multi-hour physical Windows acceptance remain open.
+
+[Release handoff](docs/RELEASE150_HANDOFF.md) ·
+[Eleven-area roadmap](docs/DEVELOPMENT_ROADMAP.md).
+
+## Previous beta - v1.17.149 Beta 13
 
 [Download the opt-in Beta 13](https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.149).
 A connected terminal's SFTP browser now has a response timeout
