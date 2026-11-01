@@ -7,6 +7,9 @@ import "context"
 // The embedded UI uses the Microsoft WebView2 Runtime installed on Windows.
 type Config struct {
 	Title   string
+	// Minimum window tracking dimensions in logical pixels. Zero uses the main-window default.
+	MinWidth int32
+	MinHeight int32
 	URL     string
 	DataDir string
 	Stop    context.CancelFunc
