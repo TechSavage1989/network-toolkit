@@ -83,7 +83,7 @@ const check=name=>{report.checks.push(name);console.log('PASS '+name)};
  await p.waitForFunction(()=>NetworkToolkitFileEditor.documents.size===0);
  assert.equal(await p.evaluate(()=>NetworkToolkitClosedTabs.count()),1);
  await p.keyboard.press('Control+Shift+T');
- await p.waitForFunction(()=>NetworkToolkitFileEditor.documents.size===1);
+ await p.waitForFunction(()=>NetworkToolkitFileEditor.documents.size===1&&[...NetworkToolkitFileEditor.documents.values()].every(d=>!d.loading&&d.content.length>0));
  const reopened=await p.evaluate(()=>[...NetworkToolkitFileEditor.documents.values()].map(d=>({path:d.path,dirty:d.dirty,content:d.content})));
  assert.equal(reopened.length,1);
  assert.equal(reopened[0].content,'hostname SYNTHETIC-SWITCH\\n');
