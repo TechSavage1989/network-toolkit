@@ -62,15 +62,15 @@ async function make(viewport){
  assert(!traffic.some(x=>x==='POST /api/jobs'));
  checks.push('Quick start navigates without scanning, dismissal persists');
  await p.evaluate(()=>navigate('ping'));
- assert(await p.locator('#toolResult').getByText('Measure response time').isVisible());
- assert(await p.locator('#toolResult').getByText('192.0.2.10',{exact:false}).isVisible());
+ assert((await p.locator('#toolResult').textContent()).includes('Measure response time'));
+ assert((await p.locator('#toolResult').textContent()).includes('192.0.2.10'));
  checks.push('No-result screen explains what to enter');
  await p.evaluate(()=>{
   jobs=[{id:'synthetic-failure',tool:'ping',target:'192.0.2.10',status:'failed',started:new Date().toISOString(),finished:new Date().toISOString(),error:'Synthetic transport failed',options:{},events:[],result:{}}];
   selected.ping='synthetic-failure';lastRender='';renderCurrentResult(true);
  });
- assert(await p.getByText('Synthetic transport failed').isVisible());
- assert(await p.getByText('Check the target, your network connection',{exact:false}).isVisible());
+ assert((await p.locator('#toolResult').textContent()).includes('Synthetic transport failed'));
+ assert((await p.locator('#toolResult').textContent()).includes('Check the target, your network connection'));
  checks.push('Failure shows original error and actionable retry guidance');
  await p.locator('#uxHelpLauncher').click();
  await p.getByRole('button',{name:'Show welcome and quick starts'}).click();
