@@ -1,0 +1,13 @@
+Network Toolkit 1.17.147 Beta 11
+
+## What's New
+
+- SFTP file transfers now handle partial packet writes more reliably.
+
+## Additional Details
+
+- SFTP protocol framing now completes each packet across permitted partial transport writes or returns the transport error.
+- Added regression coverage for short writes of 1, 3 and 7 bytes.
+- Credentials, saved settings, user permissions, transfer confirmations and updater installation consent are unchanged.
+- The Editor's narrow 390px comparison motion regression, native SFTP interruption acceptance and physical Windows endurance testing remain open.
+- This is an opt-in beta. The stable channel remains v1.17.136 and the executable name remains Network_Toolkit.exe.
