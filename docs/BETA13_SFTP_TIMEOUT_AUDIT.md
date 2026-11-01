@@ -1,3 +1,19 @@
+## Beta 13 publication verification
+
+Published v1.17.149 Beta 13 on 2026-11-01T05:06:03Z from
+bf76d7506393d4a1902c55656a5490897abf8922. The official Release
+workflow 41275438541 passed build, Windows portable/update package
+validation and publish; four GitHub-reported assets have SHA-256
+digests. Stable latest remains v1.17.136.
+
+The focused SFTP timeout regression passed on a hosted Windows
+runner. Candidate Checks 41275225328 had 11 successful job groups
+and four browser/native Windows groups still pending at release
+verification. Main Checks 41275438525 likewise had 11 passed and
+four pending. Prior Editor 390px motion and real-device/native
+endurance acceptance remain open, and no speed or memory gain is
+claimed from this scoped fix.
+
 # Beta 13 - SFTP response-timeout audit
 
 **Candidate only, not published.** No physical user desktop or live client
