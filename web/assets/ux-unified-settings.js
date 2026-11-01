@@ -104,7 +104,8 @@ function enhance(ctx,selected='general'){
   ['terminalConfirmCloseAll','Ask before closing all terminal tabs'],
   ['terminalSessionConfirmDelete','Ask before removing saved or recent session entries']
  ])confirmCard.append(field(label,name,'checkbox',checked(st,name)));
- confirmCard.append(note('Saving or discarding unsaved Editor changes remains governed by the Editor close policy. No security or file overwrite approvals are bypassed.'));
+ confirmCard.append(field('Ask before discarding unsaved Editor changes','editor.askSaveBeforeClose','checkbox',ed.askSaveBeforeClose!==false));
+ confirmCard.append(note('The Editor close policy is an explicit preference. Active saves, failed saves and native window moves remain protected regardless of this setting. No security or file overwrite approvals are bypassed.'));
  body.replaceChildren(shell);shell.append(searchLabel,columns);columns.append(nav,content);
  modal.classList.add('ux-settings-modal');
  function select(id,focus=false){

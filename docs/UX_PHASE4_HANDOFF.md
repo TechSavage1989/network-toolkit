@@ -6,7 +6,7 @@
 
 - Searchable Settings categories: General, Appearance, Terminal, Editor, Graphs, Transfers, Network, Updates and Confirmations. Existing controls are rearranged into the respective categories without replacing underlying handlers, state keys, or stored preferences. Per-tool controls remain available.
 - Ctrl+Shift+T and a visible action can reopen recently closed individual Text Editor documents, retaining in-memory unsaved edits. Empty Terminal drafts can be reopened without reconnecting. Never restore live sessions automatically, and never copy credentials into tab history.
-- Saved diagnostic targets can be removed with a brief Undo action, with ID collision and list-capacity checks. Existing confirmations remain for live sessions, unsaved content, security, updates, Windows/network actions, and overwrites. No meta-confirmations about switching off confirmation options were introduced.
+- Saved diagnostic targets can be removed with a brief Undo action, with ID collision and list-capacity checks. The Editor close-confirmation preference is available in Settings and no longer produces a second prompt merely for changing that preference. Existing confirmations remain for live sessions, unsaved content, security, updates, Windows/network actions, and overwrites. No meta-confirmations about switching off confirmation options were introduced.
 
 ## Validation
 
