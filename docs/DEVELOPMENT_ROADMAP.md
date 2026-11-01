@@ -2,6 +2,10 @@
 
 This is the **authoritative, ongoing development plan**. Preserve it across beta releases and future chats. The eleven areas and three-phase sequence originated in the approved application-wide optimization plan. Do not replace them with an Editor-only scope or assume a published beta certifies all its planned work.
 
+## Beta 11 SFTP reliability candidate (not published)
+
+v1.17.147 provides full SFTP packet write handling with focused partial-write regression tests. The original eleven-area roadmap remains authoritative. See [Beta 11 handoff](RELEASE147_HANDOFF.md). Historical Editor motion, native transfer interruption and physical Windows acceptance remain open.
+
 ## Latest publication and next development - Beta 10
 
 Published 2026-11-01T02:23:08Z as opt-in GitHub prerelease ID 430315450.
