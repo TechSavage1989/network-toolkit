@@ -1,3 +1,17 @@
+NETWORK TOOLKIT 1.17.147
+======================
+
+CURRENT RELEASE - 1.17.147 (BETA 11)
+
+Opt-in beta with more reliable SFTP wire packet handling across partial
+writes. Saved profiles, credentials, network permissions and Windows
+portable updater approval behavior remain unchanged.
+
+See docs/RELEASE147_HANDOFF.md and RELEASE_NOTES_1.17.147.txt.
+Existing Editor narrow-motion and native/physical acceptance remains open.
+Stable release remains v1.17.136.
+Previous release descriptions follow unchanged.
+
 NETWORK TOOLKIT 1.17.146
 ======================
 
