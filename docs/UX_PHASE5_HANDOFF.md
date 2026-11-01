@@ -22,3 +22,8 @@ Baseline: published opt-in v1.18.3 Beta 3, release and source verified on 2026-1
 
 ## Safeguards
 Do not use owner desktop, network or credentials. Preserve user state, unsaved work, active sessions, app data permissions, review confirmations, verified opt-in updater flow and stable Network_Toolkit.exe filename. No published release is modified by this branch.
+
+## CI fix: welcome no longer shrinks active tools
+- The full Checks `browser` job failed in `scripts/transfer-client-layout.browser.cjs`: the automatic first-launch welcome stayed above every page, reducing the SFTP remote file list from 220px to 44px, so the sticky table header intercepted the folder double-click.
+- The automatic welcome now shows only on Overview. Leaving Overview hides it without marking it dismissed; F1 Help and command search can still reopen it on the current page.
+- `scripts/ux-phase5.browser.cjs` now asserts the welcome is hidden on File Transfer and returns on Overview.
