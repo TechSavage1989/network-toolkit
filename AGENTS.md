@@ -1,3 +1,7 @@
+# v1.17.147 Beta 11 candidate - not published
+
+SFTP full-frame sending now handles partial writes. Read docs/RELEASE147_HANDOFF.md and retain all eleven roadmap areas, Editor 390px regression, native SFTP and physical Windows acceptance gaps. No desktop access or prior release replacement.
+
 # v1.17.146 Beta 10 - published; preserve all eleven areas
 
 Published 2026-11-01T02:23:08Z as opt-in GitHub prerelease ID 430315450.

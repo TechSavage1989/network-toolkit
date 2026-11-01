@@ -130,8 +130,23 @@ func (c *wireSFTP) send(t byte, p []byte) error {
 	frame.Write(sfU32(uint32(1 + len(p))))
 	frame.WriteByte(t)
 	frame.Write(p)
-	_, err := c.out.Write(frame.Bytes())
-	return err
+	// Some writers accept a partial frame without reporting an error.
+	// Continue until the full packet is sent, or fail rather than hang on no progress.
+	remaining := frame.Bytes()
+	for len(remaining) > 0 {
+		n, err := c.out.Write(remaining)
+		if n < 0 || n > len(remaining) {
+			return io.ErrShortWrite
+		}
+		remaining = remaining[n:]
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return io.ErrShortWrite
+		}
+	}
+	return nil
 }
 func (c *wireSFTP) recv() (byte, []byte, error) {
 	var lenBuf [4]byte

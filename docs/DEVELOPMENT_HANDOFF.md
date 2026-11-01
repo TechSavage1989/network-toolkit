@@ -1,3 +1,7 @@
+# v1.17.147 Beta 11 candidate - not published
+
+SFTP framing now handles partial writes and has dedicated regression tests. Preserve all eleven development areas, settings, credentials, network permissions and the portable updater. Read docs/RELEASE147_HANDOFF.md. Latest published remains v1.17.146.
+
 # v1.17.146 Beta 10 - publication verified
 
 Published 2026-11-01T02:23:08Z as opt-in GitHub prerelease ID 430315450.
