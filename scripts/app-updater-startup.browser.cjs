@@ -69,7 +69,7 @@ const pause=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {pro
         const h={page,requests,installBodies,get checks(){return checks},stateGate,unrelatedGate,
           advance:async ms=>{await page.clock.runFor(ms);await page.waitForTimeout(50)},
           completed:async expected=>{const state=await waitForAutomaticCompletion(readUpdater,expected);report.barriers.push(state);return state;},
-          settings:async()=>{await page.evaluate(()=>appSettings());await page.waitForTimeout(50)},
+          settings:async()=>{await page.evaluate(()=>appSettings());await page.locator('[data-settings-section="updates"]').click();await page.waitForTimeout(50)},
           notice:()=>page.locator('#appUpdateNotice').innerText()};
         await verify(h);
         assert.deepEqual(errors,[]);if(!options.installFlow)assert.equal(requests.some(p=>p==='/api/updates/download'||p==='/api/updates/install'),false);

@@ -143,7 +143,7 @@ async function main() {
           get maxActiveChecks() { return maxActiveChecks; },
           releaseState: () => stateGate?.resolve(),
           releaseCheck: () => checkGate?.resolve(),
-          settings: async () => { await page.evaluate(() => appSettings()); await page.locator('[data-app-update-schedule]').waitFor(); await page.locator('[data-app-update-schedule]').scrollIntoViewIfNeeded(); },
+          settings: async () => { await page.evaluate(() => appSettings()); await page.locator('[data-settings-section="updates"]').click(); await page.locator('[data-app-update-schedule]').waitFor(); await page.locator('[data-app-update-schedule]').scrollIntoViewIfNeeded(); },
           schedule: () => page.locator('[data-app-update-schedule]').innerText(),
           notice: () => page.locator('#appUpdateNotice').innerText(),
           waitForNotice: () => page.waitForFunction(() => document.querySelector('#appUpdateNotice').textContent.includes('1.17.65 is available')),
