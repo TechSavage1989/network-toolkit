@@ -9,6 +9,9 @@ on:
       - 'web/assets/ux-command-palette.*'
       - 'web/assets/terminal-tabs.js'
       - 'web/assets/file-editor.js'
+      - 'web/assets/editor-drag.js'
+      - 'web/assets/session-sidebar.js'
+      - 'web/assets/transfer-explorer.js'
       - 'scripts/ux-phase3.browser.cjs'
 
 permissions:
