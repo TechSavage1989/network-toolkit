@@ -45,9 +45,14 @@ function recovery(tool){
  if(tool==='smtp'||tool==='tls'||tool==='http')return 'Check the server address and connection settings, then try again. Keep certificate verification enabled.';
  return 'Check the target, your network connection and the selected options, then try again.';
 }
-let owner=null,element=null;
+let owner=null,element=null,shownOn='';
+// The automatic welcome stays on Overview so it never takes space from an
+// active tool such as File Transfer or Terminal. A manual reopen (F1 or
+// command search) appears on the page where it was requested.
+function currentPage(){return owner&&typeof owner.page==='function'?owner.page():'overview';}
+function sync(){if(element)element.hidden=!(currentPage()==='overview'||currentPage()===shownOn);}
 function dismiss(){
- if(element){element.remove();element=null;}
+ if(element){element.remove();element=null;}shownOn='';
  if(!owner||!owner.ready())return;
  const saved=owner.getState();if(saved.firstLaunchWelcomeSeen===true)return;
  saved.firstLaunchWelcomeSeen=true;owner.save();
@@ -55,12 +60,13 @@ function dismiss(){
 function open(manual=false){
  if(!owner||owner.detached()||!owner.ready())return false;
  if(!manual&&owner.getState().firstLaunchWelcomeSeen===true)return false;
- if(element){element.scrollIntoView({block:'nearest'});return true;}
+ if(manual)shownOn=currentPage();
+ if(element){sync();element.scrollIntoView({block:'nearest'});return true;}
  const anchor=root.document.getElementById('offlineBanner');if(!anchor)return false;
  element=root.document.createElement('section');
  element.id='uxFirstLaunchWelcome';element.className='ux-welcome';element.setAttribute('aria-label','Welcome to Network Toolkit');
  element.innerHTML='<div class="ux-welcome-heading"><div><h2>Welcome to Network Toolkit</h2><p>Choose a starting point. No connection or network change begins until you select an action.</p></div><button type="button" class="btn small ghost" data-ux-welcome-close aria-label="Dismiss welcome">Dismiss</button></div><div class="ux-welcome-choices"><button type="button" class="btn primary" data-ux-welcome-page="quick">Check a device</button><button type="button" class="btn" data-ux-welcome-page="terminal">Open a terminal</button><button type="button" class="btn" data-ux-welcome-page="sftp">Transfer files</button></div><p class="ux-welcome-foot">Open this guide again from F1 Help or the command search.</p>';
- anchor.after(element);
+ anchor.after(element);sync();
  element.addEventListener('click',event=>{
   if(event.target.closest('[data-ux-welcome-close]')){dismiss();return;}
   const button=event.target.closest('[data-ux-welcome-page]');if(!button)return;
@@ -71,5 +77,5 @@ function open(manual=false){
 }
 function initialize(config){owner=config;if(!owner.detached()&&owner.ready())open(false);}
 if(typeof module==='object'&&module.exports)module.exports={guidance,recovery,guides};
-root.NetworkToolkitPhase5=Object.freeze({guidance,recovery,initialize,open,dismiss});
+root.NetworkToolkitPhase5=Object.freeze({guidance,recovery,initialize,open,dismiss,sync});
 })(typeof window==='undefined'?globalThis:window);

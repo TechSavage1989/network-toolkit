@@ -51,6 +51,12 @@ async function make(viewport){
  assert.equal(await p.evaluate(()=>state.profiles[0].name),'Existing target');
  await p.screenshot({path:path.join(out,'welcome-dark-1280.png')});screenshots.push('welcome-dark-1280.png');
  checks.push('First launch displays choices and preserves profiles');
+ await p.evaluate(()=>navigate('sftp'));
+ assert.equal(await p.locator('#uxFirstLaunchWelcome').isVisible(),false,'automatic welcome must not take space from an active tool');
+ assert.equal(await p.evaluate(()=>state.firstLaunchWelcomeSeen),false,'leaving Overview must not count as dismissal');
+ await p.evaluate(()=>navigate('overview'));
+ assert(await p.locator('#uxFirstLaunchWelcome').isVisible());
+ checks.push('Automatic welcome stays on Overview and does not shrink tools');
  await p.locator('#uxFirstLaunchWelcome [data-ux-welcome-page="quick"]').click();
  assert.equal(await p.evaluate(()=>state.activePage),'quick');
  await p.waitForFunction(()=>state.firstLaunchWelcomeSeen===true);
