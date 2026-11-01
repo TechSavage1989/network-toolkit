@@ -1,0 +1,3 @@
+.ux-undo-toast{display:flex;align-items:center;gap:12px;max-width:min(95vw,550px)}
+.ux-undo-toast span{flex:1;min-width:0}
+.ux-settings-tool-link{display:block;max-width:100%;margin:8px 0;text-align:left;white-space:normal}
