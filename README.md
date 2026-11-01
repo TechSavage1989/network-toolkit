@@ -1,10 +1,12 @@
-## Beta 9 development candidate (not yet published)
+## Latest beta - v1.17.145 Beta 9
 
-v1.17.145 continues the [eleven-area roadmap](docs/DEVELOPMENT_ROADMAP.md)
-with shutdown/cancellation recovery, retired diagnostic data cleanup, and
-synthetic multi-tool resource/lifecycle tests. Publication and exact-source
-CI are pending. [Candidate handoff](docs/RELEASE145_HANDOFF.md).
-Latest published beta remains 1.17.144; stable remains 1.17.136.
+[Download the opt-in beta](https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.145).
+Improves shutdown/stale-response handling and retired diagnostic data cleanup;
+adds repeated multi-tool navigation, interruption and resource observations.
+Public downloads and checksums verified. Stable remains v1.17.136.
+Known narrow Editor motion CI failure remains open; this is not stable or
+physical Windows/live-device endurance certification.
+[Release handoff](docs/RELEASE145_HANDOFF.md) · [Eleven-area roadmap](docs/DEVELOPMENT_ROADMAP.md).
 
 <p align="center">
   <img src="assets/Network_Toolkit_Icon.svg" width="112" alt="Network Toolkit icon">
@@ -23,7 +25,7 @@ Latest published beta remains 1.17.144; stable remains 1.17.136.
   <a href="#development">Development</a>
 </p>
 
-## Latest beta - v1.17.144 Beta 8
+## Previous beta - v1.17.144 Beta 8
 
 Published October 31, 2026 as an opt-in prerelease. Beta 8
 improves shared diagnostics and discovery sorting/filtering, long

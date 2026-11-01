@@ -1,11 +1,38 @@
-# v1.17.145 Beta 9 - development candidate, not published
+# v1.17.145 Beta 9 - published and public downloads verified
 
-Continue the original eleven-area plan in docs/DEVELOPMENT_ROADMAP.md.
-Current scoped lifecycle work and exact validation status:
-docs/RELEASE145_HANDOFF.md and docs/BETA9_RELIABILITY_AUDIT.md.
-Latest published beta remains v1.17.144; stable v1.17.136. Preserve Editor
-390px/sidebar/alignment and native SFTP/physical Windows acceptance gaps.
-Do not use the user's desktop. No old tags/assets or access changes.
+Published 2026-11-01T01:47:19Z as opt-in prerelease 430302210:
+https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.145
+PR #20 / tag source: 84c3c53d5c2dcdee13fd04842fafa5c8693679d2.
+Tree 782528158ae2609615eae71e5b317294dca6fce6 exactly matches tested candidate
+15ddba655d31ca441d32bbf0b35c2be3d935ccf7. Release workflow 41262343931:
+build SUCCESS, publish SUCCESS. All four public assets independently downloaded
+and verified; beta feed selects 145, stable remains 136. Previous 144 tag,
+release body and asset identities/digests remain unchanged.
+
+Both final candidate Checks runs (41260830577 and 41260834361) completed with
+14 successful job groups and one failed historical Editor motion group.
+Main duplicate Checks 41262343883: completed with 14 successful groups and the same failed Editor motion group.
+**Not all CI is green.** The original 2px narrow Editor motion requirement is
+unchanged and remains failed; no fix or waiver is claimed. Hosted native Windows,
+security, core and changed-scope lifecycle checks passed before publication.
+No physical multi-hour Windows/live-device soak or native SFTP interruption
+acceptance closure is claimed. Stable certification remains pending.
+
+Continue all eleven areas in docs/DEVELOPMENT_ROADMAP.md. Read
+RELEASE145_HANDOFF.md and BETA9_RELIABILITY_AUDIT.md under docs for exact scope,
+measurements, preserved failure evidence and next proposed Beta 10 work.
+Do not use the user's desktop or overwrite published tags/assets. Credentials,
+saved preferences, network permissions and explicit download/install consent
+remain unchanged. Historical candidate entries below are retained as history.
+
+## Future release-note presentation preference
+
+User instruction (2026-11-01): keep the updater's **What's New** high-level,
+plain-language and about user experience: noticeable improvements, fixes and
+workflows. Put implementation details, test metrics and technical jargon under
+**Additional Details**. Important user-facing limitations must still be clear
+and understandable, not buried solely in technical data. Apply to future
+releases; do not rewrite published 145 assets or release notes retroactively.
 
 # Network Toolkit v1.17.144 Beta 8 - publication verified
 

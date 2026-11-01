@@ -2,14 +2,22 @@
 
 This is the **authoritative, ongoing development plan**. Preserve it across beta releases and future chats. The eleven areas and three-phase sequence originated in the approved application-wide optimization plan. Do not replace them with an Editor-only scope or assume a published beta certifies all its planned work.
 
-## Current Beta 9 candidate
+## Current publication and continuation - Beta 9
 
-v1.17.145 is in development, not published. Shutdown/stale-response guards,
-retired diagnostic caches and finite synthetic resource/lifecycle evidence:
-[Candidate handoff](RELEASE145_HANDOFF.md), [audit](BETA9_RELIABILITY_AUDIT.md).
-All eleven areas and the pending physical/native/Editor acceptance remain below.
+v1.17.145 published 2026-11-01T01:47:19Z as an opt-in prerelease from
+84c3c53d5c2dcdee13fd04842fafa5c8693679d2; public assets and channels verified.
+Shutdown/stale-response guards, retired diagnostic caches and finite synthetic
+resource/lifecycle evidence: [handoff](RELEASE145_HANDOFF.md),
+[audit](BETA9_RELIABILITY_AUDIT.md). Candidate CI: 14 successful groups and
+one unchanged failed Editor motion group. Not all CI is green or stable-ready.
 
-## Latest publication and continuation (v1.17.144)
+**Next proposed:** v1.17.146 Beta 10 (not started), further extended concurrent
+operation/native interruption/repeated-window checks across all eleven areas,
+plus diagnosis of remaining Editor motion/sidebar/alignment defects. Physical
+Windows multi-hour/live-device and native SFTP acceptance remain open.
+No beta publication implies completion of these phases or stable promotion.
+
+## Prior publication and continuation record (v1.17.144)
 
 Published v1.17.144 Beta 8 as an opt-in prerelease on
 2026-10-31T22:56:54Z. Source/tag/PR #19:
@@ -32,7 +40,8 @@ failure and physical Windows/native SFTP acceptance gaps.
 - Latest published beta when created: v1.17.143 Beta 7. Published since: v1.17.144 Beta 8 on 2026-10-31.
 - Latest stable when created: v1.17.136.
 - Completed next phase: v1.17.144 Beta 8, published as opt-in prerelease, with measured shared-results/discovery/monitoring/report/UI improvements; full eleven-area and live-Windows certification remains incomplete.
-- Proposed next: v1.17.145 Beta 9, extended concurrent operation, reliability and stress testing.
+- Current published phase: v1.17.145 Beta 9, scoped finite concurrent lifecycle reliability; full acceptance remains pending.
+- Proposed next: v1.17.146 Beta 10, further concurrent/native reliability and unresolved Editor diagnosis.
 - Release candidate and stable promotion are determined by validation, not a fixed release schedule. Additional betas are acceptable.
 - In every new chat, **recheck** GitHub branch, release, CI, version metadata and newest handoff. Versions above are a snapshot, not permanent claims.
 
@@ -63,7 +72,8 @@ All eleven remain in scope. A beta may implement targeted changes, but its hando
 | Phase 3: Reliability and final optimization | v1.17.142 Beta 6 | Published. Some concurrent UI work and graph cleanup improved; full simultaneous-tool, memory, cancellation and native Windows soak remain unfinished |
 | Additional regression work | v1.17.143 Beta 7 | Published. Improved editor rendering; intermittent 390px comparison map motion drift remains recorded |
 | Phase completion / broad optimization | v1.17.144 Beta 8 | Published opt-in prerelease; measured improvements across shared diagnostics/results, discovery, Ping/Monitor, report export and app chrome. Remaining areas are tracked, not marked certified |
-| Extended reliability and stress | v1.17.145 Beta 9 (proposed) | Pending. Long-running and simultaneous tools, memory/CPU, cancellation, network interruption and recovery |
+| Extended reliability and stress | v1.17.145 Beta 9 | Published scoped opt-in beta. Finite six-tool lifecycle, 80-navigation, shutdown/retirement and resource observations passed; multi-hour physical Windows/live-device and broader native interruption acceptance remain pending |
+| Continued reliability and regression diagnosis | v1.17.146 Beta 10 (proposed) | Not started. Continue all eleven areas, native interruption/repeated-window evidence and unresolved Editor diagnosis without relaxing acceptance |
 | Release candidate | TBD | Pending. Complete native Windows and live-device acceptance and release-blocking regression fixes |
 | Stable | TBD | Pending. Promote only after required acceptance; never just because a beta number was reached |
 

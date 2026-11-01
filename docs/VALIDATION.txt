@@ -1,3 +1,12 @@
+CURRENT v1.17.145 BETA 9 - 2026-11-01
+Public prerelease and four downloaded assets verified. Exact candidate CI:
+14 successful job groups, one unchanged historical Editor motion failure.
+Main duplicate Checks: completed with 14 successful groups and the same failed Editor motion group.
+Local JS 1564/1564, Python 44/44; hosted Windows/native/core/security and
+changed-scope lifecycle pass. Not stable certification or physical/live-device
+soak acceptance. Full evidence: docs/RELEASE145_HANDOFF.md.
+Historical validation records below remain historical.
+
 # Network Toolkit 1.17.130 — automatic profile names and type badges
 
 Published 2026-10-31T03:13:29Z, release 429690714. Release run 41163257124 succeeded.

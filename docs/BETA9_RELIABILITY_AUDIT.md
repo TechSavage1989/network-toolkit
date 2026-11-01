@@ -1,6 +1,7 @@
 # Beta 9 reliability audit
 
-Candidate, not published. Preserve the full original eleven-area roadmap.
+Published as scoped opt-in v1.17.145. Preserve the full original eleven-area roadmap.
+Final validation and limitations supersede the planned candidate coverage below.
 
 | Area | Candidate work / acceptance status |
 | --- | --- |
@@ -44,3 +45,30 @@ Final control and post-GC results are pending hosted validation.
 Remaining: real concurrent capture/transfer/scan/output load, physical Windows
 multi-hour working-set/CPU/latency soak, network interruption/reconnect and complete
 Editor/native SFTP acceptance. Beta publication is not stable certification.
+
+## Final hosted controls and resource observations
+
+Final candidate 15ddba6 / released tree 7825281: push 41260830577 and PR
+41260834361 each have 14 successful groups and the unchanged Editor motion
+failure. Main duplicate: completed with 14 successful groups and the same failed Editor motion group. Full Windows/native, broad
+browser/graph, security/core and new lifecycle checks passed before publication.
+All eleven areas remain in scope; live-network/physical acceptance is not implied.
+
+The hosted full app completed 80 navigation transitions across 16 pages with six
+synthetic jobs, cancellation, interruption/recovery and settings dismissal, with
+no browser errors. Original 144 reproduces the delayed shutdown race; 145 rejects
+that delayed reply. Controlled push-run post-GC observations:
+
+| Observation | Original 144 | Candidate 145 |
+| --- | ---: | ---: |
+| Used JS heap bytes | 9,226,092 | 9,210,168 |
+| DOM nodes | 38,946 | 38,946 |
+| Event listeners | 492 | 492 |
+| Browser TaskDuration seconds | 8.753694 | 8.701477 |
+
+These are finite comparable synthetic observations, not proof of memory-leak
+absence, speed improvement or multi-hour endurance. Raw heap growth without GC
+was not interpreted as a production leak. The 1,000-batch six-tool local fixture
+retains six active registry records; saved preferences and unrelated probe views
+are preserved. Public portable source/EXE/updater/manifest all independently
+verified; details and open Editor/native/physical gates are in RELEASE145_HANDOFF.
