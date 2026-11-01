@@ -1,0 +1,42 @@
+name: Publish Beta 14 one time
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/publish-beta150.yml'
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  dispatch-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Verify candidate and create new immutable beta tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(sed -n 's/^const Version = "\([^"]*\)"/\1/p' internal/model/model.go)" = "1.17.150"
+          test "$(python3 -c 'import json; print(json.load(open("package.json"))["version"])')" = "1.17.150"
+          test "$(cat docs/RELEASE_CHANNEL.txt)" = "beta"
+          if git ls-remote --exit-code --tags origin refs/tags/v1.17.150 >/dev/null; then
+            echo "Beta tag already exists. Refusing to replace it." >&2
+            exit 1
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git tag v1.17.150 "$SOURCE_SHA"
+          git push origin refs/tags/v1.17.150
+      - name: Dispatch official guarded release workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run release.yml --ref main --field tag=v1.17.150
