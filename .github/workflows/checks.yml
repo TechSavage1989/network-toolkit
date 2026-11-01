@@ -644,6 +644,772 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
+      - name: Verify borrowed SFTP response timeout and terminal continuity on Windows
+        env:
+          GOTOOLCHAIN: local
+        run: go test -mod=vendor ./internal/diag -run '^TestSharedSFTPCancellationUnblocksReadAndRetainsShell      - name: Test paced paste literal commands and generation cancellation on Windows
+        env:
+          GOTOOLCHAIN: local
+        run: go test -mod=vendor ./internal/macros -count=1 -v
+      - name: Test paced paste HTTP scope and display-only names on Windows
+        env:
+          GOTOOLCHAIN: local
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestTerminal(Paste127|PromptLabels127)' -count=1 -v
+      - name: Verify actual read-only Windows adapter administrative inventory
+        env:
+          GOTOOLCHAIN: local
+          NTK_NETWORK_ADMIN_READONLY_DIAGNOSTIC: '1'
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestLocalNetworkAdminReadOnlyWindowsDiagnostic$' -count=1 -v -timeout 2m
+      - name: Test typed network maintenance with mocked runners only
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestLocalNetwork' -count=1 -v
+      - name: Test Windows terminal transports and local shells
+        env:
+          GOTOOLCHAIN: local
+        run: go test -mod=vendor ./internal/terminal -run 'TestWindowsLocalShell|TestLocalShell' -count=1 -v
+      - name: Verify explicit local-shell approval and native helper boundaries
+        env:
+          GOTOOLCHAIN: local
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestTerminalShell(ExplicitApprovalAndLateCancellation|NativeHelper)$' -count=1 -v
+      - name: Test native credential protection and capability isolation
+        env:
+          GOTOOLCHAIN: local
+        run: go test -mod=vendor ./cmd/network-toolkit -run 'TestWindowsCredential|TestCredential|TestVaultV2|TestPublicBootstrap|TestTerminalActivationRecord|TestEmbeddedUI|TestTerminalWindow|TestTerminalView' -count=1 -v
+      - name: Test authenticated vault envelopes on Windows
+        env:
+          GOTOOLCHAIN: local
+        run: go test -mod=vendor ./internal/vaultcrypto -count=1 -v
+      - name: Verify real WebView2 private bootstrap
+        env:
+          GOTOOLCHAIN: local
+          NETWORK_TOOLKIT_NATIVE_SECURITY_TEST: '1'
+          TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/network-toolkit-native-dialogs
+        run: go test -mod=vendor ./internal/desktop -run 'TestNativeBootstrap|TestCredentialConfirmation|TestVaultDialog' -count=1 -v
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: native-vault-dialog-checks
+          path: ${{ runner.temp }}/network-toolkit-native-dialogs
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Verify capture navigation never requests administrator approval
+        env:
+          GOTOOLCHAIN: local
+        run: go test -mod=vendor ./cmd/network-toolkit -run 'TestPacketCapturePrivilegeBoundaryNavigationAndExplicitCancel|TestPacketNative|TestColorPickerPreferencesSurviveStateAndNarrowTerminalDisplays' -count=1 -v
+      - name: Test confined local and SFTP staged publication on Windows
+        env:
+          GOTOOLCHAIN: local
+        run: |
+          go test -mod=vendor ./cmd/network-toolkit -run 'TestExplorer|TestSFTPDropRename|TestRemoteBrowserPersistent|TestEditorCapacity114|TestLocalDriveNames115' -count=1 -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          go test -mod=vendor ./internal/diag -run TestSFTPStaged -count=1 -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          go test -mod=vendor ./cmd/network-toolkit -run 'TestEditorExplorer|TestEditorLayout' -count=1 -v
+      - name: Test delayed file data and caller-bound copy cancellation on Windows
+        if: success() || failure()
+        env:
+          GOTOOLCHAIN: local
+        run: go test -mod=vendor ./cmd/network-toolkit ./internal/desktop -run '^TestExplorerDirect121|^TestNativeDeferred121' -count=1 -v
+      - name: Reproduce published122 Terminal export Save dialog safely
+        if: success() || failure()
+        env:
+          GOTOOLCHAIN: local
+          NETWORK_TOOLKIT_NATIVE_TERMINAL_SFTP123_TEST: '1'
+          NETWORK_TOOLKIT_NATIVE_TERMINAL_SFTP123_PHASE: baseline122
+          TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/network-toolkit-terminal-sftp123-baseline
+        run: |
+          $tokens = $null; $parseErrors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path scripts/native-terminal-sftp123.ps1), [ref]$tokens, [ref]$parseErrors) | Out-Null
+          if ($parseErrors.Count) { $parseErrors | Format-List; exit 1 }
+          git fetch --no-tags --depth=1 origin 60b02cae25c1bfaf14d0c15a038706d193c99a37
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ((git rev-parse FETCH_HEAD).Trim() -ne '60b02cae25c1bfaf14d0c15a038706d193c99a37') { throw 'Published122 baseline changed' }
+          $baseline = Join-Path $env:RUNNER_TEMP 'network-toolkit-terminal-sftp122-baseline'
+          git worktree add --detach $baseline 60b02cae25c1bfaf14d0c15a038706d193c99a37
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          foreach ($file in @('cmd/network-toolkit/terminal_sftp123_windows_test.go', 'scripts/native-terminal-sftp123.ps1', 'scripts/terminal-sftp123-native-driver.js')) {
+            Copy-Item -LiteralPath $file -Destination (Join-Path $baseline $file)
+          }
+          Push-Location $baseline
+          try {
+            go test -mod=vendor ./cmd/network-toolkit -run '^TestNativeTerminalSFTP123InstalledWebView2$' -count=1 -timeout=8m -v
+            $testExit = $LASTEXITCODE
+          } finally { Pop-Location }
+          exit $testExit
+      - name: Verify Terminal own-session copy boundaries and real main/workspace file drags
+        if: success() || failure()
+        env:
+          GOTOOLCHAIN: local
+          NETWORK_TOOLKIT_NATIVE_TERMINAL_SFTP123_TEST: '1'
+          NETWORK_TOOLKIT_NATIVE_TERMINAL_SFTP123_PHASE: candidate123
+          TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/network-toolkit-terminal-sftp123-candidate
+        run: |
+          go test -mod=vendor ./cmd/network-toolkit -run '^TestTerminalSFTP123' -count=1 -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          go test -mod=vendor ./cmd/network-toolkit -run '^TestNativeTerminalSFTP123InstalledWebView2$' -count=1 -timeout=8m -v
+      - name: Retain focused123 Terminal SFTP native evidence
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: terminal-sftp123-native-checks
+          path: |
+            ${{ runner.temp }}/network-toolkit-terminal-sftp123-baseline
+            ${{ runner.temp }}/network-toolkit-terminal-sftp123-candidate
+          if-no-files-found: error
+          retention-days: 14
+      - name: Verify direct SFTP row copies to real Windows Explorer
+        if: success() || failure()
+        env:
+          GOTOOLCHAIN: local
+          NETWORK_TOOLKIT_NATIVE_SFTP121_TEST: '1'
+          TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/network-toolkit-native-sftp121
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestNativeSFTPDirect121InstalledWebView2$' -count=1 -timeout=8m -v
+      - name: Retain focused121 native SFTP copy evidence
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: native-sftp121-checks
+          path: ${{ runner.temp }}/network-toolkit-native-sftp121
+          if-no-files-found: error
+          retention-days: 14
+      - name: Verify native detached editor local files with no main window
+        env:
+          GOTOOLCHAIN: local
+          NETWORK_TOOLKIT_NATIVE_LOCAL119_TEST: '1'
+          TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/network-toolkit-native-local119
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestNativeEditorLocal119InstalledWebView2$' -count=1 -timeout=3m -v
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: native-editor-local119-checks
+          path: ${{ runner.temp }}/network-toolkit-native-local119
+          if-no-files-found: error
+          retention-days: 14
+      - name: Verify real Windows Explorer file drops into native WebView2
+        env:
+          GOTOOLCHAIN: local
+          NETWORK_TOOLKIT_NATIVE_EXPLORER_TEST: '1'
+          TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/network-toolkit-native107
+        run: go test -mod=vendor ./internal/desktop -run TestNativeExplorerDropInstalledWebView2 -count=1 -v
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: native-explorer107-checks
+          path: ${{ runner.temp }}/network-toolkit-native107
+          if-no-files-found: error
+          retention-days: 7
+      - name: Verify native editor dirty-close consent and acknowledged two-window moves
+        env:
+          GOTOOLCHAIN: local
+          NETWORK_TOOLKIT_NATIVE_EDITOR_TEST: '1'
+          TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/network-toolkit-native-editor108
+        run: |
+          go test -mod=vendor ./internal/desktop -run '^TestNativeEditorClose(ApprovalInstalledWebView2|ScriptUsesExplicitAction)$' -count=1 -timeout=3m -v
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          go test -mod=vendor ./cmd/network-toolkit -run '^TestNativeEditorTransferInstalledWebView2$' -count=1 -timeout=6m -v
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: native-editor108-checks
+          path: ${{ runner.temp }}/network-toolkit-native-editor108
+          if-no-files-found: error
+          retention-days: 7
+      - name: Verify actual Explorer files folders cancellation and junction confinement
+        env:
+          GOTOOLCHAIN: local
+          NETWORK_TOOLKIT_NATIVE_EXPLORER_TEST: '1'
+          TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/network-toolkit-native-files114
+        run: go test -mod=vendor ./internal/desktop -run 'TestNativeExplorerFiles114|TestNativeFileDrag' -count=1 -timeout=6m -v
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: native-files114-checks
+          path: ${{ runner.temp }}/network-toolkit-native-files114
+          if-no-files-found: error
+          retention-days: 7
+      - name: Verify native Terminal names gestures bulk scope selection and transport
+        env:
+          GOTOOLCHAIN: local
+          NETWORK_TOOLKIT_NATIVE_TERMINAL_TEST: '1'
+          NETWORK_TOOLKIT_NATIVE_TERMINAL_GESTURES: '1'
+          NETWORK_TOOLKIT_NATIVE_TERMINAL_SELECTION: '1'
+          TOOLKIT_NATIVE_TIMING_LABEL: '114-final'
+          TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/network-toolkit-native-transfer114/terminal
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestNativeTerminalTransferInstalledWebView2$' -count=1 -timeout=6m -v
+      - name: Verify native4MiB editor handoff state and timings
+        env:
+          GOTOOLCHAIN: local
+          NETWORK_TOOLKIT_NATIVE_EDITOR_TEST: '1'
+          NETWORK_TOOLKIT_NATIVE_PERFORMANCE114: '1'
+          NETWORK_TOOLKIT_NATIVE_PERFORMANCE_BYTES: '4194304'
+          TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/network-toolkit-native-transfer114/editor
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestNativeEditorTransferInstalledWebView2$' -count=1 -timeout=6m -v
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: native-transfer114-checks
+          path: ${{ runner.temp }}/network-toolkit-native-transfer114
+          if-no-files-found: error
+          retention-days: 7
+      - name: Test visible Windows installer progress
+        env:
+          GOTOOLCHAIN: local
+        run: go test -mod=vendor ./cmd/network-toolkit -run TestUpdateProgressWindowLifecycle -count=1 -v
+
+      - name: Test native timestamp acquisition and packet statistics
+        env:
+          GOTOOLCHAIN: local
+        run: go test -mod=vendor ./cmd/network-toolkit ./internal/platform ./internal/capture -run 'TestSnapshotRows|TestStatistics|TestLocalSnapshotTimes|TestUnavailableLocalSnapshots' -count=1 -v
+
+  browser:
+    runs-on: ubuntu-latest
+    # Keep the real five-minute updater timer and all existing acceptance checks.
+    # Allow cleanup headroom beyond the observed 20-minute job boundary.
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install isolated browser test tools
+        run: |
+          npm install --prefix "$RUNNER_TEMP/ntk-browser-tests" --no-audit --no-fund playwright@1.62.1
+          node "$RUNNER_TEMP/ntk-browser-tests/node_modules/playwright/cli.js" install chromium
+          # Hosted images normally provide Chromium's shared libraries. Avoid
+          # downloading unrelated font/library upgrades from a slow apt mirror;
+          # retain the full dependency installer when a browser cannot launch.
+          if ! PLAYWRIGHT_MODULE="$RUNNER_TEMP/ntk-browser-tests/node_modules/playwright" node -e 'require(process.env.PLAYWRIGHT_MODULE).chromium.launch({headless:true}).then(browser=>browser.close()).catch(error=>{console.error(error.message);process.exitCode=1})'; then
+            node "$RUNNER_TEMP/ntk-browser-tests/node_modules/playwright/cli.js" install --with-deps chromium
+          fi
+      - name: Check stable Local Network layout and automatic snapshots
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
+        run: node scripts/features-89.browser.cjs
+      - name: Check full-history Fit and proportional timeline navigators
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
+        run: node scripts/features-98.browser.cjs
+      - name: Check smooth graph compression, direct controls and visible-value scaling
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
+        run: node scripts/features-97.browser.cjs
+      - name: Check fitted graph tabs, shared following and responsive time axes
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
+        run: node scripts/features-96.browser.cjs
+      - name: Check condensed history, time navigation and held entry selections
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
+        run: node scripts/features-95.browser.cjs
+      - name: Check graph zoom, statistics filters and latest tracking
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
+        run: node scripts/features-94.browser.cjs
+      - name: Retain complete early graph acceptance evidence
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: graph-viewport107-checks
+          path: ${{ runner.temp }}/ntk-browser-results/ui9[4-8]*
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Check macro folders, local terminal UI, scan sizing, copy controls and update progress
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
+        run: node scripts/features-83.browser.cjs
+      - name: Check editor languages, local formatting and shell colors
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
+        run: node scripts/features-84.browser.cjs
+      - name: Check local shell colors, close preferences and collapsed tool navigation
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
+        run: node scripts/features-85.browser.cjs
+      - name: Check editor actions, in-app dialogs, wrapped syntax and shell output
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
+        run: node scripts/editor-source-review.browser.cjs
+      - name: Check remote picker columns, public IP placement and compact network layouts
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
+        run: node scripts/features-88.browser.cjs
+      - name: Check proportional headers, shared controls and sidebar toggles
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
+        run: node scripts/features-90.browser.cjs
+      - name: Check stationary navigation icons and full generated subnet list
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
+        run: node scripts/features-91.browser.cjs
+      - name: Check recorded local times and interactive result graphs
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
+        run: node scripts/features-92.browser.cjs
+      - name: Check persistent graph interactions, timestamp preferences and split results
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
+        run: node scripts/features-93.browser.cjs
+      - name: Check application layout and consistent copy controls
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
+        run: node scripts/ui-consistency.browser.cjs
+      - uses: actions/setup-go@v7
+        if: success() || failure()
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Check real diagnostic copy actions and clipboard
+        if: success() || failure()
+        env:
+          GOTOOLCHAIN: local
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          NTK_APP_EXECUTABLE: ${{ runner.temp }}/Network_Toolkit_UI_Test
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-browser-results
+        run: |
+          CGO_ENABLED=0 go build -mod=vendor -o "$NTK_APP_EXECUTABLE" ./cmd/network-toolkit
+          node scripts/value-copy-live.cjs
+      - name: Check terminal selection deletion with trailing empty cells
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          NTK_APP_EXECUTABLE: ${{ runner.temp }}/Network_Toolkit_UI_Test
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-browser-results
+        run: node scripts/terminal-selection-live.cjs
+      - name: Check Hosts editor interactions and responsive layouts
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
+        run: node scripts/hosts-editor.browser.cjs
+      - name: Check server selectors, saved addresses and responsive layouts
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
+        run: node scripts/transfer-server-layout.browser.cjs
+      - name: Check client connection controls and activity layout
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+        run: node scripts/transfer-client-layout.browser.cjs
+      - name: Check SMTP password retention and navigation clearing
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+        run: node scripts/smtp-password.browser.cjs
+      - name: Check saved session folders and persistence
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
+        run: node scripts/saved-session-folders.browser.cjs
+      - name: Check terminal command input without scrollbar tracks
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
+        run: node scripts/terminal-commandbar.browser.cjs
+      - name: Check restored terminal connection dialog and sidebar
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
+        run: node scripts/terminal-connection-dialog.browser.cjs
+      - name: Check files open at the start in the text editor
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
+        run: node scripts/file-editor-start.browser.cjs
+      - name: Check automatic update startup and release notes
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
+        run: node scripts/app-updater-startup.browser.cjs
+      - name: Check native Chromium update timers and released regression control
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
+        run: node scripts/app-updater-native-timers.browser.cjs
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: transfer-browser-checks
+          path: ${{ runner.temp }}/ntk-browser-results
+          if-no-files-found: ignore
+          retention-days: 7
+
+  browser-security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install isolated security browser tools
+        run: |
+          npm install --prefix "$RUNNER_TEMP/ntk-security-browser-tests" --no-audit --no-fund playwright@1.62.1
+          node "$RUNNER_TEMP/ntk-security-browser-tests/node_modules/playwright/cli.js" install chromium
+          if ! PLAYWRIGHT_MODULE="$RUNNER_TEMP/ntk-security-browser-tests/node_modules/playwright" node -e 'require(process.env.PLAYWRIGHT_MODULE).chromium.launch({headless:true}).then(browser=>browser.close()).catch(error=>{console.error(error.message);process.exitCode=1})'; then
+            node "$RUNNER_TEMP/ntk-security-browser-tests/node_modules/playwright/cli.js" install --with-deps chromium
+          fi
+      - name: Check real Terminal tab selection close and retained drag behavior
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-security-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-terminal-click116-results
+        run: node scripts/terminal-tab-click116.browser.cjs
+      - name: Retain focused Terminal hotfix evidence
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: terminal-tab-click116-checks
+          path: ${{ runner.temp }}/ntk-terminal-click116-results
+          if-no-files-found: error
+          retention-days: 14
+      - name: Check credential UI boundaries with synthetic fixtures
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-security-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-security-browser-results
+        run: node scripts/credential-security.browser.cjs
+      - name: Check terminal paging and full command/paste output
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-security-browser-tests/node_modules/playwright
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-security-browser-results
+        run: node scripts/terminal-pager.browser.cjs
+      - name: Check SSH authentication banner line endings and rendering
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-security-browser-tests/node_modules/playwright
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-security-browser-results
+        run: node scripts/terminal-banner.browser.cjs
+      - name: Check discovery multi-item filters
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-security-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-security-browser-results
+        run: node scripts/discovery-filter.browser.cjs
+      - name: Check explicit discovery port actions
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-security-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-security-browser-results
+        run: node scripts/discovery-port-actions.browser.cjs
+      - name: Check macro recording controls and selected sidebar view
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-security-browser-tests/node_modules/playwright
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-security-browser-results
+        run: node scripts/terminal-macro-recording.browser.cjs
+      - name: Check explicit transfer location copies and clipboard
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-security-browser-tests/node_modules/playwright
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-security-browser-results
+        run: node scripts/transfer-locations.browser.cjs
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: credential-security-browser-checks
+          path: ${{ runner.temp }}/ntk-security-browser-results
+          if-no-files-found: ignore
+          retention-days: 7
+
+
+  browser-workflows107:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install isolated browser test tools
+        run: |
+          mkdir -p "$RUNNER_TEMP/ntk-workflow107-tests"
+          npm install --prefix "$RUNNER_TEMP/ntk-workflow107-tests" playwright@1.62.1
+          "$RUNNER_TEMP/ntk-workflow107-tests/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Check network maintenance reviews and states without native actions
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results
+        run: node scripts/local-network-actions124.browser.cjs
+      - name: Retain isolated network maintenance UI evidence
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: local-network-actions124-checks
+          path: ${{ runner.temp }}/ntk-workflow107-results/local-network-actions124-*
+          if-no-files-found: error
+          retention-days: 14
+      - name: Prepare exact123 graph negative control
+        run: |
+          git fetch --no-tags --depth=1 origin c0530bbb710e1023c68b835a565fbf89e19d74a8
+          test "$(git rev-parse FETCH_HEAD)" = c0530bbb710e1023c68b835a565fbf89e19d74a8
+          mkdir -p "$RUNNER_TEMP/ntk-graph-baseline123"
+          git archive c0530bbb710e1023c68b835a565fbf89e19d74a8 | tar -xf - -C "$RUNNER_TEMP/ntk-graph-baseline123"
+      - name: Reproduce published123 mature Recent left-gap before correction
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results/negative124
+          GRAPH_SCALE_SOURCE_ROOT: ${{ runner.temp }}/ntk-graph-baseline123
+        run: |
+          set +e
+          node scripts/graph-scale119.browser.cjs
+          result=$?
+          set -e
+          test "$result" -ne 0
+          node -e 'const r=require(process.env.TOOLKIT_TEST_OUTPUT+"/graph-scale119-report.json"); if(r.passed || !r.errors.some(e=>/Mature10s actual left endpoint, cycle 0/.test(e)))process.exit(1)'
+      - name: Check stable graph density time windows follow anchors and elapsed clocks
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results
+        run: node scripts/graph-scale119.browser.cjs
+      - name: Retain focused graph time and120 density evidence
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: graph-scale119-checks
+          path: |
+            ${{ runner.temp }}/ntk-workflow107-results/graph-scale119-*
+            ${{ runner.temp }}/ntk-workflow107-results/graph-scale120-*
+            ${{ runner.temp }}/ntk-workflow107-results/negative124/**
+          if-no-files-found: error
+          retention-days: 14
+      - name: Prepare exact published108 UI for measured before-after layouts
+        if: success() || failure()
+        run: |
+          git fetch --no-tags --depth=1 origin 59a82b13bb31899206d383ea58166ec9a4f4faf0
+          test "$(git rev-parse FETCH_HEAD)" = 59a82b13bb31899206d383ea58166ec9a4f4faf0
+          mkdir -p "$RUNNER_TEMP/ntk-layout-baseline108"
+          git archive 59a82b13bb31899206d383ea58166ec9a4f4faf0 | tar -xf - -C "$RUNNER_TEMP/ntk-layout-baseline108"
+      - name: Prepare exact published109 UI for temporal graph comparison
+        if: success() || failure()
+        run: |
+          git fetch --no-tags --depth=1 origin d3494a879604fb2523e0867ad1fb175a2f9abbf5
+          test "$(git rev-parse FETCH_HEAD)" = d3494a879604fb2523e0867ad1fb175a2f9abbf5
+          mkdir -p "$RUNNER_TEMP/ntk-graph-baseline109"
+          git archive d3494a879604fb2523e0867ad1fb175a2f9abbf5 | tar -xf - -C "$RUNNER_TEMP/ntk-graph-baseline109"
+      - name: Prepare exact published112 UI for graph and reader comparisons
+        if: success() || failure()
+        run: |
+          git fetch --no-tags --depth=1 origin 4d05f6a5a4eb1c315d0a19ccf2eb8daedf2dcb1c
+          test "$(git rev-parse FETCH_HEAD)" = 4d05f6a5a4eb1c315d0a19ccf2eb8daedf2dcb1c
+          mkdir -p "$RUNNER_TEMP/ntk-ui-baseline112"
+          git archive 4d05f6a5a4eb1c315d0a19ccf2eb8daedf2dcb1c | tar -xf - -C "$RUNNER_TEMP/ntk-ui-baseline112"
+      - name: Check pinned graph endpoints and interactive compression curves
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_UI_BASELINE_DIR: ${{ runner.temp }}/ntk-ui-baseline112
+        run: node scripts/graph-curve113.browser.cjs
+      - name: Check concise result readers and preserved technical fields
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_UI_BASELINE_DIR: ${{ runner.temp }}/ntk-ui-baseline112
+        run: node scripts/result-readers113.browser.cjs
+      - name: Retain new graph and reader evidence before legacy workflows
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: graph-readers113-early-checks
+          path: |
+            ${{ runner.temp }}/ntk-workflow107-results/graph-curve113-*
+            ${{ runner.temp }}/ntk-workflow107-results/result-readers113-*
+          if-no-files-found: error
+          retention-days: 7
+      - name: Check exact saved sessions, persistent filter controls and recorded sources
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
+        run: node scripts/discovery-saved.browser.cjs
+      - name: Check transactional shared color controls and normal/narrow layouts
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
+        run: node scripts/color-picker.browser.cjs
+      - name: Check conservative terminal highlights, local font fallback and resize
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
+        run: node scripts/terminal-style107.browser.cjs
+      - name: Check ordinary capture navigation and explicit cancelled Start
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
+        run: node scripts/packet-capture-privilege.browser.cjs
+      - name: Check reviewed file drops, destination validation and cancellation
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
+        run: node scripts/transfer-drop.browser.cjs
+      - name: Check authoritative sidebar activity, cross-window state and responsive indicators
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
+        run: node scripts/sidebar-activity108.browser.cjs
+      - name: Check inline saved bookmarks, details access and independent copying
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
+        run: node scripts/saved-bookmarks.browser.cjs
+      - name: Check stable status-colored graphs and time-aligned pointer selection
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
+        run: node scripts/graph-interaction108.browser.cjs
+      - name: Check first paste creates an unsaved document and survives navigation
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
+        run: node scripts/editor-empty-paste.browser.cjs
+      - name: Reproduce the pinned 107 empty-editor regression as a negative control
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
+          TOOLKIT_EXPECT_EMPTY_PASTE_BUG: '1'
+        run: |
+          git fetch --no-tags --depth=1 origin ab0d0daeff5e2ea8f5d4da457544fc96b8202fab
+          git show ab0d0daeff5e2ea8f5d4da457544fc96b8202fab:web/assets/file-editor.js > "$RUNNER_TEMP/ntk-editor-107.js"
+          printf '5a6d23f20146b44c39a2d057a2d113f6721be0ef0c511752d7666b2d505faeb9  %s\n' "$RUNNER_TEMP/ntk-editor-107.js" | sha256sum --check
+          TOOLKIT_EDITOR_SOURCE="$RUNNER_TEMP/ntk-editor-107.js" node scripts/editor-empty-paste.browser.cjs
+      - name: Check editor tabs, local comparison, change-map geometry and appearance
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
+        run: node scripts/editor-workflows108.browser.cjs
+      - name: Check acknowledged editor window moves and scoped startup
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
+        run: node scripts/editor-windows108.browser.cjs
+      - name: Check reclaimed app workspace and reachable compact navigation
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_LAYOUT_BASELINE_DIR: ${{ runner.temp }}/ntk-layout-baseline108
+        run: node scripts/app-chrome109.browser.cjs
+      - name: Check compact editor controls and measured document height gains
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_LAYOUT_BASELINE_DIR: ${{ runner.temp }}/ntk-layout-baseline108
+        run: node scripts/editor-height109.browser.cjs
+      - name: Check full-width detached editor and direct detach controls against109
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_EDITOR_BASELINE109_DIR: ${{ runner.temp }}/ntk-graph-baseline109
+        run: node scripts/editor-window110.browser.cjs
+      - name: Check real temporal graph outlines against the published109 negative control
+        if: success() || failure()
+        timeout-minutes: 10
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_GRAPH_BASELINE_DIR: ${{ runner.temp }}/ntk-graph-baseline109
+        run: node scripts/graph-temporal110.browser.cjs
+      - name: Prepare published110 editor baseline
+        if: success() || failure()
+        run: |
+          git fetch --no-tags --depth=1 origin a71f98c4f418077cfeefa5546cfb77de1d8e7742
+          test "$(git rev-parse FETCH_HEAD)" = a71f98c4f418077cfeefa5546cfb77de1d8e7742
+          mkdir -p "$RUNNER_TEMP/ntk-layout-baseline110"
+          git archive a71f98c4f418077cfeefa5546cfb77de1d8e7742 | tar -xf - -C "$RUNNER_TEMP/ntk-layout-baseline110"
+      - name: Check compact editor and two-document map with real pointer input
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_LAYOUT_BASELINE110_DIR: ${{ runner.temp }}/ntk-layout-baseline110
+        run: node scripts/editor-layout-map.browser.cjs
+      - name: Check ten-second graph density elapsed labels and timeline wheel navigation
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results/navigation114
+        run: node scripts/graph-navigation114.browser.cjs
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: workflow107-browser-checks
+          path: ${{ runner.temp }}/ntk-workflow107-results
+          if-no-files-found: error
+          retention-days: 7
+ -count=1 -timeout=45s -v
       - name: Test paced paste literal commands and generation cancellation on Windows
         env:
           GOTOOLCHAIN: local
