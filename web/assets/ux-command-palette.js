@@ -163,7 +163,8 @@ doc.addEventListener('keydown',event=>{
   event.preventDefault();event.stopImmediatePropagation();open('help');
  }
 },true);
-doc.addEventListener('click',event=>{
+// Capture before existing document handlers that own Editor tab gestures.
+root.addEventListener('click',event=>{
  if(event.target.closest?.('#uxCommandLauncher,#uxCommandLauncherNarrow')){event.preventDefault();open('commands');}
  else if(event.target.closest?.('#uxHelpLauncher,#uxTerminalHelpLauncher')){event.preventDefault();open('help');}
  else if(event.target.closest?.('[data-ed-tab-actions]')){
