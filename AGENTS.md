@@ -1,3 +1,11 @@
+# v1.17.150 Beta 14 - published
+
+Published 2026-11-01T05:46:46Z as opt-in prerelease 430388745 from tagged commit c68d31e4cb72dcce4cc17435d4e5447961778db7. Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.150
+Official release workflow 41277868119 completed build and publication successfully; four official assets carry GitHub SHA-256 digests. Stable latest remains v1.17.136.
+The shared SFTP timeout callback is disarmed after successful operations, with focused regression tests. All existing settings, credentials, permissions, SSH terminal ownership and the Windows portable updater remain unchanged.
+Read docs/DEVELOPMENT_ROADMAP.md, docs/DEVELOPMENT_HANDOFF.md and docs/RELEASE150_HANDOFF.md. The eleven-area roadmap remains authoritative. The 390px Editor motion check and physical Windows/real-device acceptance are still open and are not waived. Next proposed v1.17.151 Beta 15: Editor narrow alignment, live SFTP interruption and broad simultaneous-tool endurance. Never modify previous published tags/assets.
+Do not use the user's desktop or require Work mode for future development. Use hosted GitHub CI. What's New should be user-focused, with technical information under Additional Details.
+
 # v1.17.150 Beta 14 - candidate, NOT PUBLISHED
 
 Read docs/DEVELOPMENT_ROADMAP.md, docs/DEVELOPMENT_HANDOFF.md and docs/RELEASE150_HANDOFF.md first. SFTP completed-response timeout lifecycle guard and regression test added. Preserve eleven-area roadmap, settings, credentials, permissions and explicit portable updater consent. The original 390px Editor motion regression and physical Windows/live-device acceptance are open. No prior release or tag replacement.
