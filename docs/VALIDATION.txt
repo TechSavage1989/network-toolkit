@@ -1,3 +1,22 @@
+CURRENT v1.17.149 BETA 13 - 2026-11-01
+
+Published opt-in prerelease:
+https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.149
+Tagged source bf76d7506393d4a1902c55656a5490897abf8922.
+Release workflow 41275438541 build/publish SUCCESS. Four assets
+with GitHub SHA-256 metadata, Windows x64 executable, portable source
+ZIP and binary-only update ZIP verified through the release workflow.
+Stable latest remains v1.17.136.
+
+Candidate Checks 41275225328: 11 groups passed and four integration
+groups still pending at publication verification. Main Checks
+41275438525: 11 passed, four pending. The new hosted Windows
+synthetic SFTP timeout test passed. Historic Editor 390px motion and
+native physical Windows/live-SFTP acceptance remain outstanding.
+The release assets were not independently downloaded and rehashed
+here. Full handoff: docs/RELEASE149_HANDOFF.md.
+Previous validation records follow unchanged.
+
 CURRENT v1.17.148 BETA 12 - 2026-11-01
 
 Published 2026-11-01T04:49:47Z as opt-in GitHub prerelease 430369106.
