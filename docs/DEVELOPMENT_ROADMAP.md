@@ -2,6 +2,17 @@
 
 This is the **authoritative, ongoing development plan**. Preserve it across beta releases and future chats. The eleven areas and three-phase sequence originated in the approved application-wide optimization plan. Do not replace them with an Editor-only scope or assume a published beta certifies all its planned work.
 
+## Beta 12 candidate (not published)
+
+v1.17.148 is in development. It adds scoped SFTP cancellation guards and
+synthetic borrowed-terminal interruption tests, plus extended six-tool
+concurrent refresh/recovery resource observations. The original eleven
+areas below remain active; Editor 390px motion, real SFTP interruption and
+physical Windows endurance acceptance remain outstanding.
+See [Beta 12 handoff](RELEASE148_HANDOFF.md) and
+[reliability audit](BETA12_RELIABILITY_AUDIT.md). No beta publication
+or stable readiness is claimed by this candidate.
+
 ## Latest publication - Beta 11 and next proposed Beta 12
 
 Published v1.17.147 Beta 11 on 2026-11-01T04:17:17Z as opt-in prerelease ID 430357367.
