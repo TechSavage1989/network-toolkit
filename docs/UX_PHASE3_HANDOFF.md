@@ -11,7 +11,7 @@
 
 ## Screenshots
 **Before:** Phase 2 synthetic screenshots, https://github.com/TechSavage1989/network-toolkit/actions/runs/41280365529/artifacts/13073296255.
-**After:** Synthetic Phase 3 screenshot workflow .github/workflows/ux-phase3.yml. Record the exact successful artifact URL and number of images after CI. Screenshots cover all tools, two resolutions and both themes.
+**After:** Phase 3 synthetic screenshots, https://github.com/TechSavage1989/network-toolkit/actions/runs/41283276219/artifacts/13074431909. This captured 176 images at both approved resolutions in light and dark, with no browser page errors or missing assets. The same run passed ten focused interaction checks. The final release candidate must still pass its exact-source checks after version/resource updates.
 No native Windows, real devices or personal files were used.
 
 ## Deferred
