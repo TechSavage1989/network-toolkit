@@ -6,7 +6,7 @@ Approval: the owner approved the UX audit's recommendations ("approved to procee
 ## What changed for users
 - **Test a target.** Ping, Trace route, DNS lookup and TCP ports share one navigation entry. A tab strip at the top switches between them. The host you type is shared, and each tab shows a dot for its latest result for that host (green finished, yellow running, red failed, faint not yet run). Switching tabs never starts a test.
 - **File Transfer.** SFTP, FTP/FTPS and TFTP share one navigation entry with a protocol picker. Each protocol's tooltip states its security (TFTP: no encryption or login). A running TFTP server still shows its activity dot on File Transfer.
-- Both entries return to the test or protocol you used last, and that choice is saved.
+- Both entries return to the test or protocol you used last, and that choice is saved. Code that opens a specific protocol (for example a device's "Open SFTP" action) still opens exactly that protocol.
 - The former names (Ping, Trace route, DNS lookup, TCP ports, SFTP, FTP / FTPS, TFTP) are still found by command search (Ctrl+Shift+P) and open directly.
 - **Terminal sidebar.** The separate "Sidebar" show/hide button is removed at the owner's request. Clicking the selected tab hides the sidebar; clicking any tab shows it again. The divider still works.
 
