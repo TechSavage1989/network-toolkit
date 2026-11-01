@@ -1,3 +1,7 @@
+# v1.17.150 Beta 14 - candidate, NOT PUBLISHED
+
+Read docs/DEVELOPMENT_ROADMAP.md, docs/DEVELOPMENT_HANDOFF.md and docs/RELEASE150_HANDOFF.md first. SFTP completed-response timeout lifecycle guard and regression test added. Preserve eleven-area roadmap, settings, credentials, permissions and explicit portable updater consent. The original 390px Editor motion regression and physical Windows/live-device acceptance are open. No prior release or tag replacement.
+
 # v1.17.149 Beta 13 - development candidate, NOT PUBLISHED
 
 Read docs/DEVELOPMENT_ROADMAP.md, docs/RELEASE149_HANDOFF.md and
