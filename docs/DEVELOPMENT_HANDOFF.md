@@ -1,3 +1,10 @@
+# v1.17.150 Beta 14 - publication verified
+
+Published 2026-11-01T05:46:46Z as opt-in GitHub prerelease 430388745. Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.150
+Tagged source c68d31e4cb72dcce4cc17435d4e5447961778db7; merged PR #26; official Release workflow 41277868119 build SUCCESS and publish SUCCESS. The executable, portable ZIP, binary-only updater ZIP and SHA256SUMS are present with GitHub digests. Stable latest remains v1.17.136.
+Borrowed SSH SFTP now disarms per-response timeout callbacks on completed operations and retains the active terminal. Version resources and release package passed the guarded workflow. One-time publication preparation workflows were removed from main after release. No previous published release/tag/asset was changed.
+Read docs/RELEASE150_HANDOFF.md and the original eleven-area roadmap. The 390px Editor comparison motion failure at the unchanged 2px requirement remains open, as do real-device SFTP interruption and physical Windows multi-hour soak. Complete Checks suite was still in progress at the handoff review; do not claim all CI passed. Next proposed Beta 15 v1.17.151 continues those gaps. Preserve credentials, settings, permissions and explicit opt-in updater approval. Future release notes: user-facing What's New, jargon in Additional Details.
+
 # v1.17.150 Beta 14 - candidate, NOT PUBLISHED
 
 Based on published v1.17.149. Candidate guards against a late SFTP timeout callback closing its completed channel, with twenty-cycle regression. Version and release notes prepared. See docs/RELEASE150_HANDOFF.md. Eleven-area roadmap unchanged, 390px Editor motion threshold still failed and real-device/Windows soak not certified. CI and publication require verification. Existing credentials/settings/permissions, fixed Network_Toolkit.exe and updater consent preserved.
