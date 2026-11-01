@@ -321,7 +321,11 @@ document.getElementById('ownerCancel').onclick=()=>api('/owner-cancel','POST',{}
 	result := make(chan error, 1)
 	title := "Network Toolkit Files114 native acceptance"
 	script, _ := filepath.Abs(filepath.Join("..", "..", "scripts", "native-explorer-files114.ps1"))
-	err = Run(ctx, Config{Title: title, URL: server.URL + "/", SessionToken: token, DataDir: profile, Stop: cancel, OnReady: func() {
+	// Keep the hosted two-window Explorer fixture below the production main-window minimum.
+	// Otherwise the 960px main window covers Explorer at x=520, so the synthetic
+	// drag lands in the wrong window despite a successful OLE copy effect.
+	// Production minimum sizes remain covered by ux_window_minimum_test.go.
+	err = Run(ctx, Config{Title: title, URL: server.URL + "/", SessionToken: token, DataDir: profile, MinWidth: 480, MinHeight: 400, Stop: cancel, OnReady: func() {
 		var hwnd uintptr
 		wndWindows.Range(func(key, value any) bool {
 			w, ok := value.(*hostWindow)
