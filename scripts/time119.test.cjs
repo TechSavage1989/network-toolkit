@@ -36,7 +36,7 @@ test('elapsed updates only existing value text during unchanged polls, with no g
  const start=html.indexOf('const elapsed=j=>'),end=html.indexOf('\n',html.indexOf('function refreshJobElapsed()',start));vm.runInContext(html.slice(start,end),c);
  c.refreshJobElapsed();assert.equal(value,'00:00:01');assert.equal(writes,1);c.refreshJobElapsed();assert.equal(writes,1);clock+=1000;c.refreshJobElapsed();assert.equal(value,'00:00:02');assert.equal(writes,2);assert.equal(orphan.textContent,'untouched');assert.equal(JSON.stringify(job),before);
  job.status='completed';job.finished='2026-10-30T00:00:02Z';clock+=90000;c.refreshJobElapsed();assert.equal(value,'00:00:02');assert.equal(writes,2);
- const poll=html.slice(html.indexOf('async function pollJobs()'),html.indexOf('\nasync function refreshSystem()'));assert.match(poll,/finally\{refreshJobElapsed\(\);polling=false\}/);
+ const poll=html.slice(html.indexOf('async function pollJobs()'),html.indexOf('\nasync function refreshSystem()'));assert.match(poll,/finally\{if\(!shutDown\)refreshJobElapsed\(\);polling=false\}/);
 });
 
 test('the graph uses one noninteractive elapsed cell in the existing statistics strip, not another header row',()=>{

@@ -1,3 +1,11 @@
+## Beta 9 development candidate (not yet published)
+
+v1.17.145 continues the [eleven-area roadmap](docs/DEVELOPMENT_ROADMAP.md)
+with shutdown/cancellation recovery, retired diagnostic data cleanup, and
+synthetic multi-tool resource/lifecycle tests. Publication and exact-source
+CI are pending. [Candidate handoff](docs/RELEASE145_HANDOFF.md).
+Latest published beta remains 1.17.144; stable remains 1.17.136.
+
 <p align="center">
   <img src="assets/Network_Toolkit_Icon.svg" width="112" alt="Network Toolkit icon">
 </p>
@@ -25,7 +33,7 @@ The stable channel remains v1.17.136; extended live Windows acceptance
 and the historical narrow Editor motion regression remain open.
 
 [Download Beta 8](https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.144) ·
-[Release notes](RELEASE_NOTES_1.17.144.txt) ·
+[Release notes](docs/releases/RELEASE_NOTES_1.17.144.txt) ·
 [Performance audit](docs/BETA8_APPWIDE_AUDIT.md) ·
 [Development roadmap](docs/DEVELOPMENT_ROADMAP.md) ·
 [Handoff](docs/RELEASE144_HANDOFF.md)

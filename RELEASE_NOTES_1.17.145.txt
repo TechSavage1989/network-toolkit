@@ -1,0 +1,16 @@
+Network Toolkit 1.17.145 Beta 9
+
+## What's New
+
+- Delayed diagnostic replies no longer reopen the online display after the workspace has closed.
+- Retired diagnostic and discovery results release their cached views while keeping saved filter preferences.
+- Late configuration status replies no longer replace a newer operation or schedule retries after closing.
+- Packet capture stops scheduling display refreshes after application shutdown.
+
+## Additional Details
+
+- Repeated synthetic batches cover concurrent Ping, Trace route, DNS, TCP, discovery and monitoring result lifecycles, with CPU, elapsed time and heap observations.
+- Full-application browser checks exercise repeated multi-tool navigation, cancellation, interruption/recovery, settings dismissal and delayed replies during closure.
+- This does not change network targets, concurrency, configuration permissions, stored credentials, report data, capture recording policy, transfer protocols or terminal ownership.
+- Preferences, stable Network_Toolkit.exe naming, beta opt-in and explicit download/install consent remain unchanged. Stable remains v1.17.136.
+- This beta does not resolve the historical 390px Editor comparison-motion drift, sidebar/alignment observations, native SFTP interruption acceptance or physical Windows/live-device soak requirements. Synthetic measurements are not real-device performance certification.
