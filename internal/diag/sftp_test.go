@@ -277,3 +277,26 @@ func TestSFTPProtocolOperations(t *testing.T) {
 		t.Fatalf("fingerprint not enforced: %v", e)
 	}
 }
+
+type shortSFTPWriter struct {
+ bytes.Buffer
+ max int
+}
+
+func (w *shortSFTPWriter) Write(p []byte) (int, error) {
+ if len(p) > w.max { p = p[:w.max] }
+ return w.Buffer.Write(p)
+}
+
+func TestSFTPFrameSurvivesPartialWrites(t *testing.T) {
+ for _, limit := range []int{1, 3, 7} {
+  writer := &shortSFTPWriter{max: limit}
+  client := &wireSFTP{out: writer}
+  payload := bytes.Repeat([]byte("abc"), 40)
+  if err := client.send(fxInit, payload); err != nil { t.Fatalf("partial writer max=%d: %v", limit, err) }
+  frame := writer.Bytes()
+  if len(frame) != len(payload)+5 { t.Fatalf("partial writer max=%d truncated frame: %d", limit, len(frame)) }
+  if got := binary.BigEndian.Uint32(frame[:4]); int(got) != len(payload)+1 { t.Fatalf("invalid frame size: %d", got) }
+  if frame[4] != fxInit || !bytes.Equal(frame[5:], payload) { t.Fatal("wire frame changed") }
+ }
+}
