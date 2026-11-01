@@ -1,6 +1,6 @@
 # Network Toolkit UX Audit - Phase 1
 
-**Status:** UX audit review in progress, 132 screenshot captures complete and sampled. No application code has been changed and no 1.18.x release has been produced.
+**Status:** Phase 1 documentation and screenshot audit prepared for owner review. The hosted fixture captured 176 screenshots successfully. No application code has changed and no 1.18.x release has been produced.
 
 **Authority:** [Owner UX plan](UX_POLISH_PLAN.md), which supersedes the archived eleven-area roadmap. **Approval gate:** Do not start Phase 2 or alter application behavior without the repository owner's explicit approval of this audit.
 
@@ -150,22 +150,11 @@ All existing keyboard shortcuts require conflict checking, especially Ctrl+Shift
 
 For every error rewrite: state **what happened** and **what the user can do next** without hiding relevant protocol/permission detail. Avoid changing raw diagnostic data, logs or exported protocol facts.
 
-## 8. Prioritized phase mapping
-
-| Priority | Phase | Proposal |
-| --- | --- | --- |
-| 1 | 2 | Shared spacing/type/color tokens, buttons/inputs/tabs/toasts/empty states, minimum native windows, before/after screenshots |
-| 2 | 3 | Navigation groups, Ctrl+Shift+P command palette with terminal focus safeguards, F1 shortcut sheet, visible equivalents for hidden actions |
-| 3 | 4 | Searchable unified Settings, migration of every existing preference, approved confirmation classification, Ctrl+Shift+T restoration |
-| 4 | 5 | Plain-language messages, helpful empty states and dismissible first-run welcome |
-| 5 | 6 | Only owner-approved Test a target and File Transfer consolidation, with compatibility mapping |
-| Final | After 6 | UI guidelines, frozen layout after approval, screenshots and 1.18.0 stable candidate |
-
 ## 9. Verified screenshot evidence and observed UI issues
 
-The hosted synthetic-browser capture passed with **132 screenshots** and no JavaScript page errors or missing assets. It includes every navigation tool at both 1280×800 and 1920×1080, in light and dark themes, detached Editor/Terminal views, App settings, target saving, four diagnostics option dialogs and the protected app-data deletion confirmation.
+The hosted synthetic-browser capture passed with **176 screenshots** and no JavaScript page errors or missing assets. It includes every navigation tool at 1280×800 and 1920×1080 in both themes, detached Editor/Terminal views, client and server modes for SFTP, FTP and TFTP, App settings, selected diagnostic option dialogs, saved-target creation, terminal sessions/profiles, report export and clearing, quitting, and destructive data deletion.
 
-[132-image audit artifact](https://github.com/TechSavage1989/network-toolkit/actions/runs/41279077691/artifacts/13071729961) (GitHub Actions attachment, retention-limited). Representative filenames below match the downloadable archive.
+[176-image audit artifact](https://github.com/TechSavage1989/network-toolkit/actions/runs/41279311855/artifacts/13072242569) (GitHub Actions attachment, retention-limited). Representative filenames below match the downloadable archive.
 
 | Evidence screenshot | Observation | Recommended phase |
 | --- | --- | --- |
@@ -181,12 +170,65 @@ Fixture-only limitations: the simulated host deliberately has no real adapters, 
 
 The owner-approved minimum widths replace narrow pixel-specific tests. The historical 390px common-row-motion CI step has been removed from the audit branch; source integrity, editing behavior and other regression checks remain active.
 
-## Open audit work before asking for approval
 
-- Capture additional transfer-mode, report, terminal and session-confirmation views; the existing 132 screenshots already cover every navigation page and representative major dialogs.
-- Finish comprehensive settings, confirmation and hidden-action inventories across separate JS/Go files rather than treating the lists above as exhaustive.
-- Review what appears in both detached editor and terminal windows.
-- Confirm startup/update timing behavior from existing code (the new six-hour schedule is for a later implementation phase).
-- Record fixture/browser limitations and any uncovered controls accurately.
+## 10. Detailed confirmation decisions for approval
 
-**Approval status: not requested.** No Phase 2 code may be written until the audit is complete and the owner approves the proposed changes.
+| Specific operation or warning | Proposal | Reason or condition |
+| --- | --- | --- |
+| Close an unsaved Editor document or quit with unsaved work | Keep | Cannot silently discard user edits |
+| Close/disconnect an active Terminal tab or multiple sessions | Keep | Live sessions and unsent context may be lost |
+| Reconnect all and disconnect all | Keep | Potential interruption to multiple live sessions |
+| Macro execution to multiple targets | Keep | May issue changes to remote equipment; review target and command |
+| Paste into terminal when review is enabled | Keep | Pasted commands can execute on devices |
+| Replace/overwrite transferred files | Keep | Data may not be recoverable; preserve protocol permissions |
+| Start FTP or TFTP server with plain-text transfer warnings | Keep | Network exposure/security is material |
+| Modify local adapter, IP address, or Hosts file | Keep | Protected OS state; maintain Windows approval and preview |
+| Delete app data | Keep typed confirmation | Destructive and affects saved profiles/settings; preserve credential vault safeguards |
+| Delete vault or SSH host trust entry | Keep | Removes security state; irreversible trust decision |
+| Install or download an update | Keep | Preserve separate user approvals and checksum verification |
+| Quit application with running diagnostics | Keep | Work/session interruption |
+| Delete one saved target | Undo toast, after reversible implementation | Restore exact entry and position without collision; otherwise keep |
+| Delete a saved Terminal profile | Undo toast only if exact secure restoration possible | Do not restore deleted credentials insecurely |
+| Clear diagnostic results | Undo toast only with bounded reliable recovery | Results can be unsaved work; otherwise keep |
+| Hide/collapse navigation/sidebar or panel | Remove | Visual toggle is immediately reversible |
+| Cosmetic theme/color toggle and tab selection | Remove | Low impact; retain explicit Apply/Cancel for color edits as appropriate |
+| Warning about disabling future confirmations | Remove | Owner expressly prohibited these meta-confirmations |
+
+This table is a proposed policy for the owner's approval. Changes to confirmations are deferred to Phase 4, and security, session, file-overwrite and system authorization gates are never removed merely for convenience.
+
+## 11. Additional discovered gestures and shortcuts
+
+- Terminal tab context menu: right click or Shift+F10; should have visible overflow action and shortcut help.
+- Terminal tab reorder: Alt+Shift+Left/Right; expose Move left/Move right in menu.
+- Terminal saved/recent entries: double-click or Enter to open; right click for more actions, so a visible menu is required.
+- File browser selection: Ctrl/Shift multi-select, double-click to open, F2 rename; show these in tooltips/help and context menus.
+- Server file activity and settings dividers: drag, double-click to reset/collapse, arrows/Home for keyboard; show Reset and Hide controls.
+- Hosts entry list: double-click editing and additional keyboard navigation; provide visible Edit and shortcut descriptions.
+- Sidebar navigation divider: double click or Enter/Space to collapse, arrow navigation to resize; keep a visible toggle.
+- Editor tabs: Alt+drag, Alt+Shift+Arrows, drag outside to detach; add explicit tab menu options.
+- Existing Terminal controls consume some keyboard shortcuts such as Ctrl+Shift+F and paste/navigation commands. Implement Phase 3 palette only after checking focused terminal input behavior so Ctrl+Shift+P is never sent incorrectly.
+
+## 12. Visual acceptance observations
+
+- At 1280×800, left navigation entries for lower Workspace tools fall below the visible sidebar. Grouping plus search/palette should reduce hunting.
+- Terminal empty state is understandable, but session controls and disabled actions occupy significant space before a connection exists.
+- The transfer server view uses a narrow, tall settings panel alongside multiple file action bars and status/activities; regroup by task.
+- App settings combines unrelated categories in one long modal without search.
+- Some diagnostic advanced dialogs contain only generic help while others have real options. Avoid empty modals and place simple toggles inline.
+- Large 1920×1080 results/dashboard views have sufficient room; optimize density and hierarchy rather than increasing page chrome.
+- Destructive data-deletion and quit dialogs identify consequences clearly. Preserve their warnings and confirmation gates.
+- Dark and light modes share a recognizable visual vocabulary, but control hierarchy, pane density and empty/loading/status messages differ between tool families.
+
+## Final prioritized change list for Phases 2–6
+
+| Priority | Phase | Proposal |
+| --- | --- | --- |
+| 1 | 2 | Shared spacing/type/color tokens, buttons/inputs/tabs/toasts/empty states, minimum native windows, before/after screenshots |
+| 2 | 3 | Navigation groups, Ctrl+Shift+P command palette with terminal focus safeguards, F1 shortcut sheet, visible equivalents for hidden actions |
+| 3 | 4 | Searchable unified Settings, migration of every existing preference, approved confirmation classification, Ctrl+Shift+T restoration |
+| 4 | 5 | Plain-language messages, helpful empty states and dismissible first-run welcome |
+| 5 | 6 | Only owner-approved Test a target and File Transfer consolidation, with compatibility mapping |
+| Final | After 6 | UI guidelines, frozen layout after approval, screenshots and 1.18.0 stable candidate |
+
+
+**Owner approval requested:** Approve or revise the proposed navigation grouping, the two consolidations and the confirmation classifications before implementation. Phase 2 is blocked until explicit approval. Screenshots are synthetic and do not certify native Windows or real-device behavior.
