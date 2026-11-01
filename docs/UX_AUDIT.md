@@ -231,4 +231,4 @@ This table is a proposed policy for the owner's approval. Changes to confirmatio
 | Final | After 6 | UI guidelines, frozen layout after approval, screenshots and 1.18.0 stable candidate |
 
 
-**Owner approval requested:** Approve or revise the proposed navigation grouping, the two consolidations and the confirmation classifications before implementation. Phase 2 is blocked until explicit approval. Screenshots are synthetic and do not certify native Windows or real-device behavior.
+**Owner decision: approved to proceed.** Approve or revise the proposed navigation grouping, the two consolidations and the confirmation classifications before implementation. Phase 2 is blocked until explicit approval. Screenshots are synthetic and do not certify native Windows or real-device behavior.
