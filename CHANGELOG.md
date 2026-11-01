@@ -1,5 +1,14 @@
 # Network Toolkit Change History
 
+## 1.18.2 Beta 2
+
+- Tools grouped into Home, Diagnose, Connect, Transfer and Configure.
+- Searchable command palette (Ctrl+Shift+P), shortcut help (F1), visible Editor and Terminal tab actions.
+- Visible Terminal sidebar show/hide control and File Transfer pane reset.
+- Existing security, update approval, connection profiles, macros and unsaved documents retained.
+
+
+
 For current release notes, see [GitHub Releases](https://github.com/TechSavage1989/network-toolkit/releases). Earlier release handoffs remain under docs/RELEASE###_HANDOFF.md and archived notes under docs/releases/.
 
 The historical version-by-version project guide is preserved below for reference. This is not the current user guide.
