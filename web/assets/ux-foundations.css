@@ -32,3 +32,14 @@
 @media (prefers-reduced-motion:reduce){
   :where(.btn,.iconbtn,.tab,.toast){animation:none!important;transition:none!important}
 }
+
+/* Shared states and predictable progress behavior, including all tool families. */
+:where(progress){accent-color:var(--accent);height:8px;border-radius:var(--ux-radius-sm);overflow:hidden}
+:where(progress)::-webkit-progress-bar{background:var(--input);border-radius:var(--ux-radius-sm)}
+:where(progress)::-webkit-progress-value{background:var(--accent);border-radius:var(--ux-radius-sm)}
+:where(progress)::-moz-progress-bar{background:var(--accent);border-radius:var(--ux-radius-sm)}
+:where(.empty,.empty-state,.empty-message,.no-results){color:var(--ux-text-secondary);padding:var(--ux-space-4)}
+:where(.notice,.alert,[role="alert"]){border-radius:var(--ux-radius-md)}
+:where(.panel-head,.modal-head){gap:var(--ux-space-3)}
+:where(.field,.form-field){gap:var(--ux-space-2)}
+:where(.modal-foot,.panel-actions){gap:var(--ux-space-2)}
