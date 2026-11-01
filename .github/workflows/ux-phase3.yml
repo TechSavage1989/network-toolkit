@@ -8,6 +8,7 @@ on:
       - 'web/index.html'
       - 'web/assets/ux-command-palette.*'
       - 'web/assets/terminal-tabs.js'
+      - 'web/assets/terminal-tab-drag.js'
       - 'web/assets/file-editor.js'
       - 'web/assets/editor-drag.js'
       - 'web/assets/session-sidebar.js'
