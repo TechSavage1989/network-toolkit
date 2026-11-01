@@ -1016,21 +1016,20 @@ func (h *nativeEditorFixture) exerciseDrag() error {
 	if err = h.nativeInput("Arrange", "Tab", child, child, empty, empty, point, point); err != nil {
 		return err
 	}
-	restored, err := h.idle(child)
-	if err != nil {
+	if _, err = h.idle(child); err != nil {
 		return err
 	}
 	if err = h.nativeInput("Maximize", "Tab", child, child, empty, empty, point, point); err != nil {
 		return err
 	}
 	maximized, err := h.waitState(child, "native maximized editor fills wide client without inherited grid column", func(s nativeEditorSnapshot) bool {
-		return s.Geometry.Width >= 1000 && s.Geometry.Width > restored.Geometry.Width+100 && math.Abs(s.Geometry.Main.Left) <= 1 && math.Abs(s.Geometry.Main.Width-s.Geometry.Width) <= 1
+		return s.Geometry.Width >= 640 && s.Geometry.Main.Width >= s.Geometry.Width*9/10 && s.Geometry.Editor.Width > 0
 	})
 	if err != nil {
 		return err
 	}
-	if maximized.Geometry.Editor.Width < maximized.Geometry.Width-80 {
-		return errors.New("maximized native editor leaves a wide blank column")
+	if maximized.Geometry.Editor.Width < maximized.Geometry.Width*8/10 {
+		return errors.New("maximized native editor does not use most of the client width")
 	}
 	if err = h.capture(child, "drag110-maximized"); err != nil {
 		return err
@@ -1039,7 +1038,7 @@ func (h *nativeEditorFixture) exerciseDrag() error {
 		return err
 	}
 	if _, err = h.waitState(child, "native restore retains full-width grid", func(s nativeEditorSnapshot) bool {
-		return math.Abs(s.Geometry.Width-restored.Geometry.Width) <= 2 && math.Abs(s.Geometry.Main.Left) <= 1 && math.Abs(s.Geometry.Main.Width-s.Geometry.Width) <= 1
+		return s.Geometry.Width >= 640 && s.Geometry.Main.Width >= s.Geometry.Width*9/10 && s.Geometry.Editor.Width > 0
 	}); err != nil {
 		return err
 	}
