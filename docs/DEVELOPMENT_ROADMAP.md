@@ -2,7 +2,22 @@
 
 This is the **authoritative, ongoing development plan**. Preserve it across beta releases and future chats. The eleven areas and three-phase sequence originated in the approved application-wide optimization plan. Do not replace them with an Editor-only scope or assume a published beta certifies all its planned work.
 
-## Beta 13 candidate - not published
+## Latest publication - v1.17.149 Beta 13
+
+Published v1.17.149 Beta 13 on 2026-11-01T05:06:03Z as opt-in prerelease 430374696.
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.149
+Tagged source and merged PR #24: bf76d7506393d4a1902c55656a5490897abf8922.
+Release workflow 41275438541: build SUCCESS and publish SUCCESS. Four official assets with GitHub SHA-256 digests. Normal stable releases/latest remains v1.17.136.
+A borrowed-terminal SFTP request now has a per-response timeout: an unresponsive SFTP channel closes without closing the parent SSH terminal, and the next file request has a fresh timeout. The focused synthetic SSH test passed in hosted Windows CI. Existing credentials, settings, permissions, network targets, terminal ownership, stable Network_Toolkit.exe and updater consent remain unchanged.
+At publication verification, 11 candidate Checks job groups had passed and four browser/Windows groups remained pending. The historical 390px Editor motion test and physical Windows/live-device SFTP acceptance remain open. Prior release tags and assets were not changed.
+
+**Next proposed:** v1.17.150 Beta 14. Fix the remaining Editor 390px
+comparison motion/sidebar issue without relaxing the original 2px
+threshold, continue native SFTP interruption/cancel and multi-hour
+Windows cross-tool CPU/memory/endurance acceptance. All eleven original
+roadmap areas remain active below; beta publication is not stable.
+
+## Beta 13 candidate record (historical)
 
 v1.17.149 adds a bounded per-response timeout to SFTP browsing on an
 already authenticated SSH terminal. An unresponsive SFTP subsystem can
