@@ -28,3 +28,11 @@ Additional Details:
 - Comparison calibration now uses the median of three or more visible matched source rows and preserves the prior behavior with one or two matches.
 - No changes to document contents, stored data, security permissions, portable updater, or network transports.
 - The longstanding Editor 390px/browser and native SFTP/physical Windows acceptance gaps are not declared resolved.
+
+## Prepared release source metadata
+
+Version metadata, HTML footer, native Windows version resource source/object,
+root beta release notes and README have been prepared for v1.17.146. The
+v1.17.145 root note was preserved byte-for-byte in docs/releases. The
+actual Windows build, broad Checks, publication, and release verification
+must be recorded separately; no physical device acceptance is inferred.

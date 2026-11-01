@@ -1,3 +1,18 @@
+NETWORK TOOLKIT 1.17.146
+======================
+
+CURRENT RELEASE - 1.17.146 (BETA 10)
+
+This opt-in beta refines how file comparisons stay aligned during scrolling,
+particularly across several matching source rows at narrow window widths.
+Original source text, undo history, credentials, permissions, preferences,
+Network_Toolkit.exe naming and explicit beta update consent remain unchanged.
+
+Read docs/DEVELOPMENT_ROADMAP.md and docs/RELEASE146_HANDOFF.md for scope,
+known regression checks and unfinished native Windows/SFTP acceptance.
+Details: RELEASE_NOTES_1.17.146.txt. Stable remains 1.17.136.
+Previous release descriptions follow unchanged.
+
 NETWORK TOOLKIT 1.17.145
 ======================
 

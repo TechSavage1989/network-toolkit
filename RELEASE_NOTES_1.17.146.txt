@@ -1,0 +1,12 @@
+Network Toolkit 1.17.146 Beta 10
+
+## What's New
+
+- File comparisons stay more consistent while scrolling through longer documents in narrow windows.
+
+## Additional Details
+
+- Comparison alignment uses a median painted-row correction when at least three matching source rows are visible, reducing the impact of a temporarily displaced row. For one or two rows, previous behavior is retained.
+- The Editor keeps authoritative source text, selection, undo/redo and saved preferences unchanged. No network, credential, transfer, permission, or updater consent behavior changes.
+- The historical 390px map-motion, sidebar and source-alignment integration assertions remain release acceptance checks, not waived requirements. Native SFTP interruption and physical Windows endurance testing are still outstanding.
+- This is an opt-in beta. The stable channel remains v1.17.136. Network_Toolkit.exe retains its fixed filename and update installation requires user approval.
