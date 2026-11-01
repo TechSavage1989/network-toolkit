@@ -265,7 +265,7 @@ func Run(ctx context.Context, cfg Config) error {
 
 	saved, _ := readWindowState(filepath.Join(cfg.DataDir, windowStateFilename))
 	work := workAreaFor(saved.Bounds)
-	saved.Bounds = fitWindowBounds(saved.Bounds, work, 720, 520)
+	saved.Bounds = fitWindowBounds(saved.Bounds, work, cfgMinimumWidth(cfg), cfgMinimumHeight(cfg))
 	saved.Version = 1
 	w := &hostWindow{
 		ctx: ctx, cfg: cfg, state: saved, initializing: true,
@@ -841,12 +841,12 @@ func windowProcedure(hwnd uintptr, message uint32, wparam, lparam uintptr) uintp
 			}
 		}
 		work := workAreaFor(bounds)
-		mmi.MinTrackSize = winPoint{min(w.scale(720), work.Right-work.Left), min(w.scale(520), work.Bottom-work.Top)}
+		mmi.MinTrackSize = winPoint{min(w.scale(cfgMinimumWidth(w.cfg)), work.Right-work.Left), min(w.scale(cfgMinimumHeight(w.cfg)), work.Bottom-work.Top)}
 		return 0
 	case wmDPIChanged:
 		suggested := *(*Rect)(unsafe.Pointer(lparam))
 		if validRect(suggested) {
-			r := fitWindowBounds(suggested, workAreaFor(suggested), w.scale(720), w.scale(520))
+			r := fitWindowBounds(suggested, workAreaFor(suggested), w.scale(cfgMinimumWidth(w.cfg)), w.scale(cfgMinimumHeight(w.cfg)))
 			wndSetWindowPos.Call(hwnd, 0, uintptr(r.Left), uintptr(r.Top), uintptr(r.Right-r.Left), uintptr(r.Bottom-r.Top), 0x0004|0x0010)
 		}
 		w.setFonts()
