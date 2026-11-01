@@ -1016,8 +1016,7 @@ func (h *nativeEditorFixture) exerciseDrag() error {
 	if err = h.nativeInput("Arrange", "Tab", child, child, empty, empty, point, point); err != nil {
 		return err
 	}
-	restored, err := h.idle(child)
-	if err != nil {
+	if _, err = h.idle(child); err != nil {
 		return err
 	}
 	if err = h.nativeInput("Maximize", "Tab", child, child, empty, empty, point, point); err != nil {
