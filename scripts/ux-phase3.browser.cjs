@@ -76,6 +76,8 @@ const check=name=>{report.checks.push(name);console.log('PASS '+name)};
   initialContent:'Synthetic editor text',read:async()=>({content:'Synthetic editor text'}),write:async()=>{throw Error('Save not requested');}});});
  await p.locator('[data-ed-tab-actions]').first().waitFor();
  await p.locator('[data-ed-tab-actions]').first().click();
+ const menuProbe=await p.evaluate(()=>({menu:document.querySelector('.nt-editor-tab-menu')?.innerText||null,tab:[...document.querySelectorAll('[data-ed-tab-actions]')].map(e=>e.dataset.edTabActions),documents:[...NetworkToolkitFileEditor.documents.values()].map(d=>({id:d.id,uid:d.uid}))}));
+ console.log('EDITOR_MENU_PROBE '+JSON.stringify(menuProbe));
  assert.match(await p.locator('.nt-editor-tab-menu').innerText(),/Move one tab left/);
  assert.match(await p.locator('.nt-editor-tab-menu').innerText(),/Move to separate window/);
  await p.keyboard.press('Escape');
