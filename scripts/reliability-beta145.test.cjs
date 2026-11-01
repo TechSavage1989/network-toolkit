@@ -13,3 +13,36 @@ test('Beta 9 filter registries release retired rows without removing user prefer
 test('Beta 9 repeated simultaneous diagnostic batches bound cache retention and record resource cost',async t=>{const {ctx,calls}=harness(),before=process.memoryUsage(),cpu=process.cpuUsage(),start=performance.now();const tools=['ping','trace','dns','tcp','discover','monitor'];for(let cycle=0;cycle<1000;cycle++){const batch=tools.map((tool,i)=>({id:cycle+'-'+i,tool,status:i%2?'completed':'running'}));for(const job of batch){ctx.caches.fullVersions.set(job.id,'synthetic');ctx.dataListViews.set(job.id,{job,rows:Array.from({length:100},(_,n)=>({sequence:n,rttMs:n%13}))});ctx.dataListPages.set(job.id,0);ctx.networkResultFilters.set(job.id,{query:''});}ctx.api=async()=>batch;await ctx.pollJobs();assert.equal(ctx.caches.jobVersions.size,tools.length);assert.equal(ctx.caches.fullVersions.size,tools.length);assert.equal(ctx.dataListViews.size,tools.length);assert.equal(ctx.dataListPages.size,tools.length);assert.equal(ctx.networkResultFilters.size,tools.length);calls.length=0;}const elapsedMs=performance.now()-start,used=process.cpuUsage(cpu),after=process.memoryUsage();t.diagnostic(JSON.stringify({scope:'1000 synthetic snapshot cycles, six tools and 600 visible rows; not networking or physical Windows soak',elapsedMs,cpuUserMs:used.user/1000,cpuSystemMs:used.system/1000,heapUsedDelta:after.heapUsed-before.heapUsed,rssDelta:after.rss-before.rss,retainedJobs:ctx.caches.jobVersions.size,retainedLists:ctx.dataListViews.size}));});
 test('Beta 9 closed capture workspace is not eligible for another refresh',()=>{const text=fs.readFileSync(path.join(root,'web/assets/packet-capture.js'),'utf8'),line=text.split('\n').find(line=>line.startsWith('const active='));assert(line);const ctx={state:{activePage:'capture'},shutDown:false,document:{getElementById:()=>({})}};vm.createContext(ctx);vm.runInContext(line+'\nglobalThis.isVisible=visible;',ctx);assert.equal(ctx.isVisible(),true);ctx.shutDown=true;assert.equal(ctx.isVisible(),false);});
 test('Beta 9 static portable and footer labels agree with the executable version',()=>{const version=/const Version = "([\d.]+)"/.exec(fs.readFileSync(path.join(root,'internal/model/model.go'),'utf8'))[1];assert(html.includes('Portable edition · v'+version+'</div>'));assert(html.includes('Network Toolkit '+version+' · Local, portable diagnostics</span>'));});
+
+test('Beta 12 alternating six-tool recovery releases retired views without losing saved settings',async t=>{
+ const {ctx,calls}=harness(),kinds=['ping','trace','dns','tcp','discover','monitor'];
+ const original={persisted:{status:'reply',query:'synthetic'}},before=process.memoryUsage(),cpu=process.cpuUsage(),start=performance.now();
+ ctx.$=()=>({innerHTML:''});ctx.icon=()=>'';ctx.state.resultFilters=original;
+ for(let cycle=0;cycle<800;cycle++){
+  ctx.state.activePage=['overview','monitor','reports','discovery'][cycle%4];
+  if(cycle>0&&cycle%37===0){
+   const oldJobs=ctx.jobs,oldVersions=ctx.caches.fullVersions.size;
+   ctx.api=async()=>{throw Error('synthetic disconnected engine')};
+   await ctx.pollJobs();
+   assert.equal(ctx.online,false);assert.equal(ctx.jobs,oldJobs,'failed poll must preserve prior snapshot');
+   assert.equal(ctx.caches.fullVersions.size,oldVersions,'interruption must not prune live cache');
+  }
+  const batch=kinds.map((tool,i)=>({id:'cycle-'+cycle+'-'+i,tool,status:i%2?'completed':'running'}));
+  for(const job of batch){
+   ctx.caches.fullVersions.set(job.id,'current');
+   ctx.dataListViews.set(job.id,{job,rows:[{sequence:1,success:true}]});
+   ctx.dataListPages.set(job.id,1);
+   ctx.networkResultFilters.set(job.id,{query:''});
+  }
+  ctx.api=async()=>batch;
+  await ctx.pollJobs();
+  assert.equal(ctx.online,true,'successful refresh must recover from interruption');
+  for(const cache of [ctx.caches.fullVersions,ctx.dataListViews,ctx.dataListPages,ctx.networkResultFilters])
+   assert.equal(cache.size,kinds.length,'retired views must remain bounded after each successful snapshot');
+  assert.equal(ctx.jobs.length,kinds.length);
+  calls.length=0;
+ }
+ assert.equal(ctx.state.resultFilters,original,'persistent user preferences must survive all simulated navigation');
+ const used=process.cpuUsage(cpu),after=process.memoryUsage();
+ t.diagnostic(JSON.stringify({scope:'800 synthetic concurrent six-tool refresh cycles with 21 simulated engine interruptions and four UI pages, not a native or live-device soak',elapsedMs:performance.now()-start,cpuUserMs:used.user/1000,cpuSystemMs:used.system/1000,heapDelta:after.heapUsed-before.heapUsed,rssDelta:after.rss-before.rss,retainedViews:ctx.dataListViews.size}));
+});
