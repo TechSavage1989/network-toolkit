@@ -92,3 +92,15 @@ type NativeFileDragObservation struct {
 	HRESULT  uint32 `json:"hresult,omitempty"`
 	Effect   uint32 `json:"effect,omitempty"`
 }
+
+// cfgMinimumWidth and cfgMinimumHeight preserve existing callers while enforcing
+// the owner's native minimum sizes. Explicit detached-window sizes are supplied
+// by the lifecycle host; missing values default to the main window.
+func cfgMinimumWidth(cfg Config) int32 {
+	if cfg.MinWidth > 0 { return cfg.MinWidth }
+	return 960
+}
+func cfgMinimumHeight(cfg Config) int32 {
+	if cfg.MinHeight > 0 { return cfg.MinHeight }
+	return 600
+}
