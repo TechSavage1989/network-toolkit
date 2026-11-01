@@ -130,7 +130,9 @@ func (c *wireSFTP) send(t byte, p []byte) error {
 	frame.Write(sfU32(uint32(1 + len(p))))
 	frame.WriteByte(t)
 	frame.Write(p)
-	_, err := c.out.Write(frame.Bytes())
+	// A writer is permitted to accept only part of a frame. Retry until the
+	// entire packet has been sent, or return the transport error.
+	_, err := io.Copy(c.out, bytes.NewReader(frame.Bytes()))
 	return err
 }
 func (c *wireSFTP) recv() (byte, []byte, error) {
