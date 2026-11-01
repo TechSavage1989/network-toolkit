@@ -1,0 +1,64 @@
+name: Phase 3 UX browser and screenshots
+
+on:
+  push:
+    branches: ['beta/1.18.2-phase3-discoverability']
+    paths:
+      - '.github/workflows/ux-phase3.yml'
+      - 'web/index.html'
+      - 'web/assets/ux-command-palette.*'
+      - 'web/assets/terminal-tabs.js'
+      - 'web/assets/terminal-tab-drag.js'
+      - 'web/assets/file-editor.js'
+      - 'web/assets/editor-drag.js'
+      - 'web/assets/session-sidebar.js'
+      - 'web/assets/transfer-explorer.js'
+      - 'scripts/ux-phase3.browser.cjs'
+      - 'scripts/terminal-tab-click116.browser.cjs'
+
+permissions:
+  contents: read
+
+jobs:
+  ux-phase3:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install isolated Chromium
+        run: |
+          npm install --prefix "$RUNNER_TEMP/ntk-phase3" --no-audit --no-fund playwright@1.62.1
+          node "$RUNNER_TEMP/ntk-phase3/node_modules/playwright/cli.js" install --with-deps chromium
+      - name: Preserve Terminal selection and drag behavior with visible overflow controls
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-phase3/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-phase3-drag
+        run: node scripts/terminal-tab-click116.browser.cjs
+      - name: Validate Phase 3 behavior without network-device access
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-phase3/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-phase3-tests
+        run: node scripts/ux-phase3.browser.cjs
+      - name: Capture every tool in light and dark at 1280x800 and 1920x1080
+        if: success()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-phase3/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-phase3-screenshots
+        run: node scripts/ux-audit-screenshots.browser.cjs
+      - name: Save behavioral evidence and screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: phase3-ux-evidence
+          path: |
+            ${{ runner.temp }}/ntk-phase3-drag
+            ${{ runner.temp }}/ntk-phase3-tests
+            ${{ runner.temp }}/ntk-phase3-screenshots
+          retention-days: 30
+          if-no-files-found: warn

@@ -32,7 +32,7 @@ function create(options={}){
  function releaseCapture(g){if(g?.tab)g.tab.draggable=true;try{if(g?.capture?.hasPointerCapture?.(g.pointer))g.capture.releasePointerCapture(g.pointer);}catch{}}
  function keepClickSuppressed(){suppressClick=true;(options.setTimeout||root.setTimeout)(()=>{suppressClick=false;},500);}
  function begin(event){
-  if(event.isTrusted===false||event.button!==0||event.isPrimary===false||event.pointerType==='touch'||event.ctrlKey||event.metaKey||event.target.closest?.('[data-ed-close-tab],[data-ed="new"]'))return;
+  if(event.isTrusted===false||event.button!==0||event.isPrimary===false||event.pointerType==='touch'||event.ctrlKey||event.metaKey||event.target.closest?.('[data-ed-close-tab],[data-ed-tab-actions],[data-ed="new"]'))return;
   const tab=event.target.closest?.('[data-ed-uid]');if(!tab||!eligible())return;
   if(gesture){cancel(gesture);releaseCapture(gesture);}mount();
   const mode=event.altKey?'native':'pointer',uid=tab.dataset.edUid;tab.draggable=mode==='native';

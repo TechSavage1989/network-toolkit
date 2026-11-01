@@ -1,0 +1,27 @@
+/* Command search and help: no remote session, settings or app state is stored here. */
+.ux-command-overlay{position:fixed;inset:0;z-index:22000;display:flex;justify-content:center;align-items:flex-start;padding:clamp(34px,9vh,100px) 18px 20px}
+.ux-command-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.55)}
+.ux-command-dialog{position:relative;width:min(640px,100%);max-height:calc(100vh - 110px);display:flex;flex-direction:column;border:1px solid var(--border);border-radius:var(--ux-radius-lg,12px);background:var(--panel);color:var(--text);box-shadow:0 28px 85px #0007;overflow:hidden}
+.ux-command-header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 18px;border-bottom:1px solid var(--line)}
+.ux-command-header h2{font-size:17px;margin:0;font-weight:650}
+.ux-command-close{border:1px solid var(--border);border-radius:6px;color:var(--text);background:var(--panel2);padding:7px 11px;cursor:pointer}
+.ux-command-input{display:block;box-sizing:border-box;width:calc(100% - 30px);min-height:44px;margin:15px;border:1px solid var(--border);border-radius:7px;background:var(--input);color:var(--text);padding:10px 13px;font-size:14px;outline-offset:2px}
+.ux-command-results{overflow-y:auto;min-height:64px;max-height:min(55vh,490px);padding:3px 12px 12px}
+.ux-command-row{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border:1px solid transparent;border-radius:7px;text-align:left;background:transparent;color:var(--text);cursor:pointer}
+.ux-command-row:hover,.ux-command-row.is-selected{border-color:var(--border);background:var(--hover)}
+.ux-command-info{display:flex;flex:1;flex-direction:column;gap:1px;min-width:0}
+.ux-command-info strong{font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ux-command-info small{font-size:11px;color:var(--muted)}
+.ux-command-shortcut,.ux-help-row kbd{display:inline-block;font-family:var(--mono);font-size:11px;border:1px solid var(--border);border-radius:5px;padding:4px 6px;color:var(--muted);background:var(--panel2);white-space:nowrap}
+.ux-command-empty{padding:24px 15px;color:var(--muted);text-align:center}
+.ux-command-footer{padding:9px 16px;color:var(--muted);border-top:1px solid var(--line);font-size:11px}
+.ux-help-intro{margin:0;padding:14px 18px 8px;color:var(--muted);font-size:12px}
+.ux-help-list{padding:8px 18px 18px;overflow:auto}
+.ux-help-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line);font-size:12px}
+.ux-help-description{min-width:0}
+#uxCommandLauncher{display:inline-flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap}
+#uxHelpLauncher{font-weight:700}
+.terminal-tab .ux-terminal-tab-actions,.nt-editor-tab .ux-editor-tab-actions{border:0;background:transparent;color:var(--muted);padding:5px 6px;cursor:pointer;min-width:25px;font-size:16px;line-height:1}
+.terminal-tab .ux-terminal-tab-actions:hover,.nt-editor-tab .ux-editor-tab-actions:hover{background:var(--hover);color:var(--text)}
+.ux-command-overlay :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media(prefers-reduced-motion:reduce){.ux-command-overlay *{scroll-behavior:auto}}

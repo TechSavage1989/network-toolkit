@@ -6,7 +6,7 @@ Open Terminal to connect to a permitted device using SSH, Telnet or serial acces
 You can work with multiple tabs and split panes. The sidebar contains Saved, Recent and Macros sections; tabs and panes may have context menus and drag interactions. Keep sessions open while you navigate other tools.
 
 ## Connection controls
-Reconnect an eligible session from its controls. The adjacent reconnect menu may also offer Reconnect all. Some tabs can be detached by dragging outside the window. Hidden shortcuts and gesture-only actions are under review for Phase 3.
+Reconnect an eligible session from its controls. The adjacent reconnect menu may also offer Reconnect all. Some tabs can be detached by dragging outside the window. Terminal tab actions are available from each tab's More actions button. The Terminal sidebar includes a visible show/hide control. Ctrl+Shift+P opens application command search when the console is not focused; F1 opens help outside focused terminal input.
 
 ## Macros
 Use the Macros library only for commands you are authorized to send. Review command targets and content before running macros in multiple sessions. Preferences, profiles, histories and active sessions must be preserved through upgrades.

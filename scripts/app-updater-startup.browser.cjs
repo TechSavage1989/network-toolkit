@@ -108,21 +108,21 @@ const pause=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {pro
       await h.advance(100);const previous=h.checks;await h.settings();await h.page.locator('[data-app-update="check"]').click();await h.page.waitForFunction(()=>document.querySelector('#appUpdateNotice').textContent.includes('1.17.62'));
       await h.advance(6000);assert.equal(h.checks,previous+1);assert.match(await h.notice(),/1.17.62 is available/);
     });
-    await scenario('five-minute checks and focus freshness preserve opt-in and no automatic install',{delayFocusStatus:true},async h=>{
+    await scenario('six-hour checks and focus freshness preserve opt-in and no automatic install',{delayFocusStatus:true},async h=>{
       await h.advance(100);await h.completed(1);assert.equal(h.checks,1);
       await h.page.evaluate(()=>{window.dispatchEvent(new Event('focus'));window.dispatchEvent(new Event('online'));});
       await h.advance(100);await h.completed(1);assert.equal(h.checks,1);
-      // Never fast-forward timeout timers across an unfinished fetch.
-      // The completion barrier observes the actual rendered scheduler state,
-      // not just a POST received by the route or a fixed settling delay.
+      // Focus and reconnect must not bypass the six-hour successful-check interval.
+      // Completion is verified from the rendered scheduler state, not request arrival.
       await h.advance(120000);
       await h.page.evaluate(()=>{window.dispatchEvent(new Event('focus'));document.dispatchEvent(new Event('visibilitychange'));window.dispatchEvent(new Event('online'));});
-      await h.advance(100);await h.completed(2);assert.equal(h.checks,2);
-      await h.advance(300100);await h.completed(3);assert.equal(h.checks,3);
+      await h.advance(100);await h.completed(1);assert.equal(h.checks,1);
+      // Skip unrelated recurring UI timers while advancing to the real six-hour deadline.
+      await h.page.clock.fastForward(6*60*60*1000+100);await h.page.waitForTimeout(50);await h.completed(2);assert.equal(h.checks,2);
       await h.settings();await h.page.locator('[data-app-update-auto]').uncheck();
       await h.advance(100);
       await h.page.evaluate(()=>window.dispatchEvent(new Event('focus')));
-      await h.advance(300100);assert.equal(h.checks,3);
+      await h.page.clock.fastForward(6*60*60*1000+100);await h.page.waitForTimeout(50);assert.equal(h.checks,2);
     });
     await scenario('server cooldown survives focus and manual checks without losing known release',{rateAfterFirst:true},async h=>{
       await h.advance(100);assert.equal(h.checks,1);await h.settings();

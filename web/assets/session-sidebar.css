@@ -8,7 +8,7 @@
 #terminalSidebarDivider.sidebar-collapsed{cursor:pointer}
 .terminal-sidebar-rail{display:flex;flex:0 0 43px;flex-direction:column;align-items:stretch;gap:3px;padding:4px 0;border-right:1px solid var(--line);background:var(--panel2);min-height:0;overflow-y:auto;scrollbar-width:thin}
 .terminal-sidebar-tabs{display:flex;flex:0 0 auto;flex-direction:column;align-items:stretch;gap:3px}
-.terminal-sidebar-tab{display:flex;flex:0 0 auto;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:42px;min-height:65px;padding:8px 2px;border:0;border-left:2px solid transparent;background:transparent;color:var(--muted);font-size:9px;line-height:1.2;cursor:pointer}
+.terminal-sidebar-tab{display:flex;flex:0 0 auto;flex-direction:column;align-items:center;justify-content:center;gap:6px;width:42px;min-height:65px;padding:8px 2px;border:0;border-left:2px solid transparent;background:transparent;color:var(--muted);font-size:9px;line-height:1.2;cursor:pointer;border-radius:var(--ux-radius-sm,6px)}
 .terminal-sidebar-tab svg{width:17px;height:17px}
 .terminal-sidebar-tab span{white-space:nowrap}
 .terminal-sidebar-tab:hover{background:var(--hover);color:var(--text)}

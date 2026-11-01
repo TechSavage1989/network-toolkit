@@ -1,0 +1,18 @@
+Network Toolkit 1.18.2 Beta 2
+
+## What's New
+
+- Find tools and common actions from the new Search button or Ctrl+Shift+P.
+- The sidebar now groups related tools under Home, Diagnose, Connect, Transfer and Configure.
+- Press F1 to open a shortcut guide, and use visible tab menus and panel controls for more actions.
+
+## Additional Details
+
+- All 23 existing tool routes and current connection, diagnostic and transfer capabilities remain available. The current phase changes navigation and discoverability, not the underlying tools.
+- The command palette lists all navigation tools, global actions, and available controls in the current tool. Search terms include familiar names such as FTP/FTPS, TFTP and Trace route; commands invoke existing actions and confirmation paths.
+- Ctrl+Shift+P and F1 do not intercept focused interactive Terminal input. The Terminal Tools menu also includes a visible Help command.
+- Terminal and Editor tabs have visible action menus. Reorder a tab one position left or right from its menu; existing shortcuts and drag-and-drop remain available.
+- The Terminal sidebar has a visible show/hide control, and the file browser has a Reset panes button. Existing divider gestures remain supported.
+- Saved credentials, vault data, profiles, settings, macros, unsaved Editor documents, active connections and terminal input protections remain unchanged. Windows/UAC approvals, Hosts/IP/adapter review, file overwrite approval and update download/install consent with checksum checks are preserved.
+- Synthetic browser screenshots and behavioral tests use isolated fixtures only. Physical Windows and real-device certification are not claimed. A previous cosmetic 390px Editor drift threshold remains retired by owner decision.
+- This is an opt-in beta. Network_Toolkit.exe retains its fixed name; the normal stable update channel remains on v1.17.136.
