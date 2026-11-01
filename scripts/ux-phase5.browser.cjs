@@ -2,6 +2,7 @@
 // Synthetic test only: no desktop, device or production network calls.
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
+const {handleEditorActivityMetadata}=require('./editor-activity-fixture.cjs');
 const root=path.resolve(__dirname,'..'),out=process.env.TOOLKIT_TEST_OUTPUT||path.join(root,'test-results','ux-phase5');
 let browser,stored={appUpdatePreferences:{enabled:false},profiles:[{id:'kept',name:'Existing target',target:'192.0.2.10',note:'keep',tool:'ping'}],firstLaunchWelcomeSeen:false};
 const traffic=[],errors=[],screenshots=[],checks=[];
@@ -9,6 +10,7 @@ async function make(viewport){
  const context=await browser.newContext({viewport,serviceWorkers:'block'}),p=await context.newPage();
  p.setDefaultTimeout(15000);p.on('pageerror',e=>errors.push(e.message));
  await context.route('**/*',async route=>{
+  if(await handleEditorActivityMetadata(route,'https://phase5.toolkit.test'))return;
   const request=route.request(),url=new URL(request.url()),name=url.pathname,method=request.method();
   assert.equal(url.origin,'https://phase5.toolkit.test');traffic.push(method+' '+name);
   if(name.startsWith('/api/')){
