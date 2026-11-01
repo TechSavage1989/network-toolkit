@@ -1,5 +1,13 @@
 # Network Toolkit Change History
 
+## 1.18.3 Beta 3 - Phase 4
+
+- Search settings by category or keyword in one Settings window.
+- Set Terminal, Editor, graph and transfer preferences alongside existing app controls.
+- Reopen recently closed text documents and empty Terminal tabs with Ctrl+Shift+T, without reconnecting devices.
+- Undo removal of a saved diagnostic target; retain protections for credentials, file overwrites, live connections, Windows changes and updates.
+- Existing saved data and user consent requirements remain unchanged.
+
 ## 1.18.2 Beta 2
 
 - Tools grouped into Home, Diagnose, Connect, Transfer and Configure.
