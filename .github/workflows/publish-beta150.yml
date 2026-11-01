@@ -18,6 +18,22 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Validate exact release source and application tests before tagging
+        run: |
+          python3 scripts/github_release.py validate
+          go test -mod=vendor ./cmd/network-toolkit ./internal/diag ./internal/terminal ./internal/macros ./internal/desktop
+          node --test scripts/*.test.cjs
       - name: Verify candidate and create new immutable beta tag
         env:
           GH_TOKEN: ${{ github.token }}
