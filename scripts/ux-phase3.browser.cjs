@@ -78,6 +78,16 @@ const check=name=>{report.checks.push(name);console.log('PASS '+name)};
  await p.locator('[data-ed-tab-actions]').first().click();
  const menuProbe=await p.evaluate(()=>({menu:document.querySelector('.nt-editor-tab-menu')?.innerText||null,tab:[...document.querySelectorAll('[data-ed-tab-actions]')].map(e=>e.dataset.edTabActions),documents:[...NetworkToolkitFileEditor.documents.values()].map(d=>({id:d.id,uid:d.uid}))}));
  console.log('EDITOR_MENU_PROBE '+JSON.stringify(menuProbe));
+ if(!menuProbe.menu){
+  const direct=await p.evaluate(()=>{
+   const b=document.querySelector('[data-ed-tab-actions]'),editor=window.NetworkToolkitFileEditor;
+   const before={method:typeof editor?.openTabActions,uid:b?.dataset.edTabActions,visible:b?.getClientRects().length,overlayHidden:!!b?.closest('[hidden]')};
+   const called=editor?.openTabActions?.(b?.dataset.edTabActions);
+   return {...before,called,menu:document.querySelector('.nt-editor-tab-menu')?.innerText||null};
+  });
+  console.log('EDITOR_MENU_DIRECT_API '+JSON.stringify(direct));
+  throw new Error('Visible Editor tab action did not open its menu');
+ }
  assert.match(await p.locator('.nt-editor-tab-menu').innerText(),/Move one tab left/);
  assert.match(await p.locator('.nt-editor-tab-menu').innerText(),/Move to separate window/);
  await p.keyboard.press('Escape');
