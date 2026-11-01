@@ -1,3 +1,7 @@
+# v1.17.150 Beta 14 - candidate, NOT PUBLISHED
+
+Based on published v1.17.149. Candidate guards against a late SFTP timeout callback closing its completed channel, with twenty-cycle regression. Version and release notes prepared. See docs/RELEASE150_HANDOFF.md. Eleven-area roadmap unchanged, 390px Editor motion threshold still failed and real-device/Windows soak not certified. CI and publication require verification. Existing credentials/settings/permissions, fixed Network_Toolkit.exe and updater consent preserved.
+
 # v1.17.149 Beta 13 - candidate, NOT PUBLISHED
 
 Published beta v1.17.148; stable v1.17.136. Development branch
