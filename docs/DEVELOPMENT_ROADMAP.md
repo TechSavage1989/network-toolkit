@@ -2,6 +2,10 @@
 
 This is the **authoritative, ongoing development plan**. Preserve it across beta releases and future chats. The eleven areas and three-phase sequence originated in the approved application-wide optimization plan. Do not replace them with an Editor-only scope or assume a published beta certifies all its planned work.
 
+## Beta 10 scoped candidate (not published)
+
+v1.17.146 proposes a bounded Editor comparison alignment refinement. It chooses the median of three or more painted matching rows, avoiding a transient single-row scroll correction while preserving the previous one/two-row behavior. Source and regression tests are in branch beta/1.17.146-editor-alignment. Read [Beta 10 handoff](RELEASE146_HANDOFF.md). The original eleven areas below remain active; full Editor 390px, native SFTP and physical Windows acceptance remain open. Do not mark this candidate published until exact-source gates and release verification pass.
+
 ## Current Beta 9 candidate
 
 v1.17.145 is in development, not published. Shutdown/stale-response guards,
