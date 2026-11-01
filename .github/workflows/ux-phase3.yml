@@ -13,6 +13,7 @@ on:
       - 'web/assets/session-sidebar.js'
       - 'web/assets/transfer-explorer.js'
       - 'scripts/ux-phase3.browser.cjs'
+      - 'scripts/terminal-tab-click116.browser.cjs'
 
 permissions:
   contents: read
@@ -33,6 +34,11 @@ jobs:
         run: |
           npm install --prefix "$RUNNER_TEMP/ntk-phase3" --no-audit --no-fund playwright@1.62.1
           node "$RUNNER_TEMP/ntk-phase3/node_modules/playwright/cli.js" install --with-deps chromium
+      - name: Preserve Terminal selection and drag behavior with visible overflow controls
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-phase3/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-phase3-drag
+        run: node scripts/terminal-tab-click116.browser.cjs
       - name: Validate Phase 3 behavior without network-device access
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-phase3/node_modules/playwright
@@ -50,6 +56,7 @@ jobs:
         with:
           name: phase3-ux-evidence
           path: |
+            ${{ runner.temp }}/ntk-phase3-drag
             ${{ runner.temp }}/ntk-phase3-tests
             ${{ runner.temp }}/ntk-phase3-screenshots
           retention-days: 30
