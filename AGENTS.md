@@ -1,3 +1,14 @@
+# v1.17.149 Beta 13 - development candidate, NOT PUBLISHED
+
+Read docs/DEVELOPMENT_ROADMAP.md, docs/RELEASE149_HANDOFF.md and
+docs/BETA13_SFTP_TIMEOUT_AUDIT.md first. Keep all original eleven areas,
+credentials, settings, network permissions and the Windows portable updater.
+This beta provides configured per-response timeouts for SFTP browsing over
+a borrowed authenticated SSH terminal without altering the shared socket.
+The historical 390px Editor motion regression, native SFTP interruption
+and physical Windows soak remain open. No Work mode or desktop use.
+Do not overwrite past release tags/assets; publish only after CI.
+
 # v1.17.148 Beta 12 - publication verified
 
 Published 2026-11-01T04:49:47Z as opt-in GitHub prerelease 430369106.
