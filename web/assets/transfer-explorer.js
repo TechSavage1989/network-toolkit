@@ -42,7 +42,7 @@ function shell(p){return '<div class="fm-explorer" data-fm-explorer="'+p+'"><div
  '<button class="btn small ghost" data-fm-action="delete" title="Delete selected server items (Delete)">'+icon('trash')+' Delete</button>'+
  '<button class="btn small ghost" data-fm-action="preview" title="Preview selected text file">'+icon('file')+' Preview</button>'+
  '<button class="btn small ghost" data-fm-action="path" title="Copy selected file path or current folder path">'+icon('copy')+' Path</button>'+
- '</div><div class="fm-toolbar-end"><button class="btn small ghost" data-fm-action="single" title="Show or hide computer pane">'+icon('grid')+' <span data-fm-single-label>Two panes</span></button><span class="fm-toolbar-help">Ctrl/Shift select · Double-click to open</span></div></div>'+ 
+ '</div><div class="fm-toolbar-end"><button type="button" class="btn small ghost" data-fm-action="reset-layout" title="Reset file browser pane widths (double-click divider)">Reset panes</button><button class="btn small ghost" data-fm-action="single" title="Show or hide computer pane">'+icon('grid')+' <span data-fm-single-label>Two panes</span></button><span class="fm-toolbar-help">Ctrl/Shift select · Double-click to open</span></div></div>'+ 
  '<div class="fm-split" data-fm-split>'+paneHTML(p,'local')+'<div class="fm-gutter" data-fm-gutter role="separator" tabindex="0" aria-label="Resize file browser panels" aria-orientation="vertical" aria-valuemin="25" aria-valuemax="75" aria-valuenow="49" title="Drag to resize. Left and Right arrows adjust, Shift makes larger steps, Home or End selects a limit. Double-click resets."></div>'+paneHTML(p,'server')+'</div>'+ 
  '<div class="fm-operation" data-fm-operation hidden></div><p class="fm-footnote">The server pane is the local folder exposed to incoming '+p.toUpperCase()+' connections. Moving files between panes copies them on this computer, even when the server is stopped. '+(p==='tftp'?'TFTP clients cannot browse remote directories.':'Remote SFTP clients can browse the server root after authenticating.')+'</p></div>'}
 function mount(p,rootPath,status){if(!PROTOCOLS.has(p))return;const host=document.querySelector('.transfer-file-manager');if(!host)return;
@@ -170,7 +170,7 @@ function nav(p,side,op,value){const m=get(p),v=m[side];m.active=side;
  if(op==='back'&&v.at>0){v.at--;void load(p,side,v.history[v.at],{skipHistory:true});return}
  if(op==='forward'&&v.at<v.history.length-1){v.at++;void load(p,side,v.history[v.at],{skipHistory:true});return}
 }
-function action(p,op,side){const m=get(p);if(op==='stopQueue'){m.cancelPending=true;toast('The queue will stop after the current file.','info');return}if(m.busy){toast('Complete the current file operation first.','info');return}if(op==='single'){m.single=!m.single;applyLayout(p);remember(p);return}
+function action(p,op,side){const m=get(p);if(op==='stopQueue'){m.cancelPending=true;toast('The queue will stop after the current file.','info');return}if(m.busy){toast('Complete the current file operation first.','info');return}if(op==='reset-layout'){resetLayout(p);return}if(op==='single'){m.single=!m.single;applyLayout(p);remember(p);return}
  if(op==='interfaces'){void(async()=>{try{system=await api('/system');root.NetworkToolkitTransfers.render(p);toast('Network adapters refreshed.','success')}catch(e){toastError(e)}})();return}
  if(['back','forward','up','home','go','refresh'].includes(op)){nav(p,side||m.active,op);return}
  if(['upload','download','mkdir','rename','duplicate','delete','preview','path'].includes(op)){if(side)m.active=side;ask(p,op)}
