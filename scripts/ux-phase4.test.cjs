@@ -45,7 +45,7 @@ test('settings module and app call preserve existing control IDs and file permis
  const src=fs.readFileSync(path.join(root,'web/assets/ux-unified-settings.js'),'utf8');
  const html=fs.readFileSync(path.join(root,'web/index.html'),'utf8');
  assert.match(src,/appUpdateSettings/);assert.match(src,/vendorSettings/);
- assert.match(src,/storageSettings/);assert.match(src,/root\.NetworkToolkitFileEditor\?\.refreshPreferences/);
+ assert.match(html,/storageSettings/);assert.match(src,/root\.NetworkToolkitFileEditor\?\.refreshPreferences/);
  assert.match(src,/ctx\.saveState\(\)/);
  assert.match(html,/NetworkToolkitUnifiedSettings\?\.enhance/);
  assert.match(html,/function reviewLocalConfiguration/);
