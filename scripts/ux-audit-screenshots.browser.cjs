@@ -54,6 +54,16 @@ async function capture(page,name){
    await page.locator('#modalTitle').filter({hasText:'App settings'}).waitFor();
    await capture(page,'dialog-'+viewport.width+'x'+viewport.height+'-'+theme+'-app-settings');
    await page.keyboard.press('Escape');await settle(page);
+   for(const dialog of ['save-target','ping-options','trace-options','dns-options','tcp-options','data-deletion']){
+    await page.evaluate(dialog=>{
+      if(dialog==='save-target')profileDialog(null);
+      else if(dialog==='data-deletion')confirmDeleteStorage();
+      else advanced(dialog.replace('-options',''));
+    },dialog);
+    await page.locator('#modalTitle').waitFor({state:'visible'});
+    await capture(page,'dialog-'+viewport.width+'x'+viewport.height+'-'+theme+'-'+dialog);
+    await page.keyboard.press('Escape');await settle(page);
+   }
    await page.locator('#themeButton').waitFor();
    await capture(page,'main-'+viewport.width+'x'+viewport.height+'-'+theme+'-overview-return');
   }
