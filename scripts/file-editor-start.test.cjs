@@ -235,10 +235,12 @@ test('ordinary tab, editor and comparison disposal refuse unfinished source comp
  view.composing=false;const closing=h.api.closeAll();view.composing=true;root.emit('click',root.querySelector('[data-ed-dialog-action="accept"]'));assert.equal(await closing,false);assert.equal(h.api.documents.get(doc.id),doc);assert.equal(h.api.comparison,view);assert.equal(doc.content,original);
 });
 
-test('close preference defaults on, requires explicit warning to disable and preserves explicit false',async()=>{
+test('close preference defaults on and changes directly without a secondary confirmation',async()=>{
  const h=harness();await h.first();const root=h.document.getElementById('networkToolkitFileEditor'),box=root.querySelector('[data-ed-ask-save-close]');assert.equal(box.checked,true);
- box.checked=false;root.emit('change',box);assert.match(root.querySelector('.nt-editor-dialog').textContent,/discard|Discard/);root.emit('click',root.querySelector('[data-ed-dialog-action="cancel"]'));await settle();assert.equal(box.checked,true);assert.notEqual(h.c.state.editorPreferences?.askSaveBeforeClose,false);
- box.checked=false;root.emit('change',box);root.emit('click',root.querySelector('[data-ed-dialog-action="accept"]'));await settle();assert.equal(h.c.state.editorPreferences.askSaveBeforeClose,false);assert.equal(box.checked,false);
+ box.checked=false;root.emit('change',box);await settle();assert.equal(h.c.state.editorPreferences.askSaveBeforeClose,false);assert.equal(box.checked,false);
+ assert.equal(root.querySelector('.nt-editor-dialog'),null,'Do not show a warning about disabling another confirmation');
+ box.checked=true;root.emit('change',box);await settle();assert.equal(h.c.state.editorPreferences.askSaveBeforeClose,true);
+ box.checked=false;root.emit('change',box);await settle();assert.equal(h.c.state.editorPreferences.askSaveBeforeClose,false);
  const wrap=root.querySelector('[data-ed-wrap]');wrap.checked=false;root.emit('change',wrap);assert.equal(h.c.state.editorPreferences.askSaveBeforeClose,false);
 });
 test('disabled close prompt skips only dirty confirmation and keeps save failure and active operation guards',async()=>{

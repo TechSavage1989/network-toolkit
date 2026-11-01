@@ -135,11 +135,7 @@
       const control = await wait(() => document.querySelector('[data-ed-ask-save-close]'), 'close preference');
       if (control.disabled) throw Error('Main close preference is unexpectedly read-only');
       if (control.checked !== command.enabled) control.click();
-      if (!command.enabled) {
-        const confirm = await wait(() => document.querySelector('.nt-editor-dialog [data-ed-dialog-action="accept"]'), 'explicit allow-discard confirmation');
-        if (confirm.textContent.trim() !== 'Allow discard') throw Error('Unexpected preference consent');
-        confirm.click();
-      }
+      // The user explicitly changed this preference, so no secondary confirmation is shown.
       await wait(() => control.checked === command.enabled && !document.querySelector('.nt-editor-dialog'), 'preference committed');
       more.querySelector('summary').click();
       return snapshot();

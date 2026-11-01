@@ -1,0 +1,26 @@
+
+.ux-settings-modal{width:min(1000px,calc(100vw - 34px));max-width:1000px}
+.ux-settings-modal .modal-body{padding:0;overflow:hidden}
+.ux-settings-shell{display:flex;flex-direction:column;min-height:320px;max-height:min(72vh,690px)}
+.ux-settings-search{padding:15px 18px 12px;border-bottom:1px solid var(--border,#475569)}
+.ux-settings-search input{width:100%;max-width:470px}
+.ux-settings-columns{display:grid;grid-template-columns:180px minmax(0,1fr);min-height:0;flex:1}
+.ux-settings-nav{display:flex;flex-direction:column;gap:3px;padding:12px;overflow:auto;border-right:1px solid var(--border,#475569)}
+.ux-settings-tab{display:block;text-align:left;padding:10px 12px;border:0;border-radius:8px;background:transparent;color:inherit;cursor:pointer;font:inherit}
+.ux-settings-tab[aria-selected="true"]{background:var(--surface-2,rgba(96,130,180,.18));font-weight:650}
+.ux-settings-tab:hover{background:var(--surface-2,rgba(96,130,180,.13))}
+.ux-settings-tab:focus-visible{outline:2px solid var(--accent,#5897e8);outline-offset:2px}
+.ux-settings-content{min-height:0;overflow:auto;padding:16px 20px}
+.ux-settings-panel[hidden],.ux-settings-tab[hidden]{display:none}
+.ux-settings-panel{max-width:760px}
+.ux-settings-panel>h2{margin:0 0 5px;font-size:18px}
+.ux-settings-panel>.help-line{margin-top:0;margin-bottom:18px}
+.ux-settings-panel>.setting-row,.ux-settings-panel>.data-section,.ux-settings-panel>.field,.ux-settings-panel>.notice,.ux-settings-panel>.data-grid{margin-bottom:15px}
+.ux-settings-card{display:flex;flex-direction:column;align-items:flex-start;gap:12px;border-bottom:1px solid var(--border,#475569);padding-bottom:18px;margin-bottom:14px}
+.ux-settings-card h3{font-size:15px;margin:0}
+.ux-settings-card .help-line{margin:0}
+.ux-settings-field{width:100%;display:flex;align-items:center;justify-content:space-between;gap:14px}
+.ux-settings-field input[type=number],.ux-settings-field select{max-width:190px}
+.ux-settings-field input[type=range]{max-width:220px}
+.ux-settings-empty{padding:20px}
+@media(max-width:760px){.ux-settings-columns{grid-template-columns:140px minmax(0,1fr)}.ux-settings-nav{padding:6px}.ux-settings-content{padding:12px}.ux-settings-tab{padding:8px}.ux-settings-field{align-items:flex-start;flex-wrap:wrap}}

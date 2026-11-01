@@ -18,7 +18,7 @@ func serveWebAsset(w http.ResponseWriter, r *http.Request) {
 	contentType := ""
 	embeddedPath := "web" + r.URL.Path
 	switch r.URL.Path {
-	case "/assets/ux-command-palette.js", "/assets/app-chrome.js", "/assets/sidebar-activity.js", "/assets/network-config-language.js", "/assets/editor-compare.js", "/assets/editor-alignment-model.js", "/assets/editor-aligned-compare.js", "/assets/editor-windows.js", "/assets/editor-drag.js", "/assets/editor-tab-groups.js", "/assets/editor-files-sidebar.js", "/assets/editor-saved-connections.js":
+	case "/assets/ux-unified-settings.js", "/assets/ux-tab-recovery.js", "/assets/ux-command-palette.js", "/assets/app-chrome.js", "/assets/sidebar-activity.js", "/assets/network-config-language.js", "/assets/editor-compare.js", "/assets/editor-alignment-model.js", "/assets/editor-aligned-compare.js", "/assets/editor-windows.js", "/assets/editor-drag.js", "/assets/editor-tab-groups.js", "/assets/editor-files-sidebar.js", "/assets/editor-saved-connections.js":
 		contentType = "text/javascript; charset=utf-8"
 	case "/assets/app-chrome.css", "/assets/sidebar-activity.css", "/assets/editor-windows.css":
 		contentType = "text/css; charset=utf-8"
@@ -34,7 +34,7 @@ func serveWebAsset(w http.ResponseWriter, r *http.Request) {
 		contentType = "text/css; charset=utf-8"
 	case "/assets/graph-navigator.js", "/assets/graph-history.js", "/assets/result-filters.js", "/assets/graph-workspace.js", "/assets/result-time.js", "/assets/result-timeline.js", "/assets/hosts-editor-model.js", "/assets/hosts-editor.js", "/assets/transfer-client-layout.js", "/assets/panel-controls.js", "/assets/input-clear.js", "/assets/value-copy.js":
 		contentType = "text/javascript; charset=utf-8"
-	case "/assets/ux-command-palette.css", "/assets/ux-foundations.css", "/assets/graph-navigator.css", "/assets/result-filters.css", "/assets/graph-workspace.css", "/assets/result-timeline.css", "/assets/result-typography.css", "/assets/hosts-editor.css", "/assets/workspace-layout.css", "/assets/transfer-client-layout.css", "/assets/panel-controls.css", "/assets/input-clear.css", "/assets/value-copy.css", "/assets/responsive-controls.css", "/assets/text-containment.css":
+	case "/assets/ux-unified-settings.css", "/assets/ux-command-palette.css", "/assets/ux-foundations.css", "/assets/graph-navigator.css", "/assets/result-filters.css", "/assets/graph-workspace.css", "/assets/result-timeline.css", "/assets/result-typography.css", "/assets/hosts-editor.css", "/assets/workspace-layout.css", "/assets/transfer-client-layout.css", "/assets/panel-controls.css", "/assets/input-clear.css", "/assets/value-copy.css", "/assets/responsive-controls.css", "/assets/text-containment.css":
 		contentType = "text/css; charset=utf-8"
 	case "/assets/Network_Toolkit_Icon.svg":
 		contentType = "image/svg+xml"

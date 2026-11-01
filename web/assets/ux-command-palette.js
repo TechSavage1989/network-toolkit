@@ -53,8 +53,13 @@ function catalog(){
   {id:'help',label:'Keyboard shortcuts and help',group:'Application',shortcut:'F1',run:()=>open('help')},
   {id:'palette',label:'Search tools and commands',group:'Application',shortcut:'Ctrl+Shift+P',run:()=>open('commands')},
   {id:'settings',label:'App settings',group:'Application',run:()=>$('#settingsButton')?.click()},
+  ...['General','Appearance','Terminal','Editor','Graphs','Transfers','Network','Updates','Confirmations'].map(name=>({
+   id:'settings-'+name.toLowerCase(),label:name+' settings',group:'Settings',
+   run:()=>{$('#settingsButton')?.click();root.NetworkToolkitUnifiedSettings?.show?.(name.toLowerCase());}
+  })),
+  {id:'reopen-closed',label:'Reopen recently closed tab',group:'Application',shortcut:'Ctrl+Shift+T',run:()=>root.NetworkToolkitTabRecovery?.reopen?.()},
   {id:'updates',label:'Update settings / Check for updates',group:'Application',keywords:'update manually',run:()=>{
-   $('#settingsButton')?.click();const settings=$('#appUpdateSettings');settings?.scrollIntoView({block:'nearest'});settings?.querySelector('button')?.focus({preventScroll:true});
+   $('#settingsButton')?.click();root.NetworkToolkitUnifiedSettings?.show?.('updates');const settings=$('#appUpdateSettings');settings?.scrollIntoView({block:'nearest'});settings?.querySelector('button')?.focus({preventScroll:true});
   }},
   {id:'theme',label:'Switch light/dark theme',group:'Application',run:()=>$('#themeButton')?.click()},
   {id:'navigation',label:'Show or hide navigation',group:'Application',run:()=>root.NetworkToolkitNavigation?.toggle?.()},
@@ -108,7 +113,7 @@ function highlight(){
  if(input){input.setAttribute('aria-activedescendant',items.length?'ux-command-option-'+selection:'');}
 }
 function helpText(){
- const all=[['Application','Ctrl+Shift+P','Search tools and commands'],['Application','F1','Open this help sheet'],
+ const all=[['Application','Ctrl+Shift+P','Search tools and commands'],['Application','F1','Open this help sheet'],['Application','Ctrl+Shift+T','Reopen a recently closed Editor document or empty Terminal tab'],
  ['Text Editor','Ctrl+N','New document'],['Text Editor','Alt+Shift+Left / Right','Reorder a document tab'],
  ['Text Editor','Shift+F10','Open the document tab menu'],
  ['Terminal','Alt+Shift+Left / Right','Reorder a terminal tab'],
