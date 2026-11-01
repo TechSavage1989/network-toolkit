@@ -175,6 +175,41 @@ func TestSharedSFTPCancellationUnblocksReadAndRetainsShell(t *testing.T) {
 	if err != nil || probe.Summary != "SFTP subsystem supported" {
 		t.Fatalf("new SFTP channel on the same shell was unavailable: %v (%v)", err, probe.Summary)
 	}
+	// An unresponsive SFTP server must not keep a borrowed terminal's
+	// file browser waiting indefinitely. The idle timeout closes only the
+	// SFTP channel; it does not expire the interactive shell connection.
+	timed := req("list")
+	timed.Options["timeoutMs"] = 500
+	timedResult := make(chan error, 1)
+	go func() {
+		_, err := RunSFTPOnClient(context.Background(), client, timed, nil)
+		timedResult <- err
+	}()
+	select {
+	case <-entered:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed SFTP listing never reached the fake server")
+	}
+	select {
+	case err := <-timedResult:
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("stalled borrowed SFTP response must return deadline exceeded: %v", err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("borrowed SFTP timeout did not interrupt a stalled reply")
+	}
+	select {
+	case <-released:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed-out SFTP channel remained open on the server")
+	}
+	if _, err = stdin.Write([]byte("shell still connected after timeout\n")); err != nil {
+		t.Fatalf("SFTP response timeout closed the terminal SSH connection: %v", err)
+	}
+	probe, err = RunSFTPOnClient(probeCtx, client, req("probe"), nil)
+	if err != nil || probe.Summary != "SFTP subsystem supported" {
+		t.Fatalf("terminal could not open a new SFTP channel after timeout: %v", err)
+	}
 	count := subsystems.Load()
 	alreadyCancelled, cancelAgain := context.WithCancel(context.Background())
 	cancelAgain()
