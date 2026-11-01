@@ -1,3 +1,9 @@
+## Latest publication: v1.17.150 Beta 14
+
+Published on 2026-11-01T05:46:46Z as opt-in prerelease 430388745. Source commit/tag c68d31e4cb72dcce4cc17435d4e5447961778db7. Official Release workflow 41277868119 completed build and publication successfully; four assets with GitHub-reported checksums. Stable latest remains v1.17.136.
+Improved shared SSH/SFTP response-timeout cleanup after successful operations, with repeated regression coverage. No changes to permission approval, credentials, settings, portable executable naming or updater consent.
+The original eleven-area roadmap below remains authoritative. The historical 390px Editor comparison motion failure beyond the 2 CSS pixel limit, real-device SFTP interruption and multi-hour native Windows acceptance are still open. Full Checks matrix not certified green at publication. Next proposed v1.17.151 Beta 15 should prioritize remaining Editor motion/sidebar, transfer interruption and concurrent-tool resource endurance without narrowing or waiving the original scope. See docs/RELEASE150_HANDOFF.md.
+
 # Beta 14 candidate status (v1.17.150, NOT PUBLISHED)
 
 SFTP successful-response timeout cleanup hardened with a repeated regression test. The approved eleven-area performance, UI and reliability roadmap below remains authoritative. The 390px Editor continuous-map motion 2px acceptance criterion, live-device transfer interruptions and multi-hour Windows endurance remain open. See docs/RELEASE150_HANDOFF.md; no stable certification or general performance claim.
