@@ -1,0 +1,45 @@
+name: Repair unpublished Beta 14 tag and dispatch release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/repair-beta150-tag.yml'
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  repair-unpublished-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - name: Verify source and prevent alteration of any published release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s scripts -p '*_test.py'
+          python3 scripts/github_release.py validate
+          if gh release view v1.17.150 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'Refusing to change an already published release.' >&2
+            exit 1
+          fi
+          existing="$(git ls-remote --tags origin refs/tags/v1.17.150 | cut -f1)"
+          test "$existing" = '048490e5dd1d081416a7c02ccc9b4ba06000bd21'
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git tag -f v1.17.150 "$GITHUB_SHA"
+          git push --force-with-lease=refs/tags/v1.17.150:048490e5dd1d081416a7c02ccc9b4ba06000bd21 origin refs/tags/v1.17.150
+      - name: Dispatch official guarded release workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run release.yml --ref main --field tag=v1.17.150
