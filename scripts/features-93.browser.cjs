@@ -81,6 +81,7 @@ async function popupBounds(locator,label){
 
 async function chooseTimestamp({hourFormat='24',zoneMode='local',timeZone='UTC'}){
  await openAppSettings(page);
+ await page.locator('[data-settings-section="appearance"]').click();
  await page.locator('#settingsTimeFormat').selectOption(hourFormat);
  await page.locator('#settingsTimeZoneMode').selectOption(zoneMode);
  if(zoneMode==='named'){
@@ -187,7 +188,7 @@ async function packetAction96(name,action){if(name==='zoom'){await page.locator(
  report.preferences.push(await assertDisplayedClock('06:00:00.625 AM UTC',{hourFormat:'12',zoneMode:'utc'}));
  report.preferences.push(await chooseTimestamp({hourFormat:'12',zoneMode:'named',timeZone:'America/Los_Angeles'}));
  report.preferences.push(await assertDisplayedClock('11:00:00.625 PM PDT',{hourFormat:'12',zoneMode:'named',timeZone:'America/Los_Angeles'}));
- await openAppSettings(page);const validPrefs=await page.evaluate(()=>NetworkToolkitResultTime.preferences());
+ await openAppSettings(page);await page.locator('[data-settings-section="appearance"]').click();const validPrefs=await page.evaluate(()=>NetworkToolkitResultTime.preferences());
  await page.locator('#settingsTimeZone').fill('Invalid/Timezone');await page.locator('#settingsTimeZone').dispatchEvent('change');
  assert.equal(await page.locator('#settingsTimeZone').getAttribute('aria-invalid'),'true','Invalid timezone receives clear validation');
  assert.deepEqual(await page.evaluate(()=>NetworkToolkitResultTime.preferences()),validPrefs,'Invalid named timezone cannot overwrite valid saved settings');

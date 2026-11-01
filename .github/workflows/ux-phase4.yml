@@ -1,0 +1,46 @@
+name: Phase 4 UX Settings and tab recovery
+on:
+  push:
+    branches: ['beta/1.18.3-phase4-settings']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  phase4-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install isolated Chromium
+        run: |
+          npm install --prefix "$RUNNER_TEMP/ntk-phase4" --no-audit --no-fund playwright@1.62.1
+          node "$RUNNER_TEMP/ntk-phase4/node_modules/playwright/cli.js" install --with-deps chromium
+      - name: Validate Settings, undo and eligible closed tabs without real devices
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-phase4/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-phase4-results
+        run: node scripts/ux-phase4.browser.cjs
+      - name: Test existing updater behavior under categorized Settings
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-phase4/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-phase4-results/updater
+        run: node scripts/app-updater-startup.browser.cjs
+      - name: Test native updater timers and explicit consent
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-phase4/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-phase4-results/updater-native
+        run: node scripts/app-updater-native-timers.browser.cjs
+      - name: Save Phase 4 screenshot and test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: phase4-ux-evidence
+          path: ${{ runner.temp }}/ntk-phase4-results
+          if-no-files-found: error
+          retention-days: 30
