@@ -46,3 +46,9 @@ test('Beta 12 alternating six-tool recovery releases retired views without losin
  const used=process.cpuUsage(cpu),after=process.memoryUsage();
  t.diagnostic(JSON.stringify({scope:'800 synthetic concurrent six-tool refresh cycles with 21 simulated engine interruptions and four UI pages, not a native or live-device soak',elapsedMs:performance.now()-start,cpuUserMs:used.user/1000,cpuSystemMs:used.system/1000,heapDelta:after.heapUsed-before.heapUsed,rssDelta:after.rss-before.rss,retainedViews:ctx.dataListViews.size}));
 });
+
+test('Beta 12 preview and Windows build metadata share the same application version',()=>{
+ const version=/const Version = "([\\d.]+)"/.exec(fs.readFileSync(path.join(root,'internal/model/model.go'),'utf8'))[1];
+ const preview=JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8')).version;
+ assert.equal(preview,version,'hosted browser fixtures must not identify a stale app version');
+});
