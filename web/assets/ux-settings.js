@@ -72,7 +72,7 @@ function enhance(category='General'){
   const section=sections.get(key);section.append(make('p','help-line',message));
   for(const [label,page] of tools[key]||[]){
    const button=make('button','btn small ghost ux-settings-tool-link',label);button.type='button';button.dataset.settingsGo=page;
-   button.title='Open '+label.toLowerCase();section.append(button);
+   button.title=label;section.append(button);
   }
  }
  layout.append(nav,content);body.append(layout);

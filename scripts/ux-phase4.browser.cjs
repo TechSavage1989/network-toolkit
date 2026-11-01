@@ -55,7 +55,7 @@ const check=name=>{report.checks.push(name);console.log('PASS '+name)};
  assert.equal(await p.locator('[data-settings-panel="updates"]').isVisible(),false);
  await p.locator('#uxSettingsSearch').fill('');
  await p.locator('[data-settings-section="terminal"]').click();
- const go=p.locator('[data-settings-go="terminal"]');
+ const go=p.locator('[data-settings-panel="terminal"] [data-settings-go="terminal"]');
  assert(await go.isVisible());
  await go.click();await p.waitForFunction(()=>state.activePage==='terminal');
  assert.equal(await p.locator('.ux-settings-layout').count(),0);
