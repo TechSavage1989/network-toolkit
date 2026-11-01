@@ -5,6 +5,7 @@ on:
     branches: ['docs/ux-phase1-audit']
     paths:
       - '.github/workflows/ux-audit-screenshots.yml'
+      - 'scripts/ux-audit-screenshots.browser.cjs'
 
 permissions:
   contents: read
