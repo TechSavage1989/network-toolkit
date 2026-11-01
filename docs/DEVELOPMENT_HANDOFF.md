@@ -1,3 +1,16 @@
+# v1.17.148 Beta 12 - development candidate, NOT PUBLISHED
+
+Based on published v1.17.147, with full eleven-area roadmap unchanged.
+Scoped SFTP cancellation now returns context cancellation accurately, avoids
+opening shared channels after cancellation, and preserves terminal ownership.
+A synthetic SSH server test covers a blocked listing, cancellation, channel
+closure, live shell continuity and a new SFTP request. The 800-cycle six-tool
+interruption fixture checks recovery, bounded caches and saved filters.
+The development preview, Go, HTML and Windows version resource are 1.17.148.
+See docs/RELEASE148_HANDOFF.md and docs/BETA12_RELIABILITY_AUDIT.md for
+validation, known Editor failure and untested physical/native requirements.
+This is not a publication or stable certification. No old release is changed.
+
 # v1.17.147 Beta 11 - publication verified
 
 Published v1.17.147 Beta 11 on 2026-11-01T04:17:17Z as opt-in prerelease ID 430357367.
