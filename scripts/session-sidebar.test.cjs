@@ -67,16 +67,22 @@ test('session sidebar preserves the existing console and persists collapse and d
  const checkbox=h.document.getElementById('sessionConfirmDelete');checkbox.checked=false;h.document.emit('change',checkbox);assert.equal(h.state.terminalSessionConfirmDelete,false);
  h.document.emit('click',h.document.getElementById('terminalSidebarTabSaved'));assert.equal(h.state.terminalSidebarCollapsed,false);assert(!h.document.getElementById('terminalSidebarContent').hidden);
 });
-test('selected tabs toggle sidebar content without separate visibility buttons',()=>{
+test('selected tabs and the visible sidebar control preserve terminal sessions',()=>{
  const h=harness(),saved=h.document.getElementById('terminalSidebarTabSaved');
  assert.equal(h.document.getElementById('terminalSidebarVisibilityToggle'),null);
- assert.equal(h.document.querySelectorAll('[data-session-action="collapse"]').length,0);
+ const toggle=h.document.querySelector('[data-session-action="collapse"]');
+ assert(toggle,'The sidebar has a visible Show/Hide action');
+ assert.equal(h.document.querySelectorAll('[data-session-action="collapse"]').length,1);
+ assert.equal(toggle.getAttribute('aria-label'),'Hide terminal sidebar');
+ toggle.focus=()=>{h.document.activeElement=toggle;};
  assert.equal(h.document.querySelector('[data-session-tab]').dataset.sessionTab,'saved');
  h.document.emit('click',saved);assert(h.state.terminalSidebarCollapsed);assert.equal(saved.getAttribute('aria-expanded'),'false');
  h.document.emit('click',saved);assert(!h.state.terminalSidebarCollapsed);assert.equal(saved.getAttribute('aria-expanded'),'true');
  h.document.emit('click',h.document.getElementById('terminalSidebarTabRecent'));assert(!h.state.terminalSidebarCollapsed);assert.equal(h.api.activeTab(),'recent');assert(!h.document.getElementById('terminalSidebarRecent').hidden);
  h.document.emit('keydown',h.document.getElementById('terminalSidebarTabRecent'),{key:' '});assert(h.state.terminalSidebarCollapsed);
  h.document.emit('keydown',h.document.getElementById('terminalSidebarTabRecent'),{key:'Enter'});assert(!h.state.terminalSidebarCollapsed);
+ h.document.emit('click',toggle);assert(h.state.terminalSidebarCollapsed);assert.equal(toggle.getAttribute('aria-label'),'Show terminal sidebar');assert.equal(toggle.getAttribute('aria-expanded'),'false');
+ h.document.emit('click',toggle);assert(!h.state.terminalSidebarCollapsed);assert.equal(toggle.getAttribute('aria-label'),'Hide terminal sidebar');assert.equal(toggle.getAttribute('aria-expanded'),'true');
  assert.equal(h.document.getElementById('existingConsole').textContent,'Retained transcript');
 });
 test('terminal sidebar drag resizing is bounded and double-click restores its previous width',()=>{
