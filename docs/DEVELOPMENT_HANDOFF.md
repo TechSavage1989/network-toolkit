@@ -1,3 +1,18 @@
+# v1.17.149 Beta 13 - candidate, NOT PUBLISHED
+
+Published beta v1.17.148; stable v1.17.136. Development branch
+beta/1.17.149-shared-sftp-timeout-reliability. See
+docs/RELEASE149_HANDOFF.md, docs/BETA13_SFTP_TIMEOUT_AUDIT.md and
+the persistent eleven-area roadmap.
+
+SFTP borrowing a terminal's SSH connection now bounds each protocol
+response by its configured timeout using scoped SFTP-channel closure,
+without touching the terminal connection or limiting entire transfers.
+Synthetic SSH tests check stalled directory reply timeout, channel
+closure, shell continuity and SFTP reuse. The same test runs in
+hosted Windows CI. Editor 390px motion and native physical-device
+endurance remain outstanding. No previous release is modified.
+
 # v1.17.148 Beta 12 - publication verified
 
 Published 2026-11-01T04:49:47Z as opt-in GitHub prerelease 430369106.

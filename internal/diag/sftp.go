@@ -19,6 +19,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -61,6 +62,7 @@ type wireSFTP struct {
 	id          uint32
 	conn        net.Conn
 	timeout     time.Duration
+	abort       func() // closes this SFTP subsystem, never the borrowed SSH connection
 }
 type sftpFileInfo struct {
 	Name     string `json:"name"`
@@ -163,11 +165,31 @@ func (c *wireSFTP) recv() (byte, []byte, error) {
 	}
 	return p[0], p[1:], nil
 }
-func (c *wireSFTP) init() error {
-	if e := c.send(fxInit, sfU32(3)); e != nil {
-		return e
+// The underlying SSH transport belongs to the interactive terminal when
+// conn is nil. Bound each SFTP response separately so a stalled server does
+// not hold file browsing indefinitely, without imposing a total transfer
+// time limit or changing deadlines on the shared SSH connection.
+func (c *wireSFTP) exchange(send func() error) (byte, []byte, error) {
+	if c.conn != nil || c.timeout <= 0 || c.abort == nil {
+		if err := send(); err != nil { return 0, nil, err }
+		return c.recv()
 	}
-	t, p, e := c.recv()
+	var expired atomic.Bool
+	timer := time.AfterFunc(c.timeout, func() {
+		expired.Store(true)
+		c.abort()
+	})
+	defer timer.Stop()
+	if err := send(); err != nil {
+		if expired.Load() { return 0, nil, context.DeadlineExceeded }
+		return 0, nil, err
+	}
+	kind, reply, err := c.recv()
+	if expired.Load() { return 0, nil, context.DeadlineExceeded }
+	return kind, reply, err
+}
+func (c *wireSFTP) init() error {
+	t, p, e := c.exchange(func() error { return c.send(fxInit, sfU32(3)) })
 	if e != nil {
 		return e
 	}
@@ -200,10 +222,7 @@ func (c *wireSFTP) request(t byte, parts ...[]byte) (byte, []byte, error) {
 	for _, p := range parts {
 		body = append(body, p...)
 	}
-	if e := c.send(t, body); e != nil {
-		return 0, nil, e
-	}
-	typ, reply, e := c.recv()
+	typ, reply, e := c.exchange(func() error { return c.send(t, body) })
 	if e != nil {
 		return 0, nil, e
 	}
@@ -876,7 +895,7 @@ func runSFTPChannel(ctx context.Context, req model.Request, emit model.Emit, cli
 		}
 		return model.Result{}, fmt.Errorf("server rejected SFTP subsystem: %w", e)
 	}
-	protocol := wireSFTP{in: stdout, out: stdin, conn: conn, timeout: timeout}
+	protocol := wireSFTP{in: stdout, out: stdin, conn: conn, timeout: timeout, abort: func() { _ = sess.Close() }}
 	if e = protocol.init(); e != nil {
 		if ctx.Err() != nil {
 			return model.Result{}, ctx.Err()

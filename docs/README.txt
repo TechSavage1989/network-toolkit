@@ -1,3 +1,20 @@
+NETWORK TOOLKIT 1.17.149
+======================
+
+CURRENT RELEASE - 1.17.149 (BETA 13)
+
+SFTP file browsing over an existing SSH terminal now enforces the configured
+response timeout for each file operation without timing out the entire transfer
+or closing the authenticated terminal. A stalled remote response closes only
+that SFTP channel. All other saved settings, credentials, permissions and
+update approval behavior remain unchanged.
+
+The narrow 390px Editor comparison-motion regression and real-device/native
+SFTP interruption and physical Windows endurance acceptance remain open.
+See RELEASE_NOTES_1.17.149.txt and docs/RELEASE149_HANDOFF.md.
+Stable release remains v1.17.136.
+Previous release descriptions follow unchanged.
+
 NETWORK TOOLKIT 1.17.148
 ======================
 

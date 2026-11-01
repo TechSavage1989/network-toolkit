@@ -2,6 +2,17 @@
 
 This is the **authoritative, ongoing development plan**. Preserve it across beta releases and future chats. The eleven areas and three-phase sequence originated in the approved application-wide optimization plan. Do not replace them with an Editor-only scope or assume a published beta certifies all its planned work.
 
+## Beta 13 candidate - not published
+
+v1.17.149 adds a bounded per-response timeout to SFTP browsing on an
+already authenticated SSH terminal. An unresponsive SFTP subsystem can
+close without breaking the interactive terminal or limiting the whole
+duration of a large transfer. The regression test is also added to hosted
+Windows CI. Read [Beta 13 handoff](RELEASE149_HANDOFF.md) and
+[timeout audit](BETA13_SFTP_TIMEOUT_AUDIT.md).
+Keep all eleven areas below. The 390px Editor 2px motion requirement,
+real-device SFTP cancellation and physical Windows endurance remain open.
+
 ## Latest publication - v1.17.148 Beta 12
 
 Published 2026-11-01T04:49:47Z as opt-in GitHub prerelease 430369106.

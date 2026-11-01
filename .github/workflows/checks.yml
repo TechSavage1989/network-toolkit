@@ -644,6 +644,10 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
+      - name: Verify shared-terminal SFTP timeout and shell continuity on Windows
+        env:
+          GOTOOLCHAIN: local
+        run: go test -mod=vendor ./internal/diag -run TestSharedSFTPCancellationUnblocksReadAndRetainsShell -count=1 -timeout=45s -v
       - name: Test paced paste literal commands and generation cancellation on Windows
         env:
           GOTOOLCHAIN: local
