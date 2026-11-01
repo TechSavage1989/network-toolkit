@@ -30,7 +30,7 @@ def version_block(key, value=b'', children=(), text=False):
 
 
 def version_info():
-    fixed = struct.pack('<13I', 0xFEEF04BD, 0x00010000, 0x00010012, 0x00020000, 0x00010012, 0x00020000, 0x3F, 0, 0x40004, 1, 0, 0, 0)
+    fixed = struct.pack('<13I', 0xFEEF04BD, 0x00010000, 0x00010012, 0x00030000, 0x00010012, 0x00030000, 0x3F, 0, 0x40004, 1, 0, 0, 0)
     strings = {
         'FileDescription': 'Network Toolkit - Portable Network Diagnostics',
         'FileVersion': '1.18.3.0',
