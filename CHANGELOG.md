@@ -1,8 +1,8 @@
-## 1.18.4 Beta 4 - UX Phase 5 (candidate)
+## 1.18.4 Beta 4 - UX Phase 5 (published 2026-11-01)
 
 - Added first-run welcome with quick starts, clearer diagnostic examples, and actionable error guidance.
 - Preserved all existing saved workspaces, security confirmations and opt-in update behavior.
-- Hosted validation and publication pending; see docs/UX_PHASE5_HANDOFF.md.
+- Published as an opt-in beta with the fixed Windows executable name and checksum-verified updater assets. See docs/UX_PHASE5_HANDOFF.md for validation limitations.
 
 # Network Toolkit Change History
 
