@@ -1,0 +1,14 @@
+Network Toolkit 1.17.148 Beta 12
+
+## What's New
+
+- Cancelling an SFTP browsing operation now reports the cancellation more accurately.
+- An interrupted file-browsing request no longer needs to disconnect an active SSH terminal.
+
+## Additional Details
+
+- SFTP operations check cancellation before starting a shared SSH subsystem, after negotiation and before reporting success. Late transport errors from a cancelled channel are reported as cancellation.
+- A synthetic SSH test pauses a directory listing, cancels it, verifies the scoped channel closes and then confirms that the authenticated terminal and another SFTP request still work.
+- An extended synthetic workload exercises 800 cycles across Ping, Trace route, DNS, TCP, discovery and monitoring, with periodic interruptions and bounded result caches. These are test observations, not live-device performance claims.
+- The existing narrow-window Editor comparison-motion regression remains unresolved. Native SFTP interruption with real devices and multi-hour physical Windows soak testing are still required.
+- Credentials, saved settings, network permissions, update consent, beta opt-in and the stable Network_Toolkit.exe filename remain unchanged.
