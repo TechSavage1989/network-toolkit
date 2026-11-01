@@ -300,3 +300,13 @@ func TestSFTPFrameSurvivesPartialWrites(t *testing.T) {
   if frame[4] != fxInit || !bytes.Equal(frame[5:], payload) { t.Fatal("wire frame changed") }
  }
 }
+
+type stalledSFTPWriter struct{}
+func (stalledSFTPWriter) Write([]byte) (int, error) { return 0, nil }
+
+func TestSFTPFrameRejectsZeroProgress(t *testing.T) {
+ c := &wireSFTP{out: stalledSFTPWriter{}}
+ if err := c.send(fxInit, sfU32(3)); err != io.ErrShortWrite {
+  t.Fatalf("expected no-progress error, got %v", err)
+ }
+}
