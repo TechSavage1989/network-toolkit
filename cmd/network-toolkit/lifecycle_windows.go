@@ -19,6 +19,8 @@ func runLifecycle(ctx context.Context, url, sessionToken string, stop context.Ca
 	defer stop()
 	err := desktop.Run(ctx, desktop.Config{
 		Title:                title,
+		MinWidth:             minimumDesktopWidth(title),
+		MinHeight:            minimumDesktopHeight(title),
 		RequireCloseApproval: mainEditorCloseApproval(title),
 		URL:                  url,
 		SessionToken:         sessionToken,
