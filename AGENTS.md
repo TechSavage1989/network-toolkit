@@ -1,3 +1,26 @@
+# v1.17.149 Beta 13 - published
+
+Published 2026-11-01T05:06:03Z as opt-in GitHub prerelease ID 430374696.
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.149
+Tagged source/merged PR #24: bf76d7506393d4a1902c55656a5490897abf8922.
+Release workflow 41275438541: build SUCCESS, publish SUCCESS. Four official
+assets carry GitHub SHA-256 metadata; stable releases/latest remains v1.17.136.
+Borrowed-terminal SFTP now bounds each protocol response without setting a
+deadline on the shared SSH connection, and closes only the unresponsive SFTP
+channel. The synthetic test passed on hosted Windows. Credentials, settings,
+network permissions, terminal ownership, fixed Network_Toolkit.exe and update
+consent remain unchanged. Existing Editor 390px comparison motion still fails
+its original 2px requirement; real-device SFTP and physical Windows endurance
+acceptance remain open. No previous release tag or asset was replaced.
+
+Read docs/DEVELOPMENT_ROADMAP.md, docs/DEVELOPMENT_HANDOFF.md,
+docs/RELEASE149_HANDOFF.md, and docs/BETA13_SFTP_TIMEOUT_AUDIT.md.
+Continue the original eleven-area roadmap, not an Editor-only or
+Terminal-only substitute. Next proposed v1.17.150 Beta 14 should focus
+on the remaining 390px Editor motion/sidebar issue, physical SFTP
+interruption and extended Windows/concurrent-tool acceptance. No Work
+mode or user's desktop. Future What's New must remain user-focused.
+
 # v1.17.149 Beta 13 - development candidate, NOT PUBLISHED
 
 Read docs/DEVELOPMENT_ROADMAP.md, docs/RELEASE149_HANDOFF.md and
