@@ -28,7 +28,7 @@ function clockHarness(overrides={}){
  const env={setTimeout:(fn,ms)=>{const n=++id;pending.set(n,fn);delays.push(ms);return n;},clearTimeout:n=>pending.delete(n),enabled:()=>true,ready:()=>true,check:async()=>{calls.push('check');return 'ok';},...overrides};
  return {s:createScheduler(env),pending,delays,calls,async tick(){const [id,fn]=pending.entries().next().value;pending.delete(id);await fn();}};
 }
-test('automatic schedule starts once immediately, then checks every five minutes',async()=>{const h=clockHarness();h.s.start();h.s.start();assert.equal(h.pending.size,1);assert.equal(h.delays[0],0);await h.tick();assert.deepEqual(h.calls,['check']);assert.equal(h.delays.at(-1),300000);h.s.stop();assert.equal(h.pending.size,0);});
+test('automatic schedule starts once immediately, then checks every six hours',async()=>{const h=clockHarness();h.s.start();h.s.start();assert.equal(h.pending.size,1);assert.equal(h.delays[0],0);await h.tick();assert.deepEqual(h.calls,['check']);assert.equal(h.delays.at(-1),21600000);h.s.stop();assert.equal(h.pending.size,0);});
 test('automatic errors back off and successful check resets failures',async()=>{let outcome='retry';const h=clockHarness({check:async()=>outcome});h.s.start();await h.tick();assert.equal(h.delays.at(-1),30000);await h.tick();assert.equal(h.delays.at(-1),120000);await h.tick();assert.equal(h.delays.at(-1),900000);await h.tick();assert.equal(h.delays.at(-1),1800000);for(let i=0;i<8;i++)await h.tick();assert.equal(h.delays.at(-1),21600000);outcome='ok';await h.tick();outcome='retry';await h.tick();assert.equal(h.delays.at(-1),30000);});
 test('disabled checks, disconnected engine, and busy requests never trigger a download',async()=>{let enabled=false,ready=true;const h=clockHarness({enabled:()=>enabled,ready:()=>ready});h.s.start();await h.tick();assert.equal(h.calls.length,0);enabled=true;ready=false;await h.tick();assert.equal(h.calls.length,0);assert.equal(h.delays.at(-1),15000);ready=true;await h.tick();assert.equal(h.calls.length,1);});
 test('stopping or resetting an in-flight scheduler never creates duplicate timers',async()=>{let resolve;const h=clockHarness({check:()=>new Promise(r=>resolve=r)});h.s.start();const pending=h.tick();h.s.reset();resolve('ok');await pending;assert.equal(h.pending.size,1);assert.equal(h.delays.at(-1),0);h.s.stop();assert.equal(h.pending.size,0);});
@@ -50,23 +50,23 @@ test('scheduler exposes automatic attempt, result and next retry without recordi
   h.s.start();assert.equal(h.s.snapshot().nextAt,1000);now=6000;await h.tick();
   assert.equal(h.s.snapshot().lastAttempt,6000);assert.equal(h.s.snapshot().lastSummary,'Network unavailable');assert.equal(h.s.snapshot().nextAt,36000);assert.equal(h.s.snapshot().nextKind,'retry');
   assert.ok(reports.some(s=>s.running));enabled=false;now=36000;await h.tick();assert.equal(h.s.snapshot().lastAttempt,6000);
-  enabled=true;result='ok';now=40000;await h.tick();assert.equal(h.s.snapshot().lastResult,'ok');assert.equal(h.s.snapshot().nextAt,40000+300000);
+  enabled=true;result='ok';now=40000;await h.tick();assert.equal(h.s.snapshot().lastResult,'ok');assert.equal(h.s.snapshot().nextAt,40000+21600000);
 });
 
 test('manual completion replaces a pending automatic timer and ignores a late in-flight result',async()=>{
   let resolve;const h=clockHarness({check:()=>new Promise(r=>resolve=r)});h.s.start();const running=h.tick();
   h.s.checked('ok');resolve('retry');await running;
-  assert.equal(h.pending.size,1);assert.equal(h.delays.at(-1),300000);assert.equal(h.s.snapshot().failures,0);
+  assert.equal(h.pending.size,1);assert.equal(h.delays.at(-1),21600000);assert.equal(h.s.snapshot().failures,0);
 });
 
 test('update copy describes public source and binary-only payload',()=>{const text=html({data:staged},true,'1.17.58');assert.doesNotMatch(text,/source repository stays private/);assert.match(text,/public main repository/);});
 
 test('focus freshness gate replaces only one timer and manual success refreshes it',async()=>{
   let now=1000;const h=clockHarness({now:()=>now});h.s.start();await h.tick();
-  now+=119999;h.s.wake();assert.equal(h.delays.at(-1),300000);
+  now+=21599999;h.s.wake();assert.equal(h.delays.at(-1),21600000);
   now++;h.s.wake();h.s.wake();assert.equal(h.pending.size,1);assert.equal(h.delays.at(-1),0);
   await h.tick();assert.equal(h.calls.length,2);
-  h.s.checked('ok');now+=119999;h.s.wake();assert.equal(h.delays.at(-1),300000);
+  h.s.checked('ok');now+=21599999;h.s.wake();assert.equal(h.delays.at(-1),21600000);
 });
 test('focus and timer races never overlap an in-flight check',async()=>{
   let resolve,now=1000,checks=0;const h=clockHarness({now:()=>now,check:()=>{checks++;return new Promise(r=>resolve=r)}});
@@ -75,13 +75,13 @@ test('focus and timer races never overlap an in-flight check',async()=>{
 });
 test('hidden or offline checks pause without a short readiness loop and resume when stale',async()=>{
   let active=false,now=1000;const h=clockHarness({now:()=>now,active:()=>active});h.s.start();await h.tick();
-  assert.equal(h.calls.length,0);assert.equal(h.delays.at(-1),300000);h.s.wake();assert.equal(h.delays.at(-1),300000);
+  assert.equal(h.calls.length,0);assert.equal(h.delays.at(-1),21600000);h.s.wake();assert.equal(h.delays.at(-1),21600000);
   active=true;h.s.wake();assert.equal(h.delays.at(-1),0);await h.tick();assert.equal(h.calls.length,1);
 });
 test('focus respects opt-out, transient retry and server deadline',async()=>{
   let now=1000,enabled=true,after=0;const h=clockHarness({now:()=>now,enabled:()=>enabled,notBefore:()=>after,check:async()=> 'retry'});
   h.s.start();await h.tick();now+=120000;h.s.wake();assert.equal(h.delays.at(-1),30000);
-  h.s.checked('ok');after=now+600000;h.s.wake();assert.equal(h.delays.at(-1),300000);
+  h.s.checked('ok');after=now+600000;h.s.wake();assert.equal(h.delays.at(-1),21600000);
   h.s.checked('retry');assert.equal(h.delays.at(-1),600000);assert.equal(h.pending.size,1);
   enabled=false;after=0;h.s.checked('ok');now+=120000;h.s.wake();assert.equal(h.delays.at(-1),21600000);
 });
