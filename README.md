@@ -1,331 +1,61 @@
-## Latest beta - v1.17.150 Beta 14
+# Network Toolkit
 
-[Download the opt-in Beta 14](https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.150).
-SFTP browsing through an active SSH terminal no longer risks closing a completed operation when an old response timeout expires. Existing settings, credentials, SSH terminal sessions, network permissions and user-approved portable updates are preserved.
-Stable latest remains v1.17.136. The 390px Text Editor comparison-motion regression, live-device SFTP interruption and multi-hour physical Windows acceptance remain open.
+A portable Windows toolkit for network diagnostics, device connections, file transfers and network administration.
 
-[Release handoff](docs/RELEASE150_HANDOFF.md) ·
-[Eleven-area roadmap](docs/DEVELOPMENT_ROADMAP.md).
-
-## Previous beta - v1.17.149 Beta 13
-
-[Download the opt-in Beta 13](https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.149).
-A connected terminal's SFTP browser now has a response timeout
-that can release a stalled file operation without disconnecting
-the interactive SSH terminal. No change to existing credentials,
-saved settings, network permissions or explicit updater consent.
-Stable latest is v1.17.136. The narrow Editor motion regression,
-native SFTP real-device interruption and physical Windows endurance
-testing remain open.
-
-[Release handoff](docs/RELEASE149_HANDOFF.md) ·
-[Eleven-area roadmap](docs/DEVELOPMENT_ROADMAP.md).
-
-## Previous beta - v1.17.148 Beta 12
-
-[Download the opt-in Beta 12](https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.148).
-More reliable SFTP cancellation and retained SSH terminal sessions, with extended synthetic multi-tool interruption testing. The original narrow Editor comparison-motion regression, real SFTP interruption and physical Windows endurance acceptance remain open. Stable latest is v1.17.136.
-
-[Release handoff](docs/RELEASE148_HANDOFF.md) · [Eleven-area roadmap](docs/DEVELOPMENT_ROADMAP.md).
-
-## Previous beta - v1.17.147 Beta 11
-
-[Download Beta 11](https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.147). SFTP transfers handle incomplete packet writes more reliably. This remains an opt-in prerelease, not stable certification. The eleven-area roadmap and known Editor 390px and native Windows/SFTP acceptance gaps remain open. Stable latest is v1.17.136.
-
-[Release handoff](docs/RELEASE147_HANDOFF.md) · [Development roadmap](docs/DEVELOPMENT_ROADMAP.md).
-
-## Previous beta - v1.17.146 Beta 10
-
-[Download the opt-in Beta 10](https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.146).
-File comparison scroll alignment now resists an isolated briefly shifted source line when several matched rows are visible. The original narrow 390px continuous-motion regression remains open, so this is not stable certification. All eleven roadmap areas remain active. Credentials, permissions, saved settings, stable Windows executable naming and explicit beta update consent stay unchanged. Stable latest remains v1.17.136.
-[Release handoff](docs/RELEASE146_HANDOFF.md) · [Eleven-area roadmap](docs/DEVELOPMENT_ROADMAP.md).
-
-## Previous beta - v1.17.145 Beta 9
-
-[Download the opt-in beta](https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.145).
-Improves shutdown/stale-response handling and retired diagnostic data cleanup;
-adds repeated multi-tool navigation, interruption and resource observations.
-Public downloads and checksums verified. Stable remains v1.17.136.
-Known narrow Editor motion CI failure remains open; this is not stable or
-physical Windows/live-device endurance certification.
-[Release handoff](docs/RELEASE145_HANDOFF.md) · [Eleven-area roadmap](docs/DEVELOPMENT_ROADMAP.md).
-
-<p align="center">
-  <img src="assets/Network_Toolkit_Icon.svg" width="112" alt="Network Toolkit icon">
-</p>
-
-<h1 align="center">Network Toolkit</h1>
-<p align="center">Network diagnostics, device terminals and file transfers in one portable Windows app.</p>
-
-<p align="center">
-  <a href="https://github.com/TechSavage1989/network-toolkit/releases/latest">Download</a> ·
-  <a href="#getting-started">Get started</a> ·
-  <a href="#features">Features</a> ·
-  <a href="#updates-and-settings">Updates</a> ·
-  <a href="docs/releases">Release history</a> ·
-  <a href="docs/DEVELOPMENT_ROADMAP.md">Development roadmap</a> ·
-  <a href="#development">Development</a>
-</p>
-
-## Previous beta - v1.17.144 Beta 8
-
-Published October 31, 2026 as an opt-in prerelease. Beta 8
-improves shared diagnostics and discovery sorting/filtering, long
-monitoring histories, large report rendering, and application status
-controls. This continues the original eleven-area roadmap.
-The stable channel remains v1.17.136; extended live Windows acceptance
-and the historical narrow Editor motion regression remain open.
-
-[Download Beta 8](https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.144) ·
-[Release notes](docs/releases/RELEASE_NOTES_1.17.144.txt) ·
-[Performance audit](docs/BETA8_APPWIDE_AUDIT.md) ·
-[Development roadmap](docs/DEVELOPMENT_ROADMAP.md) ·
-[Handoff](docs/RELEASE144_HANDOFF.md)
-
-## Previous beta - 1.17.143 Beta 7
-
-Published October 31, 2026 as an opt-in prerelease. Beta 7 improves narrow
-Editor source alignment and synchronized comparison-map scrolling, with
-changed comparison rows correctly matched across inserted or removed lines.
-The original narrow continuous-motion test retains intermittent brief
-3-5px offset failures. This is a beta limitation, not a stable promotion.
-
-[Download Beta 7](https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.143) ·
-[Release notes](docs/releases/RELEASE_NOTES_1.17.143.txt) ·
-[Validation and handoff](docs/RELEASE143_HANDOFF.md)
-
-## Previous beta - 1.17.142 Beta 6
-
-Published October 31, 2026 as an opt-in prerelease. Beta 6 reduces unrelated
-graph redraws during simultaneous Terminal and Packet Capture activity, releases
-detached graph resources and stale drags, and improves Editor comparison recovery.
-Previously observed narrow Editor aligned-comparison and map-motion CI failures
-remain documented. Beta 6 is not a stable promotion.
-
-[Download Beta 6](https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.142) ·
-[Release notes](docs/releases/RELEASE_NOTES_1.17.142.txt) ·
-[Validation and handoff](docs/RELEASE142_HANDOFF.md)
-
-## Previous beta - 1.17.141 Beta 5
-
-Published October 31, 2026 as an **opt-in prerelease**. Editor connection
-settings and comparison-map navigation have been refined; the TFTP/SFTP
-file explorer now supports keyboard sizing and cancel-safe dragging.
-Previous release tags and updater safeguards remain intact.
-
-[Download Beta 5](https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.141) ·
-[Release notes](docs/releases/RELEASE_NOTES_1.17.141.txt) ·
-[Validation and handoff](docs/RELEASE141_HANDOFF.md)
-
-## Previous beta - 1.17.140 Beta 4
-
-Published October 31, 2026 as an **opt-in prerelease**. Graph history
-and SFTP, FTP/FTPS and file-server directory views perform less repeated
-sorting while preserving existing sample and file display behavior.
-This is a beta build, not the normal stable update.
-
-[Beta 4 download](https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.140) ·
-[Release notes](RELEASE_NOTES_1.17.140.txt) ·
-[Validation handoff](docs/RELEASE140_HANDOFF.md) ·
-[Application-wide audit](docs/PERFORMANCE_AUDIT_140.md)
-
-## Previous beta - 1.17.139 Beta 3 (Phase 1)
-
-Published October 31, 2026 as an **opt-in prerelease**. Heavy terminal
-output is handled in bounded per-session batches, reducing repeated
-display work while preserving per-event history, input and connection
-behavior. Enable Beta updates under App settings > Updates to receive it.
-
-[Download Beta 3](https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.139) ·
-[Release notes](RELEASE_NOTES_1.17.139.txt) ·
-[Validation and handoff](docs/RELEASE139_HANDOFF.md)
-
-## Previous beta - 1.17.138 Beta 2 (Phase 1)
-
-Beta 2 smooths multi-pane terminal resizing. Splitter movements are applied
-once per animation frame and commit the final pointer position; content is
-clipped within its pane while the display refits. Terminals scrolled back in
-history retain a fallback viewport position if their resize marker is lost.
-
-This is an **opt-in prerelease**, not the stable update. In App settings >
-Updates, enable Beta updates to receive the verified v1.17.138 package.
-See [beta release notes](docs/releases/RELEASE_NOTES_1.17.138.txt) and
-[Beta 2 validation](docs/RELEASE138_HANDOFF.md).
-
-## Previous beta - 1.17.137
-
-Beta 1 reduced unnecessary layout measurement, highlight redraws, and
-cosmetic chrome updates during pane resizing.
-See [Beta 1 release notes](docs/releases/RELEASE_NOTES_1.17.137.txt).
-
-## Previous stable update - 1.17.136
-
-Added the off-by-default Beta updates setting, trusted release
-channel selection and the existing explicit download/install workflow.
-See [release notes](docs/releases/RELEASE_NOTES_1.17.136.txt).
-
-## Previous update - 1.17.135
-
-Last paste and Last command now show submitted commands once when enabled,
-without numbered headings or duplicate device echoes. See
-[release notes](docs/releases/RELEASE_NOTES_1.17.135.txt).
-
-## Previous update - 1.17.134
-
-Paced SSH multiline pastes were added to Last command and Last paste
-history, including the captured output and saved macro shortcuts.
-See [release notes](docs/releases/RELEASE_NOTES_1.17.134.txt).
-
-## Previous update - 1.17.133
-
-Disconnect and Reconnect are adjacent in the active Terminal controls.
-The confirmation preferences for bulk actions can be managed independently.
-See [release notes](docs/releases/RELEASE_NOTES_1.17.133.txt).
-
-## Historical 1.17.128 candidate (subsumed by published 1.17.129)
-
-## Published 1.17.127
-
-Published 2026-10-30T23:12:03Z. Actual public downloads, source, manifests, updater
-feed and prior126 immutability verified; see [127 handoff](docs/RELEASE127_HANDOFF.md).
-Adds explicit paced multiline paste and learned name/endpoint labels. User follow-up
-identified numeric/Linux recognition gaps and manual-name precedence for128.
-
-## Previous 1.17.121 release record (retained)
-
-Published 2026-10-30T05:45:41Z; actual public verification 05:48:05.062831Z.
-Release 428692620: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.121
-Compact Files/Connect controls reclaim file-list height. Local and already-authorized
-SFTP files/folders can be dragged directly to Windows Explorer; file drops inside
-the editor preserve dirty documents. Copy-only transfer, cancellation and existing
-approval/size bounds remain. Actual Explorer folders were tested; separate Desktop
-Shell/cross-integrity/arbitrary-app delivery and visible UAC transitions were not.
-FTP/FTPS native export is not included.
-
-**Known reliability issue:** the same-source duplicate Windows run failed its
-first detached-child SFTP file drag after all five main-window cases passed.
-No data was requested/materialized and no destination was written. The cause is
-unknown; matching geometry/approved metadata does not establish a fixture-only
-or premature-release explanation. Original ten-case success is retained, not a
-guarantee of reliable detached delivery. No rerun, rebuild or repair is claimed.
-
-The original review passed all 22 new rendered/native cases and core/security/
-dependency/Windows checks; the later duplicate failure above remains unresolved.
-Review 41009283786: six SUCCESS/one FAILURE (comparison motion), last job completed 05:54:57Z.
-Duplicate 41010025845: five SUCCESS/one Windows FAILURE/one browser CANCELLED, last job completed 06:04:03Z.
-The duplicate real-five-minute case did not log PASS before cancellation;
-its timer stage is not a pass, and cancellation cause/actor are unestablished.
-All four actual public downloads match the reviewed bytes; 1,170 exact source
-files/1,177 portable members, manifests, PE 121/nine canonical icons/12 resources,
-update four-file allowlist and latest feed/tag/main/notes are verified. Prior 120
-release/tag/body/original four assets remain unchanged.
-See [release 121 handoff](docs/RELEASE121_HANDOFF.md) for exact evidence, hashes,
-known comparison/Hosts/Alt-transfer caveats and retained earlier failed checks.
-
-## Features
-
-The text editor supports independent left/right tab groups, comparison, tab context
-menus and a resizable Windows/SFTP file sidebar. Use **Compare to** from a tab menu,
-drag either split divider, and use the sidebar’s **Connect** tab for active or saved
-connections and **Files** for Windows/SFTP browsing. Drag a supported file onto
-the editor to open it without replacing dirty documents. See
-[file drops](docs/EDITOR_FILE_DROP121.md),
-[saved connections](docs/EDITOR_SAVED_CONNECTIONS113.md) and
-[detached local access](docs/EDITOR_LOCAL119.md) for behavior and permission limits.
-
-Compact sidebar controls and optional editor opening panels leave more room for
-the active tool and document. See [layout guide](docs/APP_CHROME109.md).
-
-- **Investigate connectivity:** inspect local adapters, run Ping, Trace route, DNS and TCP-port checks, discover IPv4 hosts, and monitor connections.
-- **Work with devices:** open SSH, Telnet and serial terminals; organize saved sessions and macros; detach terminals into their own windows.
-- **Transfer files:** use SFTP, FTP/FTPS and TFTP client/server tools, with a built-in text editor.
-- **Review and export results:** inspect individual records, copy useful values and save diagnostic reports.
-- **Explore history:** keep graph endpoints and timestamps aligned, and shape older
-  history with the compact [compression curve controls](docs/GRAPH_CURVE113.md).
-- **Keep routine work consistent:** use saved-session indicators, named filters, installed terminal fonts, shared color palettes and reviewed file drops. See [workflow guide](docs/WORKFLOWS107.md) for behavior and protocol limits.
-- **Manage local network settings:** use IP configuration and the Hosts editor with explicit review and Windows approval for protected changes.
+<!-- Screenshot: add reviewed light/dark application screenshots after Phase 2 visual foundations. -->
 
 ## Download
 
-Download **`Network_Toolkit.exe`** from [the latest release](https://github.com/TechSavage1989/network-toolkit/releases/latest). The versioned **`Portable.zip`** includes the complete source package; **`Update.zip`** is for the in-app updater, not a first-run source package.
+[Download the latest stable release](https://github.com/TechSavage1989/network-toolkit/releases/latest).
+
+Latest beta: [v1.17.150](https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.150) (opt-in; not a stable release).
+
+## Features
+
+- Diagnose hosts with Ping, Trace route, DNS, port checks and related network tools.
+- Discover network devices and inspect connection details.
+- Monitor targets and inspect live graphs and packet captures.
+- Connect with SSH, Telnet and supported serial terminals, using saved connections, multiple tabs and macros.
+- Browse and transfer files through SFTP, FTP/FTPS and TFTP where supported.
+- Open, edit and compare text files, including common network device configurations.
+- View local network information and review authorized configuration changes.
+- Save preferences and use the built-in updater.
 
 ## Requirements
 
-| Requirement | Details |
-| --- | --- |
-| Operating system | Windows 10 or 11, 64-bit x64 |
-| Runtime | Microsoft Edge WebView2 Runtime; the Edge browser alone is not the same component |
-| Installation | Portable executable; no separate Go, Python, Node.js, .NET, Nmap or Npcap installation |
-| Network access | Needed for the selected remote target, online lookups and update checks; local tools can work offline |
-| Permissions | Normal use runs as your Windows account. Protected configuration changes and native packet recording can require administrator approval. |
-
-> **Use responsibly:** scan or connect only to systems you are authorized to manage. Telnet, plain FTP and TFTP do not provide encrypted transport. Review Hosts/IP changes before applying them.
+- Windows x64 for the packaged portable application.
+- Network access and permissions appropriate to the tools being used.
+- Windows administrative approval for protected system changes, when requested.
+- Compatible remote services, such as an SSH server with SFTP enabled, for connection-dependent features.
 
 ## Getting started
 
-1. Open [the latest release](https://github.com/TechSavage1989/network-toolkit/releases/latest) and download **`Network_Toolkit.exe`**. Choose the **`Portable.zip`** asset if you also want the complete source package; extract it before use.
-2. Keep the executable in a local folder you can write to. Make sure **Microsoft Edge WebView2 Runtime** is installed, then launch the app.
-3. Start with **Overview** to inspect adapters, or choose a diagnostic tool and enter a target you are authorized to test.
-4. Review the results and export anything you want to keep. Diagnostic output is session-based; save editor changes and reports before closing or updating.
+1. Download the stable portable package and extract it to a location you control.
+2. Start **Network_Toolkit.exe**.
+3. Select a tool from the navigation menu.
+4. Enter a target or create a terminal connection, then run only the operations you are authorized to perform.
+5. Review any changes to network configuration before confirming them.
 
-## How to use
+## Updates
 
-| Topic | Reference |
-| --- | --- |
-| Tools, storage, reports and troubleshooting | [Detailed user guide](docs/README.txt) |
-| Update installation, offline import and recovery | [Update guide](docs/UPDATING.txt) |
-| Packet recording and analysis | [Packet troubleshooting](docs/PACKET_TROUBLESHOOTING.txt) |
-| Reusable terminal commands | [Terminal macros](docs/TERMINAL_MACROS.txt) |
-| Terminal appearance and matching rules | [Terminal highlighting](docs/TERMINAL_HIGHLIGHTING.txt) |
-| Loaded editor documents and close confirmation | [Editor activity and close policy](docs/EDITOR_ACTIVITY_CLOSE113.md) |
-| Concise result details and retained exports | [Result readers](docs/RESULT_READERS113.md) |
+Use **Check for updates** to check manually. Beta updates are available only after opting in to the beta channel. Downloading and installing an update requires explicit approval; packages are verified before installation. Your saved profiles, settings and credential vault must be preserved.
 
-## Updates and settings
+## Documentation
 
-Open **App settings → Network Toolkit updates** to check for updates. Choose **Download update**, review the release notes and save your work, then confirm **Install and restart**. Downloading alone does not install anything.
+- [Getting started with diagnostics](docs/guide/diagnostics.md)
+- [Terminal](docs/guide/terminal.md)
+- [Text Editor](docs/guide/editor.md)
+- [File transfers](docs/guide/transfers.md)
+- [Network configuration](docs/guide/network-config.md)
+- [Settings and updates](docs/guide/settings-and-updates.md)
+- [Change history](CHANGELOG.md)
+- [UX development plan](docs/UX_POLISH_PLAN.md)
+- [Development](docs/DEVELOPMENT.md)
 
-Automatic checks run at startup and periodically while the app is visible and online. You can disable them in App settings; **Later** hides a reminder for 24 hours. Active jobs, terminal sessions, transfers and configuration changes block installation. Close other app windows first.
+## Building from source
 
-Editor **More → Ask to save unsaved changes before closing** is enabled by default.
-Disabling it requires a warning confirmation and allows unsaved document content
-to be discarded; active saves, failed-save warnings and ownership transfers remain
-protected. Detached windows follow the main window's setting. Moving or merging
-documents always preserves their contents.
+Use the scripts and vendored dependencies already in the repository. See [development instructions](docs/DEVELOPMENT.md) for the supported build and test commands. The distributed Windows executable retains the filename **Network_Toolkit.exe**.
 
-- Updates use this repository's stable releases and verify the binary-only **`Update.zip`** and its checksums. **Do not import the source-containing `Portable.zip` as an update.**
-- Settings and saved profiles are retained. App settings lets you choose the data folder; `--data-dir` is an explicit per-run override. Keep the same data folder and launch options when replacing the executable manually.
-- A previous executable is retained for recovery. See [UPDATING.txt](docs/UPDATING.txt) before restoring it or handling an older update-feed migration.
-- Builds are not Authenticode signed. Windows may show an unknown-publisher warning. Use the official release assets; SHA-256 checks detect corruption, not a compromised publisher.
+## Responsible use
 
-Published and verified: [1.17.112 editor views and file sidebar](docs/RELEASE112_HANDOFF.md). All seven hosted review/main checks, automatic Release and four public assets passed verification.
-
-## Development
-
-<details>
-<summary>Build, checks and release safeguards</summary>
-
-Read [AGENTS.md](AGENTS.md) and [DEVELOPMENT_HANDOFF.md](docs/DEVELOPMENT_HANDOFF.md) before editing or building. Start from current `main`; the handoff records the released source, required checks and known validation limits.
-
-Application source and Go tests live in [`cmd/network-toolkit/`](cmd/network-toolkit); supporting packages are in `internal/`, interface assets in `web/`, and guides in [`docs/`](docs/DEVELOPMENT.md).
-
-The application uses Go with an embedded web interface. Use the toolchain specified in [go.mod](go.mod). Windows build entry points are [BUILD_WINDOWS.cmd](BUILD_WINDOWS.cmd) and [build.sh](build.sh); the [Checks workflow](.github/workflows/checks.yml) is the reference for Go, JavaScript, release-guard and browser validation.
-
-**Publication is a separate action:** main pushes can publish new application versions. Do not change versions, move released tags, replace existing assets or change repository access as part of documentation work. This repository is the canonical source and update feed.
-
-See [VALIDATION.txt](docs/VALIDATION.txt) for recorded results and [THIRD_PARTY_NOTICES.txt](docs/THIRD_PARTY_NOTICES.txt) for dependency notices. Cross-compilation, browser fixtures and update staging are not proof of native Windows/WebView2 interaction or an actual install/restart.
-
-</details>
-
-Current published version: [1.17.108 — activity indicators, inline bookmarks, graphs and editor workflows](https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.108). See the [verified release handoff](docs/RELEASE108_HANDOFF.md) for evidence and compatibility limits.
-
-### Editor documents and windows
-
-See [editor tabs, comparison and change map](docs/EDITOR_WORKFLOWS108.md),
-[acknowledged editor window moves and limits](docs/EDITOR_WINDOWS.md), and
-[offline network configuration syntax support](docs/NETWORK_CONFIG_EDITOR.md).
-
-Published and verified: [1.17.109 vertical workspace improvements](docs/RELEASE109_HANDOFF.md). All six exact-source gates passed; public assets, source, version/icons and updater feed are verified.
-
-Published and verified: [1.17.111 compact controls and comparison maps](docs/RELEASE111_HANDOFF.md). Hosted checks, isolated visual/native tests and all four public downloads passed verification.
-
-Previous published and verified: [1.17.110 graph and editor corrections](docs/RELEASE110_HANDOFF.md). All six exact-source gates, temporal/native evidence, public assets and updater feed passed verification.
+Use scanning, configuration, capture and connection features only on networks and systems you own or are authorized to administer. Protected system changes require review and Windows approval. Keep credentials private and check the destination before transferring or overwriting files.
