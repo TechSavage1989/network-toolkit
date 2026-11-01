@@ -1,4 +1,11 @@
-## Latest beta - v1.17.147 Beta 11
+## Latest beta - v1.17.148 Beta 12
+
+[Download the opt-in Beta 12](https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.148).
+More reliable SFTP cancellation and retained SSH terminal sessions, with extended synthetic multi-tool interruption testing. The original narrow Editor comparison-motion regression, real SFTP interruption and physical Windows endurance acceptance remain open. Stable latest is v1.17.136.
+
+[Release handoff](docs/RELEASE148_HANDOFF.md) · [Eleven-area roadmap](docs/DEVELOPMENT_ROADMAP.md).
+
+## Previous beta - v1.17.147 Beta 11
 
 [Download Beta 11](https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.147). SFTP transfers handle incomplete packet writes more reliably. This remains an opt-in prerelease, not stable certification. The eleven-area roadmap and known Editor 390px and native Windows/SFTP acceptance gaps remain open. Stable latest is v1.17.136.
 

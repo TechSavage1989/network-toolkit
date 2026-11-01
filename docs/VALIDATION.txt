@@ -1,3 +1,15 @@
+CURRENT v1.17.148 BETA 12 - 2026-11-01
+
+Published 2026-11-01T04:49:47Z as opt-in GitHub prerelease 430369106.
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.148
+Tagged source and merged PR #23: 72d11fd8ffd5ccf719a028e7786dbc7b26868d75.
+Official Release workflow 41274392216 completed: build SUCCESS, publish SUCCESS.
+The Windows executable, portable ZIP, binary-only updater ZIP, and SHA256SUMS are published with GitHub SHA-256 metadata. Stable releases/latest remains v1.17.136.
+At publication verification, exact-source main Checks 41274392369 reported 11 successful job groups and four still running: browser-workflows107, windows-terminal, browser-editor112, browser. This is not a clean-all-checks claim. The historical 390px Editor map-motion regression was not fixed or waived. Live SFTP interruption and multi-hour physical Windows endurance acceptance remain outstanding.
+No credentials, permissions, saved settings, update installation consent, stable executable naming, or previously published release assets were changed by the scoped Beta 12 work.
+
+The exact tagged source is 72d11fd8ffd5ccf719a028e7786dbc7b26868d75. Four published assets have official GitHub digests; no independent public-byte rehash was completed in this session. Browser integration job results were still pending at publication. Detailed evidence and further acceptance: docs/RELEASE148_HANDOFF.md and docs/BETA12_RELIABILITY_AUDIT.md. Historical validation follows.
+
 CURRENT v1.17.147 BETA 11 - 2026-11-01
 Published opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.147
 Source b9bdaf40a099be557c09c8586c90bb687ea34340. Release workflow 41272278556 build/publish SUCCESS. Four GitHub assets, package validation and SHA-256 metadata verified. Full Checks 41271825934 had 11 passed groups and four still pending at publication verification; do not claim all passed. Historical narrow Editor motion and native SFTP/physical Windows endurance acceptance remain open. Full handoff docs/RELEASE147_HANDOFF.md.

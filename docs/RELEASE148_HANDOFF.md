@@ -1,3 +1,28 @@
+# v1.17.148 Beta 12 - published release handoff
+
+Published 2026-11-01T04:49:47Z as opt-in GitHub prerelease 430369106.
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.148
+Tagged source and merged PR #23: 72d11fd8ffd5ccf719a028e7786dbc7b26868d75.
+Official Release workflow 41274392216 completed: build SUCCESS, publish SUCCESS.
+The Windows executable, portable ZIP, binary-only updater ZIP, and SHA256SUMS are published with GitHub SHA-256 metadata. Stable releases/latest remains v1.17.136.
+At publication verification, exact-source main Checks 41274392369 reported 11 successful job groups and four still running: browser-workflows107, windows-terminal, browser-editor112, browser. This is not a clean-all-checks claim. The historical 390px Editor map-motion regression was not fixed or waived. Live SFTP interruption and multi-hour physical Windows endurance acceptance remain outstanding.
+No credentials, permissions, saved settings, update installation consent, stable executable naming, or previously published release assets were changed by the scoped Beta 12 work.
+
+## Published asset metadata
+
+| Asset | Size (bytes) | GitHub SHA-256 |
+| --- | ---: | --- |
+| Network_Toolkit.exe | 21113344 | 84433846e7b508307fae225e3b86ad2b628191c8d476e2aa9833b043408a12d9 |
+| Network_Toolkit_1.17.148_Portable.zip | 14506768 | 5260a6aab8c0eb9d25bc7ad3b6327076c4ac417df58741b247192c53e98693dc |
+| Network_Toolkit_1.17.148_Update.zip | 8067602 | 3f5c77eb4344ef398e8534991197b0ae2d752e20b7ba2fa190dad6967922c45f |
+| SHA256SUMS | 292 | 8f7389852908fdd12e770a8fa1da3745ee07fd42348017a82cb5929b5d9dc1d4 |
+
+The release tag and source commit agree. GitHub Actions built the Windows portable application and binary-only updater package and completed its publication checks. SHA-256 values above are GitHub-reported metadata; they were not independently downloaded and rehashed in this chat. No release-candidate or physical Windows certification is asserted.
+
+## Eleven-area continuation
+
+Continue all eleven areas in docs/DEVELOPMENT_ROADMAP.md. The documented Beta 12 scope addressed SFTP cancellation and synthetic concurrent recovery; the Editor 390px motion regression, native transfer interruption and extended Windows/end-device acceptance remain open. The next proposed build is v1.17.149 Beta 13. The original candidate record remains below.
+
 # Network Toolkit v1.17.148 Beta 12 - candidate, not published
 
 **Status:** Source development and exact-source CI pending. Never claim a published release until the tag, four assets and channel are verified.

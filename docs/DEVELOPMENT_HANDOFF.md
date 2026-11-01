@@ -1,3 +1,23 @@
+# v1.17.148 Beta 12 - publication verified
+
+Published 2026-11-01T04:49:47Z as opt-in GitHub prerelease 430369106.
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.148
+Tagged source and merged PR #23: 72d11fd8ffd5ccf719a028e7786dbc7b26868d75.
+Official Release workflow 41274392216 completed: build SUCCESS, publish SUCCESS.
+The Windows executable, portable ZIP, binary-only updater ZIP, and SHA256SUMS are published with GitHub SHA-256 metadata. Stable releases/latest remains v1.17.136.
+At publication verification, exact-source main Checks 41274392369 reported 11 successful job groups and four still running: browser-workflows107, windows-terminal, browser-editor112, browser. This is not a clean-all-checks claim. The historical 390px Editor map-motion regression was not fixed or waived. Live SFTP interruption and multi-hour physical Windows endurance acceptance remain outstanding.
+No credentials, permissions, saved settings, update installation consent, stable executable naming, or previously published release assets were changed by the scoped Beta 12 work.
+
+## Delivered scope and remaining work
+
+- Borrowed-terminal SFTP operations check cancellation before opening a channel, after subsystem negotiation, and before reporting success; late EOF on cancellation is treated as context cancellation.
+- The synthetic SSH regression tested a stalled directory reply, scoped channel cancellation, shell continuity and a subsequent SFTP request on the authenticated connection.
+- An 800-cycle synthetic six-tool recovery fixture tested cache bounds, interrupted polling and saved-filter preservation. Synthetic metrics are not a live CPU/working-set benchmark.
+- The versioned Windows resources, updater and readable release-note sections were preserved under established release packaging rules.
+- Exact-source release build and publication passed. The broader Windows/browser integration matrix was not fully complete at the publication check. The 390px Editor motion threshold remains unchanged; no fix is claimed.
+
+Continue with the persistent eleven-area roadmap. Next proposed Beta 13 v1.17.149 should prioritize remaining Editor, native SFTP and physical Windows evidence. No prior release asset/tag was revised. Candidate and historical handoff entries follow unmodified.
+
 # v1.17.148 Beta 12 - development candidate, NOT PUBLISHED
 
 Based on published v1.17.147, with full eleven-area roadmap unchanged.

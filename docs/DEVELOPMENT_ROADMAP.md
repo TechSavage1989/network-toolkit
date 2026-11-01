@@ -2,7 +2,19 @@
 
 This is the **authoritative, ongoing development plan**. Preserve it across beta releases and future chats. The eleven areas and three-phase sequence originated in the approved application-wide optimization plan. Do not replace them with an Editor-only scope or assume a published beta certifies all its planned work.
 
-## Beta 12 candidate (not published)
+## Latest publication - v1.17.148 Beta 12
+
+Published 2026-11-01T04:49:47Z as opt-in GitHub prerelease 430369106.
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.148
+Tagged source and merged PR #23: 72d11fd8ffd5ccf719a028e7786dbc7b26868d75.
+Official Release workflow 41274392216 completed: build SUCCESS, publish SUCCESS.
+The Windows executable, portable ZIP, binary-only updater ZIP, and SHA256SUMS are published with GitHub SHA-256 metadata. Stable releases/latest remains v1.17.136.
+At publication verification, exact-source main Checks 41274392369 reported 11 successful job groups and four still running: browser-workflows107, windows-terminal, browser-editor112, browser. This is not a clean-all-checks claim. The historical 390px Editor map-motion regression was not fixed or waived. Live SFTP interruption and multi-hour physical Windows endurance acceptance remain outstanding.
+No credentials, permissions, saved settings, update installation consent, stable executable naming, or previously published release assets were changed by the scoped Beta 12 work.
+
+**Next proposed:** v1.17.149 Beta 13. Priorities: diagnose and repair the original 390px Editor comparison-motion and sidebar issue without changing the 2px acceptance threshold; validate native SFTP interruption and cancellation on controlled devices; extend multi-hour Windows endurance and simultaneous diagnostics/discovery/monitoring/capture/transfer resource checks. Preserve all eleven original areas. A beta does not imply release-candidate/stable acceptance.
+
+## Beta 12 development candidate record (historical)
 
 v1.17.148 is in development. It adds scoped SFTP cancellation guards and
 synthetic borrowed-terminal interruption tests, plus extended six-tool
@@ -13,7 +25,7 @@ See [Beta 12 handoff](RELEASE148_HANDOFF.md) and
 [reliability audit](BETA12_RELIABILITY_AUDIT.md). No beta publication
 or stable readiness is claimed by this candidate.
 
-## Latest publication - Beta 11 and next proposed Beta 12
+## Previous publication - Beta 11 and its original proposed Beta 12
 
 Published v1.17.147 Beta 11 on 2026-11-01T04:17:17Z as opt-in prerelease ID 430357367.
 Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.147

@@ -1,3 +1,17 @@
+# v1.17.148 Beta 12 - publication verified
+
+Published 2026-11-01T04:49:47Z as opt-in GitHub prerelease 430369106.
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.148
+Tagged source and merged PR #23: 72d11fd8ffd5ccf719a028e7786dbc7b26868d75.
+Official Release workflow 41274392216 completed: build SUCCESS, publish SUCCESS.
+The Windows executable, portable ZIP, binary-only updater ZIP, and SHA256SUMS are published with GitHub SHA-256 metadata. Stable releases/latest remains v1.17.136.
+At publication verification, exact-source main Checks 41274392369 reported 11 successful job groups and four still running: browser-workflows107, windows-terminal, browser-editor112, browser. This is not a clean-all-checks claim. The historical 390px Editor map-motion regression was not fixed or waived. Live SFTP interruption and multi-hour physical Windows endurance acceptance remain outstanding.
+No credentials, permissions, saved settings, update installation consent, stable executable naming, or previously published release assets were changed by the scoped Beta 12 work.
+
+Read docs/DEVELOPMENT_ROADMAP.md, docs/DEVELOPMENT_HANDOFF.md, docs/RELEASE148_HANDOFF.md and docs/BETA12_RELIABILITY_AUDIT.md before further development. Continue the original eleven-area roadmap, not only Editor or Terminal. Next proposed v1.17.149 Beta 13 should address Editor narrow-window motion/sidebar regressions, live/native SFTP interruption, and application-wide resource and physical Windows acceptance. Do not use Work mode or the user's desktop. Keep What's New user-focused and details in Additional Details.
+
+Historical candidate records remain below.
+
 # v1.17.148 Beta 12 candidate - NOT PUBLISHED
 
 Read docs/DEVELOPMENT_ROADMAP.md, docs/DEVELOPMENT_HANDOFF.md,
