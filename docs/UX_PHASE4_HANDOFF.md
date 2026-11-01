@@ -1,6 +1,6 @@
-# Phase 4: v1.18.3 Beta 3 candidate
+# Phase 4: v1.18.3 Beta 3 - published
 
-Based on published v1.18.2, implementation in branch beta/1.18.3-phase4-settings. Do not call this published until the guarded GitHub Release workflow succeeds.
+Published 2026-11-01T19:26:12Z as opt-in prerelease at https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.18.3. Source and merged PR #34: bec58aa724e1ad6b33237eb6c6a4aff783bf0c85.
 
 ## Changes
 - Searchable centralized Settings modal: General, Appearance, Terminal, Editor, Graphs, Transfers, Network, Updates and Confirmations. Existing preference controls are moved without cloning or changing persistence. Specialized controls remain in their respective tools with direct links from the matching Settings section.
@@ -9,7 +9,7 @@ Based on published v1.18.2, implementation in branch beta/1.18.3-phase4-settings
 
 ## Tests and screenshot
 Six hosted synthetic browser tests passed on https://github.com/TechSavage1989/network-toolkit/actions/runs/41335427629; includes Settings, theme, updater controls, category search, Undo, Editor and Terminal recovery and device-input protection. Phase 4 screenshot and test results are in the run artifact.
-The final version/resource guards, complete Checks matrix, guarded release build and publication still require success before publication. No physical Windows or live-device acceptance is claimed.
+The exact-source push Checks run 41340055916 completed successfully with all 15 jobs. Official release workflow 41341463401 completed build and publish successfully. Four assets with GitHub SHA-256 digests are present: Network_Toolkit.exe, Network_Toolkit_1.18.3_Portable.zip, Network_Toolkit_1.18.3_Update.zip and SHA256SUMS. Stable latest remains v1.17.136. One duplicate PR Checks run 41340062114 reported a 5.254 second 16 MiB Editor input test against the 5-second threshold and a graph range assertion; neither reproduced in the all-green primary run. These intermittencies remain for investigation and must not be represented as universal CI success. No physical Windows or live-device acceptance is claimed.
 
 ## Next
-Publish v1.18.3 Beta 3 through the approved release workflow after green source checks. Verify all four release assets, source tag, update-feed selection and stable-channel isolation. Update roadmap and handoff to published. Next UX Phase 5 is language, empty states and first-run welcome after owner approval.
+Next UX Phase 5: plain-language labels and actionable errors, helpful first-run welcome and empty states, subject to owner approval. Investigate duplicate CI variability without relaxing data-integrity or security gates; retain previous stable release and all user data.
