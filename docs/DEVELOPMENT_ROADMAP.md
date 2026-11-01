@@ -11,7 +11,7 @@
 | Phase 3 | Navigation, command palette, shortcuts and discoverability | Published v1.18.2 Beta 2 on 2026-11-01; physical Windows and live-device acceptance outstanding |
 | Phase 4 | Unified settings, confirmations and reopen tabs | Published v1.18.3 Beta 3 (2026-11-01); duplicate CI timing/graph intermittency remains under review |
 | Phase 5 | Language, empty states and first-run welcome | Development candidate v1.18.4 Beta 4 on branch beta/1.18.4-ux-phase5; CI/acceptance pending |
-| Phase 6 | Owner-approved tool consolidation | Awaiting approval |
+| Phase 6 | Owner-approved tool consolidation: Test a target, File Transfer, Terminal sidebar button removed | In development on branch beta/1.18.5-ux-phase6 (planned v1.18.5 Beta 5); see [handoff](UX_PHASE6_HANDOFF.md) |
 | After Phase 6 | UI guidelines, layout freeze and 1.18.0 stable candidate | Not started |
 
 ## Rules

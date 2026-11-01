@@ -20,7 +20,6 @@
 .session-library-heading{display:flex;align-items:center;justify-content:flex-start;gap:8px;padding:8px 10px;font-size:12px;flex-shrink:0}
 .session-library-heading>strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .session-library-heading .iconbtn{width:26px;height:26px}
-.session-library-heading [data-session-action="collapse"] svg{width:15px;height:15px}
 .terminal-sidebar-rail>#terminalSidebarVisibilityToggle{flex:0 0 auto;width:30px;height:28px;min-height:28px;margin:2px auto 3px}
 #sessionLibrarySearchGroup{flex:0 0 auto;min-width:0}
 #sessionLibrarySearch{width:calc(100% - 20px);margin:0 10px 9px;min-height:30px;font-size:11px;flex-shrink:0}

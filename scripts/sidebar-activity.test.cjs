@@ -5,7 +5,7 @@ const source=fs.readFileSync(require.resolve('../web/assets/sidebar-activity.js'
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};};
 async function flush(){for(let i=0;i<12;i++)await Promise.resolve();}
 function harness(){
- const document=makeDocument('<nav id="navigation">'+[['terminal','Terminal'],['sftp','SFTP / FTP / FTPS'],['tftp','TFTP'],['discover','Network discovery'],['capture','Packet capture'],['profiles','Saved targets']].map(([id,name])=>'<button class="nav-item" data-page="'+id+'" aria-label="'+name+'" title="'+name+'. Double-click to collapse navigation."><svg></svg><span class="nav-item-text">'+name+'</span></button>').join('')+'</nav>');
+ const document=makeDocument('<nav id="navigation">'+[['terminal','Terminal'],['sftp','File Transfer'],['discover','Network discovery'],['capture','Packet capture'],['profiles','Saved targets']].map(([id,name])=>'<button class="nav-item" data-page="'+id+'" aria-label="'+name+'" title="'+name+'. Double-click to collapse navigation."><svg></svg><span class="nav-item-text">'+name+'</span></button>').join('')+'</nav>');
  let now=0,id=0,enabled=false;const timers=new Map(),events={},calls=[];
  const context={document,console,Promise,Set,WeakMap,Date,AbortController,performance:{now:()=>now},setTimeout:(fn,delay)=>{timers.set(++id,{fn,at:now+delay});return id;},clearTimeout:key=>timers.delete(key),addEventListener:(name,fn)=>(events[name]||=[]).push(fn)};
  context.window=context;vm.runInNewContext(source,context);const api=context.NetworkToolkitSidebarActivity;
@@ -24,7 +24,7 @@ test('initial/offline and saved profiles alone do not create a request or dot; o
 test('session counts, idle listening servers and running operations update in place and last close clears',async()=>{
  const h=harness();h.enabled=true;h.init();await flush();const terminal=h.button('terminal'),label=terminal.querySelector('.nav-item-text');
  await h.respond({tools:{terminal:{connections:2},sftp:{connections:1,servers:1},tftp:{servers:1},discover:{operations:2},capture:{captures:1}}});
- assert.equal(h.dots().length,5);assert.equal(terminal.getAttribute('aria-label'),'Terminal, 2 connected sessions');assert.match(h.button('sftp').getAttribute('title'),/1 connected session; Server running/);assert.equal(terminal.querySelector('.nav-item-text'),label);
+ assert.equal(h.dots().length,4);assert.equal(terminal.getAttribute('aria-label'),'Terminal, 2 connected sessions');assert.match(h.button('sftp').getAttribute('title'),/1 connected session; 2 servers running/);assert.equal(terminal.querySelector('.nav-item-text'),label);
  const dot=terminal.querySelector('.sidebar-activity-dot');await h.tick(1000);await h.respond({tools:{terminal:{connections:1},tftp:{servers:1}}});assert.equal(terminal.querySelector('.sidebar-activity-dot'),dot);assert.match(terminal.getAttribute('aria-label'),/1 connected session$/);assert.equal(h.dots().length,2);
  await h.tick(1000);await h.respond({tools:{}});assert.equal(h.dots().length,0);assert.equal(terminal.getAttribute('aria-label'),'Terminal');assert.equal(terminal.getAttribute('title'),'Terminal. Double-click to collapse navigation.');h.api.stop();
 });
@@ -39,7 +39,7 @@ test('failed or malformed reads clear existing activity and recover only after a
 });
 test('request timeout clears a stale dot and a late response cannot revive it or overwrite newer state',async()=>{
  const h=harness();h.enabled=true;h.init();await flush();await h.respond({tools:{terminal:{connections:1}}});await h.tick(1000);const old=h.calls.at(-1);await h.tick(2500);assert.equal(h.dots().length,0);assert(old.signal.aborted);
- await h.tick(1000);await h.respond({tools:{tftp:{servers:1}}});old.resolve({tools:{terminal:{connections:99}}});await flush();assert.equal(h.dots().length,1);assert(h.button('tftp').querySelector('.sidebar-activity-dot'));assert(!h.button('terminal').querySelector('.sidebar-activity-dot'));h.api.stop();
+ await h.tick(1000);await h.respond({tools:{tftp:{servers:1}}});old.resolve({tools:{terminal:{connections:99}}});await flush();assert.equal(h.dots().length,1);assert(h.button('sftp').querySelector('.sidebar-activity-dot'));assert.match(h.button('sftp').getAttribute('aria-label'),/File Transfer, Server running/);assert(!h.button('terminal').querySelector('.sidebar-activity-dot'));h.api.stop();
 });
 test('offline/restart generation invalidates a pending response without network fanout',async()=>{
  const h=harness();h.enabled=true;h.init();await flush();const old=h.calls[0];h.enabled=false;h.api.connectionChanged();await flush();assert(old.signal.aborted);assert.equal(h.dots().length,0);

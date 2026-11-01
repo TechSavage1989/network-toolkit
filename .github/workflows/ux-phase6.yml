@@ -1,0 +1,45 @@
+name: Phase 6 UX tool consolidation
+on:
+  push:
+    branches: ['beta/1.18.5-ux-phase6']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  phase6-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install isolated Chromium
+        run: |
+          npm install --prefix "$RUNNER_TEMP/ntk-phase6" --no-audit --no-fund playwright@1.62.1
+          node "$RUNNER_TEMP/ntk-phase6/node_modules/playwright/cli.js" install --with-deps chromium
+      - name: Unit tests
+        run: node --test scripts/*.test.cjs
+      - name: Check Test a target, File Transfer, palette aliases and Terminal sidebar
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-phase6/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-phase6-results
+        run: node scripts/ux-phase6.browser.cjs
+      - name: Retest Phase 3 navigation and Phase 5 welcome with merged entries
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-phase6/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-phase6-results/regression
+        run: |
+          node scripts/ux-phase3.browser.cjs
+          node scripts/ux-phase5.browser.cjs
+      - name: Save Phase 6 screenshots and test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: phase6-ux-evidence
+          path: ${{ runner.temp }}/ntk-phase6-results
+          if-no-files-found: error
+          retention-days: 30

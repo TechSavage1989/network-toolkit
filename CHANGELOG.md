@@ -1,3 +1,9 @@
+## 1.18.5 Beta 5 - UX Phase 6 (in development)
+
+- Ping, Trace route, DNS lookup and TCP ports are combined into Test a target, with tabs that share the host and show each test's latest result.
+- SFTP, FTP/FTPS and TFTP are combined into File Transfer with a protocol picker. Former tool names remain in command search.
+- The Terminal sidebar's separate Sidebar button is removed; its tabs show and hide it.
+
 ## 1.18.4 Beta 4 - UX Phase 5 (candidate)
 
 - Added first-run welcome with quick starts, clearer diagnostic examples, and actionable error guidance.

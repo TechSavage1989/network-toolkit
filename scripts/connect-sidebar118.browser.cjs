@@ -52,13 +52,14 @@ function noConnect(calls,detached=false){
  if(detached)assert(!calls.some(c=>['/api/state','/api/credentials','/api/credential-vault'].includes(c.path)));
 }
 async function tcpIconCheck(page,id,width){
- const button=page.locator('#navigation [data-page="tcp"]'),toggle=page.locator('#mobileMenu'),original=await page.evaluate(()=>document.body.classList.contains('app-nav-collapsed')),read=async()=>button.evaluate(el=>{const s=el.querySelector('svg'),r=s.getBoundingClientRect(),style=getComputedStyle(s);return {label:el.getAttribute('aria-label'),title:el.title,path:s.querySelector('path').getAttribute('d'),width:r.width,height:r.height,stroke:style.stroke,viewBox:s.getAttribute('viewBox')};});
- if(width<=800)await toggle.click();else if(original)await toggle.click();await button.waitFor({state:'visible'});await button.scrollIntoViewIfNeeded();await settle(page);
- const expanded=await read();assert.equal(expanded.label,'TCP ports');assert.match(expanded.title,/^TCP ports/);assert.equal(expanded.path,await page.evaluate(()=>paths.tcpPorts));assert.notEqual(expanded.path,connectPath);assert.equal(expanded.viewBox,'0 0 24 24');assert(expanded.width>0&&expanded.height>0&&expanded.stroke!=='none');
- await button.screenshot({path:path.join(out,'tcp-icon124-'+id+'-expanded.png')});let collapsed=null;
- if(width>800){await toggle.click();await settle(page);collapsed=await read();assert.equal(collapsed.path,expanded.path);assert.equal(collapsed.label,'TCP ports');assert.match(collapsed.title,/^TCP ports/);assert(collapsed.width>0);await button.screenshot({path:path.join(out,'tcp-icon124-'+id+'-collapsed.png')});if(!original)await toggle.click();}
- else{await page.keyboard.press('Escape');await page.waitForFunction(()=>!document.body.classList.contains('app-nav-drawer-open'));}
- (report.tcpIcons||(report.tcpIcons=[])).push({id,expanded,collapsed});
+ // Phase 6: TCP ports is a tab in Test a target; its distinct icon moved there.
+ const previous=await page.evaluate(()=>state.activePage);await page.evaluate(()=>navigate('ping'));await settle(page);
+ const button=page.locator('.nt-target-tests [data-target-test="tcp"]');await button.waitFor({state:'visible'});
+ const expanded=await button.evaluate(el=>{const s=el.querySelector('svg'),r=s.getBoundingClientRect(),style=getComputedStyle(s);return {label:el.textContent.trim(),title:el.title,path:s.querySelector('path').getAttribute('d'),width:r.width,height:r.height,stroke:style.stroke,viewBox:s.getAttribute('viewBox')};});
+ assert.match(expanded.label,/^TCP ports/);assert.match(expanded.title,/^TCP ports/);assert.equal(expanded.path,await page.evaluate(()=>paths.tcpPorts));assert.notEqual(expanded.path,connectPath);assert.equal(expanded.viewBox,'0 0 24 24');assert(expanded.width>0&&expanded.height>0&&expanded.stroke!=='none');
+ await button.screenshot({path:path.join(out,'tcp-icon124-'+id+'-expanded.png')});
+ await page.evaluate(page=>navigate(page),previous);await settle(page);
+ (report.tcpIcons||(report.tcpIcons=[])).push({id,expanded,collapsed:null});
 }
 async function editorCase(detached,width,theme){
  const id=(detached?'detached':'main')+'-'+width+'-'+theme,preference=theme==='dark'?{panel:'connections',side:'remote',width:360,collapsed:false}:undefined,f=await start({detached,width,theme,preference}),{page}=f;

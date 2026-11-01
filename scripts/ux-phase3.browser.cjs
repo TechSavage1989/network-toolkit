@@ -41,8 +41,10 @@ const check=name=>{report.checks.push(name);console.log('PASS '+name)};
  const nav=await p.evaluate(()=>({ids:[...document.querySelectorAll('#navigation [data-page]')].map(b=>b.dataset.page),
   groups:[...document.querySelectorAll('#navigation .nav-label')].map(x=>x.textContent)}));
  assert.deepEqual(nav.groups,['Home','Diagnose','Connect','Transfer','Configure']);
- assert.equal(new Set(nav.ids).size,23);assert(nav.ids.includes('editor')&&nav.ids.includes('terminal')&&nav.ids.includes('sftp'));
- check('All 23 original tool routes retained under five approved groups');
+ // Phase 6 merged Ping/Trace route/DNS/TCP ports into Test a target and
+ // SFTP/FTP/TFTP into File Transfer; former names stay in the palette.
+ assert.equal(new Set(nav.ids).size,19);assert(nav.ids.includes('editor')&&nav.ids.includes('terminal')&&nav.ids.includes('sftp')&&nav.ids.includes('ping'));
+ check('Tool routes grouped under five approved groups with Phase 6 merged entries');
  await p.locator('#uxCommandLauncher').click();
  await p.locator('[role="dialog"][aria-label="Search tools and commands"]').waitFor();
  let count=await p.locator('#uxCommandResults [role=option]').count();
@@ -103,16 +105,14 @@ const check=name=>{report.checks.push(name);console.log('PASS '+name)};
  await p.evaluate(()=>{if(typeof setTerminalToolsOpen==='function')setTerminalToolsOpen(true,false);});
  const help=p.locator('#uxTerminalHelpLauncher');
  if(await help.count()){await help.click();await p.locator('[aria-label="Keyboard shortcuts and help"][role="dialog"]').waitFor();await p.keyboard.press('Escape');check('Terminal Tools exposes help without a keyboard shortcut');}
- const sidebarToggle=p.locator('#terminalSessionSidebar [data-session-action="collapse"]');
- if(await sidebarToggle.count()){
-  const before=await p.evaluate(()=>state.terminalSidebarCollapsed===true);
-  await sidebarToggle.click();
-  const after=await p.evaluate(()=>state.terminalSidebarCollapsed===true);
-  assert.notEqual(after,before,'Sidebar show/hide button must change the collapsed state');
-  await sidebarToggle.click();
-  assert.equal(await p.evaluate(()=>state.terminalSidebarCollapsed===true),before);
-  check('Visible Terminal sidebar button hides and restores the sidebar');
- }
+ assert.equal(await p.locator('#terminalSessionSidebar [data-session-action="collapse"]').count(),0,'Terminal sidebar has no separate Sidebar button');
+ const selectedTab=p.locator('#terminalSessionSidebar [data-session-tab][aria-selected="true"]');
+ const before=await p.evaluate(()=>state.terminalSidebarCollapsed===true);
+ await selectedTab.click();
+ assert.notEqual(await p.evaluate(()=>state.terminalSidebarCollapsed===true),before,'Selected sidebar tab must change the collapsed state');
+ await p.locator('#terminalSessionSidebar [data-session-tab="saved"]').click();
+ assert.equal(await p.evaluate(()=>state.terminalSidebarCollapsed===true),false,'Sidebar tab reopens the sidebar');
+ check('Terminal sidebar tabs hide and restore the sidebar without a separate button');
  const draftAdded=await p.evaluate(()=>{
   if(typeof terminalDraftTabs==='undefined'||!terminalDraftTabs.set)return false;
   terminalDraftTabs.set('ux-draft-session',{id:'ux-draft-session',label:'Synthetic UX draft'});

@@ -9,6 +9,7 @@ const toolGroups={overview:'Home',profiles:'Home',reports:'Home',
  monitor:'Diagnose',capture:'Diagnose',terminal:'Connect',wol:'Connect',
  sftp:'Transfer',ftp:'Transfer',tftp:'Transfer',
  local:'Configure',hosts:'Configure',subnet:'Configure',editor:'Configure'};
+const navGroup=id=>['ping','trace','dns','tcp'].includes(id)?'target':['sftp','ftp','tftp'].includes(id)?'transfer':id;
 const shortcutLabels={editor:'',terminal:'',overview:'',ping:'',trace:'',dns:''};
 const launcher=()=>doc.getElementById('uxCommandLauncher'),helpLauncher=()=>doc.getElementById('uxHelpLauncher');
 let overlay=null,input=null,results=null,items=[],selection=0,previousFocus=null,mode='';
@@ -46,9 +47,17 @@ function buttons(){
 function catalog(){
  const tools=[...doc.querySelectorAll('#navigation button[data-page]')].filter(btn=>allowedTool(btn.dataset.page)).map(btn=>{
   const id=btn.dataset.page;const name=btn.querySelector('span:not(.badge)')?.textContent?.trim()||id;
-  const keywords=id==='sftp'?'ftp ftps file transfer ssh file browser':id==='tftp'?'tftp file transfer':id==='quick'?'test a target device check':id==='trace'?'traceroute network hops':id;
+  const keywords=navGroup(id)==='transfer'?'sftp ftp ftps tftp file transfer ssh file browser':navGroup(id)==='target'?'test a target ping trace route traceroute dns lookup tcp ports':id==='tftp'?'tftp file transfer':id==='quick'?'test a target device check':id==='trace'?'traceroute network hops':id;
   return {id:'tool-'+id,label:name,group:toolGroups[id]||'Tools',shortcut:shortcutLabels[id]||'',keywords,run:()=>{if(typeof root.navigate==='function')root.navigate(id);else if(typeof navigate==='function')navigate(id);}};
  });
+  // Phase 6 merged these pages into Test a target and File Transfer. Keep each
+ // former tool name searchable and open it directly.
+ const listed=new Set(tools.map(item=>item.label.toLowerCase()));
+ const go=page=>{if(typeof root.navigate==='function')root.navigate(page);else if(typeof navigate==='function')navigate(page);};
+ for(const [page,label,keywords,parent] of [['ping','Ping','icmp echo latency packet loss','Test a target'],['trace','Trace route','traceroute tracert network hops path','Test a target'],['dns','DNS lookup','dns records nslookup dig resolve','Test a target'],['tcp','TCP ports','port check scan open closed','Test a target'],['sftp','SFTP','ssh file browser transfer','File Transfer'],['ftp','FTP / FTPS','ftps file transfer','File Transfer'],['tftp','TFTP','tftp file transfer firmware config backup','File Transfer']]){
+  if(!allowedTool(page)||listed.has(label.toLowerCase()))continue;
+  tools.push({id:'tool-alias-'+page,label,group:toolGroups[page]||'Tools',shortcut:shortcutLabels[page]||'',keywords:keywords+' '+parent.toLowerCase(),run:()=>{if(page==='sftp'&&typeof state!=='undefined')state.fileTransferProtocol='sftp';go(page);}});
+ }
  const global=[
   {id:'help',label:'Keyboard shortcuts and help',group:'Application',shortcut:'F1',run:()=>open('help')},
   {id:'welcome',label:'Welcome and quick starts',group:'Application',keywords:'getting started first run guide',run:()=>root.NetworkToolkitPhase5?.open?.(true)},
