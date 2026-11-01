@@ -1,3 +1,13 @@
+# v1.18.3 Beta 3 - publication verified (2026-11-01)
+
+Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.18.3 at 2026-11-01T19:26:12Z. Merge PR #34 source/tag bec58aa724e1ad6b33237eb6c6a4aff783bf0c85. Guarded Release workflow https://github.com/TechSavage1989/network-toolkit/actions/runs/41341463401 completed build and publish successfully. GitHub lists four assets with SHA-256 digests: Network_Toolkit.exe, Network_Toolkit_1.18.3_Portable.zip, Network_Toolkit_1.18.3_Update.zip and SHA256SUMS. Stable latest remains v1.17.136. All prior tags/assets untouched.
+
+Phase 4: searchable Settings categories with existing controls and links to specialized tool preferences; Ctrl+Shift+T safely reopens clean local Editor files and unused Terminal drafts without secrets or remote reconnection; saved-target removal supports a ten-second Undo. Preserves credentials, vault, profiles, macros, unsaved documents, live sessions, Windows/UAC reviews, SSH and overwrite security and checksum-verified user-consented portable updates. Fixed executable filename Network_Toolkit.exe; high-level What's New, technical detail in Additional Details. No desktop, personal network or physical Windows acceptance was used.
+
+Exact-source Checks https://github.com/TechSavage1989/network-toolkit/actions/runs/41340055916 passed all 15 jobs, and focused Phase 4 browser suite passed. A simultaneous duplicate PR Checks run 41340062114 reported intermittent failures: 16 MiB Editor input 5.254 seconds versus 5-second performance bound, and a graph-window point-range assertion. They were not reproduced in the primary green run but should be investigated before stable; never waive a genuine data/security failure. See docs/UX_PHASE4_HANDOFF.md and docs/UX_POLISH_PLAN.md. Next Phase 5 (language, empty states and first-run) awaits owner approval.
+
+---
+
 # v1.18.2 Beta 2 - publication verified (2026-11-01)
 
 Published as opt-in prerelease at https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.18.2 on 2026-11-01T16:47:21Z. Tagged source 8ae89ad005ac112a2ab68dfffedca628efca1d65, merged PR #31. The guarded Release workflow https://github.com/TechSavage1989/network-toolkit/actions/runs/41327840149 completed both build and publish successfully. Four official assets are present with GitHub SHA-256 digests: Network_Toolkit.exe, Network_Toolkit_1.18.2_Portable.zip, Network_Toolkit_1.18.2_Update.zip and SHA256SUMS. Stable latest is still v1.17.136; the beta release is opt-in. Older tags/assets were not changed.
