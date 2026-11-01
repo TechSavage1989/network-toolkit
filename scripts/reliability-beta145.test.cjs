@@ -48,7 +48,7 @@ test('Beta 12 alternating six-tool recovery releases retired views without losin
 });
 
 test('Beta 12 preview and Windows build metadata share the same application version',()=>{
- const version=/const Version = "([\\d.]+)"/.exec(fs.readFileSync(path.join(root,'internal/model/model.go'),'utf8'))[1];
+ const version=/const Version = "([0-9.]+)"/.exec(fs.readFileSync(path.join(root,'internal/model/model.go'),'utf8'))[1];
  const preview=JSON.parse(fs.readFileSync(path.join(root,'package.json'),'utf8')).version;
  assert.equal(preview,version,'hosted browser fixtures must not identify a stale app version');
 });
