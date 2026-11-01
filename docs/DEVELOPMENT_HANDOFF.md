@@ -1,3 +1,13 @@
+# v1.18.4 Beta 4 - Phase 5 release candidate (2026-11-01)
+
+Development branch beta/1.18.4-ux-phase5, PR #36: https://github.com/TechSavage1989/network-toolkit/pull/36 . This is a candidate until guarded publication is independently verified. Published baseline remains opt-in v1.18.3 Beta 3, stable v1.17.136. Read docs/UX_PHASE5_HANDOFF.md, docs/UX_POLISH_PLAN.md and docs/DEVELOPMENT_ROADMAP.md before proceeding.
+
+Phase 5 adds a dismissible first-run welcome with quick starts, available again through F1 Help and command search; returning existing workspaces are not interrupted. Diagnostic empty results now give examples and next steps, and failures keep original technical errors alongside plain-language retry advice. The new actions do not automatically scan, connect, transfer or change network settings. Release notes contain short user-facing What's New and technical Additional Details. Stable Network_Toolkit.exe remains unchanged, and the beta update channel requires explicit verified install approval.
+
+Preserve the original release, credentials/vault, settings, profiles, unsaved Editor content, connected Terminal sessions, permissions, UAC, host-key trust and overwrite confirmations. Never use the owner's desktop or network for builds. Hosted browser/CI and guarded version-resource validation are required before merging. Synthetic browser tests are not physical Windows or live-device acceptance. Prior intermittent Editor performance/graph regression observations remain open and must not be silently waived. Do not modify published tags or assets.
+
+---
+
 # v1.18.3 Beta 3 - publication verified (2026-11-01)
 
 Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.18.3 at 2026-11-01T19:26:12Z. Merge PR #34 source/tag bec58aa724e1ad6b33237eb6c6a4aff783bf0c85. Guarded Release workflow https://github.com/TechSavage1989/network-toolkit/actions/runs/41341463401 completed build and publish successfully. GitHub lists four assets with SHA-256 digests: Network_Toolkit.exe, Network_Toolkit_1.18.3_Portable.zip, Network_Toolkit_1.18.3_Update.zip and SHA256SUMS. Stable latest remains v1.17.136. All prior tags/assets untouched.
