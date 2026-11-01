@@ -1,6 +1,6 @@
 # Network Toolkit UX Audit - Phase 1
 
-**Status:** In progress. Source inspection complete for the initial navigation and settings inventory. Synthetic-browser screenshots and visual review are pending. No application code has been changed and no 1.18.x release has been produced.
+**Status:** UX audit review in progress, 132 screenshot captures complete and sampled. No application code has been changed and no 1.18.x release has been produced.
 
 **Authority:** [Owner UX plan](UX_POLISH_PLAN.md), which supersedes the archived eleven-area roadmap. **Approval gate:** Do not start Phase 2 or alter application behavior without the repository owner's explicit approval of this audit.
 
@@ -161,9 +161,29 @@ For every error rewrite: state **what happened** and **what the user can do next
 | 5 | 6 | Only owner-approved Test a target and File Transfer consolidation, with compatibility mapping |
 | Final | After 6 | UI guidelines, frozen layout after approval, screenshots and 1.18.0 stable candidate |
 
+## 9. Verified screenshot evidence and observed UI issues
+
+The hosted synthetic-browser capture passed with **132 screenshots** and no JavaScript page errors or missing assets. It includes every navigation tool at both 1280×800 and 1920×1080, in light and dark themes, detached Editor/Terminal views, App settings, target saving, four diagnostics option dialogs and the protected app-data deletion confirmation.
+
+[132-image audit artifact](https://github.com/TechSavage1989/network-toolkit/actions/runs/41279077691/artifacts/13071729961) (GitHub Actions attachment, retention-limited). Representative filenames below match the downloadable archive.
+
+| Evidence screenshot | Observation | Recommended phase |
+| --- | --- | --- |
+| main-1280x800-dark-ping.png | The sidebar tool list extends below the fold; common workspace tools require sidebar scrolling. Primary Start and target entry are in different areas. | 3 |
+| main-1280x800-dark-terminal.png | Before connecting, the Terminal presents several rows of controls above a good central "Start a terminal" empty state, including disabled session-only actions. Hide or defer irrelevant controls on first use. | 2, 5 |
+| main-1280x800-dark-sftp.png | File-server setup, security credentials, shared file actions and activity logs compete for space. Dense controls and narrow left-hand settings need a clearer task sequence. | 2, 6 |
+| dialog-1280x800-light-app-settings.png | App settings is one vertically scrolling modal mixing appearance, time format, report label, storage, vendor data, updates and app termination. No categories or search. | 4 |
+| dialog-1280x800-light-ping-options.png | A generic advanced-settings dialog has little actionable content for Ping, while other diagnostics show numeric limits; inconsistent information density and extra interruption. | 2, 4 |
+| dialog-1280x800-dark-data-deletion.png | App-data deletion has strong warnings, typed confirmation and a disabled destructive button until explicit input. This safety confirmation must remain. | 4, KEEP |
+| main-1920x1080-light-overview.png | Large screens give useful room to cards and results, but information and action placement vary across tools; compact controls and low-emphasis hints merit consistency review. | 2, 5 |
+
+Fixture-only limitations: the simulated host deliberately has no real adapters, sessions, captures or connected devices. Messages such as "No adapter information available", "Unavailable" and "No diagnostics yet" here are **expected fixture states**, not evidence of real-device failures. Screenshots do not demonstrate performance, Windows/UAC behavior or live connections.
+
+The owner-approved minimum widths replace narrow pixel-specific tests. The historical 390px common-row-motion CI step has been removed from the audit branch; source integrity, editing behavior and other regression checks remain active.
+
 ## Open audit work before asking for approval
 
-- Finish synthetic screenshot collection for **every** navigation tool and significant modal, both target viewport sizes and both themes. Visual inspection must identify actual issues and image references.
+- Capture additional transfer-mode, report, terminal and session-confirmation views; the existing 132 screenshots already cover every navigation page and representative major dialogs.
 - Finish comprehensive settings, confirmation and hidden-action inventories across separate JS/Go files rather than treating the lists above as exhaustive.
 - Review what appears in both detached editor and terminal windows.
 - Confirm startup/update timing behavior from existing code (the new six-hour schedule is for a later implementation phase).
