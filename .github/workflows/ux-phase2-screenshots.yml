@@ -1,0 +1,41 @@
+name: Phase 2 UX Screenshot Review
+
+on:
+  push:
+    branches: ['beta/1.18.0-phase2-visual-foundations']
+    paths:
+      - '.github/workflows/ux-phase2-screenshots.yml'
+      - 'web/assets/ux-foundations.css'
+      - 'web/index.html'
+
+permissions:
+  contents: read
+
+jobs:
+  before-after:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install isolated browser
+        run: |
+          npm install --prefix "$RUNNER_TEMP/ntk-ux-phase2" --no-audit --no-fund playwright@1.62.1
+          node "$RUNNER_TEMP/ntk-ux-phase2/node_modules/playwright/cli.js" install --with-deps chromium
+      - name: Collect actual Phase 2 production UI screenshots
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-ux-phase2/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/phase2-after
+        run: node scripts/ux-audit-screenshots.browser.cjs
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: phase2-after-screenshots
+          path: ${{ runner.temp }}/phase2-after
+          retention-days: 30
+          if-no-files-found: warn
