@@ -59,7 +59,7 @@ function catalog(){
   {id:'theme',label:'Switch light/dark theme',group:'Application',run:()=>$('#themeButton')?.click()},
   {id:'navigation',label:'Show or hide navigation',group:'Application',run:()=>root.NetworkToolkitNavigation?.toggle?.()},
  ];
- if(doc.querySelector('#terminalTabs')&&allowedTool('terminal'))global.push(
+ if((doc.body.classList.contains('terminal-page')||doc.body.classList.contains('terminal-window'))&&allowedTool('terminal'))global.push(
   {id:'new-terminal',label:'Open a new terminal tab',group:'Terminal',run:()=>{if(typeof newTerminalTab==='function')newTerminalTab();}},
   {id:'reconnect-all',label:'Reconnect all terminal sessions',group:'Terminal',run:()=>root.NetworkToolkitTerminalTabs?.requestReconnectAll?.()},
   {id:'terminal-tab-menu',label:'More actions for selected Terminal tab',group:'Terminal',run:()=>{
@@ -164,7 +164,7 @@ doc.addEventListener('keydown',event=>{
  }
 },true);
 doc.addEventListener('click',event=>{
- if(event.target.closest?.('#uxCommandLauncher')){event.preventDefault();open('commands');}
+ if(event.target.closest?.('#uxCommandLauncher,#uxCommandLauncherNarrow')){event.preventDefault();open('commands');}
  else if(event.target.closest?.('#uxHelpLauncher,#uxTerminalHelpLauncher')){event.preventDefault();open('help');}
  else if(event.target.closest?.('[data-terminal-tab-actions]')){
   event.preventDefault();event.stopImmediatePropagation();const button=event.target.closest('[data-terminal-tab-actions]');const r=button.getBoundingClientRect();root.NetworkToolkitTerminalTabs?.open?.(button.dataset.terminalTabActions,r.left,r.bottom);
