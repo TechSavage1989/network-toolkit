@@ -117,11 +117,12 @@ const pause=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {pro
       await h.advance(120000);
       await h.page.evaluate(()=>{window.dispatchEvent(new Event('focus'));document.dispatchEvent(new Event('visibilitychange'));window.dispatchEvent(new Event('online'));});
       await h.advance(100);await h.completed(1);assert.equal(h.checks,1);
-      await h.advance(6*60*60*1000+100);await h.completed(2);assert.equal(h.checks,2);
+      // Skip unrelated recurring UI timers while advancing to the real six-hour deadline.
+      await h.page.clock.fastForward(6*60*60*1000+100);await h.page.waitForTimeout(50);await h.completed(2);assert.equal(h.checks,2);
       await h.settings();await h.page.locator('[data-app-update-auto]').uncheck();
       await h.advance(100);
       await h.page.evaluate(()=>window.dispatchEvent(new Event('focus')));
-      await h.advance(6*60*60*1000+100);assert.equal(h.checks,2);
+      await h.page.clock.fastForward(6*60*60*1000+100);await h.page.waitForTimeout(50);assert.equal(h.checks,2);
     });
     await scenario('server cooldown survives focus and manual checks without losing known release',{rateAfterFirst:true},async h=>{
       await h.advance(100);assert.equal(h.checks,1);await h.settings();
