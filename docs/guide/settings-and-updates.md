@@ -8,7 +8,7 @@ Network Toolkit retains preferences, saved profiles, credentials in the credenti
 ## Updates
 Use **Check for updates** for an on-demand check. Stable updates and opt-in beta updates use separate channels. A beta must be explicitly selected. Downloading and installing updates requires user consent and package checksum verification.
 
-The approved UX plan calls for automatic **checks** at startup and every six hours during Phase 4 or another approved implementation phase. This is not a claim that the current release already implements that interval.
+Automatic **checks** run at startup and every six hours while enabled. The manual Check for updates remains available, and downloading and installing still require explicit approval.
 
 ## Safety
 Before installing and restarting, save unsaved documents and review active sessions. Updates must not silently close or discard work.

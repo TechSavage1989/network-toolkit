@@ -109,7 +109,7 @@
   function createScheduler(env){
     let timer=null,started=false,generation=0,failures=0,lastContact=null;
     let lastAttempt=0,lastResult='',lastSummary='',nextAt=0,nextKind='',running=false;
-    const normal=5*60*1000,maximumBackoff=6*60*60*1000,now=()=>env.now?.()??Date.now();
+    const normal=6*60*60*1000,maximumBackoff=6*60*60*1000,now=()=>env.now?.()??Date.now();
     const active=()=>env.active?.()!==false,notBefore=()=>Math.max(0,Number(env.notBefore?.())||0);
     const snapshot=()=>({lastAttempt,lastResult,lastSummary,nextAt,nextKind,running,failures});
     const changed=()=>env.changed?.(snapshot());
@@ -144,7 +144,7 @@
       wake(){
         // Focus, visibility and reconnect share the timer, freshness and retry gates.
         if(!started||running||!env.enabled()||!env.ready()||!active()||now()<notBefore()||nextKind==='retry')return;
-        if(lastContact!==null&&now()-lastContact<120000)return;
+        if(lastContact!==null&&now()-lastContact<normal)return;
         if(timer!==null)env.clearTimeout(timer);
         timer=null;schedule(0,generation,'check');
       },
@@ -191,7 +191,7 @@
   }
   function automaticStatusHTML(){return '<p class="help-line" data-app-update-schedule role="status" aria-live="polite">'+escape(automaticStatusText())+'</p>';}
   function renderAutomaticStatus(){const host=document.querySelector('[data-app-update-schedule]');if(host)host.textContent=automaticStatusText();}
-  function preferenceHTML(){return '<div class="setting-row"><div><div class="setting-title">Automatic update checks</div><div class="setting-desc">Check after startup, every five minutes while active, and when you return to the app. Temporary failures and service limits may delay checks. Downloads and installation always need your approval. Remind me tomorrow hides that version for 24 hours, including after reopening; App settings stays available.</div></div><input type="checkbox" aria-label="Automatically check for updates" data-app-update-auto '+(preferences().enabled!==false?'checked':'')+' '+(!preferencesLoaded?'disabled':'')+'></div>'+
+  function preferenceHTML(){return '<div class="setting-row"><div><div class="setting-title">Automatic update checks</div><div class="setting-desc">Check at startup and every six hours while the app is running. Manual checks remain available. Temporary failures and service limits may delay checks. Downloads and installation always need your approval. Remind me tomorrow hides that version for 24 hours, including after reopening; App settings stays available.</div></div><input type="checkbox" aria-label="Automatically check for updates" data-app-update-auto '+(preferences().enabled!==false?'checked':'')+' '+(!preferencesLoaded?'disabled':'')+'></div>'+
     '<div class="setting-row"><div><div class="setting-title">Beta updates (opt in)</div><div class="setting-desc">Off by default. Check for both stable and prerelease builds. Betas may contain bugs. Download and Install and restart still need your approval. Turning this off resumes stable-only checks; an installed beta stays installed until a newer stable version is available.</div></div><input type="checkbox" aria-label="Allow beta updates" data-app-update-beta '+(preferences().beta===true?'checked':'')+' '+(!preferencesLoaded?'disabled':'')+'></div>'+automaticStatusHTML();}
   function setPreferences(changes){Object.assign(preferenceChanges,changes);state.appUpdatePreferences={...preferences(),...changes};if(preferencesLoaded)saveState();else preferenceWritesPending=true;}
   function mergePreferences(value){

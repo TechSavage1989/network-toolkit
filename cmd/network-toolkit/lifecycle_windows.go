@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"strings"
 	"syscall"
 	"unsafe"
 
@@ -19,6 +20,8 @@ func runLifecycle(ctx context.Context, url, sessionToken string, stop context.Ca
 	defer stop()
 	err := desktop.Run(ctx, desktop.Config{
 		Title:                title,
+		MinWidth:             minimumDesktopWidth(title),
+		MinHeight:            minimumDesktopHeight(title),
 		RequireCloseApproval: mainEditorCloseApproval(title),
 		URL:                  url,
 		SessionToken:         sessionToken,
@@ -47,4 +50,18 @@ func replaceSettingsFile(source, target string) error {
 		return e
 	}
 	return nil
+}
+
+// Detached Terminal and Editor windows use the smaller approved minimum.
+// Keep the main diagnostics workspace at 960 by 600 logical pixels.
+func detachedDesktopTitle(title string) bool {
+	return strings.Contains(strings.ToLower(title), "terminal") || strings.Contains(strings.ToLower(title), "editor")
+}
+func minimumDesktopWidth(title string) int32 {
+	if detachedDesktopTitle(title) { return 640 }
+	return 960
+}
+func minimumDesktopHeight(title string) int32 {
+	if detachedDesktopTitle(title) { return 400 }
+	return 600
 }
