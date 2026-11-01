@@ -1,0 +1,34 @@
+/* Phase 2 UX foundations: shared roles and stable controls.
+ * These tokens are intentionally additive. Existing class names and handlers stay unchanged.
+ */
+:root {
+  --ux-space-1:4px;--ux-space-2:8px;--ux-space-3:12px;--ux-space-4:16px;--ux-space-5:20px;--ux-space-6:24px;
+  --ux-text-xs:11px;--ux-text-sm:12px;--ux-text-base:13px;--ux-text-md:15px;--ux-text-lg:19px;
+  --ux-radius-sm:6px;--ux-radius-md:9px;--ux-radius-lg:12px;
+  --ux-control-height:36px;--ux-control-height-small:30px;
+  --ux-focus:var(--accent);--ux-surface:var(--panel);--ux-surface-raised:var(--panel2);
+  --ux-text:var(--text);--ux-text-secondary:var(--muted);--ux-outline:var(--border);
+  --ux-elevation:var(--shadow);
+}
+:where(.btn,.iconbtn,.tab,.nav-item,[role="tab"],button){-webkit-tap-highlight-color:transparent}
+:where(.btn,.iconbtn,.tab,.nav-item,[role="tab"]):focus-visible{
+  outline:2px solid var(--ux-focus);outline-offset:2px;
+}
+.btn:not(.small){min-height:var(--ux-control-height);border-radius:var(--ux-radius-sm)}
+.btn.small{min-height:var(--ux-control-height-small);border-radius:var(--ux-radius-sm)}
+.iconbtn{border-radius:var(--ux-radius-sm)}
+:where(input,textarea,select):not([type="checkbox"]):not([type="radio"]){
+  border-radius:var(--ux-radius-sm);
+}
+:where(input,textarea,select):focus-visible{outline:2px solid var(--ux-focus);outline-offset:1px}
+:where(.panel,.modal,.toast){border-color:var(--ux-outline)}
+.panel,.modal{border-radius:var(--ux-radius-lg)}
+.toast{border-radius:var(--ux-radius-md);box-shadow:var(--ux-elevation)}
+:where(.tabs,[role="tablist"]){gap:var(--ux-space-2)}
+.tab,[role="tab"]{border-radius:var(--ux-radius-sm)}
+:where(.notice,.help-line,.empty,.empty-state){line-height:1.5}
+:where(button,input,select,textarea):disabled{cursor:not-allowed;opacity:.65}
+:where(.btn,.iconbtn,.tab):not(:disabled){transition:background-color .14s ease,border-color .14s ease,color .14s ease}
+@media (prefers-reduced-motion:reduce){
+  :where(.btn,.iconbtn,.tab,.toast){animation:none!important;transition:none!important}
+}
