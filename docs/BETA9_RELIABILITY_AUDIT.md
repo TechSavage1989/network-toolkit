@@ -19,9 +19,9 @@ Candidate, not published. Preserve the full original eleven-area roadmap.
 ## Resource observations
 
 `node --test scripts/reliability-beta145.test.cjs` runs 1,000 sequential snapshots
-with six concurrent synthetic tool records and 600 rows per cycle. Job/version,
-discovery and list registries return to six retained records, rather than growing
-with all 6,000 historical IDs. Measurements emitted as diagnostics include elapsed
+with six concurrent synthetic tool records and 600 rows per cycle. The synthetic job/version, discovery and list registries return to six retained
+records. Production list rendering also has pre-existing count caps; this test
+is a cleanup invariant, not a claim that all production registries were unbounded. Measurements emitted as diagnostics include elapsed
 milliseconds, process CPU user/system milliseconds, heap and RSS deltas. These are
 finite process observations, not a memory-leak proof or live network benchmark.
 One cloud sample: 60.2 ms elapsed, 71.4 ms user / 6.9 ms system CPU,
@@ -32,7 +32,14 @@ New browser fixture records Chromium TaskDuration, JSHeapUsedSize, Nodes,
 Documents and JSEventListeners before/after 80 navigation transitions, with six
 synthetic running tools, cancellation, temporary engine interruption and delayed
 shutdown response. It forbids unapproved mutations and external/device requests.
-Results pending; do not claim this fixture has passed before hosted execution.
+First candidate 61788415a6a00532672194f99d4ed7e371aa9b0b passed the hosted
+80-transition fixture on PR run 41260498266/job 124712587536 with no page errors.
+Its raw heap changed 6,234,640 -> 16,967,012 bytes and DOM nodes 1,891 -> 119,979;
+TaskDuration was 13.569118 seconds. These pre-GC values include temporary garbage
+and do not establish retained-memory growth or a leak clearance. The final fixture
+adds an explicit post-GC observation and runs unchanged tagged Beta 8 as a control,
+which must reproduce the delayed-shutdown race while the candidate must reject it.
+Final control and post-GC results are pending hosted validation.
 
 Remaining: real concurrent capture/transfer/scan/output load, physical Windows
 multi-hour working-set/CPU/latency soak, network interruption/reconnect and complete

@@ -34,7 +34,7 @@ p95/max 4.140625/4.609375 and 4.453125/4.546875; detached 3.3125/3.65625.
 The original 2px requirement is unchanged. No Editor fix or waiver is included.
 
 Local baseline JS: 1,554/1,555; the report hash mismatch came from the runtime's
-America/New_York timezone versus UTC golden bytes. All eight focused Beta 9
+America/New_York timezone versus UTC golden bytes. All nine focused Beta 9
 checks pass. Original Beta 8 fails the shutdown, stale configuration and retired
 cache assertions. The new cleanup API naturally does not exist in Beta 8.
 
@@ -46,3 +46,20 @@ Hosted exact-source browser/native Windows checks are required.
 
 No physical Windows multi-hour soak, live device benchmark, native SFTP acceptance
 closure or updater installation is claimed. Prior release assets/tags are immutable.
+
+## First-candidate hosted evidence
+
+Draft PR #20: https://github.com/TechSavage1989/network-toolkit/pull/20.
+First remote source 61788415a6a00532672194f99d4ed7e371aa9b0b has tree
+9742e8a83a5f0091a5659a41e48cc3b48280f716, verified equal to local source.
+New lifecycle browser check passed in both initial push and PR runs.
+Core/security/dependency/native isolated groups passed where completed; the broad
+browser and full Windows groups were still running at this record.
+Full local JS was 1,563/1,563 and Python 44/44; core Go, Windows cross-build and
+portable/update package verification passed. These are not native Windows claims.
+
+Artifact inspection found a pre-existing footer still displaying 1.17.138 despite
+the current version constant. Final candidate corrects both static version labels
+and adds a metadata regression (nine focused tests). Browser instrumentation now
+adds a post-GC observation and a pinned original Beta 8 shutdown negative control.
+These meaningful additions require a new exact-source CI run, not a blind rerun.

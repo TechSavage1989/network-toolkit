@@ -3,8 +3,9 @@
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const {handleEditorActivityMetadata}=require('./editor-activity-fixture.cjs');
-const root=path.resolve(__dirname,'..'),out=process.env.TOOLKIT_TEST_OUTPUT,origin='https://reliability145.toolkit.test';
-const report={passed:false,errors:[],navigation:[],metrics:[],scope:'Synthetic hosted Chromium lifecycle and CPU/heap observations, not live traffic or multi-hour Windows soak'};
+const root=path.resolve(process.env.TOOLKIT_TEST_ROOT||path.join(__dirname,'..')),out=process.env.TOOLKIT_TEST_OUTPUT,origin='https://reliability145.toolkit.test';
+const version=/const Version = "([\d.]+)"/.exec(fs.readFileSync(path.join(root,'internal/model/model.go'),'utf8'))[1];
+const report={version,passed:false,errors:[],navigation:[],metrics:[],scope:'Synthetic hosted Chromium lifecycle and CPU/heap observations, not live traffic or multi-hour Windows soak'};
 let browser,context,page,interrupted=false,delayList=false,releaseList;
 const samples=Array.from({length:300},(_,i)=>({sequence:i+1,time:new Date(Date.UTC(2026,0,1)+i*1000).toISOString(),success:true,rttMs:i%17+1,address:'192.0.2.145'}));
 const jobs=['ping','trace','dns','tcp','discover','monitor'].map((tool,i)=>({id:'synthetic-'+tool,tool,target:'192.0.2.145',status:'running',started:'2026-01-01T00:00:00Z',options:{},events:[],result:{summary:'Synthetic '+tool+' workload',data:['ping','monitor'].includes(tool)?{samples,statistics:{sent:300,received:300,lost:0,minMs:1,maxMs:17,avgMs:9}}:{}}}));
@@ -13,7 +14,7 @@ const jobs=['ping','trace','dns','tcp','discover','monitor'].map((tool,i)=>({id:
  page.on('pageerror',e=>report.errors.push(e.message));
  await context.route('**/*',async route=>{try{if(await handleEditorActivityMetadata(route,origin,report))return;const req=route.request(),url=new URL(req.url()),p=url.pathname,method=req.method();assert.equal(url.origin,origin,'No external requests');
  if(p.startsWith('/api/')){assert(method==='GET'||(p==='/api/state'&&method==='PUT')||(p==='/api/packet-captures/interfaces'&&method==='POST')||(p==='/api/jobs/synthetic-ping/cancel'&&method==='POST'),'Unexpected mutation '+method+' '+p);let data={};
- if(p==='/api/status')data={version:'1.17.145',os:'windows',arch:'amd64',system:{hostname:'SYNTHETIC-145',interfaces:[]}};
+ if(p==='/api/status')data={version,os:'windows',arch:'amd64',system:{hostname:'SYNTHETIC-145',interfaces:[]}};
  if(p==='/api/state'&&method==='GET')data={appUpdatePreferences:{enabled:false},navigationCollapsed:false};
  if(p==='/api/system')data={hostname:'SYNTHETIC-145',interfaces:[],gateways:[],dnsServers:[]};
  if(p==='/api/jobs'){if(delayList)await new Promise(r=>{releaseList=r});if(interrupted)return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'Synthetic interruption'})});data=jobs;}
@@ -46,6 +47,9 @@ const jobs=['ping','trace','dns','tcp','discover','monitor'].map((tool,i)=>({id:
  interrupted=true;await page.evaluate(()=>pollJobs());assert.equal(await page.evaluate(()=>online),false);assert.equal(await page.evaluate(()=>jobs.length),6);
  interrupted=false;await page.evaluate(()=>pollJobs());assert.equal(await page.evaluate(()=>online),true);
  await metrics('after-navigation');
- delayList=true;const pending=page.evaluate(()=>pollJobs());while(!releaseList)await new Promise(r=>setTimeout(r,10));await page.evaluate(()=>{shutDown=true;online=false;});releaseList();await pending;assert.equal(await page.evaluate(()=>online),false);report.shutdownLateResponseIgnored=true;
+ // Separate uncollected temporary DOM from retained objects; this is an observation,
+ // not a universal memory limit or a production garbage-collection change.
+ await cdp.send('HeapProfiler.collectGarbage');await metrics('after-navigation-gc');
+ delayList=true;const pending=page.evaluate(()=>pollJobs());const requestDeadline=Date.now()+20000;while(!releaseList&&Date.now()<requestDeadline)await new Promise(r=>setTimeout(r,10));assert(releaseList,'Expected held diagnostic request');await page.evaluate(()=>{shutDown=true;online=false;updateEngine();});releaseList();await pending;const revived=await page.evaluate(()=>online),expectHistoricalRace=process.env.TOOLKIT_EXPECT_SHUTDOWN_RACE==='1';assert.equal(revived,expectHistoricalRace,'Delayed reply must not revive candidate; exact historical control must reproduce the race');report.shutdownLateResponseIgnored=!revived;report.expectedHistoricalRace=expectHistoricalRace;
  assert.deepEqual(report.errors,[]);report.passed=true;
  }catch(e){report.failure=e.stack;process.exitCode=1;}finally{if(out&&page)await page.screenshot({path:path.join(out,'beta145-final.png')}).catch(()=>{});await context?.close();await browser?.close();if(out)fs.writeFileSync(path.join(out,'reliability145.json'),JSON.stringify(report,null,2));console.log(JSON.stringify(report,null,2));}})();

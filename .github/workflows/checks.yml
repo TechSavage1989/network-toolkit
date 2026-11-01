@@ -29,6 +29,18 @@ jobs:
         run: |
           npm install --prefix "$RUNNER_TEMP/ntk-reliability145" --no-audit --no-fund playwright@1.62.1
           node "$RUNNER_TEMP/ntk-reliability145/node_modules/playwright/cli.js" install --with-deps chromium
+      - name: Prepare unchanged Beta 8 browser control
+        run: |
+          git fetch --no-tags origin refs/tags/v1.17.144:refs/tags/v1.17.144
+          mkdir -p "$RUNNER_TEMP/ntk-beta144-control"
+          git archive v1.17.144 | tar -x -C "$RUNNER_TEMP/ntk-beta144-control"
+      - name: Reproduce Beta 8 delayed shutdown reply and record comparable resources
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-reliability145/node_modules/playwright
+          TOOLKIT_TEST_ROOT: ${{ runner.temp }}/ntk-beta144-control
+          TOOLKIT_EXPECT_SHUTDOWN_RACE: '1'
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-reliability145-results/beta144-control
+        run: node scripts/reliability-beta145.browser.cjs
       - name: Exercise repeated multi-tool navigation cancellation interruption and late shutdown replies
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-reliability145/node_modules/playwright
