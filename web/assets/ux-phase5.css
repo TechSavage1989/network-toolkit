@@ -1,0 +1,8 @@
+/* Phase 5 welcome uses the existing design tokens and does not cover active tools. */
+.ux-welcome{margin:12px 20px 4px;padding:18px 20px;border:1px solid var(--border);background:var(--panel);border-radius:var(--radius);box-shadow:var(--shadow)}
+.ux-welcome-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:20px}
+.ux-welcome-heading h2{font-size:18px;margin-bottom:5px}
+.ux-welcome-heading p,.ux-welcome-foot{color:var(--muted);font-size:12px}
+.ux-welcome-choices{display:flex;gap:8px;flex-wrap:wrap;margin:15px 0 10px}
+.ux-welcome-choices .btn{min-height:34px}
+@media(max-width:720px){.ux-welcome{margin:10px;padding:14px}.ux-welcome-heading{flex-direction:column;gap:9px}}

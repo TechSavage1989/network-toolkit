@@ -51,6 +51,7 @@ function catalog(){
  });
  const global=[
   {id:'help',label:'Keyboard shortcuts and help',group:'Application',shortcut:'F1',run:()=>open('help')},
+  {id:'welcome',label:'Welcome and quick starts',group:'Application',keywords:'getting started first run guide',run:()=>root.NetworkToolkitPhase5?.open?.(true)},
   {id:'palette',label:'Search tools and commands',group:'Application',shortcut:'Ctrl+Shift+P',run:()=>open('commands')},
   {id:'settings',label:'App settings',group:'Application',run:()=>$('#settingsButton')?.click()},
   {id:'restore-tab',label:'Reopen recently closed tab',group:'Application',shortcut:'Ctrl+Shift+T',run:()=>root.NetworkToolkitClosedTabs?.reopen?.()},
@@ -140,6 +141,10 @@ function open(nextMode='commands'){
    const row=make('div','ux-help-row');row.append(make('span','ux-help-description',group+' · '+label),make('kbd','',key));list.append(row);
   }
   dialog.append(info,list);
+  if(!doc.body.classList.contains('terminal-window')&&!doc.body.classList.contains('editor-window')){
+   const welcome=make('button','btn small ghost','Show welcome and quick starts');welcome.type='button';
+   welcome.addEventListener('click',()=>{close();root.NetworkToolkitPhase5?.open?.(true);});dialog.append(welcome);
+  }
  }
  overlay.append(backdrop,dialog);doc.body.append(overlay);(input||closeButton).focus({preventScroll:true});if(input)render();
  return true;

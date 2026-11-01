@@ -105,7 +105,11 @@ async function main(){
  assert.equal(await page.evaluate(()=>state.transferClientLayout.sftp.activityHeight),preference);assert.equal(Number(await divider.getAttribute('aria-valuenow')),preference);
  // A directory double-click makes exactly one list request; file double-click
  // opens a loading editor immediately and reads the selected remote path once.
- await page.locator('[data-rb-side="remote"][data-rb-item="/example/configs"]').dblclick();
+ // Scroll the target row beneath the sticky file table heading after pane resizing.
+ // Keep the real pointer double-click and the single-request assertion.
+ const remoteDirectory=page.locator('[data-rb-side="remote"][data-rb-item="/example/configs"]');
+ await remoteDirectory.evaluate(row=>row.scrollIntoView({block:'center',inline:'nearest'}));
+ await remoteDirectory.dblclick();
  await page.waitForFunction(()=>NetworkToolkitRemoteBrowser.get('ssh').remote.path==='/example/configs');assert.equal(listings(),before+1);
  const remoteFile=page.locator('[data-rb-side="remote"][data-rb-item="/example/configs/switch.cfg"]');
  const readBefore=calls.filter(x=>x.body.action==='read-text').length;
