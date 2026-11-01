@@ -21,3 +21,8 @@ Each test and protocol keeps its own engine, options, jobs, history, report iden
 - New browser test scripts/ux-phase6.browser.cjs and workflow .github/workflows/ux-phase6.yml (screenshots at 1280x800 dark and 1920x1080 light). Synthetic browser tests only, not physical Windows or live-device acceptance.
 - Updated existing tests that clicked the removed navigation entries or the removed Sidebar button.
 - Local: all Node unit tests pass; Phase 3, Phase 5, Phase 6, UI consistency, navigation and transfer layout browser tests pass.
+
+## CI evidence (2026-11-01, commit e8a1435)
+- Phase 6 workflow: https://github.com/TechSavage1989/network-toolkit/actions/runs/41350832744 passed.
+- Full Checks: https://github.com/TechSavage1989/network-toolkit/actions/runs/41350832709 passed on attempt 2. Attempt 1 failed only in `browser-workflows107` at `editor-layout-map` (Editor comparison marks). The same check also failed and then passed locally on identical code, so it is treated as the existing intermittent Editor check, not dismissed: watch it on later runs.
+- The first Phase 6 Checks run found a real bug (explicit SFTP navigation could open a remembered TFTP choice); fixed in e8a1435.
