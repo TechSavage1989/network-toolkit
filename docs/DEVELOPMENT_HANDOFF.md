@@ -1,3 +1,15 @@
+# v1.18.2 Beta 2 - publication verified (2026-11-01)
+
+Published as opt-in prerelease at https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.18.2 on 2026-11-01T16:47:21Z. Tagged source 8ae89ad005ac112a2ab68dfffedca628efca1d65, merged PR #31. The guarded Release workflow https://github.com/TechSavage1989/network-toolkit/actions/runs/41327840149 completed both build and publish successfully. Four official assets are present with GitHub SHA-256 digests: Network_Toolkit.exe, Network_Toolkit_1.18.2_Portable.zip, Network_Toolkit_1.18.2_Update.zip and SHA256SUMS. Stable latest is still v1.17.136; the beta release is opt-in. Older tags/assets were not changed.
+
+UX Phase 3 groups all 23 tools in Home/Diagnose/Connect/Transfer/Configure, adds the Ctrl+Shift+P search palette and F1 keyboard help, and exposes Terminal/Editor tab actions, Terminal sidebar Show/Hide, and File Transfer Reset panes. Existing credentials, vault, saved profiles/settings/macros, unsaved documents, active sessions, UAC/network change review and explicit verified updater approval are retained. The executable name stays Network_Toolkit.exe. What's New remains short and user-facing; implementation detail belongs under Additional Details.
+
+All 15 jobs in PR Checks https://github.com/TechSavage1989/network-toolkit/actions/runs/41326780380 passed. The exact-source hosted release build, package verification and publication passed. The main-branch Checks run https://github.com/TechSavage1989/network-toolkit/actions/runs/41327840133 was still running when this record was prepared; verify its final result. Physical Windows acceptance, real SSH/SFTP device interruption and multi-hour soak were not performed. Do not claim those validations.
+
+Next: UX Phase 4, unified searchable Settings, agreed confirmation changes, and safe reopen-closed-tabs behavior, after required owner approval. Read docs/UX_POLISH_PLAN.md (authoritative), docs/DEVELOPMENT_ROADMAP.md and docs/UX_PHASE3_HANDOFF.md before implementation. The historical eleven-area roadmap is archived at docs/archive/DEVELOPMENT_ROADMAP_PRE_UX_1.17.md, not active. Do not modify any released tag or asset.
+
+---
+
 # v1.17.150 Beta 14 - publication verified
 
 Published 2026-11-01T05:46:46Z as opt-in GitHub prerelease 430388745. Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.150
