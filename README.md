@@ -1,4 +1,18 @@
-## Latest beta - v1.17.148 Beta 12
+## Latest beta - v1.17.149 Beta 13
+
+[Download the opt-in Beta 13](https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.149).
+A connected terminal's SFTP browser now has a response timeout
+that can release a stalled file operation without disconnecting
+the interactive SSH terminal. No change to existing credentials,
+saved settings, network permissions or explicit updater consent.
+Stable latest is v1.17.136. The narrow Editor motion regression,
+native SFTP real-device interruption and physical Windows endurance
+testing remain open.
+
+[Release handoff](docs/RELEASE149_HANDOFF.md) ·
+[Eleven-area roadmap](docs/DEVELOPMENT_ROADMAP.md).
+
+## Previous beta - v1.17.148 Beta 12
 
 [Download the opt-in Beta 12](https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.148).
 More reliable SFTP cancellation and retained SSH terminal sessions, with extended synthetic multi-tool interruption testing. The original narrow Editor comparison-motion regression, real SFTP interruption and physical Windows endurance acceptance remain open. Stable latest is v1.17.136.
