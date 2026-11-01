@@ -26,6 +26,16 @@ jobs:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-phase4/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-phase4-results
         run: node scripts/ux-phase4.browser.cjs
+      - name: Test existing updater behavior under categorized Settings
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-phase4/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-phase4-results/updater
+        run: node scripts/app-updater-startup.browser.cjs
+      - name: Test native updater timers and explicit consent
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-phase4/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-phase4-results/updater-native
+        run: node scripts/app-updater-native-timers.browser.cjs
       - name: Save Phase 4 screenshot and test results
         if: always()
         uses: actions/upload-artifact@v7
