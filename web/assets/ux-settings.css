@@ -1,0 +1,11 @@
+.ux-settings-dialog .modal-body{max-height:min(72vh,780px);overflow:auto}
+.ux-settings-layout{display:grid;grid-template-columns:minmax(150px,190px) minmax(0,1fr);gap:18px;min-height:280px}
+.ux-settings-nav{display:flex;flex-direction:column;align-items:stretch;gap:5px}
+.ux-settings-nav input{width:100%;min-width:0;margin-bottom:8px}
+.ux-settings-nav button{text-align:left;justify-content:flex-start}
+.ux-settings-nav button[aria-pressed="true"]{font-weight:700;outline:1px solid currentColor}
+.ux-settings-content{min-width:0}
+.ux-settings-section>h3{margin-top:0}
+.ux-settings-section[hidden],.ux-settings-nav button[hidden]{display:none!important}
+.ux-settings-searching .ux-settings-section:not([hidden]){border-bottom:1px solid var(--border,rgba(128,128,128,.35));padding-bottom:12px;margin-bottom:12px}
+@media(max-width:700px){.ux-settings-layout{grid-template-columns:1fr}.ux-settings-nav{display:flex;flex-direction:row;flex-wrap:wrap}.ux-settings-nav input{flex:1 0 100%}}
