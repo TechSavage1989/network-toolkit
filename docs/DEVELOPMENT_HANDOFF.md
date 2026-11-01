@@ -1,3 +1,22 @@
+# v1.17.146 Beta 10 - publication verified
+
+Published 2026-11-01T02:23:08Z as opt-in GitHub prerelease ID 430315450.
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.146
+Tagged source/merged PR #21: 5debf8f4882608eef4cb27b32bdffd462386cf97.
+Exact tagged Release workflow 41264759515: Windows x64 build, JavaScript/Go/release guards, portable/update packaging and publish all succeeded.
+Four GitHub-listed assets have SHA-256 digests. Beta feed selects 1.17.146; normal stable releases/latest remains 1.17.136.
+The final Beta 10 branch Checks 41263728044 completed with 14 successful job groups and 1 failed browser-editor112 group. The original 390px map motion failure was not resolved: p95 common-row offsets 4.140625, 4.453125, 3.3125 CSS pixels in three cases versus an unchanged 2px threshold, matching Beta 9. No CI waiver, stable promotion or physical Windows/native SFTP interruption acceptance is claimed.
+Credentials, saved settings, network permissions, source document integrity, stable Network_Toolkit.exe naming, opt-in beta selection and explicit update install consent are preserved.
+No previous tag, published release body or asset was replaced.
+
+## What changed and what remains
+
+The Editor's painted-row calibration uses a median of at least three matching source rows so a single briefly displaced line cannot dominate the peer correction. Existing one/two-row behavior remains. A focused regression test passed, as did core, security, native review and Windows compilation tests. The hosted 390px continuous-motion regression remains unchanged. No underlying document content, selection/undo, network configuration, transfer permission or updater behavior was intentionally modified.
+
+Next proposed Beta 11: diagnose remaining comparison-motion and sidebar alignment; assess native SFTP cancellation and interruption under authorized test environments; extend concurrent tool/long-duration memory and CPU/latency checks across all eleven areas. Physical Windows device validation and full release-candidate criteria remain pending. Do not assume all beta acceptance is complete.
+
+All earlier Beta 9 publication and historical candidate records below are preserved for future chats.
+
 # v1.17.146 Beta 10 - candidate with exact-source checks
 
 Application version, native Windows resources and release notes are prepared. All core/JS/security/native review and compilation checks passed. Browser-editor112 still reports the same 390px comparison motion offsets seen in Beta 9, beyond the unchanged 2px threshold. Two other hosted browser integration groups were still pending at the candidate decision. No stable promotion or physical Windows/SFTP certification is asserted. Follow docs/RELEASE146_HANDOFF.md and docs/DEVELOPMENT_ROADMAP.md. Beta 9 publication closure below is retained without alteration.

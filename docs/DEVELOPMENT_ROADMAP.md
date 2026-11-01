@@ -2,11 +2,24 @@
 
 This is the **authoritative, ongoing development plan**. Preserve it across beta releases and future chats. The eleven areas and three-phase sequence originated in the approved application-wide optimization plan. Do not replace them with an Editor-only scope or assume a published beta certifies all its planned work.
 
-## Current Beta 10 candidate and extended acceptance
+## Latest publication and next development - Beta 10
+
+Published 2026-11-01T02:23:08Z as opt-in GitHub prerelease ID 430315450.
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.146
+Tagged source/merged PR #21: 5debf8f4882608eef4cb27b32bdffd462386cf97.
+Exact tagged Release workflow 41264759515: Windows x64 build, JavaScript/Go/release guards, portable/update packaging and publish all succeeded.
+Four GitHub-listed assets have SHA-256 digests. Beta feed selects 1.17.146; normal stable releases/latest remains 1.17.136.
+The final Beta 10 branch Checks 41263728044 completed with 14 successful job groups and 1 failed browser-editor112 group. The original 390px map motion failure was not resolved: p95 common-row offsets 4.140625, 4.453125, 3.3125 CSS pixels in three cases versus an unchanged 2px threshold, matching Beta 9. No CI waiver, stable promotion or physical Windows/native SFTP interruption acceptance is claimed.
+Credentials, saved settings, network permissions, source document integrity, stable Network_Toolkit.exe naming, opt-in beta selection and explicit update install consent are preserved.
+No previous tag, published release body or asset was replaced.
+
+**Next proposed:** v1.17.147 Beta 11, subject to actual validation. Focus on the unresolved Editor 390px comparison motion/sidebar geometry, SFTP interruption/cancellation behavior and application-wide long-running concurrent workflows and resource use. Preserve the original eleven areas and continue recording per-area improved/deferred/unmeasured status. Release candidate and stable are not automatic; physical Windows and live-device acceptance remain required.
+
+## Beta 10 candidate review (historical)
 
 v1.17.146 adds a bounded Editor matched-row median correction and its regression test. Native resources, source version and user-facing release notes are updated. GitHub core/JavaScript/release guard, native review, security and Windows compilation passed. The historical 390px map-motion deviation remains at the Beta 9 offsets, so this beta is not a verified fix for it. Native SFTP interruption and physical Windows endurance remain outstanding. Continue the full original eleven-area roadmap below. See [Beta 10 handoff](RELEASE146_HANDOFF.md).
 
-## Current publication and continuation - Beta 9
+## Prior publication and continuation - Beta 9
 
 v1.17.145 published 2026-11-01T01:47:19Z as an opt-in prerelease from
 84c3c53d5c2dcdee13fd04842fafa5c8693679d2; public assets and channels verified.
@@ -15,7 +28,7 @@ resource/lifecycle evidence: [handoff](RELEASE145_HANDOFF.md),
 [audit](BETA9_RELIABILITY_AUDIT.md). Candidate CI: 14 successful groups and
 one unchanged failed Editor motion group. Not all CI is green or stable-ready.
 
-**Next proposed:** v1.17.146 Beta 10 (not started), further extended concurrent
+**Historical next step:** v1.17.146 Beta 10 (now published), further extended concurrent
 operation/native interruption/repeated-window checks across all eleven areas,
 plus diagnosis of remaining Editor motion/sidebar/alignment defects. Physical
 Windows multi-hour/live-device and native SFTP acceptance remain open.
@@ -45,7 +58,7 @@ failure and physical Windows/native SFTP acceptance gaps.
 - Latest stable when created: v1.17.136.
 - Completed next phase: v1.17.144 Beta 8, published as opt-in prerelease, with measured shared-results/discovery/monitoring/report/UI improvements; full eleven-area and live-Windows certification remains incomplete.
 - Current published phase: v1.17.145 Beta 9, scoped finite concurrent lifecycle reliability; full acceptance remains pending.
-- Proposed next: v1.17.146 Beta 10, further concurrent/native reliability and unresolved Editor diagnosis.
+- Latest published beta: v1.17.146 Beta 10; next proposed v1.17.147 Beta 11 for broader native and application-wide acceptance.
 - Release candidate and stable promotion are determined by validation, not a fixed release schedule. Additional betas are acceptable.
 - In every new chat, **recheck** GitHub branch, release, CI, version metadata and newest handoff. Versions above are a snapshot, not permanent claims.
 

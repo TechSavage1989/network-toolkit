@@ -1,4 +1,10 @@
-## Latest beta - v1.17.145 Beta 9
+## Latest beta - v1.17.146 Beta 10
+
+[Download the opt-in Beta 10](https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.146).
+File comparison scroll alignment now resists an isolated briefly shifted source line when several matched rows are visible. The original narrow 390px continuous-motion regression remains open, so this is not stable certification. All eleven roadmap areas remain active. Credentials, permissions, saved settings, stable Windows executable naming and explicit beta update consent stay unchanged. Stable latest remains v1.17.136.
+[Release handoff](docs/RELEASE146_HANDOFF.md) · [Eleven-area roadmap](docs/DEVELOPMENT_ROADMAP.md).
+
+## Previous beta - v1.17.145 Beta 9
 
 [Download the opt-in beta](https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.145).
 Improves shutdown/stale-response handling and retired diagnostic data cleanup;

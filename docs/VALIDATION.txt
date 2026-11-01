@@ -1,3 +1,7 @@
+CURRENT v1.17.146 BETA 10 - 2026-11-01
+Published opt-in beta https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.146
+Exact tagged source 5debf8f4882608eef4cb27b32bdffd462386cf97, release workflow 41264759515 build and publish SUCCESS; four GitHub-listed assets verified by reported SHA-256 metadata and release package checks. Beta feed includes 1.17.146; stable latest remains 1.17.136. Branch Checks 41263728044: 14 pass, 1 unchanged browser-editor112 390px motion failure, original 2px requirement retained. No physical Windows soak, live-device test or native SFTP interruption acceptance. No independent public-byte rehash in this session. Full evidence: docs/RELEASE146_HANDOFF.md. Older records remain historical.
+
 CURRENT v1.17.145 BETA 9 - 2026-11-01
 Public prerelease and four downloaded assets verified. Exact candidate CI:
 14 successful job groups, one unchanged historical Editor motion failure.

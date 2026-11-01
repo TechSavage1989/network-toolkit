@@ -1,3 +1,18 @@
+# v1.17.146 Beta 10 - published; preserve all eleven areas
+
+Published 2026-11-01T02:23:08Z as opt-in GitHub prerelease ID 430315450.
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.146
+Tagged source/merged PR #21: 5debf8f4882608eef4cb27b32bdffd462386cf97.
+Exact tagged Release workflow 41264759515: Windows x64 build, JavaScript/Go/release guards, portable/update packaging and publish all succeeded.
+Four GitHub-listed assets have SHA-256 digests. Beta feed selects 1.17.146; normal stable releases/latest remains 1.17.136.
+The final Beta 10 branch Checks 41263728044 completed with 14 successful job groups and 1 failed browser-editor112 group. The original 390px map motion failure was not resolved: p95 common-row offsets 4.140625, 4.453125, 3.3125 CSS pixels in three cases versus an unchanged 2px threshold, matching Beta 9. No CI waiver, stable promotion or physical Windows/native SFTP interruption acceptance is claimed.
+Credentials, saved settings, network permissions, source document integrity, stable Network_Toolkit.exe naming, opt-in beta selection and explicit update install consent are preserved.
+No previous tag, published release body or asset was replaced.
+
+Continue the original eleven-area roadmap in docs/DEVELOPMENT_ROADMAP.md. Read docs/DEVELOPMENT_HANDOFF.md and docs/RELEASE146_HANDOFF.md before edits. Next proposed Beta 11 should focus on unresolved Editor motion/sidebar, native SFTP interruption and application-wide simultaneous operation and endurance, not one tool alone. Future release What's New stays high-level and user-focused, while technical details go under Additional Details. Do not use the user's desktop.
+
+Historical candidate/publication records follow without altering previous release evidence.
+
 # v1.17.146 Beta 10 - verified candidate for opt-in release
 
 Beta 10 reduces sensitivity of Editor comparison alignment to one briefly displaced source row. GitHub source tests and Windows x64 compilation passed; the historical 390px Editor map-motion check still fails at unchanged measured offsets. Stable remains v1.17.136 and Beta 9 v1.17.145 is published. Read docs/DEVELOPMENT_ROADMAP.md and docs/RELEASE146_HANDOFF.md. Preserve the original eleven areas, settings, credentials, network permissions, stable executable name, and explicit beta updater consent. No physical Windows or native SFTP acceptance is claimed. No earlier tag or release asset is replaced.
