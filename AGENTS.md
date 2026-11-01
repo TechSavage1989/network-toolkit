@@ -1,3 +1,7 @@
+# v1.17.146 Beta 10 - verified candidate for opt-in release
+
+Beta 10 reduces sensitivity of Editor comparison alignment to one briefly displaced source row. GitHub source tests and Windows x64 compilation passed; the historical 390px Editor map-motion check still fails at unchanged measured offsets. Stable remains v1.17.136 and Beta 9 v1.17.145 is published. Read docs/DEVELOPMENT_ROADMAP.md and docs/RELEASE146_HANDOFF.md. Preserve the original eleven areas, settings, credentials, network permissions, stable executable name, and explicit beta updater consent. No physical Windows or native SFTP acceptance is claimed. No earlier tag or release asset is replaced.
+
 # v1.17.145 Beta 9 - published and public downloads verified
 
 Published 2026-11-01T01:47:19Z as opt-in prerelease 430302210:

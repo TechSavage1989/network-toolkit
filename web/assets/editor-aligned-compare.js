@@ -43,13 +43,20 @@ function renderedPeerOffset(views,lookup,sourceSide){
   const bounds=line.getBoundingClientRect(),row=lookup[peerSide][Number(line.dataset.sourceLine)];
   if(Number.isInteger(row)&&bounds.bottom>peerViewport.top+1&&bounds.top<peerViewport.bottom-1)peerRows.set(row,bounds.top);
  }
+ const offsets=[];
  for(const line of source.contentDOM.querySelectorAll('.cm-line[data-source-line]')){
   const bounds=line.getBoundingClientRect(),row=lookup[sourceSide][Number(line.dataset.sourceLine)];
   if(!Number.isInteger(row)||bounds.bottom<=sourceViewport.top+1||bounds.top>=sourceViewport.bottom-1||!peerRows.has(row))continue;
   const difference=peerRows.get(row)-bounds.top;
-  if(Number.isFinite(difference))return difference;
+  if(Number.isFinite(difference))offsets.push(difference);
  }
- return null;
+ if(!offsets.length)return null;
+ // A single partly painted wrapped line can have a transient offset during
+ // narrow-pane scroll gestures. Prefer the median of at least three matched
+ // comparison rows; keep the original single/paired-row behavior.
+ if(offsets.length<3)return offsets[0];
+ offsets.sort((a,b)=>a-b);
+ return offsets[Math.floor(offsets.length/2)];
 }
 function nextPaintedOffset(previous,delta){return Number.isFinite(delta)&&Math.abs(delta)>.75&&Math.abs(delta)<=12?clamp(previous+delta,-12,12):previous;}
 function createScrollReconciler(schedule,read,write,complete=()=>{}){

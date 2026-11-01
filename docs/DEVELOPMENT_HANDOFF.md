@@ -1,3 +1,7 @@
+# v1.17.146 Beta 10 - candidate with exact-source checks
+
+Application version, native Windows resources and release notes are prepared. All core/JS/security/native review and compilation checks passed. Browser-editor112 still reports the same 390px comparison motion offsets seen in Beta 9, beyond the unchanged 2px threshold. Two other hosted browser integration groups were still pending at the candidate decision. No stable promotion or physical Windows/SFTP certification is asserted. Follow docs/RELEASE146_HANDOFF.md and docs/DEVELOPMENT_ROADMAP.md. Beta 9 publication closure below is retained without alteration.
+
 # v1.17.145 Beta 9 - published and public downloads verified
 
 Published 2026-11-01T01:47:19Z as opt-in prerelease 430302210:

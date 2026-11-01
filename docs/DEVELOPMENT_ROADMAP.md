@@ -2,6 +2,10 @@
 
 This is the **authoritative, ongoing development plan**. Preserve it across beta releases and future chats. The eleven areas and three-phase sequence originated in the approved application-wide optimization plan. Do not replace them with an Editor-only scope or assume a published beta certifies all its planned work.
 
+## Current Beta 10 candidate and extended acceptance
+
+v1.17.146 adds a bounded Editor matched-row median correction and its regression test. Native resources, source version and user-facing release notes are updated. GitHub core/JavaScript/release guard, native review, security and Windows compilation passed. The historical 390px map-motion deviation remains at the Beta 9 offsets, so this beta is not a verified fix for it. Native SFTP interruption and physical Windows endurance remain outstanding. Continue the full original eleven-area roadmap below. See [Beta 10 handoff](RELEASE146_HANDOFF.md).
+
 ## Current publication and continuation - Beta 9
 
 v1.17.145 published 2026-11-01T01:47:19Z as an opt-in prerelease from
