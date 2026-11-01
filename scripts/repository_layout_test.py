@@ -15,7 +15,7 @@ def misplaced_root_sources(root):
                                          or path.suffix == '.syso'))
 
 
-ALLOWED_ROOT = {'go.mod', 'assets', 'BUILD_WINDOWS.cmd', 'Setup_GitHub.cmd', '.github', 'Open_Terminal.cmd', 'cmd', 'vendor', 'go.sum', 'AGENTS.md', 'package.json', 'resources.go', 'Publish_Update.cmd', 'README.md', 'build.sh', 'web', 'internal', 'scripts', 'themes', '.gitignore', 'docs'}
+ALLOWED_ROOT = {'go.mod', 'assets', 'BUILD_WINDOWS.cmd', 'Setup_GitHub.cmd', '.github', 'Open_Terminal.cmd', 'cmd', 'vendor', 'go.sum', 'AGENTS.md', 'package.json', 'resources.go', 'Publish_Update.cmd', 'README.md', 'CHANGELOG.md', 'build.sh', 'web', 'internal', 'scripts', 'themes', '.gitignore', 'docs'}
 
 
 def unexpected_root(paths, version):

@@ -5,8 +5,8 @@
 ## Current status
 | Stage | Scope | Status |
 | --- | --- | --- |
-| Phase 0 | Documentation reset and authoritative UX plan | In progress, documentation-only |
-| Phase 1 | Comprehensive UI audit, screenshots and owner approval | Not started |
+| Phase 0 | Documentation reset and authoritative UX plan | Complete, no release |
+| Phase 1 | Comprehensive UI audit, screenshots and owner approval | Audit documented and screenshots captured; owner approval pending |
 | Phase 2 | Shared visual foundations and native minimum window dimensions | Awaiting approval |
 | Phase 3 | Navigation, command palette, shortcuts and discoverability | Awaiting approval |
 | Phase 4 | Unified settings, confirmations and reopen tabs | Awaiting approval |

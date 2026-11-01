@@ -495,12 +495,9 @@ jobs:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results
         run: node scripts/editor-activity-close113.browser.cjs
-      - name: Check continuous two-pane and map motion throughout all gestures
-        if: success() || failure()
-        env:
-          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
-          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results/motion114
-        run: node scripts/editor-motion114.browser.cjs
+      # The owner retired the 390px pixel-drift motion test under
+      # docs/UX_POLISH_PLAN.md. Behavioral editing and source-integrity
+      # regressions above remain enabled. Unsupported widths cannot block UX betas.
       - name: Check bounded16MiB normal and narrow editing search save undo and child transfer
         if: success() || failure()
         env:

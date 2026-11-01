@@ -1,0 +1,39 @@
+name: UX Phase 1 Screenshot Audit
+
+on:
+  push:
+    branches: ['docs/ux-phase1-audit']
+    paths:
+      - '.github/workflows/ux-audit-screenshots.yml'
+      - 'scripts/ux-audit-screenshots.browser.cjs'
+
+permissions:
+  contents: read
+
+jobs:
+  screenshots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install isolated Playwright browser
+        run: |
+          npm install --prefix "$RUNNER_TEMP/ntk-ux-audit" --no-audit --no-fund playwright@1.62.1
+          node "$RUNNER_TEMP/ntk-ux-audit/node_modules/playwright/cli.js" install --with-deps chromium
+      - name: Capture all main tools and selected dialogs in both themes and sizes
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-ux-audit/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-ux-audit-images
+        run: node scripts/ux-audit-screenshots.browser.cjs
+      - name: Upload screenshots and audit report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ux-audit-phase1-screenshots
+          path: ${{ runner.temp }}/ntk-ux-audit-images/
+          if-no-files-found: warn
+          retention-days: 30
