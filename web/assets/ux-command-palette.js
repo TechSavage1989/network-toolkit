@@ -166,6 +166,11 @@ doc.addEventListener('keydown',event=>{
 doc.addEventListener('click',event=>{
  if(event.target.closest?.('#uxCommandLauncher,#uxCommandLauncherNarrow')){event.preventDefault();open('commands');}
  else if(event.target.closest?.('#uxHelpLauncher,#uxTerminalHelpLauncher')){event.preventDefault();open('help');}
+ else if(event.target.closest?.('[data-ed-tab-actions]')){
+  event.preventDefault();event.stopImmediatePropagation();
+  const button=event.target.closest('[data-ed-tab-actions]');
+  root.NetworkToolkitFileEditor?.openTabActions?.(button.dataset.edTabActions);
+ }
  else if(event.target.closest?.('[data-terminal-tab-actions]')){
   event.preventDefault();event.stopImmediatePropagation();const button=event.target.closest('[data-terminal-tab-actions]');const r=button.getBoundingClientRect();root.NetworkToolkitTerminalTabs?.open?.(button.dataset.terminalTabActions,r.left,r.bottom);
  }
