@@ -13,7 +13,7 @@ const pass=text=>{report.checks.push(text);console.log('PASS '+text);};
 const picker=()=>page.locator('[data-color-picker]'),hex=()=>page.locator('[data-color-value="hex"]');
 async function shot(name){if(!out)return;const file='color-picker-'+name+'.png';await page.screenshot({path:path.join(out,file),fullPage:true});report.screenshots.push(file);}
 async function flush(){await page.evaluate(async()=>{saveState();await flushState();await stateWrites;});}
-async function openAccent(){await page.evaluate(()=>appSettings());await page.locator('#appAccentColor').click();await picker().waitFor();}
+async function openAccent(){await page.evaluate(()=>appSettings());await page.locator('[data-settings-section="appearance"]').click();await page.locator('#appAccentColor').click();await picker().waitFor();}
 async function dismiss(){await page.keyboard.press('Escape');await picker().waitFor({state:'detached'});}
 async function startup(){await page.goto(origin+'/');await page.waitForFunction(()=>__networkToolkitStartupState===1&&online);await page.waitForFunction(()=>[...document.images].every(image=>image.complete&&image.naturalWidth>0));assert(await page.evaluate(()=>!!window.NetworkToolkitColorPicker),'Final app must load shared picker');}
 async function noOverflow(){const bounds=await picker().evaluate(el=>{const r=el.getBoundingClientRect(),body=el.querySelector('.ntk-color-body');return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:innerWidth,height:innerHeight,overflow:body.scrollWidth>body.clientWidth+1};});assert(bounds.left>=0&&bounds.right<=bounds.width+1&&bounds.top>=0&&bounds.bottom<=bounds.height+1,JSON.stringify(bounds));assert.equal(bounds.overflow,false,'Dialog body must not overflow horizontally');}

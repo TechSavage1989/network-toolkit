@@ -104,6 +104,7 @@ async function popupBounds(locator,label){
 
 async function chooseTimestamp({hourFormat='24',zoneMode='local',timeZone='UTC'}){
  await openAppSettings(page);
+ await page.locator('[data-settings-section="appearance"]').click();
  await page.locator('#settingsTimeFormat').selectOption(hourFormat);
  await page.locator('#settingsTimeZoneMode').selectOption(zoneMode);
  if(zoneMode==='named'){
