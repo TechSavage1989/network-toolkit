@@ -1,5 +1,13 @@
 # Network Toolkit Change History
 
+## 1.18.3 Beta 3
+
+- Searchable Settings window with General, Appearance, Terminal, Editor, Graphs, Transfers, Network, Updates and Confirmations categories, preserving existing preferences.
+- Direct links from settings categories to existing tool-specific controls.
+- Ctrl+Shift+T reopens eligible clean local Editor files and unused Terminal tabs without storing secrets or restarting live sessions.
+- Saved target deletion offers Undo, restoring the complete record unless its identifier has been reused.
+- Existing network authorization, unsaved-work safeguards, vault protections and verified updater approvals stay intact.
+
 ## 1.18.2 Beta 2
 
 - Tools grouped into Home, Diagnose, Connect, Transfer and Configure.

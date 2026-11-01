@@ -9,7 +9,7 @@
 | Phase 1 | Comprehensive UI audit, screenshots and owner approval | Approved by repository owner; complete |
 | Phase 2 | Shared visual foundations and native minimum window dimensions | Published v1.18.1 Beta 1; native Editor test follow-up outstanding |
 | Phase 3 | Navigation, command palette, shortcuts and discoverability | Published v1.18.2 Beta 2 on 2026-11-01; physical Windows and live-device acceptance outstanding |
-| Phase 4 | Unified settings, confirmations and reopen tabs | Awaiting approval |
+| Phase 4 | Unified settings, confirmations and reopen tabs | Approved; v1.18.3 Beta 3 candidate in validation |
 | Phase 5 | Language, empty states and first-run welcome | Awaiting approval |
 | Phase 6 | Owner-approved tool consolidation | Awaiting approval |
 | After Phase 6 | UI guidelines, layout freeze and 1.18.0 stable candidate | Not started |
