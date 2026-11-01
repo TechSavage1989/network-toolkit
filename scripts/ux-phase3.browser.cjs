@@ -94,11 +94,39 @@ const check=name=>{report.checks.push(name);console.log('PASS '+name)};
  const doc=await p.evaluate(()=>[...NetworkToolkitFileEditor.documents.values()].find(d=>d.id==='ux-doc-one')?.content);
  assert.equal(doc,'Synthetic editor text');
  check('Editor tab has visible actions without changing unsaved document bytes');
+ await p.evaluate(()=>navigate('sftp'));await settle(p);
+ const resetPanes=p.locator('[data-fm-action="reset-layout"]');
+ if(await resetPanes.count()&&await resetPanes.isVisible()){await resetPanes.click();check('File Transfer exposes a visible pane reset without a double-click');}
+ else check('File Transfer reset remains available when a file browser is open');
  await p.evaluate(()=>navigate('terminal'));await settle(p);
  // The real page contains a visible Help button inside Terminal tools.
  await p.evaluate(()=>{if(typeof setTerminalToolsOpen==='function')setTerminalToolsOpen(true,false);});
  const help=p.locator('#uxTerminalHelpLauncher');
  if(await help.count()){await help.click();await p.locator('[aria-label="Keyboard shortcuts and help"][role="dialog"]').waitFor();await p.keyboard.press('Escape');check('Terminal Tools exposes help without a keyboard shortcut');}
+ const sidebarToggle=p.locator('#terminalSessionSidebar [data-session-action="collapse"]');
+ if(await sidebarToggle.count()){
+  const before=await p.evaluate(()=>state.terminalSidebarCollapsed===true);
+  await sidebarToggle.click();
+  const after=await p.evaluate(()=>state.terminalSidebarCollapsed===true);
+  assert.notEqual(after,before,'Sidebar show/hide button must change the collapsed state');
+  await sidebarToggle.click();
+  assert.equal(await p.evaluate(()=>state.terminalSidebarCollapsed===true),before);
+  check('Visible Terminal sidebar button hides and restores the sidebar');
+ }
+ const draftAdded=await p.evaluate(()=>{
+  if(typeof terminalDraftTabs==='undefined'||!terminalDraftTabs.set)return false;
+  terminalDraftTabs.set('ux-draft-session',{id:'ux-draft-session',label:'Synthetic UX draft'});
+  terminalTabsSignature='';renderTerminalChrome();return true;
+ });
+ if(draftAdded){
+  const tabMenu=p.locator('[data-terminal-tab-actions="ux-draft-session"]');
+  await tabMenu.waitFor();
+  await tabMenu.click();
+  assert.match(await p.locator('#terminalTabContextMenu').innerText(),/Move tab left/);
+  await p.keyboard.press('Escape');
+  await p.evaluate(()=>{terminalDraftTabs.delete('ux-draft-session');terminalTabsSignature='';renderTerminalChrome();});
+  check('Visible Terminal tab menu exposes reorder without connecting a device');
+ }
  if(report.errors.length||report.assetFailures.length)throw Error(JSON.stringify(report));
  await p.screenshot({path:path.join(out,'phase3-navigation.png')});report.screenshots.push('phase3-navigation.png');
  await context.close();
