@@ -175,11 +175,20 @@ func (c *wireSFTP) exchange(send func() error) (byte, []byte, error) {
 		return c.recv()
 	}
 	var expired atomic.Bool
+	var active atomic.Bool
+	active.Store(true)
 	timer := time.AfterFunc(c.timeout, func() {
-		expired.Store(true)
-		c.abort()
+		// A response that already finished must never be closed by a late
+		// timer callback, even if the callback was scheduled before Stop.
+		if active.CompareAndSwap(true, false) {
+			expired.Store(true)
+			c.abort()
+		}
 	})
-	defer timer.Stop()
+	defer func() {
+		active.Store(false)
+		timer.Stop()
+	}()
 	if err := send(); err != nil {
 		if expired.Load() { return 0, nil, context.DeadlineExceeded }
 		return 0, nil, err

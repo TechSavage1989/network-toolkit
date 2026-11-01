@@ -1,3 +1,7 @@
+# Beta 14 candidate status (v1.17.150, NOT PUBLISHED)
+
+SFTP successful-response timeout cleanup hardened with a repeated regression test. The approved eleven-area performance, UI and reliability roadmap below remains authoritative. The 390px Editor continuous-map motion 2px acceptance criterion, live-device transfer interruptions and multi-hour Windows endurance remain open. See docs/RELEASE150_HANDOFF.md; no stable certification or general performance claim.
+
 # Network Toolkit - Persistent Development Roadmap
 
 This is the **authoritative, ongoing development plan**. Preserve it across beta releases and future chats. The eleven areas and three-phase sequence originated in the approved application-wide optimization plan. Do not replace them with an Editor-only scope or assume a published beta certifies all its planned work.
