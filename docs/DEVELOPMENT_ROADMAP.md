@@ -7,7 +7,7 @@
 | --- | --- | --- |
 | Phase 0 | Documentation reset and authoritative UX plan | Complete, no release |
 | Phase 1 | Comprehensive UI audit, screenshots and owner approval | Approved by repository owner; complete |
-| Phase 2 | Shared visual foundations and native minimum window dimensions | Implementation in progress |
+| Phase 2 | Shared visual foundations and native minimum window dimensions | Implementation candidate prepared; release validation pending |
 | Phase 3 | Navigation, command palette, shortcuts and discoverability | Awaiting approval |
 | Phase 4 | Unified settings, confirmations and reopen tabs | Awaiting approval |
 | Phase 5 | Language, empty states and first-run welcome | Awaiting approval |
