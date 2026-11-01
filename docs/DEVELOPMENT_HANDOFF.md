@@ -1,3 +1,27 @@
+# v1.17.149 Beta 13 - publication verified
+
+Published v1.17.149 Beta 13 on 2026-11-01T05:06:03Z as opt-in prerelease 430374696.
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.149
+Tagged source and merged PR #24: bf76d7506393d4a1902c55656a5490897abf8922.
+Release workflow 41275438541: build SUCCESS and publish SUCCESS. Four official assets with GitHub SHA-256 digests. Normal stable releases/latest remains v1.17.136.
+A borrowed-terminal SFTP request now has a per-response timeout: an unresponsive SFTP channel closes without closing the parent SSH terminal, and the next file request has a fresh timeout. The focused synthetic SSH test passed in hosted Windows CI. Existing credentials, settings, permissions, network targets, terminal ownership, stable Network_Toolkit.exe and updater consent remain unchanged.
+At publication verification, 11 candidate Checks job groups had passed and four browser/Windows groups remained pending. The historical 390px Editor motion test and physical Windows/live-device SFTP acceptance remain open. Prior release tags and assets were not changed.
+
+## Test evidence and next steps
+
+Focused shared SFTP timeout and shell continuity passed hosted Windows
+CI. Release Go/JavaScript tests, version/resource checks, Windows build
+and portable/update ZIP packaging passed. Four longer browser/Windows
+integration groups were still running at the time of the release check;
+no claim that all CI is green. The Editor 390px map-motion threshold
+remains 2 CSS pixels, and its previous 3-5 pixel failure was not fixed.
+No real-device SFTP outage or physical Windows multi-hour soak was
+performed. Read docs/RELEASE149_HANDOFF.md and the eleven-area
+development roadmap. Next proposed Beta 14 v1.17.150 should address
+the outstanding Editor, native transfer and physical endurance work.
+
+Previous handoff entries follow unchanged.
+
 # v1.17.149 Beta 13 - candidate, NOT PUBLISHED
 
 Published beta v1.17.148; stable v1.17.136. Development branch
