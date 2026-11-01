@@ -1,3 +1,7 @@
+# Beta 10 candidate - not published
+
+Current candidate branch beta/1.17.146-editor-alignment adds a bounded matching-row median correction and regression test for the Editor comparison. Read docs/RELEASE146_HANDOFF.md, keep all eleven roadmap areas, and do not relabel the historical 390px motion, sidebar, native SFTP or physical Windows acceptance gaps as resolved. Latest published beta verified v1.17.145; stable v1.17.136. Existing tags and assets remain unchanged.
+
 # v1.17.145 Beta 9 - development candidate, not published
 
 Continue the original eleven-area plan in docs/DEVELOPMENT_ROADMAP.md.
