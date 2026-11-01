@@ -1,3 +1,7 @@
+# v1.17.146 Beta 10 development candidate, NOT PUBLISHED
+
+Read docs/DEVELOPMENT_ROADMAP.md and docs/RELEASE146_HANDOFF.md. Preserve the original eleven areas. Scope: visible matching-row median Editor scroll calibration and a regression test, not broad acceptance certification. Source branch beta/1.17.146-editor-alignment. Stable v1.17.136, beta v1.17.145 published. No desktop access, no prior tag changes, no permission, credential or updater changes.
+
 # v1.17.145 Beta 9 - development candidate, not published
 
 Continue the original eleven-area plan in docs/DEVELOPMENT_ROADMAP.md.
