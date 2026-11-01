@@ -29,7 +29,9 @@ async function setup(mode,width){
  return {page,context,operations};
 }
 (async()=>{if(output)fs.mkdirSync(output,{recursive:true});browser=await chromium.launch({headless:true,args:['--no-sandbox']});
- for(const mode of ['main','terminal'])for(const width of [1280,390]){
+ // Exercise the owner-supported native windows: 960px main and 640px detached.
+ // Keep the same drag/close/session-integrity assertions at both minimum and wide widths.
+ for(const mode of ['main','terminal'])for(const width of mode==='main'?[1280,960]:[1280,640]){
   const f=await setup(mode,width),p=f.page,tab=id=>p.locator('[data-terminal-tab="'+id+'"]'),x=id=>p.locator('[data-terminal-close="'+id+'"]');
   for(const id of ['click116-two','click116-one']){await tab(id).click();await p.waitForFunction(id=>terminalActive===id,id);assert.equal(await tab(id).getAttribute('aria-selected'),'true');}
   assert(!f.operations.some(o=>/disconnect|reconnect/.test(o.path)));
