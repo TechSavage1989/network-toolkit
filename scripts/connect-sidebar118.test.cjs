@@ -44,7 +44,7 @@ test('Terminal Saved/Recent/Macros/SFTP rail retains its existing icons and has 
 test('TCP Ports uses a distinct port-inspection symbol in tool and navigation, not Connect',()=>{
  assert.equal(paths.tcpPorts,'M3 3h18v8H3z M7 6v2 M12 6v2 M17 6v2 M15 12a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M18 19l4 3');
  for(const key of ['connect','plug','server','network'])assert.notEqual(paths.tcpPorts,paths[key]);
- assert(html.includes("tcp:{name:'TCP ports',icon:'tcpPorts'"));assert(html.includes("['tcp','TCP ports','tcpPorts']"));
+ assert(html.includes("tcp:{name:'TCP ports',icon:'tcpPorts'"));assert(html.includes("const TARGET_TESTS=['ping','trace','dns','tcp']"));assert(html.includes("icon(TOOLS[t].icon)+esc(TOOLS[t].name)"),'Test a target tabs use each tool icon');
  assert(!html.includes("tcp:{name:'TCP ports',icon:'plug'"));assert(!html.includes("['tcp','TCP ports','plug']"));
  const svg=makeDocument(icon('tcpPorts')).querySelector('svg');assert.equal(svg.getAttribute('viewBox'),'0 0 24 24');assert.equal(svg.getAttribute('aria-hidden'),'true');
 });
