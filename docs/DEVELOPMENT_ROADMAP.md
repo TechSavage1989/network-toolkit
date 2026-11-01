@@ -2,6 +2,13 @@
 
 This is the **authoritative, ongoing development plan**. Preserve it across beta releases and future chats. The eleven areas and three-phase sequence originated in the approved application-wide optimization plan. Do not replace them with an Editor-only scope or assume a published beta certifies all its planned work.
 
+## Current Beta 9 candidate
+
+v1.17.145 is in development, not published. Shutdown/stale-response guards,
+retired diagnostic caches and finite synthetic resource/lifecycle evidence:
+[Candidate handoff](RELEASE145_HANDOFF.md), [audit](BETA9_RELIABILITY_AUDIT.md).
+All eleven areas and the pending physical/native/Editor acceptance remain below.
+
 ## Latest publication and continuation (v1.17.144)
 
 Published v1.17.144 Beta 8 as an opt-in prerelease on

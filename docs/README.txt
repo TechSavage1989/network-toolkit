@@ -1,3 +1,21 @@
+NETWORK TOOLKIT 1.17.145
+======================
+
+CURRENT RELEASE - 1.17.145 (BETA 9)
+
+This opt-in beta improves concurrent diagnostic result and shutdown reliability.
+Late replies cannot revive the closed workspace, obsolete configuration replies
+cannot overwrite newer operations, and retired job views release data references.
+Capture display refreshes stop after shutdown. Saved preferences, credentials,
+network permissions, stable Network_Toolkit.exe naming and update consent remain.
+
+Read docs/DEVELOPMENT_ROADMAP.md, docs/BETA9_RELIABILITY_AUDIT.md and
+docs/RELEASE145_HANDOFF.md for exact validation and publication status.
+Details: RELEASE_NOTES_1.17.145.txt. Stable remains 1.17.136.
+Known Editor comparison/sidebar/alignment, native SFTP interruption and physical
+Windows/live-device endurance requirements are not claimed resolved.
+Previous release descriptions follow unchanged.
+
 NETWORK TOOLKIT 1.17.144
 ======================
 

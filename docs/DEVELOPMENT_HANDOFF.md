@@ -1,3 +1,12 @@
+# v1.17.145 Beta 9 - development candidate, not published
+
+Continue the original eleven-area plan in docs/DEVELOPMENT_ROADMAP.md.
+Current scoped lifecycle work and exact validation status:
+docs/RELEASE145_HANDOFF.md and docs/BETA9_RELIABILITY_AUDIT.md.
+Latest published beta remains v1.17.144; stable v1.17.136. Preserve Editor
+390px/sidebar/alignment and native SFTP/physical Windows acceptance gaps.
+Do not use the user's desktop. No old tags/assets or access changes.
+
 # Network Toolkit v1.17.144 Beta 8 - publication verified
 
 Published 2026-10-31T22:56:54Z, GitHub prerelease ID 430235856.

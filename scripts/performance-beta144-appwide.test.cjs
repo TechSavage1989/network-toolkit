@@ -1,4 +1,7 @@
 'use strict';
+// Golden report bytes were recorded in UTC. Pin only this synthetic test process,
+// preserving production local-time preferences and the original expected hashes.
+process.env.TZ='UTC';
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const root=path.resolve(__dirname,'..'),crypto=require('node:crypto');
 const source=file=>fs.readFileSync(path.join(root,file),'utf8');

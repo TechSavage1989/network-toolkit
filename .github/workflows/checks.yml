@@ -14,6 +14,46 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  browser-reliability145:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Install isolated reliability browser
+        run: |
+          npm install --prefix "$RUNNER_TEMP/ntk-reliability145" --no-audit --no-fund playwright@1.62.1
+          node "$RUNNER_TEMP/ntk-reliability145/node_modules/playwright/cli.js" install --with-deps chromium
+      - name: Prepare unchanged Beta 8 browser control
+        run: |
+          git fetch --no-tags origin refs/tags/v1.17.144:refs/tags/v1.17.144
+          mkdir -p "$RUNNER_TEMP/ntk-beta144-control"
+          git archive v1.17.144 | tar -x -C "$RUNNER_TEMP/ntk-beta144-control"
+      - name: Reproduce Beta 8 delayed shutdown reply and record comparable resources
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-reliability145/node_modules/playwright
+          TOOLKIT_TEST_ROOT: ${{ runner.temp }}/ntk-beta144-control
+          TOOLKIT_EXPECT_SHUTDOWN_RACE: '1'
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-reliability145-results/beta144-control
+        run: node scripts/reliability-beta145.browser.cjs
+      - name: Exercise repeated multi-tool navigation cancellation interruption and late shutdown replies
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-reliability145/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-reliability145-results
+        run: node scripts/reliability-beta145.browser.cjs
+      - name: Retain synthetic resource and lifecycle evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: reliability145-browser-checks
+          path: ${{ runner.temp }}/ntk-reliability145-results
+          if-no-files-found: error
+          retention-days: 14
   native-terminal130:
     runs-on: windows-latest
     timeout-minutes: 10

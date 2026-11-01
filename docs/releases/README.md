@@ -8,9 +8,33 @@ releases, tags and downloadable assets are unchanged.
 
 ## Current version
 
-- [1.17.133](../../RELEASE_NOTES_1.17.133.txt)
+- [1.17.145](../../RELEASE_NOTES_1.17.145.txt)
 
 ## Previous versions
+
+- [1.17.144](RELEASE_NOTES_1.17.144.txt)
+
+- [1.17.143](RELEASE_NOTES_1.17.143.txt)
+
+- [1.17.142](RELEASE_NOTES_1.17.142.txt)
+
+- [1.17.141](RELEASE_NOTES_1.17.141.txt)
+
+- [1.17.140](RELEASE_NOTES_1.17.140.txt)
+
+- [1.17.139](RELEASE_NOTES_1.17.139.txt)
+
+- [1.17.138](RELEASE_NOTES_1.17.138.txt)
+
+- [1.17.137](RELEASE_NOTES_1.17.137.txt)
+
+- [1.17.136](RELEASE_NOTES_1.17.136.txt)
+
+- [1.17.135](RELEASE_NOTES_1.17.135.txt)
+
+- [1.17.134](RELEASE_NOTES_1.17.134.txt)
+
+- [1.17.133](RELEASE_NOTES_1.17.133.txt)
 
 - [1.17.132](RELEASE_NOTES_1.17.132.txt)
 
