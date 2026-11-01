@@ -1,3 +1,17 @@
+# v1.17.147 Beta 11 - published; continue eleven-area roadmap
+
+Published v1.17.147 Beta 11 on 2026-11-01T04:17:17Z as opt-in prerelease ID 430357367.
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.147
+Tag/source and merged PR #22: b9bdaf40a099be557c09c8586c90bb687ea34340.
+Release workflow 41272278556: build SUCCESS and publish SUCCESS.
+Four release assets with GitHub SHA-256 digests; normal stable releases/latest remains v1.17.136.
+SFTP sends complete protocol frames across partial writer writes, with regression tests for 1-, 3- and 7-byte chunks and no-progress failure.
+Credentials, settings, network permissions, protocol authorization and Windows portable updater behavior remain unchanged.
+Checks run 41271825934 had 11 successful job groups with four hosted browser/Windows groups still pending at the publication verification point. Do not claim all CI passed. Historical Editor 390px motion regression, live SFTP interruption testing and physical Windows multi-hour endurance remain open.
+No previous release tags/assets were replaced.
+
+Read docs/DEVELOPMENT_ROADMAP.md, docs/DEVELOPMENT_HANDOFF.md and docs/RELEASE147_HANDOFF.md. Next proposed Beta 12 should concentrate on outstanding Editor comparison motion, SFTP interruption/cancellation and simultaneous long-running resource testing across the original eleven areas. No desktop or Work mode use. Future release notes use plain-language What's New and technical Additional Details.
+
 # v1.17.147 Beta 11 candidate - not published
 
 SFTP full-frame sending now handles partial writes. Read docs/RELEASE147_HANDOFF.md and retain all eleven roadmap areas, Editor 390px regression, native SFTP and physical Windows acceptance gaps. No desktop access or prior release replacement.

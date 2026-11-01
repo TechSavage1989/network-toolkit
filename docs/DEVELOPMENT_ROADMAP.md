@@ -2,7 +2,21 @@
 
 This is the **authoritative, ongoing development plan**. Preserve it across beta releases and future chats. The eleven areas and three-phase sequence originated in the approved application-wide optimization plan. Do not replace them with an Editor-only scope or assume a published beta certifies all its planned work.
 
-## Beta 11 SFTP reliability candidate (not published)
+## Latest publication - Beta 11 and next proposed Beta 12
+
+Published v1.17.147 Beta 11 on 2026-11-01T04:17:17Z as opt-in prerelease ID 430357367.
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.147
+Tag/source and merged PR #22: b9bdaf40a099be557c09c8586c90bb687ea34340.
+Release workflow 41272278556: build SUCCESS and publish SUCCESS.
+Four release assets with GitHub SHA-256 digests; normal stable releases/latest remains v1.17.136.
+SFTP sends complete protocol frames across partial writer writes, with regression tests for 1-, 3- and 7-byte chunks and no-progress failure.
+Credentials, settings, network permissions, protocol authorization and Windows portable updater behavior remain unchanged.
+Checks run 41271825934 had 11 successful job groups with four hosted browser/Windows groups still pending at the publication verification point. Do not claim all CI passed. Historical Editor 390px motion regression, live SFTP interruption testing and physical Windows multi-hour endurance remain open.
+No previous release tags/assets were replaced.
+
+Next proposed v1.17.148 Beta 12: remaining Editor alignment/390px geometry, native SFTP interruption and cancellation, and extended application-wide resource tests. The original eleven-area scope below is unchanged. Stable promotion requires physical Windows and live-device acceptance; previous browser failures are not waived.
+
+## Beta 11 development scope (historical)
 
 v1.17.147 provides full SFTP packet write handling with focused partial-write regression tests. The original eleven-area roadmap remains authoritative. See [Beta 11 handoff](RELEASE147_HANDOFF.md). Historical Editor motion, native transfer interruption and physical Windows acceptance remain open.
 

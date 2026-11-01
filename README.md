@@ -1,4 +1,10 @@
-## Latest beta - v1.17.146 Beta 10
+## Latest beta - v1.17.147 Beta 11
+
+[Download Beta 11](https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.147). SFTP transfers handle incomplete packet writes more reliably. This remains an opt-in prerelease, not stable certification. The eleven-area roadmap and known Editor 390px and native Windows/SFTP acceptance gaps remain open. Stable latest is v1.17.136.
+
+[Release handoff](docs/RELEASE147_HANDOFF.md) · [Development roadmap](docs/DEVELOPMENT_ROADMAP.md).
+
+## Previous beta - v1.17.146 Beta 10
 
 [Download the opt-in Beta 10](https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.146).
 File comparison scroll alignment now resists an isolated briefly shifted source line when several matched rows are visible. The original narrow 390px continuous-motion regression remains open, so this is not stable certification. All eleven roadmap areas remain active. Credentials, permissions, saved settings, stable Windows executable naming and explicit beta update consent stay unchanged. Stable latest remains v1.17.136.

@@ -1,3 +1,21 @@
+# v1.17.147 Beta 11 - publication verified
+
+Published v1.17.147 Beta 11 on 2026-11-01T04:17:17Z as opt-in prerelease ID 430357367.
+Release: https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.17.147
+Tag/source and merged PR #22: b9bdaf40a099be557c09c8586c90bb687ea34340.
+Release workflow 41272278556: build SUCCESS and publish SUCCESS.
+Four release assets with GitHub SHA-256 digests; normal stable releases/latest remains v1.17.136.
+SFTP sends complete protocol frames across partial writer writes, with regression tests for 1-, 3- and 7-byte chunks and no-progress failure.
+Credentials, settings, network permissions, protocol authorization and Windows portable updater behavior remain unchanged.
+Checks run 41271825934 had 11 successful job groups with four hosted browser/Windows groups still pending at the publication verification point. Do not claim all CI passed. Historical Editor 390px motion regression, live SFTP interruption testing and physical Windows multi-hour endurance remain open.
+No previous release tags/assets were replaced.
+
+The SFTP framing test initially caught the standard io.Copy short-write error. The implementation was corrected to explicitly repeat permitted partial writes, reject no progress, and return transport failures. Exact-source core and JavaScript tests then passed in CI. The long browser/native suites were not all complete when checked. Native SFTP disconnection/cancellation and physical Windows soak are not certified.
+
+Next proposed v1.17.148 Beta 12: investigate Editor 390px motion and sidebar, native SFTP interruption and cancellation, and broader concurrent CPU, memory and latency validation. All eleven roadmap areas remain active.
+
+Previous handoff records preserved below.
+
 # v1.17.147 Beta 11 candidate - not published
 
 SFTP framing now handles partial writes and has dedicated regression tests. Preserve all eleven development areas, settings, credentials, network permissions and the portable updater. Read docs/RELEASE147_HANDOFF.md. Latest published remains v1.17.146.
