@@ -226,3 +226,17 @@ test('rendered alignment widget is matched by exact source and aligned offset, i
  const view={documentTop:50,contentDOM:{querySelectorAll:()=>[fake(0,999),fake(20,153.5)]}},actual=api.renderedBlockGeometry(view,block);
  assert.equal(actual.top,103.5);assert.equal(actual.bottom,133.5);assert.equal(actual.widget,widget);assert.equal(widget.alignedStart,20);
 });
+
+test('Beta 10 uses consensus of three matched source rows to avoid transient narrow-pane drift',()=>{
+ const rows=[{left:0,right:0},{left:1,right:1},{left:2,right:2},{left:3,right:3}];
+ const lookup=api.sourceRowLookup(rows);
+ const line=(number,top)=>({dataset:{sourceLine:String(number)},getBoundingClientRect:()=>({top,bottom:top+20,height:20})});
+ const view=positions=>({scrollDOM:{getBoundingClientRect:()=>({top:0,bottom:300})},contentDOM:{querySelectorAll:()=>positions.map(([number,top])=>line(number,top))}});
+ const left=view([[1,20],[2,70],[3,120],[4,170]]);
+ const right=view([[1,24.5],[2,70],[3,120],[4,170]]);
+ assert.equal(api.renderedPeerOffset({left,right},lookup,'left'),0,'one unstable top row must not drag the matched viewport');
+ assert.equal(api.renderedPeerOffset({left,right},lookup,'right'),0,'correction is symmetric');
+ const twoLeft=view([[1,20],[2,70]]),twoRight=view([[1,24.5],[2,70]]);
+ assert.equal(api.renderedPeerOffset({left:twoLeft,right:twoRight},lookup,'left'),4.5,'paired-row legacy behavior is preserved');
+ assert.equal(api.renderedPeerOffset({left:view([]),right},lookup,'left'),null,'no matching visible row never fabricates motion');
+});
