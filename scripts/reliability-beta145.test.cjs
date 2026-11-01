@@ -17,7 +17,7 @@ test('Beta 9 static portable and footer labels agree with the executable version
 test('Beta 12 alternating six-tool recovery releases retired views without losing saved settings',async t=>{
  const {ctx,calls}=harness(),kinds=['ping','trace','dns','tcp','discover','monitor'];
  const original={persisted:{status:'reply',query:'synthetic'}},before=process.memoryUsage(),cpu=process.cpuUsage(),start=performance.now();
- ctx.$=()=>({innerHTML:''});ctx.icon=()=>'';ctx.state.resultFilters=original;
+ ctx.$=selector=>selector==='#offlineBanner'?{innerHTML:''}:null;ctx.icon=()=>'';ctx.state.resultFilters=original;
  for(let cycle=0;cycle<800;cycle++){
   ctx.state.activePage=['overview','monitor','reports','discovery'][cycle%4];
   if(cycle>0&&cycle%37===0){
@@ -34,7 +34,7 @@ test('Beta 12 alternating six-tool recovery releases retired views without losin
    ctx.dataListPages.set(job.id,1);
    ctx.networkResultFilters.set(job.id,{query:''});
   }
-  ctx.api=async()=>batch;
+  ctx.api=async route=>route.startsWith('/jobs/')?batch.find(job=>route.endsWith(job.id)):batch;
   await ctx.pollJobs();
   assert.equal(ctx.online,true,'successful refresh must recover from interruption');
   for(const cache of [ctx.caches.fullVersions,ctx.dataListViews,ctx.dataListPages,ctx.networkResultFilters])
