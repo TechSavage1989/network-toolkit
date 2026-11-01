@@ -49,6 +49,17 @@ async function capture(page,name){
     await page.evaluate(id=>navigate(id),id);await settle(page);
     await capture(page,'main-'+viewport.width+'x'+viewport.height+'-'+theme+'-'+id);
    }
+   // Capture both client/server modes for every transfer protocol with no
+   // operations started; mode changes are synthetic presentation only.
+   for(const tool of ['sftp','ftp','tftp']){
+    for(const transferMode of ['server','client']){
+      await page.evaluate(({tool,transferMode})=>{
+        state.transferModes={...state.transferModes,[tool]:transferMode};
+        navigate(tool);
+      },{tool,transferMode});await settle(page);
+      await capture(page,'transfer-'+viewport.width+'x'+viewport.height+'-'+theme+'-'+tool+'-'+transferMode);
+    }
+   }
    await page.evaluate(()=>navigate('overview'));await settle(page);
    await page.locator('#settingsButton').click();
    await page.locator('#modalTitle').filter({hasText:'App settings'}).waitFor();
@@ -63,6 +74,21 @@ async function capture(page,name){
     await page.locator('#modalTitle').waitFor({state:'visible'});
     await capture(page,'dialog-'+viewport.width+'x'+viewport.height+'-'+theme+'-'+dialog);
     await page.keyboard.press('Escape');await settle(page);
+   }
+   for(const dialog of ['terminal-sessions','terminal-profiles','report-export','clear-results','quit-confirm']){
+     await page.evaluate(dialog=>{
+       if(dialog==='terminal-sessions')showTerminalSessions();
+       else if(dialog==='terminal-profiles')showTerminalProfiles();
+       else if(dialog==='report-export')exportDialog(null);
+       else {
+         const button=document.createElement('button');
+         button.dataset.action=dialog;
+         document.body.append(button);button.click();button.remove();
+       }
+     },dialog);
+     await page.locator('#modalTitle').waitFor({state:'visible'});
+     await capture(page,'dialog-'+viewport.width+'x'+viewport.height+'-'+theme+'-'+dialog);
+     await page.keyboard.press('Escape');await settle(page);
    }
    await page.locator('#themeButton').waitFor();
    await capture(page,'main-'+viewport.width+'x'+viewport.height+'-'+theme+'-overview-return');
