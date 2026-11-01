@@ -85,6 +85,12 @@ async function make(viewport){
  await p.getByRole('button',{name:'Show welcome and quick starts'}).click();
  await p.screenshot({path:path.join(out,'welcome-light-1920.png')});screenshots.push('welcome-light-1920.png');
  await context.close();
+ delete stored.firstLaunchWelcomeSeen;
+ ({p,context}=await make({width:1280,height:800}));
+ assert.equal(await p.locator('#uxFirstLaunchWelcome').count(),0);
+ assert.equal(await p.evaluate(()=>state.profiles[0].name),'Existing target');
+ checks.push('Upgraded existing users keep profiles and do not get an unexpected welcome');
+ await context.close();
  if(errors.length)throw Error('Browser errors: '+errors.join('; '));
  console.log('PASS '+checks.join(' | '));
 })().catch(e=>{console.error(e.stack||e);process.exitCode=1;}).finally(async()=>{
