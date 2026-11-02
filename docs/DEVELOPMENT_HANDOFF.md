@@ -6,6 +6,7 @@ Branch fix/flaky-tests-monitor-graph, based on published v1.19.1. Owner asked to
 - Flaky tests made behavior-based: editor-alignment113 waits (bounded) for scroll sync to settle and tests main 1440 / detached 1440 and 640 (390px retired per owner decision 2); editor-layout-map waits for the new comparison before asserting marks; transfer-client-layout serves the mock read after 1.5s so the loading state is observable on slow runners; graph-curve113 waits for the sparse render.
 - Monitor graph: graph-navigator.css adds a 721-820px rule that compacts only the overview strip (34px) and, under 820px, the samples toolbar and table header inside graph results. Graph height stays 230px; plot 84 to 99px; two complete rows at 1280x800. features-94/95 test 1440x1000, 1280x800 and 960x1000, and treat 800px as a short window (their own threshold boundary).
 - Open issue: main window at 960px wide, end-of-document after keyboard divider resize, panes up to 9px apart (scroll-sync residual correction, renderedPeerOffset/nextPaintedOffset). Documented in editor-alignment113; add 960 back there when fixed.
+- Open issue found by the widened tests: Packet capture at 1280x800 on hosted Ubuntu runners wraps the view bar (83px) and leaves the capture configuration reader 9px tall (scrollHeight 154). Not reproduced locally; pre-existing (capture CSS untouched here). features-94/95 measure packet layouts at 1000px height until fixed.
 - Remote branch cleanup cannot be done from this session (API path blocked); the owner was given a git command for the merged branches.
 
 ---
