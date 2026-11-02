@@ -1,4 +1,4 @@
-## Unreleased
+## 1.19.3 Beta 3 - IP configuration load order (candidate)
 
 - Local network > IP configuration loads in two steps: adapter settings appear at once (Public IP, then Current configuration and the IPv4 editor); Network actions, which need the slower Windows adapter-state read, fill in below afterwards instead of holding up the page.
 

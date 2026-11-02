@@ -1,4 +1,4 @@
-# IP configuration two-phase load (2026-11-02) - UNRELEASED
+# v1.19.3 Beta 3 - IP configuration two-phase load (2026-11-02) - candidate, NOT PUBLISHED
 
 Owner report: Local network > IP configuration took a long time to appear, and Network actions sat above the current configuration. Cause: GET /local-tools/ip runs the fast native GetAdaptersAddresses read and then a PowerShell read of each adapter's administrative state (needed only for the Enable/Disable network actions); the page waited for both.
 Change: new `GET /local-tools/ip?phase=basic` (backend `readIPBasic`, Windows = native read with admin state normalized to unknown; non-Windows = readLocalIP) returns the snapshot marked `adminPending`. The UI renders it immediately (Public IP, snapshot time, adapter picker, Current configuration + IPv4 editor), then requests the full snapshot and fills in the Network actions card, which now sits below the configuration and shows "Reading adapter state" with its buttons disabled until then. Reload uses the same two phases; a newer reload cancels an older one via a token. Default GET /local-tools/ip is unchanged (operations and verification still use the full read).
