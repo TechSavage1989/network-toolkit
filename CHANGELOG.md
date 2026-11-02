@@ -1,3 +1,8 @@
+## 1.19.0 - Stable (candidate)
+
+- First stable release of the UX polish work, combining the 1.18.1 to 1.18.5 betas: consistent visuals, grouped navigation, command search and F1 help, unified Settings, first-run welcome and clearer guidance, Test a target and File Transfer.
+- Numbered above every 1.18 beta so beta users also receive it; saved data and security confirmations unchanged.
+
 ## 1.18.5 Beta 5 - UX Phase 6 (published 2026-11-02)
 
 - Ping, Trace route, DNS lookup and TCP ports are combined into Test a target, with tabs that share the host and show each test's latest result.
