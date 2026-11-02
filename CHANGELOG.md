@@ -1,4 +1,4 @@
-## 1.19.4 Beta 4 - Results polish (candidate)
+## 1.19.4 Beta 4 - Results polish (published 2026-11-02)
 
 - Results pages no longer show an "Additional information" dump of leftover fields (recorded source object, target, recorded time); these are already in the result header and remain in Copy and Export.
 - "Recorded source" appears only when a specific adapter was chosen; Automatic routing, the default, is already shown in the command bar and header.
