@@ -1,0 +1,16 @@
+Network Toolkit 1.19.2 Beta 2
+
+## What's New
+
+- Text Editor compare: the two documents now stay lined up all the way to the end of the file, even when the status line under one of them wraps.
+- Monitor and Ping graphs: a taller plot and two complete sample rows in 1280x800 windows.
+
+## Additional Details
+
+- In side-by-side comparison, the status row under each document is given the same height, so both editors share one scroll range. Previously a wrapped status line made one pane shorter and matching lines drifted apart near the end of a short document.
+- In windows up to 820px tall the graph's overview strip, sample toolbar and table header use compact spacing. The graph keeps its normal height; the plot grows from 84px to about 99px at 1280x800.
+- Several automated checks that failed at random (editor alignment, comparison map, File Transfer editor loading, graph timing) now wait for the result they measure instead of a fixed delay. Tests no longer cover widths below the supported minimums (main window 960x600, detached windows 640x400).
+- Known issue: in the main window at exactly 960px wide, jumping to the end of a short compared document right after resizing the divider with the keyboard can leave the two panes up to 9px out of line. Resizing again or scrolling realigns them.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Windows/UAC review, SSH host-key trust, file overwrite checks and explicit user-consented SHA-256-verified updates are unchanged.
+- This is an opt-in beta. Stable users stay on 1.19.0. Portable executable filename remains Network_Toolkit.exe.
+- Validation uses hosted and synthetic fixtures; the owner reported v1.19.1 working on their own machine, but physical Windows and live-device acceptance is not formally claimed.

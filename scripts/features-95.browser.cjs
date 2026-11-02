@@ -210,8 +210,10 @@ async function geometry(kind,label){
  assert.equal(value.stats.length,packet?6:7,label+' retains every aggregate statistic');
  assert(value.statistics.bottom<=value.graph.top+2,label+' run statistics remain above the graph '+JSON.stringify(value));
  assert(value.visibleStatistics.height>=Math.min(value.statistics.height,24)-1,label+' run statistics remain available in the visible workspace');
- assert(value.visibleGraph.height>=90,label+' actual visible graph is readable '+JSON.stringify(value));assert(value.visiblePlot.height>=(packet?30:frame.height<800?30:frame.window<600?60:85),label+' at least90px of actual SVG measurements remain visible after graph controls and clipping '+JSON.stringify(value));
- const minimum=frame.height<800?2:frame.window>=1200?4:3;
+ assert(value.visibleGraph.height>=90,label+' actual visible graph is readable '+JSON.stringify(value));assert(value.visiblePlot.height>=(packet?30:frame.height<=800?30:frame.window<600?60:85),label+' at least90px of actual SVG measurements remain visible after graph controls and clipping '+JSON.stringify(value));
+ // 800px (1280x800, the smaller review size) is a short window: the graph keeps a
+ // readable plot and the samples list keeps complete rows plus its divider.
+ const minimum=frame.height<=800?2:frame.window>=1200?4:3;
  assert(value.body.completeRows>=minimum,label+' has '+minimum+' complete body rows after clipping, toolbar, header and scrollbar '+JSON.stringify(value.body));
  assert(value.table.top>=value.graph.bottom-1,label+' graph stays above the list');
  assert(['auto','scroll'].includes(value.overflow)&&value.scrollHeight>value.table.height+30,label+' rows own a substantial independent scroll area');

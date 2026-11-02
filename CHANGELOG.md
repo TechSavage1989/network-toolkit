@@ -1,3 +1,10 @@
+## 1.19.2 Beta 2 - Reliability and short-window polish (candidate)
+
+- Text Editor compare keeps both documents aligned to the end of the file when a status line wraps.
+- Monitor/Ping graphs in 1280x800 windows: taller plot (84 to 99px) and two complete sample rows; compact overview strip, toolbar and header under 820px height.
+- Flaky checks (editor alignment, comparison map, File Transfer editor loading, graph timing) now wait for the measured result; unsupported widths removed from tests.
+- Known issue: 960px-wide main window can misalign compared panes by up to 9px at end of document after a keyboard divider resize.
+
 ## 1.19.1 Beta 1 - Tool consolidation addendum (published 2026-11-02)
 
 - Test a target adds Device check, Monitor and Device details tabs; Test a website combines HTTP check and TLS certificate; the Hosts file is a Local network tab. The sidebar goes from 19 to 14 entries.
