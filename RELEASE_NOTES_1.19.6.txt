@@ -1,0 +1,15 @@
+Network Toolkit 1.19.6 Beta 6
+
+## What's New
+
+- Pasting several commands into a terminal with "One line at a time · wait for prompt" now works with paged output. When a device shows --More--, the paste answers it the way your Auto pager setting does, then continues with the next command once the prompt returns.
+- The paste review says whether Auto pager is on for the session, so you know what will happen before sending.
+- The terminal follows the output of a paced paste as it arrives, like it does for macro runs.
+
+## Additional Details
+
+- With Auto pager off, a --More-- prompt still waits for you, as before. The pager key setting (Auto, Space or Enter) applies; Auto presses Enter only for prompts that ask for it.
+- One continuation is sent per recognized pager prompt; a pager prompt is never mistaken for a command prompt, so the next line is not sent early.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Security confirmations and Windows/UAC approval are unchanged.
+- This is an opt-in beta. Stable users stay on 1.19.0. Portable executable filename remains Network_Toolkit.exe.
+- Validation uses hosted and synthetic fixtures; physical Windows and live-device acceptance is not formally claimed.
