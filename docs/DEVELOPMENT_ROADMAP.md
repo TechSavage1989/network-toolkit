@@ -17,7 +17,7 @@
 | Reliability follow-up | Flaky CI checks made behavior-based; Text Editor compare pane-height bug; compact Monitor graph chrome in short windows | **Published v1.19.2 Beta 2 (opt-in) on 2026-11-02**; stable remains v1.19.0 |
 | IP configuration load order | Owner report: slow IP configuration page; Network actions moved below Current configuration and loaded after the fast adapter read | **Published v1.19.3 Beta 3 (opt-in) on 2026-11-02**; stable remains v1.19.0 |
 | Results polish | Owner-approved: leftover-field dump removed, Recorded source only for a chosen adapter, Activity log collapsed last; per-tool review sheet to follow | **Published v1.19.4 Beta 4 (opt-in) on 2026-11-02**; stable remains v1.19.0 |
-| Results polish, part 2 | Owner reviewed the per-tool sheet: Activity log and technical blocks off results pages, toolbars only on long lists, cleaner sample tables, DNS query table folded, discovery notes to Help | v1.19.5 Beta 5 candidate on branch ux/results-polish-2, not published |
+| Results polish, part 2 | Owner reviewed the per-tool sheet: Activity log and technical blocks off results pages, toolbars only on long lists, cleaner sample tables, DNS query table folded, discovery notes to Help | **Published v1.19.5 Beta 5 (opt-in) on 2026-11-02**; stable remains v1.19.0 |
 
 ## Rules
 - Phase 0 is documentation only, with **no release**.

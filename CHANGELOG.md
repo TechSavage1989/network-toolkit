@@ -1,4 +1,4 @@
-## 1.19.5 Beta 5 - Results polish, part 2 (candidate)
+## 1.19.5 Beta 5 - Results polish, part 2 (published 2026-11-02)
 
 - Results pages no longer show the Activity log; the run's events stay in Export.
 - Device details, HTTP check, TLS certificate, SMTP test and Wake on LAN no longer repeat the recorded source, target and recorded time; Wake on LAN shows one sentence with the MAC address; HTTP shows Final URL only when it differs and keeps Headers collapsed.
