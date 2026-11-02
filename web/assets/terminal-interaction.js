@@ -105,6 +105,13 @@
     if (lines.length<2 || lines.length>1024) return 'Paced paste needs 2–1,024 complete lines.';
     return '';
   }
+  function pacedPagerPrefs(entry) {
+    const p = root.NetworkToolkitTerminalExtras?.prefs?.(entry) || preferences();
+    return { autoPager: p.autoPager !== false, pagerKey: ['space','enter'].includes(p.pagerKey) ? p.pagerKey : 'auto' };
+  }
+  function pacedPagerNote(entry) {
+    return pacedPagerPrefs(entry).autoPager ? 'Pager prompts such as --More-- are answered for you (Auto pager is on).' : 'Auto pager is off for this session, so a --More-- prompt waits for you; turn it on in the console bar to page automatically.';
+  }
   function updateReview() {
     if (!review) return;
     if (!review.form.isConnected) { review = null; return; }
@@ -119,7 +126,7 @@
     status.textContent = review.invalid ? 'This destination is no longer ready or the focused pane changed. Nothing has been sent. Cancel and paste again in the intended console.' : stats.bytes > MAX_PASTE_BYTES ? 'This paste exceeds the 1 MiB limit. Reduce the text before sending.' : stats.breaks ? 'Line breaks may execute commands on the device. Review or edit every line before sending.' : 'The edited text contains no line breaks. It will be pasted without pressing Enter.';
     status.classList.toggle('terminal-paste-invalid', blocked && !!value);
     const hint=review.form.querySelector('#terminalPasteModeHint');
-    if(hint)hint.textContent=review.error || (paced ? reason || 'Sends each complete line literally, then waits for a fresh prompt (30-second timeout, 100 ms stable output). Blank lines are kept. No auto pager. Stop or pause in Runs; stopping cannot undo commands already sent.' : 'Sends all text at once using the original paste behavior. Large command lists may overwhelm a device’s command echo.');
+    if(hint)hint.textContent=review.error || (paced ? reason || 'Sends each complete line literally, then waits for a fresh prompt (30-second timeout, 100 ms stable output). Blank lines are kept. '+(pacedPagerNote(review.destination.entry))+' Stop or pause in Runs; stopping cannot undo commands already sent.' : 'Sends all text at once using the original paste behavior. Large command lists may overwhelm a device’s command echo.');
     if(review.pending)status.textContent='Start request sent. Closing this review does not stop commands. Check Runs for Pause or Stop; do not submit again.';
     if(review.uncertain)status.textContent='Start was not confirmed. Check Runs before sending anything again; some commands may have run.';
     const resolve=review.form.querySelector('#terminalPasteResolve');if(resolve)resolve.hidden=!review.uncertain;
@@ -222,7 +229,7 @@
     // This is input metadata only; it does not send or execute any command.
     const block=root.NetworkToolkitTerminalExtras?.notePaste?.(pending.destination.entry,text);
     try {
-      const run=await root.NetworkToolkitTerminalMacros.startPacedPaste(pending.target,text,pending.destination.revision);
+      const run=await root.NetworkToolkitTerminalMacros.startPacedPaste(pending.target,text,pending.destination.revision,pacedPagerPrefs(pending.destination.entry));
       if(block)root.NetworkToolkitTerminalMacros?.trackPacedPaste?.(pending.destination.entry,block,run);
       if(pasteStarts.get(pending.destination.id)===start)pasteStarts.delete(pending.destination.id);
       // Never close a different dialog or send again after navigation/transfer.

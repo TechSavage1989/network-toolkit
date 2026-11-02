@@ -87,20 +87,20 @@ type capturedChunk struct {
 	text string
 }
 type sentPasteCommand struct {
-	index int
+	index   int
 	command string
-	cursor uint64
+	cursor  uint64
 }
 type PasteCaptureStep struct {
-	Index int `json:"index"`
+	Index   int    `json:"index"`
 	Command string `json:"command"`
-	Output string `json:"output"`
+	Output  string `json:"output"`
 }
 type PasteCapture struct {
-	RunID string `json:"runId"`
-	SessionID string `json:"sessionId"`
-	State string `json:"state"`
-	Steps []PasteCaptureStep `json:"steps"`
+	RunID     string             `json:"runId"`
+	SessionID string             `json:"sessionId"`
+	State     string             `json:"state"`
+	Steps     []PasteCaptureStep `json:"steps"`
 }
 type task struct {
 	target         Target
@@ -129,6 +129,7 @@ type execution struct {
 	secrets      []string
 	paused       bool
 	literalPaste bool
+	paste        *pasteOptions
 }
 
 // Engine runs independently of browser focus and tab ownership. Captured output
@@ -202,13 +203,14 @@ func (e *Engine) Start(req StartRequest) (Run, error) {
 	if err != nil {
 		return Run{}, err
 	}
-	return e.startPrepared(req, def, false)
+	return e.startPrepared(req, def, nil)
 }
 
 // startPrepared shares lifecycle, generation fencing and cancellation between
 // validated macro definitions and the separately validated literal paste path.
 // literal is internal only; it cannot be enabled by a saved/API macro.
-func (e *Engine) startPrepared(req StartRequest, def Definition, literal bool) (Run, error) {
+func (e *Engine) startPrepared(req StartRequest, def Definition, paste *pasteOptions) (Run, error) {
+	literal := paste != nil
 	if err := validateRefs(req.Targets); err != nil {
 		return Run{}, err
 	}
@@ -224,7 +226,7 @@ func (e *Engine) startPrepared(req StartRequest, def Definition, literal bool) (
 	if _, err = rand.Read(idBytes); err != nil {
 		return Run{}, err
 	}
-	run := &execution{view: Run{ID: hex.EncodeToString(idBytes), MacroID: def.ID, Name: def.Name, State: "running", StartedAt: now()}, definition: def, secrets: secrets, literalPaste: literal}
+	run := &execution{view: Run{ID: hex.EncodeToString(idBytes), MacroID: def.ID, Name: def.Name, State: "running", StartedAt: now()}, definition: def, secrets: secrets, literalPaste: literal, paste: paste}
 	type preparedTask struct {
 		task  *task
 		steps []Step
@@ -622,6 +624,7 @@ func lineEnding(target Target) string {
 func normalizeLines(text, ending string) string {
 	return strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(text, "\r\n", "\n"), "\r", "\n"), "\n", ending)
 }
+
 // PasteCapture uses the original transport's sequence cursor at each accepted
 // input write. Unlike browser polling, it cannot skip fast steps or label an
 // unsent line as executed. It is memory-only and scoped by the HTTP caller.

@@ -157,8 +157,14 @@ async function send(execute){
 // The paste review captures one exact generation, independent of composer
 // recipient settings. Never refresh or substitute this target during submission.
 function pasteTarget(id){const t=S.targets.find(t=>t.id===id);return t&&Number.isSafeInteger(t.generation)?{id:t.id,generation:t.generation}:null;}
-async function startPacedPaste(target,text,revision){
- const result=await api(BASE+'/paste','POST',{target:{id:target.id,generation:target.generation},text},false,undefined,revision);
+// options carry the session's Auto pager setting so the backend, which owns
+// the pager while the run is active, can answer --More-- prompts the same way
+// the console would. The terminal follows output like a macro run does.
+async function startPacedPaste(target,text,revision,options){
+ const body={target:{id:target.id,generation:target.generation},text};
+ if(options&&typeof options==='object'){body.autoPager=options.autoPager!==false;body.pagerKey=['space','enter'].includes(options.pagerKey)?options.pagerKey:'auto';}
+ if(typeof prepareRunView==='function')prepareRunView([target]);
+ const result=await api(BASE+'/paste','POST',body,false,undefined,revision);
  if(!result?.run?.id)throw new Error('The paced paste response was not confirmed. Check Runs before sending again.');
  S.runs=[result.run,...S.runs.filter(r=>r.id!==result.run.id)];renderRuns();schedule();
  if(result.run.state==='failed'){const error=new Error((result.run.targets||[]).map(t=>t.error).filter(Boolean).join(' · ')||'Paced paste was not started. Review Runs for details.');error.status=409;throw error;}

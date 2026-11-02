@@ -17,6 +17,11 @@ import (
 type PasteRequest struct {
 	Target TargetRef `json:"target"`
 	Text   string    `json:"text"`
+	// AutoPager mirrors the session's Auto pager setting. While the engine
+	// owns the target the browser's own pager replies are suppressed, so a
+	// paged "show" command would otherwise stall at --More-- until timeout.
+	AutoPager bool   `json:"autoPager"`
+	PagerKey  string `json:"pagerKey"` // auto, space or enter
 }
 
 func pasteDefinition(text string) (Definition, error) {
@@ -50,7 +55,36 @@ func (e *Engine) StartPaste(req PasteRequest) (Run, error) {
 	if err != nil {
 		return Run{}, err
 	}
-	return e.startPrepared(StartRequest{Targets: []TargetRef{req.Target}}, def, true)
+	def.AutoPager = req.AutoPager
+	key := strings.ToLower(strings.TrimSpace(req.PagerKey))
+	if key != "space" && key != "enter" {
+		key = "auto"
+	}
+	return e.startPrepared(StartRequest{Targets: []TargetRef{req.Target}}, def, &pasteOptions{pagerKey: key})
+}
+
+type pasteOptions struct {
+	pagerKey string
+}
+
+// Paced paste also recognizes prompts that ask for Enter or Return, which the
+// console's own pager handles; ordinary macros keep the narrower pagerPattern.
+var pastePagerPattern = regexp.MustCompile(pagerPattern.String() + `|(?i)press[ \t]+(?:the[ \t]+)?(?:enter|return)(?:[ \t]+key)?[^\r\n]{0,40}(?:more|continue|next)`)
+
+// pagerReply chooses the continuation for one recognized pager prompt. "auto"
+// presses Enter only when the prompt itself asks for Enter or Return.
+func pagerReply(key, prompt string) []byte {
+	switch key {
+	case "enter":
+		return []byte("\r")
+	case "space":
+		return []byte(" ")
+	}
+	lower := strings.ToLower(prompt)
+	if strings.Contains(lower, "enter") || strings.Contains(lower, "return") {
+		return []byte("\r")
+	}
+	return []byte(" ")
 }
 
 const pastePromptStable = 100 * time.Millisecond
@@ -67,6 +101,7 @@ func (e *Engine) waitPastePrompt(run *execution, t *task, cursor uint64, timeout
 	index := 0
 	tail := ""
 	boundary := false
+	lastPagerEnd := 0
 	var candidateAt time.Time
 	var candidateRevision uint64
 	e.mu.Lock()
@@ -88,11 +123,32 @@ func (e *Engine) waitPastePrompt(run *execution, t *task, cursor uint64, timeout
 			boundary = boundary || strings.ContainsAny(chunk.text, "\r\n")
 			tail += chunk.text
 			if len(tail) > 128*1024 {
-				tail = tail[len(tail)-64*1024:]
+				trim := len(tail) - 64*1024
+				tail = tail[trim:]
+				lastPagerEnd = max(0, lastPagerEnd-trim)
 			}
 		}
 		if ended {
 			return terminal.ErrTransportChanged
+		}
+		// A pager prompt is never a command prompt. With Auto pager on, send
+		// exactly one continuation per recognized prompt and keep waiting for
+		// the real prompt; with it off, the prompt waits for the user (or the
+		// 30-second timeout), exactly as before.
+		if run.definition.AutoPager && run.paste != nil {
+			for _, match := range pastePagerPattern.FindAllStringIndex(tail, -1) {
+				if match[1] <= lastPagerEnd {
+					continue
+				}
+				if err := e.gate(run, t, false); err != nil {
+					return err
+				}
+				if _, err := e.writeTask(run, t, pagerReply(run.paste.pagerKey, tail[match[0]:match[1]])); err != nil {
+					return err
+				}
+				lastPagerEnd = match[1]
+				candidateAt = time.Time{}
+			}
 		}
 		if !boundary || !matchOutput(re, DefaultPrompt, tail) {
 			candidateAt = time.Time{}
