@@ -2,7 +2,15 @@
 
 A portable Windows toolkit for network diagnostics, device connections, file transfers and network administration.
 
-<!-- Screenshot: add reviewed light/dark application screenshots after Phase 2 visual foundations. -->
+![Test a target showing a completed Ping with response-time graph and samples (dark theme)](docs/images/test-a-target-dark.png)
+
+<details><summary>Light theme: File Transfer</summary>
+
+![File Transfer with the SFTP, FTP / FTPS and TFTP protocol picker (light theme)](docs/images/file-transfer-light.png)
+
+</details>
+
+<sub>Screenshots use synthetic example data. Regenerate with `node scripts/readme-screenshots.browser.cjs`.</sub>
 
 ## Download
 
@@ -12,11 +20,11 @@ Latest beta: [v1.18.5](https://github.com/TechSavage1989/network-toolkit/release
 
 ## Features
 
-- Diagnose hosts with Ping, Trace route, DNS, port checks and related network tools.
+- Test a target: enter a host once and run Ping, Trace route, DNS lookup and TCP port checks from one page, plus SMTP, HTTP and TLS checks.
 - Discover network devices and inspect connection details.
 - Monitor targets and inspect live graphs and packet captures.
 - Connect with SSH, Telnet and supported serial terminals, using saved connections, multiple tabs and macros.
-- Browse and transfer files through SFTP, FTP/FTPS and TFTP where supported.
+- File Transfer: browse, transfer and host files over SFTP, FTP/FTPS and TFTP from one page.
 - Open, edit and compare text files, including common network device configurations.
 - View local network information and review authorized configuration changes.
 - Save preferences and use the built-in updater.

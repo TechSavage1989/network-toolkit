@@ -1,6 +1,6 @@
 # File Transfers
 
-Network Toolkit currently offers separate SFTP, FTP/FTPS and TFTP workflows. A single File Transfer tool with a protocol selector is approved for Phase 6, but not yet implemented. The existing Transfer navigation group includes both SFTP / FTP / FTPS and TFTP.
+Open **File Transfer** in the Transfer group. The buttons at the top choose the protocol: SFTP, FTP / FTPS or TFTP. Each protocol's tooltip states its security. File Transfer reopens the protocol you used last, and each protocol keeps its own settings, saved connections and Server/Client mode. Command search (Ctrl+Shift+P) also finds SFTP, FTP / FTPS and TFTP by name.
 
 ## Choose a protocol
 - **SFTP:** SSH-based file browsing and transfers. It may reuse an already connected and authenticated terminal session where the remote device supports the SFTP subsystem.

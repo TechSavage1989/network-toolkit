@@ -3,12 +3,13 @@
 Use Network Toolkit to test reachability, routes, name resolution and TCP connectivity.
 
 ## Test a host
-1. Open **Ping** and enter the target hostname or IP address. Start the test and inspect replies, loss and response times.
-2. Use **Trace route** to see the sequence of hops to the target.
-3. Use **DNS** to check name lookup and records.
-4. Use **TCP ports** to test whether a particular service is reachable.
+Open **Test a target** in the Diagnose group and enter the hostname or IP address once. The tabs at the top switch between tests; the target stays the same:
+1. **Ping:** replies, loss and response times.
+2. **Trace route:** the sequence of hops to the target.
+3. **DNS lookup:** name lookup and records.
+4. **TCP ports:** whether a particular service is reachable.
 
-Each tool currently has its own input. The owner-approved target-first shared workspace is planned for Phase 6, not yet implemented. Search or press Ctrl+Shift+P to find all diagnostic tools by name.
+Each tab shows a dot for its latest run against the current target: green finished, yellow running, red failed, faint not yet run. Switching tabs never starts a test. Test a target reopens the test you used last, and command search (Ctrl+Shift+P) still finds Ping, Trace route, DNS lookup and TCP ports by name.
 
 ## Other diagnostics
 Network discovery, monitoring, wireless information, routes, ARP and connections are available as separate tools. Network tests operate only on networks and equipment you are authorized to inspect.
