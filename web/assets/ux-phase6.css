@@ -6,3 +6,18 @@
 .nt-target-test-status.is-done{color:var(--good)}
 .nt-target-test-status.is-failed{color:var(--bad)}
 .nt-target-tests .btn.primary .nt-target-test-status{box-shadow:0 0 0 1.5px var(--panel)}
+/* Test tabs stay on one row (scrolling sideways if needed) and stay visible in
+   short windows, where the diagnostic page heading is otherwise hidden. */
+#pageActions:has(.nt-target-tests){justify-content:flex-start;flex:1 1 0;min-width:0}
+.nt-target-tests{flex-wrap:nowrap;overflow-x:auto;max-width:100%;scrollbar-width:thin;padding-bottom:1px}
+.nt-target-tests .btn{flex:0 0 auto;white-space:nowrap}
+.page-heading:has(.nt-target-tests){min-width:0}
+@media(max-height:600px){
+ .diagnostic-page .page-heading:has(.nt-target-tests){position:static;width:auto;height:auto;margin:0 0 4px;overflow:visible;clip:auto;white-space:normal}
+ .diagnostic-page .page-heading:has(.nt-target-tests) #pageActions>:not(.nt-target-tests){display:none}
+}
+.nt-target-tests{flex:0 1 auto;min-width:0}
+.scope-discovery{display:flex;flex-basis:100%}
+.scope-discovery .btn{gap:6px}
+#pageActions:has(.nt-target-tests){flex-wrap:nowrap}
+#pageActions:has(.nt-target-tests)>:not(.nt-target-tests){flex:0 0 auto}

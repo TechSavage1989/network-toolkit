@@ -1,6 +1,6 @@
 # Network Configuration
 
-Some tools inspect local network adapter, address, routing and Hosts information. Protected changes to network and system state require explicit review and the appropriate Windows/UAC permission.
+Open **Local network** in the Configure group. Its tabs show IP configuration, the routing table, ARP / neighbors, connections, Wi-Fi and the **Hosts file**. Protected changes to network and system state require explicit review and the appropriate Windows/UAC permission.
 
 ## Before applying a change
 1. Select the correct adapter or system item.

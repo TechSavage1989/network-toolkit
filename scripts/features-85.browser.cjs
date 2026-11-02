@@ -42,7 +42,7 @@ async function buffer(id){return page.evaluate(id=>{const b=terminalSessions.get
  });
  await page.goto('https://shells.toolkit.test/');await page.waitForFunction(()=>window.__networkToolkitStartupState===1&&online);
  await page.locator('#mobileMenu').click();await page.waitForFunction(()=>state.navigationCollapsed===true);assert(await page.locator('body').evaluate(el=>el.classList.contains('app-nav-collapsed')));
- for(const id of ['ping','hosts','terminal']){await page.locator('#navigation [data-page="'+id+'"]').click();await page.waitForFunction(id=>state.activePage===id,id);assert.equal(await page.evaluate(()=>state.navigationCollapsed),true);}
+ for(const id of ['ping','local','terminal']){await page.locator('#navigation [data-page="'+id+'"]').click();await page.waitForFunction(id=>state.activePage===id,id);assert.equal(await page.evaluate(()=>state.navigationCollapsed),true);}
  await page.locator('#appNavigationDivider').click();assert.equal(await page.evaluate(()=>state.navigationCollapsed),true);await page.locator('#appNavigationDivider').dblclick();assert.equal(await page.evaluate(()=>state.navigationCollapsed),false);
  await page.locator('#mobileMenu').click();await page.locator('#appNavigationDivider').focus();await page.keyboard.press('Enter');assert.equal(await page.evaluate(()=>state.navigationCollapsed),false);await page.locator('#mobileMenu').click();
  await page.evaluate(()=>flushState());await page.reload();await page.waitForFunction(()=>window.__networkToolkitStartupState===1&&online);assert.equal(await page.evaluate(()=>state.navigationCollapsed),true);await page.evaluate(()=>navigate('terminal'));

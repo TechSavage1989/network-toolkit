@@ -60,8 +60,10 @@ async function copy(button,expected,keyboard=false){
  if(out)fs.mkdirSync(out,{recursive:true});
  await page.goto('https://toolkit.test/');await page.waitForFunction(()=>window.__networkToolkitStartupState===1&&online);
  result.pages=await page.locator('#navigation [data-page]').evaluateAll(items=>[...new Set(items.map(item=>item.dataset.page))]);
- assert(result.pages.includes('terminal')&&result.pages.includes('hosts')&&result.pages.includes('capture'));
- for(const width of [1600,820,390])for(const theme of ['light','dark']){
+ assert(result.pages.includes('terminal')&&result.pages.includes('local')&&result.pages.includes('capture'));
+ // Pages that are tabs inside merged entries (Test a target, Test a website, Local network) keep their coverage.
+ for(const id of ['quick','ping','trace','dns','tcp','monitor','identify','http','tls','hosts'])if(!result.pages.includes(id))result.pages.push(id);
+ for(const width of [1600,1280,960])for(const theme of ['light','dark']){
   await page.setViewportSize({width,height:1000});await page.evaluate(theme=>setTheme(theme),theme);
   for(const id of result.pages){
    await page.evaluate(id=>navigate(id),id);await settle(page);
@@ -69,7 +71,7 @@ async function copy(button,expected,keyboard=false){
    const bad=await fit();assert.deepEqual(bad,[],JSON.stringify({width,theme,page:id,bad}));
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth+1),false,JSON.stringify({width,theme,page:id,overflow:true}));
    result.cases.push({width,theme,page:id});
-   if(out&&id==='terminal'&&(width===1600||width===390))await page.screenshot({path:path.join(out,'ui-terminal-'+theme+'-'+width+'.png')});
+   if(out&&id==='terminal'&&(width===1600||width===960))await page.screenshot({path:path.join(out,'ui-terminal-'+theme+'-'+width+'.png')});
   }
   await page.evaluate(()=>navigate('overview'));await settle(page);
   assert.equal(await page.locator('#pageContent .tool-card,#adapterList .adapter-address button:not([data-value-copy-control])').count(),0);
@@ -82,7 +84,7 @@ async function copy(button,expected,keyboard=false){
   await copy(address.locator('[data-value-copy-control]'),'192.0.2.4/24',theme==='dark');
   await copy(page.locator('#adapterList [aria-label="Copy MAC address value"]').first(),'02:00:00:00:00:04');
   assert.equal(await page.locator('#entryContextMenu:not(.hidden)').count(),0);
-  if(out&&(width===1600||width===390)){await page.evaluate(()=>document.querySelector('#workspaceScroll').scrollTo({top:0,left:0}));await settle(page);await page.screenshot({path:path.join(out,'ui-overview-'+theme+'-'+width+'.png')});}
+  if(out&&(width===1600||width===960)){await page.evaluate(()=>document.querySelector('#workspaceScroll').scrollTo({top:0,left:0}));await settle(page);await page.screenshot({path:path.join(out,'ui-overview-'+theme+'-'+width+'.png')});}
   await page.evaluate(()=>navigate('hosts'));await page.waitForSelector('.he-toolbar');await settle(page);
   await copy(page.locator('[data-hosts-action="copy-path"]'),'C:\\Windows\\System32\\drivers\\etc\\hosts',theme==='dark');
   const summary=page.locator('.he-more>summary'),find=page.locator('[data-hosts-action="find"]');
@@ -91,11 +93,11 @@ async function copy(button,expected,keyboard=false){
   await summary.focus();await page.keyboard.press('Enter');await page.waitForFunction(()=>document.querySelector('.he-more').open);await settle(page);
   const menu=await page.locator('.he-menu').boundingBox(),panel=await page.locator('.he-app').boundingBox();assert(menu.x>=panel.x-1&&menu.x+menu.width<=panel.x+panel.width+1,JSON.stringify({width,theme,menu,panel}));
   result.hostsMenu.push({width,theme,keyboardOpen:true,aligned:true,contained:true});
-  if(out&&(width===1600||width===390))await page.screenshot({path:path.join(out,'ui-hosts-menu-'+theme+'-'+width+'.png')});
+  if(out&&(width===1600||width===960))await page.screenshot({path:path.join(out,'ui-hosts-menu-'+theme+'-'+width+'.png')});
   if(width===1600&&theme==='light'){
    const downloadPromise=page.waitForEvent('download');await page.locator('[data-hosts-action="export"]').click();const download=await downloadPromise;assert.equal(fs.readFileSync(await download.path(),'utf8'),hosts);
   }else{await page.keyboard.press('Escape');assert.equal(await page.locator('.he-more').getAttribute('open'),null);assert.equal(await summary.evaluate(el=>document.activeElement===el),true);}
-  if(out&&(width===1600||width===390)){
+  if(out&&(width===1600||width===960)){
    await openAppSettings(page);await page.locator('#modalTitle').filter({hasText:'App settings'}).waitFor();await settle(page);
    await page.screenshot({path:path.join(out,'ui-settings-gear-'+theme+'-'+width+'.png')});await page.keyboard.press('Escape');
   }

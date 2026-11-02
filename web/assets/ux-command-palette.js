@@ -9,7 +9,7 @@ const toolGroups={overview:'Home',profiles:'Home',reports:'Home',
  monitor:'Diagnose',capture:'Diagnose',terminal:'Connect',wol:'Connect',
  sftp:'Transfer',ftp:'Transfer',tftp:'Transfer',
  local:'Configure',hosts:'Configure',subnet:'Configure',editor:'Configure'};
-const navGroup=id=>['ping','trace','dns','tcp'].includes(id)?'target':['sftp','ftp','tftp'].includes(id)?'transfer':id;
+const navGroup=id=>['quick','ping','trace','dns','tcp','monitor','identify'].includes(id)?'target':['http','tls'].includes(id)?'web':['sftp','ftp','tftp'].includes(id)?'transfer':id==='hosts'?'local':id;
 const shortcutLabels={editor:'',terminal:'',overview:'',ping:'',trace:'',dns:''};
 const launcher=()=>doc.getElementById('uxCommandLauncher'),helpLauncher=()=>doc.getElementById('uxHelpLauncher');
 let overlay=null,input=null,results=null,items=[],selection=0,previousFocus=null,mode='';
@@ -47,14 +47,14 @@ function buttons(){
 function catalog(){
  const tools=[...doc.querySelectorAll('#navigation button[data-page]')].filter(btn=>allowedTool(btn.dataset.page)).map(btn=>{
   const id=btn.dataset.page;const name=btn.querySelector('span:not(.badge)')?.textContent?.trim()||id;
-  const keywords=navGroup(id)==='transfer'?'sftp ftp ftps tftp file transfer ssh file browser':navGroup(id)==='target'?'test a target ping trace route traceroute dns lookup tcp ports':id==='tftp'?'tftp file transfer':id==='quick'?'test a target device check':id==='trace'?'traceroute network hops':id;
+  const keywords=navGroup(id)==='transfer'?'sftp ftp ftps tftp file transfer ssh file browser':navGroup(id)==='target'?'test a target device check ping trace route traceroute dns lookup tcp ports connection monitor device details':navGroup(id)==='web'?'test a website http check tls certificate https ssl':id==='local'?'local network adapters ipconfig routes arp connections wifi hosts file':id==='tftp'?'tftp file transfer':id==='quick'?'test a target device check':id==='trace'?'traceroute network hops':id;
   return {id:'tool-'+id,label:name,group:toolGroups[id]||'Tools',shortcut:shortcutLabels[id]||'',keywords,run:()=>{if(typeof root.navigate==='function')root.navigate(id);else if(typeof navigate==='function')navigate(id);}};
  });
   // Phase 6 merged these pages into Test a target and File Transfer. Keep each
  // former tool name searchable and open it directly.
  const listed=new Set(tools.map(item=>item.label.toLowerCase()));
  const go=page=>{if(typeof root.navigate==='function')root.navigate(page);else if(typeof navigate==='function')navigate(page);};
- for(const [page,label,keywords,parent] of [['ping','Ping','icmp echo latency packet loss','Test a target'],['trace','Trace route','traceroute tracert network hops path','Test a target'],['dns','DNS lookup','dns records nslookup dig resolve','Test a target'],['tcp','TCP ports','port check scan open closed','Test a target'],['sftp','SFTP','ssh file browser transfer','File Transfer'],['ftp','FTP / FTPS','ftps file transfer','File Transfer'],['tftp','TFTP','tftp file transfer firmware config backup','File Transfer']]){
+ for(const [page,label,keywords,parent] of [['quick','Device check','quick check name resolution reachability ports','Test a target'],['ping','Ping','icmp echo latency packet loss','Test a target'],['trace','Trace route','traceroute tracert network hops path','Test a target'],['dns','DNS lookup','dns records nslookup dig resolve','Test a target'],['tcp','TCP ports','port check scan open closed','Test a target'],['monitor','Connection monitor','continuous ping tcp chart uptime','Test a target'],['identify','Device details','mac address model vendor upnp hostname','Test a target'],['http','HTTP check','web request status headers redirects','Test a website'],['tls','TLS certificate','ssl https certificate expiry trust','Test a website'],['hosts','Hosts file','hosts file hostname mapping local network','Local network'],['sftp','SFTP','ssh file browser transfer','File Transfer'],['ftp','FTP / FTPS','ftps file transfer','File Transfer'],['tftp','TFTP','tftp file transfer firmware config backup','File Transfer']]){
   if(!allowedTool(page)||listed.has(label.toLowerCase()))continue;
   tools.push({id:'tool-alias-'+page,label,group:toolGroups[page]||'Tools',shortcut:shortcutLabels[page]||'',keywords:keywords+' '+parent.toLowerCase(),run:()=>{if(page==='sftp'&&typeof state!=='undefined')state.fileTransferProtocol='sftp';go(page);}});
  }

@@ -18,7 +18,7 @@ async function make(viewport){
   if(name.startsWith('/api/')){
    assert(['GET','PUT'].includes(method),'Unexpected API write: '+method+' '+name);
    let data={};
-   if(name==='/api/status')data={version:'1.18.5',os:'windows',arch:'amd64',system:{hostname:'EXAMPLE-PC',interfaces:[]}};
+   if(name==='/api/status')data={version:require(path.join(root,'package.json')).version,os:'windows',arch:'amd64',system:{hostname:'EXAMPLE-PC',interfaces:[]}};
    if(name==='/api/state'){if(method==='PUT'){stored=request.postDataJSON();}else data=stored;}
    if(name==='/api/system')data={hostname:'EXAMPLE-PC',interfaces:[],gateways:[],dnsServers:[]};
    if(name==='/api/jobs'||name==='/api/jobs?brief=1')data=syntheticJobs;if(name.startsWith('/api/jobs/'))data=syntheticJobs.find(job=>name==='/api/jobs/'+job.id)||{};
