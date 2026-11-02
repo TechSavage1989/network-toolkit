@@ -1,4 +1,8 @@
-# v1.19.1 Beta 1 - consolidation addendum candidate (2026-11-02) - NOT PUBLISHED
+# v1.19.1 Beta 1 - publication verified (2026-11-02)
+
+Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.19.1 at 2026-11-02T02:55:32Z; stable latest remains v1.19.0. Merged PR #42; tag v1.19.1 points to merge commit ad3675be2a8b9794a78fb79f4d413851fdf500f7. Guarded Release workflow https://github.com/TechSavage1989/network-toolkit/actions/runs/41380061126 completed build and publish. Four assets: Network_Toolkit.exe, Network_Toolkit_1.19.1_Portable.zip, Network_Toolkit_1.19.1_Update.zip and SHA256SUMS; SHA256SUMS entries match GitHub's asset digests. PR #42 Checks (pull_request https://github.com/TechSavage1989/network-toolkit/actions/runs/41378520940, push https://github.com/TechSavage1989/network-toolkit/actions/runs/41378516575) and Phase 6 workflow https://github.com/TechSavage1989/network-toolkit/actions/runs/41378516656 passed on the exact source. During review a CSS :has() slowdown that made the File Transfer editor test fail was found and fixed before merge.
+
+Owner check: on 2026-11-02 the owner reported that v1.19.1 is working. The scope of that check was not recorded (which tools or devices were exercised), so it is not a full physical Windows / live-device acceptance; record specifics when available.
 
 Branch ux/consolidation-2, based on published v1.19.0 stable. The owner approved the redundancy proposals (docs/UX_AUDIT.md section 12), keeping Wake on LAN as its own tool. docs/UI_GUIDELINES.md is updated in the same change, as the layout freeze requires.
 
@@ -10,7 +14,9 @@ Branch ux/consolidation-2, based on published v1.19.0 stable. The owner approved
 
 ---
 
-# v1.19.0 stable candidate (2026-11-02) - NOT PUBLISHED
+# v1.19.0 stable - publication verified (2026-11-02)
+
+Published as the stable release https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.19.0 at 2026-11-02T01:20:18Z (not a prerelease; GitHub's latest, replacing v1.17.136). Merged PR #40; tag v1.19.0 points to merge commit 46adc55b7a66f755060019eab198b23801f07804. Guarded Release workflow https://github.com/TechSavage1989/network-toolkit/actions/runs/41371760780 completed build and publish. Four assets: Network_Toolkit.exe, Network_Toolkit_1.19.0_Portable.zip, Network_Toolkit_1.19.0_Update.zip and SHA256SUMS; SHA256SUMS entries match GitHub's asset digests. Physical Windows and live-device acceptance were not performed.
 
 Branch release/1.19.0-stable, built on the post-Phase 6 docs branch (UI guidelines draft, README screenshots). The owner chose 1.19.0 instead of the planned 1.18.0, because a 1.18.0 stable would sort below the published v1.18.5 beta and the updater refuses downgrades.
 
