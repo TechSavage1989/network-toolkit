@@ -1,4 +1,4 @@
-## 1.18.5 Beta 5 - UX Phase 6 (candidate)
+## 1.18.5 Beta 5 - UX Phase 6 (published 2026-11-02)
 
 - Ping, Trace route, DNS lookup and TCP ports are combined into Test a target, with tabs that share the host and show each test's latest result.
 - SFTP, FTP/FTPS and TFTP are combined into File Transfer with a protocol picker. Former tool names remain in command search.

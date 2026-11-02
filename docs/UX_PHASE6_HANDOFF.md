@@ -1,6 +1,6 @@
-# Network Toolkit UX Phase 6 - tool consolidation (in development)
+# Network Toolkit UX Phase 6 - v1.18.5 Beta 5 (published)
 
-Status: v1.18.5 Beta 5 release candidate, rebased on main after v1.18.4 Beta 4 was published. Publication requested by the owner on 2026-11-02; verify the guarded Release workflow result before recording it as published.
+Status: Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.18.5 at 2026-11-02T00:44:07Z. Merged PR #37; tag v1.18.5 points to merge commit 36ef57d14b078bf5c1f9b29b2073787cd3d38609. Guarded Release workflow https://github.com/TechSavage1989/network-toolkit/actions/runs/41368461612 completed build and publish successfully. Four assets: Network_Toolkit.exe, Network_Toolkit_1.18.5_Portable.zip, Network_Toolkit_1.18.5_Update.zip and SHA256SUMS; the SHA256SUMS entries match GitHub's asset digests. Stable latest remains v1.17.136.
 Approval: the owner approved the UX audit's recommendations ("approved to proceed") and asked to continue the roadmap on 2026-11-01, including removing the Terminal sidebar's separate Sidebar button.
 
 ## What changed for users
@@ -26,3 +26,6 @@ Each test and protocol keeps its own engine, options, jobs, history, report iden
 - Phase 6 workflow: https://github.com/TechSavage1989/network-toolkit/actions/runs/41350832744 passed.
 - Full Checks: https://github.com/TechSavage1989/network-toolkit/actions/runs/41350832709 passed on attempt 2. Attempt 1 failed only in `browser-workflows107` at `editor-layout-map` (Editor comparison marks). The same check also failed and then passed locally on identical code, so it is treated as the existing intermittent Editor check, not dismissed: watch it on later runs.
 - The first Phase 6 Checks run found a real bug (explicit SFTP navigation could open a remembered TFTP choice); fixed in e8a1435.
+
+## Release CI (2026-11-02)
+- PR #37 Checks (pull_request https://github.com/TechSavage1989/network-toolkit/actions/runs/41366876843 and push https://github.com/TechSavage1989/network-toolkit/actions/runs/41366856615) and Phase 6 workflow https://github.com/TechSavage1989/network-toolkit/actions/runs/41366856618 passed on the exact release source.
