@@ -15,7 +15,7 @@
 | After Phase 6 | UI guidelines, layout freeze and 1.18.0 stable candidate | [UI guidelines](UI_GUIDELINES.md) adopted, layout frozen (changes that move or rename controls need owner approval), README screenshots added. **Published v1.19.0 stable on 2026-11-02** (owner chose 1.19.0 because a 1.18.0 stable would sort below the published 1.18.5 beta) |
 | Consolidation addendum | Owner-approved post-1.19.0 merges ([UX_AUDIT.md section 12](UX_AUDIT.md)): Device check, Connection monitor and Device details into Test a target; HTTP + TLS into Test a website; Hosts file into Local network; Ping/TCP sweeps into Network discovery. Wake on LAN kept | **Published v1.19.1 Beta 1 (opt-in) on 2026-11-02**; stable remains v1.19.0 |
 | Reliability follow-up | Flaky CI checks made behavior-based; Text Editor compare pane-height bug; compact Monitor graph chrome in short windows | **Published v1.19.2 Beta 2 (opt-in) on 2026-11-02**; stable remains v1.19.0 |
-| IP configuration load order | Owner report: slow IP configuration page; Network actions moved below Current configuration and loaded after the fast adapter read | v1.19.3 Beta 3 candidate on branch fix/ip-configuration-order, not published |
+| IP configuration load order | Owner report: slow IP configuration page; Network actions moved below Current configuration and loaded after the fast adapter read | **Published v1.19.3 Beta 3 (opt-in) on 2026-11-02**; stable remains v1.19.0 |
 
 ## Rules
 - Phase 0 is documentation only, with **no release**.
