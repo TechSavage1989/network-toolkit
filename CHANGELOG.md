@@ -1,3 +1,12 @@
+## 1.19.5 Beta 5 - Results polish, part 2 (candidate)
+
+- Results pages no longer show the Activity log; the run's events stay in Export.
+- Device details, HTTP check, TLS certificate, SMTP test and Wake on LAN no longer repeat the recorded source, target and recorded time; Wake on LAN shows one sentence with the MAC address; HTTP shows Final URL only when it differs and keeps Headers collapsed.
+- Device check, Trace route, DNS lookup, TCP ports and SMTP responses lose their filter/sort toolbars (short lists); Ping, Monitor and Network discovery keep theirs.
+- Ping and Monitor samples: no per-row Tools button or copy icons (right-click or Enter on a row still opens its menu), no TTL column, clock-only timestamps; tables whose rows carry no time no longer show a "Recorded" column.
+- DNS lookup drops the per-type "Query results" table; the total time is in the summary grid.
+- Network discovery's "About these results" text moves to the tool's Help and formats.
+
 ## 1.19.4 Beta 4 - Results polish (published 2026-11-02)
 
 - Results pages no longer show an "Additional information" dump of leftover fields (recorded source object, target, recorded time); these are already in the result header and remain in Copy and Export.

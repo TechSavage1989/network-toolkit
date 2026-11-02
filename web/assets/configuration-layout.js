@@ -94,7 +94,7 @@
     const notes = [config.note || ''];
     if (tool === 'dns' && state.diagnosticSource) notes[0] = 'Leave DNS server empty to use a compatible resolver configured on the selected source adapter. No compatible resolver means hostname queries cannot run; literal-address probes remain available. PTR accepts an IP address. SRV accepts a service name.';
     if (['quick', 'tcp', 'discover'].includes(tool)) notes.push('TCP ports accept individual numbers and ranges, for example 22,443,8000-8010. Separate entries with commas, spaces or new lines. You can edit the port list directly.');
-    if (tool === 'discover') notes.push(discoveryPortPresetDescription(discoveryPortPresetSelection()));
+    if (tool === 'discover') notes.push(discoveryPortPresetDescription(discoveryPortPresetSelection()), 'About the results: every started address is kept, including silent, errored and interrupted checks; addresses that never started have no row. A refused TCP connection is response evidence and may come from a firewall. Unanswered probes do not prove a device is offline.');
     for (const item of [...config.primary, ...config.advanced]) if (item.desc) notes.push(item.name + ': ' + item.desc);
     if (NetworkToolkitSource.supports(tool)) notes.push('Source interface is shared across diagnostic tools. Automatic uses the system routing table. An explicit source binds supported probes and DNS queries to that adapter and address. Changes made during a run apply to the next run.');
     if (notes.some(Boolean)) html += section(tool + '.help', 'Help and formats', notes.filter(Boolean).map(note => '<p>' + esc(note) + '</p>').join(''), '', 'info');
