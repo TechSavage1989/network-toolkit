@@ -1,4 +1,6 @@
-# v1.19.0 stable candidate (2026-11-02) - NOT PUBLISHED
+# v1.19.0 stable - publication verified (2026-11-02)
+
+Published as the stable release https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.19.0 at 2026-11-02T01:20:18Z (not a prerelease; now GitHub's latest, replacing v1.17.136). Merged PR #40; tag v1.19.0 points to merge commit 46adc55b7a66f755060019eab198b23801f07804. Guarded Release workflow https://github.com/TechSavage1989/network-toolkit/actions/runs/41371760780 completed build and publish. Four assets: Network_Toolkit.exe, Network_Toolkit_1.19.0_Portable.zip, Network_Toolkit_1.19.0_Update.zip and SHA256SUMS; SHA256SUMS entries match GitHub's asset digests. Physical Windows and live-device acceptance were not performed. Known intermittent CI: Editor alignment check (browser-editor112, editor-alignment113) and editor-layout-map; graph-curve113 timing.
 
 Branch release/1.19.0-stable, built on the post-Phase 6 docs branch (UI guidelines draft, README screenshots). The owner chose 1.19.0 instead of the planned 1.18.0, because a 1.18.0 stable would sort below the published v1.18.5 beta and the updater refuses downgrades.
 

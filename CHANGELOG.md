@@ -1,4 +1,4 @@
-## 1.19.0 - Stable (candidate)
+## 1.19.0 - Stable (published 2026-11-02)
 
 - First stable release of the UX polish work, combining the 1.18.1 to 1.18.5 betas: consistent visuals, grouped navigation, command search and F1 help, unified Settings, first-run welcome and clearer guidance, Test a target and File Transfer.
 - Numbered above every 1.18 beta so beta users also receive it; saved data and security confirmations unchanged.
