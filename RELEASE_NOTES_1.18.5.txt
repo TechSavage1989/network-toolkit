@@ -1,0 +1,18 @@
+Network Toolkit 1.18.5 Beta 5
+
+## What's New
+
+- Test a target: Ping, Trace route, DNS lookup and TCP ports now live together. Enter a host once and switch tests with tabs; each tab shows how its last run for that host went.
+- File Transfer: SFTP, FTP/FTPS and TFTP now live together with a protocol picker.
+- The Terminal sidebar no longer has a separate Sidebar button. Click the selected tab to hide the sidebar and any tab to show it.
+- The first-launch welcome now stays on Overview, so it no longer takes space from other tools.
+
+## Additional Details
+
+- Each test and protocol keeps its own engine, options, results, history and reports. Switching tabs never starts a test, connection or transfer.
+- Test a target and File Transfer reopen the test or protocol you used last. Actions that open a specific protocol, such as a device's Open SFTP, still open exactly that protocol.
+- The former names (Ping, Trace route, DNS lookup, TCP ports, SFTP, FTP / FTPS, TFTP) remain in command search (Ctrl+Shift+P).
+- Protocol tooltips state each protocol's security; TFTP has no encryption or login. A running TFTP server still shows its activity indicator on File Transfer.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are retained. Windows/UAC review, Hosts/IP/adapter confirmation, SSH host-key trust, file overwrite checks and explicit user-consented SHA-256-verified updates are unchanged.
+- Portable executable filename remains Network_Toolkit.exe. This release is an opt-in beta and normal stable updates stay separate.
+- Validation is performed using hosted and synthetic fixtures; physical Windows and live-device acceptance is not claimed.

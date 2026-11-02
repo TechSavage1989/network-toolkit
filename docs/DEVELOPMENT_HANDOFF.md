@@ -1,3 +1,13 @@
+# v1.18.5 Beta 5 - Phase 6 release candidate (2026-11-02)
+
+Rebased on main after published v1.18.4. The owner approved the Phase 6 consolidation and asked to publish. Read docs/UX_PHASE6_HANDOFF.md, docs/UX_POLISH_PLAN.md and docs/DEVELOPMENT_ROADMAP.md before proceeding.
+
+Phase 6 merges Ping, Trace route, DNS lookup and TCP ports into Test a target (tabs share the host and show each test's latest result) and SFTP, FTP/FTPS and TFTP into File Transfer (protocol picker). Former names remain in command search. The Terminal sidebar's separate Sidebar button is removed. The first-launch welcome stays on Overview. Engines, options, jobs, saved profiles, credentials, vault, sessions, UAC and host-key/overwrite confirmations are unchanged.
+
+After Phase 6: write docs/UI_GUIDELINES.md, freeze layout pending owner approval, update README screenshots and prepare the 1.18.0 stable candidate. A combined side-by-side results view for Test a target was not built and needs an owner-reviewed design.
+
+---
+
 # v1.18.4 Beta 4 - publication verified (2026-11-01)
 
 Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.18.4 at 2026-11-01T20:33:03Z. PR #36 merged source/tag 977e9bf6a954a16be2d8f74e8f6bd5f61fccbb19. Guarded Release workflow https://github.com/TechSavage1989/network-toolkit/actions/runs/41347071329 passed both Windows build and publish. Official assets: Network_Toolkit.exe, Network_Toolkit_1.18.4_Portable.zip, Network_Toolkit_1.18.4_Update.zip and SHA256SUMS, all uploaded with GitHub SHA-256 digests. Previous releases untouched. Stable latest stays v1.17.136.
