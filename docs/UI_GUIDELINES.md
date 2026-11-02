@@ -1,12 +1,12 @@
 # Network Toolkit UI Guidelines
 
-**Status:** Draft for owner approval, written after UX Phase 6 (v1.18.5 Beta 5). It describes the layout, components and wording as they ship in v1.18.5. Once the owner approves it, the layout is frozen (see [Layout freeze](#layout-freeze)).
+**Status:** Adopted with the v1.19.0 stable release (2026-11-02) and updated for the owner-approved v1.19.1 consolidation. It describes the layout, components and wording as they ship in v1.19.1. The layout is frozen (see [Layout freeze](#layout-freeze)).
 
 **Authority:** [UX Polish Plan](UX_POLISH_PLAN.md). Sources of truth in code: `web/assets/ux-foundations.css` (tokens), the `:root` and `[data-theme="light"]` blocks in `web/index.html` (colors), `renderNavigation()` in `web/index.html` (navigation), and `web/assets/ux-command-palette.js` (shortcuts).
 
 ## Layout freeze
 
-After owner approval of this document:
+Now that this document is adopted:
 - Moving, renaming, merging, removing or regrouping an existing control, navigation entry, tab or panel needs the owner's explicit approval first.
 - Allowed without approval: bug fixes that restore the documented layout, wording fixes that follow the [wording rules](#wording), new options inside an existing panel, and accessibility fixes that do not move controls.
 - Every approved layout change updates this document in the same pull request.
