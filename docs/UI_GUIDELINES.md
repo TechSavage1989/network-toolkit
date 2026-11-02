@@ -78,7 +78,7 @@ States every tool provides:
 - **Loading/progress:** the shared `progress` style or a running status; never a blank area.
 - **Error:** the original error text plus a next step. Never suggest bypassing a certificate, host-key or permission warning.
 
-Results pages show, in order: the result header (title, status, target, recorded time), the tool's primary results, a collapsed "Recorded source" panel only when a specific adapter was chosen (Automatic routing is already in the header), and the collapsed Activity log last. Leftover result fields are not dumped into the page; they remain in Copy and Export.
+Results pages show the result header (title, status, summary, target, recorded time) and then the tool's primary results only. There is no Activity log on the page (events remain in Export), and no recorded-source, target or recorded-time fields in the body. A collapsed "Recorded source" panel appears only when a specific adapter was chosen. Filter/sort toolbars appear on lists that can grow long (Ping and Monitor samples, Network discovery, generic tables beyond 25 rows), not on short fixed lists (Device check, Trace route, DNS records, TCP ports, SMTP responses). Row actions open from the row itself (right-click or Enter); sample tables carry no per-row Tools button or copy icons. Timestamps inside a results table show the clock only; the date is in the header. Explanatory text about a tool's results belongs in its Help and formats section, not on the results page.
 
 ## Color roles
 

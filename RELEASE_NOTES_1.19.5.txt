@@ -1,0 +1,16 @@
+Network Toolkit 1.19.5 Beta 5
+
+## What's New
+
+- Results pages show just the results. The Activity log and the technical blocks under each tool are gone; everything they showed is still in Export.
+- Shorter lists (Device check, Trace route, DNS, TCP ports, SMTP responses) no longer carry a filter and sort bar.
+- Ping and Monitor sample tables are cleaner: no per-row Tools button or copy icons, no TTL column, and clock-only times. Right-click a row (or press Enter) for its tools.
+- Wake on LAN reports in one sentence. HTTP check shows the final address only when a redirect changed it, with headers collapsed.
+
+## Additional Details
+
+- The DNS per-type timing table is folded into the summary. Network discovery's explanatory text now lives under the tool's Help and formats.
+- Copy result text and Export still contain the complete recorded data, including the event log.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Security confirmations and Windows/UAC approval are unchanged.
+- This is an opt-in beta. Stable users stay on 1.19.0. Portable executable filename remains Network_Toolkit.exe.
+- Validation uses hosted and synthetic fixtures; physical Windows and live-device acceptance is not formally claimed.

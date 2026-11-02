@@ -87,17 +87,18 @@
   for(const key of ['time','timestamp','observedAt','recordedAt','snapshotTime','captured','checkedAt'])if(Number.isFinite(epoch(row[key])))return row[key];
   return undefined;
  }
- function cell(stamp,{label='Recorded time',milliseconds=true}={}){
+ function cell(stamp,{label='Recorded time',milliseconds=true,date=true}={}){
   const number=epoch(stamp);if(!Number.isFinite(number))return '<span class="muted result-time-unknown">'+unknown+'</span>';
-  const full=format(stamp,{milliseconds}),original=typeof stamp==='string'?stamp:new Date(number).toISOString();
+  const full=format(stamp,{milliseconds,date}),original=typeof stamp==='string'?stamp:new Date(number).toISOString();
   return '<time class="mono result-recorded-time" datetime="'+escape(original)+'" data-copy-label="'+escape(label)+'" data-copy-value="'+escape(full)+'" title="'+escape(full+'\nRecorded timestamp: '+original)+'">'+escape(full)+'</time>';
  }
  const isKey=key=>['time','timestamp','observedAt','recordedAt','snapshotTime','captured','checkedAt'].includes(key);
  const snapshot=job=>['routes','arp','connections','wifi','ipconfig'].includes(job?.tool)||job?.result?.data?.timeKind==='snapshot';
  function recorded(row,job){return value(row)??(snapshot(job)?value(job?.result?.data):undefined);}
- function column(job){
-  const name=columnLabel(snapshot(job)?'Snapshot':'Recorded');
-  return {id:'time',name,type:'date',value:row=>recorded(row,job),render:row=>cell(recorded(row,job),{label:name})};
+ // timeFormat 'time' shows the clock only; the date is in the result header.
+ function column(job,timeFormat){
+  const name=columnLabel(snapshot(job)?'Snapshot':'Recorded'),compact=timeFormat==='time';
+  return {id:'time',name,type:'date',value:row=>recorded(row,job),render:row=>cell(recorded(row,job),{label:name,date:!compact,milliseconds:!compact})};
  }
  const api=Object.freeze({epoch,compareInstants,format,elapsed,cell,value,isKey,recorded,column,snapshot,unknown,defaults,preferences,normalizePreferences,configure,zoneLabel,timeLabel,columnLabel,timeZones,isTimeZone});
  if(typeof module==='object'&&module.exports)module.exports=api;
