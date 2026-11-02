@@ -27,3 +27,9 @@
 
 /* The latency overview is a connecting trace, not a result-status marker. */
 .rt-timeline .gn-series:not(.gn-unmeasured){stroke:var(--accent)}
+/* 721-820px tall (includes 1280x800): keep the normal graph height but use the
+   compact overview strip and rows, so the plot itself keeps a readable height. */
+@media(min-height:721px) and (max-height:820px){.graph-workspace-graph>.rt-timeline{grid-template-rows:auto minmax(44px,1fr) 18px 34px}.graph-navigator{height:34px;grid-template-rows:22px 11px}.graph-navigator .gn-labels{line-height:11px}}
+/* Short windows (<=820px, including 1280x800): tighter samples toolbar and
+   table header under the graph so at least two complete rows stay visible. */
+@media(max-height:820px){#toolResultsScroll .graph-workspace-results .data-list-tools{padding-top:3px;padding-bottom:3px}#toolResultsScroll .graph-workspace-results .data-list-tools input{padding-top:4px;padding-bottom:4px}#toolResultsScroll .graph-workspace-results .table-wrap thead th{padding-top:5px;padding-bottom:5px}}

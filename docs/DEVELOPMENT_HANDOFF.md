@@ -1,3 +1,16 @@
+# v1.19.2 Beta 2 - reliability candidate (2026-11-02) - NOT PUBLISHED
+
+Branch fix/flaky-tests-monitor-graph, based on published v1.19.1. Owner asked to fix the intermittent CI checks and the cramped Monitor graph at 1280x800, and to publish the result as a beta when green.
+
+- Real bug fixed in editor-aligned-compare.js: the status row under each compare pane could wrap on one side only, making that editor 15px shorter; matching lines then drifted near the end of a short document. Both rows now take the taller row's height (matchPaneChrome), re-applied on resize.
+- Flaky tests made behavior-based: editor-alignment113 waits (bounded) for scroll sync to settle and tests main 1440 / detached 1440 and 640 (390px retired per owner decision 2); editor-layout-map waits for the new comparison before asserting marks; transfer-client-layout serves the mock read after 1.5s so the loading state is observable on slow runners; graph-curve113 waits for the sparse render.
+- Monitor graph: graph-navigator.css adds a 721-820px rule that compacts only the overview strip (34px) and, under 820px, the samples toolbar and table header inside graph results. Graph height stays 230px; plot 84 to 99px; two complete rows at 1280x800. features-94/95 test 1440x1000, 1280x800 and 960x1000, and treat 800px as a short window (their own threshold boundary).
+- Open issue: main window at 960px wide, end-of-document after keyboard divider resize, panes up to 9px apart (scroll-sync residual correction, renderedPeerOffset/nextPaintedOffset). Documented in editor-alignment113; add 960 back there when fixed.
+- Open issue found by the widened tests: Packet capture at 1280x800 on hosted Ubuntu runners wraps the view bar (83px) and leaves the capture configuration reader 9px tall (scrollHeight 154). Not reproduced locally; pre-existing (capture CSS untouched here). features-94/95 measure packet layouts at 1000px height until fixed.
+- Remote branch cleanup cannot be done from this session (API path blocked); the owner was given a git command for the merged branches.
+
+---
+
 # v1.19.1 Beta 1 - publication verified (2026-11-02)
 
 Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.19.1 at 2026-11-02T02:55:32Z; stable latest remains v1.19.0. Merged PR #42; tag v1.19.1 points to merge commit ad3675be2a8b9794a78fb79f4d413851fdf500f7. Guarded Release workflow https://github.com/TechSavage1989/network-toolkit/actions/runs/41380061126 completed build and publish. Four assets: Network_Toolkit.exe, Network_Toolkit_1.19.1_Portable.zip, Network_Toolkit_1.19.1_Update.zip and SHA256SUMS; SHA256SUMS entries match GitHub's asset digests. PR #42 Checks (pull_request https://github.com/TechSavage1989/network-toolkit/actions/runs/41378520940, push https://github.com/TechSavage1989/network-toolkit/actions/runs/41378516575) and Phase 6 workflow https://github.com/TechSavage1989/network-toolkit/actions/runs/41378516656 passed on the exact source. During review a CSS :has() slowdown that made the File Transfer editor test fail was found and fixed before merge.
