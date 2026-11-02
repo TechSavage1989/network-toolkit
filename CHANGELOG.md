@@ -1,3 +1,7 @@
+## Unreleased
+
+- Local network > IP configuration loads in two steps: adapter settings appear at once (Public IP, then Current configuration and the IPv4 editor); Network actions, which need the slower Windows adapter-state read, fill in below afterwards instead of holding up the page.
+
 ## 1.19.2 Beta 2 - Reliability and short-window polish (published 2026-11-02)
 
 - Text Editor compare keeps both documents aligned to the end of the file when a status line wraps.

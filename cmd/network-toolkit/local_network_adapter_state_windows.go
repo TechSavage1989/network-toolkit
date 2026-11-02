@@ -17,6 +17,17 @@ import (
 func readLocalIP(ctx context.Context) (localIPSnapshot, error) {
 	return localReadIPWithAdmin(ctx, readLocalIPConfiguration, localReadAdapterAdmin)
 }
+
+// readLocalIPBasic is the fast native read only. Administrative state is
+// normalized to unknown/not editable until the full read replaces it.
+func readLocalIPBasic(ctx context.Context) (localIPSnapshot, error) {
+	snapshot, err := readLocalIPConfiguration(ctx)
+	if err != nil {
+		return snapshot, err
+	}
+	snapshot.Adapters = localMergeAdapterAdmin(snapshot.Adapters, nil)
+	return snapshot, ctx.Err()
+}
 func localReadAdapterAdmin(ctx context.Context) ([]localAdapterAdminRecord, error) {
 	if localSystemDirectoryError != nil {
 		return nil, localSystemDirectoryError

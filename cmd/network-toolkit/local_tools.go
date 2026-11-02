@@ -69,6 +69,9 @@ type localIPSnapshot struct {
 	Elevated  bool             `json:"elevated"`
 	Adapters  []localIPAdapter `json:"adapters"`
 	Note      string           `json:"note,omitempty"`
+	// AdminPending marks a basic-phase snapshot whose Enable/Disable state has
+	// not been read yet.
+	AdminPending bool `json:"adminPending,omitempty"`
 }
 
 type localHostsSnapshot struct {
@@ -144,6 +147,10 @@ type localToolsBackend struct {
 	readHosts func(context.Context) (localHostsSnapshot, error)
 	readIP    func(context.Context) (localIPSnapshot, error)
 	apply     func(context.Context, localToolsRequest) localApplyResult
+	// readIPBasic returns the native adapter snapshot without the slower
+	// administrative-state read; the UI uses it to render first and fill in
+	// Network actions afterwards. Optional: nil falls back to readIP.
+	readIPBasic func(context.Context) (localIPSnapshot, error)
 }
 
 type localToolsManager struct {
@@ -160,7 +167,7 @@ type localToolsManager struct {
 }
 
 func newLocalToolsManager(ctx context.Context) *localToolsManager {
-	m := newLocalToolsManagerWithBackend(ctx, localToolsBackend{localToolsAvailable(), readLocalHosts, readLocalIP, applyLocalTools})
+	m := newLocalToolsManagerWithBackend(ctx, localToolsBackend{available: localToolsAvailable(), readHosts: readLocalHosts, readIP: readLocalIP, apply: applyLocalTools, readIPBasic: readLocalIPBasic})
 	m.wifi = localWiFiBackend{read: readLocalWiFi, reveal: revealLocalWiFi}
 	return m
 }
@@ -420,10 +427,17 @@ func (a *application) handleLocalToolsWithManager(w http.ResponseWriter, r *http
 		ctx, cancel := context.WithTimeout(r.Context(), localToolsReadTimeout(path))
 		defer cancel()
 		if path == "ip" {
-			value, err := m.backend.readIP(ctx)
+			read, basic := m.backend.readIP, r.URL.Query().Get("phase") == "basic"
+			if basic && m.backend.readIPBasic != nil {
+				read = m.backend.readIPBasic
+			}
+			value, err := read(ctx)
 			if err != nil {
 				jsonError(w, 500, err.Error())
 				return
+			}
+			if basic && m.backend.readIPBasic != nil {
+				value.AdminPending = true
 			}
 			stampLocalIPSnapshot(&value, time.Now())
 			jsonResponse(w, 200, value)
