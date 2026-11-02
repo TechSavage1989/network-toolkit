@@ -1,4 +1,4 @@
-## 1.19.2 Beta 2 - Reliability and short-window polish (candidate)
+## 1.19.2 Beta 2 - Reliability and short-window polish (published 2026-11-02)
 
 - Text Editor compare keeps both documents aligned to the end of the file when a status line wraps.
 - Monitor/Ping graphs in 1280x800 windows: taller plot (84 to 99px) and two complete sample rows; compact overview strip, toolbar and header under 820px height.

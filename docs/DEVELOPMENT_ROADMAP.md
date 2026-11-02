@@ -14,7 +14,7 @@
 | Phase 6 | Owner-approved tool consolidation: Test a target, File Transfer, Terminal sidebar button removed | Published v1.18.5 Beta 5 (2026-11-02); side-by-side results view and physical Windows/live-device acceptance outstanding; see [handoff](UX_PHASE6_HANDOFF.md) |
 | After Phase 6 | UI guidelines, layout freeze and 1.18.0 stable candidate | [UI guidelines](UI_GUIDELINES.md) adopted, layout frozen (changes that move or rename controls need owner approval), README screenshots added. **Published v1.19.0 stable on 2026-11-02** (owner chose 1.19.0 because a 1.18.0 stable would sort below the published 1.18.5 beta) |
 | Consolidation addendum | Owner-approved post-1.19.0 merges ([UX_AUDIT.md section 12](UX_AUDIT.md)): Device check, Connection monitor and Device details into Test a target; HTTP + TLS into Test a website; Hosts file into Local network; Ping/TCP sweeps into Network discovery. Wake on LAN kept | **Published v1.19.1 Beta 1 (opt-in) on 2026-11-02**; stable remains v1.19.0 |
-| Reliability follow-up | Flaky CI checks made behavior-based; Text Editor compare pane-height bug; compact Monitor graph chrome in short windows | v1.19.2 Beta 2 candidate on branch fix/flaky-tests-monitor-graph, not published |
+| Reliability follow-up | Flaky CI checks made behavior-based; Text Editor compare pane-height bug; compact Monitor graph chrome in short windows | **Published v1.19.2 Beta 2 (opt-in) on 2026-11-02**; stable remains v1.19.0 |
 
 ## Rules
 - Phase 0 is documentation only, with **no release**.

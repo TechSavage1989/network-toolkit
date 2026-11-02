@@ -1,4 +1,6 @@
-# v1.19.2 Beta 2 - reliability candidate (2026-11-02) - NOT PUBLISHED
+# v1.19.2 Beta 2 - publication verified (2026-11-02)
+
+Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.19.2 at 2026-11-02T05:23:07Z; stable latest remains v1.19.0. Merged PR #44; tag v1.19.2 points to merge commit 78555d6cf716b84bb0a5706df37ae6df8fc3fe72. Guarded Release workflow https://github.com/TechSavage1989/network-toolkit/actions/runs/41393451200 completed build and publish. Four assets: Network_Toolkit.exe, Network_Toolkit_1.19.2_Portable.zip, Network_Toolkit_1.19.2_Update.zip and SHA256SUMS; SHA256SUMS entries match GitHub's asset digests. PR #44 Checks (https://github.com/TechSavage1989/network-toolkit/actions/runs/41391957700 and https://github.com/TechSavage1989/network-toolkit/actions/runs/41391952867) and the Phase 6 workflow passed on the exact source.
 
 Branch fix/flaky-tests-monitor-graph, based on published v1.19.1. Owner asked to fix the intermittent CI checks and the cramped Monitor graph at 1280x800, and to publish the result as a beta when green.
 
