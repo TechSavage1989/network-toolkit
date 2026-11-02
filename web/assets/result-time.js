@@ -95,10 +95,11 @@
  const isKey=key=>['time','timestamp','observedAt','recordedAt','snapshotTime','captured','checkedAt'].includes(key);
  const snapshot=job=>['routes','arp','connections','wifi','ipconfig'].includes(job?.tool)||job?.result?.data?.timeKind==='snapshot';
  function recorded(row,job){return value(row)??(snapshot(job)?value(job?.result?.data):undefined);}
- // timeFormat 'time' shows the clock only; the date is in the result header.
+ // timeFormat 'time' shows the clock only (with milliseconds and zone); the
+ // date is in the result header.
  function column(job,timeFormat){
   const name=columnLabel(snapshot(job)?'Snapshot':'Recorded'),compact=timeFormat==='time';
-  return {id:'time',name,type:'date',value:row=>recorded(row,job),render:row=>cell(recorded(row,job),{label:name,date:!compact,milliseconds:!compact})};
+  return {id:'time',name,type:'date',value:row=>recorded(row,job),render:row=>cell(recorded(row,job),{label:name,date:!compact})};
  }
  const api=Object.freeze({epoch,compareInstants,format,elapsed,cell,value,isKey,recorded,column,snapshot,unknown,defaults,preferences,normalizePreferences,configure,zoneLabel,timeLabel,columnLabel,timeZones,isTimeZone});
  if(typeof module==='object'&&module.exports)module.exports=api;
