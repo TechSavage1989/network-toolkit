@@ -124,7 +124,10 @@
 
   function resultHTML(job) {
     const source = jobSource(job);
-    if (!source) return '';
+    // Automatic routing is the default and is already shown in the command bar
+    // and the result header; only a specifically chosen adapter is worth a
+    // recorded-source panel (owner-approved results polish, 2026-11-02).
+    if (!source || source.mode === 'automatic') return '';
     // Keep the immutable run context available without duplicating the sidebar
     // selection in the shared results header. This disclosure is read-only.
     return '<details class="recorded-diagnostic-source" data-detail="recorded-source"><summary>Recorded source: ' +

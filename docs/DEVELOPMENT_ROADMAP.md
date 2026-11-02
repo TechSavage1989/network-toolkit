@@ -16,6 +16,7 @@
 | Consolidation addendum | Owner-approved post-1.19.0 merges ([UX_AUDIT.md section 12](UX_AUDIT.md)): Device check, Connection monitor and Device details into Test a target; HTTP + TLS into Test a website; Hosts file into Local network; Ping/TCP sweeps into Network discovery. Wake on LAN kept | **Published v1.19.1 Beta 1 (opt-in) on 2026-11-02**; stable remains v1.19.0 |
 | Reliability follow-up | Flaky CI checks made behavior-based; Text Editor compare pane-height bug; compact Monitor graph chrome in short windows | **Published v1.19.2 Beta 2 (opt-in) on 2026-11-02**; stable remains v1.19.0 |
 | IP configuration load order | Owner report: slow IP configuration page; Network actions moved below Current configuration and loaded after the fast adapter read | **Published v1.19.3 Beta 3 (opt-in) on 2026-11-02**; stable remains v1.19.0 |
+| Results polish | Owner-approved: leftover-field dump removed, Recorded source only for a chosen adapter, Activity log collapsed last; per-tool review sheet to follow | v1.19.4 Beta 4 candidate on branch ux/results-polish, not published |
 
 ## Rules
 - Phase 0 is documentation only, with **no release**.

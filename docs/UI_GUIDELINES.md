@@ -78,6 +78,8 @@ States every tool provides:
 - **Loading/progress:** the shared `progress` style or a running status; never a blank area.
 - **Error:** the original error text plus a next step. Never suggest bypassing a certificate, host-key or permission warning.
 
+Results pages show, in order: the result header (title, status, target, recorded time), the tool's primary results, a collapsed "Recorded source" panel only when a specific adapter was chosen (Automatic routing is already in the header), and the collapsed Activity log last. Leftover result fields are not dumped into the page; they remain in Copy and Export.
+
 ## Color roles
 
 Dark is the default theme; light is equivalent. Use roles, not hex values.

@@ -1,3 +1,9 @@
+## 1.19.4 Beta 4 - Results polish (candidate)
+
+- Results pages no longer show an "Additional information" dump of leftover fields (recorded source object, target, recorded time); these are already in the result header and remain in Copy and Export.
+- "Recorded source" appears only when a specific adapter was chosen; Automatic routing, the default, is already shown in the command bar and header.
+- The Activity log stays, collapsed, at the bottom.
+
 ## 1.19.3 Beta 3 - IP configuration load order (published 2026-11-02)
 
 - Local network > IP configuration loads in two steps: adapter settings appear at once (Public IP, then Current configuration and the IPv4 editor); Network actions, which need the slower Windows adapter-state read, fill in below afterwards instead of holding up the page.
