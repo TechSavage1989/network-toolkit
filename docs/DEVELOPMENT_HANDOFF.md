@@ -1,6 +1,6 @@
-# v1.18.5 Beta 5 - Phase 6 release candidate (2026-11-02)
+# v1.18.5 Beta 5 - publication verified (2026-11-02)
 
-Rebased on main after published v1.18.4. The owner approved the Phase 6 consolidation and asked to publish. Read docs/UX_PHASE6_HANDOFF.md, docs/UX_POLISH_PLAN.md and docs/DEVELOPMENT_ROADMAP.md before proceeding.
+Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.18.5 at 2026-11-02T00:44:07Z. Merged PR #37; tag v1.18.5 points to merge commit 36ef57d14b078bf5c1f9b29b2073787cd3d38609. Guarded Release workflow https://github.com/TechSavage1989/network-toolkit/actions/runs/41368461612 completed build and publish successfully. Four assets: Network_Toolkit.exe, Network_Toolkit_1.18.5_Portable.zip, Network_Toolkit_1.18.5_Update.zip and SHA256SUMS; the SHA256SUMS entries match GitHub's asset digests. Stable latest remains v1.17.136. The owner approved the Phase 6 consolidation and asked to publish. Read docs/UX_PHASE6_HANDOFF.md, docs/UX_POLISH_PLAN.md and docs/DEVELOPMENT_ROADMAP.md before proceeding.
 
 Phase 6 merges Ping, Trace route, DNS lookup and TCP ports into Test a target (tabs share the host and show each test's latest result) and SFTP, FTP/FTPS and TFTP into File Transfer (protocol picker). Former names remain in command search. The Terminal sidebar's separate Sidebar button is removed. The first-launch welcome stays on Overview. Engines, options, jobs, saved profiles, credentials, vault, sessions, UAC and host-key/overwrite confirmations are unchanged.
 
