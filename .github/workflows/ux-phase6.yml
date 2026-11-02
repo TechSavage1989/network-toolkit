@@ -1,7 +1,7 @@
 name: Phase 6 UX tool consolidation
 on:
   push:
-    branches: ['beta/1.18.5-ux-phase6', 'beta/1.18.5-release', 'release/1.19.0-stable', 'ux/consolidation-2']
+    branches: ['beta/1.18.5-ux-phase6', 'beta/1.18.5-release', 'release/1.19.0-stable', 'ux/consolidation-2', 'fix/flaky-tests-monitor-graph']
   workflow_dispatch:
 permissions:
   contents: read
