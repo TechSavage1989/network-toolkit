@@ -24,15 +24,17 @@ The left sidebar has five groups. Order is fixed.
 | Group | Entries |
 | --- | --- |
 | Home | Overview · Saved targets · Reports |
-| Diagnose | Device check · **Test a target** (Ping, Trace route, DNS lookup, TCP ports) · SMTP test · HTTP check · TLS certificate · Device details · Network discovery · Connection monitor · Packet capture |
+| Diagnose | **Test a target** (Device check, Ping, Trace route, DNS lookup, TCP ports, Connection monitor, Device details) · **Test a website** (HTTP check, TLS certificate) · SMTP test · Network discovery · Packet capture |
 | Connect | Terminal · Wake on LAN |
 | Transfer | **File Transfer** (SFTP, FTP / FTPS, TFTP) |
-| Configure | Local network · Hosts file · Network utilities · Text Editor |
+| Configure | **Local network** (IP configuration, Routing table, ARP / neighbors, Connections, Wi-Fi, Hosts file) · Network utilities · Text Editor |
 
 Rules:
-- A merged entry (Test a target, File Transfer) reopens the member used last. Code that opens a specific member (for example a device's Open SFTP) opens exactly that member.
+- A merged entry (Test a target, Test a website, File Transfer) reopens the member used last; Local network opens its last view. Code that opens a specific member (for example a device's Open SFTP) opens exactly that member.
 - Every former or member tool name stays findable in command search (Ctrl+Shift+P).
 - Activity dots on a merged entry combine all its members (for example, a running TFTP server marks File Transfer).
+- Ping and TCP ports check one target. Scanning a network or address range always happens in Network discovery; Ping and TCP ports link to it.
+- Test a website uses one address for both tabs: HTTP check adds `https://` to a bare host, and TLS certificate uses the host from a URL.
 - The sidebar can be collapsed to an icon rail; single clicks navigate, the arrow, divider or a double-click expands it.
 
 ## Page anatomy
@@ -44,7 +46,9 @@ Top to bottom, a tool page has:
 4. **Workspace:** Configuration (target, source interface, options; advanced options behind Expand options) and Results.
 
 Member tabs:
-- Test a target tabs show a status dot for the current target: green finished, yellow running, red failed, faint not yet run. Switching tabs never starts anything.
+- Test a target and Test a website tabs show a status dot for the current target: green finished, yellow running, red failed, faint not yet run. Switching tabs never starts anything.
+- Tab labels may be short (DNS, Ports, Monitor, Details); the tooltip and command search use the full tool name.
+- Test tabs stay on one row. When space runs out they scroll sideways, and they stay visible in short windows where the rest of the page heading is hidden.
 - File Transfer protocol buttons carry a tooltip with the protocol's security (SFTP encrypted over SSH; FTPS encrypted, FTP not; TFTP has no encryption or login).
 
 Terminal: a session sidebar (Saved, Recent, Files, Macros) docks left or right. Clicking the selected tab hides it; clicking any tab shows it. There is no separate Sidebar button.

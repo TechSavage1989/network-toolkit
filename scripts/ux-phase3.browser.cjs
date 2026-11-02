@@ -41,9 +41,9 @@ const check=name=>{report.checks.push(name);console.log('PASS '+name)};
  const nav=await p.evaluate(()=>({ids:[...document.querySelectorAll('#navigation [data-page]')].map(b=>b.dataset.page),
   groups:[...document.querySelectorAll('#navigation .nav-label')].map(x=>x.textContent)}));
  assert.deepEqual(nav.groups,['Home','Diagnose','Connect','Transfer','Configure']);
- // Phase 6 merged Ping/Trace route/DNS/TCP ports into Test a target and
- // SFTP/FTP/TFTP into File Transfer; former names stay in the palette.
- assert.equal(new Set(nav.ids).size,19);assert(nav.ids.includes('editor')&&nav.ids.includes('terminal')&&nav.ids.includes('sftp')&&nav.ids.includes('ping'));
+ // Phase 6 and the 1.19.1 addendum merged tools into Test a target, Test a
+ // website, File Transfer and Local network; former names stay in the palette.
+ assert.equal(new Set(nav.ids).size,14);assert(nav.ids.includes('editor')&&nav.ids.includes('terminal')&&nav.ids.includes('sftp')&&nav.ids.includes('ping'));
  check('Tool routes grouped under five approved groups with Phase 6 merged entries');
  await p.locator('#uxCommandLauncher').click();
  await p.locator('[role="dialog"][aria-label="Search tools and commands"]').waitFor();

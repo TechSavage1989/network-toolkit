@@ -1,3 +1,15 @@
+# v1.19.1 Beta 1 - consolidation addendum candidate (2026-11-02) - NOT PUBLISHED
+
+Branch ux/consolidation-2, based on published v1.19.0 stable. The owner approved the redundancy proposals (docs/UX_AUDIT.md section 12), keeping Wake on LAN as its own tool. docs/UI_GUIDELINES.md is updated in the same change, as the layout freeze requires.
+
+- Test a target tabs: Device check, Ping, Trace route, DNS, Ports, Monitor, Details (short labels; tooltips and command search use full names). Test a website: HTTP check and TLS certificate with one shared address. Local network gains a Hosts file tab. Ping/TCP ports no longer switch to network sweeps; Scan a network opens Network discovery, and saved sweep settings/ranges migrate there.
+- Fixed: at 600px window height the diagnostic page heading (and with it the Phase 6 test tabs) was hidden; test tabs now stay visible.
+- Release channel switched back to beta (docs/RELEASE_CHANNEL.txt, updateBuildChannel); stable users stay on 1.19.0.
+- Tests: ux-phase6 browser test covers the new groups, website address handling, Hosts tab and sweep migration. features-94/95 graph-space checks now use supported widths (1440/1280/960 at 1000px height) instead of 820/390px.
+- Known limitation (also in v1.19.0): at 1280x800 the Monitor graph's plot area is 84px, under the 90px the graph-space check expects in taller windows. Follow-up: make graph controls more compact in short windows.
+
+---
+
 # v1.19.0 stable candidate (2026-11-02) - NOT PUBLISHED
 
 Branch release/1.19.0-stable, built on the post-Phase 6 docs branch (UI guidelines draft, README screenshots). The owner chose 1.19.0 instead of the planned 1.18.0, because a 1.18.0 stable would sort below the published v1.18.5 beta and the updater refuses downgrades.

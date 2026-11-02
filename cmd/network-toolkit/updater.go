@@ -27,7 +27,7 @@ import (
 const updateMaxPackage = 128 << 20
 const updateMaxEXE = 96 << 20
 const updateReleasesURL = "https://github.com/TechSavage1989/network-toolkit/releases/latest"
-const updateBuildChannel = "stable" // Release build channel; beta release changes this to "beta".
+const updateBuildChannel = "beta" // Release build channel; beta release changes this to "beta".
 
 var updateVersionPattern = regexp.MustCompile(`^(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})\.(0|[1-9][0-9]{0,4})$`)
 

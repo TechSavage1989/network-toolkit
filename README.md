@@ -16,12 +16,15 @@ A portable Windows toolkit for network diagnostics, device connections, file tra
 
 [Download the latest stable release](https://github.com/TechSavage1989/network-toolkit/releases/latest).
 
+Latest beta: [v1.19.1](https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.19.1) (opt-in; not a stable release).
+
 
 ## Features
 
-- Test a target: enter a host once and run Ping, Trace route, DNS lookup and TCP port checks from one page, plus SMTP, HTTP and TLS checks.
+- Test a target: enter a host once and run a device check, Ping, Trace route, DNS lookup, TCP port checks, a continuous monitor or device details from one page.
+- Test a website: HTTP and TLS certificate checks for one address; SMTP tests for mail servers.
 - Discover network devices and inspect connection details.
-- Monitor targets and inspect live graphs and packet captures.
+- Watch targets with live response-time graphs and inspect packet captures.
 - Connect with SSH, Telnet and supported serial terminals, using saved connections, multiple tabs and macros.
 - File Transfer: browse, transfer and host files over SFTP, FTP/FTPS and TFTP from one page.
 - Open, edit and compare text files, including common network device configurations.

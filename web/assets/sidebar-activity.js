@@ -30,7 +30,7 @@
  }
  // Phase 6 merged navigation entries report activity from every member tool,
  // so a running TFTP server still marks File Transfer.
- const groups=[['ping','trace','dns','tcp'],['sftp','ftp','tftp']];
+ const groups=[['quick','ping','trace','dns','tcp','monitor','identify'],['http','tls'],['sftp','ftp','tftp'],['local','hosts']];
  function combined(page){
   const members=groups.find(group=>group.includes(page))||[page];let total=null;
   for(const member of members){const counts=snapshot?.[member];if(!counts)continue;total=total||{};for(const [key,value] of Object.entries(counts))total[key]=(total[key]||0)+value;}

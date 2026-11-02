@@ -1,0 +1,21 @@
+Network Toolkit 1.19.1 Beta 1
+
+## What's New
+
+- A shorter sidebar: related tools now share one page with tabs.
+- Test a target now also holds Device check, Monitor and Device details next to Ping, Trace route, DNS and Ports.
+- Test a website combines HTTP check and TLS certificate. Enter an address once for both.
+- The Hosts file is now a tab in Local network.
+- Ping and TCP ports check one target; Scan a network takes you to Network discovery for whole networks and ranges.
+- Test tabs stay visible in small windows.
+
+## Additional Details
+
+- Every test keeps its own engine, options, results, history and reports. Switching tabs never starts a test.
+- HTTP check adds https:// to a bare hostname; TLS certificate uses the hostname from a full web address.
+- Saved Ping or TCP ports network-sweep settings now open on a single target, and saved ranges open in Network discovery. Discovery records ICMP and TCP results for every address.
+- Former tool names (Device check, Connection monitor, Device details, HTTP check, TLS certificate, Hosts file, Ping, Trace route, DNS lookup, TCP ports) remain in command search.
+- Wake on LAN keeps its own entry. Device details also remains on each discovered device's menu.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Windows/UAC review, Hosts/IP/adapter confirmation, SSH host-key trust, file overwrite checks and explicit user-consented SHA-256-verified updates are unchanged.
+- This is an opt-in beta. Stable users stay on 1.19.0. Portable executable filename remains Network_Toolkit.exe.
+- Validation is performed using hosted and synthetic fixtures; physical Windows and live-device acceptance is not claimed.

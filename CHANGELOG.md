@@ -1,3 +1,9 @@
+## 1.19.1 Beta 1 - Tool consolidation addendum (candidate)
+
+- Test a target adds Device check, Monitor and Device details tabs; Test a website combines HTTP check and TLS certificate; the Hosts file is a Local network tab. The sidebar goes from 19 to 14 entries.
+- Ping and TCP ports check one target; network sweeps open in Network discovery.
+- Test tabs stay visible in short windows (previously hidden at 600px height).
+
 ## 1.19.0 - Stable (candidate)
 
 - First stable release of the UX polish work, combining the 1.18.1 to 1.18.5 betas: consistent visuals, grouped navigation, command search and F1 help, unified Settings, first-run welcome and clearer guidance, Test a target and File Transfer.

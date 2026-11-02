@@ -232,3 +232,18 @@ This table is a proposed policy for the owner's approval. Changes to confirmatio
 
 
 **Owner decision: approved to proceed.** Approve or revise the proposed navigation grouping, the two consolidations and the confirmation classifications before implementation. Phase 2 is blocked until explicit approval. Screenshots are synthetic and do not certify native Windows or real-device behavior.
+
+## 12. Post-1.19.0 consolidation addendum (owner-approved 2026-11-02)
+
+After v1.19.0 the owner reviewed a redundancy analysis and approved all proposals except removing Wake on LAN's navigation entry ("keep Wake on LAN as its own tool"). Approved, to ship as one beta (1.19.1):
+
+| Change | Overlap | Implementation |
+| --- | --- | --- |
+| Connection monitor into Test a target | Continuous ICMP/TCP checks with a chart; Ping already runs until stopped with the same graph | Monitor tab in Test a target; engine unchanged |
+| Device check into Test a target | Runs name lookup, ping and TCP ports, three of the Test a target tests | Device check tab in Test a target; Overview's Run device check still works |
+| HTTP check + TLS certificate into Test a website | Both test one web server | New Test a website entry with HTTP and TLS tabs; one shared address (TLS uses the host from a URL; HTTP adds https:// to a bare host) |
+| Hosts file into Local network | Both cover this computer's network configuration | Hosts file tab in Local network; Windows/UAC review unchanged |
+| Device details out of the sidebar | Discovery reads device models and offers Device details per device | Device details tab in Test a target and on the discovered-device menu |
+| Ping/TCP network sweep into Network discovery | Both sweep a network with ICMP/TCP; discovery records more | Ping and TCP ports check single targets; a Scan a network button opens Network discovery; saved sweep settings and saved ranges open in discovery |
+
+Wake on LAN stays in Connect. Former names remain in command search; saved preferences migrate; confirmations unchanged. Layout changes update docs/UI_GUIDELINES.md.

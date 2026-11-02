@@ -4,7 +4,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const {handleEditorActivityMetadata}=require('./editor-activity-fixture.cjs');
 const root=path.resolve(__dirname,'..'),out=process.env.TOOLKIT_TEST_OUTPUT||path.join(root,'test-results','ux-phase6');
-let browser,stored={appUpdatePreferences:{enabled:false},profiles:[{id:'kept',name:'Existing target',target:'192.0.2.10',note:'keep',tool:'dns'}],ftpProfiles:[{id:'ftp-kept',name:'Kept FTP',host:'192.0.2.20',port:21,username:'operator',security:'explicit'}],fileTransferProtocol:'ftp',firstLaunchWelcomeSeen:true,target:'192.0.2.10'};
+let browser,stored={appUpdatePreferences:{enabled:false},profiles:[{id:'kept',name:'Existing target',target:'192.0.2.10',note:'keep',tool:'dns'}],ftpProfiles:[{id:'ftp-kept',name:'Kept FTP',host:'192.0.2.20',port:21,username:'operator',security:'explicit'}],fileTransferProtocol:'ftp',forms:{ping:{scope:'subnet',count:10},tcp:{scope:'subnet'}},firstLaunchWelcomeSeen:true,target:'192.0.2.10'};
 let syntheticJobs=[],activity={tools:{}};
 const traffic=[],errors=[],screenshots=[],checks=[];
 async function make(viewport){
@@ -17,7 +17,7 @@ async function make(viewport){
   if(name.startsWith('/api/')){
    assert(['GET','PUT'].includes(method),'Unexpected API write: '+method+' '+name);
    let data={};
-   if(name==='/api/status')data={version:'1.19.0',os:'windows',arch:'amd64',system:{hostname:'SYNTHETIC-PHASE6',interfaces:[]}};
+   if(name==='/api/status')data={version:'1.19.1',os:'windows',arch:'amd64',system:{hostname:'SYNTHETIC-PHASE6',interfaces:[]}};
    if(name==='/api/state'){if(method==='PUT'){stored=request.postDataJSON();}else data=stored;}
    if(name==='/api/system')data={hostname:'SYNTHETIC-PHASE6',interfaces:[],gateways:[],dnsServers:[]};
    if(name==='/api/jobs'||name==='/api/jobs?brief=1')data=syntheticJobs;
@@ -51,15 +51,16 @@ const navLabels=p=>p.locator('#navigation .nav-item span:not(.badge):not(.sideba
  fs.mkdirSync(out,{recursive:true});browser=await chromium.launch({headless:true,args:['--no-sandbox']});
  let {p,context}=await make({width:1280,height:800});
  const labels=await navLabels(p);
- for(const gone of ['Ping','Trace route','DNS lookup','TCP ports','TFTP','SFTP / FTP / FTPS'])assert(!labels.includes(gone),gone+' should be merged');
- assert(labels.includes('Test a target')&&labels.includes('File Transfer'));
+ for(const gone of ['Ping','Trace route','DNS lookup','TCP ports','TFTP','SFTP / FTP / FTPS','Device check','Connection monitor','Device details','HTTP check','TLS certificate','Hosts file'])assert(!labels.includes(gone),gone+' should be merged');
+ for(const kept of ['Test a target','Test a website','File Transfer','Local network','Wake on LAN','Network discovery'])assert(labels.includes(kept),kept);
+ assert.deepEqual(await p.evaluate(()=>[state.forms.ping.scope,state.forms.tcp.scope]),['single','single'],'saved sweep settings open on a single target');
  assert.equal(await p.evaluate(()=>state.fileTransferProtocol),'ftp','saved protocol migrates');
  assert.equal(await p.evaluate(()=>state.targetTest),'ping','missing test choice defaults to Ping');
  assert.equal(await p.evaluate(()=>state.profiles[0].name),'Existing target');
  check('Navigation merges four tests and three transfer protocols; existing preferences kept');
  await p.locator('#navigation .nav-item',{hasText:'Test a target'}).click();
  assert.equal(await p.evaluate(()=>state.activePage),'ping');
- assert.equal(await p.locator('.nt-target-tests [role="tab"]').count(),4);
+ assert.equal(await p.locator('.nt-target-tests [role="tab"]').count(),7);
  assert.equal(await p.inputValue('#globalTarget'),'192.0.2.10','target entered once is shared');
  await p.locator('.nt-target-tests [data-target-test="dns"]').click();
  assert.equal(await p.evaluate(()=>state.activePage),'dns');assert.equal(await p.inputValue('#globalTarget'),'192.0.2.10');
@@ -71,9 +72,30 @@ const navLabels=p=>p.locator('#navigation .nav-item span:not(.badge):not(.sideba
  await p.evaluate(()=>pollJobs());
  await p.waitForFunction(()=>document.querySelector('.nt-target-tests [data-target-test="trace"] .is-running'));
  const status=await p.evaluate(()=>Object.fromEntries([...document.querySelectorAll('.nt-target-tests [data-target-test]')].map(b=>[b.dataset.targetTest,b.querySelector('.nt-target-test-status').className.match(/is-(\w+)/)[1]])));
- assert.deepEqual(status,{ping:'done',trace:'running',dns:'none',tcp:'none'},'status reflects only the current target');
+ assert.deepEqual(status,{quick:'none',ping:'done',trace:'running',dns:'none',tcp:'none',monitor:'none',identify:'none'},'status reflects only the current target');
  await p.screenshot({path:path.join(out,'test-a-target-1280-dark.png')});screenshots.push('test-a-target-1280-dark.png');
  check('Each test tab shows its latest result for the current target');
+ // Test a website: one address works for both tabs.
+ await p.evaluate(()=>{window.__posted=[];const real=api;api=async(path,method,body,...rest)=>{if(path==='/jobs'&&method==='POST'){window.__posted.push({tool:body.tool,target:body.target});return {id:'p6-web-'+window.__posted.length,tool:body.tool,target:body.target,status:'queued',started:new Date().toISOString(),options:body.options,events:[]};}return real(path,method,body,...rest);};});
+ await p.locator('#navigation .nav-item',{hasText:'Test a website'}).click();
+ assert.equal(await p.evaluate(()=>state.activePage),'http');assert.equal(await p.locator('.nt-target-tests [role="tab"]').count(),2);
+ await p.evaluate(()=>{state.target='example.com';});await p.evaluate(()=>startJob());
+ await p.locator('.nt-target-tests [data-target-test="tls"]').click();
+ await p.evaluate(()=>{state.target='https://example.com/login';});await p.evaluate(()=>startJob());
+ assert.deepEqual(await p.evaluate(()=>window.__posted),[{tool:'http',target:'https://example.com'},{tool:'tls',target:'example.com'}]);
+ await p.evaluate(()=>{state.target='192.0.2.10';navigate('overview');});
+ await p.locator('#navigation .nav-item',{hasText:'Test a website'}).click();assert.equal(await p.evaluate(()=>state.activePage),'tls','returns to last website test');
+ check('Test a website shares one address: HTTP adds https:// to a host, TLS uses the host from a URL');
+ await p.locator('#navigation .nav-item',{hasText:'Local network'}).click();
+ await p.locator('.local-tool-header [data-page="hosts"]').click();assert.equal(await p.evaluate(()=>state.activePage),'hosts');
+ assert.equal(await p.locator('#navigation .nav-item.active span').first().textContent(),'Local network');
+ await p.locator('.nt-local-views [data-local-open="routes"]').click();assert.deepEqual(await p.evaluate(()=>[state.activePage,state.localTab]),['local','routes']);
+ check('Hosts file is a Local network tab and links back to the other views');
+ await p.evaluate(()=>navigate('ping'));assert.equal(await p.locator('[data-target-scope]').count(),0,'no sweep switch on Ping');
+ await p.locator('.scope-discovery [data-page="discover"]').click();assert.equal(await p.evaluate(()=>state.activePage),'discover');
+ await p.evaluate(()=>useTarget('192.0.2.0/28','ping'));assert.equal(await p.evaluate(()=>[state.activePage,state.networkRange].join()),'discover,192.0.2.0/28');
+ await p.evaluate(()=>{state.target='192.0.2.10';navigate('dns');});
+ check('Network sweeps open in Network discovery; Ping and TCP ports check one target');
  await p.evaluate(()=>navigate('overview'));
  await p.locator('#navigation .nav-item',{hasText:'Test a target'}).click();
  assert.equal(await p.evaluate(()=>state.activePage),'dns','returns to last test');
@@ -91,7 +113,7 @@ const navLabels=p=>p.locator('#navigation .nav-item span:not(.badge):not(.sideba
  await p.waitForFunction(()=>[...document.querySelectorAll('#navigation .nav-item')].some(b=>/File Transfer, Server running/.test(b.getAttribute('aria-label')||'')));
  activity={tools:{}};
  check('Running TFTP server is still shown on the merged File Transfer entry');
- for(const [query,page] of [['TFTP','tftp'],['Trace route','trace'],['TCP ports','tcp'],['SFTP','sftp']]){
+ for(const [query,page] of [['TFTP','tftp'],['Trace route','trace'],['TCP ports','tcp'],['SFTP','sftp'],['Connection monitor','monitor'],['TLS certificate','tls'],['Hosts file','hosts'],['Device details','identify']]){
   await p.evaluate(()=>navigate('overview'));
   await p.keyboard.press('Control+Shift+P');await p.locator('.ux-command-input').fill(query);
   const option=p.locator('#uxCommandResults [role=option]').first();
@@ -105,11 +127,11 @@ const navLabels=p=>p.locator('#navigation .nav-item span:not(.badge):not(.sideba
  await p.screenshot({path:path.join(out,'terminal-sidebar-1280-dark.png')});screenshots.push('terminal-sidebar-1280-dark.png');
  check('Terminal sidebar has no separate Sidebar button; its tabs remain');
  await p.waitForFunction(()=>savedStateRevision===stateRevision);
- assert.equal(stored.targetTest,'tcp');assert.equal(stored.fileTransferProtocol,'sftp');
+ assert.equal(stored.targetTest,'identify');assert.equal(stored.fileTransferProtocol,'sftp');
  await context.close();({p,context}=await make({width:1920,height:1080}));
- assert.equal(await p.evaluate(()=>state.targetTest),'tcp');
+ assert.equal(await p.evaluate(()=>state.targetTest),'identify');
  await p.evaluate(()=>{setTheme('light');});await p.locator('#navigation .nav-item',{hasText:'Test a target'}).click();
- assert.equal(await p.evaluate(()=>state.activePage),'tcp');
+ assert.equal(await p.evaluate(()=>state.activePage),'identify');
  await p.screenshot({path:path.join(out,'test-a-target-1920-light.png')});screenshots.push('test-a-target-1920-light.png');
  check('Last test and protocol choices persist after reopening');
  assert.deepEqual(errors,[]);await context.close();
