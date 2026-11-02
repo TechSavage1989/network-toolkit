@@ -28,7 +28,7 @@ async function main(){
     let body={};try{body=JSON.parse(text||'{}');}catch{}
     calls.push({path:pathname,body});res.setHeader('Content-Type','application/json');
     if(pathname==='/api/remote-browser'&&req.method==='GET')return res.end(JSON.stringify({sessions:[]}));
-    if(body.action==='read-text')return setTimeout(()=>res.end(JSON.stringify({content:'hostname switch\r\ninterface 1/1/1\r\n',hash:'a'.repeat(64),encoding:'UTF-8',bom:false})),250);
+    if(body.action==='read-text')return setTimeout(()=>res.end(JSON.stringify({content:'hostname switch\r\ninterface 1/1/1\r\n',hash:'a'.repeat(64),encoding:'UTF-8',bom:false})),1500);
     const folder=body.path||'/example',delay=folder==='/slow'?350:0;
     setTimeout(()=>res.end(JSON.stringify({path:folder,parent:'/',entries:files(folder)})),delay);
    });return;
