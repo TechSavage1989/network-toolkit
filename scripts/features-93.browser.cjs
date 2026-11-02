@@ -128,7 +128,7 @@ async function latencyGeometry(label){
  assert(geometry.title.width>=Math.min(120,geometry.workspace.width-24)&&geometry.title.height<=3*geometry.titleLineHeight+1,label+' has a readable results heading');
  assert.equal(geometry.obsoleteHeaderSource,0,label+' omits the redundant source caption from the shared header');
  assert.equal(geometry.standaloneSource,0,label+' keeps recorded source out of the fitted graph footer');
- assert.equal(geometry.recordedSource,1,label+' preserves recorded source in existing run details');
+ assert.equal(geometry.recordedSource,0,label+' does not repeat Automatic routing as a recorded-source panel in run details');
  assert.equal(geometry.obsoleteRunControls,0,label+' keeps duplicate run controls out of the graph header');
  assert(geometry.graph.height>=Math.min(frame.height<800?100:150,geometry.workspace.height*.25),label+' graph pane is not crushed');
  assert(geometry.visibleGraphHeight>=90,label+' graph remains visible while its result rows are accessible '+JSON.stringify(geometry));
