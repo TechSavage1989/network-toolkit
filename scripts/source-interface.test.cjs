@@ -90,7 +90,7 @@ check('recorded source is a read-only body disclosure, not a duplicate header co
   assert.match(details, /NetworkToolkitGraphWorkspace\?\.recordsHTML/);
   assert.match(source.controlHTML(selected,adapters,'ping',false), /data-diagnostic-source/);
 });
-check('subnet ping keeps recorded source while actual fitted graphs use entry Run details', () => {
+check('subnet ping records a chosen source as a panel, not Automatic routing; fitted graphs use entry Run details', () => {
   const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path'),page=fs.readFileSync(path.join(__dirname,'../web/index.html'),'utf8');
   const start=page.indexOf('function renderJob('),end=page.indexOf('\nfunction ',start+1);
   const context={jobs:[],NetworkToolkitGraphWorkspace:{},NetworkToolkitSource:source,eventValues:(job,type)=>(job.events||[]).filter(event=>event.data?.type===type),renderRunContext:()=>'',esc:value=>String(value??''),jobTitle:job=>job.tool,pill:()=>'',icon:()=>'',isRunning:()=>false,splitToolPage:()=>false,renderDiagnosticData:()=>'<div>Fixture results</div>',renderActivityLog:()=>'',renderResultExtras:()=>''};
@@ -98,7 +98,11 @@ check('subnet ping keeps recorded source while actual fitted graphs use entry Ru
   assert.doesNotMatch(context.fixtureRenderJob({id:'graph',tool:'ping',status:'completed'}),/data-detail="recorded-source"/);
   for(const details of [{options:{scope:'subnet'}},{result:{data:{scope:'subnet'}}},{events:[{data:{type:'subnet-host',value:{address:'192.0.2.1'}}}]}]){
     const html=context.fixtureRenderJob({id:'subnet',tool:'ping',status:'completed',...details});
-    assert.equal((html.match(/data-detail="recorded-source"/g)||[]).length,1);assert.doesNotMatch(html,/graph-run-panel/);
+    // Automatic routing is already in the header and command bar; it is not repeated as a panel.
+    assert.equal((html.match(/data-detail="recorded-source"/g)||[]).length,0);assert.doesNotMatch(html,/graph-run-panel/);
   }
+  const selected={mode:'selected',status:'validated',interfaceIndex:5,interfaceName:'Ethernet 5',address:'192.0.2.20'};
+  const chosen=context.fixtureRenderJob({id:'subnet-selected',tool:'ping',status:'completed',options:{scope:'subnet'},result:{data:{scope:'subnet',source:selected}}});
+  assert.equal((chosen.match(/data-detail="recorded-source"/g)||[]).length,1);assert.doesNotMatch(chosen,/graph-run-panel/);
 });
 process.stdout.write(passed + ' source-interface checks passed.\n');

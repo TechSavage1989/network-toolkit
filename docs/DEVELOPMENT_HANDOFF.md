@@ -1,3 +1,11 @@
+# v1.19.4 Beta 4 - results polish (2026-11-02) - candidate, NOT PUBLISHED
+
+Owner request: results pages carry redundant technical panels (Device check example: "Recorded source: Automatic routing", "Additional information" with a nested "Source" block repeating mode/status/resolver/note, then the Activity log) that bury the primary results. Owner approved: remove the leftover-field dump, hide Recorded source for Automatic routing (keep it collapsed for a chosen adapter), keep the Activity log collapsed at the bottom; then review each tool's result page from a screenshot sheet for further cuts.
+Change: renderResultExtras returns '' (the v1.17.113 "readable extras" panel is retired; renderStaticObject is still used by the entry readers). NetworkToolkitSource.resultHTML returns '' for mode automatic. Copy and Export are built from result data (jobText/NetworkToolkitReportExport), so no recorded field is lost. Tests updated: result-readers113 (unit + browser: unique evidence must be in Copy/Export text, no extras panel), source-interface (chosen source renders one panel, automatic none), features-92 (no recorded-source panel for automatic routing).
+Next: per-tool result screenshot review sheet for the owner.
+
+---
+
 # v1.19.3 Beta 3 - publication verified (2026-11-02)
 
 Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.19.3 at 2026-11-02T05:57:52Z; stable latest remains v1.19.0. Merged PR #46; tag v1.19.3 points to merge commit 0c3b598fa69b5feff501a348601b2fbb22407bfd. Guarded Release workflow https://github.com/TechSavage1989/network-toolkit/actions/runs/41396803080 completed build and publish. Four assets: Network_Toolkit.exe, Network_Toolkit_1.19.3_Portable.zip, Network_Toolkit_1.19.3_Update.zip and SHA256SUMS; SHA256SUMS entries match GitHub's asset digests. PR #46 pull_request Checks https://github.com/TechSavage1989/network-toolkit/actions/runs/41395359678 passed on the exact source; the parallel push run's browser-workflows107 job failed once in editor-workflows108 (compare gutter visibility, `layout.visibleGutter.length>0`), which passed in the pull_request run and locally 2/2: recorded as intermittent, not waived.

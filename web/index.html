@@ -532,7 +532,7 @@ html,body{height:auto!important;min-height:0!important;overflow:visible!importan
   <aside class="sidebar" id="sidebar" aria-label="Primary navigation">
     <div class="brand"><div class="brand-mark"><img src="../assets/Network_Toolkit_Icon.svg" width="36" height="36" alt="" draggable="false"></div><div><div class="brand-name">Network Toolkit</div><div class="brand-sub">Diagnostics workbench</div><span class="app-system-name" id="hostTop" tabindex="0">Local diagnostics</span></div></div>
     <div class="nav-scroll" id="navigation"></div>
-    <div class="sidebar-foot"><div class="engine-label" id="engineLabel"><span class="dot warn pulse"></span><span>Connecting to app</span></div><div class="engine-sub" id="engineSub">Portable edition · v1.19.3</div><div class="app-utility-actions"><button type="button" class="btn small ghost" id="uxCommandLauncher" title="Search tools and commands (Ctrl+Shift+P)" aria-keyshortcuts="Control+Shift+P" aria-label="Search tools and commands" aria-haspopup="dialog">Search</button><button class="iconbtn" id="themeButton" data-action="theme" aria-label="Switch color theme" title="Switch color theme"></button><button class="iconbtn" id="settingsButton" data-action="settings" aria-label="App settings" title="App settings"></button><button type="button" class="iconbtn" id="uxHelpLauncher" title="Keyboard shortcuts and help (F1)" aria-keyshortcuts="F1" aria-label="Keyboard shortcuts and help">?</button><span class="pill" id="runningCount" hidden>0 running</span></div></div>
+    <div class="sidebar-foot"><div class="engine-label" id="engineLabel"><span class="dot warn pulse"></span><span>Connecting to app</span></div><div class="engine-sub" id="engineSub">Portable edition · v1.19.4</div><div class="app-utility-actions"><button type="button" class="btn small ghost" id="uxCommandLauncher" title="Search tools and commands (Ctrl+Shift+P)" aria-keyshortcuts="Control+Shift+P" aria-label="Search tools and commands" aria-haspopup="dialog">Search</button><button class="iconbtn" id="themeButton" data-action="theme" aria-label="Switch color theme" title="Switch color theme"></button><button class="iconbtn" id="settingsButton" data-action="settings" aria-label="App settings" title="App settings"></button><button type="button" class="iconbtn" id="uxHelpLauncher" title="Keyboard shortcuts and help (F1)" aria-keyshortcuts="F1" aria-label="Keyboard shortcuts and help">?</button><span class="pill" id="runningCount" hidden>0 running</span></div></div>
   </aside>
   <main class="main">
     <span id="crumb" hidden>Overview</span>
@@ -551,7 +551,7 @@ html,body{height:auto!important;min-height:0!important;overflow:visible!importan
       </div>
       <div id="terminalWorkspace" class="hidden" role="region" aria-label="Terminal connections and output" tabindex="0"></div>
       </div>
-      <div class="app-foot"><span class="app-version">Network Toolkit 1.19.3 · Local, portable diagnostics</span><span id="footerStatus">No diagnostic has run.</span><span id="appNavigationFooterSlot"></span></div>
+      <div class="app-foot"><span class="app-version">Network Toolkit 1.19.4 · Local, portable diagnostics</span><span id="footerStatus">No diagnostic has run.</span><span id="appNavigationFooterSlot"></span></div>
     </div>
   </main>
 </div>
@@ -642,7 +642,7 @@ html,body{height:auto!important;min-height:0!important;overflow:visible!importan
 'use strict';
 const SESSION=/^[a-f0-9]{64}$/.test(window.__networkToolkitNativeSession||'')?window.__networkToolkitNativeSession:'__SESSION_TOKEN__';
 const OFFLINE=location.protocol==='file:' || !/^https?:$/.test(location.protocol) || SESSION==='__SESSION_'+'TOKEN__';
-const VERSION='1.19.3';
+const VERSION='1.19.4';
 const WINDOW_MODE='__WINDOW_MODE__';
 const TERMINAL_VIEW=(()=>{try{return JSON.parse('__TERMINAL_VIEW__')}catch{return null}})();
 const EDITOR_VIEW=(()=>{try{return JSON.parse('__EDITOR_VIEW__')}catch{return null}})();
@@ -1037,12 +1037,11 @@ function renderRunContext(j){
  const fullTarget=String(j.target||'Local computer'),scopeList=Array.isArray(j.result?.data?.scopes)?j.result.data.scopes:(j.tool==='discover'||j.options?.scope==='subnet'?NetworkToolkitScanScopes.tokens(fullTarget):[fullTarget]),shortTarget=scopeList.length>2?scopeList.slice(0,2).join(', ')+' and '+(scopeList.length-2)+' more scopes':fullTarget.replace(/\s+/g,' ');
  return '<div class="result-summary'+(j.tool==='discover'&&isRunning(j)&&!j.error&&!j.result?.summary?' hidden':'')+'">'+esc(j.error||j.result?.summary||(isRunning(j)?'Diagnostic in progress. Results update as probes complete.':'Diagnostic ended.'))+'</div><div class="job-meta"><span class="job-meta-context" title="'+esc(fullTarget)+'">'+esc(shortTarget)+' · '+esc(date(j.started))+' · '+esc(elapsed(j))+'</span></div>';
 }
-function renderResultExtras(j){
- const data=j.result?.data;if(!data||typeof data!=='object'||Array.isArray(data))return '';
- const covered={ping:['target','address','statistics','samples'],monitor:['target','address','statistics','samples'],tcp:['ports','openCount','closedCount','timeoutCount'],trace:['target','address','hops','reached'],dns:['query','server','elapsedMs','records','queries'],quick:['checks','note'],sftp:['server','port','operation','remotePath','localPath','newPath','hostKeyFingerprint','hostKeyType','sizeBytes','bytesTransferred','negotiatedBlockSize','elapsedMs','modified','entries'],tftp:['server','port','operation','remotePath','localPath','newPath','hostKeyFingerprint','hostKeyType','sizeBytes','bytesTransferred','negotiatedBlockSize','elapsedMs','modified','entries']};
- if(!covered[j.tool]||data.scope==='subnet'||j.options?.scope==='subnet')return '';
- const rest=Object.fromEntries(displayObjectEntries(data,new Set(covered[j.tool])));return Object.keys(rest).length?'<details class="result-extra-fields"><summary>Additional information</summary>'+renderStaticObject(rest)+'</details>':'';
-}
+// Results show the fields each tool renders on purpose. Leftover result fields
+// (the recorded source object, target, recorded time) are already in the result
+// header and remain in Copy and Export; they are no longer dumped as an
+// "Additional information" panel (owner-approved results polish, 2026-11-02).
+function renderResultExtras(j){return '';}
 function renderJob(j,standalone=false){
  const graphAuxiliary=['ping','monitor'].includes(j.tool)&&!!globalThis.NetworkToolkitGraphWorkspace&&j.result?.data?.scope!=='subnet'&&j.options?.scope!=='subnet'&&!eventValues(j,'subnet-host').length,same=jobs.filter(x=>x.tool===j.tool),context=renderRunContext(j.error?{...j,error:'',result:{...j.result,summary:j.result?.summary||'Diagnostic ended with an error.'}}:j);
  return '<div class="panel'+(graphAuxiliary?' graph-run-panel':'')+'"><div class="result-heading"><div class="grow"><div class="result-title"><h2>'+esc(jobTitle(j))+(j.tool==='discover'?'':' results')+'</h2>'+pill(j.status)+'</div>'+(graphAuxiliary?'<div class="graph-run-expanded-context">'+context+'</div>':context)+'</div><div class="row gap6">'+(!standalone&&same.length>1?'<select class="job-select" aria-label="Previous runs" data-job-select="'+esc(j.tool)+'">'+same.map(x=>'<option value="'+esc(x.id)+'" '+(x.id===j.id?'selected':'')+'>'+esc(time(x.started)+' · '+(x.target||'Local')+' · '+x.status)+'</option>').join('')+'</select>':'')+'<button class="iconbtn" data-action="copy-job" data-id="'+esc(j.id)+'" aria-label="Copy result text" title="Copy result text">'+icon('copy')+'</button><button class="iconbtn" data-action="export-job" data-id="'+esc(j.id)+'" aria-label="Export this result" title="Export this result">'+icon('download')+'</button>'+(isRunning(j)&&(standalone||!splitToolPage())?'<button class="btn small danger" data-action="cancel-job" data-id="'+esc(j.id)+'">'+icon('stop')+'Stop</button>':'')+'</div></div><div class="result-body">'+(j.error?'<div class="notice bad mb">'+icon('alert')+'<span>'+esc(j.error)+'</span></div><div class="help-line mb">'+esc(window.NetworkToolkitPhase5?.recovery?.(j.tool)||'Review the target and try again.')+'</div>':'')+renderDiagnosticData(j)+(!graphAuxiliary?NetworkToolkitSource.resultHTML(j):'')+(!graphAuxiliary?renderResultExtras(j):'')+(!graphAuxiliary&&j.events?.length?'<details data-detail="events"><summary>Activity log · '+j.events.length+' event'+(j.events.length===1?'':'s')+'</summary>'+renderActivityLog(j)+'</details>':'')+'</div></div>';

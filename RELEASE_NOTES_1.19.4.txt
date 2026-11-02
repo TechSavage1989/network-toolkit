@@ -1,0 +1,14 @@
+Network Toolkit 1.19.4 Beta 4
+
+## What's New
+
+- Cleaner results: the extra "Additional information" and "Recorded source: Automatic routing" panels are gone, so the results you ran the check for come first.
+- Everything they showed is still in Copy and Export.
+
+## Additional Details
+
+- "Recorded source" still appears, collapsed, when you chose a specific network adapter for the run.
+- The Activity log stays at the bottom, collapsed, for step-by-step detail.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Security confirmations and Windows/UAC approval are unchanged.
+- This is an opt-in beta. Stable users stay on 1.19.0. Portable executable filename remains Network_Toolkit.exe.
+- Validation uses hosted and synthetic fixtures; physical Windows and live-device acceptance is not formally claimed.

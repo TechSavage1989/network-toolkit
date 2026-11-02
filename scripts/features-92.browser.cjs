@@ -59,7 +59,7 @@ async function assertMonitoringLayout(label){
  assert(geometry.title.width>=Math.min(120,geometry.panel.width-28)&&geometry.title.height<=3*geometry.titleLineHeight+1,label+' result title must not collapse into one-character lines '+JSON.stringify(geometry));
  assert.equal(geometry.obsoleteHeaderSource,0,label+' omits the redundant source caption from the shared header');
  assert.equal(geometry.standaloneSource,0,label+' keeps recorded source out of the fitted graph footer');
- assert.equal(geometry.recordedSource,1,label+' preserves the recorded source in existing run details');
+ assert.equal(geometry.recordedSource,0,label+' does not repeat Automatic routing as a recorded-source panel in run details');
  assert(geometry.scroll.height>=Math.min(200,geometry.panel.height*.35),label+' result heading must leave a usable scrolling results area '+JSON.stringify(geometry));
  assert.equal(geometry.stats.length,8,label+' retains elapsed plus all seven run statistics');
  assert(geometry.statStrip.left>=geometry.scroll.left-1&&geometry.statStrip.right<=geometry.scroll.right+1,label+' permanent statistics strip stays inside the results width');assert(geometry.statStrip.bottom<=geometry.graph.top+1,label+' run statistics remain above the graph');for(const stat of geometry.stats){assert(stat.card.left>=geometry.statStrip.left-geometry.statStrip.scrollLeft-1&&stat.card.right<=geometry.statStrip.left-geometry.statStrip.scrollLeft+geometry.statStrip.scrollWidth+1,label+' every horizontal statistic remains reachable in its own strip '+JSON.stringify(stat));for(const text of [...stat.valueRects,...stat.labelRects])assert(text.left>=stat.card.left-1&&text.right<=stat.card.right+1,label+' statistic text is not clipped, including unavailable jitter '+JSON.stringify(stat));}
@@ -69,13 +69,10 @@ async function assertRecordedSourceDetails(){
  const run=page.locator('#resultEntryBody details[data-run-details]');
  assert.equal(await run.count(),1,'Selected graph entries retain the existing Run details reader');
  await run.locator(':scope > summary').click();
- const source=run.locator('[data-detail="recorded-source"]');
- assert.equal(await source.count(),1,'Run details retain exactly one recorded source disclosure');
- await source.locator(':scope > summary').click();
- assert(await source.isVisible(),'Recorded source is accessible through the existing entry reader');
- assert((await source.innerText()).includes('Automatic routing'),'Recorded automatic routing remains available');
- assert((await source.innerText()).includes('The sidebar source selection applies to future runs.'),'Recorded source remains distinct from future-run selection');
- await source.locator(':scope > summary').click();await run.locator(':scope > summary').click();
+ // Automatic routing is already shown in the command bar and result header; it is not repeated as a panel.
+ assert.equal(await run.locator('[data-detail="recorded-source"]').count(),0,'Automatic routing is not repeated as a recorded-source disclosure');
+ assert.equal(await run.locator('.result-extra-fields').count(),0,'No leftover-field dump in Run details');
+ await run.locator(':scope > summary').click();
 }
 async function pointDetails(){const sidebar=page.locator('#resultEntryBody .result-record-readable'),target=await sidebar.count()?sidebar:page.locator('[data-rt-tooltip]');return target.first().evaluate(el=>Object.fromEntries([...el.querySelectorAll('dl>div')].map(row=>[row.querySelector('dt').textContent,row.querySelector('dd').textContent])));}
 (async()=>{
