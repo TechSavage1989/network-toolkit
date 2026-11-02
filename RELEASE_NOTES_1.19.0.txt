@@ -1,0 +1,21 @@
+Network Toolkit 1.19.0
+
+## What's New
+
+- A redesigned, more consistent interface: shared controls, clearer focus and spacing, and tools grouped under Home, Diagnose, Connect, Transfer and Configure.
+- Test a target: enter a host once and switch between Ping, Trace route, DNS lookup and TCP ports.
+- File Transfer: SFTP, FTP/FTPS and TFTP in one place with a protocol picker.
+- Find any tool or action with Search or Ctrl+Shift+P, and press F1 for a shortcut guide.
+- One searchable Settings window, Ctrl+Shift+T to reopen recently closed tabs, and Undo when removing a saved target.
+- A welcome guide on first launch, clearer examples in every tool, and next steps when a check fails.
+
+## Additional Details
+
+- This stable release includes everything from the 1.18.1 to 1.18.5 betas. Its version is higher than every beta, so beta users receive it too.
+- Automatic update checks run at startup and every six hours; Check for updates still works manually. Downloading and installing still require your approval, and packages are SHA-256 verified.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Existing preferences are migrated, not reset.
+- Windows/UAC review, Hosts/IP/adapter confirmation, SSH host-key trust and file overwrite checks are unchanged.
+- Minimum window sizes: main window 960×600; detached Terminal and Editor 640×400.
+- Former tool names (Ping, Trace route, DNS lookup, TCP ports, SFTP, FTP / FTPS, TFTP) remain in command search.
+- Portable executable filename remains Network_Toolkit.exe.
+- Validation uses hosted builds and synthetic fixtures; physical Windows and live-device acceptance is not claimed.

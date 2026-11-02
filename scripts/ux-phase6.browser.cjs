@@ -17,7 +17,7 @@ async function make(viewport){
   if(name.startsWith('/api/')){
    assert(['GET','PUT'].includes(method),'Unexpected API write: '+method+' '+name);
    let data={};
-   if(name==='/api/status')data={version:'1.18.5',os:'windows',arch:'amd64',system:{hostname:'SYNTHETIC-PHASE6',interfaces:[]}};
+   if(name==='/api/status')data={version:'1.19.0',os:'windows',arch:'amd64',system:{hostname:'SYNTHETIC-PHASE6',interfaces:[]}};
    if(name==='/api/state'){if(method==='PUT'){stored=request.postDataJSON();}else data=stored;}
    if(name==='/api/system')data={hostname:'SYNTHETIC-PHASE6',interfaces:[],gateways:[],dnsServers:[]};
    if(name==='/api/jobs'||name==='/api/jobs?brief=1')data=syntheticJobs;

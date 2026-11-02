@@ -12,7 +12,7 @@
 | Phase 4 | Unified settings, confirmations and reopen tabs | Published v1.18.3 Beta 3 (2026-11-01); duplicate CI timing/graph intermittency remains under review |
 | Phase 5 | Language, empty states and first-run welcome | Published v1.18.4 Beta 4 (2026-11-01); full UI regression follow-up and physical Windows/live-device acceptance outstanding |
 | Phase 6 | Owner-approved tool consolidation: Test a target, File Transfer, Terminal sidebar button removed | Published v1.18.5 Beta 5 (2026-11-02); side-by-side results view and physical Windows/live-device acceptance outstanding; see [handoff](UX_PHASE6_HANDOFF.md) |
-| After Phase 6 | UI guidelines, layout freeze and 1.18.0 stable candidate | [UI guidelines](UI_GUIDELINES.md) drafted and README screenshots added; layout freeze awaits owner approval of the guidelines. Stable candidate blocked on the version-number decision (a 1.18.0 stable sorts below the published 1.18.5 beta, and the updater refuses downgrades) |
+| After Phase 6 | UI guidelines, layout freeze and 1.18.0 stable candidate | [UI guidelines](UI_GUIDELINES.md) drafted and README screenshots added; layout freeze awaits owner approval of the guidelines. Stable candidate: owner chose **v1.19.0** (a 1.18.0 stable would sort below the published 1.18.5 beta, and the updater refuses downgrades); candidate on branch release/1.19.0-stable, not published |
 
 ## Rules
 - Phase 0 is documentation only, with **no release**.
@@ -34,4 +34,4 @@ Phase 3: 1.18.x Beta 2, navigation and discoverability.
 Phase 4: 1.18.x Beta 3, settings and interruptions.
 Phase 5: 1.18.x Beta 4, language and first-run.
 Phase 6: 1.18.x Beta 5, only approved consolidation.
-After approval and acceptance, prepare 1.18.0 stable candidate. The exact beta numbering and published state must always be verified against the live repository.
+After approval and acceptance, prepare the stable candidate, numbered 1.19.0 by owner decision so it supersedes every 1.18 beta. The exact beta numbering and published state must always be verified against the live repository.

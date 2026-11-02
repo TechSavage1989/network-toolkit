@@ -1,0 +1,17 @@
+Network Toolkit 1.18.4 Beta 4
+
+## What's New
+
+- Get started faster with a welcome guide and quick-start options.
+- See clearer first steps and examples in diagnostic tools.
+- Get useful next steps when a diagnostic check fails.
+
+## Additional Details
+
+- On new installations, the welcome offers Check a device, Open a terminal and Transfer files. These choices open the existing tool without starting a scan, connection, transfer or configuration change.
+- An existing saved workspace does not receive an unexpected first-launch welcome after upgrading. Dismissal is remembered with a single preference in the existing saved state. Reopen the guide from F1 Help or command search.
+- Diagnostic no-result guidance includes example targets, and failed checks retain the original error while displaying retry advice. Tool descriptions for Device check, Ping, Trace route and DNS are clearer.
+- Existing Terminal, Editor, transfers, saved targets, reports, credential vault, macros, unsaved documents, sessions and settings are retained.
+- Windows/UAC review, Hosts/IP/adapter confirmation, SSH host-key trust, file overwrite checks and explicit user-consented SHA-256-verified update installation are unchanged.
+- Portable executable filename remains Network_Toolkit.exe. This release is an opt-in beta and normal stable updates stay separate.
+- Validation is performed using hosted and synthetic fixtures; physical Windows and live-device acceptance is not claimed.

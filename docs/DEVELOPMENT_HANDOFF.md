@@ -1,3 +1,13 @@
+# v1.19.0 stable candidate (2026-11-02) - NOT PUBLISHED
+
+Branch release/1.19.0-stable, built on the post-Phase 6 docs branch (UI guidelines draft, README screenshots). The owner chose 1.19.0 instead of the planned 1.18.0, because a 1.18.0 stable would sort below the published v1.18.5 beta and the updater refuses downgrades.
+
+Stable switches: docs/RELEASE_CHANNEL.txt is `stable` and updater.go `updateBuildChannel` is "stable", so the guarded Release workflow publishes a normal (non-prerelease) release that becomes the stable "latest". Opted-in beta users also receive it because the beta feed picks the newest numeric version, including stable releases. RELEASE_NOTES_1.19.0.txt summarizes the 1.18.1 to 1.18.5 betas; the 1.18.4 and 1.18.5 notes are archived in docs/releases/.
+
+Before publishing: owner approval of docs/UI_GUIDELINES.md (starts the layout freeze) and of this candidate, green Checks on the exact source. Physical Windows and live-device acceptance have not been performed; decide whether stable requires them. Merging to main publishes.
+
+---
+
 # v1.18.5 Beta 5 - publication verified (2026-11-02)
 
 Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.18.5 at 2026-11-02T00:44:07Z. Merged PR #37; tag v1.18.5 points to merge commit 36ef57d14b078bf5c1f9b29b2073787cd3d38609. Guarded Release workflow https://github.com/TechSavage1989/network-toolkit/actions/runs/41368461612 completed build and publish successfully. Four assets: Network_Toolkit.exe, Network_Toolkit_1.18.5_Portable.zip, Network_Toolkit_1.18.5_Update.zip and SHA256SUMS; the SHA256SUMS entries match GitHub's asset digests. Stable latest remains v1.17.136. The owner approved the Phase 6 consolidation and asked to publish. Read docs/UX_PHASE6_HANDOFF.md, docs/UX_POLISH_PLAN.md and docs/DEVELOPMENT_ROADMAP.md before proceeding.
