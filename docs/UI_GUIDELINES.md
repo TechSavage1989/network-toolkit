@@ -51,6 +51,8 @@ Member tabs:
 - Test tabs stay on one row. When space runs out they scroll sideways, and they stay visible in short windows where the rest of the page heading is hidden.
 - File Transfer protocol buttons carry a tooltip with the protocol's security (SFTP encrypted over SSH; FTPS encrypted, FTP not; TFTP has no encryption or login).
 
+Local network > IP configuration, top to bottom: Public IP, snapshot time, adapter picker, Current configuration beside the IPv4 editor, then Network actions last. The page renders as soon as the adapter settings are read; Network actions fill in after the slower adapter-state read and show "Reading adapter state" until then.
+
 Terminal: a session sidebar (Saved, Recent, Files, Macros) docks left or right. Clicking the selected tab hides it; clicking any tab shows it. There is no separate Sidebar button.
 
 ## Components and tokens

@@ -16,6 +16,7 @@ func readLocalHosts(context.Context) (localHostsSnapshot, error) {
 func readLocalIP(context.Context) (localIPSnapshot, error) {
 	return localIPSnapshot{Adapters: []localIPAdapter{}, Note: errLocalToolsUnavailable.Error()}, nil
 }
+func readLocalIPBasic(ctx context.Context) (localIPSnapshot, error) { return readLocalIP(ctx) }
 func applyLocalTools(context.Context, localToolsRequest) localApplyResult {
 	return localApplyResult{Error: errLocalToolsUnavailable.Error(), ErrorCode: "unsupported"}
 }

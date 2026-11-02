@@ -5,7 +5,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const {handleEditorActivityMetadata}=require('./editor-activity-fixture.cjs');
 const root=path.resolve(__dirname,'..'),out=process.env.TOOLKIT_TEST_OUTPUT||path.join(root,'test-results','ux-phase6');
 let browser,stored={appUpdatePreferences:{enabled:false},profiles:[{id:'kept',name:'Existing target',target:'192.0.2.10',note:'keep',tool:'dns'}],ftpProfiles:[{id:'ftp-kept',name:'Kept FTP',host:'192.0.2.20',port:21,username:'operator',security:'explicit'}],fileTransferProtocol:'ftp',forms:{ping:{scope:'subnet',count:10},tcp:{scope:'subnet'}},firstLaunchWelcomeSeen:true,target:'192.0.2.10'};
-let syntheticJobs=[],activity={tools:{}};
+let syntheticJobs=[],activity={tools:{}},ipPhases=[];
 const traffic=[],errors=[],screenshots=[],checks=[];
 async function make(viewport){
  const context=await browser.newContext({viewport,serviceWorkers:'block'}),p=await context.newPage();
@@ -17,7 +17,7 @@ async function make(viewport){
   if(name.startsWith('/api/')){
    assert(['GET','PUT'].includes(method),'Unexpected API write: '+method+' '+name);
    let data={};
-   if(name==='/api/status')data={version:'1.19.2',os:'windows',arch:'amd64',system:{hostname:'SYNTHETIC-PHASE6',interfaces:[]}};
+   if(name==='/api/status')data={version:'1.19.3',os:'windows',arch:'amd64',system:{hostname:'SYNTHETIC-PHASE6',interfaces:[]}};
    if(name==='/api/state'){if(method==='PUT'){stored=request.postDataJSON();}else data=stored;}
    if(name==='/api/system')data={hostname:'SYNTHETIC-PHASE6',interfaces:[],gateways:[],dnsServers:[]};
    if(name==='/api/jobs'||name==='/api/jobs?brief=1')data=syntheticJobs;
@@ -27,7 +27,10 @@ async function make(viewport){
    if(name==='/api/terminal-window/requests')data={requests:[],after:0};
    if(name==='/api/credentials')data={entries:[],vault:{available:false,state:'unavailable'}};
    if(name==='/api/credential-vault')data={available:false,state:'unavailable'};
-   if(name==='/api/local-tools/ip')data={adapters:[]};
+   if(name==='/api/local-tools/ip'){const base={id:'{p6-adapter}',index:7,name:'Ethernet fixture',description:'Synthetic adapter',type:'Ethernet',status:'Up',mac:'00:00:5E:00:53:06',dhcp:true,editable:true,addressEditable:true,addresses:[{address:'192.0.2.60',prefixLength:24,origin:'dhcp'}],gateways:['192.0.2.1'],dnsServers:['192.0.2.53'],dnsAutomatic:true,revision:'fixture'};
+    // The native read answers at once; the administrative-state read (PowerShell on Windows) is slow.
+    if(url.searchParams.get('phase')==='basic'){ipPhases.push('basic');data={available:true,adminPending:true,adapters:[{...base,adminStatus:'unknown',adminEditable:false}]};}
+    else{ipPhases.push('full');await new Promise(resolve=>setTimeout(resolve,900));data={available:true,adapters:[{...base,adminStatus:'enabled',adminEditable:true}]};}}
    if(name==='/api/local-tools/hosts')data={available:true,editable:true,exists:true,path:'C:\\synthetic\\hosts',content:'127.0.0.1 localhost\n',revision:'synthetic',encoding:'UTF-8',newline:'LF',warnings:[]};
    if(name==='/api/packet-captures')data={captures:[]};
    if(name==='/api/packet-captures/interfaces')data={interfaces:[],engines:[]};
@@ -91,6 +94,15 @@ const navLabels=p=>p.locator('#navigation .nav-item span:not(.badge):not(.sideba
  assert.equal(await p.locator('#navigation .nav-item.active span').first().textContent(),'Local network');
  await p.locator('.nt-local-views [data-local-open="routes"]').click();assert.deepEqual(await p.evaluate(()=>[state.activePage,state.localTab]),['local','routes']);
  check('Hosts file is a Local network tab and links back to the other views');
+ ipPhases.length=0;
+ await p.evaluate(()=>{localConfiguration.ip.snapshot=null;localConfiguration.ip.attempted=false;localConfiguration.ip.loading=false;state.localTab='ipconfig';navigate('local');});
+ await p.locator('#ipConfiguration .ip-configuration-grid').waitFor();
+ const ipOrder=await p.evaluate(()=>{const q=s=>document.querySelector('#ipConfigurationScroll '+s);const pub=q('[data-public-ip-panel]'),cfg=q('.ip-configuration-grid'),act=q('.network-maintenance'),after=(a,b)=>!!(a&&b)&&!!(a.compareDocumentPosition(b)&Node.DOCUMENT_POSITION_FOLLOWING);return {publicThenConfiguration:after(pub,cfg),configurationThenActions:after(cfg,act),currentHeading:cfg?.querySelector('h3')?.textContent,pending:/Reading adapter state/.test(act?.textContent||''),disableButtonDisabled:document.querySelector('[data-network-action="adapter-disable"]')?.disabled,addressShown:/192\.0\.2\.60\/24/.test(cfg?.textContent||'')};});
+ assert.deepEqual(ipOrder,{publicThenConfiguration:true,configurationThenActions:true,currentHeading:'Current configuration',pending:true,disableButtonDisabled:true,addressShown:true},JSON.stringify(ipOrder));
+ assert.deepEqual(ipPhases,['basic','full'],'fast read first, then the full read');
+ await p.waitForFunction(()=>!/Reading adapter state/.test(document.querySelector('#ipConfigurationScroll .network-maintenance')?.textContent||'')&&document.querySelector('[data-network-action="adapter-disable"]')?.disabled===false);
+ assert.equal(await p.locator('#ipConfigurationScroll .ip-configuration-grid').count(),1,'configuration stays while actions fill in');
+ check('IP configuration shows Public IP, then Current configuration, then Network actions, which fill in after the slower adapter-state read');
  await p.evaluate(()=>navigate('ping'));assert.equal(await p.locator('[data-target-scope]').count(),0,'no sweep switch on Ping');
  await p.locator('.scope-discovery [data-page="discover"]').click();assert.equal(await p.evaluate(()=>state.activePage),'discover');
  await p.evaluate(()=>useTarget('192.0.2.0/28','ping'));assert.equal(await p.evaluate(()=>[state.activePage,state.networkRange].join()),'discover,192.0.2.0/28');

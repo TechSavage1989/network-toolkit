@@ -1,0 +1,14 @@
+Network Toolkit 1.19.3 Beta 3
+
+## What's New
+
+- IP configuration opens faster: your adapter settings appear right away, and the Network actions load afterwards instead of holding up the page.
+- The IP configuration page is reordered: Public IP, then Current configuration and the IPv4 editor, then Network actions.
+
+## Additional Details
+
+- Reading each adapter's administrative state (needed only for the Enable and Disable actions) uses Windows PowerShell and can take several seconds. That read now happens after the page is shown; the Network actions card says "Reading adapter state" with its buttons disabled until it finishes.
+- Applying IPv4 changes and running network actions still use the complete adapter read, so review steps, Windows/UAC approval and confirmations are unchanged.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.
+- This is an opt-in beta. Stable users stay on 1.19.0. Portable executable filename remains Network_Toolkit.exe.
+- Validation uses hosted and synthetic fixtures; physical Windows and live-device acceptance is not formally claimed.

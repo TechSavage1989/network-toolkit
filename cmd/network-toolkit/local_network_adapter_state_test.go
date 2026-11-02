@@ -391,3 +391,51 @@ func TestLocalNetworkToggleRefreshDeadlineOnlyMocks(t *testing.T) {
 		}
 	}
 }
+
+func TestLocalIPBasicPhaseServesNativeSnapshotBeforeAdminState(t *testing.T) {
+	a := testApplication(t)
+	adapter := localTestAdapter()
+	full, basic := 0, 0
+	a.localTools = newLocalToolsManagerWithBackend(a.ctx, localToolsBackend{available: true, readIP: func(context.Context) (localIPSnapshot, error) {
+		full++
+		enabled := adapter
+		enabled.AdminStatus, enabled.AdminEditable = "enabled", true
+		return localIPSnapshot{Available: true, Adapters: []localIPAdapter{enabled}}, nil
+	}, readIPBasic: func(context.Context) (localIPSnapshot, error) {
+		basic++
+		pending := adapter
+		pending.AdminStatus, pending.AdminEditable = "unknown", false
+		return localIPSnapshot{Available: true, Adapters: []localIPAdapter{pending}}, nil
+	}})
+	response := requestApp(a, "GET", "/api/local-tools/ip?phase=basic", "", true)
+	if response.Code != 200 || basic != 1 || full != 0 {
+		t.Fatal("basic phase must use the fast reader only", response.Code, basic, full)
+	}
+	var snapshot localIPSnapshot
+	if err := json.Unmarshal(response.Body.Bytes(), &snapshot); err != nil {
+		t.Fatal(err)
+	}
+	if !snapshot.AdminPending || len(snapshot.Adapters) != 1 || snapshot.Adapters[0].AdminStatus != "unknown" || snapshot.Adapters[0].AdminEditable {
+		t.Fatalf("basic snapshot must be marked pending with unknown admin state: %+v", snapshot)
+	}
+	response = requestApp(a, "GET", "/api/local-tools/ip", "", true)
+	if response.Code != 200 || full != 1 {
+		t.Fatal("default read must remain the full snapshot", response.Code, full)
+	}
+	snapshot = localIPSnapshot{}
+	if err := json.Unmarshal(response.Body.Bytes(), &snapshot); err != nil {
+		t.Fatal(err)
+	}
+	if snapshot.AdminPending || snapshot.Adapters[0].AdminStatus != "enabled" || !snapshot.Adapters[0].AdminEditable {
+		t.Fatalf("full snapshot must carry admin state without the pending marker: %+v", snapshot)
+	}
+	// Backends without a basic reader keep serving the full snapshot.
+	a.localTools = newLocalToolsManagerWithBackend(a.ctx, localToolsBackend{available: true, readIP: func(context.Context) (localIPSnapshot, error) {
+		return localIPSnapshot{Available: true, Adapters: []localIPAdapter{adapter}}, nil
+	}})
+	response = requestApp(a, "GET", "/api/local-tools/ip?phase=basic", "", true)
+	snapshot = localIPSnapshot{}
+	if response.Code != 200 || json.Unmarshal(response.Body.Bytes(), &snapshot) != nil || snapshot.AdminPending {
+		t.Fatal("without a basic reader the phase parameter must not mark the snapshot pending", response.Code)
+	}
+}

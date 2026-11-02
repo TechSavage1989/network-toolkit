@@ -1,4 +1,14 @@
-# v1.19.2 Beta 2 - reliability candidate (2026-11-02) - NOT PUBLISHED
+# v1.19.3 Beta 3 - IP configuration two-phase load (2026-11-02) - candidate, NOT PUBLISHED
+
+Owner report: Local network > IP configuration took a long time to appear, and Network actions sat above the current configuration. Cause: GET /local-tools/ip runs the fast native GetAdaptersAddresses read and then a PowerShell read of each adapter's administrative state (needed only for the Enable/Disable network actions); the page waited for both.
+Change: new `GET /local-tools/ip?phase=basic` (backend `readIPBasic`, Windows = native read with admin state normalized to unknown; non-Windows = readLocalIP) returns the snapshot marked `adminPending`. The UI renders it immediately (Public IP, snapshot time, adapter picker, Current configuration + IPv4 editor), then requests the full snapshot and fills in the Network actions card, which now sits below the configuration and shows "Reading adapter state" with its buttons disabled until then. Reload uses the same two phases; a newer reload cancels an older one via a token. Default GET /local-tools/ip is unchanged (operations and verification still use the full read).
+Tests: Go `TestLocalIPBasicPhaseServesNativeSnapshotBeforeAdminState`; ux-phase6 browser check asserts section order, pending state and the fill-in.
+
+---
+
+# v1.19.2 Beta 2 - publication verified (2026-11-02)
+
+Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.19.2 at 2026-11-02T05:23:07Z; stable latest remains v1.19.0. Merged PR #44; tag v1.19.2 points to merge commit 78555d6cf716b84bb0a5706df37ae6df8fc3fe72. Guarded Release workflow https://github.com/TechSavage1989/network-toolkit/actions/runs/41393451200 completed build and publish. Four assets: Network_Toolkit.exe, Network_Toolkit_1.19.2_Portable.zip, Network_Toolkit_1.19.2_Update.zip and SHA256SUMS; SHA256SUMS entries match GitHub's asset digests. PR #44 Checks (https://github.com/TechSavage1989/network-toolkit/actions/runs/41391957700 and https://github.com/TechSavage1989/network-toolkit/actions/runs/41391952867) and the Phase 6 workflow passed on the exact source.
 
 Branch fix/flaky-tests-monitor-graph, based on published v1.19.1. Owner asked to fix the intermittent CI checks and the cramped Monitor graph at 1280x800, and to publish the result as a beta when green.
 
