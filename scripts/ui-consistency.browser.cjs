@@ -73,7 +73,7 @@ async function copy(button,expected,keyboard=false){
   }
   await page.evaluate(()=>navigate('overview'));await settle(page);
   assert.equal(await page.locator('#pageContent .tool-card,#adapterList .adapter-address button:not([data-value-copy-control])').count(),0);
-  assert.equal(await page.locator('#navigation [data-page="dns"]').count(),1);
+  assert.equal(await page.locator('#navigation .nav-item',{hasText:'Test a target'}).count(),1);
   const address=page.locator('#adapterList .adapter-address-value').first();await address.locator('[data-value-copy-control]').waitFor();
   const placements=await page.locator('#adapterList [data-value-copy-control],#overviewStats [data-value-copy-control]').evaluateAll(buttons=>buttons.map(button=>{
    const b=button.getBoundingClientRect(),p=button.parentElement.getBoundingClientRect();return {label:button.getAttribute('aria-label'),left:b.left,top:b.top,right:b.right,bottom:b.bottom,parent:{left:p.left,top:p.top,right:p.right,bottom:p.bottom}};

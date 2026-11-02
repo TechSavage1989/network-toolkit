@@ -1,4 +1,5 @@
 /* Phase 5 welcome uses the existing design tokens and does not cover active tools. */
+.ux-welcome[hidden]{display:none}
 .ux-welcome{margin:12px 20px 4px;padding:18px 20px;border:1px solid var(--border);background:var(--panel);border-radius:var(--radius);box-shadow:var(--shadow)}
 .ux-welcome-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:20px}
 .ux-welcome-heading h2{font-size:18px;margin-bottom:5px}

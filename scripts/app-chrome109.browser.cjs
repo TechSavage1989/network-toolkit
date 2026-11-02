@@ -51,7 +51,8 @@ async function safeNavigation(p){
 }
 (async()=>{
  assert(baseline&&fs.existsSync(path.join(baseline,'web/index.html')),'NTK_LAYOUT_BASELINE_DIR must contain the exact published108 checkout');assert.equal(JSON.parse(fs.readFileSync(path.join(baseline,'package.json'))).version,'1.17.108');if(out)fs.mkdirSync(out,{recursive:true});browser=await chromium.launch({headless:true,executablePath:process.env.CHROMIUM_EXECUTABLE||undefined,args:['--no-sandbox']});
- for(const viewport of [{width:1440,height:1000},{width:390,height:900}]){
+ // Owner decision: widths below the 960x600 main-window minimum are unsupported.
+ for(const viewport of [{width:1440,height:1000},{width:960,height:600}]){
   const old=await make(baseline,viewport),now=await make(root,viewport);current=now.p;
   const pages=await current.locator('#navigation [data-page]').evaluateAll(items=>items.map(x=>x.dataset.page));assert(pages.includes('terminal')&&pages.includes('editor')&&pages.includes('capture'));
   for(const theme of ['dark','light']){

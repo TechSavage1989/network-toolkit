@@ -1,0 +1,8 @@
+/* Phase 6: target-first test tabs share the File Transfer protocol picker style. */
+.nt-target-tests .btn{gap:6px}
+.nt-target-test-status{color:var(--faint)}
+.nt-target-test-status.is-none{opacity:.45}
+.nt-target-test-status.is-running{color:var(--warn)}
+.nt-target-test-status.is-done{color:var(--good)}
+.nt-target-test-status.is-failed{color:var(--bad)}
+.nt-target-tests .btn.primary .nt-target-test-status{box-shadow:0 0 0 1.5px var(--panel)}
