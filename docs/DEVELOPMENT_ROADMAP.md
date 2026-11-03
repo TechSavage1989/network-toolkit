@@ -22,6 +22,7 @@
 | Last batch output tools; no automatic switch to Runs | Owner requests: Last command / Last batch (renamed from Last paste), Select output and Copy output work for macro runs and Run commands lists; starting a paced paste or macro never moves the Macros panel to the Runs tab | **Published v1.19.7 Beta 7 (opt-in) on 2026-11-03**; stable remains v1.19.0 |
 | No gaps in batch output | Owner report: pager erase residue (blank line plus a row of spaces) in copied AOS-CX batches; whitespace-only lines after a pager prompt are dropped | **Published v1.19.8 Beta 8 (opt-in) on 2026-11-03**; stable remains v1.19.0 |
 | Updates noticed while running | Owner request: automatic checks every 30 minutes while running and on return after 10 minutes, with a one-time toast; last batch-output gap | **Published v1.19.9 Beta 9 (opt-in) on 2026-11-03**; stable remains v1.19.0 |
+| 1.20.0 stable | Owner request: stable release combining the 1.19.1 to 1.19.9 betas; owner confirmed the paced paste and batch output fixes on a live switch | v1.20.0 candidate on branch release/1.20.0, not published |
 
 ## Rules
 - Phase 0 is documentation only, with **no release**.
