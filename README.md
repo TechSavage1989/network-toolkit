@@ -16,6 +16,8 @@ A portable Windows toolkit for network diagnostics, device connections, file tra
 
 [Download the latest stable release](https://github.com/TechSavage1989/network-toolkit/releases/latest).
 
+Latest beta: [v1.20.1](https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.20.1) (opt-in; not a stable release).
+
 
 
 ## Features

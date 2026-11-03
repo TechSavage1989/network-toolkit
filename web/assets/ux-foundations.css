@@ -34,7 +34,10 @@
 }
 
 /* Shared states and predictable progress behavior, including all tool families. */
-:where(progress){accent-color:var(--accent);height:8px;border-radius:var(--ux-radius-sm);overflow:hidden}
+/* No border-radius on the element itself: with both pseudo-elements styled,
+   Chromium stops animating an indeterminate bar (the install-and-restart
+   progress). The rounded look comes from the pseudo-elements instead. */
+:where(progress){accent-color:var(--accent);height:8px;overflow:hidden}
 :where(progress)::-webkit-progress-bar{background:var(--input);border-radius:var(--ux-radius-sm)}
 :where(progress)::-webkit-progress-value{background:var(--accent);border-radius:var(--ux-radius-sm)}
 :where(progress)::-moz-progress-bar{background:var(--accent);border-radius:var(--ux-radius-sm)}
