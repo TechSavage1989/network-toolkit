@@ -1,4 +1,4 @@
-## 1.20.4 Beta 2 - Terminal typing latency (candidate)
+## 1.20.4 Beta 2 - Terminal typing latency (published 2026-11-03)
 
 - Owner report: typing in the Terminal felt laggy. Measured per echoed character in headless Chromium: about 13 ms of app work on top of xterm's own 4 ms on a full highlighted screen, plus a 10 ms send delay per keystroke. Fixes: keystrokes are sent immediately and coalesced while a request is in flight; the highlighter keeps per-row signatures and re-analyzes only rows whose text changed (existing marks are still reconciled before the next paint, a full pass follows when output quiets); the appearance editor is not synced while hidden and the tools panel is not re-positioned while hidden; the input-clear and graph-workspace mutation observers ignore the terminal's own DOM, which had triggered a document-wide input rescan with forced layout on every keystroke (xterm flips its helper textarea's readonly attribute when disableStdin is re-assigned, which the app now does only when the value changes).
 
