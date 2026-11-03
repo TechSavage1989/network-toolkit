@@ -625,8 +625,8 @@ func normalizeLines(text, ending string) string {
 	return strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(text, "\r\n", "\n"), "\r", "\n"), "\n", ending)
 }
 
-// PasteCapture uses the original transport's sequence cursor at each accepted
-// input write. Unlike browser polling, it cannot skip fast steps or label an
+// PasteCapture serves paced pastes and macro runs alike. It uses the original
+// transport's sequence cursor at each accepted input write. Unlike browser polling, it cannot skip fast steps or label an
 // unsent line as executed. It is memory-only and scoped by the HTTP caller.
 func (e *Engine) PasteCapture(id, sessionID string) (PasteCapture, error) {
 	if sessionID == "" {
@@ -634,9 +634,9 @@ func (e *Engine) PasteCapture(id, sessionID string) (PasteCapture, error) {
 	}
 	e.mu.Lock()
 	run := e.runs[id]
-	if run == nil || !run.literalPaste {
+	if run == nil {
 		e.mu.Unlock()
-		return PasteCapture{}, errors.New("literal paste run not found")
+		return PasteCapture{}, errors.New("run not found")
 	}
 	var target *task
 	for _, t := range run.tasks {
@@ -813,7 +813,10 @@ func (e *Engine) execute(run *execution, t *task, steps []Step) {
 				}
 			}
 			cursor, failure = e.writeTask(run, t, []byte(text))
-			if failure == nil && run.literalPaste && step.Kind == "command" {
+			// Every accepted command line, for paced pastes and macro runs alike,
+			// anchors a capture step so the console's Last command / Last paste
+			// output tools can show the run's per-command output.
+			if failure == nil && step.Kind == "command" {
 				e.mu.Lock()
 				t.sentPaste = append(t.sentPaste, sentPasteCommand{index: index + 1, command: step.Text, cursor: cursor})
 				e.mu.Unlock()

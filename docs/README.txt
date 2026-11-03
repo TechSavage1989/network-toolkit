@@ -1,7 +1,7 @@
-NETWORK TOOLKIT 1.19.6
+NETWORK TOOLKIT 1.19.7
 ======================
 
-CURRENT RELEASE - 1.19.6 (BETA 6)
+CURRENT RELEASE - 1.19.7 (BETA 7)
 
 This is a compatibility entrypoint for existing portable packages and release
 validation. For current user instructions, see the Markdown guides:

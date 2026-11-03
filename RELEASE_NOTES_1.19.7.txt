@@ -1,0 +1,16 @@
+Network Toolkit 1.19.7 Beta 7
+
+## What's New
+
+- The console's output tools now cover macros. "Last paste" is renamed "Last batch": it holds the output of the latest command batch, whether you pasted it, ran a macro, started a macro automatically for a saved session, or used Run commands. Select output, Copy output, Include commands and the jump arrows work the same for all of them.
+- Starting a multi-line paste no longer switches the Terminal's Macros panel to the Runs tab. You stay where you were; a short message still tells you that Pause and Stop are in Runs.
+- Because the panel no longer jumps to Runs, it also stays put for macros you start afterwards.
+
+## Additional Details
+
+- Macro output in Last batch and Last command comes from the run's verified capture when the run finishes, so it only contains commands the device actually received. The macro shortcuts (save Last command / Last batch as a macro) still reflect what you typed or pasted, not an existing macro.
+- Menu and command names follow the rename: Jump to batch start, Previous batch, Next batch, Select batch output, Copy batch output.
+- Runs, Pause, Stop, Output and Clear are unchanged; open the Runs tab yourself when you want them.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Security confirmations and Windows/UAC approval are unchanged.
+- This is an opt-in beta. Stable users stay on 1.19.0. Portable executable filename remains Network_Toolkit.exe.
+- Validation uses hosted and synthetic fixtures; physical Windows and live-device acceptance is not formally claimed.

@@ -1,3 +1,9 @@
+## 1.19.7 Beta 7 - Last batch output tools and no automatic switch to Runs (candidate)
+
+- Owner request: Last command, Last paste, Select output and Copy output now work for macro runs (Library, shortcuts, startup bindings) and Run commands lists, not only pastes. The engine records a capture step for every run's command lines and serves it through the existing run capture endpoint; the console links a batch block to each run target and fills it from the verified capture when the run finishes.
+- "Last paste" is renamed "Last batch" everywhere (console switch, menu items, macro shortcut) because it now covers pastes, macros and command lists.
+- Owner decision: starting a One line at a time paste no longer opens the Macros panel's Runs tab. The toast still says Pause and Stop are in Runs. Macro starts never switched views; the panel only stayed on Runs because a paste had moved it there.
+
 ## 1.19.6 Beta 6 - Paced paste answers pager prompts (published 2026-11-03)
 
 - Owner report: "One line at a time · wait for prompt" stalled after the first command on a Cisco switch because the device's --More-- prompt was never answered and the console's Auto pager is suppressed while the backend owns the session.

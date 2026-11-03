@@ -41,7 +41,7 @@ function mount(){
  if(!$('#terminalMacroActivity')){const el=document.createElement('button');el.id='terminalMacroActivity';el.className='btn small ghost macro-activity hidden';el.setAttribute('type','button');el.setAttribute('data-macro-action','activity');el.setAttribute('aria-live','polite');$('#terminalMacroComposerToggle').before(el);}
  if(!$('#terminalMacroComposer')){const el=document.createElement('section');el.id='terminalMacroComposer';el.className='terminal-macro-composer';el.setAttribute('aria-label','Send commands to terminals');el.innerHTML='<div class="macro-composer-scope"><label for="terminalMacroTargetMode">Send to</label><select id="terminalMacroTargetMode" data-macro-field="target-mode" title="Choose current, selected, or all connected terminals"><option value="current">Current terminal</option><option value="selected">Selected terminals</option><option value="all">All connected terminals</option></select></div><div class="macro-composer-recipients">'+button('choose-targets','View recipients','id="terminalMacroChooseTargets" aria-controls="terminalMacroTargetPicker" aria-expanded="false" title="Review terminal recipients"')+'<span id="terminalMacroTargetCount" class="macro-recipient-count" aria-live="polite"></span></div>'+'<label class="sr-only" for="terminalMacroCommand">Command or text to send</label><textarea id="terminalMacroCommand" rows="1" spellcheck="false" placeholder="Enter a command to send to the chosen terminals" aria-describedby="terminalMacroSendHint"></textarea>'+button('insert','Insert only','title="Type one line into the chosen terminals without pressing Enter; this does not run the command"')+button('send','Run command','title="Send the command and press Enter in the chosen terminals (Ctrl+Enter)"','btn small primary')+button('expand-composer',ico('maximize'),'id="terminalMacroExpand" aria-label="Expand command input" aria-expanded="false" title="Expand command input for multiple lines"','iconbtn')+button('hide-composer',ico('close'),'aria-label="Hide command bar" title="Hide command bar; reopen with Command bar beside Tools"','iconbtn')+'<span id="terminalMacroSendHint" class="sr-only">Insert only types without pressing Enter. Run command sends and executes each line. Ctrl+Enter runs from this input.</span><span id="terminalMacroSendResult" class="macro-send-result" role="status"></span><div id="terminalMacroTargetPicker" class="macro-target-picker hidden" role="dialog" aria-label="Terminal recipients"></div>';($('#terminalTabs')||stage).before(el);}
  if(!$('#terminalMacroPanel')){const el=document.createElement('section');el.id='terminalMacroPanel';el.className='terminal-macro-panel';el.setAttribute('aria-label','Macro library and runs');el.innerHTML='<div class="macro-panel-head"><div class="macro-panel-tabs" role="tablist" aria-label="Macros"><button type="button" role="tab" id="terminalMacroLibraryTab" data-macro-action="view-library" aria-controls="terminalMacroLibraryView">Library</button><button type="button" role="tab" id="terminalMacroRunsTab" data-macro-action="view-runs" aria-controls="terminalMacroRunsView">Runs</button></div></div><div id="terminalMacroRecording" class="macro-recording hidden" role="status"></div><div id="terminalMacroLibraryView" class="macro-sidebar-view" role="tabpanel" aria-labelledby="terminalMacroLibraryTab"><div class="macro-library-actions">'+button('new',ico('plus')+'New')+button('record','● Record','id="terminalMacroRecord"')+button('library-more','More','id="terminalMacroMore" aria-haspopup="menu" aria-expanded="false" aria-controls="terminalMacroMenu" title="Import macros or export the library"')+'</div><div id="terminalMacroPins" class="terminal-macro-pins hidden" aria-label="Pinned macros"></div><div class="macro-library-filters"><label class="sr-only" for="terminalMacroSearch">Search macros</label><input id="terminalMacroSearch" type="search" placeholder="Search macros…" data-macro-field="search"><label class="sr-only" for="terminalMacroFolder">Macro folder</label><select id="terminalMacroFolder" data-macro-field="folder"><option value="">All folders</option></select>'+button('refresh',ico('refresh'),'aria-label="Refresh macro library and runs" title="Refresh macro library and runs"','iconbtn')+'</div><div id="terminalMacroList" class="macro-library-list"></div></div><div id="terminalMacroRunsView" class="macro-sidebar-view hidden" role="tabpanel" aria-labelledby="terminalMacroRunsTab"><div class="macro-run-history-head"><span id="terminalMacroRunCount" class="muted" role="status"></span>'+button('clear-runs','Clear all','title="Clear finished runs and their captured output. Running and paused macros stay available." disabled')+'</div><p class="macro-run-heading muted" id="terminalMacroRunHint">Clear removes finished runs and their output. Stop an active run before clearing it.</p><div id="terminalMacroRuns" class="macro-runs" aria-live="polite"></div></div>';host.append(el);}else if($('#terminalMacroPanel').parentElement!==host)host.append($('#terminalMacroPanel'));
- if(!$('#terminalMacroRecentInput')){const el=document.createElement('div');el.id='terminalMacroRecentInput';el.className='macro-recent-input';el.innerHTML=[['save-command','Last command'],['save-paste','Last paste']].map(([action,label])=>button(action,label,'title="Save '+label.toLowerCase()+' as a macro"')).join('');$('#terminalMacroPins').before(el);}
+ if(!$('#terminalMacroRecentInput')){const el=document.createElement('div');el.id='terminalMacroRecentInput';el.className='macro-recent-input';el.innerHTML=[['save-command','Last command'],['save-paste','Last batch']].map(([action,label])=>button(action,label,'title="Save '+label.toLowerCase()+' as a macro"')).join('');$('#terminalMacroPins').before(el);}
  if(!$('#terminalMacroConfirmation')){const el=document.createElement('label');el.className='macro-confirmation-setting';el.setAttribute('for','terminalMacroConfirmation');el.title='Show terminal and command confirmation before running a macro. Required variable values are always requested.';el.innerHTML='<span>Confirm runs</span><select id="terminalMacroConfirmation" data-macro-field="confirmation" aria-describedby="terminalMacroConfirmationHint"><option value="always">On</option><option value="multiple">Multiple terminals only</option><option value="never">Off</option></select><span id="terminalMacroConfirmationHint" class="sr-only">Show terminal and command confirmation before running a macro. Required variable values are always requested.</span>';$('.macro-panel-head',$('#terminalMacroPanel')).append(el);}
  if(!S.mounted){document.addEventListener('click',onClick);document.addEventListener('change',onChange);document.addEventListener('input',onInputEvent);document.addEventListener('keydown',onKeyDown,true);document.addEventListener('contextmenu',onContextMenu);document.addEventListener('terminal-sidebar-tab-change',onSidebarChange);S.mounted=true;}
  render();if(!S.loaded&&!S.polling)refresh(true);else schedule();return true;
@@ -145,13 +145,13 @@ function previewExpansion(){const p=S.preview;return p.targets.map((t,i)=>'<deta
 // Starting a run updates its history/activity without navigating away from the
 // user-selected Library or Runs tab, including choices made while awaiting it.
 async function runPreview(readValues=true){
- const p=S.preview;if(!p)return;try{if(readValues)for(const el of $$('[data-macro-value]'))p.values[el.dataset.macroValue]=el.value;for(const param of p.macro.parameters)if(param.required&&!String(p.values[param.name]||'').length)throw new Error('Enter '+(param.label||param.name)+'.');const confirmation=readValues?$('[data-macro-run-confirmation]'):null,nextPolicy=confirmation?(confirmation.checked?(p.confirmationPolicy==='multiple'?'multiple':'always'):'never'):null,pager=readValues?$('[data-macro-run-pager]'):null;if(pager)p.macro.autoPager=pager.checked;prepareRunView(p.targets);const result=await call('/runs','POST',{macro:p.macro,targets:targetRefs(p.targets),values:p.values});if(nextPolicy&&prefs().terminalMacroConfirmation!==nextPolicy){prefs().terminalMacroConfirmation=nextPolicy;if(typeof saveState==='function')saveState();}p.values={};S.runs=[result.run,...S.runs.filter(r=>r.id!==result.run.id)];close();renderSidebarView();renderRuns();notify('Macro started on '+p.targets.length+' terminal'+(p.targets.length===1?'':'s')+'.');}catch(err){error(err.message);}
+ const p=S.preview;if(!p)return;try{if(readValues)for(const el of $$('[data-macro-value]'))p.values[el.dataset.macroValue]=el.value;for(const param of p.macro.parameters)if(param.required&&!String(p.values[param.name]||'').length)throw new Error('Enter '+(param.label||param.name)+'.');const confirmation=readValues?$('[data-macro-run-confirmation]'):null,nextPolicy=confirmation?(confirmation.checked?(p.confirmationPolicy==='multiple'?'multiple':'always'):'never'):null,pager=readValues?$('[data-macro-run-pager]'):null;if(pager)p.macro.autoPager=pager.checked;prepareRunView(p.targets);const blocks=noteRunBlocks(p.targets,macroCommands(p.macro));let result;try{result=await call('/runs','POST',{macro:p.macro,targets:targetRefs(p.targets),values:p.values});}catch(err){linkRunBlocks(blocks,null);throw err;}linkRunBlocks(blocks,result.run);if(nextPolicy&&prefs().terminalMacroConfirmation!==nextPolicy){prefs().terminalMacroConfirmation=nextPolicy;if(typeof saveState==='function')saveState();}p.values={};S.runs=[result.run,...S.runs.filter(r=>r.id!==result.run.id)];close();renderSidebarView();renderRuns();notify('Macro started on '+p.targets.length+' terminal'+(p.targets.length===1?'':'s')+'.');}catch(err){error(err.message);}
 }
 async function send(execute){
  const entry=$('#terminalMacroCommand'),text=entry?.value||'',targets=snapshotTargets();if(!text||!targets.length)return;
  if(!execute&&/[\r\n]/.test(text)){notify('Insert only accepts one line. Use Run commands to execute a command list.','error');return;}
  const buttons=$$('[data-macro-action="send"], [data-macro-action="insert"]');for(const b of buttons)b.disabled=true;
- try{if(execute)prepareRunView(targets);const result=await call('/send','POST',{targets:targetRefs(targets),text,execute});const statuses=result.targets||result.results||result.statuses||[],failures=statuses.filter(s=>s.error||s.ok===false||s.state==='failed');const message=failures.length?failures.map(s=>(s.label||s.id)+': '+(s.error||s.message||'Not sent')).join(' · '):(execute?'Sent to ':'Inserted in ')+targets.map(targetName).join(', ');$('#terminalMacroSendResult').innerHTML=result.run?button('output',failures.length?'!':'✓','data-run="'+html(result.run.id)+'" title="'+html(message)+' · View output" aria-label="'+html(message)+'; view output"','iconbtn'):'<span title="'+html(message)+'" aria-label="'+html(message)+'">'+(failures.length?'!':'✓')+'</span>';if(result.run){S.runs=[result.run,...S.runs.filter(r=>r.id!==result.run.id)];renderRuns();}if(failures.length)notify('Some terminals did not accept the command. Open terminal recipients or run output for details.','error');else if(execute){entry.value='';S.composerExpanded=false;renderComposer();}}
+ let blocks=[];try{if(execute){prepareRunView(targets);blocks=noteRunBlocks(targets,text.replace(/\r\n?/g,'\n').split('\n'));}const result=await call('/send','POST',{targets:targetRefs(targets),text,execute}).catch(err=>{linkRunBlocks(blocks,null);throw err;});if(execute)linkRunBlocks(blocks,result.run);const statuses=result.targets||result.results||result.statuses||[],failures=statuses.filter(s=>s.error||s.ok===false||s.state==='failed');const message=failures.length?failures.map(s=>(s.label||s.id)+': '+(s.error||s.message||'Not sent')).join(' · '):(execute?'Sent to ':'Inserted in ')+targets.map(targetName).join(', ');$('#terminalMacroSendResult').innerHTML=result.run?button('output',failures.length?'!':'✓','data-run="'+html(result.run.id)+'" title="'+html(message)+' · View output" aria-label="'+html(message)+'; view output"','iconbtn'):'<span title="'+html(message)+'" aria-label="'+html(message)+'">'+(failures.length?'!':'✓')+'</span>';if(result.run){S.runs=[result.run,...S.runs.filter(r=>r.id!==result.run.id)];renderRuns();}if(failures.length)notify('Some terminals did not accept the command. Open terminal recipients or run output for details.','error');else if(execute){entry.value='';S.composerExpanded=false;renderComposer();}}
  catch(err){notify(err.message,'error');}finally{renderTargets();}
 }
 // The paste review captures one exact generation, independent of composer
@@ -168,13 +168,38 @@ async function startPacedPaste(target,text,revision,options){
  if(!result?.run?.id)throw new Error('The paced paste response was not confirmed. Check Runs before sending again.');
  S.runs=[result.run,...S.runs.filter(r=>r.id!==result.run.id)];renderRuns();schedule();
  if(result.run.state==='failed'){const error=new Error((result.run.targets||[]).map(t=>t.error).filter(Boolean).join(' · ')||'Paced paste was not started. Review Runs for details.');error.status=409;throw error;}
- openView('runs');notify('Paced paste started. Pause or Stop is available in Runs.');return result.run;
+ // Owner decision (2026-11-03): starting a paste or macro never switches the
+ // Macros panel to Runs; the toast says where Pause and Stop live.
+ notify('Paced paste started. Pause or Stop is available in Runs.');return result.run;
 }
+// Owner request: Last command, Last paste, Select output and Copy output work
+// for macro runs too. Before the backend can send the first line, each target
+// console gets a history block for the run's command lines (templates stay
+// unexpanded; the verified capture replaces them). The blocks are linked to the
+// run once it is accepted, or discarded if the start fails.
+function noteRunBlocks(targets,commands){
+ const lines=(commands||[]).map(c=>String(c??'')).filter(c=>c.trim());
+ if(!lines.length||typeof terminalSessions==='undefined'||!terminalSessions?.get)return [];
+ const blocks=[];
+ for(const target of targets||[]){
+  const entry=terminalSessions.get(target.id);if(!entry)continue;
+  const block=root.NetworkToolkitTerminalExtras?.notePaste?.(entry,lines.join('\n')+'\n');
+  if(block)blocks.push({entry,block});
+ }
+ return blocks;
+}
+function linkRunBlocks(blocks,run){
+ const accepted=run?.id&&run.state!=='failed';
+ for(const {entry,block} of blocks||[]){
+  if(!accepted||!trackPacedPaste(entry,block,run))root.NetworkToolkitTerminalExtras?.discardPacedPaste?.(entry,block);
+ }
+}
+function macroCommands(macro){return (macro?.steps||[]).filter(s=>s&&!s.disabled&&(s.kind||'command')==='command').map(s=>s.text);}
 // The backend owns execution and output capture for one-line-at-a-time pastes.
 // A browser tab keeps the original paste boundary, but only accepted steps from
 // the verified run are added to Last command, Last paste and macro shortcuts.
 function trackPacedPaste(entry,item,run){
- if(!entry||!item||item.kind!=='paste'||!run?.id||run.macroId!=='literal-paste')return false;
+ if(!entry||!item||item.kind!=='paste'||!run?.id)return false;
  const target=(run.targets||[]).find(t=>t.id===entry.info?.id);
  if(!target||!Number.isSafeInteger(target.generation))return false;
  if(!entry._ntOutputHistory?.includes(item))return false;
@@ -184,7 +209,7 @@ function trackPacedPaste(entry,item,run){
 async function collectPacedCaptures(runs){
  if(typeof terminalSessions==='undefined'||!terminalSessions?.get)return;
  for(const run of runs){
-  if(!run||run.macroId!=='literal-paste'||running(run))continue;
+  if(!run||running(run))continue;
   for(const target of run.targets||[]){
    const entry=terminalSessions.get(target.id);
    const block=entry?._ntOutputHistory?.find(i=>i.pacedRunId===run.id&&!i.pacedCapture);
@@ -198,6 +223,10 @@ async function collectPacedCaptures(runs){
     if(!capture||capture.runId!==run.id||capture.sessionId!==target.id||
        terminalSessions.get(target.id)!==entry||!entry._ntOutputHistory?.includes(block))continue;
     if(!root.NetworkToolkitTerminalExtras?.completePacedPaste?.(entry,block,capture))continue;
+    // Macro shortcuts (save Last command / Last batch as a macro) stay about
+    // what the user typed, pasted or entered in Run commands; a Library
+    // macro's commands only feed the output tools.
+    if(run.macroId!=='literal-paste'&&run.macroId!=='send-commands')continue;
     const steps=capture.steps||[],last=[...steps].reverse().find(s=>s.command?.trim());
     const history=S.last.get(target.id)||{draft:'',cursor:0,commands:[],paste:''};
     const currentPaste=root.NetworkToolkitTerminalExtras?.current?.(entry,'last-paste');
@@ -282,7 +311,7 @@ async function onConnected(entry,reconnected=false){
   const bindings=S.library.bindings.filter(b=>b.profileId===profileId&&(reconnected?b.onReconnect:b.onConnect));
   for(const binding of bindings){
    const macro=findMacro(binding.macroId);if(!macro)continue;if(macro.parameters.some(p=>p.required&&(p.secret||!p.defaultValue))){notify('Startup macro '+macro.name+' needs parameter values. Run it from Macros.','error');continue;}
-   const values=Object.fromEntries(macro.parameters.map(p=>[p.name,p.secret?'':p.defaultValue||'']));prepareRunView([target]);let run=(await call('/runs','POST',{macro,targets:targetRefs([target]),values})).run;S.runs=[run,...S.runs.filter(r=>r.id!==run.id)];renderRuns();
+   const values=Object.fromEntries(macro.parameters.map(p=>[p.name,p.secret?'':p.defaultValue||'']));prepareRunView([target]);const blocks=noteRunBlocks([target],macroCommands(macro));let run;try{run=(await call('/runs','POST',{macro,targets:targetRefs([target]),values})).run;}catch(err){linkRunBlocks(blocks,null);throw err;}linkRunBlocks(blocks,run);S.runs=[run,...S.runs.filter(r=>r.id!==run.id)];renderRuns();
    // Startup bindings for one profile run in order; the backend owns execution.
    while(running(run)&&!S.disposed){await new Promise(resolve=>setTimeout(resolve,750));run=(await call('/runs/'+encodeURIComponent(run.id))).run;}
    if(run.state!=='completed'){notify('Startup macro '+macro.name+' '+run.state+'. Remaining startup macros were skipped.','error');break;}
@@ -313,7 +342,7 @@ function stopRecording(){
  const m=blank();m.name='Recorded task';m.steps=rec.steps;detectParameters(m);editor(m);if(!$('.macro-editor'))throw new Error('The macro review could not be opened. Your recording was kept; try Stop & review again.');S.recording=null;renderRecording();
 }
 function saveLast(kind='command'){
- const entry=current(),history=S.last.get(entry?.info?.id),text=kind==='paste'?history?.paste:history?.commands.at(-1);if(!text){notify('No '+(kind==='paste'?'paste':'command')+' has been captured in this terminal yet.','error');return;}const m=blank();m.name=kind==='paste'?'Saved command list':text.slice(0,60);m.steps=model().fromCommands(redact(text));detectParameters(m);editor(m);
+ const entry=current(),history=S.last.get(entry?.info?.id),text=kind==='paste'?history?.paste:history?.commands.at(-1);if(!text){notify('No '+(kind==='paste'?'command batch':'command')+' has been captured in this terminal yet.','error');return;}const m=blank();m.name=kind==='paste'?'Saved command list':text.slice(0,60);m.steps=model().fromCommands(redact(text));detectParameters(m);editor(m);
 }
 function onContextMenu(event){const item=event.target?.closest?.('.macro-library-item');if(!item)return;event.preventDefault();event.stopPropagation();menu(item.dataset.macroId,item,event);}
 function onInputEvent(event){const el=event.target;if(el?.id==='terminalMacroCommand'){if(/[\r\n]/.test(el.value)&&!S.composerExpanded)S.composerExpanded=true;renderComposer();}if(el?.dataset?.macroField==='search'){S.query=el.value;renderLibrary();}if(el?.hasAttribute?.('data-macro-value')&&S.preview){S.preview.values[el.dataset.macroValue]=el.value;const expanded=$('#terminalMacroExpandedPreview');if(expanded)expanded.innerHTML=previewExpansion();}}
