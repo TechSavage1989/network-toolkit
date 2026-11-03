@@ -388,6 +388,16 @@
     let timer = null, active = false, suspended = '', limited = false, count = 0;
     let lastState = '', geometry = '', unsupported = false, scrollView = null;
     let records = new Map();
+    // Per-row signature (text plus the hidden/colorable/overrideable cell
+    // attributes collect() derives) of the last scan. A parsed write re-scans
+    // every visible row; rows whose signature is unchanged keep their marks
+    // without re-running the token rules, which is what kept each echoed
+    // keystroke paying for the whole screen.
+    const signatures = new Map();
+    // Visible row text seen by the last parsed-write pass, and whether a
+    // deferred full reconciliation (all visible rows) is still owed.
+    const rowText = new Map();
+    let fullPass = false;
     const dirty = new Set(), repaint = new Set(), subscriptions = [];
     const clock = () => global.performance && typeof global.performance.now === 'function' ? global.performance.now() : Date.now();
     const getState = () => ({ enabled, active, suspended, limited, count });
@@ -409,6 +419,8 @@
     function clear() {
       for (const record of records.values()) remove(record);
       records.clear();
+      signatures.clear();
+      rowText.clear();
       count = 0;
     }
     function hiddenView(){
@@ -478,6 +490,7 @@
       }
       records = next;
       for (const y of dirty) if (y < current.first || y > current.last) dirty.delete(y);
+      for (const y of signatures.keys()) if (y < current.first || y > current.last) signatures.delete(y);
     }
     function collect(buffer, y) {
       let first = y, last = y, steps = 0;
@@ -586,8 +599,15 @@
       if (!group) {
         limited = true;
         dirty.delete(y);
+        signatures.delete(y);
         updateRow(y, [], current);
         return 1;
+      }
+      const signature = group.text + '\u0001' + group.rows.map(row => row.y + ':' + row.hidden.map(Number).join('') + ':' + row.colorable.map(Number).join('') + ':' + row.overrideable.map(Number).join('')).join('\u0002');
+      const visibleRows = group.rows.filter(row => row.y >= current.first && row.y <= current.last);
+      if (visibleRows.length && visibleRows.every(row => signatures.get(row.y) === signature)) {
+        for (const row of visibleRows) dirty.delete(row.y);
+        return visibleRows.length;
       }
       const matches = analyze(group.text, language, selectedRules);
       if (matches.length === LIMITS.matches) limited = true;
@@ -618,6 +638,7 @@
           }
         }
         updateRow(row.y, segments, current);
+        signatures.set(row.y, signature);
         dirty.delete(row.y);
         scanned++;
       }
@@ -629,6 +650,7 @@
       if (disposed || !enabled || unsupported) return;
       try {
         const current = view();
+        if (fullPass) { fullPass = false; for (let y = current.first; y <= current.last; y++) dirty.add(y); }
         suspended = current.buffer.type === 'alternate' ? 'alternate' : !visible() ? 'hidden' : '';
         active = !suspended;
         if (!active) { dirty.clear(); clear(); paint(); announce(); return; }
@@ -692,16 +714,30 @@
           if(records.size||dirty.size)flush();
           return;
         }
-        // Keep the existing immediate reconciliation of old marks: changed
-        // ANSI/invisible attributes must take precedence before the next paint,
-        // including marked rows beyond this turn's new-row scanning budget.
-        try { const current = view(); prune(current); for (const y of [...records.keys()]) scan(y, current); }
-        catch (_) { clear(); }
-        // Start new and rewritten rows in this parsing turn, before the next
-        // terminal paint. Large views continue in bounded batches. Scanning
-        // only existing marks left new rows dependent on a later timer/render.
-        enqueue();
-        flush();
+        // Before the next paint, scan only the rows whose text changed in this
+        // parsing turn (an echoed keystroke changes one row; streaming output
+        // changes many). Rows with unchanged text keep their marks for now.
+        // Attribute-only changes (ANSI colors or SGR 8 over the same text) are
+        // reconciled by the deferred full pass that follows, so every echoed
+        // keystroke no longer pays for the whole screen.
+        try {
+          const current = view();
+          prune(current);
+          // Existing marks still honor ANSI/invisible rewrites before the next
+          // paint; the signature cache makes this a cell walk, not a re-analysis.
+          for (const y of [...records.keys()]) scan(y, current);
+          const buffer = current.buffer;
+          let changed = 0;
+          for (let y = current.first; y <= current.last; y++) {
+            const line = buffer.getLine(y);
+            const text = line ? line.translateToString(false) : '';
+            if (rowText.get(y) !== text) { rowText.set(y, text); dirty.add(y); changed++; }
+          }
+          for (const y of rowText.keys()) if (y < current.first || y > current.last) rowText.delete(y);
+          if (changed) flush();
+        } catch (_) { clear(); }
+        fullPass = true;
+        schedule();
       });
       subscribe(term.onScroll, () => {
         const current = view(), previous = scrollView;

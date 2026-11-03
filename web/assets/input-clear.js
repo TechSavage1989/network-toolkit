@@ -88,8 +88,10 @@ function init(){
  if(typeof root.MutationObserver==='function'){
   observer=new root.MutationObserver(changes=>{
    let changed=false;for(const mutation of changes){if(mutation.target.closest?.('.input-clear-button'))continue;
+    // Terminal output rendering and its helper textarea mutate on every frame
+    // and keystroke; nothing in there ever gets a clear button.
+    if(mutation.target.closest?.('.xterm'))continue;
     if(mutation.type==='attributes'){if(['INPUT','TEXTAREA','FIELDSET'].includes(mutation.target.tagName)){changed=true;needsScan=true;}else if(mutation.attributeName==='hidden'||mutation.attributeName==='inert')changed=true;}
-    else if(mutation.target.closest?.('.xterm'))continue;
     else{for(const added of mutation.addedNodes||[]){if(added.nodeType!==1||added.classList?.contains('input-clear-button'))continue;if(added.matches?.('input,textarea')||added.querySelector?.('input,textarea'))needsScan=true;}changed=true;}
    }if(changed)schedule();
   });observer.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['disabled','readonly','hidden','inert','type','value']});

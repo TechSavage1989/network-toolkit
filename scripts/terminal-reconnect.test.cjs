@@ -71,3 +71,21 @@ test('manual reconnect requests fresh authentication using only safe connection 
 test('late reauthentication requirement does not replace a newer connection dialog',async()=>{
  const c=setup();c.document.querySelector=()=>({});c.api=async()=>{throw Object.assign(Error('Sign in'),{code:'authentication_required',status:409});};await c.reconnectTerminal(c.entry);assert.equal(c.entry.reconnectBusy,false);
 });
+
+// Owner report (v1.20.4): typing felt sluggish. Keystrokes that queue while a
+// request is in flight now travel together, and the stdin option is only
+// re-assigned when it changes (xterm flips its helper textarea's readonly
+// attribute on every assignment, which other observers reacted to).
+test('queued keystrokes are sent in one request; pager replies stay separate; disableStdin is not re-assigned needlessly',async()=>{
+ const c=setup(),entry=c.entry;entry.info.state='connected';entry.inputError='';entry.inputUncertain=false;entry.inputChunks=[];entry.inputBytes=0;
+ c.bytesToBase64=bytes=>Buffer.from(bytes).toString('base64');c.encodeURIComponent=encodeURIComponent;
+ let assignments=0;entry.xterm.options={get disableStdin(){return this._d;},set disableStdin(v){assignments++;this._d=v;}};entry.xterm.options.disableStdin=false;assignments=0;
+ const pager=Uint8Array.from([32]);pager.terminalInputOrigin='pager';
+ for(const chunk of [Uint8Array.from([115,104]),Uint8Array.from([111,119]),pager,Uint8Array.from([13])]){entry.inputChunks.push(chunk);entry.inputBytes+=chunk.length;}
+ c.requests.length=0;c.api=async(path,method,body)=>{c.requests.push({path,method,body});return {};};
+ await c.drainTerminalInput(entry);
+ assert.deepEqual(c.requests.map(r=>[r.body.data,r.body.origin||'']),[[Buffer.from('show').toString('base64'),''],[Buffer.from(' ').toString('base64'),'pager'],[Buffer.from('\r').toString('base64'),'']],'Two typed chunks merge; the pager reply and the chunk after it are their own requests');
+ assert.equal(entry.inputChunks.length,0);assert.equal(entry.inputBytes,0);assert.equal(entry.inputError,'');
+ assert.equal(assignments,0,'disableStdin stays untouched when its value does not change');
+ entry.info.state='closed';await c.drainTerminalInput(entry);assert.equal(assignments,0,'A disconnected entry is not drained');
+});

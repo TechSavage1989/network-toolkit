@@ -138,6 +138,8 @@ Device color: <span data-terminal-preview-color="red">red slot</span>  <span dat
 }
 function sync(){
  const section=document.getElementById('terminalAppearanceEditor');if(!section)return;
+ // Nothing to show while the tools panel is hidden; the next open syncs it.
+ if(section.closest('.hidden'))return;
  const clean=normalize(effective(state.terminalAppearance)),colors=theme(clean,state.theme),font=options(clean,state.theme),highlightSettings=highlightOptions(clean,state.theme),legend=root.NTTerminalHighlight?.legend?.(highlightSettings.theme,highlightSettings)||[],marks=Object.fromEntries(legend.map(mark=>[mark.kind,mark]));
  for(const input of section.querySelectorAll('[data-terminal-appearance]')){if(input.getAttribute('type')==='checkbox')input.checked=clean[input.dataset.terminalAppearance]===true;else if(input!==document.activeElement)input.value=String(clean[input.dataset.terminalAppearance]);}
  for(const input of section.querySelectorAll('[data-terminal-color]'))syncColorButton(input,colors[input.dataset.terminalColor]);
