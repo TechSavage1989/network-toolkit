@@ -1,0 +1,13 @@
+Network Toolkit 1.19.7 Beta 7
+
+## What's New
+
+- Starting a multi-line paste no longer switches the Terminal's Macros panel to the Runs tab. You stay where you were; a short message still tells you that Pause and Stop are in Runs.
+- Because the panel no longer jumps to Runs, it also stays put for macros you start afterwards.
+
+## Additional Details
+
+- Runs, Pause, Stop, Output and Clear are unchanged; open the Runs tab yourself when you want them.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Security confirmations and Windows/UAC approval are unchanged.
+- This is an opt-in beta. Stable users stay on 1.19.0. Portable executable filename remains Network_Toolkit.exe.
+- Validation uses hosted and synthetic fixtures; physical Windows and live-device acceptance is not formally claimed.

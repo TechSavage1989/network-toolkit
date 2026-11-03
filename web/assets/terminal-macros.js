@@ -168,7 +168,9 @@ async function startPacedPaste(target,text,revision,options){
  if(!result?.run?.id)throw new Error('The paced paste response was not confirmed. Check Runs before sending again.');
  S.runs=[result.run,...S.runs.filter(r=>r.id!==result.run.id)];renderRuns();schedule();
  if(result.run.state==='failed'){const error=new Error((result.run.targets||[]).map(t=>t.error).filter(Boolean).join(' · ')||'Paced paste was not started. Review Runs for details.');error.status=409;throw error;}
- openView('runs');notify('Paced paste started. Pause or Stop is available in Runs.');return result.run;
+ // Owner decision (2026-11-03): starting a paste or macro never switches the
+ // Macros panel to Runs; the toast says where Pause and Stop live.
+ notify('Paced paste started. Pause or Stop is available in Runs.');return result.run;
 }
 // The backend owns execution and output capture for one-line-at-a-time pastes.
 // A browser tab keeps the original paste boundary, but only accepted steps from

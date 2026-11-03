@@ -1,3 +1,9 @@
+# v1.19.7 Beta 7 - no automatic switch to Runs (2026-11-03) - candidate, NOT PUBLISHED
+
+Owner: "I don't want the Runs window to be switched to after a multi line paste or after using a macro." Only `startPacedPaste` called `openView('runs')` (which also expanded the Macros sidebar tab); macro starts (`confirmRun`, shortcut runs) already only re-render. Change: the `openView('runs')` call is removed; `notify('Paced paste started. Pause or Stop is available in Runs.')` stays. `terminal-paced-paste127.test.cjs` now asserts no view change and the browser test opens the Runs tab itself before using Pause/Stop; `terminal-macros.test.cjs` already asserted "An accepted run does not navigate". UI_GUIDELINES Terminal paragraph updated.
+
+---
+
 # v1.19.6 Beta 6 - publication verified (2026-11-03)
 
 Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.19.6 at 2026-11-03T00:17:47Z; stable latest remains v1.19.0. Merged PR #52; tag v1.19.6 points to merge commit 776e9f30e7a4e54207f8cee3b5e63519b5e7acdb. Guarded Release workflow https://github.com/TechSavage1989/network-toolkit/actions/runs/41551464944 completed build and publish. Four assets: Network_Toolkit.exe, Network_Toolkit_1.19.6_Portable.zip, Network_Toolkit_1.19.6_Update.zip and SHA256SUMS; SHA256SUMS entries match GitHub's asset digests. The push Checks run https://github.com/TechSavage1989/network-toolkit/actions/runs/41549453868 passed every job on the exact source commit 0de932c; the parallel pull_request run https://github.com/TechSavage1989/network-toolkit/actions/runs/41549459403 failed once in native-editor128-diagnostic (TestNativeEditorTransferInstalledWebView2, destination ownership ACK not reached on the hosted Windows runner, same intermittent as the v1.19.4 round and the docs-only main run 41518631051) and passed on re-run: recorded, not waived. Live-device acceptance of the pager fix rests with the owner.

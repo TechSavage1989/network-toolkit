@@ -53,7 +53,7 @@ Member tabs:
 
 Local network > IP configuration, top to bottom: Public IP, snapshot time, adapter picker, Current configuration beside the IPv4 editor, then Network actions last. The page renders as soon as the adapter settings are read; Network actions fill in after the slower adapter-state read and show "Reading adapter state" until then.
 
-Terminal: a session sidebar (Saved, Recent, Files, Macros) docks left or right. Clicking the selected tab hides it; clicking any tab shows it. There is no separate Sidebar button.
+Terminal: a session sidebar (Saved, Recent, Files, Macros) docks left or right. Clicking the selected tab hides it; clicking any tab shows it. There is no separate Sidebar button. Starting a macro or a One line at a time paste never switches the Macros panel to its Runs tab; a toast says where Pause and Stop are.
 
 ## Components and tokens
 

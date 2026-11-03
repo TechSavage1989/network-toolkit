@@ -1,3 +1,7 @@
+## 1.19.7 Beta 7 - No automatic switch to Runs (candidate)
+
+- Owner decision: starting a One line at a time paste no longer opens the Macros panel's Runs tab. The toast still says Pause and Stop are in Runs. Macro starts never switched views; the panel only stayed on Runs because a paste had moved it there.
+
 ## 1.19.6 Beta 6 - Paced paste answers pager prompts (published 2026-11-03)
 
 - Owner report: "One line at a time · wait for prompt" stalled after the first command on a Cisco switch because the device's --More-- prompt was never answered and the console's Auto pager is suppressed while the backend owns the session.
