@@ -82,6 +82,35 @@ test('macro Last command and Last paste update from verified run, not initial in
  await c.collectPacedCaptures([{...run,state:'completed'}]);assert.equal(fetches.length,1);
 });
 
+test('macro runs link a batch block per target and complete it from the verified capture without touching macro shortcuts',async()=>{
+ const entry={info:{id:'A'},_ntOutputHistory:[]},other={info:{id:'B'},_ntOutputHistory:[]};
+ const noted=[],discarded=[];
+ const root={NetworkToolkitTerminalExtras:{
+  notePaste(e,text){const block={kind:'paste',text};e._ntOutputHistory.push(block);noted.push({id:e.info.id,text});return block;},
+  discardPacedPaste(e,block){discarded.push(e.info.id);e._ntOutputHistory.splice(e._ntOutputHistory.indexOf(block),1);return true;},
+  completePacedPaste(e,i,v){i.pacedCapture={steps:v.steps};return true;},
+  current(e,kind){return e._ntOutputHistory.filter(i=>i.kind===(kind==='last-paste'?'paste':'command')).at(-1)||null;}
+ }};
+ const fetches=[],S={last:new Map()},pacedPending=new Set(),terminalSessions=new Map([['A',entry],['B',other]]);
+ const capture={runId:'macro-1',sessionId:'A',state:'completed',steps:[{index:1,command:'show one',output:'one'},{index:2,command:'show two',output:'two'}]};
+ const c={S,pacedPending,terminalSessions,root,running:r=>['running','paused'].includes(r.state),call:async uri=>{fetches.push(uri);return {capture:{...capture,sessionId:uri.endsWith('=A')?'A':'B'}}},redact:s=>s,encodeURIComponent};
+ vm.createContext(c);for(const name of ['noteRunBlocks','linkRunBlocks','macroCommands','trackPacedPaste','collectPacedCaptures'])vm.runInContext(fn(macros,name),c);
+ const macro={steps:[{kind:'command',text:'show one'},{kind:'delay',delayMs:5},{kind:'command',text:'skip me',disabled:true},{kind:'command',text:'show two'}]};
+ assert.deepEqual(c.macroCommands(macro),['show one','show two'],'Only enabled command steps form the batch');
+ const blocks=c.noteRunBlocks([{id:'A',generation:9},{id:'B',generation:2},{id:'missing',generation:1}],c.macroCommands(macro));
+ assert.equal(blocks.length,2);assert.deepEqual(noted,[{id:'A',text:'show one\nshow two\n'},{id:'B',text:'show one\nshow two\n'}]);
+ const run={id:'macro-1',macroId:'fixture',state:'running',targets:[{id:'A',generation:9},{id:'B',generation:2}]};
+ c.linkRunBlocks(blocks,run);assert.deepEqual(discarded,[]);assert.equal(blocks[0].block.pacedRunId,'macro-1');assert.equal(blocks[1].block.pacedGeneration,2);
+ await tick();assert.deepEqual(fetches,[],'No capture is fetched while the run is active');
+ await c.collectPacedCaptures([{...run,state:'completed'}]);
+ assert.equal(fetches.length,2);assert(blocks[0].block.pacedCapture&&blocks[1].block.pacedCapture,'Every target console receives the verified capture');
+ assert.equal(S.last.size,0,'Macro runs do not rewrite the Last command / Last batch macro shortcuts');
+ // A start that fails discards the provisional blocks instead of leaving empty batches behind.
+ const failed=c.noteRunBlocks([{id:'A',generation:9}],['show three']);c.linkRunBlocks(failed,{id:'macro-2',state:'failed',targets:[]});assert.deepEqual(discarded,['A']);
+ c.linkRunBlocks(c.noteRunBlocks([{id:'B',generation:2}],['show four']),null);assert.deepEqual(discarded,['A','B']);
+ assert.equal(c.noteRunBlocks([{id:'A',generation:9}],['  ','']).length,0,'Blank command lists create no block');
+});
+
 test('paced output uses submitted commands without numbering or duplicate device echoes',async()=>{
  const h=harness(),e=h.entry('paced');try{
   await h.write(e,'switch# ');

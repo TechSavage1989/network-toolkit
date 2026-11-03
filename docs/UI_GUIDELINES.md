@@ -53,7 +53,7 @@ Member tabs:
 
 Local network > IP configuration, top to bottom: Public IP, snapshot time, adapter picker, Current configuration beside the IPv4 editor, then Network actions last. The page renders as soon as the adapter settings are read; Network actions fill in after the slower adapter-state read and show "Reading adapter state" until then.
 
-Terminal: a session sidebar (Saved, Recent, Files, Macros) docks left or right. Clicking the selected tab hides it; clicking any tab shows it. There is no separate Sidebar button. Starting a macro or a One line at a time paste never switches the Macros panel to its Runs tab; a toast says where Pause and Stop are.
+Terminal: a session sidebar (Saved, Recent, Files, Macros) docks left or right. Clicking the selected tab hides it; clicking any tab shows it. There is no separate Sidebar button. Starting a macro or a One line at a time paste never switches the Macros panel to its Runs tab; a toast says where Pause and Stop are. The console bar's output tools (Last command / Last batch, Jump to start/end, Select output, Copy output, Include commands) cover typed commands and every command batch: a raw or paced paste, a macro run from the Library, a shortcut or a startup binding, and a Run commands list. "Last batch" is the name for all of these; do not call it "Last paste".
 
 ## Components and tokens
 
@@ -108,7 +108,7 @@ Keep a confirmation only when an action can lose data, interrupt live sessions o
 - Plain language first. Say what the user can do ("Look up DNS records"), not how the engine works.
 - Errors say what happened and what to do next; keep the original technical error visible beside the advice.
 - Use sentence case for labels and buttons; tool names in the navigation are proper names and keep their capitals. Name buttons with a verb and object (Start ping, Open terminal).
-- Use the same name for the same thing everywhere: "Test a target", "File Transfer", "Saved targets", "Terminal", "Text Editor".
+- Use the same name for the same thing everywhere: "Test a target", "File Transfer", "Saved targets", "Terminal", "Text Editor", "Last batch" (a pasted, macro or Run commands batch).
 - Examples use documentation addresses only: `example.com`, `192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`.
 - Security notes are short and factual (TFTP: "no encryption or login; use only on trusted networks").
 - What's New in release notes stays short and user-focused; technical detail goes under Additional Details.
