@@ -1,4 +1,4 @@
-## 1.19.6 Beta 6 - Paced paste answers pager prompts (candidate)
+## 1.19.6 Beta 6 - Paced paste answers pager prompts (published 2026-11-03)
 
 - Owner report: "One line at a time · wait for prompt" stalled after the first command on a Cisco switch because the device's --More-- prompt was never answered and the console's Auto pager is suppressed while the backend owns the session.
 - The paste review now sends the session's Auto pager and pager key with the request; the engine answers each recognized pager prompt once (Space, or Enter when the prompt asks for it) and still waits for the real prompt before the next line. With Auto pager off, the prompt waits for the user as before.
