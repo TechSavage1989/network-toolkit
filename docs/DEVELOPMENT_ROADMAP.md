@@ -20,6 +20,7 @@
 | Results polish, part 2 | Owner reviewed the per-tool sheet: Activity log and technical blocks off results pages, toolbars only on long lists, cleaner sample tables, DNS query table folded, discovery notes to Help | **Published v1.19.5 Beta 5 (opt-in) on 2026-11-02**; stable remains v1.19.0 |
 | Paced paste pager | Owner report: One line at a time paste stalled at --More-- on a Cisco switch; the engine now answers pager prompts per the session Auto pager setting | **Published v1.19.6 Beta 6 (opt-in) on 2026-11-03**; stable remains v1.19.0 |
 | Last batch output tools; no automatic switch to Runs | Owner requests: Last command / Last batch (renamed from Last paste), Select output and Copy output work for macro runs and Run commands lists; starting a paced paste or macro never moves the Macros panel to the Runs tab | **Published v1.19.7 Beta 7 (opt-in) on 2026-11-03**; stable remains v1.19.0 |
+| No gaps in batch output | Owner report: pager erase residue (blank line plus a row of spaces) in copied AOS-CX batches; whitespace-only lines after a pager prompt are dropped | v1.19.8 Beta 8 candidate on branch fix/batch-pager-gaps, not published |
 
 ## Rules
 - Phase 0 is documentation only, with **no release**.

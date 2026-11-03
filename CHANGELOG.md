@@ -1,3 +1,7 @@
+## 1.19.8 Beta 8 - No gaps in batch output (candidate)
+
+- Owner report: a copied Last batch from an AOS-CX switch had a blank line and a row of spaces wherever the device had paged. Those are the pager prompt's erase residue (carriage return plus spaces). Batch output now drops whitespace-only lines that directly follow a recognized pager prompt; blank lines elsewhere are preserved.
+
 ## 1.19.7 Beta 7 - Last batch output tools and no automatic switch to Runs (published 2026-11-03)
 
 - Owner request: Last command, Last paste, Select output and Copy output now work for macro runs (Library, shortcuts, startup bindings) and Run commands lists, not only pastes. The engine records a capture step for every run's command lines and serves it through the existing run capture endpoint; the console links a batch block to each run target and fills it from the verified capture when the run finishes.

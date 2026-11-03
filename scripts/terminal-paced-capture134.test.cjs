@@ -111,6 +111,19 @@ test('macro runs link a batch block per target and complete it from the verified
  assert.equal(c.noteRunBlocks([{id:'A',generation:9}],['  ','']).length,0,'Blank command lists create no block');
 });
 
+test('pager prompt residue (blank and space-only lines after --More--) leaves no gaps in batch output',async()=>{
+ const h=harness(),e=h.entry('aoscx');try{
+  await h.write(e,'switch# ');
+  const block=h.api.notePaste(e,'show run\nshow vlan\n');block.pacedRunId='run-gaps';
+  const pad=' '.repeat(63);
+  assert(h.api.completePacedPaste(e,block,{runId:'run-gaps',sessionId:'aoscx',state:'completed',steps:[
+   {index:1,command:'show run',output:'switch# show run\r\nCurrent configuration:\r\n!\r\n    qos trust cos\r\n--More--\r\n\r'+pad+'\r    spanning-tree bpdu-guard\r\ninterface 1/1/7\r\n--More--\r'+pad+'\r\n    no shutdown\r\n\r\nhttps-server vrf mgmt\r\nswitch# '},
+   {index:2,command:'show vlan',output:'switch# show vlan\r\nVLAN  Name\r\n\r\n1     DEFAULT\r\nswitch# '}
+  ]}));
+  assert.equal(h.api.output(e,h.api.current(e,'last-paste'),false).text,'Current configuration:\n!\n    qos trust cos\n    spanning-tree bpdu-guard\ninterface 1/1/7\n    no shutdown\n\nhttps-server vrf mgmt\nVLAN  Name\n\n1     DEFAULT');
+ }finally{e.xterm.dispose();}
+});
+
 test('paced output uses submitted commands without numbering or duplicate device echoes',async()=>{
  const h=harness(),e=h.entry('paced');try{
   await h.write(e,'switch# ');

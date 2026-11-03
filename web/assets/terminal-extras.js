@@ -78,9 +78,15 @@ function pacedOutput(item,includeCommands){
  for(const step of capture.steps){
   const command=String(step.command??''),cmd=command.trim();
   const lines=String(step.output??'').replace(/\r\n?/g,'\n').split('\n');
-  const shown=[];let outputStarted=false;
+  const shown=[];let outputStarted=false,afterPager=false;
   for(const line of lines){
-   if(matchPagerLine(line))continue;
+   if(matchPagerLine(line)){afterPager=true;continue;}
+   // A device erases its pager prompt with a carriage return and a row of
+   // spaces before continuing (AOS-CX, Cisco). Those whitespace-only lines are
+   // the prompt's residue, not output; dropping them removes the gaps the
+   // owner saw in a copied batch. Blank lines elsewhere are preserved.
+   if(afterPager&&!line.trim())continue;
+   afterPager=false;
    if(!outputStarted){
     // Initial empty lines and the previous idle prompt delimit the command,
     // not its output. Preserve all blank lines once the response has begun.
