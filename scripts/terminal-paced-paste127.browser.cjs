@@ -45,10 +45,22 @@ const text='  description {{host}}\r\n\r\n  show version\r\n';
   await page.waitForFunction(()=>!!currentTerminal()?.xterm&&terminalEntryAcceptsInput(currentTerminal()));
   await page.evaluate(async()=>{await NetworkToolkitTerminalMacros.refresh(true);});
   const paced=()=>calls.filter(c=>c.p==='/api/terminal-automation/paste'),inputs=()=>calls.filter(c=>/\/input$/.test(c.p));
-  // Do not await a page-side promise: on slow runners Playwright has reported
-  // "Resulting promise was garbage collected" for the xterm write callback.
-  // Write, then wait for the prompt to be on screen with the cursor after it.
-  async function ready(){await page.evaluate(()=>{const e=currentTerminal();e.xterm.reset();e.xterm.clearSelection();e.xterm.write('lab-switch(config)# ');});await page.waitForFunction(()=>{const e=currentTerminal(),b=e?.xterm?.buffer.active;if(!b)return false;const line=b.getLine(b.baseY+b.cursorY)?.translateToString(true)||'';return line.trimEnd()==='lab-switch(config)#'&&b.cursorX===20;},undefined,{polling:100});}
+  // The xterm write callback is the proof the prompt was processed. Never leave
+  // that page-side promise unsettled (Playwright once reported "Resulting
+  // promise was garbage collected" on a slow runner): the same promise also
+  // settles when the prompt is visible in the buffer, and after 10 s it settles
+  // with a diagnostic so a failure explains itself instead of timing out.
+  async function ready(){
+    const result=await page.evaluate(()=>new Promise(resolve=>{
+      const e=currentTerminal(),prompt='lab-switch(config)# ';e.xterm.reset();e.xterm.clearSelection();
+      let done=false,poll=null,limit=null;const finish=value=>{if(done)return;done=true;clearInterval(poll);clearTimeout(limit);resolve(value);};
+      const shown=()=>{const b=e.xterm.buffer.active,line=b.getLine(b.baseY+b.cursorY)?.translateToString(true)||'';return line.trimEnd()===prompt.trimEnd()&&b.cursorX===prompt.length;};
+      e.xterm.write(prompt,()=>finish({ok:true,via:'callback'}));
+      if(done)return;poll=setInterval(()=>{if(shown())finish({ok:true,via:'buffer'});},50);
+      limit=setTimeout(()=>{const b=e.xterm.buffer.active;finish({ok:false,type:b.type,baseY:b.baseY,cursorY:b.cursorY,cursorX:b.cursorX,line:b.getLine(b.baseY+b.cursorY)?.translateToString(true),attached:!!e.xterm.element?.isConnected,state:e.info?.state,accepts:terminalEntryAcceptsInput(e)});},10000);
+    }));
+    if(!result.ok)throw new Error('Prompt was not written to the terminal within 10 s: '+JSON.stringify(result));
+  }
   async function open(value=text){await ready();await page.evaluate(value=>NetworkToolkitTerminalInteraction.pasteText(currentTerminal(),value),value);await page.locator('#terminalPasteForm').waitFor();}
   async function close(){await page.locator('#modalRoot [data-action="close-modal"]').first().click();await page.locator('#terminalPasteForm').waitFor({state:'detached'});}
   async function screenshot(label){if(!out)return;const file='terminal-paced127-'+mode+'-'+label+'.png';await page.screenshot({path:path.join(out,file),fullPage:true});report.screenshots.push(file);}
