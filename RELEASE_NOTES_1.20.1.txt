@@ -1,0 +1,13 @@
+Network Toolkit 1.20.1 Beta 1
+
+## What's New
+
+- The progress bar shown while an update downloads, installs and restarts moves again. A shared style introduced with the redesign had stopped the browser engine from animating it.
+
+## Additional Details
+
+- Cause: a rounded corner set on the progress element itself, combined with the styled bar and fill, stops Chromium's indeterminate animation. The corners now come from the bar and fill only, so the look is unchanged and the animation plays.
+- A browser check now loads the app's stylesheets and verifies that an indeterminate progress bar changes between frames.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Security confirmations and Windows/UAC approval are unchanged.
+- This is an opt-in beta. Stable users stay on 1.20.0. Portable executable filename remains Network_Toolkit.exe.
+- Validation uses hosted and synthetic fixtures; physical Windows and live-device acceptance is not formally claimed.
