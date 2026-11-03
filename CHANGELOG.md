@@ -1,3 +1,8 @@
+## 1.20.0 - Stable (candidate)
+
+- Second stable release of the UX work, combining the 1.19.1 to 1.19.9 betas: tool consolidation (Test a target, Test a website, Local network, Network discovery), results pages with primary results only, faster IP configuration, paced paste that answers pager prompts, Last batch output tools for macros and Run commands, gap-free batch output, no automatic switch to Runs, and update checks that notice new releases while the app runs.
+- Numbered above every 1.19 beta so beta users also receive it; saved data and security confirmations unchanged.
+
 ## 1.19.9 Beta 9 - Updates noticed while running; last batch gap (published 2026-11-03)
 
 - Owner request: the app must detect a new release without a manual check or a restart. Automatic checks now run at startup, every 30 minutes while the app is running, and on focus/visibility/reconnect when the last check is older than 10 minutes (previously every six hours and on focus after six hours). A background check that finds an update shows the existing top-of-app notice and a one-time toast per version. Download and install still need explicit approval.

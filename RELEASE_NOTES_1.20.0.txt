@@ -1,0 +1,21 @@
+Network Toolkit 1.20.0
+
+## What's New
+
+- Fewer, clearer tools. Device check, Connection monitor and Device details now live inside Test a target; HTTP check and TLS certificate are Test a website; the Hosts file is part of Local network; address-range sweeps belong to Network discovery. Wake on LAN stays its own tool, and every former tool name still works in search.
+- Results pages show just the results. The activity log and technical blocks are gone, short lists have no filter bar, and Ping and Monitor sample tables are cleaner. Everything removed from the page is still in Export.
+- The IP configuration page appears right away, with Network actions filling in a moment later.
+- Terminal: pasting several commands with "One line at a time" now works with paged output, since --More-- is answered the way your Auto pager setting does. Last command, Last batch, Select output and Copy output cover macros and Run commands as well as pastes, copied batches have no page-break gaps, and starting a paste or macro no longer switches the panel to Runs.
+- New releases are noticed while the app is open: checks run at startup, every 30 minutes while running, and when you come back after 10 minutes away. A notice and a short message tell you once. Downloading and installing still need your approval.
+- Monitor graph controls fit short windows, and the Text Editor compare view keeps both panes the same height.
+
+## Additional Details
+
+- This stable release includes everything from the 1.19.1 to 1.19.9 betas. Its version is higher than every beta, so beta users receive it too.
+- Automatic update checks use conditional requests; the manual Check for updates still works. Packages are SHA-256 verified.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Existing preferences are migrated, not reset.
+- Windows/UAC review, Hosts/IP/adapter confirmation, SSH host-key trust and file overwrite checks are unchanged.
+- Minimum window sizes: main window 960×600; detached Terminal and Editor 640×400.
+- "Last paste" is now "Last batch" in the console bar, menus and macro shortcuts; saved settings carry over.
+- Portable executable filename remains Network_Toolkit.exe.
+- Validation uses hosted builds and synthetic fixtures; the owner confirmed the paced paste and batch output fixes on a live AOS-CX switch. Physical Windows acceptance beyond that is not formally claimed.
