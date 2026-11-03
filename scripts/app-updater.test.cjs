@@ -135,3 +135,17 @@ test('install refuses open editor documents or pending close/move without saving
 test('install rechecks newly opened documents after settings save and status awaits',async()=>{
  for(const boundary of ['save','status']){let blocked=false,statusReads=0,posts=0;const h=harness({editorInstallBlockReason:()=>blocked?'Close the new editor document first.':'',save:async()=>{if(boundary==='save')blocked=true;return true;},api:async path=>{if(path==='/updates/install'){posts++;return {restarting:true};}if(++statusReads>1&&boundary==='status')blocked=true;return structuredClone(staged);}});await h.c.load();await h.c.install('1.17.59');assert.match(h.c.snapshot().error,/new editor document/);assert.equal(posts,0);assert.equal(h.c.snapshot().busy,false);assert.equal(h.c.snapshot().data.installing,false);}
 });
+
+test('host cadence and freshness options shorten the running interval and the focus gate without touching defaults',async()=>{
+  let now=1000;const h=clockHarness({now:()=>now,interval:()=>30*60*1000,freshness:()=>10*60*1000});h.s.start();await h.tick();
+  assert.equal(h.delays.at(-1),1800000,'Running cadence follows the host interval');
+  now+=9*60*1000;h.s.wake();assert.equal(h.delays.at(-1),1800000,'Focus within the freshness window does not re-check');
+  now+=61*1000;h.s.wake();assert.equal(h.delays.at(-1),0,'Focus after the freshness window checks right away');await h.tick();assert.equal(h.calls.length,2);
+  const plain=clockHarness({now:()=>now});plain.s.start();await plain.tick();assert.equal(plain.delays.at(-1),21600000,'Default cadence stays six hours');
+  const clamped=clockHarness({now:()=>now,interval:()=>1000,freshness:()=>5});clamped.s.start();await clamped.tick();assert.equal(clamped.delays.at(-1),60000,'Intervals below one minute are clamped');
+});
+test('a background check that finds an update announces it once per version; manual checks do not',async()=>{
+  const announced=[];let calls=0;const h=harness({api:async path=>{calls++;return path==='/updates/check'?structuredClone(available):structuredClone(staged);},announce:s=>announced.push(s.data.latest.version)});
+  await h.c.check(true);await h.c.check(true);assert.deepEqual(announced,['1.17.60','1.17.60'],'The controller reports every background find; the host decides whether to toast');
+  await h.c.check();assert.equal(announced.length,2,'Manual checks show their result inline instead');
+});

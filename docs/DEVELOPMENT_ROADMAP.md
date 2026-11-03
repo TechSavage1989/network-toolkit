@@ -21,6 +21,7 @@
 | Paced paste pager | Owner report: One line at a time paste stalled at --More-- on a Cisco switch; the engine now answers pager prompts per the session Auto pager setting | **Published v1.19.6 Beta 6 (opt-in) on 2026-11-03**; stable remains v1.19.0 |
 | Last batch output tools; no automatic switch to Runs | Owner requests: Last command / Last batch (renamed from Last paste), Select output and Copy output work for macro runs and Run commands lists; starting a paced paste or macro never moves the Macros panel to the Runs tab | **Published v1.19.7 Beta 7 (opt-in) on 2026-11-03**; stable remains v1.19.0 |
 | No gaps in batch output | Owner report: pager erase residue (blank line plus a row of spaces) in copied AOS-CX batches; whitespace-only lines after a pager prompt are dropped | v1.19.8 Beta 8 candidate on branch fix/batch-pager-gaps, not published |
+| Updates noticed while running | Owner request: automatic checks every 30 minutes while running and on return after 10 minutes, with a one-time toast; last batch-output gap | v1.19.9 Beta 9 candidate on branch fix/batch-pager-gaps-2, not published |
 
 ## Rules
 - Phase 0 is documentation only, with **no release**.

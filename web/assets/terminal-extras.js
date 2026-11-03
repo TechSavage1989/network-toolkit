@@ -80,11 +80,12 @@ function pacedOutput(item,includeCommands){
   const lines=String(step.output??'').replace(/\r\n?/g,'\n').split('\n');
   const shown=[];let outputStarted=false,afterPager=false;
   for(const line of lines){
-   if(matchPagerLine(line)){afterPager=true;continue;}
-   // A device erases its pager prompt with a carriage return and a row of
-   // spaces before continuing (AOS-CX, Cisco). Those whitespace-only lines are
-   // the prompt's residue, not output; dropping them removes the gaps the
-   // owner saw in a copied batch. Blank lines elsewhere are preserved.
+   // A device prints its pager prompt after a line break and erases it with a
+   // carriage return and a row of spaces before continuing (AOS-CX, Cisco).
+   // The whitespace-only line directly before the prompt and those directly
+   // after it are the prompt's residue, not output; dropping them removes the
+   // gaps the owner saw in a copied batch. Blank lines elsewhere are preserved.
+   if(matchPagerLine(line)){afterPager=true;if(shown.length&&!shown.at(-1).trim())shown.pop();continue;}
    if(afterPager&&!line.trim())continue;
    afterPager=false;
    if(!outputStarted){
