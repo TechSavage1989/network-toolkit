@@ -360,7 +360,10 @@ function sync(){
  if(anchor&&[...anchor.parentElement.children][[...anchor.parentElement.children].indexOf(anchor)-1]!==actions)anchor.before(actions);
  actions.dataset.position=position;
  const positionPicker=document.querySelector('#terminalActiveActionsPosition');if(positionPicker&&document.activeElement!==positionPicker)positionPicker.value=position;
- root.NetworkToolkitTerminalAppearance?.sync();
+ // The appearance editor lives in the Terminal tools panel. Syncing its
+ // colour buttons, previews and shell settings on every output batch was the
+ // largest per-keystroke cost in the profile; do it only while it is shown.
+ if(root.NetworkToolkitTerminalAppearance?.sync&&!document.querySelector('#terminalToolsPanel')?.classList.contains('hidden'))root.NetworkToolkitTerminalAppearance.sync();
  for(const el of actions.querySelectorAll('[data-terminal-session]'))el.disabled=!entry?.xterm;
  for(const el of actions.querySelectorAll('[data-terminal-input]'))el.disabled=!terminalEntryAcceptsInput(entry);
  for(const el of actions.querySelectorAll('[data-terminal-action="open-sftp"],[data-terminal-action="browse-files"]'))el.disabled=!online||!entry||entry.info.type!=='ssh'||entry.info.state!=='connected'||!terminalOwnerCanMutate(entry)||!!entry.transferBusy||TERMINAL_ONLY&&(el.dataset.terminalAction==='open-sftp'||!root.NetworkToolkitTerminalSFTP?.available?.(entry));

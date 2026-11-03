@@ -95,6 +95,9 @@
  // workspace do, including replacement of an entire parent panel.
  function workspaceMutation(records){
   for(const record of records||[]){
+   // Terminal rendering mutates its own DOM on every frame; none of it can
+   // contain a graph workspace, so skip the ancestor walk for those records.
+   if(record.target?.closest?.('.xterm'))continue;
    if(record.target?.closest?.('[data-graph-workspace]'))return true;
    for(const node of [...(record.addedNodes||[]),...(record.removedNodes||[])]){
     if(node?.nodeType===1&&(node.matches?.('[data-graph-workspace]')||node.querySelector?.('[data-graph-workspace]')))return true;

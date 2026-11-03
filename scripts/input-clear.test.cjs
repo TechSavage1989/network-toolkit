@@ -54,3 +54,16 @@ test('dynamic fields are enhanced and removed records are cleaned without observ
 test('auto initialization works once when the document is already ready and fields can opt out',()=>{
  const h=harness('<div><input id="ready" value="text"><textarea id="optout" data-input-clear="off">draft</textarea></div>','complete');assert(h.button('ready'));assert.equal(h.button('optout'),null);h.api.init();h.flush();assert.equal(h.doc.querySelectorAll('.input-clear-button').length,1);
 });
+
+// Owner report (v1.20.4): terminal typing felt sluggish. xterm flips its helper
+// textarea's readonly attribute and rewrites rows inside .xterm on every frame;
+// those mutations must not trigger a document-wide input rescan and layout.
+test('mutations inside the terminal never schedule a rescan or layout',()=>{
+ const h=harness('<div><input id="name" value="Core"></div><div class="xterm"><div class="xterm-helpers"><textarea class="xterm-helper-textarea"></textarea></div><div class="xterm-rows"><div></div></div></div>');
+ const observer=h.mutations[0];assert(observer,'input-clear installs a mutation observer');h.flush();assert.equal(h.frames.length,0);
+ const helper=h.doc.querySelector('.xterm-helper-textarea'),rows=h.doc.querySelector('.xterm-rows');
+ observer.fn([{type:'attributes',target:helper,attributeName:'readonly',addedNodes:[],removedNodes:[]},{type:'childList',target:rows,addedNodes:[h.doc.createElement('div')],removedNodes:[]}]);
+ assert.equal(h.frames.length,0,'terminal-internal mutations are ignored');
+ const input=h.doc.getElementById('name');observer.fn([{type:'attributes',target:input,attributeName:'readonly',addedNodes:[],removedNodes:[]}]);
+ assert.equal(h.frames.length,1,'a real input attribute change still schedules');h.flush();
+});

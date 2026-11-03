@@ -97,3 +97,14 @@ test('Reconnect all, Disconnect all and Close all confirmation preferences are i
  assert.equal(h.state.terminalConfirmCloseAll,true);
  assert.equal(h.state.terminalConfirmClose,undefined,'bulk choices do not affect single-session close preference');
 });
+
+// Owner report (v1.20.4): the appearance editor was synced on every terminal
+// output batch even while its panel was hidden; now it waits until shown.
+test('sync leaves a hidden appearance editor alone and catches up when it is shown',()=>{
+ const h=harness(),panel=h.document.getElementById('terminalSessionPanel'),section=h.document.getElementById('terminalAppearanceEditor');assert(section);
+ const control=section.querySelector('[data-terminal-appearance]');assert(control,'the editor has appearance controls');
+ const before=control.getAttribute('type')==='checkbox'?control.checked:control.value;
+ panel.classList.add('hidden');if(control.getAttribute('type')==='checkbox')control.checked=!before;else control.value='sentinel';
+ h.api.sync();assert.equal(control.getAttribute('type')==='checkbox'?control.checked:control.value,control.getAttribute('type')==='checkbox'?!before:'sentinel','no sync while hidden');
+ panel.classList.remove('hidden');h.api.sync();assert.equal(control.getAttribute('type')==='checkbox'?control.checked:control.value,before,'shown again: synced from preferences');
+});
