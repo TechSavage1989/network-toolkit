@@ -99,7 +99,7 @@ Never rely on color alone: status dots also have text (tooltip and screen-reader
 
 Keep a confirmation only when an action can lose data, interrupt live sessions or change system or security state. Owner-approved policy (from [UX_AUDIT.md](UX_AUDIT.md) section 10):
 
-- **Keep:** closing unsaved Editor work; closing or disconnecting live Terminal sessions (including Reconnect all and Disconnect all); macros sent to multiple targets; reviewed terminal paste; file overwrite; starting FTP/TFTP servers (plain-text warning); adapter, IP and Hosts changes (with Windows/UAC approval and preview); deleting app data (typed confirmation); deleting vault or SSH host-trust entries; downloading or installing updates; quitting with running diagnostics.
+- **Keep:** closing unsaved Editor work; closing or disconnecting live Terminal sessions (including Reconnect all and Disconnect all); macros sent to multiple targets; reviewed terminal paste; file overwrite (the Windows Save As prompt for local files, the editor's Replace confirmation for SFTP files); starting FTP/TFTP servers (plain-text warning); adapter, IP and Hosts changes (with Windows/UAC approval and preview); deleting app data (typed confirmation); deleting vault or SSH host-trust entries; downloading or installing updates; quitting with running diagnostics.
 - **Undo toast instead:** deleting a saved target (exact restore).
 - **No confirmation:** hiding or collapsing a sidebar or panel, theme and color toggles, tab selection, and warnings about turning off other confirmations.
 

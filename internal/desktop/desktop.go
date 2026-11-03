@@ -6,13 +6,13 @@ import "context"
 // Config describes one app window. DataDir is the portable application's folder.
 // The embedded UI uses the Microsoft WebView2 Runtime installed on Windows.
 type Config struct {
-	Title   string
+	Title string
 	// Minimum window tracking dimensions in logical pixels. Zero uses the main-window default.
-	MinWidth int32
+	MinWidth  int32
 	MinHeight int32
-	URL     string
-	DataDir string
-	Stop    context.CancelFunc
+	URL       string
+	DataDir   string
+	Stop      context.CancelFunc
 	// SessionToken is an in-memory capability, delivered only to this native
 	// WebView. Never put it in the URL, process arguments, profile or HTTP HTML.
 	SessionToken string
@@ -97,10 +97,29 @@ type NativeFileDragObservation struct {
 // the owner's native minimum sizes. Explicit detached-window sizes are supplied
 // by the lifecycle host; missing values default to the main window.
 func cfgMinimumWidth(cfg Config) int32 {
-	if cfg.MinWidth > 0 { return cfg.MinWidth }
+	if cfg.MinWidth > 0 {
+		return cfg.MinWidth
+	}
 	return 960
 }
 func cfgMinimumHeight(cfg Config) int32 {
-	if cfg.MinHeight > 0 { return cfg.MinHeight }
+	if cfg.MinHeight > 0 {
+		return cfg.MinHeight
+	}
 	return 600
+}
+
+// SaveFileRequest asks the native host for a Windows Save As dialog. The
+// returned path is validated by the caller before any write happens.
+type SaveFileRequest struct {
+	Title     string
+	Suggested string
+	Directory string
+}
+
+// SaveFileResponse carries the chosen absolute path, or Cancelled when the
+// user dismissed the dialog without choosing.
+type SaveFileResponse struct {
+	Path      string
+	Cancelled bool
 }

@@ -557,6 +557,7 @@ async function edit(k,newFile=false,side=get(k).active,pathOverride=''){
  try{await root.NetworkToolkitFileEditor.open({source:(side==='local'?'Local ':k.toUpperCase()+' ')+ (side==='remote'&&m.sessionId?'terminal':'files'),path:r,id:k+':'+side+':'+connectionIdentity(k)+':'+r,create:newFile,binding,
   read:async path=>{if(side==='local')return api('/file-editor/local','POST',{action:'read-text',path});check();return request(k,'read-text',{path});},
   write:async data=>{if(side==='local')return api('/file-editor/local','POST',{action:'write-text',...data});check();return request(k,'write-text',data);},
+  list:side==='remote'?async path=>{check();return request(k,'list',{path});}:undefined,
   afterSave:()=>void load(k,side,get(k)[side].path,true)});
  }catch(e){note(k,'Cannot open editor: '+e.message,'error');if(pathOverride)throw e;}
 }

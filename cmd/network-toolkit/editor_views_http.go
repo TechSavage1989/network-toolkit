@@ -345,6 +345,7 @@ type editorFileRequest struct {
 	ExpectedHash string `json:"expectedHash"`
 	BOM          bool   `json:"bom"`
 	Encoding     string `json:"encoding"`
+	Overwrite    bool   `json:"overwrite"`
 }
 
 type editorResponseStatus struct {
@@ -420,7 +421,7 @@ func (m *editorViewRegistry) file(w http.ResponseWriter, r *http.Request, caller
 		return
 	}
 	if binding.Kind == "local" || binding.Kind == "localDraft" {
-		payload, _ := json.Marshal(map[string]any{"action": request.Action, "path": request.Path, "content": request.Content, "expectedHash": request.ExpectedHash, "bom": request.BOM, "encoding": request.Encoding})
+		payload, _ := json.Marshal(map[string]any{"action": request.Action, "path": request.Path, "content": request.Content, "expectedHash": request.ExpectedHash, "bom": request.BOM, "encoding": request.Encoding, "overwrite": request.Overwrite})
 		next := r.Clone(r.Context())
 		next.Body = io.NopCloser(bytes.NewReader(payload))
 		next.ContentLength = int64(len(payload))
@@ -431,7 +432,7 @@ func (m *editorViewRegistry) file(w http.ResponseWriter, r *http.Request, caller
 	defer finishActivity()
 	// This callback never resolves IDs again. Even a concurrent reconnect can
 	// only cancel the captured client; it cannot retarget the file operation.
-	req := remoteBrowserRequest{Protocol: "sftp", Action: request.Action, Path: request.Path, Content: request.Content, ExpectedHash: request.ExpectedHash, BOM: request.BOM, Encoding: request.Encoding}
+	req := remoteBrowserRequest{Protocol: "sftp", Action: request.Action, Path: request.Path, Content: request.Content, ExpectedHash: request.ExpectedHash, BOM: request.BOM, Encoding: request.Encoding, Overwrite: request.Overwrite}
 	m.app.handleRemoteTextEditorWithOperation(response, r, req, func(ctx context.Context, req remoteBrowserRequest) (model.Result, error) {
 		if d.valid == nil || !d.valid() {
 			return model.Result{}, errors.New("The original SSH transport or ownership changed.")

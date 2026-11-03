@@ -1,3 +1,8 @@
+## 1.20.3 Beta 1 - Text Editor Save As dialogs (candidate)
+
+- Owner request: Save As must open a Windows Explorer dialog for local files and an SFTP folder picker for remote files. New `POST /api/file-editor/save-dialog` shows the Windows Save As dialog (invisible owner window on a locked thread, like the vault dialogs) and returns the chosen path or cancelled; the editor saves with an explicit `overwrite` flag that the dialog's own prompt authorizes. SFTP documents get an in-app folder picker over the document's connection (list, Up, name, Replace confirmation). The typed-path prompt remains where no dialog is available and still never overwrites.
+- Local and remote write-text accept `overwrite` only as Save As consent; a stale expected hash is still rejected.
+
 ## 1.20.2 - Stable (published 2026-11-03)
 
 - Stable release of the 1.20.1 beta: the update progress bar animates again. Numbered above every beta so beta users also receive it; saved data and security confirmations unchanged.

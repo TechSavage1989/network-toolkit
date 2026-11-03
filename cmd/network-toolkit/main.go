@@ -110,6 +110,7 @@ type application struct {
 	confirmVaultAction           func(context.Context, desktop.VaultActionRequest) (bool, error)
 	confirmVaultRecovery         func(context.Context, string) (bool, error)
 	confirmCredentialDestination func(context.Context, desktop.CredentialDestinationConfirmation) (bool, error)
+	promptSaveFile               func(context.Context, desktop.SaveFileRequest) (desktop.SaveFileResponse, error)
 	inspectCredentialDestination func(context.Context, credentialBinding) (string, error)
 	packetCaptures               *packetCaptureManager
 	transfers                    *transferHostManager
@@ -409,6 +410,7 @@ func newApplication(parent context.Context, dataPath string) *application {
 	a.confirmVaultAction = desktop.ConfirmVaultAction
 	a.confirmVaultRecovery = desktop.ConfirmVaultRecovery
 	a.confirmCredentialDestination = desktop.ConfirmCredentialDestination
+	a.promptSaveFile = desktop.PromptSaveFile
 	a.inspectCredentialDestination = inspectCredentialDestination
 	a.localTools = newLocalToolsManager(ctx)
 	a.packetCaptures = newPacketCaptureManager(ctx)
@@ -620,6 +622,8 @@ func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		a.handleRemoteDragTicket(w, r)
 	case r.URL.Path == "/api/remote-browser/drop-upload":
 		a.handleRemoteDropUpload(w, r)
+	case r.URL.Path == "/api/file-editor/save-dialog":
+		a.handleEditorSaveDialog(w, r)
 	case r.URL.Path == "/api/file-editor/local":
 		a.handleLocalTextEditor(w, r)
 	case r.URL.Path == "/api/remote-browser":

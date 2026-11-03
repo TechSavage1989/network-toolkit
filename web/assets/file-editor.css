@@ -406,3 +406,11 @@ body:has(.nt-editor:not([hidden]) [data-ed-files-sidebar]:not([hidden])) .toast-
 
 /* Connection presence lives in existing controls, not an extra feedback row. */
 .nt-editor-files-current[data-connected="true"]>span:before,.is-editor-sidebar .rb-session-endpoint[data-connected="true"]:before{content:"";display:inline-block;width:7px;height:7px;margin-right:5px;border-radius:50%;background:var(--good,#22a06b);vertical-align:1px}
+
+/* Save As folder picker for SFTP documents (its own classes; the Files sidebar owns nt-editor-picker-*) */
+.nt-editor-saveas{width:min(560px,100%)}
+.nt-editor-saveas-path{display:block;flex:1;min-width:0;overflow-wrap:anywhere;padding:6px 8px;background:var(--input);border-radius:var(--ux-radius-sm,6px);font-size:12px}
+.nt-editor-saveas-list{list-style:none;margin:10px 0;padding:4px;max-height:240px;overflow:auto;border:1px solid var(--border);border-radius:var(--ux-radius-sm,6px)}
+.nt-editor-saveas-list li{margin:0}
+.nt-editor-saveas-list button{width:100%;justify-content:flex-start;text-align:left}
+.nt-editor-saveas-empty{color:var(--muted);padding:6px 8px}

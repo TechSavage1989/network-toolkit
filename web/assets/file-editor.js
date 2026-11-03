@@ -150,6 +150,63 @@ function captureView(){const ta=findEl('[data-ed-text]');return ta?{start:ta.sel
 function restoreView(view,start=view?.start,end=view?.end,focus=false){const ta=findEl('[data-ed-text]');if(!ta||!view)return;ta.setSelectionRange(Math.min(start,ta.value.length),Math.min(end,ta.value.length),view.direction);if(focus)ta.focus({preventScroll:true});ta.scrollTop=view.top;ta.scrollLeft=view.left;scroll({target:ta});}
 function applyEdit(d,text,start,end,view=captureView()){if(!d||d.loading)return;setContent(d,text);const ta=findEl('[data-ed-text]');if(ta.value!==d.content)ta.value=d.content;restoreView(view,start,end,true);}
 const documentStamp=d=>[d.editRevision,d.eol,d.encoding,d.bom].join(':');
+// Save As destinations. Local documents use the Windows Save As dialog when
+// the native host provides one (its overwrite prompt is the user's consent to
+// replace a file); SFTP documents use an in-app folder picker over the live
+// connection; everything else keeps the typed-path prompt. Each resolver
+// returns {path, overwrite} or null when the user cancelled.
+function pathBaseName(path){const text=String(path||'');const at=Math.max(text.lastIndexOf('/'),text.lastIndexOf('\\'));return at>=0?text.slice(at+1):text;}
+function pathDirName(path){const text=String(path||'');const at=Math.max(text.lastIndexOf('/'),text.lastIndexOf('\\'));if(at<0)return '';const dir=text.slice(0,at);return /^[A-Za-z]:$/.test(dir)?dir+'\\':dir===''?text.slice(0,1):dir;}
+function isLocalDocument(d){const kind=d?.binding?.kind;if(kind==='local'||kind==='localDraft')return true;if(kind)return false;return ['Local computer','Local files','Untitled','Desktop import'].includes(d?.source);}
+function joinRemotePath(dir,name){const base=String(dir||'').replace(/\/+$/,'');return base===''||base==='.'?name:base+'/'+name;}
+function validSaveName(name){return typeof name==='string'&&name.trim()!==''&&name.length<=255&&!/[\\/:*?"<>|\x00-\x1f]/.test(name)&&name!=='.'&&name!=='..';}
+async function nativeSaveDialog(d){
+ if(typeof api!=='function')return undefined;
+ try{const result=await api('/file-editor/save-dialog','POST',{suggested:pathBaseName(d.untitled?'':d.path)||'untitled.txt',directory:d.untitled?'':pathDirName(d.path)});
+  if(result?.cancelled===true)return null;
+  if(typeof result?.path==='string'&&result.path.trim())return {path:result.path.trim(),overwrite:true};
+  return undefined;
+ }catch(error){if(error?.status===409){setMessage(error.message||'A Save As dialog is already open.',true);return null;}return undefined;}
+}
+async function promptSaveAsPath(d){
+ const other=await askEditor({title:'Save as',message:'Enter a new path. Existing destination files will not be overwritten.',value:d.path,accept:'Save',validate:value=>value.trim()&&value.length<=4096&&value.trim()!==d.path?'':'Enter a different file path.'});
+ return other===null?null:{path:other.trim(),overwrite:false};
+}
+async function chooseSaveAsPath(d){
+ if(isLocalDocument(d)){const native=await nativeSaveDialog(d);if(native!==undefined)return native;}
+ else if(typeof d.list==='function')return remoteSaveAsPicker(d);
+ return promptSaveAsPath(d);
+}
+// Folder picker for SFTP documents: browse directories over the document's own
+// connection, name the file, and confirm before replacing an existing one.
+function remoteSaveAsPicker(d){
+ if(pendingEditorDialog)pendingEditorDialog.finish(null);
+ const returnView=captureView(),owner=current(),panel=document.createElement('section');
+ panel.className='nt-editor-dialog';panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','true');panel.setAttribute('aria-label','Save as on the server');
+ panel.innerHTML='<div class="nt-editor-dialog-card nt-editor-saveas"><h3>Save as</h3><p>Choose a folder on the server and a file name.</p><div class="row gap6"><button type="button" class="btn small ghost" data-ed-pick-action="up" title="Parent folder">Up</button><code class="nt-editor-saveas-path" data-ed-pick-path></code></div><ul class="nt-editor-saveas-list" data-ed-pick-list role="listbox" aria-label="Folders"></ul><label>File name<input data-ed-pick-name data-input-clear="off" type="text" autocomplete="off" spellcheck="false"></label><p data-ed-dialog-error role="status"></p><div class="row"><button type="button" class="btn ghost" data-ed-pick-action="cancel">Cancel</button><button type="button" class="btn primary" data-ed-pick-action="save">Save</button></div></div>';
+ overlay.querySelector('.nt-editor-window').append(panel);
+ const nameInput=panel.querySelector('[data-ed-pick-name]'),pathEl=panel.querySelector('[data-ed-pick-path]'),listEl=panel.querySelector('[data-ed-pick-list]'),errorEl=panel.querySelector('[data-ed-dialog-error]');
+ nameInput.value=pathBaseName(d.path);
+ let dir=pathDirName(d.path)||'.',parent='',entries=[],loading=false;
+ return new Promise(resolve=>{
+  const finish=result=>{panel.remove();if(pendingEditorDialog?.panel===panel)pendingEditorDialog=null;if(current()===owner)restoreView(returnView,returnView?.start,returnView?.end,true);resolve(result);};
+  // Enter and Escape arrive through the editor's shared dialog key handling.
+  const pending={panel,finish:value=>{if(value===null)finish(null);else panel.querySelector('[data-ed-pick-action="save"]').click();},validate:null};pendingEditorDialog=pending;
+  const render=()=>{pathEl.textContent=dir;listEl.innerHTML=entries.filter(e=>e.directory).map(e=>'<li role="option"><button type="button" class="btn small ghost" data-ed-pick-dir="'+escaped(e.path||joinRemotePath(dir,e.name))+'">'+escaped(e.name)+'/</button></li>').join('')||'<li class="nt-editor-saveas-empty">No subfolders</li>';panel.querySelector('[data-ed-pick-action="up"]').disabled=!parent||loading;};
+  const load=async target=>{loading=true;errorEl.textContent='';render();try{const data=await d.list(target);dir=data?.path||target;parent=data?.parent||'';entries=(data?.entries||[]).map(e=>({name:e.name,path:e.path,directory:!!e.directory}));}catch(error){errorEl.textContent=error.message||'Folder could not be listed.';}finally{loading=false;render();}};
+  panel.addEventListener('click',async event=>{const dirButton=event.target.closest('[data-ed-pick-dir]');if(dirButton){await load(dirButton.dataset.edPickDir);nameInput.focus({preventScroll:true});return;}
+   const action=event.target.closest('[data-ed-pick-action]')?.dataset.edPickAction;if(!action)return;
+   if(action==='cancel'){finish(null);return;}
+   if(action==='up'){if(parent)await load(parent);return;}
+   if(action==='save'){const name=nameInput.value.trim();if(!validSaveName(name)){errorEl.textContent='Enter a valid file name without path separators.';nameInput.focus({preventScroll:true});return;}
+    const path=joinRemotePath(dir,name);if(path===d.path){errorEl.textContent='Choose a different folder or name.';return;}
+    const existing=entries.find(e=>e.name===name);if(existing?.directory){errorEl.textContent='A folder has that name.';return;}
+    let overwrite=false;if(existing){pendingEditorDialog=null;const confirmed=await askEditor({title:'Replace file?',message:name+' already exists in '+dir+'. Replace it with this document?',accept:'Replace'});if(!panel.isConnected)return;pendingEditorDialog=pending;if(confirmed!==true)return;overwrite=true;}
+    finish({path,overwrite});}
+  });
+  void load(dir).then(()=>nameInput.focus({preventScroll:true}));
+ });
+}
 function askEditor({title,message='',value,accept='Continue',validate}){if(pendingEditorDialog)pendingEditorDialog.finish(null);const returnView=captureView(),owner=current(),panel=document.createElement('section');panel.className='nt-editor-dialog';panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','true');panel.setAttribute('aria-label',title);panel.innerHTML='<div class="nt-editor-dialog-card"><h3>'+escaped(title)+'</h3><p>'+escaped(message)+'</p>'+(value===undefined?'':'<label>'+escaped(title)+'<input data-ed-dialog-input data-input-clear="off" type="text" autocomplete="off" spellcheck="false" value="'+escaped(value)+'"></label>')+'<p data-ed-dialog-error role="status"></p><div class="row"><button type="button" class="btn ghost" data-ed-dialog-action="cancel">Cancel</button><button type="button" class="btn primary" data-ed-dialog-action="accept">'+escaped(accept)+'</button></div></div>';overlay.querySelector('.nt-editor-window').append(panel);return new Promise(resolve=>{const finish=result=>{panel.remove();pendingEditorDialog=null;if(current()===owner)restoreView(returnView,returnView?.start,returnView?.end,true);resolve(result);};pendingEditorDialog={panel,finish,validate};(panel.querySelector('input')||panel.querySelector('button'))?.focus({preventScroll:true});panel.querySelector('input')?.select?.();});}
 function answerEditorDialog(accept){const pending=pendingEditorDialog;if(!pending)return;if(!accept){pending.finish(null);return;}const value=pending.panel.querySelector('input')?.value??true,error=pending.validate?.(value);if(error){pending.panel.querySelector('[data-ed-dialog-error]').textContent=error;pending.panel.querySelector('input')?.focus({preventScroll:true});return;}pending.finish(value);}
 const LARGE_EDITOR_CHARS=2*1024*1024,HISTORY_MEMORY_LIMIT=128*1024*1024;
@@ -187,7 +244,7 @@ function moveDocumentToView(uid,side,beforeUID=null){const error=canReorderDocum
 function syncEditorControls(d){if(!d)return;for(const [selector,value] of [['[data-ed-language-select]',d.language||''],['[data-ed-eol]',d.eol],['[data-ed-encoding]',d.encoding],['[data-ed-indent]',String(tabSpaces)],['[data-ed-font]',String(editorFontSize)],['[data-ed-palette]',editorPalette]])findEl(selector).value=value;findEl('[data-ed-bom]').checked=d.bom;findEl('[data-ed-wrap]').checked=wordWrap;findEl('[data-ed-syntax]').checked=syntax;findEl('[data-ed-find]').hidden=!showFind;findEl('[data-ed-replace-fields]').hidden=!showReplace;applyEditorTheme();syncLanguageControls(d);status();}
 function closeComparison(){if(!comparison)return;if(comparison.composing){setMessage('Finish text composition before closing the comparison.',true);return false;}const restore=comparisonReturnLayout;disposePaneWorkspace();if(restore)groups.restore(restore);if(splitEnabled)createPaneWorkspace(false);else{groups.single();draw();}}
 function setFileValues(d){d.editRevision=(d.editRevision||0)+1;d.eol=lineMode(d.original);d.content=normalize(d.original);d.saved=d.content;d.savedEol=d.eol;d.savedBOM=d.bom;d.savedEncoding=d.encoding||'UTF-8';d.dirty=false;d.saveFailed=false;d.undo=[];d.redo=[];d.bom=!!d.bom;d.showStart=true;}
-async function open({id,source,path,read,write,afterSave,binding=null,create=false,initialContent=''}){
+async function open({id,source,path,read,write,afterSave,list,binding=null,create=false,initialContent=''}){
  if(windowCloseState)throw Error('The editor is waiting for window close confirmation.');
  if(!path||typeof write!=='function'||typeof read!=='function')throw Error('Editor requires a file path and read/write functions.');skin();
  if(pendingSavePath===path)throw Error('This path is the destination of a pending Save As. Wait for that save to finish.');
@@ -195,7 +252,7 @@ async function open({id,source,path,read,write,afterSave,binding=null,create=fal
  let doc=documents.get(key);
  if(doc){active=key;doc.showStart=true;overlay.hidden=false;root.NetworkToolkitEditorFiles?.initialize?.(overlay);draw();if(doc.loading)return doc.loadingPromise;if(!comparison)findEl('[data-ed-text]')?.focus();return doc;}
  if(documents.size>=12)throw Error('Close an editor tab before opening another file (12 maximum).');
- doc={id:key,uid:root.crypto?.randomUUID?.()||'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const n=Math.floor(Math.random()*16);return (c==='x'?n:(n&3)|8).toString(16);}),binding,path,source:source||'SFTP',read,write,afterSave,hash:'',encoding:'UTF-8',bom:false,original:initialContent,content:'',saved:'',dirty:false,eol:'LF',undo:[],redo:[],language:'',untitled:source==='Untitled',loading:!create};
+ doc={id:key,uid:root.crypto?.randomUUID?.()||'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const n=Math.floor(Math.random()*16);return (c==='x'?n:(n&3)|8).toString(16);}),binding,path,source:source||'SFTP',read,write,afterSave,list:typeof list==='function'?list:null,hash:'',encoding:'UTF-8',bom:false,original:initialContent,content:'',saved:'',dirty:false,eol:'LF',undo:[],redo:[],language:'',untitled:source==='Untitled',loading:!create};
  setFileValues(doc);documents.set(key,doc);root.NetworkToolkitEditorWindows?.prepareDocument?.(doc);active=key;overlay.hidden=false;root.NetworkToolkitEditorFiles?.initialize?.(overlay);applyEditorTheme();draw();
  if(!create){
   doc.loadingPromise=(async()=>{
@@ -258,9 +315,10 @@ function syncLanguageControls(d){const selected=findEl('[data-ed-language-select
 function draw(){const d=current();if(!d)return;groups.activate(d.uid);if(paneWorkspace()){drawTabs();syncEditorControls(d);paneWorkspace().refresh();return;}if(displayedDocument&&displayedDocument!==d)displayedDocument.view=captureView();const view=d.showStart?{start:0,end:0,top:0,left:0}:displayedDocument===d?captureView():d.view||{start:0,end:0,top:0,left:0};displayedDocument=d;drawTabs();const ta=findEl('[data-ed-text]');ta.disabled=!!d.loading||!!d.frozen;if(ta.value!==d.content)ta.value=d.content;ta.wrap=effectiveWrap(current())?'soft':'off';ta.classList.toggle('is-wrapped',effectiveWrap(current()));findEl('[data-ed-title]').textContent=d.source+' · '+d.path;findEl('[data-ed-eol]').value=d.eol;findEl('[data-ed-indent]').value=String(tabSpaces);findEl('[data-ed-wrap]').checked=wordWrap;findEl('[data-ed-syntax]').checked=syntax;findEl('[data-ed-bom]').checked=d.bom;findEl('[data-ed-encoding]').value=d.encoding;findEl('[data-ed-language-select]').value=d.language||'';findEl('[data-ed-font]').value=String(editorFontSize);findEl('[data-ed-palette]').value=editorPalette;applyEditorTheme();findEl('[data-ed-find]').hidden=!showFind;findEl('[data-ed-replace-fields]').hidden=!showReplace;setMessage(d.loading?'Opening '+nameOf(d.path)+'...':'Ready');for(const button of overlay.querySelectorAll('[data-ed="save"],[data-ed="saveAs"],[data-ed="reload"]'))button.disabled=!!d.loading;const focus=d.showStart;d.showStart=false;paintText(d);restoreView(view,view.start,view.end,focus);status();}
 async function save(as=false,d=current()){if(!d||d.loading||d.saving||d.frozen||documents.get(d.id)!==d)return;as=as||d.untitled||d.source==='Desktop import';let path=d.path;
  if(as&&d.source==='Desktop'){exportCopy(d);return;}
- if(as){const stamp=documentStamp(d),other=await askEditor({title:'Save as',message:'Enter a new path. Existing destination files will not be overwritten.',value:d.path,accept:'Save',validate:value=>value.trim()&&value.length<=4096&&value.trim()!==d.path?'':'Enter a different file path.'});if(other===null||current()!==d||documents.get(d.id)!==d||documentStamp(d)!==stamp)return;path=other.trim();if(!path||path.length>4096||path===d.path){setMessage('Choose a different path for Save As.',true);return;}}
+ let overwrite=false;
+ if(as){const stamp=documentStamp(d),choice=await chooseSaveAsPath(d);if(choice===null||current()!==d||documents.get(d.id)!==d||documentStamp(d)!==stamp)return;path=String(choice.path||'').trim();overwrite=choice.overwrite===true;if(!path||path.length>4096||path===d.path){setMessage('Choose a different path for Save As.',true);return;}}
  if(updating){setMessage('Wait for the current save to finish.',true);return;}if(as&&[...documents.values()].some(other=>other!==d&&other.path===path)){setMessage('That destination is already open in another tab. Close or save that tab first.',true);return;}updating=true;d.saving=true;pendingSavePath=as?path:'';drawTabs();paneWorkspace()?.refresh();setMessage('Saving '+path+'...');
- const written={content:d.content,eol:d.eol,bom:d.bom,encoding:d.encoding};try{const result=await d.write({path,content:outgoing(d),expectedHash:as?'':d.hash,bom:d.bom,encoding:d.encoding});if(documents.get(d.id)!==d)return;d.hash=result.hash||d.hash;d.saved=written.content;d.savedEol=written.eol;d.savedBOM=written.bom;d.savedEncoding=written.encoding;d.untitled=false;d.saveFailed=false;d.dirty=d.content!==d.saved||d.eol!==d.savedEol||d.bom!==d.savedBOM||d.encoding!==d.savedEncoding;
+ const written={content:d.content,eol:d.eol,bom:d.bom,encoding:d.encoding};try{const result=await d.write({path,content:outgoing(d),expectedHash:as?'':d.hash,bom:d.bom,encoding:d.encoding,...(as&&overwrite?{overwrite:true}:{})});if(documents.get(d.id)!==d)return;d.hash=result.hash||d.hash;d.saved=written.content;d.savedEol=written.eol;d.savedBOM=written.bom;d.savedEncoding=written.encoding;d.untitled=false;d.saveFailed=false;d.dirty=d.content!==d.saved||d.eol!==d.savedEol||d.bom!==d.savedBOM||d.encoding!==d.savedEncoding;
   if(as){const wasActive=current()===d,oldId=d.id;documents.delete(oldId);if(d.source==='Desktop import'||d.source==='Untitled'){d.source='Local computer';d.binding={kind:'local'};d.read=p=>api('/file-editor/local','POST',{action:'read-text',path:p});d.write=data=>api('/file-editor/local','POST',{action:'write-text',...data});}d.path=path;d.id=d.source==='Local computer'?'local:'+path:d.source+':'+path;documents.set(d.id,d);root.NetworkToolkitEditorWindows?.prepareDocument?.(d);if(wasActive)active=d.id;}
   paintText(d);drawTabs();status();if(current()===d)setMessage(d.dirty?'Saved earlier contents. Newer edits remain unsaved.':'Saved '+(globalThis.NetworkToolkitResultTime?.format(Date.now(),{date:false,milliseconds:false})||new Date().toLocaleTimeString(undefined,{hour12:true})));if(typeof d.afterSave==='function')void d.afterSave();}
  catch(e){d.saveFailed=true;if(current()===d)setMessage('Save failed: '+e.message,true);}finally{updating=false;pendingSavePath='';d.saving=false;drawTabs();paneWorkspace()?.refresh();}

@@ -3,7 +3,7 @@
 The built-in Editor works with local and supported remote text documents. It provides multiple tabs, comparison, search, syntax highlighting and document navigation.
 
 ## Open and edit
-Open or create a document, review its source/connection, then edit. Save explicitly. Keep unsaved changes and undo history when switching views or during update workflows.
+Open or create a document, review its source/connection, then edit. Save explicitly. Save As opens the Windows Save As dialog for files on your computer and a folder picker for files on an SFTP server; an existing file is replaced only after you confirm. Keep unsaved changes and undo history when switching views or during update workflows.
 
 ## Compare
 Choose two documents in the comparison view. The overview map helps navigate differences and synchronized scrolling. The historical 390px-width comparison drift tolerance has been retired: supported native windows have a minimum width of 640 pixels for detached Editor windows.

@@ -1064,6 +1064,12 @@ jobs:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
         run: node scripts/progress-animation.browser.cjs
+      - name: Check Text Editor Save As dialog, SFTP folder picker and overwrite consent
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
+        run: node scripts/editor-save-as.browser.cjs
       - uses: actions/upload-artifact@v7
         if: always()
         with:
