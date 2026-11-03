@@ -27,7 +27,7 @@ func TestPaste127PromptPacingPreserves300IndentedLines(t *testing.T) {
 	// A retained prompt delivered after subscription is still older than the
 	// first write cursor, and cannot authorize a second command.
 	b.onSubscribe = func(id string) { b.emit(id, "\r\nfixture-old# ") }
-	run, err := e.startPrepared(StartRequest{Targets: refs("synthetic")}, def, true)
+	run, err := e.startPrepared(StartRequest{Targets: refs("synthetic")}, def, &pasteOptions{pagerKey: "auto"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,9 +156,9 @@ func TestPaste127ValidationRejectsUnsupportedInputWithoutWrites(t *testing.T) {
 		"empty": "", "unfinished": "fixture", "tab": "\tfixture\n",
 		"escape": "fixture\x1b[31m\n", "nul": "fixture\x00\n",
 		"delete": "fixture\x7f\n", "C1": "fixture\u009b\n",
-		"invalid UTF8": string([]byte{0xff, '\n'}),
+		"invalid UTF8":   string([]byte{0xff, '\n'}),
 		"too many lines": strings.Repeat("\n", MaxSteps+1),
-		"too many bytes": strings.Repeat("x", 64<<10)+"\n",
+		"too many bytes": strings.Repeat("x", 64<<10) + "\n",
 	} {
 		t.Run(name, func(t *testing.T) {
 			e, b := paste127Fixture(t)
@@ -168,7 +168,7 @@ func TestPaste127ValidationRejectsUnsupportedInputWithoutWrites(t *testing.T) {
 			noWrite(t, b)
 		})
 	}
-	for _, text := range []string{strings.Repeat("\n", MaxSteps), strings.Repeat("x", (64<<10)-1)+"\n", "fixture café\n"} {
+	for _, text := range []string{strings.Repeat("\n", MaxSteps), strings.Repeat("x", (64<<10)-1) + "\n", "fixture café\n"} {
 		def, err := pasteDefinition(text)
 		if err != nil || !utf8.ValidString(text) || len(def.Steps) == 0 || !def.WaitForPrompt || def.AutoPager || def.PacingMs != DefaultPacingMs || def.TimeoutMs != DefaultTimeoutMs {
 			t.Fatalf("valid boundary or fixed safety defaults changed: %+v, %v", def, err)
@@ -240,7 +240,7 @@ func TestPaste127EchoAndIntermediatePromptFragmentsCannotAdvance(t *testing.T) {
 				t.Fatal(err)
 			}
 			def.PacingMs = 0 // Isolate prompt stability from post-prompt pacing.
-			run, err := e.startPrepared(StartRequest{Targets: refs("synthetic")}, def, true)
+			run, err := e.startPrepared(StartRequest{Targets: refs("synthetic")}, def, &pasteOptions{pagerKey: "auto"})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -289,4 +289,50 @@ func TestPaste127StopDuringPromptStabilityDiscardsRemainingLines(t *testing.T) {
 		t.Fatalf("stop lost the stability race: %+v", result)
 	}
 	paste127NoWriteFor(t, b, 2*pastePromptStable)
+}
+
+// Owner report (v1.19.5): "sh run" on a Cisco switch stalled at --More-- and
+// the remaining lines never ran, because the engine owned the pager while the
+// browser's Auto pager was suppressed. With the session's Auto pager setting
+// passed along, the engine answers each pager prompt once and still waits for
+// the real prompt before the next line.
+func TestPaste135AutoPagerAnswersMoreBeforeNextLine(t *testing.T) {
+	for _, tc := range []struct{ key, prompt, reply string }{
+		{"auto", " --More-- ", " "},
+		{"auto", "Press Enter for more", "\r"},
+		{"space", "Press Enter for more", " "},
+		{"enter", " --More-- ", "\r"},
+	} {
+		t.Run(tc.key+"/"+strings.TrimSpace(tc.prompt), func(t *testing.T) {
+			e, b := paste127Fixture(t)
+			run, err := e.StartPaste(PasteRequest{Target: refs("synthetic")[0], Text: "show one\nshow two\n", AutoPager: true, PagerKey: tc.key})
+			if err != nil {
+				t.Fatal(err)
+			}
+			awaitWrite(t, b, "synthetic", "show one\r")
+			b.emit("synthetic", "show one\r\nline 1\r\n"+tc.prompt)
+			awaitWrite(t, b, "synthetic", tc.reply)
+			// One continuation per prompt; a pager prompt never passes as a command prompt.
+			paste127NoWriteFor(t, b, 250*time.Millisecond)
+			b.emit("synthetic", "\r\nline 2\r\n"+tc.prompt)
+			awaitWrite(t, b, "synthetic", tc.reply)
+			b.emit("synthetic", "\r\nline 3\r\nswitch# ")
+			awaitWrite(t, b, "synthetic", "show two\r")
+			b.emit("synthetic", "show two\r\nswitch# ")
+			final := awaitRun(t, e, run.ID, finished)
+			if final.State != "completed" || final.Targets[0].Step != 2 {
+				t.Fatalf("run did not complete both lines: %+v", final)
+			}
+		})
+	}
+}
+
+func TestPaste135AutoPagerOffStillWaitsAtMore(t *testing.T) {
+	e, b := paste127Fixture(t)
+	if _, err := e.StartPaste(PasteRequest{Target: refs("synthetic")[0], Text: "show one\nshow two\n", AutoPager: false}); err != nil {
+		t.Fatal(err)
+	}
+	awaitWrite(t, b, "synthetic", "show one\r")
+	b.emit("synthetic", "show one\r\n--More--")
+	paste127NoWriteFor(t, b, 250*time.Millisecond)
 }
