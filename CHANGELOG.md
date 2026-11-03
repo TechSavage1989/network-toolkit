@@ -1,3 +1,7 @@
+## 1.20.2 - Stable (candidate)
+
+- Stable release of the 1.20.1 beta: the update progress bar animates again. Numbered above every beta so beta users also receive it; saved data and security confirmations unchanged.
+
 ## 1.20.1 Beta 1 - Update progress animation (published 2026-11-03)
 
 - Owner report: the install-and-restart progress animation no longer played. The shared `progress` rule from the redesign set a border-radius on the element itself; with the bar and fill pseudo-elements styled too, Chromium stops animating an indeterminate bar. The radius now lives on the pseudo-elements only; a browser check loads the app's stylesheets and asserts that an indeterminate bar changes between frames.
