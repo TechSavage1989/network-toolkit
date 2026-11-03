@@ -1,4 +1,4 @@
-## 1.20.2 - Stable (candidate)
+## 1.20.2 - Stable (published 2026-11-03)
 
 - Stable release of the 1.20.1 beta: the update progress bar animates again. Numbered above every beta so beta users also receive it; saved data and security confirmations unchanged.
 
