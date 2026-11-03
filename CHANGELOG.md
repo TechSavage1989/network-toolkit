@@ -1,4 +1,4 @@
-## 1.19.9 Beta 9 - Updates noticed while running; last batch gap (candidate)
+## 1.19.9 Beta 9 - Updates noticed while running; last batch gap (published 2026-11-03)
 
 - Owner request: the app must detect a new release without a manual check or a restart. Automatic checks now run at startup, every 30 minutes while the app is running, and on focus/visibility/reconnect when the last check is older than 10 minutes (previously every six hours and on focus after six hours). A background check that finds an update shows the existing top-of-app notice and a one-time toast per version. Download and install still need explicit approval.
 - Batch output: the whitespace-only line directly before a pager prompt is dropped as well (v1.19.8 dropped only the residue after it); the owner's copied AOS-CX batch still had one blank line per page.
