@@ -12,6 +12,14 @@ Handoff split: the 1.17.x entries (v1.17.70 to v1.17.150, about 7,750 lines) mov
 
 ---
 
+# v1.20.2 stable - publication verified (2026-11-03)
+
+Published as stable release https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.20.2 at 2026-11-03T05:42:21Z (prerelease=false); the stable channel's latest moved from v1.20.0 to v1.20.2, and the newest prerelease remains v1.20.1, which v1.20.2 supersedes for beta users. Merged PR #65; tag v1.20.2 points to merge commit 4e5adbdc71619861d1758635983309918e89db9a. Guarded Release workflow https://github.com/TechSavage1989/network-toolkit/actions/runs/41585232710 completed build and publish. Four assets: Network_Toolkit.exe, Network_Toolkit_1.20.2_Portable.zip, Network_Toolkit_1.20.2_Update.zip and SHA256SUMS; SHA256SUMS entries match GitHub's asset digests. The pull_request Checks run https://github.com/TechSavage1989/network-toolkit/actions/runs/41582673658 passed every job on the exact source commit c56fa19; the parallel push run https://github.com/TechSavage1989/network-toolkit/actions/runs/41582668795 failed once in windows-terminal (TestNativeEditorCloseApprovalInstalledWebView2 on the hosted Windows runner, a docs-and-channel-only change) and was re-run for the record, not waived. No previous release was modified.
+
+Owner: "publish 1.20.2 stable" after confirming on Windows that the update progress bar animates again with v1.20.1 Beta 1. Release channel switched to stable, version 1.20.2 everywhere, README's latest-beta line removed, release notes written for stable users, UI guidelines status now names v1.20.2. No application code changes beyond the channel constant.
+
+---
+
 # v1.20.1 Beta 1 - publication verified (2026-11-03)
 
 Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.20.1 at 2026-11-03T04:41:25Z; stable latest remains v1.20.0. Merged PR #63; tag v1.20.1 points to merge commit 0fb480a09eb307f108e5adb0b11eaf6df8ac52a3. Guarded Release workflow https://github.com/TechSavage1989/network-toolkit/actions/runs/41579298512 completed build and publish. Four assets: Network_Toolkit.exe, Network_Toolkit_1.20.1_Portable.zip, Network_Toolkit_1.20.1_Update.zip and SHA256SUMS; SHA256SUMS entries match GitHub's asset digests. Both Checks runs on the final source commit 96faedb (main merged in after the v1.20.0 record) passed every job: pull_request https://github.com/TechSavage1989/network-toolkit/actions/runs/41577509664 and push https://github.com/TechSavage1989/network-toolkit/actions/runs/41577503616, including the new progress-animation browser check. Owner acceptance of the animation on Windows rests with the owner.
