@@ -800,10 +800,9 @@ jobs:
           GOTOOLCHAIN: local
           NETWORK_TOOLKIT_NATIVE_EDITOR_TEST: '1'
           TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/network-toolkit-native-editor108
-        run: |
-          go test -mod=vendor ./internal/desktop -run '^TestNativeEditorClose(ApprovalInstalledWebView2|ScriptUsesExplicitAction)$' -count=1 -timeout=3m -v
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          go test -mod=vendor ./cmd/network-toolkit -run '^TestNativeEditorTransferInstalledWebView2$' -count=1 -timeout=6m -v
+        # TestNativeEditorTransferInstalledWebView2 in this same mode runs in the
+        # dedicated native-editor128-diagnostic job; it is not repeated here.
+        run: go test -mod=vendor ./internal/desktop -run '^TestNativeEditorClose(ApprovalInstalledWebView2|ScriptUsesExplicitAction)$' -count=1 -timeout=3m -v
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -824,15 +823,9 @@ jobs:
           path: ${{ runner.temp }}/network-toolkit-native-files114
           if-no-files-found: error
           retention-days: 7
-      - name: Verify native Terminal names gestures bulk scope selection and transport
-        env:
-          GOTOOLCHAIN: local
-          NETWORK_TOOLKIT_NATIVE_TERMINAL_TEST: '1'
-          NETWORK_TOOLKIT_NATIVE_TERMINAL_GESTURES: '1'
-          NETWORK_TOOLKIT_NATIVE_TERMINAL_SELECTION: '1'
-          TOOLKIT_NATIVE_TIMING_LABEL: '114-final'
-          TOOLKIT_NATIVE_TEST_OUTPUT: ${{ runner.temp }}/network-toolkit-native-transfer114/terminal
-        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestNativeTerminalTransferInstalledWebView2$' -count=1 -timeout=6m -v
+      # The names/gestures/selection Terminal transfer scenario (same environment,
+      # label 127-focused) runs in the dedicated native-terminal127 job; the
+      # resize variant runs in native-terminal129. Neither is repeated here.
       - name: Verify native4MiB editor handoff state and timings
         env:
           GOTOOLCHAIN: local

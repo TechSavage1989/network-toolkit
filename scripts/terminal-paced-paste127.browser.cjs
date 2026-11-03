@@ -45,7 +45,10 @@ const text='  description {{host}}\r\n\r\n  show version\r\n';
   await page.waitForFunction(()=>!!currentTerminal()?.xterm&&terminalEntryAcceptsInput(currentTerminal()));
   await page.evaluate(async()=>{await NetworkToolkitTerminalMacros.refresh(true);});
   const paced=()=>calls.filter(c=>c.p==='/api/terminal-automation/paste'),inputs=()=>calls.filter(c=>/\/input$/.test(c.p));
-  async function ready(){await page.evaluate(async()=>{const e=currentTerminal();e.xterm.reset();e.xterm.clearSelection();await new Promise(resolve=>e.xterm.write('lab-switch(config)# ',resolve));});}
+  // Do not await a page-side promise: on slow runners Playwright has reported
+  // "Resulting promise was garbage collected" for the xterm write callback.
+  // Write, then wait for the prompt to be on screen with the cursor after it.
+  async function ready(){await page.evaluate(()=>{const e=currentTerminal();e.xterm.reset();e.xterm.clearSelection();e.xterm.write('lab-switch(config)# ');});await page.waitForFunction(()=>{const e=currentTerminal(),b=e?.xterm?.buffer.active;if(!b)return false;const line=b.getLine(b.baseY+b.cursorY)?.translateToString(true)||'';return line.trimEnd()==='lab-switch(config)#'&&b.cursorX===20;},undefined,{polling:100});}
   async function open(value=text){await ready();await page.evaluate(value=>NetworkToolkitTerminalInteraction.pasteText(currentTerminal(),value),value);await page.locator('#terminalPasteForm').waitFor();}
   async function close(){await page.locator('#modalRoot [data-action="close-modal"]').first().click();await page.locator('#terminalPasteForm').waitFor({state:'detached'});}
   async function screenshot(label){if(!out)return;const file='terminal-paced127-'+mode+'-'+label+'.png';await page.screenshot({path:path.join(out,file),fullPage:true});report.screenshots.push(file);}

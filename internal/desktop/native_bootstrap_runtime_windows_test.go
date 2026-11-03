@@ -30,7 +30,11 @@ func TestNativeBootstrapInstalledWebView2(t *testing.T) {
 			var unexpectedNavigation, nativeDocumentRequests atomic.Int32
 			var requestMu sync.Mutex
 			var unexpectedRequests []string
-			ctx, cancel := context.WithTimeout(context.Background(), 35*time.Second)
+			// 90 s per document: hosted Windows runners have needed up to 40 s to bring
+			// up an installed WebView2 (runtime 156) for the third document; the old
+			// 35 s budget turned that into an intermittent failure. Readiness and the
+			// valid probe are still required; only the wait is longer.
+			ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 			defer cancel()
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Cache-Control", "no-store")
