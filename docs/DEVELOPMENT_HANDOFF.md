@@ -1,3 +1,7 @@
+# README and repository standards (2026-11-03) - no release
+
+Documentation only; version stays 1.20.2. README follows the shared header and section order in docs/REPOSITORY_STANDARDS.md (copied verbatim). README images are in docs/images/ (hero.png plus one per feature) and come from `scripts/readme-screenshots.browser.cjs`, which renders the real web UI against synthetic fixtures; the packet capture image needs `NTK_APP_EXECUTABLE` (any build, a Linux one works) so the real app analyses its embedded synthetic PCAP. Layout exception: CLAUDE.md is in the root and in the root allowlist (scripts/repository_layout_test.py); it only imports AGENTS.md and the standard.
+
 # CI intermittents and handoff split (2026-11-03) - no release
 
 Owner asked for the hosted-CI intermittents to be worked and the handoff file split. Census of the last 60 Checks runs: 15 failed jobs; by test, TestNativeEditorTransferInstalledWebView2 5, TestNativeTerminalTransferInstalledWebView2 4, TestNativeBootstrapInstalledWebView2 2, TestNativeTerminalProfiles130 1, TestLocalNetworkAdminReadOnlyWindowsDiagnostic 1, plus browser-side one-offs (editor-views112 keyboard resize, graph-scale119 fit endpoint, terminal-paced-paste127 garbage-collected promise).
