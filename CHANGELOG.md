@@ -1,4 +1,4 @@
-## 1.19.8 Beta 8 - No gaps in batch output (candidate)
+## 1.19.8 Beta 8 - No gaps in batch output (published 2026-11-03)
 
 - Owner report: a copied Last batch from an AOS-CX switch had a blank line and a row of spaces wherever the device had paged. Those are the pager prompt's erase residue (carriage return plus spaces). Batch output now drops whitespace-only lines that directly follow a recognized pager prompt; blank lines elsewhere are preserved.
 
