@@ -8,7 +8,7 @@ Network Toolkit retains preferences, saved profiles, credentials in the credenti
 ## Updates
 Use **Check for updates** for an on-demand check. Stable updates and opt-in beta updates use separate channels. A beta must be explicitly selected. Downloading and installing updates requires user consent and package checksum verification.
 
-Automatic **checks** run at startup and every six hours while enabled. The manual Check for updates remains available, and downloading and installing still require explicit approval.
+Automatic **checks** run at startup, every 30 minutes while the app is running, and when you return to the app after 10 minutes away, while enabled. When a check finds a newer version, a notice appears at the top of the app and a short message tells you once per version. The manual Check for updates remains available, and downloading and installing still require explicit approval.
 
 ## Safety
 Before installing and restarting, save unsaved documents and review active sessions. Updates must not silently close or discard work.

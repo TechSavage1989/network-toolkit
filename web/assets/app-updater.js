@@ -46,7 +46,7 @@
       if(checkAfter>(env.now?.()??Date.now())){if(!background){error='Update checks are paused until '+(globalThis.NetworkToolkitResultTime?.format(new Date(checkAfter),{milliseconds:false})||new Date(checkAfter).toLocaleString(undefined,{hour12:true}))+'. Please try again then.';render();}return 'retry';}
       busy=true;if(!background){error='';message='Checking the official release feed…';}render();
       let outcome='retry';
-      try{data=await env.api('/updates/check','POST',channel()==='beta'?{channel:'beta'}:{});checkAfter=Number(data.checkAfter)||0;backgroundError='';if(!background){message=data.hasUpdate?'Update available: '+data.latest.version+'.':'No newer update was found at the last successful check.';env.reveal?.();}outcome='ok';}
+      try{data=await env.api('/updates/check','POST',channel()==='beta'?{channel:'beta'}:{});checkAfter=Number(data.checkAfter)||0;backgroundError='';if(!background){message=data.hasUpdate?'Update available: '+data.latest.version+'.':'No newer update was found at the last successful check.';env.reveal?.();}else if(data.hasUpdate)env.announce?.(snapshot());outcome='ok';}
       catch(e){checkAfter=Math.max(checkAfter,Number(e.checkAfter)||0);if(background){backgroundError='Automatic update check could not complete: '+e.message;message='';}else{error='Could not check for updates: '+e.message;message='';}}
       finally{busy=false;render();changed();}
       return outcome;
@@ -109,7 +109,10 @@
   function createScheduler(env){
     let timer=null,started=false,generation=0,failures=0,lastContact=null;
     let lastAttempt=0,lastResult='',lastSummary='',nextAt=0,nextKind='',running=false;
-    const normal=6*60*60*1000,maximumBackoff=6*60*60*1000,now=()=>env.now?.()??Date.now();
+    // normal: the running cadence (6 hours unless the host passes a shorter one);
+    // freshness: how stale the last contact may be before a focus, visibility or
+    // reconnect event triggers a check right away.
+    const normal=Math.max(60000,Number(env.interval?.())||6*60*60*1000),freshness=Math.max(60000,Math.min(normal,Number(env.freshness?.())||normal)),maximumBackoff=6*60*60*1000,now=()=>env.now?.()??Date.now();
     const active=()=>env.active?.()!==false,notBefore=()=>Math.max(0,Number(env.notBefore?.())||0);
     const snapshot=()=>({lastAttempt,lastResult,lastSummary,nextAt,nextKind,running,failures});
     const changed=()=>env.changed?.(snapshot());
@@ -144,7 +147,7 @@
       wake(){
         // Focus, visibility and reconnect share the timer, freshness and retry gates.
         if(!started||running||!env.enabled()||!env.ready()||!active()||now()<notBefore()||nextKind==='retry')return;
-        if(lastContact!==null&&now()-lastContact<normal)return;
+        if(lastContact!==null&&now()-lastContact<freshness)return;
         if(timer!==null)env.clearTimeout(timer);
         timer=null;schedule(0,generation,'check');
       },
@@ -171,7 +174,13 @@
   }
   if(typeof module==='object'&&module.exports)module.exports={createController,createScheduler,notice,noticeHTML,progressHTML,html,editorInstallBlockReason};
   if(!root.document)return;
-  let controller,scheduler,updateWelcomeShown=false,namingWarningShown=false;
+  // Owner request (v1.19.9): a release published while the app stays open must
+  // be noticed without a manual check or a restart. Checks run at startup, every
+  // 30 minutes while running, and on return to the app after 10 minutes away.
+  // Conditional requests keep this cheap for the release feed; download and
+  // install still need explicit approval.
+  const AUTO_CHECK_INTERVAL=30*60*1000,AUTO_CHECK_FRESHNESS=10*60*1000;
+  let controller,scheduler,updateWelcomeShown=false,namingWarningShown=false,announcedKey='';
   let preferencesLoaded=true,preferencesPending=false,preferencesError='',preferenceWritesPending=false,pendingManualResult='';
   const preferenceChanges={};
   const preferences=()=>state.appUpdatePreferences||{};
@@ -191,7 +200,7 @@
   }
   function automaticStatusHTML(){return '<p class="help-line" data-app-update-schedule role="status" aria-live="polite">'+escape(automaticStatusText())+'</p>';}
   function renderAutomaticStatus(){const host=document.querySelector('[data-app-update-schedule]');if(host)host.textContent=automaticStatusText();}
-  function preferenceHTML(){return '<div class="setting-row"><div><div class="setting-title">Automatic update checks</div><div class="setting-desc">Check at startup and every six hours while the app is running. Manual checks remain available. Temporary failures and service limits may delay checks. Downloads and installation always need your approval. Remind me tomorrow hides that version for 24 hours, including after reopening; App settings stays available.</div></div><input type="checkbox" aria-label="Automatically check for updates" data-app-update-auto '+(preferences().enabled!==false?'checked':'')+' '+(!preferencesLoaded?'disabled':'')+'></div>'+
+  function preferenceHTML(){return '<div class="setting-row"><div><div class="setting-title">Automatic update checks</div><div class="setting-desc">Check at startup, every 30 minutes while the app is running, and when you return to the app after 10 minutes away. Manual checks remain available. Temporary failures and service limits may delay checks. Downloads and installation always need your approval. Remind me tomorrow hides that version for 24 hours, including after reopening; App settings stays available.</div></div><input type="checkbox" aria-label="Automatically check for updates" data-app-update-auto '+(preferences().enabled!==false?'checked':'')+' '+(!preferencesLoaded?'disabled':'')+'></div>'+
     '<div class="setting-row"><div><div class="setting-title">Beta updates (opt in)</div><div class="setting-desc">Off by default. Check for both stable and prerelease builds. Betas may contain bugs. Download and Install and restart still need your approval. Turning this off resumes stable-only checks; an installed beta stays installed until a newer stable version is available.</div></div><input type="checkbox" aria-label="Allow beta updates" data-app-update-beta '+(preferences().beta===true?'checked':'')+' '+(!preferencesLoaded?'disabled':'')+'></div>'+automaticStatusHTML();}
   function setPreferences(changes){Object.assign(preferenceChanges,changes);state.appUpdatePreferences={...preferences(),...changes};if(preferencesLoaded)saveState();else preferenceWritesPending=true;}
   function mergePreferences(value){
@@ -207,7 +216,7 @@
     preferencesPending=!!savedPreferences;preferencesLoaded=!savedPreferences;
     // Native Window timers require their Window receiver, not the scheduler env.
     // Resolve them through root so injected browser/test clocks still work.
-    scheduler=createScheduler({setTimeout:(...args)=>root.setTimeout(...args),clearTimeout:(...args)=>root.clearTimeout(...args),enabled:()=>!preferencesLoaded||preferences().enabled!==false,ready:()=>!shutDown,active:()=>document.hidden!==true&&root.navigator?.onLine!==false,notBefore:()=>getController().snapshot().checkAfter,changed:renderAutomaticStatus,
+    scheduler=createScheduler({setTimeout:(...args)=>root.setTimeout(...args),clearTimeout:(...args)=>root.clearTimeout(...args),interval:()=>AUTO_CHECK_INTERVAL,freshness:()=>AUTO_CHECK_FRESHNESS,enabled:()=>!preferencesLoaded||preferences().enabled!==false,ready:()=>!shutDown,active:()=>document.hidden!==true&&root.navigator?.onLine!==false,notBefore:()=>getController().snapshot().checkAfter,changed:renderAutomaticStatus,
       describeResult:result=>result==='retry'?getController().snapshot().backgroundError||preferencesError:result==='ok'?(getController().snapshot().data?.supported===false?'Automatic updates are not supported on this platform.':getController().snapshot().data?.hasUpdate?'Update available: '+getController().snapshot().data.latest.version+'.':'No newer update was found at the last successful check.'):'',
       check:async()=>{
         // Never contact the release feed using default preferences when the saved
@@ -249,6 +258,7 @@
         let value;try{value=await response.json();}catch{throw new Error('Unreadable server response. Refresh status before retrying.');}
         if(!response.ok)throw new Error(value.error||'Import failed ('+response.status+').');return value;
       },
+      announce:snapshotValue=>{const item=notice(snapshotValue,preferences());if(!item||item.key===announcedKey)return;announcedKey=item.key;toast('Network Toolkit '+item.version+' is available. See what\u2019s new in the update notice at the top of the app.');},
       render:()=>{render();const data=controller?.snapshot().data;if(data?.restartedAfterUpdate&&!updateWelcomeShown){updateWelcomeShown=true;toast('Now running Network Toolkit '+data.currentVersion+'. Your saved settings are kept.');}if(data?.executable?.warning&&!namingWarningShown){namingWarningShown=true;toast('The app is running, but stable filename setup needs attention. Open App settings > Updates.','error');}},reveal,
       restarting:()=>{toast('Installing update. The app will close, then reopen. Allow up to 90 seconds.');}
     });return controller;

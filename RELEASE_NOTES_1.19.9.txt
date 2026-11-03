@@ -1,0 +1,14 @@
+Network Toolkit 1.19.9 Beta 9
+
+## What's New
+
+- The app notices new releases on its own. Automatic checks now run at startup, every 30 minutes while the app is open, and when you come back to the app after 10 minutes away. When a newer version is found, the update notice appears at the top of the app and a short message tells you once. You no longer need to check manually or restart the app.
+- The last blank line at each page boundary in copied batch output is gone too.
+
+## Additional Details
+
+- Downloading and installing an update still need your approval, exactly as before. Automatic checks use conditional requests, so the release feed is not loaded unnecessarily.
+- Batch output now drops the whitespace-only line directly before a pager prompt as well as the erase residue after it. Real blank lines elsewhere are kept.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Security confirmations and Windows/UAC approval are unchanged.
+- This is an opt-in beta. Stable users stay on 1.19.0. Portable executable filename remains Network_Toolkit.exe.
+- Validation uses hosted and synthetic fixtures; physical Windows and live-device acceptance is not formally claimed.
