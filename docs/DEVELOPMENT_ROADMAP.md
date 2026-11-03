@@ -25,7 +25,7 @@
 | 1.20.0 stable | Owner request: stable release combining the 1.19.1 to 1.19.9 betas; owner confirmed the paced paste and batch output fixes on a live switch | **Published v1.20.0 stable on 2026-11-03**; stable channel latest moves from v1.19.0 to v1.20.0 |
 | Update progress animation | Owner report: install-and-restart progress bar no longer animated; element border-radius removed from the shared progress rule, browser regression check added | **Published v1.20.1 Beta 1 (opt-in) on 2026-11-03**; stable remains v1.20.0 |
 | 1.20.2 stable | Owner request: stable release of the 1.20.1 progress-animation fix, confirmed by the owner on Windows | **Published v1.20.2 stable on 2026-11-03**; stable channel latest moves from v1.20.0 to v1.20.2 |
-| Text Editor Save As dialogs | Owner request: Windows Save As dialog for local files, SFTP folder picker for remote files, explicit overwrite consent | v1.20.3 Beta 1 candidate on branch feat/editor-save-as, not published |
+| Text Editor Save As dialogs | Owner request: Windows Save As dialog for local files, SFTP folder picker for remote files, explicit overwrite consent | **Published v1.20.3 Beta 1 (opt-in) on 2026-11-03**; stable remains v1.20.2 |
 
 ## Rules
 - Phase 0 is documentation only, with **no release**.
