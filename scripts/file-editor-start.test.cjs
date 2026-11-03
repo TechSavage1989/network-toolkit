@@ -70,7 +70,7 @@ test('confirmation Enter on Cancel preserves edits, Escape dismisses, and accept
 });
 
 test('a new local document acquires a real reader after Save As and reopens under its canonical file ID',async()=>{
- const h=harness();await h.first();let contents='';h.c.api=async(_path,_method,body)=>{if(body.action==='write-text'){contents=body.content;return {hash:'written'};}assert.equal(body.action,'read-text');return {content:contents+'\nRead from disk',hash:'reloaded'};};h.click('new');await settle();const root=h.document.getElementById('networkToolkitFileEditor'),ta=h.document.querySelector('[data-ed-text]');ta.value='new file contents';root.emit('input',ta);h.click('save');root.querySelector('[data-ed-dialog-input]').value='C:\\Review\\new.txt';root.emit('click',root.querySelector('[data-ed-dialog-action="accept"]'));await settle();assert.equal(h.api.active.source,'Local computer');assert.equal(h.api.active.id,'local:C:\\Review\\new.txt');h.click('reload');await settle();assert.equal(h.api.active.content,'new file contents\nRead from disk');assert.equal(h.api.active.dirty,false);
+ const h=harness();await h.first();let contents='';h.c.api=async(_path,_method,body)=>{if(body.action==='write-text'){contents=body.content;return {hash:'written'};}assert.equal(body.action,'read-text');return {content:contents+'\nRead from disk',hash:'reloaded'};};h.click('new');await settle();const root=h.document.getElementById('networkToolkitFileEditor'),ta=h.document.querySelector('[data-ed-text]');ta.value='new file contents';root.emit('input',ta);h.click('save');await settle();root.querySelector('[data-ed-dialog-input]').value='C:\\Review\\new.txt';root.emit('click',root.querySelector('[data-ed-dialog-action="accept"]'));await settle();assert.equal(h.api.active.source,'Local computer');assert.equal(h.api.active.id,'local:C:\\Review\\new.txt');h.click('reload');await settle();assert.equal(h.api.active.content,'new file contents\nRead from disk');assert.equal(h.api.active.dirty,false);
 });
 
 
@@ -101,14 +101,14 @@ test('unsupported file access and oversized/duplicate destination batches never 
 });
 
 test('Save As reserves its destination while pending so another tab cannot be overwritten',async()=>{
- const h=harness();await h.first();const d=h.api.active,pending=deferred();d.write=()=>pending.promise;h.click('saveAs');const root=h.document.getElementById('networkToolkitFileEditor');root.querySelector('[data-ed-dialog-input]').value='C:\\Review\\reserved.txt';root.emit('click',root.querySelector('[data-ed-dialog-action="accept"]'));await settle();
+ const h=harness();await h.first();const d=h.api.active,pending=deferred();d.write=()=>pending.promise;h.click('saveAs');const root=h.document.getElementById('networkToolkitFileEditor');await settle();root.querySelector('[data-ed-dialog-input]').value='C:\\Review\\reserved.txt';root.emit('click',root.querySelector('[data-ed-dialog-action="accept"]'));await settle();
  assert(d.saving);await assert.rejects(()=>h.api.open({id:'other',path:'C:\\Review\\reserved.txt',source:'Local computer',create:true,initialContent:'must not replace',read:async()=>({}),write:async()=>({})}),/pending Save As/);assert.equal(h.api.documents.size,1);
  pending.resolve({hash:'written'});await settle();assert.equal(d.id,'local:C:\\Review\\reserved.txt');assert.equal(h.api.documents.get(d.id),d);assert.equal(d.saving,false);
 });
 test('window checkpoints deep-copy without freezing and native preparation wraps new and Save-As documents',async()=>{
  const h=harness();let prepared=[];h.c.NetworkToolkitEditorWindows={mount(){},prepareDocument(d){prepared.push(d.uid);}};await h.first();const d=h.api.active,a=h.api.windowAdapter;d.binding={kind:'local'};const checkpoint=a.checkpoint();assert.equal(d.frozen,undefined);assert.equal(checkpoint.documents[0].uid,d.uid);checkpoint.documents[0].undo.push('external');assert.equal(d.undo.length,0);assert.equal(checkpoint.preferences.wordWrap,false);
  d.saving=true;assert.throws(()=>a.checkpoint(),/saving/);const single=a.snapshotDocument(d);assert.equal(single.uid,d.uid);d.saving=false;assert(prepared.includes(d.uid));
- const pending=deferred();d.write=()=>pending.promise;h.click('saveAs');const root=h.document.getElementById('networkToolkitFileEditor');root.querySelector('[data-ed-dialog-input]').value='C:\\Review\\prepared.txt';root.emit('click',root.querySelector('[data-ed-dialog-action="accept"]'));await settle();pending.resolve({});await settle();assert.equal(prepared.filter(uid=>uid===d.uid).length,2);
+ const pending=deferred();d.write=()=>pending.promise;h.click('saveAs');const root=h.document.getElementById('networkToolkitFileEditor');await settle();root.querySelector('[data-ed-dialog-input]').value='C:\\Review\\prepared.txt';root.emit('click',root.querySelector('[data-ed-dialog-action="accept"]'));await settle();pending.resolve({});await settle();assert.equal(prepared.filter(uid=>uid===d.uid).length,2);
 });
 
 test('window snapshots preflight combined history size and strip nested transient fields',async()=>{

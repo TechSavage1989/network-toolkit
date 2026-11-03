@@ -1,0 +1,15 @@
+Network Toolkit 1.20.3 Beta 1
+
+## What's New
+
+- Text Editor Save As now opens the Windows Save As dialog for files on your computer, so you can browse to a folder and name the file the way you would in any Windows app. Replacing an existing file is confirmed by the dialog itself.
+- For files opened from an SFTP server, Save As opens a folder picker that browses the server over the same connection. Pick a folder, name the file, and confirm if you choose a name that already exists.
+
+## Additional Details
+
+- The typed-path prompt remains where no native dialog is available (for example when the app runs in a browser), and it still never replaces an existing file.
+- A file is only ever replaced with your explicit consent: the Windows dialog's overwrite prompt or the editor's Replace confirmation. Saving a file you opened still checks that it has not changed since you opened it.
+- Documents in a detached editor window use the folder picker only when the connection is reachable from that window; otherwise the prompt is used.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Security confirmations and Windows/UAC approval are unchanged.
+- This is an opt-in beta. Stable users stay on 1.20.2. Portable executable filename remains Network_Toolkit.exe.
+- Validation uses hosted and synthetic fixtures; the Windows dialog itself is exercised only on a Windows machine.

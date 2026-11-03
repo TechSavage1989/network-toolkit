@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"networktoolkit/internal/desktop"
 	"networktoolkit/internal/model"
 	"os"
 	"path"
@@ -171,6 +172,14 @@ func readEditableFile(path string) (map[string]any, error) {
 	return readTextBytes(b)
 }
 func saveEditableLocal(path string, content []byte, expectedHash string) (map[string]any, error) {
+	return saveEditableLocalWith(path, content, expectedHash, false)
+}
+
+// overwrite is the user's explicit consent from a Save As dialog (the Windows
+// prompt, or the editor's Replace confirmation). Without it an existing
+// destination is never replaced; with an expected hash the usual
+// changed-since-opening check still applies.
+func saveEditableLocalWith(path string, content []byte, expectedHash string, overwrite bool) (map[string]any, error) {
 	if len(content) > textEditorLimit {
 		return nil, errors.New("text exceeds the 16 MiB editor limit")
 	}
@@ -179,7 +188,9 @@ func saveEditableLocal(path string, content []byte, expectedHash string) (map[st
 	}
 	old, mode, err := editableFile(path)
 	if err == nil {
-		if expectedHash == "" || editorDigest(old) != expectedHash {
+		if expectedHash == "" && overwrite {
+			// Explicit Save As consent; keep the existing file's mode.
+		} else if expectedHash == "" || editorDigest(old) != expectedHash {
 			return nil, errors.New("file has changed since opening, or the destination exists; reload instead of overwriting")
 		}
 	} else if os.IsNotExist(err) {
@@ -233,6 +244,7 @@ func (a *application) handleLocalTextEditor(w http.ResponseWriter, r *http.Reque
 		ExpectedHash string `json:"expectedHash"`
 		BOM          bool   `json:"bom"`
 		Encoding     string `json:"encoding"`
+		Overwrite    bool   `json:"overwrite"`
 	}
 	if e := json.NewDecoder(http.MaxBytesReader(w, r.Body, textEditorRequestLimit)).Decode(&req); e != nil {
 		jsonError(w, 400, "Invalid text editor request")
@@ -261,7 +273,7 @@ func (a *application) handleLocalTextEditor(w http.ResponseWriter, r *http.Reque
 			jsonError(w, 400, encodingError.Error())
 			return
 		}
-		result, e := saveEditableLocal(filepathAbs, contents, req.ExpectedHash)
+		result, e := saveEditableLocalWith(filepathAbs, contents, req.ExpectedHash, req.Overwrite)
 		if e != nil {
 			jsonError(w, 409, e.Error())
 			return
@@ -380,7 +392,9 @@ func (a *application) handleRemoteTextEditorWithOperation(w http.ResponseWriter,
 	upload := req
 	upload.Action = "upload"
 	upload.LocalPath = tempPath
-	upload.Overwrite = req.ExpectedHash != ""
+	// An expected hash means the opened file is being updated; Overwrite is
+	// the explicit Save As consent for replacing another existing file.
+	upload.Overwrite = req.ExpectedHash != "" || req.Overwrite
 	if _, e := run(ctx, upload); e != nil {
 		jsonError(w, 409, "Save failed: "+e.Error())
 		return
@@ -538,4 +552,51 @@ func (a *application) handleRemoteCopy(w http.ResponseWriter, r *http.Request, r
 		return
 	}
 	jsonResponse(w, 200, map[string]any{"ok": true, "message": "Remote file copied"})
+}
+
+// handleEditorSaveDialog shows the native Save As dialog for the Text Editor
+// and returns the chosen absolute path, or cancelled. Nothing is written here;
+// the editor saves with an explicit overwrite flag afterwards.
+func (a *application) handleEditorSaveDialog(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		methodError(w)
+		return
+	}
+	var req struct {
+		Suggested string `json:"suggested"`
+		Directory string `json:"directory"`
+	}
+	if e := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10)).Decode(&req); e != nil {
+		jsonError(w, 400, "Invalid Save As request")
+		return
+	}
+	if len(req.Suggested) > 255 || len(req.Directory) > 4096 {
+		jsonError(w, 400, "Invalid Save As request")
+		return
+	}
+	prompt := a.promptSaveFile
+	if prompt == nil {
+		prompt = desktop.PromptSaveFile
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Minute)
+	defer cancel()
+	result, e := prompt(ctx, desktop.SaveFileRequest{Title: "Save As", Suggested: req.Suggested, Directory: req.Directory})
+	if e != nil {
+		if errors.Is(e, desktop.ErrSaveDialogBusy) {
+			jsonError(w, 409, e.Error())
+			return
+		}
+		jsonError(w, 400, e.Error())
+		return
+	}
+	if result.Cancelled {
+		jsonResponse(w, 200, map[string]any{"cancelled": true})
+		return
+	}
+	absolute, e := absoluteExplorerPath(result.Path)
+	if e != nil {
+		jsonError(w, 400, e.Error())
+		return
+	}
+	jsonResponse(w, 200, map[string]any{"path": absolute})
 }
