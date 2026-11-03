@@ -1,4 +1,4 @@
-## 1.20.0 - Stable (candidate)
+## 1.20.0 - Stable (published 2026-11-03)
 
 - Second stable release of the UX work, combining the 1.19.1 to 1.19.9 betas: tool consolidation (Test a target, Test a website, Local network, Network discovery), results pages with primary results only, faster IP configuration, paced paste that answers pager prompts, Last batch output tools for macros and Run commands, gap-free batch output, no automatic switch to Runs, and update checks that notice new releases while the app runs.
 - Numbered above every 1.19 beta so beta users also receive it; saved data and security confirmations unchanged.
