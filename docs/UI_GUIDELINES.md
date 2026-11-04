@@ -37,6 +37,10 @@ Rules:
 - Test a website uses one address for both tabs: HTTP check adds `https://` to a bare host, and TLS certificate uses the host from a URL.
 - The sidebar can be collapsed to an icon rail; single clicks navigate, the arrow, divider or a double-click expands it.
 
+## Overview dashboard
+
+The Overview's **Customize** button (next to Refresh) opens a dialog listing its sections: Summary cards; Gateways, DNS and DHCP; Public IP; Scan a local network; Network adapters; Recent activity. Each has a Show checkbox and Move up / Move down buttons; Reset to default restores all sections in the original order. Changes apply immediately and are saved. Network adapters and Recent activity share a two-column row when adjacent. Adapter warnings always show. With every section hidden the page says so instead of going blank.
+
 ## Page anatomy
 
 Top to bottom, a tool page has:
@@ -48,6 +52,7 @@ Top to bottom, a tool page has:
 Member tabs:
 - Test a target and Test a website tabs show a status dot for the current target: green finished, yellow running, red failed, faint not yet run. Switching tabs never starts anything.
 - Tab labels may be short (DNS, Ports, Monitor, Details); the tooltip and command search use the full tool name.
+- Test a target and Test a website tabs can be reordered by dragging (drop line only where the order would change) or Alt+Shift+Left/Right; each group keeps its own saved order.
 - Test tabs stay on one row. When space runs out they scroll sideways, and they stay visible in short windows where the rest of the page heading is hidden.
 - File Transfer protocol buttons carry a tooltip with the protocol's security (SFTP encrypted over SSH; FTPS encrypted, FTP not; TFTP has no encryption or login).
 
@@ -131,6 +136,7 @@ Keep a confirmation only when an action can lose data, interrupt live sessions o
 | Text Editor | Ctrl+N | New document |
 | Text Editor / Terminal | Alt+Shift+Left / Right | Reorder a tab |
 | Terminal Saved list | Alt+Shift+Up / Down | Move a focused Saved session |
+| Test a target / Test a website | Alt+Shift+Left / Right | Reorder a focused test tab |
 | Text Editor / Terminal | Shift+F10 | Open the tab menu |
 | Terminal | Ctrl+Shift+F | Find in terminal output |
 | File browser | F2 · Ctrl/Shift+click | Rename · select multiple |
