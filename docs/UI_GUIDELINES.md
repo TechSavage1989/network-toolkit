@@ -1,6 +1,6 @@
 # Network Toolkit UI Guidelines
 
-**Status:** Adopted with the v1.19.0 stable release (2026-11-02), updated for the owner-approved v1.19.1 consolidation and the owner-requested 1.19.x changes. It describes the layout, components and wording as they ship in v1.20.6. The layout is frozen (see [Layout freeze](#layout-freeze)).
+**Status:** Adopted with the v1.19.0 stable release (2026-11-02), updated for the owner-approved v1.19.1 consolidation and the owner-requested 1.19.x changes. It describes the layout, components and wording as they ship in v1.20.7. The layout is frozen (see [Layout freeze](#layout-freeze)).
 
 **Authority:** [UX Polish Plan](UX_POLISH_PLAN.md). Sources of truth in code: `web/assets/ux-foundations.css` (tokens), the `:root` and `[data-theme="light"]` blocks in `web/index.html` (colors), `renderNavigation()` in `web/index.html` (navigation), and `web/assets/ux-command-palette.js` (shortcuts).
 
@@ -53,7 +53,7 @@ Member tabs:
 
 Local network > IP configuration, top to bottom: Public IP, snapshot time, adapter picker, Current configuration beside the IPv4 editor, then Network actions last. The page renders as soon as the adapter settings are read; Network actions fill in after the slower adapter-state read and show "Reading adapter state" until then.
 
-Terminal: a session sidebar (Saved, Recent, Files, Macros) docks left or right. Clicking the selected tab hides it; clicking any tab shows it. There is no separate Sidebar button. Starting a macro or a One line at a time paste never switches the Macros panel to its Runs tab; a toast says where Pause and Stop are. The console bar's output tools (Last command / Last batch, Jump to start/end, Select output, Copy output, Include commands) cover typed commands and every command batch: a raw or paced paste, a macro run from the Library, a shortcut or a startup binding, and a Run commands list. "Last batch" is the name for all of these; do not call it "Last paste".
+Terminal: a session sidebar (Saved, Recent, Files, Macros) docks left or right. Saved is listed by name until the user drags a row (or uses Alt+Shift+Up/Down on a focused row); from then on the user's order is kept. The Disconnect split button's menu holds Disconnect all and Close all tabs. A standard (not elevated) Command Prompt or PowerShell tab's menu offers "Open as administrator in a new tab", which starts an elevated copy through the Windows prompt and keeps the original tab. Starting directory drive buttons show the drive letter and volume name ("D: Data HDD"). Clicking the selected tab hides it; clicking any tab shows it. There is no separate Sidebar button. Starting a macro or a One line at a time paste never switches the Macros panel to its Runs tab; a toast says where Pause and Stop are. The console bar's output tools (Last command / Last batch, Jump to start/end, Select output, Copy output, Include commands) cover typed commands and every command batch: a raw or paced paste, a macro run from the Library, a shortcut or a startup binding, and a Run commands list. "Last batch" is the name for all of these; do not call it "Last paste".
 
 ## Components and tokens
 
@@ -128,6 +128,7 @@ Keep a confirmation only when an action can lose data, interrupt live sessions o
 | Application | Ctrl+Shift+T | Reopen an eligible recently closed tab |
 | Text Editor | Ctrl+N | New document |
 | Text Editor / Terminal | Alt+Shift+Left / Right | Reorder a tab |
+| Terminal Saved list | Alt+Shift+Up / Down | Move a focused Saved session |
 | Text Editor / Terminal | Shift+F10 | Open the tab menu |
 | Terminal | Ctrl+Shift+F | Find in terminal output |
 | File browser | F2 · Ctrl/Shift+click | Rename · select multiple |

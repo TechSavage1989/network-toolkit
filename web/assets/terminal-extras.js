@@ -389,9 +389,13 @@ function sync(){
  if(!allEnabled)tabs?.setReconnectOptions?.(false);
  const disconnectBulkBusy=tabs?.windowBulkBusy?.()===true||tabs?.reconnectAllBusy?.()===true;
  for(const button of actions.querySelectorAll('[data-terminal-action="disconnect"]'))button.disabled=disconnectBulkBusy||button.disabled;
- const disconnectAllEnabled=tabs?.disconnectAllAvailable?.()===true;
- for(const button of actions.querySelectorAll('[data-terminal-action="disconnect-options"],[data-terminal-action="disconnect-all"]'))button.disabled=!disconnectAllEnabled;
- if(!disconnectAllEnabled)tabs?.setDisconnectOptions?.(false);
+ // The Disconnect menu holds Disconnect all and Close all tabs; its arrow is
+ // available while either applies (Close all also covers disconnected tabs).
+ const disconnectAllEnabled=tabs?.disconnectAllAvailable?.()===true,closeAllEnabled=!disconnectBulkBusy&&tabs?.closeAllAvailable?.()===true;
+ for(const button of actions.querySelectorAll('[data-terminal-action="disconnect-all"]'))button.disabled=!disconnectAllEnabled;
+ for(const button of actions.querySelectorAll('[data-terminal-action="close-all"]'))button.disabled=!closeAllEnabled;
+ for(const button of actions.querySelectorAll('[data-terminal-action="disconnect-options"]'))button.disabled=!(disconnectAllEnabled||closeAllEnabled);
+ if(!disconnectAllEnabled&&!closeAllEnabled)tabs?.setDisconnectOptions?.(false);
 }
 function changed(event){const entry=currentTerminal(),el=event.target;if(el.id==='terminalActiveActionsPosition'){state.terminalActiveActionsPosition=el.value==='bottom'?'bottom':'top';saveState();sync();scheduleTerminalFit();return;}
  const fields={terminalQuickPager:'autoPager',terminalQuickFollow:'autoScroll',terminalQuickReview:'pasteReview',terminalIncludeInput:'pasteIncludeCommands',terminalQuickPagerKey:'pagerKey'},key=fields[el.id];if(!key||!entry)return;

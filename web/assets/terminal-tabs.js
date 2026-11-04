@@ -1,9 +1,16 @@
 (function(root){
 'use strict';
 let menu=null,target=null,pending=[],pendingBulk=null,pendingReconnect=null,reconnectAllBusy=false,windowBulkBusy=false,bulkSequence=0,pendingRename=null,renameBusy=false;
-const items=[['reconnect','Reconnect','refresh'],['reconnect-all','Reconnect all…','refresh'],['disconnect','Disconnect','stop'],['browse','Browse SFTP files','folder'],['editor','Open Text Editor','fileEdit'],['control-c','Send Ctrl+C','stop'],['copy','Copy selection','copy'],['paste','Paste into console','clipboard'],['select-all','Select all output','terminal'],['select-output','Select last command output','terminal'],['copy-output','Copy last command output','copy'],['scroll-top','Scroll to top','arrowUp'],['scroll-bottom','Scroll to bottom','arrowDown'],['search','Find in output','search'],['clear','Clear scrollback','trash'],['export','Export transcript','download'],['save-connection','Save connection...','save'],['rename','Rename tab','edit'],['move-left','Move tab left (Alt+Shift+Left)','arrowLeft'],['move-right','Move tab right (Alt+Shift+Right)','arrowRight'],['duplicate','Duplicate connection settings','plus'],['move','Detach / reattach session','external'],['workspace','Detach / reattach workspace','maximize'],['copy-connection','Copy connection details','copy'],['close','Close tab','close'],['close-others','Close other tabs','close'],['disconnect-all','Disconnect all sessions in this window…','stop'],['close-all','Close all tabs in this window…','close'],['close-disconnected','Close disconnected tabs','trash']];
+const items=[['reconnect','Reconnect','refresh'],['reconnect-all','Reconnect all…','refresh'],['disconnect','Disconnect','stop'],['browse','Browse SFTP files','folder'],['editor','Open Text Editor','fileEdit'],['control-c','Send Ctrl+C','stop'],['copy','Copy selection','copy'],['paste','Paste into console','clipboard'],['select-all','Select all output','terminal'],['select-output','Select last command output','terminal'],['copy-output','Copy last command output','copy'],['scroll-top','Scroll to top','arrowUp'],['scroll-bottom','Scroll to bottom','arrowDown'],['search','Find in output','search'],['clear','Clear scrollback','trash'],['export','Export transcript','download'],['save-connection','Save connection...','save'],['rename','Rename tab','edit'],['move-left','Move tab left (Alt+Shift+Left)','arrowLeft'],['move-right','Move tab right (Alt+Shift+Right)','arrowRight'],['duplicate','Duplicate connection settings','plus'],['run-as-admin','Open as administrator in a new tab','shield'],['move','Detach / reattach session','external'],['workspace','Detach / reattach workspace','maximize'],['copy-connection','Copy connection details','copy'],['close','Close tab','close'],['close-others','Close other tabs','close'],['disconnect-all','Disconnect all sessions in this window…','stop'],['close-all','Close all tabs in this window…','close'],['close-disconnected','Close disconnected tabs','trash']];
 function token(id){const entry=terminalSessions.get(id),draft=terminalDraftTabs.get(id);return entry||draft?{id,entry,draft,revision:entry?terminalSessionRevision(id):0}:null;}
 function valid(t){return !!t&&(t.entry?terminalSessions.get(t.id)===t.entry&&terminalSessionRevision(t.id)===t.revision:terminalDraftTabs.get(t.id)===t.draft);}
+// A running process cannot be raised to administrator. For a standard local
+// Command Prompt or PowerShell tab, offer an elevated copy (same shell, same
+// starting folder) in a new tab; Windows shows its own approval prompt and the
+// original tab is left as it is.
+function adminCandidate(entry){return !!entry&&['cmd','powershell'].includes(entry.info?.type)&&entry.info?.elevated!==true&&entry.config?.runAsAdministrator!==true;}
+function visible(action,t){return action!=='run-as-admin'||adminCandidate(t?.entry);}
+function adminConfig(entry){return safeTerminalConfig({...safeTerminalConfig(entry.config||{type:entry.info.type}),type:entry.info.type,runAsAdministrator:true});}
 function enabled(action,t){if(!valid(t))return false;const entry=t.entry,owned=entry&&terminalOwnerCanMutate(entry)&&!entry.transferBusy;
  if(action==='reconnect-all')return reconnectAllAvailable();
  if(action==='disconnect-all')return disconnectAllAvailable();
@@ -14,6 +21,7 @@ function enabled(action,t){if(!valid(t))return false;const entry=t.entry,owned=e
  if(action==='rename')return !!t.draft||!!owned;
  if(action==='move-left'||action==='move-right'){const ids=root.NetworkToolkitTerminalTabDrag?.ids?.()||[],at=ids.indexOf(t.id);return at>=0&&(action==='move-left'?at>0:at<ids.length-1);}
 
+ if(action==='run-as-admin')return adminCandidate(entry)&&!(DETACHED_TERMINAL&&!DETACHED_WORKSPACE)&&!terminalConnectBusy&&!terminalWorkspaceTransferBusy;
  if(action==='duplicate')return !(DETACHED_TERMINAL&&!DETACHED_WORKSPACE)&&!terminalConnectBusy&&!terminalWorkspaceTransferBusy;
  if(!entry)return action==='workspace'&&terminalViewRegistry.available;
  if(action==='reconnect')return !reconnectAllBusy&&!windowBulkBusy&&terminalReconnectAllowed(entry);
@@ -27,7 +35,7 @@ function enabled(action,t){if(!valid(t))return false;const entry=t.entry,owned=e
  return !!entry.xterm;
 }
 function close(focus=false){setReconnectOptions(false);setDisconnectOptions(false);const old=target;menu?.remove();menu=null;target=null;if(focus&&valid(old))document.querySelector('[data-terminal-tab="'+CSS.escape(old.id)+'"]')?.focus({preventScroll:true});}
-function open(id,x,y){close();const t=token(id);if(!t)return;target=t;menu=document.createElement('div');menu.id='terminalTabContextMenu';menu.className='terminal-context-menu terminal-tab-context-menu';menu.setAttribute('role','menu');menu.setAttribute('aria-label','Terminal tab actions');const title=t.entry?.info.label||t.draft?.label||'Terminal';menu.innerHTML='<div class="terminal-context-label">'+esc(title)+'</div>'+items.map(([action,label,ico])=>'<button role="menuitem" type="button" data-terminal-tab-action="'+action+'" '+(enabled(action,t)?'':'disabled')+'>'+icon(ico)+'<span>'+label+'</span></button>').join('');document.body.append(menu);const rect=menu.getBoundingClientRect();menu.style.left=Math.max(6,Math.min(x,innerWidth-rect.width-6))+'px';menu.style.top=Math.max(6,Math.min(y,innerHeight-rect.height-6))+'px';menu.querySelector('button:not(:disabled)')?.focus({preventScroll:true});}
+function open(id,x,y){close();const t=token(id);if(!t)return;target=t;menu=document.createElement('div');menu.id='terminalTabContextMenu';menu.className='terminal-context-menu terminal-tab-context-menu';menu.setAttribute('role','menu');menu.setAttribute('aria-label','Terminal tab actions');const title=t.entry?.info.label||t.draft?.label||'Terminal';menu.innerHTML='<div class="terminal-context-label">'+esc(title)+'</div>'+items.filter(([action])=>visible(action,t)).map(([action,label,ico])=>'<button role="menuitem" type="button" data-terminal-tab-action="'+action+'" '+(enabled(action,t)?'':'disabled')+'>'+icon(ico)+'<span>'+label+'</span></button>').join('');document.body.append(menu);const rect=menu.getBoundingClientRect();menu.style.left=Math.max(6,Math.min(x,innerWidth-rect.width-6))+'px';menu.style.top=Math.max(6,Math.min(y,innerHeight-rect.height-6))+'px';menu.querySelector('button:not(:disabled)')?.focus({preventScroll:true});}
 function activate(entry){if(entry)selectTerminal(entry.info.id,true);}
 function reconnectTargets(){
  if(reconnectAllBusy||windowBulkBusy||terminalWorkspaceTransferBusy||typeof terminalDetachedReturning!=='undefined'&&terminalDetachedReturning)return [];
@@ -115,6 +123,7 @@ function disconnectTargets(){
  return windowTargets().filter(t=>t.entry&&terminalLive(t.entry)&&t.entry.info.state!=='disconnecting');
 }
 function disconnectAllAvailable(){return disconnectTargets().length>0;}
+function closeAllAvailable(){return windowTargets().length>0;}
 function bulkConfirmationKey(action){return action==='disconnect-all'?'terminalConfirmDisconnectAll':'terminalConfirmCloseAll';}
 function bulkWindow(action){
  setDisconnectOptions(false);
@@ -183,6 +192,7 @@ async function run(action,t){if(!enabled(action,t))return;const entry=t.entry;cl
  case'export':exportTerminalTranscript(entry);break;
  case'save-connection':root.NetworkToolkitSessionSidebar?.save(entry);break;
  case'rename':pendingRename=t;openModal('Rename terminal tab','<form id="terminalTabRenameForm" data-terminal-id="'+esc(t.id)+'"><div class="field"><label for="terminalTabName">Tab name</label><input id="terminalTabName" maxlength="100" value="'+esc(entry?.info.label||t.draft?.label||'Terminal')+'" required autocomplete="off"></div></form>','<button class="btn ghost" data-action="close-modal">Cancel</button><button class="btn primary" type="submit" form="terminalTabRenameForm">Rename</button>'+(['ssh','telnet'].includes(entry?.info.type)?'<button class="btn ghost" type="button" data-terminal-clear-name>Use device name / IP</button>':''),true);break;
+ case'run-as-admin':{if(!adminCandidate(entry))break;newTerminalTab();openTerminalConnect(adminConfig(entry));if(typeof connectTerminal==='function')await connectTerminal();break;}
  case'duplicate':{const config=entry?safeTerminalConfig(entry.config):safeTerminalConfig(state.terminalConnection);newTerminalTab();openTerminalConnect(config);break;}
  case'move':if(DETACHED_WORKSPACE)await detachTerminal(entry);else if(terminalViewForSession(entry.info.id)||DETACHED_TERMINAL)await requestTerminalReattach(entry);else await detachTerminal(entry);break;
  case'workspace':if(DETACHED_TERMINAL||terminalWorkspaceView(entry))await requestTerminalReattach(entry);else await detachTerminalWorkspace();break;
@@ -218,5 +228,5 @@ async function submitName(clear=false){
 document.addEventListener('click',event=>{if(!event.target.closest('[data-terminal-clear-name]'))return;event.preventDefault();event.stopImmediatePropagation();void submitName(true);},true);
 document.addEventListener('submit',event=>{if(event.target.id!=='terminalTabRenameForm')return;event.preventDefault();event.stopImmediatePropagation();void submitName(false);},true);
 root.addEventListener('resize',()=>close());
-root.NetworkToolkitTerminalTabs=Object.freeze({open,close,run,enabled,token,items,windowTargets,reconnectTargets,reconnectAllAvailable,requestReconnectAll,confirmReconnectAll,setReconnectOptions,toggleReconnectOptions,reconnectAllBusy:()=>reconnectAllBusy,disconnectAllAvailable,bulkWindow,windowBulkBusy:()=>windowBulkBusy,setDisconnectOptions,toggleDisconnectOptions,confirmWindowBulk});
+root.NetworkToolkitTerminalTabs=Object.freeze({open,close,run,enabled,token,items,windowTargets,reconnectTargets,reconnectAllAvailable,requestReconnectAll,confirmReconnectAll,setReconnectOptions,toggleReconnectOptions,reconnectAllBusy:()=>reconnectAllBusy,disconnectAllAvailable,closeAllAvailable,adminCandidate,adminConfig,bulkWindow,windowBulkBusy:()=>windowBulkBusy,setDisconnectOptions,toggleDisconnectOptions,confirmWindowBulk});
 })(window);

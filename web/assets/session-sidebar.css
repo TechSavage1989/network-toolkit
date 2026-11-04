@@ -97,3 +97,8 @@
 /* 52px actions + 12px padding + 16px icon + 16px gaps + 67px longest badge
    leaves at least 81px for the two-line identity. Narrow lists already scroll. */
 .session-library-row:has(.terminal-protocol-badge){min-width:244px}
+
+/* Saved session reordering (drag a row, or Alt+Shift+Up/Down). */
+.session-saved-dragging{opacity:.55}
+.session-saved-drop-before{box-shadow:inset 0 3px var(--accent)}
+.session-saved-drop-after{box-shadow:inset 0 -3px var(--accent)}
