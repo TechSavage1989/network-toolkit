@@ -1,4 +1,4 @@
-## 1.20.10 Beta 8 - Test tab order and Overview layout survive restarts (candidate)
+## 1.20.10 Beta 8 - Test tab order and Overview layout survive restarts (published 2026-11-04)
 
 - Owner report: test tab positions reset on restart. `mergeState` never read `testTabOrder` or `overviewLayout` back (both were saved). It now restores both, keeping only known tests and sections. New owner default order for Test a target: Monitor, Ping, Trace route, DNS, Ports, Device check, Details (`TEST_TAB_DEFAULT_ORDER`). `customize-layout.browser.cjs` reloads the app and checks both survive; `TestStateKeepsTestTabOrderAndOverviewLayout` checks the server keeps them.
 
