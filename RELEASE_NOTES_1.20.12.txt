@@ -1,0 +1,21 @@
+Network Toolkit 1.20.12
+
+## What's New
+
+- Terminal and Text Editor tabs share one rounded design, and each tab strip ends with a "+" button for a new tab. Typing in the Terminal responds faster.
+- A Command Prompt or PowerShell tab can be opened as administrator in a new tab, or restarted as administrator in place, from the tab's menu. Windows asks for approval first.
+- The Disconnect menu has Close all tabs. Saved sessions can be dragged into your own order. Drive buttons under Starting directory show the drive letter, for example "D: Data HDD".
+- The credential vault can be set up with or without a master password. Any master password is allowed, with a strength gauge as you type. Choosing a saved credential fills in its username too.
+- The Overview can be customized: show or hide sections, and drag them into your own order. The Test a target and Test a website tabs can be reordered too. Your layout is kept between runs.
+- Text Editor Save As opens the Windows Save As dialog for local files, and a folder picker on the server for SFTP files.
+
+## Additional Details
+
+- This stable release includes the 1.20.3 to 1.20.11 betas. Its version is higher than every beta, so beta users receive it too.
+- Without a master password, the vault is protected by your Windows account, so other software running as you, or an administrator, may be able to read saved credentials. You can add or remove a master password later in Password manager, and saved credentials are kept.
+- Windows cannot raise a running shell. Restarting a tab as administrator starts a new elevated shell in the same folder and closes the old one once the new one runs. The app asks first, and declining the Windows prompt leaves the tab as it is.
+- Test a target tabs start in this order: Monitor, Ping, Trace route, DNS, Ports, Device check, Details. An order you already set is kept.
+- When you drag a tab, a Saved session or an Overview section, the drop line only appears where releasing would change the order. Escape cancels a drag. Keyboard users can press Alt+Shift with the arrow keys.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Security confirmations, Windows/UAC approval, explicit update consent and checksum verification are unchanged.
+- Portable executable filename remains Network_Toolkit.exe.
+- Validation uses hosted builds and synthetic fixtures; the owner checked the betas on Windows.

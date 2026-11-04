@@ -1,3 +1,9 @@
+# v1.20.12 stable (2026-11-04) - candidate, NOT PUBLISHED
+
+Owner: "if there are no other issues currently known, push for the stable release". No open owner-reported issues; known CI intermittents (editor-views112, native-terminal127 timeout, native-editor128-diagnostic) are test-environment flakes recorded in earlier entries. The owner confirmed the v1.20.7 to v1.20.10 betas on Windows; the v1.20.11 additions (Restart this tab as administrator, Overview section drag) had not yet been checked on Windows when this was prepared. Release channel switched to stable (`updateBuildChannel`, docs/RELEASE_CHANNEL.txt), version 1.20.12 everywhere, release notes written for stable users covering 1.20.3 to 1.20.11, UI guidelines status now names v1.20.12. No application code changes beyond the channel constant.
+
+---
+
 # v1.20.11 Beta 9 - publication verified (2026-11-04)
 
 Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.20.11 at 2026-11-04T17:16:19Z; stable latest remains v1.20.2. Merged PR #85; tag v1.20.11 points to merge commit 3e44620b7ef531567eb9645100f26c37fcff7b54. Release workflow run 41875474487 succeeded. Assets: Network_Toolkit.exe, Network_Toolkit_1.20.11_Portable.zip, Network_Toolkit_1.20.11_Update.zip, SHA256SUMS; asset digests match SHA256SUMS. Checks: green runs 41873103508 and 41873117051 on the PR head. An earlier head failed `check` because local browser-test output (test-results/) had been committed; it was removed and ignored before merge. native-terminal127 timed out once (context deadline exceeded) on that earlier head while passing in the sibling run on the same commit; recorded as intermittent.
