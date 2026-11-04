@@ -1,3 +1,7 @@
+## 1.20.12 - Stable (candidate)
+
+- Stable release of the 1.20.3 to 1.20.11 betas: Text Editor Save As dialogs, faster Terminal typing, shared tab strip with "+", Terminal administrator tabs (new tab or restart in place), Close all, Saved reorder, drive letters, optional vault master password with strength gauge, credential usernames, drop-line rule, customizable and draggable Overview, reorderable test tabs kept across restarts. Release channel switched to stable; numbered above every beta so beta users also receive it; saved data and security confirmations unchanged.
+
 ## 1.20.11 Beta 9 - Drag Overview sections, restart a tab as administrator (published 2026-11-04)
 
 - Owner requests: Overview sections drag by a grip handle on their top edge (same drop-line rule as tabs, Escape cancels, Alt+Shift+Up/Down on the handle) and save to `state.overviewLayout.order`, restored at startup. New tab menu action `convert-admin` ("Restart this tab as administrator…") for standard local cmd/PowerShell tabs: confirms, starts the elevated copy, and only once it is connected moves it into the original's pane and tab position and closes the original; declined approval or failed start leaves the original untouched.

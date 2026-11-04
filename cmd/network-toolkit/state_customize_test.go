@@ -25,7 +25,7 @@ func TestStateKeepsTestTabOrderAndOverviewLayout(t *testing.T) {
 
 // v1.20.10 is the first two-digit patch number: it must compare as newer than 1.20.9.
 func TestUpdateNewerHandlesTwoDigitPatch(t *testing.T) {
-	if !updateNewer("1.20.10", "1.20.9") || updateNewer("1.20.9", "1.20.10") || !updateNewer("1.20.10", "1.20.2") || !updateNewer("1.20.11", "1.20.10") {
+	if !updateNewer("1.20.10", "1.20.9") || updateNewer("1.20.9", "1.20.10") || !updateNewer("1.20.10", "1.20.2") || !updateNewer("1.20.11", "1.20.10") || !updateNewer("1.20.12", "1.20.11") {
 		t.Fatal("two-digit patch versions compared as text")
 	}
 }
