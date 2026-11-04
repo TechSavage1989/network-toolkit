@@ -30,7 +30,7 @@
 - **Text Editor:** open, edit and compare text files, including common network device configurations.
 - **Local network:** view local network information and review authorized configuration changes.
 - **Network utilities:** Wake on LAN, an IPv4 subnet calculator, a transfer-time estimate and a MAC address formatter.
-- **Customizable Overview:** choose which dashboard sections to show and in what order.
+- **Customizable Overview:** choose which dashboard sections to show, and drag them into the order you want; the layout is kept between runs.
 - **Settings and updates:** save preferences and use the built-in updater.
 
 ## Screenshots

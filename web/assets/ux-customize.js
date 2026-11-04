@@ -4,6 +4,9 @@
  *   Order is saved in state.testTabOrder = {target:[...], web:[...]}.
  * - The Overview dashboard is customizable: show/hide and reorder its sections
  *   (state.overviewLayout = {order:[...], hidden:[...]}) from the Customize dialog.
+ * - Overview sections also move by dragging their grip handle (same drop-line
+ *   rule; the line is drawn on the side being passed) or Alt+Shift+Up/Down on
+ *   the handle (v1.20.11). The order is the same state.overviewLayout.order.
  * Tab buttons keep their data-page navigation; a completed drag suppresses the click. */
 (function(root){
 'use strict';
@@ -49,5 +52,26 @@ document.addEventListener('click',event=>{
  if(event.target.closest?.('[data-overview-reset]')){event.preventDefault();setLayout(null);}
 },true);
 document.addEventListener('change',event=>{const box=event.target.closest?.('[data-overview-show]');if(!box)return;const l=layout(),id=box.dataset.overviewShow;l.hidden=box.checked?l.hidden.filter(x=>x!==id):[...new Set([...l.hidden,id])];setLayout(l);document.querySelector('[data-overview-show="'+CSS.escape(id)+'"]')?.focus();});
-root.NetworkToolkitCustomize=Object.freeze({orderedIds:list=>tabIds(list),unchanged,openCustomize});
+
+// ---------- Drag Overview sections ----------
+// The order compares shown sections only: hidden ones keep their place in the
+// saved order and are skipped when deciding whether a drop changes anything.
+function shownIds(){return [...document.querySelectorAll('#pageContent [data-overview-part]')].map(e=>e.dataset.overviewPart);}
+function moveSection(id,target,after){const shown=shownIds();if(unchanged(shown,id,target,after))return false;const l=layout(),order=l.order.filter(x=>x!==id),to=order.indexOf(target);if(to<0)return false;order.splice(after?to+1:to,0,id);setLayout({order,hidden:l.hidden});return true;}
+let sectionDrag=null;
+function clearSectionDrop(){for(const el of document.querySelectorAll('.overview-drop-before,.overview-drop-after,.overview-drop-left,.overview-drop-right,.overview-dragging'))el.classList.remove('overview-drop-before','overview-drop-after','overview-drop-left','overview-drop-right','overview-dragging');}
+function sectionDropTarget(event){const part=document.elementFromPoint?.(event.clientX,event.clientY)?.closest?.('#pageContent [data-overview-part]');if(!part)return null;const r=part.getBoundingClientRect(),side=part.parentElement?.closest?.('.columns[data-overview-section]')&&!part.hasAttribute('data-overview-section'),after=side?event.clientX>r.left+r.width/2:event.clientY>r.top+r.height/2,id=part.dataset.overviewPart;if(unchanged(shownIds(),sectionDrag.id,id,after))return null;return {part,id,after,side};}
+function endSectionDrag(apply){const d=sectionDrag;sectionDrag=null;clearSectionDrop();document.documentElement.classList.remove('overview-dragging-active');if(apply&&d?.moved&&d.drop){moveSection(d.id,d.drop.id,d.drop.after);document.querySelector('[data-overview-drag="'+CSS.escape(d.id)+'"]')?.focus({preventScroll:true});}}
+document.addEventListener('pointerdown',event=>{const handle=event.target.closest?.('[data-overview-drag]');if(!handle||event.button!==0||event.isPrimary===false||event.pointerType==='touch')return;event.preventDefault();sectionDrag={id:handle.dataset.overviewDrag,handle,pointer:event.pointerId,x:event.clientX,y:event.clientY,moved:false,drop:null};},true);
+document.addEventListener('pointermove',event=>{const d=sectionDrag;if(!d||event.pointerId!==d.pointer)return;if(!d.moved){if(Math.hypot(event.clientX-d.x,event.clientY-d.y)<6)return;d.moved=true;document.documentElement.classList.add('overview-dragging-active');try{d.handle.setPointerCapture?.(event.pointerId);}catch{}}event.preventDefault();clearSectionDrop();d.handle.closest('[data-overview-part]')?.classList.add('overview-dragging');d.drop=sectionDropTarget(event);if(d.drop)d.drop.part.classList.add(d.drop.side?(d.drop.after?'overview-drop-right':'overview-drop-left'):(d.drop.after?'overview-drop-after':'overview-drop-before'));},true);
+document.addEventListener('pointerup',event=>{if(sectionDrag&&event.pointerId===sectionDrag.pointer)endSectionDrag(true);},true);
+document.addEventListener('pointercancel',event=>{if(sectionDrag&&event.pointerId===sectionDrag.pointer)endSectionDrag(false);},true);
+document.addEventListener('keydown',event=>{
+ if(event.key==='Escape'&&sectionDrag?.moved){event.preventDefault();event.stopImmediatePropagation();endSectionDrag(false);return;}
+ if(!event.altKey||!event.shiftKey||event.ctrlKey||!['ArrowUp','ArrowDown'].includes(event.key))return;
+ const handle=event.target.closest?.('[data-overview-drag]');if(!handle)return;event.preventDefault();event.stopImmediatePropagation();
+ const id=handle.dataset.overviewDrag,shown=shownIds(),at=shown.indexOf(id),up=event.key==='ArrowUp',next=shown[at+(up?-1:1)];
+ if(next&&moveSection(id,next,!up))document.querySelector('[data-overview-drag="'+CSS.escape(id)+'"]')?.focus({preventScroll:true});
+},true);
+root.NetworkToolkitCustomize=Object.freeze({orderedIds:list=>tabIds(list),unchanged,openCustomize,moveSection});
 })(window);

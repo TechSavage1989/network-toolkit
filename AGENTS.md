@@ -30,7 +30,7 @@ Read [docs/UX_POLISH_PLAN.md](docs/UX_POLISH_PLAN.md) first. It is the owner's a
 ## Build and test
 Use the repo's existing scripts and vendored dependencies:
 - go test -mod=vendor ./...
-- To check that the app compiles, use go build -mod=vendor -o /dev/null ./cmd/network-toolkit (or go vet). A bare go build ./cmd/... writes a 25 MB ./network-toolkit binary at the root; it is in .gitignore and must never be committed (it once slipped into a PR via git add -A).
+- To check that the app compiles, use go build -mod=vendor -o /dev/null ./cmd/network-toolkit (or go vet). A bare go build ./cmd/... writes a 25 MB ./network-toolkit binary at the root; it is in .gitignore and must never be committed (it once slipped into a PR via git add -A). Browser tests run locally write screenshots and reports to ./test-results/ (also ignored); stage files by name instead of git add -A.
 - node --test scripts/*.test.cjs
 - python3 -m unittest discover -s scripts -p '*_test.py'
 - python3 scripts/github_release.py validate

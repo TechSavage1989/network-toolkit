@@ -1,3 +1,7 @@
+## 1.20.11 Beta 9 - Drag Overview sections, restart a tab as administrator (candidate)
+
+- Owner requests: Overview sections drag by a grip handle on their top edge (same drop-line rule as tabs, Escape cancels, Alt+Shift+Up/Down on the handle) and save to `state.overviewLayout.order`, restored at startup. New tab menu action `convert-admin` ("Restart this tab as administrator…") for standard local cmd/PowerShell tabs: confirms, starts the elevated copy, and only once it is connected moves it into the original's pane and tab position and closes the original; declined approval or failed start leaves the original untouched.
+
 ## 1.20.10 Beta 8 - Test tab order and Overview layout survive restarts (published 2026-11-04)
 
 - Owner report: test tab positions reset on restart. `mergeState` never read `testTabOrder` or `overviewLayout` back (both were saved). It now restores both, keeping only known tests and sections. New owner default order for Test a target: Monitor, Ping, Trace route, DNS, Ports, Device check, Details (`TEST_TAB_DEFAULT_ORDER`). `customize-layout.browser.cjs` reloads the app and checks both survive; `TestStateKeepsTestTabOrderAndOverviewLayout` checks the server keeps them.
