@@ -5,6 +5,9 @@ Settings currently appear in the main application and in individual tools. The P
 ## Saved data
 Network Toolkit retains preferences, saved profiles, credentials in the credential vault and macros. Updates must preserve all of these and migrate older settings without silently resetting them.
 
+## Customize the Overview
+On the Overview, choose **Customize** to show or hide its sections (summary cards; gateways, DNS and DHCP; public IP; network scan; adapters; recent activity) and move them up or down. **Reset to default** restores the original layout.
+
 ## Password manager and the credential vault
 Open **Password manager** (from a connection's Saved credential field) to store a username together with its password or SSH key. Choosing a saved credential in a connection fills in its username.
 

@@ -1,0 +1,14 @@
+Network Toolkit 1.20.9 Beta 7
+
+## What's New
+
+- The Overview can be customized. Choose Customize to show or hide its sections and move them up or down. Reset to default brings back the original layout.
+- The Test a target and Test a website tabs can be put in your own order. Drag a tab, or focus it and press Alt+Shift+Left or Right.
+
+## Additional Details
+
+- Each tab group keeps its own order, and the Overview layout is saved with your other preferences.
+- When you drag a test tab, the drop line appears only once the move would change the order. A drag never switches tools; a plain click still opens the test.
+- Network adapters and Recent activity stay side by side when they are next to each other. If every section is hidden, the Overview says so.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Security confirmations and Windows/UAC approval are unchanged.
+- This is an opt-in beta. Stable users stay on 1.20.2. Portable executable filename remains Network_Toolkit.exe.

@@ -21,3 +21,13 @@
 .scope-discovery .btn{gap:6px}
 #pageActions.has-test-tabs{flex-wrap:nowrap}
 #pageActions.has-test-tabs>:not(.nt-target-tests){flex:0 0 auto}
+
+/* v1.20.9: reorderable Test a target / Test a website tabs and Overview customization. */
+.nt-target-tests [data-target-test].test-tab-dragging{opacity:.55}
+.nt-target-tests [data-target-test].test-tab-drop-before{box-shadow:inset 3px 0 var(--accent)}
+.nt-target-tests [data-target-test].test-tab-drop-after{box-shadow:inset -3px 0 var(--accent)}
+.overview-customize-list{list-style:none;margin:var(--ux-space-3) 0 0;padding:0;display:flex;flex-direction:column;gap:var(--ux-space-1)}
+.overview-customize-row{display:flex;align-items:center;justify-content:space-between;gap:var(--ux-space-3);padding:var(--ux-space-1) var(--ux-space-2);border:1px solid var(--border);border-radius:var(--ux-radius-sm);background:var(--panel)}
+.overview-customize-row .toggle-row{margin:0}
+.overview-customize-move{display:flex;gap:var(--ux-space-1)}
+.overview-customize-move .iconbtn{width:30px;height:30px}

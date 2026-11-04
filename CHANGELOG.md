@@ -1,4 +1,8 @@
-## 1.20.8 Beta 6 - Optional master password, strength gauge, drop lines (candidate)
+## 1.20.9 Beta 7 - Customizable Overview, reorderable test tabs (candidate)
+
+- Owner requests: Test a target / Test a website tabs are movable (drag with the no-op drop rule, Alt+Shift+Left/Right; `state.testTabOrder`), and the Overview is customizable (sections shown/hidden and reordered in a Customize dialog; `state.overviewLayout`). New `web/assets/ux-customize.js`, `customize-layout.browser.cjs` in Checks. AGENTS.md notes how to compile without writing the root binary.
+
+## 1.20.8 Beta 6 - Optional master password, strength gauge, drop lines (published 2026-11-04)
 
 - Owner requests. The credential vault can be set up without a master password: a random 256-bit password protected by CurrentUser DPAPI in `Network_Toolkit.credentials.auto` unlocks it automatically (same Argon2id / AES-256-GCM envelope). Add master password / Remove master password switch modes via verified rotation; the auto-unlock file is written under the guard immediately before the vault commit and restored if the commit fails. Any non-empty master password is accepted (`vaultcrypto.MinPasswordRunes` 1); the native dialog shows a live strength gauge. Choosing a saved credential fills its username. Drag drop lines (Terminal tabs, Text Editor tabs, Saved sessions) appear only when the drop would change the order.
 

@@ -1114,6 +1114,11 @@ jobs:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-security-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-saved-order-results
         run: node scripts/session-saved-order.browser.cjs
+      - name: Check Overview customization and reorderable test tabs
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-security-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-customize-results
+        run: node scripts/customize-layout.browser.cjs
       - name: Check credential UI boundaries with synthetic fixtures
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-security-browser-tests/node_modules/playwright
