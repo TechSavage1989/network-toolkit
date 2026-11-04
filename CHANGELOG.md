@@ -1,4 +1,4 @@
-## 1.20.7 Beta 5 - Saved reordering, administrator tab, Close all, drive letters (candidate)
+## 1.20.7 Beta 5 - Saved reordering, administrator tab, Close all, drive letters (published 2026-11-04)
 
 - Owner requests. Saved sessions reorder by drag and drop or Alt+Shift+Up/Down (name order until the first move, then the stored `terminalProfiles` order; new `terminalSavedManualOrder` flag whitelisted with the other Terminal sidebar flags). Standard local Command Prompt and PowerShell tabs offer "Open as administrator in a new tab" (same shell and starting folder, `runAsAdministrator`, normal dialog and Windows prompt; original tab kept). The Disconnect menu adds Close all tabs. Starting directory drive buttons show the drive letter ("D: Data HDD"). New `session-saved-order.browser.cjs` in Checks; unit tests for drive labels, the admin action and the Disconnect menu.
 
