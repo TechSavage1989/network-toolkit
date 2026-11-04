@@ -1,4 +1,6 @@
-# v1.20.12 stable (2026-11-04) - candidate, NOT PUBLISHED
+# v1.20.12 stable (2026-11-04) - publication verified
+
+Published as stable release https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.20.12 at 2026-11-04T18:13:08Z (prerelease=false); `releases/latest` is now v1.20.12 (was v1.20.2). Merged PR #87; tag v1.20.12 points to merge commit a12c088da3c75fb383cb9d6803c7c7c76546e8a3. Release workflow run 41884351761 succeeded. Assets: Network_Toolkit.exe, Network_Toolkit_1.20.12_Portable.zip, Network_Toolkit_1.20.12_Update.zip, SHA256SUMS; asset digests match SHA256SUMS. Checks: full green run 41882247441 on the PR head. Next beta must switch `updateBuildChannel` and docs/RELEASE_CHANNEL.txt back to beta.
 
 Owner: "if there are no other issues currently known, push for the stable release". No open owner-reported issues; known CI intermittents (editor-views112, native-terminal127 timeout, native-editor128-diagnostic) are test-environment flakes recorded in earlier entries. The owner confirmed the v1.20.7 to v1.20.10 betas on Windows; the v1.20.11 additions (Restart this tab as administrator, Overview section drag) had not yet been checked on Windows when this was prepared. Release channel switched to stable (`updateBuildChannel`, docs/RELEASE_CHANNEL.txt), version 1.20.12 everywhere, release notes written for stable users covering 1.20.3 to 1.20.11, UI guidelines status now names v1.20.12. No application code changes beyond the channel constant.
 
