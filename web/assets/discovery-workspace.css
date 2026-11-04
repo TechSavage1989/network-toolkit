@@ -235,8 +235,7 @@
 .terminal-active-label{display:none}
 .terminal-detached:not(.terminal-workspace-detached) .terminal-command-start,.terminal-detached:not(.terminal-workspace-detached) .terminal-tools-connections{display:none}
 .terminal-detached:not(.terminal-workspace-detached) .terminal-active-label{display:block;min-width:0;flex:1;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.terminal-page .terminal-tabs{flex:0 0 auto;min-height:32px}
-.terminal-page .terminal-tab>button:first-child{padding:6px 9px}
+.terminal-page .terminal-tabs{flex:0 0 auto}
 .terminal-page .terminal-stage,.terminal-page .terminal-stage.panes-stacked{flex:1 1 0;min-height:100px;height:auto}
 .terminal-page .terminal-pane-head{min-height:29px;padding:2px 6px}
 .terminal-pane-grid[data-layout="single"]>.terminal-pane .terminal-pane-head,.terminal-pane-grid.maximized>.terminal-pane .terminal-pane-head{display:none}

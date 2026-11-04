@@ -5,11 +5,6 @@
 .nt-editor-title{display:flex;gap:10px;align-items:center;padding:7px 12px;border-bottom:1px solid var(--border);min-height:42px}
 .nt-editor-title strong{white-space:nowrap}.nt-editor-title>button{margin-left:auto}
 .nt-editor-filetitle{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:var(--muted)}
-.nt-editor-tabs{display:flex;gap:2px;padding:4px 6px 0;min-height:32px;overflow:auto;border-bottom:1px solid var(--border)}
-.nt-editor-tab{display:flex;flex:0 0 auto;align-items:stretch;max-width:210px;border-radius:6px 6px 0 0;background:var(--panel2);font-size:11px;overflow:hidden}
-.nt-editor-tab:has([aria-selected="true"]){box-shadow:inset 0 2px var(--accent)}
-.nt-editor-tab button{border:0;background:transparent;padding:5px 9px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.nt-editor-tab button:last-child{flex:0 0 22px;padding:4px}
 .nt-editor-toolbar,.nt-editor-options,.nt-editor-find{display:flex;flex:0 0 auto;align-items:center;gap:5px;padding:6px 10px;flex-wrap:wrap;border-bottom:1px solid var(--line);min-height:39px}
 .nt-editor-toolbar .btn{min-height:26px;padding:3px 7px;font-size:11px}
 .nt-editor-rule{border-left:1px solid var(--border);height:19px;margin:0 4px}
@@ -140,9 +135,7 @@ body:has(.nt-editor-embedded) #toolWorkspace>#pageContent{grid-row:1!important;g
 [data-ed-gutter-lines]>div{margin:0;padding:0;border:0}
 
 /* Accessible document tabs and local, editable side-by-side comparison. */
-.nt-editor-tabs{flex:0 0 auto;scrollbar-gutter:stable}
-.nt-editor-new-tab{flex:0 0 28px;border:0;background:var(--panel2);border-radius:5px;font-size:18px;line-height:1;padding:3px 7px;align-self:center;color:var(--text)}
-.nt-editor-tab button:focus-visible,.nt-editor-new-tab:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.nt-editor-tabs{flex:0 0 auto}
 .nt-editor.is-comparing .nt-editor-code,.nt-editor.is-comparing .nt-editor-find{display:none}
 .nt-editor-compare{display:flex;flex:1 1 0;flex-direction:column;min-height:220px;min-width:0;overflow:hidden;border-top:1px solid var(--border)}
 .nt-compare-tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 10px;flex:0 0 auto;border-bottom:1px solid var(--border);font-size:11px}
@@ -222,8 +215,6 @@ body:has(.nt-editor-embedded) #toolWorkspace>#pageContent{grid-row:1!important;g
 .nt-editor-workspace{display:flex;flex:1 1 0;min-height:0;min-width:0;overflow:hidden}
 .nt-editor-document-area{display:flex;flex-direction:column;flex:1 1 0;min-width:0;min-height:0;overflow:hidden}
 .nt-editor.is-split .nt-editor-code{display:none}
-.nt-editor-tabs[hidden]{display:none}
-.nt-compare-pane>.nt-editor-tabs{border-bottom:1px solid var(--border);padding:3px 4px;min-height:32px;max-height:45px;overflow:auto;scrollbar-gutter:auto}
 .nt-compare-pane.is-active-view>.nt-editor-tabs{box-shadow:inset 0 -2px var(--accent)}
 .nt-editor-compare.is-split-view>.nt-compare-tools,.nt-editor-compare.is-split-view>.nt-compare-summary,.nt-editor-compare.is-split-view .nt-compare-map-panel{display:none}
 .nt-editor-compare.is-split-view .nt-compare-grid{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
@@ -311,17 +302,7 @@ body:has(.nt-editor:not([hidden]) [data-ed-files-sidebar]:not([hidden])) .toast-
 
 .nt-editor-connection-compact{display:none}
 @media(max-width:680px){.nt-editor-connection-wide{display:none}.nt-editor-connection-compact{display:inline}}
-/* Editor114: view-local tabs follow the Terminal tab strip, without another header. */
-.nt-editor-tabs,.nt-compare-pane>.nt-editor-tabs{gap:0;padding:0;min-height:38px;max-height:46px;align-items:stretch;border-bottom:1px solid var(--border);background:var(--panel2);scrollbar-width:thin;scrollbar-gutter:auto}
-.nt-editor-tab{gap:0;min-width:150px;max-width:255px;border-radius:0;border-right:1px solid var(--line,var(--border));border-bottom:2px solid transparent;background:transparent;font-size:11px;overflow:hidden}
-.nt-editor-tab:has([aria-selected=true]){background:var(--panel);border-bottom-color:var(--accent);box-shadow:none}
-.nt-editor-tab>button:first-child{display:flex;align-items:center;gap:7px;flex:1;min-width:0;padding:10px;border:0;background:transparent;color:var(--muted);font-size:11px;text-align:left}
-.nt-editor-tab>button[aria-selected=true]{color:var(--text)}
-.nt-editor-tab>button:hover,.nt-editor-tab>.tab-close:hover{background:var(--accentBg);color:var(--text)}
-.nt-editor-tab-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.nt-editor-tab-status{flex:none;width:7px;color:var(--accent);font-size:9px}
-.nt-editor-tab>.tab-close{border:0;background:transparent;flex:0 0 28px;padding:5px 8px;color:var(--faint);font-size:14px}
-.nt-editor-new-tab{min-width:42px;border:0;border-radius:0;background:transparent;color:var(--accent)}
+/* Editor114: view-local tabs share the Terminal tab strip design (ux-tab-strip.css). */
 /* The modal has no reclaimed page-header row. Keep the shared Terminal-height
    tabs without spending document height on extra primary-toolbar padding. */
 .nt-editor:not(.nt-editor-embedded) .nt-editor-window>.nt-editor-toolbar{padding-block:1px}
@@ -358,7 +339,6 @@ body:has(.nt-editor:not([hidden]) [data-ed-files-sidebar]:not([hidden])) .toast-
 .is-editor-sidebar .rb-connect-head{flex-wrap:wrap}
 /* Core session actions stay visible; the full manual/credential form is secondary. */
 .nt-editor-files-connection>summary{font-size:10px}
-.nt-editor-tab>.tab-close svg{width:14px;height:14px;display:block}
 .nt-editor-files-session-menu{position:relative;flex:none;margin:0;border:0;border-radius:0;overflow:visible}
 .nt-editor-files-session-menu>summary{list-style:none;cursor:pointer}
 .is-editor-sidebar .nt-editor-files-session-tools>button,.is-editor-sidebar .nt-editor-files-session-menu>summary{display:flex;align-items:center;justify-content:center;box-sizing:border-box;width:29px;height:29px;min-height:29px;min-width:29px;padding:4px;line-height:1;border:1px solid var(--line);border-radius:6px}
