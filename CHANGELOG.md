@@ -1,3 +1,7 @@
+## 1.20.10 Beta 8 - Test tab order and Overview layout survive restarts (candidate)
+
+- Owner report: test tab positions reset on restart. `mergeState` never read `testTabOrder` or `overviewLayout` back (both were saved). It now restores both, keeping only known tests and sections. New owner default order for Test a target: Monitor, Ping, Trace route, DNS, Ports, Device check, Details (`TEST_TAB_DEFAULT_ORDER`). `customize-layout.browser.cjs` reloads the app and checks both survive; `TestStateKeepsTestTabOrderAndOverviewLayout` checks the server keeps them.
+
 ## 1.20.9 Beta 7 - Customizable Overview, reorderable test tabs (published 2026-11-04)
 
 - Owner requests: Test a target / Test a website tabs are movable (drag with the no-op drop rule, Alt+Shift+Left/Right; `state.testTabOrder`), and the Overview is customizable (sections shown/hidden and reordered in a Customize dialog; `state.overviewLayout`). New `web/assets/ux-customize.js`, `customize-layout.browser.cjs` in Checks. AGENTS.md notes how to compile without writing the root binary.

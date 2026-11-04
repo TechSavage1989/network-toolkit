@@ -41,19 +41,26 @@ const root=path.resolve(__dirname,'..'),output=process.env.TOOLKIT_TEST_OUTPUT,o
   // Test a target tabs.
   await page.evaluate(()=>navigate('ping'));await page.locator('.nt-target-tests [data-target-test="ping"]').waitFor();
   const tabs=()=>page.evaluate(()=>[...document.querySelectorAll('.nt-target-tests [data-target-test]')].map(b=>b.dataset.targetTest));
-  assert.deepEqual(await tabs(),['quick','ping','trace','dns','tcp','monitor','identify']);
+  assert.deepEqual(await tabs(),['monitor','ping','trace','dns','tcp','quick','identify'],'owner default order');report.checks.push('Default order: Monitor, Ping, Trace route, DNS, Ports, Device check, Details');
   const tab=id=>page.locator('.nt-target-tests [data-target-test="'+id+'"]');
-  {const a=await tab('ping').boundingBox(),b=await tab('trace').boundingBox();await page.mouse.move(a.x+a.width/2,a.y+a.height/2);await page.mouse.down();await page.mouse.move(a.x+a.width/2+8,a.y+a.height/2,{steps:3});await page.mouse.move(b.x+4,b.y+b.height/2,{steps:6});
+  {const a=await tab('monitor').boundingBox(),b=await tab('ping').boundingBox();await page.mouse.move(a.x+a.width/2,a.y+a.height/2);await page.mouse.down();await page.mouse.move(a.x+a.width/2+8,a.y+a.height/2,{steps:3});await page.mouse.move(b.x+4,b.y+b.height/2,{steps:6});
    assert.equal(await page.locator('.test-tab-drop-before,.test-tab-drop-after').count(),0,'no line over the near half of the next tab');
-   await page.mouse.move(b.x+b.width-4,b.y+b.height/2,{steps:4});assert.equal(await page.locator('[data-target-test="trace"].test-tab-drop-after').count(),1);await page.mouse.up();await page.waitForTimeout(200);}
-  assert.deepEqual(await tabs(),['quick','trace','ping','dns','tcp','monitor','identify']);assert.equal(await page.evaluate(()=>state.activePage),'ping','a drag does not switch tools');
-  assert.deepEqual(await savedValue(x=>x.testTabOrder?.target,v=>JSON.stringify(v)===JSON.stringify(['quick','trace','ping','dns','tcp','monitor','identify'])),['quick','trace','ping','dns','tcp','monitor','identify']);report.checks.push('Drag reorders Test a target tabs, saves the order and does not switch tools');
-  await page.evaluate(()=>navigate('dns'));await page.locator('.nt-target-tests [data-target-test="dns"]').waitFor();assert.deepEqual(await tabs(),['quick','trace','ping','dns','tcp','monitor','identify'],'order kept after navigation');
-  await tab('dns').focus();await page.keyboard.press('Alt+Shift+ArrowLeft');assert.deepEqual(await tabs(),['quick','trace','dns','ping','tcp','monitor','identify']);assert.equal(await page.evaluate(()=>document.activeElement?.dataset.targetTest),'dns');report.checks.push('Alt+Shift+Left moves a focused tab and keeps focus');
+   await page.mouse.move(b.x+b.width-4,b.y+b.height/2,{steps:4});assert.equal(await page.locator('[data-target-test="ping"].test-tab-drop-after').count(),1);await page.mouse.up();await page.waitForTimeout(200);}
+  assert.deepEqual(await tabs(),['ping','monitor','trace','dns','tcp','quick','identify']);assert.equal(await page.evaluate(()=>state.activePage),'ping','a drag does not switch tools');
+  assert.deepEqual(await savedValue(x=>x.testTabOrder?.target,v=>JSON.stringify(v)===JSON.stringify(['ping','monitor','trace','dns','tcp','quick','identify'])),['ping','monitor','trace','dns','tcp','quick','identify']);report.checks.push('Drag reorders Test a target tabs, saves the order and does not switch tools');
+  await page.evaluate(()=>navigate('dns'));await page.locator('.nt-target-tests [data-target-test="dns"]').waitFor();assert.deepEqual(await tabs(),['ping','monitor','trace','dns','tcp','quick','identify'],'order kept after navigation');
+  await tab('dns').focus();await page.keyboard.press('Alt+Shift+ArrowLeft');assert.deepEqual(await tabs(),['ping','monitor','dns','trace','tcp','quick','identify']);assert.equal(await page.evaluate(()=>document.activeElement?.dataset.targetTest),'dns');report.checks.push('Alt+Shift+Left moves a focused tab and keeps focus');
   await tab('tcp').click();await page.waitForFunction(()=>state.activePage==='tcp');report.checks.push('A plain click still opens the tool');
   // Test a website tabs have their own order.
   await page.evaluate(()=>navigate('http'));await page.locator('.nt-target-tests [data-target-test="tls"]').waitFor();await tab('tls').focus();await page.keyboard.press('Alt+Shift+ArrowLeft');assert.deepEqual(await tabs(),['tls','http']);
-  const order=await savedValue(x=>x.testTabOrder,v=>v?.web?.[0]==='tls');assert.deepEqual(order.web,['tls','http']);assert.deepEqual(order.target,['quick','trace','dns','ping','tcp','monitor','identify']);report.checks.push('Test a website tabs reorder separately');
+  const order=await savedValue(x=>x.testTabOrder,v=>v?.web?.[0]==='tls');assert.deepEqual(order.web,['tls','http']);assert.deepEqual(order.target,['ping','monitor','dns','trace','tcp','quick','identify']);report.checks.push('Test a website tabs reorder separately');
+  // Restart: reload the app from the saved settings; the order and a dashboard layout must come back.
+  await page.evaluate(()=>{state.overviewLayout={order:OVERVIEW_SECTIONS.map(x=>x[0]).reverse(),hidden:['publicIP']};saveState();});await savedValue(x=>x.overviewLayout,v=>v?.hidden?.includes('publicIP'));
+  await page.reload();await page.waitForFunction(()=>__networkToolkitStartupState===1&&online);
+  assert.deepEqual(await page.evaluate(()=>state.testTabOrder),{target:['ping','monitor','dns','trace','tcp','quick','identify'],web:['tls','http']},'tab order restored after restart');
+  await page.evaluate(()=>navigate('ping'));await page.locator('.nt-target-tests [data-target-test="ping"]').waitFor();assert.deepEqual(await tabs(),['ping','monitor','dns','trace','tcp','quick','identify']);
+  await page.evaluate(()=>navigate('overview'));await page.waitForFunction(()=>document.querySelectorAll('#pageContent [data-overview-section]').length>=3);
+  const restored=await sections();assert(!restored.includes('publicIP')&&restored[0].startsWith('activity'),'dashboard layout restored after restart: '+JSON.stringify(restored));report.checks.push('Tab order and dashboard layout survive a restart');
   if(output)await page.screenshot({path:path.join(output,'customize-tabs.png')});
   assert.deepEqual(report.errors,[]);report.passed=true;
  }finally{if(output)fs.writeFileSync(path.join(output,'customize-layout-report.json'),JSON.stringify(report,null,2));await browser.close();}

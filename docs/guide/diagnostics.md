@@ -14,7 +14,7 @@ Open **Test a target** in the Diagnose group and enter the hostname or IP addres
 
 Each tab shows a dot for its latest run against the current target: green finished, yellow running, red failed, faint not yet run. Switching tabs never starts a test. Test a target reopens the test you used last, and command search (Ctrl+Shift+P) still finds every test by its full name (for example Connection monitor or Device details).
 
-Drag a tab to put the tests in the order you prefer, or focus a tab and press Alt+Shift+Left or Right. Test a target and Test a website each keep their own order.
+Drag a tab to put the tests in the order you prefer, or focus a tab and press Alt+Shift+Left or Right. Test a target and Test a website each keep their own order, and it is kept when you restart the app. By default Test a target lists Monitor, Ping, Trace route, DNS, Ports, Device check and Details.
 
 Ping and Ports check one target. To check every device on a network or address range, select **Scan a network in Network discovery**; saved ranges also open there.
 
