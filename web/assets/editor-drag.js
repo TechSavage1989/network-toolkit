@@ -57,13 +57,16 @@ function create(options={}){
   let next=row.nextElementSibling;while(next&&!next.dataset?.edUid)next=next.nextElementSibling;
   return {kind:'reorder',before:after?(next?.dataset.edUid||null):row.dataset.edUid,view:target.closest?.('[data-ed-view]')?.dataset.edView,row,after};
  }
+ // Same rule as the Terminal: no drop line where releasing would not move the tab.
+ function siblingTab(row,step){let next=step>0?row?.nextElementSibling:row?.previousElementSibling;while(next&&!next.dataset?.edUid)next=step>0?next.nextElementSibling:next.previousElementSibling;return next||null;}
+ function unchangedDrop(tab,d){if(!d?.row||!tab)return false;if(d.row===tab)return true;if(d.row.parentElement!==tab.parentElement)return false;return d.after?siblingTab(d.row,1)===tab:siblingTab(d.row,-1)===tab;}
  function pointerMove(event){
   const g=gesture;if(g?.mode!=='pointer'||event.pointerId!==g.pointer)return;
   if(!pointerValid(g)){abortPointer();return;}
   if(!g.started&&Math.hypot(event.clientX-g.x,event.clientY-g.y)<6)return;
   if(!g.started){const host=g.tab.closest?.('.nt-editor-window');g.scroll=[...(host?.querySelectorAll?.('[data-ed-text],[data-compare-text],.cm-scroller')||[])].map(el=>({el,top:el.scrollTop,left:el.scrollLeft}));g.started=true;}
   event.preventDefault();g.destination=pointerDestination(event,g);clearVisual();g.strip.classList.add('nt-editor-tabs-dragging');
-  const d=g.destination;if(d.kind==='reorder'&&d.row)d.row.setAttribute(d.after?'data-editor-drop-after':'data-editor-drop-before','');
+  const d=g.destination;if(d.kind==='reorder'&&d.row&&!unchangedDrop(g.tab,d))d.row.setAttribute(d.after?'data-editor-drop-after':'data-editor-drop-before','');
   indicator=document.createElement('div');indicator.className='terminal-tab-drag-indicator nt-editor-tab-drag-indicator';indicator.setAttribute('role','status');indicator.textContent=d.kind==='detach'?(g.native?'Release to detach this document · Esc cancels':'Native editor windows are unavailable'):'Reorder document tab · Esc cancels';
   indicator.style.left=Math.max(6,Math.min((root.innerWidth||800)-280,event.clientX+12))+'px';indicator.style.top=Math.max(6,Math.min((root.innerHeight||600)-42,event.clientY+16))+'px';document.body?.append(indicator);
  }

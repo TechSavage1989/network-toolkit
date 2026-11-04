@@ -12,6 +12,8 @@ func (a *application) handleCredentials(w http.ResponseWriter, r *http.Request) 
 		jsonError(w, http.StatusServiceUnavailable, "The Windows-protected credential vault is unavailable.")
 		return
 	}
+	// A no-master-password vault opens itself before any read or use.
+	a.autoUnlockCredentials(r.Context())
 	if r.Method != http.MethodGet {
 		a.credentialChanges.Lock()
 		defer a.credentialChanges.Unlock()

@@ -32,6 +32,11 @@ const profile=(id,name,host)=>({id,name,type:'ssh',host,port:22,username:'operat
   async function drag(id,target,after,escape=false){const a=await row(id).boundingBox(),b=await row(target).boundingBox();const y=after?b.y+b.height-4:b.y+4;
    await page.mouse.move(a.x+a.width/2,a.y+a.height/2);await page.mouse.down();await page.mouse.move(a.x+a.width/2,a.y+a.height/2+8,{steps:3});await page.mouse.move(b.x+b.width/2,y,{steps:10});
    if(escape)await page.keyboard.press('Escape');await page.mouse.up();await page.waitForTimeout(150);}
+  // Hovering the near half of the next row would not move anything: no drop line until past its middle.
+  {const a=await row('p-edge').boundingBox(),b=await row('p-core').boundingBox();await page.mouse.move(a.x+a.width/2,a.y+a.height/2);await page.mouse.down();await page.mouse.move(a.x+a.width/2,a.y+a.height/2+8,{steps:3});await page.mouse.move(b.x+b.width/2,b.y+3,{steps:6});
+   assert.equal(await page.locator('.session-saved-drop-before,.session-saved-drop-after').count(),0,'no line over the near half of the next row');
+   await page.mouse.move(b.x+b.width/2,b.y+b.height-3,{steps:4});assert.equal(await page.locator('#sessionSavedList [data-session-id="p-core"].session-saved-drop-after').count(),1,'line after the next row once past its middle');
+   await page.keyboard.press('Escape');await page.mouse.up();await page.waitForTimeout(150);assert.deepEqual(await order(),['p-ap','p-edge','p-core']);report.checks.push('Drop line only where the move would change the order');}
   // Drag switch-core above ap-floor2.
   await drag('p-core','p-ap',false);assert.deepEqual(await order(),['p-core','p-ap','p-edge']);
   await page.waitForFunction(()=>state.terminalSavedManualOrder===true);await page.waitForTimeout(400);
