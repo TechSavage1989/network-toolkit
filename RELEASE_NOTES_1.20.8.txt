@@ -1,0 +1,18 @@
+Network Toolkit 1.20.8 Beta 6
+
+## What's New
+
+- The credential vault no longer needs a master password. When you set it up, choose "Set up with master password" or "Set up without master password". Without one, the vault opens automatically for your Windows account.
+- Any master password is allowed. The Windows dialog where you type it now shows a strength gauge that updates as you type.
+- You can switch later: Add master password or Remove master password in Password manager. Saved credentials are kept.
+- Choosing a saved credential in a connection now fills in the username saved with it.
+- Dragging a tab in the Terminal or Text Editor, or a Saved session, now shows the drop line only once the move would change the order.
+
+## Additional Details
+
+- Without a master password, saved credentials are still encrypted, with a random key that only your Windows account can open. Other software running as you, administrators or a compromised Windows may read them, so a master password remains the stronger choice. Lock and forget is available only with a master password.
+- Removing the master password asks for the current one. Adding one also lets you create an offline recovery key. Deleting the vault removes its automatic-unlock key too.
+- The strength gauge is an offline estimate. It never shows or stores your password.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Security confirmations and Windows/UAC approval are unchanged.
+- This is an opt-in beta. Stable users stay on 1.20.2. Portable executable filename remains Network_Toolkit.exe.
+- Validation uses hosted and synthetic fixtures; the native dialog and gauge need the owner's check on Windows.

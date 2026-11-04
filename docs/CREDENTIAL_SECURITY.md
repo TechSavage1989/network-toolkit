@@ -49,9 +49,35 @@ Argon2id (64 MiB, three iterations, one lane, random 16-byte salt) derives the
 password wrapping key. All entries, names, usernames, destination bindings and
 saved secret fields are encrypted together. Only format/KDF/cryptographic framing
 metadata is outside encryption, authenticated against modification. Passwords
-are exact UTF-8 without trimming or normalization: new passwords need at least
-12 Unicode characters and at most 1024 UTF-8 bytes. Expensive KDF parameters,
+are exact UTF-8 without trimming or normalization. Since v1.20.8 any non-empty
+master password of at most 1024 UTF-8 bytes is accepted (owner decision); the
+native dialog shows a live, offline strength gauge (character-pool entropy with
+penalties for repeats, sequences and very common passwords) instead of enforcing
+a minimum. The gauge text never contains the password. Expensive KDF parameters,
 message sizes and concurrent KDF work are bounded before derivation.
+
+## Vault without a master password (v1.20.8)
+
+The owner asked for the master password to be optional. Choosing "Set up without
+master password" (native confirmation with the disclosure below) creates the same
+v2 envelope under a random 256-bit password (43 base64url characters). That
+password is stored only in `Network_Toolkit.credentials.auto`, CurrentUser-DPAPI
+protected, and is used to unlock automatically on the first credential read in
+each app session. **Protection in this mode is the Windows account alone:**
+other software running as the same user, administrators or a compromised OS can
+read saved credentials, as with remembered unlock. Lock and forget is refused in
+this mode because the vault would reopen at once.
+
+Switching is explicit and verified like rotation. "Add master password" opens
+the native new-password dialog (gauge, optional recovery key, Remember option),
+rotates the vault from the stored random password to the new one, then removes
+the automatic-unlock file. "Remove master password" asks for the current master
+password in a native dialog, rotates to a fresh random password and writes the
+automatic-unlock file under the credential guard immediately before the vault
+commit; if the vault write fails, the previous automatic-unlock file (or its
+absence) is restored, so a vault is never left without a usable unlock secret.
+Deleting the vault also deletes the automatic-unlock file. Recovering with an
+offline key switches the vault to the new master password and removes the file.
 
 The user explicitly chose remembered unlock across application restarts and
 Windows reboots after the security tradeoff was explained. The default native

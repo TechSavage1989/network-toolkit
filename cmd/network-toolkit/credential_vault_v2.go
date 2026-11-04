@@ -3,6 +3,8 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -21,6 +23,17 @@ const credentialTransactionFilename = "Network_Toolkit.credentials.lock"
 const credentialConfigIdentityField = "_credentialVaultConfigID"
 const credentialRememberLimit = 64 << 10
 
+// Optional "no master password" mode: the vault keeps its normal Argon2id /
+// AES-256-GCM envelope, but its password is a random 256-bit value stored only
+// in this CurrentUser-DPAPI-protected file and used to unlock automatically.
+const credentialAutoFilename = "Network_Toolkit.credentials.auto"
+const credentialAutoLimit = 16 << 10
+
+type credentialAutoRecord struct {
+	Version  int    `json:"version"`
+	Password []byte `json:"password"`
+}
+
 var errCredentialVaultLocked = errors.New("Unlock the credential vault in the password manager before using saved credentials.")
 
 type credentialVaultStatus struct {
@@ -31,6 +44,7 @@ type credentialVaultStatus struct {
 	LegacyBackup bool   `json:"legacyBackup"`
 	Warning      string `json:"warning,omitempty"`
 	Protection   string `json:"protection"`
+	Mode         string `json:"mode"` // "password" or "windows" (no master password)
 }
 
 type credentialRememberRecord struct {
@@ -61,7 +75,7 @@ func newCredentialVaultWithConfig(settingsPath string, protect, unprotect func([
 		return nil, errors.New("Credential protection is unavailable.")
 	}
 	root := filepath.Dir(settingsPath)
-	v := &credentialVault{path: filepath.Join(root, credentialVaultV2Filename), legacyPath: filepath.Join(root, credentialVaultFilename), rememberPath: filepath.Join(root, credentialRememberFilename), configPath: settingsPath, entries: map[string]credentialRecord{}, protect: protect, unprotect: unprotect, state: "setup-required"}
+	v := &credentialVault{path: filepath.Join(root, credentialVaultV2Filename), legacyPath: filepath.Join(root, credentialVaultFilename), rememberPath: filepath.Join(root, credentialRememberFilename), autoPath: filepath.Join(root, credentialAutoFilename), configPath: settingsPath, entries: map[string]credentialRecord{}, protect: protect, unprotect: unprotect, state: "setup-required"}
 	err := v.loadV2()
 	if err != nil {
 		v.state = "locked"
@@ -278,7 +292,11 @@ func (v *credentialVault) status() credentialVaultStatus {
 		// bound under the cross-process guard. Never expose an unlocked gap.
 		state = "locked"
 	}
-	return credentialVaultStatus{Available: true, State: state, Remembered: v.remembered, HasRecovery: v.envelope != nil && v.envelope.HasRecovery(), LegacyBackup: legacyErr == nil && v.envelope != nil, Warning: v.warning, Protection: "Master password (Argon2id / AES-256-GCM); optional Windows current-user remembered unlock"}
+	mode, protection := "password", "Master password (Argon2id / AES-256-GCM); optional Windows current-user remembered unlock"
+	if v.envelope != nil && v.autoModeLocked() {
+		mode, protection = "windows", "No master password: random vault key (Argon2id / AES-256-GCM) protected by this Windows account (DPAPI) and unlocked automatically"
+	}
+	return credentialVaultStatus{Available: true, State: state, Remembered: v.remembered, HasRecovery: v.envelope != nil && v.envelope.HasRecovery(), LegacyBackup: legacyErr == nil && v.envelope != nil, Warning: v.warning, Protection: protection, Mode: mode}
 }
 
 // Writes are fully prepared in a new private file. Existing targets are checked
@@ -475,6 +493,31 @@ func (v *credentialVault) activate(ctx context.Context, password, payload []byte
 }
 
 func (v *credentialVault) setup(ctx context.Context, password []byte, recovery bool, confirm func(context.Context, string) (bool, error)) error {
+	return v.setupWith(ctx, password, recovery, confirm, nil)
+}
+
+// setupWithoutPassword creates the vault under a random password kept only in
+// the DPAPI-protected automatic-unlock file. That file is written under the
+// same guard immediately before the vault, and restored if the vault write fails.
+func (v *credentialVault) setupWithoutPassword(ctx context.Context) error {
+	password, err := newCredentialAutoPassword()
+	if err != nil {
+		return err
+	}
+	defer clear(password)
+	var restore func()
+	err = v.setupWith(ctx, password, false, nil, func() error {
+		r, e := v.writeAutoGuarded(password)
+		restore = r
+		return e
+	})
+	if err != nil && restore != nil {
+		restore()
+	}
+	return err
+}
+
+func (v *credentialVault) setupWith(ctx context.Context, password []byte, recovery bool, confirm func(context.Context, string) (bool, error), extra func() error) error {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	if v.state != "setup-required" && v.state != "legacy" {
@@ -506,10 +549,16 @@ func (v *credentialVault) setup(ctx context.Context, password []byte, recovery b
 	return v.activate(ctx, password, plain, recovery, confirm, nil, func() error {
 		current, err := readCredentialFile(v.legacyPath, 2<<20)
 		if legacyExpected == nil && errors.Is(err, os.ErrNotExist) {
+			if extra != nil {
+				return extra()
+			}
 			return nil
 		}
 		if err != nil || !bytes.Equal(current, legacyExpected) {
 			return errors.New("Legacy credential storage changed during setup; all existing data was kept.")
+		}
+		if extra != nil {
+			return extra()
 		}
 		return nil
 	})
@@ -552,6 +601,45 @@ func (v *credentialVault) unlock(ctx context.Context, password []byte) error {
 	return nil
 }
 func (v *credentialVault) rotate(ctx context.Context, current, newPassword []byte, recoveryKey string, recovery bool, confirm func(context.Context, string) (bool, error)) error {
+	return v.rotateWith(ctx, current, newPassword, recoveryKey, recovery, confirm, nil)
+}
+
+// removeMasterPassword re-encrypts the vault under a new random password kept
+// only in the DPAPI-protected automatic-unlock file (written immediately
+// before the vault under the guard, restored if the vault write fails).
+func (v *credentialVault) removeMasterPassword(ctx context.Context, current []byte) error {
+	password, err := newCredentialAutoPassword()
+	if err != nil {
+		return err
+	}
+	defer clear(password)
+	var restore func()
+	err = v.rotateWith(ctx, current, password, "", false, nil, func() error {
+		r, e := v.writeAutoGuarded(password)
+		restore = r
+		return e
+	})
+	if err != nil && restore != nil {
+		restore()
+	}
+	return err
+}
+
+// addMasterPassword re-encrypts a no-master-password vault under the user's
+// new master password, then removes the automatic-unlock file.
+func (v *credentialVault) addMasterPassword(ctx context.Context, newPassword []byte, recovery bool, confirm func(context.Context, string) (bool, error)) error {
+	current, err := v.readAutoPassword()
+	if err != nil {
+		return err
+	}
+	defer clear(current)
+	if err := v.rotateWith(ctx, current, newPassword, "", recovery, confirm, nil); err != nil {
+		return err
+	}
+	return v.removeAuto()
+}
+
+func (v *credentialVault) rotateWith(ctx context.Context, current, newPassword []byte, recoveryKey string, recovery bool, confirm func(context.Context, string) (bool, error), beforeCommit func() error) error {
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	raw, err := readCredentialFile(v.path, vaultcrypto.MaxEnvelopeBytes)
@@ -576,7 +664,86 @@ func (v *credentialVault) rotate(ctx context.Context, current, newPassword []byt
 	if _, err := decodeCredentialPayload(payload, 2); err != nil {
 		return err
 	}
-	return v.activate(ctx, newPassword, payload, recovery, confirm, raw, nil)
+	return v.activate(ctx, newPassword, payload, recovery, confirm, raw, beforeCommit)
+}
+
+func newCredentialAutoPassword() ([]byte, error) {
+	random := make([]byte, 32)
+	defer clear(random)
+	if _, err := rand.Read(random); err != nil {
+		return nil, errors.New("A random vault key could not be generated.")
+	}
+	return base64.RawURLEncoding.AppendEncode(nil, random), nil
+}
+
+func (v *credentialVault) autoModeLocked() bool {
+	info, err := os.Lstat(v.autoPath)
+	return err == nil && info.Mode().IsRegular() && !storageIsLink(info)
+}
+
+// readAutoPassword returns the caller-owned random vault password.
+func (v *credentialVault) readAutoPassword() ([]byte, error) {
+	raw, err := readCredentialFile(v.autoPath, credentialAutoLimit)
+	if err != nil {
+		return nil, errors.New("The automatic-unlock key is missing or unreadable. Use the offline recovery key if you created one.")
+	}
+	plain, err := v.unprotect(raw)
+	if err != nil {
+		return nil, errors.New("Windows could not open the automatic-unlock key for this account.")
+	}
+	defer clear(plain)
+	var record credentialAutoRecord
+	if json.Unmarshal(plain, &record) != nil || record.Version != 1 || len(record.Password) < 32 || len(record.Password) > 1024 {
+		clear(record.Password)
+		return nil, errors.New("The automatic-unlock key is invalid.")
+	}
+	return record.Password, nil
+}
+
+// Caller holds the credential guard. The returned restore puts back whatever
+// was there before (or removes the new file) if the following vault write fails.
+func (v *credentialVault) writeAutoGuarded(password []byte) (func(), error) {
+	plain, err := json.Marshal(credentialAutoRecord{Version: 1, Password: password})
+	if err != nil {
+		return nil, err
+	}
+	defer clear(plain)
+	encrypted, err := v.protect(plain)
+	if err != nil {
+		return nil, errors.New("Windows could not protect the automatic-unlock key.")
+	}
+	previous, readErr := readCredentialFile(v.autoPath, credentialAutoLimit)
+	if readErr != nil && !errors.Is(readErr, os.ErrNotExist) {
+		return nil, readErr
+	}
+	if readErr != nil {
+		previous = nil
+	}
+	if err := writeCredentialAtomicGuarded(v.autoPath, encrypted, previous, credentialAutoLimit); err != nil {
+		return nil, err
+	}
+	return func() {
+		if previous == nil {
+			_ = removeCredentialFile(v.autoPath)
+		} else {
+			_ = writeCredentialAtomic(v.autoPath, previous, encrypted, credentialAutoLimit)
+		}
+	}, nil
+}
+
+func (v *credentialVault) removeAuto() error {
+	release, err := acquireCredentialGuard(filepath.Dir(v.autoPath))
+	if err != nil {
+		return err
+	}
+	defer release()
+	if err := removeCredentialFile(v.autoPath); err != nil {
+		v.mu.Lock()
+		v.warning = "The master password was set, but the old automatic-unlock key could not be removed. It no longer unlocks this vault."
+		v.mu.Unlock()
+		return nil
+	}
+	return nil
 }
 func (v *credentialVault) remember(configID string, enabled bool) error {
 	v.mu.Lock()
@@ -655,6 +822,9 @@ func (v *credentialVault) destroy() error {
 	}
 	defer release()
 	if err := removeCredentialFile(v.rememberPath); err != nil {
+		return err
+	}
+	if err := removeCredentialFile(v.autoPath); err != nil {
 		return err
 	}
 	if err := removeCredentialFile(v.path); err != nil {

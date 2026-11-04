@@ -285,7 +285,8 @@ func TestRotationChangesKeysIdentitySaltAndRecovery(t *testing.T) {
 }
 
 func TestPasswordPolicyCountsUnicodeWithoutNormalization(t *testing.T) {
-	for _, password := range [][]byte{nil, []byte("12345678901"), []byte(strings.Repeat("界", 11)), {0xff}, bytes.Repeat([]byte("a"), MaxPasswordBytes+1), []byte(strings.Repeat("界", 342))} {
+	// The owner allows any non-empty master password; the native dialog shows its strength.
+	for _, password := range [][]byte{nil, {}, {0xff}, bytes.Repeat([]byte("a"), MaxPasswordBytes+1), []byte(strings.Repeat("界", 342))} {
 		if !errors.Is(ValidateNewPassword(password), ErrPassword) {
 			t.Fatal("invalid new password accepted")
 		}
@@ -293,7 +294,7 @@ func TestPasswordPolicyCountsUnicodeWithoutNormalization(t *testing.T) {
 			t.Fatal("invalid password created an envelope")
 		}
 	}
-	for _, password := range [][]byte{[]byte("123456789012"), []byte(strings.Repeat("界", 12)), bytes.Repeat([]byte("a"), MaxPasswordBytes), []byte(" 1234567890 ")} {
+	for _, password := range [][]byte{[]byte("a"), []byte("1234"), []byte("12345678901"), []byte(strings.Repeat("界", 11)), []byte("123456789012"), []byte(strings.Repeat("界", 12)), bytes.Repeat([]byte("a"), MaxPasswordBytes), []byte(" 1234567890 ")} {
 		if err := ValidateNewPassword(password); err != nil {
 			t.Fatal("valid new password rejected", err)
 		}

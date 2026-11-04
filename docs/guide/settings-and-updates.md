@@ -5,6 +5,15 @@ Settings currently appear in the main application and in individual tools. The P
 ## Saved data
 Network Toolkit retains preferences, saved profiles, credentials in the credential vault and macros. Updates must preserve all of these and migrate older settings without silently resetting them.
 
+## Password manager and the credential vault
+Open **Password manager** (from a connection's Saved credential field) to store a username together with its password or SSH key. Choosing a saved credential in a connection fills in its username.
+
+When you set up the vault, choose one of two protections:
+- **With a master password.** Any password is allowed. A strength gauge in the Windows dialog shows how hard it is to guess. You can also create an offline recovery key and let Windows remember the unlock.
+- **Without a master password.** The vault opens automatically for your Windows account. Other software running as you, or an administrator, may be able to read saved credentials.
+
+You can switch later: **Add master password** or **Remove master password** in Password manager. Your saved credentials are kept either way.
+
 ## Updates
 Use **Check for updates** for an on-demand check. Stable updates and opt-in beta updates use separate channels. A beta must be explicitly selected. Downloading and installing updates requires user consent and package checksum verification.
 
