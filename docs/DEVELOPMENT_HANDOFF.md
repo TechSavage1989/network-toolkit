@@ -1,4 +1,6 @@
-# v1.20.6 Beta 4 - candidate, NOT PUBLISHED (2026-11-04)
+# v1.20.6 Beta 4 - publication verified (2026-11-04)
+
+Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.20.6 at 2026-11-04T05:26:51Z; stable latest remains v1.20.2. Merged PR #74; tag v1.20.6 points to merge commit fe53c517645f2b3b9b15fb33167c6a7ca2491896. Guarded Release workflow run 41779004449 succeeded. Assets: Network_Toolkit.exe, Network_Toolkit_1.20.6_Portable.zip, Network_Toolkit_1.20.6_Update.zip, SHA256SUMS; asset digests match SHA256SUMS. Checks: full green run 41777429883 on the PR head.
 
 Owner: "my intention was to not have the new tab button at all since there should be the new visual tab addition button." Change: the `btn small primary` New tab button is removed from the Terminal command bar (`renderTerminalWorkspace`); the strip "+" (`data-terminal-action="new"`, same handler and disabled state) is the one New tab control. `#terminalTabs` is now hidden only when empty in a detached single-session window, so an empty main or workspace Terminal shows the strip with just the "+" above the pane's SSH/Telnet/Serial/PowerShell start buttons. Command search keeps "Open a new terminal tab". `terminal-connection-dialog` and `terminal-macros-live` click the strip "+". Release notes, UI guidelines (Tab strips entry), Terminal guide and README `terminal.png` updated; screenshots with tabs and with no tabs reviewed from this session. Owner review on Windows is the acceptance check.
 
