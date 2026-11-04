@@ -68,12 +68,13 @@ function preferences(value={}){
  state.terminalSidebarTab=restricted()?'macros':sidebarTabs.includes(value.terminalSidebarTab)?value.terminalSidebarTab:'saved';
  state.terminalRecentCollapsed=value.terminalRecentCollapsed===true;
  state.terminalSavedCollapsed=value.terminalSavedCollapsed===true;
+ state.terminalSavedManualOrder=value.terminalSavedManualOrder===true;
  state.terminalSessionConfirmDelete=value.terminalSessionConfirmDelete!==false;
  const seen=new Set();
  state.terminalRecent=(Array.isArray(value.terminalRecent)?value.terminalRecent:[]).filter(item=>item&&typeof item==='object'&&typeof item.id==='string'&&typeof item.name==='string').slice(0,50).map(item=>({id:item.id.slice(0,80),name:item.name.slice(0,100),...(typeof item.nameExplicit==='boolean'?{nameExplicit:item.nameExplicit}:{}),nameRevision:root.NetworkToolkitTerminalPromptLabels?.revision(item)||0,lastUsed:Number.isSafeInteger(item.lastUsed)&&item.lastUsed>=0?item.lastUsed:0,...safeTerminalConfig(item)})).filter(item=>{if(!item.id||seen.has(item.id))return false;seen.add(item.id);return true;});
  if(byId('terminalSessionSidebar')){render();notifySidebarChange(before);}
 }
-function displayPreferences(){return {terminalRecent:recent().map(item=>({id:item.id,name:item.name,...(typeof item.nameExplicit==='boolean'?{nameExplicit:item.nameExplicit}:{}),nameRevision:root.NetworkToolkitTerminalPromptLabels?.revision(item)||0,lastUsed:item.lastUsed,...safeTerminalConfig(item)})),terminalSidebarTab:activeTab(),terminalSidebarSide:sidebarSide(),terminalSidebarWidth:safeSidebarWidth(state.terminalSidebarWidth),terminalSidebarCollapsed:state.terminalSidebarCollapsed===true,terminalRecentCollapsed:state.terminalRecentCollapsed===true,terminalSavedCollapsed:state.terminalSavedCollapsed===true,terminalSessionConfirmDelete:state.terminalSessionConfirmDelete!==false};}
+function displayPreferences(){return {terminalRecent:recent().map(item=>({id:item.id,name:item.name,...(typeof item.nameExplicit==='boolean'?{nameExplicit:item.nameExplicit}:{}),nameRevision:root.NetworkToolkitTerminalPromptLabels?.revision(item)||0,lastUsed:item.lastUsed,...safeTerminalConfig(item)})),terminalSidebarTab:activeTab(),terminalSidebarSide:sidebarSide(),terminalSidebarWidth:safeSidebarWidth(state.terminalSidebarWidth),terminalSidebarCollapsed:state.terminalSidebarCollapsed===true,terminalRecentCollapsed:state.terminalRecentCollapsed===true,terminalSavedCollapsed:state.terminalSavedCollapsed===true,terminalSavedManualOrder:state.terminalSavedManualOrder===true,terminalSessionConfirmDelete:state.terminalSessionConfirmDelete!==false};}
 function record(entry,name=''){
  if(!entry?.info?.id)return;
  const config=safeTerminalConfig(entry.config||entry.info);
@@ -147,13 +148,22 @@ function render(){
   if(area)area.hidden=collapsed;
   const count=byId('session'+title+'Count');if(count)count.textContent=String(items.length+(kind==='saved'?transferItems(kind).length:0));
   if(!area)continue;
-  const rows=kind==='saved'?items.slice().sort((a,b)=>a.name.localeCompare(b.name)):items;
+  const rows=kind==='saved'?savedOrder():items;
   const filtered=rows.filter(item=>(kind!=='saved'||folders.matches(item,savedFolder))&&(item.name+' '+(root.NetworkToolkitTerminalPromptLabels?.title(item)||'')+' '+(kind==='saved'?item.folder||'':'')+' '+description(item)).toLocaleLowerCase().includes(query));
   const transferHTML=transferRowsHTML(kind,query,kind==='saved'?savedFolder:'');
   const html=(filtered.map(item=>rowHTML(kind,item)).join('')||(!transferHTML?'<p class="session-library-empty">'+(query||kind==='saved'&&savedFolder?'No matching sessions.':kind==='recent'?'SSH connections you open appear here.':'Save a connection to open it here.')+'</p>':''))+transferHTML;
   if(area._sessionHTML!==html){area.innerHTML=html;area._sessionHTML=html;}
  }
  const clear=sidebar.querySelector('[data-session-action="clear-recent"]');if(clear)clear.disabled=!recent().length;
+}
+// Saved sessions are listed by name until the user drags one; from then on the
+// stored order of terminalProfiles is the display order (new saves go first).
+function savedOrder(){return state.terminalSavedManualOrder===true?profiles().slice():profiles().slice().sort((a,b)=>a.name.localeCompare(b.name));}
+function moveSaved(id,targetId,after){
+ if(!id||id===targetId)return false;const order=savedOrder(),from=order.findIndex(item=>item.id===id),to=order.findIndex(item=>item.id===targetId);
+ if(from<0||to<0)return false;const [item]=order.splice(from,1);order.splice(order.findIndex(x=>x.id===targetId)+(after?1:0),0,item);
+ if(order.every((x,i)=>x.id===savedOrder()[i]?.id)&&state.terminalSavedManualOrder===true)return false;
+ state.terminalProfiles=order;state.terminalSavedManualOrder=true;changed();return true;
 }
 function changed(){saveState();render();renderTerminalProfiles();renderTerminalChrome();if(typeof terminalProfileListConfig==='function'&&typeof dataListViews!=='undefined'){const config=terminalProfileListConfig();dataListViews.set(config.id,config);refreshDataList(config.id);}}
 function closeMenu(focus=false){const old=menuTarget;menu?.remove();menu=null;menuTarget=null;if(focus&&itemFor(old))document.querySelector('[data-session-kind="'+old.kind+'"][data-session-id="'+CSS.escape(old.id)+'"] [data-session-entry]')?.focus({preventScroll:true});}
@@ -309,7 +319,21 @@ document.addEventListener('submit',event=>{
 document.addEventListener('input',event=>{if(event.target.id==='sessionLibrarySearch')render();});
 document.addEventListener('change',event=>{if(event.target.id==='sessionLibraryFolder'){savedFolder=event.target.value;closeMenu();render();return;}if(event.target.id==='sessionConfirmDelete'){state.terminalSessionConfirmDelete=event.target.checked;saveState();}});
 document.addEventListener('pointerdown',event=>{if(menu&&!menu.contains(event.target))closeMenu();if(event.target.id==='terminalSidebarDivider')resizeSidebar(event);},true);
+// Drag a Saved row onto another to reorder (pointer gesture, 6 px threshold so
+// clicks, double-click to open and right-click menus are unchanged). Escape
+// cancels. Alt+Shift+Up/Down moves a focused Saved row by one.
+let savedDrag=null,suppressSavedClick=0;
+function savedDropTarget(y,x){const row=document.elementFromPoint?.(x,y)?.closest?.('[data-session-kind="saved"][data-session-id]');if(!row||row.dataset.sessionId===savedDrag?.id)return null;const r=row.getBoundingClientRect();return {row,id:row.dataset.sessionId,after:y>r.top+r.height/2};}
+function clearSavedDrop(){for(const el of document.querySelectorAll('.session-saved-drop-before,.session-saved-drop-after'))el.classList.remove('session-saved-drop-before','session-saved-drop-after');document.querySelector('.session-saved-dragging')?.classList.remove('session-saved-dragging');}
+function endSavedDrag(apply){const drag=savedDrag;savedDrag=null;clearSavedDrop();if(!drag?.moved)return;suppressSavedClick=Date.now()+400;if(apply&&drag.drop)moveSaved(drag.id,drag.drop.id,drag.drop.after);}
+document.addEventListener('pointerdown',event=>{const entry=event.target.closest?.('[data-session-kind="saved"][data-session-id] [data-session-entry]');if(!entry||event.button!==0||event.isPrimary===false||event.pointerType==='touch'||event.ctrlKey||event.metaKey||event.altKey||event.shiftKey)return;const row=entry.closest('[data-session-id]');savedDrag={id:row.dataset.sessionId,pointer:event.pointerId,x:event.clientX,y:event.clientY,moved:false,drop:null,row};},true);
+document.addEventListener('pointermove',event=>{if(!savedDrag||event.pointerId!==savedDrag.pointer)return;if(!savedDrag.moved){if(Math.hypot(event.clientX-savedDrag.x,event.clientY-savedDrag.y)<6)return;savedDrag.moved=true;try{savedDrag.row.setPointerCapture?.(event.pointerId);}catch{}savedDrag.row.classList.add('session-saved-dragging');}event.preventDefault();clearSavedDrop();savedDrag.row.classList.add('session-saved-dragging');savedDrag.drop=savedDropTarget(event.clientY,event.clientX);savedDrag.drop?.row.classList.add(savedDrag.drop.after?'session-saved-drop-after':'session-saved-drop-before');},true);
+document.addEventListener('pointerup',event=>{if(savedDrag&&event.pointerId===savedDrag.pointer)endSavedDrag(true);},true);
+document.addEventListener('pointercancel',event=>{if(savedDrag&&event.pointerId===savedDrag.pointer)endSavedDrag(false);},true);
+document.addEventListener('click',event=>{if(Date.now()<suppressSavedClick&&event.target.closest?.('[data-session-kind="saved"]')){event.preventDefault();event.stopImmediatePropagation();suppressSavedClick=0;}},true);
 document.addEventListener('keydown',event=>{
+ if(event.key==='Escape'&&savedDrag?.moved){event.preventDefault();event.stopImmediatePropagation();endSavedDrag(false);return;}
+ if(event.altKey&&event.shiftKey&&!event.ctrlKey&&['ArrowUp','ArrowDown'].includes(event.key)){const row=event.target.closest?.('[data-session-kind="saved"][data-session-id]');if(row){event.preventDefault();event.stopImmediatePropagation();const order=savedOrder().filter(item=>document.querySelector('[data-session-kind="saved"][data-session-id="'+CSS.escape(item.id)+'"]')),at=order.findIndex(item=>item.id===row.dataset.sessionId),next=order[at+(event.key==='ArrowUp'?-1:1)];if(next&&moveSaved(row.dataset.sessionId,next.id,event.key==='ArrowDown'))document.querySelector('[data-session-kind="saved"][data-session-id="'+CSS.escape(row.dataset.sessionId)+'"] [data-session-entry]')?.focus({preventScroll:true});return;}}
  if(event.target.id==='terminalSidebarDivider'&&['Enter',' ','ArrowLeft','ArrowRight','Home','End'].includes(event.key)){
   event.preventDefault();event.stopImmediatePropagation();
   if(event.key==='Enter'||event.key===' '){setCollapsed(!state.terminalSidebarCollapsed);return;}

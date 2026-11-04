@@ -1109,6 +1109,11 @@ jobs:
           path: ${{ runner.temp }}/ntk-terminal-click116-results
           if-no-files-found: error
           retention-days: 14
+      - name: Check Saved session reordering by drag and keyboard
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-security-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-saved-order-results
+        run: node scripts/session-saved-order.browser.cjs
       - name: Check credential UI boundaries with synthetic fixtures
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-security-browser-tests/node_modules/playwright

@@ -271,3 +271,18 @@ test('Reconnect all and Disconnect all cannot overlap or interleave with Close a
  assert.deepEqual(h.calls.filter(x=>x[0]==='reconnect').map(x=>x[1]),['one','two']);
  assert.deepEqual(h.calls.filter(x=>x[0]==='disconnect').map(x=>x[1]),['one','two']);
 });
+test('standard local shells offer Open as administrator in a new tab; other tabs do not show it',async()=>{
+ const h=harness(),shell=h.entries.get('one'),ssh=h.entries.get('two');
+ shell.info.type='powershell';shell.config={type:'powershell',workingDirectory:'D:\\Work',runAsAdministrator:false};ssh.info.type='ssh';
+ const calls=[];Object.assign(h.context,{DETACHED_TERMINAL:false,DETACHED_WORKSPACE:false,terminalConnectBusy:false,terminalWorkspaceTransferBusy:false,
+  safeTerminalConfig:c=>({...c}),newTerminalTab:()=>calls.push(['new-tab']),openTerminalConnect:c=>calls.push(['dialog',c]),connectTerminal:async()=>calls.push(['connect'])});
+ const menuFor=id=>{h.document.emit('contextmenu',h.document.querySelector('[data-terminal-tab="'+id+'"]'),{clientX:10,clientY:10});return h.document.querySelector('#terminalTabContextMenu');};
+ assert(menuFor('one').querySelector('[data-terminal-tab-action="run-as-admin"]'),'local shell offers the action');h.api.close();
+ assert.equal(menuFor('two').querySelector('[data-terminal-tab-action="run-as-admin"]'),null,'SSH tab does not show it');h.api.close();
+ assert.equal(h.api.enabled('run-as-admin',h.api.token('one')),true);
+ await h.api.run('run-as-admin',h.api.token('one'));
+ assert.deepEqual(calls.map(c=>c[0]),['new-tab','dialog','connect'],'a new tab connects through the normal dialog and approval path');
+ assert.equal(calls[1][1].runAsAdministrator,true);assert.equal(calls[1][1].type,'powershell');assert.equal(calls[1][1].workingDirectory,'D:\\Work');
+ assert(h.entries.has('one'),'the original tab is kept');
+ shell.info.elevated=true;assert.equal(h.api.adminCandidate(shell),false,'an elevated shell does not offer it again');
+});

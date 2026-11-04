@@ -275,8 +275,14 @@ test('Disconnect split group sits immediately beside Reconnect and exposes a sep
  h.c.window.NetworkToolkitTerminalTabs={disconnectAllAvailable:()=>true,reconnectAllAvailable:()=>true,reconnectAllBusy:()=>false,windowBulkBusy:()=>false,setDisconnectOptions:()=>{closed++;}};
  h.api.sync();
  assert.equal(arrow.disabled,false);assert.equal(secondary.disabled,false);
+ const closeAll=disconnect.querySelector('#terminalDisconnectOptions [data-terminal-action="close-all"]');
+ assert(closeAll,'Disconnect menu offers Close all tabs');assert.equal(closeAll.textContent,'Close all tabs');
  h.c.window.NetworkToolkitTerminalTabs.disconnectAllAvailable=()=>false;
  h.api.sync();
- assert.equal(arrow.disabled,true);assert.equal(secondary.disabled,true);assert.equal(closed,1);
+ assert.equal(arrow.disabled,true);assert.equal(secondary.disabled,true);assert.equal(closeAll.disabled,true);assert.equal(closed,1);
+ // Only disconnected tabs left: Close all stays reachable through the arrow.
+ h.c.window.NetworkToolkitTerminalTabs.closeAllAvailable=()=>true;
+ h.api.sync();
+ assert.equal(arrow.disabled,false);assert.equal(secondary.disabled,true);assert.equal(closeAll.disabled,false);
  h.dispose();
 });

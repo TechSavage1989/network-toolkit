@@ -1,3 +1,7 @@
+## 1.20.7 Beta 5 - Saved reordering, administrator tab, Close all, drive letters (candidate)
+
+- Owner requests. Saved sessions reorder by drag and drop or Alt+Shift+Up/Down (name order until the first move, then the stored `terminalProfiles` order; new `terminalSavedManualOrder` flag whitelisted with the other Terminal sidebar flags). Standard local Command Prompt and PowerShell tabs offer "Open as administrator in a new tab" (same shell and starting folder, `runAsAdministrator`, normal dialog and Windows prompt; original tab kept). The Disconnect menu adds Close all tabs. Starting directory drive buttons show the drive letter ("D: Data HDD"). New `session-saved-order.browser.cjs` in Checks; unit tests for drive labels, the admin action and the Disconnect menu.
+
 ## 1.20.6 Beta 4 - Strip "+" is the only New tab control (published 2026-11-04)
 
 - Owner clarification after 1.20.5: the command bar's New tab button was not meant to stay once the tab strip had its own "+". The button is removed from the Terminal command bar; the strip stays visible with just the "+" when no tab is open (a detached single-session window still hides an empty strip). Command search keeps "Open a new terminal tab"; empty panes keep their SSH/Telnet/Serial/PowerShell start buttons. Tests click the strip "+"; guidelines, guide and README Terminal screenshot updated.

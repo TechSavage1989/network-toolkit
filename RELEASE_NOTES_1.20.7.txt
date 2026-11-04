@@ -1,0 +1,17 @@
+Network Toolkit 1.20.7 Beta 5
+
+## What's New
+
+- Drag a Saved session up or down to reorder the Saved list. Your order is kept. Until you move one, Saved stays sorted by name.
+- A Command Prompt or PowerShell tab can be opened as administrator after it has started: choose "Open as administrator in a new tab" from the tab's "⋯" menu. Windows asks for approval, and the original tab stays open.
+- The Disconnect menu in the Terminal now has Close all tabs next to Disconnect all.
+- The drive buttons under Starting directory in a new Command Prompt or PowerShell connection now show the drive letter, for example "D: Data HDD".
+
+## Additional Details
+
+- Reordering also works from the keyboard: focus a Saved session and press Alt+Shift+Up or Alt+Shift+Down. Press Escape during a drag to cancel. Clicking, double-clicking to open and right-click menus are unchanged.
+- Windows cannot raise a shell that is already running to administrator, so the elevated shell is a new tab with the same shell type and starting folder. Cancelling the Windows prompt leaves the new tab unconnected and changes nothing else.
+- Close all tabs uses the existing Close all confirmation and its Do not ask again setting, and is available even when every session is already disconnected.
+- Nothing about what is sent or saved changes beyond the Saved order. Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Security confirmations and Windows/UAC approval are unchanged.
+- This is an opt-in beta. Stable users stay on 1.20.2. Portable executable filename remains Network_Toolkit.exe.
+- Validation uses hosted and synthetic fixtures; the owner's review on Windows is the acceptance check.
