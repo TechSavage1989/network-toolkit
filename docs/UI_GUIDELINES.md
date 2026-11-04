@@ -1,6 +1,6 @@
 # Network Toolkit UI Guidelines
 
-**Status:** Adopted with the v1.19.0 stable release (2026-11-02), updated for the owner-approved v1.19.1 consolidation and the owner-requested 1.19.x changes. It describes the layout, components and wording as they ship in v1.20.8. The layout is frozen (see [Layout freeze](#layout-freeze)).
+**Status:** Adopted with the v1.19.0 stable release (2026-11-02), updated for the owner-approved v1.19.1 consolidation and the owner-requested 1.19.x changes. It describes the layout, components and wording as they ship in v1.20.9. The layout is frozen (see [Layout freeze](#layout-freeze)).
 
 **Authority:** [UX Polish Plan](UX_POLISH_PLAN.md). Sources of truth in code: `web/assets/ux-foundations.css` (tokens), the `:root` and `[data-theme="light"]` blocks in `web/index.html` (colors), `renderNavigation()` in `web/index.html` (navigation), and `web/assets/ux-command-palette.js` (shortcuts).
 
