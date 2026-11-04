@@ -1,4 +1,6 @@
-# v1.20.9 Beta 7 - candidate, NOT PUBLISHED (2026-11-04)
+# v1.20.9 Beta 7 - publication verified (2026-11-04)
+
+Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.20.9 at 2026-11-04T07:21:57Z; stable latest remains v1.20.2. Merged PR #80; tag v1.20.9 points to merge commit 1edf61527d1c9adfa26a8daea87006f3be7376c1. Release workflow run 41791456377 succeeded. Assets: Network_Toolkit.exe, Network_Toolkit_1.20.9_Portable.zip, Network_Toolkit_1.20.9_Update.zip, SHA256SUMS; asset digests match SHA256SUMS. Checks: full green run 41789524590 on the PR head; the other run on the same commit (41789521358) failed only browser-editor112 at the known editor-views112 intermittent ("Timed out: detached waitForFunction ... nt-editor-files-resize" focus), unrelated to this change and passing in the green run.
 
 Owner: "allow the Test a target tool tabs, and test a website tool tabs to be moveable for customization. also make the dashboard customizable."
 - Test tabs: `orderedTestTabs(group,members)` in `index.html` applies `state.testTabOrder.{target,web}` (unknown or new tests appended). `ux-customize.js` adds pointer drag (6 px threshold, mouse/pen only, drop line only where the order changes, Escape cancels, trailing click suppressed so a drag never navigates) and Alt+Shift+Left/Right; it moves the button in place and saves the group order.
