@@ -1,4 +1,4 @@
-## 1.20.11 Beta 9 - Drag Overview sections, restart a tab as administrator (candidate)
+## 1.20.11 Beta 9 - Drag Overview sections, restart a tab as administrator (published 2026-11-04)
 
 - Owner requests: Overview sections drag by a grip handle on their top edge (same drop-line rule as tabs, Escape cancels, Alt+Shift+Up/Down on the handle) and save to `state.overviewLayout.order`, restored at startup. New tab menu action `convert-admin` ("Restart this tab as administrator…") for standard local cmd/PowerShell tabs: confirms, starts the elevated copy, and only once it is connected moves it into the original's pane and tab position and closes the original; declined approval or failed start leaves the original untouched.
 
