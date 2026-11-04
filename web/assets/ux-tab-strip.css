@@ -70,6 +70,8 @@
   background:transparent;color:var(--accent);font-size:18px;line-height:1;cursor:pointer;
   transition:background-color .14s ease,border-color .14s ease;
 }
+/* A detached single-session window cannot open tabs; its command bar hides New tab and the strip hides "+". */
+.terminal-detached:not(.terminal-workspace-detached) .terminal-tabs>.terminal-add{display:none}
 .terminal-tabs>.terminal-add:hover,.nt-editor-new-tab:hover{background:var(--accentBg);border-style:solid;border-color:var(--accent)}
 .terminal-tabs>.terminal-add:focus-visible,.nt-editor-new-tab:focus-visible{outline:2px solid var(--ux-focus);outline-offset:-2px}
 .terminal-tabs>.terminal-add svg,.nt-editor-new-tab svg{width:15px;height:15px;display:block}

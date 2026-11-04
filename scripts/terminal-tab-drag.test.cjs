@@ -31,3 +31,13 @@ test('unchanged output refresh preserves captured tab DOM rather than moving row
  root.NetworkToolkitTerminalTabDrag.setOrder(['b','a']);assert.deepEqual(bar.children,[rows[1],rows[0]]);assert.equal(moves,2);
  for(let n=0;n<100;n++)root.NetworkToolkitTerminalTabDrag.syncOrder();assert.equal(moves,2,'settled new order remains stable');
 });
+
+test('new-tab button at the end of the strip never shifts row ordering or moves captured rows',()=>{
+ const vm=require('node:vm'),fs=require('node:fs');let moves=0;const rows=['a','b','c'].map(id=>({querySelector:()=>({dataset:{terminalTab:id}})})),add={className:'terminal-add',querySelector:()=>null};
+ const bar={children:[...rows,add],append(row){moves++;this.children=this.children.filter(item=>item!==row);this.children.push(row);},setAttribute(){}};
+ const root={document:{querySelector:()=>bar,addEventListener(){}},addEventListener(){}};
+ vm.runInNewContext(fs.readFileSync(require.resolve('../web/assets/terminal-tab-drag.js'),'utf8'),{window:root});
+ for(let n=0;n<100;n++)root.NetworkToolkitTerminalTabDrag.syncOrder();assert.equal(moves,0,'a trailing "+" button must not make every refresh re-append the rows');
+ root.NetworkToolkitTerminalDrag=undefined;root.NetworkToolkitTerminalTabDrag.setOrder(['b','c','a']);assert.deepEqual(bar.children,[rows[1],rows[2],rows[0],add],'rows reorder and the "+" stays last');
+ const settled=moves;for(let n=0;n<100;n++)root.NetworkToolkitTerminalTabDrag.syncOrder();assert.equal(moves,settled,'settled order with the "+" last remains stable');
+});
