@@ -1,0 +1,13 @@
+Network Toolkit 1.20.10 Beta 8
+
+## What's New
+
+- The order you give the Test a target and Test a website tabs is now kept when you restart the app. Your Overview layout is kept too.
+- Test a target tabs now start in this order: Monitor, Ping, Trace route, DNS, Ports, Device check, Details.
+
+## Additional Details
+
+- In 1.20.9 the order and layout were saved but not read back when the app started, so they reset on every restart.
+- If you had already rearranged the tabs, you may need to do it once more after updating.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Security confirmations and Windows/UAC approval are unchanged.
+- This is an opt-in beta. Stable users stay on 1.20.2. Portable executable filename remains Network_Toolkit.exe.

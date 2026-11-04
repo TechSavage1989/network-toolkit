@@ -1,6 +1,6 @@
 # Network Toolkit UI Guidelines
 
-**Status:** Adopted with the v1.19.0 stable release (2026-11-02), updated for the owner-approved v1.19.1 consolidation and the owner-requested 1.19.x changes. It describes the layout, components and wording as they ship in v1.20.9. The layout is frozen (see [Layout freeze](#layout-freeze)).
+**Status:** Adopted with the v1.19.0 stable release (2026-11-02), updated for the owner-approved v1.19.1 consolidation and the owner-requested 1.19.x changes. It describes the layout, components and wording as they ship in v1.20.10. The layout is frozen (see [Layout freeze](#layout-freeze)).
 
 **Authority:** [UX Polish Plan](UX_POLISH_PLAN.md). Sources of truth in code: `web/assets/ux-foundations.css` (tokens), the `:root` and `[data-theme="light"]` blocks in `web/index.html` (colors), `renderNavigation()` in `web/index.html` (navigation), and `web/assets/ux-command-palette.js` (shortcuts).
 
@@ -52,7 +52,8 @@ Top to bottom, a tool page has:
 Member tabs:
 - Test a target and Test a website tabs show a status dot for the current target: green finished, yellow running, red failed, faint not yet run. Switching tabs never starts anything.
 - Tab labels may be short (DNS, Ports, Monitor, Details); the tooltip and command search use the full tool name.
-- Test a target and Test a website tabs can be reordered by dragging (drop line only where the order would change) or Alt+Shift+Left/Right; each group keeps its own saved order.
+- Test a target tabs default to Monitor, Ping, Trace route, DNS, Ports, Device check, Details (owner order, v1.20.10).
+- Test a target and Test a website tabs can be reordered by dragging (drop line only where the order would change) or Alt+Shift+Left/Right; each group keeps its own saved order, restored when the app restarts.
 - Test tabs stay on one row. When space runs out they scroll sideways, and they stay visible in short windows where the rest of the page heading is hidden.
 - File Transfer protocol buttons carry a tooltip with the protocol's security (SFTP encrypted over SSH; FTPS encrypted, FTP not; TFTP has no encryption or login).
 

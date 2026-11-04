@@ -1,3 +1,11 @@
+# v1.20.10 Beta 8 - candidate, NOT PUBLISHED (2026-11-04)
+
+Owner: "the positions must save between runs. right now they reset when the app is restarted. also by default make Monitor first, then ping, then Trace Route, then DNS, the Ports, Device check, Details."
+Cause: v1.20.9 saved `state.testTabOrder` and `state.overviewLayout` through `/api/state` (the server keeps them; new Go test) but `mergeState` copies saved keys one by one and had no entry for them, so both were dropped at startup. The browser test had only checked saving, not a reload. Fix: `mergeState` restores both (filtered to known tests/sections, de-duplicated). `TEST_TAB_DEFAULT_ORDER.target` = monitor, ping, trace, dns, tcp, quick, identify; `orderedTestTabs` applies it before any saved order. `customize-layout.browser.cjs` now reloads from saved state and asserts the order and a dashboard layout come back (10 checks).
+Tests: node (1582), Go state test, browser customize-layout, ux-phase6, connect-sidebar118.
+
+---
+
 # v1.20.9 Beta 7 - publication verified (2026-11-04)
 
 Owner check on Windows: "the test tabs drag now" (Test a target / Test a website tab reordering works in v1.20.9). The Overview Customize dialog was not separately reported.
