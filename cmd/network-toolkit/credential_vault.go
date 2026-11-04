@@ -47,6 +47,7 @@ type credentialVault struct {
 	path         string
 	legacyPath   string
 	rememberPath string
+	autoPath     string
 	configPath   string
 	configID     string
 	entries      map[string]credentialRecord

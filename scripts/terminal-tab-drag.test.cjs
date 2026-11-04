@@ -41,3 +41,15 @@ test('new-tab button at the end of the strip never shifts row ordering or moves 
  root.NetworkToolkitTerminalDrag=undefined;root.NetworkToolkitTerminalTabDrag.setOrder(['b','c','a']);assert.deepEqual(bar.children,[rows[1],rows[2],rows[0],add],'rows reorder and the "+" stays last');
  const settled=moves;for(let n=0;n<100;n++)root.NetworkToolkitTerminalTabDrag.syncOrder();assert.equal(moves,settled,'settled order with the "+" last remains stable');
 });
+test('drop line appears only when releasing would change the order',()=>{
+ const vm=require('node:vm'),fs=require('node:fs');const ids=['a','b','c'];
+ const root={document:{querySelectorAll:()=>ids.map(id=>({dataset:{terminalTab:id}})),querySelector:()=>null,addEventListener(){}},addEventListener(){}};
+ vm.runInNewContext(fs.readFileSync(require.resolve('../web/assets/terminal-tab-drag.js'),'utf8'),{window:root});
+ const same=root.NetworkToolkitTerminalTabDrag.unchangedDrop;
+ assert.equal(same('a',{id:'a',after:true}),true,'over itself');
+ assert.equal(same('a',{id:'b',after:false}),true,'near (left) half of the next tab');
+ assert.equal(same('a',{id:'b',after:true}),false,'past the middle of the next tab');
+ assert.equal(same('c',{id:'b',after:true}),true,'near (right) half of the previous tab');
+ assert.equal(same('c',{id:'b',after:false}),false,'past the middle of the previous tab');
+ assert.equal(same('a',{id:'c',after:false}),false,'two tabs away');
+});

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -18,6 +19,7 @@ func (a *application) handleCredentialVault(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	if r.Method == http.MethodGet {
+		a.autoUnlockCredentials(r.Context())
 		jsonResponse(w, http.StatusOK, a.credentials.status())
 		return
 	}
@@ -53,7 +55,11 @@ func (a *application) handleCredentialVault(w http.ResponseWriter, r *http.Reque
 	}
 	var err error
 	switch request.Action {
-	case "setup", "unlock", "change-password", "recover":
+	case "setup", "unlock", "change-password", "recover", "set-password", "remove-password":
+		status := a.credentials.status()
+		if request.Action == "change-password" && status.Mode == "windows" {
+			request.Action = "set-password" // No current password exists to change.
+		}
 		mode := desktop.VaultSecretSetup
 		switch request.Action {
 		case "unlock":
@@ -62,8 +68,19 @@ func (a *application) handleCredentialVault(w http.ResponseWriter, r *http.Reque
 			mode = desktop.VaultSecretRotate
 		case "recover":
 			mode = desktop.VaultSecretRecover
+		case "set-password":
+			mode = desktop.VaultSecretSetPassword
+		case "remove-password":
+			mode = desktop.VaultSecretRemovePassword
 		}
-		status := a.credentials.status()
+		if request.Action == "set-password" && status.Mode != "windows" {
+			jsonError(w, 409, "This vault already uses a master password. Use Change master password.")
+			return
+		}
+		if request.Action == "remove-password" && (status.Mode != "password" || status.State != "unlocked") {
+			jsonError(w, 409, "Unlock the master-password vault before removing its master password.")
+			return
+		}
 		if request.Action == "setup" && status.State != "setup-required" && status.State != "legacy" {
 			jsonError(w, 409, "The vault is already configured. Unlock or recover it instead.")
 			return
@@ -95,6 +112,10 @@ func (a *application) handleCredentialVault(w http.ResponseWriter, r *http.Reque
 			err = a.credentials.unlock(r.Context(), response.Password)
 		case "change-password":
 			err = a.credentials.rotate(r.Context(), response.CurrentPassword, response.Password, "", response.GenerateRecovery, a.confirmVaultRecovery)
+		case "set-password":
+			err = a.credentials.addMasterPassword(r.Context(), response.Password, response.GenerateRecovery, a.confirmVaultRecovery)
+		case "remove-password":
+			err = a.credentials.removeMasterPassword(r.Context(), response.Password)
 		case "recover":
 			if len(response.RecoveryKey) == 0 {
 				err = errors.New("Enter the offline recovery key in the native dialog.")
@@ -105,9 +126,14 @@ func (a *application) handleCredentialVault(w http.ResponseWriter, r *http.Reque
 		if err == nil {
 			// Only a completed native authentication/setup may establish a new app
 			// configuration identity or re-enable remembered unlock after reset.
+			if request.Action == "recover" && a.credentials.status().Mode == "windows" {
+				// A recovered vault now uses the new master password.
+				_ = a.credentials.removeAuto()
+			}
 			configID, configErr := a.ensureCredentialConfigIdentity()
 			if configErr == nil {
-				configErr = a.credentials.remember(configID, response.Remember)
+				// Without a master password, unlock is automatic; no remembered key is needed.
+				configErr = a.credentials.remember(configID, response.Remember && request.Action != "remove-password")
 			}
 			if configErr != nil {
 				// Never retain an unbound key after a config/remember failure.
@@ -119,7 +145,29 @@ func (a *application) handleCredentialVault(w http.ResponseWriter, r *http.Reque
 				a.credentials.mu.Unlock()
 			}
 		}
+	case "setup-windows":
+		status := a.credentials.status()
+		if status.State != "setup-required" && status.State != "legacy" {
+			jsonError(w, 409, "The vault is already configured.")
+			return
+		}
+		if a.confirmVaultAction == nil {
+			jsonError(w, 503, "Native vault confirmation is unavailable.")
+			return
+		}
+		approved, confirmErr := a.confirmVaultAction(r.Context(), desktop.VaultActionRequest{Action: desktop.VaultActionNoPassword})
+		if confirmErr != nil || !approved {
+			jsonError(w, 400, "Vault setup was canceled; nothing was changed.")
+			return
+		}
+		if err = a.credentials.setupWithoutPassword(r.Context()); err == nil {
+			err = a.bindCredentialUnlock()
+		}
 	case "lock", "forget", "delete-vault", "cleanup-legacy":
+		if (request.Action == "lock" || request.Action == "forget") && a.credentials.status().Mode == "windows" {
+			jsonError(w, 409, "This vault has no master password and unlocks automatically. Add a master password to be able to lock it.")
+			return
+		}
 		action := desktop.VaultActionLock
 		switch request.Action {
 		case "forget":
@@ -177,7 +225,51 @@ func (a *application) handleCredentialVault(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	status := a.credentials.status()
-	jsonResponse(w, 200, map[string]any{"ok": true, "available": status.Available, "state": status.State, "remembered": status.Remembered, "hasRecovery": status.HasRecovery, "legacyBackup": status.LegacyBackup, "warning": status.Warning, "protection": status.Protection})
+	jsonResponse(w, 200, map[string]any{"ok": true, "available": status.Available, "state": status.State, "remembered": status.Remembered, "hasRecovery": status.HasRecovery, "legacyBackup": status.LegacyBackup, "warning": status.Warning, "protection": status.Protection, "mode": status.Mode})
+}
+
+// bindCredentialUnlock completes an automatic (no-master-password) unlock:
+// the pending key is bound to this configuration without a remembered record.
+func (a *application) bindCredentialUnlock() error {
+	configID, err := a.ensureCredentialConfigIdentity()
+	if err == nil {
+		err = a.credentials.remember(configID, false)
+	}
+	if err != nil {
+		a.credentials.mu.Lock()
+		a.credentials.clearMaterialLocked()
+		a.credentials.warning = "The vault was kept, but automatic unlock could not be completed. Reopen the app; if it persists, check app-data access."
+		a.credentials.mu.Unlock()
+	}
+	return err
+}
+
+// autoUnlockCredentials opens a no-master-password vault with its
+// Windows-account-protected key. It never prompts and never blocks on another
+// credential operation; failures leave the vault locked with a warning.
+func (a *application) autoUnlockCredentials(ctx context.Context) {
+	if a.credentials == nil {
+		return
+	}
+	if status := a.credentials.status(); status.State != "locked" || status.Mode != "windows" {
+		return
+	}
+	if !a.credentialChanges.TryLock() {
+		return
+	}
+	defer a.credentialChanges.Unlock()
+	password, err := a.credentials.readAutoPassword()
+	if err == nil {
+		err = a.credentials.unlock(ctx, password)
+		clear(password)
+	}
+	if err != nil {
+		a.credentials.mu.Lock()
+		a.credentials.warning = "Automatic unlock failed: " + err.Error()
+		a.credentials.mu.Unlock()
+		return
+	}
+	_ = a.bindCredentialUnlock()
 }
 
 // The field is backend-owned. Incoming renderer state never chooses or replaces

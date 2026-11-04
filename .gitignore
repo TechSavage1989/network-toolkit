@@ -16,3 +16,7 @@ SHA256SUMS.txt
 /public-dist/
 
 /previous-release/
+
+# Local go build output of cmd/network-toolkit (never commit binaries).
+/network-toolkit
+/network-toolkit.exe

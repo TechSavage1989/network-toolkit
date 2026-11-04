@@ -1,3 +1,15 @@
+# v1.20.8 Beta 6 - candidate, NOT PUBLISHED (2026-11-04)
+
+Owner: "The credential store should be configurable to either be locked behind a master password, or not. also the password manager should allow any password, but show a visual gauge for how secure the master password is. also the credential manager should also allow for saving username with password." and "when moving tabs in terminal, text editor, save session list, it should [show] a move indicator only once you've moved the tab past the next one".
+- Optional master password: `credential_vault_v2.go` adds `setupWithoutPassword`, `removeMasterPassword`, `addMasterPassword`, the DPAPI-protected `Network_Toolkit.credentials.auto` (random 32-byte value, base64url) and `status().Mode` ("password"/"windows"). HTTP actions `setup-windows` (native confirmation `VaultActionNoPassword`), `set-password` (`VaultSecretSetPassword`), `remove-password` (`VaultSecretRemovePassword`, asks for the current password); `change-password` in windows mode maps to `set-password`; `lock`/`forget` are refused in windows mode. `autoUnlockCredentials` runs on GET `/credential-vault` and any `/credentials` request, never prompts, uses TryLock and binds the config identity without a remember record. Vault delete removes the auto file; recovery in windows mode removes it. Safety: the auto file is written in the activate `beforeCommit` hook under the guard and restored on commit failure (`TestVaultNoPasswordSetupRollsBackKeyWhenVaultWriteFails`).
+- Any password + gauge: `vaultcrypto.MinPasswordRunes` 1 and dialog validation allow any non-empty password. `estimateVaultPasswordStrength` (pool entropy minus repeats/sequences/common passwords; five levels) feeds a static text gauge (`vaultControlStrength`) under the new-password field, refreshed on EN_CHANGE; it reads the field into a cleared buffer and never displays the password. Native dialog not exercised on Windows from this session.
+- Username: credentials already stored a username; selecting a saved credential now always fills its username (`applySelection`).
+- Drop lines: `terminal-tab-drag.js` `unchangedDrop`, `editor-drag.js` `unchangedDrop`, and `session-sidebar.js` `savedDropTarget` show no line where the drop would not change the order.
+- Docs: CREDENTIAL_SECURITY.md (policy and new mode), UI guidelines (Password manager, confirmations, drop lines), settings guide.
+Tests: Go (all packages), node (1582), Python, release validator; browser credential-security, session-saved-order (new no-line check), terminal-tab-click116, editor-drag115.
+
+---
+
 # v1.20.7 Beta 5 - publication verified (2026-11-04)
 
 Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.20.7 at 2026-11-04T05:58:53Z; stable latest remains v1.20.2. Merged PR #76; tag v1.20.7 points to merge commit e5ee76ac59de0d08c370919c2322332f86e97fb5. Release workflow run 41782210872 succeeded. Assets: Network_Toolkit.exe, Network_Toolkit_1.20.7_Portable.zip, Network_Toolkit_1.20.7_Update.zip, SHA256SUMS; asset digests match SHA256SUMS. Checks: full green run 41780811794.

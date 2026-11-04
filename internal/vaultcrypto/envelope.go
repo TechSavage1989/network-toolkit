@@ -28,7 +28,7 @@ import (
 const (
 	Version          = 2
 	KeyBytes         = 32
-	MinPasswordRunes = 12
+	MinPasswordRunes = 1
 	MaxPasswordBytes = 1024
 	MaxPayloadBytes  = 2 << 20
 	MaxEnvelopeBytes = 4 << 20
@@ -46,7 +46,7 @@ const (
 var (
 	ErrFormat         = errors.New("invalid or unsupported credential vault envelope")
 	ErrAuthentication = errors.New("credential vault authentication failed")
-	ErrPassword       = errors.New("master password must contain at least 12 Unicode characters and at most 1024 UTF-8 bytes")
+	ErrPassword       = errors.New("master password must not be empty and must be valid UTF-8 of at most 1024 bytes")
 	ErrPasswordInput  = errors.New("master password must be valid UTF-8 and at most 1024 bytes")
 	ErrTooLarge       = errors.New("credential vault exceeds the size limit")
 )

@@ -25,6 +25,7 @@
 - **Discover network devices** and inspect connection details.
 - **Watch targets** with live response-time graphs and **inspect packet captures**.
 - **Connect** with SSH, Telnet and supported serial terminals, using saved connections, multiple tabs and macros.
+- **Password manager:** save usernames with passwords or SSH keys in an encrypted vault, with or without a master password; a strength gauge helps you choose one.
 - **File Transfer:** browse, transfer and host files over SFTP, FTP/FTPS and TFTP from one page.
 - **Text Editor:** open, edit and compare text files, including common network device configurations.
 - **Local network:** view local network information and review authorized configuration changes.

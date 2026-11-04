@@ -124,7 +124,7 @@ async function stableCredentialLayout(page){
   assert.equal(await page.evaluate(()=>NetworkToolkitCredentials.meta('password')),null);assert.equal(await page.locator('#credentialManagerForm').count(),0);
   await assertNativeOnlyEntry();await captureVaultState('legacy');
   vault={...vault,state:'setup-required',legacyBackup:false};await page.evaluate(()=>NetworkToolkitCredentials.show());
-  assert.equal(await page.locator('[data-vault-action="setup"]').innerText(),'Set up vault');await captureVaultState('setup');
+  assert.equal(await page.locator('[data-vault-action="setup"]').innerText(),'Set up with master password');assert.equal(await page.locator('[data-vault-action="setup-windows"]').innerText(),'Set up without master password');await captureVaultState('setup');
   vault={...vault,state:'legacy',legacyBackup:true};await page.evaluate(()=>NetworkToolkitCredentials.show());
   denyNext=true;const deniedSetup=await vaultAction('setup');assert.equal(deniedSetup.ok,false);assert.match(deniedSetup.error,/cancelled/);assert.equal(vault.state,'legacy');assert.equal(records.size,3);assert.equal(vaultGeneration,0);await assertNativeOnlyEntry();
   await page.locator('[data-vault-action="setup"]').click();await page.waitForFunction(()=>NetworkToolkitCredentials.vaultStatus().state==='unlocked'&&!!document.querySelector('#credentialManagerForm')&&!document.querySelector('[data-vault-action="lock"]')?.disabled);assert.equal(vaultGeneration,1);assert.equal(vault.remembered,true);assert.equal(await page.locator('[data-credential-edit="password"]').count(),1);

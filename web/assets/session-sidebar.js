@@ -323,7 +323,9 @@ document.addEventListener('pointerdown',event=>{if(menu&&!menu.contains(event.ta
 // clicks, double-click to open and right-click menus are unchanged). Escape
 // cancels. Alt+Shift+Up/Down moves a focused Saved row by one.
 let savedDrag=null,suppressSavedClick=0;
-function savedDropTarget(y,x){const row=document.elementFromPoint?.(x,y)?.closest?.('[data-session-kind="saved"][data-session-id]');if(!row||row.dataset.sessionId===savedDrag?.id)return null;const r=row.getBoundingClientRect();return {row,id:row.dataset.sessionId,after:y>r.top+r.height/2};}
+function savedDropTarget(y,x){const row=document.elementFromPoint?.(x,y)?.closest?.('[data-session-kind="saved"][data-session-id]');if(!row||row.dataset.sessionId===savedDrag?.id)return null;const r=row.getBoundingClientRect(),after=y>r.top+r.height/2,rows=[...document.querySelectorAll('[data-session-kind="saved"][data-session-id]')].map(el=>el.dataset.sessionId),at=rows.indexOf(savedDrag?.id),target=rows.indexOf(row.dataset.sessionId);
+ // No drop line (and no move) where releasing would leave the order unchanged.
+ if(at>=0&&(after?target===at-1:target===at+1))return null;return {row,id:row.dataset.sessionId,after};}
 function clearSavedDrop(){for(const el of document.querySelectorAll('.session-saved-drop-before,.session-saved-drop-after'))el.classList.remove('session-saved-drop-before','session-saved-drop-after');document.querySelector('.session-saved-dragging')?.classList.remove('session-saved-dragging');}
 function endSavedDrag(apply){const drag=savedDrag;savedDrag=null;clearSavedDrop();if(!drag?.moved)return;suppressSavedClick=Date.now()+400;if(apply&&drag.drop)moveSaved(drag.id,drag.drop.id,drag.drop.after);}
 document.addEventListener('pointerdown',event=>{const entry=event.target.closest?.('[data-session-kind="saved"][data-session-id] [data-session-entry]');if(!entry||event.button!==0||event.isPrimary===false||event.pointerType==='touch'||event.ctrlKey||event.metaKey||event.altKey||event.shiftKey)return;const row=entry.closest('[data-session-id]');savedDrag={id:row.dataset.sessionId,pointer:event.pointerId,x:event.clientX,y:event.clientY,moved:false,drop:null,row};},true);

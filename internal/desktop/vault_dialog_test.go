@@ -12,12 +12,12 @@ import (
 )
 
 func TestVaultDialogPasswordValidationPreservesUnicodeAndSpaces(t *testing.T) {
-	for _, value := range []string{"twelve chars", "            ", "  significant spaces  ", strings.Repeat("🔐", 12), strings.Repeat("a", 1024)} {
+	for _, value := range []string{"a", "elevenchars", "1234", strings.Repeat("🔐", 11), "twelve chars", "            ", "  significant spaces  ", strings.Repeat("🔐", 12), strings.Repeat("a", 1024)} {
 		if err := validateVaultSecret([]byte(value), true); err != nil {
 			t.Fatalf("valid synthetic password rejected: %v", err)
 		}
 	}
-	for _, value := range [][]byte{nil, []byte("elevenchars"), []byte(strings.Repeat("🔐", 11)), []byte(strings.Repeat("a", 1025)), []byte(strings.Repeat("界", 342)), []byte("validlength\x00password"), {0xff, 0xfe}} {
+	for _, value := range [][]byte{nil, {}, []byte(strings.Repeat("a", 1025)), []byte(strings.Repeat("界", 342)), []byte("validlength\x00password"), {0xff, 0xfe}} {
 		if err := validateVaultSecret(value, true); err == nil {
 			t.Fatal("invalid synthetic password accepted")
 		}
@@ -72,7 +72,7 @@ func TestVaultDialogSecretModesAndBackendOnlyResponse(t *testing.T) {
 
 func TestVaultDialogRejectsInvalidResponsesAndNeverEchoesSecrets(t *testing.T) {
 	for _, mode := range []VaultSecretMode{VaultSecretSetup, VaultSecretRotate, VaultSecretRecover} {
-		for _, issue := range []string{"mismatch", "short", "missing-factor"} {
+		for _, issue := range []string{"mismatch", "empty", "missing-factor"} {
 			if issue == "missing-factor" && mode == VaultSecretSetup {
 				continue
 			}
@@ -81,8 +81,9 @@ func TestVaultDialogRejectsInvalidResponsesAndNeverEchoesSecrets(t *testing.T) {
 			if issue == "mismatch" {
 				confirmation = []byte("different synthetic secret")
 			}
-			if issue == "short" {
-				secret, confirmation = []byte("short"), []byte("short")
+			if issue == "empty" {
+				// Any non-empty password is allowed (owner decision); empty is still rejected.
+				secret, confirmation = []byte{}, []byte{}
 			}
 			values := map[uint16][]byte{vaultFieldPassword: secret, vaultFieldConfirm: confirmation}
 			if issue != "missing-factor" {
@@ -220,5 +221,43 @@ func TestVaultDialogUnsupportedPlatformFailsClosed(t *testing.T) {
 	}
 	if allowed, err := ConfirmVaultRecovery(context.Background(), "SYNTHETIC-KEY"); allowed || err == nil {
 		t.Fatal("non-Windows recovery display did not fail closed")
+	}
+}
+
+func TestVaultPasswordStrengthGauge(t *testing.T) {
+	cases := []struct {
+		password string
+		max, min int
+	}{
+		{"", 0, 0},
+		{"a", 0, 0},
+		{"password", 0, 0},
+		{"Password123!", 1, 0},
+		{"admin", 0, 0},
+		{"aaaaaaaaaaaaaaaaaaaa", 1, 0},
+		{"abcdefghijklmnop", 1, 0},
+		{"correct horse battery staple", 4, 3},
+		{"Tq8#vL2m!pZr", 4, 2},
+		{"x7Kp", 1, 0},
+	}
+	for _, c := range cases {
+		got := estimateVaultPasswordStrength([]byte(c.password))
+		if got.Score > c.max || got.Score < c.min || got.Label == "" || got.Hint == "" {
+			t.Fatalf("%q scored %d (%s), want %d..%d", c.password, got.Score, got.Label, c.min, c.max)
+		}
+	}
+	weak, strong := vaultStrengthGaugeText([]byte("a")), vaultStrengthGaugeText([]byte("correct horse battery staple"))
+	if !strings.HasPrefix(weak, "Strength: ██░░░░░░░░") || !strings.Contains(strong, "████████") || strings.Contains(strong, "correct") {
+		t.Fatalf("gauge text unexpected or leaked the password: %q / %q", weak, strong)
+	}
+	if !strings.Contains(vaultStrengthGaugeText(nil), "Any password is allowed") {
+		t.Fatal("empty gauge must explain the policy")
+	}
+	spec, err := vaultSecretSpec(VaultSecretRequest{Mode: VaultSecretSetup})
+	if err != nil || !spec.strength {
+		t.Fatal("new-password dialogs must show the strength gauge")
+	}
+	if spec, _ := vaultSecretSpec(VaultSecretRequest{Mode: VaultSecretUnlock}); spec.strength {
+		t.Fatal("unlock must not show a strength gauge")
 	}
 }

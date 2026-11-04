@@ -42,6 +42,8 @@ const (
 	vaultControlRecovery    = 111
 	vaultControlAcknowledge = 112
 	vaultControlError       = 113
+	vaultControlStrength    = 114
+	vaultENChange           = 0x0300
 	// Above every valid UTF-8 password's possible UTF-16 length. Otherwise a
 	// long paste could truncate both password fields identically and silently
 	// establish a different password. Values above the actual 1024-byte policy
@@ -140,6 +142,11 @@ func nativeVaultTemplate(spec vaultDialogSpec) []uint32 {
 		}
 		control(0x81, field.id, field.value, style, 10, y+11, width-20, 14)
 		y += 31
+		if spec.strength && field.id == vaultFieldPassword {
+			// Text gauge, refreshed on every edit; it never shows the password.
+			control(0x82, vaultControlStrength, vaultStrengthGaugeText(nil), 0x0080, 10, y-3, width-20, 22)
+			y += 22
+		}
 	}
 	if spec.recovery {
 		control(0x80, vaultControlRecovery, "Create a new optional offline recovery key", 0x00010003, 10, y, width-20, 14)
@@ -338,6 +345,22 @@ func (d *nativeVaultDialog) finish(accepted bool, err error) {
 	vaultEndDialog.Call(d.hwnd, result)
 }
 
+// The estimate reads the live field into a temporary buffer and clears it.
+func (d *nativeVaultDialog) updateStrength() {
+	gauge := d.item(vaultControlStrength)
+	if gauge == 0 {
+		return
+	}
+	value, err := nativeVaultReadText(d.item(vaultFieldPassword))
+	if err != nil {
+		nativeVaultSetText(gauge, "Strength: the password is longer than the 1024-byte limit.")
+		return
+	}
+	text := vaultStrengthGaugeText(value)
+	clear(value)
+	nativeVaultSetText(gauge, text)
+}
+
 func (d *nativeVaultDialog) accept() {
 	if d.done {
 		return
@@ -424,6 +447,10 @@ func vaultDialogProcedure(hwnd uintptr, message uint32, wparam, lparam uintptr) 
 	d := value.(*nativeVaultDialog)
 	switch message {
 	case wmCommand:
+		if uint16(wparam>>16) == vaultENChange && uint16(wparam) == vaultFieldPassword && d.spec.strength {
+			d.updateStrength()
+			return 0
+		}
 		if uint16(wparam>>16) != 0 { // Only BN_CLICKED / keyboard dialog commands.
 			return 0
 		}
