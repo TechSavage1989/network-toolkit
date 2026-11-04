@@ -1,0 +1,13 @@
+Network Toolkit 1.20.5 Beta 3
+
+## What's New
+
+- The Terminal and the Text Editor now share one tab design. Tabs are rounded, the selected tab uses the same accent highlight as the rest of the app's tabs, and each tab strip ends with a "+" button that opens a new tab, so both tools look and work the same way.
+
+## Additional Details
+
+- The shared style lives in one stylesheet (`web/assets/ux-tab-strip.css`) built from the app's design tokens; the Terminal's command-bar New tab button, Ctrl+N in the Text Editor, tab menus, drag to reorder or detach, keyboard shortcuts and every tab action are unchanged.
+- The Terminal strip's "+" button is the same action as the command bar's New tab button and is disabled at the same times.
+- Nothing about what is sent, shown or saved changes. Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Security confirmations and Windows/UAC approval are unchanged.
+- This is an opt-in beta. Stable users stay on 1.20.2. Portable executable filename remains Network_Toolkit.exe.
+- Validation uses hosted and synthetic fixtures with screenshots in light and dark themes; the owner's review on Windows is the acceptance check.

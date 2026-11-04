@@ -59,7 +59,7 @@ const root=path.resolve(__dirname,'..'),version=require('../package.json').versi
   assert.equal(await page.locator('[data-session-tab]').first().getAttribute('data-session-tab'),'saved');
   // New tab retains its existing empty-tab behavior; choosing a protocol opens
   // the original modal instead of redirecting into the sidebar.
-  await page.locator('[data-terminal-action="new"]').click();assert.equal(await page.locator('#terminalConnectForm').count(),0);
+  await page.locator('#terminalCommandBar [data-terminal-action="new"]').click();assert.equal(await page.locator('#terminalConnectForm').count(),0);
   await page.locator('[data-terminal-new-type="ssh"]').first().click();await dialog();
   assert.equal(await page.locator('#modalTitle').textContent(),'New terminal connection');
   await page.locator('#terminalPassword').fill('cancelled-dialog-secret');await cancel();assert.equal(posts().length,0);

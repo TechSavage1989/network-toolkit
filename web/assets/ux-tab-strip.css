@@ -1,0 +1,84 @@
+/* Shared tab strip for the Terminal session tabs and the Text Editor document
+ * tabs (v1.20.5). One design language for both, built from the app's own
+ * page-tab style and the ux-foundations tokens: rounded 30px tabs on the
+ * raised strip surface, the accent-on-accent-background active state used by
+ * the tool page tabs, subdued per-tab controls and a tab-shaped "+" button
+ * at the end of every strip that can open a new tab.
+ *
+ * Markup, ids, data attributes, keyboard shortcuts and handlers are unchanged:
+ * .terminal-tab (index.html renderTerminalChrome) and .nt-editor-tab
+ * (file-editor.js drawTabs) each hold the label button, the "⋯" actions
+ * button and the close button. */
+
+/* Strip */
+.terminal-tabs,.nt-editor-tabs,.nt-compare-pane>.nt-editor-tabs{
+  display:flex;align-items:center;gap:var(--ux-space-1);
+  padding:var(--ux-space-1) var(--ux-space-2);min-height:40px;max-height:none;
+  overflow-x:auto;overflow-y:hidden;background:var(--side);
+  border-bottom:1px solid var(--border);box-sizing:border-box;
+  scrollbar-width:thin;scrollbar-gutter:auto;
+}
+.nt-editor-tabs[hidden],#terminalTabs.hidden{display:none}
+/* The aligned comparison keeps both pane strips the same fixed height. */
+.nt-compare-aligned .nt-compare-pane>.nt-editor-tabs{height:40px;min-height:40px;max-height:40px;flex-wrap:nowrap}
+
+/* Tab */
+.terminal-tab,.nt-editor-tab{
+  display:flex;flex:0 0 auto;align-items:center;gap:0;
+  min-width:150px;max-width:255px;min-height:var(--ux-control-height-small);
+  border:0;border-radius:var(--ux-radius-sm);background:transparent;
+  color:var(--muted);font-size:var(--ux-text-xs);overflow:hidden;box-shadow:none;
+  transition:background-color .14s ease,color .14s ease;
+}
+.terminal-tab:hover,.nt-editor-tab:hover{background:var(--hover);color:var(--text)}
+.terminal-tab.active,.nt-editor-tab:has([aria-selected=true]){background:var(--accentBg);color:var(--accent)}
+.terminal-tab.active:hover,.nt-editor-tab:has([aria-selected=true]):hover{background:var(--accentBg);color:var(--accent)}
+.terminal-tab>button:first-child,.nt-editor-tab>button:first-child{
+  display:flex;align-items:center;gap:7px;flex:1;min-width:0;min-height:28px;
+  padding:3px var(--ux-space-2);border:0;border-radius:inherit;background:transparent;
+  color:inherit;font:inherit;font-size:var(--ux-text-xs);text-align:left;cursor:pointer;
+}
+.terminal-tab>button:first-child:hover,.nt-editor-tab>button:first-child:hover{background:transparent;color:inherit}
+.terminal-tab.active>button:first-child,.nt-editor-tab>button[aria-selected=true]{color:inherit;font-weight:650}
+.terminal-tab-name,.nt-editor-tab-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nt-editor-tab-status{flex:none;width:7px;color:var(--accent);font-size:9px}
+.terminal-tab .dot{flex-shrink:0}
+.terminal-tab svg,.nt-editor-tab svg{width:14px;height:14px;display:block}
+
+/* Per-tab controls: "⋯" actions and close, kept quiet until hovered. */
+.terminal-tab .ux-terminal-tab-actions,.nt-editor-tab .ux-editor-tab-actions,
+.terminal-tab>.tab-close,.nt-editor-tab>.tab-close{
+  display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;
+  width:22px;height:22px;min-width:0;margin:0;padding:0;border:0;border-radius:5px;
+  background:transparent;color:var(--faint);font-size:14px;line-height:1;cursor:pointer;
+}
+.terminal-tab>.tab-close,.nt-editor-tab>.tab-close{margin-right:3px}
+.terminal-tab .ux-terminal-tab-actions,.nt-editor-tab .ux-editor-tab-actions{font-size:15px}
+.terminal-tab.active .ux-terminal-tab-actions,.nt-editor-tab:has([aria-selected=true]) .ux-editor-tab-actions,
+.terminal-tab.active>.tab-close,.nt-editor-tab:has([aria-selected=true])>.tab-close{color:var(--muted)}
+.terminal-tab .ux-terminal-tab-actions:hover,.nt-editor-tab .ux-editor-tab-actions:hover,
+.terminal-tab>.tab-close:hover,.nt-editor-tab>.tab-close:hover{background:var(--hover);color:var(--text)}
+.terminal-tab.active .ux-terminal-tab-actions:hover,.nt-editor-tab:has([aria-selected=true]) .ux-editor-tab-actions:hover,
+.terminal-tab.active>.tab-close:hover,.nt-editor-tab:has([aria-selected=true])>.tab-close:hover{background:var(--panel);color:var(--text)}
+.terminal-tab>button:focus-visible,.nt-editor-tab>button:focus-visible{outline:2px solid var(--ux-focus);outline-offset:-2px}
+
+/* Tab-shaped "+" button: same height and radius as a tab, dashed until hovered. */
+.terminal-tabs>.terminal-add,.nt-editor-new-tab{
+  display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;align-self:center;
+  width:var(--ux-control-height-small);height:var(--ux-control-height-small);min-width:0;
+  margin:0;padding:0;border:1px dashed var(--border);border-radius:var(--ux-radius-sm);
+  background:transparent;color:var(--accent);font-size:18px;line-height:1;cursor:pointer;
+  transition:background-color .14s ease,border-color .14s ease;
+}
+/* A detached single-session window cannot open tabs; its command bar hides New tab and the strip hides "+". */
+.terminal-detached:not(.terminal-workspace-detached) .terminal-tabs>.terminal-add{display:none}
+.terminal-tabs>.terminal-add:hover,.nt-editor-new-tab:hover{background:var(--accentBg);border-style:solid;border-color:var(--accent)}
+.terminal-tabs>.terminal-add:focus-visible,.nt-editor-new-tab:focus-visible{outline:2px solid var(--ux-focus);outline-offset:-2px}
+.terminal-tabs>.terminal-add svg,.nt-editor-new-tab svg{width:15px;height:15px;display:block}
+
+/* Drag and drop keeps its accent edge markers; drop targets stay rounded. */
+.terminal-tab-drop-before,.nt-editor-tab[data-editor-drop-before]{box-shadow:inset 3px 0 var(--accent)}
+.terminal-tab-drop-after,.nt-editor-tab[data-editor-drop-after]{box-shadow:inset -3px 0 var(--accent)}
+
+@media(max-width:720px){.terminal-tab,.nt-editor-tab{min-width:135px}}
+@media (prefers-reduced-motion:reduce){.terminal-tab,.nt-editor-tab,.terminal-tabs>.terminal-add,.nt-editor-new-tab{transition:none}}

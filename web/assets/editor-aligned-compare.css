@@ -2,7 +2,6 @@
 .nt-compare-aligned .nt-compare-summary{display:flex;align-items:center;flex-wrap:wrap;gap:4px 10px}
 .nt-compare-aligned .nt-compare-legend{padding:0;gap:7px;line-height:1.4;align-items:center}
 .nt-compare-aligned .nt-compare-legend .gap{color:var(--muted)}
-.nt-compare-aligned .nt-compare-pane>.nt-editor-tabs{height:34px;min-height:34px;max-height:34px;flex-wrap:nowrap}
 .nt-compare-aligned .nt-compare-surface{display:flex;flex-direction:column}
 .nt-compare-aligned .cm-editor{height:100%;min-height:0;flex:1;min-width:0;background:var(--nt-code-bg,var(--input));color:var(--nt-code-fg,var(--text));font:var(--nt-editor-font,13px)/1.55 var(--mono,Consolas,monospace)}
 .nt-compare-aligned .cm-editor.cm-focused{outline:none}

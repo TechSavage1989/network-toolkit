@@ -1,6 +1,6 @@
 # Network Toolkit UI Guidelines
 
-**Status:** Adopted with the v1.19.0 stable release (2026-11-02), updated for the owner-approved v1.19.1 consolidation and the owner-requested 1.19.x changes. It describes the layout, components and wording as they ship in v1.20.2. The layout is frozen (see [Layout freeze](#layout-freeze)).
+**Status:** Adopted with the v1.19.0 stable release (2026-11-02), updated for the owner-approved v1.19.1 consolidation and the owner-requested 1.19.x changes. It describes the layout, components and wording as they ship in v1.20.5. The layout is frozen (see [Layout freeze](#layout-freeze)).
 
 **Authority:** [UX Polish Plan](UX_POLISH_PLAN.md). Sources of truth in code: `web/assets/ux-foundations.css` (tokens), the `:root` and `[data-theme="light"]` blocks in `web/index.html` (colors), `renderNavigation()` in `web/index.html` (navigation), and `web/assets/ux-command-palette.js` (shortcuts).
 
@@ -68,6 +68,12 @@ Use the shared tokens in `ux-foundations.css`; do not hard-code new sizes or col
 | Focus | 2 px outline in `--accent`, visible on every interactive element |
 | Disabled | `opacity:.65`, `cursor:not-allowed` |
 | Motion | short color transitions only; none under `prefers-reduced-motion` |
+
+Tab strips (Terminal sessions, Text Editor documents; `web/assets/ux-tab-strip.css`):
+- Both tools use the same strip: 40 px tall on `--side`, tabs 30 px with `--ux-radius-sm`, 150 to 255 px wide (135 px under 720 px), label text `--ux-text-xs`.
+- Inactive tabs are transparent in `--muted`; hover `--hover`; the selected tab is `--accentBg` with accent text at weight 650, the same look as the page tabs. No underline or side borders.
+- Each tab keeps its status dot (Terminal) or unsaved marker (Text Editor), the "⋯" More actions button and the close button as 22 px quiet controls (`--faint`, `--muted` on the selected tab, `--hover` when hovered).
+- Every strip that can open a tab ends with a 30 px tab-shaped "+" button: dashed `--border`, accent plus icon, filling with `--accentBg` on hover. It is the same action as the Terminal command bar's New tab button and the Text Editor's Ctrl+N; the editor shows it in the single view and the left view only.
 
 Buttons:
 - One **primary** button per view, for the main action. Other actions use the default or `ghost` style; `small` inside toolbars and tab rows.
