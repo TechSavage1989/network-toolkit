@@ -20,7 +20,7 @@
 
 ## Features
 
-- **Test a target:** enter a host once and run a device check, Ping, Trace route, DNS lookup, TCP port checks, a continuous monitor or device details from one page.
+- **Test a target:** enter a host once and run a device check, Ping, Trace route, DNS lookup, TCP port checks, a continuous monitor or device details from one page. Drag the tabs into your preferred order.
 - **Test a website:** HTTP and TLS certificate checks for one address; SMTP tests for mail servers.
 - **Discover network devices** and inspect connection details.
 - **Watch targets** with live response-time graphs and **inspect packet captures**.
@@ -30,6 +30,7 @@
 - **Text Editor:** open, edit and compare text files, including common network device configurations.
 - **Local network:** view local network information and review authorized configuration changes.
 - **Network utilities:** Wake on LAN, an IPv4 subnet calculator, a transfer-time estimate and a MAC address formatter.
+- **Customizable Overview:** choose which dashboard sections to show and in what order.
 - **Settings and updates:** save preferences and use the built-in updater.
 
 ## Screenshots
