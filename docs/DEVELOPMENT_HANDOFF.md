@@ -1,4 +1,6 @@
-# v1.20.7 Beta 5 - candidate, NOT PUBLISHED (2026-11-04)
+# v1.20.7 Beta 5 - publication verified (2026-11-04)
+
+Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.20.7 at 2026-11-04T05:58:53Z; stable latest remains v1.20.2. Merged PR #76; tag v1.20.7 points to merge commit e5ee76ac59de0d08c370919c2322332f86e97fb5. Release workflow run 41782210872 succeeded. Assets: Network_Toolkit.exe, Network_Toolkit_1.20.7_Portable.zip, Network_Toolkit_1.20.7_Update.zip, SHA256SUMS; asset digests match SHA256SUMS. Checks: full green run 41780811794.
 
 Owner: "the drive letter must be shown in the new terminal connection for powershell and command line for the starting directory configuration"; "also must be able to set a command line or powershell terminal to admin mode after launch if desired"; "also, disconnect all must also have a close all option"; "also allow re-ordering of saved sessions … by drag and drop".
 - Drive letters: `terminalDriveLabel()` in `index.html` formats the local-directories drive buttons like the Files drive bar ("D: Data HDD", "C: · Local drive" for generic labels, label kept when it already names the letter); full path as tooltip.
