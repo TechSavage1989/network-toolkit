@@ -1,3 +1,9 @@
+# v1.20.6 Beta 4 - candidate, NOT PUBLISHED (2026-11-04)
+
+Owner: "my intention was to not have the new tab button at all since there should be the new visual tab addition button." Change: the `btn small primary` New tab button is removed from the Terminal command bar (`renderTerminalWorkspace`); the strip "+" (`data-terminal-action="new"`, same handler and disabled state) is the one New tab control. `#terminalTabs` is now hidden only when empty in a detached single-session window, so an empty main or workspace Terminal shows the strip with just the "+" above the pane's SSH/Telnet/Serial/PowerShell start buttons. Command search keeps "Open a new terminal tab". `terminal-connection-dialog` and `terminal-macros-live` click the strip "+". Release notes, UI guidelines (Tab strips entry), Terminal guide and README `terminal.png` updated; screenshots with tabs and with no tabs reviewed from this session. Owner review on Windows is the acceptance check.
+
+---
+
 # v1.20.5 Beta 3 - publication verified (2026-11-04)
 
 Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.20.5 at 2026-11-04T04:53:30Z; stable latest remains v1.20.2. Merged PR #72; tag v1.20.5 points to merge commit 249f0c973661795a868124ddc25b8c45765f872e. Guarded Release workflow run 41775606306 (build and publish succeeded). Assets: Network_Toolkit.exe, Network_Toolkit_1.20.5_Portable.zip, Network_Toolkit_1.20.5_Update.zip, SHA256SUMS; asset digests match SHA256SUMS. Beta feed lists v1.20.5 first; `releases/latest` still v1.20.2. Checks on the merged commit: full green run 41774256405 (the first run on the candidate failed only native-terminal127/129 on the ordering bug fixed in the second commit). The merged branch could not be deleted from this session (remote refuses ref deletion through the proxy); it joins the stale-branch cleanup list.
