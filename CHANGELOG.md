@@ -1,4 +1,4 @@
-## 1.20.6 Beta 4 - Strip "+" is the only New tab control (candidate)
+## 1.20.6 Beta 4 - Strip "+" is the only New tab control (published 2026-11-04)
 
 - Owner clarification after 1.20.5: the command bar's New tab button was not meant to stay once the tab strip had its own "+". The button is removed from the Terminal command bar; the strip stays visible with just the "+" when no tab is open (a detached single-session window still hides an empty strip). Command search keeps "Open a new terminal tab"; empty panes keep their SSH/Telnet/Serial/PowerShell start buttons. Tests click the strip "+"; guidelines, guide and README Terminal screenshot updated.
 
