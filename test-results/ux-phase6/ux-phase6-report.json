@@ -1,0 +1,24 @@
+{
+  "passed": true,
+  "checks": [
+    "Navigation merges four tests and three transfer protocols; existing preferences kept",
+    "Test tabs share the target and never start a test on their own",
+    "Each test tab shows its latest result for the current target",
+    "Test a website shares one address: HTTP adds https:// to a host, TLS uses the host from a URL",
+    "Hosts file is a Local network tab and links back to the other views",
+    "IP configuration shows Public IP, then Current configuration, then Network actions, which fill in after the slower adapter-state read",
+    "Network sweeps open in Network discovery; Ping and TCP ports check one target",
+    "File Transfer picker includes TFTP, shows its security note and remembers the protocol",
+    "Running TFTP server is still shown on the merged File Transfer entry",
+    "Former tool names remain searchable in the command palette and open directly",
+    "Terminal sidebar has no separate Sidebar button; its tabs remain",
+    "Last test and protocol choices persist after reopening"
+  ],
+  "screenshots": [
+    "test-a-target-1280-dark.png",
+    "file-transfer-tftp-1280-dark.png",
+    "terminal-sidebar-1280-dark.png",
+    "test-a-target-1920-light.png"
+  ],
+  "errors": []
+}

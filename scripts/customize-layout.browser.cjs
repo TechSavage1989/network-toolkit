@@ -38,6 +38,26 @@ const root=path.resolve(__dirname,'..'),output=process.env.TOOLKIT_TEST_OUTPUT,o
   await page.locator('#modalRoot [data-action="close-modal"]').last().click();
   // Hide everything: a clear empty state, not a blank page.
   await page.evaluate(()=>{state.overviewLayout={order:OVERVIEW_SECTIONS.map(x=>x[0]),hidden:OVERVIEW_SECTIONS.map(x=>x[0])};renderOverview();});assert.match(await page.locator('#pageContent').innerText(),/All dashboard sections are hidden/);await page.evaluate(()=>{delete state.overviewLayout;renderOverview();});report.checks.push('All sections hidden shows a clear empty state');
+  // Drag Overview sections by their grip handle (v1.20.11).
+  {const part=id=>page.locator('#pageContent [data-overview-part="'+id+'"]'),handle=id=>page.locator('#pageContent [data-overview-drag="'+id+'"]');
+   const shown=()=>page.evaluate(()=>[...document.querySelectorAll('#pageContent [data-overview-part]')].map(e=>e.dataset.overviewPart));
+   const start=await shown();assert(start.length>=5&&start[0]==='stats','every section has a handle: '+JSON.stringify(start));
+   const grab=async id=>{await part(id).hover();const h=await handle(id).boundingBox();await page.mouse.move(h.x+h.width/2,h.y+h.height/2);await page.mouse.down();await page.mouse.move(h.x+h.width/2,h.y+h.height/2+10,{steps:3});};
+   const pi=start.indexOf('publicIP'),next=start[pi+1];
+   await grab('publicIP');{const b=await part(next).boundingBox();await page.mouse.move(b.x+b.width/2,b.y+4,{steps:6});}
+   assert.equal(await page.locator('.overview-drop-before,.overview-drop-after,.overview-drop-left,.overview-drop-right').count(),0,'no line over the near half of the next section');
+   await page.keyboard.press('Escape');await page.mouse.up();await page.waitForTimeout(150);assert.deepEqual(await shown(),start,'Escape cancels');
+   await grab('discovery');{const b=await part('stats').boundingBox();await page.mouse.move(b.x+b.width/2,b.y+3,{steps:10});}
+   assert.equal(await page.locator('#pageContent [data-overview-part="stats"].overview-drop-before').count(),1,'line above the section being passed');
+   if(output)await page.screenshot({path:path.join(output,'overview-drag.png')});
+   await page.mouse.up();await page.waitForFunction(()=>document.querySelector('#pageContent [data-overview-part]')?.dataset.overviewPart==='discovery');
+   const moved=await shown();assert.deepEqual(moved,['discovery',...start.filter(x=>x!=='discovery')]);
+   const stored=await savedValue(x=>x.overviewLayout,v=>v?.order?.[0]==='discovery');assert.equal(stored?.order?.[0],'discovery','dragged order saved');
+   await handle('discovery').focus();await page.keyboard.press('Alt+Shift+ArrowDown');await page.waitForFunction(()=>document.querySelectorAll('#pageContent [data-overview-part]')[1]?.dataset.overviewPart==='discovery');
+   assert.equal(await page.evaluate(()=>document.activeElement?.dataset.overviewDrag),'discovery','focus stays on the moved handle');
+   assert.deepEqual(operations,[],'moving sections starts no network operation');
+   report.checks.push('Overview sections drag by their handle (drop line only where order changes, Escape cancels), save, and move with Alt+Shift+Up/Down');
+   await page.evaluate(()=>{delete state.overviewLayout;saveState();renderOverview();});}
   // Test a target tabs.
   await page.evaluate(()=>navigate('ping'));await page.locator('.nt-target-tests [data-target-test="ping"]').waitFor();
   const tabs=()=>page.evaluate(()=>[...document.querySelectorAll('.nt-target-tests [data-target-test]')].map(b=>b.dataset.targetTest));
@@ -60,7 +80,7 @@ const root=path.resolve(__dirname,'..'),output=process.env.TOOLKIT_TEST_OUTPUT,o
   assert.deepEqual(await page.evaluate(()=>state.testTabOrder),{target:['ping','monitor','dns','trace','tcp','quick','identify'],web:['tls','http']},'tab order restored after restart');
   await page.evaluate(()=>navigate('ping'));await page.locator('.nt-target-tests [data-target-test="ping"]').waitFor();assert.deepEqual(await tabs(),['ping','monitor','dns','trace','tcp','quick','identify']);
   await page.evaluate(()=>navigate('overview'));await page.waitForFunction(()=>document.querySelectorAll('#pageContent [data-overview-section]').length>=3);
-  const restored=await sections();assert(!restored.includes('publicIP')&&restored[0].startsWith('activity'),'dashboard layout restored after restart: '+JSON.stringify(restored));report.checks.push('Tab order and dashboard layout survive a restart');
+  const restored=await sections();assert(!restored.includes('publicIP')&&restored[0].startsWith('activity')&&(await page.evaluate(()=>document.querySelector('#pageContent [data-overview-part]')?.dataset.overviewPart))==='activity','dashboard layout restored after restart: '+JSON.stringify(restored));report.checks.push('Tab order and dashboard layout survive a restart');
   if(output)await page.screenshot({path:path.join(output,'customize-tabs.png')});
   assert.deepEqual(report.errors,[]);report.passed=true;
  }finally{if(output)fs.writeFileSync(path.join(output,'customize-layout-report.json'),JSON.stringify(report,null,2));await browser.close();}

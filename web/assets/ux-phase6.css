@@ -31,3 +31,18 @@
 .overview-customize-row .toggle-row{margin:0}
 .overview-customize-move{display:flex;gap:var(--ux-space-1)}
 .overview-customize-move .iconbtn{width:30px;height:30px}
+/* Overview sections move by a grip handle (v1.20.11): a short pill on the
+ * section's top edge, quiet until the section is hovered or the handle focused. */
+.overview-part{position:relative}
+.overview-drag-handle{position:absolute;top:-7px;left:50%;transform:translateX(-50%);z-index:2;display:flex;align-items:center;justify-content:center;width:44px;height:14px;min-height:0;padding:0;border:1px solid var(--border);border-radius:999px;background:var(--panel);color:var(--faint);cursor:grab;opacity:0;transition:opacity .14s ease,background-color .14s ease;touch-action:none}
+.overview-drag-handle span{display:block;width:20px;height:4px;border-top:1px solid currentColor;border-bottom:1px solid currentColor}
+.overview-part:hover>.overview-drag-handle,.overview-drag-handle:focus-visible,.overview-dragging>.overview-drag-handle{opacity:1}
+.overview-drag-handle:hover{background:var(--accentBg);color:var(--accent);border-color:var(--accent)}
+.overview-drag-handle:focus-visible{outline:2px solid var(--ux-focus);outline-offset:1px}
+.overview-dragging-active,.overview-dragging-active *{cursor:grabbing!important;user-select:none}
+.overview-dragging{opacity:.6}
+.overview-drop-before{box-shadow:0 -3px 0 var(--accent);border-radius:var(--ux-radius-sm)}
+.overview-drop-after{box-shadow:0 3px 0 var(--accent);border-radius:var(--ux-radius-sm)}
+.overview-drop-left{box-shadow:-3px 0 0 var(--accent)}
+.overview-drop-right{box-shadow:3px 0 0 var(--accent)}
+@media (prefers-reduced-motion:reduce){.overview-drag-handle{transition:none}}

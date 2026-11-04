@@ -1,0 +1,14 @@
+Network Toolkit 1.20.11 Beta 9
+
+## What's New
+
+- Overview sections can be dragged into a new order. Hover a section and drag the small handle on its top edge. The order is kept when you restart the app.
+- A Command Prompt or PowerShell tab can be restarted as administrator in place. Choose **Restart this tab as administrator** from the tab's menu.
+
+## Additional Details
+
+- Windows cannot raise a shell that is already running. Restarting a tab as administrator starts a new elevated shell in the same folder, puts it in the same tab position and pane, and then closes the old shell. Anything running in the old shell stops and its output is not carried over. The app asks before doing this, and the confirmation offers to open the elevated shell in a new tab instead.
+- If you decline the Windows approval prompt or the shell does not start, the original tab is left as it is.
+- With the keyboard, focus a section's handle and press Alt+Shift+Up or Alt+Shift+Down. The Customize dialog still shows, hides and reorders sections.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Security confirmations and Windows/UAC approval are unchanged.
+- This is an opt-in beta. Stable users stay on 1.20.2. Portable executable filename remains Network_Toolkit.exe.

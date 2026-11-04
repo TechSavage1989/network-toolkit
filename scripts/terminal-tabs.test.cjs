@@ -286,3 +286,22 @@ test('standard local shells offer Open as administrator in a new tab; other tabs
  assert(h.entries.has('one'),'the original tab is kept');
  shell.info.elevated=true;assert.equal(h.api.adminCandidate(shell),false,'an elevated shell does not offer it again');
 });
+test('Restart this tab as administrator asks first, replaces the tab only once the elevated shell runs, and keeps it when approval is declined',async()=>{
+ const h=harness(),shell=h.entries.get('one');shell.info.type='cmd';shell.config={type:'cmd',workingDirectory:'C:\\Tools'};h.entries.get('two').info.type='ssh';
+ let order=['one','two'],approve=true;const calls=[];
+ Object.assign(h.context,{DETACHED_TERMINAL:false,DETACHED_WORKSPACE:false,terminalConnectBusy:false,terminalWorkspaceTransferBusy:false,terminalPanes:['one'],
+  safeTerminalConfig:c=>({...c}),newTerminalTab:()=>calls.push(['new-tab']),openTerminalConnect:c=>calls.push(['dialog',c]),
+  connectTerminal:async()=>{calls.push(['connect']);if(approve){h.entries.set('elevated',{info:{id:'elevated',type:'cmd',state:'connected',elevated:true},config:{type:'cmd',runAsAdministrator:true}});h.revisions.set('elevated',0);order.push('elevated');}},
+  assignTerminalPane:(pane,id)=>calls.push(['pane',pane,id]),selectTerminal:id=>calls.push(['select',id]),
+  deleteTerminalTab:async(e,live)=>{calls.push(['delete',e.info.id,live]);h.entries.delete(e.info.id);order=order.filter(x=>x!==e.info.id);}});
+ h.context.window.NetworkToolkitTerminalTabDrag={ids:()=>order.slice(),setOrder:ids=>{order=ids.slice();}};
+ assert.equal(h.api.enabled('convert-admin',h.api.token('one')),true);assert.equal(h.api.enabled('convert-admin',h.api.token('two')),false,'SSH tab cannot be converted');
+ await h.api.run('convert-admin',h.api.token('one'));assert.deepEqual(h.calls.at(-1),['modal','Restart tab as administrator']);assert.deepEqual(calls,[],'nothing starts before the user confirms');
+ // Approval declined: the original tab stays and nothing is closed.
+ approve=false;assert.equal(await h.api.convertToAdmin(h.api.token('one')),false);assert(h.entries.has('one'));assert(!calls.some(c=>c[0]==='delete'));
+ // Approved: the elevated shell takes the original's pane and tab position, then the original closes.
+ approve=true;calls.length=0;assert.equal(await h.api.convertToAdmin(h.api.token('one')),true);
+ assert.equal(calls[1][1].runAsAdministrator,true);assert.equal(calls[1][1].workingDirectory,'C:\\Tools');
+ assert.deepEqual(calls.filter(c=>['pane','delete','select'].includes(c[0])),[['pane',0,'elevated'],['delete','one',true],['select','elevated']]);
+ assert.deepEqual(order,['elevated','two'],'the elevated tab takes the original position');assert(!h.entries.has('one'));
+});

@@ -1,3 +1,13 @@
+# v1.20.11 Beta 9 - candidate, NOT PUBLISHED (2026-11-04)
+
+Owner check on Windows of v1.20.10: "open as admin in new tab works ... otherwise everything else looks good now" (test tab and Overview layout persistence, Customize dialog and vault dialogs reported fine).
+Owner: "id like an option to convert a current tab to administrator" and "i would like the overview cards/sections to be draggable, and obviously retain positions thorugh restarts".
+- Convert to administrator: `terminal-tabs.js` adds `convert-admin` (visible with `run-as-admin` on `adminCandidate` tabs). A confirmation explains a running shell cannot be elevated in place and that the current shell's processes and output end; it offers "Open in a new tab instead". `convertToAdmin` records the original's pane and tab index, runs the normal elevated connect path, and only if a new session with `runAsAdministrator` reaches `connected` assigns it the original pane, inserts it at the original position and deletes the original (`deleteTerminalTab(old, live)`). Declined UAC / failed start: nothing is closed. Not exercised on Windows from this session.
+- Overview drag: `overviewLayoutHTML` wraps each section in `[data-overview-part]` with a `.overview-drag-handle` (pill on the top edge, visible on hover/focus). `ux-customize.js` drags by the handle (6 px threshold, mouse/pen, drop line only where shown order changes: above/below, or left/right inside the adapters/activity pair; Escape cancels) and Alt+Shift+Up/Down on the handle; `moveSection` rewrites `state.overviewLayout.order` (hidden sections keep their place) via the existing `setLayout`, which saves; v1.20.10 `mergeState` restores it at startup.
+Tests: node (1583, new convert test), browser customize-layout (11 checks, including section drag, no-op line, Escape, keyboard, and restart).
+
+---
+
 # v1.20.10 Beta 8 - candidate, NOT PUBLISHED (2026-11-04)
 
 Owner: "the positions must save between runs. right now they reset when the app is restarted. also by default make Monitor first, then ping, then Trace Route, then DNS, the Ports, Device check, Details."
