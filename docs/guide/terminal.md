@@ -3,7 +3,7 @@
 Open Terminal to connect to a permitted device using SSH, Telnet or serial access where supported. Save connection profiles and choose the appropriate connection type. Use approved credentials and validate host identity before trusting SSH connections.
 
 ## Sessions and panes
-You can work with multiple tabs and split panes. Open another tab with **New tab** in the command bar or the **+** at the end of the tab strip. The sidebar contains Saved, Recent, Files and Macros tabs; click the selected tab to hide the sidebar and any tab to show it again; tabs and panes may have context menus and drag interactions. Keep sessions open while you navigate other tools.
+You can work with multiple tabs and split panes. Open another tab with the **+** at the end of the tab strip (or "Open a new terminal tab" in command search). The sidebar contains Saved, Recent, Files and Macros tabs; click the selected tab to hide the sidebar and any tab to show it again; tabs and panes may have context menus and drag interactions. Keep sessions open while you navigate other tools.
 
 ## Connection controls
 Reconnect an eligible session from its controls. The adjacent reconnect menu may also offer Reconnect all. Some tabs can be detached by dragging outside the window. Terminal tab actions are available from each tab's More actions button. The Terminal sidebar includes a visible show/hide control. Ctrl+Shift+P opens application command search when the console is not focused; F1 opens help outside focused terminal input.

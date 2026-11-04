@@ -1,0 +1,12 @@
+Network Toolkit 1.20.6 Beta 4
+
+## What's New
+
+- The Terminal's command bar no longer has a New tab button. The "+" at the end of the tab strip is now the one place to open a new tab, the same as in the Text Editor. The strip stays visible when no tab is open so the "+" is always there.
+
+## Additional Details
+
+- Command search still offers "Open a new terminal tab", and an empty pane still offers SSH, Telnet, Serial and PowerShell start buttons.
+- Nothing about what is sent, shown or saved changes. Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Security confirmations and Windows/UAC approval are unchanged.
+- This is an opt-in beta. Stable users stay on 1.20.2. Portable executable filename remains Network_Toolkit.exe.
+- Validation uses hosted and synthetic fixtures with screenshots; the owner's review on Windows is the acceptance check.

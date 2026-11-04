@@ -62,7 +62,7 @@ async function run(){
  await page.waitForFunction(async id=>{const m=(await api('/terminal-automation/library')).macros.find(m=>m.id===id);return m?.description==='Created and edited through the shipped UI'&&m.steps.map(s=>s.kind).join(',')==='command,pause,command';},macroId);check('create, save and advanced-step edit work through the shipped UI before connections');
  peer=makePeer();await new Promise(resolve=>peer.listen(0,'127.0.0.1',resolve));const port=peer.address().port;
  for(let count=1;count<=2;count++){
-  if(count===2)await page.locator('#terminalCommandBar [data-terminal-action="new"]').click();
+  if(count===2)await page.locator('#terminalTabs .terminal-add').click();
   await page.locator('#terminalStage [data-terminal-new-type="telnet"]').first().click();await page.fill('#con-host','127.0.0.1');await page.fill('#con-port',String(port));await page.click('#terminalConnectButton');await page.waitForSelector('#terminalConnectForm',{state:'detached'});await page.waitForFunction(async count=> (await api('/terminals')).sessions.filter(s=>s.state==='connected').length===count,count);
  }
  await page.selectOption('#terminalMacroTargetMode','all');await page.waitForFunction(()=>document.querySelector('#terminalMacroTargetCount').textContent==='2 terminals');await page.fill('#terminalMacroCommand','show clock');await page.locator('#terminalMacroComposer [data-macro-action="send"]').click();
