@@ -1,4 +1,4 @@
-## 1.20.15 Beta 3 - Network discovery shortcut on Monitor and Trace route (candidate)
+## 1.20.15 Beta 3 - Network discovery shortcut on Monitor and Trace route (published 2026-11-05)
 
 - Owner request: the "Scan a network in Network discovery" button and single-target note shown on Ping and Ports now also appear on Monitor and Trace route (`DISCOVERY_LINK_TOOLS`); the network sweep mode stays limited to Ping and Ports (`SUBNET_TOOLS`).
 

@@ -1,4 +1,6 @@
-# v1.20.15 Beta 3 - candidate, NOT PUBLISHED (2026-11-05)
+# v1.20.15 Beta 3 - publication verified (2026-11-05)
+
+Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.20.15 at 2026-11-05T21:10:57Z; stable latest remains v1.20.12. Merged PR #94; tag v1.20.15 points to merge commit d727ce39ab42c85bfb32847d897baf2efd8e1ea2. Release workflow run 42109784573 succeeded. Assets: Network_Toolkit.exe, Network_Toolkit_1.20.15_Portable.zip, Network_Toolkit_1.20.15_Update.zip, SHA256SUMS; asset digests match SHA256SUMS. Checks: green run 42107423129 on the PR head.
 
 Owner: "add Scan a network in Network discovery button to Monitor tool tab and traceroute like it's in ping."
 - `renderTargetControls` shows the `.scope-discovery` button and "One hostname or IP address." for `DISCOVERY_LINK_TOOLS` (ping, tcp, monitor, trace). `SUBNET_TOOLS` (sweep mode) is unchanged. Monitor and Trace route gain the same 39 px target-bar row Ping has.
