@@ -1,0 +1,11 @@
+Network Toolkit 1.20.15 Beta 3
+
+## What's New
+
+- Monitor and Trace route now have the Scan a network in Network discovery button above the target, the same as Ping.
+
+## Additional Details
+
+- Like Ping, these tools check one hostname or IP address. The button opens Network discovery for checking a whole network or address range.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Security confirmations and Windows/UAC approval are unchanged.
+- This is an opt-in beta. Stable users stay on 1.20.12. Portable executable filename remains Network_Toolkit.exe.

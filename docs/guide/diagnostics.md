@@ -16,7 +16,7 @@ Each tab shows a dot for its latest run against the current target: green finish
 
 Drag a tab to put the tests in the order you prefer, or focus a tab and press Alt+Shift+Left or Right. Test a target and Test a website each keep their own order, and it is kept when you restart the app. By default Test a target lists Monitor, Ping, Trace route, DNS, Ports, Device check and Details.
 
-Ping and Ports check one target. To check every device on a network or address range, select **Scan a network in Network discovery**; saved ranges also open there.
+Ping, Ports, Monitor and Trace route check one target. To check every device on a network or address range, select **Scan a network in Network discovery**; saved ranges also open there.
 
 ## Test a website
 Open **Test a website** and enter the address once:

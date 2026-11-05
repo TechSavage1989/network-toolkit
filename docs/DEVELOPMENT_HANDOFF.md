@@ -1,3 +1,11 @@
+# v1.20.15 Beta 3 - candidate, NOT PUBLISHED (2026-11-05)
+
+Owner: "add Scan a network in Network discovery button to Monitor tool tab and traceroute like it's in ping."
+- `renderTargetControls` shows the `.scope-discovery` button and "One hostname or IP address." for `DISCOVERY_LINK_TOOLS` (ping, tcp, monitor, trace). `SUBNET_TOOLS` (sweep mode) is unchanged. Monitor and Trace route gain the same 39 px target-bar row Ping has.
+- ux-phase6 checks the button on Monitor and Trace route and that it opens Network discovery.
+
+---
+
 # v1.20.14 Beta 2 - publication verified (2026-11-05)
 
 Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.20.14 at 2026-11-05T20:11:00Z; stable latest remains v1.20.12. Merged PR #92; tag v1.20.14 points to merge commit 6505ee958645649876ca048bf3023e739b2d88ea. Release workflow run 42100507462 succeeded. Assets: Network_Toolkit.exe, Network_Toolkit_1.20.14_Portable.zip, Network_Toolkit_1.20.14_Update.zip, SHA256SUMS; asset digests match SHA256SUMS. Checks: full green run 42094412114 on the PR head; in the sibling run (42094402024) browser-workflows107 was cancelled at its 20-minute job limit while still passing (it had reached graph-navigation114), recorded as a slow-runner timeout. The same happened to browser-terminal127 on record PR #91.
