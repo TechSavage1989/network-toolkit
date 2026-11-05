@@ -1,6 +1,6 @@
 # Network Toolkit UI Guidelines
 
-**Status:** Adopted with the v1.19.0 stable release (2026-11-02), updated for the owner-approved v1.19.1 consolidation and the owner-requested 1.19.x changes. It describes the layout, components and wording as they ship in v1.20.12. The layout is frozen (see [Layout freeze](#layout-freeze)).
+**Status:** Adopted with the v1.19.0 stable release (2026-11-02), updated for the owner-approved v1.19.1 consolidation and the owner-requested 1.19.x changes. It describes the layout, components and wording as they ship in v1.20.13. The layout is frozen (see [Layout freeze](#layout-freeze)).
 
 **Authority:** [UX Polish Plan](UX_POLISH_PLAN.md). Sources of truth in code: `web/assets/ux-foundations.css` (tokens), the `:root` and `[data-theme="light"]` blocks in `web/index.html` (colors), `renderNavigation()` in `web/index.html` (navigation), and `web/assets/ux-command-palette.js` (shortcuts).
 
@@ -82,6 +82,11 @@ Tab strips (Terminal sessions, Text Editor documents; `web/assets/ux-tab-strip.c
 - Inactive tabs are transparent in `--muted`; hover `--hover`; the selected tab is `--accentBg` with accent text at weight 650, the same look as the page tabs. No underline or side borders.
 - Each tab keeps its status dot (Terminal) or unsaved marker (Text Editor), the "⋯" More actions button and the close button as 22 px quiet controls (`--faint`, `--muted` on the selected tab, `--hover` when hovered).
 - Every strip that can open a tab ends with a 30 px tab-shaped "+" button: dashed `--border`, accent plus icon, filling with `--accentBg` on hover. It is the only New tab control in each tool (the Terminal command bar's New tab button was removed at the owner's request in v1.20.6; command search keeps "Open a new terminal tab" and the Text Editor keeps Ctrl+N). The Terminal strip stays visible with just the "+" when no tab is open; the editor shows it in the single view and the left view only.
+- When tabs do not fit, the strip scrolls sideways: the mouse wheel over it scrolls left and right, and two quiet chevron buttons (22 px, `--muted`, `--hover` when hovered, faded when disabled at an end) are pinned to the right edge over a short `--side` fade. They appear only while the tabs overflow, are not tab stops, never switch tabs, and a newly selected tab is scrolled clear of them (v1.20.13).
+
+Sending between the Text Editor and the Terminal (v1.20.13, owner request):
+- Text Editor **More → Send to terminal** (Ctrl+Shift+Enter) sends the selection, or the whole document, to a connected Terminal session in the same window. The Terminal opens on that session and the text goes through the normal paste path, so the paste review, limits and destination checks apply; nothing is added (no Enter).
+- The Terminal console bar's icon-only **Send to Text Editor** button (beside Copy output; icon only so the bar keeps its single row) and the tab menu's "Send output to Text Editor…" send the chosen Last command / Last batch output (the Copy output text) or the selected terminal text to a new document or an open one. For an open document, the default asks for the position: a bar above the document says what is ready and offers **Insert here** and **Cancel**; the user places the cursor or selects text to replace. Start, end, the document's current cursor and a line number are also offered. Inserts are ordinary undoable edits and mark the document unsaved.
 
 Buttons:
 - One **primary** button per view, for the main action. Other actions use the default or `ghost` style; `small` inside toolbars and tab rows.

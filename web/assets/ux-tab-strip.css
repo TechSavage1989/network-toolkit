@@ -76,9 +76,46 @@
 .terminal-tabs>.terminal-add:focus-visible,.nt-editor-new-tab:focus-visible{outline:2px solid var(--ux-focus);outline-offset:-2px}
 .terminal-tabs>.terminal-add svg,.nt-editor-new-tab svg{width:15px;height:15px;display:block}
 
+/* Scroll controls (v1.20.13): two quiet chevrons pinned to the strip's right
+ * edge, shown only while the tabs overflow. They sit on the strip surface with
+ * a short fade so tabs scroll underneath them; disabled at either end. */
+.tab-scroll-controls{
+  position:sticky;right:0;z-index:2;display:flex;align-items:center;gap:2px;flex:0 0 auto;align-self:stretch;
+  margin-left:auto;padding-left:var(--ux-space-3);
+  background:linear-gradient(to right,transparent,var(--side) var(--ux-space-3));
+}
+.tab-scroll-controls[hidden]{display:none}
+.tab-scroll-button{
+  display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;align-self:center;
+  width:22px;height:var(--ux-control-height-small);min-width:0;min-height:0;margin:0;padding:0;
+  border:0;border-radius:var(--ux-radius-sm);background:transparent;color:var(--muted);cursor:pointer;
+  transition:background-color .14s ease,color .14s ease;
+}
+.tab-scroll-button:hover:not(:disabled){background:var(--hover);color:var(--text)}
+.tab-scroll-button:active:not(:disabled){background:var(--accentBg);color:var(--accent)}
+.tab-scroll-button:disabled{color:var(--faint);opacity:.45;cursor:default}
+.tab-scroll-button svg{width:14px;height:14px;display:block}
+.tab-scroll-button:focus-visible{outline:2px solid var(--ux-focus);outline-offset:-2px}
+
 /* Drag and drop keeps its accent edge markers; drop targets stay rounded. */
 .terminal-tab-drop-before,.nt-editor-tab[data-editor-drop-before]{box-shadow:inset 3px 0 var(--accent)}
 .terminal-tab-drop-after,.nt-editor-tab[data-editor-drop-after]{box-shadow:inset -3px 0 var(--accent)}
 
 @media(max-width:720px){.terminal-tab,.nt-editor-tab{min-width:135px}}
-@media (prefers-reduced-motion:reduce){.terminal-tab,.nt-editor-tab,.terminal-tabs>.terminal-add,.nt-editor-new-tab{transition:none}}
+@media (prefers-reduced-motion:reduce){.terminal-tab,.nt-editor-tab,.terminal-tabs>.terminal-add,.nt-editor-new-tab,.tab-scroll-button{transition:none}}
+
+/* Send between the Text Editor and the Terminal (v1.20.13). */
+.editor-send-terminal fieldset,.terminal-send-editor fieldset{margin:0 0 var(--ux-space-3);padding:0;border:0;min-width:0;display:flex;flex-direction:column;gap:var(--ux-space-1)}
+.editor-send-terminal legend,.terminal-send-editor legend{padding:0;margin-bottom:var(--ux-space-1);font-size:var(--ux-text-xs);font-weight:650;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.editor-send-terminal .toggle-row,.terminal-send-editor .toggle-row{margin:0;display:flex;align-items:flex-start;justify-content:flex-start;gap:var(--ux-space-2);text-align:left;cursor:pointer}
+.editor-send-terminal input[type=radio],.terminal-send-editor input[type=radio]{flex:0 0 auto;width:16px;height:16px;min-width:0;margin:2px 0 0;padding:0}
+.editor-send-terminal .toggle-row .help-line,.terminal-send-editor .toggle-row .help-line{display:inline;margin:0}
+.terminal-send-editor .terminal-send-existing,.terminal-send-editor .terminal-send-line{margin:var(--ux-space-1) 0 0 26px}
+.editor-send-error:empty,.terminal-send-error:empty{display:none}
+.editor-send-error,.terminal-send-error{color:var(--bad,var(--danger,#d64545))}
+/* The insert-position bar sits above the document until Insert here or Cancel. */
+.nt-editor-insert-bar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:var(--ux-space-2);
+  margin:var(--ux-space-1) var(--ux-space-2);padding:var(--ux-space-2) var(--ux-space-3);
+  border:1px solid var(--accent);border-radius:var(--ux-radius-sm);background:var(--accentBg);color:var(--text);font-size:var(--ux-text-xs)}
+.nt-editor-insert-text{min-width:0;flex:1 1 320px}
+.nt-editor-insert-actions{display:flex;gap:var(--ux-space-1);flex:none}
