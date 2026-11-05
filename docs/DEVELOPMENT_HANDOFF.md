@@ -1,3 +1,9 @@
+# v1.20.16 stable (2026-11-05) - candidate, NOT PUBLISHED
+
+Owner: "publish the stable release". Stable release of the 1.20.13 to 1.20.15 betas. No open owner-reported issues; the owner confirmed v1.20.13 on Windows ("it works well"); the v1.20.14 additions (editor right-click menu, toolbar Send to terminal, Terminal menu Send to Text Editor, icons) and the v1.20.15 Network discovery shortcut had not been reported on Windows when this was prepared. Known CI intermittents are slow-runner job timeouts (browser-workflows107, browser-terminal127) and windows-terminal, recorded in earlier entries. Release channel switched to stable (`updateBuildChannel`, docs/RELEASE_CHANNEL.txt), version 1.20.16 everywhere, release notes for stable users, UI guidelines status names v1.20.16. No application code changes beyond the channel constant. Next beta must switch the channel back to beta.
+
+---
+
 # v1.20.15 Beta 3 - publication verified (2026-11-05)
 
 Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.20.15 at 2026-11-05T21:10:57Z; stable latest remains v1.20.12. Merged PR #94; tag v1.20.15 points to merge commit d727ce39ab42c85bfb32847d897baf2efd8e1ea2. Release workflow run 42109784573 succeeded. Assets: Network_Toolkit.exe, Network_Toolkit_1.20.15_Portable.zip, Network_Toolkit_1.20.15_Update.zip, SHA256SUMS; asset digests match SHA256SUMS. Checks: green run 42107423129 on the PR head.
