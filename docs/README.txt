@@ -1,7 +1,7 @@
-NETWORK TOOLKIT 1.20.15
+NETWORK TOOLKIT 1.20.16
 ======================
 
-CURRENT RELEASE - 1.20.15 (BETA 3)
+CURRENT RELEASE - 1.20.16
 
 This is a compatibility entrypoint for existing portable packages and release
 validation. For current user instructions, see the Markdown guides:

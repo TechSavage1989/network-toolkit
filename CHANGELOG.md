@@ -1,3 +1,7 @@
+## 1.20.16 - Stable (candidate)
+
+- Stable release of the 1.20.13 to 1.20.15 betas: scrollable Terminal/Text Editor tab rows, sending between the Text Editor and the Terminal, the Text Editor right-click menu, Send to Text Editor in the Terminal menu, matching send icons, and the Network discovery shortcut on Monitor and Trace route. Release channel switched to stable; numbered above every beta so beta users also receive it; saved data and security confirmations unchanged.
+
 ## 1.20.15 Beta 3 - Network discovery shortcut on Monitor and Trace route (candidate)
 
 - Owner request: the "Scan a network in Network discovery" button and single-target note shown on Ping and Ports now also appear on Monitor and Trace route (`DISCOVERY_LINK_TOOLS`); the network sweep mode stays limited to Ping and Ports (`SUBNET_TOOLS`).

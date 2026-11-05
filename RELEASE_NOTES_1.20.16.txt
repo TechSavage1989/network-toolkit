@@ -1,0 +1,19 @@
+Network Toolkit 1.20.16
+
+## What's New
+
+- When there are more Terminal or Text Editor tabs than fit, scroll the tab row with the mouse wheel or the arrow buttons at its right end.
+- Send text from the Text Editor to a Terminal session with the terminal-with-arrow button on the toolbar, the new right-click menu or Ctrl+Shift+Enter. The Terminal opens on that session and the text is entered like a paste.
+- Send Terminal output or selected text to the Text Editor: a new document, or an open one at the spot you choose. Use the document-with-arrow button next to Copy output, the right-click menu or the tab menu.
+- Right-click the text in the Text Editor for Undo, Redo, Cut, Copy, Paste, Select all, Send to terminal, Find, Replace, Go to line, comment, duplicate, case changes and Format document.
+- Monitor and Trace route have the Scan a network in Network discovery button, as Ping does.
+
+## Additional Details
+
+- This stable release includes the 1.20.13 to 1.20.15 betas. Its version is higher than every beta, so beta users receive it too.
+- Sending to a terminal follows your Terminal paste settings: text with line breaks is shown for review first when Review multi-line paste is on, and the 1 MiB limit applies. Nothing extra is added.
+- Text sent to the Text Editor is an ordinary edit: Undo removes it and the document is marked unsaved.
+- If you had chosen your own Terminal right-click menu items, Send to Text Editor is added once; untick it in Mouse and keyboard settings to remove it.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Security confirmations, Windows/UAC approval, explicit update consent and checksum verification are unchanged.
+- Portable executable filename remains Network_Toolkit.exe.
+- Validation uses hosted builds and synthetic fixtures; the owner checked the 1.20.13 beta on Windows.
