@@ -533,7 +533,7 @@ html,body{height:auto!important;min-height:0!important;overflow:visible!importan
   <aside class="sidebar" id="sidebar" aria-label="Primary navigation">
     <div class="brand"><div class="brand-mark"><img src="../assets/Network_Toolkit_Icon.svg" width="36" height="36" alt="" draggable="false"></div><div><div class="brand-name">Network Toolkit</div><div class="brand-sub">Diagnostics workbench</div><span class="app-system-name" id="hostTop" tabindex="0">Local diagnostics</span></div></div>
     <div class="nav-scroll" id="navigation"></div>
-    <div class="sidebar-foot"><div class="engine-label" id="engineLabel"><span class="dot warn pulse"></span><span>Connecting to app</span></div><div class="engine-sub" id="engineSub">Portable edition · v1.20.14</div><div class="app-utility-actions"><button type="button" class="btn small ghost" id="uxCommandLauncher" title="Search tools and commands (Ctrl+Shift+P)" aria-keyshortcuts="Control+Shift+P" aria-label="Search tools and commands" aria-haspopup="dialog">Search</button><button class="iconbtn" id="themeButton" data-action="theme" aria-label="Switch color theme" title="Switch color theme"></button><button class="iconbtn" id="settingsButton" data-action="settings" aria-label="App settings" title="App settings"></button><button type="button" class="iconbtn" id="uxHelpLauncher" title="Keyboard shortcuts and help (F1)" aria-keyshortcuts="F1" aria-label="Keyboard shortcuts and help">?</button><span class="pill" id="runningCount" hidden>0 running</span></div></div>
+    <div class="sidebar-foot"><div class="engine-label" id="engineLabel"><span class="dot warn pulse"></span><span>Connecting to app</span></div><div class="engine-sub" id="engineSub">Portable edition · v1.20.15</div><div class="app-utility-actions"><button type="button" class="btn small ghost" id="uxCommandLauncher" title="Search tools and commands (Ctrl+Shift+P)" aria-keyshortcuts="Control+Shift+P" aria-label="Search tools and commands" aria-haspopup="dialog">Search</button><button class="iconbtn" id="themeButton" data-action="theme" aria-label="Switch color theme" title="Switch color theme"></button><button class="iconbtn" id="settingsButton" data-action="settings" aria-label="App settings" title="App settings"></button><button type="button" class="iconbtn" id="uxHelpLauncher" title="Keyboard shortcuts and help (F1)" aria-keyshortcuts="F1" aria-label="Keyboard shortcuts and help">?</button><span class="pill" id="runningCount" hidden>0 running</span></div></div>
   </aside>
   <main class="main">
     <span id="crumb" hidden>Overview</span>
@@ -552,7 +552,7 @@ html,body{height:auto!important;min-height:0!important;overflow:visible!importan
       </div>
       <div id="terminalWorkspace" class="hidden" role="region" aria-label="Terminal connections and output" tabindex="0"></div>
       </div>
-      <div class="app-foot"><span class="app-version">Network Toolkit 1.20.14 · Local, portable diagnostics</span><span id="footerStatus">No diagnostic has run.</span><span id="appNavigationFooterSlot"></span></div>
+      <div class="app-foot"><span class="app-version">Network Toolkit 1.20.15 · Local, portable diagnostics</span><span id="footerStatus">No diagnostic has run.</span><span id="appNavigationFooterSlot"></span></div>
     </div>
   </main>
 </div>
@@ -648,7 +648,7 @@ html,body{height:auto!important;min-height:0!important;overflow:visible!importan
 'use strict';
 const SESSION=/^[a-f0-9]{64}$/.test(window.__networkToolkitNativeSession||'')?window.__networkToolkitNativeSession:'__SESSION_TOKEN__';
 const OFFLINE=location.protocol==='file:' || !/^https?:$/.test(location.protocol) || SESSION==='__SESSION_'+'TOKEN__';
-const VERSION='1.20.14';
+const VERSION='1.20.15';
 const WINDOW_MODE='__WINDOW_MODE__';
 const TERMINAL_VIEW=(()=>{try{return JSON.parse('__TERMINAL_VIEW__')}catch{return null}})();
 const EDITOR_VIEW=(()=>{try{return JSON.parse('__EDITOR_VIEW__')}catch{return null}})();
@@ -696,6 +696,8 @@ const LOCAL_TOOLS=['ipconfig','routes','arp','connections','wifi'];
 const localJobRequests=new Set();
 async function refreshSelectedLocalTool(){const tool=state.localTab;if(state.activePage!=='local'||!['routes','arp','connections'].includes(tool)||OFFLINE||!online||shutDown||localJobRequests.has(tool)||runningToolJob(tool))return;await startJob();}
 const SUBNET_TOOLS=['ping','tcp'];
+// Single-target tools that show the "Scan a network in Network discovery" shortcut (owner request, v1.20.15: Monitor and Trace route as on Ping).
+const DISCOVERY_LINK_TOOLS=['ping','tcp','monitor','trace'];
 const jobTitle=j=>j?.tool==='quick'&&(j.result?.data?.scope==='subnet'||j.options?.scope==='subnet'||(j.events||[]).some(e=>e?.data?.type==='subnet-host'))?'Network check (previous version)':titleFor(j?.tool);
 const DEVICE_TOOLS=['identify','quick','ping','tcp','dns','trace','http','tls','monitor'];
 const DISCOVERY_PORT_PRESETS=[
@@ -848,7 +850,7 @@ function clearCurrentTarget(){if(!needsTarget())return;const input=$('#globalTar
 function renderTargetControls(){
 const t=activeTool(),network=networkMode(t),scope=$('#targetScope'),picker=$('#networkPicker');if(!scope||!picker)return;
 const choices=network?ensureNetworkSelection():localIPv4Choices();
-scope.innerHTML=SUBNET_TOOLS.includes(t)&&!network?'<div class="scope-discovery"><button type="button" class="btn small ghost" data-page="discover" title="Check every device on a network or address range">'+icon('search')+'Scan a network in Network discovery</button></div><span class="scope-note">One hostname or IP address.</span>':SUBNET_TOOLS.includes(t)?'<div class="scope-switch" role="group" aria-label="Target scope"><button type="button" data-target-scope="single" aria-pressed="false">'+icon('server')+'Single target</button><button type="button" data-target-scope="subnet" aria-pressed="true">'+icon('network')+'Networks and hosts</button></div><span class="scope-note">Add networks, individual IPv4 hosts or address ranges.</span>':'';
+scope.innerHTML=DISCOVERY_LINK_TOOLS.includes(t)&&!network?'<div class="scope-discovery"><button type="button" class="btn small ghost" data-page="discover" title="Check every device on a network or address range">'+icon('search')+'Scan a network in Network discovery</button></div><span class="scope-note">One hostname or IP address.</span>':SUBNET_TOOLS.includes(t)?'<div class="scope-switch" role="group" aria-label="Target scope"><button type="button" data-target-scope="single" aria-pressed="false">'+icon('server')+'Single target</button><button type="button" data-target-scope="subnet" aria-pressed="true">'+icon('network')+'Networks and hosts</button></div><span class="scope-note">Add networks, individual IPv4 hosts or address ranges.</span>':'';
 picker.classList.toggle('hidden',!network);picker.innerHTML=network?NetworkToolkitWorkspace.adapterCards(choices):'';
 NetworkToolkitWorkspace.targetInput(network);$('#targetLabel').textContent=network?'Scan scopes':TOOLS[t]?.label||'Current target';$('#globalTarget').placeholder=network?'192.168.1.0/24\n192.168.2.25\n192.168.3.1-50':TOOLS[t]?.target||'Hostname or IP address';$('#globalTarget').value=currentTarget();$('#saveCurrent').innerHTML=icon('bookmark');$('#saveCurrent').title=network?'Save these scan scopes':'Save current target';$('#targetHint').textContent=network?'Ctrl+Enter to start':'Enter to run';let help=$('#scanScopeHelp');if(!help){help=document.createElement('div');help.id='scanScopeHelp';$('#globalTarget').closest('.targetfield').append(help);}help.classList.toggle('hidden',!network);help.textContent='One scope per line, or separate with commas. Ctrl+Enter starts the scan.';updateNetworkRangeStatus();updateTargetClearControl();NetworkToolkitSource.render();NetworkToolkitScanRoutes.render();NetworkToolkitConfiguration.syncTarget();
 }

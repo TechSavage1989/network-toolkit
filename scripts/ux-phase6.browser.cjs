@@ -17,7 +17,7 @@ async function make(viewport){
   if(name.startsWith('/api/')){
    assert(['GET','PUT'].includes(method),'Unexpected API write: '+method+' '+name);
    let data={};
-   if(name==='/api/status')data={version:'1.20.14',os:'windows',arch:'amd64',system:{hostname:'SYNTHETIC-PHASE6',interfaces:[]}};
+   if(name==='/api/status')data={version:'1.20.15',os:'windows',arch:'amd64',system:{hostname:'SYNTHETIC-PHASE6',interfaces:[]}};
    if(name==='/api/state'){if(method==='PUT'){stored=request.postDataJSON();}else data=stored;}
    if(name==='/api/system')data={hostname:'SYNTHETIC-PHASE6',interfaces:[],gateways:[],dnsServers:[]};
    if(name==='/api/jobs'||name==='/api/jobs?brief=1')data=syntheticJobs;
@@ -105,6 +105,8 @@ const navLabels=p=>p.locator('#navigation .nav-item span:not(.badge):not(.sideba
  check('IP configuration shows Public IP, then Current configuration, then Network actions, which fill in after the slower adapter-state read');
  await p.evaluate(()=>navigate('ping'));assert.equal(await p.locator('[data-target-scope]').count(),0,'no sweep switch on Ping');
  await p.locator('.scope-discovery [data-page="discover"]').click();assert.equal(await p.evaluate(()=>state.activePage),'discover');
+ for(const tool of ['monitor','trace']){await p.evaluate(t=>navigate(t),tool);assert.equal(await p.locator('.scope-discovery [data-page="discover"]').textContent(),'Scan a network in Network discovery','shortcut on '+tool);await p.locator('.scope-discovery [data-page="discover"]').click();assert.equal(await p.evaluate(()=>state.activePage),'discover');}
+ check('Monitor and Trace route show the Scan a network in Network discovery shortcut, as Ping does');
  await p.evaluate(()=>useTarget('192.0.2.0/28','ping'));assert.equal(await p.evaluate(()=>[state.activePage,state.networkRange].join()),'discover,192.0.2.0/28');
  await p.evaluate(()=>{state.target='192.0.2.10';navigate('dns');});
  check('Network sweeps open in Network discovery; Ping and TCP ports check one target');

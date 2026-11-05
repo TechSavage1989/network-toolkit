@@ -1,3 +1,7 @@
+## 1.20.15 Beta 3 - Network discovery shortcut on Monitor and Trace route (candidate)
+
+- Owner request: the "Scan a network in Network discovery" button and single-target note shown on Ping and Ports now also appear on Monitor and Trace route (`DISCOVERY_LINK_TOOLS`); the network sweep mode stays limited to Ping and Ports (`SUBNET_TOOLS`).
+
 ## 1.20.14 Beta 2 - Text Editor right-click menu, Send to terminal on the toolbar (published 2026-11-05)
 
 - Owner requests: Send to terminal is an always-visible toolbar icon button (`sendTerminal` icon, terminal with arrow); new `editor-context-menu.js` gives the editor text a right-click / Menu key / Shift+F10 menu (Undo, Redo, Cut, Copy, Paste, Select all, Send to terminal, Find, Replace, Go to line, Toggle comment, Duplicate line, UPPERCASE, lowercase, Format document) through `NetworkToolkitFileEditor.textMenu`; the Terminal context menu gains `send-editor` (menu revision 2: added once to saved custom menus, Go and JS). Send to Text Editor uses a matching `sendEditor` icon (document with arrow).
