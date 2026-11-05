@@ -1,0 +1,16 @@
+Network Toolkit 1.20.14 Beta 2
+
+## What's New
+
+- Send to terminal is always on the Text Editor toolbar, as a terminal-with-arrow button next to Go to line.
+- Right-click the text in the Text Editor for a menu: Undo, Redo, Cut, Copy, Paste, Select all, Send to terminal, Find, Replace, Go to line, Toggle comment, Duplicate line, UPPERCASE, lowercase and Format document.
+- The Terminal's right-click menu has Send to Text Editor.
+- Send to Text Editor now uses a document-with-arrow icon that matches Send to terminal.
+
+## Additional Details
+
+- The editor menu also opens with the Menu key or Shift+F10, and items that cannot be used right now are greyed out. Send to terminal is labelled for the selection when text is selected, and for the whole document otherwise.
+- Cut and Paste in the menu are ordinary edits, so Undo works. If the clipboard cannot be read, the app says so; Ctrl+V still works.
+- The Terminal right-click menu shows these items when Right-click is set to Open menu (Mouse and keyboard settings); the Menu key and Shift+F10 open it anyway. If you had already chosen your own menu items, Send to Text Editor is added once; untick it in Mouse and keyboard settings to remove it.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Security confirmations and Windows/UAC approval are unchanged.
+- This is an opt-in beta. Stable users stay on 1.20.12. Portable executable filename remains Network_Toolkit.exe.

@@ -20,7 +20,8 @@ func TestTerminalInteractionPersistenceAndWindowTransfer(t *testing.T) {
 	want := map[string]any{
 		"copyOnSelect": false, "copyOnClick": false, "rightClick": "menu", "ctrlC": "copy-selection",
 		"pasteReview": true, "pasteIncludeCommands": false, "autoPager": true, "pagerKey": "auto",
-		"menuItems": []any{"copy-line", "copy-token", "paste"},
+		// Saved before revision 2, so Send to Text Editor is added once.
+		"menuItems": []any{"copy-line", "copy-token", "paste", "send-editor"}, "menuRevision": float64(2),
 	}
 	check := func(label string, data []byte) {
 		t.Helper()
@@ -80,7 +81,7 @@ func TestTerminalInteractionInvalidImportUsesDefaults(t *testing.T) {
 		t.Fatal(err)
 	}
 	prefs := state["terminalInteraction"].(map[string]any)
-	if prefs["copyOnSelect"] != true || prefs["copyOnClick"] != true || prefs["rightClick"] != "paste" || prefs["ctrlC"] != "copy-selection" || prefs["pasteReview"] != true || prefs["pasteIncludeCommands"] != false || prefs["autoPager"] != true || prefs["pagerKey"] != "auto" || len(prefs["menuItems"].([]any)) != 15 {
+	if prefs["copyOnSelect"] != true || prefs["copyOnClick"] != true || prefs["rightClick"] != "paste" || prefs["ctrlC"] != "copy-selection" || prefs["pasteReview"] != true || prefs["pasteIncludeCommands"] != false || prefs["autoPager"] != true || prefs["pagerKey"] != "auto" || len(prefs["menuItems"].([]any)) != 16 || prefs["menuRevision"] != float64(2) {
 		t.Fatalf("invalid import changed default terminal behavior: %#v", prefs)
 	}
 	if strings.Contains(response.Body.String(), "secret-canary") || strings.Contains(response.Body.String(), "run-command") {
@@ -126,5 +127,16 @@ func TestTerminalInteractionExplicitPagerOffAndSendCtrlCSurviveStateRoundTrip(t 
 	prefs := state["terminalInteraction"].(map[string]any)
 	if prefs["autoPager"] != false || prefs["ctrlC"] != "send" || prefs["pasteReview"] != false || prefs["rightClick"] != "menu" || prefs["pagerKey"] != "enter" {
 		t.Fatalf("round trip overwrote explicit choices: %#v", prefs)
+	}
+}
+
+func TestTerminalMenuAdditionShownOnceThenUserChoiceKept(t *testing.T) {
+	old := safeTerminalInteraction(map[string]any{"menuItems": []any{"copy", "paste"}})
+	if !reflect.DeepEqual(old["menuItems"], []string{"copy", "paste", "send-editor"}) || old["menuRevision"] != float64(2) {
+		t.Fatalf("custom menu saved before revision 2 did not gain Send to Text Editor: %#v", old)
+	}
+	kept := safeTerminalInteraction(map[string]any{"menuItems": []any{"copy", "paste"}, "menuRevision": float64(2)})
+	if !reflect.DeepEqual(kept["menuItems"], []string{"copy", "paste"}) {
+		t.Fatalf("unticking Send to Text Editor after revision 2 was not kept: %#v", kept)
 	}
 }

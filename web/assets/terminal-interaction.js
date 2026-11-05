@@ -16,6 +16,7 @@
     {id:'select-paste-output',label:'Select batch output',icon:'terminal',group:'output'},
     {id:'copy-paste-output',label:'Copy batch output',icon:'copy',group:'output'},
     {id:'copy-paste-all',label:'Copy commands + output',icon:'copy',group:'output'},
+    {id:'send-editor',label:'Send to Text Editor…',icon:'sendEditor',group:'output'},
     {id:'select-all',label:'Select all output',icon:'terminal',group:'clipboard'},
     {id:'search',label:'Find in output',icon:'search',key:'Ctrl+Shift+F',group:'output'},
     {id:'clear',label:'Clear scrollback',icon:'trash',group:'output'},
@@ -30,7 +31,11 @@
     {id:'disconnect',label:'Disconnect',icon:'stop',group:'session'},
     {id:'move',label:'Detach / reattach',icon:'external',group:'session'}
   ];
-  const DEFAULT_MENU = ['copy','copy-line','copy-token','paste','scroll-top','scroll-bottom','paste-start','copy-paste-output','select-all','search','export','zoom-in','zoom-out','control-c','move'];
+  const DEFAULT_MENU = ['copy','copy-line','copy-token','paste','scroll-top','scroll-bottom','paste-start','copy-paste-output','send-editor','select-all','search','export','zoom-in','zoom-out','control-c','move'];
+  // Menu items added after a user may have saved a custom selection are shown
+  // once (menuRevision 2 adds Send to Text Editor); unticking them later sticks.
+  const MENU_REVISION = 2, MENU_ADDED = {2:['send-editor']};
+  function migrateMenu(items, revision) { const list = items.slice(); for (let r = (Number.isInteger(revision) ? revision : 1) + 1; r <= MENU_REVISION; r++) for (const id of MENU_ADDED[r] || []) if (!list.includes(id)) list.push(id); return list; }
   const bound = new WeakMap(), liveBindings = new Set(), pasteStarts = new Map();
   let initialized = false, observed = null, focusEpoch = 0, pasteSequence = 0, pendingNativePaste = null;
   let review = null, approvedPaste = false, menu = null, menuDestination = null, modalObserver = null;
@@ -47,7 +52,8 @@
       pagerKey:['auto','space','enter'].includes(v.pagerKey) ? v.pagerKey : 'auto',
       rightClick:v.rightClick === 'menu' ? 'menu' : 'paste',
       ctrlC:v.ctrlC === 'send' ? 'send' : 'copy-selection',
-      menuItems:Array.isArray(v.menuItems) ? MENU_ITEMS.filter(item=>v.menuItems.includes(item.id)).map(item=>item.id) : DEFAULT_MENU.slice()
+      menuItems:Array.isArray(v.menuItems) ? (list=>MENU_ITEMS.filter(item=>list.includes(item.id)).map(item=>item.id))(migrateMenu(v.menuItems,v.menuRevision)) : DEFAULT_MENU.slice(),
+      menuRevision:MENU_REVISION
     };
   }
   function preferences() { return safePreferences(state.terminalInteraction); }
@@ -410,6 +416,7 @@
     const entry = token.entry;
     if (['paste','control-c','pager-toggle'].includes(id)) return validDestination(token);
     if (id === 'copy') return entry.xterm.hasSelection();
+    if (id === 'send-editor') return !!root.NetworkToolkitTerminalSendEditor?.available?.();
     if (id === 'copy-line') return !!token.copySnapshot?.line;
     if (id === 'copy-token') return !!token.copySnapshot?.token;
     if (id === 'disconnect') return terminalLive(entry) && terminalOwnerCanMutate(entry) && !entry.transferBusy;
@@ -460,6 +467,7 @@
       case 'paste-next': root.NetworkToolkitTerminalExtras?.step?.(entry,1); break;
       case 'select-paste-output': root.NetworkToolkitTerminalExtras?.select?.(entry,root.NetworkToolkitTerminalExtras.prefs(entry).pasteIncludeCommands,root.NetworkToolkitTerminalExtras.pasteChoice(entry)); break;
       case 'copy-paste-output': void root.NetworkToolkitTerminalExtras?.copy?.(entry,root.NetworkToolkitTerminalExtras.prefs(entry).pasteIncludeCommands,root.NetworkToolkitTerminalExtras.pasteChoice(entry)); break;
+      case 'send-editor': void root.NetworkToolkitTerminalSendEditor?.open(entry); break;
       case 'copy-paste-all': void root.NetworkToolkitTerminalExtras?.copy?.(entry,true,root.NetworkToolkitTerminalExtras.pasteChoice(entry)); break;
       case 'select-all': entry.xterm.selectAll(); if (preferences().copyOnSelect) void copyValue(entry.xterm.getSelection(),{entry,silent:true}); break;
       case 'search': showTerminalSearch(); return;
