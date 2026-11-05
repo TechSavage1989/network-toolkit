@@ -1,0 +1,16 @@
+Network Toolkit 1.20.13 Beta 1
+
+## What's New
+
+- When there are more Terminal or Text Editor tabs than fit, scroll the tab row with the mouse wheel, or use the small arrow buttons at its right end.
+- Send text from the Text Editor to a Terminal session: choose More, then Send to terminal (or press Ctrl+Shift+Enter). Pick the selection or the whole document and the session. The Terminal opens on that session and the text is entered like a paste.
+- Send Terminal output to the Text Editor: choose To editor in the console bar, next to Copy output. Put it in a new document or an open one. For an open document, click where it should go and choose Insert here.
+
+## Additional Details
+
+- The arrow buttons appear only while the tabs overflow. Each press scrolls by most of the row, and an arrow is greyed out at its end. They never switch tabs, and the selected tab is kept clear of them.
+- Sending to a terminal uses your Terminal paste settings: text with line breaks is shown for review first when Review multi-line paste is on, and the 1 MiB limit applies. Nothing extra is added, so a selection without a line break is typed but not run. Only connected sessions in the same window are offered. If the document changes while the dialog is open, nothing is sent and you are asked to reopen it.
+- To editor sends the same text as Copy output (Last command or Last batch, with Include commands as you set it), or the text you selected in the terminal. Besides choosing the spot yourself, you can insert at the start, the end, the document's current cursor or a line number. Inserting is an ordinary edit, so Undo removes it and the document is marked unsaved.
+- The tab menu also has Send output to Text Editor.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Security confirmations and Windows/UAC approval are unchanged.
+- This is an opt-in beta. Stable users stay on 1.20.12. Portable executable filename remains Network_Toolkit.exe.

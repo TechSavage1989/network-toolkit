@@ -1119,6 +1119,11 @@ jobs:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-security-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-customize-results
         run: node scripts/customize-layout.browser.cjs
+      - name: Check scrollable tab strips and sending between Text Editor and Terminal
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-security-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-tab-scroll-send-results
+        run: node scripts/tab-scroll-send.browser.cjs
       - name: Check credential UI boundaries with synthetic fixtures
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-security-browser-tests/node_modules/playwright

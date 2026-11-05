@@ -18,7 +18,7 @@ func serveWebAsset(w http.ResponseWriter, r *http.Request) {
 	contentType := ""
 	embeddedPath := "web" + r.URL.Path
 	switch r.URL.Path {
-	case "/assets/ux-phase5.js", "/assets/ux-customize.js", "/assets/ux-tab-recovery.js", "/assets/ux-settings.js", "/assets/ux-command-palette.js", "/assets/app-chrome.js", "/assets/sidebar-activity.js", "/assets/network-config-language.js", "/assets/editor-compare.js", "/assets/editor-alignment-model.js", "/assets/editor-aligned-compare.js", "/assets/editor-windows.js", "/assets/editor-drag.js", "/assets/editor-tab-groups.js", "/assets/editor-files-sidebar.js", "/assets/editor-saved-connections.js":
+	case "/assets/ux-phase5.js", "/assets/ux-customize.js", "/assets/ux-tab-scroll.js", "/assets/editor-send-terminal.js", "/assets/terminal-send-editor.js", "/assets/ux-tab-recovery.js", "/assets/ux-settings.js", "/assets/ux-command-palette.js", "/assets/app-chrome.js", "/assets/sidebar-activity.js", "/assets/network-config-language.js", "/assets/editor-compare.js", "/assets/editor-alignment-model.js", "/assets/editor-aligned-compare.js", "/assets/editor-windows.js", "/assets/editor-drag.js", "/assets/editor-tab-groups.js", "/assets/editor-files-sidebar.js", "/assets/editor-saved-connections.js":
 		contentType = "text/javascript; charset=utf-8"
 	case "/assets/app-chrome.css", "/assets/sidebar-activity.css", "/assets/editor-windows.css":
 		contentType = "text/css; charset=utf-8"

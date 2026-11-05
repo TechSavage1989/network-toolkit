@@ -1,3 +1,7 @@
+## 1.20.13 Beta 1 - Scrollable tab rows, send between Text Editor and Terminal (candidate)
+
+- Owner requests: Terminal and Text Editor tab strips scroll with the mouse wheel and gain right-pinned chevron scroll buttons shown only on overflow (`ux-tab-scroll.js`). Text Editor More → Send to terminal (Ctrl+Shift+Enter) sends the selection or document to a chosen connected session through `NetworkToolkitTerminalInteraction.pasteText` (paste review, limits, destination checks) (`editor-send-terminal.js`). Terminal console bar To editor / tab menu Send output to Text Editor sends the chosen output block (Copy output text) or the terminal selection to a new or open document; for an open document the editor shows an Insert here bar for the user to place the cursor, or inserts at start, end, cursor or a line (`terminal-send-editor.js`, `insertText`/`pickInsert` in `file-editor.js`). Release channel back to beta. New `tab-scroll-send.browser.cjs` in Checks.
+
 ## 1.20.12 - Stable (published 2026-11-04)
 
 - Stable release of the 1.20.3 to 1.20.11 betas: Text Editor Save As dialogs, faster Terminal typing, shared tab strip with "+", Terminal administrator tabs (new tab or restart in place), Close all, Saved reorder, drive letters, optional vault master password with strength gauge, credential usernames, drop-line rule, customizable and draggable Overview, reorderable test tabs kept across restarts. Release channel switched to stable; numbered above every beta so beta users also receive it; saved data and security confirmations unchanged.
