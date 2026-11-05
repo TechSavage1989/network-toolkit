@@ -1,4 +1,4 @@
-## 1.20.13 Beta 1 - Scrollable tab rows, send between Text Editor and Terminal (candidate)
+## 1.20.13 Beta 1 - Scrollable tab rows, send between Text Editor and Terminal (published 2026-11-05)
 
 - Owner requests: Terminal and Text Editor tab strips scroll with the mouse wheel and gain right-pinned chevron scroll buttons shown only on overflow (`ux-tab-scroll.js`). Text Editor More → Send to terminal (Ctrl+Shift+Enter) sends the selection or document to a chosen connected session through `NetworkToolkitTerminalInteraction.pasteText` (paste review, limits, destination checks) (`editor-send-terminal.js`). Terminal console bar Send to Text Editor (icon) / tab menu Send output to Text Editor sends the chosen output block (Copy output text) or the terminal selection to a new or open document; for an open document the editor shows an Insert here bar for the user to place the cursor, or inserts at start, end, cursor or a line (`terminal-send-editor.js`, `insertText`/`pickInsert` in `file-editor.js`). Release channel back to beta. New `tab-scroll-send.browser.cjs` in Checks.
 
