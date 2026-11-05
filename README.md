@@ -27,7 +27,7 @@
 - **Connect** with SSH, Telnet and supported serial terminals, using saved connections, multiple tabs and macros.
 - **Password manager:** save usernames with passwords or SSH keys in an encrypted vault, with or without a master password; a strength gauge helps you choose one.
 - **File Transfer:** browse, transfer and host files over SFTP, FTP/FTPS and TFTP from one page.
-- **Text Editor:** open, edit and compare text files, including common network device configurations. Send a selection or document to a Terminal session, and bring terminal output back into a document at the spot you choose.
+- **Text Editor:** open, edit and compare text files, including common network device configurations. A right-click menu with editing commands; send a selection or document to a Terminal session, and bring terminal output back into a document at the spot you choose.
 - **Local network:** view local network information and review authorized configuration changes.
 - **Network utilities:** Wake on LAN, an IPv4 subnet calculator, a transfer-time estimate and a MAC address formatter.
 - **Customizable Overview:** choose which dashboard sections to show, and drag them into the order you want; the layout is kept between runs.

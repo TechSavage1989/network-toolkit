@@ -149,6 +149,12 @@ func safeTerminalRecents(value any) []map[string]any {
 	return clean
 }
 
+// terminalMenuRevision counts additions to the built-in terminal menu.
+// Revision 2 added "send-editor" (Send to Text Editor).
+const terminalMenuRevision = 2
+
+var terminalMenuAdded = map[int][]string{2: {"send-editor"}}
+
 // Mouse and keyboard settings can cross a linked-window boundary. Keep that
 // object limited to presentation choices and known built-in menu actions.
 func safeTerminalInteraction(value any) map[string]any {
@@ -161,7 +167,8 @@ func safeTerminalInteraction(value any) map[string]any {
 		"pagerKey":             "auto",
 		"rightClick":           "paste",
 		"ctrlC":                "copy-selection",
-		"menuItems":            []string{"copy", "copy-line", "copy-token", "paste", "scroll-top", "scroll-bottom", "paste-start", "copy-paste-output", "select-all", "search", "export", "zoom-in", "zoom-out", "control-c", "move"},
+		"menuItems":            []string{"copy", "copy-line", "copy-token", "paste", "scroll-top", "scroll-bottom", "paste-start", "copy-paste-output", "send-editor", "select-all", "search", "export", "zoom-in", "zoom-out", "control-c", "move"},
+		"menuRevision":         float64(terminalMenuRevision),
 	}
 	source, ok := value.(map[string]any)
 	if !ok {
@@ -197,8 +204,19 @@ func safeTerminalInteraction(value any) map[string]any {
 		}
 	}
 	if selected != nil {
+		// Items added after the saved selection was made are shown once;
+		// unticking them later is kept (the saved revision is then current).
+		revision := 1
+		if saved, ok := source["menuRevision"].(float64); ok && saved == math.Trunc(saved) && saved >= 1 {
+			revision = int(saved)
+		}
+		for r := revision + 1; r <= terminalMenuRevision; r++ {
+			for _, id := range terminalMenuAdded[r] {
+				selected[id] = true
+			}
+		}
 		items := []string{}
-		for _, id := range []string{"copy", "copy-line", "copy-token", "paste", "scroll-top", "scroll-bottom", "paste-start", "paste-previous", "paste-next", "select-paste-output", "copy-paste-output", "copy-paste-all", "select-all", "search", "clear", "export", "zoom-in", "zoom-out", "reset-font", "fit", "maximize", "control-c", "pager-toggle", "reconnect", "disconnect", "move"} {
+		for _, id := range []string{"copy", "copy-line", "copy-token", "paste", "scroll-top", "scroll-bottom", "paste-start", "paste-previous", "paste-next", "select-paste-output", "copy-paste-output", "copy-paste-all", "send-editor", "select-all", "search", "clear", "export", "zoom-in", "zoom-out", "reset-font", "fit", "maximize", "control-c", "pager-toggle", "reconnect", "disconnect", "move"} {
 			if selected[id] {
 				items = append(items, id)
 			}

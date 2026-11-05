@@ -1,4 +1,16 @@
+# v1.20.14 Beta 2 - candidate, NOT PUBLISHED (2026-11-05)
+
+Owner check of v1.20.13 on Windows: "it works well". Owner: "please make the send to terminal an always visible tool, perhaps with an icon that makes sense for what it does. also add a right click menu to text editor that contains intuitive features and options, including send to terminal. also add send to text editor as an option in the terminal right click menu", then "add an arrow to the send to editor icon in terminal similar to the icon in the text editor for send to terminal".
+- Toolbar: `data-ed="sendTerminal"` moves from More to the main toolbar as an icon-only button (`.nt-editor-icon-button`, new `sendTerminal` icon) after Go to line; editor-toolbar113 still passes against the published-112 baseline (a text button had wrapped the toolbar).
+- Editor menu: `editor-context-menu.js` replaces the browser menu on the document text area (`textMenu.target`), reuses `.terminal-context-menu` styling, runs toolbar actions via `textMenu.run`, and Cut/Copy/Paste via `navigator.clipboard` + `replaceSelection` (undoable). Menu key / Shift+F10 open it; arrow keys, Escape and outside clicks behave like the Terminal menu. Coordinates fall back to the text area when an event has none.
+- Terminal menu: `send-editor` in `MENU_ITEMS` and `DEFAULT_MENU`; `menuRevision` 2 adds it once to saved custom selections (JS `safePreferences`, Go `safeTerminalInteraction` with `terminalMenuRevision`/`terminalMenuAdded`), and a later untick is kept. New `sendEditor` icon (document with the same arrow) on the console bar button, Terminal menu and tab menu.
+Tests: node (1583), Go (menu migration test), `tab-scroll-send.browser.cjs` (16 checks), editor-toolbar113 vs published-112, editor-drag115, editor-views112, editor-saved-connections113, terminal-pager, terminal-style107, terminal-paced-paste127, terminal-macro-recording, terminal-tab-click116, terminal-connection-dialog, ux-phase4/5/6, ui-consistency.
+
+---
+
 # v1.20.13 Beta 1 - publication verified (2026-11-05)
+
+Owner check on Windows: "it works well" (tab row scrolling, Send to terminal, terminal output to the editor).
 
 Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.20.13 at 2026-11-05T19:00:59Z; stable latest remains v1.20.12. Merged PR #90; tag v1.20.13 points to merge commit 9b247e94c118421fcf6998bd9c74b0cd3ca19233. Release workflow run 42089359513 succeeded. Assets: Network_Toolkit.exe, Network_Toolkit_1.20.13_Portable.zip, Network_Toolkit_1.20.13_Update.zip, SHA256SUMS; asset digests match SHA256SUMS. Checks: green runs 42087159510 and 42087169787 on the PR head. The first head failed browser-workflows107 (app-chrome109 detached 1024x720 terminal height) because the text "To editor" button wrapped the console bar with CI fonts; fixed by making it icon-only.
 

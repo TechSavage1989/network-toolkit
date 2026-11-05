@@ -119,3 +119,6 @@
   border:1px solid var(--accent);border-radius:var(--ux-radius-sm);background:var(--accentBg);color:var(--text);font-size:var(--ux-text-xs)}
 .nt-editor-insert-text{min-width:0;flex:1 1 320px}
 .nt-editor-insert-actions{display:flex;gap:var(--ux-space-1);flex:none}
+/* Icon-only editor toolbar button (Send to terminal, v1.20.14). */
+.nt-editor-icon-button{display:inline-flex;align-items:center;justify-content:center;min-width:32px;padding-inline:6px}
+.nt-editor-icon-button svg{width:16px;height:16px;display:block}

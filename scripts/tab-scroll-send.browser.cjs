@@ -11,8 +11,8 @@ const report={passed:false,checks:[],errors:[],scope:'Synthetic sessions and API
 const sessions=Array.from({length:14},(_,i)=>({id:'s'+(i+1),label:'lab-switch-'+String(i+1).padStart(2,'0'),type:'ssh',host:'192.0.2.'+(i+10),port:22,username:'operator',state:'connected',cols:100,rows:28}));
 (async()=>{if(output)fs.mkdirSync(output,{recursive:true});const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
  try{
-  const page=await browser.newPage({viewport:{width:1280,height:800}});page.setDefaultTimeout(15000);page.on('pageerror',e=>report.errors.push(e.message));
-  let saved={activePage:'terminal',appUpdatePreferences:{enabled:false},terminalInteraction:{pasteReview:true,copyOnSelect:false},terminalSidebarCollapsed:true};const inputs=[];
+  const context=await browser.newContext({viewport:{width:1280,height:800}});await context.grantPermissions(['clipboard-read','clipboard-write'],{origin});const page=await context.newPage();page.setDefaultTimeout(15000);page.on('pageerror',e=>report.errors.push(e.message));
+  let saved={activePage:'terminal',appUpdatePreferences:{enabled:false},terminalInteraction:{pasteReview:true,copyOnSelect:false,rightClick:'menu'},terminalSidebarCollapsed:true};const inputs=[];
   await page.route(origin+'/**',async route=>{if(await handleEditorActivityMetadata(route,origin,report))return;const req=route.request(),p=new URL(req.url()).pathname,method=req.method();
    if(p.startsWith('/api/')){let data={};
     if(p==='/api/status')data={version,os:'windows',arch:'amd64'};
@@ -72,7 +72,8 @@ const sessions=Array.from({length:14},(_,i)=>({id:'s'+(i+1),label:'lab-switch-'+
   if(output)await page.screenshot({path:path.join(output,'editor-tab-scroll.png'),clip:{x:0,y:0,width:1280,height:260}});
 
   // ---- Send to terminal ----
-  const openSend=async()=>{if(await page.locator('#ntEditorMoreActions').isHidden())await page.locator('#networkToolkitFileEditor .nt-editor-more summary').click();await page.locator('#networkToolkitFileEditor [data-ed="sendTerminal"]').click();await page.locator('#editorSendTerminalForm').waitFor();};
+  const openSend=async()=>{await page.locator('#networkToolkitFileEditor .nt-editor-toolbar [data-ed="sendTerminal"]').click();await page.locator('#editorSendTerminalForm').waitFor();};
+  assert.equal(await page.locator('#networkToolkitFileEditor .nt-editor-toolbar [data-ed="sendTerminal"]').isVisible(),true,'Send to terminal is always visible on the toolbar');assert.equal(await page.locator('#networkToolkitFileEditor .nt-editor-toolbar [data-ed="sendTerminal"] svg').count(),1,'it is an icon button');report.checks.push('Send to terminal is an always-visible toolbar icon button');
   const doc='show version\nshow ip interface brief\n';
   await page.locator('#networkToolkitFileEditor [data-ed-text]').fill(doc);
   await page.evaluate(()=>{const t=document.querySelector('#networkToolkitFileEditor [data-ed-text]');t.focus();t.setSelectionRange(0,12);});
@@ -151,6 +152,39 @@ const sessions=Array.from({length:14},(_,i)=>({id:'s'+(i+1),label:'lab-switch-'+
   assert.equal(await page.evaluate(()=>NetworkToolkitFileEditor.listDocuments().find(d=>d.active)?.dirty),true,'the new document is unsaved, so closing asks first');
   report.checks.push('Selected terminal text to a new document (marked unsaved)');
   if(output)await page.screenshot({path:path.join(output,'terminal-to-editor-new.png')});
+  // ---- Text Editor right-click menu ----
+  await page.evaluate(()=>{const t=document.querySelector('#networkToolkitFileEditor [data-ed-text]');t.value='alpha beta\ngamma';t.dispatchEvent(new Event('input',{bubbles:true}));t.focus();t.setSelectionRange(0,5);});
+  const text=page.locator('#networkToolkitFileEditor [data-ed-text]');
+  await page.evaluate(()=>{const t=document.querySelector('#networkToolkitFileEditor [data-ed-text]');t.focus();t.setSelectionRange(0,5);});
+  {const b=await text.boundingBox();await page.mouse.click(b.x+28,b.y+12,{button:'right'});}await page.locator('#editorContextMenu').waitFor();
+  assert.equal(await page.evaluate(()=>{const t=document.querySelector('#networkToolkitFileEditor [data-ed-text]');return [t.selectionStart,t.selectionEnd].join();}),'0,5','right-clicking inside the selection keeps it');
+  {const r=await page.locator('#editorContextMenu').boundingBox();assert(r.y>=0&&r.y+r.height<=800&&r.x>=0&&r.x+r.width<=1280,'menu inside the window: '+JSON.stringify(r));}
+  const labels=await page.locator('#editorContextMenu [role="menuitem"] span').allTextContents();
+  for(const label of ['Undo','Redo','Cut','Copy','Paste','Select all','Send selection to terminal…','Find','Replace','Go to line','Toggle comment','Duplicate line','UPPERCASE','lowercase','Format document'])assert(labels.includes(label),'menu has '+label+': '+JSON.stringify(labels));
+  if(output)await page.screenshot({path:path.join(output,'editor-context-menu.png')});
+  await page.locator('#editorContextMenu [data-editor-menu-action="cut"]').click();await page.waitForFunction(()=>document.querySelector('#networkToolkitFileEditor [data-ed-text]').value===' beta\ngamma');
+  assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),'alpha','Cut puts the selection on the clipboard');
+  await page.evaluate(()=>{const t=document.querySelector('#networkToolkitFileEditor [data-ed-text]');t.focus();t.setSelectionRange(t.value.length,t.value.length);});
+  await page.locator('#networkToolkitFileEditor [data-ed-text]').dispatchEvent('contextmenu',{clientX:400,clientY:300,button:2});await page.locator('#editorContextMenu [data-editor-menu-action="paste"]').click();
+  await page.waitForFunction(()=>document.querySelector('#networkToolkitFileEditor [data-ed-text]').value===' beta\ngammaalpha');
+  await page.locator('#networkToolkitFileEditor [data-ed-text]').dispatchEvent('contextmenu',{clientX:400,clientY:300,button:2});await page.locator('#editorContextMenu [data-editor-menu-action="undo"]').click();
+  await page.waitForFunction(()=>document.querySelector('#networkToolkitFileEditor [data-ed-text]').value===' beta\ngamma');
+  report.checks.push('Text Editor right-click menu: full set of editing items; Cut, Paste and Undo work on the document');
+  await page.keyboard.press('Escape');
+  await page.evaluate(()=>{const t=document.querySelector('#networkToolkitFileEditor [data-ed-text]');t.focus();t.setSelectionRange(1,5);});await page.keyboard.press('Shift+F10');await page.locator('#editorContextMenu').waitFor();
+  assert.equal(await page.evaluate(()=>document.activeElement?.closest('#editorContextMenu')!==null),true,'keyboard opens the menu with focus inside');
+  await page.locator('#editorContextMenu [data-editor-menu-action="sendTerminal"]').click();await page.locator('#editorSendTerminalForm').waitFor();
+  assert.equal(await page.locator('[name="editorSendWhat"][value="selection"]').isChecked(),true);await page.locator('#modalRoot [data-action="close-modal"]').first().click();
+  report.checks.push('Shift+F10 opens the menu; Send selection to terminal opens the send dialog');
+  // ---- Terminal right-click menu ----
+  await page.evaluate(()=>navigate('terminal'));await page.waitForFunction(()=>currentTerminal()?.info.id==='s9'&&terminalEntryAcceptsInput(currentTerminal()));
+  {const b=await page.locator('.terminal-pane:not(.hidden) .xterm-screen').first().boundingBox();await page.mouse.click(b.x+80,b.y+40,{button:'right'});}
+  await page.locator('#terminalContextMenu [data-terminal-menu-action="send-editor"]').waitFor();
+  if(output)await page.screenshot({path:path.join(output,'terminal-context-menu.png')});
+  await page.locator('#terminalContextMenu [data-terminal-menu-action="send-editor"]').click();await page.locator('#terminalSendEditorForm').waitFor();await page.locator('#modalRoot [data-action="close-modal"]').first().click();
+  assert.deepEqual(await page.evaluate(()=>NetworkToolkitTerminalInteraction.safePreferences({menuItems:['copy']}).menuItems),['copy','send-editor'],'a menu customized before this version gains the item once');
+  assert.deepEqual(await page.evaluate(()=>NetworkToolkitTerminalInteraction.safePreferences({menuItems:['copy'],menuRevision:2}).menuItems),['copy'],'unticking it later is kept');
+  report.checks.push('Terminal right-click menu has Send to Text Editor (added once to customized menus)');
   report.errors=report.errors.filter(e=>!/Synthetic fixture/.test(e));assert.deepEqual(report.errors,[]);report.passed=true;
  }finally{if(output)fs.writeFileSync(path.join(output,'tab-scroll-send-report.json'),JSON.stringify(report,null,2));await browser.close();}
  console.log(report.checks.join('\n'));
