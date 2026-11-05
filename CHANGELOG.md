@@ -1,4 +1,4 @@
-## 1.20.16 - Stable (candidate)
+## 1.20.16 - Stable (published 2026-11-05)
 
 - Stable release of the 1.20.13 to 1.20.15 betas: scrollable Terminal/Text Editor tab rows, sending between the Text Editor and the Terminal, the Text Editor right-click menu, Send to Text Editor in the Terminal menu, matching send icons, and the Network discovery shortcut on Monitor and Trace route. Release channel switched to stable; numbered above every beta so beta users also receive it; saved data and security confirmations unchanged.
 
