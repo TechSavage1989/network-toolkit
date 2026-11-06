@@ -94,15 +94,15 @@ jobs:
       - name: Embed Windows icon and version resources
         if: steps.release.outputs.publish == 'true'
         run: python3 scripts/build_windows_resources.py
-      - name: Build Windows x64 GUI application
+      - name: Build Windows x64 GUI application and Linux x86_64/aarch64 programs
         if: steps.release.outputs.publish == 'true'
         run: sh ./build.sh
-      - name: Package and verify portable source and binary-only updater assets
+      - name: Package and verify portable source, binary-only updater and Linux assets
         if: steps.release.outputs.publish == 'true'
         env:
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
           RELEASE_VERSION: ${{ steps.release.outputs.version }}
-        run: python3 scripts/github_release.py package --tag "$RELEASE_TAG" --exe "build/Network_Toolkit.exe"
+        run: python3 scripts/github_release.py package --tag "$RELEASE_TAG" --exe "build/Network_Toolkit.exe" --linux-x86-64 "build/linux-amd64/network-toolkit" --linux-aarch64 "build/linux-arm64/network-toolkit"
       - uses: actions/upload-artifact@v7
         if: steps.release.outputs.publish == 'true'
         with:

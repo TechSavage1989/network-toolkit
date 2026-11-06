@@ -542,13 +542,13 @@ jobs:
         run: node --test scripts/*.test.cjs
       - name: Embed Windows icon and version resources
         run: python3 scripts/build_windows_resources.py
-      - name: Build Windows x64 GUI application
+      - name: Build Windows x64 GUI application and Linux x86_64/aarch64 programs
         run: sh ./build.sh
-      - name: Package review build
-        if: startsWith(github.ref, 'refs/heads/review/hosts-editor-')
+      - name: Rehearse release packaging (Windows assets and Linux archives)
         run: |
           REVIEW_VERSION=$(node -p "require('./package.json').version")
-          python3 scripts/github_release.py package --tag "v${REVIEW_VERSION}" --exe build/Network_Toolkit.exe
+          python3 scripts/github_release.py package --tag "v${REVIEW_VERSION}" --exe build/Network_Toolkit.exe --linux-x86-64 build/linux-amd64/network-toolkit --linux-aarch64 build/linux-arm64/network-toolkit
+          python3 scripts/github_release.py verify --tag "v${REVIEW_VERSION}"
       - uses: actions/upload-artifact@v7
         if: startsWith(github.ref, 'refs/heads/review/hosts-editor-')
         with:

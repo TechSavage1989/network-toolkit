@@ -22,8 +22,7 @@ def snapshot(repo, tag, expected_commit, expected_manifest):
     item = release.gh_json(f'repos/{repo}/releases/tags/{tag}')
     release.require(not item['draft'] and not item['prerelease'], 'Expected a stable published release')
     current = tag.removeprefix('v')
-    allowed = {release.STABLE_EXE, f'Network_Toolkit_{current}_Portable.zip',
-               f'Network_Toolkit_{current}_Update.zip', 'SHA256SUMS'}
+    allowed = set(release.release_assets(current))
     assets = item['assets']
     names = [a['name'] for a in assets]
     release.require(len(names) == len(set(names)) and set(names) <= allowed and
@@ -75,8 +74,7 @@ def publish(output, directory, repo, tag, expected_commit, expected_manifest, ex
         release.require(re.fullmatch(r'[0-9a-f]{40}', expected_request_commit), 'Invalid request commit')
         request = release.gh_json(f'repos/{repo}/git/ref/heads/release-revision-v1.17.63')
         release.require(request['object']['sha'] == expected_request_commit, 'Revision request advanced after build')
-    names = [release.STABLE_EXE, f'Network_Toolkit_{current}_Portable.zip',
-             f'Network_Toolkit_{current}_Update.zip', 'SHA256SUMS']
+    names = release.release_assets(current)
     # SHA256SUMS is last; interrupted uploads cannot pass client checksum checks.
     for name in names:
         subprocess.run(['gh', 'release', 'upload', tag, str(output / name), '--repo', repo, '--clobber'], check=True)

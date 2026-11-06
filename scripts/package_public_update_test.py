@@ -24,7 +24,7 @@ class CombinedPackageTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / 'docs').mkdir()
-            for name in ['README.txt', 'RELEASE_NOTES_1.17.63.txt', 'VALIDATION.txt', 'UPDATING.txt', 'THIRD_PARTY_NOTICES.txt']:
+            for name in ['README.txt', 'RELEASE_NOTES_1.17.63.txt', 'VALIDATION.txt', 'UPDATING.txt', 'THIRD_PARTY_NOTICES.txt', 'LINUX_README.txt']:
                 (root / name if name.startswith('RELEASE_NOTES_') else root / 'docs' / name).write_text('Public release instructions')
             source = root / 'cmd/network-toolkit/main.go'
             source.parent.mkdir(parents=True)
@@ -34,8 +34,15 @@ class CombinedPackageTests(unittest.TestCase):
             exe = root / 'test.exe'
             exe.write_bytes(b'MZbinary')
             output = root / 'dist'
+            linux = {}
+            for arch, machine in package.release.LINUX_ARCHES:
+                header = bytearray(64)
+                header[:6] = b'\x7fELF\x02\x01'
+                header[16:20] = (2).to_bytes(2, 'little') + machine.to_bytes(2, 'little')
+                linux[arch] = root / ('network-toolkit-' + arch)
+                linux[arch].write_bytes(bytes(header) + b'1.17.63')
             with mock.patch.object(package.release, 'ROOT', root), mock.patch.object(package.release, 'validate', return_value='1.17.63'), mock.patch.object(package.release, 'check_exe'), mock.patch.object(package.release, 'source_files', return_value=[source, resources]):
-                package.release.package(exe, output, 'v1.17.63', False)
+                package.release.package(exe, output, 'v1.17.63', False, linux)
                 self.assertEqual(package.release.verify(output, 'v1.17.63'), '1.17.63')
                 with zipfile.ZipFile(output / 'Network_Toolkit_1.17.63_Portable.zip') as portable:
                     prefix = 'Network_Toolkit_1.17.63/'
@@ -44,7 +51,8 @@ class CombinedPackageTests(unittest.TestCase):
                     self.assertEqual(portable.read(prefix + 'README.txt'), (root / 'docs/README.txt').read_bytes())
                     self.assertEqual(portable.read(prefix + 'VALIDATION.txt'), (root / 'docs/VALIDATION.txt').read_bytes())
                 names = package.release.check_sums((output / 'SHA256SUMS').read_bytes(), lambda n: (output / n).read_bytes())
-                self.assertEqual(names, {'Network_Toolkit.exe', 'Network_Toolkit_1.17.63_Portable.zip', 'Network_Toolkit_1.17.63_Update.zip'})
+                self.assertEqual(names, {'Network_Toolkit.exe', 'Network_Toolkit_1.17.63_Portable.zip', 'Network_Toolkit_1.17.63_Update.zip',
+                                         'Network_Toolkit_1.17.63_Linux_x86_64.tar.gz', 'Network_Toolkit_1.17.63_Linux_aarch64.tar.gz'})
                 archive = output / 'Network_Toolkit_1.17.63_Update.zip'
                 with zipfile.ZipFile(archive, 'a') as z:
                     z.writestr('Network_Toolkit_1.17.63/unexpected.go', 'not allowed')
