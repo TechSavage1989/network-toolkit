@@ -11,5 +11,5 @@ func ConfirmCredentialDestination(ctx context.Context, request CredentialDestina
 	if err := validateCredentialConfirmationContext(ctx); err != nil {
 		return false, err
 	}
-	return false, errors.New("Credential destination approval requires the native Windows application")
+	return false, errors.New("Saved credentials come to the Linux edition in a later beta")
 }

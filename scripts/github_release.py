@@ -13,11 +13,28 @@ import runpy
 import struct
 import subprocess
 import sys
+import tarfile
+import gzip
+import io
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
 VERSION_PATTERN = r'(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)'
 STABLE_EXE = 'Network_Toolkit.exe'
+# Linux edition (docs/LINUX_PLAN.md): one portable .tar.gz per architecture.
+LINUX_EXE = 'network-toolkit'
+LINUX_ARCHES = (('x86_64', 62), ('aarch64', 183))  # release name, ELF e_machine
+LINUX_MTIME = 1767225600  # 2026-01-01T00:00:00Z: reproducible archive entries
+
+
+def linux_archive_name(current, arch):
+    return f'Network_Toolkit_{current}_Linux_{arch}.tar.gz'
+
+
+def release_assets(current):
+    """Every published asset, in upload order; SHA256SUMS is always last."""
+    return [STABLE_EXE, f'Network_Toolkit_{current}_Portable.zip', f'Network_Toolkit_{current}_Update.zip',
+            *[linux_archive_name(current, arch) for arch, _ in LINUX_ARCHES], 'SHA256SUMS']
 
 
 def require(condition, message):
@@ -218,8 +235,10 @@ def sums(items):
     return ''.join(f'{sha(data)}  {name}\n' for name, data in sorted(items.items())).encode()
 
 
-def package(exe, output, tag, allow_untracked):
+def package(exe, output, tag, allow_untracked, linux=None):
     current = validate(tag)
+    linux = linux or {}
+    require(set(linux) == {arch for arch, _ in LINUX_ARCHES}, 'Provide the Linux x86_64 and aarch64 executables')
     output.mkdir(parents=True, exist_ok=True)
     binary = exe.read_bytes()
     check_exe(binary, current)
@@ -251,11 +270,69 @@ def package(exe, output, tag, allow_untracked):
     atomic_write(output / STABLE_EXE, binary)
     import package_public_update
     update_archive = package_public_update.package(exe, output, write_manifest=False)
+    linux_archives = [package_linux(linux[arch].read_bytes(), current, arch, machine, output) for arch, machine in LINUX_ARCHES]
     atomic_write(output / 'SHA256SUMS', sums({STABLE_EXE: binary, archive.name: archive.read_bytes(),
-                                           update_archive.name: update_archive.read_bytes()}))
+                                           update_archive.name: update_archive.read_bytes(),
+                                           **{path.name: path.read_bytes() for path in linux_archives}}))
     verify(output, tag)
     print(json.dumps({'version': current, 'archive': str(archive), 'bytes': archive.stat().st_size,
                       'sha256': sha(archive.read_bytes()), 'members': len(entries)}))
+
+
+def check_linux_exe(data, current, machine):
+    require(data[:4] == b'\x7fELF' and data[4] == 2 and data[5] == 1, 'Linux executable is not a 64-bit little-endian ELF file')
+    require(struct.unpack_from('<H', data, 18)[0] == machine, 'Linux executable architecture differs from its archive name')
+    require(struct.unpack_from('<H', data, 16)[0] in (2, 3), 'Linux file is not an executable')
+    require(current.encode() in data, 'Linux executable version differs from the release version')
+
+
+def package_linux(binary, current, arch, machine, output):
+    check_linux_exe(binary, current, machine)
+    prefix = f'Network_Toolkit_{current}_Linux_{arch}'
+    entries = {LINUX_EXE: binary,
+               'README.txt': (ROOT / 'docs' / 'LINUX_README.txt').read_bytes(),
+               f'RELEASE_NOTES_{current}.txt': (ROOT / f'RELEASE_NOTES_{current}.txt').read_bytes(),
+               'VALIDATION.txt': (ROOT / 'docs' / 'VALIDATION.txt').read_bytes()}
+    entries['SHA256SUMS'] = sums(entries)
+    archive = output / linux_archive_name(current, arch)
+    raw = io.BytesIO()
+    with gzip.GzipFile(fileobj=raw, mode='wb', compresslevel=9, mtime=0) as compressed:
+        with tarfile.open(fileobj=compressed, mode='w', format=tarfile.USTAR_FORMAT) as bundle:
+            folder = tarfile.TarInfo(prefix)
+            folder.type, folder.mode, folder.mtime = tarfile.DIRTYPE, 0o755, LINUX_MTIME
+            bundle.addfile(folder)
+            for name, data in sorted(entries.items()):
+                info = tarfile.TarInfo(prefix + '/' + name)
+                info.size, info.mtime = len(data), LINUX_MTIME
+                info.mode = 0o755 if name == LINUX_EXE else 0o644
+                info.uid = info.gid = 0
+                info.uname = info.gname = ''
+                bundle.addfile(info, io.BytesIO(data))
+    atomic_write(archive, raw.getvalue())
+    verify_linux(archive, current, arch, machine)
+    return archive
+
+
+def verify_linux(archive, current, arch, machine):
+    prefix = f'Network_Toolkit_{current}_Linux_{arch}'
+    with tarfile.open(archive, mode='r:gz') as bundle:
+        members = bundle.getmembers()
+        names = [m.name for m in members]
+        require(len(names) == len(set(names)), 'Linux archive has duplicate entries')
+        require(members and members[0].name == prefix and members[0].isdir(), 'Linux archive must start with its folder')
+        files = {}
+        for member in members[1:]:
+            require(member.name.startswith(prefix + '/') and '..' not in Path(member.name).parts and '/' not in member.name[len(prefix) + 1:],
+                    f'Unsafe Linux archive member: {member.name}')
+            require(member.isfile(), f'Linux archive may contain only regular files: {member.name}')
+            name = member.name[len(prefix) + 1:]
+            require((member.mode & 0o777) == (0o755 if name == LINUX_EXE else 0o644), f'Unexpected permissions: {name}')
+            files[name] = bundle.extractfile(member).read()
+        require(LINUX_EXE in files and 'SHA256SUMS' in files, 'Linux archive is missing its program or checksums')
+        listed = check_sums(files['SHA256SUMS'], lambda name: files[name])
+        require(listed | {'SHA256SUMS'} == set(files), 'Unverified entries found in Linux archive')
+        check_linux_exe(files[LINUX_EXE], current, machine)
+    return files[LINUX_EXE]
 
 
 def check_sums(manifest, load):
@@ -277,8 +354,10 @@ def verify(output, tag=None):
     archive = output / f'Network_Toolkit_{current}_Portable.zip'
     release_names = check_sums((output / 'SHA256SUMS').read_bytes(), lambda name: (output / name).read_bytes())
     update_archive = output / f'Network_Toolkit_{current}_Update.zip'
-    require(release_names == {STABLE_EXE, archive.name, update_archive.name},
+    require(release_names == set(release_assets(current)) - {'SHA256SUMS'},
             'Unexpected release assets in checksum manifest')
+    for arch, machine in LINUX_ARCHES:
+        verify_linux(output / linux_archive_name(current, arch), current, arch, machine)
     import package_public_update
     package_public_update.verify_archive(update_archive, (output / STABLE_EXE).read_bytes(), current)
     check_exe((output / STABLE_EXE).read_bytes(), current)
@@ -312,9 +391,7 @@ def publish(output, repo, tag):
                '--notes-file', str(ROOT / f'RELEASE_NOTES_{current}.txt')]
     if release_channel() == 'beta':
         command.append('--prerelease')
-    command.extend([str(output / STABLE_EXE), str(output / f'Network_Toolkit_{current}_Portable.zip'),
-                    str(output / f'Network_Toolkit_{current}_Update.zip'),
-                    str(output / 'SHA256SUMS')])
+    command.extend(str(output / name) for name in release_assets(current))
     subprocess.run(command, check=True)
 
 
@@ -335,6 +412,9 @@ def main():
             command.add_argument('--expected-new-commit', default='')
         if name == 'package':
             command.add_argument('--exe', type=Path, required=True)
+            for arch, _ in LINUX_ARCHES:
+                command.add_argument('--linux-' + arch.replace('_', '-'), type=Path, required=True, dest='linux_' + arch,
+                                     help=f'Linux {arch} executable')
             command.add_argument('--allow-untracked-source', action='store_true', help='Explicit local setup/testing only')
         if name == 'publish':
             command.add_argument('--repo', required=True)
@@ -347,7 +427,8 @@ def main():
         else:
             prepare(args.tag, args.default_branch, args.revision, args.expected_old_commit, args.expected_old_manifest, args.expected_new_commit)
     elif args.command == 'package':
-        package(args.exe, args.output_dir.resolve(), args.tag, args.allow_untracked_source)
+        package(args.exe, args.output_dir.resolve(), args.tag, args.allow_untracked_source,
+                {arch: getattr(args, 'linux_' + arch) for arch, _ in LINUX_ARCHES})
     elif args.command == 'verify':
         print('Verified ' + verify(args.output_dir.resolve(), args.tag))
     else:

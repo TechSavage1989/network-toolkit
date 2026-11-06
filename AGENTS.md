@@ -39,6 +39,12 @@ Use the repo's existing scripts and vendored dependencies:
 
 Where fixtures/browser/native host tests need platform-specific setup, run the established .github/workflows/checks.yml jobs in hosted GitHub Actions. Never claim physical Windows or live-device acceptance from synthetic tests.
 
+## Linux edition
+- Plan and phase status: docs/LINUX_PLAN.md. Windows file names, the Windows updater, saved data and behaviour must not change for Linux work.
+- In Linux window mode the session token reaches only the window the app opened (one-time `/launch` link and `ntk_window` cookie, `browser_launch_gate.go`). Never serve the token in a page without that check, and never launch a browser with `--no-sandbox` or similar.
+- Releases include `Network_Toolkit_<ver>_Linux_x86_64.tar.gz` and `_Linux_aarch64.tar.gz`; `build.sh` builds them and `github_release.py package` needs `--linux-x86-64` and `--linux-aarch64`.
+- `build.sh` pins `GOTOOLCHAIN=local`; if the system Go is older than go.mod, put the matching toolchain first on PATH.
+
 ## Release procedure
 1. Inspect the current main branch, release notes, handoff, tags, CI and updater channel.
 2. Make one reviewed beta per approved UX phase, with relevant behavior/data regressions and screenshots.

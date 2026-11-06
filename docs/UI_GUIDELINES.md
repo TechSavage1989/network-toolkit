@@ -1,6 +1,6 @@
 # Network Toolkit UI Guidelines
 
-**Status:** Adopted with the v1.19.0 stable release (2026-11-02), updated for the owner-approved v1.19.1 consolidation and the owner-requested 1.19.x changes. It describes the layout, components and wording as they ship in v1.20.16. The layout is frozen (see [Layout freeze](#layout-freeze)).
+**Status:** Adopted with the v1.19.0 stable release (2026-11-02), updated for the owner-approved v1.19.1 consolidation and the owner-requested 1.19.x changes. It describes the layout, components and wording as they ship in v1.21.0. The layout is frozen (see [Layout freeze](#layout-freeze)).
 
 **Authority:** [UX Polish Plan](UX_POLISH_PLAN.md). Sources of truth in code: `web/assets/ux-foundations.css` (tokens), the `:root` and `[data-theme="light"]` blocks in `web/index.html` (colors), `renderNavigation()` in `web/index.html` (navigation), and `web/assets/ux-command-palette.js` (shortcuts).
 
@@ -83,6 +83,8 @@ Tab strips (Terminal sessions, Text Editor documents; `web/assets/ux-tab-strip.c
 - Each tab keeps its status dot (Terminal) or unsaved marker (Text Editor), the "⋯" More actions button and the close button as 22 px quiet controls (`--faint`, `--muted` on the selected tab, `--hover` when hovered).
 - Every strip that can open a tab ends with a 30 px tab-shaped "+" button: dashed `--border`, accent plus icon, filling with `--accentBg` on hover. It is the only New tab control in each tool (the Terminal command bar's New tab button was removed at the owner's request in v1.20.6; command search keeps "Open a new terminal tab" and the Text Editor keeps Ctrl+N). The Terminal strip stays visible with just the "+" when no tab is open; the editor shows it in the single view and the left view only.
 - When tabs do not fit, the strip scrolls sideways: the mouse wheel over it scrolls left and right, and two quiet chevron buttons (22 px, `--muted`, `--hover` when hovered, faded when disabled at an end) are pinned to the right edge over a short `--side` fade. They appear only while the tabs overflow, are not tab stops, never switch tabs, and a newly selected tab is scrolled clear of them (v1.20.13).
+
+Linux edition (v1.21.0): the interface is the same. Its window is an app-mode browser window titled Network Toolkit; when no Chromium-family browser is installed, a power button (Quit Network Toolkit) joins the sidebar's utility buttons. App settings → General starts with an Applications menu block (Add / Update menu entry, Remove from menu). Features not yet on Linux keep their place and say they come in a later beta.
 
 Test a target, Scan a network shortcut (v1.20.15, owner request): Ping, Ports, Monitor and Trace route show the "Scan a network in Network discovery" button and the "One hostname or IP address." note above the target field (`DISCOVERY_LINK_TOOLS`). Ping and Ports keep their network sweep mode; Monitor and Trace route only link to Network discovery.
 

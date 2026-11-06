@@ -63,6 +63,7 @@ type Job struct {
 }
 
 type application struct {
+	launchGate                   *browserLaunchGate // Linux browser window: one-time launch link; nil elsewhere
 	activity                     activityOperations
 	explorerTransfers            explorerTransferManager
 	ctx                          context.Context
@@ -317,6 +318,12 @@ func main() {
 	if runtime.GOOS == "windows" && !*noBrowser {
 		a.uiHost = "webview2"
 	}
+	if runtime.GOOS == "linux" && !*noBrowser {
+		// Linux window mode: the page is opened through a one-time launch link
+		// and only that window receives the session token (browser_launch_gate.go).
+		a.launchGate = newBrowserLaunchGate()
+		setLinuxLaunchGate(a.launchGate)
+	}
 	var serverShutdownDone chan struct{}
 	defer func() {
 		a.stop()
@@ -494,9 +501,16 @@ func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusForbidden, "This host is not allowed.")
 		return
 	}
+	if a.launchGate.HandleLaunch(w, r) {
+		return
+	}
 	if r.URL.Path == "/" {
 		if r.Method != http.MethodGet {
 			methodError(w)
+			return
+		}
+		if !a.launchGate.Allowed(r) {
+			a.launchGate.Refuse(w)
 			return
 		}
 		b, err := web.ReadFile("web/index.html")
@@ -558,6 +572,7 @@ func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusForbidden, "Cross-site requests are not allowed.")
 		return
 	}
+	lastPageRequest.Store(time.Now().UnixNano())
 	if activationOnly {
 		a.handleTerminalWindow(w, r)
 		return
@@ -595,7 +610,7 @@ func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		a.stateMu.Lock()
 		writable, storageErr := a.storageWritable, a.storageError
 		a.stateMu.Unlock()
-		jsonResponse(w, 200, map[string]any{"name": appName, "version": model.Version, "os": runtime.GOOS, "arch": runtime.GOARCH, "uiHost": a.uiHost, "windowMode": a.windowMode, "localShellAvailable": terminal.LocalShellAvailable(), "terminalWindowAvailable": a.windowMode == "terminal" || a.openTerminalWindow != nil, "terminalDetachAvailable": a.launchTerminalView != nil, "editorWindowAvailable": a.launchEditorView != nil && a.editorViews != nil, "connectionLaunchAvailable": runtime.GOOS == "windows", "started": a.started.UTC().Format(time.RFC3339), "portable": true, "storagePath": a.dataPath, "storageWritable": writable, "storageError": storageErr, "capabilities": capabilities, "limits": map[string]int{"maxJobs": maxConcurrent, "maxHistory": maxRetained}, "system": a.getSystem(false)})
+		jsonResponse(w, 200, map[string]any{"name": appName, "version": model.Version, "os": runtime.GOOS, "arch": runtime.GOARCH, "uiHost": a.currentUIHost(), "windowMode": a.windowMode, "localShellAvailable": terminal.LocalShellAvailable(), "terminalWindowAvailable": a.windowMode == "terminal" || a.openTerminalWindow != nil, "terminalDetachAvailable": a.launchTerminalView != nil, "editorWindowAvailable": a.launchEditorView != nil && a.editorViews != nil, "connectionLaunchAvailable": runtime.GOOS == "windows", "started": a.started.UTC().Format(time.RFC3339), "portable": true, "storagePath": a.dataPath, "storageWritable": writable, "storageError": storageErr, "capabilities": capabilities, "limits": map[string]int{"maxJobs": maxConcurrent, "maxHistory": maxRetained}, "system": a.getSystem(false)})
 	case r.URL.Path == "/api/terminal-views" || strings.HasPrefix(r.URL.Path, "/api/terminal-views/"):
 		a.handleTerminalViews(w, r)
 	case strings.HasPrefix(r.URL.Path, "/api/terminal-automation/"):
@@ -684,6 +699,8 @@ func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		_ = json.Unmarshal(b, &jobs)
 		w.Header().Set("Content-Disposition", `attachment; filename="Network_Toolkit_Report.json"`)
 		jsonResponse(w, 200, map[string]any{"app": appName, "version": model.Version, "exported": time.Now().UTC().Format(time.RFC3339), "system": a.getSystem(false), "jobs": jobs})
+	case r.URL.Path == "/api/linux/desktop-entry":
+		a.handleDesktopEntry(w, r)
 	case r.URL.Path == "/api/shutdown":
 		if r.Method != http.MethodPost {
 			methodError(w)

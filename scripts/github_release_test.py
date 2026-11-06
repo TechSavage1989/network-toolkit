@@ -132,3 +132,89 @@ class ReleaseGuards(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+def fake_elf(machine, version):
+    import struct
+    header = bytearray(64)
+    header[:6] = b'\x7fELF\x02\x01'
+    struct.pack_into('<HH', header, 16, 2, machine)
+    return bytes(header) + b'\x00' * 64 + version.encode() + b'\x00synthetic'
+
+
+class LinuxArchives(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.output = Path(self.temporary.name)
+        self.current = release.version()
+
+    def build(self, arch='x86_64', machine=62):
+        return release.package_linux(fake_elf(machine, self.current), self.current, arch, machine, self.output)
+
+    def test_archive_round_trip_is_reproducible_and_verified(self):
+        first = self.build().read_bytes()
+        second = self.build().read_bytes()
+        self.assertEqual(first, second, 'Linux archives must be reproducible')
+        import tarfile
+        with tarfile.open(self.output / release.linux_archive_name(self.current, 'x86_64')) as bundle:
+            program = bundle.getmember(f'Network_Toolkit_{self.current}_Linux_x86_64/network-toolkit')
+            self.assertEqual(program.mode & 0o777, 0o755)
+            self.assertEqual((program.uid, program.gid), (0, 0))
+            self.assertIn(f'Network_Toolkit_{self.current}_Linux_x86_64/README.txt', bundle.getnames())
+
+    def test_wrong_architecture_or_version_is_rejected(self):
+        with self.assertRaises(ValueError):
+            release.package_linux(fake_elf(183, self.current), self.current, 'x86_64', 62, self.output)
+        with self.assertRaises(ValueError):
+            release.package_linux(fake_elf(62, '0.0.1'), self.current, 'x86_64', 62, self.output)
+        with self.assertRaises(ValueError):
+            release.package_linux(b'MZ' + b'\x00' * 200 + self.current.encode(), self.current, 'x86_64', 62, self.output)
+
+    def rewrite(self, mutate):
+        import gzip, tarfile
+        archive = self.build()
+        members = []
+        with tarfile.open(archive) as bundle:
+            for member in bundle.getmembers():
+                data = bundle.extractfile(member).read() if member.isfile() else None
+                members.append((member, data))
+        mutate(members)
+        raw = io.BytesIO()
+        with gzip.GzipFile(fileobj=raw, mode='wb', mtime=0) as compressed:
+            with tarfile.open(fileobj=compressed, mode='w', format=tarfile.USTAR_FORMAT) as bundle:
+                for member, data in members:
+                    bundle.addfile(member, io.BytesIO(data) if data is not None else None)
+        archive.write_bytes(raw.getvalue())
+        return archive
+
+    def test_unsafe_or_unlisted_entries_are_rejected(self):
+        import tarfile
+        prefix = f'Network_Toolkit_{self.current}_Linux_x86_64'
+        def add_symlink(members):
+            link = tarfile.TarInfo(prefix + '/escape')
+            link.type, link.linkname = tarfile.SYMTYPE, '/etc/passwd'
+            members.append((link, None))
+        def add_extra(members):
+            extra = tarfile.TarInfo(prefix + '/extra.sh')
+            extra.size, extra.mode = 3, 0o644
+            members.append((extra, b'x=1'))
+        def make_writable(members):
+            for member, _ in members:
+                if member.name.endswith('/network-toolkit'):
+                    member.mode = 0o777
+        def escape(members):
+            outside = tarfile.TarInfo('../outside')
+            outside.size = 1
+            members.append((outside, b'x'))
+        for mutate in (add_symlink, add_extra, make_writable, escape):
+            archive = self.rewrite(mutate)
+            with self.subTest(mutate.__name__), self.assertRaises(ValueError):
+                release.verify_linux(archive, self.current, 'x86_64', 62)
+
+    def test_release_asset_order_keeps_checksums_last_and_windows_names(self):
+        names = release.release_assets(self.current)
+        self.assertEqual(names[:3], ['Network_Toolkit.exe', f'Network_Toolkit_{self.current}_Portable.zip', f'Network_Toolkit_{self.current}_Update.zip'])
+        self.assertEqual(names[-1], 'SHA256SUMS')
+        self.assertIn(f'Network_Toolkit_{self.current}_Linux_x86_64.tar.gz', names)
+        self.assertIn(f'Network_Toolkit_{self.current}_Linux_aarch64.tar.gz', names)

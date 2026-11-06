@@ -32,6 +32,10 @@ func (a *application) serveTerminalView(w http.ResponseWriter, r *http.Request) 
 		http.NotFound(w, r)
 		return
 	}
+	if !a.launchGate.Allowed(r) {
+		a.launchGate.Refuse(w)
+		return
+	}
 	b, err := web.ReadFile("web/index.html")
 	if err != nil {
 		jsonError(w, 500, "Interface unavailable.")
@@ -331,7 +335,7 @@ func (a *application) serveDetachedAPI(w http.ResponseWriter, r *http.Request, i
 			methodError(w)
 			return
 		}
-		jsonResponse(w, 200, map[string]any{"name": appName, "version": model.Version, "os": runtime.GOOS, "arch": runtime.GOARCH, "uiHost": a.uiHost, "windowMode": "detached", "localShellAvailable": terminal.LocalShellAvailable(), "terminalWindowAvailable": false, "terminalDetachAvailable": info.Workspace && a.launchTerminalView != nil, "started": a.started.UTC().Format(time.RFC3339), "portable": true, "storageWritable": false, "storageError": "", "capabilities": []string{}, "system": map[string]any{"interfaces": []any{}}, "terminalView": a.terminalViewBootstrap(info)})
+		jsonResponse(w, 200, map[string]any{"name": appName, "version": model.Version, "os": runtime.GOOS, "arch": runtime.GOARCH, "uiHost": a.currentUIHost(), "windowMode": "detached", "localShellAvailable": terminal.LocalShellAvailable(), "terminalWindowAvailable": false, "terminalDetachAvailable": info.Workspace && a.launchTerminalView != nil, "started": a.started.UTC().Format(time.RFC3339), "portable": true, "storageWritable": false, "storageError": "", "capabilities": []string{}, "system": map[string]any{"interfaces": []any{}}, "terminalView": a.terminalViewBootstrap(info)})
 	case r.URL.Path == "/api/state":
 		a.handleDetachedState(w, r, id)
 	case strings.HasPrefix(r.URL.Path, "/api/terminal-automation/"):

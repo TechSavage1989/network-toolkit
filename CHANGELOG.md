@@ -1,3 +1,7 @@
+## 1.21.0 Beta 1 - Linux edition, first beta (candidate)
+
+- Owner request: develop the app for Linux (docs/LINUX_PLAN.md, phase L1). Linux x86_64/aarch64 portable `.tar.gz` assets; app-mode window from an installed Chromium-family browser with a dedicated profile (stops when it closes), browser-tab fallback with Quit Network Toolkit; one-time launch link and HttpOnly SameSite=Strict cookie so the session token is not served to other local processes (`browser_launch_gate.go`); Add to applications menu; live-session close warning; Linux messages for features coming in later phases. Release tooling packages, verifies and uploads the Linux archives; Checks rehearse packaging and run `linux-window.browser.cjs`. Release channel back to beta.
+
 ## 1.20.16 - Stable (published 2026-11-05)
 
 - Stable release of the 1.20.13 to 1.20.15 betas: scrollable Terminal/Text Editor tab rows, sending between the Text Editor and the Terminal, the Text Editor right-click menu, Send to Text Editor in the Terminal menu, matching send icons, and the Network discovery shortcut on Monitor and Trace route. Release channel switched to stable; numbered above every beta so beta users also receive it; saved data and security confirmations unchanged.

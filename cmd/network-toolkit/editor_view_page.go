@@ -32,6 +32,10 @@ func (a *application) serveEditorView(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	if !a.launchGate.Allowed(r) {
+		a.launchGate.Refuse(w)
+		return
+	}
 	b, err := web.ReadFile("web/index.html")
 	if err != nil {
 		jsonError(w, 500, "Interface unavailable.")

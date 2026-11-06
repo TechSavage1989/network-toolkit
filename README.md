@@ -3,7 +3,7 @@
 </p>
 
 <h1 align="center">Network Toolkit</h1>
-<p align="center">A portable Windows toolkit for network diagnostics, device connections, file transfers and network administration.</p>
+<p align="center">A portable toolkit for network diagnostics, device connections, file transfers and network administration, for Windows and (in beta) Linux.</p>
 
 <p align="center">
   <a href="https://github.com/TechSavage1989/network-toolkit/releases/latest">Download</a> ·
@@ -75,9 +75,12 @@
 
 [Download the latest stable release](https://github.com/TechSavage1989/network-toolkit/releases/latest). It provides the portable package **`Network_Toolkit_<version>_Portable.zip`**, the executable **`Network_Toolkit.exe`** and **`SHA256SUMS`** for checking the files.
 
+**Linux (beta):** the Linux edition is an opt-in beta while it gains every Windows feature ([plan](docs/LINUX_PLAN.md)). Download **`Network_Toolkit_<version>_Linux_x86_64.tar.gz`** (or **`_Linux_aarch64.tar.gz`** for 64-bit Arm) from the [releases page](https://github.com/TechSavage1989/network-toolkit/releases); the same **`SHA256SUMS`** lists it.
+
 ## Requirements
 
 - Windows x64 for the packaged portable application.
+- Linux beta: a 64-bit x86 or Arm Linux desktop (Ubuntu, Debian, Mint, Fedora, Arch and similar). Google Chrome, Chromium, Microsoft Edge, Brave or Vivaldi gives the app its own window; otherwise it opens in your default browser.
 - Network access and permissions appropriate to the tools being used.
 - Windows administrative approval for protected system changes, when requested.
 - Compatible remote services, such as an SSH server with SFTP enabled, for connection-dependent features.
@@ -89,6 +92,8 @@
 3. Select a tool from the navigation menu.
 4. Enter a target or create a terminal connection, then run only the operations you are authorized to perform.
 5. Review any changes to network configuration before confirming them.
+
+On Linux (beta), extract the `.tar.gz`, run **`./network-toolkit`** from its folder, and use **App settings → Add to applications menu** to start it from your desktop's menu next time. Some Windows features arrive on Linux in later betas; the [Linux plan](docs/LINUX_PLAN.md) lists what is ready.
 
 ## How to use
 
