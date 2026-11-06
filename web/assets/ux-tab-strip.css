@@ -122,3 +122,7 @@
 /* Icon-only editor toolbar button (Send to terminal, v1.20.14). */
 .nt-editor-icon-button{display:inline-flex;align-items:center;justify-content:center;min-width:32px;padding-inline:6px}
 .nt-editor-icon-button svg{width:16px;height:16px;display:block}
+/* Linux: Applications menu block in App settings (v1.21.0). */
+.linux-desktop-entry{margin-bottom:var(--ux-space-4)}
+.linux-desktop-entry h4{margin:0 0 var(--ux-space-1)}
+.linux-desktop-entry .button-row{display:flex;flex-wrap:wrap;gap:var(--ux-space-2);margin-top:var(--ux-space-2)}

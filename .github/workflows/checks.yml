@@ -993,6 +993,13 @@ jobs:
         run: |
           CGO_ENABLED=0 go build -mod=vendor -o "$NTK_APP_EXECUTABLE" ./cmd/network-toolkit
           node scripts/value-copy-live.cjs
+      - name: Check the Linux edition window, private launch link, menu entry and Quit
+        if: success() || failure()
+        env:
+          GOTOOLCHAIN: local
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results/linux-window
+        run: node scripts/linux-window.browser.cjs
       - name: Check terminal selection deletion with trailing empty cells
         if: success() || failure()
         env:

@@ -8,7 +8,7 @@ import (
 )
 
 func acquireTerminalWindowLock(string) (func(), error) {
-	return nil, errors.New("independent Terminal windows are supported on Windows; Linux supports local development checks")
+	return nil, errors.New("separate Terminal windows come to the Linux edition in a later beta")
 }
 
 func configureTerminalChild(*exec.Cmd) {}

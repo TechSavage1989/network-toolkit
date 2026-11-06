@@ -44,7 +44,7 @@ These are Windows-only today, and each phase below replaces them:
 - Linux amd64 and arm64 builds.
 - `Network_Toolkit_<ver>_Linux_x86_64.tar.gz` and `_Linux_aarch64.tar.gz` added to every release and to `SHA256SUMS`.
 - App-mode window and single-instance handoff.
-- XDG data folder (`~/.local/share/Network Toolkit`, with the portable `data/` folder honoured).
+- Data stays in the existing per-user folder `~/.config/NetworkToolkit` (movable from App settings, like Windows).
 - Optional menu entry: "Add to applications menu" writes a `.desktop` file and icon under `~/.local/share`.
 - Platform-aware wording, so Windows-only controls explain what is coming instead of failing.
 - Linux CI build and browser smoke test.
@@ -69,6 +69,10 @@ These are Windows-only today, and each phase below replaces them:
 - Linux update archive per architecture.
 - Download, SHA256SUMS check, explicit install consent, binary swap with backup and rollback, then restart.
 
+**L6 · Separate windows and Save As**
+- Detached Terminal and Text Editor windows as additional app-mode windows.
+- Native Save As (desktop portal, `zenity` or `kdialog`).
+
 **Stable**
 - Linux joins the stable release once the owner confirms each phase on a real Linux PC.
 
@@ -82,3 +86,13 @@ These are Windows-only today, and each phase below replaces them:
 
 - Hosted CI builds and tests every Linux phase: unit tests, browser tests with the Linux build, and fixtures for keyring, pseudo-terminal and helper protocols.
 - CI gives no claim of physical Linux or live-device acceptance. The owner confirms each phase on a real Linux PC.
+
+## Status
+
+**L1 (v1.21.0 Beta 1)**
+- App-mode window: a dedicated profile; the app stops when the window closes.
+- Browser-tab fallback with Quit Network Toolkit.
+- Private one-time launch link (`browser_launch_gate.go`), so the session token is never served to other local processes or users.
+- Add to applications menu (user `.desktop` entry and SVG icon).
+- Linux x86_64 and aarch64 `.tar.gz` release assets; CI rehearses packaging on every run.
+- Features that arrive in later phases say so in the app.

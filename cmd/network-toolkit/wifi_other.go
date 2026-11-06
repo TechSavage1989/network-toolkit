@@ -5,8 +5,8 @@ package main
 import "context"
 
 func readLocalWiFi(context.Context) (localWiFiSnapshot, error) {
-	return localWiFiSnapshot{Interfaces: []localWiFiInterface{}, Note: "Wi-Fi profiles and stored keys are available in the Windows app."}, nil
+	return localWiFiSnapshot{Interfaces: []localWiFiInterface{}, Note: "Wi-Fi profiles and stored keys come to the Linux edition in a later beta."}, nil
 }
 func revealLocalWiFi(context.Context, localWiFiRevealRequest) localWiFiResult {
-	return localWiFiFailure("unsupported", "Wi-Fi key viewing is available in the Windows app.", false)
+	return localWiFiFailure("unsupported", "Wi-Fi key viewing comes to the Linux edition in a later beta.", false)
 }

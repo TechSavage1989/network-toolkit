@@ -22,7 +22,7 @@ import (
 
 const localHostsLimit = 1 << 20
 
-var errLocalToolsUnavailable = errors.New("Hosts editing and IP configuration are available in the Windows app.")
+var errLocalToolsUnavailable = errors.New("Hosts editing and IP configuration come to the Linux edition in a later beta.")
 var errLocalConfigConflict = errors.New("The configuration changed since it was loaded. Reload it and review your edits before applying again.")
 var errLocalConfigBusy = errors.New("Another local configuration change is still in progress.")
 

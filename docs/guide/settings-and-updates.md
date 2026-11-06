@@ -5,6 +5,9 @@ Settings currently appear in the main application and in individual tools. The P
 ## Saved data
 Network Toolkit retains preferences, saved profiles, credentials in the credential vault and macros. Updates must preserve all of these and migrate older settings without silently resetting them.
 
+## Linux: applications menu
+In the Linux edition, **App settings → General → Applications menu** adds Network Toolkit to your desktop's applications menu (only files in your own account are written: a menu entry and the icon). If you move the program folder, choose **Update menu entry**. **Remove from menu** takes it out again.
+
 ## Customize the Overview
 On the Overview, choose **Customize** to show or hide its sections (summary cards; gateways, DNS and DHCP; public IP; network scan; adapters; recent activity) and move them up or down. **Reset to default** restores the original layout. You can also drag a section: hover it and drag the small handle on its top edge (or focus the handle and press Alt+Shift+Up or Down). Your layout is kept when you restart the app.
 

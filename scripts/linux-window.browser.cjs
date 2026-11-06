@@ -41,6 +41,15 @@ function start(env,label){const child=spawn(bin,['--data-dir',path.join(work,lab
   await page.evaluate(()=>{state.theme='dark';saveState();});await until(async()=>fs.existsSync(path.join(work,'window-data')),5000,'settings folder');
   if(output)await page.screenshot({path:path.join(output,'linux-window.png')});
   report.checks.push('The interface runs on Linux and saves settings in the app-data folder');
+  // App settings → Add to applications menu writes the user's own desktop entry and icon.
+  await page.locator('#settingsButton').click();await page.locator('#linuxDesktopEntry [data-linux-desktop-entry="add"]').waitFor();
+  const desktop=path.join(work,'window-home','.local','share','applications','network-toolkit.desktop'),svg=path.join(work,'window-home','.local','share','icons','hicolor','scalable','apps','network-toolkit.svg');
+  await page.locator('#linuxDesktopEntry [data-linux-desktop-entry="add"]').click();await page.waitForFunction(()=>/is in your applications menu/.test(document.querySelector('#linuxDesktopEntryStatus')?.textContent||''));
+  const entry=fs.readFileSync(desktop,'utf8');assert.match(entry,/^Exec="[^"]*network-toolkit"$/m);assert.match(entry,/^StartupWMClass=NetworkToolkit$/m);assert(fs.readFileSync(svg,'utf8').includes('<svg'));
+  if(output)await page.screenshot({path:path.join(output,'linux-settings-menu.png')});
+  await page.locator('#linuxDesktopEntry [data-linux-desktop-entry="add"]').count().then(n=>assert.equal(n,0,'no Add button once the entry is current'));await page.locator('#linuxDesktopEntry [data-linux-desktop-entry="remove"]').click();await page.waitForFunction(()=>/not in your applications menu/.test(document.querySelector('#linuxDesktopEntryStatus')?.textContent||''));
+  assert(!fs.existsSync(desktop)&&!fs.existsSync(svg),'removed');await page.keyboard.press('Escape');
+  report.checks.push('App settings adds Network Toolkit to the applications menu (user files only) and removes it');
   // Closing the window (its page goes away, then the window process exits) stops the app.
   await context.close();
   fs.writeFileSync(path.join(bdir,'close'),'');const code=await Promise.race([app.exited,new Promise(r=>setTimeout(()=>r('timeout'),15000))]);

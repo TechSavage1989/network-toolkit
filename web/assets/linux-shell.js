@@ -33,6 +33,29 @@ root.addEventListener('beforeunload',event=>{
  let stopped=false;try{stopped=typeof shutDown!=='undefined'&&shutDown;}catch{}
  if(!stopped&&liveSessions()){event.preventDefault();event.returnValue='';}
 });
+// App settings → General: Add to applications menu (Linux only). Writes the
+// user's own .desktop entry and icon; no administrator approval.
+const isLinux=()=>{try{return typeof status!=='undefined'&&status?.os==='linux';}catch{return false;}};
+const call=(path,method)=>typeof api==='function'?api(path,method):Promise.reject(new Error('The app is not ready.'));
+function entryHTML(state,busy,error){
+ const text=!state?'Checking…':!state.installed?'Network Toolkit is not in your applications menu.':state.current?'Network Toolkit is in your applications menu.':'The menu entry opens a different copy of Network Toolkit. Update it to open this one.';
+ return '<h4>Applications menu</h4><p class="help-line">Adds Network Toolkit to your desktop\'s applications menu so you can start it like any other app. Only files in your own account are changed.</p><p class="help-line" id="linuxDesktopEntryStatus" role="status">'+text+'</p>'+(error?'<p class="help-line error" role="alert">'+error.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'})[c])+'</p>':'')+
+  '<div class="button-row">'+(state?.installed&&state.current?'':'<button type="button" class="btn small" data-linux-desktop-entry="add"'+(busy?' disabled':'')+'>'+(state?.installed?'Update menu entry':'Add to applications menu')+'</button>')+(state?.installed?'<button type="button" class="btn small ghost" data-linux-desktop-entry="remove"'+(busy?' disabled':'')+'>Remove from menu</button>':'')+'</div>';
+}
+async function refreshEntry(block,method){
+ if(!block)return;block.innerHTML=entryHTML(block.__state,true,'');
+ try{block.__state=await call('/linux/desktop-entry',method||'GET');block.innerHTML=entryHTML(block.__state,false,'');}
+ catch(e){block.innerHTML=entryHTML(block.__state,false,e.message||String(e));}
+}
+function injectSettings(){
+ if(!isLinux())return;const general=document.querySelector('[data-settings-panel="general"]');if(!general||general.querySelector('#linuxDesktopEntry'))return;
+ const block=document.createElement('div');block.id='linuxDesktopEntry';block.className='linux-desktop-entry';general.prepend(block);
+ const heading=general.querySelector(':scope>h3');if(heading)heading.after(block);
+ void refreshEntry(block);
+}
+document.addEventListener('click',event=>{const b=event.target.closest?.('[data-linux-desktop-entry]');if(!b)return;event.preventDefault();void refreshEntry(document.getElementById('linuxDesktopEntry'),b.dataset.linuxDesktopEntry==='add'?'POST':'DELETE');},true);
+// Settings opens in #modalRoot; watching only it keeps terminal output free of this work.
+const watchSettings=()=>{const target=document.getElementById('modalRoot');if(!target){root.setTimeout(watchSettings,500);return;}new MutationObserver(()=>injectSettings()).observe(target,{childList:true,subtree:true});};watchSettings();
 root.setInterval(sync,1500);root.addEventListener('load',sync);
-root.NetworkToolkitLinuxShell=Object.freeze({sync,quit});
+root.NetworkToolkitLinuxShell=Object.freeze({sync,quit,injectSettings});
 })(window);

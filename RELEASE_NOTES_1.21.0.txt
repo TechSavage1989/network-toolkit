@@ -1,0 +1,19 @@
+Network Toolkit 1.21.0 Beta 1
+
+## What's New
+
+- Network Toolkit now runs on Linux. Download the Linux_x86_64 (or Linux_aarch64 for 64-bit Arm) .tar.gz, extract it and run network-toolkit.
+- On Linux the app opens in its own window using Google Chrome, Chromium, Microsoft Edge, Brave or Vivaldi, and closing the window stops it. Without one of these browsers it opens in your default browser, with a Quit Network Toolkit button.
+- App settings on Linux can add Network Toolkit to your applications menu.
+- Ready on Linux in this first beta: Test a target, Test a website, SMTP test, Network discovery, SSH, Telnet and serial terminals, file transfers, the Text Editor, packet file inspection, reports and settings.
+
+## Additional Details
+
+- Arriving on Linux in later betas: the credential vault and saved credentials, local shell tabs, live packet capture, hosts and IP configuration, Wi-Fi profiles, in-app updates, separate Terminal and Editor windows, and Save As. These places say so in the app. Until then, download Linux updates from the releases page.
+- On Linux the window opens through a one-time private link, so other programs and other users on the same PC cannot reach the app's session.
+- Closing a Linux window that still has connected terminal sessions asks first.
+- Settings are kept in ~/.config/NetworkToolkit; you can move this folder in App settings.
+- Windows is unchanged: same files, same updater, same saved data. Linux files are added to the same release and to SHA256SUMS.
+- Linux validation used hosted builds and a stand-in window; the Linux edition has not yet been confirmed on a physical Linux PC.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Security confirmations and Windows/UAC approval are unchanged.
+- This is an opt-in beta. Stable users stay on 1.20.16. Portable executable filename remains Network_Toolkit.exe.

@@ -699,6 +699,8 @@ func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		_ = json.Unmarshal(b, &jobs)
 		w.Header().Set("Content-Disposition", `attachment; filename="Network_Toolkit_Report.json"`)
 		jsonResponse(w, 200, map[string]any{"app": appName, "version": model.Version, "exported": time.Now().UTC().Format(time.RFC3339), "system": a.getSystem(false), "jobs": jobs})
+	case r.URL.Path == "/api/linux/desktop-entry":
+		a.handleDesktopEntry(w, r)
 	case r.URL.Path == "/api/shutdown":
 		if r.Method != http.MethodPost {
 			methodError(w)
