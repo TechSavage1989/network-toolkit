@@ -96,3 +96,14 @@ func TestWindowCloseIsToldApartFromAHandedOffWindow(t *testing.T) {
 		t.Fatal("a page still polling after the browser process exited was treated as closed")
 	}
 }
+
+func TestDefaultBrowserPreference(t *testing.T) {
+	t.Setenv("NETWORK_TOOLKIT_BROWSER", "Default")
+	if !preferDefaultBrowser() {
+		t.Fatal("NETWORK_TOOLKIT_BROWSER=default was ignored")
+	}
+	t.Setenv("NETWORK_TOOLKIT_BROWSER", "/usr/bin/chromium")
+	if preferDefaultBrowser() {
+		t.Fatal("an explicit browser path was treated as the default browser")
+	}
+}

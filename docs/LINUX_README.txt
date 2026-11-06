@@ -16,6 +16,8 @@ stops the app. Without one of these browsers it opens in your default browser
 and stays running until you choose Quit Network Toolkit (the power button at
 the bottom of the sidebar). To choose a browser yourself, start it with:
   NETWORK_TOOLKIT_BROWSER=/path/to/browser ./network-toolkit
+To use your default browser instead of a separate window:
+  NETWORK_TOOLKIT_BROWSER=default ./network-toolkit
 
 To add Network Toolkit to your applications menu, open App settings and choose
 Add to applications menu.

@@ -57,7 +57,7 @@ function start(env,label){const child=spawn(bin,['--data-dir',path.join(work,lab
 
   // ---- Browser tab mode (no Chromium-family browser) ----
   const tdir=path.join(work,'tab');const opener=fakeLauncher(tdir,'xdg-open');
-  const tab=start({NETWORK_TOOLKIT_BROWSER:'',PATH:tdir+':/usr/bin:/bin'},'tab');children.push(tab);
+  const tab=start({NETWORK_TOOLKIT_BROWSER:'default',PATH:tdir+':/usr/bin:/bin'},'tab');children.push(tab);
   const tabLaunch=(await until(()=>fs.existsSync(path.join(tdir,'xdg-open.args'))&&fs.readFileSync(path.join(tdir,'xdg-open.args'),'utf8').trim(),15000,'the browser tab launch')).split('\n')[0];
   assert.match(tabLaunch,/\/launch\?ticket=[0-9a-f]{64}$/);
   const tabContext=await browser.newContext({viewport:{width:1280,height:800}}),tabPage=await tabContext.newPage();tabPage.on('pageerror',e=>report.errors.push(e.message));
@@ -67,7 +67,7 @@ function start(env,label){const child=spawn(bin,['--data-dir',path.join(work,lab
   if(output)await tabPage.screenshot({path:path.join(output,'linux-browser-tab.png')});
   await tabPage.locator('#linuxQuitButton').click();
   const tabCode=await Promise.race([tab.exited,new Promise(r=>setTimeout(()=>r('timeout'),15000))]);assert.notEqual(tabCode,'timeout','Quit Network Toolkit stops the app');
-  report.checks.push('Without a Chromium-family browser the app opens a tab and Quit Network Toolkit stops it');
+  report.checks.push('With NETWORK_TOOLKIT_BROWSER=default (as without a Chromium-family browser) the app opens a tab and Quit Network Toolkit stops it');
   await tabContext.close();
   report.errors=report.errors.filter(e=>!/Failed to fetch|NetworkError|engine/i.test(e));assert.deepEqual(report.errors,[]);report.passed=true;
  }finally{

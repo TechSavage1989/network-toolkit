@@ -63,6 +63,12 @@ func findAppBrowser(lookPath func(string) (string, error), resolve func(string) 
 	return appBrowser{}, false
 }
 
+// NETWORK_TOOLKIT_BROWSER=default opens the interface in the default browser
+// instead of an app window (the app then shows Quit Network Toolkit).
+func preferDefaultBrowser() bool {
+	return strings.EqualFold(strings.TrimSpace(os.Getenv("NETWORK_TOOLKIT_BROWSER")), "default")
+}
+
 func classifyAppBrowser(path string, resolve func(string) (string, error)) appBrowser {
 	b := appBrowser{command: []string{path}, name: filepath.Base(path), kind: "native"}
 	real := path
@@ -126,6 +132,9 @@ func runLifecycle(ctx context.Context, url, sessionToken string, stop context.Ca
 		return
 	}
 	browser, found := findAppBrowser(exec.LookPath, filepath.EvalSymlinks, flatpakAppInstalled)
+	if preferDefaultBrowser() {
+		found = false
+	}
 	if !found || os.Geteuid() == 0 && strings.TrimSpace(os.Getenv("NETWORK_TOOLKIT_BROWSER")) == "" {
 		// Chromium-family browsers refuse to run as root without disabling
 		// their sandbox, which the app never does. An explicitly chosen
