@@ -89,7 +89,7 @@ These are Windows-only today, and each phase below replaces them:
 
 ## Status
 
-**L1 (v1.21.0 Beta 1)**
+**L1 (v1.21.0 Beta 1, published 2026-11-06)**
 - App-mode window: a dedicated profile; the app stops when the window closes.
 - Browser-tab fallback with Quit Network Toolkit.
 - Private one-time launch link (`browser_launch_gate.go`), so the session token is never served to other local processes or users.
