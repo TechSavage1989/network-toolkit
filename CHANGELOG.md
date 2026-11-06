@@ -1,4 +1,4 @@
-## 1.21.0 Beta 1 - Linux edition, first beta (candidate)
+## 1.21.0 Beta 1 - Linux edition, first beta (published 2026-11-06)
 
 - Owner request: develop the app for Linux (docs/LINUX_PLAN.md, phase L1). Linux x86_64/aarch64 portable `.tar.gz` assets; app-mode window from an installed Chromium-family browser with a dedicated profile (stops when it closes), browser-tab fallback with Quit Network Toolkit; one-time launch link and HttpOnly SameSite=Strict cookie so the session token is not served to other local processes (`browser_launch_gate.go`); Add to applications menu; live-session close warning; Linux messages for features coming in later phases. Release tooling packages, verifies and uploads the Linux archives; Checks rehearse packaging and run `linux-window.browser.cjs`. Release channel back to beta.
 
