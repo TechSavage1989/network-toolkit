@@ -100,7 +100,8 @@
     if (typeof openModal !== 'function') return;
     // The Display panel floats above dialogs; close it so the editor is usable.
     if (typeof setTerminalToolsOpen === 'function') setTerminalToolsOpen(false, false);
-    document.querySelector('#terminalSessionPanel:not(.hidden) [data-terminal-extra="close-session"]')?.click();
+    const display = document.getElementById('terminalSessionPanel');
+    if (display && !/(^|\s)hidden(\s|$)/.test(display.className)) display.querySelector('[data-terminal-extra="close-session"]')?.click();
     const active = current();
     pick(active === 'none' || active === 'smart' ? 'standard' : active);
     openModal('Syntax highlighting', bodyHTML(), footerHTML(), true);

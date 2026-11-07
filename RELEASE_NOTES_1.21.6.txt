@@ -1,0 +1,18 @@
+Network Toolkit 1.21.6 Beta 7
+
+## What's New
+
+- Terminal output can now be colored with keyword rule sets like MobaXterm's. In Display, choose Syntax highlighting: Standard keywords (errors, warnings, success and more), Unix shell script, Network configuration, Perl or SQL. The device highlighting you know stays the default.
+- Customize lets you copy a rule set and set the words or patterns for each color, try them on your own text, and import or export MobaXterm .msyn files.
+
+## Additional Details
+
+- Each color (Red, Green, Yellow, Blue, Magenta, Cyan and Underline) takes a regular expression or a comma-separated word list, with a case-sensitive option. MobaXterm patterns work as written, including their bracket style and line markers.
+- Imported files are named after the file. Built-in rule sets are read-only; your own rule sets save as you type, and up to 50 can be kept.
+- Patterns slow enough to freeze the terminal are refused with an explanation; invalid patterns are shown in red and skipped.
+- Colors follow the terminal color scheme. Text the device already colored keeps its color. Local PowerShell and Command Prompt tabs keep their own shell colors.
+- Your rule sets and choice are kept after a restart and in separate Terminal windows.
+- The full plan for MobaXterm-style terminal settings (fonts, colors and cursor, advanced options, session logging, more local shells) is in docs/TERMINAL_SETTINGS_PLAN.md and will arrive in the next betas.
+- Validation used unit tests, browser checks and sample output; no real device was used, and it has not yet been checked on a physical Windows PC.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Security confirmations and Windows/UAC approval are unchanged.
+- This is an opt-in beta. Stable users stay on 1.20.16. Portable executable filename remains Network_Toolkit.exe.
