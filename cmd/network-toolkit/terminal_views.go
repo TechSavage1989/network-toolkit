@@ -241,7 +241,7 @@ func (a *application) terminalViewDisplay() json.RawMessage {
 
 func terminalSingleViewDisplay(original map[string]any) json.RawMessage {
 	display := map[string]any{"activePage": "terminal"}
-	for _, key := range []string{"colorPickerPreferences", "theme", "terminalFontSize", "terminalHighlight", "terminalInteraction", "terminalActiveActionsPosition", "terminalAppearance", "terminalSyntax", "terminalSidebarSide", "terminalConfirmClose"} {
+	for _, key := range []string{"colorPickerPreferences", "theme", "terminalFontSize", "terminalHighlight", "terminalInteraction", "terminalActiveActionsPosition", "terminalAppearance", "terminalSyntax", "terminalBehavior", "terminalSidebarSide", "terminalConfirmClose"} {
 		if value, ok := original[key]; ok {
 			display[key] = value
 		}

@@ -357,6 +357,7 @@ function sync(){
    panel.insertAdjacentHTML('beforeend','<p class="hint">Auto pager, Auto scroll, Review paste and Include commands in the console bar apply to the focused session.</p><button class="btn small ghost" data-terminal-extra="mouse-settings">Mouse and keyboard defaults</button>');
    document.querySelector('.terminal-panel').append(panel);
    root.NetworkToolkitTerminalAppearance?.mount(panel);
+   root.NetworkToolkitTerminalBehavior?.mount(panel);root.NetworkToolkitTerminalBehavior?.apply();
  }
  const entry=currentTerminal(),p=prefs(entry),choice=entry?._ntOutputChoice||'last-command';
  const actions=document.querySelector('#terminalActiveActions');

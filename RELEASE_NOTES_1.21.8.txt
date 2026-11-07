@@ -1,0 +1,18 @@
+Network Toolkit 1.21.8 Beta 9
+
+## What's New
+
+- Display has a new Terminal features section like MobaXterm's: choose how many scrollback lines to keep, hide the scrollbar, flash the terminal or play a sound on a bell, turn bracketed paste off, and set which characters end a word when you double-click.
+- Advanced options fix devices whose lines overlap or run together (implicit CR in every LF, implicit LF in every CR) and can answer a device's ^E identity request with your own text.
+
+## Additional Details
+
+- Scrollback can be set from 500 to 10,000 lines. 10,000 stays the maximum so a session can still move to a separate window with all its output.
+- Every new option starts the way the terminal behaves today: 10,000 lines, scrollbar shown, no bell, bracketed paste on, the usual word delimiters, no implicit CR or LF and no answerback.
+- Implicit CR and LF change only what is shown. Transcripts, Last command and macros keep the output exactly as the device sent it.
+- The answerback is sent automatically whenever a device asks with ^E, so it accepts only letters, digits and symbols. Do not put a password in it.
+- Changes apply to open terminals at once and are kept after a restart and in separate Terminal windows.
+- Still planned (docs/TERMINAL_SETTINGS_PLAN.md): paste warnings, keys to reconnect after a session ends, a fixed number of rows and columns, session logging and more local shells.
+- Validation used unit tests, browser checks and sample output; no real device was used, and it has not yet been checked on a physical Windows PC.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Security confirmations and Windows/UAC approval are unchanged.
+- This is an opt-in beta. Stable users stay on 1.20.16. Portable executable filename remains Network_Toolkit.exe.

@@ -21,6 +21,14 @@ In Display, type any font size from 8 to 36 and press Enter (Ctrl+wheel over the
 
 Changes apply to open terminals at once and are kept after a restart and in separate Terminal windows.
 
+## Terminal features
+Display → **Terminal features** sets:
+- **Scrollback lines:** 500 to 10,000 lines kept above the screen (10,000 by default).
+- **Bell:** none, flash the terminal, or play a sound when a device sends a bell.
+- **Word delimiters:** the characters that end a word when you double-click to select.
+- **Show scrollbar** and **Bracketed paste** (programs that ask for it can tell pasted text from typing).
+- **Advanced:** *Implicit CR in every LF* and *Implicit LF in every CR* fix devices whose lines overlap or run together; they change only what is shown, not transcripts or saved output. *Answerback to ^E* is sent automatically whenever a device asks for it, so never put a password there.
+
 ## Connection controls
 Drag a Saved session to reorder the list (or focus it and press Alt+Shift+Up or Down); the order is kept. To run a Command Prompt or PowerShell tab as administrator after it started, choose **Open as administrator in a new tab** from the tab's More actions menu; Windows asks for approval and the original tab stays open. To replace the tab instead, choose **Restart this tab as administrator**: after you confirm and Windows approves, the elevated shell takes the tab's place and the old shell closes (anything running in it stops). If you decline the prompt, the tab is left as it is. The Disconnect button's menu offers **Disconnect all** and **Close all tabs**. Reconnect an eligible session from its controls. The adjacent reconnect menu may also offer Reconnect all. Some tabs can be detached by dragging outside the window. Terminal tab actions are available from each tab's More actions button. The Terminal sidebar includes a visible show/hide control. Ctrl+Shift+P opens application command search when the console is not focused; F1 opens help outside focused terminal input.
 

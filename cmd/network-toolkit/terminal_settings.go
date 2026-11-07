@@ -22,6 +22,9 @@ func sanitizeTerminalSettings(state map[string]any) {
 	if value, present := state["terminalSyntax"]; present {
 		state["terminalSyntax"] = safeTerminalSyntax(value)
 	}
+	if value, present := state["terminalBehavior"]; present {
+		state["terminalBehavior"] = safeTerminalBehavior(value)
+	}
 	if value, present := state["terminalActiveActionsPosition"]; present {
 		position, _ := value.(string)
 		if position != "bottom" {
