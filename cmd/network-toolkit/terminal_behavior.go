@@ -12,7 +12,7 @@ const terminalDefaultWordSeparators = " ()[]{}',\"`"
 
 func safeTerminalBehavior(value any) map[string]any {
 	source, _ := value.(map[string]any)
-	clean := map[string]any{"scrollback": 10000, "scrollbar": true, "bell": "none", "bracketedPaste": true, "wordSeparators": terminalDefaultWordSeparators, "lfImpliesCr": false, "crImpliesLf": false, "answerback": ""}
+	clean := map[string]any{"scrollback": 10000, "scrollbar": true, "bell": "none", "bracketedPaste": true, "wordSeparators": terminalDefaultWordSeparators, "lfImpliesCr": false, "crImpliesLf": false, "answerback": "", "reconnectKeys": true, "closeOnOtherKey": false}
 	if lines, ok := source["scrollback"].(float64); ok && lines == float64(int(lines)) && lines >= 500 && lines <= 10000 {
 		clean["scrollback"] = int(lines)
 	}
@@ -27,6 +27,8 @@ func safeTerminalBehavior(value any) map[string]any {
 		clean["bracketedPaste"] = false
 	}
 	clean["lfImpliesCr"] = source["lfImpliesCr"] == true
+	clean["reconnectKeys"] = source["reconnectKeys"] != false
+	clean["closeOnOtherKey"] = source["closeOnOtherKey"] == true
 	clean["crImpliesLf"] = source["crImpliesLf"] == true
 	if separators, ok := source["wordSeparators"].(string); ok {
 		clean["wordSeparators"] = keepRunes(separators, 64, func(r rune) bool {

@@ -36,8 +36,20 @@ async function main(){
  }
  // Non-SSH, closed, unavailable and transferred sessions do not offer Open SFTP.
  await terminal(page,'top');for(const change of [{type:'telnet',state:'connected'},{type:'serial',state:'connected'},{type:'ssh',state:'closed'}]){await page.evaluate(change=>{Object.assign(currentTerminal().info,change);renderTerminalChrome();},change);assert.equal(await page.locator('#terminalActiveActions [data-terminal-action="open-sftp"]').isDisabled(),true);}
+ // v1.21.9: after a session ends the card names the keys, and R reconnects that session.
+ await page.evaluate(()=>{Object.assign(currentTerminal().info,{type:'ssh',state:'closed'});online=true;renderTerminalChrome();document.activeElement?.blur?.();});
+ const card=page.locator('.terminal-disconnected-card:visible').first();await card.waitFor();assert.doesNotMatch(await card.innerText(),/Press R/,'the key hint shows only when Reconnect is available');
+ // This harness serves files without the app (OFFLINE), so Reconnect is disabled and R must do nothing too.
+ const reconnects=from=>calls.slice(from).filter(call=>call.path==='/api/terminals/active-ssh/reconnect'&&call.method==='POST').length;
+ assert.equal(await page.locator('.terminal-center-reconnect:visible').first().isDisabled(),true);let beforeKey=calls.length;await page.keyboard.press('r');await new Promise(resolve=>setTimeout(resolve,300));assert.equal(reconnects(beforeKey),0,'R reconnected while Reconnect was unavailable');
+ // When reconnecting is allowed, R sends the same request as the Reconnect button.
+ await page.evaluate(()=>{terminalReconnectAllowed=entry=>!!entry&&['closed','error'].includes(entry.info.state)&&!entry.reconnectBusy;renderTerminalChrome();});
+ await page.waitForFunction(()=>/Press R to reconnect or S to save this session\./.test(document.querySelector('.terminal-disconnected-card')?.innerText||''));
+ if(process.env.TOOLKIT_TEST_OUTPUT){fs.mkdirSync(process.env.TOOLKIT_TEST_OUTPUT,{recursive:true});await page.locator('.terminal-disconnected-card:visible').first().screenshot({path:path.join(process.env.TOOLKIT_TEST_OUTPUT,'active-session-disconnected-keys.png')});}
+ beforeKey=calls.length;await page.keyboard.press('r');for(let i=0;i<40&&!reconnects(beforeKey);i++)await new Promise(resolve=>setTimeout(resolve,50));
+ assert.equal(reconnects(beforeKey),1,'R did not reconnect the ended session');
  await page.evaluate(()=>{Object.assign(currentTerminal().info,{type:'ssh',state:'connected'});online=false;renderTerminalChrome();});assert.equal(await page.locator('#terminalActiveActions [data-terminal-action="open-sftp"]').isDisabled(),true);
  assert.deepEqual(errors,[]);if(process.env.TOOLKIT_TEST_OUTPUT){fs.mkdirSync(process.env.TOOLKIT_TEST_OUTPUT,{recursive:true});fs.writeFileSync(path.join(process.env.TOOLKIT_TEST_OUTPUT,'active-session-tools-results.json'),JSON.stringify({passed:true,cases,errors},null,2));}
- console.log(JSON.stringify({passed:true,renderedCases:cases.length,usesSelectedAuthenticatedSession:true,noCredentialReconnect:true,sharedToolbarStyles:true,sharedPositionPreference:true,sidebarIndependent:true,unavailableSessionsDisabled:true,errors}));
+ console.log(JSON.stringify({passed:true,renderedCases:cases.length,usesSelectedAuthenticatedSession:true,noCredentialReconnect:true,sharedToolbarStyles:true,sharedPositionPreference:true,sidebarIndependent:true,unavailableSessionsDisabled:true,reconnectKey:true,errors}));
 }
 main().catch(error=>{console.error(error);process.exitCode=1;}).finally(async()=>{await browser?.close();if(server)await new Promise(resolve=>server.close(resolve));});

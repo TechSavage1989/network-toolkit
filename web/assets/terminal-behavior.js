@@ -14,7 +14,7 @@ function normalize(value){
  const v=value&&typeof value==='object'&&!Array.isArray(value)?value:{};
  const scrollback=Number.isInteger(v.scrollback)&&v.scrollback>=LIMITS.scrollbackMin&&v.scrollback<=LIMITS.scrollbackMax?v.scrollback:LIMITS.scrollbackMax;
  const separators=text(v.wordSeparators,LIMITS.separators,/^[^\p{Cc}\p{L}\p{N}]$/u);
- return {scrollback,scrollbar:v.scrollbar!==false,bell:BELLS.includes(v.bell)?v.bell:'none',bracketedPaste:v.bracketedPaste!==false,wordSeparators:separators===null?WORD_SEPARATORS:separators,lfImpliesCr:v.lfImpliesCr===true,crImpliesLf:v.crImpliesLf===true,
+ return {scrollback,scrollbar:v.scrollbar!==false,bell:BELLS.includes(v.bell)?v.bell:'none',bracketedPaste:v.bracketedPaste!==false,wordSeparators:separators===null?WORD_SEPARATORS:separators,lfImpliesCr:v.lfImpliesCr===true,crImpliesLf:v.crImpliesLf===true,reconnectKeys:v.reconnectKeys!==false,closeOnOtherKey:v.closeOnOtherKey===true,
   // Printable ASCII only: the reply is sent as raw bytes whenever the device asks.
   answerback:text(v.answerback,LIMITS.answerback,/^[\x20-\x7e]$/)||''};
 }
@@ -69,6 +69,28 @@ function apply(){
  const p=preferences();for(const entry of (typeof terminalSessions==='undefined'?null:terminalSessions)?.values?.()||[])applyEntry(entry,p);
  const note=document.querySelector('.terminal-transcript-note');if(note)note.textContent='Output remains in this app session. Transcript export includes the retained screen and up to '+p.scrollback.toLocaleString('en-US')+' scrollback lines. Saved profiles contain settings and optional protected credential links.';
 }
+// Reconnection keys (T3b, v1.21.9): on a disconnected session's pane, R reconnects
+// and S saves the session; optionally any other character key closes the tab.
+// Only plain keys count, never in a field, a dialog or another page.
+function disconnectedEntry(){
+ if(typeof currentTerminal!=='function'||typeof state==='undefined')return null;
+ if(typeof TERMINAL_ONLY!=='undefined'&&!TERMINAL_ONLY&&state.activePage!=='terminal')return null;
+ if(document.querySelector('#modalRoot')?.children?.length)return null;
+ const entry=currentTerminal();if(!entry||!['closed','error'].includes(entry.info?.state)||entry.reconnectBusy)return null;
+ return typeof terminalReconnectAllowed!=='function'||terminalReconnectAllowed(entry)?entry:null;
+}
+function editable(target){if(!target?.closest)return false;if(target.closest('.xterm-helper-textarea'))return false;return !!target.closest('input,textarea,select,[contenteditable="true"],[contenteditable=""]');}
+function sessionKey(event){
+ const p=preferences();if(!p.reconnectKeys||event.defaultPrevented||event.ctrlKey||event.altKey||event.metaKey||event.isComposing||event.repeat||editable(event.target))return '';
+ const entry=disconnectedEntry();if(!entry)return '';
+ const key=String(event.key||'');
+ if(key==='r'||key==='R'){event.preventDefault();event.stopImmediatePropagation();if(typeof reconnectTerminal==='function')void reconnectTerminal(entry);return 'reconnect';}
+ if(key==='s'||key==='S'){event.preventDefault();event.stopImmediatePropagation();root.NetworkToolkitSessionSidebar?.save(entry);return 'save';}
+ if(p.closeOnOtherKey&&Array.from(key).length===1&&key!==' '){event.preventDefault();event.stopImmediatePropagation();if(typeof removeTerminal==='function')removeTerminal(entry);return 'close';}
+ return '';
+}
+document.addEventListener('keydown',sessionKey,true);
+function keysHint(){const p=preferences();return p.reconnectKeys?'Press R to reconnect or S to save this session'+(p.closeOnOtherKey?'; any other key closes the tab.':'.'):'';}
 function settingsHTML(){
  return '<section id="terminalBehaviorSettings" class="terminal-tools-section terminal-behavior-settings"><h3>Terminal features</h3><div class="terminal-behavior-grid">'
  +'<div class="field"><label for="terminalScrollback">Scrollback lines</label><input id="terminalScrollback" type="number" data-terminal-behavior="scrollback" min="'+LIMITS.scrollbackMin+'" max="'+LIMITS.scrollbackMax+'" step="500" data-input-clear="off"><span class="hint">'+LIMITS.scrollbackMin+' to '+LIMITS.scrollbackMax.toLocaleString('en-US')+' lines kept above the screen.</span></div>'
@@ -76,6 +98,8 @@ function settingsHTML(){
  +'<div class="field terminal-behavior-wide"><label for="terminalWordSeparators">Word delimiters for double-click selection</label><input id="terminalWordSeparators" data-terminal-behavior="wordSeparators" maxlength="'+LIMITS.separators+'" autocomplete="off" spellcheck="false" data-input-clear="off"><span class="hint">Characters that end a word. Letters and digits are always part of a word.</span></div></div>'
  +'<label class="terminal-behavior-check"><input type="checkbox" id="terminalScrollbar" data-terminal-behavior="scrollbar">Show scrollbar</label>'
  +'<label class="terminal-behavior-check"><input type="checkbox" id="terminalBracketedPaste" data-terminal-behavior="bracketedPaste">Bracketed paste (programs that ask for it can tell pasted text from typing)</label>'
+ +'<label class="terminal-behavior-check"><input type="checkbox" id="terminalReconnectKeys" data-terminal-behavior="reconnectKeys">After a session ends, press R to reconnect or S to save it</label>'
+ +'<label class="terminal-behavior-check terminal-behavior-sub"><input type="checkbox" id="terminalCloseOnOtherKey" data-terminal-behavior="closeOnOtherKey">Any other key closes the ended session’s tab</label>'
  +'<h4>Advanced</h4>'
  +'<label class="terminal-behavior-check"><input type="checkbox" id="terminalLfImpliesCr" data-terminal-behavior="lfImpliesCr">Implicit CR in every LF</label>'
  +'<label class="terminal-behavior-check"><input type="checkbox" id="terminalCrImpliesLf" data-terminal-behavior="crImpliesLf">Implicit LF in every CR</label>'
@@ -87,12 +111,13 @@ function sync(){
  const section=document.getElementById('terminalBehaviorSettings');if(!section)return;
  const p=preferences();
  for(const field of section.querySelectorAll('[data-terminal-behavior]')){const key=field.dataset.terminalBehavior;if(field.getAttribute('type')==='checkbox')field.checked=p[key]===true;else if(field!==document.activeElement)field.value=String(p[key]);}
+ const close=section.querySelector('#terminalCloseOnOtherKey');if(close)close.disabled=!p.reconnectKeys;
 }
 function mount(panel){
  if(!panel||document.getElementById('terminalBehaviorSettings'))return;
  panel.insertAdjacentHTML('beforeend',settingsHTML());sync();
 }
-function save(next){state.terminalBehavior=normalize(next);if(typeof saveState==='function')saveState();apply();sync();}
+function save(next){state.terminalBehavior=normalize(next);if(typeof saveState==='function')saveState();apply();sync();if(typeof renderTerminalChrome==='function')renderTerminalChrome();}
 function changed(event){
  const field=event.target,key=field?.dataset?.terminalBehavior;if(!key||!field.closest?.('#terminalBehaviorSettings'))return;
  const next={...preferences()};
@@ -103,6 +128,6 @@ function changed(event){
 }
 document.addEventListener('change',changed);
 document.addEventListener('click',event=>{if(event.target.closest?.('[data-terminal-behavior-reset]')){event.preventDefault();save({});}});
-root.NetworkToolkitTerminalBehavior=Object.freeze({limits:LIMITS,wordSeparators:WORD_SEPARATORS,normalize,preferences,options,displayBytes,observeOutput,ring,attach,apply,applyEntry,mount,sync,settingsHTML});
+root.NetworkToolkitTerminalBehavior=Object.freeze({limits:LIMITS,wordSeparators:WORD_SEPARATORS,normalize,preferences,options,displayBytes,observeOutput,ring,attach,apply,applyEntry,mount,sync,settingsHTML,sessionKey,keysHint});
 if(typeof module==='object'&&module.exports)module.exports=root.NetworkToolkitTerminalBehavior;
 })(typeof window!=='undefined'?window:globalThis);
