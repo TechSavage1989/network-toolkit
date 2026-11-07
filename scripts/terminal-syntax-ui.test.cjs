@@ -18,11 +18,14 @@ function harness(initial = {}) {
     updateTerminalHighlightStatus() {},
     openModal(title, body, footer) { doc.getElementById('modalRoot').innerHTML = '<h2>' + title + '</h2><div class="modal-body">' + body + '</div><div class="modal-foot">' + footer + '</div>'; },
     download: (data, name, type) => calls.downloads.push({ data, name, type }), toast: (message, kind) => calls.toasts.push([message, kind]),
-    NetworkToolkitTerminalAppearance: { theme: () => ({ background: '#101010', foreground: '#eeeeee' }), syntaxColors: () => ({ red: '#ff6060', green: '#18ed93', yellow: '#dedc12', blue: '#1bbae9', magenta: '#ff7dff', cyan: '#8eddf4', underline: '#eeeeee' }) }
+    NetworkToolkitTerminalAppearance: { theme: () => ({ background: '#101010', foreground: '#eeeeee' }), syntaxColors: () => ({ red: '#ff6060', green: '#18ed93', yellow: '#dedc12', blue: '#1bbae9', magenta: '#ff7dff', cyan: '#8eddf4', underline: '#eeeeee' }),
+      universalEditorHTML: () => '<section data-terminal-universal-editor><input type="checkbox" id="syntaxUniversalLinkUnderlines"></section>',
+      highlightOptions: () => ({ theme: 'dark', colors: { prompt: '#ffaa00' }, underlines: true, linkUnderlines: true, prompt: initial.prompt || 'auto', rules: {} }), sync: () => calls.synced++ }
   };
+  calls.synced = 0;
   context.window = context; context.globalThis = context;
   vm.createContext(context);
-  vm.runInContext(fs.readFileSync(require.resolve('../web/assets/terminal-syntax-rules.js'), 'utf8'), context);
+  for (const name of ['terminal-shell-syntax.js', 'terminal-syntax-rules.js', 'terminal-highlight.js']) vm.runInContext(fs.readFileSync(require.resolve('../web/assets/' + name), 'utf8'), context);
   vm.runInContext(fs.readFileSync(require.resolve('../web/assets/terminal-syntax-ui.js'), 'utf8'), context);
   const ui = context.NetworkToolkitTerminalSyntaxUI;
   doc.getElementById('display').innerHTML = ui.controlHTML();
@@ -60,7 +63,7 @@ test('Customize closes Display, shows built-ins read-only and previews colors li
 
 test('duplicating, editing, using and deleting an own rule set saves as you go', () => {
   const h = harness({ syntax: { active: 'smart' } });
-  h.ui.open(); h.click('[data-syntax-act="duplicate"]');
+  h.ui.open('standard'); h.click('[data-syntax-act="duplicate"]');
   const id = h.state.terminalSyntax.custom[0].id;
   assert.match(id, /^custom-standard-keywords/); assert.equal(h.$('syntaxRule-red').hasAttribute('readonly'), false);
   h.type('syntaxEditName', 'Lab devices'); h.type('syntaxRule-red', '(link down)'); h.type('syntaxRule-green', '');
@@ -112,4 +115,25 @@ test('each profile has its own colors that can be tried without saving and reset
   assert.equal(h.ui.resetColors('network'), true); assert.equal(h.state.terminalSyntax.colors.network, undefined);
   assert.equal(h.state.terminalSyntax.colors['custom-lab'].green, '#00ff00', 'other profiles keep their colors');
   assert.equal(h.ui.editColor('nope'), false); assert.equal(h.ui.editColor('red', 'smart'), false, 'device highlighting has its own colors');
+});
+
+test('Universal has its own Customize page with rules, colors and a live preview (v1.21.12)', () => {
+  const h = harness({ syntax: { active: 'smart' }, prompt: 'always' });
+  h.click('[data-terminal-syntax="customize"]');
+  const selected = () => h.$('syntaxEditSet').value || h.$('syntaxEditSet').querySelector('option[selected]').getAttribute('value');
+  assert.equal(selected(), 'smart'); assert(h.doc.querySelector('[data-terminal-universal-editor]'), 'the Universal page holds the rules and colors');
+  assert(h.calls.synced > 0, 'its controls are synced from saved settings');
+  assert.equal(h.doc.querySelector('[data-syntax-act="duplicate"]'), null); assert.equal(h.doc.querySelector('[data-syntax-act="export"]'), null); assert(h.doc.querySelector('[data-syntax-act="import"]'));
+  assert.equal(h.doc.querySelector('[data-syntax-act="use"]').textContent, 'Use Universal');
+  assert.match(h.$('syntaxPreview').innerHTML, /data-universal-kind="prompt-name" style="color:#ffaa00;[^"]*">biqu@CR10SPro</);
+  assert.match(h.$('syntaxPreview').innerHTML, /data-universal-kind="url"[^>]*>\\\\fileserver\\backups\\core-1\.cfg</);
+  h.type('syntaxSample', 'switch#show run'); assert.match(h.$('syntaxPreview').innerHTML, /data-universal-kind="prompt-name"[^>]*>switch</);
+  h.change('syntaxEditSet', { value: 'network' }); assert(h.$('syntaxRule-red')); assert.equal(h.doc.querySelector('[data-syntax-act="use"]').textContent, 'Use this rule set');
+  h.change('syntaxEditSet', { value: 'smart' }); assert(h.doc.querySelector('[data-terminal-universal-editor]'));
+  assert.equal(h.$('syntaxSample').textContent, 'switch#show run', 'your sample text is kept while you switch');
+  h.click('[data-syntax-act="use"]'); assert.equal(h.state.terminalSyntax.active, 'smart'); assert.match(h.calls.toasts.at(-1)[0], /Using Universal/);
+  const other = harness({ syntax: { active: 'network' } });
+  other.doc.getElementById('display').insertAdjacentHTML('beforeend', '<button data-terminal-syntax="customize" data-terminal-syntax-set="smart">Rules and colors…</button>');
+  other.click('[data-terminal-syntax-set="smart"]'); assert(other.doc.querySelector('[data-terminal-universal-editor]'), 'Rules and colors… opens Universal while a rule set is active');
+  const plain = harness({ syntax: { active: 'network' } }); plain.ui.open(); assert.equal(plain.doc.querySelector('[data-terminal-universal-editor]'), null, 'Customize still opens the active rule set');
 });

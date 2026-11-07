@@ -153,3 +153,21 @@ func TestTerminalCursorBoldBrightAndMobaXtermSchemesPersist(t *testing.T) {
 		t.Fatalf("existing settings without cursor keys must keep today's look: %#v", clean)
 	}
 }
+
+// v1.21.12: the URL and network-path underline switch and the device prompt
+// name mode survive a restart; unknown values fall back to the defaults.
+func TestTerminalLinkUnderlinesAndPromptNamePersist(t *testing.T) {
+	clean := safeTerminalAppearance(map[string]any{"highlightUnderlines": true, "highlightLinkUnderlines": false, "promptHighlight": "always"})
+	if clean["highlightLinkUnderlines"] != false || clean["highlightUnderlines"] != true || clean["promptHighlight"] != "always" {
+		t.Fatalf("link underline or prompt name choice was dropped: %#v", clean)
+	}
+	if got := safeTerminalAppearance(map[string]any{"promptHighlight": "off"})["promptHighlight"]; got != "off" {
+		t.Fatalf("No color was dropped: %v", got)
+	}
+	for _, value := range []any{nil, "", "secret-canary", true, map[string]any{}} {
+		clean := safeTerminalAppearance(map[string]any{"promptHighlight": value, "highlightLinkUnderlines": "false"})
+		if clean["promptHighlight"] != "auto" || clean["highlightLinkUnderlines"] != true {
+			t.Fatalf("invalid values did not use defaults: %#v", clean)
+		}
+	}
+}

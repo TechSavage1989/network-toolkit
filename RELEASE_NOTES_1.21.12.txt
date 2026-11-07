@@ -1,0 +1,27 @@
+Network Toolkit 1.21.12 Beta 13
+
+## What's New
+
+- Choose how the device's name in its prompt is colored: your own color, no color, or automatic. Pick the color right beside it in Settings → Highlighting.
+- URLs and network paths, such as \\server\share, have their own underline switch, separate from the one for other highlights.
+- Universal highlighting now has its own Customize page, where you can turn each kind of highlight on or off, change its colors and try it on your own text.
+
+## Additional Details
+
+- Device prompt name (Settings → Highlighting, and on the Universal Customize page):
+  - Color it unless the device does (the default and the previous behavior): Universal colors the prompt only when the device sends it without colors.
+  - Always my color: the name, such as user@host in user@host:~$ or switch in switch#, takes your color even when the device colors it itself (for example the green Linux prompt). The rest of the prompt is unchanged.
+  - No color: the name is shown as plain text, even when the device colors it.
+  - The choice works with Universal and with keyword rule sets. With a rule set and Always my color, the legend shows a Device prompt name chip you can click to change the color.
+  - Only the name's on-screen color changes; the text the device sent is not altered, and a colored background, inverse or hidden text from the device is left alone.
+- Prompt names are found for Linux, macOS (zsh), Cisco, Juniper, Palo Alto, FortiGate, MikroTik, Huawei and H3C prompts. Windows drive prompts such as C:\> have no name and are not changed. Huawei and H3C prompts typed without a space (<HUAWEI>display version) are now recognized too.
+- URLs and network paths:
+  - Underline URLs and network paths is a separate switch from Underline highlighted text; both are on by default.
+  - Recognized in addition to http, https, FTP, SFTP and SSH links: SMB, CIFS, NFS, TFTP, SCP, rsync, Git, LDAP, Telnet, RDP, VNC, WebSocket and file links; Windows shares (\\server\share\folder); and NFS or scp locations with an IP address or full host name (192.0.2.10:/exports, user@host.example.com:/srv). Names that look like files (report.txt:/x) are not treated as hosts. No clickable link is created.
+  - The URL color and rule are now labeled "URL / network path".
+- Settings → Highlighting is shorter: the Universal rule switches and colors moved to the Customize dialog. Open it with Rules and colors… or Customize while Universal is selected. The legend chips still change a color with one click.
+- The Universal page lists each kind with its switch, color and examples, has Turn all rules on and Reset colors, and a preview that follows every change. It shows Universal's own colors even while a keyword rule set is in use. Use Universal switches to it.
+- Settings, saved values and their effects are unchanged apart from the additions above.
+- Validation used unit tests with sample output from many systems and browser checks; no real device was used, and it has not yet been checked on a physical Windows PC.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Security confirmations and Windows/UAC approval are unchanged.
+- This is an opt-in beta. Stable users stay on 1.20.16. Portable executable filename remains Network_Toolkit.exe.
