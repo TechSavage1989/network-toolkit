@@ -1,4 +1,6 @@
-# v1.21.8 Beta 9 (Terminal features and Advanced, T3) - candidate
+# v1.21.8 Beta 9 (Terminal features and Advanced, T3) - publication verified (2026-11-07)
+
+Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.21.8 at 2026-11-07T11:48:51Z; stable latest remains v1.20.16. Merged PR #115; tag v1.21.8 points to merge commit 2ce7ad6fdccb44eb5562b0a3faa5029251a39a3b. Release workflow run 42369530682 succeeded. Assets: Network_Toolkit.exe, Network_Toolkit_1.21.8_Portable.zip, Network_Toolkit_1.21.8_Update.zip, Network_Toolkit_1.21.8_Linux_x86_64.tar.gz, Network_Toolkit_1.21.8_Linux_aarch64.tar.gz, SHA256SUMS; all digests match SHA256SUMS. The published Linux x86_64 archive was downloaded, extracted and run (`--version` 1.21.8 linux amd64; inner SHA256SUMS OK). Checks: both runs green (42367566185 and 42367580552), first attempt.
 
 Owner request: terminal options similar to MobaXterm (plan: docs/TERMINAL_SETTINGS_PLAN.md, T3; the rest is T3b).
 - Module `web/assets/terminal-behavior.js` (in `web_assets.go`, loaded after terminal-appearance.js). It reads the app's top-level `state`, `saveState`, `terminalSessions` and `enqueueTerminalInput` by bare name: they are script bindings, not `window` properties (`root.state` is undefined in the app; a test guards this).
