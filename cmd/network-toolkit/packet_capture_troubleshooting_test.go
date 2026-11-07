@@ -86,6 +86,22 @@ func TestPacketTroubleshootingReviewsWholeCaptureAndKeepsEvidenceInspectable(t *
 	if response.Code != http.StatusOK || json.Unmarshal(response.Body.Bytes(), &report) != nil || len(report.Limitations) < 3 {
 		t.Fatalf("capture-quality limitations missing: %d %s", response.Code, response.Body.String())
 	}
+	var check capture.TargetCheck
+	response = captureRequest(a, http.MethodGet, base+"/check?target="+url.QueryEscape("198.51.100.2:443"), nil, a.token)
+	if response.Code != http.StatusOK || json.Unmarshal(response.Body.Bytes(), &check) != nil || check.State != "problem" || len(check.Steps) != 4 || check.Steps[2].ID != "connect" || check.Steps[2].State != "fail" {
+		t.Fatalf("connection check for the refused HTTPS connection: %d %s", response.Code, response.Body.String())
+	}
+	for _, bad := range []string{"", "bad host!", "example.test:70000"} {
+		if response = captureRequest(a, http.MethodGet, base+"/check?target="+url.QueryEscape(bad), nil, a.token); response.Code != http.StatusBadRequest {
+			t.Fatalf("connection check accepted %q: %d", bad, response.Code)
+		}
+	}
+	if response = captureRequest(a, http.MethodGet, base+"/check?target=198.51.100.2", nil, ""); response.Code != http.StatusUnauthorized {
+		t.Fatal("unauthenticated connection check", response.Code)
+	}
+	if response = captureRequest(a, http.MethodPost, base+"/check?target=198.51.100.2", []byte("{}"), a.token); response.Code != http.StatusMethodNotAllowed {
+		t.Fatal("connection check accepted a write", response.Code)
+	}
 	if response = captureRequest(a, http.MethodGet, base+"/troubleshoot", nil, ""); response.Code != http.StatusUnauthorized {
 		t.Fatal("unauthenticated capture review", response.Code)
 	}

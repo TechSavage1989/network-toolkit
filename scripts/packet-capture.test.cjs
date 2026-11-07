@@ -9,6 +9,7 @@ function harness(initialCapture=null,config={}){
   if(path.endsWith('/capabilities'))return config.capabilities||{available:true,note:'Windows capture',interfaces:[{id:'nics',name:'All adapters',engine:'auto'}]};
   if(path.endsWith('/interfaces')){if(config.loadAdapters)return config.loadAdapters();return {interfaces:config.interfaces||[{id:'nics',name:'All configurable network adapters',engine:'auto'},{id:'live:wifi',name:'Wi-Fi',engine:'live'},{id:'file:12',name:'Wi-Fi',engine:'file'}]};}
   if(path.endsWith('/troubleshoot'))return config.loadReport?config.loadReport():report;
+  if(path.includes('/check?')){const target=new URLSearchParams(path.split('?')[1]).get('target');if(config.loadCheck)return config.loadCheck(target);throw new Error('No check configured for '+target);}
   if(path.includes('/statistics?'))return config.loadStatistics?config.loadStatistics(new URLSearchParams(path.split('?')[1])):config.statistics||{timeline:[],protocols:{},conversations:[],endpoints:[],bytes:0,duration:0,expert:0};
   if(path.includes('/interval?')){const params=new URLSearchParams(path.split('?')[1]),start=params.get('interval_start'),end=params.get('interval_end'),inclusive=params.get('interval_inclusive')==='1',rows=(config.packets||[]).filter(p=>Number.isFinite(resultTime.epoch(p.time))&&resultTime.compareInstants(p.time,start)>=0&&(resultTime.compareInstants(p.time,end)<0||inclusive&&resultTime.compareInstants(p.time,end)===0)),offset=Number(params.get('offset')||0),limit=Number(params.get('limit')||50);return {total:rows.length,offset,packets:rows.slice(offset,offset+limit)};}
   if(method==='POST'&&config.startRecording){capture=await config.startRecording();return capture;}
@@ -826,4 +827,73 @@ test('map synchronization does not swallow a real wheel offset merely because th
   h.doc.emit('scroll',reader);assert.equal(h.api.model[expected],262,kind+' interior offset is not evidence of a native clamp');
   const before=reader.scrollTop;h.doc.emit('scroll',map);assert.notEqual(reader.scrollTop,before,kind+' genuine interior wheel is processed');await h.settle();
  }
+});
+const checkSteps=[{id:'lookup',label:'Name lookup',state:'skipped',detail:'Not needed: you entered an IP address.'},{id:'reach',label:'Reach the device',state:'ok',detail:'192.0.2.12 answered.',packetNumbers:[7],filter:'ip.addr == "192.0.2.12"'},{id:'connect',label:'Connect',state:'fail',detail:'<b>refused</b> on Remote Desktop (port 3389)',packetNumbers:[8,9],filter:'tcp.port == 3389'},{id:'respond',label:'Service reply',state:'unexpected',detail:'Not reached.'}];
+const refusedCheck=target=>({target,host:'192.0.2.12',port:3389,state:'problem',conclusion:'The device is there, but the connection was not accepted.',steps:checkSteps});
+test('guided start keeps the website or device, coaches while recording and shows save controls only with packets',async()=>{
+ const running={id:'c'.repeat(24),name:'Packet capture',state:'running',engine:'live',count:12,bytes:900,lost:0,overwritten:0,revision:1,started:new Date(Date.now()-65000).toISOString(),options:{duration:120}},checks=[];
+ const h=harness(null,{startRecording:async()=>running,loadCheck:target=>{checks.push(target);return refusedCheck(target);}});await h.settle();
+ assert.deepEqual([...h.doc.querySelectorAll('.packet-guided-setup .packet-step-number')].map(n=>n.textContent),['1','2','3']);assert(h.doc.querySelector('.packet-start-big[data-packet-action="start"]'));
+ assert.equal(h.doc.getElementById('packetSaveControls').hidden,true,'Save controls appeared without a capture');assert.equal(h.doc.getElementById('packetRecordingCoach').hidden,true);assert.equal(h.doc.getElementById('packetPauseControl').hidden,true);
+ assert.match(h.doc.getElementById('packetCaptureStatus').textContent,/Follow the three steps above/);
+ h.doc.getElementById('packetTask').value='device';h.doc.emit('change',h.doc.getElementById('packetTask'));
+ const target=h.doc.getElementById('packetTarget');target.value='192.0.2.12:3389';h.doc.emit('input',target);
+ for(const input of h.doc.querySelectorAll('input,select'))input.checkValidity=()=>true;
+ h.doc.emit('click',h.doc.querySelector('.packet-start-big'));await h.settle();
+ const coach=h.doc.getElementById('packetRecordingCoach');assert.equal(coach.hidden,false);
+ assert.match(h.doc.getElementById('packetCoachText').textContent,/Try 192\.0\.2\.12:3389 now\. Try to reach the device now.*Stop and analyse/);
+ assert.match(h.doc.getElementById('packetCoachTime').textContent,/^1:0\d$/);assert.equal(h.doc.getElementById('packetCoachCount').textContent,'12');assert.equal(h.doc.getElementById('packetCoachProgress').getAttribute('max'),'120');
+ assert.equal(coach.querySelector('[data-packet-action="stop"]').disabled,false);assert.equal(h.doc.getElementById('packetPauseControl').hidden,false);assert.equal(h.doc.getElementById('packetSaveControls').hidden,false);
+ assert.match(h.doc.getElementById('packetCaptureStatus').textContent,/Recording\. · 12 packets/);assert.deepEqual(checks,['192.0.2.12:3389']);
+ h.setCapture({...running,state:'completed',count:14,revision:2});await h.api.refresh(true);await h.settle();
+ assert.equal(coach.hidden,true,'the coach stayed after the recording stopped');assert.equal(h.doc.getElementById('packetPauseControl').hidden,true);
+ assert.deepEqual(checks,['192.0.2.12:3389','192.0.2.12:3389'],'the target typed before recording should be checked while recording and again once the recording stops');assert.equal(h.doc.querySelectorAll('.packet-target-step').length,4);
+});
+test('the connection check follows a typed website or device step by step and opens each step\'s packets',async()=>{
+ const capture={id:'a'.repeat(24),name:'Office capture',state:'completed',count:38,bytes:3300,revision:1},checks=[];let release;
+ const h=harness(capture,{loadCheck:target=>{checks.push(target);return new Promise(resolve=>{release=()=>resolve(refusedCheck(target));});}});await h.settle();
+ const card=h.doc.getElementById('packetTargetCheck');assert.match(card.textContent,/Enter the website or device/);assert.equal(checks.length,0);assert.equal(h.doc.querySelector('[data-packet-action="clear-target"]'),null);
+ const input=h.doc.getElementById('packetCheckTarget');input.value='192.0.2.12:3389';h.doc.emit('keydown',input,{key:'Enter'});await h.settle();
+ assert.deepEqual(checks,['192.0.2.12:3389']);assert.match(h.doc.getElementById('packetTargetCheck').textContent,/Checking 192\.0\.2\.12:3389…/);assert.equal(h.doc.querySelector('.packet-target-conclusion'),null,'an unfinished check showed an empty result');
+ release();await h.settle();
+ const steps=[...h.doc.querySelectorAll('.packet-target-step')];assert.deepEqual(steps.map(s=>s.querySelector('.packet-step-state').textContent),['Not needed','Worked','Failed','Not seen']);
+ assert.deepEqual(steps.map(s=>s.className.split(' ').at(-1)),['packet-step-skipped','packet-step-ok','packet-step-fail','packet-step-unknown']);
+ assert.match(h.doc.querySelector('.packet-target-problem').textContent,/not accepted/);assert.equal(h.doc.getElementById('packetTargetCheck').querySelector('b'),null,'step text was not escaped');assert.match(steps[2].textContent,/refused.*Remote Desktop \(port 3389\)/);
+ assert.equal(steps[0].querySelector('[data-packet-check-step]'),null,'a step without packets offered Show packets');
+ await h.api.refresh();assert.equal(checks.length,1,'an unchanged capture repeated the check');
+ h.doc.getElementById('packetSearch').value='unrelated';h.api.model.query='unrelated';
+ h.doc.emit('click',steps[2].querySelector('[data-packet-check-step="2"]'));await h.settle();
+ assert.equal(h.api.model.view,'packets');assert.equal(h.api.model.query,'');assert.equal(h.doc.getElementById('packetDisplayFilter').value,'tcp.port == 3389');assert.equal(h.calls.filter(c=>c.method==='POST'&&!c.path.endsWith('/interfaces')).length,0);
+ h.doc.emit('click',h.doc.querySelector('[data-packet-view="troubleshooting"]'));await h.settle();assert.equal(h.doc.querySelectorAll('.packet-target-step').length,4);
+ h.doc.emit('click',h.doc.querySelector('[data-packet-action="clear-target"]'));await h.settle();assert.equal(h.doc.getElementById('packetCheckTarget').value,'');assert.equal(h.doc.querySelector('.packet-target-step'),null);assert.equal(checks.length,1);
+});
+test('a rejected connection check target shows its error without hiding the review',async()=>{
+ const h=harness({id:'a'.repeat(24),name:'Capture',state:'completed',count:3,bytes:300,revision:1},{loadCheck:()=>{throw new Error('Enter a website, device name or IP address, optionally with a port.');}});await h.settle();
+ h.doc.getElementById('packetCheckTarget').value='bad host!';h.doc.emit('click',h.doc.querySelector('[data-packet-action="check-target"]'));await h.settle();
+ assert.match(h.doc.querySelector('#packetTargetCheck [role="alert"]').textContent,/optionally with a port/);assert(h.doc.querySelector('.packet-verdict'));assert(h.doc.querySelector('.packet-finding'));
+});
+test('the result leads with a plain verdict and plain headlines and keeps technical details folded and in reports',async()=>{
+ const capture={id:'a'.repeat(24),name:'Office',state:'completed',count:38,bytes:3300,revision:1};
+ const report={packetCount:38,duration:5,summary:'2 types of observation are worth reviewing.',scope:'All 38 retained packets.',verdict:{state:'problems',headline:'1 problem found',detail:'Start with the first one below.'},metrics:{dnsQueries:3,dnsResponses:3,tcpConnectionAttempts:4,tcpResets:1,icmpErrors:0},limitations:['An absent reply does not prove a device is down.'],findings:[{id:'dns-name-not-found',severity:'attention',title:'DNS name not found (NXDOMAIN)',headline:'The name files.example.com does not exist',technical:'DNS response code 3 (NXDOMAIN) for files.example.com.',observation:'1 NXDOMAIN response.',meaning:'The DNS server says there is no such name.',nextSteps:['Check the name for a typo.'],count:1,packetNumbers:[4],filter:'frame.number == 4'},{id:'tcp-resets',severity:'info',title:'TCP resets',observation:'2 resets.',meaning:'Connections were ended.',nextSteps:[],count:2,packetNumbers:[5],filter:'tcp.flags.rst'}]};
+ const h=harness(capture,{report});await h.settle();
+ const verdict=h.doc.querySelector('.packet-verdict');assert(verdict.className.includes('packet-verdict-problems'));assert.equal(verdict.querySelector('h2').textContent,'1 problem found');assert.match(verdict.textContent,/Start with the first one below/);
+ const findings=[...h.doc.querySelectorAll('.packet-finding')];assert.equal(findings[0].querySelector('h3').textContent,'The name files.example.com does not exist');assert.equal(findings[1].querySelector('h3').textContent,'TCP resets');
+ assert.deepEqual(findings.map(f=>f.querySelector('.packet-finding-heading span').textContent),['Problem','Good to know']);
+ const technical=findings[0].querySelector('.packet-finding-technical');assert.equal(technical.hasAttribute('open'),false);assert.match(technical.textContent,/DNS name not found \(NXDOMAIN\)/);assert.match(technical.textContent,/response code 3/);assert.doesNotMatch(findings[0].querySelector('.packet-finding-meaning').textContent,/NXDOMAIN/);
+ const limits=h.doc.querySelector('.packet-review-limitations');assert.equal(limits.hasAttribute('open'),false);assert.match(limits.textContent,/What this capture cannot show \(1\)/);
+ technical.setAttribute('open','');limits.setAttribute('open','');report.summary='Updated';h.setCapture({...capture,count:39,revision:2});await h.api.refresh();
+ assert(h.doc.querySelector('[data-packet-technical="dns-name-not-found"]').hasAttribute('open'),'a refresh closed opened technical details');assert(h.doc.querySelector('.packet-review-limitations').hasAttribute('open'));
+ h.doc.emit('click',h.doc.querySelector('[data-packet-action="copy-review"]'));await h.settle();
+ assert.match(h.copied[0],/1 problem found/);assert.match(h.copied[0],/The name files\.example\.com does not exist/);assert.match(h.copied[0],/response code 3 \(NXDOMAIN\)/);assert.match(h.copied[0],/does not prove a device is down/);
+});
+test('conversations and devices show plain results, services and names learned from lookups',async()=>{
+ const statistics={timeline:[],protocols:{},bytes:0,duration:0,expert:0,conversations:[{id:'tcp-1',protocol:'TCP',a:'192.0.2.60:51020',b:'192.0.2.12:3389',nameB:'<rdp>.example.com',service:'Remote Desktop',servicePort:3389,outcome:'refused',packets:2,aToB:1,bToA:1,bytes:108,duration:0.001,resets:1,retransmissions:0},{id:'udp-1',protocol:'UDP',a:'192.0.2.1:67',b:'192.0.2.60:68',service:'DHCP',servicePort:67,outcome:'one-way',packets:1,aToB:1,bToA:0,bytes:316,duration:0,resets:0,retransmissions:0},{id:'udp-2',protocol:'UDP',a:'192.0.2.60:40000',b:'192.0.2.9:40001',servicePort:40000,outcome:'made-up',packets:2,aToB:1,bToA:1,bytes:90,duration:0,resets:0,retransmissions:0}],endpoints:[{address:'192.0.2.12',name:'files.example.com',packets:2,sent:1,received:1,bytes:108},{address:'192.0.2.60',packets:5,sent:3,received:2,bytes:514}]};
+ const h=harness({id:'a'.repeat(24),name:'Capture',state:'completed',count:5,bytes:514,revision:1},{statistics});await h.settle();
+ h.doc.emit('click',h.doc.querySelector('[data-packet-view="conversations"]'));await h.settle();
+ const rows=[...h.doc.querySelectorAll('.packet-conversations tbody tr')];assert.equal(rows.length,3);
+ assert.deepEqual(rows.map(r=>r.querySelector('td').textContent),['Refused','One way','UDP']);assert(rows[0].querySelector('.packet-outcome-refused'));assert.equal(rows[2].querySelector('.packet-outcome'),null,'an unknown outcome was shown as a result');
+ const cells=rows[0].querySelectorAll('td');assert.match(cells[1].textContent,/Remote Desktop.*TCP port 3389/);assert.match(cells[3].querySelector('.packet-endpoint-name').textContent,/rdp.*\.example\.com/);assert.match(cells[3].textContent,/192\.0\.2\.12:3389/);assert.equal(cells[3].querySelector('rdp'),null);assert.match(cells[4].textContent,/2.*1 \/ 1/);
+ assert.match(rows[2].querySelectorAll('td')[1].textContent,/UDP.*port 40000/);
+ h.doc.emit('click',h.doc.querySelector('[data-packet-view="endpoints"]'));await h.settle();
+ const devices=[...h.doc.querySelectorAll('.packet-summary-table tbody tr')];assert.equal(devices[0].querySelector('.packet-endpoint-name').textContent,'files.example.com');assert.equal(devices[1].querySelector('.packet-endpoint-name'),null);assert.equal(devices[1].querySelector('td').textContent,'192.0.2.60');
 });
