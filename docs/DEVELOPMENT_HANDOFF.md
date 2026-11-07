@@ -1,4 +1,6 @@
-# v1.21.7 Beta 8 (Terminal font, colors and cursor, T2) - candidate
+# v1.21.7 Beta 8 (Terminal font, colors and cursor, T2) - publication verified (2026-11-07)
+
+Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.21.7 at 2026-11-07T10:50:32Z; stable latest remains v1.20.16. Merged PR #113; tag v1.21.7 points to merge commit 5933d04a2d441214d89e7124601a224d57005005. Release workflow run 42365427156 succeeded. Assets: Network_Toolkit.exe, Network_Toolkit_1.21.7_Portable.zip, Network_Toolkit_1.21.7_Update.zip, Network_Toolkit_1.21.7_Linux_x86_64.tar.gz, Network_Toolkit_1.21.7_Linux_aarch64.tar.gz, SHA256SUMS; all digests match SHA256SUMS. The published Linux x86_64 archive was downloaded, extracted and run (`--version` 1.21.7 linux amd64; inner SHA256SUMS OK). Checks: both runs green (push 42363781393 and pull request 42363806490), first attempt.
 
 Owner request: terminal options similar to MobaXterm (plan: docs/TERMINAL_SETTINGS_PLAN.md, T2).
 - Font size: Display's `#terminalFontSize` is now `<input type="number" min="8" max="36">` with a "px" label and `data-input-clear="off"` (the app's clear button hid the value in the 78px field). It applies on `change` (Enter or leaving the field); invalid values snap back. Zoom (`FONT_SIZES`) steps 8–36; Go accepts 8–36.

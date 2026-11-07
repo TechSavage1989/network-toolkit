@@ -62,4 +62,4 @@ These MobaXterm options have no equivalent in the browser terminal (xterm.js) or
 
 ## Status
 - T1: published in v1.21.6 Beta 7 on 2026-11-07 (syntax highlighting rule sets, Customize, .msyn import and export).
-- T2: v1.21.7 Beta 8 candidate (font size 8 to 36, cursor type, bold in brighter colors, seven MobaXterm-named color schemes).
+- T2: published in v1.21.7 Beta 8 on 2026-11-07 (font size 8 to 36, cursor type, bold in brighter colors, seven MobaXterm-named color schemes).
