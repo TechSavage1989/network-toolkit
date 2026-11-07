@@ -30,3 +30,23 @@
 button.terminal-syntax-swatch{width:16px;height:16px;margin-top:1px;padding:0;border:1px solid var(--border);cursor:pointer;transform:none}
 button.terminal-syntax-swatch.underline{height:16px;border:1px solid var(--border);border-bottom:3px solid;background:transparent;border-radius:3px}
 button.terminal-syntax-swatch:hover,button.terminal-syntax-swatch:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+/* v1.21.12: Universal profile page in the Customize dialog. */
+.terminal-universal-editor{display:flex;flex-direction:column;gap:8px;min-width:0}
+.terminal-universal-options{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:12px}
+.terminal-universal-options .check{display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.terminal-universal-rules{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 10px}
+.terminal-universal-rule{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;column-gap:8px;row-gap:5px;padding:6px 8px;border:1px solid var(--border);border-radius:7px;min-width:0}
+.terminal-universal-rule>label{display:flex;flex-direction:column;gap:1px;min-width:0;font-size:12px;cursor:pointer}
+.terminal-universal-rule>label small{font-size:10.5px;line-height:1.35;color:var(--muted);overflow-wrap:anywhere}
+.terminal-universal-rule .ntk-color-trigger{min-height:28px;padding:4px 7px;gap:6px}
+.terminal-universal-prompt{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-size:11px}
+.terminal-universal-prompt select{flex:1 1 180px;min-width:0;max-width:260px}
+.terminal-universal-actions{display:flex;flex-wrap:wrap;gap:6px}
+@media(max-width:820px){.terminal-universal-rules{grid-template-columns:minmax(0,1fr)}}
+/* Highlighting tab: the device prompt name works with every profile. */
+.terminal-prompt-options{display:flex;flex-direction:column;gap:4px;margin:0 0 10px}
+.terminal-prompt-setting{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;font-size:12px}
+.terminal-prompt-setting>label{font-weight:600}
+.terminal-prompt-setting select{flex:0 1 230px;min-width:0}
+.terminal-prompt-setting .ntk-color-trigger{min-height:28px;padding:4px 7px}
+.terminal-prompt-options .hint{margin:0}

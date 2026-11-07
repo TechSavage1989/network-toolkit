@@ -19,7 +19,7 @@
 
   const LIMITS = Object.freeze({ text: 4096, token: 128, matches: 256,
     decorations: 8192, rows: 300, columns: 1000, wrapRows: 64, frameRows: 40, frameMs: 6, delay: 40 });
-  const LABELS = Object.freeze({ address: 'IP / CIDR', mac: 'MAC address', url: 'URL', prompt: 'Device prompt',
+  const LABELS = Object.freeze({ address: 'IP / CIDR', mac: 'MAC address', url: 'URL / network path', prompt: 'Device prompt',
     interface: 'Interface label', command: 'Command / config verb', field: 'Setting / field name',
     protocol: 'Protocol / service', value: 'Mode / named value', number: 'Number / unit', comment: 'Comment / description',
     warning: 'Warning / pending', error: 'Error / down', success: 'Up / success', info: 'Info / notice' });
@@ -113,12 +113,15 @@
   }
   function legend(theme, options = {}) {
     if (global.NTKTerminalShellSyntax?.supported(options.language)) return global.NTKTerminalShellSyntax.legend(options.terminalTheme, theme, options.shellColors);
-    if (options.ruleset && global.NTKTerminalSyntaxRules) return global.NTKTerminalSyntaxRules.legend(options.ruleSet).map(item => ({ kind: 'syn-' + item.color,
+    if (options.ruleset && global.NTKTerminalSyntaxRules) return [...global.NTKTerminalSyntaxRules.legend(options.ruleSet).map(item => ({ kind: 'syn-' + item.color,
       label: item.label + (item.note ? ': ' + item.note : ''), color: item.color === 'underline' ? (options.syntaxColors?.underline || '') : (options.syntaxColors?.[item.color] || ''),
-      borderStyle: item.color === 'underline' ? 'solid' : 'none', borderWidth: item.color === 'underline' ? 1 : 0 }));
-    const colors = palette(theme, options.colors);
-    return Object.keys(LABELS).filter(kind => options.rules?.[kind] !== false).map(kind => ({ kind, label: LABELS[kind], color: colors[kind],
-      borderStyle: options.underlines === false ? 'none' : MARKS[kind][0], borderWidth: options.underlines === false ? 0 : MARKS[kind][1] }));
+      borderStyle: item.color === 'underline' ? 'solid' : 'none', borderWidth: item.color === 'underline' ? 1 : 0 })),
+      ...(promptMode(options) === 'always' ? [{ kind: 'prompt', label: 'Device prompt name', color: palette(theme, options.colors).prompt, borderStyle: 'none', borderWidth: 0 }] : [])];
+    const colors = palette(theme, options.colors), mode = promptMode(options);
+    // URLs and network paths have their own underline switch (v1.21.12).
+    const underlined = kind => kind === 'url' ? options.linkUnderlines !== false : options.underlines !== false;
+    return Object.keys(LABELS).filter(kind => kind === 'prompt' ? mode === 'always' || mode === 'auto' && options.rules?.prompt !== false : options.rules?.[kind] !== false)
+      .map(kind => ({ kind, label: LABELS[kind], color: colors[kind], borderStyle: underlined(kind) ? MARKS[kind][0] : 'none', borderWidth: underlined(kind) ? MARKS[kind][1] : 0 }));
   }
   function ipv4(value) {
     const parts = value.split('.');
@@ -179,6 +182,10 @@
     // or H3C system views use [name] or [~name-view].
     prompt ||= /^\s*[A-Za-z][A-Za-z0-9_.:@/~()-]{1,62}[#>](?=[A-Za-z])/.exec(text)
       || /^\s*(?:PS )?[A-Za-z]:\\[^<>:"|?*\r\n]{0,200}>(?=\s|$|\S)/.exec(text)
+      // v1.21.12: zsh/macOS (user@host ~ %) and Huawei/H3C user view typed
+      // against a known command (<HUAWEI>display version).
+      || /^\s*[A-Za-z0-9_.-]{1,64}@[A-Za-z0-9_.-]{1,64} (?:~|\/)[^\s]{0,200} [%#$](?=\s|$)/.exec(text)
+      || /^\s*<[A-Za-z][\w.-]{0,63}>(?=(?:display|dis|system-view|sys|save|quit|return|undo|ping|tracert|reset|reboot|interface|screen-length|stelnet|telnet|ssh|sftp|ftp|tftp|copy|delete|dir|more|cd|pwd|super|terminal|debugging|clock|startup|compare|commit|rollback|local-user|user-interface|lldp|patch|upgrade|license|cls|language-mode)(?:\s|$))/.exec(text)
       || ((match => match && !/^\[[~*]?(?:ok|done|info|warn|warning|error|err|debug|fail|failed|pass|passed|running|stopped|exit|killed|notice|crit|critical|fatal|y\/n|yes|no|\d+)\]/i.test(match[0].trim()) ? match : null)(/^\s*\[[~*]?[A-Za-z][\w.-]{0,63}(?:-[\w./:-]{1,60})?\](?=[a-z]|\s*$)/.exec(text)));
     const offset = prompt ? prompt[0].length : 0, tokens = [];
     const pattern = /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s{}\[\];=]+/g;
@@ -251,8 +258,11 @@
     return !/[A-Za-z0-9_./-]/.test(text[start - 1] || '') && !/[A-Za-z0-9_./-]/.test(text[end] || '');
   }
 
+  // v1.21.12: file-share and transfer schemes count as links too.
+  const URL_SCHEMES = 'https?|ftps?|sftp|ssh|scp|smb|cifs|nfs|tftp|rsync|git|ldaps?|telnet|rdp|vnc|wss?|file';
   function urlCandidate(value) {
-    const authority = /^(?:https?|ftps?|sftp|ssh):\/\/([^/?#]+)(?:[/?#]|$)/i.exec(value);
+    if (/^file:\/\/\/[^\s]/i.test(value)) return value.length <= LIMITS.text;
+    const authority = new RegExp('^(?:' + URL_SCHEMES + '):\\/\\/([^/?#]+)(?:[/?#]|$)', 'i').exec(value);
     if (!authority || value.length > LIMITS.text) return false;
     const endpoint = authority[1].replace(/^[^@]*@/, '');
     const parts = /^(?:\[([^\]]+)\]|([^:]+))(?::([0-9]{1,5}))?$/.exec(endpoint);
@@ -262,13 +272,66 @@
     if (/^[0-9.]+$/.test(host)) return ipv4(host);
     return host.length <= 253 && host.split('.').every(label => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(label));
   }
-  function analyze(input, language, selectedRules, ruleset) {
+  function hostName(host) {
+    if (/^[0-9.]+$/.test(host)) return ipv4(host);
+    return host.length <= 253 && host.split('.').every(label => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(label));
+  }
+  // Network paths (v1.21.12): Windows UNC shares (\\server\share\dir) and
+  // NFS or scp locations (192.0.2.10:/exports, user@host.example.com:/srv).
+  // A bare host:/path needs an IPv4 address or a dotted host name.
+  const FILE_SUFFIX = /\.(?:txt|log|cfg|conf|config|json|ya?ml|xml|ini|bin|tar|gz|tgz|zip|7z|csv|md|py|js|sh|ps1|bat|exe|dll|iso|img|sql|bak|old|tmp|pdf|html?|png|jpe?g|gif|pcapng|pcap|cap|crt|pem|key|der|msi|deb|rpm)$/i;
+  function networkPaths(text, add) {
+    const unc = /\\\\([A-Za-z0-9][A-Za-z0-9._-]{0,252})(?:@SSL)?(?:@\d{1,5})?((?:\\[^\s\\/:*?"<>|]+)+\\?)/g;
+    let match;
+    while ((match = unc.exec(text))) {
+      if (/[\w\\/]/.test(text[match.index - 1] || '') || !hostName(match[1].replace(/\.$/, ''))) continue;
+      const value = match[0].replace(/[.,;:!?)\]]+$/, '');
+      add(match.index, match.index + value.length, 'url');
+    }
+    const remote = /(?:[A-Za-z0-9._-]{1,64}@)?((?:\d{1,3}\.){3}\d{1,3}|[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*\.[A-Za-z]{2,63}):\/[^\s"'<>]*/g;
+    while ((match = remote.exec(text))) {
+      if (/[\w@.:/\\-]/.test(text[match.index - 1] || '') || !hostName(match[1]) || FILE_SUFFIX.test(match[1])) continue;
+      const value = match[0].replace(/[.,;:!?)\]]+$/, '');
+      add(match.index, match.index + value.length, 'url');
+    }
+  }
+  // The device's own name inside its prompt (v1.21.12): user@host in
+  // user@host:~$, the hostname in switch#, SW1(config)# or <HUAWEI>. Windows
+  // drive prompts (C:\>) have no name.
+  function promptName(text, prompt) {
+    if (!prompt) return null;
+    const body = text.slice(prompt.start, prompt.end);
+    if (/^(?:PS )?[A-Za-z]:\\/.test(body)) return null;
+    let match = /^([\[<(]?)([A-Za-z0-9_.-]{1,64}@[A-Za-z0-9_.-]{1,64})/.exec(body);
+    if (!match) match = /^(\[[~*]?)([A-Za-z][\w.-]{0,63}?)(?=-(?:X?GigabitEthernet|Ethernet|\d+GE|Vlanif|LoopBack|Eth-Trunk|Tunnel|NULL|MEth|vlan|aaa|bgp|ospf|isis|rip|acl|ui|pool|radius|hwtacacs|domain|ip|vpn|route|stp|lldp|user|local|ssh|snmp|ntp|dhcp|qos|traffic|policy|nqa|bfd|mpls|l2vpn|ike|ipsec)|\])/.exec(body);
+    if (!match) match = /^((?:[A-Z]{2,4}\/\d+(?:\/[A-Za-z0-9]+)*:)?<?)([A-Za-z][A-Za-z0-9_.-]{0,63})(?=[\s(:#>$%\]]|$)/.exec(body);
+    if (!match || /^[0-9.]+$/.test(match[2])) return null;
+    const name = match[2].replace(/[.-]+$/, ''), start = prompt.start + match[1].length;
+    return name ? { start, end: start + name.length } : null;
+  }
+  function promptMode(options) { return options?.prompt === 'always' || options?.prompt === 'off' ? options.prompt : 'auto'; }
+  // Rule-set hits around the prompt name (the name's own color wins).
+  function aroundName(hits, name) {
+    const out = [];
+    for (const hit of hits) {
+      if (hit.end <= name.start || hit.start >= name.end) { out.push(hit); continue; }
+      if (hit.start < name.start) out.push({ ...hit, end: name.start });
+      if (hit.end > name.end) out.push({ ...hit, start: name.end });
+    }
+    return out;
+  }
+  function analyze(input, language, selectedRules, ruleset, options) {
     if (global.NTKTerminalShellSyntax?.supported(language)) {const shell=global.NTKTerminalShellSyntax;if(shell.isPrompt(input,language))return shell.analyze(input,language);return shell.analyzeOutput(input,{address:addressKind,mac});}
     // A MobaXterm-style rule set (terminal-syntax-rules.js) replaces the
     // device-aware recognizers when one is selected.
+    const mode = promptMode(options);
     if (ruleset && typeof ruleset.match === 'function') {
       const value = typeof input === 'string' ? input : '';
-      return value && value.length <= LIMITS.text ? ruleset.match(value).slice(0, LIMITS.matches) : [];
+      if (!value || value.length > LIMITS.text) return [];
+      const hits = ruleset.match(value), name = mode === 'auto' ? null : promptName(value, syntaxContext(value).prompt);
+      if (!name) return hits.slice(0, LIMITS.matches);
+      return [...aroundName(hits, name), { ...name, kind: mode === 'always' ? 'prompt-name' : 'prompt-plain' }]
+        .sort((a, b) => a.start - b.start || a.end - b.end).slice(0, LIMITS.matches);
     }
     const text = typeof input === 'string' ? input : '';
     if (!text || text.length > LIMITS.text) return [];
@@ -283,14 +346,22 @@
     // Disabled rules still reserve their spans; toggling a URL off must not
     // expose a lower-priority 'down' or 'port1' match inside that URL.
     for (const comment of syntax.comments) add(comment.start, comment.end, 'comment');
-    const urls = /\b(?:https?|ftps?|sftp|ssh):\/\/[^\s<>"']+/gi;
+    const urls = new RegExp('\\b(?:' + URL_SCHEMES + '):\\/\\/[^\\s<>"\']+', 'gi');
     let url;
     while ((url = urls.exec(text))) {
       let value = url[0].replace(/[.,;:!?]+$/, '');
       while (/[)\]}]$/.test(value) && (value.match(/[)\]}]/g) || []).length > (value.match(/[(\[{]/g) || []).length) value = value.slice(0, -1);
       if (!/[A-Za-z0-9_.:+/-]/.test(text[url.index - 1] || '') && urlCandidate(value)) add(url.index, url.index + value.length, 'url');
     }
-    if (syntax.prompt) add(syntax.prompt.start, syntax.prompt.end, 'prompt');
+    const name = mode === 'auto' ? null : promptName(text, syntax.prompt);
+    if (name) {
+      // The name takes the chosen color (or none); the rest of the prompt keeps
+      // the Device prompt rule when the name is colored and no color otherwise.
+      add(name.start, name.end, mode === 'always' ? 'prompt-name' : 'prompt-plain');
+      const rest = mode === 'always' ? 'prompt' : 'prompt-reserved';
+      add(syntax.prompt.start, name.start, rest); add(name.end, syntax.prompt.end, rest);
+    } else if (syntax.prompt) add(syntax.prompt.start, syntax.prompt.end, mode === 'off' ? 'prompt-reserved' : 'prompt');
+    networkPaths(text, add);
     universalHighlights(text, syntax, add);
     // Take complete candidates instead of accepting a valid suffix from an
     // invalid IP, version, identifier or longer hardware address.
@@ -361,7 +432,7 @@
     // Structured status labels may share a line in remote login banners.
     const fields = /(?:^|\s{2,})(Last login|Login time|IPv[46] Address|MAC Address|Link state|Admin state|State|Status|Interface|MTU|Speed|Duplex):(?=\s|$)/gi;
     while ((match = fields.exec(text))) { const start=match.index+match[0].indexOf(match[1]); add(start,start+match[1].length,'field'); }
-    return found.filter(hit => enabledRules[hit.kind]).sort((a, b) => a.start - b.start || a.end - b.end);
+    return found.filter(hit => enabledRules[hit.kind] || hit.kind === 'prompt-name' || hit.kind === 'prompt-plain').sort((a, b) => a.start - b.start || a.end - b.end);
   }
 
   // Universal recognizers (v1.21.11): log severities, CLI error and success
@@ -454,10 +525,14 @@
     let requestedShellColors = cleanShellColors(opts.shellColors);
     let ruleset = opts.ruleset && typeof opts.ruleset.match === 'function' ? opts.ruleset : null, syntaxColors = opts.syntaxColors || {};
     const syntaxPalette = () => Object.fromEntries(['red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'underline'].filter(color => typeof syntaxColors[color] === 'string').map(color => ['syn-' + color, syntaxColors[color]]));
-    const appearanceColors = (mode, custom) => ({ ...palette(mode, custom), ...syntaxPalette(), ...(shell() ? global.NTKTerminalShellSyntax.palette(term.options?.theme, mode, requestedShellColors) : {}) });
+    // The prompt name (v1.21.12) uses the Device prompt color, or the normal
+    // text color when it is set to No color.
+    const promptColors = (base, mode) => ({ 'prompt-name': base.prompt, 'prompt-plain': term.options?.theme?.foreground || (themeName(mode) === 'light' ? '#1f2937' : '#e5e7eb') });
+    const appearanceColors = (mode, custom) => { const base = palette(mode, custom); return { ...base, ...promptColors(base, mode), ...syntaxPalette(), ...(shell() ? global.NTKTerminalShellSyntax.palette(term.options?.theme, mode, requestedShellColors) : {}) }; };
     let enabled = opts.enabled !== false, theme = themeName(opts.theme), disposed = false;
     let selectedRules = rules(opts.rules);
     let requestedColors = customColors(opts.colors), colors = appearanceColors(theme, requestedColors), underlines = opts.underlines !== false;
+    let linkUnderlines = opts.linkUnderlines !== false, prompt = promptMode(opts);
     let timer = null, active = false, suspended = '', limited = false, count = 0;
     let lastState = '', geometry = '', unsupported = false, scrollView = null;
     let records = new Map();
@@ -536,7 +611,9 @@
         element.style.borderLeft = 'none';
         return;
       }
-      element.style.borderBottom = underlines && !shell() ? mark[1] + 'px ' + mark[0] + ' ' + color : 'none';
+      const lined = kind === 'url' ? linkUnderlines : kind === 'prompt-plain' || kind === 'prompt-name' && ruleset ? false : underlines;
+      const shape = kind === 'prompt-name' ? MARKS.prompt : mark;
+      element.style.borderBottom = lined && !shell() ? shape[1] + 'px ' + shape[0] + ' ' + color : 'none';
       // Underlines provide the non-color cue. A vertical stroke beside a
       // short status such as "up" looks like terminal text or a cursor.
       element.style.borderLeft = 'none';
@@ -688,7 +765,7 @@
         for (const row of visibleRows) dirty.delete(row.y);
         return visibleRows.length;
       }
-      const matches = analyze(group.text, language, selectedRules, ruleset);
+      const matches = analyze(group.text, language, selectedRules, ruleset, { prompt });
       if (matches.length === LIMITS.matches) limited = true;
       // Never decorate invisible SGR 8 cells or disclose their token shape.
       const safe = matches.filter(hit => !group.rows.some(row => {
@@ -707,7 +784,10 @@
           // label. Split its visual span at those boundaries without changing
           // the recognized token, original cells or any remote attributes.
           for (let start = first; start < last;) {
-            const canColor = index => row.colorable[index - row.start] || shell() && !!requestedShellColors[hit.kind.slice(6)] && row.overrideable[index - row.start];
+            // A chosen prompt-name color (or No color) also replaces colors the
+            // device sent for its prompt, on the normal background only.
+            const replaces = hit.kind === 'prompt-name' || hit.kind === 'prompt-plain';
+            const canColor = index => row.colorable[index - row.start] || replaces && row.overrideable[index - row.start] || shell() && !!requestedShellColors[hit.kind.slice(6)] && row.overrideable[index - row.start];
             const colorable = !!canColor(start);
             let finish = start + 1;
             while (finish < last && !!canColor(finish) === colorable) finish++;
@@ -761,7 +841,7 @@
         if (y < current.first || y > current.last) return [];
         const group = collect(current.buffer, y);
         if (!group) return [];
-        const matches = analyze(group.text, language, selectedRules, ruleset), result = [];
+        const matches = analyze(group.text, language, selectedRules, ruleset, { prompt }), result = [];
         for (const hit of matches) {
           let hidden = false;
           const spans = [];
@@ -863,8 +943,10 @@
       ruleset = nextRuleset; syntaxColors = value.syntaxColors || {};
       const nextTheme = themeName(value.theme), nextRequested = customColors(value.colors), nextColors = appearanceColors(nextTheme, nextRequested);
       const nextRules = rules(value.rules);
-      const changed = rulesetChanged || JSON.stringify(selectedRules) !== JSON.stringify(nextRules) || [...new Set([...Object.keys(colors), ...Object.keys(nextColors)])].some(kind => colors[kind] !== nextColors[kind]);
+      const nextPrompt = promptMode(value);
+      const changed = rulesetChanged || nextPrompt !== prompt || JSON.stringify(selectedRules) !== JSON.stringify(nextRules) || [...new Set([...Object.keys(colors), ...Object.keys(nextColors)])].some(kind => colors[kind] !== nextColors[kind]);
       selectedRules = nextRules; theme = nextTheme; requestedColors = nextRequested; colors = nextColors; underlines = value.underlines !== false;
+      linkUnderlines = value.linkUnderlines !== false; prompt = nextPrompt;
       // Foreground options are immutable in xterm's public API. Underline-only
       // edits restyle existing elements without replacing their decorations.
       if (changed) clear();
@@ -888,7 +970,7 @@
         else refresh();
       },
       setTheme(value) {
-        setAppearance({ theme: value, colors: requestedColors, underlines, rules: selectedRules, ruleset, syntaxColors });
+        setAppearance({ theme: value, colors: requestedColors, underlines, linkUnderlines, prompt, rules: selectedRules, ruleset, syntaxColors });
       },
       setAppearance,
       refresh,

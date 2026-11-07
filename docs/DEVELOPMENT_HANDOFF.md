@@ -1,3 +1,15 @@
+# v1.21.12 Beta 13 (Prompt name color, link underlines and Universal in Customize) - candidate (2026-11-07)
+
+Owner requests after v1.21.11: "include customize for Universal syntax highlighting.", "add option for underline URL or network paths in universal syntax, separate from the standard underline option." and "also, add option to color or not color the device main prompt name, with customization of that color too" (screenshot: a Linux prompt `biqu@CR10SPro:~$` colored green by the device).
+- Device prompt name: `terminalAppearance.promptHighlight` = `auto` (previous behavior) / `always` / `off`, color = the Device prompt highlight color (`highlightColors.prompt`). The device colored the owner's prompt itself, so Universal's own prompt color never showed; `always` and `off` therefore recolor `overrideable` cells (normal background, not inverse or hidden) for the name only, through decorations; the buffer is never changed. Works with keyword rule sets as well.
+- `highlightLinkUnderlines` (default on) controls only `url`; `highlightUnderlines` controls the rest. URL detection now includes share/transfer schemes, UNC paths and NFS/scp `host:/path`.
+- The Universal rule switches and device colors moved from the Highlighting tab to the Customize dialog's Universal page (`universalEditorHTML`, `[data-terminal-universal-editor]` in `SECTIONS`). Tests that toggled rules in the tab now open the dialog (`Rules and colors…`).
+- Gotcha found while testing: `highlightOptions()` without a language returns the active rule set, so code that needs Universal's colors must call `legend()` with `ruleset:null, ruleSet:null`.
+- Checked: unit tests, Go tests, terminal-prompt-links, terminal-style107, dropdowns and features-85 browser tests; screenshots of the tab and dialog in light, dark and 960×600 reviewed.
+- Not claimed: tested against real devices or on a physical Windows PC.
+
+---
+
 # v1.21.11 Beta 12 (Terminal settings in tabs, universal highlighting, colors for every profile) - publication verified (2026-11-07)
 
 Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.21.11 at 2026-11-07T21:29:11Z; stable latest remains v1.20.16. Merged PR #120; tag v1.21.11 points to merge commit bfd9567f1e2d1bd3c462ebcc5ffbb58d88940084. Release workflow run 42415784238 succeeded. Assets: Network_Toolkit.exe, Network_Toolkit_1.21.11_Portable.zip, Network_Toolkit_1.21.11_Update.zip, Network_Toolkit_1.21.11_Linux_x86_64.tar.gz, Network_Toolkit_1.21.11_Linux_aarch64.tar.gz, SHA256SUMS; all digests match SHA256SUMS. The published Linux x86_64 archive was downloaded, extracted and run (`--version` 1.21.11 linux amd64; inner SHA256SUMS OK). Checks: browser-editor112 (`editor-divider113`) failed once on 43d8d69 and passes locally; the dropdowns observer was narrowed in e4b192c; final runs 42413926151 and 42413931686 green on the first attempt.

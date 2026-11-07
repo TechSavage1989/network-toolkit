@@ -7,8 +7,12 @@ const CONSOLE=['background','foreground','cursor','selectionBackground'];
 const COLORS=[...CONSOLE,...ANSI];
 // Cursor types as in MobaXterm: shape, optionally blinking (owner request, v1.21.7).
 const CURSORS=['block','underline','bar','block-blink','underline-blink','bar-blink'];
+// Device prompt name (owner request, v1.21.12): color it like the Universal
+// profile does, always use your color (also over the device's own color), or
+// show it as plain text. Applies to every highlighting profile.
+const PROMPT_MODES=[['auto','Color it unless the device does'],['always','Always my color'],['off','No color']];
 const CURSOR_NAMES={block:'Block','underline':'Underline',bar:'Line','block-blink':'Blinking block','underline-blink':'Blinking underline','bar-blink':'Blinking line'};
-const HIGHLIGHTS={url:['URLs','Complete http/https, FTP or SSH URLs; no clickable link is created'],prompt:['Device prompts','Examples: router#, switch(config)#, &lt;switch&gt;'],address:['IP addresses and networks','Example: 192.168.10.1/24'],mac:['MAC addresses','Example: 00:11:22:33:44:55'],interface:['Interface names','Examples: wan1, Gi1/0/1, 1/1/1, named interface rows'],command:['Commands and config verbs','Examples: config, edit, set, show, commit'],field:['Setting and field names','Examples: mode, allowaccess, mtu, source-address'],protocol:['Protocols and services','Examples: SSH, HTTPS, TCP, BGP, OSPF'],value:['Modes and named values','Examples: static, tunnel, enable, quoted object names'],number:['Numbers and units','Examples: VLAN 20, MTU 1500, port 443'],comment:['Comments and descriptions','Examples: interface descriptions, remarks, ! comments'],success:['Up and success','Examples: up, connected, OK'],warning:['Warnings and pending','Examples: warning, pending, filtered'],error:['Errors and down','Examples: down, failed, connection refused'],info:['Information and notices','Examples: INFO, NOTICE, %SYS-5-CONFIG_I, Building configuration...']};
+const HIGHLIGHTS={url:['URLs and network paths','Examples: https://…, smb://…, \\\\server\\share, 192.0.2.10:/export; no clickable link is created'],prompt:['Device prompts','Examples: router#, switch(config)#, user@host:~$, &lt;switch&gt;'],address:['IP addresses and networks','Example: 192.168.10.1/24'],mac:['MAC addresses','Example: 00:11:22:33:44:55'],interface:['Interface names','Examples: wan1, Gi1/0/1, 1/1/1, named interface rows'],command:['Commands and config verbs','Examples: config, edit, set, show, commit'],field:['Setting and field names','Examples: mode, allowaccess, mtu, source-address'],protocol:['Protocols and services','Examples: SSH, HTTPS, TCP, BGP, OSPF'],value:['Modes and named values','Examples: static, tunnel, enable, quoted object names'],number:['Numbers and units','Examples: VLAN 20, MTU 1500, port 443'],comment:['Comments and descriptions','Examples: interface descriptions, remarks, ! comments'],success:['Up and success','Examples: up, connected, OK'],warning:['Warnings and pending','Examples: warning, pending, filtered'],error:['Errors and down','Examples: down, failed, connection refused'],info:['Information and notices','Examples: INFO, NOTICE, %SYS-5-CONFIG_I, Building configuration...']};
 const DARK={background:'#0b1220',foreground:'#dce6f6',cursor:'#7eb0ff',selectionBackground:'#537bac66',black:'#243149',red:'#f37d88',green:'#6aca9e',yellow:'#eec16f',blue:'#7baaff',magenta:'#c996e9',cyan:'#67cdd1',white:'#c8d4e8',brightBlack:'#73829a',brightRed:'#ffa1a9',brightGreen:'#8ce2b6',brightYellow:'#ffda91',brightBlue:'#9fc1ff',brightMagenta:'#deb4f6',brightCyan:'#8ce4e7',brightWhite:'#f1f6ff'};
 const LIGHT={background:'#f9fbfe',foreground:'#20324c',cursor:'#2465bc',selectionBackground:'#93bfff77',black:'#23344b',red:'#b3273b',green:'#17734a',yellow:'#916400',blue:'#2465bc',magenta:'#7b4099',cyan:'#07847e',white:'#74849b',brightBlack:'#6c7f96',brightRed:'#cc354b',brightGreen:'#208d5e',brightYellow:'#a87400',brightBlue:'#3477ce',brightMagenta:'#9654b5',brightCyan:'#0c9890',brightWhite:'#172c47'};
 function palette(background,foreground,cursor,selection,ansi){return {background,foreground,cursor,selectionBackground:selection,...Object.fromEntries(ANSI.map((key,i)=>[key,ansi[i]]))};}
@@ -37,7 +41,7 @@ const PRESETS={
 };
 function normalize(value){
  const v=value&&typeof value==='object'&&!Array.isArray(value)?value:{},family=typeof v.fontFamily==='string'?v.fontFamily.trim():'';
- const out={fontFamily:Array.from(family).length>0&&Array.from(family).length<=80&&/^[\p{L}\p{N} _.-]+$/u.test(family)?family:'Consolas',fontWeight:v.fontWeight==='bold'?'bold':'normal',lineHeight:typeof v.lineHeight==='number'&&Number.isFinite(v.lineHeight)&&v.lineHeight>=1&&v.lineHeight<=2?Math.round(v.lineHeight*100)/100:1.15,scheme:typeof v.scheme==='string'&&(v.scheme==='custom'||Object.hasOwn(PRESETS,v.scheme))?v.scheme:'app',colors:{},highlightUnderlines:v.highlightUnderlines!==false,highlightColors:{},highlightRules:{},cursor:CURSORS.includes(v.cursor)?v.cursor:'block-blink',boldBright:v.boldBright!==false};
+ const out={fontFamily:Array.from(family).length>0&&Array.from(family).length<=80&&/^[\p{L}\p{N} _.-]+$/u.test(family)?family:'Consolas',fontWeight:v.fontWeight==='bold'?'bold':'normal',lineHeight:typeof v.lineHeight==='number'&&Number.isFinite(v.lineHeight)&&v.lineHeight>=1&&v.lineHeight<=2?Math.round(v.lineHeight*100)/100:1.15,scheme:typeof v.scheme==='string'&&(v.scheme==='custom'||Object.hasOwn(PRESETS,v.scheme))?v.scheme:'app',colors:{},highlightUnderlines:v.highlightUnderlines!==false,highlightLinkUnderlines:v.highlightLinkUnderlines!==false,promptHighlight:PROMPT_MODES.some(([id])=>id===v.promptHighlight)?v.promptHighlight:'auto',highlightColors:{},highlightRules:{},cursor:CURSORS.includes(v.cursor)?v.cursor:'block-blink',boldBright:v.boldBright!==false};
  for(const key of COLORS)if(typeof v.colors?.[key]==='string'&&new RegExp(key==='selectionBackground'?'^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$':'^#[0-9a-fA-F]{6}$').test(v.colors[key]))out.colors[key]=v.colors[key].toLowerCase();
  for(const kind of Object.keys(HIGHLIGHTS))if(typeof v.highlightColors?.[kind]==='string'&&/^#[0-9a-f]{6}$/i.test(v.highlightColors[kind]))out.highlightColors[kind]=v.highlightColors[kind].toLowerCase();
  for(const kind of Object.keys(HIGHLIGHTS))out.highlightRules[kind]=v.highlightRules?.[kind]!==false;
@@ -61,7 +65,7 @@ const descriptions={background:'The area behind all terminal text.',foreground:'
 // the terminal color scheme: bright colors on dark backgrounds, normal on light.
 function syntaxColors(clean,appTheme){const t=theme(clean,appTheme),dark=mode(clean,appTheme)==='dark',pick=name=>t[dark?'bright'+name[0].toUpperCase()+name.slice(1):name];return {red:pick('red'),green:pick('green'),yellow:pick('yellow'),blue:pick('blue'),magenta:pick('magenta'),cyan:pick('cyan'),underline:t.foreground};}
 function syntaxRuleSet(language){const rules=root.NTKTerminalSyntaxRules;if(!rules||SHELLS?.supported(language))return null;const prefs=rules.preferences(typeof state==='undefined'?null:state.terminalSyntax);if(prefs.active==='smart')return null;return rules.find(prefs,prefs.active);}
-function highlightOptions(value,appTheme='dark',language){const clean=normalize(effective(value)),set=syntaxRuleSet(language);return {theme:mode(clean,appTheme),colors:clean.highlightColors,underlines:clean.highlightUnderlines,rules:clean.highlightRules,ruleset:set?root.NTKTerminalSyntaxRules.compile(set):null,ruleSet:set,syntaxColors:{...syntaxColors(clean,appTheme),...(set?(root.NetworkToolkitTerminalSyntaxUI?.colorsFor?.(set.id)||root.NTKTerminalSyntaxRules.preferences(typeof state==='undefined'?null:state.terminalSyntax).colors[set.id]):null)},...(SHELLS?.supported(language)?{shellColors:clean.shells[language].colors}:{})};}
+function highlightOptions(value,appTheme='dark',language){const clean=normalize(effective(value)),set=syntaxRuleSet(language);return {theme:mode(clean,appTheme),colors:clean.highlightColors,underlines:clean.highlightUnderlines,linkUnderlines:clean.highlightLinkUnderlines,prompt:clean.promptHighlight,rules:clean.highlightRules,ruleset:set?root.NTKTerminalSyntaxRules.compile(set):null,ruleSet:set,syntaxColors:{...syntaxColors(clean,appTheme),...(set?(root.NetworkToolkitTerminalSyntaxUI?.colorsFor?.(set.id)||root.NTKTerminalSyntaxRules.preferences(typeof state==='undefined'?null:state.terminalSyntax).colors[set.id]):null)},...(SHELLS?.supported(language)?{shellColors:clean.shells[language].colors}:{})};}
 function enabled(value,language,deviceEnabled=true){return SHELLS?.supported(language)?normalize(value).shells[language].enabled:deviceEnabled;}
 // Suggestions name local fonts only. No @font-face, FontFace URL, download,
 // installation, or permission-gated local-font enumeration is performed.
@@ -114,7 +118,18 @@ function colorField(key,label,help,highlight=false){
 // Terminal settings tabs (owner request, v1.21.11): Appearance holds the look,
 // Highlighting holds every highlight option, Features holds confirmations.
 // Without the tabbed panel (tests, older layouts) everything goes into the panel.
-const SECTIONS=['#terminalAppearanceEditor','#terminalHighlightEditor','#terminalConfirmSettings'];
+const SECTIONS=['#terminalAppearanceEditor','#terminalHighlightEditor','#terminalConfirmSettings','[data-terminal-universal-editor]'];
+function promptSelect(id,label=''){return '<select id="'+id+'" data-terminal-appearance="promptHighlight"'+(label?' aria-label="'+label+'"':'')+'>'+PROMPT_MODES.map(([value,name])=>'<option value="'+value+'">'+name+'</option>').join('')+'</select>';}
+// Universal profile rules and colors, shown in the Syntax highlighting
+// Customize dialog (owner request, v1.21.12). Controls use the same data
+// attributes as the settings panel, so they save and sync the same way.
+function universalEditorHTML(){
+ const rows=Object.entries(HIGHLIGHTS).map(([key,[label,help]])=>'<div class="terminal-universal-rule" data-universal-kind="'+key+'"><input type="checkbox" id="terminalHighlightRule-'+key+'" data-terminal-highlight-rule="'+key+'"><label for="terminalHighlightRule-'+key+'"><strong>'+label+'</strong><small>'+help+'</small></label>'+colorButton('terminalHighlightColor-'+key,label,'data-terminal-highlight-color',key)+(key==='prompt'?'<div class="terminal-universal-prompt"><label for="syntaxPromptName">Device name in the prompt</label>'+promptSelect('syntaxPromptName')+'</div>':'')+'</div>').join('');
+ return `<section class="terminal-universal-editor" data-terminal-universal-editor><div class="terminal-universal-options"><label class="check" for="syntaxUniversalUnderlines"><input type="checkbox" id="syntaxUniversalUnderlines" data-terminal-appearance="highlightUnderlines"> Underline highlighted text</label><label class="check" for="syntaxUniversalLinkUnderlines"><input type="checkbox" id="syntaxUniversalLinkUnderlines" data-terminal-appearance="highlightLinkUnderlines"> Underline URLs and network paths</label></div>
+ <div class="terminal-universal-rules">${rows}</div>
+ <p class="hint">Turn off anything you don't want colored. When rules overlap, the first one wins: comments, URLs and paths, prompts, addresses and interfaces, states, then settings. Colors the device sends itself are kept, except for the prompt name when it is set to Always my color or No color.</p>
+ <div class="terminal-universal-actions"><button type="button" class="btn small ghost" data-terminal-rules-reset>Turn all rules on</button><button type="button" class="btn small ghost" data-terminal-highlight-colors-reset>Reset colors</button></div></section>`;
+}
 function scoped(selector){return Array.from(document.querySelectorAll(SECTIONS.map(id=>id+' '+selector).join(',')));}
 function mount(panel){
  if(!panel||document.getElementById('terminalAppearanceEditor'))return;
@@ -123,7 +138,6 @@ function mount(panel){
  const fonts=FONT_FAMILIES.map(font=>'<option value="'+font+'" label="'+(fontAvailability(font)==='detected'?'Installed':font==='monospace'?'System default':'Not installed')+'"></option>').join('');
  const schemes=Object.entries(PRESETS).map(([id,preset])=>'<option value="'+id+'">'+preset.name+'</option>').join('');
  const consoleColors=CONSOLE.map(key=>colorField(key,names[key],descriptions[key])).join('');
- const highlightColors=Object.entries(HIGHLIGHTS).map(([key,[label,help]])=>colorField(key,label,help,true)).join('');
  const deviceColors=ANSI.map((key,index)=>colorField(key,names[key],'Device color slot '+index+(index>=8?' (bright variant).':'.'))).join('');
  section.innerHTML=`<div class="terminal-appearance-grid"><div class="field"><label for="terminalAppearanceFont">Font</label><input id="terminalAppearanceFont" data-terminal-appearance="fontFamily" list="terminalFontFamilies" data-combobox-font maxlength="80" autocomplete="off"><datalist id="terminalFontFamilies">${fonts}</datalist></div><div class="field"><label for="terminalAppearanceWeight">Font weight</label><select id="terminalAppearanceWeight" data-terminal-appearance="fontWeight"><option value="normal">Regular</option><option value="bold">Bold</option></select></div><div class="field"><label for="terminalAppearanceLineHeight">Line spacing</label><input id="terminalAppearanceLineHeight" type="number" data-terminal-appearance="lineHeight" min="1" max="2" step="0.05"></div><div class="field"><label for="terminalAppearanceCursor">Cursor</label><select id="terminalAppearanceCursor" data-terminal-appearance="cursor">${CURSORS.map(id=>'<option value="'+id+'">'+CURSOR_NAMES[id]+'</option>').join('')}</select></div><div class="field"><label for="terminalAppearanceScheme">Color scheme</label><select id="terminalAppearanceScheme" data-terminal-appearance="scheme"><option value="app">Follow app theme</option>${schemes}<option value="custom">Custom colors</option></select></div></div>
  <label class="terminal-highlight-underlines" for="terminalAppearanceBoldBright"><input id="terminalAppearanceBoldBright" type="checkbox" data-terminal-appearance="boldBright"><span>Show bold text in brighter colors</span></label>
@@ -151,10 +165,11 @@ Unicode: café é Δ λ 日本語 → ✓</pre></div>
  page('appearance').append(section);
  const size=panel.querySelector('.terminal-font-size-field');if(size)section.querySelector('.terminal-appearance-grid').firstElementChild.after(size);
  const highlight=document.createElement('section');highlight.id='terminalHighlightEditor';highlight.className='terminal-tools-section terminal-appearance-editor terminal-highlight-editor';
- highlight.innerHTML=`<div id="terminalUniversalOptions"><h4>Universal profile options</h4><label class="terminal-highlight-underlines" for="terminalHighlightUnderlines"><input id="terminalHighlightUnderlines" type="checkbox" data-terminal-appearance="highlightUnderlines"><span>Underline highlighted text</span></label>
- <p class="hint">Turn off for color-only highlights. Formatting sent by the device stays intact.</p>
- <details id="terminalHighlightRules"><summary>Recognized device-output rules</summary><p class="hint">Toolkit now requires recognized syntax instead of guessing from ordinary words such as “user” or “to”. Existing colors, on/off choices and shell overrides are kept; no preference migration is required. Unset rule switches start enabled.</p><div class="terminal-highlight-rule-grid">${Object.entries(HIGHLIGHTS).map(([key,[label]])=>'<label><input type="checkbox" data-terminal-highlight-rule="'+key+'">'+label+'</label>').join('')}</div><p class="hint">Precedence: comments/descriptions, complete URLs, prompts, valid addresses/MACs/interfaces, contextual status, configuration roles, then known labeled fields. Turning a rule off does not reveal lower-priority matches inside it. Plain banner prose remains normal text.</p><button type="button" class="btn small ghost" data-terminal-rules-reset>Reset recognition rules</button></details>
- <details id="terminalHighlightColorDetails"><summary>Device highlighting colors</summary><p class="hint">Colors for recognized addresses, interfaces, commands, settings and states. Colors sent by the device take precedence. Neutral white, gray and normal text can receive highlights.</p><div class="terminal-color-grid">${highlightColors}</div></details></div>
+ highlight.innerHTML=`<div id="terminalPromptOptions" class="terminal-prompt-options"><div class="terminal-prompt-setting"><label for="terminalPromptHighlight">Device prompt name</label>${promptSelect('terminalPromptHighlight')}${colorButton('terminalPromptColor','device prompt name','data-terminal-highlight-color','prompt')}</div><p class="hint">The device's name in its prompt, such as user@host in user@host:~$ or switch in switch#. Works with every profile. Always my color and No color also replace a color the device gives its own name.</p></div>
+ <div id="terminalUniversalOptions"><h4>Universal profile options</h4><label class="terminal-highlight-underlines" for="terminalHighlightUnderlines"><input id="terminalHighlightUnderlines" type="checkbox" data-terminal-appearance="highlightUnderlines"><span>Underline highlighted text</span></label>
+ <label class="terminal-highlight-underlines" for="terminalHighlightLinkUnderlines"><input id="terminalHighlightLinkUnderlines" type="checkbox" data-terminal-appearance="highlightLinkUnderlines"><span>Underline URLs and network paths</span></label>
+ <p class="hint">Underlines add a second cue besides color. URLs and network paths such as \\\\server\\share have their own switch. Formatting sent by the device stays intact.</p>
+ <button type="button" class="btn small ghost" data-terminal-syntax="customize" data-terminal-syntax-set="smart">Rules and colors…</button></div>
  ${shellSettingsHTML()}`;
  page('highlighting').append(highlight);
  const confirm=document.createElement('section');confirm.id='terminalConfirmSettings';confirm.className='terminal-tools-section terminal-appearance-editor terminal-confirm-settings';
@@ -165,11 +180,14 @@ Unicode: café é Δ λ 日本語 → ✓</pre></div>
 function sync(){
  const section=document.getElementById('terminalAppearanceEditor');if(!section)return;
  // Nothing to show while the tools panel is hidden; the next open syncs it.
- if(section.closest('.hidden'))return;
+ // The Customize dialog's Universal page is synced while it is open.
+ const dialog=document.querySelector('[data-terminal-universal-editor]');
+ if(section.closest('.hidden')&&!dialog)return;
  const clean=normalize(effective(state.terminalAppearance)),colors=theme(clean,state.theme),font=options(clean,state.theme),highlightSettings=highlightOptions(clean,state.theme),legend=root.NTTerminalHighlight?.legend?.(highlightSettings.theme,highlightSettings)||[],marks=Object.fromEntries(legend.map(mark=>[mark.kind,mark]));
  for(const input of scoped('[data-terminal-appearance]')){if(input.getAttribute('type')==='checkbox')input.checked=clean[input.dataset.terminalAppearance]===true;else if(input!==document.activeElement)input.value=String(clean[input.dataset.terminalAppearance]);}
  for(const input of scoped('[data-terminal-color]'))syncColorButton(input,colors[input.dataset.terminalColor]);
- for(const input of scoped('[data-terminal-highlight-color]'))syncColorButton(input,root.NTTerminalHighlight?.legend?.(highlightSettings.theme,{...highlightSettings,rules:{}}).find(mark=>mark.kind===input.dataset.terminalHighlightColor)?.color||colors.foreground);
+ const universalMarks=root.NTTerminalHighlight?.legend?.(highlightSettings.theme,{...highlightSettings,ruleset:null,ruleSet:null,rules:{},prompt:'auto'})||[];
+ for(const input of scoped('[data-terminal-highlight-color]'))syncColorButton(input,universalMarks.find(mark=>mark.kind===input.dataset.terminalHighlightColor)?.color||colors.foreground);
  for(const input of scoped('[data-terminal-highlight-rule]'))input.checked=clean.highlightRules[input.dataset.terminalHighlightRule];
  for(const input of scoped('[data-terminal-hex]')){if(input===document.activeElement)continue;const [scope,key]=input.dataset.terminalHex.split(':');input.value=scope==='highlight'?(marks[key]?.color||colors.foreground):colors[key].slice(0,7);}
  syncShellSettings(document.getElementById('terminalHighlightEditor')||section,clean,colors);syncFontStatus();
@@ -181,6 +199,7 @@ function sync(){
  const cursor=preview.querySelector('[data-terminal-preview-cursor]'),[shape,blink]=clean.cursor.split('-');cursor.style.backgroundColor=shape==='block'?colors.cursor:'transparent';cursor.style.boxShadow=shape==='underline'?'inset 0 -2px 0 '+colors.cursor:shape==='bar'?'inset 2px 0 0 '+colors.cursor:'none';cursor.classList.toggle('terminal-preview-cursor-blink',blink==='blink');
  const size=document.getElementById('terminalFontSize');if(size&&size!==document.activeElement)size.value=String(state.terminalFontSize||13);
  root.renderTerminalHighlightLegendInline?.();
+ if(dialog)root.NetworkToolkitTerminalSyntaxUI?.refreshUniversal?.();
 }
 function apply(value){previewAppearance=null;state.terminalAppearance=normalize(value);saveState();updateTerminalTheme();sync();}
 function changed(event){
@@ -196,7 +215,7 @@ function changed(event){
  if(color){next.colors={...theme(next,state.theme),[color]:input.value};next.scheme='custom';}
  else if(highlight){next.colors=theme(next,state.theme);next.highlightColors[highlight]=input.value;next.scheme='custom';}
  else if(key==='scheme'){if(input.value==='custom'&&next.scheme!=='custom')next.colors=theme(next,state.theme);else if(input.value!=='custom'){next.colors={};next.highlightColors={};}next.scheme=input.value;}
- else next[key]=key==='highlightUnderlines'||key==='boldBright'?input.checked:key==='lineHeight'?Number(input.value):input.value;
+ else next[key]=key==='highlightUnderlines'||key==='highlightLinkUnderlines'||key==='boldBright'?input.checked:key==='lineHeight'?Number(input.value):input.value;
  apply(next);
 }
 document.addEventListener('change',changed);
@@ -213,8 +232,11 @@ function openColor(button){
 document.addEventListener('click',event=>{
  const color=event.target.closest?.('[data-terminal-color],[data-terminal-highlight-color],[data-terminal-shell-color]');if(color&&!color.disabled){event.preventDefault();openColor(color);return;}
  const rules=event.target.closest?.('[data-terminal-rules-reset]');if(rules){event.preventDefault();const next=normalize(state.terminalAppearance);next.highlightRules={};apply(next);return;}
+ if(event.target.closest?.('[data-terminal-highlight-colors-reset]')){event.preventDefault();const next=normalize(state.terminalAppearance);next.highlightColors={};apply(next);return;}
  const reset=event.target.closest?.('[data-terminal-shell-reset]');if(reset){event.preventDefault();const next=normalize(state.terminalAppearance);next.shells[reset.dataset.terminalShellReset]={enabled:true,colors:{}};apply(next);return;}
  if(event.target.closest?.('[data-terminal-appearance-reset]')){event.preventDefault();state.terminalFontSize=13;apply({});}
 });
-root.NetworkToolkitTerminalAppearance=Object.freeze({cursors:CURSORS,normalize,theme,mode,options,highlightOptions,syntaxColors:(value,appTheme='dark')=>syntaxColors(normalize(effective(value)),appTheme),enabled,mount,sync,afterFontChange,fontAvailability,fontStack,fontFamilies:FONT_FAMILIES,presets:PRESETS,colors:COLORS,highlightKinds:Object.keys(HIGHLIGHTS)});
+// Opens the color picker for one Universal color (legend chips, v1.21.12).
+function editHighlightColor(kind){if(!Object.hasOwn(HIGHLIGHTS,kind))return false;openColor({dataset:{terminalHighlightColor:kind},getAttribute:()=>'Choose '+HIGHLIGHTS[kind][0]+' color'});return true;}
+root.NetworkToolkitTerminalAppearance=Object.freeze({cursors:CURSORS,universalEditorHTML,editHighlightColor,promptModes:PROMPT_MODES,normalize,theme,mode,options,highlightOptions,syntaxColors:(value,appTheme='dark')=>syntaxColors(normalize(effective(value)),appTheme),enabled,mount,sync,afterFontChange,fontAvailability,fontStack,fontFamilies:FONT_FAMILIES,presets:PRESETS,colors:COLORS,highlightKinds:Object.keys(HIGHLIGHTS)});
 })(window);

@@ -18,6 +18,13 @@ func safeTerminalAppearance(value any) map[string]any {
 	if source["highlightUnderlines"] == false {
 		clean["highlightUnderlines"] = false
 	}
+	// URL and network-path underlines and the device prompt name (v1.21.12).
+	clean["highlightLinkUnderlines"] = source["highlightLinkUnderlines"] != false
+	clean["promptHighlight"] = "auto"
+	switch mode, _ := source["promptHighlight"].(string); mode {
+	case "always", "off":
+		clean["promptHighlight"] = mode
+	}
 	// Cursor type and bold-brighter (v1.21.7); unknown values keep the defaults.
 	clean["cursor"] = "block-blink"
 	switch cursor, _ := source["cursor"].(string); cursor {
