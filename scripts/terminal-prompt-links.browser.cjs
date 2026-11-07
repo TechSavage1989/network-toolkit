@@ -81,6 +81,10 @@ const appearance=()=>page.evaluate(()=>JSON.parse(JSON.stringify(state.terminalA
   await page.locator('#syntaxEditSet').selectOption('network');await page.locator('#syntaxRule-red').waitFor({state:'attached'});assert.equal(await page.locator('#modalRoot [data-syntax-act="use"]').textContent(),'Use this rule set');
   // v1.21.14: rule set pages use the same cards as Universal.
   assert.equal(await page.locator('#modalRoot [data-syntax-slot]').count(),7);assert.equal(await page.locator('#modalRoot [data-terminal-prompt-card]').count(),1);
+  // v1.21.15: cards are named by purpose; the Device prompts card matches Universal's.
+  assert.equal(await page.locator('#modalRoot [data-syntax-slot="red"] strong').textContent(),'Down, disabled, denied and "no" commands');
+  assert.equal(await page.locator('#modalRoot [data-terminal-prompt-card] strong').textContent(),'Device prompts');assert.equal(await page.locator('#syntaxSlotOn-prompt').isChecked(),true);
+  await page.locator('#syntaxSlotOn-prompt').click();await page.waitForFunction(()=>state.terminalSyntax.off?.network?.includes('prompt'));await page.locator('#syntaxSlotOn-prompt').click();await page.waitForFunction(()=>!state.terminalSyntax.off?.network);
   assert.equal(await page.locator('#syntaxRulePromptName').inputValue(),await page.evaluate(()=>state.terminalAppearance.promptHighlight),'the prompt card shows the saved choice');
   await page.locator('#syntaxSlotOn-red').click();await page.waitForFunction(()=>state.terminalSyntax.off?.network?.[0]==='red');assert.equal(await page.locator('#syntaxSlotOn-red').isChecked(),false);
   assert.equal(await page.evaluate(()=>{const body=document.querySelector('#modalRoot .modal-body');return body.scrollWidth<=body.clientWidth+1;}),true,'rule set cards fit without sideways scrolling');
@@ -93,8 +97,9 @@ const appearance=()=>page.evaluate(()=>JSON.parse(JSON.stringify(state.terminalA
   // With a keyword rule set the prompt name choice still applies and shows in the legend.
   await page.evaluate(()=>window.NetworkToolkitTerminalSyntaxUI.choose('network'));await highlighting();
   assert.equal(await page.locator('#terminalUniversalOptions').isHidden(),true);assert.equal(await page.locator('#terminalPromptOptions').isVisible(),true);
-  const promptChip=page.locator('#terminalHighlightLegendInline [data-highlight-legend-kind="prompt"]');assert.equal(await promptChip.textContent(),'Device prompt name');
-  await page.locator('#terminalPromptHighlight').selectOption('auto');assert.equal(await promptChip.count(),0,'Automatic leaves rule sets alone');
+  const promptChip=page.locator('#terminalHighlightLegendInline [data-highlight-legend-kind="prompt"]');assert.equal(await promptChip.textContent(),'Device prompts','rule sets color device prompts too (v1.21.15)');
+  assert.equal(await page.locator('#terminalHighlightLegendInline [data-highlight-legend-kind="syn-red"]').textContent(),'Down, disabled, denied and "no" commands','legend chips are named by purpose');
+  await page.locator('#terminalPromptHighlight').selectOption('auto');assert.equal(await promptChip.count(),1);
   await page.locator('#terminalPromptHighlight').selectOption('always');
   pass(theme+': the prompt name choice works with keyword rule sets');
   // v1.21.13: the Appearance preview shows the rule set's own highlighting.

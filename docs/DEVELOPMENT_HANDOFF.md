@@ -1,3 +1,14 @@
+# v1.21.15 Beta 16 (Rule set colors named by purpose; Device prompts on every rule set) - candidate (2026-11-07)
+
+Owner request: label rule set colors by function rather than color, and add Universal's Device prompts card (color and configuration) to every rule set.
+- Purpose comes from `slotLabel()`: built-in notes, a custom set's `labels` (editable in its cards), or the MobaXterm meaning. Labels are app-only; `.msyn` export is unchanged.
+- Device prompts now work with keyword rule sets: `promptRule` (default on, per set via `terminalSyntax.off[id]` containing `prompt`) makes `analyze()` color the prompt and carve rule set hits around it. The color (`highlightColors.prompt`) and name choice (`promptHighlight`) stay global.
+- Behavior change to call out: rule sets color prompts by default from this version.
+- Checked: Node unit tests, Go and Python tests, terminal-prompt-links browser test with rule set card screenshots.
+- Not claimed: checked on a physical Windows PC.
+
+---
+
 # v1.21.14 Beta 15 (Rule set cards like Universal) - publication verified (2026-11-07)
 
 Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.21.14 at 2026-11-07T23:24:49Z; stable latest remains v1.20.16. Merged PR #125; tag v1.21.14 points to merge commit edb48c3a1d5c7b95b93f5a4ebc7fec0c0707b6c0. Release workflow run 42424848024 succeeded. Assets: Network_Toolkit.exe, Portable and Update ZIPs, Linux x86_64 and aarch64 tarballs and SHA256SUMS; every asset digest matches SHA256SUMS, and the Linux x86_64 binary reports "Network Toolkit 1.21.14 linux amd64". PR #125 was branched from the v1.21.13 head; its watcher merged it only after v1.21.13 was merged and released.

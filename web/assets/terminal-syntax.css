@@ -59,3 +59,8 @@ button.terminal-syntax-swatch:hover,button.terminal-syntax-swatch:focus-visible{
 .terminal-syntax-card .ntk-color-trigger.is-underline .ntk-color-chip{border-radius:0;background:transparent!important;border:0;border-bottom:3px solid var(--ntk-swatch)}
 .terminal-syntax-card-mark{display:inline-block;width:13px}
 .terminal-universal-rule:has(>input[type="checkbox"]:not(:checked))>label,.terminal-universal-rule:has(>input[type="checkbox"]:not(:checked))>.ntk-color-trigger{opacity:.55}
+/* v1.21.15: own and imported sets name each color by what it marks. */
+.terminal-syntax-card-title{display:flex;flex-direction:column;gap:2px;min-width:0}
+.terminal-syntax-card-title input{min-width:0;width:100%;min-height:28px;padding:3px 7px;font-size:12px;font-weight:600}
+.terminal-syntax-card-title small,.terminal-syntax-card>label small{font-size:10.5px;color:var(--muted)}
+.terminal-syntax-prompt-card{grid-column:1/-1}
