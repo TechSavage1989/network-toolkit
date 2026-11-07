@@ -1,3 +1,14 @@
+# v1.21.14 Beta 15 (Rule set cards like Universal) - candidate (2026-11-07)
+
+Owner request (screenshots comparing the Universal page with Standard keywords): "include the same selection style configuraiton for all the rule sets, but also continue to support the 3rd party rule sets word customizability".
+- Rule set pages in Customize use the Universal card grid: per-color switch, note, color button with hex, and the pattern (editable for own and imported sets; built-in patterns folded and read-only), plus a Device prompt name card and Turn all colors on / Reset colors.
+- New saved key `terminalSyntax.off` ({rule set id: [colors]}), kept by `preferences()` and Go `safeTerminalSyntax`; `withSwitches()` blanks those colors when the set is used (terminals, legend, previews). The saved rule set itself is unchanged, so turning a color back on restores it.
+- Bug found and fixed: clicking a pattern textarea opened the color picker (the click handler matched `data-syntax-color`, which the textareas also carry).
+- Checked: Node unit tests, Go and Python tests, terminal-prompt-links browser test with rule-set card screenshots in light and dark.
+- Not claimed: checked on a physical Windows PC.
+
+---
+
 # v1.21.13 Beta 14 (Appearance preview follows every highlighting profile) - candidate (2026-11-07)
 
 Owner request (screenshots: with "Standard keywords" selected the Appearance preview stayed plain, while Universal colored it): "allow the preview in terminal for text also work with the custom /3rd party syntax highlights".

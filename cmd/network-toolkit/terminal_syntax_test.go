@@ -21,7 +21,7 @@ func TestTerminalSyntaxKeepsOnlySafeCustomRuleSets(t *testing.T) {
 	sanitizeTerminalSettings(state)
 	clean := state["terminalSyntax"].(map[string]any)
 	// active, custom and (v1.21.11) per-profile colors; "secret" is dropped.
-	if len(clean) != 3 || clean["active"] != "custom-net" || clean["secret"] != nil {
+	if len(clean) != 4 || clean["active"] != "custom-net" || clean["secret"] != nil {
 		t.Fatalf("unexpected keys or active rule set: %#v", clean)
 	}
 	sets := clean["custom"].([]any)
@@ -71,5 +71,29 @@ func TestTerminalSyntaxKeepsPerProfileColorsForExistingProfiles(t *testing.T) {
 	}
 	if empty := safeTerminalSyntax(nil)["colors"].(map[string]any); len(empty) != 0 {
 		t.Fatalf("no colors by default: %#v", empty)
+	}
+}
+
+// v1.21.14: colors switched off per rule set survive a restart; unknown sets,
+// unknown colors and other value types are dropped.
+func TestTerminalSyntaxSwitchedOffColorsPersist(t *testing.T) {
+	clean := safeTerminalSyntax(map[string]any{
+		"active": "standard",
+		"off": map[string]any{
+			"standard": []any{"red", "secret-canary", "underline", "red"},
+			"network":  "red",
+			"missing":  []any{"green"},
+			"perl":     []any{},
+		},
+	})
+	off := clean["off"].(map[string]any)
+	if got := off["standard"].([]any); len(got) != 2 || got[0] != "red" || got[1] != "underline" {
+		t.Fatalf("switched-off colors were not kept in order without duplicates: %#v", got)
+	}
+	if len(off) != 1 {
+		t.Fatalf("invalid entries survived: %#v", off)
+	}
+	if empty := safeTerminalSyntax(nil)["off"].(map[string]any); len(empty) != 0 {
+		t.Fatalf("no switches expected by default: %#v", empty)
 	}
 }

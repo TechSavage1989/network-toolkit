@@ -137,3 +137,31 @@ test('Universal has its own Customize page with rules, colors and a live preview
   other.click('[data-terminal-syntax-set="smart"]'); assert(other.doc.querySelector('[data-terminal-universal-editor]'), 'Rules and colors… opens Universal while a rule set is active');
   const plain = harness({ syntax: { active: 'network' } }); plain.ui.open(); assert.equal(plain.doc.querySelector('[data-terminal-universal-editor]'), null, 'Customize still opens the active rule set');
 });
+
+test('rule set pages use cards: switch each color, change its color, keep editing your own patterns (v1.21.14)', () => {
+  const h = harness({ syntax: { active: 'standard' } });
+  h.ui.open('standard');
+  const cards = h.doc.querySelectorAll('[data-syntax-slot]');
+  assert.deepEqual(cards.map(card => card.dataset.syntaxSlot), ['red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'underline']);
+  assert.equal(h.$('syntaxSlotOn-red').hasAttribute('checked'), true); assert.match(h.doc.querySelector('[data-syntax-swatch="red"]').textContent, /#ff6060/);
+  assert(h.$('syntaxRule-red').closest('details'), 'built-in patterns are folded away'); assert.equal(h.$('syntaxRule-red').hasAttribute('readonly'), true);
+  assert.match(h.$('syntaxPreview').innerHTML, /color:#ff6060/);
+  h.change('syntaxSlotOn-red', { checked: false });
+  assert.deepEqual(Array.from(h.state.terminalSyntax.off.standard), ['red'], 'built-in colors can be switched off'); assert(h.calls.saved > 0);
+  assert.doesNotMatch(h.$('syntaxPreview').innerHTML, /color:#ff6060/, 'the preview leaves a switched-off color out');
+  assert.equal(h.$('syntaxSlotOn-red').hasAttribute('checked'), false, 'the card shows it is off');
+  const picks = h.context.picks.length;
+  h.editor().emit('click', h.$('syntaxRule-red')); assert.equal(h.context.picks.length, picks, 'clicking a pattern does not open the color picker');
+  h.editor().emit('click', h.doc.querySelector('[data-syntax-swatch="green"]')); assert.equal(h.context.picks.length, picks + 1); assert.match(h.context.picks.at(-1).title, /Green color for Standard keywords/);
+  h.context.picks.at(-1).onApply('#00ff88'); assert.equal(h.state.terminalSyntax.colors.standard.green, '#00ff88');
+  h.click('[data-syntax-act="duplicate"]');
+  const copy = h.state.terminalSyntax.custom[0].id;
+  assert.deepEqual(Array.from(h.state.terminalSyntax.off[copy]), ['red'], 'the copy keeps the switches'); assert.equal(h.state.terminalSyntax.colors[copy].green, '#00ff88', 'and the colors');
+  assert.equal(h.$('syntaxRule-red').closest('details'), null, 'your own patterns are shown for editing'); assert.equal(h.$('syntaxRule-red').hasAttribute('readonly'), false);
+  h.type('syntaxRule-blue', 'uplink'); assert.equal(h.state.terminalSyntax.custom[0].rules.blue, 'uplink');
+  h.click('[data-syntax-act="all-on"]'); assert.equal(h.state.terminalSyntax.off[copy], undefined);
+  h.click('[data-syntax-act="reset-colors"]'); assert.equal(h.state.terminalSyntax.colors[copy], undefined);
+  h.click('[data-syntax-act="delete"]'); h.click('[data-syntax-act="delete"]');
+  assert.equal(h.state.terminalSyntax.custom.length, 0); assert.equal(h.state.terminalSyntax.off[copy], undefined);
+  assert.deepEqual(Array.from(h.state.terminalSyntax.off.standard), ['red'], 'other sets keep their switches');
+});

@@ -50,3 +50,12 @@ button.terminal-syntax-swatch:hover,button.terminal-syntax-swatch:focus-visible{
 .terminal-prompt-setting select{flex:0 1 230px;min-width:0}
 .terminal-prompt-setting .ntk-color-trigger{min-height:28px;padding:4px 7px}
 .terminal-prompt-options .hint{margin:0}
+/* v1.21.14: rule set pages use the same cards as Universal. */
+.terminal-syntax-card .terminal-syntax-pattern,.terminal-syntax-card .terminal-syntax-error{grid-column:1/-1;min-width:0}
+.terminal-syntax-card .terminal-syntax-pattern textarea{width:100%;min-height:44px;resize:vertical;font-family:var(--mono);font-size:11px;line-height:1.45}
+.terminal-syntax-card .terminal-syntax-pattern textarea[readonly]{opacity:.85}
+.terminal-syntax-card details.terminal-syntax-pattern>summary{cursor:pointer;font-size:11px;color:var(--muted)}
+.terminal-syntax-card details.terminal-syntax-pattern[open]>summary{margin-bottom:4px}
+.terminal-syntax-card .ntk-color-trigger.is-underline .ntk-color-chip{border-radius:0;background:transparent!important;border:0;border-bottom:3px solid var(--ntk-swatch)}
+.terminal-syntax-card-mark{display:inline-block;width:13px}
+.terminal-universal-rule:has(>input[type="checkbox"]:not(:checked))>label,.terminal-universal-rule:has(>input[type="checkbox"]:not(:checked))>.ntk-color-trigger{opacity:.55}
