@@ -102,3 +102,7 @@
 .session-saved-dragging{opacity:.55}
 .session-saved-drop-before{box-shadow:inset 0 3px var(--accent)}
 .session-saved-drop-after{box-shadow:inset 0 -3px var(--accent)}
+
+/* Move-sidebar (⇄) sits at the foot of every sidebar rail (owner request,
+   v1.21.4), so it stays reachable while the sidebar is collapsed. */
+.terminal-sidebar-rail>.sidebar-rail-swap{margin:auto auto 2px;flex:0 0 27px!important}

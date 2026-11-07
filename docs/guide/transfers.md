@@ -2,7 +2,7 @@
 
 Open **File Transfer** in the Transfer group. The buttons at the top choose the protocol: SFTP, FTP / FTPS or TFTP. Each protocol's tooltip states its security. File Transfer reopens the protocol you used last, and each protocol keeps its own settings, saved connections and Server/Client mode. Command search (Ctrl+Shift+P) also finds SFTP, FTP / FTPS and TFTP by name.
 
-The connection sidebar (Client) and the server settings sidebar (Server) can be resized, hidden or moved to the other side with ⇄ in their heading; each protocol keeps its own choice.
+The connection sidebar (Client) and the server settings sidebar (Server) can be resized, hidden or moved to the other side with ⇄ at the bottom of their icon strip; each protocol keeps its own choice.
 
 ## Choose a protocol
 - **SFTP:** SSH-based file browsing and transfers. It may reuse an already connected and authenticated terminal session where the remote device supports the SFTP subsystem.

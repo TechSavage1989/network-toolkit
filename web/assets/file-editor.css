@@ -402,7 +402,6 @@ body:has(.nt-editor:not([hidden]) [data-ed-files-sidebar]:not([hidden])) .toast-
    the Terminal and File Transfer sidebars. The rail stays on its left and the
    resize edge faces the document; Move editor sidebar sits at the foot of the rail (the sidebar
    has no heading row since the v1.19.1 consolidation). */
-.nt-editor-files-dock{margin:auto auto 2px}
 .nt-editor-files-shell.is-collapsed>.nt-editor-files-resize{display:none}
 .nt-editor-workspace.files-dock-right>.nt-editor-files-shell{order:2;border-right:0;border-left:1px solid var(--line)}
 .nt-editor-files-shell.dock-right:not(.is-collapsed){padding-right:0;padding-left:5px}

@@ -1,0 +1,14 @@
+Network Toolkit 1.21.4 Beta 5
+
+## What's New
+
+- The ⇄ button that moves a sidebar to the other side is now at the bottom of every sidebar, as in the Text Editor: Terminal, File Transfer connections and server settings, and the Configuration panel.
+- Because it sits on the sidebar's icon strip, you can move a sidebar even while it is hidden.
+
+## Additional Details
+
+- The Configuration panel has no icon strip while it is open, so ⇄ is in a slim row at the bottom of the panel; when the panel is hidden, ⇄ is at the bottom of its narrow strip, under the show button.
+- The sidebar headings keep their titles and close buttons; nothing else moved.
+- Validation used unit tests, browser tests and screenshots with sample data; it has not yet been checked on a physical Windows PC.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Security confirmations and Windows/UAC approval are unchanged.
+- This is an opt-in beta. Stable users stay on 1.20.16. Portable executable filename remains Network_Toolkit.exe.

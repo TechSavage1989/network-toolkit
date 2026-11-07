@@ -12,7 +12,7 @@ Open **Test a target** in the Diagnose group and enter the hostname or IP addres
 6. **Monitor:** repeated ICMP or TCP checks with a response-time chart, for a sample count or until stopped.
 7. **Details:** hostname, MAC address and model information a single IPv4 device advertises.
 
-In wide windows the Configuration panel sits beside the results: drag the divider to resize it, double-click it to hide it, and use ⇄ in the panel heading to move it to the other side. Entry details, device details in Network discovery and packet details in Packet capture have a position menu (Auto, Right, Left or Bottom).
+In wide windows the Configuration panel sits beside the results: drag the divider to resize it, double-click it to hide it, and use ⇄ at the bottom of the panel (or of its narrow strip when hidden) to move it to the other side. Entry details, device details in Network discovery and packet details in Packet capture have a position menu (Auto, Right, Left or Bottom).
 
 Each tab shows a dot for its latest run against the current target: green finished, yellow running, red failed, faint not yet run. Switching tabs never starts a test. Test a target reopens the test you used last, and command search (Ctrl+Shift+P) still finds every test by its full name (for example Connection monitor or Device details).
 
