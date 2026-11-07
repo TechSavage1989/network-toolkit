@@ -90,6 +90,14 @@ const appearance=()=>page.evaluate(()=>JSON.parse(JSON.stringify(state.terminalA
   await page.locator('#terminalPromptHighlight').selectOption('auto');assert.equal(await promptChip.count(),0,'Automatic leaves rule sets alone');
   await page.locator('#terminalPromptHighlight').selectOption('always');
   pass(theme+': the prompt name choice works with keyword rule sets');
+  // v1.21.13: the Appearance preview shows the rule set's own highlighting.
+  await page.locator('[data-terminal-settings-tab="appearance"]').click();const sample=page.locator('#terminalAppearancePreview');await sample.waitFor({state:'visible'});
+  assert.match(await page.locator('#terminalPreviewProfile').textContent(),/Network configuration/);
+  assert(await sample.locator('[data-terminal-preview-highlight^="syn-"]').count()>0,'the preview uses the rule set');assert.equal(await sample.locator('[data-terminal-preview-highlight="address"]').count(),0,'no Universal colors while a rule set is active');
+  assert.equal(await sample.locator('[data-terminal-preview-highlight="prompt-name"]').textContent(),'router');
+  await shot('preview-ruleset-'+theme);
+  await page.evaluate(()=>window.NetworkToolkitTerminalSyntaxUI.choose('smart'));assert.equal(await page.locator('#terminalPreviewProfile').textContent(),'· Universal');assert(await sample.locator('[data-terminal-preview-highlight="address"]').count()>0);
+  pass(theme+': the Appearance preview follows the active profile, including rule sets');
   await page.locator('#terminalSessionToggle').click();
  }
  // Smallest supported window.

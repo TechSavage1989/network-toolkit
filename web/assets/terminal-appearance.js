@@ -119,6 +119,26 @@ function colorField(key,label,help,highlight=false){
 // Highlighting holds every highlight option, Features holds confirmations.
 // Without the tabbed panel (tests, older layouts) everything goes into the panel.
 const SECTIONS=['#terminalAppearanceEditor','#terminalHighlightEditor','#terminalConfirmSettings','[data-terminal-universal-editor]'];
+// The Appearance preview shows the active profile's real highlighting
+// (Universal, a keyword rule set or your own imported set; owner request,
+// v1.21.13). Lines are analyzed like terminal output; spans are rebuilt only
+// when the profile, its rules or the prompt choice change.
+const PREVIEW_LINES=['router# show interfaces','wan1  static  192.0.2.1  up  physical','Gi1/0/2  down  No link','192.168.10.1/24  00:11:22:33:44:55','set allowaccess ssh https','set mtu 1500','set description "Router uplink"','Warning: pending link check','Nov  7 10:00:01 ERROR copy to \\\\nas\\cfg failed','Copyright 2017–2026 Example Vendor. User "admin" has logged in.','https://support.example.invalid'];
+function previewEscape(value){return String(value).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function renderPreviewText(settings){
+ const box=document.getElementById('terminalPreviewText'),H=root.NTTerminalHighlight;if(!box)return;
+ const set=settings.ruleSet,signature=JSON.stringify([set?[set.id,set.rules,set.regex,set.caseSensitive]:null,settings.rules,settings.prompt,!!H]);
+ if(box.dataset.signature===signature)return;box.dataset.signature=signature;
+ const line=text=>{if(!H)return previewEscape(text);let html='',last=0;for(const hit of H.analyze(text,'ssh',settings.rules,settings.ruleset,{prompt:settings.prompt})){if(hit.start<last)continue;html+=previewEscape(text.slice(last,hit.start))+'<span data-terminal-preview-highlight="'+hit.kind+'">'+previewEscape(text.slice(hit.start,hit.end))+'</span>';last=hit.end;}return html+previewEscape(text.slice(last));};
+ box.innerHTML=line(PREVIEW_LINES[0])+'<span data-terminal-preview-cursor aria-hidden="true"> </span>\n'+PREVIEW_LINES.slice(1).map(line).join('\n');
+}
+function previewMarks(settings,colors){
+ const H=root.NTTerminalHighlight,marks=Object.fromEntries((H?.legend?.(settings.theme,{...settings,ruleset:null,ruleSet:null,rules:{},prompt:'auto'})||[]).map(mark=>[mark.kind,mark]));
+ for(const [slot,color]of Object.entries(settings.syntaxColors||{}))marks['syn-'+slot]={color,borderStyle:'solid',borderWidth:slot==='underline'?1:0};
+ if(marks.prompt)marks['prompt-name']={...marks.prompt,borderWidth:settings.ruleset?0:marks.prompt.borderWidth};
+ marks['prompt-plain']={color:colors.foreground,borderWidth:0};
+ return marks;
+}
 function promptSelect(id,label=''){return '<select id="'+id+'" data-terminal-appearance="promptHighlight"'+(label?' aria-label="'+label+'"':'')+'>'+PROMPT_MODES.map(([value,name])=>'<option value="'+value+'">'+name+'</option>').join('')+'</select>';}
 // Universal profile rules and colors, shown in the Syntax highlighting
 // Customize dialog (owner request, v1.21.12). Controls use the same data
@@ -142,16 +162,7 @@ function mount(panel){
  section.innerHTML=`<div class="terminal-appearance-grid"><div class="field"><label for="terminalAppearanceFont">Font</label><input id="terminalAppearanceFont" data-terminal-appearance="fontFamily" list="terminalFontFamilies" data-combobox-font maxlength="80" autocomplete="off"><datalist id="terminalFontFamilies">${fonts}</datalist></div><div class="field"><label for="terminalAppearanceWeight">Font weight</label><select id="terminalAppearanceWeight" data-terminal-appearance="fontWeight"><option value="normal">Regular</option><option value="bold">Bold</option></select></div><div class="field"><label for="terminalAppearanceLineHeight">Line spacing</label><input id="terminalAppearanceLineHeight" type="number" data-terminal-appearance="lineHeight" min="1" max="2" step="0.05"></div><div class="field"><label for="terminalAppearanceCursor">Cursor</label><select id="terminalAppearanceCursor" data-terminal-appearance="cursor">${CURSORS.map(id=>'<option value="'+id+'">'+CURSOR_NAMES[id]+'</option>').join('')}</select></div><div class="field"><label for="terminalAppearanceScheme">Color scheme</label><select id="terminalAppearanceScheme" data-terminal-appearance="scheme"><option value="app">Follow app theme</option>${schemes}<option value="custom">Custom colors</option></select></div></div>
  <label class="terminal-highlight-underlines" for="terminalAppearanceBoldBright"><input id="terminalAppearanceBoldBright" type="checkbox" data-terminal-appearance="boldBright"><span>Show bold text in brighter colors</span></label>
  <p id="terminalFontAvailability" class="hint" role="status" aria-live="polite"></p>
- <div class="terminal-preview-card" aria-label="Preview"><div class="terminal-preview-title">Preview</div><pre id="terminalAppearancePreview" class="terminal-appearance-preview" aria-label="Live terminal style preview"><span><span data-terminal-preview-highlight="prompt">router#</span> <span data-terminal-preview-highlight="command">show</span> <span data-terminal-preview-highlight="field">interfaces</span></span><span data-terminal-preview-cursor aria-hidden="true"> </span>
-<span data-terminal-preview-highlight="interface">wan1</span>  <span data-terminal-preview-highlight="value">static</span>  <span data-terminal-preview-highlight="address">192.0.2.1</span>  <span data-terminal-preview-highlight="success">up</span>  <span data-terminal-preview-highlight="value">physical</span>
-<span data-terminal-preview-highlight="interface">Gi1/0/2</span>  <span data-terminal-preview-highlight="error">down</span>  No link
-<span data-terminal-preview-highlight="address">192.168.10.1/24</span>  <span data-terminal-preview-highlight="mac">00:11:22:33:44:55</span>
-<span data-terminal-preview-highlight="command">set</span> <span data-terminal-preview-highlight="field">allowaccess</span> <span data-terminal-preview-highlight="protocol">ssh https</span>
-<span data-terminal-preview-highlight="command">set</span> <span data-terminal-preview-highlight="field">mtu</span> <span data-terminal-preview-highlight="number">1500</span>
-<span data-terminal-preview-highlight="command">set</span> <span data-terminal-preview-highlight="field">description</span> <span data-terminal-preview-highlight="comment">"Router uplink"</span>
-<span data-terminal-preview-highlight="warning">Warning</span>: pending link check
-Copyright 2017–2026 Example Vendor. User "admin" has logged in.
-<span data-terminal-preview-highlight="url">https://support.example.invalid</span>
+ <div class="terminal-preview-card" aria-label="Preview"><div class="terminal-preview-title">Preview <span id="terminalPreviewProfile" class="terminal-preview-profile"></span></div><pre id="terminalAppearancePreview" class="terminal-appearance-preview" aria-label="Live terminal style preview"><span id="terminalPreviewText"></span>
 Device color: <span data-terminal-preview-color="red">red slot</span>  <span data-terminal-preview-selection>Selected text</span></pre><pre id="terminalFontSample" class="terminal-font-sample" aria-label="Live font and Unicode alignment sample">0123456789 Il1 O0  WiMW
 ┌──────────┬──────────┐
 │ IPv4     │ IPv6     │
@@ -193,7 +204,9 @@ function sync(){
  syncShellSettings(document.getElementById('terminalHighlightEditor')||section,clean,colors);syncFontStatus();
  const sample=document.getElementById('terminalFontSample');if(sample){sample.style.fontFamily=font.fontFamily;sample.style.fontWeight=clean.fontWeight;sample.style.fontSize=(state.terminalFontSize||13)+'px';sample.style.lineHeight=String(clean.lineHeight);sample.style.fontVariantLigatures='none';}
  const preview=document.getElementById('terminalAppearancePreview');preview.style.backgroundColor=colors.background;preview.style.color=colors.foreground;preview.style.fontFamily=font.fontFamily;preview.style.fontWeight=clean.fontWeight;preview.style.fontSize=(state.terminalFontSize||13)+'px';preview.style.lineHeight=String(clean.lineHeight);
- for(const span of preview.querySelectorAll('[data-terminal-preview-highlight]')){const mark=marks[span.dataset.terminalPreviewHighlight],enabled=state.terminalHighlight!==false&&!!mark;span.style.color=enabled?mark.color:colors.foreground;span.style.borderBottom=enabled&&mark.borderWidth?mark.borderWidth+'px '+mark.borderStyle+' '+mark.color:'none';}
+ renderPreviewText(highlightSettings);const shown=previewMarks(highlightSettings,colors),profile=document.getElementById('terminalPreviewProfile');
+ if(profile)profile.textContent=state.terminalHighlight===false?'· highlighting off':'· '+(highlightSettings.ruleSet?.name||'Universal');
+ for(const span of preview.querySelectorAll('[data-terminal-preview-highlight]')){const mark=shown[span.dataset.terminalPreviewHighlight],enabled=state.terminalHighlight!==false&&!!mark;span.style.color=enabled?mark.color:colors.foreground;span.style.borderBottom=enabled&&mark.borderWidth?mark.borderWidth+'px '+mark.borderStyle+' '+mark.color:'none';}
  for(const span of preview.querySelectorAll('[data-terminal-preview-color]'))span.style.color=colors[span.dataset.terminalPreviewColor];
  const selection=preview.querySelector('[data-terminal-preview-selection]');selection.style.backgroundColor=colors.selectionBackground;
  const cursor=preview.querySelector('[data-terminal-preview-cursor]'),[shape,blink]=clean.cursor.split('-');cursor.style.backgroundColor=shape==='block'?colors.cursor:'transparent';cursor.style.boxShadow=shape==='underline'?'inset 0 -2px 0 '+colors.cursor:shape==='bar'?'inset 2px 0 0 '+colors.cursor:'none';cursor.classList.toggle('terminal-preview-cursor-blink',blink==='blink');

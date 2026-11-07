@@ -143,3 +143,16 @@ test('prompt name and link underline choices save, reach live terminals and matc
  const restored=h.api.normalize(JSON.parse(JSON.stringify(h.state.terminalAppearance)));assert.equal(restored.promptHighlight,'always');assert.equal(restored.highlightLinkUnderlines,false);
  assert.equal(h.api.normalize({}).promptHighlight,'auto');assert.equal(h.api.normalize({}).highlightLinkUnderlines,true);
 });
+test('the Appearance preview shows the active profile: Universal, a keyword rule set or your own set (v1.21.13)',()=>{
+ const h=harness(),d=h.document;vm.runInContext(fs.readFileSync(require.resolve('../web/assets/terminal-syntax-rules.js'),'utf8'),h.c);
+ const kinds=()=>d.querySelectorAll('#terminalAppearancePreview [data-terminal-preview-highlight]').map(span=>span.dataset.terminalPreviewHighlight+':'+span.textContent);
+ h.api.sync();assert(kinds().includes('address:192.0.2.1'));assert(kinds().includes('url:\\\\nas\\cfg'),'network paths show in the preview');assert(kinds().includes('error:ERROR'));assert.equal(d.getElementById('terminalPreviewProfile').textContent,'· Universal');
+ assert(d.querySelector('[data-terminal-preview-cursor]'),'the cursor stays after the first line');
+ h.state.terminalSyntax={active:'standard'};h.api.sync();
+ const red=d.querySelectorAll('[data-terminal-preview-highlight="syn-red"]');assert(red.some(span=>/^(ERROR|failed|down)$/i.test(span.textContent)),JSON.stringify(kinds()));
+ const syntax=h.api.syntaxColors(h.state.terminalAppearance,h.state.theme);assert.equal(red[0].style.color,syntax.red);assert.match(d.getElementById('terminalPreviewProfile').textContent,/^· Standard keywords/);
+ h.state.terminalSyntax={active:'custom-lab',custom:[{id:'custom-lab',name:'Lab devices',regex:false,rules:{green:'physical',red:'',yellow:'',blue:'',magenta:'',cyan:'',underline:''}}],colors:{'custom-lab':{green:'#13579b'}}};h.api.sync();
+ assert.deepEqual(kinds(),['syn-green:physical'],'your own set colors exactly what it matches');assert.equal(d.querySelector('[data-terminal-preview-highlight="syn-green"]').style.color,'#13579b','its own colors are used');assert.equal(d.getElementById('terminalPreviewProfile').textContent,'· Lab devices');
+ h.state.terminalAppearance=h.api.normalize({promptHighlight:'always',highlightColors:{prompt:'#abcdef'}});h.api.sync();assert(kinds().includes('prompt-name:router'));assert.equal(d.querySelector('[data-terminal-preview-highlight="prompt-name"]').style.color,'#abcdef');
+ h.state.terminalHighlight=false;h.api.sync();assert.equal(d.getElementById('terminalPreviewProfile').textContent,'· highlighting off');assert.equal(d.querySelector('[data-terminal-preview-highlight="syn-green"]').style.color,h.api.theme(h.state.terminalAppearance,h.state.theme).foreground);
+});

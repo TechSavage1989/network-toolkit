@@ -1,0 +1,16 @@
+Network Toolkit 1.21.13 Beta 14
+
+## What's New
+
+- The Preview in Settings → Appearance now shows the highlighting you use, including keyword rule sets and your own imported .msyn sets, with their colors.
+
+## Additional Details
+
+- The preview's sample output is colored by the active profile exactly as a terminal would color it: Universal, a built-in keyword rule set (Standard, Shell, Network, Perl, SQL) or one of your own, including that profile's custom colors and the Device prompt name choice.
+- The Preview heading names the profile it shows, or says highlighting is off when Syntax highlighting is None.
+- The preview gained a log line with an error and a network path, so each profile has more to color.
+- Changing a rule set's rules or colors in Customize updates the preview right away.
+- Settings, saved values and their effects are unchanged apart from the additions above.
+- Validation used unit tests and browser checks with sample text; no real device was used, and it has not yet been checked on a physical Windows PC.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Security confirmations and Windows/UAC approval are unchanged.
+- This is an opt-in beta. Stable users stay on 1.20.16. Portable executable filename remains Network_Toolkit.exe.

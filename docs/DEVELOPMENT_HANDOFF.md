@@ -1,4 +1,16 @@
-# v1.21.12 Beta 13 (Prompt name color, link underlines and Universal in Customize) - candidate (2026-11-07)
+# v1.21.13 Beta 14 (Appearance preview follows every highlighting profile) - candidate (2026-11-07)
+
+Owner request (screenshots: with "Standard keywords" selected the Appearance preview stayed plain, while Universal colored it): "allow the preview in terminal for text also work with the custom /3rd party syntax highlights".
+- `terminal-appearance.js`: the preview text is generated from `PREVIEW_LINES` with the real analyzer for the active profile (`renderPreviewText`), so built-in and imported rule sets, their per-profile colors and the prompt name choice all show. Spans are rebuilt only when the profile, its rules or the prompt choice change, so color and underline edits restyle the same elements. Heading: `Preview · <profile>`.
+- Owner also asked that every message end with a clear status and what is needed; recorded in AGENTS.md.
+- Checked: unit tests (all), Go and Python tests, terminal-prompt-links browser test with rule-set preview screenshots in light and dark.
+- Not claimed: checked on a physical Windows PC.
+
+---
+
+# v1.21.12 Beta 13 (Prompt name color, link underlines and Universal in Customize) - publication verified (2026-11-07)
+
+Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.21.12 at 2026-11-07T22:42:32Z; stable latest remains v1.20.16. Merged PR #123; tag v1.21.12 points to merge commit 054c4c2c9019e91ca4cbc18dbe6b53186564a56d. Release workflow run 42421575200 succeeded. Assets: Network_Toolkit.exe, Portable and Update ZIPs, Linux x86_64 and aarch64 tarballs and SHA256SUMS; every asset digest matches SHA256SUMS, and the Linux x86_64 binary reports "Network Toolkit 1.21.12 linux amd64".
 
 Owner requests after v1.21.11: "include customize for Universal syntax highlighting.", "add option for underline URL or network paths in universal syntax, separate from the standard underline option." and "also, add option to color or not color the device main prompt name, with customization of that color too" (screenshot: a Linux prompt `biqu@CR10SPro:~$` colored green by the device).
 - Device prompt name: `terminalAppearance.promptHighlight` = `auto` (previous behavior) / `always` / `off`, color = the Device prompt highlight color (`highlightColors.prompt`). The device colored the owner's prompt itself, so Universal's own prompt color never showed; `always` and `off` therefore recolor `overrideable` cells (normal background, not inverse or hidden) for the name only, through decorations; the buffer is never changed. Works with keyword rule sets as well.

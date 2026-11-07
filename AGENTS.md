@@ -7,6 +7,7 @@ Read [docs/UX_POLISH_PLAN.md](docs/UX_POLISH_PLAN.md) first. It is the owner's a
 
 ## Working with the owner
 - When the owner's input or decision is needed, when a release has been published, or when work is waiting on the owner, start that message with a bold, clearly marked line (for example **⚠️ ACTION NEEDED:**, **✅ PUBLISHED:** or **⏳ WAITING ON YOU:**) so it cannot be missed (owner request, 2026-11-07).
+- End every message to the owner with a clear status: what is done or published, what is running and roughly when it finishes, and what (if anything) the owner needs to do (owner request, 2026-11-07).
 - Terminal settings modeled on MobaXterm are planned in [docs/TERMINAL_SETTINGS_PLAN.md](docs/TERMINAL_SETTINGS_PLAN.md).
 
 ## Owner's non-negotiables
