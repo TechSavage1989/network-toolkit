@@ -1,4 +1,4 @@
-## 1.21.1 Beta 2 - Packet capture for beginners (candidate)
+## 1.21.1 Beta 2 - Packet capture for beginners (published 2026-11-07)
 
 - Owner request: make Packet capture usable for troubleshooting without packet-analysis knowledge. Engine: plain finding headlines with the technical wording kept (`Headline`, `Technical`), a verdict (`troubleVerdict`: problems / notes / clear / little / empty), service names for well-known ports and DNS-learned host names (`names.go`), conversation outcomes (worked / refused / no-reply / ongoing / replied / one-way), and a read-only step-by-step connection check (`target.go`, `GET /api/packet-captures/{id}/check?target=`). UI: three numbered setup steps with a large Start, a recording coach with timer and Stop and analyse, verdict banner, "Check a website or device" card, folded technical details and limitations, conversation Result/Service columns with names, readable counters, and Save/Pause controls shown only when they apply. Stale live capture tests updated for the folded "Explain this packet" section and the 960×600 minimum.
 
