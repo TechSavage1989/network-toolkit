@@ -327,7 +327,7 @@ func seedTerminalWorkspace(root, dest string) error {
 				if theme, ok := original["theme"].(string); ok && (theme == "dark" || theme == "light") {
 					state["theme"] = theme
 				}
-				if size, ok := original["terminalFontSize"].(float64); ok && size >= 10 && size <= 24 && size == float64(int(size)) {
+				if size, ok := original["terminalFontSize"].(float64); ok && size >= 8 && size <= 36 && size == float64(int(size)) {
 					state["terminalFontSize"] = size
 				}
 				if enabled, ok := original["terminalHighlight"].(bool); ok {

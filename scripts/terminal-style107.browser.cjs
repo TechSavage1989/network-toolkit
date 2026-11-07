@@ -87,8 +87,9 @@ async function evidence(name){
   assert.match(await page.evaluate(()=>currentTerminal().xterm.options.fontFamily),/^"Missing Synthetic Font 107".*monospace$/);
   // Size changes traverse the real appearance handler, xterm metrics, guarded
   // fitting, and recorded backend resize request. No resize transport is stubbed.
-  for(const size of [10,20,13]){
-   const before=calls.filter(call=>call.p.endsWith('/resize')).length;await page.locator('#terminalFontSize').selectOption(String(size));await fitted();const after=await snapshot();assert(after.cols>0&&after.rows>0);assert(calls.filter(call=>call.p.endsWith('/resize')).length>before,'font size must notify backend in '+mode);assert.equal(await page.evaluate(()=>currentTerminal().xterm.options.fontSize),size);
+  for(const size of [8,30,13]){
+   // v1.21.7: any size from 8 to 36 px, typed and confirmed with Enter.
+   const before=calls.filter(call=>call.p.endsWith('/resize')).length;await page.locator('#terminalFontSize').fill(String(size));await page.locator('#terminalFontSize').press('Enter');await fitted();const after=await snapshot();assert(after.cols>0&&after.rows>0);assert(calls.filter(call=>call.p.endsWith('/resize')).length>before,'font size must notify backend in '+mode);assert.equal(await page.evaluate(()=>currentTerminal().xterm.options.fontSize),size);
    await page.evaluate(()=>{const t=currentTerminal().xterm,b=t.buffer.active;for(let row=0;row<b.length;row++){const line=b.getLine(row);if(line.translateToString(true).startsWith('│ IPv4')){t.select(0,row,23);return;}}throw Error('Box-drawing row missing after font resize');});assert.equal(await page.evaluate(()=>currentTerminal().xterm.getSelection()),'│ IPv4     │ IPv6     │');
    const unicode=await page.evaluate(()=>{const t=currentTerminal().xterm,b=t.buffer.active;for(let row=0;row<b.length;row++){const line=b.getLine(row);if(line.translateToString(true).startsWith('café ')){return {combined:line.getCell(5).getChars(),width:line.getCell(5).getWidth(),wide:line.getCell(11).getWidth()};}}return null;});assert.deepEqual(unicode,{combined:'é',width:1,wide:2});
   }
@@ -101,7 +102,7 @@ async function evidence(name){
    await page.locator('#terminalSessionToggle').click();await fitted();await replay();await evidence(name+'-narrow');await shot(name+'-narrow-output');
   }else await page.locator('#terminalSessionToggle').click();
   await page.evaluate(()=>flushState());await page.reload();await page.waitForFunction(()=>window.__networkToolkitStartupState===1&&online);if(mode==='main')await page.evaluate(()=>navigate('terminal'));await page.waitForFunction(()=>!!currentTerminal()?.xterm);assert.equal(await page.evaluate(()=>state.terminalAppearance.fontFamily),'Missing Synthetic Font 107');assert.equal(await page.evaluate(()=>state.terminalFontSize),13);assert.equal(await page.evaluate(()=>state.terminalAppearance.highlightColors.address),'#22aaff');
-  assert.deepEqual(assetErrors,[]);assert(!calls.some(call=>call.method==='POST'&&call.p==='/api/terminals'));assert(!calls.some(call=>call.p.endsWith('/input')||call.p.startsWith('/api/credentials/')||call.method==='POST'&&call.p==='/api/terminal-automation/runs'));report.checks.push(name+': prose/ANSI, fallback, Unicode/box drawing, selection, 10/20/13 px backend resize, rules reset, preference reload, zero unintended connections/input');
+  assert.deepEqual(assetErrors,[]);assert(!calls.some(call=>call.method==='POST'&&call.p==='/api/terminals'));assert(!calls.some(call=>call.p.endsWith('/input')||call.p.startsWith('/api/credentials/')||call.method==='POST'&&call.p==='/api/terminal-automation/runs'));report.checks.push(name+': prose/ANSI, fallback, Unicode/box drawing, selection, 8/30/13 px backend resize, rules reset, preference reload, zero unintended connections/input');
   await context.close();page=null;
  }
  assert.deepEqual(report.errors,[]);report.passed=true;console.log(JSON.stringify(report));

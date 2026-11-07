@@ -21,3 +21,10 @@ test('existing preference load and window transfer use the common normalization 
  const go=fs.readFileSync(path.join(__dirname,'../cmd/network-toolkit/terminal_settings.go'),'utf8');
  assert.match(go,/"autoPager":\s+true/);assert.match(go,/"ctrlC":\s+"copy-selection"/);assert.match(go,/if source\["ctrlC"\] == "send"/);
 });
+test('terminal font size limits (8 to 36 px) agree in zoom, the Display field, startup restore and Go',()=>{
+ const sizes=JSON.parse(source.match(/const FONT_SIZES = (\[[^\]]+\])/)[1]);assert.equal(sizes[0],8);assert.equal(sizes.at(-1),36);
+ assert.match(source,/Math\.max\(8,Math\.min\(36,/);
+ const html=fs.readFileSync(path.join(__dirname,'../web/index.html'),'utf8');
+ assert.match(html,/id="terminalFontSize" class="terminal-font" min="8" max="36" step="1" data-input-clear="off"/);assert.match(html,/el\.id==='terminalFontSize'\)\{const size=Number\(el\.value\);if\(Number\.isInteger\(size\)&&size>=8&&size<=36\)/);
+ for(const file of ['terminal_settings.go','terminal_window.go'])assert.match(fs.readFileSync(path.join(__dirname,'../cmd/network-toolkit/'+file),'utf8'),/size < 8 \|\| size > 36|size >= 8 && size <= 36/,file);
+});

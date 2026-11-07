@@ -85,6 +85,10 @@
 .terminal-highlight-underlines{display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer}
 .terminal-highlight-underlines input{flex-shrink:0}
 .terminal-appearance-preview [data-terminal-preview-cursor]{display:inline-block;width:.55em;height:1em;vertical-align:-.12em}
+.terminal-appearance-preview .terminal-preview-cursor-blink{animation:terminal-preview-cursor-blink 1.2s step-end infinite}
+@keyframes terminal-preview-cursor-blink{50%{opacity:0}}
+@media(prefers-reduced-motion:reduce){.terminal-appearance-preview .terminal-preview-cursor-blink{animation:none}}
+.terminal-font-unit{font-size:11px;color:var(--muted);margin-left:-2px}
 #terminalDeviceColorsDetails{margin-top:12px}
 #terminalDeviceColorsDetails summary{cursor:pointer;font-size:12px;font-weight:600}
 @media(max-width:540px){.terminal-color-grid{grid-template-columns:1fr}.terminal-appearance-grid{grid-template-columns:1fr}}
