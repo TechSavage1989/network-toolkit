@@ -1,3 +1,16 @@
+# v1.21.7 Beta 8 (Terminal font, colors and cursor, T2) - candidate
+
+Owner request: terminal options similar to MobaXterm (plan: docs/TERMINAL_SETTINGS_PLAN.md, T2).
+- Font size: Display's `#terminalFontSize` is now `<input type="number" min="8" max="36">` with a "px" label and `data-input-clear="off"` (the app's clear button hid the value in the 78px field). It applies on `change` (Enter or leaving the field); invalid values snap back. Zoom (`FONT_SIZES`) steps 8–36; Go accepts 8–36.
+- Appearance (`terminal-appearance.js`): `cursor` and `boldBright` in `normalize`; `options()` returns `cursorStyle`, `cursorBlink`, `drawBoldTextInBrightColors`, spread into the xterm constructor and `updateTerminalTheme`. `createTerminalDisplay` no longer forces `cursorBlink:true`, so the setting must come from `options()`. Missing keys keep today's look (blinking block, bright bold).
+- Seven presets with MobaXterm's names (our own palettes; Monokai and AfterGlow follow their published palettes), also allowed in Go `safeTerminalAppearance`, which keeps `cursor` and `boldBright`.
+- Deferred to T3: grouping Display into MobaXterm-like sections and a fixed rows × columns.
+- CI: record PR #112 was merged while its push-event Checks run had failed (`browser-terminal127`, "Resulting promise was garbage collected" in `terminal-paced-paste127.browser.cjs` `ready()`; the pull_request run on the same commit passed, and #112 changed docs only). `ready()` now records the xterm write callback in a page flag and polls with `waitForFunction`, so no long-lived page promise remains. The merge watcher now requires every Checks run on the head commit to be green.
+- Tests: `terminal-appearance.test.cjs` (+1), `terminal-interaction-defaults.test.cjs` (+1 font limits across JS, HTML and Go), Go `TestTerminalCursorBoldBrightAndMobaXtermSchemesPersist`, `terminal-style107.browser.cjs` now types 8/30/13 px and presses Enter. Node 1611, Go, Python 48 pass; browser terminal-style107, color-picker, ux-phase6, ui-consistency, terminal-pager, terminal-connection-dialog, active-session-tools pass locally. A real-app check confirmed font size, cursor, bold option and Monokai survive a reload through the Go sanitizer.
+- Not claimed: tested against a real device or on a physical Windows PC.
+
+---
+
 # v1.21.6 Beta 7 (Terminal syntax highlighting, T1) - publication verified (2026-11-07)
 
 Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.21.6 at 2026-11-07T10:02:47Z; stable latest remains v1.20.16. Merged PR #111; tag v1.21.6 points to merge commit adf33240adb56918fc221165401223f07c3afc32. Release workflow run 42361977058 succeeded. Assets: Network_Toolkit.exe, Network_Toolkit_1.21.6_Portable.zip, Network_Toolkit_1.21.6_Update.zip, Network_Toolkit_1.21.6_Linux_x86_64.tar.gz, Network_Toolkit_1.21.6_Linux_aarch64.tar.gz, SHA256SUMS; all digests match SHA256SUMS. The published Linux x86_64 archive was downloaded, extracted and run (`--version` 1.21.6 linux amd64; inner SHA256SUMS OK). Checks: green pull-request run 42361035881, first attempt.

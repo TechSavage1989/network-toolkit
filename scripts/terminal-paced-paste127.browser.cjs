@@ -45,21 +45,19 @@ const text='  description {{host}}\r\n\r\n  show version\r\n';
   await page.waitForFunction(()=>!!currentTerminal()?.xterm&&terminalEntryAcceptsInput(currentTerminal()));
   await page.evaluate(async()=>{await NetworkToolkitTerminalMacros.refresh(true);});
   const paced=()=>calls.filter(c=>c.p==='/api/terminal-automation/paste'),inputs=()=>calls.filter(c=>/\/input$/.test(c.p));
-  // The xterm write callback is the proof the prompt was processed. Never leave
-  // that page-side promise unsettled (Playwright once reported "Resulting
-  // promise was garbage collected" on a slow runner): the same promise also
-  // settles when the prompt is visible in the buffer, and after 10 s it settles
-  // with a diagnostic so a failure explains itself instead of timing out.
+  // The xterm write callback, or the prompt visible at the cursor, proves the
+  // prompt was processed. Playwright twice reported "Resulting promise was
+  // garbage collected" on a slow runner while one page-side promise waited for
+  // it, so the page now only records the callback in a flag and the check is
+  // polled with waitForFunction; nothing long-lived waits inside the page.
   async function ready(){
-    const result=await page.evaluate(()=>new Promise(resolve=>{
-      const e=currentTerminal(),prompt='lab-switch(config)# ';e.xterm.reset();e.xterm.clearSelection();
-      let done=false,poll=null,limit=null;const finish=value=>{if(done)return;done=true;clearInterval(poll);clearTimeout(limit);resolve(value);};
-      const shown=()=>{const b=e.xterm.buffer.active,line=b.getLine(b.baseY+b.cursorY)?.translateToString(true)||'';return line.trimEnd()===prompt.trimEnd()&&b.cursorX===prompt.length;};
-      e.xterm.write(prompt,()=>finish({ok:true,via:'callback'}));
-      if(done)return;poll=setInterval(()=>{if(shown())finish({ok:true,via:'buffer'});},50);
-      limit=setTimeout(()=>{const b=e.xterm.buffer.active;finish({ok:false,type:b.type,baseY:b.baseY,cursorY:b.cursorY,cursorX:b.cursorX,line:b.getLine(b.baseY+b.cursorY)?.translateToString(true),attached:!!e.xterm.element?.isConnected,state:e.info?.state,accepts:terminalEntryAcceptsInput(e)});},10000);
-    }));
-    if(!result.ok)throw new Error('Prompt was not written to the terminal within 10 s: '+JSON.stringify(result));
+    await page.evaluate(()=>{const e=currentTerminal();window.__ntkPromptWritten=false;e.xterm.reset();e.xterm.clearSelection();e.xterm.write('lab-switch(config)# ',()=>{window.__ntkPromptWritten=true;});});
+    try{
+      await page.waitForFunction(()=>{if(window.__ntkPromptWritten)return true;const b=currentTerminal().xterm.buffer.active,prompt='lab-switch(config)# ',line=b.getLine(b.baseY+b.cursorY)?.translateToString(true)||'';return line.trimEnd()===prompt.trimEnd()&&b.cursorX===prompt.length;},null,{timeout:10000,polling:50});
+    }catch(error){
+      const state=await page.evaluate(()=>{const e=currentTerminal(),b=e.xterm.buffer.active;return {type:b.type,baseY:b.baseY,cursorY:b.cursorY,cursorX:b.cursorX,line:b.getLine(b.baseY+b.cursorY)?.translateToString(true),attached:!!e.xterm.element?.isConnected,state:e.info?.state,accepts:terminalEntryAcceptsInput(e)};}).catch(inner=>({unavailable:String(inner)}));
+      throw new Error('Prompt was not written to the terminal within 10 s: '+JSON.stringify(state)+' ('+error.message+')');
+    }
   }
   async function open(value=text){await ready();await page.evaluate(value=>NetworkToolkitTerminalInteraction.pasteText(currentTerminal(),value),value);await page.locator('#terminalPasteForm').waitFor();}
   async function close(){await page.locator('#modalRoot [data-action="close-modal"]').first().click();await page.locator('#terminalPasteForm').waitFor({state:'detached'});}
