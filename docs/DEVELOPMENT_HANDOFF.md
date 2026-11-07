@@ -1,4 +1,6 @@
-# v1.21.4 Beta 5 (Sidebar swap buttons at the bottom) - candidate
+# v1.21.4 Beta 5 (Sidebar swap buttons at the bottom) - publication verified (2026-11-07)
+
+Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.21.4 at 2026-11-07T08:51:03Z; stable latest remains v1.20.16. Merged PR #107; tag v1.21.4 points to merge commit 06455fa9a29bd7589e8cc82ca2d9dac4406c3416. Release workflow run 42357014751 succeeded. Assets: Network_Toolkit.exe, Network_Toolkit_1.21.4_Portable.zip, Network_Toolkit_1.21.4_Update.zip, Network_Toolkit_1.21.4_Linux_x86_64.tar.gz, Network_Toolkit_1.21.4_Linux_aarch64.tar.gz, SHA256SUMS; all digests match SHA256SUMS. The published Linux x86_64 archive was downloaded, extracted and run (`--version` 1.21.4 linux amd64; inner SHA256SUMS OK). Checks: green pull-request run 42356173853 on the PR head, first attempt.
 
 Owner: "move the sidebar swap button tot he bottom for all tools, like it is on the new one."
 - Terminal (`session-sidebar.js`), File Transfer client (`transfer-client-layout.js`) and server settings (`transfer-server.js`): `[data-session-action="swap-side"]`, `[data-client-action="swap-side"]` and `[data-transfer-sidebar-side]` now sit at the foot of `.terminal-sidebar-rail` with `.sidebar-rail-swap` (margin-top:auto), like the Text Editor's `[data-editor-files-dock]`. Headings keep their titles and close buttons. Rail click-to-reveal ignores buttons, so ⇄ never reopens a collapsed sidebar by accident.

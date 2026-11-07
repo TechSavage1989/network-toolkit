@@ -1,4 +1,4 @@
-## 1.21.4 Beta 5 - Sidebar swap buttons at the bottom (candidate)
+## 1.21.4 Beta 5 - Sidebar swap buttons at the bottom (published 2026-11-07)
 
 - Owner request: "move the sidebar swap button to the bottom for all tools, like it is on the new one." Terminal, File Transfer client and File Transfer server settings move ⇄ from the content heading to the foot of their icon rail (shared `.sidebar-rail-swap` in session-sidebar.css; the Text Editor uses it too), so it stays reachable while the sidebar is collapsed. The Configuration panel, which has no rail while open, gets a slim `#toolConfigFooter` row with ⇄ at its bottom-left; when collapsed, `syncSidebarControl` moves ⇄ to the foot of `#toolConfigurationRail` under the show control (rail now a column; the global `#toolConfigurationToggle{order:2}` is overridden inside the rail). README screenshots recaptured.
 
