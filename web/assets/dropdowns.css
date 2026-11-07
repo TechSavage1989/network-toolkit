@@ -1,0 +1,49 @@
+/* Dropdowns that match the app (owner request, v1.21.10).
+   Selects keep their native element, size, keyboard and form behavior. While
+   one is open, dropdowns.js adds .ntk-picker so that, where the engine supports
+   customizable selects (Chromium 135+, WebView2), its list is drawn in the
+   app's light or dark colors instead of the system's black popup. Older
+   engines keep the native list. */
+@supports (appearance: base-select){
+ select.ntk-picker{appearance:base-select;display:inline-flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;cursor:pointer;text-align:left}
+ select.ntk-picker::picker-icon{content:'';width:10px;height:10px;flex:none;margin-left:auto;background:currentColor;opacity:.7;transition:transform .12s;
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M1.5 3.5 5 7l3.5-3.5' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/10px 10px no-repeat;
+  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M1.5 3.5 5 7l3.5-3.5' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/10px 10px no-repeat}
+ select.ntk-picker:open::picker-icon{transform:rotate(180deg)}
+ select.ntk-picker:disabled{cursor:not-allowed}
+ select.ntk-picker::picker(select){appearance:base-select;box-sizing:border-box;min-width:anchor-size(width);max-height:min(360px,60vh);margin:4px 0;padding:4px;overflow:auto;border:1px solid var(--border);border-radius:8px;background:var(--panel);color:var(--text);box-shadow:0 12px 32px rgba(0,0,0,.28),0 2px 6px rgba(0,0,0,.14);font:inherit;font-size:12px;scrollbar-width:thin}
+ select.ntk-picker option{display:flex;align-items:center;gap:8px;min-height:28px;padding:5px 10px 5px 8px;border-radius:5px;background:transparent;color:var(--text);white-space:nowrap;cursor:pointer}
+ select.ntk-picker option::checkmark{content:'';width:12px;height:12px;flex:none;order:-1;background:var(--accent);visibility:hidden;
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.3 5 8.7l4.5-5.2' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/12px 12px no-repeat;
+  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.3 5 8.7l4.5-5.2' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/12px 12px no-repeat}
+ select.ntk-picker option:checked::checkmark{visibility:visible}
+ select.ntk-picker option:checked{color:var(--accent);font-weight:600}
+ select.ntk-picker option:hover,select.ntk-picker option:focus-visible{background:var(--hover);outline:none}
+ select.ntk-picker option:disabled{opacity:.5;cursor:default}
+ select.ntk-picker optgroup{padding:4px 0}
+ select.ntk-picker optgroup legend{padding:6px 10px 2px;font-size:10px;font-weight:650;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+ select.ntk-picker hr{border:0;border-top:1px solid var(--line);margin:4px 2px}
+ @media(prefers-reduced-motion:reduce){select.ntk-picker::picker-icon{transition:none}}
+}
+/* Text fields with suggestions (font, time zone, serial port, session folder):
+   combobox.js replaces the browser's suggestion popup with this list, which
+   shows every choice whatever is typed. */
+.combobox-host{position:relative}
+.combobox-toggle{position:absolute;display:grid;place-items:center;width:22px;height:22px;padding:0;margin:0;border:0;border-radius:5px;background:transparent;color:var(--muted);cursor:pointer;z-index:2}
+.combobox-toggle:hover{background:var(--hover);color:var(--text)}
+.combobox-toggle svg{width:12px;height:12px;transition:transform .12s}
+.combobox-toggle[aria-expanded="true"] svg{transform:rotate(180deg)}
+.combobox-popup{position:fixed;z-index:20000;box-sizing:border-box;max-height:min(340px,60vh);overflow:auto;padding:4px;border:1px solid var(--border);border-radius:8px;background:var(--panel);color:var(--text);box-shadow:0 12px 32px rgba(0,0,0,.28),0 2px 6px rgba(0,0,0,.14);font-size:12px;scrollbar-width:thin}
+.combobox-popup[hidden]{display:none}
+.combobox-option{display:flex;align-items:center;gap:8px;min-height:30px;padding:5px 10px 5px 8px;border-radius:5px;cursor:pointer;white-space:nowrap}
+.combobox-option::before{content:'';width:12px;height:12px;flex:none;background:var(--accent);visibility:hidden;
+ -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.3 5 8.7l4.5-5.2' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/12px 12px no-repeat;
+ mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2.5 6.3 5 8.7l4.5-5.2' fill='none' stroke='black' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/12px 12px no-repeat}
+.combobox-option[aria-selected="true"]::before{visibility:visible}
+.combobox-option[aria-selected="true"]{color:var(--accent);font-weight:600}
+.combobox-option.active{background:var(--hover)}
+.combobox-option .combobox-value{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.combobox-option .combobox-label{flex:none;font-size:10.5px;font-weight:400;color:var(--muted)}
+.combobox-option.combobox-font .combobox-value{font-size:14px;line-height:1.3}
+.combobox-empty{padding:8px 10px;color:var(--muted)}
+@media(prefers-reduced-motion:reduce){.combobox-toggle svg{transition:none}}
