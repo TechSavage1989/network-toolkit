@@ -1,5 +1,7 @@
 # v1.21.2 Beta 3 (Packet capture adapter list) - publication verified (2026-11-07)
 
+Owner check on Windows (2026-11-07): "it looks good." The owner's report that led to this beta came from v1.21.1 running on Windows (guided setup visible); the adapter list was the only feedback on the v1.21.1 Packet capture changes.
+
 Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.21.2 at 2026-11-07T07:10:42Z; stable latest remains v1.20.16. Merged PR #102; tag v1.21.2 points to merge commit 4fcaf11dfde1d5abca649117f4027fd1de0447c0. Release workflow run 42349968953 succeeded. Assets: Network_Toolkit.exe, Network_Toolkit_1.21.2_Portable.zip, Network_Toolkit_1.21.2_Update.zip, Network_Toolkit_1.21.2_Linux_x86_64.tar.gz, Network_Toolkit_1.21.2_Linux_aarch64.tar.gz, SHA256SUMS; all digests match SHA256SUMS. The published Linux x86_64 archive was downloaded, extracted and run (`--version` 1.21.2 linux amd64; inner SHA256SUMS OK). Checks: green runs 42349084839 (pull request) and 42349105843 (push), first attempt.
 
 Owner, with screenshots of Test a target's Source interface list and the Packet capture connection list: "the packet capture network connection adapter selection should match the design of other adapter sleections thorughout the app".
