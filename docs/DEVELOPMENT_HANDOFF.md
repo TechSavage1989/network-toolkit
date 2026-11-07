@@ -1,3 +1,14 @@
+# v1.21.10 Beta 11 (Dropdowns in the app's colors) - candidate
+
+Owner request (with a screenshot of the black font suggestion popup): native-feeling dropdowns instead of the black list, suggestion lists that show every choice regardless of typed text, and fonts shown in their own face. The same message also asked for a Display/Tools menu cleanup and a universal highlighting profile with customizable colors; those follow as v1.21.11 and v1.21.12.
+- `web/assets/dropdowns.js` + `dropdowns.css`. Closed selects are untouched (measured identical on 11 pages with and without the stylesheet), because CI compares layouts against pinned older builds and `appearance: base-select` sizes a closed select to its chosen item. The app-colored list is applied only while open: `.ntk-picker` is added on pointerdown/Alt+Arrow/F4 with width/height locked to the native box, and removed when `:open` ends (rAF watch). Unsupported engines keep native lists.
+- While a picker is open, keydown/keyup/keypress are stopped at window capture; otherwise app Escape handlers closed the Display panel and left the list open.
+- Comboboxes: any `input[list]` is converted (the `list` attribute moves to `data-combobox-list` so the browser popup never appears). Code must not rely on `input.list`; the datalist element stays and is read when the list opens, so dynamic lists (serial ports, folders) stay current. Terminal output DOM changes are ignored by the observer.
+- Tests: `scripts/dropdowns.browser.cjs` (fonts, typing, keyboard, select colors, size lock, Escape, light/dark, time zone field), added to checks.yml. Note: `active-session-tools.browser.cjs` (R reconnect key from v1.21.9) is not part of CI; it passes locally.
+- Not claimed: checked in WebView2 on a physical Windows PC.
+
+---
+
 # v1.21.9 Beta 10 (Paste warnings and reconnection keys, T3b) - publication verified (2026-11-07)
 
 Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.21.9 at 2026-11-07T12:52:36Z; stable latest remains v1.20.16. Merged PR #117; tag v1.21.9 points to merge commit a1eef91ab62df3a449e025da6f05616d7869ac39. Release workflow run 42374124770 succeeded. Assets: Network_Toolkit.exe, Network_Toolkit_1.21.9_Portable.zip, Network_Toolkit_1.21.9_Update.zip, Network_Toolkit_1.21.9_Linux_x86_64.tar.gz, Network_Toolkit_1.21.9_Linux_aarch64.tar.gz, SHA256SUMS; all digests match SHA256SUMS. The published Linux x86_64 archive was downloaded, extracted and run (`--version` 1.21.9 linux amd64; inner SHA256SUMS OK). Checks: both runs green (42371964548 and 42371967035), first attempt.
