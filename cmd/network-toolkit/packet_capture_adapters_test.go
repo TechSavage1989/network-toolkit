@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestPacketAdapterMatchingRequiresRealUniqueIdentity(t *testing.T) {
 	adapters := []packetSystemAdapter{
@@ -63,6 +66,25 @@ func TestPacketAdapterInventoryIncludesDisconnectedAndVirtualConfigurableNICs(t 
 	got := packetConfigurableAdapters(localIPSnapshot{Adapters: rows})
 	if len(got) != 2 || got[0].Name != "Ethernet" || got[1].Name != "vEthernet (Lab)" {
 		t.Fatal(got)
+	}
+}
+
+func TestPacketAdapterPickerShowsHardwareStateAndAddresses(t *testing.T) {
+	rows := []localIPAdapter{
+		{ID: "{00000000-0000-0000-0000-000000000001}", Index: 4, Name: "Ethernet", Description: "Synthetic 5GbE Controller", Status: "Up", AdminStatus: "enabled", MAC: "AA:BB:CC:DD:EE:01", Editable: true, Addresses: []localIPAddress{{Address: "fe80::1%4", PrefixLength: 64}, {Address: "192.0.2.4", PrefixLength: 24}}},
+		{ID: "{00000000-0000-0000-0000-000000000002}", Index: 5, Name: "Wi-Fi 2", Description: "Synthetic Wireless", Status: "Down", AdminStatus: "enabled", Editable: true},
+		{ID: "{00000000-0000-0000-0000-000000000003}", Index: 6, Name: "Ethernet 2", Description: "Synthetic USB Adapter", Status: "Not present", Editable: true},
+		{ID: "{00000000-0000-0000-0000-000000000004}", Index: 7, Name: "Ethernet 3", Description: "Synthetic Disabled", Status: "Down", AdminStatus: "disabled", Editable: true},
+	}
+	views := packetOrdinaryInterfaces(packetConfigurableAdapters(localIPSnapshot{Adapters: rows}))
+	if len(views) != 4 || views[0].ID != "nics" {
+		t.Fatal(views)
+	}
+	if v := views[1]; v.Name != "Ethernet" || v.Hardware != "Synthetic 5GbE Controller" || v.Status != "Up" || strings.Join(v.Addresses, ",") != "fe80::1%4,192.0.2.4" || v.Description != "Synthetic 5GbE Controller AA:BB:CC:DD:EE:01" {
+		t.Fatalf("connected adapter view: %#v", v)
+	}
+	if views[2].Status != "Down" || len(views[2].Addresses) != 0 || views[3].Status != "Disabled" {
+		t.Fatalf("disconnected and disabled adapter views: %#v", views[2:])
 	}
 }
 

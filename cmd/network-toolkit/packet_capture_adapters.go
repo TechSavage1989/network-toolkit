@@ -14,6 +14,10 @@ import (
 // or a MAC address: capturing the wrong device is worse than omitting a source.
 type packetSystemAdapter struct {
 	ID, Name, Description, MAC, Driver string
+	// Display only: link status ("Up", "Disconnected", "Disabled") and the
+	// adapter's IP addresses, so the picker reads like the other adapter lists.
+	Status    string
+	Addresses []string
 }
 
 var packetAdapterMAC = regexp.MustCompile(`(?i)(?:^|\s)([0-9a-f]{2}(?:[:-][0-9a-f]{2}){5})(?:\s|$)`)
@@ -66,7 +70,22 @@ func packetAdapterView(source capture.Interface, adapter packetSystemAdapter) ca
 		source.Name = adapter.Description
 	}
 	source.Description = strings.TrimSpace(strings.Join([]string{adapter.Description, adapter.MAC}, " "))
+	source.Hardware = strings.TrimSpace(adapter.Description)
+	source.Status = adapter.Status
+	source.Addresses = append([]string(nil), adapter.Addresses...)
 	return source
+}
+
+// packetAdapterStatus is the plain link state shown in the capture picker.
+func packetAdapterStatus(adapter localIPAdapter) string {
+	if strings.EqualFold(adapter.AdminStatus, "disabled") || strings.EqualFold(adapter.Status, "Disabled") {
+		return "Disabled"
+	}
+	status := strings.TrimSpace(adapter.Status)
+	if len(status) > 40 {
+		status = status[:40]
+	}
+	return status
 }
 
 func packetConfigurableAdapters(snapshot localIPSnapshot) []packetSystemAdapter {
@@ -75,7 +94,13 @@ func packetConfigurableAdapters(snapshot localIPSnapshot) []packetSystemAdapter 
 		if !adapter.Editable || !validAdapterID(adapter.ID) || adapter.Index == 0 || adapter.Status == "Not present" || adapter.Type == "Loopback" || strings.TrimSpace(adapter.Name) == "" {
 			continue
 		}
-		adapters = append(adapters, packetSystemAdapter{ID: adapter.ID, Name: adapter.Name, Description: adapter.Description, MAC: adapter.MAC})
+		addresses := []string{}
+		for _, address := range adapter.Addresses {
+			if ip := strings.TrimSpace(address.Address); ip != "" && len(addresses) < 8 {
+				addresses = append(addresses, ip)
+			}
+		}
+		adapters = append(adapters, packetSystemAdapter{ID: adapter.ID, Name: adapter.Name, Description: adapter.Description, MAC: adapter.MAC, Status: packetAdapterStatus(adapter), Addresses: addresses})
 	}
 	return adapters
 }
