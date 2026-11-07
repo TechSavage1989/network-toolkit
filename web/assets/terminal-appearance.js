@@ -47,7 +47,11 @@ function mode(value,appTheme='dark'){
 function options(value,appTheme='dark'){const clean=normalize(effective(value));return {fontFamily:fontStack(clean.fontFamily),fontWeight:clean.fontWeight,lineHeight:clean.lineHeight,theme:theme(clean,appTheme)};}
 const names={background:'Console background',foreground:'Normal text',cursor:'Typing cursor',selectionBackground:'Selected text background',black:'Black',red:'Red',green:'Green',yellow:'Yellow',blue:'Blue',magenta:'Magenta',cyan:'Cyan',white:'White',brightBlack:'Bright black',brightRed:'Bright red',brightGreen:'Bright green',brightYellow:'Bright yellow',brightBlue:'Bright blue',brightMagenta:'Bright magenta',brightCyan:'Bright cyan',brightWhite:'Bright white'};
 const descriptions={background:'The area behind all terminal text.',foreground:'Text without a device color or automatic highlight.',cursor:'The marker showing where you are typing.',selectionBackground:'The background behind text you select.'};
-function highlightOptions(value,appTheme='dark',language){const clean=normalize(effective(value));return {theme:mode(clean,appTheme),colors:clean.highlightColors,underlines:clean.highlightUnderlines,rules:clean.highlightRules,...(SHELLS?.supported(language)?{shellColors:clean.shells[language].colors}:{})};}
+// MobaXterm-style rule sets (terminal-syntax-rules.js) take their colors from
+// the terminal color scheme: bright colors on dark backgrounds, normal on light.
+function syntaxColors(clean,appTheme){const t=theme(clean,appTheme),dark=mode(clean,appTheme)==='dark',pick=name=>t[dark?'bright'+name[0].toUpperCase()+name.slice(1):name];return {red:pick('red'),green:pick('green'),yellow:pick('yellow'),blue:pick('blue'),magenta:pick('magenta'),cyan:pick('cyan'),underline:t.foreground};}
+function syntaxRuleSet(language){const rules=root.NTKTerminalSyntaxRules;if(!rules||SHELLS?.supported(language))return null;const prefs=rules.preferences(typeof state==='undefined'?null:state.terminalSyntax);if(prefs.active==='smart')return null;return rules.find(prefs,prefs.active);}
+function highlightOptions(value,appTheme='dark',language){const clean=normalize(effective(value)),set=syntaxRuleSet(language);return {theme:mode(clean,appTheme),colors:clean.highlightColors,underlines:clean.highlightUnderlines,rules:clean.highlightRules,ruleset:set?root.NTKTerminalSyntaxRules.compile(set):null,ruleSet:set,syntaxColors:syntaxColors(clean,appTheme),...(SHELLS?.supported(language)?{shellColors:clean.shells[language].colors}:{})};}
 function enabled(value,language,deviceEnabled=true){return SHELLS?.supported(language)?normalize(value).shells[language].enabled:deviceEnabled;}
 // Suggestions name local fonts only. No @font-face, FontFace URL, download,
 // installation, or permission-gated local-font enumeration is performed.
@@ -189,5 +193,5 @@ document.addEventListener('click',event=>{
  const reset=event.target.closest?.('[data-terminal-shell-reset]');if(reset){event.preventDefault();const next=normalize(state.terminalAppearance);next.shells[reset.dataset.terminalShellReset]={enabled:true,colors:{}};apply(next);return;}
  if(event.target.closest?.('[data-terminal-appearance-reset]')){event.preventDefault();state.terminalFontSize=13;apply({});}
 });
-root.NetworkToolkitTerminalAppearance=Object.freeze({normalize,theme,mode,options,highlightOptions,enabled,mount,sync,afterFontChange,fontAvailability,fontStack,fontFamilies:FONT_FAMILIES,presets:PRESETS,colors:COLORS,highlightKinds:Object.keys(HIGHLIGHTS)});
+root.NetworkToolkitTerminalAppearance=Object.freeze({normalize,theme,mode,options,highlightOptions,syntaxColors:(value,appTheme='dark')=>syntaxColors(normalize(effective(value)),appTheme),enabled,mount,sync,afterFontChange,fontAvailability,fontStack,fontFamilies:FONT_FAMILIES,presets:PRESETS,colors:COLORS,highlightKinds:Object.keys(HIGHLIGHTS)});
 })(window);

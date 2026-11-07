@@ -113,6 +113,9 @@
   }
   function legend(theme, options = {}) {
     if (global.NTKTerminalShellSyntax?.supported(options.language)) return global.NTKTerminalShellSyntax.legend(options.terminalTheme, theme, options.shellColors);
+    if (options.ruleset && global.NTKTerminalSyntaxRules) return global.NTKTerminalSyntaxRules.legend(options.ruleSet).map(item => ({ kind: 'syn-' + item.color,
+      label: item.label + (item.note ? ': ' + item.note : ''), color: item.color === 'underline' ? (options.syntaxColors?.underline || '') : (options.syntaxColors?.[item.color] || ''),
+      borderStyle: item.color === 'underline' ? 'solid' : 'none', borderWidth: item.color === 'underline' ? 1 : 0 }));
     const colors = palette(theme, options.colors);
     return Object.keys(LABELS).filter(kind => options.rules?.[kind] !== false).map(kind => ({ kind, label: LABELS[kind], color: colors[kind],
       borderStyle: options.underlines === false ? 'none' : MARKS[kind][0], borderWidth: options.underlines === false ? 0 : MARKS[kind][1] }));
@@ -246,8 +249,14 @@
     if (/^[0-9.]+$/.test(host)) return ipv4(host);
     return host.length <= 253 && host.split('.').every(label => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(label));
   }
-  function analyze(input, language, selectedRules) {
+  function analyze(input, language, selectedRules, ruleset) {
     if (global.NTKTerminalShellSyntax?.supported(language)) {const shell=global.NTKTerminalShellSyntax;if(shell.isPrompt(input,language))return shell.analyze(input,language);return shell.analyzeOutput(input,{address:addressKind,mac});}
+    // A MobaXterm-style rule set (terminal-syntax-rules.js) replaces the
+    // device-aware recognizers when one is selected.
+    if (ruleset && typeof ruleset.match === 'function') {
+      const value = typeof input === 'string' ? input : '';
+      return value && value.length <= LIMITS.text ? ruleset.match(value).slice(0, LIMITS.matches) : [];
+    }
     const text = typeof input === 'string' ? input : '';
     if (!text || text.length > LIMITS.text) return [];
     const found = [], enabledRules = rules(selectedRules);
@@ -381,7 +390,9 @@
     const shell = () => !!global.NTKTerminalShellSyntax?.supported(language);
     const cleanShellColors = value => global.NTKTerminalShellSyntax?.normalizePreferences({[language]:{colors:value}})?.[language]?.colors || {};
     let requestedShellColors = cleanShellColors(opts.shellColors);
-    const appearanceColors = (mode, custom) => ({ ...palette(mode, custom), ...(shell() ? global.NTKTerminalShellSyntax.palette(term.options?.theme, mode, requestedShellColors) : {}) });
+    let ruleset = opts.ruleset && typeof opts.ruleset.match === 'function' ? opts.ruleset : null, syntaxColors = opts.syntaxColors || {};
+    const syntaxPalette = () => Object.fromEntries(['red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'underline'].filter(color => typeof syntaxColors[color] === 'string').map(color => ['syn-' + color, syntaxColors[color]]));
+    const appearanceColors = (mode, custom) => ({ ...palette(mode, custom), ...syntaxPalette(), ...(shell() ? global.NTKTerminalShellSyntax.palette(term.options?.theme, mode, requestedShellColors) : {}) });
     let enabled = opts.enabled !== false, theme = themeName(opts.theme), disposed = false;
     let selectedRules = rules(opts.rules);
     let requestedColors = customColors(opts.colors), colors = appearanceColors(theme, requestedColors), underlines = opts.underlines !== false;
@@ -457,6 +468,12 @@
       element.style.pointerEvents = 'none';
       element.style.userSelect = 'none';
       element.style.boxSizing = 'border-box';
+      if (kind.startsWith('syn-')) {
+        // Rule sets color text like MobaXterm; only the Underline rule draws a line.
+        element.style.borderBottom = kind === 'syn-underline' ? '1px solid ' + (color || 'currentColor') : 'none';
+        element.style.borderLeft = 'none';
+        return;
+      }
       element.style.borderBottom = underlines && !shell() ? mark[1] + 'px ' + mark[0] + ' ' + color : 'none';
       // Underlines provide the non-color cue. A vertical stroke beside a
       // short status such as "up" looks like terminal text or a cursor.
@@ -576,7 +593,7 @@
       try {
         for (const part of segments) {
           const settings = { marker, x: part.x, width: part.width, height: 1, layer: 'bottom' };
-          if (part.colorable) settings.foregroundColor = colors[part.kind];
+          if (part.colorable && part.kind !== 'syn-underline' && colors[part.kind]) settings.foregroundColor = colors[part.kind];
           const decoration = term.registerDecoration(settings);
           if (!decoration) continue;
           const item = { decoration, listener: null, kind: part.kind, element: decoration.element };
@@ -609,7 +626,7 @@
         for (const row of visibleRows) dirty.delete(row.y);
         return visibleRows.length;
       }
-      const matches = analyze(group.text, language, selectedRules);
+      const matches = analyze(group.text, language, selectedRules, ruleset);
       if (matches.length === LIMITS.matches) limited = true;
       // Never decorate invisible SGR 8 cells or disclose their token shape.
       const safe = matches.filter(hit => !group.rows.some(row => {
@@ -682,7 +699,7 @@
         if (y < current.first || y > current.last) return [];
         const group = collect(current.buffer, y);
         if (!group) return [];
-        const matches = analyze(group.text, language, selectedRules), result = [];
+        const matches = analyze(group.text, language, selectedRules, ruleset), result = [];
         for (const hit of matches) {
           let hidden = false;
           const spans = [];
@@ -779,9 +796,12 @@
       if (disposed) return;
       if (value.language !== undefined) language = value.language;
       if (Object.prototype.hasOwnProperty.call(value, 'shellColors')) requestedShellColors = cleanShellColors(value.shellColors);
+      const nextRuleset = value.ruleset && typeof value.ruleset.match === 'function' ? value.ruleset : null;
+      const rulesetChanged = (nextRuleset?.key || '') !== (ruleset?.key || '');
+      ruleset = nextRuleset; syntaxColors = value.syntaxColors || {};
       const nextTheme = themeName(value.theme), nextRequested = customColors(value.colors), nextColors = appearanceColors(nextTheme, nextRequested);
       const nextRules = rules(value.rules);
-      const changed = JSON.stringify(selectedRules) !== JSON.stringify(nextRules) || [...new Set([...Object.keys(colors), ...Object.keys(nextColors)])].some(kind => colors[kind] !== nextColors[kind]);
+      const changed = rulesetChanged || JSON.stringify(selectedRules) !== JSON.stringify(nextRules) || [...new Set([...Object.keys(colors), ...Object.keys(nextColors)])].some(kind => colors[kind] !== nextColors[kind]);
       selectedRules = nextRules; theme = nextTheme; requestedColors = nextRequested; colors = nextColors; underlines = value.underlines !== false;
       // Foreground options are immutable in xterm's public API. Underline-only
       // edits restyle existing elements without replacing their decorations.
@@ -806,7 +826,7 @@
         else refresh();
       },
       setTheme(value) {
-        setAppearance({ theme: value, colors: requestedColors, underlines, rules: selectedRules });
+        setAppearance({ theme: value, colors: requestedColors, underlines, rules: selectedRules, ruleset, syntaxColors });
       },
       setAppearance,
       refresh,

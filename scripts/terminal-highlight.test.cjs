@@ -4,7 +4,7 @@ global.self=global;const {Terminal}=require('../web/assets/xterm.js');
 function harness(options,dimensions={},runtime={}){
  const timers=new Map(),decorations=[],refreshes=[],frames=[],painted=new Map();let next=0,clock=0,renders=0;const context={setTimeout:fn=>{timers.set(++next,fn);return next;},clearTimeout:id=>timers.delete(id),performance:{now:()=>clock+=runtime.clockStep||0}};
  vm.createContext(context);
- for(const name of ['terminal-shell-syntax.js','terminal-highlight.js'])vm.runInContext(fs.readFileSync(name==='terminal-highlight.js'&&process.env.TOOLKIT_HIGHLIGHT_SOURCE?process.env.TOOLKIT_HIGHLIGHT_SOURCE:require.resolve('../web/assets/'+name),'utf8'),context);
+ for(const name of ['terminal-shell-syntax.js','terminal-syntax-rules.js','terminal-highlight.js'])vm.runInContext(fs.readFileSync(name==='terminal-highlight.js'&&process.env.TOOLKIT_HIGHLIGHT_SOURCE?process.env.TOOLKIT_HIGHLIGHT_SOURCE:require.resolve('../web/assets/'+name),'utf8'),context);
  const term=new Terminal({cols:80,rows:8,scrollback:100,allowProposedApi:true,...dimensions});Object.defineProperty(term,'element',{value:{getClientRects:()=>[{}]}});
  const nativeDecoration=term.registerDecoration.bind(term),renderRow=runtime.realDecorations?require('./terminal-render-fixture.cjs')(term):null;
  term.registerDecoration=options=>{
@@ -351,5 +351,24 @@ test('hidden terminals skip repeated highlight reconciliation and resume after s
  assert.equal(h.controller.getState().active,true,'visible tab must resume highlighting');
  await h.write('set interface-name "After show"');
  assert(h.decorations.some(d=>!d.disposed),'new visible output must be highlighted again');
+ h.dispose();
+});
+test('a keyword rule set colors terminal output with the scheme colors and underlines links without recoloring them',async()=>{
+ const Rules=require('../web/assets/terminal-syntax-rules.js'),syntaxColors={red:'#ff6060',green:'#18ed93',yellow:'#dedc12',blue:'#1bbae9',magenta:'#ff7dff',cyan:'#8eddf4',underline:'#ececec'};
+ const h=harness({underlines:true,ruleset:Rules.compile(Rules.builtIn('standard')),syntaxColors},{cols:100,rows:6},{renderer:true});h.flush();
+ await h.write('Connection refused by 192.0.2.10\r\nLogin successful, see https://example.com/x');
+ const live=h.decorations.filter(d=>!d.disposed),at=(row,x)=>live.filter(d=>d.options.marker.line===row&&d.options.x===x);
+ assert.equal(at(0,0)[0]?.options.foregroundColor,'#ff6060','"Connection refused" should be red');assert.equal(at(0,0)[0].options.width,18);
+ assert.equal(at(0,22)[0]?.options.foregroundColor,'#ff7dff','the address should be magenta');
+ assert.equal(at(1,6)[0]?.options.foregroundColor,'#18ed93','"successful" should be green');
+ const link=at(1,22)[0];assert(link,'the web address should be marked');assert.equal(link.options.foregroundColor,undefined,'Underline must not recolor the link');
+ assert.equal(link.element.style.borderBottom,'1px solid #ececec');
+ assert.deepEqual(Array.from(h.controller.tokensAtRow(0),token=>token.kind),['syn-red','syn-magenta']);
+ const legend=h.legend('dark',{ruleset:Rules.compile(Rules.builtIn('standard')),ruleSet:Rules.builtIn('standard'),syntaxColors});
+ assert.equal(legend[0].label,'Red: Errors and failures');assert.equal(legend[0].color,'#ff6060');
+ // Switching back to device highlighting replaces the keyword colors.
+ h.controller.setAppearance({theme:'dark',underlines:true,ruleset:null,syntaxColors});h.flush();
+ assert(!h.decorations.filter(d=>!d.disposed).some(d=>d.options.foregroundColor==='#ff6060'),'old rule-set colors remained');
+ assert(h.controller.tokensAtRow(0).some(token=>token.kind==='address'),'device highlighting did not return');
  h.dispose();
 });
