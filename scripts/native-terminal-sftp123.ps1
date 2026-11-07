@@ -146,7 +146,8 @@ function Native-DragSummary {
 }
 function Native-DragEvidence {
  $relative={param($tick)if($null -eq $tick){return $null};return [int64]$tick-[int64]$drag.since}
- return @{oleEnterMS=(& $relative $drag.enter);copyAcceptedMS=(& $relative $drag.accepted);oleReturnMS=(& $relative $drag.returned);lastEffect=$drag.effect;nudges=$drag.nudges;events=$dragSeen.Count}
+ $mark={param($kind)foreach($m in $timeline){if($m.kind -eq $kind){return [int64]$m.tickMS-[int64]$drag.since}};return $null}
+ return @{arrivalMS=(& $mark 'target-arrival');oleEnterMS=(& $relative $drag.enter);copyAcceptedMS=(& $relative $drag.accepted);releaseMS=(& $mark 'release-before');oleReturnMS=(& $relative $drag.returned);lastEffect=$drag.effect;nudges=$drag.nudges;events=$dragSeen.Count}
 }
 function Wait-NativeDropAccepted([int]$x,[int]$y){
  $until=[DateTime]::UtcNow.AddSeconds(10);$nudgeAt=$null

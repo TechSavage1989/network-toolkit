@@ -355,9 +355,15 @@ func TestNativeTerminalSFTP123InstalledWebView2(t *testing.T) {
 						ActualMouseDrag, ActualExplorer, Finished, ExpectedFailureReproduced, SaveSafelyCancelled bool
 						SaveDialogCount, FixtureHostWindowCount                                                   int
 						SaveDialogs                                                                               []json.RawMessage
+						NativeDrag                                                                                json.RawMessage
 					}
 					if e = json.Unmarshal(bytes.TrimSpace(out), &input); e != nil || !input.ActualMouseDrag || !input.ActualExplorer {
 						return errors.New("real input/Explorer proof missing")
+					}
+					if len(input.NativeDrag) > 0 {
+						// Milliseconds after the press, so each hosted log shows the
+						// release gate's margin without downloading the artifact.
+						t.Logf("%s native drag: %s", name, input.NativeDrag)
 					}
 					if baseline {
 						if !input.ExpectedFailureReproduced || !input.SaveSafelyCancelled || len(input.SaveDialogs) != 1 || input.Finished {
