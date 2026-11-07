@@ -49,6 +49,11 @@ async function geometry(){return page.evaluate(()=>[...document.querySelectorAll
   assert.equal(await font.inputValue(),list.faces[list.faces.findIndex(([n])=>n==='Courier New')+1][0]);assert.equal(await page.locator('#comboboxPopup').isHidden(),true);
   assert.equal(await page.evaluate(()=>state.terminalAppearance.fontFamily),await font.inputValue(),'choosing applies through the normal change handler');
   await page.locator('#terminalAppearanceEditor').locator('.combobox-toggle').first().click();assert.equal(await page.locator('#comboboxPopup').isVisible(),true,'the arrow opens the full list');
+  // Choosing with the mouse applies the font and leaves the settings panel open.
+  await page.locator('#comboboxPopup [role=option]').filter({hasText:'JetBrains Mono'}).click();
+  assert.equal(await font.inputValue(),'JetBrains Mono');assert.equal(await page.evaluate(()=>state.terminalAppearance.fontFamily),'JetBrains Mono');
+  assert.equal(await page.locator('#terminalSessionPanel').isVisible(),true,'clicking a choice must not close the panel');assert.equal(await page.locator('#comboboxPopup').isHidden(),true);
+  await page.locator('#terminalAppearanceEditor').locator('.combobox-toggle').first().click();assert.equal(await page.locator('#comboboxPopup').isVisible(),true);
   await page.keyboard.press('Escape');assert.equal(await page.locator('#comboboxPopup').isHidden(),true);assert.equal(await page.locator('#terminalSessionPanel').isVisible(),true,'Escape closes only the list');
   pass(theme+': font field lists every font in its own face, follows typing and applies the choice');
   // Selects: closed size unchanged; the opened list uses the app colors and closes back to native.

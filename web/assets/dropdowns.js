@@ -24,8 +24,11 @@ function fontFamily(name){return /^(?:monospace|sans-serif|serif|system-ui|ui-mo
 function ensurePopup(){
  if(popup?.isConnected)return popup;
  popup=document.createElement('div');popup.className='combobox-popup';popup.id='comboboxPopup';popup.setAttribute('role','listbox');popup.hidden=true;
- popup.addEventListener('pointerdown',event=>event.preventDefault());
- popup.addEventListener('click',event=>{const option=event.target.closest?.('[role="option"]');if(option&&current)choose(current,Number(option.dataset.index));});
+ // The list sits at the page level, outside the panel or dialog that holds the field;
+ // keep its clicks from reaching "click outside closes the panel" handlers.
+ popup.addEventListener('pointerdown',event=>{event.preventDefault();event.stopPropagation();});
+ popup.addEventListener('mousedown',event=>{event.preventDefault();event.stopPropagation();});
+ popup.addEventListener('click',event=>{event.stopPropagation();const option=event.target.closest?.('[role="option"]');if(option&&current)choose(current,Number(option.dataset.index));});
  popup.addEventListener('pointermove',event=>{const option=event.target.closest?.('[role="option"]');if(option&&current&&Number(option.dataset.index)!==current.active)setActive(current,Number(option.dataset.index),false);});
  document.body.append(popup);return popup;
 }
