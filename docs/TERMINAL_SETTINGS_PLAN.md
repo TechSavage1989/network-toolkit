@@ -25,7 +25,7 @@ The owner's non-negotiables in AGENTS.md apply unchanged. Saved sessions, creden
   - Additional schemes with MobaXterm's names: Dark background / Light text, Light background / Dark text, Soft pastel, Bright, Monokai, AfterGlow, Monochrome. Solarized and Custom already exist.
   - Background, foreground and the 16 terminal colors (these exist).
 - **Cursor:** color (Customize colors), plus type (block, underline or line), each optionally blinking. Blinking block stays the default.
-- Moved to T3b: grouping Display into MobaXterm-like sections (Look and feel, Terminal features, Advanced, Local shell), and a fixed number of rows × columns, which changes how panes fit and resize.
+- Moved to later: grouping Display into MobaXterm-like sections (Look and feel, Terminal features, Advanced, Local shell), and a fixed number of rows × columns, which changes how panes fit and resize.
 
 **T3 · Terminal features and Advanced (v1.21.8)**
 New "Terminal features" section in Display, below Terminal appearance:
@@ -36,10 +36,12 @@ New "Terminal features" section in Display, below Terminal appearance:
 - **Advanced:** implicit CR in every LF; implicit LF in every CR (both off by default; they change only what is shown); answerback text for ^E (ENQ), empty by default, printable characters only, sent at most twice a second.
 - Already present: auto-copy selected text, paste with right-click, multi-line paste review, close prompts (session confirmations).
 
-**T3b · Paste safety, reconnection and layout**
-- **Paste warnings** (multi-line review already exists): homograph characters, commands piped to interpreters (`curl … | sh`), changes to shell profiles, archives extracted to system folders, and short or plain-HTTP links.
-- **Reconnection keys** after a session ends: R reconnects and S saves the session. Closing the tab on any other key needs care so a stray keypress does not close output you still want; it will be offered as an option.
-- **Fixed size:** an optional fixed number of rows × columns instead of fitting the pane.
+**T3b · Paste safety and reconnection (v1.21.9)**
+- **Paste warnings** (Mouse and keyboard defaults → Warn before pasting, each on by default): look-alike, invisible or typographic characters; commands that download and run a script (`curl … | sh`, `bash <(curl …)`, `iex … DownloadString`); changes to shell startup files (`>> ~/.bashrc`, `Add-Content $PROFILE`); archives extracted into system folders (`tar … -C /usr`); plain-HTTP links to public hosts (lab addresses such as `http://10.0.0.5/` are not flagged) and shortened links. A paste with a warning opens the review even on one line; sending is still allowed.
+- **Reconnection keys** (Terminal features, on by default): on an ended session, R reconnects and S saves the session; "Any other key closes the ended session's tab" is optional and off by default. Keys are taken only on the Terminal page, outside fields and dialogs, and only while Reconnect is available; the Disconnected card names them.
+
+**Later, not scheduled**
+- **Fixed size:** an optional fixed number of rows × columns instead of fitting the pane. It changes how every pane fits and resizes, so it needs its own careful beta.
 - **Grouping:** arrange Display into Look and feel, Terminal features, Advanced and Local shell. This moves existing controls, so it waits for the owner's approval under the layout freeze (docs/UI_GUIDELINES.md).
 
 **T4 · Session logging**
@@ -56,10 +58,11 @@ New "Terminal features" section in Display, below Terminal appearance:
 These MobaXterm options have no equivalent in the browser terminal (xterm.js) or do not apply to Network Toolkit:
 - **Text rendering** handled by the browser engine: antialiasing toggle, ligatures (xterm.js has no supported ligature addon for WebView2), Arabic text shaping, bidirectional text, and font or terminal character sets (the terminal is always UTF-8).
 - **Terminal modes** the remote program controls: forced local echo and local line editing, and forced application cursor or keypad modes.
-- **Escape-sequence behavior:** "destructive backspace", alternate-screen switching, "scrollback clearing" and xterm mouse reporting are standard escape sequences that xterm.js always honors. Mouse reporting may become an on/off option in T3b if the owner wants it.
+- **Escape-sequence behavior:** "destructive backspace", alternate-screen switching, "scrollback clearing" and xterm mouse reporting are standard escape sequences that xterm.js always honors. Mouse reporting may become an on/off option later if the owner wants it.
 - **MobaXterm's built-in Cygwin environment:** Use Windows PATH and Prompt type belong to MobaXterm's own Unix environment.
 
 ## Status
 - T1: published in v1.21.6 Beta 7 on 2026-11-07 (syntax highlighting rule sets, Customize, .msyn import and export).
 - T2: published in v1.21.7 Beta 8 on 2026-11-07 (font size 8 to 36, cursor type, bold in brighter colors, seven MobaXterm-named color schemes).
 - T3: published in v1.21.8 Beta 9 on 2026-11-07 (scrollback and scrollbar, bell, bracketed paste, word delimiters, implicit CR/LF, answerback).
+- T3b: v1.21.9 Beta 10 candidate (paste warnings, reconnection keys).

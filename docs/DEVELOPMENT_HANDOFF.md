@@ -1,3 +1,15 @@
+# v1.21.9 Beta 10 (Paste warnings and reconnection keys, T3b) - candidate
+
+Owner request: terminal options similar to MobaXterm (plan: docs/TERMINAL_SETTINGS_PLAN.md, T3b).
+- Paste warnings: `web/assets/terminal-paste-warnings.js` (pure, `check(text, enabled)` → `{kind, message, sample}`; one warning per kind and reason; line-by-line scan capped at 4,000 lines × 8,192 characters). Private and lab hosts (RFC 1918, loopback, link-local, CGNAT, single-label names, `.local`/`.lan`/`.internal`/`.home.arpa`, ULA/link-local IPv6) are not flagged for plain HTTP, because network engineers routinely copy images from lab servers.
+- `terminal-interaction.js`: `acceptText` opens the review for multi-line (when review is on) or any warned paste; `updateReview` renders `#terminalPasteAlerts` from the current text. Unit harnesses that load interaction functions by name must include `pasteWarnings` and stub `preferences` (see `terminal-paced-paste127.test.cjs`).
+- Reconnection keys: `sessionKey` in `terminal-behavior.js` (capture phase). Ignored with modifiers, while composing, on repeat, in inputs/selects/editable elements (the xterm helper textarea is allowed), with a dialog open, on another page in the main window, for connected or reconnecting sessions, and whenever `terminalReconnectAllowed` is false.
+- State: `terminalInteraction.pasteWarnings`, `terminalBehavior.reconnectKeys`, `terminalBehavior.closeOnOtherKey`, all sanitized in Go.
+- Tests: `terminal-paste-warnings.test.cjs` (5), `terminal-paced-paste127.test.cjs` (+1 review integration), `terminal-behavior.test.cjs` (+1 keys), Go `TestTerminalPasteWarningsDefaultOnAndKeepTurnedOffKindsAcrossRestart`; browser `terminal-paced-paste127` (warning dialog in main, separate and detached windows) and `active-session-tools` (no R action while Reconnect is unavailable; R posts reconnect when allowed; card hint).
+- Not claimed: tested against a real device or on a physical Windows PC.
+
+---
+
 # v1.21.8 Beta 9 (Terminal features and Advanced, T3) - publication verified (2026-11-07)
 
 Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.21.8 at 2026-11-07T11:48:51Z; stable latest remains v1.20.16. Merged PR #115; tag v1.21.8 points to merge commit 2ce7ad6fdccb44eb5562b0a3faa5029251a39a3b. Release workflow run 42369530682 succeeded. Assets: Network_Toolkit.exe, Network_Toolkit_1.21.8_Portable.zip, Network_Toolkit_1.21.8_Update.zip, Network_Toolkit_1.21.8_Linux_x86_64.tar.gz, Network_Toolkit_1.21.8_Linux_aarch64.tar.gz, SHA256SUMS; all digests match SHA256SUMS. The published Linux x86_64 archive was downloaded, extracted and run (`--version` 1.21.8 linux amd64; inner SHA256SUMS OK). Checks: both runs green (42367566185 and 42367580552), first attempt.
