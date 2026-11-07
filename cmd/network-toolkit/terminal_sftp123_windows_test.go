@@ -53,6 +53,21 @@ func TestNativeTerminalSFTP123InstalledWebView2(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(private)
+	// The main host observer and the tagged detached child write typed, path-free
+	// native drag events here. The gesture script releases the button only after
+	// the native source reports Explorer's COPY feedback: a fixed dwell raced OLE
+	// admission when the pointer left the 960px owner on the last travel steps.
+	traceDir := filepath.Join(private, "native-drag-trace")
+	if err = os.Mkdir(traceDir, 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("NETWORK_TOOLKIT_NATIVE_SFTP122_TEST", "1")
+	t.Setenv("NETWORK_TOOLKIT_NATIVE_DRAG_TRACE122", traceDir)
+	mainTrace, err := os.OpenFile(filepath.Join(traceDir, "native-drag-main.jsonl"), os.O_CREATE|os.O_EXCL|os.O_WRONLY|os.O_APPEND, 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer mainTrace.Close()
 	source := filepath.Join(private, "source")
 	for _, p := range []string{source, filepath.Join(source, "tree", "empty"), filepath.Join(source, "tree", "nested")} {
 		if err = os.MkdirAll(p, 0700); err != nil {
@@ -96,7 +111,7 @@ func TestNativeTerminalSFTP123InstalledWebView2(t *testing.T) {
 		time.Sleep(20 * time.Millisecond)
 	}
 	executable := filepath.Join(private, "Network_Toolkit.terminal-sftp123.exe")
-	build := exec.CommandContext(ctx, "go", "build", "-mod=vendor", "-trimpath", "-ldflags=-H=windowsgui", "-o", executable, "./cmd/network-toolkit")
+	build := exec.CommandContext(ctx, "go", "build", "-mod=vendor", "-trimpath", "-ldflags=-H=windowsgui", "-tags", "toolkit_native_drag_trace122", "-o", executable, "./cmd/network-toolkit")
 	build.Dir = root
 	if out, e := build.CombinedOutput(); e != nil {
 		t.Fatalf("production Terminal child build: %v %s", e, out)
@@ -168,6 +183,9 @@ func TestNativeTerminalSFTP123InstalledWebView2(t *testing.T) {
 			a.ServeHTTP(w, r)
 			if request.Action != "" {
 				event := map[string]any{"case": activeCase.Load(), "action": request.Action, "tickMS": sftp122TickMS()}
+				if request.Action == "finish" {
+					event["outcome"] = request.Outcome
+				}
 				a.explorerTransfers.mu.Lock()
 				if j := a.explorerTransfers.jobs[request.ID]; j != nil {
 					event["state"] = j.state
@@ -181,7 +199,9 @@ func TestNativeTerminalSFTP123InstalledWebView2(t *testing.T) {
 				mu.Unlock()
 				if request.Action == "finish" {
 					if p := finished.Load().(string); p != "" {
-						_ = os.WriteFile(p, []byte("finished"), 0600)
+						// Any finish ends the gesture; the script needs its outcome to
+						// tell a completed copy from a drag that never dropped.
+						_ = os.WriteFile(p, []byte(request.Outcome), 0600)
 					}
 				}
 			}
@@ -302,7 +322,7 @@ func TestNativeTerminalSFTP123InstalledWebView2(t *testing.T) {
 					if e != nil {
 						return e
 					}
-					args := []string{"-NoProfile", "-NonInteractive", "-File", filepath.Join(root, "scripts", "native-terminal-sftp123.ps1"), "-OwnerProcessID", strconv.Itoa(pid), "-ExecutablePath", exe, "-DestinationDirectory", dest, "-FinishedFile", finish, "-MaterializingFile", started, "-Mode", test.mode, "-FromX", fmt.Sprint(point.Left), "-FromY", fmt.Sprint(point.Top), "-FromWidth", fmt.Sprint(s.Geometry.Width), "-FromHeight", fmt.Sprint(s.Geometry.Height)}
+					args := []string{"-NoProfile", "-NonInteractive", "-File", filepath.Join(root, "scripts", "native-terminal-sftp123.ps1"), "-OwnerProcessID", strconv.Itoa(pid), "-ExecutablePath", exe, "-DestinationDirectory", dest, "-FinishedFile", finish, "-MaterializingFile", started, "-TraceDirectory", traceDir, "-Mode", test.mode, "-FromX", fmt.Sprint(point.Left), "-FromY", fmt.Sprint(point.Top), "-FromWidth", fmt.Sprint(s.Geometry.Width), "-FromHeight", fmt.Sprint(s.Geometry.Height)}
 					if test.expected != "" {
 						args = append(args, "-ExpectedPath", filepath.Join(dest, filepath.FromSlash(test.expected)))
 					}
@@ -456,6 +476,15 @@ func TestNativeTerminalSFTP123InstalledWebView2(t *testing.T) {
 		report["transitions"] = transitions
 		report["mainNativeTrace"] = nativeTrace
 		mu.Unlock()
+		report["childInstrumentation"] = "toolkit_native_drag_trace122 build tag; typed path-free drag trace in a private temp folder; production admission decisions unchanged"
+		report["releaseGate"] = "button released after the unchanged dwell only once the native drag source reported Explorer DROPEFFECT_COPY feedback"
+		if entries, traceErr := os.ReadDir(traceDir); traceErr == nil {
+			for _, entry := range entries {
+				if raw, readErr := os.ReadFile(filepath.Join(traceDir, entry.Name())); readErr == nil {
+					_ = os.WriteFile(filepath.Join(output, "native-terminal-sftp123-"+phase+"-"+entry.Name()), raw, 0600)
+				}
+			}
+		}
 		if e != nil {
 			report["error"] = e.Error()
 		}
@@ -468,6 +497,9 @@ func TestNativeTerminalSFTP123InstalledWebView2(t *testing.T) {
 		mu.Lock()
 		if len(nativeTrace) < 512 {
 			nativeTrace = append(nativeTrace, event)
+		}
+		if line, e := json.Marshal(event); e == nil {
+			_, _ = mainTrace.Write(append(line, '\n'))
 		}
 		mu.Unlock()
 	}})
