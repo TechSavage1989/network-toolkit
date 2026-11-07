@@ -93,7 +93,7 @@ document.addEventListener('keydown',sessionKey,true);
 function keysHint(){const p=preferences();return p.reconnectKeys?'Press R to reconnect or S to save this session'+(p.closeOnOtherKey?'; any other key closes the tab.':'.'):'';}
 function settingsHTML(){
  return '<section id="terminalBehaviorSettings" class="terminal-tools-section terminal-behavior-settings"><h3>Terminal features</h3><div class="terminal-behavior-grid">'
- +'<div class="field"><label for="terminalScrollback">Scrollback lines</label><input id="terminalScrollback" type="number" data-terminal-behavior="scrollback" min="'+LIMITS.scrollbackMin+'" max="'+LIMITS.scrollbackMax+'" step="500" data-input-clear="off"><span class="hint">'+LIMITS.scrollbackMin+' to '+LIMITS.scrollbackMax.toLocaleString('en-US')+' lines kept above the screen.</span></div>'
+ +'<div class="field"><label for="terminalScrollback">Scrollback lines</label><input id="terminalScrollback" type="number" data-terminal-behavior="scrollback" min="'+LIMITS.scrollbackMin+'" max="'+LIMITS.scrollbackMax+'" step="500" data-input-clear="off"><span class="hint">'+LIMITS.scrollbackMin+' to '+LIMITS.scrollbackMax.toLocaleString('en-US')+' lines kept above the screen. Export transcript includes them.</span></div>'
  +'<div class="field"><label for="terminalBell">Bell</label><select id="terminalBell" data-terminal-behavior="bell"><option value="none">None</option><option value="visual">Flash the terminal</option><option value="sound">Play a sound</option></select></div>'
  +'<div class="field terminal-behavior-wide"><label for="terminalWordSeparators">Word delimiters for double-click selection</label><input id="terminalWordSeparators" data-terminal-behavior="wordSeparators" maxlength="'+LIMITS.separators+'" autocomplete="off" spellcheck="false" data-input-clear="off"><span class="hint">Characters that end a word. Letters and digits are always part of a word.</span></div></div>'
  +'<label class="terminal-behavior-check"><input type="checkbox" id="terminalScrollbar" data-terminal-behavior="scrollbar">Show scrollbar</label>'
@@ -115,7 +115,9 @@ function sync(){
 }
 function mount(panel){
  if(!panel||document.getElementById('terminalBehaviorSettings'))return;
- panel.insertAdjacentHTML('beforeend',settingsHTML());sync();
+ (panel.querySelector('[data-settings-panel="behavior"]')||panel).insertAdjacentHTML('beforeend',settingsHTML());
+ const section=document.getElementById('terminalBehaviorSettings'),note=panel.querySelector('.terminal-transcript-note'),grid=section?.querySelector('.terminal-behavior-grid');if(note&&grid)grid.after(note);
+ const confirm=document.getElementById('terminalConfirmSettings');if(confirm&&section&&confirm.parentElement===section.parentElement)section.after(confirm);sync();
 }
 function save(next){state.terminalBehavior=normalize(next);if(typeof saveState==='function')saveState();apply();sync();if(typeof renderTerminalChrome==='function')renderTerminalChrome();}
 function changed(event){
