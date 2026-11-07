@@ -60,4 +60,4 @@ These MobaXterm options have no equivalent in the browser terminal (xterm.js) or
 - **MobaXterm's built-in Cygwin environment:** Use Windows PATH and Prompt type belong to MobaXterm's own Unix environment.
 
 ## Status
-- T1: v1.21.6 Beta 7 candidate (syntax highlighting rule sets, Customize, .msyn import and export).
+- T1: published in v1.21.6 Beta 7 on 2026-11-07 (syntax highlighting rule sets, Customize, .msyn import and export).
