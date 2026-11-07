@@ -1,5 +1,5 @@
 'use strict';
-// Universal device highlighting (v1.21.12): severities, CLI errors and results,
+// Universal device highlighting (v1.21.11): severities, CLI errors and results,
 // ping, routing and service states, more vendors' interfaces and prompts.
 const fs = require('node:fs'), vm = require('node:vm'), path = require('node:path'), assert = require('node:assert/strict'), { test } = require('node:test');
 const context = {}; context.global = context; vm.createContext(context);

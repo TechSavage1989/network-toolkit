@@ -68,7 +68,7 @@ func safeTerminalSyntax(value any) map[string]any {
 	if active != "smart" && !terminalSyntaxBuiltIn[active] && !seen[active] {
 		active = "smart"
 	}
-	// Per-profile color overrides (v1.21.12) for built-in and kept custom rule sets.
+	// Per-profile color overrides (v1.21.11) for built-in and kept custom rule sets.
 	colors := map[string]any{}
 	if requested, ok := source["colors"].(map[string]any); ok {
 		for id, raw := range requested {

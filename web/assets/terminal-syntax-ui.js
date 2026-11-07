@@ -31,7 +31,7 @@
   const refreshTerminals = () => { if (typeof updateTerminalTheme === 'function') updateTerminalTheme(); };
   let editing = null, sample = SAMPLE, timer = 0, deleteArmed = false, trying = null;
 
-  // ----- Profile colors (v1.21.12) -----------------------------------------
+  // ----- Profile colors (v1.21.11) -----------------------------------------
   // Each rule set can override its seven colors. A color being tried in the
   // picker is kept here, never in saved state, until it is applied.
   const SLOT_NAMES = { red: 'Red', green: 'Green', yellow: 'Yellow', blue: 'Blue', magenta: 'Magenta', cyan: 'Cyan', underline: 'Underline' };

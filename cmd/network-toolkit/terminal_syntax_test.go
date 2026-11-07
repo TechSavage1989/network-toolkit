@@ -20,7 +20,7 @@ func TestTerminalSyntaxKeepsOnlySafeCustomRuleSets(t *testing.T) {
 	state := map[string]any{"terminalSyntax": map[string]any{"active": "custom-net", "custom": custom, "secret": "dropped"}}
 	sanitizeTerminalSettings(state)
 	clean := state["terminalSyntax"].(map[string]any)
-	// active, custom and (v1.21.12) per-profile colors; "secret" is dropped.
+	// active, custom and (v1.21.11) per-profile colors; "secret" is dropped.
 	if len(clean) != 3 || clean["active"] != "custom-net" || clean["secret"] != nil {
 		t.Fatalf("unexpected keys or active rule set: %#v", clean)
 	}

@@ -163,7 +163,7 @@
   function interfaceLabel(value, contextual = false) {
     if (/^(?:(?:en|wl|ww)(?:o\d+(?:n\d+)?|s\d+(?:f\d+)?(?:d\d+)?|p\d+s\d+(?:f\d+)?(?:d\d+)?|x[0-9a-f]{12})|(?:eth|wlan|wwan|tun|tap|wg|utun|bond|br|virbr|docker|vnet|vmnet|vxlan)\d+|veth[0-9a-f]{4,16})(?:\.\d{1,4})?$/i.test(value)) return true;
     if (/^(?:GigabitEthernet|TenGigabitEthernet|TwentyFiveGigE|FortyGigabitEthernet|HundredGigE|FastEthernet|Ethernet|Eth|Gi|Te|Fa|Fo|Hu)\d+(?:\/\d+){1,3}(?:\.\d{1,4})?$/i.test(value)) return true;
-    // v1.21.12: more vendors. Cisco multigig/serial/cellular and short logical names;
+    // v1.21.11: more vendors. Cisco multigig/serial/cellular and short logical names;
     // Huawei and H3C; Arista Ethernet1/Management1; PAN-OS tunnel.1; MikroTik SFP ports.
     if (/^(?:TwoGigabitEthernet|FiveGigabitEthernet|AppGigabitEthernet|TwentyFiveGigabitEthernet|Twe|Tw|Fi|Ap|Se|Serial|Cellular|XGigabitEthernet|XGE|10GE|25GE|40GE|100GE|400GE|MEth|M-GigabitEthernet|Ten-GigabitEthernet|FortyGigE|Wlan-GigabitEthernet)\d+(?:\/\d+){1,3}(?:[.:]\d{1,4})?$/i.test(value)) return true;
     if (/^(?:BDI|Dialer|nve|NULL|LoopBack|Eth-Trunk|Vlanif|Bridge-Aggregation|Route-Aggregation|Vlan-interface|Management|mgmt|Ethernet|Et)\d+(?:\/\d+)?(?:\.\d{1,4})?$/.test(value)) return true;
@@ -174,7 +174,7 @@
   function syntaxContext(text) {
     let prompt = /^\s*(?:[A-Za-z0-9_.:@/~()\[\]-]+(?:\s+\([^()]{1,64}\))?\s*[#>$%]|<[A-Za-z0-9_.-]{1,120}>)(?:\s+|$)/.exec(text);
     if (prompt && /^\s*[0-9.]+\s*[%$]\s*$/.test(prompt[0])) prompt = null;
-    // v1.21.12: Cisco-style prompts are usually typed against the command
+    // v1.21.11: Cisco-style prompts are usually typed against the command
     // (switch#copy ...), Windows hosts reached over SSH use C:\path>, and Huawei
     // or H3C system views use [name] or [~name-view].
     prompt ||= /^\s*[A-Za-z][A-Za-z0-9_.:@/~()-]{1,62}[#>](?=[A-Za-z])/.exec(text)
@@ -364,7 +364,7 @@
     return found.filter(hit => enabledRules[hit.kind]).sort((a, b) => a.start - b.start || a.end - b.end);
   }
 
-  // Universal recognizers (v1.21.12): log severities, CLI error and success
+  // Universal recognizers (v1.21.11): log severities, CLI error and success
   // messages, ping results and routing/service states that look the same on
   // any system. Each needs a recognizable shape, never a bare word in prose.
   const SEVERITY = { fatal: 'error', emerg: 'error', emergency: 'error', alert: 'error', crit: 'error', critical: 'error', err: 'error', error: 'error',

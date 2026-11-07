@@ -290,7 +290,7 @@
       seen.add(set.id); custom.push(set);
     }
     const active = typeof v.active === 'string' && (v.active === 'smart' || builtIn(v.active) || custom.some(set => set.id === v.active)) ? v.active : 'smart';
-    // Per-profile color overrides (v1.21.12): {profile id: {red: '#rrggbb', ...}}.
+    // Per-profile color overrides (v1.21.11): {profile id: {red: '#rrggbb', ...}}.
     const colors = {}, requested = v.colors && typeof v.colors === 'object' && !Array.isArray(v.colors) ? v.colors : {};
     for (const [id, slots] of Object.entries(requested)) {
       if (!(builtIn(id) || custom.some(set => set.id === id)) || !slots || typeof slots !== 'object') continue;
