@@ -65,4 +65,4 @@ These MobaXterm options have no equivalent in the browser terminal (xterm.js) or
 - T1: published in v1.21.6 Beta 7 on 2026-11-07 (syntax highlighting rule sets, Customize, .msyn import and export).
 - T2: published in v1.21.7 Beta 8 on 2026-11-07 (font size 8 to 36, cursor type, bold in brighter colors, seven MobaXterm-named color schemes).
 - T3: published in v1.21.8 Beta 9 on 2026-11-07 (scrollback and scrollbar, bell, bracketed paste, word delimiters, implicit CR/LF, answerback).
-- T3b: v1.21.9 Beta 10 candidate (paste warnings, reconnection keys).
+- T3b: published in v1.21.9 Beta 10 on 2026-11-07 (paste warnings, reconnection keys).
