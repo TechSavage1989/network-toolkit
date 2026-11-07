@@ -13,6 +13,14 @@ Display → **Syntax highlighting** chooses how terminal output is colored:
 
 **Customize** lets you duplicate a rule set and edit one pattern per color (a regular expression or a comma-separated word list), try it on your own text, and import or export MobaXterm `.msyn` files. Patterns from MobaXterm work as they are. Colors follow the terminal color scheme, and text already colored by the device keeps its color. Local PowerShell and Command Prompt tabs keep their own shell colors.
 
+## Font, colors and cursor
+In Display, type any font size from 8 to 36 and press Enter (Ctrl+wheel over the terminal also changes it). **Terminal appearance** sets the font, weight, line spacing and:
+- **Cursor:** block, underline or line, each steady or blinking (blinking block is the default).
+- **Color scheme:** besides the existing schemes, MobaXterm's Dark background / Light text, Light background / Dark text, Soft pastel, Bright, Monokai, AfterGlow and Monochrome. Customize colors changes any color, including the cursor's.
+- **Show bold text in brighter colors:** on by default; turn it off to keep bold text in its normal color.
+
+Changes apply to open terminals at once and are kept after a restart and in separate Terminal windows.
+
 ## Connection controls
 Drag a Saved session to reorder the list (or focus it and press Alt+Shift+Up or Down); the order is kept. To run a Command Prompt or PowerShell tab as administrator after it started, choose **Open as administrator in a new tab** from the tab's More actions menu; Windows asks for approval and the original tab stays open. To replace the tab instead, choose **Restart this tab as administrator**: after you confirm and Windows approves, the elevated shell takes the tab's place and the old shell closes (anything running in it stops). If you decline the prompt, the tab is left as it is. The Disconnect button's menu offers **Disconnect all** and **Close all tabs**. Reconnect an eligible session from its controls. The adjacent reconnect menu may also offer Reconnect all. Some tabs can be detached by dragging outside the window. Terminal tab actions are available from each tab's More actions button. The Terminal sidebar includes a visible show/hide control. Ctrl+Shift+P opens application command search when the console is not focused; F1 opens help outside focused terminal input.
 
