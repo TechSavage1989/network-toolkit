@@ -1,3 +1,13 @@
+# v1.21.4 Beta 5 (Sidebar swap buttons at the bottom) - candidate
+
+Owner: "move the sidebar swap button tot he bottom for all tools, like it is on the new one."
+- Terminal (`session-sidebar.js`), File Transfer client (`transfer-client-layout.js`) and server settings (`transfer-server.js`): `[data-session-action="swap-side"]`, `[data-client-action="swap-side"]` and `[data-transfer-sidebar-side]` now sit at the foot of `.terminal-sidebar-rail` with `.sidebar-rail-swap` (margin-top:auto), like the Text Editor's `[data-editor-files-dock]`. Headings keep their titles and close buttons. Rail click-to-reveal ignores buttons, so ⇄ never reopens a collapsed sidebar by accident.
+- Configuration: `#toolConfigurationSide` lives in `#toolConfigFooter` (bottom row, left-aligned) while open; `syncSidebarControl` moves it to `#toolConfigurationRail` (column, ⇄ at the foot, show control on top via `order:0`) while collapsed. Footer and button stay hidden in the compact tabbed layout.
+- Tests: node 1594 (sidebar-collapse asserts footer/rail placement; editor-files114 asserts `.sidebar-rail-swap`). Browser: terminal-connection-dialog, transfer-client-layout, transfer-server-layout, editor-sidebar117 (vs published116), editor-views112, sidebar-activity108, ux-phase4/5/6, ui-consistency, features-85/90 pass locally. Screens at 1600×900 for Configuration open/collapsed, Terminal, File Transfer client and server.
+- Not claimed: checked on a physical Windows PC.
+
+---
+
 # v1.21.3 Beta 4 (Sidebars on either side) - publication verified (2026-11-07)
 
 Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.21.3 at 2026-11-07T08:19:11Z; stable latest remains v1.20.16. Merged PR #105; tag v1.21.3 points to merge commit 0045255c72209bd633a61fad0b10999510df12b7. Release workflow run 42354726537 succeeded. Assets: Network_Toolkit.exe, Network_Toolkit_1.21.3_Portable.zip, Network_Toolkit_1.21.3_Update.zip, Network_Toolkit_1.21.3_Linux_x86_64.tar.gz, Network_Toolkit_1.21.3_Linux_aarch64.tar.gz, SHA256SUMS; all digests match SHA256SUMS. The published Linux x86_64 archive was downloaded, extracted and run (`--version` 1.21.3 linux amd64; inner SHA256SUMS OK). Checks: green runs 42353599711 (pull request) and 42353621903 (push) on the PR head, first attempt.
