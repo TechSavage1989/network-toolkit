@@ -20,6 +20,8 @@ Settings → Highlighting → **Syntax highlighting** chooses how terminal outpu
 
 **Underlines:** *Underline highlighted text* and *Underline URLs and network paths* are separate switches, so links can stay underlined when other highlights are color only.
 
+**Preview:** the Preview in Settings → Appearance colors its sample output with the profile you use, including keyword rule sets and your own imported sets, and names that profile in its heading.
+
 **Universal rules and colors:** choose **Rules and colors…** (or **Customize** while Universal is selected) to turn each kind of highlight on or off, change its color and try it on your own text.
 
 **Customize** lets you duplicate a rule set and edit one pattern per color (a regular expression or a comma-separated word list), try it on your own text, and import or export MobaXterm `.msyn` files. Patterns from MobaXterm work as they are. Colors follow the terminal color scheme, and text already colored by the device keeps its color. Local PowerShell and Command Prompt tabs keep their own shell colors.
