@@ -1,4 +1,4 @@
-## 1.21.3 Beta 4 - Sidebars on either side (candidate)
+## 1.21.3 Beta 4 - Sidebars on either side (published 2026-11-07)
 
 - Owner requests: the Text Editor sidebar repositions to both sides like the Terminal sidebar, then "allow all the resizable sidebars to swap sides where able". ⇄ (`arrowSwap`) swap buttons for the Text Editor Connect/Files sidebar (foot of the rail; `editorFilesPreferences.dock`, resize handle moved onto the shell so it sits on the inner edge), the diagnostic Configuration panel (`toolLayout.side`, `configuration-right` grid, mirrored divider drag and arrow keys, panel-control edge follows the side) and the File Transfer server settings sidebar (`transferServerSidebar.side`, allowed in the Go sanitizer). Left joins Auto/Right/Bottom for entry details (`entry-details-left`), Network discovery device details (`details-left`) and Packet capture details (`packet-details-left`). Fixes `mergeState` never restoring `editorFilesPreferences`. README screenshots recaptured.
 

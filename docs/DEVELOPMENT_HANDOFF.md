@@ -1,4 +1,6 @@
-# v1.21.3 Beta 4 (Sidebars on either side) - candidate
+# v1.21.3 Beta 4 (Sidebars on either side) - publication verified (2026-11-07)
+
+Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.21.3 at 2026-11-07T08:19:11Z; stable latest remains v1.20.16. Merged PR #105; tag v1.21.3 points to merge commit 0045255c72209bd633a61fad0b10999510df12b7. Release workflow run 42354726537 succeeded. Assets: Network_Toolkit.exe, Network_Toolkit_1.21.3_Portable.zip, Network_Toolkit_1.21.3_Update.zip, Network_Toolkit_1.21.3_Linux_x86_64.tar.gz, Network_Toolkit_1.21.3_Linux_aarch64.tar.gz, SHA256SUMS; all digests match SHA256SUMS. The published Linux x86_64 archive was downloaded, extracted and run (`--version` 1.21.3 linux amd64; inner SHA256SUMS OK). Checks: green runs 42353599711 (pull request) and 42353621903 (push) on the PR head, first attempt.
 
 Owner: "can you make the sidebar for text editor reposition able to both sides, similar to other sidebars, like the one in terminal?" then, mid-work: "allow all the resizable sidebars to swap sides where able."
 - Inventory of resizable sidebars: Terminal sessions and File Transfer client (already swapped); added Text Editor Connect/Files, diagnostic Configuration, File Transfer server settings; Left added to the position menus of entry details, Network discovery device details and Packet capture details. Not sidebars (unchanged): Terminal and editor compare split panes, File Transfer local/remote panes, graph/list and activity row splitters. The main navigation is not resizable.
