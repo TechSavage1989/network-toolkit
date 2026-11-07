@@ -13,7 +13,7 @@ function base(markup) {
   return {c, state, calls, document, listeners};
 }
 function configHarness(width = 1400) {
-  const h = base('<div id="toolWorkspace"><div id="toolCommandBar"><button id="toolConfigurationToggle"></button></div><section id="toolConfiguration"><div id="toolConfigHeading"><span>Configuration</span><button id="configurationExpandAll"></button></div></section><div id="toolDivider"></div><div id="pageContent"></div></div>');
+  const h = base('<div id="toolWorkspace"><div id="toolCommandBar"><button id="toolConfigurationToggle"></button></div><section id="toolConfiguration"><div id="toolConfigHeading"><span>Configuration</span><button id="configurationExpandAll"></button></div><div id="toolConfigFooter"><button id="toolConfigurationSide"></button></div></section><div id="toolDivider"></div><div id="pageContent"></div></div>');
   h.document.getElementById('toolWorkspace').clientWidth = width;
   for (const name of ['safeToolLayout', 'toolConfigurationSide', 'splitToolPage', 'compactToolWorkspace', 'toolConfigurationLimit', 'applyToolLayout', 'setToolPanel']) vm.runInContext(html.split('\n').find(line => line.startsWith('function ' + name + '(')), h.c);
   vm.runInContext('const toolPanelViews=new Map();', h.c);
@@ -108,6 +108,9 @@ test('the configuration sidebar moves to the right, mirrors its resize direction
   h.state.toolLayout.side = 'right'; h.c.applyToolLayout();
   assert(workspace.classList.contains('configuration-right')); assert.equal(toggle.querySelector('svg').dataset.panelDirection, 'right');
   assert.equal(h.c.safeToolLayout({width: 320, collapsed: false, side: 'right'}).side, 'right'); assert.equal(h.c.safeToolLayout({side: 'top'}).side, 'left');
+  const side = h.document.getElementById('toolConfigurationSide'); assert.equal(side.parentElement.id, 'toolConfigFooter', 'Move configuration sidebar sits in the bottom row while the panel is open');
   h.document.emit('dblclick', divider); assert.equal(h.state.toolLayout.collapsed, true); assert.equal(h.state.toolLayout.side, 'right');
+  assert.equal(side.parentElement.id, 'toolConfigurationRail', 'Move configuration sidebar stays reachable on the collapsed rail');
   assert.equal(toggle.querySelector('svg').dataset.panelDirection, 'left', 'the collapsed control points back into the page');
+  h.document.emit('dblclick', divider); assert.equal(side.parentElement.id, 'toolConfigFooter');
 });

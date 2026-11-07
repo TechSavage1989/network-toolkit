@@ -132,10 +132,13 @@
 /* The configuration sidebar can sit on the right (owner request, v1.21.3), like
    the Terminal and File Transfer sidebars. Compact widths show one panel at a
    time, so the side only applies to the wide layout. */
-#toolConfigHeading>#toolConfigurationSide{flex:0 0 26px;width:26px;height:26px;min-height:26px;padding:5px;margin-left:4px}
-#toolConfigHeading>#configurationExpandAll[hidden]+#toolConfigurationSide{margin-left:auto}
-#toolConfigHeading>#toolConfigurationSide svg{width:13px;height:13px}
-.compact-tool-workspace #toolConfigurationSide{display:none}
+#toolConfigFooter{display:flex;flex:none;align-items:center;padding:3px 6px;border-top:1px solid var(--line)}
+#toolConfigurationSide svg{width:13px;height:13px}
+.diagnostic-page #toolWorkspace.configuration-hidden:not(.local-workspace)>#toolConfigurationRail{flex-direction:column;align-items:center;justify-content:flex-start}
+#toolConfigurationRail>#toolConfigurationToggle{order:0}
+#toolConfigurationRail>#toolConfigurationSide{order:1;margin:auto 0 4px}
+#toolConfigFooter>#toolConfigurationSide{margin-left:0}
+.compact-tool-workspace #toolConfigFooter,.compact-tool-workspace #toolConfigurationSide{display:none}
 .diagnostic-page #toolWorkspace.configuration-right:not(.compact-tool-workspace):not(.local-workspace){grid-template-columns:minmax(0,1fr) 6px var(--tool-config-width,300px)}
 .diagnostic-page #toolWorkspace.configuration-right:not(.compact-tool-workspace):not(.local-workspace)>#toolConfiguration{grid-column:3}
 .diagnostic-page #toolWorkspace.configuration-right:not(.compact-tool-workspace):not(.local-workspace)>#pageContent{grid-column:1}
