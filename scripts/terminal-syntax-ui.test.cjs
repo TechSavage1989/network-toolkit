@@ -13,7 +13,8 @@ function harness(initial = {}) {
     state: { terminalHighlight: initial.highlight !== false, terminalSyntax: initial.syntax, terminalAppearance: {}, theme: 'dark' },
     saveState: () => calls.saved++, updateTerminalTheme: () => calls.themes++, setTimeout: fn => { fn(); return 1; }, clearTimeout() {},
     setTerminalHighlight(value) { context.state.terminalHighlight = value; calls.highlight.push(value); calls.saved++; },
-    setTerminalToolsOpen: () => calls.toolsClosed++,
+    setTerminalToolsOpen: () => calls.toolsClosed++, picks: [],
+    NetworkToolkitColorPicker: { open: options => context.picks.push(options) },
     updateTerminalHighlightStatus() {},
     openModal(title, body, footer) { doc.getElementById('modalRoot').innerHTML = '<h2>' + title + '</h2><div class="modal-body">' + body + '</div><div class="modal-foot">' + footer + '</div>'; },
     download: (data, name, type) => calls.downloads.push({ data, name, type }), toast: (message, kind) => calls.toasts.push([message, kind]),
@@ -91,4 +92,24 @@ test('importing .msyn files names sets after the file and export writes Windows-
   const out = h.calls.downloads.at(-1);
   assert.equal(out.name, 'Shell keywords.msyn'); assert.equal(out.data.includes(0xa8), true, '¨ must be saved as the Windows-1252 byte');
   assert.match(Rules.decode(out.data), /^\[CustomSyntax\]\r\nName=Shell keywords\r\nUseRegex=1\r\n/);
+});
+
+test('each profile has its own colors that can be tried without saving and reset', () => {
+  const h = harness({ syntax: { active: 'network', custom: [{ id: 'custom-lab', name: 'Lab', rules: { red: 'x' } }] } });
+  assert.equal(h.ui.editColor('red'), true);
+  const picker = h.context.picks.at(-1);
+  assert.match(picker.title, /Red color for Network configuration/); assert.equal(picker.value, '#ff6060'); assert.equal(picker.defaultValue, '#ff6060');
+  picker.onPreview('#112233');
+  assert.equal(h.ui.colorsFor('network').red, '#112233', 'the color being tried is shown');
+  assert.equal(h.state.terminalSyntax.colors?.network, undefined, 'a color being tried is never saved');
+  picker.onCancel(); assert.equal(h.ui.colorsFor('network').red, undefined);
+  h.ui.editColor('cyan'); h.context.picks.at(-1).onApply('#00AAFF');
+  assert.equal(h.state.terminalSyntax.colors.network.cyan, '#00aaff'); assert(h.calls.saved > 0); assert(h.calls.themes > 0, 'open terminals repaint');
+  h.ui.editColor('green', 'custom-lab'); h.context.picks.at(-1).onApply('#00ff00');
+  h.ui.editColor('cyan'); h.context.picks.at(-1).onApply('#ffffff', { reset: true });
+  assert.equal(h.state.terminalSyntax.colors.network, undefined, 'choosing the default removes the override');
+  h.ui.editColor('blue'); h.context.picks.at(-1).onApply('#0000ff');
+  assert.equal(h.ui.resetColors('network'), true); assert.equal(h.state.terminalSyntax.colors.network, undefined);
+  assert.equal(h.state.terminalSyntax.colors['custom-lab'].green, '#00ff00', 'other profiles keep their colors');
+  assert.equal(h.ui.editColor('nope'), false); assert.equal(h.ui.editColor('red', 'smart'), false, 'device highlighting has its own colors');
 });

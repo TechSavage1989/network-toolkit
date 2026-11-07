@@ -22,14 +22,14 @@
   const LABELS = Object.freeze({ address: 'IP / CIDR', mac: 'MAC address', url: 'URL', prompt: 'Device prompt',
     interface: 'Interface label', command: 'Command / config verb', field: 'Setting / field name',
     protocol: 'Protocol / service', value: 'Mode / named value', number: 'Number / unit', comment: 'Comment / description',
-    warning: 'Warning / pending', error: 'Error / down', success: 'Up / success' });
+    warning: 'Warning / pending', error: 'Error / down', success: 'Up / success', info: 'Info / notice' });
   const MARKS = Object.freeze({ address: ['solid', 2], mac: ['dotted', 2], url: ['solid', 1], prompt: ['solid', 1],
     interface: ['dashed', 1], command: ['solid', 1], field: ['dotted', 1], protocol: ['dashed', 1],
     value: ['solid', 1], number: ['dotted', 1], comment: ['dotted', 1],
-    warning: ['dashed', 2], error: ['double', 3], success: ['solid', 2] });
+    warning: ['dashed', 2], error: ['double', 3], success: ['solid', 2], info: ['dotted', 1] });
   const COLORS = Object.freeze({
-    dark: Object.freeze({ address: '#69c7ff', mac: '#7ed4d8', url: '#69c7ff', prompt: '#c6a6ff', interface: '#c6a6ff', command: '#f0a3d0', field: '#a6b8f8', protocol: '#e9bd81', value: '#d0cb93', number: '#bddf86', comment: '#9ba7b8', warning: '#f4c365', error: '#ff9b9b', success: '#91d8ae' }),
-    light: Object.freeze({ address: '#165aa0', mac: '#007a79', url: '#165aa0', prompt: '#7748a9', interface: '#7748a9', command: '#a02678', field: '#3f55ab', protocol: '#99501a', value: '#626300', number: '#386712', comment: '#596579', warning: '#8b5b00', error: '#a82033', success: '#177344' })
+    dark: Object.freeze({ address: '#69c7ff', mac: '#7ed4d8', url: '#69c7ff', prompt: '#c6a6ff', interface: '#c6a6ff', command: '#f0a3d0', field: '#a6b8f8', protocol: '#e9bd81', value: '#d0cb93', number: '#bddf86', comment: '#9ba7b8', warning: '#f4c365', error: '#ff9b9b', success: '#91d8ae', info: '#7fd0e8' }),
+    light: Object.freeze({ address: '#165aa0', mac: '#007a79', url: '#165aa0', prompt: '#7748a9', interface: '#7748a9', command: '#a02678', field: '#3f55ab', protocol: '#99501a', value: '#626300', number: '#386712', comment: '#596579', warning: '#8b5b00', error: '#a82033', success: '#177344', info: '#0b6f8a' })
   });
 
   // Syntax roles are based on the published FortiOS, IOS/IOS XE, AOS-CX,
@@ -163,15 +163,27 @@
   function interfaceLabel(value, contextual = false) {
     if (/^(?:(?:en|wl|ww)(?:o\d+(?:n\d+)?|s\d+(?:f\d+)?(?:d\d+)?|p\d+s\d+(?:f\d+)?(?:d\d+)?|x[0-9a-f]{12})|(?:eth|wlan|wwan|tun|tap|wg|utun|bond|br|virbr|docker|vnet|vmnet|vxlan)\d+|veth[0-9a-f]{4,16})(?:\.\d{1,4})?$/i.test(value)) return true;
     if (/^(?:GigabitEthernet|TenGigabitEthernet|TwentyFiveGigE|FortyGigabitEthernet|HundredGigE|FastEthernet|Ethernet|Eth|Gi|Te|Fa|Fo|Hu)\d+(?:\/\d+){1,3}(?:\.\d{1,4})?$/i.test(value)) return true;
+    // v1.21.11: more vendors. Cisco multigig/serial/cellular and short logical names;
+    // Huawei and H3C; Arista Ethernet1/Management1; PAN-OS tunnel.1; MikroTik SFP ports.
+    if (/^(?:TwoGigabitEthernet|FiveGigabitEthernet|AppGigabitEthernet|TwentyFiveGigabitEthernet|Twe|Tw|Fi|Ap|Se|Serial|Cellular|XGigabitEthernet|XGE|10GE|25GE|40GE|100GE|400GE|MEth|M-GigabitEthernet|Ten-GigabitEthernet|FortyGigE|Wlan-GigabitEthernet)\d+(?:\/\d+){1,3}(?:[.:]\d{1,4})?$/i.test(value)) return true;
+    if (/^(?:BDI|Dialer|nve|NULL|LoopBack|Eth-Trunk|Vlanif|Bridge-Aggregation|Route-Aggregation|Vlan-interface|Management|mgmt|Ethernet|Et)\d+(?:\/\d+)?(?:\.\d{1,4})?$/.test(value)) return true;
+    if (/^(?:tunnel|loopback|vlan)\.\d{1,4}$|^(?:sfp|sfpplus|sfp28|qsfpplus|qsfp28|combo)\d{1,3}(?:-\d{1,3})?$|^(?:sfp-sfpplus|pppoe-out|l2tp-out|ovpn-out)\d{1,3}$/i.test(value)) return true;
     if (/^(?:(?:ge|xe|et|fe|at|gr|ip|lt|mt|ms)-\d+\/\d+\/\d+(?::\d+)?(?:\.\d+)?|(?:ae|reth|irb|lo|st|em|fxp|vme)(?:\d+)(?:\.\d+)?|(?:Vlan|Loopback|Port-channel|Bundle-Ether|Tunnel|port|lag|trk|ether|bridge)\d+(?:\.\d+)?|X\d+(?::V\d+)?)$/i.test(value)) return true;
-    return contextual && /^(?:Port[A-Z](?:\.\d+)?|\d{1,2}\/\d{1,2}\/\d{1,3}(?:[.:]\d+)?|[A-P]\d{1,2}(?:-[A-P]?\d{1,2})?(?:-Trk\d+)?|wan\d*|lan\d*|internal\d*|dmz|mgmt|fortilink|(?:ssl|naf|l2)\.root)$/i.test(value);
+    return contextual && /^(?:(?:Po|Vl|Lo|Tu|Null)\d{1,4}(?:\.\d{1,4})?|Port[A-Z](?:\.\d+)?|\d{1,2}\/\d{1,2}\/\d{1,3}(?:[.:]\d+)?|[A-P]\d{1,2}(?:-[A-P]?\d{1,2})?(?:-Trk\d+)?|wan\d*|lan\d*|internal\d*|dmz|mgmt|fortilink|(?:ssl|naf|l2)\.root)$/i.test(value);
   }
   function syntaxContext(text) {
     let prompt = /^\s*(?:[A-Za-z0-9_.:@/~()\[\]-]+(?:\s+\([^()]{1,64}\))?\s*[#>$%]|<[A-Za-z0-9_.-]{1,120}>)(?:\s+|$)/.exec(text);
     if (prompt && /^\s*[0-9.]+\s*[%$]\s*$/.test(prompt[0])) prompt = null;
+    // v1.21.11: Cisco-style prompts are usually typed against the command
+    // (switch#copy ...), Windows hosts reached over SSH use C:\path>, and Huawei
+    // or H3C system views use [name] or [~name-view].
+    prompt ||= /^\s*[A-Za-z][A-Za-z0-9_.:@/~()-]{1,62}[#>](?=[A-Za-z])/.exec(text)
+      || /^\s*(?:PS )?[A-Za-z]:\\[^<>:"|?*\r\n]{0,200}>(?=\s|$|\S)/.exec(text)
+      || ((match => match && !/^\[[~*]?(?:ok|done|info|warn|warning|error|err|debug|fail|failed|pass|passed|running|stopped|exit|killed|notice|crit|critical|fatal|y\/n|yes|no|\d+)\]/i.test(match[0].trim()) ? match : null)(/^\s*\[[~*]?[A-Za-z][\w.-]{0,63}(?:-[\w./:-]{1,60})?\](?=[a-z]|\s*$)/.exec(text)));
     const offset = prompt ? prompt[0].length : 0, tokens = [];
     const pattern = /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s{}\[\];=]+/g;
     let match;
+    pattern.lastIndex = offset; // a prompt typed against its command (switch#copy) ends mid-word
     while ((match = pattern.exec(text))) {
       if (match.index < offset) continue;
       const raw = match[0], quoted = /^["']/.test(raw), value = quoted ? raw.slice(1, -1) : raw.replace(/[,;:]$/, '');
@@ -189,7 +201,7 @@
     const verb = !!first && !first.quoted && COMMANDS.has(first.word) && (offset > 0 || exactLower && commandShape && !proseTail) && (first.word !== 'no' || offset > 0 || FIELDS.has(second?.word));
     const field = !!first && !first.quoted && exactLower && rootDirective && !proseTail && (argument || !second && first.word === 'shutdown' || /^(?:description|comment|comments|remark|remarks)$/.test(first.word));
     const hasAddress = /(?:^|\s)(?:\d{1,3}\.){3}\d{1,3}(?=\s|up\b|down\b|$)/i.test(text.slice(offset));
-    const hasState = /(?:\b|\d)(?:up|down|connected|notconnect|disabled|active|inactive)(?=\s|$)/i.test(text.slice(offset));
+    const hasState = /(?:\b|\d)(?:up|down|connected|notconnect|disabled|err-disabled|active|inactive|FWD|BLK|BKN|LRN|LIS|forwarding|blocking|discarding|learning)(?=\s|$)/i.test(text.slice(offset));
     const namedTable = tokens.length >= 4 && /^(?:static|dhcp|pppoe|manual|auto)$/i.test(tokens[1]?.word) && hasAddress && hasState;
     const interfaceTable = !!first && hasState && (interfaceLabel(first.value, true) || namedTable);
     const isConfig = !!(verb || field && !/^(?:is|are|was|were)$/i.test(second?.word || '') || exactLower && FIELDS.has(first?.word) && /^\s*[a-z][a-z0-9-]*(?:\s+[a-z0-9_.-]+)?\s*\{\s*$/.test(text));
@@ -217,6 +229,7 @@
     if (!before.trim() && !after.trim()) return true;
     if (syntax?.interfaceTable && /\s$/.test(before) && /^(?:\s|$)/.test(after)) return true;
     if (/\b(?:state|status|link|protocol|operstate|carrier)\s*(?::|=|is)\s*(?:administratively\s+)?$/i.test(before)) return true;
+    if (/\bchanged state to\s+(?:administratively\s+)?$/i.test(before)) return true;
     if (syntax?.tokens[0] && interfaceLabel(syntax.tokens[0].value, true) && /\bis\s+(?:administratively\s+)?$/i.test(before)) return true;
     if (/(?:^|[\s])(?:administratively\s+)$/.test(before)) return true;
     if ((syntax?.interfaceTable || /^(?:up|down)\/(?:up|down)$/i.test(text.trim())) && (/\b(?:up|down)\/$/i.test(before) || /^\/(?:up|down)\b/i.test(after))) return true;
@@ -278,6 +291,7 @@
       if (!/[A-Za-z0-9_.:+/-]/.test(text[url.index - 1] || '') && urlCandidate(value)) add(url.index, url.index + value.length, 'url');
     }
     if (syntax.prompt) add(syntax.prompt.start, syntax.prompt.end, 'prompt');
+    universalHighlights(text, syntax, add);
     // Take complete candidates instead of accepting a valid suffix from an
     // invalid IP, version, identifier or longer hardware address.
     const candidates = /[A-Za-z0-9_.:%/~\-]+/g;
@@ -314,12 +328,12 @@
       const word = match[0].toLowerCase();
       add(start, end, /^(?:warn|warning)$/.test(word) ? 'warning' : /^(?:success|successful|passed)$/.test(word) ? 'success' : 'error');
     }
-    const states = /\b(?:administratively down|lower_up|no-carrier|established|listen(?:ing)?|connected|disconnected|unreachable|incomplete|filtered|pending|degraded|dormant|notconnect|active|inactive|up|down|open|closed|ok)\b/gi;
+    const states = /\b(?:administratively down|err-disabled|lower_up|no-carrier|established|listen(?:ing)?|connected|disconnected|unreachable|incomplete|filtered|pending|degraded|dormant|notconnect|forwarding|blocking|discarding|learning|FWD|BLK|BKN|LRN|LIS|active|inactive|up|down|open|closed|ok)\b/gi;
     while ((match = states.exec(text))) {
       const start = match.index, end = start + match[0].length;
       if (syntax.quoted(start, end) || !stateBoundary(text, start, end) || negatedOrZero(text, start, end, syntax.interfaceTable) || !statusContext(text, start, end, syntax)) continue;
       const word = match[0].toLowerCase();
-      add(start, end, /^(?:up|lower_up|established|listen|listening|connected|active|open|ok)$/.test(word) ? 'success' : /^(?:pending|filtered|incomplete|degraded|dormant|inactive)$/.test(word) ? 'warning' : 'error');
+      add(start, end, /^(?:up|lower_up|established|listen|listening|connected|active|open|ok|forwarding|fwd)$/.test(word) ? 'success' : /^(?:pending|filtered|incomplete|degraded|dormant|inactive|blocking|discarding|learning|blk|bkn|lrn|lis)$/.test(word) ? 'warning' : 'error');
     }
     // Fixed-width interface tables can omit the gap between an address and
     // its state. Recognize the compact state only inside an identified table.
@@ -350,6 +364,54 @@
     return found.filter(hit => enabledRules[hit.kind]).sort((a, b) => a.start - b.start || a.end - b.end);
   }
 
+  // Universal recognizers (v1.21.11): log severities, CLI error and success
+  // messages, ping results and routing/service states that look the same on
+  // any system. Each needs a recognizable shape, never a bare word in prose.
+  const SEVERITY = { fatal: 'error', emerg: 'error', emergency: 'error', alert: 'error', crit: 'error', critical: 'error', err: 'error', error: 'error',
+    warn: 'warning', warning: 'warning', notice: 'info', info: 'info', information: 'info', informational: 'info', debug: 'comment', trace: 'comment' };
+  function universalHighlights(text, syntax, add) {
+    let match;
+    // Cisco/Arista/NX-OS system messages: %FACILITY-SEVERITY-MNEMONIC (0-3 error, 4 warning, 5-6 info, 7 debug).
+    const tag = /(^|[\s:*])(%[A-Z][A-Z0-9_]*(?:-[A-Z0-9_]+)*-([0-7])-[A-Z][A-Z0-9_]*)(?=:|\s|$)/g;
+    while ((match = tag.exec(text))) { const start = match.index + match[1].length, level = Number(match[3]); add(start, start + match[2].length, level <= 3 ? 'error' : level === 4 ? 'warning' : level <= 6 ? 'info' : 'comment'); }
+    // key=value levels in structured logs: level=error, severity: warning, "level":"info".
+    const keyed = /\b(?:level|lvl|severity|loglevel|log_level)"?\s*[=:]\s*"?(fatal|emerg|alert|crit|critical|err|error|warn|warning|notice|info|information|debug|trace)\b/gi;
+    while ((match = keyed.exec(text))) { const start = match.index + match[0].length - match[1].length; add(start, start + match[1].length, SEVERITY[match[1].toLowerCase()]); }
+    // Upper-case level after a timestamp (and up to three host/process fields), or bracketed.
+    const stamped = /^\s*\*?(?:\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:[.,]\d+)?(?:Z|[+-]\d{2}:?\d{2})?|[A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}(?:\.\d+)?)\s+(?:\S+\s+){0,3}?\[?(FATAL|EMERG|ALERT|CRITICAL|CRIT|ERROR|ERR|WARNING|WARN|NOTICE|INFO|DEBUG|TRACE)\]?(?=[\s:]|$)/.exec(text);
+    if (stamped) { const end = stamped.index + stamped[0].length - (stamped[0].endsWith(']') ? 1 : 0), start = end - stamped[1].length; add(start, end, SEVERITY[stamped[1].toLowerCase()]); }
+    const bracketed = /(^|\s)[\[<(](FATAL|EMERG|ALERT|CRITICAL|CRIT|ERROR|ERR|WARNING|WARN|NOTICE|INFO|DEBUG|TRACE)[\]>)](?=[\s:]|$)/g;
+    while ((match = bracketed.exec(text))) { const start = match.index + match[1].length + 1; add(start, start + match[2].length, SEVERITY[match[2].toLowerCase()]); }
+    const leading = /^\s*(NOTICE|INFO|DEBUG|TRACE)(?=:\s)/.exec(text);
+    if (leading) { const start = leading[0].length - leading[1].length; add(start, start + leading[1].length, SEVERITY[leading[1].toLowerCase()]); }
+    // CLI and shell errors that every user meets.
+    const cli = /^\s*%\s*(Invalid input detected|Incomplete command|Ambiguous command|Unknown command|Unrecognized command|Invalid command|Bad (?:mask|IP address|command)|Authorization failed|Command authorization failed|Access denied|Login invalid|Connection refused by remote host|Unknown host|Unrecognized host or address|Error[^.:]{0,60})/i.exec(text);
+    if (cli) { const start = cli[0].length - cli[1].length; add(start, start + cli[1].length, 'error'); }
+    const shell = /(?:^|:\s)(command not found|no such file or directory|operation not permitted|cannot access|not a directory|is a directory|syntax error[^,:]{0,40}|unknown command\.?|invalid input|not authorized|host key verification failed|too many authentication failures|segmentation fault|cannot allocate memory|no space left on device|read-only file system)(?=[\s,.:;]|$)/gi;
+    while ((match = shell.exec(text))) { const start = match.index + match[0].length - match[1].length; if (!syntax.quoted(start, start + match[1].length)) add(start, start + match[1].length, 'error'); }
+    const windows = /^'[^']{1,100}' is not recognized as an internal or external command/.exec(text);
+    if (windows) add(windows[0].indexOf(' is not') + 1, windows[0].length, 'error');
+    const ok = /^\s*(\[OK\](?=\s*$)|commit complete|commit succeeded|configuration committed(?: successfully)?|configuration (?:saved|check succeeds)|copy complete(?:d)?(?:,|\.|$)|saved successfully|build successful)/i.exec(text);
+    if (ok) { const start = ok[0].length - ok[1].length; add(start, start + ok[1].replace(/[,.]$/, '').length, 'success'); }
+    const building = /^\s*(Building configuration\.\.\.|Destination filename \[)/.exec(text);
+    if (building) { const start = building[0].length - building[1].length; add(start, start + building[1].length - (building[1].endsWith('[') ? 2 : 0), 'info'); }
+    // Ping results: 0% loss is good, 100% is down, anything between is a warning.
+    const loss = /\b(\d{1,3}(?:\.\d+)?)% packet loss\b|\((\d{1,3})% loss\)/gi;
+    while ((match = loss.exec(text))) { const value = Number(match[1] ?? match[2]); add(match.index, match.index + match[0].length, value === 0 ? 'success' : value >= 100 ? 'error' : 'warning'); }
+    const rate = /\bSuccess rate is (\d{1,3}) percent\b/.exec(text);
+    if (rate) { const value = Number(rate[1]); add(rate.index, rate.index + rate[0].length, value === 100 ? 'success' : value === 0 ? 'error' : 'warning'); }
+    // Routing neighbor tables start with the neighbor address.
+    const first = syntax.tokens[0];
+    if (first && addressKind(first.value) && syntax.tokens.length >= 4) {
+      const bgp = /\s(Idle(?: \((?:Admin|PfxCt|NoNeigh)\))?|Active|Connect|OpenSent|OpenConfirm|Established|Establ)\s*$/.exec(text);
+      if (bgp) { const start = bgp.index + bgp[0].indexOf(bgp[1]); add(start, start + bgp[1].length, /^Establ/.test(bgp[1]) ? 'success' : 'warning'); }
+      const ospf = /\s((?:FULL|2WAY|INIT|EXSTART|EXCHANGE|LOADING|ATTEMPT|DOWN)\/(?:DR|BDR|DROTHER|\s*-)|Full|2Way|Init|ExStart|Exchange|Loading|Attempt)(?=\s)/.exec(text);
+      if (ospf) { const start = ospf.index + 1, state = ospf[1].toUpperCase(); add(start, start + ospf[1].trimEnd().length, /^(?:FULL|2WAY)/.test(state) ? 'success' : /^DOWN/.test(state) ? 'error' : 'warning'); }
+    }
+    // systemd: Active: active (running) / failed / inactive (dead).
+    const unit = /^\s*Active:\s+(active \((?:running|exited|listening|waiting)\)|activating(?: \([^)]*\))?|deactivating(?: \([^)]*\))?|inactive \(dead\)|failed)/.exec(text);
+    if (unit) { const start = unit[0].length - unit[1].length, state = unit[1]; add(start, start + state.length, /^active/.test(state) ? 'success' : /^failed/.test(state) ? 'error' : 'warning'); }
+  }
   function syntaxHighlights(text, syntax, found, add) {
     // Fill around higher-priority addresses, interfaces and operational
     // states rather than replacing their categories inside quoted values.
@@ -371,7 +433,7 @@
       const token = tokens[i], previous = tokens[i - 1], next = tokens[i + 1], word = token.word;
       if (syntax.comments.some(comment => token.start >= comment.start)) continue;
       const parameter = syntax.isConfig && i > 0;
-      if (parameter && previous && namedInterfaceFields.test(previous.word) && !FIELDS.has(word) && !PROTOCOLS.has(word)) add(token.start, token.end, 'interface');
+      if (parameter && previous && namedInterfaceFields.test(previous.word) && !FIELDS.has(word) && !PROTOCOLS.has(word) && !VALUES.has(word)) add(token.start, token.end, 'interface');
       const pathField = /^(?:vlan|access|trunk|native|tagged|untagged|aggregate)$/.test(word) && !/^(?:mode|type)$/.test(previous?.word || '') && next && (FIELDS.has(next.word) || /^\d/.test(next.value));
       if (syntax.isConfig && !token.quoted && (i === 0 && !syntax.verb || pathField || FIELDS.has(word) && !VALUES.has(word) && !PROTOCOLS.has(word) || i === 1 && /^(?:set|unset|append|select|unselect|config|configure|conf)$/.test(first.word))) add(token.start, token.start + token.value.length, 'field');
       if (!token.quoted && (syntax.isConfig || syntax.interfaceTable) && PROTOCOLS.has(word)) add(token.start, token.start + token.value.length, 'protocol');

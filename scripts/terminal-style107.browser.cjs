@@ -23,7 +23,8 @@ const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 let browser,page,activeCase='',activeCalls=[];
 async function shot(name){if(!out)return;const file='terminal-style107-'+name+'.png';await page.screenshot({path:path.join(out,file),fullPage:true});report.screenshots.push(file);}
 async function settle(){await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));}
-async function display(){if(await page.locator('#terminalSessionPanel.hidden').count())await page.locator('#terminalSessionToggle').click();await page.locator('#terminalAppearanceEditor').waitFor({state:'visible'});}
+// v1.21.11: Terminal settings reopens on the last tab; tests choose Appearance.
+async function display(){if(await page.locator('#terminalSessionPanel.hidden').count())await page.locator('#terminalSessionToggle').click();await page.locator('[data-terminal-settings-tab="appearance"]').click();await page.locator('#terminalAppearanceEditor').waitFor({state:'visible'});}
 async function fitted(){
  try{
   // Keep the full acceptance predicate: matching DOM cell geometry AND an
@@ -93,7 +94,8 @@ async function evidence(name){
    await page.evaluate(()=>{const t=currentTerminal().xterm,b=t.buffer.active;for(let row=0;row<b.length;row++){const line=b.getLine(row);if(line.translateToString(true).startsWith('│ IPv4')){t.select(0,row,23);return;}}throw Error('Box-drawing row missing after font resize');});assert.equal(await page.evaluate(()=>currentTerminal().xterm.getSelection()),'│ IPv4     │ IPv6     │');
    const unicode=await page.evaluate(()=>{const t=currentTerminal().xterm,b=t.buffer.active;for(let row=0;row<b.length;row++){const line=b.getLine(row);if(line.translateToString(true).startsWith('café ')){return {combined:line.getCell(5).getChars(),width:line.getCell(5).getWidth(),wide:line.getCell(11).getWidth()};}}return null;});assert.deepEqual(unicode,{combined:'é',width:1,wide:2});
   }
-  await page.locator('#terminalHighlightRules summary').click();await page.locator('[data-terminal-highlight-rule="url"]').uncheck();await page.evaluate(()=>flushState());assert.equal(saved.terminalAppearance.highlightRules.url,false);assert.equal(saved.terminalAppearance.highlightColors.address,'#22aaff');assert.equal(saved.terminalAppearance.highlightUnderlines,false);await page.locator('[data-terminal-rules-reset]').click();assert.equal(await page.evaluate(()=>state.terminalAppearance.highlightRules.url),true);assert.equal(await page.evaluate(()=>state.terminalAppearance.fontFamily),'Missing Synthetic Font 107');
+  // v1.21.11: highlight rules are on Terminal settings → Highlighting.
+  await page.locator('[data-terminal-settings-tab="highlighting"]').click();await page.locator('#terminalHighlightRules summary').click();await page.locator('[data-terminal-highlight-rule="url"]').uncheck();await page.evaluate(()=>flushState());assert.equal(saved.terminalAppearance.highlightRules.url,false);assert.equal(saved.terminalAppearance.highlightColors.address,'#22aaff');assert.equal(saved.terminalAppearance.highlightUnderlines,false);await page.locator('[data-terminal-rules-reset]').click();assert.equal(await page.evaluate(()=>state.terminalAppearance.highlightRules.url),true);assert.equal(await page.evaluate(()=>state.terminalAppearance.fontFamily),'Missing Synthetic Font 107');
   if(scale===1){
    // The production resize listener intentionally closes Display. Await that
    // observable state before reopening; otherwise the pending resize can close

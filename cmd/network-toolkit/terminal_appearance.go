@@ -8,7 +8,7 @@ import (
 )
 
 var terminalColorPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
-var terminalHighlightKinds = []string{"address", "mac", "url", "prompt", "interface", "command", "field", "protocol", "value", "number", "comment", "warning", "error", "success"}
+var terminalHighlightKinds = []string{"address", "mac", "url", "prompt", "interface", "command", "field", "protocol", "value", "number", "comment", "warning", "error", "success", "info"}
 
 var terminalSelectionPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$`)
 

@@ -1,6 +1,28 @@
-# v1.21.10 Beta 11 (Dropdowns in the app's colors) - candidate
+# v1.21.11 Beta 12 (Terminal settings in tabs, universal highlighting, colors for every profile) - candidate
 
-Owner request (with a screenshot of the black font suggestion popup): native-feeling dropdowns instead of the black list, suggestion lists that show every choice regardless of typed text, and fonts shown in their own face. The same message also asked for a Display/Tools menu cleanup and a universal highlighting profile with customizable colors; those follow as v1.21.11 and v1.21.12.
+Owner (after trying 1.21.10: "drop downs are better"): "please continue with the next releases, and combine 11 and 12 into one release". The menu cleanup and the universal highlighting therefore ship together as 1.21.11; no 1.21.12 was published.
+
+Owner: "please polish and clean up the display and tools menus of terminal. make sure they are intuitive and think about ease of use and QoL and reduce redundancies." That request is the owner's approval for moving these controls (layout freeze); docs/UI_GUIDELINES.md records the new arrangement.
+- Panel: `terminal-extras.js` builds `#terminalSessionPanel` (ids kept for tests and code) with a tab strip and four `[data-terminal-settings-panel]` pages. Markup in `terminalToolsHTML` marked `data-terminal-settings-target` (highlighting profile, font size field, transcript note) is moved into its page. Settings modules mount into their page when present, else into the panel (unit-test harnesses).
+- `terminal-appearance.js`: `SECTIONS` + `scoped()` replace the single-section queries; confirmation checkboxes are found by id (they used to be looked up in the shell section).
+- Tab memory is per app session (module variable), not saved. Tests that open the panel must click the tab they need (`[data-terminal-settings-tab="…"]`).
+- Separate terminal windows have no sidebar, so Theme and App settings icons appear in the Tools heading there only.
+- Checked: features-85, terminal-style107, color-picker, dropdowns, terminal-pager browser tests; unit tests; README terminal screenshot recaptured.
+- Not claimed: checked on a physical Windows PC.
+
+Owner: compare the original device highlighting with the MobaXterm rule sets, make it a universal profile with better detection, and make highlight colors customizable for every profile.
+- Comparison: the MobaXterm rule sets color keywords anywhere (useful breadth, but they paint prose); the device highlighter was precise but missed logs, CLI errors, ping, routing/service states and several vendors. The universal profile adds those as shape-based recognizers (`universalHighlights` in terminal-highlight.js) and keeps the no-prose rule; `scripts/terminal-highlight-universal.test.cjs` holds the multi-vendor positives and the prose negatives (add both when extending).
+- New kind `info` (Info / notice) is wired through LABELS/MARKS/COLORS, terminal-appearance HIGHLIGHTS, Go `terminalHighlightKinds` and the rule switches.
+- Rule-set colors per profile live in `terminalSyntax.colors[id][slot]`; deleting a custom set removes its colors; the Customize dialog and the legend both call `NetworkToolkitTerminalSyntaxUI.editColor`. Picker previews use a module variable (`colorsFor`), never saved state.
+- Not claimed: tested against real devices or on a physical Windows PC.
+
+---
+
+# v1.21.10 Beta 11 (Dropdowns in the app's colors) - publication verified (2026-11-07)
+
+Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.21.10 at 2026-11-07T20:33:00Z; stable latest remains v1.20.16. Merged PR #119; tag v1.21.10 points to merge commit a60fb5b6c3872e3ba9c88570bdd0f56402ca688d. Release workflow run 42411270581 succeeded. Assets: Network_Toolkit.exe, Network_Toolkit_1.21.10_Portable.zip, Network_Toolkit_1.21.10_Update.zip, Network_Toolkit_1.21.10_Linux_x86_64.tar.gz, Network_Toolkit_1.21.10_Linux_aarch64.tar.gz, SHA256SUMS; all digests match SHA256SUMS. The published Linux x86_64 archive was downloaded, extracted and run (`--version` 1.21.10 linux amd64; inner SHA256SUMS OK). Checks: CI found that typing in a suggestion field opened the list over the session-folder dialog's button (fixed in 4e82e91: the list opens only on request). `windows-terminal` (`TestNativeTerminalSFTP123InstalledWebView2`, Explorer drop) failed once per head and passed on re-run; it also fails intermittently on main (runs 42375596212, 42371008876). Final runs 42408514386 and 42408518327 green.
+
+Owner request (with a screenshot of the black font suggestion popup): native-feeling dropdowns instead of the black list, suggestion lists that show every choice regardless of typed text, and fonts shown in their own face. The same message also asked for a Display/Tools menu cleanup and a universal highlighting profile with customizable colors; those follow together in v1.21.11.
 - `web/assets/dropdowns.js` + `dropdowns.css`. Closed selects are untouched (measured identical on 11 pages with and without the stylesheet), because CI compares layouts against pinned older builds and `appearance: base-select` sizes a closed select to its chosen item. The app-colored list is applied only while open: `.ntk-picker` is added on pointerdown/Alt+Arrow/F4 with width/height locked to the native box, and removed when `:open` ends (rAF watch). Unsupported engines keep native lists.
 - While a picker is open, keydown/keyup/keypress are stopped at window capture; otherwise app Escape handlers closed the Display panel and left the list open.
 - Comboboxes: any `input[list]` is converted (the `list` attribute moves to `data-combobox-list` so the browser popup never appears). Code must not rely on `input.list`; the datalist element stays and is read when the list opens, so dynamic lists (serial ports, folders) stay current. Terminal output DOM changes are ignored by the observer.

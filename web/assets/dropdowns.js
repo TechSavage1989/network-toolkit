@@ -166,8 +166,16 @@ function init(){
  document.addEventListener('scroll',event=>{if(current&&!popup.contains(event.target))place(current);},true);
  root.addEventListener('resize',()=>{if(current)place(current);for(const input of records.keys())layout(input);});
  if(typeof root.MutationObserver==='function'){let queued=false;// Terminal output changes the DOM constantly and never contains dropdowns.
-  const ignored=mutation=>{const node=mutation.target.nodeType===1?mutation.target:mutation.target.parentElement;return !!node?.closest?.('.xterm,.combobox-popup,.terminal-view');};
-  observer=new root.MutationObserver(changes=>{if(changes.every(ignored))return;if(queued)return;queued=true;(root.requestAnimationFrame||setTimeout)(()=>{queued=false;scan();if(current&&!current.input.isConnected)close();});});observer.observe(document.body,{childList:true,subtree:true,characterData:true,attributes:true,attributeFilter:['list','class','hidden','open']});}
+  // Editors and terminals rewrite their DOM constantly; only a suggestion field
+  // being added or removed, or a visibility change while one exists, matters.
+  const ignored=mutation=>{const node=mutation.target.nodeType===1?mutation.target:mutation.target.parentElement;return !!node?.closest?.('.xterm,.combobox-popup,.terminal-view,.cm-editor');};
+  const relevant=mutation=>{
+   if(ignored(mutation)||mutation.type==='characterData')return false;
+   if(mutation.type==='attributes')return mutation.attributeName==='list'||records.size>0;
+   for(const node of mutation.addedNodes)if(node.nodeType===1&&(node.matches?.('input[list]')||node.querySelector?.('input[list]')))return true;
+   return records.size>0&&mutation.removedNodes.length>0;
+  };
+  observer=new root.MutationObserver(changes=>{if(!changes.some(relevant))return;if(queued)return;queued=true;(root.requestAnimationFrame||setTimeout)(()=>{queued=false;scan();if(current&&!current.input.isConnected)close();});});observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['list','class','hidden']});}
  if(typeof root.ResizeObserver==='function'){const resized=new root.ResizeObserver(entries=>{for(const entry of entries)layout(entry.target);});const watch=enhance;enhanceWatch=input=>{watch(input);if(records.has(input))resized.observe(input);};}
  scan();
 }

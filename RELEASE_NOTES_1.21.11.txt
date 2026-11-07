@@ -1,0 +1,26 @@
+Network Toolkit 1.21.11 Beta 12
+
+## What's New
+
+- Terminal settings are tidier. The Display button is now Settings, with four tabs: Appearance, Highlighting, Features, and Mouse & keyboard. Each setting appears once, in the place you would look for it.
+- Highlighting is now one universal profile. It works with network devices from many vendors, Linux and Windows servers, and logs, and colors errors, warnings and notices, error messages, ping loss, and routing and service states.
+- Every highlighting profile's colors can be changed. In Settings → Highlighting, click a color in the legend to pick a new one. Reset colors goes back to the defaults.
+
+## Additional Details
+
+- Settings and Tools:
+  - Mouse and keyboard defaults moved from Tools into Settings. Tools now holds saved connections, the password manager, SSH host keys, the separate window, Pane shortcuts and Help.
+  - Removed duplicates: Toggle theme and App settings are in the app sidebar; separate terminal windows have no sidebar, so they show both in the Tools heading. The Highlight legend is now shown right under the profile menu, Pane shortcuts moved to Tools, and the font size sits next to the font.
+  - Highlighting options are together (underline, device-output rules and colors, PowerShell and Command Prompt colors), and session confirmations moved to Features. Appearance has one preview with your colors, cursor, font and a Unicode alignment check.
+  - Settings reopens on the tab you used last, and the arrow keys move between tabs.
+- New recognition, still only for recognizable shapes and never for ordinary sentences:
+  - Log levels after a timestamp, in brackets or as level=…, and Cisco-style %FACILITY-SEVERITY-NAME messages (0–3 red, 4 yellow, 5–6 the new Info color, 7 gray).
+  - Error and success messages from network CLIs, Linux shells and Windows.
+  - Ping results: "0% packet loss" and "Success rate is 100 percent" in green, any loss in yellow or red.
+  - BGP and OSPF neighbor states, STP forwarding/blocking, err-disabled ports, and systemd "Active:" states.
+- More interface names: Huawei and H3C, Arista, Palo Alto, MikroTik, and Cisco multigig, serial, cellular and short names. More prompts: Cisco prompts typed without a space (switch#copy), Windows prompts over SSH, and Huawei/H3C views.
+- The device profile is now called "Universal (devices, servers and logs)"; your choice and colors are kept. The new Info / notice color can be changed or turned off like the others. Keyword rule sets (Standard, Shell, Network, Perl, SQL and your own) each keep their own colors; in Customize, the color square beside each rule changes it too.
+- Settings, saved values and their effects are unchanged apart from the additions above.
+- Validation used unit tests with sample output from many systems and browser checks; no real device was used, and it has not yet been checked on a physical Windows PC.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Security confirmations and Windows/UAC approval are unchanged.
+- This is an opt-in beta. Stable users stay on 1.20.16. Portable executable filename remains Network_Toolkit.exe.
