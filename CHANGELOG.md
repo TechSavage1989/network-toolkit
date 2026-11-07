@@ -1,4 +1,4 @@
-## 1.21.11 Beta 12 - Terminal settings in tabs, universal highlighting and colors for every profile (candidate)
+## 1.21.11 Beta 12 - Terminal settings in tabs, universal highlighting and colors for every profile (published 2026-11-07)
 
 - Owner asked to combine the menu cleanup and universal highlighting into one release.
 - Dropdowns follow-up: the suggestion-field observer in `dropdowns.js` now ignores Text Editor (CodeMirror) and terminal DOM changes and reacts only to suggestion fields being added or removed, so it no longer rescans on every editor keystroke or render.

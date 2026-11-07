@@ -1,4 +1,6 @@
-# v1.21.11 Beta 12 (Terminal settings in tabs, universal highlighting, colors for every profile) - candidate
+# v1.21.11 Beta 12 (Terminal settings in tabs, universal highlighting, colors for every profile) - publication verified (2026-11-07)
+
+Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.21.11 at 2026-11-07T21:29:11Z; stable latest remains v1.20.16. Merged PR #120; tag v1.21.11 points to merge commit bfd9567f1e2d1bd3c462ebcc5ffbb58d88940084. Release workflow run 42415784238 succeeded. Assets: Network_Toolkit.exe, Network_Toolkit_1.21.11_Portable.zip, Network_Toolkit_1.21.11_Update.zip, Network_Toolkit_1.21.11_Linux_x86_64.tar.gz, Network_Toolkit_1.21.11_Linux_aarch64.tar.gz, SHA256SUMS; all digests match SHA256SUMS. The published Linux x86_64 archive was downloaded, extracted and run (`--version` 1.21.11 linux amd64; inner SHA256SUMS OK). Checks: browser-editor112 (`editor-divider113`) failed once on 43d8d69 and passes locally; the dropdowns observer was narrowed in e4b192c; final runs 42413926151 and 42413931686 green on the first attempt.
 
 Owner (after trying 1.21.10: "drop downs are better"): "please continue with the next releases, and combine 11 and 12 into one release". The menu cleanup and the universal highlighting therefore ship together as 1.21.11; no 1.21.12 was published.
 
