@@ -25,7 +25,7 @@ func TestStateKeepsTestTabOrderAndOverviewLayout(t *testing.T) {
 
 // v1.20.10 is the first two-digit patch number: it must compare as newer than 1.20.9.
 func TestUpdateNewerHandlesTwoDigitPatch(t *testing.T) {
-	if !updateNewer("1.20.10", "1.20.9") || updateNewer("1.20.9", "1.20.10") || !updateNewer("1.20.10", "1.20.2") || !updateNewer("1.20.11", "1.20.10") || !updateNewer("1.20.12", "1.20.11") || !updateNewer("1.20.13", "1.20.12") || !updateNewer("1.20.14", "1.20.13") || !updateNewer("1.20.15", "1.20.14") || !updateNewer("1.20.16", "1.20.15") || !updateNewer("1.21.0", "1.20.16") || !updateNewer("1.21.1", "1.21.0") || !updateNewer("1.21.2", "1.21.1") || !updateNewer("1.21.3", "1.21.2") || !updateNewer("1.21.4", "1.21.3") || !updateNewer("1.21.5", "1.21.4") || !updateNewer("1.21.6", "1.21.5") || !updateNewer("1.21.7", "1.21.6") {
+	if !updateNewer("1.20.10", "1.20.9") || updateNewer("1.20.9", "1.20.10") || !updateNewer("1.20.10", "1.20.2") || !updateNewer("1.20.11", "1.20.10") || !updateNewer("1.20.12", "1.20.11") || !updateNewer("1.20.13", "1.20.12") || !updateNewer("1.20.14", "1.20.13") || !updateNewer("1.20.15", "1.20.14") || !updateNewer("1.20.16", "1.20.15") || !updateNewer("1.21.0", "1.20.16") || !updateNewer("1.21.1", "1.21.0") || !updateNewer("1.21.2", "1.21.1") || !updateNewer("1.21.3", "1.21.2") || !updateNewer("1.21.4", "1.21.3") || !updateNewer("1.21.5", "1.21.4") || !updateNewer("1.21.6", "1.21.5") || !updateNewer("1.21.7", "1.21.6") || !updateNewer("1.21.8", "1.21.7") {
 		t.Fatal("two-digit patch versions compared as text")
 	}
 }

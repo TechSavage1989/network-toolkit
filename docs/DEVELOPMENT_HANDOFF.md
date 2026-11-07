@@ -1,3 +1,16 @@
+# v1.21.8 Beta 9 (Terminal features and Advanced, T3) - candidate
+
+Owner request: terminal options similar to MobaXterm (plan: docs/TERMINAL_SETTINGS_PLAN.md, T3; the rest is T3b).
+- Module `web/assets/terminal-behavior.js` (in `web_assets.go`, loaded after terminal-appearance.js). It reads the app's top-level `state`, `saveState`, `terminalSessions` and `enqueueTerminalInput` by bare name: they are script bindings, not `window` properties (`root.state` is undefined in the app; a test guards this).
+- `options()` is spread into the xterm constructor in `createTerminalDisplay` (replacing `scrollback:10000,convertEol:false`); `attach(entry)` adds the bell listener and the scrollbar class; `apply()` updates open terminals and the transcript note on change. `convertEol` is only written when the setting changes, so a device's own LNM mode is not overridden on every theme update.
+- `displayBytes(entry, bytes)` runs in `writeTerminalDisplay` (pending-byte accounting still uses the original length). `observeOutput(entry, bytes)` runs only for live events, so a replayed or late-created display never answers an old ^E. Answerback is sent with `enqueueTerminalInput(entry, text, true, 'answerback')`, so it is not recorded as typed input or macro input.
+- Scrollback is capped at 10,000: `terminal-state.js` LIMITS.scrollback and the 10 MB transfer bound what a separate window can receive. Raising it needs that format to grow first.
+- State `terminalBehavior`: Go `safeTerminalBehavior` (terminal_behavior.go), the three window key lists, workspace display get/apply, `mergeState`.
+- Tests: `terminal-behavior.test.cjs` (6, with real xterm), Go `TestTerminalBehaviorKeepsValidSettingsAndDefaultsTheRest`. Node 1617, Go, Python 48 pass; browser terminal-style107, terminal-paced-paste127, terminal-pager, terminal-connection-dialog, active-session-tools, ui-consistency, ux-phase6, color-picker pass locally. A real-app check confirmed the settings survive a reload through the Go sanitizer, the scrollbar CSS matches xterm 6's DOM and the bell flash shows.
+- Not claimed: tested against a real device (bell, ^E or CR-only output) or on a physical Windows PC.
+
+---
+
 # v1.21.7 Beta 8 (Terminal font, colors and cursor, T2) - publication verified (2026-11-07)
 
 Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.21.7 at 2026-11-07T10:50:32Z; stable latest remains v1.20.16. Merged PR #113; tag v1.21.7 points to merge commit 5933d04a2d441214d89e7124601a224d57005005. Release workflow run 42365427156 succeeded. Assets: Network_Toolkit.exe, Network_Toolkit_1.21.7_Portable.zip, Network_Toolkit_1.21.7_Update.zip, Network_Toolkit_1.21.7_Linux_x86_64.tar.gz, Network_Toolkit_1.21.7_Linux_aarch64.tar.gz, SHA256SUMS; all digests match SHA256SUMS. The published Linux x86_64 archive was downloaded, extracted and run (`--version` 1.21.7 linux amd64; inner SHA256SUMS OK). Checks: both runs green (push 42363781393 and pull request 42363806490), first attempt.
