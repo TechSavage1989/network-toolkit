@@ -1,3 +1,17 @@
+# v1.21.3 Beta 4 (Sidebars on either side) - candidate
+
+Owner: "can you make the sidebar for text editor reposition able to both sides, similar to other sidebars, like the one in terminal?" then, mid-work: "allow all the resizable sidebars to swap sides where able."
+- Inventory of resizable sidebars: Terminal sessions and File Transfer client (already swapped); added Text Editor Connect/Files, diagnostic Configuration, File Transfer server settings; Left added to the position menus of entry details, Network discovery device details and Packet capture details. Not sidebars (unchanged): Terminal and editor compare split panes, File Transfer local/remote panes, graph/list and activity row splitters. The main navigation is not resizable.
+- Pattern (UI_GUIDELINES "Sidebars"): rail stays on the sidebar's left; ⇄ button in the heading, or at the rail foot for the Text Editor (its heading row was removed in v1.19.1 and `editor-files114` asserts it stays removed); the resize edge faces the content and drag/arrow directions mirror; the side is saved with the sidebar's layout.
+- Text Editor: `.nt-editor-files-resize` moved from the content panel to the shell; `.dock-right` and `.files-dock-right` (order 2); compact drawer opens from the right when docked right. Found and fixed: `mergeState` never restored `editorFilesPreferences`, so width/panel/collapsed reset at every start.
+- Configuration: `safeToolLayout` keeps `side`; `toolConfigurationSide()`; `#toolConfigurationSide` in `#toolConfigHeading`, hidden in the compact (tabbed) layout; Reset layout returns it to the left.
+- File Transfer server: `transferServerSidebar[p].side` (Go `sanitizeTransferClientSettings` now keeps `side`), `transfer-settings-right` flex order.
+- Details panes: dock values gain `left`; Auto still chooses Right or Bottom; explicit Left/Right do not fall to Bottom on narrow results (Network discovery keeps its 900 px stacking rule).
+- Tests: node 1594+ (editor-files114 dock test, result-details left, packet left, sidebar-collapse configuration right and discovery left); Go transfer sanitizer test. Browser: editor-sidebar117 (vs published116), editor-toolbar113 (vs published112), result-readers113 (vs published112), editor-views112, transfer-server-layout, discovery-saved/filter/port-actions, packet-capture-privilege, sidebar-activity108, ux-phase4/5/6, ui-consistency, features-92/96 pass locally. Screens reviewed at 1600×900 (Configuration right and collapsed, Text Editor right and collapsed, server settings right, reload persistence).
+- Not claimed: checked on a physical Windows PC.
+
+---
+
 # v1.21.2 Beta 3 (Packet capture adapter list) - publication verified (2026-11-07)
 
 Owner check on Windows (2026-11-07): "it looks good." The owner's report that led to this beta came from v1.21.1 running on Windows (guided setup visible); the adapter list was the only feedback on the v1.21.1 Packet capture changes.

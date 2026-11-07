@@ -26,6 +26,7 @@ Read [docs/UX_POLISH_PLAN.md](docs/UX_POLISH_PLAN.md) first. It is the owner's a
 - CLAUDE.md sits in the root (allowlisted in scripts/repository_layout_test.py) because Claude reads it there; it only imports this file and docs/REPOSITORY_STANDARDS.md.
 - README images live in docs/images/ (hero.png plus kebab-case names) and are regenerated with `node scripts/readme-screenshots.browser.cjs` (synthetic data only; see its header for the packet capture shot).
 - Preserve the portable executable filename Network_Toolkit.exe and the existing update feed semantics.
+- New saved UI settings must survive a restart: `mergeState` in web/index.html (or the module's `mergePreferences`) has to restore the key, and keys with a Go sanitizer (`transferClientLayout`, `transferServerSidebar` in transfer_client_settings.go) must allow the new field. The Text Editor sidebar preferences were silently dropped until v1.21.3 for this reason.
 
 ## Build and test
 Use the repo's existing scripts and vendored dependencies:
