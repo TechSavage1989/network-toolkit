@@ -1,4 +1,6 @@
-# v1.21.9 Beta 10 (Paste warnings and reconnection keys, T3b) - candidate
+# v1.21.9 Beta 10 (Paste warnings and reconnection keys, T3b) - publication verified (2026-11-07)
+
+Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.21.9 at 2026-11-07T12:52:36Z; stable latest remains v1.20.16. Merged PR #117; tag v1.21.9 points to merge commit a1eef91ab62df3a449e025da6f05616d7869ac39. Release workflow run 42374124770 succeeded. Assets: Network_Toolkit.exe, Network_Toolkit_1.21.9_Portable.zip, Network_Toolkit_1.21.9_Update.zip, Network_Toolkit_1.21.9_Linux_x86_64.tar.gz, Network_Toolkit_1.21.9_Linux_aarch64.tar.gz, SHA256SUMS; all digests match SHA256SUMS. The published Linux x86_64 archive was downloaded, extracted and run (`--version` 1.21.9 linux amd64; inner SHA256SUMS OK). Checks: both runs green (42371964548 and 42371967035), first attempt.
 
 Owner request: terminal options similar to MobaXterm (plan: docs/TERMINAL_SETTINGS_PLAN.md, T3b).
 - Paste warnings: `web/assets/terminal-paste-warnings.js` (pure, `check(text, enabled)` → `{kind, message, sample}`; one warning per kind and reason; line-by-line scan capped at 4,000 lines × 8,192 characters). Private and lab hosts (RFC 1918, loopback, link-local, CGNAT, single-label names, `.local`/`.lan`/`.internal`/`.home.arpa`, ULA/link-local IPv6) are not flagged for plain HTTP, because network engineers routinely copy images from lab servers.
