@@ -163,7 +163,7 @@ async function openCapture(p){
  await p.locator('#packetCaptureFile').setInputFiles(file);
  await p.waitForFunction(()=>NetworkToolkitPacketCapture.model.report?.packetCount>0);await settle(p,1200);
 }
-shots['packet-capture']=async p=>{await openCapture(p);};
+shots['packet-capture']=async p=>{await openCapture(p);await p.fill('#packetCheckTarget','192.0.2.12:3389');await p.click('[data-packet-action="check-target"]');await p.waitForSelector('.packet-target-step');await settle(p,600);};
 shots['network-discovery']=async p=>{await p.evaluate(()=>setTheme('dark'));await showJob(p,'discover',discover);await p.locator('#toolResult').getByText('192.0.2.10',{exact:true}).first().click();await settle(p,300);await p.mouse.move(988,598);await p.mouse.down();await p.mouse.move(988,700,{steps:5});await p.mouse.move(988,742,{steps:5});await p.mouse.up();await p.mouse.move(5,895);await settle(p,900);};
 shots['hosts-file-review']=async p=>{
  extraApi=name=>{if(name==='/api/local-tools/hosts')return {available:true,editable:true,exists:true,path:'C:\\Windows\\System32\\drivers\\etc\\hosts',content:hostsText,revision:'readme',encoding:'UTF-8',newline:'CRLF',warnings:[]};};

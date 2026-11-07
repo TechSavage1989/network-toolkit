@@ -15,7 +15,7 @@ async function start(){app=spawn(report.binary,['-no-browser','-port','0','-data
 async function settled(){await page.waitForFunction(()=>!NetworkToolkitPacketCapture.model.busy);await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));}
 async function disclosure(selector,open){const area=page.locator(selector);if(((await area.getAttribute('open'))!==null)!==open)await area.locator('summary').first().click();await settled();}
 async function total(count){await page.waitForFunction(expected=>!NetworkToolkitPacketCapture.model.busy&&NetworkToolkitPacketCapture.model.total===expected,count);}
-async function select(number){await page.locator('[data-packet-number="'+number+'"]').click({position:{x:15,y:10}});await page.waitForFunction(expected=>NetworkToolkitPacketCapture.model.detail?.packet.number===expected,number);await settled();}
+async function select(number){await page.locator('tr[data-packet-number="'+number+'"]').click({position:{x:15,y:10}});await page.waitForFunction(expected=>NetworkToolkitPacketCapture.model.detail?.packet.number===expected,number);await settled();await page.locator('#packetInspector .packet-plain-guide').evaluate(details=>details.open=true);}
 async function captureCount(){return page.evaluate(async()=>(await api('/packet-captures/'+NetworkToolkitPacketCapture.model.selected+'/troubleshoot')).packetCount);}
 async function screenshot(name){if(!process.env.NTK_BROWSER_OUTPUT_DIR)return;fs.mkdirSync(process.env.NTK_BROWSER_OUTPUT_DIR,{recursive:true});await page.screenshot({path:path.join(process.env.NTK_BROWSER_OUTPUT_DIR,'packet-dhcp-'+name+'.png'),fullPage:true});}
 (async()=>{

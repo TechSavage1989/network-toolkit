@@ -37,6 +37,8 @@ type TroubleshootFinding struct {
 	ID            string   `json:"id"`
 	Severity      string   `json:"severity"`
 	Title         string   `json:"title"`
+	Headline      string   `json:"headline"`  // everyday wording with real names, for the first example
+	Technical     string   `json:"technical"` // protocol detail (codes, flags) for the Technical details toggle
 	Observation   string   `json:"observation"`
 	Meaning       string   `json:"meaning"`
 	NextSteps     []string `json:"nextSteps"`
@@ -45,7 +47,18 @@ type TroubleshootFinding struct {
 	Filter        string   `json:"filter"`
 }
 
+// TroubleshootVerdict is the one-line answer shown first: "problems",
+// "notes" (only informational findings), "clear", "little" (too little
+// traffic to judge) or "empty".
+type TroubleshootVerdict struct {
+	State    string `json:"state"`
+	Headline string `json:"headline"`
+	Detail   string `json:"detail"`
+}
+
 type Troubleshooting struct {
+	Verdict     TroubleshootVerdict   `json:"verdict"`
+	Names       map[string]string     `json:"names"`
 	PacketCount int                   `json:"packetCount"`
 	Duration    float64               `json:"duration"`
 	Summary     string                `json:"summary"`
@@ -115,7 +128,7 @@ type arpTroubleKey struct{ iface, source, target string }
 // only when at least three more seconds are visible in the capture. This is an
 // observation window, not a protocol timeout or proof that a device is down.
 func Troubleshoot(packets []Packet, context TroubleshootContext) Troubleshooting {
-	r := Troubleshooting{PacketCount: len(packets), Scope: "All retained packets; display filters do not change these findings.", Limitations: []string{}, Findings: []TroubleshootFinding{}}
+	r := Troubleshooting{Names: map[string]string{}, PacketCount: len(packets), Scope: "All retained packets; display filters do not change these findings.", Limitations: []string{}, Findings: []TroubleshootFinding{}}
 	r.Limitations = append(r.Limitations, "This capture shows traffic visible at the selected capture point. Traffic elsewhere, replies outside the capture window, and unsupported or encrypted content may be absent. A finding is a clue to investigate, not a confirmed root cause.")
 	if context.Active {
 		r.Limitations = append(r.Limitations, "Capture is still running. Findings can change as replies arrive.")
@@ -134,7 +147,18 @@ func Troubleshoot(packets []Packet, context TroubleshootContext) Troubleshooting
 	}
 	if len(packets) == 0 {
 		r.Summary = "No retained packets to analyze. Start a capture, reproduce the problem, then stop it, or open a capture file."
+		r.Verdict = TroubleshootVerdict{State: "empty", Headline: "Nothing was recorded", Detail: "Start a capture, try the failing website, app or device while it records, then stop it. Or open a saved capture file."}
 		return r
+	}
+	r.Names = HostNames(packets)
+	host := func(address string) string {
+		if name := r.Names[address]; name != "" {
+			return name + " (" + address + ")"
+		}
+		if address == "" {
+			return "an unknown address"
+		}
+		return address
 	}
 
 	ordered := make([]*Packet, len(packets))
@@ -208,6 +232,15 @@ func Troubleshoot(packets []Packet, context TroubleshootContext) Troubleshooting
 			}
 		}
 	}
+	// explain sets a finding's everyday headline and technical detail from the
+	// same packet that supplies its example observation.
+	explain := func(id string, number uint64, headline, technical string) {
+		f := findings[id]
+		if f == nil || (f.Headline != "" && examples[id] != number) {
+			return
+		}
+		f.Headline, f.Technical = headline, technical
+	}
 	dnsPending := map[dnsTroubleKey]*troubleRequest{}
 	dnsOpaqueReplies := map[dnsTroubleExchange]int{}
 	tcpPending := map[tcpTroubleKey]*tcpTroubleRequest{}
@@ -224,6 +257,7 @@ func Troubleshoot(packets []Packet, context TroubleshootContext) Troubleshooting
 		multipleInterfaces = multipleInterfaces || p.Interface != firstInterface
 		if p.Record.DropReason != 0 {
 			add("windows-local-drop", "attention", "Windows reported local packet drops", fmt.Sprintf("Windows recorded local drop events. Example: %s, reason code 0x%X.", troubleEndpoints(p), p.Record.DropReason), "This is evidence of a drop reported by the local Windows networking stack at the capture point. It does not measure packet loss across the whole network or identify a remote cause.", []string{"Open an example packet and note the Windows drop reason code.", "Compare the event time with Windows, firewall and adapter logs before changing a rule or driver."}, p.Number)
+			explain("windows-local-drop", p.Number, "Windows dropped some packets on this computer", fmt.Sprintf("Windows drop reason code 0x%X on %s.", p.Record.DropReason, troubleEndpoints(p)))
 		}
 		if p.Captured < int(p.Length) {
 			truncated++
@@ -263,6 +297,7 @@ func Troubleshoot(packets []Packet, context TroubleshootContext) Troubleshooting
 					r.Metrics.DNSErrors++
 					id, title, meaning, next := dnsTroubleError(d.rcode)
 					add(id, "attention", title, fmt.Sprintf("DNS error responses were captured. Example: resolver %s returned code %d for %s.", p.Source, d.rcode, troubleName(d.name)), meaning, next, p.Number)
+					explain(id, p.Number, dnsErrorHeadline(d.rcode, troubleName(d.name)), fmt.Sprintf("DNS response code %d (%s) from resolver %s for %s.", d.rcode, dnsCodeName(d.rcode), p.Source, troubleName(d.name)))
 				}
 			} else {
 				r.Metrics.DNSQueries++
@@ -314,7 +349,8 @@ func Troubleshoot(packets []Packet, context TroubleshootContext) Troubleshooting
 				if q := tcpReplies[key]; q != nil {
 					if p.TCPFlags&4 != 0 {
 						refused = true
-						add("tcp-rejected", "attention", "A connection attempt was rejected", "A TCP reset acknowledged a captured connection request. Example: "+troubleFlowEndpoints(flow.reverse())+".", "The destination, or a device responding on its behalf, rejected the connection attempt. A service may not be listening on that port, or a policy may be rejecting it.", []string{"Check the destination IP address and service port.", "Use TCP ports to test the same service, then check the service and firewall logs on the destination."}, q.number, p.Number)
+						add("tcp-rejected", "attention", "A connection attempt was rejected", "A TCP reset acknowledged a captured connection request. Example: "+troubleFlowEndpoints(flow.reverse())+".", "The device answered but would not accept the connection. Usually nothing is running on that port, or a firewall or policy is rejecting it.", []string{"Check the destination IP address and service port.", "Use TCP ports to test the same service, then check the service and firewall logs on the destination."}, q.number, p.Number)
+						explain("tcp-rejected", q.number, capitalize(ServiceLabel(flow.reverse().destinationPort))+" on "+host(flow.reverse().destination)+" refused the connection", "A TCP reset (RST) answered the connection request (SYN): "+troubleFlowEndpoints(flow.reverse())+".")
 					}
 					q.answered = true
 					for _, ack := range []uint32{q.ack, q.dataAck} {
@@ -329,12 +365,18 @@ func Troubleshoot(packets []Packet, context TroubleshootContext) Troubleshooting
 				r.Metrics.TCPResets++
 				if !refused {
 					add("tcp-resets", "info", "Connections were reset", "TCP reset packets were captured. Example: "+troubleEndpoints(p)+".", "A reset abruptly ends or rejects a connection. This can be normal application behavior and does not, by itself, prove a firewall or network fault.", []string{"Check whether the reset happened when the reported problem occurred.", "Inspect the example packet addresses and ports, then compare with the application and firewall logs."}, p.Number)
+					server, port := p.Destination, p.DestinationPort
+					if servicePort(p.SourcePort, p.DestinationPort) == p.SourcePort {
+						server, port = p.Source, p.SourcePort
+					}
+					explain("tcp-resets", p.Number, "A connection to "+ServiceLabel(port)+" on "+host(server)+" was cut off", "TCP reset (RST) from "+troubleEndpoints(p)+".")
 				}
 			}
 			if payload, ok := troublePayload(p); ok && len(payload) > 0 {
 				key := tcpTroubleKey{flow, p.Sequence}
 				if old, exists := segments[key]; exists && bytes.Equal(old.payload, payload) {
 					add("tcp-repeated-data", "info", "Repeated TCP data was captured", "The same TCP sequence number and payload appeared more than once in the same direction. Example: "+troubleEndpoints(p)+".", "This may be a retransmission, or the same traffic captured more than once. It is not a measured packet-loss percentage.", []string{"Look for repeated data near the reported delay.", "Capture on one adapter and compare both endpoints when possible. Check link errors and interface utilization before assuming packet loss."}, old.number, p.Number)
+					explain("tcp-repeated-data", old.number, "Some data was sent more than once (possible resends)", "The same TCP sequence number and payload appeared twice in one direction: "+troubleEndpoints(p)+".")
 				} else {
 					segments[key] = tcpTroubleSegment{payload, p.Number}
 				}
@@ -347,13 +389,16 @@ func Troubleshoot(packets []Packet, context TroubleshootContext) Troubleshooting
 			switch {
 			case (!v6 && kind == 3 && code == 4) || (v6 && kind == 2):
 				r.Metrics.ICMPErrors++
-				add("icmp-size", "attention", "A path reported that packets were too large", "ICMP fragmentation-needed or Packet Too Big messages were captured."+example, "A device on the path requested smaller packets. This is useful evidence when some sites or VPN traffic stall while small requests work.", []string{"Check the MTU settings along the path, especially VPNs and tunnels.", "Check that required ICMP messages are allowed. Compare a small request with a larger one before changing MTU values."}, p.Number)
+				add("icmp-size", "attention", "A path reported that packets were too large", "ICMP fragmentation-needed or Packet Too Big messages were captured."+example, "A router on the way asked for smaller packets. This often explains why some websites or VPN traffic stall while small requests still work.", []string{"Check the maximum packet size (MTU) settings along the path, especially VPNs and tunnels.", "Check that required ICMP messages are allowed. Compare a small request with a larger one before changing MTU values."}, p.Number)
+				explain("icmp-size", p.Number, host(p.Source)+" said some packets were too big for the path", fmt.Sprintf("ICMP type %d, code %d (fragmentation needed / packet too big) from %s to %s.", kind, code, p.Source, p.Destination))
 			case (!v6 && kind == 3) || (v6 && kind == 1):
 				r.Metrics.ICMPErrors++
-				add("icmp-unreachable", "attention", "A device reported unreachable traffic", "ICMP destination-unreachable messages were captured."+example, "A host or router reported that traffic could not be delivered. The ICMP code and quoted original packet help distinguish a route, port or policy issue.", []string{"Open an example packet and inspect its ICMP code and addresses.", "Check the destination service, routing and firewall logs. Use Trace route or TCP ports for a focused follow-up."}, p.Number)
+				add("icmp-unreachable", "attention", "A device reported unreachable traffic", "ICMP destination-unreachable messages were captured."+example, "A router or the device itself said the traffic could not be delivered. The reason in the heading comes from the message and points to a route, the device, a closed port or a firewall.", []string{"Open an example packet and inspect its ICMP code and addresses.", "Check the destination service, routing and firewall logs. Use Trace route or TCP ports for a focused follow-up."}, p.Number)
+				explain("icmp-unreachable", p.Number, host(p.Source)+" reported that traffic could not be delivered: "+icmpUnreachableReason(v6, code), fmt.Sprintf("ICMP%s type %d, code %d (destination unreachable) from %s to %s.", map[bool]string{true: "v6", false: ""}[v6], kind, code, p.Source, p.Destination))
 			case (!v6 && kind == 11) || (v6 && kind == 3):
 				r.Metrics.ICMPErrors++
 				add("icmp-time-exceeded", "info", "Hop-limit messages were captured", "ICMP Time Exceeded messages were captured."+example, "These are expected during many traceroute tests. Outside a path test they may be a clue to a routing loop or an unusually long path.", []string{"Check whether Trace route or a similar path test was running.", "If these messages occur during normal application traffic, review the route and forwarding path."}, p.Number)
+				explain("icmp-time-exceeded", p.Number, "Some traffic ran out of hops on the way (normal during Trace route)", fmt.Sprintf("ICMP%s type %d, code %d (time exceeded) from %s to %s.", map[bool]string{true: "v6", false: ""}[v6], kind, code, p.Source, p.Destination))
 			}
 		}
 
@@ -376,6 +421,7 @@ func Troubleshoot(packets []Packet, context TroubleshootContext) Troubleshooting
 			if len(words) >= 2 && strings.HasPrefix(words[0], "HTTP/") {
 				if status, err := strconv.Atoi(words[1]); err == nil && status >= 400 && status <= 599 {
 					add("http-errors", "attention", "A web server returned error responses", fmt.Sprintf("Plaintext HTTP responses with status 400 through 599 were captured. Example: %s returned HTTP %d to %s.", p.Source, status, p.Destination), "The server returned an application-level error. A missing page or denied request can be expected; the status alone does not identify a network failure. Encrypted HTTPS responses cannot be inspected here.", []string{"Inspect the example status and requested service.", "Use HTTP check for the affected URL and compare the result with the web server or proxy logs."}, p.Number)
+					explain("http-errors", p.Number, "The website on "+host(p.Source)+" answered with an error: "+httpStatusText(status), fmt.Sprintf("HTTP status %d from %s to %s.", status, p.Source, p.Destination))
 				}
 			}
 		}
@@ -387,16 +433,19 @@ func Troubleshoot(packets []Packet, context TroubleshootContext) Troubleshooting
 		replyAt, ambiguous := dnsOpaqueReplies[key.exchange()]
 		if oldEnough(q) && (!ambiguous || replyAt < q.order) {
 			add("dns-no-visible-reply", "attention", "Some DNS requests have no visible reply", fmt.Sprintf("DNS requests had no matching response despite at least three more seconds of captured traffic. Example: %s asked resolver %s for %s.", key.flow.source, key.flow.destination, troubleName(q.name)), "The reply may be missing, outside the capture point, or excluded from the recording. This observation is not proof that the DNS server is down.", []string{"Use DNS lookup with the same name and resolver.", "Repeat the capture on the correct adapter with both directions and without a restrictive keep filter. Check resolver reachability and logs."}, q.number)
+			explain("dns-no-visible-reply", q.number, "No answer was seen when looking up "+troubleName(q.name), "DNS query from "+key.flow.source+" to resolver "+key.flow.destination+" with no matching response in the following 3 seconds or more.")
 		}
 	}
 	for key, q := range tcpPending {
 		if !q.answered && oldEnough(&q.troubleRequest) {
-			add("tcp-no-visible-reply", "attention", "Some connection requests have no visible reply", "TCP SYN requests had no matching SYN-ACK or reset despite at least three more seconds of captured traffic. Example: "+troubleFlowEndpoints(key.flow)+".", "A response was not seen at this capture point. Possible explanations include a filtered request or reply, the wrong address, a missing route, an unavailable host, or incomplete capture visibility.", []string{"Use TCP ports to test the same destination and port.", "Check routes and firewall logs. If possible, compare captures at both endpoints before identifying where traffic is lost."}, q.number)
+			add("tcp-no-visible-reply", "attention", "Some connection requests have no visible reply", "TCP SYN requests had no matching SYN-ACK or reset despite at least three more seconds of captured traffic. Example: "+troubleFlowEndpoints(key.flow)+".", "No reply was seen here. The device may be off or unreachable, the address may be wrong, a firewall may be dropping the request, or the reply took a path this capture could not see.", []string{"Use TCP ports to test the same destination and port.", "Check routes and firewall logs. If possible, compare captures at both endpoints before identifying where traffic is lost."}, q.number)
+			explain("tcp-no-visible-reply", q.number, capitalize(ServiceLabel(key.flow.destinationPort))+" on "+host(key.flow.destination)+" did not answer the connection request", "TCP SYN with no SYN-ACK or reset in the following 3 seconds or more: "+troubleFlowEndpoints(key.flow)+".")
 		}
 	}
 	for key, q := range arpPending {
 		if q.count >= 3 && oldEnough(q) {
 			add("arp-no-visible-reply", "info", "Repeated local address lookups have no visible reply", fmt.Sprintf("Repeated ARP requests had no matching reply in the retained capture. Example: %s repeatedly asked for local IP %s.", key.source, key.target), "The requested IP may be unused, which is normal during a network scan. If it should be active, a local address, VLAN, link or device issue is worth checking.", []string{"Confirm that the requested IP is expected to be online on this local network.", "Check the adapter subnet, VLAN and physical link. Compare the Local network and neighbor information before changing settings."}, q.number)
+			explain("arp-no-visible-reply", q.number, "No local device answered for address "+key.target, fmt.Sprintf("ARP requests from %s for %s (%d) with no reply.", key.source, key.target, q.count))
 		}
 	}
 	if truncated > 0 {
@@ -444,6 +493,7 @@ func Troubleshoot(packets []Packet, context TroubleshootContext) Troubleshooting
 	} else {
 		r.Summary = fmt.Sprintf("%d types of observation are worth reviewing. Open their example packets and use the suggested checks to investigate.", len(r.Findings))
 	}
+	r.Verdict = troubleVerdict(r)
 	return r
 }
 
@@ -598,13 +648,13 @@ func troubleDNSCode(d []byte, offset int, code uint16) (uint16, bool) {
 func dnsTroubleError(code uint16) (string, string, string, []string) {
 	switch code {
 	case 3:
-		return "dns-name-not-found", "A DNS server reported that a name does not exist", "The resolver returned NXDOMAIN. This can be a misspelled name, a missing DNS record or an expected background lookup; it is not the same as no DNS response.", []string{"Check the requested name for a typo and confirm that its DNS record should exist.", "Use DNS lookup against the same resolver and check the correct internal or public DNS zone."}
+		return "dns-name-not-found", "A DNS server reported that a name does not exist", "The DNS server says there is no such name. The name may be misspelled, its DNS record may be missing, or a program may have looked it up in the background. This is different from getting no answer.", []string{"Check the requested name for a typo and confirm that its DNS record should exist.", "Use DNS lookup against the same resolver and check the correct internal or public DNS zone."}
 	case 2:
-		return "dns-server-failure", "A DNS server could not complete a lookup", "The resolver returned SERVFAIL. The server answered, but could not complete that DNS lookup. Upstream resolution, DNSSEC validation or server configuration may need checking.", []string{"Use DNS lookup with the same name and resolver.", "Check resolver logs and upstream DNS access. Compare another permitted resolver without changing the client's DNS settings."}
+		return "dns-server-failure", "A DNS server could not complete a lookup", "The DNS server answered, but could not finish the lookup. The server, or the DNS servers it relies on, may need checking (including DNSSEC validation).", []string{"Use DNS lookup with the same name and resolver.", "Check resolver logs and upstream DNS access. Compare another permitted resolver without changing the client's DNS settings."}
 	case 5:
-		return "dns-refused", "A DNS server refused a lookup", "The resolver returned REFUSED. Its access or query policy may not permit this request.", []string{"Check that this client is using the intended DNS resolver.", "Review recursion, zone access and resolver policy for the client network."}
+		return "dns-refused", "A DNS server refused a lookup", "The DNS server would not answer this computer. It may be the wrong DNS server, or its settings may not allow this request.", []string{"Check that this client is using the intended DNS resolver.", "Review recursion, zone access and resolver policy for the client network."}
 	default:
-		return "dns-other-error", "DNS returned other error responses", "The DNS server answered with a nonzero response code. Inspect the code and query before deciding whether it relates to the reported problem.", []string{"Open the example packet and inspect its DNS flags and requested name.", "Repeat that lookup with DNS lookup and review the resolver logs."}
+		return "dns-other-error", "DNS returned other error responses", "The DNS server answered with an error. Open the example to see the name and error code before deciding whether it relates to the problem.", []string{"Open the example packet and inspect its DNS flags and requested name.", "Repeat that lookup with DNS lookup and review the resolver logs."}
 	}
 }
 

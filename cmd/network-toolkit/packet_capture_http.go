@@ -214,6 +214,17 @@ func (a *application) handlePacketCapture(w http.ResponseWriter, r *http.Request
 		jsonResponse(w, 200, capture.Follow(packets, key))
 		return
 	}
+	if parts[1] == "check" && len(parts) == 2 {
+		// Plain connection check for one website or device named by the user.
+		// It reads the retained packets only; nothing is sent.
+		check, err := capture.CheckTarget(packets, r.URL.Query().Get("target"))
+		if err != nil {
+			jsonError(w, 400, err.Error())
+			return
+		}
+		jsonResponse(w, 200, check)
+		return
+	}
 	if parts[1] == "troubleshoot" && len(parts) == 2 {
 		filter := info.Options.Filter
 		filteredCapture := filter.Protocol != "" && filter.Protocol != "any" || filter.Host != "" || len(filter.Ports) != 0 || filter.MAC != "" || filter.VLAN != nil || filter.Direction != "" && filter.Direction != "any"
