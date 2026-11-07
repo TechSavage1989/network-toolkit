@@ -576,3 +576,7 @@
 .packet-endpoint-name{display:block;font-weight:600}
 .packet-viewbar .packet-save-controls select{width:190px}
 .packet-conversations td:nth-child(3),.packet-conversations td:nth-child(4){min-width:150px}
+
+/* Packet details can also dock on the left (owner request, v1.21.3). */
+.packet-analysis.packet-details-left>.packet-list-panel{grid-column:3}
+.packet-analysis.packet-details-left>.packet-inspector,.packet-analysis.packet-details-left>.packet-details-rail{grid-column:1}

@@ -128,6 +128,7 @@ sidebarState:function(p){
  if(!s||typeof s!=='object')state.transferServerSidebar[p]={collapsed:(document.documentElement?.clientWidth||1024)<760,width:320};
  const settings=state.transferServerSidebar[p];
  settings.width=Math.max(270,Math.min(460,Number(settings.width)||320));
+ settings.side=settings.side==='right'?'right':'left';
  settings.collapsed=settings.collapsed===true;
  const height=Number(settings.activityHeight);
  // Zero selects a balanced default; explicit user sizes survive redraws and
@@ -142,7 +143,7 @@ mountSidebar:function(p){
  const sidebar=document.createElement('aside');
  sidebar.className='transfer-server-config-panel panel';sidebar.dataset.transferSidebar=p;
  sidebar.setAttribute('aria-label',p.toUpperCase()+' server configuration');
- sidebar.innerHTML='<div class="terminal-sidebar-rail transfer-server-sidebar-rail"><button type="button" class="terminal-sidebar-tab transfer-server-sidebar-button" data-transfer-sidebar-toggle="'+p+'" data-transfer-proto="'+p+'" aria-controls="transferServerSidebarBody" title="Show or hide server settings">'+icon('connect')+'<span>Connect</span></button></div><div class="transfer-server-sidebar-body" id="transferServerSidebarBody"><div class="transfer-server-sidebar-header"><strong>'+p.toUpperCase()+' settings</strong><button type="button" class="btn small ghost" data-transfer-sidebar-toggle="'+p+'" data-transfer-proto="'+p+'" title="Collapse settings">'+icon('close')+'</button></div><div class="transfer-server-sidebar-fields"></div></div>';
+ sidebar.innerHTML='<div class="terminal-sidebar-rail transfer-server-sidebar-rail"><button type="button" class="terminal-sidebar-tab transfer-server-sidebar-button" data-transfer-sidebar-toggle="'+p+'" data-transfer-proto="'+p+'" aria-controls="transferServerSidebarBody" title="Show or hide server settings">'+icon('connect')+'<span>Connect</span></button></div><div class="transfer-server-sidebar-body" id="transferServerSidebarBody"><div class="transfer-server-sidebar-header"><strong>'+p.toUpperCase()+' settings</strong><button type="button" class="iconbtn terminal-sidebar-side-button" data-transfer-sidebar-side="'+p+'" title="Move server settings sidebar to right" aria-label="Move server settings sidebar to right">'+icon('arrowSwap')+'</button><button type="button" class="btn small ghost" data-transfer-sidebar-toggle="'+p+'" data-transfer-proto="'+p+'" title="Collapse settings">'+icon('close')+'</button></div><div class="transfer-server-sidebar-fields"></div></div>';
  const fields=sidebar.querySelector('.transfer-server-sidebar-fields');
  settings.open=true;fields.appendChild(settings);
  const adapter=fields.querySelector('.transfer-interface-field');
@@ -163,17 +164,18 @@ mountSidebar:function(p){
  splitter.addEventListener('pointermove',event=>{
   if(activePointer!==event.pointerId)return;
   const max=Math.min(460,Math.max(270,app.clientWidth-320));
-  this.sidebarState(p).width=Math.min(max,Math.max(270,Math.round(startWidth+event.clientX-startX)));
+  this.sidebarState(p).width=Math.min(max,Math.max(270,Math.round(startWidth+(this.sidebarState(p).side==='right'?-1:1)*(event.clientX-startX))));
   this.applySidebar(p);
  });
  const finish=event=>{if(activePointer!==event.pointerId)return;activePointer=undefined;saveState();};
  splitter.addEventListener('pointerup',finish);splitter.addEventListener('pointercancel',finish);
  splitter.addEventListener('dblclick',()=>this.toggleSidebar(p));
+ sidebar.querySelector('[data-transfer-sidebar-side]')?.addEventListener('click',event=>{event.preventDefault();event.stopPropagation();const saved=this.sidebarState(p);saved.side=saved.side==='right'?'left':'right';this.applySidebar(p);saveState();event.currentTarget.focus({preventScroll:true});});
  splitter.addEventListener('keydown',event=>{
   if(event.key==='Enter'||event.key===' '){event.preventDefault();this.toggleSidebar(p);return;}
   if(!['ArrowLeft','ArrowRight','Home'].includes(event.key))return;
   event.preventDefault();const state=this.sidebarState(p);state.collapsed=false;
-  state.width=event.key==='Home'?320:Math.max(270,Math.min(460,state.width+(event.key==='ArrowRight'?1:-1)*(event.shiftKey?40:12)));
+  state.width=event.key==='Home'?320:Math.max(270,Math.min(460,state.width+(event.key==='ArrowRight'?1:-1)*(state.side==='right'?-1:1)*(event.shiftKey?40:12)));
   this.applySidebar(p);saveState();
  });
 },
@@ -182,7 +184,8 @@ applySidebar:function(p){
  const saved=this.sidebarState(p),aside=app.querySelector('.transfer-server-config-panel'),divider=app.querySelector('.transfer-server-splitter');
  if(!aside)return;
  app.style.setProperty('--transfer-sidebar-width',saved.width+'px');
- app.classList.toggle('transfer-settings-collapsed',saved.collapsed);
+ app.classList.toggle('transfer-settings-collapsed',saved.collapsed);app.classList.toggle('transfer-settings-right',saved.side==='right');
+ {const side=aside.querySelector('[data-transfer-sidebar-side]'),label='Move server settings sidebar to '+(saved.side==='right'?'left':'right');if(side){side.title=label;side.setAttribute('aria-label',label);}}
  aside.classList.toggle('is-collapsed',saved.collapsed);
  const body=aside.querySelector('.transfer-server-sidebar-body');if(body)body.inert=saved.collapsed;
  for(const toggle of aside.querySelectorAll('[data-transfer-sidebar-toggle]')){

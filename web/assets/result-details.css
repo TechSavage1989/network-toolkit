@@ -85,3 +85,9 @@ tr.result-entry-selected{background:var(--accentBg);box-shadow:inset 3px 0 var(-
 
 /* Compact labeled result readers; structured exports remain explicit actions. */
 .result-row-detail .result-detail-copy{margin-bottom:8px}.result-row-detail .result-record-grid>div{padding:6px 8px}.result-row-detail .result-record-grid dt{margin-bottom:3px}.result-row-detail [data-run-details]{margin-top:8px}.result-object-entry{margin:8px 0}.result-object-entry>h4{font-size:11px;color:var(--muted);margin:0 0 5px}.result-value-list{padding-left:20px;overflow-wrap:anywhere}.result-record-value{white-space:pre-wrap;overflow-wrap:anywhere}
+
+/* Entry details can also dock on the left (owner request, v1.21.3). */
+.result-area#toolResult.entry-details-left{grid-template-columns:var(--entry-details-size,350px) 6px minmax(0,1fr)}
+.result-area#toolResult.entry-details-left>.panel{grid-column:3}
+.entry-details-left>.result-entry-pane,.entry-details-left>.result-entry-rail{grid-column:1}
+.entry-details-left>.result-entry-rail{border-left:0;border-right:1px solid var(--border)}

@@ -1,0 +1,16 @@
+Network Toolkit 1.21.3 Beta 4
+
+## What's New
+
+- Sidebars can now sit on either side. Use the ⇄ button to move the Text Editor's Files and Connect sidebar, the Configuration panel in Test a target, Test a website, SMTP test and Network discovery, and the File Transfer server settings, just like the Terminal and File Transfer connection sidebars.
+- Entry details, Network discovery device details and Packet capture packet details can now also be placed on the Left, next to Auto, Right and Bottom.
+- Your choice is remembered after a restart.
+
+## Additional Details
+
+- In the Text Editor the ⇄ button is at the bottom of the sidebar's icon strip; elsewhere it is in the sidebar heading. Dragging the edge resizes from whichever side faces your work, and the arrow keys follow the same direction.
+- The Text Editor sidebar's width, open panel and hidden state are now also kept after a restart; before this beta they were reset each time the app started.
+- Reset layout returns the Configuration panel to the left. Narrow windows that show configuration and results as tabs are unchanged.
+- Validation used unit tests, browser tests and screenshots with sample data; it has not yet been checked on a physical Windows PC.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Security confirmations and Windows/UAC approval are unchanged.
+- This is an opt-in beta. Stable users stay on 1.20.16. Portable executable filename remains Network_Toolkit.exe.

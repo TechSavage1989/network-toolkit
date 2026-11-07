@@ -96,7 +96,7 @@ test('vertical rail arrows, Home and End select without toggling and do not reac
  key(files,'ArrowDown');assert.equal(h.host.dataset.editorSidebarPanel,'connections');key(connections,'End');assert(!h.host.hidden);assert.equal(h.host.dataset.editorSidebarPanel,'files');key(files,'ArrowUp');assert.equal(h.host.dataset.editorSidebarPanel,'connections');key(connections,'Home');assert(!h.host.hidden);assert.equal(h.host.dataset.editorSidebarPanel,'connections');key(connections,'ArrowLeft');assert.equal(h.host.dataset.editorSidebarPanel,'connections');key(files,'s');assert.equal(stopped,4);
 });
 test('resize divider supports keyboard, captured pointer, and keyboard/double-click collapse',()=>{
- const h=harness();h.api.initialize(h.editor);const shell=h.host.closest('.nt-editor-files-shell'),handle=h.host.querySelector('.nt-editor-files-resize');let pointer=null;handle.setPointerCapture=id=>pointer=id;handle.hasPointerCapture=id=>pointer===id;handle.releasePointerCapture=()=>pointer=null;shell.getBoundingClientRect=()=>({left:80});
+ const h=harness();h.api.initialize(h.editor);const shell=h.host.closest('.nt-editor-files-shell'),handle=shell.querySelector('.nt-editor-files-resize');let pointer=null;handle.setPointerCapture=id=>pointer=id;handle.hasPointerCapture=id=>pointer===id;handle.releasePointerCapture=()=>pointer=null;shell.getBoundingClientRect=()=>({left:80});
  handle.emit('keydown',handle,{key:'ArrowRight'});assert.equal(shell.style.width,'320px');handle.emit('pointerdown',handle,{button:0,pointerId:7});handle.emit('pointermove',handle,{pointerId:8,clientX:530});assert.equal(shell.style.width,'320px');handle.emit('pointermove',handle,{pointerId:7,clientX:530});handle.emit('pointerup',handle,{pointerId:7});assert.equal(shell.style.width,'450px');assert.equal(pointer,null);
  handle.emit('keydown',handle,{key:'Home'});assert.equal(shell.style.width,'220px');handle.emit('keydown',handle,{key:'End'});assert.equal(shell.style.width,'600px');handle.emit('keydown',handle,{key:'Enter'});assert(h.host.hidden);h.api.toggle(h.editor);assert.equal(shell.style.width,'600px');handle.emit('dblclick',handle);assert(h.host.hidden);assert.equal(h.host.inert,true);
 });
@@ -130,4 +130,17 @@ test('approved child Connect remount refreshes choices after earlier local-only 
  root.mountSidebar(host,'local','ssh',{panel:'files'});const select=host.querySelector('select');assert.equal(choices.length,0);approved=true;
  root.mountSidebar(host,'local','ssh',{panel:'connections'});assert.equal(host.querySelector('select'),select);assert.deepEqual(choices,['same-pinned-connection']);assert.equal(calls.filter(v=>v==='render').length,1);
  root.mountSidebar(host,'local','ssh',{panel:'files'});assert.equal(calls.filter(v=>v==='metadata:ssh').length,1,'Files return does not cause a metadata request');
+});
+test('the editor sidebar docks left or right like the Terminal sidebar and keeps the choice',()=>{
+ const h=harness(),saved=[];h.root.state={editorFilesPreferences:{width:340,panel:'files',dock:'right'}};h.root.saveState=()=>saved.push(JSON.parse(JSON.stringify(h.root.state.editorFilesPreferences)));
+ const workspace=h.editor.ownerDocument?.createElement?h.editor.ownerDocument.createElement('div'):null;
+ h.api.initialize(h.editor);const shell=h.host.closest('.nt-editor-files-shell'),button=shell.querySelector('.terminal-sidebar-rail [data-editor-files-dock]'),handle=shell.querySelector('.nt-editor-files-resize');
+ assert(button,'Move editor sidebar sits on the rail, which stays visible when the sidebar is collapsed');assert.equal(button.querySelector('svg').dataset.icon,'arrowSwap');assert.equal(h.host.querySelector('[data-editor-files-dock]'),null);
+ assert(shell.classList.contains('dock-right'),'a saved right dock was not restored');assert.equal(h.api.dock,'right');assert.equal(button.getAttribute('aria-label'),'Move editor sidebar to left');
+ let pointer=null;handle.setPointerCapture=id=>pointer=id;handle.hasPointerCapture=id=>pointer===id;handle.releasePointerCapture=()=>pointer=null;shell.getBoundingClientRect=()=>({left:500,right:840});
+ handle.emit('pointerdown',handle,{button:0,pointerId:3});handle.emit('pointermove',handle,{pointerId:3,clientX:440});handle.emit('pointerup',handle,{pointerId:3});assert.equal(shell.style.width,'400px','dragging the left edge of a right-docked sidebar to the left should widen it');
+ handle.emit('keydown',handle,{key:'ArrowLeft'});assert.equal(shell.style.width,'420px');handle.emit('keydown',handle,{key:'ArrowRight'});assert.equal(shell.style.width,'400px');
+ shell.emit('click',button);assert.equal(shell.classList.contains('dock-right'),false);assert.equal(h.api.dock,'left');assert.equal(button.getAttribute('aria-label'),'Move editor sidebar to right');assert.equal(saved.at(-1).dock,'left');assert.equal(saved.at(-1).width,400);
+ handle.emit('keydown',handle,{key:'ArrowLeft'});assert.equal(shell.style.width,'380px');
+ shell.emit('click',button);assert.equal(saved.at(-1).dock,'right');assert.equal(h.api.dock,'right');
 });

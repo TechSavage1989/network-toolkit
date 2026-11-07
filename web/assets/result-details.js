@@ -10,20 +10,20 @@
   function preferences() { return state.entryDetails || (state.entryDetails={...defaults}); }
   function mergePreferences(saved) {
     const source=saved?.entryDetails,value=source&&typeof source==='object'&&!Array.isArray(source)?source:{};
-    state.entryDetails={width:Number.isInteger(value.width)?clamp(value.width,260,700):defaults.width,height:Number.isInteger(value.height)?clamp(value.height,80,650):defaults.height,hidden:value.hidden===true,dock:['auto','right','bottom'].includes(value.dock)?value.dock:'auto'};
+    state.entryDetails={width:Number.isInteger(value.width)?clamp(value.width,260,700):defaults.width,height:Number.isInteger(value.height)?clamp(value.height,80,650):defaults.height,hidden:value.hidden===true,dock:['auto','right','left','bottom'].includes(value.dock)?value.dock:'auto'};
     if(Number.isInteger(value.graphHeight))state.entryDetails.graphHeight=clamp(value.graphHeight,80,650);layoutDetails();
   }
   function persist() { if(typeof saveState==='function')saveState(); }
   function sticky() { if(typeof root.requestAnimationFrame==='function'&&typeof updateToolResultSticky==='function')root.requestAnimationFrame(updateToolResultSticky); }
   function layoutDetails() {
     const area=document.getElementById('toolResult'),pane=document.getElementById('resultEntryPane');if(!sideDetail||!area||!pane)return;
-    const pref=preferences(),bounds=area.getBoundingClientRect(),width=bounds.width||area.clientWidth||1000,height=bounds.height||area.clientHeight||400,bottom=pref.dock==='bottom'||pref.dock!=='right'&&width<(sideDetail.graph?640:900);
+    const pref=preferences(),bounds=area.getBoundingClientRect(),width=bounds.width||area.clientWidth||1000,height=bounds.height||area.clientHeight||400,bottom=pref.dock==='bottom'||pref.dock==='auto'&&width<(sideDetail.graph?640:900),left=!bottom&&pref.dock==='left';
     const minimum=bottom?Math.min(sideDetail.graph?130:80,Math.max(40,height-96)):260,maximum=bottom?Math.max(minimum,Math.min(650,height*.65,height-96)):Math.max(260,Math.min(700,width-326)),dimension=Math.round(clamp(sideDetail.graph&&bottom&&pref.dock==='auto'?(pref.graphHeight??Math.min(pref.height,160)):pref[bottom?'height':'width'],minimum,maximum));
-    area.classList.toggle('has-entry-details',!pref.hidden);area.classList.toggle('entry-details-hidden',pref.hidden);area.classList.toggle('entry-details-bottom',bottom);
+    area.classList.toggle('has-entry-details',!pref.hidden);area.classList.toggle('entry-details-hidden',pref.hidden);area.classList.toggle('entry-details-bottom',bottom);area.classList.toggle('entry-details-left',left);
     area.style.setProperty('--entry-details-size',(pref.hidden?34:dimension)+'px');
     pane.classList.toggle('hidden',pref.hidden);const rail=document.getElementById('resultEntryRail');rail?.classList.toggle('hidden',!pref.hidden);
     const divider=document.getElementById('resultEntryDivider');if(divider){divider.setAttribute('aria-orientation',bottom?'horizontal':'vertical');divider.setAttribute('aria-valuenow',pref.hidden?'0':String(dimension));divider.setAttribute('aria-valuemin',String(pref.hidden?0:Math.round(minimum)));divider.setAttribute('aria-valuemax',String(Math.round(maximum)));divider.setAttribute('aria-label',pref.hidden?'Show entry details':'Resize or hide entry details');divider.setAttribute('aria-valuetext',pref.hidden?'Collapsed':dimension+' pixels');divider.title=pref.hidden?'Double-click or press Enter or Space to show entry details.':'Drag to resize. Double-click or press Enter or Space to hide details. Arrow keys resize; Home resets.';}
-    for(const button of area.querySelectorAll('[data-result-side-close],[data-result-side-show]'))root.NetworkToolkitPanelControls.set(button,{name:'entry details',edge:bottom?'bottom':'right',expanded:!pref.hidden});
+    for(const button of area.querySelectorAll('[data-result-side-close],[data-result-side-show]'))root.NetworkToolkitPanelControls.set(button,{name:'entry details',edge:bottom?'bottom':left?'left':'right',expanded:!pref.hidden});
     root.NetworkToolkitPanelControls.bindReveal(rail,{collapsed:()=>!!sideDetail&&preferences().hidden,button:()=>document.getElementById('resultEntryShow')});
     const dock=document.getElementById('resultEntryDock');if(dock)dock.value=pref.dock;
     if(!resizeObserver&&typeof root.ResizeObserver==='function')resizeObserver=new root.ResizeObserver(layoutDetails);
@@ -37,9 +37,9 @@
   function resizeDetails(event,divider) {
     if(event.button!==0||!sideDetail||preferences().hidden)return;
     finishResize?.();event.preventDefault();event.stopPropagation();divider.focus({preventScroll:true});
-    const area=document.getElementById('toolResult'),bottom=area.classList.contains('entry-details-bottom'),name=bottom?'height':'width',start=bottom?event.clientY:event.clientX,initial=Number(divider.getAttribute('aria-valuenow')),pointer=event.pointerId;
+    const area=document.getElementById('toolResult'),bottom=area.classList.contains('entry-details-bottom'),left=area.classList.contains('entry-details-left'),name=bottom?'height':'width',start=bottom?event.clientY:event.clientX,initial=Number(divider.getAttribute('aria-valuenow')),pointer=event.pointerId;
     divider.classList.add('dragging');document.body.classList.add(bottom?'resizing-rows':'resizing-columns');
-    const move=next=>{if(pointer!==undefined&&next.pointerId!==undefined&&next.pointerId!==pointer)return;if(!area.isConnected||!sideDetail){finish();return;}const coordinate=bottom?next.clientY:next.clientX;if(!Number.isFinite(coordinate))return;preferences()[name]=Math.round(clamp(initial-(coordinate-start),Number(divider.getAttribute('aria-valuemin')),Number(divider.getAttribute('aria-valuemax'))));if(sideDetail.graph&&bottom)preferences().graphHeight=preferences().height;layoutDetails();};
+    const move=next=>{if(pointer!==undefined&&next.pointerId!==undefined&&next.pointerId!==pointer)return;if(!area.isConnected||!sideDetail){finish();return;}const coordinate=bottom?next.clientY:next.clientX;if(!Number.isFinite(coordinate))return;preferences()[name]=Math.round(clamp(initial+(left?1:-1)*(coordinate-start),Number(divider.getAttribute('aria-valuemin')),Number(divider.getAttribute('aria-valuemax'))));if(sideDetail.graph&&bottom)preferences().graphHeight=preferences().height;layoutDetails();};
     const finish=next=>{if(next?.pointerId!==undefined&&pointer!==undefined&&next.pointerId!==pointer)return;root.removeEventListener('pointermove',move);for(const type of ['pointerup','pointercancel','blur'])root.removeEventListener(type,finish);divider.classList.remove('dragging');document.body.classList.remove('resizing-rows','resizing-columns');finishResize=null;persist();};
     finishResize=finish;root.addEventListener('pointermove',move);for(const type of ['pointerup','pointercancel','blur'])root.addEventListener(type,finish);
   }
@@ -197,7 +197,7 @@
     let pane=document.getElementById('resultEntryPane');
     if(!pane){
       pane=document.createElement('aside');pane.id='resultEntryPane';pane.className='result-entry-pane';pane.setAttribute('role','region');pane.setAttribute('aria-label','Selected entry details');
-      pane.innerHTML='<div class="result-entry-heading"><button type="button" class="iconbtn" data-result-side-close aria-controls="resultEntryPane"></button><div><strong>Entry details</strong><span id="resultEntryTitle" aria-live="polite"></span></div><label class="sr-only" for="resultEntryDock">Details position</label><select id="resultEntryDock" aria-label="Details position" title="Details position"><option value="auto">Auto</option><option value="right">Right</option><option value="bottom">Bottom</option></select></div><div id="resultEntryBody" class="result-entry-body" tabindex="0" aria-label="Selected entry information"></div><div class="result-entry-footer"><button type="button" class="btn small ghost" data-result-side-expand>'+icon('maximize')+'Expand details</button></div>';
+      pane.innerHTML='<div class="result-entry-heading"><button type="button" class="iconbtn" data-result-side-close aria-controls="resultEntryPane"></button><div><strong>Entry details</strong><span id="resultEntryTitle" aria-live="polite"></span></div><label class="sr-only" for="resultEntryDock">Details position</label><select id="resultEntryDock" aria-label="Details position" title="Details position"><option value="auto">Auto</option><option value="right">Right</option><option value="left">Left</option><option value="bottom">Bottom</option></select></div><div id="resultEntryBody" class="result-entry-body" tabindex="0" aria-label="Selected entry information"></div><div class="result-entry-footer"><button type="button" class="btn small ghost" data-result-side-expand>'+icon('maximize')+'Expand details</button></div>';
       area.append(pane);
     }
     let rail=document.getElementById('resultEntryRail');if(!rail){rail=document.createElement('div');rail.id='resultEntryRail';rail.className='result-entry-rail';area.append(rail);}
@@ -260,7 +260,7 @@
     if (initialized) return;
     initialized = true;
     root.addEventListener?.('resize',layoutDetails);
-    document.addEventListener('change',event=>{if(event.target.id==='resultEntryDock'&&['auto','right','bottom'].includes(event.target.value)){preferences().dock=event.target.value;layoutDetails();persist();}});
+    document.addEventListener('change',event=>{if(event.target.id==='resultEntryDock'&&['auto','right','left','bottom'].includes(event.target.value)){preferences().dock=event.target.value;layoutDetails();persist();}});
     document.addEventListener('dblclick',event=>{if(event.target.id==='resultEntryDivider'&&sideDetail){event.preventDefault();event.stopPropagation();toggleDetails(undefined,false);}});
     document.addEventListener('pointerdown', event => {
       cancelPending();
@@ -294,7 +294,7 @@
       if(event.target.id==='resultEntryDivider'&&sideDetail&&['Enter',' ','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home'].includes(event.key)){
         event.preventDefault();event.stopImmediatePropagation();if(event.key==='Enter'||event.key===' '){toggleDetails(undefined,false);return;}
         const area=document.getElementById('toolResult'),bottom=area.classList.contains('entry-details-bottom');if(bottom&&!['ArrowUp','ArrowDown','Home'].includes(event.key)||!bottom&&!['ArrowLeft','ArrowRight','Home'].includes(event.key))return;
-        if(preferences().hidden){preferences().hidden=false;layoutDetails();}const name=bottom?'height':'width';preferences()[name]=event.key==='Home'?defaults[name]:Math.round(clamp(Number(event.target.getAttribute('aria-valuenow'))+(['ArrowLeft','ArrowUp'].includes(event.key)?1:-1)*(event.shiftKey?30:10),Number(event.target.getAttribute('aria-valuemin')),Number(event.target.getAttribute('aria-valuemax'))));if(sideDetail.graph&&bottom)preferences().graphHeight=preferences().height;layoutDetails();persist();return;
+        if(preferences().hidden){preferences().hidden=false;layoutDetails();}const name=bottom?'height':'width';preferences()[name]=event.key==='Home'?defaults[name]:Math.round(clamp(Number(event.target.getAttribute('aria-valuenow'))+(['ArrowLeft','ArrowUp'].includes(event.key)?1:-1)*(area.classList.contains('entry-details-left')?-1:1)*(event.shiftKey?30:10),Number(event.target.getAttribute('aria-valuemin')),Number(event.target.getAttribute('aria-valuemax'))));if(sideDetail.graph&&bottom)preferences().graphHeight=preferences().height;layoutDetails();persist();return;
       }
       if (event.key === 'Escape') {cancelPending();if(sideDetail&&!document.querySelector('.modal')){event.preventDefault();event.stopImmediatePropagation();if(sideDetail.graph)root.NetworkToolkitResultTimeline?.clearSelection?.(sideDetail.graph.id);else closeSide(true);return;}}
       const row = candidate(event.target);

@@ -216,3 +216,11 @@ body.transfer-server-mode #toolWorkspace>#pageContent{overflow:hidden!important;
 .transfer-locations select{width:100%;min-width:0}
 .transfer-manager-path{flex-wrap:wrap}
 @media(max-width:520px){.transfer-location-row{align-items:flex-start;gap:8px}.transfer-location-row>button{padding-left:8px;padding-right:8px}}
+
+/* Server settings can sit on the right (owner request, v1.21.3), like the
+   File Transfer client sidebar: the rail stays on its left. */
+.transfer-server-sidebar-header>.terminal-sidebar-side-button{margin-left:auto}
+.transfer-server-sidebar-header>[data-transfer-sidebar-toggle]{margin-left:4px}
+.transfer-server-layout.transfer-settings-right>.transfer-server-config-panel{order:3}
+.transfer-server-layout.transfer-settings-right>.transfer-server-splitter{order:2}
+.transfer-server-layout.transfer-settings-right>.transfer-server-primary{order:1}

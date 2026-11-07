@@ -134,8 +134,8 @@ func TestServerSidebarSettingsPersistWithoutUntrustedKeys(t *testing.T) {
 	state := map[string]any{
 		"transferServerSidebar": map[string]any{
 			"sftp":    map[string]any{"width": float64(355), "activityHeight": float64(420), "collapsed": true, "password": "not-a-setting"},
-			"ftp":     map[string]any{"width": float64(410), "activityHeight": float64(180), "collapsed": false, "privateKey": "not-a-setting"},
-			"tftp":    map[string]any{"width": float64(20000), "activityHeight": "bad", "collapsed": "yes"},
+			"ftp":     map[string]any{"width": float64(410), "activityHeight": float64(180), "collapsed": false, "side": "right", "privateKey": "not-a-setting"},
+			"tftp":    map[string]any{"width": float64(20000), "activityHeight": "bad", "collapsed": "yes", "side": "top"},
 			"invalid": map[string]any{"secret": "not-a-setting"},
 		},
 	}
@@ -152,9 +152,12 @@ func TestServerSidebarSettingsPersistWithoutUntrustedKeys(t *testing.T) {
 		if !ok {
 			t.Fatalf("missing protocol %s", protocol)
 		}
-		if len(record) != 3 {
+		if len(record) != 4 {
 			t.Fatalf("unknown/secret fields persisted for %s: %#v", protocol, record)
 		}
+	}
+	if rows["ftp"].(map[string]any)["side"] != "right" || rows["tftp"].(map[string]any)["side"] != "left" || rows["sftp"].(map[string]any)["side"] != "left" {
+		t.Fatalf("server sidebar side was not kept or defaulted: %#v", rows)
 	}
 	if rows["sftp"].(map[string]any)["collapsed"] != true || rows["sftp"].(map[string]any)["width"] != 355 {
 		t.Fatalf("resizable SFTP pane was not retained: %#v", rows["sftp"])

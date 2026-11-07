@@ -218,7 +218,7 @@
     if (!rail) { rail = document.createElement('div'); rail.id = 'toolConfigurationRail'; rail.setAttribute('aria-label', 'Configuration sidebar controls'); workspace.append(rail); }
     const collapsed = workspace.classList.contains('configuration-hidden'), owner = collapsed ? rail : heading;
     if (toggle.parentElement !== owner || !collapsed && owner.firstElementChild !== toggle) {if(collapsed)owner.append(toggle);else heading.firstElementChild.before(toggle);}
-    root.NetworkToolkitPanelControls.set(toggle, {name: 'configuration', edge: 'left', expanded: !collapsed});
+    root.NetworkToolkitPanelControls.set(toggle, {name: 'configuration', edge: workspace.classList.contains('configuration-right') ? 'right' : 'left', expanded: !collapsed});
     root.NetworkToolkitPanelControls.bindReveal(rail, {collapsed: () => workspace.classList.contains('configuration-hidden'), button: () => toggle});
     divider.setAttribute('aria-label', collapsed ? 'Show configuration sidebar' : 'Resize or hide configuration sidebar');
     divider.setAttribute('aria-controls', 'toolConfiguration');

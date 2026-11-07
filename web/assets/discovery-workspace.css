@@ -300,3 +300,11 @@
 .network-port-connect:hover{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--panel))}
 .network-port-connect:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .network-port-connect:disabled{cursor:not-allowed;opacity:.5}
+
+/* Device details can also dock on the left (owner request, v1.21.3). */
+.network-results-workspace.details-left{grid-template-columns:var(--device-details-width,330px) 6px minmax(0,1fr)}
+.network-results-workspace.details-left>#toolResultsScroll{grid-column:3}
+.network-results-workspace.details-left>#selectedDevicePane{grid-column:1;border-left:0;border-right:1px solid var(--border)}
+.network-results-workspace.details-left.details-hidden{grid-template-columns:28px 6px minmax(0,1fr)}
+.network-results-workspace.details-left.details-hidden>#deviceDetailsRail{grid-column:1;border-left:0;border-right:1px solid var(--border)}
+.network-results-workspace.details-left.details-hidden>#deviceDetailsDivider{border-left:0;border-right:1px solid var(--border)}

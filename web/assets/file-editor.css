@@ -230,11 +230,12 @@ body:has(.nt-editor-embedded) #toolWorkspace>#pageContent{grid-row:1!important;g
 .nt-editor-files-shell{display:flex;position:relative;flex:0 0 300px;width:300px;min-width:220px;max-width:45%;min-height:0;overflow:hidden;border-right:1px solid var(--line);background:var(--panel)}
 .nt-editor-files-shell.is-collapsed{flex-basis:44px!important;width:44px!important;min-width:44px;max-width:44px}
 .nt-editor-files-shell.is-collapsed>.terminal-sidebar-rail{border-right:0}
-.nt-editor-files-sidebar{display:flex;position:relative;flex:1 1 0;flex-direction:column;min-width:0;min-height:0;overflow:hidden;padding-right:5px}
+.nt-editor-files-sidebar{display:flex;position:relative;flex:1 1 0;flex-direction:column;min-width:0;min-height:0;overflow:hidden}
+.nt-editor-files-shell:not(.is-collapsed){padding-right:5px}
 .nt-editor-files-sidebar[hidden]{display:none}
 .nt-editor-files-sidebar .btn{min-height:28px;padding:4px 7px;font-size:11px}
 .nt-editor-files-body{display:flex;flex-direction:column;flex:1;min-height:0;overflow:auto}
-.nt-editor-files-resize{position:absolute;inset:0 0 0 auto;width:5px;background:var(--line);cursor:col-resize;touch-action:none}
+.nt-editor-files-resize{position:absolute;inset:0 0 0 auto;z-index:2;width:5px;background:var(--line);cursor:col-resize;touch-action:none}
 .nt-editor-files-resize:after{content:'';position:absolute;left:1px;right:1px;top:calc(50% - 16px);height:32px;border-radius:2px;background:var(--faint)}
 .nt-editor-files-resize:hover,.nt-editor-files-resize:focus-visible{background:var(--accentBg)}
 .nt-editor-files-resize:focus-visible:after{background:var(--accent)}
@@ -381,7 +382,9 @@ body:has(.nt-editor:not([hidden]) [data-ed-files-sidebar]:not([hidden])) .toast-
  .nt-editor-window{position:relative}
  .nt-editor-workspace{position:static}
  .nt-editor-files-shell:not(.is-collapsed){position:absolute;inset:0 auto 0 0;width:min(360px,calc(100% - 28px))!important;max-width:calc(100% - 28px);min-width:0;z-index:20;box-shadow:var(--shadow)}
- .nt-editor-files-sidebar .nt-editor-files-resize{display:none}
+ .nt-editor-files-shell .nt-editor-files-resize{display:none}
+ .nt-editor-files-shell:not(.is-collapsed){padding-right:0}
+ .nt-editor-files-shell.dock-right:not(.is-collapsed){inset:0 0 0 auto}
 }
 
 /* Connection presence lives in existing controls, not an extra feedback row. */
@@ -394,3 +397,14 @@ body:has(.nt-editor:not([hidden]) [data-ed-files-sidebar]:not([hidden])) .toast-
 .nt-editor-saveas-list li{margin:0}
 .nt-editor-saveas-list button{width:100%;justify-content:flex-start;text-align:left}
 .nt-editor-saveas-empty{color:var(--muted);padding:6px 8px}
+
+/* Docking (owner request, v1.21.3): the editor sidebar moves left or right like
+   the Terminal and File Transfer sidebars. The rail stays on its left and the
+   resize edge faces the document; Move editor sidebar sits at the foot of the rail (the sidebar
+   has no heading row since the v1.19.1 consolidation). */
+.nt-editor-files-dock{margin:auto auto 2px}
+.nt-editor-files-shell.is-collapsed>.nt-editor-files-resize{display:none}
+.nt-editor-workspace.files-dock-right>.nt-editor-files-shell{order:2;border-right:0;border-left:1px solid var(--line)}
+.nt-editor-files-shell.dock-right:not(.is-collapsed){padding-right:0;padding-left:5px}
+.nt-editor-files-shell.dock-right>.nt-editor-files-resize{inset:0 auto 0 0}
+@media(max-width:680px){.nt-editor-files-shell.dock-right:not(.is-collapsed){padding-left:0}}

@@ -41,10 +41,15 @@ func sanitizeTransferClientSettings(state map[string]any) {
 		if entries, ok := raw.(map[string]any); ok {
 			for _, protocol := range []string{"sftp", "tftp", "ftp"} {
 				if row, ok := entries[protocol].(map[string]any); ok {
+					side, _ := row["side"].(string)
+					if side != "right" {
+						side = "left"
+					}
 					clean[protocol] = map[string]any{
 						"collapsed":      row["collapsed"] == true,
 						"width":          transferInteger(row["width"], 270, 460, 320),
 						"activityHeight": transferInteger(row["activityHeight"], 180, 1200, 0),
+						"side":           side,
 					}
 				}
 			}
