@@ -40,13 +40,16 @@ async function geometry(){return page.evaluate(()=>[...document.querySelectorAll
   const font=page.locator('#terminalAppearanceFont');await font.scrollIntoViewIfNeeded();
   // Suggestion list: every choice is listed whatever is typed, each font in its own face.
   assert.equal(await font.getAttribute('list'),null,'the browser suggestion popup is replaced');assert.equal(await font.getAttribute('role'),'combobox');
-  await font.fill('Cour');await page.waitForFunction(()=>!document.querySelector('#comboboxPopup')?.hidden);
+  // Typing never opens the list by itself (it would cover dialog buttons); Down opens it at the best match.
+  await font.fill('Cour');assert.equal(await page.locator('#comboboxPopup').isHidden(),true,'typing alone does not open the list');
+  await font.press('ArrowDown');await page.waitForFunction(()=>!document.querySelector('#comboboxPopup')?.hidden);
   const list=await page.evaluate(()=>{const options=[...document.querySelectorAll('#comboboxPopup [role=option]')];return {count:options.length,total:document.querySelectorAll('#terminalFontFamilies option').length,active:options.find(o=>o.classList.contains('active'))?.querySelector('.combobox-value').textContent,faces:options.map(o=>[o.querySelector('.combobox-value').textContent,o.querySelector('.combobox-value').style.fontFamily])};});
   assert.equal(list.count,list.total,'typing must not hide the other choices');assert.equal(list.active,'Courier New','typing moves to the best match');
   for(const [name,face] of list.faces)assert(face.includes(name)||face===name,'each font is shown in its own face: '+name+' → '+face);
   await shot('font-'+theme);
   await page.keyboard.press('ArrowDown');await page.keyboard.press('Enter');
-  assert.equal(await font.inputValue(),list.faces[list.faces.findIndex(([n])=>n==='Courier New')+1][0]);assert.equal(await page.locator('#comboboxPopup').isHidden(),true);
+  assert.equal(await font.inputValue(),list.faces[list.faces.findIndex(([n])=>n==='Courier New')+1][0]);
+  await font.click();assert.equal(await page.locator('#comboboxPopup').isHidden(),true,'clicking in the field only places the caret');assert.equal(await page.locator('#comboboxPopup').isHidden(),true);
   assert.equal(await page.evaluate(()=>state.terminalAppearance.fontFamily),await font.inputValue(),'choosing applies through the normal change handler');
   await page.locator('#terminalAppearanceEditor').locator('.combobox-toggle').first().click();assert.equal(await page.locator('#comboboxPopup').isVisible(),true,'the arrow opens the full list');
   // Choosing with the mouse applies the font and leaves the settings panel open.

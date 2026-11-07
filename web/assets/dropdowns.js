@@ -92,7 +92,7 @@ function keydown(event){
   const count=current.items.length;if(!count)return;const step=event.key==='ArrowDown'?1:-1;setActive(current,current.active<0?(step>0?0:count-1):(current.active+step+count)%count);return;
  }
  if(!isOpen)return;
- if(event.key==='Enter'&&current.active>=0){event.preventDefault();event.stopPropagation();choose(current,current.active);return;}
+ if(event.key==='Enter'){if(current.active>=0){event.preventDefault();event.stopPropagation();choose(current,current.active);}else close();return;}
  if(event.key==='Escape'){event.preventDefault();event.stopPropagation();close();return;}
  if(event.key==='Tab')close();
  if(event.key==='Home'||event.key==='End'){if(event.ctrlKey){event.preventDefault();setActive(current,event.key==='Home'?0:current.items.length-1);}}
@@ -157,8 +157,10 @@ function init(){
  document.addEventListener('keydown',keydown,true);
  document.addEventListener('pointerdown',pickerPointer,true);document.addEventListener('keydown',pickerKey,true);
  for(const type of ['keydown','keyup','keypress'])root.addEventListener(type,isolateKeys,true);
- document.addEventListener('input',event=>{if(records.has(event.target)&&event.isTrusted!==false&&document.activeElement===event.target){open(event.target,{fromTyping:true});}},true);
- document.addEventListener('click',event=>{if(records.has(event.target)&&current?.input!==event.target)open(event.target);},true);
+ // The list opens from its arrow button or Down/Up, never by itself while typing or
+ // clicking in the field: an open list must not cover the dialog's own buttons.
+ // While it is open, typing moves to the best match.
+ document.addEventListener('input',event=>{if(records.has(event.target)&&current?.input===event.target)open(event.target,{fromTyping:true});},true);
  document.addEventListener('pointerdown',event=>{if(current&&event.target!==current.input&&!popup?.contains(event.target)&&!records.get(current.input)?.toggle.contains(event.target))close();},true);
  document.addEventListener('focusout',event=>{if(current&&event.target===current.input)setTimeout(()=>{if(current&&document.activeElement!==current.input)close();},0);},true);
  document.addEventListener('scroll',event=>{if(current&&!popup.contains(event.target))place(current);},true);
