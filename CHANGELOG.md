@@ -1,4 +1,4 @@
-## 1.21.2 Beta 3 - Packet capture adapter list matches the app (candidate)
+## 1.21.2 Beta 3 - Packet capture adapter list matches the app (published 2026-11-07)
 
 - Owner request: the Packet capture network connection picker should match the other adapter pickers. `capture.Interface` gains `hardware`, `status` and `addresses` for ordinary adapters (from the Local network snapshot; `packetAdapterStatus` reports Disabled from the admin state); `captureAdapterLabel` renders "Name - Hardware | address (IPv4/IPv6)" like Test a target's Source interface, or Not connected / Disabled. Refresh moves to the label row, the picker is full width in a wider middle column, and the select title shows the full label. While no capture is open (`packet-setup-only`) the setup region is not height-capped so Start stays visible; the how-it-works strip loses its numbers and hides at 720 px height or less.
 
