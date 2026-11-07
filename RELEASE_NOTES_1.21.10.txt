@@ -1,0 +1,16 @@
+Network Toolkit 1.21.10 Beta 11
+
+## What's New
+
+- Dropdown lists now open in the app's own light or dark colors with a check mark on the current choice, instead of the black system list.
+- Fields that suggest values, such as the terminal font, always show every choice, even after you type. Fonts are shown in their own typeface, with a note saying whether each one is installed.
+
+## Additional Details
+
+- A closed dropdown looks and sizes exactly as before; only the open list changed. Keyboard use is unchanged, and Alt+Down or F4 opens a list. While a list is open, Escape closes just the list.
+- Suggestion fields (terminal font, time zone, serial port and session folder) have an arrow button that shows every choice. Typing moves to the closest match without hiding the rest; the arrow keys and Enter choose, and Escape closes the list. You can still type any value.
+- The app-colored list needs the WebView2 runtime that Windows keeps up to date. On an older runtime, the system list is used as before.
+- Next: tidier terminal Display and Tools menus, and one improved highlighting profile with customizable colors for every profile.
+- Validation used unit tests and browser checks; it has not yet been checked on a physical Windows PC.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Security confirmations and Windows/UAC approval are unchanged.
+- This is an opt-in beta. Stable users stay on 1.20.16. Portable executable filename remains Network_Toolkit.exe.
