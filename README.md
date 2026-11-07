@@ -23,7 +23,8 @@
 - **Test a target:** enter a host once and run a device check, Ping, Trace route, DNS lookup, TCP port checks, a continuous monitor or device details from one page. Drag the tabs into your preferred order.
 - **Test a website:** HTTP and TLS certificate checks for one address; SMTP tests for mail servers.
 - **Discover network devices** and inspect connection details.
-- **Watch targets** with live response-time graphs and **inspect packet captures**.
+- **Watch targets** with live response-time graphs.
+- **Packet capture for everyone:** record while a problem happens, then get a plain answer ("2 problems found") with what each problem means and what to check next. Check a website or device step by step to see where its connection stopped. Experts keep the packet list, filters, technical details and PCAPNG export.
 - **Connect** with SSH, Telnet and supported serial terminals, using saved connections, multiple tabs and macros.
 - **Password manager:** save usernames with passwords or SSH keys in an encrypted vault, with or without a master password; a strength gauge helps you choose one.
 - **File Transfer:** browse, transfer and host files over SFTP, FTP/FTPS and TFTP from one page.
@@ -54,7 +55,7 @@
 ### Network discovery and packet capture
 
 <table>
-  <tr><td width="50%"><b>Network discovery with hostnames, vendors and open ports</b><br><img src="docs/images/network-discovery.png" alt="Network discovery of a /25 network listing responding devices with MAC addresses, vendors and open TCP ports" width="440"></td><td width="50%"><b>Packet capture troubleshooting findings</b><br><img src="docs/images/packet-capture.png" alt="Packet capture troubleshooting view explaining a DNS name error and a rejected TCP connection found in an imported capture" width="440"></td></tr>
+  <tr><td width="50%"><b>Network discovery with hostnames, vendors and open ports</b><br><img src="docs/images/network-discovery.png" alt="Network discovery of a /25 network listing responding devices with MAC addresses, vendors and open TCP ports" width="440"></td><td width="50%"><b>Packet capture explained in plain words</b><br><img src="docs/images/packet-capture.png" alt="Packet capture result saying 2 problems found, a step-by-step check showing that Remote Desktop on 192.0.2.12 refused the connection, and plain explanations of a missing DNS name and the refused connection" width="440"></td></tr>
 </table>
 
 ### Terminal, file transfer and text editor

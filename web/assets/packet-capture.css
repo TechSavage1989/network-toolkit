@@ -566,5 +566,5 @@
 .packet-outcome-ongoing,.packet-outcome-one-way{color:var(--muted)}
 .packet-summary-table td .hint{display:block;font-size:10px}
 .packet-endpoint-name{display:block;font-weight:600}
-.packet-viewbar .packet-save-controls select{width:170px}
+.packet-viewbar .packet-save-controls select{width:190px}
 .packet-conversations td:nth-child(3),.packet-conversations td:nth-child(4){min-width:150px}

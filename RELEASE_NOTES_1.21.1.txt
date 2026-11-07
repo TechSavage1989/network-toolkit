@@ -1,0 +1,20 @@
+Network Toolkit 1.21.1 Beta 2
+
+## What's New
+
+- Packet capture is now built for people who have never read a packet capture. Setting up takes three numbered steps: what the problem is, which network connection, and (optionally) the website or device that fails. Then select the large Start button.
+- While it records, a panel shows the time, how many packets were recorded and what to try now, with a Stop and analyse button.
+- Results start with a clear answer, such as "2 problems found" or "No problems found in this capture". Each problem has a plain headline, for example "The name files.example.com does not exist" or "Remote Desktop (port 3389) on 192.0.2.12 refused the connection", with what it usually means and what to check next.
+- New "Check a website or device": enter a name or address and see, step by step, where the connection stopped: finding its address, reaching it, connecting or its reply. It only reads the recording; nothing is sent.
+- Conversations now say whether each connection worked, was refused or got no reply, name the service (such as Secure web or File sharing) and show device names learned from the recording.
+
+## Additional Details
+
+- The exact technical evidence is kept: each finding has Technical details and View example packets, and Copy findings and Save troubleshooting report include both the plain and the technical wording.
+- Save as (PCAPNG, PCAP, CSV, JSON or text) and Pause updates appear only when they apply: saving once a capture has packets, pausing while recording.
+- Traffic at a glance counters keep their color as a side stripe so the numbers stay readable.
+- Service names follow common port numbers; a service can use another port. Device names come only from name lookups seen in the capture; nothing is looked up.
+- Live capture is still Windows only; on Linux, opening a saved PCAP or PCAPNG file gives the same plain results. Live capture for Linux is planned (docs/LINUX_PLAN.md, phase L3).
+- Validation used synthetic captures, unit tests and hosted builds; no real network was recorded.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Security confirmations and Windows/UAC approval are unchanged.
+- This is an opt-in beta. Stable users stay on 1.20.16. Portable executable filename remains Network_Toolkit.exe.
