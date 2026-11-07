@@ -35,8 +35,10 @@
     const additional=blocks.findIndex((block,index)=>index>whatsNew&&block.type==='heading'&&/^additional details$/i.test(key(block.text)));
     if(whatsNew>=0&&additional>whatsNew){
       const changes=blocks.slice(whatsNew+1,additional).filter(block=>['bullet','paragraph'].includes(block.type)).map(block=>block.text);
-      const highlights=[...new Map(changes.map(text=>[key(text),text])).values()].slice(0,4);
-      const shown=new Set(highlights.filter(text=>short(text)===text).map(key));
+      // Owner request (v1.21.5): every What's New item is shown in full; the
+      // main update details are never shortened or moved into Additional details.
+      const highlights=[...new Map(changes.map(text=>[key(text),text])).values()];
+      const shown=new Set(highlights.map(key));
       const detail=blocks.filter((block,index)=>{
         if(index===whatsNew||index===additional)return false;
         if(index<whatsNew&&block.type==='heading'&&block.text.toLowerCase()==='network toolkit '+String(version??'').trim().toLowerCase())return false;
@@ -45,10 +47,10 @@
       });
       return {highlights,full:detail.map(block=>(block.type==='bullet'?'• ':'')+block.text).join('\n').trim()};
     }
+    // Older notes without a What's New section: the first four points are the
+    // highlights, shown in full; everything else stays under Additional details.
     const highlights=[...new Map((bullets.length?bullets:paragraphs).map(text=>[key(text),text])).values()].slice(0,4);
-    // Only remove content already shown in full. Long, shortened highlights keep
-    // their complete text available so no substantive release information is lost.
-    const shown=new Set(highlights.filter(text=>short(text)===text).map(key));
+    const shown=new Set(highlights.map(key));
     const remaining=blocks.filter(block=>block.type==='code'||block.type==='heading'||!shown.has(key(block.text)));
     const details=remaining.filter((block,index)=>{
       if(block.type!=='heading')return true;
@@ -58,13 +60,6 @@
     });
     return {highlights,full:details.map(block=>(block.type==='bullet'?'• ':'')+block.text).join('\n').trim()};
   }
-  function short(text){
-    const chars=Array.from(text);
-    if(chars.length<=180)return text;
-    const prefix=chars.slice(0,177).join('');
-    const boundary=prefix.lastIndexOf(' ');
-    return (boundary>130?prefix.slice(0,boundary):prefix).trimEnd()+'…';
-  }
   function html({version,currentVersion,notes}={}){
     const parsed=parse(notes,version),current=String(currentVersion??'').trim(),next=String(version??'').trim();
     const pill=wrap+'display:inline-block;padding:3px 8px;border:1px solid var(--border,#506078);border-radius:6px;font-size:11px;line-height:1.45;font-variant-numeric:tabular-nums;';
@@ -72,7 +67,7 @@
       '<span aria-label="Release version" style="'+pill+'color:var(--text,#e8edf5);background:var(--accentBg,#18334a)">'+escape(next||'Upcoming release')+'</span>';
     return '<section class="nt-update-notes" aria-label="Release notes" style="'+wrap+'width:100%;margin:10px 0;padding:12px 14px;border:1px solid var(--border,#506078);border-left:3px solid var(--accent,#3caaf5);border-radius:9px;background:var(--panel2,#18212e);color:var(--text,#e8edf5);text-align:left">'+
       '<div class="nt-update-notes-header" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px 12px;'+wrap+'"><h4 style="margin:0;font-size:12px;line-height:1.5;font-weight:650">What\'s new</h4><div class="nt-update-notes-versions" style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;'+wrap+'">'+versions+'</div></div>'+
-      (parsed.highlights.length?'<ul class="nt-update-notes-highlights" style="margin:10px 0 0;padding-left:18px;font-size:12px;line-height:1.6;'+wrap+'">'+parsed.highlights.map(text=>'<li style="padding-left:2px;margin:3px 0;'+wrap+'">'+escape(short(text))+'</li>').join('')+'</ul>':
+      (parsed.highlights.length?'<ul class="nt-update-notes-highlights" style="margin:10px 0 0;padding-left:18px;font-size:12px;line-height:1.6;'+wrap+'">'+parsed.highlights.map(text=>'<li style="padding-left:2px;margin:3px 0;'+wrap+'">'+escape(text)+'</li>').join('')+'</ul>':
         '<p class="nt-update-notes-empty" style="margin:9px 0 0;color:var(--muted,#a5afbf);font-size:12px;line-height:1.6">Release notes are not available for this update.</p>')+
       (parsed.full?'<details class="nt-update-notes-details" style="margin-top:9px;'+wrap+'"><summary style="cursor:pointer;padding:5px 0;font-size:11px;line-height:1.5;color:var(--accent,#3caaf5);'+wrap+'">Additional details</summary><div class="nt-update-notes-full" role="region" aria-label="Additional release notes" tabindex="0" style="margin-top:7px;padding:10px;border:1px solid var(--border,#506078);border-radius:6px;background:var(--panel,#111925);font-size:12px;line-height:1.65;white-space:pre-wrap;max-height:16rem;overflow:auto;overscroll-behavior:contain;'+wrap+'">'+escape(parsed.full)+'</div></details>':'')+
       '</section>';

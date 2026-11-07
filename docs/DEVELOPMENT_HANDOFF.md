@@ -1,3 +1,14 @@
+# v1.21.5 Beta 6 (Update notice shows What's New in full) - candidate
+
+Owner: "Do not truncate the high level primary update details in the updater".
+- `web/assets/app-update-notes.js`: structured notes list every What's New item in full (no `.slice(0,4)`, no 180-character `short()` with "…"); none are moved into Additional details. Unstructured notes keep the first four bullets or paragraphs as highlights, now complete, and the rest stay in Additional details. Escaping and inert links unchanged.
+- Checked with the real v1.21.3 notes: the 298-character first item now shows whole.
+- Tests: `app-update-notes.test.cjs` (full highlights, Unicode, structured overflow), all updater node tests pass.
+- AGENTS: What's New is shown in full, so keep it to a few clear sentences.
+- Not claimed: checked on a physical Windows PC.
+
+---
+
 # v1.21.4 Beta 5 (Sidebar swap buttons at the bottom) - publication verified (2026-11-07)
 
 Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.21.4 at 2026-11-07T08:51:03Z; stable latest remains v1.20.16. Merged PR #107; tag v1.21.4 points to merge commit 06455fa9a29bd7589e8cc82ca2d9dac4406c3416. Release workflow run 42357014751 succeeded. Assets: Network_Toolkit.exe, Network_Toolkit_1.21.4_Portable.zip, Network_Toolkit_1.21.4_Update.zip, Network_Toolkit_1.21.4_Linux_x86_64.tar.gz, Network_Toolkit_1.21.4_Linux_aarch64.tar.gz, SHA256SUMS; all digests match SHA256SUMS. The published Linux x86_64 archive was downloaded, extracted and run (`--version` 1.21.4 linux amd64; inner SHA256SUMS OK). Checks: green pull-request run 42356173853 on the PR head, first attempt.

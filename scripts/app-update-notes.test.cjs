@@ -79,10 +79,10 @@ test('fenced code stays inert and does not displace actual change highlights',()
   assert.equal(doc.querySelectorAll('script').length,0);
 });
 
-test('long notes have four bounded highlights and a scrollable, keyboard-accessible full view',()=>{
+test('long notes show four complete highlights and a scrollable, keyboard-accessible full view',()=>{
   const long='Word'.repeat(3000),doc=render(Array.from({length:30},(_,i)=>'- '+i+' '+long).join('\n'));
   const items=doc.querySelectorAll('li');assert.equal(items.length,4);
-  for(const item of items){assert.ok(Array.from(item.textContent).length<=180);assert.ok(item.textContent.endsWith('…'));assert.match(item.getAttribute('style'),/overflow-wrap:anywhere/);}
+  items.forEach((item,i)=>{assert.equal(item.textContent,i+' '+long,'a highlight was shortened');assert.doesNotMatch(item.textContent,/…$/);assert.match(item.getAttribute('style'),/overflow-wrap:anywhere/);});
   const full=doc.querySelector('.nt-update-notes-full');assert.ok(full.textContent.includes('29 '+long));
   assert.match(full.getAttribute('style'),/max-height:16rem;overflow:auto/);
   assert.match(full.getAttribute('style'),/white-space:pre-wrap/);
@@ -95,10 +95,10 @@ test('long notes have four bounded highlights and a scrollable, keyboard-accessi
   assert.match(doc.querySelector('.nt-update-notes-versions').getAttribute('style'),/flex-wrap:wrap/);
 });
 
-test('long Unicode highlights do not split surrogate pairs',()=>{
+test('long Unicode highlights are shown whole without splitting surrogate pairs',()=>{
   const doc=render('- '+('🚀'.repeat(200)));
   const text=doc.querySelector('li').textContent;
-  assert.equal(Array.from(text).length,178);assert.equal(text.endsWith('🚀…'),true);
+  assert.equal(text,'🚀'.repeat(200));
   assert.doesNotMatch(text,/\ufffd/);
 });
 
@@ -150,11 +150,12 @@ test('structured release notes reserve main highlights for user-facing benefits'
   assert.doesNotMatch(doc.querySelector('.nt-update-notes-highlights').textContent,/Technical parser|Legacy release|Compatibility/);
 });
 
-test('structured release notes retain overflow without promoting technical details to highlights',()=>{
-  const doc=render("## What's New\n- One\n- Two\n- Three\n- Four\n- Five\n\n## Additional Details\n- Expert diagnostic log explains the new behavior.");
-  assert.deepEqual(doc.querySelectorAll('.nt-update-notes-highlights li').map(node=>node.textContent),['One','Two','Three','Four']);
+test('structured release notes show every What\'s New item in full without promoting technical details',()=>{
+  const longItem='Sidebars can now sit on either side. Use the swap button to move the Files and Connect sidebar of the Text Editor, the Configuration panel in Test a target, Test a website, SMTP test and Network discovery, and the File Transfer server settings.';
+  const doc=render("## What's New\n- One\n- Two\n- Three\n- Four\n- Five\n- "+longItem+"\n\n## Additional Details\n- Expert diagnostic log explains the new behavior.");
+  assert.deepEqual(doc.querySelectorAll('.nt-update-notes-highlights li').map(node=>node.textContent),['One','Two','Three','Four','Five',longItem]);
   const full=doc.querySelector('.nt-update-notes-full').textContent;
-  assert.match(full,/• Five/);
+  assert.doesNotMatch(full,/• Five|Sidebars can now/,'What\'s New items must not be moved into Additional details');
   assert.match(full,/• Expert diagnostic log explains/);
   assert.doesNotMatch(doc.querySelector('.nt-update-notes-highlights').textContent,/Expert diagnostic log/);
 });

@@ -1,0 +1,13 @@
+Network Toolkit 1.21.5 Beta 6
+
+## What's New
+
+- The update notice now shows every "What's new" point in full, so nothing important is cut short.
+
+## Additional Details
+
+- Before, the notice showed at most four points and shortened long ones to about 180 characters with "…". What's New items now always appear in the main list; Additional details keeps only the technical notes.
+- Older release notes without a What's New section still list their first four points, now in full, with the rest under Additional details.
+- Release notes are still shown as plain text; links stay inactive.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Security confirmations, Windows/UAC approval, download and install consent and checksum verification are unchanged.
+- This is an opt-in beta. Stable users stay on 1.20.16. Portable executable filename remains Network_Toolkit.exe.
