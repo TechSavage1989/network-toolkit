@@ -11,6 +11,7 @@ import (
 
 type Endpoint struct {
 	Address  string     `json:"address"`
+	Name     string     `json:"name,omitempty"` // learned from DNS answers in this capture
 	Packets  int        `json:"packets"`
 	Bytes    uint64     `json:"bytes"`
 	Sent     int        `json:"sent"`
@@ -32,6 +33,23 @@ type Conversation struct {
 	Duration        float64    `json:"duration"`
 	Resets          int        `json:"resets"`
 	Retransmissions int        `json:"retransmissions"`
+	// Plain reading for people new to captures: the service on the server
+	// port, and what happened to the conversation ("worked", "refused",
+	// "no-reply", "ongoing", "replied" or "one-way").
+	ServicePort uint16 `json:"servicePort,omitempty"`
+	Service     string `json:"service,omitempty"`
+	Outcome     string `json:"outcome,omitempty"`
+	NameA       string `json:"nameA,omitempty"`
+	NameB       string `json:"nameB,omitempty"`
+}
+
+// conversationStart tracks how a TCP conversation began.
+type conversationStart struct {
+	client       string // address:port that sent the first SYN
+	syn, synAck  bool
+	refused      bool // the other side reset before accepting
+	addrA, addrB string
+	portA, portB uint16
 }
 type Bucket struct {
 	PacketNumber    uint64         `json:"packetNumber,omitempty"`
@@ -45,21 +63,22 @@ type Bucket struct {
 	IntervalSeconds float64        `json:"intervalSeconds"`
 }
 type Statistics struct {
-	GraphStarted   *time.Time     `json:"graphStarted,omitempty"`
-	GraphFinished  *time.Time     `json:"graphFinished,omitempty"`
-	GraphNote      string         `json:"graphNote,omitempty"`
-	Protocols      map[string]int `json:"protocols"`
-	Endpoints      []Endpoint     `json:"endpoints"`
-	Conversations  []Conversation `json:"conversations"`
-	Timeline       []Bucket       `json:"timeline"`
-	Bytes          uint64         `json:"bytes"`
-	Expert         int            `json:"expert"`
-	Duration       float64        `json:"duration"`
-	Started        *time.Time     `json:"started,omitempty"`
-	Finished       *time.Time     `json:"finished,omitempty"`
-	TimedPackets   int            `json:"timedPackets"`
-	UntimedPackets int            `json:"untimedPackets"`
-	TimedBytes     uint64         `json:"timedBytes"`
+	GraphStarted   *time.Time        `json:"graphStarted,omitempty"`
+	GraphFinished  *time.Time        `json:"graphFinished,omitempty"`
+	GraphNote      string            `json:"graphNote,omitempty"`
+	Protocols      map[string]int    `json:"protocols"`
+	Names          map[string]string `json:"names,omitempty"` // IP address to name, from DNS answers in this capture
+	Endpoints      []Endpoint        `json:"endpoints"`
+	Conversations  []Conversation    `json:"conversations"`
+	Timeline       []Bucket          `json:"timeline"`
+	Bytes          uint64            `json:"bytes"`
+	Expert         int               `json:"expert"`
+	Duration       float64           `json:"duration"`
+	Started        *time.Time        `json:"started,omitempty"`
+	Finished       *time.Time        `json:"finished,omitempty"`
+	TimedPackets   int               `json:"timedPackets"`
+	UntimedPackets int               `json:"untimedPackets"`
+	TimedBytes     uint64            `json:"timedBytes"`
 }
 
 func Stats(packets []Packet) Statistics {
@@ -106,6 +125,7 @@ func Stats(packets []Packet) Statistics {
 	}
 	endpoints := map[string]*Endpoint{}
 	flows := map[string]*Conversation{}
+	starts := map[string]*conversationStart{}
 	seen := map[string]map[uint32][]byte{}
 	for _, p := range packets {
 		s.Protocols[p.Protocol]++
@@ -160,6 +180,17 @@ func Stats(packets []Packet) Statistics {
 		if v == nil {
 			v = &Conversation{ID: p.Stream, Protocol: p.Transport, A: a, B: b, Start: p.Time}
 			flows[p.Stream] = v
+			starts[p.Stream] = &conversationStart{addrA: p.Source, addrB: p.Destination, portA: p.SourcePort, portB: p.DestinationPort}
+		}
+		if st := starts[p.Stream]; p.Transport == "TCP" {
+			switch flags := p.TCPFlags & 0x17; {
+			case flags == 0x02 && !st.syn:
+				st.syn, st.client = true, a
+			case flags == 0x12 && st.syn && a != st.client:
+				st.synAck = true
+			case flags&0x04 != 0 && st.syn && !st.synAck && a != st.client:
+				st.refused = true
+			}
 		}
 		v.Packets++
 		v.Bytes += uint64(p.Length)
@@ -196,10 +227,17 @@ func Stats(packets []Packet) Statistics {
 			}
 		}
 	}
+	s.Names = HostNames(packets)
 	for _, v := range endpoints {
+		v.Name = s.Names[v.Address]
 		s.Endpoints = append(s.Endpoints, *v)
 	}
-	for _, v := range flows {
+	for id, v := range flows {
+		st := starts[id]
+		v.ServicePort = servicePort(st.portA, st.portB)
+		v.Service = ServiceName(v.ServicePort)
+		v.NameA, v.NameB = s.Names[st.addrA], s.Names[st.addrB]
+		v.Outcome = conversationOutcome(v, st)
 		s.Conversations = append(s.Conversations, *v)
 	}
 	sort.Slice(s.Endpoints, func(i, j int) bool { return s.Endpoints[i].Bytes > s.Endpoints[j].Bytes })
@@ -284,4 +322,28 @@ func Follow(packets []Packet, id string) Stream {
 		s.Note = "UDP datagram payloads are shown in capture order. Datagram boundaries use the packet list. Encrypted data is not decrypted."
 	}
 	return s
+}
+
+func conversationOutcome(v *Conversation, st *conversationStart) string {
+	both := v.AToB > 0 && v.BToA > 0
+	switch v.Protocol {
+	case "TCP":
+		switch {
+		case st.synAck:
+			return "worked"
+		case st.refused:
+			return "refused"
+		case st.syn && !both:
+			return "no-reply"
+		case both:
+			return "ongoing"
+		}
+		return "one-way"
+	case "UDP":
+		if both {
+			return "replied"
+		}
+		return "one-way"
+	}
+	return ""
 }
