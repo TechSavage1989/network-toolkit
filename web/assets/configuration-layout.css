@@ -128,3 +128,17 @@
 .tftp-session-picker p{margin:4px 0 0}
 .tftp-session-manager{max-height:56vh;overflow:auto}.tftp-session-entry{display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:8px 0;border-bottom:1px solid var(--border)}
 .tftp-session-entry strong{flex:1 1 180px;overflow-wrap:anywhere}.tftp-session-entry small{flex:1 1 200px;overflow-wrap:anywhere}
+
+/* The configuration sidebar can sit on the right (owner request, v1.21.3), like
+   the Terminal and File Transfer sidebars. Compact widths show one panel at a
+   time, so the side only applies to the wide layout. */
+#toolConfigHeading>#toolConfigurationSide{flex:0 0 26px;width:26px;height:26px;min-height:26px;padding:5px;margin-left:4px}
+#toolConfigHeading>#configurationExpandAll[hidden]+#toolConfigurationSide{margin-left:auto}
+#toolConfigHeading>#toolConfigurationSide svg{width:13px;height:13px}
+.compact-tool-workspace #toolConfigurationSide{display:none}
+.diagnostic-page #toolWorkspace.configuration-right:not(.compact-tool-workspace):not(.local-workspace){grid-template-columns:minmax(0,1fr) 6px var(--tool-config-width,300px)}
+.diagnostic-page #toolWorkspace.configuration-right:not(.compact-tool-workspace):not(.local-workspace)>#toolConfiguration{grid-column:3}
+.diagnostic-page #toolWorkspace.configuration-right:not(.compact-tool-workspace):not(.local-workspace)>#pageContent{grid-column:1}
+.diagnostic-page #toolWorkspace.configuration-right.configuration-hidden:not(.compact-tool-workspace):not(.local-workspace){grid-template-columns:minmax(0,1fr) 6px 34px}
+.diagnostic-page #toolWorkspace.configuration-right.configuration-hidden:not(.compact-tool-workspace):not(.local-workspace)>#toolConfigurationRail{grid-column:3}
+.diagnostic-page #toolWorkspace.configuration-right.configuration-hidden:not(.compact-tool-workspace):not(.local-workspace)>#pageContent{grid-column:1}
