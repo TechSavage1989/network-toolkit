@@ -910,3 +910,14 @@ test('the network connection picker labels adapters like the other adapter picke
  assert(h.doc.getElementById('packetCaptureWorkspace').classList.contains('packet-setup-only'),'a new capture should give the setup its full height');
  const reviewing=harness({id:'a'.repeat(24),name:'Capture',state:'completed',count:3,bytes:300,revision:1});await reviewing.settle();assert.equal(reviewing.doc.getElementById('packetCaptureWorkspace').classList.contains('packet-setup-only'),false);
 });
+test('packet details can dock on the left of the packet list, resize from their right edge and keep the choice',async()=>{
+ const h=harness({id:'a'.repeat(24),name:'Capture',state:'completed',count:1,bytes:54,revision:1});await h.settle();h.doc.emit('click',h.doc.querySelector('[data-packet-view="packets"]'));await h.settle();
+ const area=h.doc.getElementById('packetCaptureAnalysis'),divider=h.doc.getElementById('packetDetailsDivider'),dock=h.doc.getElementById('packetDetailsDock');area.getBoundingClientRect=()=>({width:1200,height:600});
+ assert.deepEqual(dock.querySelectorAll('option').map(o=>o.getAttribute('value')),['auto','right','left','bottom']);
+ dock.value='left';h.doc.emit('change',dock);assert.equal(h.c.state.packetDetails.dock,'left');assert(area.classList.contains('packet-details-left'));assert.equal(area.style.gridTemplateColumns,'360px 6px minmax(0,1fr)');
+ assert(h.doc.querySelector('#packetInspector [data-panel-direction="left"]'),'the hide control should point toward the left edge');
+ h.doc.emit('pointerdown',divider,{button:0,clientX:366,pointerId:2});h.c.window.emit('pointermove',{clientX:406,pointerId:2});h.c.window.emit('pointerup');assert.equal(h.c.state.packetDetails.width,400,'dragging the divider right should widen left-docked details');
+ h.doc.emit('keydown',divider,{key:'ArrowLeft'});assert.equal(h.c.state.packetDetails.width,390);h.doc.emit('keydown',divider,{key:'ArrowRight'});assert.equal(h.c.state.packetDetails.width,400);
+ area.getBoundingClientRect=()=>({width:700,height:600});h.api.layoutDetails();assert(area.classList.contains('packet-details-left'),'an explicit Left dock should not move below a narrow list');
+ h.api.mergePreferences({packetDetails:{width:420,height:260,hidden:false,dock:'left'}});assert.equal(h.c.state.packetDetails.dock,'left');
+});
