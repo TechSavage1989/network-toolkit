@@ -87,5 +87,27 @@ func safeTerminalSyntax(value any) map[string]any {
 			}
 		}
 	}
-	return map[string]any{"active": active, "custom": custom, "colors": colors}
+	// Colors switched off per rule set (v1.21.14): {id: ["red", ...]}.
+	off := map[string]any{}
+	if requested, ok := source["off"].(map[string]any); ok {
+		for id, raw := range requested {
+			slots, ok := raw.([]any)
+			if !ok || !(terminalSyntaxBuiltIn[id] || seen[id]) {
+				continue
+			}
+			clean := []any{}
+			for _, color := range terminalSyntaxColors {
+				for _, slot := range slots {
+					if slot == color {
+						clean = append(clean, color)
+						break
+					}
+				}
+			}
+			if len(clean) > 0 {
+				off[id] = clean
+			}
+		}
+	}
+	return map[string]any{"active": active, "custom": custom, "colors": colors, "off": off}
 }

@@ -1,7 +1,7 @@
-NETWORK TOOLKIT 1.21.13
+NETWORK TOOLKIT 1.21.14
 ======================
 
-CURRENT RELEASE - 1.21.13 (BETA 14)
+CURRENT RELEASE - 1.21.14 (BETA 15)
 
 This is a compatibility entrypoint for existing portable packages and release
 validation. For current user instructions, see the Markdown guides:

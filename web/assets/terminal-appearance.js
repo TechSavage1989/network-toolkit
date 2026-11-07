@@ -64,7 +64,7 @@ const descriptions={background:'The area behind all terminal text.',foreground:'
 // MobaXterm-style rule sets (terminal-syntax-rules.js) take their colors from
 // the terminal color scheme: bright colors on dark backgrounds, normal on light.
 function syntaxColors(clean,appTheme){const t=theme(clean,appTheme),dark=mode(clean,appTheme)==='dark',pick=name=>t[dark?'bright'+name[0].toUpperCase()+name.slice(1):name];return {red:pick('red'),green:pick('green'),yellow:pick('yellow'),blue:pick('blue'),magenta:pick('magenta'),cyan:pick('cyan'),underline:t.foreground};}
-function syntaxRuleSet(language){const rules=root.NTKTerminalSyntaxRules;if(!rules||SHELLS?.supported(language))return null;const prefs=rules.preferences(typeof state==='undefined'?null:state.terminalSyntax);if(prefs.active==='smart')return null;return rules.find(prefs,prefs.active);}
+function syntaxRuleSet(language){const rules=root.NTKTerminalSyntaxRules;if(!rules||SHELLS?.supported(language))return null;const prefs=rules.preferences(typeof state==='undefined'?null:state.terminalSyntax);if(prefs.active==='smart')return null;const set=rules.find(prefs,prefs.active);return set&&rules.withSwitches?rules.withSwitches(set,prefs):set;}
 function highlightOptions(value,appTheme='dark',language){const clean=normalize(effective(value)),set=syntaxRuleSet(language);return {theme:mode(clean,appTheme),colors:clean.highlightColors,underlines:clean.highlightUnderlines,linkUnderlines:clean.highlightLinkUnderlines,prompt:clean.promptHighlight,rules:clean.highlightRules,ruleset:set?root.NTKTerminalSyntaxRules.compile(set):null,ruleSet:set,syntaxColors:{...syntaxColors(clean,appTheme),...(set?(root.NetworkToolkitTerminalSyntaxUI?.colorsFor?.(set.id)||root.NTKTerminalSyntaxRules.preferences(typeof state==='undefined'?null:state.terminalSyntax).colors[set.id]):null)},...(SHELLS?.supported(language)?{shellColors:clean.shells[language].colors}:{})};}
 function enabled(value,language,deviceEnabled=true){return SHELLS?.supported(language)?normalize(value).shells[language].enabled:deviceEnabled;}
 // Suggestions name local fonts only. No @font-face, FontFace URL, download,
@@ -118,7 +118,7 @@ function colorField(key,label,help,highlight=false){
 // Terminal settings tabs (owner request, v1.21.11): Appearance holds the look,
 // Highlighting holds every highlight option, Features holds confirmations.
 // Without the tabbed panel (tests, older layouts) everything goes into the panel.
-const SECTIONS=['#terminalAppearanceEditor','#terminalHighlightEditor','#terminalConfirmSettings','[data-terminal-universal-editor]'];
+const SECTIONS=['#terminalAppearanceEditor','#terminalHighlightEditor','#terminalConfirmSettings','[data-terminal-universal-editor]','[data-terminal-prompt-card]'];
 // The Appearance preview shows the active profile's real highlighting
 // (Universal, a keyword rule set or your own imported set; owner request,
 // v1.21.13). Lines are analyzed like terminal output; spans are rebuilt only
@@ -140,6 +140,8 @@ function previewMarks(settings,colors){
  return marks;
 }
 function promptSelect(id,label=''){return '<select id="'+id+'" data-terminal-appearance="promptHighlight"'+(label?' aria-label="'+label+'"':'')+'>'+PROMPT_MODES.map(([value,name])=>'<option value="'+value+'">'+name+'</option>').join('')+'</select>';}
+// Device prompt name card for keyword rule set pages in Customize (v1.21.14).
+function promptCardHTML(){return '<div class="terminal-universal-rule terminal-syntax-prompt-card" data-terminal-prompt-card><span class="terminal-syntax-card-mark" aria-hidden="true"></span><label for="syntaxRulePromptName"><strong>Device prompt name</strong><small>user@host, switch# and similar. Works with every profile.</small></label>'+colorButton('syntaxRulePromptColor','device prompt name','data-terminal-highlight-color','prompt')+'<div class="terminal-universal-prompt">'+promptSelect('syntaxRulePromptName','Device prompt name')+'</div></div>';}
 // Universal profile rules and colors, shown in the Syntax highlighting
 // Customize dialog (owner request, v1.21.12). Controls use the same data
 // attributes as the settings panel, so they save and sync the same way.
@@ -192,7 +194,7 @@ function sync(){
  const section=document.getElementById('terminalAppearanceEditor');if(!section)return;
  // Nothing to show while the tools panel is hidden; the next open syncs it.
  // The Customize dialog's Universal page is synced while it is open.
- const dialog=document.querySelector('[data-terminal-universal-editor]');
+ const dialog=document.querySelector('[data-terminal-universal-editor],[data-terminal-prompt-card]');
  if(section.closest('.hidden')&&!dialog)return;
  const clean=normalize(effective(state.terminalAppearance)),colors=theme(clean,state.theme),font=options(clean,state.theme),highlightSettings=highlightOptions(clean,state.theme),legend=root.NTTerminalHighlight?.legend?.(highlightSettings.theme,highlightSettings)||[],marks=Object.fromEntries(legend.map(mark=>[mark.kind,mark]));
  for(const input of scoped('[data-terminal-appearance]')){if(input.getAttribute('type')==='checkbox')input.checked=clean[input.dataset.terminalAppearance]===true;else if(input!==document.activeElement)input.value=String(clean[input.dataset.terminalAppearance]);}
@@ -251,5 +253,5 @@ document.addEventListener('click',event=>{
 });
 // Opens the color picker for one Universal color (legend chips, v1.21.12).
 function editHighlightColor(kind){if(!Object.hasOwn(HIGHLIGHTS,kind))return false;openColor({dataset:{terminalHighlightColor:kind},getAttribute:()=>'Choose '+HIGHLIGHTS[kind][0]+' color'});return true;}
-root.NetworkToolkitTerminalAppearance=Object.freeze({cursors:CURSORS,universalEditorHTML,editHighlightColor,promptModes:PROMPT_MODES,normalize,theme,mode,options,highlightOptions,syntaxColors:(value,appTheme='dark')=>syntaxColors(normalize(effective(value)),appTheme),enabled,mount,sync,afterFontChange,fontAvailability,fontStack,fontFamilies:FONT_FAMILIES,presets:PRESETS,colors:COLORS,highlightKinds:Object.keys(HIGHLIGHTS)});
+root.NetworkToolkitTerminalAppearance=Object.freeze({cursors:CURSORS,universalEditorHTML,promptCardHTML,editHighlightColor,promptModes:PROMPT_MODES,normalize,theme,mode,options,highlightOptions,syntaxColors:(value,appTheme='dark')=>syntaxColors(normalize(effective(value)),appTheme),enabled,mount,sync,afterFontChange,fontAvailability,fontStack,fontFamilies:FONT_FAMILIES,presets:PRESETS,colors:COLORS,highlightKinds:Object.keys(HIGHLIGHTS)});
 })(window);

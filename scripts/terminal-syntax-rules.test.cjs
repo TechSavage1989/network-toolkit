@@ -113,3 +113,14 @@ test('per-profile colors (v1.21.11) keep only valid colors for profiles that exi
   assert.deepEqual(JSON.parse(JSON.stringify(prefs.colors)), { network: { red: '#aa0000' }, 'custom-lab': { cyan: '#00aaff' } });
   assert.deepEqual(JSON.parse(JSON.stringify(R.preferences(null).colors)), {});
 });
+
+test('switched-off colors are kept per rule set and match nothing (v1.21.14)', () => {
+  const prefs = R.preferences({ active: 'standard', custom: [{ id: 'custom-a', name: 'A', rules: { red: 'boom' } }], off: { standard: ['red', 'nope', 'underline'], 'custom-a': 'red', missing: ['red'] } });
+  assert.deepEqual(prefs.off, { standard: ['red', 'underline'] });
+  const set = R.withSwitches(R.find(prefs, 'standard'), prefs);
+  assert.equal(set.rules.red, ''); assert.equal(set.rules.underline, ''); assert.notEqual(set.rules.green, '');
+  assert(!R.compile(set).match('error: link failed').some(hit => hit.kind === 'syn-red'));
+  assert(R.compile(R.find(prefs, 'standard')).match('error: link failed').some(hit => hit.kind === 'syn-red'), 'the saved rule set itself is unchanged');
+  assert(!R.legend(set).some(item => item.color === 'red'), 'the legend leaves it out'); assert.equal(R.legend(set).find(item => item.color === 'green').note, 'Success');
+  assert.equal(R.withSwitches(R.find(prefs, 'network'), prefs), R.find(prefs, 'network'));
+});

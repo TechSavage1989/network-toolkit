@@ -78,7 +78,14 @@ const appearance=()=>page.evaluate(()=>JSON.parse(JSON.stringify(state.terminalA
   assert.equal((await appearance()).highlightColors.prompt,'#cc5500');assert.match(await span('prompt-name').evaluate(el=>el.style.color),/rgb\(204, 85, 0\)|#cc5500/);
   await dialog.locator('[data-terminal-highlight-colors-reset]').click();assert.deepEqual((await appearance()).highlightColors,{});
   // Switching to a rule set and back keeps the dialog usable.
-  await page.locator('#syntaxEditSet').selectOption('network');await page.locator('#syntaxRule-red').waitFor();assert.equal(await page.locator('#modalRoot [data-syntax-act="use"]').textContent(),'Use this rule set');
+  await page.locator('#syntaxEditSet').selectOption('network');await page.locator('#syntaxRule-red').waitFor({state:'attached'});assert.equal(await page.locator('#modalRoot [data-syntax-act="use"]').textContent(),'Use this rule set');
+  // v1.21.14: rule set pages use the same cards as Universal.
+  assert.equal(await page.locator('#modalRoot [data-syntax-slot]').count(),7);assert.equal(await page.locator('#modalRoot [data-terminal-prompt-card]').count(),1);
+  assert.equal(await page.locator('#syntaxRulePromptName').inputValue(),await page.evaluate(()=>state.terminalAppearance.promptHighlight),'the prompt card shows the saved choice');
+  await page.locator('#syntaxSlotOn-red').click();await page.waitForFunction(()=>state.terminalSyntax.off?.network?.[0]==='red');assert.equal(await page.locator('#syntaxSlotOn-red').isChecked(),false);
+  assert.equal(await page.evaluate(()=>{const body=document.querySelector('#modalRoot .modal-body');return body.scrollWidth<=body.clientWidth+1;}),true,'rule set cards fit without sideways scrolling');
+  await shot('ruleset-cards-'+theme);
+  await page.locator('#syntaxSlotOn-red').click();await page.waitForFunction(()=>!state.terminalSyntax.off?.network);
   await page.locator('#syntaxEditSet').selectOption('smart');await dialog.waitFor();
   await page.locator('#modalRoot [data-syntax-act="use"]').click();assert.equal(await page.evaluate(()=>state.terminalSyntax.active),'smart');
   await page.locator('#modalRoot [data-action="close-modal"]').first().click();

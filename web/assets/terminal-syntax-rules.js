@@ -298,7 +298,20 @@
       for (const color of COLORS) if (typeof slots[color] === 'string' && /^#[0-9a-f]{6}$/i.test(slots[color])) clean[color] = slots[color].toLowerCase();
       if (Object.keys(clean).length) colors[id] = clean;
     }
-    return { active, custom, colors };
+    // Colors switched off per profile (v1.21.14): {profile id: ['red', ...]}.
+    const off = {}, requestedOff = v.off && typeof v.off === 'object' && !Array.isArray(v.off) ? v.off : {};
+    for (const [id, slots] of Object.entries(requestedOff)) {
+      if (!(builtIn(id) || custom.some(set => set.id === id)) || !Array.isArray(slots)) continue;
+      const clean = COLORS.filter(color => slots.includes(color));
+      if (clean.length) off[id] = clean;
+    }
+    return { active, custom, colors, off };
+  }
+  // The rule set as it colors output: switched-off colors match nothing.
+  function withSwitches(set, prefs) {
+    const off = set ? preferences(prefs).off[set.id] || [] : [];
+    if (!off.length) return set;
+    return { ...set, rules: Object.fromEntries(COLORS.map(color => [color, off.includes(color) ? '' : set.rules?.[color] || ''])) };
   }
   function find(prefs, id) { const clean = preferences(prefs); return builtIn(id) || clean.custom.find(set => set.id === id) || null; }
   function newId(prefs, name) {
@@ -309,11 +322,11 @@
   }
   // Built-in color notes, used by the legend; custom sets list their colors.
   function legend(set) {
-    const value = builtIn(set?.id) || set;
-    return COLORS.filter(color => value?.rules?.[color]).map(color => ({ color, label: LABELS[color], note: value.notes?.[color] || '' }));
+    const notes = (builtIn(set?.id) || set)?.notes || {};
+    return COLORS.filter(color => set?.rules?.[color]).map(color => ({ color, label: LABELS[color], note: notes[color] || '' }));
   }
 
-  const api = { COLORS, LABELS, LIMITS, BUILT_IN, convert, compile, compileColor, match, parseMsyn, toMsyn, decode, encode, normalize, preferences, find, builtIn, newId, legend };
+  const api = { COLORS, LABELS, LIMITS, BUILT_IN, convert, compile, compileColor, match, parseMsyn, toMsyn, decode, encode, normalize, preferences, find, builtIn, newId, legend, withSwitches };
   if (typeof module === 'object' && module.exports) module.exports = api;
   global.NTKTerminalSyntaxRules = Object.freeze(api);
 })(typeof window === 'object' ? window : globalThis);

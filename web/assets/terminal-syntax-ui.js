@@ -125,24 +125,43 @@
       '<div class="terminal-syntax-preview"><label for="syntaxSample">Try it with your own text</label><textarea id="syntaxSample" rows="6" spellcheck="false">' + escape(universalSample) + '</textarea>' +
       '<pre id="syntaxPreview" class="terminal-syntax-preview-output" style="background:' + escape(c.terminal.background) + ';color:' + escape(c.terminal.foreground) + '" aria-label="Preview"></pre></div></div>';
   }
+  // One card per color, like the Universal page (owner request, v1.21.14):
+  // on/off switch, name and note, color button, then the words or pattern
+  // (editable for your own and imported sets, folded away for built-ins).
+  function cardHTML(color, value, note, on, builtIn) {
+    const pattern = '<textarea id="syntaxRule-' + color + '" data-syntax-color="' + color + '" rows="2" spellcheck="false" autocomplete="off" aria-label="' + R.LABELS[color] + ' words or pattern"' + (builtIn ? ' readonly' : '') + '>' + escape(editing.rules[color]) + '</textarea>';
+    return '<div class="terminal-universal-rule terminal-syntax-card" data-syntax-slot="' + color + '">' +
+      '<input type="checkbox" id="syntaxSlotOn-' + color + '" data-syntax-slot-on="' + color + '"' + (on ? ' checked' : '') + '>' +
+      '<label for="syntaxSlotOn-' + color + '"><strong>' + R.LABELS[color] + '</strong><small>' + escape(note || (color === 'underline' ? 'Underlined text' : builtIn ? '' : 'Your words or pattern')) + '</small></label>' +
+      '<button type="button" class="ntk-color-trigger' + (color === 'underline' ? ' is-underline' : '') + '" data-syntax-swatch="' + color + '" aria-label="Choose the ' + R.LABELS[color] + ' color for this rule set" title="Change the ' + R.LABELS[color] + ' color for this rule set"><span class="ntk-color-chip" aria-hidden="true" style="background-color:' + escape(value) + ';--ntk-swatch:' + escape(value) + '"></span><code>' + escape(value) + '</code></button>' +
+      (builtIn ? '<details class="terminal-syntax-pattern"><summary>Pattern</summary>' + pattern + '</details>' : '<div class="terminal-syntax-pattern">' + pattern + '</div>') +
+      '<p class="terminal-syntax-error" id="syntaxError-' + color + '" role="alert"></p></div>';
+  }
+  function setOff(id, slots) {
+    const p = prefs(), off = { ...p.off };
+    if (slots.length) off[id] = slots; else delete off[id];
+    appState().terminalSyntax = { ...p, off }; save(); repaint();
+  }
+  function setSlot(id, slot, on) { const current = prefs().off[id] || []; setOff(id, on ? current.filter(item => item !== slot) : [...new Set([...current, slot])]); }
   function bodyHTML() {
     const c = colors(), set = editing, locked = set.builtIn ? ' readonly' : '', disabled = set.builtIn ? ' disabled' : '';
     const setOptions = '<option value="' + UNIVERSAL + '"' + (set.universal ? ' selected' : '') + '>' + escape(UNIVERSAL_NAME) + '</option><optgroup label="Keyword rule sets">' + R.BUILT_IN.map(item => '<option value="' + item.id + '"' + (item.id === set.id ? ' selected' : '') + '>' + escape(item.name) + '</option>').join('') + '</optgroup>' +
       (prefs().custom.length ? '<optgroup label="Your rule sets">' + prefs().custom.map(item => '<option value="' + item.id + '"' + (item.id === set.id ? ' selected' : '') + '>' + escape(item.name) + '</option>').join('') + '</optgroup>' : '');
     if (set.universal) return universalBodyHTML(setOptions);
-    const notes = R.builtIn(set.id)?.notes || {};
+    const notes = R.builtIn(set.id)?.notes || {}, off = prefs().off[set.id] || [];
     return '<div class="terminal-syntax-editor" data-syntax-editor>' +
       '<div class="terminal-syntax-toolbar"><label for="syntaxEditSet">Rule set</label><select id="syntaxEditSet">' + setOptions + '</select>' +
       '<button type="button" class="btn small ghost" data-syntax-act="duplicate">Duplicate</button>' +
       (set.builtIn ? '' : '<button type="button" class="btn small ghost" data-syntax-act="delete">' + (deleteArmed ? 'Confirm delete' : 'Delete') + '</button>') +
       '<button type="button" class="btn small ghost" data-syntax-act="import">Import .msyn…</button><input type="file" id="syntaxImportFile" accept=".msyn,.ini,.txt" multiple hidden>' +
       '<button type="button" class="btn small ghost" data-syntax-act="export">Export .msyn</button></div>' +
-      (set.builtIn ? '<p class="hint">Built-in rule sets can\'t be changed. Duplicate one to edit your own copy.</p>' : '<p class="hint">Changes are saved as you type. Each color is a regular expression or, with Regular expressions off, a comma-separated word list. MobaXterm patterns can be pasted as they are.</p>') +
+      (set.builtIn ? '<p class="hint">Built-in rule sets can\'t be changed, but you can turn each color on or off and pick its color. Duplicate one to edit its words or patterns.</p>' : '<p class="hint">Changes are saved as you type. Each color uses a regular expression or, with Regular expressions off, a comma-separated word list. MobaXterm patterns can be pasted as they are.</p>') +
       '<div class="terminal-syntax-meta"><label for="syntaxEditName">Name</label><input id="syntaxEditName" maxlength="' + R.LIMITS.name + '" value="' + escape(set.name) + '"' + locked + '>' +
       '<label class="check"><input type="checkbox" id="syntaxEditRegex"' + (set.regex ? ' checked' : '') + disabled + '> Regular expressions</label>' +
       '<label class="check"><input type="checkbox" id="syntaxEditCase"' + (set.caseSensitive ? ' checked' : '') + disabled + '> Case sensitive</label></div>' +
-      '<div class="terminal-syntax-rules">' + R.COLORS.map(color => '<div class="terminal-syntax-rule"><button type="button" class="terminal-syntax-swatch' + (color === 'underline' ? ' underline' : '') + '" data-syntax-color="' + color + '" style="' + (color === 'underline' ? 'border-bottom-color:' : 'background:') + escape(c.syntax[color] || 'currentColor') + '" title="Change the ' + R.LABELS[color] + ' color for this rule set" aria-label="Change the ' + R.LABELS[color] + ' color for this rule set"></button><label for="syntaxRule-' + color + '">' + R.LABELS[color] + (notes[color] ? '<span class="hint">' + escape(notes[color]) + '</span>' : '') + '</label>' +
-        '<textarea id="syntaxRule-' + color + '" data-syntax-color="' + color + '" rows="2" spellcheck="false" autocomplete="off"' + locked + '>' + escape(set.rules[color]) + '</textarea><p class="terminal-syntax-error" id="syntaxError-' + color + '" role="alert"></p></div>').join('') + '</div>' +
+      '<div class="terminal-universal-rules terminal-syntax-cards">' + R.COLORS.map(color => cardHTML(color, c.syntax[color] || '', notes[color], !off.includes(color), set.builtIn)).join('') +
+        (root.NetworkToolkitTerminalAppearance?.promptCardHTML ? root.NetworkToolkitTerminalAppearance.promptCardHTML() : '') + '</div>' +
+      '<div class="terminal-universal-actions"><button type="button" class="btn small ghost" data-syntax-act="all-on">Turn all colors on</button><button type="button" class="btn small ghost" data-syntax-act="reset-colors">Reset colors</button></div>' +
       '<div class="terminal-syntax-preview"><label for="syntaxSample">Try it with your own text</label><textarea id="syntaxSample" rows="6" spellcheck="false">' + escape(sample) + '</textarea>' +
       '<pre id="syntaxPreview" class="terminal-syntax-preview-output" style="background:' + escape(c.terminal.background) + ';color:' + escape(c.terminal.foreground) + '" aria-label="Preview"></pre></div></div>';
   }
@@ -155,11 +174,11 @@
     if (!body || !body.querySelector('[data-syntax-editor]')) return;
     body.innerHTML = bodyHTML(); bind(); preview();
     const use = document.querySelector('#modalRoot [data-syntax-act="use"]'); if (use) use.textContent = useLabel();
-    if (editing?.universal) root.NetworkToolkitTerminalAppearance?.sync?.();
+    root.NetworkToolkitTerminalAppearance?.sync?.(); // Universal and prompt card controls
     if (focusId) document.getElementById(focusId)?.focus?.();
   }
   // Called after Universal settings change (terminal-appearance.js sync).
-  function refreshUniversal() { if (editing?.universal && typeof document !== 'undefined' && document.querySelector('[data-syntax-editor]')) preview(); }
+  function refreshUniversal() { if (editing && typeof document !== 'undefined' && document.querySelector('[data-syntax-editor]')) preview(); }
   function open(target) {
     if (typeof openModal !== 'function') return;
     // The Display panel floats above dialogs; close it so the editor is usable.
@@ -170,13 +189,13 @@
     pick(id === 'none' ? UNIVERSAL : id);
     openModal('Syntax highlighting', bodyHTML(), footerHTML(), true);
     bind(); preview();
-    if (editing.universal) root.NetworkToolkitTerminalAppearance?.sync?.();
+    root.NetworkToolkitTerminalAppearance?.sync?.();
   }
   function bind() {
     const editor = document.querySelector('[data-syntax-editor]');
     if (!editor || editor.dataset.bound) return;
     editor.dataset.bound = '1';
-    editor.addEventListener('click', event => { const swatch = event.target.closest?.('[data-syntax-color]'); if (swatch && editing) { event.preventDefault(); editColor(swatch.dataset.syntaxColor, editing.id); } });
+    editor.addEventListener('click', event => { const swatch = event.target.closest?.('[data-syntax-swatch]'); if (swatch && editing) { event.preventDefault(); editColor(swatch.dataset.syntaxSwatch, editing.id); } });
     editor.addEventListener('input', event => {
       const el = event.target;
       if (el.id === 'syntaxSample') { if (editing.universal) universalSample = el.value.slice(0, 20000); else sample = el.value.slice(0, 20000); schedule(); return; }
@@ -190,6 +209,7 @@
       const el = event.target;
       if (el.id === 'syntaxEditSet') { pick(el.value); render('syntaxEditSet'); return; }
       if (el.id === 'syntaxImportFile') { void importFiles(el.files); el.value = ''; return; }
+      if (el.dataset.syntaxSlotOn && !editing.universal) { setSlot(editing.id, el.dataset.syntaxSlotOn, el.checked); return; }
       if (editing.builtIn || editing.universal) return;
       if (el.id === 'syntaxEditRegex') editing.regex = el.checked;
       else if (el.id === 'syntaxEditCase') editing.caseSensitive = el.checked;
@@ -208,6 +228,13 @@
     appState().terminalSyntax = { ...p, custom: p.custom.map(item => item.id === set.id ? set : item) };
     save(); sync();
     if (prefs().active === set.id) refreshTerminals();
+  }
+  // The Device prompt color as the terminal uses it (Universal's prompt color).
+  function promptColor() {
+    const appearance = root.NetworkToolkitTerminalAppearance, H = root.NTTerminalHighlight;
+    if (!appearance?.highlightOptions || !H) return '';
+    const settings = appearance.highlightOptions(appState().terminalAppearance, appState().theme);
+    return H.legend(settings.theme, { ...settings, ruleset: null, ruleSet: null, rules: {}, prompt: 'auto' }).find(mark => mark.kind === 'prompt')?.color || '';
   }
   function universalPreview(output) {
     const appearance = root.NetworkToolkitTerminalAppearance, H = root.NTTerminalHighlight;
@@ -233,12 +260,15 @@
     const output = document.getElementById('syntaxPreview');
     if (!output || !editing) return;
     if (editing.universal) { universalPreview(output); return; }
-    const compiled = R.compile(editing), c = colors();
+    // Errors come from every pattern; matching leaves switched-off colors out.
+    const compiled = R.compile(editing), active = R.compile(R.withSwitches(editing, prefs())), c = colors(), H = root.NTTerminalHighlight;
     for (const color of R.COLORS) { const error = document.getElementById('syntaxError-' + color); if (error) error.textContent = compiled.errors[color] || ''; }
+    const promptMode = root.NetworkToolkitTerminalAppearance?.highlightOptions?.(appState().terminalAppearance, appState().theme)?.prompt || 'auto';
+    const named = { 'prompt-name': promptColor(), 'prompt-plain': c.terminal.foreground };
     output.innerHTML = sample.split('\n').slice(0, 200).map(line => {
-      const hits = compiled.match(line), marks = [];
+      const hits = H ? H.analyze(line, 'ssh', {}, active, { prompt: promptMode }) : active.match(line), marks = [];
       for (let i = 0; i <= line.length; i++) marks.push({ color: '', underline: false });
-      for (const hit of hits) for (let i = hit.start; i < hit.end; i++) { const color = hit.kind.slice(4); if (color === 'underline') marks[i].underline = true; else marks[i].color = c.syntax[color]; }
+      for (const hit of hits) for (let i = hit.start; i < hit.end; i++) { if (named[hit.kind] !== undefined) { marks[i].color = named[hit.kind]; continue; } const color = hit.kind.slice(4); if (color === 'underline') marks[i].underline = true; else marks[i].color = c.syntax[color]; }
       let html = '', openKey = null;
       for (let i = 0; i < line.length; i++) {
         const key = marks[i].color + '|' + marks[i].underline;
@@ -253,15 +283,17 @@
     if (p.custom.length >= R.LIMITS.custom) { notify('You can keep up to ' + R.LIMITS.custom + ' rule sets. Delete one first.', 'error'); return; }
     const name = (editing.name + ' (copy)').slice(0, R.LIMITS.name), id = R.newId(p, name);
     const set = { ...R.normalize({ ...editing, name }), id };
-    appState().terminalSyntax = { ...p, custom: [...p.custom, set] };
+    // The copy starts with the original's colors and switches.
+    const colors = p.colors[editing.id] ? { ...p.colors, [id]: { ...p.colors[editing.id] } } : p.colors, off = p.off[editing.id] ? { ...p.off, [id]: [...p.off[editing.id]] } : p.off;
+    appState().terminalSyntax = { ...p, custom: [...p.custom, set], colors, off };
     save(); sync(); pick(id); render('syntaxEditName');
   }
   function remove() {
     if (editing.builtIn) return;
     if (!deleteArmed) { deleteArmed = true; render(); document.querySelector('[data-syntax-act="delete"]')?.focus?.(); return; }
     const p = prefs(), id = editing.id, wasActive = p.active === id;
-    const colors = { ...p.colors }; delete colors[id];
-    appState().terminalSyntax = { ...p, active: wasActive ? 'smart' : p.active, custom: p.custom.filter(item => item.id !== id), colors };
+    const colors = { ...p.colors }, off = { ...p.off }; delete colors[id]; delete off[id];
+    appState().terminalSyntax = { ...p, active: wasActive ? 'smart' : p.active, custom: p.custom.filter(item => item.id !== id), colors, off };
     save(); sync(); if (wasActive) refreshTerminals();
     pick('standard'); render('syntaxEditSet');
   }
@@ -307,6 +339,8 @@
       else if (action === 'delete') remove();
       else if (action === 'import') document.getElementById('syntaxImportFile')?.click();
       else if (action === 'export') exportSet();
+      else if (action === 'all-on') setOff(editing.id, []);
+      else if (action === 'reset-colors') resetColors(editing.id);
       else if (action === 'use') { persist(); choose(editing.id); notify('Using ' + (editing.universal ? 'Universal' : editing.name) + ' for terminal output.'); }
     });
   }

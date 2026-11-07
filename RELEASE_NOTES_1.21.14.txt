@@ -1,0 +1,18 @@
+Network Toolkit 1.21.14 Beta 15
+
+## What's New
+
+- Keyword rule sets in Customize now look and work like Universal: switch each color on or off and change its color in one place.
+- Your own and imported .msyn rule sets keep their editable words and patterns, right on each color's card.
+
+## Additional Details
+
+- Each rule set page lists Red, Green, Yellow, Blue, Magenta, Cyan and Underline as cards with an on/off switch, the color's meaning, a color button with its value, and the words or pattern.
+- Built-in rule sets can't be edited, but their colors can be switched off or recolored; their patterns are folded under "Pattern". Duplicate makes an editable copy that keeps the colors and switches.
+- A switched-off color stops coloring terminal output, disappears from the legend and is left out of the previews. Turn all colors on and Reset colors undo your changes for that rule set.
+- A Device prompt name card on every rule set page sets the prompt name color or turns it off (it applies to every profile), and the Customize preview shows it.
+- Fixed: clicking inside a pattern box no longer opens the color picker.
+- Settings, saved values and their effects are unchanged apart from the additions above; switched-off colors are saved per rule set and kept after a restart.
+- Validation used unit tests and browser checks with sample text; no real device was used, and it has not yet been checked on a physical Windows PC.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Security confirmations and Windows/UAC approval are unchanged.
+- This is an opt-in beta. Stable users stay on 1.20.16. Portable executable filename remains Network_Toolkit.exe.
