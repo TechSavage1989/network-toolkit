@@ -16,7 +16,7 @@ Read [docs/UX_POLISH_PLAN.md](docs/UX_POLISH_PLAN.md) first. It is the owner's a
 - No application-code changes in Phase 1. After the UX audit, **stop for explicit approval** before implementation.
 - Work in 1.18.x betas, one per approved implementation phase (2 through 6).
 - Update checks must eventually run at startup and every six hours, with manual checking and explicit user approval to download/install retained.
-- Keep What's New short, plain-language and focused on the experience; technical detail belongs under Additional Details.
+- Keep What's New short, plain-language and focused on the experience; technical detail belongs under Additional Details. The updater shows every What's New item in full (owner request, v1.21.5), so keep the list to a few clear sentences.
 
 ## Repository layout
 - cmd/network-toolkit/: Go application and Windows native host; internal/: platform, network operations, security, Terminal and transfer logic.
