@@ -1,3 +1,15 @@
+# v1.21.11 Beta 12 (Terminal settings and Tools menus cleaned up) - candidate
+
+Owner: "please polish and clean up the display and tools menus of terminal. make sure they are intuitive and think about ease of use and QoL and reduce redundancies." That request is the owner's approval for moving these controls (layout freeze); docs/UI_GUIDELINES.md records the new arrangement.
+- Panel: `terminal-extras.js` builds `#terminalSessionPanel` (ids kept for tests and code) with a tab strip and four `[data-settings-panel]` pages. Markup in `terminalToolsHTML` marked `data-settings-tab` (highlighting profile, font size field, transcript note) is moved into its page. Settings modules mount into their page when present, else into the panel (unit-test harnesses).
+- `terminal-appearance.js`: `SECTIONS` + `scoped()` replace the single-section queries; confirmation checkboxes are found by id (they used to be looked up in the shell section).
+- Tab memory is per app session (module variable), not saved. Tests that open the panel must click the tab they need (`[data-terminal-settings-tab="…"]`).
+- Separate terminal windows have no sidebar, so Theme and App settings icons appear in the Tools heading there only.
+- Checked: features-85, terminal-style107, color-picker, dropdowns, terminal-pager browser tests; unit tests; README terminal screenshot recaptured.
+- Not claimed: checked on a physical Windows PC.
+
+---
+
 # v1.21.10 Beta 11 (Dropdowns in the app's colors) - candidate
 
 Owner request (with a screenshot of the black font suggestion popup): native-feeling dropdowns instead of the black list, suggestion lists that show every choice regardless of typed text, and fonts shown in their own face. The same message also asked for a Display/Tools menu cleanup and a universal highlighting profile with customizable colors; those follow as v1.21.11 and v1.21.12.

@@ -5,8 +5,11 @@ Open Terminal to connect to a permitted device using SSH, Telnet or serial acces
 ## Sessions and panes
 You can work with multiple tabs and split panes. Open another tab with the **+** at the end of the tab strip (or "Open a new terminal tab" in command search). The sidebar contains Saved, Recent, Files and Macros tabs; click the selected tab to hide the sidebar and any tab to show it again, and use ⇄ at the bottom of its icon strip to move it to the other side; tabs and panes may have context menus and drag interactions. Keep sessions open while you navigate other tools.
 
+## Terminal settings
+**Settings** in the terminal toolbar opens Terminal settings, with four tabs: **Appearance** (font, size, cursor, colors and a live preview), **Highlighting** (how output is colored), **Features** (scrollback, bell, selection, line endings, confirmations) and **Mouse & keyboard** (copy, paste, right-click, Ctrl+C, pager and paste warnings). It reopens on the tab you used last. **Tools** holds saved connections, the password manager, SSH host keys, the separate window and help.
+
 ## Syntax highlighting
-Display → **Syntax highlighting** chooses how terminal output is colored:
+Settings → Highlighting → **Syntax highlighting** chooses how terminal output is colored; the colors the chosen profile uses are shown right below it:
 - **Network Toolkit device highlighting** (default) recognizes addresses, interfaces, commands, settings and states.
 - **Keyword rule sets** work like MobaXterm's: Standard keywords (errors red, success green, warnings yellow, addresses magenta, information cyan, links underlined), Unix shell script, Network configuration (Cisco and others), Perl syntax and SQL syntax.
 - **None** turns highlighting off.
@@ -14,7 +17,7 @@ Display → **Syntax highlighting** chooses how terminal output is colored:
 **Customize** lets you duplicate a rule set and edit one pattern per color (a regular expression or a comma-separated word list), try it on your own text, and import or export MobaXterm `.msyn` files. Patterns from MobaXterm work as they are. Colors follow the terminal color scheme, and text already colored by the device keeps its color. Local PowerShell and Command Prompt tabs keep their own shell colors.
 
 ## Font, colors and cursor
-In Display, type any font size from 8 to 36 and press Enter (Ctrl+wheel over the terminal also changes it). **Terminal appearance** sets the font, weight, line spacing and:
+Settings → **Appearance**: pick a font (each is shown in its own typeface, with a note saying whether it is installed), type any size from 8 to 36 and press Enter (Ctrl+wheel over the terminal also changes it), and set the weight, line spacing and:
 - **Cursor:** block, underline or line, each steady or blinking (blinking block is the default).
 - **Color scheme:** besides the existing schemes, MobaXterm's Dark background / Light text, Light background / Dark text, Soft pastel, Bright, Monokai, AfterGlow and Monochrome. Customize colors changes any color, including the cursor's.
 - **Show bold text in brighter colors:** on by default; turn it off to keep bold text in its normal color.
@@ -22,7 +25,7 @@ In Display, type any font size from 8 to 36 and press Enter (Ctrl+wheel over the
 Changes apply to open terminals at once and are kept after a restart and in separate Terminal windows.
 
 ## Terminal features
-Display → **Terminal features** sets:
+Settings → **Features** sets:
 - **Scrollback lines:** 500 to 10,000 lines kept above the screen (10,000 by default).
 - **Bell:** none, flash the terminal, or play a sound when a device sends a bell.
 - **Word delimiters:** the characters that end a word when you double-click to select.
@@ -31,7 +34,7 @@ Display → **Terminal features** sets:
 - **After a session ends:** press R to reconnect or S to save the session. Optionally, any other key closes the ended session's tab.
 
 ## Paste warnings
-Before text is pasted, the terminal checks it for commands that download and run a script (`curl … | sh`), changes to shell startup files, archives unpacked into system folders, look-alike, hidden or typographic characters, and plain-HTTP or shortened links. If any are found, the paste review opens, even for one line, and lists them. You can edit the text or send it anyway. Turn each kind off in Mouse and keyboard defaults → **Warn before pasting**.
+Before text is pasted, the terminal checks it for commands that download and run a script (`curl … | sh`), changes to shell startup files, archives unpacked into system folders, look-alike, hidden or typographic characters, and plain-HTTP or shortened links. If any are found, the paste review opens, even for one line, and lists them. You can edit the text or send it anyway. Turn each kind off in Settings → Mouse & keyboard → **Warn before pasting**.
 
 ## Connection controls
 Drag a Saved session to reorder the list (or focus it and press Alt+Shift+Up or Down); the order is kept. To run a Command Prompt or PowerShell tab as administrator after it started, choose **Open as administrator in a new tab** from the tab's More actions menu; Windows asks for approval and the original tab stays open. To replace the tab instead, choose **Restart this tab as administrator**: after you confirm and Windows approves, the elevated shell takes the tab's place and the old shell closes (anything running in it stops). If you decline the prompt, the tab is left as it is. The Disconnect button's menu offers **Disconnect all** and **Close all tabs**. Reconnect an eligible session from its controls. The adjacent reconnect menu may also offer Reconnect all. Some tabs can be detached by dragging outside the window. Terminal tab actions are available from each tab's More actions button. The Terminal sidebar includes a visible show/hide control. Ctrl+Shift+P opens application command search when the console is not focused; F1 opens help outside focused terminal input.

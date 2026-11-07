@@ -1,0 +1,19 @@
+Network Toolkit 1.21.11 Beta 12
+
+## What's New
+
+- Terminal settings are tidier. The Display button is now Settings, with four tabs: Appearance, Highlighting, Features, and Mouse & keyboard. Each setting appears once, in the place you would look for it.
+- The Highlighting tab shows the colors of the chosen profile right under the menu, so you no longer need a separate legend window.
+
+## Additional Details
+
+- Mouse and keyboard defaults moved from Tools into Settings. Tools now holds saved connections, the password manager, SSH host keys, the separate window, Pane shortcuts and Help.
+- Removed duplicates: Toggle theme and App settings are in the app sidebar. Separate terminal windows have no sidebar, so they show both in the Tools heading. The Highlight legend is now inline, Pane shortcuts moved to Tools, and the font size sits next to the font.
+- Highlighting options are together: underline, device-output rules and colors, and PowerShell and Command Prompt colors. Session confirmations moved to Features.
+- Appearance has one preview with your colors, cursor, font and a Unicode alignment check.
+- Settings reopens on the tab you used last. The arrow keys move between tabs.
+- Settings, saved values and their effects are unchanged; only their place in the menus moved.
+- Next: one improved highlighting profile, and customizable colors for every profile.
+- Validation used unit tests and browser checks; it has not yet been checked on a physical Windows PC.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Security confirmations and Windows/UAC approval are unchanged.
+- This is an opt-in beta. Stable users stay on 1.20.16. Portable executable filename remains Network_Toolkit.exe.
