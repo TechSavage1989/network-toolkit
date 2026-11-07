@@ -5,6 +5,10 @@ Read [docs/UX_POLISH_PLAN.md](docs/UX_POLISH_PLAN.md) first. It is the owner's a
 
 **Never prepend release records to AGENTS.md or README.md.** Keep release history in CHANGELOG.md and per-release technical evidence in docs/releases/ or existing docs/RELEASE###_HANDOFF.md files.
 
+## Working with the owner
+- When the owner's input or decision is needed, when a release has been published, or when work is waiting on the owner, start that message with a bold, clearly marked line (for example **⚠️ ACTION NEEDED:**, **✅ PUBLISHED:** or **⏳ WAITING ON YOU:**) so it cannot be missed (owner request, 2026-11-07).
+- Terminal settings modeled on MobaXterm are planned in [docs/TERMINAL_SETTINGS_PLAN.md](docs/TERMINAL_SETTINGS_PLAN.md).
+
 ## Owner's non-negotiables
 - Never lose credentials, vault entries, saved profiles, preferences, macros, unsaved work or active sessions. Migrate settings explicitly.
 - Preserve Windows/UAC authorization, Hosts/IP/adapter review, explicit download and install consent, and checksum verification.

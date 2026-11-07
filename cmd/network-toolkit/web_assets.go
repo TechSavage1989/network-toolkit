@@ -20,9 +20,9 @@ func serveWebAsset(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
 	case "/assets/ux-phase5.js", "/assets/ux-customize.js", "/assets/ux-tab-scroll.js", "/assets/editor-send-terminal.js", "/assets/terminal-send-editor.js", "/assets/editor-context-menu.js", "/assets/linux-shell.js", "/assets/ux-tab-recovery.js", "/assets/ux-settings.js", "/assets/ux-command-palette.js", "/assets/app-chrome.js", "/assets/sidebar-activity.js", "/assets/network-config-language.js", "/assets/editor-compare.js", "/assets/editor-alignment-model.js", "/assets/editor-aligned-compare.js", "/assets/editor-windows.js", "/assets/editor-drag.js", "/assets/editor-tab-groups.js", "/assets/editor-files-sidebar.js", "/assets/editor-saved-connections.js":
 		contentType = "text/javascript; charset=utf-8"
-	case "/assets/app-chrome.css", "/assets/sidebar-activity.css", "/assets/editor-windows.css":
+	case "/assets/app-chrome.css", "/assets/sidebar-activity.css", "/assets/editor-windows.css", "/assets/terminal-syntax.css":
 		contentType = "text/css; charset=utf-8"
-	case "/assets/terminal-shell-syntax.js", "/assets/editor-languages.js", "/assets/editor-language-service.js", "/assets/editor-language-worker.js",
+	case "/assets/terminal-shell-syntax.js", "/assets/terminal-syntax-rules.js", "/assets/terminal-syntax-ui.js", "/assets/editor-languages.js", "/assets/editor-language-service.js", "/assets/editor-language-worker.js",
 		"/assets/vendor/codemirror/codemirror.js", "/assets/editor-vendor/languages.js", "/assets/editor-vendor/prism.js", "/assets/editor-vendor/prettier.js",
 		"/assets/editor-vendor/prettier-babel.js", "/assets/editor-vendor/prettier-estree.js", "/assets/editor-vendor/prettier-typescript.js",
 		"/assets/editor-vendor/prettier-html.js", "/assets/editor-vendor/prettier-postcss.js", "/assets/editor-vendor/prettier-markdown.js",
