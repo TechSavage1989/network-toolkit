@@ -1,3 +1,13 @@
+# v1.21.12 Beta 13 (Universal highlighting and colors for every profile) - candidate
+
+Owner: compare the original device highlighting with the MobaXterm rule sets, make it a universal profile with better detection, and make highlight colors customizable for every profile.
+- Comparison: the MobaXterm rule sets color keywords anywhere (useful breadth, but they paint prose); the device highlighter was precise but missed logs, CLI errors, ping, routing/service states and several vendors. The universal profile adds those as shape-based recognizers (`universalHighlights` in terminal-highlight.js) and keeps the no-prose rule; `scripts/terminal-highlight-universal.test.cjs` holds the multi-vendor positives and the prose negatives (add both when extending).
+- New kind `info` (Info / notice) is wired through LABELS/MARKS/COLORS, terminal-appearance HIGHLIGHTS, Go `terminalHighlightKinds` and the rule switches.
+- Rule-set colors per profile live in `terminalSyntax.colors[id][slot]`; deleting a custom set removes its colors; the Customize dialog and the legend both call `NetworkToolkitTerminalSyntaxUI.editColor`. Picker previews use a module variable (`colorsFor`), never saved state.
+- Not claimed: tested against real devices or on a physical Windows PC.
+
+---
+
 # v1.21.11 Beta 12 (Terminal settings and Tools menus cleaned up) - candidate
 
 Owner: "please polish and clean up the display and tools menus of terminal. make sure they are intuitive and think about ease of use and QoL and reduce redundancies." That request is the owner's approval for moving these controls (layout freeze); docs/UI_GUIDELINES.md records the new arrangement.

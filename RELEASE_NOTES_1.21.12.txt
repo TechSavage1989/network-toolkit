@@ -1,0 +1,20 @@
+Network Toolkit 1.21.12 Beta 13
+
+## What's New
+
+- Device highlighting is now one universal profile that works with network devices from many vendors, Linux and Windows servers, and logs. It colors errors, warnings and notices in logs, error messages such as "% Invalid input" or "command not found", ping loss, and routing and service states.
+- Every highlighting profile's colors can be changed. In Settings → Highlighting, click a color in the legend to pick a new one; Reset colors goes back to the defaults.
+
+## Additional Details
+
+- New recognition, still only for recognizable shapes and never for ordinary sentences:
+  - Log levels after a timestamp, in brackets or as level=…, and Cisco-style %FACILITY-SEVERITY-NAME messages (0–3 red, 4 yellow, 5–6 the new Info color, 7 gray).
+  - Error and success messages from network CLIs, Linux shells and Windows.
+  - Ping results ("0% packet loss" and "Success rate is 100 percent" in green, loss in yellow or red).
+  - BGP and OSPF neighbor states, STP forwarding/blocking, err-disabled ports, and systemd "Active:" states.
+- More interface names: Huawei and H3C, Arista, Palo Alto, MikroTik, and Cisco multigig, serial, cellular and short names. More prompts: Cisco prompts typed without a space (switch#copy), Windows prompts over SSH, and Huawei/H3C views.
+- The profile is now called "Universal (devices, servers and logs)"; its saved choice and colors are kept. A new Info / notice color can be changed or turned off like the others.
+- Keyword rule sets (Standard, Shell, Network, Perl, SQL and your own) keep their own colors per profile. In Customize, the color square beside each rule also changes it.
+- Validation used unit tests with sample output from many systems and browser checks; no real device was used, and it has not yet been checked on a physical Windows PC.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Security confirmations and Windows/UAC approval are unchanged.
+- This is an opt-in beta. Stable users stay on 1.20.16. Portable executable filename remains Network_Toolkit.exe.

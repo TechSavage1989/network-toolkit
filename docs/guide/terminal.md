@@ -10,9 +10,11 @@ You can work with multiple tabs and split panes. Open another tab with the **+**
 
 ## Syntax highlighting
 Settings → Highlighting → **Syntax highlighting** chooses how terminal output is colored; the colors the chosen profile uses are shown right below it:
-- **Network Toolkit device highlighting** (default) recognizes addresses, interfaces, commands, settings and states.
+- **Universal (devices, servers and logs)** (default) recognizes addresses, MAC addresses, interfaces from many vendors (Cisco, Juniper, Aruba, Arista, Huawei/H3C, FortiGate, Palo Alto, MikroTik, Linux), prompts (including Windows and Huawei), commands and settings, states, log severities (`ERROR`, `[WARN]`, `level=info`, `%LINK-3-UPDOWN`), CLI errors (`% Invalid input`, `command not found`), ping loss, BGP/OSPF neighbor states, STP states and systemd service states. It colors only recognizable shapes, never ordinary sentences.
 - **Keyword rule sets** work like MobaXterm's: Standard keywords (errors red, success green, warnings yellow, addresses magenta, information cyan, links underlined), Unix shell script, Network configuration (Cisco and others), Perl syntax and SQL syntax.
 - **None** turns highlighting off.
+
+**Colors:** click any color in the legend under the menu to change it for that profile; **Reset colors** goes back to the scheme's colors. In Customize, the color square beside each rule does the same for any rule set.
 
 **Customize** lets you duplicate a rule set and edit one pattern per color (a regular expression or a comma-separated word list), try it on your own text, and import or export MobaXterm `.msyn` files. Patterns from MobaXterm work as they are. Colors follow the terminal color scheme, and text already colored by the device keeps its color. Local PowerShell and Command Prompt tabs keep their own shell colors.
 
