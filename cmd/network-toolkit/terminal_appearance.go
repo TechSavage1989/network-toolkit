@@ -18,6 +18,13 @@ func safeTerminalAppearance(value any) map[string]any {
 	if source["highlightUnderlines"] == false {
 		clean["highlightUnderlines"] = false
 	}
+	// Cursor type and bold-brighter (v1.21.7); unknown values keep the defaults.
+	clean["cursor"] = "block-blink"
+	switch cursor, _ := source["cursor"].(string); cursor {
+	case "block", "underline", "bar", "block-blink", "underline-blink", "bar-blink":
+		clean["cursor"] = cursor
+	}
+	clean["boldBright"] = source["boldBright"] != false
 	highlights := map[string]any{}
 	if requested, ok := source["highlightColors"].(map[string]any); ok {
 		for _, key := range terminalHighlightKinds {
@@ -55,7 +62,7 @@ func safeTerminalAppearance(value any) map[string]any {
 	}
 	if scheme, ok := source["scheme"].(string); ok {
 		switch scheme {
-		case "app", "dark", "light", "mobaCurrent", "pastelDusk", "pastelMint", "pastelLavender", "rosePine", "catppuccin", "nord", "tokyoNight", "gruvbox", "dracula", "solarizedDark", "solarizedLight", "campbell", "custom":
+		case "app", "dark", "light", "mobaCurrent", "pastelDusk", "pastelMint", "pastelLavender", "rosePine", "catppuccin", "nord", "tokyoNight", "gruvbox", "dracula", "solarizedDark", "solarizedLight", "campbell", "darkLight", "lightDark", "softPastel", "bright", "monokai", "afterglow", "monochrome", "custom":
 			clean["scheme"] = scheme
 		}
 	}

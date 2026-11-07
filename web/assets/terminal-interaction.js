@@ -2,7 +2,7 @@
   'use strict';
 
   const MAX_PASTE_BYTES = 1024 * 1024;
-  const FONT_SIZES = [10,11,12,13,14,16,18,20,22,24];
+  const FONT_SIZES = [8,9,10,11,12,13,14,16,18,20,22,24,28,32,36];
   const MENU_ITEMS = [
     {id:'copy',label:'Copy selection',icon:'copy',key:'Ctrl+Shift+C',group:'clipboard'},
     {id:'copy-line',label:'Copy line',icon:'copy',group:'clipboard'},
@@ -325,7 +325,7 @@
   }
 
   function setFontSize(size) {
-    const value = Math.max(10,Math.min(24,Math.round(size)));
+    const value = Math.max(8,Math.min(36,Math.round(size)));
     if (state.terminalFontSize === value) return;
     state.terminalFontSize = value;
     const select = document.querySelector('#terminalFontSize');
@@ -422,8 +422,8 @@
     if (id === 'disconnect') return terminalLive(entry) && terminalOwnerCanMutate(entry) && !entry.transferBusy;
     if (id === 'reconnect') return terminalReconnectAllowed(entry);
     if (id === 'maximize') return terminalPaneCount() > 1;
-    if (id === 'zoom-in') return (state.terminalFontSize || 13) < 24;
-    if (id === 'zoom-out') return (state.terminalFontSize || 13) > 10;
+    if (id === 'zoom-in') return (state.terminalFontSize || 13) < 36;
+    if (id === 'zoom-out') return (state.terminalFontSize || 13) > 8;
     if (id === 'move') { const button = document.querySelector('[data-terminal-action="move"]'); return !!button && !button.disabled; }
     return true;
   }

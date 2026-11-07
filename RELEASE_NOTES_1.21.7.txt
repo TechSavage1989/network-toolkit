@@ -1,0 +1,17 @@
+Network Toolkit 1.21.7 Beta 8
+
+## What's New
+
+- Terminal font, colors and cursor are now set like in MobaXterm. Type any font size from 8 to 36, choose a block, underline or line cursor (steady or blinking), and pick new color schemes: Dark background / Light text, Light background / Dark text, Soft pastel, Bright, Monokai, AfterGlow and Monochrome.
+- A new option shows bold text in brighter colors. It is on by default, as before, and can be turned off.
+
+## Additional Details
+
+- Font size is in Display; cursor, color schemes and the bold option are in Display under Terminal appearance. Ctrl+wheel over the terminal steps through the full 8 to 36 range.
+- The cursor color can still be changed in Customize colors. The style preview shows the chosen cursor.
+- Existing settings look the same after updating: a blinking block cursor, bright bold text and your current font size and colors.
+- Changes apply to open terminals at once and are kept after a restart and in separate Terminal windows.
+- The next betas add terminal features and advanced options, session logging and more local shells (docs/TERMINAL_SETTINGS_PLAN.md).
+- Validation used unit tests, browser checks and sample output; no real device was used, and it has not yet been checked on a physical Windows PC.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Security confirmations and Windows/UAC approval are unchanged.
+- This is an opt-in beta. Stable users stay on 1.20.16. Portable executable filename remains Network_Toolkit.exe.

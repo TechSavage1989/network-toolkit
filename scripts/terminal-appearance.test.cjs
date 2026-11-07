@@ -108,3 +108,20 @@ test('sync leaves a hidden appearance editor alone and catches up when it is sho
  h.api.sync();assert.equal(control.getAttribute('type')==='checkbox'?control.checked:control.value,control.getAttribute('type')==='checkbox'?!before:'sentinel','no sync while hidden');
  panel.classList.remove('hidden');h.api.sync();assert.equal(control.getAttribute('type')==='checkbox'?control.checked:control.value,before,'shown again: synced from preferences');
 });
+test('cursor type, bold-brighter and MobaXterm-named schemes save, apply live and keep today\'s look by default',async()=>{
+ const h=harness(),term=new Terminal({cols:40,rows:6,allowProposedApi:true,...h.api.options({},'dark')});
+ // Existing settings without the new keys keep a blinking block cursor and bright bold text.
+ const legacy=h.api.normalize({fontFamily:'Consolas',scheme:'dracula'});assert.equal(legacy.cursor,'block-blink');assert.equal(legacy.boldBright,true);
+ assert.deepEqual([term.options.cursorStyle,term.options.cursorBlink,term.options.drawBoldTextInBrightColors],['block',true,true]);
+ assert.equal(h.api.normalize({cursor:'url(x)',boldBright:'false'}).cursor,'block-blink');assert.equal(h.api.normalize({boldBright:'false'}).boldBright,true);
+ const entry={xterm:term,element:new Element(),highlighter:{setAppearance(){}}};h.c.terminalSessions.set('one',entry);
+ const cursor=h.document.getElementById('terminalAppearanceCursor');assert.deepEqual(cursor.querySelectorAll('option').map(o=>o.textContent),['Block','Underline','Line','Blinking block','Blinking underline','Blinking line']);
+ cursor.value='bar';h.document.emit('change',cursor);assert.equal(h.state.terminalAppearance.cursor,'bar');assert.equal(term.options.cursorStyle,'bar');assert.equal(term.options.cursorBlink,false);
+ const preview=h.document.querySelector('[data-terminal-preview-cursor]');assert.equal(preview.style.backgroundColor,'transparent');assert.match(preview.style.boxShadow,/^inset 2px 0 0 /);
+ cursor.value='underline-blink';h.document.emit('change',cursor);assert.equal(term.options.cursorStyle,'underline');assert.equal(term.options.cursorBlink,true);assert.match(preview.style.boxShadow,/^inset 0 -2px 0 /);assert.match(preview.className,/terminal-preview-cursor-blink/);
+ const bold=h.document.getElementById('terminalAppearanceBoldBright');assert.equal(bold.checked,true);bold.checked=false;h.document.emit('change',bold);assert.equal(h.state.terminalAppearance.boldBright,false);assert.equal(term.options.drawBoldTextInBrightColors,false);
+ const names=Object.values(h.api.presets).map(p=>p.name);for(const name of ['Dark background / Light text','Light background / Dark text','Soft pastel','Bright','Monokai','AfterGlow','Monochrome'])assert(names.includes(name),name);
+ assert.equal(h.api.mode({scheme:'lightDark'},'dark'),'light');assert.equal(h.api.mode({scheme:'monokai'},'light'),'dark');
+ const scheme=h.document.getElementById('terminalAppearanceScheme');scheme.value='monokai';h.document.emit('change',scheme);assert.equal(term.options.theme.background,'#272822');assert.equal(h.state.terminalAppearance.cursor,'underline-blink','changing colors keeps the cursor');
+ h.document.emit('click',h.document.querySelector('[data-terminal-appearance-reset]'));assert.equal(h.state.terminalAppearance.cursor,'block-blink');assert.equal(h.state.terminalAppearance.boldBright,true);term.dispose();
+});

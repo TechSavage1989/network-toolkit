@@ -42,7 +42,7 @@ Use the repo's existing scripts and vendored dependencies:
 - python3 scripts/build_windows_resources.py
 - sh ./build.sh
 
-Where fixtures/browser/native host tests need platform-specific setup, run the established .github/workflows/checks.yml jobs in hosted GitHub Actions. Never claim physical Windows or live-device acceptance from synthetic tests.
+Where fixtures/browser/native host tests need platform-specific setup, run the established .github/workflows/checks.yml jobs in hosted GitHub Actions. Checks runs twice for a pull request from a branch in this repository (push and pull_request events); merge only when both runs are green, re-running a failed job rather than relying on the other run. Never claim physical Windows or live-device acceptance from synthetic tests.
 
 ## Linux edition
 - Plan and phase status: docs/LINUX_PLAN.md. Windows file names, the Windows updater, saved data and behaviour must not change for Linux work.

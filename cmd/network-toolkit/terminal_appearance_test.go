@@ -130,3 +130,26 @@ func TestTerminalHighlightRulesDefaultWithoutResettingExistingCustomSettings(t *
 		}
 	}
 }
+
+func TestTerminalCursorBoldBrightAndMobaXtermSchemesPersist(t *testing.T) {
+	for _, scheme := range []string{"darkLight", "lightDark", "softPastel", "bright", "monokai", "afterglow", "monochrome"} {
+		if got := safeTerminalAppearance(map[string]any{"scheme": scheme})["scheme"]; got != scheme {
+			t.Fatalf("scheme %s was dropped: %v", scheme, got)
+		}
+	}
+	for _, cursor := range []string{"block", "underline", "bar", "block-blink", "underline-blink", "bar-blink"} {
+		if got := safeTerminalAppearance(map[string]any{"cursor": cursor})["cursor"]; got != cursor {
+			t.Fatalf("cursor %s was dropped: %v", cursor, got)
+		}
+	}
+	clean := safeTerminalAppearance(map[string]any{"cursor": "url(secret-canary)", "boldBright": "false"})
+	if clean["cursor"] != "block-blink" || clean["boldBright"] != true {
+		t.Fatalf("invalid cursor settings did not use defaults: %#v", clean)
+	}
+	if safeTerminalAppearance(map[string]any{"boldBright": false})["boldBright"] != false {
+		t.Fatal("turning off bold-brighter was not kept")
+	}
+	if clean := safeTerminalAppearance(nil); clean["cursor"] != "block-blink" || clean["boldBright"] != true {
+		t.Fatalf("existing settings without cursor keys must keep today's look: %#v", clean)
+	}
+}

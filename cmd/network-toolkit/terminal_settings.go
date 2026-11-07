@@ -89,7 +89,7 @@ func sanitizeTerminalSettings(state map[string]any) {
 	}
 	if value, present := state["terminalFontSize"]; present {
 		size, ok := value.(float64)
-		if !ok || size < 10 || size > 24 || size != math.Trunc(size) {
+		if !ok || size < 8 || size > 36 || size != math.Trunc(size) {
 			delete(state, "terminalFontSize")
 		}
 	}

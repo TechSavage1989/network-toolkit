@@ -16,19 +16,20 @@ The owner's non-negotiables in AGENTS.md apply unchanged. Saved sessions, creden
 - Patterns that would freeze the terminal are rejected with an explanation.
 - Colors come from the terminal color scheme: bright colors on dark backgrounds, normal colors on light ones. Text colored by the remote program keeps its own color.
 
-**T2 · Font, colors and cursor**
-- Restructure Display into MobaXterm-like groups: Look and feel, Terminal features, Advanced, Local shell.
+**T2 · Font, colors and cursor (v1.21.7)**
 - **Font:**
-  - Any font size.
+  - Any font size from 8 to 36 px, typed in Display (Ctrl+wheel steps through the same range).
   - Bold and line spacing (both exist today).
-  - Bold text shown in brighter colors.
-  - A fixed number of rows × columns.
+  - Bold text shown in brighter colors (on by default, as before).
 - **Colors:**
   - Additional schemes with MobaXterm's names: Dark background / Light text, Light background / Dark text, Soft pastel, Bright, Monokai, AfterGlow, Monochrome. Solarized and Custom already exist.
   - Background, foreground and the 16 terminal colors (these exist).
-- **Cursor:** color, plus type (block, underline or line), each optionally blinking.
+- **Cursor:** color (Customize colors), plus type (block, underline or line), each optionally blinking. Blinking block stays the default.
+- Moved to T3: grouping Display into MobaXterm-like sections (Look and feel, Terminal features, Advanced, Local shell), which needs the T3 settings to fill them, and a fixed number of rows × columns, which changes how panes fit and resize.
 
 **T3 · Terminal features and Advanced**
+- Group Display into Look and feel, Terminal features, Advanced and Local shell (moved from T2).
+- **Fixed size:** an optional fixed number of rows × columns instead of fitting the pane (moved from T2).
 - **Scrollback:** a configurable number of lines (today 10,000), and show or hide the scrollbar.
 - **Line endings:** implicit CR in every LF; implicit LF in every CR.
 - **Bell:** none, visual flash or sound.
@@ -61,3 +62,4 @@ These MobaXterm options have no equivalent in the browser terminal (xterm.js) or
 
 ## Status
 - T1: published in v1.21.6 Beta 7 on 2026-11-07 (syntax highlighting rule sets, Customize, .msyn import and export).
+- T2: v1.21.7 Beta 8 candidate (font size 8 to 36, cursor type, bold in brighter colors, seven MobaXterm-named color schemes).
