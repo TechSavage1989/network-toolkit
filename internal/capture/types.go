@@ -116,6 +116,11 @@ type Interface struct {
 	Name        string `json:"name"`
 	Description string `json:"description,omitempty"`
 	Engine      string `json:"engine"`
+	// Picker details for an ordinary Windows adapter, shown like the other
+	// adapter pickers: "Name - Hardware | 192.0.2.4 (IPv4)" or its status.
+	Hardware  string   `json:"hardware,omitempty"`
+	Status    string   `json:"status,omitempty"`
+	Addresses []string `json:"addresses,omitempty"`
 }
 type Record struct {
 	Time           time.Time `json:"time"`

@@ -28,7 +28,7 @@ function harness(initialCapture=null,config={}){
  return {api,doc,c,calls,copied,downloads,saved,settle,setCapture:next=>capture=next};
 }
 test('opening capture automatically loads actual adapters, retains selection and reloads after leaving the tool',async()=>{
- const h=harness();await h.settle();assert.equal(h.calls.filter(c=>c.path==='/packet-captures/interfaces').length,1);assert.match(h.doc.getElementById('packetInterface').textContent,/Wi-Fi/);assert.equal(h.doc.querySelector('[data-packet-action="interfaces"]').textContent,'Refresh adapters');
+ const h=harness();await h.settle();assert.equal(h.calls.filter(c=>c.path==='/packet-captures/interfaces').length,1);assert.match(h.doc.getElementById('packetInterface').textContent,/Wi-Fi/);assert.equal(h.doc.querySelector('[data-packet-action="interfaces"]').textContent,'Refresh');assert.equal(h.doc.querySelector('[data-packet-action="interfaces"]').getAttribute('aria-label'),'Refresh adapters');
  h.doc.getElementById('packetInterface').value='live:wifi';h.doc.emit('click',h.doc.querySelector('[data-packet-action="interfaces"]'));await h.settle();assert.equal(h.doc.getElementById('packetInterface').value,'live:wifi');assert.equal(h.calls.filter(c=>c.path==='/packet-captures/interfaces').length,2);
  h.api.render();await h.settle();assert.equal(h.calls.filter(c=>c.path==='/packet-captures/interfaces').length,2,'rerendering the same tool unnecessarily refreshed ordinary adapters');
  h.doc.getElementById('pageContent').innerHTML='';h.api.render();await h.settle();assert.equal(h.calls.filter(c=>c.path==='/packet-captures/interfaces').length,3);
@@ -896,4 +896,17 @@ test('conversations and devices show plain results, services and names learned f
  assert.match(rows[2].querySelectorAll('td')[1].textContent,/UDP.*port 40000/);
  h.doc.emit('click',h.doc.querySelector('[data-packet-view="endpoints"]'));await h.settle();
  const devices=[...h.doc.querySelectorAll('.packet-summary-table tbody tr')];assert.equal(devices[0].querySelector('.packet-endpoint-name').textContent,'files.example.com');assert.equal(devices[1].querySelector('.packet-endpoint-name'),null);assert.equal(devices[1].querySelector('td').textContent,'192.0.2.60');
+});
+test('the network connection picker labels adapters like the other adapter pickers, with their address or state',async()=>{
+ const interfaces=[{id:'nics',name:'All configurable network adapters',engine:'auto'},{id:'adapter:{1}',name:'Ethernet',hardware:'Synthetic 5GbE Controller',status:'Up',addresses:['fe80::1%4','192.0.2.4'],engine:'auto'},{id:'adapter:{2}',name:'Wi-Fi 2',hardware:'Synthetic Wireless',status:'Down',addresses:[],engine:'auto'},{id:'adapter:{3}',name:'Ethernet 3',hardware:'Synthetic Disabled',status:'Disabled',engine:'auto'},{id:'adapter:{4}',name:'VPN',hardware:'VPN',status:'Up',addresses:['2001:db8::4'],engine:'auto'},{id:'adapter:{5}',name:'Tunnel',hardware:'<b>Tunnel</b>',status:'Up',addresses:[],engine:'auto'},{id:'live:'+'a'.repeat(24),name:'Wi-Fi',engine:'live'}];
+ const h=harness(null,{interfaces});await h.settle();
+ const picker=h.doc.getElementById('packetInterface'),labels=picker.querySelectorAll('option').map(o=>o.textContent);
+ assert.deepEqual(labels.slice(0,5),['All configurable network adapters','Ethernet - Synthetic 5GbE Controller | 192.0.2.4 (IPv4)','Wi-Fi 2 - Synthetic Wireless | Not connected','Ethernet 3 - Synthetic Disabled | Disabled','VPN | 2001:db8::4 (IPv6)']);
+ assert.match(labels[5],/^Tunnel - .*Tunnel.* \| No IP address$/);assert.equal(picker.querySelector('b'),null,'adapter text was not escaped');assert.equal(labels[6],'Wi-Fi (live)');
+ assert.equal(picker.title,'All configurable network adapters');
+ picker.value='adapter:{1}';h.doc.emit('change',picker);assert.equal(picker.title,'Ethernet - Synthetic 5GbE Controller | 192.0.2.4 (IPv4)');
+ assert.match(h.doc.querySelector('.packet-adapter-hint').textContent,/usually the one that shows an IP address/);
+ assert.doesNotMatch(h.doc.querySelector('.packet-workflow').textContent,/\d\./,'the how-it-works strip repeated the step numbers');
+ assert(h.doc.getElementById('packetCaptureWorkspace').classList.contains('packet-setup-only'),'a new capture should give the setup its full height');
+ const reviewing=harness({id:'a'.repeat(24),name:'Capture',state:'completed',count:3,bytes:300,revision:1});await reviewing.settle();assert.equal(reviewing.doc.getElementById('packetCaptureWorkspace').classList.contains('packet-setup-only'),false);
 });

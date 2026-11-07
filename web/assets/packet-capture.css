@@ -496,7 +496,15 @@
 /* Guided capture and plain results (v1.21.1, owner request: usable by people
  * new to packet captures). Three numbered setup steps, a recording coach,
  * a verdict first, a step-by-step connection check and readable counters. */
-.packet-guided-setup{grid-template-columns:repeat(3,minmax(0,1fr));align-items:start;gap:10px 14px;padding:10px}
+.packet-guided-setup{grid-template-columns:minmax(0,1fr) minmax(0,1.35fr) minmax(0,1fr);align-items:start;gap:10px 14px;padding:10px}
+/* Network connection: label row with a small Refresh and a full-width picker, as in Test a target's Source interface. */
+.packet-field-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;min-width:0}.packet-field-heading>label{margin:0}
+.packet-guided-setup .packet-adapter-refresh{flex:none;min-height:22px;padding:1px 7px;font-size:10px}
+.packet-guided-setup #packetInterface{width:100%;min-width:0}
+/* With no capture open the review area only holds the welcome text: let the setup take the height it needs so Start stays in view. */
+.packet-workspace.packet-setup-only>.packet-configuration-region{max-height:none;flex:0 1 auto}
+.packet-workspace.packet-setup-only>.packet-analysis{flex:1 1 0;min-height:110px}
+@media(max-height:720px){.packet-workspace.packet-setup-only .packet-workflow{display:none}}
 .packet-guided-setup .field label{display:flex;align-items:center;gap:7px;font-weight:650;color:var(--text)}
 .packet-step-number{display:inline-flex;align-items:center;justify-content:center;flex:none;width:20px;height:20px;border-radius:50%;background:var(--accentBg);color:var(--accent);font-size:11px;font-weight:700}
 .packet-optional{font-weight:400;color:var(--muted)}

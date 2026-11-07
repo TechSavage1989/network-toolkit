@@ -1,0 +1,15 @@
+Network Toolkit 1.21.2 Beta 3
+
+## What's New
+
+- Packet capture's network connection list now looks like the other adapter lists in the app. Each adapter shows its name, hardware and IP address, for example "Ethernet - Realtek PCIe 5GbE Family Controller | 192.168.1.4 (IPv4)". Adapters that are not connected or are disabled say so.
+- The large Start capture button stays in view while you set up a new capture, also in smaller windows.
+
+## Additional Details
+
+- Refresh now sits beside "Which network connection?", and the list is wider so the address is visible without opening it. Hover over the list to see the full name.
+- The short "Start capture, Reproduce the problem, Stop and review" guide above the setup no longer repeats the step numbers, so only the three setup steps are numbered. In short windows it is hidden to leave room for the setup.
+- Capture still records only the adapter you choose and never switches to another one. Adapter details are read the same way as in Local network; no administrator approval is needed to list them.
+- Validation used synthetic adapter lists, unit tests and hosted builds; no real network was recorded.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Security confirmations and Windows/UAC approval are unchanged.
+- This is an opt-in beta. Stable users stay on 1.20.16. Portable executable filename remains Network_Toolkit.exe.
