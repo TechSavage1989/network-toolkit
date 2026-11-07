@@ -15,7 +15,7 @@ function base(markup) {
 function configHarness(width = 1400) {
   const h = base('<div id="toolWorkspace"><div id="toolCommandBar"><button id="toolConfigurationToggle"></button></div><section id="toolConfiguration"><div id="toolConfigHeading"><span>Configuration</span><button id="configurationExpandAll"></button></div></section><div id="toolDivider"></div><div id="pageContent"></div></div>');
   h.document.getElementById('toolWorkspace').clientWidth = width;
-  for (const name of ['safeToolLayout', 'splitToolPage', 'compactToolWorkspace', 'toolConfigurationLimit', 'applyToolLayout', 'setToolPanel']) vm.runInContext(html.split('\n').find(line => line.startsWith('function ' + name + '(')), h.c);
+  for (const name of ['safeToolLayout', 'toolConfigurationSide', 'splitToolPage', 'compactToolWorkspace', 'toolConfigurationLimit', 'applyToolLayout', 'setToolPanel']) vm.runInContext(html.split('\n').find(line => line.startsWith('function ' + name + '(')), h.c);
   vm.runInContext('const toolPanelViews=new Map();', h.c);
   vm.runInContext(configuration, h.c); h.c.applyToolLayout(); h.c.NetworkToolkitConfiguration.init();
   return h;
@@ -88,4 +88,26 @@ test('drag resizing is preserved and the resized device details width survives c
   assert.equal(h.state.discoveryDetails.width, 470);
   h.document.emit('dblclick', divider); h.document.emit('dblclick', divider);
   assert.equal(h.state.discoveryDetails.width, 470); assert.equal(divider.getAttribute('aria-valuenow'), '470');
+});
+test('left device details resize from their right edge, keep their side when hidden and do not move below at wide sizes', () => {
+  const h = detailsHarness('left'), divider = h.document.getElementById('deviceDetailsDivider'), workspace = h.document.getElementById('networkResultsWorkspace');
+  assert(workspace.classList.contains('details-left')); assert(!workspace.classList.contains('details-right')); assert.equal(h.document.querySelector('[data-device-pane-toggle] svg').dataset.panelDirection, 'left');
+  const before = h.state.discoveryDetails.width;
+  h.document.emit('pointerdown', divider, {button: 0, clientX: 500, clientY: 500});
+  for (const move of h.listeners.get('pointermove') || []) move({clientX: 540, clientY: 500});
+  for (const finish of [...h.listeners.get('pointerup') || []]) finish();
+  assert.equal(h.state.discoveryDetails.width, before + 40, 'dragging right widens left-docked details');
+  h.document.emit('keydown', divider, {key: 'ArrowRight'}); assert.equal(h.state.discoveryDetails.width, before + 50);
+  h.document.emit('keydown', divider, {key: 'ArrowLeft'}); assert.equal(h.state.discoveryDetails.width, before + 40);
+  h.document.emit('dblclick', divider); assert(h.state.discoveryDetails.hidden); assert(workspace.classList.contains('details-left'));
+  assert.equal(h.document.querySelector('#deviceDetailsRail button').querySelector('svg').dataset.panelDirection, 'right');
+});
+test('the configuration sidebar moves to the right, mirrors its resize direction and keeps its width', () => {
+  const h = configHarness(), divider = h.document.getElementById('toolDivider'), workspace = h.document.getElementById('toolWorkspace'), toggle = h.document.getElementById('toolConfigurationToggle');
+  assert.equal(h.state.toolLayout.side, 'left');
+  h.state.toolLayout.side = 'right'; h.c.applyToolLayout();
+  assert(workspace.classList.contains('configuration-right')); assert.equal(toggle.querySelector('svg').dataset.panelDirection, 'right');
+  assert.equal(h.c.safeToolLayout({width: 320, collapsed: false, side: 'right'}).side, 'right'); assert.equal(h.c.safeToolLayout({side: 'top'}).side, 'left');
+  h.document.emit('dblclick', divider); assert.equal(h.state.toolLayout.collapsed, true); assert.equal(h.state.toolLayout.side, 'right');
+  assert.equal(toggle.querySelector('svg').dataset.panelDirection, 'left', 'the collapsed control points back into the page');
 });
