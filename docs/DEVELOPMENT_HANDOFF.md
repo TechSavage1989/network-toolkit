@@ -1,3 +1,13 @@
+# v1.21.2 Beta 3 (Packet capture adapter list) - candidate
+
+Owner, with screenshots of Test a target's Source interface list and the Packet capture connection list: "the packet capture network connection adapter selection should match the design of other adapter sleections thorughout the app".
+- Backend: `packetSystemAdapter` carries `Status` and `Addresses` from `readLocalIP` (no new privileged read); `packetAdapterView` fills the new `capture.Interface` fields `hardware`, `status`, `addresses` (omitempty, so imports and legacy live/file IDs are unchanged). Selection IDs and the no-fallback rule are unchanged.
+- UI: `captureAdapterLabel` mirrors `source-interface.js` `choiceLabel` ("Name - Hardware | address (IPv4)"); without a link it shows Not connected (Down, Lower layer down, Dormant), Disabled or the Windows status; Up without an address shows "No IP address". Refresh is a small button on the label row (aria-label "Refresh adapters"), the select is full width and the middle column 1.35× wider. `packet-setup-only` on the workspace (no capture selected) removes the configuration region's max-height so the big Start is visible at 960×600, 1280×800 and 1920×1080. The how-it-works strip drops its numbers and hides at max-height 720 px.
+- Tests: Go `TestPacketAdapterPickerShowsHardwareStateAndAddresses`; node packet-capture (90; labels, escaping, title, setup-only class), all node 1589; packet-capture-privilege, packet-troubleshooting-live, packet-dhcp-live and packet-inspector-live pass on the Linux build.
+- Not claimed: checked on a physical Windows PC with real adapters; validated with a synthetic adapter list.
+
+---
+
 # v1.21.1 Beta 2 (Packet capture for beginners) - publication verified (2026-11-07)
 
 Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.21.1 at 2026-11-07T06:38:00Z; stable latest remains v1.20.16. Merged PR #100; tag v1.21.1 points to merge commit 7f24d361c0469fc21db6ad9dce41b8bdacb50cbe. Release workflow run 42347674184 succeeded. Assets: Network_Toolkit.exe, Network_Toolkit_1.21.1_Portable.zip, Network_Toolkit_1.21.1_Update.zip, Network_Toolkit_1.21.1_Linux_x86_64.tar.gz, Network_Toolkit_1.21.1_Linux_aarch64.tar.gz, SHA256SUMS; all digests match SHA256SUMS. The published Linux x86_64 archive was downloaded, extracted and run (`--version` 1.21.1 linux amd64; inner SHA256SUMS OK). Checks: green runs 42346624230 (pull request) and 42346647922 (push) on the PR head, first attempt.
