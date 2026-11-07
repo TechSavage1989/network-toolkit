@@ -492,3 +492,79 @@
 .packet-traffic-heading .graph-range-advanced{display:inline-flex;align-items:center;flex:0 0 auto}
 @container (max-width:420px){.packet-traffic-heading .graph-range-advanced{padding:3px 4px;min-height:26px;font-size:10px}}
 @container (max-width:650px){.packet-traffic-heading .packet-mode-control{flex:0 1 85px;min-width:75px;max-width:85px}.packet-traffic-heading .graph-timeframe{padding:0;display:block;flex:0 0 54px;width:54px}.packet-traffic-heading .graph-timeframe>span{display:none}.packet-traffic-heading .graph-timeframe select{width:54px}.packet-traffic-heading .graph-range-advanced{padding:3px 4px;min-height:26px;font-size:10px}}
+
+/* Guided capture and plain results (v1.21.1, owner request: usable by people
+ * new to packet captures). Three numbered setup steps, a recording coach,
+ * a verdict first, a step-by-step connection check and readable counters. */
+.packet-guided-setup{grid-template-columns:repeat(3,minmax(0,1fr));align-items:start;gap:10px 14px;padding:10px}
+.packet-guided-setup .field label{display:flex;align-items:center;gap:7px;font-weight:650;color:var(--text)}
+.packet-step-number{display:inline-flex;align-items:center;justify-content:center;flex:none;width:20px;height:20px;border-radius:50%;background:var(--accentBg);color:var(--accent);font-size:11px;font-weight:700}
+.packet-optional{font-weight:400;color:var(--muted)}
+.packet-guided-setup .packet-adapter-hint,.packet-guided-setup .field .hint{grid-column:auto;margin:4px 0 0;font-size:10px;line-height:1.5;color:var(--muted)}
+.packet-guided-setup .packet-task-hint{display:block;margin-top:4px}.packet-guided-setup .packet-task-hint p{margin:0 0 4px;font-size:10px;line-height:1.5;color:var(--muted)}
+.packet-start-row{display:flex;flex-wrap:wrap;align-items:end;gap:10px 14px;padding:4px 10px 10px}
+.packet-start-row .packet-start-big{min-height:36px;padding:0 18px;font-size:13px}
+.packet-start-row .packet-duration{width:120px;margin:0}.packet-start-row .packet-duration input{width:100%}
+.packet-start-row .hint{margin:0;font-size:11px;color:var(--muted)}
+.packet-link{border:0;background:none;padding:0;color:var(--accent);font:inherit;text-decoration:underline;cursor:pointer}
+@media(max-width:900px){.packet-guided-setup{grid-template-columns:minmax(0,1fr)}}
+
+.packet-coach{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px;margin:6px 8px;padding:12px 14px;border:1px solid var(--accent);border-radius:8px;background:var(--accentBg)}
+.packet-coach[hidden]{display:none}
+.packet-coach-main{display:flex;align-items:flex-start;gap:10px;flex:1 1 320px;min-width:0}
+.packet-coach-main strong{font-size:13px}.packet-coach-main p{margin:3px 0 0;font-size:12px;line-height:1.5}
+.packet-coach-dot{flex:none;width:12px;height:12px;margin-top:3px;border-radius:50%;background:var(--bad);animation:packet-coach-pulse 1.4s ease-in-out infinite}
+@keyframes packet-coach-pulse{50%{opacity:.35}}
+@media(prefers-reduced-motion:reduce){.packet-coach-dot{animation:none}}
+.packet-coach-stats{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;font-size:12px;color:var(--muted)}.packet-coach-stats b{color:var(--text);font-size:15px;font-variant-numeric:tabular-nums}
+.packet-coach-stats progress{width:140px;height:6px}
+.packet-coach-stop{min-height:34px}
+
+.packet-verdict{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:start;gap:12px;margin:2px 0 12px;padding:14px 16px;border:1px solid var(--border);border-left-width:4px;border-radius:8px;background:var(--panel2)}
+.packet-verdict-icon{display:flex;width:28px;height:28px;align-items:center;justify-content:center;border-radius:50%}.packet-verdict-icon svg{width:18px;height:18px}
+.packet-verdict h2{margin:0 0 3px;font-size:17px}.packet-verdict p{margin:0;font-size:12px;line-height:1.55}.packet-verdict .hint{margin-top:4px;font-size:11px}
+.packet-verdict-problems{border-left-color:var(--bad)}.packet-verdict-problems .packet-verdict-icon{color:var(--bad)}
+.packet-verdict-notes,.packet-verdict-little,.packet-verdict-empty{border-left-color:var(--warn)}.packet-verdict-notes .packet-verdict-icon,.packet-verdict-little .packet-verdict-icon,.packet-verdict-empty .packet-verdict-icon{color:var(--warn)}
+.packet-verdict-clear{border-left-color:var(--good)}.packet-verdict-clear .packet-verdict-icon{color:var(--good)}
+.packet-verdict .packet-review-actions{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+@media(max-width:760px){.packet-verdict{grid-template-columns:auto minmax(0,1fr)}.packet-verdict .packet-review-actions{grid-column:1/-1;justify-content:flex-start}}
+
+.packet-target-check{margin:0 0 12px;padding:12px 14px;border:1px solid var(--border);border-radius:8px;background:var(--panel2)}
+.packet-target-head{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px 14px}
+.packet-target-head h3{display:flex;align-items:center;gap:7px;margin:0;font-size:13px}.packet-target-head h3 svg{width:16px;height:16px;color:var(--accent)}.packet-target-head .hint{margin:2px 0 0;font-size:11px}
+.packet-target-form{display:flex;gap:6px;align-items:center;flex:1 1 260px;max-width:460px}.packet-target-form input{flex:1;min-width:0}
+.packet-target-check>.hint{margin:8px 0 0;font-size:11px;color:var(--muted)}
+.packet-target-conclusion{margin:10px 0 8px;padding:8px 10px;border-radius:6px;font-size:12px;line-height:1.5;background:var(--panel);border-left:3px solid var(--line)}
+.packet-target-problem{border-left-color:var(--bad)}.packet-target-warn{border-left-color:var(--warn)}.packet-target-ok{border-left-color:var(--good)}
+.packet-target-steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.packet-target-step{display:flex;gap:8px;align-items:flex-start;min-width:0;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--panel)}
+.packet-target-step p{margin:3px 0 6px;font-size:11px;line-height:1.5;overflow-wrap:anywhere}
+.packet-step-title{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline}.packet-step-title strong{font-size:12px}.packet-step-state{font-size:10px;color:var(--muted)}
+.packet-step-mark{display:inline-flex;flex:none;width:22px;height:22px;align-items:center;justify-content:center;border-radius:50%;font-weight:700;font-size:12px;background:var(--line);color:var(--text)}
+.packet-step-ok .packet-step-mark{background:var(--good);color:#06130c}.packet-step-fail .packet-step-mark{background:var(--bad);color:#fff}.packet-step-warn .packet-step-mark{background:var(--warn);color:#1b1300}
+.packet-step-skipped,.packet-step-unknown{opacity:.78}
+@media(max-width:1100px){.packet-target-steps{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.packet-target-steps{grid-template-columns:minmax(0,1fr)}}
+
+.packet-finding-meaning{margin:6px 0;font-size:12px;line-height:1.55}
+.packet-finding-attention{border-left-color:var(--bad)}
+.packet-finding-technical{margin-top:8px;font-size:11px;color:var(--muted)}.packet-finding-technical summary{cursor:pointer;color:var(--muted)}.packet-finding-technical p{margin:5px 0;overflow-wrap:anywhere}
+.packet-review-subheading{margin:16px 0 2px;font-size:12px}
+.packet-review-scope{margin:0 0 4px;padding:0;border:0;background:none;font-size:11px;color:var(--muted)}
+.packet-review-limitations{margin:12px 0;padding:8px 12px;border:1px solid var(--line);border-radius:6px}.packet-review-limitations summary{cursor:pointer;font-size:12px;font-weight:600}.packet-review-limitations ul{margin:6px 0 0;padding-left:18px;font-size:11px;line-height:1.55}
+
+/* Readable counters: the event color marks the card, the number stays legible. */
+.packet-review-metrics>button[data-packet-stat="tcpresets"] strong,.packet-review-metrics>button[data-packet-stat="icmperrors"] strong,.packet-statistic[data-packet-stat="expert"] strong{color:var(--text)}
+.packet-review-metrics>button[data-packet-stat="tcpresets"]{box-shadow:inset 3px 0 var(--packet-color-note,var(--accent))}
+.packet-review-metrics>button[data-packet-stat="icmperrors"]{box-shadow:inset 3px 0 var(--packet-color-warn,var(--warn))}
+.packet-statistic[data-packet-stat="expert"]{box-shadow:inset 3px 0 var(--packet-color-note,var(--accent))}
+
+.packet-save-controls{display:flex;align-items:center;gap:6px;margin-left:auto}.packet-save-controls[hidden],#packetPauseControl[hidden]{display:none}.packet-save-controls label{font-size:11px;color:var(--muted)}
+.packet-outcome{display:inline-block;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:600;white-space:nowrap;border:1px solid var(--line)}
+.packet-outcome-worked,.packet-outcome-replied{color:var(--good);border-color:var(--good)}
+.packet-outcome-refused,.packet-outcome-no-reply{color:var(--bad);border-color:var(--bad)}
+.packet-outcome-ongoing,.packet-outcome-one-way{color:var(--muted)}
+.packet-summary-table td .hint{display:block;font-size:10px}
+.packet-endpoint-name{display:block;font-weight:600}
+.packet-viewbar .packet-save-controls select{width:170px}
+.packet-conversations td:nth-child(3),.packet-conversations td:nth-child(4){min-width:150px}
