@@ -21,11 +21,11 @@ const plain = value => JSON.parse(JSON.stringify(value));
 
 test('defaults keep today\'s terminal and invalid saved values fall back', () => {
   const h = harness(undefined);
-  assert.deepEqual(plain(h.api.preferences()), { scrollback: 10000, scrollbar: true, bell: 'none', bracketedPaste: true, wordSeparators: ' ()[]{}\',"`', lfImpliesCr: false, crImpliesLf: false, answerback: '' });
+  assert.deepEqual(plain(h.api.preferences()), { scrollback: 10000, scrollbar: true, bell: 'none', bracketedPaste: true, wordSeparators: ' ()[]{}\',"`', lfImpliesCr: false, crImpliesLf: false, reconnectKeys: true, closeOnOtherKey: false, answerback: '' });
   assert.deepEqual(plain(h.api.options()), { scrollback: 10000, convertEol: false, ignoreBracketedPasteMode: false, wordSeparator: ' ()[]{}\',"`' });
   assert.equal(new Terminal({}).options.wordSeparator, h.api.wordSeparators, 'the default must match xterm\'s own word separators');
   const bad = h.api.normalize({ scrollback: 100000, scrollbar: 'false', bell: 'loud', bracketedPaste: 0, wordSeparators: 'ab1 ,\u0007', lfImpliesCr: 'true', answerback: 'id\r\né-ok', extra: 'secret-canary' });
-  assert.deepEqual(plain(bad), { scrollback: 10000, scrollbar: true, bell: 'none', bracketedPaste: true, wordSeparators: ' ,', lfImpliesCr: false, crImpliesLf: false, answerback: 'id-ok' });
+  assert.deepEqual(plain(bad), { scrollback: 10000, scrollbar: true, bell: 'none', bracketedPaste: true, wordSeparators: ' ,', lfImpliesCr: false, crImpliesLf: false, reconnectKeys: true, closeOnOtherKey: false, answerback: 'id-ok' });
   assert.equal(h.api.normalize({ answerback: 'x'.repeat(100) }).answerback.length, 64);
 });
 
@@ -76,7 +76,7 @@ test('settings save, apply to open terminals and restore; invalid scrollback sna
   h.change('terminalLfImpliesCr', { checked: true }); assert.equal(term.options.convertEol, true);
   h.change('terminalWordSeparators', { value: ' :' }); assert.equal(term.options.wordSeparator, ' :');
   h.change('terminalBell', { value: 'sound' }); h.change('terminalAnswerback', { value: 'lab-term' });
-  assert.deepEqual(plain(h.state.terminalBehavior), { scrollback: 2500, scrollbar: false, bell: 'sound', bracketedPaste: false, wordSeparators: ' :', lfImpliesCr: true, crImpliesLf: false, answerback: 'lab-term' });
+  assert.deepEqual(plain(h.state.terminalBehavior), { scrollback: 2500, scrollbar: false, bell: 'sound', bracketedPaste: false, wordSeparators: ' :', lfImpliesCr: true, crImpliesLf: false, reconnectKeys: true, closeOnOtherKey: false, answerback: 'lab-term' });
   const restored = harness(plain(h.state.terminalBehavior));
   assert.equal(restored.$('terminalScrollback').value, '2500'); assert.equal(restored.$('terminalScrollbar').checked, false); assert.equal(restored.$('terminalBell').value, 'sound'); assert.equal(restored.$('terminalAnswerback').value, 'lab-term');
   h.doc.emit('click', h.doc.querySelector('[data-terminal-behavior-reset]'));
@@ -97,4 +97,24 @@ test('the app creates terminals with these settings, restores them at startup an
   // state, saveState and terminalSessions are top-level bindings in index.html, not window properties.
   assert.doesNotMatch(source, /root\.(state|saveState|terminalSessions|enqueueTerminalInput)\b/);
   assert.match(html, /let state=|const state=|var state=/);
+});
+
+test('after a session ends, R reconnects and S saves it; other keys close the tab only when chosen', () => {
+  const h = harness({}), calls = [];
+  const entry = { info: { id: 'one', state: 'closed' } };
+  Object.assign(h.c, { currentTerminal: () => entry, TERMINAL_ONLY: false, terminalReconnectAllowed: () => true, reconnectTerminal: e => calls.push(['reconnect', e.info.id]), removeTerminal: e => calls.push(['close', e.info.id]), NetworkToolkitSessionSidebar: { save: e => calls.push(['save', e.info.id]) } });
+  h.state.activePage = 'terminal'; h.doc.getElementById('panel').insertAdjacentHTML('afterend', '<div id="modalRoot"></div><input id="field">');
+  const key = (k, extra = {}) => { let prevented = false; const result = h.api.sessionKey({ key: k, target: h.doc, preventDefault() { prevented = true; }, stopImmediatePropagation() {}, ...extra }); return [result, prevented]; };
+  assert.deepEqual(key('r'), ['reconnect', true]); assert.deepEqual(key('S'), ['save', true]);
+  assert.deepEqual(key('x'), ['', false], 'other keys do nothing unless chosen');
+  assert.deepEqual(key('r', { ctrlKey: true }), ['', false]); assert.deepEqual(key('r', { target: h.$('field') }), ['', false], 'typing in a field is never taken');
+  h.state.activePage = 'editor'; assert.deepEqual(key('r'), ['', false], 'another page is never affected'); h.state.activePage = 'terminal';
+  entry.info.state = 'connected'; assert.deepEqual(key('r'), ['', false], 'a connected session receives R as normal input'); entry.info.state = 'error';
+  h.$('modalRoot').innerHTML = '<div></div>'; assert.deepEqual(key('r'), ['', false], 'not while a dialog is open'); h.$('modalRoot').innerHTML = '';
+  h.change('terminalCloseOnOtherKey', { checked: true }); assert.deepEqual(key('q'), ['close', true]); assert.deepEqual(key('Shift'), ['', false], 'modifier keys alone do not close');
+  assert.match(h.api.keysHint(), /R to reconnect or S to save this session; any other key closes the tab/);
+  h.change('terminalReconnectKeys', { checked: false }); assert.deepEqual(key('r'), ['', false]); assert.equal(h.api.keysHint(), ''); assert.equal(h.$('terminalCloseOnOtherKey').disabled, true);
+  assert.deepEqual(calls, [['reconnect', 'one'], ['save', 'one'], ['close', 'one']]);
+  assert.match(html, /keysHint\?'<p class="terminal-disconnected-keys">'\+esc\(keysHint\)\+'<\/p>'/);
+  assert.match(html, /const keysHint=entry\.reconnectBusy\|\|!terminalReconnectAllowed\(entry\)\?'':/);
 });

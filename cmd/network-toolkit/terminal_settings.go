@@ -176,6 +176,16 @@ func safeTerminalInteraction(value any) map[string]any {
 		"menuItems":            []string{"copy", "copy-line", "copy-token", "paste", "scroll-top", "scroll-bottom", "paste-start", "copy-paste-output", "send-editor", "select-all", "search", "export", "zoom-in", "zoom-out", "control-c", "move"},
 		"menuRevision":         float64(terminalMenuRevision),
 	}
+	// Paste warnings (v1.21.9): each kind stays on unless explicitly turned off.
+	warnings := map[string]any{}
+	var requestedWarnings map[string]any
+	if source, ok := value.(map[string]any); ok {
+		requestedWarnings, _ = source["pasteWarnings"].(map[string]any)
+	}
+	for _, kind := range []string{"homograph", "pipeToShell", "shellProfile", "systemArchive", "link"} {
+		warnings[kind] = requestedWarnings[kind] != false
+	}
+	clean["pasteWarnings"] = warnings
 	source, ok := value.(map[string]any)
 	if !ok {
 		return clean

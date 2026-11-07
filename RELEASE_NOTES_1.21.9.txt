@@ -1,0 +1,17 @@
+Network Toolkit 1.21.9 Beta 10
+
+## What's New
+
+- Pasting into the terminal now warns you about risky text, like MobaXterm: commands that download and run a script, changes to shell startup files, archives unpacked into system folders, look-alike or hidden characters, and plain-HTTP or shortened links. You see the warning before anything is sent and can still send it.
+- After a session ends, press R to reconnect or S to save it. You can also choose to close the tab with any other key.
+
+## Additional Details
+
+- A paste with a warning opens the paste review even when it is a single line. Edit the text and the warnings update as you type.
+- Each kind of warning can be turned off in Mouse and keyboard defaults → Warn before pasting. Plain-HTTP links to lab and private addresses (for example http://10.0.0.5/) are not flagged.
+- The keys work only on the Terminal page, never while you type in a field or a dialog is open, and only when Reconnect is available. The Disconnected card shows them. Turn them off, or turn on "Any other key closes the ended session's tab", in Display → Terminal features.
+- Settings are kept after a restart and in separate Terminal windows.
+- Still planned (docs/TERMINAL_SETTINGS_PLAN.md): session logging and more local shells. A fixed number of rows and columns and regrouping Display are listed for later.
+- Validation used unit tests, browser checks and sample output; no real device was used, and it has not yet been checked on a physical Windows PC.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Security confirmations and Windows/UAC approval are unchanged.
+- This is an opt-in beta. Stable users stay on 1.20.16. Portable executable filename remains Network_Toolkit.exe.

@@ -35,6 +35,8 @@
   // Menu items added after a user may have saved a custom selection are shown
   // once (menuRevision 2 adds Send to Text Editor); unticking them later sticks.
   const MENU_REVISION = 2, MENU_ADDED = {2:['send-editor']};
+  const PASTE_WARNING_IDS = ['homograph','pipeToShell','shellProfile','systemArchive','link'];
+  function pasteWarnings(text) { return root.NetworkToolkitPasteWarnings?.check(text, preferences().pasteWarnings) || []; }
   function migrateMenu(items, revision) { const list = items.slice(); for (let r = (Number.isInteger(revision) ? revision : 1) + 1; r <= MENU_REVISION; r++) for (const id of MENU_ADDED[r] || []) if (!list.includes(id)) list.push(id); return list; }
   const bound = new WeakMap(), liveBindings = new Set(), pasteStarts = new Map();
   let initialized = false, observed = null, focusEpoch = 0, pasteSequence = 0, pendingNativePaste = null;
@@ -52,6 +54,8 @@
       pagerKey:['auto','space','enter'].includes(v.pagerKey) ? v.pagerKey : 'auto',
       rightClick:v.rightClick === 'menu' ? 'menu' : 'paste',
       ctrlC:v.ctrlC === 'send' ? 'send' : 'copy-selection',
+      // Paste warnings (v1.21.9): every kind is on unless turned off.
+      pasteWarnings:Object.fromEntries(PASTE_WARNING_IDS.map(id=>[id, !(v.pasteWarnings && typeof v.pasteWarnings === 'object' && v.pasteWarnings[id] === false)])),
       menuItems:Array.isArray(v.menuItems) ? (list=>MENU_ITEMS.filter(item=>list.includes(item.id)).map(item=>item.id))(migrateMenu(v.menuItems,v.menuRevision)) : DEFAULT_MENU.slice(),
       menuRevision:MENU_REVISION
     };
@@ -126,6 +130,8 @@
     review.pending=!!(start&&start.generation===review.target?.generation&&start.pending);review.uncertain=!!(start&&start.generation===review.target?.generation&&start.uncertain);
     const value = reviewText(), stats = pasteStats(value), mode=review.form.querySelector('#terminalPasteMode'), paced=mode?.value==='paced', reason=pacedPasteReason(review.destination,value,review.target), blocked = review.invalid || review.pending || review.uncertain || stats.bytes > MAX_PASTE_BYTES || !value || paced && !!reason;
     const status = review.form.querySelector('#terminalPasteStatus');
+    const alerts = review.form.querySelector('#terminalPasteAlerts'), warnings = pasteWarnings(value);
+    if (alerts) { alerts.hidden = !warnings.length; const key = JSON.stringify(warnings); if (alerts.dataset.key !== key) { alerts.dataset.key = key; alerts.innerHTML = warnings.length ? '<strong>Check before sending</strong><ul>' + warnings.map(w=>'<li>' + esc(w.message) + (w.sample ? ' <code>' + esc(w.sample) + '</code>' : '') + '</li>').join('') + '</ul><p class="hint">Sending is still allowed. Turn warnings off in Mouse and keyboard defaults.</p>' : ''; } }
     const count = review.form.querySelector('#terminalPasteStats');
     const submit = document.querySelector('#terminalPasteConfirm');
     count.textContent = stats.lines + (stats.lines === 1 ? ' line' : ' lines') + ' · ' + stats.breaks + (stats.breaks === 1 ? ' line break' : ' line breaks') + ' · ' + stats.bytes.toLocaleString() + ' bytes' + (stats.trailing ? ' · Ends with a line break' : '');
@@ -145,7 +151,7 @@
     closeMenu(false);
     setTerminalToolsOpen(false,false);
     openModal('Review paste to ' + token.label,
-      '<form id="terminalPasteForm" class="terminal-paste-review" data-terminal-id="' + esc(token.id) + '"><div class="terminal-paste-destination">' + icon('terminal') + '<span>Destination: <strong>' + esc(token.label) + '</strong></span></div><p id="terminalPasteStatus" class="terminal-paste-warning" role="status"></p><div class="field"><label for="terminalPasteText">Text to send</label><textarea id="terminalPasteText" class="mono" spellcheck="false" autocomplete="off" autocapitalize="off" aria-describedby="terminalPasteStats terminalPasteStatus"></textarea></div><div id="terminalPasteStats" class="terminal-paste-stats" aria-live="polite"></div><div class="field mt"><label for="terminalPasteMode">Send method</label><select id="terminalPasteMode" aria-describedby="terminalPasteModeHint"><option value="paced">One line at a time · wait for prompt</option><option value="raw">Raw paste · all at once</option></select><p id="terminalPasteModeHint" class="help-line" role="status"></p><button id="terminalPasteResolve" type="button" class="btn small ghost" hidden>I checked Runs · allow a new paste</button></div></form>',
+      '<form id="terminalPasteForm" class="terminal-paste-review" data-terminal-id="' + esc(token.id) + '"><div class="terminal-paste-destination">' + icon('terminal') + '<span>Destination: <strong>' + esc(token.label) + '</strong></span></div><p id="terminalPasteStatus" class="terminal-paste-warning" role="status"></p><div id="terminalPasteAlerts" class="terminal-paste-alerts" role="alert" hidden></div><div class="field"><label for="terminalPasteText">Text to send</label><textarea id="terminalPasteText" class="mono" spellcheck="false" autocomplete="off" autocapitalize="off" aria-describedby="terminalPasteStats terminalPasteStatus"></textarea></div><div id="terminalPasteStats" class="terminal-paste-stats" aria-live="polite"></div><div class="field mt"><label for="terminalPasteMode">Send method</label><select id="terminalPasteMode" aria-describedby="terminalPasteModeHint"><option value="paced">One line at a time · wait for prompt</option><option value="raw">Raw paste · all at once</option></select><p id="terminalPasteModeHint" class="help-line" role="status"></p><button id="terminalPasteResolve" type="button" class="btn small ghost" hidden>I checked Runs · allow a new paste</button></div></form>',
       '<button id="terminalPasteDismiss" type="button" class="btn ghost" data-action="close-modal">Cancel</button><button id="terminalPasteConfirm" class="btn primary" type="submit" form="terminalPasteForm">Send to this console</button>',true);
     const form = document.querySelector('#terminalPasteForm'), field = form.querySelector('#terminalPasteText');
     field.value = text;
@@ -183,7 +189,7 @@
     if (typeof text !== 'string' || !text) return false;
     if (review?.form.isConnected) { toast('Finish or cancel the open paste review before pasting again.'); return false; }
     if (byteLength(text) > MAX_PASTE_BYTES) { toast('Paste no more than 1 MiB of text at a time.','error'); return false; }
-    if (/[\r\n]/.test(text) && root.NetworkToolkitTerminalExtras.prefs(token.entry).pasteReview) { openReview(token,text); return false; }
+    if (/[\r\n]/.test(text) && root.NetworkToolkitTerminalExtras.prefs(token.entry).pasteReview || pasteWarnings(text).length) { openReview(token,text); return false; }
     return sendPaste(token,text);
   }
   function pasteText(entry, text) {
@@ -384,7 +390,7 @@
   }
 
   function settingsHTML() {
-    return '<section id="terminalInteractionSettings" class="terminal-tools-section terminal-interaction-settings"><h3>Mouse and keyboard defaults</h3><div class="terminal-interaction-fields"><label><input type="checkbox" id="terminalCopyOnSelect">Copy selected text automatically</label><label><input type="checkbox" id="terminalCopyOnClick">Click highlighted values to copy</label><label><input type="checkbox" id="terminalPasteReview">Review multiline pastes before sending</label><div class="field"><label for="terminalRightClick">Right-click in the console</label><select id="terminalRightClick"><option value="paste">Paste</option><option value="menu">Context menu</option></select><span class="hint">Shift + right-click temporarily does the opposite.</span></div><div class="field"><label for="terminalCtrlC">Ctrl+C behavior</label><select id="terminalCtrlC"><option value="send">Always send Ctrl+C to the device</option><option value="copy-selection">Copy selection; otherwise send Ctrl+C</option></select></div><label><input type="checkbox" id="terminalAutoPager">Automatically advance known More/pager prompts</label><div class="field"><label for="terminalPagerKey">Pager key</label><select id="terminalPagerKey"><option value="auto">Automatic</option><option value="space">Space</option><option value="enter">Enter</option></select></div></div><p class="terminal-interaction-help">Ctrl+A selects a recognized editable command without its prompt. Ctrl+Shift+C copies. Ctrl+V, Ctrl+Shift+V, and Shift+Insert paste. Ctrl+wheel changes console text size. Single-line pastes go directly to the console. Multiline review is optional and enabled by default. Session controls in the console bar can override Review paste and Auto pager for the focused session.</p><details id="terminalContextMenuSettings"><summary>Choose context-menu tools</summary><div class="terminal-menu-options">' + MENU_ITEMS.map(item=>'<label><input type="checkbox" data-terminal-menu-option="' + item.id + '">' + esc(item.label) + '</label>').join('') + '</div><p class="hint">Mouse and keyboard settings always remain in the menu.</p></details></section>';
+    return '<section id="terminalInteractionSettings" class="terminal-tools-section terminal-interaction-settings"><h3>Mouse and keyboard defaults</h3><div class="terminal-interaction-fields"><label><input type="checkbox" id="terminalCopyOnSelect">Copy selected text automatically</label><label><input type="checkbox" id="terminalCopyOnClick">Click highlighted values to copy</label><label><input type="checkbox" id="terminalPasteReview">Review multiline pastes before sending</label><div class="field"><label for="terminalRightClick">Right-click in the console</label><select id="terminalRightClick"><option value="paste">Paste</option><option value="menu">Context menu</option></select><span class="hint">Shift + right-click temporarily does the opposite.</span></div><div class="field"><label for="terminalCtrlC">Ctrl+C behavior</label><select id="terminalCtrlC"><option value="send">Always send Ctrl+C to the device</option><option value="copy-selection">Copy selection; otherwise send Ctrl+C</option></select></div><label><input type="checkbox" id="terminalAutoPager">Automatically advance known More/pager prompts</label><div class="field"><label for="terminalPagerKey">Pager key</label><select id="terminalPagerKey"><option value="auto">Automatic</option><option value="space">Space</option><option value="enter">Enter</option></select></div></div><fieldset id="terminalPasteWarningSettings" class="terminal-paste-warning-settings"><legend>Warn before pasting</legend>' + PASTE_WARNING_IDS.map(id=>'<label><input type="checkbox" data-terminal-paste-warning="' + id + '">' + esc((root.NetworkToolkitPasteWarnings?.kinds.find(kind=>kind.id === id)?.label) || id) + '</label>').join('') + '<p class="hint">A paste with any of these opens the review first, even on one line. You can still send it.</p></fieldset><p class="terminal-interaction-help">Ctrl+A selects a recognized editable command without its prompt. Ctrl+Shift+C copies. Ctrl+V, Ctrl+Shift+V, and Shift+Insert paste. Ctrl+wheel changes console text size. Single-line pastes go directly to the console unless a paste warning applies. Multiline review is optional and enabled by default. Session controls in the console bar can override Review paste and Auto pager for the focused session.</p><details id="terminalContextMenuSettings"><summary>Choose context-menu tools</summary><div class="terminal-menu-options">' + MENU_ITEMS.map(item=>'<label><input type="checkbox" data-terminal-menu-option="' + item.id + '">' + esc(item.label) + '</label>').join('') + '</div><p class="hint">Mouse and keyboard settings always remain in the menu.</p></details></section>';
   }
   function updateSettings() {
     const panel = document.querySelector('#terminalToolsPanel');
@@ -395,6 +401,7 @@
       if (field.type === 'checkbox') field.checked = value; else if (document.activeElement !== field) field.value = value;
     }
     for (const field of document.querySelectorAll('[data-terminal-menu-option]')) field.checked = p.menuItems.includes(field.dataset.terminalMenuOption);
+    for (const field of document.querySelectorAll('[data-terminal-paste-warning]')) field.checked = p.pasteWarnings[field.dataset.terminalPasteWarning] !== false;
   }
   function settingsChanged(event) {
     const field = event.target, p = preferences();
@@ -406,6 +413,7 @@
     else if (field.id === 'terminalPagerKey') p.pagerKey = field.value;
     else if (field.id === 'terminalRightClick') p.rightClick = field.value;
     else if (field.id === 'terminalCtrlC') p.ctrlC = field.value;
+    else if (field.dataset.terminalPasteWarning) p.pasteWarnings = {...p.pasteWarnings, [field.dataset.terminalPasteWarning]: field.checked};
     else if (field.dataset.terminalMenuOption) p.menuItems = MENU_ITEMS.filter(item=>item.id === field.dataset.terminalMenuOption ? field.checked : p.menuItems.includes(item.id)).map(item=>item.id);
     else return;
     state.terminalInteraction = safePreferences(p); saveState();

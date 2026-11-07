@@ -22,6 +22,8 @@ func TestTerminalInteractionPersistenceAndWindowTransfer(t *testing.T) {
 		"pasteReview": true, "pasteIncludeCommands": false, "autoPager": true, "pagerKey": "auto",
 		// Saved before revision 2, so Send to Text Editor is added once.
 		"menuItems": []any{"copy-line", "copy-token", "paste", "send-editor"}, "menuRevision": float64(2),
+		// Paste warnings (v1.21.9) default on.
+		"pasteWarnings": map[string]any{"homograph": true, "pipeToShell": true, "shellProfile": true, "systemArchive": true, "link": true},
 	}
 	check := func(label string, data []byte) {
 		t.Helper()
@@ -138,5 +140,36 @@ func TestTerminalMenuAdditionShownOnceThenUserChoiceKept(t *testing.T) {
 	kept := safeTerminalInteraction(map[string]any{"menuItems": []any{"copy", "paste"}, "menuRevision": float64(2)})
 	if !reflect.DeepEqual(kept["menuItems"], []string{"copy", "paste"}) {
 		t.Fatalf("unticking Send to Text Editor after revision 2 was not kept: %#v", kept)
+	}
+}
+
+func TestTerminalPasteWarningsDefaultOnAndKeepTurnedOffKindsAcrossRestart(t *testing.T) {
+	for _, value := range []any{nil, map[string]any{}, map[string]any{"pasteWarnings": "off"}, map[string]any{"pasteWarnings": map[string]any{"link": "false", "unknown": false}}} {
+		warnings := safeTerminalInteraction(value)["pasteWarnings"].(map[string]any)
+		if len(warnings) != 5 {
+			t.Fatalf("unexpected paste warning kinds: %#v", warnings)
+		}
+		for kind, on := range warnings {
+			if on != true {
+				t.Fatalf("%s must default on for %#v", kind, value)
+			}
+		}
+	}
+	a := testApplication(t)
+	body := `{"terminalInteraction":{"pasteWarnings":{"link":false,"homograph":true,"secret":"secret-canary"}}}`
+	if response := requestApp(a, http.MethodPut, "/api/state", body, true); response.Code != http.StatusOK {
+		t.Fatalf("save paste warnings: %d %s", response.Code, response.Body.String())
+	}
+	response := requestApp(a, http.MethodGet, "/api/state", "", true)
+	if strings.Contains(response.Body.String(), "secret-canary") {
+		t.Fatal("unknown paste warning key was stored")
+	}
+	var state map[string]any
+	if err := json.Unmarshal(response.Body.Bytes(), &state); err != nil {
+		t.Fatal(err)
+	}
+	warnings := state["terminalInteraction"].(map[string]any)["pasteWarnings"].(map[string]any)
+	if warnings["link"] != false || warnings["homograph"] != true || warnings["pipeToShell"] != true {
+		t.Fatalf("paste warning choices did not survive a restart: %#v", warnings)
 	}
 }

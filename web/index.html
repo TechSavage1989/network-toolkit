@@ -534,7 +534,7 @@ html,body{height:auto!important;min-height:0!important;overflow:visible!importan
   <aside class="sidebar" id="sidebar" aria-label="Primary navigation">
     <div class="brand"><div class="brand-mark"><img src="../assets/Network_Toolkit_Icon.svg" width="36" height="36" alt="" draggable="false"></div><div><div class="brand-name">Network Toolkit</div><div class="brand-sub">Diagnostics workbench</div><span class="app-system-name" id="hostTop" tabindex="0">Local diagnostics</span></div></div>
     <div class="nav-scroll" id="navigation"></div>
-    <div class="sidebar-foot"><div class="engine-label" id="engineLabel"><span class="dot warn pulse"></span><span>Connecting to app</span></div><div class="engine-sub" id="engineSub">Portable edition · v1.21.8</div><div class="app-utility-actions"><button type="button" class="btn small ghost" id="uxCommandLauncher" title="Search tools and commands (Ctrl+Shift+P)" aria-keyshortcuts="Control+Shift+P" aria-label="Search tools and commands" aria-haspopup="dialog">Search</button><button class="iconbtn" id="themeButton" data-action="theme" aria-label="Switch color theme" title="Switch color theme"></button><button class="iconbtn" id="settingsButton" data-action="settings" aria-label="App settings" title="App settings"></button><button type="button" class="iconbtn" id="uxHelpLauncher" title="Keyboard shortcuts and help (F1)" aria-keyshortcuts="F1" aria-label="Keyboard shortcuts and help">?</button><span class="pill" id="runningCount" hidden>0 running</span></div></div>
+    <div class="sidebar-foot"><div class="engine-label" id="engineLabel"><span class="dot warn pulse"></span><span>Connecting to app</span></div><div class="engine-sub" id="engineSub">Portable edition · v1.21.9</div><div class="app-utility-actions"><button type="button" class="btn small ghost" id="uxCommandLauncher" title="Search tools and commands (Ctrl+Shift+P)" aria-keyshortcuts="Control+Shift+P" aria-label="Search tools and commands" aria-haspopup="dialog">Search</button><button class="iconbtn" id="themeButton" data-action="theme" aria-label="Switch color theme" title="Switch color theme"></button><button class="iconbtn" id="settingsButton" data-action="settings" aria-label="App settings" title="App settings"></button><button type="button" class="iconbtn" id="uxHelpLauncher" title="Keyboard shortcuts and help (F1)" aria-keyshortcuts="F1" aria-label="Keyboard shortcuts and help">?</button><span class="pill" id="runningCount" hidden>0 running</span></div></div>
   </aside>
   <main class="main">
     <span id="crumb" hidden>Overview</span>
@@ -553,7 +553,7 @@ html,body{height:auto!important;min-height:0!important;overflow:visible!importan
       </div>
       <div id="terminalWorkspace" class="hidden" role="region" aria-label="Terminal connections and output" tabindex="0"></div>
       </div>
-      <div class="app-foot"><span class="app-version">Network Toolkit 1.21.8 · Local, portable diagnostics</span><span id="footerStatus">No diagnostic has run.</span><span id="appNavigationFooterSlot"></span></div>
+      <div class="app-foot"><span class="app-version">Network Toolkit 1.21.9 · Local, portable diagnostics</span><span id="footerStatus">No diagnostic has run.</span><span id="appNavigationFooterSlot"></span></div>
     </div>
   </main>
 </div>
@@ -593,6 +593,7 @@ html,body{height:auto!important;min-height:0!important;overflow:visible!importan
 <script src="assets/app-update-notes.js"></script>
 <script src="assets/app-updater.js"></script>
 <script src="assets/configuration-layout.js"></script>
+<script src="assets/terminal-paste-warnings.js"></script>
 <script src="assets/terminal-interaction.js"></script>
 <script src="assets/terminal-copy.js"></script>
 <script src="assets/terminal-prompt-labels.js"></script>
@@ -653,7 +654,7 @@ html,body{height:auto!important;min-height:0!important;overflow:visible!importan
 'use strict';
 const SESSION=/^[a-f0-9]{64}$/.test(window.__networkToolkitNativeSession||'')?window.__networkToolkitNativeSession:'__SESSION_TOKEN__';
 const OFFLINE=location.protocol==='file:' || !/^https?:$/.test(location.protocol) || SESSION==='__SESSION_'+'TOKEN__';
-const VERSION='1.21.8';
+const VERSION='1.21.9';
 const WINDOW_MODE='__WINDOW_MODE__';
 const TERMINAL_VIEW=(()=>{try{return JSON.parse('__TERMINAL_VIEW__')}catch{return null}})();
 const EDITOR_VIEW=(()=>{try{return JSON.parse('__EDITOR_VIEW__')}catch{return null}})();
@@ -1758,8 +1759,8 @@ const disconnected=!!entry&&!remote&&(['closed','error'].includes(entry.info.sta
 screen.classList.toggle('hidden',!show);outputBar.classList.toggle('hidden',!showOutput);const wasVisible=outputBar.dataset.visible==='true';outputBar.dataset.visible=String(showOutput);if(wasVisible!==showOutput)scheduleTerminalFit();
 if(!disconnected){screen.dataset.signature='';outputBar.dataset.signature='';return;}
 const message=entry.reconnectError||entry.info.error||'Reconnect using this session’s previous connection settings.',index=Number(pane.dataset?.terminalPane)||0,title=entry.reconnectBusy?'Reconnecting...':'Disconnected';
-const signature=JSON.stringify([entry.info.id,index,title,message,terminalReconnectAllowed(entry)]);
-if(screen.dataset.signature!==signature){screen.dataset.signature=signature;const options=terminalConnectionButtonsHTML(index,false,!!entry.reconnectBusy);screen.innerHTML='<section class="terminal-disconnected-card"><h3>'+icon(entry.reconnectBusy?'refresh':'alert')+esc(title)+'</h3><p class="terminal-disconnected-target">'+esc(entry.info.label||entry.info.host||entry.info.serialPort||'Terminal session')+'</p><p class="terminal-disconnected-message" title="'+esc(message)+'">'+esc(message)+'</p><button type="button" class="btn primary terminal-center-reconnect" data-terminal-action="reconnect" data-terminal-id="'+esc(entry.info.id)+'" '+(terminalReconnectAllowed(entry)?'':'disabled')+'>'+icon('refresh')+(entry.reconnectBusy?'Reconnecting...':'Reconnect')+'</button>'+(options?'<div class="terminal-new-connection-label">Start a new connection</div>'+options:'')+'<button type="button" class="btn small ghost terminal-view-output" data-terminal-action="view-disconnected-output" data-terminal-id="'+esc(entry.info.id)+'">'+icon('terminal')+'View output</button></section>';}
+const keysHint=entry.reconnectBusy||!terminalReconnectAllowed(entry)?'':window.NetworkToolkitTerminalBehavior?.keysHint()||'',signature=JSON.stringify([entry.info.id,index,title,message,terminalReconnectAllowed(entry),keysHint]);
+if(screen.dataset.signature!==signature){screen.dataset.signature=signature;const options=terminalConnectionButtonsHTML(index,false,!!entry.reconnectBusy);screen.innerHTML='<section class="terminal-disconnected-card"><h3>'+icon(entry.reconnectBusy?'refresh':'alert')+esc(title)+'</h3><p class="terminal-disconnected-target">'+esc(entry.info.label||entry.info.host||entry.info.serialPort||'Terminal session')+'</p><p class="terminal-disconnected-message" title="'+esc(message)+'">'+esc(message)+'</p><button type="button" class="btn primary terminal-center-reconnect" data-terminal-action="reconnect" data-terminal-id="'+esc(entry.info.id)+'" '+(terminalReconnectAllowed(entry)?'':'disabled')+'>'+icon('refresh')+(entry.reconnectBusy?'Reconnecting...':'Reconnect')+'</button>'+(keysHint?'<p class="terminal-disconnected-keys">'+esc(keysHint)+'</p>':'')+(options?'<div class="terminal-new-connection-label">Start a new connection</div>'+options:'')+'<button type="button" class="btn small ghost terminal-view-output" data-terminal-action="view-disconnected-output" data-terminal-id="'+esc(entry.info.id)+'">'+icon('terminal')+'View output</button></section>';}
 if(outputBar.dataset.signature!==signature){outputBar.dataset.signature=signature;outputBar.innerHTML=icon(entry.reconnectBusy?'refresh':'alert')+'<strong>'+esc(title)+'</strong><span class="terminal-connection-message">Console output retained</span><button type="button" class="btn small ghost" data-terminal-action="show-connection-options" data-terminal-id="'+esc(entry.info.id)+'">Connection options</button>';}
 }
 function setTerminalConnectionScreen(entry,viewOutput){if(!entry)return;entry._ntDisconnectedOutput=!!viewOutput;renderTerminalChrome();if(viewOutput&&currentTerminal()===entry)window.NetworkToolkitTerminalCopy?.withInputSuppressed?window.NetworkToolkitTerminalCopy.withInputSuppressed(entry,()=>entry.xterm?.focus()):entry.xterm?.focus();}
