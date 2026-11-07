@@ -1,4 +1,6 @@
-# v1.21.14 Beta 15 (Rule set cards like Universal) - candidate (2026-11-07)
+# v1.21.14 Beta 15 (Rule set cards like Universal) - publication verified (2026-11-07)
+
+Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.21.14 at 2026-11-07T23:24:49Z; stable latest remains v1.20.16. Merged PR #125; tag v1.21.14 points to merge commit edb48c3a1d5c7b95b93f5a4ebc7fec0c0707b6c0. Release workflow run 42424848024 succeeded. Assets: Network_Toolkit.exe, Portable and Update ZIPs, Linux x86_64 and aarch64 tarballs and SHA256SUMS; every asset digest matches SHA256SUMS, and the Linux x86_64 binary reports "Network Toolkit 1.21.14 linux amd64". PR #125 was branched from the v1.21.13 head; its watcher merged it only after v1.21.13 was merged and released.
 
 Owner request (screenshots comparing the Universal page with Standard keywords): "include the same selection style configuraiton for all the rule sets, but also continue to support the 3rd party rule sets word customizability".
 - Rule set pages in Customize use the Universal card grid: per-color switch, note, color button with hex, and the pattern (editable for own and imported sets; built-in patterns folded and read-only), plus a Device prompt name card and Turn all colors on / Reset colors.
@@ -9,7 +11,9 @@ Owner request (screenshots comparing the Universal page with Standard keywords):
 
 ---
 
-# v1.21.13 Beta 14 (Appearance preview follows every highlighting profile) - candidate (2026-11-07)
+# v1.21.13 Beta 14 (Appearance preview follows every highlighting profile) - publication verified (2026-11-07)
+
+Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.21.13 at 2026-11-07T23:09:07Z; stable latest remains v1.20.16. Merged PR #124; tag v1.21.13 points to merge commit 99eb8e9ef55f779b37279a67a12353588621728b. Release workflow run 42423664610 succeeded. Assets: Network_Toolkit.exe, Portable and Update ZIPs, Linux x86_64 and aarch64 tarballs and SHA256SUMS; every asset digest matches SHA256SUMS, and the Linux x86_64 binary reports "Network Toolkit 1.21.13 linux amd64".
 
 Owner request (screenshots: with "Standard keywords" selected the Appearance preview stayed plain, while Universal colored it): "allow the preview in terminal for text also work with the custom /3rd party syntax highlights".
 - `terminal-appearance.js`: the preview text is generated from `PREVIEW_LINES` with the real analyzer for the active profile (`renderPreviewText`), so built-in and imported rule sets, their per-profile colors and the prompt name choice all show. Spans are rebuilt only when the profile, its rules or the prompt choice change, so color and underline edits restyle the same elements. Heading: `Preview · <profile>`.
