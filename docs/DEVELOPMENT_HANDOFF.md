@@ -1,4 +1,6 @@
-# v1.21.5 Beta 6 (Update notice shows What's New in full) - candidate
+# v1.21.5 Beta 6 (Update notice shows What's New in full) - publication verified (2026-11-07)
+
+Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.21.5 at 2026-11-07T09:27:56Z; stable latest remains v1.20.16. Merged PR #109; tag v1.21.5 points to merge commit 08b7757f5d5cf2ec5c5b43aded993e9836e9fccc. Release workflow run 42359577156 succeeded. Assets: Network_Toolkit.exe, Network_Toolkit_1.21.5_Portable.zip, Network_Toolkit_1.21.5_Update.zip, Network_Toolkit_1.21.5_Linux_x86_64.tar.gz, Network_Toolkit_1.21.5_Linux_aarch64.tar.gz, SHA256SUMS; all digests match SHA256SUMS. The published Linux x86_64 archive was downloaded, extracted and run (`--version` 1.21.5 linux amd64; inner SHA256SUMS OK). Checks: green pull-request run 42358571723, first attempt.
 
 Owner: "Do not truncate the high level primary update details in the updater".
 - `web/assets/app-update-notes.js`: structured notes list every What's New item in full (no `.slice(0,4)`, no 180-character `short()` with "…"); none are moved into Additional details. Unstructured notes keep the first four bullets or paragraphs as highlights, now complete, and the rest stay in Additional details. Escaping and inert links unchanged.

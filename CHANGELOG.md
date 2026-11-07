@@ -1,4 +1,4 @@
-## 1.21.5 Beta 6 - Update notice shows What's New in full (candidate)
+## 1.21.5 Beta 6 - Update notice shows What's New in full (published 2026-11-07)
 
 - Owner request: "Do not truncate the high level primary update details in the updater." `app-update-notes.js` no longer limits What's New to four items or shortens items to 180 characters (`short()` removed); every What's New item is listed in full and never moved into Additional details. Unstructured older notes keep four highlights, now complete. Tests updated in `app-update-notes.test.cjs`.
 
