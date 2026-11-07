@@ -331,7 +331,7 @@ let settingsTab='appearance';
 function selectSettingsTab(id,focus=false){
  if(!SETTINGS_TABS.some(tab=>tab.id===id))return;settingsTab=id;
  for(const tab of document.querySelectorAll('[data-terminal-settings-tab]')){const on=tab.dataset.terminalSettingsTab===id;tab.setAttribute('aria-selected',String(on));tab.tabIndex=on?0:-1;if(on&&focus)tab.focus();}
- for(const page of document.querySelectorAll('[data-settings-panel]'))page.hidden=page.dataset.settingsPanel!==id;
+ for(const page of document.querySelectorAll('[data-terminal-settings-panel]'))page.hidden=page.dataset.terminalSettingsPanel!==id;
  const panel=document.querySelector('#terminalSessionPanel');if(panel)panel.scrollTop=0;
  if(id==='highlighting')root.updateTerminalHighlightStatus?.();
  root.NetworkToolkitTerminalAppearance?.sync?.();root.NetworkToolkitTerminalBehavior?.sync?.();
@@ -359,11 +359,11 @@ function sync(){
    bar.querySelector('#terminalToolsToggle').insertAdjacentHTML('beforebegin','<button class="btn small ghost" id="terminalSessionToggle" data-terminal-extra="session" aria-haspopup="dialog" aria-expanded="false" aria-controls="terminalSessionPanel" title="Terminal settings: appearance, highlighting, features, mouse and keyboard">'+icon('settings')+'Settings</button>');
    // Terminal settings (owner request, v1.21.11): one panel with tabs like
    // MobaXterm's settings instead of one long page. Pieces of the Tools panel
-   // markup marked data-settings-tab move into their tab.
+   // markup marked data-terminal-settings-target move into their tab.
    const panel=document.createElement('div');panel.id='terminalSessionPanel';panel.className='terminal-session-panel hidden';panel.setAttribute('role','dialog');panel.setAttribute('aria-label','Terminal settings');
    panel.innerHTML='<div class="terminal-tools-heading"><strong>Terminal settings</strong><button class="iconbtn" data-terminal-extra="close-session" aria-label="Close terminal settings">'+icon('close')+'</button></div>'
     +'<div class="terminal-settings-tabs" role="tablist" aria-label="Terminal settings sections">'+SETTINGS_TABS.map(tab=>'<button type="button" role="tab" id="terminalSettingsTab-'+tab.id+'" aria-controls="terminalSettings-'+tab.id+'" aria-selected="'+(tab.id===settingsTab)+'" tabindex="'+(tab.id===settingsTab?0:-1)+'" data-terminal-settings-tab="'+tab.id+'">'+tab.label+'</button>').join('')+'</div>'
-    +SETTINGS_TABS.map(tab=>'<div class="terminal-settings-page" role="tabpanel" id="terminalSettings-'+tab.id+'" aria-labelledby="terminalSettingsTab-'+tab.id+'" data-settings-panel="'+tab.id+'"'+(tab.id===settingsTab?'':' hidden')+'></div>').join('');
+    +SETTINGS_TABS.map(tab=>'<div class="terminal-settings-page" role="tabpanel" id="terminalSettings-'+tab.id+'" aria-labelledby="terminalSettingsTab-'+tab.id+'" data-terminal-settings-panel="'+tab.id+'"'+(tab.id===settingsTab?'':' hidden')+'></div>').join('');
    for(const section of [...tools.children]){
      const heading=section.querySelector('h3')?.textContent;
      if(heading==='Active session'){
@@ -371,9 +371,9 @@ function sync(){
        section.insertAdjacentHTML('beforeend','<label class="terminal-active-position" for="terminalActiveActionsPosition"><span>Position</span><select id="terminalActiveActionsPosition" aria-label="Active session button position"><option value="top">Top</option><option value="bottom">Bottom</option></select></label>');
      }
    }
-   for(const piece of [...tools.querySelectorAll('[data-settings-tab]')])panel.querySelector('[data-settings-panel="'+piece.dataset.settingsTab+'"]')?.append(piece);
-   panel.querySelector('[data-settings-panel="input"]').insertAdjacentHTML('beforeend','<p class="hint terminal-settings-scope">Auto pager, Auto scroll, Review paste and Include commands in the console bar change only the focused session; these are the defaults.</p>');
-   const input=document.querySelector('#terminalInteractionSettings');if(input)panel.querySelector('[data-settings-panel="input"]').append(input);
+   for(const piece of [...tools.querySelectorAll('[data-terminal-settings-target]')])panel.querySelector('[data-terminal-settings-panel="'+piece.dataset.terminalSettingsTarget+'"]')?.append(piece);
+   panel.querySelector('[data-terminal-settings-panel="input"]').insertAdjacentHTML('beforeend','<p class="hint terminal-settings-scope">Auto pager, Auto scroll, Review paste and Include commands in the console bar change only the focused session; these are the defaults.</p>');
+   const input=document.querySelector('#terminalInteractionSettings');if(input)panel.querySelector('[data-terminal-settings-panel="input"]').append(input);
    document.querySelector('.terminal-panel').append(panel);
    root.NetworkToolkitTerminalAppearance?.mount(panel);
    root.NetworkToolkitTerminalBehavior?.mount(panel);root.NetworkToolkitTerminalBehavior?.apply();

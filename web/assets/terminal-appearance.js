@@ -118,7 +118,7 @@ const SECTIONS=['#terminalAppearanceEditor','#terminalHighlightEditor','#termina
 function scoped(selector){return Array.from(document.querySelectorAll(SECTIONS.map(id=>id+' '+selector).join(',')));}
 function mount(panel){
  if(!panel||document.getElementById('terminalAppearanceEditor'))return;
- const page=id=>panel.querySelector('[data-settings-panel="'+id+'"]')||panel;
+ const page=id=>panel.querySelector('[data-terminal-settings-panel="'+id+'"]')||panel;
  const section=document.createElement('section');section.id='terminalAppearanceEditor';section.className='terminal-tools-section terminal-appearance-editor';
  const fonts=FONT_FAMILIES.map(font=>'<option value="'+font+'" label="'+(fontAvailability(font)==='detected'?'Installed':font==='monospace'?'System default':'Not installed')+'"></option>').join('');
  const schemes=Object.entries(PRESETS).map(([id,preset])=>'<option value="'+id+'">'+preset.name+'</option>').join('');

@@ -115,7 +115,7 @@ function sync(){
 }
 function mount(panel){
  if(!panel||document.getElementById('terminalBehaviorSettings'))return;
- (panel.querySelector('[data-settings-panel="behavior"]')||panel).insertAdjacentHTML('beforeend',settingsHTML());
+ (panel.querySelector('[data-terminal-settings-panel="behavior"]')||panel).insertAdjacentHTML('beforeend',settingsHTML());
  const section=document.getElementById('terminalBehaviorSettings'),note=panel.querySelector('.terminal-transcript-note'),grid=section?.querySelector('.terminal-behavior-grid');if(note&&grid)grid.after(note);
  const confirm=document.getElementById('terminalConfirmSettings');if(confirm&&section&&confirm.parentElement===section.parentElement)section.after(confirm);sync();
 }

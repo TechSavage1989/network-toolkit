@@ -394,7 +394,7 @@
   }
   function updateSettings() {
     // Terminal settings → Mouse & keyboard (v1.21.11); the Tools panel only without it.
-    const panel = document.querySelector('[data-settings-panel="input"]') || document.querySelector('#terminalToolsPanel');
+    const panel = document.querySelector('[data-terminal-settings-panel="input"]') || document.querySelector('#terminalToolsPanel');
     if (panel && !document.querySelector('#terminalInteractionSettings')) panel.insertAdjacentHTML('beforeend',settingsHTML());
     const p = preferences();
     for (const [id,value] of [['terminalCopyOnSelect',p.copyOnSelect],['terminalCopyOnClick',p.copyOnClick],['terminalPasteReview',p.pasteReview],['terminalAutoPager',p.autoPager],['terminalPagerKey',p.pagerKey],['terminalRightClick',p.rightClick],['terminalCtrlC',p.ctrlC]]) {
