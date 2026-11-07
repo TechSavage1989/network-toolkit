@@ -68,5 +68,24 @@ func safeTerminalSyntax(value any) map[string]any {
 	if active != "smart" && !terminalSyntaxBuiltIn[active] && !seen[active] {
 		active = "smart"
 	}
-	return map[string]any{"active": active, "custom": custom}
+	// Per-profile color overrides (v1.21.12) for built-in and kept custom rule sets.
+	colors := map[string]any{}
+	if requested, ok := source["colors"].(map[string]any); ok {
+		for id, raw := range requested {
+			slots, ok := raw.(map[string]any)
+			if !ok || !(terminalSyntaxBuiltIn[id] || seen[id]) {
+				continue
+			}
+			clean := map[string]any{}
+			for _, color := range terminalSyntaxColors {
+				if value, ok := slots[color].(string); ok && terminalColorPattern.MatchString(value) && len(value) == 7 {
+					clean[color] = strings.ToLower(value)
+				}
+			}
+			if len(clean) > 0 {
+				colors[id] = clean
+			}
+		}
+	}
+	return map[string]any{"active": active, "custom": custom, "colors": colors}
 }

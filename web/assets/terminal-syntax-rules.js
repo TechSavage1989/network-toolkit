@@ -290,7 +290,15 @@
       seen.add(set.id); custom.push(set);
     }
     const active = typeof v.active === 'string' && (v.active === 'smart' || builtIn(v.active) || custom.some(set => set.id === v.active)) ? v.active : 'smart';
-    return { active, custom };
+    // Per-profile color overrides (v1.21.12): {profile id: {red: '#rrggbb', ...}}.
+    const colors = {}, requested = v.colors && typeof v.colors === 'object' && !Array.isArray(v.colors) ? v.colors : {};
+    for (const [id, slots] of Object.entries(requested)) {
+      if (!(builtIn(id) || custom.some(set => set.id === id)) || !slots || typeof slots !== 'object') continue;
+      const clean = {};
+      for (const color of COLORS) if (typeof slots[color] === 'string' && /^#[0-9a-f]{6}$/i.test(slots[color])) clean[color] = slots[color].toLowerCase();
+      if (Object.keys(clean).length) colors[id] = clean;
+    }
+    return { active, custom, colors };
   }
   function find(prefs, id) { const clean = preferences(prefs); return builtIn(id) || clean.custom.find(set => set.id === id) || null; }
   function newId(prefs, name) {

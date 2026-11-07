@@ -29,11 +29,37 @@
   const current = () => appState().terminalHighlight === false ? 'none' : prefs().active;
   const save = () => { if (typeof saveState === 'function') saveState(); };
   const refreshTerminals = () => { if (typeof updateTerminalTheme === 'function') updateTerminalTheme(); };
-  let editing = null, sample = SAMPLE, timer = 0, deleteArmed = false;
+  let editing = null, sample = SAMPLE, timer = 0, deleteArmed = false, trying = null;
+
+  // ----- Profile colors (v1.21.12) -----------------------------------------
+  // Each rule set can override its seven colors. A color being tried in the
+  // picker is kept here, never in saved state, until it is applied.
+  const SLOT_NAMES = { red: 'Red', green: 'Green', yellow: 'Yellow', blue: 'Blue', magenta: 'Magenta', cyan: 'Cyan', underline: 'Underline' };
+  function colorsFor(id) { const saved = prefs().colors[id] || {}; return trying && trying.id === id ? { ...saved, [trying.slot]: trying.value } : { ...saved }; }
+  function setColor(id, slot, value) {
+    const p = prefs(), colors = { ...p.colors }, slots = { ...(colors[id] || {}) };
+    if (value) slots[slot] = value; else delete slots[slot];
+    if (Object.keys(slots).length) colors[id] = slots; else delete colors[id];
+    appState().terminalSyntax = { ...p, colors };
+  }
+  function repaint() { refreshTerminals(); if (typeof updateTerminalHighlightStatus === 'function') updateTerminalHighlightStatus(); if (typeof document !== 'undefined' && document.querySelector('[data-syntax-editor]')) render(); }
+  function editColor(slot, id = prefs().active) {
+    const picker = root.NetworkToolkitColorPicker, set = R.find(prefs(), id);
+    if (!picker || !set || !SLOT_NAMES[slot]) return false;
+    const appearance = root.NetworkToolkitTerminalAppearance, pref = appState().terminalAppearance, theme = appState().theme;
+    const base = appearance?.syntaxColors ? appearance.syntaxColors(pref, theme)[slot] : '#cccccc', current = colorsFor(id)[slot] || base;
+    picker.open({ title: 'Choose ' + SLOT_NAMES[slot] + ' color for ' + set.name, value: current, defaultValue: base, allowAlpha: false,
+      background: appearance?.theme ? appearance.theme(pref, theme).background : undefined, semanticColors: {},
+      onPreview: value => { trying = { id, slot, value }; repaint(); },
+      onApply: (value, meta) => { trying = null; setColor(id, slot, meta?.reset ? null : String(value).slice(0, 7).toLowerCase()); save(); repaint(); },
+      onCancel: () => { trying = null; repaint(); } });
+    return true;
+  }
+  function resetColors(id = prefs().active) { if (!prefs().colors[id]) return false; const p = prefs(), colors = { ...p.colors }; delete colors[id]; appState().terminalSyntax = { ...p, colors }; save(); repaint(); return true; }
 
   function optionsHTML() {
     const p = prefs(), option = (value, label) => '<option value="' + escape(value) + '">' + escape(label) + '</option>';
-    return option('none', 'None') + option('smart', 'Network Toolkit device highlighting') +
+    return option('none', 'None') + option('smart', 'Universal (devices, servers and logs)') +
       '<optgroup label="Keyword rule sets">' + R.BUILT_IN.map(set => option(set.id, set.name)).join('') + '</optgroup>' +
       (p.custom.length ? '<optgroup label="Your rule sets">' + p.custom.map(set => option(set.id, set.name)).join('') + '</optgroup>' : '');
   }
@@ -63,7 +89,7 @@
   function colors() {
     const appearance = root.NetworkToolkitTerminalAppearance, pref = appState().terminalAppearance, theme = appState().theme;
     const terminal = appearance?.theme ? appearance.theme(pref, theme) : { background: '#111', foreground: '#ddd' };
-    return { terminal, syntax: appearance?.syntaxColors ? appearance.syntaxColors(pref, theme) : {} };
+    return { terminal, syntax: { ...(appearance?.syntaxColors ? appearance.syntaxColors(pref, theme) : {}), ...(editing ? colorsFor(editing.id) : {}) } };
   }
   function allSets() { const p = prefs(); return [...R.BUILT_IN, ...p.custom]; }
   function pick(id) { const set = R.find(prefs(), id) || R.BUILT_IN[0]; editing = { ...R.normalize(set), id: set.id, builtIn: !!R.builtIn(set.id) }; deleteArmed = false; }
@@ -82,7 +108,7 @@
       '<div class="terminal-syntax-meta"><label for="syntaxEditName">Name</label><input id="syntaxEditName" maxlength="' + R.LIMITS.name + '" value="' + escape(set.name) + '"' + locked + '>' +
       '<label class="check"><input type="checkbox" id="syntaxEditRegex"' + (set.regex ? ' checked' : '') + disabled + '> Regular expressions</label>' +
       '<label class="check"><input type="checkbox" id="syntaxEditCase"' + (set.caseSensitive ? ' checked' : '') + disabled + '> Case sensitive</label></div>' +
-      '<div class="terminal-syntax-rules">' + R.COLORS.map(color => '<div class="terminal-syntax-rule"><label for="syntaxRule-' + color + '"><span class="terminal-syntax-swatch' + (color === 'underline' ? ' underline' : '') + '" style="' + (color === 'underline' ? 'border-bottom-color:' : 'background:') + escape(c.syntax[color] || 'currentColor') + '" aria-hidden="true"></span>' + R.LABELS[color] + (notes[color] ? '<span class="hint">' + escape(notes[color]) + '</span>' : '') + '</label>' +
+      '<div class="terminal-syntax-rules">' + R.COLORS.map(color => '<div class="terminal-syntax-rule"><button type="button" class="terminal-syntax-swatch' + (color === 'underline' ? ' underline' : '') + '" data-syntax-color="' + color + '" style="' + (color === 'underline' ? 'border-bottom-color:' : 'background:') + escape(c.syntax[color] || 'currentColor') + '" title="Change the ' + R.LABELS[color] + ' color for this rule set" aria-label="Change the ' + R.LABELS[color] + ' color for this rule set"></button><label for="syntaxRule-' + color + '">' + R.LABELS[color] + (notes[color] ? '<span class="hint">' + escape(notes[color]) + '</span>' : '') + '</label>' +
         '<textarea id="syntaxRule-' + color + '" data-syntax-color="' + color + '" rows="2" spellcheck="false" autocomplete="off"' + locked + '>' + escape(set.rules[color]) + '</textarea><p class="terminal-syntax-error" id="syntaxError-' + color + '" role="alert"></p></div>').join('') + '</div>' +
       '<div class="terminal-syntax-preview"><label for="syntaxSample">Try it with your own text</label><textarea id="syntaxSample" rows="6" spellcheck="false">' + escape(sample) + '</textarea>' +
       '<pre id="syntaxPreview" class="terminal-syntax-preview-output" style="background:' + escape(c.terminal.background) + ';color:' + escape(c.terminal.foreground) + '" aria-label="Preview"></pre></div></div>';
@@ -111,6 +137,7 @@
     const editor = document.querySelector('[data-syntax-editor]');
     if (!editor || editor.dataset.bound) return;
     editor.dataset.bound = '1';
+    editor.addEventListener('click', event => { const swatch = event.target.closest?.('[data-syntax-color]'); if (swatch && editing) { event.preventDefault(); editColor(swatch.dataset.syntaxColor, editing.id); } });
     editor.addEventListener('input', event => {
       const el = event.target;
       if (el.id === 'syntaxSample') { sample = el.value.slice(0, 20000); schedule(); return; }
@@ -173,7 +200,8 @@
     if (editing.builtIn) return;
     if (!deleteArmed) { deleteArmed = true; render(); document.querySelector('[data-syntax-act="delete"]')?.focus?.(); return; }
     const p = prefs(), id = editing.id, wasActive = p.active === id;
-    appState().terminalSyntax = { active: wasActive ? 'smart' : p.active, custom: p.custom.filter(item => item.id !== id) };
+    const colors = { ...p.colors }; delete colors[id];
+    appState().terminalSyntax = { ...p, active: wasActive ? 'smart' : p.active, custom: p.custom.filter(item => item.id !== id), colors };
     save(); sync(); if (wasActive) refreshTerminals();
     pick('standard'); render('syntaxEditSet');
   }
@@ -223,5 +251,5 @@
     });
   }
 
-  root.NetworkToolkitTerminalSyntaxUI = Object.freeze({ controlHTML, optionsHTML, sync, choose, open, current, sample: () => SAMPLE });
+  root.NetworkToolkitTerminalSyntaxUI = Object.freeze({ controlHTML, optionsHTML, sync, choose, open, current, sample: () => SAMPLE, colorsFor, editColor, resetColors, slotNames: SLOT_NAMES });
 })(typeof window === 'object' ? window : globalThis);

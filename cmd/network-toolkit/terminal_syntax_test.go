@@ -20,7 +20,8 @@ func TestTerminalSyntaxKeepsOnlySafeCustomRuleSets(t *testing.T) {
 	state := map[string]any{"terminalSyntax": map[string]any{"active": "custom-net", "custom": custom, "secret": "dropped"}}
 	sanitizeTerminalSettings(state)
 	clean := state["terminalSyntax"].(map[string]any)
-	if len(clean) != 2 || clean["active"] != "custom-net" {
+	// active, custom and (v1.21.12) per-profile colors; "secret" is dropped.
+	if len(clean) != 3 || clean["active"] != "custom-net" || clean["secret"] != nil {
 		t.Fatalf("unexpected keys or active rule set: %#v", clean)
 	}
 	sets := clean["custom"].([]any)
@@ -49,5 +50,26 @@ func TestTerminalSyntaxKeepsOnlySafeCustomRuleSets(t *testing.T) {
 		if got := state["terminalSyntax"].(map[string]any)["active"]; got != want {
 			t.Fatalf("active %q became %q, want %q", active, got, want)
 		}
+	}
+}
+
+func TestTerminalSyntaxKeepsPerProfileColorsForExistingProfiles(t *testing.T) {
+	clean := safeTerminalSyntax(map[string]any{
+		"active": "network",
+		"custom": []any{map[string]any{"id": "custom-lab", "name": "Lab", "rules": map[string]any{"red": "x"}}},
+		"colors": map[string]any{
+			"network":     map[string]any{"red": "#AA0000", "green": "url(secret-canary)", "unknown": "#ffffff"},
+			"custom-lab":  map[string]any{"cyan": "#00aaff"},
+			"custom-gone": map[string]any{"red": "#ff0000"},
+			"smart":       map[string]any{"red": "#ff0000"},
+			"standard":    "secret-canary",
+		},
+	})
+	colors := clean["colors"].(map[string]any)
+	if len(colors) != 2 || colors["network"].(map[string]any)["red"] != "#aa0000" || len(colors["network"].(map[string]any)) != 1 || colors["custom-lab"].(map[string]any)["cyan"] != "#00aaff" {
+		t.Fatalf("unexpected profile colors: %#v", colors)
+	}
+	if empty := safeTerminalSyntax(nil)["colors"].(map[string]any); len(empty) != 0 {
+		t.Fatalf("no colors by default: %#v", empty)
 	}
 }

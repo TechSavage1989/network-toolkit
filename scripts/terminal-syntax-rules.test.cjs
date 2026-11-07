@@ -106,3 +106,10 @@ test('long lines and many matches stay bounded', () => {
   assert.equal(R.compile(set).match(line).length <= R.LIMITS.hitsPerColor, true);
   assert.deepEqual(R.compile(set).match('x'.repeat(R.LIMITS.text + 1)), []);
 });
+
+test('per-profile colors (v1.21.12) keep only valid colors for profiles that exist', () => {
+  const prefs = R.preferences({ active: 'network', custom: [{ id: 'custom-lab', name: 'Lab', rules: { red: 'x' } }],
+    colors: { network: { red: '#AA0000', green: 'url(x)', blue: '#12345', unknown: '#ffffff' }, 'custom-lab': { cyan: '#00aaff' }, 'custom-gone': { red: '#ff0000' }, smart: { red: '#ff0000' }, standard: 'red' } });
+  assert.deepEqual(JSON.parse(JSON.stringify(prefs.colors)), { network: { red: '#aa0000' }, 'custom-lab': { cyan: '#00aaff' } });
+  assert.deepEqual(JSON.parse(JSON.stringify(R.preferences(null).colors)), {});
+});
