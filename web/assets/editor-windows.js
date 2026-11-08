@@ -110,7 +110,9 @@ function create(options={}){
  function configure(value={}){activityAvailable=value.activityAvailable||activityAvailable;request=value.request||request;adapter=value.adapter||adapter;available=value.available||available;if(value.self!==undefined)self=value.self==='main'?'':value.self;mount();}
  function start(){if(!supported())return;enabled=true;mount();schedule(0);}
  function stop(){stopped=true;if(timer!==null)root.clearTimeout(timer);timer=null;}
- return Object.freeze({reportActivity,configure,start,mount,dismissMenu,poll,move,detachEditor,beginDrag,claimDrag:ticket=>dragAction('claim',ticket),detachDrag:ticket=>dragAction('detach',ticket),cancelDrag:ticket=>dragAction('cancel',ticket),cancel,beforeClose,prepareMainClose,cancelMainClose,commitMainClose,stop,prepareDocument,notifyChanged(){lastCheckpoint='';lastCheckpointVersion=null;render();if(enabled)schedule(200);},get state(){return {enabled,self,running,closing,detaching,dragPreparing,owned:{...owned},outgoing:outgoing.size,incoming:incoming.size,pendingReceipts:receipts.size,error};}});
+ return Object.freeze({reportActivity,configure,start,mount,dismissMenu,poll,move,detachEditor,beginDrag,claimDrag:ticket=>dragAction('claim',ticket),detachDrag:ticket=>dragAction('detach',ticket),cancelDrag:ticket=>dragAction('cancel',ticket),cancel,beforeClose,prepareMainClose,cancelMainClose,commitMainClose,stop,prepareDocument,notifyChanged(){// checkpointVersion detects content, selection and layout changes. Do not force a full large-document snapshot merely because a tab label refreshed.
+ if(!getAdapter()?.checkpointVersion){lastCheckpoint='';lastCheckpointVersion=null;}
+ render();if(enabled)schedule(200);},get state(){return {enabled,self,running,closing,detaching,dragPreparing,owned:{...owned},outgoing:outgoing.size,incoming:incoming.size,pendingReceipts:receipts.size,error};}});
 }
 const controller=create();root.NetworkToolkitEditorWindows=controller;
 if(typeof module==='object'&&module.exports)module.exports={create};
