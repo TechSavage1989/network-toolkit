@@ -1,6 +1,6 @@
 /* Local-only, bounded line comparison. It never reads files or sends document text. */
 (function(root){'use strict';
-const LIMITS=Object.freeze({characters:16*1024*1024,lines:50000,cells:2000000});
+const LIMITS=Object.freeze({characters:16*1024*1024,lines:30000,cells:2000000});
 const splitPreferences=new WeakMap();
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,Number(v)||0));
 const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -25,7 +25,7 @@ function appendRegion(a,b,fromA,toA,fromB,toB,ops,budget){
  return true;
 }
 function compare(left,right){
- left=String(left);right=String(right);const limitMessage={limited:true,message:'Comparison supports up to 16 MiB and 50,000 lines per document. Both documents remain editable; compare smaller sections for larger files.'};
+ left=String(left);right=String(right);const limitMessage={limited:true,message:'Comparison supports up to 16 MiB and 30,000 lines per document. Both documents remain editable; compare smaller sections for larger files.'};
  if(left.length>LIMITS.characters||right.length>LIMITS.characters)return limitMessage;
  const tooManyLines=text=>{let count=1,at=-1;while((at=text.indexOf('\n',at+1))!==-1)if(++count>LIMITS.lines)return true;return false;};
  if(tooManyLines(left)||tooManyLines(right))return limitMessage;
