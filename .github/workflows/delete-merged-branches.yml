@@ -13,6 +13,11 @@ name: Delete merged branches
 # The default branch, protected branches and branches with an open pull
 # request are never touched. Branches with commits that are not on main are
 # kept and listed in the run summary for review.
+#
+# A manual run can also delete branches the owner names (input "branches"),
+# including ones with unmerged work. The default, protected and open-PR
+# branches are still refused, and each branch's last commit is printed first
+# so it can be restored (git push origin <sha>:refs/heads/<name>).
 on:
   push:
     branches: [main]
@@ -22,6 +27,10 @@ on:
         description: 'Only list the branches that would be deleted'
         type: boolean
         default: false
+      branches:
+        description: 'Owner-approved branch names to delete even if not merged (space separated); leave empty for the normal cleanup'
+        type: string
+        default: ''
 
 permissions:
   contents: write
@@ -41,10 +50,25 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
           DRY_RUN: ${{ inputs.dry_run == true && 'true' || 'false' }}
+          NAMED: ${{ inputs.branches || '' }}
         run: |
           set -euo pipefail
           default=$(gh api "repos/$REPO" --jq .default_branch)
           gh api --paginate "repos/$REPO/pulls?state=open&per_page=100" --jq '.[].head.ref' | sort -u > open.txt
+          if [ -n "$NAMED" ]; then
+            set -f; deleted=0
+            for name in $(printf '%s' "$NAMED" | tr ',' ' '); do
+              if [ "$name" = "$default" ]; then echo "::warning::refusing to delete the default branch"; continue; fi
+              if grep -qxF -- "$name" open.txt; then echo "::warning::refusing $name: it has an open pull request"; continue; fi
+              if ! info=$(gh api "repos/$REPO/branches/$name" --jq '"\(.protected)\t\(.commit.sha)"' 2>/dev/null); then echo "not found: $name"; continue; fi
+              if [ "${info%%$'\t'*}" = "true" ]; then echo "::warning::refusing $name: it is protected"; continue; fi
+              sha=${info#*$'\t'}
+              if [ "$DRY_RUN" = "true" ]; then echo "would delete: $name at $sha"; deleted=$((deleted+1)); continue; fi
+              if gh api -X DELETE "repos/$REPO/git/refs/heads/$name" >/dev/null; then echo "deleted: $name at $sha"; deleted=$((deleted+1)); else echo "::warning::could not delete $name"; fi
+            done
+            echo "### Named branches: $( [ "$DRY_RUN" = "true" ] && echo 'would delete' || echo 'deleted' ) $deleted" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           gh api --paginate "repos/$REPO/pulls?state=closed&per_page=100" \
             --jq '.[] | select(.merged_at != null and .head.repo.full_name == $ENV.REPO) | "\(.head.ref)\t\(.head.sha)"' > merged.tsv
           gh api --paginate "repos/$REPO/branches?per_page=100" \
