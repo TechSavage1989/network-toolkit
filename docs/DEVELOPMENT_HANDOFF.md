@@ -1,4 +1,6 @@
-# v1.21.15 Beta 16 (Rule set colors named by purpose; Device prompts on every rule set) - candidate (2026-11-07)
+# v1.21.15 Beta 16 (Rule set colors named by purpose; Device prompts on every rule set) - publication verified (2026-11-08)
+
+Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.21.15 at 2026-11-08T00:21:59Z; stable latest remains v1.20.16. Merged PR #127; tag v1.21.15 points to merge commit a9ac25f085b7461520abd3071d59c25a0bb6e482. Release workflow run 42429130578 succeeded. Assets: Network_Toolkit.exe, Portable and Update ZIPs, Linux x86_64 and aarch64 tarballs and SHA256SUMS; every asset digest matches SHA256SUMS, and the Linux x86_64 binary reports "Network Toolkit 1.21.15 linux amd64". CI note: windows-terminal (TestNativeTerminalSFTP123InstalledWebView2, the known Explorer drop timing failure; fix proposed in #121) and browser-editor112 (editor-views112 focus wait) failed once and passed on re-run.
 
 Owner request: label rule set colors by function rather than color, and add Universal's Device prompts card (color and configuration) to every rule set.
 - Purpose comes from `slotLabel()`: built-in notes, a custom set's `labels` (editable in its cards), or the MobaXterm meaning. Labels are app-only; `.msyn` export is unchanged.
