@@ -15,9 +15,10 @@
 - Hosted Chromium: scripts/editor-capacity114.browser.cjs checks 16 MiB scrolling, gutter coalescing, unchanged scroll-only recovery checkpoint versions and byte-exact editing/undo/save.
 - Hosted Chromium: scripts/editor-alignment113.browser.cjs checks an actual >2 MiB worker comparison, source integrity, hunk navigation readiness and map rendering in addition to the existing wrapped/edited compare cases.
 - Existing Go, Python, native host and browser regression suites remain active. Main branch and release workflow use the verified Windows and Linux portable pipeline.
+- Local continuation checks: 49 Python release/layout tests and 24 focused Editor comparison, line-index and worker tests passed. Icon verification used the exact committed SVG bytes after Windows checkout line-ending conversion was corrected locally.
 
 ## Limitations
-- Files beyond the comparison's 16 MiB or 50,000-line limit, and changed regions exceeding the safe algorithm budget, report that they cannot be compared fully. No partial result is mislabeled as exact.
+- Files beyond the comparison's 16 MiB or 30,000-line limit, and changed regions exceeding the safe algorithm budget, report that they cannot be compared fully. No partial result is mislabeled as exact.
 - A physical Windows desktop and real network files were not accessed for tests.
 - No network adapter, Hosts file, SSH host trust, credential, vault, file overwrite, updater consent, or saved state authorization changes were made.
 - Existing stable v1.21.19 and all previous tags/assets must remain unchanged.
