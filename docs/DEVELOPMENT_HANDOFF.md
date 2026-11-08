@@ -1,3 +1,14 @@
+# v1.21.17 Stable (all 1.21 betas) - candidate (2026-11-08)
+
+Owner: "delete old branches. also the current version works well. please make stable version". The owner confirms the current beta on Windows.
+- Stable 1.21.17 contains the 1.21.0 to 1.21.16 betas. Channel switched to stable in `docs/RELEASE_CHANNEL.txt` and `updateBuildChannel` (cmd/network-toolkit/updater.go), as for 1.20.16. Version is above every beta, so beta users receive it.
+- v1.21.16 Beta 17 (flat icon, PR #131 from another session) was published at 2026-11-08T02:53:30Z with tag v1.21.16 at merge commit 756b9656383cae618230adab79a2d101e5c12826; its six asset digests match SHA256SUMS (checked here). Its preparation deleted RELEASE_NOTES_1.21.15.txt instead of archiving it; restored to docs/releases/. It also left ux-phase6's fixture version, the UI guidelines version line and the updateNewer chain at 1.21.15; this release updates them.
+- Linux: release packaging always includes the Linux tarballs. docs/LINUX_PLAN.md says Linux joins stable after the owner confirms it on a real Linux PC, which has not happened, so the stable notes and README keep Linux as a preview/beta.
+- Old branches: the automatic cleanup kept 24 branches with unmerged work (see PR #130). PR #132 adds a manual `branches` input to `delete-merged-branches.yml`; the owner approved deleting them, and each deleted branch's last commit is logged in that run for restore.
+- Not claimed: physical Linux checks.
+
+---
+
 # Repository housekeeping: merged branches deleted automatically (2026-11-08)
 
 Owner: "i don't know how to delete merged branches. i thought you could do that". The session's GitHub access refuses branch deletion (git push --delete and the refs API both return 403), so `.github/workflows/delete-merged-branches.yml` deletes them with the repository's own token after every push to main (and on demand from Actions, with a dry-run option). Rules: delete when the branch's pull request was merged and the branch still points at the merged commit, or when main contains every commit on it and its last commit is over a day old; never the default, protected or open-PR branches. A local dry run against the live repository (read-only) found 224 branches to delete and 25 to keep: 24 with commits not on main (old beta/, investigate/, review/, proof/ and docs/ branches, `feat/vault-options`, `release-revision-v1.17.63`) and the open PR #129 branch. The kept ones stay for the owner to review; the run summary lists them. No version bump or release.
