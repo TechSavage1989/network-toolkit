@@ -166,12 +166,13 @@ function mount(panel){
  section.innerHTML=`<div class="terminal-appearance-grid"><div class="field"><label for="terminalAppearanceFont">Font</label><input id="terminalAppearanceFont" data-terminal-appearance="fontFamily" list="terminalFontFamilies" data-combobox-font maxlength="80" autocomplete="off"><datalist id="terminalFontFamilies">${fonts}</datalist></div><div class="field"><label for="terminalAppearanceWeight">Font weight</label><select id="terminalAppearanceWeight" data-terminal-appearance="fontWeight"><option value="normal">Regular</option><option value="bold">Bold</option></select></div><div class="field"><label for="terminalAppearanceLineHeight">Line spacing</label><input id="terminalAppearanceLineHeight" type="number" data-terminal-appearance="lineHeight" min="1" max="2" step="0.05"></div><div class="field"><label for="terminalAppearanceCursor">Cursor</label><select id="terminalAppearanceCursor" data-terminal-appearance="cursor">${CURSORS.map(id=>'<option value="'+id+'">'+CURSOR_NAMES[id]+'</option>').join('')}</select></div><div class="field"><label for="terminalAppearanceScheme">Color scheme</label><select id="terminalAppearanceScheme" data-terminal-appearance="scheme"><option value="app">Follow app theme</option>${schemes}<option value="custom">Custom colors</option></select></div></div>
  <label class="terminal-highlight-underlines" for="terminalAppearanceBoldBright"><input id="terminalAppearanceBoldBright" type="checkbox" data-terminal-appearance="boldBright"><span>Show bold text in brighter colors</span></label>
  <p id="terminalFontAvailability" class="hint" role="status" aria-live="polite"></p>
- <div class="terminal-preview-card" aria-label="Preview"><div class="terminal-preview-title">Preview <span id="terminalPreviewProfile" class="terminal-preview-profile"></span></div><pre id="terminalAppearancePreview" class="terminal-appearance-preview" aria-label="Live terminal style preview"><span id="terminalPreviewText"></span>
-Device color: <span data-terminal-preview-color="red">red slot</span>  <span data-terminal-preview-selection>Selected text</span></pre><pre id="terminalFontSample" class="terminal-font-sample" aria-label="Live font and Unicode alignment sample">0123456789 Il1 O0  WiMW
+ <pre id="terminalFontSample" class="terminal-font-sample" aria-label="Live font and Unicode alignment sample">0123456789 Il1 O0  WiMW
 ┌──────────┬──────────┐
 │ IPv4     │ IPv6     │
 └──────────┴──────────┘
-Unicode: café é Δ λ 日本語 → ✓</pre></div>
+Unicode: café é Δ λ 日本語 → ✓</pre>
+ <div class="terminal-preview-card" aria-label="Preview"><div class="terminal-preview-title">Preview <span id="terminalPreviewProfile" class="terminal-preview-profile"></span></div><pre id="terminalAppearancePreview" class="terminal-appearance-preview" aria-label="Live terminal style preview"><span id="terminalPreviewText"></span>
+Device color: <span data-terminal-preview-color="red">red slot</span>  <span data-terminal-preview-selection>Selected text</span></pre></div>
  <details id="terminalPaletteDetails"><summary>Customize colors</summary>
  <h4>Console colors</h4><div class="terminal-color-grid">${consoleColors}</div>
  <details id="terminalDeviceColorsDetails"><summary>Device colors (advanced)</summary><p class="hint">These 16 ANSI color slots are chosen by the connected device or application. They have no fixed meaning such as error or success. Most users can keep the preset.</p><p class="hint">Names such as White are traditional slot names. A light theme may use dark text for that slot so it remains readable.</p><div class="terminal-color-grid terminal-ansi-grid">${deviceColors}</div></details>
@@ -186,7 +187,13 @@ Unicode: café é Δ λ 日本語 → ✓</pre></div>
  <p class="hint">Underlines add a second cue besides color. URLs and network paths such as \\\\server\\share have their own switch. Formatting sent by the device stays intact.</p>
  <button type="button" class="btn small ghost" data-terminal-syntax="customize" data-terminal-syntax-set="smart">Rules and colors…</button></div>
  ${shellSettingsHTML()}`;
- page('highlighting').append(highlight);
+ // One Appearance page (owner request, v1.21.19): font, then the Syntax highlighting picker and the preview,
+ // then the color legend and highlighting options, then the color palette. The picker and preview stay in
+ // view below the tabs (CSS sticky) while the rest scrolls, so every change shows at once.
+ const preview=section.querySelector('.terminal-preview-card'),profile=panel.querySelector('.terminal-highlight-profile'),legend=panel.querySelector('#terminalHighlightLegendInline');
+ const sticky=document.createElement('div');sticky.className='terminal-preview-sticky';preview.before(sticky);if(profile)sticky.append(profile);sticky.append(preview);
+ if(legend)highlight.prepend(legend);
+ section.querySelector('#terminalPaletteDetails').before(highlight);
  const confirm=document.createElement('section');confirm.id='terminalConfirmSettings';confirm.className='terminal-tools-section terminal-appearance-editor terminal-confirm-settings';
  confirm.innerHTML=`<section class="terminal-close-settings"><h4>Session confirmations</h4><label class="terminal-close-confirmation"><input type="checkbox" id="terminalConfirmClose">Confirm before closing an active terminal or using Close other tabs</label><label class="terminal-close-confirmation"><input type="checkbox" id="terminalConfirmReconnectAll">Confirm before Reconnect all</label><label class="terminal-close-confirmation"><input type="checkbox" id="terminalConfirmDisconnectAll">Confirm before Disconnect all</label><label class="terminal-close-confirmation"><input type="checkbox" id="terminalConfirmCloseAll">Confirm before Close all tabs</label><p class="hint">Do not ask again in a confirmation turns it off; turn it back on here. Removing Saved or Recent entries has its own confirmation in the sidebar.</p></section>`;
  page('behavior').append(confirm);
