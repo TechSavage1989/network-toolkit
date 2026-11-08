@@ -1,3 +1,13 @@
+# CI intermittent: late-launch handle check (2026-11-08) - no release
+
+`TestTerminalShellExplicitApprovalAndLateCancellation` failed once with `late-launch handle leaked` on the hosted windows-terminal job (Checks run 42413442967, attempt 4, job 128547688715, PR #121); attempts 1–3 and 5 of the same commit passed.
+- Cause, in the test: it decided "closed" by polling the old handle value with `WaitForSingleObject(h, 0)` until it errored. Windows reuses a freed handle value for the next handle the process opens (the Go runtime opens thread and timer handles at any time), so the poll could succeed against a new object for the whole deadline. Production code (`openElevatedTerminalShell`, launcher goroutine closes the late handle on `ctx.Done()`) is unchanged.
+- Fix, test only: the fake launcher duplicates the synthetic event before returning it and confirms `CompareObjectHandles` matches the pair; the test then polls `CompareObjectHandles(h, dup)`, where "not the same object" (closed, or closed and reused) means closed, and closes the duplicate. A handle the production code leaves open still fails the test. Deadline raised from 1 s to 5 s, which only lengthens a genuine failure.
+- Checked locally: `GOOS=windows go test -mod=vendor -c`, and `GOOS=windows go vet` with no new findings (it still reports the five existing `unsafe.Pointer` warnings in credential and packet capture files, unchanged on main).
+- Hosted windows-terminal step "Verify explicit local-shell approval and native helper boundaries": pending.
+
+---
+
 # v1.21.15 Beta 16 (Rule set colors named by purpose; Device prompts on every rule set) - candidate (2026-11-07)
 
 Owner request: label rule set colors by function rather than color, and add Universal's Device prompts card (color and configuration) to every rule set.

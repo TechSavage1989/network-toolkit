@@ -46,6 +46,8 @@ Use the repo's existing scripts and vendored dependencies:
 - python3 scripts/build_windows_resources.py
 - sh ./build.sh
 
+Windows tests must not prove a handle was closed by polling its old value (`WaitForSingleObject(h, 0)` failing): Windows reuses freed handle values and the Go runtime opens handles at any time. Keep a `DuplicateHandle` copy and poll `CompareObjectHandles(h, dup)` instead, as in `TestTerminalShellExplicitApprovalAndLateCancellation`.
+
 Where fixtures/browser/native host tests need platform-specific setup, run the established .github/workflows/checks.yml jobs in hosted GitHub Actions. Checks runs twice for a pull request from a branch in this repository (push and pull_request events); merge only when both runs are green, re-running a failed job rather than relying on the other run. Never claim physical Windows or live-device acceptance from synthetic tests.
 
 ## Linux edition
