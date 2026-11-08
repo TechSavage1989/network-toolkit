@@ -1,3 +1,9 @@
+## 1.21.20 Beta 1 - Large-file editor responsiveness (candidate)
+
+- Coalesce virtual line-number repainting and update line offsets incrementally for large text edits.
+- Avoid giant recovery snapshots caused solely by scrolling, while preserving explicit source and window transfers.
+- Compare larger configurations with bounded unique-line anchors and a local background worker; keep existing save, permissions, and history controls.
+
 ## 1.21.19 - Stable - Highlighting in the Appearance tab (published 2026-11-08)
 
 - Owner: "I believe the highlighting settings should be with appearance, or at the very least allow selecting syntax highlighting form appearance as well so in real time you can see the preview." and "release as stable". The Highlighting tab is merged into Appearance (`SETTINGS_TABS` in terminal-extras.js; the profile section's `data-terminal-settings-target` is now `appearance`). `mount()` in terminal-appearance.js orders the page: font grid, bold, font availability, font/Unicode sample (moved out of the preview card), then `.terminal-preview-sticky` holding the Syntax highlighting picker and the Preview card, then `#terminalHighlightEditor` (legend moved in, Device prompt name, Universal profile options, Local shell syntax colors), then Customize colors and Reset appearance. `.terminal-preview-sticky` is `position:sticky` below the tab strip (`--terminal-settings-tabs-height`, measured by `stickyOffset()` when the panel opens or a tab is chosen) when the window is at least 640 px tall. `selectSettingsTab('highlighting')`/`openSettings('highlighting')` open Appearance at the picker. Settings button tooltip updated.
