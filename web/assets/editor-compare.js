@@ -33,7 +33,7 @@ function compare(left,right){
  let prefix=0,suffix=0;while(prefix<a.length&&prefix<b.length&&a[prefix]===b[prefix])prefix++;
  while(suffix<a.length-prefix&&suffix<b.length-prefix&&a[a.length-1-suffix]===b[b.length-1-suffix])suffix++;
  const n=a.length-prefix-suffix,m=b.length-prefix-suffix,budget={remaining:LIMITS.cells};
- const limited={limited:true,message:'The changed sections exceed the safe comparison work budget. Compare smaller sections; both original files remain intact.'};
+ const limited={limited:true,message:'This changed region exceeds the bounded comparison budget. Compare smaller sections; both original files remain intact.'};
  const ops=[];for(let i=0;i<prefix;i++)ops.push({type:'equal',left:i,right:i});
  const startA=prefix,endA=a.length-suffix,startB=prefix,endB=b.length-suffix;
  const anchors=n*m>LIMITS.cells?uniqueAnchors(a,b,startA,endA,startB,endB):[];
