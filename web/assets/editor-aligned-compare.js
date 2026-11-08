@@ -196,8 +196,36 @@ function matchPaneChrome(){const rows=sides.map(side=>q('[data-compare-state="'+
 function refresh(force=false){if(disposed)return;if(inUpdate||isComposing()){pendingRefresh=true;return;}pendingRefresh=false;syncPreferences();const all=docs(),selection=options.selection?.();for(const side of sides){ids[side]=selection?(selection[side]||''):(all.some(d=>d.id===ids[side])?ids[side]:side==='left'?options.active()?.id||all[0]?.id||'':all.find(d=>d.id!==ids.left)?.id||'');const select=q('[data-compare-select="'+side+'"]');select.innerHTML='<option value="">Choose document</option>'+all.map(d=>'<option value="'+escape(d.id)+'">'+escape((d.dirty?'* ':'')+d.path+' · '+d.source)+'</option>').join('');select.value=ids[side];syncDocument(side);}const signature=sides.map(side=>{const d=doc(side),v=views[side];return [d?.uid,d?.editRevision,v.scrollDOM.clientWidth,v.scrollDOM.clientHeight,options.wordWrap?.(),options.syntax?.(),d?options.language?.(d):''].join(':')}).join('|');if(force||signature!==lastSignature){lastSignature=signature;generation++;invalidatePixels();clearTimeout(timer);timer=setTimeout(compute,force?0:80);}updateMap();}
  function stable(epoch,stamp){return presentationCurrent({disposed,generation,composing:isComposing()},epoch,stamp,doc);}
  const frame=()=>new Promise(resolve=>root.requestAnimationFrame(resolve));
+ const workerUnavailable={limited:true,message:'Large comparison could not run in the background. Both documents remain editable. Reopen the portable app and retry.'};
+ let largeWorker=null,largeWorkerCancel=null,largeWorkerID=0;
+ function stopLargeWorker(){const worker=largeWorker,cancel=largeWorkerCancel;largeWorker=null;largeWorkerCancel=null;if(worker)worker.terminate();cancel?.();}
+ function compareInWorker(left,right){
+  stopLargeWorker();
+  if(typeof root.Worker!=='function')return Promise.resolve(workerUnavailable);
+  return new Promise(resolve=>{
+   let worker;try{worker=new root.Worker(new URL('assets/editor-compare-worker.js',root.document.baseURI));}
+   catch{return resolve(workerUnavailable);}
+   largeWorker=worker;const id=++largeWorkerID;
+   let timeout=null;
+   const finish=value=>{if(largeWorker!==worker)return;root.clearTimeout(timeout);largeWorker=null;largeWorkerCancel=null;worker.terminate();resolve(value);};
+   largeWorkerCancel=()=>{root.clearTimeout(timeout);resolve(null);};
+   timeout=root.setTimeout(()=>finish({limited:true,message:'Large comparison exceeded the time budget. Documents are unchanged; compare smaller sections.'}),20000);
+   worker.onmessage=event=>{if(event.data?.id!==id)return;finish(event.data.error?{limited:true,message:event.data.error}:event.data.result||workerUnavailable);};
+   worker.onerror=()=>finish(workerUnavailable);
+   try{worker.postMessage({id,left,right});}catch{finish(workerUnavailable);}
+  });
+ }
+
  async function measure(side,epoch,stamp){const d=doc(side),view=views[side],text=d?.content||'',lines=text.split('\n'),style=getComputedStyle(view.contentDOM),lineStyle=getComputedStyle(view.contentDOM.querySelector('.cm-line')||view.contentDOM),{height,width}=measurementMetrics(view,parseFloat(style.lineHeight)||20),wrapped=!!options.wordWrap?.(),key=[d?.uid,d?.editRevision,width,height,style.font,lineStyle.paddingLeft,lineStyle.paddingRight,style.tabSize,wrapped].join(':');if(geometryCache[side]?.key===key)return geometryCache[side].heights;if(!wrapped){const heights=lines.map(()=>height);geometryCache[side]={key,heights};return heights;}const node=document.createElement('div');node.className='nt-compare-measure nt-compare-aligned-measure';Object.assign(node.style,{width:width+'px',font:style.font,lineHeight:height+'px',tabSize:style.tabSize||'4','--line-left':lineStyle.paddingLeft,'--line-right':lineStyle.paddingRight});host.append(node);const heights=[];try{for(let at=0;at<lines.length;at+=250){if(!stable(epoch,stamp))return null;node.innerHTML=lines.slice(at,at+250).map(line=>'<div>'+escape(line||'\u200b')+'</div>').join('');for(const line of node.children)heights.push(line.getBoundingClientRect().height||height);if(lines.length>500)await frame();}}finally{node.remove();}if(stable(epoch,stamp))geometryCache[side]={key,heights};return heights;}
- async function compute(){timer=null;if(disposed||isComposing())return;const epoch=++generation,stamp=Object.fromEntries(sides.map(side=>[side,{d:doc(side),text:doc(side)?.content,revision:doc(side)?.editRevision}]));invalidatePixels();const left=doc('left'),right=doc('right');result=left&&right&&!left.loading&&!right.loading?E.compare(left.content,right.content):null;selected=-1;q('[data-compare-summary]').textContent=!result?'Choose two documents.':result.limited?result.message:result.identical?'Identical.':result.hunks.length+' differences.';for(const el of host.querySelectorAll('[data-compare="next"],[data-compare="previous"]'))el.disabled=!result?.hunks?.length;if(!result||result.limited){geometry=null;applyDecorations(null);drawMap();for(const side of sides)void paintSyntax(side,epoch,stamp);return;}await frame();if(!stable(epoch,stamp))return;const heights=await Promise.all(sides.map(side=>measure(side,epoch,stamp)));if(!stable(epoch,stamp)||heights.some(x=>!x))return;sourceHeights={left:heights[0],right:heights[1]};geometry=M.alignedGeometry(result,heights[0],heights[1]);rowLookup=sourceRowLookup(result.rows);applyDecorations({heights});await frame();if(!stable(epoch,stamp))return;pixelReady=true;drawMap();scrollReconciler.resume();for(const side of sides){gutterRefresh[side].request();void paintSyntax(side,epoch,stamp);}}
+ async function compute(){timer=null;if(disposed||isComposing())return;stopLargeWorker();const epoch=++generation,stamp=Object.fromEntries(sides.map(side=>[side,{d:doc(side),text:doc(side)?.content,revision:doc(side)?.editRevision}]));invalidatePixels();const left=doc('left'),right=doc('right');selected=-1;
+ if(left&&right&&!left.loading&&!right.loading){
+  if(Math.max(left.content.length,right.content.length)>2*1024*1024){
+   q('[data-compare-summary]').textContent='Comparing large documents in the background...';
+   for(const button of host.querySelectorAll('[data-compare="next"],[data-compare="previous"]'))button.disabled=true;
+   await frame();if(!stable(epoch,stamp))return;
+   result=await compareInWorker(left.content,right.content);if(!stable(epoch,stamp))return;
+  }else result=E.compare(left.content,right.content);
+ }else result=null;q('[data-compare-summary]').textContent=!result?'Choose two documents.':result.limited?result.message:result.identical?'Identical.':result.hunks.length+' differences.';for(const el of host.querySelectorAll('[data-compare="next"],[data-compare="previous"]'))el.disabled=!result?.hunks?.length;if(!result||result.limited){geometry=null;applyDecorations(null);drawMap();for(const side of sides)void paintSyntax(side,epoch,stamp);return;}await frame();if(!stable(epoch,stamp))return;const heights=await Promise.all(sides.map(side=>measure(side,epoch,stamp)));if(!stable(epoch,stamp)||heights.some(x=>!x))return;sourceHeights={left:heights[0],right:heights[1]};geometry=M.alignedGeometry(result,heights[0],heights[1]);rowLookup=sourceRowLookup(result.rows);applyDecorations({heights});await frame();if(!stable(epoch,stamp))return;pixelReady=true;drawMap();scrollReconciler.resume();for(const side of sides){gutterRefresh[side].request();void paintSyntax(side,epoch,stamp);}}
  const baseDecorations={left:[],right:[]};
  function applyDecorations(rebuild){
   if(disposed||isComposing())return;
