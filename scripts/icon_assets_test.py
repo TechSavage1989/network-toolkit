@@ -61,6 +61,25 @@ class IconAssetsTests(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'Icon asset changed'):
                     icons.validate_assets(root)
 
+    def test_approved_icon_is_editable_and_uses_only_solid_colors(self):
+        original = (icons.ROOT / icons.ORIGINAL).read_bytes()
+        source = icons.safe_source(original)
+        ns = '{' + icons.NS + '}'
+        groups = {g.get('id') for g in source.findall(ns + 'g')}
+        self.assertTrue({'background', 'terminal-window', 'terminal-controls',
+                         'transfer-arrows', 'network-topology', 'network-node-cutouts'} <= groups)
+        palette = {'#071F43', '#08B9F2', '#FFFFFF', '#FF8B17'}
+        for node in source.iter():
+            for name in ('fill', 'stroke'):
+                paint = node.get(name)
+                if paint and paint != 'none':
+                    self.assertIn(paint, palette)
+            self.assertNotIn(node.tag.rsplit('}', 1)[-1],
+                             {'linearGradient', 'radialGradient', 'filter', 'image', 'pattern'})
+        rendered = icons.runtime_svg(original)
+        self.assertNotIn(b'gradient', rendered.lower())
+        self.assertNotIn(b'url(', rendered.lower())
+
     def test_external_entities_scripts_and_resources_fail_closed(self):
         original = (icons.ROOT / icons.ORIGINAL).read_bytes()
         simple = b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><path d="M0 0h1"/></svg>'
