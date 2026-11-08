@@ -110,3 +110,8 @@
 .session-library-tools{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 9px}
 .session-library-tools .btn{display:inline-flex;align-items:center;gap:5px;font-size:11px}
 .session-library-tools .btn svg{width:13px;height:13px}
+/* Separate terminal windows: theme, app settings and help at the bottom of the rail (v1.21.18). */
+.terminal-sidebar-rail>.terminal-app-tools{display:flex;flex-direction:column;align-items:center;gap:3px;margin-top:auto;padding-top:5px;border-top:1px solid var(--line)}
+.terminal-sidebar-rail>.terminal-app-tools .iconbtn{width:30px;height:28px;min-height:28px}
+.terminal-sidebar-rail>.terminal-app-tools .terminal-app-help{font-weight:700}
+.terminal-sidebar-rail>.terminal-app-tools+.sidebar-rail-swap{margin-top:3px}

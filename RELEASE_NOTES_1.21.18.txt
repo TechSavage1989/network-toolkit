@@ -9,7 +9,7 @@ Network Toolkit 1.21.18
 
 - Saved connections: double-click one in the Saved sidebar to open it, or right-click it to edit, rename, duplicate or remove it. Open sessions are the tabs above the terminal, and recent connections are on the Recent tab.
 - Pane shortcuts: the ⓘ button beside the pane layout picker lists them.
-- Separate terminal window: open it from the "Start a terminal" card. A separate terminal window has its own theme, app settings and help buttons in its toolbar.
+- Separate terminal window: open it from the "Start a terminal" card. A separate terminal window has theme, window settings and help buttons at the bottom of its sidebar's icon strip.
 - Help is still on F1 and the ? button at the bottom of the app sidebar.
 - Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Security confirmations, Windows/UAC approval, explicit update consent and checksum verification are unchanged.
 - Linux: the Linux packages (x86_64 and aarch64) remain a preview; they have not yet been confirmed on a physical Linux PC.

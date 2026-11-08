@@ -73,15 +73,21 @@ async function open(mode){
  await shot('start-card');
  pass('Separate terminal window is offered on the Start a terminal card');
  await context.close();
- // A separate terminal window has no app sidebar: theme, settings and help are in its toolbar.
+ // A separate terminal window has no app sidebar: theme, settings and help sit at the bottom of the
+ // terminal sidebar rail, so the toolbar is no wider than in the main window (it must not wrap).
  context=await open('terminal');
  assert.equal(await page.locator('#terminalToolsToggle').count(),0);
- const app=page.locator('#terminalCommandBar .terminal-app-tools');
- assert.deepEqual(await app.locator('button').evaluateAll(buttons=>buttons.map(b=>b.getAttribute('aria-label'))),['Switch color theme','App settings','Keyboard shortcuts and help']);
+ assert.equal(await page.locator('#terminalCommandBar .terminal-app-tools').count(),0,'nothing added to the toolbar');
+ const app=page.locator('#terminalSessionSidebar .terminal-sidebar-rail .terminal-app-tools');
+ assert.deepEqual(await app.locator('button').evaluateAll(buttons=>buttons.map(b=>b.getAttribute('aria-label'))),['Switch color theme','Window settings','Keyboard shortcuts and help']);
+ const rail=await page.evaluate(()=>{const r=e=>e.getBoundingClientRect(),tools=document.querySelector('.terminal-sidebar-rail .terminal-app-tools'),swap=document.querySelector('.terminal-sidebar-rail .sidebar-rail-swap'),tabs=document.querySelector('.terminal-sidebar-rail .terminal-sidebar-tabs');return{toolsTop:r(tools).top,toolsBottom:r(tools).bottom,swapTop:r(swap).top,tabsBottom:r(tabs).bottom};});
+ assert(rail.toolsTop>rail.tabsBottom&&rail.toolsBottom<=rail.swapTop,'app tools sit between the tabs and the swap button: '+JSON.stringify(rail));
+ const theme=await page.evaluate(()=>state.theme);await app.locator('[data-action="theme"]').click();assert.notEqual(await page.evaluate(()=>state.theme),theme,'theme button switches the theme');await app.locator('[data-action="theme"]').click();
+ await app.locator('[data-action="settings"]').click();await page.locator('#modalTitle').filter({hasText:'Terminal window settings'}).waitFor();await page.keyboard.press('Escape');
  await app.locator('#uxTerminalHelpLauncher').click();await page.locator('[aria-label="Keyboard shortcuts and help"][role="dialog"]').waitFor();await page.keyboard.press('Escape');
  assert.equal(await page.locator('#terminalStage [data-terminal-action="separate-window"]').count(),0,'no nested separate window from a separate window');
  await shot('terminal-window');
- pass('separate terminal windows keep theme, app settings and help in the toolbar');
+ pass('separate terminal windows keep theme, app settings and help at the bottom of the sidebar rail');
  await context.close();
  assert.deepEqual(report.errors,[]);report.passed=true;
 })().catch(error=>{report.errors.push(String(error?.stack||error));console.error(error);process.exitCode=1;}).finally(async()=>{if(out)fs.writeFileSync(path.join(out,'tools-removed-results.json'),JSON.stringify(report,null,2));await browser?.close();console.log(JSON.stringify({passed:report.passed,checks:report.checks.length,errors:report.errors}));});
