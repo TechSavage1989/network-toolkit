@@ -31,3 +31,27 @@ test('horizontal disabled/wrapped mode preserves preference and handles no overf
 test('horizontal restores and peer geometry changes cannot become unsolicited user gestures',()=>{const values={left:{left:1000,width:2000,client:200},right:{left:500,width:700,client:200}},writes=[];const sync=c.createHorizontalSync(side=>values[side],(side,left)=>{values[side].left=left;writes.push(side)},()=>true);sync.scroll('right');sync.scroll('left');assert.equal(writes.length,0);sync.input('left');values.left.left=1100;sync.scroll('left');assert.equal(values.right.left,500);sync.reset();values.right.left=100;sync.scroll('right');assert.equal(values.left.left,1100);assert.equal(writes.length,0);});
 
 test('peer width clamping before its acknowledgement cannot seize horizontal source ownership',()=>{const values={left:{left:1200,width:2000,client:500},right:{left:0,width:1000,client:500}},writes=[];const sync=c.createHorizontalSync(side=>values[side],(side,left)=>{values[side].left=left;writes.push({side,left})},()=>true);sync.input('left');sync.scroll('left');assert.equal(values.right.left,500);values.right.width=800;values.right.left=300;sync.scroll('right');assert.equal(values.left.left,1200);assert.equal(writes.length,1);sync.input('right');values.right.left=250;sync.scroll('right');assert.equal(values.left.left,250,'real new peer gesture takes ownership');});
+
+test('large mostly similar configurations align unique unchanged interface lines within a bounded budget',()=>{
+ const a=Array.from({length:6500},(_,i)=>'interface '+i+' description '+('network configuration '.repeat(28))+i);
+ const b=a.slice();
+ for(let i=10;i<6500;i+=33)b[i]='interface '+i+' changed description '+('network configuration '.repeat(28))+i;
+ const old=a.join('\n'),updated=b.join('\n');
+ assert(old.length>2*1024*1024);
+ const result=c.compare(old,updated);
+ assert.equal(result.limited,false,result.message);
+ assert(result.hunks.length>100);
+ assert.equal(result.lineCounts.left,6500);
+ assert.equal(result.lineCounts.right,6500);
+ assert(result.rows.some(row=>row.type==='equal'&&row.left===5000&&row.right===5000));
+ const changed=result.rows.find(row=>row.left===10);
+ assert.equal(changed.type,'changed');
+});
+test('large file with a single changed line compares instead of failing the old 2 MiB limit',()=>{
+ const original=Array.from({length:12000},(_,i)=>'hostname switch-'+i+' '.padEnd(450,'x'));
+ const revised=original.slice();revised[6000]='hostname replacement '.padEnd(450,'z');
+ const result=c.compare(original.join('\n'),revised.join('\n'));
+ assert.equal(result.limited,false,result.message);
+ assert.equal(result.hunks.length,1);
+ assert.equal(result.hunks[0].start,6000);
+});
