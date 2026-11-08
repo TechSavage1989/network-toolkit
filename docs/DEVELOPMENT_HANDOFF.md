@@ -1,4 +1,6 @@
-# v1.21.19 Stable candidate (Highlighting in the Appearance tab) - in review (2026-11-08)
+# v1.21.19 Stable (Highlighting in the Appearance tab) - publication verified (2026-11-08)
+
+Published as the stable release https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.21.19 at 2026-11-08T07:42:46Z (not a prerelease); releases/latest is now v1.21.19. Merged PR #137 (stacked on the docs PR #136, which merged first); tag v1.21.19 points to merge commit 9d93520c7404c0b4cc7bce0bce2c76123be12e39. Release workflow run 42459712063 succeeded. Assets: Network_Toolkit.exe, Portable and Update ZIPs, Linux x86_64 and aarch64 tarballs and SHA256SUMS; every asset digest matches SHA256SUMS, and the Linux x86_64 binary reports "Network Toolkit 1.21.19 linux amd64". Both Checks runs on PR #137 were green on the first attempt.
 
 Owner: "I believe the highlighting settings should be with appearance, or at the very least allow selecting syntax highlighting form appearance as well so in real time you can see the preview." then "release as stable".
 - Terminal settings tabs: Appearance, Features, Mouse & keyboard. Everything from Highlighting is on Appearance below the font settings. The Syntax highlighting picker and the Preview card are one sticky block (`.terminal-preview-sticky`) under the tab strip, so profile, color, prompt and underline changes show in the preview while the options scroll. Sticky only applies at a window height of 640 px or more.
