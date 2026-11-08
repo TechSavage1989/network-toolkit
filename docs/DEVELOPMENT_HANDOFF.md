@@ -11,6 +11,22 @@ Owner request: label rule set colors by function rather than color, and add Univ
 
 ---
 
+# CI: Terminal SFTP drag-to-Explorer race in windows-terminal (2026-11-07) - no release
+
+Report: `TestNativeTerminalSFTP123InstalledWebView2` sometimes fails at `actual detached-workspace-file` with "Actual Explorer destination file did not arrive" (native-terminal-sftp123.ps1:165). That is the only failure found in this test: run 41707445828, first attempt (2026-11-03, job 126166393524). The two main runs named in the report failed for other reasons. 42375596212 failed the baseline122 negative control (ps1:150, the Save dialog did not appear). 42371008876 failed `TestNativeEditorLocal119`. The candidate step passed in both.
+
+Root cause, from the failing run's evidence (server actions and the script's input timeline use the same GetTickCount64 clock):
+- The page arms the native copy only when the pointer leaves the source window. The owner is held at its 960px minimum width and the hosted screen is 1024px wide, so only a 16px strip of Explorer's Items View is exposed. The pointer leaves on step 27–28 of 28, which leaves about 530 ms between native `start` and release.
+- In every passing main-window gesture, `DoDragDrop` started about 30 ms before the cursor stopped moving, and Explorer replied with COPY at once. In the failing detached gesture, `start` came at +1234 ms and the release at +1781 ms. `finish` came 16 ms after the release with outcome `cancelled`, and Explorer never asked for the data (no `materialize`). The release came before OLE had an accepted drop target. The detached child has no native trace, so the slow step (admission or Explorer's first `DragEnter`) cannot be named.
+- The fixture writes the finish marker for any outcome, so the script then waited 15 s for a file that could not arrive.
+
+Fix (test only, no application code): the gesture timings and the 500 ms dwell are unchanged. After the dwell, the script releases only when the native drag source reports Explorer's DROPEFFECT_COPY feedback. While OLE runs without feedback, it moves the cursor one pixel inside the drop strip. It fails at once with the native event sequence if OLE ends before the release, or after 10 s with a reason. The finish marker now holds the outcome, and Copy fails at once on anything other than `copied`. The detached child is built with `toolkit_native_drag_trace122` (typed, path-free trace in a private temp folder, as in SFTP121's diagnostic mode). The main window's observer writes the same events. The traces and per-gesture `nativeDrag` timings are in the `terminal-sftp123-native-checks` artifact. Baseline122 still runs the copied test files against the unmodified 60b02cae tree.
+- Hosted CI on PR #121: the Terminal SFTP drag test passed seven of seven runs. Those were push run 42412176475 (75bc699), run 42413442967 attempts 1–5 (6cbde18) and run 42422856889 (5c76fbc). In the six timed runs (6cbde18 onward), all 48 gestures passed, OLE entered `DoDragDrop` 15–47 ms before the cursor stopped, and no nudges were needed. That margin of one to three 16 ms ticks is the race the gate now covers. The windows-terminal job was green in five of the six. Attempt 4 failed only in `TestTerminalShellExplicitApprovalAndLateCancellation` ("late-launch handle leaked"), which passed on its one re-run (attempt 5). That test checks closure by polling a handle value that Windows can reuse. It needs its own fix (keep a duplicate handle and use `CompareObjectHandles`).
+- No pull_request Checks run was created for PR #121, so only push runs are listed.
+- Not changed: `native-sftp-direct121.ps1` still releases after a fixed dwell. It failed the same way once (run 41560040060, main-folder).
+
+---
+
 # v1.21.14 Beta 15 (Rule set cards like Universal) - publication verified (2026-11-07)
 
 Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.21.14 at 2026-11-07T23:24:49Z; stable latest remains v1.20.16. Merged PR #125; tag v1.21.14 points to merge commit edb48c3a1d5c7b95b93f5a4ebc7fec0c0707b6c0. Release workflow run 42424848024 succeeded. Assets: Network_Toolkit.exe, Portable and Update ZIPs, Linux x86_64 and aarch64 tarballs and SHA256SUMS; every asset digest matches SHA256SUMS, and the Linux x86_64 binary reports "Network Toolkit 1.21.14 linux amd64". PR #125 was branched from the v1.21.13 head; its watcher merged it only after v1.21.13 was merged and released.

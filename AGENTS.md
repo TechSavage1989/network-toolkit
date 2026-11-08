@@ -46,6 +46,8 @@ Use the repo's existing scripts and vendored dependencies:
 - python3 scripts/build_windows_resources.py
 - sh ./build.sh
 
+Native Explorer drag tests must not release the mouse after a fixed delay. The page arms the native copy only when the pointer leaves the source window, which on the hosted 1024px screen happens on the last travel steps. `native-terminal-sftp123.ps1` therefore releases only after the native drag trace reports Explorer's COPY feedback (`Wait-NativeDropAccepted`; the child is built with `toolkit_native_drag_trace122`). If a native drag ends with outcome `cancelled` and no `materialize`, the release came before OLE admission. It does not mean Explorer copied slowly.
+
 Where fixtures/browser/native host tests need platform-specific setup, run the established .github/workflows/checks.yml jobs in hosted GitHub Actions. Checks runs twice for a pull request from a branch in this repository (push and pull_request events); merge only when both runs are green, re-running a failed job rather than relying on the other run. Never claim physical Windows or live-device acceptance from synthetic tests.
 
 ## Linux edition
