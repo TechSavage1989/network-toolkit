@@ -65,7 +65,7 @@ const descriptions={background:'The area behind all terminal text.',foreground:'
 // the terminal color scheme: bright colors on dark backgrounds, normal on light.
 function syntaxColors(clean,appTheme){const t=theme(clean,appTheme),dark=mode(clean,appTheme)==='dark',pick=name=>t[dark?'bright'+name[0].toUpperCase()+name.slice(1):name];return {red:pick('red'),green:pick('green'),yellow:pick('yellow'),blue:pick('blue'),magenta:pick('magenta'),cyan:pick('cyan'),underline:t.foreground};}
 function syntaxRuleSet(language){const rules=root.NTKTerminalSyntaxRules;if(!rules||SHELLS?.supported(language))return null;const prefs=rules.preferences(typeof state==='undefined'?null:state.terminalSyntax);if(prefs.active==='smart')return null;const set=rules.find(prefs,prefs.active);return set&&rules.withSwitches?rules.withSwitches(set,prefs):set;}
-function highlightOptions(value,appTheme='dark',language){const clean=normalize(effective(value)),set=syntaxRuleSet(language);return {theme:mode(clean,appTheme),colors:clean.highlightColors,underlines:clean.highlightUnderlines,linkUnderlines:clean.highlightLinkUnderlines,prompt:clean.promptHighlight,rules:clean.highlightRules,ruleset:set?root.NTKTerminalSyntaxRules.compile(set):null,ruleSet:set,syntaxColors:{...syntaxColors(clean,appTheme),...(set?(root.NetworkToolkitTerminalSyntaxUI?.colorsFor?.(set.id)||root.NTKTerminalSyntaxRules.preferences(typeof state==='undefined'?null:state.terminalSyntax).colors[set.id]):null)},...(SHELLS?.supported(language)?{shellColors:clean.shells[language].colors}:{})};}
+function highlightOptions(value,appTheme='dark',language){const clean=normalize(effective(value)),set=syntaxRuleSet(language);return {theme:mode(clean,appTheme),colors:clean.highlightColors,underlines:clean.highlightUnderlines,linkUnderlines:clean.highlightLinkUnderlines,prompt:clean.promptHighlight,promptRule:set?!(root.NTKTerminalSyntaxRules.preferences(typeof state==='undefined'?null:state.terminalSyntax).off[set.id]||[]).includes('prompt'):clean.highlightRules.prompt!==false,rules:clean.highlightRules,ruleset:set?root.NTKTerminalSyntaxRules.compile(set):null,ruleSet:set,syntaxColors:{...syntaxColors(clean,appTheme),...(set?(root.NetworkToolkitTerminalSyntaxUI?.colorsFor?.(set.id)||root.NTKTerminalSyntaxRules.preferences(typeof state==='undefined'?null:state.terminalSyntax).colors[set.id]):null)},...(SHELLS?.supported(language)?{shellColors:clean.shells[language].colors}:{})};}
 function enabled(value,language,deviceEnabled=true){return SHELLS?.supported(language)?normalize(value).shells[language].enabled:deviceEnabled;}
 // Suggestions name local fonts only. No @font-face, FontFace URL, download,
 // installation, or permission-gated local-font enumeration is performed.
@@ -127,21 +127,23 @@ const PREVIEW_LINES=['router# show interfaces','wan1  static  192.0.2.1  up  phy
 function previewEscape(value){return String(value).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
 function renderPreviewText(settings){
  const box=document.getElementById('terminalPreviewText'),H=root.NTTerminalHighlight;if(!box)return;
- const set=settings.ruleSet,signature=JSON.stringify([set?[set.id,set.rules,set.regex,set.caseSensitive]:null,settings.rules,settings.prompt,!!H]);
+ const set=settings.ruleSet,signature=JSON.stringify([set?[set.id,set.rules,set.regex,set.caseSensitive]:null,settings.rules,settings.prompt,settings.promptRule,!!H]);
  if(box.dataset.signature===signature)return;box.dataset.signature=signature;
- const line=text=>{if(!H)return previewEscape(text);let html='',last=0;for(const hit of H.analyze(text,'ssh',settings.rules,settings.ruleset,{prompt:settings.prompt})){if(hit.start<last)continue;html+=previewEscape(text.slice(last,hit.start))+'<span data-terminal-preview-highlight="'+hit.kind+'">'+previewEscape(text.slice(hit.start,hit.end))+'</span>';last=hit.end;}return html+previewEscape(text.slice(last));};
+ const line=text=>{if(!H)return previewEscape(text);let html='',last=0;for(const hit of H.analyze(text,'ssh',settings.rules,settings.ruleset,{prompt:settings.prompt,promptRule:settings.promptRule})){if(hit.start<last)continue;html+=previewEscape(text.slice(last,hit.start))+'<span data-terminal-preview-highlight="'+hit.kind+'">'+previewEscape(text.slice(hit.start,hit.end))+'</span>';last=hit.end;}return html+previewEscape(text.slice(last));};
  box.innerHTML=line(PREVIEW_LINES[0])+'<span data-terminal-preview-cursor aria-hidden="true"> </span>\n'+PREVIEW_LINES.slice(1).map(line).join('\n');
 }
 function previewMarks(settings,colors){
  const H=root.NTTerminalHighlight,marks=Object.fromEntries((H?.legend?.(settings.theme,{...settings,ruleset:null,ruleSet:null,rules:{},prompt:'auto'})||[]).map(mark=>[mark.kind,mark]));
  for(const [slot,color]of Object.entries(settings.syntaxColors||{}))marks['syn-'+slot]={color,borderStyle:'solid',borderWidth:slot==='underline'?1:0};
- if(marks.prompt)marks['prompt-name']={...marks.prompt,borderWidth:settings.ruleset?0:marks.prompt.borderWidth};
+ if(marks.prompt){marks['prompt-name']={...marks.prompt,borderWidth:settings.ruleset?0:marks.prompt.borderWidth};if(settings.ruleset)marks.prompt={...marks.prompt,borderWidth:0};}
  marks['prompt-plain']={color:colors.foreground,borderWidth:0};
  return marks;
 }
 function promptSelect(id,label=''){return '<select id="'+id+'" data-terminal-appearance="promptHighlight"'+(label?' aria-label="'+label+'"':'')+'>'+PROMPT_MODES.map(([value,name])=>'<option value="'+value+'">'+name+'</option>').join('')+'</select>';}
 // Device prompt name card for keyword rule set pages in Customize (v1.21.14).
-function promptCardHTML(){return '<div class="terminal-universal-rule terminal-syntax-prompt-card" data-terminal-prompt-card><span class="terminal-syntax-card-mark" aria-hidden="true"></span><label for="syntaxRulePromptName"><strong>Device prompt name</strong><small>user@host, switch# and similar. Works with every profile.</small></label>'+colorButton('syntaxRulePromptColor','device prompt name','data-terminal-highlight-color','prompt')+'<div class="terminal-universal-prompt">'+promptSelect('syntaxRulePromptName','Device prompt name')+'</div></div>';}
+// The same Device prompts card as Universal's (v1.21.15); the switch is the
+// rule set's own, the color and name choice are shared by every profile.
+function promptCardHTML(toggle=''){return '<div class="terminal-universal-rule terminal-syntax-prompt-card" data-terminal-prompt-card>'+(toggle||'<span class="terminal-syntax-card-mark" aria-hidden="true"></span>')+'<label for="'+(toggle?'syntaxSlotOn-prompt':'syntaxRulePromptName')+'"><strong>'+HIGHLIGHTS.prompt[0]+'</strong><small>'+HIGHLIGHTS.prompt[1]+'</small></label>'+colorButton('syntaxRulePromptColor',HIGHLIGHTS.prompt[0],'data-terminal-highlight-color','prompt')+'<div class="terminal-universal-prompt"><label for="syntaxRulePromptName">Device name in the prompt</label>'+promptSelect('syntaxRulePromptName')+'</div></div>';}
 // Universal profile rules and colors, shown in the Syntax highlighting
 // Customize dialog (owner request, v1.21.12). Controls use the same data
 // attributes as the settings panel, so they save and sync the same way.

@@ -29,7 +29,7 @@ func TestTerminalSyntaxKeepsOnlySafeCustomRuleSets(t *testing.T) {
 		t.Fatalf("custom rule sets were not capped: %d", len(sets))
 	}
 	first := sets[0].(map[string]any)
-	if first["id"] != "custom-net" || first["name"] != "Network keywords" || first["regex"] != true || first["caseSensitive"] != true || len(first) != 5 {
+	if first["id"] != "custom-net" || first["name"] != "Network keywords" || first["regex"] != true || first["caseSensitive"] != true || len(first) != 6 {
 		t.Fatalf("first rule set not sanitized: %#v", first)
 	}
 	rules := first["rules"].(map[string]any)
@@ -95,5 +95,26 @@ func TestTerminalSyntaxSwitchedOffColorsPersist(t *testing.T) {
 	}
 	if empty := safeTerminalSyntax(nil)["off"].(map[string]any); len(empty) != 0 {
 		t.Fatalf("no switches expected by default: %#v", empty)
+	}
+}
+
+// v1.21.15: what each color marks (labels) and the device prompt switch are
+// kept for your own rule sets; labels are trimmed to 40 characters.
+func TestTerminalSyntaxLabelsAndPromptSwitchPersist(t *testing.T) {
+	clean := safeTerminalSyntax(map[string]any{
+		"custom": []any{map[string]any{"id": "custom-lab", "name": "Lab", "rules": map[string]any{"red": "boom"},
+			"labels": map[string]any{"red": "  Link failures  ", "green": strings.Repeat("x", 60), "blinking": "nope", "blue": 7}}},
+		"off": map[string]any{"custom-lab": []any{"prompt", "red"}, "standard": []any{"prompt"}},
+	})
+	labels := clean["custom"].([]any)[0].(map[string]any)["labels"].(map[string]any)
+	if labels["red"] != "Link failures" || len([]rune(labels["green"].(string))) != 40 || labels["blinking"] != nil || labels["blue"] != nil {
+		t.Fatalf("labels were not sanitized: %#v", labels)
+	}
+	off := clean["off"].(map[string]any)
+	if got := off["custom-lab"].([]any); len(got) != 2 || got[0] != "red" || got[1] != "prompt" {
+		t.Fatalf("prompt switch was dropped: %#v", got)
+	}
+	if got := off["standard"].([]any); len(got) != 1 || got[0] != "prompt" {
+		t.Fatalf("built-in prompt switch was dropped: %#v", got)
 	}
 }

@@ -34,12 +34,19 @@ test('the device name inside prompts is found for Linux, network devices and ven
 
 test('the prompt name option also works with keyword rule sets', () => {
   const set = R.compile(R.find(R.preferences({}), 'standard'));
-  assert.deepEqual(spans('biqu@CR10SPro:~$ cat error.log', 'auto', set), ['syn-red:error']);
-  assert.deepEqual(spans('biqu@CR10SPro:~$ cat error.log', 'always', set), ['prompt-name:biqu@CR10SPro', 'syn-red:error']);
+  // v1.21.15: rule sets color device prompts too, unless switched off for the set.
+  assert.deepEqual(spans('biqu@CR10SPro:~$ cat error.log', 'auto', set), ['prompt:biqu@CR10SPro:~$', 'syn-red:error']);
+  assert.deepEqual(spans('biqu@CR10SPro:~$ cat error.log', 'always', set), ['prompt-name:biqu@CR10SPro', 'prompt::~$', 'syn-red:error']);
   assert.deepEqual(spans('switch#show interfaces', 'off', set), ['prompt-plain:switch']);
-  const legend = H.legend('dark', { ruleset: set, ruleSet: R.find(R.preferences({}), 'standard'), syntaxColors: {}, prompt: 'always', colors: { prompt: '#123456' } });
-  assert.deepEqual(JSON.parse(JSON.stringify(legend.at(-1))), { kind: 'prompt', label: 'Device prompt name', color: '#123456', borderStyle: 'none', borderWidth: 0 });
-  assert(!H.legend('dark', { ruleset: set, ruleSet: R.find(R.preferences({}), 'standard'), syntaxColors: {}, prompt: 'auto' }).some(item => item.kind === 'prompt'));
+  const noPrompt = (line, prompt) => Array.from(H.analyze(line, 'ssh', {}, set, { prompt, promptRule: false }), hit => hit.kind + ':' + line.slice(hit.start, hit.end));
+  assert.deepEqual(noPrompt('biqu@CR10SPro:~$ cat error.log', 'auto'), ['syn-red:error'], 'Device prompts switched off leaves the prompt alone');
+  assert.deepEqual(noPrompt('biqu@CR10SPro:~$ cat error.log', 'always'), ['prompt-name:biqu@CR10SPro', 'syn-red:error'], 'the name choice still applies');
+  assert.deepEqual(spans('error#show run', 'auto', set), ['prompt:error#'], 'rule set words inside a prompt give way to the prompt');
+  const ruleSet = R.find(R.preferences({}), 'standard'), base = { ruleset: set, ruleSet, syntaxColors: {}, colors: { prompt: '#123456' } };
+  assert.deepEqual(JSON.parse(JSON.stringify(H.legend('dark', { ...base, prompt: 'auto' }).at(-1))), { kind: 'prompt', label: 'Device prompts', color: '#123456', borderStyle: 'none', borderWidth: 0 });
+  assert.equal(H.legend('dark', { ...base, prompt: 'always', promptRule: false }).at(-1).label, 'Device prompt name');
+  assert(!H.legend('dark', { ...base, prompt: 'auto', promptRule: false }).some(item => item.kind === 'prompt'));
+  assert.equal(H.legend('dark', base)[0].label, 'Errors and failures', 'chips are named by purpose, not color');
 });
 
 test('URLs and network paths: share and transfer schemes, UNC shares, NFS and scp locations', () => {

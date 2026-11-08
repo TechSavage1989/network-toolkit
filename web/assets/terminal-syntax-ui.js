@@ -64,7 +64,7 @@
     if (!picker || !set || !SLOT_NAMES[slot]) return false;
     const appearance = root.NetworkToolkitTerminalAppearance, pref = appState().terminalAppearance, theme = appState().theme;
     const base = appearance?.syntaxColors ? appearance.syntaxColors(pref, theme)[slot] : '#cccccc', current = colorsFor(id)[slot] || base;
-    picker.open({ title: 'Choose ' + SLOT_NAMES[slot] + ' color for ' + set.name, value: current, defaultValue: base, allowAlpha: false,
+    picker.open({ title: 'Choose the color for ' + R.slotLabel(set, slot) + ' in ' + set.name, value: current, defaultValue: base, allowAlpha: false,
       background: appearance?.theme ? appearance.theme(pref, theme).background : undefined, semanticColors: {},
       onPreview: value => { trying = { id, slot, value }; repaint(); },
       onApply: (value, meta) => { trying = null; setColor(id, slot, meta?.reset ? null : String(value).slice(0, 7).toLowerCase()); save(); repaint(); },
@@ -128,12 +128,18 @@
   // One card per color, like the Universal page (owner request, v1.21.14):
   // on/off switch, name and note, color button, then the words or pattern
   // (editable for your own and imported sets, folded away for built-ins).
-  function cardHTML(color, value, note, on, builtIn) {
-    const pattern = '<textarea id="syntaxRule-' + color + '" data-syntax-color="' + color + '" rows="2" spellcheck="false" autocomplete="off" aria-label="' + R.LABELS[color] + ' words or pattern"' + (builtIn ? ' readonly' : '') + '>' + escape(editing.rules[color]) + '</textarea>';
+  // Cards are named by what the color marks (owner request, v1.21.15),
+  // since the color itself can be changed. Your own and imported sets can
+  // rename them; the MobaXterm color each pattern belongs to stays visible.
+  function cardHTML(color, value, on, builtIn) {
+    const purpose = R.slotLabel(editing, color), slot = R.LABELS[color];
+    const pattern = '<textarea id="syntaxRule-' + color + '" data-syntax-color="' + color + '" rows="2" spellcheck="false" autocomplete="off" aria-label="Words or pattern for ' + escape(purpose) + '"' + (builtIn ? ' readonly' : '') + '>' + escape(editing.rules[color]) + '</textarea>';
+    const title = builtIn
+      ? '<label for="syntaxSlotOn-' + color + '"><strong>' + escape(purpose) + '</strong><small>' + slot + ' color in .msyn files</small></label>'
+      : '<div class="terminal-syntax-card-title"><input id="syntaxLabel-' + color + '" data-syntax-label="' + color + '" maxlength="' + R.LIMITS.label + '" value="' + escape(editing.labels?.[color] || '') + '" placeholder="' + escape(R.DEFAULT_LABELS[color]) + '" aria-label="What the ' + slot + ' color marks"><small>' + slot + ' color in .msyn files</small></div>';
     return '<div class="terminal-universal-rule terminal-syntax-card" data-syntax-slot="' + color + '">' +
-      '<input type="checkbox" id="syntaxSlotOn-' + color + '" data-syntax-slot-on="' + color + '"' + (on ? ' checked' : '') + '>' +
-      '<label for="syntaxSlotOn-' + color + '"><strong>' + R.LABELS[color] + '</strong><small>' + escape(note || (color === 'underline' ? 'Underlined text' : builtIn ? '' : 'Your words or pattern')) + '</small></label>' +
-      '<button type="button" class="ntk-color-trigger' + (color === 'underline' ? ' is-underline' : '') + '" data-syntax-swatch="' + color + '" aria-label="Choose the ' + R.LABELS[color] + ' color for this rule set" title="Change the ' + R.LABELS[color] + ' color for this rule set"><span class="ntk-color-chip" aria-hidden="true" style="background-color:' + escape(value) + ';--ntk-swatch:' + escape(value) + '"></span><code>' + escape(value) + '</code></button>' +
+      '<input type="checkbox" id="syntaxSlotOn-' + color + '" data-syntax-slot-on="' + color + '"' + (on ? ' checked' : '') + ' aria-label="Color ' + escape(purpose) + '">' + title +
+      '<button type="button" class="ntk-color-trigger' + (color === 'underline' ? ' is-underline' : '') + '" data-syntax-swatch="' + color + '" aria-label="Choose the color for ' + escape(purpose) + '" title="Change the color for ' + escape(purpose) + '"><span class="ntk-color-chip" aria-hidden="true" style="background-color:' + escape(value) + ';--ntk-swatch:' + escape(value) + '"></span><code>' + escape(value) + '</code></button>' +
       (builtIn ? '<details class="terminal-syntax-pattern"><summary>Pattern</summary>' + pattern + '</details>' : '<div class="terminal-syntax-pattern">' + pattern + '</div>') +
       '<p class="terminal-syntax-error" id="syntaxError-' + color + '" role="alert"></p></div>';
   }
@@ -148,7 +154,7 @@
     const setOptions = '<option value="' + UNIVERSAL + '"' + (set.universal ? ' selected' : '') + '>' + escape(UNIVERSAL_NAME) + '</option><optgroup label="Keyword rule sets">' + R.BUILT_IN.map(item => '<option value="' + item.id + '"' + (item.id === set.id ? ' selected' : '') + '>' + escape(item.name) + '</option>').join('') + '</optgroup>' +
       (prefs().custom.length ? '<optgroup label="Your rule sets">' + prefs().custom.map(item => '<option value="' + item.id + '"' + (item.id === set.id ? ' selected' : '') + '>' + escape(item.name) + '</option>').join('') + '</optgroup>' : '');
     if (set.universal) return universalBodyHTML(setOptions);
-    const notes = R.builtIn(set.id)?.notes || {}, off = prefs().off[set.id] || [];
+    const off = prefs().off[set.id] || [];
     return '<div class="terminal-syntax-editor" data-syntax-editor>' +
       '<div class="terminal-syntax-toolbar"><label for="syntaxEditSet">Rule set</label><select id="syntaxEditSet">' + setOptions + '</select>' +
       '<button type="button" class="btn small ghost" data-syntax-act="duplicate">Duplicate</button>' +
@@ -159,8 +165,9 @@
       '<div class="terminal-syntax-meta"><label for="syntaxEditName">Name</label><input id="syntaxEditName" maxlength="' + R.LIMITS.name + '" value="' + escape(set.name) + '"' + locked + '>' +
       '<label class="check"><input type="checkbox" id="syntaxEditRegex"' + (set.regex ? ' checked' : '') + disabled + '> Regular expressions</label>' +
       '<label class="check"><input type="checkbox" id="syntaxEditCase"' + (set.caseSensitive ? ' checked' : '') + disabled + '> Case sensitive</label></div>' +
-      '<div class="terminal-universal-rules terminal-syntax-cards">' + R.COLORS.map(color => cardHTML(color, c.syntax[color] || '', notes[color], !off.includes(color), set.builtIn)).join('') +
-        (root.NetworkToolkitTerminalAppearance?.promptCardHTML ? root.NetworkToolkitTerminalAppearance.promptCardHTML() : '') + '</div>' +
+      // Built-in sets show only the colors they use; your own sets show all seven.
+      '<div class="terminal-universal-rules terminal-syntax-cards">' + (root.NetworkToolkitTerminalAppearance?.promptCardHTML ? root.NetworkToolkitTerminalAppearance.promptCardHTML('<input type="checkbox" id="syntaxSlotOn-prompt" data-syntax-slot-on="prompt"' + (off.includes('prompt') ? '' : ' checked') + '>') : '') +
+        R.COLORS.filter(color => !set.builtIn || set.rules[color]).map(color => cardHTML(color, c.syntax[color] || '', !off.includes(color), set.builtIn)).join('') + '</div>' +
       '<div class="terminal-universal-actions"><button type="button" class="btn small ghost" data-syntax-act="all-on">Turn all colors on</button><button type="button" class="btn small ghost" data-syntax-act="reset-colors">Reset colors</button></div>' +
       '<div class="terminal-syntax-preview"><label for="syntaxSample">Try it with your own text</label><textarea id="syntaxSample" rows="6" spellcheck="false">' + escape(sample) + '</textarea>' +
       '<pre id="syntaxPreview" class="terminal-syntax-preview-output" style="background:' + escape(c.terminal.background) + ';color:' + escape(c.terminal.foreground) + '" aria-label="Preview"></pre></div></div>';
@@ -201,6 +208,7 @@
       if (el.id === 'syntaxSample') { if (editing.universal) universalSample = el.value.slice(0, 20000); else sample = el.value.slice(0, 20000); schedule(); return; }
       if (editing.builtIn || editing.universal) return;
       if (el.id === 'syntaxEditName') editing.name = el.value;
+      else if (el.dataset.syntaxLabel) editing.labels = { ...(editing.labels || {}), [el.dataset.syntaxLabel]: el.value };
       else if (el.dataset.syntaxColor) editing.rules[el.dataset.syntaxColor] = el.value;
       else return;
       schedule(true);
@@ -264,9 +272,9 @@
     const compiled = R.compile(editing), active = R.compile(R.withSwitches(editing, prefs())), c = colors(), H = root.NTTerminalHighlight;
     for (const color of R.COLORS) { const error = document.getElementById('syntaxError-' + color); if (error) error.textContent = compiled.errors[color] || ''; }
     const promptMode = root.NetworkToolkitTerminalAppearance?.highlightOptions?.(appState().terminalAppearance, appState().theme)?.prompt || 'auto';
-    const named = { 'prompt-name': promptColor(), 'prompt-plain': c.terminal.foreground };
+    const promptRule = !(prefs().off[editing.id] || []).includes('prompt'), named = { prompt: promptColor(), 'prompt-name': promptColor(), 'prompt-plain': c.terminal.foreground };
     output.innerHTML = sample.split('\n').slice(0, 200).map(line => {
-      const hits = H ? H.analyze(line, 'ssh', {}, active, { prompt: promptMode }) : active.match(line), marks = [];
+      const hits = H ? H.analyze(line, 'ssh', {}, active, { prompt: promptMode, promptRule }) : active.match(line), marks = [];
       for (let i = 0; i <= line.length; i++) marks.push({ color: '', underline: false });
       for (const hit of hits) for (let i = hit.start; i < hit.end; i++) { if (named[hit.kind] !== undefined) { marks[i].color = named[hit.kind]; continue; } const color = hit.kind.slice(4); if (color === 'underline') marks[i].underline = true; else marks[i].color = c.syntax[color]; }
       let html = '', openKey = null;
@@ -282,7 +290,7 @@
     const p = prefs();
     if (p.custom.length >= R.LIMITS.custom) { notify('You can keep up to ' + R.LIMITS.custom + ' rule sets. Delete one first.', 'error'); return; }
     const name = (editing.name + ' (copy)').slice(0, R.LIMITS.name), id = R.newId(p, name);
-    const set = { ...R.normalize({ ...editing, name }), id };
+    const set = { ...R.normalize({ ...editing, name, labels: Object.fromEntries(R.COLORS.map(color => [color, R.slotLabel(editing, color)])) }), id };
     // The copy starts with the original's colors and switches.
     const colors = p.colors[editing.id] ? { ...p.colors, [id]: { ...p.colors[editing.id] } } : p.colors, off = p.off[editing.id] ? { ...p.off, [id]: [...p.off[editing.id]] } : p.off;
     appState().terminalSyntax = { ...p, custom: [...p.custom, set], colors, off };

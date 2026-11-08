@@ -101,7 +101,7 @@ test('each profile has its own colors that can be tried without saving and reset
   const h = harness({ syntax: { active: 'network', custom: [{ id: 'custom-lab', name: 'Lab', rules: { red: 'x' } }] } });
   assert.equal(h.ui.editColor('red'), true);
   const picker = h.context.picks.at(-1);
-  assert.match(picker.title, /Red color for Network configuration/); assert.equal(picker.value, '#ff6060'); assert.equal(picker.defaultValue, '#ff6060');
+  assert.equal(picker.title, 'Choose the color for Down, disabled, denied and "no" commands in Network configuration (Cisco and others)', 'named by purpose (v1.21.15)'); assert.equal(picker.value, '#ff6060'); assert.equal(picker.defaultValue, '#ff6060');
   picker.onPreview('#112233');
   assert.equal(h.ui.colorsFor('network').red, '#112233', 'the color being tried is shown');
   assert.equal(h.state.terminalSyntax.colors?.network, undefined, 'a color being tried is never saved');
@@ -142,7 +142,7 @@ test('rule set pages use cards: switch each color, change its color, keep editin
   const h = harness({ syntax: { active: 'standard' } });
   h.ui.open('standard');
   const cards = h.doc.querySelectorAll('[data-syntax-slot]');
-  assert.deepEqual(cards.map(card => card.dataset.syntaxSlot), ['red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'underline']);
+  assert.deepEqual(cards.map(card => card.dataset.syntaxSlot), ['red', 'green', 'yellow', 'magenta', 'cyan', 'underline'], 'built-in sets show only the colors they use');
   assert.equal(h.$('syntaxSlotOn-red').hasAttribute('checked'), true); assert.match(h.doc.querySelector('[data-syntax-swatch="red"]').textContent, /#ff6060/);
   assert(h.$('syntaxRule-red').closest('details'), 'built-in patterns are folded away'); assert.equal(h.$('syntaxRule-red').hasAttribute('readonly'), true);
   assert.match(h.$('syntaxPreview').innerHTML, /color:#ff6060/);
@@ -152,7 +152,7 @@ test('rule set pages use cards: switch each color, change its color, keep editin
   assert.equal(h.$('syntaxSlotOn-red').hasAttribute('checked'), false, 'the card shows it is off');
   const picks = h.context.picks.length;
   h.editor().emit('click', h.$('syntaxRule-red')); assert.equal(h.context.picks.length, picks, 'clicking a pattern does not open the color picker');
-  h.editor().emit('click', h.doc.querySelector('[data-syntax-swatch="green"]')); assert.equal(h.context.picks.length, picks + 1); assert.match(h.context.picks.at(-1).title, /Green color for Standard keywords/);
+  h.editor().emit('click', h.doc.querySelector('[data-syntax-swatch="green"]')); assert.equal(h.context.picks.length, picks + 1); assert.equal(h.context.picks.at(-1).title, 'Choose the color for Success in Standard keywords (OK/warning/error/…)');
   h.context.picks.at(-1).onApply('#00ff88'); assert.equal(h.state.terminalSyntax.colors.standard.green, '#00ff88');
   h.click('[data-syntax-act="duplicate"]');
   const copy = h.state.terminalSyntax.custom[0].id;
@@ -164,4 +164,23 @@ test('rule set pages use cards: switch each color, change its color, keep editin
   h.click('[data-syntax-act="delete"]'); h.click('[data-syntax-act="delete"]');
   assert.equal(h.state.terminalSyntax.custom.length, 0); assert.equal(h.state.terminalSyntax.off[copy], undefined);
   assert.deepEqual(Array.from(h.state.terminalSyntax.off.standard), ['red'], 'other sets keep their switches');
+});
+
+test('cards are named by purpose, own sets can rename them, and every rule set has the Device prompts card (v1.21.15)', () => {
+  const h = harness({ syntax: { active: 'standard' } });
+  h.context.NetworkToolkitTerminalAppearance.promptCardHTML = toggle => '<div data-terminal-prompt-card>' + toggle + '<label><strong>Device prompts</strong></label></div>';
+  h.ui.open('standard');
+  const red = h.doc.querySelector('[data-syntax-slot="red"]');
+  assert.equal(red.querySelector('strong').textContent, 'Errors and failures', 'built-in cards use their purpose'); assert.match(red.textContent, /Red color in \.msyn files/);
+  assert.equal(h.doc.querySelector('[data-syntax-slot="blue"]'), null, 'unused built-in colors are not listed');
+  const prompt = h.$('syntaxSlotOn-prompt'); assert(prompt, 'the Device prompts card has its own switch'); assert.equal(prompt.hasAttribute('checked'), true);
+  h.change('syntaxSlotOn-prompt', { checked: false }); assert.deepEqual(Array.from(h.state.terminalSyntax.off.standard), ['prompt']);
+  h.change('syntaxSlotOn-prompt', { checked: true }); assert.equal(h.state.terminalSyntax.off.standard, undefined);
+  h.click('[data-syntax-act="duplicate"]');
+  const copy = h.state.terminalSyntax.custom[0];
+  assert.equal(copy.labels.red, 'Errors and failures', 'a copy keeps the purposes'); assert.equal(copy.labels.blue, 'Other keywords');
+  assert.equal(h.$('syntaxLabel-red').getAttribute('value'), 'Errors and failures'); assert(h.doc.querySelector('[data-syntax-slot="blue"]'), 'your own sets list all seven colors');
+  h.type('syntaxLabel-red', 'Link failures'); assert.equal(h.state.terminalSyntax.custom[0].labels.red, 'Link failures', 'renamed as you type');
+  h.type('syntaxSample', 'switch#show logging');
+  assert.match(h.$('syntaxPreview').innerHTML, /<span style="color:#ffaa00;">switch#<\/span>/, 'the preview colors the device prompt');
 });

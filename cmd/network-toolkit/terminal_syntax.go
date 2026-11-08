@@ -22,6 +22,7 @@ const (
 	terminalSyntaxMaxCustom  = 50
 	terminalSyntaxMaxPattern = 8000
 	terminalSyntaxMaxName    = 80
+	terminalSyntaxMaxLabel   = 40
 )
 
 func terminalSyntaxText(value any, limit int) string {
@@ -61,7 +62,15 @@ func safeTerminalSyntax(value any) map[string]any {
 			for _, color := range terminalSyntaxColors {
 				rules[color] = terminalSyntaxText(requested[color], terminalSyntaxMaxPattern)
 			}
-			custom = append(custom, map[string]any{"id": id, "name": name, "regex": item["regex"] != false, "caseSensitive": item["caseSensitive"] == true, "rules": rules})
+			// What each color marks (v1.21.15), named by the user.
+			requestedLabels, _ := item["labels"].(map[string]any)
+			labels := map[string]any{}
+			for _, color := range terminalSyntaxColors {
+				if label := strings.TrimSpace(terminalSyntaxText(requestedLabels[color], terminalSyntaxMaxLabel)); label != "" {
+					labels[color] = label
+				}
+			}
+			custom = append(custom, map[string]any{"id": id, "name": name, "regex": item["regex"] != false, "caseSensitive": item["caseSensitive"] == true, "rules": rules, "labels": labels})
 		}
 	}
 	active, _ := source["active"].(string)
@@ -96,7 +105,7 @@ func safeTerminalSyntax(value any) map[string]any {
 				continue
 			}
 			clean := []any{}
-			for _, color := range terminalSyntaxColors {
+			for _, color := range append(append([]string{}, terminalSyntaxColors...), "prompt") {
 				for _, slot := range slots {
 					if slot == color {
 						clean = append(clean, color)

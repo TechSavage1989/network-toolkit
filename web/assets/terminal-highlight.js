@@ -114,9 +114,9 @@
   function legend(theme, options = {}) {
     if (global.NTKTerminalShellSyntax?.supported(options.language)) return global.NTKTerminalShellSyntax.legend(options.terminalTheme, theme, options.shellColors);
     if (options.ruleset && global.NTKTerminalSyntaxRules) return [...global.NTKTerminalSyntaxRules.legend(options.ruleSet).map(item => ({ kind: 'syn-' + item.color,
-      label: item.label + (item.note ? ': ' + item.note : ''), color: item.color === 'underline' ? (options.syntaxColors?.underline || '') : (options.syntaxColors?.[item.color] || ''),
+      label: item.note || item.label, color: item.color === 'underline' ? (options.syntaxColors?.underline || '') : (options.syntaxColors?.[item.color] || ''),
       borderStyle: item.color === 'underline' ? 'solid' : 'none', borderWidth: item.color === 'underline' ? 1 : 0 })),
-      ...(promptMode(options) === 'always' ? [{ kind: 'prompt', label: 'Device prompt name', color: palette(theme, options.colors).prompt, borderStyle: 'none', borderWidth: 0 }] : [])];
+      ...(options.promptRule !== false && promptMode(options) !== 'off' || promptMode(options) === 'always' ? [{ kind: 'prompt', label: options.promptRule !== false && promptMode(options) !== 'off' ? 'Device prompts' : 'Device prompt name', color: palette(theme, options.colors).prompt, borderStyle: 'none', borderWidth: 0 }] : [])];
     const colors = palette(theme, options.colors), mode = promptMode(options);
     // URLs and network paths have their own underline switch (v1.21.12).
     const underlined = kind => kind === 'url' ? options.linkUnderlines !== false : options.underlines !== false;
@@ -328,10 +328,18 @@
     if (ruleset && typeof ruleset.match === 'function') {
       const value = typeof input === 'string' ? input : '';
       if (!value || value.length > LIMITS.text) return [];
-      const hits = ruleset.match(value), name = mode === 'auto' ? null : promptName(value, syntaxContext(value).prompt);
-      if (!name) return hits.slice(0, LIMITS.matches);
-      return [...aroundName(hits, name), { ...name, kind: mode === 'always' ? 'prompt-name' : 'prompt-plain' }]
-        .sort((a, b) => a.start - b.start || a.end - b.end).slice(0, LIMITS.matches);
+      // Device prompts (v1.21.15) work with rule sets as with Universal: the
+      // prompt takes the Device prompt color unless switched off for this set.
+      const hits = ruleset.match(value), promptRule = options?.promptRule !== false;
+      const prompt = promptRule || mode !== 'auto' ? syntaxContext(value).prompt : null, name = mode === 'auto' ? null : promptName(value, prompt);
+      if (!prompt || !promptRule && !name) return hits.slice(0, LIMITS.matches);
+      const own = [];
+      if (name) own.push({ ...name, kind: mode === 'always' ? 'prompt-name' : 'prompt-plain' });
+      if (promptRule && mode !== 'off') {
+        if (name) { if (name.start > prompt.start) own.push({ start: prompt.start, end: name.start, kind: 'prompt' }); if (prompt.end > name.end) own.push({ start: name.end, end: prompt.end, kind: 'prompt' }); }
+        else own.push({ start: prompt.start, end: prompt.end, kind: 'prompt' });
+      }
+      return [...aroundName(hits, promptRule ? prompt : name), ...own].sort((a, b) => a.start - b.start || a.end - b.end).slice(0, LIMITS.matches);
     }
     const text = typeof input === 'string' ? input : '';
     if (!text || text.length > LIMITS.text) return [];
@@ -532,7 +540,7 @@
     let enabled = opts.enabled !== false, theme = themeName(opts.theme), disposed = false;
     let selectedRules = rules(opts.rules);
     let requestedColors = customColors(opts.colors), colors = appearanceColors(theme, requestedColors), underlines = opts.underlines !== false;
-    let linkUnderlines = opts.linkUnderlines !== false, prompt = promptMode(opts);
+    let linkUnderlines = opts.linkUnderlines !== false, prompt = promptMode(opts), promptRule = opts.promptRule !== false;
     let timer = null, active = false, suspended = '', limited = false, count = 0;
     let lastState = '', geometry = '', unsupported = false, scrollView = null;
     let records = new Map();
@@ -611,7 +619,7 @@
         element.style.borderLeft = 'none';
         return;
       }
-      const lined = kind === 'url' ? linkUnderlines : kind === 'prompt-plain' || kind === 'prompt-name' && ruleset ? false : underlines;
+      const lined = kind === 'url' ? linkUnderlines : kind === 'prompt-plain' || (kind === 'prompt-name' || kind === 'prompt') && ruleset ? false : underlines;
       const shape = kind === 'prompt-name' ? MARKS.prompt : mark;
       element.style.borderBottom = lined && !shell() ? shape[1] + 'px ' + shape[0] + ' ' + color : 'none';
       // Underlines provide the non-color cue. A vertical stroke beside a
@@ -765,7 +773,7 @@
         for (const row of visibleRows) dirty.delete(row.y);
         return visibleRows.length;
       }
-      const matches = analyze(group.text, language, selectedRules, ruleset, { prompt });
+      const matches = analyze(group.text, language, selectedRules, ruleset, { prompt, promptRule });
       if (matches.length === LIMITS.matches) limited = true;
       // Never decorate invisible SGR 8 cells or disclose their token shape.
       const safe = matches.filter(hit => !group.rows.some(row => {
@@ -841,7 +849,7 @@
         if (y < current.first || y > current.last) return [];
         const group = collect(current.buffer, y);
         if (!group) return [];
-        const matches = analyze(group.text, language, selectedRules, ruleset, { prompt }), result = [];
+        const matches = analyze(group.text, language, selectedRules, ruleset, { prompt, promptRule }), result = [];
         for (const hit of matches) {
           let hidden = false;
           const spans = [];
@@ -943,10 +951,10 @@
       ruleset = nextRuleset; syntaxColors = value.syntaxColors || {};
       const nextTheme = themeName(value.theme), nextRequested = customColors(value.colors), nextColors = appearanceColors(nextTheme, nextRequested);
       const nextRules = rules(value.rules);
-      const nextPrompt = promptMode(value);
-      const changed = rulesetChanged || nextPrompt !== prompt || JSON.stringify(selectedRules) !== JSON.stringify(nextRules) || [...new Set([...Object.keys(colors), ...Object.keys(nextColors)])].some(kind => colors[kind] !== nextColors[kind]);
+      const nextPrompt = promptMode(value), nextPromptRule = value.promptRule !== false;
+      const changed = rulesetChanged || nextPrompt !== prompt || nextPromptRule !== promptRule || JSON.stringify(selectedRules) !== JSON.stringify(nextRules) || [...new Set([...Object.keys(colors), ...Object.keys(nextColors)])].some(kind => colors[kind] !== nextColors[kind]);
       selectedRules = nextRules; theme = nextTheme; requestedColors = nextRequested; colors = nextColors; underlines = value.underlines !== false;
-      linkUnderlines = value.linkUnderlines !== false; prompt = nextPrompt;
+      linkUnderlines = value.linkUnderlines !== false; prompt = nextPrompt; promptRule = nextPromptRule;
       // Foreground options are immutable in xterm's public API. Underline-only
       // edits restyle existing elements without replacing their decorations.
       if (changed) clear();
@@ -970,7 +978,7 @@
         else refresh();
       },
       setTheme(value) {
-        setAppearance({ theme: value, colors: requestedColors, underlines, linkUnderlines, prompt, rules: selectedRules, ruleset, syntaxColors });
+        setAppearance({ theme: value, colors: requestedColors, underlines, linkUnderlines, prompt, promptRule, rules: selectedRules, ruleset, syntaxColors });
       },
       setAppearance,
       refresh,

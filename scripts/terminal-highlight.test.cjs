@@ -365,7 +365,7 @@ test('a keyword rule set colors terminal output with the scheme colors and under
  assert.equal(link.element.style.borderBottom,'1px solid #ececec');
  assert.deepEqual(Array.from(h.controller.tokensAtRow(0),token=>token.kind),['syn-red','syn-magenta']);
  const legend=h.legend('dark',{ruleset:Rules.compile(Rules.builtIn('standard')),ruleSet:Rules.builtIn('standard'),syntaxColors});
- assert.equal(legend[0].label,'Red: Errors and failures');assert.equal(legend[0].color,'#ff6060');
+ assert.equal(legend[0].label,'Errors and failures','named by purpose, not color (v1.21.15)');assert.equal(legend[0].color,'#ff6060');
  // Switching back to device highlighting replaces the keyword colors.
  h.controller.setAppearance({theme:'dark',underlines:true,ruleset:null,syntaxColors});h.flush();
  assert(!h.decorations.filter(d=>!d.disposed).some(d=>d.options.foregroundColor==='#ff6060'),'old rule-set colors remained');

@@ -124,3 +124,14 @@ test('switched-off colors are kept per rule set and match nothing (v1.21.14)', (
   assert(!R.legend(set).some(item => item.color === 'red'), 'the legend leaves it out'); assert.equal(R.legend(set).find(item => item.color === 'green').note, 'Success');
   assert.equal(R.withSwitches(R.find(prefs, 'network'), prefs), R.find(prefs, 'network'));
 });
+
+test('purpose labels: built-in notes, your own names, MobaXterm defaults (v1.21.15)', () => {
+  assert.equal(R.slotLabel(R.find(R.preferences({}), 'network'), 'red'), 'Down, disabled, denied and "no" commands');
+  const own = R.normalize({ id: 'custom-x', name: 'X', rules: { red: 'a' }, labels: { red: '  Link failures ', green: 'x'.repeat(60), bogus: 'no', cyan: 5 } });
+  assert.deepEqual(JSON.parse(JSON.stringify(own.labels)), { red: 'Link failures', green: 'x'.repeat(40) });
+  assert.equal(R.slotLabel(own, 'red'), 'Link failures'); assert.equal(R.slotLabel(own, 'cyan'), 'Information'); assert.equal(R.slotLabel(own, 'blue'), 'Other keywords');
+  assert.equal(R.legend(own)[0].note, 'Link failures', 'the legend uses the purpose');
+  assert.deepEqual(R.preferences({ off: { standard: ['prompt', 'red', 'nope'] } }).off.standard, ['red', 'prompt']);
+  const set = R.withSwitches(R.find(R.preferences({}), 'standard'), { off: { standard: ['prompt'] } });
+  assert.notEqual(set.rules.red, '', 'the prompt switch does not blank a color');
+});
