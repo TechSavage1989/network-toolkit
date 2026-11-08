@@ -203,7 +203,7 @@ function refresh(force=false){if(disposed)return;if(inUpdate||isComposing()){pen
   stopLargeWorker();
   if(typeof root.Worker!=='function')return Promise.resolve(workerUnavailable);
   return new Promise(resolve=>{
-   let worker;try{worker=new root.Worker(new URL('assets/editor-compare-worker.js',root.document.baseURI));}
+   let worker;try{worker=new root.Worker(new URL('/assets/editor-compare-worker.js',root.location.href));}
    catch{return resolve(workerUnavailable);}
    largeWorker=worker;const id=++largeWorkerID;
    let timeout=null;
