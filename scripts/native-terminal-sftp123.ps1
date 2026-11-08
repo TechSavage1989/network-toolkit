@@ -3,7 +3,7 @@ param(
  [Parameter(Mandatory=$true)][string]$ExecutablePath,
  [string]$DestinationDirectory,
  [string]$FinishedFile,
- [string]$MaterializingFile='', [string]$ExpectedPath='',
+ [string]$MaterializingFile='', [string]$ExpectedPath='', [string]$TraceDirectory='',
  [double]$FromX,[double]$FromY,
  [double]$FromWidth,[double]$FromHeight,
  [ValidateSet('Arrange','Copy','CancelBefore','CancelDuring','BaselineSaveDialog')][string]$Mode='Copy',
@@ -14,6 +14,13 @@ param(
 # Hosted synthetic acceptance only. Input goes to exact supplied fixture PIDs and
 # executable identities. No clipboard, synthetic DOM drag, debug port, security
 # setting, unrelated window activation, or full-desktop screenshot is used.
+# Release gate: the page arms the native copy only when the pointer leaves the
+# source window. On the hosted 1024px screen the 960px minimum-width owner leaves
+# Explorer a narrow strip, so that happens on the last travel steps. A fixed dwell
+# raced native admission: when DoDragDrop began after the last mouse move, the
+# button could be released before Explorer accepted, OLE returned no effect and
+# the host honestly sent finish(cancelled) with no file. Native gestures now
+# release only after the drag source itself reports Explorer's COPY feedback.
 $ErrorActionPreference='Stop'
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName UIAutomationClient
@@ -81,6 +88,7 @@ if($Mode -eq 'Arrange'){
  @{mode=$Mode;sourcePID=$OwnerProcessID;width=$width;height=$height;actualWindowResize=$true}|ConvertTo-Json -Compress;exit
 }
 if(!$DestinationDirectory -or !$FinishedFile){throw 'Synthetic copy needs owned destination and finish marker'}
+if($Mode -ne 'BaselineSaveDialog' -and !$TraceDirectory){throw 'Native copy gestures need the typed native drag trace directory'}
 $source=Client-Point $owner $FromX $FromY $FromWidth $FromHeight
 $timeline=New-Object System.Collections.Generic.List[object]
 function Mark-Input([string]$kind){$timeline.Add(@{kind=$kind;tickMS=[SFTPDirectInput]::GetTickCount64()})}
@@ -102,6 +110,60 @@ function Check-OwnedDialogs {
   while([SFTPDirectInput]::IsWindowVisible($dialog) -and [DateTime]::UtcNow -lt $until){Start-Sleep -Milliseconds 20}
   if([SFTPDirectInput]::IsWindowVisible($dialog)){throw 'Fixture-owned Save dialog did not close'}
   if($Mode -ne 'BaselineSaveDialog'){throw 'Unexpected native Save/export dialog during ordinary Terminal SFTP copy'}
+ }
+}
+# Typed, path-free events from the main host observer and the tagged detached
+# child (same GetTickCount64 clock as Mark-Input). Only this gesture's events count.
+$drag=@{since=[uint64]0;enter=$null;accepted=$null;effect=$null;returned=$null;nudges=0}
+$dragOffsets=@{};$dragSeen=New-Object System.Collections.Generic.List[object]
+function Read-NativeDrag {
+ if(!$TraceDirectory){return}
+ foreach($file in @(Get-ChildItem -LiteralPath $TraceDirectory -Filter '*.jsonl' -File -ErrorAction SilentlyContinue)){
+  $offset=[long]0;if($dragOffsets.ContainsKey($file.FullName)){$offset=$dragOffsets[$file.FullName]}
+  $bytes=$null;$count=0
+  try{$stream=[IO.File]::Open($file.FullName,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]'ReadWrite, Delete')}catch{continue}
+  try{if($stream.Length -gt $offset){[void]$stream.Seek($offset,[IO.SeekOrigin]::Begin);$bytes=New-Object byte[] ([int]($stream.Length-$offset));$count=$stream.Read($bytes,0,$bytes.Length)}}finally{$stream.Dispose()}
+  if($count -le 0){continue}
+  $text=[Text.Encoding]::ASCII.GetString($bytes,0,$count);$end=$text.LastIndexOf([char]10)
+  if($end -lt 0){continue}
+  $dragOffsets[$file.FullName]=$offset+$end+1
+  foreach($line in $text.Substring(0,$end).Split([char]10)){
+   if(!$line.Trim()){continue}
+   try{$event=$line|ConvertFrom-Json}catch{continue}
+   if([uint64]$event.tickMS -lt $drag.since){continue}
+   $dragSeen.Add($event)
+   if($event.kind -eq 'ole-enter' -and $null -eq $drag.enter){$drag.enter=[uint64]$event.tickMS}
+   if($event.kind -eq 'ole-return' -and $null -eq $drag.returned){$drag.returned=[uint64]$event.tickMS}
+   if($event.kind -eq 'feedback'){$effect=[uint64]0;if($null -ne $event.effect){$effect=[uint64]$event.effect};$drag.effect=$effect;if(($effect -band 1) -and $null -eq $drag.accepted){$drag.accepted=[uint64]$event.tickMS}}
+  }
+ }
+}
+function Native-DragSummary {
+ Read-NativeDrag
+ $parts=@(foreach($e in $dragSeen){if($e.kind -in @('get-data','query-data','enum-format')){continue};$text=$e.kind+'@+'+([int64]$e.tickMS-[int64]$drag.since);if($null -ne $e.effect){$text+=' effect=0x'+([uint64]$e.effect).ToString('x')};if($null -ne $e.status){$text+=' status='+$e.status};$text})
+ if(!$parts.Count){return 'no native drag events since the press (the native host never claimed the armed copy); nudges='+$drag.nudges}
+ return ((@($parts|Select-Object -Last 24) -join ', ')+'; nudges='+$drag.nudges)
+}
+function Native-DragEvidence {
+ $relative={param($tick)if($null -eq $tick){return $null};return [int64]$tick-[int64]$drag.since}
+ $mark={param($kind)foreach($m in $timeline){if($m.kind -eq $kind){return [int64]$m.tickMS-[int64]$drag.since}};return $null}
+ return @{arrivalMS=(& $mark 'target-arrival');oleEnterMS=(& $relative $drag.enter);copyAcceptedMS=(& $relative $drag.accepted);releaseMS=(& $mark 'release-before');oleReturnMS=(& $relative $drag.returned);lastEffect=$drag.effect;nudges=$drag.nudges;events=$dragSeen.Count}
+}
+function Wait-NativeDropAccepted([int]$x,[int]$y){
+ $until=[DateTime]::UtcNow.AddSeconds(10);$nudgeAt=$null
+ while($true){
+  Read-NativeDrag
+  if($null -ne $drag.returned){throw ('Native OLE drag ended before release: '+(Native-DragSummary))}
+  if($null -ne $drag.enter -and $null -ne $drag.effect -and ($drag.effect -band 1)){Mark-Input 'drop-accepted';return}
+  if([DateTime]::UtcNow -ge $until){throw ('Explorer never accepted the native drag before release: '+(Native-DragSummary))}
+  if($null -ne $drag.enter){
+   # A hand is never perfectly still; SetCursorPos input is. If OLE runs without
+   # Explorer feedback, move one pixel inside the verified Items View strip so
+   # DoDragDrop gets the mouse move it uses to find its drop target.
+   if($null -eq $nudgeAt){$nudgeAt=[DateTime]::UtcNow.AddMilliseconds(150)}
+   elseif([DateTime]::UtcNow -ge $nudgeAt){$drag.nudges++;[void][SFTPDirectInput]::SetCursorPos($x+($drag.nudges%2),$y);Mark-Input ('nudge-'+$drag.nudges);$nudgeAt=[DateTime]::UtcNow.AddMilliseconds(100)}
+  }
+  Check-OwnedDialogs;Start-Sleep -Milliseconds 20
  }
 }
 $shell=New-Object -ComObject Shell.Application
@@ -135,13 +197,14 @@ try{
  [uint32]$explorerPID=0;[void][SFTPDirectInput]::GetWindowThreadProcessId($explorer,[ref]$explorerPID)
  $inputEvidence=@{sourceToken=[SFTPDirectInput]::TokenFacts($OwnerProcessID);targetToken=[SFTPDirectInput]::TokenFacts($explorerPID);tokenFactFields=@('elevated','integrityRID','error');source=@($source.X,$source.Y);target=@($to.X,$to.Y);targetClass='UIItemsView';targetBounds=@($bounds.Left,$bounds.Top,$bounds.Width,$bounds.Height);targetVerified=$true;mode=$Mode;speed=$Speed;timing=$timing;clock='Windows GetTickCount64 milliseconds since boot'}
  $inputEvidence|ConvertTo-Json -Depth 8 -Compress|Set-Content -LiteralPath ($FinishedFile+'.input.json') -Encoding UTF8
- [void][SFTPDirectInput]::SetCursorPos($source.X,$source.Y);if($Mode -eq 'BaselineSaveDialog'){Mark-Input 'baseline-real-hover';Start-Sleep -Milliseconds 1500};Mark-Input 'press-before';[SFTPDirectInput]::mouse_event(2,0,0,0,[UIntPtr]::Zero);Mark-Input 'press-after'
+ [void][SFTPDirectInput]::SetCursorPos($source.X,$source.Y);$drag.since=[SFTPDirectInput]::GetTickCount64();Read-NativeDrag;if($Mode -eq 'BaselineSaveDialog'){Mark-Input 'baseline-real-hover';Start-Sleep -Milliseconds 1500};Mark-Input 'press-before';[SFTPDirectInput]::mouse_event(2,0,0,0,[UIntPtr]::Zero);Mark-Input 'press-after'
  try{
   Start-Sleep -Milliseconds $timing.press
   Mark-Input 'threshold-before';[void][SFTPDirectInput]::SetCursorPos($source.X+10,$source.Y+2);Mark-Input 'threshold-after';Start-Sleep -Milliseconds $timing.threshold
   Mark-Input 'travel-start'
   for($i=1;$i -le $timing.steps;$i++){[void][SFTPDirectInput]::SetCursorPos([int]($source.X+($to.X-$source.X)*$i/$timing.steps),[int]($source.Y+($to.Y-$source.Y)*$i/$timing.steps));Mark-Input ('move-'+$i);Start-Sleep -Milliseconds $timing.step;Check-OwnedDialogs}
   Mark-Input 'target-arrival';Start-Sleep -Milliseconds $timing.dwell
+  if($Mode -ne 'BaselineSaveDialog'){Wait-NativeDropAccepted $to.X $to.Y}
   if($Mode -eq 'CancelBefore'){Mark-Input 'escape-before';[SFTPDirectInput]::keybd_event(27,0,0,[UIntPtr]::Zero);Start-Sleep -Milliseconds 150;[SFTPDirectInput]::keybd_event(27,0,2,[UIntPtr]::Zero)}
  }finally{Mark-Input 'release-before';[SFTPDirectInput]::mouse_event(4,0,0,0,[UIntPtr]::Zero);Mark-Input 'release-after'}
  Check-OwnedDialogs
@@ -161,9 +224,13 @@ try{
  if(!(Test-Path -LiteralPath $FinishedFile)){throw 'Native copy gesture never sent its authenticated terminal finish'}
  Mark-Input 'finish-marker-observed'
  if($Mode -eq 'Copy'){
+  # The marker holds the native outcome. Only 'copied' can publish a file; say
+  # so at once instead of waiting for a destination that cannot arrive.
+  $outcome=[string](Get-Content -LiteralPath $FinishedFile -Raw -ErrorAction SilentlyContinue)
+  if($outcome.Trim() -and $outcome.Trim() -ne 'copied'){throw ('Native drag finished with outcome '+$outcome.Trim()+' after Explorer accepted it: '+(Native-DragSummary))}
   $until=[DateTime]::UtcNow.AddSeconds(15);while(!(Test-Path -LiteralPath $ExpectedPath) -and [DateTime]::UtcNow -lt $until){Check-OwnedDialogs;Start-Sleep -Milliseconds 50}
   if(!(Test-Path -LiteralPath $ExpectedPath)){throw 'Actual Explorer destination file did not arrive'}
  }else{if(@(Get-ChildItem -LiteralPath $DestinationDirectory -Force).Count -ne 0){throw 'Cancelled gesture published files into destination'}}
  Check-OwnedDialogs
- @{mode=$Mode;sourcePID=$OwnerProcessID;actualMouseDrag=$true;actualExplorer=$true;saveDialogCount=$saveDialogs.Count;fixtureHostWindowCount=@([SFTPDirectInput]::Find($OwnerProcessID)).Count;from=@($source.X,$source.Y);to=@($to.X,$to.Y);materializationObserved=([bool]$MaterializingFile -and (Test-Path -LiteralPath $MaterializingFile));finished=$true}|ConvertTo-Json -Compress
-}finally{Mark-Input 'script-finally';[SFTPDirectInput]::mouse_event(4,0,0,0,[UIntPtr]::Zero);if($inputEvidence){$inputEvidence.timeline=$timeline.ToArray();$inputEvidence.saveDialogs=$saveDialogs.ToArray();$inputEvidence|ConvertTo-Json -Depth 8 -Compress|Set-Content -LiteralPath ($FinishedFile+'.input.json') -Encoding UTF8};try{$window.Quit()}catch{}}
+ @{mode=$Mode;sourcePID=$OwnerProcessID;actualMouseDrag=$true;actualExplorer=$true;saveDialogCount=$saveDialogs.Count;fixtureHostWindowCount=@([SFTPDirectInput]::Find($OwnerProcessID)).Count;from=@($source.X,$source.Y);to=@($to.X,$to.Y);materializationObserved=([bool]$MaterializingFile -and (Test-Path -LiteralPath $MaterializingFile));nativeDrag=(Native-DragEvidence);finished=$true}|ConvertTo-Json -Compress
+}finally{Mark-Input 'script-finally';[SFTPDirectInput]::mouse_event(4,0,0,0,[UIntPtr]::Zero);if($inputEvidence){$inputEvidence.timeline=$timeline.ToArray();$inputEvidence.saveDialogs=$saveDialogs.ToArray();try{$inputEvidence.nativeDrag=(Native-DragEvidence)}catch{};$inputEvidence|ConvertTo-Json -Depth 8 -Compress|Set-Content -LiteralPath ($FinishedFile+'.input.json') -Encoding UTF8};try{$window.Quit()}catch{}}

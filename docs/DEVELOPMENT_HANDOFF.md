@@ -4,11 +4,13 @@
 - Cause, in the test: it decided "closed" by polling the old handle value with `WaitForSingleObject(h, 0)` until it errored. Windows reuses a freed handle value for the next handle the process opens (the Go runtime opens thread and timer handles at any time), so the poll could succeed against a new object for the whole deadline. Production code (`openElevatedTerminalShell`, launcher goroutine closes the late handle on `ctx.Done()`) is unchanged.
 - Fix, test only: the fake launcher duplicates the synthetic event before returning it and confirms `CompareObjectHandles` matches the pair; the test then polls `CompareObjectHandles(h, dup)`, where "not the same object" (closed, or closed and reused) means closed, and closes the duplicate. A handle the production code leaves open still fails the test. Deadline raised from 1 s to 5 s, which only lengthens a genuine failure.
 - Checked locally: `GOOS=windows go test -mod=vendor -c`, and `GOOS=windows go vet` with no new findings (it still reports the five existing `unsafe.Pointer` warnings in credential and packet capture files, unchanged on main).
-- Hosted windows-terminal step "Verify explicit local-shell approval and native helper boundaries": pending.
+- Hosted windows-terminal step "Verify explicit local-shell approval and native helper boundaries" on PR #129 (d0dd3fc): passed 4 of 4. Push run 42430439320 attempts 1 and 2 (jobs 128577929497, 128584565421) and pull_request run 42430461615 attempts 1 and 2 (jobs 128578001402, 128584589344); both whole runs were green. The test finishes in 0.00–0.01 s, so the original's close is seen on the first poll. Later runs on the PR's merge-with-main commit are listed on the PR.
 
 ---
 
-# v1.21.15 Beta 16 (Rule set colors named by purpose; Device prompts on every rule set) - candidate (2026-11-07)
+# v1.21.15 Beta 16 (Rule set colors named by purpose; Device prompts on every rule set) - publication verified (2026-11-08)
+
+Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.21.15 at 2026-11-08T00:21:59Z; stable latest remains v1.20.16. Merged PR #127; tag v1.21.15 points to merge commit a9ac25f085b7461520abd3071d59c25a0bb6e482. Release workflow run 42429130578 succeeded. Assets: Network_Toolkit.exe, Portable and Update ZIPs, Linux x86_64 and aarch64 tarballs and SHA256SUMS; every asset digest matches SHA256SUMS, and the Linux x86_64 binary reports "Network Toolkit 1.21.15 linux amd64". CI note: windows-terminal (TestNativeTerminalSFTP123InstalledWebView2, the known Explorer drop timing failure; fix proposed in #121) and browser-editor112 (editor-views112 focus wait) failed once and passed on re-run.
 
 Owner request: label rule set colors by function rather than color, and add Universal's Device prompts card (color and configuration) to every rule set.
 - Purpose comes from `slotLabel()`: built-in notes, a custom set's `labels` (editable in its cards), or the MobaXterm meaning. Labels are app-only; `.msyn` export is unchanged.
@@ -16,6 +18,22 @@ Owner request: label rule set colors by function rather than color, and add Univ
 - Behavior change to call out: rule sets color prompts by default from this version.
 - Checked: Node unit tests, Go and Python tests, terminal-prompt-links browser test with rule set card screenshots.
 - Not claimed: checked on a physical Windows PC.
+
+---
+
+# CI: Terminal SFTP drag-to-Explorer race in windows-terminal (2026-11-07) - no release
+
+Report: `TestNativeTerminalSFTP123InstalledWebView2` sometimes fails at `actual detached-workspace-file` with "Actual Explorer destination file did not arrive" (native-terminal-sftp123.ps1:165). That is the only failure found in this test: run 41707445828, first attempt (2026-11-03, job 126166393524). The two main runs named in the report failed for other reasons. 42375596212 failed the baseline122 negative control (ps1:150, the Save dialog did not appear). 42371008876 failed `TestNativeEditorLocal119`. The candidate step passed in both.
+
+Root cause, from the failing run's evidence (server actions and the script's input timeline use the same GetTickCount64 clock):
+- The page arms the native copy only when the pointer leaves the source window. The owner is held at its 960px minimum width and the hosted screen is 1024px wide, so only a 16px strip of Explorer's Items View is exposed. The pointer leaves on step 27–28 of 28, which leaves about 530 ms between native `start` and release.
+- In every passing main-window gesture, `DoDragDrop` started about 30 ms before the cursor stopped moving, and Explorer replied with COPY at once. In the failing detached gesture, `start` came at +1234 ms and the release at +1781 ms. `finish` came 16 ms after the release with outcome `cancelled`, and Explorer never asked for the data (no `materialize`). The release came before OLE had an accepted drop target. The detached child has no native trace, so the slow step (admission or Explorer's first `DragEnter`) cannot be named.
+- The fixture writes the finish marker for any outcome, so the script then waited 15 s for a file that could not arrive.
+
+Fix (test only, no application code): the gesture timings and the 500 ms dwell are unchanged. After the dwell, the script releases only when the native drag source reports Explorer's DROPEFFECT_COPY feedback. While OLE runs without feedback, it moves the cursor one pixel inside the drop strip. It fails at once with the native event sequence if OLE ends before the release, or after 10 s with a reason. The finish marker now holds the outcome, and Copy fails at once on anything other than `copied`. The detached child is built with `toolkit_native_drag_trace122` (typed, path-free trace in a private temp folder, as in SFTP121's diagnostic mode). The main window's observer writes the same events. The traces and per-gesture `nativeDrag` timings are in the `terminal-sftp123-native-checks` artifact. Baseline122 still runs the copied test files against the unmodified 60b02cae tree.
+- Hosted CI on PR #121: the Terminal SFTP drag test passed seven of seven runs. Those were push run 42412176475 (75bc699), run 42413442967 attempts 1–5 (6cbde18) and run 42422856889 (5c76fbc). In the six timed runs (6cbde18 onward), all 48 gestures passed, OLE entered `DoDragDrop` 15–47 ms before the cursor stopped, and no nudges were needed. That margin of one to three 16 ms ticks is the race the gate now covers. The windows-terminal job was green in five of the six. Attempt 4 failed only in `TestTerminalShellExplicitApprovalAndLateCancellation` ("late-launch handle leaked"), which passed on its one re-run (attempt 5). That test checks closure by polling a handle value that Windows can reuse. It needs its own fix (keep a duplicate handle and use `CompareObjectHandles`).
+- No pull_request Checks run was created for PR #121, so only push runs are listed.
+- Not changed: `native-sftp-direct121.ps1` still releases after a fixed dwell. It failed the same way once (run 41560040060, main-folder).
 
 ---
 
