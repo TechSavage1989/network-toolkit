@@ -1,4 +1,8 @@
-# v1.21.18 Stable candidate (Terminal Tools menu removed) - in review (2026-11-08)
+# v1.21.18 Stable (Terminal Tools menu removed) - publication verified (2026-11-08)
+
+Published as the stable release https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.21.18 at 2026-11-08T07:02:33Z (not a prerelease); releases/latest is now v1.21.18. Merged PR #135; tag v1.21.18 points to merge commit 0bf23380230a0d4e783fcda16823fae7fbfffbf2. Release workflow run 42456939245 succeeded. Assets: Network_Toolkit.exe, Portable and Update ZIPs, Linux x86_64 and aarch64 tarballs and SHA256SUMS; every asset digest matches SHA256SUMS, and the Linux x86_64 binary reports "Network Toolkit 1.21.18 linux amd64".
+- PR #135's first CI run failed app-chrome109 (separate terminal window lost 46 px of terminal height at 1024 px because the new toolbar icons wrapped the toolbar). Fixed by moving those icons to the sidebar rail; both Checks runs on the fix were green before the merge.
+- Known CI issue: hosts-editor.browser.cjs ("Find shortcut stole focus from entry dialog") failed once on main for the docs-only commit a5b789d and passes elsewhere; a follow-up task was suggested to the owner.
 
 Owner: "i don't think the tools menu is needed if all that is in it it connections basically or other redundent options", then "make the next release stable". The owner checked v1.21.17 on Windows and said "looks good".
 - Removed: the Terminal toolbar's Tools button and menu, including the saved-connection select with Configure/Delete (the Saved sidebar's double-click and right-click menu cover them) and the Sessions/Profiles shortcuts (session tabs and the Saved/Recent tabs cover them).
