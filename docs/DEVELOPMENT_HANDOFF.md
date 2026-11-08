@@ -2,9 +2,11 @@
 
 The owner clarified: "the text editor must effectively be able to work with a text file of any size ... without slowdowns or lag or latency." The bounded-file candidate below does not meet that requirement. **PR #139 is a draft and must not be merged or published on the strength of its previous green checks.**
 
-See [Editor scalability](EDITOR_SCALABILITY_PLAN.md). A disk-backed document engine and lease-aware file API are implemented, with synthetic data-integrity and ownership tests. Benchmarks cover 256 MiB and 2 GiB inputs. The visible editor is not connected yet; virtual rendering, complete editing/search/clipboard integration, streamed comparison and end-to-end acceptance remain required. Stable v1.21.19 is unchanged.
+See [Editor scalability](EDITOR_SCALABILITY_PLAN.md) for implementation evidence and the explicit remaining integration list. The disk-backed engine now includes streaming search, safe reload, retryable mutation identities and staged remote-save tests. A bounded renderer/session passed an isolated 8 GiB logical-document browser fixture, separate from the 256 MiB/2 GiB engine benchmarks. The normal editor is not connected yet; the backend does not advertise `editorDiskAvailable`. Application editing/search/clipboard, split/comparison, browser import and handle-only close/move/recovery integration remain publication blockers. Stable v1.21.19 is unchanged.
 
 Validation: `go test -mod=vendor ./internal/editorbuffer`; `go test -mod=vendor ./cmd/network-toolkit -run 'TestDiskEditor|TestEditor'`; `go test -mod=vendor ./... -run '^$'`; `go test -mod=vendor ./internal/editorbuffer -run '^$' -bench BenchmarkLargeFileInteraction -benchtime=1x`. The last command creates generated 256 MiB and 2 GiB temporary fixtures, then removes them.
+
+Additional validation: `node --test scripts/editor-disk-session.test.cjs scripts/editor-windows.test.cjs`; `node scripts/editor-disk-view.browser.cjs` with an isolated Playwright installation. Hosted Checks now run the new Go package, focused race checks and the viewport browser fixture. Local full JavaScript testing exposed four Windows checkout line-ending failures in untouched fixtures/vendor assets; restoring their exact committed bytes made the 122 targeted tests pass; the final full run passed all 1,667 JavaScript tests. The 49 Python tests, release metadata validator and all-package compile checks also passed. Preserve those original bytes and provenance hashes rather than regenerating assets.
 
 ---
 

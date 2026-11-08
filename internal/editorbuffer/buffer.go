@@ -122,9 +122,11 @@ type Metadata struct {
 }
 type Window struct {
 	Metadata
-	Start int64  `json:"start"`
-	Text  string `json:"text"`
-	Line  int64  `json:"line"`
+	Start     int64  `json:"start"`
+	Text      string `json:"text"`
+	Line      int64  `json:"line"`
+	Column    int64  `json:"column"`
+	LineUnits int64  `json:"lineUnits"`
 }
 type Buffer struct {
 	// lifetime lets a save read an immutable tree while edits append new pieces.
@@ -423,6 +425,28 @@ func (b *Buffer) WindowAtLine(line int64, limit int) (Window, error) {
 	}
 	return b.windowLocked(start, limit)
 }
+
+// WindowNear permits a viewport to start at an approximate UTF-16 position.
+// Mutation ranges still use strict boundaries; only a read moves left by one
+// unit when its requested starting position falls inside a surrogate pair.
+func (b *Buffer) WindowNear(start int64, limit int) (Window, error) {
+	b.lifetime.RLock()
+	defer b.lifetime.RUnlock()
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+	if b.closed {
+		return Window{}, ErrClosed
+	}
+	if start < 0 || start > size(b.root).units {
+		return Window{}, ErrBoundary
+	}
+	if _, err := b.lineAt(b.root, start); err == ErrBoundary && start > 0 {
+		start--
+	} else if err != nil {
+		return Window{}, err
+	}
+	return b.windowLocked(start, limit)
+}
 func (b *Buffer) windowLocked(start int64, limit int) (Window, error) {
 	if start < 0 || start > size(b.root).units || limit < 1 || limit > MaxWindowUnits {
 		return Window{}, ErrBoundary
@@ -443,7 +467,19 @@ func (b *Buffer) windowLocked(start int64, limit int) (Window, error) {
 	if e != nil {
 		return Window{}, e
 	}
-	return Window{b.metadataLocked(), start, string(data), line}, nil
+	lineStart, e := b.lineStart(b.root, line)
+	if e != nil {
+		return Window{}, e
+	}
+	lineEnd := size(b.root).units
+	if line < size(b.root).lines {
+		next, err := b.lineStart(b.root, line+1)
+		if err != nil {
+			return Window{}, err
+		}
+		lineEnd = next - 1
+	}
+	return Window{Metadata: b.metadataLocked(), Start: start, Text: string(data), Line: line, Column: start - lineStart, LineUnits: lineEnd - lineStart}, nil
 }
 func (b *Buffer) Close() error {
 	b.lifetime.Lock()

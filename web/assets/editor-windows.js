@@ -3,7 +3,7 @@
 // Native-window ownership is an explicit backend capability, never inferred
 // from a preview page, an open editor, or locally cached connection state.
 function create(options={}){
- let requestTail=Promise.resolve();
+ let requestTail=Promise.resolve(),bufferAvailable=options.bufferAvailable||(()=>false);
  let request=options.request,adapter=options.adapter,available=options.available||(()=>false),self=options.self||'',enabled=false,stopped=false,timer=null,running=false,error='',instance='',owned={},views=[],lastCheckpoint='',lastCheckpointVersion=null,closing=false,detaching=false,dragPreparing=false,closeAfterReturn=false,receivedAny=false,closeCancellationPending=false;
  const outgoing=new Map(),incoming=new Map(),receipts=new Set(),handledDrags=new Map();
  let activityPending=null,lastActivity=null,activityAvailable=options.activityAvailable||(()=>false);
@@ -23,6 +23,10 @@ function create(options={}){
  async function completeReceipts(){for(const key of [...receipts]){try{await call('/transfers/'+key+'/complete','POST',{});receipts.delete(key);}catch(e){if(e.status===404)receipts.delete(key);else break;}}}
  async function file(uid,action,path,payload={}){if(!supported()||!owned[uid])throw Error('File access is unavailable until this window owns the document.');return call('/documents/'+encodeURIComponent(uid)+'/file','POST',{...payload,lease:owned[uid],action,path});}
  function prepareDocument(doc){if(!self||!supported()||!['local','localDraft'].includes(doc.binding?.kind))return;const originalRead=doc.read;doc.read=path=>owned[doc.uid]?file(doc.uid,'read-text',path):originalRead(path);doc.write=async payload=>{if(!owned[doc.uid]){const batch={documents:[getAdapter().snapshotDocument(doc)],active:doc.uid,compare:null};const response=await call('/current/state','POST',{batch,leases:leases([doc.uid])});if(!response?.owned?.[doc.uid])throw Error('Document ownership could not be registered.');owned={...owned,...response.owned};}return file(doc.uid,'write-text',payload.path,payload);};}
+ function bufferSupported(){return !stopped&&bufferAvailable()===true&&typeof request==='function';}
+ async function openBuffer(document){if(!bufferSupported())throw Error('Disk-backed editing is unavailable.');const result=await call('/buffers/open','POST',{document});if(!Number.isSafeInteger(result.lease)||result.lease<1)throw Error('The document owner could not be established.');owned[document.uid]=result.lease;return result;}
+ async function buffer(uid,action,payload={},signal){if(!bufferSupported()||!owned[uid])throw Error('This window no longer owns the document.');return request(endpoint+'/documents/'+encodeURIComponent(uid)+'/buffer','POST',{...payload,action,lease:owned[uid]},false,signal);}
+ async function releaseBuffer(uid){const lease=owned[uid];if(!lease)return;await call('/documents/'+encodeURIComponent(uid)+'/release','POST',{lease});if(owned[uid]===lease)delete owned[uid];}
  function resolveBinding(binding,doc){if(!['local','localDraft','terminal','sshConnection'].includes(binding?.kind))throw Error('This file access cannot be transferred safely.');return {read:path=>file(doc.uid,'read-text',path),write:payload=>file(doc.uid,'write-text',payload.path,payload)};}
  async function receive(t){let pending=incoming.get(t.id);if(!pending){try{const applyPreferences=!!self&&!receivedAny&&docs().length===0,uids=await getAdapter().stage(t.batch,resolveBinding);pending={ids:uids,batch:t.batch,applyPreferences};incoming.set(t.id,pending);}catch(e){note('Could not receive documents: '+e.message+'. The source retains them until the move expires.');return;}}
   try{const result=await call('/transfers/'+t.id+'/accept','POST',{});if(result.state==='accepted'){owned={...owned,...result.leases};activate(t.id);}}catch(e){note('Waiting to confirm document ownership. The staged tabs remain read-only. '+e.message);}
@@ -107,10 +111,10 @@ function create(options={}){
   }
   render();schedule(0);
  }
- function configure(value={}){activityAvailable=value.activityAvailable||activityAvailable;request=value.request||request;adapter=value.adapter||adapter;available=value.available||available;if(value.self!==undefined)self=value.self==='main'?'':value.self;mount();}
+ function configure(value={}){bufferAvailable=value.bufferAvailable||bufferAvailable;activityAvailable=value.activityAvailable||activityAvailable;request=value.request||request;adapter=value.adapter||adapter;available=value.available||available;if(value.self!==undefined)self=value.self==='main'?'':value.self;mount();}
  function start(){if(!supported())return;enabled=true;mount();schedule(0);}
  function stop(){stopped=true;if(timer!==null)root.clearTimeout(timer);timer=null;}
- return Object.freeze({reportActivity,configure,start,mount,dismissMenu,poll,move,detachEditor,beginDrag,claimDrag:ticket=>dragAction('claim',ticket),detachDrag:ticket=>dragAction('detach',ticket),cancelDrag:ticket=>dragAction('cancel',ticket),cancel,beforeClose,prepareMainClose,cancelMainClose,commitMainClose,stop,prepareDocument,notifyChanged(){// checkpointVersion detects content, selection and layout changes. Do not force a full large-document snapshot merely because a tab label refreshed.
+ return Object.freeze({bufferSupported,openBuffer,buffer,releaseBuffer,reportActivity,configure,start,mount,dismissMenu,poll,move,detachEditor,beginDrag,claimDrag:ticket=>dragAction('claim',ticket),detachDrag:ticket=>dragAction('detach',ticket),cancelDrag:ticket=>dragAction('cancel',ticket),cancel,beforeClose,prepareMainClose,cancelMainClose,commitMainClose,stop,prepareDocument,notifyChanged(){// checkpointVersion detects content, selection and layout changes. Do not force a full large-document snapshot merely because a tab label refreshed.
  if(!getAdapter()?.checkpointVersion){lastCheckpoint='';lastCheckpointVersion=null;}
  render();if(enabled)schedule(200);},get state(){return {enabled,self,running,closing,detaching,dragPreparing,owned:{...owned},outgoing:outgoing.size,incoming:incoming.size,pendingReceipts:receipts.size,error};}});
 }

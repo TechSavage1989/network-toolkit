@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -11,7 +12,146 @@ import (
 	"time"
 
 	"networktoolkit/internal/editorbuffer"
+	"networktoolkit/internal/model"
 )
+
+func TestDiskEditorLostAcknowledgementAndReload(t *testing.T) {
+	a, _, path, lease := diskFixture(t)
+	edit := map[string]any{"action": "edit", "requestId": "repeat-safe-edit", "revision": 1, "from": 0, "to": 6, "text": "changed"}
+	first := diskCall(a, a.token, lease, edit)
+	second := diskCall(a, a.token, lease, edit)
+	if first.Code != 200 || second.Code != 200 || first.Body.String() != second.Body.String() {
+		t.Fatalf("retry: %s / %s", first.Body, second.Body)
+	}
+	edit["text"] = "different"
+	if r := diskCall(a, a.token, lease, edit); r.Code != 409 {
+		t.Fatal("reused nonce changed the document")
+	}
+	if err := os.WriteFile(path, []byte{0xff}, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if r := diskCall(a, a.token, lease, map[string]any{"action": "reload"}); r.Code != 409 {
+		t.Fatal("invalid reload succeeded")
+	}
+	r := diskCall(a, a.token, lease, map[string]any{"action": "window"})
+	var window editorbuffer.Window
+	json.Unmarshal(r.Body.Bytes(), &window)
+	if window.Text != "changed\nλ😀\n" || !window.Dirty {
+		t.Fatal("failed reload discarded work", window)
+	}
+	os.WriteFile(path, []byte("replacement\r\n"), 0600)
+	if r = diskCall(a, a.token, lease, map[string]any{"action": "reload"}); r.Code != 200 {
+		t.Fatal(r.Body)
+	}
+	r = diskCall(a, a.token, lease, map[string]any{"action": "window"})
+	json.Unmarshal(r.Body.Bytes(), &window)
+	if window.Text != "replacement\n" || window.Dirty || window.CanUndo {
+		t.Fatal(window)
+	}
+}
+
+func TestDiskEditorRemoteStagedSaveAndPinnedTransport(t *testing.T) {
+	a, m, _, lease := diskFixture(t)
+	m.mu.Lock()
+	g := m.documents[editorFixtureUID]
+	g.snapshot.Binding = editorBinding{Kind: "terminal", SessionID: "fixture"}
+	g.snapshot.Path = "/fixture.txt"
+	m.mu.Unlock()
+	remote := []byte("before\r\nλ😀\r\n")
+	valid, uploads := true, 0
+	g.valid = func() bool { return valid }
+	g.run = func(ctx context.Context, req remoteBrowserRequest) (model.Result, error) {
+		if req.Action == "download" {
+			return model.Result{}, os.WriteFile(req.LocalPath, remote, 0600)
+		}
+		if req.Action != "upload" || !req.StagedUpload || !req.Overwrite || req.Path != "/fixture.txt" {
+			t.Fatalf("unsafe remote request: %#v", req)
+		}
+		var err error
+		remote, err = os.ReadFile(req.LocalPath)
+		uploads++
+		return model.Result{}, err
+	}
+	r := diskCall(a, a.token, lease, map[string]any{"action": "edit", "revision": 1, "from": 0, "to": 6, "text": "after"})
+	if r.Code != 200 {
+		t.Fatal(r.Body)
+	}
+	save := map[string]any{"action": "save", "revision": 2, "format": editorbuffer.Format{"UTF-8", false, "CRLF"}}
+	if r = diskCall(a, a.token, lease, save); r.Code != 200 || string(remote) != "after\r\nλ😀\r\n" || uploads != 1 {
+		t.Fatal(r.Body, string(remote), uploads)
+	}
+	remote = []byte("external")
+	if r = diskCall(a, a.token, lease, save); r.Code != 409 || uploads != 1 {
+		t.Fatal("remote conflict overwrote data")
+	}
+	valid = false
+	if r = diskCall(a, a.token, lease, save); r.Code != 409 || uploads != 1 {
+		t.Fatal("stale transport saved data")
+	}
+}
+
+func TestDiskEditorTypingWhileRemoteSaveWaits(t *testing.T) {
+	a, m, _, lease := diskFixture(t)
+	m.mu.Lock()
+	g := m.documents[editorFixtureUID]
+	g.snapshot.Binding = editorBinding{Kind: "terminal", SessionID: "fixture"}
+	g.snapshot.Path = "/fixture.txt"
+	m.mu.Unlock()
+	uploading, finish := make(chan struct{}), make(chan struct{})
+	defer func() {
+		select {
+		case <-finish:
+		default:
+			close(finish)
+		}
+	}()
+	g.valid = func() bool { return true }
+	g.run = func(ctx context.Context, req remoteBrowserRequest) (model.Result, error) {
+		if req.Action == "download" {
+			return model.Result{}, os.WriteFile(req.LocalPath, []byte("before\r\nλ😀\r\n"), 0600)
+		}
+		close(uploading)
+		select {
+		case <-finish:
+		case <-ctx.Done():
+			return model.Result{}, ctx.Err()
+		}
+		return model.Result{}, nil
+	}
+	saved := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		saved <- diskCall(a, a.token, lease, map[string]any{"action": "save", "revision": 1, "format": editorbuffer.Format{"UTF-8", false, "CRLF"}})
+	}()
+	select {
+	case <-uploading:
+	case <-time.After(3 * time.Second):
+		t.Fatal("save did not reach fixture upload")
+	}
+	edited := make(chan *httptest.ResponseRecorder, 1)
+	go func() {
+		edited <- diskCall(a, a.token, lease, map[string]any{"action": "edit", "revision": 1, "from": 0, "to": 0, "text": "newer "})
+	}()
+	select {
+	case response := <-edited:
+		if response.Code != 200 {
+			t.Fatal(response.Body)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("typing waited for upload")
+	}
+	close(finish)
+	response := <-saved
+	var result struct {
+		Metadata editorbuffer.Metadata `json:"metadata"`
+	}
+	if response.Code != 200 {
+		t.Fatal(response.Body)
+	}
+	json.Unmarshal(response.Body.Bytes(), &result)
+	if !result.Metadata.Dirty || result.Metadata.Revision != 2 {
+		t.Fatal("save discarded newer typing", response.Body)
+	}
+}
 
 func diskFixture(t *testing.T) (*application, *editorViewRegistry, string, uint64) {
 	t.Helper()

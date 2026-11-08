@@ -283,6 +283,81 @@ func TestRepeatedEditsKeepAccessBalanced(t *testing.T) {
 	}
 }
 
+func TestStreamingSearchAcrossPiecesAndUnicodeOffsets(t *testing.T) {
+	text := strings.Repeat("x", ChunkBytes-2) + "λ😀needle\nlast NEEDLE\n"
+	b := openTest(t, text)
+	s, e := b.Snapshot()
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer s.Close()
+	match, e := s.Find(context.Background(), "λ😀needle", 0, false, true, false)
+	if e != nil || !match.Found || match.From != ChunkBytes-2 || match.To != ChunkBytes+7 {
+		t.Fatalf("boundary search: %+v %v", match, e)
+	}
+	next, e := s.Find(context.Background(), "needle", match.To, false, false, true)
+	if e != nil || !next.Found || next.Line != 1 {
+		t.Fatalf("later match: %+v %v", next, e)
+	}
+	regex, e := s.Find(context.Background(), `last\s+NEEDLE`, 0, true, true, false)
+	if e != nil || !regex.Found {
+		t.Fatalf("regex: %+v %v", regex, e)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, e = s.Find(ctx, "missing", 0, false, true, false); !errors.Is(e, context.Canceled) {
+		t.Fatal("search ignored cancellation", e)
+	}
+	if _, e = s.Find(context.Background(), "[", 0, true, true, false); e == nil {
+		t.Fatal("invalid regex accepted")
+	}
+}
+
+func TestStreamingSearchPreservesCursorContext(t *testing.T) {
+	imported, err := Import(context.Background(), strings.NewReader("abc needle\nneedle 😀needle\n"), t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer imported.Buffer.Close()
+	s, err := imported.Buffer.Snapshot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.Close()
+	for _, tc := range []struct {
+		query              string
+		from               int64
+		regex, word, found bool
+		at                 int64
+	}{
+		{"bc", 1, false, true, false, 0}, {"^bc", 1, true, false, false, 0}, {"\\Aneedle", 4, true, false, false, 0},
+		{"(?m)^needle", 4, true, false, true, 11}, {"needle", 4, false, true, true, 4}, {"needle", 12, false, true, true, 20},
+		{"needle", 20, false, false, true, 20}, {"(needle)", 5, true, false, true, 11}, {".*needle", 4, true, false, true, 4},
+	} {
+		m, err := s.Find(context.Background(), tc.query, tc.from, tc.regex, true, tc.word)
+		if err != nil || m.Found != tc.found || m.Found && m.From != tc.at {
+			t.Fatalf("%+v => %+v, %v", tc, m, err)
+		}
+	}
+}
+
+func TestViewportNearUnicodeAndLongLineColumns(t *testing.T) {
+	text := strings.Repeat("x", ChunkBytes+5) + "😀tail\nnext"
+	v, err := Import(context.Background(), strings.NewReader(text), t.TempDir(), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer v.Buffer.Close()
+	position := int64(ChunkBytes + 6)
+	if _, err = v.Buffer.Window(position, 20); err != ErrBoundary {
+		t.Fatal("strict window split a surrogate", err)
+	}
+	w, err := v.Buffer.WindowNear(position, 20)
+	if err != nil || w.Start != position-1 || w.Column != position-1 || w.LineUnits != int64(ChunkBytes+11) || w.Text != "😀tail\nnext" {
+		t.Fatal(w, err)
+	}
+}
+
 func BenchmarkLargeFileInteraction(b *testing.B) {
 	for _, length := range []int64{256 << 20, 2 << 30} {
 		name := "256MiB"

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -16,14 +17,62 @@ import (
 // This state stays with the existing document grant across window moves. Only
 // the owning lease may reach it; checkpoints contain no source text or history.
 type editorDiskDocument struct {
-	mu       sync.Mutex
-	imported *editorbuffer.Imported
-	progress int64
-	err      string
-	loading  bool
-	cancel   context.CancelFunc
-	closed   bool
-	saving   bool
+	editMu    sync.Mutex
+	receipts  []editorDiskReceipt
+	mu        sync.Mutex
+	imported  *editorbuffer.Imported
+	progress  int64
+	err       string
+	loading   bool
+	cancel    context.CancelFunc
+	closed    bool
+	ctx       context.Context
+	saving    bool
+	reloading bool
+}
+
+type editorDiskReceipt struct {
+	id       string
+	digest   [32]byte
+	metadata editorbuffer.Metadata
+}
+
+// A renderer may lose an edit acknowledgement after the server applied it.
+// Replaying that exact request must acknowledge the original edit, not apply
+// it twice or force the renderer to throw away newer, unacknowledged typing.
+func (d *editorDiskDocument) mutate(b *editorbuffer.Buffer, req editorDiskRequest) (editorbuffer.Metadata, error) {
+	d.editMu.Lock()
+	defer d.editMu.Unlock()
+	if len(req.RequestID) > 128 {
+		return editorbuffer.Metadata{}, errors.New("invalid edit request identity")
+	}
+	encoded, _ := json.Marshal(req)
+	digest := sha256.Sum256(encoded)
+	if req.RequestID != "" {
+		for _, receipt := range d.receipts {
+			if receipt.id == req.RequestID {
+				if receipt.digest != digest {
+					return editorbuffer.Metadata{}, errors.New("edit request identity was reused with different contents")
+				}
+				return receipt.metadata, nil
+			}
+		}
+	}
+	var metadata editorbuffer.Metadata
+	var err error
+	if req.Action == "edit" {
+		metadata, err = b.Edit(req.Revision, req.From, req.To, req.Text)
+	} else {
+		metadata, err = b.History(req.Revision, req.Action == "redo")
+	}
+	if err == nil && req.RequestID != "" {
+		d.receipts = append(d.receipts, editorDiskReceipt{req.RequestID, digest, metadata})
+		if len(d.receipts) > 64 {
+			copy(d.receipts, d.receipts[len(d.receipts)-64:])
+			d.receipts = d.receipts[:64]
+		}
+	}
+	return metadata, err
 }
 
 func (g *editorDocumentGrant) diskSnapshotMatches(s editorDocumentSnapshot) bool {
@@ -85,7 +134,7 @@ func (m *editorViewRegistry) openDiskDocument(w http.ResponseWriter, r *http.Req
 		parent = context.Background()
 	}
 	ctx, cancel := context.WithCancel(parent)
-	disk := &editorDiskDocument{loading: true, cancel: cancel}
+	disk := &editorDiskDocument{loading: true, ctx: ctx, cancel: cancel}
 	grant.buffer = disk
 	grant.snapshot.Disk = true
 	m.mu.Lock()
@@ -183,12 +232,18 @@ func (m *editorViewRegistry) importDiskDocument(ctx context.Context, g *editorDo
 }
 
 type editorDiskRequest struct {
+	RequestID string              `json:"requestId"`
+	Query     string              `json:"query"`
+	Regex     bool                `json:"regex"`
+	MatchCase bool                `json:"matchCase"`
+	WholeWord bool                `json:"wholeWord"`
 	Lease     uint64              `json:"lease"`
 	Action    string              `json:"action"`
 	Revision  uint64              `json:"revision"`
 	Start     int64               `json:"start"`
 	Line      *int64              `json:"line,omitempty"`
 	Limit     int                 `json:"limit"`
+	Align     bool                `json:"align"`
 	From      int64               `json:"from"`
 	To        int64               `json:"to"`
 	Text      string              `json:"text"`
@@ -210,10 +265,26 @@ func (m *editorViewRegistry) diskDocument(w http.ResponseWriter, r *http.Request
 		jsonError(w, 409, errEditorLease.Error())
 		return
 	}
-	g.busy++
 	disk := g.buffer
+	disk.mu.Lock()
+	if disk.reloading || req.Action == "reload" && g.busy != 0 {
+		disk.mu.Unlock()
+		m.mu.Unlock()
+		jsonError(w, 409, "Wait for the current document operation before reloading.")
+		return
+	}
+	if req.Action == "reload" {
+		disk.reloading = true
+	}
+	disk.mu.Unlock()
+	g.busy++
 	m.mu.Unlock()
 	defer func() {
+		if req.Action == "reload" {
+			disk.mu.Lock()
+			disk.reloading = false
+			disk.mu.Unlock()
+		}
 		m.mu.Lock()
 		g.busy--
 		if g.orphan && g.busy == 0 {
@@ -242,6 +313,10 @@ func (m *editorViewRegistry) diskDocument(w http.ResponseWriter, r *http.Request
 		jsonResponse(w, 200, map[string]any{"ok": true})
 		return
 	}
+	ctx, cancel := context.WithCancel(r.Context())
+	stop := context.AfterFunc(disk.ctx, cancel)
+	defer stop()
+	defer cancel()
 	if failure != "" {
 		jsonError(w, 400, failure)
 		return
@@ -261,15 +336,46 @@ func (m *editorViewRegistry) diskDocument(w http.ResponseWriter, r *http.Request
 		}
 		if req.Line != nil {
 			value, err = v.Buffer.WindowAtLine(*req.Line, req.Limit)
+		} else if req.Align {
+			value, err = v.Buffer.WindowNear(req.Start, req.Limit)
 		} else {
 			value, err = v.Buffer.Window(req.Start, req.Limit)
 		}
-	case "edit":
-		value, err = v.Buffer.Edit(req.Revision, req.From, req.To, req.Text)
-	case "undo", "redo":
-		value, err = v.Buffer.History(req.Revision, req.Action == "redo")
+	case "edit", "undo", "redo":
+		value, err = disk.mutate(v.Buffer, req)
 	case "save":
-		value, err = m.saveDiskDocument(r.Context(), g, disk, req)
+		value, err = m.saveDiskDocument(ctx, g, disk, req)
+	case "find":
+		var snapshot *editorbuffer.Snapshot
+		snapshot, err = v.Buffer.Snapshot()
+		if err == nil {
+			value, err = snapshot.Find(ctx, req.Query, req.Start, req.Regex, req.MatchCase, req.WholeWord)
+			snapshot.Close()
+		}
+	case "reload":
+		var replacement *editorbuffer.Imported
+		replacement, err = m.importDiskDocument(ctx, g, disk)
+		if err == nil {
+			disk.mu.Lock()
+			old := disk.imported
+			disk.imported = replacement
+			disk.mu.Unlock()
+			v = replacement
+			disk.editMu.Lock()
+			disk.receipts = nil
+			disk.editMu.Unlock()
+			old.Buffer.Close()
+			m.mu.Lock()
+			g.snapshot.Hash = v.Hash
+			g.snapshot.Encoding = v.Format.Encoding
+			g.snapshot.SavedEncoding = v.Format.Encoding
+			g.snapshot.BOM = v.Format.BOM
+			g.snapshot.SavedBOM = v.Format.BOM
+			g.snapshot.EOL = v.Format.EOL
+			g.snapshot.SavedEOL = v.Format.EOL
+			m.mu.Unlock()
+			value = map[string]any{"metadata": v.Buffer.Metadata(), "format": v.Format, "hash": v.Hash}
+		}
 	default:
 		jsonError(w, 400, "Unsupported disk-backed editor action.")
 		return
@@ -447,6 +553,14 @@ func (m *editorViewRegistry) saveRemoteDiskDocument(ctx context.Context, g *edit
 	if !validEditorText(destination, 4096) || destination == "" {
 		return nil, errors.New("invalid remote destination")
 	}
+	m.mu.Lock()
+	if m.explorerConflictLocked(g.snapshot.Binding, destination) {
+		m.mu.Unlock()
+		return nil, errors.New("a file operation is changing this path")
+	}
+	g.filePath = destination
+	m.mu.Unlock()
+	defer func() { m.mu.Lock(); g.filePath = ""; m.mu.Unlock() }()
 	expected := v.Hash
 	if destination != path {
 		expected = ""
