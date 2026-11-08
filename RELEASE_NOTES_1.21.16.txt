@@ -1,0 +1,14 @@
+Network Toolkit 1.21.16 Beta 17
+
+## What's New
+
+- A simpler Network Toolkit icon represents terminal access, file transfers, and connected network devices.
+- The new desktop and app icon uses consistent flat navy, cyan, white, and orange colors.
+
+## Additional Details
+
+- The owner-approved design is stored as editable vector shapes in assets/source/Network_Toolkit_Icon.original.svg.
+- Runtime SVG, 256-pixel PNG, and nine-size Windows ICO are generated through the existing secure icon pipeline and embedded at compile time rather than patching the executable afterward.
+- Network features, saved connections, credentials, settings, macros, and updater behavior are unchanged.
+- Windows and Linux portable names, beta opt-in, explicit install approval, and checksum verification remain unchanged.
+- Previously published versions and assets are untouched.
