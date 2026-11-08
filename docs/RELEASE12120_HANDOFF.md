@@ -7,7 +7,7 @@
 - A browser beforeinput edit plan updates the cached source line index incrementally for ordinary typing, paste, and deletions. Any unexpected input safely falls back to rebuilding exact line positions.
 - The window recovery checkpoint version no longer changes merely because a large document scrolled. Explicit moves and edits still snapshot the complete document with existing security, ownership, and size checks.
 - Comparison's source view tracks applied document revisions so a simple refresh does not serialize or replace a multi-megabyte CodeMirror document.
-- Comparisons now accept up to 16 MiB and 50,000 lines on each side. Bounded unique-line anchors allow large mostly similar device configurations to compare without a quadratic matrix for the whole changed region.
+- Comparisons now accept up to 16 MiB and 30,000 lines on each side. Bounded unique-line anchors allow large mostly similar device configurations to compare without a quadratic matrix for the whole changed region.
 - Diff calculation above 2 MiB runs in a same-origin Worker with a 20-second bounded completion. Worker failure gives an actionable limited result rather than blocking UI. No document text is transmitted to an external service.
 
 ## Tests
