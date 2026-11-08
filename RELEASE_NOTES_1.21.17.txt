@@ -1,0 +1,24 @@
+Network Toolkit 1.21.17
+
+## What's New
+
+- Packet capture is built for beginners: three setup steps, a large Start button, and results that start with a plain answer such as "2 problems found".
+- Color terminal output like MobaXterm with the Universal profile for devices, servers and logs, or with keyword rule sets including your own .msyn files.
+- Terminal Settings has tabs for appearance, highlighting, features and mouse and keyboard, and risky pastes are flagged before they are sent.
+- Sidebars can sit on either side, dropdown lists use the app's colors, and the app has a new flat icon.
+
+## Additional Details
+
+- This stable release includes the 1.21.0 to 1.21.16 betas. Its version is higher than every beta, so beta users receive it too.
+- Packet capture: a recording panel shows what to try while it records; results name each problem in plain words; "Check a website or device" shows where a connection stopped; conversations show whether each connection worked and name the service. The adapter list matches the other adapter lists in the app.
+- Terminal highlighting: choose Universal or a keyword rule set (Standard keywords, Unix shell script, Network configuration, Perl, SQL or your own) in Settings → Highlighting. Click a color in the legend to change it. Customize shows each kind of highlight as a card named by what it marks, with an on/off switch and its color; your own and imported .msyn sets keep editable words and patterns and can be exported again.
+- Universal recognizes prompts, interfaces, addresses, URLs and network paths, log levels, error and success messages, ping results and routing and service states from many vendors, and colors only recognizable shapes, never ordinary sentences.
+- Device prompts: color the device's prompt with your color, show its name as plain text, or leave the device's own colors, with every profile. URLs and network paths have their own underline switch.
+- Terminal settings: font size from 8 to 36, block, underline or line cursor (steady or blinking), more color schemes, bold text in brighter colors, scrollback lines, scrollbar, bell (flash or sound), bracketed paste, word delimiters, line-ending fixes and an answerback text. The Appearance preview shows the highlighting you use.
+- Paste warnings cover commands that download and run a script, shell startup file changes, archives unpacked into system folders, look-alike or hidden characters, and plain-HTTP or shortened links. After a session ends, press R to reconnect or S to save it.
+- Sidebars: the ⇄ button at the bottom of the Text Editor, Terminal, File Transfer and Configuration sidebars moves them to the other side; entry, device and packet details can also be placed on the left. Your choices are remembered.
+- Text fields with suggestions always list every choice, and fonts are shown in their own typeface. The update notice shows every What's New point in full.
+- Linux: the Linux packages (x86_64 and aarch64) are included as a preview while the Linux edition gains every Windows feature; it has not yet been confirmed on a physical Linux PC.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept. Security confirmations, Windows/UAC approval, explicit update consent and checksum verification are unchanged.
+- Portable executable filename remains Network_Toolkit.exe.
+- Validation uses hosted builds and synthetic fixtures; the owner checked the 1.21 betas on Windows and reported that the current beta works well.
