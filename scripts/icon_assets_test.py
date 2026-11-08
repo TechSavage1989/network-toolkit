@@ -65,7 +65,7 @@ class IconAssetsTests(unittest.TestCase):
         original = (icons.ROOT / icons.ORIGINAL).read_bytes()
         simple = b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><path d="M0 0h1"/></svg>'
         invalid = [
-            original.replace(b'http://ns.adobe.com/Extensibility/1.0/', b'file:///unreadable-entity-target'),
+            b'<!DOCTYPE svg [<!ENTITY leak SYSTEM "file:///unreadable-entity-target">]>' + simple,
             b'<!DOCTYPE svg SYSTEM "file:///unreadable-dtd-target">' + simple,
             simple.replace(b'<path', b'<script/> <path'),
             simple.replace(b'<path', b'<path onload="unsafe()"'),
