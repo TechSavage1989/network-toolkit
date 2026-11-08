@@ -14,7 +14,7 @@ test('input plans handle typing, selection replacements, backspace and forward d
  const cases=[
   {from:11,to:11,type:'insertText',data:'X',next:'first\nseconXd\nthird',caret:12},
   {from:6,to:12,type:'insertText',data:'middle\n',next:'first\nmiddle\n\nthird',caret:13},
-  {from:7,to:7,type:'deleteContentBackward',data:null,next:'first\nscond\nthird',caret:6},
+  {from:8,to:8,type:'deleteContentBackward',data:null,next:'first\nscond\nthird',caret:7},
   {from:6,to:6,type:'deleteContentForward',data:null,next:'first\necond\nthird',caret:6},
  ];
  for(const c of cases){const p=plan(old,1,c.from,c.to,c.type,c.data);const result=update(cache,old,c.next,p,c.caret);assert.deepEqual(result,starts(c.next),c.type);}
