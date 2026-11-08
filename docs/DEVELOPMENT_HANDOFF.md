@@ -1,4 +1,9 @@
-# v1.21.17 Stable (all 1.21 betas) - candidate (2026-11-08)
+# v1.21.17 Stable (all 1.21 betas) - publication verified (2026-11-08)
+
+Published as the stable release https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.21.17 at 2026-11-08T04:52:29Z (not a prerelease); releases/latest is now v1.21.17. Tag v1.21.17 points to ab0f50da978eaec9d171a648c882fee4d487a608 (the merge of PR #132, which came right after the stable PR #133 and contains it). The first publish attempt (release run 42448048350, for the PR #133 merge 4f428b6) built fine but GitHub refused `gh release create` with "HTTP 403: Resource not accessible by integration"; nothing was published. The next push to main started release run 42448282030, which built and published successfully, so the 403 was transient. Assets: Network_Toolkit.exe, Portable and Update ZIPs, Linux x86_64 and aarch64 tarballs and SHA256SUMS; every asset digest matches SHA256SUMS, and the Linux x86_64 binary reports "Network Toolkit 1.21.17 linux amd64".
+- Next beta: switch `docs/RELEASE_CHANNEL.txt` and `updateBuildChannel` back to `beta` (as v1.21.0 did after 1.20.16).
+- Old branches: run 42448308140 of delete-merged-branches deleted the 24 approved branches (each deleted branch and its last commit is in that run's log, for restore). The repository now has `main` and the open PR #129 branch.
+- Known CI issue: browser-editor112 (editor-views112 focus wait on the detached file-list resize handle; the divider geometry check; editor-capacity114's 5 s input bound) fails intermittently on unrelated PRs and passes on re-run. A follow-up task was suggested to find the cause.
 
 Owner: "delete old branches. also the current version works well. please make stable version". The owner confirms the current beta on Windows.
 - Stable 1.21.17 contains the 1.21.0 to 1.21.16 betas. Channel switched to stable in `docs/RELEASE_CHANNEL.txt` and `updateBuildChannel` (cmd/network-toolkit/updater.go), as for 1.20.16. Version is above every beta, so beta users receive it.

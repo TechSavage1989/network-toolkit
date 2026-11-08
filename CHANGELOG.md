@@ -1,4 +1,4 @@
-## 1.21.17 - Stable (candidate)
+## 1.21.17 - Stable (published 2026-11-08)
 
 - Owner: "the current version works well. please make stable version". Stable release of the 1.21.0 to 1.21.16 betas: beginner packet capture, MobaXterm-style terminal highlighting (Universal profile, keyword rule sets, .msyn import/export, per-profile colors, purpose-named cards, device prompt colors, link underlines), terminal settings tabs (font, cursor, schemes, features, paste warnings, reconnect keys), sidebars on either side, app-colored dropdowns, full What's New in the update notice and the flat icon. Release channel switched to stable (`docs/RELEASE_CHANNEL.txt`, `updateBuildChannel`); numbered above every beta so beta users also receive it. Linux packages remain a preview (docs/LINUX_PLAN.md: Linux joins stable after the owner confirms it on a real Linux PC). `docs/releases/RELEASE_NOTES_1.21.15.txt` restored from history (the 1.21.16 preparation had deleted it instead of archiving it).
 
