@@ -106,3 +106,32 @@ test('long lines and many matches stay bounded', () => {
   assert.equal(R.compile(set).match(line).length <= R.LIMITS.hitsPerColor, true);
   assert.deepEqual(R.compile(set).match('x'.repeat(R.LIMITS.text + 1)), []);
 });
+
+test('per-profile colors (v1.21.11) keep only valid colors for profiles that exist', () => {
+  const prefs = R.preferences({ active: 'network', custom: [{ id: 'custom-lab', name: 'Lab', rules: { red: 'x' } }],
+    colors: { network: { red: '#AA0000', green: 'url(x)', blue: '#12345', unknown: '#ffffff' }, 'custom-lab': { cyan: '#00aaff' }, 'custom-gone': { red: '#ff0000' }, smart: { red: '#ff0000' }, standard: 'red' } });
+  assert.deepEqual(JSON.parse(JSON.stringify(prefs.colors)), { network: { red: '#aa0000' }, 'custom-lab': { cyan: '#00aaff' } });
+  assert.deepEqual(JSON.parse(JSON.stringify(R.preferences(null).colors)), {});
+});
+
+test('switched-off colors are kept per rule set and match nothing (v1.21.14)', () => {
+  const prefs = R.preferences({ active: 'standard', custom: [{ id: 'custom-a', name: 'A', rules: { red: 'boom' } }], off: { standard: ['red', 'nope', 'underline'], 'custom-a': 'red', missing: ['red'] } });
+  assert.deepEqual(prefs.off, { standard: ['red', 'underline'] });
+  const set = R.withSwitches(R.find(prefs, 'standard'), prefs);
+  assert.equal(set.rules.red, ''); assert.equal(set.rules.underline, ''); assert.notEqual(set.rules.green, '');
+  assert(!R.compile(set).match('error: link failed').some(hit => hit.kind === 'syn-red'));
+  assert(R.compile(R.find(prefs, 'standard')).match('error: link failed').some(hit => hit.kind === 'syn-red'), 'the saved rule set itself is unchanged');
+  assert(!R.legend(set).some(item => item.color === 'red'), 'the legend leaves it out'); assert.equal(R.legend(set).find(item => item.color === 'green').note, 'Success');
+  assert.equal(R.withSwitches(R.find(prefs, 'network'), prefs), R.find(prefs, 'network'));
+});
+
+test('purpose labels: built-in notes, your own names, MobaXterm defaults (v1.21.15)', () => {
+  assert.equal(R.slotLabel(R.find(R.preferences({}), 'network'), 'red'), 'Down, disabled, denied and "no" commands');
+  const own = R.normalize({ id: 'custom-x', name: 'X', rules: { red: 'a' }, labels: { red: '  Link failures ', green: 'x'.repeat(60), bogus: 'no', cyan: 5 } });
+  assert.deepEqual(JSON.parse(JSON.stringify(own.labels)), { red: 'Link failures', green: 'x'.repeat(40) });
+  assert.equal(R.slotLabel(own, 'red'), 'Link failures'); assert.equal(R.slotLabel(own, 'cyan'), 'Information'); assert.equal(R.slotLabel(own, 'blue'), 'Other keywords');
+  assert.equal(R.legend(own)[0].note, 'Link failures', 'the legend uses the purpose');
+  assert.deepEqual(R.preferences({ off: { standard: ['prompt', 'red', 'nope'] } }).off.standard, ['red', 'prompt']);
+  const set = R.withSwitches(R.find(R.preferences({}), 'standard'), { off: { standard: ['prompt'] } });
+  assert.notEqual(set.rules.red, '', 'the prompt switch does not blank a color');
+});

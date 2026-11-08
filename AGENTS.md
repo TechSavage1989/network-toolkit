@@ -7,6 +7,7 @@ Read [docs/UX_POLISH_PLAN.md](docs/UX_POLISH_PLAN.md) first. It is the owner's a
 
 ## Working with the owner
 - When the owner's input or decision is needed, when a release has been published, or when work is waiting on the owner, start that message with a bold, clearly marked line (for example **⚠️ ACTION NEEDED:**, **✅ PUBLISHED:** or **⏳ WAITING ON YOU:**) so it cannot be missed (owner request, 2026-11-07).
+- End every message to the owner with a clear status: what is done or published, what is running and roughly when it finishes, and what (if anything) the owner needs to do (owner request, 2026-11-07).
 - Terminal settings modeled on MobaXterm are planned in [docs/TERMINAL_SETTINGS_PLAN.md](docs/TERMINAL_SETTINGS_PLAN.md).
 
 ## Owner's non-negotiables
@@ -30,6 +31,9 @@ Read [docs/UX_POLISH_PLAN.md](docs/UX_POLISH_PLAN.md) first. It is the owner's a
 - CLAUDE.md sits in the root (allowlisted in scripts/repository_layout_test.py) because Claude reads it there; it only imports this file and docs/REPOSITORY_STANDARDS.md.
 - README images live in docs/images/ (hero.png plus kebab-case names) and are regenerated with `node scripts/readme-screenshots.browser.cjs` (synthetic data only; see its header for the packet capture shot).
 - Preserve the portable executable filename Network_Toolkit.exe and the existing update feed semantics.
+- Dropdowns (v1.21.10): `web/assets/dropdowns.js` converts every `<input list="…">` into an app-styled combobox and removes its `list` attribute (kept as `data-combobox-list`), so never rely on `input.list`. Selects stay native while closed and switch to the app-colored list (`.ntk-picker`, base-select) only while open; do not style closed selects with `appearance: base-select`, because it changes their size and CI compares layouts with pinned older builds.
+- Terminal settings (v1.21.11) has tabs: Appearance, Highlighting, Features, Mouse & keyboard. Put a new terminal option in the matching tab (`[data-terminal-settings-panel="…"]`, or mark Tools markup with `data-terminal-settings-target`); never add app-level buttons (theme, app settings) to it, and keep Tools for connections and help.
+- Universal highlighting (v1.21.12): its rule switches and colors live on the Customize dialog's Universal page (`universalEditorHTML()`, `[data-terminal-universal-editor]` is in `SECTIONS` of terminal-appearance.js, so the same change/sync handlers serve it). `highlightOptions()` without a language returns the active rule set; pass `ruleset:null, ruleSet:null` to `legend()` when you need Universal's own colors.
 - New saved UI settings must survive a restart: `mergeState` in web/index.html (or the module's `mergePreferences`) has to restore the key, and keys with a Go sanitizer (`transferClientLayout`, `transferServerSidebar` in transfer_client_settings.go) must allow the new field. The Text Editor sidebar preferences were silently dropped until v1.21.3 for this reason.
 
 ## Build and test

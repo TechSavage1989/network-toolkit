@@ -22,6 +22,7 @@ const (
 	terminalSyntaxMaxCustom  = 50
 	terminalSyntaxMaxPattern = 8000
 	terminalSyntaxMaxName    = 80
+	terminalSyntaxMaxLabel   = 40
 )
 
 func terminalSyntaxText(value any, limit int) string {
@@ -61,12 +62,61 @@ func safeTerminalSyntax(value any) map[string]any {
 			for _, color := range terminalSyntaxColors {
 				rules[color] = terminalSyntaxText(requested[color], terminalSyntaxMaxPattern)
 			}
-			custom = append(custom, map[string]any{"id": id, "name": name, "regex": item["regex"] != false, "caseSensitive": item["caseSensitive"] == true, "rules": rules})
+			// What each color marks (v1.21.15), named by the user.
+			requestedLabels, _ := item["labels"].(map[string]any)
+			labels := map[string]any{}
+			for _, color := range terminalSyntaxColors {
+				if label := strings.TrimSpace(terminalSyntaxText(requestedLabels[color], terminalSyntaxMaxLabel)); label != "" {
+					labels[color] = label
+				}
+			}
+			custom = append(custom, map[string]any{"id": id, "name": name, "regex": item["regex"] != false, "caseSensitive": item["caseSensitive"] == true, "rules": rules, "labels": labels})
 		}
 	}
 	active, _ := source["active"].(string)
 	if active != "smart" && !terminalSyntaxBuiltIn[active] && !seen[active] {
 		active = "smart"
 	}
-	return map[string]any{"active": active, "custom": custom}
+	// Per-profile color overrides (v1.21.11) for built-in and kept custom rule sets.
+	colors := map[string]any{}
+	if requested, ok := source["colors"].(map[string]any); ok {
+		for id, raw := range requested {
+			slots, ok := raw.(map[string]any)
+			if !ok || !(terminalSyntaxBuiltIn[id] || seen[id]) {
+				continue
+			}
+			clean := map[string]any{}
+			for _, color := range terminalSyntaxColors {
+				if value, ok := slots[color].(string); ok && terminalColorPattern.MatchString(value) && len(value) == 7 {
+					clean[color] = strings.ToLower(value)
+				}
+			}
+			if len(clean) > 0 {
+				colors[id] = clean
+			}
+		}
+	}
+	// Colors switched off per rule set (v1.21.14): {id: ["red", ...]}.
+	off := map[string]any{}
+	if requested, ok := source["off"].(map[string]any); ok {
+		for id, raw := range requested {
+			slots, ok := raw.([]any)
+			if !ok || !(terminalSyntaxBuiltIn[id] || seen[id]) {
+				continue
+			}
+			clean := []any{}
+			for _, color := range append(append([]string{}, terminalSyntaxColors...), "prompt") {
+				for _, slot := range slots {
+					if slot == color {
+						clean = append(clean, color)
+						break
+					}
+				}
+			}
+			if len(clean) > 0 {
+				off[id] = clean
+			}
+		}
+	}
+	return map[string]any{"active": active, "custom": custom, "colors": colors, "off": off}
 }

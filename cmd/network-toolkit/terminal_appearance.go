@@ -8,7 +8,7 @@ import (
 )
 
 var terminalColorPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
-var terminalHighlightKinds = []string{"address", "mac", "url", "prompt", "interface", "command", "field", "protocol", "value", "number", "comment", "warning", "error", "success"}
+var terminalHighlightKinds = []string{"address", "mac", "url", "prompt", "interface", "command", "field", "protocol", "value", "number", "comment", "warning", "error", "success", "info"}
 
 var terminalSelectionPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})?$`)
 
@@ -17,6 +17,13 @@ func safeTerminalAppearance(value any) map[string]any {
 	clean := map[string]any{"fontFamily": "Consolas", "fontWeight": "normal", "lineHeight": 1.15, "scheme": "app", "highlightUnderlines": true}
 	if source["highlightUnderlines"] == false {
 		clean["highlightUnderlines"] = false
+	}
+	// URL and network-path underlines and the device prompt name (v1.21.12).
+	clean["highlightLinkUnderlines"] = source["highlightLinkUnderlines"] != false
+	clean["promptHighlight"] = "auto"
+	switch mode, _ := source["promptHighlight"].(string); mode {
+	case "always", "off":
+		clean["promptHighlight"] = mode
 	}
 	// Cursor type and bold-brighter (v1.21.7); unknown values keep the defaults.
 	clean["cursor"] = "block-blink"

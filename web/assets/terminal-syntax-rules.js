@@ -17,7 +17,13 @@
 
   const COLORS = Object.freeze(['red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'underline']);
   const LABELS = Object.freeze({ red: 'Red', green: 'Green', yellow: 'Yellow', blue: 'Blue', magenta: 'Magenta', cyan: 'Cyan', underline: 'Underline' });
-  const LIMITS = Object.freeze({ pattern: 8000, name: 80, text: 4096, hitsPerColor: 96, custom: 50, words: 2000, probeMs: 25 });
+  // What each color marks (owner request, v1.21.15): cards and legends name
+  // the purpose, since colors can be changed. Built-in sets use their notes;
+  // your own and imported sets can rename these (MobaXterm convention by default).
+  const DEFAULT_LABELS = Object.freeze({ red: 'Errors and failures', green: 'Success', yellow: 'Warnings', blue: 'Other keywords', magenta: 'Addresses and values', cyan: 'Information', underline: 'Web addresses' });
+  // Per-rule-set switches: the seven colors plus device prompts.
+  const SWITCHES = Object.freeze([...COLORS, 'prompt']);
+  const LIMITS = Object.freeze({ label: 40, pattern: 8000, name: 80, text: 4096, hitsPerColor: 96, custom: 50, words: 2000, probeMs: 25 });
   const LINE = '¨';
 
   // Shared pieces for the built-in rule sets (lookarounds keep spans tight).
@@ -148,8 +154,11 @@
     const id = typeof v.id === 'string' && /^[a-z0-9][a-z0-9-]{0,39}$/.test(v.id) ? v.id : '';
     const rules = {};
     for (const color of COLORS) rules[color] = cleanText(v.rules?.[color], LIMITS.pattern).replace(/[\r\n]+/g, ' ');
-    return { id, name: cleanText(v.name, LIMITS.name).trim() || 'Custom syntax', regex: v.regex !== false, caseSensitive: v.caseSensitive === true, rules };
+    const labels = {};
+    for (const color of COLORS) { const label = cleanText(v.labels?.[color], LIMITS.label).replace(/[\r\n]+/g, ' ').trim(); if (label) labels[color] = label; }
+    return { id, name: cleanText(v.name, LIMITS.name).trim() || 'Custom syntax', regex: v.regex !== false, caseSensitive: v.caseSensitive === true, rules, labels };
   }
+  function slotLabel(set, color) { return builtIn(set?.id)?.notes?.[color] || set?.labels?.[color] || DEFAULT_LABELS[color] || LABELS[color]; }
 
   // Compile one color's pattern; returns {regex} or {error}.
   function compileColor(text, regexMode, caseSensitive) {
@@ -290,7 +299,28 @@
       seen.add(set.id); custom.push(set);
     }
     const active = typeof v.active === 'string' && (v.active === 'smart' || builtIn(v.active) || custom.some(set => set.id === v.active)) ? v.active : 'smart';
-    return { active, custom };
+    // Per-profile color overrides (v1.21.11): {profile id: {red: '#rrggbb', ...}}.
+    const colors = {}, requested = v.colors && typeof v.colors === 'object' && !Array.isArray(v.colors) ? v.colors : {};
+    for (const [id, slots] of Object.entries(requested)) {
+      if (!(builtIn(id) || custom.some(set => set.id === id)) || !slots || typeof slots !== 'object') continue;
+      const clean = {};
+      for (const color of COLORS) if (typeof slots[color] === 'string' && /^#[0-9a-f]{6}$/i.test(slots[color])) clean[color] = slots[color].toLowerCase();
+      if (Object.keys(clean).length) colors[id] = clean;
+    }
+    // Colors switched off per profile (v1.21.14): {profile id: ['red', ...]}.
+    const off = {}, requestedOff = v.off && typeof v.off === 'object' && !Array.isArray(v.off) ? v.off : {};
+    for (const [id, slots] of Object.entries(requestedOff)) {
+      if (!(builtIn(id) || custom.some(set => set.id === id)) || !Array.isArray(slots)) continue;
+      const clean = SWITCHES.filter(color => slots.includes(color));
+      if (clean.length) off[id] = clean;
+    }
+    return { active, custom, colors, off };
+  }
+  // The rule set as it colors output: switched-off colors match nothing.
+  function withSwitches(set, prefs) {
+    const off = set ? (preferences(prefs).off[set.id] || []).filter(slot => COLORS.includes(slot)) : [];
+    if (!off.length) return set;
+    return { ...set, rules: Object.fromEntries(COLORS.map(color => [color, off.includes(color) ? '' : set.rules?.[color] || ''])) };
   }
   function find(prefs, id) { const clean = preferences(prefs); return builtIn(id) || clean.custom.find(set => set.id === id) || null; }
   function newId(prefs, name) {
@@ -301,11 +331,10 @@
   }
   // Built-in color notes, used by the legend; custom sets list their colors.
   function legend(set) {
-    const value = builtIn(set?.id) || set;
-    return COLORS.filter(color => value?.rules?.[color]).map(color => ({ color, label: LABELS[color], note: value.notes?.[color] || '' }));
+    return COLORS.filter(color => set?.rules?.[color]).map(color => ({ color, label: LABELS[color], note: slotLabel(set, color) }));
   }
 
-  const api = { COLORS, LABELS, LIMITS, BUILT_IN, convert, compile, compileColor, match, parseMsyn, toMsyn, decode, encode, normalize, preferences, find, builtIn, newId, legend };
+  const api = { COLORS, LABELS, LIMITS, BUILT_IN, convert, compile, compileColor, match, parseMsyn, toMsyn, decode, encode, normalize, preferences, find, builtIn, newId, legend, withSwitches, slotLabel, DEFAULT_LABELS, SWITCHES };
   if (typeof module === 'object' && module.exports) module.exports = api;
   global.NTKTerminalSyntaxRules = Object.freeze(api);
 })(typeof window === 'object' ? window : globalThis);

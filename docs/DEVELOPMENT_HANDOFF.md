@@ -1,3 +1,14 @@
+# v1.21.15 Beta 16 (Rule set colors named by purpose; Device prompts on every rule set) - candidate (2026-11-07)
+
+Owner request: label rule set colors by function rather than color, and add Universal's Device prompts card (color and configuration) to every rule set.
+- Purpose comes from `slotLabel()`: built-in notes, a custom set's `labels` (editable in its cards), or the MobaXterm meaning. Labels are app-only; `.msyn` export is unchanged.
+- Device prompts now work with keyword rule sets: `promptRule` (default on, per set via `terminalSyntax.off[id]` containing `prompt`) makes `analyze()` color the prompt and carve rule set hits around it. The color (`highlightColors.prompt`) and name choice (`promptHighlight`) stay global.
+- Behavior change to call out: rule sets color prompts by default from this version.
+- Checked: Node unit tests, Go and Python tests, terminal-prompt-links browser test with rule set card screenshots.
+- Not claimed: checked on a physical Windows PC.
+
+---
+
 # CI: Terminal SFTP drag-to-Explorer race in windows-terminal (2026-11-07) - no release
 
 Report: `TestNativeTerminalSFTP123InstalledWebView2` sometimes fails at `actual detached-workspace-file` with "Actual Explorer destination file did not arrive" (native-terminal-sftp123.ps1:165). That is the only failure found in this test: run 41707445828, first attempt (2026-11-03, job 126166393524). The two main runs named in the report failed for other reasons. 42375596212 failed the baseline122 negative control (ps1:150, the Save dialog did not appear). 42371008876 failed `TestNativeEditorLocal119`. The candidate step passed in both.
@@ -8,9 +19,83 @@ Root cause, from the failing run's evidence (server actions and the script's inp
 - The fixture writes the finish marker for any outcome, so the script then waited 15 s for a file that could not arrive.
 
 Fix (test only, no application code): the gesture timings and the 500 ms dwell are unchanged. After the dwell, the script releases only when the native drag source reports Explorer's DROPEFFECT_COPY feedback. While OLE runs without feedback, it moves the cursor one pixel inside the drop strip. It fails at once with the native event sequence if OLE ends before the release, or after 10 s with a reason. The finish marker now holds the outcome, and Copy fails at once on anything other than `copied`. The detached child is built with `toolkit_native_drag_trace122` (typed, path-free trace in a private temp folder, as in SFTP121's diagnostic mode). The main window's observer writes the same events. The traces and per-gesture `nativeDrag` timings are in the `terminal-sftp123-native-checks` artifact. Baseline122 still runs the copied test files against the unmodified 60b02cae tree.
-- Hosted CI on PR #121: the Terminal SFTP drag test passed six of six runs. Those were push run 42412176475 (75bc699) and run 42413442967 attempts 1–5 (6cbde18). All 48 gestures passed, OLE entered `DoDragDrop` 15–47 ms before the cursor stopped, and no nudges were needed. That margin of one to three 16 ms ticks is the race the gate now covers. The windows-terminal job was green in five of the six. Attempt 4 failed only in `TestTerminalShellExplicitApprovalAndLateCancellation` ("late-launch handle leaked"), which passed on its one re-run (attempt 5). That test checks closure by polling a handle value that Windows can reuse. It needs its own fix (keep a duplicate handle and use `CompareObjectHandles`).
+- Hosted CI on PR #121: the Terminal SFTP drag test passed seven of seven runs. Those were push run 42412176475 (75bc699), run 42413442967 attempts 1–5 (6cbde18) and run 42422856889 (5c76fbc). In the six timed runs (6cbde18 onward), all 48 gestures passed, OLE entered `DoDragDrop` 15–47 ms before the cursor stopped, and no nudges were needed. That margin of one to three 16 ms ticks is the race the gate now covers. The windows-terminal job was green in five of the six. Attempt 4 failed only in `TestTerminalShellExplicitApprovalAndLateCancellation` ("late-launch handle leaked"), which passed on its one re-run (attempt 5). That test checks closure by polling a handle value that Windows can reuse. It needs its own fix (keep a duplicate handle and use `CompareObjectHandles`).
 - No pull_request Checks run was created for PR #121, so only push runs are listed.
 - Not changed: `native-sftp-direct121.ps1` still releases after a fixed dwell. It failed the same way once (run 41560040060, main-folder).
+
+---
+
+# v1.21.14 Beta 15 (Rule set cards like Universal) - publication verified (2026-11-07)
+
+Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.21.14 at 2026-11-07T23:24:49Z; stable latest remains v1.20.16. Merged PR #125; tag v1.21.14 points to merge commit edb48c3a1d5c7b95b93f5a4ebc7fec0c0707b6c0. Release workflow run 42424848024 succeeded. Assets: Network_Toolkit.exe, Portable and Update ZIPs, Linux x86_64 and aarch64 tarballs and SHA256SUMS; every asset digest matches SHA256SUMS, and the Linux x86_64 binary reports "Network Toolkit 1.21.14 linux amd64". PR #125 was branched from the v1.21.13 head; its watcher merged it only after v1.21.13 was merged and released.
+
+Owner request (screenshots comparing the Universal page with Standard keywords): "include the same selection style configuraiton for all the rule sets, but also continue to support the 3rd party rule sets word customizability".
+- Rule set pages in Customize use the Universal card grid: per-color switch, note, color button with hex, and the pattern (editable for own and imported sets; built-in patterns folded and read-only), plus a Device prompt name card and Turn all colors on / Reset colors.
+- New saved key `terminalSyntax.off` ({rule set id: [colors]}), kept by `preferences()` and Go `safeTerminalSyntax`; `withSwitches()` blanks those colors when the set is used (terminals, legend, previews). The saved rule set itself is unchanged, so turning a color back on restores it.
+- Bug found and fixed: clicking a pattern textarea opened the color picker (the click handler matched `data-syntax-color`, which the textareas also carry).
+- Checked: Node unit tests, Go and Python tests, terminal-prompt-links browser test with rule-set card screenshots in light and dark.
+- Not claimed: checked on a physical Windows PC.
+
+---
+
+# v1.21.13 Beta 14 (Appearance preview follows every highlighting profile) - publication verified (2026-11-07)
+
+Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.21.13 at 2026-11-07T23:09:07Z; stable latest remains v1.20.16. Merged PR #124; tag v1.21.13 points to merge commit 99eb8e9ef55f779b37279a67a12353588621728b. Release workflow run 42423664610 succeeded. Assets: Network_Toolkit.exe, Portable and Update ZIPs, Linux x86_64 and aarch64 tarballs and SHA256SUMS; every asset digest matches SHA256SUMS, and the Linux x86_64 binary reports "Network Toolkit 1.21.13 linux amd64".
+
+Owner request (screenshots: with "Standard keywords" selected the Appearance preview stayed plain, while Universal colored it): "allow the preview in terminal for text also work with the custom /3rd party syntax highlights".
+- `terminal-appearance.js`: the preview text is generated from `PREVIEW_LINES` with the real analyzer for the active profile (`renderPreviewText`), so built-in and imported rule sets, their per-profile colors and the prompt name choice all show. Spans are rebuilt only when the profile, its rules or the prompt choice change, so color and underline edits restyle the same elements. Heading: `Preview · <profile>`.
+- Owner also asked that every message end with a clear status and what is needed; recorded in AGENTS.md.
+- Checked: unit tests (all), Go and Python tests, terminal-prompt-links browser test with rule-set preview screenshots in light and dark.
+- Not claimed: checked on a physical Windows PC.
+
+---
+
+# v1.21.12 Beta 13 (Prompt name color, link underlines and Universal in Customize) - publication verified (2026-11-07)
+
+Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.21.12 at 2026-11-07T22:42:32Z; stable latest remains v1.20.16. Merged PR #123; tag v1.21.12 points to merge commit 054c4c2c9019e91ca4cbc18dbe6b53186564a56d. Release workflow run 42421575200 succeeded. Assets: Network_Toolkit.exe, Portable and Update ZIPs, Linux x86_64 and aarch64 tarballs and SHA256SUMS; every asset digest matches SHA256SUMS, and the Linux x86_64 binary reports "Network Toolkit 1.21.12 linux amd64".
+
+Owner requests after v1.21.11: "include customize for Universal syntax highlighting.", "add option for underline URL or network paths in universal syntax, separate from the standard underline option." and "also, add option to color or not color the device main prompt name, with customization of that color too" (screenshot: a Linux prompt `biqu@CR10SPro:~$` colored green by the device).
+- Device prompt name: `terminalAppearance.promptHighlight` = `auto` (previous behavior) / `always` / `off`, color = the Device prompt highlight color (`highlightColors.prompt`). The device colored the owner's prompt itself, so Universal's own prompt color never showed; `always` and `off` therefore recolor `overrideable` cells (normal background, not inverse or hidden) for the name only, through decorations; the buffer is never changed. Works with keyword rule sets as well.
+- `highlightLinkUnderlines` (default on) controls only `url`; `highlightUnderlines` controls the rest. URL detection now includes share/transfer schemes, UNC paths and NFS/scp `host:/path`.
+- The Universal rule switches and device colors moved from the Highlighting tab to the Customize dialog's Universal page (`universalEditorHTML`, `[data-terminal-universal-editor]` in `SECTIONS`). Tests that toggled rules in the tab now open the dialog (`Rules and colors…`).
+- Gotcha found while testing: `highlightOptions()` without a language returns the active rule set, so code that needs Universal's colors must call `legend()` with `ruleset:null, ruleSet:null`.
+- Checked: unit tests, Go tests, terminal-prompt-links, terminal-style107, dropdowns and features-85 browser tests; screenshots of the tab and dialog in light, dark and 960×600 reviewed.
+- Not claimed: tested against real devices or on a physical Windows PC.
+
+---
+
+# v1.21.11 Beta 12 (Terminal settings in tabs, universal highlighting, colors for every profile) - publication verified (2026-11-07)
+
+Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.21.11 at 2026-11-07T21:29:11Z; stable latest remains v1.20.16. Merged PR #120; tag v1.21.11 points to merge commit bfd9567f1e2d1bd3c462ebcc5ffbb58d88940084. Release workflow run 42415784238 succeeded. Assets: Network_Toolkit.exe, Network_Toolkit_1.21.11_Portable.zip, Network_Toolkit_1.21.11_Update.zip, Network_Toolkit_1.21.11_Linux_x86_64.tar.gz, Network_Toolkit_1.21.11_Linux_aarch64.tar.gz, SHA256SUMS; all digests match SHA256SUMS. The published Linux x86_64 archive was downloaded, extracted and run (`--version` 1.21.11 linux amd64; inner SHA256SUMS OK). Checks: browser-editor112 (`editor-divider113`) failed once on 43d8d69 and passes locally; the dropdowns observer was narrowed in e4b192c; final runs 42413926151 and 42413931686 green on the first attempt.
+
+Owner (after trying 1.21.10: "drop downs are better"): "please continue with the next releases, and combine 11 and 12 into one release". The menu cleanup and the universal highlighting therefore ship together as 1.21.11; no 1.21.12 was published.
+
+Owner: "please polish and clean up the display and tools menus of terminal. make sure they are intuitive and think about ease of use and QoL and reduce redundancies." That request is the owner's approval for moving these controls (layout freeze); docs/UI_GUIDELINES.md records the new arrangement.
+- Panel: `terminal-extras.js` builds `#terminalSessionPanel` (ids kept for tests and code) with a tab strip and four `[data-terminal-settings-panel]` pages. Markup in `terminalToolsHTML` marked `data-terminal-settings-target` (highlighting profile, font size field, transcript note) is moved into its page. Settings modules mount into their page when present, else into the panel (unit-test harnesses).
+- `terminal-appearance.js`: `SECTIONS` + `scoped()` replace the single-section queries; confirmation checkboxes are found by id (they used to be looked up in the shell section).
+- Tab memory is per app session (module variable), not saved. Tests that open the panel must click the tab they need (`[data-terminal-settings-tab="…"]`).
+- Separate terminal windows have no sidebar, so Theme and App settings icons appear in the Tools heading there only.
+- Checked: features-85, terminal-style107, color-picker, dropdowns, terminal-pager browser tests; unit tests; README terminal screenshot recaptured.
+- Not claimed: checked on a physical Windows PC.
+
+Owner: compare the original device highlighting with the MobaXterm rule sets, make it a universal profile with better detection, and make highlight colors customizable for every profile.
+- Comparison: the MobaXterm rule sets color keywords anywhere (useful breadth, but they paint prose); the device highlighter was precise but missed logs, CLI errors, ping, routing/service states and several vendors. The universal profile adds those as shape-based recognizers (`universalHighlights` in terminal-highlight.js) and keeps the no-prose rule; `scripts/terminal-highlight-universal.test.cjs` holds the multi-vendor positives and the prose negatives (add both when extending).
+- New kind `info` (Info / notice) is wired through LABELS/MARKS/COLORS, terminal-appearance HIGHLIGHTS, Go `terminalHighlightKinds` and the rule switches.
+- Rule-set colors per profile live in `terminalSyntax.colors[id][slot]`; deleting a custom set removes its colors; the Customize dialog and the legend both call `NetworkToolkitTerminalSyntaxUI.editColor`. Picker previews use a module variable (`colorsFor`), never saved state.
+- Not claimed: tested against real devices or on a physical Windows PC.
+
+---
+
+# v1.21.10 Beta 11 (Dropdowns in the app's colors) - publication verified (2026-11-07)
+
+Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.21.10 at 2026-11-07T20:33:00Z; stable latest remains v1.20.16. Merged PR #119; tag v1.21.10 points to merge commit a60fb5b6c3872e3ba9c88570bdd0f56402ca688d. Release workflow run 42411270581 succeeded. Assets: Network_Toolkit.exe, Network_Toolkit_1.21.10_Portable.zip, Network_Toolkit_1.21.10_Update.zip, Network_Toolkit_1.21.10_Linux_x86_64.tar.gz, Network_Toolkit_1.21.10_Linux_aarch64.tar.gz, SHA256SUMS; all digests match SHA256SUMS. The published Linux x86_64 archive was downloaded, extracted and run (`--version` 1.21.10 linux amd64; inner SHA256SUMS OK). Checks: CI found that typing in a suggestion field opened the list over the session-folder dialog's button (fixed in 4e82e91: the list opens only on request). `windows-terminal` (`TestNativeTerminalSFTP123InstalledWebView2`, Explorer drop) failed once per head and passed on re-run; it also fails intermittently on main (runs 42375596212, 42371008876). Final runs 42408514386 and 42408518327 green.
+
+Owner request (with a screenshot of the black font suggestion popup): native-feeling dropdowns instead of the black list, suggestion lists that show every choice regardless of typed text, and fonts shown in their own face. The same message also asked for a Display/Tools menu cleanup and a universal highlighting profile with customizable colors; those follow together in v1.21.11.
+- `web/assets/dropdowns.js` + `dropdowns.css`. Closed selects are untouched (measured identical on 11 pages with and without the stylesheet), because CI compares layouts against pinned older builds and `appearance: base-select` sizes a closed select to its chosen item. The app-colored list is applied only while open: `.ntk-picker` is added on pointerdown/Alt+Arrow/F4 with width/height locked to the native box, and removed when `:open` ends (rAF watch). Unsupported engines keep native lists.
+- While a picker is open, keydown/keyup/keypress are stopped at window capture; otherwise app Escape handlers closed the Display panel and left the list open.
+- Comboboxes: any `input[list]` is converted (the `list` attribute moves to `data-combobox-list` so the browser popup never appears). Code must not rely on `input.list`; the datalist element stays and is read when the list opens, so dynamic lists (serial ports, folders) stay current. Terminal output DOM changes are ignored by the observer.
+- Tests: `scripts/dropdowns.browser.cjs` (fonts, typing, keyboard, select colors, size lock, Escape, light/dark, time zone field), added to checks.yml. Note: `active-session-tools.browser.cjs` (R reconnect key from v1.21.9) is not part of CI; it passes locally.
+- Not claimed: checked in WebView2 on a physical Windows PC.
 
 ---
 

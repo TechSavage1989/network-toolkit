@@ -19,17 +19,17 @@
 
   const LIMITS = Object.freeze({ text: 4096, token: 128, matches: 256,
     decorations: 8192, rows: 300, columns: 1000, wrapRows: 64, frameRows: 40, frameMs: 6, delay: 40 });
-  const LABELS = Object.freeze({ address: 'IP / CIDR', mac: 'MAC address', url: 'URL', prompt: 'Device prompt',
+  const LABELS = Object.freeze({ address: 'IP / CIDR', mac: 'MAC address', url: 'URL / network path', prompt: 'Device prompt',
     interface: 'Interface label', command: 'Command / config verb', field: 'Setting / field name',
     protocol: 'Protocol / service', value: 'Mode / named value', number: 'Number / unit', comment: 'Comment / description',
-    warning: 'Warning / pending', error: 'Error / down', success: 'Up / success' });
+    warning: 'Warning / pending', error: 'Error / down', success: 'Up / success', info: 'Info / notice' });
   const MARKS = Object.freeze({ address: ['solid', 2], mac: ['dotted', 2], url: ['solid', 1], prompt: ['solid', 1],
     interface: ['dashed', 1], command: ['solid', 1], field: ['dotted', 1], protocol: ['dashed', 1],
     value: ['solid', 1], number: ['dotted', 1], comment: ['dotted', 1],
-    warning: ['dashed', 2], error: ['double', 3], success: ['solid', 2] });
+    warning: ['dashed', 2], error: ['double', 3], success: ['solid', 2], info: ['dotted', 1] });
   const COLORS = Object.freeze({
-    dark: Object.freeze({ address: '#69c7ff', mac: '#7ed4d8', url: '#69c7ff', prompt: '#c6a6ff', interface: '#c6a6ff', command: '#f0a3d0', field: '#a6b8f8', protocol: '#e9bd81', value: '#d0cb93', number: '#bddf86', comment: '#9ba7b8', warning: '#f4c365', error: '#ff9b9b', success: '#91d8ae' }),
-    light: Object.freeze({ address: '#165aa0', mac: '#007a79', url: '#165aa0', prompt: '#7748a9', interface: '#7748a9', command: '#a02678', field: '#3f55ab', protocol: '#99501a', value: '#626300', number: '#386712', comment: '#596579', warning: '#8b5b00', error: '#a82033', success: '#177344' })
+    dark: Object.freeze({ address: '#69c7ff', mac: '#7ed4d8', url: '#69c7ff', prompt: '#c6a6ff', interface: '#c6a6ff', command: '#f0a3d0', field: '#a6b8f8', protocol: '#e9bd81', value: '#d0cb93', number: '#bddf86', comment: '#9ba7b8', warning: '#f4c365', error: '#ff9b9b', success: '#91d8ae', info: '#7fd0e8' }),
+    light: Object.freeze({ address: '#165aa0', mac: '#007a79', url: '#165aa0', prompt: '#7748a9', interface: '#7748a9', command: '#a02678', field: '#3f55ab', protocol: '#99501a', value: '#626300', number: '#386712', comment: '#596579', warning: '#8b5b00', error: '#a82033', success: '#177344', info: '#0b6f8a' })
   });
 
   // Syntax roles are based on the published FortiOS, IOS/IOS XE, AOS-CX,
@@ -113,12 +113,15 @@
   }
   function legend(theme, options = {}) {
     if (global.NTKTerminalShellSyntax?.supported(options.language)) return global.NTKTerminalShellSyntax.legend(options.terminalTheme, theme, options.shellColors);
-    if (options.ruleset && global.NTKTerminalSyntaxRules) return global.NTKTerminalSyntaxRules.legend(options.ruleSet).map(item => ({ kind: 'syn-' + item.color,
-      label: item.label + (item.note ? ': ' + item.note : ''), color: item.color === 'underline' ? (options.syntaxColors?.underline || '') : (options.syntaxColors?.[item.color] || ''),
-      borderStyle: item.color === 'underline' ? 'solid' : 'none', borderWidth: item.color === 'underline' ? 1 : 0 }));
-    const colors = palette(theme, options.colors);
-    return Object.keys(LABELS).filter(kind => options.rules?.[kind] !== false).map(kind => ({ kind, label: LABELS[kind], color: colors[kind],
-      borderStyle: options.underlines === false ? 'none' : MARKS[kind][0], borderWidth: options.underlines === false ? 0 : MARKS[kind][1] }));
+    if (options.ruleset && global.NTKTerminalSyntaxRules) return [...global.NTKTerminalSyntaxRules.legend(options.ruleSet).map(item => ({ kind: 'syn-' + item.color,
+      label: item.note || item.label, color: item.color === 'underline' ? (options.syntaxColors?.underline || '') : (options.syntaxColors?.[item.color] || ''),
+      borderStyle: item.color === 'underline' ? 'solid' : 'none', borderWidth: item.color === 'underline' ? 1 : 0 })),
+      ...(options.promptRule !== false && promptMode(options) !== 'off' || promptMode(options) === 'always' ? [{ kind: 'prompt', label: options.promptRule !== false && promptMode(options) !== 'off' ? 'Device prompts' : 'Device prompt name', color: palette(theme, options.colors).prompt, borderStyle: 'none', borderWidth: 0 }] : [])];
+    const colors = palette(theme, options.colors), mode = promptMode(options);
+    // URLs and network paths have their own underline switch (v1.21.12).
+    const underlined = kind => kind === 'url' ? options.linkUnderlines !== false : options.underlines !== false;
+    return Object.keys(LABELS).filter(kind => kind === 'prompt' ? mode === 'always' || mode === 'auto' && options.rules?.prompt !== false : options.rules?.[kind] !== false)
+      .map(kind => ({ kind, label: LABELS[kind], color: colors[kind], borderStyle: underlined(kind) ? MARKS[kind][0] : 'none', borderWidth: underlined(kind) ? MARKS[kind][1] : 0 }));
   }
   function ipv4(value) {
     const parts = value.split('.');
@@ -163,15 +166,31 @@
   function interfaceLabel(value, contextual = false) {
     if (/^(?:(?:en|wl|ww)(?:o\d+(?:n\d+)?|s\d+(?:f\d+)?(?:d\d+)?|p\d+s\d+(?:f\d+)?(?:d\d+)?|x[0-9a-f]{12})|(?:eth|wlan|wwan|tun|tap|wg|utun|bond|br|virbr|docker|vnet|vmnet|vxlan)\d+|veth[0-9a-f]{4,16})(?:\.\d{1,4})?$/i.test(value)) return true;
     if (/^(?:GigabitEthernet|TenGigabitEthernet|TwentyFiveGigE|FortyGigabitEthernet|HundredGigE|FastEthernet|Ethernet|Eth|Gi|Te|Fa|Fo|Hu)\d+(?:\/\d+){1,3}(?:\.\d{1,4})?$/i.test(value)) return true;
+    // v1.21.11: more vendors. Cisco multigig/serial/cellular and short logical names;
+    // Huawei and H3C; Arista Ethernet1/Management1; PAN-OS tunnel.1; MikroTik SFP ports.
+    if (/^(?:TwoGigabitEthernet|FiveGigabitEthernet|AppGigabitEthernet|TwentyFiveGigabitEthernet|Twe|Tw|Fi|Ap|Se|Serial|Cellular|XGigabitEthernet|XGE|10GE|25GE|40GE|100GE|400GE|MEth|M-GigabitEthernet|Ten-GigabitEthernet|FortyGigE|Wlan-GigabitEthernet)\d+(?:\/\d+){1,3}(?:[.:]\d{1,4})?$/i.test(value)) return true;
+    if (/^(?:BDI|Dialer|nve|NULL|LoopBack|Eth-Trunk|Vlanif|Bridge-Aggregation|Route-Aggregation|Vlan-interface|Management|mgmt|Ethernet|Et)\d+(?:\/\d+)?(?:\.\d{1,4})?$/.test(value)) return true;
+    if (/^(?:tunnel|loopback|vlan)\.\d{1,4}$|^(?:sfp|sfpplus|sfp28|qsfpplus|qsfp28|combo)\d{1,3}(?:-\d{1,3})?$|^(?:sfp-sfpplus|pppoe-out|l2tp-out|ovpn-out)\d{1,3}$/i.test(value)) return true;
     if (/^(?:(?:ge|xe|et|fe|at|gr|ip|lt|mt|ms)-\d+\/\d+\/\d+(?::\d+)?(?:\.\d+)?|(?:ae|reth|irb|lo|st|em|fxp|vme)(?:\d+)(?:\.\d+)?|(?:Vlan|Loopback|Port-channel|Bundle-Ether|Tunnel|port|lag|trk|ether|bridge)\d+(?:\.\d+)?|X\d+(?::V\d+)?)$/i.test(value)) return true;
-    return contextual && /^(?:Port[A-Z](?:\.\d+)?|\d{1,2}\/\d{1,2}\/\d{1,3}(?:[.:]\d+)?|[A-P]\d{1,2}(?:-[A-P]?\d{1,2})?(?:-Trk\d+)?|wan\d*|lan\d*|internal\d*|dmz|mgmt|fortilink|(?:ssl|naf|l2)\.root)$/i.test(value);
+    return contextual && /^(?:(?:Po|Vl|Lo|Tu|Null)\d{1,4}(?:\.\d{1,4})?|Port[A-Z](?:\.\d+)?|\d{1,2}\/\d{1,2}\/\d{1,3}(?:[.:]\d+)?|[A-P]\d{1,2}(?:-[A-P]?\d{1,2})?(?:-Trk\d+)?|wan\d*|lan\d*|internal\d*|dmz|mgmt|fortilink|(?:ssl|naf|l2)\.root)$/i.test(value);
   }
   function syntaxContext(text) {
     let prompt = /^\s*(?:[A-Za-z0-9_.:@/~()\[\]-]+(?:\s+\([^()]{1,64}\))?\s*[#>$%]|<[A-Za-z0-9_.-]{1,120}>)(?:\s+|$)/.exec(text);
     if (prompt && /^\s*[0-9.]+\s*[%$]\s*$/.test(prompt[0])) prompt = null;
+    // v1.21.11: Cisco-style prompts are usually typed against the command
+    // (switch#copy ...), Windows hosts reached over SSH use C:\path>, and Huawei
+    // or H3C system views use [name] or [~name-view].
+    prompt ||= /^\s*[A-Za-z][A-Za-z0-9_.:@/~()-]{1,62}[#>](?=[A-Za-z])/.exec(text)
+      || /^\s*(?:PS )?[A-Za-z]:\\[^<>:"|?*\r\n]{0,200}>(?=\s|$|\S)/.exec(text)
+      // v1.21.12: zsh/macOS (user@host ~ %) and Huawei/H3C user view typed
+      // against a known command (<HUAWEI>display version).
+      || /^\s*[A-Za-z0-9_.-]{1,64}@[A-Za-z0-9_.-]{1,64} (?:~|\/)[^\s]{0,200} [%#$](?=\s|$)/.exec(text)
+      || /^\s*<[A-Za-z][\w.-]{0,63}>(?=(?:display|dis|system-view|sys|save|quit|return|undo|ping|tracert|reset|reboot|interface|screen-length|stelnet|telnet|ssh|sftp|ftp|tftp|copy|delete|dir|more|cd|pwd|super|terminal|debugging|clock|startup|compare|commit|rollback|local-user|user-interface|lldp|patch|upgrade|license|cls|language-mode)(?:\s|$))/.exec(text)
+      || ((match => match && !/^\[[~*]?(?:ok|done|info|warn|warning|error|err|debug|fail|failed|pass|passed|running|stopped|exit|killed|notice|crit|critical|fatal|y\/n|yes|no|\d+)\]/i.test(match[0].trim()) ? match : null)(/^\s*\[[~*]?[A-Za-z][\w.-]{0,63}(?:-[\w./:-]{1,60})?\](?=[a-z]|\s*$)/.exec(text)));
     const offset = prompt ? prompt[0].length : 0, tokens = [];
     const pattern = /"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s{}\[\];=]+/g;
     let match;
+    pattern.lastIndex = offset; // a prompt typed against its command (switch#copy) ends mid-word
     while ((match = pattern.exec(text))) {
       if (match.index < offset) continue;
       const raw = match[0], quoted = /^["']/.test(raw), value = quoted ? raw.slice(1, -1) : raw.replace(/[,;:]$/, '');
@@ -189,7 +208,7 @@
     const verb = !!first && !first.quoted && COMMANDS.has(first.word) && (offset > 0 || exactLower && commandShape && !proseTail) && (first.word !== 'no' || offset > 0 || FIELDS.has(second?.word));
     const field = !!first && !first.quoted && exactLower && rootDirective && !proseTail && (argument || !second && first.word === 'shutdown' || /^(?:description|comment|comments|remark|remarks)$/.test(first.word));
     const hasAddress = /(?:^|\s)(?:\d{1,3}\.){3}\d{1,3}(?=\s|up\b|down\b|$)/i.test(text.slice(offset));
-    const hasState = /(?:\b|\d)(?:up|down|connected|notconnect|disabled|active|inactive)(?=\s|$)/i.test(text.slice(offset));
+    const hasState = /(?:\b|\d)(?:up|down|connected|notconnect|disabled|err-disabled|active|inactive|FWD|BLK|BKN|LRN|LIS|forwarding|blocking|discarding|learning)(?=\s|$)/i.test(text.slice(offset));
     const namedTable = tokens.length >= 4 && /^(?:static|dhcp|pppoe|manual|auto)$/i.test(tokens[1]?.word) && hasAddress && hasState;
     const interfaceTable = !!first && hasState && (interfaceLabel(first.value, true) || namedTable);
     const isConfig = !!(verb || field && !/^(?:is|are|was|were)$/i.test(second?.word || '') || exactLower && FIELDS.has(first?.word) && /^\s*[a-z][a-z0-9-]*(?:\s+[a-z0-9_.-]+)?\s*\{\s*$/.test(text));
@@ -217,6 +236,7 @@
     if (!before.trim() && !after.trim()) return true;
     if (syntax?.interfaceTable && /\s$/.test(before) && /^(?:\s|$)/.test(after)) return true;
     if (/\b(?:state|status|link|protocol|operstate|carrier)\s*(?::|=|is)\s*(?:administratively\s+)?$/i.test(before)) return true;
+    if (/\bchanged state to\s+(?:administratively\s+)?$/i.test(before)) return true;
     if (syntax?.tokens[0] && interfaceLabel(syntax.tokens[0].value, true) && /\bis\s+(?:administratively\s+)?$/i.test(before)) return true;
     if (/(?:^|[\s])(?:administratively\s+)$/.test(before)) return true;
     if ((syntax?.interfaceTable || /^(?:up|down)\/(?:up|down)$/i.test(text.trim())) && (/\b(?:up|down)\/$/i.test(before) || /^\/(?:up|down)\b/i.test(after))) return true;
@@ -238,8 +258,11 @@
     return !/[A-Za-z0-9_./-]/.test(text[start - 1] || '') && !/[A-Za-z0-9_./-]/.test(text[end] || '');
   }
 
+  // v1.21.12: file-share and transfer schemes count as links too.
+  const URL_SCHEMES = 'https?|ftps?|sftp|ssh|scp|smb|cifs|nfs|tftp|rsync|git|ldaps?|telnet|rdp|vnc|wss?|file';
   function urlCandidate(value) {
-    const authority = /^(?:https?|ftps?|sftp|ssh):\/\/([^/?#]+)(?:[/?#]|$)/i.exec(value);
+    if (/^file:\/\/\/[^\s]/i.test(value)) return value.length <= LIMITS.text;
+    const authority = new RegExp('^(?:' + URL_SCHEMES + '):\\/\\/([^/?#]+)(?:[/?#]|$)', 'i').exec(value);
     if (!authority || value.length > LIMITS.text) return false;
     const endpoint = authority[1].replace(/^[^@]*@/, '');
     const parts = /^(?:\[([^\]]+)\]|([^:]+))(?::([0-9]{1,5}))?$/.exec(endpoint);
@@ -249,13 +272,74 @@
     if (/^[0-9.]+$/.test(host)) return ipv4(host);
     return host.length <= 253 && host.split('.').every(label => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(label));
   }
-  function analyze(input, language, selectedRules, ruleset) {
+  function hostName(host) {
+    if (/^[0-9.]+$/.test(host)) return ipv4(host);
+    return host.length <= 253 && host.split('.').every(label => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(label));
+  }
+  // Network paths (v1.21.12): Windows UNC shares (\\server\share\dir) and
+  // NFS or scp locations (192.0.2.10:/exports, user@host.example.com:/srv).
+  // A bare host:/path needs an IPv4 address or a dotted host name.
+  const FILE_SUFFIX = /\.(?:txt|log|cfg|conf|config|json|ya?ml|xml|ini|bin|tar|gz|tgz|zip|7z|csv|md|py|js|sh|ps1|bat|exe|dll|iso|img|sql|bak|old|tmp|pdf|html?|png|jpe?g|gif|pcapng|pcap|cap|crt|pem|key|der|msi|deb|rpm)$/i;
+  function networkPaths(text, add) {
+    const unc = /\\\\([A-Za-z0-9][A-Za-z0-9._-]{0,252})(?:@SSL)?(?:@\d{1,5})?((?:\\[^\s\\/:*?"<>|]+)+\\?)/g;
+    let match;
+    while ((match = unc.exec(text))) {
+      if (/[\w\\/]/.test(text[match.index - 1] || '') || !hostName(match[1].replace(/\.$/, ''))) continue;
+      const value = match[0].replace(/[.,;:!?)\]]+$/, '');
+      add(match.index, match.index + value.length, 'url');
+    }
+    const remote = /(?:[A-Za-z0-9._-]{1,64}@)?((?:\d{1,3}\.){3}\d{1,3}|[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*\.[A-Za-z]{2,63}):\/[^\s"'<>]*/g;
+    while ((match = remote.exec(text))) {
+      if (/[\w@.:/\\-]/.test(text[match.index - 1] || '') || !hostName(match[1]) || FILE_SUFFIX.test(match[1])) continue;
+      const value = match[0].replace(/[.,;:!?)\]]+$/, '');
+      add(match.index, match.index + value.length, 'url');
+    }
+  }
+  // The device's own name inside its prompt (v1.21.12): user@host in
+  // user@host:~$, the hostname in switch#, SW1(config)# or <HUAWEI>. Windows
+  // drive prompts (C:\>) have no name.
+  function promptName(text, prompt) {
+    if (!prompt) return null;
+    const body = text.slice(prompt.start, prompt.end);
+    if (/^(?:PS )?[A-Za-z]:\\/.test(body)) return null;
+    let match = /^([\[<(]?)([A-Za-z0-9_.-]{1,64}@[A-Za-z0-9_.-]{1,64})/.exec(body);
+    if (!match) match = /^(\[[~*]?)([A-Za-z][\w.-]{0,63}?)(?=-(?:X?GigabitEthernet|Ethernet|\d+GE|Vlanif|LoopBack|Eth-Trunk|Tunnel|NULL|MEth|vlan|aaa|bgp|ospf|isis|rip|acl|ui|pool|radius|hwtacacs|domain|ip|vpn|route|stp|lldp|user|local|ssh|snmp|ntp|dhcp|qos|traffic|policy|nqa|bfd|mpls|l2vpn|ike|ipsec)|\])/.exec(body);
+    if (!match) match = /^((?:[A-Z]{2,4}\/\d+(?:\/[A-Za-z0-9]+)*:)?<?)([A-Za-z][A-Za-z0-9_.-]{0,63})(?=[\s(:#>$%\]]|$)/.exec(body);
+    if (!match || /^[0-9.]+$/.test(match[2])) return null;
+    const name = match[2].replace(/[.-]+$/, ''), start = prompt.start + match[1].length;
+    return name ? { start, end: start + name.length } : null;
+  }
+  function promptMode(options) { return options?.prompt === 'always' || options?.prompt === 'off' ? options.prompt : 'auto'; }
+  // Rule-set hits around the prompt name (the name's own color wins).
+  function aroundName(hits, name) {
+    const out = [];
+    for (const hit of hits) {
+      if (hit.end <= name.start || hit.start >= name.end) { out.push(hit); continue; }
+      if (hit.start < name.start) out.push({ ...hit, end: name.start });
+      if (hit.end > name.end) out.push({ ...hit, start: name.end });
+    }
+    return out;
+  }
+  function analyze(input, language, selectedRules, ruleset, options) {
     if (global.NTKTerminalShellSyntax?.supported(language)) {const shell=global.NTKTerminalShellSyntax;if(shell.isPrompt(input,language))return shell.analyze(input,language);return shell.analyzeOutput(input,{address:addressKind,mac});}
     // A MobaXterm-style rule set (terminal-syntax-rules.js) replaces the
     // device-aware recognizers when one is selected.
+    const mode = promptMode(options);
     if (ruleset && typeof ruleset.match === 'function') {
       const value = typeof input === 'string' ? input : '';
-      return value && value.length <= LIMITS.text ? ruleset.match(value).slice(0, LIMITS.matches) : [];
+      if (!value || value.length > LIMITS.text) return [];
+      // Device prompts (v1.21.15) work with rule sets as with Universal: the
+      // prompt takes the Device prompt color unless switched off for this set.
+      const hits = ruleset.match(value), promptRule = options?.promptRule !== false;
+      const prompt = promptRule || mode !== 'auto' ? syntaxContext(value).prompt : null, name = mode === 'auto' ? null : promptName(value, prompt);
+      if (!prompt || !promptRule && !name) return hits.slice(0, LIMITS.matches);
+      const own = [];
+      if (name) own.push({ ...name, kind: mode === 'always' ? 'prompt-name' : 'prompt-plain' });
+      if (promptRule && mode !== 'off') {
+        if (name) { if (name.start > prompt.start) own.push({ start: prompt.start, end: name.start, kind: 'prompt' }); if (prompt.end > name.end) own.push({ start: name.end, end: prompt.end, kind: 'prompt' }); }
+        else own.push({ start: prompt.start, end: prompt.end, kind: 'prompt' });
+      }
+      return [...aroundName(hits, promptRule ? prompt : name), ...own].sort((a, b) => a.start - b.start || a.end - b.end).slice(0, LIMITS.matches);
     }
     const text = typeof input === 'string' ? input : '';
     if (!text || text.length > LIMITS.text) return [];
@@ -270,14 +354,23 @@
     // Disabled rules still reserve their spans; toggling a URL off must not
     // expose a lower-priority 'down' or 'port1' match inside that URL.
     for (const comment of syntax.comments) add(comment.start, comment.end, 'comment');
-    const urls = /\b(?:https?|ftps?|sftp|ssh):\/\/[^\s<>"']+/gi;
+    const urls = new RegExp('\\b(?:' + URL_SCHEMES + '):\\/\\/[^\\s<>"\']+', 'gi');
     let url;
     while ((url = urls.exec(text))) {
       let value = url[0].replace(/[.,;:!?]+$/, '');
       while (/[)\]}]$/.test(value) && (value.match(/[)\]}]/g) || []).length > (value.match(/[(\[{]/g) || []).length) value = value.slice(0, -1);
       if (!/[A-Za-z0-9_.:+/-]/.test(text[url.index - 1] || '') && urlCandidate(value)) add(url.index, url.index + value.length, 'url');
     }
-    if (syntax.prompt) add(syntax.prompt.start, syntax.prompt.end, 'prompt');
+    const name = mode === 'auto' ? null : promptName(text, syntax.prompt);
+    if (name) {
+      // The name takes the chosen color (or none); the rest of the prompt keeps
+      // the Device prompt rule when the name is colored and no color otherwise.
+      add(name.start, name.end, mode === 'always' ? 'prompt-name' : 'prompt-plain');
+      const rest = mode === 'always' ? 'prompt' : 'prompt-reserved';
+      add(syntax.prompt.start, name.start, rest); add(name.end, syntax.prompt.end, rest);
+    } else if (syntax.prompt) add(syntax.prompt.start, syntax.prompt.end, mode === 'off' ? 'prompt-reserved' : 'prompt');
+    networkPaths(text, add);
+    universalHighlights(text, syntax, add);
     // Take complete candidates instead of accepting a valid suffix from an
     // invalid IP, version, identifier or longer hardware address.
     const candidates = /[A-Za-z0-9_.:%/~\-]+/g;
@@ -314,12 +407,12 @@
       const word = match[0].toLowerCase();
       add(start, end, /^(?:warn|warning)$/.test(word) ? 'warning' : /^(?:success|successful|passed)$/.test(word) ? 'success' : 'error');
     }
-    const states = /\b(?:administratively down|lower_up|no-carrier|established|listen(?:ing)?|connected|disconnected|unreachable|incomplete|filtered|pending|degraded|dormant|notconnect|active|inactive|up|down|open|closed|ok)\b/gi;
+    const states = /\b(?:administratively down|err-disabled|lower_up|no-carrier|established|listen(?:ing)?|connected|disconnected|unreachable|incomplete|filtered|pending|degraded|dormant|notconnect|forwarding|blocking|discarding|learning|FWD|BLK|BKN|LRN|LIS|active|inactive|up|down|open|closed|ok)\b/gi;
     while ((match = states.exec(text))) {
       const start = match.index, end = start + match[0].length;
       if (syntax.quoted(start, end) || !stateBoundary(text, start, end) || negatedOrZero(text, start, end, syntax.interfaceTable) || !statusContext(text, start, end, syntax)) continue;
       const word = match[0].toLowerCase();
-      add(start, end, /^(?:up|lower_up|established|listen|listening|connected|active|open|ok)$/.test(word) ? 'success' : /^(?:pending|filtered|incomplete|degraded|dormant|inactive)$/.test(word) ? 'warning' : 'error');
+      add(start, end, /^(?:up|lower_up|established|listen|listening|connected|active|open|ok|forwarding|fwd)$/.test(word) ? 'success' : /^(?:pending|filtered|incomplete|degraded|dormant|inactive|blocking|discarding|learning|blk|bkn|lrn|lis)$/.test(word) ? 'warning' : 'error');
     }
     // Fixed-width interface tables can omit the gap between an address and
     // its state. Recognize the compact state only inside an identified table.
@@ -347,9 +440,57 @@
     // Structured status labels may share a line in remote login banners.
     const fields = /(?:^|\s{2,})(Last login|Login time|IPv[46] Address|MAC Address|Link state|Admin state|State|Status|Interface|MTU|Speed|Duplex):(?=\s|$)/gi;
     while ((match = fields.exec(text))) { const start=match.index+match[0].indexOf(match[1]); add(start,start+match[1].length,'field'); }
-    return found.filter(hit => enabledRules[hit.kind]).sort((a, b) => a.start - b.start || a.end - b.end);
+    return found.filter(hit => enabledRules[hit.kind] || hit.kind === 'prompt-name' || hit.kind === 'prompt-plain').sort((a, b) => a.start - b.start || a.end - b.end);
   }
 
+  // Universal recognizers (v1.21.11): log severities, CLI error and success
+  // messages, ping results and routing/service states that look the same on
+  // any system. Each needs a recognizable shape, never a bare word in prose.
+  const SEVERITY = { fatal: 'error', emerg: 'error', emergency: 'error', alert: 'error', crit: 'error', critical: 'error', err: 'error', error: 'error',
+    warn: 'warning', warning: 'warning', notice: 'info', info: 'info', information: 'info', informational: 'info', debug: 'comment', trace: 'comment' };
+  function universalHighlights(text, syntax, add) {
+    let match;
+    // Cisco/Arista/NX-OS system messages: %FACILITY-SEVERITY-MNEMONIC (0-3 error, 4 warning, 5-6 info, 7 debug).
+    const tag = /(^|[\s:*])(%[A-Z][A-Z0-9_]*(?:-[A-Z0-9_]+)*-([0-7])-[A-Z][A-Z0-9_]*)(?=:|\s|$)/g;
+    while ((match = tag.exec(text))) { const start = match.index + match[1].length, level = Number(match[3]); add(start, start + match[2].length, level <= 3 ? 'error' : level === 4 ? 'warning' : level <= 6 ? 'info' : 'comment'); }
+    // key=value levels in structured logs: level=error, severity: warning, "level":"info".
+    const keyed = /\b(?:level|lvl|severity|loglevel|log_level)"?\s*[=:]\s*"?(fatal|emerg|alert|crit|critical|err|error|warn|warning|notice|info|information|debug|trace)\b/gi;
+    while ((match = keyed.exec(text))) { const start = match.index + match[0].length - match[1].length; add(start, start + match[1].length, SEVERITY[match[1].toLowerCase()]); }
+    // Upper-case level after a timestamp (and up to three host/process fields), or bracketed.
+    const stamped = /^\s*\*?(?:\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}(?:[.,]\d+)?(?:Z|[+-]\d{2}:?\d{2})?|[A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}(?:\.\d+)?)\s+(?:\S+\s+){0,3}?\[?(FATAL|EMERG|ALERT|CRITICAL|CRIT|ERROR|ERR|WARNING|WARN|NOTICE|INFO|DEBUG|TRACE)\]?(?=[\s:]|$)/.exec(text);
+    if (stamped) { const end = stamped.index + stamped[0].length - (stamped[0].endsWith(']') ? 1 : 0), start = end - stamped[1].length; add(start, end, SEVERITY[stamped[1].toLowerCase()]); }
+    const bracketed = /(^|\s)[\[<(](FATAL|EMERG|ALERT|CRITICAL|CRIT|ERROR|ERR|WARNING|WARN|NOTICE|INFO|DEBUG|TRACE)[\]>)](?=[\s:]|$)/g;
+    while ((match = bracketed.exec(text))) { const start = match.index + match[1].length + 1; add(start, start + match[2].length, SEVERITY[match[2].toLowerCase()]); }
+    const leading = /^\s*(NOTICE|INFO|DEBUG|TRACE)(?=:\s)/.exec(text);
+    if (leading) { const start = leading[0].length - leading[1].length; add(start, start + leading[1].length, SEVERITY[leading[1].toLowerCase()]); }
+    // CLI and shell errors that every user meets.
+    const cli = /^\s*%\s*(Invalid input detected|Incomplete command|Ambiguous command|Unknown command|Unrecognized command|Invalid command|Bad (?:mask|IP address|command)|Authorization failed|Command authorization failed|Access denied|Login invalid|Connection refused by remote host|Unknown host|Unrecognized host or address|Error[^.:]{0,60})/i.exec(text);
+    if (cli) { const start = cli[0].length - cli[1].length; add(start, start + cli[1].length, 'error'); }
+    const shell = /(?:^|:\s)(command not found|no such file or directory|operation not permitted|cannot access|not a directory|is a directory|syntax error[^,:]{0,40}|unknown command\.?|invalid input|not authorized|host key verification failed|too many authentication failures|segmentation fault|cannot allocate memory|no space left on device|read-only file system)(?=[\s,.:;]|$)/gi;
+    while ((match = shell.exec(text))) { const start = match.index + match[0].length - match[1].length; if (!syntax.quoted(start, start + match[1].length)) add(start, start + match[1].length, 'error'); }
+    const windows = /^'[^']{1,100}' is not recognized as an internal or external command/.exec(text);
+    if (windows) add(windows[0].indexOf(' is not') + 1, windows[0].length, 'error');
+    const ok = /^\s*(\[OK\](?=\s*$)|commit complete|commit succeeded|configuration committed(?: successfully)?|configuration (?:saved|check succeeds)|copy complete(?:d)?(?:,|\.|$)|saved successfully|build successful)/i.exec(text);
+    if (ok) { const start = ok[0].length - ok[1].length; add(start, start + ok[1].replace(/[,.]$/, '').length, 'success'); }
+    const building = /^\s*(Building configuration\.\.\.|Destination filename \[)/.exec(text);
+    if (building) { const start = building[0].length - building[1].length; add(start, start + building[1].length - (building[1].endsWith('[') ? 2 : 0), 'info'); }
+    // Ping results: 0% loss is good, 100% is down, anything between is a warning.
+    const loss = /\b(\d{1,3}(?:\.\d+)?)% packet loss\b|\((\d{1,3})% loss\)/gi;
+    while ((match = loss.exec(text))) { const value = Number(match[1] ?? match[2]); add(match.index, match.index + match[0].length, value === 0 ? 'success' : value >= 100 ? 'error' : 'warning'); }
+    const rate = /\bSuccess rate is (\d{1,3}) percent\b/.exec(text);
+    if (rate) { const value = Number(rate[1]); add(rate.index, rate.index + rate[0].length, value === 100 ? 'success' : value === 0 ? 'error' : 'warning'); }
+    // Routing neighbor tables start with the neighbor address.
+    const first = syntax.tokens[0];
+    if (first && addressKind(first.value) && syntax.tokens.length >= 4) {
+      const bgp = /\s(Idle(?: \((?:Admin|PfxCt|NoNeigh)\))?|Active|Connect|OpenSent|OpenConfirm|Established|Establ)\s*$/.exec(text);
+      if (bgp) { const start = bgp.index + bgp[0].indexOf(bgp[1]); add(start, start + bgp[1].length, /^Establ/.test(bgp[1]) ? 'success' : 'warning'); }
+      const ospf = /\s((?:FULL|2WAY|INIT|EXSTART|EXCHANGE|LOADING|ATTEMPT|DOWN)\/(?:DR|BDR|DROTHER|\s*-)|Full|2Way|Init|ExStart|Exchange|Loading|Attempt)(?=\s)/.exec(text);
+      if (ospf) { const start = ospf.index + 1, state = ospf[1].toUpperCase(); add(start, start + ospf[1].trimEnd().length, /^(?:FULL|2WAY)/.test(state) ? 'success' : /^DOWN/.test(state) ? 'error' : 'warning'); }
+    }
+    // systemd: Active: active (running) / failed / inactive (dead).
+    const unit = /^\s*Active:\s+(active \((?:running|exited|listening|waiting)\)|activating(?: \([^)]*\))?|deactivating(?: \([^)]*\))?|inactive \(dead\)|failed)/.exec(text);
+    if (unit) { const start = unit[0].length - unit[1].length, state = unit[1]; add(start, start + state.length, /^active/.test(state) ? 'success' : /^failed/.test(state) ? 'error' : 'warning'); }
+  }
   function syntaxHighlights(text, syntax, found, add) {
     // Fill around higher-priority addresses, interfaces and operational
     // states rather than replacing their categories inside quoted values.
@@ -371,7 +512,7 @@
       const token = tokens[i], previous = tokens[i - 1], next = tokens[i + 1], word = token.word;
       if (syntax.comments.some(comment => token.start >= comment.start)) continue;
       const parameter = syntax.isConfig && i > 0;
-      if (parameter && previous && namedInterfaceFields.test(previous.word) && !FIELDS.has(word) && !PROTOCOLS.has(word)) add(token.start, token.end, 'interface');
+      if (parameter && previous && namedInterfaceFields.test(previous.word) && !FIELDS.has(word) && !PROTOCOLS.has(word) && !VALUES.has(word)) add(token.start, token.end, 'interface');
       const pathField = /^(?:vlan|access|trunk|native|tagged|untagged|aggregate)$/.test(word) && !/^(?:mode|type)$/.test(previous?.word || '') && next && (FIELDS.has(next.word) || /^\d/.test(next.value));
       if (syntax.isConfig && !token.quoted && (i === 0 && !syntax.verb || pathField || FIELDS.has(word) && !VALUES.has(word) && !PROTOCOLS.has(word) || i === 1 && /^(?:set|unset|append|select|unselect|config|configure|conf)$/.test(first.word))) add(token.start, token.start + token.value.length, 'field');
       if (!token.quoted && (syntax.isConfig || syntax.interfaceTable) && PROTOCOLS.has(word)) add(token.start, token.start + token.value.length, 'protocol');
@@ -392,10 +533,14 @@
     let requestedShellColors = cleanShellColors(opts.shellColors);
     let ruleset = opts.ruleset && typeof opts.ruleset.match === 'function' ? opts.ruleset : null, syntaxColors = opts.syntaxColors || {};
     const syntaxPalette = () => Object.fromEntries(['red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'underline'].filter(color => typeof syntaxColors[color] === 'string').map(color => ['syn-' + color, syntaxColors[color]]));
-    const appearanceColors = (mode, custom) => ({ ...palette(mode, custom), ...syntaxPalette(), ...(shell() ? global.NTKTerminalShellSyntax.palette(term.options?.theme, mode, requestedShellColors) : {}) });
+    // The prompt name (v1.21.12) uses the Device prompt color, or the normal
+    // text color when it is set to No color.
+    const promptColors = (base, mode) => ({ 'prompt-name': base.prompt, 'prompt-plain': term.options?.theme?.foreground || (themeName(mode) === 'light' ? '#1f2937' : '#e5e7eb') });
+    const appearanceColors = (mode, custom) => { const base = palette(mode, custom); return { ...base, ...promptColors(base, mode), ...syntaxPalette(), ...(shell() ? global.NTKTerminalShellSyntax.palette(term.options?.theme, mode, requestedShellColors) : {}) }; };
     let enabled = opts.enabled !== false, theme = themeName(opts.theme), disposed = false;
     let selectedRules = rules(opts.rules);
     let requestedColors = customColors(opts.colors), colors = appearanceColors(theme, requestedColors), underlines = opts.underlines !== false;
+    let linkUnderlines = opts.linkUnderlines !== false, prompt = promptMode(opts), promptRule = opts.promptRule !== false;
     let timer = null, active = false, suspended = '', limited = false, count = 0;
     let lastState = '', geometry = '', unsupported = false, scrollView = null;
     let records = new Map();
@@ -474,7 +619,9 @@
         element.style.borderLeft = 'none';
         return;
       }
-      element.style.borderBottom = underlines && !shell() ? mark[1] + 'px ' + mark[0] + ' ' + color : 'none';
+      const lined = kind === 'url' ? linkUnderlines : kind === 'prompt-plain' || (kind === 'prompt-name' || kind === 'prompt') && ruleset ? false : underlines;
+      const shape = kind === 'prompt-name' ? MARKS.prompt : mark;
+      element.style.borderBottom = lined && !shell() ? shape[1] + 'px ' + shape[0] + ' ' + color : 'none';
       // Underlines provide the non-color cue. A vertical stroke beside a
       // short status such as "up" looks like terminal text or a cursor.
       element.style.borderLeft = 'none';
@@ -626,7 +773,7 @@
         for (const row of visibleRows) dirty.delete(row.y);
         return visibleRows.length;
       }
-      const matches = analyze(group.text, language, selectedRules, ruleset);
+      const matches = analyze(group.text, language, selectedRules, ruleset, { prompt, promptRule });
       if (matches.length === LIMITS.matches) limited = true;
       // Never decorate invisible SGR 8 cells or disclose their token shape.
       const safe = matches.filter(hit => !group.rows.some(row => {
@@ -645,7 +792,10 @@
           // label. Split its visual span at those boundaries without changing
           // the recognized token, original cells or any remote attributes.
           for (let start = first; start < last;) {
-            const canColor = index => row.colorable[index - row.start] || shell() && !!requestedShellColors[hit.kind.slice(6)] && row.overrideable[index - row.start];
+            // A chosen prompt-name color (or No color) also replaces colors the
+            // device sent for its prompt, on the normal background only.
+            const replaces = hit.kind === 'prompt-name' || hit.kind === 'prompt-plain';
+            const canColor = index => row.colorable[index - row.start] || replaces && row.overrideable[index - row.start] || shell() && !!requestedShellColors[hit.kind.slice(6)] && row.overrideable[index - row.start];
             const colorable = !!canColor(start);
             let finish = start + 1;
             while (finish < last && !!canColor(finish) === colorable) finish++;
@@ -699,7 +849,7 @@
         if (y < current.first || y > current.last) return [];
         const group = collect(current.buffer, y);
         if (!group) return [];
-        const matches = analyze(group.text, language, selectedRules, ruleset), result = [];
+        const matches = analyze(group.text, language, selectedRules, ruleset, { prompt, promptRule }), result = [];
         for (const hit of matches) {
           let hidden = false;
           const spans = [];
@@ -801,8 +951,10 @@
       ruleset = nextRuleset; syntaxColors = value.syntaxColors || {};
       const nextTheme = themeName(value.theme), nextRequested = customColors(value.colors), nextColors = appearanceColors(nextTheme, nextRequested);
       const nextRules = rules(value.rules);
-      const changed = rulesetChanged || JSON.stringify(selectedRules) !== JSON.stringify(nextRules) || [...new Set([...Object.keys(colors), ...Object.keys(nextColors)])].some(kind => colors[kind] !== nextColors[kind]);
+      const nextPrompt = promptMode(value), nextPromptRule = value.promptRule !== false;
+      const changed = rulesetChanged || nextPrompt !== prompt || nextPromptRule !== promptRule || JSON.stringify(selectedRules) !== JSON.stringify(nextRules) || [...new Set([...Object.keys(colors), ...Object.keys(nextColors)])].some(kind => colors[kind] !== nextColors[kind]);
       selectedRules = nextRules; theme = nextTheme; requestedColors = nextRequested; colors = nextColors; underlines = value.underlines !== false;
+      linkUnderlines = value.linkUnderlines !== false; prompt = nextPrompt; promptRule = nextPromptRule;
       // Foreground options are immutable in xterm's public API. Underline-only
       // edits restyle existing elements without replacing their decorations.
       if (changed) clear();
@@ -826,7 +978,7 @@
         else refresh();
       },
       setTheme(value) {
-        setAppearance({ theme: value, colors: requestedColors, underlines, rules: selectedRules, ruleset, syntaxColors });
+        setAppearance({ theme: value, colors: requestedColors, underlines, linkUnderlines, prompt, promptRule, rules: selectedRules, ruleset, syntaxColors });
       },
       setAppearance,
       refresh,

@@ -20,7 +20,8 @@ func TestTerminalSyntaxKeepsOnlySafeCustomRuleSets(t *testing.T) {
 	state := map[string]any{"terminalSyntax": map[string]any{"active": "custom-net", "custom": custom, "secret": "dropped"}}
 	sanitizeTerminalSettings(state)
 	clean := state["terminalSyntax"].(map[string]any)
-	if len(clean) != 2 || clean["active"] != "custom-net" {
+	// active, custom and (v1.21.11) per-profile colors; "secret" is dropped.
+	if len(clean) != 4 || clean["active"] != "custom-net" || clean["secret"] != nil {
 		t.Fatalf("unexpected keys or active rule set: %#v", clean)
 	}
 	sets := clean["custom"].([]any)
@@ -28,7 +29,7 @@ func TestTerminalSyntaxKeepsOnlySafeCustomRuleSets(t *testing.T) {
 		t.Fatalf("custom rule sets were not capped: %d", len(sets))
 	}
 	first := sets[0].(map[string]any)
-	if first["id"] != "custom-net" || first["name"] != "Network keywords" || first["regex"] != true || first["caseSensitive"] != true || len(first) != 5 {
+	if first["id"] != "custom-net" || first["name"] != "Network keywords" || first["regex"] != true || first["caseSensitive"] != true || len(first) != 6 {
 		t.Fatalf("first rule set not sanitized: %#v", first)
 	}
 	rules := first["rules"].(map[string]any)
@@ -49,5 +50,71 @@ func TestTerminalSyntaxKeepsOnlySafeCustomRuleSets(t *testing.T) {
 		if got := state["terminalSyntax"].(map[string]any)["active"]; got != want {
 			t.Fatalf("active %q became %q, want %q", active, got, want)
 		}
+	}
+}
+
+func TestTerminalSyntaxKeepsPerProfileColorsForExistingProfiles(t *testing.T) {
+	clean := safeTerminalSyntax(map[string]any{
+		"active": "network",
+		"custom": []any{map[string]any{"id": "custom-lab", "name": "Lab", "rules": map[string]any{"red": "x"}}},
+		"colors": map[string]any{
+			"network":     map[string]any{"red": "#AA0000", "green": "url(secret-canary)", "unknown": "#ffffff"},
+			"custom-lab":  map[string]any{"cyan": "#00aaff"},
+			"custom-gone": map[string]any{"red": "#ff0000"},
+			"smart":       map[string]any{"red": "#ff0000"},
+			"standard":    "secret-canary",
+		},
+	})
+	colors := clean["colors"].(map[string]any)
+	if len(colors) != 2 || colors["network"].(map[string]any)["red"] != "#aa0000" || len(colors["network"].(map[string]any)) != 1 || colors["custom-lab"].(map[string]any)["cyan"] != "#00aaff" {
+		t.Fatalf("unexpected profile colors: %#v", colors)
+	}
+	if empty := safeTerminalSyntax(nil)["colors"].(map[string]any); len(empty) != 0 {
+		t.Fatalf("no colors by default: %#v", empty)
+	}
+}
+
+// v1.21.14: colors switched off per rule set survive a restart; unknown sets,
+// unknown colors and other value types are dropped.
+func TestTerminalSyntaxSwitchedOffColorsPersist(t *testing.T) {
+	clean := safeTerminalSyntax(map[string]any{
+		"active": "standard",
+		"off": map[string]any{
+			"standard": []any{"red", "secret-canary", "underline", "red"},
+			"network":  "red",
+			"missing":  []any{"green"},
+			"perl":     []any{},
+		},
+	})
+	off := clean["off"].(map[string]any)
+	if got := off["standard"].([]any); len(got) != 2 || got[0] != "red" || got[1] != "underline" {
+		t.Fatalf("switched-off colors were not kept in order without duplicates: %#v", got)
+	}
+	if len(off) != 1 {
+		t.Fatalf("invalid entries survived: %#v", off)
+	}
+	if empty := safeTerminalSyntax(nil)["off"].(map[string]any); len(empty) != 0 {
+		t.Fatalf("no switches expected by default: %#v", empty)
+	}
+}
+
+// v1.21.15: what each color marks (labels) and the device prompt switch are
+// kept for your own rule sets; labels are trimmed to 40 characters.
+func TestTerminalSyntaxLabelsAndPromptSwitchPersist(t *testing.T) {
+	clean := safeTerminalSyntax(map[string]any{
+		"custom": []any{map[string]any{"id": "custom-lab", "name": "Lab", "rules": map[string]any{"red": "boom"},
+			"labels": map[string]any{"red": "  Link failures  ", "green": strings.Repeat("x", 60), "blinking": "nope", "blue": 7}}},
+		"off": map[string]any{"custom-lab": []any{"prompt", "red"}, "standard": []any{"prompt"}},
+	})
+	labels := clean["custom"].([]any)[0].(map[string]any)["labels"].(map[string]any)
+	if labels["red"] != "Link failures" || len([]rune(labels["green"].(string))) != 40 || labels["blinking"] != nil || labels["blue"] != nil {
+		t.Fatalf("labels were not sanitized: %#v", labels)
+	}
+	off := clean["off"].(map[string]any)
+	if got := off["custom-lab"].([]any); len(got) != 2 || got[0] != "red" || got[1] != "prompt" {
+		t.Fatalf("prompt switch was dropped: %#v", got)
+	}
+	if got := off["standard"].([]any); len(got) != 1 || got[0] != "prompt" {
+		t.Fatalf("built-in prompt switch was dropped: %#v", got)
 	}
 }
