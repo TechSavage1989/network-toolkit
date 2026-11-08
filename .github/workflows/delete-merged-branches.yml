@@ -1,0 +1,75 @@
+name: Delete merged branches
+
+# Repository standard: delete each branch once it is merged. AI coding
+# sessions cannot delete branches through their GitHub access, so this
+# workflow does it with the repository's own token after every push to main,
+# and on demand (with an optional dry run).
+#
+# A branch is deleted only when
+#   - its pull request was merged and the branch still points at the commit
+#     that was merged (what GitHub's "Automatically delete head branches" does), or
+#   - main already contains every commit on it and its last commit is more
+#     than a day old (nothing is lost, and new work branches are left alone).
+# The default branch, protected branches and branches with an open pull
+# request are never touched. Branches with commits that are not on main are
+# kept and listed in the run summary for review.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Only list the branches that would be deleted'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: delete-merged-branches
+  cancel-in-progress: false
+
+jobs:
+  delete:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Delete merged branches
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          DRY_RUN: ${{ inputs.dry_run == true && 'true' || 'false' }}
+        run: |
+          set -euo pipefail
+          default=$(gh api "repos/$REPO" --jq .default_branch)
+          gh api --paginate "repos/$REPO/pulls?state=open&per_page=100" --jq '.[].head.ref' | sort -u > open.txt
+          gh api --paginate "repos/$REPO/pulls?state=closed&per_page=100" \
+            --jq '.[] | select(.merged_at != null and .head.repo.full_name == $ENV.REPO) | "\(.head.ref)\t\(.head.sha)"' > merged.tsv
+          gh api --paginate "repos/$REPO/branches?per_page=100" \
+            --jq '.[] | select(.protected | not) | "\(.name)\t\(.commit.sha)"' > branches.tsv
+          cutoff=$(( $(date +%s) - 86400 )); deleted=0; : > kept.txt
+          while IFS=$'\t' read -r name sha; do
+            [ "$name" = "$default" ] && continue
+            if grep -qxF -- "$name" open.txt; then echo "$name (open pull request)" >> kept.txt; continue; fi
+            if grep -qxF -- "$name"$'\t'"$sha" merged.tsv; then
+              reason='pull request merged'
+            else
+              ahead=$(gh api "repos/$REPO/compare/$default...$sha" --jq .ahead_by 2>/dev/null || echo unknown)
+              when=$(gh api "repos/$REPO/commits/$sha" --jq .commit.committer.date 2>/dev/null || echo '')
+              if [ "$ahead" = "0" ] && [ -n "$when" ] && [ "$(date -d "$when" +%s)" -lt "$cutoff" ]; then
+                reason="already in $default"
+              else
+                echo "$name ($ahead commits not on $default)" >> kept.txt; continue
+              fi
+            fi
+            if [ "$DRY_RUN" = "true" ]; then echo "would delete: $name ($reason)"; deleted=$((deleted+1)); continue; fi
+            if gh api -X DELETE "repos/$REPO/git/refs/heads/$name" >/dev/null; then echo "deleted: $name ($reason)"; deleted=$((deleted+1)); else echo "::warning::could not delete $name"; fi
+          done < branches.tsv
+          {
+            echo "### Merged branches"
+            echo "$( [ "$DRY_RUN" = "true" ] && echo 'Would delete' || echo 'Deleted' ): $deleted. Kept: $(wc -l < kept.txt)."
+            if [ -s kept.txt ]; then echo; echo "Kept (review these; they have work that is not on $default or an open pull request):"; sed 's/^/- /' kept.txt; fi
+          } >> "$GITHUB_STEP_SUMMARY"
+          cat kept.txt
