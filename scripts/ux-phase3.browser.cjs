@@ -101,10 +101,10 @@ const check=name=>{report.checks.push(name);console.log('PASS '+name)};
  if(await resetPanes.count()&&await resetPanes.isVisible()){await resetPanes.click();check('File Transfer exposes a visible pane reset without a double-click');}
  else check('File Transfer reset remains available when a file browser is open');
  await p.evaluate(()=>navigate('terminal'));await settle(p);
- // The real page contains a visible Help button inside Terminal tools.
- await p.evaluate(()=>{if(typeof setTerminalToolsOpen==='function')setTerminalToolsOpen(true,false);});
- const help=p.locator('#uxTerminalHelpLauncher');
- if(await help.count()){await help.click();await p.locator('[aria-label="Keyboard shortcuts and help"][role="dialog"]').waitFor();await p.keyboard.press('Escape');check('Terminal Tools exposes help without a keyboard shortcut');}
+ // v1.21.18: no Tools menu; the home window reaches help from the app sidebar
+ // (separate terminal windows have #uxTerminalHelpLauncher in their toolbar).
+ const help=p.locator('#uxTerminalHelpLauncher:visible, #uxHelpLauncher:visible').first();
+ if(await help.count()){await help.click();await p.locator('[aria-label="Keyboard shortcuts and help"][role="dialog"]').waitFor();await p.keyboard.press('Escape');check('The Terminal page exposes help without a keyboard shortcut');}
  assert.equal(await p.locator('#terminalSessionSidebar [data-session-action="collapse"]').count(),0,'Terminal sidebar has no separate Sidebar button');
  const selectedTab=p.locator('#terminalSessionSidebar [data-session-tab][aria-selected="true"]');
  const before=await p.evaluate(()=>state.terminalSidebarCollapsed===true);

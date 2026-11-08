@@ -12,7 +12,7 @@ In the Linux edition, **App settings → General → Applications menu** adds Ne
 On the Overview, choose **Customize** to show or hide its sections (summary cards; gateways, DNS and DHCP; public IP; network scan; adapters; recent activity) and move them up or down. **Reset to default** restores the original layout. You can also drag a section: hover it and drag the small handle on its top edge (or focus the handle and press Alt+Shift+Up or Down). Your layout is kept when you restart the app.
 
 ## Password manager and the credential vault
-Open **Password manager** (from a connection's Saved credential field) to store a username together with its password or SSH key. Choosing a saved credential in a connection fills in its username.
+Open **Password manager** (from a connection's Saved credential field, or at the bottom of the Terminal's Saved sidebar) to store a username together with its password or SSH key. Choosing a saved credential in a connection fills in its username.
 
 When you set up the vault, choose one of two protections:
 - **With a master password.** Any password is allowed. A strength gauge in the Windows dialog shows how hard it is to guess. You can also create an offline recovery key and let Windows remember the unlock.

@@ -106,3 +106,7 @@
 /* Move-sidebar (⇄) sits at the foot of every sidebar rail (owner request,
    v1.21.4), so it stays reachable while the sidebar is collapsed. */
 .terminal-sidebar-rail>.sidebar-rail-swap{margin:auto auto 2px;flex:0 0 27px!important}
+/* v1.21.18: connection security tools moved here from the removed Terminal Tools menu. */
+.session-library-tools{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 9px}
+.session-library-tools .btn{display:inline-flex;align-items:center;gap:5px;font-size:11px}
+.session-library-tools .btn svg{width:13px;height:13px}

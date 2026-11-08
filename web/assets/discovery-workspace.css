@@ -225,6 +225,10 @@
 .terminal-commandbar{display:flex;flex:0 0 auto;align-items:center;gap:6px;flex-wrap:wrap;min-width:0;padding:6px 8px;border-bottom:1px solid var(--line);background:var(--panel2)}
 .terminal-command-start,.terminal-quick-tools{display:flex;align-items:center;gap:5px;min-width:0}
 .terminal-quick-tools{margin-left:auto}
+/* v1.21.18: separate terminal windows have no app sidebar, so theme, app settings and help sit at the end of the toolbar. */
+.terminal-app-tools{display:flex;align-items:center;gap:3px;padding-left:6px;margin-left:2px;border-left:1px solid var(--line)}
+.terminal-welcome-more{margin:10px 0 0}
+.terminal-welcome-more .btn{display:inline-flex;align-items:center;gap:6px}
 .terminal-commandbar .btn,.terminal-commandbar .iconbtn{min-height:30px;height:30px;flex-shrink:0}
 .terminal-commandbar .iconbtn{width:30px;padding:6px}
 .terminal-commandbar .iconbtn svg,.terminal-commandbar .btn svg{width:15px;height:15px}
