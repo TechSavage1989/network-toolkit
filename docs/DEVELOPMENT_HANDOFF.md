@@ -1,3 +1,15 @@
+# v1.21.18 Stable candidate (Terminal Tools menu removed) - in review (2026-11-08)
+
+Owner: "i don't think the tools menu is needed if all that is in it it connections basically or other redundent options", then "make the next release stable". The owner checked v1.21.17 on Windows and said "looks good".
+- Removed: the Terminal toolbar's Tools button and menu, including the saved-connection select with Configure/Delete (the Saved sidebar's double-click and right-click menu cover them) and the Sessions/Profiles shortcuts (session tabs and the Saved/Recent tabs cover them).
+- Moved: Password manager and SSH host keys to the Saved/Recent sidebar footer; Pane shortcuts to an ⓘ beside the layout picker; Separate terminal window to the Start a terminal card. Separate terminal windows show theme, window settings and help icons at the bottom of the terminal sidebar rail (above ⇄), since they have no app sidebar. They were first put at the end of the toolbar, but that made the toolbar wrap on CI's 1024 px terminal window (app-chrome109 measured 46 px less terminal height), so they moved to the rail. The scoped modal is now titled "Terminal window settings".
+- `#terminalToolsPanel` still exists as a hidden staging container (terminal-extras.js moves the active-session bar and Settings sections out of it). `setTerminalToolsOpen`, `showTerminalProfiles` and `showTerminalSessions` stay because remote-browser.js and the UX audit script call them.
+- Channel stays stable for this release (owner request). The next beta, if any, switches `docs/RELEASE_CHANNEL.txt` and `updateBuildChannel` back to `beta`.
+- Tests: `scripts/terminal-tools-removed.browser.cjs` (added to checks.yml), updated macro/controls fixtures and the ux-phase3 help step. README terminal screenshot recaptured.
+- Not claimed: physical Windows or Linux checks of this change.
+
+---
+
 # v1.21.17 Stable (all 1.21 betas) - publication verified (2026-11-08)
 
 Published as the stable release https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.21.17 at 2026-11-08T04:52:29Z (not a prerelease); releases/latest is now v1.21.17. Tag v1.21.17 points to ab0f50da978eaec9d171a648c882fee4d487a608 (the merge of PR #132, which came right after the stable PR #133 and contains it). The first publish attempt (release run 42448048350, for the PR #133 merge 4f428b6) built fine but GitHub refused `gh release create` with "HTTP 403: Resource not accessible by integration"; nothing was published. The next push to main started release run 42448282030, which built and published successfully, so the 403 was transient. Assets: Network_Toolkit.exe, Portable and Update ZIPs, Linux x86_64 and aarch64 tarballs and SHA256SUMS; every asset digest matches SHA256SUMS, and the Linux x86_64 binary reports "Network Toolkit 1.21.17 linux amd64".
