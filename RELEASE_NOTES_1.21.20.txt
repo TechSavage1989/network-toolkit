@@ -1,0 +1,17 @@
+Network Toolkit 1.21.20 Beta 1
+
+## What's New
+
+- Large text files scroll more smoothly and no longer rebuild line numbers for every scroll event.
+- Editing large files avoids repeated full-file line scans during common typing and paste operations.
+- Compare larger configuration files, with background processing that keeps the rest of Network Toolkit responsive.
+
+## Additional Details
+
+- Editor gutter updates are coalesced by animation frame, and unchanged visible ranges are reused. Common edits update the line index incrementally without altering source contents, encoding, undo history, or save behavior.
+- Editor window recovery no longer resends an entire multi-megabyte document solely because its scroll position changes. Full document edits and explicit transfer snapshots remain subject to the established recovery, size, and ownership checks.
+- Comparison now accepts up to 16 MiB and 50,000 logical lines per side. A bounded unique-line anchor pass handles large, mostly similar configurations; unsafe work volumes still display a clear limit rather than locking up or inventing differences.
+- Large comparison calculations run in a same-origin background worker. The original files remain editable and intact. Comparing, editing, or closing documents never automatically writes to remote devices.
+- Unchanged: credential vault, Windows/UAC review, host key verification, explicit update consent and SHA-256 verification, portable executable naming, and Windows/Linux support.
+- This is an opt-in beta. Stable v1.21.19 and all earlier releases remain unchanged.
+- Hosted fixtures and CI do not constitute physical Windows or live-device acceptance.
