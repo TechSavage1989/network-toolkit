@@ -199,3 +199,12 @@
 .terminal-highlight-legend-inline .legend-reset{margin-left:auto;border:0;background:transparent;color:inherit;opacity:.75;font:inherit;font-size:11px;text-decoration:underline;cursor:pointer}
 .terminal-highlight-legend-inline .legend-hint{flex-basis:100%;order:2;font-size:10.5px;opacity:.7;font-family:var(--sans,inherit)}
 .terminal-highlight-legend-inline .legend-reset{order:3}
+/* v1.21.19 (owner request): Highlighting is part of Appearance. The Syntax highlighting picker sits right
+   above the preview, and the preview stays in view below the tabs while the settings under it scroll. */
+#terminalAppearanceEditor>.terminal-font-sample{margin:8px 0 0}
+#terminalAppearanceEditor>.terminal-preview-sticky{margin:12px 0 0;padding:0 0 4px;border-top:1px solid var(--line);background:var(--panel)}
+.terminal-preview-sticky>.terminal-highlight-profile{margin:0;padding:10px 0 0;border-top:0}
+.terminal-preview-sticky>.terminal-preview-card{margin:8px 0 4px;background:var(--panel)}
+#terminalAppearanceEditor>.terminal-highlight-editor{padding:0;border-top:0}
+#terminalAppearanceEditor>.terminal-highlight-editor>.terminal-highlight-legend-inline{margin-top:6px}
+@media (min-height:640px){#terminalAppearanceEditor>.terminal-preview-sticky{position:sticky;top:var(--terminal-settings-tabs-height,38px);z-index:2;box-shadow:0 8px 12px -10px #0006}}

@@ -52,7 +52,7 @@ async function open(mode){
  assert.equal(await page.locator('.terminal-app-tools').count(),0,'the home window uses the app sidebar for theme, settings and help');
  // The active session buttons and the Settings panel still come from the staging container.
  assert(await page.locator('#terminalActiveActions [data-terminal-action="disconnect"]').isVisible());
- await page.locator('#terminalSessionToggle').click();await page.locator('#terminalSessionPanel [data-terminal-settings-tab="highlighting"]').click();assert(await page.locator('#terminalSyntaxSelect').isVisible(),'Settings still holds the highlighting profile');
+ await page.locator('#terminalSessionToggle').click();await page.locator('#terminalSessionPanel [data-terminal-settings-tab="appearance"]').click();assert(await page.locator('#terminalSyntaxSelect').isVisible(),'Settings still holds the highlighting profile');
  await page.locator('[data-terminal-extra="close-session"]').click();
  pass('the toolbar has no Tools menu; Command bar, Settings and the active session buttons remain');
  // Pane shortcuts beside the layout picker.
