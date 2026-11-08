@@ -53,7 +53,27 @@ func TestTerminalShellExplicitApprovalAndLateCancellation(t *testing.T) {
 	if calls.Load() != 1 {
 		t.Fatal("explicit Cancel automatically retried")
 	}
-	entered, release, closed := make(chan struct{}), make(chan struct{}), make(chan syscall.Handle, 1)
+	// Windows hands a freed handle value to the next handle the process opens,
+	// and the Go runtime opens thread and timer handles at any moment, so
+	// polling the old value cannot tell "closed" from "closed and reused". The
+	// fake keeps its own duplicate of the event and the check below compares
+	// kernel objects instead of handle values.
+	if localSystemDirectoryError != nil {
+		t.Fatal(localSystemDirectoryError)
+	}
+	compare := syscall.NewLazyDLL(filepath.Join(localSystemDirectory, "kernelbase.dll")).NewProc("CompareObjectHandles")
+	if err := compare.Find(); err != nil {
+		t.Fatalf("CompareObjectHandles (Windows 10 1607 or later) is unavailable: %v", err)
+	}
+	sameObject := func(a, b syscall.Handle) bool {
+		same, _, _ := compare.Call(uintptr(a), uintptr(b))
+		return same != 0
+	}
+	type lateLaunch struct {
+		h, dup syscall.Handle
+		err    error
+	}
+	entered, release, launched := make(chan struct{}), make(chan struct{}), make(chan lateLaunch, 1)
 	terminalShellLaunch = func(id string, parent uint32) (syscall.Handle, error) {
 		if !validLocalHelperID(id) || parent != uint32(os.Getpid()) {
 			t.Error("bad private identity")
@@ -61,7 +81,16 @@ func TestTerminalShellExplicitApprovalAndLateCancellation(t *testing.T) {
 		close(entered)
 		<-release
 		h, e := localEvent()
-		closed <- h
+		l := lateLaunch{h: h, err: e}
+		if e == nil {
+			// Duplicate before production code receives h, while h is certainly open.
+			self, _ := syscall.GetCurrentProcess()
+			l.err = syscall.DuplicateHandle(self, h, self, &l.dup, 0, false, syscall.DUPLICATE_SAME_ACCESS)
+			if l.err == nil && !sameObject(h, l.dup) {
+				l.err = errors.New("CompareObjectHandles did not match the open event with its duplicate")
+			}
+		}
+		launched <- l
 		return h, e
 	}
 	ctx, stop := context.WithCancel(context.Background())
@@ -73,13 +102,19 @@ func TestTerminalShellExplicitApprovalAndLateCancellation(t *testing.T) {
 		t.Fatal(err)
 	}
 	close(release)
-	h := <-closed
-	if h == 0 || h == syscall.InvalidHandle {
-		t.Fatal("synthetic late-launch handle could not be created")
+	l := <-launched
+	if l.dup != 0 {
+		defer syscall.CloseHandle(l.dup)
 	}
-	deadline := time.Now().Add(time.Second)
+	if l.err != nil || l.h == 0 || l.h == syscall.InvalidHandle || l.dup == 0 {
+		t.Fatal("synthetic late-launch handle could not be created", l.err)
+	}
+	// While production code keeps l.h open it still names the event. Once it
+	// closes l.h, the value is invalid or names a different, reused object;
+	// both mean the late-launch handle was closed.
+	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {
-		if _, err := syscall.WaitForSingleObject(h, 0); err != nil {
+		if !sameObject(l.h, l.dup) {
 			return
 		}
 		time.Sleep(time.Millisecond)

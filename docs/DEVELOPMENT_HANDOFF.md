@@ -1,3 +1,13 @@
+# CI intermittent: late-launch handle check (2026-11-08) - no release
+
+`TestTerminalShellExplicitApprovalAndLateCancellation` failed once with `late-launch handle leaked` on the hosted windows-terminal job (Checks run 42413442967, attempt 4, job 128547688715, PR #121); attempts 1–3 and 5 of the same commit passed.
+- Cause, in the test: it decided "closed" by polling the old handle value with `WaitForSingleObject(h, 0)` until it errored. Windows reuses a freed handle value for the next handle the process opens (the Go runtime opens thread and timer handles at any time), so the poll could succeed against a new object for the whole deadline. Production code (`openElevatedTerminalShell`, launcher goroutine closes the late handle on `ctx.Done()`) is unchanged.
+- Fix, test only: the fake launcher duplicates the synthetic event before returning it and confirms `CompareObjectHandles` matches the pair; the test then polls `CompareObjectHandles(h, dup)`, where "not the same object" (closed, or closed and reused) means closed, and closes the duplicate. A handle the production code leaves open still fails the test. Deadline raised from 1 s to 5 s, which only lengthens a genuine failure.
+- Checked locally: `GOOS=windows go test -mod=vendor -c`, and `GOOS=windows go vet` with no new findings (it still reports the five existing `unsafe.Pointer` warnings in credential and packet capture files, unchanged on main).
+- Hosted windows-terminal step "Verify explicit local-shell approval and native helper boundaries" on PR #129 (d0dd3fc): passed 4 of 4. Push run 42430439320 attempts 1 and 2 (jobs 128577929497, 128584565421) and pull_request run 42430461615 attempts 1 and 2 (jobs 128578001402, 128584589344); both whole runs were green. The test finishes in 0.00–0.01 s, so the original's close is seen on the first poll. Later runs on the PR's merge-with-main commit are listed on the PR.
+
+---
+
 # v1.21.15 Beta 16 (Rule set colors named by purpose; Device prompts on every rule set) - publication verified (2026-11-08)
 
 Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.21.15 at 2026-11-08T00:21:59Z; stable latest remains v1.20.16. Merged PR #127; tag v1.21.15 points to merge commit a9ac25f085b7461520abd3071d59c25a0bb6e482. Release workflow run 42429130578 succeeded. Assets: Network_Toolkit.exe, Portable and Update ZIPs, Linux x86_64 and aarch64 tarballs and SHA256SUMS; every asset digest matches SHA256SUMS, and the Linux x86_64 binary reports "Network Toolkit 1.21.15 linux amd64". CI note: windows-terminal (TestNativeTerminalSFTP123InstalledWebView2, the known Explorer drop timing failure; fix proposed in #121) and browser-editor112 (editor-views112 focus wait) failed once and passed on re-run.
