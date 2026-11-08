@@ -1,7 +1,7 @@
-"""Derive safe runtime SVG, PNG and ICO from the preserved Illustrator original.
+"""Derive safe runtime SVG, PNG and ICO from the editable canonical vector icon.
 
 Regeneration needs Inkscape on PATH; ordinary builds use checked-in outputs and
-only Python's standard library. The original is never passed to an SVG renderer.
+only Python's standard library. The editable source is never passed directly to an SVG renderer.
 No DTD/entity resolution, external resource fetching or script execution occurs.
 """
 from pathlib import Path

@@ -1,3 +1,8 @@
+## 1.21.16 Beta 17 - Flat Network Toolkit icon (candidate)
+
+- New flat-color CLI, transfer-arrow, and network topology icon for desktop, app, and packages.
+- Editable SVG and generated PNG/ICO/native Windows resources, preserving user data and updates.
+
 ## 1.21.15 Beta 16 - Rule set colors named by purpose; Device prompts on every rule set (published 2026-11-08)
 
 - Owner request (screenshots of the Standard keywords cards and Universal's Device prompts card): "for the rule sets, label them based on their function, like errors and failures, not on the color, since the color is customizable. also add the device prompts color selector and configuraiton to all the other rule sets." `terminal-syntax-rules.js`: `DEFAULT_LABELS`, `slotLabel(set, color)` (built-in notes, then the set's `labels`, then the MobaXterm meaning), `labels` kept by `normalize()` (40 characters; Go `safeTerminalSyntax` keeps them for custom sets), `legend()` notes use it, `SWITCHES` adds `prompt` to `terminalSyntax.off`. `terminal-syntax-ui.js`: cards titled by purpose (built-in) or an editable name (`data-syntax-label`, saved as you type) with "<Color> color in .msyn files"; built-in sets list only the colors they use; the Device prompts card (`promptCardHTML(toggle)`, full width, first) with a per-set switch; picker titles use the purpose; Duplicate copies purposes. `terminal-highlight.js`: with a rule set, `analyze(..., {prompt, promptRule})` colors the whole prompt as `prompt` (rule set hits inside it give way) unless switched off; legend chips read the purpose and add "Device prompts". `terminal-appearance.js`: `highlightOptions().promptRule`, the preview passes it.
