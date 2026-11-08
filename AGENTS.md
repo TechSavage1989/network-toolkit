@@ -11,6 +11,7 @@ Read [docs/UX_POLISH_PLAN.md](docs/UX_POLISH_PLAN.md) first. It is the owner's a
 - Terminal settings modeled on MobaXterm are planned in [docs/TERMINAL_SETTINGS_PLAN.md](docs/TERMINAL_SETTINGS_PLAN.md).
 
 ## Owner's non-negotiables
+- Text Editor scalability (owner clarification, 2026-11-08): work effectively with text files of any size while keeping interaction and the rest of the app responsive. Fixed 16/32 MiB file and 30,000-line limits do not meet this requirement. Follow `docs/EDITOR_SCALABILITY_PLAN.md`; do not publish the current bounded-file candidate as completing it.
 - Never lose credentials, vault entries, saved profiles, preferences, macros, unsaved work or active sessions. Migrate settings explicitly.
 - Preserve Windows/UAC authorization, Hosts/IP/adapter review, explicit download and install consent, and checksum verification.
 - Never modify or overwrite previously published tags, releases or binary assets.

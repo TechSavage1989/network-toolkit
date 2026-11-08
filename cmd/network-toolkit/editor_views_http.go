@@ -101,6 +101,10 @@ func (a *application) handleEditorViews(w http.ResponseWriter, r *http.Request) 
 		methodError(w)
 		return
 	}
+	if path == "/buffers/open" {
+		m.openDiskDocument(w, r, caller)
+		return
+	}
 	if path == "/drags" || strings.HasPrefix(path, "/drags/") {
 		m.handleDrag(w, r, caller, path)
 		return
@@ -220,6 +224,10 @@ func (a *application) handleEditorViews(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if len(parts) == 3 && parts[0] == "documents" && editorUID.MatchString(parts[1]) {
+		if parts[2] == "buffer" {
+			m.diskDocument(w, r, caller, parts[1])
+			return
+		}
 		if parts[2] == "file" {
 			m.file(w, r, caller, parts[1])
 			return
@@ -291,7 +299,7 @@ func (m *editorViewRegistry) checkpoint(caller string, batch editorBatch, leases
 			count++
 			ownedCount++
 		} else {
-			if d.owner != caller || d.lease != leases[snapshot.UID] || d.pending != "" || d.busy != 0 || !editorSameBinding(d.snapshot.Binding, snapshot.Binding) {
+			if d.owner != caller || d.lease != leases[snapshot.UID] || d.pending != "" || d.busy != 0 || !editorSameBinding(d.snapshot.Binding, snapshot.Binding) || !d.diskSnapshotMatches(snapshot) {
 				return nil, errEditorLease
 			}
 			total -= d.bytes
@@ -331,6 +339,9 @@ func (m *editorViewRegistry) releaseDocument(caller, uid string, lease uint64) e
 	d := m.documents[uid]
 	if d == nil || d.owner != caller || d.lease != lease || d.pending != "" || d.busy != 0 {
 		return errEditorLease
+	}
+	if d.buffer != nil {
+		d.buffer.close()
 	}
 	delete(m.documents, uid)
 	delete(m.recovery, uid)
@@ -378,7 +389,7 @@ func (m *editorViewRegistry) file(w http.ResponseWriter, r *http.Request, caller
 	}
 	m.mu.Lock()
 	d := m.documents[uid]
-	if !m.callerLocked(caller) || d == nil || d.owner != caller || d.lease != request.Lease || d.pending != "" || d.busy != 0 || m.explorerConflictLocked(d.snapshot.Binding, request.Path) {
+	if !m.callerLocked(caller) || d == nil || d.owner != caller || d.lease != request.Lease || d.pending != "" || d.busy != 0 || d.buffer != nil || m.explorerConflictLocked(d.snapshot.Binding, request.Path) {
 		m.mu.Unlock()
 		jsonError(w, 409, errEditorLease.Error())
 		return

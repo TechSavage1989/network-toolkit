@@ -1,4 +1,14 @@
-# v1.21.20 Beta 1 - large-file Editor and comparison candidate (2026-11-08)
+# v1.21.20 Beta 1 - scalability requirement expanded (2026-11-08)
+
+The owner clarified: "the text editor must effectively be able to work with a text file of any size ... without slowdowns or lag or latency." The bounded-file candidate below does not meet that requirement. **PR #139 is a draft and must not be merged or published on the strength of its previous green checks.**
+
+See [Editor scalability](EDITOR_SCALABILITY_PLAN.md). A disk-backed document engine and lease-aware file API are implemented, with synthetic data-integrity and ownership tests. Benchmarks cover 256 MiB and 2 GiB inputs. The visible editor is not connected yet; virtual rendering, complete editing/search/clipboard integration, streamed comparison and end-to-end acceptance remain required. Stable v1.21.19 is unchanged.
+
+Validation: `go test -mod=vendor ./internal/editorbuffer`; `go test -mod=vendor ./cmd/network-toolkit -run 'TestDiskEditor|TestEditor'`; `go test -mod=vendor ./... -run '^$'`; `go test -mod=vendor ./internal/editorbuffer -run '^$' -bench BenchmarkLargeFileInteraction -benchtime=1x`. The last command creates generated 256 MiB and 2 GiB temporary fixtures, then removes them.
+
+---
+
+# Earlier v1.21.20 Beta 1 bounded-file candidate (superseded acceptance criteria)
 
 Candidate in [PR #139](https://github.com/TechSavage1989/network-toolkit/pull/139), continuing the owner's report that large files make scrolling and the entire app laggy and comparison does not work correctly. Not published. Stable remains v1.21.19. See [the technical handoff](RELEASE12120_HANDOFF.md) for changes, tests and limits.
 

@@ -1,6 +1,6 @@
 # Network Toolkit v1.21.20 Beta 1 - Text Editor large-file performance candidate
 
-**Status:** Candidate on branch fix/1.21.20-large-editor-comparison-performance. Not published until the release workflow succeeds.
+**Status:** Draft on branch fix/1.21.20-large-editor-comparison-performance. The owner expanded the requirement to scalable editing without fixed file-size limits. The bounded-file improvements below are insufficient for publication; see [the scalability plan](EDITOR_SCALABILITY_PLAN.md).
 
 ## What changed
 - Large-file gutter repaint work is coalesced to once per animation frame and skips unchanged visible line ranges. The editable textarea and exact source data remain unchanged.
