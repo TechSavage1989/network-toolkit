@@ -6,12 +6,12 @@ Element.prototype.replaceChildren=function(...children){this.children=[];this.ap
 Object.defineProperty(Element.prototype,'options',{get(){return this.children;}});
 Element.prototype.focus=function(){let top=this;while(top.parentElement)top=top.parentElement;top.activeElement=this;};
 const source=fs.readFileSync(require.resolve('../web/assets/editor-windows.js'),'utf8');
-function fixture(){
+function fixture(beforePoll){
  const document=makeDocument('<div class="nt-editor-window"><div class="nt-editor-toolbar"><button data-ed="compare">Compare documents</button></div></div>');
  const calls=[],docs=[{uid:'11111111-1111-4111-8111-111111111111',content:'synthetic retained draft',dirty:true}],events=[];let transfer='',viewName='Other window';
  const ctx={document,console,Uint8Array,AbortController,crypto:require('node:crypto').webcrypto,setTimeout:()=>1,clearTimeout(){}};vm.createContext(ctx);vm.runInContext(source,ctx);
  const adapter={documents:()=>docs,active:()=>docs[0]?.uid,canTransfer:()=>'',snapshot(ids){events.push('freeze');docs[0].frozen=true;return {documents:docs.map(d=>({...d})),active:docs[0].uid};},rollback(){docs[0].frozen=false;events.push('rollback');},release(){events.push('release');docs.splice(0);}};
- const controller=ctx.NetworkToolkitEditorWindows;controller.configure({adapter,available:()=>true,request:async(path,method,body)=>{calls.push({path,method,body});if(path.endsWith('/transfers')){transfer=body.id;return {id:transfer,state:'offered'};}if(path.endsWith('/cancel'))return {id:transfer,state:'cancelled'};return {available:true,ownerInstanceId:'engine',self:'',owned:{},incoming:[],outgoing:transfer?[{id:transfer,state:'offered'}]:[],views:[{id:'other',name:viewName,state:'ready'}]};}});
+ const controller=ctx.NetworkToolkitEditorWindows;controller.configure({adapter,available:()=>true,request:async(path,method,body)=>{calls.push({path,method,body});if(path.endsWith('/transfers')){transfer=body.id;return {id:transfer,state:'offered'};}if(path.endsWith('/cancel'))return {id:transfer,state:'cancelled'};if(beforePoll)await beforePoll();return {available:true,ownerInstanceId:'engine',self:'',owned:{},incoming:[],outgoing:transfer?[{id:transfer,state:'offered'}]:[],views:[{id:'other',name:viewName,state:'ready'}]};}});
  return {document,controller,calls,docs,events,adapter,setName:v=>viewName=v,button:()=>document.querySelector('[data-editor-window-toggle]'),box:()=>document.querySelector('[data-editor-window-controls]')};
 }
 test('compact window action adds no row and opens a keyboard dialog without transfer side effects',async()=>{
@@ -45,3 +45,21 @@ test('empty detach failure keeps a newly edited draft and protected operations r
 });
 
 test('document model changes update direct-detach label synchronously without a transport call',async()=>{const f=fixture();await f.controller.poll();const button=f.document.querySelector('[data-editor-window-detach]'),kept=f.docs[0],calls=f.calls.length;assert.equal(button.textContent,'Detach editor');f.docs.splice(0);f.controller.notifyChanged();assert.equal(button.textContent,'Open separately');assert.equal(f.calls.length,calls);f.docs.push(kept);f.controller.notifyChanged();assert.equal(button.textContent,'Detach editor');assert.equal(f.calls.length,calls);assert.equal(f.docs[0],kept);assert.deepEqual(f.events,[]);f.controller.stop();});
+
+
+test('Detach stays enabled during an ownership poll and a click waits for it',async()=>{
+ let finish;
+ const gate=new Promise(resolve=>{finish=resolve;});
+ const f=fixture(()=>gate);
+ const polling=f.controller.poll();
+ const detach=f.document.querySelector('[data-editor-window-detach]');
+ assert.equal(detach.disabled,false);
+ const moving=f.controller.detachEditor();
+ assert.equal(detach.disabled,true);
+ assert.equal(f.calls.filter(call=>call.path.endsWith('/transfers')).length,0);
+ finish();
+ await Promise.all([polling,moving]);
+ assert.equal(f.calls.filter(call=>call.path.endsWith('/transfers')).length,1);
+ assert.equal(f.docs[0].frozen,true);
+ f.controller.stop();
+});

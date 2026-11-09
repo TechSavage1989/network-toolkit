@@ -1,0 +1,14 @@
+Network Toolkit 1.21.21 Beta 1
+
+## What's New
+
+- Comparison panes track each other more closely while scrolling.
+- Large text files start loading the next page before you reach it, so the first scroll is smoother.
+- Detach Editor stays steady during background checks.
+
+## Additional Details
+
+- Comparison preserves partial-line scroll offsets and reuses nearby line mappings.
+- The editor prefetches pages in single, split and comparison views.
+- Detach waits for an in-progress ownership check before moving the document.
+- This beta is opt-in. Enable beta updates to receive it through the app.

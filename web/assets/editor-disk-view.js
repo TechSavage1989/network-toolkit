@@ -32,6 +32,7 @@ function create({textarea, gutter, container, session, changed = () => {}, messa
  let navigation = 0, navigating = false, frame = 0, pointer = false;
  let top = page.line, barTop = 0, barLeft = 0, lastScrollTop = 0, lastScrollLeft = 0;
  let gutterStamp = '', lastAnnouncement = '', lastPrefetch = '';
+ let fraction = 0;
  let rowHeight = 20, characterWidth = 8, clientRows = 1, clientColumns = 1, font = '';
  let verticalFrame = 0, horizontalFrame = 0;
  textarea.value = page.text;
@@ -90,7 +91,7 @@ function create({textarea, gutter, container, session, changed = () => {}, messa
     direction: textarea.selectionDirection || 'none'
    };
   }
-  return {...selection, top, left: textarea.scrollLeft + page.column * characterWidth};
+  return {...selection, top, left: textarea.scrollLeft + page.column * characterWidth, fraction};
  }
 
  function announce() {
@@ -136,7 +137,7 @@ function create({textarea, gutter, container, session, changed = () => {}, messa
  function paint() {
   if (disposed) return;
   frame = 0;
-  const {lines} = session.state().metadata;
+  const {lines, units} = session.state().metadata;
   const row = clamp(Math.floor(textarea.scrollTop / rowHeight), 0, starts.length - 1);
   const first = Math.max(0, row - 3);
   const last = Math.min(starts.length, first + clientRows + 8);
@@ -159,6 +160,7 @@ function create({textarea, gutter, container, session, changed = () => {}, messa
   }
   gutter.style.transform = 'translateY(' + (-textarea.scrollTop) + 'px)';
   top = page.line + row;
+  fraction = clamp(textarea.scrollTop / rowHeight - row, 0, 0.999);
   vertical.hidden = lines <= clientRows;
   const lastTop = Math.max(1, lines - clientRows);
   barTop = clamp(top / lastTop, 0, 1) * (RANGE - vertical.clientHeight);
@@ -173,6 +175,10 @@ function create({textarea, gutter, container, session, changed = () => {}, messa
    barLeft = clamp(column / lastColumn, 0, 1) * (RANGE - horizontal.clientWidth);
    if (Math.abs(horizontal.scrollLeft - barLeft) > 1) horizontal.scrollLeft = barLeft;
    scrollbarValue(horizontal, page.lineUnits + 1, Math.floor(column) + 1);
+  }
+  if (page.start + page.text.length < units) {
+   const origin = nextPageOrigin();
+   if (origin > page.line) prefetch({line: origin});
   }
   lastScrollTop = textarea.scrollTop;
   lastScrollLeft = textarea.scrollLeft;
@@ -263,12 +269,12 @@ function create({textarea, gutter, container, session, changed = () => {}, messa
   return true;
  }
 
- async function goLine(line, focus = false, force = false) {
+ async function goLine(line, focus = false, force = false, fraction = 0) {
   line = clamp(Math.floor(line), 0, session.state().metadata.lines - 1);
   return navigate(async active => {
    if (!await openLine(line, active, force)) return false;
    if (focus) select(page.start + starts[line - page.line], undefined, 'none', true);
-   showLine(line);
+   showLine(line + fraction);
    return true;
   });
  }
@@ -364,13 +370,18 @@ function create({textarea, gutter, container, session, changed = () => {}, messa
   return load({start: start + column}, {left: 0, keepSelection: true});
  }
 
- function rollForward(line, origin) {
+ function rollForward(line, origin, offset) {
   return navigate(async active => {
    if (!await loadPage({line: origin}, active)) return false;
    if (line >= page.line + starts.length && !await openLine(line, active)) return false;
-   showLine(line);
+   showLine(line + offset);
    return true;
   });
+ }
+
+ function nextPageOrigin() {
+  const spare = starts.length - clientRows;
+  return page.line + Math.max(0, spare - Math.min(BUFFER_LINES, Math.floor(spare / 2)));
  }
 
  function scroll() {
@@ -386,9 +397,9 @@ function create({textarea, gutter, container, session, changed = () => {}, messa
    if (target < page.line) run(goLine(line, false, true));
   } else if (movedDown && page.start + page.text.length < units) {
    const remaining = starts.length - row - clientRows;
-   const origin = page.line + starts.length - clientRows - Math.floor(1.5 * BUFFER_LINES);
+   const origin = nextPageOrigin();
    if (origin > page.line) {
-    if (remaining < BUFFER_LINES / 2) run(rollForward(line, origin));
+    if (row >= origin - page.line && remaining < BUFFER_LINES / 2) run(rollForward(line, origin, Math.max(0, textarea.scrollTop / rowHeight - row)));
     else if (remaining < BUFFER_LINES) prefetch({line: origin});
    }
   }

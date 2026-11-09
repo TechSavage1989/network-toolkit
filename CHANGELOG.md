@@ -1,3 +1,9 @@
+## 1.21.21 Beta 1 - Editor scrolling and detach controls
+
+- Keep synchronized comparison panes aligned at partial-line scroll positions.
+- Prefetch the next editor page on open and preserve the scroll offset through page changes.
+- Keep Detach Editor enabled during passive ownership polling and wait for the poll before moving.
+
 ## 1.21.20 Beta 1 - Large-file text editing and comparison
 
 - Open and edit large text files through disk-backed storage and a bounded viewport. Search, compare and save run in the background.
