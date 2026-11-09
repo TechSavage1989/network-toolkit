@@ -261,9 +261,8 @@ function create({textarea, gutter, container, session, changed = () => {}, messa
    // A very long line may consume the look-behind page before the target line.
    return loadPage({line}, active);
   }
-  if (line > page.line && line === page.line + starts.length - 1 &&
+  if (line - page.line + clientRows >= starts.length &&
       page.start + page.text.length < session.state().metadata.units) {
-   // Obtain the complete logical length for a last row that may span pages.
    return loadPage({line}, active);
   }
   return true;
@@ -320,12 +319,12 @@ function create({textarea, gutter, container, session, changed = () => {}, messa
    }
    select(view.start ?? 0, view.end ?? view.start ?? 0, view.direction, focus);
    textarea.scrollLeft = Math.max(0, (view.left || 0) - page.column * characterWidth);
-   showLine(line);
+   showLine(line + clamp(view.fraction || 0, 0, 0.999));
    return true;
   });
  }
 
- async function applyEdit(operation, offset) {
+ async function applyEdit(operation, offset, savedView) {
   if (readOnly || editing || disposed) return false;
   if (composing) throw Error('Finish text composition before changing the selection.');
   editing = true;
@@ -342,7 +341,8 @@ function create({textarea, gutter, container, session, changed = () => {}, messa
    if (!disposed) updateReadOnly();
   }
   const at = Math.min(offset, session.state().metadata.units);
-  await position(at);
+  if (savedView) await restore(savedView);
+  else await position(at);
   return true;
  }
 
@@ -353,7 +353,7 @@ function create({textarea, gutter, container, session, changed = () => {}, messa
 
  function history(redo = false) {
   const view = capture();
-  return applyEdit(() => session.history(redo), view.start);
+  return applyEdit(() => session.history(redo), view.start, view);
  }
 
  function prefetch(target) {

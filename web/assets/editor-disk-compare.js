@@ -8,6 +8,7 @@ const peerOf = side => side === 'left' ? 'right' : 'left';
 const number = value => Number(value || 0).toLocaleString();
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const pageSize = 64;
+const differenceSymbols = {added:'+', removed:'−', changed:'~'};
 const mapScrollRange = 1000000;
 
 function selectorMarkup(side) {
@@ -48,9 +49,11 @@ function create(options) {
   '<label><input type="checkbox" data-compare-underline> Underline changes</label>' +
   '<label>Map zoom <select data-compare-scale aria-label="Map zoom"><option value="0">Individual lines</option>' +
   '<option value="0.5">1.5×</option><option value="1">2×</option><option value="2">3×</option><option value="4">5×</option></select></label>' +
-  '<span class="nt-compare-legend"><span class="added">+ Added</span><span class="removed">− Removed</span><span class="changed">~ Modified</span></span></div></details>' +
+  '</div></details>' +
   '<button type="button" class="btn small ghost" data-compare="close">Close comparison</button></div>' +
-  '<div class="nt-compare-summary" data-compare-summary role="status"></div><div class="nt-compare-grid">' +
+  '<div class="nt-compare-summary"><span data-compare-summary role="status"></span>' +
+  '<span class="nt-compare-legend" aria-label="Difference key"><span class="added">+ Added</span><span class="removed">− Removed</span>' +
+  '<span class="changed">~ Modified</span></span></div><div class="nt-compare-grid">' +
   sides.map(paneMarkup).join('<div class="nt-editor-pane-resize" data-compare-divider></div>') +
   '<div class="nt-compare-map-panel"><div class="nt-compare-map-labels" aria-hidden="true"><span>Left</span><span>Right</span></div>' +
   '<div class="nt-compare-map is-line-map" data-compare-map><div data-compare-map-content><div class="nt-disk-map-window">' +
@@ -87,6 +90,8 @@ function create(options) {
  let mapFrame = 0, gestureSide = null;
  let mapTop = 0, mapExtent = 0, mapScrollMax = 0, mapScrollPosition = 0;
  let mapData = null, mapRequest = null, mapPaintKey = '';
+ const preview = comparing && root.NTKEditorCompare.mountDifferencePreview(host, readDifferencePreview, () =>
+  job?.status && {count:job.status.count, index:Math.max(0, selected)});
  const mapPitch = () => Math.max(2, Math.ceil(map.clientHeight / 3500)) * (1 + scale);
  const splitter = root.NTKEditorCompare.createDivider(host, q('.nt-compare-grid'), comparing, () => {
   for (const side of sides) changed(side);
@@ -214,6 +219,8 @@ function create(options) {
    const kind = differenceKind(side, line, pane.ranges);
    const className = kind ? 'nt-compare-line ' + kind : '';
    if (row.className !== className) row.className = className;
+   if (kind) row.dataset.differenceSymbol = differenceSymbols[kind];
+   else delete row.dataset.differenceSymbol;
    const offset = index++;
    if (!kind || !bounds) continue;
    const color = document.createElement('span');
@@ -436,6 +443,7 @@ function create(options) {
    if (previous.sent) void options.compareRequest({action:'cancel', id:previous.id}).catch(() => {});
   }
   mapData = mapRequest = null;
+  preview?.refresh?.();
   for (const side of sides) {
    const pane = panes[side];
    pane.ranges = [];
@@ -451,8 +459,7 @@ function create(options) {
 
  function buttons() {
   const enabled = !!job?.status?.count && !job.status.error;
-  q('[data-compare="next"]').disabled = !enabled;
-  q('[data-compare="previous"]').disabled = !enabled;
+  for (const button of host.querySelectorAll(root.NTKEditorCompare.differenceControls)) button.disabled = !enabled;
   q('[data-compare="compute"]').textContent = job && !job.status?.done ? 'Cancel comparison' : 'Compare';
  }
 
@@ -464,6 +471,8 @@ function create(options) {
 
  function applyStatus(current, status) {
   if (job !== current || disposed) return;
+  const justFinished = status.done && !current.status?.done;
+  const countChanged = current.status?.count !== status.count;
   current.status = status;
   if (status.error) {
    failJob(current, Error(status.error));
@@ -478,7 +487,9 @@ function create(options) {
     '% · ' + number(status.count) + ' differences found.');
   }
   buttons();
-  for (const side of sides) queueLocate(side);
+  if (justFinished || countChanged) preview.refresh();
+  if (justFinished && q('[data-compare-sync]').checked) gestureSide ||= activeSide();
+  for (const side of sides) queueLocate(side, justFinished && gestureSide === side);
   scheduleMap();
   root.clearTimeout(current.timer);
   current.timer = root.setTimeout(() => void poll(current), status.done ? 30000 : 250);
@@ -523,28 +534,62 @@ function create(options) {
    }));
    if (job !== current || disposed) return;
    current.sent = true;
-   const status = await options.compareRequest({action:'start', id, left:sources[0], right:sources[1]}, current.abort.signal);
+   const status = await options.compareRequest({action:'start', id, left:sources[0], right:sources[1], spaces:q('[data-compare-spaces]').value}, current.abort.signal);
    applyStatus(current, status);
   } catch (error) {
    failJob(current, error);
   }
  }
 
- async function difference(step) {
-  const current = job;
-  const count = current?.status?.count || 0;
-  if (!count) return;
-  const index = selected < 0 ? step > 0 ? 0 : count - 1 : (selected + step + count) % count;
+ async function getDifference(current, index, signal = current.abort.signal) {
   const start = Math.floor(index / pageSize) * pageSize;
   let page = current.pages.get(start);
   if (!page || !page[index - start]) {
-   const value = await options.compareRequest({action:'page', id:current.id, start, limit:pageSize}, current.abort.signal);
+   const value = await options.compareRequest({action:'page', id:current.id, start, limit:pageSize}, signal);
    if (job !== current || disposed) return;
    page = value.differences;
    current.pages.set(start, page);
    if (current.pages.size > 3) current.pages.delete(current.pages.keys().next().value);
   }
-  const diff = page[index - start];
+  return page[index - start];
+ }
+
+ async function readDifferencePreview(index, offset, limit, signal) {
+  const current = job, diff = await getDifference(current, index, signal);
+  if (!diff || job !== current) return;
+  const read = async side => {
+   const d = panes[side].doc, count = Math.max(0, Math.min(limit, diff[side + 'Count'] - offset));
+   const line = diff[side] + offset, end = line + count;
+   if (!count) return [];
+   const extract = root.NTKEditorCompare.previewSourceLines;
+   if (!d.disk) return extract(d.content, line, count);
+   const session = options.ensureDiskSession(d), values = [];
+   for (let first = line; first < end;) {
+    signal.throwIfAborted();
+    const page = await session.previewWindow(first, signal);
+    const rows = extract(page.text, first, end - first, page.line);
+    const last = rows.at(-1);
+    if (!last) throw Error('Could not read the changed lines.');
+    if (last.line === page.line + page.text.split('\n').length - 1 &&
+        page.start + page.text.length < page.units) {
+     if (rows.length > 1) rows.pop();
+     else last.text += ' … (open the editable comparison to view the full line)';
+    }
+    values.push(...rows);
+    first = rows.at(-1).line + 1;
+   }
+   return values;
+  };
+  const [left, right] = await Promise.all(sides.map(read));
+  return {left, right, length:Math.max(diff.leftCount, diff.rightCount)};
+ }
+
+ async function difference(step) {
+  const current = job;
+  const count = current?.status?.count || 0;
+  if (!count) return;
+  const index = root.NTKEditorCompare.differenceIndex(selected, step, count);
+  const diff = await getDifference(current, index);
   if (!diff || job !== current) return;
   syncing++;
   try { await Promise.all(sides.map(side => goLine(side, diff[side]))); }
@@ -552,6 +597,7 @@ function create(options) {
   if (job !== current || disposed) return;
   revealMap(activeSide());
   selected = index;
+  preview.refresh();
   summary.dataset.compareSelected = String(index);
   setSummary('Difference ' + number(index + 1) + ' of ' + number(count) + ' · ' +
    number(diff.leftCount) + ' left / ' + number(diff.rightCount) + ' right lines.');
@@ -642,9 +688,12 @@ function create(options) {
  }
 
  function pointOnMap(event, side) {
-  const line = (event.clientY - map.getBoundingClientRect().top + mapTop) / mapPitch();
+  const pane = panes[side];
+  const line = clamp(Math.floor((event.clientY - map.getBoundingClientRect().top + mapTop) / mapPitch()), 0, totalLines(pane) - 1);
+  const halfView = Math.floor(pane.textarea.clientHeight / lineHeight(pane) / 2);
   gestureSide = side;
-  go(goLine(side, line));
+  go(goLine(side, line - halfView));
+  return line;
  }
 
  map.addEventListener('scroll', () => { if (readMapScroll()) scheduleMap(); });
@@ -716,12 +765,17 @@ function create(options) {
   track.addEventListener('pointerdown', event => {
    if (!pane.doc || event.button !== 0) return;
    event.preventDefault();
-   drag = {id:event.pointerId, side};
+   drag = {id:event.pointerId, line:0, y:event.clientY};
    track.setPointerCapture?.(event.pointerId);
    track.focus({preventScroll:true});
-   pointOnMap(event, side);
+   drag.line = pointOnMap(event, side);
   });
   track.addEventListener('pointermove', event => { if (drag?.id === event.pointerId) pointOnMap(event, side); });
+  track.addEventListener('pointerup', event => {
+   if (drag?.id !== event.pointerId || Math.abs(event.clientY - drag.y) > 3) return;
+   setMapTop((drag.line + .5) * mapPitch() - map.clientHeight / 2);
+   scheduleMap();
+  });
   track.addEventListener('lostpointercapture', () => { drag = null; });
   track.addEventListener('keydown', event => {
    const targets = {Home:0, End:totalLines(pane) - 1, ArrowUp:pane.top - 1, ArrowDown:pane.top + 1,
@@ -742,10 +796,12 @@ function create(options) {
   }
   if (action === 'swap' && !composing()) { options.swap?.(); refresh(); }
   if (action === 'previous' || action === 'next') go(difference(action === 'next' ? 1 : -1));
+  if (action === 'first' || action === 'last') go(difference(action));
   if (action === 'close') options.close?.();
  });
  host.addEventListener('change', event => {
   const control = event.target;
+  if (control.matches('[data-compare-spaces]')) void compute();
   if (control.matches('[data-compare-scale]')) {
    const topLine = mapTop / mapPitch();
    scale = Number(control.value) || 0;
@@ -820,6 +876,7 @@ function create(options) {
    if (disposed) return;
    clearJob();
    disposed = true;
+   preview?.dispose?.();
    splitter.dispose();
    observer?.disconnect();
    if (mapFrame) root.cancelAnimationFrame(mapFrame);

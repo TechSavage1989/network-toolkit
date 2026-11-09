@@ -20,11 +20,17 @@
 .nt-editor-code.nt-editor-disk{position:relative}
 .nt-editor-disk-scroll{flex:0 0 16px;overflow-y:scroll;overflow-x:hidden;min-height:0;scrollbar-width:auto}
 .nt-editor-disk-scroll>div{width:1px}
+.nt-editor-disk .nt-editor-surface textarea::-webkit-scrollbar:vertical{width:0}
+.nt-editor-disk .nt-editor-surface textarea::-webkit-scrollbar-button:vertical{display:none}
 .nt-editor-disk-horizontal{position:absolute;bottom:0;left:52px;right:16px;height:16px;overflow-x:scroll;overflow-y:hidden;z-index:3}
 .nt-editor-disk-long-line .nt-editor-surface textarea{height:calc(100% - 16px)}
 .nt-editor-disk [hidden]{display:none!important}
 .nt-disk-compare-code{position:relative;display:flex;flex:1 1 0;min-height:0;min-width:0;overflow:hidden;background:var(--nt-code-bg,var(--input));font:var(--nt-editor-font,13px)/1.55 var(--mono,Consolas,monospace)}
 .nt-disk-compare-code .nt-editor-gutter .nt-compare-line{padding:0 2px}
+.nt-disk-compare-code .nt-compare-line[data-difference-symbol]::before{content:attr(data-difference-symbol);float:left;font-weight:700}
+.nt-disk-compare-code .nt-compare-line.added::before{color:var(--good)}
+.nt-disk-compare-code .nt-compare-line.removed::before{color:var(--bad)}
+.nt-disk-compare-code .nt-compare-line.changed::before{color:var(--warn)}
 .nt-disk-compare-colors{position:absolute;inset:0;pointer-events:none;overflow:hidden}
 .nt-disk-compare-color{position:absolute;left:0;right:0;color:var(--warn);background:color-mix(in srgb,currentColor 14%,transparent)}
 .nt-disk-compare-color.added{color:var(--good)}
@@ -159,6 +165,20 @@ body:has(.nt-editor-embedded) #toolWorkspace>#pageContent{grid-row:1!important;g
 .nt-compare-summary{font-size:11px;padding:5px 10px;color:var(--text);overflow-wrap:anywhere;flex-shrink:0}
 .nt-compare-legend{display:flex;gap:9px;flex-wrap:wrap;font-size:10px;padding:0 10px 5px;color:var(--muted);flex-shrink:0}
 .nt-compare-legend .added{color:var(--good)}.nt-compare-legend .removed{color:var(--bad)}.nt-compare-legend .changed{color:var(--warn)}
+.nt-compare-grid{position:relative}
+.nt-editor-compare .nt-compare-preview{position:absolute;inset:0;z-index:4;display:flex;flex-direction:column;background:var(--panel);overflow:hidden}
+.nt-compare-preview-tools{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:6px 8px;border-bottom:1px solid var(--border)}
+.nt-compare-preview-tools [role=status]{margin-right:auto;font-size:12px}
+.nt-compare-preview-rows{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-content:start;overflow:auto}
+.nt-compare-preview-line{display:flex;gap:8px;align-items:baseline;min-height:1.55em;padding:2px 8px;border-right:1px solid var(--border);font:var(--nt-editor-font,13px)/1.55 var(--mono,monospace)}
+.nt-compare-preview-line span{color:var(--muted);min-width:5ch;text-align:right}
+.nt-compare-preview-line code{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--text);min-width:0}
+.nt-compare-preview-line.changed{background:color-mix(in srgb,var(--warn) 15%,var(--panel))}
+.nt-compare-preview-line.added{background:color-mix(in srgb,var(--good) 15%,var(--panel))}
+.nt-compare-preview-line.removed{background:color-mix(in srgb,var(--bad) 15%,var(--panel))}
+.nt-compare-preview-line.gap{background:var(--panel2)}
+.nt-editor-disk-compare .nt-compare-summary{display:flex;align-items:center;flex-wrap:wrap;gap:4px 10px}
+.nt-editor-disk-compare .nt-compare-summary .nt-compare-legend{padding:0;align-items:center}
 .nt-compare-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) 52px;flex:1 1 0;min-height:140px;min-width:0;border-top:1px solid var(--border);overflow:hidden}
 .nt-compare-pane{display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;border-right:1px solid var(--border)}
 .nt-compare-pane>label{display:flex;gap:5px;align-items:center;padding:5px 7px;flex:0 0 auto;color:var(--muted);font-size:10px;min-width:0}.nt-compare-pane select{min-width:0;width:100%;font-size:11px;padding:4px;min-height:28px}

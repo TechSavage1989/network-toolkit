@@ -108,6 +108,29 @@ async function main() {
     const summary = page.locator('.nt-editor-disk-compare [data-compare-summary]');
     await page.waitForFunction(() => document.querySelector('.nt-editor-disk-compare [data-compare-summary]')?.dataset.compareDone === 'true', null, { timeout: 180000 });
     assert.equal(await summary.getAttribute('data-compare-count'), '2');
+    await page.locator('.nt-compare-settings summary').click();
+    await page.check('[data-compare-only]');
+    const preview = page.locator('.nt-compare-preview');
+    await preview.locator('code').first().waitFor();
+    assert.match(await preview.innerText(), new RegExp(head));
+    assert.equal(await preview.locator('code').count(), 2);
+    await preview.getByRole('button', {name:'Return to editable comparison'}).click();
+    assert.equal(await preview.isVisible(), false);
+    const legend = page.locator('.nt-editor-disk-compare .nt-compare-legend');
+    assert.equal(await legend.isVisible(), true);
+    assert.match(await legend.innerText(), /\+ Added.*− Removed.*~ Modified/s);
+    await page.uncheck('[data-compare-show-map]');
+    assert.equal(await page.locator('[data-compare-map]').isVisible(), false);
+    await page.check('[data-compare-show-map]');
+    await page.selectOption('[data-compare-spaces]', 'all');
+    await page.waitForFunction(() => document.querySelector('[data-compare-summary]')?.dataset.compareDone === 'true');
+    assert.equal(await summary.getAttribute('data-compare-count'), '2');
+    await page.locator('.nt-compare-settings summary').click();
+    for (const side of ['left', 'right']) {
+      const pane = page.locator('[data-compare-pane="' + side + '"]');
+      assert.equal(await pane.locator('.nt-editor-disk-scroll:visible').count(), 1);
+      assert.equal(await pane.locator('textarea').evaluate(el => el.offsetWidth - el.clientWidth), 0);
+    }
     const map = page.locator('.nt-editor-disk-compare [data-compare-map]');
     const leftTrack = map.locator('[data-compare-track="left"]');
     const leftMark = leftTrack.locator('rect.changed');
@@ -160,6 +183,13 @@ async function main() {
     await page.waitForFunction(() => document.querySelector('.nt-editor-disk-compare [data-compare-summary]')?.dataset.compareSelected === '1');
     await page.waitForFunction(marker => [...document.querySelectorAll('.nt-editor-disk-compare textarea')].some(el => el.value.includes(marker)), tail);
     await page.locator('.nt-editor-disk-compare .nt-compare-line.changed').first().waitFor();
+    assert.equal(await page.locator('.nt-editor-disk-compare .nt-compare-line.changed').first().getAttribute('data-difference-symbol'), '~');
+    await page.locator('.nt-compare-settings summary').click();
+    await page.locator('[data-compare="first"]').click();
+    await page.waitForFunction(() => document.querySelector('[data-compare-summary]').dataset.compareSelected === '0');
+    await page.locator('[data-compare="last"]').click();
+    await page.waitForFunction(() => document.querySelector('[data-compare-summary]').dataset.compareSelected === '1');
+    await page.locator('.nt-compare-settings summary').click();
     report.compareMs = Date.now() - compareStarted;
     await page.screenshot({ path: path.join(output, 'editor-large-file-comparison.png') });
     await page.evaluate(() => NetworkToolkitFileEditor.closeComparison());
@@ -186,11 +216,23 @@ async function main() {
     assert.ok(await page.evaluate(() => NetworkToolkitFileEditor.active.dirty), 'new typing must remain unsaved');
     assert.ok(await text.inputValue().then(value => value.endsWith(tail + '!')));
     report.editsDuringSave = await page.evaluate(async () => (await api('/editor-fixture/state')).editsDuringSave);
-    await text.press('Control+z');
+    const documentBar = page.locator('.nt-editor-code .nt-editor-disk-scroll');
+    await documentBar.evaluate(el => el.scrollTop = (el.scrollHeight - el.clientHeight) / 2);
+    await page.waitForFunction(() => {
+      const bar = document.querySelector('.nt-editor-code .nt-editor-disk-scroll');
+      return Number(bar.getAttribute('aria-valuenow')) > Number(bar.getAttribute('aria-valuemax')) / 3 &&
+        Number(bar.getAttribute('aria-valuenow')) < Number(bar.getAttribute('aria-valuemax')) * 2 / 3;
+    });
+    const beforeUndo = await documentBar.getAttribute('aria-valuenow');
+    await page.keyboard.press('Control+z');
     await page.waitForFunction(n => {
       const editor = NetworkToolkitFileEditor.active;
       return editor.diskMeta.units === n && !editor.dirty && !editor.diskSession.pending;
     }, editedSize);
+    await page.waitForFunction(top => document.querySelector('.nt-editor-code .nt-editor-disk-scroll').getAttribute('aria-valuenow') === top, beforeUndo, {timeout:3000}).catch(async error => {
+      report.undoViewport = {before:beforeUndo, after:await documentBar.getAttribute('aria-valuenow')};
+      throw error;
+    });
     report.timing = await page.evaluate(() => {
       const { gaps, input, long } = window.editorTimings;
       const percentile = (values, fraction) => values.slice().sort((a, b) => a - b)[Math.max(0, Math.ceil(values.length * fraction) - 1)];

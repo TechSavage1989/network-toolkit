@@ -28,7 +28,7 @@
 - **Connect** with SSH, Telnet and supported serial terminals, using saved connections, multiple tabs and macros. Color terminal output with universal highlighting (devices, servers and logs) or MobaXterm-style keyword rule sets, each with its own colors, including your own `.msyn` files; pick a color (or none) for the device's name in its prompt, and choose the font size, cursor, color scheme, scrollback, bell and line-ending options. Risky pastes are flagged before they are sent.
 - **Password manager:** save usernames with passwords or SSH keys in an encrypted vault, with or without a master password; a strength gauge helps you choose one.
 - **File Transfer:** browse, transfer and host files over SFTP, FTP/FTPS and TFTP from one page.
-- **Text Editor:** open, edit and compare text files, including common network device configurations. Send selected commands to a Terminal session and bring terminal output back into a document. The v1.21.22 beta processes large files in the background without fixed file-size or line-count limits.
+- **Text Editor:** open, edit and compare text files, including common network device configurations. Convert selected text to or from hex and Base64. Send selected commands to a Terminal session and bring terminal output back into a document. The v1.21.23 beta processes large files in the background without fixed file-size or line-count limits.
 - **Local network:** view local network information and review authorized configuration changes.
 - **Network utilities:** Wake on LAN, an IPv4 subnet calculator, a transfer-time estimate and a MAC address formatter.
 - **Customizable Overview:** choose which dashboard sections to show, and drag them into the order you want; the layout is kept between runs.

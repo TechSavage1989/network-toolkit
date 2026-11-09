@@ -33,6 +33,7 @@ type diskComparisonRequest struct {
 	Side   string               `json:"side"`
 	Line   int64                `json:"line"`
 	End    int64                `json:"end"`
+	Spaces string               `json:"spaces"`
 }
 
 type diskComparisonSnapshot struct {
@@ -152,6 +153,9 @@ func (m *editorViewRegistry) comparisonInputLocked(caller string, source diskCom
 }
 
 func (m *editorViewRegistry) startDiskComparison(r *http.Request, caller string, req diskComparisonRequest) (*diskComparisonJob, error) {
+	if req.Spaces != "" && req.Spaces != "changed" && req.Spaces != "all" {
+		return nil, errors.New("Unsupported comparison spacing option.")
+	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if !m.callerLocked(caller) || r.Context().Err() != nil {
@@ -198,12 +202,12 @@ func (m *editorViewRegistry) startDiskComparison(r *http.Request, caller string,
 	go func() {
 		defer closeLeft()
 		defer closeRight()
-		job.scan(ctx, left, right)
+		job.scan(ctx, left, right, editorbuffer.CompareOptions{Spaces: req.Spaces})
 	}()
 	return job, nil
 }
 
-func (j *diskComparisonJob) scan(ctx context.Context, left, right editorbuffer.ComparisonInput) {
+func (j *diskComparisonJob) scan(ctx context.Context, left, right editorbuffer.ComparisonInput, options editorbuffer.CompareOptions) {
 	status := diskComparisonStatus{
 		LeftTotal: left.Lines(), RightTotal: right.Lines(), LeftSize: left.Bytes(), RightSize: right.Bytes(),
 	}
@@ -223,7 +227,7 @@ func (j *diskComparisonJob) scan(ctx context.Context, left, right editorbuffer.C
 		}
 		j.mu.Unlock()
 	}
-	err := editorbuffer.Compare(ctx, left, right, func(diff editorbuffer.Difference) error {
+	err := editorbuffer.CompareWithOptions(ctx, left, right, func(diff editorbuffer.Difference) error {
 		if writeErr != nil {
 			return writeErr
 		}
@@ -236,7 +240,7 @@ func (j *diskComparisonJob) scan(ctx context.Context, left, right editorbuffer.C
 		}
 		status.Count++
 		return nil
-	}, publish)
+	}, publish, options)
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	if !j.closed {
