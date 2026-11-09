@@ -229,7 +229,13 @@ function mountDifferencePreview(host, read, getCount) {
  });
  const resize = typeof ResizeObserver === 'function' ? new ResizeObserver(queue) : null;
  resize?.observe(scroll);
- toggle.addEventListener('change', () => { refresh(true); if (!panel.hidden) scroll.focus({preventScroll:true}); });
+ toggle.addEventListener('change', () => {
+  refresh(true);
+  if (!panel.hidden) {
+   host.querySelector('.nt-compare-settings').open = false;
+   scroll.focus({preventScroll:true});
+  }
+ });
  panel.querySelector('[data-preview-edit]').addEventListener('click', () => {
   toggle.checked = false;
   refresh(true);
