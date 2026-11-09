@@ -120,3 +120,24 @@ func TestStreamingCompareCancellation(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+func TestCompareWhitespaceOptions(t *testing.T) {
+	for _, test := range []struct {
+		mode        string
+		left, right string
+	}{
+		{"changed", "  start\tend  ", "start end"},
+		{"all", "start\tend", "startend"},
+		{"changed", strings.Repeat("a", ChunkBytes-1) + "\t\tend", strings.Repeat("a", ChunkBytes-1) + " end"},
+	} {
+		for _, reverse := range []bool{false, true} {
+			options := CompareOptions{Spaces: test.mode}
+			left := newLineSignatures(context.Background(), InlineComparisonInput(test.left), reverse, 1, options)
+			right := newLineSignatures(context.Background(), InlineComparisonInput(test.right), reverse, 1, options)
+			a, errA := left.next()
+			b, errB := right.next()
+			if errA != nil || errB != nil || a != b {
+				t.Fatalf("spacing mode %q, reverse %v: %v %v", test.mode, reverse, errA, errB)
+			}
+		}
+	}
+}

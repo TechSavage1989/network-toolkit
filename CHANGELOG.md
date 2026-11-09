@@ -1,3 +1,10 @@
+## 1.21.23 Beta 1 - Compare filters and text conversion
+
+- Browse only the changed blocks and keep the source line numbers visible.
+- Ignore spacing differences, toggle the change map, and jump to the first or last change.
+- Convert selected text to or from hex and Base64 from More or the right-click menu.
+- Use a single full-document scrollbar per pane, center map clicks, and retain the current viewport on undo.
+
 ## 1.21.22 Beta 1 - Scrollable line-by-line comparison map
 
 - Show individual changed lines with one-pixel marks, including consecutive changes.

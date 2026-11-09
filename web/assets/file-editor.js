@@ -537,7 +537,7 @@ function skin(){if(overlay)return;readPreferences();
  overlay=document.createElement('div');overlay.id='networkToolkitFileEditor';overlay.className='nt-editor';overlay.hidden=true;
  overlay.innerHTML='<div class="nt-editor-window" role="dialog" aria-modal="true" aria-label="Network Toolkit text editor">'+
  '<div class="nt-editor-toolbar"><button class="btn small ghost" data-ed="browse" title="Open a Windows file with editing permissions (Ctrl+O)">Open file</button><button class="btn small primary" data-ed="save" title="Save (Ctrl+S)">Save</button><button class="btn small ghost" data-ed="saveAs" title="Save As (Ctrl+Shift+S)">Save as</button><button class="btn small ghost" data-ed="reload">Reload</button><button type="button" class="btn small ghost" data-ed="compare" aria-label="Compare documents" title="Compare documents"><span class="nt-editor-label-wide">Compare documents</span><span class="nt-editor-label-compact" aria-hidden="true">Compare</span></button><button type="button" class="btn small ghost" data-ed="split" aria-pressed="false" title="Show two independent document views">Split view</button><button type="button" class="btn small ghost" data-ed="files" aria-expanded="false">Files</button><span class="nt-editor-rule"></span><button class="btn small ghost" data-ed="undo">Undo</button><button class="btn small ghost" data-ed="redo">Redo</button><button class="btn small ghost" data-ed="find">Find</button><button class="btn small ghost" data-ed="replace">Replace</button><button class="btn small ghost" data-ed="goto">Go to line</button><button type="button" class="btn small ghost nt-editor-icon-button" data-ed="sendTerminal" aria-label="Send to terminal" title="Send to terminal: the selection or the whole document (Ctrl+Shift+Enter)" aria-keyshortcuts="Control+Shift+Enter">'+(typeof icon==='function'?icon('sendTerminal'):'&gt;_')+'</button><details class="nt-editor-more"><summary class="btn small ghost" aria-controls="ntEditorMoreActions" aria-expanded="false">More</summary></details><button type="button" class="btn small ghost" data-ed="localTools" title="Open the full Text Editor in Tools">Full editor</button><button type="button" class="btn small ghost" data-ed="close" aria-label="Close text editor">Close editor</button><span data-ed-title hidden></span></div>'+
- '<div id="ntEditorMoreActions" class="nt-editor-more-actions" role="group" aria-label="More editor actions" hidden><button class="btn small ghost" data-ed="comment" title="Toggle comment (Ctrl+/)">Comment</button><button class="btn small ghost" data-ed="duplicate" title="Duplicate line (Ctrl+D)">Duplicate</button><button class="btn small ghost" data-ed="trim">Trim spaces</button><button class="btn small ghost" data-ed="upper">UPPER</button><button class="btn small ghost" data-ed="lower">lower</button><button class="btn small ghost" data-ed="sortLines">Sort lines</button><button class="btn small ghost" data-ed="format" title="Format document (Ctrl+Shift+F)">Format document</button><button class="btn small ghost" data-ed="download">Save copy</button><button type="button" class="btn small ghost" data-ed="colors" title="Customize syntax and editor colors">Text colors</button><label class="nt-editor-close-preference"><input type="checkbox" data-ed-ask-save-close checked aria-label="Ask to save unsaved changes before closing" aria-describedby="ntEditorClosePolicyNote"> Confirm unsaved close</label><span id="ntEditorClosePolicyNote" data-ed-close-policy-note class="nt-editor-window-announcement"></span></div>'+
+ '<div id="ntEditorMoreActions" class="nt-editor-more-actions" role="group" aria-label="More editor actions" hidden><button class="btn small ghost" data-ed="comment" title="Toggle comment (Ctrl+/)">Comment</button><button class="btn small ghost" data-ed="duplicate" title="Duplicate line (Ctrl+D)">Duplicate</button><button class="btn small ghost" data-ed="trim">Trim spaces</button><button class="btn small ghost" data-ed="upper">UPPER</button><button class="btn small ghost" data-ed="lower">lower</button><button class="btn small ghost" data-ed="sortLines">Sort lines</button>'+conversionActions.map(([action,label])=>'<button type="button" class="btn small ghost" data-ed="'+action+'">'+label+'</button>').join('')+'<button class="btn small ghost" data-ed="format" title="Format document (Ctrl+Shift+F)">Format document</button><button class="btn small ghost" data-ed="download">Save copy</button><button type="button" class="btn small ghost" data-ed="colors" title="Customize syntax and editor colors">Text colors</button><label class="nt-editor-close-preference"><input type="checkbox" data-ed-ask-save-close checked aria-label="Ask to save unsaved changes before closing" aria-describedby="ntEditorClosePolicyNote"> Confirm unsaved close</label><span id="ntEditorClosePolicyNote" data-ed-close-policy-note class="nt-editor-window-announcement"></span></div>'+
  '<div id="ntEditorRemotePanel" class="nt-editor-file-sessions" data-ed-page-panel="remote" hidden><div class="nt-editor-file-session-row"><label class="sr-only" for="ntEditorRemoteSource">Active or saved file connection</label><select id="ntEditorRemoteSource" aria-label="Connected or saved SSH, SFTP, FTP or FTPS session"><option value="">Loading connections...</option></select><button type="button" class="btn small primary" id="ntEditorConnectSaved" data-ed-page="connectSaved" hidden disabled>Connect</button><button type="button" class="btn small primary" id="ntEditorOpenRemote" data-ed-page="useRemote" disabled>Use</button><button type="button" class="btn small ghost" data-ed-page="refreshRemote" title="Refresh active and saved connections" aria-label="Refresh connections">↻</button></div><details class="nt-editor-file-path-actions"><summary class="btn small ghost">Open / create by path</summary><label>Remote file path<input id="ntEditorRemotePath" type="text" spellcheck="false" placeholder="/home/user/config.txt"></label><div class="row"><button type="button" class="btn small ghost" data-ed-page="browseRemote">Browse…</button><button class="btn small ghost" id="ntEditorOpenRemotePath" data-ed-page="openRemotePath" disabled>Open file</button><button class="btn small ghost" id="ntEditorNewRemote" data-ed-page="newRemote" disabled>New file</button></div></details><div class="nt-editor-remote-hint" id="ntEditorRemoteHint" role="status">Select an active or saved connection.</div></div>'+
  '<div class="nt-editor-find" data-ed-find hidden><label>Find <input type="text" data-ed-query placeholder="Find text (Ctrl+F)"></label><button class="btn small ghost" data-ed="previous">Previous</button><button class="btn small ghost" data-ed="next">Next</button><label><input type="checkbox" data-ed-case> Case</label><label><input type="checkbox" data-ed-regex> Regex</label><label><input type="checkbox" data-ed-word> Word</label><div data-ed-replace-fields hidden class="nt-editor-replace-fields"><label>Replace <input type="text" data-ed-replacement placeholder="Replacement text"></label><button class="btn small ghost" data-ed="replaceOne">Replace</button><button class="btn small ghost" data-ed="replaceAll">Replace all</button></div><button type="button" class="btn small ghost" data-ed="hideFind">Hide</button></div>'+
  '<div class="nt-editor-options"><label>Line endings <select data-ed-eol><option>LF</option><option>CRLF</option><option>CR</option></select></label><label>Indent <select data-ed-indent><option value="4">4 spaces</option><option value="2">2 spaces</option><option value="0">Tabs</option></select></label><label><input data-ed-wrap type="checkbox"> Wrap</label><label><input data-ed-syntax type="checkbox" checked> Highlight</label><label>Language <select data-ed-language-select>'+'<option value="" data-ed-auto-language>Auto</option>'+languageRows.map(row=>'<option value="'+escaped(row.id)+'">'+escaped(row.label)+'</option>').join('')+'</select></label><label>Encoding <select data-ed-encoding><option>UTF-8</option><option>UTF-16LE</option><option>UTF-16BE</option></select></label><label><input type="checkbox" data-ed-bom> BOM</label><label>Font size <input type="number" data-ed-font data-input-clear="off" min="10" max="24" step="1" value="13"></label><label>Editor colors <select data-ed-palette><option value="auto">Follow app</option><option value="dark">Dark</option><option value="light">Light</option><option value="pastel">Pastel</option><option value="forest">Forest</option><option value="highContrast">High contrast</option><option value="custom">Custom</option></select></label></div><section class="nt-editor-color-controls" data-ed-custom-palette hidden><div class="row between"><strong>Custom editor colors</strong><button type="button" class="btn small ghost" data-ed="colors">Close</button></div><div data-ed-color-panel></div></section>'+
@@ -807,6 +807,64 @@ function rememberClosedDocument(d){
 }
 async function closeTab(key){const d=documents.get(key);if(!d)return false;if(pendingEditorDialog||documentCloseBlocked(d)||editorComposing()){setMessage('Finish text composition, document saving or the window move before closing it.',true);return false;}const stamp=documentStamp(d);if(closeNeedsConfirmation([d])&&await askEditor({title:'Close file',message:(d.saveFailed?'A previous save failed. ':'')+'Discard unsaved changes to '+nameOf(d.path)+'?',accept:'Discard and close'})===null)return false;if(editorComposing()||documentCloseBlocked(d)||documents.get(key)!==d||documentStamp(d)!==stamp){setMessage('The file changed while the dialog was open. Review it before closing.',true);return false;}const wasActive=active===key;if(d.disk)discardDiskView(d);if(wasActive)displayedDocument=null;rememberClosedDocument(d);documents.delete(key);paneWorkspace()?.refresh(true);if(wasActive)active=[...documents.keys()].at(-1)||'';if(active){if(wasActive)draw();else drawTabs();}else{if(paneWorkspace())disposePaneWorkspace();splitEnabled=false;groups.single();findEl('[data-ed-text]').value='';findEl('[data-ed-text]').disabled=false;findEl('[data-ed-highlight]').textContent='';findEl('[data-ed-gutter-lines]').textContent='';drawTabs();overlay.hidden=!embedded;setMessage('No open documents.');paintGeneration++;root.NTKEditorLanguageService?.cancelHighlight?.();}return true;}
 async function closeAll(){if(pendingEditorDialog||editorComposing()||[...documents.values()].some(d=>documentCloseBlocked(d))){setMessage('Finish text composition, pending saves or window moves before closing the editor.',true);return false;}const snapshot=[...documents.values()].map(d=>({d,stamp:documentStamp(d)})),dirty=snapshot.filter(({d})=>d.dirty);if(closeNeedsConfirmation(snapshot.map(x=>x.d))&&await askEditor({title:'Close editor',message:(snapshot.some(x=>x.d.saveFailed)?'A previous save failed. ':'')+'Discard unsaved changes in '+dirty.length+' file(s)?',accept:'Discard and close'})===null)return false;if(editorComposing()||snapshot.length!==documents.size||snapshot.some(({d,stamp})=>documents.get(d.id)!==d||documentStamp(d)!==stamp||documentCloseBlocked(d))){setMessage('An open file changed. Review it before closing.',true);return false;}for(const {d} of snapshot){rememberClosedDocument(d);if(d.disk)discardDiskView(d);}if(paneWorkspace())disposePaneWorkspace();splitEnabled=false;documents.clear();root.NetworkToolkitEditorWindows?.notifyChanged?.();active='';displayedDocument=null;if(embedded)detachPage();overlay.hidden=true;paintGeneration++;if(paintTimer!==null){root.clearTimeout(paintTimer);paintTimer=null;}root.NTKEditorLanguageService?.dispose?.();return true;}
+const conversionActions = [
+ ['textToHex','Text to hex'], ['hexToText','Hex to text'],
+ ['base64Encode','Base64 encode'], ['base64Decode','Base64 decode']
+];
+
+function convertText(kind, text) {
+ if (kind === 'textToHex' || kind === 'base64Encode') {
+  const bytes = new TextEncoder().encode(text);
+  if (kind === 'textToHex') return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
+  let binary = '';
+  for (let start = 0; start < bytes.length; start += 8192) {
+   binary += String.fromCharCode(...bytes.subarray(start, start + 8192));
+  }
+  return btoa(binary);
+ }
+ const input = text.replace(/\s/g, '');
+ let bytes;
+ if (kind === 'hexToText') {
+  if (!input || input.length % 2 || /[^\da-f]/i.test(input)) throw Error('Select complete pairs of hexadecimal digits.');
+  bytes = new Uint8Array(input.length / 2);
+  for (let i = 0; i < bytes.length; i++) bytes[i] = parseInt(input.slice(i * 2, i * 2 + 2), 16);
+ } else {
+  let decoded;
+  try { decoded = atob(input); } catch { throw Error('The selection is not valid Base64.'); }
+  bytes = Uint8Array.from(decoded, char => char.charCodeAt(0));
+ }
+ try { return new TextDecoder('utf-8', {fatal:true, ignoreBOM:true}).decode(bytes).replace(/\r\n?/g, '\n'); }
+ catch { throw Error('The decoded bytes are not valid UTF-8 text.'); }
+}
+
+async function convertSelection(kind) {
+ const d = current(), ta = findEl('[data-ed-text]'), view = diskView();
+ if (!d || !ta || ta.disabled || d.loading || d.frozen || d.reloading || editorComposing()) return;
+ const range = view?.selection() || {start:ta.selectionStart, end:ta.selectionEnd};
+ if (!(range.end > range.start)) { setMessage('Select the text you want to convert.'); return; }
+ const limit = 1024 * 1024;
+ if (range.end - range.start > limit) { setMessage('Select up to 1 million characters to convert at a time.', true); return; }
+ const revision = d.disk ? d.diskMeta?.revision : d.editRevision;
+ try {
+  const text = view ? await view.selectedText(limit) : d.content.slice(range.start, range.end);
+  const selection = view?.selection() || {start:ta.selectionStart, end:ta.selectionEnd};
+  if (current() !== d || findEl('[data-ed-text]') !== ta || diskView() !== view ||
+      d.loading || d.frozen || d.reloading || editorComposing() ||
+      revision !== (d.disk ? d.diskMeta?.revision : d.editRevision) ||
+      selection.start !== range.start || selection.end !== range.end) return;
+  const converted = convertText(kind, text);
+  if (view) {
+   if (await view.replace(converted, range)) view.select(range.start, range.start + converted.length, 'none', true);
+  } else if (ta.inputElement) {
+   ta.setRangeText(converted, range.start, range.end, 'select');
+   ta.focus();
+  } else if (paneWorkspace()) {
+   ta.setRangeText(converted, range.start, range.end, 'select');
+   ta.dispatchEvent(new Event('input', {bubbles:true}));
+  } else replaceSelection(converted, true);
+ } catch (error) { setMessage(error.message, true); }
+}
+
 function replaceSelection(value,select=false){const paged=diskView();if(paged){const start=paged.selection().start;return paged.replace(value).then(()=>{if(select)paged.select(start,start+value.length,'none',true);}).catch(error=>setMessage(error.message,true));}const el=findEl('[data-ed-text]'),d=current();if(!el||!d||d.loading)return;const a=el.selectionStart,b=el.selectionEnd,next=d.content.slice(0,a)+value+d.content.slice(b);applyEdit(d,next,select?a:a+value.length,a+value.length);}
 function search(backwards=false,replace=false,all=false,focus=true){const d=current(),ta=findEl('[data-ed-text]'),query=findEl('[data-ed-query]')?.value||'';if(!d||!ta||!query)return;
  if(d.disk){void searchDiskDocument(d,query,backwards,replace,all,focus);return;}
@@ -840,6 +898,7 @@ function click(ev){if(ev.target.closest?.('[data-ed-insert-cancel]')){ev.prevent
  case 'replace':showFind=true;showReplace=true;draw();findEl('[data-ed-query]').focus();break;
  case 'hideFind':showFind=false;showReplace=false;draw();break;
  case 'next':search();break;case 'previous':search(true);break;case 'replaceOne':search(false,true);break;case 'replaceAll':search(false,true,true);break;
+ case 'textToHex':case 'hexToText':case 'base64Encode':case 'base64Decode':void convertSelection(el.dataset.ed);break;
  case 'upper':transformSelection('upper');break;case 'lower':transformSelection('lower');break;case 'sortLines':transformSelection('sort');break;case 'format':void formatDocument();break;case 'comment':linesAction('comment');break;case 'duplicate':linesAction('duplicate');break;case 'trim':linesAction('trim');break;
  case 'goto':void goToLine();break;
  case 'download':{exportCopy(current());break;}
@@ -1145,8 +1204,10 @@ async function runTabMenu(action){const uid=tabMenu?.dataset.documentUID,d=[...d
 
 const textMenu=Object.freeze({
  // The text area the right-click menu applies to (single view or the focused split pane).
- target:el=>!!el&&!!overlay&&!overlay.hidden&&el===findEl('[data-ed-text]'),
- state(){const d=current(),ta=findEl('[data-ed-text]'),range=d?.disk?diskView()?.selection():null,a=range?.start??ta?.selectionStart??0,b=range?.end??ta?.selectionEnd??0;return {open:!!d,editable:!!d&&!d.loading&&!d.frozen&&!comparison,selection:!!d&&b>a,empty:!d||!(d.disk?d.diskMeta?.units:d.content.length),canUndo:!!(d?.disk?d.diskMeta?.canUndo:d?.undo?.length),canRedo:!!(d?.disk?d.diskMeta?.canRedo:d?.redo?.length)};},
+ target(el){const ta=findEl('[data-ed-text]'), input=el?.closest?.('[data-compare-text]')||el;return !!input&&!!overlay&&!overlay.hidden&&overlay.contains(input)&&(input===(ta?.inputElement||ta)||input.matches('[data-compare-text]'));},
+ focusTarget(el){el?.closest?.('[data-compare-text]')?.focus({preventScroll:true});},
+ conversions:conversionActions,
+ state(){const d=current(),ta=findEl('[data-ed-text]'),range=d?.disk?diskView()?.selection():null,a=range?.start??ta?.selectionStart??0,b=range?.end??ta?.selectionEnd??0;return {open:!!d,editable:!!d&&!d.loading&&!d.frozen&&!comparison,convertible:!!d&&!d.loading&&!d.frozen&&!d.reloading&&!ta?.disabled,selection:!!d&&b>a,empty:!d||!(d.disk?d.diskMeta?.units:d.content.length),canUndo:!!(d?.disk?d.diskMeta?.canUndo:d?.undo?.length),canRedo:!!(d?.disk?d.diskMeta?.canRedo:d?.redo?.length)};},
  selection(){const d=current(),ta=findEl('[data-ed-text]');if(!d||!ta)return '';return d.content.slice(Math.min(ta.selectionStart,ta.selectionEnd),Math.max(ta.selectionStart,ta.selectionEnd));},
  copy(cut){return current()?.disk?diskView()?.copy(cut):undefined;},
  replace(text){const d=current();if(!d||d.loading||d.frozen||comparison)return false;if(d.disk)return diskView()?.replace(String(text??'')).then(()=>true);replaceSelection(String(text??''));status();return true;},

@@ -73,8 +73,22 @@ async function assertSyncedSourceNavigation(label){
  await page.waitForFunction(()=>document.querySelector('[data-compare-map]').scrollTop>0);
  assert.equal(await left.evaluate(el=>el.closest('.cm-editor').querySelector('.cm-scroller').scrollTop),editorPosition);
  await map.locator('[data-compare-map-marks="left"] .changed').first().click();
- await page.waitForFunction(()=>Number(document.querySelector('[data-compare-track="left"]').getAttribute('aria-valuenow'))===590);
+ await page.waitForFunction(()=>{
+  const line=document.querySelector('[data-compare-pane="left"] [data-source-line="591"]'), scroller=document.querySelector('[data-compare-pane="left"] .cm-scroller'), map=document.querySelector('[data-compare-map]');
+  if(!line)return false;
+  const box=scroller.getBoundingClientRect();
+  return Math.abs(line.getBoundingClientRect().top-box.top-box.height/2)<35&&Math.abs(map.scrollTop+map.clientHeight/2-1180)<3;
+ });
  check('individual-line map separates consecutive changes and scrolls independently before click navigation');
+ const mapRight=page.locator('[data-compare-text="right"]');
+ await page.evaluate(()=>NetworkToolkitFileEditor.comparison.sourceView('right').setSelectionRange(0,9));
+ await mapRight.dispatchEvent('contextmenu',{clientX:800,clientY:330,button:2});
+ await page.locator('#editorContextMenu [data-editor-menu-action="textToHex"]').click();
+ await page.waitForFunction(()=>NetworkToolkitFileEditor.documents.get('map-right').content.startsWith('53796e746865746963'));
+ assert.equal(await compareText('left'),mapLines.join('\n'));
+ await mapRight.press('Control+z');
+ assert.equal(await compareText('right'),revisedMapLines.join('\n'));
+ check('right-click conversion and undo affect only the selected comparison pane');
 
  // Synthetic network configuration only; no user configuration or secret values.
  await page.locator('[data-compare="close"]').click();const config='!Version ArubaOS-CX 10.15.0001\nhostname SYNTHETIC-CX\ninterface 1/1/1\n    description "Synthetic uplink"\n    no shutdown\n    vlan access 120\n';await open('synthetic-cx-a',config);await page.evaluate(()=>{NetworkToolkitFileEditor.active.path='synthetic-a.cfg';NetworkToolkitFileEditor.active.language='';});await open('synthetic-cx-b',config.replace('120','121'));await page.evaluate(()=>{NetworkToolkitFileEditor.active.path='synthetic-b.cfg';NetworkToolkitFileEditor.active.language='';});await page.locator('[data-ed="compare"]').click();await page.selectOption('[data-compare-select="left"]','synthetic-cx-a');await page.selectOption('[data-compare-select="right"]','synthetic-cx-b');await page.waitForFunction(()=>[...document.querySelectorAll('.cm-content[data-compare-text]')].length===2&&[...document.querySelectorAll('.cm-content[data-compare-text]')].every(el=>el.querySelector('[class^="nt-ed-"]')));assert.equal(await compareText('left'),config);assert.equal(await page.evaluate(()=>NTKEditorLanguages.detect('synthetic.cfg',NetworkToolkitFileEditor.documents.get('synthetic-cx-a').content)),'network-aruba-cx');await left.focus();await page.selectOption('[data-ed-language-select]','text');await page.waitForFunction(()=>!document.querySelector('.cm-content[data-compare-text="left"]').querySelector('[class^="nt-ed-"]'));assert.equal(await compareText('left'),config);await page.selectOption('[data-ed-language-select]','');await page.waitForFunction(()=>!!document.querySelector('.cm-content[data-compare-text="left"]').querySelector('[class^="nt-ed-"]'));check('synthetic network Auto/manual Plain/Auto and simultaneous compare highlighting preserve exact bytes');

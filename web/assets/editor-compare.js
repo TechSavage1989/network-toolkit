@@ -24,12 +24,14 @@ function appendRegion(a,b,fromA,toA,fromB,toB,ops,budget){
  }else{for(let i=fromA;i<toA;i++)ops.push({type:'removed',left:i,right:null});for(let j=fromB;j<toB;j++)ops.push({type:'added',left:null,right:j});}
  return true;
 }
-function compare(left,right){
+function compare(left,right,spaces){
  left=String(left);right=String(right);const limitMessage={limited:true,message:'Comparison supports up to 16 MiB and 30,000 lines per document. Both documents remain editable; compare smaller sections for larger files.'};
  if(left.length>LIMITS.characters||right.length>LIMITS.characters)return limitMessage;
  const tooManyLines=text=>{let count=1,at=-1;while((at=text.indexOf('\n',at+1))!==-1)if(++count>LIMITS.lines)return true;return false;};
  if(tooManyLines(left)||tooManyLines(right))return limitMessage;
- const a=left.split('\n'),b=right.split('\n');
+ const normalize=spaces==='all'?line=>line.replace(/[ \t]/g,''):spaces==='changed'?line=>line.replace(/[ \t]+/g,' ').replace(/^ | $/g,''):null;
+ const lines=text=>{const rows=text.split('\n');return normalize?rows.map(normalize):rows;};
+ const a=lines(left),b=lines(right);
  let prefix=0,suffix=0;while(prefix<a.length&&prefix<b.length&&a[prefix]===b[prefix])prefix++;
  while(suffix<a.length-prefix&&suffix<b.length-prefix&&a[a.length-1-suffix]===b[b.length-1-suffix])suffix++;
  const n=a.length-prefix-suffix,m=b.length-prefix-suffix,budget={remaining:LIMITS.cells};
@@ -81,7 +83,127 @@ function createDivider(host,grid,comparing,onResize){
  return {apply:applySplit,dispose:()=>stopSplit({},false)};
 }
 let settingsSequence=0;
-function mountSettings(host){const disclosure=host.querySelector('.nt-compare-settings'),panel=disclosure?.querySelector('div'),summary=disclosure?.querySelector('summary');if(!panel||!summary)return;panel.className='nt-compare-settings-actions';panel.id='ntCompareSettings'+(++settingsSequence);panel.hidden=!disclosure.open;summary.setAttribute('aria-controls',panel.id);summary.setAttribute('aria-expanded',String(disclosure.open));host.querySelector('.nt-compare-tools').after(panel);disclosure.addEventListener('toggle',()=>{panel.hidden=!disclosure.open;summary.setAttribute('aria-expanded',String(disclosure.open));});}
+const differenceControls='[data-compare="previous"],[data-compare="next"],[data-compare="first"],[data-compare="last"]';
+function differenceIndex(current,step,count){return step==='first'?0:step==='last'?count-1:current<0?(step>0?0:count-1):(current+step+count)%count;}
+function mountExtraSettings(host,panel){
+ panel.insertAdjacentHTML('beforeend','<label>Whitespace <select data-compare-spaces><option value="">Exact</option><option value="changed">Ignore changed spaces</option><option value="all">Ignore all spaces</option></select></label>'+
+  '<label><input type="checkbox" data-compare-only> Show only differences</label>'+
+  '<label><input type="checkbox" data-compare-show-map checked> Show change map</label>'+
+  '<button type="button" class="btn small ghost" data-compare="first" disabled>First difference</button>'+
+  '<button type="button" class="btn small ghost" data-compare="last" disabled>Last difference</button>');
+ panel.querySelector('[data-compare-show-map]').addEventListener('change',event=>{
+  const hide=!event.target.checked;
+  host.classList.toggle('is-map-hidden',hide);
+  host.querySelector('.nt-compare-map-panel').hidden=hide;
+ });
+ host.addEventListener('keydown', event => {
+  if (!event.altKey || event.shiftKey || event.isComposing || !['PageUp','PageDown'].includes(event.key)) return;
+  const earlier = event.key === 'PageUp';
+  const action = event.ctrlKey ? (earlier ? 'first' : 'last') : (earlier ? 'previous' : 'next');
+  const button = host.querySelector('[data-compare="' + action + '"]');
+  if (!button || button.disabled) return;
+  event.preventDefault();
+  event.stopPropagation();
+  button.click();
+ }, true);
+}
+
+// Browse one page of a difference at a time, without copying either document
+// into a second editor or mixing alignment gaps into editable source text.
+function mountDifferencePreview(host, read, getSelection) {
+ const toggle = host.querySelector('[data-compare-only]');
+ const grid = host.querySelector('.nt-compare-grid');
+ const panel = document.createElement('section');
+ panel.className = 'nt-compare-preview';
+ panel.hidden = true;
+ panel.innerHTML = '<div class="nt-compare-preview-tools"><span role="status"></span>' +
+  '<button type="button" class="btn small ghost" data-preview-back>Previous lines</button>' +
+  '<button type="button" class="btn small ghost" data-preview-next>Next lines</button>' +
+  '<button type="button" class="btn small ghost" data-preview-edit>Return to editable comparison</button></div>' +
+  '<div class="nt-compare-preview-rows" tabindex="0" aria-label="Changed lines"></div>';
+ const covered = [...grid.children];
+ grid.append(panel);
+ const status = panel.querySelector('[role="status"]'), rows = panel.lastElementChild;
+ const back = panel.querySelector('[data-preview-back]'), next = panel.querySelector('[data-preview-next]');
+ const pageSize = 12;
+ let offset = 0, controller;
+ async function render(reset = false) {
+  if (reset) offset = 0;
+  controller?.abort();
+  panel.hidden = !toggle.checked;
+  for (const child of covered) child.inert = !panel.hidden;
+  if (panel.hidden) return;
+  const selected = getSelection();
+  rows.replaceChildren();
+  back.disabled = next.disabled = true;
+  if (!selected) { status.textContent = 'Choose two documents and run Compare.'; return; }
+  if (!selected.count) { status.textContent = 'No differences.'; return; }
+  status.textContent = 'Loading changed lines…';
+  const pending = new AbortController();
+  controller = pending;
+  try {
+   const page = await read(selected.index, offset, pageSize, pending.signal);
+   if (pending.signal.aborted || !page) return;
+   const {left, right, length} = page;
+   const fragment = document.createDocumentFragment();
+   for (let i = 0; i < Math.min(pageSize, length - offset); i++) {
+    for (const [side, peer] of [[left, right], [right, left]]) {
+     const value = side[i], cell = document.createElement('div');
+     cell.className = 'nt-compare-preview-line ' + (value ? peer[i] ? 'changed' : side === left ? 'removed' : 'added' : 'gap');
+     if (value) {
+      const label = document.createElement('span');
+      label.textContent = String(value.line + 1);
+      const text = document.createElement('code');
+      text.textContent = value.text;
+      cell.append(label, text);
+     }
+     fragment.append(cell);
+    }
+   }
+   rows.replaceChildren(fragment);
+   rows.scrollTop = 0;
+   status.textContent = 'Difference ' + (selected.index + 1) + ' of ' + selected.count +
+    ' · Rows ' + (offset + 1) + '–' + Math.min(length, offset + pageSize) + ' of ' + length;
+   back.disabled = offset === 0;
+   next.disabled = offset + pageSize >= length;
+  } catch (error) {
+   if (!pending.signal.aborted) status.textContent = error.message;
+  }
+ }
+ toggle.addEventListener('change', () => void render(true));
+ back.addEventListener('click', () => { offset -= pageSize; void render(); });
+ next.addEventListener('click', () => { offset += pageSize; void render(); });
+ panel.querySelector('[data-preview-edit]').addEventListener('click', () => {
+  toggle.checked = false;
+  void render(true);
+  host.querySelector('.nt-compare-settings summary').focus();
+ });
+ return {refresh:() => { if (toggle.checked) void render(true); }, dispose:() => controller?.abort()};
+}
+
+function previewSourceLines(text, line, count, first = 0) {
+ const result = [];
+ for (let start = 0; first < line + count && start <= text.length; first++) {
+  const end = text.indexOf('\n', start);
+  if (first >= line) result.push({line:first, text:text.slice(start, end < 0 ? text.length : end)});
+  if (end < 0) break;
+  start = end + 1;
+ }
+ return result;
+}
+function inlineDifferencePage(result, getDocument, index, offset, limit) {
+ const hunk = result.hunks[index], length = hunk.end - hunk.start;
+ const rows = result.rows.slice(hunk.start + offset, hunk.start + Math.min(offset + limit, length));
+ const read = side => {
+  const first = rows.find(row => row[side] !== null)?.[side];
+  if (first === undefined) return [];
+  const last = rows.findLast(row => row[side] !== null)[side];
+  const lines = previewSourceLines(getDocument(side).content, first, last - first + 1);
+  return rows.map(row => row[side] === null ? null : lines[row[side] - first]);
+ };
+ return {length,left:read('left'),right:read('right')};
+}
+function mountSettings(host){const disclosure=host.querySelector('.nt-compare-settings'),panel=disclosure?.querySelector('div'),summary=disclosure?.querySelector('summary');if(!panel||!summary)return;mountExtraSettings(host,panel);panel.className='nt-compare-settings-actions';panel.id='ntCompareSettings'+(++settingsSequence);panel.hidden=!disclosure.open;summary.setAttribute('aria-controls',panel.id);summary.setAttribute('aria-expanded',String(disclosure.open));host.querySelector('.nt-compare-tools').after(panel);disclosure.addEventListener('toggle',()=>{panel.hidden=!disclosure.open;summary.setAttribute('aria-expanded',String(disclosure.open));});}
 // Source-owned horizontal pixels, independent of aligned vertical geometry.
 // Peer clamping must never pull a longer source backward or become a new gesture.
 function createHorizontalSync(read,write,enabled){let source=null;const previous={left:0,right:0},expected={left:null,right:null};
@@ -98,6 +220,7 @@ function create(options){
  mountSettings(host);
  const q=sel=>host.querySelector(sel),panes={left:q('[data-compare-text="left"]'),right:q('[data-compare-text="right"]')},map=q('[data-compare-map]'),mapContent=q('[data-compare-map-content]');
  const tracks={left:q('[data-compare-track="left"]'),right:q('[data-compare-track="right"]')};
+ const preview=comparing&&mountDifferencePreview(host,(index,offset,limit)=>inlineDifferencePage(result,doc,index,offset,limit),()=>result&&!result.limited&&{count:result.hunks.length,index:Math.max(0,selected)});
  const splitControl=createDivider(host,q('.nt-compare-grid'),comparing,()=>refresh(true));
 
  const docs=()=>options.documents(),doc=side=>docs().find(d=>d.id===(side==='left'?leftID:rightID));
@@ -110,11 +233,11 @@ function create(options){
   fill('left',doc('left'),prevLeft!==leftID);fill('right',doc('right'),prevRight!==rightID);
   const l=doc('left'),r=doc('right'),next=[l?.uid||l?.id,l?.editRevision,r?.uid||r?.id,r?.editRevision].join(':');if(force||next!==signature){signature=next;layoutGeneration++;pixelReady=false;map.setAttribute('aria-disabled','true');for(const side of ['left','right'])tracks[side].setAttribute('aria-disabled','true');updateMap();clearTimeout(timer);timer=setTimeout(compute,force?0:120);}else updateMap();
  }
- async function compute(){timer=null;const generation=++layoutGeneration;pixelReady=false;if(disposed)return;const l=doc('left'),r=doc('right');result=comparing&&l&&r&&!l.loading&&!r.loading?compare(l.content,r.content):null;selected=-1;
+ async function compute(){timer=null;const generation=++layoutGeneration;pixelReady=false;if(disposed)return;const l=doc('left'),r=doc('right');result=comparing&&l&&r&&!l.loading&&!r.loading?compare(l.content,r.content,q('[data-compare-spaces]')?.value):null;selected=-1;
   q('[data-compare-summary]').textContent=(alignmentUnavailable?'Aligned editing is unavailable: a local component could not load. Unaligned source editors remain usable. ':'')+(!result?'Choose two open documents to compare.':result.limited?result.message:result.identical?'Documents are identical.':result.hunks.length+' difference'+(result.hunks.length===1?'':'s')+'. Use Previous / Next or the change map.');
   if(result?.limited){for(const side of ['left','right']){q('[data-compare-lines="'+side+'"]').innerHTML='';paintSyntax(side);}drawMap();return;}
   await Promise.all(['left','right'].map(side=>measure(side,generation)));if(disposed||generation!==layoutGeneration)return;pixelReady=true;for(const side of ['left','right']){paintPane(side);paintSyntax(side);}
-  for(const el of host.querySelectorAll('[data-compare="next"],[data-compare="previous"]'))el.disabled=!result?.hunks?.length;
+  for(const el of host.querySelectorAll(differenceControls))el.disabled=!result?.hunks?.length;preview?.refresh?.();
   drawMap();syncScroll(lastSide);
  }
  async function measure(side,generation){const d=doc(side),{ta,height}=metrics(side),lines=(d?.content||'').split('\n');ta.style.setProperty('--nt-compare-gutter',String(Math.max(3,String(lines.length).length))+'ch');const style=root.getComputedStyle(ta),width=Math.max(1,ta.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight)),wrapped=!!options.wordWrap?.(),key=[d?.uid||d?.id,d?.editRevision,width,style.font,style.lineHeight,style.tabSize,wrapped].join(':');if(geometryCache[side]?.key===key){offsets[side]=geometryCache[side].offsets;return;}const values=[0];if(!wrapped){for(let i=0;i<lines.length;i++)values.push(values.at(-1)+height);}else{const node=document.createElement('div');node.className='nt-compare-measure';Object.assign(node.style,{width:width+'px',font:style.font,lineHeight:style.lineHeight,tabSize:style.tabSize||'4'});host.append(node);try{for(let at=0;at<lines.length;at+=250){if(disposed||generation!==layoutGeneration)return;node.innerHTML=lines.slice(at,at+250).map(line=>'<div>'+escape(line||'\u200b')+'</div>').join('');for(const line of node.children)values.push(values.at(-1)+Math.max(height,line.getBoundingClientRect().height));if(lines.length>500)await new Promise(resolve=>root.requestAnimationFrame(resolve));}}finally{node.remove();}}if(generation===layoutGeneration){offsets[side]=values;geometryCache[side]={key,offsets:values};}}
@@ -152,10 +275,10 @@ function create(options){
  function revealMap(side){if(!scale||drag!==null)return;const marker=q('[data-compare-map-viewport="'+side+'"]'),top=parseFloat(marker.style.top)||0,bottom=top+parseFloat(marker.style.height||0);if(top<map.scrollTop)map.scrollTop=top;else if(bottom>map.scrollTop+map.clientHeight)map.scrollTop=Math.min(top,bottom-map.clientHeight);}
  function syncScroll(side,other=true){if(syncing)return;lastSide=side;const ta=panes[side];paintPane(side);remember(side);if(other&&q('[data-compare-sync]').checked&&result?.positions&&pixelReady){syncing=true;const target=side==='left'?'right':'left',a=metrics(side),b=metrics(target),row=rowAtLine(result.positions[side],lineAtOffset(offsets[side],Math.max(0,ta.scrollTop-a.padding)));b.ta.scrollTop=row<=0?0:clamp(offsetAtLine(offsets[target],lineAtRow(result.positions[target],row))+b.padding,0,b.ta.scrollHeight-b.ta.clientHeight);programScroll[target]=b.ta.scrollTop;paintPane(target);remember(target);syncing=false;}updateMap();revealMap(side);}
  function jump(row,center=false,side=lastSide,both=q('[data-compare-sync]').checked){if(!result?.positions||!pixelReady)return;row=clamp(row,0,result.rows.length);lastSide=side;const sides=both?['left','right']:[side];syncing=true;for(const side of sides){const {ta,height,padding}=metrics(side);ta.scrollTop=row<=0?0:clamp(offsetAtLine(offsets[side],lineAtRow(result.positions[side],row))+padding-(center?ta.clientHeight/2:0),0,ta.scrollHeight-ta.clientHeight);programScroll[side]=ta.scrollTop;paintPane(side);remember(side);}syncing=false;updateMap();}
- function difference(step){if(!result?.hunks?.length||!pixelReady)return;selected=selected<0?(step>0?0:result.hunks.length-1):(selected+step+result.hunks.length)%result.hunks.length;const h=result.hunks[selected];jump(h.start,false,lastSide,true);revealMap(lastSide);for(const side of ['left','right']){const d=doc(side),line=h[side];if(d&&line!==null){const start=d.content.split('\n').slice(0,line).reduce((n,s)=>n+s.length+1,0);panes[side].setSelectionRange(start,start+(d.content.split('\n')[line]||'').length);remember(side);}}q('[data-compare-summary]').textContent='Difference '+(selected+1)+' of '+result.hunks.length+' · '+h.type+'.';}
+ function difference(step){if(!result?.hunks?.length||!pixelReady)return;selected=differenceIndex(selected,step,result.hunks.length);preview.refresh();const h=result.hunks[selected];jump(h.start,false,lastSide,true);revealMap(lastSide);for(const side of ['left','right']){const d=doc(side),line=h[side];if(d&&line!==null){const start=d.content.split('\n').slice(0,line).reduce((n,s)=>n+s.length+1,0);panes[side].setSelectionRange(start,start+(d.content.split('\n')[line]||'').length);remember(side);}}q('[data-compare-summary]').textContent='Difference '+(selected+1)+' of '+result.hunks.length+' · '+h.type+'.';}
  function mapPoint(e,side){const r=map.getBoundingClientRect();jump(rowFromPointer(e.clientY,r.top,map.scrollTop,mapContent.offsetHeight,result.rows.length),true,side);}
- host.addEventListener('click',async e=>{const action=e.target.closest?.('[data-compare]');if(!action)return;e.preventDefault();e.stopPropagation();if(action.dataset.compare==='next')difference(1);if(action.dataset.compare==='previous')difference(-1);if(action.dataset.compare==='close')options.close();if(action.dataset.compare==='compute')refresh(true);if(action.dataset.compare==='swap'){for(const side of ['left','right'])remember(side);options.swap?.();[leftID,rightID]=[rightID,leftID];listSignature='';for(const side of ['left','right'])fill(side,doc(side),true);refresh(true);}});
- host.addEventListener('change',e=>{if(e.target.dataset.compareSelect){const side=e.target.dataset.compareSelect;remember(side);if(options.choose)options.choose(side,e.target.value);if(side==='left')leftID=e.target.value;else rightID=e.target.value;signature='';fill(side,doc(side),true);refresh(true);}if(e.target.matches('[data-compare-scale]')){scale=Number(e.target.value)||0;drawMap();const marker=q('[data-compare-map-viewport="'+lastSide+'"]');map.scrollTop=Math.max(0,parseFloat(marker.style.top)-map.clientHeight/2);}if(e.target.matches('[data-compare-sync]'))syncScroll(lastSide);});
+ host.addEventListener('click',async e=>{const action=e.target.closest?.('[data-compare]');if(!action)return;e.preventDefault();e.stopPropagation();if(action.dataset.compare==='first'||action.dataset.compare==='last')difference(action.dataset.compare);if(action.dataset.compare==='next')difference(1);if(action.dataset.compare==='previous')difference(-1);if(action.dataset.compare==='close')options.close();if(action.dataset.compare==='compute')refresh(true);if(action.dataset.compare==='swap'){for(const side of ['left','right'])remember(side);options.swap?.();[leftID,rightID]=[rightID,leftID];listSignature='';for(const side of ['left','right'])fill(side,doc(side),true);refresh(true);}});
+ host.addEventListener('change',e=>{if(e.target.dataset.compareSelect){const side=e.target.dataset.compareSelect;remember(side);if(options.choose)options.choose(side,e.target.value);if(side==='left')leftID=e.target.value;else rightID=e.target.value;signature='';fill(side,doc(side),true);refresh(true);}if(e.target.matches('[data-compare-scale]')){scale=Number(e.target.value)||0;drawMap();const marker=q('[data-compare-map-viewport="'+lastSide+'"]');map.scrollTop=Math.max(0,parseFloat(marker.style.top)-map.clientHeight/2);}if(e.target.matches('[data-compare-spaces]'))refresh(true);if(e.target.matches('[data-compare-sync]'))syncScroll(lastSide);});
  host.addEventListener('focusin',e=>{const side=e.target.dataset.compareText;if(side&&doc(side)){lastSide=side;options.activate(doc(side),side);for(const name of ['left','right'])q('[data-compare-pane="'+name+'"]').classList.toggle('is-active-view',name===side);updateMap();}});
  host.addEventListener('input',async e=>{const side=e.target.dataset.compareText;if(!side)return;let d=doc(side);if(!d&&!comparing){const text=e.target.value,start=e.target.selectionStart,end=e.target.selectionEnd;d=await options.createInView?.(side);if(disposed)return;if(d){options.edit(d,text);refresh(true);panes[side].setSelectionRange(start,end);panes[side].focus();remember(side);}return;}if(d){options.edit(d,e.target.value);remember(side);refresh();}});
  host.addEventListener('scroll',e=>{const side=e.target.dataset.compareText;if(side){if(programScroll[side]!==null&&Math.abs(e.target.scrollTop-programScroll[side])<1){programScroll[side]=null;paintPane(side);remember(side);updateMap();return;}programScroll[side]=null;syncScroll(side);}},true);
@@ -177,7 +300,7 @@ function create(options){
  }
 
  const observer=typeof ResizeObserver==='function'?new ResizeObserver(()=>{splitControl.apply();refresh(true);}):null;observer?.observe(map);observer?.observe(q('.nt-compare-grid'));splitControl.apply();for(const side of ['left','right'])observer?.observe(panes[side]);refresh(true);
- return {refresh,difference,jump,get textarea(){return panes[options.activeSide?.()||lastSide];},get activeSide(){return lastSide;},scrollActive(){syncScroll(options.activeSide?.()||lastSide,false);},positionAt(offset,focus=true){const side=options.activeSide?.()||lastSide,ta=panes[side],d=doc(side);if(!d)return;lastSide=side;ta.setSelectionRange(offset,offset);if(focus)ta.focus({preventScroll:true});const line=d.content.slice(0,offset).split('\n').length-1;ta.scrollTop=Math.max(0,(offsets[side][line]||0)-metrics(side).height);syncScroll(side,false);},showDocument(id){if(!docs().some(d=>d.id===id))return;const side=options.sideOf?.(docs().find(d=>d.id===id)?.uid)||(leftID===id?'left':rightID===id?'right':lastSide);lastSide=side;remember(side);if(side==='left')leftID=id;else rightID=id;listSignature='';fill(side,doc(side),true);refresh(true);panes[side].focus({preventScroll:true});},undo(redo=false){const d=doc(lastSide);if(d){options.undo(d,redo);refresh(true);}},snapshot(){for(const side of ['left','right'])remember(side);return {left:leftID,right:rightID,scale,sync:q('[data-compare-sync]').checked};},restore(value){if(!value)return;const activeBefore=options.active()?.id;leftID=String(value.left||'');rightID=String(value.right||'');options.choose?.('left',leftID);options.choose?.('right',rightID);if([leftID,rightID].includes(activeBefore)){const activeDocument=docs().find(d=>d.id===activeBefore);if(activeDocument)options.activate(activeDocument,options.sideOf?.(activeDocument.uid));}scale=[0,.5,1,2,4].includes(value.scale)?value.scale:0;q('[data-compare-scale]').value=String(scale);q('[data-compare-sync]').checked=value.sync!==false;refresh(true);},get result(){return result;},get selection(){return {left:leftID,right:rightID};},dispose(){splitControl.dispose();disposed=true;layoutGeneration++;clearTimeout(timer);root.NTKEditorLanguageService?.cancelHighlight?.('compare-left');root.NTKEditorLanguageService?.cancelHighlight?.('compare-right');for(const side of ['left','right'])remember(side);observer?.disconnect();host.replaceChildren();}};
+ return {refresh,difference,jump,get textarea(){return panes[options.activeSide?.()||lastSide];},get activeSide(){return lastSide;},scrollActive(){syncScroll(options.activeSide?.()||lastSide,false);},positionAt(offset,focus=true){const side=options.activeSide?.()||lastSide,ta=panes[side],d=doc(side);if(!d)return;lastSide=side;ta.setSelectionRange(offset,offset);if(focus)ta.focus({preventScroll:true});const line=d.content.slice(0,offset).split('\n').length-1;ta.scrollTop=Math.max(0,(offsets[side][line]||0)-metrics(side).height);syncScroll(side,false);},showDocument(id){if(!docs().some(d=>d.id===id))return;const side=options.sideOf?.(docs().find(d=>d.id===id)?.uid)||(leftID===id?'left':rightID===id?'right':lastSide);lastSide=side;remember(side);if(side==='left')leftID=id;else rightID=id;listSignature='';fill(side,doc(side),true);refresh(true);panes[side].focus({preventScroll:true});},undo(redo=false){const d=doc(lastSide);if(d){options.undo(d,redo);refresh(true);}},snapshot(){for(const side of ['left','right'])remember(side);return {left:leftID,right:rightID,scale,sync:q('[data-compare-sync]').checked};},restore(value){if(!value)return;const activeBefore=options.active()?.id;leftID=String(value.left||'');rightID=String(value.right||'');options.choose?.('left',leftID);options.choose?.('right',rightID);if([leftID,rightID].includes(activeBefore)){const activeDocument=docs().find(d=>d.id===activeBefore);if(activeDocument)options.activate(activeDocument,options.sideOf?.(activeDocument.uid));}scale=[0,.5,1,2,4].includes(value.scale)?value.scale:0;q('[data-compare-scale]').value=String(scale);q('[data-compare-sync]').checked=value.sync!==false;refresh(true);},get result(){return result;},get selection(){return {left:leftID,right:rightID};},dispose(){preview?.dispose?.();splitControl.dispose();disposed=true;layoutGeneration++;clearTimeout(timer);root.NTKEditorLanguageService?.cancelHighlight?.('compare-left');root.NTKEditorLanguageService?.cancelHighlight?.('compare-right');for(const side of ['left','right'])remember(side);observer?.disconnect();host.replaceChildren();}};
 }
-const api=Object.freeze({LIMITS,compare,lineAtRow,rowAtLine,viewport,offsetAtLine,lineAtOffset,mapHeight,rowFromPointer,splitBounds,splitRatio,createDivider,mountSettings,createHorizontalSync,create});root.NTKEditorCompare=api;if(typeof module==='object'&&module.exports)module.exports=api;
+const api=Object.freeze({LIMITS,compare,lineAtRow,rowAtLine,viewport,offsetAtLine,lineAtOffset,mapHeight,rowFromPointer,splitBounds,splitRatio,createDivider,mountSettings,mountDifferencePreview,inlineDifferencePage,previewSourceLines,differenceIndex,differenceControls,createHorizontalSync,create});root.NTKEditorCompare=api;if(typeof module==='object'&&module.exports)module.exports=api;
 })(typeof window==='undefined'?globalThis:window);

@@ -19,7 +19,8 @@ function items(s){const sel=s.selection;return [
  ['cut','Cut','cut','Ctrl+X',s.editable&&sel],['copy','Copy','copy','Ctrl+C',sel],['paste','Paste','clipboard','Ctrl+V',s.editable&&!!navigator.clipboard?.readText],['selectAll','Select all','selectAll','Ctrl+A',!s.empty],null,
  ['sendTerminal',sel?'Send selection to terminal…':'Send document to terminal…','sendTerminal','Ctrl+Shift+Enter',!s.empty&&!!root.NetworkToolkitEditorSendTerminal?.available?.()],null,
  ['find','Find','search','Ctrl+F',s.open],['replace','Replace','search','Ctrl+H',s.editable],['goto','Go to line','goto','Ctrl+G',s.open],null,
- ['comment','Toggle comment','comment','Ctrl+/',s.editable],['duplicate','Duplicate line','duplicate','Ctrl+D',s.editable],['upper','UPPERCASE','textCase','',s.editable&&sel],['lower','lowercase','textCase','',s.editable&&sel],['format','Format document','format','Ctrl+Shift+F',s.editable&&!s.empty]];}
+ ['comment','Toggle comment','comment','Ctrl+/',s.editable],['duplicate','Duplicate line','duplicate','Ctrl+D',s.editable],['upper','UPPERCASE','textCase','',s.editable&&sel],['lower','lowercase','textCase','',s.editable&&sel],['format','Format document','format','Ctrl+Shift+F',s.editable&&!s.empty],null,
+ ...(api()?.conversions||[]).map(([action,label])=>[action,label,'textCase','',s.convertible&&sel])];}
 function close(focus=true){if(!menu)return;menu.remove();menu=null;if(focus)restore?.();restore=null;}
 function open(x,y){const t=api();if(!t)return false;close(false);const s=t.state();if(!s.open)return false;
  menu=document.createElement('div');menu.id='editorContextMenu';menu.className='terminal-context-menu nt-editor-context-menu';menu.setAttribute('role','menu');menu.setAttribute('aria-label','Text Editor actions');
@@ -43,13 +44,13 @@ async function run(action){const t=api();if(!t)return;close(false);t.focus();
   default:t.run(action);
  }}catch{toastMessage(action==='paste'?'The clipboard could not be read. Use Ctrl+V instead.':'The clipboard is not available. Use the keyboard shortcut instead.','error');}
  if(sameDocument()&&!['find','replace','goto','sendTerminal'].includes(action))t.focus();}
-document.addEventListener('contextmenu',event=>{const t=api();if(!t?.target(event.target))return;event.preventDefault();event.stopImmediatePropagation();let x=event.clientX,y=event.clientY;if(!Number.isFinite(x)||!Number.isFinite(y)||x<=0&&y<=0){const r=event.target.getBoundingClientRect();x=r.left+24;y=r.top+24;}open(x,y);},true);
+document.addEventListener('contextmenu',event=>{const t=api();if(!t?.target(event.target))return;event.preventDefault();event.stopImmediatePropagation();let x=event.clientX,y=event.clientY;if(!Number.isFinite(x)||!Number.isFinite(y)||x<=0&&y<=0){const r=event.target.getBoundingClientRect();x=r.left+24;y=r.top+24;}t.focusTarget?.(event.target);open(x,y);},true);
 document.addEventListener('keydown',event=>{
  if(menu){const list=[...menu.querySelectorAll('button:not(:disabled)')],at=list.indexOf(document.activeElement);
   if(event.key==='Escape'||event.key==='Tab'){event.preventDefault();event.stopImmediatePropagation();close(true);return;}
   if(['ArrowDown','ArrowUp','Home','End'].includes(event.key)){event.preventDefault();event.stopImmediatePropagation();const next=event.key==='Home'?0:event.key==='End'?list.length-1:(at+(event.key==='ArrowUp'?-1:1)+list.length)%list.length;list[next]?.focus({preventScroll:true});return;}
   return;}
- const t=api();if((event.key==='ContextMenu'||event.shiftKey&&event.key==='F10')&&t?.target(event.target)){event.preventDefault();event.stopImmediatePropagation();const r=event.target.getBoundingClientRect();open(r.left+24,r.top+24);}
+ const t=api();if((event.key==='ContextMenu'||event.shiftKey&&event.key==='F10')&&t?.target(event.target)){event.preventDefault();event.stopImmediatePropagation();const r=event.target.getBoundingClientRect();t.focusTarget?.(event.target);open(r.left+24,r.top+24);}
 },true);
 document.addEventListener('click',event=>{const button=event.target.closest?.('[data-editor-menu-action]');if(!button||!menu?.contains(button))return;event.preventDefault();event.stopImmediatePropagation();if(!button.disabled)void run(button.dataset.editorMenuAction);},true);
 document.addEventListener('pointerdown',event=>{if(menu&&!menu.contains(event.target))close(false);},true);

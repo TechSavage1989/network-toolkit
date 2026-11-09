@@ -8,6 +8,10 @@ Open or create a document, review its source/connection, then edit. Save explici
 ## Compare
 Choose two documents in the comparison view. The change map shows individual changed lines on the left and right tracks. Use the wheel or the map's scrollbar to browse it independently, then click a mark to jump to that line. Sync scroll keeps the comparison panes together as you navigate.
 
+Choose **Show only differences** in **Options** to browse changed blocks with their original line numbers. Use **Previous** and **Next** to switch blocks. Open **Options** to jump to the first or last difference, hide the change map, or ignore spacing differences. **Ignore changed spaces** ignores indentation and the width of spaces and tabs between words. **Ignore all spaces** skips spaces and tabs anywhere on a line.
+
+Select text, then open **More** or right-click the selection to convert between UTF-8 text and hex or Base64. The result replaces the selection and can be undone. Each conversion accepts a selection of about one million characters.
+
 Detached Editor windows have a minimum width of 640 pixels.
 
 Starting with v1.21.20 Beta 1, large text files use temporary disk storage and display only the section you are working on. Open, edit, save and compare files without a fixed file-size or line-count limit. Opening, searching, comparing and saving still take time to read or write the data, and large files need space for temporary working copies.

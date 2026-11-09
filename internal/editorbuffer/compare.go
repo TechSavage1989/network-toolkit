@@ -133,6 +133,12 @@ type CompareProgress struct {
 	RightBytes int64 `json:"rightBytes"`
 }
 
+type CompareOptions struct {
+	// Spaces can be "changed" to ignore indentation and runs of spaces and
+	// tabs, or "all" to ignore spaces and tabs anywhere in a line.
+	Spaces string
+}
+
 const compareLookahead = 128
 
 type lineSignature [sha256.Size]byte
@@ -148,25 +154,59 @@ type lineSignatures struct {
 	end         int64
 	bytesRead   int64
 	notifyChunk func()
+	options     CompareOptions
 }
 
-func newLineSignatures(ctx context.Context, in ComparisonInput, reverse bool, lines int64) *lineSignatures {
+func newLineSignatures(ctx context.Context, in ComparisonInput, reverse bool, lines int64, options CompareOptions) *lineSignatures {
 	return &lineSignatures{
-		ctx: ctx, reader: bufio.NewReaderSize(in.reader(ctx, reverse), ChunkBytes), end: lines,
+		ctx: ctx, reader: bufio.NewReaderSize(in.reader(ctx, reverse), ChunkBytes), end: lines, options: options,
 	}
 }
 
 func (s *lineSignatures) next() (lineSignature, error) {
 	var signature lineSignature
+	seen, pendingSpace := false, false
 	for {
 		if err := s.ctx.Err(); err != nil {
 			return signature, err
 		}
 		part, err := s.reader.ReadSlice('\n')
 		s.bytesRead += int64(len(part))
+		if err == nil {
+			part = part[:len(part)-1]
+		}
+		if s.options.Spaces != "" {
+			// Normalize in place in either read direction. Retain space state
+			// across chunks so a single long line stays bounded.
+			n := 0
+			for _, b := range part {
+				if b == ' ' || b == '\t' {
+					if s.options.Spaces == "changed" {
+						pendingSpace = seen
+					}
+					continue
+				}
+				if pendingSpace {
+					if n == 0 {
+						// Emit a carried separator without growing this chunk.
+						if s.longLine == nil {
+							s.longLine = sha256.New()
+						}
+						s.longLine.Write([]byte{' '})
+					} else {
+						part[n] = ' '
+						n++
+					}
+					pendingSpace = false
+				}
+				part[n] = b
+				n++
+				seen = true
+			}
+			part = part[:n]
+		}
 		switch err {
 		case nil:
-			part = part[:len(part)-1]
 		case io.EOF:
 			// The line count includes the empty line after a final newline.
 		case bufio.ErrBufferFull:
@@ -250,9 +290,9 @@ func nearestAnchor(left, right *lineSignatures, positions map[lineSignature]int)
 	return int64(bestLeft), int64(bestRight), bestRun > 0
 }
 
-func commonSuffix(ctx context.Context, left, right ComparisonInput, maxLines int64, progress func(int64, int64)) (int64, int64, int64, error) {
-	a := newLineSignatures(ctx, left, true, maxLines)
-	b := newLineSignatures(ctx, right, true, maxLines)
+func commonSuffix(ctx context.Context, left, right ComparisonInput, maxLines int64, progress func(int64, int64), options CompareOptions) (int64, int64, int64, error) {
+	a := newLineSignatures(ctx, left, true, maxLines, options)
+	b := newLineSignatures(ctx, right, true, maxLines, options)
 	report := func() { progress(a.bytesRead, b.bytesRead) }
 	a.notifyChunk, b.notifyChunk = report, report
 	for a.line < maxLines {
@@ -280,11 +320,15 @@ func commonSuffix(ctx context.Context, left, right ComparisonInput, maxLines int
 // regions. Distant reordered regions may be grouped into one change. The
 // result is a useful line comparison without a quadratic full-file matrix.
 func Compare(ctx context.Context, left, right ComparisonInput, emit func(Difference) error, progress func(CompareProgress)) error {
+	return CompareWithOptions(ctx, left, right, emit, progress, CompareOptions{})
+}
+
+func CompareWithOptions(ctx context.Context, left, right ComparisonInput, emit func(Difference) error, progress func(CompareProgress), options CompareOptions) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	a := newLineSignatures(ctx, left, false, left.Lines())
-	b := newLineSignatures(ctx, right, false, right.Lines())
+	a := newLineSignatures(ctx, left, false, left.Lines(), options)
+	b := newLineSignatures(ctx, right, false, right.Lines(), options)
 	var current Difference
 	var hasChange, searchedSuffix bool
 	var suffix int64
@@ -348,7 +392,7 @@ func Compare(ctx context.Context, left, right ComparisonInput, emit func(Differe
 		if !found && !searchedSuffix {
 			searchedSuffix = true
 			var err error
-			suffix, leftReverse, rightReverse, err = commonSuffix(ctx, left, right, min(a.end-a.line, b.end-b.line), report)
+			suffix, leftReverse, rightReverse, err = commonSuffix(ctx, left, right, min(a.end-a.line, b.end-b.line), report, options)
 			if err != nil {
 				return err
 			}

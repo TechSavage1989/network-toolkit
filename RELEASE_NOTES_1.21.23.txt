@@ -1,0 +1,13 @@
+Network Toolkit 1.21.23 Beta 1
+
+## What's New
+
+- Show only changed blocks in Compare, skip spacing differences, or jump to the first or last change.
+- Convert selected text to or from hex and Base64 using More or the right-click menu.
+- Each editor pane uses one full-document scrollbar. Undo keeps the current view, and clicking the change map centers the selected area.
+
+## Additional Details
+
+- The differences-only view shows source line numbers and loads changed rows a page at a time.
+- The comparison legend and change symbols are visible beside the editor.
+- This beta is opt-in. Enable beta updates to receive it through the app.

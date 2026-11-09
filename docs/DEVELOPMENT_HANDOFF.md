@@ -1,3 +1,11 @@
+# v1.21.23 Beta 1 - Compare filters and text conversion
+
+The working branch hides the temporary page scrollbar, restores the disk comparison legend and symbols, preserves the viewport through undo and redo, and centers map clicks. Compare Options add whitespace matching modes, a map visibility switch, and jumps to the first and last difference. The read-only differences view pages through changed rows without loading the whole document. More and the text context menu provide selection-based UTF-8 hex and Base64 conversion.
+
+The disk-backed renderer still needs display-only gap rows and an aligned map coordinate system.
+
+---
+
 # v1.21.22 Beta 1 - Editor change map
 
 Comparison defaults to individual one-pixel marks with a shared map scrollbar. The wheel pans the map independently, and clicking a mark navigates the editor. Inline comparisons still offer Fit entire document under Options.

@@ -297,6 +297,17 @@ function create({request, exportRange, changed = () => {}, failed = () => {}, id
   return promise;
  }
 
+ async function previewWindow(line, signal) {
+  await flush();
+  ensure();
+  const revision = metadata.revision;
+  const value = await request('window', {line, limit:PAGE_UNITS, align:true}, signal);
+  if (closed || hasChanges() || value.revision !== revision || metadata.revision !== revision) {
+   throw Error('The comparison source changed. Run Compare again.');
+  }
+  return value;
+ }
+
  async function replace(from, to, text) {
   await flush();
   ensure();
@@ -442,7 +453,7 @@ function create({request, exportRange, changed = () => {}, failed = () => {}, id
  }
 
  return Object.freeze({
-  change, flush, load, prefetch, replace, history, readParts, readText, readBlob, find, save, reload,
+  change, flush, load, prefetch, previewWindow, replace, history, readParts, readText, readBlob, find, save, reload,
   cancelRead,
   initialize(value) { ensure(); receive(value); notify(); },
   state,
