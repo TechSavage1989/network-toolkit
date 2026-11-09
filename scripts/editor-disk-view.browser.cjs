@@ -95,6 +95,34 @@ fs.mkdirSync(out,{recursive:true});
   await page.getByRole('scrollbar',{name:'Section of long source line'}).press('End');
   await page.waitForFunction(()=>session.state().page.start>8*1024*1024*1024-1000);
   assert.ok(await editor.evaluate(ta=>ta.value.length<=49152));
+
+  // Native textarea selection and visible syntax text share a baseline deep
+  // inside a page, where fractional line heights can accumulate error.
+  await page.evaluate(async()=>{
+   view.dispose();session.close();
+   const text=Array.from({length:1024},(_,i)=>'set alias FIXTURE_'+String(i).padStart(4,'0')).join('\n');
+   const metadata={revision:1,units:text.length,lines:1024};
+   session=NTKEditorDiskSession.create({request:async(action,p)=>{
+    if(action!=='window')throw Error('Unexpected syntax fixture request '+action);
+    const start=p.start||0, prefix=text.slice(0,start);
+    return {...metadata,start,line:prefix.split('\n').length-1,column:start-prefix.lastIndexOf('\n')-1,
+     lineUnits:22,text:text.slice(start,start+p.limit)};
+   }});
+   session.initialize(metadata);
+   window.NTKEditorLanguageService={highlight:async source=>({html:source.replace(/FIXTURE_\d{4}/g,
+    token=>'<span class="nt-ed-string">'+token+'</span>')})};
+   const container=document.querySelector('.nt-editor-code');
+   container.style.fontSize='13px';
+   view=NTKEditorDiskView.create({textarea:document.querySelector('textarea'),gutter:document.getElementById('lines'),
+    container,session,syntaxLanguage:()=> 'fixture',readOnly:true});
+   await view.load({start:0});
+   await view.goLine(846);
+  });
+  const token=page.locator('.nt-editor-disk-highlight .nt-ed-string').filter({hasText:'FIXTURE_0850'});
+  await token.waitFor();
+  const box=await token.boundingBox();
+  await page.mouse.dblclick(box.x+box.width/2,box.y+box.height*.8);
+  assert.equal(await editor.evaluate(ta=>ta.value.slice(ta.selectionStart,ta.selectionEnd)),'FIXTURE_0850');
   assert.equal(report.errors.length,0);report.passed=true;
  }finally{fs.writeFileSync(path.join(out,'editor-disk-view-report.json'),JSON.stringify(report,null,2));await browser.close();}
  console.log(JSON.stringify(report));

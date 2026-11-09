@@ -2,6 +2,7 @@
 
 - Wrap large files in the editor and in Compare. Keep source line numbers on the first visual row and use gray spacers to align matching text.
 - More and Compare Options open beneath their buttons. Compare settings include navigation wraparound, changed-text selection in standard comparisons, and summary visibility.
+- Text selection stays on the visible text. Compare keeps matching policy blocks aligned when new blocks contain repeated settings.
 
 ## 1.21.26 Beta 1 - Continuous differences-only comparison
 

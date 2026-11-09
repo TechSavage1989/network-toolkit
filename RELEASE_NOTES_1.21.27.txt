@@ -4,6 +4,7 @@ Network Toolkit 1.21.27 Beta 1
 
 - Word Wrap works in the large-file editor and Compare. Continuation rows leave the gutter blank, and gray spacers keep matching lines aligned.
 - More and Compare Options open beneath their buttons. Compare settings include navigation wraparound, changed-text selection in standard comparisons, and summary visibility.
+- Text selection stays on the visible text. Compare keeps matching policy blocks aligned when new blocks contain repeated settings.
 
 ## Additional Details
 

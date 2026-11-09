@@ -22,6 +22,52 @@ async function waitForEngine(page, predicate, timeout = 30000) {
   throw Error('The editor engine did not reach the expected fixture state.');
 }
 
+async function verifyRepeatedPolicies(page) {
+  const policy = (id, action = 'accept') => [
+    '    edit ' + id,
+    '        set srcintf "port1"',
+    '        set dstintf "port2"',
+    '        set action ' + action,
+    '    next',
+  ];
+  const ids = Array.from({length:12}, (_, i) => 10000 + i);
+  const config = lines => ['config firewall policy', ...lines, 'end', ''].join('\n');
+  const before = config(ids.flatMap(id => policy(id)));
+  const after = config([
+    ...[20000, 20001, 20002].flatMap(id => policy(id)),
+    ...ids.flatMap(id => policy(id, id === ids.at(-1) ? 'deny' : 'accept')),
+  ]);
+  // Use the same disk-backed route as the real files without adding another
+  // large on-disk fixture just to demonstrate the repeated-policy anchor.
+  await page.evaluate(async ({before, after}) => {
+    for (const [id, content] of [['policies-before', before], ['policies-after', after]]) {
+      const file = new File([content], id + '.conf');
+      await NetworkToolkitFileEditor.open({
+        id, path:file.name, source:'Synthetic FortiOS fixture', binding:{kind:'localDraft'},
+        create:true, diskMode:'upload', diskFile:file, read:async()=>({content}), write:async()=>({}),
+      });
+    }
+  }, {before, after});
+  await page.locator('[data-ed="compare"]').click();
+  await page.selectOption('[data-compare-select="left"]', 'policies-before');
+  await page.selectOption('[data-compare-select="right"]', 'policies-after');
+  await page.waitForFunction(() => document.querySelector('[data-compare-summary]')?.dataset.compareDone === 'true');
+  assert.equal(await page.locator('[data-compare-summary]').getAttribute('data-compare-count'), '2');
+  await page.locator('.nt-compare-settings summary').click();
+  await page.check('[data-compare-only]');
+  const preview = page.locator('.nt-compare-preview');
+  for (const id of [20000, 20001, 20002]) {
+    await preview.locator('.nt-compare-preview-line.added code').filter({hasText:'edit ' + id}).waitFor();
+  }
+  assert.equal(await preview.locator('code').filter({hasText:'edit 10000'}).count(), 0);
+  await preview.getByRole('button', {name:'Return to editable comparison'}).click();
+  await page.waitForFunction(() => {
+    const line = (side, n) => [...document.querySelector('[data-disk-compare-gutter="'+side+'"]').children]
+      .find(row => row.textContent === n)?.getBoundingClientRect().top;
+    return Math.abs(line('left', '2') - line('right', '17')) < 2;
+  });
+}
+
 async function main() {
   const browser = await chromium.launch({ headless: true, ignoreDefaultArgs:['--hide-scrollbars'],
     ...(process.env.TOOLKIT_BROWSER_EXECUTABLE ? { executablePath: process.env.TOOLKIT_BROWSER_EXECUTABLE } : {}) });
@@ -419,10 +465,14 @@ async function main() {
     assert.ok(report.timing.pageUnits < 128 * 1024, 'renderer received a bounded page');
     assert.ok(report.timing.inputSamples >= head.length + tail.length + 1, 'timed each edit event');
     assert.ok(report.timing.frameP99Ms < 100 && report.timing.inputP95Ms < 100, JSON.stringify(report.timing));
-    assert.deepEqual(report.browserErrors, []);
     report.phase = 'close';
     assert.ok(await page.evaluate(() => NetworkToolkitFileEditor.closeAll()));
     await waitForEngine(page, state => state.grants === 0 && state.comparisons === 0);
+    report.phase = 'fortios-policy-alignment';
+    await verifyRepeatedPolicies(page);
+    assert.ok(await page.evaluate(() => NetworkToolkitFileEditor.closeAll()));
+    await waitForEngine(page, state => state.grants === 0 && state.comparisons === 0);
+    assert.deepEqual(report.browserErrors, []);
     report.passed = true;
     report.phase = 'verified';
   } finally {

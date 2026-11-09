@@ -22,8 +22,8 @@ function createMeasure(container) {
  return measure;
 }
 
-function layoutRows(measure, text, {width, font, height, letterSpacing, tabSize}, previous) {
- Object.assign(measure.style, {width:width + 'px', font, lineHeight:height + 'px', letterSpacing, tabSize});
+function layoutRows(measure, text, {width, height, letterSpacing, tabSize}, previous) {
+ Object.assign(measure.style, {width:width + 'px', font:'inherit', letterSpacing, tabSize});
  const lines = text.split('\n');
  const oldLines = previous?.lines || [];
  let first = 0, end = lines.length, oldEnd = oldLines.length;
@@ -332,18 +332,28 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
 
  function metrics() {
   const style = root.getComputedStyle(textarea);
-  rowHeight = parseFloat(style.lineHeight) || 20;
   const fontStyle = style.font || style.fontSize + ' ' + style.fontFamily;
-  if (fontStyle !== font) {
+  const metricKey = fontStyle + '/' + style.lineHeight;
+  const changedMetrics = metricKey !== font;
+  if (changedMetrics) {
    const context = document.createElement('canvas').getContext('2d');
    if (context) {
     context.font = fontStyle;
     characterWidth = context.measureText('0').width || 8;
    }
-   font = fontStyle;
+   // CSSOM rounds line-height differently from the native editor's line
+   // boxes. Measure one box so hundreds of rows cannot accumulate drift.
+   const probe = createMeasure(container);
+   probe.style.font = 'inherit';
+   probe.textContent = '0';
+   const height = probe.getBoundingClientRect().height;
+   probe.remove();
+   rowHeight = height || parseFloat(style.lineHeight) || 20;
+   if (height) font = metricKey;
   }
   clientRows = Math.max(1, Math.floor(textarea.clientHeight / rowHeight));
   clientColumns = Math.max(1, Math.floor(textarea.clientWidth / characterWidth));
+  return changedMetrics;
  }
 
  function refreshWrap(force = false) {
@@ -351,7 +361,10 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
   const style = root.getComputedStyle(textarea);
   const next = wordWrap() === true;
   const key = next ? [textarea.clientWidth, style.font, style.lineHeight, style.tabSize, style.letterSpacing].join(':') : '';
-  if (!force && next === wrapped && key === wrapStyle) return;
+  if (!force && next === wrapped && key === wrapStyle) {
+   if (metrics()) schedulePaint();
+   return;
+  }
   const saved = viewAnchor();
   wrapped = next;
   wrapStyle = key;
