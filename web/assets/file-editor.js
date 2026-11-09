@@ -1235,7 +1235,6 @@ function tabMenuKey(event){if(!tabMenu)return;const items=[...tabMenu.querySelec
 async function runTabMenu(action){const uid=tabMenu?.dataset.documentUID,d=[...documents.values()].find(d=>d.uid===uid);if(action==='compareTo'&&d){openCompareTabMenu(d);return;}closeTabMenu(false);if(!d)return;activateDocument(d.id);try{if(action==='save')await save();else if(action==='saveAs')await save(true);else if(action==='reload')await reload();else if(action==='move')moveDocumentToView(uid);else if(action==='detach')await root.NetworkToolkitEditorWindows.move([uid],'new');else if(action==='copyName'||action==='copyPath')await root.copyText(action==='copyName'?nameOf(d.path):d.path);else{const list=paneWorkspace()?groups.list(groups.sideOf(uid)):[...documents.values()],at=list.indexOf(d);if(action==='stepLeft'){if(at>0)reorderDocument(uid,list[at-1].uid);}else if(action==='stepRight'){if(at>=0&&at<list.length-1)reorderDocument(uid,list[at+2]?.uid||null);}else if(action==='first')reorderDocument(uid,list[0]?.uid||null);else if(action==='last'){const after=[...documents.values()].find((other,index,all)=>index>all.indexOf(list.at(-1)));reorderDocument(uid,after?.uid||null);}else{const chosen=action==='close'?[d]:action==='others'?list.filter(x=>x!==d):action==='following'?list.slice(at+1):[];for(const item of chosen)if(!await closeTab(item.id))break;}}}catch(error){setMessage(error.message,true);}}
 
 const compareMenuControls=[
- ['compareRun','Recalculate comparison','[data-compare="compute"]'],
  ['compareSwap','Swap comparison sides','[data-compare="swap"]'],
  ['compareFirst','First difference','[data-compare="first"]'],
  ['comparePrevious','Previous difference','[data-compare="previous"]'],
@@ -1258,7 +1257,7 @@ const textMenu=Object.freeze({
  conversions:conversionActions,
  compareActions(){
   if(!comparison)return [];
-  return [['compareOptions','Compare options...',true],...compareMenuControls.flatMap(([action,label,selector,value])=>{
+  return [['compareOptions','Compare options...',true],['compareRun','Recalculate comparison',!comparison.composing],...compareMenuControls.flatMap(([action,label,selector,value])=>{
    const control=comparisonHost.querySelector(selector);
    if(!control)return [];
    const checked=control.type==='checkbox'?control.checked:value===undefined?undefined:control.value===value;
@@ -1276,6 +1275,11 @@ const textMenu=Object.freeze({
    const disclosure=comparisonHost.querySelector('.nt-compare-settings');
    disclosure.open=true;
    disclosure.querySelector('summary').focus({preventScroll:true});
+   return true;
+  }
+  if(comparison&&action==='compareRun'){
+   if(comparison.composing)return false;
+   if(comparison.recalculate)void comparison.recalculate();else comparison.refresh(true);
    return true;
   }
   const compareControl=compareMenuControls.find(([name])=>name===action);

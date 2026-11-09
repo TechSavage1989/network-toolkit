@@ -969,7 +969,7 @@ function create(options) {
  refresh();
 
  return {
-  refresh, showDocument, undo, difference,
+  refresh, recalculate:compute, showDocument, undo, difference,
   get textarea() { return panes[activeSide()].textarea; },
   get activeSide() { return lastSide; },
   get composing() { return composing(); },
