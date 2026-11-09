@@ -292,6 +292,23 @@ jobs:
           test "$(git rev-parse FETCH_HEAD)" = 45ee25b15c1c88fdb7c77b2f06057d38ae6b5357
           mkdir -p "$RUNNER_TEMP/ntk-sidebar-baseline120"
           git archive 45ee25b15c1c88fdb7c77b2f06057d38ae6b5357 | tar -xf - -C "$RUNNER_TEMP/ntk-sidebar-baseline120"
+      - name: Check bounded editor viewport and multi-gigabyte positions
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results
+        run: node scripts/editor-disk-view.browser.cjs
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Edit, compare, and save two real 2 GiB files through the editor
+        env:
+          GOTOOLCHAIN: local
+          NTK_EDITOR_LARGE_BROWSER: '1'
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results/large-editor
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestEditor(LargeFileBrowser|BrowserStorage)$' -count=1 -v -timeout=8m
       - name: Check compact sidebar controls and reclaimed file-list height
         if: success() || failure()
         env:
@@ -537,7 +554,9 @@ jobs:
       - name: Test release publication guards
         run: python3 -m unittest discover -s scripts -p '*_test.py' -v
       - name: Test application and terminal lifecycle
-        run: go test -mod=vendor ./cmd/network-toolkit ./internal/terminal ./internal/macros ./internal/desktop ./internal/vaultcrypto ./internal/diag ./internal/deviceinfo ./internal/platform ./internal/capture
+        run: go test -mod=vendor ./cmd/network-toolkit ./internal/editorbuffer ./internal/terminal ./internal/macros ./internal/desktop ./internal/vaultcrypto ./internal/diag ./internal/deviceinfo ./internal/platform ./internal/capture
+      - name: Check concurrent editor buffers and file ownership
+        run: go test -race -mod=vendor ./internal/editorbuffer ./cmd/network-toolkit -run 'TestDiskEditor|TestSnapshot|TestStreamingSearch' -count=1
       - name: Test JavaScript behavior
         run: node --test scripts/*.test.cjs
       - name: Embed Windows icon and version resources

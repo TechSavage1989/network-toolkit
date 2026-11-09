@@ -46,6 +46,7 @@ type editorSelection struct {
 	Left      float64 `json:"left"`
 }
 type editorDocumentSnapshot struct {
+	Disk          bool             `json:"disk,omitempty"`
 	ID            string           `json:"id"`
 	UID           string           `json:"uid"`
 	Path          string           `json:"path"`
@@ -129,6 +130,7 @@ type editorWindow struct {
 	lastPulse       time.Time
 }
 type editorDocumentGrant struct {
+	buffer   *editorDiskDocument
 	filePath string
 	snapshot editorDocumentSnapshot
 	owner    string
@@ -148,6 +150,7 @@ type editorTransfer struct {
 	acked                                           bool
 }
 type editorViewRegistry struct {
+	diskComparisons          map[string]*diskComparisonJob
 	loaded                   map[string]map[string]editorLoadedDocument
 	explorerOperations       map[string][]editorExplorerTarget
 	mu                       sync.Mutex
@@ -182,6 +185,21 @@ func newEditorViewRegistry(a *application) *editorViewRegistry {
 			for {
 				select {
 				case <-a.ctx.Done():
+					m.mu.Lock()
+					for caller, job := range m.diskComparisons {
+						delete(m.diskComparisons, caller)
+						job.discard()
+					}
+					var buffers []*editorDiskDocument
+					for _, d := range m.documents {
+						if d.buffer != nil {
+							buffers = append(buffers, d.buffer)
+						}
+					}
+					m.mu.Unlock()
+					for _, buffer := range buffers {
+						buffer.close()
+					}
 					return
 				case <-ticker.C:
 					m.mu.Lock()
@@ -277,8 +295,14 @@ func (m *editorViewRegistry) retainedTransports() (map[string]bool, map[string]b
 	return terminals, browsers
 }
 func (m *editorViewRegistry) setHomePresent(present bool) {
+	var discarded []*editorDiskDocument
 	m.mu.Lock()
-	defer m.mu.Unlock()
+	defer func() {
+		m.mu.Unlock()
+		for _, disk := range discarded {
+			disk.close()
+		}
+	}()
 	if !present {
 		delete(m.loaded, "")
 	}
@@ -303,6 +327,9 @@ func (m *editorViewRegistry) setHomePresent(present bool) {
 			continue
 		}
 		if m.homeCloseApproved && d.pending == "" && d.busy == 0 && !m.recovery[uid] {
+			if d.buffer != nil {
+				discarded = append(discarded, d.buffer)
+			}
 			delete(m.documents, uid)
 			continue
 		}
@@ -392,6 +419,9 @@ func validateEditorBatch(batch editorBatch) error {
 	}
 	uids, ids := map[string]bool{}, map[string]bool{}
 	for _, d := range batch.Documents {
+		if d.Disk && (d.Content != "" || d.Original != "" || d.Saved != "" || len(d.Undo) != 0 || len(d.Redo) != 0) {
+			return errors.New("Disk-backed documents transfer handles, never text fragments.")
+		}
 		if !editorUID.MatchString(d.UID) || uids[d.UID] || d.ID == "" || ids[d.ID] || !validEditorText(d.ID, 1024) || !validEditorText(d.Path, 4096) || d.Path == "" || !validEditorText(d.Source, 512) {
 			return errors.New("Invalid or duplicate editor document identity.")
 		}
@@ -429,7 +459,13 @@ func validateEditorBatch(batch editorBatch) error {
 			}
 		}
 		for _, v := range []*editorSelection{d.View, d.CompareView} {
-			if v != nil && (v.Start < 0 || v.End < v.Start || v.End > editorDocumentLimit*2 || v.Top < 0 || v.Left < 0 || v.Top > 1e9 || v.Left > 1e9 || (v.Direction != "none" && v.Direction != "forward" && v.Direction != "backward")) {
+			positionLimit := int64(editorDocumentLimit * 2)
+			scrollLimit := float64(1e9)
+			if d.Disk {
+				positionLimit = 9007199254740991
+				scrollLimit = float64(positionLimit)
+			}
+			if v != nil && (v.Start < 0 || v.End < v.Start || int64(v.End) > positionLimit || v.Top < 0 || v.Left < 0 || v.Top > scrollLimit || v.Left > scrollLimit || (v.Direction != "none" && v.Direction != "forward" && v.Direction != "backward")) {
 				return errors.New("Invalid editor view position.")
 			}
 		}
@@ -438,6 +474,10 @@ func validateEditorBatch(batch editorBatch) error {
 		case "local", "localDraft":
 			if b.SessionID != "" || b.ConnectionID != "" || b.Revision != 0 {
 				return errors.New("Local editor binding contains unrelated connection fields.")
+			}
+		case "ftp":
+			if !d.Disk || b.SessionID != "" || b.ConnectionID != "" || b.Revision != 0 {
+				return errors.New("FTP editor files require an existing disk buffer.")
 			}
 		case "terminal":
 			if b.SessionID == "" || len(b.SessionID) > 128 || b.ConnectionID != "" || b.Revision > 9007199254740991 {
@@ -540,8 +580,14 @@ func editorCloneBatch(b editorBatch) editorBatch {
 	return copy
 }
 func (m *editorViewRegistry) makeGrant(caller string, d editorDocumentSnapshot) (*editorDocumentGrant, error) {
+	if d.Disk {
+		return nil, errors.New("Open a disk-backed document through its file capability first.")
+	}
 	grant := &editorDocumentGrant{snapshot: d, owner: caller, lease: 1, bytes: editorSnapshotBytes(d)}
 	b := d.Binding
+	if b.Kind == "ftp" {
+		return nil, errors.New("Open FTP files through the owning main workspace first.")
+	}
 	if b.Kind == "local" || b.Kind == "localDraft" {
 		return grant, nil
 	}
@@ -623,6 +669,7 @@ func (m *editorViewRegistry) expireLocked() {
 		}
 	}
 	m.expireDragsLocked()
+	m.expireComparisonsLocked(now)
 }
 func (m *editorViewRegistry) failLocked(t *editorTransfer, state, note string) {
 	if t.state != "offered" {
@@ -693,6 +740,11 @@ func (m *editorViewRegistry) offer(caller string, req editorTransferRequest) (ma
 	}
 	if err := validateEditorBatch(req.Batch); err != nil {
 		return nil, err
+	}
+	for _, d := range req.Batch.Documents {
+		if d.Binding.Kind == "ftp" {
+			return nil, errors.New("FTP documents must stay with the connection in the main workspace.")
+		}
 	}
 	if err := validateEditorLeases(req.Batch, req.Leases); err != nil {
 		return nil, err
@@ -784,7 +836,7 @@ func (m *editorViewRegistry) offer(caller string, req editorTransferRequest) (ma
 			}
 			count++
 		} else {
-			if d.owner != caller || d.lease != req.Leases[snapshot.UID] || d.pending != "" || d.busy != 0 || !editorSameBinding(d.snapshot.Binding, snapshot.Binding) {
+			if d.owner != caller || d.lease != req.Leases[snapshot.UID] || d.pending != "" || d.busy != 0 || !editorSameBinding(d.snapshot.Binding, snapshot.Binding) || !d.diskSnapshotMatches(snapshot) {
 				m.mu.Unlock()
 				return nil, errEditorLease
 			}

@@ -1,24 +1,46 @@
 /* Local-only, bounded line comparison. It never reads files or sends document text. */
 (function(root){'use strict';
-const LIMITS=Object.freeze({characters:2*1024*1024,lines:30000,cells:2000000});
+const LIMITS=Object.freeze({characters:16*1024*1024,lines:30000,cells:2000000});
 const splitPreferences=new WeakMap();
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,Number(v)||0));
 const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// Find unique exact lines in both changed regions, then their order-preserving
+// longest increasing sequence. This bounds work for large, mostly similar files
+// without treating repeated configuration lines as reliable anchors.
+function uniqueAnchors(a,b,fromA,toA,fromB,toB){
+ const counts=new Map(),positions=new Map();
+ for(let i=fromA;i<toA;i++)counts.set(a[i],(counts.get(a[i])||0)+1);
+ for(let j=fromB;j<toB;j++)positions.set(b[j],positions.has(b[j])?-1:j);
+ const candidates=[];for(let i=fromA;i<toA;i++)if(counts.get(a[i])===1&&positions.get(a[i])>=fromB)candidates.push({left:i,right:positions.get(a[i])});
+ const tails=[],previous=[],atTail=[];
+ for(let i=0;i<candidates.length;i++){const v=candidates[i].right;let lo=0,hi=tails.length;while(lo<hi){const mid=(lo+hi)>>1;if(tails[mid]<v)lo=mid+1;else hi=mid;}previous[i]=lo?atTail[lo-1]:-1;tails[lo]=v;atTail[lo]=i;}
+ const ordered=[];for(let i=atTail.at(-1);i!==undefined&&i>=0;i=previous[i])ordered.push(candidates[i]);return ordered.reverse();
+}
+function appendRegion(a,b,fromA,toA,fromB,toB,ops,budget){
+ const n=toA-fromA,m=toB-fromB;
+ if(n&&m){const cells=n*m;if(cells>budget.remaining)return false;budget.remaining-=cells;const width=m+1,table=new Uint32Array((n+1)*width);
+  for(let i=n-1;i>=0;i--)for(let j=m-1;j>=0;j--)table[i*width+j]=a[fromA+i]===b[fromB+j]?1+table[(i+1)*width+j+1]:Math.max(table[(i+1)*width+j],table[i*width+j+1]);
+  let i=0,j=0;while(i<n||j<m){if(i<n&&j<m&&a[fromA+i]===b[fromB+j])ops.push({type:'equal',left:fromA+i++,right:fromB+j++});else if(i<n&&(j===m||table[(i+1)*width+j]>=table[i*width+j+1]))ops.push({type:'removed',left:fromA+i++,right:null});else ops.push({type:'added',left:null,right:fromB+j++});}
+ }else{for(let i=fromA;i<toA;i++)ops.push({type:'removed',left:i,right:null});for(let j=fromB;j<toB;j++)ops.push({type:'added',left:null,right:j});}
+ return true;
+}
 function compare(left,right){
- left=String(left);right=String(right);const limitMessage={limited:true,message:'Comparison supports up to 2,097,152 characters and 30,000 lines per side. Both documents remain editable.'};
+ left=String(left);right=String(right);const limitMessage={limited:true,message:'Comparison supports up to 16 MiB and 30,000 lines per document. Both documents remain editable; compare smaller sections for larger files.'};
  if(left.length>LIMITS.characters||right.length>LIMITS.characters)return limitMessage;
  const tooManyLines=text=>{let count=1,at=-1;while((at=text.indexOf('\n',at+1))!==-1)if(++count>LIMITS.lines)return true;return false;};
  if(tooManyLines(left)||tooManyLines(right))return limitMessage;
  const a=left.split('\n'),b=right.split('\n');
  let prefix=0,suffix=0;while(prefix<a.length&&prefix<b.length&&a[prefix]===b[prefix])prefix++;
  while(suffix<a.length-prefix&&suffix<b.length-prefix&&a[a.length-1-suffix]===b[b.length-1-suffix])suffix++;
- const n=a.length-prefix-suffix,m=b.length-prefix-suffix;
- if(n*m>LIMITS.cells)return {limited:true,message:'This changed region exceeds the bounded comparison budget. Compare smaller documents or a smaller changed region; no text was discarded.'};
+ const n=a.length-prefix-suffix,m=b.length-prefix-suffix,budget={remaining:LIMITS.cells};
+ const limited={limited:true,message:'This changed region exceeds the bounded comparison budget. Compare smaller sections; both original files remain intact.'};
  const ops=[];for(let i=0;i<prefix;i++)ops.push({type:'equal',left:i,right:i});
- if(n&&m){const width=m+1,table=new Uint32Array((n+1)*width);
-  for(let i=n-1;i>=0;i--)for(let j=m-1;j>=0;j--)table[i*width+j]=a[prefix+i]===b[prefix+j]?1+table[(i+1)*width+j+1]:Math.max(table[(i+1)*width+j],table[i*width+j+1]);
-  let i=0,j=0;while(i<n||j<m){if(i<n&&j<m&&a[prefix+i]===b[prefix+j]){ops.push({type:'equal',left:prefix+i++,right:prefix+j++});}else if(i<n&&(j===m||table[(i+1)*width+j]>=table[i*width+j+1]))ops.push({type:'removed',left:prefix+i++,right:null});else ops.push({type:'added',left:null,right:prefix+j++});}
- }else{for(let i=0;i<n;i++)ops.push({type:'removed',left:prefix+i,right:null});for(let j=0;j<m;j++)ops.push({type:'added',left:null,right:prefix+j});}
+ const startA=prefix,endA=a.length-suffix,startB=prefix,endB=b.length-suffix;
+ const anchors=n*m>LIMITS.cells?uniqueAnchors(a,b,startA,endA,startB,endB):[];
+ if(n*m>LIMITS.cells&&!anchors.length)return limited;
+ let fromA=startA,fromB=startB;
+ for(const item of anchors){if(!appendRegion(a,b,fromA,item.left,fromB,item.right,ops,budget))return limited;ops.push({type:'equal',left:item.left,right:item.right});fromA=item.left+1;fromB=item.right+1;}
+ if(!appendRegion(a,b,fromA,endA,fromB,endB,ops,budget))return limited;
  for(let i=0;i<suffix;i++)ops.push({type:'equal',left:a.length-suffix+i,right:b.length-suffix+i});
  const rows=[],hunks=[],kinds={left:new Array(a.length).fill('equal'),right:new Array(b.length).fill('equal')};
  for(let i=0;i<ops.length;){if(ops[i].type==='equal'){rows.push(ops[i++]);continue;}const removed=[],added=[];while(i<ops.length&&ops[i].type!=='equal'){const op=ops[i++];(op.type==='removed'?removed:added).push(op);}const start=rows.length,type=removed.length&&added.length?'changed':removed.length?'removed':'added';

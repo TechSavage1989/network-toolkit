@@ -1,3 +1,10 @@
+## 1.21.20 Beta 1 - Large-file text editing and comparison
+
+- Open and edit large text files through disk-backed storage and a bounded viewport. Search, compare and save run in the background.
+- Remove fixed file and line limits from large-file editing and comparison. Changes are shown in pages, with navigation between differences.
+- Save a consistent revision and preserve any edits made during the save. Window moves carry the document handle and retain undo history.
+- Verify editing, comparison, typing during save and exact saved bytes with two generated 2 GiB files in the application browser test.
+
 ## 1.21.19 - Stable - Highlighting in the Appearance tab (published 2026-11-08)
 
 - Owner: "I believe the highlighting settings should be with appearance, or at the very least allow selecting syntax highlighting form appearance as well so in real time you can see the preview." and "release as stable". The Highlighting tab is merged into Appearance (`SETTINGS_TABS` in terminal-extras.js; the profile section's `data-terminal-settings-target` is now `appearance`). `mount()` in terminal-appearance.js orders the page: font grid, bold, font availability, font/Unicode sample (moved out of the preview card), then `.terminal-preview-sticky` holding the Syntax highlighting picker and the Preview card, then `#terminalHighlightEditor` (legend moved in, Device prompt name, Universal profile options, Local shell syntax colors), then Customize colors and Reset appearance. `.terminal-preview-sticky` is `position:sticky` below the tab strip (`--terminal-settings-tabs-height`, measured by `stickyOffset()` when the panel opens or a tab is chosen) when the window is at least 640 px tall. `selectSettingsTab('highlighting')`/`openSettings('highlighting')` open Appearance at the picker. Settings button tooltip updated.

@@ -25,6 +25,8 @@ import (
 )
 
 type ftpClient struct {
+	ctx     context.Context
+	stop    func() bool
 	conn    net.Conn
 	rd      *bufio.Reader
 	host    string
@@ -128,8 +130,7 @@ func openFTP(ctx context.Context, host string, port int, security, username, pas
 		return nil, "", e
 	}
 	stop := context.AfterFunc(ctx, func() { _ = conn.Close() })
-	_ = stop
-	f := &ftpClient{conn: conn, rd: bufio.NewReader(conn), host: host, port: port, timeout: timeout}
+	f := &ftpClient{ctx: ctx, stop: stop, conn: conn, rd: bufio.NewReader(conn), host: host, port: port, timeout: timeout}
 	var certHash string
 	f.tlsCfg = &tls.Config{ServerName: host, MinVersion: tls.VersionTLS12}
 	if inspect || pin != "" {
@@ -213,6 +214,9 @@ func openFTP(ctx context.Context, host string, port int, security, username, pas
 	return f, certHash, nil
 }
 func (f *ftpClient) close() {
+	if f.stop != nil {
+		defer f.stop()
+	}
 	if f.conn != nil {
 		_, _, _ = f.command("QUIT")
 		_ = f.conn.Close()
@@ -254,7 +258,11 @@ func (f *ftpClient) openData() (net.Conn, error) {
 		return nil, errors.New("invalid FTP data port")
 	}
 	// Never allow untrusted FTP PASV replies to redirect a client to a different host.
-	c, e := net.DialTimeout("tcp", net.JoinHostPort(f.host, strconv.Itoa(port)), f.timeout)
+	ctx := f.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	c, e := (&net.Dialer{Timeout: f.timeout}).DialContext(ctx, "tcp", net.JoinHostPort(f.host, strconv.Itoa(port)))
 	if e != nil {
 		return nil, e
 	}
@@ -271,6 +279,11 @@ func (f *ftpClient) dataCommand(cmd string, writer io.Writer, reader io.Reader) 
 	data, e := f.openData()
 	if e != nil {
 		return 0, e
+	}
+	if f.ctx != nil {
+		original := data
+		stop := context.AfterFunc(f.ctx, func() { _ = original.Close() })
+		defer stop()
 	}
 	code, msg, e := f.command("%s", cmd)
 	if e != nil {
@@ -290,10 +303,15 @@ func (f *ftpClient) dataCommand(cmd string, writer io.Writer, reader io.Reader) 
 		data = wrapped
 	}
 	var n int64
+	stream := ftpDataStream{Conn: data, idle: maxFTPTimeout(f.timeout)}
 	if writer != nil {
-		n, e = io.Copy(writer, io.LimitReader(data, 64<<30))
+		if strings.HasPrefix(cmd, "RETR ") {
+			n, e = io.Copy(writer, stream)
+		} else {
+			n, e = io.Copy(writer, io.LimitReader(data, 64<<30))
+		}
 	} else if reader != nil {
-		n, e = io.Copy(data, reader)
+		n, e = io.Copy(stream, reader)
 	}
 	_ = data.Close()
 	if e != nil {
@@ -307,6 +325,25 @@ func (f *ftpClient) dataCommand(cmd string, writer io.Writer, reader io.Reader) 
 		return n, fmt.Errorf("FTP transfer incomplete: %s", msg)
 	}
 	return n, nil
+}
+
+type ftpDataStream struct {
+	net.Conn
+	idle time.Duration
+}
+
+func (s ftpDataStream) Read(p []byte) (int, error) {
+	if err := s.SetReadDeadline(time.Now().Add(s.idle)); err != nil {
+		return 0, err
+	}
+	return s.Conn.Read(p)
+}
+
+func (s ftpDataStream) Write(p []byte) (int, error) {
+	if err := s.SetWriteDeadline(time.Now().Add(s.idle)); err != nil {
+		return 0, err
+	}
+	return s.Conn.Write(p)
 }
 func (f *ftpClient) listing(dir string) ([]ftpFileInfo, error) {
 	if dir == "" {

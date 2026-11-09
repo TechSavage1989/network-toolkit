@@ -297,6 +297,9 @@ func (a *application) handleRemoteBrowser(w http.ResponseWriter, request *http.R
 	}
 	targets := []editorExplorerTarget{}
 	binding := editorBinding{Kind: "sshConnection", ConnectionID: r.ConnectionID}
+	if r.Protocol == "ftp" {
+		binding = editorBinding{Kind: "ftp"}
+	}
 	if r.SessionID != "" {
 		binding = editorBinding{Kind: "terminal", SessionID: r.SessionID}
 	}

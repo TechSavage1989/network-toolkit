@@ -1,3 +1,24 @@
+# v1.21.20 Beta 1 - integrated large-file editor
+
+PR #139 integrates disk-backed open, edit, search, split views, comparison and saves in the normal app. The real-file browser test with two 2 GiB files verified responsiveness, typing during save and exact saved bytes. See [editor scalability](EDITOR_SCALABILITY_PLAN.md) and [the release handoff](RELEASE12120_HANDOFF.md).
+
+The owner requested publication as soon as verification is complete. Check both push and pull request runs on the release commit, merge through the existing beta workflow, and verify the release assets and update channels.
+
+---
+
+# Earlier v1.21.20 Beta 1 bounded-file candidate (superseded acceptance criteria)
+
+Candidate in [PR #139](https://github.com/TechSavage1989/network-toolkit/pull/139), continuing the owner's report that large files make scrolling and the entire app laggy and comparison does not work correctly. Not published. Stable remains v1.21.19. See [the technical handoff](RELEASE12120_HANDOFF.md) for changes, tests and limits.
+
+- Large-file line numbers repaint once per frame; common edits update the cached line index; scrolling alone no longer uploads a full recovery snapshot.
+- Comparisons accept up to 16 MiB and 30,000 lines per side. Large comparisons use a local background worker and bounded processing. The renderer's 30,000-line limit is retained.
+- Branch Checks run 42529345146 passed all 15 jobs at application commit `0c8ae1f4b6b1dfe94f0cbaca511255f65d79640d`, including the 16 MiB edit/undo/save and real-worker comparison tests. The matching PR run's updater browser test was still running when this note was written. Final checks must pass on both events before merge.
+- Restored the unchanged v1.21.19 notes to `docs/releases/`; updated the README and Editor guide. No layout changes require new README screenshots.
+- Validation: `python scripts/github_release.py validate`, `python -m unittest discover -s scripts -p '*_test.py'`, and hosted `.github/workflows/checks.yml`. Native fixture tests run in hosted CI only.
+- Remaining: green final checks, guarded release publication, and verification of source/tag, six assets, checksums and stable-channel isolation. Physical Windows/Linux and live-device acceptance are not claimed.
+
+---
+
 # v1.21.19 Stable (Highlighting in the Appearance tab) - publication verified (2026-11-08)
 
 Published as the stable release https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.21.19 at 2026-11-08T07:42:46Z (not a prerelease); releases/latest is now v1.21.19. Merged PR #137 (stacked on the docs PR #136, which merged first); tag v1.21.19 points to merge commit 9d93520c7404c0b4cc7bce0bce2c76123be12e39. Release workflow run 42459712063 succeeded. Assets: Network_Toolkit.exe, Portable and Update ZIPs, Linux x86_64 and aarch64 tarballs and SHA256SUMS; every asset digest matches SHA256SUMS, and the Linux x86_64 binary reports "Network Toolkit 1.21.19 linux amd64". Both Checks runs on PR #137 were green on the first attempt.

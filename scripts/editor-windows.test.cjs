@@ -3,6 +3,19 @@ const test=require('node:test'),assert=require('node:assert/strict');
 if(!global.crypto)Object.defineProperty(global,'crypto',{value:require('node:crypto').webcrypto});
 const {create}=require('../web/assets/editor-windows.js');
 const uid='11111111-1111-4111-8111-111111111111';
+test('disk document access needs explicit capability and its current owner lease',async()=>{
+ const calls=[],controller=create({bufferAvailable:()=>true,request:async(path,method,body)=>{calls.push({path,method,body});return path.endsWith('/buffers/open')?{lease:7}:{};}});
+ await assert.rejects(controller.buffer(uid,'window'),/owns/);
+ await controller.openBuffer({uid,content:''});await controller.buffer(uid,'window',{start:8589934592,limit:32768});
+ assert.equal(calls[1].body.lease,7);assert.equal(calls[1].body.start,8589934592);
+ await controller.releaseBuffer(uid);await assert.rejects(controller.buffer(uid,'edit',{text:'stale'}),/owns/);controller.stop();
+ const unsupported=create({request:async()=>{throw Error('must not request');}});await assert.rejects(unsupported.openBuffer({uid}),/unavailable/);unsupported.stop();
+});
+test('a streaming disk save does not block viewport or edit requests',async()=>{
+ let finish;const gate=new Promise(resolve=>finish=resolve),calls=[];
+ const controller=create({bufferAvailable:()=>true,request:async(path,method,body)=>{calls.push(body);if(path.endsWith('/buffers/open'))return {lease:3};if(body.action==='save')await gate;return {};}});
+ await controller.openBuffer({uid});const saving=controller.buffer(uid,'save',{revision:1});await controller.buffer(uid,'edit',{revision:1,from:0,to:0,text:'newer'});assert.equal(calls.at(-1).action,'edit');finish();await saving;controller.stop();
+});
 function fixture({available=true,self='',request}={}){
  const calls=[],events=[],documents=[{uid,content:'synthetic unsaved',dirty:true,binding:{kind:'local'}}];
  const adapter={documents:()=>documents,active:()=>uid,canTransfer:()=>'',snapshot(ids){events.push('freeze');for(const d of documents)d.frozen=true;return {documents:structuredClone(documents),active:uid};},stage:async batch=>{events.push('stage');documents.splice(0,documents.length,...batch.documents.map(d=>({...d,frozen:true,staged:true})));return batch.documents.map(d=>d.uid);},activate(ids){events.push('activate');for(const d of documents){d.frozen=false;d.staged=false;}},release(ids){events.push('release');documents.splice(0);},rollback(ids,opt){events.push(opt?.staged?'remove-staged':'rollback');if(opt?.staged)documents.splice(0);else for(const d of documents)d.frozen=false;},restoreCompare(){},applyPreferences(){}};

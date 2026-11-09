@@ -171,15 +171,17 @@ type nativeEditorDocument struct {
 	ID, UID, Path, Source, Hash, Content, Original, Saved, EOL, Encoding, Language string
 	SavedEOL, SavedEncoding                                                        string
 	Dirty, BOM, SavedBOM, Untitled, Frozen, Staged, Saving, SaveFailed             bool
+	Disk, CanUndo, CanRedo                                                         bool
 	Undo, Redo                                                                     []string
 	View, CompareView                                                              *editorSelection
 	Binding                                                                        editorBinding
 	EditRevision                                                                   uint64
 }
 type nativeEditorSnapshot struct {
-	Documents []nativeEditorDocument
-	Active    string
-	Window    struct {
+	HistoryDigests []string
+	Documents      []nativeEditorDocument
+	Active         string
+	Window         struct {
 		Enabled, Running, DragPreparing, Closing bool
 		Self, Error                              string
 		Owned                                    map[string]uint64

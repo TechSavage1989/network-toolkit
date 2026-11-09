@@ -123,5 +123,33 @@ async function saveCopy(page,expected,label){await input(page,'left').focus();co
   const checkpoint=await page.evaluate(()=>NetworkToolkitFileEditor.windowAdapter.checkpoint());assert.equal(checkpoint.documents.find(d=>d.id==='alignment-left').content,leftSource);assert.equal(checkpoint.documents.find(d=>d.id==='alignment-right').content,rightSource);const afterDownload=await saveCopy(page,leftSource,'after navigation and edits');assert.equal(beforeDownload,afterDownload);geometry.push(await assertAlignment(page,'after undo and source checkpoint'));
   await input(page,'left').press('Control+Home');await ready(page);await page.screenshot({path:path.join(output,'editor-alignment113-'+mode+'-'+width+'-'+theme+'.png')});report.layouts.push({mode,width,theme,geometry,downloadSHA256:afterDownload});check(mode+' '+width+' '+theme+' visual spacers, wrapped alignment, exact clipboard/edit/history/source bytes and real divider changes');await f.context.close();
  }
- assert.equal(report.layouts.length,6);assert.deepEqual(report.errors,[]);assert.deepEqual(report.assetErrors,[]);report.passed=true;
+ assert.equal(report.layouts.length,6);
+ // A >2 MiB comparison must run in the same-origin worker and keep document
+ // content unchanged. Validate the real main-window path, not a unit-test stub.
+ const large=await start(current,'main','large-worker');
+ large.page.setDefaultTimeout(60000);
+ const workers=[];large.page.on('worker',worker=>workers.push(worker.url()));
+ const originals=await large.page.evaluate(async()=>{
+  const line=i=>'interface '+i+' description '+('synthetic config line '.repeat(23));
+  const left=Array.from({length:6200},(_,i)=>line(i)).join('\n');
+  const right=left.replace('interface 3100 description','interface 3100 changed description');
+  for(const [id,content] of [['large-left',left],['large-right',right]]){
+   await NetworkToolkitFileEditor.open({id,path:id+'.txt',source:'Synthetic',binding:{kind:'local'},create:true,initialContent:content,read:async()=>({content}),write:async()=>{throw Error('No write expected');}});
+  }
+  return {left,right};
+ });
+ assert(originals.left.length>2*1024*1024);
+ await large.page.locator('[data-ed="compare"]').click();
+ await large.page.selectOption('[data-compare-select="left"]','large-left');
+ await large.page.selectOption('[data-compare-select="right"]','large-right');
+ await large.page.waitForFunction(()=>NetworkToolkitFileEditor.comparison?.result?.limited===false&&NetworkToolkitFileEditor.comparison.result.hunks.length===1,null,{timeout:60000});
+ await large.page.waitForFunction(()=>document.querySelector('[data-compare-map]')?.getAttribute('aria-disabled')==='false',null,{timeout:60000});
+ const actual=await large.page.evaluate(()=>({left:NetworkToolkitFileEditor.documents.get('large-left').content,right:NetworkToolkitFileEditor.documents.get('large-right').content,summary:document.querySelector('[data-compare-summary]').textContent}));
+ assert.equal(actual.left,originals.left);assert.equal(actual.right,originals.right);
+ assert(workers.some(url=>url.endsWith('/assets/editor-compare-worker.js')),'Large comparison must execute a real same-origin background worker');
+ report.large={bytes:originals.left.length,worker:true,summary:actual.summary};
+ await large.page.screenshot({path:path.join(output,'editor-alignment113-large-worker.png')});
+ check('Multi-megabyte comparison uses same-origin worker, preserves exact content and renders a bounded hunk');
+ await large.context.close();
+ assert.deepEqual(report.errors,[]);assert.deepEqual(report.assetErrors,[]);report.passed=true;
 })().catch(async error=>{report.failure=error.stack||String(error);console.error(report.failure);if(lastPage&&!lastPage.isClosed())await lastPage.screenshot({path:path.join(output,'editor-alignment113-failure.png')}).catch(()=>{});process.exitCode=1;}).finally(async()=>{if(output)fs.writeFileSync(path.join(output,'editor-alignment113-results.json'),JSON.stringify(report,null,2));for(const context of contexts)await context.close().catch(()=>{});await browser?.close();});

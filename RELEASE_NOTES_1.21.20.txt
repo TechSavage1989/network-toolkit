@@ -1,0 +1,14 @@
+Network Toolkit 1.21.20 Beta 1
+
+## What's New
+
+- Open, edit, compare and save multi-gigabyte text files without a fixed file-size or line-count limit.
+- Large comparisons run in the background and let you jump between differences as they are found.
+- Keep typing while a large file saves. Edits made after the save starts stay unsaved for your next save.
+
+## Additional Details
+
+- Large files use temporary disk storage and show only the section you are working on. Opening, searching, comparing and saving depend on disk or network speed. Large-file views use plain text and unwrapped lines.
+- Large comparisons highlight changed lines and may group distant rearrangements into a single difference.
+- The editor saves a consistent document revision and checks for outside changes before replacing a file. Format settings and undo history follow the document when it moves to another editor window.
+- This beta is opt-in. Enable beta updates to receive it through the app.
