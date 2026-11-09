@@ -1,0 +1,11 @@
+Network Toolkit 1.21.30 Beta 1
+
+## What's New
+
+- Compare keeps matching lines unshaded when a later match uses the same alignment.
+- A long line replaced by a much shorter one shows a removal and an addition on the same aligned row. Smaller edits keep their changed-character highlighting.
+
+## Additional Details
+
+- The replacement markers appear in the editor panes and the differences-only view. The disk-backed change map shows the overall changed region.
+- This beta is opt-in. Enable beta updates to receive it through the app.

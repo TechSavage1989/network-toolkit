@@ -55,8 +55,7 @@ function appendRegion(a,b,fromA,toA,fromB,toB,ops,budget){
 }
 // Match a unique adjacent pair among unmatched rows, then extend through
 // identical neighboring lines. Keep both blocks in their original order.
-function markMovedRows(rows, text, kinds){
- const lines={left:text.left.split('\n'),right:text.right.split('\n')};
+function markMovedRows(rows, lines, kinds){
  function index(side, kind){
   const pairs=new Map();
   for(let i=0;i+1<rows.length;i++){
@@ -84,14 +83,21 @@ function markMovedRows(rows, text, kinds){
   }
  }
 }
+// A line much shorter than its counterpart reads as a replacement rather
+// than a character edit. Keep their row paired so later lines stay aligned.
+function isLowSimilarityReplacement(left,right){
+ if(typeof left!=='string'||typeof right!=='string')return false;
+ const a=left.trim().length,b=right.trim().length,larger=Math.max(a,b);
+ return larger>=20&&Math.min(a,b)*10<larger*3;
+}
 function compare(left,right,spaces){
  left=String(left);right=String(right);const limitMessage={limited:true,message:'Comparison supports up to 16 MiB and 30,000 lines per document. Both documents remain editable; compare smaller sections for larger files.'};
  if(left.length>LIMITS.characters||right.length>LIMITS.characters)return limitMessage;
  const tooManyLines=text=>{let count=1,at=-1;while((at=text.indexOf('\n',at+1))!==-1)if(++count>LIMITS.lines)return true;return false;};
  if(tooManyLines(left)||tooManyLines(right))return limitMessage;
  const normalize=spaces==='all'?line=>line.replace(/[ \t]/g,''):spaces==='changed'?line=>line.replace(/[ \t]+/g,' ').replace(/^ | $/g,''):null;
- const lines=text=>{const rows=text.split('\n');return normalize?rows.map(normalize):rows;};
- const a=lines(left),b=lines(right);
+ const lines={left:left.split('\n'),right:right.split('\n')};
+ const a=normalize?lines.left.map(normalize):lines.left,b=normalize?lines.right.map(normalize):lines.right;
  let prefix=0,suffix=0;while(prefix<a.length&&prefix<b.length&&a[prefix]===b[prefix])prefix++;
  while(suffix<a.length-prefix&&suffix<b.length-prefix&&a[a.length-1-suffix]===b[b.length-1-suffix])suffix++;
  const n=a.length-prefix-suffix,m=b.length-prefix-suffix,budget={remaining:LIMITS.cells};
@@ -106,10 +112,17 @@ function compare(left,right,spaces){
  for(let i=0;i<suffix;i++)ops.push({type:'equal',left:a.length-suffix+i,right:b.length-suffix+i});
  const rows=[],hunks=[],kinds={left:new Array(a.length).fill('equal'),right:new Array(b.length).fill('equal')};
  for(let i=0;i<ops.length;){if(ops[i].type==='equal'){rows.push(ops[i++]);continue;}const removed=[],added=[];while(i<ops.length&&ops[i].type!=='equal'){const op=ops[i++];(op.type==='removed'?removed:added).push(op);}const start=rows.length,type=removed.length&&added.length?'changed':removed.length?'removed':'added';
-  for(let k=0;k<Math.max(removed.length,added.length);k++){const l=removed[k]?.left??null,r=added[k]?.right??null,rowType=l!==null&&r!==null?'changed':l!==null?'removed':'added';rows.push({type:rowType,left:l,right:r});if(l!==null)kinds.left[l]=rowType;if(r!==null)kinds.right[r]=rowType;}
+  for(let k=0;k<Math.max(removed.length,added.length);k++){
+   const l=removed[k]?.left??null,r=added[k]?.right??null;
+   const rowType=l!==null&&r!==null?'changed':l!==null?'removed':'added';
+   const replacement=rowType==='changed'&&isLowSimilarityReplacement(lines.left[l],lines.right[r]);
+   rows.push({type:replacement?'replacement':rowType,left:l,right:r});
+   if(l!==null)kinds.left[l]=replacement?'removed':rowType;
+   if(r!==null)kinds.right[r]=replacement?'added':rowType;
+  }
   hunks.push({start,end:rows.length,type,left:removed[0]?.left??null,right:added[0]?.right??null});
  }
- markMovedRows(rows,{left,right},kinds);
+ markMovedRows(rows,lines,kinds);
  const positions={left:[0],right:[0]};for(const row of rows)for(const side of ['left','right'])positions[side].push(positions[side].at(-1)+(row[side]===null?0:1));
  return {limited:false,rows,hunks,kinds,positions,lineCounts:{left:a.length,right:b.length},identical:hunks.length===0};
 }
@@ -224,7 +237,7 @@ function mountDifferencePreview(host, read, getCount) {
   for (const pair of data) {
    for (let side = 0; side < 2; side++) {
     const value = pair[side], cell = document.createElement('div');
-    const kind = value ? value.moved ? 'moved' : pair[1-side] ? 'changed' : side === 0 ? 'removed' : 'added' : 'gap';
+    const kind = value ? value.kind || (value.moved ? 'moved' : pair[1-side] ? 'changed' : side === 0 ? 'removed' : 'added') : 'gap';
     cell.className = 'nt-compare-preview-line ' + kind;
     if (value) {
      const symbol = document.createElement('b');
@@ -331,11 +344,11 @@ function inlinePreviewRows(result, getDocument) {
  if (!result || result.limited) return null;
  if (!inlinePreviewCache.has(result)) {
   const changed = result.rows.filter(row => row.type !== 'equal');
-  const left = getDocument('left').content.split('\n'), right = getDocument('right').content.split('\n');
-  inlinePreviewCache.set(result, changed.map(row => [
-   row.left == null ? null : {line:row.left,text:left[row.left],moved:row.type==='moved',counterpart:row.counterpart},
-   row.right == null ? null : {line:row.right,text:right[row.right],moved:row.type==='moved',counterpart:row.counterpart}
-  ]));
+  const lines={left:getDocument('left').content.split('\n'),right:getDocument('right').content.split('\n')};
+  inlinePreviewCache.set(result, changed.map(row => ['left','right'].map(side => {
+   const line=row[side];
+   return line==null?null:{line,text:lines[side][line],kind:result.kinds[side][line],counterpart:row.counterpart};
+  })));
  }
  return inlinePreviewCache.get(result);
 }
@@ -437,7 +450,7 @@ function create(options){
    const svg=q('[data-compare-map-marks="'+side+'"]');svg.setAttribute('viewBox','0 0 20 '+rows);
    const runs=[];
    for(const [i,row] of (result?.rows||[]).entries()){
-    const kind=row[side]===null?'gap':row.type,last=runs.at(-1);
+    const kind=row[side]===null?'gap':result.kinds[side][row[side]],last=runs.at(-1);
     if(last?.kind===kind)last.end=i+1;else runs.push({kind,start:i,end:i+1});
    }
    svg.innerHTML=runs.map(r=>'<rect class="'+r.kind+'" x="1" width="18" y="'+r.start+'" height="'+(r.end-r.start)+'"/>').join('');
@@ -487,5 +500,5 @@ function create(options){
  const observer=typeof ResizeObserver==='function'?new ResizeObserver(()=>{splitControl.apply();refresh(true);}):null;observer?.observe(map);observer?.observe(q('.nt-compare-grid'));splitControl.apply();for(const side of ['left','right'])observer?.observe(panes[side]);refresh(true);
  return {refresh,difference,jump,get textarea(){return panes[options.activeSide?.()||lastSide];},get activeSide(){return lastSide;},scrollActive(){syncScroll(options.activeSide?.()||lastSide,false);},positionAt(offset,focus=true){const side=options.activeSide?.()||lastSide,ta=panes[side],d=doc(side);if(!d)return;lastSide=side;ta.setSelectionRange(offset,offset);if(focus)ta.focus({preventScroll:true});const line=d.content.slice(0,offset).split('\n').length-1;ta.scrollTop=Math.max(0,(offsets[side][line]||0)-metrics(side).height);syncScroll(side,false);},showDocument(id){if(!docs().some(d=>d.id===id))return;const side=options.sideOf?.(docs().find(d=>d.id===id)?.uid)||(leftID===id?'left':rightID===id?'right':lastSide);lastSide=side;remember(side);if(side==='left')leftID=id;else rightID=id;listSignature='';fill(side,doc(side),true);refresh(true);panes[side].focus({preventScroll:true});},undo(redo=false){const d=doc(lastSide);if(d){options.undo(d,redo);refresh(true);}},snapshot(){for(const side of ['left','right'])remember(side);return {left:leftID,right:rightID,scale,sync:q('[data-compare-sync]').checked};},restore(value){if(!value)return;const activeBefore=options.active()?.id;leftID=String(value.left||'');rightID=String(value.right||'');options.choose?.('left',leftID);options.choose?.('right',rightID);if([leftID,rightID].includes(activeBefore)){const activeDocument=docs().find(d=>d.id===activeBefore);if(activeDocument)options.activate(activeDocument,options.sideOf?.(activeDocument.uid));}scale=[0,.5,1,2,4].includes(value.scale)?value.scale:0;q('[data-compare-scale]').value=String(scale);q('[data-compare-sync]').checked=value.sync!==false;refresh(true);},get result(){return result;},get selection(){return {left:leftID,right:rightID};},dispose(){preview?.dispose?.();splitControl.dispose();disposed=true;layoutGeneration++;clearTimeout(timer);root.NTKEditorLanguageService?.cancelHighlight?.('compare-left');root.NTKEditorLanguageService?.cancelHighlight?.('compare-right');for(const side of ['left','right'])remember(side);observer?.disconnect();host.replaceChildren();}};
 }
-const api=Object.freeze({LIMITS,compare,lineAtRow,rowAtLine,viewport,offsetAtLine,lineAtOffset,mapHeight,rowFromPointer,splitBounds,splitRatio,createDivider,placeToolbarDropdown,mountSettings,mountDifferencePreview,inlinePreviewRows,inlineChangedStart,inlineDifferencePage,previewSourceLines,differenceIndex,differenceControls,createHorizontalSync,create});root.NTKEditorCompare=api;if(typeof module==='object'&&module.exports)module.exports=api;
+const api=Object.freeze({LIMITS,compare,isLowSimilarityReplacement,lineAtRow,rowAtLine,viewport,offsetAtLine,lineAtOffset,mapHeight,rowFromPointer,splitBounds,splitRatio,createDivider,placeToolbarDropdown,mountSettings,mountDifferencePreview,inlinePreviewRows,inlineChangedStart,inlineDifferencePage,previewSourceLines,differenceIndex,differenceControls,createHorizontalSync,create});root.NTKEditorCompare=api;if(typeof module==='object'&&module.exports)module.exports=api;
 })(typeof window==='undefined'?globalThis:window);

@@ -3,6 +3,21 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),c=require
 function reconstruct(result,a,b){assert.equal(result.limited,false);const left=result.rows.filter(r=>r.left!==null).map(r=>a.split('\n')[r.left]).join('\n'),right=result.rows.filter(r=>r.right!==null).map(r=>b.split('\n')[r.right]).join('\n');assert.equal(left,a);assert.equal(right,b);for(const row of result.rows)if(row.type==='equal')assert.equal(a.split('\n')[row.left],b.split('\n')[row.right]);}
 test('identical, empty and Unicode documents preserve every logical line',()=>{for(const text of ['', 'hello\n', 'α\n界\n😀']){const r=c.compare(text,text);reconstruct(r,text,text);assert(r.identical);assert.equal(r.hunks.length,0);}});
 test('adds, removes and changes have explicit line identities and grouped hunks',()=>{const a='first\nold\nremove\nlast',b='first\nnew\nlast\nadded',r=c.compare(a,b);reconstruct(r,a,b);assert.equal(r.hunks.length,2);assert.equal(r.hunks[0].type,'changed');assert.equal(r.hunks[1].type,'added');assert(r.kinds.left.includes('removed'));assert(r.kinds.right.includes('added'));});
+test('a low-similarity replacement keeps both source lines aligned with separate change colors',()=>{
+ const short='    end',long='    set description "Synthetic extended configuration text"';
+ assert.equal(c.isLowSimilarityReplacement(short,null),false);
+ assert.equal(c.isLowSimilarityReplacement(undefined,long),false);
+ const docs={left:{content:['first',short,'before','last'].join('\n')},right:{content:['first',long,'after','last'].join('\n')}};
+ for(const [left,right] of [[docs.left,docs.right],[docs.right,docs.left]]){
+  const result=c.compare(left.content,right.content);
+  reconstruct(result,left.content,right.content);
+  assert.deepEqual(result.rows.slice(1,3),[{type:'replacement',left:1,right:1},{type:'changed',left:2,right:2}]);
+  const [removed,added]=c.inlinePreviewRows(result,side=>({left,right})[side])[0];
+  assert.equal(removed.kind,'removed');
+  assert.equal(added.kind,'added');
+  assert.deepEqual(result.positions,{left:[0,1,2,3,4],right:[0,1,2,3,4]});
+ }
+});
 test('repeated lines and reordered blocks never confuse source positions',()=>{for(const [a,b] of [['a\na\nb','a\nb\na'],['x\ny\nz','z\nx\ny'],['\n\na','\na\n']])reconstruct(c.compare(a,b),a,b);});
 test('deterministic randomized comparisons reconstruct both original documents',()=>{let seed=7;const rand=()=>{seed=(seed*1664525+1013904223)>>>0;return seed;};for(let i=0;i<200;i++){const text=()=>Array.from({length:rand()%20+1},()=>['a','b','c','', 'λ'][rand()%5]).join('\n');const a=text(),b=text();reconstruct(c.compare(a,b),a,b);}});
 test('a moved block retains original order, repeated lines and gaps at both locations',()=>{

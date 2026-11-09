@@ -1,3 +1,9 @@
+# v1.21.30 Beta 1 - Clearer Compare replacement markers
+
+Compare keeps an earlier exact row when a longer repeated match would preserve the same alignment. Editor panes and the differences-only view distinguish large length changes from smaller modifications without altering row geometry. The disk-backed change map still uses the overall region classification.
+
+---
+
 # v1.21.29 Beta 1 - Moved blocks and steadier Compare scrolling
 
 Compare uses bounded context to disambiguate repeated lines and marks exact moved blocks while retaining source order and gray spacers. The synchronized disk viewport uses aligned display rows through page transitions.

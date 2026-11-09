@@ -286,7 +286,7 @@ function refresh(force=false){if(disposed)return;if(inUpdate||isComposing()){pen
    svg.setAttribute('viewBox', '0 0 20 ' + (detail ? height : total));
    const runs = [];
    for (const [at, row] of rows.entries()) {
-    const kind = row[side] === null ? 'gap' : row.type;
+    const kind = row[side] === null ? 'gap' : result.kinds[side][row[side]];
     const start = detail ? Math.floor(at * pitch) : geometry.rowOffsets[at];
     const end = detail ? start + 1 : geometry.rowOffsets[at + 1];
     const last = runs.at(-1);

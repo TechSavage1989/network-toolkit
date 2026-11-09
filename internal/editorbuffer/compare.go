@@ -458,7 +458,9 @@ func nearestAnchor(left, right *lineSignatures, positions map[lineSignature]int)
 	}
 	if bestRun == 1 &&
 		(hasRepeatedAnchor(left, bestLeft) || hasRepeatedAnchor(right, bestRight)) {
-		if i, j, found := repeatedAnchor(left, right, left.at(bestLeft)); found {
+		// A later anchor with the same alignment cannot improve pairing.
+		// Keep the earlier exact row so it stays outside the changed run.
+		if i, j, found := repeatedAnchor(left, right, left.at(bestLeft)); found && i-j != bestLeft-bestRight {
 			return int64(i), int64(j), true
 		}
 	}
