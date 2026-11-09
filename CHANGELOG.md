@@ -1,3 +1,8 @@
+## 1.21.33 Beta 1 - Compare zoom alignment and right-click submenus
+
+- Keep matching lines aligned in detached Compare when zooming in or out, with Word Wrap on or off.
+- Group related editor right-click commands into slide-out submenus.
+
 ## 1.21.32 Beta 1 - Editor wheel zoom and moved text
 
 - Hold Ctrl and use the mouse wheel over editor text to change the font size in single, split and comparison views.

@@ -88,20 +88,28 @@ async function splitWheelZoom(page){
 }
 async function compareWheelZoom(page){
  const original=await sourceState(page),viewport=await viewportZoom(page),size=Number(await page.locator(editorFontControl).inputValue());
- const sameVisualRow=({left,right})=>{
-  const overlap=Math.min(left.bottom,right.bottom)-Math.max(left.top,right.top);
-  return overlap>Math.min(left.bottom-left.top,right.bottom-right.top)*.75;
- };
- for(const [side,delta,target] of [['left',-120,size+1],['right',120,size]]){
-  await wheelOver(page,input(page,side),delta,true);
-  await waitEditorFont(page,compareEditorText,target);
-  assert.deepEqual(await viewportZoom(page),viewport,'Compare text zoom must leave the page zoom unchanged');
-  await revealSourceRow(page,'left',6);
-  const anchor=await settledAnchor(page,'ANCHOR_ONE',1500,sameVisualRow);
-  assert(anchor.left.visible&&anchor.right.visible&&sameVisualRow(anchor),JSON.stringify(anchor));
+ const wrap=page.locator('[data-ed-wrap]');
+ for(const wrapped of [true,false]){
+  await wrap.setChecked(wrapped);
+  await ready(page);
+  for(const [side,delta,target] of [['left',-120,size+1],['right',120,size],['right',120,size-1],['left',-120,size]]){
+   await wheelOver(page,input(page,side),delta,true);
+   await waitEditorFont(page,compareEditorText,target);
+   assert.deepEqual(await viewportZoom(page),viewport,'Compare text zoom must leave the page zoom unchanged');
+   for(const [name,line] of [['ANCHOR_ONE',6],['ANCHOR_TWO',8]]){
+    await revealSourceRow(page,'left',line);
+    const anchor=await settledAnchor(page,name);
+    const label=`${name}, Word Wrap ${wrapped?'on':'off'}, ${target}px at ${viewport.width}px wide`;
+    const offset=Math.abs(anchor.left.top-anchor.right.top);
+    if(offset>2)await renderGeometry(page,'after zoom '+label);
+    assert(anchor.left.visible&&anchor.right.visible&&offset<=2,label+': '+JSON.stringify(anchor));
+   }
+  }
  }
+ await wrap.check();
+ await ready(page);
  assert.deepEqual(await sourceState(page),original,'Compare zoom preserves both source documents');
- check('Ctrl+wheel on either Compare pane changes both font sizes and keeps matching source rows aligned');
+ check('Ctrl+wheel in Compare keeps matching lines aligned in both directions with Word Wrap on and off at '+viewport.width+'px');
 }
 async function sourceState(page){return page.evaluate(()=>[...NetworkToolkitFileEditor.documents.values()].map(d=>({uid:d.uid,id:d.id,content:d.content,dirty:d.dirty,undo:[...d.undo],redo:[...d.redo],eol:d.eol,bom:d.bom,encoding:d.encoding})));}
 async function anchorGeometry(page,name){return page.evaluate(name=>{const lines={ANCHOR_ONE:{left:6,right:4},ANCHOR_TWO:{left:8,right:8}},sides={};for(const side of ['left','right']){const host=document.querySelector('[data-compare-pane="'+side+'"]'),line=host.querySelector('.cm-line[data-source-line="'+lines[name][side]+'"]');if(!line||line.textContent!==name)throw Error('Matching source anchor is not rendered: '+side+' '+name);const rect=line.getBoundingClientRect(),scroll=host.querySelector('.cm-scroller').getBoundingClientRect();sides[side]={top:rect.top,bottom:rect.bottom,sourceLine:Number(line.dataset.sourceLine),visible:rect.bottom>scroll.top&&rect.top<scroll.bottom};}return sides;},name);}
@@ -245,11 +253,13 @@ async function verifyMovedScript(page) {
   await input(page,'left').press('Control+Home');await ready(page);const gap=page.locator('[data-compare-pane="right"] [data-compare-gap]').first();await gap.click({position:{x:3,y:3}});const at=await page.evaluate(()=>NetworkToolkitFileEditor.comparison.sourceView('right').selectionStart);assert(Number.isInteger(at)&&at>=0&&at<=rightSource.length);await page.keyboard.insertText('Z');await page.waitForFunction(({text,at})=>NetworkToolkitFileEditor.documents.get('alignment-right').content===text.slice(0,at)+'Z'+text.slice(at),{text:rightSource,at});await input(page,'right').press('Control+z');await page.waitForFunction(text=>NetworkToolkitFileEditor.documents.get('alignment-right').content===text,rightSource);await ready(page);
   const checkpoint=await page.evaluate(()=>NetworkToolkitFileEditor.windowAdapter.checkpoint());assert.equal(checkpoint.documents.find(d=>d.id==='alignment-left').content,leftSource);assert.equal(checkpoint.documents.find(d=>d.id==='alignment-right').content,rightSource);const afterDownload=await saveCopy(page,leftSource,'after navigation and edits');assert.equal(beforeDownload,afterDownload);geometry.push(await assertAlignment(page,'after undo and source checkpoint'));
   await input(page,'left').press('Control+Home');await ready(page);await page.screenshot({path:path.join(output,'editor-alignment113-'+mode+'-'+width+'-'+theme+'.png')});report.layouts.push({mode,width,theme,geometry,downloadSHA256:afterDownload});check(mode+' '+width+' '+theme+' visual spacers, wrapped alignment, exact clipboard/edit/history/source bytes and real divider changes');
-  if(width===1440&&theme==='light'){
+  if(theme==='light'){
    await compareWheelZoom(page);
-   await page.locator('[data-ed="compare"][aria-pressed="true"]').click();
-   await singleWheelZoom(f,mode);
-   if(mode==='main')await splitWheelZoom(page);
+   if(width===1440){
+    await page.locator('[data-ed="compare"][aria-pressed="true"]').click();
+    await singleWheelZoom(f,mode);
+    if(mode==='main')await splitWheelZoom(page);
+   }
   }
   await f.context.close();
  }

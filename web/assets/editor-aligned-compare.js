@@ -248,7 +248,38 @@ function refresh(force=false){if(disposed)return;if(inUpdate||isComposing()){pen
   });
  }
 
- async function measure(side,epoch,stamp){const d=doc(side),view=views[side],text=d?.content||'',lines=text.split('\n'),style=getComputedStyle(view.contentDOM),lineStyle=getComputedStyle(view.contentDOM.querySelector('.cm-line')||view.contentDOM),{height,width}=measurementMetrics(view,parseFloat(style.lineHeight)||20),wrapped=!!options.wordWrap?.(),key=[d?.uid,d?.editRevision,width,height,style.font,lineStyle.paddingLeft,lineStyle.paddingRight,style.tabSize,wrapped].join(':');if(geometryCache[side]?.key===key)return geometryCache[side].heights;if(!wrapped){const heights=lines.map(()=>height);geometryCache[side]={key,heights};return heights;}const node=document.createElement('div');node.className='nt-compare-measure nt-compare-aligned-measure';Object.assign(node.style,{width:width+'px',font:style.font,lineHeight:height+'px',tabSize:style.tabSize||'4','--line-left':lineStyle.paddingLeft,'--line-right':lineStyle.paddingRight});host.append(node);const heights=[];try{for(let at=0;at<lines.length;at+=250){if(!stable(epoch,stamp))return null;node.innerHTML=lines.slice(at,at+250).map(line=>'<div>'+escape(line||'\u200b')+'</div>').join('');for(const line of node.children)heights.push(line.getBoundingClientRect().height||height);if(lines.length>500)await frame();}}finally{node.remove();}if(stable(epoch,stamp))geometryCache[side]={key,heights};return heights;}
+ async function measure(side,epoch,stamp){
+  const d=doc(side),view=views[side],lines=(d?.content||'').split('\n');
+  const style=getComputedStyle(view.contentDOM),lineStyle=getComputedStyle(view.contentDOM.querySelector('.cm-line')||view.contentDOM);
+  const {height:fallbackHeight,width}=measurementMetrics(view,parseFloat(lineStyle.lineHeight)||20);
+  const wrapped=!!options.wordWrap?.(),key=[d?.uid,d?.editRevision,width,style.font,lineStyle.lineHeight,lineStyle.paddingLeft,lineStyle.paddingRight,style.tabSize,wrapped].join(':');
+  if(geometryCache[side]?.key===key)return geometryCache[side].heights;
+
+  const node=document.createElement('div'),probe=document.createElement('div');
+  node.className='nt-compare-measure nt-compare-aligned-measure';
+  Object.assign(node.style,{width:width+'px',font:'inherit',tabSize:style.tabSize||'4','--line-left':lineStyle.paddingLeft,'--line-right':lineStyle.paddingRight});
+  probe.textContent='M';
+  node.append(probe);
+  view.scrollDOM.append(node);
+  let heights=[];
+  try{
+   // Native defaultLineHeight may retain the previous font after a CSS zoom.
+   // Use the live row height so spacer widgets and source lines resize together.
+   const height=probe.getBoundingClientRect().height||fallbackHeight;
+   if(!wrapped){
+    heights=Array(lines.length).fill(height);
+   }else{
+    for(let at=0;at<lines.length;at+=250){
+     if(!stable(epoch,stamp))return null;
+     node.innerHTML=lines.slice(at,at+250).map(line=>'<div>'+escape(line||'\u200b')+'</div>').join('');
+     for(const line of node.children)heights.push(line.getBoundingClientRect().height||height);
+     if(lines.length>500)await frame();
+    }
+   }
+  }finally{node.remove();}
+  if(stable(epoch,stamp))geometryCache[side]={key,heights};
+  return heights;
+ }
  async function compute(){timer=null;if(disposed||isComposing())return;stopLargeWorker();const epoch=++generation,stamp=Object.fromEntries(sides.map(side=>[side,{d:doc(side),text:doc(side)?.content,revision:doc(side)?.editRevision}]));invalidatePixels();const left=doc('left'),right=doc('right');selected=-1;
  if(left&&right&&!left.loading&&!right.loading){
   if(Math.max(left.content.length,right.content.length)>2*1024*1024){

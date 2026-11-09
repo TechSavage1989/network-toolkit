@@ -1,3 +1,9 @@
+# v1.21.33 Beta 1 - Compare zoom alignment and right-click submenus
+
+Compare remeasures line and spacer heights after a font change. The detached editor browser fixture checks matching rows through zoom in and out with Word Wrap on and off. The editor context menu keeps common actions at the top level and groups related commands into submenus that support mouse and keyboard navigation.
+
+---
+
 # v1.21.32 Beta 1 - Editor wheel zoom and moved text
 
 Ctrl+mouse wheel changes the existing editor font size in single, split and comparison views. Synthetic log and PowerShell comparisons exercise repeated lines, moved sections, gray spacers, original line numbers and changed-character marks. Standard comparisons identify exact moved blocks before pairing nearby edits. Disk-backed comparisons use the closer context when both files offer a unique match farther down.
