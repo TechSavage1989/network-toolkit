@@ -1,0 +1,11 @@
+Network Toolkit 1.21.33 Beta 1
+
+## What's New
+
+- Matching lines stay aligned in detached Compare when you zoom in or out, with Word Wrap on or off.
+- Related Text Editor right-click commands now open in submenus.
+
+## Additional Details
+
+- Right-click editor text or press Shift+F10 to open the menu. Use the arrow keys to navigate its commands.
+- This beta is opt-in. Enable beta updates to receive it through the app.

@@ -59,6 +59,9 @@ function renderedPeerOffset(views,lookup,sourceSide){
  return offsets[Math.floor(offsets.length/2)];
 }
 function nextPaintedOffset(previous,delta){return Number.isFinite(delta)&&Math.abs(delta)>.75&&Math.abs(delta)<=12?clamp(previous+delta,-12,12):previous;}
+// Aligned row pixels start after the document padding. A short comparison can
+// still scroll a few pixels inside that padding after reducing the font size.
+function topPaddingFraction(scrollTop,padding){return scrollTop>padding?null:padding?clamp(scrollTop/padding,0,1):0;}
 function createScrollReconciler(schedule,read,write,complete=()=>{}){
  const key={};let intent=null,epoch=0,revision=0,passes=0,stable=0,running=false;
  function queue(){if(running||!intent)return;running=true;const token=epoch;
@@ -144,6 +147,7 @@ function create(options){
  E.mountSettings(host,options);
  const q=selector=>host.querySelector(selector),views={},facades={},bound={left:null,right:null},appliedDocument={left:null,right:null},appliedRevision={left:-1,right:-1},ids={left:'',right:''},syntax={left:[],right:[]},syntaxKeys={left:'',right:''},geometryCache={left:null,right:null},sourceStamps={left:'',right:''},composition={left:false,right:false},inputBusy={left:{},right:{}},originRepair=createOriginRepairGuard(),config={},gutterConfig={},gutterRefresh={};
  let disposed=false,reflecting=0,inUpdate=0,pendingRefresh=false,timer=null,generation=0,pixelReady=false,result=null,geometry=null,sourceHeights=null,lastSide='left',scale=options.comparisonPreferences?.().compareMapZoom??-3,selected=-1,mapDrag=null,syncing=false,independentReveal=false,scrollSource=null,mapFrame=null,lastSignature='',rowLookup={left:[],right:[]},paintedOffsets={left:0,right:0};
+ let zoomedFont=false;
  const map=q('[data-compare-map]'),mapContent=q('[data-compare-map-content]'),tracks=Object.fromEntries(sides.map(side=>[side,q('[data-compare-track="'+side+'"]')]));
  q('[data-compare-scale]').value=String(scale);
  const horizontalSync=E.createHorizontalSync(side=>{const el=views[side].scrollDOM;return {left:el.scrollLeft,width:el.scrollWidth,client:el.clientWidth}},(side,value)=>{views[side].scrollDOM.scrollLeft=value;remember(side)},()=>q('[data-compare-horizontal]').checked&&!options.wordWrap?.());
@@ -153,18 +157,23 @@ function create(options){
  const wheelIdle=Object.fromEntries(sides.map(side=>[side,createWheelIdle(active=>{inputBusy[side].wheel=active;if(!active)gutterRefresh[side]?.request()})]));
  const scrollReconciler=createScrollReconciler((job,intent)=>{if(!disposed)views[intent.side].requestMeasure(job)},intent=>{
   if(disposed||!pixelReady||!geometry||!sourceHeights||isComposing())return null;
-  const origin=views[intent.side],pixel=intent.kind==='source'?alignedPixelFromNative(origin,geometry.sourceOffsets[intent.side],sourceHeights[intent.side],Math.max(0,origin.scrollDOM.scrollTop-origin.documentPadding.top)):Number.isFinite(intent.pixel)?clamp(intent.pixel,0,geometry.rowOffsets.at(-1)||0):E.offsetAtLine(geometry.rowOffsets,intent.row);
-  const targets=intent.kind==='source'?(q('[data-compare-sync]').checked?[intent.side==='left'?'right':'left']:[]):intent.both?sides:[intent.side];
+  const origin=views[intent.side],source=intent.kind==='source',top=origin.scrollDOM.scrollTop,padding=origin.documentPadding.top;
+  const paddingFraction=source?topPaddingFraction(top,padding):null;
+  const pixel=source?(paddingFraction===null?alignedPixelFromNative(origin,geometry.sourceOffsets[intent.side],sourceHeights[intent.side],top-padding):0):Number.isFinite(intent.pixel)?clamp(intent.pixel,0,geometry.rowOffsets.at(-1)||0):E.offsetAtLine(geometry.rowOffsets,intent.row);
   const peer=intent.side==='left'?'right':'left';
+  const targets=source?(q('[data-compare-sync]').checked?[peer]:[]):intent.both?sides:[intent.side];
   // The native height map remains authoritative for large movements. Correct
   // only a small, measured residual between real common source rows. Retain
   // the offset across subsequent frames so a stable native estimate does not
   // undo the adjustment on the next measurement pass.
   if(targets.includes(peer)&&q('[data-compare-sync]').checked){
-   const delta=renderedPeerOffset(views,rowLookup,intent.side);
-   paintedOffsets[peer]=nextPaintedOffset(paintedOffsets[peer],delta);
+   paintedOffsets[peer]=paddingFraction===null?nextPaintedOffset(paintedOffsets[peer],renderedPeerOffset(views,rowLookup,intent.side)):0;
   }
-  return targets.map(side=>{const view=views[side],scroll=view.scrollDOM;return {side,actual:scroll.scrollTop,target:clamp(pixel<=0?0:nativePixelFromAligned(view,geometry.sourceOffsets[side],sourceHeights[side],pixel)+view.documentPadding.top+(side===peer?paintedOffsets[side]:0),0,scroll.scrollHeight-scroll.clientHeight)}});
+  return targets.map(side=>{
+   const view=views[side],scroll=view.scrollDOM;
+   const target=paddingFraction!==null?paddingFraction*view.documentPadding.top:pixel<=0?0:nativePixelFromAligned(view,geometry.sourceOffsets[side],sourceHeights[side],pixel)+view.documentPadding.top+(side===peer?paintedOffsets[side]:0);
+   return {side,actual:scroll.scrollTop,target:clamp(target,0,scroll.scrollHeight-scroll.clientHeight)};
+  });
  },targets=>{let changed=false;syncing=true;try{for(const {side,actual,target}of targets)if(Math.abs(actual-target)>.5){views[side].scrollDOM.scrollTop=target;remember(side);changed=true;}}finally{syncing=false;}queueMapUpdate();return changed;});
  function queueMapUpdate(){if(mapFrame===null)mapFrame=root.requestAnimationFrame(()=>{mapFrame=null;updateMap()});}
  function invalidatePixels(){scrollReconciler.pause();highlightedRow=null;pixelReady=false;paintedOffsets={left:0,right:0};rowLookup={left:[],right:[]};map.setAttribute('aria-disabled','true');}
@@ -221,6 +230,7 @@ function create(options){
 function matchPaneChrome(){const rows=sides.map(side=>q('[data-compare-state="'+side+'"]')).filter(Boolean);if(rows.length!==2)return;for(const row of rows)row.style.minHeight='';const tallest=Math.max(...rows.map(row=>row.getBoundingClientRect().height));if(!(tallest>0))return;for(const row of rows)if(row.getBoundingClientRect().height<tallest-0.5)row.style.minHeight=tallest+'px';}
 function refresh(force=false){if(disposed)return;if(inUpdate||isComposing()){pendingRefresh=true;return;}pendingRefresh=false;syncPreferences();const all=docs(),selection=options.selection?.();for(const side of sides){ids[side]=selection?(selection[side]||''):(all.some(d=>d.id===ids[side])?ids[side]:side==='left'?options.active()?.id||all[0]?.id||'':all.find(d=>d.id!==ids.left)?.id||'');const select=q('[data-compare-select="'+side+'"]');select.innerHTML='<option value="">Choose document</option>'+all.map(d=>'<option value="'+escape(d.id)+'">'+escape((d.dirty?'* ':'')+d.path+' · '+d.source)+'</option>').join('');select.value=ids[side];syncDocument(side);}const signature=sides.map(side=>{const d=doc(side),v=views[side];return [d?.uid,d?.editRevision,v.scrollDOM.clientWidth,v.scrollDOM.clientHeight,options.wordWrap?.(),options.syntax?.(),d?options.language?.(d):''].join(':')}).join('|');if(force||signature!==lastSignature){lastSignature=signature;generation++;invalidatePixels();clearTimeout(timer);timer=setTimeout(compute,force?0:80);}updateMap();}
  function refreshFont(){
+  zoomedFont=true;
   preview.reflow();
   for(const side of sides)views[side].requestMeasure();
   refresh(true);
@@ -248,7 +258,43 @@ function refresh(force=false){if(disposed)return;if(inUpdate||isComposing()){pen
   });
  }
 
- async function measure(side,epoch,stamp){const d=doc(side),view=views[side],text=d?.content||'',lines=text.split('\n'),style=getComputedStyle(view.contentDOM),lineStyle=getComputedStyle(view.contentDOM.querySelector('.cm-line')||view.contentDOM),{height,width}=measurementMetrics(view,parseFloat(style.lineHeight)||20),wrapped=!!options.wordWrap?.(),key=[d?.uid,d?.editRevision,width,height,style.font,lineStyle.paddingLeft,lineStyle.paddingRight,style.tabSize,wrapped].join(':');if(geometryCache[side]?.key===key)return geometryCache[side].heights;if(!wrapped){const heights=lines.map(()=>height);geometryCache[side]={key,heights};return heights;}const node=document.createElement('div');node.className='nt-compare-measure nt-compare-aligned-measure';Object.assign(node.style,{width:width+'px',font:style.font,lineHeight:height+'px',tabSize:style.tabSize||'4','--line-left':lineStyle.paddingLeft,'--line-right':lineStyle.paddingRight});host.append(node);const heights=[];try{for(let at=0;at<lines.length;at+=250){if(!stable(epoch,stamp))return null;node.innerHTML=lines.slice(at,at+250).map(line=>'<div>'+escape(line||'\u200b')+'</div>').join('');for(const line of node.children)heights.push(line.getBoundingClientRect().height||height);if(lines.length>500)await frame();}}finally{node.remove();}if(stable(epoch,stamp))geometryCache[side]={key,heights};return heights;}
+ function measureZoomedLineHeight(view,fallback){
+  // Native defaultLineHeight can retain the previous font after a CSS zoom.
+  // Measure an isolated row with the editor's active inherited typography.
+  const probe=document.createElement('div');
+  probe.className='nt-compare-measure';
+  probe.style.font='inherit';
+  probe.textContent='M';
+  view.dom.append(probe);
+  try{return probe.getBoundingClientRect().height||fallback;}
+  finally{probe.remove();}
+ }
+
+ async function measure(side,epoch,stamp){
+  const d=doc(side),view=views[side],lines=(d?.content||'').split('\n');
+  const style=getComputedStyle(view.contentDOM),lineStyle=getComputedStyle(view.contentDOM.querySelector('.cm-line')||view.contentDOM);
+  const {height:nativeHeight,width}=measurementMetrics(view,parseFloat(style.lineHeight)||20);
+  const height=zoomedFont?measureZoomedLineHeight(view,nativeHeight):nativeHeight;
+  const wrapped=!!options.wordWrap?.(),key=[d?.uid,d?.editRevision,width,height,style.font,lineStyle.paddingLeft,lineStyle.paddingRight,style.tabSize,wrapped].join(':');
+  if(geometryCache[side]?.key===key)return geometryCache[side].heights;
+  if(!wrapped){const heights=Array(lines.length).fill(height);geometryCache[side]={key,heights};return heights;}
+
+  const node=document.createElement('div');
+  node.className='nt-compare-measure nt-compare-aligned-measure';
+  Object.assign(node.style,{width:width+'px',font:style.font,lineHeight:height+'px',tabSize:style.tabSize||'4','--line-left':lineStyle.paddingLeft,'--line-right':lineStyle.paddingRight});
+  host.append(node);
+  const heights=[];
+  try{
+   for(let at=0;at<lines.length;at+=250){
+    if(!stable(epoch,stamp))return null;
+    node.innerHTML=lines.slice(at,at+250).map(line=>'<div>'+escape(line||'\u200b')+'</div>').join('');
+    for(const line of node.children)heights.push(line.getBoundingClientRect().height||height);
+    if(lines.length>500)await frame();
+   }
+  }finally{node.remove();}
+  if(stable(epoch,stamp))geometryCache[side]={key,heights};
+  return heights;
+ }
  async function compute(){timer=null;if(disposed||isComposing())return;stopLargeWorker();const epoch=++generation,stamp=Object.fromEntries(sides.map(side=>[side,{d:doc(side),text:doc(side)?.content,revision:doc(side)?.editRevision}]));invalidatePixels();const left=doc('left'),right=doc('right');selected=-1;
  if(left&&right&&!left.loading&&!right.loading){
   if(Math.max(left.content.length,right.content.length)>2*1024*1024){
@@ -328,5 +374,5 @@ function refresh(force=false){if(disposed)return;if(inUpdate||isComposing()){pen
  const observer=typeof ResizeObserver==='function'?new ResizeObserver(()=>{if(disposed)return;splitter.apply();matchPaneChrome();refresh(true)}):null;observer?.observe(q('.nt-compare-grid'));observer?.observe(map);for(const side of sides)observer?.observe(views[side].scrollDOM);splitter.apply();refresh(true);
  return {refresh,refreshFont,difference,jump,sourceView:side=>facades[side],get textarea(){return facades[options.activeSide?.()||lastSide]},get activeSide(){return lastSide},get composing(){return isComposing()},scrollActive(){const side=options.activeSide?.()||lastSide;remember(side);updateMap()},positionAt(offset,focus=true){scrollReconciler.cancel();independentReveal=true;scrollSource=null;const side=options.activeSide?.()||lastSide;facades[side].setSelectionRange(offset,offset);views[side].dispatch({effects:EditorView.scrollIntoView(clamp(offset,0,views[side].state.doc.length),{y:'start'})});if(focus)views[side].focus()},showDocument(id){if(isComposing())return false;const d=docs().find(d=>d.id===id);if(!d)return;const side=options.sideOf?.(d.uid)||(ids.left===id?'left':ids.right===id?'right':lastSide);lastSide=side;remember(side);ids[side]=id;refresh(true);views[side].focus()},undo(redo=false){ownedUndo(options.activeSide?.()||lastSide,redo)},snapshot(){for(const side of sides)remember(side);return {left:ids.left,right:ids.right,scale,sync:q('[data-compare-sync]').checked}},restore(value){if(!value||isComposing())return;const active=options.active()?.id;ids.left=String(value.left||'');ids.right=String(value.right||'');options.choose?.('left',ids.left);options.choose?.('right',ids.right);if([ids.left,ids.right].includes(active)){const d=docs().find(d=>d.id===active);if(d)options.activate(d,options.sideOf?.(d.uid))}scale=[-3,-2,-1,0,.5,1,2,4].includes(value.scale)?value.scale:-1;q('[data-compare-scale]').value=String(scale);q('[data-compare-sync]').checked=value.sync!==false;refresh(true)},get result(){return result},get selection(){return {...ids}},dispose(){if(disposed)return;preview.dispose();stopLargeWorker();for(const side of sides)remember(side);splitter.dispose();scrollReconciler.cancel();for(const event of ['pointerup','pointercancel','lostpointercapture','touchend','touchcancel','keyup','blur'])root.removeEventListener(event,endInteraction);disposed=true;generation++;clearTimeout(timer);if(mapFrame!==null)root.cancelAnimationFrame(mapFrame);observer?.disconnect();for(const side of sides){wheelIdle[side].cancel();gutterRefresh[side].cancel();root.NTKEditorLanguageService?.cancelHighlight?.('compare-'+side);views[side].destroy()}host.replaceChildren()}};
 }
-const api=Object.freeze({create,createSourceView,starts,presentationCurrent,moveToDocumentEdge,revealSourceRange,alignedPixelFromNative,nativePixelFromAligned,createScrollReconciler,nativeOriginMismatch,createOriginRepairGuard,createWheelIdle,resetNativeOrigin,nativeHeightMismatch,nativeGutterSignature,createMeasuredRefresh,measurementMetrics,renderedBlockGeometry,createNativeLineNumberGutter,sourceRowLookup,renderedPeerOffset,nextPaintedOffset});root.NTKEditorAlignedCompare=api;if(typeof module==='object'&&module.exports)module.exports=api;
+const api=Object.freeze({create,createSourceView,starts,presentationCurrent,moveToDocumentEdge,revealSourceRange,alignedPixelFromNative,nativePixelFromAligned,createScrollReconciler,nativeOriginMismatch,createOriginRepairGuard,createWheelIdle,resetNativeOrigin,nativeHeightMismatch,nativeGutterSignature,createMeasuredRefresh,measurementMetrics,renderedBlockGeometry,createNativeLineNumberGutter,sourceRowLookup,renderedPeerOffset,nextPaintedOffset,topPaddingFraction});root.NTKEditorAlignedCompare=api;if(typeof module==='object'&&module.exports)module.exports=api;
 })(typeof window==='undefined'?globalThis:window);

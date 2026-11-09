@@ -89,7 +89,8 @@ async function assertSyncedSourceNavigation(label){
  const mapRight=page.locator('[data-compare-text="right"]');
  await page.evaluate(()=>NetworkToolkitFileEditor.comparison.sourceView('right').setSelectionRange(0,9));
  await mapRight.dispatchEvent('contextmenu',{clientX:800,clientY:330,button:2});
- await page.locator('#editorContextMenu [data-editor-menu-action="textToHex"]').click();
+ await page.locator('#editorContextMenu [data-editor-submenu="convert"]').hover();
+ await page.locator('#editorContextMenu [data-editor-submenu-panel="convert"] [data-editor-menu-action="textToHex"]').click();
  await page.waitForFunction(()=>NetworkToolkitFileEditor.documents.get('map-right').content.startsWith('53796e746865746963'));
  assert.equal(await compareText('left'),mapLines.join('\n'));
  await mapRight.press('Control+z');

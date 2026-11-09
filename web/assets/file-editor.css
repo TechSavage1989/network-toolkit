@@ -286,6 +286,14 @@ body:has(.nt-editor-embedded) #toolWorkspace>#pageContent{grid-row:1!important;g
 .nt-editor-tab-menu button:disabled{opacity:.45;cursor:default}
 .nt-editor-tab-menu [role=separator]{border-top:1px solid var(--border);margin:3px 0}
 .terminal-context-menu .nt-editor-menu-check{flex:0 0 16px;text-align:center;color:var(--accent)}
+.nt-editor-context-menu{position:fixed;top:0;left:0;z-index:410;width:max-content;max-width:calc(100vw - 12px)}
+.nt-editor-context-menu>.nt-editor-menu-root{position:static}
+.nt-editor-context-menu>.nt-editor-submenu{top:0;left:0;z-index:1;width:max-content}
+.nt-editor-context-menu .terminal-context-menu button{min-height:27px;padding:4px 9px}
+.nt-editor-context-menu .terminal-menu-separator{margin-block:2px}
+.nt-editor-context-menu button[aria-expanded=true]{background:var(--accentBg)}
+.nt-editor-context-menu button>.nt-editor-submenu-arrow{flex:0 0 auto;color:var(--muted);font-size:16px;line-height:1}
+.nt-editor-context-menu button.opens-left>.nt-editor-submenu-arrow{transform:scaleX(-1)}
 /* Files uses the same persistent icon rail as Terminal and transfer clients. */
 .nt-editor-files-shell{display:flex;position:relative;flex:0 0 300px;width:300px;min-width:220px;max-width:45%;min-height:0;overflow:hidden;border-right:1px solid var(--line);background:var(--panel)}
 .nt-editor-files-shell.is-collapsed{flex-basis:44px!important;width:44px!important;min-width:44px;max-width:44px}
