@@ -246,7 +246,7 @@ function create(options) {
   return pane.inlineWrap.offsets;
  }
 
- function refreshWrapLayout() {
+ function refreshWrapLayout(fontChanged = false) {
   const wrap = wrapping();
   q('[data-compare-horizontal-sync]').disabled = wrap;
   const resized = sides.map(side => {
@@ -256,7 +256,7 @@ function create(options) {
    return true;
   });
   for (const [i, side] of sides.entries()) {
-   if (resized[i] || resized[1 - i]) panes[side].view?.refreshWrap(resized[1 - i]);
+   if (fontChanged || resized[i] || resized[1 - i]) panes[side].view?.refreshWrap(fontChanged || resized[1 - i]);
   }
  }
 
@@ -1147,6 +1147,19 @@ function create(options) {
 
  return {
   refresh, recalculate:compute, showDocument, undo, difference,
+  refreshFont() {
+   refreshWrapLayout(true);
+   for (const side of sides) {
+    const pane = panes[side];
+    if (!pane.view) {
+     const offsets = inlineWrapOffsets(pane), row = offsets?.[pane.top] ?? pane.top;
+     const height = offsets ? offsets[pane.top + 1] - row : 1;
+     pane.textarea.scrollTop = (row + height * pane.fraction) * lineHeight(pane);
+    }
+    changed(side);
+   }
+   preview?.reflow();
+  },
   get textarea() { return panes[activeSide()].textarea; },
   get activeSide() { return lastSide; },
   get composing() { return composing(); },

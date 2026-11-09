@@ -103,19 +103,24 @@ async function verifyRepeatedPolicies(page) {
   }
 }
 
-async function verifyMovedBlock(page) {
-  const moved = ['move start','repeat this line','repeat this line','move end'];
-  const stable = Array.from({length:24}, (_, i) => 'stable line ' + i);
-  const longSetting = 'set srcintf ' + Array.from({length:20}, (_, i) => '"synthetic-interface-' + i + '"').join(' ');
-  const shortSetting = 'set srcintf "VPN_Tunnels"';
-  const wrappedSetting = value => 'set comment "' + 'synthetic address '.repeat(250) + value + ' side"';
-  const before = ['header', ...moved, ...stable, 'settings', longSetting, 'set action accept', 'name before', wrappedSetting('Internal'), 'footer'].join('\n');
-  const after = ['header', ...stable, ...moved, 'settings', shortSetting, 'set action accept', 'name after', wrappedSetting('port2'), 'footer'].join('\n');
+async function verifyMovedLogBlock(page) {
+  const repeated = 'INFO Probe sent';
+  const moved = ['INFO Starting replay', repeated, repeated, 'INFO Replay complete'];
+  const stable = Array.from({length:8}, (_, i) => [
+    'INFO Checking channel ' + i, repeated, 'INFO Channel check complete',
+  ]).flat();
+  const longRecord = 'WARN Ignored noisy probes ' + Array.from({length:20}, (_, i) => 'synthetic-probe-' + i).join(', ');
+  const shortRecord = 'WARN Ignored noisy probe';
+  const wrappedRecord = value => 'INFO Replay samples ' + 'synthetic probe '.repeat(275) + ' route=' + value + ' recorded';
+  const before = ['INFO Run started', ...moved, ...stable, 'INFO Applying results', longRecord,
+    'INFO Results ready', 'INFO Status before', wrappedRecord('Internal'), 'INFO Run finished'].join('\n');
+  const after = ['INFO Run started', ...stable, ...moved, 'INFO Applying results', shortRecord,
+    'INFO Results ready', 'INFO Status after', wrappedRecord('port2'), 'INFO Run finished'].join('\n');
   await page.evaluate(async ({before, after}) => {
     for (const [id, content] of [['moves-before', before], ['moves-after', after]]) {
-      const file = new File([content], id + '.txt');
+      const file = new File([content], id + '.log');
       await NetworkToolkitFileEditor.open({
-        id, path:file.name, source:'Synthetic move fixture', binding:{kind:'localDraft'},
+        id, path:file.name, source:'Synthetic log fixture', binding:{kind:'localDraft'},
         create:true, diskMode:'upload', diskFile:file, read:async()=>({content}), write:async()=>({}),
       });
     }
@@ -130,17 +135,30 @@ async function verifyMovedBlock(page) {
   await preview.locator('.nt-compare-preview-line.moved').first().waitFor();
   const rows = await preview.locator('.nt-compare-preview-line.moved').allTextContents();
   assert.equal(rows.length, 8, 'both ends of the entire moved block are marked');
-  assert.equal(rows.filter(row => row.includes('repeat this line')).length, 4);
+  assert.equal(rows.filter(row => row.includes(repeated)).length, 4);
   assert.equal(await preview.locator('.nt-compare-preview-line.gap').count(), 8);
-  await preview.locator('.nt-compare-preview-line.removed code').filter({hasText:longSetting}).waitFor();
-  await preview.locator('.nt-compare-preview-line.added code').filter({hasText:shortSetting}).waitFor();
-  await preview.locator('.nt-compare-preview-line.changed code').filter({hasText:'name before'}).waitFor();
-  assert.equal(await preview.locator('code').filter({hasText:'set action accept'}).count(), 0);
+  await preview.locator('.nt-compare-preview-line.removed code').filter({hasText:longRecord}).waitFor();
+  await preview.locator('.nt-compare-preview-line.added code').filter({hasText:shortRecord}).waitFor();
+  await preview.locator('.nt-compare-preview-line.changed code').filter({hasText:'INFO Status before'}).waitFor();
+  assert.equal(await preview.locator('code').filter({hasText:'INFO Results ready'}).count(), 0);
   await preview.getByRole('button', {name:'Return to editable comparison'}).click();
   const source = page.locator('[data-compare-pane="left"] [data-difference-symbol="↔"]');
   await source.first().waitFor();
   assert.equal(await source.first().textContent(), '2');
-  await page.locator('[data-compare-pane="right"] [data-alignment-gap]').first().waitFor();
+  await page.waitForFunction(moveLength => {
+    const rows = side => [...document.querySelector(`[data-disk-compare-gutter="${side}"]`).children];
+    const rightRows = rows('right');
+    const left = rows('left').find(row => row.dataset.sourceLine === String(moveLength + 3));
+    const right = rightRows.find(row => row.dataset.sourceLine === '3');
+    const firstStable = rightRows.findIndex(row => row.dataset.sourceLine === '2');
+    if (!left || !right || firstStable <= moveLength) return false;
+    const gaps = rightRows.slice(firstStable - moveLength, firstStable);
+    const bounds = right.getBoundingClientRect();
+    return Math.abs(left.getBoundingClientRect().top - bounds.top) < bounds.height / 2 &&
+      !left.dataset.differenceSymbol && !right.dataset.differenceSymbol &&
+      gaps.every(gap => gap.hasAttribute('data-alignment-gap') && gap.textContent === '') &&
+      gaps.every(gap => getComputedStyle(gap).backgroundColor !== 'rgba(0, 0, 0, 0)');
+  }, moved.length);
   const replacementLine = stable.length + moved.length + 3;
   await page.evaluate(async line => {
     const compare = NetworkToolkitFileEditor.comparison;
@@ -160,7 +178,7 @@ async function verifyMovedBlock(page) {
     const highlight = page.locator(`[data-compare-pane="${side}"] .nt-disk-compare-intraline > span`).filter({hasText:value});
     await highlight.waitFor();
     assert.equal(await highlight.textContent(), value);
-    assert.equal(await highlight.locator('..').textContent(), wrappedSetting(value));
+    assert.equal(await highlight.locator('..').textContent(), wrappedRecord(value));
   }
 }
 
@@ -446,6 +464,19 @@ async function main() {
     await page.waitForFunction(aligned);
     assert.equal(await leftPane.locator('textarea').inputValue().then(value => value.includes('\n\n\nconfig system global')), true);
     assert.equal(await leftPane.locator('textarea').evaluate(el => getComputedStyle(el.parentElement.querySelector('.nt-disk-compare-color.gap')).backgroundColor !== 'rgba(0, 0, 0, 0)'), true);
+    const initialFontSize = Number(await page.locator('[data-ed-font]').inputValue());
+    const zoomDiskCompare = async (side, delta, size) => {
+      await page.locator(`[data-compare-text="${side}"]`).hover();
+      await page.keyboard.down('Control');
+      try { await page.mouse.wheel(0, delta); }
+      finally { await page.keyboard.up('Control'); }
+      await page.waitForFunction(expected => [...document.querySelectorAll('[data-compare-text]')]
+        .every(editor => parseFloat(getComputedStyle(editor).fontSize) === expected), size);
+      assert.equal(await page.locator('[data-ed-font]').inputValue(), String(size));
+      await page.waitForFunction(aligned);
+    };
+    await zoomDiskCompare('left', -120, initialFontSize + 1);
+    await zoomDiskCompare('right', 120, initialFontSize);
     await page.screenshot({path:path.join(output,'editor-aligned-spacers.png')});
 
     report.phase = 'comparison-word-wrap';
@@ -619,8 +650,8 @@ async function main() {
     await verifyRepeatedPolicies(page);
     assert.ok(await page.evaluate(() => NetworkToolkitFileEditor.closeAll()));
     await waitForEngine(page, state => state.grants === 0 && state.comparisons === 0);
-    report.phase = 'moved-blocks';
-    await verifyMovedBlock(page);
+    report.phase = 'generic-log-comparison';
+    await verifyMovedLogBlock(page);
     assert.ok(await page.evaluate(() => NetworkToolkitFileEditor.closeAll()));
     await waitForEngine(page, state => state.grants === 0 && state.comparisons === 0);
     assert.deepEqual(report.browserErrors, []);

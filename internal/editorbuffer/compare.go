@@ -481,8 +481,14 @@ func repeatedAnchor(left, right anchorWindow, signature lineSignature) (int, int
 func nearestAnchor(left, right anchorWindow, positions map[lineSignature]int) (int64, int64, bool) {
 	l, deleted := uniqueHeadAnchor(right, left)
 	r, inserted := uniqueHeadAnchor(left, right)
-	if inserted != deleted {
-		return l, r, true
+	// When both heads match a unique context later in the other document,
+	// prefer the shorter move before considering repeated single lines.
+	// Equally close contexts still need the ordinary local alignment.
+	if deleted && (!inserted || l < r) {
+		return l, 0, true
+	}
+	if inserted && (!deleted || r < l) {
+		return 0, r, true
 	}
 	// Keep a one-line replacement paired when neighboring repeated lines
 	// otherwise make a spurious insertion plus trailing deletion look cheaper.

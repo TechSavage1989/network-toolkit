@@ -1,3 +1,9 @@
+# v1.21.32 Beta 1 - Editor wheel zoom and moved text
+
+Ctrl+mouse wheel changes the existing editor font size in single, split and comparison views. Synthetic log and PowerShell comparisons exercise repeated lines, moved sections, gray spacers, original line numbers and changed-character marks. Standard comparisons identify exact moved blocks before pairing nearby edits. Disk-backed comparisons use the closer context when both files offer a unique match farther down.
+
+---
+
 # v1.21.31 Beta 1 - Compare policy alignment and character highlighting
 
 Disk-backed Compare preserves the next matching FortiOS policy header and UUID when different policy blocks precede it on both sides. Both panes share a single character comparison for each pair of loaded lines. Lines that span multiple editor pages still use whole-line marks.

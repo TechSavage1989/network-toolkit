@@ -68,6 +68,29 @@ func TestStreamingCompareRepeatedLineReplacement(t *testing.T) {
 	}
 }
 
+func TestStreamingComparePrefersNearbyContextBeforeRepeatedLogLine(t *testing.T) {
+	const prefix = "INFO Run started\n"
+	const moved = "INFO Starting replay\nINFO Probe sent\nINFO Probe sent\nINFO Replay complete\n"
+	const stable = "INFO Checking channel 1\nINFO Probe sent\nINFO Channel check complete\n" +
+		"INFO Checking channel 2\nINFO Probe sent\nINFO Channel check complete\n"
+	left := InlineComparisonInput(prefix + moved + stable + "INFO Applying results\nINFO Route Internal\nINFO Run finished\n")
+	right := InlineComparisonInput(prefix + stable + moved + "INFO Applying results\nINFO Route port2\nINFO Run finished\n")
+	want := []Difference{
+		{Left: 1, Right: 1, LeftCount: 4},
+		{Left: 11, Right: 7, RightCount: 4},
+		{Left: 12, Right: 12, LeftCount: 1, RightCount: 1},
+	}
+	if got := collectDifferences(t, left, right); !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %+v, want %+v", got, want)
+	}
+	for i, d := range want {
+		want[i] = Difference{Left: d.Right, Right: d.Left, LeftCount: d.RightCount, RightCount: d.LeftCount}
+	}
+	if got := collectDifferences(t, right, left); !reflect.DeepEqual(got, want) {
+		t.Fatalf("reverse comparison got %+v, want %+v", got, want)
+	}
+}
+
 func TestStreamingCompareMatchesRepeatedLineByContext(t *testing.T) {
 	const prefix = "prefix\n"
 	const inserted = "inserted start\nshared heading\ninserted detail\n"
