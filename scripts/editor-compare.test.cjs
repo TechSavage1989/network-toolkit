@@ -5,8 +5,30 @@ test('identical, empty and Unicode documents preserve every logical line',()=>{f
 test('adds, removes and changes have explicit line identities and grouped hunks',()=>{const a='first\nold\nremove\nlast',b='first\nnew\nlast\nadded',r=c.compare(a,b);reconstruct(r,a,b);assert.equal(r.hunks.length,2);assert.equal(r.hunks[0].type,'changed');assert.equal(r.hunks[1].type,'added');assert(r.kinds.left.includes('removed'));assert(r.kinds.right.includes('added'));});
 test('repeated lines and reordered blocks never confuse source positions',()=>{for(const [a,b] of [['a\na\nb','a\nb\na'],['x\ny\nz','z\nx\ny'],['\n\na','\na\n']])reconstruct(c.compare(a,b),a,b);});
 test('deterministic randomized comparisons reconstruct both original documents',()=>{let seed=7;const rand=()=>{seed=(seed*1664525+1013904223)>>>0;return seed;};for(let i=0;i<200;i++){const text=()=>Array.from({length:rand()%20+1},()=>['a','b','c','', 'λ'][rand()%5]).join('\n');const a=text(),b=text();reconstruct(c.compare(a,b),a,b);}});
+test('a moved block retains original order, repeated lines and gaps at both locations',()=>{
+ const moved=['move start','repeated','repeated','move end'];
+ const stable=Array.from({length:10},(_,i)=>'stable '+i);
+ const a=['header',...moved,...stable,'footer'].join('\n');
+ const b=['header',...stable,...moved,'footer'].join('\n');
+ const result=c.compare(a,b);
+ reconstruct(result,a,b);
+ assert.deepEqual(result.rows.filter(row=>row.type==='moved').map(({left,right,counterpart})=>[left,right,counterpart]),[
+  [1,null,11],[2,null,12],[3,null,13],[4,null,14],
+  [null,11,1],[null,12,2],[null,13,3],[null,14,4]
+ ]);
+});
 test('large nearly identical documents use prefix/suffix trimming',()=>{const a=Array.from({length:20000},(_,i)=>'line '+i);const b=a.slice();b[10000]='changed';const r=c.compare(a.join('\n'),b.join('\n'));assert(!r.limited);assert.equal(r.hunks.length,1);assert.equal(r.hunks[0].start,10000);});
 test('very large or extensively changed documents stop with an explicit bounded result',()=>{assert(c.compare('x'.repeat(c.LIMITS.characters+1),'').limited);assert(c.compare('\n'.repeat(c.LIMITS.lines),'').limited);const a=Array.from({length:2000},(_,i)=>'a'+i).join('\n'),b=Array.from({length:2000},(_,i)=>'b'+i).join('\n');assert(c.compare(a,b).limited);});
+test('unique line contexts align a large region of repeated lines',()=>{
+ const repeated=[];
+ for(let a=0;a<9;a++)for(let b=0;b<9;b++)for(let c=0;c<9;c++)repeated.push('a'+a,'b'+b,'c'+c);
+ const left=['old opening',...repeated,'old ending'].join('\n'),right=['new opening',...repeated,'new ending'].join('\n');
+ assert((repeated.length+2)**2>c.LIMITS.cells);
+ const result=c.compare(left,right);
+ reconstruct(result,left,right);
+ assert.equal(result.hunks.length,2);
+ assert.equal(result.rows.filter(row=>row.type==='equal').length,repeated.length);
+});
 test('row/line mappings account for asymmetric additions and deletions',()=>{const r=c.compare('a\nz','a\nb\nc\nz');assert.deepEqual(r.positions.left,[0,1,1,1,2]);assert.deepEqual(r.positions.right,[0,1,2,3,4]);assert.equal(c.lineAtRow(r.positions.left,2.5),1);assert.equal(c.rowAtLine(r.positions.left,1.5),3.5);assert.equal(c.lineAtRow(r.positions.right,3.5),3.5);});
 
 test('difference navigation can stop at each end without changing first or last',()=>{

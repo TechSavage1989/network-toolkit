@@ -4,14 +4,43 @@ const LIMITS=Object.freeze({characters:16*1024*1024,lines:30000,cells:2000000});
 const splitPreferences=new WeakMap();
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,Number(v)||0));
 const escape=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-// Find unique exact lines in both changed regions, then their order-preserving
-// longest increasing sequence. This bounds work for large, mostly similar files
-// without treating repeated configuration lines as reliable anchors.
+// Find unique exact lines, or unique three-line contexts when every matching
+// line repeats. Keep their order with a longest increasing sequence.
 function uniqueAnchors(a,b,fromA,toA,fromB,toB){
- const counts=new Map(),positions=new Map();
- for(let i=fromA;i<toA;i++)counts.set(a[i],(counts.get(a[i])||0)+1);
- for(let j=fromB;j<toB;j++)positions.set(b[j],positions.has(b[j])?-1:j);
- const candidates=[];for(let i=fromA;i<toA;i++)if(counts.get(a[i])===1&&positions.get(a[i])>=fromB)candidates.push({left:i,right:positions.get(a[i])});
+ const leftPositions=new Map(),rightPositions=new Map();
+ const remember=(positions,key,index)=>positions.set(key,positions.has(key)?-1:index);
+ const candidates=[];
+ const collect=()=>{
+  for(const [key,left] of leftPositions){
+   const right=rightPositions.get(key);
+   if(left>=0&&right>=0)candidates.push({left,right});
+  }
+ };
+ for(let i=fromA;i<toA;i++)remember(leftPositions,a[i],i);
+ for(let j=fromB;j<toB;j++)remember(rightPositions,b[j],j);
+ collect();
+ if(!candidates.length&&toA-fromA>=3&&toB-fromB>=3){
+  leftPositions.clear();
+  rightPositions.clear();
+  // Intern lines so a context key does not copy long line text.
+  const ids=new Map();
+  const id=line=>{
+   if(!ids.has(line))ids.set(line,ids.size);
+   return ids.get(line);
+  };
+  const indexContexts=(rows,from,to,positions)=>{
+   let first=id(rows[from]),second=id(rows[from+1]);
+   for(let i=from;i+2<to;i++){
+    const third=id(rows[i+2]);
+    remember(positions,first+','+second+','+third,i);
+    first=second;
+    second=third;
+   }
+  };
+  indexContexts(a,fromA,toA,leftPositions);
+  indexContexts(b,fromB,toB,rightPositions);
+  collect();
+ }
  const tails=[],previous=[],atTail=[];
  for(let i=0;i<candidates.length;i++){const v=candidates[i].right;let lo=0,hi=tails.length;while(lo<hi){const mid=(lo+hi)>>1;if(tails[mid]<v)lo=mid+1;else hi=mid;}previous[i]=lo?atTail[lo-1]:-1;tails[lo]=v;atTail[lo]=i;}
  const ordered=[];for(let i=atTail.at(-1);i!==undefined&&i>=0;i=previous[i])ordered.push(candidates[i]);return ordered.reverse();
@@ -23,6 +52,37 @@ function appendRegion(a,b,fromA,toA,fromB,toB,ops,budget){
   let i=0,j=0;while(i<n||j<m){if(i<n&&j<m&&a[fromA+i]===b[fromB+j])ops.push({type:'equal',left:fromA+i++,right:fromB+j++});else if(i<n&&(j===m||table[(i+1)*width+j]>=table[i*width+j+1]))ops.push({type:'removed',left:fromA+i++,right:null});else ops.push({type:'added',left:null,right:fromB+j++});}
  }else{for(let i=fromA;i<toA;i++)ops.push({type:'removed',left:i,right:null});for(let j=fromB;j<toB;j++)ops.push({type:'added',left:null,right:j});}
  return true;
+}
+// Match a unique adjacent pair among unmatched rows, then extend through
+// identical neighboring lines. Keep both blocks in their original order.
+function markMovedRows(rows, text, kinds){
+ const lines={left:text.left.split('\n'),right:text.right.split('\n')};
+ function index(side, kind){
+  const pairs=new Map();
+  for(let i=0;i+1<rows.length;i++){
+   const a=rows[i],b=rows[i+1];
+   if(a.type!==kind||b.type!==kind||b[side]!==a[side]+1)continue;
+   const first=lines[side][a[side]],second=lines[side][b[side]];
+   if(!first.trim()&&!second.trim())continue;
+   const key=first+'\n'+second;
+   pairs.set(key,pairs.has(key)?-1:i);
+  }
+  return pairs;
+ }
+ const left=index('left','removed'),right=index('right','added');
+ const matches=(i,j)=>rows[i]?.type==='removed'&&rows[j]?.type==='added'&&lines.left[rows[i].left]===lines.right[rows[j].right];
+ for(const [key,leftAt] of left){
+  const rightAt=right.get(key);
+  if(leftAt<0||!(rightAt>=0)||!matches(leftAt,rightAt)||!matches(leftAt+1,rightAt+1))continue;
+  let i=leftAt,j=rightAt;
+  while(matches(i-1,j-1)){i--;j--;}
+  for(;matches(i,j);i++,j++){
+   const from=rows[i],to=rows[j];
+   from.type=to.type='moved';
+   from.counterpart=to.right;to.counterpart=from.left;
+   kinds.left[from.left]=kinds.right[to.right]='moved';
+  }
+ }
 }
 function compare(left,right,spaces){
  left=String(left);right=String(right);const limitMessage={limited:true,message:'Comparison supports up to 16 MiB and 30,000 lines per document. Both documents remain editable; compare smaller sections for larger files.'};
@@ -49,6 +109,7 @@ function compare(left,right,spaces){
   for(let k=0;k<Math.max(removed.length,added.length);k++){const l=removed[k]?.left??null,r=added[k]?.right??null,rowType=l!==null&&r!==null?'changed':l!==null?'removed':'added';rows.push({type:rowType,left:l,right:r});if(l!==null)kinds.left[l]=rowType;if(r!==null)kinds.right[r]=rowType;}
   hunks.push({start,end:rows.length,type,left:removed[0]?.left??null,right:added[0]?.right??null});
  }
+ markMovedRows(rows,{left,right},kinds);
  const positions={left:[0],right:[0]};for(const row of rows)for(const side of ['left','right'])positions[side].push(positions[side].at(-1)+(row[side]===null?0:1));
  return {limited:false,rows,hunks,kinds,positions,lineCounts:{left:a.length,right:b.length},identical:hunks.length===0};
 }
@@ -163,12 +224,13 @@ function mountDifferencePreview(host, read, getCount) {
   for (const pair of data) {
    for (let side = 0; side < 2; side++) {
     const value = pair[side], cell = document.createElement('div');
-    const kind = value ? pair[1-side] ? 'changed' : side === 0 ? 'removed' : 'added' : 'gap';
+    const kind = value ? value.moved ? 'moved' : pair[1-side] ? 'changed' : side === 0 ? 'removed' : 'added' : 'gap';
     cell.className = 'nt-compare-preview-line ' + kind;
     if (value) {
      const symbol = document.createElement('b');
-     symbol.textContent = {changed:'~',removed:'−',added:'+'}[kind];
-     symbol.setAttribute('aria-label', {changed:'Modified',removed:'Removed',added:'Added'}[kind]);
+     symbol.textContent = {changed:'~',removed:'−',added:'+',moved:'↔'}[kind];
+     symbol.setAttribute('aria-label', {changed:'Modified',removed:'Removed',added:'Added',moved:'Moved'}[kind]);
+     if(Number.isInteger(value.counterpart))symbol.title='Other document line '+(value.counterpart+1);
      const label = document.createElement('span');
      label.textContent = String(value.line + 1);
      const text = document.createElement('code');
@@ -271,8 +333,8 @@ function inlinePreviewRows(result, getDocument) {
   const changed = result.rows.filter(row => row.type !== 'equal');
   const left = getDocument('left').content.split('\n'), right = getDocument('right').content.split('\n');
   inlinePreviewCache.set(result, changed.map(row => [
-   row.left == null ? null : {line:row.left,text:left[row.left]},
-   row.right == null ? null : {line:row.right,text:right[row.right]}
+   row.left == null ? null : {line:row.left,text:left[row.left],moved:row.type==='moved',counterpart:row.counterpart},
+   row.right == null ? null : {line:row.right,text:right[row.right],moved:row.type==='moved',counterpart:row.counterpart}
   ]));
  }
  return inlinePreviewCache.get(result);
@@ -339,7 +401,7 @@ function create(options){
  host.className='nt-editor-compare'+(comparing?'':' is-split-view');
  const alignmentUnavailable=comparing&&(!root.NTKEditorAlignedCompare||!root.NetworkToolkitCodeMirror||!root.NTKEditorAlignmentModel);
  const selectors=['left','right'].map(side=>'<label class="nt-compare-selector">'+(side==='left'?'Left':'Right')+' <select data-compare-select="'+side+'" aria-label="'+side+' comparison document"></select></label>').join('');
- host.innerHTML='<div class="nt-compare-tools">'+selectors+'<button type="button" class="btn small ghost" data-compare="swap" title="Swap left and right documents">Swap sides</button><button type="button" class="btn small ghost" data-compare="previous" title="Previous difference">Previous</button><button type="button" class="btn small ghost" data-compare="next" title="Next difference">Next</button><details class="nt-compare-settings"><summary class="btn small ghost">Options</summary><div><label><input type="checkbox" data-compare-sync checked> Sync scroll</label><label title="Fit shows the entire comparison. Zoom expands only the map, never the editor text.">Map zoom <select data-compare-scale aria-label="Map zoom"><option value="0">Fit entire document</option><option value="0.5">1.5×</option><option value="1">2×</option><option value="2">3×</option><option value="4">5×</option></select></label><span class="nt-compare-legend"><span class="added">+ Added</span><span class="removed">− Removed</span><span class="changed">~ Modified</span><span>= Unchanged</span><span>Blank = alignment gap</span></span></div></details></div><div class="nt-compare-summary" data-compare-summary role="status"></div><div class="nt-compare-grid">'+['left','right'].map(side=>'<section class="nt-compare-pane" data-compare-pane="'+side+'"><div class="nt-editor-tabs" data-ed-tabs data-ed-view="'+side+'" role="tablist" aria-label="'+side+' view document tabs"></div><div class="nt-compare-surface"><pre data-compare-lines="'+side+'" aria-hidden="true"></pre><pre class="nt-compare-highlight" data-compare-highlight="'+side+'" aria-hidden="true" hidden></pre><textarea id="ntCompare-'+side+'" data-compare-text="'+side+'" data-input-clear="off" wrap="off" spellcheck="false" aria-label="Edit '+side+' comparison document"></textarea></div><div class="nt-compare-document-state" data-compare-state="'+side+'"></div><div class="nt-compare-syntax-notice" data-compare-syntax-notice="'+side+'" role="status" hidden></div></section>').join('<div class="nt-editor-pane-resize" data-compare-divider></div>')+'<div class="nt-compare-map-panel"><div class="nt-compare-map-labels" aria-hidden="true"><span>Left</span><span>Right</span></div><div class="nt-compare-map" data-compare-map><div data-compare-map-content>'+['left','right'].map(side=>'<div class="nt-compare-track" data-compare-track="'+side+'" tabindex="0" role="scrollbar" aria-label="'+side+' document map" aria-orientation="vertical" aria-controls="ntCompare-'+side+'" aria-valuemin="0" title="Click or drag anywhere to navigate this document. Fit: wheel scrolls the document. Zoom: wheel pans the map and document."><svg data-compare-map-marks="'+side+'" aria-hidden="true" preserveAspectRatio="none"></svg><div data-compare-map-viewport="'+side+'" aria-hidden="true"></div></div>').join('')+'</div></div></div></div>';
+ host.innerHTML='<div class="nt-compare-tools">'+selectors+'<button type="button" class="btn small ghost" data-compare="swap" title="Swap left and right documents">Swap sides</button><button type="button" class="btn small ghost" data-compare="previous" title="Previous difference">Previous</button><button type="button" class="btn small ghost" data-compare="next" title="Next difference">Next</button><details class="nt-compare-settings"><summary class="btn small ghost">Options</summary><div><label><input type="checkbox" data-compare-sync checked> Sync scroll</label><label title="Fit shows the entire comparison. Zoom expands only the map, never the editor text.">Map zoom <select data-compare-scale aria-label="Map zoom"><option value="0">Fit entire document</option><option value="0.5">1.5×</option><option value="1">2×</option><option value="2">3×</option><option value="4">5×</option></select></label><span class="nt-compare-legend"><span class="added">+ Added</span><span class="removed">− Removed</span><span class="changed">~ Modified</span><span>= Unchanged</span><span class="moved">↔ Moved</span><span>Blank = alignment gap</span></span></div></details></div><div class="nt-compare-summary" data-compare-summary role="status"></div><div class="nt-compare-grid">'+['left','right'].map(side=>'<section class="nt-compare-pane" data-compare-pane="'+side+'"><div class="nt-editor-tabs" data-ed-tabs data-ed-view="'+side+'" role="tablist" aria-label="'+side+' view document tabs"></div><div class="nt-compare-surface"><pre data-compare-lines="'+side+'" aria-hidden="true"></pre><pre class="nt-compare-highlight" data-compare-highlight="'+side+'" aria-hidden="true" hidden></pre><textarea id="ntCompare-'+side+'" data-compare-text="'+side+'" data-input-clear="off" wrap="off" spellcheck="false" aria-label="Edit '+side+' comparison document"></textarea></div><div class="nt-compare-document-state" data-compare-state="'+side+'"></div><div class="nt-compare-syntax-notice" data-compare-syntax-notice="'+side+'" role="status" hidden></div></section>').join('<div class="nt-editor-pane-resize" data-compare-divider></div>')+'<div class="nt-compare-map-panel"><div class="nt-compare-map-labels" aria-hidden="true"><span>Left</span><span>Right</span></div><div class="nt-compare-map" data-compare-map><div data-compare-map-content>'+['left','right'].map(side=>'<div class="nt-compare-track" data-compare-track="'+side+'" tabindex="0" role="scrollbar" aria-label="'+side+' document map" aria-orientation="vertical" aria-controls="ntCompare-'+side+'" aria-valuemin="0" title="Click or drag anywhere to navigate this document. Fit: wheel scrolls the document. Zoom: wheel pans the map and document."><svg data-compare-map-marks="'+side+'" aria-hidden="true" preserveAspectRatio="none"></svg><div data-compare-map-viewport="'+side+'" aria-hidden="true"></div></div>').join('')+'</div></div></div></div>';
  mountSettings(host,options);
  const q=sel=>host.querySelector(sel),panes={left:q('[data-compare-text="left"]'),right:q('[data-compare-text="right"]')},map=q('[data-compare-map]'),mapContent=q('[data-compare-map-content]');
  const tracks={left:q('[data-compare-track="left"]'),right:q('[data-compare-track="right"]')};

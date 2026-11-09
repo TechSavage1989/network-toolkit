@@ -68,6 +68,47 @@ func TestStreamingCompareRepeatedLineReplacement(t *testing.T) {
 	}
 }
 
+func TestStreamingCompareMatchesRepeatedLineByContext(t *testing.T) {
+	const prefix = "prefix\n"
+	const inserted = "inserted start\nshared heading\ninserted detail\n"
+	const retained = "shared heading\nretained detail\nretained ending\n"
+	left := InlineComparisonInput(prefix + retained + "left tail\n")
+	right := InlineComparisonInput(prefix + inserted + retained + "right tail\n")
+	want := []Difference{
+		{Left: 1, Right: 1, RightCount: 3},
+		{Left: 4, Right: 7, LeftCount: 1, RightCount: 1},
+	}
+	if got := collectDifferences(t, left, right); !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %+v, want %+v", got, want)
+	}
+	want = []Difference{
+		{Left: 1, Right: 1, LeftCount: 3},
+		{Left: 7, Right: 4, LeftCount: 1, RightCount: 1},
+	}
+	if got := collectDifferences(t, right, left); !reflect.DeepEqual(got, want) {
+		t.Fatalf("reverse comparison got %+v, want %+v", got, want)
+	}
+}
+
+func TestStreamingCompareMatchesShiftedRepeatedLineByContext(t *testing.T) {
+	const retained = "shared heading\nretained detail\nretained ending\n"
+	left := InlineComparisonInput("prefix\nleft heading\n" + retained + "left tail\n")
+	right := InlineComparisonInput("prefix\nright heading\nshared heading\ninserted detail\n" + retained + "right tail\n")
+	want := []Difference{
+		{Left: 1, Right: 1, LeftCount: 1, RightCount: 3},
+		{Left: 5, Right: 7, LeftCount: 1, RightCount: 1},
+	}
+	if got := collectDifferences(t, left, right); !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %+v, want %+v", got, want)
+	}
+	for i, d := range want {
+		want[i] = Difference{Left: d.Right, Right: d.Left, LeftCount: d.RightCount, RightCount: d.LeftCount}
+	}
+	if got := collectDifferences(t, right, left); !reflect.DeepEqual(got, want) {
+		t.Fatalf("reverse comparison got %+v, want %+v", got, want)
+	}
+}
+
 func TestStreamingCompareKeepsExistingPolicyAfterRepeatedInsertions(t *testing.T) {
 	policy := func(id string) string {
 		return "    edit " + id + "\n" +

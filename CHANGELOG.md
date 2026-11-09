@@ -1,3 +1,8 @@
+## 1.21.29 Beta 1 - Moved blocks and steadier Compare scrolling
+
+- Use nearby text to distinguish repeated lines and mark exact moved blocks with gray spacers.
+- Keep synchronized Compare scrolling on aligned display rows through delayed results and page changes.
+
 ## 1.21.28 Beta 1 - FortiOS policy alignment
 
 - Align matching policy IDs and UUIDs across inserted policies, including when the original policy has changed.

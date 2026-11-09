@@ -97,6 +97,39 @@ async function verifyRepeatedPolicies(page) {
   }
 }
 
+async function verifyMovedBlock(page) {
+  const moved = ['move start','repeat this line','repeat this line','move end'];
+  const stable = Array.from({length:24}, (_, i) => 'stable line ' + i);
+  const before = ['header', ...moved, ...stable, 'footer'].join('\n');
+  const after = ['header', ...stable, ...moved, 'footer'].join('\n');
+  await page.evaluate(async ({before, after}) => {
+    for (const [id, content] of [['moves-before', before], ['moves-after', after]]) {
+      const file = new File([content], id + '.txt');
+      await NetworkToolkitFileEditor.open({
+        id, path:file.name, source:'Synthetic move fixture', binding:{kind:'localDraft'},
+        create:true, diskMode:'upload', diskFile:file, read:async()=>({content}), write:async()=>({}),
+      });
+    }
+  }, {before, after});
+  await page.locator('[data-ed="compare"]').click();
+  await page.selectOption('[data-compare-select="left"]', 'moves-before');
+  await page.selectOption('[data-compare-select="right"]', 'moves-after');
+  await page.waitForFunction(() => document.querySelector('[data-compare-summary]')?.dataset.compareDone === 'true');
+  await page.locator('.nt-compare-settings summary').click();
+  await page.check('[data-compare-only]');
+  const preview = page.locator('.nt-compare-preview');
+  await preview.locator('.nt-compare-preview-line.moved').first().waitFor();
+  const rows = await preview.locator('.nt-compare-preview-line.moved').allTextContents();
+  assert.equal(rows.length, 8, 'both ends of the entire moved block are marked');
+  assert.equal(rows.filter(row => row.includes('repeat this line')).length, 4);
+  assert.equal(await preview.locator('.nt-compare-preview-line.gap').count(), 8);
+  await preview.getByRole('button', {name:'Return to editable comparison'}).click();
+  const source = page.locator('[data-compare-pane="left"] [data-difference-symbol="↔"]');
+  await source.first().waitFor();
+  assert.equal(await source.first().textContent(), '2');
+  await page.locator('[data-compare-pane="right"] [data-alignment-gap]').first().waitFor();
+}
+
 async function main() {
   const browser = await chromium.launch({ headless: true, ignoreDefaultArgs:['--hide-scrollbars'],
     ...(process.env.TOOLKIT_BROWSER_EXECUTABLE ? { executablePath: process.env.TOOLKIT_BROWSER_EXECUTABLE } : {}) });
@@ -431,6 +464,57 @@ async function main() {
       return left.querySelector('textarea').scrollTop > 30 && right.querySelector('textarea').scrollTop > 30 &&
         Math.abs(y(left, '2') - y(right, '4')) < 3;
     });
+    // A slow source-line lookup may finish after both panes have moved into
+    // a spacer. Its result must never replace the current aligned-row anchor.
+    const compareRoute = '**/buffers/compare';
+    let releaseLocate, locateStarted;
+    const locateDelay = new Promise(resolve => { releaseLocate = resolve; });
+    const locateRequested = new Promise(resolve => { locateStarted = resolve; });
+    const isLeftLocate = request => {
+      const body = request.postDataJSON();
+      return body?.action === 'locate' && body.side === 'left';
+    };
+    const sync = page.locator('[data-compare-sync]');
+    await page.locator('.nt-compare-settings summary').click();
+    await sync.uncheck();
+    await page.evaluate(async () => {
+      const compare = NetworkToolkitFileEditor.comparison;
+      await Promise.all(['left', 'right'].map(side => compare.diskView(side).goAlignedRow(1)));
+      document.querySelector('[data-compare-text="left"]').focus({preventScroll:true});
+    });
+    const delayLocate = async route => {
+      if (isLeftLocate(route.request())) {
+        locateStarted();
+        await locateDelay;
+      }
+      await route.continue();
+    };
+    await page.route(compareRoute, delayLocate);
+    try {
+      const response = page.waitForResponse(value => value.url().endsWith('/buffers/compare') && isLeftLocate(value.request()));
+      await sync.check();
+      await Promise.race([locateRequested, response.then(() => { throw Error('The source lookup was not held.'); })]);
+      await page.evaluate(() => {
+        const source = document.querySelector('[data-compare-text="left"]');
+        source.dispatchEvent(new WheelEvent('wheel', {bubbles:true, deltaY:7}));
+        source.scrollTop += 7;
+      });
+      const insideSpacer = () => {
+        const compare = NetworkToolkitFileEditor.comparison;
+        const left = compare.diskView('left').capture(), right = compare.diskView('right').capture();
+        return left.alignedTop === 1 && right.alignedTop === 1 && left.fraction > .15 &&
+          Math.abs(left.fraction - right.fraction) < .05;
+      };
+      await page.waitForFunction(insideSpacer);
+      releaseLocate();
+      await response;
+      await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      assert.equal(await page.evaluate(insideSpacer), true, 'late source lookup moved an aligned pane out of the spacer');
+    } finally {
+      releaseLocate();
+      await page.unroute(compareRoute, delayLocate);
+    }
+    await page.locator('.nt-compare-settings summary').click();
     await leftPane.locator('textarea').evaluate(el=>{
       const at = el.value.indexOf('config system global');
       el.focus({preventScroll:true});
@@ -499,6 +583,10 @@ async function main() {
     await waitForEngine(page, state => state.grants === 0 && state.comparisons === 0);
     report.phase = 'fortios-policy-alignment';
     await verifyRepeatedPolicies(page);
+    assert.ok(await page.evaluate(() => NetworkToolkitFileEditor.closeAll()));
+    await waitForEngine(page, state => state.grants === 0 && state.comparisons === 0);
+    report.phase = 'moved-blocks';
+    await verifyMovedBlock(page);
     assert.ok(await page.evaluate(() => NetworkToolkitFileEditor.closeAll()));
     await waitForEngine(page, state => state.grants === 0 && state.comparisons === 0);
     assert.deepEqual(report.browserErrors, []);

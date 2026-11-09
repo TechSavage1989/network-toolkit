@@ -8,7 +8,7 @@ const peerOf = side => side === 'left' ? 'right' : 'left';
 const number = value => Number(value || 0).toLocaleString();
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const pageSize = 64;
-const differenceSymbols = {added:'+', removed:'−', changed:'~'};
+const differenceSymbols = {added:'+', removed:'−', changed:'~', moved:'↔'};
 const mapScrollRange = 1000000;
 
 function selectorMarkup(side) {
@@ -54,7 +54,7 @@ function create(options) {
   '</div>' +
   '<div class="nt-compare-summary"><span data-compare-summary role="status"></span>' +
   '<span class="nt-compare-legend" aria-label="Difference key"><span class="added">+ Added</span><span class="removed">− Removed</span>' +
-  '<span class="changed">~ Modified</span></span></div><div class="nt-compare-grid">' +
+  '<span class="changed">~ Modified</span><span class="moved">↔ Moved</span></span></div><div class="nt-compare-grid">' +
   sides.map(paneMarkup).join('<div class="nt-editor-pane-resize" data-compare-divider></div>') +
   '<div class="nt-compare-map-panel"><div class="nt-compare-map-labels" aria-hidden="true"><span>Left</span><span>Right</span></div>' +
   '<div class="nt-compare-map is-line-map" data-compare-map><div data-compare-map-content><div class="nt-disk-map-window">' +
@@ -140,6 +140,8 @@ function create(options) {
    pane.ready = false;
    pane.doc = doc;
    pane.top = 0;
+   pane.alignedTop = undefined;
+   pane.fraction = 0;
    pane.ranges = [];
    pane.mapping = null;
    pane.requested = null;
@@ -257,15 +259,8 @@ function create(options) {
   }
  }
 
- function differenceKind(side, line, ranges) {
-  for (const diff of ranges) {
-   const start = diff[side], count = diff[side + 'Count'];
-   if (line >= start && line < start + count) {
-    const peerCount = diff[peerOf(side) + 'Count'];
-    return line - start < peerCount ? 'changed' : side === 'left' ? 'removed' : 'added';
-   }
-  }
-  return '';
+ function differenceAt(side, line, ranges) {
+  return ranges.find(diff => line >= diff[side] && line - diff[side] < diff[side + 'Count']);
  }
 
  function paintDifferences(side) {
@@ -280,11 +275,16 @@ function create(options) {
   for (const row of rows) {
    const gap = row.hasAttribute('data-alignment-gap');
    const line = Number(row.dataset.sourceLine || row.textContent) - 1;
-   const kind = gap ? 'gap' : differenceKind(side, line, pane.ranges);
+   const diff = !gap && differenceAt(side, line, pane.ranges);
+   const offsetInTail = diff ? line - diff[side] - diff[peerOf(side) + 'Count'] : -1;
+   const counterpart = offsetInTail >= 0 && diff.movedTo ? diff.movedTo + offsetInTail : null;
+   const kind = gap ? 'gap' : !diff ? '' : counterpart ? 'moved' :
+    offsetInTail < 0 ? 'changed' : side === 'left' ? 'removed' : 'added';
    const className = kind ? 'nt-compare-line ' + kind : '';
    if (row.className !== className) row.className = className;
    if (row.textContent && differenceSymbols[kind]) row.dataset.differenceSymbol = differenceSymbols[kind];
    else delete row.dataset.differenceSymbol;
+   row.title = counterpart && row.textContent ? 'Moved · other document line ' + number(counterpart) : '';
    const height = parseFloat(row.style.height) || defaultHeight;
    const offset = top;
    top += height;
@@ -382,7 +382,7 @@ function create(options) {
   setMapTop(atEnd ? mapExtent : mapTop);
   const first = Math.floor(mapTop / (pitch * step)) * step;
   const end = Math.ceil((mapTop + height) / (pitch * step)) * step;
-  const revision = status?.count ? job.id + ':' + status.count : '';
+  const revision = status?.count ? job.id + ':' + status.count + ':' + status.done : '';
   const data = mapData?.revision === revision ? mapData : null;
   const paintKey = [revision, data?.start, first, end, pitch, height].join(':');
   for (const side of sides) {
@@ -411,7 +411,7 @@ function create(options) {
      }
     }
     pane.markers.innerHTML = Array.from(marks, ([y, kind]) => '<rect width="1" height="' +
-     (fit || step > 1 ? 1 : pitch - 1) + '" y="' + y + '" class="' + ['', 'removed', 'added', 'changed'][kind] + '"/>').join('');
+     (fit || step > 1 ? 1 : pitch - 1) + '" y="' + y + '" class="' + ['', 'removed', 'added', 'changed', 'moved'][kind] + '"/>').join('');
    }
   }
   mapPaintKey = paintKey;
@@ -467,7 +467,6 @@ function create(options) {
   if (disposed) return;
   const pane = panes[side];
   const previousTop = pane.top;
-  const previousAligned = pane.alignedTop;
   if (pane.view) {
    const view = pane.view.capture();
    pane.top = Math.max(0, view.top || 0);
@@ -481,11 +480,16 @@ function create(options) {
   scheduleMap();
   if (pane.top !== previousTop && gestureSide === side && drag === null) revealMap(side);
   const sync = !syncing && gestureSide === side && q('[data-compare-sync]').checked;
-  if (sync && pane.alignedTop != null && panes[peerOf(side)].alignedTop != null) {
-   if (previousAligned !== pane.alignedTop || Math.abs(panes[peerOf(side)].fraction - pane.fraction) >= .03) syncAligned(side);
-  } else if (sync) syncFromCache(side);
+  if (sync) syncVertical(side);
   if (pane.top !== previousTop && job?.status && !coversViewport(side)) queueLocate(side, sync);
   if (activeSide() === side) options.selectionChanged?.();
+ }
+
+ function syncVertical(side) {
+  if (disposed || syncing || !side || !q('[data-compare-sync]').checked) return;
+  const pane = panes[side], peer = panes[peerOf(side)];
+  if (pane.view && peer.view && pane.alignedTop != null && peer.alignedTop != null) syncAligned(side);
+  else syncFromCache(side);
  }
 
  function syncAligned(side) {
@@ -495,8 +499,7 @@ function create(options) {
   syncing++;
   go(peer.view.goAlignedRow(row, fraction).finally(() => {
    syncing--;
-   if (!disposed && gestureSide === side && pane.alignedTop != null && peer.alignedTop != null &&
-       (pane.alignedTop !== row || pane.fraction !== fraction) && q('[data-compare-sync]').checked) syncAligned(side);
+   if (gestureSide !== side || pane.alignedTop !== row || pane.fraction !== fraction) syncVertical(gestureSide);
   }));
  }
 
@@ -518,7 +521,7 @@ function create(options) {
 
  function coversViewport(side) {
   const pane = panes[side], mapping = pane.mapping;
-  return !!mapping && mapping.job === job && mapping.count === job.status.count &&
+  return !!mapping && mapping.job === job && mapping.count === job.status.count && mapping.done === job.status.done &&
    pane.top >= mapping.top && Math.min(totalLines(pane) - 1, pane.top + linesInView(pane)) <= mapping.end;
  }
 
@@ -539,11 +542,7 @@ function create(options) {
   syncing++;
   go(goLine(peer, line, fraction).finally(() => {
    syncing--;
-   if (!disposed && gestureSide === side && q('[data-compare-sync]').checked &&
-       (pane.top !== topAtSync || pane.fraction !== fraction)) {
-    if (pane.alignedTop != null && panes[peerOf(side)].alignedTop != null) syncAligned(side);
-    else syncFromCache(side);
-   }
+   if (gestureSide !== side || pane.top !== topAtSync || pane.fraction !== fraction) syncVertical(gestureSide);
   }));
  }
 
@@ -552,12 +551,12 @@ function create(options) {
   if (!current?.status || !pane.doc || current.status.error) return;
   // Reuse the mapping while scrolling within a small band around the viewport.
   const top = Math.max(0, pane.top - 16), end = pane.top + linesInView(pane) + 48;
-  const key = [current.id, current.status.count, current.status[side + 'Lines'] > top, top, end].join(':');
+  const key = [current.id, current.status.count, current.status.done, current.status[side + 'Lines'] > top, top, end].join(':');
   if (pane.requested?.key === key) {
    pane.requested.sync ||= sync;
    return;
   }
-  pane.requested = {key, top, end, sync, job:current, count:current.status.count};
+  pane.requested = {key, top, end, sync, job:current, count:current.status.count, done:current.status.done};
   if (pane.locateTimer !== null || pane.pending) return;
   pane.locateTimer = root.setTimeout(() => {
    pane.locateTimer = null;
@@ -579,8 +578,9 @@ function create(options) {
    pane.ranges = result.differences;
    pane.mapping = result.aligned ? {...request, peerLine:result.peerLine, end} : null;
    paintDifferences(side);
-   if (result.aligned && (request.sync || pane.requested?.sync) && gestureSide === side && !syncing && q('[data-compare-sync]').checked) {
-    syncFromCache(side);
+   if (result.aligned && (request.sync || pane.requested?.sync) && gestureSide === side) {
+    // Source-line mappings cannot represent a viewport inside a spacer.
+    syncVertical(side);
    }
   } catch (error) {
    if (job === request.job && !request.job.abort.signal.aborted) failJob(request.job, error);
@@ -708,20 +708,21 @@ function create(options) {
     '% · ' + number(status.count) + ' differences found.');
   }
   buttons();
+  if (justFinished) current.pages.clear();
   if (justFinished || countChanged) preview.refresh();
   if (justFinished && q('[data-compare-sync]').checked) gestureSide ||= activeSide();
   if (justFinished && sides.every(side => panes[side].view)) {
-   const request = (side, action, line, end) => options.compareRequest({action,id:current.id,side,line,end}, current.abort.signal);
+   const request = (side, action, line, end, signal) => options.compareRequest({action,id:current.id,side,line,end},
+    signal ? AbortSignal.any([signal, current.abort.signal]) : current.abort.signal);
    syncing++;
    const pending = sides.map(side => panes[side].view.setAlignment({
     rows:status.rows,
-    layout:(line,end)=>request(side,'alignment',line,end),
+    layout:(line,end,signal)=>request(side,'alignment',line,end,signal),
     source:row=>request(side,'alignment-row',row),
     peerWrapRows:(rows,signal)=>peerWrapRows(side,current,rows,signal)
    }));
    void Promise.all(pending).finally(() => { syncing--; }).then(() => {
-    if (job === current && q('[data-compare-sync]').checked && panes[gestureSide]?.alignedTop != null &&
-        panes[peerOf(gestureSide)].alignedTop != null) syncAligned(gestureSide);
+    if (job === current) syncVertical(gestureSide);
    }).catch(error => { if (job === current) failJob(current, error); });
   }
   for (const side of sides) queueLocate(side, justFinished && gestureSide === side);
@@ -814,7 +815,15 @@ function create(options) {
    return values;
   };
   const [left, right] = await Promise.all(sides.map(read));
-  return Array.from({length:limit}, (_, i) => [left[i], right[i]]);
+  const paired = Math.min(diff.leftCount, diff.rightCount);
+  return Array.from({length:limit}, (_, i) => {
+   const row = [left[i], right[i]], tail = offset + i - paired;
+   if (diff.movedTo && tail >= 0) {
+    const value = left[i] || right[i];
+    if (value) Object.assign(value, {moved:true, counterpart:diff.movedTo + tail - 1});
+   }
+   return row;
+  });
  }
 
  async function readChangedRows(start, count, signal) {
@@ -1068,7 +1077,8 @@ function create(options) {
   if (control.matches('[data-compare-sync]') && control.checked) {
    panes[activeSide()].requested = null;
    gestureSide = activeSide();
-   queueLocate(activeSide(), true);
+   syncVertical(gestureSide);
+   queueLocate(gestureSide, true);
   }
   if (control.matches('[data-compare-horizontal-sync]')) {
    options.setComparisonPreference?.('compareHorizontalSync', control.checked);

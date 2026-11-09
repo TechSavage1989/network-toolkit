@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-const diskCompareRecordSize = 48
+const diskCompareRecordSize = 56
 const diskComparePageSize = 128
 const diskCompareMapWindow = 32768
 const diskCompareOverviewBins = 2048
@@ -234,6 +234,7 @@ func (j *diskComparisonJob) scan(ctx context.Context, left, right editorbuffer.C
 		j.mu.Unlock()
 	}
 	var leftGaps, rightGaps int64
+	var moveCandidates [2]bool
 	err := editorbuffer.CompareWithOptions(ctx, left, right, func(diff editorbuffer.Difference) error {
 		if writeErr != nil {
 			return writeErr
@@ -250,6 +251,8 @@ func (j *diskComparisonJob) scan(ctx context.Context, left, right editorbuffer.C
 			return err
 		}
 		paired := min(diff.LeftCount, diff.RightCount)
+		moveCandidates[0] = moveCandidates[0] || diff.LeftCount-paired >= 2
+		moveCandidates[1] = moveCandidates[1] || diff.RightCount-paired >= 2
 		addOverview(&status.LeftOverview, diff.Left, paired, max(status.LeftTotal, status.RightTotal), 3)
 		addOverview(&status.RightOverview, diff.Right, paired, max(status.LeftTotal, status.RightTotal), 3)
 		addOverview(&status.LeftOverview, diff.Left+paired, diff.LeftCount-paired, max(status.LeftTotal, status.RightTotal), 1)
@@ -258,10 +261,14 @@ func (j *diskComparisonJob) scan(ctx context.Context, left, right editorbuffer.C
 		status.ChangedRows += max(diff.LeftCount, diff.RightCount)
 		return nil
 	}, publish, options)
+	if err == nil && writeErr == nil && moveCandidates[0] && moveCandidates[1] {
+		err = j.findMoves(ctx, left, right, &status)
+	}
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	if !j.closed {
 		j.status.Done = true
+		j.status.LeftOverview, j.status.RightOverview = status.LeftOverview, status.RightOverview
 		j.status.Rows = max(status.LeftTotal+leftGaps, status.RightTotal+rightGaps)
 		if err != nil || writeErr != nil {
 			j.status.Error = "Comparison could not finish. Choose Compare to try again."
@@ -279,29 +286,34 @@ func addOverview(bins *[diskCompareOverviewBins]int, start, count, total int64, 
 	}
 }
 
-func (j *diskComparisonJob) read(index int64) (editorbuffer.Difference, error) {
+type diskComparisonDifference struct {
+	editorbuffer.Difference
+	MovedTo int64 `json:"movedTo,omitempty"` // One-based source line in the other document.
+}
+
+func (j *diskComparisonJob) read(index int64) (diskComparisonDifference, error) {
 	diff, _, err := j.readAligned(index)
 	return diff, err
 }
 
-func (j *diskComparisonJob) readAligned(index int64) (editorbuffer.Difference, int64, error) {
+func (j *diskComparisonJob) readAligned(index int64) (diskComparisonDifference, int64, error) {
 	diff, row, _, err := j.readRows(index)
 	return diff, row, err
 }
 
-func (j *diskComparisonJob) readRows(index int64) (editorbuffer.Difference, int64, int64, error) {
+func (j *diskComparisonJob) readRows(index int64) (diskComparisonDifference, int64, int64, error) {
 	var record [diskCompareRecordSize]byte
 	if _, err := j.file.ReadAt(record[:], index*diskCompareRecordSize); err != nil {
-		return editorbuffer.Difference{}, 0, 0, err
+		return diskComparisonDifference{}, 0, 0, err
 	}
-	return editorbuffer.Difference{
+	return diskComparisonDifference{Difference: editorbuffer.Difference{
 		Left: int64(binary.LittleEndian.Uint64(record[0:8])), Right: int64(binary.LittleEndian.Uint64(record[8:16])),
 		LeftCount: int64(binary.LittleEndian.Uint64(record[16:24])), RightCount: int64(binary.LittleEndian.Uint64(record[24:32])),
-	}, int64(binary.LittleEndian.Uint64(record[32:40])), int64(binary.LittleEndian.Uint64(record[40:48])), nil
+	}, MovedTo: int64(binary.LittleEndian.Uint64(record[48:56]))}, int64(binary.LittleEndian.Uint64(record[32:40])), int64(binary.LittleEndian.Uint64(record[40:48])), nil
 }
 
 type diskChangedRun struct {
-	editorbuffer.Difference
+	diskComparisonDifference
 	Offset int64 `json:"offset"`
 	Count  int64 `json:"count"`
 }
@@ -331,14 +343,14 @@ func (j *diskComparisonJob) changedRuns(start int64, limit int) ([]diskChangedRu
 			return nil, err
 		}
 		next := min(end, row+max(diff.LeftCount, diff.RightCount))
-		runs = append(runs, diskChangedRun{Difference: diff, Offset: start - row, Count: next - start})
+		runs = append(runs, diskChangedRun{diskComparisonDifference: diff, Offset: start - row, Count: next - start})
 		start = next
 	}
 	return runs, nil
 }
 
-func (j *diskComparisonJob) page(start int64, limit int) ([]editorbuffer.Difference, []int64, error) {
-	out := make([]editorbuffer.Difference, 0, limit)
+func (j *diskComparisonJob) page(start int64, limit int) ([]diskComparisonDifference, []int64, error) {
+	out := make([]diskComparisonDifference, 0, limit)
 	rows := make([]int64, 0, limit)
 	for n := start; n < j.status.Count && len(out) < limit; n++ {
 		difference, _, row, err := j.readRows(n)
@@ -351,7 +363,7 @@ func (j *diskComparisonJob) page(start int64, limit int) ([]editorbuffer.Differe
 	return out, rows, nil
 }
 
-func comparisonSide(diff editorbuffer.Difference, right bool) (start, count, peer, peerCount int64) {
+func comparisonSide(diff diskComparisonDifference, right bool) (start, count, peer, peerCount int64) {
 	if right {
 		return diff.Right, diff.RightCount, diff.Left, diff.LeftCount
 	}
@@ -490,6 +502,8 @@ func (j *diskComparisonJob) mapLines(first, end int64, right bool) ([]int, error
 			kind := 1
 			if line-start < peerCount {
 				kind = 3
+			} else if diff.MovedTo > 0 {
+				kind = 4
 			} else if right {
 				kind = 2
 			}
@@ -534,7 +548,7 @@ func (j *diskComparisonJob) locate(req diskComparisonRequest) (map[string]any, e
 			peerLine = peer + peerCount + relative - count
 		}
 	}
-	differences := make([]editorbuffer.Difference, 0, req.Limit)
+	differences := make([]diskComparisonDifference, 0, req.Limit)
 	for n := index; n < j.status.Count && len(differences) < req.Limit; n++ {
 		diff, err := j.read(n)
 		if err != nil {
@@ -626,7 +640,7 @@ func (m *editorViewRegistry) compareDiskDocuments(w http.ResponseWriter, r *http
 			err = editorbuffer.ErrBoundary
 			break
 		}
-		var differences []editorbuffer.Difference
+		var differences []diskComparisonDifference
 		var rows []int64
 		differences, rows, err = job.page(req.Start, req.Limit)
 		value = map[string]any{"start": req.Start, "differences": differences, "changedStarts": rows}

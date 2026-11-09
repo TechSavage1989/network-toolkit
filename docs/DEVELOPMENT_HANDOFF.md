@@ -1,3 +1,9 @@
+# v1.21.29 Beta 1 - Moved blocks and steadier Compare scrolling
+
+Compare uses bounded context to disambiguate repeated lines and marks exact moved blocks while retaining source order and gray spacers. The synchronized disk viewport uses aligned display rows through page transitions.
+
+---
+
 # v1.21.28 Beta 1 - FortiOS policy alignment
 
 The disk-backed comparison recognizes a unique edit header followed by the same UUID even when nearby fields changed. Synthetic regressions cover three policy insertions, a modified existing policy, and another insertion before the next matching policy.
