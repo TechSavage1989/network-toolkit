@@ -53,13 +53,14 @@ function appendRegion(a,b,fromA,toA,fromB,toB,ops,budget){
  }else{for(let i=fromA;i<toA;i++)ops.push({type:'removed',left:i,right:null});for(let j=fromB;j<toB;j++)ops.push({type:'added',left:null,right:j});}
  return true;
 }
-// Match a unique adjacent pair among unmatched rows, then extend through
-// identical neighboring lines. Keep both blocks in their original order.
-function markMovedRows(rows, lines, kinds){
+// Match a unique adjacent pair among unmatched operations, then extend through
+// identical neighboring lines. Detect moves before pairing changed lines, so
+// an edit next to a moved block does not consume one of its source lines.
+function markMovedOperations(ops, lines){
  function index(side, kind){
   const pairs=new Map();
-  for(let i=0;i+1<rows.length;i++){
-   const a=rows[i],b=rows[i+1];
+  for(let i=0;i+1<ops.length;i++){
+   const a=ops[i],b=ops[i+1];
    if(a.type!==kind||b.type!==kind||b[side]!==a[side]+1)continue;
    const first=lines[side][a[side]],second=lines[side][b[side]];
    if(!first.trim()&&!second.trim())continue;
@@ -69,17 +70,16 @@ function markMovedRows(rows, lines, kinds){
   return pairs;
  }
  const left=index('left','removed'),right=index('right','added');
- const matches=(i,j)=>rows[i]?.type==='removed'&&rows[j]?.type==='added'&&lines.left[rows[i].left]===lines.right[rows[j].right];
+ const matches=(i,j)=>ops[i]?.type==='removed'&&ops[j]?.type==='added'&&lines.left[ops[i].left]===lines.right[ops[j].right];
  for(const [key,leftAt] of left){
   const rightAt=right.get(key);
   if(leftAt<0||!(rightAt>=0)||!matches(leftAt,rightAt)||!matches(leftAt+1,rightAt+1))continue;
   let i=leftAt,j=rightAt;
   while(matches(i-1,j-1)){i--;j--;}
   for(;matches(i,j);i++,j++){
-   const from=rows[i],to=rows[j];
+   const from=ops[i],to=ops[j];
    from.type=to.type='moved';
    from.counterpart=to.right;to.counterpart=from.left;
-   kinds.left[from.left]=kinds.right[to.right]='moved';
   }
  }
 }
@@ -110,19 +110,21 @@ function compare(left,right,spaces){
  for(const item of anchors){if(!appendRegion(a,b,fromA,item.left,fromB,item.right,ops,budget))return limited;ops.push({type:'equal',left:item.left,right:item.right});fromA=item.left+1;fromB=item.right+1;}
  if(!appendRegion(a,b,fromA,endA,fromB,endB,ops,budget))return limited;
  for(let i=0;i<suffix;i++)ops.push({type:'equal',left:a.length-suffix+i,right:b.length-suffix+i});
+ markMovedOperations(ops,lines);
  const rows=[],hunks=[],kinds={left:new Array(a.length).fill('equal'),right:new Array(b.length).fill('equal')};
- for(let i=0;i<ops.length;){if(ops[i].type==='equal'){rows.push(ops[i++]);continue;}const removed=[],added=[];while(i<ops.length&&ops[i].type!=='equal'){const op=ops[i++];(op.type==='removed'?removed:added).push(op);}const start=rows.length,type=removed.length&&added.length?'changed':removed.length?'removed':'added';
-  for(let k=0;k<Math.max(removed.length,added.length);k++){
-   const l=removed[k]?.left??null,r=added[k]?.right??null;
-   const rowType=l!==null&&r!==null?'changed':l!==null?'removed':'added';
+ for(let i=0;i<ops.length;){if(ops[i].type==='equal'){rows.push(ops[i++]);continue;}const removed=[],added=[];while(i<ops.length&&ops[i].type!=='equal'){const op=ops[i++];(op.left!==null?removed:added).push(op);}const start=rows.length,type=removed.length&&added.length?'changed':removed.length?'removed':'added';
+  for(let i=0,j=0;i<removed.length||j<added.length;){
+   const before=removed[i],after=added[j];
+   const move=before?.type==='moved'?before:after?.type==='moved'?after:null;
+   const l=move?move.left:before?.left??null,r=move?move.right:after?.right??null;
+   const rowType=move?'moved':l!==null&&r!==null?'changed':l!==null?'removed':'added';
    const replacement=rowType==='changed'&&isLowSimilarityReplacement(lines.left[l],lines.right[r]);
-   rows.push({type:replacement?'replacement':rowType,left:l,right:r});
-   if(l!==null)kinds.left[l]=replacement?'removed':rowType;
-   if(r!==null)kinds.right[r]=replacement?'added':rowType;
+   rows.push(move||{type:replacement?'replacement':rowType,left:l,right:r});
+   if(l!==null){kinds.left[l]=replacement?'removed':rowType;i++;}
+   if(r!==null){kinds.right[r]=replacement?'added':rowType;j++;}
   }
   hunks.push({start,end:rows.length,type,left:removed[0]?.left??null,right:added[0]?.right??null});
  }
- markMovedRows(rows,lines,kinds);
  const positions={left:[0],right:[0]};for(const row of rows)for(const side of ['left','right'])positions[side].push(positions[side].at(-1)+(row[side]===null?0:1));
  return {limited:false,rows,hunks,kinds,positions,lineCounts:{left:a.length,right:b.length},identical:hunks.length===0};
 }
@@ -335,7 +337,7 @@ function mountDifferencePreview(host, read, getCount) {
   refresh(true);
   host.querySelector('.nt-compare-settings summary').focus();
  });
- return {refresh, reveal(row){if (!panel.hidden && row != null) move(row*rowHeight);},
+ return {refresh, reflow:queue, reveal(row){if (!panel.hidden && row != null) move(row*rowHeight);},
   dispose(){controller?.abort();resize?.disconnect();if(frame)root.cancelAnimationFrame(frame);}};
 }
 

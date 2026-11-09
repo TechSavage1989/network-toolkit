@@ -1,0 +1,11 @@
+Network Toolkit 1.21.32 Beta 1
+
+## What's New
+
+- Hold Ctrl and use the mouse wheel over editor text to make it larger or smaller. Both panes zoom together in Compare and Split View.
+- Compare keeps moved sections separate from adjacent edits so the changed words are easier to spot.
+
+## Additional Details
+
+- Comparison tests cover repeated lines, moved blocks, alignment spacers and changed text in synthetic logs and scripts.
+- This beta is opt-in. Enable beta updates to receive it through the app.

@@ -39,6 +39,70 @@ const rightSource=[marker,'shared before','mode new_value α','ANCHOR_ONE','righ
 const input=(page,side)=>page.locator('.cm-content[data-compare-text="'+side+'"]');
 const value=(page,side)=>page.evaluate(side=>{const editor=NetworkToolkitFileEditor;return editor.documents.get(editor.comparison.selection[side]).content;},side);
 async function ready(page){await page.waitForFunction(()=>NetworkToolkitFileEditor.comparison?.result&&!NetworkToolkitFileEditor.comparison.result.limited&&document.querySelector('[data-compare-map]')?.getAttribute('aria-disabled')==='false');await settle(page);}
+const editorFontControl='[data-ed-font]',singleEditorText='[data-ed-text]';
+const compareEditorText=['left','right'].map(side=>'.cm-content[data-compare-text="'+side+'"]');
+function viewportZoom(page){return page.evaluate(()=>({width:innerWidth,height:innerHeight,dpr:devicePixelRatio,scale:visualViewport.scale}));}
+async function waitEditorFont(page,selectors,size){
+ await page.waitForFunction(({selectors,size})=>document.querySelector('[data-ed-font]')?.value===String(size)&&selectors.every(selector=>{
+  const surface=document.querySelector(selector);
+  return surface&&getComputedStyle(surface).fontSize===size+'px';
+ }),{selectors,size});
+}
+async function wheelOver(page,surface,delta,control=false){
+ await surface.hover({position:{x:40,y:20}});
+ if(control)await page.keyboard.down('Control');
+ try{await page.mouse.wheel(0,delta);}finally{if(control)await page.keyboard.up('Control');}
+}
+async function singleWheelZoom(f,mode){
+ const {page}=f,surface=page.locator(singleEditorText),size=Number(await page.locator(editorFontControl).inputValue());
+ const viewport=await viewportZoom(page),original=await snapshot(page);
+ if(mode==='main'){
+  await Promise.all([
+   page.waitForResponse(response=>response.url().endsWith('/api/state')&&response.request().method()==='PUT'&&response.request().postDataJSON()?.editorPreferences?.fontSize===size+1&&response.ok()),
+   wheelOver(page,surface,-120,true),
+  ]);
+  assert.equal(f.saved.editorPreferences.fontSize,size+1);
+ }else await wheelOver(page,surface,-120,true);
+ await waitEditorFont(page,[singleEditorText],size+1);
+ assert.deepEqual(await viewportZoom(page),viewport,'Ctrl+wheel must zoom text without zooming the page');
+ if(mode==='detached')assert.equal(await page.evaluate(()=>NetworkToolkitFileEditor.windowAdapter.checkpoint().preferences.fontSize),size+1);
+ await wheelOver(page,surface,120,true);
+ await waitEditorFont(page,[singleEditorText],size);
+ assert.deepEqual(await viewportZoom(page),viewport,'Ctrl+wheel must zoom text without zooming the page');
+ assert.deepEqual(await snapshot(page),original,'Zoom preserves the normal editor document and selection');
+ check(mode+' single editor zooms by one font size with Ctrl+wheel and retains its preference');
+}
+async function splitWheelZoom(page){
+ const original=await sourceState(page),viewport=await viewportZoom(page),size=Number(await page.locator(editorFontControl).inputValue());
+ const split=page.locator('[data-ed="split"]'),texts=['left','right'].map(side=>'.is-split-view textarea[data-compare-text="'+side+'"]');
+ await split.click();
+ await wheelOver(page,page.locator(texts[0]),-120,true);
+ await waitEditorFont(page,texts,size+1);
+ assert.deepEqual(await viewportZoom(page),viewport,'Split text zoom must leave the page zoom unchanged');
+ await wheelOver(page,page.locator(texts[1]),120,true);
+ await waitEditorFont(page,texts,size);
+ await split.click();
+ await page.locator(singleEditorText).waitFor({state:'visible'});
+ assert.deepEqual(await sourceState(page),original,'Split zoom preserves both source documents');
+ check('Ctrl+wheel on either split pane changes both font sizes');
+}
+async function compareWheelZoom(page){
+ const original=await sourceState(page),viewport=await viewportZoom(page),size=Number(await page.locator(editorFontControl).inputValue());
+ const sameVisualRow=({left,right})=>{
+  const overlap=Math.min(left.bottom,right.bottom)-Math.max(left.top,right.top);
+  return overlap>Math.min(left.bottom-left.top,right.bottom-right.top)*.75;
+ };
+ for(const [side,delta,target] of [['left',-120,size+1],['right',120,size]]){
+  await wheelOver(page,input(page,side),delta,true);
+  await waitEditorFont(page,compareEditorText,target);
+  assert.deepEqual(await viewportZoom(page),viewport,'Compare text zoom must leave the page zoom unchanged');
+  await revealSourceRow(page,'left',6);
+  const anchor=await settledAnchor(page,'ANCHOR_ONE',1500,sameVisualRow);
+  assert(anchor.left.visible&&anchor.right.visible&&sameVisualRow(anchor),JSON.stringify(anchor));
+ }
+ assert.deepEqual(await sourceState(page),original,'Compare zoom preserves both source documents');
+ check('Ctrl+wheel on either Compare pane changes both font sizes and keeps matching source rows aligned');
+}
 async function sourceState(page){return page.evaluate(()=>[...NetworkToolkitFileEditor.documents.values()].map(d=>({uid:d.uid,id:d.id,content:d.content,dirty:d.dirty,undo:[...d.undo],redo:[...d.redo],eol:d.eol,bom:d.bom,encoding:d.encoding})));}
 async function anchorGeometry(page,name){return page.evaluate(name=>{const lines={ANCHOR_ONE:{left:6,right:4},ANCHOR_TWO:{left:8,right:8}},sides={};for(const side of ['left','right']){const host=document.querySelector('[data-compare-pane="'+side+'"]'),line=host.querySelector('.cm-line[data-source-line="'+lines[name][side]+'"]');if(!line||line.textContent!==name)throw Error('Matching source anchor is not rendered: '+side+' '+name);const rect=line.getBoundingClientRect(),scroll=host.querySelector('.cm-scroller').getBoundingClientRect();sides[side]={top:rect.top,bottom:rect.bottom,sourceLine:Number(line.dataset.sourceLine),visible:rect.bottom>scroll.top&&rect.top<scroll.bottom};}return sides;},name);}
 async function colorGeometry(page){return page.evaluate(()=>{const result={};for(const side of ['left','right']){const host=document.querySelector('[data-compare-pane="'+side+'"]'),line=host.querySelector('.cm-line[data-source-line="3"]'),marks=[...line.querySelectorAll('.nt-compare-intraline[data-diff-kind="changed"]')],map=document.querySelector('[data-compare-map-marks="'+side+'"] .changed'),probe=document.createElement('span');probe.style.backgroundColor='color-mix(in srgb,var(--warn) 28%,transparent)';probe.style.color='var(--warn)';host.append(probe);const rowExpected=getComputedStyle(probe).backgroundColor,mapExpected=getComputedStyle(probe).color;probe.style.backgroundColor='color-mix(in srgb,var(--warn) 55%,transparent)';const inlineExpected=getComputedStyle(probe).backgroundColor;probe.remove();result[side]={text:marks.map(mark=>mark.textContent).join(''),row:getComputedStyle(line).backgroundColor,rowExpected,inline:marks.map(mark=>getComputedStyle(mark).backgroundColor),inlineExpected,map:map?getComputedStyle(map).fill:'',mapExpected};}return result;});}
@@ -67,9 +131,9 @@ async function revealSourceRow(page,side,line){
 // Scroll synchronization between panes completes on the next animation
 // frames. Wait (bounded) for the panes to settle before measuring, so the
 // check verifies the aligned result instead of an in-flight scroll.
-async function settledAnchor(page,name,timeout=1500){
+async function settledAnchor(page,name,timeout=1500,aligned=({left,right})=>Math.abs(left.top-right.top)<=2){
  const end=Date.now()+timeout;let last;
- do{last=await anchorGeometry(page,name);if(last.left.visible&&last.right.visible&&Math.abs(last.left.top-last.right.top)<=2)return last;await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));}while(Date.now()<end);
+ do{last=await anchorGeometry(page,name);if(last.left.visible&&last.right.visible&&aligned(last))return last;await page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));}while(Date.now()<end);
  return last;
 }
 async function assertAlignment(page,label){
@@ -99,6 +163,65 @@ async function comparisonTabInput(page){
  await editor.press('Escape');await page.keyboard.press('Tab');assert.equal(await editor.evaluate(el=>el===document.activeElement),false,'Escape then Tab must leave the comparison editor instead of trapping keyboard focus');assert.equal(await value(page,'left'),leftSource);assert.equal(await value(page,'right'),rightSource);check('real Tab inserts one source tab, Undo restores bytes, and Escape then Tab exits keyboard focus without changing either document');
 }
 async function saveCopy(page,expected,label){await input(page,'left').focus();const summary=page.locator('.nt-editor-more summary');if(!await page.locator('.nt-editor-more').evaluate(el=>el.open))await summary.click();const downloadPromise=page.waitForEvent('download');await page.locator('[data-ed="download"]').click();const download=await downloadPromise,bytes=fs.readFileSync(await download.path());assert.deepEqual(bytes,Buffer.from(expected,'utf8'),label+' downloaded bytes contain no visual gaps');return require('node:crypto').createHash('sha256').update(bytes).digest('hex');}
+async function verifyMovedScript(page) {
+ const repeated = '  Write-Output "probe"';
+ const moved = ['function Invoke-Replay {', repeated, repeated, '} # Invoke-Replay'];
+ const steps = ['# Main steps', 'Write-Output "start"', ...Array.from({length:3}, (_, index) => [
+  repeated, '  Write-Output "phase ' + index + '"',
+ ]).flat(), '# Complete steps'];
+ const prefix = '$ErrorActionPreference = "Stop"';
+ const tail = 'Write-Output $Mode';
+ const before = [prefix, ...moved, ...steps, '$Mode = "Internal"', tail].join('\n');
+ const after = [prefix, ...steps, ...moved, '$Mode = "port2"', tail].join('\n');
+ await page.evaluate(async ({before, after}) => {
+  for (const [id, content] of [['script-before', before], ['script-after', after]]) {
+   await NetworkToolkitFileEditor.open({
+    id, path:id + '.ps1', source:'Synthetic PowerShell fixture', binding:{kind:'local'},
+    create:true, initialContent:content, read:async()=>({content}), write:async()=>{throw Error('No source write expected');},
+   });
+  }
+ }, {before, after});
+ await page.locator('[data-ed="compare"]').click();
+ await page.selectOption('[data-compare-select="left"]', 'script-before');
+ await page.selectOption('[data-compare-select="right"]', 'script-after');
+ await ready(page);
+ const actual = await page.evaluate(() => {
+  const pane = side => document.querySelector(`[data-compare-pane="${side}"]`);
+  const line = (side, text) => [...pane(side).querySelectorAll('.cm-line')].find(row => row.textContent === text);
+  const geometry = (side, text) => {
+   const row = line(side,text);
+   const rect = row.getBoundingClientRect();
+   return {top:rect.top,height:rect.height,kind:row.dataset.diffKind};
+  };
+  return Object.fromEntries(['left','right'].map(side => {
+   const token = side === 'left' ? 'Internal' : 'port2';
+   const movedLines = [...pane(side).querySelectorAll('.cm-line.moved')].map(row => row.textContent);
+   const marks = [...line(side,`$Mode = "${token}"`).querySelectorAll('.nt-compare-intraline.changed')].map(mark => mark.textContent);
+   const gaps = [...pane(side).querySelectorAll('[data-compare-gap]')].map(gap => ({
+    blank:gap.getAttribute('aria-hidden') === 'true' && gap.textContent === '',
+    gray:getComputedStyle(gap).backgroundImage !== 'none',
+    height:gap.getBoundingClientRect().height,
+   }));
+   return [side, {movedLines, marks, gaps, anchor:geometry(side,'# Main steps'), tail:geometry(side,'Write-Output $Mode')}];
+  }));
+ });
+ for (const side of ['left','right']) {
+  assert.deepEqual(actual[side].movedLines, moved, 'all moved lines must retain their original order');
+  assert.deepEqual(actual[side].marks, [side === 'left' ? 'Internal' : 'port2']);
+  assert.equal(actual[side].gaps.length, 1);
+  const [gap] = actual[side].gaps;
+  assert(gap.blank && gap.gray && gap.height > actual[side].anchor.height, 'the moved block must leave a visible gray spacer');
+ }
+ for (const key of ['anchor','tail']) {
+  const left = actual.left[key], right = actual.right[key];
+  assert.equal(left.kind, 'equal');
+  assert.equal(right.kind, 'equal');
+  assert(Math.abs(left.top - right.top) < left.height / 2, 'matching lines must occupy the same visual row');
+ }
+ assert.equal(await value(page,'left'), before);
+ assert.equal(await value(page,'right'), after);
+}
+
 (async()=>{
  assert(output,'Set isolated TOOLKIT_TEST_OUTPUT');fs.mkdirSync(output,{recursive:true});report.sourceHashes=Object.fromEntries(['web/assets/editor-compare.js','web/assets/file-editor.js','web/assets/editor-aligned-compare.js','web/assets/editor-aligned-compare.css'].map(file=>[file,require('node:crypto').createHash('sha256').update(fs.readFileSync(path.join(current,file))).digest('hex')]));browser=await chromium.launch({headless:true,args:['--no-sandbox']});
  // Owner decisions 1-2: widths below the native minimums (main 960, detached
@@ -121,9 +244,22 @@ async function saveCopy(page,expected,label){await input(page,'left').focus();co
   // production facade used by editor toolbar actions, not a test-only bridge.
   await input(page,'left').press('Control+Home');await ready(page);const gap=page.locator('[data-compare-pane="right"] [data-compare-gap]').first();await gap.click({position:{x:3,y:3}});const at=await page.evaluate(()=>NetworkToolkitFileEditor.comparison.sourceView('right').selectionStart);assert(Number.isInteger(at)&&at>=0&&at<=rightSource.length);await page.keyboard.insertText('Z');await page.waitForFunction(({text,at})=>NetworkToolkitFileEditor.documents.get('alignment-right').content===text.slice(0,at)+'Z'+text.slice(at),{text:rightSource,at});await input(page,'right').press('Control+z');await page.waitForFunction(text=>NetworkToolkitFileEditor.documents.get('alignment-right').content===text,rightSource);await ready(page);
   const checkpoint=await page.evaluate(()=>NetworkToolkitFileEditor.windowAdapter.checkpoint());assert.equal(checkpoint.documents.find(d=>d.id==='alignment-left').content,leftSource);assert.equal(checkpoint.documents.find(d=>d.id==='alignment-right').content,rightSource);const afterDownload=await saveCopy(page,leftSource,'after navigation and edits');assert.equal(beforeDownload,afterDownload);geometry.push(await assertAlignment(page,'after undo and source checkpoint'));
-  await input(page,'left').press('Control+Home');await ready(page);await page.screenshot({path:path.join(output,'editor-alignment113-'+mode+'-'+width+'-'+theme+'.png')});report.layouts.push({mode,width,theme,geometry,downloadSHA256:afterDownload});check(mode+' '+width+' '+theme+' visual spacers, wrapped alignment, exact clipboard/edit/history/source bytes and real divider changes');await f.context.close();
+  await input(page,'left').press('Control+Home');await ready(page);await page.screenshot({path:path.join(output,'editor-alignment113-'+mode+'-'+width+'-'+theme+'.png')});report.layouts.push({mode,width,theme,geometry,downloadSHA256:afterDownload});check(mode+' '+width+' '+theme+' visual spacers, wrapped alignment, exact clipboard/edit/history/source bytes and real divider changes');
+  if(width===1440&&theme==='light'){
+   await compareWheelZoom(page);
+   await page.locator('[data-ed="compare"][aria-pressed="true"]').click();
+   await singleWheelZoom(f,mode);
+   if(mode==='main')await splitWheelZoom(page);
+  }
+  await f.context.close();
  }
  assert.equal(report.layouts.length,6);
+ const script = await start(current,'main','generic-script-comparison');
+ await verifyMovedScript(script.page);
+ await script.page.screenshot({path:path.join(output,'editor-alignment113-powershell.png')});
+ check('PowerShell scripts preserve exact moved blocks, repeated lines, gray spacers and the adjacent changed text');
+ await script.context.close();
+
  // A >2 MiB comparison must run in the same-origin worker and keep document
  // content unchanged. Validate the real main-window path, not a unit-test stub.
  const large=await start(current,'main','large-worker');
@@ -144,6 +280,11 @@ async function saveCopy(page,expected,label){await input(page,'left').focus();co
  await large.page.selectOption('[data-compare-select="right"]','large-right');
  await large.page.waitForFunction(()=>NetworkToolkitFileEditor.comparison?.result?.limited===false&&NetworkToolkitFileEditor.comparison.result.hunks.length===1,null,{timeout:60000});
  await large.page.waitForFunction(()=>document.querySelector('[data-compare-map]')?.getAttribute('aria-disabled')==='false',null,{timeout:60000});
+ const scroller=large.page.locator('[data-compare-pane="left"] .cm-scroller');
+ const beforeScroll=await scroller.evaluate(el=>el.scrollTop),size=await large.page.locator(editorFontControl).inputValue();
+ await wheelOver(large.page,scroller,180);
+ await large.page.waitForFunction(top=>document.querySelector('[data-compare-pane="left"] .cm-scroller').scrollTop>top,beforeScroll);
+ assert.equal(await large.page.locator(editorFontControl).inputValue(),size,'Plain wheel scrolls a document and leaves font size alone');
  const actual=await large.page.evaluate(()=>({left:NetworkToolkitFileEditor.documents.get('large-left').content,right:NetworkToolkitFileEditor.documents.get('large-right').content,summary:document.querySelector('[data-compare-summary]').textContent}));
  assert.equal(actual.left,originals.left);assert.equal(actual.right,originals.right);
  assert(workers.some(url=>url.endsWith('/assets/editor-compare-worker.js')),'Large comparison must execute a real same-origin background worker');

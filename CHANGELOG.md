@@ -1,3 +1,9 @@
+## 1.21.32 Beta 1 - Editor wheel zoom and moved text
+
+- Hold Ctrl and use the mouse wheel over editor text to change the font size in single, split and comparison views.
+- Keep exact moved blocks separate from adjacent line edits in standard comparisons.
+- Prefer nearby matching context over a repeated log message when aligning a move in large files.
+
 ## 1.21.31 Beta 1 - Compare policy alignment and character highlighting
 
 - Keep FortiOS policies with the same ID and UUID aligned when different policies appear before them on both sides.
