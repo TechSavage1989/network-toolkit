@@ -1,0 +1,13 @@
+Network Toolkit 1.21.34
+
+## What's New
+
+- Open, edit, compare, and save large text files. Word Wrap keeps original line numbers, and gray spacers keep matching lines aligned.
+- Compare marks moved blocks and highlights changed values in logs, scripts, and device configurations.
+- Hold Ctrl and roll the mouse wheel to zoom in the editor. Right-click for grouped Compare, Convert text, and Edit text commands.
+
+## Additional Details
+
+- The Stable release includes the detached Compare zoom alignment fix from v1.21.33 Beta 1. Matching rows stay aligned as the font changes with Word Wrap on or off.
+- The large-file editor reads and saves in the background. Large files require temporary working space, and file operations depend on disk speed.
+- Browser tests compare, edit, and save two synthetic 2 GiB files and verify the saved bytes.

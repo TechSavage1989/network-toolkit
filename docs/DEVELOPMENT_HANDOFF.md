@@ -1,3 +1,9 @@
+# v1.21.34 Stable - Large-file Text Editor and Compare
+
+Promotes the editor improvements through v1.21.33 Beta 1 to the Stable channel. Editor behavior matches the verified beta. The release updates the version and channel metadata.
+
+---
+
 # v1.21.33 Beta 1 - Compare zoom alignment and right-click submenus
 
 Compare remeasures line and spacer heights after a font change. The detached editor browser fixture checks matching rows through zoom in and out with Word Wrap on and off. The editor context menu keeps common actions at the top level and groups related commands into submenus that support mouse and keyboard navigation.

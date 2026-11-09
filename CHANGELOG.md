@@ -1,3 +1,9 @@
+## 1.21.34 Stable - Large-file Text Editor and Compare
+
+- Edit and compare large text files with Word Wrap, synchronized scrolling, and gray alignment spacers.
+- Identify moved blocks and see changed values across logs, scripts, and device configurations.
+- Zoom editor text with Ctrl+mouse wheel and find related commands in right-click submenus.
+
 ## 1.21.33 Beta 1 - Compare zoom alignment and right-click submenus
 
 - Keep matching lines aligned in detached Compare when zooming in or out, with Word Wrap on or off.
