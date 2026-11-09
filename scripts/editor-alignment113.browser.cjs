@@ -95,7 +95,16 @@ async function compareWheelZoom(page){
   for(const [side,delta,target] of [['left',-120,size+1],['right',120,size],['right',120,size-1],['left',-120,size]]){
    await wheelOver(page,input(page,side),delta,true);
    await waitEditorFont(page,compareEditorText,target);
+   await ready(page);
    assert.deepEqual(await viewportZoom(page),viewport,'Compare text zoom must leave the page zoom unchanged');
+   for(const name of ['ANCHOR_ONE','ANCHOR_TWO']){
+    const visible=await anchorGeometry(page,name).catch(()=>null);
+    if(!visible?.left.visible||!visible.right.visible)continue;
+    const anchor=await settledAnchor(page,name);
+    const offset=Math.abs(anchor.left.top-anchor.right.top);
+    if(offset>2)await renderGeometry(page,'visible matching rows after zoom '+name);
+    assert(offset<=2,`Visible matching rows moved out of alignment after zoom to ${target}px: ${JSON.stringify(anchor)}`);
+   }
    for(const [name,line] of [['ANCHOR_ONE',6],['ANCHOR_TWO',8]]){
     await revealSourceRow(page,'left',line);
     const anchor=await settledAnchor(page,name);

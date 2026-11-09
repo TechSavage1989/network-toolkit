@@ -59,6 +59,9 @@ function renderedPeerOffset(views,lookup,sourceSide){
  return offsets[Math.floor(offsets.length/2)];
 }
 function nextPaintedOffset(previous,delta){return Number.isFinite(delta)&&Math.abs(delta)>.75&&Math.abs(delta)<=12?clamp(previous+delta,-12,12):previous;}
+// Aligned row pixels start after the document padding. A short comparison can
+// still scroll a few pixels inside that padding after reducing the font size.
+function topPaddingFraction(scrollTop,padding){return scrollTop>padding?null:padding?clamp(scrollTop/padding,0,1):0;}
 function createScrollReconciler(schedule,read,write,complete=()=>{}){
  const key={};let intent=null,epoch=0,revision=0,passes=0,stable=0,running=false;
  function queue(){if(running||!intent)return;running=true;const token=epoch;
@@ -154,18 +157,23 @@ function create(options){
  const wheelIdle=Object.fromEntries(sides.map(side=>[side,createWheelIdle(active=>{inputBusy[side].wheel=active;if(!active)gutterRefresh[side]?.request()})]));
  const scrollReconciler=createScrollReconciler((job,intent)=>{if(!disposed)views[intent.side].requestMeasure(job)},intent=>{
   if(disposed||!pixelReady||!geometry||!sourceHeights||isComposing())return null;
-  const origin=views[intent.side],pixel=intent.kind==='source'?alignedPixelFromNative(origin,geometry.sourceOffsets[intent.side],sourceHeights[intent.side],Math.max(0,origin.scrollDOM.scrollTop-origin.documentPadding.top)):Number.isFinite(intent.pixel)?clamp(intent.pixel,0,geometry.rowOffsets.at(-1)||0):E.offsetAtLine(geometry.rowOffsets,intent.row);
-  const targets=intent.kind==='source'?(q('[data-compare-sync]').checked?[intent.side==='left'?'right':'left']:[]):intent.both?sides:[intent.side];
+  const origin=views[intent.side],source=intent.kind==='source',top=origin.scrollDOM.scrollTop,padding=origin.documentPadding.top;
+  const paddingFraction=source?topPaddingFraction(top,padding):null;
+  const pixel=source?(paddingFraction===null?alignedPixelFromNative(origin,geometry.sourceOffsets[intent.side],sourceHeights[intent.side],top-padding):0):Number.isFinite(intent.pixel)?clamp(intent.pixel,0,geometry.rowOffsets.at(-1)||0):E.offsetAtLine(geometry.rowOffsets,intent.row);
   const peer=intent.side==='left'?'right':'left';
+  const targets=source?(q('[data-compare-sync]').checked?[peer]:[]):intent.both?sides:[intent.side];
   // The native height map remains authoritative for large movements. Correct
   // only a small, measured residual between real common source rows. Retain
   // the offset across subsequent frames so a stable native estimate does not
   // undo the adjustment on the next measurement pass.
   if(targets.includes(peer)&&q('[data-compare-sync]').checked){
-   const delta=renderedPeerOffset(views,rowLookup,intent.side);
-   paintedOffsets[peer]=nextPaintedOffset(paintedOffsets[peer],delta);
+   paintedOffsets[peer]=paddingFraction===null?nextPaintedOffset(paintedOffsets[peer],renderedPeerOffset(views,rowLookup,intent.side)):0;
   }
-  return targets.map(side=>{const view=views[side],scroll=view.scrollDOM;return {side,actual:scroll.scrollTop,target:clamp(pixel<=0?0:nativePixelFromAligned(view,geometry.sourceOffsets[side],sourceHeights[side],pixel)+view.documentPadding.top+(side===peer?paintedOffsets[side]:0),0,scroll.scrollHeight-scroll.clientHeight)}});
+  return targets.map(side=>{
+   const view=views[side],scroll=view.scrollDOM;
+   const target=paddingFraction!==null?paddingFraction*view.documentPadding.top:pixel<=0?0:nativePixelFromAligned(view,geometry.sourceOffsets[side],sourceHeights[side],pixel)+view.documentPadding.top+(side===peer?paintedOffsets[side]:0);
+   return {side,actual:scroll.scrollTop,target:clamp(target,0,scroll.scrollHeight-scroll.clientHeight)};
+  });
  },targets=>{let changed=false;syncing=true;try{for(const {side,actual,target}of targets)if(Math.abs(actual-target)>.5){views[side].scrollDOM.scrollTop=target;remember(side);changed=true;}}finally{syncing=false;}queueMapUpdate();return changed;});
  function queueMapUpdate(){if(mapFrame===null)mapFrame=root.requestAnimationFrame(()=>{mapFrame=null;updateMap()});}
  function invalidatePixels(){scrollReconciler.pause();highlightedRow=null;pixelReady=false;paintedOffsets={left:0,right:0};rowLookup={left:[],right:[]};map.setAttribute('aria-disabled','true');}
@@ -366,5 +374,5 @@ function refresh(force=false){if(disposed)return;if(inUpdate||isComposing()){pen
  const observer=typeof ResizeObserver==='function'?new ResizeObserver(()=>{if(disposed)return;splitter.apply();matchPaneChrome();refresh(true)}):null;observer?.observe(q('.nt-compare-grid'));observer?.observe(map);for(const side of sides)observer?.observe(views[side].scrollDOM);splitter.apply();refresh(true);
  return {refresh,refreshFont,difference,jump,sourceView:side=>facades[side],get textarea(){return facades[options.activeSide?.()||lastSide]},get activeSide(){return lastSide},get composing(){return isComposing()},scrollActive(){const side=options.activeSide?.()||lastSide;remember(side);updateMap()},positionAt(offset,focus=true){scrollReconciler.cancel();independentReveal=true;scrollSource=null;const side=options.activeSide?.()||lastSide;facades[side].setSelectionRange(offset,offset);views[side].dispatch({effects:EditorView.scrollIntoView(clamp(offset,0,views[side].state.doc.length),{y:'start'})});if(focus)views[side].focus()},showDocument(id){if(isComposing())return false;const d=docs().find(d=>d.id===id);if(!d)return;const side=options.sideOf?.(d.uid)||(ids.left===id?'left':ids.right===id?'right':lastSide);lastSide=side;remember(side);ids[side]=id;refresh(true);views[side].focus()},undo(redo=false){ownedUndo(options.activeSide?.()||lastSide,redo)},snapshot(){for(const side of sides)remember(side);return {left:ids.left,right:ids.right,scale,sync:q('[data-compare-sync]').checked}},restore(value){if(!value||isComposing())return;const active=options.active()?.id;ids.left=String(value.left||'');ids.right=String(value.right||'');options.choose?.('left',ids.left);options.choose?.('right',ids.right);if([ids.left,ids.right].includes(active)){const d=docs().find(d=>d.id===active);if(d)options.activate(d,options.sideOf?.(d.uid))}scale=[-3,-2,-1,0,.5,1,2,4].includes(value.scale)?value.scale:-1;q('[data-compare-scale]').value=String(scale);q('[data-compare-sync]').checked=value.sync!==false;refresh(true)},get result(){return result},get selection(){return {...ids}},dispose(){if(disposed)return;preview.dispose();stopLargeWorker();for(const side of sides)remember(side);splitter.dispose();scrollReconciler.cancel();for(const event of ['pointerup','pointercancel','lostpointercapture','touchend','touchcancel','keyup','blur'])root.removeEventListener(event,endInteraction);disposed=true;generation++;clearTimeout(timer);if(mapFrame!==null)root.cancelAnimationFrame(mapFrame);observer?.disconnect();for(const side of sides){wheelIdle[side].cancel();gutterRefresh[side].cancel();root.NTKEditorLanguageService?.cancelHighlight?.('compare-'+side);views[side].destroy()}host.replaceChildren()}};
 }
-const api=Object.freeze({create,createSourceView,starts,presentationCurrent,moveToDocumentEdge,revealSourceRange,alignedPixelFromNative,nativePixelFromAligned,createScrollReconciler,nativeOriginMismatch,createOriginRepairGuard,createWheelIdle,resetNativeOrigin,nativeHeightMismatch,nativeGutterSignature,createMeasuredRefresh,measurementMetrics,renderedBlockGeometry,createNativeLineNumberGutter,sourceRowLookup,renderedPeerOffset,nextPaintedOffset});root.NTKEditorAlignedCompare=api;if(typeof module==='object'&&module.exports)module.exports=api;
+const api=Object.freeze({create,createSourceView,starts,presentationCurrent,moveToDocumentEdge,revealSourceRange,alignedPixelFromNative,nativePixelFromAligned,createScrollReconciler,nativeOriginMismatch,createOriginRepairGuard,createWheelIdle,resetNativeOrigin,nativeHeightMismatch,nativeGutterSignature,createMeasuredRefresh,measurementMetrics,renderedBlockGeometry,createNativeLineNumberGutter,sourceRowLookup,renderedPeerOffset,nextPaintedOffset,topPaddingFraction});root.NTKEditorAlignedCompare=api;if(typeof module==='object'&&module.exports)module.exports=api;
 })(typeof window==='undefined'?globalThis:window);
