@@ -226,6 +226,7 @@ function promoteDocument(d,value,caret){
  d.promoting=true;
  if(current()===d){findEl('[data-ed-text]').disabled=true;setMessage('Preparing this document for large-file editing…');}
  const promotion=(async()=>{
+  let failure;
   try{
    await adoptDiskDocument(d,snapshot);
    await ensureDiskSession(d).replace(fragment.from,fragment.to,fragment.text);
@@ -235,12 +236,12 @@ function promoteDocument(d,value,caret){
    if(displayedDocument===d)displayedDocument=null;
    return {ok:true};
   }catch(error){
-   if(current()===d)setMessage('Could not apply the edit. '+error.message,true);
+   failure=error;
    return {ok:false,error:error.message};
   }finally{
    d.promoting=false;d.promotionResult=null;
    if(d.disk)updatePaneFactory();
-   if(current()===d)draw();
+   if(current()===d){draw();setMessage(failure?'Could not apply the edit. '+failure.message:'Ready',!!failure);}
   }
  })();
  d.promotionResult=promotion;
@@ -691,7 +692,12 @@ async function open({id,source,path,read,write,afterSave,list,binding=null,creat
     doc.loading=false;
     if(!result.disk){doc.original=result.content||'';doc.hash=result.hash||'';doc.bom=result.bom===true;doc.encoding=result.encoding||'UTF-8';setFileValues(doc);if(result.eol)doc.eol=doc.savedEol=result.eol;if(paged)root.NetworkToolkitEditorWindows?.prepareDocument?.(doc);}
     else updatePaneFactory();
-    if(active===key){draw();if(!comparison&&!doc.disk)findEl('[data-ed-text]')?.focus();}else paneWorkspace()?.refresh();return doc;
+    if(active===key){
+     draw();
+     if(doc.disk)setMessage('Opened '+nameOf(doc.path)+'.');
+     else if(!comparison)findEl('[data-ed-text]')?.focus();
+    }else paneWorkspace()?.refresh();
+    return doc;
    }catch(error){
     if(documents.get(key)===doc){documents.delete(key);if(active===key){active=documents.has(previous)?previous:[...documents.keys()].at(-1)||'';if(active){draw();setMessage('Cannot open '+nameOf(path)+': '+error.message,true);}else overlay.hidden=true;}}
     throw error;
@@ -884,7 +890,7 @@ async function reload(){
  }catch(error){failure=error;}
  finally{
   d.reloading=false;
-  if(current()===d){diskView()?.setReadOnly(!!comparison);draw();if(failure)setMessage(failure.message,true);}
+  if(current()===d){diskView()?.setReadOnly(!!comparison);draw();if(failure)setMessage(failure.message,true);else if(d.disk)setMessage('Reloaded '+nameOf(d.path)+'.');}
  }
 }
 function applyEditorTheme(){if(!overlay)return;overlay.dataset.palette=editorPalette;overlay.style.setProperty('--nt-editor-font',editorFontSize+'px');for(const [key,hex] of Object.entries({...editorColorDefaults,...editorCustomColors})){if(editorPalette==='custom'&&goodEditorColor(hex))overlay.style.setProperty('--nt-code-'+key,hex);else overlay.style.removeProperty('--nt-code-'+key);} }

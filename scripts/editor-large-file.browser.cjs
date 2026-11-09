@@ -54,6 +54,7 @@ async function main() {
     await page.evaluate(async name => { await NetworkToolkitFileEditor.openLocalPath(name); }, right);
     await page.waitForFunction(n => NetworkToolkitFileEditor.active?.diskMeta?.units === n &&
       !document.querySelector('.nt-editor-code textarea[data-ed-text]').disabled, Number(size));
+    assert.match(await page.locator('[data-ed-message]').textContent(), /^Opened edited\.txt\.$/);
     report.openBothMs = Date.now() - opened;
 
     report.phase = 'edit';
