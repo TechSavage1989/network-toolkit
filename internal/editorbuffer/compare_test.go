@@ -109,6 +109,19 @@ func TestStreamingCompareMatchesShiftedRepeatedLineByContext(t *testing.T) {
 	}
 }
 
+func TestStreamingCompareRetainsExactRowsBeforeRepeatedContext(t *testing.T) {
+	left := InlineComparisonInput("header\nold interface\nshared action\nold group\nshared action\nshared schedule\nshared logging\nfooter\n")
+	right := InlineComparisonInput("header\nnew interface\nshared action\nnew group\nshared action\nshared schedule\nshared logging\nfooter\nadded tail\n")
+	want := []Difference{
+		{Left: 1, Right: 1, LeftCount: 1, RightCount: 1},
+		{Left: 3, Right: 3, LeftCount: 1, RightCount: 1},
+		{Left: 8, Right: 8, RightCount: 1},
+	}
+	if got := collectDifferences(t, left, right); !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %+v, want %+v", got, want)
+	}
+}
+
 func TestStreamingCompareKeepsExistingPolicyAfterRepeatedInsertions(t *testing.T) {
 	policy := func(id string) string {
 		return "    edit " + id + "\n" +

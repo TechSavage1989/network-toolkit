@@ -278,13 +278,17 @@ function create(options) {
    const diff = !gap && differenceAt(side, line, pane.ranges);
    const offsetInTail = diff ? line - diff[side] - diff[peerOf(side) + 'Count'] : -1;
    const counterpart = offsetInTail >= 0 && diff.movedTo ? diff.movedTo + offsetInTail : null;
+   const replacement = diff && offsetInTail < 0 && root.NTKEditorCompare.isLowSimilarityReplacement(
+    visibleLine(pane, line), visibleLine(panes[peerOf(side)], diff[peerOf(side)] + line - diff[side])
+   );
    const kind = gap ? 'gap' : !diff ? '' : counterpart ? 'moved' :
-    offsetInTail < 0 ? 'changed' : side === 'left' ? 'removed' : 'added';
+    offsetInTail < 0 && !replacement ? 'changed' : side === 'left' ? 'removed' : 'added';
    const className = kind ? 'nt-compare-line ' + kind : '';
    if (row.className !== className) row.className = className;
    if (row.textContent && differenceSymbols[kind]) row.dataset.differenceSymbol = differenceSymbols[kind];
    else delete row.dataset.differenceSymbol;
-   row.title = counterpart && row.textContent ? 'Moved · other document line ' + number(counterpart) : '';
+   row.title = !row.textContent ? '' : counterpart ? 'Moved · other document line ' + number(counterpart) :
+    replacement ? 'Replacement with substantially different text' : '';
    const height = parseFloat(row.style.height) || defaultHeight;
    const offset = top;
    top += height;
@@ -477,6 +481,13 @@ function create(options) {
   }
   remember(side);
   paintDifferences(side);
+  const source = pane.view?.comparisonPage();
+  const previous = pane.paintedSource;
+  if (previous?.text !== source?.text || previous?.line !== source?.line ||
+      previous?.column !== source?.column || previous?.complete !== source?.complete) {
+   pane.paintedSource = source;
+   if (comparing && panes[peerOf(side)].ranges.length) paintDifferences(peerOf(side));
+  }
   scheduleMap();
   if (pane.top !== previousTop && gestureSide === side && drag === null) revealMap(side);
   const sync = !syncing && gestureSide === side && q('[data-compare-sync]').checked;
@@ -807,7 +818,10 @@ function create(options) {
     if (last.line === page.line + page.text.split('\n').length - 1 &&
         page.start + page.text.length < page.units) {
      if (rows.length > 1) rows.pop();
-     else last.text += ' … (open the editable comparison to view the full line)';
+     else {
+      last.truncated = true;
+      last.text += ' … (open the editable comparison to view the full line)';
+     }
     }
     values.push(...rows);
     first = rows.at(-1).line + 1;
@@ -818,6 +832,11 @@ function create(options) {
   const paired = Math.min(diff.leftCount, diff.rightCount);
   return Array.from({length:limit}, (_, i) => {
    const row = [left[i], right[i]], tail = offset + i - paired;
+   if (left[i] && right[i] && !left[i].truncated && !right[i].truncated &&
+       root.NTKEditorCompare.isLowSimilarityReplacement(left[i].text, right[i].text)) {
+    left[i].kind = 'removed';
+    right[i].kind = 'added';
+   }
    if (diff.movedTo && tail >= 0) {
     const value = left[i] || right[i];
     if (value) Object.assign(value, {moved:true, counterpart:diff.movedTo + tail - 1});

@@ -1,3 +1,8 @@
+## 1.21.30 Beta 1 - Clearer Compare replacement markers
+
+- Keep exact matches out of changed regions when a later repeated match uses the same alignment.
+- Show replacements with a large length difference as removal and addition on the same comparison row.
+
 ## 1.21.29 Beta 1 - Moved blocks and steadier Compare scrolling
 
 - Use nearby text to distinguish repeated lines and mark exact moved blocks with gray spacers.

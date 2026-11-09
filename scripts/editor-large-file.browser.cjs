@@ -100,8 +100,10 @@ async function verifyRepeatedPolicies(page) {
 async function verifyMovedBlock(page) {
   const moved = ['move start','repeat this line','repeat this line','move end'];
   const stable = Array.from({length:24}, (_, i) => 'stable line ' + i);
-  const before = ['header', ...moved, ...stable, 'footer'].join('\n');
-  const after = ['header', ...stable, ...moved, 'footer'].join('\n');
+  const longSetting = 'set srcintf ' + Array.from({length:20}, (_, i) => '"synthetic-interface-' + i + '"').join(' ');
+  const shortSetting = 'set srcintf "VPN_Tunnels"';
+  const before = ['header', ...moved, ...stable, 'settings', longSetting, 'set action accept', 'name before', 'footer'].join('\n');
+  const after = ['header', ...stable, ...moved, 'settings', shortSetting, 'set action accept', 'name after', 'footer'].join('\n');
   await page.evaluate(async ({before, after}) => {
     for (const [id, content] of [['moves-before', before], ['moves-after', after]]) {
       const file = new File([content], id + '.txt');
@@ -123,11 +125,24 @@ async function verifyMovedBlock(page) {
   assert.equal(rows.length, 8, 'both ends of the entire moved block are marked');
   assert.equal(rows.filter(row => row.includes('repeat this line')).length, 4);
   assert.equal(await preview.locator('.nt-compare-preview-line.gap').count(), 8);
+  await preview.locator('.nt-compare-preview-line.removed code').filter({hasText:longSetting}).waitFor();
+  await preview.locator('.nt-compare-preview-line.added code').filter({hasText:shortSetting}).waitFor();
+  await preview.locator('.nt-compare-preview-line.changed code').filter({hasText:'name before'}).waitFor();
+  assert.equal(await preview.locator('code').filter({hasText:'set action accept'}).count(), 0);
   await preview.getByRole('button', {name:'Return to editable comparison'}).click();
   const source = page.locator('[data-compare-pane="left"] [data-difference-symbol="↔"]');
   await source.first().waitFor();
   assert.equal(await source.first().textContent(), '2');
   await page.locator('[data-compare-pane="right"] [data-alignment-gap]').first().waitFor();
+  const replacementLine = stable.length + moved.length + 3;
+  await page.evaluate(async line => {
+    const compare = NetworkToolkitFileEditor.comparison;
+    await Promise.all(['left', 'right'].map(side => compare.diskView(side).goLine(line - 1, false)));
+  }, replacementLine);
+  await page.waitForFunction(line => {
+    const row = side => document.querySelector('[data-disk-compare-gutter="' + side + '"] [data-source-line="' + line + '"]');
+    return row('left')?.dataset.differenceSymbol === '−' && row('right')?.dataset.differenceSymbol === '+';
+  }, replacementLine);
 }
 
 async function main() {
