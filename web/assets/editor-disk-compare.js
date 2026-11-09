@@ -39,7 +39,6 @@ function create(options) {
  const viewField = comparing ? 'compareView' : 'view';
  host.className = 'nt-editor-compare nt-editor-disk-compare' + (comparing ? '' : ' is-split-view');
  host.innerHTML = '<div class="nt-compare-tools">' + sides.map(selectorMarkup).join('') +
-  '<button type="button" class="btn small primary" data-compare="compute">Compare</button>' +
   '<button type="button" class="btn small ghost" data-compare="swap">Swap sides</button>' +
   '<button type="button" class="btn small ghost" data-compare="previous" title="Previous difference">Previous</button>' +
   '<button type="button" class="btn small ghost" data-compare="next" title="Next difference">Next</button>' +
@@ -52,7 +51,7 @@ function create(options) {
   '<option value="-2">Compact (3 lines per pixel)</option><option value="-3">Dynamic fit (1 pixel marks)</option>' +
   '<option value="0.5">1.5×</option><option value="1">2×</option><option value="2">3×</option><option value="4">5×</option></select></label>' +
   '</div></details>' +
-  '<button type="button" class="btn small ghost" data-compare="close">Close comparison</button></div>' +
+  '</div>' +
   '<div class="nt-compare-summary"><span data-compare-summary role="status"></span>' +
   '<span class="nt-compare-legend" aria-label="Difference key"><span class="added">+ Added</span><span class="removed">− Removed</span>' +
   '<span class="changed">~ Modified</span></span></div><div class="nt-compare-grid">' +
@@ -562,7 +561,6 @@ function create(options) {
  function buttons() {
   const enabled = !!job?.status?.count && !job.status.error;
   for (const button of host.querySelectorAll(root.NTKEditorCompare.differenceControls)) button.disabled = !enabled;
-  q('[data-compare="compute"]').textContent = job && !job.status?.done ? 'Cancel comparison' : 'Compare';
  }
 
  function failJob(current, error) {
@@ -928,14 +926,9 @@ function create(options) {
 
  host.addEventListener('click', event => {
   const action = event.target.closest('[data-compare]')?.dataset.compare;
-  if (action === 'compute') {
-   if (job && !job.status?.done) { clearJob(); setSummary('Comparison cancelled.'); }
-   else void compute();
-  }
   if (action === 'swap' && !composing()) { options.swap?.(); refresh(); }
   if (action === 'previous' || action === 'next') go(difference(action === 'next' ? 1 : -1));
   if (action === 'first' || action === 'last') go(difference(action));
-  if (action === 'close') options.close?.();
  });
  host.addEventListener('change', event => {
   const control = event.target;

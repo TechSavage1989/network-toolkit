@@ -223,13 +223,16 @@ body:has(.nt-editor-embedded) #toolWorkspace>#pageContent{grid-row:1!important;g
 /* Compact shared document controls: optional actions expand only on request. */
 .nt-editor-more>summary,.nt-compare-settings>summary{list-style:none;cursor:pointer}
 .nt-editor-more>summary::-webkit-details-marker,.nt-compare-settings>summary::-webkit-details-marker{display:none}
-.nt-editor-more>summary::after,.nt-compare-settings>summary::after{content:' ▾'}
+.nt-editor-more>summary::after,.nt-compare-settings>summary::after{content:'';width:5px;height:5px;margin:0 1px 3px 6px;border-right:1px solid;border-bottom:1px solid;transform:rotate(45deg)}
+.nt-editor-more[open]>summary::after,.nt-compare-settings[open]>summary::after{transform:rotate(225deg);margin-block:3px 0}
+.nt-editor-toolbar,.nt-compare-tools{position:relative}
 .nt-compare-settings,.nt-compare-settings[open]{flex:0 0 auto;order:0}
 .nt-editor-more,.nt-editor-more[open]{flex:0 0 auto;order:0}
-.nt-editor-more-actions{flex:0 0 auto;padding:5px 8px!important;border-bottom:1px solid var(--line);max-height:35vh;overflow:auto}
-.nt-editor-more-actions .btn{min-height:28px;padding:4px 8px;font-size:11px}
-.nt-editor-more-actions,.nt-compare-settings-actions{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding-top:5px}
-.nt-editor.is-comparing [data-ed="compare"]{display:none}
+.nt-editor-more-actions,.nt-compare-settings-actions{position:absolute;top:100%;right:8px;z-index:12;display:grid;gap:2px;width:224px;max-width:calc(100% - 16px);max-height:min(55dvh,440px);box-sizing:border-box;overflow:auto;padding:5px;border:1px solid var(--border);border-radius:7px;background:var(--panel);box-shadow:var(--shadow)}
+.nt-editor-more-actions[hidden],.nt-compare-settings-actions[hidden]{display:none}
+.nt-editor-more-actions .btn{justify-content:flex-start;min-height:28px;padding:4px 8px;font-size:11px;text-align:left}
+.nt-editor-more-actions .nt-editor-close-preference{margin:0;padding:4px 8px}
+.nt-editor [data-ed="compare"][aria-pressed="true"]{background:var(--accentBg);color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
 .nt-editor.is-comparing :is([data-ed="find"],[data-ed="replace"],[data-ed="goto"]){display:none}
 /* Embedded tools retain the same natural toolbar wrapping at narrow widths. */
 .nt-editor-toolbar,.nt-editor-embedded .nt-editor-toolbar,.nt-editor.is-comparing .nt-editor-toolbar{max-height:none;overflow:visible;min-height:0;padding:5px 8px}
@@ -264,10 +267,6 @@ body:has(.nt-editor-embedded) #toolWorkspace>#pageContent{grid-row:1!important;g
 }
 
 .nt-compare-syntax-notice{font-size:10px;padding:3px 7px;color:var(--warn);max-height:45px;overflow:auto;flex-shrink:0}
-
-/* Keep the primary action concise at every width; its accessible name stays explicit. */
-.nt-editor-toolbar .nt-editor-label-wide{display:none}
-.nt-editor-toolbar .nt-editor-label-compact{display:inline}
 
 /* Shared controls stay above view-local tabs and their editing surfaces. */
 .nt-editor-workspace{display:flex;flex:1 1 0;min-height:0;min-width:0;overflow:hidden}
@@ -407,7 +406,7 @@ body:has(.nt-editor:not([hidden]) [data-ed-files-sidebar]:not([hidden])) .toast-
 .nt-editor-files-session-menu>div{position:absolute;right:0;top:100%;z-index:15;display:flex;flex-direction:column;min-width:145px;padding:4px;border:1px solid var(--border);border-radius:6px;background:var(--panel);box-shadow:var(--shadow)}
 .nt-editor-files-session-menu>div .btn{justify-content:flex-start;white-space:nowrap}
 
-.nt-compare-settings-actions{flex:0 0 auto;padding:4px 8px;border-bottom:1px solid var(--line);max-height:30vh;overflow:auto;justify-content:flex-start}.nt-compare-settings-actions[hidden]{display:none}.nt-compare-settings-actions label{display:inline-flex;align-items:center;gap:4px;font-size:11px;white-space:nowrap}
+.nt-compare-settings-actions{width:270px}.nt-compare-settings-actions>button{text-align:left;justify-content:flex-start}.nt-compare-settings-actions label{display:inline-flex;align-items:center;gap:4px;font-size:11px;white-space:nowrap}
 .nt-compare-settings-actions input[type=checkbox]{width:14px;height:14px;margin:0;flex:0 0 auto}.nt-compare-settings-actions select{width:auto;min-height:27px;padding:3px 5px;font-size:11px}
 /* Editor Files/Connections use persistent tab panels; switching does not remount auth fields. */
 .nt-editor-files-locations{display:flex;align-items:center;gap:4px;padding:4px 5px;flex:none;border-bottom:1px solid var(--border)}

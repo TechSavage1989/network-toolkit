@@ -1,6 +1,7 @@
 ## 1.21.26 Beta 1 - Continuous differences-only comparison
 
 - Scroll through added, removed, and modified lines together, with original line numbers and gray spacers.
+- Use toolbar icons for Undo, Redo, Split View, Open Separately, Compare, Reload, and Go to Line. More and Compare Options open as dropdowns. Use the Compare icon to enter or leave comparison.
 - Load a bounded window of changed rows from the on-disk comparison index.
 
 ## 1.21.25 Beta 1 - Editable comparison alignment

@@ -65,7 +65,7 @@ async function compareOpen(p){await p.locator('[data-ed="compare"]').click();awa
     report.layouts.push({mode,theme,comparing,...size,before:a,after:b,gain:b.visibleHeight-a.visibleHeight});
     assert(b.overflow<=1);assert(b.visibleHeight>=a.visibleHeight,JSON.stringify(report.layouts.at(-1)));
     if(output&&size.width!==820)for(const [label,item] of [['before',before],['after',after]])await item.page.screenshot({path:path.join(output,`${label}-${mode}-${size.width}-${theme}-${comparing?'compare':'text'}.png`)});
-    if(comparing)for(const item of [before,after])await item.page.locator('[data-compare="close"]').click();
+    if(comparing){await before.page.locator('[data-compare="close"]').click();await after.page.locator('[data-ed="compare"]').click();}
    }
   }
   check(mode+' rendered before/after height, narrow, short, light/dark');
