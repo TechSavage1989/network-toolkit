@@ -1,3 +1,10 @@
+## 1.21.24 Beta 1 - Compare navigation and FortiOS coloring
+
+- Add Compact and Dynamic fit change maps and align gutter symbols.
+- Highlight corresponding lines and changed characters. Include additions and removals in the differences-only view.
+- Open comparison actions from the text context menu.
+- Show one vertical document scrollbar per pane and restore syntax coloring in disk-backed editors, including FortiOS configurations.
+
 ## 1.21.23 Beta 1 - Compare filters and text conversion
 
 - Browse only the changed blocks and keep the source line numbers visible.

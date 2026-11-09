@@ -46,11 +46,18 @@ func TestEditorLargeFileBrowser(t *testing.T) {
 		t.Fatal(err)
 	}
 	block := bytes.Repeat([]byte(strings.Repeat("x", 1023)+"\n"), blockSize/1024)
+	firstBlock := bytes.Clone(block)
+	copy(firstBlock, "#config-version=FGTTEST-7.4.0 synthetic ")
+	copy(firstBlock[1024:], "config system global ")
 	want := sha256.New()
 	_, _ = io.WriteString(want, head)
 	writer := io.MultiWriter(file, want)
 	for remaining := size; remaining > 0; remaining -= blockSize {
-		if _, err := writer.Write(block); err != nil {
+		data := block
+		if remaining == size {
+			data = firstBlock
+		}
+		if _, err := writer.Write(data); err != nil {
 			file.Close()
 			t.Fatal(err)
 		}

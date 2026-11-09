@@ -1,3 +1,9 @@
+# v1.21.24 Beta 1 - Compare navigation and FortiOS coloring
+
+The working branch tests the full-document scrollbar with native Chromium scrollbars visible. Compare gains compact and dynamic map modes, fixed gutter symbols, counterpart line highlighting, and right-click comparison actions. Disk-backed views color the loaded page through the existing language worker, including FortiOS syntax. Display-only spacers in the editable disk-backed panes remain open.
+
+---
+
 # v1.21.23 Beta 1 - Compare filters and text conversion
 
 The working branch hides the temporary page scrollbar, restores the disk comparison legend and symbols, preserves the viewport through undo and redo, and centers map clicks. Compare Options add whitespace matching modes, a map visibility switch, and jumps to the first and last difference. The read-only differences view pages through changed rows without loading the whole document. More and the text context menu provide selection-based UTF-8 hex and Base64 conversion.

@@ -47,7 +47,9 @@ function create(options) {
   '<label><input type="checkbox" data-compare-sync checked> Sync scroll</label>' +
   '<label><input type="checkbox" data-compare-horizontal-sync> Sync horizontal scroll</label>' +
   '<label><input type="checkbox" data-compare-underline> Underline changes</label>' +
+  '<label><input type="checkbox" data-compare-intraline> Highlight changed characters</label>' +
   '<label>Map zoom <select data-compare-scale aria-label="Map zoom"><option value="0">Individual lines</option>' +
+  '<option value="-2">Compact (3 lines per pixel)</option><option value="-3">Dynamic fit (1 pixel marks)</option>' +
   '<option value="0.5">1.5×</option><option value="1">2×</option><option value="2">3×</option><option value="4">5×</option></select></label>' +
   '</div></details>' +
   '<button type="button" class="btn small ghost" data-compare="close">Close comparison</button></div>' +
@@ -66,6 +68,7 @@ function create(options) {
  const prefs = options.comparisonPreferences?.() || {};
  q('[data-compare-horizontal-sync]').checked = prefs.compareHorizontalSync === true;
  q('[data-compare-underline]').checked = prefs.compareUnderline !== false;
+ q('[data-compare-intraline]').checked = prefs.compareIntralineHighlight !== false;
  root.NTKEditorCompare.mountSettings(host);
 
  const panes = Object.fromEntries(sides.map(side => {
@@ -90,9 +93,12 @@ function create(options) {
  let mapFrame = 0, gestureSide = null;
  let mapTop = 0, mapExtent = 0, mapScrollMax = 0, mapScrollPosition = 0;
  let mapData = null, mapRequest = null, mapPaintKey = '';
+ let lineHighlight = null;
  const preview = comparing && root.NTKEditorCompare.mountDifferencePreview(host, readDifferencePreview, () =>
   job?.status && {count:job.status.count, index:Math.max(0, selected)});
- const mapPitch = () => Math.max(2, Math.ceil(map.clientHeight / 3500)) * (1 + scale);
+ const mapLineCount = () => Math.max(...sides.map(side => totalLines(panes[side])));
+ const mapPitch = () => scale === -3 ? Math.max(1, map.clientHeight) / mapLineCount() :
+  scale === -2 ? 1 / 3 : Math.max(2, Math.ceil(map.clientHeight / 3500)) * (1 + scale);
  const splitter = root.NTKEditorCompare.createDivider(host, q('.nt-compare-grid'), comparing, () => {
   for (const side of sides) changed(side);
  });
@@ -174,6 +180,7 @@ function create(options) {
   } else if (pane.ready) {
    ta.disabled = false;
   }
+  pane.view?.refreshSyntax();
   const state = q('[data-compare-state="' + side + '"]');
   state.textContent = doc ? doc.source + ' · ' + doc.path + (doc.dirty ? ' · Unsaved' : ' · Saved') +
    (doc.saving ? ' · Saving…' : '') : 'Open or create a second document.';
@@ -211,9 +218,11 @@ function create(options) {
  function paintDifferences(side) {
   const pane = panes[side], rows = pane.gutter.children, colors = [];
   const first = rows[0];
-  const bounds = first && pane.ranges.length ? first.getBoundingClientRect() : null;
+  const bounds = first && (pane.ranges.length || lineHighlight?.lines[side] != null) ? first.getBoundingClientRect() : null;
   const top = bounds ? bounds.top - pane.colors.getBoundingClientRect().top : 0;
   let index = 0;
+  const intraline = q('[data-compare-intraline]').checked;
+  const budget = {remaining:8192};
   for (const row of rows) {
    const line = Number(row.textContent) - 1;
    const kind = differenceKind(side, line, pane.ranges);
@@ -222,14 +231,76 @@ function create(options) {
    if (kind) row.dataset.differenceSymbol = differenceSymbols[kind];
    else delete row.dataset.differenceSymbol;
    const offset = index++;
-   if (!kind || !bounds) continue;
+   const current = lineHighlight?.lines[side] === line;
+   if ((!kind && !current) || !bounds) continue;
    const color = document.createElement('span');
-   color.className = 'nt-disk-compare-color ' + kind;
+   color.className = 'nt-disk-compare-color ' + kind + (current ? ' is-current' : '');
    color.style.top = top + offset * bounds.height + 'px';
    color.style.height = bounds.height + 'px';
+   if (intraline && kind === 'changed') paintCharacters(side, line, color, budget);
    colors.push(color);
   }
   if (colors.length || pane.colors.childElementCount) pane.colors.replaceChildren(...colors);
+ }
+
+ function visibleLine(pane, line) {
+  const page = pane.view?.comparisonPage() || {line:0, text:pane.text, column:0, complete:true};
+  if (pane.characterText?.text !== page.text) pane.characterText = {text:page.text, lines:page.text.split('\n')};
+  const lines = pane.characterText.lines, local = line - page.line;
+  if ((local === 0 && page.column) || (local === lines.length - 1 && !page.complete)) return null;
+  return lines[local] ?? null;
+ }
+
+ function paintCharacters(side, line, row, budget) {
+  const peer = peerOf(side), pane = panes[side];
+  const diff = pane.ranges.find(value => line >= value[side] && line - value[side] < value[side + 'Count']);
+  if (!diff) return;
+  const text = visibleLine(pane, line), other = visibleLine(panes[peer], diff[peer] + line - diff[side]);
+  if (text == null || other == null || Math.max(text.length, other.length) > 4096) return;
+  const ranges = root.NTKEditorAlignmentModel?.intralineRanges(text, other, budget).left;
+  if (!ranges?.length) return;
+  const overlay = document.createElement('span');
+  overlay.className = 'nt-disk-compare-intraline';
+  overlay.style.transform = 'translateX(' + (-pane.textarea.scrollLeft) + 'px)';
+  let from = 0;
+  for (const range of ranges) {
+   overlay.append(text.slice(from, range.from));
+   const mark = document.createElement('span');
+   mark.textContent = text.slice(range.from, range.to);
+   overlay.append(mark);
+   from = range.to;
+  }
+  row.append(overlay);
+ }
+
+ function highlightLine(side) {
+  if (!comparing || disposed || composing()) return;
+  const pane = panes[side];
+  if (!pane.doc) return;
+  const cursor = pane.textarea.selectionDirection === 'backward' ? pane.textarea.selectionStart : pane.textarea.selectionEnd;
+  let line = pane.view?.cursor.line;
+  if (line === undefined) {
+   let first = 0, end = pane.lines.length;
+   while (first + 1 < end) {
+    const mid = Math.floor((first + end) / 2);
+    if (pane.lines[mid] <= cursor) first = mid;
+    else end = mid;
+   }
+   line = first;
+  }
+  const current = job, peer = peerOf(side);
+  if (lineHighlight?.side === side && lineHighlight.lines[side] === line && lineHighlight.job === current) return;
+  const highlight = {side, lines:{[side]:line}, job:current};
+  lineHighlight = highlight;
+  for (const name of sides) paintDifferences(name);
+  if (!current?.status || line >= current.status[side + 'Lines']) return;
+  void options.compareRequest({action:'locate', id:current.id, side, line, end:line, limit:1}, current.abort.signal).then(value => {
+   if (disposed || highlight !== lineHighlight || current !== job || !value.aligned) return;
+   const diff = value.differences[0], relative = line - (diff?.[side] ?? line);
+   if (diff && relative >= diff[peer + 'Count'] && relative < diff[side + 'Count']) return;
+   highlight.lines[peer] = value.peerLine;
+   paintDifferences(peer);
+  }).catch(() => {});
  }
 
  function paintMap() {
@@ -238,7 +309,8 @@ function create(options) {
   const atEnd = mapExtent > 0 && mapTop === mapExtent;
   const status = job?.status;
   const height = Math.max(1, map.clientHeight), pitch = mapPitch();
-  const contentHeight = Math.max(height, pitch * Math.max(...sides.map(side => totalLines(panes[side]))));
+  const fit = scale === -3, step = scale === -2 ? 3 : 1;
+  const contentHeight = fit ? height : Math.max(height, Math.ceil(pitch * mapLineCount()));
   // Keep the native scrollbar within browser layout limits. The wheel and
   // visible marks still use the full, unscaled line coordinates.
   mapExtent = contentHeight - height;
@@ -246,7 +318,8 @@ function create(options) {
   mapContent.style.setProperty('--nt-disk-map-height', height + 'px');
   mapScrollMax = map.scrollHeight - map.clientHeight;
   setMapTop(atEnd ? mapExtent : mapTop);
-  const first = Math.floor(mapTop / pitch), end = Math.ceil((mapTop + height) / pitch);
+  const first = Math.floor(mapTop / (pitch * step)) * step;
+  const end = Math.ceil((mapTop + height) / (pitch * step)) * step;
   const revision = status?.count ? job.id + ':' + status.count : '';
   const data = mapData?.revision === revision ? mapData : null;
   const paintKey = [revision, data?.start, first, end, pitch, height].join(':');
@@ -257,22 +330,31 @@ function create(options) {
    pane.track.setAttribute('aria-valuenow', String(clamp(pane.top + 1, 1, count)));
    pane.track.setAttribute('aria-disabled', String(!pane.doc));
    pane.marker.style.top = pane.top * pitch - mapTop + 'px';
-   pane.marker.style.height = Math.min(linesInView(pane), count - pane.top) * pitch + 'px';
-   pane.markers.style.transform = 'translateY(' + (first * pitch - mapTop) + 'px)';
+   pane.marker.style.height = Math.max(1, Math.min(linesInView(pane), count - pane.top) * pitch) + 'px';
+   pane.markers.style.transform = fit ? '' : 'translateY(' + (first * pitch - mapTop) + 'px)';
    if (paintKey !== mapPaintKey) {
     pane.markers.setAttribute('viewBox', '0 0 1 ' + height);
-    const marks = [];
-    for (let line = first; line < end; line++) {
-     const kind = data?.[side][line - data.start];
-     if (kind) marks.push('<rect width="1" height="' + (pitch - 1) + '" y="' +
-      ((line - first) * pitch) + '" class="' + ['', 'removed', 'added', 'changed'][kind] + '"/>');
+    const marks = new Map();
+    if (fit) {
+     const bins = status?.[side + 'Overview'] || [];
+     for (let i = 0; i < bins.length; i++) {
+      const y = Math.floor(i / bins.length * height);
+      if (bins[i]) marks.set(y, Math.max(marks.get(y) || 0, bins[i]));
+     }
+    } else if (data) {
+     for (let line = first; line < end; line += step) {
+      let kind = 0;
+      for (let row = line; row < line + step; row++) kind = Math.max(kind, data[side][row - data.start] || 0);
+      if (kind) marks.set((line - first) * pitch, kind);
+     }
     }
-    pane.markers.innerHTML = marks.join('');
+    pane.markers.innerHTML = Array.from(marks, ([y, kind]) => '<rect width="1" height="' +
+     (fit || step > 1 ? 1 : pitch - 1) + '" y="' + y + '" class="' + ['', 'removed', 'added', 'changed'][kind] + '"/>').join('');
    }
   }
   mapPaintKey = paintKey;
-  if (revision && !mapRequest && (!data || first < data.start || end > data.end)) {
-   const start = Math.max(0, first - 256), stop = Math.min(start + 4096, end + 256);
+  if (!fit && revision && !mapRequest && (!data || first < data.start || end > data.end)) {
+   const start = Math.max(0, first - 256), stop = Math.min(start + 32768, end + 256);
    const current = job;
    const request = options.compareRequest({action:'map', id:current.id, start, end:stop}, current.abort.signal);
    mapRequest = request;
@@ -443,6 +525,7 @@ function create(options) {
    if (previous.sent) void options.compareRequest({action:'cancel', id:previous.id}).catch(() => {});
   }
   mapData = mapRequest = null;
+  lineHighlight = null;
   preview?.refresh?.();
   for (const side of sides) {
    const pane = panes[side];
@@ -737,6 +820,7 @@ function create(options) {
   pane.container.addEventListener('keydown', gesture, true);
   ta.addEventListener('scroll', () => { horizontal.scroll(side); if (!pane.view) changed(side); });
   ta.addEventListener('select', () => { if (!pane.view) changed(side); });
+  for (const event of ['click', 'keyup']) ta.addEventListener(event, () => highlightLine(side));
   ta.addEventListener('compositionstart', () => { if (!pane.view) pane.composing = true; });
   ta.addEventListener('compositionend', () => {
    if (!pane.view) { pane.composing = false; go(inlineInput(side)); }
@@ -821,6 +905,10 @@ function create(options) {
    options.setComparisonPreference?.('compareUnderline', control.checked);
    host.classList.toggle('nt-disk-compare-underline', control.checked);
   }
+  if (control.matches('[data-compare-intraline]')) {
+   options.setComparisonPreference?.('compareIntralineHighlight', control.checked);
+   for (const side of sides) paintDifferences(side);
+  }
  });
  host.classList.toggle('nt-disk-compare-underline', q('[data-compare-underline]').checked);
  const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(() => {
@@ -867,7 +955,7 @@ function create(options) {
    ids = {left:String(value.left || ''), right:String(value.right || '')};
    for (const side of sides) if (ids[side]) options.choose?.(side, ids[side]);
    if (active && sides.some(side => ids[side] === active.id)) options.activate(active, options.sideOf?.(active.uid));
-   scale = [0, .5, 1, 2, 4].includes(value.scale) ? value.scale : 0;
+   scale = [-3, -2, 0, .5, 1, 2, 4].includes(value.scale) ? value.scale : 0;
    q('[data-compare-scale]').value = String(scale);
    q('[data-compare-sync]').checked = value.sync !== false;
    refresh();

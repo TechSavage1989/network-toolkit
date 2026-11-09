@@ -23,7 +23,7 @@ async function waitForEngine(page, predicate, timeout = 30000) {
 }
 
 async function main() {
-  const browser = await chromium.launch({ headless: true,
+  const browser = await chromium.launch({ headless: true, ignoreDefaultArgs:['--hide-scrollbars'],
     ...(process.env.TOOLKIT_BROWSER_EXECUTABLE ? { executablePath: process.env.TOOLKIT_BROWSER_EXECUTABLE } : {}) });
   try {
     const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
@@ -62,6 +62,7 @@ async function main() {
     await page.waitForFunction(n => NetworkToolkitFileEditor.active?.diskMeta?.units === n &&
       !document.querySelector('.nt-editor-code textarea[data-ed-text]').disabled, Number(size));
     assert.match(await page.locator('[data-ed-message]').textContent(), /^Opened edited\.txt\.$/);
+    await page.locator('.nt-editor-disk-highlight:visible .nt-ed-keyword').first().waitFor();
     report.openBothMs = Date.now() - opened;
     const activeUID = await page.evaluate(() => NetworkToolkitFileEditor.active.uid);
     assert.ok([...prefetched].some(url => url.endsWith('/' + activeUID + '/buffer')) ||
@@ -125,6 +126,14 @@ async function main() {
     await page.selectOption('[data-compare-spaces]', 'all');
     await page.waitForFunction(() => document.querySelector('[data-compare-summary]')?.dataset.compareDone === 'true');
     assert.equal(await summary.getAttribute('data-compare-count'), '2');
+    await page.selectOption('[data-compare-scale]', '-2');
+    await page.waitForFunction(() => document.querySelector('[data-compare-map-marks="left"] rect')?.getAttribute('height') === '1');
+    await page.selectOption('[data-compare-scale]', '-3');
+    await page.waitForFunction(() => {
+      const map = document.querySelector('[data-compare-map]');
+      return map.scrollHeight === map.clientHeight && map.querySelectorAll('[data-compare-map-marks="left"] rect').length === 2;
+    });
+    await page.selectOption('[data-compare-scale]', '0');
     await page.locator('.nt-compare-settings summary').click();
     for (const side of ['left', 'right']) {
       const pane = page.locator('[data-compare-pane="' + side + '"]');
@@ -162,6 +171,21 @@ async function main() {
     await page.waitForFunction(marker => [...document.querySelectorAll('.nt-editor-disk-compare textarea')].some(el => el.value.includes(marker)), tail);
     await leftTrack.press('Home');
     await page.waitForFunction(() => document.querySelector('[data-compare-track="left"]').getAttribute('aria-valuenow') === '1');
+    await map.locator('[data-compare-track="right"]').press('Home');
+    await page.waitForFunction(() => ['left','right'].every(side =>
+      document.querySelector('[data-compare-pane="' + side + '"] .nt-editor-disk-highlight:not([hidden]) .nt-ed-keyword')), null, {timeout:5000}).catch(async error => {
+      report.syntax = await page.evaluate(() => ['left','right'].map(side => {
+        const d = NetworkToolkitFileEditor.documents.get(NetworkToolkitFileEditor.comparison.selection[side]);
+        const pane = document.querySelector('[data-compare-pane="' + side + '"]');
+        return {side, language:d.language, detected:d.diskSyntaxLanguage, page:d.diskSession.state().page.line,
+          hidden:pane.querySelector('.nt-editor-disk-highlight').hidden, keywords:pane.querySelectorAll('.nt-ed-keyword').length};
+      }));
+      throw error;
+    });
+    const leftText = page.locator('[data-compare-text="left"]');
+    await leftText.click({position:{x:30,y:30}});
+    await page.waitForFunction(() => ['left','right'].every(side =>
+      document.querySelector('[data-compare-pane="' + side + '"] .nt-disk-compare-color.is-current')));
     // The first scroll should preserve the partial row on both sides. Matching
     // only the integer line leaves the peer up to a full row out of alignment.
     await page.evaluate(() => {
@@ -184,7 +208,15 @@ async function main() {
     await page.waitForFunction(marker => [...document.querySelectorAll('.nt-editor-disk-compare textarea')].some(el => el.value.includes(marker)), tail);
     await page.locator('.nt-editor-disk-compare .nt-compare-line.changed').first().waitFor();
     assert.equal(await page.locator('.nt-editor-disk-compare .nt-compare-line.changed').first().getAttribute('data-difference-symbol'), '~');
-    await page.locator('.nt-compare-settings summary').click();
+    const changedCharacters = page.locator('.nt-disk-compare-intraline > span');
+    await changedCharacters.first().waitFor();
+    await leftText.dispatchEvent('contextmenu',{clientX:440,clientY:330,button:2});
+    await page.locator('#editorContextMenu [data-editor-menu-action="compareCharacters"]').click();
+    assert.equal(await changedCharacters.count(), 0);
+    await leftText.dispatchEvent('contextmenu',{clientX:440,clientY:330,button:2});
+    await page.locator('#editorContextMenu [data-editor-menu-action="compareOptions"]').click();
+    await page.waitForFunction(() => document.querySelector('.nt-compare-settings').open);
+    await page.check('[data-compare-intraline]');
     await page.locator('[data-compare="first"]').click();
     await page.waitForFunction(() => document.querySelector('[data-compare-summary]').dataset.compareSelected === '0');
     await page.locator('[data-compare="last"]').click();

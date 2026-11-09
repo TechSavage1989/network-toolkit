@@ -12,7 +12,7 @@ const nameOf=p=>String(p||'Untitled').split(/[\\/]/).pop()||'Untitled';
 const languageTools=root.NTKEditorLanguages;
 const languageRows=languageTools?.languages||[{id:'text',label:'Plain text'}];
 const languageFor=(path,content='')=>languageTools?.detect(path,content)||'text';
-const languageOf=d=>d.language||languageFor(d.path,d.content);
+const languageOf=d=>d.language||d.diskSyntaxLanguage||languageFor(d.path,d.content);
 let paintGeneration=0,paintTimer=null,largeScrollFrame=null,pendingLargeInput=null,displayedDocument=null,pendingEditorDialog=null,comparison=null,splitView=null,splitEnabled=false,comparisonReturnLayout=null,tabMenu=null,comparisonHost=null,pendingSavePath='',windowCloseState=null;
 let singleDiskView=null,paneUsesDisk=false;
 const diskAvailable=()=>root.NetworkToolkitEditorWindows?.bufferSupported?.()&&!!root.NTKEditorDiskSession&&!!root.NTKEditorDiskView;
@@ -253,7 +253,22 @@ function mountDiskView(d,{textarea,gutter,container,readOnly=false,changed=()=>{
  textarea.disabled=true;
  textarea.classList.remove('highlight-active','is-wrapped');
  textarea.wrap='off';
- const view=root.NTKEditorDiskView.create({textarea,gutter,container,session,readOnly,changed,message:setMessage});
+ let sample, detected;
+ const syntaxLanguage=text=>{
+  if(!syntax)return '';
+  if(d.language)return d.language;
+  if(d.diskSyntaxLanguage)return d.diskSyntaxLanguage;
+  if(sample!==text){
+   sample=text;
+   const name=nameOf(d.path);
+   const candidate=languageFor(name,text);
+   if(candidate.startsWith('network-'))d.diskSyntaxLanguage=candidate;
+   else if(/forti(?:gate|net|os).*\.(?:cfg|conf)$/i.test(name))d.diskSyntaxLanguage='network-fortios';
+   detected=d.diskSyntaxLanguage||candidate;
+  }
+  return detected||'text';
+ };
+ const view=root.NTKEditorDiskView.create({textarea,gutter,container,session,syntaxLanguage,readOnly,changed,message:setMessage});
  let disposed=false,loaded=false;
  const ready=(async()=>{
   if(!session.state().metadata.revision){
@@ -766,7 +781,7 @@ function drawTabs(){
 
 // Paint a plain escaped copy immediately. Late worker replies must match the
 // same document, text, language and paint generation before touching the UI.
-function paintText(d){if(d?.disk)return;if(paneWorkspace()){if(current()===d)syncLanguageControls(d);return;}const ta=findEl('[data-ed-text]'),pre=findEl('[data-ed-highlight]'),gutter=findEl('[data-ed-gutter-lines]');if(!ta||!pre||!gutter||current()!==d)return;
+function paintText(d){if(d?.disk){if(current()===d)diskView()?.refreshSyntax();return;}if(paneWorkspace()){if(current()===d)syncLanguageControls(d);return;}const ta=findEl('[data-ed-text]'),pre=findEl('[data-ed-highlight]'),gutter=findEl('[data-ed-gutter-lines]');if(!ta||!pre||!gutter||current()!==d)return;
  const generation=++paintGeneration;if(paintTimer!==null){root.clearTimeout(paintTimer);paintTimer=null;}
  ta.wrap=effectiveWrap(d)?'soft':'off';ta.classList.toggle('is-wrapped',effectiveWrap(d));const wrap=findEl('[data-ed-wrap]');if(wrap){wrap.disabled=largeDocument(d);wrap.title=largeDocument(d)?'Wrap is paused in large-file mode; your saved preference is retained.':'';}paintGutter(d,ta,gutter);pre.classList.toggle('is-wrapped',wordWrap);pre.style.width=wordWrap?ta.clientWidth+'px':'';
  const language=languageOf(d),paintLimit=root.NTKNetworkConfig?.supports(language)?root.NTKNetworkConfig.MAX_PAINT:250000;const show=syntax&&d.content.length<=paintLimit;pre.hidden=!show;ta.classList.toggle('highlight-active',show);
@@ -1207,13 +1222,37 @@ const textMenu=Object.freeze({
  target(el){const ta=findEl('[data-ed-text]'), input=el?.closest?.('[data-compare-text]')||el;return !!input&&!!overlay&&!overlay.hidden&&overlay.contains(input)&&(input===(ta?.inputElement||ta)||input.matches('[data-compare-text]'));},
  focusTarget(el){el?.closest?.('[data-compare-text]')?.focus({preventScroll:true});},
  conversions:conversionActions,
+ compareActions(){
+  if(!comparison)return [];
+  return [
+   ['compareOptions','Compare options...',true],
+   ['comparePrevious','Previous difference',!comparisonHost.querySelector('[data-compare="previous"]').disabled],
+   ['compareNext','Next difference',!comparisonHost.querySelector('[data-compare="next"]').disabled],
+   ['compareOnly','Show only differences',!!comparisonHost.querySelector('[data-compare-only]')],
+   ['compareCharacters','Highlight changed characters',!!comparisonHost.querySelector('[data-compare-intraline]')]
+  ];
+ },
  state(){const d=current(),ta=findEl('[data-ed-text]'),range=d?.disk?diskView()?.selection():null,a=range?.start??ta?.selectionStart??0,b=range?.end??ta?.selectionEnd??0;return {open:!!d,editable:!!d&&!d.loading&&!d.frozen&&!comparison,convertible:!!d&&!d.loading&&!d.frozen&&!d.reloading&&!ta?.disabled,selection:!!d&&b>a,empty:!d||!(d.disk?d.diskMeta?.units:d.content.length),canUndo:!!(d?.disk?d.diskMeta?.canUndo:d?.undo?.length),canRedo:!!(d?.disk?d.diskMeta?.canRedo:d?.redo?.length)};},
  selection(){const d=current(),ta=findEl('[data-ed-text]');if(!d||!ta)return '';return d.content.slice(Math.min(ta.selectionStart,ta.selectionEnd),Math.max(ta.selectionStart,ta.selectionEnd));},
  copy(cut){return current()?.disk?diskView()?.copy(cut):undefined;},
  replace(text){const d=current();if(!d||d.loading||d.frozen||comparison)return false;if(d.disk)return diskView()?.replace(String(text??'')).then(()=>true);replaceSelection(String(text??''));status();return true;},
  selectAll(){if(current()?.disk){diskView()?.selectAll();return;}const ta=findEl('[data-ed-text]');if(!ta)return;ta.focus({preventScroll:true});ta.select();status();},
  focus(){findEl('[data-ed-text]')?.focus({preventScroll:true});},
- run(action){const button=overlay?.querySelector('[data-ed="'+action+'"]');if(!button||button.disabled)return false;button.click();return true;}
+ run(action){
+  if(comparison&&action==='compareOptions'){
+   const disclosure=comparisonHost.querySelector('.nt-compare-settings');
+   disclosure.open=true;
+   disclosure.querySelector('summary').focus({preventScroll:true});
+   return true;
+  }
+  const compareControl={comparePrevious:'[data-compare="previous"]',compareNext:'[data-compare="next"]',compareOnly:'[data-compare-only]',compareCharacters:'[data-compare-intraline]'}[action];
+  if(comparison&&compareControl){
+   const control=comparisonHost.querySelector(compareControl);
+   if(!control||control.disabled)return false;
+   control.click();
+   return true;
+  }
+  const button=overlay?.querySelector('[data-ed="'+action+'"]');if(!button||button.disabled)return false;button.click();return true;}
 });
 root.NetworkToolkitFileEditor={textMenu,listDocuments,insertText,pickInsert,cancelInsertPick:endPick,insertPickActive:()=>!!pickState,openTabActions(uid){const d=[...documents.values()].find(item=>item.uid===uid);if(!d||!overlay||overlay.hidden)return false;const button=[...overlay.querySelectorAll('[data-ed-tab-actions]')].find(el=>el.dataset.edTabActions===uid);if(!button)return false;const rect=button.getBoundingClientRect();openTabMenu(d,rect.left,rect.bottom);return true;},beginSidebarPointerDrag,finishSidebarPointerDrop,cancelSidebarPointerDrag,requestName:(title,message,value)=>{skin();return askEditor({title,message,value,accept:'Create',validate:value=>value.trim()?'':'Enter a name.'});},moveDocumentToView,openSplit,get viewGroups(){return groups.snapshot();},windowAdapter,canReorderDocuments,reorderDocument,open,openDesktopFile,importFiles,openLocalPath,newDocument,renderPage,detachPage,closeAll,preferConnection,refreshConnectedSources,openRemotePath,showRemoteFilePicker,get documents(){return documents;},activateDocument,openComparison,closeComparison,get comparison(){return comparison;},get active(){return current();}};
 })(globalThis);

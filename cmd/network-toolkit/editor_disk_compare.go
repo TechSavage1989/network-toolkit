@@ -14,7 +14,8 @@ import (
 
 const diskCompareRecordSize = 32
 const diskComparePageSize = 128
-const diskCompareMapWindow = 4096
+const diskCompareMapWindow = 32768
+const diskCompareOverviewBins = 2048
 
 type diskComparisonSource struct {
 	UID      string  `json:"uid"`
@@ -45,13 +46,15 @@ type diskComparisonSnapshot struct {
 
 type diskComparisonStatus struct {
 	editorbuffer.CompareProgress
-	LeftSize   int64  `json:"leftSize"`
-	RightSize  int64  `json:"rightSize"`
-	LeftTotal  int64  `json:"leftTotal"`
-	RightTotal int64  `json:"rightTotal"`
-	Count      int64  `json:"count"`
-	Done       bool   `json:"done"`
-	Error      string `json:"error,omitempty"`
+	LeftSize      int64                        `json:"leftSize"`
+	RightSize     int64                        `json:"rightSize"`
+	LeftTotal     int64                        `json:"leftTotal"`
+	RightTotal    int64                        `json:"rightTotal"`
+	Count         int64                        `json:"count"`
+	Done          bool                         `json:"done"`
+	Error         string                       `json:"error,omitempty"`
+	LeftOverview  [diskCompareOverviewBins]int `json:"leftOverview"`
+	RightOverview [diskCompareOverviewBins]int `json:"rightOverview"`
 }
 
 type diskComparisonJob struct {
@@ -238,6 +241,11 @@ func (j *diskComparisonJob) scan(ctx context.Context, left, right editorbuffer.C
 		if _, err := writer.Write(record[:]); err != nil {
 			return err
 		}
+		paired := min(diff.LeftCount, diff.RightCount)
+		addOverview(&status.LeftOverview, diff.Left, paired, max(status.LeftTotal, status.RightTotal), 3)
+		addOverview(&status.RightOverview, diff.Right, paired, max(status.LeftTotal, status.RightTotal), 3)
+		addOverview(&status.LeftOverview, diff.Left+paired, diff.LeftCount-paired, max(status.LeftTotal, status.RightTotal), 1)
+		addOverview(&status.RightOverview, diff.Right+paired, diff.RightCount-paired, max(status.LeftTotal, status.RightTotal), 2)
 		status.Count++
 		return nil
 	}, publish, options)
@@ -248,6 +256,16 @@ func (j *diskComparisonJob) scan(ctx context.Context, left, right editorbuffer.C
 		if err != nil || writeErr != nil {
 			j.status.Error = "Comparison could not finish. Choose Compare to try again."
 		}
+	}
+}
+
+func addOverview(bins *[diskCompareOverviewBins]int, start, count, total int64, kind int) {
+	if count <= 0 || total <= 0 {
+		return
+	}
+	bin := func(line int64) int { return min(len(bins)-1, int(float64(line)/float64(total)*float64(len(bins)))) }
+	for i, end := bin(start), bin(start+count-1); i <= end; i++ {
+		bins[i] = max(bins[i], kind)
 	}
 }
 
