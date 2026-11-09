@@ -1,0 +1,11 @@
+Network Toolkit 1.21.27 Beta 1
+
+## What's New
+
+- Word Wrap works in the large-file editor and Compare. Continuation rows leave the gutter blank, and gray spacers keep matching lines aligned.
+- More and Compare Options open beneath their buttons. Compare settings include navigation wraparound, changed-text selection in standard comparisons, and summary visibility.
+
+## Additional Details
+
+- Wrap is applied to the loaded portion of the file. The scrollbar continues to navigate the full document.
+- This beta is opt-in. Enable beta updates to receive it through the app.

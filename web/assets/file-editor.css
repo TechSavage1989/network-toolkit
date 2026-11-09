@@ -26,6 +26,8 @@
 .nt-editor-disk .nt-editor-surface textarea::-webkit-scrollbar-thumb:horizontal{background:var(--muted);border-radius:6px;border:2px solid var(--nt-code-bg,var(--input))}
 .nt-editor-disk-horizontal{position:absolute;bottom:0;left:52px;right:16px;height:16px;overflow-x:scroll;overflow-y:hidden;z-index:3}
 .nt-editor-disk-long-line .nt-editor-surface textarea{height:calc(100% - 16px)}
+.nt-editor-disk-wrapped .nt-editor-surface textarea{overflow-x:hidden}
+.nt-editor-disk-highlight.is-wrapped{width:100%;min-width:0;white-space:pre-wrap;overflow-wrap:anywhere}
 .nt-editor-disk [hidden]{display:none!important}
 .nt-disk-compare-code{position:relative;display:flex;flex:1 1 0;min-height:0;min-width:0;overflow:hidden;background:var(--nt-code-bg,var(--input));font:var(--nt-editor-font,13px)/1.55 var(--mono,Consolas,monospace)}
 .nt-disk-compare-code .nt-editor-gutter .nt-compare-line{position:relative;padding:0 2px}
@@ -228,7 +230,7 @@ body:has(.nt-editor-embedded) #toolWorkspace>#pageContent{grid-row:1!important;g
 .nt-editor-toolbar,.nt-compare-tools{position:relative}
 .nt-compare-settings,.nt-compare-settings[open]{flex:0 0 auto;order:0}
 .nt-editor-more,.nt-editor-more[open]{flex:0 0 auto;order:0}
-.nt-editor-more-actions,.nt-compare-settings-actions{position:absolute;top:100%;right:8px;z-index:12;display:grid;gap:2px;width:224px;max-width:calc(100% - 16px);max-height:min(55dvh,440px);box-sizing:border-box;overflow:auto;padding:5px;border:1px solid var(--border);border-radius:7px;background:var(--panel);box-shadow:var(--shadow)}
+.nt-editor-more-actions,.nt-compare-settings-actions{position:absolute;top:100%;left:8px;z-index:12;display:grid;gap:2px;width:224px;max-width:calc(100% - 16px);max-height:min(55dvh,440px);box-sizing:border-box;overflow:auto;padding:5px;border:1px solid var(--border);border-radius:7px;background:var(--panel);box-shadow:var(--shadow)}
 .nt-editor-more-actions[hidden],.nt-compare-settings-actions[hidden]{display:none}
 .nt-editor-more-actions .btn{justify-content:flex-start;min-height:28px;padding:4px 8px;font-size:11px;text-align:left}
 .nt-editor-more-actions .nt-editor-close-preference{margin:0;padding:4px 8px}
@@ -407,7 +409,7 @@ body:has(.nt-editor:not([hidden]) [data-ed-files-sidebar]:not([hidden])) .toast-
 .nt-editor-files-session-menu>div .btn{justify-content:flex-start;white-space:nowrap}
 
 .nt-compare-settings-actions{width:270px}.nt-compare-settings-actions>button{text-align:left;justify-content:flex-start}.nt-compare-settings-actions label{display:inline-flex;align-items:center;gap:4px;font-size:11px;white-space:nowrap}
-.nt-compare-settings-actions input[type=checkbox]{width:14px;height:14px;margin:0;flex:0 0 auto}.nt-compare-settings-actions select{width:auto;min-height:27px;padding:3px 5px;font-size:11px}
+.nt-compare-settings-actions label[hidden]{display:none}.nt-compare-settings-actions input[type=checkbox]{width:14px;height:14px;margin:0;flex:0 0 auto}.nt-compare-settings-actions select{width:auto;min-height:27px;padding:3px 5px;font-size:11px}
 /* Editor Files/Connections use persistent tab panels; switching does not remount auth fields. */
 .nt-editor-files-locations{display:flex;align-items:center;gap:4px;padding:4px 5px;flex:none;border-bottom:1px solid var(--border)}
 .nt-editor-files-locations[hidden]{display:none}
@@ -465,3 +467,5 @@ body:has(.nt-editor:not([hidden]) [data-ed-files-sidebar]:not([hidden])) .toast-
 .nt-editor-files-shell.dock-right:not(.is-collapsed){padding-right:0;padding-left:5px}
 .nt-editor-files-shell.dock-right>.nt-editor-files-resize{inset:0 auto 0 0}
 @media(max-width:680px){.nt-editor-files-shell.dock-right:not(.is-collapsed){padding-left:0}}
+
+.nt-editor-compare.is-summary-hidden > .nt-compare-summary{position:absolute;width:1px;height:1px;min-height:0;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}

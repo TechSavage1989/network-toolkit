@@ -34,6 +34,7 @@ type diskComparisonRequest struct {
 	Side   string               `json:"side"`
 	Line   int64                `json:"line"`
 	End    int64                `json:"end"`
+	Rows   []int64              `json:"rows"`
 	Spaces string               `json:"spaces"`
 }
 
@@ -436,6 +437,29 @@ func (j *diskComparisonJob) atAlignmentRow(line int64, right bool) (map[string]i
 	return map[string]int64{"line": start + offset}, nil
 }
 
+// wrapSources translates a bounded set of display rows to source lines.
+// A negative source identifies a spacer and needs no document text.
+func (j *diskComparisonJob) wrapSources(rows []int64, right bool) ([]int64, error) {
+	if len(rows) > 256 {
+		return nil, editorbuffer.ErrBoundary
+	}
+	lines := make([]int64, len(rows))
+	for i, row := range rows {
+		if row < 0 || row >= j.status.Rows {
+			return nil, editorbuffer.ErrBoundary
+		}
+		location, err := j.atAlignmentRow(row, right)
+		if err != nil {
+			return nil, err
+		}
+		lines[i] = location["line"]
+		if location["gap"] != 0 {
+			lines[i] = -1
+		}
+	}
+	return lines, nil
+}
+
 // Read the exact changes intersecting a small window of source lines.
 func (j *diskComparisonJob) mapLines(first, end int64, right bool) ([]int, error) {
 	marks := make([]int, end-first)
@@ -618,12 +642,14 @@ func (m *editorViewRegistry) compareDiskDocuments(w http.ResponseWriter, r *http
 			break
 		}
 		value, err = job.locate(req)
-	case "alignment", "alignment-row":
+	case "alignment", "alignment-row", "alignment-wrap":
 		if !job.status.Done || (req.Side != "left" && req.Side != "right") || req.Line < 0 {
 			err = editorbuffer.ErrBoundary
 			break
 		}
-		if req.Action == "alignment-row" {
+		if req.Action == "alignment-wrap" {
+			value, err = job.wrapSources(req.Rows, req.Side == "right")
+		} else if req.Action == "alignment-row" {
 			value, err = job.atAlignmentRow(min(req.Line, max(0, job.status.Rows-1)), req.Side == "right")
 		} else if req.End < req.Line || req.End-req.Line > 8192 {
 			err = editorbuffer.ErrBoundary

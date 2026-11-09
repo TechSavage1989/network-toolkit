@@ -1,3 +1,8 @@
+## 1.21.27 Beta 1 - Large-file Word Wrap
+
+- Wrap large files in the editor and in Compare. Keep source line numbers on the first visual row and use gray spacers to align matching text.
+- More and Compare Options open beneath their buttons. Compare settings include navigation wraparound, changed-text selection in standard comparisons, and summary visibility.
+
 ## 1.21.26 Beta 1 - Continuous differences-only comparison
 
 - Scroll through added, removed, and modified lines together, with original line numbers and gray spacers.

@@ -1,3 +1,9 @@
+# v1.21.27 Beta 1 - Large-file Word Wrap
+
+The paged editor wraps visible source lines, keeps source numbers on the first visual row, and aligns wrapped comparisons with display-only spacers.
+
+---
+
 # v1.21.26 Beta 1 - Continuous differences-only comparison
 
 The disk-backed difference index stores cumulative changed-row offsets. The differences-only view uses one virtual scroll range and fetches the visible window with its source line numbers. Gray spacers fill missing sides, and the comparison toolbar can still jump to a difference.
