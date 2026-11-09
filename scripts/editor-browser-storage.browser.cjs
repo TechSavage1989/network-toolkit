@@ -122,9 +122,13 @@ async function run() {
   for (let i = 0; i < 4; i++) await text.press('Shift+ArrowRight');
   const draftUID = await page.evaluate(() => NetworkToolkitFileEditor.active.uid);
   const move = async (source, target) => {
-   await source.waitForFunction(() => !NetworkToolkitEditorWindows.state.running);
    await source.evaluate(async ({uid, target}) => {
     const windows = NetworkToolkitEditorWindows;
+    const deadline = performance.now() + 5000;
+    while (windows.state.running) {
+     if (performance.now() >= deadline) throw Error('Editor ownership check did not finish.');
+     await new Promise(resolve => setTimeout(resolve, 20));
+    }
     await windows.move([uid], target);
     if (!windows.state.outgoing && NetworkToolkitFileEditor.active?.uid === uid) throw Error(windows.state.error || 'No move offer for the disk-backed draft.');
    }, {uid: draftUID, target});
