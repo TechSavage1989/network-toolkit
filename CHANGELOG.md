@@ -1,8 +1,9 @@
-## 1.21.20 Beta 1 - Large-file editor responsiveness (candidate)
+## 1.21.20 Beta 1 - Large-file text editing and comparison
 
-- Coalesce virtual line-number repainting and update line offsets incrementally for large text edits.
-- Avoid giant recovery snapshots caused solely by scrolling, while preserving explicit source and window transfers.
-- Compare larger configurations with bounded unique-line anchors and a local background worker; keep existing save, permissions, and history controls.
+- Open and edit large text files through disk-backed storage and a bounded viewport. Search, compare and save run in the background.
+- Remove fixed file and line limits from large-file editing and comparison. Changes are shown in pages, with navigation between differences.
+- Save a consistent revision and preserve any edits made during the save. Window moves carry the document handle and retain undo history.
+- Verify editing, comparison, typing during save and exact saved bytes with two generated 2 GiB files in the application browser test.
 
 ## 1.21.19 - Stable - Highlighting in the Appearance tab (published 2026-11-08)
 

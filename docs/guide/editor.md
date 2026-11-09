@@ -8,7 +8,9 @@ Open or create a document, review its source/connection, then edit. Save explici
 ## Compare
 Choose two documents in the comparison view. The overview map helps navigate differences and synchronized scrolling. The historical 390px-width comparison drift tolerance has been retired: supported native windows have a minimum width of 640 pixels for detached Editor windows.
 
-Starting with v1.21.20 Beta 1, comparison accepts up to 16 MiB of decoded text and 30,000 lines per document. Large comparisons run in the background. If a changed region is too complex to compare within the processing limit, the Editor explains the limit and keeps both files available for editing; compare smaller sections in that case.
+Starting with v1.21.20 Beta 1, large text files use temporary disk storage and display only the section you are working on. Open, edit, save and compare files without a fixed file-size or line-count limit. Opening, searching, comparing and saving still take time to read or write the data, and large files need space for temporary working copies.
+
+Large comparisons run in the background and show changes as they are found. Use **Next** and **Previous** to move through differences. Large-file views use plain text and unwrapped lines. Comparisons highlight changed lines and may group distant rearrangements into one change. Select the commands you intend to send when using **Send to terminal** from a large file.
 
 ## Files and Connect sidebar
 The sidebar's Connect and Files buttons open saved connections and the file browser. Drag its edge to resize it, or double-click the edge to hide it. The ⇄ button at the bottom of the sidebar's icon strip moves it to the other side of the editor; the side, width and open panel are kept when you restart.

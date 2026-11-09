@@ -1,0 +1,68 @@
+package main
+
+import (
+	"encoding/json"
+	"net/http/httptest"
+	"networktoolkit/internal/editorbuffer"
+	"strings"
+	"testing"
+	"time"
+)
+
+func TestDiskEditorCompareMixedDocumentsAndLease(t *testing.T) {
+	a, _, _, lease := diskFixture(t)
+	id := strings.Repeat("1", 32)
+	call := func(action string, body map[string]any) *httptest.ResponseRecorder {
+		body["action"], body["id"] = action, id
+		return editorHTTP(a, a.token, "/api/editor-views/buffers/compare", body)
+	}
+	t.Cleanup(func() { call("cancel", map[string]any{}) })
+	left := map[string]any{"uid": editorFixtureUID, "lease": lease + 1, "revision": 1}
+	right := map[string]string{"text": "before\ninserted\nλ😀\n"}
+	if r := call("start", map[string]any{"left": left, "right": right}); r.Code != 409 {
+		t.Fatal("comparison accepted another owner's lease", r.Code, r.Body)
+	}
+	left["lease"] = lease
+	if r := call("start", map[string]any{"left": left, "right": right}); r.Code != 202 {
+		t.Fatal(r.Code, r.Body)
+	}
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		r := call("status", map[string]any{})
+		var state diskComparisonStatus
+		if r.Code != 200 || json.Unmarshal(r.Body.Bytes(), &state) != nil || state.Error != "" {
+			t.Fatal(r.Code, r.Body)
+		}
+		if state.Done {
+			if state.Count != 1 || state.LeftLines != 3 || state.RightLines != 4 {
+				t.Fatal(state)
+			}
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("comparison did not finish")
+		}
+		time.Sleep(time.Millisecond)
+	}
+	page := call("page", map[string]any{"start": 0, "limit": 5})
+	var result struct {
+		Differences []editorbuffer.Difference `json:"differences"`
+	}
+	if page.Code != 200 || json.Unmarshal(page.Body.Bytes(), &result) != nil || len(result.Differences) != 1 || result.Differences[0] != (editorbuffer.Difference{Left: 1, Right: 1, RightCount: 1}) {
+		t.Fatal(page.Code, page.Body)
+	}
+	location := call("locate", map[string]any{"side": "left", "line": 1, "end": 2, "limit": 5})
+	var mapping struct {
+		Aligned  bool  `json:"aligned"`
+		PeerLine int64 `json:"peerLine"`
+	}
+	if location.Code != 200 || json.Unmarshal(location.Body.Bytes(), &mapping) != nil || !mapping.Aligned || mapping.PeerLine != 2 {
+		t.Fatal(location.Code, location.Body)
+	}
+	if edit := diskCall(a, a.token, lease, map[string]any{"action": "edit", "revision": 1, "from": 0, "to": 0, "text": "new "}); edit.Code != 200 {
+		t.Fatal(edit.Code, edit.Body)
+	}
+	if stale := call("status", map[string]any{}); stale.Code != 409 && stale.Code != 410 {
+		t.Fatal("stale result stayed available", stale.Code, stale.Body)
+	}
+}

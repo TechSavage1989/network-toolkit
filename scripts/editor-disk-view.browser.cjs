@@ -30,7 +30,29 @@ fs.mkdirSync(out,{recursive:true});
    session.initialize(metadata());window.tail=()=>read(size()-40,size());window.view=NTKEditorDiskView.create({textarea:document.querySelector('textarea'),gutter:document.getElementById('lines'),container:document.querySelector('.nt-editor-code'),session,changed:()=>{document.getElementById('status').textContent=session.state().metadata.units.toLocaleString()+' characters';},message:(text,error)=>{if(error)throw Error(text);}});await view.load({start:0});
   });
   await page.evaluate(()=>view.goLine(1000000,true));
-  assert.equal(await page.evaluate(()=>view.position.line),1000000);
+  assert.equal(await page.evaluate(()=>view.cursor.line),1000000);
+  const edge=await page.evaluate(()=>{
+   const {start,text}=session.state().page;
+   const caret=start+text.length-3;view.select(caret,caret,'none',true);
+   return {caret,end:start+text.length};
+  });
+  await page.locator('textarea').press('Shift+ArrowDown');
+  await page.waitForFunction(({caret,end})=>view.selection().start===caret&&view.selection().end>end,edge);
+  const copied=await page.evaluate(async()=>{
+   const from=50000000,to=from+100000;
+   await view.position(from,to);
+   let written='';
+   Object.defineProperty(window,'ClipboardItem',{configurable:true,value:class{constructor(data){this.data=data;}}});
+   Object.defineProperty(navigator,'clipboard',{configurable:true,value:{async write(items){written=await (await items[0].data['text/plain']).text();}}});
+   await view.copy();
+   const before=session.state().metadata.units;
+   navigator.clipboard.write=async()=>{throw Error('Fixture clipboard refused the selection');};
+   try{await view.copy(true);}catch(error){if(!error.message.includes('refused'))throw error;}
+   return {length:written.length,first:written.slice(0,32),unchanged:before===session.state().metadata.units};
+  });
+  assert.deepEqual(copied,{length:100000,first:'0123456789012345678901234567890\n',unchanged:true});
+  await page.locator('textarea').press('Control+Shift+End');
+  await page.waitForFunction(()=>view.selection().start===50000000&&view.selection().end===8*1024*1024*1024);
   await page.locator('textarea').press('Control+End');await page.waitForFunction(()=>view.selection().start===8*1024*1024*1024);
   await page.locator('textarea').pressSequentially('TAIL');await page.evaluate(()=>session.flush());
   await page.locator('textarea').press('Control+z');await page.evaluate(()=>session.flush());
@@ -39,7 +61,25 @@ fs.mkdirSync(out,{recursive:true});
   assert.ok((await page.evaluate(()=>tail())).endsWith('TAIL'));
   report.metrics=await page.evaluate(()=>({pageUnits:document.querySelector('textarea').value.length,gutterNodes:document.getElementById('lines').childElementCount,largestEdit:Math.max(0,...requests.filter(r=>r.action==='edit').map(r=>r.text.length)),fullDocumentUnits:session.state().metadata.units,longTasks:longTasks.filter(ms=>ms>50)}));
   assert.ok(report.metrics.pageUnits<=49156);assert.ok(report.metrics.gutterNodes<50);assert.ok(report.metrics.largestEdit<=4);assert.equal(report.errors.length,0);
-  await page.screenshot({path:path.join(out,'editor-disk-view.png')});report.passed=true;
+  await page.screenshot({path:path.join(out,'editor-disk-view.png')});
+  await page.evaluate(async()=>{
+   view.dispose();session.close();
+   const size=8*1024*1024*1024;
+   session=NTKEditorDiskSession.create({request:async(action,p)=>{
+    if(action!=='window')throw Error('Unexpected long-line request '+action);
+    const start=p.start||0;
+    return {revision:1,units:size,lines:1,start,line:0,column:start,lineUnits:size,text:'x'.repeat(Math.min(p.limit,size-start))};
+   }});
+   session.initialize({revision:1,units:size,lines:1});
+   view=NTKEditorDiskView.create({textarea:document.querySelector('textarea'),gutter:document.getElementById('lines'),container:document.querySelector('.nt-editor-code'),session,readOnly:true});
+   await view.load({start:0});
+  });
+  await page.getByRole('scrollbar',{name:'Position in long line'}).press('End');
+  await page.waitForFunction(()=>session.state().page.start>8*1024*1024*1024-1000);
+  await page.locator('textarea').press('Control+End');
+  await page.waitForFunction(()=>view.cursor.column===8*1024*1024*1024);
+  assert.ok(await page.locator('textarea').evaluate(ta=>ta.readOnly&&ta.value.length<=49152));
+  assert.equal(report.errors.length,0);report.passed=true;
  }finally{fs.writeFileSync(path.join(out,'editor-disk-view-report.json'),JSON.stringify(report,null,2));await browser.close();}
  console.log(JSON.stringify(report));
 })().catch(error=>{console.error(error);process.exitCode=1;});

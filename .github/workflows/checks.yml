@@ -298,6 +298,17 @@ jobs:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results
         run: node scripts/editor-disk-view.browser.cjs
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Edit, compare, and save two real 2 GiB files through the editor
+        env:
+          GOTOOLCHAIN: local
+          NTK_EDITOR_LARGE_BROWSER: '1'
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results/large-editor
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestEditor(LargeFileBrowser|BrowserStorage)$' -count=1 -v -timeout=8m
       - name: Check compact sidebar controls and reclaimed file-list height
         if: success() || failure()
         env:

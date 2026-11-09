@@ -256,13 +256,8 @@ func (b *Buffer) Edit(revision uint64, from, to int64, text string) (Metadata, e
 	if from < 0 || to < from || to > size(b.root).units {
 		return b.metadataLocked(), ErrBoundary
 	}
-	if len(text) > MaxEditBytes || !utf8.ValidString(text) {
-		return b.metadataLocked(), errors.New("invalid or oversized edit fragment")
-	}
-	for _, r := range text {
-		if r == 0 || r == '\r' {
-			return b.metadataLocked(), errors.New("edit fragments require normalized Unicode text")
-		}
+	if e := validateEditFragment(text); e != nil {
+		return b.metadataLocked(), e
 	}
 	left, rest, e := b.split(b.root, from)
 	if e != nil {

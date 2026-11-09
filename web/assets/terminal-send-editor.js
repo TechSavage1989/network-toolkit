@@ -63,9 +63,9 @@ async function submit(form){
  pending=null;const closeModal=g('closeModal');if(typeof closeModal==='function')closeModal();
  const navigate=g('navigate');if(typeof navigate==='function')navigate('editor');await wait();
  const label=(source==='selection'?'Selected terminal text':p.kind)+' from '+p.label;
- if(target!=='existing'){const doc=await ed.newDocument?.();if(!doc?.id){toastMessage('Could not create a new document.','error');return;}const r=ed.insertText(doc.id,text,'start');if(!r?.ok)toastMessage(r?.error||'The text could not be inserted.','error');return;}
+ if(target!=='existing'){const doc=await ed.newDocument?.();if(!doc?.id){toastMessage('Could not create a new document.','error');return;}const r=await ed.insertText(doc.id,text,'start');if(!r?.ok)toastMessage(r?.error||'The text could not be inserted.','error');return;}
  if(where==='pick'){if(!ed.pickInsert(docId,text,label))toastMessage('That document is not available. Nothing was added.','error');return;}
- const r=ed.insertText(docId,text,where);if(!r?.ok)toastMessage(r?.error||'The text could not be inserted.','error');
+ const r=await ed.insertText(docId,text,where);if(!r?.ok)toastMessage(r?.error||'The text could not be inserted.','error');
 }
 document.addEventListener('change',event=>{const form=event.target.closest?.('#terminalSendEditorForm');if(form)sync(form);});
 document.addEventListener('submit',event=>{const form=event.target;if(form?.id!=='terminalSendEditorForm')return;event.preventDefault();event.stopImmediatePropagation();void submit(form).catch(e=>toastMessage(e.message,'error'));},true);

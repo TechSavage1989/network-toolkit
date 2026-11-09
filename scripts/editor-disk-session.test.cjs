@@ -92,3 +92,63 @@ test('a failed refresh after an acknowledged edit cannot turn stale page text in
  assert.equal(f.session.state().blocked,true);assert.throws(()=>f.session.change('stale page'),/pending/);
  fail=false;await f.session.flush();assert.equal(f.session.state().page.text,'replacement');assert.equal(f.calls.filter(c=>c.action==='edit').length,1);
 });
+
+test('multi-megabyte Unicode paste stages bounded fragments and commits one undo operation',async()=>{
+ const inserted='€'.repeat(128*1024-1)+'😀'+'λ'.repeat(400000),chunks=[];
+ const original='prefix:old:suffix';let content=original,revision=1,staged,committed=0;
+ const metadata=()=>({revision,units:content.length,lines:1,dirty:revision>1,canUndo:revision>1});
+ const session=create({identity:()=> 'transaction-id',request:async(action,p)=>{
+  if(action==='window')return {...metadata(),start:p.start||0,line:0,text:content.slice(p.start||0,(p.start||0)+p.limit)};
+  if(action==='edit-begin'){assert.equal(p.revision,1);staged={...p,text:''};return {};}
+  if(action==='edit-chunk'){
+   assert.equal(p.requestId,staged.requestId);assert.equal(p.offset,staged.text.length);
+   assert.equal(p.text.isWellFormed(),true);assert.ok(Buffer.byteLength(p.text)<=1024*1024);
+   chunks.push(p.text.length);staged.text+=p.text;return {received:staged.text.length};
+  }
+  if(action==='edit-commit'){
+   assert.equal(p.requestId,staged.requestId);assert.equal(content,original);
+   content=content.slice(0,staged.from)+staged.text+content.slice(staged.to);committed++;revision++;
+   return metadata();
+  }
+  if(action==='undo'){content=original;revision++;return metadata();}
+  throw Error('Unexpected action '+action);
+ }});
+ session.initialize(metadata());await session.load();await session.replace(7,10,inserted);
+ assert.equal(content,'prefix:'+inserted+':suffix');assert.equal(committed,1);assert.ok(chunks.length>2);
+ assert.ok(session.state().page.text.length<=PAGE_UNITS);await session.history();assert.equal(content,original);
+});
+
+test('superseded viewport requests abort and viewport reads do not advance the edit stamp',async()=>{
+ const f=fixture('abcdefghijklmnopqrstuvwxyz'),started=deferred();
+ f.intercept(async(action,p,signal)=>{
+  if(action==='window'&&p.start===0){
+   started.resolve();return new Promise((_,reject)=>signal.addEventListener('abort',()=>reject(signal.reason),{once:true}));
+  }
+  return f.request(action,p);
+ });
+ const old=f.session.load({start:0});await started.promise;
+ await f.session.load({start:20});assert.equal(await old,null);
+ assert.equal(f.session.state().page.text,'uvwxyz');assert.equal(f.session.state().editVersion,0);
+ f.session.change('uvwxyZ');assert.equal(f.session.state().editVersion,1);await f.session.flush();
+});
+
+test('reading a cross-page selection rejects concurrent changes instead of returning mixed revisions',async()=>{
+ const f=fixture('x'.repeat(PAGE_UNITS*2+10));await f.session.load();
+ const text=f.session.readParts(0,f.text.length);
+ assert.equal((await text.next()).value.length,PAGE_UNITS);
+ f.session.change('Y'+f.session.state().page.text.slice(1));
+ await assert.rejects(text.next(),/changed while reading/);await f.session.flush();
+ await assert.rejects(f.session.readText(0,1000,10),/too large for this command/);
+});
+
+test('large clipboard selections use a binary range from one acknowledged document revision',async()=>{
+ const seen=[];
+ const session=create({request:()=>{throw Error('Clipboard export must not read text windows');},exportRange:async payload=>{
+  seen.push(payload);return new Response(new TextEncoder().encode('one\nλ😀'),{headers:{'Content-Type':'application/octet-stream'}});
+ }});
+ session.initialize({revision:9,units:8*1024*1024*1024,lines:3});
+ const from=4*1024*1024*1024,to=from+7;
+ const blob=await session.readBlob(from,to);
+ assert.deepEqual(seen,[{revision:9,from,to,format:{encoding:'UTF-8',bom:false,eol:'LF'}}]);
+ assert.equal(blob.type,'text/plain');assert.equal(await blob.text(),'one\nλ😀');
+});

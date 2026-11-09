@@ -123,17 +123,9 @@ type Match struct {
 
 func (s *Snapshot) Find(ctx context.Context, query string, from int64, regex, matchCase, wholeWord bool) (Match, error) {
 	result := Match{Revision: s.Revision}
-	if query == "" || len(query) > 4096 {
-		return result, errors.New("enter a search pattern of up to 4096 bytes")
-	}
-	if !regex {
-		query = regexp.QuoteMeta(query)
-	}
-	if wholeWord {
-		query = `\b(?:` + query + `)\b`
-	}
-	if !matchCase {
-		query = "(?i)" + query
+	query, e := searchPattern(query, regex, matchCase, wholeWord)
+	if e != nil {
+		return result, e
 	}
 	start, e := s.bytePosition(s.root, from)
 	if e != nil {
@@ -141,10 +133,7 @@ func (s *Snapshot) Find(ctx context.Context, query string, from int64, regex, ma
 	}
 	group := 0
 	if from > 0 {
-		// Keep the actual preceding rune in the regexp input so ^, \A and
-		// word boundaries do not treat the search cursor as a new document.
-		// The mandatory rune plus lazy prefix excludes matches before from;
-		// the capture is the first match at or after the requested position.
+		// Include the preceding rune to preserve anchors and word boundaries.
 		start, e = s.bytePosition(s.root, from-1)
 		if e == ErrBoundary && from >= 2 {
 			start, e = s.bytePosition(s.root, from-2)
@@ -152,7 +141,7 @@ func (s *Snapshot) Find(ctx context.Context, query string, from int64, regex, ma
 		if e != nil {
 			return result, e
 		}
-		query = `(?s:\A..*?)(` + query + `)`
+		query = resumeSearchPattern(query)
 		group = 2
 	}
 	pattern, e := regexp.Compile(query)
@@ -182,4 +171,24 @@ func (s *Snapshot) Find(ctx context.Context, query string, from int64, regex, ma
 	}
 	result.Line, e = s.b.lineAt(s.root, result.From)
 	return result, e
+}
+
+func resumeSearchPattern(pattern string) string {
+	return `(?s:\A..*?)(` + pattern + `)`
+}
+
+func searchPattern(query string, regex, matchCase, wholeWord bool) (string, error) {
+	if query == "" || len(query) > 4096 {
+		return "", errors.New("enter a search pattern of up to 4096 bytes")
+	}
+	if !regex {
+		query = regexp.QuoteMeta(query)
+	}
+	if wholeWord {
+		query = `\b(?:` + query + `)\b`
+	}
+	if !matchCase {
+		query = "(?i)" + query
+	}
+	return query, nil
 }

@@ -192,6 +192,46 @@ func validFormat(f Format) bool {
 // Encode writes one stable revision in the selected encoding and line endings.
 // Its caller commits a staged file only after checking conflicts and consent.
 func (s *Snapshot) Encode(ctx context.Context, dst io.Writer, f Format) error {
+	return s.encode(ctx, dst, f, s.root)
+}
+
+// PrepareEncoding validates a snapshot range and returns its exact encoded
+// byte length and a streaming encoder. The snapshot must stay open until the
+// encoder finishes. A nil range selects the complete document.
+func (s *Snapshot) PrepareEncoding(f Format, selection *[2]int64) (int64, func(context.Context, io.Writer) error, error) {
+	if !validFormat(f) {
+		return 0, nil, errors.New("unsupported text encoding or line ending")
+	}
+	root := s.root
+	if selection != nil {
+		from, to := selection[0], selection[1]
+		if from < 0 || to < from || to > size(root).units {
+			return 0, nil, ErrBoundary
+		}
+		_, tail, err := s.b.split(root, from)
+		if err != nil {
+			return 0, nil, err
+		}
+		root, _, err = s.b.split(tail, to-from)
+		if err != nil {
+			return 0, nil, err
+		}
+	}
+	content := size(root)
+	count, scale, bom := content.bytes, int64(1), int64(3)
+	if f.Encoding != "UTF-8" {
+		count, scale, bom = content.units*2, 2, 2
+	}
+	if f.EOL == "CRLF" {
+		count += scale * content.lines
+	}
+	if f.BOM {
+		count += bom
+	}
+	return count, func(ctx context.Context, dst io.Writer) error { return s.encode(ctx, dst, f, root) }, nil
+}
+
+func (s *Snapshot) encode(ctx context.Context, dst io.Writer, f Format, root *node) error {
 	if !validFormat(f) {
 		return errors.New("unsupported text encoding or line ending")
 	}
@@ -271,7 +311,7 @@ func (s *Snapshot) Encode(ctx context.Context, dst io.Writer, f Format) error {
 		}
 		return visit(n.right)
 	}
-	if e := visit(s.root); e != nil {
+	if e := visit(root); e != nil {
 		return e
 	}
 	if e := ctx.Err(); e != nil {

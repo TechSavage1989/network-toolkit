@@ -4,7 +4,7 @@
  * Terminal menu: Undo/Redo, Cut/Copy/Paste/Select all, Send to terminal,
  * Find/Replace/Go to line, and the line and text tools. Commands reuse the
  * editor's existing toolbar actions (NetworkToolkitFileEditor.textMenu.run),
- * so their rules (frozen, loading, comparison, large-file limits) still apply.
+ * so their rules for frozen documents, loading, and comparison still apply.
  * Clipboard access uses the same browser clipboard calls as the Terminal;
  * edits go through the editor's replaceSelection, so Undo works. */
 (function(root){
@@ -27,14 +27,22 @@ function open(x,y){const t=api();if(!t)return false;close(false);const s=t.state
  document.body.append(menu);const r=menu.getBoundingClientRect();menu.style.left=Math.max(6,Math.min(x,innerWidth-r.width-6))+'px';menu.style.top=Math.max(6,Math.min(y,innerHeight-r.height-6))+'px';
  restore=()=>api()?.focus();menu.querySelector('button:not(:disabled)')?.focus({preventScroll:true});return true;}
 async function run(action){const t=api();if(!t)return;close(false);t.focus();
+ const editor=root.NetworkToolkitFileEditor,owner=editor?.active;
+ const sameDocument=()=>editor?.active===owner;
  try{switch(action){
-  case 'copy':{const text=t.selection();if(text)await navigator.clipboard.writeText(text);break;}
-  case 'cut':{const text=t.selection();if(!text)break;await navigator.clipboard.writeText(text);t.replace('');break;}
-  case 'paste':{const text=await navigator.clipboard.readText();if(text)t.replace(text);break;}
+  case 'copy':case 'cut':{
+   const cut=action==='cut',copy=t.copy?.(cut);
+   if(copy!==undefined){await copy;break;}
+   const text=t.selection();if(!text)break;
+   await navigator.clipboard.writeText(text);
+   if(cut&&sameDocument())await t.replace('');
+   break;
+  }
+  case 'paste':{const text=await navigator.clipboard.readText();if(text&&sameDocument())await t.replace(text);break;}
   case 'selectAll':t.selectAll();break;
   default:t.run(action);
  }}catch{toastMessage(action==='paste'?'The clipboard could not be read. Use Ctrl+V instead.':'The clipboard is not available. Use the keyboard shortcut instead.','error');}
- if(!['find','replace','goto','sendTerminal'].includes(action))t.focus();}
+ if(sameDocument()&&!['find','replace','goto','sendTerminal'].includes(action))t.focus();}
 document.addEventListener('contextmenu',event=>{const t=api();if(!t?.target(event.target))return;event.preventDefault();event.stopImmediatePropagation();let x=event.clientX,y=event.clientY;if(!Number.isFinite(x)||!Number.isFinite(y)||x<=0&&y<=0){const r=event.target.getBoundingClientRect();x=r.left+24;y=r.top+24;}open(x,y);},true);
 document.addEventListener('keydown',event=>{
  if(menu){const list=[...menu.querySelectorAll('button:not(:disabled)')],at=list.indexOf(document.activeElement);

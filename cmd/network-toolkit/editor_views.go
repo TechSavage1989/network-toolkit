@@ -150,6 +150,7 @@ type editorTransfer struct {
 	acked                                           bool
 }
 type editorViewRegistry struct {
+	diskComparisons          map[string]*diskComparisonJob
 	loaded                   map[string]map[string]editorLoadedDocument
 	explorerOperations       map[string][]editorExplorerTarget
 	mu                       sync.Mutex
@@ -185,6 +186,10 @@ func newEditorViewRegistry(a *application) *editorViewRegistry {
 				select {
 				case <-a.ctx.Done():
 					m.mu.Lock()
+					for caller, job := range m.diskComparisons {
+						delete(m.diskComparisons, caller)
+						job.discard()
+					}
 					var buffers []*editorDiskDocument
 					for _, d := range m.documents {
 						if d.buffer != nil {
@@ -290,8 +295,14 @@ func (m *editorViewRegistry) retainedTransports() (map[string]bool, map[string]b
 	return terminals, browsers
 }
 func (m *editorViewRegistry) setHomePresent(present bool) {
+	var discarded []*editorDiskDocument
 	m.mu.Lock()
-	defer m.mu.Unlock()
+	defer func() {
+		m.mu.Unlock()
+		for _, disk := range discarded {
+			disk.close()
+		}
+	}()
 	if !present {
 		delete(m.loaded, "")
 	}
@@ -317,7 +328,7 @@ func (m *editorViewRegistry) setHomePresent(present bool) {
 		}
 		if m.homeCloseApproved && d.pending == "" && d.busy == 0 && !m.recovery[uid] {
 			if d.buffer != nil {
-				d.buffer.close()
+				discarded = append(discarded, d.buffer)
 			}
 			delete(m.documents, uid)
 			continue
@@ -449,10 +460,12 @@ func validateEditorBatch(batch editorBatch) error {
 		}
 		for _, v := range []*editorSelection{d.View, d.CompareView} {
 			positionLimit := int64(editorDocumentLimit * 2)
+			scrollLimit := float64(1e9)
 			if d.Disk {
 				positionLimit = 9007199254740991
+				scrollLimit = float64(positionLimit)
 			}
-			if v != nil && (v.Start < 0 || v.End < v.Start || int64(v.End) > positionLimit || v.Top < 0 || v.Left < 0 || v.Top > 1e9 || v.Left > 1e9 || (v.Direction != "none" && v.Direction != "forward" && v.Direction != "backward")) {
+			if v != nil && (v.Start < 0 || v.End < v.Start || int64(v.End) > positionLimit || v.Top < 0 || v.Left < 0 || v.Top > scrollLimit || v.Left > scrollLimit || (v.Direction != "none" && v.Direction != "forward" && v.Direction != "backward")) {
 				return errors.New("Invalid editor view position.")
 			}
 		}
@@ -461,6 +474,10 @@ func validateEditorBatch(batch editorBatch) error {
 		case "local", "localDraft":
 			if b.SessionID != "" || b.ConnectionID != "" || b.Revision != 0 {
 				return errors.New("Local editor binding contains unrelated connection fields.")
+			}
+		case "ftp":
+			if !d.Disk || b.SessionID != "" || b.ConnectionID != "" || b.Revision != 0 {
+				return errors.New("FTP editor files require an existing disk buffer.")
 			}
 		case "terminal":
 			if b.SessionID == "" || len(b.SessionID) > 128 || b.ConnectionID != "" || b.Revision > 9007199254740991 {
@@ -568,6 +585,9 @@ func (m *editorViewRegistry) makeGrant(caller string, d editorDocumentSnapshot) 
 	}
 	grant := &editorDocumentGrant{snapshot: d, owner: caller, lease: 1, bytes: editorSnapshotBytes(d)}
 	b := d.Binding
+	if b.Kind == "ftp" {
+		return nil, errors.New("Open FTP files through the owning main workspace first.")
+	}
 	if b.Kind == "local" || b.Kind == "localDraft" {
 		return grant, nil
 	}
@@ -649,6 +669,7 @@ func (m *editorViewRegistry) expireLocked() {
 		}
 	}
 	m.expireDragsLocked()
+	m.expireComparisonsLocked(now)
 }
 func (m *editorViewRegistry) failLocked(t *editorTransfer, state, note string) {
 	if t.state != "offered" {
@@ -719,6 +740,11 @@ func (m *editorViewRegistry) offer(caller string, req editorTransferRequest) (ma
 	}
 	if err := validateEditorBatch(req.Batch); err != nil {
 		return nil, err
+	}
+	for _, d := range req.Batch.Documents {
+		if d.Binding.Kind == "ftp" {
+			return nil, errors.New("FTP documents must stay with the connection in the main workspace.")
+		}
 	}
 	if err := validateEditorLeases(req.Batch, req.Leases); err != nil {
 		return nil, err

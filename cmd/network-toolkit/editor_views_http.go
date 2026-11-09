@@ -41,7 +41,7 @@ func (a *application) serveEditorAPI(w http.ResponseWriter, r *http.Request) {
 	}
 	switch {
 	case r.URL.Path == "/api/status" && r.Method == http.MethodGet:
-		jsonResponse(w, 200, map[string]any{"editorWindowAvailable": a.launchEditorView != nil, "version": model.Version, "os": runtime.GOOS, "arch": runtime.GOARCH})
+		jsonResponse(w, 200, map[string]any{"editorDiskAvailable": a.editorViews != nil, "editorWindowAvailable": a.launchEditorView != nil, "version": model.Version, "os": runtime.GOOS, "arch": runtime.GOARCH})
 	case r.URL.Path == "/api/editor-views" || strings.HasPrefix(r.URL.Path, "/api/editor-views/"):
 		a.handleEditorViews(w, r)
 	case r.URL.Path == "/api/file-editor/local":
@@ -78,7 +78,8 @@ func (a *application) handleEditorViews(w http.ResponseWriter, r *http.Request) 
 	}
 	caller := editorRequestView(r)
 	path := strings.TrimPrefix(r.URL.Path, "/api/editor-views")
-	if (r.Method == http.MethodGet && (path == "" || path == "/current")) || (r.Method == http.MethodPost && (path == "/transfers" || path == "/current/state" || (strings.HasPrefix(path, "/documents/") && strings.HasSuffix(path, "/file")))) {
+	largeComparison := path == "/buffers/compare" && (r.ContentLength < 0 || r.ContentLength > 1<<20)
+	if (r.Method == http.MethodGet && (path == "" || path == "/current")) || (r.Method == http.MethodPost && (path == "/transfers" || path == "/current/state" || path == "/buffers/promote" || largeComparison || (strings.HasPrefix(path, "/documents/") && strings.HasSuffix(path, "/file")))) {
 		var release func()
 		var admitted bool
 		r, release, admitted = admitEditorMemory(w, r)
@@ -103,6 +104,14 @@ func (a *application) handleEditorViews(w http.ResponseWriter, r *http.Request) 
 	}
 	if path == "/buffers/open" {
 		m.openDiskDocument(w, r, caller)
+		return
+	}
+	if path == "/buffers/promote" {
+		m.promoteDiskDocument(w, r, caller)
+		return
+	}
+	if path == "/buffers/compare" {
+		m.compareDiskDocuments(w, r, caller)
 		return
 	}
 	if path == "/drags" || strings.HasPrefix(path, "/drags/") {
@@ -335,16 +344,18 @@ func (m *editorViewRegistry) checkpoint(caller string, batch editorBatch, leases
 }
 func (m *editorViewRegistry) releaseDocument(caller, uid string, lease uint64) error {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	d := m.documents[uid]
 	if d == nil || d.owner != caller || d.lease != lease || d.pending != "" || d.busy != 0 {
+		m.mu.Unlock()
 		return errEditorLease
-	}
-	if d.buffer != nil {
-		d.buffer.close()
 	}
 	delete(m.documents, uid)
 	delete(m.recovery, uid)
+	m.mu.Unlock()
+	if d.buffer != nil {
+		m.cancelComparisonsUsing(uid)
+		d.buffer.close()
+	}
 	return nil
 }
 

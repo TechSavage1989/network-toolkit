@@ -11,24 +11,36 @@ import (
 	"networktoolkit/internal/editorbuffer"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 )
 
 // This state stays with the existing document grant across window moves. Only
 // the owning lease may reach it; checkpoints contain no source text or history.
 type editorDiskDocument struct {
-	editMu    sync.Mutex
-	receipts  []editorDiskReceipt
-	mu        sync.Mutex
-	imported  *editorbuffer.Imported
-	progress  int64
-	err       string
-	loading   bool
-	cancel    context.CancelFunc
-	closed    bool
-	ctx       context.Context
-	saving    bool
-	reloading bool
+	editMu         sync.Mutex
+	receipts       []editorDiskReceipt
+	mu             sync.Mutex
+	imported       *editorbuffer.Imported
+	progress       int64
+	err            string
+	loading        bool
+	cancel         context.CancelFunc
+	closed         bool
+	ctx            context.Context
+	saving         bool
+	reloading      bool
+	upload         *editorDiskUpload
+	uploadSize     int64
+	reloadUpload   bool
+	reloadRevision uint64
+	reloadError    string
+	uploadCancel   context.CancelFunc
+	mode           string
+	bulk           *editorDiskEdit
+	exported       *editorDiskExport
+	verify         *editorDiskVerify
+	ftp            *editorFTPEndpoint
 }
 
 type editorDiskReceipt struct {
@@ -43,6 +55,9 @@ type editorDiskReceipt struct {
 func (d *editorDiskDocument) mutate(b *editorbuffer.Buffer, req editorDiskRequest) (editorbuffer.Metadata, error) {
 	d.editMu.Lock()
 	defer d.editMu.Unlock()
+	if d.bulk != nil {
+		return editorbuffer.Metadata{}, errors.New("finish or cancel the pending bulk edit")
+	}
 	if len(req.RequestID) > 128 {
 		return editorbuffer.Metadata{}, errors.New("invalid edit request identity")
 	}
@@ -66,13 +81,17 @@ func (d *editorDiskDocument) mutate(b *editorbuffer.Buffer, req editorDiskReques
 		metadata, err = b.History(req.Revision, req.Action == "redo")
 	}
 	if err == nil && req.RequestID != "" {
-		d.receipts = append(d.receipts, editorDiskReceipt{req.RequestID, digest, metadata})
-		if len(d.receipts) > 64 {
-			copy(d.receipts, d.receipts[len(d.receipts)-64:])
-			d.receipts = d.receipts[:64]
-		}
+		d.rememberMutationLocked(editorDiskReceipt{req.RequestID, digest, metadata})
 	}
 	return metadata, err
+}
+
+func (d *editorDiskDocument) rememberMutationLocked(receipt editorDiskReceipt) {
+	d.receipts = append(d.receipts, receipt)
+	if len(d.receipts) > 64 {
+		copy(d.receipts, d.receipts[len(d.receipts)-64:])
+		d.receipts = d.receipts[:64]
+	}
 }
 
 func (g *editorDocumentGrant) diskSnapshotMatches(s editorDocumentSnapshot) bool {
@@ -84,6 +103,11 @@ func (g *editorDocumentGrant) diskSnapshotMatches(s editorDocumentSnapshot) bool
 	}
 	g.buffer.mu.Lock()
 	defer g.buffer.mu.Unlock()
+	g.buffer.editMu.Lock()
+	defer g.buffer.editMu.Unlock()
+	if g.buffer.bulk != nil {
+		return false
+	}
 	return !g.buffer.closed && !g.buffer.loading && g.buffer.imported != nil && s.Path == g.snapshot.Path && s.EditRevision == g.buffer.imported.Buffer.Metadata().Revision
 }
 
@@ -93,7 +117,15 @@ func (d *editorDiskDocument) close() {
 	d.cancel()
 	b := d.imported
 	d.imported = nil
+	upload := d.upload
+	d.upload = nil
 	d.mu.Unlock()
+	d.editMu.Lock()
+	d.clearBulkLocked()
+	d.editMu.Unlock()
+	if upload != nil {
+		upload.close()
+	}
 	if b != nil {
 		b.Buffer.Close()
 	}
@@ -101,8 +133,10 @@ func (d *editorDiskDocument) close() {
 func (m *editorViewRegistry) openDiskDocument(w http.ResponseWriter, r *http.Request, caller string) {
 	var req struct {
 		Document editorDocumentSnapshot `json:"document"`
+		Mode     string                 `json:"mode"`
+		Remote   *remoteBrowserRequest  `json:"remote"`
 	}
-	if e := decodeEditorBody(w, r, 16384, &req); e != nil {
+	if e := decodeEditorBody(w, r, 64<<10, &req); e != nil {
 		jsonError(w, 400, e.Error())
 		return
 	}
@@ -111,16 +145,46 @@ func (m *editorViewRegistry) openDiskDocument(w http.ResponseWriter, r *http.Req
 		jsonError(w, 400, "Open disk-backed files from an empty document identity.")
 		return
 	}
-	if e := validateEditorBatch(editorBatch{Documents: []editorDocumentSnapshot{s}, Active: s.UID}); e != nil {
+	validation := s
+	if s.Binding.Kind == "ftp" {
+		// FTP is admitted only through this authenticated file opening path.
+		validation.Disk = true
+	}
+	if e := validateEditorBatch(editorBatch{Documents: []editorDocumentSnapshot{validation}, Active: s.UID}); e != nil {
 		jsonError(w, 400, e.Error())
 		return
 	}
-	grant, e := m.makeGrant(caller, s)
-	if e != nil {
-		jsonError(w, 403, e.Error())
+	var grant *editorDocumentGrant
+	var ftp *editorFTPEndpoint
+	if s.Binding.Kind == "ftp" {
+		if caller != "" {
+			jsonError(w, 403, "FTP file editing requires the main workspace.")
+			return
+		}
+		_, endpoint, err := diskFTPConnection(req.Remote)
+		if err != nil {
+			jsonError(w, 400, err.Error())
+			return
+		}
+		ftp = &endpoint
+		grant = &editorDocumentGrant{snapshot: s, owner: caller, lease: 1, bytes: editorSnapshotBytes(s)}
+	} else {
+		var err error
+		grant, err = m.makeGrant(caller, s)
+		if err != nil {
+			jsonError(w, 403, err.Error())
+			return
+		}
+	}
+	if req.Mode != "" && req.Mode != "draft" && req.Mode != "upload" {
+		jsonError(w, 400, "Unsupported file opening mode.")
 		return
 	}
-	if s.Binding.Kind == "local" || s.Binding.Kind == "localDraft" {
+	if req.Mode == "upload" && (s.Binding.Kind != "localDraft" || filepath.Base(s.Path) != s.Path) {
+		jsonError(w, 400, "Choose a file name for the browser import.")
+		return
+	}
+	if s.Binding.Kind == "local" || s.Binding.Kind == "localDraft" && req.Mode == "" {
 		p, e := absoluteExplorerPath(s.Path)
 		if e != nil {
 			jsonError(w, 400, e.Error())
@@ -134,7 +198,16 @@ func (m *editorViewRegistry) openDiskDocument(w http.ResponseWriter, r *http.Req
 		parent = context.Background()
 	}
 	ctx, cancel := context.WithCancel(parent)
-	disk := &editorDiskDocument{loading: true, ctx: ctx, cancel: cancel}
+	disk := &editorDiskDocument{loading: true, ctx: ctx, cancel: cancel, mode: req.Mode, ftp: ftp}
+	if req.Mode == "upload" {
+		f, err := os.CreateTemp("", "nt-editor-import-*")
+		if err != nil {
+			cancel()
+			jsonError(w, 500, "Could not prepare browser file import: "+err.Error())
+			return
+		}
+		disk.upload = &editorDiskUpload{file: f}
+	}
 	grant.buffer = disk
 	grant.snapshot.Disk = true
 	m.mu.Lock()
@@ -144,64 +217,73 @@ func (m *editorViewRegistry) openDiskDocument(w http.ResponseWriter, r *http.Req
 			owned++
 		}
 	}
-	if !m.callerLocked(caller) || m.documents[s.UID] != nil || len(m.documents) >= editorDocumentCountLimit || owned >= 12 || m.explorerConflictLocked(s.Binding, s.Path) {
+	if !m.callerLocked(caller) || r.Context().Err() != nil || m.documents[s.UID] != nil || len(m.documents) >= editorDocumentCountLimit || owned >= 12 || m.explorerConflictLocked(s.Binding, s.Path) {
 		m.mu.Unlock()
-		cancel()
+		disk.close()
 		jsonError(w, 409, "This document cannot be opened in the current workspace.")
 		return
 	}
 	m.documents[s.UID] = grant
 	m.registerLoadedLocked(s.UID)
+	lease := grant.lease
 	m.mu.Unlock()
-	go func() {
-		result, err := m.importDiskDocument(ctx, grant, disk)
-		disk.mu.Lock()
-		disk.loading = false
-		if disk.closed {
-			disk.mu.Unlock()
-			if result != nil {
-				result.Buffer.Close()
-			}
-			return
+	if req.Mode == "draft" {
+		result, err := editorbuffer.Import(ctx, strings.NewReader(""), "", nil)
+		if result != nil {
+			result.Hash = ""
+			result.Format = editorbuffer.Format{Encoding: s.Encoding, BOM: s.BOM, EOL: s.EOL}
 		}
-		if err != nil {
-			disk.err = err.Error()
-		} else {
-			disk.imported = result
-		}
-		disk.mu.Unlock()
-		m.mu.Lock()
-		if m.documents[s.UID] == grant && err == nil {
-			grant.snapshot.Hash = result.Hash
-			grant.snapshot.Encoding = result.Format.Encoding
-			grant.snapshot.SavedEncoding = result.Format.Encoding
-			grant.snapshot.BOM = result.Format.BOM
-			grant.snapshot.SavedBOM = result.Format.BOM
-			grant.snapshot.EOL = result.Format.EOL
-			grant.snapshot.SavedEOL = result.Format.EOL
-			grant.snapshot.EditRevision = result.Buffer.Metadata().Revision
-		}
-		m.mu.Unlock()
-	}()
-	jsonResponse(w, 202, map[string]any{"lease": grant.lease, "loading": true, "disk": true})
+		m.finishDiskOpen(grant, disk, result, err)
+	} else if req.Mode != "upload" {
+		go func() {
+			result, err := m.importDiskDocument(ctx, grant, disk, req.Remote)
+			m.finishDiskOpen(grant, disk, result, err)
+		}()
+	}
+	jsonResponse(w, 202, map[string]any{"lease": lease, "loading": true, "disk": true})
 }
-func (m *editorViewRegistry) importDiskDocument(ctx context.Context, g *editorDocumentGrant, d *editorDiskDocument) (*editorbuffer.Imported, error) {
-	path := g.snapshot.Path
-	cleanup := func() {}
-	if g.snapshot.Binding.Kind != "local" && g.snapshot.Binding.Kind != "localDraft" {
-		if g.valid == nil || !g.valid() {
-			return nil, errEditorLease
+
+func (m *editorViewRegistry) finishDiskOpen(g *editorDocumentGrant, d *editorDiskDocument, result *editorbuffer.Imported, err error) {
+	m.mu.Lock()
+	d.mu.Lock()
+	defer m.mu.Unlock()
+	defer d.mu.Unlock()
+	if d.closed {
+		if result != nil {
+			result.Buffer.Close()
 		}
+		return
+	}
+	d.loading = false
+	if err != nil {
+		d.err = err.Error()
+		return
+	}
+	d.imported = result
+	g.snapshot.Hash = result.Hash
+	g.snapshot.Encoding, g.snapshot.SavedEncoding = result.Format.Encoding, result.Format.Encoding
+	g.snapshot.BOM, g.snapshot.SavedBOM = result.Format.BOM, result.Format.BOM
+	g.snapshot.EOL, g.snapshot.SavedEOL = result.Format.EOL, result.Format.EOL
+	g.snapshot.EditRevision = result.Buffer.Metadata().Revision
+}
+
+func (m *editorViewRegistry) importDiskDocument(ctx context.Context, g *editorDocumentGrant, d *editorDiskDocument, details *remoteBrowserRequest) (*editorbuffer.Imported, error) {
+	m.mu.Lock()
+	path, binding := g.snapshot.Path, g.snapshot.Binding.Kind
+	m.mu.Unlock()
+	if binding != "local" && binding != "localDraft" {
 		dir, e := os.MkdirTemp("", "nt-editor-download-*")
 		if e != nil {
 			return nil, e
 		}
-		cleanup = func() { os.RemoveAll(dir) }
-		defer cleanup()
+		defer os.RemoveAll(dir)
+		source := path
 		path = filepath.Join(dir, "source")
-		if _, e = g.run(ctx, remoteBrowserRequest{Protocol: "sftp", Action: "download", Path: g.snapshot.Path, LocalPath: path}); e != nil {
+		if _, e = m.diskRemoteOperation(ctx, g, d, details, remoteBrowserRequest{Protocol: "sftp", Action: "download", Path: source, LocalPath: path}); e != nil {
 			return nil, e
 		}
+	} else if !filepath.IsAbs(path) {
+		return nil, errors.New("this document has no saved local path; open the source file again to reload it")
 	}
 	info, e := os.Lstat(path)
 	if e != nil {
@@ -232,24 +314,32 @@ func (m *editorViewRegistry) importDiskDocument(ctx context.Context, g *editorDo
 }
 
 type editorDiskRequest struct {
-	RequestID string              `json:"requestId"`
-	Query     string              `json:"query"`
-	Regex     bool                `json:"regex"`
-	MatchCase bool                `json:"matchCase"`
-	WholeWord bool                `json:"wholeWord"`
-	Lease     uint64              `json:"lease"`
-	Action    string              `json:"action"`
-	Revision  uint64              `json:"revision"`
-	Start     int64               `json:"start"`
-	Line      *int64              `json:"line,omitempty"`
-	Limit     int                 `json:"limit"`
-	Align     bool                `json:"align"`
-	From      int64               `json:"from"`
-	To        int64               `json:"to"`
-	Text      string              `json:"text"`
-	Path      string              `json:"path"`
-	Overwrite bool                `json:"overwrite"`
-	Format    editorbuffer.Format `json:"format"`
+	RequestID string                `json:"requestId"`
+	Query     string                `json:"query"`
+	Regex     bool                  `json:"regex"`
+	MatchCase bool                  `json:"matchCase"`
+	WholeWord bool                  `json:"wholeWord"`
+	Lease     uint64                `json:"lease"`
+	Action    string                `json:"action"`
+	Revision  uint64                `json:"revision"`
+	Start     int64                 `json:"start"`
+	Line      *int64                `json:"line,omitempty"`
+	Limit     int                   `json:"limit"`
+	Align     bool                  `json:"align"`
+	From      int64                 `json:"from"`
+	To        int64                 `json:"to"`
+	Text      string                `json:"text"`
+	Path      string                `json:"path"`
+	Overwrite bool                  `json:"overwrite"`
+	Format    editorbuffer.Format   `json:"format"`
+	Offset    int64                 `json:"offset"`
+	Size      int64                 `json:"size"`
+	Data      []byte                `json:"data"`
+	Backwards bool                  `json:"backwards"`
+	Replace   string                `json:"replacement"`
+	Receipt   string                `json:"receipt"`
+	Range     *editorDiskRange      `json:"range"`
+	Remote    *remoteBrowserRequest `json:"remote"`
 }
 
 func (m *editorViewRegistry) diskDocument(w http.ResponseWriter, r *http.Request, caller, uid string) {
@@ -278,6 +368,7 @@ func (m *editorViewRegistry) diskDocument(w http.ResponseWriter, r *http.Request
 	}
 	disk.mu.Unlock()
 	g.busy++
+	path := g.snapshot.Path
 	m.mu.Unlock()
 	defer func() {
 		if req.Action == "reload" {
@@ -295,13 +386,39 @@ func (m *editorViewRegistry) diskDocument(w http.ResponseWriter, r *http.Request
 		}
 		m.mu.Unlock()
 	}()
+	if req.Action == "import-chunk" || req.Action == "import-finish" || req.Action == "reload-start" {
+		m.diskUpload(w, g, disk, req)
+		return
+	}
 	disk.mu.Lock()
 	if disk.closed {
 		disk.mu.Unlock()
 		jsonError(w, 410, "The document is closed.")
 		return
 	}
-	loading, progress, failure, v := disk.loading, disk.progress, disk.err, disk.imported
+	loading, progress, failure, v, reloadError := disk.loading, disk.progress, disk.err, disk.imported, disk.reloadError
+	if req.Action == "cancel" && disk.reloadUpload {
+		if disk.upload != nil {
+			disk.upload.close()
+			disk.upload = nil
+			disk.reloadUpload = false
+			disk.reloadError = "Browser file reload cancelled."
+		} else if disk.uploadCancel != nil {
+			disk.uploadCancel()
+		}
+		disk.mu.Unlock()
+		jsonResponse(w, 200, map[string]any{"ok": true})
+		return
+	}
+	if req.Action == "cancel" && loading {
+		disk.cancel()
+		if disk.upload != nil {
+			disk.upload.close()
+			disk.upload = nil
+			disk.loading = false
+			disk.err = "Browser file import cancelled."
+		}
+	}
 	var format editorbuffer.Format
 	var hash string
 	if v != nil {
@@ -309,7 +426,6 @@ func (m *editorViewRegistry) diskDocument(w http.ResponseWriter, r *http.Request
 	}
 	disk.mu.Unlock()
 	if req.Action == "cancel" {
-		disk.cancel()
 		jsonResponse(w, 200, map[string]any{"ok": true})
 		return
 	}
@@ -329,7 +445,7 @@ func (m *editorViewRegistry) diskDocument(w http.ResponseWriter, r *http.Request
 	var err error
 	switch req.Action {
 	case "status":
-		value = map[string]any{"loading": false, "metadata": v.Buffer.Metadata(), "format": format, "hash": hash}
+		value = map[string]any{"loading": false, "metadata": v.Buffer.Metadata(), "format": format, "hash": hash, "path": path, "reloadError": reloadError}
 	case "window":
 		if req.Limit == 0 {
 			req.Limit = 32768
@@ -343,27 +459,49 @@ func (m *editorViewRegistry) diskDocument(w http.ResponseWriter, r *http.Request
 		}
 	case "edit", "undo", "redo":
 		value, err = disk.mutate(v.Buffer, req)
+	case "edit-begin", "edit-chunk", "edit-commit", "edit-abort":
+		value, err = disk.bulkEdit(v.Buffer, req)
 	case "save":
 		value, err = m.saveDiskDocument(ctx, g, disk, req)
+	case "export":
+		disk.export(ctx, w, v.Buffer, req)
+		return
+	case "mark-saved":
+		value, err = disk.markExportSaved(ctx, v, req.Receipt)
+	case "verify-start", "verify-chunk", "verify-finish":
+		value, err = disk.verifyBrowserSource(req)
 	case "find":
 		var snapshot *editorbuffer.Snapshot
 		snapshot, err = v.Buffer.Snapshot()
 		if err == nil {
-			value, err = snapshot.Find(ctx, req.Query, req.Start, req.Regex, req.MatchCase, req.WholeWord)
+			if req.Backwards {
+				value, err = snapshot.FindPrevious(ctx, req.Query, req.Start, req.Regex, req.MatchCase, req.WholeWord)
+			} else {
+				value, err = snapshot.Find(ctx, req.Query, req.Start, req.Regex, req.MatchCase, req.WholeWord)
+			}
 			snapshot.Close()
 		}
+	case "replace-all":
+		value, err = disk.replaceDiskMatches(ctx, v.Buffer, req)
 	case "reload":
 		var replacement *editorbuffer.Imported
-		replacement, err = m.importDiskDocument(ctx, g, disk)
+		if g.snapshot.Untitled && g.snapshot.Binding.Kind == "localDraft" && !filepath.IsAbs(g.snapshot.Path) {
+			replacement, err = editorbuffer.Import(ctx, strings.NewReader(""), "", nil)
+		} else {
+			replacement, err = m.importDiskDocument(ctx, g, disk, req.Remote)
+		}
 		if err == nil {
 			disk.mu.Lock()
 			old := disk.imported
 			disk.imported = replacement
+			disk.exported = nil
 			disk.mu.Unlock()
 			v = replacement
 			disk.editMu.Lock()
+			disk.clearBulkLocked()
 			disk.receipts = nil
 			disk.editMu.Unlock()
+			m.cancelComparisonsUsing(uid)
 			old.Buffer.Close()
 			m.mu.Lock()
 			g.snapshot.Hash = v.Hash
@@ -384,8 +522,8 @@ func (m *editorViewRegistry) diskDocument(w http.ResponseWriter, r *http.Request
 		jsonError(w, 409, err.Error())
 		return
 	}
-	meta := v.Buffer.Metadata()
 	m.mu.Lock()
+	meta := v.Buffer.Metadata()
 	g.snapshot.Dirty = meta.Dirty
 	g.snapshot.EditRevision = meta.Revision
 	m.mu.Unlock()
@@ -450,11 +588,19 @@ func (m *editorViewRegistry) saveDiskDocument(ctx context.Context, g *editorDocu
 	}
 	destination := path
 	if req.Path != "" {
-		var e error
-		destination, e = absoluteExplorerPath(req.Path)
-		if e != nil {
-			return nil, e
-		}
+		destination = req.Path
+	}
+	destination, e := absoluteExplorerPath(destination)
+	if e != nil {
+		return nil, e
+	}
+	s, e := v.Buffer.Snapshot()
+	if e != nil {
+		return nil, e
+	}
+	defer s.Close()
+	if s.Revision != req.Revision {
+		return nil, editorbuffer.ErrRevision
 	}
 	m.mu.Lock()
 	if m.explorerConflictLocked(binding, destination) {
@@ -485,14 +631,6 @@ func (m *editorViewRegistry) saveDiskDocument(ctx context.Context, g *editorDocu
 	} else {
 		return nil, e
 	}
-	s, e := v.Buffer.Snapshot()
-	if e != nil {
-		return nil, e
-	}
-	defer s.Close()
-	if s.Revision != req.Revision {
-		return nil, editorbuffer.ErrRevision
-	}
 	f, e := os.CreateTemp(filepath.Dir(destination), ".network-toolkit-edit-*")
 	if e != nil {
 		return nil, e
@@ -520,7 +658,12 @@ func (m *editorViewRegistry) saveDiskDocument(ctx context.Context, g *editorDocu
 	if e = ctx.Err(); e != nil {
 		return nil, e
 	}
-	if e = os.Rename(temp, destination); e != nil {
+	if exists {
+		e = replaceSettingsFile(temp, destination)
+	} else {
+		e = moveUpdateNamingNoReplace(temp, destination)
+	}
+	if e != nil {
 		return nil, e
 	}
 	newHash := hex.EncodeToString(hash.Sum(nil))
@@ -528,6 +671,11 @@ func (m *editorViewRegistry) saveDiskDocument(ctx context.Context, g *editorDocu
 	d.mu.Lock()
 	v.Hash = newHash
 	v.Format = req.Format
+	d.exported = nil
+	d.verify = nil
+	if d.mode == "upload" {
+		d.mode = ""
+	}
 	d.mu.Unlock()
 	m.mu.Lock()
 	g.snapshot.Path = destination
@@ -543,7 +691,7 @@ func (m *editorViewRegistry) saveDiskDocument(ctx context.Context, g *editorDocu
 }
 
 func (m *editorViewRegistry) saveRemoteDiskDocument(ctx context.Context, g *editorDocumentGrant, d *editorDiskDocument, v *editorbuffer.Imported, path string, req editorDiskRequest) (any, error) {
-	if g.valid == nil || !g.valid() {
+	if d.ftp == nil && (g.valid == nil || !g.valid()) {
 		return nil, errEditorLease
 	}
 	destination := path
@@ -599,10 +747,7 @@ func (m *editorViewRegistry) saveRemoteDiskDocument(ctx context.Context, g *edit
 	// that was opened. Save As uses the staged uploader's no-overwrite default.
 	if expected != "" {
 		old := filepath.Join(dir, "current")
-		if !g.valid() {
-			return nil, errEditorLease
-		}
-		if _, e = g.run(ctx, remoteBrowserRequest{Protocol: "sftp", Action: "download", Path: destination, LocalPath: old}); e != nil {
+		if _, e = m.diskRemoteOperation(ctx, g, d, req.Remote, remoteBrowserRequest{Protocol: "sftp", Action: "download", Path: destination, LocalPath: old}); e != nil {
 			return nil, e
 		}
 		actual, _, e := hashDiskFile(ctx, old)
@@ -613,10 +758,7 @@ func (m *editorViewRegistry) saveRemoteDiskDocument(ctx context.Context, g *edit
 			return nil, errors.New("remote file changed after opening; reload or save a new copy")
 		}
 	}
-	if !g.valid() {
-		return nil, errEditorLease
-	}
-	if _, e = g.run(ctx, remoteBrowserRequest{Protocol: "sftp", Action: "upload", Path: destination, LocalPath: temp, Overwrite: expected != "" || req.Overwrite, StagedUpload: true}); e != nil {
+	if _, e = m.diskRemoteOperation(ctx, g, d, req.Remote, remoteBrowserRequest{Protocol: "sftp", Action: "upload", Path: destination, LocalPath: temp, Overwrite: expected != "" || req.Overwrite, StagedUpload: true}); e != nil {
 		return nil, e
 	}
 	newHash := hex.EncodeToString(hash.Sum(nil))
