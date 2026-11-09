@@ -1,3 +1,7 @@
+## 1.21.28 Beta 1 - FortiOS policy alignment
+
+- Align matching policy IDs and UUIDs across inserted policies, including when the original policy has changed.
+
 ## 1.21.27 Beta 1 - Large-file Word Wrap
 
 - Wrap large files in the editor and in Compare. Keep source line numbers on the first visual row and use gray spacers to align matching text.

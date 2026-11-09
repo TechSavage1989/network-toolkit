@@ -1,0 +1,10 @@
+Network Toolkit 1.21.28 Beta 1
+
+## What's New
+
+- Compare keeps the original FortiOS policy aligned when nearby policies were inserted and the original policy name or settings changed. Gray spacer rows show where the inserted policies have no counterpart.
+
+## Additional Details
+
+- The disk-backed comparison uses the matching edit header and policy UUID to recognize a policy whose fields have changed.
+- This beta is opt-in. Enable beta updates to receive it through the app.

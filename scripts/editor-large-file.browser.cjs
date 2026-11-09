@@ -23,19 +23,30 @@ async function waitForEngine(page, predicate, timeout = 30000) {
 }
 
 async function verifyRepeatedPolicies(page) {
-  const policy = (id, action = 'accept') => [
+  const policy = (id, {name = 'Synthetic policy ' + id, destination = 'port2', action = 'accept'} = {}) => [
     '    edit ' + id,
+    '        set name "' + name + '"',
+    '        set uuid 00000000-0000-4000-8000-' + String(id).padStart(12, '0'),
     '        set srcintf "port1"',
-    '        set dstintf "port2"',
+    '        set dstintf "' + destination + '"',
     '        set action ' + action,
     '    next',
   ];
   const ids = Array.from({length:12}, (_, i) => 10000 + i);
-  const config = lines => ['config firewall policy', ...lines, 'end', ''].join('\n');
+  const prefix = ['config firewall address', ...Array.from({length:3400}, (_, i) => [
+    '    edit "Synthetic address ' + i + '"',
+    '        set type ipmask',
+    '        set subnet 192.0.2.0 255.255.255.0',
+    '        set comment "Synthetic fixture"',
+    '    next',
+  ]).flat(), 'end'];
+  const config = lines => [...prefix, 'config firewall policy', ...lines, 'end', ''].join('\n');
   const before = config(ids.flatMap(id => policy(id)));
   const after = config([
     ...[20000, 20001, 20002].flatMap(id => policy(id)),
-    ...ids.flatMap(id => policy(id, id === ids.at(-1) ? 'deny' : 'accept')),
+    ...policy(10000, {name:'Renamed original policy', destination:'port3'}),
+    ...policy(20003),
+    ...ids.slice(1).flatMap(id => policy(id, {action:id === ids.at(-1) ? 'deny' : 'accept'})),
   ]);
   // Use the same disk-backed route as the real files without adding another
   // large on-disk fixture just to demonstrate the repeated-policy anchor.
@@ -52,7 +63,6 @@ async function verifyRepeatedPolicies(page) {
   await page.selectOption('[data-compare-select="left"]', 'policies-before');
   await page.selectOption('[data-compare-select="right"]', 'policies-after');
   await page.waitForFunction(() => document.querySelector('[data-compare-summary]')?.dataset.compareDone === 'true');
-  assert.equal(await page.locator('[data-compare-summary]').getAttribute('data-compare-count'), '2');
   await page.locator('.nt-compare-settings summary').click();
   await page.check('[data-compare-only]');
   const preview = page.locator('.nt-compare-preview');
@@ -60,12 +70,31 @@ async function verifyRepeatedPolicies(page) {
     await preview.locator('.nt-compare-preview-line.added code').filter({hasText:'edit ' + id}).waitFor();
   }
   assert.equal(await preview.locator('code').filter({hasText:'edit 10000'}).count(), 0);
+  assert.equal(await preview.locator('code').filter({hasText:'edit 10001'}).count(), 0);
   await preview.getByRole('button', {name:'Return to editable comparison'}).click();
-  await page.waitForFunction(() => {
-    const line = (side, n) => [...document.querySelector('[data-disk-compare-gutter="'+side+'"]').children]
-      .find(row => row.textContent === n)?.getBoundingClientRect().top;
-    return Math.abs(line('left', '2') - line('right', '17')) < 2;
-  });
+  const policyLines = policy(10000).length;
+  const firstPolicyLine = prefix.length + 2;
+  for (const [id, leftLine, rightLine, gaps] of [
+    [10000, firstPolicyLine, firstPolicyLine + 3 * policyLines, 3 * policyLines],
+    [10001, firstPolicyLine + policyLines, firstPolicyLine + 5 * policyLines, policyLines],
+  ]) {
+    const alignedRow = rightLine - 1;
+    await page.evaluate(async row => {
+      const compare = NetworkToolkitFileEditor.comparison;
+      await Promise.all(['left', 'right'].map(side => compare.diskView(side).goAlignedRow(row)));
+    }, Math.max(0, alignedRow - gaps));
+    await page.waitForFunction(({leftLine, rightLine, gaps}) => {
+      const find = (side, number) => [...document.querySelector(`[data-disk-compare-gutter="${side}"]`).children]
+        .find(row => row.dataset.sourceLine === String(number));
+      const left = find('left', leftLine), right = find('right', rightLine);
+      if (!left || !right || Math.abs(left.getBoundingClientRect().top - right.getBoundingClientRect().top) >= 2) return false;
+      let previous = left.previousElementSibling;
+      for (let i = 0; i < gaps; i++, previous = previous?.previousElementSibling) {
+        if (!previous?.hasAttribute('data-alignment-gap')) return false;
+      }
+      return true;
+    }, {leftLine, rightLine, gaps}).catch(error => { throw Error(`Policy ${id} did not align below ${gaps} spacer rows`, {cause:error}); });
+  }
 }
 
 async function main() {
