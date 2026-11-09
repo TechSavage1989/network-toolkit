@@ -179,13 +179,16 @@ body:has(.nt-editor-embedded) #toolWorkspace>#pageContent{grid-row:1!important;g
 .nt-editor-compare .nt-compare-preview{position:absolute;inset:0;z-index:4;display:flex;flex-direction:column;background:var(--panel);overflow:hidden}
 .nt-compare-preview-tools{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:6px 8px;border-bottom:1px solid var(--border)}
 .nt-compare-preview-tools [role=status]{margin-right:auto;font-size:12px}
-.nt-compare-preview-rows{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-content:start;overflow:auto}
-.nt-compare-preview-line{display:flex;gap:8px;align-items:baseline;min-height:1.55em;padding:2px 8px;border-right:1px solid var(--border);font:var(--nt-editor-font,13px)/1.55 var(--mono,monospace)}
+.nt-compare-preview-scroll{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;overflow-anchor:none}
+.nt-compare-preview-spacer{position:relative;overflow:clip}
+.nt-compare-preview-window{position:sticky;top:0;overflow:clip}
+.nt-compare-preview-rows{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:var(--nt-preview-row-height,25px);align-content:start}
+.nt-compare-preview-line{display:flex;gap:8px;align-items:baseline;overflow:hidden;padding:2px 8px;border-right:1px solid var(--border);font:var(--nt-editor-font,13px)/1.55 var(--mono,monospace)}
 .nt-compare-preview-line span{color:var(--muted);min-width:5ch;text-align:right}
 .nt-compare-preview-line b{flex:0 0 1ch;text-align:center;color:var(--warn)}
 .nt-compare-preview-line.added b{color:var(--good)}
 .nt-compare-preview-line.removed b{color:var(--bad)}
-.nt-compare-preview-line code{white-space:pre-wrap;overflow-wrap:anywhere;color:var(--text);min-width:0}
+.nt-compare-preview-line code{white-space:pre;overflow-x:auto;scrollbar-width:none;color:var(--text);min-width:0;tab-size:var(--nt-editor-tab,4)}
 .nt-compare-preview-line.changed{background:color-mix(in srgb,var(--warn) 15%,var(--panel))}
 .nt-compare-preview-line.added{background:color-mix(in srgb,var(--good) 15%,var(--panel))}
 .nt-compare-preview-line.removed{background:color-mix(in srgb,var(--bad) 15%,var(--panel))}

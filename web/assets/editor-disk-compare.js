@@ -94,8 +94,7 @@ function create(options) {
  let mapTop = 0, mapExtent = 0, mapScrollMax = 0, mapScrollPosition = 0;
  let mapData = null, mapRequest = null, mapPaintKey = '';
  let lineHighlight = null;
- const preview = comparing && root.NTKEditorCompare.mountDifferencePreview(host, readDifferencePreview, () =>
-  job?.status && {count:job.status.count, index:Math.max(0, selected)});
+ const preview = comparing && root.NTKEditorCompare.mountDifferencePreview(host, readChangedRows, () => job?.status?.changedRows);
  const mapLineCount = () => Math.max(...sides.map(side => totalLines(panes[side])));
  const mapPitch = () => scale === -3 ? Math.max(1, map.clientHeight) / mapLineCount() :
   scale === -2 ? 1 / 3 : Math.max(2, Math.ceil(map.clientHeight / 3500)) * (1 + Math.max(0,scale));
@@ -663,16 +662,14 @@ function create(options) {
   if (!page || !page[index - start]) {
    const value = await options.compareRequest({action:'page', id:current.id, start, limit:pageSize}, signal);
    if (job !== current || disposed) return;
-   page = value.differences;
+   page = value.differences.map((diff,i)=>({...diff,changedStart:value.changedStarts?.[i]}));
    current.pages.set(start, page);
    if (current.pages.size > 3) current.pages.delete(current.pages.keys().next().value);
   }
   return page[index - start];
  }
 
- async function readDifferencePreview(index, offset, limit, signal) {
-  const current = job, diff = await getDifference(current, index, signal);
-  if (!diff || job !== current) return;
+ async function readChangedRun(diff, offset, limit, signal) {
   const read = async side => {
    const d = panes[side].doc, count = Math.max(0, Math.min(limit, diff[side + 'Count'] - offset));
    const line = diff[side] + offset, end = line + count;
@@ -697,7 +694,21 @@ function create(options) {
    return values;
   };
   const [left, right] = await Promise.all(sides.map(read));
-  return {left, right, length:Math.max(diff.leftCount, diff.rightCount)};
+  return Array.from({length:limit}, (_, i) => [left[i], right[i]]);
+ }
+
+ async function readChangedRows(start, count, signal) {
+  const current = job, rows = [];
+  for (let offset = 0; offset < count; offset += 128) {
+   const runs = await options.compareRequest({action:'changed-rows',id:current.id,start:start+offset,limit:Math.min(128,count-offset)},signal);
+   for (let i = 0; i < runs.length; i += 8) {
+    signal.throwIfAborted();
+    if (job !== current) return;
+    const parts = await Promise.all(runs.slice(i,i+8).map(run=>readChangedRun(run,run.offset,run.count,signal)));
+    for (const part of parts) rows.push(...part);
+   }
+  }
+  return rows;
  }
 
  async function difference(step) {
@@ -723,7 +734,7 @@ function create(options) {
   if (job !== current || disposed) return;
   revealMap(activeSide());
   selected = index;
-  preview.refresh();
+  preview.reveal(diff.changedStart);
   summary.dataset.compareSelected = String(index);
   setSummary('Difference ' + number(index + 1) + ' of ' + number(count) + ' · ' +
    number(diff.leftCount) + ' left / ' + number(diff.rightCount) + ' right lines.');

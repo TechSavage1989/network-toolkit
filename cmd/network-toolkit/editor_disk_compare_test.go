@@ -34,7 +34,7 @@ func TestDiskEditorCompareMixedDocumentsAndLease(t *testing.T) {
 			t.Fatal(r.Code, r.Body)
 		}
 		if state.Done {
-			if state.Count != 1 || state.LeftLines != 3 || state.RightLines != 4 || state.Rows != 4 {
+			if state.Count != 1 || state.LeftLines != 3 || state.RightLines != 4 || state.Rows != 4 || state.ChangedRows != 1 {
 				t.Fatal(state)
 			}
 			break
@@ -43,6 +43,12 @@ func TestDiskEditorCompareMixedDocumentsAndLease(t *testing.T) {
 			t.Fatal("comparison did not finish")
 		}
 		time.Sleep(time.Millisecond)
+	}
+	changed := call("changed-rows", map[string]any{"start": 0, "limit": 8})
+	var runs []diskChangedRun
+	if changed.Code != 200 || json.Unmarshal(changed.Body.Bytes(), &runs) != nil || len(runs) != 1 ||
+		runs[0].Count != 1 || runs[0].Offset != 0 || runs[0].LeftCount != 0 || runs[0].RightCount != 1 {
+		t.Fatal(changed.Code, changed.Body)
 	}
 	page := call("page", map[string]any{"start": 0, "limit": 5})
 	var result struct {

@@ -97,7 +97,8 @@ async function assertSyncedSourceNavigation(label){
  check('right-click conversion and undo affect only the selected comparison pane');
  await page.locator('[data-compare="close"]').click();
  await open('preview-left','first\nremove me\ncommon\nlast');
- await open('preview-right','first\ncommon\nadd me\nlast');
+ const inserted=Array.from({length:220},(_,i)=>'add me '+(i+1));
+ await open('preview-right',['first','common',...inserted,'last'].join('\n'));
  await page.locator('[data-ed="compare"]').click();
  await page.selectOption('[data-compare-select="left"]','preview-left');
  await page.selectOption('[data-compare-select="right"]','preview-right');
@@ -106,11 +107,16 @@ async function assertSyncedSourceNavigation(label){
  await page.check('[data-compare-only]');
  const preview=page.locator('.nt-compare-preview');
  assert.match(await preview.locator('.removed').innerText(),/−.*remove me/s);
- await preview.locator('[data-preview-next-block]').click();
- await preview.locator('.added').waitFor();
- assert.match(await preview.locator('.added').innerText(),/\+.*add me/s);
- assert.equal(await preview.locator('.gap').count(),1);
- check('differences-only navigation exposes pure removals and additions');
+ assert.match(await preview.locator('.added').first().innerText(),/\+.*add me 1/s);
+ assert.equal(await preview.locator('.gap').first().textContent(),'');
+ const changedScroll=preview.locator('[aria-label="Changed lines"]');
+ await changedScroll.press('End');
+ await preview.locator('.added').filter({hasText:'add me 220'}).waitFor();
+ assert.match(await preview.locator('.added').last().innerText(),/222.*add me 220/s);
+ assert((await preview.locator('.nt-compare-preview-line').count())<220);
+ await changedScroll.press('Home');
+ await preview.locator('.removed').waitFor();
+ check('one differences-only scrollbar reaches added and removed lines across a bounded viewport');
 
  // Synthetic network configuration only; no user configuration or secret values.
  await page.locator('[data-compare="close"]').click();const config='!Version ArubaOS-CX 10.15.0001\nhostname SYNTHETIC-CX\ninterface 1/1/1\n    description "Synthetic uplink"\n    no shutdown\n    vlan access 120\n';await open('synthetic-cx-a',config);await page.evaluate(()=>{NetworkToolkitFileEditor.active.path='synthetic-a.cfg';NetworkToolkitFileEditor.active.language='';});await open('synthetic-cx-b',config.replace('120','121'));await page.evaluate(()=>{NetworkToolkitFileEditor.active.path='synthetic-b.cfg';NetworkToolkitFileEditor.active.language='';});await page.locator('[data-ed="compare"]').click();await page.selectOption('[data-compare-select="left"]','synthetic-cx-a');await page.selectOption('[data-compare-select="right"]','synthetic-cx-b');await page.waitForFunction(()=>[...document.querySelectorAll('.cm-content[data-compare-text]')].length===2&&[...document.querySelectorAll('.cm-content[data-compare-text]')].every(el=>el.querySelector('[class^="nt-ed-"]')));assert.equal(await compareText('left'),config);assert.equal(await page.evaluate(()=>NTKEditorLanguages.detect('synthetic.cfg',NetworkToolkitFileEditor.documents.get('synthetic-cx-a').content)),'network-aruba-cx');await left.focus();await page.selectOption('[data-ed-language-select]','text');await page.waitForFunction(()=>!document.querySelector('.cm-content[data-compare-text="left"]').querySelector('[class^="nt-ed-"]'));assert.equal(await compareText('left'),config);await page.selectOption('[data-ed-language-select]','');await page.waitForFunction(()=>!!document.querySelector('.cm-content[data-compare-text="left"]').querySelector('[class^="nt-ed-"]'));check('synthetic network Auto/manual Plain/Auto and simultaneous compare highlighting preserve exact bytes');

@@ -8,7 +8,7 @@ Open or create a document, review its source/connection, then edit. Save explici
 ## Compare
 Choose two documents in the comparison view. The change map shows individual changed lines on the left and right tracks. Use the wheel or the map's scrollbar to browse it independently, then click a mark to jump to that line. Sync scroll keeps the comparison panes together as you navigate.
 
-Choose **Show only differences** in **Options** to browse additions, removals, and modifications with their original line numbers. Use **Previous** and **Next** to switch blocks. **Exact** counts every space and tab. **Ignore changed spaces** matches `set  status` with `set status`. **Ignore all spaces** also matches `set status` with `setstatus`. These settings affect the comparison and leave the text unchanged.
+Choose **Show only differences** in **Options** to scroll through all additions, removals, and modifications in one view. Original line numbers and gray alignment spacers stay visible. Use **Previous** and **Next** to jump to a change. **Exact** counts every space and tab. **Ignore changed spaces** matches `set  status` with `set status`. **Ignore all spaces** also matches `set status` with `setstatus`. These settings affect the comparison and leave the text unchanged.
 
 **Dynamic fit** shows the entire document with one-pixel marks and is the default. **Compact** shows up to three lines per map pixel. The editor remembers the last map zoom you choose. Right-click either pane for difference navigation, map visibility, whitespace, scroll sync, and highlighting controls. Clicking or moving the caret to a line highlights its counterpart when one exists.
 

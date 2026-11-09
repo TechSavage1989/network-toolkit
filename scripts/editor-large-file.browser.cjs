@@ -114,7 +114,8 @@ async function main() {
     const preview = page.locator('.nt-compare-preview');
     await preview.locator('code').first().waitFor();
     assert.match(await preview.innerText(), new RegExp(head));
-    assert.equal(await preview.locator('code').count(), 2);
+    assert.match(await preview.innerText(), new RegExp(tail));
+    assert.equal(await preview.locator('code').count(), 4);
     await preview.getByRole('button', {name:'Return to editable comparison'}).click();
     assert.equal(await preview.isVisible(), false);
     const legend = page.locator('.nt-editor-disk-compare .nt-compare-legend');

@@ -1,0 +1,11 @@
+Network Toolkit 1.21.26 Beta 1
+
+## What's New
+
+- Show only differences now scrolls through added, removed, and modified lines in one view. Original line numbers and gray spacers stay visible.
+
+## Additional Details
+
+- The editor loads the changed rows around the current scroll position from the comparison index.
+- Previous and Next still jump to the next change.
+- This beta is opt-in. Enable beta updates to receive it through the app.

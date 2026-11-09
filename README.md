@@ -28,7 +28,7 @@
 - **Connect** with SSH, Telnet and supported serial terminals, using saved connections, multiple tabs and macros. Color terminal output with universal highlighting (devices, servers and logs) or MobaXterm-style keyword rule sets, each with its own colors, including your own `.msyn` files; pick a color (or none) for the device's name in its prompt, and choose the font size, cursor, color scheme, scrollback, bell and line-ending options. Risky pastes are flagged before they are sent.
 - **Password manager:** save usernames with passwords or SSH keys in an encrypted vault, with or without a master password; a strength gauge helps you choose one.
 - **File Transfer:** browse, transfer and host files over SFTP, FTP/FTPS and TFTP from one page.
-- **Text Editor:** open, edit and compare text files, including FortiOS and other network device configurations with syntax coloring. Convert selected text to or from hex and Base64. Send selected commands to a Terminal session and bring terminal output back into a document. The v1.21.25 beta processes large files in the background without fixed file-size or line-count limits.
+- **Text Editor:** open, edit and compare text files, including FortiOS and other network device configurations with syntax coloring. Convert selected text to or from hex and Base64. Send selected commands to a Terminal session and bring terminal output back into a document. The v1.21.26 beta processes large files in the background without fixed file-size or line-count limits.
 - **Local network:** view local network information and review authorized configuration changes.
 - **Network utilities:** Wake on LAN, an IPv4 subnet calculator, a transfer-time estimate and a MAC address formatter.
 - **Customizable Overview:** choose which dashboard sections to show, and drag them into the order you want; the layout is kept between runs.
@@ -62,7 +62,7 @@
 
 <table>
   <tr><td width="50%"><b>SSH and serial sessions in tabs, with saved connections</b><br><img src="docs/images/terminal.png" alt="Terminal with three session tabs showing switch interface and route output, and a sidebar of saved connections" width="440"></td><td width="50%"><b>SFTP client with local and remote files (light theme)</b><br><img src="docs/images/file-transfer.png" alt="File Transfer connected to an SFTP server, with local and remote file lists and transfer activity" width="440"></td></tr>
-  <tr><td width="50%"><b>Compare two device configurations with a scrollable, line-by-line change map</b><br><img src="docs/images/text-editor-compare.png" alt="Text Editor comparing two switch configurations side by side with added lines highlighted and a change map" width="440"></td><td width="50%"></td></tr>
+  <tr><td width="50%"><b>Compare two device configurations with a scrollable change map and a continuous differences-only view</b><br><img src="docs/images/text-editor-compare.png" alt="Text Editor comparing two switch configurations side by side with added lines highlighted and a change map" width="440"></td><td width="50%"></td></tr>
 </table>
 
 ### Local network, utilities and settings

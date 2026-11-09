@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-const diskCompareRecordSize = 40
+const diskCompareRecordSize = 48
 const diskComparePageSize = 128
 const diskCompareMapWindow = 32768
 const diskCompareOverviewBins = 2048
@@ -47,6 +47,7 @@ type diskComparisonSnapshot struct {
 type diskComparisonStatus struct {
 	editorbuffer.CompareProgress
 	Rows          int64                        `json:"rows"`
+	ChangedRows   int64                        `json:"changedRows"`
 	LeftSize      int64                        `json:"leftSize"`
 	RightSize     int64                        `json:"rightSize"`
 	LeftTotal     int64                        `json:"leftTotal"`
@@ -241,7 +242,7 @@ func (j *diskComparisonJob) scan(ctx context.Context, left, right editorbuffer.C
 		leftGaps += max(0, diff.RightCount-diff.LeftCount)
 		rightGaps += max(0, diff.LeftCount-diff.RightCount)
 		status.Rows = max(status.LeftTotal+leftGaps, status.RightTotal+rightGaps)
-		for i, value := range [...]int64{diff.Left, diff.Right, diff.LeftCount, diff.RightCount, row} {
+		for i, value := range [...]int64{diff.Left, diff.Right, diff.LeftCount, diff.RightCount, row, status.ChangedRows} {
 			binary.LittleEndian.PutUint64(record[i*8:], uint64(value))
 		}
 		if _, err := writer.Write(record[:]); err != nil {
@@ -253,6 +254,7 @@ func (j *diskComparisonJob) scan(ctx context.Context, left, right editorbuffer.C
 		addOverview(&status.LeftOverview, diff.Left+paired, diff.LeftCount-paired, max(status.LeftTotal, status.RightTotal), 1)
 		addOverview(&status.RightOverview, diff.Right+paired, diff.RightCount-paired, max(status.LeftTotal, status.RightTotal), 2)
 		status.Count++
+		status.ChangedRows += max(diff.LeftCount, diff.RightCount)
 		return nil
 	}, publish, options)
 	j.mu.Lock()
@@ -282,26 +284,70 @@ func (j *diskComparisonJob) read(index int64) (editorbuffer.Difference, error) {
 }
 
 func (j *diskComparisonJob) readAligned(index int64) (editorbuffer.Difference, int64, error) {
+	diff, row, _, err := j.readRows(index)
+	return diff, row, err
+}
+
+func (j *diskComparisonJob) readRows(index int64) (editorbuffer.Difference, int64, int64, error) {
 	var record [diskCompareRecordSize]byte
 	if _, err := j.file.ReadAt(record[:], index*diskCompareRecordSize); err != nil {
-		return editorbuffer.Difference{}, 0, err
+		return editorbuffer.Difference{}, 0, 0, err
 	}
 	return editorbuffer.Difference{
 		Left: int64(binary.LittleEndian.Uint64(record[0:8])), Right: int64(binary.LittleEndian.Uint64(record[8:16])),
 		LeftCount: int64(binary.LittleEndian.Uint64(record[16:24])), RightCount: int64(binary.LittleEndian.Uint64(record[24:32])),
-	}, int64(binary.LittleEndian.Uint64(record[32:40])), nil
+	}, int64(binary.LittleEndian.Uint64(record[32:40])), int64(binary.LittleEndian.Uint64(record[40:48])), nil
 }
 
-func (j *diskComparisonJob) page(start int64, limit int) ([]editorbuffer.Difference, error) {
-	out := make([]editorbuffer.Difference, 0, limit)
-	for n := start; n < j.status.Count && len(out) < limit; n++ {
-		difference, err := j.read(n)
+type diskChangedRun struct {
+	editorbuffer.Difference
+	Offset int64 `json:"offset"`
+	Count  int64 `json:"count"`
+}
+
+func (j *diskComparisonJob) changedRuns(start int64, limit int) ([]diskChangedRun, error) {
+	end := start + min(int64(limit), max(0, j.status.ChangedRows-start))
+	runs := make([]diskChangedRun, 0)
+	if start == end {
+		return runs, nil
+	}
+	low, high := int64(0), j.status.Count
+	for low < high {
+		mid := low + (high-low)/2
+		diff, _, row, err := j.readRows(mid)
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, difference)
+		if row+max(diff.LeftCount, diff.RightCount) <= start {
+			low = mid + 1
+		} else {
+			high = mid
+		}
 	}
-	return out, nil
+	for index := low; index < j.status.Count && start < end; index++ {
+		diff, _, row, err := j.readRows(index)
+		if err != nil {
+			return nil, err
+		}
+		next := min(end, row+max(diff.LeftCount, diff.RightCount))
+		runs = append(runs, diskChangedRun{Difference: diff, Offset: start - row, Count: next - start})
+		start = next
+	}
+	return runs, nil
+}
+
+func (j *diskComparisonJob) page(start int64, limit int) ([]editorbuffer.Difference, []int64, error) {
+	out := make([]editorbuffer.Difference, 0, limit)
+	rows := make([]int64, 0, limit)
+	for n := start; n < j.status.Count && len(out) < limit; n++ {
+		difference, _, row, err := j.readRows(n)
+		if err != nil {
+			return nil, nil, err
+		}
+		out = append(out, difference)
+		rows = append(rows, row)
+	}
+	return out, rows, nil
 }
 
 func comparisonSide(diff editorbuffer.Difference, right bool) (start, count, peer, peerCount int64) {
@@ -557,8 +603,15 @@ func (m *editorViewRegistry) compareDiskDocuments(w http.ResponseWriter, r *http
 			break
 		}
 		var differences []editorbuffer.Difference
-		differences, err = job.page(req.Start, req.Limit)
-		value = map[string]any{"start": req.Start, "differences": differences}
+		var rows []int64
+		differences, rows, err = job.page(req.Start, req.Limit)
+		value = map[string]any{"start": req.Start, "differences": differences, "changedStarts": rows}
+	case "changed-rows":
+		if req.Start < 0 {
+			err = editorbuffer.ErrBoundary
+			break
+		}
+		value, err = job.changedRuns(req.Start, req.Limit)
 	case "locate":
 		if (req.Side != "left" && req.Side != "right") || req.Line < 0 || req.End < req.Line {
 			err = editorbuffer.ErrBoundary

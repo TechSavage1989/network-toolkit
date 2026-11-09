@@ -1,3 +1,8 @@
+## 1.21.26 Beta 1 - Continuous differences-only comparison
+
+- Scroll through added, removed, and modified lines together, with original line numbers and gray spacers.
+- Load a bounded window of changed rows from the on-disk comparison index.
+
 ## 1.21.25 Beta 1 - Editable comparison alignment
 
 - Keep matching lines aligned with gray display rows in disk-backed comparisons.
