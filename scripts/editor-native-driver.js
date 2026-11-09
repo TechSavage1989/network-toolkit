@@ -20,7 +20,7 @@
   const editor = () => globalThis.NetworkToolkitFileEditor;
   const windows = () => globalThis.NetworkToolkitEditorWindows;
   const textarea = () => document.querySelector('[data-ed-text]');
-  const fields = ['id', 'uid', 'path', 'source', 'binding', 'hash', 'content', 'original', 'saved', 'savedEol', 'savedBOM', 'savedEncoding', 'dirty', 'saving', 'saveFailed', 'undo', 'redo', 'view', 'compareView', 'eol', 'encoding', 'bom', 'language', 'untitled', 'editRevision', 'frozen', 'staged'];
+  const fields = ['id', 'uid', 'path', 'source', 'binding', 'hash', 'content', 'original', 'saved', 'savedEol', 'savedBOM', 'savedEncoding', 'dirty', 'saving', 'saveFailed', 'undo', 'redo', 'view', 'compareView', 'eol', 'encoding', 'bom', 'language', 'untitled', 'editRevision', 'frozen', 'staged', 'disk'];
   const rect = el => { if (!el) return null; const r=el.getBoundingClientRect(); return {left:r.left,top:r.top,width:r.width,height:r.height}; };
   function detachPoint() {
     // Test-only pre-drag geometry: do not display a hidden target or synthesize
@@ -41,7 +41,8 @@
     }
     const ta = textarea();
     return {
-      documents: docs.map(doc => Object.fromEntries(fields.map(key => [key, doc[key]]))),
+      documents: docs.map(doc => ({...Object.fromEntries(fields.map(key => [key, doc[key]])),
+        ...(doc.disk ? {canUndo:doc.diskMeta?.canUndo,canRedo:doc.diskMeta?.canRedo} : {})})),
       active: editor().active?.uid || '',
       window: windows().state,
       textarea: ta && {value: ta.value, disabled: ta.disabled, start: ta.selectionStart, end: ta.selectionEnd, direction: ta.selectionDirection, top: ta.scrollTop, left: ta.scrollLeft},
@@ -65,14 +66,59 @@
   }
   async function performanceDigest() {
     const state=snapshot(),cache=new Map(),digest=async text=>{if(!cache.has(text)){const bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text));cache.set(text,[...new Uint8Array(bytes)].map(n=>n.toString(16).padStart(2,'0')).join(''));}return cache.get(text);};
-    for(const doc of state.documents){for(const key of ['content','original','saved'])doc[key]=await digest(doc[key]);doc.undo=await Promise.all(doc.undo.map(digest));doc.redo=await Promise.all(doc.redo.map(digest));}
+    for (const doc of state.documents) {
+      for (const key of ['content','original','saved']) doc[key]=await digest(doc[key]);
+      doc.undo=await Promise.all(doc.undo.map(digest));
+      doc.redo=await Promise.all(doc.redo.map(digest));
+      if (doc.disk) {
+        const response=await windows().bufferExport(doc.uid,{revision:doc.editRevision,format:{encoding:'UTF-8',eol:'LF',bom:false}});
+        const bytes=await crypto.subtle.digest('SHA-256',await response.arrayBuffer());
+        doc.content=Array.from(new Uint8Array(bytes), n=>n.toString(16).padStart(2,'0')).join('');
+      }
+    }
     if(state.textarea)state.textarea.value=await digest(state.textarea.value);
     return state;
+  }
+  function waitPerformanceEdit(afterRevision=0) {
+    return wait(() => {
+      const doc=editor().active, ta=textarea();
+      return doc?.disk && doc.editRevision>afterRevision && !doc.promoting &&
+        !doc.diskSession.pending && !ta.disabled && !ta.readOnly && doc;
+    }, 'acknowledged editable disk page');
+  }
+  async function performancePosition(atEnd) {
+    const doc=await waitPerformanceEdit(), ta=textarea();
+    const offset=atEnd ? doc.diskMeta.units : 0;
+    ta.focus();
+    ta.dispatchEvent(new KeyboardEvent('keydown',{bubbles:true,ctrlKey:true,key:atEnd?'End':'Home'}));
+    await wait(() => doc.diskSession.state().page.start+ta.selectionStart===offset, 'logical document boundary');
+  }
+  async function performanceSelection() {
+    await performancePosition(false);
+    const ta=textarea();
+    ta.setSelectionRange(11,29,'backward');
+    ta.scrollTop=120;
+    ta.dispatchEvent(new Event('scroll',{bubbles:true}));
+    // The paged view reconciles its logical top line on the next paint.
+    await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+  }
+  async function performanceHistory() {
+    let doc=await waitPerformanceEdit();
+    const historyDigests=[];
+    for (const action of ['undo','undo','redo','redo']) {
+      const revision=doc.editRevision;
+      document.querySelector('[data-ed="'+action+'"]').click();
+      doc=await waitPerformanceEdit(revision);
+      historyDigests.push((await performanceDigest()).documents[0].content);
+    }
+    await performanceSelection();
+    return {...await performanceDigest(),historyDigests};
   }
   async function execute(command) {
     if (command.action === 'snapshot') return snapshot();
     if (command.action === 'performance-state') return performanceState();
     if (command.action === 'performance-digest') return performanceDigest();
+    if (command.action === 'performance-history') return performanceHistory();
     if (command.action === 'seed' || command.action === 'performance-seed') {
       const texts=command.action==='performance-seed'?[('SYNTHETIC PERFORMANCE114 ONLY\n'+'x'.repeat(1000)+'\n').repeat(Math.ceil(command.size/1030)).slice(0,command.size)]:command.texts;
       for (const text of texts) {
@@ -83,15 +129,27 @@
         ta.focus();
         ta.value = text;
         ta.dispatchEvent(new InputEvent('input', {bubbles: true, inputType: 'insertText', data: text}));
+        if (command.action === 'performance-seed') {
+          await performancePosition(true);
+          const revision=editor().active.editRevision;
+          if(!await editor().textMenu.replace('\nSYNTHETIC SECOND EDIT'))throw Error('Disk edit did not apply');
+          await waitPerformanceEdit(revision);
+          continue;
+        }
         ta.value += '\nSYNTHETIC SECOND EDIT';
         ta.dispatchEvent(new InputEvent('input', {bubbles: true, inputType: 'insertText', data: '\nSYNTHETIC SECOND EDIT'}));
+      }
+      if (command.action==='performance-seed') {
+        await performanceSelection();
+        return performanceState();
       }
       textarea().setSelectionRange(11, 29, 'backward');
       textarea().scrollTop = 120;
       textarea().dispatchEvent(new Event('scroll', {bubbles: true}));
-      return command.action==='performance-seed'?performanceState():snapshot();
+      return snapshot();
     }
     if (command.action === 'move' || command.action === 'performance-move') {
+      if(command.action==='performance-move')await waitPerformanceEdit();
       const trigger = await wait(() => document.querySelector('[data-editor-window-toggle]'), 'compact move menu');
       trigger.click();
       const box = await wait(() => { const menu = document.querySelector('[data-editor-window-controls]'); return menu && !menu.hidden && menu.getBoundingClientRect().height > 0 && menu; }, 'visible native move controls');

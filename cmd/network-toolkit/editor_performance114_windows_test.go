@@ -3,11 +3,14 @@
 package main
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -28,8 +31,8 @@ func (h *nativeEditorFixture) exercisePerformance114() (failure error) {
 	size := 4 << 20
 	if value := os.Getenv("NETWORK_TOOLKIT_NATIVE_PERFORMANCE_BYTES"); value != "" {
 		n, err := strconv.Atoi(value)
-		if err != nil || n < 1 || n > 16<<20 {
-			return fmt.Errorf("invalid synthetic performance size")
+		if err != nil || n <= 512<<10 || n > 16<<20 {
+			return fmt.Errorf("synthetic performance size must exercise disk promotion and be at most 16 MiB")
 		}
 		size = n
 	}
@@ -37,12 +40,21 @@ func (h *nativeEditorFixture) exercisePerformance114() (failure error) {
 	if err != nil {
 		return err
 	}
-	if len(initial.Documents) != 1 {
-		return fmt.Errorf("expected one synthetic document")
+	if len(initial.Documents) != 1 || !initial.Documents[0].Disk || !initial.Documents[0].CanUndo || initial.Documents[0].Content != "length:0" {
+		return fmt.Errorf("expected one synthetic disk document with undo and no inline source text")
 	}
 	expected, err := h.command("", nativeEditorCommand{Action: "performance-digest"})
 	if err != nil {
 		return err
+	}
+	row := "SYNTHETIC PERFORMANCE114 ONLY\n" + strings.Repeat("x", 1000) + "\n"
+	seed := strings.Repeat(row, (size+len(row)-1)/len(row))[:size]
+	undoDigest := fmt.Sprintf("%x", sha256.Sum256([]byte(seed)))
+	fullDigest := fmt.Sprintf("%x", sha256.Sum256([]byte(seed+"\nSYNTHETIC SECOND EDIT")))
+	historyDigests := []string{undoDigest, fmt.Sprintf("%x", sha256.Sum256(nil)), undoDigest, fullDigest}
+	if len(expected.Documents) != 1 || expected.Documents[0].Content != fullDigest || expected.Documents[0].View == nil ||
+		expected.Documents[0].View.Start != 11 || expected.Documents[0].View.End != 29 || expected.Documents[0].View.Direction != "backward" {
+		return fmt.Errorf("initial native disk edit or logical selection differs")
 	}
 	uid := initial.Documents[0].UID
 	for repeat := 0; repeat < 3; repeat++ {
@@ -74,7 +86,12 @@ func (h *nativeEditorFixture) exercisePerformance114() (failure error) {
 					time.Sleep(10 * time.Millisecond)
 				}
 				if target == "" {
-					return fmt.Errorf("new native destination missing")
+					state, err := h.command(source, nativeEditorCommand{Action: "performance-state"})
+					if err != nil {
+						return fmt.Errorf("new native destination missing; source state: %w", err)
+					}
+					report["sourceLastState"] = state
+					return fmt.Errorf("new native destination missing: %s", state.Window.Error)
 				}
 				child = target
 			}
@@ -109,6 +126,17 @@ func (h *nativeEditorFixture) exercisePerformance114() (failure error) {
 			if err := nativeEditorEquivalent(expected.Documents[0], actual.Documents[0]); err != nil {
 				return fmt.Errorf("native exact text/history/position hashes: %w", err)
 			}
+			history, err := h.command(target, nativeEditorCommand{Action: "performance-history"})
+			if err != nil {
+				return err
+			}
+			if len(history.Documents) != 1 || !slices.Equal(history.HistoryDigests, historyDigests) {
+				return fmt.Errorf("native disk undo or redo changed the expected text after %s", direction)
+			}
+			if history.Documents[0].View == nil || history.Documents[0].View.Start != 11 || history.Documents[0].View.End != 29 || history.Documents[0].View.Direction != "backward" {
+				return fmt.Errorf("native disk history verification did not restore the logical selection")
+			}
+			expected = history
 			records = append(records, map[string]any{"iteration": repeat + 1, "direction": direction, "encodedSyntheticBytes": size, "elapsedMs": elapsed, "sourceReleased": true, "exclusiveDestination": true, "exactTextUndoSelectionRetained": true})
 			if repeat == 0 {
 				if err := h.capture(target, "performance114-"+direction); err != nil {

@@ -117,6 +117,36 @@ async function run() {
   await text.press('Control+y');
   await waitForEditableUnits(draft.length);
 
+  await text.press('Control+Home');
+  await page.waitForFunction(() => document.querySelector('.nt-editor-code textarea').value.startsWith('seed\n'));
+  for (let i = 0; i < 4; i++) await text.press('Shift+ArrowRight');
+  const draftUID = await page.evaluate(() => NetworkToolkitFileEditor.active.uid);
+  const move = async (source, target) => {
+   await source.waitForFunction(() => !NetworkToolkitEditorWindows.state.running);
+   await source.evaluate(async ({uid, target}) => {
+    const windows = NetworkToolkitEditorWindows;
+    await windows.move([uid], target);
+    if (!windows.state.outgoing && NetworkToolkitFileEditor.active?.uid === uid) throw Error(windows.state.error || 'No move offer for the disk-backed draft.');
+   }, {uid: draftUID, target});
+  };
+  await move(page, 'new');
+  const launch = await page.evaluate(() => api('/editor-fixture/child'));
+  const child = await browser.newPage({viewport: {width: 960, height: 600}});
+  child.on('pageerror', error => pageErrors.push(error.message));
+  await child.addInitScript(value => { window.__networkToolkitNativeSession = value; }, launch.token);
+  await child.goto(new URL(launch.path, url).href);
+  await child.waitForFunction(({uid, units}) => {
+   const d = window.NetworkToolkitFileEditor?.active;
+   const ta = document.querySelector('.nt-editor-code textarea');
+   return d?.uid === uid && !d.frozen && d.diskMeta?.units === units && !ta?.disabled && ta?.selectionEnd === 4;
+  }, {uid: draftUID, units: draft.length});
+  await page.waitForFunction(uid => ![...NetworkToolkitFileEditor.documents.values()].some(d => d.uid === uid), draftUID);
+  await move(child, 'main');
+  await child.waitForFunction(() => !NetworkToolkitFileEditor.documents.size);
+  await child.close();
+  await waitForEditableUnits(draft.length);
+  assert.equal(await text.evaluate(editor => editor.value.slice(editor.selectionStart, editor.selectionEnd)), 'seed');
+
   await page.locator('[data-ed="saveAs"]').click();
   await page.locator('[data-ed-dialog-input]').fill(destination);
   await page.locator('.nt-editor-dialog [data-ed-dialog-action="accept"]').click();

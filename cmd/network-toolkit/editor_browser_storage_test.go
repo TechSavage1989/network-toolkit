@@ -25,8 +25,27 @@ func TestEditorBrowserStorage(t *testing.T) {
 	}
 	a, _, _ := editorFixture(t)
 	a.windowMode = "main"
+	childBoot := make(chan editorViewLaunch, 1)
+	a.launchEditorView = func(_ context.Context, launch editorViewLaunch) (<-chan error, error) {
+		if err := launch.validate(); err != nil {
+			return nil, err
+		}
+		childBoot <- launch
+		return nil, nil
+	}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
+		case r.URL.Path == "/api/editor-fixture/child":
+			if r.Header.Get("X-Session-Token") != a.token {
+				jsonError(w, http.StatusForbidden, "Fixture session required.")
+				return
+			}
+			select {
+			case launch := <-childBoot:
+				jsonResponse(w, 200, map[string]string{"path": "/editor-view/" + launch.ViewID, "token": launch.ViewToken})
+			default:
+				jsonError(w, http.StatusNotFound, "No fixture child has been offered.")
+			}
 		case r.URL.Path == "/api/status":
 			jsonResponse(w, 200, map[string]any{
 				"version": model.Version, "os": runtime.GOOS, "arch": runtime.GOARCH,
