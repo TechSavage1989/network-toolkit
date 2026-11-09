@@ -242,7 +242,8 @@ shots['text-editor-compare']=async p=>{
   if(name==='/api/editor-views/current/state'){const body=request.postDataJSON()||{};for(const d of body.batch?.documents||[])owned[d.uid]=1;return {owned};}
  };
  await p.evaluate(()=>{setTheme('dark');navigate('editor');});await settle(p,400);
- await p.evaluate(async({cfgOld,cfgNew})=>{const docs=[['switch-core-2026-11-01.cfg',cfgOld],['switch-core-2026-11-02.cfg',cfgNew]];for(const [file,text] of docs)await NetworkToolkitFileEditor.open({id:file,path:'C:\\Users\\operator\\Documents\\Configs\\'+file,source:'Local computer',binding:{kind:'local'},create:true,initialContent:text,read:async()=>({content:text}),write:async()=>{throw Error('read-only screenshot');}});},{cfgOld,cfgNew});
+ const ports=Array.from({length:100},(_,i)=>'interface lag '+(i+1)+'\n description Synthetic aggregation '+(i+1)+'\n!\n').join('');
+ await p.evaluate(async({cfgOld,cfgNew})=>{const docs=[['switch-core-2026-11-01.cfg',cfgOld],['switch-core-2026-11-02.cfg',cfgNew]];for(const [file,text] of docs)await NetworkToolkitFileEditor.open({id:file,path:'C:\\Users\\operator\\Documents\\Configs\\'+file,source:'Local computer',binding:{kind:'local'},create:true,initialContent:text,read:async()=>({content:text}),write:async()=>{throw Error('read-only screenshot');}});},{cfgOld:cfgOld+ports,cfgNew:cfgNew+ports});
  await p.locator('[data-ed="compare"]').click();
  await p.selectOption('[data-compare-select="left"]','switch-core-2026-11-01.cfg');await p.selectOption('[data-compare-select="right"]','switch-core-2026-11-02.cfg');
  await settle(p,1200);
@@ -250,7 +251,7 @@ shots['text-editor-compare']=async p=>{
 shots['settings-updates']=async p=>{await p.evaluate(()=>setTheme('dark'));await p.locator('#settingsButton').click();await settle(p,500);await p.locator('[data-settings-section="updates"]').click();await settle(p,700);};
 
 (async()=>{
- fs.mkdirSync(out,{recursive:true});browser=await chromium.launch({headless:true,args:['--no-sandbox']});
+ fs.mkdirSync(out,{recursive:true});browser=await chromium.launch({headless:true,ignoreDefaultArgs:['--hide-scrollbars'],args:['--no-sandbox']});
  for(const [name,fn] of Object.entries(shots)){
   if(only.length&&!only.includes(name))continue;
   if(name.startsWith('packet-')&&!liveApp){if(!process.env.NTK_APP_EXECUTABLE){console.log('Skipped '+name+': set NTK_APP_EXECUTABLE to a Network Toolkit build (it analyses the capture)');continue;}liveApp=await startLiveApp();}

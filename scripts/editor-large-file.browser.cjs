@@ -108,6 +108,37 @@ async function main() {
     const summary = page.locator('.nt-editor-disk-compare [data-compare-summary]');
     await page.waitForFunction(() => document.querySelector('.nt-editor-disk-compare [data-compare-summary]')?.dataset.compareDone === 'true', null, { timeout: 180000 });
     assert.equal(await summary.getAttribute('data-compare-count'), '2');
+    const map = page.locator('.nt-editor-disk-compare [data-compare-map]');
+    const leftTrack = map.locator('[data-compare-track="left"]');
+    const leftMark = leftTrack.locator('rect.changed');
+    await leftMark.waitFor();
+    assert.equal(await leftMark.getAttribute('height'), '1');
+    const sourceLine = await leftTrack.getAttribute('aria-valuenow');
+    await map.hover();
+    await page.mouse.wheel(0, 100);
+    await page.waitForFunction(() => document.querySelector('[data-compare-map]').scrollTop > 0);
+    assert.equal(await leftTrack.getAttribute('aria-valuenow'), sourceLine, 'wheel pans only the change map');
+    await leftMark.waitFor({state:'hidden'});
+    await page.locator('.nt-compare-settings summary').click();
+    await page.selectOption('[data-compare-scale]', '4');
+    await page.locator('.nt-compare-settings summary').click();
+    const requestedBottom = await map.evaluate(el => {
+      el.scrollTop = el.scrollHeight;
+      return {top:el.scrollTop, height:el.clientHeight, scrollHeight:el.scrollHeight};
+    });
+    await leftMark.waitFor().catch(async error => {
+      report.map = {requestedBottom, settled:await map.evaluate(el => ({
+        top:el.scrollTop, height:el.clientHeight, scrollHeight:el.scrollHeight,
+        markerTop:el.querySelector('[data-compare-map-viewport]').style.top,
+        marks:el.querySelector('[data-compare-map-marks]').innerHTML
+      }))};
+      throw error;
+    });
+    const mark = await leftMark.boundingBox();
+    await page.mouse.click(mark.x + mark.width / 2, mark.y + mark.height / 2);
+    await page.waitForFunction(marker => [...document.querySelectorAll('.nt-editor-disk-compare textarea')].some(el => el.value.includes(marker)), tail);
+    await leftTrack.press('Home');
+    await page.waitForFunction(() => document.querySelector('[data-compare-track="left"]').getAttribute('aria-valuenow') === '1');
     // The first scroll should preserve the partial row on both sides. Matching
     // only the integer line leaves the peer up to a full row out of alignment.
     await page.evaluate(() => {

@@ -8,6 +8,7 @@ const peerOf = side => side === 'left' ? 'right' : 'left';
 const number = value => Number(value || 0).toLocaleString();
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 const pageSize = 64;
+const mapScrollRange = 1000000;
 
 function selectorMarkup(side) {
  return '<label class="nt-compare-selector">' + (side === 'left' ? 'Left' : 'Right') +
@@ -26,8 +27,8 @@ function paneMarkup(side) {
 
 function mapMarkup(side) {
  return '<div class="nt-compare-track" data-compare-track="' + side + '" tabindex="0" role="scrollbar" aria-label="' +
-  side + ' document map" aria-orientation="vertical" aria-controls="ntCompare-' + side + '">' +
-  '<svg data-compare-map-marks="' + side + '" aria-hidden="true" preserveAspectRatio="none" viewBox="0 0 1 96"></svg>' +
+  side + ' document map" aria-orientation="vertical" aria-controls="ntCompare-' + side + '" title="Scroll the map. Click a line to navigate.">' +
+  '<svg data-compare-map-marks="' + side + '" aria-hidden="true" preserveAspectRatio="none"></svg>' +
   '<div data-compare-map-viewport="' + side + '" aria-hidden="true"></div></div>';
 }
 
@@ -45,14 +46,15 @@ function create(options) {
   '<label><input type="checkbox" data-compare-sync checked> Sync scroll</label>' +
   '<label><input type="checkbox" data-compare-horizontal-sync> Sync horizontal scroll</label>' +
   '<label><input type="checkbox" data-compare-underline> Underline changes</label>' +
-  '<label>Map zoom <select data-compare-scale aria-label="Map zoom"><option value="0">Fit entire document</option>' +
+  '<label>Map zoom <select data-compare-scale aria-label="Map zoom"><option value="0">Individual lines</option>' +
   '<option value="0.5">1.5×</option><option value="1">2×</option><option value="2">3×</option><option value="4">5×</option></select></label>' +
   '<span class="nt-compare-legend"><span class="added">+ Added</span><span class="removed">− Removed</span><span class="changed">~ Modified</span></span></div></details>' +
   '<button type="button" class="btn small ghost" data-compare="close">Close comparison</button></div>' +
   '<div class="nt-compare-summary" data-compare-summary role="status"></div><div class="nt-compare-grid">' +
   sides.map(paneMarkup).join('<div class="nt-editor-pane-resize" data-compare-divider></div>') +
   '<div class="nt-compare-map-panel"><div class="nt-compare-map-labels" aria-hidden="true"><span>Left</span><span>Right</span></div>' +
-  '<div class="nt-compare-map" data-compare-map><div data-compare-map-content>' + sides.map(mapMarkup).join('') + '</div></div></div></div>';
+  '<div class="nt-compare-map is-line-map" data-compare-map><div data-compare-map-content><div class="nt-disk-map-window">' +
+  sides.map(mapMarkup).join('') + '</div></div></div></div></div>';
 
  const q = selector => host.querySelector(selector);
  const summary = q('[data-compare-summary]');
@@ -82,7 +84,10 @@ function create(options) {
  let lastSide = options.activeSide?.() || 'left';
  let signature = '', listSignature = '', disposed = false, syncing = 0, scale = 0;
  let job = null, startTimer = null, selected = -1, drag = null;
- let overviewKey = '', mapFrame = 0, gestureSide = null;
+ let mapFrame = 0, gestureSide = null;
+ let mapTop = 0, mapExtent = 0, mapScrollMax = 0, mapScrollPosition = 0;
+ let mapData = null, mapRequest = null, mapPaintKey = '';
+ const mapPitch = () => Math.max(2, Math.ceil(map.clientHeight / 3500)) * (1 + scale);
  const splitter = root.NTKEditorCompare.createDivider(host, q('.nt-compare-grid'), comparing, () => {
   for (const side of sides) changed(side);
  });
@@ -222,32 +227,81 @@ function create(options) {
 
  function paintMap() {
   if (!comparing || disposed) return;
+  readMapScroll();
+  const atEnd = mapExtent > 0 && mapTop === mapExtent;
   const status = job?.status;
-  mapContent.style.height = Math.max(1, map.clientHeight) * (1 + scale) + 'px';
-  const marksKey = status ? job.id + ':' + status.count : '';
-  const refreshMarkers = marksKey !== overviewKey;
-  overviewKey = marksKey;
+  const height = Math.max(1, map.clientHeight), pitch = mapPitch();
+  const contentHeight = Math.max(height, pitch * Math.max(...sides.map(side => totalLines(panes[side]))));
+  // Keep the native scrollbar within browser layout limits. The wheel and
+  // visible marks still use the full, unscaled line coordinates.
+  mapExtent = contentHeight - height;
+  mapContent.style.height = Math.min(contentHeight, Math.max(mapScrollRange, height)) + 'px';
+  mapContent.style.setProperty('--nt-disk-map-height', height + 'px');
+  mapScrollMax = map.scrollHeight - map.clientHeight;
+  setMapTop(atEnd ? mapExtent : mapTop);
+  const first = Math.floor(mapTop / pitch), end = Math.ceil((mapTop + height) / pitch);
+  const revision = status?.count ? job.id + ':' + status.count : '';
+  const data = mapData?.revision === revision ? mapData : null;
+  const paintKey = [revision, data?.start, first, end, pitch, height].join(':');
   for (const side of sides) {
    const pane = panes[side], count = totalLines(pane);
    pane.track.setAttribute('aria-valuemin', '1');
    pane.track.setAttribute('aria-valuemax', String(count));
    pane.track.setAttribute('aria-valuenow', String(clamp(pane.top + 1, 1, count)));
    pane.track.setAttribute('aria-disabled', String(!pane.doc));
-   pane.marker.style.top = 100 * pane.top / count + '%';
-   pane.marker.style.height = 100 * Math.min(linesInView(pane), count - pane.top) / count + '%';
-   if (!refreshMarkers) continue;
-   const values = status?.[side + 'Map'] || [];
-   const marks = [];
-   for (let i = 0; i < values.length; i++) {
-    if (!values[i]) continue;
-    const mark = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-    mark.setAttribute('width', '1');
-    mark.setAttribute('height', '1');
-    mark.setAttribute('y', String(i));
-    mark.setAttribute('class', values[i] === 3 ? 'changed' : values[i] === 1 ? 'removed' : 'added');
-    marks.push(mark);
+   pane.marker.style.top = pane.top * pitch - mapTop + 'px';
+   pane.marker.style.height = Math.min(linesInView(pane), count - pane.top) * pitch + 'px';
+   pane.markers.style.transform = 'translateY(' + (first * pitch - mapTop) + 'px)';
+   if (paintKey !== mapPaintKey) {
+    pane.markers.setAttribute('viewBox', '0 0 1 ' + height);
+    const marks = [];
+    for (let line = first; line < end; line++) {
+     const kind = data?.[side][line - data.start];
+     if (kind) marks.push('<rect width="1" height="' + (pitch - 1) + '" y="' +
+      ((line - first) * pitch) + '" class="' + ['', 'removed', 'added', 'changed'][kind] + '"/>');
+    }
+    pane.markers.innerHTML = marks.join('');
    }
-   pane.markers.replaceChildren(...marks);
+  }
+  mapPaintKey = paintKey;
+  if (revision && !mapRequest && (!data || first < data.start || end > data.end)) {
+   const start = Math.max(0, first - 256), stop = Math.min(start + 4096, end + 256);
+   const current = job;
+   const request = options.compareRequest({action:'map', id:current.id, start, end:stop}, current.abort.signal);
+   mapRequest = request;
+   void request.then(values => {
+    if (job === current) {
+     mapData = {...values, start, end:stop, revision};
+     scheduleMap();
+    }
+   }).catch(() => {}).finally(() => {
+    if (mapRequest === request) mapRequest = null;
+   });
+  }
+ }
+
+ function setMapTop(top) {
+  mapTop = clamp(top, 0, mapExtent);
+  const position = mapExtent ? mapTop / mapExtent * mapScrollMax : 0;
+  if (Math.abs(map.scrollTop - position) >= .5) map.scrollTop = position;
+  mapScrollPosition = map.scrollTop;
+ }
+
+ function readMapScroll() {
+  const position = map.scrollTop;
+  if (position === mapScrollPosition) return false;
+  // A resize can clamp the native scroll position before the map is repainted.
+  const currentMax = map.scrollHeight - map.clientHeight;
+  mapTop = currentMax ? clamp(position / currentMax, 0, 1) * mapExtent : 0;
+  mapScrollPosition = position;
+  return true;
+ }
+
+ function revealMap(side, line = panes[side].top) {
+  const y = line * mapPitch();
+  if (y < mapTop || y >= mapTop + map.clientHeight) {
+   setMapTop(y - map.clientHeight / 2);
+   scheduleMap();
   }
  }
 
@@ -273,6 +327,7 @@ function create(options) {
   remember(side);
   paintDifferences(side);
   scheduleMap();
+  if (pane.top !== previousTop && gestureSide === side && drag === null) revealMap(side);
   const sync = !syncing && gestureSide === side && q('[data-compare-sync]').checked;
   if (sync) syncFromCache(side);
   if (pane.top !== previousTop && job?.status && !coversViewport(side)) queueLocate(side, sync);
@@ -380,6 +435,7 @@ function create(options) {
    root.clearTimeout(previous.timer);
    if (previous.sent) void options.compareRequest({action:'cancel', id:previous.id}).catch(() => {});
   }
+  mapData = mapRequest = null;
   for (const side of sides) {
    const pane = panes[side];
    pane.ranges = [];
@@ -494,6 +550,7 @@ function create(options) {
   try { await Promise.all(sides.map(side => goLine(side, diff[side]))); }
   finally { syncing--; }
   if (job !== current || disposed) return;
+  revealMap(activeSide());
   selected = index;
   summary.dataset.compareSelected = String(index);
   setSummary('Difference ' + number(index + 1) + ' of ' + number(count) + ' · ' +
@@ -585,10 +642,27 @@ function create(options) {
  }
 
  function pointOnMap(event, side) {
-  const fraction = (event.clientY - map.getBoundingClientRect().top + map.scrollTop) / Math.max(1, mapContent.clientHeight);
+  const line = (event.clientY - map.getBoundingClientRect().top + mapTop) / mapPitch();
   gestureSide = side;
-  go(goLine(side, fraction * totalLines(panes[side])));
+  go(goLine(side, line));
  }
+
+ map.addEventListener('scroll', () => { if (readMapScroll()) scheduleMap(); });
+ map.addEventListener('wheel', event => {
+  if (!event.deltaY || event.ctrlKey) return;
+  const unit = event.deltaMode === 1 ? 20 : event.deltaMode === 2 ? map.clientHeight : 1;
+  event.preventDefault();
+  if (!mapExtent) {
+   const side = event.target.closest('[data-compare-track]')?.dataset.compareTrack || activeSide();
+   const pane = panes[side];
+   const line = Math.max(0, pane.top + (pane.fraction || 0) + event.deltaY * unit / lineHeight(pane));
+   gestureSide = side;
+   go(goLine(side, line, line % 1));
+   return;
+  }
+  setMapTop(mapTop + event.deltaY * unit);
+  scheduleMap();
+ }, {passive:false});
 
  const horizontal = root.NTKEditorCompare.createHorizontalSync(side => {
   const ta = panes[side].textarea;
@@ -655,6 +729,7 @@ function create(options) {
    if (!Object.hasOwn(targets, event.key)) return;
    event.preventDefault();
    gestureSide = side;
+   revealMap(side, clamp(targets[event.key], 0, totalLines(pane) - 1));
    go(goLine(side, targets[event.key]));
   });
  }
@@ -671,7 +746,12 @@ function create(options) {
  });
  host.addEventListener('change', event => {
   const control = event.target;
-  if (control.matches('[data-compare-scale]')) { scale = Number(control.value) || 0; paintMap(); }
+  if (control.matches('[data-compare-scale]')) {
+   const topLine = mapTop / mapPitch();
+   scale = Number(control.value) || 0;
+   mapTop = topLine * mapPitch();
+   paintMap();
+  }
   if (control.matches('[data-compare-sync]') && control.checked) {
    panes[activeSide()].requested = null;
    gestureSide = activeSide();
@@ -692,6 +772,7 @@ function create(options) {
   for (const side of sides) changed(side);
  }) : null;
  observer?.observe(q('.nt-compare-grid'));
+ if (comparing) observer?.observe(map);
  splitter.apply();
  refresh();
 

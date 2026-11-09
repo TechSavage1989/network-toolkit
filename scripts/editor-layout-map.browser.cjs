@@ -73,7 +73,7 @@ async function compareOpen(p){await p.locator('[data-ed="compare"]').click();awa
    const p=after.page;lastPage=p;await p.setViewportSize({width:1440,height:1000});await p.uncheck('[data-ed-wrap]');await compareOpen(p);
    const left=p.locator('[data-compare-text="left"]'),right=p.locator('[data-compare-text="right"]'),map=p.locator('[data-compare-map]'),track=side=>p.locator('[data-compare-track="'+side+'"]');
    assert.equal(await p.locator('[data-compare-track]').count(),2);assert.equal(await p.locator('.nt-editor-title').count(),0);assert.equal(await p.locator('[data-compare="new"],[data-compare="open"]').count(),0);
-   await p.locator('.nt-compare-settings summary').click();await p.uncheck('[data-compare-sync]');
+   await p.locator('.nt-compare-settings summary').click();await p.selectOption('[data-compare-scale]','0');await p.uncheck('[data-compare-sync]');
    const documents=()=>p.evaluate(()=>[...NetworkToolkitFileEditor.documents.values()].map(d=>({uid:d.uid,content:d.content,dirty:d.dirty,undo:[...d.undo],redo:[...d.redo]}))),retained=await documents();
    for(const side of ['left','right']){
     const own=side==='left'?left:right,other=side==='left'?right:left;

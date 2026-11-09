@@ -1,3 +1,9 @@
+## 1.21.22 Beta 1 - Scrollable line-by-line comparison map
+
+- Show individual changed lines with one-pixel marks, including consecutive changes.
+- Browse the map independently with the wheel or its scrollbar, then click to navigate.
+- Load exact map marks in small windows for disk-backed comparisons.
+
 ## 1.21.21 Beta 1 - Editor scrolling and detach controls
 
 - Keep synchronized comparison panes aligned at partial-line scroll positions.

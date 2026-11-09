@@ -59,6 +59,13 @@ func TestDiskEditorCompareMixedDocumentsAndLease(t *testing.T) {
 	if location.Code != 200 || json.Unmarshal(location.Body.Bytes(), &mapping) != nil || !mapping.Aligned || mapping.PeerLine != 2 {
 		t.Fatal(location.Code, location.Body)
 	}
+	marks := call("map", map[string]any{"start": 0, "end": 3})
+	if marks.Code != 200 || strings.TrimSpace(marks.Body.String()) != `{"left":[0,0,0],"right":[0,2,0]}` {
+		t.Fatal(marks.Code, marks.Body)
+	}
+	if oversized := call("map", map[string]any{"start": 0, "end": diskCompareMapWindow + 1}); oversized.Code != 400 {
+		t.Fatal(oversized.Code, oversized.Body)
+	}
 	if edit := diskCall(a, a.token, lease, map[string]any{"action": "edit", "revision": 1, "from": 0, "to": 0, "text": "new "}); edit.Code != 200 {
 		t.Fatal(edit.Code, edit.Body)
 	}
