@@ -1,3 +1,9 @@
+# v1.21.28 Beta 1 - FortiOS policy alignment
+
+The disk-backed comparison recognizes a unique edit header followed by the same UUID even when nearby fields changed. Synthetic regressions cover three policy insertions, a modified existing policy, and another insertion before the next matching policy.
+
+---
+
 # v1.21.27 Beta 1 - Large-file Word Wrap
 
 The paged editor wraps visible source lines, keeps source numbers on the first visual row, and aligns wrapped comparisons with display-only spacers.

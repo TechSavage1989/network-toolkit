@@ -2,6 +2,7 @@ package editorbuffer
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"hash"
@@ -143,11 +144,50 @@ const compareLookahead = 128
 
 type lineSignature [sha256.Size]byte
 
+type lineRole uint8
+
+const (
+	ordinaryLine lineRole = iota
+	editHeader
+	blockBoundary
+	uuidField
+)
+
+type lineRecord struct {
+	signature lineSignature
+	role      lineRole
+	uuid      [36]byte
+}
+
+func (r *lineRecord) readRole(text []byte) {
+	text = bytes.Trim(text, " 	")
+	switch {
+	case bytes.HasPrefix(text, []byte("edit ")):
+		r.role = editHeader
+	case bytes.Equal(text, []byte("next")), bytes.Equal(text, []byte("end")):
+		r.role = blockBoundary
+	case len(text) == 45 && bytes.HasPrefix(text, []byte("set uuid ")):
+		uuid := text[9:]
+		for i, c := range uuid {
+			if i == 8 || i == 13 || i == 18 || i == 23 {
+				if c != '-' {
+					return
+				}
+			} else if !(c >= '0' && c <= '9' || c >= 'a' && c <= 'f' || c >= 'A' && c <= 'F') {
+				return
+			}
+		}
+		r.role = uuidField
+		copy(r.uuid[:], uuid)
+	}
+}
+
 type lineSignatures struct {
 	ctx         context.Context
 	reader      *bufio.Reader
 	longLine    hash.Hash
-	records     [compareLookahead]lineSignature
+	records     [compareLookahead]lineRecord
+	reverse     bool
 	first       int
 	count       int
 	line        int64
@@ -159,21 +199,24 @@ type lineSignatures struct {
 
 func newLineSignatures(ctx context.Context, in ComparisonInput, reverse bool, lines int64, options CompareOptions) *lineSignatures {
 	return &lineSignatures{
-		ctx: ctx, reader: bufio.NewReaderSize(in.reader(ctx, reverse), ChunkBytes), end: lines, options: options,
+		ctx: ctx, reader: bufio.NewReaderSize(in.reader(ctx, reverse), ChunkBytes), end: lines, options: options, reverse: reverse,
 	}
 }
 
-func (s *lineSignatures) next() (lineSignature, error) {
-	var signature lineSignature
-	seen, pendingSpace := false, false
+func (s *lineSignatures) next() (lineRecord, error) {
+	var record lineRecord
+	seen, pendingSpace, chunked := false, false, false
 	for {
 		if err := s.ctx.Err(); err != nil {
-			return signature, err
+			return record, err
 		}
 		part, err := s.reader.ReadSlice('\n')
 		s.bytesRead += int64(len(part))
 		if err == nil {
 			part = part[:len(part)-1]
+		}
+		if !s.reverse && !chunked && (err == nil || err == io.EOF) {
+			record.readRole(part)
 		}
 		if s.options.Spaces != "" {
 			// Normalize in place in either read direction. Retain space state
@@ -210,6 +253,7 @@ func (s *lineSignatures) next() (lineSignature, error) {
 		case io.EOF:
 			// The line count includes the empty line after a final newline.
 		case bufio.ErrBufferFull:
+			chunked = true
 			if s.notifyChunk != nil {
 				s.notifyChunk()
 			}
@@ -219,15 +263,16 @@ func (s *lineSignatures) next() (lineSignature, error) {
 			s.longLine.Write(part)
 			continue
 		default:
-			return signature, err
+			return record, err
 		}
 		if s.longLine == nil {
-			return sha256.Sum256(part), nil
+			record.signature = sha256.Sum256(part)
+			return record, nil
 		}
 		s.longLine.Write(part)
-		s.longLine.Sum(signature[:0])
+		s.longLine.Sum(record.signature[:0])
 		s.longLine.Reset()
-		return signature, nil
+		return record, nil
 	}
 }
 
@@ -244,6 +289,10 @@ func (s *lineSignatures) fill(n int) error {
 }
 
 func (s *lineSignatures) at(i int) lineSignature {
+	return s.record(i).signature
+}
+
+func (s *lineSignatures) record(i int) lineRecord {
 	return s.records[(s.first+i)%len(s.records)]
 }
 
@@ -258,12 +307,31 @@ func (s *lineSignatures) keepSuffix(n int64) {
 	s.count = min(s.count, int(s.end-s.line))
 }
 
-// uniqueHeadAnchor recognizes an unchanged block after a local insertion or
-// deletion. A unique header followed by two exact lines is stronger evidence
+// blockUUID looks only at the first few children of the identified edit block.
+func blockUUID(lines *lineSignatures, start int) ([36]byte, bool) {
+	var value [36]byte
+	found := false
+	for i := start + 1; i < min(start+9, lines.count); i++ {
+		line := lines.record(i)
+		if line.role == editHeader || line.role == blockBoundary {
+			break
+		}
+		if line.role == uuidField {
+			if found {
+				return value, false
+			}
+			value, found = line.uuid, true
+		}
+	}
+	return value, found
+}
+
+// uniqueHeadAnchor recognizes a block after a local insertion or deletion.
+// A unique header with matching context or policy UUID is stronger evidence
 // than a closer run of repeated lines inside an unrelated block.
 func uniqueHeadAnchor(source, other *lineSignatures) (int64, bool) {
 	const run = 3
-	if source.count < run || other.count <= run {
+	if source.count < 2 || other.count < 2 {
 		return 0, false
 	}
 	head := source.at(0)
@@ -276,11 +344,18 @@ func uniqueHeadAnchor(source, other *lineSignatures) (int64, bool) {
 			match = i
 		}
 	}
-	if match < 0 || match+run > other.count {
+	if match < 0 {
 		return 0, false
 	}
-	for i := 1; i < run; i++ {
-		if source.at(i) != other.at(match+i) {
+	exactRun := source.count >= run && match+run <= other.count &&
+		source.at(1) == other.at(match+1) && source.at(2) == other.at(match+2)
+	if !exactRun {
+		if source.record(0).role != editHeader || other.record(match).role != editHeader {
+			return 0, false
+		}
+		leftUUID, leftOK := blockUUID(source, 0)
+		rightUUID, rightOK := blockUUID(other, match)
+		if !leftOK || !rightOK || leftUUID != rightUUID {
 			return 0, false
 		}
 	}
@@ -343,7 +418,7 @@ func commonSuffix(ctx context.Context, left, right ComparisonInput, maxLines int
 		if err != nil {
 			return 0, 0, 0, err
 		}
-		if l != r {
+		if l.signature != r.signature {
 			break
 		}
 		a.line++
