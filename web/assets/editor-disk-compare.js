@@ -124,6 +124,7 @@ function create(options) {
    pane.doc = doc;
    pane.top = 0;
    pane.ranges = [];
+   pane.mapping = null;
    pane.requested = null;
    pane.gutter.replaceChildren();
    pane.colors.replaceChildren();
@@ -199,17 +200,20 @@ function create(options) {
 
  function paintDifferences(side) {
   const pane = panes[side], rows = pane.gutter.children, colors = [];
-  const top = pane.ranges.length ? pane.colors.getBoundingClientRect().top : 0;
+  const first = rows[0];
+  const bounds = first && pane.ranges.length ? first.getBoundingClientRect() : null;
+  const top = bounds ? bounds.top - pane.colors.getBoundingClientRect().top : 0;
+  let index = 0;
   for (const row of rows) {
    const line = Number(row.textContent) - 1;
    const kind = differenceKind(side, line, pane.ranges);
    const className = kind ? 'nt-compare-line ' + kind : '';
    if (row.className !== className) row.className = className;
-   if (!kind) continue;
-   const bounds = row.getBoundingClientRect();
+   const offset = index++;
+   if (!kind || !bounds) continue;
    const color = document.createElement('span');
    color.className = 'nt-disk-compare-color ' + kind;
-   color.style.top = bounds.top - top + 'px';
+   color.style.top = top + offset * bounds.height + 'px';
    color.style.height = bounds.height + 'px';
    colors.push(color);
   }
@@ -258,44 +262,83 @@ function create(options) {
   if (disposed) return;
   const pane = panes[side];
   const previousTop = pane.top;
-  if (pane.view) pane.top = Math.max(0, pane.view.capture().top || 0);
-  else paintInlineGutter(pane);
+  if (pane.view) {
+   const view = pane.view.capture();
+   pane.top = Math.max(0, view.top || 0);
+   pane.fraction = view.fraction || 0;
+  } else {
+   paintInlineGutter(pane);
+   pane.fraction = pane.textarea.scrollTop / lineHeight(pane) - pane.top;
+  }
   remember(side);
   paintDifferences(side);
   scheduleMap();
-  if (pane.top !== previousTop && job?.status) queueLocate(side, !syncing && gestureSide === side);
+  const sync = !syncing && gestureSide === side && q('[data-compare-sync]').checked;
+  if (sync) syncFromCache(side);
+  if (pane.top !== previousTop && job?.status && !coversViewport(side)) queueLocate(side, sync);
   if (activeSide() === side) options.selectionChanged?.();
  }
 
- async function goLine(side, line) {
+ async function goLine(side, line, fraction = 0) {
   const pane = panes[side];
   if (!pane.doc) return;
   const target = clamp(Math.floor(line), 0, totalLines(pane) - 1);
   if (pane.view) {
    const view = pane.view;
    await view.ready;
-   if (pane.view === view && !disposed) await view.goLine(target, false);
+   if (pane.view === view && !disposed) await view.goLine(target, false, false, fraction);
   } else {
-   pane.textarea.scrollTop = target * lineHeight(pane);
+   pane.textarea.scrollTop = (target + fraction) * lineHeight(pane);
    changed(side);
   }
+ }
+
+ function coversViewport(side) {
+  const pane = panes[side], mapping = pane.mapping;
+  return !!mapping && mapping.job === job && mapping.count === job.status.count &&
+   pane.top >= mapping.top && Math.min(totalLines(pane) - 1, pane.top + linesInView(pane)) <= mapping.end;
+ }
+
+ function syncFromCache(side) {
+  const pane = panes[side], mapping = pane.mapping, peer = peerOf(side);
+  if (!coversViewport(side) || pane.top >= job.status[side + 'Lines']) return;
+  let line = mapping.peerLine + pane.top - mapping.top;
+  for (const diff of pane.ranges) {
+   const start = diff[side];
+   if (start > pane.top) break;
+   const relative = pane.top - start, count = diff[side + 'Count'], peerCount = diff[peer + 'Count'];
+   line = diff[peer] + (relative < count ? Math.min(relative, Math.max(0, peerCount - 1)) : peerCount + relative - count);
+  }
+  line = clamp(line, 0, totalLines(panes[peer]) - 1);
+  const fraction = pane.fraction || 0;
+  if (panes[peer].top === line && Math.abs((panes[peer].fraction || 0) - fraction) < 0.03) return;
+  const topAtSync = pane.top;
+  syncing++;
+  go(goLine(peer, line, fraction).finally(() => {
+   syncing--;
+   if (!disposed && gestureSide === side && q('[data-compare-sync]').checked &&
+       (pane.top !== topAtSync || pane.fraction !== fraction)) {
+    syncFromCache(side);
+   }
+  }));
  }
 
  function queueLocate(side, sync = false) {
   const pane = panes[side], current = job;
   if (!current?.status || !pane.doc || current.status.error) return;
-  const top = Math.floor(pane.top), end = top + linesInView(pane);
+  // Reuse the mapping while scrolling within a small band around the viewport.
+  const top = Math.max(0, pane.top - 16), end = pane.top + linesInView(pane) + 48;
   const key = [current.id, current.status.count, current.status[side + 'Lines'] > top, top, end].join(':');
   if (pane.requested?.key === key) {
    pane.requested.sync ||= sync;
    return;
   }
-  pane.requested = {key, top, end, sync, job:current};
+  pane.requested = {key, top, end, sync, job:current, count:current.status.count};
   if (pane.locateTimer !== null || pane.pending) return;
   pane.locateTimer = root.setTimeout(() => {
    pane.locateTimer = null;
    void locate(side);
-  }, 45);
+  }, 0);
  }
 
  async function locate(side) {
@@ -306,19 +349,20 @@ function create(options) {
    const result = await options.compareRequest({
     action:'locate', id:request.job.id, side, line:request.top, end:request.end, limit:pageSize
    }, request.job.abort.signal);
-   if (job !== request.job || pane.requested !== request) return;
+   if (job !== request.job) return;
+   const end = result.differences.length === pageSize ? result.differences.at(-1)[side] : request.end;
+   if (pane.requested !== request && (pane.top < request.top || pane.top > end)) return;
    pane.ranges = result.differences;
+   pane.mapping = result.aligned ? {...request, peerLine:result.peerLine, end} : null;
    paintDifferences(side);
-   if (result.aligned && request.sync && gestureSide === side && !syncing && q('[data-compare-sync]').checked) {
-    syncing++;
-    try { await goLine(peerOf(side), result.peerLine); }
-    finally { syncing--; }
+   if (result.aligned && (request.sync || pane.requested?.sync) && gestureSide === side && !syncing && q('[data-compare-sync]').checked) {
+    syncFromCache(side);
    }
   } catch (error) {
    if (job === request.job && !request.job.abort.signal.aborted) failJob(request.job, error);
   } finally {
    pane.pending = null;
-   if (pane.requested !== request && pane.requested?.job === job && !disposed) void locate(side);
+   if (pane.requested !== request && pane.requested?.job === job && !disposed && !coversViewport(side)) void locate(side);
   }
  }
 
@@ -339,6 +383,7 @@ function create(options) {
   for (const side of sides) {
    const pane = panes[side];
    pane.ranges = [];
+   pane.mapping = null;
    pane.requested = null;
    root.clearTimeout(pane.locateTimer);
    pane.locateTimer = null;

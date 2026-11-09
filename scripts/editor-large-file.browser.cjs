@@ -49,6 +49,13 @@ async function main() {
     });
 
     report.phase = 'open';
+    const prefetched = new Set();
+    page.on('response', response => {
+      const request = response.request();
+      if (!request.url().endsWith('/buffer') || !response.ok()) return;
+      const body = request.postDataJSON();
+      if (body?.action === 'window' && body.line > 0) prefetched.add(request.url());
+    });
     const opened = Date.now();
     await page.evaluate(async name => { await NetworkToolkitFileEditor.openLocalPath(name); }, left);
     await page.evaluate(async name => { await NetworkToolkitFileEditor.openLocalPath(name); }, right);
@@ -56,6 +63,22 @@ async function main() {
       !document.querySelector('.nt-editor-code textarea[data-ed-text]').disabled, Number(size));
     assert.match(await page.locator('[data-ed-message]').textContent(), /^Opened edited\.txt\.$/);
     report.openBothMs = Date.now() - opened;
+    const activeUID = await page.evaluate(() => NetworkToolkitFileEditor.active.uid);
+    assert.ok([...prefetched].some(url => url.endsWith('/' + activeUID + '/buffer')) ||
+      await page.waitForResponse(response => response.ok() &&
+        response.url().endsWith('/' + activeUID + '/buffer') &&
+        response.request().postDataJSON()?.action === 'window' &&
+        response.request().postDataJSON().line > 0, {timeout: 3000}));
+    const firstScroll = await text.evaluate(editor => {
+      editor.scrollTop = (editor.scrollHeight - editor.clientHeight) * 0.85;
+      return editor.scrollTop / parseFloat(getComputedStyle(editor).lineHeight);
+    });
+    await page.waitForFunction(expected => {
+      const page = NetworkToolkitFileEditor.active.diskSession.state().page;
+      const editor = document.querySelector('.nt-editor-code textarea[data-ed-text]');
+      const height = parseFloat(getComputedStyle(editor).lineHeight);
+      return page.start > 0 && Math.abs((page.line - expected) * height + editor.scrollTop) <= 1;
+    }, firstScroll, {timeout: 3000});
 
     report.phase = 'edit';
     await text.press('Control+End');
@@ -85,6 +108,19 @@ async function main() {
     const summary = page.locator('.nt-editor-disk-compare [data-compare-summary]');
     await page.waitForFunction(() => document.querySelector('.nt-editor-disk-compare [data-compare-summary]')?.dataset.compareDone === 'true', null, { timeout: 180000 });
     assert.equal(await summary.getAttribute('data-compare-count'), '2');
+    // The first scroll should preserve the partial row on both sides. Matching
+    // only the integer line leaves the peer up to a full row out of alignment.
+    await page.evaluate(() => {
+      const source = document.querySelector('[data-compare-text="left"]');
+      const height = parseFloat(getComputedStyle(source).lineHeight);
+      source.dispatchEvent(new WheelEvent('wheel', {bubbles: true, deltaY: height * 8.5}));
+      source.scrollTop = height * 8.5;
+    });
+    await page.waitForFunction(() => {
+      const left = document.querySelector('[data-compare-text="left"]');
+      const right = document.querySelector('[data-compare-text="right"]');
+      return left.scrollTop > 0 && Math.abs(left.scrollTop - right.scrollTop) <= 1;
+    }, null, {timeout: 3000});
     const next = page.locator('.nt-editor-disk-compare [data-compare="next"]');
     await next.click();
     await page.waitForFunction(() => document.querySelector('.nt-editor-disk-compare [data-compare-summary]')?.dataset.compareSelected === '0');
