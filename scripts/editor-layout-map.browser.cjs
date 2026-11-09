@@ -102,14 +102,12 @@ async function compareOpen(p){await p.locator('[data-ed="compare"]').click();awa
    check('empty, one-line, unequal-length and heavily changed documents render both tracks');
    await p.setViewportSize({width:1440,height:1000});await p.uncheck('[data-ed-wrap]');await p.evaluate(()=>setTheme('dark'));
    const example=Array.from({length:600},(_,i)=>'const synthetic'+i+' = '+i+';'),revised=example.slice();revised.splice(450,15,...Array.from({length:15},(_,i)=>'const modified'+i+' = true;'));revised.splice(260,0,...Array.from({length:35},(_,i)=>'const added'+i+' = true;'));revised.splice(90,25);await left.fill(example.join('\n'));await ready(p);await right.fill(revised.join('\n'));await ready(p);
-   // ready() only proves the map is enabled; it may still show the previous diff
-   // for a frame after the second fill. Wait (bounded) for the new comparison.
-   await p.waitForFunction(()=>document.querySelectorAll('[data-compare-map-marks] .changed').length===2&&document.querySelector('[data-compare-map-marks="left"] .removed')&&document.querySelector('[data-compare-map-marks="right"] .added'),null,{timeout:5000}).catch(()=>{});
-  
-   assert(await p.locator('[data-compare-map-marks="left"] .removed').count()>0);assert(await p.locator('[data-compare-map-marks="right"] .added').count()>0);assert.equal(await p.locator('[data-compare-map-marks] .changed').count(),2);
-   await p.selectOption('[data-compare-scale]','0');await track('left').press('Home');await mapHome(p,['left','right']);
+   await p.waitForFunction(()=>[
+    ['left','removed'],['right','added'],['left','changed'],['right','changed']
+   ].every(([side,kind])=>document.querySelector('[data-compare-map-marks="'+side+'"] .'+kind)));
+   await p.locator('.nt-compare-settings summary').click();await p.selectOption('[data-compare-scale]','0');await p.locator('.nt-compare-settings summary').click();await track('left').press('Home');await mapHome(p,['left','right']);
    if(output)await p.screenshot({path:path.join(output,'map-fit-all-change-types.png')});
-   await p.selectOption('[data-compare-scale]','4');await track('left').press('PageDown');
+   await p.locator('.nt-compare-settings summary').click();await p.selectOption('[data-compare-scale]','4');await p.locator('.nt-compare-settings summary').click();await track('left').press('PageDown');
    await p.waitForFunction(()=>document.querySelector('[data-compare-pane="left"] .cm-scroller').scrollTop>0);const geometryCheck=await measuredMap(p,'zoomed PageDown');
    for(const g of geometryCheck)assert(Math.abs(g.expected-g.actual)<1,JSON.stringify(g));
    if(output)await p.screenshot({path:path.join(output,'map-zoom-5x.png')});
