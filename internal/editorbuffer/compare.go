@@ -308,7 +308,7 @@ func (s *lineSignatures) keepSuffix(n int64) {
 }
 
 // blockUUID looks only at the first few children of the identified edit block.
-func blockUUID(lines *lineSignatures, start int) ([36]byte, bool) {
+func blockUUID(lines anchorWindow, start int) ([36]byte, bool) {
 	var value [36]byte
 	found := false
 	for i := start + 1; i < min(start+9, lines.count); i++ {
@@ -330,7 +330,18 @@ const anchorContextLines = 3
 
 type anchorContext [anchorContextLines]lineSignature
 
-func (s *lineSignatures) anchorContext(start int) anchorContext {
+type anchorWindow struct {
+	*lineSignatures
+	count     int
+	remaining int64
+}
+
+func (s *lineSignatures) window(end int64) anchorWindow {
+	remaining := end - s.line
+	return anchorWindow{s, int(min(remaining, int64(s.count))), remaining}
+}
+
+func (s anchorWindow) anchorContext(start int) anchorContext {
 	var context anchorContext
 	for i := range context {
 		context[i] = s.at(start + i)
@@ -341,7 +352,7 @@ func (s *lineSignatures) anchorContext(start int) anchorContext {
 // uniqueHeadAnchor recognizes a block after a local insertion or deletion.
 // An exact context can identify a repeated heading. A policy UUID can identify
 // a unique heading whose neighboring lines were edited.
-func uniqueHeadAnchor(source, other *lineSignatures) (int64, bool) {
+func uniqueHeadAnchor(source, other anchorWindow) (int64, bool) {
 	if source.count < 2 || other.count < 2 {
 		return 0, false
 	}
@@ -387,7 +398,50 @@ func uniqueHeadAnchor(source, other *lineSignatures) (int64, bool) {
 	return int64(match), true
 }
 
-func hasRepeatedAnchor(lines *lineSignatures, index int) bool {
+type policyIdentity struct {
+	header lineSignature
+	uuid   [36]byte
+}
+
+func policyPositions(lines anchorWindow) map[policyIdentity]int {
+	positions := make(map[policyIdentity]int)
+	for i := 0; i < lines.count; i++ {
+		if lines.record(i).role != editHeader {
+			continue
+		}
+		if uuid, ok := blockUUID(lines, i); ok {
+			key := policyIdentity{lines.at(i), uuid}
+			if _, exists := positions[key]; exists {
+				positions[key] = -1
+			} else {
+				positions[key] = i
+			}
+		}
+	}
+	return positions
+}
+
+// sharedPolicyAnchor finds a policy identified by the same heading and UUID
+// on both sides. Repeated body lines in another policy cannot cross this anchor.
+func sharedPolicyAnchor(left, right anchorWindow) (int64, int64, bool) {
+	rightPositions := policyPositions(right)
+	bestLeft, bestRight, bestCost := 0, 0, left.count+right.count
+	found := false
+	for key, i := range policyPositions(left) {
+		j, ok := rightPositions[key]
+		if !ok || i < 0 || j < 0 || i+j > bestCost {
+			continue
+		}
+		if i+j == bestCost {
+			found = false
+			continue
+		}
+		bestLeft, bestRight, bestCost, found = i, j, i+j, true
+	}
+	return int64(bestLeft), int64(bestRight), found
+}
+
+func hasRepeatedAnchor(lines anchorWindow, index int) bool {
 	signature := lines.at(index)
 	for i := 0; i < lines.count; i++ {
 		if i != index && lines.at(i) == signature {
@@ -400,7 +454,7 @@ func hasRepeatedAnchor(lines *lineSignatures, index int) bool {
 // repeatedAnchor resolves an ambiguous nearest line using its exact surrounding
 // lines. It only searches for the same line, so an unrelated distant run
 // cannot displace an otherwise valid nearby anchor.
-func repeatedAnchor(left, right *lineSignatures, signature lineSignature) (int, int, bool) {
+func repeatedAnchor(left, right anchorWindow, signature lineSignature) (int, int, bool) {
 	positions := make(map[anchorContext]int)
 	for j := 0; j+anchorContextLines <= right.count; j++ {
 		if right.at(j) == signature {
@@ -424,7 +478,7 @@ func repeatedAnchor(left, right *lineSignatures, signature lineSignature) (int, 
 
 // nearestAnchor preserves a clear inserted or deleted block, then finds a
 // local resynchronization with fewest skipped lines.
-func nearestAnchor(left, right *lineSignatures, positions map[lineSignature]int) (int64, int64, bool) {
+func nearestAnchor(left, right anchorWindow, positions map[lineSignature]int) (int64, int64, bool) {
 	l, deleted := uniqueHeadAnchor(right, left)
 	r, inserted := uniqueHeadAnchor(left, right)
 	if inserted != deleted {
@@ -432,7 +486,7 @@ func nearestAnchor(left, right *lineSignatures, positions map[lineSignature]int)
 	}
 	// Keep a one-line replacement paired when neighboring repeated lines
 	// otherwise make a spurious insertion plus trailing deletion look cheaper.
-	if left.count > 1 && right.count > 1 && left.end-left.line == right.end-right.line && left.at(1) == right.at(1) {
+	if left.count > 1 && right.count > 1 && left.remaining == right.remaining && left.at(1) == right.at(1) {
 		return 1, 1, true
 	}
 	clear(positions)
@@ -507,8 +561,8 @@ func CompareWithOptions(ctx context.Context, left, right ComparisonInput, emit f
 	a := newLineSignatures(ctx, left, false, left.Lines(), options)
 	b := newLineSignatures(ctx, right, false, right.Lines(), options)
 	var current Difference
-	var hasChange, searchedSuffix bool
-	var suffix int64
+	var hasChange, searchedSuffix, policyPending bool
+	var suffix, policyLeft, policyRight int64
 	positions := make(map[lineSignature]int, compareLookahead)
 	flush := func() error {
 		if !hasChange {
@@ -545,6 +599,16 @@ func CompareWithOptions(ctx context.Context, left, right ComparisonInput, emit f
 	a.notifyChunk, b.notifyChunk = notify, notify
 	for a.line < a.end && b.line < b.end {
 		notify()
+		if policyPending && (a.line == policyLeft || b.line == policyRight) {
+			l, r := policyLeft-a.line, policyRight-b.line
+			if l != 0 || r != 0 {
+				change(l, r)
+				a.consume(l)
+				b.consume(r)
+				continue
+			}
+			policyPending = false
+		}
 		if err := a.fill(1); err != nil {
 			return err
 		}
@@ -565,7 +629,21 @@ func CompareWithOptions(ctx context.Context, left, right ComparisonInput, emit f
 		if err := b.fill(compareLookahead); err != nil {
 			return err
 		}
-		l, r, found := nearestAnchor(a, b, positions)
+		leftWindow, rightWindow := a.window(a.end), b.window(b.end)
+		if !policyPending && a.record(0).role == editHeader && b.record(0).role == editHeader {
+			if l, r, found := sharedPolicyAnchor(leftWindow, rightWindow); found {
+				policyLeft, policyRight, policyPending = a.line+l, b.line+r, true
+			}
+		}
+		if policyPending {
+			// Compare the preceding text normally, but stop before the shared
+			// policy so common settings cannot match across its boundary.
+			leftWindow, rightWindow = a.window(policyLeft), b.window(policyRight)
+		}
+		l, r, found := nearestAnchor(leftWindow, rightWindow, positions)
+		if !found && policyPending {
+			l, r, found = leftWindow.remaining, rightWindow.remaining, true
+		}
 		if !found && !searchedSuffix {
 			searchedSuffix = true
 			var err error
@@ -578,7 +656,7 @@ func CompareWithOptions(ctx context.Context, left, right ComparisonInput, emit f
 			if a.line == a.end || b.line == b.end {
 				break
 			}
-			l, r, found = nearestAnchor(a, b, positions)
+			l, r, found = nearestAnchor(a.window(a.end), b.window(b.end), positions)
 		}
 		if !found {
 			// Compare the next blocks without retaining unmatched rows.

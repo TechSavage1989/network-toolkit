@@ -190,6 +190,51 @@ func TestStreamingCompareKeepsModifiedPolicyAlignedAfterInsertions(t *testing.T)
 	}
 }
 
+func TestStreamingCompareKeepsSharedPolicyAfterDifferentPolicies(t *testing.T) {
+	policy := func(id, name, source string) string {
+		return "    edit " + id + "\n" +
+			"        set name " + name + "\n" +
+			"        set uuid 12345678-abcd-4567-8910-1234567" + id + "\n" +
+			"        set action accept\n" +
+			"        set srcaddr " + source + "\n" +
+			"        set dstaddr all\n" +
+			"        set schedule always\n" +
+			"        set logtraffic all\n" +
+			"    next\n"
+	}
+	const prefix = "config firewall policy\n"
+	left := InlineComparisonInput(prefix + policy("10035", "legacy access", "all") + policy("10037", "mail to internal", "mail hosts") + "end\n")
+	for _, test := range []struct{ name, inserted string }{
+		{name: "same offset"},
+		{name: "shifted offset", inserted: "    # inserted before retained policy\n"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			right := InlineComparisonInput(prefix + policy("20010", "mail to VLAN", "mail hosts") + test.inserted + policy("10037", "mail to port2", "mail hosts") + "end\n# tail\n")
+			want := []Difference{
+				{Left: 1, Right: 1, LeftCount: 3, RightCount: 3},
+				{Left: 5, Right: 5, LeftCount: 1, RightCount: 1},
+			}
+			added := int64(strings.Count(test.inserted, "\n"))
+			if added != 0 {
+				want = append(want, Difference{Left: 10, Right: 10, RightCount: added})
+			}
+			want = append(want,
+				Difference{Left: 11, Right: 11 + added, LeftCount: 1, RightCount: 1},
+				Difference{Left: 20, Right: 20 + added, RightCount: 1},
+			)
+			if got := collectDifferences(t, left, right); !reflect.DeepEqual(got, want) {
+				t.Fatalf("got %+v, want %+v", got, want)
+			}
+			for i, d := range want {
+				want[i] = Difference{Left: d.Right, Right: d.Left, LeftCount: d.RightCount, RightCount: d.LeftCount}
+			}
+			if got := collectDifferences(t, right, left); !reflect.DeepEqual(got, want) {
+				t.Fatalf("reverse comparison got %+v, want %+v", got, want)
+			}
+		})
+	}
+}
+
 func TestStreamingCompareReportsEveryChangedRegion(t *testing.T) {
 	rng := rand.New(rand.NewSource(11))
 	for range 40 {

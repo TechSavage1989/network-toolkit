@@ -5,6 +5,7 @@ const LIMITS = Object.freeze({lineCells: 40000, totalCells: 1000000, sourceLines
 const isHigh = value => value >= 0xD800 && value <= 0xDBFF;
 const isLow = value => value >= 0xDC00 && value <= 0xDFFF;
 const splitsPair = (text, offset) => offset > 0 && offset < text.length && isHigh(text.charCodeAt(offset - 1)) && isLow(text.charCodeAt(offset));
+const wordParts = /[\p{L}\p{M}\p{N}_]+(?:[.-][\p{L}\p{M}\p{N}_]+)*|\s+|./gsu;
 function range(from, to) { return from < to ? [{from, to}] : []; }
 function appendRange(ranges, from, to) {
  const last = ranges[ranges.length - 1];
@@ -12,43 +13,92 @@ function appendRange(ranges, from, to) {
  else if (from < to) ranges.push({from, to});
 }
 
-// Only the bounded changed middle uses LCS. Prefix/suffix work is linear in the
-// input, and all offsets remain UTF-16 source offsets (never inside a pair).
-// The shared mutable budget is charged the conservative UTF-16 cell product.
+function commonEdges(left, right, leftStart, rightStart, leftEnd, rightEnd) {
+ const max = Math.min(leftEnd - leftStart, rightEnd - rightStart);
+ let prefix = 0, suffix = 0;
+ while (prefix < max && left[leftStart + prefix] === right[rightStart + prefix]) prefix++;
+ if (splitsPair(left, leftStart + prefix) || splitsPair(right, rightStart + prefix)) prefix--;
+ while (suffix < max - prefix && left[leftEnd - suffix - 1] === right[rightEnd - suffix - 1]) suffix++;
+ if (splitsPair(left, leftEnd - suffix) || splitsPair(right, rightEnd - suffix)) suffix--;
+ return {prefix, suffix};
+}
+
+function compareParts(text, from, to) {
+ return Array.from(text.slice(from, to).matchAll(wordParts), match => ({text:match[0], from:from + match.index}));
+}
+
+// Align complete words and identifiers inside the changed middle. Exact edges
+// inside each replacement still expose small character edits, while a shared
+// letter inside two unrelated words cannot interrupt the highlighted span.
+// Bound the alignment work by the original UTF-16 cell product.
 function intralineRanges(left, right, budget = {remaining: LIMITS.totalCells}) {
  if (typeof left !== 'string' || typeof right !== 'string') throw new TypeError('Intraline inputs must be strings.');
  if (!budget || typeof budget !== 'object' || !Number.isSafeInteger(budget.remaining) || budget.remaining < 0) throw new TypeError('A finite nonnegative integer comparison budget is required.');
  budget.remaining = Math.min(LIMITS.totalCells, budget.remaining);
- let prefix = 0;
- while (prefix < left.length && prefix < right.length && left[prefix] === right[prefix]) prefix++;
- if (splitsPair(left, prefix) || splitsPair(right, prefix)) prefix--;
- let suffix = 0;
- while (suffix < left.length - prefix && suffix < right.length - prefix && left[left.length - suffix - 1] === right[right.length - suffix - 1]) suffix++;
- if (splitsPair(left, left.length - suffix) || splitsPair(right, right.length - suffix)) suffix--;
+ const {prefix, suffix} = commonEdges(left, right, 0, 0, left.length, right.length);
  const leftEnd = left.length - suffix, rightEnd = right.length - suffix;
  const fallback = {left: range(prefix, leftEnd), right: range(prefix, rightEnd)};
  const cells = (leftEnd - prefix) * (rightEnd - prefix);
  if (!cells || cells > LIMITS.lineCells || cells > budget.remaining) return fallback;
  budget.remaining -= cells;
- const a = Array.from(left.slice(prefix, leftEnd)), b = Array.from(right.slice(prefix, rightEnd));
- const starts = values => { const offsets = [prefix]; for (const value of values) offsets.push(offsets[offsets.length - 1] + value.length); return offsets; };
- const aOffsets = starts(a), bOffsets = starts(b), width = b.length + 1;
+ const a = compareParts(left, prefix, leftEnd), b = compareParts(right, prefix, rightEnd);
+ const width = b.length + 1;
  // With a 40,000-cell product, the shorter dimension is at most 200, so a
  // Uint16 LCS length cannot overflow. Degenerate zero dimensions returned above.
  const table = new Uint16Array((a.length + 1) * width);
  for (let i = a.length - 1; i >= 0; i--) {
   for (let j = b.length - 1; j >= 0; j--) {
-   table[i * width + j] = a[i] === b[j] ? 1 + table[(i + 1) * width + j + 1] : Math.max(table[(i + 1) * width + j], table[i * width + j + 1]);
+   table[i * width + j] = a[i].text === b[j].text
+    ? a[i].text.length + table[(i + 1) * width + j + 1]
+    : Math.max(table[(i + 1) * width + j], table[i * width + j + 1]);
   }
  }
  const result = {left: [], right: []};
- let i = 0, j = 0;
- while (i < a.length || j < b.length) {
-  if (i < a.length && j < b.length && a[i] === b[j]) { i++; j++; }
-  else if (i < a.length && (j === b.length || table[(i + 1) * width + j] >= table[i * width + j + 1])) {
-   appendRange(result.left, aOffsets[i], aOffsets[i + 1]); i++;
-  } else { appendRange(result.right, bOffsets[j], bOffsets[j + 1]); j++; }
+ let leftStart = prefix, rightStart = prefix;
+ function appendChanges(leftStop, rightStop) {
+  const {prefix, suffix} = commonEdges(left, right, leftStart, rightStart, leftStop, rightStop);
+  const leftFrom = leftStart + prefix, rightFrom = rightStart + prefix;
+  const leftTo = leftStop - suffix, rightTo = rightStop - suffix;
+  if (leftTo - leftFrom === rightTo - rightFrom && leftTo - leftFrom > 2) {
+   const oldText = Array.from(left.slice(leftFrom, leftTo));
+   const newText = Array.from(right.slice(rightFrom, rightTo));
+   const same = oldText.length === newText.length && oldText.filter((value, index) => value === newText[index]).length;
+   // Two-thirds positional agreement distinguishes several small edits from
+   // a replacement that happens to share repeated characters or punctuation.
+   if (same * 3 >= oldText.length * 2) {
+    let leftOffset = leftFrom, rightOffset = rightFrom;
+    for (let index = 0; index < oldText.length; index++) {
+     const nextLeft = leftOffset + oldText[index].length, nextRight = rightOffset + newText[index].length;
+     if (oldText[index] !== newText[index]) {
+      appendRange(result.left, leftOffset, nextLeft);
+      appendRange(result.right, rightOffset, nextRight);
+     }
+     leftOffset = nextLeft;
+     rightOffset = nextRight;
+    }
+    return;
+   }
+  }
+  appendRange(result.left, leftFrom, leftTo);
+  appendRange(result.right, rightFrom, rightTo);
  }
+ let i = 0, j = 0;
+ while (i < a.length && j < b.length) {
+  const leftPart = a[i], rightPart = b[j];
+  if (leftPart.text === rightPart.text) {
+   appendChanges(leftPart.from, rightPart.from);
+   leftStart = leftPart.from + leftPart.text.length;
+   rightStart = rightPart.from + rightPart.text.length;
+   i++;
+   j++;
+  } else {
+   const skipLeft = table[(i + 1) * width + j], skipRight = table[i * width + j + 1];
+   // A tied alignment must choose the same spans if the panes are swapped.
+   if (skipLeft > skipRight || (skipLeft === skipRight && leftPart.text < rightPart.text)) i++;
+   else j++;
+  }
+ }
+ appendChanges(leftEnd, rightEnd);
  return result;
 }
 

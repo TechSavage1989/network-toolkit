@@ -1,3 +1,11 @@
+# v1.21.31 Beta 1 - Compare policy alignment and character highlighting
+
+Disk-backed Compare preserves the next matching FortiOS policy header and UUID when different policy blocks precede it on both sides. Both panes share a single character comparison for each pair of loaded lines. Lines that span multiple editor pages still use whole-line marks.
+
+The synthetic browser run compared two 2 GiB files, accepted an edit during save, and verified the saved SHA-256. Verify with `go test -mod=vendor ./internal/editorbuffer`, `node --test scripts/editor-alignment-model.test.cjs`, and the opt-in `TestEditorLargeFileBrowser` fixture.
+
+---
+
 # v1.21.30 Beta 1 - Clearer Compare replacement markers
 
 Compare keeps an earlier exact row when a longer repeated match would preserve the same alignment. Editor panes and the differences-only view distinguish large length changes from smaller modifications without altering row geometry. The disk-backed change map still uses the overall region classification.

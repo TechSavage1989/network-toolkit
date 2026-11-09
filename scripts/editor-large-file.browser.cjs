@@ -46,7 +46,11 @@ async function verifyRepeatedPolicies(page) {
     ...[20000, 20001, 20002].flatMap(id => policy(id)),
     ...policy(10000, {name:'Renamed original policy', destination:'port3'}),
     ...policy(20003),
-    ...ids.slice(1).flatMap(id => policy(id, {action:id === ids.at(-1) ? 'deny' : 'accept'})),
+    ...ids.slice(1, 4).flatMap(id => policy(id)),
+    ...policy(20004),
+    ...policy(20005),
+    ...policy(10005, {name:'Renamed policy after replacements'}),
+    ...ids.slice(6).flatMap(id => policy(id, {action:id === ids.at(-1) ? 'deny' : 'accept'})),
   ]);
   // Use the same disk-backed route as the real files without adding another
   // large on-disk fixture just to demonstrate the repeated-policy anchor.
@@ -77,6 +81,7 @@ async function verifyRepeatedPolicies(page) {
   for (const [id, leftLine, rightLine, gaps] of [
     [10000, firstPolicyLine, firstPolicyLine + 3 * policyLines, 3 * policyLines],
     [10001, firstPolicyLine + policyLines, firstPolicyLine + 5 * policyLines, policyLines],
+    [10005, firstPolicyLine + 5 * policyLines, firstPolicyLine + 10 * policyLines, policyLines],
   ]) {
     const alignedRow = rightLine - 1;
     await page.evaluate(async row => {
@@ -88,6 +93,7 @@ async function verifyRepeatedPolicies(page) {
         .find(row => row.dataset.sourceLine === String(number));
       const left = find('left', leftLine), right = find('right', rightLine);
       if (!left || !right || Math.abs(left.getBoundingClientRect().top - right.getBoundingClientRect().top) >= 2) return false;
+      if (left.dataset.differenceSymbol || right.dataset.differenceSymbol) return false;
       let previous = left.previousElementSibling;
       for (let i = 0; i < gaps; i++, previous = previous?.previousElementSibling) {
         if (!previous?.hasAttribute('data-alignment-gap')) return false;
@@ -102,8 +108,9 @@ async function verifyMovedBlock(page) {
   const stable = Array.from({length:24}, (_, i) => 'stable line ' + i);
   const longSetting = 'set srcintf ' + Array.from({length:20}, (_, i) => '"synthetic-interface-' + i + '"').join(' ');
   const shortSetting = 'set srcintf "VPN_Tunnels"';
-  const before = ['header', ...moved, ...stable, 'settings', longSetting, 'set action accept', 'name before', 'footer'].join('\n');
-  const after = ['header', ...stable, ...moved, 'settings', shortSetting, 'set action accept', 'name after', 'footer'].join('\n');
+  const wrappedSetting = value => 'set comment "' + 'synthetic address '.repeat(250) + value + ' side"';
+  const before = ['header', ...moved, ...stable, 'settings', longSetting, 'set action accept', 'name before', wrappedSetting('Internal'), 'footer'].join('\n');
+  const after = ['header', ...stable, ...moved, 'settings', shortSetting, 'set action accept', 'name after', wrappedSetting('port2'), 'footer'].join('\n');
   await page.evaluate(async ({before, after}) => {
     for (const [id, content] of [['moves-before', before], ['moves-after', after]]) {
       const file = new File([content], id + '.txt');
@@ -143,6 +150,18 @@ async function verifyMovedBlock(page) {
     const row = side => document.querySelector('[data-disk-compare-gutter="' + side + '"] [data-source-line="' + line + '"]');
     return row('left')?.dataset.differenceSymbol === '−' && row('right')?.dataset.differenceSymbol === '+';
   }, replacementLine);
+  const wrap = page.locator('[data-ed-wrap]');
+  await wrap.check();
+  await page.evaluate(async line => {
+    const compare = NetworkToolkitFileEditor.comparison;
+    await Promise.all(['left', 'right'].map(side => compare.diskView(side).goLine(line - 1, false)));
+  }, replacementLine + 3);
+  for (const [side, value] of [['left','Internal'], ['right','port2']]) {
+    const highlight = page.locator(`[data-compare-pane="${side}"] .nt-disk-compare-intraline > span`).filter({hasText:value});
+    await highlight.waitFor();
+    assert.equal(await highlight.textContent(), value);
+    assert.equal(await highlight.locator('..').textContent(), wrappedSetting(value));
+  }
 }
 
 async function main() {

@@ -93,6 +93,7 @@ function create(options) {
  let mapTop = 0, mapExtent = 0, mapScrollMax = 0, mapScrollPosition = 0;
  let mapData = null, mapRequest = null, mapPaintKey = '';
  let lineHighlight = null;
+ const characterPairs = new Map();
  const preview = comparing && root.NTKEditorCompare.mountDifferencePreview(host, readChangedRows, () => job?.status?.changedRows);
  const mapLineCount = () => Math.max(...sides.map(side => totalLines(panes[side])));
  const mapPitch = () => scale === -3 ? Math.max(1, map.clientHeight) / mapLineCount() :
@@ -271,6 +272,7 @@ function create(options) {
   let top = bounds ? bounds.top - pane.colors.getBoundingClientRect().top : 0;
   const defaultHeight = bounds?.height || 0;
   const intraline = q('[data-compare-intraline]').checked;
+  const pages = pane.ranges.length ? comparisonPages() : null;
   const budget = {remaining:8192};
   for (const row of rows) {
    const gap = row.hasAttribute('data-alignment-gap');
@@ -278,9 +280,10 @@ function create(options) {
    const diff = !gap && differenceAt(side, line, pane.ranges);
    const offsetInTail = diff ? line - diff[side] - diff[peerOf(side) + 'Count'] : -1;
    const counterpart = offsetInTail >= 0 && diff.movedTo ? diff.movedTo + offsetInTail : null;
-   const replacement = diff && offsetInTail < 0 && root.NTKEditorCompare.isLowSimilarityReplacement(
-    visibleLine(pane, line), visibleLine(panes[peerOf(side)], diff[peerOf(side)] + line - diff[side])
-   );
+   const offsetInDiff = diff ? line - diff[side] : 0;
+   const left = diff && offsetInTail < 0 ? visibleLine(pages.left, diff.left + offsetInDiff) : null;
+   const right = diff && offsetInTail < 0 ? visibleLine(pages.right, diff.right + offsetInDiff) : null;
+   const replacement = root.NTKEditorCompare.isLowSimilarityReplacement(left, right);
    const kind = gap ? 'gap' : !diff ? '' : counterpart ? 'moved' :
     offsetInTail < 0 && !replacement ? 'changed' : side === 'left' ? 'removed' : 'added';
    const className = kind ? 'nt-compare-line ' + kind : '';
@@ -298,28 +301,45 @@ function create(options) {
    color.className = 'nt-disk-compare-color ' + kind + (current ? ' is-current' : '');
    color.style.top = offset + 'px';
    color.style.height = height + 'px';
-   if (intraline && kind === 'changed') paintCharacters(side, line, color, budget);
+   if (intraline && kind === 'changed' && left !== null && right !== null) {
+    const key = (diff.left + offsetInDiff) + ':' + (diff.right + offsetInDiff);
+    let ranges = characterPairs.get(key);
+    if (!ranges) {
+     ranges = root.NTKEditorAlignmentModel.intralineRanges(left, right, budget);
+     if (characterPairs.size >= 256) characterPairs.clear();
+     characterPairs.set(key, ranges);
+    }
+    paintCharacters(pane, side === 'left' ? left : right, color, ranges[side]);
+   }
    colors.push(color);
   }
   if (colors.length || pane.colors.childElementCount) pane.colors.replaceChildren(...colors);
  }
 
- function visibleLine(pane, line) {
-  const page = pane.view?.comparisonPage() || {line:0, text:pane.text, column:0, complete:true};
-  if (pane.characterText?.text !== page.text) pane.characterText = {text:page.text, lines:page.text.split('\n')};
-  const lines = pane.characterText.lines, local = line - page.line;
+ function comparisonPages() {
+  const pages = {};
+  for (const side of sides) {
+   const pane = panes[side];
+   const page = pane.view?.comparisonPage() || {line:0, text:pane.text, column:0, complete:true};
+   const previous = pane.characterPage;
+   if (previous?.text !== page.text || previous?.line !== page.line ||
+       previous?.column !== page.column || previous?.complete !== page.complete) {
+    pane.characterPage = {...page, lines:previous?.text === page.text ? previous.lines : page.text.split('\n')};
+    characterPairs.clear();
+   }
+   pages[side] = pane.characterPage;
+  }
+  return pages;
+ }
+
+ function visibleLine(page, line) {
+  const lines = page.lines, local = line - page.line;
   if ((local === 0 && page.column) || (local === lines.length - 1 && !page.complete)) return null;
   return lines[local] ?? null;
  }
 
- function paintCharacters(side, line, row, budget) {
-  const peer = peerOf(side), pane = panes[side];
-  const diff = pane.ranges.find(value => line >= value[side] && line - value[side] < value[side + 'Count']);
-  if (!diff) return;
-  const text = visibleLine(pane, line), other = visibleLine(panes[peer], diff[peer] + line - diff[side]);
-  if (text == null || other == null || Math.max(text.length, other.length) > 4096) return;
-  const ranges = root.NTKEditorAlignmentModel?.intralineRanges(text, other, budget).left;
-  if (!ranges?.length) return;
+ function paintCharacters(pane, text, row, ranges) {
+  if (!ranges.length) return;
   const overlay = document.createElement('span');
   overlay.className = 'nt-disk-compare-intraline';
   if (pane.textarea.wrap === 'soft') {
@@ -336,6 +356,7 @@ function create(options) {
    overlay.append(mark);
    from = range.to;
   }
+  overlay.append(text.slice(from));
   row.append(overlay);
  }
 

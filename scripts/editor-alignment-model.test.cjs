@@ -30,6 +30,33 @@ test('bounded LCS marks separate changed tokens without marking equal middle',()
  assert.deepEqual(fragments(left,r.left),['12','old']);assert.deepEqual(fragments(right,r.right),['34','new']);
  assert.equal(unchanged(left,r.left),unchanged(right,r.right));
 });
+test('unrelated replacement words and identifiers are highlighted without stray matching fragments',()=>{
+ const pairs = [
+  ['set name "Internal to VPN - Site Networks"', 'set name "port2 to VPN - Site Networks"', 'Internal', 'port2'],
+  ['set uuid 10203040-5060-7080-90a0-b0c0d0e0f000', 'set uuid f0e0d0c0-b0a0-9080-7060-504030201001', '10203040-5060-7080-90a0-b0c0d0e0f000', 'f0e0d0c0-b0a0-9080-7060-504030201001'],
+ ];
+ for (const [left, right, removed, added] of pairs) {
+  const marks = model.intralineRanges(left, right);
+  assert.deepEqual(fragments(left, marks.left), [removed]);
+  assert.deepEqual(fragments(right, marks.right), [added]);
+ }
+});
+test('trailing values are fully marked and small edits within comparable identifiers stay precise',()=>{
+ const left = 'set srcintf "port2" "port2.10"', right = 'set srcintf "port2"';
+ const marks = model.intralineRanges(left, right);
+ assert.deepEqual(fragments(left, marks.left), [' "port2.10"']);
+ assert.deepEqual(marks.right, []);
+ const before = 'set id 10203040-5060-7080-90a0-b0c0d0e0f000';
+ const after = 'set id 10203240-5060-7080-90a0-b0c0d0e0f003';
+ const edits = model.intralineRanges(before, after);
+ assert.deepEqual(fragments(before, edits.left), ['0', '0']);
+ assert.deepEqual(fragments(after, edits.right), ['2', '3']);
+});
+test('swapping comparison panes preserves both sets of marks',()=>{
+ const left = 'set x primary secondary suffix', right = 'set x secondary primary suffix';
+ const forward = model.intralineRanges(left, right);
+ assert.deepEqual(model.intralineRanges(right, left), {left:forward.right, right:forward.left});
+});
 test('shared conservative work budget is exhausted deterministically and never negative',()=>{
  const budget={remaining:9};assert.deepEqual(model.intralineRanges('abc','xyz',budget),{left:[{from:0,to:3}],right:[{from:0,to:3}]});assert.equal(budget.remaining,0);
  assert.deepEqual(model.intralineRanges('prefix a M c suffix','prefix x M y suffix',budget),{left:[{from:7,to:12}],right:[{from:7,to:12}]});assert.equal(budget.remaining,0);

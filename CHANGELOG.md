@@ -1,3 +1,8 @@
+## 1.21.31 Beta 1 - Compare policy alignment and character highlighting
+
+- Keep FortiOS policies with the same ID and UUID aligned when different policies appear before them on both sides.
+- Highlight complete replaced values and preserve small edits within similar values, including on long wrapped lines.
+
 ## 1.21.30 Beta 1 - Clearer Compare replacement markers
 
 - Keep exact matches out of changed regions when a later repeated match uses the same alignment.
