@@ -8,7 +8,7 @@ const BUFFER_LINES = 40;
 const PREVIEW_UNITS = 512;
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
 
-function create({textarea, gutter, container, session, changed = () => {}, message = () => {}, readOnly = false}) {
+function create({textarea, gutter, container, session, syntaxLanguage, changed = () => {}, message = () => {}, readOnly = false}) {
  const pageUnits = root.NTKEditorDiskSession.PAGE_UNITS;
  const abort = new AbortController();
  const listeners = {signal: abort.signal};
@@ -22,6 +22,15 @@ function create({textarea, gutter, container, session, changed = () => {}, messa
  };
  const vertical = scrollBar('nt-editor-disk-scroll', 'Document position', 'vertical');
  const horizontal = scrollBar('nt-editor-disk-horizontal', 'Position in long line', 'horizontal');
+ const syntax = syntaxLanguage ? document.createElement('pre') : null;
+ const syntaxChannel = textarea.dataset.compareText ? 'compare-' + textarea.dataset.compareText : 'default';
+ let syntaxText, language, syntaxTicket = 0, syntaxTimer;
+ if (syntax) {
+  syntax.className = 'nt-editor-highlight nt-editor-disk-highlight';
+  syntax.hidden = true;
+  syntax.setAttribute('aria-hidden', 'true');
+  textarea.before(syntax);
+ }
  container.classList.add('nt-editor-disk');
  textarea.wrap = 'off';
 
@@ -159,6 +168,7 @@ function create({textarea, gutter, container, session, changed = () => {}, messa
    gutter.parentElement.style.flexBasis = width;
   }
   gutter.style.transform = 'translateY(' + (-textarea.scrollTop) + 'px)';
+  paintSyntax();
   top = page.line + row;
   fraction = clamp(textarea.scrollTop / rowHeight - row, 0, 0.999);
   vertical.hidden = lines <= clientRows;
@@ -183,6 +193,28 @@ function create({textarea, gutter, container, session, changed = () => {}, messa
   lastScrollTop = textarea.scrollTop;
   lastScrollLeft = textarea.scrollLeft;
   announce();
+ }
+
+ function paintSyntax() {
+  if (!syntax) return;
+  syntax.style.transform = 'translate(' + (-textarea.scrollLeft) + 'px,' + (-textarea.scrollTop) + 'px)';
+  const text = textarea.value, next = syntaxLanguage(text);
+  if (text === syntaxText && next === language) return;
+  syntaxText = text;
+  language = next;
+  const ticket = ++syntaxTicket, service = root.NTKEditorLanguageService;
+  root.clearTimeout(syntaxTimer);
+  service?.cancelHighlight?.(syntaxChannel);
+  syntax.hidden = true;
+  textarea.classList.remove('highlight-active');
+  if (!next || next === 'text' || !text || !service) return;
+  syntaxTimer = root.setTimeout(() => void service.highlight(text, next, {channel:syntaxChannel}).then(value => {
+   if (disposed || ticket !== syntaxTicket || textarea.value !== text || syntaxLanguage(text) !== next) return;
+   if (value.limited) return;
+   syntax.innerHTML = value.html + '\n';
+   syntax.hidden = false;
+   textarea.classList.add('highlight-active');
+  }).catch(() => {}), 60);
  }
 
  function scrollbarValue(element, maximum, value) {
@@ -770,6 +802,8 @@ function create({textarea, gutter, container, session, changed = () => {}, messa
 
  return Object.freeze({
   load, goLine, position, restore, replace, history, capture, select, selectedText, copy,
+  comparisonPage: () => ({line:page.line, text:page.text, column:page.column, complete:page.start+page.text.length>=session.state().metadata.units}),
+  refreshSyntax: paintSyntax,
   selectAll() { select(0, session.state().metadata.units, 'none', true); },
   setReadOnly(value) { readOnly = !!value; updateReadOnly(); },
   refresh() {
@@ -796,6 +830,12 @@ function create({textarea, gutter, container, session, changed = () => {}, messa
    for (const job of [frame, verticalFrame, horizontalFrame]) if (job) root.cancelAnimationFrame(job);
    vertical.remove();
    horizontal.remove();
+   if (syntax) {
+    root.clearTimeout(syntaxTimer);
+    root.NTKEditorLanguageService?.cancelHighlight?.(syntaxChannel);
+    syntax.remove();
+    textarea.classList.remove('highlight-active');
+   }
    textarea.readOnly = original.readOnly;
    textarea.wrap = original.wrap;
    gutter.parentElement.style.width = original.width;

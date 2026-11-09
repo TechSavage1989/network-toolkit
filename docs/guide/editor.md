@@ -8,7 +8,9 @@ Open or create a document, review its source/connection, then edit. Save explici
 ## Compare
 Choose two documents in the comparison view. The change map shows individual changed lines on the left and right tracks. Use the wheel or the map's scrollbar to browse it independently, then click a mark to jump to that line. Sync scroll keeps the comparison panes together as you navigate.
 
-Choose **Show only differences** in **Options** to browse changed blocks with their original line numbers. Use **Previous** and **Next** to switch blocks. Open **Options** to jump to the first or last difference, hide the change map, or ignore spacing differences. **Ignore changed spaces** ignores indentation and the width of spaces and tabs between words. **Ignore all spaces** skips spaces and tabs anywhere on a line.
+Choose **Show only differences** in **Options** to browse additions, removals, and modifications with their original line numbers. Use **Previous** and **Next** to switch blocks. **Exact** counts every space and tab. **Ignore changed spaces** matches `set  status` with `set status`. **Ignore all spaces** also matches `set status` with `setstatus`. These settings affect the comparison and leave the text unchanged.
+
+Use **Compact** to show up to three lines per map pixel, or **Dynamic fit** to show the entire document with one-pixel marks. Right-click either pane for comparison commands and **Highlight changed characters**. Clicking or moving the caret to a line highlights its counterpart when one exists.
 
 Select text, then open **More** or right-click the selection to convert between UTF-8 text and hex or Base64. The result replaces the selection and can be undone. Each conversion accepts a selection of about one million characters.
 

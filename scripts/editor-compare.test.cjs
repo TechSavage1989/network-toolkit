@@ -16,6 +16,15 @@ test('whitespace modes preserve source line coordinates',()=>{
  const result=c.compare(left,right,'all');
  assert.deepEqual(result.rows.map(({type,left,right})=>[type,left,right]),[['equal',0,0],['equal',1,1],['changed',2,2]]);
 });
+
+test('differences-only pages retain additions, removals and original source numbers',()=>{
+ const docs={left:{content:'first\nremoved\nmatch\nlast'},right:{content:'first\nmatch\nadded\nlast'}};
+ const result=c.compare(docs.left.content,docs.right.content);
+ assert.deepEqual(c.inlineDifferencePage(result,side=>docs[side],0,0,12),
+  {length:1,left:[{line:1,text:'removed'}],right:[]});
+ assert.deepEqual(c.inlineDifferencePage(result,side=>docs[side],1,0,12),
+  {length:1,left:[],right:[{line:2,text:'added'}]});
+});
 test('viewport geometry uses each pane measured height and clamps shorter documents',()=>{const p=Array.from({length:101},(_,i)=>i);const a=c.viewport(p,210,200,2020,20,10),b=c.viewport(p,310,300,3020,30,10);assert.equal(a.start,10);assert.equal(b.start,10);assert.equal(a.end,20);assert.equal(b.end,20);assert.deepEqual(c.viewport([0,1],1000,400,50,25,10),{start:0,end:1});});
 test('fit and zoom map coordinates include independent map scrolling',()=>{assert.equal(c.mapHeight(10000,300,0),300);assert.equal(c.mapHeight(10000,300,2),900);assert(Math.abs(c.rowFromPointer(150,100,0,300,10000)-10000/6)<1e-9);assert.equal(c.rowFromPointer(150,100,9950,20000,10000),5000);assert.equal(c.rowFromPointer(-500,100,0,300,100),0);assert.equal(c.rowFromPointer(900,100,0,300,100),100);});
 

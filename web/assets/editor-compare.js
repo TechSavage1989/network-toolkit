@@ -149,13 +149,17 @@ function mountDifferencePreview(host, read, getSelection) {
    for (let i = 0; i < Math.min(pageSize, length - offset); i++) {
     for (const [side, peer] of [[left, right], [right, left]]) {
      const value = side[i], cell = document.createElement('div');
-     cell.className = 'nt-compare-preview-line ' + (value ? peer[i] ? 'changed' : side === left ? 'removed' : 'added' : 'gap');
+     const kind = value ? peer[i] ? 'changed' : side === left ? 'removed' : 'added' : 'gap';
+     cell.className = 'nt-compare-preview-line ' + kind;
      if (value) {
+      const symbol = document.createElement('b');
+      symbol.textContent = {changed:'~',removed:'−',added:'+'}[kind];
+      symbol.setAttribute('aria-label', {changed:'Modified',removed:'Removed',added:'Added'}[kind]);
       const label = document.createElement('span');
       label.textContent = String(value.line + 1);
       const text = document.createElement('code');
       text.textContent = value.text;
-      cell.append(label, text);
+      cell.append(symbol, label, text);
      }
      fragment.append(cell);
     }

@@ -1,0 +1,13 @@
+Network Toolkit 1.21.24 Beta 1
+
+## What's New
+
+- Use Compact or Dynamic fit to see more changes on the comparison map.
+- Click a line to highlight its counterpart, or right-click a pane for comparison actions and changed-character highlighting.
+- Each editor pane shows one vertical document scrollbar. FortiOS syntax coloring works in Single and Compare views.
+
+## Additional Details
+
+- Show only differences labels additions, removals, and modifications with their original line numbers.
+- The disk-backed editor colors the loaded page without reading the whole file into the editor.
+- This beta is opt-in. Enable beta updates to receive it through the app.

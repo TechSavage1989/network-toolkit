@@ -80,6 +80,9 @@ async function assertSyncedSourceNavigation(label){
   return Math.abs(line.getBoundingClientRect().top-box.top-box.height/2)<35&&Math.abs(map.scrollTop+map.clientHeight/2-1180)<3;
  });
  check('individual-line map separates consecutive changes and scrolls independently before click navigation');
+ await page.locator('[data-compare-pane="left"] [data-source-line="591"]').click({position:{x:20,y:6}});
+ await page.waitForFunction(()=>['left','right'].every(side=>
+  document.querySelector('[data-compare-pane="'+side+'"] .nt-compare-current-line[data-source-line="591"]')));
  const mapRight=page.locator('[data-compare-text="right"]');
  await page.evaluate(()=>NetworkToolkitFileEditor.comparison.sourceView('right').setSelectionRange(0,9));
  await mapRight.dispatchEvent('contextmenu',{clientX:800,clientY:330,button:2});
