@@ -162,11 +162,11 @@ test('legacy disclosure preferences cannot restore a redundant toolbar or expose
  }
 });
 test('compact Compare action retains its full accessible name and explanatory title',async()=>{
- const h=harness();await h.first();const button=h.document.querySelector('[data-ed="compare"]');assert.equal(button.getAttribute('aria-label'),'Compare documents');assert.equal(button.getAttribute('title'),'Compare documents');assert.equal(button.querySelector('.nt-editor-label-compact').textContent,'Compare');
+ const h=harness();await h.first();const button=h.document.querySelector('[data-ed="compare"]');assert.equal(button.getAttribute('aria-label'),'Compare documents');assert.equal(button.getAttribute('title'),'Compare documents');assert.match(button.className,/nt-editor-icon-button/);
 });
-test('More stays in the toolbar while its separate action row toggles and restores keyboard focus',async()=>{
+test('More stays in the toolbar while its dropdown toggles and restores keyboard focus',async()=>{
  const h=harness(),ta=await h.first(),root=h.document.getElementById('networkToolkitFileEditor'),more=root.querySelector('.nt-editor-more'),actions=root.querySelector('#ntEditorMoreActions'),summary=more.querySelector('summary');
- assert(more.closest('.nt-editor-toolbar'));assert(!actions.closest('.nt-editor-toolbar'));assert(actions.hasAttribute('hidden'));const doc=h.api.active;ta.setSelectionRange(8,16);ta.scrollTop=40;
+ assert(more.closest('.nt-editor-toolbar'));assert(actions.closest('.nt-editor-more')===more);assert(actions.hasAttribute('hidden'));const doc=h.api.active;ta.setSelectionRange(8,16);ta.scrollTop=40;
  more.open=true;more.emit('toggle',more);assert.equal(actions.hidden,false);assert.equal(summary.getAttribute('aria-expanded'),'true');assert.equal(actions.querySelector('[data-ed="openLocalPath"]'),null);assert.equal(actions.querySelector('[data-ed="newLocalPath"]'),null);assert.equal(root.querySelector('[data-ed-panel-toggle="remote"]'),null);
  h.document.activeElement=actions.querySelector('[data-ed="trim"]');summary.focus=()=>{h.document.activeElement=summary;};more.open=false;more.emit('toggle',more);assert.equal(actions.hidden,true);assert(h.document.activeElement===summary);assert.equal(h.api.active,doc);assert.equal(ta.selectionStart,8);assert.equal(ta.scrollTop,40);
 });

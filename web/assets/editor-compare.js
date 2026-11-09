@@ -108,96 +108,160 @@ function mountExtraSettings(host,panel){
  }, true);
 }
 
-// Browse one page of a difference at a time, without copying either document
-// into a second editor or mixing alignment gaps into editable source text.
-function mountDifferencePreview(host, read, getSelection) {
+// One continuous scroll range with a bounded window of source rows.
+function mountDifferencePreview(host, read, getCount) {
  const toggle = host.querySelector('[data-compare-only]');
  const grid = host.querySelector('.nt-compare-grid');
  const panel = document.createElement('section');
  panel.className = 'nt-compare-preview';
  panel.hidden = true;
  panel.innerHTML = '<div class="nt-compare-preview-tools"><span role="status"></span>' +
-  '<button type="button" class="btn small ghost" data-preview-previous-block>Previous difference</button>' +
-  '<button type="button" class="btn small ghost" data-preview-next-block>Next difference</button>' +
-  '<button type="button" class="btn small ghost" data-preview-back>Previous lines</button>' +
-  '<button type="button" class="btn small ghost" data-preview-next>Next lines</button>' +
   '<button type="button" class="btn small ghost" data-preview-edit>Return to editable comparison</button></div>' +
-  '<div class="nt-compare-preview-rows" tabindex="0" aria-label="Changed lines"></div>';
+  '<div class="nt-compare-preview-scroll" tabindex="0" aria-label="Changed lines"><div class="nt-compare-preview-spacer">' +
+  '<div class="nt-compare-preview-window"><div class="nt-compare-preview-rows"></div></div></div></div>';
  const covered = [...grid.children];
  grid.append(panel);
- const status = panel.querySelector('[role="status"]'), rows = panel.lastElementChild;
- const back = panel.querySelector('[data-preview-back]'), next = panel.querySelector('[data-preview-next]');
- const previousBlock = panel.querySelector('[data-preview-previous-block]'), nextBlock = panel.querySelector('[data-preview-next-block]');
- const pageSize = 12;
- let offset = 0, block = null, controller;
- async function render(reset = false) {
-  if (reset) { offset = 0; block = null; }
+ const status = panel.querySelector('[role="status"]'), scroll = panel.querySelector('.nt-compare-preview-scroll'), spacer = scroll.firstElementChild;
+ const viewport = spacer.firstElementChild, rows = viewport.firstElementChild;
+ let logicalTop = 0, expectedTop = 0, controller, cache, requested, frame = 0;
+ let rowHeight = 25;
+
+ function extent() {
+  return Math.max(0, (getCount() || 0) * rowHeight - scroll.clientHeight);
+ }
+ function move(top) {
+  logicalTop = clamp(top, 0, extent());
+  const range = scroll.scrollHeight - scroll.clientHeight;
+  scroll.scrollTop = extent() ? logicalTop / extent() * range : 0;
+  expectedTop = scroll.scrollTop;
+  queue();
+ }
+ function queue() {
+  if (!panel.hidden && !frame) frame = root.requestAnimationFrame(() => {frame = 0; void paint();});
+ }
+ function paintRows(data, first) {
+  const fragment = document.createDocumentFragment();
+  for (const pair of data) {
+   for (let side = 0; side < 2; side++) {
+    const value = pair[side], cell = document.createElement('div');
+    const kind = value ? pair[1-side] ? 'changed' : side === 0 ? 'removed' : 'added' : 'gap';
+    cell.className = 'nt-compare-preview-line ' + kind;
+    if (value) {
+     const symbol = document.createElement('b');
+     symbol.textContent = {changed:'~',removed:'−',added:'+'}[kind];
+     symbol.setAttribute('aria-label', {changed:'Modified',removed:'Removed',added:'Added'}[kind]);
+     const label = document.createElement('span');
+     label.textContent = String(value.line + 1);
+     const text = document.createElement('code');
+     text.textContent = value.text;
+     cell.append(symbol, label, text);
+    }
+    fragment.append(cell);
+   }
+  }
+  rows.replaceChildren(fragment);
+  rows.dataset.first = String(first);
+ }
+ async function paint() {
+  if (panel.hidden) return;
+  const count = getCount();
+  const oldHeight = rowHeight;
+  rowHeight = Math.max(25, Math.ceil((parseFloat(getComputedStyle(rows).getPropertyValue('--nt-editor-font')) || 13) * 1.55 + 4));
+  rows.style.setProperty('--nt-preview-row-height', rowHeight + 'px');
+  spacer.style.height = Math.min(1000000, (count || 0) * rowHeight) + 'px';
+  viewport.style.height = Math.min(scroll.clientHeight, (count || 0) * rowHeight) + 'px';
+  if (oldHeight !== rowHeight) move(logicalTop / oldHeight * rowHeight);
+  const first = Math.floor(logicalTop / rowHeight), last = Math.min(count || 0, Math.ceil((logicalTop + scroll.clientHeight) / rowHeight));
+  rows.style.transform = 'translateY(' + (Number(rows.dataset.first || 0) * rowHeight - logicalTop) + 'px)';
+  if (!count || last <= first) return;
+  if (cache && first >= cache.start && last <= cache.end) return;
+  if (requested && first >= requested.start && last <= requested.end) return;
+  const start = Math.max(0, first - 24), end = Math.min(count, last + 40);
   controller?.abort();
+  const pending = new AbortController();
+  controller = pending;
+  requested = {start,end};
+  try {
+   const data = await read(start, end - start, pending.signal);
+   if (pending.signal.aborted || !data) return;
+   cache = {start, end:start+data.length};
+   paintRows(data, start);
+   rows.style.transform = 'translateY(' + (start * rowHeight - logicalTop) + 'px)';
+  } catch (error) {
+   if (!pending.signal.aborted) status.textContent = error.message;
+  } finally {
+   if (controller === pending) requested = null;
+  }
+ }
+ function refresh(reset = false) {
+  controller?.abort();
+  cache = requested = null;
   panel.hidden = !toggle.checked;
   for (const child of covered) child.inert = !panel.hidden;
   if (panel.hidden) return;
-  const selected = getSelection();
+  if (reset) { logicalTop = 0; scroll.scrollTop = expectedTop = 0; }
+  const count = getCount();
+  status.textContent = count == null ? 'Choose two documents to compare.' :
+   count ? count.toLocaleString() + ' changed rows' : 'No differences.';
   rows.replaceChildren();
-  back.disabled = next.disabled = true;
-  previousBlock.disabled = nextBlock.disabled = !selected || selected.count < 2;
-  if (!selected) { status.textContent = 'Choose two documents and run Compare.'; return; }
-  if (!selected.count) { status.textContent = 'No differences.'; return; }
-  block ??= selected.index;
-  const index = block;
-  status.textContent = 'Loading changed lines…';
-  const pending = new AbortController();
-  controller = pending;
-  try {
-   const page = await read(index, offset, pageSize, pending.signal);
-   if (pending.signal.aborted || !page) return;
-   const {left, right, length} = page;
-   const fragment = document.createDocumentFragment();
-   for (let i = 0; i < Math.min(pageSize, length - offset); i++) {
-    for (const [side, peer] of [[left, right], [right, left]]) {
-     const value = side[i], cell = document.createElement('div');
-     const kind = value ? peer[i] ? 'changed' : side === left ? 'removed' : 'added' : 'gap';
-     cell.className = 'nt-compare-preview-line ' + kind;
-     if (value) {
-      const symbol = document.createElement('b');
-      symbol.textContent = {changed:'~',removed:'−',added:'+'}[kind];
-      symbol.setAttribute('aria-label', {changed:'Modified',removed:'Removed',added:'Added'}[kind]);
-      const label = document.createElement('span');
-      label.textContent = String(value.line + 1);
-      const text = document.createElement('code');
-      text.textContent = value.text;
-      cell.append(symbol, label, text);
-     }
-     fragment.append(cell);
-    }
-   }
-   rows.replaceChildren(fragment);
-   rows.scrollTop = 0;
-   status.textContent = 'Difference ' + (index + 1) + ' of ' + selected.count +
-    ' · Rows ' + (offset + 1) + '–' + Math.min(length, offset + pageSize) + ' of ' + length;
-   back.disabled = offset === 0;
-   next.disabled = offset + pageSize >= length;
-  } catch (error) {
-   if (!pending.signal.aborted) status.textContent = error.message;
+  queue();
+ }
+ scroll.addEventListener('scroll', () => {
+  if (scroll.scrollTop !== expectedTop) {
+   const range = scroll.scrollHeight - scroll.clientHeight;
+   logicalTop = range ? scroll.scrollTop / range * extent() : 0;
+   expectedTop = scroll.scrollTop;
   }
- }
- toggle.addEventListener('change', () => void render(true));
- back.addEventListener('click', () => { offset -= pageSize; void render(); });
- next.addEventListener('click', () => { offset += pageSize; void render(); });
- function moveBlock(step) {
-  const selection = getSelection();
-  if (!selection?.count) return;
-  block = ((block ?? selection.index) + step + selection.count) % selection.count;
-  offset = 0;
-  void render();
- }
- previousBlock.addEventListener('click', () => moveBlock(-1));
- nextBlock.addEventListener('click', () => moveBlock(1));
+  queue();
+ });
+ scroll.addEventListener('wheel', event => {
+  if (!event.deltaY || event.ctrlKey || extent() <= scroll.scrollHeight - scroll.clientHeight) return;
+  event.preventDefault();
+  move(logicalTop + event.deltaY * (event.deltaMode === 1 ? rowHeight : event.deltaMode === 2 ? scroll.clientHeight : 1));
+ }, {passive:false});
+ scroll.addEventListener('keydown', event => {
+  if (event.target !== scroll || event.altKey || event.ctrlKey || event.metaKey) return;
+  const targets = {Home:0,End:extent(),PageUp:logicalTop-scroll.clientHeight,PageDown:logicalTop+scroll.clientHeight,
+   ArrowUp:logicalTop-rowHeight,ArrowDown:logicalTop+rowHeight};
+  if (!Object.hasOwn(targets,event.key)) return;
+  event.preventDefault();
+  move(targets[event.key]);
+ });
+ const resize = typeof ResizeObserver === 'function' ? new ResizeObserver(queue) : null;
+ resize?.observe(scroll);
+ toggle.addEventListener('change', () => {
+  refresh(true);
+  if (!panel.hidden) {
+   host.querySelector('.nt-compare-settings').open = false;
+   scroll.focus({preventScroll:true});
+  }
+ });
  panel.querySelector('[data-preview-edit]').addEventListener('click', () => {
   toggle.checked = false;
-  void render(true);
+  refresh(true);
   host.querySelector('.nt-compare-settings summary').focus();
  });
- return {refresh:() => { if (toggle.checked) void render(true); }, dispose:() => controller?.abort()};
+ return {refresh, reveal(row){if (!panel.hidden && row != null) move(row*rowHeight);},
+  dispose(){controller?.abort();resize?.disconnect();if(frame)root.cancelAnimationFrame(frame);}};
+}
+
+const inlinePreviewCache = new WeakMap();
+function inlinePreviewRows(result, getDocument) {
+ if (!result || result.limited) return null;
+ if (!inlinePreviewCache.has(result)) {
+  const changed = result.rows.filter(row => row.type !== 'equal');
+  const left = getDocument('left').content.split('\n'), right = getDocument('right').content.split('\n');
+  inlinePreviewCache.set(result, changed.map(row => [
+   row.left == null ? null : {line:row.left,text:left[row.left]},
+   row.right == null ? null : {line:row.right,text:right[row.right]}
+  ]));
+ }
+ return inlinePreviewCache.get(result);
+}
+function inlineChangedStart(result, index) {
+ let start = 0;
+ for (let i = 0; i < index; i++) start += result.hunks[i].end - result.hunks[i].start;
+ return start;
 }
 
 function previewSourceLines(text, line, count, first = 0) {
@@ -222,7 +286,20 @@ function inlineDifferencePage(result, getDocument, index, offset, limit) {
  };
  return {length,left:read('left'),right:read('right')};
 }
-function mountSettings(host){const disclosure=host.querySelector('.nt-compare-settings'),panel=disclosure?.querySelector('div'),summary=disclosure?.querySelector('summary');if(!panel||!summary)return;mountExtraSettings(host,panel);panel.className='nt-compare-settings-actions';panel.id='ntCompareSettings'+(++settingsSequence);panel.hidden=!disclosure.open;summary.setAttribute('aria-controls',panel.id);summary.setAttribute('aria-expanded',String(disclosure.open));host.querySelector('.nt-compare-tools').after(panel);disclosure.addEventListener('toggle',()=>{panel.hidden=!disclosure.open;summary.setAttribute('aria-expanded',String(disclosure.open));});}
+function mountSettings(host){
+ const disclosure=host.querySelector('.nt-compare-settings'),panel=disclosure?.querySelector('div'),summary=disclosure?.querySelector('summary');
+ if(!panel||!summary)return;
+ mountExtraSettings(host,panel);panel.className='nt-compare-settings-actions';panel.id='ntCompareSettings'+(++settingsSequence);
+ panel.hidden=!disclosure.open;summary.setAttribute('aria-controls',panel.id);summary.setAttribute('aria-expanded',String(disclosure.open));
+ disclosure.addEventListener('toggle',()=>{
+  if(!disclosure.open&&panel.contains(document.activeElement))summary.focus({preventScroll:true});
+  panel.hidden=!disclosure.open;summary.setAttribute('aria-expanded',String(disclosure.open));
+ });
+ disclosure.addEventListener('keydown',event=>{
+  if(event.key!=='Escape'||!disclosure.open)return;
+  event.stopPropagation();summary.focus({preventScroll:true});disclosure.open=false;
+ });
+}
 // Source-owned horizontal pixels, independent of aligned vertical geometry.
 // Peer clamping must never pull a longer source backward or become a new gesture.
 function createHorizontalSync(read,write,enabled){let source=null;const previous={left:0,right:0},expected={left:null,right:null};
@@ -235,11 +312,11 @@ function create(options){
  host.className='nt-editor-compare'+(comparing?'':' is-split-view');
  const alignmentUnavailable=comparing&&(!root.NTKEditorAlignedCompare||!root.NetworkToolkitCodeMirror||!root.NTKEditorAlignmentModel);
  const selectors=['left','right'].map(side=>'<label class="nt-compare-selector">'+(side==='left'?'Left':'Right')+' <select data-compare-select="'+side+'" aria-label="'+side+' comparison document"></select></label>').join('');
- host.innerHTML='<div class="nt-compare-tools">'+selectors+'<button type="button" class="btn small primary" data-compare="compute" title="Recalculate differences">Compare</button><button type="button" class="btn small ghost" data-compare="swap" title="Swap left and right documents">Swap sides</button><button type="button" class="btn small ghost" data-compare="previous" title="Previous difference">Previous</button><button type="button" class="btn small ghost" data-compare="next" title="Next difference">Next</button><details class="nt-compare-settings"><summary class="btn small ghost">Options</summary><div><label><input type="checkbox" data-compare-sync checked> Sync scroll</label><label title="Fit shows the entire comparison. Zoom expands only the map, never the editor text.">Map zoom <select data-compare-scale aria-label="Map zoom"><option value="0">Fit entire document</option><option value="0.5">1.5×</option><option value="1">2×</option><option value="2">3×</option><option value="4">5×</option></select></label><span class="nt-compare-legend"><span class="added">+ Added</span><span class="removed">− Removed</span><span class="changed">~ Modified</span><span>= Unchanged</span><span>Blank = alignment gap</span></span></div></details><button type="button" class="btn small ghost" data-compare="close">Close comparison</button></div><div class="nt-compare-summary" data-compare-summary role="status"></div><div class="nt-compare-grid">'+['left','right'].map(side=>'<section class="nt-compare-pane" data-compare-pane="'+side+'"><div class="nt-editor-tabs" data-ed-tabs data-ed-view="'+side+'" role="tablist" aria-label="'+side+' view document tabs"></div><div class="nt-compare-surface"><pre data-compare-lines="'+side+'" aria-hidden="true"></pre><pre class="nt-compare-highlight" data-compare-highlight="'+side+'" aria-hidden="true" hidden></pre><textarea id="ntCompare-'+side+'" data-compare-text="'+side+'" data-input-clear="off" wrap="off" spellcheck="false" aria-label="Edit '+side+' comparison document"></textarea></div><div class="nt-compare-document-state" data-compare-state="'+side+'"></div><div class="nt-compare-syntax-notice" data-compare-syntax-notice="'+side+'" role="status" hidden></div></section>').join('<div class="nt-editor-pane-resize" data-compare-divider></div>')+'<div class="nt-compare-map-panel"><div class="nt-compare-map-labels" aria-hidden="true"><span>Left</span><span>Right</span></div><div class="nt-compare-map" data-compare-map><div data-compare-map-content>'+['left','right'].map(side=>'<div class="nt-compare-track" data-compare-track="'+side+'" tabindex="0" role="scrollbar" aria-label="'+side+' document map" aria-orientation="vertical" aria-controls="ntCompare-'+side+'" aria-valuemin="0" title="Click or drag anywhere to navigate this document. Fit: wheel scrolls the document. Zoom: wheel pans the map and document."><svg data-compare-map-marks="'+side+'" aria-hidden="true" preserveAspectRatio="none"></svg><div data-compare-map-viewport="'+side+'" aria-hidden="true"></div></div>').join('')+'</div></div></div></div>';
+ host.innerHTML='<div class="nt-compare-tools">'+selectors+'<button type="button" class="btn small ghost" data-compare="swap" title="Swap left and right documents">Swap sides</button><button type="button" class="btn small ghost" data-compare="previous" title="Previous difference">Previous</button><button type="button" class="btn small ghost" data-compare="next" title="Next difference">Next</button><details class="nt-compare-settings"><summary class="btn small ghost">Options</summary><div><label><input type="checkbox" data-compare-sync checked> Sync scroll</label><label title="Fit shows the entire comparison. Zoom expands only the map, never the editor text.">Map zoom <select data-compare-scale aria-label="Map zoom"><option value="0">Fit entire document</option><option value="0.5">1.5×</option><option value="1">2×</option><option value="2">3×</option><option value="4">5×</option></select></label><span class="nt-compare-legend"><span class="added">+ Added</span><span class="removed">− Removed</span><span class="changed">~ Modified</span><span>= Unchanged</span><span>Blank = alignment gap</span></span></div></details></div><div class="nt-compare-summary" data-compare-summary role="status"></div><div class="nt-compare-grid">'+['left','right'].map(side=>'<section class="nt-compare-pane" data-compare-pane="'+side+'"><div class="nt-editor-tabs" data-ed-tabs data-ed-view="'+side+'" role="tablist" aria-label="'+side+' view document tabs"></div><div class="nt-compare-surface"><pre data-compare-lines="'+side+'" aria-hidden="true"></pre><pre class="nt-compare-highlight" data-compare-highlight="'+side+'" aria-hidden="true" hidden></pre><textarea id="ntCompare-'+side+'" data-compare-text="'+side+'" data-input-clear="off" wrap="off" spellcheck="false" aria-label="Edit '+side+' comparison document"></textarea></div><div class="nt-compare-document-state" data-compare-state="'+side+'"></div><div class="nt-compare-syntax-notice" data-compare-syntax-notice="'+side+'" role="status" hidden></div></section>').join('<div class="nt-editor-pane-resize" data-compare-divider></div>')+'<div class="nt-compare-map-panel"><div class="nt-compare-map-labels" aria-hidden="true"><span>Left</span><span>Right</span></div><div class="nt-compare-map" data-compare-map><div data-compare-map-content>'+['left','right'].map(side=>'<div class="nt-compare-track" data-compare-track="'+side+'" tabindex="0" role="scrollbar" aria-label="'+side+' document map" aria-orientation="vertical" aria-controls="ntCompare-'+side+'" aria-valuemin="0" title="Click or drag anywhere to navigate this document. Fit: wheel scrolls the document. Zoom: wheel pans the map and document."><svg data-compare-map-marks="'+side+'" aria-hidden="true" preserveAspectRatio="none"></svg><div data-compare-map-viewport="'+side+'" aria-hidden="true"></div></div>').join('')+'</div></div></div></div>';
  mountSettings(host);
  const q=sel=>host.querySelector(sel),panes={left:q('[data-compare-text="left"]'),right:q('[data-compare-text="right"]')},map=q('[data-compare-map]'),mapContent=q('[data-compare-map-content]');
  const tracks={left:q('[data-compare-track="left"]'),right:q('[data-compare-track="right"]')};
- const preview=comparing&&mountDifferencePreview(host,(index,offset,limit)=>inlineDifferencePage(result,doc,index,offset,limit),()=>result&&!result.limited&&{count:result.hunks.length,index:Math.max(0,selected)});
+ const preview=comparing&&mountDifferencePreview(host,(start,count)=>inlinePreviewRows(result,doc).slice(start,start+count),()=>inlinePreviewRows(result,doc)?.length);
  const splitControl=createDivider(host,q('.nt-compare-grid'),comparing,()=>refresh(true));
 
  const docs=()=>options.documents(),doc=side=>docs().find(d=>d.id===(side==='left'?leftID:rightID));
@@ -294,9 +371,9 @@ function create(options){
  function revealMap(side){if(!scale||drag!==null)return;const marker=q('[data-compare-map-viewport="'+side+'"]'),top=parseFloat(marker.style.top)||0,bottom=top+parseFloat(marker.style.height||0);if(top<map.scrollTop)map.scrollTop=top;else if(bottom>map.scrollTop+map.clientHeight)map.scrollTop=Math.min(top,bottom-map.clientHeight);}
  function syncScroll(side,other=true){if(syncing)return;lastSide=side;const ta=panes[side];paintPane(side);remember(side);if(other&&q('[data-compare-sync]').checked&&result?.positions&&pixelReady){syncing=true;const target=side==='left'?'right':'left',a=metrics(side),b=metrics(target),row=rowAtLine(result.positions[side],lineAtOffset(offsets[side],Math.max(0,ta.scrollTop-a.padding)));b.ta.scrollTop=row<=0?0:clamp(offsetAtLine(offsets[target],lineAtRow(result.positions[target],row))+b.padding,0,b.ta.scrollHeight-b.ta.clientHeight);programScroll[target]=b.ta.scrollTop;paintPane(target);remember(target);syncing=false;}updateMap();revealMap(side);}
  function jump(row,center=false,side=lastSide,both=q('[data-compare-sync]').checked){if(!result?.positions||!pixelReady)return;row=clamp(row,0,result.rows.length);lastSide=side;const sides=both?['left','right']:[side];syncing=true;for(const side of sides){const {ta,height,padding}=metrics(side);ta.scrollTop=row<=0?0:clamp(offsetAtLine(offsets[side],lineAtRow(result.positions[side],row))+padding-(center?ta.clientHeight/2:0),0,ta.scrollHeight-ta.clientHeight);programScroll[side]=ta.scrollTop;paintPane(side);remember(side);}syncing=false;updateMap();}
- function difference(step){if(!result?.hunks?.length||!pixelReady)return;selected=differenceIndex(selected,step,result.hunks.length);preview.refresh();const h=result.hunks[selected];jump(h.start,false,lastSide,true);revealMap(lastSide);for(const side of ['left','right']){const d=doc(side),line=h[side];if(d&&line!==null){const start=d.content.split('\n').slice(0,line).reduce((n,s)=>n+s.length+1,0);panes[side].setSelectionRange(start,start+(d.content.split('\n')[line]||'').length);remember(side);}}q('[data-compare-summary]').textContent='Difference '+(selected+1)+' of '+result.hunks.length+' · '+h.type+'.';}
+ function difference(step){if(!result?.hunks?.length||!pixelReady)return;selected=differenceIndex(selected,step,result.hunks.length);preview.reveal(inlineChangedStart(result,selected));const h=result.hunks[selected];jump(h.start,false,lastSide,true);revealMap(lastSide);for(const side of ['left','right']){const d=doc(side),line=h[side];if(d&&line!==null){const start=d.content.split('\n').slice(0,line).reduce((n,s)=>n+s.length+1,0);panes[side].setSelectionRange(start,start+(d.content.split('\n')[line]||'').length);remember(side);}}q('[data-compare-summary]').textContent='Difference '+(selected+1)+' of '+result.hunks.length+' · '+h.type+'.';}
  function mapPoint(e,side){const r=map.getBoundingClientRect();jump(rowFromPointer(e.clientY,r.top,map.scrollTop,mapContent.offsetHeight,result.rows.length),true,side);}
- host.addEventListener('click',async e=>{const action=e.target.closest?.('[data-compare]');if(!action)return;e.preventDefault();e.stopPropagation();if(action.dataset.compare==='first'||action.dataset.compare==='last')difference(action.dataset.compare);if(action.dataset.compare==='next')difference(1);if(action.dataset.compare==='previous')difference(-1);if(action.dataset.compare==='close')options.close();if(action.dataset.compare==='compute')refresh(true);if(action.dataset.compare==='swap'){for(const side of ['left','right'])remember(side);options.swap?.();[leftID,rightID]=[rightID,leftID];listSignature='';for(const side of ['left','right'])fill(side,doc(side),true);refresh(true);}});
+ host.addEventListener('click',async e=>{const action=e.target.closest?.('[data-compare]');if(!action)return;e.preventDefault();e.stopPropagation();if(action.dataset.compare==='first'||action.dataset.compare==='last')difference(action.dataset.compare);if(action.dataset.compare==='next')difference(1);if(action.dataset.compare==='previous')difference(-1);if(action.dataset.compare==='swap'){for(const side of ['left','right'])remember(side);options.swap?.();[leftID,rightID]=[rightID,leftID];listSignature='';for(const side of ['left','right'])fill(side,doc(side),true);refresh(true);}});
  host.addEventListener('change',e=>{if(e.target.dataset.compareSelect){const side=e.target.dataset.compareSelect;remember(side);if(options.choose)options.choose(side,e.target.value);if(side==='left')leftID=e.target.value;else rightID=e.target.value;signature='';fill(side,doc(side),true);refresh(true);}if(e.target.matches('[data-compare-scale]')){scale=Number(e.target.value)||0;drawMap();const marker=q('[data-compare-map-viewport="'+lastSide+'"]');map.scrollTop=Math.max(0,parseFloat(marker.style.top)-map.clientHeight/2);}if(e.target.matches('[data-compare-spaces]'))refresh(true);if(e.target.matches('[data-compare-sync]'))syncScroll(lastSide);});
  host.addEventListener('focusin',e=>{const side=e.target.dataset.compareText;if(side&&doc(side)){lastSide=side;options.activate(doc(side),side);for(const name of ['left','right'])q('[data-compare-pane="'+name+'"]').classList.toggle('is-active-view',name===side);updateMap();}});
  host.addEventListener('input',async e=>{const side=e.target.dataset.compareText;if(!side)return;let d=doc(side);if(!d&&!comparing){const text=e.target.value,start=e.target.selectionStart,end=e.target.selectionEnd;d=await options.createInView?.(side);if(disposed)return;if(d){options.edit(d,text);refresh(true);panes[side].setSelectionRange(start,end);panes[side].focus();remember(side);}return;}if(d){options.edit(d,e.target.value);remember(side);refresh();}});
@@ -321,5 +398,5 @@ function create(options){
  const observer=typeof ResizeObserver==='function'?new ResizeObserver(()=>{splitControl.apply();refresh(true);}):null;observer?.observe(map);observer?.observe(q('.nt-compare-grid'));splitControl.apply();for(const side of ['left','right'])observer?.observe(panes[side]);refresh(true);
  return {refresh,difference,jump,get textarea(){return panes[options.activeSide?.()||lastSide];},get activeSide(){return lastSide;},scrollActive(){syncScroll(options.activeSide?.()||lastSide,false);},positionAt(offset,focus=true){const side=options.activeSide?.()||lastSide,ta=panes[side],d=doc(side);if(!d)return;lastSide=side;ta.setSelectionRange(offset,offset);if(focus)ta.focus({preventScroll:true});const line=d.content.slice(0,offset).split('\n').length-1;ta.scrollTop=Math.max(0,(offsets[side][line]||0)-metrics(side).height);syncScroll(side,false);},showDocument(id){if(!docs().some(d=>d.id===id))return;const side=options.sideOf?.(docs().find(d=>d.id===id)?.uid)||(leftID===id?'left':rightID===id?'right':lastSide);lastSide=side;remember(side);if(side==='left')leftID=id;else rightID=id;listSignature='';fill(side,doc(side),true);refresh(true);panes[side].focus({preventScroll:true});},undo(redo=false){const d=doc(lastSide);if(d){options.undo(d,redo);refresh(true);}},snapshot(){for(const side of ['left','right'])remember(side);return {left:leftID,right:rightID,scale,sync:q('[data-compare-sync]').checked};},restore(value){if(!value)return;const activeBefore=options.active()?.id;leftID=String(value.left||'');rightID=String(value.right||'');options.choose?.('left',leftID);options.choose?.('right',rightID);if([leftID,rightID].includes(activeBefore)){const activeDocument=docs().find(d=>d.id===activeBefore);if(activeDocument)options.activate(activeDocument,options.sideOf?.(activeDocument.uid));}scale=[0,.5,1,2,4].includes(value.scale)?value.scale:0;q('[data-compare-scale]').value=String(scale);q('[data-compare-sync]').checked=value.sync!==false;refresh(true);},get result(){return result;},get selection(){return {left:leftID,right:rightID};},dispose(){preview?.dispose?.();splitControl.dispose();disposed=true;layoutGeneration++;clearTimeout(timer);root.NTKEditorLanguageService?.cancelHighlight?.('compare-left');root.NTKEditorLanguageService?.cancelHighlight?.('compare-right');for(const side of ['left','right'])remember(side);observer?.disconnect();host.replaceChildren();}};
 }
-const api=Object.freeze({LIMITS,compare,lineAtRow,rowAtLine,viewport,offsetAtLine,lineAtOffset,mapHeight,rowFromPointer,splitBounds,splitRatio,createDivider,mountSettings,mountDifferencePreview,inlineDifferencePage,previewSourceLines,differenceIndex,differenceControls,createHorizontalSync,create});root.NTKEditorCompare=api;if(typeof module==='object'&&module.exports)module.exports=api;
+const api=Object.freeze({LIMITS,compare,lineAtRow,rowAtLine,viewport,offsetAtLine,lineAtOffset,mapHeight,rowFromPointer,splitBounds,splitRatio,createDivider,mountSettings,mountDifferencePreview,inlinePreviewRows,inlineChangedStart,inlineDifferencePage,previewSourceLines,differenceIndex,differenceControls,createHorizontalSync,create});root.NTKEditorCompare=api;if(typeof module==='object'&&module.exports)module.exports=api;
 })(typeof window==='undefined'?globalThis:window);

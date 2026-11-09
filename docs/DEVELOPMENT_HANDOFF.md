@@ -1,3 +1,11 @@
+# v1.21.26 Beta 1 - Continuous differences-only comparison
+
+The disk-backed difference index stores cumulative changed-row offsets. The differences-only view uses one virtual scroll range and fetches the visible window with its source line numbers. Gray spacers fill missing sides, and the comparison toolbar can still jump to a difference.
+
+Moved-text research covers ComparePlus, WinMerge, and Git. Move detection is a separate follow-up.
+
+---
+
 # v1.21.25 Beta 1 - Editable disk-backed alignment
 
 The comparison index stores a display row alongside each difference. Editable disk-backed panes use that index to project gray rows into the loaded viewport and translate selection and edits back to source offsets. The aligned scrollbar covers the whole comparison. The browser fixture inserts lines in a synthetic FortiOS file, scrolls through the gap, edits below it, and verifies saved bytes.

@@ -65,7 +65,7 @@ async function compareOpen(p){await p.locator('[data-ed="compare"]').click();awa
     report.layouts.push({mode,theme,comparing,...size,before:a,after:b,gain:b.visibleHeight-a.visibleHeight});
     assert(b.overflow<=1);assert(b.visibleHeight>=a.visibleHeight,JSON.stringify(report.layouts.at(-1)));
     if(output&&size.width!==820)for(const [label,item] of [['before',before],['after',after]])await item.page.screenshot({path:path.join(output,`${label}-${mode}-${size.width}-${theme}-${comparing?'compare':'text'}.png`)});
-    if(comparing)for(const item of [before,after])await item.page.locator('[data-compare="close"]').click();
+    if(comparing){await before.page.locator('[data-compare="close"]').click();await after.page.locator('[data-ed="compare"]').click();}
    }
   }
   check(mode+' rendered before/after height, narrow, short, light/dark');
@@ -73,7 +73,7 @@ async function compareOpen(p){await p.locator('[data-ed="compare"]').click();awa
    const p=after.page;lastPage=p;await p.setViewportSize({width:1440,height:1000});await p.uncheck('[data-ed-wrap]');await compareOpen(p);
    const left=p.locator('[data-compare-text="left"]'),right=p.locator('[data-compare-text="right"]'),map=p.locator('[data-compare-map]'),track=side=>p.locator('[data-compare-track="'+side+'"]');
    assert.equal(await p.locator('[data-compare-track]').count(),2);assert.equal(await p.locator('.nt-editor-title').count(),0);assert.equal(await p.locator('[data-compare="new"],[data-compare="open"]').count(),0);
-   await p.locator('.nt-compare-settings summary').click();await p.selectOption('[data-compare-scale]','0');await p.uncheck('[data-compare-sync]');
+   await p.locator('.nt-compare-settings summary').click();await p.selectOption('[data-compare-scale]','0');await p.uncheck('[data-compare-sync]');await p.locator('.nt-compare-settings summary').click();
    const documents=()=>p.evaluate(()=>[...NetworkToolkitFileEditor.documents.values()].map(d=>({uid:d.uid,content:d.content,dirty:d.dirty,undo:[...d.undo],redo:[...d.redo]}))),retained=await documents();
    for(const side of ['left','right']){
     const own=side==='left'?left:right,other=side==='left'?right:left;
@@ -85,10 +85,12 @@ async function compareOpen(p){await p.locator('[data-ed="compare"]').click();awa
    }
    check('Fit wheel and click-drag on either track navigate only the selected document with sync off');
    const font=await left.evaluate(e=>getComputedStyle(e).fontSize);
+   await p.locator('.nt-compare-settings summary').click();
    for(const scale of ['0.5','1','2','4']){await p.selectOption('[data-compare-scale]',scale);await p.waitForFunction(scale=>{const map=document.querySelector('[data-compare-map]');return Math.abs(map.firstElementChild.offsetHeight/map.clientHeight-(1+Number(scale)))<.02;},scale);await measuredMap(p,'scale '+scale);const sizes=await map.evaluate(e=>({view:e.clientHeight,content:e.firstElementChild.offsetHeight}));assert(Math.abs(sizes.content/sizes.view-(1+Number(scale)))<.02);}
+   await p.locator('.nt-compare-settings summary').click();
    const fixed=await left.evaluate(e=>e.closest('.cm-editor').querySelector('.cm-scroller').scrollTop),rightBefore=await right.evaluate(e=>e.closest('.cm-editor').querySelector('.cm-scroller').scrollTop);await track('right').hover();await p.mouse.wheel(0,-110);await p.waitForFunction(top=>document.querySelector('[data-compare-pane="right"] .cm-scroller').scrollTop!==top,rightBefore);await measuredMap(p,'zoomed unsynced right wheel');assert.equal(await left.evaluate(e=>e.closest('.cm-editor').querySelector('.cm-scroller').scrollTop),fixed);assert.equal(await left.evaluate(e=>getComputedStyle(e).fontSize),font);
    check('all zoom choices visibly expand map, wheel pans/navigates without changing font or other document');
-   await p.check('[data-compare-sync]');await p.selectOption('[data-compare-scale]','0');await track('left').press('Home');await mapHome(p,['left','right']);await track('right').hover();await p.mouse.wheel(0,123.5);await p.waitForFunction(()=>{const left=document.querySelector('[data-compare-pane="left"] .cm-scroller'),right=document.querySelector('[data-compare-pane="right"] .cm-scroller');return left.scrollTop>0&&right.scrollTop>0&&Math.abs(left.scrollTop-right.scrollTop)<2;});await measuredMap(p,'synced fractional wheel');assert(Math.abs(await left.evaluate(e=>e.closest('.cm-editor').querySelector('.cm-scroller').scrollTop)-await right.evaluate(e=>e.closest('.cm-editor').querySelector('.cm-scroller').scrollTop))<2);
+   await p.locator('.nt-compare-settings summary').click();await p.check('[data-compare-sync]');await p.selectOption('[data-compare-scale]','0');await p.locator('.nt-compare-settings summary').click();await track('left').press('Home');await mapHome(p,['left','right']);await track('right').hover();await p.mouse.wheel(0,123.5);await p.waitForFunction(()=>{const left=document.querySelector('[data-compare-pane="left"] .cm-scroller'),right=document.querySelector('[data-compare-pane="right"] .cm-scroller');return left.scrollTop>0&&right.scrollTop>0&&Math.abs(left.scrollTop-right.scrollTop)<2;});await measuredMap(p,'synced fractional wheel');assert(Math.abs(await left.evaluate(e=>e.closest('.cm-editor').querySelector('.cm-scroller').scrollTop)-await right.evaluate(e=>e.closest('.cm-editor').querySelector('.cm-scroller').scrollTop))<2);
    await p.check('[data-ed-wrap]');await ready(p);await p.setViewportSize({width:700,height:650});await ready(p);await track('right').press('End');await p.waitForFunction(()=>{const scroll=document.querySelector('[data-compare-pane="right"] .cm-scroller');return scroll.scrollTop>0&&Math.abs(scroll.scrollHeight-scroll.clientHeight-scroll.scrollTop)<=1;});assert.deepEqual(await documents(),retained);assert(await right.evaluate(e=>e.closest('.cm-editor').querySelector('.cm-scroller').scrollTop)>0);
    const old=await p.evaluate(()=>NetworkToolkitFileEditor.comparison.selection);await p.locator('[data-compare="swap"]').click();await ready(p);assert.deepEqual(await p.evaluate(()=>NetworkToolkitFileEditor.comparison.selection),{left:old.right,right:old.left});
    await right.focus();await right.press('Control+Home');const original=await compareText(p,'right');await right.press('X');await ready(p);await right.press('Control+z');await ready(p);assert.equal(await compareText(p,'right'),original);
@@ -100,14 +102,12 @@ async function compareOpen(p){await p.locator('[data-ed="compare"]').click();awa
    check('empty, one-line, unequal-length and heavily changed documents render both tracks');
    await p.setViewportSize({width:1440,height:1000});await p.uncheck('[data-ed-wrap]');await p.evaluate(()=>setTheme('dark'));
    const example=Array.from({length:600},(_,i)=>'const synthetic'+i+' = '+i+';'),revised=example.slice();revised.splice(450,15,...Array.from({length:15},(_,i)=>'const modified'+i+' = true;'));revised.splice(260,0,...Array.from({length:35},(_,i)=>'const added'+i+' = true;'));revised.splice(90,25);await left.fill(example.join('\n'));await ready(p);await right.fill(revised.join('\n'));await ready(p);
-   // ready() only proves the map is enabled; it may still show the previous diff
-   // for a frame after the second fill. Wait (bounded) for the new comparison.
-   await p.waitForFunction(()=>document.querySelectorAll('[data-compare-map-marks] .changed').length===2&&document.querySelector('[data-compare-map-marks="left"] .removed')&&document.querySelector('[data-compare-map-marks="right"] .added'),null,{timeout:5000}).catch(()=>{});
-  
-   assert(await p.locator('[data-compare-map-marks="left"] .removed').count()>0);assert(await p.locator('[data-compare-map-marks="right"] .added').count()>0);assert.equal(await p.locator('[data-compare-map-marks] .changed').count(),2);
-   await p.selectOption('[data-compare-scale]','0');await track('left').press('Home');await mapHome(p,['left','right']);
+   await p.waitForFunction(()=>[
+    ['left','removed'],['right','added'],['left','changed'],['right','changed']
+   ].every(([side,kind])=>document.querySelector('[data-compare-map-marks="'+side+'"] .'+kind)));
+   await p.locator('.nt-compare-settings summary').click();await p.selectOption('[data-compare-scale]','0');await p.locator('.nt-compare-settings summary').click();await track('left').press('Home');await mapHome(p,['left','right']);
    if(output)await p.screenshot({path:path.join(output,'map-fit-all-change-types.png')});
-   await p.selectOption('[data-compare-scale]','4');await track('left').press('PageDown');
+   await p.locator('.nt-compare-settings summary').click();await p.selectOption('[data-compare-scale]','4');await p.locator('.nt-compare-settings summary').click();await track('left').press('PageDown');
    await p.waitForFunction(()=>document.querySelector('[data-compare-pane="left"] .cm-scroller').scrollTop>0);const geometryCheck=await measuredMap(p,'zoomed PageDown');
    for(const g of geometryCheck)assert(Math.abs(g.expected-g.actual)<1,JSON.stringify(g));
    if(output)await p.screenshot({path:path.join(output,'map-zoom-5x.png')});

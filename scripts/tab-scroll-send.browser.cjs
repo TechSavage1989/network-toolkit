@@ -180,6 +180,7 @@ const sessions=Array.from({length:14},(_,i)=>({id:'s'+(i+1),label:'lab-switch-'+
   await page.locator('.nt-editor-more summary').click();
   await page.locator('[data-ed="textToHex"]').click();
   assert.equal(await text.inputValue(),' 62657461\ngamma');
+  await page.locator('.nt-editor-more summary').click();
   await page.locator('[data-ed="hexToText"]').click();
   assert.equal(await text.inputValue(),' beta\ngamma');
   await page.locator('.nt-editor-more summary').click();

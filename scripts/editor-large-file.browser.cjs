@@ -114,12 +114,14 @@ async function main() {
     const preview = page.locator('.nt-compare-preview');
     await preview.locator('code').first().waitFor();
     assert.match(await preview.innerText(), new RegExp(head));
-    assert.equal(await preview.locator('code').count(), 2);
+    assert.match(await preview.innerText(), new RegExp(tail));
+    assert.equal(await preview.locator('code').count(), 4);
     await preview.getByRole('button', {name:'Return to editable comparison'}).click();
     assert.equal(await preview.isVisible(), false);
     const legend = page.locator('.nt-editor-disk-compare .nt-compare-legend');
     assert.equal(await legend.isVisible(), true);
     assert.match(await legend.innerText(), /\+ Added.*− Removed.*~ Modified/s);
+    await page.locator('.nt-compare-settings summary').click();
     await page.uncheck('[data-compare-show-map]');
     assert.equal(await page.locator('[data-compare-map]').isVisible(), false);
     await page.check('[data-compare-show-map]');
@@ -222,7 +224,6 @@ async function main() {
     await page.waitForFunction(() => document.querySelector('[data-compare-summary]').dataset.compareSelected === '0');
     await page.locator('[data-compare="last"]').click();
     await page.waitForFunction(() => document.querySelector('[data-compare-summary]').dataset.compareSelected === '1');
-    await page.locator('.nt-compare-settings summary').click();
     report.compareMs = Date.now() - compareStarted;
     await page.screenshot({ path: path.join(output, 'editor-large-file-comparison.png') });
     await page.evaluate(() => NetworkToolkitFileEditor.closeComparison());

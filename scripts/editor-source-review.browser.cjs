@@ -18,9 +18,9 @@ const settle=()=>page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requ
  const text=Array.from({length:220},(_,i)=>'Write-Output "line '+i+' '+('long text '.repeat(i%4===0?32:2))+'" # sample').join('\n');
  async function open(id,content=text){await page.evaluate(async({id,content})=>NetworkToolkitFileEditor.open({id,path:id+'.ps1',source:'Local computer',create:true,initialContent:content,read:async()=>({content}),write:async data=>{globalThis.__savedEditorFile=data;return {hash:'saved'};}}),{id,content});}
  const ta=page.locator('[data-ed-text]'),action=name=>page.locator('[data-ed="'+name+'"]');
- await open('review');await page.waitForFunction(()=>NetworkToolkitFileEditor.active.syntaxCache);await page.locator('.nt-editor-more summary').click();
+ await open('review');await page.waitForFunction(()=>NetworkToolkitFileEditor.active.syntaxCache);
  for(const name of ['upper','lower','comment','duplicate','trim','sortLines','undo','redo']){
-  await ta.evaluate(el=>{const start=el.value.indexOf('line 60');el.setSelectionRange(start,start+7);el.scrollTop=700;el.scrollLeft=25;});const before=await ta.evaluate(el=>({top:el.scrollTop,left:el.scrollLeft}));await action(name).click();await settle();assert.deepEqual(await ta.evaluate(el=>({top:el.scrollTop,left:el.scrollLeft})),before,name);
+  await ta.evaluate(el=>{const start=el.value.indexOf('line 60');el.setSelectionRange(start,start+7);el.scrollTop=700;el.scrollLeft=25;});const before=await ta.evaluate(el=>({top:el.scrollTop,left:el.scrollLeft}));if(name!=='undo'&&name!=='redo')await page.locator('.nt-editor-more summary').click();await action(name).click();await settle();assert.deepEqual(await ta.evaluate(el=>({top:el.scrollTop,left:el.scrollLeft})),before,name);
  }
  check('case, comment, duplicate, trim, sort, undo and redo preserve both scroll positions');
  await action('goto').click();await page.locator('[data-ed-dialog-input]').fill('30');await page.locator('[data-ed-dialog-action="accept"]').click();await settle();assert.equal(await ta.evaluate(el=>el.value.slice(0,el.selectionStart).split('\n').length),30);
