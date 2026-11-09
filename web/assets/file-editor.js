@@ -573,6 +573,8 @@ function skin(){if(overlay)return;readPreferences();
   if(event.key!=='Escape'||!more.open)return;
   event.stopPropagation();moreSummary.focus({preventScroll:true});more.open=false;
  });
+ moreActions.addEventListener('click',event=>{if(event.target.closest('[data-ed]'))more.open=false;});
+ moreActions.addEventListener('change',()=>{more.open=false;});
  overlay.addEventListener('pointerdown',event=>{if(more.open&&!more.contains(event.target))more.open=false;
   const settings=comparisonHost?.querySelector('.nt-compare-settings');
   if(settings?.open&&!settings.contains(event.target))settings.open=false;});
