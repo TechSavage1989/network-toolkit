@@ -91,6 +91,15 @@ func TestDiskEditorCompareMixedDocumentsAndLease(t *testing.T) {
 			t.Fatal(result.Code, result.Body)
 		}
 	}
+	for side, want := range map[string]string{"left": "[0,-1,1,2]", "right": "[0,1,2,3]"} {
+		result := call("alignment-wrap", map[string]any{"side": side, "rows": []int{0, 1, 2, 3}})
+		if result.Code != 200 || strings.TrimSpace(result.Body.String()) != want {
+			t.Fatal(result.Code, result.Body)
+		}
+	}
+	if result := call("alignment-wrap", map[string]any{"side": "left", "rows": []int{4}}); result.Code != 400 {
+		t.Fatal(result.Code, result.Body)
+	}
 	if edit := diskCall(a, a.token, lease, map[string]any{"action": "edit", "revision": 1, "from": 0, "to": 0, "text": "new "}); edit.Code != 200 {
 		t.Fatal(edit.Code, edit.Body)
 	}

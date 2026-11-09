@@ -96,6 +96,9 @@ type editorPreferences struct {
 	CompareHorizontalSync     bool              `json:"compareHorizontalSync,omitempty"`
 	CompareUnderline          *bool             `json:"compareUnderline,omitempty"`
 	CompareIntralineHighlight *bool             `json:"compareIntralineHighlight,omitempty"`
+	CompareWrapNavigation     *bool             `json:"compareWrapNavigation,omitempty"`
+	CompareMoveCaret          *bool             `json:"compareMoveCaret,omitempty"`
+	CompareShowSummary        *bool             `json:"compareShowSummary,omitempty"`
 	WordWrap                  bool              `json:"wordWrap"`
 	Syntax                    bool              `json:"syntax"`
 	Indent                    int               `json:"indent"`

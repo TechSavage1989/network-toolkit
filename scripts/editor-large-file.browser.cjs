@@ -22,6 +22,52 @@ async function waitForEngine(page, predicate, timeout = 30000) {
   throw Error('The editor engine did not reach the expected fixture state.');
 }
 
+async function verifyRepeatedPolicies(page) {
+  const policy = (id, action = 'accept') => [
+    '    edit ' + id,
+    '        set srcintf "port1"',
+    '        set dstintf "port2"',
+    '        set action ' + action,
+    '    next',
+  ];
+  const ids = Array.from({length:12}, (_, i) => 10000 + i);
+  const config = lines => ['config firewall policy', ...lines, 'end', ''].join('\n');
+  const before = config(ids.flatMap(id => policy(id)));
+  const after = config([
+    ...[20000, 20001, 20002].flatMap(id => policy(id)),
+    ...ids.flatMap(id => policy(id, id === ids.at(-1) ? 'deny' : 'accept')),
+  ]);
+  // Use the same disk-backed route as the real files without adding another
+  // large on-disk fixture just to demonstrate the repeated-policy anchor.
+  await page.evaluate(async ({before, after}) => {
+    for (const [id, content] of [['policies-before', before], ['policies-after', after]]) {
+      const file = new File([content], id + '.conf');
+      await NetworkToolkitFileEditor.open({
+        id, path:file.name, source:'Synthetic FortiOS fixture', binding:{kind:'localDraft'},
+        create:true, diskMode:'upload', diskFile:file, read:async()=>({content}), write:async()=>({}),
+      });
+    }
+  }, {before, after});
+  await page.locator('[data-ed="compare"]').click();
+  await page.selectOption('[data-compare-select="left"]', 'policies-before');
+  await page.selectOption('[data-compare-select="right"]', 'policies-after');
+  await page.waitForFunction(() => document.querySelector('[data-compare-summary]')?.dataset.compareDone === 'true');
+  assert.equal(await page.locator('[data-compare-summary]').getAttribute('data-compare-count'), '2');
+  await page.locator('.nt-compare-settings summary').click();
+  await page.check('[data-compare-only]');
+  const preview = page.locator('.nt-compare-preview');
+  for (const id of [20000, 20001, 20002]) {
+    await preview.locator('.nt-compare-preview-line.added code').filter({hasText:'edit ' + id}).waitFor();
+  }
+  assert.equal(await preview.locator('code').filter({hasText:'edit 10000'}).count(), 0);
+  await preview.getByRole('button', {name:'Return to editable comparison'}).click();
+  await page.waitForFunction(() => {
+    const line = (side, n) => [...document.querySelector('[data-disk-compare-gutter="'+side+'"]').children]
+      .find(row => row.textContent === n)?.getBoundingClientRect().top;
+    return Math.abs(line('left', '2') - line('right', '17')) < 2;
+  });
+}
+
 async function main() {
   const browser = await chromium.launch({ headless: true, ignoreDefaultArgs:['--hide-scrollbars'],
     ...(process.env.TOOLKIT_BROWSER_EXECUTABLE ? { executablePath: process.env.TOOLKIT_BROWSER_EXECUTABLE } : {}) });
@@ -81,6 +127,27 @@ async function main() {
       return page.start > 0 && Math.abs((page.line - expected) * height + editor.scrollTop) <= 1;
     }, firstScroll, {timeout: 3000});
 
+    report.phase = 'single-word-wrap';
+    const wrap = page.locator('[data-ed-wrap]');
+    const documentBar = page.locator('.nt-editor-code .nt-editor-disk-scroll');
+    await wrap.check();
+    await documentBar.press('Home');
+    await page.waitForFunction(() => {
+      const editor = document.querySelector('.nt-editor-code textarea[data-ed-text]');
+      const rows = [...document.querySelectorAll('[data-ed-gutter-lines] > div')];
+      const first = rows.filter(row => row.textContent === '1');
+      const second = rows.find(row => row.textContent === '2');
+      const style = getComputedStyle(editor);
+      return ['pre-wrap', 'break-spaces'].includes(style.whiteSpace) && first.length === 1 &&
+        second && second.getBoundingClientRect().top - first[0].getBoundingClientRect().top > 2 * parseFloat(style.lineHeight);
+    });
+    assert.equal(await text.evaluate(editor => editor.scrollWidth <= editor.clientWidth + 1), true);
+    await documentBar.press('End');
+    await page.waitForFunction(() => {
+      const bar = document.querySelector('.nt-editor-code .nt-editor-disk-scroll');
+      return Number(bar.getAttribute('aria-valuenow')) >= .99 * Number(bar.getAttribute('aria-valuemax'));
+    });
+
     report.phase = 'edit';
     await text.press('Control+End');
     await page.waitForFunction(n => {
@@ -102,6 +169,7 @@ async function main() {
     const editedSize = Number(size) + head.length + tail.length;
     await page.waitForFunction(n => NetworkToolkitFileEditor.active.diskMeta.units === n && !NetworkToolkitFileEditor.active.diskSession.pending, editedSize);
     assert.ok(await text.inputValue().then(value => value.startsWith(head)));
+    await wrap.uncheck();
 
     report.phase = 'compare';
     const compareStarted = Date.now();
@@ -283,6 +351,57 @@ async function main() {
     assert.equal(await leftPane.locator('textarea').inputValue().then(value => value.includes('\n\n\nconfig system global')), true);
     assert.equal(await leftPane.locator('textarea').evaluate(el => getComputedStyle(el.parentElement.querySelector('.nt-disk-compare-color.gap')).backgroundColor !== 'rgba(0, 0, 0, 0)'), true);
     await page.screenshot({path:path.join(output,'editor-aligned-spacers.png')});
+
+    report.phase = 'comparison-word-wrap';
+    await page.setViewportSize({width:1920,height:1100});
+    const divider = page.locator('[data-compare-divider]');
+    await wrap.check();
+    for (let i = 0; i < 4; i++) await divider.press('ArrowRight');
+    await leftPane.locator('.nt-editor-disk-scroll').press('Home');
+    await page.waitForFunction(() => {
+      const left = document.querySelector('[data-compare-pane="left"]');
+      const right = document.querySelector('[data-compare-pane="right"]');
+      const editor = pane => pane.querySelector('textarea');
+      const rows = pane => [...pane.querySelector('[data-disk-compare-gutter]').children];
+      const number = (pane, n) => rows(pane).find(row => row.textContent === n);
+      const y = el => el?.getBoundingClientRect().top;
+      const style = getComputedStyle(editor(left));
+      const height = parseFloat(style.lineHeight);
+      const leftHead = number(left, '1'), rightHead = number(right, '1');
+      return ['pre-wrap', 'break-spaces'].includes(style.whiteSpace) &&
+        ['pre-wrap', 'break-spaces'].includes(getComputedStyle(editor(right)).whiteSpace) &&
+        editor(left).clientWidth > editor(right).clientWidth + 100 &&
+        Math.abs(y(leftHead) - y(rightHead)) < height / 2 &&
+        y(number(left, '2')) - y(leftHead) > 2 * height &&
+        Math.abs(y(number(left, '2')) - y(number(right, '4'))) < height / 2 &&
+        left.querySelector('[data-wrap-gap]') && leftHead.dataset.differenceSymbol === '~' &&
+        rows(left).filter(row => row.textContent === '1').length === 1;
+    }, null, {timeout:10000}).catch(async error => {
+      report.wrappedComparison = await page.evaluate(() => ['left','right'].map(side => {
+        const pane = document.querySelector('[data-compare-pane="'+side+'"]');
+        const textarea = pane.querySelector('textarea');
+        return {
+          side, width:textarea.clientWidth, wrap:getComputedStyle(textarea).whiteSpace, scrollTop:textarea.scrollTop,
+          rows:[...pane.querySelector('[data-disk-compare-gutter]').children].slice(0, 20).map(row => ({
+            text:row.textContent, y:row.getBoundingClientRect().top, height:row.getBoundingClientRect().height,
+            gap:row.hasAttribute('data-wrap-gap'), diff:row.dataset.differenceSymbol
+          }))
+        };
+      }));
+      await page.screenshot({path:path.join(output,'editor-wrapped-comparison-failed.png')});
+      throw error;
+    });
+    await page.screenshot({path:path.join(output,'editor-wrapped-comparison.png')});
+    await leftPane.locator('textarea').hover();
+    await page.mouse.wheel(0, 84);
+    await page.waitForFunction(() => {
+      const left = document.querySelector('[data-compare-pane="left"]');
+      const right = document.querySelector('[data-compare-pane="right"]');
+      const y = (pane, number) => [...pane.querySelector('[data-disk-compare-gutter]').children]
+        .find(row => row.textContent === number)?.getBoundingClientRect().top;
+      return left.querySelector('textarea').scrollTop > 30 && right.querySelector('textarea').scrollTop > 30 &&
+        Math.abs(y(left, '2') - y(right, '4')) < 3;
+    });
     await leftPane.locator('textarea').evaluate(el=>{
       const at = el.value.indexOf('config system global');
       el.focus({preventScroll:true});
@@ -293,6 +412,8 @@ async function main() {
     assert.equal(await page.evaluate(name => [...NetworkToolkitFileEditor.documents.values()].find(d=>d.path===name).diskSession.state().page.text.includes('\n!config system global'),left),true);
     await leftPane.locator('textarea').press('Control+z');
     await page.waitForFunction(({name,size}) => [...NetworkToolkitFileEditor.documents.values()].find(d=>d.path===name).diskMeta.units === size, {name:left,size:Number(size)});
+    await wrap.uncheck();
+    await divider.press('Enter');
     await page.evaluate(name => {
       NetworkToolkitFileEditor.closeComparison();
       const doc = [...NetworkToolkitFileEditor.documents.values()].find(item => item.path === name);
@@ -317,7 +438,6 @@ async function main() {
     assert.ok(await page.evaluate(() => NetworkToolkitFileEditor.active.dirty), 'new typing must remain unsaved');
     assert.ok(await text.inputValue().then(value => value.endsWith(tail + '!')));
     report.editsDuringSave = await page.evaluate(async () => (await api('/editor-fixture/state')).editsDuringSave);
-    const documentBar = page.locator('.nt-editor-code .nt-editor-disk-scroll');
     await documentBar.evaluate(el => el.scrollTop = (el.scrollHeight - el.clientHeight) / 2);
     await page.waitForFunction(() => {
       const bar = document.querySelector('.nt-editor-code .nt-editor-disk-scroll');
@@ -345,10 +465,14 @@ async function main() {
     assert.ok(report.timing.pageUnits < 128 * 1024, 'renderer received a bounded page');
     assert.ok(report.timing.inputSamples >= head.length + tail.length + 1, 'timed each edit event');
     assert.ok(report.timing.frameP99Ms < 100 && report.timing.inputP95Ms < 100, JSON.stringify(report.timing));
-    assert.deepEqual(report.browserErrors, []);
     report.phase = 'close';
     assert.ok(await page.evaluate(() => NetworkToolkitFileEditor.closeAll()));
     await waitForEngine(page, state => state.grants === 0 && state.comparisons === 0);
+    report.phase = 'fortios-policy-alignment';
+    await verifyRepeatedPolicies(page);
+    assert.ok(await page.evaluate(() => NetworkToolkitFileEditor.closeAll()));
+    await waitForEngine(page, state => state.grants === 0 && state.comparisons === 0);
+    assert.deepEqual(report.browserErrors, []);
     report.passed = true;
     report.phase = 'verified';
   } finally {

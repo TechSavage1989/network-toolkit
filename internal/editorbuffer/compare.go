@@ -258,9 +258,48 @@ func (s *lineSignatures) keepSuffix(n int64) {
 	s.count = min(s.count, int(s.end-s.line))
 }
 
-// nearestAnchor finds a local resynchronization with fewest skipped lines.
-// Prefer a short matching run when repeated lines offer equivalent anchors.
+// uniqueHeadAnchor recognizes an unchanged block after a local insertion or
+// deletion. A unique header followed by two exact lines is stronger evidence
+// than a closer run of repeated lines inside an unrelated block.
+func uniqueHeadAnchor(source, other *lineSignatures) (int64, bool) {
+	const run = 3
+	if source.count < run || other.count <= run {
+		return 0, false
+	}
+	head := source.at(0)
+	match := -1
+	for i := 1; i < other.count; i++ {
+		if other.at(i) == head {
+			if match >= 0 {
+				return 0, false
+			}
+			match = i
+		}
+	}
+	if match < 0 || match+run > other.count {
+		return 0, false
+	}
+	for i := 1; i < run; i++ {
+		if source.at(i) != other.at(match+i) {
+			return 0, false
+		}
+	}
+	for i := 1; i < source.count; i++ {
+		if source.at(i) == head {
+			return 0, false
+		}
+	}
+	return int64(match), true
+}
+
+// nearestAnchor preserves a clear inserted or deleted block, then finds a
+// local resynchronization with fewest skipped lines.
 func nearestAnchor(left, right *lineSignatures, positions map[lineSignature]int) (int64, int64, bool) {
+	l, deleted := uniqueHeadAnchor(right, left)
+	r, inserted := uniqueHeadAnchor(left, right)
+	if inserted != deleted {
+		return l, r, true
+	}
 	// Keep a one-line replacement paired when neighboring repeated lines
 	// otherwise make a spurious insertion plus trailing deletion look cheaper.
 	if left.count > 1 && right.count > 1 && left.end-left.line == right.end-right.line && left.at(1) == right.at(1) {

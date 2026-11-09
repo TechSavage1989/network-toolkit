@@ -9,6 +9,14 @@ test('large nearly identical documents use prefix/suffix trimming',()=>{const a=
 test('very large or extensively changed documents stop with an explicit bounded result',()=>{assert(c.compare('x'.repeat(c.LIMITS.characters+1),'').limited);assert(c.compare('\n'.repeat(c.LIMITS.lines),'').limited);const a=Array.from({length:2000},(_,i)=>'a'+i).join('\n'),b=Array.from({length:2000},(_,i)=>'b'+i).join('\n');assert(c.compare(a,b).limited);});
 test('row/line mappings account for asymmetric additions and deletions',()=>{const r=c.compare('a\nz','a\nb\nc\nz');assert.deepEqual(r.positions.left,[0,1,1,1,2]);assert.deepEqual(r.positions.right,[0,1,2,3,4]);assert.equal(c.lineAtRow(r.positions.left,2.5),1);assert.equal(c.rowAtLine(r.positions.left,1.5),3.5);assert.equal(c.lineAtRow(r.positions.right,3.5),3.5);});
 
+test('difference navigation can stop at each end without changing first or last',()=>{
+ assert.equal(c.differenceIndex(2,1,3),0);
+ assert.equal(c.differenceIndex(2,1,3,false),2);
+ assert.equal(c.differenceIndex(0,-1,3,false),0);
+ assert.equal(c.differenceIndex(-1,-1,3,false),2);
+ assert.equal(c.differenceIndex(2,'first',3,false),0);
+ assert.equal(c.differenceIndex(0,'last',3,false),2);
+});
 test('whitespace modes preserve source line coordinates',()=>{
  const left='  first\tword\nsecond word\nleft',right='first word\nsecondword\nright';
  assert.equal(c.compare(left,right).rows[0].type,'changed');

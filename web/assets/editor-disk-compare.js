@@ -68,7 +68,7 @@ function create(options) {
  q('[data-compare-horizontal-sync]').checked = prefs.compareHorizontalSync === true;
  q('[data-compare-underline]').checked = prefs.compareUnderline !== false;
  q('[data-compare-intraline]').checked = prefs.compareIntralineHighlight !== false;
- root.NTKEditorCompare.mountSettings(host);
+ root.NTKEditorCompare.mountSettings(host, {...options, compareCanSelect:false});
 
  const panes = Object.fromEntries(sides.map(side => {
   const section = q('[data-compare-pane="' + side + '"]');
@@ -99,6 +99,7 @@ function create(options) {
   scale === -2 ? 1 / 3 : Math.max(2, Math.ceil(map.clientHeight / 3500)) * (1 + Math.max(0,scale));
  q('[data-compare-scale]').value = String(scale === 0 ? -1 : scale);
  const splitter = root.NTKEditorCompare.createDivider(host, q('.nt-compare-grid'), comparing, () => {
+  refreshWrapLayout();
   for (const side of sides) changed(side);
  });
  const activeSide = () => options.activeSide?.() || lastSide;
@@ -106,6 +107,7 @@ function create(options) {
  const lineHeight = pane => parseFloat(root.getComputedStyle(pane.textarea).lineHeight) || 20;
  const linesInView = pane => Math.ceil(pane.textarea.clientHeight / lineHeight(pane)) + 6;
  const totalLines = pane => pane.doc?.disk ? pane.doc.diskMeta?.lines || 1 : pane.lines.length;
+ const wrapping = () => !!options.wordWrap?.();
  const go = promise => { void promise.catch(error => setSummary(error.message)); };
 
  function setSummary(message) {
@@ -159,13 +161,19 @@ function create(options) {
   }
   const blocked = !!(doc?.loading || doc?.frozen || doc?.reloading || doc?.promoting || doc?.staged);
   if (!doc?.disk) {
+   const wasWrapped = ta.wrap === 'soft';
    ta.disabled = blocked || (!doc && (comparing || options.documents().length >= 12));
    ta.placeholder = doc ? '' : comparing ? 'Choose a document to compare.' : 'Type here or move a tab to this view.';
-   ta.wrap = options.wordWrap?.() ? 'soft' : 'off';
+   ta.wrap = wrapping() ? 'soft' : 'off';
    ta.classList.toggle('is-wrapped', ta.wrap === 'soft');
    const value = doc?.content || '';
    if (ta.value !== value) ta.value = value;
    indexInline(pane, value);
+   if (!changedDocument && wasWrapped !== (ta.wrap === 'soft')) {
+    const offsets = inlineWrapOffsets(pane);
+    const line = clamp(pane.top, 0, pane.lines.length - 1);
+    ta.scrollTop = (offsets?.[line] ?? line) * lineHeight(pane);
+   }
    if (changedDocument && doc) {
     const saved = doc[viewField] || doc.view;
     if (saved) {
@@ -187,20 +195,66 @@ function create(options) {
  }
 
  function paintInlineGutter(pane) {
-  const height = lineHeight(pane), top = Math.floor(pane.textarea.scrollTop / height);
+  const height = lineHeight(pane), offsets = inlineWrapOffsets(pane);
+  const scrollTop = pane.textarea.scrollTop;
+  let top = Math.floor(scrollTop / height);
+  if (offsets) {
+   let first = 0, end = pane.lines.length;
+   while (first + 1 < end) {
+    const mid = Math.floor((first + end) / 2);
+    if (offsets[mid] * height <= scrollTop) first = mid;
+    else end = mid;
+   }
+   top = first;
+  }
   const from = Math.max(0, top - 3), end = Math.min(pane.lines.length, top + linesInView(pane));
   pane.top = top;
-  pane.gutter.style.paddingTop = from * height + 'px';
-  pane.gutter.style.transform = 'translateY(' + (-pane.textarea.scrollTop) + 'px)';
+  const lineTop = (offsets?.[top] ?? top) * height;
+  const lineSize = offsets ? (offsets[top + 1] - offsets[top]) * height : height;
+  pane.fraction = clamp((scrollTop - lineTop) / lineSize, 0, .999);
+  pane.gutter.style.paddingTop = (offsets?.[from] ?? from) * height + 'px';
+  pane.gutter.style.transform = 'translateY(' + (-scrollTop) + 'px)';
   const rows = [];
   for (let line = from; line < end; line++) {
    const row = document.createElement('div');
-   row.style.height = height + 'px';
+   row.style.height = (offsets ? (offsets[line + 1] - offsets[line]) * height : height) + 'px';
    row.style.lineHeight = height + 'px';
    row.textContent = String(line + 1);
    rows.push(row);
   }
   pane.gutter.replaceChildren(...rows);
+ }
+
+ function wrapGeometry(ta) {
+  const style = root.getComputedStyle(ta);
+  return [ta.clientWidth, style.font, style.lineHeight, style.tabSize].join(':');
+ }
+
+ function inlineWrapOffsets(pane) {
+  if (pane.textarea.wrap !== 'soft') return null;
+  const key = wrapGeometry(pane.textarea);
+  if (pane.inlineWrap?.text !== pane.text || pane.inlineWrap.key !== key) {
+   const offsets = [0];
+   for (const count of root.NTKEditorDiskView.measureWrapRows(pane.text, pane.textarea)) {
+    offsets.push(offsets.at(-1) + count);
+   }
+   pane.inlineWrap = {key, text:pane.text, offsets};
+  }
+  return pane.inlineWrap.offsets;
+ }
+
+ function refreshWrapLayout() {
+  const wrap = wrapping();
+  q('[data-compare-horizontal-sync]').disabled = wrap;
+  const resized = sides.map(side => {
+   const pane = panes[side], key = wrap && wrapGeometry(pane.textarea);
+   if (pane.wrapGeometry === key) return false;
+   pane.wrapGeometry = key;
+   return true;
+  });
+  for (const [i, side] of sides.entries()) {
+   if (resized[i] || resized[1 - i]) panes[side].view?.refreshWrap(resized[1 - i]);
+  }
  }
 
  function differenceKind(side, line, ranges) {
@@ -217,26 +271,29 @@ function create(options) {
  function paintDifferences(side) {
   const pane = panes[side], rows = pane.gutter.children, colors = [];
   const first = rows[0];
-  const bounds = first && (pane.ranges.length || lineHighlight?.lines[side] != null) ? first.getBoundingClientRect() : null;
-  const top = bounds ? bounds.top - pane.colors.getBoundingClientRect().top : 0;
-  let index = 0;
+  const hasMarks = pane.ranges.length || lineHighlight?.lines[side] != null || pane.gutter.querySelector('[data-alignment-gap]');
+  const bounds = first && hasMarks ? first.getBoundingClientRect() : null;
+  let top = bounds ? bounds.top - pane.colors.getBoundingClientRect().top : 0;
+  const defaultHeight = bounds?.height || 0;
   const intraline = q('[data-compare-intraline]').checked;
   const budget = {remaining:8192};
   for (const row of rows) {
    const gap = row.hasAttribute('data-alignment-gap');
-   const line = Number(row.textContent) - 1;
+   const line = Number(row.dataset.sourceLine || row.textContent) - 1;
    const kind = gap ? 'gap' : differenceKind(side, line, pane.ranges);
    const className = kind ? 'nt-compare-line ' + kind : '';
    if (row.className !== className) row.className = className;
-   if (differenceSymbols[kind]) row.dataset.differenceSymbol = differenceSymbols[kind];
+   if (row.textContent && differenceSymbols[kind]) row.dataset.differenceSymbol = differenceSymbols[kind];
    else delete row.dataset.differenceSymbol;
-   const offset = index++;
+   const height = parseFloat(row.style.height) || defaultHeight;
+   const offset = top;
+   top += height;
    const current = lineHighlight?.lines[side] === line;
    if ((!kind && !current) || !bounds) continue;
    const color = document.createElement('span');
    color.className = 'nt-disk-compare-color ' + kind + (current ? ' is-current' : '');
-   color.style.top = top + offset * bounds.height + 'px';
-   color.style.height = bounds.height + 'px';
+   color.style.top = offset + 'px';
+   color.style.height = height + 'px';
    if (intraline && kind === 'changed') paintCharacters(side, line, color, budget);
    colors.push(color);
   }
@@ -261,6 +318,11 @@ function create(options) {
   if (!ranges?.length) return;
   const overlay = document.createElement('span');
   overlay.className = 'nt-disk-compare-intraline';
+  if (pane.textarea.wrap === 'soft') {
+   overlay.style.whiteSpace = 'pre-wrap';
+   overlay.style.overflowWrap = 'anywhere';
+   overlay.style.right = '12px';
+  }
   overlay.style.transform = 'translateX(' + (-pane.textarea.scrollLeft) + 'px)';
   let from = 0;
   for (const range of ranges) {
@@ -413,7 +475,6 @@ function create(options) {
    pane.alignedTop = view.alignedTop;
   } else {
    paintInlineGutter(pane);
-   pane.fraction = pane.textarea.scrollTop / lineHeight(pane) - pane.top;
   }
   remember(side);
   paintDifferences(side);
@@ -448,7 +509,9 @@ function create(options) {
    await view.ready;
    if (pane.view === view && !disposed) await view.goLine(target, false, false, fraction);
   } else {
-   pane.textarea.scrollTop = (target + fraction) * lineHeight(pane);
+   const offsets = inlineWrapOffsets(pane);
+   const row = offsets ? offsets[target] + fraction * (offsets[target + 1] - offsets[target]) : target + fraction;
+   pane.textarea.scrollTop = row * lineHeight(pane);
    changed(side);
   }
  }
@@ -569,6 +632,64 @@ function create(options) {
   setSummary(error.message);
  }
 
+ async function peerWrapRows(side, current, rows, signal) {
+  if (!wrapping() || job !== current || !rows.length) return new Map();
+  const peer = peerOf(side), pane = panes[peer], view = pane.view;
+  if (!view) return new Map();
+  const abort = signal ? AbortSignal.any([signal, current.abort.signal]) : current.abort.signal;
+  const sources = [];
+  for (let i = 0; i < rows.length; i += 256) {
+   const batch = rows.slice(i, i + 256).filter(row => row >= 0 && row < current.status.rows);
+   if (!batch.length) continue;
+   const lines = await options.compareRequest({action:'alignment-wrap', id:current.id, side:peer, rows:batch}, abort);
+   for (let j = 0; j < batch.length; j++) if (lines[j] >= 0) sources.push({row:batch[j], line:lines[j]});
+  }
+  const counts = new Map();
+  if (job !== current || view !== pane.view || !sources.length) return counts;
+  const session = options.ensureDiskSession(pane.doc);
+  const geometry = wrapGeometry(pane.textarea);
+  let cache = pane.wrapPages;
+  if (cache?.job !== current || cache.geometry !== geometry) {
+   cache = pane.wrapPages = {job:current, geometry, pages:[]};
+  }
+  const measure = page => {
+   let lines = page.text.split('\n'), line = page.line;
+   // Never treat a page fragment as a complete source line. A line that
+   // spans pages wraps locally and can still be navigated in each pane.
+   if (!page.complete) lines.pop();
+   if (page.column && lines.length) { lines.shift(); line++; }
+   const rows = lines.length ? view.measureWrapRows(lines.join('\n')) : [];
+   return {line, end:line + rows.length, rows};
+  };
+  const visible = view.comparisonPage();
+  if (!cache.shown || cache.shown.text !== visible.text || cache.shown.line !== visible.line ||
+      cache.shown.column !== visible.column || cache.shown.complete !== visible.complete) {
+   cache.shown = {...visible, measured:measure(visible)};
+  }
+  const shown = cache.shown.measured;
+  let index = 0;
+  while (index < sources.length) {
+   abort.throwIfAborted();
+   if (job !== current || view !== pane.view) return new Map();
+   const first = sources[index].line;
+   let page = [shown, ...cache.pages].find(value => first >= value.line && first < value.end);
+   if (!page) {
+    const data = await session.previewWindow(first, abort);
+    page = measure({...data, complete:data.start + data.text.length >= data.units});
+    if (page.rows.length) {
+     cache.pages.unshift(page);
+     if (cache.pages.length > 4) cache.pages.pop();
+    }
+   }
+   if (first < page.line || first >= page.end) { index++; continue; }
+   while (index < sources.length && sources[index].line >= page.line && sources[index].line < page.end) {
+    const {row, line} = sources[index++];
+    counts.set(row, page.rows[line - page.line]);
+   }
+  }
+  return counts;
+ }
+
  function applyStatus(current, status) {
   if (job !== current || disposed) return;
   const justFinished = status.done && !current.status?.done;
@@ -595,7 +716,8 @@ function create(options) {
    const pending = sides.map(side => panes[side].view.setAlignment({
     rows:status.rows,
     layout:(line,end)=>request(side,'alignment',line,end),
-    source:row=>request(side,'alignment-row',row)
+    source:row=>request(side,'alignment-row',row),
+    peerWrapRows:(rows,signal)=>peerWrapRows(side,current,rows,signal)
    }));
    void Promise.all(pending).finally(() => { syncing--; }).then(() => {
     if (job === current && q('[data-compare-sync]').checked && panes[gestureSide]?.alignedTop != null &&
@@ -713,7 +835,9 @@ function create(options) {
   const current = job;
   const count = current?.status?.count || 0;
   if (!count) return;
-  const index = root.NTKEditorCompare.differenceIndex(selected, step, count);
+  const wrapNavigation = q('[data-compare-wrap-nav]')?.checked !== false;
+  const index = root.NTKEditorCompare.differenceIndex(selected, step, count, wrapNavigation);
+  if (!wrapNavigation && typeof step === 'number' && index === selected) return;
   const diff = await getDifference(current, index);
   if (!diff || job !== current) return;
   syncing++;
@@ -758,8 +882,9 @@ function create(options) {
    }
    pane.select.value = ids[side];
    updatePane(side, docs.find(d => d.id === ids[side]) || null);
-   changed(side);
   }
+  refreshWrapLayout();
+  for (const side of sides) changed(side);
   listSignature = listKey;
   const key = JSON.stringify(sides.map(side => {
    const d = panes[side].doc;
@@ -851,7 +976,7 @@ function create(options) {
  const horizontal = root.NTKEditorCompare.createHorizontalSync(side => {
   const ta = panes[side].textarea;
   return {left:ta.scrollLeft, width:ta.scrollWidth, client:ta.clientWidth};
- }, (side, left) => { panes[side].textarea.scrollLeft = left; }, () => comparing && q('[data-compare-horizontal-sync]').checked);
+ }, (side, left) => { panes[side].textarea.scrollLeft = left; }, () => comparing && !wrapping() && q('[data-compare-horizontal-sync]').checked);
 
  for (const side of sides) {
   const pane = panes[side], ta = pane.textarea, track = pane.track;
@@ -961,9 +1086,11 @@ function create(options) {
  host.classList.toggle('nt-disk-compare-underline', q('[data-compare-underline]').checked);
  const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(() => {
   splitter.apply();
+  refreshWrapLayout();
   for (const side of sides) changed(side);
  }) : null;
  observer?.observe(q('.nt-compare-grid'));
+ for (const side of sides) observer?.observe(panes[side].textarea);
  if (comparing) observer?.observe(map);
  splitter.apply();
  refresh();
@@ -989,7 +1116,7 @@ function create(options) {
      if (pane.lines[mid] <= offset) low = mid;
      else high = mid;
     }
-    pane.textarea.scrollTop = low * lineHeight(pane);
+    pane.textarea.scrollTop = (inlineWrapOffsets(pane)?.[low] ?? low) * lineHeight(pane);
     changed(activeSide());
    }
   },

@@ -68,6 +68,38 @@ func TestStreamingCompareRepeatedLineReplacement(t *testing.T) {
 	}
 }
 
+func TestStreamingCompareKeepsExistingPolicyAfterRepeatedInsertions(t *testing.T) {
+	policy := func(id string) string {
+		return "    edit " + id + "\n" +
+			"        set srcintf \"port1\"\n" +
+			"        set dstintf \"port2\"\n" +
+			"        set action accept\n" +
+			"    next\n"
+	}
+	prefix := strings.Repeat("# unchanged fixture\n", 18000) + "config firewall policy\n"
+	retained := policy("10000") + policy("10001") + "end\n"
+	added := policy("20000") + policy("20001") + policy("20002")
+	left := InlineComparisonInput(prefix + retained + "# before\n")
+	right := InlineComparisonInput(prefix + added + retained + "# after\n")
+	start := int64(strings.Count(prefix, "\n"))
+	linesAdded := int64(strings.Count(added, "\n"))
+	changed := start + int64(strings.Count(retained, "\n"))
+	want := []Difference{
+		{Left: start, Right: start, RightCount: linesAdded},
+		{Left: changed, Right: changed + linesAdded, LeftCount: 1, RightCount: 1},
+	}
+	if got := collectDifferences(t, left, right); !reflect.DeepEqual(got, want) {
+		t.Fatalf("got %+v, want %+v", got, want)
+	}
+	want = []Difference{
+		{Left: start, Right: start, LeftCount: linesAdded},
+		{Left: changed + linesAdded, Right: changed, LeftCount: 1, RightCount: 1},
+	}
+	if got := collectDifferences(t, right, left); !reflect.DeepEqual(got, want) {
+		t.Fatalf("reverse comparison got %+v, want %+v", got, want)
+	}
+}
+
 func TestStreamingCompareReportsEveryChangedRegion(t *testing.T) {
 	rng := rand.New(rand.NewSource(11))
 	for range 40 {
