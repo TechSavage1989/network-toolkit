@@ -1,0 +1,11 @@
+Network Toolkit 1.21.31 Beta 1
+
+## What's New
+
+- Compare keeps matching FortiOS policies aligned when nearby policies repeat the same settings.
+- Highlight changed characters shows full replacement values and works on longer wrapped lines.
+
+## Additional Details
+
+- Gray spacer rows keep later matches aligned after insertions and removals. A single line spanning multiple editor pages uses whole-line highlighting.
+- This beta is opt-in. Enable beta updates to receive it through the app.

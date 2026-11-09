@@ -14,6 +14,8 @@ Choose **Show only differences** in **Options** to scroll through all additions,
 
 When both comparison documents use disk-backed editing, gray, unnumbered rows fill the space opposite insertions and deletions. The panes scroll on the same row positions when **Sync scroll** is enabled. Copying, editing, and saving operate on the original text.
 
+**Highlight changed characters** emphasizes the edited parts of paired lines. A replacement can highlight a whole value when only a few letters happen to match. A line marked **Added** or **Removed** uses a whole-line color.
+
 Select text, then open **More** or right-click the selection to convert between UTF-8 text and hex or Base64. The result replaces the selection and can be undone. Each conversion accepts a selection of about one million characters.
 
 Detached Editor windows have a minimum width of 640 pixels.
