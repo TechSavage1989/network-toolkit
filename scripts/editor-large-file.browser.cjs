@@ -126,6 +126,7 @@ async function main() {
     await page.selectOption('[data-compare-spaces]', 'all');
     await page.waitForFunction(() => document.querySelector('[data-compare-summary]')?.dataset.compareDone === 'true');
     assert.equal(await summary.getAttribute('data-compare-count'), '2');
+    assert.equal(await page.locator('[data-compare-scale]').inputValue(),'-3');
     await page.selectOption('[data-compare-scale]', '-2');
     await page.waitForFunction(() => document.querySelector('[data-compare-map-marks="left"] rect')?.getAttribute('height') === '1');
     await page.selectOption('[data-compare-scale]', '-3');
@@ -133,7 +134,7 @@ async function main() {
       const map = document.querySelector('[data-compare-map]');
       return map.scrollHeight === map.clientHeight && map.querySelectorAll('[data-compare-map-marks="left"] rect').length === 2;
     });
-    await page.selectOption('[data-compare-scale]', '0');
+    await page.selectOption('[data-compare-scale]', '-1');
     await page.locator('.nt-compare-settings summary').click();
     for (const side of ['left', 'right']) {
       const pane = page.locator('[data-compare-pane="' + side + '"]');
@@ -230,18 +231,85 @@ async function main() {
       NetworkToolkitFileEditor.activateDocument(doc.id);
     }, right);
 
+    report.phase = 'alignment';
+    const added = '    set alias synthetic-added\n    set status enable\n';
+    const savedSize = editedSize + added.length;
+    await text.press('Control+Home');
+    await page.waitForFunction(() => NetworkToolkitFileEditor.active.diskSession.state().page.start === 0);
+    await text.evaluate((el, {at,added}) => {
+      el.setSelectionRange(at, at);
+      const data = new DataTransfer();
+      data.setData('text/plain', added);
+      el.dispatchEvent(new ClipboardEvent('paste', {clipboardData:data,bubbles:true,cancelable:true}));
+    }, {at:head.length+1024,added});
+    await page.waitForFunction(n => NetworkToolkitFileEditor.active.diskMeta.units === n && !NetworkToolkitFileEditor.active.diskSession.pending, savedSize);
+    await page.locator('[data-ed="compare"]').click();
+    for (const [side,path] of [['left',left],['right',right]]) {
+      const id = await page.evaluate(path => [...NetworkToolkitFileEditor.documents.values()].find(d => d.path === path).id, path);
+      await page.selectOption('[data-compare-select="'+side+'"]', id);
+    }
+    await page.waitForFunction(() => document.querySelector('[data-compare-summary]')?.dataset.compareDone === 'true', null, {timeout:180000});
+    assert.equal(await page.locator('[data-compare-scale]').inputValue(),'4');
+    const leftPane = page.locator('[data-compare-pane="left"]');
+    await leftPane.locator('.nt-editor-disk-scroll').press('Home');
+    await leftPane.locator('[data-alignment-gap]').first().waitFor({timeout:5000}).catch(async error => {
+      report.alignment = await page.evaluate(() => {
+        const c = NetworkToolkitFileEditor.comparison;
+        return {summary:document.querySelector('[data-compare-summary]')?.textContent, rows:c.result?.rows, sides:['left','right'].map(side => {
+          const d = NetworkToolkitFileEditor.documents.get(c.selection[side]);
+          return {size:d.diskMeta.units,view:c.diskView(side).capture(),
+            gaps:document.querySelectorAll('[data-compare-pane="'+side+'"] [data-alignment-gap]').length};
+        })};
+      });
+      throw error;
+    });
+    const aligned = () => {
+      const row = (side, number) => [...document.querySelectorAll('[data-compare-pane="'+side+'"] .nt-editor-gutter [data-disk-compare-gutter] > div')]
+        .find(el => el.textContent === number)?.getBoundingClientRect().top;
+      return Math.abs(row('left','2') - row('right','4')) < 1;
+    };
+    await page.waitForFunction(aligned);
+    assert.equal(await leftPane.locator('[data-alignment-gap]').count(), 2);
+    await leftPane.locator('textarea').hover();
+    await page.mouse.wheel(0, 28);
+    await page.waitForFunction(() => {
+      const c = NetworkToolkitFileEditor.comparison;
+      const left = c.diskView('left').capture(), right = c.diskView('right').capture();
+      return left.alignedTop > 0 && left.alignedTop === right.alignedTop && Math.abs(left.fraction-right.fraction) < .05;
+    });
+    await leftPane.locator('.nt-editor-disk-scroll').press('Home');
+    await page.waitForFunction(aligned);
+    assert.equal(await leftPane.locator('textarea').inputValue().then(value => value.includes('\n\n\nconfig system global')), true);
+    assert.equal(await leftPane.locator('textarea').evaluate(el => getComputedStyle(el.parentElement.querySelector('.nt-disk-compare-color.gap')).backgroundColor !== 'rgba(0, 0, 0, 0)'), true);
+    await page.screenshot({path:path.join(output,'editor-aligned-spacers.png')});
+    await leftPane.locator('textarea').evaluate(el=>{
+      const at = el.value.indexOf('config system global');
+      el.focus({preventScroll:true});
+      el.setSelectionRange(at,at);
+    });
+    await leftPane.locator('textarea').pressSequentially('!');
+    await page.waitForFunction(({name,size}) => [...NetworkToolkitFileEditor.documents.values()].find(d=>d.path===name).diskMeta.units === size, {name:left,size:Number(size)+1});
+    assert.equal(await page.evaluate(name => [...NetworkToolkitFileEditor.documents.values()].find(d=>d.path===name).diskSession.state().page.text.includes('\n!config system global'),left),true);
+    await leftPane.locator('textarea').press('Control+z');
+    await page.waitForFunction(({name,size}) => [...NetworkToolkitFileEditor.documents.values()].find(d=>d.path===name).diskMeta.units === size, {name:left,size:Number(size)});
+    await page.evaluate(name => {
+      NetworkToolkitFileEditor.closeComparison();
+      const doc = [...NetworkToolkitFileEditor.documents.values()].find(item => item.path === name);
+      NetworkToolkitFileEditor.activateDocument(doc.id);
+    }, right);
+
     report.phase = 'save';
     await text.press('Control+End');
     await page.waitForFunction(n => {
       const editor = NetworkToolkitFileEditor.active;
       const textarea = document.querySelector('.nt-editor-code textarea[data-ed-text]');
       return editor.diskSession.state().page.start + textarea.selectionEnd === n;
-    }, editedSize);
+    }, savedSize);
     const saveStarted = Date.now();
     await page.locator('[data-ed="save"]').click();
     await waitForEngine(page, state => state.snapshotWriting || state.saveReturned, 180000);
     await text.pressSequentially('!');
-    await page.waitForFunction(n => NetworkToolkitFileEditor.active.diskMeta.units === n && !NetworkToolkitFileEditor.active.diskSession.pending, editedSize + 1);
+    await page.waitForFunction(n => NetworkToolkitFileEditor.active.diskMeta.units === n && !NetworkToolkitFileEditor.active.diskSession.pending, savedSize + 1);
     await page.evaluate(() => api('/editor-fixture/release-save', 'POST', {}));
     await page.waitForFunction(() => !NetworkToolkitFileEditor.active.saving, null, { timeout: 180000 });
     report.saveMs = Date.now() - saveStarted;
@@ -260,7 +328,7 @@ async function main() {
     await page.waitForFunction(n => {
       const editor = NetworkToolkitFileEditor.active;
       return editor.diskMeta.units === n && !editor.dirty && !editor.diskSession.pending;
-    }, editedSize);
+    }, savedSize);
     await page.waitForFunction(top => document.querySelector('.nt-editor-code .nt-editor-disk-scroll').getAttribute('aria-valuenow') === top, beforeUndo, {timeout:3000}).catch(async error => {
       report.undoViewport = {before:beforeUndo, after:await documentBar.getAttribute('aria-valuenow')};
       throw error;

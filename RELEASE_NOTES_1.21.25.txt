@@ -1,0 +1,13 @@
+Network Toolkit 1.21.25 Beta 1
+
+## What's New
+
+- Gray spacer rows keep matching lines level in editable large-file comparisons.
+- FortiOS coloring reuses the visible highlight and waits for scrolling to settle before repainting.
+- The change map defaults to Dynamic fit and remembers your last zoom. More Compare controls are available by right-clicking either pane.
+
+## Additional Details
+
+- Spacer rows are display only. Edits, clipboard operations and saves use source text and source line numbers.
+- Show only differences includes navigation between added, removed and modified blocks.
+- This beta is opt-in. Enable beta updates to receive it through the app.

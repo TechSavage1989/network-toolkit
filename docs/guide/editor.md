@@ -10,7 +10,9 @@ Choose two documents in the comparison view. The change map shows individual cha
 
 Choose **Show only differences** in **Options** to browse additions, removals, and modifications with their original line numbers. Use **Previous** and **Next** to switch blocks. **Exact** counts every space and tab. **Ignore changed spaces** matches `set  status` with `set status`. **Ignore all spaces** also matches `set status` with `setstatus`. These settings affect the comparison and leave the text unchanged.
 
-Use **Compact** to show up to three lines per map pixel, or **Dynamic fit** to show the entire document with one-pixel marks. Right-click either pane for comparison commands and **Highlight changed characters**. Clicking or moving the caret to a line highlights its counterpart when one exists.
+**Dynamic fit** shows the entire document with one-pixel marks and is the default. **Compact** shows up to three lines per map pixel. The editor remembers the last map zoom you choose. Right-click either pane for difference navigation, map visibility, whitespace, scroll sync, and highlighting controls. Clicking or moving the caret to a line highlights its counterpart when one exists.
+
+When both comparison documents use disk-backed editing, gray, unnumbered rows fill the space opposite insertions and deletions. The panes scroll on the same row positions when **Sync scroll** is enabled. Copying, editing, and saving operate on the original text.
 
 Select text, then open **More** or right-click the selection to convert between UTF-8 text and hex or Base64. The result replaces the selection and can be undone. Each conversion accepts a selection of about one million characters.
 

@@ -1,3 +1,10 @@
+## 1.21.25 Beta 1 - Editable comparison alignment
+
+- Keep matching lines aligned with gray display rows in disk-backed comparisons.
+- Reuse syntax coloring during scrolling and defer new highlights until the view settles.
+- Default to Dynamic fit and remember the last map zoom.
+- Expose comparison controls in the right-click menu and navigate added and removed blocks directly in the differences-only view.
+
 ## 1.21.24 Beta 1 - Compare navigation and FortiOS coloring
 
 - Add Compact and Dynamic fit change maps and align gutter symbols.

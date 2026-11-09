@@ -117,6 +117,8 @@ function mountDifferencePreview(host, read, getSelection) {
  panel.className = 'nt-compare-preview';
  panel.hidden = true;
  panel.innerHTML = '<div class="nt-compare-preview-tools"><span role="status"></span>' +
+  '<button type="button" class="btn small ghost" data-preview-previous-block>Previous difference</button>' +
+  '<button type="button" class="btn small ghost" data-preview-next-block>Next difference</button>' +
   '<button type="button" class="btn small ghost" data-preview-back>Previous lines</button>' +
   '<button type="button" class="btn small ghost" data-preview-next>Next lines</button>' +
   '<button type="button" class="btn small ghost" data-preview-edit>Return to editable comparison</button></div>' +
@@ -125,10 +127,11 @@ function mountDifferencePreview(host, read, getSelection) {
  grid.append(panel);
  const status = panel.querySelector('[role="status"]'), rows = panel.lastElementChild;
  const back = panel.querySelector('[data-preview-back]'), next = panel.querySelector('[data-preview-next]');
+ const previousBlock = panel.querySelector('[data-preview-previous-block]'), nextBlock = panel.querySelector('[data-preview-next-block]');
  const pageSize = 12;
- let offset = 0, controller;
+ let offset = 0, block = null, controller;
  async function render(reset = false) {
-  if (reset) offset = 0;
+  if (reset) { offset = 0; block = null; }
   controller?.abort();
   panel.hidden = !toggle.checked;
   for (const child of covered) child.inert = !panel.hidden;
@@ -136,13 +139,16 @@ function mountDifferencePreview(host, read, getSelection) {
   const selected = getSelection();
   rows.replaceChildren();
   back.disabled = next.disabled = true;
+  previousBlock.disabled = nextBlock.disabled = !selected || selected.count < 2;
   if (!selected) { status.textContent = 'Choose two documents and run Compare.'; return; }
   if (!selected.count) { status.textContent = 'No differences.'; return; }
+  block ??= selected.index;
+  const index = block;
   status.textContent = 'Loading changed lines…';
   const pending = new AbortController();
   controller = pending;
   try {
-   const page = await read(selected.index, offset, pageSize, pending.signal);
+   const page = await read(index, offset, pageSize, pending.signal);
    if (pending.signal.aborted || !page) return;
    const {left, right, length} = page;
    const fragment = document.createDocumentFragment();
@@ -166,7 +172,7 @@ function mountDifferencePreview(host, read, getSelection) {
    }
    rows.replaceChildren(fragment);
    rows.scrollTop = 0;
-   status.textContent = 'Difference ' + (selected.index + 1) + ' of ' + selected.count +
+   status.textContent = 'Difference ' + (index + 1) + ' of ' + selected.count +
     ' · Rows ' + (offset + 1) + '–' + Math.min(length, offset + pageSize) + ' of ' + length;
    back.disabled = offset === 0;
    next.disabled = offset + pageSize >= length;
@@ -177,6 +183,15 @@ function mountDifferencePreview(host, read, getSelection) {
  toggle.addEventListener('change', () => void render(true));
  back.addEventListener('click', () => { offset -= pageSize; void render(); });
  next.addEventListener('click', () => { offset += pageSize; void render(); });
+ function moveBlock(step) {
+  const selection = getSelection();
+  if (!selection?.count) return;
+  block = ((block ?? selection.index) + step + selection.count) % selection.count;
+  offset = 0;
+  void render();
+ }
+ previousBlock.addEventListener('click', () => moveBlock(-1));
+ nextBlock.addEventListener('click', () => moveBlock(1));
  panel.querySelector('[data-preview-edit]').addEventListener('click', () => {
   toggle.checked = false;
   void render(true);

@@ -30,6 +30,7 @@ func TestEditorLargeFileBrowser(t *testing.T) {
 		t.Skip("requires the isolated Playwright browser")
 	}
 	const head, tail = "HEAD-VERIFIED", "TAIL-VERIFIED"
+	const inserted = "    set alias synthetic-added\n    set status enable\n"
 	const blockSize = 1 << 20
 	size := int64(2 << 30)
 	if value := os.Getenv("NTK_EDITOR_FIXTURE_BYTES"); value != "" {
@@ -51,13 +52,17 @@ func TestEditorLargeFileBrowser(t *testing.T) {
 	copy(firstBlock[1024:], "config system global ")
 	want := sha256.New()
 	_, _ = io.WriteString(want, head)
-	writer := io.MultiWriter(file, want)
 	for remaining := size; remaining > 0; remaining -= blockSize {
 		data := block
 		if remaining == size {
 			data = firstBlock
+			_, _ = want.Write(data[:1024])
+			_, _ = io.WriteString(want, inserted)
+			_, _ = want.Write(data[1024:])
+		} else {
+			_, _ = want.Write(data)
 		}
-		if _, err := writer.Write(data); err != nil {
+		if _, err := file.Write(data); err != nil {
 			file.Close()
 			t.Fatal(err)
 		}
@@ -190,7 +195,7 @@ func TestEditorLargeFileBrowser(t *testing.T) {
 		t.Fatal(err)
 	}
 	info, err := os.Stat(right)
-	if err != nil || info.Size() != size+int64(len(head)+len(tail)) {
+	if err != nil || info.Size() != size+int64(len(head)+len(tail)+len(inserted)) {
 		t.Fatalf("saved file size: %v, %v", info, err)
 	}
 	file, err = os.Open(right)
