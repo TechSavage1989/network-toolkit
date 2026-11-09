@@ -144,6 +144,7 @@ function create(options){
  E.mountSettings(host,options);
  const q=selector=>host.querySelector(selector),views={},facades={},bound={left:null,right:null},appliedDocument={left:null,right:null},appliedRevision={left:-1,right:-1},ids={left:'',right:''},syntax={left:[],right:[]},syntaxKeys={left:'',right:''},geometryCache={left:null,right:null},sourceStamps={left:'',right:''},composition={left:false,right:false},inputBusy={left:{},right:{}},originRepair=createOriginRepairGuard(),config={},gutterConfig={},gutterRefresh={};
  let disposed=false,reflecting=0,inUpdate=0,pendingRefresh=false,timer=null,generation=0,pixelReady=false,result=null,geometry=null,sourceHeights=null,lastSide='left',scale=options.comparisonPreferences?.().compareMapZoom??-3,selected=-1,mapDrag=null,syncing=false,independentReveal=false,scrollSource=null,mapFrame=null,lastSignature='',rowLookup={left:[],right:[]},paintedOffsets={left:0,right:0};
+ let zoomedFont=false;
  const map=q('[data-compare-map]'),mapContent=q('[data-compare-map-content]'),tracks=Object.fromEntries(sides.map(side=>[side,q('[data-compare-track="'+side+'"]')]));
  q('[data-compare-scale]').value=String(scale);
  const horizontalSync=E.createHorizontalSync(side=>{const el=views[side].scrollDOM;return {left:el.scrollLeft,width:el.scrollWidth,client:el.clientWidth}},(side,value)=>{views[side].scrollDOM.scrollLeft=value;remember(side)},()=>q('[data-compare-horizontal]').checked&&!options.wordWrap?.());
@@ -221,6 +222,7 @@ function create(options){
 function matchPaneChrome(){const rows=sides.map(side=>q('[data-compare-state="'+side+'"]')).filter(Boolean);if(rows.length!==2)return;for(const row of rows)row.style.minHeight='';const tallest=Math.max(...rows.map(row=>row.getBoundingClientRect().height));if(!(tallest>0))return;for(const row of rows)if(row.getBoundingClientRect().height<tallest-0.5)row.style.minHeight=tallest+'px';}
 function refresh(force=false){if(disposed)return;if(inUpdate||isComposing()){pendingRefresh=true;return;}pendingRefresh=false;syncPreferences();const all=docs(),selection=options.selection?.();for(const side of sides){ids[side]=selection?(selection[side]||''):(all.some(d=>d.id===ids[side])?ids[side]:side==='left'?options.active()?.id||all[0]?.id||'':all.find(d=>d.id!==ids.left)?.id||'');const select=q('[data-compare-select="'+side+'"]');select.innerHTML='<option value="">Choose document</option>'+all.map(d=>'<option value="'+escape(d.id)+'">'+escape((d.dirty?'* ':'')+d.path+' · '+d.source)+'</option>').join('');select.value=ids[side];syncDocument(side);}const signature=sides.map(side=>{const d=doc(side),v=views[side];return [d?.uid,d?.editRevision,v.scrollDOM.clientWidth,v.scrollDOM.clientHeight,options.wordWrap?.(),options.syntax?.(),d?options.language?.(d):''].join(':')}).join('|');if(force||signature!==lastSignature){lastSignature=signature;generation++;invalidatePixels();clearTimeout(timer);timer=setTimeout(compute,force?0:80);}updateMap();}
  function refreshFont(){
+  zoomedFont=true;
   preview.reflow();
   for(const side of sides)views[side].requestMeasure();
   refresh(true);
@@ -248,33 +250,38 @@ function refresh(force=false){if(disposed)return;if(inUpdate||isComposing()){pen
   });
  }
 
+ function measureZoomedLineHeight(view,fallback){
+  // Native defaultLineHeight can retain the previous font after a CSS zoom.
+  // Measure an isolated row with the editor's active inherited typography.
+  const probe=document.createElement('div');
+  probe.className='nt-compare-measure';
+  probe.style.font='inherit';
+  probe.textContent='M';
+  view.dom.append(probe);
+  try{return probe.getBoundingClientRect().height||fallback;}
+  finally{probe.remove();}
+ }
+
  async function measure(side,epoch,stamp){
   const d=doc(side),view=views[side],lines=(d?.content||'').split('\n');
   const style=getComputedStyle(view.contentDOM),lineStyle=getComputedStyle(view.contentDOM.querySelector('.cm-line')||view.contentDOM);
-  const {height:fallbackHeight,width}=measurementMetrics(view,parseFloat(lineStyle.lineHeight)||20);
-  const wrapped=!!options.wordWrap?.(),key=[d?.uid,d?.editRevision,width,style.font,lineStyle.lineHeight,lineStyle.paddingLeft,lineStyle.paddingRight,style.tabSize,wrapped].join(':');
+  const {height:nativeHeight,width}=measurementMetrics(view,parseFloat(style.lineHeight)||20);
+  const height=zoomedFont?measureZoomedLineHeight(view,nativeHeight):nativeHeight;
+  const wrapped=!!options.wordWrap?.(),key=[d?.uid,d?.editRevision,width,height,style.font,lineStyle.paddingLeft,lineStyle.paddingRight,style.tabSize,wrapped].join(':');
   if(geometryCache[side]?.key===key)return geometryCache[side].heights;
+  if(!wrapped){const heights=Array(lines.length).fill(height);geometryCache[side]={key,heights};return heights;}
 
-  const node=document.createElement('div'),probe=document.createElement('div');
+  const node=document.createElement('div');
   node.className='nt-compare-measure nt-compare-aligned-measure';
-  Object.assign(node.style,{width:width+'px',font:'inherit',tabSize:style.tabSize||'4','--line-left':lineStyle.paddingLeft,'--line-right':lineStyle.paddingRight});
-  probe.textContent='M';
-  node.append(probe);
-  view.scrollDOM.append(node);
-  let heights=[];
+  Object.assign(node.style,{width:width+'px',font:style.font,lineHeight:height+'px',tabSize:style.tabSize||'4','--line-left':lineStyle.paddingLeft,'--line-right':lineStyle.paddingRight});
+  host.append(node);
+  const heights=[];
   try{
-   // Native defaultLineHeight may retain the previous font after a CSS zoom.
-   // Use the live row height so spacer widgets and source lines resize together.
-   const height=probe.getBoundingClientRect().height||fallbackHeight;
-   if(!wrapped){
-    heights=Array(lines.length).fill(height);
-   }else{
-    for(let at=0;at<lines.length;at+=250){
-     if(!stable(epoch,stamp))return null;
-     node.innerHTML=lines.slice(at,at+250).map(line=>'<div>'+escape(line||'\u200b')+'</div>').join('');
-     for(const line of node.children)heights.push(line.getBoundingClientRect().height||height);
-     if(lines.length>500)await frame();
-    }
+   for(let at=0;at<lines.length;at+=250){
+    if(!stable(epoch,stamp))return null;
+    node.innerHTML=lines.slice(at,at+250).map(line=>'<div>'+escape(line||'\u200b')+'</div>').join('');
+    for(const line of node.children)heights.push(line.getBoundingClientRect().height||height);
+    if(lines.length>500)await frame();
    }
   }finally{node.remove();}
   if(stable(epoch,stamp))geometryCache[side]={key,heights};
