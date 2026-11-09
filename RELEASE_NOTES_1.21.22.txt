@@ -1,0 +1,12 @@
+Network Toolkit 1.21.22 Beta 1
+
+## What's New
+
+- The comparison map shows each changed line as a separate mark, even when changes are consecutive.
+- Browse the map with the mouse wheel or its scrollbar, then click a mark to jump to that line.
+
+## Additional Details
+
+- Large-file comparisons load exact marks for the visible map area.
+- Browser tests verified navigation to a change near the end of a 2 GiB file, including at 5× map zoom.
+- This beta is opt-in. Enable beta updates to receive it through the app.

@@ -1,3 +1,11 @@
+# v1.21.22 Beta 1 - Editor change map
+
+Comparison defaults to individual one-pixel marks with a shared map scrollbar. The wheel pans the map independently, and clicking a mark navigates the editor. Inline comparisons still offer Fit entire document under Options.
+
+Disk-backed comparisons read the exact visible line range from the existing on-disk difference index. The browser caps the native scrollbar's physical height and maps it to the full logical range, so the map can display changes at the end of multi-gigabyte documents. The comparison browser fixtures cover consecutive marks, independent wheel and scrollbar input, and navigation to changes near the end of the file.
+
+---
+
 # v1.21.20 Beta 1 - integrated large-file editor
 
 PR #139 integrates disk-backed open, edit, search, split views, comparison and saves in the normal app. The real-file browser test with two 2 GiB files verified responsiveness, typing during save and exact saved bytes. See [editor scalability](EDITOR_SCALABILITY_PLAN.md) and [the release handoff](RELEASE12120_HANDOFF.md).

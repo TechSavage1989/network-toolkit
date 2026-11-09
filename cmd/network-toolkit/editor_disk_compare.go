@@ -14,7 +14,7 @@ import (
 
 const diskCompareRecordSize = 32
 const diskComparePageSize = 128
-const diskCompareOverviewSize = 96
+const diskCompareMapWindow = 4096
 
 type diskComparisonSource struct {
 	UID      string  `json:"uid"`
@@ -44,15 +44,13 @@ type diskComparisonSnapshot struct {
 
 type diskComparisonStatus struct {
 	editorbuffer.CompareProgress
-	LeftSize   int64                        `json:"leftSize"`
-	RightSize  int64                        `json:"rightSize"`
-	LeftTotal  int64                        `json:"leftTotal"`
-	RightTotal int64                        `json:"rightTotal"`
-	Count      int64                        `json:"count"`
-	Done       bool                         `json:"done"`
-	Error      string                       `json:"error,omitempty"`
-	LeftMap    [diskCompareOverviewSize]int `json:"leftMap"`
-	RightMap   [diskCompareOverviewSize]int `json:"rightMap"`
+	LeftSize   int64  `json:"leftSize"`
+	RightSize  int64  `json:"rightSize"`
+	LeftTotal  int64  `json:"leftTotal"`
+	RightTotal int64  `json:"rightTotal"`
+	Count      int64  `json:"count"`
+	Done       bool   `json:"done"`
+	Error      string `json:"error,omitempty"`
 }
 
 type diskComparisonJob struct {
@@ -205,14 +203,6 @@ func (m *editorViewRegistry) startDiskComparison(r *http.Request, caller string,
 	return job, nil
 }
 
-func compareOverview(markers *[diskCompareOverviewSize]int, start, count, total int64, kind int) {
-	first := min(len(markers)-1, int(float64(start)/float64(total)*float64(len(markers))))
-	last := min(len(markers)-1, int(float64(start+max(count-1, 0))/float64(total)*float64(len(markers))))
-	for i := first; i <= last; i++ {
-		markers[i] |= kind
-	}
-}
-
 func (j *diskComparisonJob) scan(ctx context.Context, left, right editorbuffer.ComparisonInput) {
 	status := diskComparisonStatus{
 		LeftTotal: left.Lines(), RightTotal: right.Lines(), LeftSize: left.Bytes(), RightSize: right.Bytes(),
@@ -244,15 +234,6 @@ func (j *diskComparisonJob) scan(ctx context.Context, left, right editorbuffer.C
 		if _, err := writer.Write(record[:]); err != nil {
 			return err
 		}
-		kind := 0
-		if diff.LeftCount > 0 {
-			kind |= 1
-		}
-		if diff.RightCount > 0 {
-			kind |= 2
-		}
-		compareOverview(&status.LeftMap, diff.Left, diff.LeftCount, status.LeftTotal, kind)
-		compareOverview(&status.RightMap, diff.Right, diff.RightCount, status.RightTotal, kind)
 		status.Count++
 		return nil
 	}, publish)
@@ -294,6 +275,45 @@ func comparisonSide(diff editorbuffer.Difference, right bool) (start, count, pee
 		return diff.Right, diff.RightCount, diff.Left, diff.LeftCount
 	}
 	return diff.Left, diff.LeftCount, diff.Right, diff.RightCount
+}
+
+// Read the exact changes intersecting a small window of source lines.
+func (j *diskComparisonJob) mapLines(first, end int64, right bool) ([]int, error) {
+	marks := make([]int, end-first)
+	low, high := int64(0), j.status.Count
+	for low < high {
+		mid := low + (high-low)/2
+		diff, err := j.read(mid)
+		if err != nil {
+			return nil, err
+		}
+		start, count, _, _ := comparisonSide(diff, right)
+		if start+count <= first {
+			low = mid + 1
+		} else {
+			high = mid
+		}
+	}
+	for index := low; index < j.status.Count; index++ {
+		diff, err := j.read(index)
+		if err != nil {
+			return nil, err
+		}
+		start, count, _, peerCount := comparisonSide(diff, right)
+		if start >= end {
+			break
+		}
+		for line := max(first, start); line < min(end, start+count); line++ {
+			kind := 1
+			if line-start < peerCount {
+				kind = 3
+			} else if right {
+				kind = 2
+			}
+			marks[line-first] = kind
+		}
+	}
+	return marks, nil
 }
 
 func (j *diskComparisonJob) locate(req diskComparisonRequest) (map[string]any, error) {
@@ -407,6 +427,17 @@ func (m *editorViewRegistry) compareDiskDocuments(w http.ResponseWriter, r *http
 	switch req.Action {
 	case "status":
 		value = job.status
+	case "map":
+		if req.Start < 0 || req.End <= req.Start || req.End-req.Start > diskCompareMapWindow {
+			err = editorbuffer.ErrBoundary
+			break
+		}
+		var left, right []int
+		left, err = job.mapLines(req.Start, req.End, false)
+		if err == nil {
+			right, err = job.mapLines(req.Start, req.End, true)
+		}
+		value = map[string]any{"left": left, "right": right}
 	case "page":
 		if req.Start < 0 {
 			err = editorbuffer.ErrBoundary
