@@ -43,3 +43,6 @@
 .nt-compare-aligned.no-intraline-highlight .nt-compare-intraline{background:transparent}
 
 @media(forced-colors:active){.nt-compare-aligned.no-intraline-highlight .nt-compare-intraline{outline:none}}
+
+.nt-compare-aligned .nt-compare-source-line.moved{background:color-mix(in srgb,var(--info) 28%,transparent);box-shadow:inset 3px 0 var(--info)}
+.nt-compare-diff-icon.moved{color:var(--info)}

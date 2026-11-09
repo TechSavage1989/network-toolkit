@@ -93,20 +93,24 @@ function create({request, exportRange, changed = () => {}, failed = () => {}, id
   prefetching.clear();
  }
 
- function install(value) {
+ function viewport(value) {
   if (value.loading) throw Error('The file is still opening.');
   if (typeof value.text !== 'string' || !Number.isSafeInteger(value.start) ||
       !Number.isSafeInteger(value.line)) throw Error('The document engine returned an invalid viewport.');
-  receive(value);
   let end = -1;
   for (let line = 0; line < PAGE_LINES; line++) {
    end = value.text.indexOf('\n', end + 1);
    if (end < 0) break;
   }
-  page = {
+  return {
    start: value.start, line: value.line, column: value.column || 0,
    lineUnits: value.lineUnits || 0, text: end < 0 ? value.text : value.text.slice(0, end)
   };
+ }
+
+ function install(value, next = viewport(value)) {
+  receive(value);
+  page = next;
   acknowledged = page.text;
   pageLines = acknowledgedLines = countLines(page.text);
   failure = null;
@@ -241,7 +245,7 @@ function create({request, exportRange, changed = () => {}, failed = () => {}, id
   return JSON.stringify([metadata.revision, target.line ?? null, target.start ?? null, limit]);
  }
 
- async function load(target = {start: 0}, limit = PAGE_UNITS) {
+ async function load(target = {start: 0}, limit = PAGE_UNITS, prepare) {
   ensure();
   const ticket = ++readTicket;
   reading?.abort();
@@ -257,7 +261,13 @@ function create({request, exportRange, changed = () => {}, failed = () => {}, id
     if (ticket !== readTicket || closed) return null;
     // Typing may continue while a viewport is read. Read again after edits settle.
     if (epoch !== stamp || hasChanges()) continue;
-    install(value);
+    const next = viewport(value);
+    if (prepare) {
+     await prepare(next, value.units, controller.signal);
+     if (ticket !== readTicket || controller.signal.aborted || closed) return null;
+     if (epoch !== stamp || hasChanges()) continue;
+    }
+    install(value, next);
     notify();
     return {...page};
    }

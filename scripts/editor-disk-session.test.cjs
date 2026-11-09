@@ -56,6 +56,21 @@ test('a late viewport response cannot overwrite typing',async()=>{
  f.session.change('abX');await f.session.flush();held.resolve();await loading;
  assert.equal(f.text,'abXdef');assert.equal(f.session.state().page.text,'def');
 });
+test('a viewport awaiting layout keeps the previous page editable and retries after typing',async()=>{
+ const f=fixture('abcdef'), started=deferred(), ready=deferred();
+ await f.session.load({start:0},3);
+ let preparations=0;
+ const loading=f.session.load({start:3},3,async page=>{
+  assert.equal(page.text,'def');
+  if(++preparations===1){started.resolve();await ready.promise;}
+ });
+ await started.promise;
+ assert.equal(f.session.state().page.text,'abc');
+ f.session.change('abX');await f.session.flush();
+ ready.resolve();await loading;
+ assert.equal(preparations,2);
+ assert.equal(f.text,'abXdef');assert.equal(f.session.state().page.text,'def');
+});
 test('history and saving operate on the document rather than its current page',async()=>{
  const f=fixture('prefix\nmiddle\nsuffix');await f.session.load({line:1},6);f.session.change('change');await f.session.flush();
  assert.equal(f.text,'prefix\nchange\nsuffix');await f.session.history();assert.equal(f.text,'prefix\nmiddle\nsuffix');await f.session.history(true);

@@ -469,3 +469,8 @@ body:has(.nt-editor:not([hidden]) [data-ed-files-sidebar]:not([hidden])) .toast-
 @media(max-width:680px){.nt-editor-files-shell.dock-right:not(.is-collapsed){padding-left:0}}
 
 .nt-editor-compare.is-summary-hidden > .nt-compare-summary{position:absolute;width:1px;height:1px;min-height:0;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+
+.nt-compare-legend .moved,.nt-compare-preview-line.moved b,.nt-disk-compare-code .nt-compare-line.moved::before,.nt-disk-compare-color.moved{color:var(--info)}
+.nt-compare-preview-line.moved{background:color-mix(in srgb,var(--info) 18%,var(--panel))}
+.nt-compare-line.moved{background:color-mix(in srgb,var(--info) 18%,transparent);box-shadow:inset 3px 0 var(--info)}
+[data-compare-map-marks] .moved{fill:var(--info)}

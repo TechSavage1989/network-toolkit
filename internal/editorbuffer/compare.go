@@ -326,38 +326,58 @@ func blockUUID(lines *lineSignatures, start int) ([36]byte, bool) {
 	return value, found
 }
 
+const anchorContextLines = 3
+
+type anchorContext [anchorContextLines]lineSignature
+
+func (s *lineSignatures) anchorContext(start int) anchorContext {
+	var context anchorContext
+	for i := range context {
+		context[i] = s.at(start + i)
+	}
+	return context
+}
+
 // uniqueHeadAnchor recognizes a block after a local insertion or deletion.
-// A unique header with matching context or policy UUID is stronger evidence
-// than a closer run of repeated lines inside an unrelated block.
+// An exact context can identify a repeated heading. A policy UUID can identify
+// a unique heading whose neighboring lines were edited.
 func uniqueHeadAnchor(source, other *lineSignatures) (int64, bool) {
-	const run = 3
 	if source.count < 2 || other.count < 2 {
 		return 0, false
 	}
 	head := source.at(0)
-	match := -1
+	match, matches := -1, 0
+	contextMatch, contextMatches := -1, 0
+	hasContext := source.count >= anchorContextLines
+	var context anchorContext
+	if hasContext {
+		context = source.anchorContext(0)
+	}
 	for i := 1; i < other.count; i++ {
 		if other.at(i) == head {
-			if match >= 0 {
+			matches++
+			match = i
+			if hasContext && i+anchorContextLines <= other.count && other.anchorContext(i) == context {
+				contextMatch = i
+				contextMatches++
+			}
+		}
+	}
+	if contextMatches == 1 {
+		for i := 1; i+anchorContextLines <= source.count; i++ {
+			if source.at(i) == head && source.anchorContext(i) == context {
 				return 0, false
 			}
-			match = i
 		}
+		return int64(contextMatch), true
 	}
-	if match < 0 {
+	if matches != 1 || source.record(0).role != editHeader || other.record(match).role != editHeader {
 		return 0, false
 	}
-	exactRun := source.count >= run && match+run <= other.count &&
-		source.at(1) == other.at(match+1) && source.at(2) == other.at(match+2)
-	if !exactRun {
-		if source.record(0).role != editHeader || other.record(match).role != editHeader {
-			return 0, false
-		}
-		leftUUID, leftOK := blockUUID(source, 0)
-		rightUUID, rightOK := blockUUID(other, match)
-		if !leftOK || !rightOK || leftUUID != rightUUID {
-			return 0, false
-		}
+	leftUUID, leftOK := blockUUID(source, 0)
+	rightUUID, rightOK := blockUUID(other, match)
+	if !leftOK || !rightOK || leftUUID != rightUUID {
+		return 0, false
 	}
 	for i := 1; i < source.count; i++ {
 		if source.at(i) == head {
@@ -365,6 +385,41 @@ func uniqueHeadAnchor(source, other *lineSignatures) (int64, bool) {
 		}
 	}
 	return int64(match), true
+}
+
+func hasRepeatedAnchor(lines *lineSignatures, index int) bool {
+	signature := lines.at(index)
+	for i := 0; i < lines.count; i++ {
+		if i != index && lines.at(i) == signature {
+			return true
+		}
+	}
+	return false
+}
+
+// repeatedAnchor resolves an ambiguous nearest line using its exact surrounding
+// lines. It only searches for the same line, so an unrelated distant run
+// cannot displace an otherwise valid nearby anchor.
+func repeatedAnchor(left, right *lineSignatures, signature lineSignature) (int, int, bool) {
+	positions := make(map[anchorContext]int)
+	for j := 0; j+anchorContextLines <= right.count; j++ {
+		if right.at(j) == signature {
+			context := right.anchorContext(j)
+			if _, exists := positions[context]; !exists {
+				positions[context] = j
+			}
+		}
+	}
+	bestLeft, bestRight, bestCost := 0, 0, left.count+right.count
+	for i := 0; i+anchorContextLines <= left.count && i < bestCost; i++ {
+		if left.at(i) != signature {
+			continue
+		}
+		if j, exists := positions[left.anchorContext(i)]; exists && i+j < bestCost {
+			bestLeft, bestRight, bestCost = i, j, i+j
+		}
+	}
+	return bestLeft, bestRight, bestCost < left.count+right.count
 }
 
 // nearestAnchor preserves a clear inserted or deleted block, then finds a
@@ -394,11 +449,17 @@ func nearestAnchor(left, right *lineSignatures, positions map[lineSignature]int)
 			continue
 		}
 		run := 1
-		for run < 3 && i+run < left.count && j+run < right.count && left.at(i+run) == right.at(j+run) {
+		for run < anchorContextLines && i+run < left.count && j+run < right.count && left.at(i+run) == right.at(j+run) {
 			run++
 		}
 		if i+j < bestCost || run > bestRun {
 			bestLeft, bestRight, bestCost, bestRun = i, j, i+j, run
+		}
+	}
+	if bestRun == 1 &&
+		(hasRepeatedAnchor(left, bestLeft) || hasRepeatedAnchor(right, bestRight)) {
+		if i, j, found := repeatedAnchor(left, right, left.at(bestLeft)); found {
+			return int64(i), int64(j), true
 		}
 	}
 	return int64(bestLeft), int64(bestRight), bestRun > 0

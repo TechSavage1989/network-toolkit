@@ -94,7 +94,7 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
  let navigation = 0, navigating = false, frame = 0, pointer = false;
  let top = page.line, barTop = 0, barLeft = 0, lastScrollTop = 0, lastScrollLeft = 0;
  let gutterStamp = '', lastAnnouncement = '', lastPrefetch = '';
- let fraction = 0;
+ let fraction = 0, alignedTop;
  let rowHeight = 20, characterWidth = 8, clientRows = 1, clientColumns = 1, font = '';
  let wrapped = false, wrapStyle = '', measure, measured, wrapGeometry, gutterGeometry;
  let wrapFrame = 0, wrapRead;
@@ -198,14 +198,18 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
   return clamp((textarea.scrollTop - pixelAt(start)) / (pixelAt(groupEnd(start)) - pixelAt(start)), 0, 0.999);
  }
 
- function scrollToRow(row, fraction = 0) {
+ function rowScrollOffset(row, fraction) {
   row = groupStart(row);
   const pixel = pixelAt(row);
-  textarea.scrollTop = pixel + fraction * (pixelAt(groupEnd(row)) - pixel);
+  return pixel + fraction * (pixelAt(groupEnd(row)) - pixel);
  }
 
- function projectionRows(layout, around) {
-  const gaps = new Map(layout.gaps.map(gap => [gap.line - page.line, gap.count]));
+ function scrollToRow(row, fraction = 0) {
+  textarea.scrollTop = rowScrollOffset(row, fraction);
+ }
+
+ function projectionRows(layout, around, source, offsets) {
+  const gaps = new Map(layout.gaps.map(gap => [gap.line - source.line, gap.count]));
   const rows = [];
   let row = layout.row;
   const addGaps = source => {
@@ -215,26 +219,26 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
    for (let i = first; i < first + size; i++) rows.push({source, row:row+i, gap:true});
    row += count;
   };
-  for (let source = 0; source < starts.length; source++) {
+  for (let source = 0; source < offsets.length; source++) {
    addGaps(source);
    rows.push({source,row:row++});
   }
-  addGaps(starts.length);
+  addGaps(offsets.length);
   return rows;
  }
 
- function installProjection(baseRows, peerCounts) {
+ function buildProjection(baseRows, peerCounts, source, offsets, units) {
   const sourceRows = [], rows = [], parts = [];
-  const ownCounts = peerCounts?.size ? measureCurrentWrapRows(page.text) : [];
-  const partialTail = page.start + page.text.length < session.state().metadata.units;
+  const ownCounts = peerCounts?.size ? measureCurrentWrapRows(source.text) : [];
+  const partialTail = source.start + source.text.length < units;
   for (const value of baseRows) {
    const head = rows.length;
    if (!value.gap) sourceRows[value.source] = head;
    rows.push(value);
-   const text = value.gap ? '' : page.text.slice(starts[value.source], starts[value.source + 1]).replace(/\n$/, '');
+   const text = value.gap ? '' : source.text.slice(offsets[value.source], offsets[value.source + 1]).replace(/\n$/, '');
    parts.push(text);
    const own = value.gap ? 1 : ownCounts[value.source] || 1;
-   const pad = !value.gap && partialTail && value.source === starts.length - 1
+   const pad = !value.gap && partialTail && value.source === offsets.length - 1
     ? 0 : Math.max(0, (peerCounts?.get(value.row) || 1) - own);
    for (let i = 0; i < pad; i++) {
     rows.push({source:value.source + (value.gap ? 0 : 1), row:value.row, gap:true, wrapHead:head});
@@ -243,38 +247,46 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
    if (pad) value.wrapEnd = rows.length;
   }
   const text = parts.join('\n');
-  projection = {rows, sourceRows, offsets:lineStarts(text), text};
-  gutterStamp = '';
-  if (textarea.value !== text) textarea.value = text;
+  return {rows, sourceRows, offsets:lineStarts(text), text};
+ }
+
+ async function planProjection(source, offsets, units, active, around, signal) {
+  if (!alignment || source.column) return;
+  const current = alignment;
+  const complete = source.start + source.text.length === units;
+  const end = source.line + offsets.length - (complete ? 0 : 1);
+  const layout = await current.layout(source.line, end, signal);
+  const valid = () => active() && !disposed && !composing && !signal.aborted && alignment === current;
+  if (!valid()) return;
+  const viewRow = alignedTop ?? layout.row + Math.max(0, top - source.line);
+  const rows = projectionRows(layout, around ?? viewRow, source, offsets);
+  const style = wrapStyle;
+  const counts = wrapped && current.peerWrapRows ? await current.peerWrapRows(rows.map(row => row.row), signal) : null;
+  if (!valid()) return;
+  if (style !== wrapStyle) return planProjection(source, offsets, units, active, around, signal);
+  return buildProjection(rows, counts, source, offsets, units);
  }
 
  async function project(active, around, preserveView = false) {
   if (!alignment || page.column) return;
-  const current = alignment, source = page;
-  const complete = page.start + page.text.length === session.state().metadata.units;
-  const end = page.line + starts.length - (complete ? 0 : 1);
-  const layout = await current.layout(page.line, end);
-  const valid = () => active() && !disposed && !composing && alignment === current && page === source;
-  if (!valid()) return;
-  const viewRow = projection?.rows[displayRow()]?.row ?? layout.row + Math.max(0, top - page.line);
-  const rows = projectionRows(layout, around ?? viewRow);
-  const style = wrapStyle;
+  const source = page;
+  const valid = () => active() && page === source;
   wrapRead?.abort();
   const request = wrapRead = new AbortController();
-  let counts = null;
+  let planned;
   try {
-   if (wrapped && current.peerWrapRows) counts = await current.peerWrapRows(rows.map(row => row.row), request.signal);
+   planned = await planProjection(source, starts, session.state().metadata.units, valid, around, request.signal);
   } catch (error) {
    if (!request.signal.aborted) throw error;
    return;
   } finally {
    if (wrapRead === request) wrapRead = null;
   }
-  if (request.signal.aborted) return;
-  if (!valid()) return;
-  if (style !== wrapStyle) return project(active, around, preserveView);
+  if (request.signal.aborted || !valid() || !planned) return;
   const view = preserveView ? viewAnchor() : capture();
-  installProjection(rows, counts);
+  projection = planned;
+  gutterStamp = '';
+  if (textarea.value !== projection.text) textarea.value = projection.text;
   select(view.start, view.end, view.direction);
   if (preserveView && (view.alignedTop == null || !showAligned(view.alignedTop, view.fraction))) showLine(view.top + view.fraction);
  }
@@ -297,8 +309,7 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
     direction: textarea.selectionDirection || 'none'
    };
   }
-  return {...selection, top, left: textarea.scrollLeft + page.column * characterWidth, fraction,
-   alignedTop:projection?.rows[displayRow()]?.row};
+  return {...selection, top, left: textarea.scrollLeft + page.column * characterWidth, fraction, alignedTop};
  }
 
  function viewAnchor() {
@@ -434,6 +445,7 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
   paintSyntax();
   top = Math.min(lines - 1, page.line + (projection?.rows[groupStart(row)]?.source ?? row));
   fraction = rowFraction(row);
+  alignedTop = projected?.row;
   const scrollLines = alignment?.rows || lines, scrollTop = projected?.row ?? top;
   vertical.hidden = scrollLines <= clientRows;
   const lastTop = Math.max(1, scrollLines - clientRows);
@@ -503,14 +515,15 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
   if (!frame && !disposed) frame = root.requestAnimationFrame(paint);
  }
 
- function install(value) {
+ function install(value, planned = null) {
   if (disposed || !value) return;
   const view = capture();
-  projection = null;
+  projection = planned;
   alignmentTicket++;
   page = value;
   starts = lineStarts(page.text);
-  if (textarea.value !== page.text) textarea.value = page.text;
+  const text = projection?.text ?? page.text;
+  if (textarea.value !== text) textarea.value = text;
   select(view.start, view.end, view.direction);
   updateReadOnly();
  }
@@ -529,10 +542,20 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
 
  async function loadPage(target, active) {
   const {alignedRow, ...source} = target;
-  const result = await session.load(source);
+  let planned, current;
+  // Keep the current projected page visible until the new source text and
+  // its spacer layout can be installed together.
+  const prepare = alignment ? async (next, units, signal) => {
+   const offsets = lineStarts(next.text);
+   do {
+    current = alignment;
+    planned = await planProjection(next, offsets, units, active, alignedRow, signal);
+   } while (active() && !signal.aborted && current !== alignment);
+  } : undefined;
+  const result = await session.load(source, pageUnits, prepare);
   if (!result || !active()) return false;
-  install(result);
-  await project(active, alignedRow);
+  install(result, current === alignment ? planned : null);
+  if (alignment && !projection && !page.column) await project(active, alignedRow);
   return true;
  }
 
@@ -560,15 +583,22 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
   const current = alignment;
   row = clamp(Math.floor(row), 0, current.rows - 1);
   const local = projection?.rows.findIndex(value => value.row === row) ?? -1;
-  if (local >= 0 && (local + clientRows < projection.rows.length ||
-      projection.rows.at(-1).row === current.rows - 1)) return showAligned(row, fraction);
+  if (local >= 0 && (projection.rows.at(-1).row === current.rows - 1 ||
+      rowScrollOffset(local, fraction) + textarea.clientHeight <= pixelAt(projection.rows.length))) {
+   if (navigating) {
+    navigation++;
+    navigating = false;
+    session.cancelRead?.();
+   }
+   return showAligned(row, fraction);
+  }
   return navigate(async active => {
    const target = await current.source(row);
    if (!active() || current !== alignment) return false;
    const count = session.state().metadata.lines;
    const line = Math.min(count - 1, target.line);
    const origin = Math.max(0, line - Math.min(BUFFER_LINES, clientRows));
-   if (!await loadPage({line:origin, alignedRow:row}, active)) return false;
+   if (!await loadPage({line:origin, alignedRow:row}, active) || current !== alignment) return false;
    if (showAligned(row, fraction) && displayRow() >= (projection?.rows.findIndex(value => value.row === row) ?? 0)) return true;
    if (origin !== line && await loadPage({line, alignedRow:row}, active)) return showAligned(row, fraction);
    return false;
@@ -802,10 +832,10 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
     return;
    }
   }
-  if (movedUp && row < BUFFER_LINES / 2 && page.line > 0) {
+  if (!projected && movedUp && row < BUFFER_LINES / 2 && page.line > 0) {
    const target = Math.max(0, line - BUFFER_LINES);
    if (target < page.line) run(goLine(line, false, true));
-  } else if (movedDown && page.start + page.text.length < units) {
+  } else if (!projected && movedDown && page.start + page.text.length < units) {
    const remaining = starts.length - row - clientRows;
    const origin = nextPageOrigin();
    if (origin > page.line) {
@@ -850,7 +880,7 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
     run(panLongLine(page.column + (forward ? step : -step), backward));
     return;
    }
-   if (forward && starts.length > 1 && starts.at(-1) < page.text.length) {
+   if (!projection && forward && starts.length > 1 && starts.at(-1) < page.text.length) {
     // Continue a partially loaded line before moving to the next logical line.
     const line = page.line + starts.length - 1;
     event.preventDefault();
@@ -858,7 +888,7 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
     return;
    }
   }
-  if (projection && (delta < 0 && row <= 0 || delta > 0 && bottom)) {
+  if (projection && (delta < 0 && textarea.scrollTop < 2 || delta > 0 && bottom)) {
    const currentRow = projection.rows[displayRow()].row;
    const next = clamp(currentRow + (delta < 0 ? -3 : 3), 0, Math.max(0, alignment.rows - clientRows));
    if (next !== currentRow) {
