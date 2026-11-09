@@ -117,6 +117,8 @@ function mountDifferencePreview(host, read, getSelection) {
  panel.className = 'nt-compare-preview';
  panel.hidden = true;
  panel.innerHTML = '<div class="nt-compare-preview-tools"><span role="status"></span>' +
+  '<button type="button" class="btn small ghost" data-preview-previous-block>Previous difference</button>' +
+  '<button type="button" class="btn small ghost" data-preview-next-block>Next difference</button>' +
   '<button type="button" class="btn small ghost" data-preview-back>Previous lines</button>' +
   '<button type="button" class="btn small ghost" data-preview-next>Next lines</button>' +
   '<button type="button" class="btn small ghost" data-preview-edit>Return to editable comparison</button></div>' +
@@ -125,6 +127,7 @@ function mountDifferencePreview(host, read, getSelection) {
  grid.append(panel);
  const status = panel.querySelector('[role="status"]'), rows = panel.lastElementChild;
  const back = panel.querySelector('[data-preview-back]'), next = panel.querySelector('[data-preview-next]');
+ const previousBlock = panel.querySelector('[data-preview-previous-block]'), nextBlock = panel.querySelector('[data-preview-next-block]');
  const pageSize = 12;
  let offset = 0, controller;
  async function render(reset = false) {
@@ -136,6 +139,7 @@ function mountDifferencePreview(host, read, getSelection) {
   const selected = getSelection();
   rows.replaceChildren();
   back.disabled = next.disabled = true;
+  previousBlock.disabled = nextBlock.disabled = !selected || selected.count < 2;
   if (!selected) { status.textContent = 'Choose two documents and run Compare.'; return; }
   if (!selected.count) { status.textContent = 'No differences.'; return; }
   status.textContent = 'Loading changed lines…';
@@ -177,6 +181,8 @@ function mountDifferencePreview(host, read, getSelection) {
  toggle.addEventListener('change', () => void render(true));
  back.addEventListener('click', () => { offset -= pageSize; void render(); });
  next.addEventListener('click', () => { offset += pageSize; void render(); });
+ previousBlock.addEventListener('click', () => host.querySelector('[data-compare="previous"]').click());
+ nextBlock.addEventListener('click', () => host.querySelector('[data-compare="next"]').click());
  panel.querySelector('[data-preview-edit]').addEventListener('click', () => {
   toggle.checked = false;
   void render(true);

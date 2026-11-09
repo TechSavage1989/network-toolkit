@@ -1,3 +1,11 @@
+# v1.21.25 Beta 1 - Editable disk-backed alignment
+
+The comparison index stores a display row alongside each difference. Editable disk-backed panes use that index to project gray rows into the loaded viewport and translate selection and edits back to source offsets. The aligned scrollbar covers the whole comparison. The browser fixture inserts lines in a synthetic FortiOS file, scrolls through the gap, edits below it, and verifies saved bytes.
+
+Syntax coloring reuses the highlighted viewport while scrolling and delays new work until the viewport settles. The change map continues to show the source position of each document.
+
+---
+
 # v1.21.24 Beta 1 - Compare navigation and FortiOS coloring
 
 The working branch tests the full-document scrollbar with native Chromium scrollbars visible. Compare gains compact and dynamic map modes, fixed gutter symbols, counterpart line highlighting, and right-click comparison actions. Disk-backed views color the loaded page through the existing language worker, including FortiOS syntax. Display-only spacers in the editable disk-backed panes remain open.

@@ -92,6 +92,7 @@ type editorTabGroup struct {
 	Side string `json:"side"`
 }
 type editorPreferences struct {
+	CompareMapZoom            *float64          `json:"compareMapZoom,omitempty"`
 	CompareHorizontalSync     bool              `json:"compareHorizontalSync,omitempty"`
 	CompareUnderline          *bool             `json:"compareUnderline,omitempty"`
 	CompareIntralineHighlight *bool             `json:"compareIntralineHighlight,omitempty"`
@@ -495,7 +496,7 @@ func validateEditorBatch(batch editorBatch) error {
 		return errors.New("The active document is not in the transfer.")
 	}
 	if c := batch.Compare; c != nil {
-		if c.Left == c.Right || !ids[c.Left] || !ids[c.Right] || (c.Scale != 0 && c.Scale != .5 && c.Scale != 1 && c.Scale != 2 && c.Scale != 4) {
+		if c.Left == c.Right || !ids[c.Left] || !ids[c.Right] || (c.Scale != -3 && c.Scale != -2 && c.Scale != -1 && c.Scale != 0 && c.Scale != .5 && c.Scale != 1 && c.Scale != 2 && c.Scale != 4) {
 			return errors.New("Invalid editor comparison.")
 		}
 	}

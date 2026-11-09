@@ -24,7 +24,7 @@ function create({textarea, gutter, container, session, syntaxLanguage, changed =
  const horizontal = scrollBar('nt-editor-disk-horizontal', 'Position in long line', 'horizontal');
  const syntax = syntaxLanguage ? document.createElement('pre') : null;
  const syntaxChannel = textarea.dataset.compareText ? 'compare-' + textarea.dataset.compareText : 'default';
- let syntaxText, language, syntaxTicket = 0, syntaxTimer;
+ let syntaxWindow, syntaxTicket = 0, syntaxTimer;
  if (syntax) {
   syntax.className = 'nt-editor-highlight nt-editor-disk-highlight';
   syntax.hidden = true;
@@ -36,6 +36,7 @@ function create({textarea, gutter, container, session, syntaxLanguage, changed =
 
  let page = session.state().page;
  let starts = lineStarts(page.text);
+ let alignment = null, projection = null, alignmentTicket = 0;
  let selection = {start: page.start, end: page.start, direction: 'none'};
  let virtual = false, composing = false, disposed = false, editing = false;
  let navigation = 0, navigating = false, frame = 0, pointer = false;
@@ -72,14 +73,68 @@ function create({textarea, gutter, container, session, syntaxLanguage, changed =
   return offsets;
  }
 
- function localLine(offset) {
-  let low = 0, high = starts.length;
+ function localLine(offset, offsets = starts) {
+  let low = 0, high = offsets.length;
   while (low + 1 < high) {
    const mid = Math.floor((low + high) / 2);
-   if (starts[mid] <= offset) low = mid;
+   if (offsets[mid] <= offset) low = mid;
    else high = mid;
   }
   return low;
+ }
+
+ function displayOffset(offset) {
+  if (!projection) return offset;
+  const line = localLine(offset);
+  return projection.offsets[projection.sourceRows[line]] + offset - starts[line];
+ }
+
+ function sourceOffset(offset) {
+  if (!projection) return offset;
+  const row = localLine(offset, projection.offsets), value = projection.rows[row];
+  if (value.gap) return starts[value.source] ?? page.text.length;
+  return starts[value.source] + offset - projection.offsets[row];
+ }
+
+ function displayRow() {
+  return clamp(Math.floor(textarea.scrollTop / rowHeight), 0, (projection?.rows.length || starts.length) - 1);
+ }
+
+ function installProjection(layout, around) {
+  const gaps = new Map(layout.gaps.map(gap => [gap.line - page.line, gap.count]));
+  const rows = [], sourceRows = [], parts = [];
+  let row = layout.row;
+  const addGaps = source => {
+   const count = gaps.get(source) || 0;
+   const size = Math.min(count, Math.max(128, clientRows * 3));
+   const first = clamp((around ?? row) - row - clientRows, 0, count - size);
+   for (let i = first; i < first + size; i++) rows.push({source, row:row+i, gap:true});
+   parts.push('\n'.repeat(size));
+   row += count;
+  };
+  for (let source = 0; source < starts.length; source++) {
+   addGaps(source);
+   sourceRows.push(rows.length);
+   rows.push({source,row:row++});
+   parts.push(page.text.slice(starts[source], starts[source+1]));
+  }
+  addGaps(starts.length);
+  const text = parts.join('');
+  projection = {rows, sourceRows, offsets:lineStarts(text), text};
+  gutterStamp = '';
+  if (textarea.value !== text) textarea.value = text;
+ }
+
+ async function project(active, around) {
+  if (!alignment || page.column) return;
+  const current = alignment, source = page;
+  const complete = page.start + page.text.length === session.state().metadata.units;
+  const end = page.line + starts.length - (complete ? 0 : 1);
+  const layout = await current.layout(page.line, end);
+  if (!active() || disposed || composing || alignment !== current || page !== source) return;
+  const view = capture();
+  installProjection(layout, around);
+  select(view.start, view.end, view.direction);
  }
 
  function updateReadOnly() {
@@ -95,12 +150,13 @@ function create({textarea, gutter, container, session, syntaxLanguage, changed =
  function capture() {
   if (!virtual) {
    selection = {
-    start: page.start + textarea.selectionStart,
-    end: page.start + textarea.selectionEnd,
+    start: page.start + sourceOffset(textarea.selectionStart),
+    end: page.start + sourceOffset(textarea.selectionEnd),
     direction: textarea.selectionDirection || 'none'
    };
   }
-  return {...selection, top, left: textarea.scrollLeft + page.column * characterWidth, fraction};
+  return {...selection, top, left: textarea.scrollLeft + page.column * characterWidth, fraction,
+   alignedTop:projection?.rows[displayRow()]?.row};
  }
 
  function announce() {
@@ -119,8 +175,8 @@ function create({textarea, gutter, container, session, syntaxLanguage, changed =
   selection = {start, end, direction};
   virtual = start < page.start || end > page.start + page.text.length;
   textarea.setSelectionRange(
-   clamp(start - page.start, 0, page.text.length),
-   clamp(end - page.start, 0, page.text.length),
+   displayOffset(clamp(start - page.start, 0, page.text.length)),
+   displayOffset(clamp(end - page.start, 0, page.text.length)),
    direction
   );
   if (focus) textarea.focus({preventScroll: true});
@@ -147,10 +203,10 @@ function create({textarea, gutter, container, session, syntaxLanguage, changed =
   if (disposed) return;
   frame = 0;
   const {lines, units} = session.state().metadata;
-  const row = clamp(Math.floor(textarea.scrollTop / rowHeight), 0, starts.length - 1);
+  const row = displayRow(), projected = projection?.rows[row];
   const first = Math.max(0, row - 3);
-  const last = Math.min(starts.length, first + clientRows + 8);
-  const stamp = [page.line, first, last, rowHeight, String(lines).length].join(':');
+  const last = Math.min(projection?.rows.length || starts.length, first + clientRows + 8);
+  const stamp = [page.line, first, last, rowHeight, String(lines).length, alignmentTicket].join(':');
   if (stamp !== gutterStamp) {
    gutterStamp = stamp;
    const rows = [];
@@ -158,7 +214,9 @@ function create({textarea, gutter, container, session, syntaxLanguage, changed =
     const element = document.createElement('div');
     element.style.height = rowHeight + 'px';
     element.style.lineHeight = rowHeight + 'px';
-    element.textContent = String(page.line + line + 1);
+    const value = projection?.rows[line];
+    if (value?.gap) element.dataset.alignmentGap = '';
+    else element.textContent = String(page.line + (value?.source ?? line) + 1);
     rows.push(element);
    }
    gutter.style.paddingTop = first * rowHeight + 'px';
@@ -169,13 +227,14 @@ function create({textarea, gutter, container, session, syntaxLanguage, changed =
   }
   gutter.style.transform = 'translateY(' + (-textarea.scrollTop) + 'px)';
   paintSyntax();
-  top = page.line + row;
+  top = Math.min(lines - 1, page.line + (projected?.source ?? row));
   fraction = clamp(textarea.scrollTop / rowHeight - row, 0, 0.999);
-  vertical.hidden = lines <= clientRows;
-  const lastTop = Math.max(1, lines - clientRows);
-  barTop = clamp(top / lastTop, 0, 1) * (RANGE - vertical.clientHeight);
+  const scrollLines = alignment?.rows || lines, scrollTop = projected?.row ?? top;
+  vertical.hidden = scrollLines <= clientRows;
+  const lastTop = Math.max(1, scrollLines - clientRows);
+  barTop = clamp(scrollTop / lastTop, 0, 1) * (RANGE - vertical.clientHeight);
   if (Math.abs(vertical.scrollTop - barTop) > 1) vertical.scrollTop = barTop;
-  scrollbarValue(vertical, lines, top + 1);
+  scrollbarValue(vertical, scrollLines, scrollTop + 1);
   const longLine = page.lineUnits > pageUnits;
   horizontal.hidden = !longLine;
   container.classList.toggle('nt-editor-disk-long-line', longLine);
@@ -197,24 +256,34 @@ function create({textarea, gutter, container, session, syntaxLanguage, changed =
 
  function paintSyntax() {
   if (!syntax) return;
-  syntax.style.transform = 'translate(' + (-textarea.scrollLeft) + 'px,' + (-textarea.scrollTop) + 'px)';
   const text = textarea.value, next = syntaxLanguage(text);
-  if (text === syntaxText && next === language) return;
-  syntaxText = text;
-  language = next;
+  const offsets = projection?.offsets || starts;
+  const top = displayRow(), bottom = Math.min(offsets.length, top + clientRows + 2);
+  const position = first => {
+   syntax.style.transform = 'translate(' + (-textarea.scrollLeft) + 'px,' +
+    (first * rowHeight - textarea.scrollTop) + 'px)';
+  };
+  if (syntaxWindow?.text === text && syntaxWindow.language === next &&
+      syntaxWindow.first <= top && syntaxWindow.end >= bottom) {
+   position(syntaxWindow.first);
+   return;
+  }
+  const first = Math.max(0, top - 8), end = Math.min(offsets.length, bottom + 12);
+  syntaxWindow = {text, language:next, first, end};
+  position(first);
   const ticket = ++syntaxTicket, service = root.NTKEditorLanguageService;
   root.clearTimeout(syntaxTimer);
-  service?.cancelHighlight?.(syntaxChannel);
   syntax.hidden = true;
   textarea.classList.remove('highlight-active');
   if (!next || next === 'text' || !text || !service) return;
-  syntaxTimer = root.setTimeout(() => void service.highlight(text, next, {channel:syntaxChannel}).then(value => {
+  const visible = text.slice(offsets[first], offsets[end]);
+  syntaxTimer = root.setTimeout(() => void service.highlight(visible, next, {channel:syntaxChannel}).then(value => {
    if (disposed || ticket !== syntaxTicket || textarea.value !== text || syntaxLanguage(text) !== next) return;
    if (value.limited) return;
    syntax.innerHTML = value.html + '\n';
    syntax.hidden = false;
    textarea.classList.add('highlight-active');
-  }).catch(() => {}), 60);
+  }).catch(() => {}), 140);
  }
 
  function scrollbarValue(element, maximum, value) {
@@ -230,6 +299,8 @@ function create({textarea, gutter, container, session, syntaxLanguage, changed =
  function install(value) {
   if (disposed || !value) return;
   const view = capture();
+  projection = null;
+  alignmentTicket++;
   page = value;
   starts = lineStarts(page.text);
   if (textarea.value !== page.text) textarea.value = page.text;
@@ -250,15 +321,68 @@ function create({textarea, gutter, container, session, syntaxLanguage, changed =
  }
 
  async function loadPage(target, active) {
-  const result = await session.load(target);
+  const {alignedRow, ...source} = target;
+  const result = await session.load(source);
   if (!result || !active()) return false;
   install(result);
+  await project(active, alignedRow);
   return true;
  }
 
  function showLine(line) {
-  textarea.scrollTop = Math.max(0, (line - page.line) * rowHeight);
+  const source = Math.max(0, Math.floor(line - page.line));
+  const row = projection?.sourceRows[source] ?? source;
+  textarea.scrollTop = (row + (line % 1)) * rowHeight;
   paint();
+ }
+
+ function showAligned(row, fraction) {
+  const local = projection?.rows.findIndex(value => value.row === row) ?? -1;
+  if (local < 0) return false;
+  textarea.scrollTop = (local + fraction) * rowHeight;
+  paint();
+  return true;
+ }
+
+ async function goAlignedRow(row, fraction = 0) {
+  if (!alignment) return false;
+  const current = alignment;
+  row = clamp(Math.floor(row), 0, current.rows - 1);
+  const local = projection?.rows.findIndex(value => value.row === row) ?? -1;
+  if (local >= 0 && (local + clientRows < projection.rows.length ||
+      projection.rows.at(-1).row === current.rows - 1)) return showAligned(row, fraction);
+  return navigate(async active => {
+   const target = await current.source(row);
+   if (!active() || current !== alignment) return false;
+   const count = session.state().metadata.lines;
+   const line = Math.min(count - 1, target.line);
+   const origin = Math.max(0, line - Math.min(BUFFER_LINES, clientRows));
+   if (!await loadPage({line:origin, alignedRow:row}, active)) return false;
+   if (showAligned(row, fraction) && displayRow() >= (projection?.rows.findIndex(value => value.row === row) ?? 0)) return true;
+   if (origin !== line && await loadPage({line, alignedRow:row}, active)) return showAligned(row, fraction);
+   return false;
+  });
+ }
+
+ async function setAlignment(value) {
+  if (alignment === value || disposed) return;
+  if (composing) {
+   if (!value) { alignment = null; alignmentTicket++; }
+   return;
+  }
+  const saved = capture();
+  alignment = value;
+  alignmentTicket++;
+  if (!value) {
+   projection = null;
+   textarea.value = page.text;
+   select(saved.start, saved.end, saved.direction);
+   showLine(saved.top + saved.fraction);
+   return;
+  }
+  const ticket = alignmentTicket;
+  await project(() => ticket === alignmentTicket);
+  if (ticket === alignmentTicket) showLine(saved.top + saved.fraction);
  }
 
  function alignCursor(offset) {
@@ -420,10 +544,23 @@ function create({textarea, gutter, container, session, syntaxLanguage, changed =
   schedulePaint();
   if (composing || navigating || editing || pointer) return;
   const {units, lines} = session.state().metadata;
-  const row = clamp(Math.floor(textarea.scrollTop / rowHeight), 0, starts.length - 1);
+  const display = displayRow(), projected = projection?.rows[display];
+  const row = projected?.source ?? display;
   const line = page.line + row;
   const movedDown = textarea.scrollTop > lastScrollTop;
   const movedUp = textarea.scrollTop < lastScrollTop;
+  if (projected) {
+   const previous = clamp(Math.floor(lastScrollTop / rowHeight), 0, projection.rows.length - 1);
+   const expected = projection.rows[previous].row + display - previous;
+   if (expected !== projected.row) {
+    run(goAlignedRow(expected, textarea.scrollTop / rowHeight - display));
+    return;
+   }
+   if (movedDown && display + clientRows >= projection.rows.length - 2 && projected.row + clientRows < alignment.rows) {
+    run(goAlignedRow(projected.row + 1));
+    return;
+   }
+  }
   if (movedUp && row < BUFFER_LINES / 2 && page.line > 0) {
    const target = Math.max(0, line - BUFFER_LINES);
    if (target < page.line) run(goLine(line, false, true));
@@ -431,7 +568,7 @@ function create({textarea, gutter, container, session, syntaxLanguage, changed =
    const remaining = starts.length - row - clientRows;
    const origin = nextPageOrigin();
    if (origin > page.line) {
-    if (row >= origin - page.line && remaining < BUFFER_LINES / 2) run(rollForward(line, origin, Math.max(0, textarea.scrollTop / rowHeight - row)));
+    if (row >= origin - page.line && remaining < BUFFER_LINES / 2 && !projected?.gap) run(rollForward(line, origin, Math.max(0, textarea.scrollTop / rowHeight - display)));
     else if (remaining < BUFFER_LINES) prefetch({line: origin});
    }
   }
@@ -462,6 +599,15 @@ function create({textarea, gutter, container, session, syntaxLanguage, changed =
   const delta = event.deltaY;
   const row = Math.floor(textarea.scrollTop / rowHeight);
   const bottom = textarea.scrollTop + textarea.clientHeight >= textarea.scrollHeight - 2;
+  if (projection && (delta < 0 && row <= 0 || delta > 0 && bottom)) {
+   const currentRow = projection.rows[displayRow()].row;
+   const next = clamp(currentRow + (delta < 0 ? -3 : 3), 0, Math.max(0, alignment.rows - clientRows));
+   if (next !== currentRow) {
+    event.preventDefault();
+    run(goAlignedRow(next));
+   }
+   return;
+  }
   if (delta < 0 && textarea.scrollTop < 2 && page.line > 0) {
    event.preventDefault();
    run(goLine(page.line - 1, false, true));
@@ -477,6 +623,15 @@ function create({textarea, gutter, container, session, syntaxLanguage, changed =
 
  function changedText() {
   const text = textarea.value;
+  if (projection) {
+   // Some native input events cannot be cancelled. Never send display rows
+   // to the source buffer even if the browser has already changed the control.
+   if (text !== projection.text) {
+    textarea.value = projection.text;
+    select(selection.start, selection.end, selection.direction);
+   }
+   return;
+  }
   if (page.text === text) return;
   session.change(text);
   page = {...page, text};
@@ -489,6 +644,19 @@ function create({textarea, gutter, container, session, syntaxLanguage, changed =
     if (loaded) showOffset(cursorOffset(capture()));
    }));
   }
+ }
+
+ function editProjected(text) {
+  const view = capture();
+  const from = view.start - page.start, to = view.end - page.start;
+  if (from < 0 || to > page.text.length) { run(replace(text, view)); return; }
+  const value = page.text.slice(0, from) + text + page.text.slice(to);
+  projection = null;
+  alignmentTicket++;
+  textarea.value = value;
+  textarea.setSelectionRange(from + text.length, from + text.length);
+  changedText();
+  showOffset(page.start + from + text.length);
  }
 
  function cursorOffset(view) {
@@ -654,7 +822,7 @@ function create({textarea, gutter, container, session, syntaxLanguage, changed =
    if (!readOnly) run(history(command === 'y' || event.shiftKey));
    return;
   }
-  const at = textarea.selectionDirection === 'backward' ? textarea.selectionStart : textarea.selectionEnd;
+  const at = sourceOffset(textarea.selectionDirection === 'backward' ? textarea.selectionStart : textarea.selectionEnd);
   const row = localLine(at);
   const before = page.start > 0;
   const after = page.start + page.text.length < session.state().metadata.units;
@@ -690,6 +858,14 @@ function create({textarea, gutter, container, session, syntaxLanguage, changed =
  textarea.addEventListener('select', schedulePaint, listeners);
  textarea.addEventListener('keyup', schedulePaint, listeners);
  textarea.addEventListener('compositionstart', () => {
+  if (projection) {
+   const view = capture();
+   projection = null;
+   alignmentTicket++;
+   textarea.value = page.text;
+   select(view.start, view.end, view.direction);
+   showLine(view.top + view.fraction);
+  }
   composing = true;
   navigation++;
   navigating = false;
@@ -718,7 +894,7 @@ function create({textarea, gutter, container, session, syntaxLanguage, changed =
    run(history(type === 'historyRedo'));
    return;
   }
-  if (!virtual) return;
+  if (!virtual && !projection) return;
   event.preventDefault();
   event.stopImmediatePropagation();
   if (event.isComposing) {
@@ -726,9 +902,11 @@ function create({textarea, gutter, container, session, syntaxLanguage, changed =
   } else if (type.startsWith('delete') && type !== 'deleteByCut') {
    run(erase(type.endsWith('Backward')));
   } else if (type === 'insertText' || type === 'insertReplacementText') {
-   run(replace(event.data || ''));
+   if (projection) editProjected(event.data || '');
+   else run(replace(event.data || ''));
   } else if (type === 'insertLineBreak' || type === 'insertParagraph') {
-   run(replace('\n'));
+   if (projection) editProjected('\n');
+   else run(replace('\n'));
   }
  }, listeners);
  textarea.addEventListener('paste', event => {
@@ -745,7 +923,7 @@ function create({textarea, gutter, container, session, syntaxLanguage, changed =
   if (!readOnly) run(replace(event.dataTransfer.getData('text/plain')));
  }, listeners);
  for (const type of ['copy', 'cut']) textarea.addEventListener(type, event => {
-  if (!virtual) return;
+  if (!virtual && !projection) return;
   event.preventDefault();
   event.stopImmediatePropagation();
   run(copy(type === 'cut'));
@@ -759,20 +937,21 @@ function create({textarea, gutter, container, session, syntaxLanguage, changed =
   verticalFrame = root.requestAnimationFrame(() => {
    verticalFrame = 0;
    if (disposed || Math.abs(vertical.scrollTop - barTop) <= 1) return;
-   const last = Math.max(0, session.state().metadata.lines - clientRows);
+   const last = Math.max(0, (alignment?.rows || session.state().metadata.lines) - clientRows);
    const line = Math.round(vertical.scrollTop / Math.max(1, RANGE - vertical.clientHeight) * last);
-   run(goLine(line));
+   run(alignment ? goAlignedRow(line) : goLine(line));
   });
  }, listeners);
  vertical.addEventListener('keydown', event => {
-  const count = session.state().metadata.lines;
+  const count = alignment?.rows || session.state().metadata.lines;
+  const position = projection?.rows[displayRow()].row ?? top;
   const targets = {
-   Home: 0, End: count - 1, ArrowUp: top - 1, ArrowDown: top + 1,
-   PageUp: top - clientRows, PageDown: top + clientRows
+   Home: 0, End: count - 1, ArrowUp: position - 1, ArrowDown: position + 1,
+   PageUp: position - clientRows, PageDown: position + clientRows
   };
   if (!Object.hasOwn(targets, event.key)) return;
   event.preventDefault();
-  run(goLine(targets[event.key]));
+  run(alignment ? goAlignedRow(targets[event.key]) : goLine(targets[event.key]));
  }, listeners);
  horizontal.addEventListener('scroll', () => {
   if (Math.abs(horizontal.scrollLeft - barLeft) <= 1 || horizontalFrame) return;
@@ -801,7 +980,7 @@ function create({textarea, gutter, container, session, syntaxLanguage, changed =
  schedulePaint();
 
  return Object.freeze({
-  load, goLine, position, restore, replace, history, capture, select, selectedText, copy,
+  load, goLine, goAlignedRow, setAlignment, position, restore, replace, history, capture, select, selectedText, copy,
   comparisonPage: () => ({line:page.line, text:page.text, column:page.column, complete:page.start+page.text.length>=session.state().metadata.units}),
   refreshSyntax: paintSyntax,
   selectAll() { select(0, session.state().metadata.units, 'none', true); },

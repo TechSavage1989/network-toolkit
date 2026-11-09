@@ -48,7 +48,7 @@ function create(options) {
   '<label><input type="checkbox" data-compare-horizontal-sync> Sync horizontal scroll</label>' +
   '<label><input type="checkbox" data-compare-underline> Underline changes</label>' +
   '<label><input type="checkbox" data-compare-intraline> Highlight changed characters</label>' +
-  '<label>Map zoom <select data-compare-scale aria-label="Map zoom"><option value="0">Individual lines</option>' +
+  '<label>Map zoom <select data-compare-scale aria-label="Map zoom"><option value="-1">Individual lines</option>' +
   '<option value="-2">Compact (3 lines per pixel)</option><option value="-3">Dynamic fit (1 pixel marks)</option>' +
   '<option value="0.5">1.5×</option><option value="1">2×</option><option value="2">3×</option><option value="4">5×</option></select></label>' +
   '</div></details>' +
@@ -88,7 +88,7 @@ function create(options) {
  }));
  let ids = {left:'', right:''};
  let lastSide = options.activeSide?.() || 'left';
- let signature = '', listSignature = '', disposed = false, syncing = 0, scale = 0;
+ let signature = '', listSignature = '', disposed = false, syncing = 0, scale = prefs.compareMapZoom ?? -3;
  let job = null, startTimer = null, selected = -1, drag = null;
  let mapFrame = 0, gestureSide = null;
  let mapTop = 0, mapExtent = 0, mapScrollMax = 0, mapScrollPosition = 0;
@@ -98,7 +98,8 @@ function create(options) {
   job?.status && {count:job.status.count, index:Math.max(0, selected)});
  const mapLineCount = () => Math.max(...sides.map(side => totalLines(panes[side])));
  const mapPitch = () => scale === -3 ? Math.max(1, map.clientHeight) / mapLineCount() :
-  scale === -2 ? 1 / 3 : Math.max(2, Math.ceil(map.clientHeight / 3500)) * (1 + scale);
+  scale === -2 ? 1 / 3 : Math.max(2, Math.ceil(map.clientHeight / 3500)) * (1 + Math.max(0,scale));
+ q('[data-compare-scale]').value = String(scale === 0 ? -1 : scale);
  const splitter = root.NTKEditorCompare.createDivider(host, q('.nt-compare-grid'), comparing, () => {
   for (const side of sides) changed(side);
  });
@@ -224,11 +225,12 @@ function create(options) {
   const intraline = q('[data-compare-intraline]').checked;
   const budget = {remaining:8192};
   for (const row of rows) {
+   const gap = row.hasAttribute('data-alignment-gap');
    const line = Number(row.textContent) - 1;
-   const kind = differenceKind(side, line, pane.ranges);
+   const kind = gap ? 'gap' : differenceKind(side, line, pane.ranges);
    const className = kind ? 'nt-compare-line ' + kind : '';
    if (row.className !== className) row.className = className;
-   if (kind) row.dataset.differenceSymbol = differenceSymbols[kind];
+   if (differenceSymbols[kind]) row.dataset.differenceSymbol = differenceSymbols[kind];
    else delete row.dataset.differenceSymbol;
    const offset = index++;
    const current = lineHighlight?.lines[side] === line;
@@ -405,10 +407,12 @@ function create(options) {
   if (disposed) return;
   const pane = panes[side];
   const previousTop = pane.top;
+  const previousAligned = pane.alignedTop;
   if (pane.view) {
    const view = pane.view.capture();
    pane.top = Math.max(0, view.top || 0);
    pane.fraction = view.fraction || 0;
+   pane.alignedTop = view.alignedTop;
   } else {
    paintInlineGutter(pane);
    pane.fraction = pane.textarea.scrollTop / lineHeight(pane) - pane.top;
@@ -418,9 +422,23 @@ function create(options) {
   scheduleMap();
   if (pane.top !== previousTop && gestureSide === side && drag === null) revealMap(side);
   const sync = !syncing && gestureSide === side && q('[data-compare-sync]').checked;
-  if (sync) syncFromCache(side);
+  if (sync && pane.alignedTop != null && panes[peerOf(side)].alignedTop != null) {
+   if (previousAligned !== pane.alignedTop || Math.abs(panes[peerOf(side)].fraction - pane.fraction) >= .03) syncAligned(side);
+  } else if (sync) syncFromCache(side);
   if (pane.top !== previousTop && job?.status && !coversViewport(side)) queueLocate(side, sync);
   if (activeSide() === side) options.selectionChanged?.();
+ }
+
+ function syncAligned(side) {
+  const pane = panes[side], peer = panes[peerOf(side)];
+  const row = pane.alignedTop, fraction = pane.fraction;
+  if (peer.alignedTop === row && Math.abs(peer.fraction - fraction) < .03) return;
+  syncing++;
+  go(peer.view.goAlignedRow(row, fraction).finally(() => {
+   syncing--;
+   if (!disposed && gestureSide === side && pane.alignedTop != null && peer.alignedTop != null &&
+       (pane.alignedTop !== row || pane.fraction !== fraction) && q('[data-compare-sync]').checked) syncAligned(side);
+  }));
  }
 
  async function goLine(side, line, fraction = 0) {
@@ -462,7 +480,8 @@ function create(options) {
    syncing--;
    if (!disposed && gestureSide === side && q('[data-compare-sync]').checked &&
        (pane.top !== topAtSync || pane.fraction !== fraction)) {
-    syncFromCache(side);
+    if (pane.alignedTop != null && panes[peerOf(side)].alignedTop != null) syncAligned(side);
+    else syncFromCache(side);
    }
   }));
  }
@@ -529,6 +548,7 @@ function create(options) {
   preview?.refresh?.();
   for (const side of sides) {
    const pane = panes[side];
+   void pane.view?.setAlignment(null);
    pane.ranges = [];
    pane.mapping = null;
    pane.requested = null;
@@ -572,6 +592,19 @@ function create(options) {
   buttons();
   if (justFinished || countChanged) preview.refresh();
   if (justFinished && q('[data-compare-sync]').checked) gestureSide ||= activeSide();
+  if (justFinished && sides.every(side => panes[side].view)) {
+   const request = (side, action, line, end) => options.compareRequest({action,id:current.id,side,line,end}, current.abort.signal);
+   syncing++;
+   const pending = sides.map(side => panes[side].view.setAlignment({
+    rows:status.rows,
+    layout:(line,end)=>request(side,'alignment',line,end),
+    source:row=>request(side,'alignment-row',row)
+   }));
+   void Promise.all(pending).finally(() => { syncing--; }).then(() => {
+    if (job === current && q('[data-compare-sync]').checked && panes[gestureSide]?.alignedTop != null &&
+        panes[peerOf(gestureSide)].alignedTop != null) syncAligned(gestureSide);
+   }).catch(error => { if (job === current) failJob(current, error); });
+  }
   for (const side of sides) queueLocate(side, justFinished && gestureSide === side);
   scheduleMap();
   root.clearTimeout(current.timer);
@@ -675,7 +708,17 @@ function create(options) {
   const diff = await getDifference(current, index);
   if (!diff || job !== current) return;
   syncing++;
-  try { await Promise.all(sides.map(side => goLine(side, diff[side]))); }
+  try {
+   let row;
+   if (current.status.done && sides.every(side => panes[side].view)) {
+    const layout = await options.compareRequest({action:'alignment', id:current.id, side:'left', line:diff.left, end:diff.left}, current.abort.signal);
+    if (job !== current || disposed) return;
+    row = layout.row;
+   }
+   await Promise.all(sides.map(async side => {
+    if (row == null || !await panes[side].view.goAlignedRow(row)) await goLine(side, diff[side]);
+   }));
+  }
   finally { syncing--; }
   if (job !== current || disposed) return;
   revealMap(activeSide());
@@ -888,7 +931,8 @@ function create(options) {
   if (control.matches('[data-compare-spaces]')) void compute();
   if (control.matches('[data-compare-scale]')) {
    const topLine = mapTop / mapPitch();
-   scale = Number(control.value) || 0;
+   scale = Number(control.value);
+   options.setComparisonPreference?.('compareMapZoom', scale);
    mapTop = topLine * mapPitch();
    paintMap();
   }
@@ -955,8 +999,8 @@ function create(options) {
    ids = {left:String(value.left || ''), right:String(value.right || '')};
    for (const side of sides) if (ids[side]) options.choose?.(side, ids[side]);
    if (active && sides.some(side => ids[side] === active.id)) options.activate(active, options.sideOf?.(active.uid));
-   scale = [-3, -2, 0, .5, 1, 2, 4].includes(value.scale) ? value.scale : 0;
-   q('[data-compare-scale]').value = String(scale);
+   scale = [-3,-2,-1,0,.5,1,2,4].includes(value.scale) ? value.scale : -3;
+   q('[data-compare-scale]').value = String(scale === 0 ? -1 : scale);
    q('[data-compare-sync]').checked = value.sync !== false;
    refresh();
   },

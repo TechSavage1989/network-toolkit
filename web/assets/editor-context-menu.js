@@ -21,11 +21,11 @@ function items(s){const sel=s.selection,compares=api()?.compareActions?.()||[];r
  ['find','Find','search','Ctrl+F',s.open],['replace','Replace','search','Ctrl+H',s.editable],['goto','Go to line','goto','Ctrl+G',s.open],null,
  ['comment','Toggle comment','comment','Ctrl+/',s.editable],['duplicate','Duplicate line','duplicate','Ctrl+D',s.editable],['upper','UPPERCASE','textCase','',s.editable&&sel],['lower','lowercase','textCase','',s.editable&&sel],['format','Format document','format','Ctrl+Shift+F',s.editable&&!s.empty],null,
  ...(api()?.conversions||[]).map(([action,label])=>[action,label,'textCase','',s.convertible&&sel]),
- ...(compares.length?[null,...compares.map(([action,label,enabled])=>[action,label,'compare','',enabled])]:[])];}
+ ...(compares.length?[null,...compares.map(([action,label,enabled,checked])=>[action,label,'compare','',enabled,checked])]:[])];}
 function close(focus=true){if(!menu)return;menu.remove();menu=null;if(focus)restore?.();restore=null;}
 function open(x,y){const t=api();if(!t)return false;close(false);const s=t.state();if(!s.open)return false;
  menu=document.createElement('div');menu.id='editorContextMenu';menu.className='terminal-context-menu nt-editor-context-menu';menu.setAttribute('role','menu');menu.setAttribute('aria-label','Text Editor actions');
- menu.innerHTML=items(s).map(item=>item?'<button type="button" role="menuitem" tabindex="-1" data-editor-menu-action="'+item[0]+'"'+(item[4]?'':' disabled')+'>'+ico(item[2])+'<span>'+item[1]+'</span>'+(item[3]?'<kbd>'+item[3]+'</kbd>':'')+'</button>':'<div role="separator" class="terminal-menu-separator"></div>').join('');
+ menu.innerHTML=items(s).map(item=>item?'<button type="button" role="'+(item[5]===undefined?'menuitem':'menuitemcheckbox')+'" tabindex="-1" data-editor-menu-action="'+item[0]+'"'+(item[5]===undefined?'':' aria-checked="'+item[5]+'"')+(item[4]?'':' disabled')+'>'+(item[5]===undefined?ico(item[2]):'<span class="nt-editor-menu-check" aria-hidden="true">'+(item[5]?'✓':'')+'</span>')+'<span>'+item[1]+'</span>'+(item[3]?'<kbd>'+item[3]+'</kbd>':'')+'</button>':'<div role="separator" class="terminal-menu-separator"></div>').join('');
  document.body.append(menu);const r=menu.getBoundingClientRect();menu.style.left=Math.max(6,Math.min(x,innerWidth-r.width-6))+'px';menu.style.top=Math.max(6,Math.min(y,innerHeight-r.height-6))+'px';
  restore=()=>api()?.focus();menu.querySelector('button:not(:disabled)')?.focus({preventScroll:true});return true;}
 async function run(action){const t=api();if(!t)return;close(false);t.focus();

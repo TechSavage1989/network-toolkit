@@ -34,7 +34,7 @@ func TestDiskEditorCompareMixedDocumentsAndLease(t *testing.T) {
 			t.Fatal(r.Code, r.Body)
 		}
 		if state.Done {
-			if state.Count != 1 || state.LeftLines != 3 || state.RightLines != 4 {
+			if state.Count != 1 || state.LeftLines != 3 || state.RightLines != 4 || state.Rows != 4 {
 				t.Fatal(state)
 			}
 			break
@@ -65,6 +65,25 @@ func TestDiskEditorCompareMixedDocumentsAndLease(t *testing.T) {
 	}
 	if oversized := call("map", map[string]any{"start": 0, "end": diskCompareMapWindow + 1}); oversized.Code != 400 {
 		t.Fatal(oversized.Code, oversized.Body)
+	}
+	geometry := call("alignment", map[string]any{"side": "left", "line": 1, "end": 2})
+	if geometry.Code != 200 || strings.TrimSpace(geometry.Body.String()) != `{"gaps":[{"line":1,"count":1}],"row":1}` {
+		t.Fatal(geometry.Code, geometry.Body)
+	}
+	for _, check := range []struct {
+		side string
+		row  int
+		want string
+	}{
+		{"left", 1, `{"gap":1,"line":1}`},
+		{"right", 1, `{"line":1}`},
+		{"left", 2, `{"line":1}`},
+		{"right", 2, `{"line":2}`},
+	} {
+		result := call("alignment-row", map[string]any{"side": check.side, "line": check.row})
+		if result.Code != 200 || strings.TrimSpace(result.Body.String()) != check.want {
+			t.Fatal(result.Code, result.Body)
+		}
 	}
 	if edit := diskCall(a, a.token, lease, map[string]any{"action": "edit", "revision": 1, "from": 0, "to": 0, "text": "new "}); edit.Code != 200 {
 		t.Fatal(edit.Code, edit.Body)
