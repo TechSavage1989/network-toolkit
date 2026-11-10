@@ -42,7 +42,8 @@ async function open(mode,options={}){
     if(b.action==='probe')data={supported:true};else if(b.action==='list')data={path:'/home/operator',entries:[{name:'running-config.txt',path:'/home/operator/running-config.txt',size:21},{name:'backups',path:'/home/operator/backups',directory:true}]};
     else if(b.action==='read-text')data={content:'hostname lab-switch-01\n',hash:'synthetic',encoding:'UTF-8',bom:false};
     else return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'Synthetic fixture: not available'})});}
-   else if(p==='/api/peer-send/inbox')data={request:null};
+   else if(p==='/api/peer-send/inbox')data={request:null,report:false};
+   else if(p==='/api/peer-send/report')data={ok:true};
    else if(p==='/api/peer-send/targets')data={app:mode==='terminal'?'editor':'terminal',name:mode==='terminal'?'Network Toolkit Text Editor':'Network Toolkit Terminal',running:false,ready:false,targets:[]};
    else if(p==='/api/peer-send/open'){f.opens++;data={running:true,ready:false};}
    else if(/\/api\/terminals\/[^/]+\/resize$/.test(p))data={};
@@ -120,6 +121,15 @@ async function standaloneEditor(){
  await run('Send to terminal');await page.locator('[data-editor-send-peer-missing]').waitFor();assert.match(await page.locator('#modalRoot .modal-body').innerText(),/Network Toolkit Terminal is not open\./);await closeModal();
  await run('Open Network Toolkit Terminal');await page.waitForFunction(()=>[...document.querySelectorAll('#toastStack .toast')].some(n=>n.textContent.includes('Network Toolkit Terminal is open.')));assert.equal(f.opens,1);
  pass('Text Editor: the command palette lists only editor commands plus the Terminal connection, and every one of them works');
+ // The Connect sidebar: nothing that points to, or starts, another Toolkit tool.
+ await closeModal();await page.locator(editor+' button[aria-label="Connections"],'+editor+' button[title="Connections"]').first().click();
+ await page.waitForFunction(()=>/Fill in the connection below, then choose Connect \/ Browse\./.test(document.querySelector('#ntEditorRemoteHint')?.textContent||''));
+ assert.equal(/Terminal|FTPS browser/.test(await page.locator('#ntEditorRemoteHint').textContent()),false,'the hint does not send the user to tools this app does not have');
+ const openTerminal=await page.evaluate(()=>[...document.querySelectorAll('#networkToolkitFileEditor [data-rb-action="openTerminal"]')].map(el=>getComputedStyle(el).display));
+ assert(openTerminal.length>0&&openTerminal.every(display=>display==='none'),'"Open terminal" on a file connection is hidden: '+JSON.stringify(openTerminal));
+ assert.equal(await page.locator(editor+' [data-rb-action="connect"]').first().isVisible(),true,'file connections stay');
+ await shot('editor-connect');
+ pass('Text Editor: the Connect sidebar keeps file connections and offers no terminal');
  // The Toolkit's services are never asked for by this app.
  const unrelated=f.calls.filter(call=>/\/api\/(updates|vendors|storage|jobs|report|system|local-tools|packet-captures|public-ip|scan-networks|terminal-window|terminals)\b/.test(call));
  assert.deepEqual([...new Set(unrelated)],[],'the standalone Text Editor does not use these Toolkit services');
@@ -159,6 +169,10 @@ async function standaloneTerminal(){
  for(const label of ['Ping','Text Editor','Terminal','Reports'])assert(mainCommands.some(row=>row.endsWith('| '+label)),'main window keeps the '+label+' tool');
  assert.equal(mainCommands.some(row=>/Open Network Toolkit (Terminal|Text Editor)|\| Window settings$/.test(row)),false);
  const mainHelp=await helpRows();assert.deepEqual([...new Set(mainHelp.map(row=>row.split(' | ')[0]))],['Application','Text Editor','Terminal','File browser','Panels']);assert.equal(mainHelp.length,13);
+ await page.evaluate(()=>navigate('editor'));await page.locator('#networkToolkitFileEditor button[aria-label="Connections"],#networkToolkitFileEditor button[title="Connections"]').first().click();
+ await page.waitForFunction(()=>/Connect through Terminal or the SFTP \/ FTP \/ FTPS browser first\./.test(document.querySelector('#ntEditorRemoteHint')?.textContent||''));
+ assert.equal(await page.evaluate(()=>[...document.querySelectorAll('#networkToolkitFileEditor [data-rb-action="openTerminal"]')].some(el=>getComputedStyle(el).display!=='none')),true,'the main window keeps Open terminal for file connections');
+ assert.equal(await page.locator('#networkToolkitFileEditor .standalone-app-tools').count(),0);
  await page.evaluate(()=>navigate('overview'));assert.equal(await visible('.app-foot'),true,'the main window keeps its footer');
  await page.evaluate(()=>appSettings());await page.locator('#modalRoot .ux-settings-nav').waitFor();assert.equal(await modalTitle(),'App settings');assert.equal(await page.locator('#modalRoot #appUpdateSettings').count(),1);await closeModal();
  await context.close();
