@@ -47,7 +47,7 @@ test('the standalone Terminal lists only its own commands and help',()=>{
  assert.equal(h.api.configure({editor:false,terminal:true}),'terminal');
  assert(h.document.classList.contains('standalone-terminal'));assert.equal(h.document.classList.contains('standalone-editor'),false);assert.deepEqual(h.started,['terminal']);
  assert.deepEqual(h.api.commands(GLOBAL).map(item=>item.label),['Keyboard shortcuts and help','Search tools and commands','Window settings','Reopen recently closed tab','Switch light/dark theme','Send output to Text Editor','Open Network Toolkit Text Editor']);
- assert.deepEqual(h.api.helpRows(HELP).map(row=>row[0]+'|'+row[1]),['Application|Ctrl+Shift+P','Application|F1','Terminal|Ctrl+Shift+F','Terminal|To editor','Panels|Arrow keys on divider']);
+ assert.deepEqual(h.api.helpRows(HELP).map(row=>row[0]+'|'+row[1]),['Application|Ctrl+Shift+P','Application|F1','Terminal|Ctrl+Shift+F','Terminal|Send to Text Editor','Panels|Arrow keys on divider']);
  assert.equal(h.api.helpIntro('intro'),'intro');
  assert.equal(h.document.querySelector('.standalone-app-tools'),null,'the Terminal keeps its app buttons in its sidebar rail');
 });

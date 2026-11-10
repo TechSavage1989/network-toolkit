@@ -1,7 +1,8 @@
 /* Standalone apps (owner request). The installed edition starts the same
  * program three ways: Network Toolkit, Network Toolkit Text Editor and Network
  * Toolkit Terminal. Each standalone app shows only what belongs to it, plus
- * what connects it to the other standalone app (Send to terminal, To editor).
+ * what connects it to the other standalone app (Send to terminal, Send to Text
+ * Editor).
  * Rule: nothing visible that does nothing, and nothing from another tool.
  *
  * This module is active only in those two apps. index.html calls configure()
@@ -74,7 +75,7 @@ function helpRows(all){
   ['Text Editor','Ctrl+Shift+Enter','Send the selection or the document to Network Toolkit Terminal'],
   ['Files sidebar','F2','Rename the selected file'],['Files sidebar','Ctrl / Shift+click','Select several files']);
  else rows.splice(rows.findIndex(row=>row[0]==='Panels'),0,
-  ['Terminal','To editor','Send output or selected text to Network Toolkit Text Editor']);
+  ['Terminal','Send to Text Editor','Send output or selected text to Network Toolkit Text Editor (button under the console, tab menu, right-click menu)']);
  return rows;
 }
 function helpIntro(text){return mode==='editor'?'Use the menus and visible action buttons if you prefer not to use shortcuts.':text;}

@@ -56,7 +56,7 @@ In the Text Editor app, **Send to terminal** (toolbar button, right-click menu o
 - Up to 1 MiB of text can be sent at a time. Your document stays open and unchanged.
 - If a dialog is open in the Terminal (a connection form, a sign-in or host key question, or another paste review), the text is refused instead of replacing it. Close the dialog and send again.
 
-Text sent from the Terminal app with **To editor** arrives here as a new document or in the open document you chose there; see [Terminal](terminal.md#the-terminal-app). Only the text you send travels between the two apps. Passwords, saved connections, host keys and file contents you did not send are never shared, and nothing leaves this computer. Both apps must use the same data folder, which they do when installed with setup. In the main Toolkit window **Send to terminal** works as before, inside that window.
+Text sent from the Terminal app with **Send to Text Editor** arrives here as a new document or in the open document you chose there; see [Terminal](terminal.md#the-terminal-app). Only the text you send travels between the two apps. Passwords, saved connections, host keys and file contents you did not send are never shared, and nothing leaves this computer. Both apps must use the same data folder, which they do when installed with setup. In the main Toolkit window **Send to terminal** works as before, inside that window.
 
 ## Configuration text
 For network configuration syntax, choose Auto, the network language or plain text. This affects highlighting only; review actual device commands independently before applying configuration.

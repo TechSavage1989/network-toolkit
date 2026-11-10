@@ -188,10 +188,10 @@ async function standaloneTerminal(){
  for(const label of GONE.concat(['Ping','Text Editor','Reports','File Transfer','SFTP','Overview'])){await page.locator('#uxCommandOverlay .ux-command-input').fill(label);await page.waitForTimeout(30);assert.equal(await page.locator('#uxCommandResults .ux-command-row strong').evaluateAll((rows,l)=>rows.some(r=>r.textContent===l),label),false,label+' is not offered');}
  await shot('terminal-palette');await page.keyboard.press('Escape');
  const help=await helpRows();
- assert.deepEqual([...new Set(help.map(row=>row.split(' | ')[0]))],['Application','Terminal','Panels']);assert(help.includes('Terminal | To editor | Send output or selected text to Network Toolkit Text Editor'));assert(help.includes('Terminal | Ctrl+Shift+F | Find in terminal output'));
+ assert.deepEqual([...new Set(help.map(row=>row.split(' | ')[0]))],['Application','Terminal','Panels']);assert(help.includes('Terminal | Send to Text Editor | Send output or selected text to Network Toolkit Text Editor (button under the console, tab menu, right-click menu)'));assert(help.includes('Terminal | Ctrl+Shift+F | Find in terminal output'));
  await page.locator('#uxTerminalHelpLauncher').click();await page.locator('[aria-label="Keyboard shortcuts and help"][role="dialog"]').waitFor();assert.equal(await page.locator('#uxCommandOverlay .ux-help-row').count(),help.length);
  assert.equal(/welcome and quick starts|Rename selected file|New document/i.test(await page.locator('#uxCommandOverlay').innerText()),false);await shot('terminal-help');await page.keyboard.press('Escape');
- pass('Terminal: the command palette and F1 help list terminal commands and To editor only');
+ pass('Terminal: the command palette and F1 help list terminal commands and Send to Text Editor only');
  // Each remaining palette command works.
  await run('Window settings');assert.equal(await modalTitle(),'Terminal window settings');
  let text=await page.locator('#modalRoot .modal').innerText();assert.equal(/main diagnostics window/i.test(text),false,'no wording about a main diagnostics window');assert.match(text,/Ends this window's connections\. Other Network Toolkit windows you have open are not affected\./);
