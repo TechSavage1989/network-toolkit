@@ -137,6 +137,9 @@
 #terminalConnectForm .field.mt,#terminalConnectForm .notice.mt{margin-top:10px}
 #terminalConnectForm .toggle-row{padding:6px 0}
 #terminalConnectForm .terminal-profile-note{margin-top:6px;line-height:1.45}
+#terminalConnectForm .terminal-link-notice{margin-bottom:12px;flex-wrap:wrap;line-height:1.45}
+#terminalConnectForm .terminal-link-notice .btn{flex:0 0 auto}
+#terminalLinkSettings .hint{display:block}
 #terminalConnectForm textarea{min-height:100px}
 #terminalConnectFields>.connect-grid:has(#con-serialPort){grid-template-columns:repeat(auto-fit,minmax(min(100%,180px),1fr))}
 

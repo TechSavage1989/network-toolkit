@@ -1096,6 +1096,12 @@ jobs:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
         run: node scripts/terminal-connection-dialog.browser.cjs
+      - name: Check SSH, Telnet and serial links open a prefilled form and never connect on their own
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-browser-results
+        run: node scripts/terminal-links.browser.cjs
       - name: Check files open at the start in the text editor
         if: success() || failure()
         env:
