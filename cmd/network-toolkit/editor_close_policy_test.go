@@ -3,7 +3,7 @@ package main
 import "testing"
 
 func TestMainEditorCloseApprovalOptIn(t *testing.T) {
-	for _, title := range []string{appName, appName + " Terminal"} {
+	for _, title := range []string{appName, appName + " Terminal", standaloneEditorTitle} {
 		if !mainEditorCloseApproval(title) {
 			t.Fatalf("primary editor-capable workspace %q must require close approval", title)
 		}

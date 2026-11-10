@@ -226,6 +226,7 @@ func main() {
 		platform.NotifyFatal(err.Error())
 		return
 	}
+	editorStandalone := *editorOptions.standalone
 	if *printVersion {
 		fmt.Println(appName, model.Version, runtime.GOOS, runtime.GOARCH)
 		return
@@ -283,8 +284,19 @@ func main() {
 		return
 	}
 	var editorWorkspaceOwner bool
-	if runtime.GOOS == "windows" && !*noBrowser && !*terminalOnly {
-		release, reused, err := prepareEditorWorkspace(rootDataDir, editorLaunch)
+	if editorStandalone {
+		editorDir, release, reused, err := prepareStandaloneEditor(rootDataDir, editorLaunch)
+		if err != nil {
+			platform.NotifyFatal("Unable to open the Text Editor workspace: " + err.Error())
+			return
+		}
+		if reused {
+			return
+		}
+		defer release()
+		*dataDir, editorWorkspaceOwner = editorDir, true
+	} else if runtime.GOOS == "windows" && !*noBrowser && !*terminalOnly {
+		release, reused, err := prepareEditorWorkspace(rootDataDir, "main", editorLaunch)
 		if err != nil && editorLaunch != nil {
 			platform.NotifyFatal("Unable to open Text Editor: " + err.Error())
 			return
@@ -323,14 +335,18 @@ func main() {
 		a.updateFinalizing.Store(true)
 	}
 	defer a.cleanupStagedUpdate()
-	a.storage = storage
+	if !editorStandalone {
+		a.storage = storage
+	}
 	a.headless = *noBrowser
 	a.editorLaunchAvailable = editorLaunch != nil
 	if editorLaunch != nil {
 		a.editorLaunchInbox.add(*editorLaunch)
 	}
 	if runtime.GOOS == "windows" || *noBrowser {
-		a.launchTerminalView = launchDetachedTerminal
+		if !editorStandalone {
+			a.launchTerminalView = launchDetachedTerminal
+		}
 		a.launchEditorView = launchDetachedEditor
 	}
 	title := appName
@@ -338,6 +354,8 @@ func main() {
 		a.windowMode = "terminal"
 		a.windowInbox.add(initialPreset)
 		title = appName + " Terminal"
+	} else if editorStandalone {
+		a.windowMode, title = standaloneEditorMode, standaloneEditorTitle
 	} else if runtime.GOOS == "windows" && !*noBrowser {
 		a.openTerminalWindow = func(ctx context.Context, preset *terminalWindowPreset) (bool, error) {
 			return launchIndependentTerminal(ctx, rootDataDir, preset)
@@ -413,6 +431,9 @@ func main() {
 			defer unregister()
 			a.editorLaunchAvailable = true
 			a.editorLaunchReusable = true
+		} else if editorStandalone {
+			platform.NotifyFatal("Unable to register the Text Editor workspace: " + err.Error())
+			return
 		}
 	}
 	srv := &http.Server{Handler: a, BaseContext: func(net.Listener) context.Context { return a.ctx }, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16384}
@@ -770,8 +791,8 @@ func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *application) getSystem(refresh bool) map[string]any {
-	if a.windowMode == "terminal" {
-		// A terminal-only startup needs no diagnostic adapter enumeration.
+	if a.windowMode == "terminal" || a.windowMode == standaloneEditorMode {
+		// A tool-only startup needs no diagnostic adapter enumeration.
 		host, _ := os.Hostname()
 		return map[string]any{"hostname": host, "interfaces": []any{}}
 	}

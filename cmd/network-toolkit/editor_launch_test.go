@@ -28,6 +28,9 @@ func TestEditorLaunchCLI(t *testing.T) {
 	}{
 		{name: "ordinary app"},
 		{name: "editor shortcut", args: []string{"--editor"}, want: &editorLaunchRequest{}},
+		{name: "standalone editor shortcut", args: []string{"--editor-standalone"}, want: &editorLaunchRequest{}},
+		{name: "standalone Explorer file", args: []string{"--editor-standalone", "--open-file", path}, want: &editorLaunchRequest{Path: path}},
+		{name: "conflicting editor modes", args: []string{"--editor", "--editor-standalone"}, wantError: true},
 		{name: "Explorer file", args: []string{"--open-file", path}, want: &editorLaunchRequest{Path: path}},
 		{name: "missing file", args: []string{"--open-file", filepath.Join(root, "missing.txt")}, wantError: true},
 		{name: "empty filename", args: []string{"--open-file", ""}, wantError: true},
@@ -66,7 +69,7 @@ func TestEditorLaunchReusesRegisteredWorkspace(t *testing.T) {
 	defer server.Close()
 	a.host = strings.TrimPrefix(server.URL, "http://")
 	root := t.TempDir()
-	release, reused, err := prepareEditorWorkspace(root, nil)
+	release, reused, err := prepareEditorWorkspace(root, "main", nil)
 	if err != nil || reused || release == nil {
 		t.Fatalf("first workspace ownership: %v (reused=%t)", err, reused)
 	}
@@ -82,7 +85,7 @@ func TestEditorLaunchReusesRegisteredWorkspace(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, request := range []editorLaunchRequest{{Path: file}, {Path: file}, {}} {
-		nextRelease, nextReused, err := prepareEditorWorkspace(root, &request)
+		nextRelease, nextReused, err := prepareEditorWorkspace(root, "main", &request)
 		if err != nil || !nextReused || nextRelease != nil {
 			t.Fatalf("later launch failed to reuse workspace: %v (reused=%t)", err, nextReused)
 		}
