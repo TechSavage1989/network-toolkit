@@ -260,6 +260,60 @@ func TestPeerRoutesByKindOfWindow(t *testing.T) {
 			}
 		}
 	}
+	// Real child windows of the MAIN engine: the token of a detached terminal
+	// view and of a detached editor view reaches no peer page route and is not
+	// an activation token. (The main engine's own page does reach its inbox.)
+	if r := requestApp(main, http.MethodGet, "/api/peer-send/inbox", "", true); r.Code != http.StatusOK {
+		t.Fatalf("the main page's own inbox: %d %s", r.Code, r.Body)
+	}
+	session := viewTestConnected(t, main)
+	var terminalLaunch terminalViewLaunch
+	main.launchTerminalView = func(_ context.Context, value terminalViewLaunch) (<-chan error, error) {
+		terminalLaunch = value
+		return nil, nil
+	}
+	view, err := main.views.create(session.ID, viewTestSnapshot(main, session))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = main.views.ready(view.ID); err != nil {
+		t.Fatal(err)
+	}
+	main.launchEditorView = func(context.Context, editorViewLaunch) (<-chan error, error) { return nil, nil }
+	_, _, editorView := editorFixtureOffer(t, main.editorViews)
+	main.editorViews.mu.Lock()
+	editorToken := main.editorViews.views[editorView].token
+	main.editorViews.mu.Unlock()
+	for name, token := range map[string]string{"detached terminal view": terminalLaunch.ViewToken, "detached editor view": editorToken} {
+		if len(token) != 64 {
+			t.Fatalf("%s: no view token", name)
+		}
+		if _, found := main.views.authenticate(token); !found {
+			if _, found = main.editorViews.authenticate(token); !found {
+				t.Fatalf("%s: the token is not a live view token", name)
+			}
+		}
+		for route, method := range map[string]string{"inbox": http.MethodGet, "targets": http.MethodGet, "result?requestId=" + peerTestRequestID: http.MethodGet, "report": http.MethodPost, "ack": http.MethodPost, "send": http.MethodPost, "open": http.MethodPost} {
+			var body any
+			if method == http.MethodPost {
+				body = map[string]any{"targets": []any{}}
+			}
+			if r := viewTestRequest(main, token, method, "/api/peer-send/"+route, body, nil); r.Code < 400 || strings.Contains(r.Body.String(), `"report"`) || strings.Contains(r.Body.String(), `"ok":true`) {
+				t.Fatalf("%s reached /api/peer-send/%s: %d %s", name, route, r.Code, r.Body)
+			}
+		}
+		for _, path := range []string{"/api/peer/terminal/sessions", "/api/peer/editor/documents"} {
+			if r := peerInbound(main, http.MethodGet, path, "", token, nil); r.Code != http.StatusUnauthorized {
+				t.Fatalf("%s as an activation token on %s: %d", name, path, r.Code)
+			}
+		}
+	}
+	main.peer.mu.Lock()
+	reported := main.peer.reported
+	main.peer.mu.Unlock()
+	if reported {
+		t.Fatal("a child window's report was stored")
+	}
 	editor := testApplication(t)
 	editor.windowMode = standaloneEditorMode
 	editor.configurePeerSend(t.TempDir())
@@ -617,7 +671,7 @@ func TestPeerSendBetweenTwoStandaloneAppsOfOneDataRoot(t *testing.T) {
 			t.Fatalf("targets without the other app: %d %s", code, raw)
 		}
 	}
-	if code, _, raw := peerPage(t, editor, http.MethodPost, "/api/peer-send/send", `{"session":"s1","text":"show version"}`); code != http.StatusServiceUnavailable || !strings.Contains(raw, "Network Toolkit Terminal is not open") {
+	if code, _, raw := peerPage(t, editor, http.MethodPost, "/api/peer-send/send", `{"session":"s1","text":"show version"}`); code != http.StatusConflict || !strings.Contains(raw, "Nothing was sent") || !strings.Contains(raw, "Choose Send to terminal again.") {
 		t.Fatalf("send without the Terminal: %d %s", code, raw)
 	}
 	peerRegister(t, terminal, root)
@@ -839,7 +893,7 @@ func TestPeerSendIgnoresAnEndpointThatIsNotTheOtherApp(t *testing.T) {
 	if code, reply, raw := peerPage(t, editor, http.MethodGet, "/api/peer-send/targets", ""); code != http.StatusOK || reply["running"] != false || strings.Contains(raw, "trap") {
 		t.Fatalf("an unconfirmed endpoint was trusted: %d %s", code, raw)
 	}
-	if code, _, raw := peerPage(t, editor, http.MethodPost, "/api/peer-send/send", `{"session":"s1","text":"enable secret synthetic"}`); code != http.StatusServiceUnavailable {
+	if code, _, raw := peerPage(t, editor, http.MethodPost, "/api/peer-send/send", `{"session":"s1","text":"enable secret synthetic"}`); code != http.StatusConflict {
 		t.Fatalf("send to an unconfirmed endpoint: %d %s", code, raw)
 	}
 	close(received)
@@ -1268,7 +1322,7 @@ func TestPeerSendStartsTheOtherAppAndDeliversTheTextOnce(t *testing.T) {
 	alone.peer.mu.Lock()
 	alone.peer.launch = func(context.Context) error { started = true; return nil }
 	alone.peer.mu.Unlock()
-	if code, _, raw = peerPage(t, alone, http.MethodPost, "/api/peer-send/send", `{"session":"s1","text":"reload"}`); code != http.StatusServiceUnavailable || !strings.Contains(raw, "Network Toolkit Terminal is not open. Nothing was sent.") || started {
+	if code, _, raw = peerPage(t, alone, http.MethodPost, "/api/peer-send/send", `{"session":"s1","text":"reload"}`); code != http.StatusConflict || !strings.Contains(raw, "Nothing was sent") || !strings.Contains(raw, "Choose Send to terminal again.") || started {
 		t.Fatalf("terminal text with nothing running: %d %s (started %v)", code, raw, started)
 	}
 }
@@ -1447,7 +1501,7 @@ func TestPeerSendSkipsOlderAppsAndSaysSo(t *testing.T) {
 	if note, _ := reply["note"].(string); code != http.StatusOK || reply["running"] != false || !strings.Contains(note, skipped) {
 		t.Fatalf("an untrusted record: %d %s", code, raw)
 	}
-	if code, _, raw = peerPage(t, sender, http.MethodPost, "/api/peer-send/send", `{"session":"s1","text":"x"}`); code != http.StatusServiceUnavailable || !strings.Contains(raw, "Nothing was sent.") || !strings.Contains(raw, skipped) {
+	if code, _, raw = peerPage(t, sender, http.MethodPost, "/api/peer-send/send", `{"session":"s1","text":"x"}`); code != http.StatusConflict || !strings.Contains(raw, "Nothing was sent") {
 		t.Fatalf("send with only an untrusted record: %d %s", code, raw)
 	}
 	if contacted {
@@ -1824,5 +1878,268 @@ func TestPeerSendPutsNothingButTheTextOnTheWire(t *testing.T) {
 				t.Fatalf("%s to %s: %d POSTs", own, receiver, posts)
 			}
 		}
+	}
+}
+
+// ---- Hardening from the security review ----
+
+// The engine itself enforces "only the listed receiver": a send that names a
+// session or an open document is refused unless this app's page was shown that
+// receiver's list, and it stays with that receiver whatever starts later.
+func TestPeerSendRefusesAnExistingTargetWithoutAListedReceiver(t *testing.T) {
+	root := t.TempDir()
+	editor, _ := peerTestApp(t, root, standaloneEditorMode)
+	terminal, _ := peerTestApp(t, root, "terminal")
+	main, _ := peerTestApp(t, root, "main")
+	peerRegister(t, main, root)
+	mainPage := peerLivePage(t, main, `{"targets":[{"id":"s1","name":"main-s1","type":"ssh","connected":true}],"documents":[{"id":"doc-main-1","name":"main notes.txt"}]}`)
+	nothingArrives := func(what string) {
+		t.Helper()
+		select {
+		case request := <-mainPage:
+			t.Fatalf("%s: the main window received %v", what, request)
+		case <-time.After(400 * time.Millisecond):
+		}
+	}
+	// Wait until the main window would be chosen, without listing it to the senders.
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		if rc, _, _, _, _ := editor.peerChoose(context.Background()); rc != nil && rc.mode == "main" {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the main window never became a receiver")
+		}
+		time.Sleep(40 * time.Millisecond)
+	}
+	code, _, raw := peerPage(t, editor, http.MethodPost, "/api/peer-send/send", `{"session":"s1","text":"reload"}`)
+	if code != http.StatusConflict || !strings.Contains(raw, "Nothing was sent") || !strings.Contains(raw, "Choose Send to terminal again.") {
+		t.Fatalf("terminal text without a listed receiver: %d %s", code, raw)
+	}
+	code, _, raw = peerPage(t, terminal, http.MethodPost, "/api/peer-send/send", `{"target":"doc-main-1","where":"end","text":"output"}`)
+	if code != http.StatusConflict || !strings.Contains(raw, "Choose Send to editor again.") {
+		t.Fatalf("editor text for a document without a listed receiver: %d %s", code, raw)
+	}
+	nothingArrives("unlisted sends")
+	// Listed: the same send goes to the main window ...
+	if code, reply, raw := peerPage(t, editor, http.MethodGet, "/api/peer-send/targets", ""); code != http.StatusOK || reply["receiver"] != "main" {
+		t.Fatalf("targets: %d %s", code, raw)
+	}
+	// ... and stays there when the standalone Terminal starts with a session of the same id.
+	standalone, _ := peerTestApp(t, root, "terminal")
+	peerRegister(t, standalone, root)
+	standalonePage := peerLivePage(t, standalone, peerOwnSessions)
+	deadline = time.Now().Add(5 * time.Second)
+	for {
+		if rc, _, ready, _, _ := editor.peerChoose(context.Background()); rc != nil && rc.mode == "terminal" && ready {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("the standalone Terminal never became the first receiver")
+		}
+		time.Sleep(40 * time.Millisecond)
+	}
+	code, reply, raw := peerPage(t, editor, http.MethodPost, "/api/peer-send/send", `{"session":"s1","text":"reload"}`)
+	if code != http.StatusOK || reply["receiver"] != "main" || reply["name"] != "Network Toolkit" {
+		t.Fatalf("send to the listed receiver: %d %s", code, raw)
+	}
+	if request := peerAwaitRequest(t, mainPage, "listed main window"); request["session"] != "s1" || request["text"] != "reload" {
+		t.Fatalf("request: %v", request)
+	}
+	select {
+	case request := <-standalonePage:
+		t.Fatalf("the text went to an app the page had not listed: %v", request)
+	case <-time.After(400 * time.Millisecond):
+	}
+	// A listing that found nobody clears the listed receiver again.
+	empty, _ := peerTestApp(t, t.TempDir(), standaloneEditorMode)
+	if _, reply, _ := peerPage(t, empty, http.MethodGet, "/api/peer-send/targets", ""); reply["running"] != false {
+		t.Fatal("unexpected receiver")
+	}
+	if code, _, raw = peerPage(t, empty, http.MethodPost, "/api/peer-send/send", `{"session":"s1","text":"x"}`); code != http.StatusConflict {
+		t.Fatalf("send after an empty listing: %d %s", code, raw)
+	}
+}
+
+// Text is delivered only to the instance that was probed. If the record names
+// another instance by the time of delivery, nothing is sent to it: the check
+// happens before the request is made.
+func TestPeerDeliverIsPinnedToTheProbedInstance(t *testing.T) {
+	root := t.TempDir()
+	editor, _ := peerTestApp(t, root, standaloneEditorMode)
+	dir := peerWorkspaceDir(root, "terminal")
+	rc := peerReceiver{mode: "terminal", dir: dir}
+	first := peerRecordingReceiver(t, dir, "terminal")
+	_, ready, probed, err := editor.peerProbe(context.Background(), rc)
+	if err != nil || !ready || probed == "" {
+		t.Fatalf("probe: %v %v %q", err, ready, probed)
+	}
+	// Between the probe and the delivery another instance registers in the
+	// same place (the first app closed; something else answers now).
+	second := peerRecordingReceiver(t, dir, "terminal")
+	payload := &peerPayload{RequestID: peerTestRequestID, Session: "s1", Text: "enable secret synthetic"}
+	code, err := editor.peerDeliver(context.Background(), rc, probed, payload)
+	if err == nil || code != http.StatusServiceUnavailable || !strings.Contains(err.Error(), "Nothing was sent") {
+		t.Fatalf("delivery to a changed record: %d %v", code, err)
+	}
+	if got := second(); len(got) != 0 {
+		t.Fatalf("the new instance was contacted %d times", len(got))
+	}
+	for _, request := range first() {
+		if request.Method != http.MethodGet {
+			t.Fatalf("the text was posted: %s %s", request.Method, request.URL)
+		}
+	}
+	// Without an instance to pin to, nothing is sent either.
+	if _, err = editor.peerDeliver(context.Background(), rc, "", payload); err == nil || len(second()) != 0 {
+		t.Fatalf("an unpinned delivery was attempted: %v", err)
+	}
+	// The same through the page route: the page was shown the first instance.
+	root2 := t.TempDir()
+	sender, _ := peerTestApp(t, root2, standaloneEditorMode)
+	dir2 := peerWorkspaceDir(root2, "terminal")
+	peerRecordingReceiver(t, dir2, "terminal")
+	if code, reply, raw := peerPage(t, sender, http.MethodGet, "/api/peer-send/targets", ""); code != http.StatusOK || reply["running"] != true {
+		t.Fatalf("targets: %d %s", code, raw)
+	}
+	replaced := peerRecordingReceiver(t, dir2, "terminal")
+	if code, _, raw := peerPage(t, sender, http.MethodPost, "/api/peer-send/send", `{"session":"s1","text":"enable secret synthetic"}`); code != http.StatusServiceUnavailable || !strings.Contains(raw, "is not open any more. Nothing was sent.") {
+		t.Fatalf("send after the listed instance was replaced: %d %s", code, raw)
+	}
+	for _, request := range replaced() {
+		body, _ := io.ReadAll(request.Body)
+		if request.Method != http.MethodGet || strings.Contains(string(body), "synthetic") {
+			t.Fatalf("text reached the replacing instance: %s %s %s", request.Method, request.URL, body)
+		}
+	}
+	// The pinned identity is the record's: a result is not asked of another instance.
+	other := peerRecordingReceiver(t, dir, "terminal")
+	if _, _, err = editor.peerCall(context.Background(), rc, probed, http.MethodGet, "/api/peer/terminal/result?requestId="+peerTestRequestID, nil, time.Second); !errors.Is(err, errPeerNotOpen) || len(other()) != 0 {
+		t.Fatalf("a pinned call reached another instance: %v", err)
+	}
+}
+
+// Opening the other app without a click must not give foreground rights to a
+// process named by a record peer send does not trust.
+func TestPeerLaunchGrantsForegroundOnlyFromATrustedRecord(t *testing.T) {
+	dir := t.TempDir()
+	if _, ok := peerForegroundPID(dir); ok {
+		t.Fatal("a missing record named a process")
+	}
+	record, _ := json.Marshal(terminalWindowInstance{Version: 2, Host: "127.0.0.1:9", Token: randomHex(32), InstanceID: randomHex(16), PID: os.Getpid()})
+	path := filepath.Join(dir, terminalInstanceFilename)
+	// A plain record where protection is required (an older Terminal), or one
+	// other users can read: still valid for window activation, never for this.
+	if err := os.WriteFile(path, append(record, '\n'), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(path, 0644); err != nil {
+		t.Fatal(err)
+	}
+	previous := workspaceInstanceGuard
+	defer func() { workspaceInstanceGuard = previous }()
+	workspaceInstanceGuard = workspaceInstanceProtection{required: true, protect: previous.protect, unprotect: previous.unprotect}
+	if _, err := readWorkspaceWindowInstance(dir, false); err != nil {
+		t.Fatalf("the plain record should still serve window activation: %v", err)
+	}
+	if pid, ok := peerForegroundPID(dir); ok {
+		t.Fatalf("a plain record granted foreground rights to process %d", pid)
+	}
+	workspaceInstanceGuard = previous
+	if pid, ok := peerForegroundPID(dir); ok && runtime.GOOS != "windows" {
+		t.Fatalf("a record other users can read granted foreground rights to process %d", pid)
+	}
+	// A trusted record names its process.
+	stored, err := workspaceInstanceGuard.seal(append(record, '\n'))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if err = writeAtomic(path, stored); err != nil {
+		t.Fatal(err)
+	}
+	if pid, ok := peerForegroundPID(dir); !ok || pid != os.Getpid() {
+		t.Fatalf("a trusted record: %d %v", pid, ok)
+	}
+}
+
+// Several sends at once with nothing running: exactly one starts the other
+// app, the others are refused, and the text arrives once.
+func TestPeerSendConcurrentAutoStartsStartOnceAndDeliverOnce(t *testing.T) {
+	root := t.TempDir()
+	terminal, _ := peerTestApp(t, root, "terminal")
+	editor, _ := peerTestApp(t, root, standaloneEditorMode)
+	editorPage := peerLivePage(t, editor, peerNoTargetsBody)
+	var mu sync.Mutex
+	launches := 0
+	terminal.peer.mu.Lock()
+	terminal.peer.launch = func(context.Context) error {
+		mu.Lock()
+		launches++
+		mu.Unlock()
+		go func() {
+			time.Sleep(400 * time.Millisecond)
+			if _, err := editor.registerWorkspaceWindow(peerWorkspaceDir(root, standaloneEditorMode)); err != nil {
+				t.Error(err)
+			}
+		}()
+		return nil
+	}
+	terminal.peer.mu.Unlock()
+	const senders = 8
+	type result struct {
+		code  int
+		state any
+		raw   string
+	}
+	results := make(chan result, senders)
+	begin := make(chan struct{})
+	for i := 0; i < senders; i++ {
+		go func() {
+			<-begin
+			req, _ := http.NewRequest(http.MethodPost, "http://"+terminal.host+"/api/peer-send/send", strings.NewReader(`{"target":"new","text":"same text"}`))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("X-Session-Token", terminal.token)
+			response, err := http.DefaultClient.Do(req)
+			if err != nil {
+				results <- result{raw: err.Error()}
+				return
+			}
+			defer response.Body.Close()
+			raw, _ := io.ReadAll(response.Body)
+			var decoded map[string]any
+			_ = json.Unmarshal(raw, &decoded)
+			results <- result{code: response.StatusCode, state: decoded["state"], raw: string(raw)}
+		}()
+	}
+	close(begin)
+	started, refused := 0, 0
+	for i := 0; i < senders; i++ {
+		switch r := <-results; {
+		case r.code == http.StatusOK && r.state == "starting":
+			started++
+		case r.code == http.StatusConflict && strings.Contains(r.raw, "still waiting for Network Toolkit Text Editor to open"):
+			refused++
+		default:
+			t.Fatalf("unexpected reply: %d %s", r.code, r.raw)
+		}
+	}
+	if started != 1 || refused != senders-1 {
+		t.Fatalf("started %d, refused %d", started, refused)
+	}
+	if request := peerAwaitRequest(t, editorPage, "started Text Editor"); request["text"] != "same text" {
+		t.Fatalf("request: %v", request)
+	}
+	select {
+	case again := <-editorPage:
+		t.Fatalf("the text was delivered twice: %v", again)
+	case <-time.After(700 * time.Millisecond):
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if launches != 1 {
+		t.Fatalf("launches: %d", launches)
 	}
 }
