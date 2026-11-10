@@ -22,6 +22,9 @@ if ($identity.Name -notmatch '\\runneradmin$') {
 }
 $integrity = (& (Join-Path $env:SystemRoot 'System32\whoami.exe') /groups /fo csv /nh | Where-Object { $_ -match '"S-1-16-\d+"' } |
     ForEach-Object { if ($_ -match '"(S-1-16-\d+)"') { $Matches[1] } }) | Select-Object -First 1
+if ($integrity -ne 'S-1-16-8192') {
+    throw "Run the handoff proof unelevated (medium integrity); this process has $integrity."
+}
 $localData = $env:LOCALAPPDATA
 
 Add-Type -Path (Join-Path $PSScriptRoot 'InteractiveSmoke.cs')
@@ -40,7 +43,7 @@ $processes = [Collections.Generic.List[Diagnostics.Process]]::new()
 function Get-BrokerDiagnostics {
     if ($brokerLog -and (Test-Path -LiteralPath $brokerLog -PathType Leaf)) {
         Get-Content -LiteralPath $brokerLog -Tail 128 |
-            Where-Object { $_ -match '^[A-Za-z0-9_.-]{1,64} 0x[0-9A-Fa-f]{8}$' }
+            Where-Object { $_ -match '^[A-Za-z0-9_.-]{1,64} 0x[0-9A-Fa-f]{8}$' } | ForEach-Object { [string]$_ }
     }
 }
 

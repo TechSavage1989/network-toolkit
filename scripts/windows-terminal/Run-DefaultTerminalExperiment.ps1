@@ -53,7 +53,7 @@ $workerDirectory = Join-Path $env:ProgramData "NTK-DefaultTerminal-CI-$nonce"
 $resultPath = Join-Path $env:RUNNER_TEMP 'ntk-default-terminal-evidence.json'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
 $certificate = $null
-$worker = $null
+$taskName = $null
 $seen = $null
 $experimentStart = $null
 try {
@@ -122,31 +122,46 @@ try {
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination $workerDirectory
     }
     $workerFile = Join-Path $workerDirectory 'Test-DefaultTerminalExperiment.ps1'
-    $stdout = Join-Path $scratch 'worker-output.txt'
-    $stderr = Join-Path $scratch 'worker-error.txt'
-    $startArgs = @{
-        FilePath = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-        ArgumentList = '-NoLogo -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File "{0}" -MicrosoftTerminalManifest "{1}"' -f $workerFile, $officialManifest
-        WorkingDirectory = $workerDirectory
-        PassThru = $true
-        Environment = @{
-            GITHUB_ACTIONS = 'true'
-            RUNNER_ENVIRONMENT = 'github-hosted'
-            GITHUB_REPOSITORY = $env:GITHUB_REPOSITORY
-            TEMP = $workerTemp
-            TMP = $workerTemp
-        }
-        RedirectStandardOutput = $stdout
-        RedirectStandardError = $stderr
-    }
+    $stdout = Join-Path $workerDirectory 'worker-output.txt'
+    $stderr = Join-Path $workerDirectory 'worker-error.txt'
+    $exitFile = Join-Path $workerDirectory 'worker-exit.txt'
+    # Windows does not hand an elevated console to another terminal, and the
+    # job runs elevated (run 42746869734: integrity S-1-16-12288, no
+    # OpenConsole). Run the proof as the session owner's limited token through
+    # an interactive scheduled task, as an ordinary unelevated user does.
+    $me = [Security.Principal.WindowsIdentity]::GetCurrent()
+    $acl = Get-Acl -LiteralPath $workerDirectory
+    $acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($me.User, 'Modify',
+        'ContainerInherit,ObjectInherit', 'None', 'Allow'))
+    Set-Acl -LiteralPath $workerDirectory -AclObject $acl
+    $windowsPowerShell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    $wrapper = Join-Path $workerDirectory 'run-worker.cmd'
+    @(
+        '@echo off',
+        'set GITHUB_ACTIONS=true',
+        'set RUNNER_ENVIRONMENT=github-hosted',
+        ('set GITHUB_REPOSITORY={0}' -f $env:GITHUB_REPOSITORY),
+        ('set TEMP={0}' -f $workerTemp),
+        ('set TMP={0}' -f $workerTemp),
+        ('cd /d "{0}"' -f $workerDirectory),
+        ('"{0}" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File "{1}" -MicrosoftTerminalManifest "{2}" > "{3}" 2> "{4}"' -f
+            $windowsPowerShell, $workerFile, $officialManifest, $stdout, $stderr),
+        ('echo %errorlevel%> "{0}"' -f $exitFile)
+    ) | Set-Content -Encoding ascii -LiteralPath $wrapper
+    $taskName = "NTK-DefaultTerminal-$nonce"
+    $taskPrincipal = New-ScheduledTaskPrincipal -UserId $me.Name -LogonType Interactive -RunLevel Limited
+    $taskAction = New-ScheduledTaskAction -Execute $env:ComSpec -Argument ('/d /c "{0}"' -f $wrapper) -WorkingDirectory $workerDirectory
+    $taskSettings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Minutes 6) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries
+    Register-ScheduledTask -TaskName $taskName -Action $taskAction -Principal $taskPrincipal -Settings $taskSettings | Out-Null
     $experimentStart = [DateTime]::Now
-    $worker = Start-Process @startArgs
+    Start-ScheduledTask -TaskName $taskName
     # Sample console and broker processes while the worker runs. The artifact
     # store is not reachable from every reviewer, so this goes to the job log.
     $watched = 'conhost', 'OpenConsole', 'WindowsTerminal', 'NetworkToolkitTerminalHandoff', 'Network_Toolkit', 'cmd', 'powershell'
     $seen = [ordered]@{}
     $deadline = [DateTime]::UtcNow.AddMilliseconds(300000)
-    while (-not $worker.WaitForExit(500)) {
+    while (-not (Test-Path -LiteralPath $exitFile -PathType Leaf)) {
+        Start-Sleep -Milliseconds 500
         if ([DateTime]::UtcNow -ge $deadline) { throw 'The console handoff fixture timed out.' }
         try { $samples = @(Get-Process -Name $watched -IncludeUserName -ErrorAction SilentlyContinue) }
         catch { $samples = @(Get-Process -Name $watched -ErrorAction SilentlyContinue) }
@@ -160,14 +175,15 @@ try {
                 $sample.ProcessName, $sample.Id, $parent, $sample.SessionId, $user, $commandLine
         }
     }
-    Get-Content -LiteralPath $stdout
-    Get-Content -LiteralPath $stderr
-    if ($worker.ExitCode -ne 0) { throw "The console handoff fixture failed with exit code $($worker.ExitCode)." }
+    Start-Sleep -Seconds 1
+    if (Test-Path -LiteralPath $stdout) { Get-Content -LiteralPath $stdout }
+    if (Test-Path -LiteralPath $stderr) { Get-Content -LiteralPath $stderr }
+    $workerExit = (Get-Content -Raw -LiteralPath $exitFile).Trim()
+    if ($workerExit -ne '0') { throw "The console handoff fixture failed with exit code $workerExit." }
 } finally {
-    if ($worker) {
-        try {
-            if (-not $worker.HasExited) { $worker.Kill(); [void]$worker.WaitForExit(5000) }
-        } finally { $worker.Dispose() }
+    if ($taskName) {
+        Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+        Unregister-ScheduledTask -TaskName $taskName -Confirm:$false -ErrorAction SilentlyContinue
     }
     $evidence = Join-Path $workerDirectory 'evidence.json'
     if (Test-Path -LiteralPath $evidence -PathType Leaf) {
