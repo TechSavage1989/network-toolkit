@@ -193,8 +193,12 @@ function create(host){
   });
   carried=carry;
   if(limited)notes.push(limited+' unsaved tab(s) from the last session did not fit in 12 tabs. Their text is kept and they reopen the next time the editor starts with fewer tabs open.');
-  const userOpened=host.documents().some(d=>!restored.includes(d))||earlier.size>0;
-  host.finishRestore({docs:restored,active:userOpened?null:activeDoc});
+  // A document that was asked for while the session was being reopened (a
+  // file from Explorer, for example) is the active tab, also when it is one
+  // of the restored tabs. The stored active tab applies only when nothing
+  // was asked for and nothing else is open.
+  const requested=host.requested?.()||null,userOpened=host.documents().some(d=>!restored.includes(d))||earlier.size>0;
+  host.finishRestore({docs:restored,active:requested||(userOpened?null:activeDoc)});
   if(!keeping&&restored.length)notes.push('Unsaved documents from the last session were reopened. "Reopen files next time" is off, so they are not kept again: save them before you close.');
   // The setting as it is now decides what happens next; it may have changed
   // while the documents were reopened.
