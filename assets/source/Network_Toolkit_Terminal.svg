@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Network Toolkit Terminal">
+  <rect width="256" height="256" rx="43" fill="#08B9F2"/>
+  <rect x="10" y="10" width="236" height="236" rx="34" fill="#071F43"/>
+  <rect x="41" y="57" width="174" height="142" rx="15" fill="none" stroke="#FFF" stroke-width="13"/>
+  <path d="M43 90H213" stroke="#FFF" stroke-width="13"/>
+  <path d="M77 116L101 139L77 162" fill="none" stroke="#08B9F2" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M122 162H174" stroke="#FFF" stroke-width="15" stroke-linecap="round"/>
+</svg>

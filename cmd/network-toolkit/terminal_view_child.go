@@ -354,6 +354,7 @@ func runDetachedTerminalView(input io.Reader, noBrowser bool) error {
 	} else {
 		err = desktop.Run(ctx, desktop.Config{
 			Title: launch.Title, URL: "http://" + launch.OwnerHost + "/terminal-view/" + launch.ViewID,
+			IconResource: desktop.IconTerminal,
 			SessionToken: launch.ViewToken,
 			DataDir:      launch.DataDir, Stop: cancel,
 		})

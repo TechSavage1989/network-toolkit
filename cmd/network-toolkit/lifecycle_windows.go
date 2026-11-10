@@ -18,8 +18,16 @@ func runLifecycle(ctx context.Context, url, sessionToken string, stop context.Ca
 		return
 	}
 	defer stop()
+	icon := uint16(desktop.IconToolkit)
+	switch title {
+	case appName + " Terminal":
+		icon = desktop.IconTerminal
+	case appName + " Text Editor":
+		icon = desktop.IconEditor
+	}
 	err := desktop.Run(ctx, desktop.Config{
 		Title:                title,
+		IconResource:         icon,
 		MinWidth:             minimumDesktopWidth(title),
 		MinHeight:            minimumDesktopHeight(title),
 		RequireCloseApproval: mainEditorCloseApproval(title),

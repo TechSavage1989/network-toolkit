@@ -338,6 +338,7 @@ func runDetachedEditorView(input io.Reader, noBrowser bool) error {
 	} else {
 		err = desktop.Run(ctx, desktop.Config{
 			Title: launch.Title, URL: "http://" + launch.OwnerHost + "/editor-view/" + launch.ViewID,
+			IconResource:         desktop.IconEditor,
 			SessionToken:         launch.ViewToken,
 			RequireCloseApproval: true,
 			DataDir:              launch.DataDir, Stop: cancel,

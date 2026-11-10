@@ -33,7 +33,8 @@ type splashWindow struct {
 
 func newSplashWindow(owner *hostWindow, instance uintptr, work Rect) (*splashWindow, error) {
 	s := &splashWindow{owner: owner, instance: instance, className: utf16String("NetworkToolkit.Startup.Splash")}
-	icon, _, _ := wndLoadIcon.Call(instance, 1)
+	iconID := cfgIconResource(owner.cfg)
+	icon, _, _ := wndLoadIcon.Call(instance, iconID)
 	cursor, _, _ := wndLoadCursor.Call(0, 32512)
 	class := windowClass{
 		Size: uint32(unsafe.Sizeof(windowClass{})), Style: 0x00020003, // CS_DROPSHADOW
@@ -58,7 +59,7 @@ func newSplashWindow(owner *hostWindow, instance uintptr, work Rect) (*splashWin
 		return nil, nativeError("create the splash screen", err)
 	}
 	s.hwnd = hwnd
-	s.icon, _, _ = splashLoadImage.Call(instance, 1, 1, uintptr(owner.scale(56)), uintptr(owner.scale(56)), 0x8000)
+	s.icon, _, _ = splashLoadImage.Call(instance, iconID, 1, uintptr(owner.scale(56)), uintptr(owner.scale(56)), 0x8000)
 	buttonClass, text := utf16String("BUTTON"), utf16String("Cancel")
 	button, _, _ := wndCreateWindow.Call(0, uintptr(unsafe.Pointer(buttonClass)), uintptr(unsafe.Pointer(text)),
 		0x40000000|0x10000000|0x00010000, uintptr(owner.scale(326)), uintptr(owner.scale(176)),
