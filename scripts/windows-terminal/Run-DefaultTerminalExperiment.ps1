@@ -56,6 +56,8 @@ $username = "ntkci-$nonce"
 $certificate = $null
 $account = $null
 $worker = $null
+$seen = $null
+$experimentStart = $null
 try {
     $workerTemp = Join-Path $workerDirectory 'Temp'
     [void](New-Item -ItemType Directory -Path $scratch, $stage, (Join-Path $stage 'Assets'), (Join-Path $stage 'Public'), $workerDirectory, $workerTemp)
@@ -150,8 +152,27 @@ try {
         RedirectStandardOutput = $stdout
         RedirectStandardError = $stderr
     }
+    $experimentStart = [DateTime]::Now
     $worker = Start-Process @startArgs
-    if (-not $worker.WaitForExit(300000)) { throw 'The standard-user console handoff fixture timed out.' }
+    # Sample console and broker processes while the worker runs. The artifact
+    # store is not reachable from every reviewer, so this goes to the job log.
+    $watched = 'conhost', 'OpenConsole', 'WindowsTerminal', 'NetworkToolkitTerminalHandoff', 'Network_Toolkit', 'cmd', 'powershell'
+    $seen = [ordered]@{}
+    $deadline = [DateTime]::UtcNow.AddMilliseconds(300000)
+    while (-not $worker.WaitForExit(500)) {
+        if ([DateTime]::UtcNow -ge $deadline) { throw 'The standard-user console handoff fixture timed out.' }
+        try { $samples = @(Get-Process -Name $watched -IncludeUserName -ErrorAction SilentlyContinue) }
+        catch { $samples = @(Get-Process -Name $watched -ErrorAction SilentlyContinue) }
+        foreach ($sample in $samples) {
+            $key = '{0}:{1}' -f $sample.ProcessName, $sample.Id
+            if ($seen.Contains($key)) { continue }
+            $commandLine = (Get-CimInstance Win32_Process -Filter "ProcessId=$($sample.Id)" -ErrorAction SilentlyContinue).CommandLine
+            $parent = (Get-CimInstance Win32_Process -Filter "ProcessId=$($sample.Id)" -ErrorAction SilentlyContinue).ParentProcessId
+            $user = if ($sample.PSObject.Properties['UserName']) { $sample.UserName } else { '?' }
+            $seen[$key] = '{0:HH:mm:ss.fff} {1} pid={2} parent={3} session={4} user={5} cmd={6}' -f [DateTime]::Now,
+                $sample.ProcessName, $sample.Id, $parent, $sample.SessionId, $user, $commandLine
+        }
+    }
     Get-Content -LiteralPath $stdout
     Get-Content -LiteralPath $stderr
     if ($worker.ExitCode -ne 0) { throw "The standard-user console handoff fixture failed with exit code $($worker.ExitCode)." }
@@ -164,6 +185,25 @@ try {
     $evidence = Join-Path $workerDirectory 'evidence.json'
     if (Test-Path -LiteralPath $evidence -PathType Leaf) {
         Copy-Item -LiteralPath $evidence -Destination $resultPath -Force
+        Write-Host '----- evidence.json -----'
+        Get-Content -Raw -LiteralPath $evidence | Write-Host
+    }
+    if ($seen) {
+        Write-Host '----- processes started while the fixture ran -----'
+        foreach ($line in $seen.Values) { Write-Host $line }
+    }
+    if ($experimentStart) {
+        Write-Host '----- Windows events while the fixture ran (warnings and errors) -----'
+        foreach ($log in 'System', 'Application', 'Microsoft-Windows-AppModel-Runtime/Admin',
+                         'Microsoft-Windows-AppXDeploymentServer/Operational', 'Microsoft-Windows-TWinUI/Operational') {
+            try {
+                Get-WinEvent -FilterHashtable @{ LogName = $log; StartTime = $experimentStart; Level = 1, 2, 3 } -MaxEvents 40 -ErrorAction Stop |
+                    Sort-Object TimeCreated | ForEach-Object {
+                        Write-Host ('{0:HH:mm:ss} [{1}] {2} {3}: {4}' -f $_.TimeCreated, $log, $_.ProviderName, $_.Id,
+                            (($_.Message -replace '\s+', ' ') -replace '^(.{0,400}).*$', '$1'))
+                    }
+            } catch { Write-Host "[$log] $($_.Exception.Message)" }
+        }
     }
     try {
         if ($account) { Remove-LocalUser -SID $account.SID }

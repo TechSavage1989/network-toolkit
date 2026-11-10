@@ -197,6 +197,47 @@ try {
         } finally { $current.Dispose() }
     }
     $restoreSelection = $true
+    # Control: select Microsoft's own Windows Terminal Stable first. If Windows
+    # does not hand cmd to WindowsTerminal.exe either, the fixture environment
+    # blocks delegation and the broker cannot be judged from this run.
+    $controlNames = 'WindowsTerminal', 'OpenConsole', 'conhost'
+    $controlBefore = @(Get-Process -Name $controlNames -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id)
+    $control = [ordered]@{ selection = 'Microsoft Windows Terminal Stable' }
+    try {
+        $officialManifest = Get-AppxPackageManifest -Package $officialTerminal.PackageFullName
+        $officialPair = [ordered]@{}
+        foreach ($contract in 'com.microsoft.windows.console.host', 'com.microsoft.windows.terminal.host') {
+            $node = $officialManifest.SelectSingleNode("//*[local-name()='AppExtension' and @Name='$contract']/*[local-name()='Properties']/*[local-name()='Clsid']")
+            $officialPair[$contract] = if ($node) { $node.InnerText } else { $null }
+        }
+        $results.microsoftTerminalClsids = $officialPair
+        if (-not $officialPair['com.microsoft.windows.console.host'] -or -not $officialPair['com.microsoft.windows.terminal.host']) { throw 'Windows Terminal Stable does not declare both delegation CLSIDs.' }
+        $current = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey($startupKey)
+        try {
+            $current.SetValue('DelegationConsole', $officialPair['com.microsoft.windows.console.host'])
+            $current.SetValue('DelegationTerminal', $officialPair['com.microsoft.windows.terminal.host'])
+        } finally { $current.Dispose() }
+        $controlPid = [DefaultTerminalSmoke]::LaunchNewConsole((Join-Path $env:SystemRoot 'System32\cmd.exe'),
+            '/D /Q /K "echo control>control-startup.txt"', $PSScriptRoot)
+        $processes.Add([Diagnostics.Process]::GetProcessById($controlPid))
+        Wait-ForFile (Join-Path $PSScriptRoot 'control-startup.txt') 'control'
+        $control.startupMarker = $true
+        Start-Sleep -Seconds 8
+        $mySession = [Diagnostics.Process]::GetCurrentProcess().SessionId
+        $control.newProcesses = @(Get-Process -Name $controlNames -ErrorAction SilentlyContinue |
+            Where-Object { $_.Id -notin $controlBefore -and $_.SessionId -eq $mySession } |
+            ForEach-Object { '{0}:{1}' -f $_.ProcessName, $_.Id })
+        $control.windowsTerminalStarted = [bool]($control.newProcesses -match '^WindowsTerminal:')
+        foreach ($started in @(Get-Process -Name 'WindowsTerminal', 'OpenConsole' -ErrorAction SilentlyContinue |
+                               Where-Object { $_.Id -notin $controlBefore -and $_.SessionId -eq $mySession })) {
+            $processes.Add($started)
+        }
+    } catch {
+        $control.error = $_.Exception.Message
+    } finally { Stop-FixtureProcesses }
+    $results.control = $control
+    Write-Host ('Control (Windows Terminal selected): ' + ($control | ConvertTo-Json -Compress))
+
     $current = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey($startupKey)
     try {
         $current.SetValue('DelegationConsole', $consoleClsid)
