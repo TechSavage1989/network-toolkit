@@ -52,6 +52,36 @@ function Invoke-Silent([string]$Path, [int]$ExpectedExitCode = 0, [string]$Argum
     } finally { $process.Dispose() }
 }
 
+# An NSIS uninstaller copies itself to a temporary folder, starts that copy and
+# exits at once; the copy removes the files and registry entries. Wait for the
+# copy (a child of the launched uninstaller) before checking what it removed.
+function Invoke-Uninstaller([string]$Path) {
+    $process = Start-Process -FilePath $Path -ArgumentList '/S' -PassThru
+    try {
+        $id = $process.Id
+        $deadline = [DateTime]::UtcNow.AddMinutes(2)
+        do {
+            $children = @(Get-CimInstance Win32_Process -Filter "ParentProcessId=$id" -ErrorAction SilentlyContinue)
+            $running = -not $process.HasExited -or $children.Count -gt 0
+            if ($running) { Start-Sleep -Milliseconds 200 }
+        } while ($running -and [DateTime]::UtcNow -lt $deadline)
+        if ($running) { throw "$(Split-Path -Leaf $Path) did not finish within two minutes." }
+        Assert-Same $process.ExitCode 0 "Exit code from $(Split-Path -Leaf $Path)"
+    } finally { $process.Dispose() }
+}
+
+# When uninstall leaves the program behind, say why: a process still using a
+# file in the folder, or an uninstaller that refused (it keeps its own key).
+function Assert-UninstallFinished {
+    if (-not (Test-Path -LiteralPath $installedExe)) { return }
+    $holders = @(Get-Process -ErrorAction SilentlyContinue | Where-Object {
+        try { $_.Path -and $_.Path.StartsWith($installDir, [StringComparison]::OrdinalIgnoreCase) } catch { $false }
+    } | ForEach-Object { '{0} ({1})' -f $_.ProcessName, $_.Id })
+    $refused = Test-Path -LiteralPath $uninstallKey
+    throw ("Uninstall left $installedExe. Uninstall registration still present: $refused. " +
+        "Processes running from the install folder: $(if ($holders) { $holders -join ', ' } else { 'none' }).")
+}
+
 $setupFiles = @(Get-ChildItem -LiteralPath $ArtifactDirectory -Filter '*_Windows_x64_Setup.exe' -File)
 if ($setupFiles.Count -ne 1 -or $setupFiles[0].Name -cnotmatch '^Network_Toolkit_(\d+\.\d+\.\d+)_Windows_x64_Setup\.exe$') {
     throw 'The artifact must contain exactly one versioned Network Toolkit Windows setup executable.'
@@ -259,7 +289,8 @@ Assert-Preserved
 Copy-Item -LiteralPath $portableExe -Destination $installedExe
 
 Write-Host 'Checking uninstall removes owned registrations and preserves data.'
-Invoke-Silent $uninstaller
+Invoke-Uninstaller $uninstaller
+Assert-UninstallFinished
 foreach ($path in @($installedExe, $uninstaller, $menu, $desktopShortcut, $uninstallKey, "HKLM:\$uninstallSubkey", $capabilities, $progKey)) {
     Assert-Absent $path
 }
@@ -305,7 +336,8 @@ $fixtures[$desktopShortcut] = (Get-FileHash -LiteralPath $desktopShortcut -Algor
 Invoke-Silent $setup
 Assert-Installed
 Assert-Preserved
-Invoke-Silent $uninstaller
+Invoke-Uninstaller $uninstaller
+Assert-UninstallFinished
 foreach ($path in @($installedExe, $uninstaller, $menu, $uninstallKey)) {
     Assert-Absent $path
 }
