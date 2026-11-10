@@ -577,7 +577,7 @@ jobs:
       - name: Test release publication guards
         run: python3 -m unittest discover -s scripts -p '*_test.py' -v
       - name: Test application and terminal lifecycle
-        run: go test -mod=vendor ./cmd/network-toolkit ./internal/editorbuffer ./internal/terminal ./internal/macros ./internal/desktop ./internal/vaultcrypto ./internal/diag ./internal/deviceinfo ./internal/platform ./internal/capture
+        run: go test -mod=vendor ./cmd/network-toolkit ./internal/editorbuffer ./internal/terminal ./internal/macros ./internal/desktop ./internal/vaultcrypto ./internal/diag ./internal/deviceinfo ./internal/sharedfile ./internal/platform ./internal/capture
       - name: Check concurrent editor buffers and file ownership
         run: go test -race -mod=vendor ./internal/editorbuffer ./cmd/network-toolkit -run 'TestDiskEditor|TestSnapshot|TestStreamingSearch' -count=1
       - name: Test JavaScript behavior
