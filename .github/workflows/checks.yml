@@ -310,6 +310,20 @@ jobs:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results/large-editor
         run: go test -mod=vendor ./cmd/network-toolkit -run '^TestEditor(LargeFileBrowser|BrowserStorage)$' -count=1 -v -timeout=8m
+      - name: Keep and restore Text Editor sessions through the real editor handlers
+        if: success() || failure()
+        env:
+          GOTOOLCHAIN: local
+          NTK_EDITOR_SESSION_BROWSER: '1'
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results/session-editor
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestEditorSessionBrowser$' -count=1 -v -timeout=5m
+      - name: Restore Text Editor tabs and unsaved changes in the shipped page
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results
+        run: node scripts/editor-session-restore.browser.cjs
       - name: Check compact sidebar controls and reclaimed file-list height
         if: success() || failure()
         env:
