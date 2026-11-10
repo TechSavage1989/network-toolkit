@@ -12,7 +12,13 @@ function valid(t){return !!t&&(t.entry?terminalSessions.get(t.id)===t.entry&&ter
 // into the original tab's place and pane and closes the original. If Windows
 // approval is declined or the shell fails to start, the original is untouched.
 function adminCandidate(entry){return !!entry&&['cmd','powershell'].includes(entry.info?.type)&&entry.info?.elevated!==true&&entry.config?.runAsAdministrator!==true;}
-function visible(action,t){return !['run-as-admin','convert-admin'].includes(action)||adminCandidate(t?.entry);}
+// The standalone Terminal app has no Text Editor or SFTP tool of its own. Hide
+// what cannot work there instead of showing it disabled: "Open Text Editor"
+// always, and "Browse SFTP files" unless this session offers the SFTP sidebar.
+// "Send output to Text Editor" reaches the standalone Text Editor app.
+function standaloneTerminal(){try{return typeof TERMINAL_WINDOW!=='undefined'&&TERMINAL_WINDOW===true;}catch{return false;}}
+function visible(action,t){if(standaloneTerminal()){if(action==='editor')return false;if(action==='browse')return !!root.NetworkToolkitTerminalSFTP?.available?.(t?.entry);}
+ return !['run-as-admin','convert-admin'].includes(action)||adminCandidate(t?.entry);}
 function adminConfig(entry){return safeTerminalConfig({...safeTerminalConfig(entry.config||{type:entry.info.type}),type:entry.info.type,runAsAdministrator:true});}
 function enabled(action,t){if(!valid(t))return false;const entry=t.entry,owned=entry&&terminalOwnerCanMutate(entry)&&!entry.transferBusy;
  if(action==='reconnect-all')return reconnectAllAvailable();
@@ -24,13 +30,13 @@ function enabled(action,t){if(!valid(t))return false;const entry=t.entry,owned=e
  if(action==='rename')return !!t.draft||!!owned;
  if(action==='move-left'||action==='move-right'){const ids=root.NetworkToolkitTerminalTabDrag?.ids?.()||[],at=ids.indexOf(t.id);return at>=0&&(action==='move-left'?at>0:at<ids.length-1);}
 
- if(action==='send-editor')return !!entry&&!TERMINAL_ONLY&&!!root.NetworkToolkitTerminalSendEditor?.available?.();
+ if(action==='send-editor')return !!entry&&(!TERMINAL_ONLY||standaloneTerminal())&&!!root.NetworkToolkitTerminalSendEditor?.available?.();
  if(action==='run-as-admin'||action==='convert-admin')return adminCandidate(entry)&&!(DETACHED_TERMINAL&&!DETACHED_WORKSPACE)&&!terminalConnectBusy&&!terminalWorkspaceTransferBusy;
  if(action==='duplicate')return !(DETACHED_TERMINAL&&!DETACHED_WORKSPACE)&&!terminalConnectBusy&&!terminalWorkspaceTransferBusy;
  if(!entry)return action==='workspace'&&terminalViewRegistry.available;
  if(action==='reconnect')return !reconnectAllBusy&&!windowBulkBusy&&terminalReconnectAllowed(entry);
  if(action==='disconnect')return !reconnectAllBusy&&!windowBulkBusy&&owned&&terminalLive(entry)&&entry.info.state!=='disconnecting'&&online;
- if(['browse','editor'].includes(action))return !TERMINAL_ONLY&&entry.info.type==='ssh'&&entry.info.state==='connected'&&online;
+ if(['browse','editor'].includes(action))return (!TERMINAL_ONLY||action==='browse'&&standaloneTerminal())&&entry.info.type==='ssh'&&entry.info.state==='connected'&&online;
  if(['paste','control-c'].includes(action))return owned&&entry.info.state==='connected'&&online;
  if(action==='copy')return !!entry.xterm?.hasSelection();
  if(['select-output','copy-output'].includes(action))return !!NetworkToolkitTerminalExtras.output(entry,NetworkToolkitTerminalExtras.current(entry),true)?.text;
