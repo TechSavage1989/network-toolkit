@@ -290,16 +290,14 @@ func copyStorageData(source, destination *storageRoot) ([]string, func(), error)
 }
 
 func copySavedListsWitness(source, destination string) (func(), error) {
+	// The id is protection, never a reason to refuse a move: when it cannot
+	// be read, is damaged, or cannot be written at the new place, the move
+	// goes on without it. The settings file that is moved carries the same
+	// id, so the next start at the new place writes it again
+	// (settleSavedListsCopy).
 	id, _, err := readSavedListsWitness(source)
-	if err != nil {
-		// Not "there is none": the move is refused and can be tried again.
-		return nil, err
-	}
-	if id == "" {
+	if err != nil || id == "" || writeSavedListsWitness(destination, id) != nil {
 		return func() {}, nil
-	}
-	if err := writeSavedListsWitness(destination, id); err != nil {
-		return nil, err
 	}
 	return func() {
 		path := savedListsWitnessPath(destination)

@@ -76,7 +76,7 @@ func TestSharedFileReadersNeverSeeAReplaceInProgress(t *testing.T) {
 	writeFailures := 0
 	var lastWriteError error
 	for n := 1; n <= sharedStressReplaces; n++ {
-		if _, err := writeSharedSettings(path, document(n)); err != nil {
+		if _, err := writeSharedSettings(path, document(n), false); err != nil {
 			writeFailures++
 			lastWriteError = err
 		}

@@ -110,7 +110,9 @@ func TestSharedUnreadableIDOrCopyAtStartNeverCostsTheCopy(t *testing.T) {
 
 // The same while apps run: a standalone app saves over a file an older
 // version wrote, and cannot read the id beside the copy (or the copy) at
-// that moment. It must not write the copy without the dropped entry.
+// that moment. It must not write the copy without the dropped entry. The
+// save itself is not refused (shared_review6_test.go): the settings are
+// saved, the copy is left as it is, and the entry comes back afterwards.
 func TestSharedUnreadableIDOrCopyDuringASaveNeverCostsTheCopy(t *testing.T) {
 	for _, which := range []string{savedListsWitnessFile, savedListsFilename} {
 		root := t.TempDir()
@@ -123,10 +125,14 @@ func TestSharedUnreadableIDOrCopyDuringASaveNeverCostsTheCopy(t *testing.T) {
 		failReadsOf(t, which)
 		terminal.poll()
 		terminal.set("editorPreferences", "wordWrap", true)
+		before := r3Copy(t, root)
 		code, body := terminal.trySave()
 		readCredentialFault = nil
-		if code != 409 || !strings.Contains(body, "could not be read") {
-			t.Errorf("%s: a save that cannot tell what the older version dropped: %d %s", which, code, body)
+		if code != 200 || r3Disk(t, root)["editorPreferences"] == nil {
+			t.Errorf("%s: the save while the copy cannot be used: %d %s", which, code, body)
+		}
+		if r3Copy(t, root) != before {
+			t.Errorf("%s: the copy was written although it could not be taken into account", which)
 		}
 		if !strings.Contains(r3Copy(t, root), "192.0.2.1") {
 			t.Fatalf("%s: the copy lost the entry the older version dropped: %s", which, r3Copy(t, root))
@@ -141,7 +147,8 @@ func TestSharedUnreadableIDOrCopyDuringASaveNeverCostsTheCopy(t *testing.T) {
 }
 
 // The settings file is missing and the copy cannot be read at this moment
-// (not: is damaged). No app writes over a copy it could not read.
+// (not: is damaged). No app writes over a copy it could not read. The save
+// itself is not refused (shared_review6_test.go).
 func TestSharedMissingFileAndCopyThatCannotBeReadRightNow(t *testing.T) {
 	for _, which := range []string{savedListsWitnessFile, savedListsFilename} {
 		root := t.TempDir()
@@ -156,12 +163,14 @@ func TestSharedMissingFileAndCopyThatCannotBeReadRightNow(t *testing.T) {
 		page.add("terminalProfiles", sharedProfile("n", "N", "192.0.2.9"))
 		code, body := page.trySave()
 		readCredentialFault = nil
-		if code != 409 || !strings.Contains(body, "could not be read") {
-			t.Errorf("%s: a save over a copy that could not be read: %d %s", which, code, body)
+		if code != 200 || !sameIDs(sharedDiskIDs(t, root, "terminalProfiles"), "n") {
+			t.Errorf("%s: the save while the copy could not be read: %d %s, disk %v", which, code, body, sharedDiskIDs(t, root, "terminalProfiles"))
 		}
 		if !strings.Contains(r3Copy(t, root), "192.0.2.1") || !strings.Contains(r3Copy(t, root), "target-1") {
 			t.Fatalf("%s: the copy was written over: %s", which, r3Copy(t, root))
 		}
+		page.poll()
+		page.state["theme"] = "light"
 		page.save()
 		if got := sharedDiskIDs(t, root, "terminalProfiles"); !sameIDs(got, "a", "n") {
 			t.Errorf("%s: after the read worked again: %v", which, got)
@@ -298,61 +307,10 @@ func TestSharedUpgradeFromTheVersionWithoutIDs(t *testing.T) {
 	}
 }
 
-// What an app holds beyond the file is saved by its refresh. When that
-// write keeps failing, the refresh still answers, the failure is shown, and
-// after a few attempts the app stops treating every change of the file as
-// "written anew".
-func TestSharedRefreshWriteThatKeepsFailingIsBounded(t *testing.T) {
-	root := t.TempDir()
-	if err := os.WriteFile(filepath.Join(root, appSettingsFilename), []byte(`{"terminalProfiles":[{"id":"a","name":"A","type":"ssh","host":"192.0.2.1","port":22}]}`), 0600); err != nil {
-		t.Fatal(err)
-	}
-	terminal := openSharedPage(t, sharedTestApp(t, root, terminalWorkspaceName, "terminal"))
-	if err := os.Remove(filepath.Join(root, appSettingsFilename)); err != nil {
-		t.Fatal(err)
-	}
-	terminal.poll()
-	main := openSharedPage(t, sharedTestApp(t, root, "", "main"))
-	main.state["activePage"] = "overview"
-	main.save()
-	// The copy cannot be written: its place is taken by a folder.
-	if err := os.Remove(filepath.Join(root, savedListsFilename)); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Mkdir(filepath.Join(root, savedListsFilename), 0700); err != nil {
-		t.Fatal(err)
-	}
-	terminal.poll()
-	terminal.app.stateMu.Lock()
-	dirty := terminal.app.shared.dirty
-	terminal.app.stateMu.Unlock()
-	if !dirty || !sameIDs(terminal.ids("terminalProfiles"), "a") {
-		t.Fatalf("after the first refresh: dirty=%v holds %v", dirty, terminal.ids("terminalProfiles"))
-	}
-	for n := 0; n < sharedDirtyAttempts+1; n++ {
-		terminal.poll()
-	}
-	terminal.app.stateMu.Lock()
-	dirty, message := terminal.app.shared.dirty, terminal.app.storageError
-	terminal.app.stateMu.Unlock()
-	if dirty {
-		t.Error("the app still treats every change as written anew after its write failed again and again")
-	}
-	if !strings.Contains(message, "could not be saved") {
-		t.Errorf("the failure is not shown: %q", message)
-	}
-	// What it holds is not thrown away: once saving works, its own save
-	// writes it.
-	if err := os.Remove(filepath.Join(root, savedListsFilename)); err != nil {
-		t.Fatal(err)
-	}
-	terminal.state["terminalSidebarWidth"] = float64(300)
-	terminal.add("terminalProfiles", sharedProfile("b", "B", "192.0.2.2"))
-	terminal.save()
-	if got := sharedDiskIDs(t, root, "terminalProfiles"); !sameIDs(got, "a", "b") {
-		t.Errorf("after saving works again: %v", got)
-	}
-}
+// What happens when the refresh's save keeps failing is tested in
+// shared_review6_test.go (TestSharedHeldEntriesAreNeverDroppedByFailedSaves):
+// the values stay pending. An earlier version of this file tested that the
+// app gave up after five failures, which dropped them.
 
 // The id that pairs the copy with the settings file is refreshed like the
 // files of a pending move: an id that was first written after the move was

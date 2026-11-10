@@ -355,7 +355,7 @@ func (a *application) ensureCredentialConfigIdentity() (string, error) {
 	if err != nil {
 		return "", errors.New("App settings exceed their size limit.")
 	}
-	written, err := writeSharedSettings(path, raw)
+	written, err := writeSharedSettings(path, raw, root.copyUnread)
 	if err != nil {
 		return "", err
 	}

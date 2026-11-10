@@ -491,7 +491,7 @@ func (m *sharedMigration) settings(workspace legacyWorkspace, dir string) error 
 		if err != nil {
 			return err
 		}
-		if _, err := writeSharedSettings(settingsPath, next); err != nil {
+		if _, err := writeSharedSettings(settingsPath, next, rootFile.copyUnread); err != nil {
 			return err
 		}
 	}

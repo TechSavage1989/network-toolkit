@@ -44,9 +44,10 @@ var sharedLockWait = 5 * time.Second
 // only this long for another app: the page asks again in a few seconds.
 var sharedRefreshLockWait = 250 * time.Millisecond
 
-// How often in a row that save may fail before the app stops treating a
-// changed settings file as "written anew" (sharedData.dirty).
-const sharedDirtyAttempts = 5
+// After that save failed, the next refresh tries again after this long,
+// doubled with each further failure up to sharedHeldRetryMax. What the app
+// holds is never given up.
+var sharedHeldRetry, sharedHeldRetryMax = 2 * time.Second, time.Minute
 
 // terminalPromptNameIdentity names a learned prompt name by its endpoint.
 func terminalPromptNameIdentity(item map[string]any) string {
@@ -155,6 +156,8 @@ var perWindowStateKeys = []string{
 	// Written by a standalone app that had to write the settings file anew
 	// without what only the main window uses (shared_older_version.go).
 	sharedMainOnlyAbsentField,
+	// Written when a save had to leave the copy of the saved lists as it was.
+	sharedCopyBehindField,
 }
 
 func sharedKeyNamed(name string) (sharedKey, bool) {
@@ -265,6 +268,19 @@ type sharedData struct {
 	// What this app holds came from a settings file that a version which
 	// does not merge wrote last.
 	fromOlder bool
+	// What this app holds beyond the settings file, per key (entries of a
+	// list, members of an object, or a single value): kept pending until a
+	// save of this app has written it, however often that save fails.
+	heldExtra map[string]any
+	// The next time a refresh tries that save again after a failure.
+	heldRetryAt time.Time
+	// Saved entries that were put back from the copy after it could not be
+	// read for a while; the user is told.
+	pendingBehind []string
+	// The settings file as last read notes that the copy of the saved lists
+	// is behind, and the copy could be read: the next refresh saves what was
+	// put back, which also brings the copy up to date.
+	behind bool
 	// This app holds shared values that are not in the settings file: they
 	// were kept when the file was found written anew, or come from the copy
 	// of the saved lists. The next refresh or save writes them.
@@ -334,6 +350,17 @@ type rootSettings struct {
 	// filled from the copy of the saved lists (recovered), or a copy is there
 	// but cannot be read.
 	recovered, copyUnreadable bool
+	// Set by readSharedSettings: the copy (or the id beside it) was needed
+	// and could not be read at that moment. Passed on to writeSharedSettings,
+	// which then leaves the copy as it is.
+	copyUnread bool
+	// Set by readSharedSettings: this version saved the file while the copy
+	// could not be read or written, the copy can be read now, and what the
+	// file lacked was put back into members.
+	behind bool
+	// Set by readSharedSettings: the file is the truth, but its copy could
+	// not be written with it and is written by the next save.
+	rewrite bool
 	// The copy of the saved lists, for a file that does not exist.
 	copy *savedListsCopy
 	// The id in the file's mark; empty for a file without one.
@@ -440,10 +467,19 @@ func marshalRootSettings(members map[string]json.RawMessage, exists bool) ([]byt
 	return raw, nil
 }
 
+// writeRootSettingsFault lets a test make the write of the settings file
+// fail (a full disk, a file another program keeps locked).
+var writeRootSettingsFault func(path string) error
+
 // writeRootSettings replaces the main settings file. The caller holds the
 // data folder's credential transaction lock. Only writeSharedSettings calls
 // it, so the copy of the saved lists is always written first.
 func writeRootSettings(path string, raw []byte) error {
+	if writeRootSettingsFault != nil {
+		if err := writeRootSettingsFault(path); err != nil {
+			return err
+		}
+	}
 	if info, err := os.Lstat(path); err == nil {
 		if !info.Mode().IsRegular() || storageIsLink(info) {
 			return errors.New("The main settings file must be a regular file, not a link.")
