@@ -318,6 +318,14 @@ jobs:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results/session-editor
         run: go test -mod=vendor ./cmd/network-toolkit -run '^TestEditorSessionBrowser$' -count=1 -v -timeout=5m
+      - name: Send text between the standalone Text Editor and Terminal through both real engines and pages
+        if: success() || failure()
+        env:
+          GOTOOLCHAIN: local
+          NTK_PEER_SEND_BROWSER: '1'
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results/standalone-peer
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestStandalonePeerSendBrowser$' -count=1 -v -timeout=5m
       - name: Restore Text Editor tabs and unsaved changes in the shipped page
         if: success() || failure()
         env:

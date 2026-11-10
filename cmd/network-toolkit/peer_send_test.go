@@ -24,6 +24,11 @@ const peerTestRequestID = "0123456789abcdef0123456789abcdef"
 // instance record, as main() does.
 func peerTestApp(t *testing.T, root, mode string) (*application, *httptest.Server) {
 	t.Helper()
+	return peerTestAppWith(t, root, mode, func(a *application) http.Handler { return a })
+}
+
+func peerTestAppWith(t *testing.T, root, mode string, handler func(*application) http.Handler) (*application, *httptest.Server) {
+	t.Helper()
 	dir := peerWorkspaceDir(root, mode)
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		t.Fatal(err)
@@ -33,7 +38,7 @@ func peerTestApp(t *testing.T, root, mode string) (*application, *httptest.Serve
 	if mode == standaloneEditorMode {
 		a.editorLaunchAvailable, a.editorLaunchReusable = true, true
 	}
-	server := httptest.NewServer(a)
+	server := httptest.NewServer(handler(a))
 	a.host = strings.TrimPrefix(server.URL, "http://")
 	a.configurePeerSend(root)
 	t.Cleanup(func() {
