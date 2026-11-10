@@ -1,6 +1,6 @@
 # Windows default terminal: hosted experiment findings
 
-Status: not releasable. Network Toolkit can ship as the Windows default terminal only after a hosted (or owner-run) test shows both original shells (Command Prompt and Windows PowerShell) opening in Network Toolkit, with interactive input working, while Network Toolkit is the selected default. A public release also needs a trusted MSIX signer; the repository has none, and fixture certificates stay on disposable runners.
+Status: functional test passed on the owner's Windows 11 PC (2026-11-10); not yet releasable (needs a trusted MSIX signer and product integration). The release criterion was a hosted (or owner-run) test showing both original shells (Command Prompt and Windows PowerShell) opening in Network Toolkit, with interactive input working, while Network Toolkit is the selected default. A public release also needs a trusted MSIX signer; the repository has none, and fixture certificates stay on disposable runners.
 
 ## How the prototype works
 
@@ -26,10 +26,9 @@ Conclusions:
 
 ## Owner test on a physical Windows 11 PC (2026-11-10)
 
-The owner installed the side-loaded x64 test package from the "Windows default terminal test package" workflow (run 42750697252) and selected "Network Toolkit Default Terminal Experiment" as the default terminal. They reported that **both Command Prompt and Windows PowerShell opened in Network Toolkit**. Interactive typing has not yet been confirmed. This is the first evidence that the broker, Microsoft's OpenConsole handoff and the Network Toolkit renderer work together for a real user.
+The owner installed the side-loaded x64 test package from the "Windows default terminal test package" workflow (run 42750697252) and selected "Network Toolkit Default Terminal Experiment" as the default terminal. They reported that **both Command Prompt and Windows PowerShell opened in Network Toolkit, typing worked in both, and nothing looked wrong** (title, resizing, closing). They then ran the remove script, which restored their previous default terminal and removed the package and certificate. This meets the functional release criterion: the broker, Microsoft's OpenConsole handoff and the Network Toolkit renderer work together for a real user.
 
 Still needed before release:
-- Owner confirms typing works in both shells.
 - A trusted MSIX signer, for a public package that installs without trusting a test certificate.
 - Product integration: a packaged install path, a settings entry, and documentation of what changes when Network Toolkit is the default.
 
