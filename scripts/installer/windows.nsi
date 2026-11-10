@@ -17,6 +17,14 @@ RequestExecutionLevel user
 !define CAPABILITIES "Software\${APP_NAME}\Capabilities"
 !define PROG_ID "NetworkToolkit.TextDocument"
 !define PROG_KEY "Software\Classes\${PROG_ID}"
+; Terminal links (ssh://, telnet://, serial:). Windows lists the Terminal under
+; Default apps; the user chooses it there. Setup never writes a UserChoice and
+; never changes a scheme key that another app or Windows already registered.
+!define TERMINAL_NAME "${APP_NAME} Terminal"
+!define TERMINAL_KEY "Software\${APP_NAME}\Terminal"
+!define TERMINAL_CAPABILITIES "${TERMINAL_KEY}\Capabilities"
+!define LINK_PROG_ID "NetworkToolkit.TerminalLink"
+!define LINK_PROG_KEY "Software\Classes\${LINK_PROG_ID}"
 
 Name "${APP_NAME} ${APP_VERSION}"
 OutFile "${SETUP_EXE}"
@@ -57,6 +65,9 @@ Var NewMainShortcut
 Var NewEditorShortcut
 Var NewTerminalShortcut
 Var DeleteAttempts
+Var NewSshScheme
+Var NewTelnetScheme
+Var NewSerialScheme
 
 !macro AcquireSetupMutex
   ; Keep the handle alive until this setup or uninstall process exits.
@@ -271,11 +282,61 @@ FunctionEnd
   !insertmacro ${ACTION} ".conf"
 !macroend
 
+; A scheme key is described only when neither this user nor the machine has
+; one, so no other app's handler is replaced. Setup records each key it
+; created; only that key, still exactly as written, is removed again.
+!macro ProbeLinkScheme SCHEME RESULT
+  StrCpy ${RESULT} 0
+  ClearErrors
+  EnumRegKey $0 HKCU "Software\Classes\${SCHEME}" 0
+  ${If} ${Errors}
+    ClearErrors
+    EnumRegKey $0 HKLM "Software\Classes\${SCHEME}" 0
+    ${If} ${Errors}
+      StrCpy ${RESULT} 1
+    ${EndIf}
+  ${EndIf}
+  ClearErrors
+!macroend
+
+!macro RegisterLinkScheme SCHEME DESCRIPTION CREATE
+  WriteRegStr HKCU "${TERMINAL_CAPABILITIES}\URLAssociations" "${SCHEME}" "${LINK_PROG_ID}"
+  ${If} ${CREATE} == 1
+    WriteRegStr HKCU "Software\Classes\${SCHEME}" "" "URL:${DESCRIPTION}"
+    WriteRegStr HKCU "Software\Classes\${SCHEME}" "URL Protocol" ""
+    WriteRegDWORD HKCU "${TERMINAL_KEY}\CreatedSchemes" "${SCHEME}" 1
+  ${EndIf}
+!macroend
+
+!macro RemoveLinkScheme SCHEME DESCRIPTION
+  ReadRegDWORD $0 HKCU "${TERMINAL_KEY}\CreatedSchemes" "${SCHEME}"
+  ${If} $0 == 1
+    ClearErrors
+    EnumRegKey $1 HKCU "Software\Classes\${SCHEME}" 0
+    ReadRegStr $2 HKCU "Software\Classes\${SCHEME}" ""
+    EnumRegValue $3 HKCU "Software\Classes\${SCHEME}" 2
+    ; Leave the key if another app has since added a command or other data.
+    ${If} $1 == ""
+    ${AndIf} $2 == "URL:${DESCRIPTION}"
+    ${AndIf} $3 == ""
+      DeleteRegKey HKCU "Software\Classes\${SCHEME}"
+    ${EndIf}
+    ClearErrors
+  ${EndIf}
+!macroend
+
 !macro UnregisterShell
   !insertmacro TextExtensions RemoveExtension
   DeleteRegValue HKCU "Software\RegisteredApplications" "${EDITOR_NAME}"
   DeleteRegKey HKCU "${CAPABILITIES}"
   DeleteRegKey HKCU "${PROG_KEY}"
+  DeleteRegValue HKCU "Software\RegisteredApplications" "${TERMINAL_NAME}"
+  !insertmacro RemoveLinkScheme "ssh" "SSH Protocol"
+  !insertmacro RemoveLinkScheme "telnet" "Telnet Protocol"
+  !insertmacro RemoveLinkScheme "serial" "Serial Port Protocol"
+  DeleteRegKey HKCU "${TERMINAL_KEY}"
+  DeleteRegKey HKCU "${LINK_PROG_KEY}"
+  DeleteRegKey /ifempty HKCU "Software\${APP_NAME}"
   DeleteRegKey HKCU "${UNINSTALL_KEY}"
   System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, p 0, p 0)'
 !macroend
@@ -364,6 +425,23 @@ Section "Network Toolkit"
   WriteRegStr HKCU "${CAPABILITIES}" "ApplicationIcon" '"$INSTDIR\${APP_FILENAME}",1'
   !insertmacro TextExtensions RegisterExtension
   WriteRegStr HKCU "Software\RegisteredApplications" "${EDITOR_NAME}" "${CAPABILITIES}"
+  IfErrors install_error
+  ; Probing reports a missing key through the error flag; probe every scheme
+  ; first, then write and check the registration as one step.
+  !insertmacro ProbeLinkScheme "ssh" $NewSshScheme
+  !insertmacro ProbeLinkScheme "telnet" $NewTelnetScheme
+  !insertmacro ProbeLinkScheme "serial" $NewSerialScheme
+  WriteRegStr HKCU "${LINK_PROG_KEY}" "" "${TERMINAL_NAME} link"
+  WriteRegStr HKCU "${LINK_PROG_KEY}" "URL Protocol" ""
+  WriteRegStr HKCU "${LINK_PROG_KEY}\DefaultIcon" "" '"$INSTDIR\${APP_FILENAME}",2'
+  WriteRegStr HKCU "${LINK_PROG_KEY}\shell\open\command" "" '"$INSTDIR\${APP_FILENAME}" --terminal --open-url "%1"'
+  WriteRegStr HKCU "${TERMINAL_CAPABILITIES}" "ApplicationName" "${TERMINAL_NAME}"
+  WriteRegStr HKCU "${TERMINAL_CAPABILITIES}" "ApplicationDescription" "Open SSH, Telnet and serial links in Network Toolkit Terminal. Every link opens the connection form for you to confirm."
+  WriteRegStr HKCU "${TERMINAL_CAPABILITIES}" "ApplicationIcon" '"$INSTDIR\${APP_FILENAME}",2'
+  !insertmacro RegisterLinkScheme "ssh" "SSH Protocol" $NewSshScheme
+  !insertmacro RegisterLinkScheme "telnet" "Telnet Protocol" $NewTelnetScheme
+  !insertmacro RegisterLinkScheme "serial" "Serial Port Protocol" $NewSerialScheme
+  WriteRegStr HKCU "Software\RegisteredApplications" "${TERMINAL_NAME}" "${TERMINAL_CAPABILITIES}"
   IfErrors install_error
   CreateDirectory "$SMPROGRAMS\${APP_NAME}"
   IfErrors install_error

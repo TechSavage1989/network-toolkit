@@ -25,6 +25,13 @@ const terminalWorkspaceName = "Network_Toolkit.Terminal"
 const terminalInstanceFilename = "Network_Toolkit.instance.json"
 const terminalWindowRequestLimit = 16
 
+// Windows can deliver one click on a link twice (for example a browser asking
+// again after its own confirmation). The same link within this window is shown
+// once; a later click opens it again.
+const terminalLinkDuplicateWindow = 3 * time.Second
+
+var terminalWindowNow = time.Now
+
 // This is deliberately a separate schema from ConnectRequest. Window launch
 // can carry only connection settings, never authentication or terminal input.
 type terminalWindowPreset struct {
@@ -50,17 +57,23 @@ type terminalWindowPreset struct {
 
 type terminalWindowEnvelope struct {
 	Config *terminalWindowPreset `json:"config,omitempty"`
+	// Link marks a request opened from an ssh://, telnet:// or serial: link
+	// (terminal_link.go). It carries no secret and is never persisted.
+	Link *terminalWindowLink `json:"link,omitempty"`
 }
 
 type terminalWindowRequest struct {
 	Seq    uint64               `json:"seq"`
 	Config terminalWindowPreset `json:"config"`
+	Link   *terminalWindowLink  `json:"link,omitempty"`
 }
 
 type terminalWindowInbox struct {
 	mu       sync.Mutex
 	latest   uint64
 	requests []terminalWindowRequest
+	lastLink string
+	lastAt   time.Time
 }
 
 type terminalWindowBatch struct {
@@ -206,16 +219,34 @@ func decodeTerminalWindowPreset(encoded string) (*terminalWindowPreset, error) {
 }
 
 func (q *terminalWindowInbox) add(preset *terminalWindowPreset) {
+	q.addRequest(preset, nil)
+}
+
+// addRequest queues a connection form for review. It reports false when the
+// request was an immediate repeat of the previous link and was not queued.
+// The queue keeps the newest terminalWindowRequestLimit requests in memory.
+func (q *terminalWindowInbox) addRequest(preset *terminalWindowPreset, link *terminalWindowLink) bool {
 	if preset == nil {
-		return
+		return false
 	}
 	q.mu.Lock()
 	defer q.mu.Unlock()
+	if link != nil {
+		key, _ := json.Marshal(terminalWindowRequest{Config: *preset, Link: link})
+		now := terminalWindowNow()
+		if string(key) == q.lastLink && now.Sub(q.lastAt) >= 0 && now.Sub(q.lastAt) < terminalLinkDuplicateWindow {
+			return false
+		}
+		q.lastLink, q.lastAt = string(key), now
+		copied := *link
+		link = &copied
+	}
 	q.latest++
-	q.requests = append(q.requests, terminalWindowRequest{Seq: q.latest, Config: *preset})
+	q.requests = append(q.requests, terminalWindowRequest{Seq: q.latest, Config: *preset, Link: link})
 	if len(q.requests) > terminalWindowRequestLimit {
 		q.requests = append([]terminalWindowRequest(nil), q.requests[len(q.requests)-terminalWindowRequestLimit:]...)
 	}
+	return true
 }
 
 func (q *terminalWindowInbox) batch(after uint64) terminalWindowBatch {
@@ -281,12 +312,22 @@ func (a *application) handleTerminalWindow(w http.ResponseWriter, r *http.Reques
 		jsonError(w, http.StatusBadRequest, err.Error())
 		return
 	}
+	if envelope.Link != nil {
+		if a.windowMode != "terminal" || envelope.Config == nil {
+			jsonError(w, http.StatusBadRequest, "Terminal links open in the separate Terminal window.")
+			return
+		}
+		if err := envelope.Link.validate(envelope.Config); err != nil {
+			jsonError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+	}
 	if a.windowMode == "terminal" {
 		if a.shutdownRequested.Load() || a.ctx.Err() != nil {
 			jsonError(w, http.StatusServiceUnavailable, "The terminal window is closing. Try again after it closes.")
 			return
 		}
-		a.windowInbox.add(envelope.Config)
+		a.windowInbox.addRequest(envelope.Config, envelope.Link)
 		a.activatePrimary()
 		jsonResponse(w, http.StatusOK, map[string]any{"ok": true, "reused": true, "windowMode": "terminal", "instanceId": a.windowInstanceID})
 		return
@@ -460,7 +501,11 @@ func readWorkspaceWindowInstance(dir string, editor bool) (terminalWindowInstanc
 }
 
 func activateTerminalWindow(ctx context.Context, dir string, preset *terminalWindowPreset) error {
-	return activateWorkspaceWindow(ctx, dir, "terminal", "/api/terminal-window", terminalWindowEnvelope{Config: preset})
+	return activateTerminalWindowRequest(ctx, dir, terminalWindowEnvelope{Config: preset})
+}
+
+func activateTerminalWindowRequest(ctx context.Context, dir string, request terminalWindowEnvelope) error {
+	return activateWorkspaceWindow(ctx, dir, "terminal", "/api/terminal-window", request)
 }
 
 func activateWorkspaceWindow(ctx context.Context, dir, mode, endpoint string, envelope any) error {
@@ -518,6 +563,13 @@ func awaitTerminalWindow(ctx context.Context, dir string, preset *terminalWindow
 }
 
 func prepareTerminalWindow(root string, preset *terminalWindowPreset) (dir string, release func(), reused bool, err error) {
+	return prepareTerminalWindowRequest(root, terminalWindowEnvelope{Config: preset})
+}
+
+// prepareTerminalWindowRequest either hands the request to the running
+// Terminal window (reused) or takes ownership of the Terminal workspace so
+// this process becomes that window and queues the request itself.
+func prepareTerminalWindowRequest(root string, request terminalWindowEnvelope) (dir string, release func(), reused bool, err error) {
 	dir = terminalWorkspace(root)
 	if err = os.MkdirAll(dir, 0700); err != nil {
 		return "", nil, false, err
@@ -529,7 +581,7 @@ func prepareTerminalWindow(root string, preset *terminalWindowPreset) (dir strin
 		if !errors.Is(err, ErrTerminalWindowInUse) {
 			break
 		}
-		if activateTerminalWindow(ctx, dir, preset) == nil {
+		if activateTerminalWindowRequest(ctx, dir, request) == nil {
 			return dir, nil, true, nil
 		}
 		select {

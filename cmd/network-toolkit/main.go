@@ -156,6 +156,7 @@ func main() {
 	printVersion := flag.Bool("version", false, "Print version")
 	terminalOnly := flag.Bool("terminal", false, "Open the independent Terminal application window")
 	terminalPreset := flag.String("terminal-preset", "", "Encoded nonsecret settings for a Terminal connection form")
+	flag.String(terminalLinkFlag, "", "Open an ssh://, telnet:// or serial: link in the Terminal connection form (with --terminal)")
 	terminalView := flag.Bool("terminal-view", false, "Open a live terminal view using its private stdin bootstrap")
 	editorOptions := registerEditorLaunchOptions(flag.CommandLine)
 	editorView := flag.Bool("editor-view", false, "Open an editor view using its private stdin bootstrap")
@@ -227,6 +228,12 @@ func main() {
 		return
 	}
 	editorStandalone := *editorOptions.standalone
+	// A link from Windows Default apps only prefills the connection form.
+	linkLaunch, err := terminalLinkLaunch(flag.CommandLine, runtime.GOOS)
+	if err != nil {
+		platform.NotifyFatal(err.Error())
+		return
+	}
 	if *printVersion {
 		fmt.Println(appName, model.Version, runtime.GOOS, runtime.GOARCH)
 		return
@@ -309,8 +316,12 @@ func main() {
 			editorWorkspaceOwner = true
 		}
 	}
+	terminalRequest := terminalWindowEnvelope{Config: initialPreset}
+	if linkLaunch != nil {
+		terminalRequest = terminalWindowEnvelope{Config: &linkLaunch.Preset, Link: &linkLaunch.Link}
+	}
 	if *terminalOnly {
-		terminalDir, release, reused, err := prepareTerminalWindow(rootDataDir, initialPreset)
+		terminalDir, release, reused, err := prepareTerminalWindowRequest(rootDataDir, terminalRequest)
 		if err != nil {
 			platform.NotifyFatal("Unable to open the Terminal workspace: " + err.Error())
 			return
@@ -352,7 +363,7 @@ func main() {
 	title := appName
 	if *terminalOnly {
 		a.windowMode = "terminal"
-		a.windowInbox.add(initialPreset)
+		a.windowInbox.addRequest(terminalRequest.Config, terminalRequest.Link)
 		title = appName + " Terminal"
 	} else if editorStandalone {
 		a.windowMode, title = standaloneEditorMode, standaloneEditorTitle
@@ -713,6 +724,8 @@ func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		a.handleStorage(w, r)
 	case r.URL.Path == "/api/terminal-window" || strings.HasPrefix(r.URL.Path, "/api/terminal-window/"):
 		a.handleTerminalWindow(w, r)
+	case r.URL.Path == "/api/terminal-links" || strings.HasPrefix(r.URL.Path, "/api/terminal-links/"):
+		a.handleTerminalLinks(w, r)
 	case r.URL.Path == "/api/credential-vault":
 		a.handleCredentialVault(w, r)
 	case r.URL.Path == "/api/credentials" || strings.HasPrefix(r.URL.Path, "/api/credentials/"):

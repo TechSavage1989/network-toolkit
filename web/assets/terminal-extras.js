@@ -383,6 +383,7 @@ function sync(){
    document.querySelector('.terminal-panel').append(panel);
    root.NetworkToolkitTerminalAppearance?.mount(panel);
    root.NetworkToolkitTerminalBehavior?.mount(panel);root.NetworkToolkitTerminalBehavior?.apply();
+   root.NetworkToolkitTerminalLinks?.mount(panel);
  }
  const entry=currentTerminal(),p=prefs(entry),choice=entry?._ntOutputChoice||'last-command';
  const actions=document.querySelector('#terminalActiveActions');

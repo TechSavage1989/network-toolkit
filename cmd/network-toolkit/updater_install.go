@@ -92,8 +92,9 @@ func updateRestartArgs(args []string) []string {
 		}
 		name, _, inline := strings.Cut(strings.TrimLeft(arg, "-"), "=")
 		switch name {
-		case "update-health", "open-file":
-			// Health markers and Explorer file paths are one-shot.
+		case "update-health", "open-file", terminalLinkFlag:
+			// Health markers, Explorer file paths and terminal links are one-shot.
+			// A restarted Terminal must not reopen a link the user already saw.
 			if !inline {
 				i++
 			}

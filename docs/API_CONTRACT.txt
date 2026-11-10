@@ -1479,6 +1479,12 @@ POST /api/terminal-window {config?:SafeTerminalConfig} -> {ok:true,reused:bool}
   as ConnectRequest and is carried through child arguments and queued requests.
 
 GET /api/terminal-window/requests?after=SEQ -> {requests,latest,oldest,lost,reset}
+  Each request is {seq,config[,link]}. link {scheme:"ssh"|"telnet"|"serial",passwordIgnored?} marks a request opened from
+  an ssh://, telnet:// or serial: link (Network_Toolkit.exe --terminal --open-url "<link>"); the window only prefills the
+  connection form. POST /api/terminal-window accepts {config,link} from the Terminal window's activation route only when
+  link matches config (no profile, local folder or elevation). An identical link within 3 s is queued once.
+GET /api/terminal-links -> {supported,registered,current}  Windows setup registered the Terminal for links (current: for this copy)
+POST /api/terminal-links/default-apps -> {ok}  opens the fixed Windows Default apps page; changes no association
   Terminal mode only; main mode returns409. Entries are {seq,config}. Retain
   the latest16requests; report gaps and future-cursor resets. Reading does
   not create connections. A serialized UI poll queues requests and defers
