@@ -1,3 +1,8 @@
+## 1.21.37 Beta 1 - Terminal links and a calmer uninstaller
+
+- Choose Network Toolkit Terminal in Windows Default apps for ssh://, telnet:// and serial: links; a link opens the prefilled connection form and never connects or takes a password by itself.
+- Uninstall retries for a few seconds when the program file is briefly locked instead of asking you to close Network Toolkit.
+
 ## 1.21.36 Beta 1 - Windows setup options and standalone editor
 
 - Choose the Windows install folder and whether to create a desktop shortcut.

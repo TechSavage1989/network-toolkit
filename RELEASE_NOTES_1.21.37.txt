@@ -1,0 +1,14 @@
+Network Toolkit 1.21.37
+
+## What's New
+
+- Make Network Toolkit Terminal the app for SSH, Telnet and serial links. Clicking an ssh:// or telnet:// link opens the connection form filled in, ready for you to connect.
+- Uninstall no longer asks you to close Network Toolkit when it is already closed.
+
+## Additional Details
+
+- Setup lists Network Toolkit Terminal in Windows Settings > Default apps for ssh, telnet and serial links. Choose it there, or from Terminal settings > Features > Links. Setup never changes your current default and never replaces another app's link handler.
+- A link only fills in the form: nothing connects until you choose Connect, passwords in links are ignored, and host key checks still apply. If a saved connection matches the link, you can use it with its saved sign-in.
+- Serial links look like serial:COM3 or serial:COM3?baud=115200&parity=none.
+- Uninstall waits a few seconds when antivirus or Windows search briefly holds the program file, instead of reporting that Network Toolkit is still open.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.

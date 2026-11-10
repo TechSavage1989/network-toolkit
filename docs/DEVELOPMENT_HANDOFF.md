@@ -1,3 +1,13 @@
+# v1.21.37 Beta 1 - Terminal links and uninstall retry
+
+Owner: "the terminal doesn't have to be able to set powershell or cmd as default, it just has to be able to run them. it should be able to be default SSH, Telnet, or serial app". Setup registers Network Toolkit Terminal per user for `ssh`, `telnet` and `serial` links (Capabilities\URLAssociations, ProgID `NetworkToolkit.TerminalLink`, Terminal icon). It never writes a UserChoice and creates a scheme key only when neither HKCU nor HKLM has one, recording what it created so uninstall removes only those keys, and only while unchanged. `--terminal --open-url "<link>"` must appear exactly so; `terminal_link.go` parses strictly (no paths, queries or commands; passwords dropped; the connection-launch host rules), hands the link to the running Terminal window or queues it, never stores it and never replays it after an update. The Terminal opens the existing connection form prefilled, offers an exact saved match, and connects only when the user chooses Connect. Terminal settings > Features > Links opens Windows Default apps.
+
+The uninstaller now retries deleting `Network_Toolkit.exe` for about five seconds before deciding the program is open (PR #157); the hosted setup check also checks link registration, rollback, preservation of another app's handler, and a link delivered to a running Terminal without connecting.
+
+Not yet seen on physical Windows: how Settings > Default apps lists the Terminal and how the "pick an app" prompt appears. The Windows default console (PowerShell/Command Prompt) prototype stays parked on `feat/windows-terminal-default` until a trusted signer exists.
+
+---
+
 # v1.21.36 Beta 1 - Windows setup options and standalone editor
 
 Setup uses the selected program folder and preserves it on upgrade. The optional desktop shortcut opens Toolkit. The installed Text Editor opens in a separate workspace with its own preferences and keeps the existing paged editing, Compare, and save workflows. Each Start menu shortcut and native window uses its own icon.
