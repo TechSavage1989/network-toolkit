@@ -1,3 +1,17 @@
+# v1.21.39 Beta 1 - Standalone apps send to each other and show only their own UI
+
+Owner: "in installer mode, the standalone text editor should be able to send to the standalone terminal and vice versa with their existing send to tools. also, for the standalone tools, remove the features or functions, or ui elements not relevant to the specific app unless it is associated with another app that it can connect to" and "the standalone terminal app should still be able to open cmd and powershell".
+
+Peer send (`peer_send.go`, `web/assets/peer-send.js`): the sender's page asks its own engine (`/api/peer-send/`, session token); the engine reads the other app's instance record of the same data root and calls it on loopback with that app's activation token (`/api/peer/`, loopback only, refused with any browser header, one pending request, 60 s). The Terminal's instance record is now DPAPI-protected like the main and editor records; an older plain record still receives window launches but is never trusted for peer send. The receiving page polls its inbox and runs the same code as an in-window send: the Terminal's `pasteText` (paste review, warnings, bracketed paste, 1 MiB) or the editor's insert (8 MiB). Window launch requests still carry only connection settings or a file path.
+
+The Start a terminal card was built before `/api/status` answered, so it never showed Command Prompt or PowerShell in the standalone Terminal (or in the main window when Terminal is the startup page); `refreshTerminalWelcome()` rebuilds it when local shell availability arrives. Standalone palettes, F1 help, settings and buttons are limited to each app (`standalone-apps.js`); the main window and detached child windows are unchanged.
+
+v1.21.37 and v1.21.38 were published and verified earlier the same day: tags at merge commits 45b4786 and a5c34d0, release runs 42758979504 and 42763002678 green, all seven assets of each matching GitHub's digests, and `github_release.py verify` reporting "Verified 1.21.37" and "Verified 1.21.38".
+
+Known limits: an older running app cannot read the protected Terminal record, so its "Separate terminal window" reports the workspace busy until that app restarts. The hosted setup check has no peer-send step. Windows-only parts (DPAPI record, foreground request) are compiled and vetted, and first run in hosted CI. Not yet seen on physical Windows.
+
+---
+
 # v1.21.38 Beta 1 - Text Editor session restore
 
 Owner: "Notepad++ and even windows notepad now save previously opened documents in tab if they were open when the app closed." Each primary workspace (main window, standalone Text Editor) keeps `Network_Toolkit.editor-session/` beside its settings: a strictly validated `session.json` index (metadata only) and one copy per document with unsaved text. Copies of disk-backed documents are streamed by Go from a buffer snapshot, so there is no size ceiling and the text never passes through the renderer; small in-memory documents upload their text. Bindings, connection ids and passwords are never stored. The page saves in the background when something changed and once more during window close; when every dirty document was kept, app close does not prompt, and it still prompts for any document that could not be kept. Tab close and Close editor prompt as before.

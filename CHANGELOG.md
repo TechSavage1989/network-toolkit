@@ -1,3 +1,8 @@
+## 1.21.39 Beta 1 - Standalone Text Editor and Terminal work together
+
+- Send to terminal and Send to Text Editor work between the standalone Text Editor and the standalone Terminal.
+- The standalone Terminal's Start card offers Command Prompt and PowerShell; each standalone app shows only its own commands, settings and help.
+
 ## 1.21.38 Beta 1 - Text Editor remembers open tabs and unsaved changes
 
 - The Text Editor reopens last session's tabs, including unsaved changes and untitled tabs, in the main window and the standalone editor.
