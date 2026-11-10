@@ -42,8 +42,15 @@ type sharedKey struct {
 	MainOnly bool
 	// Newest-first lists are ordered by their "lastUsed" time after a merge.
 	NewestFirst bool
-	// Limit is the largest number of list items kept (0 means no limit).
+	// Limit makes a list a rolling one (recent connections, learned names):
+	// only this many entries are kept and the oldest leave on their own.
 	Limit int
+	// MaxSaved makes a list a saved one (saved sessions, saved targets): the
+	// user may add entries up to this number. Such a list is never shortened
+	// by loading, saving or a sanitizer; an entry that would take it past the
+	// number is refused and the page says so (web/assets/shared-data.js holds
+	// the same numbers, checked by scripts/shared-list-limits.test.cjs).
+	MaxSaved int
 }
 
 var errSharedInvalid = errors.New("Saved connections and shared settings are invalid.")
@@ -329,6 +336,42 @@ func mergeSharedMap(base, theirs, ours any) (any, error) {
 		}
 	}
 	return result, nil
+}
+
+// sharedRefuseOverflow keeps a saved list within its limit without removing
+// anything that is saved: entries the page adds (they are not in theirs, the
+// list on disk) are taken out again, last added first, until the list fits or
+// none is left. It returns the list and the entries that were refused. A list
+// that is over its limit already stays as it is.
+func sharedRefuseOverflow(key sharedKey, theirs, merged any) (any, []map[string]string) {
+	list, ok := merged.([]any)
+	if key.MaxSaved <= 0 || !ok || len(list) <= key.MaxSaved {
+		return merged, nil
+	}
+	identity := key.Identity
+	if identity == nil {
+		identity = sharedItemID
+	}
+	saved := map[string]bool{}
+	if existing, ok := theirs.([]any); ok {
+		for _, entry := range existing {
+			if item, ok := entry.(map[string]any); ok {
+				saved[identity(item)] = true
+			}
+		}
+	}
+	kept := append([]any{}, list...)
+	var refused []map[string]string
+	for index := len(kept) - 1; index >= 0 && len(kept) > key.MaxSaved; index-- {
+		item, ok := kept[index].(map[string]any)
+		if !ok || saved[identity(item)] {
+			continue
+		}
+		name, _ := item["name"].(string)
+		refused = append(refused, map[string]string{"id": identity(item), "name": name})
+		kept = append(kept[:index], kept[index+1:]...)
+	}
+	return kept, refused
 }
 
 // mergeSharedPlain takes the page's value only when the page changed it.

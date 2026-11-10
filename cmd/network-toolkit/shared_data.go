@@ -70,15 +70,15 @@ func terminalPromptNameIdentity(item map[string]any) string {
 // Text Editor neither receives nor writes them.
 var sharedDataKeys = []sharedKey{
 	// Saved connections and what makes them usable.
-	{Name: "terminalProfiles", Kind: sharedList, Live: true},                                          // saved terminal connections (folder is a field of each)
-	{Name: "terminalRecent", Kind: sharedList, Live: true, NewestFirst: true, Limit: 50},              // recent terminal connections
-	{Name: "terminalSavedManualOrder", Kind: sharedValue, Live: true},                                 // Saved uses the user's own order (the list order)
-	{Name: "terminalPromptNames", Kind: sharedList, Identity: terminalPromptNameIdentity, Live: true}, // device names learned from prompts
-	{Name: "terminalNameRevision", Kind: sharedCounter},                                               // display-name revision counter (kept by the engine)
-	{Name: "ftpProfiles", Kind: sharedList, Live: true},                                               // saved FTP/FTPS connections
-	{Name: "ftpRecent", Kind: sharedList, Live: true, NewestFirst: true, Limit: 50},                   // recent FTP/FTPS connections
-	{Name: "sftpRecent", Kind: sharedList, Live: true, NewestFirst: true, Limit: 50},                  // recent SFTP connections
-	{Name: "sftpVerifiedHostKeys", Kind: sharedMap, Live: true},                                       // SSH fingerprints verified for the file browser
+	{Name: "terminalProfiles", Kind: sharedList, Live: true, MaxSaved: 200},                                       // saved terminal connections (folder is a field of each)
+	{Name: "terminalRecent", Kind: sharedList, Live: true, NewestFirst: true, Limit: 50},                          // recent terminal connections
+	{Name: "terminalSavedManualOrder", Kind: sharedValue, Live: true},                                             // Saved uses the user's own order (the list order)
+	{Name: "terminalPromptNames", Kind: sharedList, Identity: terminalPromptNameIdentity, Live: true, Limit: 200}, // device names learned from prompts, newest first
+	{Name: "terminalNameRevision", Kind: sharedCounter},                                                           // display-name revision counter (kept by the engine)
+	{Name: "ftpProfiles", Kind: sharedList, Live: true, MaxSaved: 200},                                            // saved FTP/FTPS connections
+	{Name: "ftpRecent", Kind: sharedList, Live: true, NewestFirst: true, Limit: 50},                               // recent FTP/FTPS connections
+	{Name: "sftpRecent", Kind: sharedList, Live: true, NewestFirst: true, Limit: 50},                              // recent SFTP connections
+	{Name: "sftpVerifiedHostKeys", Kind: sharedMap, Live: true},                                                   // SSH fingerprints verified for the file browser
 
 	// Appearance of every app.
 	{Name: "theme", Kind: sharedValue, Live: true},
@@ -109,9 +109,9 @@ var sharedDataKeys = []sharedKey{
 	{Name: "transferExplorerSettings", Kind: sharedMap},      // file browser options
 
 	// Used by the main window only.
-	{Name: "profiles", Kind: sharedList, MainOnly: true},                                 // saved diagnostic targets
+	{Name: "profiles", Kind: sharedList, MainOnly: true, MaxSaved: 200},                  // saved diagnostic targets
 	{Name: "savedResultFilters", Kind: sharedMap, MainOnly: true},                        // saved result filters
-	{Name: "tftpProfiles", Kind: sharedList, MainOnly: true},                             // saved TFTP transfers
+	{Name: "tftpProfiles", Kind: sharedList, MainOnly: true, MaxSaved: 100},              // saved TFTP transfers
 	{Name: "tftpRecent", Kind: sharedList, MainOnly: true, NewestFirst: true, Limit: 50}, // recent TFTP transfers
 	{Name: "transferServerSettings", Kind: sharedMap, MainOnly: true},                    // file server settings
 	{Name: "tableColumns", Kind: sharedMap, MainOnly: true},                              // chosen result columns

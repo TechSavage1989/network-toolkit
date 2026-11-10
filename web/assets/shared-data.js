@@ -25,6 +25,19 @@ const SHARED=[...LIVE,...AT_START];
 // (applyTerminalWorkspaceDisplay in index.html).
 const DISPLAY=new Set(['theme','colorPickerPreferences','terminalAppearance','terminalSyntax','terminalHighlight','terminalBehavior','terminalInteraction','terminalFontSize','terminalMacroConfirmation','terminalActiveActionsPosition','terminalSidebarSide','terminalSessionConfirmDelete','terminalConfirmClose','terminalConfirmReconnectAll','terminalConfirmDisconnectAll','terminalConfirmCloseAll']);
 const LISTS=new Set(['terminalProfiles','terminalRecent','terminalSavedManualOrder','terminalPromptNames','ftpProfiles','ftpRecent','sftpRecent','sftpVerifiedHostKeys']);
+// The largest number of entries the user can add to each saved list, the same
+// numbers as MaxSaved in the engine's table. A saved list is shared and merged
+// by entry, so nothing may shorten one: it is loaded whole and saved whole,
+// and when it is full another entry is refused in plain words (full()).
+const SAVED_LIMITS=Object.freeze({terminalProfiles:200,ftpProfiles:200,profiles:200,tftpProfiles:100});
+// Rolling lists (Limit in the engine's table) keep their newest entries.
+const ROLLING_LIMITS=Object.freeze({terminalRecent:50,terminalPromptNames:200,ftpRecent:50,sftpRecent:50,tftpRecent:50});
+const LIST_NAMES={terminalProfiles:'saved sessions',ftpProfiles:'saved FTP connections',profiles:'saved targets',tftpProfiles:'saved TFTP profiles'};
+// Why a saved list with count entries cannot take another one ('' if it can).
+function full(key,count){
+ const limit=SAVED_LIMITS[key];
+ return limit&&count>=limit?'The list of '+LIST_NAMES[key]+' is full ('+limit+'). Remove one you no longer need before adding another.':'';
+}
 let revision='',timer=null,polling=false,stopped=false,listening=false,noticeHandler=null,credentialMark;
 // The JSON text of each shared value as last agreed with the engine. Null
 // until the page has loaded its settings.
@@ -45,13 +58,13 @@ function normalize(values,deps={}){
  const revisionOf=item=>labels?.revision?.(item)||0,folder=value=>folders?.normalize?folders.normalize(value):'';
  const named=item=>item&&typeof item==='object'&&typeof item.id==='string'&&typeof item.name==='string';
  const out={};
- out.terminalProfiles=list(source.terminalProfiles).filter(named).slice(0,200).map(p=>({id:p.id.slice(0,80),name:p.name.slice(0,100),...(typeof p.nameExplicit==='boolean'?{nameExplicit:p.nameExplicit}:{}),nameRevision:revisionOf(p),folder:folder(p.folder),...config(p)}));
+ out.terminalProfiles=list(source.terminalProfiles).filter(named).map(p=>({id:p.id.slice(0,80),name:p.name.slice(0,100),...(typeof p.nameExplicit==='boolean'?{nameExplicit:p.nameExplicit}:{}),nameRevision:revisionOf(p),folder:folder(p.folder),...config(p)}));
  const seen=new Set();
- out.terminalRecent=list(source.terminalRecent).filter(named).slice(0,50).map(item=>({id:item.id.slice(0,80),name:item.name.slice(0,100),...(typeof item.nameExplicit==='boolean'?{nameExplicit:item.nameExplicit}:{}),nameRevision:revisionOf(item),lastUsed:Number.isSafeInteger(item.lastUsed)&&item.lastUsed>=0?item.lastUsed:0,...config(item)})).filter(item=>{if(!item.id||seen.has(item.id))return false;seen.add(item.id);return true;});
+ out.terminalRecent=list(source.terminalRecent).filter(named).slice(0,ROLLING_LIMITS.terminalRecent).map(item=>({id:item.id.slice(0,80),name:item.name.slice(0,100),...(typeof item.nameExplicit==='boolean'?{nameExplicit:item.nameExplicit}:{}),nameRevision:revisionOf(item),lastUsed:Number.isSafeInteger(item.lastUsed)&&item.lastUsed>=0?item.lastUsed:0,...config(item)})).filter(item=>{if(!item.id||seen.has(item.id))return false;seen.add(item.id);return true;});
  out.terminalSavedManualOrder=source.terminalSavedManualOrder===true;
  out.terminalPromptNames=labels?.normalize?labels.normalize(source.terminalPromptNames):list(source.terminalPromptNames);
- out.ftpProfiles=list(source.ftpProfiles).filter(x=>x&&typeof x.id==='string'&&typeof x.name==='string'&&typeof x.host==='string').slice(0,100).map(x=>({id:x.id,name:x.name,folder:folder(x.folder),host:x.host,port:Number(x.port)||21,username:typeof x.username==='string'?x.username:'',security:['explicit','implicit','plain'].includes(x.security)?x.security:'explicit',fingerprint:typeof x.fingerprint==='string'?x.fingerprint:'',credentialId:typeof x.credentialId==='string'?x.credentialId:''}));
- out.ftpRecent=list(source.ftpRecent).filter(x=>x&&typeof x.id==='string'&&typeof x.name==='string'&&typeof x.host==='string'&&typeof x.username==='string'&&Number.isInteger(Number(x.port))&&Number(x.port)>=1&&Number(x.port)<=65535).slice(0,50).map(x=>({id:x.id.slice(0,80),name:x.name.slice(0,100),host:x.host.slice(0,253),port:Number(x.port),username:x.username.slice(0,256),security:['explicit','implicit','plain'].includes(x.security)?x.security:'explicit',fingerprint:short(x.fingerprint,256),credentialId:short(x.credentialId,128),lastUsed:Number.isSafeInteger(x.lastUsed)?x.lastUsed:0}));
+ out.ftpProfiles=list(source.ftpProfiles).filter(x=>x&&typeof x.id==='string'&&typeof x.name==='string'&&typeof x.host==='string').map(x=>({id:x.id,name:x.name,folder:folder(x.folder),host:x.host,port:Number(x.port)||21,username:typeof x.username==='string'?x.username:'',security:['explicit','implicit','plain'].includes(x.security)?x.security:'explicit',fingerprint:typeof x.fingerprint==='string'?x.fingerprint:'',credentialId:typeof x.credentialId==='string'?x.credentialId:''}));
+ out.ftpRecent=list(source.ftpRecent).filter(x=>x&&typeof x.id==='string'&&typeof x.name==='string'&&typeof x.host==='string'&&typeof x.username==='string'&&Number.isInteger(Number(x.port))&&Number(x.port)>=1&&Number(x.port)<=65535).slice(0,ROLLING_LIMITS.ftpRecent).map(x=>({id:x.id.slice(0,80),name:x.name.slice(0,100),host:x.host.slice(0,253),port:Number(x.port),username:x.username.slice(0,256),security:['explicit','implicit','plain'].includes(x.security)?x.security:'explicit',fingerprint:short(x.fingerprint,256),credentialId:short(x.credentialId,128),lastUsed:Number.isSafeInteger(x.lastUsed)?x.lastUsed:0}));
  out.sftpRecent=list(source.sftpRecent);
  out.sftpVerifiedHostKeys=plain(source.sftpVerifiedHostKeys)?source.sftpVerifiedHostKeys:{};
  // Settings.
@@ -169,6 +182,7 @@ function saved(response,sent){
  if(values&&baseline)for(const [key,text] of values)baseline.set(key,text);
  const shared=response?.sharedData;
  if(!shared||typeof shared.revision!=='string')return;
+ if(plain(shared.refused))notSaved(shared.refused);
  if(!shared.values){revision=shared.revision;return;}
  // The engine merged in something this page did not have. If the user has
  // changed anything since, or is in a dialog, the next poll offers it again.
@@ -179,6 +193,24 @@ function saved(response,sent){
  if(changed.length)applyChanged(next,changed);
  if(baseline)for(const key of LIVE)baseline.set(key,textOf(state[key]));
  revision=shared.revision;
+}
+// Entries that did not fit in a full list (another app filled it at the same
+// moment) were not saved. They leave this page's list too, so the page shows
+// what is saved, and the user is told which ones and why.
+function notSaved(refused){
+ const lines=[];
+ for(const key of Object.keys(SAVED_LIMITS)){
+  const rows=list(refused[key]).filter(row=>row&&typeof row.id==='string');
+  if(!rows.length)continue;
+  const ids=new Set(rows.map(row=>row.id)),without=value=>list(value).filter(item=>!ids.has(item?.id));
+  state[key]=without(state[key]);
+  if(baseline){let agreed=[];try{agreed=JSON.parse(baseline.get(key)||'[]');}catch{}baseline.set(key,textOf(without(agreed)));}
+  lines.push(rows.map(row=>'"'+short(row.name,100)+'"').join(', ')+' was not saved: the list of '+LIST_NAMES[key]+' is full ('+SAVED_LIMITS[key]+') because another Network Toolkit app added entries at the same time. Remove one you no longer need, then save it again.');
+ }
+ if(!lines.length)return;
+ redrawLists();
+ attempt(()=>{if(typeof toast==='function')toast(lines.join(' '),'error');});
+ document.dispatchEvent(new CustomEvent('shared-data-changed',{detail:{keys:Object.keys(refused)}}));
 }
 function busyTyping(keys){
  const active=typing();
@@ -244,7 +276,7 @@ function start(){
 }
 function stop(){stopped=true;if(timer!==null)root.clearInterval(timer);timer=null;}
 
-const api_=Object.freeze({normalize,loaded,outgoing,saved,failed,apply,poll,start,stop,busy,LIVE,AT_START,SHARED,POLL_MS,onNotices(handler){noticeHandler=handler;},get revision(){return revision;}});
+const api_=Object.freeze({normalize,loaded,outgoing,saved,failed,apply,poll,start,stop,busy,full,LIVE,AT_START,SHARED,SAVED_LIMITS,ROLLING_LIMITS,POLL_MS,onNotices(handler){noticeHandler=handler;},get revision(){return revision;}});
 root.NetworkToolkitSharedData=api_;
 if(typeof module==='object'&&module.exports)module.exports=api_;
 if(typeof document!=='undefined')start();

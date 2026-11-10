@@ -8,7 +8,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const output=process.env.TOOLKIT_TEST_OUTPUT||process.env.NTK_BROWSER_OUTPUT_DIR;
 const urls={main:process.env.NTK_SHARED_MAIN_URL,terminal:process.env.NTK_SHARED_TERMINAL_URL,editor:process.env.NTK_SHARED_EDITOR_URL};
 const tokens={main:process.env.NTK_SHARED_MAIN_TOKEN,terminal:process.env.NTK_SHARED_TERMINAL_TOKEN,editor:process.env.NTK_SHARED_EDITOR_TOKEN};
-const report={passed:false,checks:[],errors:[],keys:{}};
+const report={passed:false,checks:[],errors:[],keys:{},profiles:[]};
 const check=text=>{report.checks.push(text);console.log('ok - '+text);};
 (async()=>{
  for(const [name,url] of Object.entries(urls))assert(url,'missing engine URL for '+name);
@@ -140,6 +140,37 @@ const check=text=>{report.checks.push(text);console.log('ok - '+text);};
   await settled(terminal);await main.waitForTimeout(3200);
   assert.equal(await main.evaluate(()=>state.terminalSidebarCollapsed),false,'a collapsed sidebar is not a shared setting');
   check('Window state such as a collapsed sidebar stays in its own window');
+
+  // 9. More saved sessions than earlier versions could hold. One of them is
+  //    changed in the main window's connection form and saved with the
+  //    page's own Save: every session is still there, in every app.
+  await terminal.evaluate(()=>{const extra=Array.from({length:147},(_,i)=>({id:'bulk-'+String(i).padStart(3,'0'),name:'Bulk '+i,nameExplicit:true,nameRevision:0,_nameNew:true,folder:'',...safeTerminalConfig({type:'ssh',host:'192.0.2.'+(i%200+1),port:22,username:'operator'})}));state.terminalProfiles=[...state.terminalProfiles,...extra];saveState();NetworkToolkitSessionSidebar.render();});
+  await settled(terminal);
+  for(const page of [main,editor])await page.waitForFunction(()=>state.terminalProfiles.length===150);
+  await main.evaluate(()=>{const saved=state.terminalProfiles.find(p=>p.id==='bulk-120');openTerminalConnect(saved,saved.id);});
+  await main.locator('#con-username').fill('admin');
+  await main.evaluate(()=>{saveTerminalProfile();closeModal();});
+  await settled(main);
+  assert.equal(await main.evaluate(()=>state.terminalProfiles.length),150,'saving one session in the connection form kept the others');
+  assert.equal(await main.evaluate(()=>state.terminalProfiles.find(p=>p.id==='bulk-120').username),'admin');
+  for(const page of [terminal,editor])await page.waitForFunction(()=>state.terminalProfiles.length===150&&state.terminalProfiles.find(p=>p.id==='bulk-120')?.username==='admin');
+  // The Terminal saves a window preference afterwards: still all of them.
+  await terminal.evaluate(()=>{state.terminalComposerCollapsed=!state.terminalComposerCollapsed;saveState();});
+  await settled(terminal);await main.waitForTimeout(3200);
+  assert.deepEqual(await Promise.all([main,terminal,editor].map(page=>page.evaluate(()=>state.terminalProfiles.length))),[150,150,150]);
+  // A full list refuses another session in plain words and changes nothing.
+  const limit=await main.evaluate(()=>NetworkToolkitSharedData.SAVED_LIMITS.terminalProfiles);
+  await terminal.evaluate(limit=>{const extra=Array.from({length:limit-state.terminalProfiles.length},(_,i)=>({id:'fill-'+i,name:'Fill '+i,nameExplicit:true,nameRevision:0,_nameNew:true,folder:'',...safeTerminalConfig({type:'ssh',host:'192.0.2.9',port:22,username:'operator'})}));state.terminalProfiles=[...state.terminalProfiles,...extra];saveState();},limit);
+  await settled(terminal);
+  await main.waitForFunction(limit=>state.terminalProfiles.length===limit,limit);
+  await main.evaluate(()=>{openTerminalConnect({type:'ssh',host:'192.0.2.77',port:22,username:'operator'},'');});
+  await main.locator('#con-username').waitFor();
+  const refusal=await main.evaluate(()=>{const seen=[];const original=toast;toast=(text,kind)=>{seen.push([kind,text]);};try{saveTerminalProfile();}finally{toast=original;}closeModal();return seen;});
+  assert.equal(await main.evaluate(()=>state.terminalProfiles.length),limit,'a full list is not changed');
+  assert(refusal.some(([kind,text])=>kind==='error'&&/list of saved sessions is full/.test(text)),'the page says that the list is full: '+JSON.stringify(refusal));
+  await settled(main);
+  report.profiles=await main.evaluate(()=>state.terminalProfiles.map(p=>p.id).sort());
+  check('150 saved sessions survive an edit in the connection form in every app, and a full list refuses another one');
 
   if(output){await main.screenshot({path:path.join(output,'shared-data-main.png')});await terminal.screenshot({path:path.join(output,'shared-data-terminal.png')});}
   assert.deepEqual(report.errors,[]);report.passed=true;

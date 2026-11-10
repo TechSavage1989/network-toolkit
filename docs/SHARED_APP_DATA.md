@@ -34,6 +34,11 @@ Every 2.5 seconds, while its window is visible, a page asks `GET /api/shared-dat
 
 A client that sends no `_sharedBase` is taken to have started from what the engine last served to it or accepted from it.
 
+**Lists are never cut short.** Because a list is merged by entry, a page that sent a shorter list than it was given would be read as "the user removed these". The key table therefore gives every list one of two rules, and the page (`SAVED_LIMITS` and `ROLLING_LIMITS` in `web/assets/shared-data.js`) uses the same numbers; `scripts/shared-list-limits.test.cjs` compares them and fails on any page statement that shortens a saved list.
+
+- A **saved list** (`MaxSaved`: saved sessions 200, saved FTP connections 200, saved targets 200, saved TFTP profiles 100) is loaded whole and saved whole. No sanitizer and no load path shortens it, even when it holds more than the number. When it is full, the page refuses another entry in plain words and changes nothing. If two apps add at the same moment and only one entry fits, the engine saves the first, leaves the other out, and tells that page which entry was not saved (`sharedData.refused` in the answer); the page removes it from its list and says so.
+- A **rolling list** (`Limit`: recent connections 50, learned prompt names 200) keeps its newest entries; the oldest leave on their own.
+
 The 2 MiB limit of a settings file is unchanged, as are all sanitizers; they run on the page's values, on the earlier values it sends, and on what is read from disk.
 
 ## Other shared stores

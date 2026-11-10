@@ -134,6 +134,27 @@ test('a change from another app waits for unsaved changes, dialogs, menus, drags
  c.answers.push({revision:'r11',credentials:'a'});await shared.poll();c.answers.push({revision:'r11',credentials:'a'});await shared.poll();assert.deepEqual(calls,[]);
  c.answers.push({revision:'r11',credentials:'b'});await shared.poll();assert.deepEqual(calls,['credentials']);
 });
+test('an entry that did not fit in a full list leaves the page and the user is told',()=>{
+ const h=harness(),{c,shared}=h;shared.loaded();
+ const toasts=[];c.toast=(text,kind)=>toasts.push([kind,text]);
+ c.state.terminalProfiles=[profile('mine'),profile('kept')];c.stateRevision++;
+ const sent=c.stateRevision,body=shared.outgoing(c.state);
+ assert.deepEqual(plain(body._sharedBase.terminalProfiles),[]);
+ // The answer arrives while the user is already changing something else.
+ c.state.theme='light';c.stateRevision++;c.savedStateRevision=sent;
+ shared.saved({sharedData:{revision:'r2',refused:{terminalProfiles:[{id:'mine',name:'Device mine'}]},values:{...c.state,terminalProfiles:[profile('kept'),profile('theirs')]}}},sent);
+ assert.deepEqual(c.state.terminalProfiles.map(p=>p.id),['kept'],'the entry that was not saved is not shown as saved');
+ assert.equal(toasts.length,1);assert.equal(toasts[0][0],'error');
+ assert.match(toasts[0][1],/"Device mine" was not saved: the list of saved sessions is full \(200\) because another Network Toolkit app added entries at the same time/);
+ assert(h.calls.includes('profiles')&&h.calls.includes('indicators'),'the lists are redrawn');
+ // The next save does not tell the engine that this page removed anything.
+ const next=shared.outgoing(c.state);
+ assert.deepEqual(Object.keys(plain(next._sharedBase)),['theme']);
+ // A list this page does not refresh while it runs (saved targets).
+ shared.failed();c.state.profiles=[{id:'t',name:'Gateway'},{id:'extra',name:'Extra'}];c.stateRevision++;
+ save(h,{sharedData:{revision:'r3',refused:{profiles:[{id:'extra',name:'Extra'}]}}});
+ assert.deepEqual(c.state.profiles.map(p=>p.id),['t']);assert.match(toasts.at(-1)[1],/saved targets is full \(200\)/);
+});
 test('an answer to a poll that was asked before a save is ignored',async()=>{
  const h=harness(),{c,shared}=h;shared.loaded();
  let release;c.api=()=>new Promise(resolve=>{release=resolve;});

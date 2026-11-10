@@ -105,12 +105,12 @@ func sanitizeTerminalSettings(state map[string]any) {
 		state["terminalConnection"] = safeTerminalProfile(current, false)
 	}
 	if profiles, present := state["terminalProfiles"]; present {
+		// Saved sessions are never cut short here: the list is shared and merged
+		// by entry, so a shorter list would read as removals. Adding past the
+		// limit is refused where entries are added (sharedKey.MaxSaved).
 		clean := []map[string]any{}
 		if list, ok := profiles.([]any); ok {
 			for _, profile := range list {
-				if len(clean) >= 200 {
-					break
-				}
 				if _, ok := profile.(map[string]any); !ok {
 					continue
 				}

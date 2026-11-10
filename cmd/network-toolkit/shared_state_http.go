@@ -313,6 +313,7 @@ func (a *application) putState(w http.ResponseWriter, r *http.Request) {
 	if tracked {
 		base = sharedSectionOf(started, keys)
 	}
+	refused := map[string][]map[string]string{}
 	for _, key := range keys {
 		value := theirs[key.Name]
 		_, changed := started[key.Name]
@@ -322,6 +323,12 @@ func (a *application) putState(w http.ResponseWriter, r *http.Request) {
 			if value, err = mergeSharedKey(key, base[key.Name], theirs[key.Name], ours[key.Name], sent[key.Name]); err != nil {
 				jsonError(w, http.StatusBadRequest, err.Error())
 				return
+			}
+			// An entry that does not fit in a full list (another app added one
+			// at the same time) is not saved, and the page is told.
+			var dropped []map[string]string
+			if value, dropped = sharedRefuseOverflow(key, theirs[key.Name], value); len(dropped) > 0 {
+				refused[key.Name] = dropped
 			}
 		}
 		if value == nil {
@@ -417,6 +424,9 @@ func (a *application) putState(w http.ResponseWriter, r *http.Request) {
 	a.storageError = ""
 	revision := a.shared.served(merged)
 	shared := map[string]any{"revision": revision}
+	if len(refused) > 0 {
+		shared["refused"] = refused
+	}
 	for _, key := range keys {
 		if key.Live && !sharedEqual(ours[key.Name], merged[key.Name]) {
 			// The page does not hold everything that is saved now (another app

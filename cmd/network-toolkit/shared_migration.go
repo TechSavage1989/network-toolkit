@@ -243,10 +243,6 @@ func migrateSharedData(root string) error {
 	return errors.Join(failures...)
 }
 
-// Lists whose entries are kept twice when both sides changed them, and the
-// largest number of entries the page and the sanitizers accept.
-var sharedMigrationDuplicates = map[string]int{"terminalProfiles": 200, "ftpProfiles": 100}
-
 func sharedMigrationCopyID(id, source string, item any) string {
 	digest := sharedDigest(item)
 	if len(id) > 60 {
@@ -308,7 +304,9 @@ func (m *sharedMigration) settings(workspace legacyWorkspace, dir string) error 
 			if !okTheirs || !okOurs {
 				continue
 			}
-			limit, duplicate := sharedMigrationDuplicates[key.Name]
+			// A saved list keeps both versions of an entry that the two sides
+			// changed, up to the limit of the key table.
+			limit, duplicate := key.MaxSaved, key.MaxSaved > 0
 			list, _ := current[key.Name].([]any)
 			list = append([]any{}, list...)
 			have := map[string][]byte{}

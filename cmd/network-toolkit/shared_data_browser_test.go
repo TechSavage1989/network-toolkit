@@ -66,7 +66,8 @@ func TestSharedDataBrowser(t *testing.T) {
 	// Every key the three pages keep in their settings is classified as shared
 	// or per-window in the engine table.
 	var report struct {
-		Keys map[string][]string `json:"keys"`
+		Keys     map[string][]string `json:"keys"`
+		Profiles []string            `json:"profiles"`
 	}
 	raw, err := os.ReadFile(filepath.Join(reportDir, "shared-data-report.json"))
 	if err != nil || json.Unmarshal(raw, &report) != nil || len(report.Keys["main"]) < 60 {
@@ -94,15 +95,28 @@ func TestSharedDataBrowser(t *testing.T) {
 	}
 	// What the three pages agreed on is what is on disk, in the main settings
 	// file only.
-	if got := sharedDiskIDs(t, root, "terminalProfiles"); !sameIDs(got, "from-terminal", "from-main", "while-stale") {
-		t.Fatalf("saved connections on disk after the browser run: %v", got)
+	// The run ends with a full list of saved sessions: the three from the
+	// first steps and every one added in bulk since.
+	got := sharedDiskIDs(t, root, "terminalProfiles")
+	limit, _ := sharedKeyNamed("terminalProfiles")
+	if len(got) != limit.MaxSaved || !sameIDs(got, report.Profiles...) {
+		t.Fatalf("saved connections on disk after the browser run: %d on disk, %d in the page", len(got), len(report.Profiles))
+	}
+	have := map[string]bool{}
+	for _, id := range got {
+		have[id] = true
+	}
+	for _, id := range []string{"from-terminal", "from-main", "while-stale", "bulk-000", "bulk-120", "bulk-146"} {
+		if !have[id] {
+			t.Fatalf("%s is missing from the data folder after the browser run", id)
+		}
 	}
 	for _, workspace := range []string{terminalWorkspaceName, standaloneEditorDirectory} {
 		raw, err := os.ReadFile(filepath.Join(root, workspace, appSettingsFilename))
 		if err != nil {
 			t.Fatal(err)
 		}
-		if strings.Contains(string(raw), "from-terminal") || strings.Contains(string(raw), "terminalProfiles") || strings.Contains(string(raw), `"theme"`) || strings.Contains(string(raw), "terminalAppearance") {
+		if strings.Contains(string(raw), "from-terminal") || strings.Contains(string(raw), "bulk-") || strings.Contains(string(raw), "terminalProfiles") || strings.Contains(string(raw), `"theme"`) || strings.Contains(string(raw), "terminalAppearance") {
 			t.Fatalf("%s holds shared data in its own settings file: %s", workspace, raw)
 		}
 		if !strings.Contains(string(raw), "activePage") {

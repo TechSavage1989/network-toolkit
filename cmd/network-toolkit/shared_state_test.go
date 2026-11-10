@@ -75,6 +75,8 @@ type sharedPage struct {
 	baseline map[string]string
 	// An older client that does not say what it started from.
 	untracked bool
+	// Entries of the last save that did not fit in a full list: key to ids.
+	refused map[string][]string
 }
 
 func pageJSON(value any) string {
@@ -185,7 +187,29 @@ func (p *sharedPage) trySave() (int, string) {
 		p.baseline[name] = value
 	}
 	p.apply(response.Shared)
+	// Entries that did not fit in a full list were not saved. The page takes
+	// them out of its own list, as web/assets/shared-data.js does.
+	p.refused = map[string][]string{}
+	if refused, ok := response.Shared["refused"].(map[string]any); ok {
+		for name, entries := range refused {
+			list, _ := entries.([]any)
+			for _, entry := range list {
+				row, _ := entry.(map[string]any)
+				id, _ := row["id"].(string)
+				p.refused[name] = append(p.refused[name], id)
+				p.remove(name, id)
+			}
+			p.baseline[name] = pageJSON(p.state[name])
+		}
+	}
 	return 200, ""
+}
+
+// saveRefused saves and returns the entries that did not fit in a full list.
+func (p *sharedPage) saveRefused() map[string][]string {
+	p.t.Helper()
+	p.save()
+	return p.refused
 }
 
 func (p *sharedPage) ids(name string) []string {
