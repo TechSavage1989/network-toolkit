@@ -11,7 +11,7 @@ function ui(options={}){
   const document=makeDocument('<button id="mobileMenu"></button><button id="settingsButton"></button><div id="appUpdateNotice"></div><div id="modalRoot"><div id="existingDialog">Existing work</div></div>');
   const calls=[],timers=new Map(),saved=[],toasts=[],listeners={};let timerId=0,now=1792872000000,data=structuredClone(available);
   class TestDate extends Date{constructor(value=now){super(value)}static now(){return now}}
-  const c={document,AbortController,Date:TestDate,online:true,OFFLINE:false,shutDown:false,TERMINAL_ONLY:false,DETACHED_TERMINAL:false,EDITOR_WINDOW:false,status:{version:'1.17.61'},VERSION:'1.17.61',state:{appUpdatePreferences:{enabled:true,...options.preferences}},
+  const c={document,AbortController,Date:TestDate,online:true,OFFLINE:false,shutDown:false,TERMINAL_ONLY:false,DETACHED_TERMINAL:false,EDITOR_ONLY:false,EDITOR_WINDOW:false,status:{version:'1.17.61'},VERSION:'1.17.61',state:{appUpdatePreferences:{enabled:true,...options.preferences}},
     addEventListener:(name,fn)=>(listeners[name]??=[]).push(fn),
     setTimeout:(fn,delay)=>{timers.set(++timerId,{fn,delay});return timerId},clearTimeout:id=>timers.delete(id),
     saveState:()=>saved.push(structuredClone(c.state.appUpdatePreferences)),flushState:async()=>true,toast:message=>toasts.push(message),

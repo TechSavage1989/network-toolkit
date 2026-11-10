@@ -77,6 +77,9 @@ func TestEditorLargeFileBrowser(t *testing.T) {
 
 	a, registry, _ := editorFixture(t)
 	a.windowMode = "main"
+	if os.Getenv("NTK_EDITOR_STANDALONE_FIXTURE") == "1" {
+		a.windowMode = standaloneEditorMode
+	}
 	shellFile := filepath.Join(dir, "résumé & notes %[v2].txt")
 	const shellText = "Opened from the synthetic Explorer launch.\n"
 	if err := os.WriteFile(shellFile, []byte(shellText+strings.Repeat("Synthetic log record\n", 4001)), 0600); err != nil {

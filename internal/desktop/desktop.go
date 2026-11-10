@@ -3,10 +3,18 @@ package desktop
 
 import "context"
 
+const (
+	IconToolkit  = 1
+	IconEditor   = 2
+	IconTerminal = 3
+)
+
 // Config describes one app window. DataDir is the portable application's folder.
 // The embedded UI uses the Microsoft WebView2 Runtime installed on Windows.
 type Config struct {
 	Title string
+	// IconResource is the linked Windows group icon. Zero uses IconToolkit.
+	IconResource uint16
 	// Minimum window tracking dimensions in logical pixels. Zero uses the main-window default.
 	MinWidth  int32
 	MinHeight int32
@@ -39,6 +47,13 @@ type Config struct {
 	// Package-private native acceptance instrumentation. It observes decisions
 	// but cannot alter the document policy or supply a capability.
 	navigationObserver func(nativeNavigationObservation)
+}
+
+func cfgIconResource(cfg Config) uintptr {
+	if cfg.IconResource != 0 {
+		return uintptr(cfg.IconResource)
+	}
+	return IconToolkit
 }
 
 type nativeNavigationObservation struct {

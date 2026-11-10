@@ -306,6 +306,7 @@ jobs:
         env:
           GOTOOLCHAIN: local
           NTK_EDITOR_LARGE_BROWSER: '1'
+          NTK_EDITOR_STANDALONE_FIXTURE: '1'
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results/large-editor
         run: go test -mod=vendor ./cmd/network-toolkit -run '^TestEditor(LargeFileBrowser|BrowserStorage)$' -count=1 -v -timeout=8m
@@ -688,7 +689,7 @@ jobs:
       - name: Verify text file launch and reuse of the existing editor workspace
         env:
           GOTOOLCHAIN: local
-        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestEditorLaunch(CLI|ReusesRegisteredWorkspace)$' -count=1 -v
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^Test(EditorLaunch(CLI|ReusesRegisteredWorkspace)|StandaloneEditorActivationAndPreferenceIsolation|MainEditorCloseApprovalOptIn)$' -count=1 -v
       - name: Verify shared-terminal SFTP timeout and shell continuity on Windows
         env:
           GOTOOLCHAIN: local

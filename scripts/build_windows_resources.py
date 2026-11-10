@@ -30,14 +30,14 @@ def version_block(key, value=b'', children=(), text=False):
 
 
 def version_info():
-    fixed = struct.pack('<13I', 0xFEEF04BD, 0x00010000, 0x00010015, 0x00230000, 0x00010015, 0x00230000, 0x3F, 0, 0x40004, 1, 0, 0, 0)
+    fixed = struct.pack('<13I', 0xFEEF04BD, 0x00010000, 0x00010015, 0x00240000, 0x00010015, 0x00240000, 0x3F, 0, 0x40004, 1, 0, 0, 0)
     strings = {
         'FileDescription': 'Network Toolkit - Network Diagnostics',
-        'FileVersion': '1.21.35.0',
+        'FileVersion': '1.21.36.0',
         'InternalName': 'NetworkToolkit',
         'OriginalFilename': 'Network_Toolkit.exe',
         'ProductName': 'Network Toolkit',
-        'ProductVersion': '1.21.35',
+        'ProductVersion': '1.21.36',
     }
     table = version_block('040904B0', children=[version_block(k, utf16(v), text=True) for k, v in strings.items()], text=True)
     string_info = version_block('StringFileInfo', children=[table], text=True)
@@ -47,20 +47,26 @@ def version_info():
 
 def main():
     validate_assets(ROOT)
-    icon = (ROOT / 'assets/Network_Toolkit_Icon.ico').read_bytes()
-    reserved, kind, count = struct.unpack_from('<HHH', icon)
-    if reserved or kind != 1 or not 1 <= count <= 30:
-        raise ValueError('Invalid ICO')
     icons = {}
-    group = bytearray(struct.pack('<HHH', 0, 1, count))
-    for i in range(count):
-        width, height, colors, res, planes, bits, size, offset = struct.unpack_from('<BBBBHHII', icon, 6 + i * 16)
-        data = icon[offset:offset+size]
-        if len(data) != size:
-            raise ValueError('Truncated ICO entry')
-        icons[i+1] = {1033: data}
-        group.extend(struct.pack('<BBBBHHIH', width, height, colors, res, planes, bits, size, i+1))
-    tree = {3: icons, 14: {1: {1033: bytes(group)}}, 16: {1: {1033: version_info()}}, 24: {1: {1033: (ROOT/'assets/app.manifest').read_bytes()}}}
+    groups = {}
+    # Keep group order in sync with desktop icon resource IDs and the setup's
+    # zero-based shortcut icon indexes.
+    for group_id, name in enumerate(('Icon', 'Editor', 'Terminal'), 1):
+        icon = (ROOT / f'assets/Network_Toolkit_{name}.ico').read_bytes()
+        reserved, kind, count = struct.unpack_from('<HHH', icon)
+        if reserved or kind != 1 or not 1 <= count <= 30:
+            raise ValueError(f'Invalid {name} ICO')
+        group = bytearray(struct.pack('<HHH', 0, 1, count))
+        for i in range(count):
+            width, height, colors, res, planes, bits, size, offset = struct.unpack_from('<BBBBHHII', icon, 6 + i * 16)
+            data = icon[offset:offset+size]
+            if len(data) != size:
+                raise ValueError(f'Truncated {name} ICO entry')
+            icon_id = len(icons) + 1
+            icons[icon_id] = {1033: data}
+            group.extend(struct.pack('<BBBBHHIH', width, height, colors, res, planes, bits, size, icon_id))
+        groups[group_id] = {1033: bytes(group)}
+    tree = {3: icons, 14: groups, 16: {1: {1033: version_info()}}, 24: {1: {1033: (ROOT/'assets/app.manifest').read_bytes()}}}
     section = bytearray()
     leaves = []
 
