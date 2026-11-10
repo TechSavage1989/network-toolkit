@@ -565,6 +565,17 @@ Section "Uninstall"
     SetErrorLevel 2
     Abort
   ${EndIf}
+  ; Windows reports a delete as done while another program (a scanner) still
+  ; has the file open, and removes the name only when that program closes it.
+  ; Wait for the name to go, so the program folder can be removed below.
+  StrCpy $DeleteAttempts 0
+  wait_program_gone:
+  IfFileExists "$INSTDIR\${APP_FILENAME}" 0 remove_registration
+  IntOp $DeleteAttempts $DeleteAttempts + 1
+  ${If} $DeleteAttempts < 20
+    Sleep 250
+    Goto wait_program_gone
+  ${EndIf}
 
 remove_registration:
   ${If} $R7 == 1

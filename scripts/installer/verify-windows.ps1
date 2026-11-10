@@ -85,8 +85,13 @@ function Invoke-Uninstaller([string]$Path) {
         $id = $process.Id
         $deadline = [DateTime]::UtcNow.AddMinutes(2)
         do {
-            $children = @(Get-CimInstance Win32_Process -Filter "ParentProcessId=$id" -ErrorAction SilentlyContinue)
-            $running = -not $process.HasExited -or $children.Count -gt 0
+            # Read the launcher's state before listing its children: once it
+            # has exited, the copy it started already exists, so the listing
+            # cannot miss it. The other order can see no copy yet and then an
+            # exited launcher, and report "finished" while the copy still runs.
+            $exited = $process.HasExited
+            $children = @(Get-CimInstance Win32_Process -Filter "ParentProcessId=$id" -ErrorAction Stop)
+            $running = -not $exited -or $children.Count -gt 0
             if ($running) { Start-Sleep -Milliseconds 200 }
         } while ($running -and [DateTime]::UtcNow -lt $deadline)
         if ($running) { throw "$(Split-Path -Leaf $Path) did not finish within two minutes." }
@@ -94,16 +99,28 @@ function Invoke-Uninstaller([string]$Path) {
     } finally { $process.Dispose() }
 }
 
-# When uninstall leaves the program behind, say why: a process still using a
-# file in the folder, or an uninstaller that refused (it keeps its own key).
+# When uninstall leaves the program behind, say why: an uninstaller that
+# refused (it keeps its own key), an uninstaller copy that is still working, a
+# process still using a file in the folder, or a delete that Windows finishes
+# only when another program closes the file. The registration is read first,
+# before the slower process listings, so it describes the same moment as the
+# file check. The check fails in every case; the wait only names the cause.
 function Assert-UninstallFinished {
     if (-not (Test-Path -LiteralPath $installedExe)) { return }
+    $refused = Test-Path -LiteralPath $uninstallKey
+    $uninstallers = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+        $_.ExecutablePath -and $_.ExecutablePath -like '*\~nsu*'
+    } | ForEach-Object { '{0} ({1})' -f $_.Name, $_.ProcessId })
     $holders = @(Get-Process -ErrorAction SilentlyContinue | Where-Object {
         try { $_.Path -and $_.Path.StartsWith($installDir, [StringComparison]::OrdinalIgnoreCase) } catch { $false }
     } | ForEach-Object { '{0} ({1})' -f $_.ProcessName, $_.Id })
-    $refused = Test-Path -LiteralPath $uninstallKey
+    $watch = [Diagnostics.Stopwatch]::StartNew()
+    while ((Test-Path -LiteralPath $installedExe) -and $watch.Elapsed.TotalSeconds -lt 15) { Start-Sleep -Milliseconds 250 }
+    $later = "It disappeared about $([int]$watch.Elapsed.TotalMilliseconds) ms later."
+    if (Test-Path -LiteralPath $installedExe) { $later = 'It was still there 15 seconds later.' }
     throw ("Uninstall left $installedExe. Uninstall registration still present: $refused. " +
-        "Processes running from the install folder: $(if ($holders) { $holders -join ', ' } else { 'none' }).")
+        "Uninstaller copies still running: $(if ($uninstallers) { $uninstallers -join ', ' } else { 'none' }). " +
+        "Processes running from the install folder: $(if ($holders) { $holders -join ', ' } else { 'none' }). $later")
 }
 
 $setupFiles = @(Get-ChildItem -LiteralPath $ArtifactDirectory -Filter '*_Windows_x64_Setup.exe' -File)

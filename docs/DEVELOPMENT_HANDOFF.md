@@ -8,6 +8,10 @@ The Start a terminal card was built before `/api/status` answered, so it never s
 
 v1.21.37 and v1.21.38 were published and verified earlier the same day: tags at merge commits 45b4786 and a5c34d0, release runs 42758979504 and 42763002678 green, all seven assets of each matching GitHub's digests, and `github_release.py verify` reporting "Verified 1.21.37" and "Verified 1.21.38".
 
+v1.21.39 was published and verified: tag at merge commit e42b2c3, release run 42775425248 green (build, windows-setup, publish), all seven assets matching GitHub's digests, `github_release.py verify` reporting "Verified 1.21.39"; the stable channel still points at v1.21.34.
+
+After the merge, the main Checks run 42775425351 failed `windows-setup` at the last uninstall: `Network_Toolkit.exe` was still present although the uninstaller had exited 0 and removed its registration, with no process running from the install folder (the same job passed in the Release run and twice on the pull request). Two causes fit and both are fixed without a new version: `Invoke-Uninstaller` listed the launcher's children before reading whether the launcher had exited, so it could miss the working copy and check too early; and the uninstaller now waits up to five seconds for the program's name to disappear after a successful delete, because Windows completes a delete only when a scanner that still has the file open closes it (otherwise the empty program folder stayed behind). `Assert-UninstallFinished` now says which case it saw. The installer change ships with the next beta.
+
 Known limits: an older running app cannot read the protected Terminal record, so its "Separate terminal window" reports the workspace busy until that app restarts. The hosted setup check has no peer-send step. Windows-only parts (DPAPI record, foreground request) are compiled and vetted, and first run in hosted CI. Not yet seen on physical Windows.
 
 ---
