@@ -1,3 +1,8 @@
+## 1.21.40 Beta 1 - One set of settings and saved data for all three apps
+
+- The full Toolkit (portable or installed), the standalone Terminal and the standalone Text Editor share saved connections, saved passwords, trusted SSH keys, macros and settings; a change in one app appears in the others without restarting.
+- The first start brings together what each app had saved on its own and removes nothing. Setup and uninstall wait briefly when a scanner holds a program file.
+
 ## 1.21.39 Beta 1 - Standalone Text Editor and Terminal work together
 
 - Send to terminal and Send to Text Editor work between the standalone Text Editor and the standalone Terminal.
