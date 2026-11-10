@@ -24,6 +24,15 @@ Conclusions:
 2. **This hosted desktop can't test a default terminal.** Windows does not apply a default terminal choice for the built-in Administrator without Admin Approval Mode. Even selecting Microsoft's own Windows Terminal has no effect there.
 3. **A second account doesn't help.** A separate account inside that desktop does get its console handed off, but its OpenConsole and broker run as the desktop owner. The broker correctly refuses a different user.
 
+## Owner test on a physical Windows 11 PC (2026-11-10)
+
+The owner installed the side-loaded x64 test package from the "Windows default terminal test package" workflow (run 42750697252) and selected "Network Toolkit Default Terminal Experiment" as the default terminal. They reported that **both Command Prompt and Windows PowerShell opened in Network Toolkit**. Interactive typing has not yet been confirmed. This is the first evidence that the broker, Microsoft's OpenConsole handoff and the Network Toolkit renderer work together for a real user.
+
+Still needed before release:
+- Owner confirms typing works in both shells.
+- A trusted MSIX signer, for a public package that installs without trusting a test certificate.
+- Product integration: a packaged install path, a settings entry, and documentation of what changes when Network Toolkit is the default.
+
 ## What a valid test needs
 
 A standard (or UAC-filtered) user who owns their own interactive session, with Network Toolkit selected for that user. Options:
