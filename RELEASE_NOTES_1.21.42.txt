@@ -1,0 +1,14 @@
+Network Toolkit 1.21.42
+
+## What's New
+
+- Send to terminal in the standalone Text Editor and Send to Text Editor in the standalone Terminal no longer ask you to open the other app. If it is not open, it opens by itself and receives what you sent.
+- If the full Toolkit is already open, the text goes to its Terminal or Text Editor instead, and that window comes to the front.
+
+## Additional Details
+
+- The order is: the other standalone app if it is open, otherwise the open Toolkit window, otherwise the other standalone app is started.
+- Text sent to a terminal still goes through the Terminal's paste review and paste warnings, and nothing is connected or run for you. A newly opened Terminal has no session yet: connect one there, then choose Send to terminal again.
+- Only the text you chose is passed between the apps: no passwords, host keys or file paths.
+- Send to inside the full Toolkit window is unchanged. On Linux the Toolkit window does not receive text from the standalone apps.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.
