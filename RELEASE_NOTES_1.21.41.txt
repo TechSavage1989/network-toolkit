@@ -1,0 +1,16 @@
+Network Toolkit 1.21.41
+
+## What's New
+
+- Shared settings and saved data recover better when the settings file is lost: the apps bring back your saved connections from their safety copy and tell you what was recovered.
+- Delete app data stays deleted, also when it was run from an older copy of Network Toolkit.
+
+## Additional Details
+
+- A problem with the safety copy never stops your settings from being saved. The app saves, tells you once which file is the problem, and repairs the copy later.
+- A save that could not be written is tried again by itself, and a message stays until it works. If it still cannot be written when you close the app, you choose whether to try again, close anyway or keep the app open.
+- A standalone Terminal or Text Editor no longer refuses to save when the settings file and its safety copy are both gone. It writes what it holds, and the full Toolkit keeps its own saved targets and settings.
+- When the settings file is lost while an app is minimized, that app combines its list with the newer safety copy instead of writing over it.
+- The safety copy is tied to its data folder. A copy left behind by a deletion is ignored and removed at the next start.
+- Update every copy of Network Toolkit, portable and installed. Mixed with 1.21.40 or older, some of these protections do not apply.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.

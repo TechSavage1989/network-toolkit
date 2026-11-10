@@ -221,6 +221,48 @@ test('an older version saving to the data folder is reported once, and what was 
  assert.match(modals[0].body,/removed one of them in the older version on purpose, remove it again here/);
  assert(!/now share saved connections/.test(modals[0].body),'this is not the notice of the one-time move');
 });
+test('saved entries that came back after the settings file was lost are named',async()=>{
+ const h=harness(),{c,shared}=h;shared.loaded();
+ const modals=[];c.openModal=(title,body)=>{modals.push({title,body});};c.closeModal=()=>{};c.esc=value=>String(value).replace(/</g,'&lt;');
+ c.api=async()=>({revision:'r1',notices:[{id:'n7',kind:'recovered',source:'',items:['Core switch','<i>Edge</i>']},{id:'n8',kind:'limit',source:'terminal',items:['Saved sessions']}]});
+ await shared.poll();
+ assert.equal(modals.length,1);assert.equal(modals[0].title,'Saved entries were recovered');
+ assert(modals[0].body.includes('Core switch')&&modals[0].body.includes('&lt;i>Edge&lt;/i>')&&!modals[0].body.includes('<i>Edge'));
+ assert.match(modals[0].body,/The settings file of this data folder was missing/);
+ assert.match(modals[0].body,/these came back from it/);
+ assert.match(modals[0].body,/deleted the settings file on purpose to start over, remove what you do not want here/);
+ assert(!/now share saved connections/.test(modals[0].body)&&!/lists are full/.test(modals[0].body),'it is shown on its own, not as part of the one-time move');
+ // Together with entries an older version dropped, both are explained.
+ const both=harness();both.shared.loaded();
+ const seen=[];both.c.openModal=(title,body)=>{seen.push({title,body});};both.c.closeModal=()=>{};
+ both.c.api=async()=>({revision:'r1',notices:[{id:'n7',kind:'recovered',source:'',items:['Core switch']},{id:'n2',kind:'older-version',source:'',items:['Lab']}]});
+ await both.shared.poll();
+ assert.equal(seen[0].title,'Saved entries were put back');
+ assert.match(seen[0].body,/settings file of this data folder was missing/);assert.match(seen[0].body,/An older version of Network Toolkit saved its settings/);
+});
+test('a problem with the safety copy is told once, and the settings are said to be saved',async()=>{
+ const h=harness(),{c,shared}=h;shared.loaded();
+ const toasts=[];c.toast=(text,kind)=>toasts.push([kind,text]);
+ const problem='Network Toolkit could not read the safety copy of the saved lists (Network_Toolkit.saved-lists.json in the data folder). Your settings are saved.';
+ c.answers.push({revision:'r1',protectionProblem:problem},{revision:'r1',protectionProblem:problem},{revision:'r1'},{revision:'r1',protectionProblem:problem},{revision:'r1',protectionProblem:'Another file.'});
+ await shared.poll();await shared.poll();
+ assert.deepEqual(toasts,[['error',problem]],'told once, not with every refresh');
+ await shared.poll();await shared.poll();
+ assert.equal(toasts.length,2,'told again when it comes back after it was gone');
+ await shared.poll();
+ assert.deepEqual(toasts[2],['error','Another file.']);
+});
+test('entries put back after the safety copy could not be read for a while are named',async()=>{
+ const h=harness(),{c,shared}=h;shared.loaded();
+ const modals=[];c.openModal=(title,body)=>{modals.push({title,body});};c.closeModal=()=>{};c.esc=value=>String(value).replace(/</g,'&lt;');
+ c.api=async()=>({revision:'r1',notices:[{id:'n9',kind:'copy-unread',source:'',items:['Core switch','<i>Edge</i>']},{id:'n8',kind:'limit',source:'terminal',items:['Saved sessions']}]});
+ await shared.poll();
+ assert.equal(modals.length,1);assert.equal(modals[0].title,'Saved entries were put back');
+ assert(modals[0].body.includes('Core switch')&&modals[0].body.includes('&lt;i>Edge&lt;/i>'));
+ assert.match(modals[0].body,/safety copy of the saved lists could not be read for a while/);
+ assert.match(modals[0].body,/removed one of them on purpose in the meantime, remove it again here/);
+ assert(!/lists are full/.test(modals[0].body)&&!/An older version/.test(modals[0].body));
+});
 test('nothing is asked while the page is hidden, offline, closing or a detached window',async()=>{
  const {c,shared}=harness();
  for(const [set,reset] of [[()=>{c.document.visibilityState='hidden';},()=>{c.document.visibilityState='visible';}],[()=>{c.online=false;},()=>{c.online=true;}],[()=>{c.stateLoaded=false;},()=>{c.stateLoaded=true;}],[()=>{c.shutDown=true;},()=>{c.shutDown=false;}],[()=>{c.EDITOR_WINDOW=true;},()=>{c.EDITOR_WINDOW=false;}],[()=>{c.DETACHED_TERMINAL=true;},()=>{c.DETACHED_TERMINAL=false;}]]){

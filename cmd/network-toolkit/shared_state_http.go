@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"path/filepath"
+	"time"
 )
 
 // sharedSettingsPath is the settings file that holds the shared values: the
@@ -99,13 +100,25 @@ func (a *application) overlaySharedLocked(values map[string]any) {
 // the in-memory settings when another app changed that file. It reports
 // whether the shared values changed.
 func (a *application) absorbRootLocked(root *rootSettings, force bool) bool {
-	a.shared.older = root.older
+	a.shared.older, a.shared.behind = root.older, root.behind || root.rewrite
 	if !root.exists {
 		a.shared.lost = a.shared.lost || a.shared.had
 		if !force {
 			// The file is gone. That is not "another app removed everything":
 			// this app keeps what it holds, and its next save writes it again.
-			return false
+			// Where another app saved since this one last looked, the copy of
+			// the saved lists is newer than what this app holds, so the copy
+			// is taken in first.
+			changed := a.absorbCopyLocked(root)
+			// What this app holds is in no file: a file that appears was
+			// written by an app that could not know it.
+			a.shared.lost = a.shared.lost || a.shared.dirty
+			return changed
+		}
+		if root.recovered && len(root.members) > 0 {
+			// An app that starts without the file starts from the copy. Its
+			// first refresh writes the file again, and the user is told.
+			a.shared.recovering, a.shared.dirty, a.shared.lost = savedListNames(root.members), true, true
 		}
 	} else {
 		a.shared.had = true
@@ -116,18 +129,42 @@ func (a *application) absorbRootLocked(root *rootSettings, force bool) bool {
 	}
 	a.shared.seen = digest
 	values := root.shared(a.shared.keys())
-	if a.shared.lost && root.exists && !a.shared.standalone {
-		// The file went missing and another app has written it again. If that
-		// was a standalone app, the file lacks everything only the main window
-		// uses. A key that is absent is therefore kept as this window holds it
-		// (its next save writes it again), not read as removed.
-		held := a.sharedValuesLocked()
-		for _, key := range a.shared.keys() {
-			if _, present := root.members[key.Name]; key.MainOnly && !present {
-				if value, ok := held[key.Name]; ok {
-					values[key.Name] = value
-				}
+	if root.exists {
+		// The file was written anew when this app saw it missing (or holds
+		// values that were in no file while it was missing), or when the file
+		// carries another id than the one this app knew. Whoever wrote it
+		// could not know what this app holds (a main window that started with
+		// nothing writes empty lists), so nothing in it is read as removed:
+		// this app adds what it holds, and saves that with its next refresh.
+		// That happens once. What the file lacked is remembered per key
+		// (heldExtra) and stays pending until a save of this app has written
+		// it; from then on a later change of the file is read as it is, with
+		// only those pending values added. So a removal another app makes
+		// meanwhile is accepted, and nothing this app holds is dropped.
+		anew := a.shared.lost || root.lineage != "" && a.shared.lineage != "" && root.lineage != a.shared.lineage
+		// A standalone app that wrote the file anew notes that it left out
+		// what only the main window uses. Those keys are kept as held.
+		_, absent := root.members[sharedMainOnlyAbsentField]
+		if !force {
+			if anew {
+				a.shared.heldExtra = nil
 			}
+			if !anew {
+				a.keepExtraLocked(values)
+			}
+			if anew || absent {
+				a.keepHeldLocked(root, values, anew)
+			}
+			a.shared.dirty = len(a.shared.heldExtra) > 0
+			// The file changed: a save that failed before is tried at once.
+			a.shared.heldRetryAt = time.Time{}
+		}
+		a.shared.lost, a.shared.fromOlder, a.shared.recovering = false, root.stale(), nil
+		if _, marked := root.members[sharedWriterField]; marked {
+			// A file an older version wrote has no id; this version writes
+			// it again under the id it had. A file v1.21.40 wrote has none
+			// either, and the id that follows it is not compared.
+			a.shared.lineage = root.lineage
 		}
 	}
 	if !force && sharedRevision(a.sharedValuesLocked()) == sharedRevision(values) {
@@ -135,6 +172,189 @@ func (a *application) absorbRootLocked(root *rootSettings, force bool) bool {
 	}
 	a.overlaySharedLocked(values)
 	return true
+}
+
+// keepHeldLocked adds what this app holds to the values of a settings file
+// that was written anew: entries of lists and members of maps that the file
+// lacks, and single values as this app holds them. With everything false,
+// only keys of the main window that the file does not have at all are kept.
+func (a *application) keepHeldLocked(root *rootSettings, values map[string]any, everything bool) {
+	held := a.sharedValuesLocked()
+	for _, key := range a.shared.keys() {
+		mine, ok := held[key.Name]
+		if !ok {
+			continue
+		}
+		if _, present := root.members[key.Name]; !everything && (!key.MainOnly || present) {
+			continue
+		}
+		merged, err := mergeSharedKey(key, nil, values[key.Name], mine, true)
+		if err != nil || merged == nil || sharedEqual(merged, values[key.Name]) {
+			continue
+		}
+		if a.shared.heldExtra == nil {
+			a.shared.heldExtra = map[string]any{}
+		}
+		a.shared.heldExtra[key.Name] = sharedExtraOf(values[key.Name], merged)
+		values[key.Name] = merged
+		a.shared.dirty = true
+	}
+}
+
+// keepExtraLocked adds the values this app still holds beyond the settings
+// file (heldExtra) to the values of a file that changed meanwhile. A value
+// the file has by now is no longer pending.
+func (a *application) keepExtraLocked(values map[string]any) {
+	for name, extra := range a.shared.heldExtra {
+		key, ok := sharedKeyNamed(name)
+		if !ok {
+			delete(a.shared.heldExtra, name)
+			continue
+		}
+		merged, err := mergeSharedKey(key, nil, values[name], extra, true)
+		if err != nil || merged == nil {
+			continue
+		}
+		if sharedEqual(merged, values[name]) {
+			delete(a.shared.heldExtra, name)
+			continue
+		}
+		values[name] = merged
+	}
+}
+
+// sharedExtraOf returns what merged has beyond file: the entries of a list
+// that file lacks (by id, or by content for an entry without one), the
+// members of an object that file lacks or has differently, or the value.
+func sharedExtraOf(file, merged any) any {
+	switch all := merged.(type) {
+	case []any:
+		have, _ := file.([]any)
+		ids, contents := map[string]bool{}, map[string]bool{}
+		for _, entry := range have {
+			if item, ok := entry.(map[string]any); ok {
+				if id := sharedItemID(item); id != "" {
+					ids[id] = true
+				}
+			}
+			if _, raw, err := sharedCanonical(entry); err == nil {
+				contents[string(raw)] = true
+			}
+		}
+		extra := []any{}
+		for _, entry := range all {
+			if item, ok := entry.(map[string]any); ok {
+				if id := sharedItemID(item); id != "" && ids[id] {
+					continue
+				}
+			}
+			if _, raw, err := sharedCanonical(entry); err == nil && contents[string(raw)] {
+				continue
+			}
+			extra = append(extra, entry)
+		}
+		return extra
+	case map[string]any:
+		have, _ := file.(map[string]any)
+		extra := map[string]any{}
+		for name, value := range all {
+			if other, ok := have[name]; !ok || !sharedEqual(value, other) {
+				extra[name] = value
+			}
+		}
+		return extra
+	default:
+		return merged
+	}
+}
+
+// absorbCopyLocked is for a settings file that is missing while this app
+// runs. The copy of the saved lists is written before every save of the
+// file, so it is at least as new as the file this app last read: an entry
+// that another app removed or added since is removed or added here as well
+// (a merge of the copy with what this app holds, on the base of what its
+// page was last given). Only when what this app holds is in no file at all,
+// or came from a file of an older version (which does not write the copy),
+// is nothing removed. Without this, an app that had not refreshed would
+// write its older view over the newer copy.
+func (a *application) absorbCopyLocked(root *rootSettings) bool {
+	if root.copy == nil {
+		return false
+	}
+	keys := a.shared.keys()
+	held := a.sharedValuesLocked()
+	values := map[string]any{}
+	for name, value := range held {
+		values[name] = value
+	}
+	keepAll := a.shared.fromOlder || a.shared.dirty
+	changed := false
+	for _, key := range keys {
+		raw, ok := root.copy.Lists[key.Name]
+		if key.Kind != sharedList || key.MaxSaved == 0 || !ok {
+			if raw, ok = root.copy.MainOnly[key.Name]; !ok || !key.MainOnly {
+				continue
+			}
+		}
+		var theirs any
+		if json.Unmarshal(raw, &theirs) != nil || theirs == nil {
+			continue
+		}
+		merged, mine := theirs, held[key.Name]
+		if mine == nil && sharedValuesEmpty(map[string]any{key.Name: theirs}) {
+			continue // an empty list is what "no entries" already is here
+		}
+		if mine != nil {
+			base := a.shared.last[key.Name]
+			if keepAll {
+				base = nil
+			}
+			var err error
+			if merged, err = mergeSharedKey(key, base, theirs, mine, true); err != nil || merged == nil {
+				continue
+			}
+		}
+		if !sharedEqual(merged, mine) {
+			values[key.Name], changed = merged, true
+		}
+	}
+	if !changed {
+		return false
+	}
+	values = sharedSectionOf(values, keys)
+	if sharedRevision(values) == sharedRevision(held) {
+		return false
+	}
+	// What came from the copy is named in a notice once it is written.
+	before := map[string]int{}
+	for _, name := range savedEntryNames(held) {
+		before[name]++
+	}
+	for _, name := range savedEntryNames(values) {
+		if before[name] > 0 {
+			before[name]--
+		} else {
+			a.shared.recovering = append(a.shared.recovering, name)
+		}
+	}
+	a.shared.dirty = true
+	a.overlaySharedLocked(values)
+	return true
+}
+
+// savedEntryNames returns the names of all entries in the saved lists.
+func savedEntryNames(values map[string]any) []string {
+	var names []string
+	for _, key := range savedListKeys() {
+		list, _ := values[key.Name].([]any)
+		for _, entry := range list {
+			if item, ok := entry.(map[string]any); ok {
+				name, _ := item["name"].(string)
+				names = append(names, name)
+			}
+		}
+	}
+	return names
 }
 
 // noteReplacedStateLocked treats settings that were replaced outside this
@@ -189,6 +409,13 @@ func (a *application) loadSharedState() {
 			a.absorbRootLocked(root, true)
 		} else {
 			a.shared.seen, a.shared.older, a.shared.had = root.digest(), root.older, root.exists
+			a.shared.lineage, a.shared.fromOlder = root.lineage, root.stale()
+			if root.older {
+				// Its copy still has the id the file is written under next.
+				if kept := readSavedListsCopy(a.shared.root); kept != nil {
+					a.shared.lineage = kept.Pair
+				}
+			}
 		}
 	} else if a.shared.standalone && a.storageError == "" {
 		a.storageError = "Saved connections and settings could not be read: " + err.Error()
@@ -282,6 +509,9 @@ func (a *application) putState(w http.ResponseWriter, r *http.Request) {
 	}
 	// Vault config identity is native/backend-owned, never supplied by the renderer.
 	delete(state, credentialConfigIdentityField)
+	// Kept by the engine as well (shared_older_version.go).
+	delete(state, sharedMainOnlyAbsentField)
+	delete(state, sharedCopyBehindField)
 	for _, values := range []map[string]any{state, started} {
 		if err := validateSharedTypes(values); err != nil {
 			jsonError(w, http.StatusBadRequest, err.Error())
@@ -321,7 +551,11 @@ func (a *application) putState(w http.ResponseWriter, r *http.Request) {
 	ours := sharedSectionOf(state, keys)
 	// One transaction for every app of this data folder: read what is on
 	// disk, merge the page's changes into it and write the result.
-	release, lockErr := acquireSettingsLock(a.sharedRoot())
+	wait := sharedLockWait
+	if r.URL.Query().Get("closing") == "1" {
+		wait = sharedClosingLockWait
+	}
+	release, lockErr := acquireSettingsLockWait(a.sharedRoot(), wait)
 	if lockErr != nil {
 		jsonError(w, http.StatusConflict, lockErr.Error())
 		return
@@ -376,7 +610,9 @@ func (a *application) putState(w http.ResponseWriter, r *http.Request) {
 	}
 	sharedNameRevisionReset(state, base, theirs)
 	if err := reconcileTerminalDisplayNames(state, theirs); err != nil {
-		jsonError(w, http.StatusConflict, err.Error())
+		// Trying the same save again cannot work: the page is told so by the
+		// code and does not retry it.
+		jsonResponse(w, http.StatusConflict, map[string]string{"error": err.Error(), "code": "settings-reload-required"})
 		return
 	}
 	merged := sharedSectionOf(state, keys)
@@ -414,12 +650,12 @@ func (a *application) putState(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, 400, tooLarge)
 			return
 		}
-		if err = writeSharedSettings(a.dataPath, full); err != nil {
+		// What was written carries the id of the file in its mark.
+		if full, err = writeSharedSettings(a.dataPath, full, root.copyUnread); err != nil {
 			failed(err)
 			return
 		}
-		a.shared.seen, a.shared.older, a.shared.lost, a.shared.had = sha256.Sum256(full), false, false, true
-		a.shared.pendingPutBack = append(a.shared.pendingPutBack, sharedNamesWritten(full, root.putBack)...)
+		a.wroteSharedLocked(full, root, !root.exists)
 	} else {
 		// This window's own file: its preferences, the untouched copy from
 		// before sharing, and the identity its previous vault was bound to.
@@ -446,24 +682,23 @@ func (a *application) putState(w http.ResponseWriter, r *http.Request) {
 		}
 		// The main settings file is written when the shared values changed,
 		// when an older version wrote it last (so that what it dropped is on
-		// disk again), and when it is gone although this app holds values.
+		// disk again), when this app holds values the file does not have, and
+		// when it is gone although this app holds values.
 		changed := sharedRevision(merged) != sharedRevision(theirs)
-		if root.exists && (changed || root.older) || !root.exists && !sharedValuesEmpty(merged) {
-			if err := a.recreateRootLocked(root); err != nil {
-				jsonError(w, http.StatusConflict, err.Error())
-				return
-			}
+		if root.exists && (changed || root.stale() || root.rewrite || a.shared.dirty) || !root.exists && !sharedValuesEmpty(merged) {
+			recreated := !root.exists
+			a.recreateRootLocked(root)
 			next, err := root.encode(merged, keys)
 			if err != nil {
 				jsonError(w, 400, err.Error())
 				return
 			}
-			if err = writeSharedSettings(a.sharedSettingsPath(), next); err != nil {
+			written, err := writeSharedSettings(a.sharedSettingsPath(), next, root.copyUnread)
+			if err != nil {
 				failed(err)
 				return
 			}
-			a.shared.seen, a.shared.older, a.shared.lost, a.shared.had = sha256.Sum256(next), false, false, true
-			a.shared.pendingPutBack = append(a.shared.pendingPutBack, sharedNamesWritten(next, root.putBack)...)
+			a.wroteSharedLocked(written, root, recreated)
 		}
 		if err = writeAtomic(a.dataPath, ownRaw); err != nil {
 			failed(err)
@@ -542,8 +777,48 @@ func sharedValuesEmpty(values map[string]any) bool {
 // page): it reads the current values from disk, applies change and saves.
 // Callers hold stateMu.
 func (a *application) updateSharedLocked(change func(shared map[string]any) error) error {
+	return a.updateSharedWaitLocked(change, sharedLockWait)
+}
+
+// sharedHeldUnsaved starts the message shown while saveHeldLocked fails.
+const sharedHeldUnsaved = "Saved connections and settings this app holds could not be saved: "
+
+// saveHeldLocked saves the shared values this app holds beyond the settings
+// file (sharedData.dirty). A refresh calls it with stateMu held, so it waits
+// only a moment for another app. A failure is shown as the app's storage
+// error for as long as the values are pending, and the save is tried again:
+// after sharedHeldRetry, then after twice as long, up to once in
+// sharedHeldRetryMax, and at once when the settings file changes. The values
+// are never given up; a save of the page writes them as well.
+func (a *application) saveHeldLocked() {
+	now := time.Now()
+	if now.Before(a.shared.heldRetryAt) {
+		return
+	}
+	err := a.updateSharedWaitLocked(func(map[string]any) error { return nil }, sharedRefreshLockWait)
+	if err == nil && !a.shared.behind {
+		return // wroteSharedLocked has cleared the message and the retry
+	}
+	if err != nil {
+		a.storageError = sharedHeldUnsaved + err.Error()
+	}
+	// Also when the settings were saved but the copy of the saved lists
+	// still could not be brought up to date: that is tried again with the
+	// same growing wait, not with every refresh.
+	delay := sharedHeldRetry
+	for n := 0; n < a.shared.dirtyFailures && delay < sharedHeldRetryMax; n++ {
+		delay *= 2
+	}
+	if delay > sharedHeldRetryMax {
+		delay = sharedHeldRetryMax
+	}
+	a.shared.dirtyFailures++
+	a.shared.heldRetryAt = now.Add(delay)
+}
+
+func (a *application) updateSharedWaitLocked(change func(shared map[string]any) error, wait time.Duration) error {
 	a.ensureShared()
-	release, err := acquireSettingsLock(a.sharedRoot())
+	release, err := acquireSettingsLockWait(a.sharedRoot(), wait)
 	if err != nil {
 		return err
 	}
@@ -554,9 +829,8 @@ func (a *application) updateSharedLocked(change func(shared map[string]any) erro
 	}
 	a.noteReplacedStateLocked()
 	a.absorbRootLocked(root, false)
-	if err := a.recreateRootLocked(root); err != nil {
-		return err
-	}
+	recreated := !root.exists
+	a.recreateRootLocked(root)
 	keys := a.shared.keys()
 	shared := a.sharedValuesLocked()
 	if err := change(shared); err != nil {
@@ -572,21 +846,23 @@ func (a *application) updateSharedLocked(change func(shared map[string]any) erro
 				root.members[name] = raw
 			}
 		}
+		// This window writes what only it uses: nothing is absent any more.
+		delete(root.members, sharedMainOnlyAbsentField)
 		root.exists = true
 	}
 	next, err := root.encode(shared, keys)
 	if err != nil {
 		return err
 	}
-	if err := writeSharedSettings(a.sharedSettingsPath(), next); err != nil {
+	written, err := writeSharedSettings(a.sharedSettingsPath(), next, root.copyUnread)
+	if err != nil {
 		return err
 	}
-	a.shared.seen, a.shared.older, a.shared.had, a.shared.lost = sha256.Sum256(next), false, true, false
-	a.shared.pendingPutBack = append(a.shared.pendingPutBack, sharedNamesWritten(next, root.putBack)...)
+	a.wroteSharedLocked(written, root, recreated)
 	if a.shared.standalone {
 		a.overlaySharedLocked(shared)
 	} else {
-		a.setStateLocked(next)
+		a.setStateLocked(written)
 	}
 	return nil
 }
@@ -630,6 +906,12 @@ func (a *application) handleSharedData(w http.ResponseWriter, r *http.Request) {
 	}
 	a.stateMu.Lock()
 	a.syncSharedLocked()
+	if a.shared.dirty || a.shared.behind {
+		// This app holds values that are in no file (the settings file was
+		// lost, or written anew by an app that could not know them). They are
+		// saved now, not with the next change the user happens to make.
+		a.saveHeldLocked()
+	}
 	current := a.sharedValuesLocked()
 	revision := sharedRevision(current)
 	if known == "" {
@@ -640,6 +922,11 @@ func (a *application) handleSharedData(w http.ResponseWriter, r *http.Request) {
 	if known != revision {
 		a.shared.offered(current)
 		response["values"] = sharedLiveValues(current)
+	}
+	if problem := sharedProtectionProblem(a.shared.root); problem != "" {
+		// The settings are saved, but the copy that protects the saved lists
+		// (or its id file) could not be read or written: the page says which.
+		response["protectionProblem"] = problem
 	}
 	if a.shared.older {
 		// An older version, which does not merge, saved the settings file last

@@ -277,7 +277,34 @@ func copyStorageData(source, destination *storageRoot) ([]string, func(), error)
 		rollback()
 		return nil, nil, err
 	}
-	return paths, func() { sessionRollback(); rollback() }, nil
+	// The id that pairs the copy of the saved lists with the settings file
+	// is kept with the window states, which stay behind. It goes along, or
+	// the copy would count as left over from deleted data at the new place.
+	witnessRollback, err := copySavedListsWitness(source.path, destination.path)
+	if err != nil {
+		sessionRollback()
+		rollback()
+		return nil, nil, err
+	}
+	return paths, func() { witnessRollback(); sessionRollback(); rollback() }, nil
+}
+
+func copySavedListsWitness(source, destination string) (func(), error) {
+	// The id is protection, never a reason to refuse a move: when it cannot
+	// be read, is damaged, or cannot be written at the new place, the move
+	// goes on without it. The settings file that is moved carries the same
+	// id, so the next start at the new place writes it again
+	// (settleSavedListsCopy).
+	id, _, err := readSavedListsWitness(source)
+	if err != nil || id == "" || writeSavedListsWitness(destination, id) != nil {
+		return func() {}, nil
+	}
+	return func() {
+		path := savedListsWitnessPath(destination)
+		_ = os.Remove(path)
+		_ = os.Remove(filepath.Dir(path))
+		_ = os.Remove(filepath.Dir(filepath.Dir(path)))
+	}, nil
 }
 
 func collectStorageCopies(source *storageRoot) (copies []storageCopy, err error) {
@@ -437,7 +464,13 @@ func refreshStorageMigration(source, destination *storageRoot, migration *storag
 			return err
 		}
 	}
-	return refreshEditorSessions(source, destination)
+	if err := refreshEditorSessions(source, destination); err != nil {
+		return err
+	}
+	// The id beside the copy may have been written, or written anew, since
+	// the move was chosen; the copy itself was refreshed above.
+	_, err = copySavedListsWitness(source.path, destination.path)
+	return err
 }
 
 func replaceStorageCopy(parent *storageRoot, name string, raw []byte, expected [32]byte) error {

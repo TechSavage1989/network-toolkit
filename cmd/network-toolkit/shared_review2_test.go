@@ -146,12 +146,11 @@ func TestSharedMigrationFailedSettingsWriteIsNotRecordedAsHandled(t *testing.T) 
 	// The Terminal workspace also has a trusted host, so the known-hosts step
 	// has something to do and marks the marker as changed.
 	writeKnownHostFixture(t, workspace, knownHostFixtureEntry("edge.test:22", knownHostFixtureKey(t)))
-	// The settings write cannot be done in this run: the copy of the saved
-	// lists cannot be written (stands in for any failed write).
-	blocker := filepath.Join(root, savedListsFilename)
-	if err := os.Mkdir(blocker, 0700); err != nil {
-		t.Fatal(err)
-	}
+	// The settings write cannot be done in this run. (This used to be staged
+	// with a folder in the place of the copy of the saved lists; a problem
+	// with the copy no longer fails a save of the settings.)
+	writeRootSettingsFault = func(string) error { return errors.New("disk full") }
+	t.Cleanup(func() { writeRootSettingsFault = nil })
 	err := migrateSharedData(root)
 	if err == nil {
 		t.Fatal("expected the first run to report the failed settings write")
@@ -161,9 +160,7 @@ func TestSharedMigrationFailedSettingsWriteIsNotRecordedAsHandled(t *testing.T) 
 		t.Fatalf("unexpected: settings were written: %v", got)
 	}
 	// The obstacle goes away; the next start must complete the migration.
-	if err := os.Remove(blocker); err != nil {
-		t.Fatal(err)
-	}
+	writeRootSettingsFault = nil
 	if err := migrateSharedData(root); err != nil {
 		t.Fatalf("second run: %v", err)
 	}

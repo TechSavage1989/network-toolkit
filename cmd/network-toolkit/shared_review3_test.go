@@ -231,11 +231,13 @@ func TestSharedMissingFileAppStartedWithoutTheFileUsesTheCopy(t *testing.T) {
 	}
 }
 
-// Neither the settings file nor a usable copy: a standalone app does not
-// write a settings file without the main window's data. It says so; the main
-// window writes the file from what it holds, and then the standalone app's
-// save goes through.
-func TestSharedMissingFileAndCopyStandaloneRefusesAndMainRecreates(t *testing.T) {
+// Neither the settings file nor a usable copy. A standalone app used to
+// refuse to save then ("open the main window"); that left what it holds
+// nowhere but in its memory and was no help when the main window was not
+// running (shared_review4_test.go). It now writes what it holds and notes
+// that the main window's data is absent. What this test is about stays: the
+// main window's data is never lost, and the Terminal's change is saved.
+func TestSharedMissingFileAndCopyStandaloneWritesAndMainKeepsItsData(t *testing.T) {
 	for _, damage := range []string{"missing", "unreadable"} {
 		root := t.TempDir()
 		main := r3Seed(t, root)
@@ -247,31 +249,40 @@ func TestSharedMissingFileAndCopyStandaloneRefusesAndMainRecreates(t *testing.T)
 			t.Fatal(err)
 		}
 		terminal.add("terminalProfiles", sharedProfile("b", "B", "192.0.2.2"))
-		code, body := terminal.trySave()
-		if code != 409 || !strings.Contains(body, "Open the main Network Toolkit window") {
+		if code, body := terminal.trySave(); code != 200 {
 			t.Fatalf("%s copy: the Terminal's save: %d %s", damage, code, body)
 		}
-		if _, err := os.Stat(filepath.Join(root, appSettingsFilename)); !os.IsNotExist(err) {
-			t.Fatalf("%s copy: a settings file was written without the main window's data", damage)
+		d := r3Disk(t, root)
+		if _, noted := d[sharedMainOnlyAbsentField]; !noted || d["profiles"] != nil {
+			t.Fatalf("%s copy: the file the Terminal wrote does not say that main-window data is absent: %v", damage, d)
+		}
+		if strings.Contains(r3Copy(t, root), "not json") {
+			t.Fatalf("%s copy: the copy was not written again", damage)
 		}
 		terminal.app.stateMu.Lock()
 		err := terminal.app.updateSharedLocked(func(map[string]any) error { return nil })
 		terminal.app.stateMu.Unlock()
-		if err == nil {
-			t.Fatalf("%s copy: an engine-side save recreated the file", damage)
+		if err != nil {
+			t.Fatalf("%s copy: an engine-side save: %v", damage, err)
 		}
-		if _, err := terminal.app.ensureCredentialConfigIdentity(); err == nil {
-			t.Fatalf("%s copy: the vault identity was written into a new file", damage)
+		if _, err := terminal.app.ensureCredentialConfigIdentity(); err != nil {
+			t.Fatalf("%s copy: the vault identity: %v", damage, err)
 		}
 		main.state["activePage"] = "overview"
 		main.save()
-		d := r3Disk(t, root)
+		d = r3Disk(t, root)
 		if l, _ := d["profiles"].([]any); len(l) != 1 || d["savedResultFilters"] == nil {
 			t.Fatalf("%s copy: the main window did not write everything it holds: %v", damage, d["profiles"])
+		}
+		if _, noted := d[sharedMainOnlyAbsentField]; noted {
+			t.Fatalf("%s copy: the note stayed after the main window wrote its data", damage)
 		}
 		terminal.save()
 		if got := sharedDiskIDs(t, root, "terminalProfiles"); !sameIDs(got, "a", "b") {
 			t.Fatalf("%s copy: after the main window wrote the file: %v", damage, got)
+		}
+		if !strings.Contains(r3Copy(t, root), "target-1") {
+			t.Fatalf("%s copy: the copy lacks the main window's targets in the end: %s", damage, r3Copy(t, root))
 		}
 	}
 }

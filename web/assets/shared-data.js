@@ -234,6 +234,7 @@ async function poll(){
   if(!result||typeof result.revision!=='string'||asked!==saves)return false;
   if(Array.isArray(result.notices)&&result.notices.length)attempt(()=>noticeHandler?.(result.notices));
   if(result.olderVersion===true)olderVersion();
+  protectionProblem(typeof result.protectionProblem==='string'?result.protectionProblem:'');
   if(result.credentials!==undefined)credentialsChanged(result.credentials);
   if(!result.values){revision=result.revision;return false;}
   const next=normalize(result.values),changed=differing(next);
@@ -255,26 +256,39 @@ function olderVersion(){
  attempt(()=>{if(typeof toast==='function')toast('An older version of Network Toolkit is saving to this data folder. While it is open, changes you make here may be replaced by what it holds. Saved sessions and connections it drops are put back. Close that window and update it.','error');});
 }
 
+// The settings were saved, but the safety copy of the saved lists (or its id
+// file) could not be read or written. The engine says which file in plain
+// words. Said once for as long as the same problem lasts.
+let protectionTold='';
+function protectionProblem(text){
+ if(text===protectionTold)return;
+ protectionTold=text;
+ if(text)attempt(()=>{if(typeof toast==='function')toast(text,'error');});
+}
+
 // Things the user should know about shared data: what the one-time move
 // found (SSH hosts for which two apps had remembered different keys, lists
-// that were full), and saved entries that were put back after an older
-// version dropped them. Shown once, in plain words, when nothing else is
-// open; acknowledged notices do not return.
+// that were full), saved entries that were put back after an older version
+// dropped them, and saved entries that came back from the copy of the saved
+// lists after the settings file was lost. Shown once, in plain words, when
+// nothing else is open; acknowledged notices do not return.
 let noticeShown='';
 function showNotices(notices){
- const all=notices.filter(n=>n&&typeof n.id==='string'&&Array.isArray(n.items)&&n.items.length),older=all.filter(n=>n.kind==='older-version');
+ const all=notices.filter(n=>n&&typeof n.id==='string'&&Array.isArray(n.items)&&n.items.length),older=all.filter(n=>n.kind==='older-version'||n.kind==='recovered'||n.kind==='copy-unread');
  const list=(older.length?older:all).slice(0,8),key=list.map(n=>n.id).join(',');
  if(!list.length||key===noticeShown||busy()||typeof openModal!=='function')return;
  const names={terminal:'Terminal',editor:'Text Editor'},escape=typeof esc==='function'?esc:value=>String(value).replace(/[&<>"']/g,'');
  const parts=list.map(n=>{
   const app=names[n.source]||'other',items='<ul>'+n.items.slice(0,61).map(item=>'<li style="overflow-wrap:anywhere">'+escape(item)+'</li>').join('')+'</ul>';
   if(n.kind==='older-version')return '<p>An older version of Network Toolkit saved its settings over the shared ones. It can hold fewer saved entries and does not know what other apps saved meanwhile, so these were missing afterwards. They were put back:</p>'+items+'<p>If you removed one of them in the older version on purpose, remove it again here. Update every copy of Network Toolkit to avoid this.</p>';
+  if(n.kind==='copy-unread')return '<p>The safety copy of the saved lists could not be read for a while, so Network Toolkit saved your settings without it. It can be read again. These saved entries were in it but not in your settings, and were put back:</p>'+items+'<p>If you removed one of them on purpose in the meantime, remove it again here.</p>';
+  if(n.kind==='recovered')return '<p>The settings file of this data folder was missing. Network Toolkit keeps a second copy of its saved lists, and these came back from it:</p>'+items+'<p>If you had deleted the settings file on purpose to start over, remove what you do not want here. Preferences that are not part of that copy may be back at their defaults.</p>';
   if(n.kind==='hosts-added')return '<p>These SSH hosts were trusted only by the '+app+' window. They are trusted by every app now, also if you had removed one of them in another window. To stop trusting one, open the Saved sidebar of the Terminal, choose SSH host keys and remove it.</p>'+items;
   if(n.kind==='host-key-conflict')return '<p>For these SSH hosts the '+app+' window had remembered a different host key than the main window. The main window\'s key was kept and nothing else was changed. The next time you connect to one of them, compare the fingerprint that is shown with one you trust before you accept a changed key.</p>'+items;
   return '<p>Not everything the '+app+' window had saved could be added because these lists are full. Nothing was removed; remove entries you no longer need and the rest is added the next time the app starts.</p>'+items;
  });
  noticeShown=key;
- if(older.length)openModal('Saved entries were put back',parts.join(''),'<button class="btn primary" data-shared-notice-ok>OK</button>',true);
+ if(older.length)openModal(older.some(n=>n.kind!=='recovered')?'Saved entries were put back':'Saved entries were recovered',parts.join(''),'<button class="btn primary" data-shared-notice-ok>OK</button>',true);
  else openModal('Saved data is now shared','<p>Network Toolkit, its Terminal and its Text Editor now share saved connections, settings, trusted SSH host keys and macros.</p>'+parts.join(''),'<button class="btn primary" data-shared-notice-ok>OK</button>',true);
  const button=document.querySelector('[data-shared-notice-ok]');
  if(button)button.addEventListener('click',()=>{void api('/shared-data/notices','POST',{acknowledge:list.map(n=>n.id)}).catch(()=>{noticeShown='';});if(typeof closeModal==='function')closeModal();});
