@@ -7,7 +7,9 @@ Network Toolkit retains preferences, saved profiles, credentials in the credenti
 
 ## Windows installation and defaults
 
-Run `Network_Toolkit_<version>_Windows_x64_Setup.exe` from the project's releases page. Setup installs for your Windows account and creates Start menu shortcuts for Network Toolkit, Network Toolkit Text Editor and Network Toolkit Terminal. Close the app before running setup again or uninstalling. Uninstall from **Settings → Apps → Installed apps**. Setup and uninstall leave your saved profiles, credential vault, settings and documents in place.
+Run `Network_Toolkit_<version>_Windows_x64_Setup.exe` from the project's releases page. Choose a program folder on the first install and select **Create a desktop shortcut** if you want to launch Toolkit from the desktop. Setup installs for your Windows account and uses the same folder on upgrades.
+
+Open **Network Toolkit**, **Network Toolkit Text Editor**, or **Network Toolkit Terminal** from Start. Each shortcut has its own icon and opens its own window. The editor and terminal can run while the main Toolkit is closed. Close the app windows before running setup again or uninstalling. Uninstall from **Settings → Apps → Installed apps**. Setup and uninstall leave your saved profiles, credential vault, settings and documents in place.
 
 To use the editor when you double-click a text file, open **Settings → Apps → Default apps**, search for **Network Toolkit Text Editor**, and choose it for each extension you want. Setup registers `.txt`, `.log`, `.ini`, `.cfg` and `.conf`. The Terminal shortcut opens a standalone Network Toolkit Terminal window. Windows system-wide terminal selection is a separate integration.
 

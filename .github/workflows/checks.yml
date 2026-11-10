@@ -306,6 +306,7 @@ jobs:
         env:
           GOTOOLCHAIN: local
           NTK_EDITOR_LARGE_BROWSER: '1'
+          NTK_EDITOR_STANDALONE_FIXTURE: '1'
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results/large-editor
         run: go test -mod=vendor ./cmd/network-toolkit -run '^TestEditor(LargeFileBrowser|BrowserStorage)$' -count=1 -v -timeout=8m
