@@ -66,8 +66,8 @@ function create(host){
   const started=Date.now();
   const result=d.disk?await host.request(ENDPOINT+'/backup','POST',{source:'buffer',uid:d.uid,lease:host.lease(d)}):await host.request(ENDPOINT+'/backup','POST',{source:'text',text:d.content});
   if(!result||!/^[0-9a-f]{32}$/.test(result.id||''))throw Error('The engine did not confirm the kept copy.');
-  const ref={id:result.id,size:result.size,sha256:result.sha256},copied=d.disk?result.revision:revision,elapsed=Number(result.elapsedMs)||Date.now()-started;
-  d.sessionBackup={key,revision:copied,ref,next:Date.now()+Math.max(TICK_MS,elapsed*9)};
+  const ref={id:result.id,size:result.size,sha256:result.sha256},copied=d.disk?result.revision:revision,elapsed=Number.isFinite(result.elapsedMs)?result.elapsedMs:Date.now()-started;
+  d.sessionBackup={key,revision:copied,ref,next:Date.now()+elapsed*9};
   return {ref,stamp:settled&&copied===revision?stamp:null};
  }
 
@@ -166,7 +166,7 @@ function create(host){
  // open) and starts keeping the current tabs.
  function enable(){if(phase==='off'){root.clearTimeout(waiting);waiting=null;phase='ready';lastSignature='';lastIndex='';carried=[];startTimer();}}
  async function disable(){root.clearTimeout(waiting);waiting=null;phase='off';carried=[];lastIndex='';lastSignature='';await chain;await host.request(ENDPOINT,'DELETE');}
- function startTimer(){if(timer===null&&typeof root.setInterval==='function')timer=root.setInterval(tick,TICK_MS);}
+ function startTimer(){if(timer===null&&typeof root.setInterval==='function'){timer=root.setInterval(tick,TICK_MS);timer?.unref?.();}}
  // After a window close is committed nothing may overwrite the final session.
  function stop(){if(timer!==null)root.clearInterval(timer);timer=null;root.clearTimeout(waiting);waiting=null;phase='closed';}
  return Object.freeze({start,restore,save,tick,isKept,enable,disable,stop,get phase(){return phase;},get carried(){return carried.slice();},get busy(){return running>0;}});
