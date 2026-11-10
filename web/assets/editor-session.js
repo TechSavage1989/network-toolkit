@@ -93,7 +93,13 @@ function create(host){
   }
   for(const record of carried)if(tabs.length<TAB_LIMIT)tabs.push(record);
   const index=JSON.stringify({version:1,active,tabs});
-  if(index!==lastIndex){await host.request(ENDPOINT,'PUT',{version:1,active,tabs});lastIndex=index;}
+  if(index!==lastIndex){
+   // A refused index (for example a kept copy that was removed) makes every
+   // document write a fresh copy on the next attempt.
+   try{await host.request(ENDPOINT,'PUT',{version:1,active,tabs});}
+   catch(error){for(const row of rows)delete row.d.sessionBackup;throw error;}
+   lastIndex=index;
+  }
   for(const [d,stamp] of now)kept.set(d,stamp);
   lastSignature=stale?'':startSignature;
   const failed=rows.filter(row=>row.error);
@@ -138,7 +144,7 @@ function create(host){
    if(value.error&&!value.limit)notes.push('Could not reopen '+(record.kind==='local'?baseName(record.path):record.name)+': '+(value.error.message||value.error));
   });
   carried=carry;
-  if(limited)notes.push(limited+' unsaved tab(s) from the last session will reopen when fewer than 12 tabs are open.');
+  if(limited)notes.push(limited+' unsaved tab(s) from the last session did not fit in 12 tabs. Their text is kept and they reopen the next time the editor starts with fewer tabs open.');
   const userOpened=host.documents().some(d=>!restored.includes(d))||earlier.size>0;
   host.finishRestore({docs:restored,active:userOpened?null:activeDoc});
   phase='ready';lastSignature='';lastIndex='';startTimer();
@@ -165,7 +171,7 @@ function create(host){
  // Turning the preference back on restores nothing (the tabs are already
  // open) and starts keeping the current tabs.
  function enable(){if(phase==='off'){root.clearTimeout(waiting);waiting=null;phase='ready';lastSignature='';lastIndex='';carried=[];startTimer();}}
- async function disable(){root.clearTimeout(waiting);waiting=null;phase='off';carried=[];lastIndex='';lastSignature='';await chain;await host.request(ENDPOINT,'DELETE');}
+ async function disable(){root.clearTimeout(waiting);waiting=null;phase='off';carried=[];lastIndex='';lastSignature='';await chain;for(const d of host.documents())delete d.sessionBackup;await host.request(ENDPOINT,'DELETE');}
  function startTimer(){if(timer===null&&typeof root.setInterval==='function'){timer=root.setInterval(tick,TICK_MS);timer?.unref?.();}}
  // After a window close is committed nothing may overwrite the final session.
  function stop(){if(timer!==null)root.clearInterval(timer);timer=null;root.clearTimeout(waiting);waiting=null;phase='closed';}

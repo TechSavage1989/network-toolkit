@@ -92,7 +92,7 @@ test('restore keeps stored order, carries limited records and leaves the active 
  const keeper=session.create(host);assert.equal(await keeper.restore(),true);
  assert.deepEqual(host.finished.docs.map(d=>d.path),['C:\\a.txt','Untitled.txt']);assert.equal(host.finished.active.path,'Untitled.txt');
  assert.deepEqual(keeper.carried.map(r=>r.kind),['copy']);
- assert.match(host.messages.at(-1).text,/restored draft.*1 unsaved tab\(s\).*fewer than 12/);
+ assert.match(host.messages.at(-1).text,/restored draft.*1 unsaved tab\(s\).*did not fit in 12 tabs/);
  host.calls.length=0;await keeper.save();
  assert.deepEqual(host.calls.find(c=>c.method==='PUT').body.tabs.map(t=>t.kind),['local','untitled','copy'],'carried records stay in the session');
  const busy=[{id:'explorer',uid:'e',path:'C:\\explorer.txt',dirty:false,editRevision:1}],other=fakeHost(busy);other.session={version:1,active:0,tabs:[records[0]]};
