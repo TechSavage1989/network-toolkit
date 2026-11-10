@@ -97,6 +97,7 @@ type application struct {
 	editorLaunchInbox            editorLaunchInbox
 	editorLaunchAvailable        bool
 	editorLaunchReusable         bool
+	peer                         peerSendState // standalone Text Editor <-> Terminal text (peer_send.go)
 	windowLaunchMu               sync.Mutex
 	shutdownRequested            atomic.Bool
 	openTerminalWindow           func(context.Context, *terminalWindowPreset) (bool, error)
@@ -381,6 +382,7 @@ func main() {
 			return launchIndependentTerminal(ctx, rootDataDir, preset)
 		}
 	}
+	a.configurePeerSend(rootDataDir)
 	if runtime.GOOS == "windows" && !*noBrowser {
 		a.uiHost = "webview2"
 	}
@@ -643,6 +645,10 @@ func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	if strings.HasPrefix(r.URL.Path, peerInboundPrefix) {
+		a.servePeerInbound(w, r) // the other standalone app: activation token only
+		return
+	}
 	requestView := ""
 	requestEditorView := ""
 	activationRoute := a.windowMode == "terminal" && r.URL.Path == "/api/terminal-window" || a.editorLaunchReusable && r.URL.Path == editorLaunchEndpoint
@@ -693,6 +699,8 @@ func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		a.handleEditorViews(w, r)
 	case r.URL.Path == editorLaunchEndpoint && a.editorLaunchAvailable:
 		a.handleEditorLaunch(w, r, false)
+	case strings.HasPrefix(r.URL.Path, peerPagePrefix):
+		a.handlePeerSend(w, r)
 	case strings.HasPrefix(r.URL.Path, "/api/updates/"):
 		a.handleUpdates(w, r)
 	case r.URL.Path == "/api/activity":

@@ -1,0 +1,25 @@
+/* Standalone Text Editor and Terminal apps (standalone-apps.js). These rules
+   apply only inside those two apps; the main window and detached child
+   windows never get the body classes. */
+
+/* Text Editor: the diagnostics footer belongs to the Toolkit's main window. */
+body.standalone-editor .app-foot{display:none}
+
+/* Text Editor: "Open terminal" on a connected SFTP session would start a
+   terminal inside this app, which has no Terminal to show it in. The signed-in
+   connection cannot be handed to the Terminal app, so the action is hidden. */
+body.standalone-editor [data-rb-action="openTerminal"]{display:none!important}
+
+/* Text Editor: theme, window settings and help at the end of the status bar. */
+.standalone-app-tools{display:inline-flex;align-items:center;gap:4px;flex:0 0 auto;margin-left:auto}
+.standalone-app-tools .iconbtn{width:26px;height:22px;min-height:22px;padding:0}
+.standalone-app-tools .iconbtn svg{width:14px;height:14px}
+.standalone-app-tools .standalone-app-help{font-weight:700;font-size:12px;line-height:1}
+
+/* Terminal: these open the Toolkit's Text Editor or File Transfer tools, which
+   this app does not have. A remote file cannot be handed to another app, so
+   they are hidden; files still open in the Terminal's own floating editor. */
+body.standalone-terminal [data-tsftp="textEditor"],
+body.standalone-terminal [data-tsftp="full"],
+body.standalone-terminal .nt-editor [data-ed="localTools"],
+body.standalone-terminal .transfer-session-section{display:none!important}

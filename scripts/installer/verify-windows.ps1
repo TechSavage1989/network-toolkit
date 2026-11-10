@@ -69,10 +69,27 @@ function Get-ExecutableVersion([string]$Path) {
     [version]::new($info.FileMajorPart, $info.FileMinorPart, $info.FileBuildPart, $info.FilePrivatePart)
 }
 
-function Invoke-Silent([string]$Path, [int]$ExpectedExitCode = 0, [string]$Arguments = '/S') {
+# Silent setup and uninstall show no message; they leave the reason they
+# stopped in this log (replaced on every run, absent after a successful one).
+function Get-SetupLog {
+    $log = Join-Path ([IO.Path]::GetTempPath()) 'Network_Toolkit_Setup.log'
+    if (-not (Test-Path -LiteralPath $log -PathType Leaf)) { return '' }
+    return ([IO.File]::ReadAllText($log)).Trim()
+}
+
+# $ExpectedReason is a regular expression the logged reason must match.
+function Invoke-Silent([string]$Path, [int]$ExpectedExitCode = 0, [string]$Arguments = '/S', [string]$ExpectedReason = '') {
     $process = Start-Process -FilePath $Path -ArgumentList $Arguments -Wait -PassThru
     try {
-        Assert-Same $process.ExitCode $ExpectedExitCode "Exit code from $(Split-Path -Leaf $Path)"
+        $reason = Get-SetupLog
+        $run = "$(Split-Path -Leaf $Path) $Arguments"
+        if ($process.ExitCode -cne $ExpectedExitCode) {
+            throw "Exit code from $run was $($process.ExitCode), expected $ExpectedExitCode. Reason given: $(if ($reason) { $reason } else { 'none' })"
+        }
+        if ($ExpectedExitCode -eq 0 -and $reason) { throw "$run succeeded but left a reason: $reason" }
+        if ($ExpectedReason -and $reason -notmatch $ExpectedReason) {
+            throw "$run stopped for an unexpected reason. Expected one matching '$ExpectedReason', got: $(if ($reason) { $reason } else { 'none' })"
+        }
     } finally { $process.Dispose() }
 }
 
@@ -85,8 +102,13 @@ function Invoke-Uninstaller([string]$Path) {
         $id = $process.Id
         $deadline = [DateTime]::UtcNow.AddMinutes(2)
         do {
-            $children = @(Get-CimInstance Win32_Process -Filter "ParentProcessId=$id" -ErrorAction SilentlyContinue)
-            $running = -not $process.HasExited -or $children.Count -gt 0
+            # Read the launcher's state before listing its children: once it
+            # has exited, the copy it started already exists, so the listing
+            # cannot miss it. The other order can see no copy yet and then an
+            # exited launcher, and report "finished" while the copy still runs.
+            $exited = $process.HasExited
+            $children = @(Get-CimInstance Win32_Process -Filter "ParentProcessId=$id" -ErrorAction Stop)
+            $running = -not $exited -or $children.Count -gt 0
             if ($running) { Start-Sleep -Milliseconds 200 }
         } while ($running -and [DateTime]::UtcNow -lt $deadline)
         if ($running) { throw "$(Split-Path -Leaf $Path) did not finish within two minutes." }
@@ -94,16 +116,30 @@ function Invoke-Uninstaller([string]$Path) {
     } finally { $process.Dispose() }
 }
 
-# When uninstall leaves the program behind, say why: a process still using a
-# file in the folder, or an uninstaller that refused (it keeps its own key).
+# When uninstall leaves the program behind, say why: an uninstaller that
+# refused (it keeps its own key), an uninstaller copy that is still working, a
+# process still using a file in the folder, or a delete that Windows finishes
+# only when another program closes the file. The registration is read first,
+# before the slower process listings, so it describes the same moment as the
+# file check. The check fails in every case; the wait only names the cause.
 function Assert-UninstallFinished {
     if (-not (Test-Path -LiteralPath $installedExe)) { return }
+    $refused = Test-Path -LiteralPath $uninstallKey
+    $reason = Get-SetupLog
+    $uninstallers = @(Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | Where-Object {
+        $_.ExecutablePath -and $_.ExecutablePath -like '*\~nsu*'
+    } | ForEach-Object { '{0} ({1})' -f $_.Name, $_.ProcessId })
     $holders = @(Get-Process -ErrorAction SilentlyContinue | Where-Object {
         try { $_.Path -and $_.Path.StartsWith($installDir, [StringComparison]::OrdinalIgnoreCase) } catch { $false }
     } | ForEach-Object { '{0} ({1})' -f $_.ProcessName, $_.Id })
-    $refused = Test-Path -LiteralPath $uninstallKey
+    $watch = [Diagnostics.Stopwatch]::StartNew()
+    while ((Test-Path -LiteralPath $installedExe) -and $watch.Elapsed.TotalSeconds -lt 15) { Start-Sleep -Milliseconds 250 }
+    $later = "It disappeared about $([int]$watch.Elapsed.TotalMilliseconds) ms later."
+    if (Test-Path -LiteralPath $installedExe) { $later = 'It was still there 15 seconds later.' }
     throw ("Uninstall left $installedExe. Uninstall registration still present: $refused. " +
-        "Processes running from the install folder: $(if ($holders) { $holders -join ', ' } else { 'none' }).")
+        "Uninstaller copies still running: $(if ($uninstallers) { $uninstallers -join ', ' } else { 'none' }). " +
+        "Processes running from the install folder: $(if ($holders) { $holders -join ', ' } else { 'none' }). $later " +
+        "Reason given by the uninstaller: $(if ($reason) { $reason } else { 'none' }).")
 }
 
 $setupFiles = @(Get-ChildItem -LiteralPath $ArtifactDirectory -Filter '*_Windows_x64_Setup.exe' -File)
@@ -297,7 +333,7 @@ Write-Host 'Checking setup preserves files in an occupied custom folder.'
 $occupiedDir = Join-Path $env:RUNNER_TEMP 'Occupied Network Toolkit Install'
 New-Item -Path $occupiedDir -ItemType Directory | Out-Null
 Add-Fixture (Join-Path $occupiedDir 'Uninstall.exe') 'Unrelated program in a custom installation directory'
-Invoke-Silent $setup 2 "/S /D=$occupiedDir"
+Invoke-Silent $setup 2 "/S /D=$occupiedDir" 'without an existing Network Toolkit executable or uninstaller'
 Assert-Absent $uninstallKey
 Assert-Preserved
 
@@ -307,7 +343,7 @@ $junctionTarget = Join-Path $env:RUNNER_TEMP 'Physical Network Toolkit Fixture'
 New-Item -Path $junctionTarget -ItemType Directory | Out-Null
 New-Item -Path $junctionPath -ItemType Junction -Target $junctionTarget | Out-Null
 try {
-    Invoke-Silent $setup 2 "/S /D=$junctionPath\Nested"
+    Invoke-Silent $setup 2 "/S /D=$junctionPath\Nested" 'does not redirect to another location'
     Assert-Absent (Join-Path $junctionTarget 'Nested')
     Assert-Absent $uninstallKey
 } finally { [IO.Directory]::Delete($junctionPath) }
@@ -317,7 +353,7 @@ $lateFailureDir = Join-Path $env:RUNNER_TEMP 'Failed Network Toolkit Install'
 [IO.File]::WriteAllText($menu, 'Synthetic item occupying the Start menu folder')
 $blockedMenuHash = (Get-FileHash -LiteralPath $menu -Algorithm SHA256).Hash
 try {
-    Invoke-Silent $setup 2 "/S /D=$lateFailureDir"
+    Invoke-Silent $setup 2 "/S /D=$lateFailureDir" 'could not finish while creating the Start menu (folder|shortcuts)'
     Assert-Absent (Join-Path $lateFailureDir 'Network_Toolkit.exe')
     Assert-Absent (Join-Path $lateFailureDir 'Uninstall.exe')
     Assert-Absent $uninstallKey
@@ -375,12 +411,12 @@ Write-Host 'Checking install and uninstall leave a locked program intact.'
 $temporaryUninstaller = Join-Path $env:RUNNER_TEMP "ntk-uninstall-$([Guid]::NewGuid().ToString('N')).exe"
 $programLock = [IO.File]::Open($installedExe, 'Open', 'Read', 'Read')
 try {
-    Invoke-Silent $setup 2
+    Invoke-Silent $setup 2 '/S' 'could not finish while placing the program file \(Windows error (5|32)\)'
     Assert-Installed
     # NSIS normally relaunches from a temp copy, hiding the worker's exit code.
     # Run our own copy with _?= last and unquoted, including spaces in the path.
     Copy-Item -LiteralPath $uninstaller -Destination $temporaryUninstaller
-    Invoke-Silent $temporaryUninstaller 2 "/S _?=$installDir"
+    Invoke-Silent $temporaryUninstaller 2 "/S _?=$installDir" 'Close Network Toolkit and any separate Editor or Terminal windows before uninstalling'
     Assert-Installed
     Assert-Preserved
 } finally {
@@ -412,7 +448,7 @@ if ((Get-ExecutableVersion $newerExe) -le $expectedVersion) { throw 'The downgra
 $newerHash = (Get-FileHash -LiteralPath $newerExe -Algorithm SHA256).Hash
 $uninstallHash = (Get-FileHash -LiteralPath $uninstaller -Algorithm SHA256).Hash
 Copy-Item -LiteralPath $newerExe -Destination $installedExe
-Invoke-Silent $setup 2
+Invoke-Silent $setup 2 '/S' 'A newer version of Network Toolkit'
 Assert-Installed $newerHash
 Assert-Same (Get-FileHash -LiteralPath $uninstaller -Algorithm SHA256).Hash $uninstallHash 'Uninstaller after refused downgrade'
 Assert-Preserved

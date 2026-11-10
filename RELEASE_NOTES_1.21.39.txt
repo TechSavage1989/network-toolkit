@@ -1,0 +1,15 @@
+Network Toolkit 1.21.39
+
+## What's New
+
+- The standalone Text Editor and the standalone Terminal now send to each other: Send to terminal in the editor reaches the Terminal app's sessions, and Send to Text Editor in the Terminal puts output into the editor app.
+- The standalone Terminal's Start a terminal card now offers Command Prompt and PowerShell, as the full Toolkit does.
+- Each standalone app shows only its own commands, settings and help.
+
+## Additional Details
+
+- Text sent to a terminal still goes through the Terminal's paste review and paste warnings. If the other app is not open, the sending app offers to open it.
+- Only the Text Editor and Terminal installed for your Windows account and data folder can send to each other. Nothing but the text you chose is passed: no passwords, host keys or file paths.
+- The standalone Text Editor has its own small Window settings (theme, accent color) and theme, settings and help buttons in its status bar. Buttons that could not work in a standalone app, such as Full editor in the Terminal's file panel, are hidden.
+- The full Toolkit window is unchanged.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.

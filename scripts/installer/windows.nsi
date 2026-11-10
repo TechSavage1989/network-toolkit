@@ -65,9 +65,31 @@ Var NewMainShortcut
 Var NewEditorShortcut
 Var NewTerminalShortcut
 Var DeleteAttempts
+Var FailedStep
 Var NewSshScheme
 Var NewTelnetScheme
 Var NewSerialScheme
+
+; Silent setup and uninstall show no message. Leave the reason they stopped in
+; a small log, replaced on every run, so the hosted setup check and support can
+; read it. It holds the message only: no folder, file or user name.
+!define SETUP_LOG "$TEMP\Network_Toolkit_Setup.log"
+!macro LogSetupStop TEXT
+  ClearErrors
+  FileOpen $9 "${SETUP_LOG}" w
+  ${IfNot} ${Errors}
+    FileWrite $9 "${TEXT}$\r$\n"
+    FileClose $9
+  ${EndIf}
+  ClearErrors
+!macroend
+
+!macro StopSetup TEXT
+  !insertmacro LogSetupStop "${TEXT}"
+  MessageBox MB_OK|MB_ICONSTOP "${TEXT}" /SD IDOK
+  SetErrorLevel 2
+  Abort
+!macroend
 
 !macro AcquireSetupMutex
   ; Keep the handle alive until this setup or uninstall process exits.
@@ -75,10 +97,33 @@ Var NewSerialScheme
   Pop $1
   ${If} $0 == 0
   ${OrIf} $1 == 183
-    MessageBox MB_OK|MB_ICONSTOP "Another Network Toolkit setup or uninstall is already running." /SD IDOK
-    SetErrorLevel 2
-    Abort
+    !insertmacro StopSetup "Another Network Toolkit setup or uninstall is already running."
   ${EndIf}
+  Delete "${SETUP_LOG}"
+!macroend
+
+; Move a staged file into place ($R7 holds the MoveFileEx flags). A scanner can
+; hold a just-written file for a moment, so a sharing or access failure is
+; retried for about five seconds. Any other failure, such as an existing file
+; on a fresh setup, is final at once. $0 is 0 on failure and $1 the Windows error.
+!macro PlaceStagedFile SOURCE TARGET
+  StrCpy $DeleteAttempts 0
+  ${Do}
+    System::Call 'kernel32::MoveFileExW(w "${SOURCE}", w "${TARGET}", i $R7) i .r0 ?e'
+    Pop $1
+    ${If} $0 != 0
+      ${ExitDo}
+    ${EndIf}
+    ${If} $1 != 5
+    ${AndIf} $1 != 32
+      ${ExitDo}
+    ${EndIf}
+    IntOp $DeleteAttempts $DeleteAttempts + 1
+    ${If} $DeleteAttempts >= 20
+      ${ExitDo}
+    ${EndIf}
+    Sleep 250
+  ${Loop}
 !macroend
 
 ; Compare the filesystem's resolved directory to its ordinary long path.
@@ -155,15 +200,11 @@ Function un.onInit
   ReadRegStr $0 HKCU "${UNINSTALL_KEY}" "InstallLocation"
   ${If} $0 == ""
   ${OrIf} $0 != $INSTDIR
-    MessageBox MB_OK|MB_ICONSTOP "The uninstaller is outside the registered Network Toolkit folder." /SD IDOK
-    SetErrorLevel 2
-    Abort
+    !insertmacro StopSetup "The uninstaller is outside the registered Network Toolkit folder."
   ${EndIf}
   !insertmacro IsPhysicalDirectory "$INSTDIR"
   ${If} $R5 != 1
-    MessageBox MB_OK|MB_ICONSTOP "The registered Network Toolkit folder no longer points to its original location." /SD IDOK
-    SetErrorLevel 2
-    Abort
+    !insertmacro StopSetup "The registered Network Toolkit folder no longer points to its original location."
   ${EndIf}
 FunctionEnd
 
@@ -259,9 +300,7 @@ Function RefuseDowngrade
     ${If} $StagedApp != ""
       Delete "$StagedApp"
     ${EndIf}
-    MessageBox MB_OK|MB_ICONSTOP "A newer version of Network Toolkit ($0) is already installed. Use setup for that version or a later version." /SD IDOK
-    SetErrorLevel 2
-    Abort
+    !insertmacro StopSetup "A newer version of Network Toolkit ($0) is already installed. Use setup for that version or a later version."
   ${EndIf}
 FunctionEnd
 
@@ -363,10 +402,10 @@ Section "Network Toolkit"
   SectionIn RO
   Call ValidateInstallDirectory
   ${If} $R5 != ""
-    MessageBox MB_OK|MB_ICONSTOP "$R5" /SD IDOK
-    SetErrorLevel 2
-    Abort
+    !insertmacro StopSetup "$R5"
   ${EndIf}
+  ; $FailedStep names the step under way, for the log written at install_error.
+  StrCpy $FailedStep "creating the program folder"
   ClearErrors
   SetOutPath "$INSTDIR"
   IfErrors install_error
@@ -374,6 +413,7 @@ Section "Network Toolkit"
   ${If} $R5 != 1
     Goto install_error
   ${EndIf}
+  StrCpy $FailedStep "extracting the program"
   GetTempFileName $StagedApp "$INSTDIR"
   IfErrors install_error
   SetOverwrite try
@@ -383,6 +423,7 @@ Section "Network Toolkit"
   ; Replace the program on the same volume only after extraction succeeds.
   ; Windows rejects the move if the running program is still using the file.
   Call RefuseDowngrade
+  StrCpy $FailedStep "writing the uninstaller"
   ClearErrors
   GetTempFileName $StagedUninstaller "$INSTDIR"
   IfErrors install_error
@@ -393,19 +434,22 @@ Section "Network Toolkit"
   ${If} $RegisteredInstallDir != ""
     StrCpy $R7 0x9
   ${EndIf}
-  System::Call 'kernel32::MoveFileExW(w "$StagedApp", w "$INSTDIR\${APP_FILENAME}", i $R7) i .r0'
+  !insertmacro PlaceStagedFile "$StagedApp" "$INSTDIR\${APP_FILENAME}"
   ${If} $0 == 0
+    StrCpy $FailedStep "placing the program file (Windows error $1)"
     Goto install_error
   ${EndIf}
   StrCpy $StagedApp ""
   StrCpy $NewAppWritten 1
 
-  System::Call 'kernel32::MoveFileExW(w "$StagedUninstaller", w "$INSTDIR\Uninstall.exe", i $R7) i .r0'
+  !insertmacro PlaceStagedFile "$StagedUninstaller" "$INSTDIR\Uninstall.exe"
   ${If} $0 == 0
+    StrCpy $FailedStep "placing the uninstaller (Windows error $1)"
     Goto install_error
   ${EndIf}
   StrCpy $StagedUninstaller ""
   StrCpy $NewUninstallerWritten 1
+  StrCpy $FailedStep "registering the Text Editor"
   ClearErrors
   StrCpy $ShellRegistrationStarted 1
   WriteRegStr HKCU "${UNINSTALL_KEY}" "DisplayName" "${APP_NAME}"
@@ -426,6 +470,7 @@ Section "Network Toolkit"
   !insertmacro TextExtensions RegisterExtension
   WriteRegStr HKCU "Software\RegisteredApplications" "${EDITOR_NAME}" "${CAPABILITIES}"
   IfErrors install_error
+  StrCpy $FailedStep "registering terminal links"
   ; Probing reports a missing key through the error flag; probe every scheme
   ; first, then write and check the registration as one step.
   !insertmacro ProbeLinkScheme "ssh" $NewSshScheme
@@ -443,8 +488,10 @@ Section "Network Toolkit"
   !insertmacro RegisterLinkScheme "serial" "Serial Port Protocol" $NewSerialScheme
   WriteRegStr HKCU "Software\RegisteredApplications" "${TERMINAL_NAME}" "${TERMINAL_CAPABILITIES}"
   IfErrors install_error
+  StrCpy $FailedStep "creating the Start menu folder"
   CreateDirectory "$SMPROGRAMS\${APP_NAME}"
   IfErrors install_error
+  StrCpy $FailedStep "creating the Start menu shortcuts"
   !insertmacro CreateStartShortcut "$SMPROGRAMS\${APP_NAME}\${APP_NAME}.lnk" "" "" 0 $NewMainShortcut
   !insertmacro CreateStartShortcut "$SMPROGRAMS\${APP_NAME}\${EDITOR_NAME}.lnk" "${EDITOR_ARGS}" "--editor" 1 $NewEditorShortcut
   !insertmacro CreateStartShortcut "$SMPROGRAMS\${APP_NAME}\${APP_NAME} Terminal.lnk" "--terminal" "--terminal" 2 $NewTerminalShortcut
@@ -452,6 +499,7 @@ Section "Network Toolkit"
   Return
 
 install_error:
+  !insertmacro LogSetupStop "Setup could not finish while $FailedStep."
   ${If} $StagedApp != ""
     Delete "$StagedApp"
   ${EndIf}
@@ -511,9 +559,7 @@ SectionEnd
 
 Function .onInit
   ${IfNot} ${RunningX64}
-    MessageBox MB_OK|MB_ICONSTOP "This setup requires 64-bit Windows." /SD IDOK
-    SetErrorLevel 2
-    Abort
+    !insertmacro StopSetup "This setup requires 64-bit Windows."
   ${EndIf}
   SetShellVarContext current
   SetRegView 64
@@ -561,9 +607,18 @@ Section "Uninstall"
       Sleep 250
       Goto delete_program
     ${EndIf}
-    MessageBox MB_OK|MB_ICONSTOP "Close Network Toolkit and any separate Editor or Terminal windows before uninstalling." /SD IDOK
-    SetErrorLevel 2
-    Abort
+    !insertmacro StopSetup "Close Network Toolkit and any separate Editor or Terminal windows before uninstalling."
+  ${EndIf}
+  ; Windows reports a delete as done while another program (a scanner) still
+  ; has the file open, and removes the name only when that program closes it.
+  ; Wait for the name to go, so the program folder can be removed below.
+  StrCpy $DeleteAttempts 0
+  wait_program_gone:
+  IfFileExists "$INSTDIR\${APP_FILENAME}" 0 remove_registration
+  IntOp $DeleteAttempts $DeleteAttempts + 1
+  ${If} $DeleteAttempts < 20
+    Sleep 250
+    Goto wait_program_gone
   ${EndIf}
 
 remove_registration:

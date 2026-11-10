@@ -38,3 +38,28 @@ test('retained local startup dialog prevents background initial-pane assignment;
  context.terminalPanes[0]='cancelled';assert.equal(context.placeConnectedTerminal(context.terminalSessions.get('retry'),destination),-1);assert.equal(context.terminalPanes[0],'cancelled');
  context.form=null;context.terminalInitialPanesFilled=false;context.terminalPanes=['','','',''];context.processTerminalBatch({sessions:[],events:[],next:3});assert.equal(context.terminalInitialPanesFilled,true);assert.equal(context.terminalPanes[0],'cancelled');
 });
+
+test('the Start a terminal card gains Command Prompt and PowerShell when the app reports them after the card was built',()=>{
+ // The separate Terminal window (and the main window when Terminal is its startup page) builds the card before /api/status answers.
+ const {document:makeDocument}=require('./terminal-dom-fixture.cjs');
+ const types=card=>card.querySelectorAll('[data-terminal-new-type]').map(button=>button.getAttribute('data-terminal-new-type'));
+ function page(detached=false){
+  const document=makeDocument('<div data-terminal-welcome="0"></div><div data-terminal-welcome="1"></div>');
+  const c={status:{},document,DETACHED_TERMINAL:detached,DETACHED_WORKSPACE:false,TERMINAL_ONLY:true,esc:String,icon:()=>'',$:(selector,root=document)=>root.querySelector(selector),$$:(selector,root=document)=>root.querySelectorAll(selector)};
+  vm.createContext(c);vm.runInContext('let terminalWelcomeShells=null;',c);
+  for(const name of ['terminalConnectionButtonsHTML','terminalWelcomeHTML','refreshTerminalWelcome']){const line=html.split('\n').find(s=>s.startsWith('function '+name+'('));assert(line,name);vm.runInContext(line,c);}
+  const cards=document.querySelectorAll('[data-terminal-welcome]');cards.forEach((card,index)=>{card.innerHTML=c.terminalWelcomeHTML(index);});
+  return {c,cards,document};
+ }
+ const h=page();
+ for(const card of h.cards)assert.deepEqual(types(card),['ssh','telnet','serial'],'built before the app answered');
+ h.c.refreshTerminalWelcome();for(const card of h.cards)assert.deepEqual(types(card),['ssh','telnet','serial'],'nothing to add yet');
+ h.c.status={localShellAvailable:true};h.c.refreshTerminalWelcome();
+ for(const [index,card] of h.cards.entries()){assert.deepEqual(types(card),['ssh','telnet','serial','cmd','powershell']);assert.equal(card.querySelector('[data-terminal-new-type="cmd"]').getAttribute('data-terminal-new-pane'),String(index),'each pane keeps its own buttons');assert.match(card.textContent,/or start a local Windows shell/);}
+ // Once in step, the card is left alone (no rebuild on every render).
+ const kept=h.cards[0].querySelector('[data-terminal-new-type="ssh"]');h.c.refreshTerminalWelcome();assert.equal(h.cards[0].querySelector('[data-terminal-new-type="ssh"]'),kept);
+ // If local shells stop being available, they are withdrawn again.
+ h.c.status={localShellAvailable:false};h.c.refreshTerminalWelcome();for(const card of h.cards)assert.deepEqual(types(card),['ssh','telnet','serial']);
+ // A window that shows one linked session has no Start buttons to add.
+ const linked=page(true);linked.c.status={localShellAvailable:true};linked.c.refreshTerminalWelcome();for(const card of linked.cards)assert.deepEqual(types(card),[]);
+});

@@ -68,6 +68,21 @@ Drag a Saved session to reorder the list (or focus it and press Alt+Shift+Up or 
 ## Console output tools
 The console bar under a session offers Last command and Last batch. Last command is the output of the most recent single command; Last batch is the output of the most recent command batch, whether it came from a paste, a macro, a startup macro or the Run commands box. Select output, Copy output and **Send to Text Editor** (the document-with-arrow button) use the chosen block, Include commands adds the command lines, and the arrows jump to the block's start or end. Macro output is filled in from the run's verified capture when the run finishes, so it contains only lines the device actually received. **Send to Text Editor** (also in the right-click menu) sends that output, or the text you selected in the terminal, to the Text Editor: pick a new document or an open one, and for an open one choose where it goes (by default you click the spot in the document and choose **Insert here**). When many tabs are open, scroll the tab row with the mouse wheel or the arrow buttons at its right end.
 
+## The Terminal app
+With the Windows setup installed, **Network Toolkit Terminal** in the Start menu opens the Terminal in its own window, without the rest of the Toolkit. It is also the window that **Separate terminal window** opens. It contains what belongs to the Terminal: SSH, Telnet and serial sessions, **Command Prompt and PowerShell** tabs (with a starting folder and **Run as administrator**, exactly as in the main Toolkit window), tabs and panes, saved and recent connections, the password manager, SSH host keys, macros, Terminal settings, the SFTP sidebar for SSH sessions with its floating editor, and **Send to Text Editor**.
+
+Actions that open another Toolkit tool are not shown there: **Open Text Editor** in a tab's menu, and **Editor** and **Expand** in the SFTP sidebar. Remote files still open in the Terminal's own floating editor with **Edit**. Theme, **Window settings** and help (?) are at the bottom of the sidebar's icon strip. Command search (Ctrl+Shift+P) and the F1 help list only Terminal commands.
+
+### Send output to the Text Editor app
+In the Terminal app, **Send to Text Editor** (the document-with-arrow button under the console, **Send output to Text Editor…** in a tab's menu, or **Send to Text Editor…** in the right-click menu) sends to **Network Toolkit Text Editor**, the separate Text Editor app. The dialog is the same: choose the last command or batch output or the selected text, then a new document or one of the documents open in the Text Editor app, and where it goes.
+
+- The Text Editor app comes forward with the text added as an ordinary edit: the document is marked unsaved and Undo removes it. For **A position I choose in the editor**, the Text Editor shows its **Insert here** bar and waits for you.
+- If the Text Editor app is not open, it is opened for you and the text goes into a new document.
+- Up to 8 MiB of text can be sent at a time.
+- If a dialog is open in the Text Editor, the text is refused instead of replacing it. Close the dialog and send again.
+
+Text sent from the Text Editor app with **Send to terminal** arrives here through the normal paste path: it is entered in the session you chose there, and text with line breaks opens the paste review first when **Review multi-line paste** is on. Only the text you send travels between the two apps. Passwords, saved connections, host keys and terminal output you did not send are never shared, and nothing leaves this computer. Both apps must use the same data folder, which they do when installed with setup. In the main Toolkit window **Send to Text Editor** works as before, inside that window.
+
 ## Macros
 Use the Macros library only for commands you are authorized to send. Review command targets and content before running macros in multiple sessions. Preferences, profiles, histories and active sessions must be preserved through upgrades.
 

@@ -34,6 +34,12 @@ var terminalWindowNow = time.Now
 
 // This is deliberately a separate schema from ConnectRequest. Window launch
 // can carry only connection settings, never authentication or terminal input.
+// Peer send (peer_send.go) is a second, separate capability and never travels
+// in a launch request. It carries text only, only between the standalone Text
+// Editor and the standalone Terminal of one data root, found through the
+// protected instance record. Text for a session always goes through the
+// Terminal page's paste path (review, warnings, limits); it never carries
+// authentication either.
 type terminalWindowPreset struct {
 	ProfileID          string `json:"profileId,omitempty"`
 	Type               string `json:"type"`
@@ -414,17 +420,21 @@ func readTerminalWindowInstance(dir string) (terminalWindowInstance, error) {
 	return readWorkspaceWindowInstance(dir, false)
 }
 
-func readWorkspaceWindowInstance(dir string, editor bool) (terminalWindowInstance, error) {
+// readWorkspaceWindowInstance reads a workspace's instance record. With strict
+// set the record must be protected where the platform protects it (Windows).
+// Without it, a plain record written by an older Terminal is still accepted,
+// only so that Terminal keeps receiving window launches (workspace_instance.go).
+func readWorkspaceWindowInstance(dir string, strict bool) (terminalWindowInstance, error) {
 	var record terminalWindowInstance
 	b, err := readBoundedRegularFile(filepath.Join(dir, terminalInstanceFilename), 4096)
 	if err != nil {
 		return record, err
 	}
-	if editor && runtime.GOOS == "windows" {
-		b, err = unprotectCredentialBlob(b)
-		if err != nil {
-			return record, err
-		}
+	b, protected, err := workspaceInstanceGuard.open(b, !strict)
+	if err != nil {
+		return record, err
+	}
+	if protected {
 		defer clear(b)
 	}
 	dec := json.NewDecoder(bytes.NewReader(b))
@@ -552,8 +562,12 @@ func (a *application) registerTerminalWindow(dir string) (func(), error) {
 }
 
 func (a *application) registerWorkspaceWindow(dir string) (func(), error) {
-	// The persisted instance record can only raise this window and supply a
-	// nonsecret connection preset. It must never contain the general API token.
+	// The persisted instance record holds the window activation token, never
+	// the general API token. That token can do two things only: raise this
+	// window with a launch request (a nonsecret connection preset or a file to
+	// open), and, in the standalone Text Editor and Terminal, reach the peer
+	// send routes that pass text between those two apps (peer_send.go). It
+	// cannot read settings, credentials, host keys, files or sessions.
 	if a.windowActivationToken == "" {
 		return nil, errors.New("The window activation capability is unavailable.")
 	}
@@ -563,17 +577,13 @@ func (a *application) registerWorkspaceWindow(dir string) (func(), error) {
 		return nil, err
 	}
 	b = append(b, '\n')
-	editor := a.windowMode != "terminal"
-	if editor && runtime.GOOS == "windows" {
-		// The selected app-data folder may be shared. Only this Windows user
-		// can recover the loopback endpoint and its restricted activation token.
-		protected, err := protectCredentialBlob(b)
-		clear(b)
-		if err != nil {
-			return nil, errors.New("The editor activation capability could not be protected.")
-		}
-		b = protected
+	// The selected app-data folder may be shared. On Windows only this user can
+	// recover the loopback endpoint and its restricted activation token; this
+	// includes the Terminal record, which older builds stored as plain JSON.
+	if b, err = workspaceInstanceGuard.seal(b); err != nil {
+		return nil, errors.New("The window activation capability could not be protected.")
 	}
+	editor := a.windowMode != "terminal"
 	path := filepath.Join(dir, terminalInstanceFilename)
 	if err = writeAtomic(path, b); err != nil {
 		return nil, fmt.Errorf("Save the workspace-window instance: %w", err)
