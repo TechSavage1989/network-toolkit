@@ -193,6 +193,11 @@ async function main() {
     report.phase = 'startup';
     await page.goto(url);
     await page.waitForFunction(() => window.NetworkToolkitEditorWindows?.bufferSupported());
+    if(process.env.NTK_EDITOR_STANDALONE_FIXTURE==='1'){
+      assert.equal(await page.locator('#sidebar').isVisible(),false);
+      await page.evaluate(()=>navigate('terminal'));
+      assert.equal(await page.evaluate(()=>state.activePage),'editor');
+    }
     const text = page.locator('.nt-editor-code textarea[data-ed-text]').first();
     await text.waitFor();
     await page.waitForFunction(({shellFile, shellText}) => {

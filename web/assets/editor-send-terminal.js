@@ -17,7 +17,7 @@ const MAX_BYTES=1024*1024;
 let pending=null,sequence=0,lastTarget='';
 const g=name=>{try{return root[name]??(typeof globalThis!=='undefined'?globalThis[name]:undefined);}catch{return undefined;}};
 function sessions(){try{return typeof terminalSessions!=='undefined'?terminalSessions:null;}catch{return null;}}
-function windowAllows(){try{if(typeof EDITOR_WINDOW!=='undefined'&&EDITOR_WINDOW)return 'Return this editor to the main window to send text to a terminal.';if(typeof DETACHED_TERMINAL!=='undefined'&&DETACHED_TERMINAL)return 'Open the main window to send text to a terminal.';}catch{}return sessions()?'':'The Terminal is not available in this window.';}
+function windowAllows(){try{if(typeof EDITOR_STANDALONE!=='undefined'&&EDITOR_STANDALONE)return 'Open the editor in Network Toolkit to send text to a terminal.';if(typeof EDITOR_WINDOW!=='undefined'&&EDITOR_WINDOW)return 'Return this editor to the main window to send text to a terminal.';if(typeof DETACHED_TERMINAL!=='undefined'&&DETACHED_TERMINAL)return 'Open the main window to send text to a terminal.';}catch{}return sessions()?'':'The Terminal is not available in this window.';}
 function shown(entry){try{return typeof terminalEntryShown!=='function'||terminalEntryShown(entry);}catch{return false;}}
 function owned(entry){try{return typeof terminalOwnerCanMutate!=='function'||terminalOwnerCanMutate(entry);}catch{return false;}}
 // Connected sessions displayed in this window, in tab order.

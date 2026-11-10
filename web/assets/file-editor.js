@@ -949,7 +949,7 @@ function click(ev){if(ev.target.closest?.('[data-ed-insert-cancel]')){ev.prevent
  case 'openLocalPath':case 'newLocalPath':void askLocalPath(el.dataset.ed==='newLocalPath');break;
  case 'split':openSplit();break;case 'files':root.NetworkToolkitEditorFiles?.toggle?.(overlay);break;
  case 'colors':{const panel=findEl('[data-ed-custom-palette]');if(panel)panel.hidden=!panel.hidden;break;}
- case 'sendTerminal':sendToTerminal();break;case 'close':{const docked=embedded;void closeAll().then(closed=>{if(closed&&docked&&typeof navigate==='function')navigate('local');});break;}case 'new':void newDocument();break;case 'browse':void openDesktopFile();break;case 'localTools':if(typeof navigate==='function'){navigate('editor');}break;case 'save':void save();break;case 'saveAs':void save(true);break;case 'reload':void reload();break;
+ case 'sendTerminal':sendToTerminal();break;case 'close':{if(typeof EDITOR_STANDALONE!=='undefined'&&EDITOR_STANDALONE){void root.__networkToolkitClose?.();break;}const docked=embedded;void closeAll().then(closed=>{if(closed&&docked&&typeof navigate==='function')navigate('local');});break;}case 'new':void newDocument();break;case 'browse':void openDesktopFile();break;case 'localTools':if(typeof navigate==='function'){navigate('editor');}break;case 'save':void save();break;case 'saveAs':void save(true);break;case 'reload':void reload();break;
  case 'undo':if(paneWorkspace())paneWorkspace().undo();else doUndo(current());break;case 'redo':if(paneWorkspace())paneWorkspace().undo(true);else doUndo(current(),true);break;
  case 'find':showFind=true;showReplace=false;draw();findEl('[data-ed-query]').focus();break;
  case 'replace':showFind=true;showReplace=true;draw();findEl('[data-ed-query]').focus();break;

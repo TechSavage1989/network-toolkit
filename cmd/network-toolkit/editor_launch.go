@@ -13,31 +13,37 @@ import (
 	"time"
 )
 
-const editorLaunchEndpoint = "/api/editor-launch"
+const (
+	editorLaunchEndpoint  = "/api/editor-launch"
+	standaloneEditorMode  = "editor-standalone"
+	standaloneEditorTitle = appName + " Text Editor"
+)
 
 type editorLaunchRequest struct {
 	Path string `json:"path,omitempty"`
 }
 
 type editorLaunchOptions struct {
-	show *bool
-	file *string
+	show       *bool
+	standalone *bool
+	file       *string
 }
 
 func registerEditorLaunchOptions(flags *flag.FlagSet) editorLaunchOptions {
 	return editorLaunchOptions{
-		show: flags.Bool("editor", false, "Open the Text Editor in the main workspace"),
-		file: flags.String("open-file", "", "Open a local file in Text Editor"),
+		show:       flags.Bool("editor", false, "Open the Text Editor in the main workspace"),
+		standalone: flags.Bool(standaloneEditorMode, false, "Open the independent Text Editor window"),
+		file:       flags.String("open-file", "", "Open a local file in Text Editor"),
 	}
 }
 
 func (o editorLaunchOptions) request(flags *flag.FlagSet, incompatible bool) (*editorLaunchRequest, error) {
 	openFileSet := false
 	flags.Visit(func(f *flag.Flag) { openFileSet = openFileSet || f.Name == "open-file" })
-	if !*o.show && !openFileSet {
+	if !*o.show && !*o.standalone && !openFileSet {
 		return nil, nil
 	}
-	if incompatible || flags.NArg() != 0 {
+	if incompatible || (*o.show && *o.standalone) || flags.NArg() != 0 {
 		return nil, errors.New("The Text Editor launch request cannot be combined with another application mode.")
 	}
 	request := &editorLaunchRequest{}
@@ -108,7 +114,7 @@ func checkedEditorLaunchPath(path string) (string, error) {
 	return path, nil
 }
 
-func prepareEditorWorkspace(root string, request *editorLaunchRequest) (release func(), reused bool, err error) {
+func prepareEditorWorkspace(root, mode string, request *editorLaunchRequest) (release func(), reused bool, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 8*time.Second)
 	defer cancel()
 	for {
@@ -122,8 +128,8 @@ func prepareEditorWorkspace(root string, request *editorLaunchRequest) (release 
 			return nil, false, nil
 		}
 		// Verify the process on loopback before sending the selected file path.
-		if activateWorkspaceWindow(ctx, root, "main", editorLaunchEndpoint, nil) == nil &&
-			activateWorkspaceWindow(ctx, root, "main", editorLaunchEndpoint, request) == nil {
+		if activateWorkspaceWindow(ctx, root, mode, editorLaunchEndpoint, nil) == nil &&
+			activateWorkspaceWindow(ctx, root, mode, editorLaunchEndpoint, request) == nil {
 			return nil, true, nil
 		}
 		select {

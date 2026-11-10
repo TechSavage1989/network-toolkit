@@ -464,7 +464,7 @@ func activateTerminalWindow(ctx context.Context, dir string, preset *terminalWin
 }
 
 func activateWorkspaceWindow(ctx context.Context, dir, mode, endpoint string, envelope any) error {
-	record, err := readWorkspaceWindowInstance(dir, mode == "main")
+	record, err := readWorkspaceWindowInstance(dir, mode != "terminal")
 	if err != nil {
 		return err
 	}
@@ -566,7 +566,7 @@ func (a *application) registerWorkspaceWindow(dir string) (func(), error) {
 		return nil, err
 	}
 	b = append(b, '\n')
-	editor := a.windowMode == "main"
+	editor := a.windowMode != "terminal"
 	if editor && runtime.GOOS == "windows" {
 		// The selected app-data folder may be shared. Only this Windows user
 		// can recover the loopback endpoint and its restricted activation token.
