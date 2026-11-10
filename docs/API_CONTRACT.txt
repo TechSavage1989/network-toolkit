@@ -1968,7 +1968,9 @@ POST /api/peer-send/send {session,text} | {target,where?,line?,label?,text}
      -> {requestId,state:"queued"|"starting",name,receiver,note?}. "starting":
      nothing was running; the engine starts the other standalone app and
      delivers this text itself (new documents only; terminal text needs a
-     session of a running receiver). A session or an open document is sent only
+     session of a running receiver). With no receiver listed, a send that names
+     a session or a document is refused (409). Text is delivered only to the
+     instance that was probed. A session or an open document is sent only
      to the receiver the last targets reply listed.
 GET  /api/peer-send/result?requestId= -> {state:starting|queued|taken|done|
      failed|expired|lost,outcome,name,message,local?}
