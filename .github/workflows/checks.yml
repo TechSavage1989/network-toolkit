@@ -318,6 +318,14 @@ jobs:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results/session-editor
         run: go test -mod=vendor ./cmd/network-toolkit -run '^TestEditorSessionBrowser$' -count=1 -v -timeout=5m
+      - name: Send text between the standalone Text Editor and Terminal through both real engines and pages
+        if: success() || failure()
+        env:
+          GOTOOLCHAIN: local
+          NTK_PEER_SEND_BROWSER: '1'
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results/standalone-peer
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestStandalonePeerSendBrowser$' -count=1 -v -timeout=5m
       - name: Restore Text Editor tabs and unsaved changes in the shipped page
         if: success() || failure()
         env:
@@ -704,6 +712,10 @@ jobs:
         env:
           GOTOOLCHAIN: local
         run: go test -mod=vendor ./cmd/network-toolkit -run '^Test(EditorLaunch(CLI|ReusesRegisteredWorkspace)|StandaloneEditorActivationAndPreferenceIsolation|MainEditorCloseApprovalOptIn)$' -count=1 -v
+      - name: Verify the DPAPI-protected Terminal instance record and peer send between the standalone apps
+        env:
+          GOTOOLCHAIN: local
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^Test(WindowsTerminalInstanceRecordUsesDPAPI|TerminalInstanceRecord|InstanceRecord|InstanceProtection|Peer)' -count=1 -v
       - name: Verify shared-terminal SFTP timeout and shell continuity on Windows
         env:
           GOTOOLCHAIN: local
@@ -1200,6 +1212,11 @@ jobs:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-security-browser-tests/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-tab-scroll-send-results
         run: node scripts/tab-scroll-send.browser.cjs
+      - name: Check sending between the standalone Text Editor and Terminal apps
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-security-browser-tests/node_modules/playwright
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-security-browser-results
+        run: node scripts/standalone-send.browser.cjs
       - name: Check credential UI boundaries with synthetic fixtures
         env:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-security-browser-tests/node_modules/playwright
@@ -1392,6 +1409,13 @@ jobs:
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results
           NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
         run: node scripts/terminal-tools-removed.browser.cjs
+      - name: Check each standalone app shows only its own tools and the Terminal keeps local shells
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-workflow107-tests/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-workflow107-results
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-workflow107-results
+        run: node scripts/standalone-apps.browser.cjs
       - name: Check highlighting on the Appearance tab with the pinned preview
         if: success() || failure()
         env:

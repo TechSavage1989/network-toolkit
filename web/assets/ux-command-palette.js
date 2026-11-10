@@ -44,8 +44,13 @@ function buttons(){
  }
  return out;
 }
+// The standalone Text Editor and Terminal apps list only their own commands
+// (standalone-apps.js). Opening "the tool" does nothing there, so tool entries
+// and former tool names are left out; the main window is unchanged.
+const standalone=()=>root.NetworkToolkitStandalone?.mode?.()?root.NetworkToolkitStandalone:null;
 function catalog(){
- const tools=[...doc.querySelectorAll('#navigation button[data-page]')].filter(btn=>allowedTool(btn.dataset.page)).map(btn=>{
+ const app=standalone();
+ const tools=app?[]:[...doc.querySelectorAll('#navigation button[data-page]')].filter(btn=>allowedTool(btn.dataset.page)).map(btn=>{
   const id=btn.dataset.page;const name=btn.querySelector('span:not(.badge)')?.textContent?.trim()||id;
   const keywords=navGroup(id)==='transfer'?'sftp ftp ftps tftp file transfer ssh file browser':navGroup(id)==='target'?'test a target device check ping trace route traceroute dns lookup tcp ports connection monitor device details':navGroup(id)==='web'?'test a website http check tls certificate https ssl':id==='local'?'local network adapters ipconfig routes arp connections wifi hosts file':id==='tftp'?'tftp file transfer':id==='quick'?'test a target device check':id==='trace'?'traceroute network hops':id;
   return {id:'tool-'+id,label:name,group:toolGroups[id]||'Tools',shortcut:shortcutLabels[id]||'',keywords,run:()=>{if(typeof root.navigate==='function')root.navigate(id);else if(typeof navigate==='function')navigate(id);}};
@@ -55,7 +60,7 @@ function catalog(){
  const listed=new Set(tools.map(item=>item.label.toLowerCase()));
  const go=page=>{if(typeof root.navigate==='function')root.navigate(page);else if(typeof navigate==='function')navigate(page);};
  for(const [page,label,keywords,parent] of [['quick','Device check','quick check name resolution reachability ports','Test a target'],['ping','Ping','icmp echo latency packet loss','Test a target'],['trace','Trace route','traceroute tracert network hops path','Test a target'],['dns','DNS lookup','dns records nslookup dig resolve','Test a target'],['tcp','TCP ports','port check scan open closed','Test a target'],['monitor','Connection monitor','continuous ping tcp chart uptime','Test a target'],['identify','Device details','mac address model vendor upnp hostname','Test a target'],['http','HTTP check','web request status headers redirects','Test a website'],['tls','TLS certificate','ssl https certificate expiry trust','Test a website'],['hosts','Hosts file','hosts file hostname mapping local network','Local network'],['sftp','SFTP','ssh file browser transfer','File Transfer'],['ftp','FTP / FTPS','ftps file transfer','File Transfer'],['tftp','TFTP','tftp file transfer firmware config backup','File Transfer']]){
-  if(!allowedTool(page)||listed.has(label.toLowerCase()))continue;
+  if(app||!allowedTool(page)||listed.has(label.toLowerCase()))continue;
   tools.push({id:'tool-alias-'+page,label,group:toolGroups[page]||'Tools',shortcut:shortcutLabels[page]||'',keywords:keywords+' '+parent.toLowerCase(),run:()=>{if(page==='sftp'&&typeof state!=='undefined')state.fileTransferProtocol='sftp';go(page);}});
  }
  const global=[
@@ -83,7 +88,7 @@ function catalog(){
    const btn=doc.querySelector('.nt-editor-tab [data-ed-tab-actions]');if(btn)btn.click();
   }}
  );
- return [...tools,...global,...buttons()];
+ return [...tools,...(app?app.commands(global):global),...buttons()];
 }
 function rank(item,words){
  const target=(item.label+' '+(item.keywords||'')+' '+item.group+' '+item.shortcut).toLowerCase();
@@ -128,7 +133,7 @@ function helpText(){
  ['File browser','F2','Rename selected file'],['File browser','Ctrl / Shift+click','Select multiple files'],
  ['Panels','Enter or Space on divider','Collapse or restore a sidebar'],
  ['Panels','Arrow keys on divider','Resize a panel']];
- return all;
+ return standalone()?.helpRows(all)||all;
 }
 function open(nextMode='commands'){
  if(overlay){if(mode===nextMode){input?.focus({preventScroll:true});return;}close();}
@@ -145,7 +150,8 @@ function open(nextMode='commands'){
   results=make('div','ux-command-results');results.id='uxCommandResults';results.setAttribute('role','listbox');input.addEventListener('input',()=>{selection=0;render();});
   dialog.append(input,results,make('footer','ux-command-footer','Arrow keys to choose • Enter to open • Esc to close'));
  }else{
-  const info=make('p','ux-help-intro','Use the menus and visible action buttons if you prefer not to use shortcuts. Terminal keystrokes are reserved for the connected device while its console is focused.');
+  const intro='Use the menus and visible action buttons if you prefer not to use shortcuts. Terminal keystrokes are reserved for the connected device while its console is focused.';
+  const info=make('p','ux-help-intro',standalone()?.helpIntro(intro)||intro);
   const list=make('div','ux-help-list');for(const [group,key,label] of helpText()){
    const row=make('div','ux-help-row');row.append(make('span','ux-help-description',group+' · '+label),make('kbd','',key));list.append(row);
   }
@@ -181,7 +187,7 @@ doc.addEventListener('keydown',event=>{
 // Capture before existing document handlers that own Editor tab gestures.
 root.addEventListener('click',event=>{
  if(event.target.closest?.('#uxCommandLauncher,#uxCommandLauncherNarrow')){event.preventDefault();open('commands');}
- else if(event.target.closest?.('#uxHelpLauncher,#uxTerminalHelpLauncher')){event.preventDefault();open('help');}
+ else if(event.target.closest?.('#uxHelpLauncher,#uxTerminalHelpLauncher,#uxEditorHelpLauncher')){event.preventDefault();open('help');}
  else if(event.target.closest?.('[data-ed-tab-actions]')){
   event.preventDefault();event.stopImmediatePropagation();
   const button=event.target.closest('[data-ed-tab-actions]');
