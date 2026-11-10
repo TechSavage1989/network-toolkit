@@ -7,9 +7,10 @@
  * Sending: this page asks its own engine (/api/peer-send/). The engine finds
  * the other app through that app's protected instance record and calls it on
  * this computer only. This page never sees the other app's token.
- * Receiving: this page reports what can take text (connected sessions, or open
- * document names) once a second and collects at most one waiting request. It
- * then runs the same code as a send inside one window:
+ * Receiving: this page asks its engine once a second (a GET) whether a request
+ * is waiting, and tells it what can take text (connected sessions, or open
+ * document names) when asked and whenever that changes. It collects at most
+ * one request at a time and runs the same code as a send inside one window:
  *   Terminal: NetworkToolkitEditorSendTerminal.deliver → the console's paste
  *     path (multi-line review, paste warnings, 1 MiB limit, bracketed paste).
  *   Text Editor: NetworkToolkitTerminalSendEditor.deliver → a new document, an
@@ -102,9 +103,16 @@ async function receive(request){
  try{await call('ack','POST',result?.ok?{requestId:request.requestId,ok:true,outcome:result.outcome}:{requestId:request.requestId,ok:false,error:String(result?.error||'The text was not accepted.').slice(0,280)});}catch{}
  finally{receiving=false;}
 }
+// The summary goes to this app's engine when the engine asks for it, on this
+// page's first poll, and afterwards only when it changes.
+let reported=null;
+async function report(force){const targets=summary(),json=JSON.stringify(targets);if(!force&&json===reported)return;await call('report','POST',{targets});reported=json;}
 async function poll(){
  if(polling||receiving||!mode||!live())return;polling=true;
- try{const reply=await call('inbox','POST',{targets:summary()});polling=false;if(reply?.request)await receive(reply.request);}
+ try{const reply=await call('inbox');
+  // An engine with peer send always answers with a "report" flag.
+  if(typeof reply?.report==='boolean')await report(reply.report||reported===null);
+  polling=false;if(reply?.request)await receive(reply.request);}
  catch{}finally{polling=false;}
 }
 function start(app){if(app!=='editor'&&app!=='terminal')return false;mode=app;if(started)return true;started=true;setInterval(()=>void poll(),1000);return true;}

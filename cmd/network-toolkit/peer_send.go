@@ -37,8 +37,9 @@ import (
 //   - The receiving engine accepts /api/peer/ only with its activation token,
 //     only from loopback, never from a page, and only queues the request. It
 //     holds at most one request, for at most a minute.
-//   - The receiving page collects the request on its one-second poll and runs
-//     the same code as a send inside one window: the Terminal's paste path
+//   - The receiving page polls its engine's inbox once a second (a GET) and
+//     reports what can receive text only when asked and when that changes. It
+//     collects the request and runs the same code as a send inside one window: the Terminal's paste path
 //     (paste review, paste warnings, bracketed paste, 1 MiB limit) or the
 //     editor's ordinary undoable insert.
 //
@@ -127,13 +128,14 @@ type peerRequest struct {
 }
 
 type peerSendState struct {
-	mu        sync.Mutex
-	root      string // data root shared by the standalone apps; empty elsewhere
-	targets   []peerTarget
-	targetsAt time.Time
-	request   *peerRequest
-	launchMu  sync.Mutex
-	launch    func(context.Context) error // tests start the other app in-process
+	mu       sync.Mutex
+	root     string       // data root shared by the standalone apps; empty elsewhere
+	targets  []peerTarget // what this app's page last reported; the page keeps it current
+	reported bool
+	polledAt time.Time // the page's latest inbox poll: proof that it is running
+	request  *peerRequest
+	launchMu sync.Mutex
+	launch   func(context.Context) error // tests start the other app in-process
 }
 
 func peerOf(mode string) string {
@@ -334,8 +336,10 @@ func (s *peerSendState) expireLocked(now time.Time) {
 	r.state, r.payload = peerExpired, nil
 }
 
+// freshTargetsLocked returns the page's summary while the page is known to be
+// running: it polls the inbox once a second and reports every change.
 func (s *peerSendState) freshTargetsLocked(now time.Time) ([]peerTarget, bool) {
-	if s.targetsAt.IsZero() || now.Sub(s.targetsAt) > peerTargetsFresh || now.Before(s.targetsAt) {
+	if !s.reported || s.polledAt.IsZero() || now.Sub(s.polledAt) > peerTargetsFresh || now.Before(s.polledAt) {
 		return nil, false
 	}
 	return s.targets, true
@@ -396,21 +400,31 @@ func (a *application) peerEnqueue(payload peerPayload) (int, error) {
 	return http.StatusOK, nil
 }
 
-// peerPoll records the page's current targets and hands over the queued
-// request, if any. The text leaves the engine's memory with it.
-func (a *application) peerPoll(targets []peerTarget) *peerPayload {
+// peerPoll is the page's one-second inbox poll. It hands over the queued
+// request, if any (the text leaves the engine's memory with it), and says
+// whether the engine still needs the page's summary of what can receive text.
+func (a *application) peerPoll() (payload *peerPayload, report bool) {
 	now := peerNow()
 	a.peer.mu.Lock()
 	defer a.peer.mu.Unlock()
-	a.peer.targets, a.peer.targetsAt = targets, now
+	a.peer.polledAt = now
 	a.peer.expireLocked(now)
+	report = !a.peer.reported
 	r := a.peer.request
 	if r == nil || r.state != peerQueued || r.payload == nil {
-		return nil
+		return nil, report
 	}
-	payload := r.payload
+	payload = r.payload
 	r.state, r.payload = peerTaken, nil
-	return payload
+	return payload, report
+}
+
+// peerReport stores the page's validated summary. The page sends it when the
+// engine asks for it and again whenever it changes.
+func (a *application) peerReport(targets []peerTarget) {
+	a.peer.mu.Lock()
+	defer a.peer.mu.Unlock()
+	a.peer.targets, a.peer.reported = targets, true
 }
 
 func (a *application) peerAcknowledge(id string, ok bool, outcome, message string) bool {
@@ -803,7 +817,7 @@ func (a *application) handlePeerSend(w http.ResponseWriter, r *http.Request) {
 	}
 	name := peerAppName(mode)
 	route := strings.TrimPrefix(r.URL.Path, peerPagePrefix)
-	method := map[string]string{"targets": http.MethodGet, "result": http.MethodGet, "open": http.MethodPost, "send": http.MethodPost, "inbox": http.MethodPost, "ack": http.MethodPost}[route]
+	method := map[string]string{"targets": http.MethodGet, "result": http.MethodGet, "open": http.MethodPost, "send": http.MethodPost, "inbox": http.MethodGet, "report": http.MethodPost, "ack": http.MethodPost}[route]
 	if method == "" {
 		http.NotFound(w, r)
 		return
@@ -888,6 +902,9 @@ func (a *application) handlePeerSend(w http.ResponseWriter, r *http.Request) {
 		}
 		jsonResponse(w, http.StatusOK, map[string]any{"requestId": id, "state": state, "outcome": outcome, "message": peerPlainText(reply.Message, peerMessageRunes)})
 	case "inbox":
+		request, report := a.peerPoll()
+		jsonResponse(w, http.StatusOK, map[string]any{"request": request, "report": report, "from": name})
+	case "report":
 		var report *struct {
 			Targets []peerTarget `json:"targets"`
 		}
@@ -904,7 +921,8 @@ func (a *application) handlePeerSend(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		jsonResponse(w, http.StatusOK, map[string]any{"request": a.peerPoll(targets), "from": name})
+		a.peerReport(targets)
+		jsonResponse(w, http.StatusOK, map[string]any{"ok": true})
 	case "ack":
 		var ack *struct {
 			RequestID string `json:"requestId"`

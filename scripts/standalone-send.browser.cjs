@@ -26,7 +26,7 @@ const clearToasts=()=>page.evaluate(()=>{document.querySelector('#toastStack').i
 
 async function open(mode){
  fixture={mode,saved:{activePage:mode==='terminal'?'terminal':'editor',appUpdatePreferences:{enabled:false},theme:'light',terminalInteraction:{pasteReview:true,copyOnSelect:false,rightClick:'menu'},terminalSidebarCollapsed:true},
-  targets:{app:mode==='terminal'?'editor':'terminal',name:mode==='terminal'?EDITOR:TERMINAL,running:false,ready:false,targets:[]},peerCalls:[],reports:[],inbox:[],acks:[],sends:[],opens:0,results:[],sendError:null,inputs:[],unexpected:[]};
+  targets:{app:mode==='terminal'?'editor':'terminal',name:mode==='terminal'?EDITOR:TERMINAL,running:false,ready:false,targets:[]},peerCalls:[],polls:0,reports:[],inbox:[],acks:[],sends:[],opens:0,results:[],sendError:null,inputs:[],unexpected:[]};
  const context=await browser.newContext({viewport:{width:1280,height:800},serviceWorkers:'block'});page=await context.newPage();page.setDefaultTimeout(15000);
  page.on('pageerror',error=>report.errors.push(mode+': '+error.message));
  const f=fixture;
@@ -39,7 +39,8 @@ async function open(mode){
     else if(p==='/api/peer-send/open'&&method==='POST'){f.opens++;f.targets={...f.targets,running:true};data={app:f.targets.app,name:f.targets.name,running:true,ready:f.targets.ready};}
     else if(p==='/api/peer-send/send'&&method==='POST'){f.sends.push(body());if(f.sendError){status=f.sendError.status;data={error:f.sendError.error};}else data={requestId:String(f.sends.length).padStart(32,'0'),state:'queued',name:f.targets.name};}
     else if(p==='/api/peer-send/result'&&method==='GET'){assert.match(url.searchParams.get('requestId')||'',/^[0-9]{32}$/);data={requestId:url.searchParams.get('requestId'),...(f.results.length>1?f.results.shift():f.results[0]||{state:'queued'})};}
-    else if(p==='/api/peer-send/inbox'&&method==='POST'){f.reports.push(body());data={request:f.inbox.shift()||null,from:f.targets.name};}
+    else if(p==='/api/peer-send/inbox'&&method==='GET'){f.polls++;data={request:f.inbox.shift()||null,report:!f.reports.length,from:f.targets.name};}
+    else if(p==='/api/peer-send/report'&&method==='POST'){f.reports.push(body());data={ok:true};}
     else if(p==='/api/peer-send/ack'&&method==='POST'){f.acks.push(body());data={ok:true};}
     else{f.unexpected.push(method+' '+p);status=404;data={error:'unexpected peer-send request'};}
     return route.fulfill({status,contentType:'application/json',body:JSON.stringify(data)});}
@@ -78,7 +79,9 @@ async function standaloneEditor(){
  const reported=await until(()=>f.reports.find(r=>r.targets.length===1),'the document summary');
  assert.deepEqual(Object.keys(reported).sort(),['targets']);assert.deepEqual(Object.keys(reported.targets[0]).sort(),['active','busy','id','name','unsaved']);
  assert.match(reported.targets[0].id,/^[0-9a-f-]{36}$/);assert.equal(reported.targets[0].name,'Untitled.txt');assert.equal(reported.targets[0].unsaved,true);assert.equal(JSON.stringify(reported).includes('show version'),false,'document text is never reported');
- pass('Text Editor: reports open document names (no text, no folders) to its own engine once a second');
+ // Nothing changed: the page keeps polling but does not report again.
+ {const reports=f.reports.length,polls=f.polls;await until(()=>f.polls>=polls+2,'two more polls');assert.equal(f.reports.length,reports,'an unchanged summary is not sent again');}
+ pass('Text Editor: reports open document names (no text, no folders) to its own engine when asked and when they change');
 
  // ---- The Terminal is not open ----
  await send.click();await page.locator('[data-editor-send-peer-missing]').waitFor();
@@ -182,7 +185,10 @@ async function standaloneTerminal(){
  // The page tells its own engine which sessions can take input.
  const reported=await until(()=>f.reports.find(r=>r.targets.length===2),'the session summary');
  assert.deepEqual(reported.targets,[{id:'s1',name:'lab-switch-01',type:'ssh',connected:true,active:true},{id:'s2',name:'lab-router-02',type:'telnet',connected:true,active:false}],'connected sessions only, as their tabs name them');
- pass('Terminal: reports the connected sessions (tab name and type only) to its own engine once a second');
+ {const reports=f.reports.length,polls=f.polls;await until(()=>f.polls>=polls+2,'two more polls');assert.equal(f.reports.length,reports,'an unchanged summary is not sent again');}
+ await page.evaluate(()=>selectTerminal('s2',true));await until(()=>f.reports.at(-1).targets.find(t=>t.id==='s2')?.active===true,'the changed summary');await page.evaluate(()=>selectTerminal('s1',true));
+ await until(()=>f.reports.at(-1).targets.find(t=>t.id==='s1')?.active===true,'the summary after switching back');
+ pass('Terminal: reports the connected sessions (tab name and type only) to its own engine when asked and when they change');
 
  // ---- Output to the Text Editor app ----
  await page.evaluate(()=>{window.receive=async text=>{const e=currentTerminal(),api=NetworkToolkitTerminalExtras,position=api.beforeOutput(e);api.observeOutput(e,text);await new Promise(r=>e.xterm.write(text,r));api.afterOutput(e,position);await api.flush(e);};currentTerminal().xterm.reset();});

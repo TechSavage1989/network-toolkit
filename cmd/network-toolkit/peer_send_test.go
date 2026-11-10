@@ -87,6 +87,15 @@ func peerPage(t *testing.T, a *application, method, path, body string) (int, map
 	return response.StatusCode, decoded, string(raw)
 }
 
+// peerPageTick is one tick of the app's page over HTTP: report, then poll.
+func peerPageTick(t *testing.T, a *application, report string) (int, map[string]any, string) {
+	t.Helper()
+	if code, _, raw := peerPage(t, a, http.MethodPost, "/api/peer-send/report", report); code != http.StatusOK {
+		t.Fatalf("page report refused: %d %s", code, raw)
+	}
+	return peerPage(t, a, http.MethodGet, "/api/peer-send/inbox", "")
+}
+
 // peerInbound is a request as the other app's engine would send it, straight
 // into ServeHTTP so headers and the remote address can be chosen.
 func peerInbound(a *application, method, path, body, token string, change func(*http.Request)) *httptest.ResponseRecorder {
@@ -106,11 +115,16 @@ func peerInbound(a *application, method, path, body, token string, change func(*
 	return w
 }
 
+// peerReport is one tick of the app's page: it reports what can receive text
+// and collects the waiting request, if any.
 func peerReport(t *testing.T, a *application, targets string) *peerPayload {
 	t.Helper()
-	r := requestApp(a, http.MethodPost, "/api/peer-send/inbox", `{"targets":`+targets+`}`, true)
-	if r.Code != http.StatusOK {
+	if r := requestApp(a, http.MethodPost, "/api/peer-send/report", `{"targets":`+targets+`}`, true); r.Code != http.StatusOK {
 		t.Fatalf("page report refused: %d %s", r.Code, r.Body)
+	}
+	r := requestApp(a, http.MethodGet, "/api/peer-send/inbox", "", true)
+	if r.Code != http.StatusOK {
+		t.Fatalf("page poll refused: %d %s", r.Code, r.Body)
 	}
 	var reply struct {
 		Request *peerPayload `json:"request"`
@@ -239,8 +253,18 @@ func TestPeerTerminalSendValidationLimitsAndSinglePendingRequest(t *testing.T) {
 	if r := peerInbound(a, http.MethodPost, send, body("s1", "show version", peerTestRequestID), token, nil); r.Code != http.StatusServiceUnavailable {
 		t.Fatalf("send before the page was ready: %d %s", r.Code, r.Body)
 	}
+	if r := requestApp(a, http.MethodGet, "/api/peer-send/inbox", "", true); !strings.Contains(r.Body.String(), `"report":true`) {
+		t.Fatalf("the engine did not ask its page for the sessions: %s", r.Body)
+	}
+	// A page that only polls has not said what can receive text yet.
+	if r := peerInbound(a, http.MethodPost, send, body("s1", "show version", peerTestRequestID), token, nil); r.Code != http.StatusServiceUnavailable {
+		t.Fatalf("send before the page reported: %d %s", r.Code, r.Body)
+	}
 	if got := peerReport(t, a, `[{"id":"s1","name":"lab-switch-01","type":"ssh","connected":true,"active":true},{"id":"s2","name":"closed","type":"telnet","connected":false}]`); got != nil {
 		t.Fatalf("unexpected request: %+v", got)
+	}
+	if r := requestApp(a, http.MethodGet, "/api/peer-send/inbox", "", true); !strings.Contains(r.Body.String(), `"report":false`) {
+		t.Fatalf("the engine asked again for an unchanged summary: %s", r.Body)
 	}
 	list := peerInbound(a, http.MethodGet, "/api/peer/terminal/sessions", "", token, nil)
 	var listed struct {
@@ -444,15 +468,22 @@ func TestPeerEditorInsertValidationAndDocumentSummaries(t *testing.T) {
 		"not a list":       `{"id":"x"}`,
 		"too many targets": "[" + strings.TrimSuffix(strings.Repeat(`{"id":"d","name":"n"},`, peerDocumentLimit+1), ",") + "]",
 	} {
-		if r := requestApp(a, http.MethodPost, "/api/peer-send/inbox", `{"targets":`+bad+`}`, true); r.Code != http.StatusBadRequest {
+		if r := requestApp(a, http.MethodPost, "/api/peer-send/report", `{"targets":`+bad+`}`, true); r.Code != http.StatusBadRequest {
 			t.Fatalf("summary %s: %d %s", name, r.Code, r.Body)
 		}
 	}
-	if r := requestApp(a, http.MethodPost, "/api/peer-send/inbox", `{"targets":[],"token":"x"}`, true); r.Code != http.StatusBadRequest {
+	if r := requestApp(a, http.MethodPost, "/api/peer-send/report", `{"targets":[],"token":"x"}`, true); r.Code != http.StatusBadRequest {
 		t.Fatalf("unknown field in the page report: %d", r.Code)
 	}
-	if r := requestApp(a, http.MethodGet, "/api/peer-send/inbox", "", true); r.Code != http.StatusMethodNotAllowed {
-		t.Fatalf("GET inbox: %d", r.Code)
+	if r := requestApp(a, http.MethodPost, "/api/peer-send/inbox", `{}`, true); r.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("POST inbox: %d", r.Code)
+	}
+	if r := requestApp(a, http.MethodGet, "/api/peer-send/report", "", true); r.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("GET report: %d", r.Code)
+	}
+	// The engine asks for the summary until the page has given it once.
+	if r := requestApp(a, http.MethodGet, "/api/peer-send/inbox", "", true); r.Code != http.StatusOK || !strings.Contains(r.Body.String(), `"report":true`) || !strings.Contains(r.Body.String(), `"request":null`) {
+		t.Fatalf("first poll: %d %s", r.Code, r.Body)
 	}
 	report := `[{"id":"` + uid + `","name":"C:\\Users\\operator\\Documents\\switch notes.txt","unsaved":true,"active":true},{"id":"busy-1","name":"/home/operator/loading.cfg","busy":true}]`
 	if got := peerReport(t, a, report); got != nil {
@@ -569,7 +600,7 @@ func TestPeerSendBetweenTwoStandaloneAppsOfOneDataRoot(t *testing.T) {
 		t.Fatalf("Terminal running but its page not ready: %d %s", code, raw)
 	}
 	clean("targets", raw)
-	if code, _, raw = peerPage(t, terminal, http.MethodPost, "/api/peer-send/inbox", `{"targets":[{"id":"s1","name":"lab-switch-01","type":"ssh","connected":true,"active":true},{"id":"s2","name":"COM3","type":"serial","connected":true}]}`); code != http.StatusOK || !strings.Contains(raw, `"request":null`) {
+	if code, _, raw = peerPageTick(t, terminal, `{"targets":[{"id":"s1","name":"lab-switch-01","type":"ssh","connected":true,"active":true},{"id":"s2","name":"COM3","type":"serial","connected":true}]}`); code != http.StatusOK || !strings.Contains(raw, `"request":null`) {
 		t.Fatalf("Terminal page report: %d %s", code, raw)
 	}
 	code, reply, raw = peerPage(t, editor, http.MethodGet, "/api/peer-send/targets", "")
@@ -613,7 +644,7 @@ func TestPeerSendBetweenTwoStandaloneAppsOfOneDataRoot(t *testing.T) {
 	if code, reply, raw = peerPage(t, editor, http.MethodGet, "/api/peer-send/result?requestId="+id, ""); code != http.StatusOK || reply["state"] != "queued" {
 		t.Fatalf("queued result: %d %s", code, raw)
 	}
-	code, reply, raw = peerPage(t, terminal, http.MethodPost, "/api/peer-send/inbox", `{"targets":[{"id":"s1","name":"lab-switch-01","type":"ssh","connected":true}]}`)
+	code, reply, raw = peerPageTick(t, terminal, `{"targets":[{"id":"s1","name":"lab-switch-01","type":"ssh","connected":true}]}`)
 	request, _ := reply["request"].(map[string]any)
 	if code != http.StatusOK || request["requestId"] != id || request["session"] != "s1" || request["text"] != commands || reply["from"] != "Network Toolkit Text Editor" {
 		t.Fatalf("Terminal page inbox: %d %s", code, raw)
@@ -636,7 +667,7 @@ func TestPeerSendBetweenTwoStandaloneAppsOfOneDataRoot(t *testing.T) {
 	// ---- Terminal -> Text Editor ----
 	const uid = "0b6f5d3e-8a55-4b0e-9f3c-2d1f0a6c7e11"
 	documents := `{"targets":[{"id":"` + uid + `","name":"notes.txt","unsaved":true,"active":true}]}`
-	if code, _, raw = peerPage(t, editor, http.MethodPost, "/api/peer-send/inbox", documents); code != http.StatusOK {
+	if code, _, raw = peerPageTick(t, editor, documents); code != http.StatusOK {
 		t.Fatalf("editor page report: %d %s", code, raw)
 	}
 	code, reply, raw = peerPage(t, terminal, http.MethodGet, "/api/peer-send/targets", "")
@@ -657,7 +688,7 @@ func TestPeerSendBetweenTwoStandaloneAppsOfOneDataRoot(t *testing.T) {
 	case <-time.After(2 * time.Second):
 		t.Fatal("the Text Editor window was not raised")
 	}
-	code, reply, raw = peerPage(t, editor, http.MethodPost, "/api/peer-send/inbox", documents)
+	code, reply, raw = peerPageTick(t, editor, documents)
 	request, _ = reply["request"].(map[string]any)
 	if code != http.StatusOK || request["requestId"] != id || request["target"] != uid || request["where"] != "line" || request["line"] != float64(2) || request["text"] != output || request["label"] != "Last command output from lab-switch-01" || reply["from"] != "Network Toolkit Terminal" {
 		t.Fatalf("editor page inbox: %d %s", code, raw)
@@ -702,7 +733,7 @@ func TestPeerSendBetweenTwoStandaloneAppsOfOneDataRoot(t *testing.T) {
 	if code != http.StatusOK || id == "" {
 		t.Fatalf("send to a new document: %d %s", code, raw)
 	}
-	_, reply, raw = peerPage(t, editor, http.MethodPost, "/api/peer-send/inbox", `{"targets":[]}`)
+	_, reply, raw = peerPageTick(t, editor, `{"targets":[]}`)
 	request, _ = reply["request"].(map[string]any)
 	if request["requestId"] != id || request["target"] != "new" || request["where"] != "start" || request["text"] != output {
 		t.Fatalf("new document request: %s", raw)
