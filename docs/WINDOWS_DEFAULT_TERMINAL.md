@@ -1,6 +1,6 @@
 # Windows default terminal: hosted experiment findings
 
-Status: functional test passed on the owner's Windows 11 PC (2026-11-10); not yet releasable (needs a trusted MSIX signer and product integration). The release criterion was a hosted (or owner-run) test showing both original shells (Command Prompt and Windows PowerShell) opening in Network Toolkit, with interactive input working, while Network Toolkit is the selected default. A public release also needs a trusted MSIX signer; the repository has none, and fixture certificates stay on disposable runners.
+Status: **parked** (2026-11-10). The functional test passed on the owner's Windows 11 PC, but the owner cannot obtain a trusted signer right now, so nothing ships. Resume when a signer (Azure Trusted Signing, a commercial code-signing certificate or the Microsoft Store) is available. The working prototype, the hosted experiment and the side-loaded test package workflow stay on `feat/windows-terminal-default`; merge `main` into it before resuming. The release criterion was a hosted (or owner-run) test showing both original shells (Command Prompt and Windows PowerShell) opening in Network Toolkit, with interactive input working, while Network Toolkit is the selected default. A public release also needs a trusted MSIX signer; the repository has none, and fixture certificates stay on disposable runners.
 
 ## How the prototype works
 
