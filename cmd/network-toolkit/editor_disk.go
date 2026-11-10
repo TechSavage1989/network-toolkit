@@ -41,6 +41,7 @@ type editorDiskDocument struct {
 	exported       *editorDiskExport
 	verify         *editorDiskVerify
 	ftp            *editorFTPEndpoint
+	restored       *editorSessionRestoreState
 }
 
 type editorDiskReceipt struct {
@@ -135,12 +136,42 @@ func (m *editorViewRegistry) openDiskDocument(w http.ResponseWriter, r *http.Req
 		Document editorDocumentSnapshot `json:"document"`
 		Mode     string                 `json:"mode"`
 		Remote   *remoteBrowserRequest  `json:"remote"`
+		Restore  *editorSessionRestore  `json:"restore,omitempty"`
 	}
 	if e := decodeEditorBody(w, r, 64<<10, &req); e != nil {
 		jsonError(w, 400, e.Error())
 		return
 	}
 	s := req.Document
+	// A session restore imports a kept copy of unsaved text; only the main
+	// workspace (or the standalone Text Editor) reopens its own session.
+	var backup *os.File
+	var expected editorSessionBackup
+	defer func() {
+		if backup != nil {
+			backup.Close()
+		}
+	}()
+	if (req.Mode == "restore") != (req.Restore != nil) {
+		jsonError(w, 400, "A kept copy is restored only in restore mode.")
+		return
+	}
+	if req.Mode == "restore" {
+		if caller != "" {
+			jsonError(w, 403, "Only the main editor workspace reopens its last session.")
+			return
+		}
+		if e := req.Restore.validate(s.Binding.Kind); e != nil {
+			jsonError(w, 400, e.Error())
+			return
+		}
+		file, entry, e := m.app.openEditorSessionBackup(req.Restore.Backup)
+		if e != nil {
+			jsonError(w, 404, e.Error())
+			return
+		}
+		backup, expected = file, entry
+	}
 	if s.Disk || s.Content != "" || s.Original != "" || s.Saved != "" || s.Dirty || len(s.Undo) > 0 || len(s.Redo) > 0 {
 		jsonError(w, 400, "Open disk-backed files from an empty document identity.")
 		return
@@ -176,7 +207,7 @@ func (m *editorViewRegistry) openDiskDocument(w http.ResponseWriter, r *http.Req
 			return
 		}
 	}
-	if req.Mode != "" && req.Mode != "draft" && req.Mode != "upload" {
+	if req.Mode != "" && req.Mode != "draft" && req.Mode != "upload" && req.Mode != "restore" {
 		jsonError(w, 400, "Unsupported file opening mode.")
 		return
 	}
@@ -234,6 +265,13 @@ func (m *editorViewRegistry) openDiskDocument(w http.ResponseWriter, r *http.Req
 			result.Format = editorbuffer.Format{Encoding: s.Encoding, BOM: s.BOM, EOL: s.EOL}
 		}
 		m.finishDiskOpen(grant, disk, result, err)
+	} else if req.Mode == "restore" {
+		file, restore := backup, *req.Restore
+		backup = nil
+		go func() {
+			result, err := m.importSessionBackup(ctx, grant, disk, file, expected, restore)
+			m.finishDiskOpen(grant, disk, result, err)
+		}()
 	} else if req.Mode != "upload" {
 		go func() {
 			result, err := m.importDiskDocument(ctx, grant, disk, req.Remote)
@@ -396,7 +434,7 @@ func (m *editorViewRegistry) diskDocument(w http.ResponseWriter, r *http.Request
 		jsonError(w, 410, "The document is closed.")
 		return
 	}
-	loading, progress, failure, v, reloadError := disk.loading, disk.progress, disk.err, disk.imported, disk.reloadError
+	loading, progress, failure, v, reloadError, restored := disk.loading, disk.progress, disk.err, disk.imported, disk.reloadError, disk.restored
 	if req.Action == "cancel" && disk.reloadUpload {
 		if disk.upload != nil {
 			disk.upload.close()
@@ -445,7 +483,11 @@ func (m *editorViewRegistry) diskDocument(w http.ResponseWriter, r *http.Request
 	var err error
 	switch req.Action {
 	case "status":
-		value = map[string]any{"loading": false, "metadata": v.Buffer.Metadata(), "format": format, "hash": hash, "path": path, "reloadError": reloadError}
+		status := map[string]any{"loading": false, "metadata": v.Buffer.Metadata(), "format": format, "hash": hash, "path": path, "reloadError": reloadError}
+		if restored != nil {
+			status["restore"] = restored
+		}
+		value = status
 	case "window":
 		if req.Limit == 0 {
 			req.Limit = 32768

@@ -99,6 +99,7 @@ type application struct {
 	openTerminalWindow           func(context.Context, *terminalWindowPreset) (bool, error)
 	views                        *terminalViewRegistry
 	editorViews                  *editorViewRegistry
+	editorSession                editorSessionStore
 	launchEditorView             func(context.Context, editorViewLaunch) (<-chan error, error)
 	launchTerminalView           func(context.Context, terminalViewLaunch) (<-chan error, error)
 	headless                     bool
@@ -716,6 +717,8 @@ func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		a.handleEditorSaveDialog(w, r)
 	case r.URL.Path == "/api/file-editor/local":
 		a.handleLocalTextEditor(w, r)
+	case r.URL.Path == editorSessionEndpoint || strings.HasPrefix(r.URL.Path, editorSessionEndpoint+"/"):
+		a.handleEditorSession(w, r)
 	case r.URL.Path == "/api/remote-browser":
 		a.handleRemoteBrowser(w, r)
 	case r.URL.Path == "/api/connections/open":

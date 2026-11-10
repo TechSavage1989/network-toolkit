@@ -532,6 +532,7 @@ func (s *Snapshot) WriteTo(ctx context.Context, w io.Writer) error {
 	}
 	return visit(s.root)
 }
+
 // MarkUnsaved records that the current text has not been written to the
 // document's file, for example after restoring a kept copy of unsaved edits.
 // Only a later MarkSaved clears it; undo history is unchanged.
