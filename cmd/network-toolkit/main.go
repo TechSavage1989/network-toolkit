@@ -83,6 +83,8 @@ type application struct {
 	storageWritable              bool
 	storageError                 string
 	state                        json.RawMessage
+	stateMark                    [32]byte    // digest of state as last set by the shared-data layer
+	shared                       *sharedData // settings shared by every app of the data folder (shared_data.go)
 	terminals                    *terminal.Manager
 	terminalAutomation           *macros.Engine
 	terminalError                string
@@ -341,7 +343,7 @@ func main() {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
-	a := newApplication(ctx, filepath.Join(*dataDir, "Network_Toolkit.settings.json"))
+	a := newApplicationForRoot(ctx, filepath.Join(*dataDir, "Network_Toolkit.settings.json"), rootDataDir)
 	a.updateHealthDir = *updateHealth
 	if _, official := updateOfficialExecutableVersion(filepath.Base(executable)); official {
 		a.updateFinalizing.Store(true)
@@ -480,6 +482,12 @@ func main() {
 }
 
 func newApplication(parent context.Context, dataPath string) *application {
+	return newApplicationForRoot(parent, dataPath, filepath.Dir(dataPath))
+}
+
+// sharedRoot is the data folder whose saved connections, credentials, SSH host
+// trust and macros this workspace shares with the other apps (shared_data.go).
+func newApplicationForRoot(parent context.Context, dataPath, sharedRoot string) *application {
 	ctx, cancel := context.WithCancel(parent)
 	a := &application{ctx: ctx, stop: cancel, jobs: make(map[string]*Job), started: time.Now(), token: randomHex(32), uiHost: "browser", dataPath: dataPath, state: json.RawMessage(`{}`), windowMode: "main", windowInstanceID: randomHex(16), windowActivationToken: randomHex(32), windowActivate: make(chan struct{}, 1), primaryWake: make(chan struct{}, 1)}
 	a.promptVaultSecret = desktop.PromptVaultSecret
@@ -492,7 +500,8 @@ func newApplication(parent context.Context, dataPath string) *application {
 	a.packetCaptures = newPacketCaptureManager(ctx)
 	a.transfers = newTransferHostManager(ctx, filepath.Dir(dataPath))
 	a.publicIP = newPublicIPManager(ctx)
-	vault, vaultErr := newCredentialVaultForSettings(dataPath)
+	a.shared = newSharedData(sharedRoot, dataPath)
+	vault, vaultErr := newCredentialVaultForSettings(a.sharedSettingsPath())
 	a.credentials = vault
 	if vaultErr != nil {
 		a.storageError = "Credential vault could not be opened: " + vaultErr.Error()
@@ -501,7 +510,7 @@ func newApplication(parent context.Context, dataPath string) *application {
 		go func() { <-ctx.Done(); vault.close() }()
 	}
 	var terminalErr error
-	a.terminals, terminalErr = terminal.NewManager(ctx, filepath.Dir(dataPath))
+	a.terminals, terminalErr = terminal.NewManager(ctx, a.shared.root)
 	configureLocalShellElevation(a.terminals)
 	if terminalErr != nil {
 		a.terminalError = terminalErr.Error()
@@ -526,6 +535,7 @@ func newApplication(parent context.Context, dataPath string) *application {
 			a.storageError = "Saved settings were invalid. Export any new settings before replacing this file."
 		}
 	}
+	a.loadSharedState()
 	if f, err := os.CreateTemp(filepath.Dir(dataPath), ".network-toolkit-write-check-*"); err == nil {
 		_ = f.Close()
 		_ = os.Remove(f.Name())
@@ -743,6 +753,8 @@ func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		a.handleScanNetworks(w, r)
 	case r.URL.Path == "/api/state":
 		a.handleState(w, r)
+	case r.URL.Path == "/api/shared-data" || strings.HasPrefix(r.URL.Path, "/api/shared-data/"):
+		a.handleSharedData(w, r)
 	case strings.HasPrefix(r.URL.Path, "/api/vendors/"):
 		a.handleVendors(w, r)
 	case r.URL.Path == "/api/terminals" || strings.HasPrefix(r.URL.Path, "/api/terminals/"):
@@ -1085,72 +1097,11 @@ func (a *application) handleJob(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(b)
 }
 
+// handleState loads and saves a page's settings. Saved connections and the
+// other shared values are merged with what the other apps of this data
+// folder saved (shared_state_http.go).
 func (a *application) handleState(w http.ResponseWriter, r *http.Request) {
-	a.stateMu.Lock()
-	defer a.stateMu.Unlock()
-	switch r.Method {
-	case http.MethodGet:
-		w.Header().Set("Content-Type", "application/json; charset=utf-8")
-		_, _ = w.Write(a.state)
-	case http.MethodPut:
-		var state map[string]any
-		if err := decodeBody(w, r, 2<<20, &state); err != nil {
-			jsonError(w, 400, err.Error())
-			return
-		}
-		if state == nil {
-			jsonError(w, 400, "Settings must be a JSON object.")
-			return
-		}
-		release, lockErr := acquireCredentialGuard(filepath.Dir(a.dataPath))
-		if lockErr != nil {
-			jsonError(w, http.StatusConflict, lockErr.Error())
-			return
-		}
-		defer release()
-		// Vault config identity is native/backend-owned, never supplied by the renderer.
-		delete(state, credentialConfigIdentityField)
-		if id := credentialConfigID(a.dataPath); id != "" {
-			state[credentialConfigIdentityField] = id
-		}
-		if err := validateTerminalDisplayRevisions(state); err != nil {
-			jsonError(w, http.StatusBadRequest, err.Error())
-			return
-		}
-		sanitizeTerminalSettings(state)
-		currentNames := map[string]any{}
-		_ = json.Unmarshal(a.state, &currentNames)
-		if err := reconcileTerminalDisplayNames(state, currentNames); err != nil {
-			jsonError(w, http.StatusConflict, err.Error())
-			return
-		}
-		sanitizeFTPProfiles(state)
-		sanitizeTransferClientSettings(state)
-		sanitizeListPreferences(state)
-		sanitizeSavedResultFilters(state)
-		sanitizeColorPickerPreferences(state)
-		b, err := json.MarshalIndent(state, "", "  ")
-		if err != nil {
-			jsonError(w, 400, "Invalid settings.")
-			return
-		}
-		if len(b) > 2<<20 {
-			jsonError(w, 400, "Saved settings would exceed the 2 MiB limit. Reduce the saved data first.")
-			return
-		}
-		if err = writeAtomic(a.dataPath, b); err != nil {
-			a.storageWritable = false
-			a.storageError = err.Error()
-			jsonError(w, 500, "Settings were not saved: "+err.Error())
-			return
-		}
-		a.state = b
-		a.storageWritable = true
-		a.storageError = ""
-		jsonResponse(w, 200, map[string]any{"ok": true, "terminalNames": terminalDisplayNamesResponse(state)})
-	default:
-		methodError(w)
-	}
+	a.serveState(w, r)
 }
 
 func writeAtomic(path string, b []byte) error {

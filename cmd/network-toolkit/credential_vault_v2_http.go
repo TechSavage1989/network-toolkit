@@ -2,11 +2,11 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
-	"os"
 	"path/filepath"
 	"time"
 
@@ -207,8 +207,14 @@ func (a *application) handleCredentialVault(w http.ResponseWriter, r *http.Reque
 		case "lock", "forget":
 			a.stateMu.Lock()
 			err = a.credentials.lockAndForget()
-			if raw, readErr := readCredentialFile(a.dataPath, 2<<20); readErr == nil && json.Valid(raw) {
-				a.state = raw
+			// The vault's configuration identity lives in the main settings file,
+			// which a standalone window does not hold in memory.
+			a.ensureShared()
+			if !a.shared.standalone {
+				if raw, readErr := readCredentialFile(a.dataPath, 2<<20); readErr == nil && json.Valid(raw) {
+					a.setStateLocked(raw)
+					a.shared.seen = sha256.Sum256(raw)
+				}
 			}
 			a.stateMu.Unlock()
 		case "delete-vault":
@@ -277,37 +283,47 @@ func (a *application) autoUnlockCredentials(ctx context.Context) {
 func (a *application) ensureCredentialConfigIdentity() (string, error) {
 	a.stateMu.Lock()
 	defer a.stateMu.Unlock()
-	release, err := acquireCredentialGuard(filepath.Dir(a.dataPath))
+	// Every app of a data folder uses its one vault, bound to the identity in
+	// the folder's main settings file.
+	path := a.sharedSettingsPath()
+	release, err := acquireCredentialGuard(filepath.Dir(path))
 	if err != nil {
 		return "", err
 	}
 	defer release()
-	id := credentialConfigID(a.dataPath)
+	id := credentialConfigID(path)
 	if id != "" {
 		return id, nil
 	}
-	state := map[string]any{}
-	current, readErr := readCredentialFile(a.dataPath, 2<<20)
-	if readErr == nil {
-		if json.Unmarshal(current, &state) != nil || state == nil {
-			return "", errors.New("App settings are invalid; they were not replaced.")
-		}
-	} else if !errors.Is(readErr, os.ErrNotExist) {
-		return "", readErr
+	root, readErr := readRootSettings(path)
+	if readErr != nil {
+		return "", errors.New("App settings are invalid; they were not replaced.")
 	}
-
+	if !a.shared.standalone {
+		// Settings this window holds in memory but has not written yet are
+		// saved with the identity, as before.
+		for name, raw := range stateMembers(a.state) {
+			if _, exists := root.members[name]; !exists {
+				root.members[name] = raw
+			}
+		}
+		root.exists = true
+	}
 	id = randomHex(16)
-	state[credentialConfigIdentityField] = id
-	raw, err := json.MarshalIndent(state, "", "  ")
+	root.members[credentialConfigIdentityField], err = json.Marshal(id)
 	if err != nil {
 		return "", err
 	}
-	if len(raw) > 2<<20 {
+	raw, err := root.encode(root.shared())
+	if err != nil {
 		return "", errors.New("App settings exceed their size limit.")
 	}
-	if err := writeAtomic(a.dataPath, raw); err != nil {
+	if err := writeRootSettings(path, raw); err != nil {
 		return "", err
 	}
-	a.state = raw
+	a.shared.seen = sha256.Sum256(raw)
+	if !a.shared.standalone {
+		a.setStateLocked(raw)
+	}
 	return id, nil
 }

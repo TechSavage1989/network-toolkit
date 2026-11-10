@@ -896,7 +896,7 @@ func acquireCredentialGuard(dir string) (func(), error) {
 		}
 		if err := lockStorageFile(file, true); err != nil {
 			file.Close()
-			return nil, errors.New("Another Network Toolkit instance is changing credentials. Finish that action and retry.")
+			return nil, errCredentialGuardBusy
 		}
 		return func() { _ = unlockStorageFile(file); _ = file.Close() }, nil
 	}

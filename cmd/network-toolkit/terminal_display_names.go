@@ -3,9 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net"
-	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -357,63 +355,54 @@ func reconcileTerminalDisplayNames(incoming, current map[string]any) error {
 func (a *application) persistTerminalDisplayName(s terminal.SessionInfo) (uint64, error) {
 	a.stateMu.Lock()
 	defer a.stateMu.Unlock()
-	state := map[string]any{}
-	if len(a.state) > 0 {
-		if err := json.Unmarshal(a.state, &state); err != nil {
-			return 0, errors.New("Stored settings could not be read; the terminal name was not changed.")
+	var revision uint64
+	// Saved connections are shared by every app of the data folder: the name
+	// is applied to the list on disk, never to a copy this process holds.
+	err := a.updateSharedLocked(func(state map[string]any) error {
+		var err error
+		revision, err = terminalNextNameRevision(state)
+		if err != nil {
+			return err
 		}
-	}
-	revision, err := terminalNextNameRevision(state)
-	if err != nil {
-		return 0, err
-	}
-	apply := func(row map[string]any) {
-		if s.NameExplicit {
-			row["name"] = s.ManualName
+		apply := func(row map[string]any) {
+			if s.NameExplicit {
+				row["name"] = s.ManualName
+			}
+			row["nameExplicit"], row["nameRevision"] = s.NameExplicit, revision
 		}
-		row["nameExplicit"], row["nameRevision"] = s.NameExplicit, revision
-	}
-	profiles := terminalNameRows(state, "terminalProfiles")
-	matchingID, matchingEndpoint := 0, 0
-	for _, row := range profiles {
-		p := terminalNameRecord(row)
-		if p.ID == s.ProfileID && s.ProfileID != "" {
-			matchingID++
+		profiles := terminalNameRows(state, "terminalProfiles")
+		matchingID, matchingEndpoint := 0, 0
+		for _, row := range profiles {
+			p := terminalNameRecord(row)
+			if p.ID == s.ProfileID && s.ProfileID != "" {
+				matchingID++
+			}
+			if p.matches(s) {
+				matchingEndpoint++
+			}
 		}
-		if p.matches(s) {
-			matchingEndpoint++
+		if matchingID > 1 {
+			return errors.New("Saved profile identity is ambiguous; the terminal name was not changed.")
 		}
-	}
-	if matchingID > 1 {
-		return 0, errors.New("Saved profile identity is ambiguous; the terminal name was not changed.")
-	}
-	for _, row := range profiles {
-		p := terminalNameRecord(row)
-		if (s.ProfileID != "" && p.ID == s.ProfileID) || (s.ProfileID == "" && matchingEndpoint == 1 && p.matches(s)) {
-			apply(row)
-		}
-	}
-	if matchingEndpoint <= 1 {
-		for _, row := range terminalNameRows(state, "terminalRecent") {
-			if terminalNameRecord(row).matches(s) {
+		for _, row := range profiles {
+			p := terminalNameRecord(row)
+			if (s.ProfileID != "" && p.ID == s.ProfileID) || (s.ProfileID == "" && matchingEndpoint == 1 && p.matches(s)) {
 				apply(row)
 			}
 		}
-	}
-	state["terminalNameRevision"] = revision
-	b, err := json.MarshalIndent(state, "", "  ")
-	if err != nil || len(b) > 2<<20 {
-		return 0, errors.New("Terminal name would exceed the saved settings limit.")
-	}
-	release, err := acquireCredentialGuard(filepath.Dir(a.dataPath))
+		if matchingEndpoint <= 1 {
+			for _, row := range terminalNameRows(state, "terminalRecent") {
+				if terminalNameRecord(row).matches(s) {
+					apply(row)
+				}
+			}
+		}
+		state["terminalNameRevision"] = revision
+		return nil
+	})
 	if err != nil {
 		return 0, err
 	}
-	defer release()
-	if err = writeAtomic(a.dataPath, b); err != nil {
-		return 0, fmt.Errorf("Terminal name was not saved: %w", err)
-	}
-	a.state = b
 	return revision, nil
 }
 
