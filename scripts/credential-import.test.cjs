@@ -55,3 +55,19 @@ test('a connection whose credential is still in the previous vault says so inste
  const odd=harness({previous:[{source:'../other',label:'<b>x</b>',imported:false},{source:'editor',label:'ignored',imported:false}]});await odd.tool.refresh();
  assert.deepEqual(JSON.parse(JSON.stringify(odd.tool.previousVaults())),[{source:'editor',label:'Text Editor',imported:false}]);
 });
+test('credentials that did not fit in a full vault are named and the import stays on offer',async()=>{
+ const h=harness();await h.tool.refresh();
+ // The engine does not record an import that left credentials out.
+ h.root.api=async(path,method,body)=>{
+  if(path==='/credentials'&&!method)return {vault:{available:true,state:'unlocked'},entries:[],previousVaults:h.server.previous};
+  if(path==='/credential-vault'&&body.action==='import-previous')return {ok:true,state:'unlocked',available:true,imported:1,alreadyPresent:0,skipped:2,skippedNames:['Lab console','<b>Switch</b> admin'],previousVaults:h.server.previous};
+  throw Error('Unexpected '+path);
+ };
+ await h.tool.importPrevious('terminal');
+ const [message,type]=h.toasts.at(-1);
+ assert.match(message,/1 saved credential was imported\./);
+ assert.match(message,/2 were not imported because the password manager is full: Lab console, <b>Switch<\/b> admin\./);
+ assert.match(message,/Remove saved credentials you no longer need, then import again\./);
+ assert.equal(type,'error','something was left out: this is not a plain success');
+ assert(h.root.__test.previousVaultsHTML().includes('data-vault-import="terminal"'),'the import stays on offer');
+});

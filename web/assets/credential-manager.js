@@ -23,7 +23,9 @@ async function importPrevious(source){
   previousVaults=cleanPreviousVaults(result.previousVaults);await refresh();
   document.dispatchEvent(new CustomEvent('credentials-updated',{detail:{imported:Number(result.imported)||0}}));
   const imported=Number(result.imported)||0,present=Number(result.alreadyPresent)||0,skipped=Number(result.skipped)||0;
-  toast((imported?imported+' saved credential'+(imported===1?' was':'s were')+' imported.':'No new saved credentials were found.')+(present?' '+present+' '+(present===1?'was':'were')+' already in the shared vault.':'')+(skipped?' '+skipped+' could not be added because the vault is full.':'')+' The previous vault was not changed.',imported?'success':'info');
+  // What did not fit is named, and the import stays on offer until it is in.
+  const left=(Array.isArray(result.skippedNames)?result.skippedNames:[]).filter(name=>typeof name==='string').map(name=>name.slice(0,100)),named=left.slice(0,20).join(', ')+(left.length>20?' and '+(left.length-20)+' more':'');
+  toast((imported?imported+' saved credential'+(imported===1?' was':'s were')+' imported.':'No new saved credentials were found.')+(present?' '+present+' '+(present===1?'was':'were')+' already in the shared vault.':'')+(skipped?' '+skipped+' '+(skipped===1?'was':'were')+' not imported because the password manager is full'+(named?': '+named:'')+'. Remove saved credentials you no longer need, then import again.':'')+' The previous vault was not changed.',skipped?'error':imported?'success':'info');
  }finally{importPending=false;if(document.querySelector('#credentialVaultPanel'))await show();}
 }
 function endpoint(config={}){

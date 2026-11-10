@@ -111,6 +111,10 @@ type editorSessionStore struct {
 	known map[string]bool
 	// An unreadable index was set aside: only known copies may be removed.
 	unreadable bool
+	// What the user is told about that, until a page has been given it. The
+	// index may be set aside by a step that reports nothing itself (taking
+	// over the other editor's tabs, or a save).
+	asideNote string
 	// Kept copies this process wrote itself.
 	own map[string]bool
 	// The saved session was given to the page in this run (GET). Until then
@@ -265,7 +269,8 @@ func (a *application) readEditorSessionLocked(root *storageRoot) (editorSessionI
 			return index, "", errors.Join(err, renameErr)
 		}
 		s.unreadable = true
-		return index, "The last Text Editor session could not be read. It was kept as " + aside + " in the app data folder, and no unsaved copies were removed.", nil
+		s.asideNote = "The last Text Editor session could not be read. It was kept as " + aside + " in the app data folder, and no unsaved copies were removed."
+		return index, s.asideNote, nil
 	}
 	if err != nil {
 		return index, "", err
@@ -612,6 +617,12 @@ func (a *application) handleEditorSession(w http.ResponseWriter, r *http.Request
 		if err == nil {
 			// From here on the page knows what was kept and decides about it.
 			s.given = true
+			// An index that was set aside before this read (while the other
+			// editor's tabs were taken over, or by a save) is reported now.
+			if warning == "" {
+				warning = s.asideNote
+			}
+			s.asideNote = ""
 		}
 		s.mu.Unlock()
 		if _, mode := a.otherEditorWorkspace(); adopted > 0 {

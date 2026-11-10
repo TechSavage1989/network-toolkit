@@ -3,7 +3,10 @@ package main
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"math/rand"
 	"reflect"
+	"sort"
 	"strings"
 	"testing"
 )
@@ -184,5 +187,160 @@ func TestSharedSectionIsCanonicalAndCarriesNoSecrets(t *testing.T) {
 	standalone := sharedSectionOf(map[string]any{"theme": "dark", "profiles": []any{map[string]any{"id": "t", "name": "Gateway", "target": "192.0.2.1"}}}, sharedKeysFor(true))
 	if _, present := standalone["profiles"]; present || standalone["theme"] != "dark" {
 		t.Fatalf("a standalone app's shared section: %v", standalone)
+	}
+}
+
+// Entries without an id, or with an id that another entry of the list has
+// too, must never make the merge fall back to "the page's whole list wins":
+// that loses what another app added. Such entries are told apart by their
+// content instead.
+func TestSharedListMergeNeverLosesAnEntryBecauseOfABadID(t *testing.T) {
+	key := sharedKey{Name: "terminalProfiles", Kind: sharedList}
+	ids := func(value any) []string {
+		out := []string{}
+		for _, entry := range value.([]any) {
+			row := entry.(map[string]any)
+			out = append(out, fmt.Sprint(row["id"], "/", row["name"]))
+		}
+		sort.Strings(out)
+		return out
+	}
+	list := func(text string) any { return sharedJSON(t, text) }
+	// Two entries on disk share an id. One app adds x, then another, which
+	// had not heard of x, adds y.
+	disk := list(`[{"id":"dup","name":"One"},{"id":"dup","name":"Two"},{"id":"","name":"Nameless"},{"name":"No id at all"}]`)
+	afterA, err := mergeSharedList(key, disk, disk, list(`[{"id":"dup","name":"One"},{"id":"dup","name":"Two"},{"id":"","name":"Nameless"},{"name":"No id at all"},{"id":"x","name":"X"}]`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	afterB, err := mergeSharedList(key, disk, afterA, list(`[{"id":"dup","name":"One"},{"id":"dup","name":"Two"},{"id":"","name":"Nameless"},{"name":"No id at all"},{"id":"y","name":"Y"}]`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"/Nameless", "<nil>/No id at all", "dup/One", "dup/Two", "x/X", "y/Y"}
+	if got := ids(afterB); strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("after two apps each added an entry to a list with bad ids: %v", got)
+	}
+	// The page removes one of the two that share an id; another app renamed
+	// the nameless one meanwhile. Both changes hold.
+	theirs := list(`[{"id":"dup","name":"One"},{"id":"dup","name":"Two"},{"id":"","name":"Renamed elsewhere"},{"name":"No id at all"}]`)
+	merged, err := mergeSharedList(key, disk, theirs, list(`[{"id":"dup","name":"One"},{"id":"","name":"Nameless"},{"name":"No id at all"}]`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := ids(merged); strings.Join(got, ",") != "/Renamed elsewhere,<nil>/No id at all,dup/One" {
+		t.Fatalf("a removal next to another app's change, with bad ids: %v", got)
+	}
+	// Exact duplicates are kept as often as they occur.
+	twice := list(`[{"id":"a","name":"A"},{"id":"a","name":"A"}]`)
+	merged, err = mergeSharedList(key, twice, twice, list(`[{"id":"a","name":"A"},{"id":"a","name":"A"},{"id":"b","name":"B"}]`))
+	if err != nil || len(merged.([]any)) != 3 {
+		t.Fatalf("exact duplicates: %v %v", merged, err)
+	}
+}
+
+// Randomized: whatever two sides do to a list, including lists with repeated
+// and empty ids, nothing either side added or changed is lost, an unchanged
+// side never overrules a change, and nothing that both sides lack appears.
+func TestSharedListMergeRandomized(t *testing.T) {
+	rng := rand.New(rand.NewSource(7))
+	key := sharedKey{Name: "terminalProfiles", Kind: sharedList}
+	item := func(id string, v int) map[string]any { return map[string]any{"id": id, "v": float64(v)} }
+	content := func(entry any) string { raw, _ := json.Marshal(entry); return string(raw) }
+	for round := 0; round < 20000; round++ {
+		bad := round%4 == 0 // every fourth round uses repeated and empty ids
+		base := []any{}
+		for i := 0; i < rng.Intn(6); i++ {
+			id := fmt.Sprintf("b%d", i)
+			if bad && rng.Intn(3) == 0 {
+				id = []string{"", "same"}[rng.Intn(2)]
+			}
+			base = append(base, item(id, 100+i))
+		}
+		mutate := func(tag string, offset int) []any {
+			out := []any{}
+			for _, entry := range base {
+				row := entry.(map[string]any)
+				switch rng.Intn(5) {
+				case 0: // removed
+				case 1:
+					out = append(out, item(row["id"].(string), offset+rng.Intn(1000)))
+				default:
+					out = append(out, row)
+				}
+			}
+			for i := 0; i < rng.Intn(3); i++ {
+				id := fmt.Sprintf("%s%d", tag, i)
+				if bad && rng.Intn(3) == 0 {
+					id = []string{"", "same"}[rng.Intn(2)]
+				}
+				at := rng.Intn(len(out) + 1)
+				out = append(out[:at], append([]any{item(id, offset+1000+rng.Intn(1000))}, out[at:]...)...)
+			}
+			if rng.Intn(4) == 0 {
+				rng.Shuffle(len(out), func(i, j int) { out[i], out[j] = out[j], out[i] })
+			}
+			return out
+		}
+		ours, theirs := mutate("o", 10000), mutate("t", 20000)
+		merged, err := mergeSharedList(key, base, theirs, ours)
+		if err != nil {
+			t.Fatal(err)
+		}
+		result := merged.([]any)
+		count := func(list []any) map[string]int {
+			out := map[string]int{}
+			for _, entry := range list {
+				out[content(entry)]++
+			}
+			return out
+		}
+		r, b, o, th := count(result), count(base), count(ours), count(theirs)
+		describe := func() string {
+			return fmt.Sprintf("round %d\nbase   %s\nours   %s\ntheirs %s\nresult %s", round, content(base), content(ours), content(theirs), content(result))
+		}
+		// Everything a side has that the base did not have (added, or changed
+		// into) is in the result.
+		for text, n := range o {
+			if n > b[text] && r[text] < 1 {
+				t.Fatalf("something the page added or changed is lost: %s\n%s", text, describe())
+			}
+		}
+		for text, n := range th {
+			if n <= b[text] || r[text] >= 1 {
+				continue
+			}
+			// The other app's version may only give way to a change the page
+			// made to the same entry (same id, and the page's differs from base).
+			var row map[string]any
+			_ = json.Unmarshal([]byte(text), &row)
+			overruled := false
+			for _, entry := range ours {
+				mine := entry.(map[string]any)
+				if mine["id"] == row["id"] && row["id"] != "" && b[content(mine)] == 0 {
+					overruled = true
+				}
+			}
+			if !overruled {
+				t.Fatalf("something another app added or changed is lost: %s\n%s", text, describe())
+			}
+		}
+		// Nothing appears that neither side has.
+		for text := range r {
+			if o[text] == 0 && th[text] == 0 {
+				t.Fatalf("an entry appeared that neither side has: %s\n%s", text, describe())
+			}
+		}
+		// With clean ids the result has no repeated id.
+		if !bad {
+			seen := map[string]bool{}
+			for _, entry := range result {
+				id := entry.(map[string]any)["id"].(string)
+				if seen[id] {
+					t.Fatalf("an id is repeated in the result: %s\n%s", id, describe())
+				}
+				seen[id] = true
+			}
+		}
 	}
 }

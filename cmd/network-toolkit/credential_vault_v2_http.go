@@ -160,7 +160,7 @@ func (a *application) handleCredentialVault(w http.ResponseWriter, r *http.Reque
 			return
 		}
 		status := a.credentials.status()
-		jsonResponse(w, 200, map[string]any{"ok": true, "available": status.Available, "state": status.State, "remembered": status.Remembered, "hasRecovery": status.HasRecovery, "legacyBackup": status.LegacyBackup, "warning": status.Warning, "protection": status.Protection, "mode": status.Mode, "imported": result.Imported, "alreadyPresent": result.Present, "skipped": result.Skipped, "previousVaults": a.previousVaults()})
+		jsonResponse(w, 200, map[string]any{"ok": true, "available": status.Available, "state": status.State, "remembered": status.Remembered, "hasRecovery": status.HasRecovery, "legacyBackup": status.LegacyBackup, "warning": status.Warning, "protection": status.Protection, "mode": status.Mode, "imported": result.Imported, "alreadyPresent": result.Present, "skipped": result.Skipped, "skippedNames": result.SkippedNames, "previousVaults": a.previousVaults()})
 		return
 	case "setup-windows":
 		status := a.credentials.status()

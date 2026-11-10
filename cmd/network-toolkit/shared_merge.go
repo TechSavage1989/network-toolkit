@@ -8,6 +8,8 @@ package main
 // new profile therefore cannot remove it.
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -86,12 +88,47 @@ type sharedListView struct {
 	order []string
 	items map[string]any
 	raw   map[string][]byte
+	// Keys that stand for an entry's content, because the entry has no id of
+	// its own: its id is empty, another entry of the list has the same id, or
+	// it is not an object.
+	byContent map[string]bool
 }
 
-// sharedListOf indexes a list by identity. It reports false when the value is
-// not a list of uniquely identified objects; such a list is merged as a whole.
-func sharedListOf(value any, identity func(map[string]any) string) (sharedListView, bool, error) {
-	view := sharedListView{items: map[string]any{}, raw: map[string][]byte{}}
+// sharedRepeatedIDs returns the identities that more than one entry of one of
+// the lists has. Such an identity cannot tell entries apart in any of the
+// lists that are merged with it, so all of them use the same answer.
+func sharedRepeatedIDs(identity func(map[string]any) string, values ...any) map[string]bool {
+	if identity == nil {
+		identity = sharedItemID
+	}
+	repeated := map[string]bool{}
+	for _, value := range values {
+		canonical, _, err := sharedCanonical(value)
+		list, ok := canonical.([]any)
+		if err != nil || !ok {
+			continue
+		}
+		uses := map[string]int{}
+		for _, entry := range list {
+			if item, ok := entry.(map[string]any); ok {
+				if id := identity(item); id != "" {
+					if uses[id]++; uses[id] > 1 {
+						repeated[id] = true
+					}
+				}
+			}
+		}
+	}
+	return repeated
+}
+
+// sharedListOf indexes a list by the identity of its entries. An entry
+// without a usable identity (none, or one in repeated) is known by what it
+// holds instead, so a list with such entries is still merged entry by entry:
+// falling back to "the whole list of the page wins" would lose what another
+// app added. It reports false only for a value that is not a list.
+func sharedListOf(value any, identity func(map[string]any) string, repeated map[string]bool) (sharedListView, bool, error) {
+	view := sharedListView{items: map[string]any{}, raw: map[string][]byte{}, byContent: map[string]bool{}}
 	if value == nil {
 		return view, true, nil
 	}
@@ -106,21 +143,26 @@ func sharedListOf(value any, identity func(map[string]any) string) (sharedListVi
 	if identity == nil {
 		identity = sharedItemID
 	}
+	copies := map[string]int{}
 	for _, entry := range list {
-		item, ok := entry.(map[string]any)
-		if !ok {
-			return view, false, nil
-		}
-		id := identity(item)
-		if _, repeated := view.items[id]; id == "" || repeated {
-			return view, false, nil
-		}
-		raw, err := json.Marshal(item)
+		raw, err := json.Marshal(entry)
 		if err != nil {
 			return view, false, err
 		}
-		view.order = append(view.order, id)
-		view.items[id], view.raw[id] = item, raw
+		key := ""
+		if item, ok := entry.(map[string]any); ok {
+			key = identity(item)
+		}
+		if key == "" || repeated[key] {
+			// Equal entries are told apart by their position among their equals.
+			digest := sha256.Sum256(raw)
+			content := "\x00\x00content:" + hex.EncodeToString(digest[:16])
+			key = content + "#" + strconv.Itoa(copies[content])
+			copies[content]++
+			view.byContent[key] = true
+		}
+		view.order = append(view.order, key)
+		view.items[key], view.raw[key] = entry, raw
 	}
 	return view, true, nil
 }
@@ -206,18 +248,19 @@ func sharedSameOrder(a, b []string) bool {
 //   - the page's order is used when the page reordered its items, otherwise
 //     the order on disk; new items stay next to their neighbours.
 func mergeSharedList(key sharedKey, base, theirs, ours any) (any, error) {
-	b, okB, err := sharedListOf(base, key.Identity)
+	repeated := sharedRepeatedIDs(key.Identity, base, theirs, ours)
+	b, okB, err := sharedListOf(base, key.Identity, repeated)
 	if err != nil {
 		// An unreadable base is treated as "nothing was known before".
-		b, okB = sharedListView{items: map[string]any{}, raw: map[string][]byte{}}, true
+		b, okB = sharedListView{items: map[string]any{}, raw: map[string][]byte{}, byContent: map[string]bool{}}, true
 	}
-	t, okT, err := sharedListOf(theirs, key.Identity)
+	t, okT, err := sharedListOf(theirs, key.Identity, repeated)
 	if err != nil {
 		// What is on disk cannot be merged item by item; the page's list wins
 		// only if the page changed it.
 		okT = false
 	}
-	o, okO, err := sharedListOf(ours, key.Identity)
+	o, okO, err := sharedListOf(ours, key.Identity, repeated)
 	if err != nil {
 		return nil, err
 	}

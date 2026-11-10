@@ -394,3 +394,38 @@ func TestEditorSessionWaitsWhileItsTabsAreBeingTakenOver(t *testing.T) {
 		t.Fatalf("session after the move finished: %s", tabSummary(index))
 	}
 }
+
+// This app's own session index is damaged and the other editor's tabs are
+// taken over in the same step. The damaged index is set aside as always, and
+// the user is told so: taking over the other tabs must not swallow that.
+func TestEditorSessionAdoptionStillReportsAnUnreadableSessionOfItsOwn(t *testing.T) {
+	_, main, editor := editorSessionApps(t)
+	mustPutSession(t, editor, 0, cleanLocalTab(sessionLocalPath("a.txt")))
+	closeEditorApp(t, editor)
+	own, err := main.editorSessionRoot(true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := writeStorageAtomicLimit(own, editorSessionIndexName, []byte("{not json"), editorSessionIndexLimit); err != nil {
+		t.Fatal(err)
+	}
+	own.Close()
+	index, warning := readSession(t, main)
+	if len(index.Tabs) != 1 || index.Tabs[0].Path != sessionLocalPath("a.txt") {
+		t.Fatalf("the other editor's tab was not taken over: %+v", index.Tabs)
+	}
+	if !strings.Contains(warning, "could not be read") || !strings.Contains(warning, "session.unreadable-") {
+		t.Fatalf("the user is not told that this app's own session was set aside: %q", warning)
+	}
+	if !strings.Contains(warning, "Also reopened 1 file") {
+		t.Fatalf("the note about the other editor's file is missing: %q", warning)
+	}
+	aside, _ := filepath.Glob(filepath.Join(sessionDir(main), "session.unreadable-*.json"))
+	if len(aside) != 1 {
+		t.Fatalf("the damaged index was not kept aside: %v", sessionFiles(t, main))
+	}
+	// It is said once.
+	if _, again := readSession(t, main); strings.Contains(again, "could not be read") {
+		t.Fatalf("the warning is repeated: %q", again)
+	}
+}

@@ -182,6 +182,17 @@ test('a host-key difference found by the one-time move is shown once, in plain w
  click();await new Promise(resolve=>setImmediate(resolve));
  assert.deepEqual(posts,[['/shared-data/notices',{acknowledge:['n1']}]]);assert.equal(modals.at(-1),'closed');
 });
+test('hosts that only one window trusted are named, with where to remove them',async()=>{
+ const h=harness(),{c,shared}=h;shared.loaded();
+ const modals=[];c.openModal=(title,body)=>{modals.push({title,body});};c.closeModal=()=>{};c.esc=value=>String(value).replace(/</g,'&lt;');
+ c.api=async()=>({revision:'r1',notices:[{id:'n4',kind:'hosts-added',source:'terminal',items:['lab.test:2222','<i>x</i>.test:22']},{id:'n5',kind:'host-key-conflict',source:'terminal',items:['router.test:22']}]});
+ await shared.poll();
+ assert.equal(modals.length,1);assert.equal(modals[0].title,'Saved data is now shared');
+ assert(modals[0].body.includes('lab.test:2222')&&modals[0].body.includes('&lt;i>x&lt;/i>.test:22')&&modals[0].body.includes('router.test:22'));
+ assert.match(modals[0].body,/These SSH hosts were trusted only by the Terminal window\. They are trusted by every app now/);
+ assert.match(modals[0].body,/To stop trusting one, open the Saved sidebar of the Terminal, choose SSH host keys and remove it/);
+ assert.match(modals[0].body,/had remembered a different host key/,'both notices are shown together');
+});
 test('an older version saving to the data folder is reported once, and what was put back is named',async()=>{
  const h=harness(),{c,shared}=h;shared.loaded();
  const toasts=[];c.toast=(text,kind)=>toasts.push([kind,text]);

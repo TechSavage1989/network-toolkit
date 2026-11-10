@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"path/filepath"
 	"testing"
 )
 
@@ -47,5 +48,46 @@ func TestSharedMigrationNoticesReachEveryAppUntilAcknowledged(t *testing.T) {
 		if got := notices(app); len(got) != 0 {
 			t.Fatalf("%s still shows an acknowledged notice: %+v", app.windowMode, got)
 		}
+	}
+}
+
+// The one-time move unites SSH host trust. A host that only a standalone
+// window trusted (the user may have removed it in the main window on purpose)
+// is trusted by every app afterwards, so the user is told which hosts those
+// are; the page says where to remove one.
+func TestSharedMigrationNamesTheHostsItAddedToTrust(t *testing.T) {
+	root := t.TempDir()
+	both, onlyTerminal, onlyEditor := knownHostFixtureKey(t), knownHostFixtureKey(t), knownHostFixtureKey(t)
+	writeFixture(t, filepath.Join(root, appSettingsFilename), `{"theme":"dark"}`)
+	writeKnownHostFixture(t, root, knownHostFixtureEntry("both.test:22", both))
+	writeKnownHostFixture(t, filepath.Join(root, terminalWorkspaceName), knownHostFixtureEntry("both.test:22", both), knownHostFixtureEntry("removed-in-main.test:22", onlyTerminal), knownHostFixtureEntry("lab.test:2222", onlyTerminal))
+	writeKnownHostFixture(t, filepath.Join(root, standaloneEditorDirectory), knownHostFixtureEntry("files.test:22", onlyEditor))
+	if err := migrateSharedData(root); err != nil {
+		t.Fatal(err)
+	}
+	added := map[string][]string{}
+	for _, notice := range sharedNotices(root) {
+		if notice.Kind == "hosts-added" {
+			added[notice.Source] = append(added[notice.Source], notice.Items...)
+		}
+	}
+	if !sameIDs(added["terminal"], "removed-in-main.test:22", "lab.test:2222") || !sameIDs(added["editor"], "files.test:22") {
+		t.Fatalf("the hosts that are trusted by every app now are not named: %v", added)
+	}
+	app := sharedTestApp(t, root, "", "main")
+	if got := knownHostsOf(t, app); !sameIDs(got, "both.test:22", "removed-in-main.test:22", "lab.test:2222", "files.test:22") {
+		t.Fatalf("trusted hosts after the move: %v", got)
+	}
+	// A repeated start says nothing new, and a host the user then removes
+	// stays removed.
+	if r := requestApp(app, "DELETE", "/api/terminals/known-hosts", `{"host":"removed-in-main.test:22"}`, true); r.Code != 200 {
+		t.Fatalf("remove: %d %s", r.Code, r.Body.String())
+	}
+	before := len(sharedNotices(root))
+	if err := migrateSharedData(root); err != nil {
+		t.Fatal(err)
+	}
+	if got := knownHostsOf(t, app); len(sharedNotices(root)) != before || !sameIDs(got, "both.test:22", "lab.test:2222", "files.test:22") {
+		t.Fatalf("after a second start: %d notices, trusted %v", len(sharedNotices(root)), got)
 	}
 }

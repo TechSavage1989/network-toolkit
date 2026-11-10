@@ -264,6 +264,7 @@ function showNotices(notices){
  const parts=list.map(n=>{
   const app=names[n.source]||'other',items='<ul>'+n.items.slice(0,61).map(item=>'<li style="overflow-wrap:anywhere">'+escape(item)+'</li>').join('')+'</ul>';
   if(n.kind==='older-version')return '<p>An older version of Network Toolkit saved its settings over the shared ones. It can hold fewer saved entries and does not know what other apps saved meanwhile, so these were missing afterwards. They were put back:</p>'+items+'<p>If you removed one of them in the older version on purpose, remove it again here. Update every copy of Network Toolkit to avoid this.</p>';
+  if(n.kind==='hosts-added')return '<p>These SSH hosts were trusted only by the '+app+' window. They are trusted by every app now, also if you had removed one of them in another window. To stop trusting one, open the Saved sidebar of the Terminal, choose SSH host keys and remove it.</p>'+items;
   if(n.kind==='host-key-conflict')return '<p>For these SSH hosts the '+app+' window had remembered a different host key than the main window. The main window\'s key was kept and nothing else was changed. The next time you connect to one of them, compare the fingerprint that is shown with one you trust before you accept a changed key.</p>'+items;
   return '<p>Not everything the '+app+' window had saved could be added because these lists are full. Nothing was removed; remove entries you no longer need and the rest is added the next time the app starts.</p>'+items;
  });

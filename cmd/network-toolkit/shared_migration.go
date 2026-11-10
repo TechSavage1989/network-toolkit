@@ -300,6 +300,8 @@ func (m *sharedMigration) settings(workspace legacyWorkspace, dir string) error 
 		renamed = map[string]string{}
 	}
 	var conflicts, full []string
+	// A key that could not be brought over is tried again at the next start.
+	incomplete := false
 	for _, key := range keys {
 		value, present := legacy[key.Name]
 		if !present {
@@ -307,9 +309,11 @@ func (m *sharedMigration) settings(workspace legacyWorkspace, dir string) error 
 		}
 		switch key.Kind {
 		case sharedList:
-			theirs, okTheirs, _ := sharedListOf(value, key.Identity)
-			ours, okOurs, _ := sharedListOf(current[key.Name], key.Identity)
+			repeated := sharedRepeatedIDs(key.Identity, value, current[key.Name])
+			theirs, okTheirs, _ := sharedListOf(value, key.Identity, repeated)
+			ours, okOurs, _ := sharedListOf(current[key.Name], key.Identity, repeated)
 			if !okTheirs || !okOurs {
+				incomplete = true
 				continue
 			}
 			// A saved list keeps both versions of an entry that the two sides
@@ -317,9 +321,10 @@ func (m *sharedMigration) settings(workspace legacyWorkspace, dir string) error 
 			limit, duplicate := key.MaxSaved, key.MaxSaved > 0
 			list, _ := current[key.Name].([]any)
 			list = append([]any{}, list...)
-			have := map[string][]byte{}
+			have, contents := map[string][]byte{}, map[string]bool{}
 			for id, raw := range ours.raw {
 				have[id] = raw
+				contents[string(raw)] = true
 			}
 			add := func(id string, item map[string]any) bool {
 				if limit > 0 && len(list) >= limit {
@@ -327,6 +332,7 @@ func (m *sharedMigration) settings(workspace legacyWorkspace, dir string) error 
 				}
 				list = append(list, item)
 				have[id], _ = json.Marshal(item)
+				contents[string(have[id])] = true
 				if credential, _ := item["credentialId"].(string); credential != "" {
 					m.marker.Credentials = append(m.marker.Credentials, sharedMigratedCredential{Source: workspace.ID, Key: key.Name, ID: id, CredentialID: credential})
 				}
@@ -338,6 +344,26 @@ func (m *sharedMigration) settings(workspace legacyWorkspace, dir string) error 
 					continue
 				}
 				item, _ := theirs.items[id].(map[string]any)
+				if theirs.byContent[id] {
+					// An entry without an id of its own (empty, or shared with
+					// another entry). It is brought over unless the data folder
+					// holds the very same entry, and gets an id of its own.
+					if item != nil && !contents[string(theirs.raw[id])] {
+						copied := map[string]any{}
+						for name, field := range item {
+							copied[name] = field
+						}
+						original, _ := item["id"].(string)
+						copyID := sharedMigrationCopyID(original, workspace.ID, item)
+						copied["id"] = copyID
+						if _, done := have[copyID]; !done && !add(copyID, copied) {
+							full = append(full, key.Name)
+							continue
+						}
+					}
+					source.Seen[seenKey] = itemDigest
+					continue
+				}
 				existing, exists := have[id]
 				switch {
 				case exists && string(existing) == string(theirs.raw[id]):
@@ -460,7 +486,7 @@ func (m *sharedMigration) settings(workspace legacyWorkspace, dir string) error 
 	}
 	m.marker.notice("host-key-conflict", workspace.ID, conflicts)
 	m.marker.notice("limit", workspace.ID, full)
-	if len(full) == 0 {
+	if len(full) == 0 && !incomplete {
 		source.Digest = digest
 	}
 	m.changed = true
@@ -556,6 +582,10 @@ func (m *sharedMigration) knownHosts(workspace legacyWorkspace, dir string) erro
 	for host, fingerprint := range imported.Entries {
 		source.Seen[host] = fingerprint
 	}
+	// Hosts that only this workspace trusted are trusted by every app now.
+	// The user may have removed one of them elsewhere on purpose, so they are
+	// named, and the page says where to remove a host.
+	m.marker.notice("hosts-added", workspace.ID, sharedNoticeNames(append([]string{}, imported.Added...)))
 	m.marker.notice("host-key-conflict", workspace.ID, conflicts)
 	source.Digest = digest
 	m.changed = true

@@ -91,6 +91,8 @@ type credentialImportResult struct {
 	Imported int `json:"imported"`
 	Present  int `json:"alreadyPresent"`
 	Skipped  int `json:"skipped"`
+	// The names (never the secrets) of the credentials that did not fit.
+	SkippedNames []string `json:"skippedNames,omitempty"`
 	// Old id to new id, for credentials whose id was taken.
 	Renamed map[string]string `json:"-"`
 }
@@ -129,6 +131,7 @@ func (v *credentialVault) importRecords(records []credentialRecord) (credentialI
 				}
 				if len(v.entries) >= maxCredentialEntries {
 					result.Skipped++
+					result.SkippedNames = append(result.SkippedNames, record.Name)
 					continue
 				}
 				id := "credential-" + randomHex(12)
@@ -136,6 +139,7 @@ func (v *credentialVault) importRecords(records []credentialRecord) (credentialI
 				record.ID = id
 			} else if len(v.entries) >= maxCredentialEntries {
 				result.Skipped++
+				result.SkippedNames = append(result.SkippedNames, record.Name)
 				continue
 			}
 			v.entries[record.ID] = record
@@ -150,6 +154,7 @@ func (v *credentialVault) importRecords(records []credentialRecord) (credentialI
 	if errors.Is(err, errCredentialNoChange) {
 		err = nil
 	}
+	sort.Strings(result.SkippedNames)
 	return result, err
 }
 
@@ -311,9 +316,13 @@ func (a *application) importPreviousVault(ctx context.Context, source string) (c
 			reference.CredentialID = id
 		}
 	}
-	if marker.Imports == nil {
-		marker.Imports = map[string]sharedVaultImport{}
+	if result.Skipped == 0 {
+		// Everything is in the shared vault. While credentials are left out
+		// (the vault is full) the import stays on offer.
+		if marker.Imports == nil {
+			marker.Imports = map[string]sharedVaultImport{}
+		}
+		marker.Imports[workspace.ID] = sharedVaultImport{At: time.Now().UTC().Format(time.RFC3339), Imported: result.Imported}
 	}
-	marker.Imports[workspace.ID] = sharedVaultImport{At: time.Now().UTC().Format(time.RFC3339), Imported: result.Imported}
 	return result, writeSharedMarker(root, marker)
 }

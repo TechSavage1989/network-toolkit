@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -357,5 +358,59 @@ func TestSharedVaultImportFromPreviousVaultWithoutMasterPassword(t *testing.T) {
 	stranger.shared = newSharedData(root, stranger.dataPath)
 	if _, err := stranger.importPreviousVault(context.Background(), "terminal"); err == nil {
 		t.Fatal("a previous vault was opened with another account's protection")
+	}
+}
+
+// The shared vault has room for fewer credentials than the previous vault
+// holds. What does not fit is named, nothing is recorded as done, and the
+// import stays available until everything is in.
+func TestSharedVaultImportThatDoesNotFitStaysAvailableAndNamesWhatWasLeftOut(t *testing.T) {
+	root, main, _ := sharedVaultApps(t)
+	for n := 0; n < maxCredentialEntries-1; n++ {
+		if _, err := main.credentials.put(credentialRecord{ID: fmt.Sprintf("filler-%03d", n), Name: fmt.Sprintf("Filler %d", n), Kind: "password", Secret: "fixture-secret"}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	previousTerminalVault(t, root, main.credentials.protect, main.credentials.unprotect, "",
+		credentialRecord{ID: "old-a", Name: "Router admin", Username: "admin", Kind: "password", Secret: "secret-a"},
+		credentialRecord{ID: "old-b", Name: "Switch admin", Username: "admin", Kind: "password", Secret: "secret-b"},
+		credentialRecord{ID: "old-c", Name: "Lab console", Username: "lab", Kind: "password", Secret: "secret-c"})
+	post := func() (int, map[string]any) {
+		r := requestApp(main, "POST", "/api/credential-vault", `{"action":"import-previous","source":"terminal"}`, true)
+		var decoded map[string]any
+		_ = json.Unmarshal(r.Body.Bytes(), &decoded)
+		return r.Code, decoded
+	}
+	code, body := post()
+	if code != 200 || body["imported"] != float64(1) || body["skipped"] != float64(2) {
+		t.Fatalf("an import into a nearly full vault: %d %v", code, body)
+	}
+	names, _ := body["skippedNames"].([]any)
+	if len(names) != 2 || fmt.Sprint(names) != "[Router admin Switch admin]" && fmt.Sprint(names) != "[Lab console Switch admin]" && fmt.Sprint(names) != "[Lab console Router admin]" {
+		t.Fatalf("the credentials that were left out are not named: %v", body["skippedNames"])
+	}
+	if strings.Contains(fmt.Sprint(body), "secret-") {
+		t.Fatalf("the answer carries a secret: %v", body)
+	}
+	if vaults := main.previousVaults(); len(vaults) != 1 || vaults[0].Imported {
+		t.Fatalf("an import that left credentials out was recorded as done: %+v", vaults)
+	}
+	// The user makes room and imports again: the rest comes in, nothing twice.
+	for _, id := range []string{"filler-000", "filler-001"} {
+		if err := main.credentials.delete(id); err != nil {
+			t.Fatal(err)
+		}
+	}
+	code, body = post()
+	if code != 200 || body["imported"] != float64(2) || body["skipped"] != float64(0) || body["alreadyPresent"] != float64(1) {
+		t.Fatalf("the second import: %d %v", code, body)
+	}
+	for _, id := range []string{"old-a", "old-b", "old-c"} {
+		if _, ok := main.credentials.get(id); !ok {
+			t.Fatalf("%s is not in the shared vault after both imports", id)
+		}
+	}
+	if vaults := main.previousVaults(); len(vaults) != 1 || !vaults[0].Imported {
+		t.Fatalf("a complete import was not recorded: %+v", vaults)
 	}
 }

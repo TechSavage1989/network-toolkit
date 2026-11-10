@@ -514,3 +514,44 @@ func TestSharedMigrationTextEditorPreferences(t *testing.T) {
 		t.Fatalf("the standalone Text Editor after the migration: %v", editor.state)
 	}
 }
+
+// Saved sessions whose id another entry of the same list also has cannot be
+// matched by id. They are still brought over, each with an id of its own, and
+// the workspace is recorded as done only because nothing was left out.
+func TestSharedMigrationBringsOverEntriesThatShareAnID(t *testing.T) {
+	root := t.TempDir()
+	profile := func(id, name, host string) map[string]any { return sharedProfile(id, name, host) }
+	rootRaw, _ := json.Marshal(map[string]any{"terminalProfiles": []any{profile("dup", "Root one", "192.0.2.1"), profile("plain", "Plain", "192.0.2.2")}})
+	workspaceRaw, _ := json.Marshal(map[string]any{"terminalProfiles": []any{profile("dup", "Workspace one", "192.0.2.11"), profile("dup", "Workspace two", "192.0.2.12"), profile("plain", "Plain", "192.0.2.2"), profile("fine", "Fine", "192.0.2.13")}})
+	writeFixture(t, filepath.Join(root, appSettingsFilename), string(rootRaw))
+	writeFixture(t, filepath.Join(root, terminalWorkspaceName, appSettingsFilename), string(workspaceRaw))
+	if err := migrateSharedData(root); err != nil {
+		t.Fatal(err)
+	}
+	list, _ := sharedDisk(t, root)["terminalProfiles"].([]any)
+	names, ids := []string{}, map[string]bool{}
+	for _, entry := range list {
+		row := entry.(map[string]any)
+		names = append(names, row["name"].(string))
+		id := row["id"].(string)
+		if id == "" || ids[id] {
+			t.Fatalf("an entry was brought over without an id of its own: %v", row)
+		}
+		ids[id] = true
+	}
+	sort.Strings(names)
+	if strings.Join(names, ",") != "Fine,Plain,Root one,Workspace one,Workspace two" {
+		t.Fatalf("saved sessions after the move: %v", names)
+	}
+	marker, err := readSharedMarker(root)
+	if err != nil || marker.Sources["terminal/settings"] == nil || marker.Sources["terminal/settings"].Digest == "" {
+		t.Fatalf("the workspace is not recorded as done although everything was brought over: %+v %v", marker.Sources, err)
+	}
+	before := snapshotFiles(t, root)
+	if err := migrateSharedData(root); err != nil {
+		t.Fatal(err)
+	}
+	if diff := sameFiles(before, snapshotFiles(t, root)); diff != "" {
+		t.Fatalf("a second start changed: %s", diff)
+	}
+}
