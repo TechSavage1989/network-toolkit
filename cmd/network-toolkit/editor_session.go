@@ -108,6 +108,11 @@ type editorSessionStore struct {
 	known map[string]bool
 	// An unreadable index was set aside: only known copies may be removed.
 	unreadable bool
+	// Held for as long as this process runs once it has used its session, so
+	// the other editor app never takes tabs from a running one
+	// (editor_session_adopt.go).
+	leaseMu sync.Mutex
+	lease   *os.File
 }
 
 func (s *editorSessionStore) initLocked() {
@@ -539,9 +544,23 @@ func (a *application) handleEditorSession(w http.ResponseWriter, r *http.Request
 		return
 	}
 	s := &a.editorSession
+	if err := a.holdEditorSessionLease(); errors.Is(err, errEditorSessionTakeover) {
+		jsonError(w, http.StatusServiceUnavailable, err.Error())
+		return
+	}
 	switch {
 	case r.URL.Path == editorSessionEndpoint && r.Method == http.MethodGet:
+		// Bringing over a very large kept copy can take longer than an
+		// ordinary request.
+		_ = http.NewResponseController(w).SetWriteDeadline(time.Time{})
 		s.mu.Lock()
+		s.initLocked()
+		// Tabs the other editor app (main window or Text Editor) kept are
+		// reopened here when that app is not running.
+		adopted, adoptErr := a.adoptEditorSessionLocked(r.Context())
+		if adoptErr != nil {
+			log.Print("Text Editor session of the other window: ", adoptErr)
+		}
 		root, err := a.editorSessionRoot(false)
 		index, warning := emptyEditorSession(), ""
 		if err == nil {
@@ -550,6 +569,9 @@ func (a *application) handleEditorSession(w http.ResponseWriter, r *http.Request
 			err = nil
 		}
 		s.mu.Unlock()
+		if _, mode := a.otherEditorWorkspace(); adopted > 0 {
+			warning = strings.TrimSpace(warning + " " + editorSessionAdoptionNote(adopted, mode))
+		}
 		if err != nil {
 			jsonError(w, http.StatusInternalServerError, "The last Text Editor session could not be read: "+err.Error())
 			return
