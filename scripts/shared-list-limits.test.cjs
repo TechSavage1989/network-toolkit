@@ -140,3 +140,32 @@ test('the Saved sidebar and the saved targets form ask the same limit',()=>{
  assert(/NetworkToolkitSharedData\?\.full\('terminalProfiles'/.test(read('assets/session-sidebar.js')),'Save session in the sidebar');
  assert(/NetworkToolkitSharedData\?\.full\('profiles'/.test(html),'the saved target form');
 });
+
+// Rolling lists (recent connections, learned names) are cut on purpose: the
+// oldest entries leave. Wherever the page cuts one, it cuts at the number of
+// the engine's table, so no part of the page keeps fewer than another.
+test('every cut of a rolling list uses the number of the engine table',()=>{
+ const files=['index.html',...fs.readdirSync(path.join(web,'assets')).filter(name=>name.endsWith('.js')).map(name=>'assets/'+name)];
+ const cuts=[];
+ for(const file of files){
+  const text=read(file);
+  for(const key of Object.keys(shared.ROLLING_LIMITS)){
+   const assignment=new RegExp('(?:state|out)\\.'+key+'\\s*=(?!=)[^;]*','g');let match;
+   while((match=assignment.exec(text))){
+    // The cut of the list itself: ".slice(0,n)" after an array literal or an array method.
+    for(const cut of match[0].matchAll(/(?:\]|\)\s*)\.slice\(\s*0\s*,\s*([A-Za-z_.$\d]+)\s*\)/g)){
+     const before=match[0].slice(0,cut.index+1);
+     if(/\.(?:id|name|host|username|fingerprint|credentialId|trim\(\)|toString\(\d*\))$/.test(before))continue; // a text, not the list
+     cuts.push([file,key,cut[1]]);
+    }
+   }
+  }
+ }
+ assert(cuts.length>=6,'the cuts of rolling lists were found: '+JSON.stringify(cuts));
+ for(const [file,key,amount] of cuts){
+  const number=/^\d+$/.test(amount)?Number(amount):amount==='ROLLING_LIMITS.'+key?shared.ROLLING_LIMITS[key]:NaN;
+  assert.equal(number,shared.ROLLING_LIMITS[key],file+' cuts '+key+' at '+amount+', the table says '+shared.ROLLING_LIMITS[key]);
+ }
+ // Learned prompt names are cut inside their own module.
+ assert.equal(Number((/const LIMIT=(\d+)/.exec(read('assets/terminal-prompt-labels.js'))||[])[1]),shared.ROLLING_LIMITS.terminalPromptNames);
+});
