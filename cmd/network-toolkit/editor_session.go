@@ -16,6 +16,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -298,7 +299,12 @@ func (a *application) writeEditorSessionLocked(root *storageRoot, index editorSe
 		delete(s.pending, id)
 		s.known[id] = true
 	}
-	return a.cleanupEditorSessionLocked(root, referenced)
+	// The index is saved; a copy that cannot be removed now (for example while
+	// another program reads it) is retried by the next save.
+	if err := a.cleanupEditorSessionLocked(root, referenced); err != nil {
+		log.Print("Text Editor session cleanup: ", err)
+	}
+	return nil
 }
 
 func (a *application) cleanupEditorSessionLocked(root *storageRoot, referenced map[string]bool) error {
