@@ -1,3 +1,7 @@
+## 1.21.43 Beta 1 - An opened document is the tab in front
+
+- A document opened from Windows with the Text Editor becomes the active tab, also while last session's tabs reopen.
+
 ## 1.21.42 Beta 1 - Send to opens the other app by itself
 
 - Send to terminal and Send to Text Editor in the standalone apps open the other app automatically and deliver what was sent, without a second click.
