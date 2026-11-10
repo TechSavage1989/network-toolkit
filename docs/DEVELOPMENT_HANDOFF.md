@@ -1,3 +1,17 @@
+# v1.21.43 Beta 1 - An opened document is the tab in front
+
+Owner: "when a document is opened by default with text editor, the opened document must be the active tab. currently it seems like the last active tab remains active even when the new document is added as a new tab."
+
+v1.21.42 was published and verified: tag at merge commit 684095f (PR #164), release run green (build, windows-setup, publish), all seven assets matching GitHub's digests, `github_release.py verify` reporting "Verified 1.21.42", stable channel still at v1.21.34. Its security review found no HIGH or MEDIUM; seven LOW items were hardened before the merge.
+
+Cause: a file from outside and the reopening of the last session start together and finish in either order, and every reopened tab made itself active as it was added; when the file was itself a kept tab, the restore preferred the session's stored active tab. Wrong before the fix: a cold start with `--open-file` and a kept session (including tabs taken over from the other editor), the main window started with or handed its first file before its editor page was shown, restore off with kept unsaved text, several files before the session was back, and a session read that failed and was retried. A running editor whose session was already restored was right.
+
+Fix (page only, `web/assets/file-editor.js`, `web/assets/editor-session.js`): the editor remembers the last document asked for until the session is back (`noteAsked`); kept tabs reopen behind it and `finishSessionRestore` activates it; the restore asks the host for that document (`requested`) and prefers it over the stored active tab. The same rule covers a file or text opened from another tool, and a tab the user clicks, while the session is still loading. Every kept tab and its unsaved text still reopens in order. Tests: `scripts/editor-session.test.cjs`, the last part of `scripts/editor-session-restore.browser.cjs`, and `TestEditorSessionBrowserOpenedFileIsActive` (two real engines, a disk-backed file with unsaved text, real second starts); the `browser-editor112` step now runs every `TestEditorSessionBrowser*` test.
+
+Known limits: with 12 tabs already open a launch file is refused with the existing "12 maximum" message. The Windows file association, native foregrounding and the DPAPI record were not run; the hand-over was exercised through the same Go path on Linux. Not yet seen on physical Windows.
+
+---
+
 # v1.21.42 Beta 1 - Send to opens the other app by itself
 
 Owner: "the 'send to' commands in terminal and text editor should automatically open the respective standalone app to perform the task and if the main toolkit app is already open then it would send there".

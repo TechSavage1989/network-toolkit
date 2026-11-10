@@ -707,7 +707,7 @@ async function goToLine(){const d=current();if(!d)return;
  }
  const starts=lineIndex(d);const value=await askEditor({title:'Go to line',message:'Enter a line number from 1 to '+starts.length+'.',value:String(sourceLineAt(starts,findEl('[data-ed-text]').selectionStart)+1),accept:'Go',validate:value=>Number.isSafeInteger(Number(value))&&Number(value)>=1&&Number(value)<=lineIndex(d).length?'':'Enter an existing line number.'});if(value===null||current()!==d||documents.get(d.id)!==d)return;positionAt(lineIndex(d)[Number(value)-1]);}
 function setMessage(s,error=false){const el=findEl('[data-ed-message]');if(el){el.textContent=s;el.classList.toggle('error',error);}}
-function activateDocument(id,focus=false){const d=documents.get(id);if(!d)return false;if(editorComposing()&&current()!==d){setMessage('Finish text composition before switching documents.',true);return false;}if(!paneWorkspace()&&displayedDocument)displayedDocument.view=captureView();active=id;groups.activate(d.uid);if(paneWorkspace()){displayedDocument=null;drawTabs();paneWorkspace().showDocument(id);}else draw();if(focus)findEl('[data-ed-text]')?.focus({preventScroll:true});return true;}
+function activateDocument(id,focus=false){const d=documents.get(id);if(!d)return false;if(editorComposing()&&current()!==d){setMessage('Finish text composition before switching documents.',true);return false;}if(!paneWorkspace()&&displayedDocument)displayedDocument.view=captureView();active=id;groups.activate(d.uid);if(paneWorkspace()){displayedDocument=null;drawTabs();paneWorkspace().showDocument(id);}else draw();if(focus)findEl('[data-ed-text]')?.focus({preventScroll:true});noteAsked(id);return true;}
 // Reordering changes presentation order only: keep the same document objects,
 // active identity and live editor/compare DOM (including selection and history).
 function canReorderDocuments({ignoreDragPreparation=false}={}){const windows=root.NetworkToolkitEditorWindows?.state;if(windowCloseState||pendingEditorDialog||paneWorkspace()?.composing||windows?.closing||windows?.outgoing||windows?.incoming||windows?.detaching||(!ignoreDragPreparation&&windows?.dragPreparing)||[...documents.values()].some(d=>d.loading||d.reloading||d.saving||d.formatting||d.frozen))return 'Finish pending editor operations before rearranging tabs.';return '';}
@@ -747,13 +747,18 @@ async function open({id,source,path,read,write,afterSave,list,binding=null,creat
  if(pendingSavePath===path)throw Error('This path is the destination of a pending Save As. Wait for that save to finish.');
  const key=String(id||source+':'+path),previous=active;
  let doc=documents.get(key);
- if(doc){active=key;doc.showStart=true;overlay.hidden=false;root.NetworkToolkitEditorFiles?.initialize?.(overlay);draw();if(doc.loading)return doc.loadingPromise;if(!comparison)findEl('[data-ed-text]')?.focus();return doc;}
+ if(doc){noteAsked(key);active=key;doc.showStart=true;overlay.hidden=false;root.NetworkToolkitEditorFiles?.initialize?.(overlay);draw();if(doc.loading)return doc.loadingPromise;if(!comparison)findEl('[data-ed-text]')?.focus();return doc;}
  if(documents.size>=12)throw Error('Close an editor tab before opening another file (12 maximum).');
  startSession();
  doc={id:key,restoreRequest:restore,uid:root.crypto?.randomUUID?.()||'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const n=Math.floor(Math.random()*16);return (c==='x'?n:(n&3)|8).toString(16);}),binding,path,source:source||'SFTP',read,write,afterSave,diskRemote,desktopHandle,diskFile,list:typeof list==='function'?list:null,hash:'',encoding:'UTF-8',bom:false,original:initialContent,content:'',saved:'',dirty:false,eol:'LF',undo:[],redo:[],language:'',untitled:source==='Untitled',loading:!create};
  const paged=!!diskAvailable()&&(!!diskMode||!create&&['local','terminal','sshConnection','ftp'].includes(binding?.kind));
  if(paged)doc.loading=true;
- setFileValues(doc);documents.set(key,doc);if(!paged)root.NetworkToolkitEditorWindows?.prepareDocument?.(doc);active=key;overlay.hidden=false;root.NetworkToolkitEditorFiles?.initialize?.(overlay);applyEditorTheme();draw();
+ setFileValues(doc);documents.set(key,doc);if(!paged)root.NetworkToolkitEditorWindows?.prepareDocument?.(doc);
+ // A tab of the last session reopens behind a document that was asked for
+ // (see noteAsked); every other new document becomes the active tab.
+ const behind=restoringRecord&&!!askedBeforeRestore&&!!current();
+ if(!behind){noteAsked(key);active=key;}
+ overlay.hidden=false;root.NetworkToolkitEditorFiles?.initialize?.(overlay);applyEditorTheme();if(behind)drawTabs();else draw();
  if(!create||paged){
   doc.loadingPromise=(async()=>{
    try{const result=paged?await openDiskDocument(doc,diskMode,diskFile):await read(path);if(result.binary)throw Error('Binary files cannot be opened in the text editor.');
@@ -1293,8 +1298,19 @@ function restoreSessionLocal(record){
   return {doc:d,note:missing&&record.hash?name+' is no longer on disk. Your unsaved version is shown; use Save As to keep it.':changed?name+' changed on disk since your last session. Your unsaved version is shown.':''};
  },error=>paged?{error,carry:sessionCarry(error)}:restoreSessionDraft(record,{name,note:name+' could not be opened ('+error.message+'). Your unsaved text was restored into a new untitled tab; use Save As to keep it.'}));
 }
+// A document that was asked for is the active tab, whatever the last session
+// held: a file from Explorer (a launch request), a file or text opened from
+// another tool, or a tab the user chose. The session may be reopened before
+// or after such a request (the two start together when the app starts with a
+// file), so until it has been reopened the last request is remembered here.
+// Tabs of the last session then reopen behind it, and the session's own
+// "which tab was active" applies only when nothing was asked for.
+let restoringRecord=false,finishingRestore=false,askedBeforeRestore='';
+function noteAsked(id){if(!restoringRecord&&!finishingRestore&&session&&['idle','restoring','failed'].includes(session.phase))askedBeforeRestore=id;}
+const askedDocument=()=>askedBeforeRestore?documents.get(askedBeforeRestore)||current()||null:null;
 // Called in tab order; each call adds its tab before it waits for anything.
-function restoreSessionRecord(record){
+function restoreSessionRecord(record){restoringRecord=true;try{return reopenSessionRecord(record);}finally{restoringRecord=false;}}
+function reopenSessionRecord(record){
  if(documents.size>=12)return {carry:true,limit:true};
  if(record.kind==='local'){
   const existing=documents.get('local:'+record.path),name=nameOf(record.path);
@@ -1310,13 +1326,17 @@ function restoreSessionRecord(record){
  return restoreSessionDraft(record,{name:record.name,origin:record.kind==='copy'?record.origin:'',note:record.kind==='copy'?'Restored unsaved text from '+record.origin+'. Reconnect and use Save As to save it there.':''});
 }
 // Restored tabs keep their stored order ahead of tabs opened meanwhile (for
-// example from Explorer); those keep the active tab.
+// example from Explorer). The active tab is the document that was asked for
+// meanwhile, otherwise the one the session stored.
 function finishSessionRestore({docs,active:chosen}){
  const restored=docs.filter((d,index)=>documents.get(d.id)===d&&docs.indexOf(d)===index),list=[...documents.values()];
  const order=[...restored,...list.filter(d=>!restored.includes(d))];
  if(order.some((d,index)=>d!==list[index])){documents.clear();for(const d of order)documents.set(d.id,d);}
- if(chosen&&documents.get(chosen.id)===chosen&&current()!==chosen&&!editorComposing())activateDocument(chosen.id);
- else if(overlay&&documents.size)drawTabs();
+ finishingRestore=true;
+ try{
+  if(chosen&&documents.get(chosen.id)===chosen&&current()!==chosen&&!editorComposing())activateDocument(chosen.id);
+  else if(overlay&&documents.size)drawTabs();
+ }finally{finishingRestore=false;askedBeforeRestore='';}
  root.NetworkToolkitEditorWindows?.notifyChanged?.();
 }
 const sessionReadiness=()=>!sessionWorkspace()?'never':(typeof stateLoaded!=='undefined'&&!stateLoaded)||(typeof online!=='undefined'&&!online)?'wait':!sessionEngine()?'never':restoreSessionPreference()?'ready':'off';
@@ -1332,6 +1352,7 @@ const session=root.NTKEditorSession?.create({
  idle:()=>!windowCloseState&&!pendingEditorDialog&&!editorComposing()&&![...documents.values()].some(d=>d.promoting||d.diskEditing||d.reloading||d.staged||d.frozen),
  readiness:sessionReadiness,
  restoreRecord:restoreSessionRecord,
+ requested:askedDocument,
  finishRestore:finishSessionRestore,
  message:(text,error)=>{if(overlay)setMessage(text,error);if(error&&typeof toast==='function')toast(text,'error');}
 });

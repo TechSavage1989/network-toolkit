@@ -98,6 +98,12 @@ test('restore keeps stored order, carries limited records and leaves the active 
  const busy=[{id:'explorer',uid:'e',path:'C:\\explorer.txt',dirty:false,editRevision:1}],other=fakeHost(busy);other.session={version:1,active:0,tabs:[records[0]]};
  other.restoreRecord=()=>{const d={id:'a',uid:'a',path:'C:\\a.txt',editRevision:1};busy.push(d);return {doc:d};};
  await session.create(other).restore();assert.equal(other.finished.active,null,'a file opened from Explorer keeps focus');
+ // A document that was asked for meanwhile is the active tab even when it is
+ // itself one of the restored tabs; without a request the stored tab applies.
+ const again=[],asked=fakeHost(again);asked.session={version:1,active:0,tabs:[records[0],{kind:'local',path:'C:\\b.txt',dirty:false}]};
+ asked.restoreRecord=record=>{const d=local(record.path);again.push(d);return {doc:d};};asked.requested=()=>again[1];
+ await session.create(asked).restore();assert.equal(asked.finished.active?.path,'C:\\b.txt','the file asked for is active, not the stored active tab');
+ again.length=0;asked.requested=()=>null;await session.create(asked).restore();assert.equal(asked.finished.active?.path,'C:\\a.txt','nothing was asked for: the stored active tab');
  const failing=fakeHost([]);failing.request=async()=>{throw Error('offline');};const stopped=session.create(failing);
  assert.equal(await stopped.restore(),false);assert.equal(stopped.phase,'failed');assert.equal(stopped.tick(),false,'a session that could not be read is never overwritten');
 });
@@ -211,12 +217,14 @@ test('a session that could not be read is asked for again and then reopened',asy
 
 // ---- Integration through the real file-editor.js in memory mode ----
 const editorSource=fs.readFileSync(require.resolve('../web/assets/file-editor.js'),'utf8');
-function harness({preferences={},stored={version:1,active:-1,tabs:[]},files={},failBackup=()=>false}={}){
+function harness({preferences={},stored={version:1,active:-1,tabs:[]},files={},failBackup=()=>false,hold={}}={}){
  const document=makeDocument('');document.body=document;document.body.appendChild=document.body.append;
  const create=document.createElement;document.createElement=tag=>{const el=create(tag);el.style.setProperty=(k,v)=>el.style[k]=v;el.style.removeProperty=k=>delete el.style[k];return el;};
  const calls=[],kept=new Map(),index={value:stored};
  const api=async(path,method='GET',body)=>{
   calls.push({path,method,body:body&&JSON.parse(JSON.stringify(body))});
+  // hold.text delays the text of files and kept copies until the test releases it.
+  if(path==='/file-editor/local'&&body.action==='read-text'||path.startsWith('/editor-session/backup?id='))await hold.text;
   if(path==='/file-editor/local'&&body.action==='read-text'){if(!(body.path in files))throw Object.assign(Error('The system cannot find the file specified.'),{status:400});return {content:files[body.path].content,hash:files[body.path].hash,encoding:'UTF-8',bom:false};}
   if(path==='/editor-session'&&method==='GET')return index.value;
   if(path==='/editor-session'&&method==='PUT'){index.value=JSON.parse(JSON.stringify(body));return {ok:true};}
@@ -320,4 +328,113 @@ test('restoring reopens tabs in order with dirty text, reports a changed file an
  assert.equal(h.calls.filter(c=>c.path==='/editor-session/backup'&&c.method==='POST').length,posts,'unchanged restored text is not copied again');
  assert.deepEqual(h.index.value.tabs.map(t=>t.kind),['local','local','untitled','untitled','copy']);
  assert.equal(h.index.value.tabs[4].origin,'SFTP files · /etc/router.cfg');
+});
+
+// ---- A document opened from outside (Explorer, a launch request) and the last session ----
+// The page opens a launch file with openLocalPath(path,false,true) (openEditorLaunchRequests in index.html).
+const LAUNCH={A:'C:\\work\\a.txt',B:'C:\\work\\b.txt',NEW:'C:\\work\\from-explorer.txt',NEW2:'C:\\work\\second.txt',NEW3:'C:\\work\\third.txt'};
+const launchFiles=()=>Object.fromEntries(Object.values(LAUNCH).map((path,i)=>[path,{content:'saved '+path+'\n',hash:hash(String(i+1))}]));
+const fmtLF={encoding:'UTF-8',bom:false,eol:'LF'};
+// Three tabs: a.txt, b.txt with unsaved text (the stored active tab) and an unsaved draft.
+function keptSession(h,active=1){
+ h.kept.set('1'.repeat(32),'unsaved b\n');h.kept.set('2'.repeat(32),'unsaved draft');
+ h.index.value={version:1,active,tabs:[{kind:'local',path:LAUNCH.A,dirty:false,exists:true},{kind:'local',path:LAUNCH.B,dirty:true,hash:hash('2'),format:fmtLF,savedFormat:fmtLF,backup:{id:'1'.repeat(32),size:9,sha256:hash('f')},exists:true},{kind:'untitled',name:'Untitled.txt',dirty:true,format:fmtLF,backup:{id:'2'.repeat(32),size:9,sha256:hash('f')}}]};
+}
+const gate=()=>{let release;const text=new Promise(resolve=>{release=resolve;});return {hold:{text},release};};
+const openFromOutside=(h,path)=>h.editor.openLocalPath(path,false,true);
+const tabState=h=>[...h.editor.documents.values()].map(d=>[d.path,!!d.dirty,d.content]);
+const savedText=path=>'saved '+path+'\n';
+const KEPT_TABS=[[LAUNCH.A,false,savedText(LAUNCH.A)],[LAUNCH.B,true,'unsaved b\n'],['Untitled.txt',true,'unsaved draft']];
+const selectedTab=h=>h.root().querySelectorAll('[data-ed-open]').filter(tab=>tab.getAttribute('aria-selected')==='true').map(tab=>tab.dataset.edOpen);
+
+test('a file opened from outside before the last session is reopened is the active tab; every kept tab and unsaved text still reopens',async()=>{
+ // The main window started with a file (or was handed one before its editor was ever shown), or the session read is slow.
+ const h=harness({files:launchFiles()});keptSession(h);
+ const opened=openFromOutside(h,LAUNCH.NEW);h.mount();
+ await waitFor(()=>h.editor.session.phase==='ready','restore');await opened;
+ assert.deepEqual(tabState(h),[...KEPT_TABS,[LAUNCH.NEW,false,savedText(LAUNCH.NEW)]],'kept tabs first in their order, then the file from outside');
+ assert.equal(h.editor.active.path,LAUNCH.NEW,'the file from outside is the active tab');
+ assert.deepEqual(selectedTab(h),['local:'+LAUNCH.NEW]);
+ assert.equal(h.root().querySelector('[data-ed-text]').value,savedText(LAUNCH.NEW),'and its text is shown');
+});
+
+test('the same with the session read finishing first: a file from outside that arrives while kept tabs still load stays active',async()=>{
+ const {hold,release}=gate(),h=harness({files:launchFiles(),hold});keptSession(h);
+ h.mount();await waitFor(()=>h.editor.documents.size===3,'kept tabs are added');
+ assert.equal(h.editor.session.phase,'restoring');
+ const opened=openFromOutside(h,LAUNCH.NEW);release();
+ await waitFor(()=>h.editor.session.phase==='ready','restore');await opened;
+ assert.deepEqual(tabState(h),[...KEPT_TABS,[LAUNCH.NEW,false,savedText(LAUNCH.NEW)]]);
+ assert.equal(h.editor.active.path,LAUNCH.NEW);
+});
+
+test('a file from outside that is already one of the kept tabs becomes active and is not opened twice',async()=>{
+ // a.txt is a kept tab but not the stored active one (b.txt is).
+ for(const first of ['launch','restore']){
+  const {hold,release}=gate(),h=harness({files:launchFiles(),hold});keptSession(h);let opened;
+  if(first==='launch'){opened=openFromOutside(h,LAUNCH.A);h.mount();}
+  else{h.mount();await waitFor(()=>h.editor.documents.size===3,'kept tabs are added');opened=openFromOutside(h,LAUNCH.A);}
+  release();await waitFor(()=>h.editor.session.phase==='ready','restore');await opened;
+  assert.deepEqual(tabState(h),KEPT_TABS,first+' first: three tabs, a.txt once');
+  assert.equal(h.editor.active.path,LAUNCH.A,first+' first: the file from outside is active, not the stored active tab');
+  assert.deepEqual(selectedTab(h),['local:'+LAUNCH.A]);
+  assert.equal(h.calls.filter(c=>c.path==='/file-editor/local'&&c.body.path===LAUNCH.A).length,1,'a.txt is read once');
+ }
+ // With unsaved text kept for the file that is asked for, that text stays reachable.
+ const h=harness({files:launchFiles()});keptSession(h,0);
+ const opened=openFromOutside(h,LAUNCH.B);h.mount();await waitFor(()=>h.editor.session.phase==='ready','restore');await opened;
+ assert.equal(h.editor.active.path,LAUNCH.B,'the file from outside is active');
+ assert.deepEqual([...h.editor.documents.values()].map(d=>d.content).sort(),[savedText(LAUNCH.A),savedText(LAUNCH.B),'unsaved b\n','unsaved draft'].sort(),'the kept unsaved version is open as well');
+ assert.match(h.root().querySelector('[data-ed-message]').textContent,/b\.txt was already open, so your unsaved version from the last session opened in a separate tab/);
+});
+
+test('several files from outside: each opens once and the last one handed over is active',async()=>{
+ for(const first of ['launch','restore']){
+  const {hold,release}=gate(),h=harness({files:launchFiles(),hold});keptSession(h);
+  const open=()=>[LAUNCH.NEW,LAUNCH.A,LAUNCH.NEW2,LAUNCH.NEW,LAUNCH.NEW3].map(path=>openFromOutside(h,path));let opened;
+  if(first==='launch'){opened=open();h.mount();}
+  else{h.mount();await waitFor(()=>h.editor.documents.size===3,'kept tabs are added');opened=open();}
+  release();await waitFor(()=>h.editor.session.phase==='ready','restore');await Promise.all(opened);
+  assert.deepEqual(tabState(h).map(row=>row[0]),[LAUNCH.A,LAUNCH.B,'Untitled.txt',LAUNCH.NEW,LAUNCH.NEW2,LAUNCH.NEW3],first+' first');
+  assert.equal(h.editor.active.path,LAUNCH.NEW3,first+' first: the last file handed over is active');
+ }
+});
+
+test('with "Reopen files next time" off, kept unsaved text still reopens behind the file from outside',async()=>{
+ const h=harness({files:launchFiles(),preferences:{restoreSession:false}});keptSession(h);
+ const opened=openFromOutside(h,LAUNCH.NEW);h.mount();
+ await waitFor(()=>h.editor.session.phase==='off','restore');await opened;
+ assert.deepEqual(tabState(h),[KEPT_TABS[1],KEPT_TABS[2],[LAUNCH.NEW,false,savedText(LAUNCH.NEW)]],'unsaved text is reopened, the saved file is not');
+ assert.equal(h.editor.active.path,LAUNCH.NEW);
+ // Nothing kept: only the file from outside.
+ const plain=harness({files:launchFiles(),preferences:{restoreSession:false}});
+ const one=openFromOutside(plain,LAUNCH.NEW);plain.mount();await waitFor(()=>plain.editor.session.phase==='off','restore');await one;
+ assert.deepEqual(tabState(plain).map(row=>row[0]),[LAUNCH.NEW]);assert.equal(plain.editor.active.path,LAUNCH.NEW);
+});
+
+test('an editor that is already running makes a handed-over file the active tab, new or already open',async()=>{
+ const h=harness({files:launchFiles()});keptSession(h);h.mount();await waitFor(()=>h.editor.session.phase==='ready','restore');
+ assert.equal(h.editor.active.path,LAUNCH.B,'nothing was asked for: the stored active tab');
+ await openFromOutside(h,LAUNCH.NEW);assert.equal(h.editor.active.path,LAUNCH.NEW);assert.equal(h.editor.documents.size,4);
+ h.editor.activateDocument('local:'+LAUNCH.B);
+ await openFromOutside(h,LAUNCH.A);assert.equal(h.editor.active.path,LAUNCH.A,'an already open file becomes active');assert.equal(h.editor.documents.size,4,'and is not opened twice');
+ assert.deepEqual(selectedTab(h),['local:'+LAUNCH.A]);
+});
+
+test('a tab the user chooses while the last session still loads is kept, and a session that is read later does not move the active tab',async()=>{
+ const {hold,release}=gate(),h=harness({files:launchFiles(),hold});keptSession(h);
+ h.mount();await waitFor(()=>h.editor.documents.size===3,'kept tabs are added');
+ h.editor.activateDocument('local:'+LAUNCH.A);release();
+ await waitFor(()=>h.editor.session.phase==='ready','restore');
+ assert.equal(h.editor.active.path,LAUNCH.A);
+ // The session could not be read at first: the file from outside stays active when it is read later.
+ let fail=true;const late=harness({files:launchFiles()});keptSession(late);const api=late.c.api;
+ late.c.api=async(path,method='GET',body)=>{if(fail&&path==='/editor-session'&&method==='GET')throw Error('offline');return api(path,method,body);};
+ late.c.toast=()=>{};
+ late.mount();await waitFor(()=>late.editor.session.phase==='failed','first read fails');
+ await openFromOutside(late,LAUNCH.NEW);fail=false;
+ const realNow=Date.now;Date.now=()=>realNow()+60000;try{late.editor.session.tick();}finally{Date.now=realNow;}
+ await waitFor(()=>late.editor.session.phase==='ready','second read');
+ assert.deepEqual(tabState(late),[...KEPT_TABS,[LAUNCH.NEW,false,savedText(LAUNCH.NEW)]]);
+ assert.equal(late.editor.active.path,LAUNCH.NEW);
 });

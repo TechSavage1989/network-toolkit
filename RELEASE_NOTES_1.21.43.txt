@@ -1,0 +1,12 @@
+Network Toolkit 1.21.43
+
+## What's New
+
+- A document you open from Windows with the Text Editor is now the tab you see. Before, the tab from your last session could stay in front while the new document opened behind it.
+
+## Additional Details
+
+- This holds whether the Text Editor is starting or already open, whether the document is new or already open in a tab, and when several documents are opened at once (the last one ends in front).
+- The tabs and unsaved text from your last session still reopen behind it. The tab that was in front last time comes back only when you did not ask to open anything.
+- The same applies to a file or text sent to the editor from another tool while last session's tabs are still loading.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.
