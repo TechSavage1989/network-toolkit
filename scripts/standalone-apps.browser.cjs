@@ -44,8 +44,8 @@ async function open(mode,options={}){
     else return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'Synthetic fixture: not available'})});}
    else if(p==='/api/peer-send/inbox')data={request:null,report:false};
    else if(p==='/api/peer-send/report')data={ok:true};
-   else if(p==='/api/peer-send/targets')data={app:mode==='terminal'?'editor':'terminal',name:mode==='terminal'?'Network Toolkit Text Editor':'Network Toolkit Terminal',running:false,ready:false,targets:[]};
-   else if(p==='/api/peer-send/open'){f.opens++;data={running:true,ready:false};}
+   else if(p==='/api/peer-send/targets')data={app:mode==='terminal'?'editor':'terminal',name:mode==='terminal'?'Network Toolkit Text Editor':'Network Toolkit Terminal',receiver:f.opens?'standalone':'',running:f.opens>0,ready:f.opens>0,targets:[]};
+   else if(p==='/api/peer-send/open'){f.opens++;data={receiver:'standalone',running:true,ready:true};}
    else if(/\/api\/terminals\/[^/]+\/resize$/.test(p))data={};
    else if(p.startsWith('/api/storage'))data={rootDir:'C:\\Synthetic\\Network Toolkit',defaultDir:'C:\\Synthetic\\Network Toolkit',explicit:false};
    else if(method!=='GET')return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'Synthetic fixture: not available'})});
@@ -123,8 +123,10 @@ async function standaloneEditor(){
  {const before=await page.evaluate(()=>NetworkToolkitFileEditor.listDocuments().length);await run('New Text Editor document');await page.waitForFunction(n=>NetworkToolkitFileEditor.listDocuments().length===n+1,before);}
  await run('More actions for selected Editor tab');await page.getByRole('menuitem',{name:/^Save as/}).first().waitFor();await page.keyboard.press('Escape');
  await page.locator(editor+' [data-ed-text]').fill('show version');
- await run('Send to terminal');await page.locator('[data-editor-send-peer-missing]').waitFor();assert.match(await page.locator('#modalRoot .modal-body').innerText(),/Network Toolkit Terminal is not open\./);await closeModal();
- await run('Open Network Toolkit Terminal');await page.waitForFunction(()=>[...document.querySelectorAll('#toastStack .toast')].some(n=>n.textContent.includes('Network Toolkit Terminal is open.')));assert.equal(f.opens,1);
+ // Send to terminal with nothing running opens the Terminal app by itself (owner request; this used to
+ // show "Network Toolkit Terminal is not open." and wait for the user). A new Terminal has no session yet.
+ await run('Send to terminal');await page.locator('[data-editor-send-peer-missing]').waitFor();assert.equal(f.opens,1,'the Terminal app is started without a question');assert.match(await page.locator('#modalRoot .modal-body').innerText(),/No terminal session is connected in Network Toolkit Terminal\./);await closeModal();
+ await run('Open Network Toolkit Terminal');await page.waitForFunction(()=>[...document.querySelectorAll('#toastStack .toast')].some(n=>n.textContent.includes('Network Toolkit Terminal is open.')));assert.equal(f.opens,2);
  pass('Text Editor: the command palette lists only editor commands plus the Terminal connection, and every one of them works');
  // The Connect sidebar: nothing that points to, or starts, another Toolkit tool.
  await closeModal();await page.locator(editor+' button[aria-label="Connections"],'+editor+' button[title="Connections"]').first().click();

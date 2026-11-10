@@ -142,3 +142,65 @@ test('listing the other app tolerates a missing engine and keeps only safe field
  const down=peer({engine:()=>new Error('Request failed (404).')});down.api.start('terminal');
  assert.deepEqual(JSON.parse(JSON.stringify(await down.api.targets())),{running:false,ready:false,targets:[],error:'Request failed (404).'});
 });
+
+// Owner request: the receiver is the other standalone app, else the main Toolkit window, else the
+// other standalone app is started. The engine decides; the page shows which app answered.
+test('the main Toolkit window only receives: sessions and documents reported, text delivered by kind, nothing sent',async()=>{
+ const entries=[{info:{id:'m1',type:'ssh',label:'lab-core-01',state:'connected'}}],documents=[{id:'local:1',uid:'0b6f5d3e-8a55-4b0e-9f3c-2d1f0a6c7e11',name:'main notes.txt',path:'C:\\Users\\operator\\main notes.txt',dirty:true,active:true,blocked:''}];
+ const inbox=[],acks=[],pasted=[],inserted=[];
+ const h=peer({context:{terminalActive:'m1'},engine:(route,method,body)=>{if(route==='/peer-send/inbox'){const next=inbox.shift();return next?{request:next.request,kind:next.kind,report:false}:{request:null,report:false};}if(route==='/peer-send/ack'){acks.push(body);return {ok:true};}return {ok:true};}});
+ h.window.NetworkToolkitEditorSendTerminal={targets:()=>entries,label:entry=>entry.info.label,deliver:async(entry,text,options)=>{pasted.push([entry.info.id,text,options]);return {ok:true,outcome:'review'};}};
+ h.window.NetworkToolkitFileEditor={listDocuments:()=>documents};
+ h.window.NetworkToolkitTerminalSendEditor={deliver:async request=>{inserted.push(request);return {ok:true,outcome:request.where==='pick'?'pick':'inserted'};}};
+ assert.equal(h.api.start('main'),false,'start() is for the standalone apps');assert.deepEqual(h.timers,[]);
+ assert.equal(h.api.startMain(),true);assert.equal(h.timers.length,1);assert.equal(h.api.startMain(),true);assert.equal(h.timers.length,1,'started once');
+ assert.equal(h.api.sender(),'','the main window is never a sender');assert.equal(h.api.peerName(),'');assert.equal(h.api.peerKind(),'');
+ // Its own Send to commands stay inside the window: no engine call is made for them.
+ assert.deepEqual(JSON.parse(JSON.stringify(await h.api.targets())),{running:false,ready:false,targets:[]});assert.equal(await h.api.open(),false);assert.equal((await h.api.send({session:'m1',text:'x'})).ok,false);
+ assert.deepEqual(h.calls,[]);
+ await h.api.poll();
+ assert.deepEqual(h.calls.map(c=>c[0]+' '+c[1]),['GET /peer-send/inbox','POST /peer-send/report']);
+ assert.deepEqual(JSON.parse(JSON.stringify(h.calls[1][2])),{targets:[{id:'m1',name:'lab-core-01',type:'ssh',connected:true,active:true}],documents:[{id:'0b6f5d3e-8a55-4b0e-9f3c-2d1f0a6c7e11',name:'main notes.txt',unsaved:true,busy:false,active:true}]},'names only: no path, no text');
+ // Terminal text takes the paste path; editor text the insert path.
+ inbox.push({kind:'terminal',request:{requestId:'a'.repeat(32),session:'m1',text:'show version\nshow clock\n'}});await h.api.poll();
+ assert.deepEqual(JSON.parse(JSON.stringify(pasted)),[['m1','show version\nshow clock\n',{report:true}]]);assert.deepEqual(JSON.parse(JSON.stringify(acks.at(-1))),{requestId:'a'.repeat(32),ok:true,outcome:'review'});
+ inbox.push({kind:'editor',request:{requestId:'b'.repeat(32),target:'0b6f5d3e-8a55-4b0e-9f3c-2d1f0a6c7e11',where:'pick',text:'output\n',label:'Last command output'}});await h.api.poll();
+ assert.deepEqual(JSON.parse(JSON.stringify(inserted)),[{docId:'local:1',where:'pick',text:'output\n',label:'Last command output',report:true}]);assert.deepEqual(JSON.parse(JSON.stringify(acks.at(-1))),{requestId:'b'.repeat(32),ok:true,outcome:'pick'});
+ inbox.push({kind:'editor',request:{requestId:'c'.repeat(32),target:'new',where:'start',text:'new\n'}});await h.api.poll();
+ assert.deepEqual(JSON.parse(JSON.stringify(inserted.at(-1))),{docId:'',where:'start',text:'new\n',label:'Terminal output',report:true});
+ // A request without a known kind, and an open dialog, are refused; nothing is pasted or inserted.
+ inbox.push({kind:'',request:{requestId:'d'.repeat(32),session:'m1',text:'x'}});await h.api.poll();assert.deepEqual(JSON.parse(JSON.stringify(acks.at(-1))),{requestId:'d'.repeat(32),ok:false,error:'Network Toolkit cannot take the text right now.'});
+ h.document.querySelector('#modalRoot').innerHTML='<section class="modal"></section>';
+ for(const [id,kind,request] of [['e','terminal',{session:'m1',text:'x'}],['f','editor',{target:'new',where:'start',text:'x'}]]){inbox.push({kind,request:{requestId:id.repeat(32),...request}});await h.api.poll();assert.deepEqual(JSON.parse(JSON.stringify(acks.at(-1))),{requestId:id.repeat(32),ok:false,error:'A dialog is open in Network Toolkit. Finish or close it there, then send again.'});}
+ assert.equal(pasted.length,1);assert.equal(inserted.length,2);
+ assert.equal(h.calls.some(c=>/^\/peer-send\/(targets|open|send|result)/.test(c[1])),false,'the main window page never uses a sending route');
+});
+
+test('a send names the app that received it, and waits without a second click while the other app is started',async()=>{
+ // The main Toolkit window answered.
+ const main=peer({engine:route=>route==='/peer-send/send'?{requestId:'4'.repeat(32),state:'queued',name:'Network Toolkit',receiver:'main'}:{state:'done',outcome:'review',name:'Network Toolkit'}});
+ main.api.start('editor');assert.equal((await main.api.send({session:'m1',text:'a\nb\n'},{target:'lab-core-01',interval:1})).ok,true);
+ assert.deepEqual(main.toasts,[['Network Toolkit is showing the text for review before it goes to lab-core-01.','success']]);
+ // Nothing was running: the engine starts the other app and delivers the same text itself.
+ const results=[{state:'starting'},{state:'starting'},{state:'queued'},{state:'done',outcome:'inserted'}];
+ const started=peer({engine:route=>route==='/peer-send/send'?{requestId:'5'.repeat(32),state:'starting',name:'Network Toolkit Text Editor',receiver:'standalone'}:results.shift()});
+ started.api.start('terminal');const sent=await started.api.send({target:'new',text:'output\n'},{target:'a new document',interval:1});
+ assert.equal(sent.ok,true);assert.deepEqual(started.toasts,[['Opening Network Toolkit Text Editor… The text is sent when it is ready.',''],['Sent to a new document in Network Toolkit Text Editor.','success']]);
+ assert.equal(started.calls.filter(c=>c[1]==='/peer-send/send').length,1,'the text is sent once');assert.equal(started.calls.some(c=>c[1]==='/peer-send/open'),false,'the page does not open the other app itself');
+ // The other app did not come up: the engine's own explanation is shown as it is.
+ const late=peer({engine:route=>route==='/peer-send/send'?{requestId:'6'.repeat(32),state:'starting',name:'Network Toolkit Text Editor'}:{state:'failed',local:true,message:'Network Toolkit Text Editor did not become ready. If it is open from an older version, close it and open it again. Nothing was sent.'}});
+ late.api.start('terminal');assert.equal((await late.api.send({target:'new',text:'x'},{interval:1})).ok,false);
+ assert.deepEqual(late.toasts.at(-1),['Network Toolkit Text Editor did not become ready. If it is open from an older version, close it and open it again. Nothing was sent.','error']);
+ // An app that was passed over is named.
+ const noted=peer({engine:route=>route==='/peer-send/send'?{requestId:'7'.repeat(32),state:'queued',name:'Network Toolkit',note:'Network Toolkit Terminal was skipped: it is open from an older version.'}:{state:'done',outcome:'sent'}});
+ noted.api.start('editor');await noted.api.send({session:'m1',text:'x'},{target:'lab-core-01',interval:1});
+ assert.deepEqual(noted.toasts,[['Network Toolkit Terminal was skipped: it is open from an older version.',''],['Sent to lab-core-01 in Network Toolkit.','success']]);
+ const listed=peer({engine:()=>({running:true,ready:true,name:'Network Toolkit',receiver:'main',note:'Network Toolkit Terminal was skipped.',token:'never shown',targets:[{id:'m1',name:'lab-core-01',type:'ssh',connected:true}]})});
+ listed.api.start('editor');
+ assert.deepEqual(JSON.parse(JSON.stringify(await listed.api.targets())),{running:true,ready:true,targets:[{id:'m1',name:'lab-core-01',type:'ssh',connected:true,unsaved:false,busy:false,active:false}],name:'Network Toolkit',receiver:'main',note:'Network Toolkit Terminal was skipped.'});
+ // Opening failed: the reason, plus what happened to the user's text.
+ const closed=peer({engine:()=>new Error('Network Toolkit Terminal did not become ready.')});closed.api.start('editor');
+ assert.equal(await closed.api.open({quiet:true,failure:' Nothing was sent; your document is unchanged.'}),false);
+ assert.deepEqual(closed.toasts,[['Network Toolkit Terminal did not become ready. Nothing was sent; your document is unchanged.','error']]);
+ await sleep(5);
+});
