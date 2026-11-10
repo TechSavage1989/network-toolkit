@@ -1,0 +1,46 @@
+name: Windows default terminal test package
+
+# Builds the side-loaded x64 package the owner installs on their own Windows 11
+# PC to check Network Toolkit as the default terminal (docs/WINDOWS_DEFAULT_TERMINAL.md).
+# The signing key exists only on this disposable runner; only the public
+# certificate is uploaded. This is a test build, never a release asset.
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/windows-terminal-default]
+    paths:
+      - .github/workflows/windows-default-terminal-test-package.yml
+      - scripts/windows-terminal/**
+      - cmd/network-toolkit/**
+      - internal/terminal/**
+      - internal/desktop/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-default-terminal-test-package-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test-package:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Build and sign the x64 test package
+        env:
+          GOTOOLCHAIN: local
+        run: ./scripts/windows-terminal/Build-DefaultTerminalTestPackage.ps1
+      - uses: actions/upload-artifact@v7
+        with:
+          name: network-toolkit-terminal-test-package
+          path: ${{ runner.temp }}/NetworkToolkitTerminalTest
+          if-no-files-found: error
+          retention-days: 14

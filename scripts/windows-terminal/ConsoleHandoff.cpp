@@ -111,10 +111,16 @@ void writeDiagnostic(const char* stage, HRESULT status) {
     DWORD domainSize = ARRAYSIZE(domain);
     SID_NAME_USE accountType{};
     const auto sid = reinterpret_cast<const TOKEN_USER*>(user.data())->User.Sid;
-    // Diagnostics are compiled only into the CI experiment package and are
-    // written only for the hosted runner account that owns the session.
+    // Diagnostics are compiled only into the CI experiment package and the
+    // owner's side-loaded test package, never into a release. The hosted
+    // experiment writes them only for the runner account that owns the session;
+    // the test package writes them for whoever installed it, inside the
+    // package's own LocalState, which Windows deletes when it is removed.
     if (!LookupAccountSidW(nullptr, sid, account, &accountSize, domain, &domainSize, &accountType) ||
-        accountType != SidTypeUser || _wcsicmp(account, L"runneradmin") != 0) return;
+        accountType != SidTypeUser) return;
+#ifndef NTK_HANDOFF_TEST_PACKAGE
+    if (_wcsicmp(account, L"runneradmin") != 0) return;
+#endif
 
     // COM can inherit a different process environment from the test launcher.
     // Use the real token's profile and the fixture's own package LocalState.
