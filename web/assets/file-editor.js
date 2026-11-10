@@ -456,11 +456,14 @@ const closeNeedsConfirmation=list=>list.some(d=>d.saveFailed===true)||askSaveBef
 // Session restore runs only in the main window and the standalone Text Editor,
 // never in detached editor windows, Terminal-only windows or offline pages.
 const sessionWorkspace=()=>!detachedEditorWindow()&&!(typeof EDITOR_WINDOW!=='undefined'&&EDITOR_WINDOW)&&!(typeof TERMINAL_ONLY!=='undefined'&&TERMINAL_ONLY)&&typeof OFFLINE!=='undefined'&&!OFFLINE&&typeof api==='function';
+// The engine advertises the session capability in its status (editor_session.go).
+const sessionEngine=()=>root.NTKEditorSession?.engineAvailable?.()===true;
+const sessionAvailable=()=>sessionWorkspace()&&sessionEngine();
 const restoreSessionPreference=()=>typeof state==='undefined'||state.editorPreferences?.restoreSession!==false;
 let restorePreferencePending=false;
-function syncClosePreference(){const restore=findEl('[data-ed-restore-session]');if(restore){const available=sessionWorkspace();restore.checked=restoreSessionPreference();restore.disabled=!available||restorePreferencePending;restore.closest('label')?.setAttribute('title',detachedEditorWindow()?'Change this app preference in the main window.':available?'Reopen the files that were open, and their unsaved changes, the next time the Text Editor starts.':'Available in the main window and the Text Editor app.');}const input=findEl('[data-ed-ask-save-close]');if(input){input.checked=askSaveBeforeClose();input.disabled=detachedEditorWindow()||closePreferencePending;input.closest('label')?.setAttribute('title',detachedEditorWindow()?'Change this app preference in the main window. Closing this child returns its documents without discarding.':'Disabling permits unsaved changes to be discarded when documents or the app close.');}const note=findEl('[data-ed-close-policy-note]');if(note)note.textContent=detachedEditorWindow()?'This app preference is changed in the main window. Closing this window returns its documents to the main workspace.':'When disabled, closing documents or the app may discard unsaved changes. Saved files are never deleted.';}
+function syncClosePreference(){const restore=findEl('[data-ed-restore-session]');if(restore){const available=sessionAvailable();restore.checked=restoreSessionPreference();restore.disabled=!available||restorePreferencePending;restore.closest('label')?.setAttribute('title',detachedEditorWindow()?'Change this app preference in the main window.':available?'Reopen the files that were open, and their unsaved changes, the next time the Text Editor starts.':'Available in the main window and the Text Editor app.');}const input=findEl('[data-ed-ask-save-close]');if(input){input.checked=askSaveBeforeClose();input.disabled=detachedEditorWindow()||closePreferencePending;input.closest('label')?.setAttribute('title',detachedEditorWindow()?'Change this app preference in the main window. Closing this child returns its documents without discarding.':'Disabling permits unsaved changes to be discarded when documents or the app close.');}const note=findEl('[data-ed-close-policy-note]');if(note)note.textContent=detachedEditorWindow()?'This app preference is changed in the main window. Closing this window returns its documents to the main workspace.':'When disabled, closing documents or the app may discard unsaved changes. Saved files are never deleted.';}
 function setClosePolicy(value){childAskSaveBeforeClose=value!==false;syncClosePreference();}
-async function changeRestorePreference(value){if(!sessionWorkspace()||restorePreferencePending){syncClosePreference();return;}restorePreferencePending=true;syncClosePreference();try{if(typeof state!=='undefined'){state.editorPreferences={...(state.editorPreferences||{}),restoreSession:value!==false};if(typeof saveState==='function')saveState();}if(value!==false){session?.enable();setMessage('Open files and unsaved changes will reopen next time.');}else{await session?.disable();setMessage('Open files will not reopen next time. Kept copies of unsaved text were removed.');}}catch(error){setMessage('The kept session could not be removed: '+error.message,true);}finally{restorePreferencePending=false;syncClosePreference();}}
+async function changeRestorePreference(value){if(!sessionAvailable()||restorePreferencePending){syncClosePreference();return;}restorePreferencePending=true;syncClosePreference();try{if(typeof state!=='undefined'){state.editorPreferences={...(state.editorPreferences||{}),restoreSession:value!==false};if(typeof saveState==='function')saveState();}if(value!==false){session?.enable();setMessage('Open files and unsaved changes will reopen next time.');}else{await session?.disable();setMessage('Open files will not reopen next time. Kept copies of unsaved text were removed.');}}catch(error){setMessage('The kept session could not be removed: '+error.message,true);}finally{restorePreferencePending=false;syncClosePreference();}}
 async function changeClosePreference(value){if(detachedEditorWindow()||closePreferencePending){syncClosePreference();return;}closePreferencePending=true;syncClosePreference();try{if(!value&&await askEditor({title:'Allow unsaved changes to be discarded?',message:'Closing documents or the app without asking may discard unsaved changes. Saved files will not be deleted. Active saves, window moves and failed-save warnings remain protected.',accept:'Allow discard'})===null)return;if(typeof state!=='undefined'){state.editorPreferences={...(state.editorPreferences||{}),askSaveBeforeClose:value!==false};if(typeof saveState==='function')saveState();}}finally{closePreferencePending=false;syncClosePreference();}}
 function activityDocuments(){return [...documents.values()].filter(d=>!d.staged).map(d=>({uid:d.uid,loaded:!d.loading&&(!d.untitled||d.content!==''||d.dirty||d.editRevision>1||d.undo.length>0||d.redo.length>0)}));}
 
@@ -1316,7 +1319,7 @@ function finishSessionRestore({docs,active:chosen}){
  else if(overlay&&documents.size)drawTabs();
  root.NetworkToolkitEditorWindows?.notifyChanged?.();
 }
-const sessionReadiness=()=>!sessionWorkspace()?'never':(typeof stateLoaded!=='undefined'&&!stateLoaded)||(typeof online!=='undefined'&&!online)?'wait':restoreSessionPreference()?'ready':'off';
+const sessionReadiness=()=>!sessionWorkspace()?'never':(typeof stateLoaded!=='undefined'&&!stateLoaded)||(typeof online!=='undefined'&&!online)?'wait':!sessionEngine()?'never':restoreSessionPreference()?'ready':'off';
 const session=root.NTKEditorSession?.create({
  request:(path,method='GET',body)=>api(path,method,body),
  documents:()=>[...documents.values()],
@@ -1325,7 +1328,7 @@ const session=root.NTKEditorSession?.create({
  flush:d=>d.diskSession?.flush(),
  pending:d=>!!d.diskSession?.pending,
  lease:d=>root.NetworkToolkitEditorWindows?.state?.owned?.[d.uid]||0,
- enabled:()=>sessionWorkspace()&&restoreSessionPreference(),
+ enabled:()=>sessionAvailable()&&restoreSessionPreference(),
  idle:()=>!windowCloseState&&!pendingEditorDialog&&!editorComposing()&&![...documents.values()].some(d=>d.promoting||d.diskEditing||d.reloading||d.staged||d.frozen),
  readiness:sessionReadiness,
  restoreRecord:restoreSessionRecord,
@@ -1333,7 +1336,7 @@ const session=root.NTKEditorSession?.create({
  message:(text,error)=>{if(overlay)setMessage(text,error);if(error&&typeof toast==='function')toast(text,'error');}
 });
 function startSession(){if(session&&session.phase==='idle')session.start();}
-const sessionKeeping=()=>!!session&&session.phase==='ready'&&sessionWorkspace()&&restoreSessionPreference();
+const sessionKeeping=()=>!!session&&session.phase==='ready'&&sessionAvailable()&&restoreSessionPreference();
 // Keep the final session before a window close asks about unsaved changes.
 // Documents are read-only while their last copies are written.
 async function keepSessionForClose(){

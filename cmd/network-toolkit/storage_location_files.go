@@ -239,7 +239,12 @@ func copyStorageData(source, destination *storageRoot) ([]string, func(), error)
 		}
 		paths = append(paths, item.path)
 	}
-	return paths, rollback, nil
+	sessionRollback, err := copyEditorSessions(source, destination)
+	if err != nil {
+		rollback()
+		return nil, nil, err
+	}
+	return paths, func() { sessionRollback(); rollback() }, nil
 }
 
 func collectStorageCopies(source *storageRoot) (copies []storageCopy, err error) {
@@ -285,6 +290,8 @@ func collectStorageCopies(source *storageRoot) (copies []storageCopy, err error)
 type storageMigration struct {
 	destination string
 	initial     map[string][32]byte
+	// Digests of the Text Editor session indexes copied per workspace.
+	sessions map[string][32]byte
 }
 
 func recordStorageMigration(destination *storageRoot, path string, copied []string) (*storageMigration, error) {
@@ -296,6 +303,9 @@ func recordStorageMigration(destination *storageRoot, path string, copied []stri
 		}
 		migration.initial[path] = sha256.Sum256(raw)
 		clear(raw)
+	}
+	if err := recordEditorSessionMigration(destination, migration); err != nil {
+		return nil, err
 	}
 	return migration, nil
 }
@@ -338,6 +348,9 @@ func refreshStorageMigration(source, destination *storageRoot, migration *storag
 		if !unchanged {
 			return fmt.Errorf("The copied destination %s changed. It was not overwritten; newer app data remains in the original folder.", path)
 		}
+	}
+	if err := checkEditorSessionMigration(destination, migration); err != nil {
+		return err
 	}
 	for _, item := range copies {
 		current[item.path] = true
@@ -391,7 +404,7 @@ func refreshStorageMigration(source, destination *storageRoot, migration *storag
 			return err
 		}
 	}
-	return nil
+	return refreshEditorSessions(source, destination)
 }
 
 func replaceStorageCopy(parent *storageRoot, name string, raw []byte, expected [32]byte) error {
@@ -480,7 +493,7 @@ func inspectStorageCopyDestination(destination *storageRoot) error {
 				return err
 			}
 		}
-		names := []string{storageBrowserDirectory, storageViewsDirectory, "Network_Toolkit.instance.json", credentialRememberFilename}
+		names := []string{storageBrowserDirectory, storageViewsDirectory, editorSessionDirectory, "Network_Toolkit.instance.json", credentialRememberFilename}
 		for _, allowed := range storagePortableFiles {
 			names = append(names, allowed.name)
 		}
@@ -502,6 +515,18 @@ func inspectStorageCopyDestination(destination *storageRoot) error {
 		if root != destination {
 			_ = root.Close()
 		}
+	}
+	if editor, err := openStorageChild(destination, standaloneEditorDirectory); err == nil {
+		_, statErr := editor.Lstat(editorSessionDirectory)
+		_ = editor.Close()
+		if statErr == nil {
+			return fmt.Errorf("The destination already contains %s. Choose an empty app-data folder or turn off copying; existing data was kept.", filepath.Join(standaloneEditorDirectory, editorSessionDirectory))
+		}
+		if !errors.Is(statErr, os.ErrNotExist) {
+			return statErr
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
 	}
 	return nil
 }
@@ -575,6 +600,12 @@ func walkStorageWorkspace(root *storageRoot, options storageWalkOptions, budget 
 		}
 	}
 	if err := walkStorageTree(root, storageBrowserDirectory, options, budget, 0); err != nil {
+		return err
+	}
+	// The Text Editor session holds tab records and kept copies of unsaved
+	// text; deleting app data removes it too (no copies are kept while a
+	// deletion is pending).
+	if err := walkStorageTree(root, editorSessionDirectory, options, budget, 0); err != nil {
 		return err
 	}
 	views, err := openStorageChild(root, storageViewsDirectory)

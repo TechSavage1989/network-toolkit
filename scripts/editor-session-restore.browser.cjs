@@ -19,7 +19,7 @@ const NOTES='C:\\fixture\\notes.txt',PLAN='C:\\fixture\\plan.txt',CLEAN='C:\\fix
   const request=route.request(),url=new URL(request.url()),p=url.pathname,method=request.method();
   if(p.startsWith('/api/')){
    const body=request.postData()?request.postDataJSON():null;let data={},status=200;
-   if(p==='/api/status')data={version,os:'windows',arch:'amd64',editorDiskAvailable:false};
+   if(p==='/api/status')data={version,os:'windows',arch:'amd64',editorDiskAvailable:false,editorSessionAvailable:true};
    else if(p==='/api/state')data=method==='GET'?{appUpdatePreferences:{enabled:false}}:{};
    else if(p==='/api/jobs')data=[];
    else if(p==='/api/terminals')data={sessions:[]};

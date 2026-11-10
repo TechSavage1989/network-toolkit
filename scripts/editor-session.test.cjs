@@ -125,7 +125,7 @@ function harness({preferences={},stored={version:1,active:-1,tabs:[]},files={},f
   if(path.startsWith('/editor-session/backup?id=')){const id=decodeURIComponent(path.split('=')[1]);if(!kept.has(id))throw Object.assign(Error('The kept copy of this document is no longer available.'),{status:404});return {text:kept.get(id)};}
   throw Error('Unexpected '+method+' '+path);
  };
- const c={document,console,Map,Set,WeakMap,Date,Math,JSON,Promise,TextDecoder,TextEncoder,Uint8Array,DataView,Blob,URL,setTimeout,clearTimeout,state:{editorPreferences:preferences},saveState(){c.saved++;},saved:0,esc:x=>String(x).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;'),addEventListener(){},OFFLINE:false,online:true,stateLoaded:true,api};
+ const c={document,console,Map,Set,WeakMap,Date,Math,JSON,Promise,TextDecoder,TextEncoder,Uint8Array,DataView,Blob,URL,setTimeout,clearTimeout,state:{editorPreferences:preferences},saveState(){c.saved++;},saved:0,esc:x=>String(x).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;'),addEventListener(){},OFFLINE:false,online:true,stateLoaded:true,status:{editorSessionAvailable:true},api};
  vm.createContext(c);
  for(const file of ['editor-tab-groups.js','editor-session.js'])vm.runInContext(fs.readFileSync(require.resolve('../web/assets/'+file),'utf8'),c);
  vm.runInContext(editorSource,c);

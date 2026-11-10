@@ -172,7 +172,10 @@ function create(host){
  return Object.freeze({start,restore,save,tick,isKept,enable,disable,stop,get phase(){return phase;},get carried(){return carried.slice();},get busy(){return running>0;}});
 }
 
-const api=Object.freeze({create,plan,kindOf,ENDPOINT,TICK_MS});
+// The page's engine status (index.html) says whether this workspace keeps a
+// session; file-editor.js has its own status() function, so it asks here.
+const engineAvailable=()=>typeof status!=='undefined'&&status?.editorSessionAvailable===true;
+const api=Object.freeze({create,plan,kindOf,engineAvailable,ENDPOINT,TICK_MS});
 root.NTKEditorSession=api;
 if(typeof module==='object'&&module.exports)module.exports=api;
 })(globalThis);
