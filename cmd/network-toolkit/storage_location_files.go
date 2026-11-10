@@ -21,6 +21,14 @@ const (
 	storageTreeEntryLimit    = 200000
 )
 
+// The workspaces of a data folder whose files are moved and deleted with it:
+// the data folder itself, the standalone Terminal's folder and the standalone
+// Text Editor's. The one-time move to shared data (shared_migration.go) reads
+// the settings, trusted hosts and macros of the two standalone folders, so
+// "Delete app data" must remove them there too: otherwise the next start
+// would bring saved data and host trust back from what was left behind.
+var storageWorkspaces = []string{"", storageTerminalDirectory, standaloneEditorDirectory}
+
 var storagePortableFiles = []struct {
 	name  string
 	limit int64
@@ -280,7 +288,7 @@ func collectStorageCopies(source *storageRoot) (copies []storageCopy, err error)
 			}
 		}
 	}()
-	for _, workspace := range []string{"", storageTerminalDirectory} {
+	for _, workspace := range storageWorkspaces {
 		root := source
 		if workspace != "" {
 			var err error
@@ -477,7 +485,7 @@ func storageCopyParent(root *storageRoot, path string, create bool) (*storageRoo
 	if parent == "." {
 		return root, func() {}, nil
 	}
-	if parent != storageTerminalDirectory {
+	if parent != storageTerminalDirectory && parent != standaloneEditorDirectory {
 		return nil, nil, errors.New("Unknown app-data copy path.")
 	}
 	if create {
@@ -506,7 +514,7 @@ func removeStorageCopy(root *storageRoot, item storageCopy) {
 }
 
 func inspectStorageCopyDestination(destination *storageRoot) error {
-	for _, workspace := range []string{"", storageTerminalDirectory} {
+	for _, workspace := range storageWorkspaces {
 		root := destination
 		if workspace != "" {
 			var err error
@@ -579,20 +587,26 @@ func walkStorageData(root *storageRoot, options storageWalkOptions, budget *int)
 	if err := walkStorageWorkspace(root, options, budget); err != nil {
 		return err
 	}
-	terminal, err := openStorageChild(root, storageTerminalDirectory)
-	if errors.Is(err, os.ErrNotExist) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	err = walkStorageWorkspace(terminal, options, budget)
-	_ = terminal.Close()
-	if err != nil {
-		return err
-	}
-	if options.remove {
-		return removeStorageEmptyDirectory(root, storageTerminalDirectory)
+	for _, name := range storageWorkspaces[1:] {
+		workspace, err := openStorageChild(root, name)
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		err = walkStorageWorkspace(workspace, options, budget)
+		_ = workspace.Close()
+		if err != nil {
+			return err
+		}
+		if options.remove {
+			// A folder that still holds something (a vault, a file of the
+			// user's) stays.
+			if err := removeStorageEmptyDirectory(root, name); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }

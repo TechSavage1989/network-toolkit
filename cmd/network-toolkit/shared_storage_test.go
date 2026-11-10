@@ -199,3 +199,106 @@ func TestSharedDataFilesMoveAndAreDeletedWithAppData(t *testing.T) {
 		}
 	}
 }
+
+// "Delete app data" removes everything the one-time move reads, in every
+// workspace, so the next start cannot bring saved data or host trust back.
+func TestSharedDeleteAppDataIsNotUndoneByTheNextStart(t *testing.T) {
+	manager := storageFixture(t, false)
+	root := manager.config.RootDir
+	editor := filepath.Join(root, standaloneEditorDirectory)
+	terminalDir := filepath.Join(root, storageTerminalDirectory)
+	writeStorageFixture(t, root, appSettingsFilename, `{"theme":"dark"}`)
+	writeStorageFixture(t, editor, appSettingsFilename, `{"activePage":"editor","theme":"light","accentColor":"#112233","editorPreferences":{"wordWrap":true},"terminalProfiles":[{"id":"e1","name":"From editor","type":"ssh","host":"192.0.2.3","port":22}]}`)
+	writeKnownHostFixture(t, editor, knownHostFixtureEntry("192.0.2.9:22", knownHostFixtureKey(t)))
+	writeStorageFixture(t, editor, terminalMacroLibraryFilename, `{"version":1,"macros":[],"bindings":[]}`)
+	writeStorageFixture(t, terminalDir, appSettingsFilename, `{"terminalProfiles":[{"id":"t1","name":"Edge","type":"ssh","host":"192.0.2.2","port":22}]}`)
+	writeKnownHostFixture(t, terminalDir, knownHostFixtureEntry("192.0.2.8:22", knownHostFixtureKey(t)))
+	// Vaults are never removed with app data: each needs its own action.
+	vaults := []string{writeStorageFixture(t, root, credentialVaultV2Filename, "vault"), writeStorageFixture(t, terminalDir, credentialVaultV2Filename, "terminal vault"), writeStorageFixture(t, editor, credentialVaultV2Filename, "editor vault")}
+	unrelated := writeStorageFixture(t, editor, "notes-from-user.txt", "kept")
+	if err := migrateSharedData(root); err != nil {
+		t.Fatal(err)
+	}
+	if got := sharedDiskIDs(t, root, "terminalProfiles"); !sameIDs(got, "e1", "t1") {
+		t.Fatalf("fixture: after the one-time move: %v", got)
+	}
+
+	if err := manager.scheduleDelete(); err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.Close(); err != nil {
+		t.Fatal(err)
+	}
+	for _, gone := range []string{
+		filepath.Join(root, appSettingsFilename), filepath.Join(root, knownHostsFilename), filepath.Join(root, sharedMarkerFilename), filepath.Join(root, savedListsFilename),
+		filepath.Join(root, sharedBackupSettings), filepath.Join(root, sharedBackupKnownHosts),
+		filepath.Join(terminalDir, appSettingsFilename), filepath.Join(terminalDir, knownHostsFilename),
+		filepath.Join(editor, appSettingsFilename), filepath.Join(editor, knownHostsFilename), filepath.Join(editor, terminalMacroLibraryFilename),
+	} {
+		if _, err := os.Stat(gone); !errors.Is(err, os.ErrNotExist) {
+			t.Errorf("%s survived deleting app data: %v", gone, err)
+		}
+	}
+	for _, kept := range append(vaults, unrelated) {
+		if _, err := os.Stat(kept); err != nil {
+			t.Errorf("%s was removed with app data: %v", kept, err)
+		}
+	}
+
+	// The next start: nothing is brought back, no host is trusted.
+	if err := migrateSharedData(root); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{appSettingsFilename, knownHostsFilename, terminalMacroLibraryFilename, savedListsFilename} {
+		if raw, err := os.ReadFile(filepath.Join(root, name)); !errors.Is(err, os.ErrNotExist) {
+			t.Errorf("the next start wrote %s again: %s", name, raw)
+		}
+	}
+	app := sharedTestApp(t, root, "", "main")
+	page := openSharedPage(t, app)
+	if len(page.ids("terminalProfiles")) != 0 || page.state["theme"] != nil || len(knownHostsOf(t, app)) != 0 {
+		t.Fatalf("after deleting app data the next start shows %v, theme %v, trusted hosts %v", page.ids("terminalProfiles"), page.state["theme"], knownHostsOf(t, app))
+	}
+}
+
+// Moving the data folder takes the Text Editor workspace's files along too,
+// so the record of the one-time move and what it was made from stay together.
+func TestSharedMoveTakesEveryWorkspaceTheOneTimeMoveReads(t *testing.T) {
+	manager := storageFixture(t, false)
+	root := manager.config.RootDir
+	files := map[string]string{
+		appSettingsFilename: `{"theme":"dark"}`,
+		filepath.Join(standaloneEditorDirectory, appSettingsFilename):          `{"activePage":"editor","terminalProfiles":[{"id":"e1","name":"From editor","type":"ssh","host":"192.0.2.3","port":22}]}`,
+		filepath.Join(standaloneEditorDirectory, terminalMacroLibraryFilename): `{"version":1,"macros":[],"bindings":[]}`,
+		filepath.Join(storageTerminalDirectory, appSettingsFilename):           `{"terminalProfiles":[{"id":"t1","name":"Edge","type":"ssh","host":"192.0.2.2","port":22}]}`,
+	}
+	for name, contents := range files {
+		writeStorageFixture(t, root, name, contents)
+	}
+	writeKnownHostFixture(t, filepath.Join(root, standaloneEditorDirectory), knownHostFixtureEntry("192.0.2.9:22", knownHostFixtureKey(t)))
+	if err := migrateSharedData(root); err != nil {
+		t.Fatal(err)
+	}
+	destination := filepath.Join(t.TempDir(), "chosen")
+	status, copied, err := manager.changeLocation(destination, true)
+	if err != nil || !status.CopyPending {
+		t.Fatalf("move: %+v %v", status, err)
+	}
+	listed := strings.Join(copied, "\n")
+	for _, name := range []string{filepath.Join(standaloneEditorDirectory, appSettingsFilename), filepath.Join(standaloneEditorDirectory, knownHostsFilename), filepath.Join(standaloneEditorDirectory, terminalMacroLibraryFilename), filepath.Join(storageTerminalDirectory, appSettingsFilename), sharedMarkerFilename, savedListsFilename} {
+		if !strings.Contains(listed, name) {
+			t.Errorf("%s was not moved with the data folder: %v", name, copied)
+		}
+	}
+	// At the new place the next start has nothing left to do.
+	before := snapshotFiles(t, destination)
+	if err := migrateSharedData(destination); err != nil {
+		t.Fatal(err)
+	}
+	if diff := sameFiles(before, snapshotFiles(t, destination)); diff != "" {
+		t.Fatalf("the next start at the new place changed: %s", diff)
+	}
+	if got := sharedDiskIDs(t, destination, "terminalProfiles"); !sameIDs(got, "e1", "t1") {
+		t.Fatalf("saved sessions at the new place: %v", got)
+	}
+}
