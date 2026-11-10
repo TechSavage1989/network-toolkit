@@ -4,6 +4,8 @@ Owner: "Notepad++ and even windows notepad now save previously opened documents 
 
 Restore reopens tabs in order with the stored active tab. A dirty local file opens disk-backed from its copy with the stored hash as the save baseline, so Save refuses to overwrite a file that changed meanwhile; a deleted file's text and unsaved remote text come back as untitled tabs with a note. The preference `editorPreferences.restoreSession` (default on, More menu) deletes the stored session when turned off. The engine reports `editorSessionAvailable` only for the main and standalone editor workspaces; detached editor windows never save or restore. Sessions move with the data folder.
 
+The native Windows editor acceptance (`editor_native_windows_test.go`: window transfers, drag, and the WM_CLOSE dirty confirmation) runs with `restoreSession` off, because with it on the app keeps dirty documents and does not ask. Keeping and reopening is covered by `TestEditorSessionBrowser` (real editor and session handlers in Chromium) and the Node close tests, not yet through the native window.
+
 Known gaps: the standalone Text Editor's own settings still do not move with the data folder (existing gap), and deleting app data does not remove the standalone editor's session. Not yet seen on physical Windows.
 
 ---

@@ -86,7 +86,12 @@ func TestNativeEditorTransferInstalledWebView2(t *testing.T) {
 		}
 	}()
 	a.uiHost = "webview2"
-	a.state = json.RawMessage(`{"activePage":"editor","appUpdatePreferences":{"enabled":false}}`)
+	// Session restore (v1.21.38) keeps unsaved documents at close instead of
+	// asking. This acceptance covers window transfers and the dirty-close
+	// confirmation, so it runs with session restore turned off: the page then
+	// makes no /api/editor-session calls and WM_CLOSE asks as before. Keeping
+	// and reopening a session is covered by TestEditorSessionBrowser.
+	a.state = json.RawMessage(`{"activePage":"editor","appUpdatePreferences":{"enabled":false},"editorPreferences":{"restoreSession":false}}`)
 	output := os.Getenv("TOOLKIT_NATIVE_TEST_OUTPUT")
 	if output == "" {
 		output = filepath.Join(private, "evidence")
