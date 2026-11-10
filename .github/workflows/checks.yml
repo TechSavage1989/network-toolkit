@@ -563,11 +563,21 @@ jobs:
         run: python3 scripts/build_windows_resources.py
       - name: Build Windows x64 GUI application and Linux x86_64/aarch64 programs
         run: sh ./build.sh
+      - name: Install the Windows setup compiler
+        run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends nsis
       - name: Rehearse release packaging (Windows assets and Linux archives)
         run: |
           REVIEW_VERSION=$(node -p "require('./package.json').version")
           python3 scripts/github_release.py package --tag "v${REVIEW_VERSION}" --exe build/Network_Toolkit.exe --linux-x86-64 build/linux-amd64/network-toolkit --linux-aarch64 build/linux-arm64/network-toolkit
           python3 scripts/github_release.py verify --tag "v${REVIEW_VERSION}"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: windows-setup-check-input
+          path: |
+            dist/*_Windows_x64_Setup.exe
+            dist/Network_Toolkit.exe
+          if-no-files-found: error
+          retention-days: 7
       - uses: actions/upload-artifact@v7
         if: startsWith(github.ref, 'refs/heads/review/hosts-editor-')
         with:
@@ -575,6 +585,21 @@ jobs:
           path: dist/*_Portable.zip
           if-no-files-found: error
           retention-days: 30
+
+  windows-setup:
+    needs: check
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          name: windows-setup-check-input
+          path: ${{ runner.temp }}/ntk-setup-check
+      - name: Verify Windows installation, registration, upgrade and uninstall
+        run: ./scripts/installer/verify-windows.ps1 -ArtifactDirectory "${{ runner.temp }}/ntk-setup-check"
 
   dependency-security:
     runs-on: ubuntu-latest
@@ -660,6 +685,10 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
+      - name: Verify text file launch and reuse of the existing editor workspace
+        env:
+          GOTOOLCHAIN: local
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestEditorLaunch(CLI|ReusesRegisteredWorkspace)$' -count=1 -v
       - name: Verify shared-terminal SFTP timeout and shell continuity on Windows
         env:
           GOTOOLCHAIN: local

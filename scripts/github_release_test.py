@@ -218,3 +218,21 @@ class LinuxArchives(unittest.TestCase):
         self.assertEqual(names[-1], 'SHA256SUMS')
         self.assertIn(f'Network_Toolkit_{self.current}_Linux_x86_64.tar.gz', names)
         self.assertIn(f'Network_Toolkit_{self.current}_Linux_aarch64.tar.gz', names)
+
+    def test_windows_setup_is_required_only_starting_with_its_first_release(self):
+        self.assertNotIn(release.windows_setup_name('1.21.34'), release.release_assets('1.21.34'))
+        self.assertIn(release.windows_setup_name('1.21.35'), release.release_assets('1.21.35'))
+        self.assertIn(release.windows_setup_name('1.22.0'), release.release_assets('1.22.0'))
+
+    def test_windows_setup_verifies_the_nsis_file_and_product_versions(self):
+        import struct
+        data = bytearray(200)
+        data[:2] = b'MZ'
+        struct.pack_into('<I', data, 0x3c, 0x40)
+        data[0x40:0x44] = b'PE\0\0'
+        struct.pack_into('<H', data, 0x40 + 24 + 68, 2)
+        version_words = release.windows_version_words('1.21.35')
+        struct.pack_into('<6I', data, 160, 0xFEEF04BD, 0, *version_words, *version_words)
+        release.check_windows_setup(data, '1.21.35')
+        with self.assertRaisesRegex(ValueError, 'version resource'):
+            release.check_windows_setup(data, '1.21.36')

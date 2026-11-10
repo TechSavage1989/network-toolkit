@@ -1,3 +1,11 @@
+# v1.21.35 Beta 1 - Windows installation and editor defaults
+
+The per-user installer registers the editor in Windows Default apps, adds Start menu shortcuts and keeps existing app data. Windows chooses file associations through its own Settings UI. Repeated Explorer launches use the active editor workspace. The guarded release tests the exact setup executable on a hosted Windows runner before publishing.
+
+The standalone Terminal has a Start menu shortcut. System default terminal selection still requires packaged Windows console delegation and an inbound console session transport. The existing local terminal starts and owns a new pseudoconsole.
+
+---
+
 # v1.21.34 Stable - Large-file Text Editor and Compare
 
 Promotes the editor improvements through v1.21.33 Beta 1 to the Stable channel. Editor behavior matches the verified beta. The release updates the version and channel metadata.

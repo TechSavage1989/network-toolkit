@@ -77,6 +77,17 @@ func TestEditorLargeFileBrowser(t *testing.T) {
 
 	a, registry, _ := editorFixture(t)
 	a.windowMode = "main"
+	shellFile := filepath.Join(dir, "résumé & notes %[v2].txt")
+	const shellText = "Opened from the synthetic Explorer launch.\n"
+	if err := os.WriteFile(shellFile, []byte(shellText+strings.Repeat("Synthetic log record\n", 4001)), 0600); err != nil {
+		t.Fatal(err)
+	}
+	shellFile, err = editorLaunchPath(shellFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	a.editorLaunchAvailable = true
+	a.editorLaunchInbox.add(editorLaunchRequest{Path: shellFile})
 	var saveReturned atomic.Bool
 	var editsDuringSave atomic.Int64
 	var releaseOnce sync.Once
@@ -96,9 +107,9 @@ func TestEditorLargeFileBrowser(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/api/status":
-			jsonResponse(w, 200, map[string]any{"version": model.Version, "os": runtime.GOOS, "arch": runtime.GOARCH, "editorWindowAvailable": true, "editorDiskAvailable": true, "uiHost": "browser", "system": map[string]any{}})
+			jsonResponse(w, 200, map[string]any{"version": model.Version, "os": runtime.GOOS, "arch": runtime.GOARCH, "editorWindowAvailable": true, "editorDiskAvailable": true, "editorLaunchAvailable": true, "uiHost": "browser", "system": map[string]any{}})
 		case r.URL.Path == "/api/state":
-			jsonResponse(w, 200, map[string]any{"activePage": "editor", "appUpdatePreferences": map[string]any{"enabled": false}})
+			jsonResponse(w, 200, map[string]any{"activePage": "overview", "appUpdatePreferences": map[string]any{"enabled": false}})
 		case r.URL.Path == "/api/jobs":
 			jsonResponse(w, 200, []any{})
 		case r.URL.Path == "/api/editor-fixture/state":
@@ -152,7 +163,7 @@ func TestEditorLargeFileBrowser(t *testing.T) {
 			}
 			w.WriteHeader(response.Code)
 			w.Write(response.Body.Bytes())
-		case strings.HasPrefix(r.URL.Path, "/api/editor-views"), r.URL.Path == "/api/file-editor/local", !strings.HasPrefix(r.URL.Path, "/api/"):
+		case strings.HasPrefix(r.URL.Path, "/api/editor-views"), r.URL.Path == "/api/file-editor/local", r.URL.Path == editorLaunchEndpoint, !strings.HasPrefix(r.URL.Path, "/api/"):
 			a.ServeHTTP(w, r)
 		default:
 			jsonResponse(w, 200, map[string]any{"sessions": []any{}, "entries": []any{}})
@@ -188,7 +199,7 @@ func TestEditorLargeFileBrowser(t *testing.T) {
 	command.Dir = filepath.Join("..", "..")
 	command.Env = append(os.Environ(), "NTK_EDITOR_FIXTURE_URL="+server.URL, "NTK_EDITOR_FIXTURE_TOKEN="+a.token,
 		"NTK_EDITOR_FIXTURE_LEFT="+left, "NTK_EDITOR_FIXTURE_RIGHT="+right, "NTK_EDITOR_FIXTURE_SIZE="+strconv.FormatInt(size, 10),
-		"NTK_EDITOR_FIXTURE_HEAD="+head, "NTK_EDITOR_FIXTURE_TAIL="+tail)
+		"NTK_EDITOR_FIXTURE_HEAD="+head, "NTK_EDITOR_FIXTURE_TAIL="+tail, "NTK_EDITOR_FIXTURE_SHELL="+shellFile, "NTK_EDITOR_FIXTURE_SHELL_TEXT="+shellText)
 	output, err := command.CombinedOutput()
 	t.Log(string(output))
 	if err != nil {

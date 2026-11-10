@@ -91,6 +91,9 @@ type application struct {
 	windowActivationToken        string
 	windowActivate               chan struct{}
 	windowInbox                  terminalWindowInbox
+	editorLaunchInbox            editorLaunchInbox
+	editorLaunchAvailable        bool
+	editorLaunchReusable         bool
 	windowLaunchMu               sync.Mutex
 	shutdownRequested            atomic.Bool
 	openTerminalWindow           func(context.Context, *terminalWindowPreset) (bool, error)
@@ -154,6 +157,7 @@ func main() {
 	terminalOnly := flag.Bool("terminal", false, "Open the independent Terminal application window")
 	terminalPreset := flag.String("terminal-preset", "", "Encoded nonsecret settings for a Terminal connection form")
 	terminalView := flag.Bool("terminal-view", false, "Open a live terminal view using its private stdin bootstrap")
+	editorOptions := registerEditorLaunchOptions(flag.CommandLine)
 	editorView := flag.Bool("editor-view", false, "Open an editor view using its private stdin bootstrap")
 	localHelper := flag.String("local-tools-helper", "", "Private local configuration helper pipe")
 	localParent := flag.Uint("local-tools-parent", 0, "Expected local configuration helper parent process")
@@ -217,6 +221,11 @@ func main() {
 		}
 		return
 	}
+	editorLaunch, err := editorOptions.request(flag.CommandLine, *terminalOnly || *terminalPreset != "" || *terminalView || *editorView || *printVersion || *previewHost != "")
+	if err != nil {
+		platform.NotifyFatal(err.Error())
+		return
+	}
 	if *printVersion {
 		fmt.Println(appName, model.Version, runtime.GOOS, runtime.GOARCH)
 		return
@@ -273,6 +282,21 @@ func main() {
 		platform.NotifyFatal(err.Error())
 		return
 	}
+	var editorWorkspaceOwner bool
+	if runtime.GOOS == "windows" && !*noBrowser && !*terminalOnly {
+		release, reused, err := prepareEditorWorkspace(rootDataDir, editorLaunch)
+		if err != nil && editorLaunch != nil {
+			platform.NotifyFatal("Unable to open Text Editor: " + err.Error())
+			return
+		}
+		if reused {
+			return
+		}
+		if release != nil {
+			defer release()
+			editorWorkspaceOwner = true
+		}
+	}
 	if *terminalOnly {
 		terminalDir, release, reused, err := prepareTerminalWindow(rootDataDir, initialPreset)
 		if err != nil {
@@ -301,6 +325,10 @@ func main() {
 	defer a.cleanupStagedUpdate()
 	a.storage = storage
 	a.headless = *noBrowser
+	a.editorLaunchAvailable = editorLaunch != nil
+	if editorLaunch != nil {
+		a.editorLaunchInbox.add(*editorLaunch)
+	}
 	if runtime.GOOS == "windows" || *noBrowser {
 		a.launchTerminalView = launchDetachedTerminal
 		a.launchEditorView = launchDetachedEditor
@@ -379,6 +407,14 @@ func main() {
 	a.host = net.JoinHostPort("127.0.0.1", fmt.Sprint(ln.Addr().(*net.TCPAddr).Port))
 	a.extraHost = *previewHost
 	url := "http://" + a.host + "/"
+	if editorWorkspaceOwner {
+		unregister, err := a.registerWorkspaceWindow(*dataDir)
+		if err == nil {
+			defer unregister()
+			a.editorLaunchAvailable = true
+			a.editorLaunchReusable = true
+		}
+	}
 	srv := &http.Server{Handler: a, BaseContext: func(net.Listener) context.Context { return a.ctx }, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16384}
 	serverShutdownDone = make(chan struct{})
 	go func() {
@@ -552,7 +588,8 @@ func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	requestView := ""
 	requestEditorView := ""
-	activationOnly := a.windowMode == "terminal" && r.Method == http.MethodPost && r.URL.Path == "/api/terminal-window" && a.windowActivationToken != "" && subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Window-Activation-Token")), []byte(a.windowActivationToken)) == 1
+	activationRoute := a.windowMode == "terminal" && r.URL.Path == "/api/terminal-window" || a.editorLaunchReusable && r.URL.Path == editorLaunchEndpoint
+	activationOnly := activationRoute && r.Method == http.MethodPost && a.windowActivationToken != "" && subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Window-Activation-Token")), []byte(a.windowActivationToken)) == 1
 	if !activationOnly && subtle.ConstantTimeCompare([]byte(r.Header.Get("X-Session-Token")), []byte(a.token)) != 1 {
 		var found bool
 		requestView, found = a.views.authenticate(r.Header.Get("X-Session-Token"))
@@ -574,7 +611,11 @@ func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	lastPageRequest.Store(time.Now().UnixNano())
 	if activationOnly {
-		a.handleTerminalWindow(w, r)
+		if r.URL.Path == editorLaunchEndpoint {
+			a.handleEditorLaunch(w, r, true)
+		} else {
+			a.handleTerminalWindow(w, r)
+		}
 		return
 	}
 	if requestEditorView != "" {
@@ -593,6 +634,8 @@ func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		a.handleLocalExplorerDrop(w, r)
 	case r.URL.Path == "/api/editor-views" || strings.HasPrefix(r.URL.Path, "/api/editor-views/"):
 		a.handleEditorViews(w, r)
+	case r.URL.Path == editorLaunchEndpoint && a.editorLaunchAvailable:
+		a.handleEditorLaunch(w, r, false)
 	case strings.HasPrefix(r.URL.Path, "/api/updates/"):
 		a.handleUpdates(w, r)
 	case r.URL.Path == "/api/activity":
@@ -610,7 +653,7 @@ func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		a.stateMu.Lock()
 		writable, storageErr := a.storageWritable, a.storageError
 		a.stateMu.Unlock()
-		jsonResponse(w, 200, map[string]any{"name": appName, "version": model.Version, "os": runtime.GOOS, "arch": runtime.GOARCH, "uiHost": a.currentUIHost(), "windowMode": a.windowMode, "localShellAvailable": terminal.LocalShellAvailable(), "terminalWindowAvailable": a.windowMode == "terminal" || a.openTerminalWindow != nil, "terminalDetachAvailable": a.launchTerminalView != nil, "editorDiskAvailable": a.editorViews != nil, "editorWindowAvailable": a.launchEditorView != nil && a.editorViews != nil, "connectionLaunchAvailable": runtime.GOOS == "windows", "started": a.started.UTC().Format(time.RFC3339), "portable": true, "storagePath": a.dataPath, "storageWritable": writable, "storageError": storageErr, "capabilities": capabilities, "limits": map[string]int{"maxJobs": maxConcurrent, "maxHistory": maxRetained}, "system": a.getSystem(false)})
+		jsonResponse(w, 200, map[string]any{"name": appName, "version": model.Version, "os": runtime.GOOS, "arch": runtime.GOARCH, "uiHost": a.currentUIHost(), "windowMode": a.windowMode, "localShellAvailable": terminal.LocalShellAvailable(), "terminalWindowAvailable": a.windowMode == "terminal" || a.openTerminalWindow != nil, "terminalDetachAvailable": a.launchTerminalView != nil, "editorDiskAvailable": a.editorViews != nil, "editorWindowAvailable": a.launchEditorView != nil && a.editorViews != nil, "editorLaunchAvailable": a.editorLaunchAvailable, "editorLaunchReusable": a.editorLaunchReusable, "connectionLaunchAvailable": runtime.GOOS == "windows", "started": a.started.UTC().Format(time.RFC3339), "portable": true, "storagePath": a.dataPath, "storageWritable": writable, "storageError": storageErr, "capabilities": capabilities, "limits": map[string]int{"maxJobs": maxConcurrent, "maxHistory": maxRetained}, "system": a.getSystem(false)})
 	case r.URL.Path == "/api/terminal-views" || strings.HasPrefix(r.URL.Path, "/api/terminal-views/"):
 		a.handleTerminalViews(w, r)
 	case strings.HasPrefix(r.URL.Path, "/api/terminal-automation/"):

@@ -3,7 +3,7 @@
 </p>
 
 <h1 align="center">Network Toolkit</h1>
-<p align="center">A portable toolkit for network diagnostics, device connections, file transfers and network administration, for Windows and (in beta) Linux.</p>
+<p align="center">A toolkit for network diagnostics, device connections, file transfers and network administration, for Windows and (in beta) Linux.</p>
 
 <p align="center">
   <a href="https://github.com/TechSavage1989/network-toolkit/releases/latest">Download</a> ·
@@ -76,11 +76,13 @@
 
 [Download the latest stable release](https://github.com/TechSavage1989/network-toolkit/releases/latest). It provides the portable package **`Network_Toolkit_<version>_Portable.zip`**, the executable **`Network_Toolkit.exe`** and **`SHA256SUMS`** for checking the files.
 
+The [releases page](https://github.com/TechSavage1989/network-toolkit/releases) also offers **`Network_Toolkit_<version>_Windows_x64_Setup.exe`** starting with version 1.21.35 Beta. Setup installs for your Windows account and adds Start menu shortcuts for Network Toolkit, Text Editor and Terminal. See [Windows installation and defaults](docs/guide/settings-and-updates.md#windows-installation-and-defaults).
+
 **Linux (beta):** the Linux edition is an opt-in beta while it gains every Windows feature ([plan](docs/LINUX_PLAN.md)). Download **`Network_Toolkit_<version>_Linux_x86_64.tar.gz`** (or **`_Linux_aarch64.tar.gz`** for 64-bit Arm) from the [releases page](https://github.com/TechSavage1989/network-toolkit/releases); the same **`SHA256SUMS`** lists it.
 
 ## Requirements
 
-- Windows x64 for the packaged portable application.
+- Windows x64 for setup and the portable application.
 - Linux beta: a 64-bit x86 or Arm Linux desktop (Ubuntu, Debian, Mint, Fedora, Arch and similar). Google Chrome, Chromium, Microsoft Edge, Brave or Vivaldi gives the app its own window; otherwise it opens in your default browser.
 - Network access and permissions appropriate to the tools being used.
 - Windows administrative approval for protected system changes, when requested.

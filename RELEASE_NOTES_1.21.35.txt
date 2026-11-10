@@ -1,0 +1,13 @@
+Network Toolkit 1.21.35
+
+## What's New
+
+- Install Network Toolkit on Windows and open Text Editor or Terminal directly from Start.
+- Choose Network Toolkit Text Editor as the default app for supported text files in Windows Settings.
+
+## Additional Details
+
+- Windows x64 Setup installs for your Windows account and can be removed from Installed apps. Settings, saved profiles, the credential vault and documents are kept.
+- Setup registers the editor for `.txt`, `.log`, `.ini`, `.cfg` and `.conf`. Windows Settings controls the default for each extension.
+- The Terminal shortcut opens Network Toolkit's standalone Terminal. Windows system-wide terminal selection requires a separate integration.
+- The portable executable and portable ZIP remain available. The built-in updater continues to use its verified binary-only package.

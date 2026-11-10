@@ -1,3 +1,8 @@
+## 1.21.35 Beta 1 - Windows installer and editor file associations
+
+- Install Network Toolkit for the current Windows account and launch its Text Editor and Terminal directly from Start.
+- Choose Network Toolkit Text Editor as the Windows default for supported text files.
+
 ## 1.21.34 Stable - Large-file Text Editor and Compare
 
 - Edit and compare large text files with Word Wrap, synchronized scrolling, and gray alignment spacers.
