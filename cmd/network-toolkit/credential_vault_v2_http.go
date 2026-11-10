@@ -308,13 +308,22 @@ func (a *application) ensureCredentialConfigIdentity() (string, error) {
 		return "", err
 	}
 	defer release()
-	id := credentialConfigID(path)
+	// The identity is created only when the settings file was read and has
+	// none. A file that could not be read just now must never get a new one:
+	// that would lock the vault in every app of the data folder.
+	id, err := credentialConfigIdentity(path)
+	if err != nil {
+		return "", err
+	}
 	if id != "" {
 		return id, nil
 	}
 	root, readErr := readSharedSettings(path)
 	if readErr != nil {
 		return "", errors.New("App settings are invalid; they were not replaced.")
+	}
+	if id := credentialConfigIDOf(root.members); id != "" {
+		return id, nil
 	}
 	if !a.shared.standalone {
 		// Settings this window holds in memory but has not written yet are

@@ -187,15 +187,21 @@ func credentialConfigIdentity(path string) (string, error) {
 	if json.Unmarshal(raw, &state) != nil || state == nil {
 		return "", errCredentialConfigUnreadable
 	}
+	return credentialConfigIDOf(state), nil
+}
+
+// credentialConfigIDOf returns the valid identity among the members of a
+// settings file that has been read, or "".
+func credentialConfigIDOf(members map[string]json.RawMessage) string {
 	var id string
-	if json.Unmarshal(state[credentialConfigIdentityField], &id) != nil || len(id) != 32 {
-		return "", nil
+	if json.Unmarshal(members[credentialConfigIdentityField], &id) != nil || len(id) != 32 {
+		return ""
 	}
 	decoded, err := hex.DecodeString(id)
 	if err != nil || len(decoded) != 16 {
-		return "", nil
+		return ""
 	}
-	return id, nil
+	return id
 }
 
 // configCurrentLocked checks that the settings file still carries the

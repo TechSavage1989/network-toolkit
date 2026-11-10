@@ -384,7 +384,9 @@ func (a *application) putState(w http.ResponseWriter, r *http.Request) {
 	}
 	const tooLarge = "Saved settings would exceed the 2 MiB limit. Reduce the saved data first."
 	if !a.shared.standalone {
-		if id := credentialConfigID(a.sharedSettingsPath()); id != "" {
+		// The identity the vault is bound to stays the one in the file that
+		// was read above for this save; it is not read a second time.
+		if id := credentialConfigIDOf(root.members); id != "" {
 			state[credentialConfigIdentityField] = id
 		}
 		// The mark of a version that merges saves is never the page's.
