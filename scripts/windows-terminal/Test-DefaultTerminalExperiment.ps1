@@ -16,18 +16,21 @@ if ($principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator) 
     throw 'Run the handoff proof only as the dedicated medium-integrity fixture user.'
 }
 
-# Secondary Logon creates the requested token and loads its profile, but
-# Start-Process also passes the runner environment. Use the current token's
-# known folders and the private fixture scratch directory instead.
-$workerProfile = [Environment]::GetFolderPath('UserProfile', 'DoNotVerify')
-$localData = [Environment]::GetFolderPath('LocalApplicationData', 'DoNotVerify')
-$roamingData = [Environment]::GetFolderPath('ApplicationData', 'DoNotVerify')
+# Secondary Logon loads the user's hive but Start-Process passes the runner
+# environment. Resolve the profile from this process token's SID, independently
+# of environment-backed known folder resolution.
 $accountName = ($identity.Name -split '\\')[-1]
-if (-not $workerProfile -or (Split-Path $workerProfile -Leaf) -ine $accountName -or
-    -not $localData.StartsWith("$workerProfile\", [StringComparison]::OrdinalIgnoreCase) -or
-    -not $roamingData.StartsWith("$workerProfile\", [StringComparison]::OrdinalIgnoreCase)) {
-    throw 'The isolated standard-user profile or its app data folders were not loaded.'
+$profileListKey = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\' + $identity.User.Value
+$workerProfile = [Environment]::ExpandEnvironmentVariables(
+    (Get-ItemPropertyValue -LiteralPath $profileListKey -Name ProfileImagePath))
+if (-not [IO.Path]::IsPathRooted($workerProfile) -or (Split-Path $workerProfile -Leaf) -ine $accountName -or
+    -not (Test-Path -LiteralPath $workerProfile -PathType Container)) {
+    throw 'The token SID did not identify the new standard-user fixture profile.'
 }
+$localData = Join-Path $workerProfile 'AppData\Local'
+$roamingData = Join-Path $workerProfile 'AppData\Roaming'
+[void][IO.Directory]::CreateDirectory($localData)
+[void][IO.Directory]::CreateDirectory($roamingData)
 $env:USERNAME = $accountName
 $env:USERPROFILE = $workerProfile
 $env:LOCALAPPDATA = $localData
