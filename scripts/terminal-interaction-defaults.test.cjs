@@ -26,5 +26,7 @@ test('terminal font size limits (8 to 36 px) agree in zoom, the Display field, s
  assert.match(source,/Math\.max\(8,Math\.min\(36,/);
  const html=fs.readFileSync(path.join(__dirname,'../web/index.html'),'utf8');
  assert.match(html,/id="terminalFontSize" class="terminal-font" min="8" max="36" step="1" data-input-clear="off"/);assert.match(html,/el\.id==='terminalFontSize'\)\{const size=Number\(el\.value\);if\(Number\.isInteger\(size\)&&size>=8&&size<=36\)/);
- for(const file of ['terminal_settings.go','terminal_window.go'])assert.match(fs.readFileSync(path.join(__dirname,'../cmd/network-toolkit/'+file),'utf8'),/size < 8 \|\| size > 36|size >= 8 && size <= 36/,file);
+ assert.match(fs.readFileSync(path.join(__dirname,'../cmd/network-toolkit/terminal_settings.go'),'utf8'),/size < 8 \|\| size > 36|size >= 8 && size <= 36/);
+ // The separate Terminal window uses the shared font size (shared_data.go), which passes the same sanitizer; it is no longer copied when the window is first used.
+ const shared=fs.readFileSync(path.join(__dirname,'../cmd/network-toolkit/shared_data.go'),'utf8');assert.match(shared,/\{Name: "terminalFontSize", Kind: sharedValue, Live: true\}/);assert.match(shared,/sanitizeTerminalSettings\(picked\)/);
 });

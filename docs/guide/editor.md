@@ -7,8 +7,10 @@ Open or create a document, review its source/connection, then edit. Save explici
 
 Hold **Ctrl** and roll the mouse wheel over editor text to change the font size. Wheel up enlarges the text and wheel down shrinks it. In Compare and Split View, both panes use the same size shown in the **Font size** control.
 
+Editor preferences (word wrap, highlighting, indent, font size, colors, compare options, and whether files are reopened) and the saved connections in the Files sidebar are the same in the main window's editor and in the separate **Network Toolkit Text Editor** window. See [One set of settings and saved data for all apps](settings-and-updates.md#one-set-of-settings-and-saved-data-for-all-apps).
+
 ## Reopen files from the last session
-Like Notepad and Notepad++, the Text Editor reopens the tabs that were open when it last closed, in the same order, with the same tab selected. Unsaved changes come back too, still marked as unsaved. The main window reopens its tabs the first time the Text Editor opens there; the Text Editor app reopens its own tabs when it starts. Detached editor windows do not keep a session.
+Like Notepad and Notepad++, the Text Editor reopens the tabs that were open when it last closed, in the same order, with the same tab selected. Unsaved changes come back too, still marked as unsaved. The main window reopens its tabs the first time the Text Editor opens there; the Text Editor app reopens its tabs when it starts. Each of the two also reopens what the other one had kept, if that other app is not running at the time: tabs you left open in the Text Editor app come back in the main window, and the other way round. They are moved, not copied, so nothing appears twice. If both are running, each keeps its own tabs. A file that was open in both with unsaved changes comes back twice, once as the file and once as a copy that names it, so neither version is lost. Detached editor windows do not keep a session.
 
 - Files on your computer reopen from disk. A file with unsaved changes shows your unsaved version. If the file changed on disk since then, the editor says so, and **Save** refuses to replace the newer file; use **Save As** to keep your version. If the file was deleted, your text opens in a new untitled tab.
 - New, unsaved documents reopen with their text. Blank, untouched documents are not kept.

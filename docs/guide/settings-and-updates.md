@@ -5,6 +5,31 @@ Settings currently appear in the main application and in individual tools. The P
 ## Saved data
 Network Toolkit retains preferences, saved profiles, credentials in the credential vault and macros. Updates must preserve all of these and migrate older settings without silently resetting them.
 
+## One set of settings and saved data for all apps
+Network Toolkit, the **Terminal** window and the **Text Editor** window share their settings and saved data. It does not matter whether you start them from the portable folder or from the installed shortcuts: for the same Windows account they all use the same data folder.
+
+- **Saved data**: saved and recent connections with their folders and order, saved credentials, trusted SSH host keys, and macros.
+- **Settings**: the light or dark theme and accent color, Terminal settings (appearance, syntax highlighting and your own rule sets, features, mouse and keyboard, confirmations), and Text Editor preferences (word wrap, font size, colors, reopening files).
+
+A change made in one app shows up in the others within a few seconds, without a restart. If you have a dialog open or are typing, the change waits until you are done. Two apps can be open and changed at the same time; neither undoes what the other saved.
+
+Each window still keeps what is only about that window: its size, which sidebar tab and panels are open, split panes, and what you have typed into forms.
+
+The saved credentials are in one vault. When you unlock it in one app, the other apps ask for the master password themselves unless you let Windows remember the unlock; **Lock and forget** locks it in all of them.
+
+### The first start after updating
+Earlier versions gave the Terminal window and the Text Editor window their own copies of connections, settings, trusted SSH keys and macros. The first time you start a version that shares them, Network Toolkit brings those copies together:
+
+- Connections and macros that only one app had are added for all of them. If both had changed the same one, both versions are kept; the second is named with the app it came from, for example **Core switch (Terminal)**. Remove the one you do not need.
+- Where a setting differed, the main window's setting is used.
+- Trusted SSH host keys are combined. If the Terminal window had remembered a different key for a host than the main window, the main window's key is kept and a message lists those hosts. Compare the fingerprint the next time you connect before you accept a changed key.
+
+Nothing is deleted: the earlier files stay in the data folder, and a copy of each file is kept as it was before the change (`Network_Toolkit.before-sharing…`).
+
+**Saved credentials of the earlier Terminal window** are not moved automatically, because that vault may have its own master password. Open **Password manager** and choose **Import saved credentials from the previous Terminal vault**. If that vault has a master password, Windows asks for it. The earlier vault is not changed. Until you import, a connection that uses one of those credentials tells you so.
+
+Use the same version of the portable and the installed program. An older copy keeps working, but it does not share its changes and can overwrite a change another app made at the same moment.
+
 ## Windows installation and defaults
 
 Run `Network_Toolkit_<version>_Windows_x64_Setup.exe` from the project's releases page. Choose a program folder on the first install and select **Create a desktop shortcut** if you want to launch Toolkit from the desktop. Setup installs for your Windows account and uses the same folder on upgrades.
