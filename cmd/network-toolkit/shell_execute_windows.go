@@ -31,8 +31,9 @@ type externalShellExecuteInfo struct {
 }
 
 // The connection tools use this helper for a validated HTTP(S) destination or
-// the system Remote Desktop client. It never accepts a terminal executable,
-// command shell, PowerShell command, or command template from the interface.
+// the system Remote Desktop client, and the Terminal for its fixed Windows
+// Default apps Settings URI. It never accepts a terminal executable, command
+// shell, PowerShell command, or command template from the interface.
 func shellExecuteWindowsOpen(ctx context.Context, filename string, arguments []string) error {
 	if err := ctx.Err(); err != nil {
 		return err

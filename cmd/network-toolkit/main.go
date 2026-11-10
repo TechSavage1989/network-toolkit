@@ -724,6 +724,8 @@ func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		a.handleStorage(w, r)
 	case r.URL.Path == "/api/terminal-window" || strings.HasPrefix(r.URL.Path, "/api/terminal-window/"):
 		a.handleTerminalWindow(w, r)
+	case r.URL.Path == "/api/terminal-links" || strings.HasPrefix(r.URL.Path, "/api/terminal-links/"):
+		a.handleTerminalLinks(w, r)
 	case r.URL.Path == "/api/credential-vault":
 		a.handleCredentialVault(w, r)
 	case r.URL.Path == "/api/credentials" || strings.HasPrefix(r.URL.Path, "/api/credentials/"):
