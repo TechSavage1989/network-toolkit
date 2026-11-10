@@ -198,9 +198,9 @@ async function main() {
     await page.waitForFunction(({shellFile, shellText}) => {
       const active = NetworkToolkitFileEditor.active;
       return active?.path === shellFile && active.disk &&
-        document.querySelector('.nt-editor-code textarea[data-ed-text]')?.value === shellText;
+        document.querySelector('.nt-editor-code textarea[data-ed-text]')?.value.startsWith(shellText);
     }, {shellFile, shellText});
-    await page.evaluate(() => NetworkToolkitFileEditor.closeAll());
+    assert.ok(await page.evaluate(() => NetworkToolkitFileEditor.closeAll()));
     await waitForEngine(page, state => state.grants === 0);
     await page.evaluate(() => navigate('editor'));
     await text.waitFor();

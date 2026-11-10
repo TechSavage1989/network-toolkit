@@ -79,7 +79,7 @@ func TestEditorLargeFileBrowser(t *testing.T) {
 	a.windowMode = "main"
 	shellFile := filepath.Join(dir, "résumé & notes %[v2].txt")
 	const shellText = "Opened from the synthetic Explorer launch.\n"
-	if err := os.WriteFile(shellFile, []byte(shellText), 0600); err != nil {
+	if err := os.WriteFile(shellFile, []byte(shellText+strings.Repeat("Synthetic log record\n", 4001)), 0600); err != nil {
 		t.Fatal(err)
 	}
 	shellFile, err = editorLaunchPath(shellFile)
