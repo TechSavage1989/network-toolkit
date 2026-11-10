@@ -1,3 +1,9 @@
+# v1.21.36 Beta 1 - Windows setup options and standalone editor
+
+Setup uses the selected program folder and preserves it on upgrade. The optional desktop shortcut opens Toolkit. The installed Text Editor opens in a separate workspace with its own preferences and keeps the existing paged editing, Compare, and save workflows. Each Start menu shortcut and native window uses its own icon.
+
+---
+
 # v1.21.35 Beta 1 - Windows installation and editor defaults
 
 The per-user installer registers the editor in Windows Default apps, adds Start menu shortcuts and keeps existing app data. Windows chooses file associations through its own Settings UI. Repeated Explorer launches use the active editor workspace. The guarded release tests the exact setup executable on a hosted Windows runner before publishing.

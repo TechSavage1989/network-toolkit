@@ -76,7 +76,7 @@
 
 [Download the latest stable release](https://github.com/TechSavage1989/network-toolkit/releases/latest). It provides the portable package **`Network_Toolkit_<version>_Portable.zip`**, the executable **`Network_Toolkit.exe`** and **`SHA256SUMS`** for checking the files.
 
-The [releases page](https://github.com/TechSavage1989/network-toolkit/releases) also offers **`Network_Toolkit_<version>_Windows_x64_Setup.exe`** starting with version 1.21.35 Beta. Setup installs for your Windows account and adds Start menu shortcuts for Network Toolkit, Text Editor and Terminal. See [Windows installation and defaults](docs/guide/settings-and-updates.md#windows-installation-and-defaults).
+The [releases page](https://github.com/TechSavage1989/network-toolkit/releases) also offers **`Network_Toolkit_<version>_Windows_x64_Setup.exe`**. Choose an install folder and an optional desktop shortcut. Setup adds separate Start menu shortcuts for Toolkit, Text Editor and Terminal. See [Windows installation and defaults](docs/guide/settings-and-updates.md#windows-installation-and-defaults).
 
 **Linux (beta):** the Linux edition is an opt-in beta while it gains every Windows feature ([plan](docs/LINUX_PLAN.md)). Download **`Network_Toolkit_<version>_Linux_x86_64.tar.gz`** (or **`_Linux_aarch64.tar.gz`** for 64-bit Arm) from the [releases page](https://github.com/TechSavage1989/network-toolkit/releases); the same **`SHA256SUMS`** lists it.
 

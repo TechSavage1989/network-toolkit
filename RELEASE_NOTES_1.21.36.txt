@@ -1,0 +1,12 @@
+Network Toolkit 1.21.36
+
+## What's New
+
+- Choose where to install Network Toolkit and whether to add a desktop shortcut.
+- Open Toolkit, Text Editor, and Terminal independently from Start. Each has its own icon.
+
+## Additional Details
+
+- Setup reuses your chosen program folder on upgrade. Uninstall removes the installed app and its shortcuts while retaining saved settings, profiles, and documents.
+- Files associated with Network Toolkit open in the standalone Text Editor, even while Toolkit is closed. The editor keeps its own preferences and supports large-file Compare and editing.
+- Portable downloads and the verified binary-only updater remain available.

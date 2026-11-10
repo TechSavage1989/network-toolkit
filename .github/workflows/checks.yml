@@ -689,7 +689,7 @@ jobs:
       - name: Verify text file launch and reuse of the existing editor workspace
         env:
           GOTOOLCHAIN: local
-        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestEditorLaunch(CLI|ReusesRegisteredWorkspace)$' -count=1 -v
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^Test(EditorLaunch(CLI|ReusesRegisteredWorkspace)|StandaloneEditorActivationAndPreferenceIsolation|MainEditorCloseApprovalOptIn)$' -count=1 -v
       - name: Verify shared-terminal SFTP timeout and shell continuity on Windows
         env:
           GOTOOLCHAIN: local

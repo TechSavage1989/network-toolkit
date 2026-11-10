@@ -1,3 +1,8 @@
+## 1.21.36 Beta 1 - Windows setup options and standalone editor
+
+- Choose the Windows install folder and whether to create a desktop shortcut.
+- Open Toolkit, Text Editor, and Terminal independently with distinct icons.
+
 ## 1.21.35 Beta 1 - Windows installer and editor file associations
 
 - Install Network Toolkit for the current Windows account and launch its Text Editor and Terminal directly from Start.
