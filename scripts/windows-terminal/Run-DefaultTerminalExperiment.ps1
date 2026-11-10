@@ -57,7 +57,8 @@ $certificate = $null
 $account = $null
 $worker = $null
 try {
-    [void](New-Item -ItemType Directory -Path $scratch, $stage, (Join-Path $stage 'Assets'), (Join-Path $stage 'Public'), $workerDirectory)
+    $workerTemp = Join-Path $workerDirectory 'Temp'
+    [void](New-Item -ItemType Directory -Path $scratch, $stage, (Join-Path $stage 'Assets'), (Join-Path $stage 'Public'), $workerDirectory, $workerTemp)
     $manifestPath = Join-Path $stage 'AppxManifest.xml'
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'DefaultTerminalExperiment.appxmanifest') -Destination $manifestPath
     Write-PackageLogos (Join-Path $root 'assets\Network_Toolkit_Icon.png') (Join-Path $stage 'Assets')
@@ -110,6 +111,7 @@ try {
     Import-Certificate -FilePath $certPath -CertStoreLocation 'Cert:\LocalMachine\TrustedPeople' | Out-Null
     Invoke-Checked $signtool @('verify', '/pa', $package)
 
+    Import-Module Appx -UseWindowsPowerShell -WarningAction SilentlyContinue
     $official = Get-AppxPackage -AllUsers -Name Microsoft.WindowsTerminal |
         Where-Object { $_.PackageFamilyName -ceq 'Microsoft.WindowsTerminal_8wekyb3d8bbwe' -and $_.Architecture -eq 'Arm64' } |
         Sort-Object { [version]$_.Version } -Descending | Select-Object -First 1
@@ -121,7 +123,9 @@ try {
     }
     $password = ConvertTo-SecureString ("NtK!" + [Guid]::NewGuid().ToString('N')) -AsPlainText -Force
     $account = New-LocalUser -Name $username -Password $password -Description 'Disposable Network Toolkit console fixture'
-    Add-LocalGroupMember -SID 'S-1-5-32-545' -Member $account
+    if (-not (Get-LocalGroupMember -SID 'S-1-5-32-545' | Where-Object SID -eq $account.SID)) {
+        Add-LocalGroupMember -SID 'S-1-5-32-545' -Member $account
+    }
     $acl = Get-Acl -LiteralPath $workerDirectory
     $acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($account.SID, 'Modify',
         'ContainerInherit,ObjectInherit', 'None', 'Allow'))
@@ -131,17 +135,23 @@ try {
     $stderr = Join-Path $scratch 'worker-error.txt'
     $startArgs = @{
         FilePath = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-        ArgumentList = '-NoLogo -NoProfile -NonInteractive -File "{0}" -MicrosoftTerminalManifest "{1}"' -f $workerFile, $officialManifest
+        ArgumentList = '-NoLogo -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File "{0}" -MicrosoftTerminalManifest "{1}"' -f $workerFile, $officialManifest
         Credential = [PSCredential]::new(".\$username", $password)
         LoadUserProfile = $true
         WorkingDirectory = $workerDirectory
         PassThru = $true
-        Environment = @{ GITHUB_ACTIONS = 'true'; RUNNER_ENVIRONMENT = 'github-hosted'; GITHUB_REPOSITORY = $env:GITHUB_REPOSITORY }
+        Environment = @{
+            GITHUB_ACTIONS = 'true'
+            RUNNER_ENVIRONMENT = 'github-hosted'
+            GITHUB_REPOSITORY = $env:GITHUB_REPOSITORY
+            TEMP = $workerTemp
+            TMP = $workerTemp
+        }
         RedirectStandardOutput = $stdout
         RedirectStandardError = $stderr
     }
     $worker = Start-Process @startArgs
-    if (-not $worker.WaitForExit(180000)) { throw 'The standard-user console handoff fixture timed out.' }
+    if (-not $worker.WaitForExit(300000)) { throw 'The standard-user console handoff fixture timed out.' }
     Get-Content -LiteralPath $stdout
     Get-Content -LiteralPath $stderr
     if ($worker.ExitCode -ne 0) { throw "The standard-user console handoff fixture failed with exit code $($worker.ExitCode)." }

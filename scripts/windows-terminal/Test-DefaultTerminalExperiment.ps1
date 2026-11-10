@@ -16,6 +16,25 @@ if ($principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator) 
     throw 'Run the handoff proof only as the dedicated medium-integrity fixture user.'
 }
 
+# Secondary Logon creates the requested token and loads its profile, but
+# Start-Process also passes the runner environment. Use the current token's
+# known folders and the private fixture scratch directory instead.
+$workerProfile = [Environment]::GetFolderPath('UserProfile', 'DoNotVerify')
+$localData = [Environment]::GetFolderPath('LocalApplicationData', 'DoNotVerify')
+$roamingData = [Environment]::GetFolderPath('ApplicationData', 'DoNotVerify')
+$accountName = ($identity.Name -split '\\')[-1]
+if (-not $workerProfile -or (Split-Path $workerProfile -Leaf) -ine $accountName -or
+    -not $localData.StartsWith("$workerProfile\", [StringComparison]::OrdinalIgnoreCase) -or
+    -not $roamingData.StartsWith("$workerProfile\", [StringComparison]::OrdinalIgnoreCase)) {
+    throw 'The isolated standard-user profile or its app data folders were not loaded.'
+}
+$env:USERNAME = $accountName
+$env:USERPROFILE = $workerProfile
+$env:LOCALAPPDATA = $localData
+$env:APPDATA = $roamingData
+$env:TEMP = Join-Path $PSScriptRoot 'Temp'
+$env:TMP = $env:TEMP
+
 Add-Type -Path (Join-Path $PSScriptRoot 'InteractiveSmoke.cs')
 
 $packageName = 'NetworkToolkit.DefaultTerminalExperiment'
@@ -27,6 +46,15 @@ $savedSelection = @{}
 $createdStartupKey = $false
 $restoreSelection = $false
 $processes = [Collections.Generic.List[Diagnostics.Process]]::new()
+
+function Stop-FixtureProcesses {
+    foreach ($process in $processes) {
+        try {
+            if (-not $process.HasExited) { $process.Kill(); [void]$process.WaitForExit(5000) }
+        } finally { $process.Dispose() }
+    }
+    $processes.Clear()
+}
 
 function Wait-ForFile([string]$File, [string]$Expected) {
     $until = [DateTime]::UtcNow.AddSeconds(20)
@@ -129,19 +157,27 @@ try {
     } finally { $current.Dispose() }
 
     $nonce = [Guid]::NewGuid().ToString('N')
+    $errors = @()
     $cmdStart = '/D /Q /K "set NTK_HANDOFF_NONCE={0}&&echo {0}>cmd-startup.txt"' -f $nonce
-    Test-Shell 'cmd' (Join-Path $env:SystemRoot 'System32\cmd.exe') $cmdStart $nonce 'echo %NTK_HANDOFF_NONCE%>cmd-input.txt' $nonce
+    try {
+        Test-Shell 'cmd' (Join-Path $env:SystemRoot 'System32\cmd.exe') $cmdStart $nonce 'echo %NTK_HANDOFF_NONCE%>cmd-input.txt' $nonce
+    } catch {
+        $errors += $_.Exception.Message
+    } finally { Stop-FixtureProcesses }
 
     $ps = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
     $psStart = '-NoLogo -NoProfile -NoExit -Command "$env:NTK_HANDOFF_NONCE = ''{0}''; Set-Content -Encoding Ascii ps-startup.txt ''{0}''"' -f $nonce
     $psInput = 'Set-Content -Encoding Ascii ps-input.txt "$PID|$env:NTK_HANDOFF_NONCE"'
-    Test-Shell 'ps' $ps $psStart $nonce $psInput "%PID%|$nonce"
-} finally {
-    foreach ($process in $processes) {
-        try {
-            if (-not $process.HasExited) { $process.Kill(); [void]$process.WaitForExit(5000) }
-        } finally { $process.Dispose() }
+    try {
+        Test-Shell 'ps' $ps $psStart $nonce $psInput "%PID%|$nonce"
+    } catch {
+        $errors += $_.Exception.Message
+    } finally { Stop-FixtureProcesses }
+    if ($errors.Count -ne 0) {
+        $results.errors = $errors
+        throw ($errors -join [Environment]::NewLine)
     }
+} finally {
     try {
         if ($restoreSelection) {
             $current = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($startupKey, $true)
