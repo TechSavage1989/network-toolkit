@@ -44,6 +44,12 @@ var sharedLockWait = 5 * time.Second
 // only this long for another app: the page asks again in a few seconds.
 var sharedRefreshLockWait = 250 * time.Millisecond
 
+// The save a page makes while the app is closing waits only this long for
+// another app (PUT /api/state?closing=1): the page tries a few times and
+// must reach the user with its question well inside the five seconds the
+// host window waits for a close.
+var sharedClosingLockWait = 500 * time.Millisecond
+
 // After that save failed, the next refresh tries again after this long,
 // doubled with each further failure up to sharedHeldRetryMax. What the app
 // holds is never given up.
@@ -358,6 +364,9 @@ type rootSettings struct {
 	// could not be read or written, the copy can be read now, and what the
 	// file lacked was put back into members.
 	behind bool
+	// Set with behind: settings of the main window were restored from the
+	// copy as well (named in the notice).
+	restoredSettings bool
 	// Set by readSharedSettings: the file is the truth, but its copy could
 	// not be written with it and is written by the next save.
 	rewrite bool

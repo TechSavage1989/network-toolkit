@@ -385,6 +385,11 @@ func TestSharedMoveIsNotRefusedForTheIDFile(t *testing.T) {
 // back from it later, because the saves knew everything: a removal made
 // meanwhile stays a removal, and the copy is written again when it can be.
 func TestSharedCopyThatCannotBeWrittenNeverBlocksSaving(t *testing.T) {
+	// A refresh tries the copy again after a growing wait
+	// (shared_review7_test.go); here the next refresh is to try at once.
+	retry := sharedHeldRetry
+	sharedHeldRetry = 0
+	t.Cleanup(func() { sharedHeldRetry = retry })
 	root := t.TempDir()
 	main := r3Seed(t, root)
 	main.add("terminalProfiles", sharedProfile("b", "B", "192.0.2.2"))

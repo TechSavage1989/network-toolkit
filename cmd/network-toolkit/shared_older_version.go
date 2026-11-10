@@ -486,17 +486,75 @@ func readSharedSettings(path string) (*rootSettings, error) {
 		}
 	}
 	if settings.behind {
-		// A standalone app may have written the file anew without what only
-		// the main window uses; the copy still has that.
+		// What only the main window uses is in the copy as well, and the
+		// save that follows writes the copy again: whatever is not taken
+		// from it here is gone. A standalone app may have written the file
+		// anew without those keys, and a main window that started with
+		// nothing has saved its defaults (empty objects). So the copy's
+		// values are merged under the file's: what the file has wins, what
+		// only the copy has is restored, and an empty object in the file
+		// does not hide the members the copy has.
 		for name, raw := range kept.MainOnly {
-			if key, ok := sharedKeyNamed(name); ok && key.MainOnly {
-				if _, present := settings.members[name]; !present {
-					settings.members[name] = raw
-				}
+			key, ok := sharedKeyNamed(name)
+			if !ok || !key.MainOnly || key.Kind == sharedList && key.MaxSaved > 0 {
+				continue
+			}
+			if next, restored := restoreUnder(settings.members[name], raw); restored {
+				settings.members[name] = next
+				settings.restoredSettings = true
 			}
 		}
 	}
 	return settings, nil
+}
+
+// restoreUnder returns current with what only kept has: for objects member
+// by member (recursively), for lists the entries current lacks, and kept
+// itself when current is absent. It reports whether anything was restored.
+func restoreUnder(current, kept json.RawMessage) (json.RawMessage, bool) {
+	var have, copied any
+	if json.Unmarshal(kept, &copied) != nil || copied == nil {
+		return current, false
+	}
+	if len(current) == 0 || json.Unmarshal(current, &have) != nil || have == nil {
+		return kept, true
+	}
+	switch copied.(type) {
+	case []any:
+		if _, list := have.([]any); !list {
+			return current, false
+		}
+		next, names := restoreSavedList(current, kept)
+		return next, len(names) > 0
+	case map[string]any:
+		merged, restored := restoreMembersUnder(have, copied)
+		if !restored {
+			return current, false
+		}
+		next, err := json.Marshal(merged)
+		if err != nil {
+			return current, false
+		}
+		return next, true
+	}
+	return current, false
+}
+
+func restoreMembersUnder(have, copied any) (any, bool) {
+	mine, ok := have.(map[string]any)
+	theirs, object := copied.(map[string]any)
+	if !ok || !object {
+		return have, false
+	}
+	restored := false
+	for name, value := range theirs {
+		if existing, present := mine[name]; !present {
+			mine[name], restored = value, true
+		} else if merged, deeper := restoreMembersUnder(existing, value); deeper {
+			mine[name], restored = merged, true
+		}
+	}
+	return mine, restored
 }
 
 // sharedCopyBehindOf returns the value of the note that the copy is behind
@@ -601,17 +659,25 @@ func (a *application) recreateRootLocked(root *rootSettings) {
 func (a *application) wroteSharedLocked(written []byte, root *rootSettings, recreated bool) {
 	shared := a.shared
 	shared.seen, shared.older, shared.fromOlder, shared.behind = sha256.Sum256(written), false, false, false
-	shared.had, shared.lost, shared.dirty, shared.dirtyFailures = true, false, false, 0
-	shared.heldExtra, shared.heldRetryAt = nil, time.Time{}
+	shared.had, shared.lost, shared.dirty, shared.heldExtra = true, false, false, nil
 	if strings.HasPrefix(a.storageError, sharedHeldUnsaved) {
 		a.storageError = ""
 	}
 	var members map[string]json.RawMessage
 	if json.Unmarshal(written, &members) == nil {
 		shared.lineage = sharedLineageOf(members)
+		// The copy could still not be written or read: the file says so, and
+		// the refresh tries again later (saveHeldLocked), not every time.
+		shared.behind = sharedCopyBehindOf(members) != ""
+	}
+	if !shared.behind {
+		shared.dirtyFailures, shared.heldRetryAt = 0, time.Time{}
 	}
 	if root.behind {
 		shared.pendingBehind = append(shared.pendingBehind, sharedNamesWritten(written, root.putBack)...)
+		if root.restoredSettings {
+			shared.pendingBehind = append(shared.pendingBehind, sharedRecoveredSettings)
+		}
 	} else {
 		shared.pendingPutBack = append(shared.pendingPutBack, sharedNamesWritten(written, root.putBack)...)
 	}
@@ -703,8 +769,10 @@ func writeSharedSettings(path string, raw []byte, copyUnread bool) ([]byte, erro
 	}
 	dir := filepath.Dir(path)
 	pair, truth := "", false
+	var onDisk []byte
 	switch current, err := readRootSettings(path); {
 	case err == nil:
+		onDisk = current.raw
 		pair = sharedLineageOf(current.members)
 		_, marked := current.members[sharedWriterField]
 		truth = current.exists && marked && sharedCopyBehindOf(current.members) != "read"
@@ -778,8 +846,13 @@ func writeSharedSettings(path string, raw []byte, copyUnread bool) ([]byte, erro
 	if len(written) > appSettingsLimit {
 		return nil, errors.New("Saved settings would exceed the 2 MiB limit. Reduce the saved data first.")
 	}
-	if err := writeRootSettings(path, written); err != nil {
-		return nil, err
+	// A settings file that would be the same byte for byte is not written
+	// again: a refresh that only tries to bring the copy up to date must not
+	// replace the settings file every time while the copy cannot be written.
+	if onDisk == nil || !bytes.Equal(onDisk, written) {
+		if err := writeRootSettings(path, written); err != nil {
+			return nil, err
+		}
 	}
 	sharedProtectionProblems.Store(filepath.Clean(dir), problem)
 	return written, nil
@@ -845,7 +918,11 @@ func (m *sharedMigration) olderVersion() error {
 	if err != nil {
 		return err
 	}
-	if names := sharedNamesWritten(written, settings.putBack); len(names) > 0 {
+	names := sharedNamesWritten(written, settings.putBack)
+	if settings.behind && settings.restoredSettings {
+		names = append(names, sharedRecoveredSettings)
+	}
+	if len(names) > 0 {
 		kind := "older-version"
 		if settings.behind {
 			kind = "copy-unread"

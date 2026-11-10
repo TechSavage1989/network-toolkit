@@ -551,7 +551,11 @@ func (a *application) putState(w http.ResponseWriter, r *http.Request) {
 	ours := sharedSectionOf(state, keys)
 	// One transaction for every app of this data folder: read what is on
 	// disk, merge the page's changes into it and write the result.
-	release, lockErr := acquireSettingsLock(a.sharedRoot())
+	wait := sharedLockWait
+	if r.URL.Query().Get("closing") == "1" {
+		wait = sharedClosingLockWait
+	}
+	release, lockErr := acquireSettingsLockWait(a.sharedRoot(), wait)
 	if lockErr != nil {
 		jsonError(w, http.StatusConflict, lockErr.Error())
 		return
@@ -606,7 +610,9 @@ func (a *application) putState(w http.ResponseWriter, r *http.Request) {
 	}
 	sharedNameRevisionReset(state, base, theirs)
 	if err := reconcileTerminalDisplayNames(state, theirs); err != nil {
-		jsonError(w, http.StatusConflict, err.Error())
+		// Trying the same save again cannot work: the page is told so by the
+		// code and does not retry it.
+		jsonResponse(w, http.StatusConflict, map[string]string{"error": err.Error(), "code": "settings-reload-required"})
 		return
 	}
 	merged := sharedSectionOf(state, keys)
@@ -790,10 +796,15 @@ func (a *application) saveHeldLocked() {
 		return
 	}
 	err := a.updateSharedWaitLocked(func(map[string]any) error { return nil }, sharedRefreshLockWait)
-	if err == nil {
+	if err == nil && !a.shared.behind {
 		return // wroteSharedLocked has cleared the message and the retry
 	}
-	a.storageError = sharedHeldUnsaved + err.Error()
+	if err != nil {
+		a.storageError = sharedHeldUnsaved + err.Error()
+	}
+	// Also when the settings were saved but the copy of the saved lists
+	// still could not be brought up to date: that is tried again with the
+	// same growing wait, not with every refresh.
 	delay := sharedHeldRetry
 	for n := 0; n < a.shared.dirtyFailures && delay < sharedHeldRetryMax; n++ {
 		delay *= 2
