@@ -65,8 +65,13 @@ async function run(label){await page.evaluate(()=>{NetworkToolkitCommands.close(
 const modalTitle=()=>page.locator('#modalTitle').innerText();
 const closeModal=()=>page.evaluate(()=>closeModal());
 // The connection form as a user sees it: every control, its label, state and choices.
-const connectForm=()=>page.evaluate(()=>{const modal=document.querySelector('#modalRoot .modal');if(!modal)return null;const shown=el=>{const s=getComputedStyle(el);return s.display!=='none'&&s.visibility!=='hidden'&&el.getClientRects().length>0;};
+const connectFormNow=()=>page.evaluate(()=>{const modal=document.querySelector('#modalRoot .modal');if(!modal)return null;const shown=el=>{const s=getComputedStyle(el);return s.display!=='none'&&s.visibility!=='hidden'&&el.getClientRects().length>0;};
  return {title:modal.querySelector('#modalTitle')?.textContent,controls:[...modal.querySelectorAll('input,select,textarea,button')].filter(el=>el.type!=='hidden').map(el=>({tag:el.tagName,id:el.id||'',name:el.getAttribute('name')||'',type:el.type||'',label:(el.labels?.[0]?.textContent||el.getAttribute('aria-label')||el.textContent||'').replace(/\s+/g,' ').trim().slice(0,80),value:el.tagName==='SELECT'?el.value:el.type==='checkbox'||el.type==='radio'?String(el.checked):el.tagName==='BUTTON'?'':el.value,options:el.tagName==='SELECT'?[...el.options].map(o=>o.value+'='+o.textContent.trim()):undefined,disabled:el.disabled,shown:shown(el)}))};});
+// input-clear.js and dropdowns.js add their Clear and Show all choices buttons on the animation frame after the
+// form appears, so a form read at once may or may not have them. Read it only when it has stopped changing.
+const connectForm=async()=>{const frames=()=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>requestAnimationFrame(resolve)))));
+ let previous=JSON.stringify(await connectFormNow());for(let attempt=0;attempt<100;attempt++){await frames();const form=await connectFormNow(),text=JSON.stringify(form);if(text===previous)return form;previous=text;}
+ throw new Error('The connection form kept changing.');};
 
 const EDITOR_COMMANDS=['Application | Keyboard shortcuts and help','Application | Search tools and commands','Application | Window settings','Application | Reopen recently closed tab','Application | Switch light/dark theme','Text Editor | New Text Editor document','Text Editor | More actions for selected Editor tab','Text Editor | Send to terminal','Text Editor | Open Network Toolkit Terminal'];
 const TERMINAL_COMMANDS=['Application | Keyboard shortcuts and help','Application | Search tools and commands','Application | Window settings','Application | Reopen recently closed tab','Application | Switch light/dark theme','Terminal | Open a new terminal tab','Terminal | Reconnect all terminal sessions','Terminal | More actions for selected Terminal tab','Terminal | Send output to Text Editor','Terminal | Open Network Toolkit Text Editor'];
