@@ -102,24 +102,37 @@ async function send(payload,options={}){
 }
 // ---- Receiving ----
 function ownName(){return NAMES[mode]||'';}
-function dialogOpen(){return !!document.querySelector('#modalRoot .modal,#modalRoot [role="dialog"],.nt-editor-dialog,[data-ed-dialog],#uxCommandOverlay');}
+// Anything the user is in the middle of: an app dialog, a native <dialog> (the
+// colour picker), the editor's Move / merge box, command search.
+function dialogOpen(){return !!document.querySelector('#modalRoot .modal,#modalRoot [role="dialog"],.nt-editor-dialog,[data-ed-dialog],#uxCommandOverlay,dialog[open],[data-editor-window-controls]:not([hidden])');}
+// The main window clears a typed secret (the Wi-Fi password) when it changes page.
+function entryPending(){if(mode!=='main')return false;try{return [...document.querySelectorAll('[data-transient-secret]')].some(input=>!!input.value);}catch{return false;}}
+// Why arriving text cannot be shown right now, or ''. It is asked before the
+// window changes page and again immediately before the text is pasted or
+// inserted (deliver() can wait a few seconds for a session to be ready).
+function blocked(){
+ if(dialogOpen())return 'A dialog is open in '+ownName()+'. Finish or close it there, then send again.';
+ if(entryPending())return 'A password is being entered in '+ownName()+'. Finish that there, then send again.';
+ return '';
+}
 const refuse=error=>({ok:false,error});
 async function receiveTerminal(request){
  const send=root.NetworkToolkitEditorSendTerminal;
  if(!send?.deliver||typeof request.text!=='string'||!request.text)return refuse(ownName()+' cannot take the text right now.');
  // Never replace a connection form, a host key or sign-in prompt, or a paste review.
- if(dialogOpen())return refuse('A dialog is open in '+ownName()+'. Finish or close it there, then send again.');
+ // Checked before anything changes here (deliver() changes the page), and again by deliver().
+ const busy=blocked();if(busy)return refuse(busy);
  const entry=send.targets().find(item=>item.info.id===request.session);
  if(!entry)return refuse('That terminal session is no longer connected. Nothing was sent.');
- return send.deliver(entry,request.text,{report:true});
+ return send.deliver(entry,request.text,{report:true,guard:blocked});
 }
 async function receiveEditor(request){
  const send=root.NetworkToolkitTerminalSendEditor,editor=root.NetworkToolkitFileEditor;
  if(!send?.deliver||!editor?.listDocuments||typeof request.text!=='string'||!request.text)return refuse(ownName()+' cannot take the text right now.');
- if(dialogOpen())return refuse('A dialog is open in '+ownName()+'. Finish or close it there, then send again.');
+ const busy=blocked();if(busy)return refuse(busy);
  let docId='';
  if(request.target!=='new'){const doc=editor.listDocuments().find(item=>item.uid===request.target);if(!doc)return refuse('That document is no longer open. Nothing was added.');if(doc.blocked)return refuse(doc.blocked);docId=doc.id;}
- return send.deliver({docId,where:request.where==='line'?{line:Number(request.line)}:request.where||'end',text:request.text,label:clip(request.label)||'Terminal output',report:true});
+ return send.deliver({docId,where:request.where==='line'?{line:Number(request.line)}:request.where||'end',text:request.text,label:clip(request.label)||'Terminal output',report:true,guard:blocked});
 }
 // kind: what the text is for. A standalone app receives its own kind only; the
 // main window is told by its engine ("terminal" or "editor").
@@ -148,5 +161,5 @@ function start(app){if(app!=='editor'&&app!=='terminal')return false;return begi
 // The main Toolkit window: receive only, and only when its engine reports that
 // a standalone app can find it (status.peerReceive).
 function startMain(){if(mode&&mode!=='main')return false;return begin('main');}
-root.NetworkToolkitPeerSend=Object.freeze({start,startMain,sender,peerKind,peerName,targets,open,send,poll,summary});
+root.NetworkToolkitPeerSend=Object.freeze({start,startMain,sender,peerKind,peerName,targets,open,send,poll,summary,dialogOpen});
 })(window);

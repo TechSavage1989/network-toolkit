@@ -41,7 +41,7 @@ async function open(mode,options={}){
    if(p.startsWith('/api/peer-send/')){f.peerCalls.push(method+' '+p);
     assert.equal(req.headers()['x-session-token'],'standalone-send','peer-send calls carry this page\'s own session token');
     if(p==='/api/peer-send/targets'&&method==='GET')data=f.targets;
-    else if(p==='/api/peer-send/open'&&method==='POST'){f.opens++;if(f.openError){status=f.openError.status;data={error:f.openError.error};}else{f.targets={...f.targets,receiver:'standalone',running:true,ready:true};data={app:f.targets.app,name:f.targets.name,receiver:'standalone',running:true,ready:true};}}
+    else if(p==='/api/peer-send/open'&&method==='POST'){f.opens++;if(f.openDelay)await new Promise(r=>setTimeout(r,f.openDelay));if(f.openError){status=f.openError.status;data={error:f.openError.error};}else{f.targets={...f.targets,receiver:'standalone',running:true,ready:true};data={app:f.targets.app,name:f.targets.name,receiver:'standalone',running:true,ready:true};}}
     else if(p==='/api/peer-send/send'&&method==='POST'){f.sends.push(body());if(f.sendError){status=f.sendError.status;data={error:f.sendError.error};}else data={requestId:String(f.sends.length).padStart(32,'0'),state:f.targets.running?'queued':'starting',name:f.targets.name,receiver:f.targets.receiver||'standalone'};}
     else if(p==='/api/peer-send/result'&&method==='GET'){assert.match(url.searchParams.get('requestId')||'',/^[0-9]{32}$/);data={requestId:url.searchParams.get('requestId'),...(f.results.length>1?f.results.shift():f.results[0]||{state:'queued'})};}
     else if(p==='/api/peer-send/inbox'&&method==='GET'){f.polls++;const request=f.inbox.shift()||null;data={request,report:!f.reports.length,from:f.targets.name};if(request)data.kind=request.session?'terminal':'editor';}
@@ -107,6 +107,17 @@ async function standaloneEditor(){
  await send.click();await toast(TERMINAL+' did not become ready. If it is open from an older version, close it and open it again. Nothing was sent; your document is unchanged.');
  assert.equal(f.opens,3);assert.equal(await page.locator('#modalRoot .modal').count(),0,'no dialog is left behind');assert.equal(await text.inputValue(),doc);assert.deepEqual(f.sends,[]);f.openError=null;
  pass('Text Editor: when the Terminal app does not come up in time the user is told plainly and the text stays in the document');
+ // While the Terminal app starts (up to 25 s) the user opens another dialog here: it is never replaced.
+ await clearToasts();f.targets={...f.targets,running:false,ready:false};f.openDelay=1500;
+ await send.click();await toast('Opening '+TERMINAL+'…');
+ // (The "Opening…" message covers the button for the mouse; the keyboard reaches it.)
+ await page.locator('.standalone-app-tools [data-action="settings"]').evaluate(button=>button.click());await page.locator('#modalTitle').filter({hasText:'Text Editor window settings'}).waitFor();
+ await toast(TERMINAL+' is open. A dialog is open here, so Send to terminal was not shown and nothing was sent. Close the dialog, then choose Send to terminal again.');
+ await page.waitForTimeout(300);
+ assert.equal(await page.locator('#modalTitle').innerText(),'Text Editor window settings','the dialog the user opened is still there');assert.equal(await page.locator('[data-editor-send-peer-missing],#editorSendTerminalForm').count(),0);
+ assert.equal(f.opens,4);assert.deepEqual(f.sends,[]);assert.equal(await text.inputValue(),doc,'the document is unchanged');
+ await page.keyboard.press('Escape');await page.locator('#modalRoot .modal').waitFor({state:'detached'});f.openDelay=0;
+ pass('Text Editor: a dialog opened while the Terminal app was starting is not replaced; a message is shown instead');
  // ---- Open, but nothing connected yet ----
  f.targets={...f.targets,receiver:'standalone',running:true,ready:true,targets:[]};await clearToasts();
  await send.click();await page.locator('[data-editor-send-peer-missing]').waitFor();assert.match(await page.locator('#modalRoot .modal-body').innerText(),/No terminal session is connected in Network Toolkit Terminal\./);
@@ -395,6 +406,43 @@ async function mainWindowReceives(){
  await text.evaluate(el=>{el.focus();el.setSelectionRange(0,0);});await page.locator('[data-ed-insert-here]').click();await page.waitForFunction(()=>!document.querySelector('[data-ed-insert-bar]'));
  assert.equal(await text.inputValue(),'interface Vlan10\nmain window notes\n');
  pass('Main window as receiver: editor text arrives in a new unsaved document or through the Insert here bar in its Text Editor');
+ // ---- Never in the way of what the user is doing in the main window ----
+ // A native dialog (the colour picker), the editor's Move / merge box and a typed secret (the Wi-Fi
+ // password, which a page change clears) refuse the text BEFORE the window changes page.
+ await page.evaluate(()=>navigate('overview'));await page.waitForFunction(()=>state.activePage==='overview');
+ const refused=async(request,error,what)=>{const n=f.acks.length;f.inbox.push(request);await until(()=>f.acks.length===n+1,what);assert.deepEqual(f.acks.at(-1),{requestId:request.requestId,ok:false,error},what);};
+ const DIALOG='A dialog is open in Network Toolkit. Finish or close it there, then send again.';
+ const inputsBefore=f.inputs.length,docsBefore=await page.evaluate(()=>NetworkToolkitFileEditor.listDocuments().length);
+ await page.evaluate(()=>document.body.insertAdjacentHTML('beforeend','<dialog open id="peerTestDialog">Synthetic colour picker</dialog>'));
+ await refused({requestId:'1'.repeat(32),session:'s1',text:'reload'},DIALOG,'terminal text with a native dialog open');
+ await refused({requestId:'2'.repeat(32),target:'new',where:'start',text:'x'},DIALOG,'editor text with a native dialog open');
+ assert.equal(await page.evaluate(()=>state.activePage),'overview','the page did not change under the dialog');assert.equal(await page.locator('#peerTestDialog').count(),1);
+ await page.evaluate(()=>document.querySelector('#peerTestDialog').remove());
+ const realBox=await page.evaluate(()=>{const box=document.querySelector('[data-editor-window-controls]');if(box){box.hidden=false;return true;}document.body.insertAdjacentHTML('beforeend','<section id="peerTestBox" data-editor-window-controls role="dialog">Move or merge documents</section>');return false;});
+ await refused({requestId:'3'.repeat(32),session:'s1',text:'reload'},DIALOG,'terminal text with the Move / merge box open');
+ await refused({requestId:'4'.repeat(32),target:uid,where:'end',text:'x'},DIALOG,'editor text with the Move / merge box open');
+ assert.equal(await page.evaluate(()=>state.activePage),'overview');
+ await page.evaluate(real=>{if(real)document.querySelector('[data-editor-window-controls]').hidden=true;else document.querySelector('#peerTestBox').remove();},realBox);
+ await page.evaluate(()=>document.querySelector('#pageBody,main,body').insertAdjacentHTML('beforeend','<input id="peerTestSecret" type="password" data-transient-secret value="synthetic-secret">'));
+ const SECRET='A password is being entered in Network Toolkit. Finish that there, then send again.';
+ await refused({requestId:'5'.repeat(32),session:'s1',text:'reload'},SECRET,'terminal text while a password is being typed');
+ await refused({requestId:'6'.repeat(32),target:'new',where:'start',text:'x'},SECRET,'editor text while a password is being typed');
+ assert.equal(await page.evaluate(()=>state.activePage),'overview');assert.equal(await page.evaluate(()=>document.querySelector('#peerTestSecret')?.value),'synthetic-secret','what the user typed is still there');
+ await page.evaluate(()=>document.querySelector('#peerTestSecret').remove());
+ pass('Main window as receiver: a native dialog, the Move / merge box or a password being typed refuses the text before the page changes');
+ // A dialog that opens AFTER the first check (while the window changes page or waits for the
+ // session) is seen by the second check, immediately before the paste or the insert.
+ await page.evaluate(()=>{window.__peerNavigate=navigate;window.navigate=function(target){if(window.__peerInject){window.__peerInject=false;document.body.insertAdjacentHTML('beforeend','<dialog open id="peerTestDialog">Synthetic colour picker</dialog>');}return window.__peerNavigate(target);};});
+ for(const [id,request,what] of [['7',{session:'s2',text:'reload'},'paste'],['8',{target:'new',where:'start',text:'late'},'new document'],['9',{target:uid,where:'pick',text:'late'},'Insert here bar'],['0',{target:uid,where:'end',text:'late'},'insert']]){
+  await page.evaluate(()=>{window.__peerInject=true;});
+  await refused({requestId:id.repeat(32),...request},DIALOG,'a dialog that opened before the '+what);
+  assert.equal(await page.evaluate(()=>window.__peerInject),false,'the dialog opened after the first check');
+  await page.evaluate(()=>document.querySelector('#peerTestDialog').remove());}
+ await page.evaluate(()=>{window.navigate=window.__peerNavigate;});
+ assert.equal(f.inputs.length,inputsBefore,'nothing was pasted');assert.equal(await page.locator('#terminalPasteForm').count(),0);
+ assert.equal(await page.evaluate(()=>NetworkToolkitFileEditor.listDocuments().length),docsBefore,'no document was created');assert.equal(await page.locator('[data-ed-insert-bar]').count(),0);
+ await page.evaluate(()=>navigate('editor'));assert.equal(await text.inputValue(),'interface Vlan10\nmain window notes\n','nothing was inserted');
+ pass('Main window as receiver: the dialog check is repeated immediately before the paste and before each change to the editor');
  // Its own Send to terminal is unchanged: inside the window, and no sending route is ever used.
  await text.evaluate(el=>{el.focus();el.setSelectionRange(0,16);});
  await page.locator('#networkToolkitFileEditor .nt-editor-toolbar [data-ed="sendTerminal"]').click();await page.locator('#editorSendTerminalForm').waitFor();

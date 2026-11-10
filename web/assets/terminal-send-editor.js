@@ -74,13 +74,19 @@ function wait(bounded){return new Promise(resolve=>{const raf=root.requestAnimat
  * "choose the position" bar, or an insert at the cursor, start, end or a line.
  * A send inside one window shows its own messages. With request.report (text
  * from the standalone Terminal) the result is returned for the other app:
- * {ok:true,outcome:'inserted'|'pick'} or {ok:false,error}. */
+ * {ok:true,outcome:'inserted'|'pick'} or {ok:false,error}. request.guard (text
+ * from another app) returns a reason when a dialog is open in this window; it
+ * is asked before the page changes and again immediately before each step
+ * that changes the editor. */
 async function deliver(request){
  const {docId,where,text,label}=request,report=request.report===true,ed=editor();
  const fail=message=>{if(report)return {ok:false,error:message};toastMessage(message,'error');return false;},done=outcome=>report?{ok:true,outcome}:true;
+ const guard=()=>{try{return report&&typeof request.guard==='function'?String(request.guard()||''):'';}catch{return 'The Text Editor cannot take text right now.';}};
  if(!ed?.insertText)return fail('The Text Editor is not available.');
+ let busy=guard();if(busy)return fail(busy);
  const navigate=g('navigate');if(typeof navigate==='function')navigate('editor');await wait(report);
- if(!docId){const doc=await ed.newDocument?.();if(!doc?.id)return fail('Could not create a new document.');const r=await ed.insertText(doc.id,text,'start');return r?.ok?done('inserted'):fail(r?.error||'The text could not be inserted.');}
+ if((busy=guard()))return fail(busy);
+ if(!docId){const doc=await ed.newDocument?.();if(!doc?.id)return fail('Could not create a new document.');if((busy=guard()))return fail(busy);const r=await ed.insertText(doc.id,text,'start');return r?.ok?done('inserted'):fail(r?.error||'The text could not be inserted.');}
  if(where==='pick')return ed.pickInsert(docId,text,label)?done('pick'):fail('That document is not available. Nothing was added.');
  const r=await ed.insertText(docId,text,where);return r?.ok?done('inserted'):fail(r?.error||'The text could not be inserted.');
 }
