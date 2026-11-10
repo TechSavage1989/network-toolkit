@@ -86,11 +86,11 @@ func updatePlanLaunchTarget(dir string, p updatePlan) string {
 func updateRestartArgs(args []string) []string {
 	out := []string{}
 	for i := 0; i < len(args); i++ {
-		if args[i] == "--update-health" || args[i] == "-update-health" {
+		if args[i] == "--update-health" || args[i] == "-update-health" || args[i] == "--open-file" || args[i] == "-open-file" {
 			i++
 			continue
 		}
-		if strings.HasPrefix(args[i], "--update-health=") || strings.HasPrefix(args[i], "-update-health=") {
+		if strings.HasPrefix(args[i], "--update-health=") || strings.HasPrefix(args[i], "-update-health=") || strings.HasPrefix(args[i], "--open-file=") || strings.HasPrefix(args[i], "-open-file=") {
 			continue
 		}
 		out = append(out, args[i])

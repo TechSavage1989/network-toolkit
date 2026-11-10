@@ -45,6 +45,7 @@ jobs:
       old_manifest: ${{ steps.release.outputs.old_manifest }}
       new_commit: ${{ steps.release.outputs.new_commit }}
       request_commit: ${{ steps.release.outputs.request_commit }}
+      windows_setup: ${{ steps.package.outputs.windows_setup }}
     env:
       GOTOOLCHAIN: local
     steps:
@@ -97,12 +98,20 @@ jobs:
       - name: Build Windows x64 GUI application and Linux x86_64/aarch64 programs
         if: steps.release.outputs.publish == 'true'
         run: sh ./build.sh
-      - name: Package and verify portable source, binary-only updater and Linux assets
+      - name: Install the Windows setup compiler
+        if: steps.release.outputs.publish == 'true'
+        run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends nsis
+      - name: Package and verify Windows setup, portable assets, updater and Linux assets
+        id: package
         if: steps.release.outputs.publish == 'true'
         env:
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
           RELEASE_VERSION: ${{ steps.release.outputs.version }}
-        run: python3 scripts/github_release.py package --tag "$RELEASE_TAG" --exe "build/Network_Toolkit.exe" --linux-x86-64 "build/linux-amd64/network-toolkit" --linux-aarch64 "build/linux-arm64/network-toolkit"
+        run: |
+          python3 scripts/github_release.py package --tag "$RELEASE_TAG" --exe "build/Network_Toolkit.exe" --linux-x86-64 "build/linux-amd64/network-toolkit" --linux-aarch64 "build/linux-arm64/network-toolkit"
+          if test -f "dist/Network_Toolkit_${RELEASE_VERSION}_Windows_x64_Setup.exe"; then
+            echo "windows_setup=true" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/upload-artifact@v7
         if: steps.release.outputs.publish == 'true'
         with:
@@ -111,9 +120,26 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  publish:
+  windows-setup:
     needs: build
-    if: needs.build.outputs.publish == 'true'
+    if: needs.build.outputs.publish == 'true' && needs.build.outputs.windows_setup == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.build.outputs.commit }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-assets
+          path: ${{ runner.temp }}/ntk-setup-release
+      - name: Test the exact Windows installer that will be published
+        run: ./scripts/installer/verify-windows.ps1 -ArtifactDirectory "${{ runner.temp }}/ntk-setup-release"
+
+  publish:
+    needs: [build, windows-setup]
+    if: ${{ !cancelled() && needs.build.result == 'success' && needs.build.outputs.publish == 'true' && (needs.windows-setup.result == 'success' || (needs.build.outputs.windows_setup != 'true' && needs.windows-setup.result == 'skipped')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:

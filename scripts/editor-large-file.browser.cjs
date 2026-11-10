@@ -7,7 +7,8 @@ const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 
 const { NTK_EDITOR_FIXTURE_URL: url, NTK_EDITOR_FIXTURE_LEFT: left,
   NTK_EDITOR_FIXTURE_RIGHT: right, NTK_EDITOR_FIXTURE_HEAD: head, NTK_EDITOR_FIXTURE_TAIL: tail,
-  NTK_EDITOR_FIXTURE_SIZE: size, NTK_EDITOR_FIXTURE_TOKEN: token } = process.env;
+  NTK_EDITOR_FIXTURE_SIZE: size, NTK_EDITOR_FIXTURE_TOKEN: token,
+  NTK_EDITOR_FIXTURE_SHELL: shellFile, NTK_EDITOR_FIXTURE_SHELL_TEXT: shellText } = process.env;
 const output = process.env.TOOLKIT_TEST_OUTPUT || path.resolve('test-results/editor-large-file');
 const report = { bytesPerFile: Number(size), browserErrors: [], passed: false };
 fs.mkdirSync(output, { recursive: true });
@@ -192,8 +193,16 @@ async function main() {
     report.phase = 'startup';
     await page.goto(url);
     await page.waitForFunction(() => window.NetworkToolkitEditorWindows?.bufferSupported());
-    await page.evaluate(() => navigate('editor'));
     const text = page.locator('.nt-editor-code textarea[data-ed-text]').first();
+    await text.waitFor();
+    await page.waitForFunction(({shellFile, shellText}) => {
+      const active = NetworkToolkitFileEditor.active;
+      return active?.path === shellFile && active.disk &&
+        document.querySelector('.nt-editor-code textarea[data-ed-text]')?.value === shellText;
+    }, {shellFile, shellText});
+    await page.evaluate(() => NetworkToolkitFileEditor.closeAll());
+    await waitForEngine(page, state => state.grants === 0);
+    await page.evaluate(() => navigate('editor'));
     await text.waitFor();
     await page.evaluate(() => {
       const marks = window.editorTimings = { gaps: [], input: [], long: [] };

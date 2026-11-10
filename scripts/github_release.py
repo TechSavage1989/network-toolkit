@@ -21,6 +21,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 VERSION_PATTERN = r'(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)'
 STABLE_EXE = 'Network_Toolkit.exe'
+FIRST_WINDOWS_SETUP = (1, 21, 35)
 # Linux edition (docs/LINUX_PLAN.md): one portable .tar.gz per architecture.
 LINUX_EXE = 'network-toolkit'
 LINUX_ARCHES = (('x86_64', 62), ('aarch64', 183))  # release name, ELF e_machine
@@ -31,9 +32,18 @@ def linux_archive_name(current, arch):
     return f'Network_Toolkit_{current}_Linux_{arch}.tar.gz'
 
 
+def windows_setup_name(current):
+    return f'Network_Toolkit_{current}_Windows_x64_Setup.exe'
+
+
+def has_windows_setup(current):
+    return tuple(map(int, current.split('.'))) >= FIRST_WINDOWS_SETUP
+
+
 def release_assets(current):
     """Every published asset, in upload order; SHA256SUMS is always last."""
     return [STABLE_EXE, f'Network_Toolkit_{current}_Portable.zip', f'Network_Toolkit_{current}_Update.zip',
+            *([windows_setup_name(current)] if has_windows_setup(current) else []),
             *[linux_archive_name(current, arch) for arch, _ in LINUX_ARCHES], 'SHA256SUMS']
 
 
@@ -80,9 +90,8 @@ def validate(tag=None):
     for name in ['build.sh', 'BUILD_WINDOWS.cmd', 'Open_Terminal.cmd']:
         require('Network_Toolkit.exe' in (ROOT / name).read_text(), f'Stable executable name missing in {name}')
     resources = runpy.run_path(str(ROOT / 'scripts/build_windows_resources.py'))['version_info']()
-    major, minor, patch = map(int, current.split('.'))
-    fixed = struct.pack('<6I', 0xFEEF04BD, 0x00010000, major << 16 | minor, patch << 16,
-                        major << 16 | minor, patch << 16)
+    version_words = windows_version_words(current)
+    fixed = struct.pack('<6I', 0xFEEF04BD, 0x00010000, *version_words, *version_words)
     require(fixed in resources, 'Numeric Windows resource version differs from Go version')
     require((current + '.0').encode('utf-16le') in resources, 'Windows resource text differs from Go version')
     require('Network_Toolkit.exe'.encode('utf-16le') in resources, 'Windows resource executable name differs')
@@ -202,6 +211,38 @@ def check_exe(data, current):
     require((current + '.0').encode('utf-16le') in data, 'Executable version resource does not match the release')
 
 
+def check_windows_setup(data, current):
+    require(len(data) >= 128 and data[:2] == b'MZ', 'Windows setup is not a PE file')
+    at = struct.unpack_from('<I', data, 0x3c)[0]
+    require(at + 94 <= len(data) and data[at:at+4] == b'PE\0\0', 'Invalid Windows setup PE header')
+    require(struct.unpack_from('<H', data, at+24+68)[0] == 2, 'Windows setup is not a GUI executable')
+    version_words = windows_version_words(current)
+    # NSIS 3.09 writes zero in the structure-version field. Check both the
+    # numeric file version and product version independently of that field.
+    require(any(struct.pack('<6I', 0xFEEF04BD, structure, *version_words, *version_words) in data
+                for structure in (0, 0x00010000)), 'Windows setup version resource does not match the release')
+
+
+def windows_version_words(current):
+    major, minor, patch = map(int, current.split('.'))
+    return major << 16 | minor, patch << 16
+
+
+def package_windows_setup(exe, current, output):
+    setup = output / windows_setup_name(current)
+    temporary = setup.with_name(setup.name + '.building')
+    option = '/' if os.name == 'nt' else '-'
+    try:
+        subprocess.run(['makensis', option + 'WX', f'{option}DAPP_VERSION={current}', f'{option}DAPP_EXE={exe.resolve()}',
+                        f'{option}DSETUP_EXE={temporary.resolve()}', f'{option}DAPP_ICON={ROOT / "assets/Network_Toolkit_Icon.ico"}',
+                        str(ROOT / 'scripts/installer/windows.nsi')], check=True, cwd=ROOT)
+        check_windows_setup(temporary.read_bytes(), current)
+        os.replace(temporary, setup)
+    finally:
+        temporary.unlink(missing_ok=True)
+    return setup
+
+
 def source_files(allow_untracked):
     try:
         paths = subprocess.check_output(['git', 'ls-files', '-z'], cwd=ROOT, stderr=subprocess.DEVNULL).decode().split('\0')
@@ -270,10 +311,11 @@ def package(exe, output, tag, allow_untracked, linux=None):
     atomic_write(output / STABLE_EXE, binary)
     import package_public_update
     update_archive = package_public_update.package(exe, output, write_manifest=False)
-    linux_archives = [package_linux(linux[arch].read_bytes(), current, arch, machine, output) for arch, machine in LINUX_ARCHES]
-    atomic_write(output / 'SHA256SUMS', sums({STABLE_EXE: binary, archive.name: archive.read_bytes(),
-                                           update_archive.name: update_archive.read_bytes(),
-                                           **{path.name: path.read_bytes() for path in linux_archives}}))
+    packages = [output / STABLE_EXE, archive, update_archive]
+    if has_windows_setup(current):
+        packages.append(package_windows_setup(exe, current, output))
+    packages.extend(package_linux(linux[arch].read_bytes(), current, arch, machine, output) for arch, machine in LINUX_ARCHES)
+    atomic_write(output / 'SHA256SUMS', sums({path.name: path.read_bytes() for path in packages}))
     verify(output, tag)
     print(json.dumps({'version': current, 'archive': str(archive), 'bytes': archive.stat().st_size,
                       'sha256': sha(archive.read_bytes()), 'members': len(entries)}))
@@ -356,6 +398,8 @@ def verify(output, tag=None):
     update_archive = output / f'Network_Toolkit_{current}_Update.zip'
     require(release_names == set(release_assets(current)) - {'SHA256SUMS'},
             'Unexpected release assets in checksum manifest')
+    if has_windows_setup(current):
+        check_windows_setup((output / windows_setup_name(current)).read_bytes(), current)
     for arch, machine in LINUX_ARCHES:
         verify_linux(output / linux_archive_name(current, arch), current, arch, machine)
     import package_public_update

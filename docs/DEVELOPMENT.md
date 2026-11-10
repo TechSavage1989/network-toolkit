@@ -56,17 +56,22 @@ published notes without rewriting them.
 
 Stage/commit all intended source paths before packaging: the packager uses
 `git ls-files`, so unstaged newly added files are not part of its source list.
-Create local review artifacts without publishing:
+Create local review artifacts without publishing. Install the NSIS compiler and
+make `makensis` available on `PATH` to include the Windows setup executable.
 
 ```sh
-python3 scripts/github_release.py package --tag v1.17.90 --exe build/Network_Toolkit.exe
-python3 scripts/github_release.py verify --tag v1.17.90
+python3 scripts/github_release.py package --exe build/Network_Toolkit.exe \
+  --linux-x86-64 build/linux-amd64/network-toolkit --linux-aarch64 build/linux-arm64/network-toolkit
+python3 scripts/github_release.py verify
 ```
 
-Replace the example tag only for an authorized version change. Portable bundles
-retain top-level `README.txt`, `VALIDATION.txt` and the current release note;
+Packaging uses the current version from source. Portable bundles retain
+top-level `README.txt`, `VALIDATION.txt` and the current release note;
 their `source/` tree mirrors the repository. The binary-only update bundle keeps
 its original four-member allowlist, taking its guides from `docs/`.
+
+Checks installs and removes the setup build on an isolated Windows runner.
+Release repeats that validation against the exact installer before publishing.
 
 Publication needs explicit authorization. The existing release guard skips an
 already-published version on main pushes. Do not change versions/tags/assets or

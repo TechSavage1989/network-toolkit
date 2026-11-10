@@ -425,10 +425,21 @@ func readBoundedRegularFile(path string, limit int64) ([]byte, error) {
 }
 
 func readTerminalWindowInstance(dir string) (terminalWindowInstance, error) {
+	return readWorkspaceWindowInstance(dir, false)
+}
+
+func readWorkspaceWindowInstance(dir string, editor bool) (terminalWindowInstance, error) {
 	var record terminalWindowInstance
 	b, err := readBoundedRegularFile(filepath.Join(dir, terminalInstanceFilename), 4096)
 	if err != nil {
 		return record, err
+	}
+	if editor && runtime.GOOS == "windows" {
+		b, err = unprotectCredentialBlob(b)
+		if err != nil {
+			return record, err
+		}
+		defer clear(b)
 	}
 	dec := json.NewDecoder(bytes.NewReader(b))
 	dec.DisallowUnknownFields()
@@ -449,17 +460,21 @@ func readTerminalWindowInstance(dir string) (terminalWindowInstance, error) {
 }
 
 func activateTerminalWindow(ctx context.Context, dir string, preset *terminalWindowPreset) error {
-	record, err := readTerminalWindowInstance(dir)
+	return activateWorkspaceWindow(ctx, dir, "terminal", "/api/terminal-window", terminalWindowEnvelope{Config: preset})
+}
+
+func activateWorkspaceWindow(ctx context.Context, dir, mode, endpoint string, envelope any) error {
+	record, err := readWorkspaceWindowInstance(dir, mode == "main")
 	if err != nil {
 		return err
 	}
-	b, err := json.Marshal(terminalWindowEnvelope{Config: preset})
+	b, err := json.Marshal(envelope)
 	if err != nil {
 		return err
 	}
 	requestCtx, cancel := context.WithTimeout(ctx, 1200*time.Millisecond)
 	defer cancel()
-	req, err := http.NewRequestWithContext(requestCtx, http.MethodPost, "http://"+record.Host+"/api/terminal-window", bytes.NewReader(b))
+	req, err := http.NewRequestWithContext(requestCtx, http.MethodPost, "http://"+record.Host+endpoint, bytes.NewReader(b))
 	if err != nil {
 		return err
 	}
@@ -468,7 +483,7 @@ func activateTerminalWindow(ctx context.Context, dir string, preset *terminalWin
 	transport := &http.Transport{Proxy: nil, DialContext: (&net.Dialer{Timeout: time.Second}).DialContext, DisableKeepAlives: true, MaxResponseHeaderBytes: 16384}
 	defer transport.CloseIdleConnections()
 	client := &http.Client{Transport: transport, CheckRedirect: func(*http.Request, []*http.Request) error {
-		return errors.New("Terminal activation cannot follow redirects.")
+		return errors.New("Workspace activation cannot follow redirects.")
 	}}
 	response, err := client.Do(req)
 	if err != nil {
@@ -480,8 +495,8 @@ func activateTerminalWindow(ctx context.Context, dir string, preset *terminalWin
 		WindowMode string `json:"windowMode"`
 		InstanceID string `json:"instanceId"`
 	}
-	if response.StatusCode != http.StatusOK || json.NewDecoder(io.LimitReader(response.Body, 4096)).Decode(&result) != nil || !result.OK || result.WindowMode != "terminal" || result.InstanceID != record.InstanceID {
-		return errors.New("The existing terminal window did not confirm the request.")
+	if response.StatusCode != http.StatusOK || json.NewDecoder(io.LimitReader(response.Body, 4096)).Decode(&result) != nil || !result.OK || result.WindowMode != mode || result.InstanceID != record.InstanceID {
+		return errors.New("The existing workspace window did not confirm the request.")
 	}
 	return nil
 }
@@ -536,24 +551,40 @@ func prepareTerminalWindow(root string, preset *terminalWindowPreset) (dir strin
 }
 
 func (a *application) registerTerminalWindow(dir string) (func(), error) {
+	return a.registerWorkspaceWindow(dir)
+}
+
+func (a *application) registerWorkspaceWindow(dir string) (func(), error) {
 	// The persisted instance record can only raise this window and supply a
 	// nonsecret connection preset. It must never contain the general API token.
 	if a.windowActivationToken == "" {
-		return nil, errors.New("The terminal activation capability is unavailable.")
+		return nil, errors.New("The window activation capability is unavailable.")
 	}
 	record := terminalWindowInstance{Version: 2, Host: a.host, Token: a.windowActivationToken, InstanceID: a.windowInstanceID, PID: os.Getpid()}
 	b, err := json.Marshal(record)
 	if err != nil {
 		return nil, err
 	}
+	b = append(b, '\n')
+	editor := a.windowMode == "main"
+	if editor && runtime.GOOS == "windows" {
+		// The selected app-data folder may be shared. Only this Windows user
+		// can recover the loopback endpoint and its restricted activation token.
+		protected, err := protectCredentialBlob(b)
+		clear(b)
+		if err != nil {
+			return nil, errors.New("The editor activation capability could not be protected.")
+		}
+		b = protected
+	}
 	path := filepath.Join(dir, terminalInstanceFilename)
-	if err = writeAtomic(path, append(b, '\n')); err != nil {
-		return nil, fmt.Errorf("Save the terminal-window instance: %w", err)
+	if err = writeAtomic(path, b); err != nil {
+		return nil, fmt.Errorf("Save the workspace-window instance: %w", err)
 	}
 	return func() {
 		// Only remove our own registration while still holding the process
 		// lock. A later instance's endpoint must never be removed by us.
-		if current, err := readTerminalWindowInstance(dir); err == nil && current.InstanceID == record.InstanceID {
+		if current, err := readWorkspaceWindowInstance(dir, editor); err == nil && current.InstanceID == record.InstanceID {
 			_ = os.Remove(path)
 		}
 	}, nil
