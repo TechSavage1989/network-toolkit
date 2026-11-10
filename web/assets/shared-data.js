@@ -228,6 +228,7 @@ async function poll(){
   const asked=saves,result=await api('/shared-data?revision='+encodeURIComponent(revision));
   if(!result||typeof result.revision!=='string'||asked!==saves)return false;
   if(Array.isArray(result.notices)&&result.notices.length)attempt(()=>noticeHandler?.(result.notices));
+  if(result.olderVersion===true)olderVersion();
   if(result.credentials!==undefined)credentialsChanged(result.credentials);
   if(!result.values){revision=result.revision;return false;}
   const next=normalize(result.values),changed=differing(next);
@@ -239,21 +240,36 @@ async function poll(){
  finally{polling=false;}
 }
 
-// Things the one-time move to shared data wants the user to know, such as
-// SSH hosts for which two apps had remembered different keys. Shown once, in
-// plain words, when nothing else is open; acknowledged notices do not return.
+// An older version of the app (from before shared app data) saved the
+// settings file last. It does not merge: whatever it holds replaces what the
+// other apps saved, for as long as it runs. Said once per window.
+let olderWarned=false;
+function olderVersion(){
+ if(olderWarned)return;
+ olderWarned=true;
+ attempt(()=>{if(typeof toast==='function')toast('An older version of Network Toolkit is saving to this data folder. While it is open, changes you make here may be replaced by what it holds. Saved sessions and connections it drops are put back. Close that window and update it.','error');});
+}
+
+// Things the user should know about shared data: what the one-time move
+// found (SSH hosts for which two apps had remembered different keys, lists
+// that were full), and saved entries that were put back after an older
+// version dropped them. Shown once, in plain words, when nothing else is
+// open; acknowledged notices do not return.
 let noticeShown='';
 function showNotices(notices){
- const list=notices.filter(n=>n&&typeof n.id==='string'&&Array.isArray(n.items)&&n.items.length).slice(0,8),key=list.map(n=>n.id).join(',');
+ const all=notices.filter(n=>n&&typeof n.id==='string'&&Array.isArray(n.items)&&n.items.length),older=all.filter(n=>n.kind==='older-version');
+ const list=(older.length?older:all).slice(0,8),key=list.map(n=>n.id).join(',');
  if(!list.length||key===noticeShown||busy()||typeof openModal!=='function')return;
  const names={terminal:'Terminal',editor:'Text Editor'},escape=typeof esc==='function'?esc:value=>String(value).replace(/[&<>"']/g,'');
  const parts=list.map(n=>{
-  const app=names[n.source]||'other',items='<ul>'+n.items.slice(0,40).map(item=>'<li style="overflow-wrap:anywhere">'+escape(item)+'</li>').join('')+'</ul>';
+  const app=names[n.source]||'other',items='<ul>'+n.items.slice(0,61).map(item=>'<li style="overflow-wrap:anywhere">'+escape(item)+'</li>').join('')+'</ul>';
+  if(n.kind==='older-version')return '<p>An older version of Network Toolkit saved its settings over the shared ones. It can hold fewer saved entries and does not know what other apps saved meanwhile, so these were missing afterwards. They were put back:</p>'+items+'<p>If you removed one of them in the older version on purpose, remove it again here. Update every copy of Network Toolkit to avoid this.</p>';
   if(n.kind==='host-key-conflict')return '<p>For these SSH hosts the '+app+' window had remembered a different host key than the main window. The main window\'s key was kept and nothing else was changed. The next time you connect to one of them, compare the fingerprint that is shown with one you trust before you accept a changed key.</p>'+items;
   return '<p>Not everything the '+app+' window had saved could be added because these lists are full. Nothing was removed; remove entries you no longer need and the rest is added the next time the app starts.</p>'+items;
  });
  noticeShown=key;
- openModal('Saved data is now shared','<p>Network Toolkit, its Terminal and its Text Editor now share saved connections, settings, trusted SSH host keys and macros.</p>'+parts.join(''),'<button class="btn primary" data-shared-notice-ok>OK</button>',true);
+ if(older.length)openModal('Saved entries were put back',parts.join(''),'<button class="btn primary" data-shared-notice-ok>OK</button>',true);
+ else openModal('Saved data is now shared','<p>Network Toolkit, its Terminal and its Text Editor now share saved connections, settings, trusted SSH host keys and macros.</p>'+parts.join(''),'<button class="btn primary" data-shared-notice-ok>OK</button>',true);
  const button=document.querySelector('[data-shared-notice-ok]');
  if(button)button.addEventListener('click',()=>{void api('/shared-data/notices','POST',{acknowledge:list.map(n=>n.id)}).catch(()=>{noticeShown='';});if(typeof closeModal==='function')closeModal();});
 }

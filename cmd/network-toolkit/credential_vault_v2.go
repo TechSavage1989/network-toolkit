@@ -1047,24 +1047,19 @@ func invalidateCredentialConfigIdentity(path string) error {
 	if credentialConfigID(path) == "" {
 		return nil
 	}
-	raw, err := readCredentialFile(path, 2<<20)
-	if err != nil {
-		return err
-	}
-	var state map[string]json.RawMessage
-	if json.Unmarshal(raw, &state) != nil || state == nil {
+	// The settings file of the data folder: read and written like every
+	// other change to it, so nothing else in it is lost.
+	settings, err := readSharedSettings(path)
+	if err != nil || !settings.exists {
 		return errors.New("App settings cannot be safely invalidated.")
 	}
-	state[credentialConfigIdentityField], err = json.Marshal(randomHex(16))
+	settings.members[credentialConfigIdentityField], err = json.Marshal(randomHex(16))
 	if err != nil {
 		return err
 	}
-	raw, err = json.MarshalIndent(state, "", "  ")
+	raw, err := settings.marshal()
 	if err != nil {
-		return err
-	}
-	if len(raw) > 2<<20 {
 		return errors.New("App settings exceed their size limit.")
 	}
-	return writeAtomic(path, raw)
+	return writeSharedSettings(path, raw)
 }

@@ -182,6 +182,25 @@ test('a host-key difference found by the one-time move is shown once, in plain w
  click();await new Promise(resolve=>setImmediate(resolve));
  assert.deepEqual(posts,[['/shared-data/notices',{acknowledge:['n1']}]]);assert.equal(modals.at(-1),'closed');
 });
+test('an older version saving to the data folder is reported once, and what was put back is named',async()=>{
+ const h=harness(),{c,shared}=h;shared.loaded();
+ const toasts=[];c.toast=(text,kind)=>toasts.push([kind,text]);
+ c.answers.push({revision:'r1',olderVersion:true},{revision:'r1',olderVersion:true},{revision:'r1'});
+ await shared.poll();await shared.poll();await shared.poll();
+ assert.equal(toasts.length,1,'the warning is shown once, not with every refresh');assert.equal(toasts[0][0],'error');
+ assert.match(toasts[0][1],/An older version of Network Toolkit is saving to this data folder/);
+ assert.match(toasts[0][1],/changes you make here may be replaced/);assert.match(toasts[0][1],/Close that window and update it/);
+ // The saved entries that were written again after the older version dropped
+ // them are listed, with what to do about one that was removed on purpose.
+ const modals=[];c.openModal=(title,body)=>{modals.push({title,body});};c.closeModal=()=>{};c.esc=value=>String(value).replace(/</g,'&lt;');
+ c.api=async()=>({revision:'r1',notices:[{id:'n2',kind:'older-version',source:'',items:['Core switch','<i>Edge</i>']}]});
+ await shared.poll();
+ assert.equal(modals.length,1);assert.equal(modals[0].title,'Saved entries were put back');
+ assert(modals[0].body.includes('Core switch')&&modals[0].body.includes('&lt;i>Edge&lt;/i>')&&!modals[0].body.includes('<i>Edge'));
+ assert.match(modals[0].body,/An older version of Network Toolkit saved its settings over the shared ones/);
+ assert.match(modals[0].body,/removed one of them in the older version on purpose, remove it again here/);
+ assert(!/now share saved connections/.test(modals[0].body),'this is not the notice of the one-time move');
+});
 test('nothing is asked while the page is hidden, offline, closing or a detached window',async()=>{
  const {c,shared}=harness();
  for(const [set,reset] of [[()=>{c.document.visibilityState='hidden';},()=>{c.document.visibilityState='visible';}],[()=>{c.online=false;},()=>{c.online=true;}],[()=>{c.stateLoaded=false;},()=>{c.stateLoaded=true;}],[()=>{c.shutDown=true;},()=>{c.shutDown=false;}],[()=>{c.EDITOR_WINDOW=true;},()=>{c.EDITOR_WINDOW=false;}],[()=>{c.DETACHED_TERMINAL=true;},()=>{c.DETACHED_TERMINAL=false;}]]){

@@ -85,7 +85,9 @@ func TestStatePersistenceAndReplacement(t *testing.T) {
 	}
 	// The cross-process credential transaction guard is deliberately persistent;
 	// unlinking it would let concurrent instances lock different file objects.
-	want := map[string]bool{filepath.Base(a.dataPath): true, credentialTransactionFilename: true}
+	// The copy of the saved lists is written with every save of the settings
+	// (shared_older_version.go) and is just as persistent.
+	want := map[string]bool{filepath.Base(a.dataPath): true, credentialTransactionFilename: true, savedListsFilename: true}
 	if len(files) != len(want) {
 		t.Fatalf("Unexpected files remain after state replacement: %v", files)
 	}

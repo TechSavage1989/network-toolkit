@@ -12,6 +12,7 @@ Settings and saved data are shared by every Network Toolkit app that uses the sa
 | Trusted SSH host keys | `Network_Toolkit.ssh_known_hosts.json` |
 | Macros and startup macros | `Network_Toolkit.macros.json` |
 | Open editor tabs and kept copies of unsaved text | `Network_Toolkit.editor-session/` per editor workspace, taken over by the other editor when its app is not running |
+| A copy of the saved lists, for the case that an older version saves over them | `Network_Toolkit.saved-lists.json` (see "Older versions on the same data folder") |
 
 The portable and the installed program already used the same data folder (`%LocalAppData%\NetworkToolkit`, or the folder chosen under **App data**; see `storage_location.go`). The standalone apps now use that folder's files too, instead of copies in `Network_Toolkit.Terminal/` and `Network_Toolkit.TextEditor/`. Those workspace folders hold only what is about one window.
 
@@ -70,8 +71,42 @@ The workspace files are only read and stay where they are. Each data-folder file
 - **A crash during a save**: every file is replaced atomically; the previous file stays until the new one is complete.
 - **A crash during the migration**: each part can be repeated. The next start completes it and adds nothing twice.
 - **One part of the migration fails** (for example a damaged macro library): the other parts are done, the failure is logged, and the part is tried again at the next start.
-- **The data folder's settings file cannot be read**: a standalone app saves no shared data over it and reports the problem; the file is not changed.
+- **The data folder's settings file is gone while apps run**: that is not read as "another app removed everything". Every app keeps what it shows, and its next save writes all of it again. (An app that starts without a settings file starts empty, as always.)
+- **The settings file cannot be read**: pages keep what they show. A file that could not be read at that moment (for example while another program holds it) is never replaced; the save is refused and tried again. A file that is not valid is replaced only by the main window, with everything it holds, as before; a standalone app refuses to save over it and reports the problem.
 - **Another app holds the lock**: a save waits up to five seconds, then reports that another app is saving.
-- **An older version runs at the same time**: it keeps working on its own copies as before. An older main window can overwrite a change another app made in the same moment, because it saves without merging. Update all copies of the app to avoid this.
+- **An older version runs on the same data folder**: see the next section.
 
-Moving the data folder and deleting app data include the shared files, the migration record and the untouched copies. Both are refused while another app of the data folder is running.
+## Older versions on the same data folder
+
+A portable copy and an installed copy are updated separately, so a version from before shared app data (v1.21.38 and older) can meet a data folder this version uses. What such a version does, from its code:
+
+- Its engine reads the settings file once, at start, and never again.
+- Its page keeps only the keys it knows (any other key is dropped with its next save) and at most the first 100 saved sessions and the first 100 saved FTP connections.
+- Every save writes all of that back: no reading, no merging. It takes the same lock file, so it never writes in the middle of another app's save.
+- Its standalone Terminal and Text Editor read and write only their own workspace folders.
+
+**Saved entries are never dropped for good.** `shared_older_version.go`:
+
+- Every save of this version puts the mark `sharedDataWriter` into the settings file. An older page drops it, so a settings file without the mark was last written by a version that does not merge.
+- Every save of this version first writes the saved lists (saved sessions, saved FTP connections, saved targets, saved TFTP profiles) to `Network_Toolkit.saved-lists.json`, then the settings file. `writeSharedSettings` is the only function that writes the settings file.
+- A reader that finds the settings file without the mark (`readSharedSettings`, used by every read of shared values) puts back every entry of that copy that the file no longer has. Entries the file has always win; entries that are put back follow them. The next save of this version, or its next start (`migrateSharedData` repairs the file before a page is served), writes them to disk again, and the user gets a notice naming them.
+- A settings file with the mark is taken as it is, whatever the copy says: this version writes the whole file, so after an interrupted save the settings file is the truth.
+
+This design was chosen over keeping only 100 entries in the settings file and the rest in a second file. That split still loses an entry that moves from the second file into the first 100 (after a removal or an edit in this version) while an older window, which loaded before that, saves what it holds. Putting back every missing entry has no such gap. Its price is that the two cases below cannot be told apart from "the older version never saw this entry".
+
+While an older main window is open, every running app of this version says so once (the settings file lacks the mark; `olderVersion` in the answer of `GET /api/shared-data`). That is only known after the older window has saved something.
+
+**What an older standalone app adds later is picked up.** Its workspace files are examined again at every start of this version when they changed. Saved sessions, FTP connections, macros and trusted hosts that are new are added; an entry or host the user removed in this version is recorded per id in `Network_Toolkit.shared-data.json` and does not come back.
+
+**What remains unprotected while an older version is in use:**
+
+- A saved entry removed in the older version comes back (it is named in the notice; remove it again in this version). A saved entry removed in this version while the older main window is open comes back with that window's next save, because it still holds it.
+- An edit made in this version to a saved entry that the older main window also holds is replaced by that window's version with its next save.
+- Settings, recent connections, learned prompt names and verified SFTP fingerprints go back to what the older main window holds with each of its saves, until it is closed.
+- Trusted SSH hosts: an older main window writes the whole trust file from what it loaded at start. A host trusted elsewhere meanwhile is asked about again; a host removed elsewhere meanwhile is trusted again without a question.
+- An older standalone app does not see what was saved since the one-time move, and what was removed in this version is still in its own copy.
+- Saved credentials of an older standalone app stay in its own vault until they are imported.
+
+Update every copy of the app to end all of this.
+
+Moving the data folder and deleting app data include the shared files, the copy of the saved lists, the migration record and the untouched copies. Both are refused while another app of the data folder is running.

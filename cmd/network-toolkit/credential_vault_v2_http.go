@@ -312,7 +312,7 @@ func (a *application) ensureCredentialConfigIdentity() (string, error) {
 	if id != "" {
 		return id, nil
 	}
-	root, readErr := readRootSettings(path)
+	root, readErr := readSharedSettings(path)
 	if readErr != nil {
 		return "", errors.New("App settings are invalid; they were not replaced.")
 	}
@@ -335,7 +335,7 @@ func (a *application) ensureCredentialConfigIdentity() (string, error) {
 	if err != nil {
 		return "", errors.New("App settings exceed their size limit.")
 	}
-	if err := writeRootSettings(path, raw); err != nil {
+	if err := writeSharedSettings(path, raw); err != nil {
 		return "", err
 	}
 	a.shared.seen = sha256.Sum256(raw)

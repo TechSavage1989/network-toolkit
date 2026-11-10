@@ -141,6 +141,9 @@ var perWindowStateKeys = []string{
 	"firstLaunchWelcomeSeen", "appUpdatePreferences", "discoveryWorkflowVersion", "hostnameColumnsVersion",
 	// The identity the credential vault is bound to (kept by the engine).
 	credentialConfigIdentityField,
+	// The mark of a version that merges saves (kept by the engine, see
+	// shared_older_version.go).
+	sharedWriterField,
 }
 
 func sharedKeyNamed(name string) (sharedKey, bool) {
@@ -235,6 +238,9 @@ type sharedData struct {
 	lastRevision string
 	// Digest of the main settings file as last read into application.state.
 	seen [32]byte
+	// The settings file as last read was written by a version that does not
+	// merge saves (shared_older_version.go): pages warn the user.
+	older bool
 	// Shared keys found in this standalone workspace's own settings file: a
 	// copy from before sharing. It is kept as it is and never used.
 	legacy map[string]json.RawMessage
@@ -283,11 +289,21 @@ type rootSettings struct {
 	raw     []byte
 	exists  bool
 	members map[string]json.RawMessage
+	// Set by readSharedSettings: a version that does not merge wrote the file
+	// last, and the names of the saved entries that were put back.
+	older   bool
+	putBack []string
 }
 
+// The file could be read but does not hold a settings object. Any other
+// error means the file could not be read at this moment.
+var errRootSettingsInvalid = errors.New("The main settings file is not valid; it was not changed.")
+
+// readRootSettings reads a settings file as it is. Shared values of the data
+// folder are read with readSharedSettings.
 func readRootSettings(path string) (*rootSettings, error) {
 	settings := &rootSettings{members: map[string]json.RawMessage{}}
-	raw, err := readCredentialFile(path, appSettingsLimit)
+	raw, err := readSharedFile(path, appSettingsLimit)
 	if errors.Is(err, os.ErrNotExist) {
 		return settings, nil
 	}
@@ -296,7 +312,7 @@ func readRootSettings(path string) (*rootSettings, error) {
 	}
 	settings.raw, settings.exists = raw, true
 	if err := json.Unmarshal(raw, &settings.members); err != nil || settings.members == nil {
-		return nil, errors.New("The main settings file is not valid; it was not changed.")
+		return nil, errRootSettingsInvalid
 	}
 	return settings, nil
 }
@@ -358,6 +374,8 @@ func (s *rootSettings) encode(values map[string]any, keys []sharedKey) ([]byte, 
 func (s *rootSettings) marshal() ([]byte, error) { return marshalRootSettings(s.members, s.exists) }
 
 func marshalRootSettings(members map[string]json.RawMessage, exists bool) ([]byte, error) {
+	// Written by a version that merges saves (shared_older_version.go).
+	members[sharedWriterField] = json.RawMessage("1")
 	if !exists {
 		// The main window has not saved anything yet. Without this, its first
 		// start would take a file written by another app for its own and skip
@@ -377,7 +395,8 @@ func marshalRootSettings(members map[string]json.RawMessage, exists bool) ([]byt
 }
 
 // writeRootSettings replaces the main settings file. The caller holds the
-// data folder's credential transaction lock.
+// data folder's credential transaction lock. Only writeSharedSettings calls
+// it, so the copy of the saved lists is always written first.
 func writeRootSettings(path string, raw []byte) error {
 	if info, err := os.Lstat(path); err == nil {
 		if !info.Mode().IsRegular() || storageIsLink(info) {

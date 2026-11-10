@@ -37,6 +37,9 @@ var storagePortableFiles = []struct {
 	{sharedBackupSettings, appSettingsLimit},
 	{sharedBackupMacros, terminalMacroLibraryLimit},
 	{sharedBackupKnownHosts, knownHostsLimit},
+	// The copy of the saved lists that protects them from versions that do
+	// not merge saves (shared_older_version.go).
+	{savedListsFilename, savedListsLimit},
 }
 
 // Open each directory component through an anchored os.Root. No symlink or

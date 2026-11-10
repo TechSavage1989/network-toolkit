@@ -127,6 +127,7 @@ func TestSharedDataFilesMoveAndAreDeletedWithAppData(t *testing.T) {
 		sharedBackupSettings:         `{"theme":"dark"}`,
 		sharedBackupMacros:           `{"version":1,"macros":[],"bindings":[]}`,
 		sharedBackupKnownHosts:       `{"version":1,"hosts":[]}`,
+		savedListsFilename:           `{"version":1,"lists":{"terminalProfiles":[{"id":"p","name":"Core","type":"ssh","host":"192.0.2.1","port":22}]}}`,
 		terminalMacroLibraryFilename: `{"version":1,"macros":[],"bindings":[]}`,
 		knownHostsFilename:           `{"version":1,"hosts":[]}`,
 		filepath.Join(storageTerminalDirectory, appSettingsFilename): `{"activePage":"terminal","terminalProfiles":[{"id":"old"}]}`,
