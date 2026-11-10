@@ -37,11 +37,11 @@ var terminalWindowNow = time.Now
 // This is deliberately a separate schema from ConnectRequest. Window launch
 // can carry only connection settings, never authentication or terminal input.
 // Peer send (peer_send.go) is a second, separate capability and never travels
-// in a launch request. It carries text only, only between the standalone Text
-// Editor and the standalone Terminal of one data root, found through the
-// protected instance record. Text for a session always goes through the
-// Terminal page's paste path (review, warnings, limits); it never carries
-// authentication either.
+// in a launch request. It carries text only, from the standalone Text Editor
+// or the standalone Terminal of one data root to the other standalone app or
+// to the main window, found through the protected instance record. Text for a
+// session always goes through the receiving Terminal page's paste path
+// (review, warnings, limits); it never carries authentication either.
 type terminalWindowPreset struct {
 	ProfileID          string `json:"profileId,omitempty"`
 	Type               string `json:"type"`
@@ -568,9 +568,9 @@ func (a *application) registerWorkspaceWindow(dir string) (func(), error) {
 	// The persisted instance record holds the window activation token, never
 	// the general API token. That token can do two things only: raise this
 	// window with a launch request (a nonsecret connection preset or a file to
-	// open), and, in the standalone Text Editor and Terminal, reach the peer
-	// send routes that pass text between those two apps (peer_send.go). It
-	// cannot read settings, credentials, host keys, files or sessions.
+	// open), and reach the peer send routes through which a standalone Text
+	// Editor or Terminal hands text to this window (peer_send.go). It cannot
+	// read settings, credentials, host keys, files or sessions.
 	if a.windowActivationToken == "" {
 		return nil, errors.New("The window activation capability is unavailable.")
 	}

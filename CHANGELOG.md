@@ -1,3 +1,8 @@
+## 1.21.42 Beta 1 - Send to opens the other app by itself
+
+- Send to terminal and Send to Text Editor in the standalone apps open the other app automatically and deliver what was sent, without a second click.
+- When the full Toolkit window is open, the text goes to its Terminal or Text Editor instead.
+
 ## 1.21.41 Beta 1 - Safer recovery of shared settings and saved data
 
 - A lost settings file is recovered from the safety copy with a notice; a standalone app no longer refuses to save, and a minimized app no longer writes an older list over newer changes.

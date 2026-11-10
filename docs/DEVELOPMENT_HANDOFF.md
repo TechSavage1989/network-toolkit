@@ -1,3 +1,17 @@
+# v1.21.42 Beta 1 - Send to opens the other app by itself
+
+Owner: "the 'send to' commands in terminal and text editor should automatically open the respective standalone app to perform the task and if the main toolkit app is already open then it would send there".
+
+v1.21.41 was published and verified: tag at merge commit 7a376a0 (PR #163), release run green (build, windows-setup, publish), all seven assets matching GitHub's digests, `github_release.py verify` reporting "Verified 1.21.41", stable channel still at v1.21.34. On that pull request's final commit `TestNativeSFTPDirect121InstalledWebView2` failed once (setup-sftp timed out with a page startup error "Failed to fetch", run 42816756135) and passed in the other run and on its re-run; it is not explained.
+
+The sender's engine now chooses the receiver (`peer_send.go`): the other standalone app if its protected record answers, otherwise the main window of the same data folder if its page is polling, otherwise the other standalone app is started through the existing fixed launch arguments and the text, held only in the sender's engine memory, is delivered when the new app is ready (25 seconds at most; dropped when the sender closes). The main window is a receiver only: it serves `/api/peer/terminal/*` and `/api/peer/editor/*` with the same guards (activation token, loopback, no browser headers, strict JSON, 1 MiB and 8 MiB, one pending request for a minute), has no sending routes, and its page runs the inbox only when `/api/status` reports `peerReceive`. A target chosen from one receiver's list is sent only to that receiver. Text to a terminal still goes through `pasteText` and its review; a freshly started Terminal has no session and says so. Older apps (plain or unreadable records, no `/api/peer/`) are skipped and named.
+
+Decisions: a running standalone app wins over a running main window; the main window counts as running only with a live page; on Linux the main window never registers a record, so it is not a receiver.
+
+Known limits: the DPAPI record of the main window, the real process start, and raising the native window are compiled and vetted and first run in hosted CI; a long-minimised main window whose timers are throttled can be passed over in favour of starting the standalone app. Not yet seen on physical Windows.
+
+---
+
 # v1.21.41 Beta 1 - Safer recovery of shared settings and saved data
 
 v1.21.40 was published and verified: tag at merge commit 3c08e58 (PR #162), release run 42803456524 green (build, windows-setup, publish), all seven assets matching GitHub's digests, `github_release.py verify` reporting "Verified 1.21.40", main's Checks run 42803456756 green, stable channel still at v1.21.34. Four independent reviews ran on that change. The second found four more data-loss paths (an older window re-saving identical bytes hid another app's save; the migration recorded entries before its write succeeded; a standalone app recreating a missing settings file wiped main-only lists; vault identity creation from a standalone app undid another app's save) and the third found the missing-settings-file case still losing data on three write paths; all were fixed before the merge. The fourth found nothing at HIGH and three MEDIUM cases, which v1.21.40 shipped with and this version fixes.

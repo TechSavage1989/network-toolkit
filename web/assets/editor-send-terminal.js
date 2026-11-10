@@ -11,10 +11,13 @@
  * The dialog snapshots the text when it opens; if the document changes
  * before Send, the dialog asks the user to reopen it.
  *
- * Standalone Text Editor: the same dialog lists the sessions of the standalone
- * Terminal app (Network Toolkit Terminal) and sends through peer-send.js. That
- * app's page then calls deliver() below, so the text takes exactly the same
- * paste path there. If the Terminal is not open, the dialog offers to open it. */
+ * Standalone Text Editor: the same dialog lists the sessions of the receiver
+ * its engine picked and sends through peer-send.js: the standalone Terminal
+ * app (Network Toolkit Terminal) if it is running, otherwise the main Toolkit
+ * window. That app's page then calls deliver() below, so the text takes
+ * exactly the same paste path there. If neither is running, the Terminal app
+ * is opened automatically (no question). A session still has to be connected
+ * by the user: nothing here connects one, as inside one window. */
 (function(root){
 'use strict';
 const document=root.document;if(!document)return;
@@ -64,17 +67,34 @@ function open(snapshot){
   'The Terminal opens on this session and the text is entered as a paste, using your Terminal paste settings. Text with line breaks is shown for review first when Review multi-line paste is on. Line breaks can run commands.'),FORM_FOOTER,true);
  return true;
 }
-// Standalone Text Editor: the sessions are those of the standalone Terminal app.
+// Standalone Text Editor: the sessions are those of the receiver this app's
+// engine picked: the standalone Terminal app, or the main Toolkit window.
 async function openPeer(other,snapshot){
- const openModal=g('openModal'),id=++sequence,name=other.peerName(),stamp=snapshot.stamp?.(),content=String(snapshot.content||''),selection=String(snapshot.selection||'');
+ const openModal=g('openModal'),id=++sequence,stamp=snapshot.stamp?.(),content=String(snapshot.content||''),selection=String(snapshot.selection||'');
  pending=null;
- const info=await other.targets();
+ let info=await other.targets();
  if(id!==sequence)return false;
+ if(!info.running){
+  // Nothing is running: open the Terminal app, with no question. The document stays as it is.
+  toastMessage('Opening '+other.peerName()+'…');
+  const opened=await other.open({quiet:true,failure:' Nothing was sent; your document is unchanged.'});
+  if(!opened||id!==sequence)return false;
+  // That wait can take many seconds. Whatever dialog the user opened meanwhile is never replaced.
+  if(other.dialogOpen?.()){toastMessage(other.peerName()+' is open. A dialog is open here, so Send to terminal was not shown and nothing was sent. Close the dialog, then choose Send to terminal again.');return false;}
+  info=await other.targets();
+  if(id!==sequence)return false;
+  if(other.dialogOpen?.()){toastMessage(other.peerName()+' is open. A dialog is open here, so Send to terminal was not shown and nothing was sent. Close the dialog, then choose Send to terminal again.');return false;}
+ }
+ const name=info.name||other.peerName();
+ if(info.note)toastMessage(info.note);
  const list=info.targets.filter(item=>item.connected);
  if(!info.running||!list.length){
+  // As inside one window: a session has to be connected first; nothing connects one for the user.
   const what=!info.running?name+' is not open.':info.ready?'No terminal session is connected in '+name+'.':name+' is not ready yet.';
-  const next=info.running&&info.ready?'Connect a session there, then choose Send to terminal again.':'Open it and connect a session there, then choose Send to terminal again.';
-  openModal('Send to terminal','<div data-editor-send-peer-missing><p>'+escapeHTML(what)+'</p><p class="help-line">'+escapeHTML(next)+'</p></div>','<button type="button" class="btn ghost" data-action="close-modal">Cancel</button><button type="button" class="btn primary" data-editor-send-open-peer>Open Terminal</button>');
+  const next=info.running&&info.ready?'Connect one there, then choose Send to terminal again.':'Choose Send to terminal again in a moment.';
+  // The Terminal app can be brought to the front from here; the main window has no such request.
+  const show=info.running&&info.receiver==='standalone'?'<button type="button" class="btn ghost" data-editor-send-open-peer>Show Terminal</button>':'';
+  openModal('Send to terminal','<div data-editor-send-peer-missing><p>'+escapeHTML(what)+'</p><p class="help-line">'+escapeHTML(next)+'</p></div>',show+'<button type="button" class="btn primary" data-action="close-modal">OK</button>');
   return false;
  }
  const chosen=list.find(item=>item.id===lastTarget)||list.find(item=>item.active)||list[0];
@@ -90,11 +110,15 @@ function wait(bounded){return new Promise(resolve=>{const raf=root.requestAnimat
  * messages and returns what pasteText returned. With options.report (text
  * from the standalone Text Editor) nothing is shown here beyond what the
  * paste path itself shows, and the result is returned for the other app:
- * {ok:true,outcome:'sent'|'review'} or {ok:false,error}. */
+ * {ok:true,outcome:'sent'|'review'} or {ok:false,error}. options.guard (text
+ * from another app) returns a reason when a dialog is open in this window; it
+ * is asked before the page changes and again immediately before the paste. */
 async function deliver(entry,text,options={}){
  const report=options.report===true,fail=message=>{if(report)return {ok:false,error:message};toastMessage(message,'error');return false;};
+ const guard=()=>{try{return report&&typeof options.guard==='function'?String(options.guard()||''):'';}catch{return 'The terminal cannot take text right now.';}};
  const navigate=g('navigate'),select=g('selectTerminal'),interaction=root.NetworkToolkitTerminalInteraction;
  if(typeof navigate!=='function'||typeof select!=='function'||!interaction?.pasteText)return report?{ok:false,error:'The terminal cannot take text right now.'}:false;
+ {const busy=guard();if(busy)return fail(busy);}
  navigate('terminal');
  for(let attempt=0;attempt<30;attempt++){
   await wait(report);
@@ -103,6 +127,7 @@ async function deliver(entry,text,options={}){
   if(current!==entry){select(entry.info.id,true);continue;}
   let ready=true;try{ready=typeof terminalEntryAcceptsInput!=='function'||terminalEntryAcceptsInput(entry);}catch{ready=false;}
   if(!ready)continue;
+  {const busy=guard();if(busy)return fail(busy);}
   const sent=interaction.pasteText(entry,text);
   if(!report)return sent;
   if(sent)return {ok:true,outcome:'sent'};

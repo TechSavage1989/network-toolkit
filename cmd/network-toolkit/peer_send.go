@@ -27,6 +27,21 @@ import (
 // Terminal of ONE data root, so each app's existing "Send to terminal" and "To
 // editor" commands work across the two processes.
 //
+// Receivers (owner request): a standalone app sends to the first of these that
+// answers, without asking the user to open anything:
+//  1. the other standalone app, if it is running;
+//  2. the main Toolkit window of the same data root, if its page is running:
+//     the text goes to its Terminal page or its Text Editor, and that window
+//     comes to the front;
+//  3. otherwise the other standalone app is started (launchPeerApp: the fixed
+//     launch arguments, never text), and the text waits in THIS engine's
+//     memory until the new app's record appears and its page is ready, for at
+//     most peerLaunchWait. A send that is waiting when this app closes is
+//     dropped; it is never written anywhere.
+//
+// The main window only receives. Its own Send to commands stay inside its
+// window, and its child windows take no part.
+//
 // It is a separate capability from window launch (terminal_window.go,
 // editor_launch.go). Launch requests still carry only connection settings or a
 // file to open. Peer send carries text only:
@@ -34,9 +49,13 @@ import (
 //     The engine reads the other app's instance record, which is protected for
 //     this Windows user (workspace_instance.go), and calls that app on loopback
 //     with its activation token. The page never sees the other app's token.
-//   - The receiving engine accepts /api/peer/ only with its activation token,
-//     only from loopback, never from a page, and only queues the request. It
-//     holds at most one request, for at most a minute.
+//   - The receiving engine (a standalone app or the main window) accepts
+//     /api/peer/ only with its activation token, only from loopback, never
+//     from a page, and only queues the request. It holds at most one request,
+//     for at most a minute.
+//   - A running app whose record is plain or unreadable, or that has no
+//     /api/peer/ route (an older version), is never a receiver: it is skipped
+//     and the user is told.
 //   - The receiving page polls its engine's inbox once a second (a GET) and
 //     reports what can receive text only when asked and when that changes. It
 //     collects the request and runs the same code as a send inside one window: the Terminal's paste path
@@ -59,21 +78,27 @@ const (
 	peerRequestLifetime   = time.Minute
 	peerTargetsFresh      = 5 * time.Second
 
-	peerQueued  = "queued"
-	peerTaken   = "taken"
-	peerDone    = "done"
-	peerFailed  = "failed"
-	peerExpired = "expired"
+	peerStarting = "starting" // sender only: the other app is being started
+	peerQueued   = "queued"
+	peerTaken    = "taken"
+	peerDone     = "done"
+	peerFailed   = "failed"
+	peerExpired  = "expired"
 )
 
 var (
-	peerNow          = time.Now
-	peerLaunchWait   = 15 * time.Second
+	peerNow = time.Now
+	// peerLaunchWait bounds starting the other app: launch, instance record,
+	// page ready. It stays under the HTTP server's 30 second write timeout.
+	peerLaunchWait   = 25 * time.Second
 	peerIDPattern    = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`)
 	peerRequestID    = regexp.MustCompile(`^[a-f0-9]{32}$`)
 	peerTypePattern  = regexp.MustCompile(`^[a-z0-9-]{0,24}$`)
 	errPeerNotOpen   = errors.New("The other app is not open.")
 	errPeerUnchecked = errors.New("The other app did not confirm the request.")
+	// errPeerOlder: something is registered, but its record is plain or cannot
+	// be read, or its engine has no peer routes. It is not a valid receiver.
+	errPeerOlder = errors.New("The other app is open from an older version.")
 )
 
 // peerTarget is the nonsecret summary a page reports about what can receive
@@ -119,6 +144,7 @@ type peerPayload struct {
 
 type peerRequest struct {
 	id      string
+	kind    string // "terminal" or "editor": what the text is for
 	created time.Time
 	state   string
 	outcome string
@@ -129,14 +155,51 @@ type peerRequest struct {
 
 type peerSendState struct {
 	mu       sync.Mutex
-	root     string       // data root shared by the standalone apps; empty elsewhere
-	targets  []peerTarget // what this app's page last reported; the page keeps it current
+	root     string                  // data root shared by the apps; empty where peer send is off
+	targets  map[string][]peerTarget // by kind: what this app's page last reported; the page keeps it current
 	reported bool
 	polledAt time.Time // the page's latest inbox poll: proof that it is running
 	request  *peerRequest
 	launchMu sync.Mutex
 	launch   func(context.Context) error // tests start the other app in-process
+	// Sending side (standalone apps only).
+	listed   peerListed      // the receiver whose targets this app's page was last shown
+	outbound []*peerOutbound // recent sends: where each went, or that it is waiting for a start
 }
+
+// peerReceiver is one app that may receive: the other standalone app or the
+// main window. dir holds its instance record.
+type peerReceiver struct {
+	mode string
+	dir  string
+}
+
+func (r peerReceiver) name() string { return peerAppName(r.mode) }
+
+func (r peerReceiver) role() string {
+	if r.mode == "main" {
+		return "main"
+	}
+	return "standalone"
+}
+
+type peerListed struct {
+	mode       string
+	instanceID string
+}
+
+// peerOutbound is one send as the sending engine knows it. While the other app
+// is being started the text is held by the goroutine that delivers it, never
+// here and never on disk.
+type peerOutbound struct {
+	id         string
+	receiver   peerReceiver
+	instanceID string // the instance the text was delivered to
+	state      string // peerStarting, peerQueued (delivered: ask the receiver), peerFailed
+	message    string
+}
+
+const peerOutboundKept = 8
 
 func peerOf(mode string) string {
 	switch mode {
@@ -149,10 +212,44 @@ func peerOf(mode string) string {
 }
 
 func peerAppName(mode string) string {
-	if mode == "terminal" {
+	switch mode {
+	case "terminal":
 		return appName + " Terminal"
+	case "main":
+		return appName
 	}
 	return standaloneEditorTitle
+}
+
+// peerReceives lists what this app's page can receive: a standalone app its
+// own kind, the main window both.
+func peerReceives(mode string) []string {
+	switch mode {
+	case "terminal":
+		return []string{"terminal"}
+	case standaloneEditorMode:
+		return []string{"editor"}
+	case "main":
+		return []string{"terminal", "editor"}
+	}
+	return nil
+}
+
+func peerReceivesKind(mode, kind string) bool {
+	for _, k := range peerReceives(mode) {
+		if k == kind {
+			return true
+		}
+	}
+	return false
+}
+
+// peerSenderName names the standalone app that sends text of this kind.
+func peerSenderName(kind string) string {
+	if kind == "terminal" {
+		return standaloneEditorTitle
+	}
+	return appName + " Terminal"
 }
 
 func peerKind(mode string) string {
@@ -163,16 +260,21 @@ func peerKind(mode string) string {
 }
 
 func peerWorkspaceDir(root, mode string) string {
-	if mode == "terminal" {
+	switch mode {
+	case "terminal":
 		return terminalWorkspace(root)
+	case "main":
+		return root // the main window registers in the data root itself
 	}
 	return filepath.Join(root, standaloneEditorDirectory)
 }
 
-// configurePeerSend enables peer send in the standalone Text Editor and the
-// standalone Terminal. The main window and its child windows never get it.
+// configurePeerSend enables peer send: sending and receiving in the standalone
+// Text Editor and the standalone Terminal, receiving only in the main window.
+// Child windows of the main window never get it (they use view tokens and
+// never reach these routes).
 func (a *application) configurePeerSend(root string) {
-	if root == "" || peerOf(a.windowMode) == "" {
+	if root == "" || len(peerReceives(a.windowMode)) == 0 {
 		return
 	}
 	a.peer.mu.Lock()
@@ -180,13 +282,28 @@ func (a *application) configurePeerSend(root string) {
 	a.peer.mu.Unlock()
 }
 
+// peerRoot is the data root when this app can receive peer text.
 func (a *application) peerRoot() string {
 	a.peer.mu.Lock()
 	defer a.peer.mu.Unlock()
-	if peerOf(a.windowMode) == "" {
+	if len(peerReceives(a.windowMode)) == 0 {
 		return ""
 	}
 	return a.peer.root
+}
+
+// peerSenderRoot is the data root when this app can send: standalone apps only.
+func (a *application) peerSenderRoot() string {
+	if peerOf(a.windowMode) == "" {
+		return ""
+	}
+	return a.peerRoot()
+}
+
+// peerReceiveAvailable tells the main window's page whether to run the peer
+// inbox: only a main window that registered its instance record can be found.
+func (a *application) peerReceiveAvailable() bool {
+	return a.windowMode == "main" && a.editorLaunchReusable && a.peerRoot() != ""
 }
 
 func peerPlainText(value string, limit int) string {
@@ -338,16 +455,16 @@ func (s *peerSendState) expireLocked(now time.Time) {
 
 // freshTargetsLocked returns the page's summary while the page is known to be
 // running: it polls the inbox once a second and reports every change.
-func (s *peerSendState) freshTargetsLocked(now time.Time) ([]peerTarget, bool) {
+func (s *peerSendState) freshTargetsLocked(now time.Time, kind string) ([]peerTarget, bool) {
 	if !s.reported || s.polledAt.IsZero() || now.Sub(s.polledAt) > peerTargetsFresh || now.Before(s.polledAt) {
 		return nil, false
 	}
-	return s.targets, true
+	return s.targets[kind], true
 }
 
 // peerEnqueue queues one validated request for this app's page. It returns an
 // HTTP status with a plain-language reason when the request cannot be taken.
-func (a *application) peerEnqueue(payload peerPayload) (int, error) {
+func (a *application) peerEnqueue(kind string, payload peerPayload) (int, error) {
 	mode := a.windowMode
 	now := peerNow()
 	a.peer.mu.Lock()
@@ -356,7 +473,7 @@ func (a *application) peerEnqueue(payload peerPayload) (int, error) {
 	if current := a.peer.request; current != nil && (current.state == peerQueued || current.state == peerTaken) {
 		return http.StatusConflict, errors.New("Another send is still waiting in " + peerAppName(mode) + ". Finish it there, then send again.")
 	}
-	targets, fresh := a.peer.freshTargetsLocked(now)
+	targets, fresh := a.peer.freshTargetsLocked(now, kind)
 	find := func(id string) *peerTarget {
 		for i := range targets {
 			if targets[i].ID == id {
@@ -365,7 +482,7 @@ func (a *application) peerEnqueue(payload peerPayload) (int, error) {
 		}
 		return nil
 	}
-	if mode == "terminal" {
+	if kind == "terminal" {
 		if !fresh {
 			return http.StatusServiceUnavailable, errors.New(peerAppName(mode) + " is not ready yet. Try again in a moment.")
 		}
@@ -387,7 +504,7 @@ func (a *application) peerEnqueue(payload peerPayload) (int, error) {
 	if previous := a.peer.request; previous != nil && previous.timer != nil {
 		previous.timer.Stop()
 	}
-	request := &peerRequest{id: payload.RequestID, created: now, state: peerQueued, payload: &payload}
+	request := &peerRequest{id: payload.RequestID, kind: kind, created: now, state: peerQueued, payload: &payload}
 	// The text never outlives the request, even if this app's page has gone.
 	request.timer = time.AfterFunc(peerRequestLifetime+time.Second, func() {
 		a.peer.mu.Lock()
@@ -403,7 +520,7 @@ func (a *application) peerEnqueue(payload peerPayload) (int, error) {
 // peerPoll is the page's one-second inbox poll. It hands over the queued
 // request, if any (the text leaves the engine's memory with it), and says
 // whether the engine still needs the page's summary of what can receive text.
-func (a *application) peerPoll() (payload *peerPayload, report bool) {
+func (a *application) peerPoll() (payload *peerPayload, kind string, report bool) {
 	now := peerNow()
 	a.peer.mu.Lock()
 	defer a.peer.mu.Unlock()
@@ -412,28 +529,33 @@ func (a *application) peerPoll() (payload *peerPayload, report bool) {
 	report = !a.peer.reported
 	r := a.peer.request
 	if r == nil || r.state != peerQueued || r.payload == nil {
-		return nil, report
+		return nil, "", report
 	}
 	payload = r.payload
 	r.state, r.payload = peerTaken, nil
-	return payload, report
+	return payload, r.kind, report
 }
 
 // peerReport stores the page's validated summary. The page sends it when the
 // engine asks for it and again whenever it changes.
-func (a *application) peerReport(targets []peerTarget) {
+func (a *application) peerReport(targets map[string][]peerTarget) {
 	a.peer.mu.Lock()
 	defer a.peer.mu.Unlock()
 	a.peer.targets, a.peer.reported = targets, true
 }
 
-func (a *application) peerAcknowledge(id string, ok bool, outcome, message string) bool {
+// peerAcknowledge records the page's result. valid is false when the outcome
+// does not belong to the kind of text the request carried.
+func (a *application) peerAcknowledge(id string, ok bool, outcome, message string) (found, valid bool) {
 	a.peer.mu.Lock()
 	defer a.peer.mu.Unlock()
 	a.peer.expireLocked(peerNow())
 	r := a.peer.request
 	if r == nil || r.id != id || r.state != peerTaken {
-		return false
+		return false, true
+	}
+	if ok && !peerOutcomeAllowed(r.kind, outcome) {
+		return true, false
 	}
 	if ok {
 		r.state, r.outcome, r.message = peerDone, outcome, ""
@@ -443,7 +565,7 @@ func (a *application) peerAcknowledge(id string, ok bool, outcome, message strin
 	if r.timer != nil {
 		r.timer.Stop()
 	}
-	return true
+	return true, true
 }
 
 func (a *application) peerResult(id string) (state, outcome, message string, found bool) {
@@ -457,14 +579,14 @@ func (a *application) peerResult(id string) (state, outcome, message string, fou
 	return r.state, r.outcome, r.message, true
 }
 
-func peerOutcomeAllowed(mode, outcome string) bool {
-	if mode == "terminal" {
+func peerOutcomeAllowed(kind, outcome string) bool {
+	if kind == "terminal" {
 		return outcome == "sent" || outcome == "review"
 	}
 	return outcome == "inserted" || outcome == "pick"
 }
 
-// ---- Inbound routes: the other standalone app, activation token only ----
+// ---- Inbound routes: a standalone app of this data root, activation token only ----
 
 func peerLoopback(remote string) bool {
 	host, _, err := net.SplitHostPort(remote)
@@ -533,7 +655,13 @@ func (a *application) servePeerInbound(w http.ResponseWriter, r *http.Request) {
 		a.peerRefuse(w, http.StatusServiceUnavailable, peerAppName(mode)+" is closing.")
 		return
 	}
-	kind := peerKind(mode)
+	// /api/peer/<kind>/<action>: a standalone app serves its own kind only, the
+	// main window both (its Terminal page and its Text Editor).
+	kind, _, _ := strings.Cut(strings.TrimPrefix(r.URL.Path, peerInboundPrefix), "/")
+	if !peerReceivesKind(mode, kind) {
+		http.NotFound(w, r)
+		return
+	}
 	list, send := "sessions", "send"
 	if kind == "editor" {
 		list, send = "documents", "insert"
@@ -546,7 +674,7 @@ func (a *application) servePeerInbound(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		a.peer.mu.Lock()
-		targets, ready := a.peer.freshTargetsLocked(peerNow())
+		targets, ready := a.peer.freshTargetsLocked(peerNow(), kind)
 		targets = append([]peerTarget(nil), targets...)
 		a.peer.mu.Unlock()
 		body := map[string]any{"ready": ready}
@@ -570,19 +698,20 @@ func (a *application) servePeerInbound(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		var payload *peerPayload
-		if err := decodePeerBody(w, r, peerBodyLimit(mode), &payload); err != nil {
+		if err := decodePeerBody(w, r, peerBodyLimit(kind), &payload); err != nil {
 			a.peerRefuse(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		if err := validatePeerPayload(mode, payload); err != nil {
+		if err := validatePeerPayload(kind, payload); err != nil {
 			a.peerRefuse(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		if status, err := a.peerEnqueue(*payload); err != nil {
+		if status, err := a.peerEnqueue(kind, *payload); err != nil {
 			a.peerRefuse(w, status, err.Error())
 			return
 		}
-		// Raise this window so a paste review or the position bar is seen.
+		// Raise this window so a paste review or the position bar is seen. The
+		// page then shows its Terminal page or its Text Editor (deliver()).
 		a.activatePrimary()
 		a.peerReply(w, http.StatusOK, map[string]any{"requestId": payload.RequestID, "state": peerQueued})
 	case base + "result":
@@ -605,7 +734,7 @@ func (a *application) servePeerInbound(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// ---- Sending side: this app's engine calling the other app ----
+// ---- Sending side: this app's engine calling a receiver ----
 
 type peerResponse struct {
 	OK         bool                  `json:"ok"`
@@ -621,7 +750,7 @@ type peerResponse struct {
 	Message    string                `json:"message"`
 }
 
-// readPeerInstance reads the other app's instance record for peer send. The
+// readPeerInstance reads a receiver's instance record for peer send. The
 // record must be protected where the platform protects it; a plain record is
 // never trusted with the user's text. Elsewhere it must be a private file.
 func readPeerInstance(dir string) (terminalWindowInstance, error) {
@@ -637,17 +766,50 @@ func readPeerInstance(dir string) (terminalWindowInstance, error) {
 	return readWorkspaceWindowInstance(dir, true)
 }
 
-// peerCall sends one request to the other standalone app of this data root.
-// A reply counts only when it echoes the window mode and the instance
-// identifier from the protected record, as window activation requires.
-func (a *application) peerCall(ctx context.Context, method, path string, body any, timeout time.Duration) (peerResponse, int, error) {
-	var reply peerResponse
-	root, mode := a.peerRoot(), peerOf(a.windowMode)
+// peerSendKind is what this app sends: the standalone Text Editor sends text
+// for a terminal, the standalone Terminal text for the editor.
+func (a *application) peerSendKind() string { return peerKind(peerOf(a.windowMode)) }
+
+// peerCandidates lists the receivers in the order they are tried: the other
+// standalone app, then the main window of the same data root.
+func (a *application) peerCandidates() []peerReceiver {
+	root, mode := a.peerSenderRoot(), peerOf(a.windowMode)
 	if root == "" {
+		return nil
+	}
+	return []peerReceiver{{mode: mode, dir: peerWorkspaceDir(root, mode)}, {mode: "main", dir: peerWorkspaceDir(root, "main")}}
+}
+
+func (a *application) peerStandalone() peerReceiver {
+	mode := peerOf(a.windowMode)
+	return peerReceiver{mode: mode, dir: peerWorkspaceDir(a.peerSenderRoot(), mode)}
+}
+
+// peerCall sends one request to a receiver of this data root. A reply counts
+// only when it echoes the window mode and the instance identifier from the
+// protected record, as window activation requires.
+//
+// errPeerNotOpen: no record, or nothing answers at its endpoint.
+// errPeerOlder: a record that is plain or cannot be read, or an engine without
+// peer routes. errPeerUnchecked: another program answered.
+//
+// expect pins the call to one instance: when it is set and the record now
+// names another instance (the app closed and a different one registered since
+// it was probed), nothing is sent to the new endpoint and errPeerNotOpen is
+// returned. Every call that carries the user's text passes it.
+func (a *application) peerCall(ctx context.Context, rc peerReceiver, expect, method, path string, body any, timeout time.Duration) (peerResponse, int, error) {
+	var reply peerResponse
+	if a.peerSenderRoot() == "" || rc.mode == "" {
 		return reply, 0, errPeerNotOpen
 	}
-	record, err := readPeerInstance(peerWorkspaceDir(root, mode))
+	record, err := readPeerInstance(rc.dir)
 	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return reply, 0, errPeerNotOpen
+		}
+		return reply, 0, errPeerOlder
+	}
+	if expect != "" && subtle.ConstantTimeCompare([]byte(record.InstanceID), []byte(expect)) != 1 {
 		return reply, 0, errPeerNotOpen
 	}
 	var reader io.Reader
@@ -671,7 +833,7 @@ func (a *application) peerCall(ctx context.Context, method, path string, body an
 	}
 	req.Header.Set("X-Window-Activation-Token", record.Token)
 	if method == http.MethodPost {
-		// The other app raises its own window for the text it is given.
+		// The receiver raises its own window for the text it is given.
 		peerAllowForeground(record.PID)
 	}
 	transport := &http.Transport{Proxy: nil, DialContext: (&net.Dialer{Timeout: time.Second}).DialContext, DisableKeepAlives: true, MaxResponseHeaderBytes: 16384}
@@ -684,37 +846,38 @@ func (a *application) peerCall(ctx context.Context, method, path string, body an
 		return reply, 0, errPeerNotOpen
 	}
 	defer response.Body.Close()
-	if json.NewDecoder(io.LimitReader(response.Body, peerSummaryBodyLimit)).Decode(&reply) != nil || reply.WindowMode != mode || reply.InstanceID != record.InstanceID {
+	if json.NewDecoder(io.LimitReader(response.Body, peerSummaryBodyLimit)).Decode(&reply) != nil || reply.WindowMode != rc.mode || reply.InstanceID != record.InstanceID {
+		if response.StatusCode == http.StatusNotFound {
+			// The record's engine has no peer routes: an older version.
+			return peerResponse{}, response.StatusCode, errPeerOlder
+		}
 		// Another program may now own a stale record's port.
 		return peerResponse{}, response.StatusCode, errPeerUnchecked
 	}
 	if response.StatusCode != http.StatusOK || !reply.OK {
 		message := peerPlainText(reply.Error, peerMessageRunes)
 		if message == "" {
-			message = peerAppName(mode) + " refused the request."
+			message = rc.name() + " refused the request."
 		}
 		return reply, response.StatusCode, errors.New(message)
 	}
 	return reply, response.StatusCode, nil
 }
 
-func (a *application) peerTargetsPath() string {
-	if peerOf(a.windowMode) == "terminal" {
-		return peerInboundPrefix + "terminal/sessions"
-	}
-	return peerInboundPrefix + "editor/documents"
-}
-
-// peerList asks the other app what can receive text. It also proves, before
+// peerProbe asks one receiver what can receive text. It also proves, before
 // any text is sent, that the record's endpoint is that app.
-func (a *application) peerList(ctx context.Context) ([]peerTarget, bool, error) {
-	reply, _, err := a.peerCall(ctx, http.MethodGet, a.peerTargetsPath(), nil, 2*time.Second)
-	if err != nil {
-		return nil, false, err
+func (a *application) peerProbe(ctx context.Context, rc peerReceiver) (targets []peerTarget, ready bool, instanceID string, err error) {
+	kind := a.peerSendKind()
+	path := peerInboundPrefix + "terminal/sessions"
+	if kind != "terminal" {
+		path = peerInboundPrefix + "editor/documents"
 	}
-	mode := peerOf(a.windowMode)
-	targets := make([]peerTarget, 0, len(reply.Sessions)+len(reply.Documents))
-	if mode == "terminal" {
+	reply, _, err := a.peerCall(ctx, rc, "", http.MethodGet, path, nil, 2*time.Second)
+	if err != nil {
+		return nil, false, "", err
+	}
+	targets = make([]peerTarget, 0, len(reply.Sessions)+len(reply.Documents))
+	if kind == "terminal" {
 		for _, s := range reply.Sessions {
 			targets = append(targets, peerTarget{ID: s.ID, Name: s.Name, Type: s.Type, Connected: s.Connected, Active: s.Active})
 		}
@@ -723,12 +886,42 @@ func (a *application) peerList(ctx context.Context) ([]peerTarget, bool, error) 
 			targets = append(targets, peerTarget{ID: d.UID, Name: d.Name, Unsaved: d.Unsaved, Busy: d.Busy, Active: d.Active})
 		}
 	}
-	// The other app validated its own list; validate again before showing it.
-	targets, err = normalizePeerTargets(mode, targets)
+	// The receiver validated its own list; validate again before showing it.
+	targets, err = normalizePeerTargets(kind, targets)
 	if err != nil {
-		return nil, false, errPeerUnchecked
+		return nil, false, "", errPeerUnchecked
 	}
-	return targets, reply.Ready, nil
+	return targets, reply.Ready, reply.InstanceID, nil
+}
+
+// peerChoose returns the first receiver that is running, in the order of
+// peerCandidates, or nil when the other standalone app has to be started.
+// The main window counts only while its page is running: without a page it
+// cannot show a paste review or the position bar. skipped names apps that are
+// registered but cannot receive (an older version, or an unreadable record).
+func (a *application) peerChoose(ctx context.Context) (chosen *peerReceiver, targets []peerTarget, ready bool, instanceID string, skipped []string) {
+	for _, rc := range a.peerCandidates() {
+		list, isReady, id, err := a.peerProbe(ctx, rc)
+		if errors.Is(err, errPeerOlder) {
+			skipped = append(skipped, rc.name())
+			continue
+		}
+		if err != nil || rc.mode == "main" && !isReady {
+			continue
+		}
+		rc := rc
+		return &rc, list, isReady, id, skipped
+	}
+	return nil, nil, false, "", skipped
+}
+
+// peerNote tells the user, in plain words, which running apps were passed over.
+func peerNote(skipped []string) string {
+	notes := make([]string, 0, len(skipped))
+	for _, name := range skipped {
+		notes = append(notes, name+" was skipped: it is open from an older version, or its window record cannot be read, so it cannot receive text. Close it and open it again to send to it.")
+	}
+	return strings.Join(notes, " ")
 }
 
 func peerLaunchArguments(root, mode string, headless bool) ([]string, error) {
@@ -742,14 +935,28 @@ func peerLaunchArguments(root, mode string, headless bool) ([]string, error) {
 	return args, nil
 }
 
+// peerForegroundPID names the process that may be allowed to come to the front
+// when the other app is opened: only one named by a record peer send trusts
+// (readPeerInstance). A plain or unreadable record names none.
+func peerForegroundPID(dir string) (int, bool) {
+	record, err := readPeerInstance(dir)
+	if err != nil || record.PID < 1 {
+		return 0, false
+	}
+	return record.PID, true
+}
+
 // launchPeerApp opens the other standalone app the way its Start menu shortcut
 // does: a running app is raised, otherwise this executable is started with the
 // fixed --terminal or --editor-standalone arguments. No text, credentials,
 // shell, parent-owned pipes or parent cancellation are passed to it.
 func launchPeerApp(ctx context.Context, root, mode string, headless bool) error {
 	dir := peerWorkspaceDir(root, mode)
-	if record, err := readWorkspaceWindowInstance(dir, mode != "terminal"); err == nil {
-		peerAllowForeground(record.PID) // a running app may come to the front
+	// Only a protected (elsewhere: private) record names a process that may
+	// come to the front. A plain record of an older Terminal is still raised
+	// by the activation below, but it gets no foreground right from here.
+	if pid, ok := peerForegroundPID(dir); ok {
+		peerAllowForeground(pid)
 	}
 	var raised error
 	if mode == "terminal" {
@@ -780,13 +987,17 @@ func launchPeerApp(ctx context.Context, root, mode string, headless bool) error 
 	return nil
 }
 
-// peerOpen raises or starts the other app and waits, for a bounded time, until
-// its engine answers through its protected instance record.
-func (a *application) peerOpen(ctx context.Context) (ready bool, err error) {
-	root, mode := a.peerRoot(), peerOf(a.windowMode)
+// peerOpen raises or starts the other standalone app and waits, for at most
+// peerLaunchWait, until its engine answers through its protected instance
+// record and its page is running. Nothing but the fixed launch arguments goes
+// to the new process. It returns the instance that answered, so text is then
+// delivered to that instance only.
+func (a *application) peerOpen(ctx context.Context) (instanceID string, err error) {
+	root := a.peerSenderRoot()
 	if root == "" {
-		return false, errPeerNotOpen
+		return "", errPeerNotOpen
 	}
+	rc := a.peerStandalone()
 	a.peer.launchMu.Lock()
 	defer a.peer.launchMu.Unlock()
 	ctx, cancel := context.WithTimeout(ctx, peerLaunchWait)
@@ -795,61 +1006,152 @@ func (a *application) peerOpen(ctx context.Context) (ready bool, err error) {
 	launch := a.peer.launch
 	a.peer.mu.Unlock()
 	if launch == nil {
-		launch = func(ctx context.Context) error { return launchPeerApp(ctx, root, mode, a.headless) }
+		launch = func(ctx context.Context) error { return launchPeerApp(ctx, root, rc.mode, a.headless) }
 	}
-	if err = launch(ctx); err != nil {
-		return false, fmt.Errorf("%s could not be opened: %w", peerAppName(mode), err)
+	if err := launch(ctx); err != nil {
+		return "", fmt.Errorf("%s could not be opened: %w", rc.name(), err)
 	}
 	ticker := time.NewTicker(150 * time.Millisecond)
 	defer ticker.Stop()
 	for {
-		if _, ready, err = a.peerList(ctx); err == nil {
-			return ready, nil
+		if _, ready, id, err := a.peerProbe(ctx, rc); err == nil && ready {
+			return id, nil
 		}
 		select {
 		case <-ctx.Done():
-			return false, errors.New(peerAppName(mode) + " did not become ready. If it is open from an older version, close it and open it again.")
+			return "", errors.New(rc.name() + " did not become ready. If it is open from an older version, close it and open it again.")
 		case <-ticker.C:
 		}
 	}
 }
 
+// peerDeliver hands one validated request to the instance of a receiver that
+// peerProbe has just confirmed (instanceID; never empty). If the record names
+// another instance by now, nothing is sent. It returns the HTTP status for
+// this app's page.
+func (a *application) peerDeliver(ctx context.Context, rc peerReceiver, instanceID string, payload *peerPayload) (int, error) {
+	if instanceID == "" {
+		return http.StatusServiceUnavailable, errors.New(rc.name() + " did not accept the text. Nothing was sent.")
+	}
+	path := peerInboundPrefix + "terminal/send"
+	if a.peerSendKind() != "terminal" {
+		path = peerInboundPrefix + "editor/insert"
+	}
+	reply, status, err := a.peerCall(ctx, rc, instanceID, http.MethodPost, path, payload, 20*time.Second)
+	if err == nil && reply.RequestID == payload.RequestID {
+		return http.StatusOK, nil
+	}
+	message := rc.name() + " did not accept the text. Nothing was sent."
+	code := http.StatusServiceUnavailable
+	if err != nil && !errors.Is(err, errPeerNotOpen) && !errors.Is(err, errPeerUnchecked) && !errors.Is(err, errPeerOlder) {
+		message = err.Error()
+		if status >= 400 && status < 500 {
+			code = http.StatusConflict
+		}
+	}
+	return code, errors.New(message)
+}
+
+func (a *application) peerRemember(o *peerOutbound) {
+	a.peer.mu.Lock()
+	defer a.peer.mu.Unlock()
+	a.peer.rememberLocked(o)
+}
+
+func (s *peerSendState) rememberLocked(o *peerOutbound) {
+	s.outbound = append(s.outbound, o)
+	if extra := len(s.outbound) - peerOutboundKept; extra > 0 {
+		s.outbound = append([]*peerOutbound(nil), s.outbound[extra:]...)
+	}
+}
+
+func (a *application) peerOutboundFor(id string) (peerOutbound, bool) {
+	a.peer.mu.Lock()
+	defer a.peer.mu.Unlock()
+	for _, o := range a.peer.outbound {
+		if o.id == id {
+			return *o, true
+		}
+	}
+	return peerOutbound{}, false
+}
+
+// peerStartAndDeliver is step 3 of the receiver order: nothing was running, so
+// the other standalone app is started and the text, held only by this
+// goroutine, is delivered once that app's page is ready. If the app does not
+// come up in time, or this app closes first, the text is dropped here and the
+// user's own copy (the terminal output, the document) is untouched.
+func (a *application) peerStartAndDeliver(o *peerOutbound, payload peerPayload) {
+	instanceID, err := a.peerOpen(a.ctx)
+	if err == nil {
+		_, err = a.peerDeliver(a.ctx, o.receiver, instanceID, &payload)
+	}
+	a.peer.mu.Lock()
+	defer a.peer.mu.Unlock()
+	o.instanceID = instanceID
+	if err != nil {
+		message := strings.TrimSuffix(err.Error(), " Nothing was sent.")
+		if !strings.HasSuffix(message, ".") {
+			message += "."
+		}
+		o.state, o.message = peerFailed, message+" Nothing was sent."
+		return
+	}
+	o.state = peerQueued
+}
+
 // ---- Page routes: this app's own page, session token ----
 
 func (a *application) handlePeerSend(w http.ResponseWriter, r *http.Request) {
-	own, mode := a.windowMode, peerOf(a.windowMode)
+	own := a.windowMode
+	const unavailable = "Sending between apps is available in the standalone Text Editor and Terminal."
 	if a.peerRoot() == "" {
-		jsonError(w, http.StatusNotFound, "Sending between apps is available in the standalone Text Editor and Terminal.")
+		jsonError(w, http.StatusNotFound, unavailable)
 		return
 	}
-	name := peerAppName(mode)
 	route := strings.TrimPrefix(r.URL.Path, peerPagePrefix)
 	method := map[string]string{"targets": http.MethodGet, "result": http.MethodGet, "open": http.MethodPost, "send": http.MethodPost, "inbox": http.MethodGet, "report": http.MethodPost, "ack": http.MethodPost}[route]
 	if method == "" {
 		http.NotFound(w, r)
 		return
 	}
+	sending := route == "targets" || route == "result" || route == "open" || route == "send"
+	if sending && a.peerSenderRoot() == "" {
+		// The main window only receives.
+		jsonError(w, http.StatusNotFound, unavailable)
+		return
+	}
 	if r.Method != method {
 		methodError(w)
 		return
 	}
+	kind := a.peerSendKind() // meaningful on the sending routes only
 	switch route {
 	case "targets":
-		body := map[string]any{"app": peerKind(mode), "name": name, "running": false, "ready": false, "targets": []peerTarget{}}
-		if targets, ready, err := a.peerList(r.Context()); err == nil {
-			body["running"], body["ready"], body["targets"] = true, ready, targets
+		standalone := a.peerStandalone()
+		rc, targets, ready, id, skipped := a.peerChoose(r.Context())
+		body := map[string]any{"app": kind, "name": standalone.name(), "receiver": "", "running": false, "ready": false, "targets": []peerTarget{}}
+		listed := peerListed{}
+		if rc != nil {
+			body["name"], body["receiver"], body["running"], body["ready"], body["targets"] = rc.name(), rc.role(), true, ready, targets
+			listed = peerListed{mode: rc.mode, instanceID: id}
 		}
+		if note := peerNote(skipped); note != "" {
+			body["note"] = note
+		}
+		a.peer.mu.Lock()
+		a.peer.listed = listed
+		a.peer.mu.Unlock()
 		jsonResponse(w, http.StatusOK, body)
 	case "open":
-		ready, err := a.peerOpen(r.Context())
-		if err != nil {
+		if _, err := a.peerOpen(r.Context()); err != nil {
 			jsonError(w, http.StatusServiceUnavailable, err.Error())
 			return
 		}
-		jsonResponse(w, http.StatusOK, map[string]any{"app": peerKind(mode), "name": name, "running": true, "ready": ready})
+		jsonResponse(w, http.StatusOK, map[string]any{"app": kind, "name": a.peerStandalone().name(), "receiver": "standalone", "running": true, "ready": true})
 	case "send":
 		var payload *peerPayload
-		if err := decodePeerBody(w, r, peerBodyLimit(mode), &payload); err != nil {
+		if err := decodePeerBody(w, r, peerBodyLimit(kind), &payload); err != nil {
 			jsonError(w, http.StatusBadRequest, err.Error())
 			return
 		}
@@ -858,77 +1160,176 @@ func (a *application) handlePeerSend(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		payload.RequestID = randomHex(16)
-		if err := validatePeerPayload(mode, payload); err != nil {
+		if err := validatePeerPayload(kind, payload); err != nil {
 			jsonError(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		// Prove the endpoint is the other app before any text leaves this one.
-		if _, _, err := a.peerList(r.Context()); err != nil {
-			jsonError(w, http.StatusServiceUnavailable, name+" is not open. Nothing was sent.")
+		standalone := a.peerStandalone()
+		// A session or an open document belongs to the receiver the page listed.
+		// Text for a new document goes to whichever receiver is running now.
+		existing := kind == "terminal" || payload.Target != "new"
+		// One lock for "is another send being started?" and for recording this
+		// one, so two sends can never both start the other app. A send for a new
+		// document is recorded as starting before a receiver is looked for.
+		o := &peerOutbound{id: payload.RequestID, receiver: standalone, state: peerStarting}
+		a.peer.mu.Lock()
+		listed, starting := a.peer.listed, false
+		for _, other := range a.peer.outbound {
+			starting = starting || other.state == peerStarting
+		}
+		if !starting && !existing {
+			a.peer.rememberLocked(o)
+		}
+		a.peer.mu.Unlock()
+		if starting {
+			jsonError(w, http.StatusConflict, "Another send is still waiting for "+standalone.name()+" to open. Try again in a moment.")
 			return
 		}
-		path := peerInboundPrefix + "terminal/send"
-		if mode != "terminal" {
-			path = peerInboundPrefix + "editor/insert"
-		}
-		reply, status, err := a.peerCall(r.Context(), http.MethodPost, path, payload, 20*time.Second)
-		if err != nil || reply.RequestID != payload.RequestID {
-			message := name + " did not accept the text. Nothing was sent."
-			code := http.StatusServiceUnavailable
-			if err != nil && !errors.Is(err, errPeerNotOpen) && !errors.Is(err, errPeerUnchecked) {
-				message = err.Error()
-				if status >= 400 && status < 500 {
-					code = http.StatusConflict
+		if existing {
+			// The engine enforces what the page shows: a session or a document
+			// is sent only to the receiver that listed it, never to whichever
+			// app happens to run now.
+			if listed.mode == "" || listed.instanceID == "" {
+				again := "Choose Send to terminal again."
+				if kind != "terminal" {
+					again = "Choose Send to editor again."
 				}
+				jsonError(w, http.StatusConflict, "Nothing was sent: the list of where the text can go is out of date. "+again)
+				return
 			}
-			jsonError(w, code, message)
+			candidate := peerReceiver{mode: listed.mode, dir: peerWorkspaceDir(a.peerSenderRoot(), listed.mode)}
+			// Prove the endpoint is still that app before any text leaves this one.
+			if _, _, id, err := a.peerProbe(r.Context(), candidate); err != nil || id != listed.instanceID {
+				jsonError(w, http.StatusServiceUnavailable, candidate.name()+" is not open any more. Nothing was sent.")
+				return
+			}
+			if code, err := a.peerDeliver(r.Context(), candidate, listed.instanceID, payload); err != nil {
+				jsonError(w, code, err.Error())
+				return
+			}
+			a.peerRemember(&peerOutbound{id: payload.RequestID, receiver: candidate, instanceID: listed.instanceID, state: peerQueued})
+			jsonResponse(w, http.StatusOK, map[string]any{"requestId": payload.RequestID, "state": peerQueued, "name": candidate.name(), "receiver": candidate.role()})
 			return
 		}
-		jsonResponse(w, http.StatusOK, map[string]any{"requestId": payload.RequestID, "state": peerQueued, "name": name})
+		// settle ends this send's "starting" record when no app is started.
+		settle := func(state, message string, rc *peerReceiver, instanceID string) {
+			a.peer.mu.Lock()
+			defer a.peer.mu.Unlock()
+			o.state, o.message, o.instanceID = state, message, instanceID
+			if rc != nil {
+				o.receiver = *rc
+			}
+		}
+		rc, _, _, instanceID, skipped := a.peerChoose(r.Context())
+		note := peerNote(skipped)
+		if rc == nil {
+			if a.shutdownRequested.Load() || a.ctx.Err() != nil {
+				settle(peerFailed, "This app is closing. Nothing was sent.", nil, "")
+				jsonError(w, http.StatusServiceUnavailable, "This app is closing. Nothing was sent.")
+				return
+			}
+			// Nothing is running: start the other app and deliver when it is ready.
+			go a.peerStartAndDeliver(o, *payload)
+			body := map[string]any{"requestId": o.id, "state": peerStarting, "name": standalone.name(), "receiver": "standalone"}
+			if note != "" {
+				body["note"] = note
+			}
+			jsonResponse(w, http.StatusOK, body)
+			return
+		}
+		if code, err := a.peerDeliver(r.Context(), *rc, instanceID, payload); err != nil {
+			settle(peerFailed, err.Error(), rc, instanceID)
+			jsonError(w, code, err.Error())
+			return
+		}
+		settle(peerQueued, "", rc, instanceID)
+		body := map[string]any{"requestId": payload.RequestID, "state": peerQueued, "name": rc.name(), "receiver": rc.role()}
+		if note != "" {
+			body["note"] = note
+		}
+		jsonResponse(w, http.StatusOK, body)
 	case "result":
 		id := r.URL.Query().Get("requestId")
 		if !peerRequestID.MatchString(id) {
 			jsonError(w, http.StatusBadRequest, "The request identifier is invalid.")
 			return
 		}
-		reply, status, err := a.peerCall(r.Context(), http.MethodGet, peerInboundPrefix+peerKind(mode)+"/result?requestId="+id, nil, 2*time.Second)
+		o, known := a.peerOutboundFor(id)
+		if !known {
+			jsonResponse(w, http.StatusOK, map[string]any{"requestId": id, "state": "lost", "name": a.peerStandalone().name(), "message": "This request is no longer known. Check the other window."})
+			return
+		}
+		name := o.receiver.name()
+		switch o.state {
+		case peerStarting:
+			jsonResponse(w, http.StatusOK, map[string]any{"requestId": id, "state": peerStarting, "name": name})
+			return
+		case peerFailed:
+			// local: the message is this app's own and already names the other app.
+			jsonResponse(w, http.StatusOK, map[string]any{"requestId": id, "state": peerFailed, "name": name, "local": true, "message": peerPlainText(o.message, peerMessageRunes)})
+			return
+		}
+		reply, status, err := a.peerCall(r.Context(), o.receiver, o.instanceID, http.MethodGet, peerInboundPrefix+kind+"/result?requestId="+id, nil, 2*time.Second)
 		if err != nil {
 			message := name + " closed before it confirmed the text."
 			if status == http.StatusNotFound {
 				message = name + " no longer knows this request. Check that window."
 			}
-			jsonResponse(w, http.StatusOK, map[string]any{"requestId": id, "state": "lost", "message": message})
+			jsonResponse(w, http.StatusOK, map[string]any{"requestId": id, "state": "lost", "name": name, "message": message})
 			return
 		}
 		state, outcome := reply.State, reply.Outcome
 		if state != peerQueued && state != peerTaken && state != peerDone && state != peerFailed && state != peerExpired || reply.RequestID != id {
 			state = "lost"
 		}
-		if state != peerDone || !peerOutcomeAllowed(mode, outcome) {
+		if state != peerDone || !peerOutcomeAllowed(kind, outcome) {
 			outcome = ""
 		}
-		jsonResponse(w, http.StatusOK, map[string]any{"requestId": id, "state": state, "outcome": outcome, "message": peerPlainText(reply.Message, peerMessageRunes)})
+		jsonResponse(w, http.StatusOK, map[string]any{"requestId": id, "state": state, "outcome": outcome, "name": name, "message": peerPlainText(reply.Message, peerMessageRunes)})
 	case "inbox":
-		request, report := a.peerPoll()
-		jsonResponse(w, http.StatusOK, map[string]any{"request": request, "report": report, "from": name})
+		request, requestKind, report := a.peerPoll()
+		body := map[string]any{"request": request, "report": report, "from": ""}
+		if peerOf(own) != "" {
+			body["from"] = peerAppName(peerOf(own))
+		}
+		if request != nil {
+			body["kind"], body["from"] = requestKind, peerSenderName(requestKind)
+		}
+		jsonResponse(w, http.StatusOK, body)
 	case "report":
+		// A standalone app reports "targets" (its sessions or its documents). The
+		// main window reports its sessions as "targets" and its documents as
+		// "documents".
 		var report *struct {
-			Targets []peerTarget `json:"targets"`
+			Targets   []peerTarget  `json:"targets"`
+			Documents *[]peerTarget `json:"documents"`
 		}
 		if err := decodePeerBody(w, r, peerSummaryBodyLimit, &report); err != nil {
 			jsonError(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		if report == nil {
+		if report == nil || report.Documents != nil && own != "main" {
 			jsonError(w, http.StatusBadRequest, "Send one JSON object.")
 			return
 		}
-		targets, err := normalizePeerTargets(own, report.Targets)
+		kinds := peerReceives(own)
+		targets, err := normalizePeerTargets(kinds[0], report.Targets)
 		if err != nil {
 			jsonError(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		a.peerReport(targets)
+		summary := map[string][]peerTarget{kinds[0]: targets}
+		if own == "main" {
+			var documents []peerTarget
+			if report.Documents != nil {
+				documents = *report.Documents
+			}
+			if summary["editor"], err = normalizePeerTargets("editor", documents); err != nil {
+				jsonError(w, http.StatusBadRequest, err.Error())
+				return
+			}
+		}
+		a.peerReport(summary)
 		jsonResponse(w, http.StatusOK, map[string]any{"ok": true})
 	case "ack":
 		var ack *struct {
@@ -941,7 +1342,13 @@ func (a *application) handlePeerSend(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		if ack == nil || !peerRequestID.MatchString(ack.RequestID) || ack.OK && !peerOutcomeAllowed(own, ack.Outcome) || !ack.OK && ack.Outcome != "" {
+		allowed := false
+		if ack != nil {
+			for _, received := range peerReceives(own) {
+				allowed = allowed || peerOutcomeAllowed(received, ack.Outcome)
+			}
+		}
+		if ack == nil || !peerRequestID.MatchString(ack.RequestID) || ack.OK && !allowed || !ack.OK && ack.Outcome != "" {
 			jsonError(w, http.StatusBadRequest, "The acknowledgement is invalid.")
 			return
 		}
@@ -949,7 +1356,12 @@ func (a *application) handlePeerSend(w http.ResponseWriter, r *http.Request) {
 		if !ack.OK && message == "" {
 			message = "The text was not accepted."
 		}
-		if !a.peerAcknowledge(ack.RequestID, ack.OK, ack.Outcome, message) {
+		found, valid := a.peerAcknowledge(ack.RequestID, ack.OK, ack.Outcome, message)
+		if !valid {
+			jsonError(w, http.StatusBadRequest, "The acknowledgement is invalid.")
+			return
+		}
+		if !found {
 			jsonError(w, http.StatusConflict, "That request is no longer waiting.")
 			return
 		}

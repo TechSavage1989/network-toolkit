@@ -1932,3 +1932,49 @@ window is visible (explicit headless mode acknowledges its ready engine).
 Versioned-name promotion runs after that marker. Its failure is a visible
 warning and does not undo a healthy update. Exact official versioned filenames
 use a same-directory, version/hash/product-validated compatibility pointer.
+
+PEER SEND: TEXT FROM A STANDALONE APP
+Text only. Never credentials, tokens, host keys, file paths, an added Enter or
+command execution. Sender: the standalone Text Editor (text for a terminal) or
+the standalone Terminal (text for the editor). Receiver, chosen by the
+sender's engine without a question to the user: (1) the other standalone app
+if it runs; (2) otherwise the main window of the same data folder while its
+page runs; (3) otherwise the other standalone app is started with its fixed
+launch arguments and the text waits in the sender's engine memory (never on
+disk, never on a command line) until that app is ready, for at most 25 s.
+
+Inbound, served by the standalone apps (their own kind) and by the main window
+(both kinds). X-Window-Activation-Token only (constant-time), loopback only,
+refused with Origin, Referer, Sec-Fetch-* or Cookie, strict JSON, one pending
+request per window for at most a minute. Every reply echoes windowMode and
+instanceId; the sender ignores a reply that does not match the protected
+instance record.
+GET  /api/peer/terminal/sessions -> {ready,sessions:[{id,name,type,connected,active?}]}
+POST /api/peer/terminal/send {requestId,session,text} (text <= 1 MiB)
+GET  /api/peer/editor/documents -> {ready,documents:[{uid,name,unsaved?,busy?,active?}]}
+POST /api/peer/editor/insert {requestId,target:"new"|uid,where?,line?,label?,text} (text <= 8 MiB)
+GET  /api/peer/<kind>/result?requestId= -> {state:queued|taken|done|failed|expired,outcome,message}
+An app without these routes (an older version), or whose instance record is
+plain or unreadable, is never a receiver; it is skipped and named to the user.
+
+Page routes (session token). Sending routes exist in the standalone apps only;
+the main window has the receiving routes only (status.peerReceive is true when
+its page should run the inbox); child windows have none.
+GET  /api/peer-send/targets -> {app,name,receiver:"standalone"|"main"|"",
+     running,ready,targets:[...],note?}; note names skipped older apps.
+POST /api/peer-send/open {} -> raises or starts the other standalone app and
+     waits until it is ready (503 with the reason after at most 25 s).
+POST /api/peer-send/send {session,text} | {target,where?,line?,label?,text}
+     -> {requestId,state:"queued"|"starting",name,receiver,note?}. "starting":
+     nothing was running; the engine starts the other standalone app and
+     delivers this text itself (new documents only; terminal text needs a
+     session of a running receiver). With no receiver listed, a send that names
+     a session or a document is refused (409). Text is delivered only to the
+     instance that was probed. A session or an open document is sent only
+     to the receiver the last targets reply listed.
+GET  /api/peer-send/result?requestId= -> {state:starting|queued|taken|done|
+     failed|expired|lost,outcome,name,message,local?}
+GET  /api/peer-send/inbox -> {request,report,from,kind?} (kind: "terminal" or
+     "editor"; the receiving page uses its paste path or its insert path).
+POST /api/peer-send/report {targets:[...],documents?:[...]} (documents: main
+     window only). POST /api/peer-send/ack {requestId,ok,outcome?,error?}.

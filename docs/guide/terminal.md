@@ -76,12 +76,18 @@ Actions that open another Toolkit tool are not shown there: **Open Text Editor**
 ### Send output to the Text Editor app
 In the Terminal app, **Send to Text Editor** (the document-with-arrow button under the console, **Send output to Text Editor…** in a tab's menu, or **Send to Text Editor…** in the right-click menu) sends to **Network Toolkit Text Editor**, the separate Text Editor app. The dialog is the same: choose the last command or batch output or the selected text, then a new document or one of the documents open in the Text Editor app, and where it goes.
 
-- The Text Editor app comes forward with the text added as an ordinary edit: the document is marked unsaved and Undo removes it. For **A position I choose in the editor**, the Text Editor shows its **Insert here** bar and waits for you.
-- If the Text Editor app is not open, it is opened for you and the text goes into a new document.
+You are never asked to open anything first, and you choose **Send to editor** once. The Terminal app looks for an editor in this order:
+
+1. **Network Toolkit Text Editor**, if it is open.
+2. Otherwise the main **Network Toolkit** window, if it is open: its open documents are listed, and the text goes to its Text Editor, which comes to the front.
+3. Otherwise Network Toolkit Text Editor is started for you and the text you sent goes into a new document as soon as it is ready. If it does not come up within about 25 seconds, the Terminal says so and nothing is sent; your terminal output is still there to send again.
+
+- The editor comes forward with the text added as an ordinary edit: the document is marked unsaved and Undo removes it. For **A position I choose in the editor**, the Text Editor shows its **Insert here** bar and waits for you.
+- An app that is still open from an older version cannot receive text. It is skipped, and the dialog names it so you can close it and open it again.
 - Up to 8 MiB of text can be sent at a time.
 - If a dialog is open in the Text Editor, the text is refused instead of replacing it. Close the dialog and send again.
 
-Text sent from the Text Editor app with **Send to terminal** arrives here through the normal paste path: it is entered in the session you chose there, and text with line breaks opens the paste review first when **Review multi-line paste** is on. Only the text you send travels between the two apps. Passwords, saved connections, host keys and terminal output you did not send are never shared, and nothing leaves this computer. Both apps must use the same data folder, which they do when installed with setup. In the main Toolkit window **Send to Text Editor** works as before, inside that window.
+Text sent from the Text Editor app with **Send to terminal** arrives here through the normal paste path: it is entered in the session you chose there, and text with line breaks opens the paste review first when **Review multi-line paste** is on. The same is true in the main Toolkit window when the Text Editor app sends to it. Only the text you send travels between the apps. Passwords, saved connections, host keys and terminal output you did not send are never shared, and nothing leaves this computer. The apps must use the same data folder, which they do when installed with setup. In the main Toolkit window **Send to Text Editor** works as before, inside that window.
 
 ## Macros
 Use the Macros library only for commands you are authorized to send. Review command targets and content before running macros in multiple sessions. Preferences, profiles, histories and active sessions must be preserved through upgrades.

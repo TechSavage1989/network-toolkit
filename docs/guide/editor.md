@@ -53,12 +53,19 @@ The three small buttons at the right end of the status bar switch the color them
 ### Send to the Terminal app
 In the Text Editor app, **Send to terminal** (toolbar button, right-click menu or Ctrl+Shift+Enter) lists the connected sessions of **Network Toolkit Terminal**, the separate Terminal app. Pick the selection or the whole document and a session, then choose **Send to terminal**.
 
-- The Terminal app comes forward on that session and the text is entered like a paste, with the Terminal's own paste settings. Text with line breaks is shown there for review first when **Review multi-line paste** is on, and paste warnings apply. The Text Editor then tells you whether the text was sent or is waiting for your review in the Terminal.
-- If the Terminal app is not open, or has no connected session, the dialog says so and **Open Terminal** starts it. Connect a session there, then send again.
+You are never asked to open anything first. The Text Editor app looks for a terminal in this order:
+
+1. **Network Toolkit Terminal**, if it is open.
+2. Otherwise the main **Network Toolkit** window, if it is open: its Terminal sessions are listed, and the text goes to its Terminal page, which comes to the front.
+3. Otherwise Network Toolkit Terminal is started for you. A newly started Terminal has no session yet, and nothing is connected for you: connect one there, then choose **Send to terminal** again. If the Terminal does not come up within about 25 seconds, the Text Editor says so and your document is unchanged.
+
+- The Terminal comes forward on that session and the text is entered like a paste, with the Terminal's own paste settings. Text with line breaks is shown there for review first when **Review multi-line paste** is on, and paste warnings apply. The Text Editor then tells you where the text went and whether it was sent or is waiting for your review.
+- If the terminal that was found has no connected session, the dialog says so. For the Terminal app, **Show Terminal** brings it to the front. Connect a session there, then send again.
+- An app that is still open from an older version cannot receive text. It is skipped, and the Text Editor names it so you can close it and open it again.
 - Up to 1 MiB of text can be sent at a time. Your document stays open and unchanged.
 - If a dialog is open in the Terminal (a connection form, a sign-in or host key question, or another paste review), the text is refused instead of replacing it. Close the dialog and send again.
 
-Text sent from the Terminal app with **Send to Text Editor** arrives here as a new document or in the open document you chose there; see [Terminal](terminal.md#the-terminal-app). Only the text you send travels between the two apps. Passwords, saved connections, host keys and file contents you did not send are never shared, and nothing leaves this computer. Both apps must use the same data folder, which they do when installed with setup. In the main Toolkit window **Send to terminal** works as before, inside that window.
+Text sent from the Terminal app with **Send to Text Editor** arrives here as a new document or in the open document you chose there; see [Terminal](terminal.md#the-terminal-app). Only the text you send travels between the apps. Passwords, saved connections, host keys and file contents you did not send are never shared, and nothing leaves this computer. The apps must use the same data folder, which they do when installed with setup. In the main Toolkit window **Send to terminal** works as before, inside that window.
 
 ## Configuration text
 For network configuration syntax, choose Auto, the network language or plain text. This affects highlighting only; review actual device commands independently before applying configuration.

@@ -12,11 +12,13 @@
  * Send. Inserts are ordinary edits: undoable, and the document becomes unsaved.
  * Only the main window's editor is used; a detached Terminal window has none.
  *
- * Standalone Terminal: the same dialog lists the documents of the standalone
- * Text Editor app (Network Toolkit Text Editor) and sends through
- * peer-send.js. That app's page then calls deliver() below, so the text is
- * added there in exactly the same way. If the Text Editor is not open, it is
- * opened and the text goes to a new document. */
+ * Standalone Terminal: the same dialog lists the documents of the receiver its
+ * engine picked and sends through peer-send.js: the standalone Text Editor app
+ * (Network Toolkit Text Editor) if it is running, otherwise the main Toolkit
+ * window. That app's page then calls deliver() below, so the text is added
+ * there in exactly the same way. If neither is running, Send starts the Text
+ * Editor app: this app's engine holds the text until that app is ready and
+ * delivers it to a new document, so the user sends once. */
 (function(root){
 'use strict';
 const document=root.document;if(!document)return;
@@ -45,13 +47,14 @@ async function open(entry){
  const other=peer();let remote=null;
  if(other){remote=await other.targets();if(id!==sequence)return false;}
  const docs=other?remote.targets.map(item=>({id:item.id,name:item.name,dirty:item.unsaved,active:item.active,blocked:item.busy?'unavailable':''})):(editor().listDocuments?.()||[]),usable=docs.filter(d=>!d.blocked),activeDoc=usable.find(d=>d.active)||usable[0];
- const name=other?other.peerName():'';
- pending={id,entry,output,selection,kind,label:sessionLabel(entry),peer:other,launch:!!other&&!remote.running,names:new Map(docs.map(d=>[d.id,d.name]))};
+ // The receiver: the Text Editor app, or the main Toolkit window when that app is not running.
+ const name=other?remote.name||other.peerName():'';
+ pending={id,entry,output,selection,kind,label:sessionLabel(entry),peer:other,names:new Map(docs.map(d=>[d.id,d.name]))};
  const sourceRow=(value,title,text,checked)=>'<label class="toggle-row"><input type="radio" name="terminalSendSource" value="'+value+'" '+(text?(checked?'checked':''):'disabled')+'><span>'+title+' <span class="help-line">('+(text?describe(text):value==='selection'?'nothing selected':'nothing retained yet')+')</span></span></label>';
  openModal('Send to Text Editor',
   '<form id="terminalSendEditorForm" class="terminal-send-editor" data-send-id="'+id+'">'+
   '<fieldset><legend>Send</legend>'+sourceRow('output',kind,output,false)+sourceRow('selection','Selected terminal text',selection,!!selection)+(block?.truncated?'<p class="help-line">Only the retained part of a long output is available.</p>':'')+'</fieldset>'+
-  '<fieldset><legend>'+(other?'To '+escapeHTML(name):'To')+'</legend>'+(other&&!remote.running?'<p class="help-line" data-terminal-send-peer-missing>'+escapeHTML(name)+' is not open. It opens when you choose Send to editor.</p>':'')+'<label class="toggle-row"><input type="radio" name="terminalSendTarget" value="new" '+(activeDoc?'':'checked')+'><span>New document</span></label>'+
+  '<fieldset><legend>'+(other?'To '+escapeHTML(name):'To')+'</legend>'+(other&&!remote.running?'<p class="help-line" data-terminal-send-peer-missing>'+escapeHTML(name)+' is not open. It opens when you choose Send to editor.</p>':'')+(other&&remote.note?'<p class="help-line" data-terminal-send-peer-note>'+escapeHTML(remote.note)+'</p>':'')+'<label class="toggle-row"><input type="radio" name="terminalSendTarget" value="new" '+(activeDoc?'':'checked')+'><span>New document</span></label>'+
   '<label class="toggle-row"><input type="radio" name="terminalSendTarget" value="existing" '+(activeDoc?'checked':'disabled')+'><span>Open document'+(docs.length?'':' <span class="help-line">(none open)</span>')+'</span></label>'+
   '<div class="field terminal-send-existing"><label for="terminalSendDocument">Document</label><select id="terminalSendDocument" '+(activeDoc?'':'disabled')+'>'+docs.map((d,i)=>'<option value="'+escapeHTML(d.id)+'"'+(d.blocked?' disabled':'')+(d===activeDoc?' selected':'')+'>'+escapeHTML((i+1)+'. '+d.name+(d.dirty?' (unsaved)':'')+(d.source?' · '+d.source:'')+(d.blocked?' · unavailable':''))+'</option>').join('')+'</select></div>'+
   '<div class="field terminal-send-existing"><label for="terminalSendWhere">Insert at</label><select id="terminalSendWhere" '+(activeDoc?'':'disabled')+'><option value="pick" selected>A position I choose in the editor</option><option value="cursor">The document’s current cursor</option><option value="end">The end of the document</option><option value="start">The start of the document</option><option value="line">The start of line…</option></select></div>'+
@@ -71,13 +74,19 @@ function wait(bounded){return new Promise(resolve=>{const raf=root.requestAnimat
  * "choose the position" bar, or an insert at the cursor, start, end or a line.
  * A send inside one window shows its own messages. With request.report (text
  * from the standalone Terminal) the result is returned for the other app:
- * {ok:true,outcome:'inserted'|'pick'} or {ok:false,error}. */
+ * {ok:true,outcome:'inserted'|'pick'} or {ok:false,error}. request.guard (text
+ * from another app) returns a reason when a dialog is open in this window; it
+ * is asked before the page changes and again immediately before each step
+ * that changes the editor. */
 async function deliver(request){
  const {docId,where,text,label}=request,report=request.report===true,ed=editor();
  const fail=message=>{if(report)return {ok:false,error:message};toastMessage(message,'error');return false;},done=outcome=>report?{ok:true,outcome}:true;
+ const guard=()=>{try{return report&&typeof request.guard==='function'?String(request.guard()||''):'';}catch{return 'The Text Editor cannot take text right now.';}};
  if(!ed?.insertText)return fail('The Text Editor is not available.');
+ let busy=guard();if(busy)return fail(busy);
  const navigate=g('navigate');if(typeof navigate==='function')navigate('editor');await wait(report);
- if(!docId){const doc=await ed.newDocument?.();if(!doc?.id)return fail('Could not create a new document.');const r=await ed.insertText(doc.id,text,'start');return r?.ok?done('inserted'):fail(r?.error||'The text could not be inserted.');}
+ if((busy=guard()))return fail(busy);
+ if(!docId){const doc=await ed.newDocument?.();if(!doc?.id)return fail('Could not create a new document.');if((busy=guard()))return fail(busy);const r=await ed.insertText(doc.id,text,'start');return r?.ok?done('inserted'):fail(r?.error||'The text could not be inserted.');}
  if(where==='pick')return ed.pickInsert(docId,text,label)?done('pick'):fail('That document is not available. Nothing was added.');
  const r=await ed.insertText(docId,text,where);return r?.ok?done('inserted'):fail(r?.error||'The text could not be inserted.');
 }
@@ -95,8 +104,7 @@ async function submit(form){
  if(p.peer){
   if(text.length*3>PEER_MAX_BYTES&&new TextEncoder().encode(text).length>PEER_MAX_BYTES){fail('Send no more than 8 MiB of text to the Text Editor at a time. Select a smaller part.');return;}
   pending=null;if(typeof closeModal==='function')closeModal();
-  // Open the Text Editor first when it was not running; the text then waits for its window.
-  if(p.launch&&!await p.peer.open({quiet:true}))return;
+  // If no receiver is running, this app's engine starts the Text Editor app and delivers this text itself.
   const payload=target==='existing'?{target:docId,where:typeof where==='object'?'line':where,text,label}:{target:'new',text,label};if(typeof where==='object')payload.line=where.line;
   await p.peer.send(payload,{target:target==='existing'?p.names.get(docId):'a new document'});return;
  }
