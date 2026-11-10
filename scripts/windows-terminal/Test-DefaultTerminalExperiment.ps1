@@ -73,10 +73,10 @@ function Wait-ForFile([string]$File, [string]$Expected) {
 function Test-Shell([string]$Name, [string]$Executable, [string]$Arguments,
                    [string]$StartupMarker, [string]$InputCommand, [string]$ExpectedInput) {
     $before = @(Get-Process -Name Network_Toolkit -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id)
-    $shellId = [DefaultTerminalSmoke]::LaunchNewConsole($Executable, $Arguments, $PSScriptRoot)
-    $shell = [Diagnostics.Process]::GetProcessById($shellId)
+    $fixtureShellPid = [DefaultTerminalSmoke]::LaunchNewConsole($Executable, $Arguments, $PSScriptRoot)
+    $shell = [Diagnostics.Process]::GetProcessById($fixtureShellPid)
     $processes.Add($shell)
-    $result = [ordered]@{ shell = $Name; shellPid = $shellId; window = $false; input = $false }
+    $result = [ordered]@{ shell = $Name; shellPid = $fixtureShellPid; window = $false; input = $false }
     $results.shells += $result
 
     Wait-ForFile (Join-Path $PSScriptRoot "$Name-startup.txt") $StartupMarker
@@ -101,7 +101,7 @@ function Test-Shell([string]$Name, [string]$Executable, [string]$Arguments,
     $result.hostPid = $hostProcess.Id
     $result.window = $true
     [DefaultTerminalSmoke]::SendCommand($window, $hostProcess.Id, $InputCommand)
-    Wait-ForFile (Join-Path $PSScriptRoot "$Name-input.txt") ($ExpectedInput.Replace('%PID%', [string]$shellId))
+    Wait-ForFile (Join-Path $PSScriptRoot "$Name-input.txt") ($ExpectedInput.Replace('%PID%', [string]$fixtureShellPid))
     $result.input = $true
     [DefaultTerminalSmoke]::SendCommand($window, $hostProcess.Id, 'exit')
     if (-not $shell.WaitForExit(15000) -or -not $hostProcess.WaitForExit(15000)) {
