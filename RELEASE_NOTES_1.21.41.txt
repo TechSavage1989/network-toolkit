@@ -7,6 +7,8 @@ Network Toolkit 1.21.41
 
 ## Additional Details
 
+- A problem with the safety copy never stops your settings from being saved. The app saves, tells you once which file is the problem, and repairs the copy later.
+- A save that could not be written is tried again by itself, and a message stays until it works. If it still cannot be written when you close the app, you choose whether to try again, close anyway or keep the app open.
 - A standalone Terminal or Text Editor no longer refuses to save when the settings file and its safety copy are both gone. It writes what it holds, and the full Toolkit keeps its own saved targets and settings.
 - When the settings file is lost while an app is minimized, that app combines its list with the newer safety copy instead of writing over it.
 - The safety copy is tied to its data folder. A copy left behind by a deletion is ignored and removed at the next start.
