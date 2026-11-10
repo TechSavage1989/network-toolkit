@@ -36,7 +36,7 @@ func TestSharedDataBrowser(t *testing.T) {
 	env := os.Environ()
 	for _, app := range []struct{ name, workspace, mode string }{{"MAIN", "", "main"}, {"TERMINAL", terminalWorkspaceName, "terminal"}, {"EDITOR", standaloneEditorDirectory, standaloneEditorMode}} {
 		a := sharedTestApp(t, root, app.workspace, app.mode)
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if strings.HasPrefix(r.URL.Path, "/api/updates/") {
 				// Never contact the update server from a test.
 				jsonResponse(w, 200, map[string]any{})
@@ -44,8 +44,12 @@ func TestSharedDataBrowser(t *testing.T) {
 			}
 			a.ServeHTTP(w, r)
 		}))
+		// The app learns its address before the server answers anyone: another
+		// test's client can reach a reused port at once (the race detector saw
+		// that write next to a request).
+		a.host = server.Listener.Addr().String()
+		server.Start()
 		t.Cleanup(server.Close)
-		a.host = strings.TrimPrefix(server.URL, "http://")
 		env = append(env, "NTK_SHARED_"+app.name+"_URL="+server.URL, "NTK_SHARED_"+app.name+"_TOKEN="+a.token)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Minute)

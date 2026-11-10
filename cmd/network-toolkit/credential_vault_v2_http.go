@@ -330,6 +330,12 @@ func (a *application) ensureCredentialConfigIdentity() (string, error) {
 	// and its next save would undo whatever it had not taken in.
 	a.noteReplacedStateLocked()
 	a.absorbRootLocked(root, false)
+	// A file that is missing is written with everything this app holds and,
+	// for the rest, with what the copy of the saved lists has: never with the
+	// identity alone, which every other app would read as "all removed".
+	if err := a.recreateRootLocked(root); err != nil {
+		return "", err
+	}
 	if !a.shared.standalone {
 		// Settings this window holds in memory but has not written yet are
 		// saved with the identity, as before.
@@ -352,7 +358,7 @@ func (a *application) ensureCredentialConfigIdentity() (string, error) {
 	if err := writeSharedSettings(path, raw); err != nil {
 		return "", err
 	}
-	a.shared.seen = sha256.Sum256(raw)
+	a.shared.seen, a.shared.had, a.shared.lost = sha256.Sum256(raw), true, false
 	if !a.shared.standalone {
 		a.setStateLocked(raw)
 	}

@@ -185,7 +185,7 @@ func (a *application) loadSharedState() {
 	if root, err := readSharedSettings(a.sharedSettingsPath()); err == nil {
 		// The main window holds its own file as it was read; entries an older
 		// version dropped from it are put back here too.
-		if a.shared.standalone || len(root.putBack) > 0 {
+		if a.shared.standalone || len(root.putBack) > 0 || root.recovered {
 			a.absorbRootLocked(root, true)
 		} else {
 			a.shared.seen, a.shared.older, a.shared.had = root.digest(), root.older, root.exists
@@ -449,8 +449,9 @@ func (a *application) putState(w http.ResponseWriter, r *http.Request) {
 		// disk again), and when it is gone although this app holds values.
 		changed := sharedRevision(merged) != sharedRevision(theirs)
 		if root.exists && (changed || root.older) || !root.exists && !sharedValuesEmpty(merged) {
-			if !root.exists && a.shared.lost {
-				keepMainOnlySavedLists(root, a.sharedRoot())
+			if err := a.recreateRootLocked(root); err != nil {
+				jsonError(w, http.StatusConflict, err.Error())
+				return
 			}
 			next, err := root.encode(merged, keys)
 			if err != nil {
@@ -553,6 +554,9 @@ func (a *application) updateSharedLocked(change func(shared map[string]any) erro
 	}
 	a.noteReplacedStateLocked()
 	a.absorbRootLocked(root, false)
+	if err := a.recreateRootLocked(root); err != nil {
+		return err
+	}
 	keys := a.shared.keys()
 	shared := a.sharedValuesLocked()
 	if err := change(shared); err != nil {
@@ -577,7 +581,7 @@ func (a *application) updateSharedLocked(change func(shared map[string]any) erro
 	if err := writeSharedSettings(a.sharedSettingsPath(), next); err != nil {
 		return err
 	}
-	a.shared.seen, a.shared.older, a.shared.had = sha256.Sum256(next), false, true
+	a.shared.seen, a.shared.older, a.shared.had, a.shared.lost = sha256.Sum256(next), false, true, false
 	a.shared.pendingPutBack = append(a.shared.pendingPutBack, sharedNamesWritten(next, root.putBack)...)
 	if a.shared.standalone {
 		a.overlaySharedLocked(shared)

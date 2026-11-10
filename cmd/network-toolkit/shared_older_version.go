@@ -44,6 +44,10 @@ const (
 type savedListsCopy struct {
 	Version int                        `json:"version"`
 	Lists   map[string]json.RawMessage `json:"lists"`
+	// Every key only the main window uses, as last written. It is read only
+	// to write a settings file that is missing: a standalone app does not
+	// hold these keys and would otherwise write the file without them.
+	MainOnly map[string]json.RawMessage `json:"mainOnly,omitempty"`
 }
 
 // savedListKeys returns the keys whose entries the user saves on purpose.
@@ -61,15 +65,24 @@ func savedListKeys() []sharedKey {
 // is none or it cannot be used. A damaged copy is never a reason to refuse a
 // read or a save: the next save of this version writes it again.
 func readSavedListsCopy(dir string) *savedListsCopy {
+	kept, _ := readSavedListsCopyState(dir)
+	return kept
+}
+
+// readSavedListsCopyState also says whether a copy is there at all.
+func readSavedListsCopyState(dir string) (kept *savedListsCopy, present bool) {
 	raw, err := readSharedFile(filepath.Join(dir, savedListsFilename), savedListsLimit)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, false
+	}
 	if err != nil {
-		return nil
+		return nil, true
 	}
-	var kept savedListsCopy
-	if json.Unmarshal(raw, &kept) != nil || kept.Version != 1 || kept.Lists == nil {
-		return nil
+	var copied savedListsCopy
+	if json.Unmarshal(raw, &copied) != nil || copied.Version != 1 || copied.Lists == nil {
+		return nil, true
 	}
-	return &kept
+	return &copied, true
 }
 
 // writeSavedListsCopy stores the saved lists of a settings file that is about
@@ -83,6 +96,14 @@ func writeSavedListsCopy(dir string, members map[string]json.RawMessage) error {
 			if json.Unmarshal(raw, &list) == nil && list != nil {
 				kept.Lists[key.Name] = raw
 			}
+		}
+	}
+	for _, key := range sharedDataKeys {
+		if raw, ok := members[key.Name]; ok && key.MainOnly {
+			if kept.MainOnly == nil {
+				kept.MainOnly = map[string]json.RawMessage{}
+			}
+			kept.MainOnly[key.Name] = raw
 		}
 	}
 	next, err := json.Marshal(kept)
@@ -164,8 +185,31 @@ func restoreSavedList(current, kept json.RawMessage) (json.RawMessage, []string)
 // of this version writes them).
 func readSharedSettings(path string) (*rootSettings, error) {
 	settings, err := readRootSettings(path)
-	if err != nil || !settings.exists {
+	if err != nil {
 		return settings, err
+	}
+	if !settings.exists {
+		// The file is missing. If a copy exists, the file was lost (deleting
+		// app data removes both): the saved lists and the main-window keys of
+		// the copy are what a writer starts from, so that no app writes the
+		// file, and then the copy, without them.
+		kept, present := readSavedListsCopyState(filepath.Dir(path))
+		settings.copyUnreadable = present && kept == nil
+		if kept != nil {
+			settings.recovered = true
+			for name, raw := range kept.MainOnly {
+				if key, ok := sharedKeyNamed(name); ok && key.MainOnly {
+					settings.members[name] = raw
+				}
+			}
+			for _, key := range savedListKeys() {
+				var list []any
+				if raw := kept.Lists[key.Name]; json.Unmarshal(raw, &list) == nil && len(list) > 0 {
+					settings.members[key.Name] = raw
+				}
+			}
+		}
+		return settings, nil
 	}
 	if _, merging := settings.members[sharedWriterField]; merging {
 		return settings, nil
@@ -238,24 +282,34 @@ func sharedNamesWritten(raw []byte, names []string) []string {
 	return out
 }
 
-// keepMainOnlySavedLists is for a standalone app that writes a settings file
-// which went missing while it ran. It knows nothing of the lists only the
-// main window uses (saved targets, saved TFTP profiles); they are taken from
-// the copy of the saved lists, so neither the new file nor the copy written
-// with it loses them.
-func keepMainOnlySavedLists(root *rootSettings, dir string) {
-	kept := readSavedListsCopy(dir)
-	if kept == nil {
-		return
+// errSharedSettingsLost: a standalone app found neither the settings file
+// nor a usable copy to write it again from.
+var errSharedSettingsLost = errors.New("Settings were not saved: the settings file of the data folder is missing and its copy cannot be read. Open the main Network Toolkit window; it writes the file again from what it holds.")
+
+// recreateRootLocked is what every writer calls before it writes a settings
+// file that does not exist (root.exists is false). readSharedSettings has
+// filled root from the copy; this adds everything this app holds, which is
+// newer. A standalone app holds nothing of what only the main window uses,
+// so it writes the file only when the copy could supply that: if the file
+// was there earlier in this run, or a copy exists that cannot be read, it
+// refuses, and the main window writes the file from what it holds. The
+// vault's identity is never carried over: a file that was gone is a reset.
+// Callers hold stateMu and the settings lock.
+func (a *application) recreateRootLocked(root *rootSettings) error {
+	if root.exists {
+		return nil
 	}
-	for _, key := range savedListKeys() {
-		if _, present := root.members[key.Name]; key.MainOnly && !present {
-			var list []any
-			if raw := kept.Lists[key.Name]; json.Unmarshal(raw, &list) == nil && len(list) > 0 {
-				root.members[key.Name] = raw
-			}
+	if a.shared.standalone && (root.copyUnreadable || a.shared.had && !root.recovered) {
+		return errSharedSettingsLost
+	}
+	for name, raw := range stateMembers(a.state) {
+		key, shared := sharedKeyNamed(name)
+		if name == credentialConfigIdentityField || a.shared.standalone && (!shared || key.MainOnly) {
+			continue
 		}
+		root.members[name] = raw
 	}
+	return nil
 }
 
 // flushSharedNotices tells the user about saved entries that were put back.
@@ -266,7 +320,13 @@ func (a *application) flushSharedNotices() {
 	names, root := a.shared.pendingPutBack, a.sharedRoot()
 	a.shared.pendingPutBack = nil
 	a.stateMu.Unlock()
-	recordSharedNotice(root, "older-version", "", names)
+	if !recordSharedNotice(root, "older-version", "", names) {
+		// Not recorded (the lock was busy, or the record could not be
+		// written): the names are kept for the next attempt.
+		a.stateMu.Lock()
+		a.shared.pendingPutBack = append(names, a.shared.pendingPutBack...)
+		a.stateMu.Unlock()
+	}
 }
 
 // writeSharedSettings is the one way this version writes the data folder's
@@ -297,24 +357,25 @@ func sharedNoticeNames(names []string) []string {
 
 // recordSharedNotice adds a notice for the user. It takes the shared-data
 // lock, so the caller must not hold the settings lock.
-func recordSharedNotice(root, kind, source string, items []string) {
+func recordSharedNotice(root, kind, source string, items []string) bool {
 	if len(items) == 0 {
-		return
+		return true
 	}
 	release, err := acquireSharedDataLock(root)
 	if err != nil {
-		return
+		return false
 	}
 	defer release()
 	marker, err := readSharedMarker(root)
 	if err != nil {
-		return
+		return false
 	}
 	before := len(marker.Notices)
-	marker.notice(kind, source, sharedNoticeNames(items))
+	marker.notice(kind, source, sharedNoticeNames(append([]string{}, items...)))
 	if len(marker.Notices) != before {
-		_ = writeSharedMarker(root, marker)
+		return writeSharedMarker(root, marker) == nil
 	}
+	return true
 }
 
 // sharedSettingsNeedRepair reports, without a lock, whether a version that

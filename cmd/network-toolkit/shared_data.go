@@ -302,6 +302,10 @@ type rootSettings struct {
 	// last, and the names of the saved entries that were put back.
 	older   bool
 	putBack []string
+	// Set by readSharedSettings for a file that does not exist: members were
+	// filled from the copy of the saved lists (recovered), or a copy is there
+	// but cannot be read.
+	recovered, copyUnreadable bool
 }
 
 // The file could be read but does not hold a settings object. Any other
