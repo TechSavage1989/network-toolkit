@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"networktoolkit/internal/sharedfile"
 )
 
 // storageRoot is a compatibility implementation of the anchored file API used
@@ -16,6 +18,11 @@ import (
 type storageRoot struct {
 	path string
 }
+
+// The entry that was opened is not the one that was inspected a moment
+// before. Another app replaced the file in between (every shared file is
+// replaced as a whole), or someone swapped it; the caller inspects again.
+var errStorageEntryChanged = errors.New("App-data entry changed while it was being opened.")
 
 func openStorageRootBase(path string) (*storageRoot, error) {
 	clean, err := filepath.Abs(path)
@@ -124,7 +131,7 @@ func (r *storageRoot) Open(name string) (*os.File, error) {
 	if storageIsLink(before) {
 		return nil, errors.New("Refusing to open linked app data.")
 	}
-	file, err := os.Open(full)
+	file, err := sharedfile.Open(full)
 	if err != nil {
 		return nil, err
 	}
@@ -134,7 +141,7 @@ func (r *storageRoot) Open(name string) (*os.File, error) {
 		if statErr != nil {
 			return nil, statErr
 		}
-		return nil, errors.New("App-data entry changed while it was being opened.")
+		return nil, errStorageEntryChanged
 	}
 	return file, nil
 }
@@ -151,7 +158,13 @@ func (r *storageRoot) OpenFile(name string, flag int, perm os.FileMode) (*os.Fil
 	if beforeErr != nil && !errors.Is(beforeErr, os.ErrNotExist) {
 		return nil, beforeErr
 	}
-	file, err := os.OpenFile(full, flag, perm)
+	var file *os.File
+	if flag == os.O_RDONLY {
+		// Reading must not keep another app from replacing the file.
+		file, err = sharedfile.Open(full)
+	} else {
+		file, err = os.OpenFile(full, flag, perm)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +174,7 @@ func (r *storageRoot) OpenFile(name string, flag int, perm os.FileMode) (*os.Fil
 		if statErr != nil {
 			return nil, statErr
 		}
-		return nil, errors.New("App-data entry changed while it was being opened.")
+		return nil, errStorageEntryChanged
 	}
 	return file, nil
 }
@@ -232,5 +245,6 @@ func (r *storageRoot) Rename(oldName, newName string) error {
 	} else if destErr != nil && !errors.Is(destErr, os.ErrNotExist) {
 		return destErr
 	}
-	return os.Rename(oldPath, newPath)
+	// Another app of the data folder may have the file open for reading.
+	return sharedfile.Replace(oldPath, newPath)
 }

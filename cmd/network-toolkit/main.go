@@ -30,6 +30,7 @@ import (
 	"networktoolkit/internal/macros"
 	"networktoolkit/internal/model"
 	"networktoolkit/internal/platform"
+	"networktoolkit/internal/sharedfile"
 	"networktoolkit/internal/terminal"
 )
 
@@ -527,7 +528,13 @@ func newApplicationForRoot(parent context.Context, dataPath, sharedRoot string) 
 	}
 	a.views = newTerminalViewRegistry(a)
 	a.editorViews = newEditorViewRegistry(a)
-	if b, err := os.ReadFile(dataPath); err == nil {
+	// Another app of the data folder may be replacing the file right now: a
+	// plain read could fail at that moment and this app would start empty.
+	b, err := readSharedFile(dataPath, 2<<20)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		a.storageError = "Saved settings could not be read: " + err.Error()
+	}
+	if err == nil {
 		if len(b) <= 2<<20 && json.Valid(b) && len(strings.TrimSpace(string(b))) > 0 && strings.HasPrefix(strings.TrimSpace(string(b)), "{") {
 			var state map[string]any
 			if json.Unmarshal(b, &state) == nil {
@@ -1129,7 +1136,8 @@ func writeAtomic(path string, b []byte) error {
 	if err = f.Close(); err != nil {
 		return err
 	}
-	return replaceSettingsFile(tmp, path)
+	// The apps of one data folder read this file while it is replaced.
+	return sharedfile.Replace(tmp, path)
 }
 
 func decodeBody(w http.ResponseWriter, r *http.Request, limit int64, out any) error {

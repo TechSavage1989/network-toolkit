@@ -10,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"networktoolkit/internal/sharedfile"
 )
 
 const (
@@ -119,12 +121,25 @@ func openStorageRegular(root *storageRoot, name string, flags int, mode os.FileM
 		if err != nil {
 			return nil, err
 		}
-		return nil, fmt.Errorf("%s changed while it was being opened", name)
+		return nil, fmt.Errorf("%s changed while it was being opened: %w", name, errStorageEntryChanged)
 	}
 	return file, nil
 }
 
+// readStorageFile reads an app-data file. The apps of one data folder replace
+// these files while others read them, so a read that meets a replace in
+// progress is made again; every attempt is inspected in full.
 func readStorageFile(root *storageRoot, name string, limit int64) ([]byte, error) {
+	var raw []byte
+	err := sharedfile.Retry(func() error {
+		var err error
+		raw, err = readStorageFileOnce(root, name, limit)
+		return err
+	}, func(err error) bool { return errors.Is(err, errStorageEntryChanged) || sharedfile.Transient(err) })
+	return raw, err
+}
+
+func readStorageFileOnce(root *storageRoot, name string, limit int64) ([]byte, error) {
 	file, err := openStorageRegular(root, name, os.O_RDONLY, 0)
 	if err != nil {
 		return nil, err

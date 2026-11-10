@@ -747,6 +747,18 @@ jobs:
         env:
           GOTOOLCHAIN: local
         run: go test -mod=vendor ./internal/vaultcrypto -count=1 -v
+      # Shared app data is used by several processes at once. On Windows a file
+      # cannot be replaced while another handle has it open without delete
+      # sharing, and locks are per handle, so these run here as well: replaces
+      # under readers, the lock and the merge across real processes, the vault
+      # staying unlocked while another app saves, and the editor session rules.
+      - name: Test shared app data across processes and replaces under readers on Windows
+        env:
+          GOTOOLCHAIN: local
+        run: |
+          go test -mod=vendor ./internal/sharedfile -count=1 -v
+          go test -mod=vendor ./internal/terminal -run 'TestKnownHost|TestSharedKnownHosts' -count=1 -v
+          go test -mod=vendor ./cmd/network-toolkit -run '^Test(Shared|EditorSession|KnownHosts)' -count=1 -v -timeout=10m
       - name: Verify real WebView2 private bootstrap
         env:
           GOTOOLCHAIN: local

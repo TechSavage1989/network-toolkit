@@ -17,6 +17,8 @@ import (
 	"time"
 
 	"golang.org/x/crypto/ssh"
+
+	"networktoolkit/internal/sharedfile"
 )
 
 const maxKnownHostFile = 4 * 1024 * 1024
@@ -45,6 +47,9 @@ type knownHostStore struct {
 	path    string
 	entries map[string]knownHostEntry
 	err     error
+	// The trust file could not be loaded when the app started. As before, that
+	// needs a repair and a restart; it is never retried.
+	startErr error
 	// The file as last read or written. Several apps of one data folder use
 	// the same trust file, so it is read again whenever it has changed.
 	seen [sha256.Size]byte
@@ -57,7 +62,8 @@ func loadKnownHostStore(dataDir string) (*knownHostStore, error) {
 	store := &knownHostStore{path: filepath.Join(dataDir, "Network_Toolkit.ssh_known_hosts.json"), entries: map[string]knownHostEntry{}}
 	err := store.load()
 	if err != nil {
-		store.err = fmt.Errorf("SSH known-host trust file %s could not be loaded; repair or deliberately rename that file, then restart Network Toolkit before using SSH: %w", store.path, err)
+		store.startErr = fmt.Errorf("SSH known-host trust file %s could not be loaded; repair or deliberately rename that file, then restart Network Toolkit before using SSH: %w", store.path, err)
+		store.err = store.startErr
 	}
 	return store, store.err
 }
@@ -71,21 +77,27 @@ func (s *knownHostStore) load() error {
 	return nil
 }
 
-// refreshLocked reads the trust file again when another app changed it. A
-// file that can no longer be read disables SSH exactly as it does at start:
-// trust is never guessed, reset or replaced. Callers hold s.mu.
+// refreshLocked reads the trust file again when another app changed it. While
+// the file cannot be read, SSH is refused: trust is never guessed, reset or
+// replaced. That lasts as long as the file is unreadable and no longer: the
+// next call reads it again, so one failed read (another program held the file
+// for a moment) does not disable SSH until the app is restarted. A file that
+// was unreadable when the app started still needs a restart, as before.
+// Callers hold s.mu.
 func (s *knownHostStore) refreshLocked() {
-	if s.err != nil {
+	if s.startErr != nil {
+		s.err = s.startErr
 		return
 	}
 	entries, seen, err := s.read()
 	if err != nil {
-		s.err = fmt.Errorf("SSH known-host trust file %s could not be loaded; repair or deliberately rename that file, then restart Network Toolkit before using SSH: %w", s.path, err)
+		s.err = fmt.Errorf("SSH known-host trust file %s cannot be read right now, so SSH is refused until it can be; if this stays, repair or deliberately rename that file: %w", s.path, err)
 		return
 	}
-	if seen != s.seen {
+	if s.err != nil || seen != s.seen || s.entries == nil {
 		s.entries, s.seen = entries, seen
 	}
+	s.err = nil
 }
 
 // transaction runs change with the cross-app lock held and the newest trust
@@ -122,7 +134,8 @@ func (s *knownHostStore) read() (map[string]knownHostEntry, [sha256.Size]byte, e
 	if info.Size() > maxKnownHostFile {
 		return nil, seen, errors.New("trust file exceeds the 4 MiB limit")
 	}
-	file, err := os.Open(s.path)
+	// Another app of the data folder may replace the file at this moment.
+	file, err := sharedfile.Open(s.path)
 	if err != nil {
 		return nil, seen, err
 	}
@@ -135,7 +148,7 @@ func (s *knownHostStore) read() (map[string]knownHostEntry, [sha256.Size]byte, e
 		return nil, seen, errors.New("trust file exceeds the 4 MiB limit")
 	}
 	seen = sha256.Sum256(raw)
-	if seen == s.seen && s.entries != nil {
+	if seen == s.seen && s.entries != nil && s.err == nil {
 		return s.entries, seen, nil // Unchanged since it was last read.
 	}
 	if err := decodeKnownHosts(raw, entries); err != nil {
@@ -206,7 +219,13 @@ func (m *Manager) SetKnownHostLock(lock func() (func(), error)) {
 	m.known.mu.Unlock()
 }
 
-func (s *knownHostStore) loadError() error { s.mu.Lock(); defer s.mu.Unlock(); return s.err }
+// loadError reports whether the trust file can be used right now.
+func (s *knownHostStore) loadError() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.refreshLocked()
+	return s.err
+}
 
 func (m *Manager) KnownHosts() ([]KnownHostInfo, error) {
 	if m.known == nil {
@@ -237,9 +256,6 @@ func (m *Manager) RemoveKnownHost(host string) error {
 	s := m.known
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.err != nil {
-		return s.err
-	}
 	// Remove from the list as it is on disk now, so a host another app has
 	// just trusted is kept.
 	return s.transactionLocked(func() error {
@@ -312,9 +328,6 @@ func (s *knownHostStore) verify(ctx context.Context, endpoint string, key ssh.Pu
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.err != nil {
-		return s.err
-	}
 	// The decision is checked against, and saved into, the trust file as it
 	// is on disk now: this app or another one may have changed it while the
 	// prompt was open.
@@ -396,7 +409,8 @@ func (s *knownHostStore) persist(entries map[string]knownHostEntry) error {
 	if err := temporary.Close(); err != nil {
 		return err
 	}
-	if err := os.Rename(path, s.path); err != nil {
+	// Another app of the data folder may have the file open for reading.
+	if err := sharedfile.Replace(path, s.path); err != nil {
 		return err
 	}
 	s.seen = sha256.Sum256(raw)
