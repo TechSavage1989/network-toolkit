@@ -164,6 +164,18 @@ try {
         $node = $manifest.SelectSingleNode("//*[local-name()='AppExtension' and @Name='$($contract.Name)']/*[local-name()='Properties']/*[local-name()='Clsid']")
         if (-not $node -or $node.InnerText -cne $contract.Clsid) { throw "Registered fixture lost the $($contract.Name) extension." }
     }
+    # Facts that decide whether Windows offers delegation for this account.
+    $policy = Get-ItemProperty -LiteralPath 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System' -ErrorAction SilentlyContinue
+    $consoleKey = Get-ItemProperty -LiteralPath 'HKCU:\Console' -ErrorAction SilentlyContinue
+    $results.accountFacts = [ordered]@{
+        sid = $identity.User.Value
+        builtInAdministrator = $identity.User.Value -match '-500$'
+        enableLua = if ($policy -and $policy.PSObject.Properties['EnableLUA']) { $policy.EnableLUA } else { $null }
+        filterAdministratorToken = if ($policy -and $policy.PSObject.Properties['FilterAdministratorToken']) { $policy.FilterAdministratorToken } else { $null }
+        consentPromptBehaviorAdmin = if ($policy -and $policy.PSObject.Properties['ConsentPromptBehaviorAdmin']) { $policy.ConsentPromptBehaviorAdmin } else { $null }
+        consoleForceV2 = if ($consoleKey -and $consoleKey.PSObject.Properties['ForceV2']) { $consoleKey.ForceV2 } else { $null }
+        elevationType = [DefaultTerminalSmoke]::ElevationType()
+    }
     $results.extensionCatalogs = @(
         Get-ExtensionCatalogEvidence 'com.microsoft.windows.console.host' $installed.PackageFamilyName
         Get-ExtensionCatalogEvidence 'com.microsoft.windows.terminal.host' $installed.PackageFamilyName
@@ -222,6 +234,8 @@ try {
     } catch {
         $control.error = $_.Exception.Message
     } finally { Stop-FixtureProcesses }
+    $readBack = Get-ItemProperty -LiteralPath ('HKCU:\' + $startupKey) -ErrorAction SilentlyContinue
+    $control.selectionReadBack = if ($readBack) { '{0} / {1}' -f $readBack.DelegationConsole, $readBack.DelegationTerminal } else { $null }
     $results.control = $control
     Write-Host ('Control (Windows Terminal selected): ' + ($control | ConvertTo-Json -Compress))
 

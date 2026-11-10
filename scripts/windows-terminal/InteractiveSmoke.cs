@@ -70,6 +70,23 @@ public static class DefaultTerminalSmoke
         return info.ProcessId;
     }
 
+    // TOKEN_ELEVATION_TYPE of this process: 1 default (no split token), 2 full, 3 limited.
+    public static int ElevationType()
+    {
+        IntPtr token, buffer = Marshal.AllocHGlobal(4);
+        try
+        {
+            if (!OpenProcessToken(GetCurrentProcess(), 8, out token)) return -1;
+            try
+            {
+                uint needed;
+                return GetTokenInformation(token, 18, buffer, 4, out needed) ? Marshal.ReadInt32(buffer) : -1;
+            }
+            finally { CloseHandle(token); }
+        }
+        finally { Marshal.FreeHGlobal(buffer); }
+    }
+
     // Mandatory label RID of a process (8192 medium, 12288 high), or -1.
     public static int ProcessIntegrity(uint processId)
     {
@@ -235,6 +252,7 @@ public static class DefaultTerminalSmoke
     [DllImport("advapi32.dll")] private static extern IntPtr GetSidSubAuthority(IntPtr sid, uint index);
     [DllImport("kernel32.dll", SetLastError = true)] private static extern IntPtr OpenProcess(uint access, bool inherit, uint processId);
     [DllImport("kernel32.dll")] private static extern IntPtr LocalFree(IntPtr memory);
+    [DllImport("kernel32.dll")] private static extern IntPtr GetCurrentProcess();
     [DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();
     [DllImport("ole32.dll")] private static extern int CoInitializeEx(IntPtr reserved, uint flags);
     [DllImport("ole32.dll")] private static extern void CoUninitialize();
