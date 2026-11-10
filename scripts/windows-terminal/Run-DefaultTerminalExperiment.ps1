@@ -76,7 +76,7 @@ try {
         ('call "{0}" -arch=arm64 -host_arch=arm64' -f $devCmd),
         'if errorlevel 1 exit /b %errorlevel%',
         ('cd /d "{0}"' -f $scratch),
-        ('cl.exe /nologo /W4 /WX /EHsc /std:c++17 /O2 /MT /DUNICODE /D_UNICODE /DWIN32_LEAN_AND_MEAN /DNOMINMAX "{0}" /link /SUBSYSTEM:WINDOWS /OUT:"{1}" ole32.lib advapi32.lib' -f $cpp, $broker),
+        ('cl.exe /nologo /W4 /WX /EHsc /std:c++17 /O2 /MT /DUNICODE /D_UNICODE /DWIN32_LEAN_AND_MEAN /DNOMINMAX /DNTK_HANDOFF_EXPERIMENT_DIAGNOSTICS "{0}" /link /SUBSYSTEM:WINDOWS /OUT:"{1}" ole32.lib advapi32.lib' -f $cpp, $broker),
         'exit /b %errorlevel%'
     ) | Set-Content -Encoding ascii -LiteralPath $buildCmd
     Invoke-Checked $env:ComSpec @('/d', '/c', $buildCmd)

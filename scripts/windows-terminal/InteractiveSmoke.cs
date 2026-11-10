@@ -48,6 +48,40 @@ public static class DefaultTerminalSmoke
         return found;
     }
 
+    public static int ProbeActivation(string classId)
+    {
+        RequireHostedRunner();
+        Guid clsid = new Guid(classId);
+        Guid unknown = new Guid("00000000-0000-0000-C000-000000000046");
+        int apartment = CoInitializeEx(IntPtr.Zero, 2);
+        if (apartment < 0 && apartment != unchecked((int)0x80010106))
+            return apartment;
+        try
+        {
+            IntPtr instance;
+            int result = CoCreateInstance(ref clsid, IntPtr.Zero, 4, ref unknown, out instance);
+            if (instance != IntPtr.Zero)
+                Marshal.Release(instance);
+            return result;
+        }
+        finally
+        {
+            if (apartment >= 0)
+                CoUninitialize();
+        }
+    }
+
+    public static bool DesktopHasInput()
+    {
+        RequireHostedRunner();
+        IntPtr desktop = GetThreadDesktop(GetCurrentThreadId());
+        int receivesInput;
+        uint bytesNeeded;
+        return desktop != IntPtr.Zero &&
+               GetUserObjectInformation(desktop, 6, out receivesInput, 4, out bytesNeeded) &&
+               receivesInput != 0;
+    }
+
     public static void SendCommand(IntPtr window, uint expectedProcess, string command)
     {
         RequireHostedRunner();
@@ -121,7 +155,13 @@ public static class DefaultTerminalSmoke
         IntPtr processAttributes, IntPtr threadAttributes, bool inherit, uint flags, IntPtr environment,
         string currentDirectory, ref StartupInfo startup, out ProcessInfo process);
     [DllImport("kernel32.dll")] private static extern bool CloseHandle(IntPtr handle);
+    [DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();
+    [DllImport("ole32.dll")] private static extern int CoInitializeEx(IntPtr reserved, uint flags);
+    [DllImport("ole32.dll")] private static extern void CoUninitialize();
+    [DllImport("ole32.dll")] private static extern int CoCreateInstance(ref Guid clsid, IntPtr outer, uint context, ref Guid iid, out IntPtr instance);
     [DllImport("user32.dll")] private static extern bool EnumWindows(WindowCallback callback, IntPtr parameter);
+    [DllImport("user32.dll")] private static extern IntPtr GetThreadDesktop(uint thread);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern bool GetUserObjectInformation(IntPtr handle, int index, out int value, uint size, out uint bytesNeeded);
     [DllImport("user32.dll")] private static extern bool IsWindowVisible(IntPtr window);
     [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr window, out uint process);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] private static extern int GetClassName(IntPtr window, StringBuilder name, int count);

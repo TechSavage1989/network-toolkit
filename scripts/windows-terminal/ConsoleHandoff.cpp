@@ -6,6 +6,10 @@
 #include <atomic>
 #include <cstdint>
 #include <cwchar>
+#ifdef NTK_HANDOFF_EXPERIMENT_DIAGNOSTICS
+#include <cstdio>
+#include <cstring>
+#endif
 #include <new>
 #include <string>
 #include <vector>
@@ -84,30 +88,133 @@ bool processIdentity(HANDLE process, Identity& identity) {
     return true;
 }
 
+HRESULT lastError() noexcept {
+    const DWORD error = GetLastError();
+    return error ? HRESULT_FROM_WIN32(error) : E_FAIL;
+}
+
+#ifdef NTK_HANDOFF_EXPERIMENT_DIAGNOSTICS
+void writeDiagnostic(const char* stage, HRESULT status) {
+    constexpr wchar_t familyPrefix[] = L"NetworkToolkit.DefaultTerminalExperiment_";
+    std::array<wchar_t, PACKAGE_FAMILY_NAME_MAX_LENGTH + 1> family{};
+    UINT32 familySize = static_cast<UINT32>(family.size());
+    if (GetCurrentPackageFamilyName(&familySize, family.data()) != ERROR_SUCCESS ||
+        std::wcsncmp(family.data(), familyPrefix, ARRAYSIZE(familyPrefix) - 1) != 0) return;
+
+    Handle token;
+    std::vector<BYTE> user;
+    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, token.put()) ||
+        !tokenInfo(token.get(), TokenUser, user)) return;
+    wchar_t account[64]{};
+    wchar_t domain[128]{};
+    DWORD accountSize = ARRAYSIZE(account);
+    DWORD domainSize = ARRAYSIZE(domain);
+    SID_NAME_USE accountType{};
+    const auto sid = reinterpret_cast<const TOKEN_USER*>(user.data())->User.Sid;
+    if (!LookupAccountSidW(nullptr, sid, account, &accountSize, domain, &domainSize, &accountType) ||
+        accountType != SidTypeUser || std::wcslen(account) != 14 ||
+        std::wcsncmp(account, L"ntkci-", 6) != 0) return;
+    for (const wchar_t* suffix = account + 6; *suffix; ++suffix) {
+        if ((*suffix < L'0' || *suffix > L'9') && (*suffix < L'a' || *suffix > L'f')) return;
+    }
+
+    // COM can inherit a different process environment from the test launcher.
+    // Use the real token's profile and the fixture's own package LocalState.
+    std::wstring directory(32768, L'\0');
+    DWORD length = static_cast<DWORD>(directory.size());
+    const auto userenv = LoadLibraryExW(L"userenv.dll", nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+    if (!userenv) return;
+    using ProfileDirectory = BOOL (WINAPI*)(HANDLE, LPWSTR, LPDWORD);
+    const auto address = GetProcAddress(userenv, "GetUserProfileDirectoryW");
+    ProfileDirectory profile = nullptr;
+    static_assert(sizeof(profile) == sizeof(address));
+    std::memcpy(&profile, &address, sizeof(profile));
+    const auto resolved = profile && profile(token.get(), directory.data(), &length);
+    FreeLibrary(userenv);
+    if (!resolved) return;
+    directory.resize(std::wcslen(directory.c_str()));
+    directory += L"\\AppData\\Local\\Packages";
+    CreateDirectoryW(directory.c_str(), nullptr);
+    directory += L"\\";
+    directory += family.data();
+    CreateDirectoryW(directory.c_str(), nullptr);
+    directory += L"\\LocalState";
+    CreateDirectoryW(directory.c_str(), nullptr);
+    directory += L"\\broker.log";
+
+    const Handle log(CreateFileW(directory.c_str(), FILE_APPEND_DATA | FILE_READ_ATTRIBUTES,
+                                 FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
+                                 nullptr, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr));
+    LARGE_INTEGER size{};
+    if (!log || !GetFileSizeEx(log.get(), &size)) return;
+    char line[96]{};
+    const auto written = std::snprintf(line, sizeof(line), "%s 0x%08lX\r\n", stage,
+                                       static_cast<unsigned long>(status));
+    if (written <= 0 || static_cast<size_t>(written) >= sizeof(line) || size.QuadPart + written > 64 * 1024) return;
+    DWORD count = 0;
+    WriteFile(log.get(), line, static_cast<DWORD>(written), &count, nullptr);
+}
+
+void diagnostic(const char* stage, HRESULT status = S_OK) noexcept {
+    const auto error = GetLastError();
+    try { writeDiagnostic(stage, status); } catch (...) {}
+    SetLastError(error);
+}
+#else
+void diagnostic(const char*, HRESULT = S_OK) noexcept {}
+#endif
+
+HRESULT reported(const char* stage, HRESULT status) noexcept {
+    diagnostic(stage, status);
+    return status;
+}
+
 bool matchesIdentity(const Identity& receiver, HANDLE process) {
     Identity sender;
-    return processIdentity(process, sender) && sender.session == receiver.session &&
-           sender.integrity == receiver.integrity && EqualSid(sender.sid(), receiver.sid());
+    if (!processIdentity(process, sender)) {
+        diagnostic("identity-token", lastError());
+        return false;
+    }
+    if (sender.session != receiver.session) {
+        diagnostic("identity-session", E_ACCESSDENIED);
+        return false;
+    }
+    if (sender.integrity != receiver.integrity) {
+        diagnostic("identity-integrity", E_ACCESSDENIED);
+        return false;
+    }
+    if (!EqualSid(sender.sid(), receiver.sid())) {
+        diagnostic("identity-user", E_ACCESSDENIED);
+        return false;
+    }
+    return true;
 }
 
 bool isOpenConsole(HANDLE server) {
     std::array<wchar_t, PACKAGE_FAMILY_NAME_MAX_LENGTH + 1> family{};
     UINT32 size = static_cast<UINT32>(family.size());
-    if (GetPackageFamilyName(server, &size, family.data()) != ERROR_SUCCESS ||
-        _wcsicmp(family.data(), openConsolePackage) != 0) {
+    const auto familyStatus = GetPackageFamilyName(server, &size, family.data());
+    if (familyStatus != ERROR_SUCCESS) {
+        diagnostic("source-family-query", HRESULT_FROM_WIN32(familyStatus));
+        return false;
+    }
+    if (_wcsicmp(family.data(), openConsolePackage) != 0) {
+        diagnostic("source-family-mismatch", E_ACCESSDENIED);
         return false;
     }
     std::wstring image(32768, L'\0');
     DWORD length = static_cast<DWORD>(image.size());
-    if (!QueryFullProcessImageNameW(server, 0, image.data(), &length)) return false;
+    if (!QueryFullProcessImageNameW(server, 0, image.data(), &length)) {
+        diagnostic("source-image-query", lastError());
+        return false;
+    }
     image.resize(length);
     const auto separator = image.find_last_of(L'\\');
-    return separator != std::wstring::npos && _wcsicmp(image.c_str() + separator + 1, L"OpenConsole.exe") == 0;
-}
-
-HRESULT lastError() noexcept {
-    const DWORD error = GetLastError();
-    return error ? HRESULT_FROM_WIN32(error) : E_FAIL;
+    if (separator == std::wstring::npos || _wcsicmp(image.c_str() + separator + 1, L"OpenConsole.exe") != 0) {
+        diagnostic("source-image-mismatch", E_ACCESSDENIED);
+        return false;
+    }
+    return true;
 }
 
 HRESULT createVtPipe(bool appReads, Handle& app, Handle& console) {
@@ -149,10 +256,10 @@ HRESULT createVtPipe(bool appReads, Handle& app, Handle& console) {
 HRESULT launchTerminal(const std::array<HANDLE, 5>& handles, HANDLE ready) {
     std::wstring folder(32768, L'\0');
     const auto length = GetModuleFileNameW(nullptr, folder.data(), static_cast<DWORD>(folder.size()));
-    if (!length || length >= folder.size()) return lastError();
+    if (!length || length >= folder.size()) return reported("renderer-resolve", lastError());
     folder.resize(length);
     const auto separator = folder.find_last_of(L'\\');
-    if (separator == std::wstring::npos) return E_FAIL;
+    if (separator == std::wstring::npos) return reported("renderer-resolve", E_FAIL);
     folder.resize(separator);
     const std::wstring executable = folder + L"\\Network_Toolkit.exe";
 
@@ -162,7 +269,7 @@ HRESULT launchTerminal(const std::array<HANDLE, 5>& handles, HANDLE ready) {
     const auto self = GetCurrentProcess();
     for (size_t i = 0; i < handles.size(); ++i) {
         if (!DuplicateHandle(self, handles[i], self, inherited[i].put(), 0, TRUE, DUPLICATE_SAME_ACCESS)) {
-            return lastError();
+            return reported("renderer-inherit", lastError());
         }
         allowlist[i] = inherited[i].get();
         arguments += L" " + std::to_wstring(reinterpret_cast<uintptr_t>(allowlist[i]));
@@ -170,10 +277,12 @@ HRESULT launchTerminal(const std::array<HANDLE, 5>& handles, HANDLE ready) {
 
     SIZE_T size = 0;
     InitializeProcThreadAttributeList(nullptr, 1, 0, &size);
-    if (!size) return lastError();
+    if (!size) return reported("renderer-attribute-init", lastError());
     std::vector<BYTE> memory(size);
     const auto attributes = reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(memory.data());
-    if (!InitializeProcThreadAttributeList(attributes, 1, 0, &size)) return lastError();
+    if (!InitializeProcThreadAttributeList(attributes, 1, 0, &size)) {
+        return reported("renderer-attribute-init", lastError());
+    }
 
     STARTUPINFOEXW startup{};
     startup.StartupInfo.cb = sizeof(startup);
@@ -181,10 +290,11 @@ HRESULT launchTerminal(const std::array<HANDLE, 5>& handles, HANDLE ready) {
     PROCESS_INFORMATION process{};
     HRESULT result = S_OK;
     if (!UpdateProcThreadAttribute(attributes, 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST, allowlist.data(),
-                                   sizeof(allowlist), nullptr, nullptr) ||
-        !CreateProcessW(executable.c_str(), arguments.data(), nullptr, nullptr, TRUE, EXTENDED_STARTUPINFO_PRESENT,
-                        nullptr, folder.c_str(), &startup.StartupInfo, &process)) {
-        result = lastError();
+                                   sizeof(allowlist), nullptr, nullptr)) {
+        result = reported("renderer-attribute-update", lastError());
+    } else if (!CreateProcessW(executable.c_str(), arguments.data(), nullptr, nullptr, TRUE, EXTENDED_STARTUPINFO_PRESENT,
+                               nullptr, folder.c_str(), &startup.StartupInfo, &process)) {
+        result = reported("renderer-create", lastError());
     }
     DeleteProcThreadAttributeList(attributes);
     if (FAILED(result)) return result;
@@ -192,11 +302,12 @@ HRESULT launchTerminal(const std::array<HANDLE, 5>& handles, HANDLE ready) {
     const Handle child(process.hProcess);
     const Handle childThread(process.hThread);
     const HANDLE waits[] = {child.get(), ready};
+    diagnostic("renderer-created");
     switch (WaitForMultipleObjects(ARRAYSIZE(waits), waits, FALSE, adoptionTimeout)) {
-    case WAIT_OBJECT_0 + 1: return S_OK;
-    case WAIT_OBJECT_0: return HRESULT_FROM_WIN32(ERROR_PROCESS_ABORTED);
-    case WAIT_TIMEOUT: result = HRESULT_FROM_WIN32(ERROR_TIMEOUT); break;
-    default: result = lastError(); break;
+    case WAIT_OBJECT_0 + 1: return reported("renderer-ready", S_OK);
+    case WAIT_OBJECT_0: return reported("renderer-exit-early", HRESULT_FROM_WIN32(ERROR_PROCESS_ABORTED));
+    case WAIT_TIMEOUT: result = reported("renderer-timeout", HRESULT_FROM_WIN32(ERROR_TIMEOUT)); break;
+    default: result = reported("renderer-wait", lastError()); break;
     }
     TerminateProcess(child.get(), ERROR_CANCELLED);
     return result;
@@ -229,38 +340,46 @@ public:
     HRESULT STDMETHODCALLTYPE EstablishPtyHandoff(
         HANDLE* input, HANDLE* output, HANDLE signal, HANDLE reference,
         HANDLE server, HANDLE client, const TerminalStartupInfo* startup) override try {
-        if (!input || !output) return E_POINTER;
+        diagnostic("establish-enter");
+        if (!input || !output) return reported("handoff-outputs", E_POINTER);
         *input = nullptr;
         *output = nullptr;
         DWORD referenceFlags = 0;
-        if (!startup || GetFileType(signal) != FILE_TYPE_PIPE || !GetHandleInformation(reference, &referenceFlags)) {
+        if (!startup) return reported("handoff-startup-info", E_INVALIDARG);
+        if (GetFileType(signal) != FILE_TYPE_PIPE) return reported("handoff-signal", E_INVALIDARG);
+        if (!GetHandleInformation(reference, &referenceFlags)) {
+            diagnostic("handoff-reference", lastError());
             return E_INVALIDARG;
         }
         Identity receiver;
-        if (!isOpenConsole(server) || !processIdentity(GetCurrentProcess(), receiver) || receiver.session == 0 ||
-            !matchesIdentity(receiver, server) || !matchesIdentity(receiver, client)) {
-            return E_ACCESSDENIED;
+        if (!isOpenConsole(server)) return reported("source-check", E_ACCESSDENIED);
+        diagnostic("source-verified");
+        if (!processIdentity(GetCurrentProcess(), receiver) || receiver.session == 0) {
+            return reported("receiver-identity", E_ACCESSDENIED);
         }
-        if (handedOff.exchange(true)) return HRESULT_FROM_WIN32(ERROR_ALREADY_INITIALIZED);
+        if (!matchesIdentity(receiver, server)) return reported("source-identity", E_ACCESSDENIED);
+        if (!matchesIdentity(receiver, client)) return reported("client-identity", E_ACCESSDENIED);
+        diagnostic("identity-verified");
+        if (handedOff.exchange(true)) return reported("handoff-already-used", HRESULT_FROM_WIN32(ERROR_ALREADY_INITIALIZED));
 
         Handle appRead, consoleWrite, appWrite, consoleRead;
         auto result = createVtPipe(true, appRead, consoleWrite);
-        if (FAILED(result)) return result;
+        if (FAILED(result)) return reported("vt-read-pipe", result);
         result = createVtPipe(false, appWrite, consoleRead);
-        if (FAILED(result)) return result;
+        if (FAILED(result)) return reported("vt-write-pipe", result);
         Handle ready(CreateEventW(nullptr, TRUE, FALSE, nullptr));
-        if (!ready) return lastError();
+        if (!ready) return reported("ready-event", lastError());
 
         result = launchTerminal({appRead.get(), appWrite.get(), signal, reference, ready.get()}, ready.get());
         if (FAILED(result)) return result;
         // The console host reads terminal input and writes terminal output.
         *input = consoleRead.release();
         *output = consoleWrite.release();
-        return S_OK;
+        return reported("handoff-accepted", S_OK);
     } catch (const std::bad_alloc&) {
-        return E_OUTOFMEMORY;
+        return reported("handoff-exception", E_OUTOFMEMORY);
     } catch (...) {
-        return E_FAIL;
+        return reported("handoff-exception", E_FAIL);
     }
 
 private:
@@ -288,6 +407,7 @@ public:
     }
 
     HRESULT STDMETHODCALLTYPE CreateInstance(IUnknown* outer, REFIID iid, void** result) override {
+        diagnostic("class-request");
         if (!result) return E_POINTER;
         *result = nullptr;
         if (outer) return CLASS_E_NOAGGREGATION;
@@ -295,9 +415,10 @@ public:
         auto handoff = new (std::nothrow) Handoff;
         if (!handoff) {
             SetEvent(sessionReleased);
-            return E_OUTOFMEMORY;
+            return reported("class-instance", E_OUTOFMEMORY);
         }
         const auto status = handoff->QueryInterface(iid, result);
+        diagnostic("class-instance", status);
         handoff->Release();
         return status;
     }
@@ -315,28 +436,41 @@ private:
 } // namespace
 
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR commandLine, int) {
-    if (_wcsicmp(commandLine, L"-Embedding") != 0 && _wcsicmp(commandLine, L"/Embedding") != 0) return ERROR_BAD_ARGUMENTS;
+    diagnostic("entry");
+    if (_wcsicmp(commandLine, L"-Embedding") != 0 && _wcsicmp(commandLine, L"/Embedding") != 0) {
+        diagnostic("embedding-argument", HRESULT_FROM_WIN32(ERROR_BAD_ARGUMENTS));
+        return ERROR_BAD_ARGUMENTS;
+    }
     Handle created(CreateEventW(nullptr, TRUE, FALSE, nullptr));
     Handle released(CreateEventW(nullptr, TRUE, FALSE, nullptr));
-    if (!created || !released) return 1;
+    if (!created || !released) {
+        diagnostic("startup-events", lastError());
+        return 1;
+    }
     sessionCreated = created.get();
     sessionReleased = released.get();
 
     const auto init = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+    diagnostic("com-init", init);
     if (FAILED(init)) return 1;
     auto factory = new (std::nothrow) Factory;
     if (!factory) {
+        diagnostic("class-factory", E_OUTOFMEMORY);
         CoUninitialize();
         return 1;
     }
     DWORD registration = 0;
     const auto result = CoRegisterClassObject(terminalClass, factory, CLSCTX_LOCAL_SERVER, REGCLS_SINGLEUSE, &registration);
+    diagnostic("class-register", result);
     factory->Release();
     if (SUCCEEDED(result)) {
-        if (WaitForSingleObject(created.get(), 20000) == WAIT_OBJECT_0) {
+        const auto creation = WaitForSingleObject(created.get(), 20000);
+        if (creation == WAIT_OBJECT_0) {
             WaitForSingleObject(released.get(), INFINITE);
+        } else {
+            diagnostic("class-wait", creation == WAIT_TIMEOUT ? HRESULT_FROM_WIN32(ERROR_TIMEOUT) : lastError());
         }
-        CoRevokeClassObject(registration);
+        diagnostic("class-revoke", CoRevokeClassObject(registration));
     }
     CoUninitialize();
     return FAILED(result) ? 1 : 0;

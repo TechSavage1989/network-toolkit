@@ -45,10 +45,43 @@ $consoleClsid = '{2EACA947-7F5F-4CFA-BA87-8F7FBEEFBE69}'
 $terminalClsid = '{B60E0829-5BF3-4A4A-ACB9-C661D85B7282}'
 $startupKey = 'Console\%%Startup'
 $results = [ordered]@{ fixture = 'Windows 11 ARM64 with x64 Network Toolkit'; installed = $false; shells = @() }
+$brokerLog = $null
 $savedSelection = @{}
 $createdStartupKey = $false
 $restoreSelection = $false
 $processes = [Collections.Generic.List[Diagnostics.Process]]::new()
+
+function Get-BrokerDiagnostics {
+    if ($brokerLog -and (Test-Path -LiteralPath $brokerLog -PathType Leaf)) {
+        Get-Content -LiteralPath $brokerLog -Tail 128 |
+            Where-Object { $_ -match '^[A-Za-z0-9_.-]{1,64} 0x[0-9A-Fa-f]{8}$' }
+    }
+}
+
+function Get-ExtensionCatalogEvidence([string]$Name, [string]$FamilyName) {
+    try {
+        # FindAll is available on Windows 11 24H2 and later. An unpackaged
+        # worker may lack catalog access, so retain that result separately.
+        $catalog = [Windows.ApplicationModel.AppExtensions.AppExtensionCatalog, Windows.ApplicationModel, ContentType=WindowsRuntime]::Open($Name)
+        $entries = @($catalog.FindAll())
+        [ordered]@{
+            name = $Name
+            accessible = $true
+            fixtureListed = [bool]($entries | Where-Object { $_.Package.Id.FamilyName -ceq $FamilyName })
+        }
+    } catch {
+        [ordered]@{ name = $Name; accessible = $false; error = $_.Exception.Message }
+    }
+}
+
+function Get-ComActivationEvidence([string]$Clsid) {
+    try {
+        $hresult = [DefaultTerminalSmoke]::ProbeActivation($Clsid)
+        [ordered]@{ activated = $hresult -ge 0; hresult = ('0x{0:X8}' -f $hresult) }
+    } catch {
+        [ordered]@{ activated = $false; error = $_.Exception.Message }
+    }
+}
 
 function Stop-FixtureProcesses {
     foreach ($process in $processes) {
@@ -80,6 +113,7 @@ function Test-Shell([string]$Name, [string]$Executable, [string]$Arguments,
     $results.shells += $result
 
     Wait-ForFile (Join-Path $PSScriptRoot "$Name-startup.txt") $StartupMarker
+    $result.startupMarker = $true
     $until = [DateTime]::UtcNow.AddSeconds(50)
     $window = [IntPtr]::Zero
     do {
@@ -123,13 +157,19 @@ try {
     if ($officialTerminal.PackageFamilyName -cne 'Microsoft.WindowsTerminal_8wekyb3d8bbwe') {
         throw 'The registered console host does not have the expected Microsoft package identity.'
     }
+    $results.microsoftTerminalVersion = [string]$officialTerminal.Version
 
     if (Get-AppxPackage -Name $packageName) { throw 'The fixture package already exists in this test profile.' }
     Add-AppxPackage -Path (Join-Path $PSScriptRoot 'DefaultTerminalExperiment.msix')
     $installed = Get-AppxPackage -Name $packageName
     if (-not $installed -or $installed.Architecture -ne 'Arm64') { throw 'The native ARM64 fixture MSIX did not register.' }
     $results.installed = $true
+    $results.fixturePackageVersion = [string]$installed.Version
+    $results.sessionId = [Diagnostics.Process]::GetCurrentProcess().SessionId
+    try { $results.desktopHasInput = [DefaultTerminalSmoke]::DesktopHasInput() }
+    catch { $results.desktopInputProbeError = $_.Exception.Message }
     $installedExecutable = Join-Path $installed.InstallLocation 'Network_Toolkit.exe'
+    $brokerLog = Join-Path $localData "Packages\$($installed.PackageFamilyName)\LocalState\broker.log"
     $manifest = Get-AppxPackageManifest -Package $installed.PackageFullName
     foreach ($contract in @(
         @{ Name = 'com.microsoft.windows.console.host'; Clsid = $consoleClsid },
@@ -138,6 +178,10 @@ try {
         $node = $manifest.SelectSingleNode("//*[local-name()='AppExtension' and @Name='$($contract.Name)']/*[local-name()='Properties']/*[local-name()='Clsid']")
         if (-not $node -or $node.InnerText -cne $contract.Clsid) { throw "Registered fixture lost the $($contract.Name) extension." }
     }
+    $results.extensionCatalogs = @(
+        Get-ExtensionCatalogEvidence 'com.microsoft.windows.console.host' $installed.PackageFamilyName
+        Get-ExtensionCatalogEvidence 'com.microsoft.windows.terminal.host' $installed.PackageFamilyName
+    )
 
     # Model the choice written by Windows Settings, in this fixture profile only.
     # Native CreateProcess then exercises the real OS console handoff.
@@ -176,6 +220,13 @@ try {
     } catch {
         $errors += $_.Exception.Message
     } finally { Stop-FixtureProcesses }
+
+    # Probe COM independently after native launches so this activation cannot
+    # make the real shell test appear to have started the broker.
+    $results.brokerBeforeDirectProbe = @(Get-BrokerDiagnostics)
+    $results.comActivation = Get-ComActivationEvidence $terminalClsid
+    $results.brokerAfterDirectProbe = @(Get-BrokerDiagnostics)
+
     if ($errors.Count -ne 0) {
         $results.errors = $errors
         throw ($errors -join [Environment]::NewLine)
