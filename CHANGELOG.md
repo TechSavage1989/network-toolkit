@@ -1,3 +1,8 @@
+## 1.21.38 Beta 1 - Text Editor remembers open tabs and unsaved changes
+
+- The Text Editor reopens last session's tabs, including unsaved changes and untitled tabs, in the main window and the standalone editor.
+- Closing the app does not ask about unsaved documents that were kept; a setting turns session restore off.
+
 ## 1.21.37 Beta 1 - Terminal links and a calmer uninstaller
 
 - Choose Network Toolkit Terminal in Windows Default apps for ssh://, telnet:// and serial: links; a link opens the prefilled connection form and never connects or takes a password by itself.

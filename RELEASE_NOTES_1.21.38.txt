@@ -1,0 +1,14 @@
+Network Toolkit 1.21.38
+
+## What's New
+
+- The Text Editor reopens your tabs from last time, including unsaved changes, the way Notepad does.
+- Closing the app no longer asks about unsaved documents when they have been kept for next time.
+
+## Additional Details
+
+- Files with unsaved changes come back with your version, still marked unsaved. If the file changed on disk in the meantime, the editor says so and Save will not overwrite the newer file; use Save As to keep both.
+- Untitled tabs come back with their text. Unsaved text from SFTP or FTP files comes back as an untitled tab with a note to reconnect and use Save As. Passwords and connection details are never stored.
+- Unsaved text is kept in Network Toolkit's data folder until you save it or close its tab, for files of any size. The main window and the standalone Text Editor each remember their own tabs.
+- Turn this off with "Reopen files and unsaved changes from the last session" in the editor's More menu. Turning it off deletes the kept copies. Closing a single tab still asks before discarding changes.
+- Saved targets, connection profiles, credential vault, macros, sessions and settings are kept.
