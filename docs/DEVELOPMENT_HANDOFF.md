@@ -2,6 +2,8 @@
 
 Setup uses the selected program folder and preserves it on upgrade. The optional desktop shortcut opens Toolkit. The installed Text Editor opens in a separate workspace with its own preferences and keeps the existing paged editing, Compare, and save workflows. Each Start menu shortcut and native window uses its own icon.
 
+Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.21.36 at 2026-11-10T03:20:43Z; stable latest remains v1.21.34. PR #155 merged after both Checks runs passed on 09daee9 (the push run's `browser-workflows107` hit the known `graph-scale119` live-window intermittent once and passed on its single re-run). Tag v1.21.36 points to merge commit 9316b2f787032d31fe455e425cd7a38d48909f24; Release run 42748387582 passed build, the hosted Windows setup test and publish. The seven downloaded assets (executable, Portable and Update ZIPs, Windows x64 setup, Linux x86_64 and aarch64 tarballs, SHA256SUMS) match GitHub's digests, and `python scripts/github_release.py verify --tag v1.21.36 --output-dir <folder>` reports "Verified 1.21.36".
+
 ---
 
 # v1.21.35 Beta 1 - Windows installation and editor defaults
