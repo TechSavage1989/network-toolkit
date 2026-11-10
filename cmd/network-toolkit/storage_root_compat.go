@@ -131,7 +131,14 @@ func (r *storageRoot) Open(name string) (*os.File, error) {
 	if storageIsLink(before) {
 		return nil, errors.New("Refusing to open linked app data.")
 	}
-	file, err := sharedfile.Open(full)
+	// A regular file may be replaced by another app while it is read; a
+	// folder is opened as before (it is listed, never replaced).
+	var file *os.File
+	if before.Mode().IsRegular() {
+		file, err = sharedfile.Open(full)
+	} else {
+		file, err = os.Open(full)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -159,7 +166,7 @@ func (r *storageRoot) OpenFile(name string, flag int, perm os.FileMode) (*os.Fil
 		return nil, beforeErr
 	}
 	var file *os.File
-	if flag == os.O_RDONLY {
+	if flag == os.O_RDONLY && beforeErr == nil && before.Mode().IsRegular() {
 		// Reading must not keep another app from replacing the file.
 		file, err = sharedfile.Open(full)
 	} else {
@@ -244,6 +251,9 @@ func (r *storageRoot) Rename(oldName, newName string) error {
 		return errors.New("Refusing to replace linked app data.")
 	} else if destErr != nil && !errors.Is(destErr, os.ErrNotExist) {
 		return destErr
+	}
+	if !source.Mode().IsRegular() {
+		return os.Rename(oldPath, newPath) // A folder is renamed as before.
 	}
 	// Another app of the data folder may have the file open for reading.
 	return sharedfile.Replace(oldPath, newPath)

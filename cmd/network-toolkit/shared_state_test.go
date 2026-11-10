@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"networktoolkit/internal/terminal"
 )
@@ -39,6 +40,17 @@ func sharedTestApp(t *testing.T, root, workspace, mode string) *application {
 		a.stop()
 		if a.terminals != nil {
 			_ = a.terminals.Close()
+		}
+		// The lock on the editor session is released a moment after the app
+		// stops. On Windows the temporary folder cannot be removed while a
+		// file in it is still open.
+		for deadline := time.Now().Add(3 * time.Second); time.Now().Before(deadline); time.Sleep(5 * time.Millisecond) {
+			a.editorSession.leaseMu.Lock()
+			released := a.editorSession.lease == nil
+			a.editorSession.leaseMu.Unlock()
+			if released {
+				break
+			}
 		}
 	})
 	return a
