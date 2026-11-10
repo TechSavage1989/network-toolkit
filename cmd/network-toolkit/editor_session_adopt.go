@@ -81,9 +81,11 @@ func (a *application) holdEditorSessionLease() error {
 			<-a.ctx.Done()
 			s.leaseMu.Lock()
 			defer s.leaseMu.Unlock()
+			// The file is closed in any case: an open handle keeps the folder
+			// from being removed on Windows.
+			_ = unlockStorageFile(file)
+			_ = file.Close()
 			if s.lease == file {
-				_ = unlockStorageFile(file)
-				_ = file.Close()
 				s.lease = nil
 			}
 		}()

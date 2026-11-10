@@ -113,6 +113,14 @@ func replaceOpenTarget(from *uint16, target string) error {
 	return nil
 }
 
+// HeldByAnother reports whether err says that another program has the file
+// open in a way that excludes this one (a sharing or lock violation). Unlike
+// "access denied" this is never a matter of permissions.
+func HeldByAnother(err error) bool {
+	var code syscall.Errno
+	return errors.As(err, &code) && (code == errorSharingViolation || code == errorLockViolation)
+}
+
 // Transient reports whether err only says that another program has the file
 // at this moment: a sharing or lock violation, a file that is being removed,
 // or "access denied", which is what replacing or opening a file answers

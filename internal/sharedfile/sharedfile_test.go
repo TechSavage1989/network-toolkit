@@ -25,13 +25,22 @@ func TestReplaceWhileReadersHoldTheFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	var stop atomic.Bool
-	var reads atomic.Int64
+	var reads, refused atomic.Int64
 	var problem atomic.Value
 	var wg sync.WaitGroup
 	reader := func(open func(string) (*os.File, error), hold time.Duration) {
 		defer wg.Done()
 		for !stop.Load() {
 			file, err := open(target)
+			if err != nil && hold > 0 && HeldByAnother(err) {
+				// The program that does not share: in the instant in which a
+				// file is renamed into place, Windows refuses an open that
+				// does not allow deletion. It tries again later, as a scanner
+				// would; readers that use Open never see this.
+				refused.Add(1)
+				time.Sleep(hold)
+				continue
+			}
 			if err != nil {
 				problem.CompareAndSwap(nil, "open: "+err.Error())
 				return
@@ -85,6 +94,7 @@ func TestReplaceWhileReadersHoldTheFile(t *testing.T) {
 	if reads.Load() == 0 {
 		t.Fatal("no read completed")
 	}
+	t.Logf("%d reads; the reader that does not share was refused %d times", reads.Load(), refused.Load())
 	entries, _ := os.ReadDir(dir)
 	if len(entries) != 1 {
 		t.Fatalf("temporary files were left behind: %d entries", len(entries))

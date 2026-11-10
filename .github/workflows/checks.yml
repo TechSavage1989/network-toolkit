@@ -752,13 +752,21 @@ jobs:
       # sharing, and locks are per handle, so these run here as well: replaces
       # under readers, the lock and the merge across real processes, the vault
       # staying unlocked while another app saves, and the editor session rules.
-      - name: Test shared app data across processes and replaces under readers on Windows
+      - name: Test replacing a shared file while readers have it open on Windows
+        if: success() || failure()
         env:
           GOTOOLCHAIN: local
-        run: |
-          go test -mod=vendor ./internal/sharedfile -count=1 -v
-          go test -mod=vendor ./internal/terminal -run 'TestKnownHost|TestSharedKnownHosts' -count=1 -v
-          go test -mod=vendor ./cmd/network-toolkit -run '^Test(Shared|EditorSession|KnownHosts)' -count=1 -v -timeout=10m
+        run: go test -mod=vendor ./internal/sharedfile -count=1 -v
+      - name: Test shared SSH host trust on Windows
+        if: success() || failure()
+        env:
+          GOTOOLCHAIN: local
+        run: go test -mod=vendor ./internal/terminal -run 'TestKnownHost|TestSharedKnownHosts' -count=1 -v
+      - name: Test shared app data across processes and the editor session rules on Windows
+        if: success() || failure()
+        env:
+          GOTOOLCHAIN: local
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^Test(Shared|EditorSession|KnownHosts)' -count=1 -v -timeout=10m
       - name: Verify real WebView2 private bootstrap
         env:
           GOTOOLCHAIN: local

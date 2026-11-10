@@ -1114,6 +1114,12 @@ func acquireCredentialGuard(dir string) (func(), error) {
 			}
 			file, err = os.OpenFile(path, os.O_RDWR, 0)
 			if err != nil {
+				if sharedfile.HeldByAnother(err) {
+					// The app that created the lock file a moment ago holds it
+					// without sharing (Windows) until its change is done: that
+					// is the same as finding the file locked.
+					return nil, errCredentialGuardBusy
+				}
 				return nil, err
 			}
 			after, err := file.Stat()
