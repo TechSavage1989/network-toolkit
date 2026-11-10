@@ -56,10 +56,12 @@ const NOTES='C:\\fixture\\notes.txt',PLAN='C:\\fixture\\plan.txt',CLEAN='C:\\fix
   if(output)fs.mkdirSync(output,{recursive:true});
   await page.goto('https://toolkit.local/');await openEditor();
   assert.equal(await page.locator('[data-ed-restore-session]').isChecked(),true,'restore is on by default');
-  await page.locator('.nt-editor-more>summary').click();assert(await page.locator('[data-ed-restore-session]').isVisible());assert.match(await page.locator('#ntEditorRestoreHint').textContent(),/kept in this app’s data folder until it is saved or its tab is closed/);
+  // The menu panel is shown by the details element's toggle event, which fires
+  // just after the click; wait for it instead of checking in the same instant.
+  await page.locator('.nt-editor-more>summary').click();await page.locator('[data-ed-restore-session]').waitFor({state:'visible'});assert.match(await page.locator('#ntEditorRestoreHint').textContent(),/kept in this app’s data folder until it is saved or its tab is closed/);
   await page.locator('#ntEditorRestoreHint').scrollIntoViewIfNeeded();
   if(output)await page.screenshot({path:path.join(output,'editor-session-preference.png')});
-  await page.locator('.nt-editor-more>summary').click();
+  await page.locator('.nt-editor-more>summary').click();await page.locator('[data-ed-restore-session]').waitFor({state:'hidden'});
   await page.evaluate(file=>NetworkToolkitFileEditor.openLocalPath(file),NOTES);await type('Unsaved third line');
   await page.evaluate(file=>NetworkToolkitFileEditor.openLocalPath(file),PLAN);await type('Plan v2 (unsaved)');
   await page.locator('[data-ed-tabs] [data-ed="new"]').first().click();await type('An untitled draft\nwith two lines');
