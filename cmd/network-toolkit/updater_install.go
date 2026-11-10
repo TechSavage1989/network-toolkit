@@ -86,14 +86,30 @@ func updatePlanLaunchTarget(dir string, p updatePlan) string {
 func updateRestartArgs(args []string) []string {
 	out := []string{}
 	for i := 0; i < len(args); i++ {
-		if args[i] == "--update-health" || args[i] == "-update-health" || args[i] == "--open-file" || args[i] == "-open-file" {
-			i++
-			continue
+		arg := args[i]
+		if arg == "--" || arg == "-" || !strings.HasPrefix(arg, "-") {
+			return append(out, args[i:]...)
 		}
-		if strings.HasPrefix(args[i], "--update-health=") || strings.HasPrefix(args[i], "-update-health=") || strings.HasPrefix(args[i], "--open-file=") || strings.HasPrefix(args[i], "-open-file=") {
+		name, _, inline := strings.Cut(strings.TrimLeft(arg, "-"), "=")
+		switch name {
+		case "update-health", "open-file":
+			// Health markers and Explorer file paths are one-shot.
+			if !inline {
+				i++
+			}
 			continue
+		case "editor":
+			// A restart must open its own window and report health instead of
+			// forwarding a shortcut request to an already running workspace.
+			continue
+		case "data-dir", "terminal-preset", "preview-host", "port":
+			if !inline && i+1 < len(args) {
+				out = append(out, arg, args[i+1])
+				i++
+				continue
+			}
 		}
-		out = append(out, args[i])
+		out = append(out, arg)
 	}
 	return out
 }

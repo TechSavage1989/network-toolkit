@@ -48,8 +48,11 @@ func TestEditorLaunchCLI(t *testing.T) {
 		})
 	}
 	args := updateRestartArgs([]string{"--editor", "--open-file", path, "--data-dir", root, "-open-file=" + path})
-	if !reflect.DeepEqual(args, []string{"--editor", "--data-dir", root}) {
+	if !reflect.DeepEqual(args, []string{"--data-dir", root}) {
 		t.Fatalf("restart arguments retained a one-shot launch: %v", args)
+	}
+	if args := updateRestartArgs([]string{"--data-dir", "--open-file", "--editor"}); !reflect.DeepEqual(args, []string{"--data-dir", "--open-file"}) {
+		t.Fatalf("restart arguments lost a literal settings folder: %v", args)
 	}
 }
 
@@ -99,6 +102,14 @@ func TestEditorLaunchReusesRegisteredWorkspace(t *testing.T) {
 	if protected.Code != http.StatusUnauthorized {
 		t.Fatalf("activation token accessed regular API: %d", protected.Code)
 	}
+	if html := requestApp(a, http.MethodGet, "/", "", false); strings.Contains(html.Body.String(), filepath.Base(file)) {
+		t.Fatal("the shell file name appeared in the page bootstrap")
+	}
+	a.updateFinalizing.Store(true)
+	if response := requestApp(a, http.MethodPost, editorLaunchEndpoint, "", true); response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("launch inbox during update returned %d", response.Code)
+	}
+	a.updateFinalizing.Store(false)
 	next := func() []editorLaunchRequest {
 		t.Helper()
 		var result struct{ Requests []editorLaunchRequest }
@@ -113,8 +124,5 @@ func TestEditorLaunchReusesRegisteredWorkspace(t *testing.T) {
 	}
 	if len(next()) != 0 {
 		t.Fatal("launch requests must be consumed only once")
-	}
-	if html := requestApp(a, http.MethodGet, "/", "", false); strings.Contains(html.Body.String(), filepath.Base(file)) {
-		t.Fatal("the shell file name appeared in the page bootstrap")
 	}
 }
