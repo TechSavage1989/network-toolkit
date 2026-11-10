@@ -25,6 +25,7 @@ package main
 // whole file, so after an interrupted save the settings file is the truth.
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -184,6 +185,88 @@ func readSharedSettings(path string) (*rootSettings, error) {
 		}
 	}
 	return settings, nil
+}
+
+// digest identifies what a reader of the settings file gets. For a file with
+// the mark that is the file. For a file an older version wrote it is the
+// file together with the saved lists after entries were put back: the older
+// version can write the very same bytes again while the copy of the saved
+// lists has changed in between, and the result is then a different one.
+func (s *rootSettings) digest() [32]byte {
+	if !s.older {
+		return sha256.Sum256(s.raw)
+	}
+	hash := sha256.New()
+	hash.Write(s.raw)
+	for _, key := range savedListKeys() {
+		hash.Write([]byte{0})
+		hash.Write(s.members[key.Name])
+	}
+	var out [32]byte
+	copy(out[:], hash.Sum(nil))
+	return out
+}
+
+// sharedNamesWritten returns those of names that a settings file which was
+// just written really holds in its saved lists, so a notice never says that
+// an entry was put back when it was not.
+func sharedNamesWritten(raw []byte, names []string) []string {
+	if len(names) == 0 {
+		return nil
+	}
+	var members map[string]json.RawMessage
+	if json.Unmarshal(raw, &members) != nil {
+		return nil
+	}
+	held := map[string]int{}
+	for _, key := range savedListKeys() {
+		var list []map[string]any
+		if json.Unmarshal(members[key.Name], &list) == nil {
+			for _, item := range list {
+				name, _ := item["name"].(string)
+				held[name]++
+			}
+		}
+	}
+	var out []string
+	for _, name := range names {
+		if held[name] > 0 {
+			held[name]--
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
+// keepMainOnlySavedLists is for a standalone app that writes a settings file
+// which went missing while it ran. It knows nothing of the lists only the
+// main window uses (saved targets, saved TFTP profiles); they are taken from
+// the copy of the saved lists, so neither the new file nor the copy written
+// with it loses them.
+func keepMainOnlySavedLists(root *rootSettings, dir string) {
+	kept := readSavedListsCopy(dir)
+	if kept == nil {
+		return
+	}
+	for _, key := range savedListKeys() {
+		if _, present := root.members[key.Name]; key.MainOnly && !present {
+			var list []any
+			if raw := kept.Lists[key.Name]; json.Unmarshal(raw, &list) == nil && len(list) > 0 {
+				root.members[key.Name] = raw
+			}
+		}
+	}
+}
+
+// flushSharedNotices tells the user about saved entries that were put back.
+// It takes the shared-data lock and is therefore called with no lock held.
+func (a *application) flushSharedNotices() {
+	a.stateMu.Lock()
+	a.ensureShared()
+	names, root := a.shared.pendingPutBack, a.sharedRoot()
+	a.shared.pendingPutBack = nil
+	a.stateMu.Unlock()
+	recordSharedNotice(root, "older-version", "", names)
 }
 
 // writeSharedSettings is the one way this version writes the data folder's

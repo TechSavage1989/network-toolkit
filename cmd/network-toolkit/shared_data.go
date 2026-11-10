@@ -241,6 +241,15 @@ type sharedData struct {
 	// The settings file as last read was written by a version that does not
 	// merge saves (shared_older_version.go): pages warn the user.
 	older bool
+	// The settings file existed at some read of this run, and was then found
+	// missing. Until this app has written it again, a file that someone else
+	// recreated is not taken as the whole truth: a standalone app writes only
+	// the keys it knows, and the main window must not read the others as
+	// removed.
+	had, lost bool
+	// Names of saved entries that an older version had dropped and a save of
+	// this app wrote again. The user is told (a notice) once no lock is held.
+	pendingPutBack []string
 	// Shared keys found in this standalone workspace's own settings file: a
 	// copy from before sharing. It is kept as it is and never used.
 	legacy map[string]json.RawMessage

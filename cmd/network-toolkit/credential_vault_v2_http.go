@@ -325,6 +325,11 @@ func (a *application) ensureCredentialConfigIdentity() (string, error) {
 	if id := credentialConfigIDOf(root.members); id != "" {
 		return id, nil
 	}
+	// What another app saved since this one last looked is taken in before
+	// the file is written again: afterwards this app counts the file as seen,
+	// and its next save would undo whatever it had not taken in.
+	a.noteReplacedStateLocked()
+	a.absorbRootLocked(root, false)
 	if !a.shared.standalone {
 		// Settings this window holds in memory but has not written yet are
 		// saved with the identity, as before.

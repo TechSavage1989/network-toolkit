@@ -283,6 +283,15 @@ func (m *sharedMigration) settings(workspace legacyWorkspace, dir string) error 
 	if source.Digest == digest {
 		return nil
 	}
+	// What this run handles is recorded in the marker only after the settings
+	// file was written: a write that fails must leave everything to be tried
+	// again at the next start, also when another part of this run succeeds
+	// and the marker is saved for it.
+	seen := map[string]string{}
+	for name, value := range source.Seen {
+		seen[name] = value
+	}
+	var credentials []sharedMigratedCredential
 	settingsPath := filepath.Join(m.root, appSettingsFilename)
 	release, err := acquireCredentialGuardWait(m.root, sharedLockWait)
 	if err != nil {
@@ -295,9 +304,9 @@ func (m *sharedMigration) settings(workspace legacyWorkspace, dir string) error 
 	}
 	current := rootFile.shared(sharedDataKeys)
 	before := sharedDigest(current)
-	renamed := m.marker.Renamed[workspace.ID]
-	if renamed == nil {
-		renamed = map[string]string{}
+	renamed := map[string]string{}
+	for name, value := range m.marker.Renamed[workspace.ID] {
+		renamed[name] = value
 	}
 	var conflicts, full []string
 	// A key that could not be brought over is tried again at the next start.
@@ -334,13 +343,13 @@ func (m *sharedMigration) settings(workspace legacyWorkspace, dir string) error 
 				have[id], _ = json.Marshal(item)
 				contents[string(have[id])] = true
 				if credential, _ := item["credentialId"].(string); credential != "" {
-					m.marker.Credentials = append(m.marker.Credentials, sharedMigratedCredential{Source: workspace.ID, Key: key.Name, ID: id, CredentialID: credential})
+					credentials = append(credentials, sharedMigratedCredential{Source: workspace.ID, Key: key.Name, ID: id, CredentialID: credential})
 				}
 				return true
 			}
 			for _, id := range theirs.order {
 				seenKey, itemDigest := key.Name+"\x00"+id, sharedDigest(theirs.items[id])
-				if source.Seen[seenKey] == itemDigest {
+				if seen[seenKey] == itemDigest {
 					continue
 				}
 				item, _ := theirs.items[id].(map[string]any)
@@ -361,7 +370,7 @@ func (m *sharedMigration) settings(workspace legacyWorkspace, dir string) error 
 							continue
 						}
 					}
-					source.Seen[seenKey] = itemDigest
+					seen[seenKey] = itemDigest
 					continue
 				}
 				existing, exists := have[id]
@@ -394,7 +403,7 @@ func (m *sharedMigration) settings(workspace legacyWorkspace, dir string) error 
 						continue
 					}
 				}
-				source.Seen[seenKey] = itemDigest
+				seen[seenKey] = itemDigest
 			}
 			if key.NewestFirst {
 				sort.SliceStable(list, func(i, j int) bool { return sharedLastUsed(list[i]) > sharedLastUsed(list[j]) })
@@ -413,14 +422,14 @@ func (m *sharedMigration) settings(workspace legacyWorkspace, dir string) error 
 				next[name] = member
 			}
 			if key.Name == "editorPreferences" {
-				sharedMigrationSaferClosePreferences(next, theirs, source.Seen)
+				sharedMigrationSaferClosePreferences(next, theirs, seen)
 			}
 			for name, member := range theirs {
 				seenKey, memberDigest := key.Name+"\x00"+name, sharedDigest(member)
-				if source.Seen[seenKey] == memberDigest {
+				if seen[seenKey] == memberDigest {
 					continue
 				}
-				source.Seen[seenKey] = memberDigest
+				seen[seenKey] = memberDigest
 				existing, exists := next[name]
 				switch {
 				case !exists:
@@ -478,6 +487,8 @@ func (m *sharedMigration) settings(workspace legacyWorkspace, dir string) error 
 			return err
 		}
 	}
+	source.Seen = seen
+	m.marker.Credentials = append(m.marker.Credentials, credentials...)
 	if len(renamed) > 0 {
 		if m.marker.Renamed == nil {
 			m.marker.Renamed = map[string]map[string]string{}
@@ -611,6 +622,11 @@ func (m *sharedMigration) macros(workspace legacyWorkspace, dir string) error {
 	if source.Digest == digest {
 		return nil
 	}
+	// As for the settings: recorded only after the library was written.
+	seen := map[string]string{}
+	for name, value := range source.Seen {
+		seen[name] = value
+	}
 	legacy, err := readTerminalMacroLibrary(legacyRoot)
 	if err != nil {
 		return err
@@ -653,8 +669,8 @@ func (m *sharedMigration) macros(workspace legacyWorkspace, dir string) error {
 	full := false
 	for _, definition := range legacy.Macros {
 		seenKey, itemDigest := "macro\x00"+definition.ID, sharedDigest(definition)
-		if source.Seen[seenKey] == itemDigest {
-			if copied, ok := source.Seen["copy\x00"+definition.ID]; ok {
+		if seen[seenKey] == itemDigest {
+			if copied, ok := seen["copy\x00"+definition.ID]; ok {
 				renamedMacros[definition.ID] = copied
 			}
 			continue
@@ -671,14 +687,14 @@ func (m *sharedMigration) macros(workspace legacyWorkspace, dir string) error {
 				continue
 			}
 			renamedMacros[definition.ID] = copied.ID
-			source.Seen["copy\x00"+definition.ID] = copied.ID
+			seen["copy\x00"+definition.ID] = copied.ID
 		default:
 			if !add(definition) {
 				full = true
 				continue
 			}
 		}
-		source.Seen[seenKey] = itemDigest
+		seen[seenKey] = itemDigest
 	}
 	bound := map[string]bool{}
 	for _, binding := range library.Bindings {
@@ -686,7 +702,7 @@ func (m *sharedMigration) macros(workspace legacyWorkspace, dir string) error {
 	}
 	for _, binding := range legacy.Bindings {
 		seenKey := "binding\x00" + binding.ProfileID + "\x00" + binding.MacroID
-		if source.Seen[seenKey] != "" {
+		if seen[seenKey] != "" {
 			continue
 		}
 		// A startup macro follows its saved session and its macro to the ids
@@ -709,7 +725,7 @@ func (m *sharedMigration) macros(workspace legacyWorkspace, dir string) error {
 			bound[binding.ProfileID+"\x00"+binding.MacroID] = true
 			changed = true
 		}
-		source.Seen[seenKey] = "1"
+		seen[seenKey] = "1"
 	}
 	if changed {
 		validated, err := validateTerminalMacroLibrary(library)
@@ -727,6 +743,7 @@ func (m *sharedMigration) macros(workspace legacyWorkspace, dir string) error {
 			return err
 		}
 	}
+	source.Seen = seen
 	if full {
 		m.marker.notice("limit", workspace.ID, []string{"macros"})
 	} else {

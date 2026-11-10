@@ -40,7 +40,7 @@ func (a *application) ensureShared() {
 		a.stateMark = sha256.Sum256(a.state)
 		a.shared.served(a.sharedValuesLocked())
 		if root, err := readSharedSettings(a.dataPath); err == nil {
-			a.shared.seen = sha256.Sum256(root.raw)
+			a.shared.seen, a.shared.had = root.digest(), root.exists
 		}
 	}
 }
@@ -100,17 +100,36 @@ func (a *application) overlaySharedLocked(values map[string]any) {
 // whether the shared values changed.
 func (a *application) absorbRootLocked(root *rootSettings, force bool) bool {
 	a.shared.older = root.older
-	if !root.exists && !force {
-		// The file is gone. That is not "another app removed everything":
-		// this app keeps what it holds, and its next save writes it again.
-		return false
+	if !root.exists {
+		a.shared.lost = a.shared.lost || a.shared.had
+		if !force {
+			// The file is gone. That is not "another app removed everything":
+			// this app keeps what it holds, and its next save writes it again.
+			return false
+		}
+	} else {
+		a.shared.had = true
 	}
-	digest := sha256.Sum256(root.raw)
+	digest := root.digest()
 	if !force && digest == a.shared.seen {
 		return false
 	}
 	a.shared.seen = digest
 	values := root.shared(a.shared.keys())
+	if a.shared.lost && root.exists && !a.shared.standalone {
+		// The file went missing and another app has written it again. If that
+		// was a standalone app, the file lacks everything only the main window
+		// uses. A key that is absent is therefore kept as this window holds it
+		// (its next save writes it again), not read as removed.
+		held := a.sharedValuesLocked()
+		for _, key := range a.shared.keys() {
+			if _, present := root.members[key.Name]; key.MainOnly && !present {
+				if value, ok := held[key.Name]; ok {
+					values[key.Name] = value
+				}
+			}
+		}
+	}
 	if !force && sharedRevision(a.sharedValuesLocked()) == sharedRevision(values) {
 		return false
 	}
@@ -169,7 +188,7 @@ func (a *application) loadSharedState() {
 		if a.shared.standalone || len(root.putBack) > 0 {
 			a.absorbRootLocked(root, true)
 		} else {
-			a.shared.seen, a.shared.older = sha256.Sum256(root.raw), root.older
+			a.shared.seen, a.shared.older, a.shared.had = root.digest(), root.older, root.exists
 		}
 	} else if a.shared.standalone && a.storageError == "" {
 		a.storageError = "Saved connections and settings could not be read: " + err.Error()
@@ -190,6 +209,8 @@ func (a *application) serveState(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write(raw)
 	case http.MethodPut:
 		a.putState(w, r)
+		// With no lock held: tell the user about entries that were put back.
+		a.flushSharedNotices()
 	default:
 		methodError(w)
 	}
@@ -305,13 +326,7 @@ func (a *application) putState(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusConflict, lockErr.Error())
 		return
 	}
-	// Saved entries that an older version had dropped and this save wrote
-	// again: the user is told once the settings lock is released.
-	var putBack []string
-	defer func() {
-		release()
-		recordSharedNotice(a.sharedRoot(), "older-version", "", putBack)
-	}()
+	defer release()
 	a.noteReplacedStateLocked()
 	root, err := readSharedSettings(a.sharedSettingsPath())
 	switch {
@@ -403,7 +418,8 @@ func (a *application) putState(w http.ResponseWriter, r *http.Request) {
 			failed(err)
 			return
 		}
-		a.shared.seen, a.shared.older, putBack = sha256.Sum256(full), false, root.putBack
+		a.shared.seen, a.shared.older, a.shared.lost, a.shared.had = sha256.Sum256(full), false, false, true
+		a.shared.pendingPutBack = append(a.shared.pendingPutBack, sharedNamesWritten(full, root.putBack)...)
 	} else {
 		// This window's own file: its preferences, the untouched copy from
 		// before sharing, and the identity its previous vault was bound to.
@@ -433,6 +449,9 @@ func (a *application) putState(w http.ResponseWriter, r *http.Request) {
 		// disk again), and when it is gone although this app holds values.
 		changed := sharedRevision(merged) != sharedRevision(theirs)
 		if root.exists && (changed || root.older) || !root.exists && !sharedValuesEmpty(merged) {
+			if !root.exists && a.shared.lost {
+				keepMainOnlySavedLists(root, a.sharedRoot())
+			}
 			next, err := root.encode(merged, keys)
 			if err != nil {
 				jsonError(w, 400, err.Error())
@@ -442,7 +461,8 @@ func (a *application) putState(w http.ResponseWriter, r *http.Request) {
 				failed(err)
 				return
 			}
-			a.shared.seen, a.shared.older, putBack = sha256.Sum256(next), false, root.putBack
+			a.shared.seen, a.shared.older, a.shared.lost, a.shared.had = sha256.Sum256(next), false, false, true
+			a.shared.pendingPutBack = append(a.shared.pendingPutBack, sharedNamesWritten(next, root.putBack)...)
 		}
 		if err = writeAtomic(a.dataPath, ownRaw); err != nil {
 			failed(err)
@@ -526,11 +546,7 @@ func (a *application) updateSharedLocked(change func(shared map[string]any) erro
 	if err != nil {
 		return err
 	}
-	var putBack []string
-	defer func() {
-		release()
-		recordSharedNotice(a.sharedRoot(), "older-version", "", putBack)
-	}()
+	defer release()
 	root, err := readSharedSettings(a.sharedSettingsPath())
 	if err != nil {
 		return err
@@ -561,7 +577,8 @@ func (a *application) updateSharedLocked(change func(shared map[string]any) erro
 	if err := writeSharedSettings(a.sharedSettingsPath(), next); err != nil {
 		return err
 	}
-	a.shared.seen, a.shared.older, putBack = sha256.Sum256(next), false, root.putBack
+	a.shared.seen, a.shared.older, a.shared.had = sha256.Sum256(next), false, true
+	a.shared.pendingPutBack = append(a.shared.pendingPutBack, sharedNamesWritten(next, root.putBack)...)
 	if a.shared.standalone {
 		a.overlaySharedLocked(shared)
 	} else {
@@ -629,6 +646,7 @@ func (a *application) handleSharedData(w http.ResponseWriter, r *http.Request) {
 	if a.credentials != nil {
 		response["credentials"] = a.credentials.mark()
 	}
+	a.flushSharedNotices()
 	if notices := sharedNotices(a.sharedRoot()); len(notices) > 0 {
 		response["notices"] = notices
 	}

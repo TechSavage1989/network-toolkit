@@ -112,7 +112,16 @@ func readCredentialFile(path string, limit int) ([]byte, error) {
 	return raw, err
 }
 
+// readCredentialFault lets a test make the read of one file fail the way it
+// does when another program holds the file. It is nil outside tests.
+var readCredentialFault func(path string) error
+
 func readCredentialFileOnce(path string, limit int) ([]byte, error) {
+	if readCredentialFault != nil {
+		if err := readCredentialFault(path); err != nil {
+			return nil, err
+		}
+	}
 	before, err := os.Lstat(path)
 	if err != nil {
 		return nil, err
@@ -246,7 +255,14 @@ func (v *credentialVault) loadV2() error {
 		return errors.New("The v2 credential vault is invalid; the legacy copy was not used.")
 	}
 	v.state = "locked"
-	v.configID = credentialConfigID(v.configPath)
+	v.configUnread = false
+	if v.configID, err = credentialConfigIdentity(v.configPath); err != nil {
+		// The settings file could not be read at this moment. A remembered
+		// unlock is neither used nor called expired; status() looks again.
+		v.configID, v.configUnread = "", true
+		v.warning = "App settings could not be read just now. Enter the master password, or try again in a moment."
+		return nil
+	}
 	remembered, err := readCredentialFile(v.rememberPath, credentialRememberLimit)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil
@@ -497,7 +513,7 @@ func (v *credentialVault) status() credentialVaultStatus {
 		// it or changed it since this app last looked: start over from the
 		// files on disk, as a newly started app would.
 		raw, err := readCredentialFile(v.path, vaultcrypto.MaxEnvelopeBytes)
-		if missing := errors.Is(err, os.ErrNotExist); missing != (v.raw == nil) || err == nil && !bytes.Equal(raw, v.raw) {
+		if missing := errors.Is(err, os.ErrNotExist); missing != (v.raw == nil) || err == nil && !bytes.Equal(raw, v.raw) || v.configUnread {
 			v.reloadExternalLocked()
 		}
 	}

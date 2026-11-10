@@ -43,6 +43,8 @@ type credentialVaultFile struct {
 }
 
 type credentialVault struct {
+	// The settings file could not be read when the vault was loaded.
+	configUnread bool
 	mu           sync.Mutex
 	path         string
 	legacyPath   string
