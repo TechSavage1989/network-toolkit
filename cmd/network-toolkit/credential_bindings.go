@@ -238,6 +238,11 @@ func (a *application) resolveCredential(ctx context.Context, id string, binding 
 	}
 	item, found := a.credentials.get(id)
 	if !found {
+		// Before saved data was shared, a standalone window kept its own vault.
+		// Say where the credential may still be instead of only "unavailable".
+		if hint := a.previousVaultHint(); hint != "" {
+			return credentialRecord{}, errors.New(hint)
+		}
 		return credentialRecord{}, errors.New("Saved credential was removed or is unavailable.")
 	}
 	for _, approved := range item.Bindings {

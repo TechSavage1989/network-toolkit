@@ -31,9 +31,15 @@ func TestStandaloneEditorActivationAndPreferenceIsolation(t *testing.T) {
 		t.Fatalf("standalone workspace: %s (%v, reused=%t)", dir, err, reused)
 	}
 	defer release()
+	// The workspace holds only this window's own state. Editor preferences
+	// and saved connections are the data folder's, shared with the main window.
 	data, err := os.ReadFile(filepath.Join(dir, settings))
-	if err != nil || !strings.Contains(string(data), `"wordWrap": true`) || strings.Contains(string(data), "private") {
-		t.Fatalf("unexpected editor preferences: %s (%v)", data, err)
+	if err != nil || !strings.Contains(string(data), `"activePage": "editor"`) || strings.Contains(string(data), "private") || strings.Contains(string(data), "wordWrap") {
+		t.Fatalf("unexpected editor workspace settings: %s (%v)", data, err)
+	}
+	loaded := requestApp(sharedTestApp(t, root, standaloneEditorDirectory, standaloneEditorMode), http.MethodGet, "/api/state", "", true)
+	if loaded.Code != http.StatusOK || !strings.Contains(loaded.Body.String(), `"wordWrap": true`) || !strings.Contains(loaded.Body.String(), `"theme": "light"`) || strings.Contains(loaded.Body.String(), "credentialConfigIdentity") {
+		t.Fatalf("the standalone editor does not load the shared preferences: %d %s", loaded.Code, loaded.Body)
 	}
 	a := testApplication(t)
 	a.windowMode = standaloneEditorMode

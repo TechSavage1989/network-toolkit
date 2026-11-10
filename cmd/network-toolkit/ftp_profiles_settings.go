@@ -18,12 +18,10 @@ func sanitizeFTPProfiles(state map[string]any) {
 		state["ftpProfiles"] = []any{}
 		return
 	}
+	// The list is never cut short here (see sharedKey.MaxSaved).
 	clean := make([]map[string]any, 0, len(list))
 	seen := map[string]bool{}
 	for _, row := range list {
-		if len(clean) >= 100 {
-			break
-		}
 		item, ok := row.(map[string]any)
 		if !ok {
 			continue

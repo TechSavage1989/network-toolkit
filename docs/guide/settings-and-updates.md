@@ -5,6 +5,41 @@ Settings currently appear in the main application and in individual tools. The P
 ## Saved data
 Network Toolkit retains preferences, saved profiles, credentials in the credential vault and macros. Updates must preserve all of these and migrate older settings without silently resetting them.
 
+## One set of settings and saved data for all apps
+Network Toolkit, the **Terminal** window and the **Text Editor** window share their settings and saved data. It does not matter whether you start them from the portable folder or from the installed shortcuts: for the same Windows account they all use the same data folder.
+
+- **Saved data**: saved and recent connections with their folders and order, saved credentials, trusted SSH host keys, and macros.
+- **Settings**: the light or dark theme and accent color, Terminal settings (appearance, syntax highlighting and your own rule sets, features, mouse and keyboard, confirmations), and Text Editor preferences (word wrap, font size, colors, reopening files).
+
+A change made in one app shows up in the others within a few seconds, without a restart. If you have a dialog open or are typing, the change waits until you are done. Two apps can be open and changed at the same time; neither undoes what the other saved.
+
+Each window still keeps what is only about that window: its size, which sidebar tab and panels are open, split panes, and what you have typed into forms.
+
+The saved credentials are in one vault. When you unlock it in one app, the other apps ask for the master password themselves unless you let Windows remember the unlock; **Lock and forget** locks it in all of them.
+
+### The first start after updating
+Earlier versions gave the Terminal window and the Text Editor window their own copies of connections, settings, trusted SSH keys and macros. The first time you start a version that shares them, Network Toolkit brings those copies together:
+
+- Connections and macros that only one app had are added for all of them. If both had changed the same one, both versions are kept; the second is named with the app it came from, for example **Core switch (Terminal)**. Remove the one you do not need.
+- Where a setting differed, the main window's setting is used. Two Text Editor settings are the exception: **Reopen files and unsaved changes from the last session** and **Ask before closing unsaved documents** stay on if either app had them on, so unsaved text is neither hidden nor discarded by the change.
+- Trusted SSH host keys are combined. A message lists the hosts that only the Terminal or Text Editor window had trusted, because they are trusted by every app now; to stop trusting one, open the Terminal's **Saved** sidebar, choose **SSH host keys** and remove it. If the Terminal window had remembered a different key for a host than the main window, the main window's key is kept and the message lists those hosts too. Compare the fingerprint the next time you connect before you accept a changed key.
+
+Nothing is deleted: the earlier files stay in the data folder, and a copy of each file is kept as it was before the change (`Network_Toolkit.before-sharing…`).
+
+**Saved credentials of the earlier Terminal window** are not moved automatically, because that vault may have its own master password. Open **Password manager** and choose **Import saved credentials from the previous Terminal vault**. If that vault has a master password, Windows asks for it. The earlier vault is not changed. Until you import, a connection that uses one of those credentials tells you so. If the shared vault is full, the message names the credentials that did not fit; remove some you no longer need and import again.
+
+### Lists that are full
+You can save up to 200 sessions, 200 FTP connections, 200 targets and 100 TFTP profiles. When a list is full, saving another entry is refused with a message and nothing is changed; an existing entry can still be edited. If two apps add an entry at the same moment and only one fits, the other app tells you which entry was not saved.
+
+### Using an older copy at the same time
+Use the same version of the portable and the installed program. A copy from before this change keeps working, but it does not merge its changes with what the other apps saved:
+
+- While an older main window is open, each of its saves puts back the settings and lists it holds, so a change you made in an updated app can be replaced until that window is closed. An updated app that notices this tells you once.
+- Saved sessions, FTP connections, targets and TFTP profiles are never lost this way. An older copy can show at most 100 saved sessions; whatever it drops is put back by the updated apps, and a message names what was put back. For the same reason an entry you removed in the older copy comes back: remove it again in an updated app.
+- What you add in an older Terminal or Text Editor app (saved sessions, macros, trusted hosts) appears in the updated apps the next time one of them starts.
+
+Updating every copy ends all of this.
+
 ## Windows installation and defaults
 
 Run `Network_Toolkit_<version>_Windows_x64_Setup.exe` from the project's releases page. Choose a program folder on the first install and select **Create a desktop shortcut** if you want to launch Toolkit from the desktop. Setup installs for your Windows account and uses the same folder on upgrades.

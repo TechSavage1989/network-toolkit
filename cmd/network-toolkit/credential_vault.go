@@ -43,6 +43,8 @@ type credentialVaultFile struct {
 }
 
 type credentialVault struct {
+	// The settings file could not be read when the vault was loaded.
+	configUnread bool
 	mu           sync.Mutex
 	path         string
 	legacyPath   string
@@ -141,52 +143,44 @@ func (v *credentialVault) get(id string) (credentialRecord, bool) {
 func (v *credentialVault) put(record credentialRecord) (credentialMetadata, error) {
 	v.mu.Lock()
 	defer v.mu.Unlock()
-	if err := v.requireUnlockedLocked(); err != nil {
-		return credentialMetadata{}, err
-	}
-	_, exists := v.entries[record.ID]
-	if !exists && len(v.entries) >= maxCredentialEntries {
-		return credentialMetadata{}, fmt.Errorf("The password manager is limited to %d saved credentials.", maxCredentialEntries)
-	}
-	currentID := record.ID
-	clean, err := sanitizeCredentialRecord(record, currentID)
+	var saved credentialMetadata
+	err := v.changeLocked(func() (func(), error) {
+		_, exists := v.entries[record.ID]
+		if !exists && len(v.entries) >= maxCredentialEntries {
+			return nil, fmt.Errorf("The password manager is limited to %d saved credentials.", maxCredentialEntries)
+		}
+		clean, err := sanitizeCredentialRecord(record, record.ID)
+		if err != nil {
+			return nil, err
+		}
+		previous, hadPrevious := v.entries[clean.ID]
+		v.entries[clean.ID] = clean
+		saved = credentialMetadataFor(clean)
+		return func() {
+			if hadPrevious {
+				v.entries[clean.ID] = previous
+			} else {
+				delete(v.entries, clean.ID)
+			}
+		}, nil
+	})
 	if err != nil {
 		return credentialMetadata{}, err
 	}
-	previous, hadPrevious := v.entries[clean.ID]
-	v.entries[clean.ID] = clean
-	if err := v.saveLocked(); err != nil {
-		if v.state != "unlocked" {
-			return credentialMetadata{}, err
-		}
-		if hadPrevious {
-			v.entries[clean.ID] = previous
-		} else {
-			delete(v.entries, clean.ID)
-		}
-		return credentialMetadata{}, err
-	}
-	return credentialMetadataFor(clean), nil
+	return saved, nil
 }
 
 func (v *credentialVault) delete(id string) error {
 	v.mu.Lock()
 	defer v.mu.Unlock()
-	if err := v.requireUnlockedLocked(); err != nil {
-		return err
-	}
-	previous, ok := v.entries[id]
-	if !ok {
-		return os.ErrNotExist
-	}
-	delete(v.entries, id)
-	if err := v.saveLocked(); err != nil {
-		if v.state == "unlocked" {
-			v.entries[id] = previous
+	return v.changeLocked(func() (func(), error) {
+		previous, ok := v.entries[id]
+		if !ok {
+			return nil, os.ErrNotExist
 		}
-		return err
-	}
-	return nil
+		delete(v.entries, id)
+		return func() { v.entries[id] = previous }, nil
+	})
 }
 
 func (v *credentialVault) clear() error {
@@ -198,13 +192,9 @@ func (v *credentialVault) clear() error {
 	if len(v.entries) == 0 {
 		return nil
 	}
-	previous := v.entries
-	v.entries = map[string]credentialRecord{}
-	if err := v.saveLocked(); err != nil {
-		if v.state == "unlocked" {
-			v.entries = previous
-		}
-		return err
-	}
-	return nil
+	return v.changeLocked(func() (func(), error) {
+		previous := v.entries
+		v.entries = map[string]credentialRecord{}
+		return func() { v.entries = previous }, nil
+	})
 }

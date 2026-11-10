@@ -2,11 +2,11 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
-	"os"
 	"path/filepath"
 	"time"
 
@@ -29,6 +29,8 @@ func (a *application) handleCredentialVault(w http.ResponseWriter, r *http.Reque
 	}
 	var request struct {
 		Action string `json:"action"`
+		// For import-previous: which standalone window's previous vault.
+		Source string `json:"source,omitempty"`
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 1024)
 	decoder := json.NewDecoder(r.Body)
@@ -145,6 +147,21 @@ func (a *application) handleCredentialVault(w http.ResponseWriter, r *http.Reque
 				a.credentials.mu.Unlock()
 			}
 		}
+	case "import-previous":
+		// Copy the saved credentials of the vault an earlier version kept for a
+		// standalone window into the shared vault. That vault is only read.
+		result, importErr := a.importPreviousVault(r.Context(), request.Source)
+		if importErr != nil {
+			code := http.StatusBadRequest
+			if errors.Is(importErr, errCredentialVaultLocked) {
+				code = http.StatusLocked
+			}
+			jsonError(w, code, importErr.Error())
+			return
+		}
+		status := a.credentials.status()
+		jsonResponse(w, 200, map[string]any{"ok": true, "available": status.Available, "state": status.State, "remembered": status.Remembered, "hasRecovery": status.HasRecovery, "legacyBackup": status.LegacyBackup, "warning": status.Warning, "protection": status.Protection, "mode": status.Mode, "imported": result.Imported, "alreadyPresent": result.Present, "skipped": result.Skipped, "skippedNames": result.SkippedNames, "previousVaults": a.previousVaults()})
+		return
 	case "setup-windows":
 		status := a.credentials.status()
 		if status.State != "setup-required" && status.State != "legacy" {
@@ -207,8 +224,14 @@ func (a *application) handleCredentialVault(w http.ResponseWriter, r *http.Reque
 		case "lock", "forget":
 			a.stateMu.Lock()
 			err = a.credentials.lockAndForget()
-			if raw, readErr := readCredentialFile(a.dataPath, 2<<20); readErr == nil && json.Valid(raw) {
-				a.state = raw
+			// The vault's configuration identity lives in the main settings file,
+			// which a standalone window does not hold in memory.
+			a.ensureShared()
+			if !a.shared.standalone {
+				if raw, readErr := readCredentialFile(a.dataPath, 2<<20); readErr == nil && json.Valid(raw) {
+					a.setStateLocked(raw)
+					a.shared.seen = sha256.Sum256(raw)
+				}
 			}
 			a.stateMu.Unlock()
 		case "delete-vault":
@@ -277,37 +300,67 @@ func (a *application) autoUnlockCredentials(ctx context.Context) {
 func (a *application) ensureCredentialConfigIdentity() (string, error) {
 	a.stateMu.Lock()
 	defer a.stateMu.Unlock()
-	release, err := acquireCredentialGuard(filepath.Dir(a.dataPath))
+	// Every app of a data folder uses its one vault, bound to the identity in
+	// the folder's main settings file.
+	path := a.sharedSettingsPath()
+	release, err := acquireCredentialGuard(filepath.Dir(path))
 	if err != nil {
 		return "", err
 	}
 	defer release()
-	id := credentialConfigID(a.dataPath)
-	if id != "" {
-		return id, nil
-	}
-	state := map[string]any{}
-	current, readErr := readCredentialFile(a.dataPath, 2<<20)
-	if readErr == nil {
-		if json.Unmarshal(current, &state) != nil || state == nil {
-			return "", errors.New("App settings are invalid; they were not replaced.")
-		}
-	} else if !errors.Is(readErr, os.ErrNotExist) {
-		return "", readErr
-	}
-
-	id = randomHex(16)
-	state[credentialConfigIdentityField] = id
-	raw, err := json.MarshalIndent(state, "", "  ")
+	// The identity is created only when the settings file was read and has
+	// none. A file that could not be read just now must never get a new one:
+	// that would lock the vault in every app of the data folder.
+	id, err := credentialConfigIdentity(path)
 	if err != nil {
 		return "", err
 	}
-	if len(raw) > 2<<20 {
-		return "", errors.New("App settings exceed their size limit.")
+	if id != "" {
+		return id, nil
 	}
-	if err := writeAtomic(a.dataPath, raw); err != nil {
+	root, readErr := readSharedSettings(path)
+	if readErr != nil {
+		return "", errors.New("App settings are invalid; they were not replaced.")
+	}
+	if id := credentialConfigIDOf(root.members); id != "" {
+		return id, nil
+	}
+	// What another app saved since this one last looked is taken in before
+	// the file is written again: afterwards this app counts the file as seen,
+	// and its next save would undo whatever it had not taken in.
+	a.noteReplacedStateLocked()
+	a.absorbRootLocked(root, false)
+	// A file that is missing is written with everything this app holds and,
+	// for the rest, with what the copy of the saved lists has: never with the
+	// identity alone, which every other app would read as "all removed".
+	if err := a.recreateRootLocked(root); err != nil {
 		return "", err
 	}
-	a.state = raw
+	if !a.shared.standalone {
+		// Settings this window holds in memory but has not written yet are
+		// saved with the identity, as before.
+		for name, raw := range stateMembers(a.state) {
+			if _, exists := root.members[name]; !exists {
+				root.members[name] = raw
+			}
+		}
+		root.exists = true
+	}
+	id = randomHex(16)
+	root.members[credentialConfigIdentityField], err = json.Marshal(id)
+	if err != nil {
+		return "", err
+	}
+	raw, err := root.marshal()
+	if err != nil {
+		return "", errors.New("App settings exceed their size limit.")
+	}
+	if err := writeSharedSettings(path, raw); err != nil {
+		return "", err
+	}
+	a.shared.seen, a.shared.had, a.shared.lost = sha256.Sum256(raw), true, false
+	if !a.shared.standalone {
+		a.setStateLocked(raw)
+	}
 	return id, nil
 }

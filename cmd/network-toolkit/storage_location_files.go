@@ -10,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"networktoolkit/internal/sharedfile"
 )
 
 const (
@@ -18,6 +20,14 @@ const (
 	storageBrowserDirectory  = "Network_Toolkit.WebView2"
 	storageTreeEntryLimit    = 200000
 )
+
+// The workspaces of a data folder whose files are moved and deleted with it:
+// the data folder itself, the standalone Terminal's folder and the standalone
+// Text Editor's. The one-time move to shared data (shared_migration.go) reads
+// the settings, trusted hosts and macros of the two standalone folders, so
+// "Delete app data" must remove them there too: otherwise the next start
+// would bring saved data and host trust back from what was left behind.
+var storageWorkspaces = []string{"", storageTerminalDirectory, standaloneEditorDirectory}
 
 var storagePortableFiles = []struct {
 	name  string
@@ -30,6 +40,16 @@ var storagePortableFiles = []struct {
 	{"Network_Toolkit.ssh_known_hosts.json", 4 << 20},
 	{"Network_Toolkit.vendors.json.gz", 24 << 20},
 	{"Network_Toolkit.window.json", 64 << 10},
+	// Shared app data (shared_migration.go): the record of what was brought
+	// over from standalone workspaces, and the untouched copies of the data
+	// folder's files from before. They move and are deleted with the data.
+	{sharedMarkerFilename, sharedMarkerLimit},
+	{sharedBackupSettings, appSettingsLimit},
+	{sharedBackupMacros, terminalMacroLibraryLimit},
+	{sharedBackupKnownHosts, knownHostsLimit},
+	// The copy of the saved lists that protects them from versions that do
+	// not merge saves (shared_older_version.go).
+	{savedListsFilename, savedListsLimit},
 }
 
 // Open each directory component through an anchored os.Root. No symlink or
@@ -109,12 +129,25 @@ func openStorageRegular(root *storageRoot, name string, flags int, mode os.FileM
 		if err != nil {
 			return nil, err
 		}
-		return nil, fmt.Errorf("%s changed while it was being opened", name)
+		return nil, fmt.Errorf("%s changed while it was being opened: %w", name, errStorageEntryChanged)
 	}
 	return file, nil
 }
 
+// readStorageFile reads an app-data file. The apps of one data folder replace
+// these files while others read them, so a read that meets a replace in
+// progress is made again; every attempt is inspected in full.
 func readStorageFile(root *storageRoot, name string, limit int64) ([]byte, error) {
+	var raw []byte
+	err := sharedfile.Retry(func() error {
+		var err error
+		raw, err = readStorageFileOnce(root, name, limit)
+		return err
+	}, func(err error) bool { return errors.Is(err, errStorageEntryChanged) || sharedfile.Transient(err) })
+	return raw, err
+}
+
+func readStorageFileOnce(root *storageRoot, name string, limit int64) ([]byte, error) {
 	file, err := openStorageRegular(root, name, os.O_RDONLY, 0)
 	if err != nil {
 		return nil, err
@@ -255,7 +288,7 @@ func collectStorageCopies(source *storageRoot) (copies []storageCopy, err error)
 			}
 		}
 	}()
-	for _, workspace := range []string{"", storageTerminalDirectory} {
+	for _, workspace := range storageWorkspaces {
 		root := source
 		if workspace != "" {
 			var err error
@@ -452,7 +485,7 @@ func storageCopyParent(root *storageRoot, path string, create bool) (*storageRoo
 	if parent == "." {
 		return root, func() {}, nil
 	}
-	if parent != storageTerminalDirectory {
+	if parent != storageTerminalDirectory && parent != standaloneEditorDirectory {
 		return nil, nil, errors.New("Unknown app-data copy path.")
 	}
 	if create {
@@ -481,7 +514,7 @@ func removeStorageCopy(root *storageRoot, item storageCopy) {
 }
 
 func inspectStorageCopyDestination(destination *storageRoot) error {
-	for _, workspace := range []string{"", storageTerminalDirectory} {
+	for _, workspace := range storageWorkspaces {
 		root := destination
 		if workspace != "" {
 			var err error
@@ -554,20 +587,26 @@ func walkStorageData(root *storageRoot, options storageWalkOptions, budget *int)
 	if err := walkStorageWorkspace(root, options, budget); err != nil {
 		return err
 	}
-	terminal, err := openStorageChild(root, storageTerminalDirectory)
-	if errors.Is(err, os.ErrNotExist) {
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	err = walkStorageWorkspace(terminal, options, budget)
-	_ = terminal.Close()
-	if err != nil {
-		return err
-	}
-	if options.remove {
-		return removeStorageEmptyDirectory(root, storageTerminalDirectory)
+	for _, name := range storageWorkspaces[1:] {
+		workspace, err := openStorageChild(root, name)
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		err = walkStorageWorkspace(workspace, options, budget)
+		_ = workspace.Close()
+		if err != nil {
+			return err
+		}
+		if options.remove {
+			// A folder that still holds something (a vault, a file of the
+			// user's) stays.
+			if err := removeStorageEmptyDirectory(root, name); err != nil {
+				return err
+			}
+		}
 	}
 	return nil
 }

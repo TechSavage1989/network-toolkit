@@ -38,33 +38,33 @@ func TestColorPickerPreferencesSurviveStateAndNarrowTerminalDisplays(t *testing.
 			t.Fatalf("%s broadened unrelated display preferences", name)
 		}
 	}
-	root, dest := t.TempDir(), t.TempDir()
+	// Color preferences are shared by every app of the data folder: a
+	// standalone Terminal uses the data folder's, and keeps no copy.
+	root := t.TempDir()
 	if err := os.WriteFile(filepath.Join(root, "Network_Toolkit.settings.json"), []byte(body), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err := seedTerminalWorkspace(root, dest); err != nil {
+	data := standaloneTerminalState(t, root)
+	var loaded map[string]any
+	if err := json.Unmarshal(data, &loaded); err != nil {
 		t.Fatal(err)
 	}
-	path := filepath.Join(dest, "Network_Toolkit.settings.json")
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
+	if !reflect.DeepEqual(safeColorPickerPreferences(loaded["colorPickerPreferences"]), want) || strings.Contains(string(data), "palette-canary") {
+		t.Fatal("the standalone Terminal lost color preferences or received noncolor data")
 	}
-	var seeded map[string]any
-	if err = json.Unmarshal(data, &seeded); err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(safeColorPickerPreferences(seeded["colorPickerPreferences"]), want) || strings.Contains(string(data), "palette-canary") {
-		t.Fatal("seed lost color preferences or retained noncolor data")
+	path := filepath.Join(terminalWorkspace(root), "Network_Toolkit.settings.json")
+	own, err := os.ReadFile(path)
+	if err != nil || strings.Contains(string(own), "colorPickerPreferences") {
+		t.Fatalf("the Terminal workspace keeps its own copy of shared color preferences: %s %v", own, err)
 	}
 	if err = os.WriteFile(filepath.Join(root, "Network_Toolkit.settings.json"), []byte(`{"colorPickerPreferences":{"saved":["#654321"]}}`), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if err = seedTerminalWorkspace(root, dest); err != nil {
+	if err = seedTerminalWorkspace(root, terminalWorkspace(root)); err != nil {
 		t.Fatal(err)
 	}
 	after, err := os.ReadFile(path)
-	if err != nil || string(after) != string(data) {
-		t.Fatal("existing independent terminal workspace was overwritten")
+	if err != nil || string(after) != string(own) {
+		t.Fatal("existing terminal workspace was overwritten")
 	}
 }

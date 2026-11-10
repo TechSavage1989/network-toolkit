@@ -2,6 +2,8 @@
 
 Open Terminal to connect to a permitted device using SSH, Telnet or serial access where supported. Save connection profiles and choose the appropriate connection type. Use approved credentials and validate host identity before trusting SSH connections.
 
+Saved and recent connections, saved credentials, trusted SSH host keys, macros and all Terminal settings are the same in the main window's Terminal page and in the separate **Network Toolkit Terminal** window, and a change in one appears in the other within a few seconds. See [One set of settings and saved data for all apps](settings-and-updates.md#one-set-of-settings-and-saved-data-for-all-apps).
+
 ## Sessions and panes
 You can work with multiple tabs and split panes. Open another tab with the **+** at the end of the tab strip (or "Open a new terminal tab" in command search). The sidebar contains Saved, Recent, Files and Macros tabs; click the selected tab to hide the sidebar and any tab to show it again, and use ⇄ at the bottom of its icon strip to move it to the other side; tabs and panes may have context menus and drag interactions. Keep sessions open while you navigate other tools.
 
@@ -32,7 +34,7 @@ Settings → **Appearance**: pick a font (each is shown in its own typeface, wit
 - **Color scheme:** besides the existing schemes, MobaXterm's Dark background / Light text, Light background / Dark text, Soft pastel, Bright, Monokai, AfterGlow and Monochrome. Customize colors changes any color, including the cursor's.
 - **Show bold text in brighter colors:** on by default; turn it off to keep bold text in its normal color.
 
-Changes apply to open terminals at once and are kept after a restart and in separate Terminal windows.
+Changes apply to open terminals at once, are kept after a restart, and are shared with the separate Terminal window and the other Network Toolkit apps.
 
 ## Terminal features
 Settings → **Features** sets:

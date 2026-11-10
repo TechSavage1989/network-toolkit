@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"path/filepath"
 	"strings"
 
 	"networktoolkit/internal/macros"
@@ -115,12 +114,23 @@ func (a *application) handleTerminalMacroLibrary(w http.ResponseWriter, r *http.
 	}
 	a.stateMu.Lock()
 	defer a.stateMu.Unlock()
-	root, err := openStorageRoot(filepath.Dir(a.dataPath), true)
+	// One macro library per data folder, used by every app of it. A save is
+	// read-compare-write under the folder's OS lock, so two apps cannot both
+	// save from the same revision.
+	root, err := openStorageRoot(a.sharedRoot(), true)
 	if err != nil {
 		jsonError(w, 500, "The macro library could not be opened: "+err.Error())
 		return
 	}
 	defer root.Close()
+	if r.Method == http.MethodPut {
+		release, lockErr := acquireSharedDataLock(a.sharedRoot())
+		if lockErr != nil {
+			jsonError(w, 409, "The macro library is being changed in another window. Try again in a moment.")
+			return
+		}
+		defer release()
+	}
 	library, err := readTerminalMacroLibrary(root)
 	if err != nil {
 		jsonError(w, 500, err.Error())

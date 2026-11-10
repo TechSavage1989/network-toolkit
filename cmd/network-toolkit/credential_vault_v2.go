@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -13,7 +14,9 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"time"
 
+	"networktoolkit/internal/sharedfile"
 	"networktoolkit/internal/vaultcrypto"
 )
 
@@ -35,6 +38,13 @@ type credentialAutoRecord struct {
 }
 
 var errCredentialVaultLocked = errors.New("Unlock the credential vault in the password manager before using saved credentials.")
+
+// The vault file exists but could not be read at this moment.
+var errCredentialVaultUnreadable = errors.New("The credential vault could not be read just now, so the saved credential was not used. Try again.")
+
+// Another app of this data folder saved the vault between this app's read
+// and its write. The change is redone on the newer vault, never forced.
+var errCredentialStorageChanged = errors.New("Credential storage changed before saving; it was kept.")
 
 type credentialVaultStatus struct {
 	Available    bool   `json:"available"`
@@ -84,8 +94,34 @@ func newCredentialVaultWithConfig(settingsPath string, protect, unprotect func([
 	return v, err
 }
 
+// The file that was opened is not the file that was looked at a moment
+// before: another app replaced it in between.
+var errCredentialFileChanged = errors.New("Credential storage changed while opening it.")
+
 // Bounded and identity-checked reads reject links, devices and replaced files.
+// The apps of one data folder replace these files while others read them, so
+// a read that meets a replace in progress is made again: every attempt is
+// checked in full, and what is returned is one complete file.
 func readCredentialFile(path string, limit int) ([]byte, error) {
+	var raw []byte
+	err := sharedfile.Retry(func() error {
+		var err error
+		raw, err = readCredentialFileOnce(path, limit)
+		return err
+	}, func(err error) bool { return errors.Is(err, errCredentialFileChanged) || sharedfile.Transient(err) })
+	return raw, err
+}
+
+// readCredentialFault lets a test make the read of one file fail the way it
+// does when another program holds the file. It is nil outside tests.
+var readCredentialFault func(path string) error
+
+func readCredentialFileOnce(path string, limit int) ([]byte, error) {
+	if readCredentialFault != nil {
+		if err := readCredentialFault(path); err != nil {
+			return nil, err
+		}
+	}
 	before, err := os.Lstat(path)
 	if err != nil {
 		return nil, err
@@ -96,14 +132,20 @@ func readCredentialFile(path string, limit int) ([]byte, error) {
 	if before.Size() > int64(limit) {
 		return nil, errors.New("Credential storage exceeds its supported size limit.")
 	}
-	f, err := os.Open(path)
+	f, err := sharedfile.Open(path)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
 	after, err := f.Stat()
-	if err != nil || !after.Mode().IsRegular() || storageIsLink(after) || !os.SameFile(before, after) {
-		return nil, errors.New("Credential storage changed while opening it.")
+	if err != nil {
+		return nil, err
+	}
+	if !after.Mode().IsRegular() || storageIsLink(after) {
+		return nil, errors.New("Credential storage must be a regular file, not a link or device.")
+	}
+	if !os.SameFile(before, after) {
+		return nil, errCredentialFileChanged
 	}
 	raw, err := io.ReadAll(io.LimitReader(f, int64(limit)+1))
 	if err != nil {
@@ -115,17 +157,53 @@ func readCredentialFile(path string, limit int) ([]byte, error) {
 	return raw, nil
 }
 
+// credentialConfigID returns the identity in the settings file at path, or ""
+// when there is none or the file cannot be read. Code that locks the vault
+// when the identity is gone uses credentialConfigIdentity, which tells the
+// two apart.
 func credentialConfigID(path string) string {
+	id, _ := credentialConfigIdentity(path)
+	return id
+}
+
+// The settings file exists but its identity could not be determined now.
+var errCredentialConfigUnreadable = errors.New("App settings could not be read just now, so the saved credential was not used. Try again.")
+
+// credentialConfigIdentity reads the identity the vault is bound to. It
+// returns "" with no error only when the settings file is really gone or
+// holds no valid identity: the configuration was deleted or reset. A file
+// that could not be read, or that is not a settings object at this moment,
+// is an error. The caller then refuses the operation and locks nothing: the
+// app next door replaces this file with every save, and a reader that met
+// such a moment used to take it for a reset and locked the vault.
+func credentialConfigIdentity(path string) (string, error) {
 	raw, err := readCredentialFile(path, 2<<20)
+	if errors.Is(err, os.ErrNotExist) {
+		// Gone for good only if it stays gone: a file being replaced must
+		// never read as deleted.
+		for attempt := 0; attempt < 2 && errors.Is(err, os.ErrNotExist); attempt++ {
+			time.Sleep(5 * time.Millisecond)
+			raw, err = readCredentialFile(path, 2<<20)
+		}
+		if errors.Is(err, os.ErrNotExist) {
+			return "", nil
+		}
+	}
 	if err != nil {
-		return ""
+		return "", fmt.Errorf("%w (%v)", errCredentialConfigUnreadable, err)
 	}
 	var state map[string]json.RawMessage
-	if json.Unmarshal(raw, &state) != nil {
-		return ""
+	if json.Unmarshal(raw, &state) != nil || state == nil {
+		return "", errCredentialConfigUnreadable
 	}
+	return credentialConfigIDOf(state), nil
+}
+
+// credentialConfigIDOf returns the valid identity among the members of a
+// settings file that has been read, or "".
+func credentialConfigIDOf(members map[string]json.RawMessage) string {
 	var id string
-	if json.Unmarshal(state[credentialConfigIdentityField], &id) != nil || len(id) != 32 {
+	if json.Unmarshal(members[credentialConfigIdentityField], &id) != nil || len(id) != 32 {
 		return ""
 	}
 	decoded, err := hex.DecodeString(id)
@@ -133,6 +211,25 @@ func credentialConfigID(path string) string {
 		return ""
 	}
 	return id
+}
+
+// configCurrentLocked checks that the settings file still carries the
+// identity this vault was unlocked for. Only a settings file that was read
+// and shows another identity (or none, or is gone) locks the vault.
+func (v *credentialVault) configCurrentLocked() error {
+	if v.configID != "" {
+		id, err := credentialConfigIdentity(v.configPath)
+		if err != nil {
+			return err
+		}
+		if id == v.configID {
+			return nil
+		}
+	}
+	v.clearMaterialLocked()
+	// Do not delete a different instance's newer remembered record.
+	v.warning = "App configuration was deleted or reset. Enter the master password again."
+	return errCredentialVaultLocked
 }
 
 func (v *credentialVault) loadV2() error {
@@ -158,7 +255,14 @@ func (v *credentialVault) loadV2() error {
 		return errors.New("The v2 credential vault is invalid; the legacy copy was not used.")
 	}
 	v.state = "locked"
-	v.configID = credentialConfigID(v.configPath)
+	v.configUnread = false
+	if v.configID, err = credentialConfigIdentity(v.configPath); err != nil {
+		// The settings file could not be read at this moment. A remembered
+		// unlock is neither used nor called expired; status() looks again.
+		v.configID, v.configUnread = "", true
+		v.warning = "App settings could not be read just now. Enter the master password, or try again in a moment."
+		return nil
+	}
 	remembered, err := readCredentialFile(v.rememberPath, credentialRememberLimit)
 	if errors.Is(err, os.ErrNotExist) {
 		return nil
@@ -260,19 +364,139 @@ func (v *credentialVault) requireUnlockedLocked() error {
 	if v.state != "unlocked" || len(v.key) != vaultcrypto.KeyBytes {
 		return errCredentialVaultLocked
 	}
-	if v.configID == "" || credentialConfigID(v.configPath) != v.configID {
-		v.clearMaterialLocked()
-		// Do not delete a different instance's newer remembered record.
-		v.warning = "App configuration was deleted or reset. Enter the master password again."
-		return errCredentialVaultLocked
+	if err := v.configCurrentLocked(); err != nil {
+		return err
 	}
 	raw, err := readCredentialFile(v.path, vaultcrypto.MaxEnvelopeBytes)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		// The vault file could not be read at this moment. That says nothing
+		// about the vault: refuse this use and keep everything as it is.
+		return fmt.Errorf("%w (%v)", errCredentialVaultUnreadable, err)
+	}
 	if err != nil || !bytes.Equal(raw, v.raw) {
-		v.clearMaterialLocked()
-		v.warning = "The encrypted vault changed outside this instance. Close and reopen the app before unlocking."
+		// The main window, the Terminal and the Text Editor of one data folder
+		// use this one vault. A vault another of them saved is taken over when
+		// the key this app unlocked with still opens it (same vault, same
+		// master password); otherwise the ordinary unlock rules apply again.
+		if err == nil && v.adoptExternalLocked(raw) {
+			return nil
+		}
+		v.reloadExternalLocked()
+		if v.state == "unlocked" {
+			return nil
+		}
 		return errCredentialVaultLocked
 	}
 	return nil
+}
+
+// adoptExternalLocked accepts a vault file written by another app only if it
+// is the same vault generation and authenticates with the key already held.
+// Authenticated decryption with that key is what an unlock proves, so this
+// grants nothing a fresh unlock with the same password would not.
+func (v *credentialVault) adoptExternalLocked(raw []byte) bool {
+	if v.envelope == nil || len(v.key) != vaultcrypto.KeyBytes {
+		return false
+	}
+	envelope, err := vaultcrypto.Parse(raw)
+	if err != nil {
+		return false
+	}
+	id, generation := envelope.Identity()
+	heldID, heldGeneration := v.envelope.Identity()
+	if id != heldID || generation != heldGeneration {
+		return false
+	}
+	payload, err := envelope.OpenKey(v.key)
+	if err != nil {
+		return false
+	}
+	defer clear(payload)
+	entries, err := decodeCredentialPayload(payload, 2)
+	if err != nil {
+		return false
+	}
+	clear(v.entries)
+	v.envelope, v.raw, v.entries = envelope, raw, entries
+	return true
+}
+
+// reloadExternalLocked starts over from the files on disk, exactly as a newly
+// started app would: a vault whose master password another app changed, or
+// that was deleted or recreated, is locked here unless a valid remembered
+// unlock for the new vault exists.
+func (v *credentialVault) reloadExternalLocked() {
+	v.clearMaterialLocked()
+	v.envelope, v.raw, v.configID = nil, nil, ""
+	v.state, v.warning = "setup-required", ""
+	if err := v.loadV2(); err != nil {
+		v.state = "locked"
+		v.warning = "The credential vault could not be opened. Existing encrypted data was kept; no legacy fallback was attempted."
+		return
+	}
+	if v.state == "locked" && v.warning == "" {
+		v.warning = "The credential vault was changed in another Network Toolkit window (for example its master password). Unlock it again."
+	}
+}
+
+// requireCurrentLocked is the check before a write: the vault must be
+// unlocked and the file must still be the one this app holds. A newer file
+// is reported, not adopted, so the pending change is not silently dropped.
+func (v *credentialVault) requireCurrentLocked() error {
+	if v.state != "unlocked" || len(v.key) != vaultcrypto.KeyBytes {
+		return errCredentialVaultLocked
+	}
+	if err := v.configCurrentLocked(); err != nil {
+		return err
+	}
+	raw, err := readCredentialFile(v.path, vaultcrypto.MaxEnvelopeBytes)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("%w (%v)", errCredentialVaultUnreadable, err)
+	}
+	if err != nil {
+		v.reloadExternalLocked()
+		return errCredentialVaultLocked
+	}
+	if !bytes.Equal(raw, v.raw) {
+		return errCredentialStorageChanged
+	}
+	return nil
+}
+
+// changeLocked applies one change to the entries and saves it. If another
+// app saved the vault meanwhile, the change is undone, the newer vault is
+// loaded and the change is applied to it again: neither app's change is lost.
+func (v *credentialVault) changeLocked(apply func() (undo func(), err error)) error {
+	for attempt := 0; ; attempt++ {
+		if err := v.requireUnlockedLocked(); err != nil {
+			return err
+		}
+		undo, err := apply()
+		if err != nil {
+			return err
+		}
+		err = v.saveLocked()
+		if err == nil {
+			return nil
+		}
+		if v.state == "unlocked" && undo != nil {
+			undo()
+		}
+		if !errors.Is(err, errCredentialStorageChanged) || attempt >= 3 {
+			return err
+		}
+	}
+}
+
+// mark changes whenever the vault file or its lock state changes, so a page
+// knows when to read the list of saved credentials again. It reveals nothing
+// about the contents.
+func (v *credentialVault) mark() string {
+	state := v.status().State
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	digest := sha256.Sum256(append([]byte(state+"\x00"), v.raw...))
+	return hex.EncodeToString(digest[:8])
 }
 func (v *credentialVault) requireUnlocked() error {
 	v.mu.Lock()
@@ -284,6 +508,14 @@ func (v *credentialVault) status() credentialVaultStatus {
 	defer v.mu.Unlock()
 	if v.state == "unlocked" {
 		_ = v.requireUnlockedLocked()
+	} else if v.state != "pending-authentication" {
+		// Another app of this data folder may have set the vault up, deleted
+		// it or changed it since this app last looked: start over from the
+		// files on disk, as a newly started app would.
+		raw, err := readCredentialFile(v.path, vaultcrypto.MaxEnvelopeBytes)
+		if missing := errors.Is(err, os.ErrNotExist); missing != (v.raw == nil) || err == nil && !bytes.Equal(raw, v.raw) || v.configUnread {
+			v.reloadExternalLocked()
+		}
 	}
 	_, legacyErr := os.Lstat(v.legacyPath)
 	state := v.state
@@ -343,9 +575,10 @@ func writeCredentialAtomicGuarded(path string, raw, expected []byte, limit int) 
 			return errors.New("Credential storage already exists or cannot be safely inspected; it was kept.")
 		}
 	} else if readErr != nil || !bytes.Equal(current, expected) {
-		return errors.New("Credential storage changed before saving; it was kept.")
+		return errCredentialStorageChanged
 	}
-	return replaceSettingsFile(temp, path)
+	// Another app of the data folder may be reading the vault right now.
+	return sharedfile.Replace(temp, path)
 }
 func removeCredentialFile(path string) error {
 	before, err := os.Lstat(path)
@@ -361,7 +594,7 @@ func removeCredentialFile(path string) error {
 	return os.Remove(path)
 }
 func (v *credentialVault) saveLocked() error {
-	if err := v.requireUnlockedLocked(); err != nil {
+	if err := v.requireCurrentLocked(); err != nil {
 		return err
 	}
 	plain, err := marshalCredentialPayload(v.entries)
@@ -389,7 +622,14 @@ func (v *credentialVault) saveLocked() error {
 	if !bytes.Equal(verified, plain) {
 		return errors.New("Credential vault verification failed.")
 	}
-	if err := writeCredentialAtomic(v.path, raw, v.raw, vaultcrypto.MaxEnvelopeBytes); err != nil {
+	// Another app may be saving its settings at this moment (the same lock);
+	// wait briefly for it instead of failing the user's change.
+	release, err := acquireCredentialGuardWait(filepath.Dir(v.path), 1500*time.Millisecond)
+	if err != nil {
+		return err
+	}
+	defer release()
+	if err := writeCredentialAtomicGuarded(v.path, raw, v.raw, vaultcrypto.MaxEnvelopeBytes); err != nil {
 		return err
 	}
 	v.envelope = next
@@ -758,7 +998,11 @@ func (v *credentialVault) remember(configID string, enabled bool) error {
 	if (v.state != "pending-authentication" && v.state != "unlocked") || len(v.key) != vaultcrypto.KeyBytes {
 		return errCredentialVaultLocked
 	}
-	if configID == "" || credentialConfigID(v.configPath) != configID {
+	current, err := credentialConfigIdentity(v.configPath)
+	if err != nil {
+		return err
+	}
+	if configID == "" || current != configID {
 		v.clearMaterialLocked()
 		return errors.New("Unlock configuration changed before authentication completed. Unlock again.")
 	}
@@ -886,6 +1130,12 @@ func acquireCredentialGuard(dir string) (func(), error) {
 			}
 			file, err = os.OpenFile(path, os.O_RDWR, 0)
 			if err != nil {
+				if sharedfile.HeldByAnother(err) {
+					// The app that created the lock file a moment ago holds it
+					// without sharing (Windows) until its change is done: that
+					// is the same as finding the file locked.
+					return nil, errCredentialGuardBusy
+				}
 				return nil, err
 			}
 			after, err := file.Stat()
@@ -896,7 +1146,7 @@ func acquireCredentialGuard(dir string) (func(), error) {
 		}
 		if err := lockStorageFile(file, true); err != nil {
 			file.Close()
-			return nil, errors.New("Another Network Toolkit instance is changing credentials. Finish that action and retry.")
+			return nil, errCredentialGuardBusy
 		}
 		return func() { _ = unlockStorageFile(file); _ = file.Close() }, nil
 	}
@@ -909,24 +1159,19 @@ func invalidateCredentialConfigIdentity(path string) error {
 	if credentialConfigID(path) == "" {
 		return nil
 	}
-	raw, err := readCredentialFile(path, 2<<20)
-	if err != nil {
-		return err
-	}
-	var state map[string]json.RawMessage
-	if json.Unmarshal(raw, &state) != nil || state == nil {
+	// The settings file of the data folder: read and written like every
+	// other change to it, so nothing else in it is lost.
+	settings, err := readSharedSettings(path)
+	if err != nil || !settings.exists {
 		return errors.New("App settings cannot be safely invalidated.")
 	}
-	state[credentialConfigIdentityField], err = json.Marshal(randomHex(16))
+	settings.members[credentialConfigIdentityField], err = json.Marshal(randomHex(16))
 	if err != nil {
 		return err
 	}
-	raw, err = json.MarshalIndent(state, "", "  ")
+	raw, err := settings.marshal()
 	if err != nil {
-		return err
-	}
-	if len(raw) > 2<<20 {
 		return errors.New("App settings exceed their size limit.")
 	}
-	return writeAtomic(path, raw)
+	return writeSharedSettings(path, raw)
 }

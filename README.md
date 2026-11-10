@@ -32,6 +32,7 @@
 - **Local network:** view local network information and review authorized configuration changes.
 - **Network utilities:** Wake on LAN, an IPv4 subnet calculator, a transfer-time estimate and a MAC address formatter.
 - **Customizable Overview:** choose which dashboard sections to show, and drag them into the order you want; the layout is kept between runs.
+- **One set of settings and saved data:** the portable program, the installed program, the Terminal window and the Text Editor window share saved connections, saved credentials, trusted SSH keys, macros and settings. Change something in one and it shows in the others.
 - **Settings and updates:** save preferences and use the built-in updater.
 
 ## Screenshots
@@ -117,7 +118,7 @@ Use scanning, configuration, capture and connection features only on networks an
 
 Use **Check for updates** to check manually. Beta updates are available only after opting in to the beta channel. Downloading and installing an update requires explicit approval; packages are verified before installation. Your saved profiles, settings and credential vault must be preserved.
 
-Open **App settings** to search General, Appearance, Terminal, Editor, Graphs, Transfers, Network, Updates and Confirmations. Preferences, saved targets and connection profiles are stored in the app data folder; diagnostic results stay in the current session until you export them. See the [change history](CHANGELOG.md) for what each release changed.
+Open **App settings** to search General, Appearance, Terminal, Editor, Graphs, Transfers, Network, Updates and Confirmations. Preferences, saved targets and connection profiles are stored in the app data folder and are shared by Network Toolkit, its Terminal window and its Text Editor window ([details](docs/guide/settings-and-updates.md#one-set-of-settings-and-saved-data-for-all-apps)); diagnostic results stay in the current session until you export them. See the [change history](CHANGELOG.md) for what each release changed.
 
 ## Development
 

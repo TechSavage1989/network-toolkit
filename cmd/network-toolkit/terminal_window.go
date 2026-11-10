@@ -19,6 +19,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"networktoolkit/internal/sharedfile"
 )
 
 const terminalWorkspaceName = "Network_Toolkit.Terminal"
@@ -356,8 +358,15 @@ func (a *application) handleTerminalWindow(w http.ResponseWriter, r *http.Reques
 
 func terminalWorkspace(root string) string { return filepath.Join(root, terminalWorkspaceName) }
 
-// First-use seeding copies only nonsecret preferences and public SSH trust.
-// Once created, the independent workspace is never overwritten by the main UI.
+// terminalWindowSeedKeys is the main window's arrangement of the terminal
+// page that a new Terminal window starts with. All of it is per-window state.
+var terminalWindowSeedKeys = []string{"terminalSidebarCollapsed", "terminalSidebarTab", "terminalSidebarWidth", "terminalComposerCollapsed", "terminalRecentCollapsed", "terminalSavedCollapsed", "terminalConnection", "terminalLayout"}
+
+// First use: the Terminal window starts with the main window's arrangement of
+// the terminal page. Saved connections, settings, SSH host trust, macros and
+// saved credentials are shared by every app of the data folder and are not
+// copied into the workspace (shared_data.go). An existing workspace file is
+// never overwritten.
 func seedTerminalWorkspace(root, dest string) error {
 	settingsPath := filepath.Join(dest, "Network_Toolkit.settings.json")
 	if _, err := os.Lstat(settingsPath); errors.Is(err, os.ErrNotExist) {
@@ -366,26 +375,16 @@ func seedTerminalWorkspace(root, dest string) error {
 		if readErr == nil {
 			var original map[string]any
 			if json.Unmarshal(b, &original) == nil {
-				for _, key := range []string{"colorPickerPreferences", "terminalPromptNames", "terminalProfiles", "terminalRecent", "terminalSidebarCollapsed", "terminalSidebarTab", "terminalSidebarWidth", "terminalComposerCollapsed", "terminalMacroConfirmation", "terminalConfirmClose", "terminalRecentCollapsed", "terminalSavedCollapsed", "terminalSavedManualOrder", "terminalSessionConfirmDelete", "terminalConnection", "terminalLayout", "terminalInteraction", "terminalActiveActionsPosition", "terminalAppearance", "terminalSyntax", "terminalBehavior"} {
+				for _, key := range terminalWindowSeedKeys {
 					if value, ok := original[key]; ok {
 						state[key] = value
 					}
-				}
-				if theme, ok := original["theme"].(string); ok && (theme == "dark" || theme == "light") {
-					state["theme"] = theme
-				}
-				if size, ok := original["terminalFontSize"].(float64); ok && size >= 8 && size <= 36 && size == float64(int(size)) {
-					state["terminalFontSize"] = size
-				}
-				if enabled, ok := original["terminalHighlight"].(bool); ok {
-					state["terminalHighlight"] = enabled
 				}
 			}
 		} else if !errors.Is(readErr, os.ErrNotExist) {
 			return fmt.Errorf("read the initial terminal preferences: %w", readErr)
 		}
 		sanitizeTerminalSettings(state)
-		sanitizeColorPickerPreferences(state)
 		b, err = json.MarshalIndent(state, "", "  ")
 		if err != nil {
 			return err
@@ -396,59 +395,7 @@ func seedTerminalWorkspace(root, dest string) error {
 	} else if err != nil {
 		return err
 	}
-	trustPath := filepath.Join(dest, "Network_Toolkit.ssh_known_hosts.json")
-	if _, err := os.Lstat(trustPath); errors.Is(err, os.ErrNotExist) {
-		b, readErr := readBoundedRegularFile(filepath.Join(root, "Network_Toolkit.ssh_known_hosts.json"), 4<<20)
-		if errors.Is(readErr, os.ErrNotExist) {
-			// Persist the intentionally empty first-use trust store too. Leaving
-			// it absent would import main-window trust on a later launch.
-			b = []byte("{\"version\":1,\"hosts\":[]}\n")
-			readErr = nil
-		}
-		if readErr != nil {
-			return fmt.Errorf("read the initial SSH host trust: %w", readErr)
-		}
-		// Manager construction applies the same strict validation as the main
-		// app. An invalid source remains an explicit SSH load error, not empty
-		// implicit trust or an automatic replacement with another key.
-		if err = writeAtomic(trustPath, b); err != nil {
-			return fmt.Errorf("save the initial SSH host trust: %w", err)
-		}
-	} else if err != nil {
-		return err
-	}
-	if err := seedTerminalMacroLibrary(root, dest); err != nil {
-		return fmt.Errorf("save the initial macro library: %w", err)
-	}
 	return nil
-}
-
-func seedTerminalMacroLibrary(source, destination string) error {
-	destRoot, err := openStorageRoot(destination, true)
-	if err != nil {
-		return err
-	}
-	defer destRoot.Close()
-	if _, err := destRoot.Lstat(terminalMacroLibraryFilename); err == nil {
-		return nil
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return err
-	}
-	sourceRoot, err := openStorageRoot(source, false)
-	if err != nil {
-		return err
-	}
-	defer sourceRoot.Close()
-	library, err := readTerminalMacroLibrary(sourceRoot)
-	if err != nil {
-		return err
-	}
-	library.Revision = ""
-	raw, err := json.MarshalIndent(library, "", "  ")
-	if err != nil {
-		return err
-	}
-	return writeStorageAtomicLimit(destRoot, terminalMacroLibraryFilename, raw, terminalMacroLibraryLimit)
 }
 
 func readBoundedRegularFile(path string, limit int64) ([]byte, error) {
@@ -459,7 +406,8 @@ func readBoundedRegularFile(path string, limit int64) ([]byte, error) {
 	if !info.Mode().IsRegular() || info.Size() > limit {
 		return nil, errors.New("The saved file is not a regular file or exceeds its size limit.")
 	}
-	f, err := os.Open(path)
+	// Another app may be replacing the file (the shared settings are read here).
+	f, err := sharedfile.Open(path)
 	if err != nil {
 		return nil, err
 	}

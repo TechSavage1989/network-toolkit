@@ -28,7 +28,7 @@ func (a *application) handleCredentials(w http.ResponseWriter, r *http.Request) 
 	if suffix == "" || suffix == "/" {
 		switch r.Method {
 		case http.MethodGet:
-			jsonResponse(w, http.StatusOK, map[string]any{"available": true, "entries": a.credentials.list(), "protection": a.credentials.status().Protection, "vault": a.credentials.status()})
+			jsonResponse(w, http.StatusOK, map[string]any{"available": true, "entries": a.credentials.list(), "protection": a.credentials.status().Protection, "vault": a.credentials.status(), "previousVaults": a.previousVaults()})
 		case http.MethodPost:
 			var input credentialRecord
 			if err := decodeBody(w, r, 512<<10, &input); err != nil {

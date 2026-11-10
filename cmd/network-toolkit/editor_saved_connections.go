@@ -29,6 +29,9 @@ type editorSavedConnectionRequest struct {
 
 func (a *application) editorSavedProfiles() []editorSavedProfile {
 	a.stateMu.Lock()
+	// Saved connections are shared with the other apps of this data folder;
+	// list what is saved now, not what this window loaded when it started.
+	a.syncSharedLocked()
 	data := append([]byte(nil), a.state...)
 	a.stateMu.Unlock()
 	var state map[string]any

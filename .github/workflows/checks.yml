@@ -332,6 +332,14 @@ jobs:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results
         run: node scripts/editor-session-restore.browser.cjs
+      - name: Share saved connections between the main window, Terminal and Text Editor through real engines
+        if: success() || failure()
+        env:
+          GOTOOLCHAIN: local
+          NTK_SHARED_DATA_BROWSER: '1'
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results/shared-data
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestSharedDataBrowser$' -count=1 -v -timeout=5m
       - name: Check compact sidebar controls and reclaimed file-list height
         if: success() || failure()
         env:
@@ -577,7 +585,7 @@ jobs:
       - name: Test release publication guards
         run: python3 -m unittest discover -s scripts -p '*_test.py' -v
       - name: Test application and terminal lifecycle
-        run: go test -mod=vendor ./cmd/network-toolkit ./internal/editorbuffer ./internal/terminal ./internal/macros ./internal/desktop ./internal/vaultcrypto ./internal/diag ./internal/deviceinfo ./internal/platform ./internal/capture
+        run: go test -mod=vendor ./cmd/network-toolkit ./internal/editorbuffer ./internal/terminal ./internal/macros ./internal/desktop ./internal/vaultcrypto ./internal/diag ./internal/deviceinfo ./internal/sharedfile ./internal/platform ./internal/capture
       - name: Check concurrent editor buffers and file ownership
         run: go test -race -mod=vendor ./internal/editorbuffer ./cmd/network-toolkit -run 'TestDiskEditor|TestSnapshot|TestStreamingSearch' -count=1
       - name: Test JavaScript behavior
@@ -751,6 +759,26 @@ jobs:
         env:
           GOTOOLCHAIN: local
         run: go test -mod=vendor ./internal/vaultcrypto -count=1 -v
+      # Shared app data is used by several processes at once. On Windows a file
+      # cannot be replaced while another handle has it open without delete
+      # sharing, and locks are per handle, so these run here as well: replaces
+      # under readers, the lock and the merge across real processes, the vault
+      # staying unlocked while another app saves, and the editor session rules.
+      - name: Test replacing a shared file while readers have it open on Windows
+        if: success() || failure()
+        env:
+          GOTOOLCHAIN: local
+        run: go test -mod=vendor ./internal/sharedfile -count=1 -v
+      - name: Test shared SSH host trust on Windows
+        if: success() || failure()
+        env:
+          GOTOOLCHAIN: local
+        run: go test -mod=vendor ./internal/terminal -run 'TestKnownHost|TestSharedKnownHosts' -count=1 -v
+      - name: Test shared app data across processes and the editor session rules on Windows
+        if: success() || failure()
+        env:
+          GOTOOLCHAIN: local
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^Test(Shared|EditorSession|KnownHosts)' -count=1 -v -timeout=10m
       - name: Verify real WebView2 private bootstrap
         env:
           GOTOOLCHAIN: local

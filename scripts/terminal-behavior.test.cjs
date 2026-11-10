@@ -92,7 +92,11 @@ test('the app creates terminals with these settings, restores them at startup an
   assert.match(html, /if\(s\.terminalBehavior&&typeof s\.terminalBehavior==='object'/);
   assert.match(html, /terminalBehavior:window\.NetworkToolkitTerminalBehavior\.preferences\(\)/);
   assert.match(html, /if\(value\.terminalBehavior!==undefined&&window\.NetworkToolkitTerminalBehavior\)/);
-  for (const file of ['terminal_views.go', 'terminal_window.go', 'terminal_workspace_view.go']) assert.match(fs.readFileSync(path.join(__dirname, '../cmd/network-toolkit/' + file), 'utf8'), /"terminalBehavior"/, file);
+  for (const file of ['terminal_views.go', 'terminal_workspace_view.go']) assert.match(fs.readFileSync(path.join(__dirname, '../cmd/network-toolkit/' + file), 'utf8'), /"terminalBehavior"/, file);
+  // The separate Terminal window no longer gets a copy when it is first used:
+  // these settings are shared by every app of the data folder (shared_data.go).
+  assert.match(fs.readFileSync(path.join(__dirname, '../cmd/network-toolkit/shared_data.go'), 'utf8'), /\{Name: "terminalBehavior", Kind: sharedMap, Live: true\}/);
+  assert.doesNotMatch(fs.readFileSync(path.join(__dirname, '../cmd/network-toolkit/terminal_window.go'), 'utf8'), /"terminalBehavior"/, 'shared settings are not copied into the Terminal workspace');
   assert.match(fs.readFileSync(path.join(__dirname, '../cmd/network-toolkit/web_assets.go'), 'utf8'), /"\/assets\/terminal-behavior\.js"/);
   // state, saveState and terminalSessions are top-level bindings in index.html, not window properties.
   assert.doesNotMatch(source, /root\.(state|saveState|terminalSessions|enqueueTerminalInput)\b/);

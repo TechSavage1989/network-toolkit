@@ -18,8 +18,9 @@ function load(kind,id){const item=rows(kind==='recent'?'tftpRecent':'tftpProfile
 function save(){const data=setting();if(!valid(data)){toast('Enter a valid TFTP host and port before saving.','error');return;}
  const name=prompt('TFTP profile name:',data.host);if(name===null)return;if(!name.trim()){toast('Enter a profile name.','error');return;}
  const found=rows('tftpProfiles').find(x=>x.name===name.trim()&&x.host===data.host);
+ const full=!found&&root.NetworkToolkitSharedData?.full('tftpProfiles',rows('tftpProfiles').length);if(full){toast(full,'error');return;}
  const id=found?.id||'tftp-profile-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8);
- state.tftpProfiles=[{...data,id,name:name.trim().slice(0,100)},...rows('tftpProfiles').filter(x=>x.id!==id)].slice(0,100);saveState();mountOrUpdate();toast('TFTP profile saved.','success');}
+ state.tftpProfiles=[{...data,id,name:name.trim().slice(0,100)},...rows('tftpProfiles').filter(x=>x.id!==id)];saveState();mountOrUpdate();toast('TFTP profile saved.','success');}
 function recent(target,config){const item={host:String(target||''),...Object.fromEntries(fields.map(k=>[k,config[k]]))};if(!valid(item))return;
  const found=rows('tftpRecent').find(x=>x.host===item.host&&x.remotePath===item.remotePath&&x.operation===item.operation);
  const id=found?.id||'tftp-recent-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8);

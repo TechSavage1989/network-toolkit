@@ -54,6 +54,9 @@ var (
 	editorSessionBOM         = []byte{0xef, 0xbb, 0xbf}
 	errEditorSessionInvalid  = errors.New("The saved editor session is invalid.")
 	errEditorSessionNoBackup = errors.New("The kept copy of this document is no longer available.")
+	// "Reopen files next time" is shared by every app of the data folder, so a
+	// page can start with it off although an earlier run kept unsaved text.
+	errEditorSessionNotGiven = errors.New("The session kept by an earlier run has not been reopened yet, so nothing in it was replaced or removed.")
 )
 
 type editorSessionBackup struct {
@@ -108,11 +111,29 @@ type editorSessionStore struct {
 	known map[string]bool
 	// An unreadable index was set aside: only known copies may be removed.
 	unreadable bool
+	// What the user is told about that, until a page has been given it. The
+	// index may be set aside by a step that reports nothing itself (taking
+	// over the other editor's tabs, or a save).
+	asideNote string
+	// Kept copies this process wrote itself.
+	own map[string]bool
+	// The saved session was given to the page in this run (GET). Until then
+	// this process removes only copies it wrote itself and never replaces or
+	// deletes an index that names others, whatever the page asks for.
+	given bool
+	// Held for as long as this process runs once it has used its session, so
+	// the other editor app never takes tabs from a running one
+	// (editor_session_adopt.go).
+	leaseMu sync.Mutex
+	lease   *os.File
 }
 
 func (s *editorSessionStore) initLocked() {
 	if s.pending == nil {
 		s.pending, s.writing, s.known = map[string]time.Time{}, map[string]bool{}, map[string]bool{}
+	}
+	if s.own == nil {
+		s.own = map[string]bool{}
 	}
 }
 
@@ -248,7 +269,8 @@ func (a *application) readEditorSessionLocked(root *storageRoot) (editorSessionI
 			return index, "", errors.Join(err, renameErr)
 		}
 		s.unreadable = true
-		return index, "The last Text Editor session could not be read. It was kept as " + aside + " in the app data folder, and no unsaved copies were removed.", nil
+		s.asideNote = "The last Text Editor session could not be read. It was kept as " + aside + " in the app data folder, and no unsaved copies were removed."
+		return index, s.asideNote, nil
 	}
 	if err != nil {
 		return index, "", err
@@ -270,8 +292,9 @@ func (a *application) editorSessionDeletePending() bool {
 func (a *application) writeEditorSessionLocked(root *storageRoot, index editorSessionIndex) error {
 	s := &a.editorSession
 	s.initLocked()
+	existing := emptyEditorSession()
 	if _, err := root.Lstat(editorSessionIndexName); err == nil {
-		if _, _, err := a.readEditorSessionLocked(root); err != nil {
+		if existing, _, err = a.readEditorSessionLocked(root); err != nil {
 			return err
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
@@ -287,6 +310,15 @@ func (a *application) writeEditorSessionLocked(root *storageRoot, index editorSe
 			return fmt.Errorf("The kept copy for editor tab %d is missing or changed.", i+1)
 		}
 		referenced[tab.Backup.ID] = true
+	}
+	if !s.given {
+		// A record of kept text that this run was never given must not leave
+		// the index: nobody could reopen that text afterwards.
+		for _, tab := range existing.Tabs {
+			if tab.Backup != nil && !referenced[tab.Backup.ID] && !s.own[tab.Backup.ID] {
+				return errEditorSessionNotGiven
+			}
+		}
 	}
 	raw, err := json.MarshalIndent(index, "", "  ")
 	if err != nil {
@@ -321,7 +353,7 @@ func (a *application) cleanupEditorSessionLocked(root *storageRoot, referenced m
 		if match := editorSessionBackupName.FindStringSubmatch(name); match != nil {
 			id := match[1]
 			written, pending := s.pending[id]
-			remove = !referenced[id] && (!pending || now.Sub(written) > editorSessionGrace) && (!s.unreadable || s.known[id])
+			remove = !referenced[id] && (!pending || now.Sub(written) > editorSessionGrace) && (!s.unreadable || s.known[id]) && (s.given || s.own[id])
 		} else if editorSessionTempName.MatchString(name) {
 			remove = !s.writing[name]
 		}
@@ -343,8 +375,10 @@ func (a *application) cleanupEditorSessionLocked(root *storageRoot, referenced m
 	return errors.Join(failures...)
 }
 
-// deleteEditorSessionLocked removes the index, every kept copy and any index
-// that was set aside, then the folder when it is empty.
+// deleteEditorSessionLocked removes the index and the kept copies, then the
+// folder when it is empty. It removes only what this run was given: a session
+// the page has not read yet is refused, and after an unreadable index was set
+// aside, that index and the copies it may name stay.
 func (a *application) deleteEditorSessionLocked() error {
 	s := &a.editorSession
 	s.initLocked()
@@ -354,6 +388,17 @@ func (a *application) deleteEditorSessionLocked() error {
 	}
 	if err != nil {
 		return err
+	}
+	if !s.given {
+		existing, err := readEditorSessionIndex(root)
+		if err != nil {
+			return errEditorSessionNotGiven
+		}
+		for _, tab := range existing.Tabs {
+			if tab.Backup != nil && !s.own[tab.Backup.ID] {
+				return errEditorSessionNotGiven
+			}
+		}
 	}
 	entries, err := readStorageDirectory(root)
 	if err != nil {
@@ -365,6 +410,13 @@ func (a *application) deleteEditorSessionLocked() error {
 		if s.writing[name] || name != editorSessionIndexName && !editorSessionBackupName.MatchString(name) && !editorSessionTempName.MatchString(name) && !editorSessionAsideName.MatchString(name) {
 			continue
 		}
+		if match := editorSessionBackupName.FindStringSubmatch(name); match != nil {
+			if id := match[1]; !s.given && !s.own[id] || s.unreadable && !s.known[id] {
+				continue
+			}
+		} else if editorSessionAsideName.MatchString(name) && s.unreadable {
+			continue
+		}
 		info, err := root.Lstat(name)
 		if err != nil || !info.Mode().IsRegular() || storageIsLink(info) {
 			continue
@@ -374,7 +426,6 @@ func (a *application) deleteEditorSessionLocked() error {
 		}
 	}
 	clear(s.pending)
-	s.unreadable = false
 	if len(failures) > 0 {
 		return errors.Join(failures...)
 	}
@@ -404,7 +455,7 @@ func (a *application) writeEditorSessionBackup(ctx context.Context, write func(i
 	temp := ".backup-" + id + ".tmp"
 	s.mu.Lock()
 	s.initLocked()
-	s.pending[id], s.writing[temp], s.known[id] = time.Now(), true, true
+	s.pending[id], s.writing[temp], s.known[id], s.own[id] = time.Now(), true, true, true
 	s.mu.Unlock()
 	success := false
 	defer func() {
@@ -539,9 +590,23 @@ func (a *application) handleEditorSession(w http.ResponseWriter, r *http.Request
 		return
 	}
 	s := &a.editorSession
+	if err := a.holdEditorSessionLease(); errors.Is(err, errEditorSessionTakeover) {
+		jsonError(w, http.StatusServiceUnavailable, err.Error())
+		return
+	}
 	switch {
 	case r.URL.Path == editorSessionEndpoint && r.Method == http.MethodGet:
+		// Bringing over a very large kept copy can take longer than an
+		// ordinary request.
+		_ = http.NewResponseController(w).SetWriteDeadline(time.Time{})
 		s.mu.Lock()
+		s.initLocked()
+		// Tabs the other editor app (main window or Text Editor) kept are
+		// reopened here when that app is not running.
+		adopted, adoptErr := a.adoptEditorSessionLocked(r.Context())
+		if adoptErr != nil {
+			log.Print("Text Editor session of the other window: ", adoptErr)
+		}
 		root, err := a.editorSessionRoot(false)
 		index, warning := emptyEditorSession(), ""
 		if err == nil {
@@ -549,7 +614,20 @@ func (a *application) handleEditorSession(w http.ResponseWriter, r *http.Request
 		} else if errors.Is(err, os.ErrNotExist) {
 			err = nil
 		}
+		if err == nil {
+			// From here on the page knows what was kept and decides about it.
+			s.given = true
+			// An index that was set aside before this read (while the other
+			// editor's tabs were taken over, or by a save) is reported now.
+			if warning == "" {
+				warning = s.asideNote
+			}
+			s.asideNote = ""
+		}
 		s.mu.Unlock()
+		if _, mode := a.otherEditorWorkspace(); adopted > 0 {
+			warning = strings.TrimSpace(warning + " " + editorSessionAdoptionNote(adopted, mode))
+		}
 		if err != nil {
 			jsonError(w, http.StatusInternalServerError, "The last Text Editor session could not be read: "+err.Error())
 			return
@@ -599,6 +677,10 @@ func (a *application) handleEditorSession(w http.ResponseWriter, r *http.Request
 		s.mu.Lock()
 		err := a.deleteEditorSessionLocked()
 		s.mu.Unlock()
+		if errors.Is(err, errEditorSessionNotGiven) {
+			jsonError(w, http.StatusConflict, err.Error())
+			return
+		}
 		if err != nil {
 			jsonError(w, http.StatusInternalServerError, "The kept editor session could not be removed: "+err.Error())
 			return

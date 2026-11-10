@@ -301,7 +301,7 @@ document.addEventListener('submit',event=>{
   if(pending.target&&!itemFor(pending.target)){toast('This session changed. Open its actions again.');closeModal();return;}
   const folder=folders.normalize(byId('sessionLibrarySaveFolder')?.value);
   if(pending.mode==='rename'){const item=itemFor(pending.target);item.name=name;item.nameExplicit=true;item._namePending=true;item.folder=folder;}
-  else{if(profiles().length>=100){toast('Remove a saved session before adding another. The limit is 100.');return;}state.terminalProfiles=[{id:'terminal-profile-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8),name:(name||(root.NetworkToolkitTerminalPromptLabels?.fallback(pending.config)||label(pending.config))).slice(0,100),nameExplicit:!!name,nameRevision:0,_nameNew:true,_namePending:true,folder,...pending.config},...profiles()];}
+  else{const full=root.NetworkToolkitSharedData?.full('terminalProfiles',profiles().length);if(full){toast(full);return;}state.terminalProfiles=[{id:'terminal-profile-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8),name:(name||(root.NetworkToolkitTerminalPromptLabels?.fallback(pending.config)||label(pending.config))).slice(0,100),nameExplicit:!!name,nameRevision:0,_nameNew:true,_namePending:true,folder,...pending.config},...profiles()];}
   pendingName=null;closeModal();changed();
  }else if(event.target.id==='sessionLibraryFolderForm'){
   event.preventDefault();event.stopImmediatePropagation();const pending=pendingFolder;if(!pending)return;

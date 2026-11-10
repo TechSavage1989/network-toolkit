@@ -1,0 +1,20 @@
+Network Toolkit 1.21.40
+
+## What's New
+
+- The full Toolkit, the standalone Terminal and the standalone Text Editor now share your saved connections, saved passwords, trusted SSH keys, macros and settings. Save a connection or change a setting in one app and it is there in the others, without restarting.
+- The portable and the installed program use the same data, so a session saved in one is available in the other and in both standalone apps.
+- The first start after this update brings together what each app had saved on its own. Nothing is removed, and a notice tells you what was added.
+
+## Additional Details
+
+- Each window still keeps its own layout: the page it was on, open panels and their sizes, and unfinished forms.
+- Saved passwords of the previous standalone Terminal vault are not moved by themselves, because that vault can have a different master password. Open Password manager and choose Import saved credentials from the previous Terminal vault.
+- Trusted SSH keys are combined. If two apps had different keys for one host, the full Toolkit's key stays and you are told which hosts to check. Hosts that came from another app's list are named, so you can remove any you do not want (Saved sidebar, SSH host keys).
+- When one Text Editor app is closed, the other can reopen its tabs and unsaved text. Unsaved text is reopened even when Reopen files next time is off.
+- Saved sessions and saved FTP connections hold up to 200 each. A full list refuses a new entry with a message instead of dropping an old one.
+- Update every copy of Network Toolkit, portable and installed. If an older copy saves to the same data folder, this version puts back the saved connections that copy dropped and tells you; other changes made while an older copy is open can be replaced by it.
+- Delete app data now clears the folders of all three apps, and its confirmation says so. Credential vaults are still kept.
+- An untouched copy of each data file from before this change is kept beside it (Network_Toolkit.before-sharing).
+- Setup and uninstall wait a few seconds when a scanner briefly holds a program file, and record why they stopped.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.

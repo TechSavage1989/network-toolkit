@@ -6,7 +6,7 @@ const route='/editor-views/saved-connections';
 const safeProfile=p=>p&&typeof p.id==='string'&&/^(ssh|ftp):.{1,100}$/.test(p.id)&&typeof p.name==='string'&&p.name.length<=100&&typeof p.host==='string'&&p.host.length<=255&&Number.isInteger(p.port)&&p.port>0&&p.port<=65535&&['ssh','ftp','ftps'].includes(p.protocol)?{id:p.id,name:p.name,host:p.host,port:p.port,protocol:p.protocol}:null;
 async function list(){
  const result=await api(route),child=detached();
- profiles=(Array.isArray(result?.profiles)?result.profiles:[]).slice(0,300).map(safeProfile).filter(p=>p&&(!child||p.protocol==='ssh'));
+ profiles=(Array.isArray(result?.profiles)?result.profiles:[]).map(safeProfile).filter(p=>p&&(!child||p.protocol==='ssh'));
  pendingRequest=typeof result.pendingRequest==='string'?result.pendingRequest:'';
  syncPending();return {profiles:profiles.map(p=>({...p})),detached:child,requiresApproval:child,pendingRequest};
 }

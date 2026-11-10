@@ -87,16 +87,5 @@ func TestRemovedExternalTerminalPreferencesOnReadWriteAndWorkspaceSeed(t *testin
 	if err = os.WriteFile(settings, []byte(legacyTerminalSettings), 0600); err != nil {
 		t.Fatal(err)
 	}
-	dest := filepath.Join(dir, "terminal-fixture")
-	if err = os.Mkdir(dest, 0700); err != nil {
-		t.Fatal(err)
-	}
-	if err = seedTerminalWorkspace(dir, dest); err != nil {
-		t.Fatal(err)
-	}
-	seed, err := os.ReadFile(filepath.Join(dest, "Network_Toolkit.settings.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	assertBuiltInTerminalSettings(t, seed)
+	assertBuiltInTerminalSettings(t, standaloneTerminalState(t, dir))
 }
