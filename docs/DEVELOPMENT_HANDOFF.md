@@ -1,3 +1,17 @@
+# v1.21.41 Beta 1 - Safer recovery of shared settings and saved data
+
+v1.21.40 was published and verified: tag at merge commit 3c08e58 (PR #162), release run 42803456524 green (build, windows-setup, publish), all seven assets matching GitHub's digests, `github_release.py verify` reporting "Verified 1.21.40", main's Checks run 42803456756 green, stable channel still at v1.21.34. Four independent reviews ran on that change. The second found four more data-loss paths (an older window re-saving identical bytes hid another app's save; the migration recorded entries before its write succeeded; a standalone app recreating a missing settings file wiped main-only lists; vault identity creation from a standalone app undid another app's save) and the third found the missing-settings-file case still losing data on three write paths; all were fixed before the merge. The fourth found nothing at HIGH and three MEDIUM cases, which v1.21.40 shipped with and this version fixes.
+
+Fixed here (`shared_review4_test.go`, design in `docs/SHARED_APP_DATA.md`):
+
+- "Delete app data" run from an older build left `Network_Toolkit.saved-lists.json`, and this version showed the saved entries again. The copy is now paired with its data folder: one id is the value of the `sharedDataWriter` mark, `pair` in the copy, and the content of `Network_Toolkit.Views/00000000000000000000000000000000/Network_Toolkit.window.json`, which every version's delete removes. An unpaired copy is ignored and removed at the next start. A copy written by v1.21.40 has no id and is trusted as before.
+- A standalone app without a usable copy no longer refuses (409) to write a missing settings file; it writes what it holds and marks the main-only keys as absent (`sharedMainOnlyAbsent`), which a running main window honours and clears. An app that finds the file written anew adds what it holds instead of reading absences as removals.
+- With the file missing and the copy readable, a running app merges the copy three ways into what it holds before any write; a copy unreadable at start is taken in before the first write; anything recovered from the copy is named in a notice.
+
+Known limits: the copy holds only saved lists and main-only keys, so other settings of a stale app can win after a lost file; with no file, no usable copy and no main window running, main-only data is gone; mixed with v1.21.40 (which strips the id from the copy on each save) the pairing is restored only while the Views entry exists. Not yet seen on physical Windows.
+
+---
+
 # v1.21.40 Beta 1 - One set of settings and saved data for all three apps
 
 Owner: "any saved session from the portable app should be accessible to the installer version and the standalone installed version of terminal and vice versa. Same with Text editor files", "the settings should also carry from the main toolkit app to the standalones" and "my terminal for example should have all the same settings, and so should text editor".

@@ -1,3 +1,8 @@
+## 1.21.41 Beta 1 - Safer recovery of shared settings and saved data
+
+- A lost settings file is recovered from the safety copy with a notice; a standalone app no longer refuses to save, and a minimized app no longer writes an older list over newer changes.
+- Delete app data run from an older copy is no longer undone at the next start.
+
 ## 1.21.40 Beta 1 - One set of settings and saved data for all three apps
 
 - The full Toolkit (portable or installed), the standalone Terminal and the standalone Text Editor share saved connections, saved passwords, trusted SSH keys, macros and settings; a change in one app appears in the others without restarting.
