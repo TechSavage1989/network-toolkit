@@ -24,11 +24,17 @@ const (
 	VaultSecretSetPassword VaultSecretMode = "set-password"
 	// Asks for the current master password before switching to Windows-account protection.
 	VaultSecretRemovePassword VaultSecretMode = "remove-password"
+	// Asks for the master password of the vault an earlier version kept for a
+	// standalone window, to copy its saved credentials into the shared vault.
+	VaultSecretImport VaultSecretMode = "import"
 )
 
 type VaultSecretRequest struct {
 	Mode  VaultSecretMode
 	Owner uintptr
+	// Label names the window whose previous vault is imported ("Terminal").
+	// Metadata only, never a secret.
+	Label string
 }
 
 // The backend caller owns these byte slices and must clear them after use.
@@ -241,6 +247,16 @@ func vaultSecretSpec(request VaultSecretRequest) (vaultDialogSpec, error) {
 		spec.body = "Enter the current master password to switch to automatic unlock. " + vaultNoPasswordDisclosure
 		spec.remember = false
 		spec.acceptLabel = "Remove password"
+		newPassword = false
+	case VaultSecretImport:
+		label := "standalone"
+		if request.Label == "Terminal" || request.Label == "Text Editor" {
+			label = request.Label
+		}
+		spec.title = "Network Toolkit — import saved credentials"
+		spec.body = "Enter the master password of the previous " + label + " credential vault. Its saved credentials are copied into the vault that Network Toolkit, the Terminal and the Text Editor now share. The previous vault is not changed."
+		spec.remember = false
+		spec.acceptLabel = "Import"
 		newPassword = false
 	case VaultSecretRecover:
 		spec.title = "Network Toolkit — recover credential vault"

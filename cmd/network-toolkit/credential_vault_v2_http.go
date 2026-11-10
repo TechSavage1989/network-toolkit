@@ -29,6 +29,8 @@ func (a *application) handleCredentialVault(w http.ResponseWriter, r *http.Reque
 	}
 	var request struct {
 		Action string `json:"action"`
+		// For import-previous: which standalone window's previous vault.
+		Source string `json:"source,omitempty"`
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 1024)
 	decoder := json.NewDecoder(r.Body)
@@ -145,6 +147,21 @@ func (a *application) handleCredentialVault(w http.ResponseWriter, r *http.Reque
 				a.credentials.mu.Unlock()
 			}
 		}
+	case "import-previous":
+		// Copy the saved credentials of the vault an earlier version kept for a
+		// standalone window into the shared vault. That vault is only read.
+		result, importErr := a.importPreviousVault(r.Context(), request.Source)
+		if importErr != nil {
+			code := http.StatusBadRequest
+			if errors.Is(importErr, errCredentialVaultLocked) {
+				code = http.StatusLocked
+			}
+			jsonError(w, code, importErr.Error())
+			return
+		}
+		status := a.credentials.status()
+		jsonResponse(w, 200, map[string]any{"ok": true, "available": status.Available, "state": status.State, "remembered": status.Remembered, "hasRecovery": status.HasRecovery, "legacyBackup": status.LegacyBackup, "warning": status.Warning, "protection": status.Protection, "mode": status.Mode, "imported": result.Imported, "alreadyPresent": result.Present, "skipped": result.Skipped, "previousVaults": a.previousVaults()})
+		return
 	case "setup-windows":
 		status := a.credentials.status()
 		if status.State != "setup-required" && status.State != "legacy" {

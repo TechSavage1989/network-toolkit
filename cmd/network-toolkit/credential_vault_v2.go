@@ -407,6 +407,14 @@ func (v *credentialVault) status() credentialVaultStatus {
 	defer v.mu.Unlock()
 	if v.state == "unlocked" {
 		_ = v.requireUnlockedLocked()
+	} else if v.state != "pending-authentication" {
+		// Another app of this data folder may have set the vault up, deleted
+		// it or changed it since this app last looked: start over from the
+		// files on disk, as a newly started app would.
+		raw, err := readCredentialFile(v.path, vaultcrypto.MaxEnvelopeBytes)
+		if missing := errors.Is(err, os.ErrNotExist); missing != (v.raw == nil) || err == nil && !bytes.Equal(raw, v.raw) {
+			v.reloadExternalLocked()
+		}
 	}
 	_, legacyErr := os.Lstat(v.legacyPath)
 	state := v.state
