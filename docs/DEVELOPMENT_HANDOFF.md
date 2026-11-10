@@ -4,6 +4,8 @@ Setup uses the selected program folder and preserves it on upgrade. The optional
 
 Published as opt-in prerelease https://github.com/TechSavage1989/network-toolkit/releases/tag/v1.21.36 at 2026-11-10T03:20:43Z; stable latest remains v1.21.34. PR #155 merged after both Checks runs passed on 09daee9 (the push run's `browser-workflows107` hit the known `graph-scale119` live-window intermittent once and passed on its single re-run). Tag v1.21.36 points to merge commit 9316b2f787032d31fe455e425cd7a38d48909f24; Release run 42748387582 passed build, the hosted Windows setup test and publish. The seven downloaded assets (executable, Portable and Update ZIPs, Windows x64 setup, Linux x86_64 and aarch64 tarballs, SHA256SUMS) match GitHub's digests, and `python scripts/github_release.py verify --tag v1.21.36 --output-dir <folder>` reports "Verified 1.21.36".
 
+After the merge, the main Checks run for 9316b2f failed `windows-setup`: right after `Uninstall.exe /S` returned, `Network_Toolkit.exe` was still in the install folder. NSIS uninstallers copy themselves to a temporary folder, start the copy and exit at once, so `verify-windows.ps1` (used by Checks and the Release gate) raced the copy. It now waits for that child process before checking what was removed. `editor-views112` re-focuses the file-sidebar resize handle while waiting, because the sidebar can re-mount after the 390 px layout and drop focus. That focus wait failed twice in a row on the docs-only PR #156.
+
 ---
 
 # v1.21.35 Beta 1 - Windows installation and editor defaults
