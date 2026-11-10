@@ -7,6 +7,17 @@ Open or create a document, review its source/connection, then edit. Save explici
 
 Hold **Ctrl** and roll the mouse wheel over editor text to change the font size. Wheel up enlarges the text and wheel down shrinks it. In Compare and Split View, both panes use the same size shown in the **Font size** control.
 
+## Reopen files from the last session
+Like Notepad and Notepad++, the Text Editor reopens the tabs that were open when it last closed, in the same order, with the same tab selected. Unsaved changes come back too, still marked as unsaved. The main window reopens its tabs the first time the Text Editor opens there; the Text Editor app reopens its own tabs when it starts. Detached editor windows do not keep a session.
+
+- Files on your computer reopen from disk. A file with unsaved changes shows your unsaved version. If the file changed on disk since then, the editor says so, and **Save** refuses to replace the newer file; use **Save As** to keep your version. If the file was deleted, your text opens in a new untitled tab.
+- New, unsaved documents reopen with their text. Blank, untouched documents are not kept.
+- Unsaved text from an SFTP, FTP, SSH terminal or browser file opens as a new untitled tab that names where it came from. Reconnect and use **Save As** to save it there. Remote files without unsaved changes are not reopened, and connection details and passwords are never stored.
+
+While this is on, closing the app or the Text Editor does not ask about unsaved changes that were kept. It still asks about any document whose text could not be kept. Closing a single tab, or **Close editor**, asks as before.
+
+To turn this off, open **More** and clear **Reopen files and unsaved changes from the last session**. Turning it off removes the kept session and its unsaved text. Unsaved text is kept in a `Network_Toolkit.editor-session` folder in this app's data folder until it is saved or its tab is closed; large files are copied without a size limit, so the folder needs room for them. Moving the data folder moves the session too, and deleting stored app data removes it.
+
 ## Compare
 Choose two documents in the comparison view. The change map shows individual changed lines on the left and right tracks. Use the wheel or the map's scrollbar to browse it independently, then click a mark to jump to that line. Sync scroll keeps the comparison panes together as you navigate.
 
