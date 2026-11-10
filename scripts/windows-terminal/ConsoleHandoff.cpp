@@ -167,7 +167,11 @@ HRESULT reported(const char* stage, HRESULT status) noexcept {
     return status;
 }
 
-bool matchesIdentity(const Identity& receiver, HANDLE process) {
+// The console host must match the broker exactly. A client may run at a
+// lower integrity than the broker (an unelevated shell on a desktop whose
+// session user has no split token), never higher: a more privileged console
+// is not shown in a less privileged window.
+bool matchesIdentity(const Identity& receiver, HANDLE process, bool allowLowerIntegrity = false) {
     Identity sender;
     if (!processIdentity(process, sender)) {
         diagnostic("identity-token", lastError());
@@ -177,7 +181,7 @@ bool matchesIdentity(const Identity& receiver, HANDLE process) {
         diagnostic("identity-session", E_ACCESSDENIED);
         return false;
     }
-    if (sender.integrity != receiver.integrity) {
+    if (sender.integrity > receiver.integrity || (!allowLowerIntegrity && sender.integrity != receiver.integrity)) {
         diagnostic("identity-integrity", E_ACCESSDENIED);
         return false;
     }
@@ -356,7 +360,7 @@ public:
             return reported("receiver-identity", E_ACCESSDENIED);
         }
         if (!matchesIdentity(receiver, server)) return reported("source-identity", E_ACCESSDENIED);
-        if (!matchesIdentity(receiver, client)) return reported("client-identity", E_ACCESSDENIED);
+        if (!matchesIdentity(receiver, client, true)) return reported("client-identity", E_ACCESSDENIED);
         diagnostic("identity-verified");
         if (handedOff.exchange(true)) return reported("handoff-already-used", HRESULT_FROM_WIN32(ERROR_ALREADY_INITIALIZED));
 

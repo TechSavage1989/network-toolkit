@@ -22,9 +22,6 @@ if ($identity.Name -notmatch '\\runneradmin$') {
 }
 $integrity = (& (Join-Path $env:SystemRoot 'System32\whoami.exe') /groups /fo csv /nh | Where-Object { $_ -match '"S-1-16-\d+"' } |
     ForEach-Object { if ($_ -match '"(S-1-16-\d+)"') { $Matches[1] } }) | Select-Object -First 1
-if ($integrity -ne 'S-1-16-8192') {
-    throw "Run the handoff proof unelevated (medium integrity); this process has $integrity."
-}
 $localData = $env:LOCALAPPDATA
 
 Add-Type -Path (Join-Path $PSScriptRoot 'InteractiveSmoke.cs')
@@ -98,7 +95,7 @@ function Test-Shell([string]$Name, [string]$Executable, [string]$Arguments,
     $fixtureShellPid = [DefaultTerminalSmoke]::LaunchNewConsole($Executable, $Arguments, $PSScriptRoot)
     $shell = [Diagnostics.Process]::GetProcessById($fixtureShellPid)
     $processes.Add($shell)
-    $result = [ordered]@{ shell = $Name; shellPid = $fixtureShellPid; window = $false; input = $false }
+    $result = [ordered]@{ shell = $Name; shellPid = $fixtureShellPid; shellIntegrity = [DefaultTerminalSmoke]::ProcessIntegrity($fixtureShellPid); window = $false; input = $false }
     $results.shells += $result
 
     Wait-ForFile (Join-Path $PSScriptRoot "$Name-startup.txt") $StartupMarker
@@ -208,6 +205,7 @@ try {
         } finally { $current.Dispose() }
         $controlPid = [DefaultTerminalSmoke]::LaunchNewConsole((Join-Path $env:SystemRoot 'System32\cmd.exe'),
             '/D /Q /K "echo control>control-startup.txt"', $PSScriptRoot)
+        $control.shellIntegrity = [DefaultTerminalSmoke]::ProcessIntegrity($controlPid)
         $processes.Add([Diagnostics.Process]::GetProcessById($controlPid))
         Wait-ForFile (Join-Path $PSScriptRoot 'control-startup.txt') 'control'
         $control.startupMarker = $true

@@ -16,6 +16,11 @@ public static class DefaultTerminalSmoke
     private const uint MouseLeftDown = 2;
     private const uint MouseLeftUp = 4;
     private const string HostClass = "NetworkToolkit.WebView2.Window";
+    private const uint SaferScopeUser = 2;
+    private const uint SaferLevelNormalUser = 0x20000;
+    private const uint SaferLevelOpen = 1;
+    private const int TokenIntegrityLevelClass = 25;
+    private const uint GroupIntegrity = 0x20;
 
     public static uint LaunchNewConsole(string executable, string arguments, string workingDirectory)
     {
@@ -26,12 +31,68 @@ public static class DefaultTerminalSmoke
         var startup = new StartupInfo { Size = (uint)Marshal.SizeOf(typeof(StartupInfo)) };
         var command = new StringBuilder("\"" + executable + "\" " + arguments);
         ProcessInfo info;
-        if (!CreateProcess(executable, command, IntPtr.Zero, IntPtr.Zero, false,
-                           CreateNewConsole, IntPtr.Zero, workingDirectory, ref startup, out info))
+        // Windows hands only unelevated consoles to another terminal. The hosted
+        // runner account has no split token, so start the shell the way an
+        // ordinary user's shell runs: Safer "normal user" token (Administrators
+        // deny-only, privileges removed) at medium integrity.
+        IntPtr level, token = IntPtr.Zero, sid = IntPtr.Zero, label = IntPtr.Zero;
+        if (!SaferCreateLevel(SaferScopeUser, SaferLevelNormalUser, SaferLevelOpen, out level, IntPtr.Zero))
             throw new Win32Exception(Marshal.GetLastWin32Error());
+        try
+        {
+            if (!SaferComputeTokenFromLevel(level, IntPtr.Zero, out token, 0, IntPtr.Zero))
+                throw new Win32Exception(Marshal.GetLastWin32Error());
+            if (!ConvertStringSidToSid("S-1-16-8192", out sid))
+                throw new Win32Exception(Marshal.GetLastWin32Error());
+            int size = Marshal.SizeOf(typeof(SidAndAttributes)) + GetLengthSid(sid);
+            label = Marshal.AllocHGlobal(size);
+            Marshal.StructureToPtr(new SidAndAttributes { Sid = sid, Attributes = GroupIntegrity }, label, false);
+            if (!SetTokenInformation(token, TokenIntegrityLevelClass, label, (uint)size))
+                throw new Win32Exception(Marshal.GetLastWin32Error());
+            if (!CreateProcessAsUser(token, executable, command, IntPtr.Zero, IntPtr.Zero, false,
+                                     CreateNewConsole, IntPtr.Zero, workingDirectory, ref startup, out info))
+            {
+                int error = Marshal.GetLastWin32Error();
+                if (error != 1314 || !CreateProcessWithTokenW(token, 0, executable, command,
+                        CreateNewConsole, IntPtr.Zero, workingDirectory, ref startup, out info))
+                    throw new Win32Exception(error == 1314 ? Marshal.GetLastWin32Error() : error);
+            }
+        }
+        finally
+        {
+            if (label != IntPtr.Zero) Marshal.FreeHGlobal(label);
+            if (sid != IntPtr.Zero) LocalFree(sid);
+            if (token != IntPtr.Zero) CloseHandle(token);
+            SaferCloseLevel(level);
+        }
         CloseHandle(info.Thread);
         CloseHandle(info.Process);
         return info.ProcessId;
+    }
+
+    // Mandatory label RID of a process (8192 medium, 12288 high), or -1.
+    public static int ProcessIntegrity(uint processId)
+    {
+        IntPtr process = OpenProcess(0x1000, false, processId), token = IntPtr.Zero, buffer = IntPtr.Zero;
+        if (process == IntPtr.Zero) return -1;
+        try
+        {
+            if (!OpenProcessToken(process, 8, out token)) return -1;
+            uint needed;
+            GetTokenInformation(token, TokenIntegrityLevelClass, IntPtr.Zero, 0, out needed);
+            if (needed == 0) return -1;
+            buffer = Marshal.AllocHGlobal((int)needed);
+            if (!GetTokenInformation(token, TokenIntegrityLevelClass, buffer, needed, out needed)) return -1;
+            IntPtr labelSid = Marshal.ReadIntPtr(buffer);
+            int count = Marshal.ReadByte(GetSidSubAuthorityCount(labelSid));
+            return count == 0 ? -1 : Marshal.ReadInt32(GetSidSubAuthority(labelSid, (uint)(count - 1)));
+        }
+        finally
+        {
+            if (buffer != IntPtr.Zero) Marshal.FreeHGlobal(buffer);
+            if (token != IntPtr.Zero) CloseHandle(token);
+            CloseHandle(process);
+        }
     }
 
     public static IntPtr FindWindow(uint expectedProcess)
@@ -155,6 +216,25 @@ public static class DefaultTerminalSmoke
         IntPtr processAttributes, IntPtr threadAttributes, bool inherit, uint flags, IntPtr environment,
         string currentDirectory, ref StartupInfo startup, out ProcessInfo process);
     [DllImport("kernel32.dll")] private static extern bool CloseHandle(IntPtr handle);
+    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern bool CreateProcessAsUser(IntPtr token, string application, StringBuilder commandLine,
+        IntPtr processAttributes, IntPtr threadAttributes, bool inherit, uint flags, IntPtr environment,
+        string currentDirectory, ref StartupInfo startup, out ProcessInfo process);
+    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern bool CreateProcessWithTokenW(IntPtr token, uint logonFlags, string application, StringBuilder commandLine,
+        uint flags, IntPtr environment, string currentDirectory, ref StartupInfo startup, out ProcessInfo process);
+    [DllImport("advapi32.dll", SetLastError = true)] private static extern bool SaferCreateLevel(uint scope, uint level, uint flags, out IntPtr handle, IntPtr reserved);
+    [DllImport("advapi32.dll", SetLastError = true)] private static extern bool SaferComputeTokenFromLevel(IntPtr level, IntPtr inToken, out IntPtr outToken, uint flags, IntPtr reserved);
+    [DllImport("advapi32.dll")] private static extern bool SaferCloseLevel(IntPtr level);
+    [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)] private static extern bool ConvertStringSidToSid(string sid, out IntPtr value);
+    [DllImport("advapi32.dll")] private static extern int GetLengthSid(IntPtr sid);
+    [DllImport("advapi32.dll", SetLastError = true)] private static extern bool SetTokenInformation(IntPtr token, int kind, IntPtr information, uint length);
+    [DllImport("advapi32.dll", SetLastError = true)] private static extern bool GetTokenInformation(IntPtr token, int kind, IntPtr information, uint length, out uint needed);
+    [DllImport("advapi32.dll", SetLastError = true)] private static extern bool OpenProcessToken(IntPtr process, uint access, out IntPtr token);
+    [DllImport("advapi32.dll")] private static extern IntPtr GetSidSubAuthorityCount(IntPtr sid);
+    [DllImport("advapi32.dll")] private static extern IntPtr GetSidSubAuthority(IntPtr sid, uint index);
+    [DllImport("kernel32.dll", SetLastError = true)] private static extern IntPtr OpenProcess(uint access, bool inherit, uint processId);
+    [DllImport("kernel32.dll")] private static extern IntPtr LocalFree(IntPtr memory);
     [DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();
     [DllImport("ole32.dll")] private static extern int CoInitializeEx(IntPtr reserved, uint flags);
     [DllImport("ole32.dll")] private static extern void CoUninitialize();
@@ -188,6 +268,8 @@ public static class DefaultTerminalSmoke
         public IntPtr Process, Thread;
         public uint ProcessId, ThreadId;
     }
+    [StructLayout(LayoutKind.Sequential)]
+    private struct SidAndAttributes { public IntPtr Sid; public uint Attributes; }
     [StructLayout(LayoutKind.Sequential)]
     private struct Rect { public int Left, Top, Right, Bottom; }
     [StructLayout(LayoutKind.Sequential)]
