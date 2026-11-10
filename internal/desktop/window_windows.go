@@ -247,7 +247,7 @@ func Run(ctx context.Context, cfg Config) error {
 		return nativeError("get application module", callErr)
 	}
 	className := utf16String("NetworkToolkit.WebView2.Window")
-	icon, _, _ := wndLoadIcon.Call(instance, 1)  // Linked group icon resource 1.
+	icon, _, _ := wndLoadIcon.Call(instance, cfgIconResource(cfg))
 	cursor, _, _ := wndLoadCursor.Call(0, 32512) // IDC_ARROW
 	class := windowClass{
 		Size: uint32(unsafe.Sizeof(windowClass{})), Style: 0x0003,
