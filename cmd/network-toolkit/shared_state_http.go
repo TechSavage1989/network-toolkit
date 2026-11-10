@@ -290,7 +290,7 @@ func (a *application) putState(w http.ResponseWriter, r *http.Request) {
 	ours := sharedSectionOf(state, keys)
 	// One transaction for every app of this data folder: read what is on
 	// disk, merge the page's changes into it and write the result.
-	release, lockErr := acquireCredentialGuardWait(a.sharedRoot(), sharedLockWait)
+	release, lockErr := acquireSettingsLock(a.sharedRoot())
 	if lockErr != nil {
 		jsonError(w, http.StatusConflict, lockErr.Error())
 		return
@@ -482,7 +482,7 @@ func sharedValuesEmpty(values map[string]any) bool {
 // Callers hold stateMu.
 func (a *application) updateSharedLocked(change func(shared map[string]any) error) error {
 	a.ensureShared()
-	release, err := acquireCredentialGuardWait(a.sharedRoot(), sharedLockWait)
+	release, err := acquireSettingsLock(a.sharedRoot())
 	if err != nil {
 		return err
 	}

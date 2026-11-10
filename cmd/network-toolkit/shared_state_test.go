@@ -84,6 +84,17 @@ func pageJSON(value any) string {
 
 func openSharedPage(t *testing.T, app *application) *sharedPage {
 	t.Helper()
+	p := loadSharedPage(t, app)
+	if p.poll() {
+		t.Fatal("a page that has just loaded was told its shared values changed")
+	}
+	return p
+}
+
+// loadSharedPage loads a page without asking for changes afterwards, for a
+// test in which another app may save at that very moment.
+func loadSharedPage(t *testing.T, app *application) *sharedPage {
+	t.Helper()
 	p := &sharedPage{t: t, app: app, baseline: map[string]string{}}
 	r := requestApp(app, "GET", "/api/state", "", true)
 	if r.Code != 200 || json.Unmarshal(r.Body.Bytes(), &p.state) != nil {
@@ -99,9 +110,6 @@ func openSharedPage(t *testing.T, app *application) *sharedPage {
 	}
 	for _, key := range sharedDataKeys {
 		p.baseline[key.Name] = pageJSON(p.state[key.Name])
-	}
-	if p.poll() {
-		t.Fatal("a page that has just loaded was told its shared values changed")
 	}
 	return p
 }

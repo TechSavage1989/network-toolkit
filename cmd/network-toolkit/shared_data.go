@@ -34,8 +34,11 @@ const (
 	sharedBaseField = "_sharedBase"
 	// The request may carry the settings and those earlier values.
 	appStateRequestLimit = 4 << 20
-	sharedLockWait       = 5 * time.Second
 )
+
+// How long a change waits for another app that is saving at this moment
+// before it is reported as busy. A variable so that a test can shorten it.
+var sharedLockWait = 5 * time.Second
 
 // terminalPromptNameIdentity names a learned prompt name by its endpoint.
 func terminalPromptNameIdentity(item map[string]any) string {
@@ -399,6 +402,21 @@ func acquireCredentialGuardWait(dir string, wait time.Duration) (func(), error) 
 		}
 		time.Sleep(15 * time.Millisecond)
 	}
+}
+
+// errSharedSettingsBusy is reported when another app of the data folder was
+// still saving after the wait. Nothing was written; the page keeps the change
+// and saves it again.
+var errSharedSettingsBusy = errors.New("Settings were not saved: another Network Toolkit app is saving at this moment. Try again in a moment.")
+
+// acquireSettingsLock takes the lock that guards the data folder's settings
+// file, waiting a short time for another app that is saving.
+func acquireSettingsLock(root string) (func(), error) {
+	release, err := acquireCredentialGuardWait(root, sharedLockWait)
+	if errors.Is(err, errCredentialGuardBusy) {
+		return nil, errSharedSettingsBusy
+	}
+	return release, err
 }
 
 var sharedLockLocal sync.Map // one in-process mutex per lock file
