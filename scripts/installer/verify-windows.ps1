@@ -69,6 +69,7 @@ $dataDir = Join-Path $env:LOCALAPPDATA 'NetworkToolkit'
 $installedExe = Join-Path $installDir 'Network_Toolkit.exe'
 $uninstaller = Join-Path $installDir 'Uninstall.exe'
 $menu = Join-Path ([Environment]::GetFolderPath('Programs')) 'Network Toolkit'
+$desktopShortcut = Join-Path ([Environment]::GetFolderPath('DesktopDirectory')) 'Network Toolkit.lnk'
 $uninstallSubkey = 'Software\Microsoft\Windows\CurrentVersion\Uninstall\NetworkToolkit'
 $uninstallKey = "HKCU:\$uninstallSubkey"
 $appKey = 'HKCU:\Software\Network Toolkit'
@@ -84,7 +85,7 @@ $shortcutArguments = [ordered]@{
     'Network Toolkit Terminal.lnk' = '--terminal'
 }
 
-foreach ($path in @($installDir, $dataDir, $menu, $uninstallKey, "HKLM:\$uninstallSubkey", $appKey, $progKey)) {
+foreach ($path in @($installDir, $dataDir, $menu, $desktopShortcut, $uninstallKey, "HKLM:\$uninstallSubkey", $appKey, $progKey)) {
     Assert-Absent $path
 }
 Assert-Same (Read-RegistryValue $registeredApps $registeredName) $null 'Preexisting app registration'
@@ -165,6 +166,7 @@ Write-Host 'Checking silent install, shortcuts, and editor registration.'
 Invoke-Silent $setup
 Assert-Installed
 Assert-Preserved
+Assert-Absent $desktopShortcut
 
 Write-Host 'Checking install and uninstall leave a locked program intact.'
 $temporaryUninstaller = Join-Path $env:RUNNER_TEMP "ntk-uninstall-$([Guid]::NewGuid().ToString('N')).exe"
@@ -211,6 +213,33 @@ foreach ($path in @($installedExe, $uninstaller, $menu, $uninstallKey, "HKLM:\$u
 Assert-Same (Read-RegistryValue $registeredApps $registeredName) $null 'Removed Default Apps registration'
 foreach ($ext in $extensions) {
     Assert-Same (Read-RegistryValue "HKCU:\Software\Classes\$ext\OpenWithProgids" $progID) $null "Removed $ext Open With registration"
+}
+Assert-Preserved
+Write-Host 'Checking custom location, optional desktop shortcut, and in-place upgrade.'
+$defaultInstallDir = $installDir
+$installDir = Join-Path $env:RUNNER_TEMP 'Custom Network Toolkit Install'
+$installedExe = Join-Path $installDir 'Network_Toolkit.exe'
+$uninstaller = Join-Path $installDir 'Uninstall.exe'
+Invoke-Silent $setup 0 "/S /DesktopShortcut /D=$installDir"
+Assert-Installed
+$desktopShell = New-Object -ComObject WScript.Shell
+try {
+    if (-not (Test-Path -LiteralPath $desktopShortcut -PathType Leaf)) { throw 'Selected desktop shortcut is missing.' }
+    $desktopLink = $desktopShell.CreateShortcut($desktopShortcut)
+    try {
+        Assert-Same $desktopLink.TargetPath $installedExe 'Desktop shortcut target'
+        Assert-Same $desktopLink.Arguments '' 'Desktop shortcut arguments'
+    } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($desktopLink) }
+} finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($desktopShell) }
+Assert-Absent (Join-Path $defaultInstallDir 'Network_Toolkit.exe')
+
+# Re-running Setup with no location switch must reuse the registered custom folder.
+Invoke-Silent $setup
+Assert-Installed
+Assert-Same (Read-RegistryValue $uninstallKey 'DesktopShortcut') 1 'Preserved desktop shortcut choice'
+Invoke-Silent $uninstaller
+foreach ($path in @($installedExe, $uninstaller, $menu, $uninstallKey, $desktopShortcut)) {
+    Assert-Absent $path
 }
 Assert-Preserved
 Write-Host "Windows setup smoke passed for $version."

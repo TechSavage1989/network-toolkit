@@ -4,6 +4,7 @@ RequestExecutionLevel user
 
 !include "MUI2.nsh"
 !include "FileFunc.nsh"
+!include "Sections.nsh"
 !include "WordFunc.nsh"
 !include "x64.nsh"
 
@@ -19,6 +20,7 @@ RequestExecutionLevel user
 Name "${APP_NAME} ${APP_VERSION}"
 OutFile "${SETUP_EXE}"
 InstallDir "${INSTALL_DIR}"
+InstallDirRegKey HKCU "${UNINSTALL_KEY}" "InstallLocation"
 SetCompressor /SOLID lzma
 VIProductVersion "${APP_VERSION}.0"
 VIAddVersionKey "ProductName" "${APP_NAME}"
@@ -34,6 +36,9 @@ VIAddVersionKey "LegalCopyright" "Network Toolkit contributors"
 !define MUI_FINISHPAGE_RUN_NOTCHECKED
 !define MUI_FINISHPAGE_RUN_FUNCTION OpenDefaultApps
 !insertmacro MUI_PAGE_WELCOME
+!define MUI_PAGE_CUSTOMFUNCTION_PRE ShowDirectoryPage
+!insertmacro MUI_PAGE_DIRECTORY
+!insertmacro MUI_PAGE_COMPONENTS
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
 !insertmacro MUI_UNPAGE_CONFIRM
@@ -41,6 +46,8 @@ VIAddVersionKey "LegalCopyright" "Network Toolkit contributors"
 !insertmacro MUI_LANGUAGE "English"
 
 Var StagedApp
+Var RegisteredInstallDir
+Var NewAppWritten
 
 !macro AcquireSetupMutex
   ; Keep the handle alive until this setup or uninstall process exits.
@@ -54,24 +61,44 @@ Var StagedApp
   ${EndIf}
 !macroend
 
-Function .onInit
-  ${IfNot} ${RunningX64}
-    MessageBox MB_OK|MB_ICONSTOP "This setup requires 64-bit Windows." /SD IDOK
-    SetErrorLevel 2
-    Abort
-  ${EndIf}
-  SetShellVarContext current
-  SetRegView 64
-  StrCpy $INSTDIR "${INSTALL_DIR}"
-  !insertmacro AcquireSetupMutex
-  Call RefuseDowngrade
-FunctionEnd
-
 Function un.onInit
   SetShellVarContext current
   SetRegView 64
-  StrCpy $INSTDIR "${INSTALL_DIR}"
   !insertmacro AcquireSetupMutex
+  ReadRegStr $0 HKCU "${UNINSTALL_KEY}" "InstallLocation"
+  ${If} $0 == ""
+  ${OrIf} $0 != $INSTDIR
+    MessageBox MB_OK|MB_ICONSTOP "The uninstaller is outside the registered Network Toolkit folder." /SD IDOK
+    SetErrorLevel 2
+    Abort
+  ${EndIf}
+FunctionEnd
+
+Function ShowDirectoryPage
+  ${If} $RegisteredInstallDir != ""
+    Abort
+  ${EndIf}
+FunctionEnd
+
+Function ValidateInstallDirectory
+  GetFullPathName $INSTDIR "$INSTDIR"
+  ${GetRoot} "$INSTDIR" $0
+  ${If} $0 == ""
+  ${OrIf} $INSTDIR == $0
+  ${OrIf} $INSTDIR == "$0\"
+  ${OrIf} $INSTDIR == "$LOCALAPPDATA\NetworkToolkit"
+    MessageBox MB_OK|MB_ICONSTOP "Choose a program folder separate from the drive root and Network Toolkit data folder." /SD IDOK
+    SetErrorLevel 2
+    Abort
+  ${EndIf}
+  ${If} $RegisteredInstallDir == ""
+    ${If} ${FileExists} "$INSTDIR\${APP_FILENAME}"
+    ${OrIf} ${FileExists} "$INSTDIR\Uninstall.exe"
+      MessageBox MB_OK|MB_ICONSTOP "Choose a folder without an existing Network Toolkit executable or uninstaller." /SD IDOK
+      SetErrorLevel 2
+      Abort
+    ${EndIf}
+  ${EndIf}
 FunctionEnd
 
 Function OpenDefaultApps
@@ -117,7 +144,9 @@ FunctionEnd
   !insertmacro ${ACTION} ".conf"
 !macroend
 
-Section "Install"
+Section "Network Toolkit"
+  SectionIn RO
+  Call ValidateInstallDirectory
   ClearErrors
   SetOutPath "$INSTDIR"
   IfErrors install_error
@@ -135,6 +164,7 @@ Section "Install"
     Goto install_error
   ${EndIf}
   StrCpy $StagedApp ""
+  StrCpy $NewAppWritten 1
 
   ClearErrors
   WriteUninstaller "$INSTDIR\Uninstall.exe"
@@ -170,10 +200,60 @@ install_error:
   ${If} $StagedApp != ""
     Delete "$StagedApp"
   ${EndIf}
+  ${If} $NewAppWritten == 1
+  ${AndIf} $RegisteredInstallDir == ""
+    Delete "$INSTDIR\${APP_FILENAME}"
+    Delete "$INSTDIR\Uninstall.exe"
+  ${EndIf}
   MessageBox MB_OK|MB_ICONSTOP "Setup could not finish. Close Network Toolkit and any separate Editor or Terminal windows, then run setup again." /SD IDOK
   SetErrorLevel 2
   Abort
 SectionEnd
+
+Section /o "Create a desktop shortcut" DesktopShortcut
+SectionEnd
+
+Section -ApplyDesktopShortcut
+  ReadRegDWORD $0 HKCU "${UNINSTALL_KEY}" "DesktopShortcut"
+  ${If} ${SectionIsSelected} ${DesktopShortcut}
+    ${If} $0 == 1
+    ${OrIfNot} ${FileExists} "$DESKTOP\${APP_NAME}.lnk"
+      ClearErrors
+      CreateShortcut "$DESKTOP\${APP_NAME}.lnk" "$INSTDIR\${APP_FILENAME}"
+      ${IfNot} ${Errors}
+        WriteRegDWORD HKCU "${UNINSTALL_KEY}" "DesktopShortcut" 1
+      ${EndIf}
+    ${EndIf}
+  ${ElseIf} $0 == 1
+    Delete "$DESKTOP\${APP_NAME}.lnk"
+    DeleteRegValue HKCU "${UNINSTALL_KEY}" "DesktopShortcut"
+  ${EndIf}
+SectionEnd
+
+Function .onInit
+  ${IfNot} ${RunningX64}
+    MessageBox MB_OK|MB_ICONSTOP "This setup requires 64-bit Windows." /SD IDOK
+    SetErrorLevel 2
+    Abort
+  ${EndIf}
+  SetShellVarContext current
+  SetRegView 64
+  !insertmacro AcquireSetupMutex
+  ReadRegStr $RegisteredInstallDir HKCU "${UNINSTALL_KEY}" "InstallLocation"
+  ${If} $RegisteredInstallDir != ""
+    StrCpy $INSTDIR "$RegisteredInstallDir"
+    Call RefuseDowngrade
+  ${EndIf}
+  ReadRegDWORD $0 HKCU "${UNINSTALL_KEY}" "DesktopShortcut"
+  ${If} $0 == 1
+    !insertmacro SelectSection ${DesktopShortcut}
+  ${EndIf}
+  ${GetParameters} $0
+  ${GetOptions} $0 "/DesktopShortcut" $1
+  ${IfNot} ${Errors}
+    !insertmacro SelectSection ${DesktopShortcut}
+  ${EndIf}
+FunctionEnd
 
 Section "Uninstall"
   ; An open program must be closed before removing shortcuts or registrations.
@@ -187,6 +267,10 @@ Section "Uninstall"
   ${EndIf}
 
 remove_registration:
+  ReadRegDWORD $0 HKCU "${UNINSTALL_KEY}" "DesktopShortcut"
+  ${If} $0 == 1
+    Delete "$DESKTOP\${APP_NAME}.lnk"
+  ${EndIf}
   !insertmacro TextExtensions RemoveExtension
   DeleteRegValue HKCU "Software\RegisteredApplications" "${EDITOR_NAME}"
   DeleteRegKey HKCU "${CAPABILITIES}"
