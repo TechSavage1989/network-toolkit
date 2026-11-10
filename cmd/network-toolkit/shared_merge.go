@@ -34,9 +34,12 @@ type sharedKey struct {
 	Kind sharedKeyKind
 	// Identity names a list item. Nil means its nonempty string "id".
 	Identity func(map[string]any) string
-	// Live keys are refreshed in running pages. The other keys are read when
-	// a page starts; for those the base is what that page itself last sent.
+	// Live keys are refreshed in running pages when another app changes them.
+	// The other keys are read when a page starts.
 	Live bool
+	// MainOnly keys are used by the main window only. A standalone app
+	// neither receives nor writes them.
+	MainOnly bool
 	// Newest-first lists are ordered by their "lastUsed" time after a merge.
 	NewestFirst bool
 	// Limit is the largest number of list items kept (0 means no limit).

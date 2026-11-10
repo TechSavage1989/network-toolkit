@@ -27,11 +27,14 @@ const (
 	// migration and editor-session adoption. The settings file itself is
 	// guarded by the credential transaction lock, as in earlier versions.
 	sharedDataLockFilename = "Network_Toolkit.shared-data.lock"
-	// Sent by a page with its settings: the revision of the shared values the
-	// page holds. Never stored.
-	sharedBaseField     = "_sharedBase"
-	sharedLockWait      = 5 * time.Second
-	sharedSnapshotLimit = 8
+	// Sent by a page with its settings and never stored: for every shared key
+	// the page changed, the value the page started from. The engine merges the
+	// change into what is on disk now; shared keys the page does not list were
+	// not changed by it and are left as they are on disk.
+	sharedBaseField = "_sharedBase"
+	// The request may carry the settings and those earlier values.
+	appStateRequestLimit = 4 << 20
+	sharedLockWait       = 5 * time.Second
 )
 
 // terminalPromptNameIdentity names a learned prompt name by its endpoint.
@@ -53,31 +56,88 @@ func terminalPromptNameIdentity(item map[string]any) string {
 	return kind + "\x00" + host + "\x00" + strconv.Itoa(int(port)) + "\x00" + user
 }
 
-// sharedDataKeys is the one table of settings shared by every app of a data
-// folder. Everything else in a settings file belongs to one window: layout,
-// sidebar width and tab, active page, theme, terminal appearance and the
-// connection form draft.
+// sharedDataKeys is the one table of everything the apps of a data folder
+// share: saved data and every preference the user sets on purpose. A key that
+// is not listed here belongs to one window (perWindowStateKeys).
 //
-//	terminalProfiles          saved terminal connections (folder is a field of each)
-//	terminalRecent            recent terminal connections
-//	terminalSavedManualOrder  whether Saved uses the user's own order (the list order)
-//	terminalPromptNames       device names learned from prompts
-//	terminalNameRevision      display-name revision counter (kept by the engine)
-//	ftpProfiles, ftpRecent    saved and recent FTP/FTPS connections (Terminal sidebar, Text Editor)
-//	sftpRecent                recent SFTP connections (Text Editor and file browser)
-//	sftpVerifiedHostKeys      SSH fingerprints the user verified for the file browser
-//	editorPreferences         Text Editor preferences (read when an editor starts)
+// Live keys are refreshed in running pages when another app changes them.
+// The other keys are read when a page starts. MainOnly keys are used by the
+// main window only (diagnostics, transfer servers); they are shared between
+// the portable and the installed main window, and a standalone Terminal or
+// Text Editor neither receives nor writes them.
 var sharedDataKeys = []sharedKey{
-	{Name: "terminalProfiles", Kind: sharedList, Live: true},
-	{Name: "terminalRecent", Kind: sharedList, Live: true, NewestFirst: true, Limit: 50},
-	{Name: "terminalSavedManualOrder", Kind: sharedValue, Live: true},
-	{Name: "terminalPromptNames", Kind: sharedList, Identity: terminalPromptNameIdentity, Live: true},
-	{Name: "terminalNameRevision", Kind: sharedCounter},
-	{Name: "ftpProfiles", Kind: sharedList, Live: true},
-	{Name: "ftpRecent", Kind: sharedList, Live: true, NewestFirst: true, Limit: 50},
-	{Name: "sftpRecent", Kind: sharedList, Live: true, NewestFirst: true, Limit: 50},
-	{Name: "sftpVerifiedHostKeys", Kind: sharedMap, Live: true},
-	{Name: "editorPreferences", Kind: sharedMap},
+	// Saved connections and what makes them usable.
+	{Name: "terminalProfiles", Kind: sharedList, Live: true},                                          // saved terminal connections (folder is a field of each)
+	{Name: "terminalRecent", Kind: sharedList, Live: true, NewestFirst: true, Limit: 50},              // recent terminal connections
+	{Name: "terminalSavedManualOrder", Kind: sharedValue, Live: true},                                 // Saved uses the user's own order (the list order)
+	{Name: "terminalPromptNames", Kind: sharedList, Identity: terminalPromptNameIdentity, Live: true}, // device names learned from prompts
+	{Name: "terminalNameRevision", Kind: sharedCounter},                                               // display-name revision counter (kept by the engine)
+	{Name: "ftpProfiles", Kind: sharedList, Live: true},                                               // saved FTP/FTPS connections
+	{Name: "ftpRecent", Kind: sharedList, Live: true, NewestFirst: true, Limit: 50},                   // recent FTP/FTPS connections
+	{Name: "sftpRecent", Kind: sharedList, Live: true, NewestFirst: true, Limit: 50},                  // recent SFTP connections
+	{Name: "sftpVerifiedHostKeys", Kind: sharedMap, Live: true},                                       // SSH fingerprints verified for the file browser
+
+	// Appearance of every app.
+	{Name: "theme", Kind: sharedValue, Live: true},
+	{Name: "accentColor", Kind: sharedValue, Live: true},
+	{Name: "colorPickerPreferences", Kind: sharedMap, Live: true}, // recent and saved colors
+	{Name: "diagnosticColors", Kind: sharedMap, Live: true},       // good / warning / bad colors
+	{Name: "resultTimePreferences", Kind: sharedMap},              // 12/24-hour clock and time zone
+
+	// Terminal settings (Appearance, Features, Mouse & keyboard, confirmations).
+	{Name: "terminalAppearance", Kind: sharedMap, Live: true},
+	{Name: "terminalSyntax", Kind: sharedMap, Live: true}, // highlighting rule sets, colors, labels, switches
+	{Name: "terminalHighlight", Kind: sharedValue, Live: true},
+	{Name: "terminalBehavior", Kind: sharedMap, Live: true},
+	{Name: "terminalInteraction", Kind: sharedMap, Live: true}, // mouse, keyboard, menu, paste review and warnings, pager
+	{Name: "terminalFontSize", Kind: sharedValue, Live: true},
+	{Name: "terminalMacroConfirmation", Kind: sharedValue, Live: true},
+	{Name: "terminalActiveActionsPosition", Kind: sharedValue, Live: true}, // active-session bar at the top or bottom
+	{Name: "terminalSidebarSide", Kind: sharedValue, Live: true},           // terminal sidebar on the left or right
+	{Name: "terminalSessionConfirmDelete", Kind: sharedValue, Live: true},
+	{Name: "terminalConfirmClose", Kind: sharedValue, Live: true},
+	{Name: "terminalConfirmReconnectAll", Kind: sharedValue, Live: true},
+	{Name: "terminalConfirmDisconnectAll", Kind: sharedValue, Live: true},
+	{Name: "terminalConfirmCloseAll", Kind: sharedValue, Live: true},
+
+	// Text Editor settings.
+	{Name: "editorPreferences", Kind: sharedMap, Live: true}, // restore session, ask before close, wrap, syntax, indent, font, palette, colors, compare
+	{Name: "editorFilesPreferences", Kind: sharedMap},        // file sidebar: side, panel, width, dock
+	{Name: "transferExplorerSettings", Kind: sharedMap},      // file browser options
+
+	// Used by the main window only.
+	{Name: "profiles", Kind: sharedList, MainOnly: true},                                 // saved diagnostic targets
+	{Name: "savedResultFilters", Kind: sharedMap, MainOnly: true},                        // saved result filters
+	{Name: "tftpProfiles", Kind: sharedList, MainOnly: true},                             // saved TFTP transfers
+	{Name: "tftpRecent", Kind: sharedList, MainOnly: true, NewestFirst: true, Limit: 50}, // recent TFTP transfers
+	{Name: "transferServerSettings", Kind: sharedMap, MainOnly: true},                    // file server settings
+	{Name: "tableColumns", Kind: sharedMap, MainOnly: true},                              // chosen result columns
+	{Name: "testTabOrder", Kind: sharedMap, MainOnly: true},                              // the user's order of test tabs
+	{Name: "overviewLayout", Kind: sharedMap, MainOnly: true},                            // customized Overview
+	{Name: "graphPlotPreferences", Kind: sharedMap, MainOnly: true},                      // which plots a graph shows
+	{Name: "packetMapSettings", Kind: sharedMap, MainOnly: true},                         // packet capture map options
+}
+
+// perWindowStateKeys lists every other key a page keeps: things that are
+// about one window or one run, not a preference. Each window keeps its own.
+// A key in neither table is treated as per-window, and
+// TestSharedKeyTableClassifiesEveryPageKey fails until it is classified.
+var perWindowStateKeys = []string{
+	// What is open or selected in this window.
+	"activePage", "utilityTab", "localTab", "fileTransferProtocol", "targetTest", "webTest", "transferModes", "configurationNetworkTab",
+	"terminalSidebarTab", "terminalSidebarCollapsed", "terminalComposerCollapsed", "terminalRecentCollapsed", "terminalSavedCollapsed",
+	"terminalLayout", "navigationCollapsed", "configurationSections",
+	// Sizes and positions of panels in this window.
+	"terminalSidebarWidth", "toolLayout", "tableWidths", "discoveryDetails", "packetDetails", "entryDetails", "transferClientLayout",
+	"transferServerSidebar", "graphWorkspacePreferences", "packetGraphPreferences",
+	// Work in progress: form drafts, inputs, current filters and searches.
+	"terminalConnection", "remoteBrowserSettings", "forms", "target", "networkRange", "networkRangeCleared", "networkAdapter",
+	"diagnosticSource", "reportLabel", "reportNotes", "subnetInput", "subnetPrefix", "subnetCompare", "bandwidth", "macInput",
+	"listPreferences", "resultFilters", "graphTimeRange",
+	// Per-app bookkeeping: welcome shown, update reminders, one-time upgrades.
+	"firstLaunchWelcomeSeen", "appUpdatePreferences", "discoveryWorkflowVersion", "hostnameColumnsVersion",
+	// The identity the credential vault is bound to (kept by the engine).
+	credentialConfigIdentityField,
 }
 
 func sharedKeyNamed(name string) (sharedKey, bool) {
@@ -89,11 +149,30 @@ func sharedKeyNamed(name string) (sharedKey, bool) {
 	return sharedKey{}, false
 }
 
+// sharedKeysFor returns the shared keys an app uses: all of them for the
+// main window, all but the main-only ones for a standalone app.
+func sharedKeysFor(standalone bool) []sharedKey {
+	if !standalone {
+		return sharedDataKeys
+	}
+	keys := make([]sharedKey, 0, len(sharedDataKeys))
+	for _, key := range sharedDataKeys {
+		if !key.MainOnly {
+			keys = append(keys, key)
+		}
+	}
+	return keys
+}
+
 // sharedSection returns the canonical shared values of a settings object,
 // after the same sanitizers every settings file passes through.
 func sharedSection(state map[string]any) map[string]any {
+	return sharedSectionOf(state, sharedDataKeys)
+}
+
+func sharedSectionOf(state map[string]any, keys []sharedKey) map[string]any {
 	picked := map[string]any{}
-	for _, key := range sharedDataKeys {
+	for _, key := range keys {
 		if value, ok := state[key.Name]; ok && value != nil {
 			// The sanitizers expect values as decoded from JSON.
 			if canonical, _, err := sharedCanonical(value); err == nil && canonical != nil {
@@ -105,6 +184,8 @@ func sharedSection(state map[string]any) map[string]any {
 	sanitizeFTPProfiles(picked)
 	sanitizeFTPRecent(picked)
 	sanitizeTransferClientSettings(picked)
+	sanitizeSavedResultFilters(picked)
+	sanitizeColorPickerPreferences(picked)
 	out := map[string]any{}
 	for name, value := range picked {
 		if canonical, _, err := sharedCanonical(value); err == nil && canonical != nil {
@@ -123,22 +204,13 @@ func sharedRevision(values map[string]any) string {
 	return hex.EncodeToString(digest[:16])
 }
 
-type sharedSnapshot struct {
-	revision string
-	values   map[string]any
-}
-
-func newSharedSnapshot(values map[string]any) sharedSnapshot {
-	return sharedSnapshot{revision: sharedRevision(values), values: values}
-}
-
-func (s sharedSnapshot) liveValues() map[string]any {
+func sharedLiveValues(values map[string]any) map[string]any {
 	out := map[string]any{}
 	for _, key := range sharedDataKeys {
 		if !key.Live {
 			continue
 		}
-		if value, ok := s.values[key.Name]; ok {
+		if value, ok := values[key.Name]; ok {
 			out[key.Name] = value
 		}
 	}
@@ -153,11 +225,11 @@ type sharedData struct {
 	// main window's own settings file is the shared one (sharedSettingsPath).
 	rootSettings string
 	standalone   bool
-	// Shared values this process served to, or accepted from, its page; the
-	// newest is last. A page names the one it holds when it saves.
-	snapshots []sharedSnapshot
-	// For keys that pages read only at start: what the page last got or sent.
-	deferred map[string]any
+	// The shared values this process last served to, or accepted from, its
+	// page. A page that does not say what it started from (pages do, see
+	// sharedBaseField) is taken to have started from these.
+	last         map[string]any
+	lastRevision string
 	// Digest of the main settings file as last read into application.state.
 	seen [32]byte
 	// Shared keys found in this standalone workspace's own settings file: a
@@ -167,75 +239,39 @@ type sharedData struct {
 
 func newSharedData(root, dataPath string) *sharedData {
 	root = filepath.Clean(root)
-	shared := &sharedData{root: root, deferred: map[string]any{}}
+	shared := &sharedData{root: root, last: map[string]any{}}
 	if filepath.Clean(filepath.Dir(dataPath)) != root {
 		shared.standalone, shared.rootSettings = true, filepath.Join(root, appSettingsFilename)
 	}
 	return shared
 }
 
-// latest is the newest revision this process served or accepted.
-func (s *sharedData) latest() string {
-	if n := len(s.snapshots); n > 0 {
-		return s.snapshots[n-1].revision
-	}
-	return ""
+func (s *sharedData) keys() []sharedKey { return sharedKeysFor(s.standalone) }
+
+// served records what a page was given or what was accepted from it.
+func (s *sharedData) served(values map[string]any) string {
+	s.last, s.lastRevision = values, sharedRevision(values)
+	return s.lastRevision
 }
 
-func (s *sharedData) remember(snapshot sharedSnapshot) {
-	for i, old := range s.snapshots {
-		if old.revision == snapshot.revision {
-			s.snapshots = append(s.snapshots[:i], s.snapshots[i+1:]...)
-			break
-		}
+// offered records the live values a running page was given by a poll. The
+// other values are not sent to a running page, so their base stays.
+func (s *sharedData) offered(values map[string]any) {
+	next := map[string]any{}
+	for name, value := range s.last {
+		next[name] = value
 	}
-	s.snapshots = append(s.snapshots, snapshot)
-	if len(s.snapshots) > sharedSnapshotLimit {
-		s.snapshots = append([]sharedSnapshot(nil), s.snapshots[len(s.snapshots)-sharedSnapshotLimit:]...)
-	}
-}
-
-// base returns the shared values a saving page started from. A page that
-// names no revision is taken to hold what this process last served or
-// accepted. An unknown revision gives an empty base: nothing on disk is then
-// removed by that save.
-func (s *sharedData) base(revision string) map[string]any {
-	var live map[string]any
-	if revision == "" {
-		if n := len(s.snapshots); n > 0 {
-			live = s.snapshots[n-1].values
-		}
-	} else {
-		for _, snapshot := range s.snapshots {
-			if snapshot.revision == revision {
-				live = snapshot.values
-			}
-		}
-	}
-	base := map[string]any{}
 	for _, key := range sharedDataKeys {
-		if key.Live {
-			if value, ok := live[key.Name]; ok {
-				base[key.Name] = value
-			}
-		} else if value, ok := s.deferred[key.Name]; ok {
-			base[key.Name] = value
+		if !key.Live {
+			continue
+		}
+		if value, ok := values[key.Name]; ok {
+			next[key.Name] = value
+		} else {
+			delete(next, key.Name)
 		}
 	}
-	return base
-}
-
-// served records what a page was given when it loaded its settings.
-func (s *sharedData) served(values map[string]any) sharedSnapshot {
-	snapshot := newSharedSnapshot(values)
-	s.remember(snapshot)
-	s.deferred = map[string]any{}
-	for _, key := range sharedDataKeys {
-		if value, ok := values[key.Name]; ok && !key.Live {
-			s.deferred[key.Name] = value
-		}
-	}
-	return snapshot
+	s.last, s.lastRevision = next, sharedRevision(values)
 }
 
 // rootSettings is the main settings file with every member kept as written,
@@ -285,21 +321,22 @@ func (s *rootSettings) state(names ...string) map[string]any {
 	return out
 }
 
-func (s *rootSettings) shared() map[string]any {
-	names := make([]string, 0, len(sharedDataKeys))
-	for _, key := range sharedDataKeys {
+// shared returns the canonical shared values of the file for keys.
+func (s *rootSettings) shared(keys []sharedKey) map[string]any {
+	names := make([]string, 0, len(keys))
+	for _, key := range keys {
 		names = append(names, key.Name)
 	}
-	return sharedSection(s.state(names...))
+	return sharedSectionOf(s.state(names...), keys)
 }
 
-// encode returns the file with its shared members replaced by values.
-func (s *rootSettings) encode(values map[string]any) ([]byte, error) {
+// encode returns the file with the shared members of keys replaced by values.
+func (s *rootSettings) encode(values map[string]any, keys []sharedKey) ([]byte, error) {
 	members := make(map[string]json.RawMessage, len(s.members)+len(values))
 	for name, raw := range s.members {
 		members[name] = raw
 	}
-	for _, key := range sharedDataKeys {
+	for _, key := range keys {
 		value, ok := values[key.Name]
 		if !ok || value == nil {
 			delete(members, key.Name)
@@ -311,7 +348,14 @@ func (s *rootSettings) encode(values map[string]any) ([]byte, error) {
 		}
 		members[key.Name] = raw
 	}
-	if !s.exists {
+	return marshalRootSettings(members, s.exists)
+}
+
+// marshal returns the file with its members as they are.
+func (s *rootSettings) marshal() ([]byte, error) { return marshalRootSettings(s.members, s.exists) }
+
+func marshalRootSettings(members map[string]json.RawMessage, exists bool) ([]byte, error) {
+	if !exists {
 		// The main window has not saved anything yet. Without this, its first
 		// start would take a file written by another app for its own and skip
 		// the first-launch welcome.

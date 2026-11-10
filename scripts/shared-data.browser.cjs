@@ -8,7 +8,7 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const output=process.env.TOOLKIT_TEST_OUTPUT||process.env.NTK_BROWSER_OUTPUT_DIR;
 const urls={main:process.env.NTK_SHARED_MAIN_URL,terminal:process.env.NTK_SHARED_TERMINAL_URL,editor:process.env.NTK_SHARED_EDITOR_URL};
 const tokens={main:process.env.NTK_SHARED_MAIN_TOKEN,terminal:process.env.NTK_SHARED_TERMINAL_TOKEN,editor:process.env.NTK_SHARED_EDITOR_TOKEN};
-const report={passed:false,checks:[],errors:[]};
+const report={passed:false,checks:[],errors:[],keys:{}};
 const check=text=>{report.checks.push(text);console.log('ok - '+text);};
 (async()=>{
  for(const [name,url] of Object.entries(urls))assert(url,'missing engine URL for '+name);
@@ -26,6 +26,9 @@ const check=text=>{report.checks.push(text);console.log('ok - '+text);};
    pages[name]=page;
   }
   const {main,terminal,editor}=pages;
+  // Every key a page keeps in its settings; the engine test checks that each
+  // one is classified as shared or per-window.
+  report.keys={};for(const name of ['main','terminal','editor'])report.keys[name]=await pages[name].evaluate(()=>Object.keys(state).sort());
   assert.equal(await main.evaluate(()=>WINDOW_MODE),'main');
   assert.equal(await terminal.evaluate(()=>WINDOW_MODE),'terminal');
   assert.equal(await editor.evaluate(()=>WINDOW_MODE),'editor-standalone');
@@ -70,7 +73,7 @@ const check=text=>{report.checks.push(text);console.log('ok - '+text);};
   await settled(terminal);
   await main.waitForTimeout(600);
   assert.deepEqual(await profiles(main),['from-main','from-terminal'],'the main page is stale now');
-  await main.evaluate(()=>{setTheme(state.theme==='dark'?'light':'dark');});
+  await main.evaluate(()=>{state.terminalComposerCollapsed=!state.terminalComposerCollapsed;saveState();});
   await hasRow(main,'while-stale');
   assert.deepEqual(await rows(main),['from-main','from-terminal','while-stale']);
   await main.evaluate(()=>NetworkToolkitSharedData.start());
@@ -97,6 +100,46 @@ const check=text=>{report.checks.push(text);console.log('ok - '+text);};
   assert.deepEqual(listed,['ssh:from-main','ssh:from-terminal','ssh:while-stale']);
   await editor.waitForFunction(()=>state.terminalProfiles.length===3);
   assert.deepEqual(await profiles(editor),['from-main','from-terminal','while-stale'],'the editor page holds the shared list');check('The standalone Text Editor lists the saved connections');
+
+  // 8. Settings carry over in both directions and take effect at once.
+  assert.equal(await editor.evaluate(()=>typeof NetworkToolkitFileEditor.windowAdapter.applyPreferences),'function');
+  assert.deepEqual(await Promise.all([main,terminal,editor].map(page=>page.evaluate(()=>state.theme))),['dark','dark','dark']);
+  await terminal.evaluate(()=>{setTheme('light');state.terminalFontSize=17;saveState();updateTerminalTheme();});
+  await settled(terminal);
+  for(const page of [main,editor])await page.waitForFunction(()=>state.theme==='light'&&document.documentElement.dataset.theme==='light'&&state.terminalFontSize===17);
+  check('The theme and terminal font size chosen in the Terminal take effect in the main window and the Text Editor');
+  // The main window changes the terminal cursor and two editor preferences.
+  // The standalone editor is being typed in, so its change waits for that.
+  await editor.evaluate(()=>navigate('editor'));
+  await editor.locator('#networkToolkitFileEditor').waitFor();
+  await editor.evaluate(()=>NetworkToolkitFileEditor.newDocument?.());
+  const editorText=editor.locator('#networkToolkitFileEditor textarea').first();
+  await editorText.focus();
+  await main.evaluate(()=>{state.terminalAppearance=NetworkToolkitTerminalAppearance.normalize({...state.terminalAppearance,cursor:'bar'});state.editorPreferences={...state.editorPreferences,wordWrap:true,fontSize:16};saveState();});
+  await settled(main);
+  await terminal.waitForFunction(()=>state.terminalAppearance.cursor==='bar'&&state.editorPreferences.fontSize===16);
+  await editor.waitForTimeout(3200);
+  assert.notEqual(await editor.evaluate(()=>state.editorPreferences.fontSize),16,'editor preferences wait while the user types in the editor');
+  await editor.evaluate(()=>document.activeElement?.blur());
+  await editor.waitForFunction(()=>state.editorPreferences.wordWrap===true&&state.editorPreferences.fontSize===16&&document.querySelector('#networkToolkitFileEditor').style.getPropertyValue('--nt-editor-font')==='16px');
+  check('Terminal appearance and editor preferences changed in the main window take effect in the other apps, after text entry');
+  // A page that has not refreshed does not revert a setting changed elsewhere.
+  await main.evaluate(()=>NetworkToolkitSharedData.stop());
+  await terminal.evaluate(()=>setTheme('dark'));
+  await settled(terminal);await main.waitForTimeout(600);
+  assert.equal(await main.evaluate(()=>state.theme),'light','the main page is stale now');
+  await main.evaluate(()=>{state.terminalComposerCollapsed=!state.terminalComposerCollapsed;saveState();});
+  await main.waitForFunction(()=>state.theme==='dark'&&document.documentElement.dataset.theme==='dark');
+  await main.evaluate(()=>NetworkToolkitSharedData.start());
+  await terminal.waitForTimeout(3200);
+  assert.equal(await terminal.evaluate(()=>state.theme),'dark','the stale save did not revert the theme');
+  await editor.waitForFunction(()=>state.theme==='dark');
+  check('A save from a page that had not refreshed does not revert a setting changed elsewhere');
+  // What is about one window stays there.
+  await terminal.evaluate(()=>NetworkToolkitSessionSidebar.setCollapsed(true));
+  await settled(terminal);await main.waitForTimeout(3200);
+  assert.equal(await main.evaluate(()=>state.terminalSidebarCollapsed),false,'a collapsed sidebar is not a shared setting');
+  check('Window state such as a collapsed sidebar stays in its own window');
 
   if(output){await main.screenshot({path:path.join(output,'shared-data-main.png')});await terminal.screenshot({path:path.join(output,'shared-data-terminal.png')});}
   assert.deepEqual(report.errors,[]);report.passed=true;

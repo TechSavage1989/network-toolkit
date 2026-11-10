@@ -2079,7 +2079,7 @@ function startupStateLoader(){
     // The updater preference is safe to load independently of unsaved diagnostic work.
     NetworkToolkitUpdater.mergePreferences(saved.appUpdatePreferences);
     if(fingerprint()!==initial){const error=new Error('Settings changed before saved settings loaded. Preserve your current work, then reopen the app before saving settings. Existing saved settings are unchanged.');error.updatePreferencesLoaded=true;throw error;}
-    mergeState(saved);stateLoaded=true;return saved;
+    mergeState(saved);globalThis.NetworkToolkitSharedData?.loaded();stateLoaded=true;return saved;
   };
 }
 function configureEditorWindows(){window.NetworkToolkitEditorWindows?.configure({request:api,bufferAvailable:()=>status?.editorDiskAvailable===true,available:()=>status?.editorWindowAvailable===true,activityAvailable:()=>online&&!OFFLINE&&!shutDown,self:typeof EDITOR_VIEW!=='undefined'&&EDITOR_VIEW?.id||'main',adapter:()=>window.NetworkToolkitFileEditor?.windowAdapter});window.NetworkToolkitEditorWindows?.start();}

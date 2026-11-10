@@ -446,16 +446,23 @@ func TestVaultV2CrossInstanceWritesCannotOverwriteEachOther(t *testing.T) {
 			successes++
 		}
 	}
-	if successes != 1 {
-		t.Fatalf("expected one safe commit and one stale/busy rejection, got %d commits", successes)
+	// Every app of a data folder uses this one vault. A save that finds the
+	// vault changed by the other instance is redone on the newer vault, so
+	// each reported commit must be in the file: none overwrites the other.
+	if successes < 1 {
+		t.Fatalf("expected at least one safe commit, got %d", successes)
 	}
 	loaded := reloadFixtureVault(t, first)
 	if err := loaded.unlock(context.Background(), []byte(syntheticMasterPassword)); err != nil {
 		t.Fatal(err)
 	}
 	bindFixtureVault(t, loaded)
-	if len(loaded.list()) != 1 {
-		t.Fatal("cross-instance transaction lost or corrupted committed records")
+	if len(loaded.list()) != successes {
+		t.Fatalf("cross-instance transaction lost or corrupted committed records: %d commits, %d records", successes, len(loaded.list()))
+	}
+	// Both running instances end up with the same records, without a restart.
+	if len(first.list()) != successes || len(second.list()) != successes {
+		t.Fatalf("running instances disagree after concurrent saves: %d and %d of %d", len(first.list()), len(second.list()), successes)
 	}
 }
 

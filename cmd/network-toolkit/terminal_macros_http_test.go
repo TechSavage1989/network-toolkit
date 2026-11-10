@@ -211,10 +211,12 @@ func TestTerminalMacroLibraryRejectsLinkedFilesAndStorageAncestors(t *testing.T)
 	}
 }
 
-func TestTerminalMacroLibrarySeedIsSanitizedIndependentAndDoesNotOverwrite(t *testing.T) {
+// The macro library is one file per data folder for every app (shared_data.go):
+// a new Terminal workspace gets no copy of it, and a library an earlier
+// version left in the workspace is never touched by a later launch.
+func TestTerminalWorkspaceSeedCopiesNoMacroLibrary(t *testing.T) {
 	source, destination := t.TempDir(), t.TempDir()
 	definition := macroHTTPDefinition("seeded")
-	definition.Parameters = []macros.Parameter{{Name: "password", Secret: true, DefaultValue: "seed-secret-canary"}}
 	library := terminalMacroLibrary{Version: 1, Macros: []macros.Definition{definition}, Bindings: []terminalMacroBinding{{ProfileID: "saved", MacroID: "seeded", OnConnect: true}}}
 	raw, err := json.Marshal(library)
 	if err != nil {
@@ -227,44 +229,21 @@ func TestTerminalMacroLibrarySeedIsSanitizedIndependentAndDoesNotOverwrite(t *te
 		t.Fatal(err)
 	}
 	filename := filepath.Join(destination, terminalMacroLibraryFilename)
-	seeded, err := os.ReadFile(filename)
-	if err != nil {
-		t.Fatal(err)
+	if _, err := os.Stat(filename); !os.IsNotExist(err) {
+		t.Fatalf("a macro library was copied into the Terminal workspace: %v", err)
 	}
-	if bytes.Contains(seeded, []byte("seed-secret-canary")) || !bytes.Contains(seeded, []byte("seeded")) || !bytes.Contains(seeded, []byte("saved")) {
-		t.Fatalf("seeded library lost bindings or retained secrets: %s", seeded)
-	}
-	independent := []byte(`{"version":1,"macros":[],"bindings":[]}`)
-	if err := os.WriteFile(filename, independent, 0600); err != nil {
+	previous := []byte(`{"version":1,"macros":[],"bindings":[]}`)
+	if err := os.WriteFile(filename, previous, 0600); err != nil {
 		t.Fatal(err)
 	}
 	if err := seedTerminalWorkspace(source, destination); err != nil {
 		t.Fatal(err)
 	}
-	if current, err := os.ReadFile(filename); err != nil || !bytes.Equal(current, independent) {
-		t.Fatal("later launch overwrote the independent library", err)
+	if current, err := os.ReadFile(filename); err != nil || !bytes.Equal(current, previous) {
+		t.Fatal("a later launch changed the library an earlier version left in the workspace", err)
 	}
 	if current, err := os.ReadFile(filepath.Join(source, terminalMacroLibraryFilename)); err != nil || !bytes.Equal(current, raw) {
-		t.Fatal("seeding changed the source library", err)
-	}
-	// Persist an intentionally empty first-use library, so a later source
-	// library cannot unexpectedly introduce macros into an existing workspace.
-	emptySource, emptyDestination := t.TempDir(), t.TempDir()
-	if err := seedTerminalMacroLibrary(emptySource, emptyDestination); err != nil {
-		t.Fatal(err)
-	}
-	emptyBefore, err := os.ReadFile(filepath.Join(emptyDestination, terminalMacroLibraryFilename))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(emptySource, terminalMacroLibraryFilename), raw, 0600); err != nil {
-		t.Fatal(err)
-	}
-	if err := seedTerminalMacroLibrary(emptySource, emptyDestination); err != nil {
-		t.Fatal(err)
-	}
-	if current, err := os.ReadFile(filepath.Join(emptyDestination, terminalMacroLibraryFilename)); err != nil || !bytes.Equal(current, emptyBefore) {
-		t.Fatal("later source macros replaced an intentionally empty library", err)
+		t.Fatal("seeding changed the data folder's library", err)
 	}
 }
 

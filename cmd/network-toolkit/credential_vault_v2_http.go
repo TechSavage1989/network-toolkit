@@ -314,7 +314,7 @@ func (a *application) ensureCredentialConfigIdentity() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	raw, err := root.encode(root.shared())
+	raw, err := root.marshal()
 	if err != nil {
 		return "", errors.New("App settings exceed their size limit.")
 	}

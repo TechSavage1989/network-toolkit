@@ -54,18 +54,8 @@ func TestTerminalInteractionPersistenceAndWindowTransfer(t *testing.T) {
 		t.Fatal(err)
 	}
 	check("linked workspace", workspace)
-	dest := terminalWorkspace(filepath.Dir(a.dataPath))
-	if err := os.MkdirAll(dest, 0700); err != nil {
-		t.Fatal(err)
-	}
-	if err := seedTerminalWorkspace(filepath.Dir(a.dataPath), dest); err != nil {
-		t.Fatal(err)
-	}
-	seeded, err := os.ReadFile(filepath.Join(dest, "Network_Toolkit.settings.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	check("independent window", seeded)
+	// A standalone Terminal uses the same, shared mouse and keyboard settings.
+	check("independent window", standaloneTerminalState(t, filepath.Dir(a.dataPath)))
 	if len(a.terminals.List()) != 0 {
 		t.Fatal("saving display preferences created a connection")
 	}

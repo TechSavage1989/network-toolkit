@@ -30,6 +30,13 @@ var storagePortableFiles = []struct {
 	{"Network_Toolkit.ssh_known_hosts.json", 4 << 20},
 	{"Network_Toolkit.vendors.json.gz", 24 << 20},
 	{"Network_Toolkit.window.json", 64 << 10},
+	// Shared app data (shared_migration.go): the record of what was brought
+	// over from standalone workspaces, and the untouched copies of the data
+	// folder's files from before. They move and are deleted with the data.
+	{sharedMarkerFilename, sharedMarkerLimit},
+	{sharedBackupSettings, appSettingsLimit},
+	{sharedBackupMacros, terminalMacroLibraryLimit},
+	{sharedBackupKnownHosts, knownHostsLimit},
 }
 
 // Open each directory component through an anchored os.Root. No symlink or

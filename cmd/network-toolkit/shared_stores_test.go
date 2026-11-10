@@ -39,6 +39,8 @@ func knownHostFixtureKey(t *testing.T) ssh.PublicKey {
 	return key
 }
 
+func sshFingerprint(key ssh.PublicKey) string { return ssh.FingerprintSHA256(key) }
+
 func knownHostFixtureEntry(host string, key ssh.PublicKey) knownHostFixture {
 	now := time.Now().UTC().Format(time.RFC3339Nano)
 	return knownHostFixture{Host: host, KeyType: key.Type(), Fingerprint: ssh.FingerprintSHA256(key), AddedAt: now, UpdatedAt: now, Key: key.Marshal()}

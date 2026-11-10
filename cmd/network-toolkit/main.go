@@ -338,6 +338,11 @@ func main() {
 	if err := os.MkdirAll(*dataDir, 0700); err != nil {
 		log.Print("Settings folder unavailable: ", err)
 	}
+	// Bring what an earlier version kept per standalone window into the data
+	// folder's shared files (once; see shared_migration.go).
+	if err := migrateSharedData(rootDataDir); err != nil {
+		log.Print("Shared app data: ", err)
+	}
 	if err := identity.Configure(*dataDir); err != nil {
 		log.Print("Vendor database: ", err)
 	}

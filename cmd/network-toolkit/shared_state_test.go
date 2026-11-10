@@ -44,18 +44,47 @@ func sharedTestApp(t *testing.T, root, workspace, mode string) *application {
 	return a
 }
 
-// sharedPage behaves like the page of one window: it loads its settings once,
-// keeps all of them in memory, and writes all of them back.
+// standaloneTerminalState returns the settings a newly created standalone
+// Terminal window loads for a data folder: its own window state plus the
+// data folder's shared settings and saved connections.
+func standaloneTerminalState(t *testing.T, root string) []byte {
+	t.Helper()
+	dest := terminalWorkspace(root)
+	if err := os.MkdirAll(dest, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := seedTerminalWorkspace(root, dest); err != nil {
+		t.Fatal(err)
+	}
+	r := requestApp(sharedTestApp(t, root, terminalWorkspaceName, "terminal"), "GET", "/api/state", "", true)
+	if r.Code != 200 {
+		t.Fatalf("standalone Terminal settings: %d %s", r.Code, r.Body.String())
+	}
+	return r.Body.Bytes()
+}
+
+// sharedPage behaves like the page of one window (web/assets/shared-data.js):
+// it loads its settings once, keeps all of them in memory, writes all of them
+// back and says, for each shared key it changed, what it started from.
 type sharedPage struct {
 	t        *testing.T
 	app      *application
 	state    map[string]any
 	revision string
+	// What the page and the engine last agreed on, per shared key.
+	baseline map[string]string
+	// An older client that does not say what it started from.
+	untracked bool
+}
+
+func pageJSON(value any) string {
+	raw, _ := json.Marshal(value)
+	return string(raw)
 }
 
 func openSharedPage(t *testing.T, app *application) *sharedPage {
 	t.Helper()
-	p := &sharedPage{t: t, app: app}
+	p := &sharedPage{t: t, app: app, baseline: map[string]string{}}
 	r := requestApp(app, "GET", "/api/state", "", true)
 	if r.Code != 200 || json.Unmarshal(r.Body.Bytes(), &p.state) != nil {
 		t.Fatalf("load: %d %s", r.Code, r.Body.String())
@@ -67,6 +96,9 @@ func openSharedPage(t *testing.T, app *application) *sharedPage {
 		if _, ok := p.state[name]; !ok {
 			p.state[name] = []any{} // A page always holds every list, empty or not.
 		}
+	}
+	for _, key := range sharedDataKeys {
+		p.baseline[key.Name] = pageJSON(p.state[key.Name])
 	}
 	if p.poll() {
 		t.Fatal("a page that has just loaded was told its shared values changed")
@@ -88,6 +120,7 @@ func (p *sharedPage) apply(shared map[string]any) {
 			} else {
 				delete(p.state, key.Name)
 			}
+			p.baseline[key.Name] = pageJSON(p.state[key.Name])
 		}
 	}
 }
@@ -113,12 +146,21 @@ func (p *sharedPage) save() {
 
 func (p *sharedPage) trySave() (int, string) {
 	p.t.Helper()
-	body := map[string]any{}
+	body, sent := map[string]any{}, map[string]string{}
 	for name, value := range p.state {
 		body[name] = value
 	}
-	if p.revision != "" {
-		body[sharedBaseField] = p.revision
+	if !p.untracked {
+		started := map[string]any{}
+		for _, key := range sharedDataKeys {
+			sent[key.Name] = pageJSON(p.state[key.Name])
+			if sent[key.Name] != p.baseline[key.Name] {
+				var before any
+				_ = json.Unmarshal([]byte(p.baseline[key.Name]), &before)
+				started[key.Name] = before
+			}
+		}
+		body[sharedBaseField] = started
 	}
 	raw, _ := json.Marshal(body)
 	r := requestApp(p.app, "PUT", "/api/state", string(raw), true)
@@ -130,6 +172,9 @@ func (p *sharedPage) trySave() (int, string) {
 	}
 	if json.Unmarshal(r.Body.Bytes(), &response) != nil || response.Shared == nil {
 		p.t.Fatalf("save response: %s", r.Body.String())
+	}
+	for name, value := range sent {
+		p.baseline[name] = value
 	}
 	p.apply(response.Shared)
 	return 200, ""
@@ -172,18 +217,40 @@ func (p *sharedPage) remove(name, id string) {
 	p.state[name] = kept
 }
 
+// set changes one member of a settings object the way a settings dialog does:
+// the page replaces the whole object.
+func (p *sharedPage) set(name, member string, value any) {
+	next := map[string]any{}
+	current, _ := p.state[name].(map[string]any)
+	for k, v := range current {
+		next[k] = v
+	}
+	next[member] = value
+	p.state[name] = next
+}
+
+func (p *sharedPage) member(name, member string) any {
+	current, _ := p.state[name].(map[string]any)
+	return current[member]
+}
+
 func sharedProfile(id, name, host string) map[string]any {
 	return map[string]any{"id": id, "name": name, "nameExplicit": true, "nameRevision": float64(0), "type": "ssh", "host": host, "port": float64(22), "username": "operator", "authMethod": "password", "sshCompatibility": "modern", "timeoutMs": float64(10000)}
 }
 
-func sharedDiskIDs(t *testing.T, root, name string) []string {
+func sharedDisk(t *testing.T, root string) map[string]any {
 	t.Helper()
 	settings, err := readRootSettings(filepath.Join(root, appSettingsFilename))
 	if err != nil {
 		t.Fatal(err)
 	}
+	return settings.shared(sharedDataKeys)
+}
+
+func sharedDiskIDs(t *testing.T, root, name string) []string {
+	t.Helper()
 	out := []string{}
-	list, _ := settings.shared()[name].([]any)
+	list, _ := sharedDisk(t, root)[name].([]any)
 	for _, entry := range list {
 		row, _ := entry.(map[string]any)
 		id, _ := row["id"].(string)
@@ -225,8 +292,8 @@ func TestSharedStateStalePageNeverRemovesAnotherAppsProfile(t *testing.T) {
 	}
 
 	// The main window has not heard of it and saves its whole (stale) state,
-	// for example after a sidebar was resized.
-	main.state["theme"] = "light"
+	// for example after a panel was resized.
+	main.state["toolLayout"] = map[string]any{"width": float64(340), "collapsed": false}
 	main.save()
 	if got := sharedDiskIDs(t, root, "terminalProfiles"); !sameIDs(got, "from-terminal") {
 		t.Fatalf("a stale save removed another app's profile: %v", got)
@@ -239,7 +306,7 @@ func TestSharedStateStalePageNeverRemovesAnotherAppsProfile(t *testing.T) {
 	// The other direction, and a third app.
 	main.add("terminalProfiles", sharedProfile("from-main", "Edge router", "192.0.2.20"))
 	main.save()
-	editor.state["editorFilesPreferences"] = map[string]any{"width": float64(320)}
+	editor.state["activePage"] = "editor"
 	editor.save()
 	if got := sharedDiskIDs(t, root, "terminalProfiles"); !sameIDs(got, "from-terminal", "from-main") {
 		t.Fatalf("profiles after saves from three apps: %v", got)
@@ -260,7 +327,7 @@ func TestSharedStateStalePageNeverRemovesAnotherAppsProfile(t *testing.T) {
 	// their next save.
 	terminal.remove("terminalProfiles", "from-main")
 	terminal.save()
-	main.state["theme"] = "dark"
+	main.state["activePage"] = "terminal"
 	main.save() // stale: still lists from-main
 	if got := sharedDiskIDs(t, root, "terminalProfiles"); !sameIDs(got, "from-terminal") {
 		t.Fatalf("a removal was undone by a stale save: %v", got)
@@ -276,24 +343,124 @@ func TestSharedStateStalePageNeverRemovesAnotherAppsProfile(t *testing.T) {
 	}
 }
 
-func TestSharedStateKeepsWindowPreferencesPerWorkspace(t *testing.T) {
+func TestSharedSettingsCarryBetweenAppsInBothDirections(t *testing.T) {
+	root := t.TempDir()
+	main := openSharedPage(t, sharedTestApp(t, root, "", "main"))
+	terminal := openSharedPage(t, sharedTestApp(t, root, terminalWorkspaceName, "terminal"))
+	editor := openSharedPage(t, sharedTestApp(t, root, standaloneEditorDirectory, standaloneEditorMode))
+
+	// Settings made in the main window: theme, accent, terminal look and
+	// behaviour, confirmations, editor preferences.
+	main.state["theme"], main.state["accentColor"] = "light", "#286dbb"
+	main.state["terminalFontSize"], main.state["terminalHighlight"] = float64(16), false
+	main.set("terminalAppearance", "cursor", "bar")
+	main.set("terminalBehavior", "scrollback", float64(2000))
+	main.state["terminalConfirmClose"], main.state["terminalMacroConfirmation"], main.state["terminalSidebarSide"] = false, "never", "left"
+	main.set("editorPreferences", "wordWrap", true)
+	main.set("editorPreferences", "fontSize", float64(15))
+	main.save()
+	want := sharedDisk(t, root)
+	for _, page := range []*sharedPage{terminal, editor} {
+		if !page.poll() {
+			t.Fatalf("%s was not told about the main window's settings", page.app.windowMode)
+		}
+		for _, name := range []string{"theme", "accentColor", "terminalFontSize", "terminalHighlight", "terminalAppearance", "terminalBehavior", "terminalConfirmClose", "terminalMacroConfirmation", "terminalSidebarSide", "editorPreferences"} {
+			if !sharedEqual(page.state[name], want[name]) || want[name] == nil {
+				t.Fatalf("%s: %s is %s, the data folder has %s", page.app.windowMode, name, pageJSON(page.state[name]), pageJSON(want[name]))
+			}
+		}
+	}
+	if terminal.state["theme"] != "light" || terminal.state["terminalFontSize"] != float64(16) || terminal.state["terminalHighlight"] != false || terminal.member("editorPreferences", "wordWrap") != true {
+		t.Fatalf("the Terminal did not take over the main window's settings: %v", terminal.state)
+	}
+
+	// The other direction: a change in the standalone Terminal shows in the
+	// main window, and in an app started later.
+	terminal.state["theme"] = "dark"
+	terminal.set("terminalAppearance", "boldBright", false)
+	terminal.save()
+	if !main.poll() || main.state["theme"] != "dark" || main.member("terminalAppearance", "boldBright") != false {
+		t.Fatalf("the main window did not take over the Terminal's settings: theme=%v appearance=%v", main.state["theme"], main.state["terminalAppearance"])
+	}
+	if main.member("terminalAppearance", "cursor") != "bar" {
+		t.Fatal("a setting changed in one app reverted another setting of the same dialog")
+	}
+	late := openSharedPage(t, sharedTestApp(t, root, standaloneEditorDirectory, standaloneEditorMode))
+	if late.state["theme"] != "dark" || late.member("editorPreferences", "fontSize") != float64(15) {
+		t.Fatalf("a Text Editor started later does not use the shared settings: %v", late.state)
+	}
+
+	// A stale page never reverts a setting changed elsewhere. The editor page
+	// still holds the light theme and the old cursor settings; it changes one
+	// editor preference and saves its whole state.
+	if editor.state["theme"] != "light" {
+		t.Fatal("fixture: the editor page should still be stale")
+	}
+	editor.set("editorPreferences", "syntax", false)
+	editor.save()
+	disk := sharedDisk(t, root)
+	if disk["theme"] != "dark" {
+		t.Fatalf("a stale page reverted the theme to %v", disk["theme"])
+	}
+	appearance, _ := disk["terminalAppearance"].(map[string]any)
+	prefs, _ := disk["editorPreferences"].(map[string]any)
+	if appearance["boldBright"] != false || appearance["cursor"] != "bar" || prefs["syntax"] != false || prefs["wordWrap"] != true || prefs["fontSize"] != float64(15) {
+		t.Fatalf("settings after a stale save: appearance=%v editor=%v", appearance, prefs)
+	}
+	if editor.state["theme"] != "dark" {
+		t.Fatal("the stale page was not given the current theme by its save")
+	}
+
+	// Two apps change different members of one settings object at the same
+	// time: both changes are kept.
+	main.poll()
+	terminal.poll()
+	main.set("terminalBehavior", "bell", "visual")
+	terminal.set("terminalBehavior", "scrollback", float64(5000))
+	main.save()
+	terminal.save()
+	behavior, _ := sharedDisk(t, root)["terminalBehavior"].(map[string]any)
+	if behavior["bell"] != "visual" || behavior["scrollback"] != float64(5000) {
+		t.Fatalf("two apps changed one settings object: %v", behavior)
+	}
+	// The same setting changed in both: the later save (that page's change)
+	// is kept.
+	main.poll()
+	terminal.poll()
+	main.state["terminalFontSize"] = float64(18)
+	terminal.state["terminalFontSize"] = float64(11)
+	main.save()
+	terminal.save()
+	if got := sharedDisk(t, root)["terminalFontSize"]; got != float64(11) {
+		t.Fatalf("font size after two apps changed it: %v", got)
+	}
+}
+
+func TestSharedStateKeepsWindowStatePerWorkspace(t *testing.T) {
 	root := t.TempDir()
 	mainPath := filepath.Join(root, appSettingsFilename)
 	// Main settings with members only the main window uses; one has a number
 	// format a careless rewrite would change.
-	original := `{"theme":"dark","forms":{"ping":{"count":4}},"bandwidth":{"size":1e3},"_credentialVaultConfigID":"0123456789abcdef0123456789abcdef","terminalProfiles":[{"id":"p","name":"Core","type":"ssh","host":"192.0.2.1","port":22}],"terminalSidebarWidth":300}`
+	original := `{"theme":"dark","activePage":"overview","forms":{"ping":{"count":4}},"bandwidth":{"size":1e3},"profiles":[{"id":"t","name":"Gateway","target":"192.0.2.1"}],"_credentialVaultConfigID":"0123456789abcdef0123456789abcdef","terminalProfiles":[{"id":"p","name":"Core","type":"ssh","host":"192.0.2.1","port":22}],"terminalSidebarWidth":300}`
 	if err := os.WriteFile(mainPath, []byte(original), 0600); err != nil {
 		t.Fatal(err)
 	}
 	terminalApp := sharedTestApp(t, root, terminalWorkspaceName, "terminal")
 	terminal := openSharedPage(t, terminalApp)
-	if !sameIDs(terminal.ids("terminalProfiles"), "p") {
-		t.Fatalf("the Terminal does not list the data folder's profile: %v", terminal.state)
+	if !sameIDs(terminal.ids("terminalProfiles"), "p") || terminal.state["theme"] != "dark" {
+		t.Fatalf("the Terminal does not start with the data folder's connections and settings: %v", terminal.state)
 	}
-	if _, leaked := terminal.state["forms"]; leaked || terminal.state["theme"] != nil || terminal.state[credentialConfigIdentityField] != nil {
-		t.Fatalf("main-window preferences reached the Terminal: %v", terminal.state)
+	for _, name := range []string{"forms", "bandwidth", "activePage", "terminalSidebarWidth", "profiles", credentialConfigIdentityField} {
+		if _, leaked := terminal.state[name]; leaked {
+			t.Fatalf("%s of the main window reached the Terminal: %v", name, terminal.state)
+		}
 	}
-	terminal.state["theme"], terminal.state["terminalSidebarWidth"] = "light", float64(420)
+	// What is about this window stays in its own file.
+	terminal.state["activePage"], terminal.state["terminalSidebarWidth"], terminal.state["terminalSidebarCollapsed"] = "terminal", float64(420), true
+	terminal.state["terminalConnection"] = map[string]any{"type": "ssh", "host": "192.0.2.77"}
+	// A page holds a default for every key; one for a main-only key must not
+	// reach the main window's data.
+	terminal.state["profiles"] = []any{}
 	terminal.add("terminalProfiles", sharedProfile("q", "Edge", "192.0.2.2"))
 	terminal.save()
 
@@ -309,11 +476,14 @@ func TestSharedStateKeepsWindowPreferencesPerWorkspace(t *testing.T) {
 		}
 		return out.String()
 	}
-	if compact("theme") != `"dark"` || compact("terminalSidebarWidth") != `300` || compact("bandwidth") != `{"size":1e3}` || compact("forms") != `{"ping":{"count":4}}` || compact(credentialConfigIdentityField) != `"0123456789abcdef0123456789abcdef"` {
+	if compact("activePage") != `"overview"` || compact("terminalSidebarWidth") != `300` || compact("bandwidth") != `{"size":1e3}` || compact("forms") != `{"ping":{"count":4}}` || compact(credentialConfigIdentityField) != `"0123456789abcdef0123456789abcdef"` || compact("profiles") != `[{"id":"t","name":"Gateway","target":"192.0.2.1"}]` {
 		t.Fatalf("a standalone save changed the main window's own settings: %s", raw)
 	}
 	if _, added := disk["firstLaunchWelcomeSeen"]; added {
 		t.Fatal("an existing main settings file must not gain a first-launch marker")
+	}
+	if _, added := disk["terminalConnection"]; added {
+		t.Fatal("the Terminal's connection form draft was written to the main settings")
 	}
 	if got := sharedDiskIDs(t, root, "terminalProfiles"); !sameIDs(got, "p", "q") {
 		t.Fatalf("shared profiles on disk: %v", got)
@@ -323,25 +493,102 @@ func TestSharedStateKeepsWindowPreferencesPerWorkspace(t *testing.T) {
 		t.Fatal(err)
 	}
 	var workspace map[string]any
-	if json.Unmarshal(own, &workspace) != nil || workspace["theme"] != "light" || workspace["terminalSidebarWidth"] != float64(420) {
-		t.Fatalf("the Terminal's window preferences were not saved in its own file: %s", own)
+	if json.Unmarshal(own, &workspace) != nil || workspace["activePage"] != "terminal" || workspace["terminalSidebarWidth"] != float64(420) || workspace["terminalSidebarCollapsed"] != true || workspace["terminalConnection"] == nil {
+		t.Fatalf("the Terminal's window state was not saved in its own file: %s", own)
 	}
 	for _, key := range sharedDataKeys {
 		if _, present := workspace[key.Name]; present {
 			t.Fatalf("the standalone workspace file holds shared data (%s): %s", key.Name, own)
 		}
 	}
-	// The main window keeps its own preferences and sees the new profile.
+	// The main window keeps its own window state and sees the new profile.
 	main := openSharedPage(t, sharedTestApp(t, root, "", "main"))
-	if main.state["theme"] != "dark" || !sameIDs(main.ids("terminalProfiles"), "p", "q") {
+	if main.state["activePage"] != "overview" || main.state["terminalSidebarWidth"] != float64(300) || !sameIDs(main.ids("terminalProfiles"), "p", "q") || !sameIDs(main.ids("profiles"), "t") {
 		t.Fatalf("main window state: %v", main.state)
+	}
+	// A restarted Terminal has its own window state back.
+	again := openSharedPage(t, sharedTestApp(t, root, terminalWorkspaceName, "terminal"))
+	if again.state["terminalSidebarWidth"] != float64(420) || again.state["activePage"] != "terminal" {
+		t.Fatalf("the Terminal's window state after a restart: %v", again.state)
+	}
+}
+
+func TestSharedKeyTableClassifiesEveryPageKey(t *testing.T) {
+	shared, perWindow := map[string]bool{}, map[string]bool{}
+	for _, key := range sharedDataKeys {
+		if key.Name == "" || shared[key.Name] {
+			t.Fatalf("shared key %q is empty or repeated", key.Name)
+		}
+		shared[key.Name] = true
+		if key.Kind == sharedCounter && key.Live {
+			t.Fatalf("%s: a counter is kept by the engine, not refreshed in pages", key.Name)
+		}
+	}
+	for _, name := range perWindowStateKeys {
+		if name == "" || perWindow[name] || shared[name] {
+			t.Fatalf("per-window key %q is empty, repeated or also shared", name)
+		}
+		perWindow[name] = true
+	}
+	// Every key the page declares in its initial settings object, and every
+	// key a module adds later, must be classified.
+	html, err := os.ReadFile(filepath.Join("..", "..", "web", "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var declared string
+	for _, line := range strings.Split(string(html), "\n") {
+		if strings.HasPrefix(line, "let state={") {
+			declared = line
+		}
+	}
+	if declared == "" {
+		t.Fatal("the page's settings object was not found")
+	}
+	depth, start := 0, len("let state={")
+	names := []string{}
+	for i := start; i < len(declared) && depth >= 0; i++ {
+		switch declared[i] {
+		case '{', '[':
+			depth++
+		case '}', ']':
+			depth--
+		case ':':
+			if depth == 0 {
+				j := i
+				for j > start && declared[j-1] != ',' && declared[j-1] != '{' {
+					j--
+				}
+				names = append(names, strings.Trim(declared[j:i], `'" `))
+			}
+		}
+	}
+	if len(names) < 60 {
+		t.Fatalf("only %d settings keys were read from the page: %v", len(names), names)
+	}
+	names = append(names, "terminalSyntax", "terminalBehavior", "terminalInteraction", "terminalPromptNames", "terminalSavedManualOrder", "terminalNameRevision", "editorFilesPreferences", "transferServerSettings", "transferServerSidebar", "transferClientLayout", "transferModes", "testTabOrder", "overviewLayout", "remoteBrowserSettings", "resultFilters", "graphPlotPreferences", "graphTimeRange", "graphWorkspacePreferences", "packetGraphPreferences", "packetMapSettings")
+	for _, name := range names {
+		if !shared[name] && !perWindow[name] {
+			t.Errorf("%s is not classified: add it to sharedDataKeys (a preference or saved data) or perWindowStateKeys (about one window) in shared_data.go", name)
+		}
+	}
+	// What the user sets on purpose is shared; what is about one window is not.
+	for _, name := range []string{"terminalProfiles", "terminalRecent", "ftpProfiles", "sftpRecent", "sftpVerifiedHostKeys", "theme", "accentColor", "colorPickerPreferences", "terminalAppearance", "terminalSyntax", "terminalHighlight", "terminalBehavior", "terminalInteraction", "terminalFontSize", "terminalMacroConfirmation", "terminalSidebarSide", "terminalConfirmClose", "terminalSessionConfirmDelete", "editorPreferences", "editorFilesPreferences"} {
+		if key, ok := sharedKeyNamed(name); !ok || key.MainOnly {
+			t.Errorf("%s must be shared by every app", name)
+		}
+	}
+	for _, name := range []string{"activePage", "terminalSidebarWidth", "terminalSidebarCollapsed", "terminalSidebarTab", "terminalLayout", "terminalConnection", "toolLayout", "firstLaunchWelcomeSeen", "appUpdatePreferences", credentialConfigIdentityField} {
+		if !perWindow[name] {
+			t.Errorf("%s is about one window or one run and must stay per window", name)
+		}
 	}
 }
 
 func TestSharedStateStandaloneCreatesMainSettingsWithoutHidingFirstLaunch(t *testing.T) {
 	root := t.TempDir()
 	terminal := openSharedPage(t, sharedTestApp(t, root, terminalWorkspaceName, "terminal"))
-	terminal.state["theme"] = "light"
+	terminal.state["terminalSidebarWidth"] = float64(400)
 	terminal.save()
 	if _, err := os.Lstat(filepath.Join(root, appSettingsFilename)); !os.IsNotExist(err) {
 		t.Fatalf("a save without shared data created the main settings file: %v", err)
@@ -356,8 +603,8 @@ func TestSharedStateStandaloneCreatesMainSettingsWithoutHidingFirstLaunch(t *tes
 	if json.Unmarshal(raw, &disk) != nil || disk["firstLaunchWelcomeSeen"] != false {
 		t.Fatalf("the main window would skip its first-launch welcome: %s", raw)
 	}
-	if strings.Contains(string(raw), "theme") {
-		t.Fatalf("a window preference of the Terminal was written to the main settings: %s", raw)
+	if strings.Contains(string(raw), "terminalSidebarWidth") {
+		t.Fatalf("window state of the Terminal was written to the main settings: %s", raw)
 	}
 }
 
@@ -376,6 +623,8 @@ func TestSharedStateConcurrentSavesFromThreeAppsLoseNothing(t *testing.T) {
 				id := fmt.Sprintf("app%d-profile%d", index, n)
 				page.add("terminalProfiles", sharedProfile(id, id, "192.0.2.50"))
 				page.add("ftpProfiles", map[string]any{"id": id, "name": id, "host": "files.test", "username": "operator", "port": float64(21), "security": "explicit", "fingerprint": "", "credentialId": ""})
+				// Each app also keeps changing its own member of one settings object.
+				page.set("editorPreferences", fmt.Sprintf("app%d", index), float64(n))
 				if n%3 == 2 {
 					// Sometimes a page polls and applies what the others saved,
 					// sometimes it saves without having looked.
@@ -404,6 +653,12 @@ func TestSharedStateConcurrentSavesFromThreeAppsLoseNothing(t *testing.T) {
 			t.Fatalf("%s after interleaved saves: %d of %d kept: %v", name, len(got), len(want), got)
 		}
 	}
+	prefs, _ := sharedDisk(t, root)["editorPreferences"].(map[string]any)
+	for index := range apps {
+		if prefs[fmt.Sprintf("app%d", index)] != float64(perApp-1) {
+			t.Fatalf("interleaved settings saves lost a change: %v", prefs)
+		}
+	}
 	// Every app converges on the same list.
 	for _, app := range apps {
 		page := openSharedPage(t, app)
@@ -413,14 +668,14 @@ func TestSharedStateConcurrentSavesFromThreeAppsLoseNothing(t *testing.T) {
 	}
 }
 
-func TestSharedStateRevisionSignalsAndNamedBase(t *testing.T) {
+func TestSharedStateRevisionSignalsAndBusyPages(t *testing.T) {
 	root := t.TempDir()
 	mainApp := sharedTestApp(t, root, "", "main")
 	main := openSharedPage(t, mainApp)
 	terminal := openSharedPage(t, sharedTestApp(t, root, terminalWorkspaceName, "terminal"))
 	first := main.revision
-	if first == "" || first != terminal.revision {
-		t.Fatalf("two apps of one data folder disagree on the revision: %q %q", first, terminal.revision)
+	if first == "" || terminal.revision == "" {
+		t.Fatalf("a loaded page has no revision: %q %q", first, terminal.revision)
 	}
 	if r := requestApp(mainApp, "POST", "/api/shared-data", "{}", true); r.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("the revision endpoint accepted a write: %d", r.Code)
@@ -431,17 +686,25 @@ func TestSharedStateRevisionSignalsAndNamedBase(t *testing.T) {
 	if r := requestApp(mainApp, "GET", "/api/shared-data?revision="+strings.Repeat("a", 65), "", true); r.Code != http.StatusBadRequest {
 		t.Fatalf("an oversized revision was accepted: %d", r.Code)
 	}
-	// A window preference is not shared data: no signal.
+	// Window state is not shared data: no signal.
 	terminal.state["terminalSidebarWidth"] = float64(400)
 	terminal.save()
 	if main.poll() || main.revision != first {
-		t.Fatal("a window preference changed the shared revision")
+		t.Fatal("window state changed the shared revision")
 	}
+	// Data only the main window uses does not make a standalone app refresh.
+	before := terminal.revision
+	main.add("profiles", map[string]any{"id": "t", "name": "Gateway", "target": "192.0.2.1"})
+	main.save()
+	if terminal.poll() || terminal.revision != before {
+		t.Fatal("main-only data made the Terminal refresh")
+	}
+	first = main.revision
 	terminal.add("terminalProfiles", sharedProfile("a", "A", "192.0.2.1"))
 	terminal.save()
 
 	// The main page is busy (a dialog is open): it asks, is told about the
-	// change, but does not apply it and keeps naming its old revision.
+	// change, but does not apply it.
 	r := requestApp(mainApp, "GET", "/api/shared-data?revision="+first, "", true)
 	var told struct {
 		Revision string         `json:"revision"`
@@ -450,34 +713,42 @@ func TestSharedStateRevisionSignalsAndNamedBase(t *testing.T) {
 	if r.Code != 200 || json.Unmarshal(r.Body.Bytes(), &told) != nil || told.Revision == first || told.Values == nil {
 		t.Fatalf("the change was not signalled: %s", r.Body.String())
 	}
-	if _, deferredKey := told.Values["editorPreferences"]; deferredKey {
-		t.Fatal("editor preferences are read when an editor starts, not pushed into a running page")
-	}
-	if _, counter := told.Values["terminalNameRevision"]; counter {
-		t.Fatal("the name revision counter belongs to the engine")
+	for _, key := range sharedDataKeys {
+		if _, sent := told.Values[key.Name]; sent && !key.Live {
+			t.Fatalf("%s is read when a page starts, not pushed into a running page", key.Name)
+		}
 	}
 	// Asked again with the same old revision, the values are offered again.
 	if r := requestApp(mainApp, "GET", "/api/shared-data?revision="+first, "", true); !strings.Contains(r.Body.String(), `"values"`) {
 		t.Fatalf("a page that could not apply a change must be offered it again: %s", r.Body.String())
 	}
-	// It then saves its own new profile, still from the old revision. The
+	// It then saves its own new profile, still without the Terminal's. The
 	// Terminal's profile must survive although the engine has since shown the
 	// page a newer list.
 	main.add("terminalProfiles", sharedProfile("b", "B", "192.0.2.2"))
 	main.save()
 	if got := sharedDiskIDs(t, root, "terminalProfiles"); !sameIDs(got, "a", "b") {
-		t.Fatalf("saving from an older revision lost a profile: %v", got)
+		t.Fatalf("a save from a page that had not applied a change lost a profile: %v", got)
 	}
-	// A revision the engine no longer knows removes nothing either.
-	main.remove("terminalProfiles", "a")
-	main.revision = "0000000000000000000000000000dead"
-	main.save()
-	if got := sharedDiskIDs(t, root, "terminalProfiles"); !sameIDs(got, "a", "b") {
-		t.Fatalf("a save from an unknown revision removed a profile: %v", got)
+	// An older client that does not say what it started from is taken to
+	// hold what the engine last gave it or accepted from it.
+	old := openSharedPage(t, sharedTestApp(t, root, standaloneEditorDirectory, standaloneEditorMode))
+	old.untracked = true
+	terminal.add("terminalProfiles", sharedProfile("c", "C", "192.0.2.3"))
+	terminal.save()
+	old.add("terminalProfiles", sharedProfile("d", "D", "192.0.2.4"))
+	old.save()
+	if got := sharedDiskIDs(t, root, "terminalProfiles"); !sameIDs(got, "a", "b", "c", "d") {
+		t.Fatalf("a save from an older client lost a profile: %v", got)
+	}
+	old.remove("terminalProfiles", "a")
+	old.save()
+	if got := sharedDiskIDs(t, root, "terminalProfiles"); !sameIDs(got, "b", "c", "d") {
+		t.Fatalf("an older client could not remove a profile it was given: %v", got)
 	}
 }
 
-func TestSharedStateEditsRenamesAndDeferredPreferences(t *testing.T) {
+func TestSharedStateEditsRenamesAndEditorPreferences(t *testing.T) {
 	root := t.TempDir()
 	mainApp := sharedTestApp(t, root, "", "main")
 	main := openSharedPage(t, mainApp)
@@ -514,10 +785,10 @@ func TestSharedStateEditsRenamesAndDeferredPreferences(t *testing.T) {
 		t.Fatalf("the engine's rename did not reach the other app: %v", row)
 	}
 
-	// Editor preferences merge one by one, and each editor writes back only
-	// what its user changed.
+	// Editor preferences merge one by one: each editor writes back all of its
+	// preferences, and only what its user changed counts as a change.
 	editor := openSharedPage(t, sharedTestApp(t, root, standaloneEditorDirectory, standaloneEditorMode))
-	if prefs, _ := editor.state["editorPreferences"].(map[string]any); prefs["fontSize"] != float64(13) {
+	if editor.member("editorPreferences", "fontSize") != float64(13) {
 		t.Fatalf("the standalone Text Editor does not start with the shared preferences: %v", editor.state["editorPreferences"])
 	}
 	editor.state["editorPreferences"] = map[string]any{"wordWrap": true, "fontSize": float64(13)}
@@ -526,16 +797,13 @@ func TestSharedStateEditsRenamesAndDeferredPreferences(t *testing.T) {
 	// them, having changed only the font size.
 	main.state["editorPreferences"] = map[string]any{"wordWrap": false, "fontSize": float64(16)}
 	main.save()
-	settings, err := readRootSettings(filepath.Join(root, appSettingsFilename))
-	if err != nil {
-		t.Fatal(err)
-	}
-	prefs, _ := settings.shared()["editorPreferences"].(map[string]any)
+	prefs, _ := sharedDisk(t, root)["editorPreferences"].(map[string]any)
 	if prefs["wordWrap"] != true || prefs["fontSize"] != float64(16) {
 		t.Fatalf("editor preferences from two editors: %v", prefs)
 	}
-	if prefs, _ := main.state["editorPreferences"].(map[string]any); prefs["wordWrap"] != false {
-		t.Fatal("a running editor's preferences were replaced under it")
+	// The save's answer brings the main window's editor up to date.
+	if main.member("editorPreferences", "wordWrap") != true {
+		t.Fatalf("the main window's editor was not given the other editor's change: %v", main.state["editorPreferences"])
 	}
 }
 
@@ -550,7 +818,8 @@ func TestSharedStateRejectsInvalidAndOversizedSharedData(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, body := range []string{`{"terminalProfiles":"junk"}`, `{"terminalProfiles":{"id":"p"}}`, `{"terminalRecent":7}`, `{"ftpProfiles":"x"}`, `{"ftpRecent":{}}`, `{"sftpRecent":true}`, `{"sftpVerifiedHostKeys":[]}`, `{"editorPreferences":"x"}`, `{"terminalPromptNames":{}}`} {
+	for _, body := range []string{`{"terminalProfiles":"junk"}`, `{"terminalProfiles":{"id":"p"}}`, `{"terminalRecent":7}`, `{"ftpProfiles":"x"}`, `{"ftpRecent":{}}`, `{"sftpRecent":true}`, `{"sftpVerifiedHostKeys":[]}`, `{"editorPreferences":"x"}`, `{"terminalPromptNames":{}}`, `{"terminalAppearance":[]}`, `{"terminalSyntax":"x"}`,
+		`{"_sharedBase":"token"}`, `{"_sharedBase":[]}`, `{"terminalProfiles":[],"_sharedBase":{"terminalProfiles":"junk"}}`, `{"_sharedBase":{"editorPreferences":7}}`} {
 		if r := requestApp(terminalApp, "PUT", "/api/state", body, true); r.Code != http.StatusBadRequest {
 			t.Fatalf("invalid shared data accepted (%d): %s", r.Code, body)
 		}

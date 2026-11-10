@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -51,11 +52,45 @@ func TestSharedDataBrowser(t *testing.T) {
 	defer cancel()
 	command := exec.CommandContext(ctx, "node", "scripts/shared-data.browser.cjs")
 	command.Dir = filepath.Join("..", "..")
+	reportDir := os.Getenv("TOOLKIT_TEST_OUTPUT")
+	if reportDir == "" {
+		reportDir = t.TempDir()
+		env = append(env, "TOOLKIT_TEST_OUTPUT="+reportDir)
+	}
 	command.Env = env
 	output, err := command.CombinedOutput()
 	t.Log(string(output))
 	if err != nil {
 		t.Fatal(err)
+	}
+	// Every key the three pages keep in their settings is classified as shared
+	// or per-window in the engine table.
+	var report struct {
+		Keys map[string][]string `json:"keys"`
+	}
+	raw, err := os.ReadFile(filepath.Join(reportDir, "shared-data-report.json"))
+	if err != nil || json.Unmarshal(raw, &report) != nil || len(report.Keys["main"]) < 60 {
+		t.Fatalf("the browser run did not report the pages' settings keys: %v", err)
+	}
+	classified := map[string]bool{}
+	for _, key := range sharedDataKeys {
+		classified[key.Name] = true
+	}
+	for _, name := range perWindowStateKeys {
+		classified[name] = true
+	}
+	for app, names := range report.Keys {
+		for _, name := range names {
+			if !classified[name] {
+				t.Errorf("%s keeps %q, which is neither in sharedDataKeys nor in perWindowStateKeys (shared_data.go)", app, name)
+			}
+		}
+	}
+	disk := sharedDisk(t, root)
+	prefs, _ := disk["editorPreferences"].(map[string]any)
+	appearance, _ := disk["terminalAppearance"].(map[string]any)
+	if disk["theme"] != "dark" || disk["terminalFontSize"] != float64(17) || prefs["wordWrap"] != true || prefs["fontSize"] != float64(16) || appearance["cursor"] != "bar" {
+		t.Fatalf("settings on disk after the browser run: theme=%v font=%v editor=%v appearance=%v", disk["theme"], disk["terminalFontSize"], prefs, appearance)
 	}
 	// What the three pages agreed on is what is on disk, in the main settings
 	// file only.
@@ -67,8 +102,11 @@ func TestSharedDataBrowser(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if strings.Contains(string(raw), "from-terminal") || strings.Contains(string(raw), "terminalProfiles") {
-			t.Fatalf("%s holds saved connections in its own settings file: %s", workspace, raw)
+		if strings.Contains(string(raw), "from-terminal") || strings.Contains(string(raw), "terminalProfiles") || strings.Contains(string(raw), `"theme"`) || strings.Contains(string(raw), "terminalAppearance") {
+			t.Fatalf("%s holds shared data in its own settings file: %s", workspace, raw)
+		}
+		if !strings.Contains(string(raw), "activePage") {
+			t.Fatalf("%s lost its own window state: %s", workspace, raw)
 		}
 	}
 }

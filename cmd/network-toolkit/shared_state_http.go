@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"path/filepath"
 )
@@ -36,7 +37,7 @@ func (a *application) ensureShared() {
 	if a.shared == nil {
 		a.shared = newSharedData(filepath.Dir(a.dataPath), a.dataPath)
 		a.stateMark = sha256.Sum256(a.state)
-		a.shared.served(sharedValuesOf(a.state))
+		a.shared.served(a.sharedValuesLocked())
 		if root, err := readRootSettings(a.dataPath); err == nil {
 			a.shared.seen = sha256.Sum256(root.raw)
 		}
@@ -51,10 +52,10 @@ func stateMembers(state []byte) map[string]json.RawMessage {
 	return members
 }
 
-func sharedValuesOf(state []byte) map[string]any {
+func sharedValuesOf(state []byte, keys []sharedKey) map[string]any {
 	members := stateMembers(state)
 	picked := map[string]any{}
-	for _, key := range sharedDataKeys {
+	for _, key := range keys {
 		if raw, ok := members[key.Name]; ok {
 			var value any
 			if json.Unmarshal(raw, &value) == nil && value != nil {
@@ -62,7 +63,12 @@ func sharedValuesOf(state []byte) map[string]any {
 			}
 		}
 	}
-	return sharedSection(picked)
+	return sharedSectionOf(picked, keys)
+}
+
+// sharedValuesLocked returns the shared values this app holds in memory.
+func (a *application) sharedValuesLocked() map[string]any {
+	return sharedValuesOf(a.state, a.shared.keys())
 }
 
 // setStateLocked replaces the in-memory settings. Callers hold stateMu.
@@ -74,7 +80,7 @@ func (a *application) setStateLocked(state []byte) {
 // overlaySharedLocked puts shared values into the in-memory settings.
 func (a *application) overlaySharedLocked(values map[string]any) {
 	members := stateMembers(a.state)
-	for _, key := range sharedDataKeys {
+	for _, key := range a.shared.keys() {
 		if value, ok := values[key.Name]; ok && value != nil {
 			if raw, err := json.Marshal(value); err == nil {
 				members[key.Name] = raw
@@ -97,24 +103,28 @@ func (a *application) absorbRootLocked(root *rootSettings, force bool) bool {
 		return false
 	}
 	a.shared.seen = digest
-	before := sharedRevision(sharedValuesOf(a.state))
-	values := root.shared()
-	if !force && before == sharedRevision(values) {
+	values := root.shared(a.shared.keys())
+	if !force && sharedRevision(a.sharedValuesLocked()) == sharedRevision(values) {
 		return false
 	}
 	a.overlaySharedLocked(values)
 	return true
 }
 
-// syncSharedLocked brings the in-memory settings up to date before they are
-// read: settings replaced outside this file count as newly loaded, and shared
-// values another app saved are read from disk.
-func (a *application) syncSharedLocked() {
-	a.ensureShared()
+// noteReplacedStateLocked treats settings that were replaced outside this
+// file (unit tests assign application.state directly) as newly loaded.
+func (a *application) noteReplacedStateLocked() {
 	if sha256.Sum256(a.state) != a.stateMark {
 		a.stateMark = sha256.Sum256(a.state)
-		a.shared.served(sharedValuesOf(a.state))
+		a.shared.served(a.sharedValuesLocked())
 	}
+}
+
+// syncSharedLocked brings the in-memory settings up to date before they are
+// read: shared values another app saved are read from disk.
+func (a *application) syncSharedLocked() {
+	a.ensureShared()
+	a.noteReplacedStateLocked()
 	if root, err := readRootSettings(a.sharedSettingsPath()); err == nil {
 		a.absorbRootLocked(root, false)
 	}
@@ -152,9 +162,9 @@ func (a *application) loadSharedState() {
 			a.shared.seen = sha256.Sum256(root.raw)
 		}
 	} else if a.shared.standalone && a.storageError == "" {
-		a.storageError = "Saved connections could not be read: " + err.Error()
+		a.storageError = "Saved connections and settings could not be read: " + err.Error()
 	}
-	a.shared.served(sharedValuesOf(a.state))
+	a.shared.served(a.sharedValuesLocked())
 }
 
 func (a *application) serveState(w http.ResponseWriter, r *http.Request) {
@@ -163,7 +173,7 @@ func (a *application) serveState(w http.ResponseWriter, r *http.Request) {
 		a.stateMu.Lock()
 		a.syncSharedLocked()
 		// What the page is given now is what its next save starts from.
-		a.shared.served(sharedValuesOf(a.state))
+		a.shared.served(a.sharedValuesLocked())
 		raw := append([]byte(nil), a.state...)
 		a.stateMu.Unlock()
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
@@ -206,8 +216,13 @@ func sharedNameRevisionReset(state, base, theirs map[string]any) {
 }
 
 func (a *application) putState(w http.ResponseWriter, r *http.Request) {
+	// The settings themselves keep their 2 MiB limit. A page also sends what
+	// it started from for the shared keys it changed, so the request may be
+	// larger than the settings it carries.
+	counted := &countingBody{ReadCloser: r.Body}
+	r.Body = counted
 	var state map[string]any
-	if err := decodeBody(w, r, appSettingsLimit, &state); err != nil {
+	if err := decodeBody(w, r, appStateRequestLimit, &state); err != nil {
 		jsonError(w, 400, err.Error())
 		return
 	}
@@ -215,13 +230,32 @@ func (a *application) putState(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 400, "Settings must be a JSON object.")
 		return
 	}
-	baseRevision, _ := state[sharedBaseField].(string)
+	// A page says what it started from for each shared key it changed.
+	var started map[string]any
+	tracked := false
+	if value, present := state[sharedBaseField]; present {
+		if started, tracked = value.(map[string]any); !tracked {
+			jsonError(w, http.StatusBadRequest, errSharedInvalid.Error())
+			return
+		}
+	}
 	delete(state, sharedBaseField)
+	size := counted.n
+	if tracked {
+		raw, _ := json.Marshal(state)
+		size = int64(len(raw))
+	}
+	if size > appSettingsLimit {
+		jsonError(w, 400, "Invalid JSON request: http: request body too large")
+		return
+	}
 	// Vault config identity is native/backend-owned, never supplied by the renderer.
 	delete(state, credentialConfigIdentityField)
-	if err := validateSharedTypes(state); err != nil {
-		jsonError(w, http.StatusBadRequest, err.Error())
-		return
+	for _, values := range []map[string]any{state, started} {
+		if err := validateSharedTypes(values); err != nil {
+			jsonError(w, http.StatusBadRequest, err.Error())
+			return
+		}
 	}
 	if err := validateTerminalDisplayRevisions(state); err != nil {
 		jsonError(w, http.StatusBadRequest, err.Error())
@@ -234,17 +268,26 @@ func (a *application) putState(w http.ResponseWriter, r *http.Request) {
 	sanitizeListPreferences(state)
 	sanitizeSavedResultFilters(state)
 	sanitizeColorPickerPreferences(state)
-	sent := map[string]bool{}
-	for _, key := range sharedDataKeys {
-		if value, ok := state[key.Name]; ok && value != nil {
-			sent[key.Name] = true
-		}
-	}
-	ours := sharedSection(state)
 
 	a.stateMu.Lock()
 	defer a.stateMu.Unlock()
 	a.ensureShared()
+	keys := a.shared.keys()
+	if a.shared.standalone {
+		// Used by the main window only: a standalone app never writes them.
+		for _, key := range sharedDataKeys {
+			if key.MainOnly {
+				delete(state, key.Name)
+			}
+		}
+	}
+	sent := map[string]bool{}
+	for _, key := range keys {
+		if value, ok := state[key.Name]; ok && value != nil {
+			sent[key.Name] = true
+		}
+	}
+	ours := sharedSectionOf(state, keys)
 	// One transaction for every app of this data folder: read what is on
 	// disk, merge the page's changes into it and write the result.
 	release, lockErr := acquireCredentialGuardWait(a.sharedRoot(), sharedLockWait)
@@ -253,10 +296,7 @@ func (a *application) putState(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer release()
-	if sha256.Sum256(a.state) != a.stateMark {
-		a.stateMark = sha256.Sum256(a.state)
-		a.shared.served(sharedValuesOf(a.state))
-	}
+	a.noteReplacedStateLocked()
 	root, err := readRootSettings(a.sharedSettingsPath())
 	if err != nil {
 		if a.shared.standalone {
@@ -268,13 +308,21 @@ func (a *application) putState(w http.ResponseWriter, r *http.Request) {
 	} else {
 		a.absorbRootLocked(root, false)
 	}
-	theirs := sharedValuesOf(a.state)
-	base := a.shared.base(baseRevision)
-	for _, key := range sharedDataKeys {
-		value, err := mergeSharedKey(key, base[key.Name], theirs[key.Name], ours[key.Name], sent[key.Name])
-		if err != nil {
-			jsonError(w, http.StatusBadRequest, err.Error())
-			return
+	theirs := a.sharedValuesLocked()
+	base := a.shared.last
+	if tracked {
+		base = sharedSectionOf(started, keys)
+	}
+	for _, key := range keys {
+		value := theirs[key.Name]
+		_, changed := started[key.Name]
+		if key.Kind == sharedCounter || !tracked || changed {
+			// The page changed this key (or cannot say): its change is applied on
+			// top of what is on disk. Otherwise what is on disk stays.
+			if value, err = mergeSharedKey(key, base[key.Name], theirs[key.Name], ours[key.Name], sent[key.Name]); err != nil {
+				jsonError(w, http.StatusBadRequest, err.Error())
+				return
+			}
 		}
 		if value == nil {
 			delete(state, key.Name)
@@ -287,8 +335,8 @@ func (a *application) putState(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, http.StatusConflict, err.Error())
 		return
 	}
-	merged := sharedSection(state)
-	for _, key := range sharedDataKeys {
+	merged := sharedSectionOf(state, keys)
+	for _, key := range keys {
 		if value, ok := merged[key.Name]; ok {
 			state[key.Name] = value
 		} else {
@@ -305,6 +353,7 @@ func (a *application) putState(w http.ResponseWriter, r *http.Request) {
 		a.storageError = err.Error()
 		jsonError(w, 500, "Settings were not saved: "+err.Error())
 	}
+	const tooLarge = "Saved settings would exceed the 2 MiB limit. Reduce the saved data first."
 	if !a.shared.standalone {
 		if id := credentialConfigID(a.sharedSettingsPath()); id != "" {
 			state[credentialConfigIdentityField] = id
@@ -314,7 +363,7 @@ func (a *application) putState(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if len(full) > appSettingsLimit {
-			jsonError(w, 400, "Saved settings would exceed the 2 MiB limit. Reduce the saved data first.")
+			jsonError(w, 400, tooLarge)
 			return
 		}
 		if err = writeAtomic(a.dataPath, full); err != nil {
@@ -343,11 +392,11 @@ func (a *application) putState(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if len(ownRaw) > appSettingsLimit {
-			jsonError(w, 400, "Saved settings would exceed the 2 MiB limit. Reduce the saved data first.")
+			jsonError(w, 400, tooLarge)
 			return
 		}
 		if sharedRevision(merged) != sharedRevision(theirs) && (root.exists || !sharedValuesEmpty(merged)) {
-			next, err := root.encode(merged)
+			next, err := root.encode(merged, keys)
 			if err != nil {
 				jsonError(w, 400, err.Error())
 				return
@@ -366,25 +415,15 @@ func (a *application) putState(w http.ResponseWriter, r *http.Request) {
 	a.setStateLocked(full)
 	a.storageWritable = true
 	a.storageError = ""
-	snapshot := newSharedSnapshot(merged)
-	a.shared.remember(snapshot)
-	changed := false
-	for _, key := range sharedDataKeys {
-		if !key.Live {
-			if sent[key.Name] {
-				a.shared.deferred[key.Name] = ours[key.Name]
-			}
-			continue
+	revision := a.shared.served(merged)
+	shared := map[string]any{"revision": revision}
+	for _, key := range keys {
+		if key.Live && !sharedEqual(ours[key.Name], merged[key.Name]) {
+			// The page does not hold everything that is saved now (another app
+			// added or changed something): give it the merged values.
+			shared["values"] = sharedLiveValues(merged)
+			break
 		}
-		if !sharedEqual(ours[key.Name], merged[key.Name]) {
-			changed = true
-		}
-	}
-	shared := map[string]any{"revision": snapshot.revision}
-	if changed {
-		// The page did not have everything that is saved now (another app
-		// added or changed something): give it the merged values.
-		shared["values"] = snapshot.liveValues()
 	}
 	jsonResponse(w, 200, map[string]any{"ok": true, "terminalNames": terminalDisplayNamesResponse(state), "sharedData": shared})
 }
@@ -452,27 +491,26 @@ func (a *application) updateSharedLocked(change func(shared map[string]any) erro
 	if err != nil {
 		return err
 	}
-	if sha256.Sum256(a.state) != a.stateMark {
-		a.stateMark = sha256.Sum256(a.state)
-		a.shared.served(sharedValuesOf(a.state))
-	}
+	a.noteReplacedStateLocked()
 	a.absorbRootLocked(root, false)
-	shared := sharedValuesOf(a.state)
+	keys := a.shared.keys()
+	shared := a.sharedValuesLocked()
 	if err := change(shared); err != nil {
 		return err
 	}
-	shared = sharedSection(shared)
-	// Members of the file that are not on disk yet (settings held in memory
-	// only) are written with it, so the file matches this process's view.
+	shared = sharedSectionOf(shared, keys)
 	if !a.shared.standalone {
+		// Settings this window holds in memory but has not written yet are
+		// written with the change, so the file matches this process's view. The
+		// vault's configuration identity is always the one on disk.
 		for name, raw := range stateMembers(a.state) {
-			if _, isShared := sharedKeyNamed(name); !isShared {
+			if _, isShared := sharedKeyNamed(name); !isShared && name != credentialConfigIdentityField {
 				root.members[name] = raw
 			}
 		}
 		root.exists = true
 	}
-	next, err := root.encode(shared)
+	next, err := root.encode(shared, keys)
 	if err != nil {
 		return err
 	}
@@ -489,9 +527,29 @@ func (a *application) updateSharedLocked(change func(shared map[string]any) erro
 }
 
 // handleSharedData lets a page notice what another app saved. A page asks
-// with the revision it holds and gets the current values only when they
-// differ.
+// with the revision it holds and gets the current values of the keys a
+// running page refreshes only when something differs.
 func (a *application) handleSharedData(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path == "/api/shared-data/notices" {
+		// The user has read a notice of the one-time move to shared data.
+		if r.Method != http.MethodPost {
+			methodError(w)
+			return
+		}
+		var request struct {
+			Acknowledge []string `json:"acknowledge"`
+		}
+		if err := decodeBody(w, r, 4096, &request); err != nil || len(request.Acknowledge) == 0 || len(request.Acknowledge) > 32 {
+			jsonError(w, http.StatusBadRequest, "Name the notices that were read.")
+			return
+		}
+		if err := acknowledgeSharedNotices(a.sharedRoot(), request.Acknowledge); err != nil {
+			jsonError(w, http.StatusConflict, err.Error())
+			return
+		}
+		jsonResponse(w, http.StatusOK, map[string]bool{"ok": true})
+		return
+	}
 	if r.URL.Path != "/api/shared-data" {
 		http.NotFound(w, r)
 		return
@@ -507,16 +565,34 @@ func (a *application) handleSharedData(w http.ResponseWriter, r *http.Request) {
 	}
 	a.stateMu.Lock()
 	a.syncSharedLocked()
-	current := newSharedSnapshot(sharedValuesOf(a.state))
+	current := a.sharedValuesLocked()
+	revision := sharedRevision(current)
 	if known == "" {
 		// A page that has just loaded its settings holds what was served.
-		known = a.shared.latest()
+		known = a.shared.lastRevision
 	}
-	response := map[string]any{"revision": current.revision}
-	if known != current.revision {
-		a.shared.remember(current)
-		response["values"] = current.liveValues()
+	response := map[string]any{"revision": revision}
+	if known != revision {
+		a.shared.offered(current)
+		response["values"] = sharedLiveValues(current)
 	}
 	a.stateMu.Unlock()
+	if a.credentials != nil {
+		response["credentials"] = a.credentials.mark()
+	}
+	if notices := sharedNotices(a.sharedRoot()); len(notices) > 0 {
+		response["notices"] = notices
+	}
 	jsonResponse(w, http.StatusOK, response)
+}
+
+type countingBody struct {
+	io.ReadCloser
+	n int64
+}
+
+func (c *countingBody) Read(p []byte) (int, error) {
+	n, err := c.ReadCloser.Read(p)
+	c.n += int64(n)
+	return n, err
 }

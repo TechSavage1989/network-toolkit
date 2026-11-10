@@ -42,16 +42,10 @@ func TestSSHCompatibilityProfilePersistenceAndNormalization(t *testing.T) {
 	if len(a.terminals.List()) != 0 {
 		t.Fatal("Saving a compatibility profile opened a connection")
 	}
-	dest := terminalWorkspace(filepath.Dir(a.dataPath))
-	if err = os.MkdirAll(dest, 0700); err != nil {
-		t.Fatal(err)
-	}
-	if err = seedTerminalWorkspace(filepath.Dir(a.dataPath), dest); err != nil {
-		t.Fatal(err)
-	}
-	seeded, err := os.ReadFile(filepath.Join(dest, "Network_Toolkit.settings.json"))
-	if err != nil || !strings.Contains(string(seeded), `"sshCompatibility": "legacy"`) || strings.Contains(string(seeded), "credential-canary") {
-		t.Fatalf("Independent workspace did not preserve only safe compatibility settings: %s %v", seeded, err)
+	// A standalone Terminal lists the same saved connections (shared).
+	seeded := standaloneTerminalState(t, filepath.Dir(a.dataPath))
+	if !strings.Contains(string(seeded), `"sshCompatibility": "legacy"`) || strings.Contains(string(seeded), "credential-canary") {
+		t.Fatalf("Independent workspace did not preserve only safe compatibility settings: %s", seeded)
 	}
 }
 

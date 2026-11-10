@@ -151,40 +151,29 @@ func TestSharedMergeOtherKindsAndInvalidInput(t *testing.T) {
 	}
 }
 
-func TestSharedKeyTableAndRevision(t *testing.T) {
-	seen := map[string]bool{}
-	for _, key := range sharedDataKeys {
-		if key.Name == "" || seen[key.Name] {
-			t.Fatalf("shared key %q is empty or repeated", key.Name)
-		}
-		seen[key.Name] = true
-		if key.Kind == sharedCounter && key.Live {
-			t.Fatalf("%s: a counter is kept by the engine, not refreshed in pages", key.Name)
-		}
-	}
-	for _, name := range []string{"terminalProfiles", "terminalRecent", "terminalSavedManualOrder", "terminalPromptNames", "ftpProfiles", "ftpRecent", "sftpRecent", "sftpVerifiedHostKeys", "editorPreferences"} {
-		if !seen[name] {
-			t.Fatalf("%s must be shared", name)
-		}
-	}
-	// Window preferences are never shared.
-	for _, name := range []string{"theme", "activePage", "terminalSidebarWidth", "terminalSidebarCollapsed", "terminalSidebarTab", "terminalComposerCollapsed", "terminalLayout", "terminalConnection", "editorFilesPreferences", "toolLayout", credentialConfigIdentityField} {
-		if seen[name] {
-			t.Fatalf("%s is a window preference and must stay per workspace", name)
-		}
-	}
-	a := sharedSection(map[string]any{"terminalProfiles": []any{map[string]any{"id": "p", "name": "Core", "type": "ssh", "host": "192.0.2.1", "port": float64(22)}}, "theme": "dark"})
-	b := sharedSection(map[string]any{"theme": "light", "terminalProfiles": []map[string]any{{"port": 22, "host": "192.0.2.1", "type": "ssh", "name": "Core", "id": "p"}}})
-	if _, leaked := a["theme"]; leaked || sharedRevision(a) != sharedRevision(b) || !reflect.DeepEqual(a, b) {
-		t.Fatalf("the shared section must not depend on window preferences or value types: %v %v", a, b)
+func TestSharedSectionIsCanonicalAndCarriesNoSecrets(t *testing.T) {
+	a := sharedSection(map[string]any{"terminalProfiles": []any{map[string]any{"id": "p", "name": "Core", "type": "ssh", "host": "192.0.2.1", "port": float64(22)}}, "activePage": "terminal"})
+	b := sharedSection(map[string]any{"activePage": "overview", "terminalProfiles": []map[string]any{{"port": 22, "host": "192.0.2.1", "type": "ssh", "name": "Core", "id": "p"}}})
+	if _, leaked := a["activePage"]; leaked || sharedRevision(a) != sharedRevision(b) || !reflect.DeepEqual(a, b) {
+		t.Fatalf("the shared section must not depend on window state or value types: %v %v", a, b)
 	}
 	c := sharedSection(map[string]any{"terminalProfiles": []any{map[string]any{"id": "p", "name": "Edge", "type": "ssh", "host": "192.0.2.1", "port": float64(22)}}})
 	if sharedRevision(a) == sharedRevision(c) || len(sharedRevision(a)) != 32 {
 		t.Fatal("a changed profile must change the revision")
 	}
+	// A setting is part of the shared section, and so of the revision.
+	d := sharedSection(map[string]any{"theme": "light", "terminalFontSize": float64(15), "terminalAppearance": map[string]any{"cursorStyle": "bar"}})
+	if d["theme"] != "light" || d["terminalFontSize"] != float64(15) || d["terminalAppearance"] == nil || sharedRevision(d) == sharedRevision(sharedSection(map[string]any{"theme": "dark"})) {
+		t.Fatalf("settings are shared: %v", d)
+	}
 	// Secrets and unknown fields never enter the shared section.
-	d := sharedSection(map[string]any{"terminalProfiles": []any{map[string]any{"id": "p", "name": "Core", "password": "secret-marker", "privateKey": "secret-marker"}}, "ftpProfiles": []any{map[string]any{"id": "f", "name": "Files", "host": "files.test", "username": "u", "port": float64(21), "password": "secret-marker"}}})
-	if strings.Contains(sharedText(t, d), "secret-marker") {
+	e := sharedSection(map[string]any{"terminalProfiles": []any{map[string]any{"id": "p", "name": "Core", "password": "secret-marker", "privateKey": "secret-marker"}}, "ftpProfiles": []any{map[string]any{"id": "f", "name": "Files", "host": "files.test", "username": "u", "port": float64(21), "password": "secret-marker"}}, "ftpRecent": []any{map[string]any{"id": "g", "name": "Files", "host": "files.test", "username": "u", "port": float64(21), "password": "secret-marker"}}})
+	if strings.Contains(sharedText(t, e), "secret-marker") {
 		t.Fatal("a secret reached the shared section")
+	}
+	// A standalone app's section leaves out what only the main window uses.
+	standalone := sharedSectionOf(map[string]any{"theme": "dark", "profiles": []any{map[string]any{"id": "t", "name": "Gateway", "target": "192.0.2.1"}}}, sharedKeysFor(true))
+	if _, present := standalone["profiles"]; present || standalone["theme"] != "dark" {
+		t.Fatalf("a standalone app's shared section: %v", standalone)
 	}
 }

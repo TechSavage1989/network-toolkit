@@ -134,13 +134,16 @@ func TestTerminalWindowInboxBoundedHistoryAndSnapshots(t *testing.T) {
 	}
 }
 
-func TestTerminalWorkspaceSeedsOnlyNonsecretStateAndDoesNotOverwrite(t *testing.T) {
+// A new Terminal workspace starts with the main window's arrangement of the
+// terminal page and nothing else: connections, settings, SSH host trust and
+// macros are shared by every app of the data folder, not copied.
+func TestTerminalWorkspaceSeedsOnlyWindowStateAndDoesNotOverwrite(t *testing.T) {
 	root := t.TempDir()
 	dest := terminalWorkspace(root)
 	if err := os.MkdirAll(dest, 0700); err != nil {
 		t.Fatal(err)
 	}
-	parent := `{"theme":"light","terminalFontSize":16,"terminalHighlight":false,"terminalSidebarWidth":372,"terminalPromptNames":[{"type":"ssh","host":"192.0.2.1","port":22,"username":"operator","name":"EDGE-SW01","password":"private-prompt-marker"}],"activePage":"discover","reportNotes":"private-report-marker","terminalConnection":{"type":"ssh","host":"192.0.2.1","password":"private-password-marker"},"terminalProfiles":[{"id":"one","name":"Lab","host":"192.0.2.1","privateKey":"private-key-marker","passphrase":"private-passphrase-marker"}]}`
+	parent := `{"theme":"light","terminalFontSize":16,"terminalHighlight":false,"terminalSidebarWidth":372,"terminalSidebarCollapsed":true,"terminalPromptNames":[{"type":"ssh","host":"192.0.2.1","port":22,"username":"operator","name":"EDGE-SW01","password":"private-prompt-marker"}],"activePage":"discover","reportNotes":"private-report-marker","terminalConnection":{"type":"ssh","host":"192.0.2.1","password":"private-password-marker"},"terminalProfiles":[{"id":"one","name":"Lab","host":"192.0.2.1","privateKey":"private-key-marker","passphrase":"private-passphrase-marker"}]}`
 	if err := os.WriteFile(filepath.Join(root, "Network_Toolkit.settings.json"), []byte(parent), 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -153,14 +156,29 @@ func TestTerminalWorkspaceSeedsOnlyNonsecretStateAndDoesNotOverwrite(t *testing.
 	}
 	settingsPath := filepath.Join(dest, "Network_Toolkit.settings.json")
 	b, err := os.ReadFile(settingsPath)
-	if err != nil || strings.Contains(string(b), "private-") || !strings.Contains(string(b), `"activePage": "terminal"`) || !strings.Contains(string(b), "Lab") || !strings.Contains(string(b), `"terminalSidebarWidth": 372`) || !strings.Contains(string(b), `"name": "EDGE-SW01"`) {
-		t.Fatalf("Unsafe or incomplete seeded state: %s %v", b, err)
+	if err != nil || strings.Contains(string(b), "private-") || !strings.Contains(string(b), `"activePage": "terminal"`) || !strings.Contains(string(b), `"terminalSidebarWidth": 372`) || !strings.Contains(string(b), `"terminalSidebarCollapsed": true`) || !strings.Contains(string(b), `"host": "192.0.2.1"`) {
+		t.Fatalf("Unsafe or incomplete seeded window state: %s %v", b, err)
 	}
-	childTrust, err := os.ReadFile(filepath.Join(dest, "Network_Toolkit.ssh_known_hosts.json"))
-	if err != nil || string(childTrust) != string(trust) {
-		t.Fatal("Public trust was not copied exactly")
+	var seeded map[string]any
+	if err := json.Unmarshal(b, &seeded); err != nil {
+		t.Fatal(err)
 	}
-	child := []byte(`{"theme":"dark","terminalProfiles":[],"terminalPromptNames":[{"type":"ssh","host":"192.0.2.1","port":22,"username":"operator","name":"INDEPENDENT-SW"}]}`)
+	for _, key := range sharedDataKeys {
+		if _, copied := seeded[key.Name]; copied {
+			t.Fatalf("shared data (%s) was copied into the Terminal workspace: %s", key.Name, b)
+		}
+	}
+	for _, name := range []string{"Network_Toolkit.ssh_known_hosts.json", terminalMacroLibraryFilename, credentialVaultV2Filename} {
+		if _, err := os.Stat(filepath.Join(dest, name)); !os.IsNotExist(err) {
+			t.Fatalf("%s was created in the Terminal workspace: %v", name, err)
+		}
+	}
+	// The window still starts with the shared connections and settings.
+	loaded := string(standaloneTerminalState(t, root))
+	if strings.Contains(loaded, "private-") || !strings.Contains(loaded, "Lab") || !strings.Contains(loaded, `"name": "EDGE-SW01"`) || !strings.Contains(loaded, `"theme": "light"`) || !strings.Contains(loaded, `"terminalFontSize": 16`) || !strings.Contains(loaded, `"terminalSidebarWidth": 372`) {
+		t.Fatalf("the Terminal window does not start with the shared data: %s", loaded)
+	}
+	child := []byte(`{"activePage":"terminal","terminalSidebarWidth":300}`)
 	if err := os.WriteFile(settingsPath, child, 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -168,14 +186,20 @@ func TestTerminalWorkspaceSeedsOnlyNonsecretStateAndDoesNotOverwrite(t *testing.
 		t.Fatal(err)
 	}
 	if b, _ = os.ReadFile(settingsPath); string(b) != string(child) {
-		t.Fatal("Later launch overwrote independent window preferences")
+		t.Fatal("Later launch overwrote the window's own state")
 	}
 	if b, _ = os.ReadFile(filepath.Join(root, "Network_Toolkit.settings.json")); string(b) != parent {
 		t.Fatal("Seeding modified main-window preferences")
 	}
+	if b, _ = os.ReadFile(filepath.Join(root, "Network_Toolkit.ssh_known_hosts.json")); string(b) != string(trust) {
+		t.Fatal("Seeding modified the data folder's SSH host trust")
+	}
 }
 
-func TestTerminalWorkspaceInitiallyEmptyTrustRemainsIndependent(t *testing.T) {
+// SSH host trust is one file per data folder. A trust file an earlier version
+// left in the Terminal workspace is never created, replaced or removed by a
+// launch.
+func TestTerminalWorkspaceTrustFileOfEarlierVersionIsLeftAlone(t *testing.T) {
 	root := t.TempDir()
 	dest := terminalWorkspace(root)
 	if err := os.MkdirAll(dest, 0700); err != nil {
@@ -185,20 +209,21 @@ func TestTerminalWorkspaceInitiallyEmptyTrustRemainsIndependent(t *testing.T) {
 		t.Fatal(err)
 	}
 	path := filepath.Join(dest, "Network_Toolkit.ssh_known_hosts.json")
-	initial, err := os.ReadFile(path)
-	if err != nil || strings.TrimSpace(string(initial)) != `{"version":1,"hosts":[]}` {
-		t.Fatalf("First-use empty trust was not persisted: %s %v", initial, err)
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Fatalf("a trust file was created in the Terminal workspace: %v", err)
 	}
-	// A later change to the main trust file is unrelated to this workspace.
-	later := []byte("{\n  \"version\": 1,\n  \"hosts\": []\n}\n")
-	if err := os.WriteFile(filepath.Join(root, "Network_Toolkit.ssh_known_hosts.json"), later, 0600); err != nil {
+	previous := []byte("{\"version\":1,\"hosts\":[]}\n")
+	if err := os.WriteFile(path, previous, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "Network_Toolkit.ssh_known_hosts.json"), []byte("{\n  \"version\": 1,\n  \"hosts\": []\n}\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
 	if err := seedTerminalWorkspace(root, dest); err != nil {
 		t.Fatal(err)
 	}
-	if current, err := os.ReadFile(path); err != nil || string(current) != string(initial) {
-		t.Fatal("A later launch replaced the initially empty independent trust store")
+	if current, err := os.ReadFile(path); err != nil || string(current) != string(previous) {
+		t.Fatal("A later launch changed the trust file an earlier version left in the workspace")
 	}
 }
 

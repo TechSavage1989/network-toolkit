@@ -30,6 +30,9 @@ func prepareStandaloneEditor(root string, request *editorLaunchRequest) (string,
 	return dir, release, false, nil
 }
 
+// First use: the Text Editor window opens on the editor. Its settings and the
+// saved connections it lists are shared by every app of the data folder and
+// are not copied into the workspace (shared_data.go).
 func seedStandaloneEditor(root string, editor *storageRoot) error {
 	const settings = "Network_Toolkit.settings.json"
 	if info, err := editor.Lstat(settings); err == nil {
@@ -40,24 +43,7 @@ func seedStandaloneEditor(root string, editor *storageRoot) error {
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return err
 	}
-	source, err := openStorageRoot(root, false)
-	if err != nil {
-		return err
-	}
-	defer source.Close()
-	initial := map[string]any{"activePage": "editor"}
-	if raw, err := readStorageFile(source, settings, 2<<20); err == nil {
-		var prior map[string]any
-		if json.Unmarshal(raw, &prior) == nil {
-			for _, key := range []string{"theme", "accentColor", "editorPreferences", "editorFilesPreferences", "colorPickerPreferences"} {
-				if value, ok := prior[key]; ok {
-					initial[key] = value
-				}
-			}
-		}
-	}
-	sanitizeColorPickerPreferences(initial)
-	data, err := json.MarshalIndent(initial, "", "  ")
+	data, err := json.MarshalIndent(map[string]any{"activePage": "editor"}, "", "  ")
 	if err != nil {
 		return err
 	}

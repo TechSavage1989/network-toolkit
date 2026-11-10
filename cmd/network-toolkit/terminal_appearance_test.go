@@ -67,18 +67,8 @@ func TestTerminalAppearanceAndActionsPositionPersistAndTransfer(t *testing.T) {
 	}
 	data, _ := json.Marshal(workspace)
 	check(data)
-	dest := terminalWorkspace(filepath.Dir(a.dataPath))
-	if err := os.MkdirAll(dest, 0700); err != nil {
-		t.Fatal(err)
-	}
-	if err := seedTerminalWorkspace(filepath.Dir(a.dataPath), dest); err != nil {
-		t.Fatal(err)
-	}
-	data, err = os.ReadFile(filepath.Join(dest, "Network_Toolkit.settings.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	check(data)
+	// A standalone Terminal uses the same, shared appearance settings.
+	check(standaloneTerminalState(t, filepath.Dir(a.dataPath)))
 }
 
 func TestInvalidTerminalAppearanceAndPositionUseDefaults(t *testing.T) {
