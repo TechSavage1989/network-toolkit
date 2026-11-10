@@ -324,6 +324,14 @@ jobs:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results
         run: node scripts/editor-session-restore.browser.cjs
+      - name: Share saved connections between the main window, Terminal and Text Editor through real engines
+        if: success() || failure()
+        env:
+          GOTOOLCHAIN: local
+          NTK_SHARED_DATA_BROWSER: '1'
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results/shared-data
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestSharedDataBrowser$' -count=1 -v -timeout=5m
       - name: Check compact sidebar controls and reclaimed file-list height
         if: success() || failure()
         env:

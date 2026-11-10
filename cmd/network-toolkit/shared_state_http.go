@@ -21,6 +21,15 @@ func (a *application) sharedSettingsPath() string {
 	return a.dataPath
 }
 
+// sharedRoot is the data folder whose shared files this app uses.
+func (a *application) sharedRoot() string {
+	a.ensureShared()
+	if a.shared.standalone {
+		return a.shared.root
+	}
+	return filepath.Dir(a.dataPath)
+}
+
 // ensureShared gives an application object built without newApplication (in
 // unit tests) the main window's view of its own data folder.
 func (a *application) ensureShared() {
@@ -238,7 +247,7 @@ func (a *application) putState(w http.ResponseWriter, r *http.Request) {
 	a.ensureShared()
 	// One transaction for every app of this data folder: read what is on
 	// disk, merge the page's changes into it and write the result.
-	release, lockErr := acquireCredentialGuardWait(a.shared.root, sharedLockWait)
+	release, lockErr := acquireCredentialGuardWait(a.sharedRoot(), sharedLockWait)
 	if lockErr != nil {
 		jsonError(w, http.StatusConflict, lockErr.Error())
 		return
@@ -434,7 +443,7 @@ func sharedValuesEmpty(values map[string]any) bool {
 // Callers hold stateMu.
 func (a *application) updateSharedLocked(change func(shared map[string]any) error) error {
 	a.ensureShared()
-	release, err := acquireCredentialGuardWait(a.shared.root, sharedLockWait)
+	release, err := acquireCredentialGuardWait(a.sharedRoot(), sharedLockWait)
 	if err != nil {
 		return err
 	}

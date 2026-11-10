@@ -511,6 +511,8 @@ func newApplicationForRoot(parent context.Context, dataPath, sharedRoot string) 
 	}
 	var terminalErr error
 	a.terminals, terminalErr = terminal.NewManager(ctx, a.shared.root)
+	// SSH host trust is one file per data folder, used by every app of it.
+	a.terminals.SetKnownHostLock(func() (func(), error) { return acquireSharedDataLock(a.shared.root) })
 	configureLocalShellElevation(a.terminals)
 	if terminalErr != nil {
 		a.terminalError = terminalErr.Error()
