@@ -81,8 +81,12 @@ $progKey = "HKCU:\Software\Classes\$progID"
 $extensions = '.txt', '.log', '.ini', '.cfg', '.conf'
 $shortcutArguments = [ordered]@{
     'Network Toolkit.lnk' = ''
-    'Network Toolkit Text Editor.lnk' = '--editor'
+    'Network Toolkit Text Editor.lnk' = '--editor-standalone'
     'Network Toolkit Terminal.lnk' = '--terminal'
+}
+$shortcutIcons = @{
+    'Network Toolkit Text Editor.lnk' = 1
+    'Network Toolkit Terminal.lnk' = 2
 }
 
 foreach ($path in @($installDir, $dataDir, $menu, $desktopShortcut, $uninstallKey, "HKLM:\$uninstallSubkey", $appKey, $progKey)) {
@@ -132,8 +136,9 @@ function Assert-Installed([string]$ExpectedHash = $portableHash) {
     Assert-Same (Read-RegistryValue $uninstallKey 'QuietUninstallString') ('"{0}" /S' -f $uninstaller) 'Silent uninstall command'
     Assert-Same (Read-RegistryValue $registeredApps $registeredName) 'Software\Network Toolkit\Capabilities' 'Default Apps registration'
     Assert-Same (Read-RegistryValue $capabilities 'ApplicationName') $registeredName 'Default Apps display name'
+    Assert-Same (Read-RegistryValue $capabilities 'ApplicationIcon') ('"{0}",1' -f $installedExe) 'Default Apps editor icon'
     if (-not (Read-RegistryValue $capabilities 'ApplicationDescription')) { throw 'The Default Apps description is missing.' }
-    Assert-Same (Read-RegistryValue "$progKey\shell\open\command" '') ('"{0}" --open-file "%1"' -f $installedExe) 'Editor open command'
+    Assert-Same (Read-RegistryValue "$progKey\shell\open\command" '') ('"{0}" --editor-standalone --open-file "%1"' -f $installedExe) 'Editor open command'
     $editorClass = Get-Item -LiteralPath $progKey
     try {
         Assert-Same ($editorClass.GetValueKind('AllowSilentDefaultTakeOver')) ([Microsoft.Win32.RegistryValueKind]::None) 'Default takeover opt-out'
@@ -152,6 +157,9 @@ function Assert-Installed([string]$ExpectedHash = $portableHash) {
             try {
                 Assert-Same $link.TargetPath $installedExe "$name target"
                 Assert-Same $link.Arguments $shortcutArguments[$name] "$name arguments"
+                if ($shortcutIcons.ContainsKey($name)) {
+                    Assert-Same ($link.IconLocation -replace ',\s+', ',') ('{0},{1}' -f $installedExe, $shortcutIcons[$name]) "$name icon"
+                }
             } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($link) }
         }
     } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($shell) }
@@ -161,6 +169,41 @@ New-Item -Path $dataDir -ItemType Directory | Out-Null
 Add-Fixture (Join-Path $dataDir 'Network_Toolkit.settings.json') '{"theme":"dark"}'
 Add-Fixture (Join-Path $dataDir 'Network_Toolkit.macros.json') '{"syntheticFixture":true}'
 Add-Fixture (Join-Path $dataDir 'Network_Toolkit.credentials.v2.vault') 'Synthetic installer preservation fixture'
+
+Write-Host 'Checking setup preserves files in an occupied custom folder.'
+$occupiedDir = Join-Path $env:RUNNER_TEMP 'Occupied Network Toolkit Install'
+New-Item -Path $occupiedDir -ItemType Directory | Out-Null
+Add-Fixture (Join-Path $occupiedDir 'Uninstall.exe') 'Unrelated program in a custom installation directory'
+Invoke-Silent $setup 2 "/S /D=$occupiedDir"
+Assert-Absent $uninstallKey
+Assert-Preserved
+
+Write-Host 'Checking setup refuses a custom folder beneath a junction.'
+$junctionPath = Join-Path $env:RUNNER_TEMP 'Redirected Network Toolkit Install'
+$junctionTarget = Join-Path $env:RUNNER_TEMP 'Physical Network Toolkit Fixture'
+New-Item -Path $junctionTarget -ItemType Directory | Out-Null
+New-Item -Path $junctionPath -ItemType Junction -Target $junctionTarget | Out-Null
+try {
+    Invoke-Silent $setup 2 "/S /D=$junctionPath\Nested"
+    Assert-Absent (Join-Path $junctionTarget 'Nested')
+    Assert-Absent $uninstallKey
+} finally { [IO.Directory]::Delete($junctionPath) }
+
+Write-Host 'Checking a fresh setup rolls back when it cannot create Start menu shortcuts.'
+$lateFailureDir = Join-Path $env:RUNNER_TEMP 'Failed Network Toolkit Install'
+[IO.File]::WriteAllText($menu, 'Synthetic item occupying the Start menu folder')
+$blockedMenuHash = (Get-FileHash -LiteralPath $menu -Algorithm SHA256).Hash
+try {
+    Invoke-Silent $setup 2 "/S /D=$lateFailureDir"
+    Assert-Absent (Join-Path $lateFailureDir 'Network_Toolkit.exe')
+    Assert-Absent (Join-Path $lateFailureDir 'Uninstall.exe')
+    Assert-Absent $uninstallKey
+    Assert-Absent $capabilities
+    Assert-Absent $progKey
+    Assert-Same (Read-RegistryValue $registeredApps $registeredName) $null 'Rolled back editor registration'
+    Assert-Same (Get-FileHash -LiteralPath $menu -Algorithm SHA256).Hash $blockedMenuHash 'Unrelated Start menu item'
+    Assert-Preserved
+} finally { Remove-Item -LiteralPath $menu }
 
 Write-Host 'Checking silent install, shortcuts, and editor registration.'
 Invoke-Silent $setup
@@ -188,9 +231,19 @@ try {
 Write-Host 'Checking repair replaces the executable and preserves data.'
 Add-Fixture (Join-Path $installDir 'user-created.txt') 'Unrelated file in the install directory'
 [IO.File]::WriteAllText($installedExe, 'Synthetic fixture for installer repair')
-Invoke-Silent $setup
+# Version 1.21.35 created this shortcut with --editor. Upgrade it in place.
+$legacyShell = New-Object -ComObject WScript.Shell
+try {
+    $legacyLink = $legacyShell.CreateShortcut((Join-Path $menu 'Network Toolkit Text Editor.lnk'))
+    try {
+        $legacyLink.Arguments = '--editor'
+        $legacyLink.Save()
+    } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($legacyLink) }
+} finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($legacyShell) }
+Invoke-Silent $setup 0 '/S /DesktopShortcut'
 Assert-Installed
 Assert-Preserved
+Assert-Same (Read-RegistryValue $uninstallKey 'DesktopShortcut') 1 'Selected desktop shortcut'
 
 Write-Host 'Checking setup refuses to overwrite a newer executable.'
 # An inbox PE has a real fixed version resource. It is copied only, never launched.
@@ -207,7 +260,7 @@ Copy-Item -LiteralPath $portableExe -Destination $installedExe
 
 Write-Host 'Checking uninstall removes owned registrations and preserves data.'
 Invoke-Silent $uninstaller
-foreach ($path in @($installedExe, $uninstaller, $menu, $uninstallKey, "HKLM:\$uninstallSubkey", $capabilities, $progKey)) {
+foreach ($path in @($installedExe, $uninstaller, $menu, $desktopShortcut, $uninstallKey, "HKLM:\$uninstallSubkey", $capabilities, $progKey)) {
     Assert-Absent $path
 }
 Assert-Same (Read-RegistryValue $registeredApps $registeredName) $null 'Removed Default Apps registration'
@@ -237,8 +290,23 @@ Assert-Absent (Join-Path $defaultInstallDir 'Network_Toolkit.exe')
 Invoke-Silent $setup
 Assert-Installed
 Assert-Same (Read-RegistryValue $uninstallKey 'DesktopShortcut') 1 'Preserved desktop shortcut choice'
+
+Write-Host 'Checking repair and uninstall preserve a replacement desktop shortcut.'
+$replacementShell = New-Object -ComObject WScript.Shell
+try {
+    $replacementLink = $replacementShell.CreateShortcut($desktopShortcut)
+    try {
+        $replacementLink.TargetPath = $newerExe
+        $replacementLink.Arguments = '/d /c exit'
+        $replacementLink.Save()
+    } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($replacementLink) }
+} finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($replacementShell) }
+$fixtures[$desktopShortcut] = (Get-FileHash -LiteralPath $desktopShortcut -Algorithm SHA256).Hash
+Invoke-Silent $setup
+Assert-Installed
+Assert-Preserved
 Invoke-Silent $uninstaller
-foreach ($path in @($installedExe, $uninstaller, $menu, $uninstallKey, $desktopShortcut)) {
+foreach ($path in @($installedExe, $uninstaller, $menu, $uninstallKey)) {
     Assert-Absent $path
 }
 Assert-Preserved
