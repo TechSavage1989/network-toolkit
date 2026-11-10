@@ -290,7 +290,11 @@ func copyStorageData(source, destination *storageRoot) ([]string, func(), error)
 }
 
 func copySavedListsWitness(source, destination string) (func(), error) {
-	id := readSavedListsWitness(source)
+	id, _, err := readSavedListsWitness(source)
+	if err != nil {
+		// Not "there is none": the move is refused and can be tried again.
+		return nil, err
+	}
 	if id == "" {
 		return func() {}, nil
 	}
@@ -462,7 +466,13 @@ func refreshStorageMigration(source, destination *storageRoot, migration *storag
 			return err
 		}
 	}
-	return refreshEditorSessions(source, destination)
+	if err := refreshEditorSessions(source, destination); err != nil {
+		return err
+	}
+	// The id beside the copy may have been written, or written anew, since
+	// the move was chosen; the copy itself was refreshed above.
+	_, err = copySavedListsWitness(source.path, destination.path)
+	return err
 }
 
 func replaceStorageCopy(parent *storageRoot, name string, raw []byte, expected [32]byte) error {

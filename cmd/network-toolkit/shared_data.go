@@ -40,6 +40,14 @@ const (
 // before it is reported as busy. A variable so that a test can shorten it.
 var sharedLockWait = 5 * time.Second
 
+// A refresh that saves what the app holds beyond the settings file waits
+// only this long for another app: the page asks again in a few seconds.
+var sharedRefreshLockWait = 250 * time.Millisecond
+
+// How often in a row that save may fail before the app stops treating a
+// changed settings file as "written anew" (sharedData.dirty).
+const sharedDirtyAttempts = 5
+
 // terminalPromptNameIdentity names a learned prompt name by its endpoint.
 func terminalPromptNameIdentity(item map[string]any) string {
 	kind, _ := item["type"].(string)
@@ -261,6 +269,8 @@ type sharedData struct {
 	// were kept when the file was found written anew, or come from the copy
 	// of the saved lists. The next refresh or save writes them.
 	dirty bool
+	// How often in a row the save of those values failed (saveHeldLocked).
+	dirtyFailures int
 	// Names of saved entries that an older version had dropped and a save of
 	// this app wrote again. The user is told (a notice) once no lock is held.
 	pendingPutBack []string
@@ -467,7 +477,11 @@ var errSharedSettingsBusy = errors.New("Settings were not saved: another Network
 // acquireSettingsLock takes the lock that guards the data folder's settings
 // file, waiting a short time for another app that is saving.
 func acquireSettingsLock(root string) (func(), error) {
-	release, err := acquireCredentialGuardWait(root, sharedLockWait)
+	return acquireSettingsLockWait(root, sharedLockWait)
+}
+
+func acquireSettingsLockWait(root string, wait time.Duration) (func(), error) {
+	release, err := acquireCredentialGuardWait(root, wait)
 	if errors.Is(err, errCredentialGuardBusy) {
 		return nil, errSharedSettingsBusy
 	}

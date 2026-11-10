@@ -86,47 +86,87 @@ func savedListKeys() []sharedKey {
 	return keys
 }
 
-// readSavedListsCopy returns the copy of the saved lists, or nil when there
-// is none or it cannot be used. A damaged copy is never a reason to refuse a
-// read or a save: the next save of this version writes it again.
+// Reading the copy and the id beside it has three answers, and they are
+// never mixed up: the file does not exist, the file could not be read at
+// this moment (err; another program holds it, access is denied), and the
+// file was read. Only "does not exist" and "was read and says otherwise" may
+// lead to a copy being ignored or removed. A read that failed changes
+// nothing: whoever needed the answer reports that and tries again.
+
+// errSavedListsUnread: the copy, or the id beside it, could not be read now.
+var errSavedListsUnread = errors.New("the copy of the saved lists could not be read at this moment. Try again.")
+
+// readSavedListsCopy returns the copy of the saved lists when it may be
+// used, or nil. It is for callers that only look something up and lose
+// nothing when the copy cannot be read.
 func readSavedListsCopy(dir string) *savedListsCopy {
-	kept, _ := usableSavedListsCopy(dir)
+	kept, _, _ := usableSavedListsCopy(dir)
 	return kept
 }
 
 // usableSavedListsCopy returns the copy when it belongs to the settings file
-// of this data folder: its id is the one kept beside it. unreadable says that
-// a copy is there but cannot be read. A copy that is paired with nothing
-// (an older version deleted the app data) is treated as if it were absent.
-func usableSavedListsCopy(dir string) (kept *savedListsCopy, unreadable bool) {
-	kept, present := readSavedListsCopyState(dir)
+// of this data folder: its id is the one kept beside it.
+//
+//   - kept != nil: use it.
+//   - err != nil: the copy or the id could not be read now. Nothing is known
+//     about the copy; it must not be written over by a caller that would
+//     have needed what it holds.
+//   - unusable: a copy is there and was read, but it is damaged. As before,
+//     that is never a reason to refuse a save: the next save writes it again.
+//   - all zero: there is no copy, or its id is confirmed to be gone or
+//     another one (an older version deleted the app data). It is treated as
+//     absent.
+//
+// An id file that is there but damaged was not removed by a deletion, so the
+// copy still counts as paired.
+func usableSavedListsCopy(dir string) (kept *savedListsCopy, unusable bool, err error) {
+	kept, present, err := readSavedListsCopyState(dir)
+	if err != nil {
+		return nil, false, err
+	}
 	if kept == nil {
-		return nil, present
+		return nil, present, nil
 	}
-	if kept.Pair != "" && readSavedListsWitness(dir) != kept.Pair {
-		return nil, false
+	if kept.Pair == "" {
+		return kept, false, nil
 	}
-	return kept, false
+	beside, exists, err := readSavedListsWitness(dir)
+	if err != nil {
+		return nil, false, err
+	}
+	if beside == kept.Pair || exists && beside == "" {
+		return kept, false, nil
+	}
+	return nil, false, nil
 }
 
 func savedListsWitnessPath(dir string) string {
 	return filepath.Join(dir, storageViewsDirectory, savedListsWitnessView, savedListsWitnessFile)
 }
 
-// readSavedListsWitness returns the id kept beside the copy, or "".
-func readSavedListsWitness(dir string) string {
+// readSavedListsWitness reads the id kept beside the copy. exists is false
+// only when the file is confirmed not to be there; err says that it could
+// not be read at this moment. A file that was read but is damaged gives
+// ("", true, nil).
+func readSavedListsWitness(dir string) (id string, exists bool, err error) {
 	raw, err := readSharedFile(savedListsWitnessPath(dir), 4096)
+	if errors.Is(err, os.ErrNotExist) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", true, fmt.Errorf("%w (%v)", errSavedListsUnread, err)
+	}
 	var witness struct {
 		SavedLists string `json:"savedLists"`
 	}
-	if err != nil || json.Unmarshal(raw, &witness) != nil {
-		return ""
+	if json.Unmarshal(raw, &witness) != nil {
+		return "", true, nil
 	}
-	return witness.SavedLists
+	return witness.SavedLists, true, nil
 }
 
 func writeSavedListsWitness(dir, id string) error {
-	if readSavedListsWitness(dir) == id {
+	if current, _, err := readSavedListsWitness(dir); err == nil && current == id {
 		return nil
 	}
 	path := savedListsWitnessPath(dir)
@@ -199,20 +239,23 @@ func savedListNames(members map[string]json.RawMessage) []string {
 	return names
 }
 
-// readSavedListsCopyState also says whether a copy is there at all.
-func readSavedListsCopyState(dir string) (kept *savedListsCopy, present bool) {
+// readSavedListsCopyState reads the copy as it is, whatever its id. present
+// is false only when the file is confirmed not to be there; err says that it
+// could not be read at this moment. A copy that was read but is damaged
+// gives (nil, true, nil).
+func readSavedListsCopyState(dir string) (kept *savedListsCopy, present bool, err error) {
 	raw, err := readSharedFile(filepath.Join(dir, savedListsFilename), savedListsLimit)
 	if errors.Is(err, os.ErrNotExist) {
-		return nil, false
+		return nil, false, nil
 	}
 	if err != nil {
-		return nil, true
+		return nil, true, fmt.Errorf("%w (%v)", errSavedListsUnread, err)
 	}
 	var copied savedListsCopy
 	if json.Unmarshal(raw, &copied) != nil || copied.Version != 1 || copied.Lists == nil {
-		return nil, true
+		return nil, true, nil
 	}
-	return &copied, true
+	return &copied, true, nil
 }
 
 // writeSavedListsCopy stores the saved lists of a settings file that is about
@@ -324,8 +367,11 @@ func readSharedSettings(path string) (*rootSettings, error) {
 		// is not this file's copy any more): the saved lists and the
 		// main-window keys of the copy are what a writer starts from, so that
 		// no app writes the file, and then the copy, without them.
-		kept, unreadable := usableSavedListsCopy(filepath.Dir(path))
-		settings.copyUnreadable = unreadable
+		// A copy that could not be read right now is not a copy that is
+		// absent: the app starts without it and takes it in later, and no
+		// writer writes over it meanwhile (writeSharedSettings refuses).
+		kept, unusable, copyErr := usableSavedListsCopy(filepath.Dir(path))
+		settings.copyUnreadable = unusable || copyErr != nil
 		if kept != nil {
 			settings.recovered, settings.copy = true, kept
 			for name, raw := range kept.MainOnly {
@@ -346,9 +392,16 @@ func readSharedSettings(path string) (*rootSettings, error) {
 		settings.lineage = sharedLineageOf(settings.members)
 		return settings, nil
 	}
-	kept := readSavedListsCopy(filepath.Dir(path))
+	kept, _, err := usableSavedListsCopy(filepath.Dir(path))
+	if err != nil {
+		// What the older version dropped cannot be told at this moment. The
+		// file is not served without it: a save from that view would write
+		// the copy without the dropped entries.
+		return nil, err
+	}
 	if kept == nil {
-		// No version that merges has saved here yet: nothing to put back.
+		// No version that merges has saved here yet (or the copy is damaged,
+		// or it is left over from deleted data): nothing to put back.
 		return settings, nil
 	}
 	settings.older = true
@@ -435,7 +488,9 @@ func (a *application) recreateRootLocked(root *rootSettings) {
 		}
 		root.members[name] = raw
 	}
-	if a.shared.standalone && root.copy == nil {
+	// Only when this app saw a settings file in this run: in a data folder
+	// that never had one, nothing of the main window's is absent.
+	if a.shared.standalone && root.copy == nil && a.shared.had {
 		root.members[sharedMainOnlyAbsentField] = json.RawMessage("1")
 	}
 }
@@ -445,7 +500,7 @@ func (a *application) recreateRootLocked(root *rootSettings) {
 func (a *application) wroteSharedLocked(written []byte, root *rootSettings, recreated bool) {
 	shared := a.shared
 	shared.seen, shared.older, shared.fromOlder = sha256.Sum256(written), false, false
-	shared.had, shared.lost, shared.dirty = true, false, false
+	shared.had, shared.lost, shared.dirty, shared.dirtyFailures = true, false, false, 0
 	var members map[string]json.RawMessage
 	if json.Unmarshal(written, &members) == nil {
 		shared.lineage = sharedLineageOf(members)
@@ -506,10 +561,36 @@ func writeSharedSettings(path string, raw []byte) ([]byte, error) {
 		return nil, errors.New("Settings were not saved: the file does not say which version wrote it.")
 	}
 	dir := filepath.Dir(path)
+	// The id of the settings file that is being replaced is kept, whatever
+	// can be read of the copy and the id beside it at this moment. A new id
+	// tells every running app that the file was written anew.
 	pair := ""
-	if kept, _ := readSavedListsCopyState(dir); kept != nil {
-		if beside := readSavedListsWitness(dir); kept.Pair == "" || kept.Pair == beside {
+	switch current, err := readRootSettings(path); {
+	case err == nil:
+		pair = sharedLineageOf(current.members)
+	case !errors.Is(err, errRootSettingsInvalid):
+		return nil, err
+	}
+	if pair == "" {
+		// A file that is missing, or has no id: one an older version or
+		// v1.21.40 wrote, or one that is not valid. The id comes from the
+		// copy and the id beside it when they agree. If either could not be
+		// read, nothing is written: the copy may hold what this save lacks,
+		// and a new id would cut it off from its settings file.
+		kept, _, err := readSavedListsCopyState(dir)
+		if err != nil {
+			return nil, err
+		}
+		beside, exists, err := readSavedListsWitness(dir)
+		if err != nil {
+			return nil, err
+		}
+		switch {
+		case kept == nil:
+		case kept.Pair == "":
 			pair = beside
+		case kept.Pair == beside || exists && beside == "":
+			pair = kept.Pair
 		}
 	}
 	if pair == "" {
@@ -609,29 +690,46 @@ func (m *sharedMigration) olderVersion() error {
 }
 
 // savedListsCopyNeedsSettling reports, without a lock, whether the copy of
-// the saved lists is not paired with the settings file as it should be.
+// the saved lists may not be paired with the settings file as it should be.
 func savedListsCopyNeedsSettling(root string) bool {
-	kept, _ := readSavedListsCopyState(root)
-	return kept != nil && kept.Pair != "" && readSavedListsWitness(root) != kept.Pair
+	kept, _, err := readSavedListsCopyState(root)
+	if err != nil || kept == nil || kept.Pair == "" {
+		return false
+	}
+	beside, _, err := readSavedListsWitness(root)
+	return err == nil && beside != kept.Pair
 }
 
 // settleSavedListsCopy runs at every start, before any page is served, for a
 // copy whose id is not kept beside it.
 //
-//   - The settings file carries the same id: the data folder was moved or
+//   - The id file is there but damaged: it was not removed by a deletion.
+//     The id is written again.
+//   - The settings file carries the same id: the data folder was copied or
 //     restored without the folder of window states. The id is written again.
-//   - Otherwise an older version deleted the app data (it removes the
-//     settings file and the id, and does not know the copy). The copy holds
-//     deleted data: it is removed, which completes the deletion.
+//   - The id file is confirmed to be absent, or holds another id: an older
+//     version deleted the app data (it removes the settings file and the id,
+//     and does not know the copy). The copy holds deleted data: it is
+//     removed, which completes the deletion.
+//
+// A copy, an id or a settings file that could not be read at this moment
+// decides nothing: the copy stays, and the next start looks again.
 func (m *sharedMigration) settleSavedListsCopy() error {
 	release, err := acquireCredentialGuardWait(m.root, sharedLockWait)
 	if err != nil {
 		return err
 	}
 	defer release()
-	kept, _ := readSavedListsCopyState(m.root)
-	if kept == nil || kept.Pair == "" || readSavedListsWitness(m.root) == kept.Pair {
-		return nil
+	kept, _, err := readSavedListsCopyState(m.root)
+	if err != nil || kept == nil || kept.Pair == "" {
+		return err
+	}
+	beside, exists, err := readSavedListsWitness(m.root)
+	if err != nil || beside == kept.Pair {
+		return err
+	}
+	if exists && beside == "" {
+		return writeSavedListsWitness(m.root, kept.Pair)
 	}
 	settings, err := readRootSettings(filepath.Join(m.root, appSettingsFilename))
 	if err != nil {

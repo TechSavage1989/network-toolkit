@@ -11,6 +11,8 @@ import (
 	"io"
 	"net/http"
 	"path/filepath"
+	"strings"
+	"time"
 )
 
 // sharedSettingsPath is the settings file that holds the shared values: the
@@ -530,6 +532,12 @@ func (a *application) putState(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	failed := func(err error) {
+		if errors.Is(err, errSavedListsUnread) {
+			// Nothing was written and storage is not broken: the copy could
+			// not be read at this moment, and the page tries again.
+			jsonError(w, http.StatusConflict, "Settings were not saved: "+err.Error())
+			return
+		}
 		a.storageWritable = false
 		a.storageError = err.Error()
 		jsonError(w, 500, "Settings were not saved: "+err.Error())
@@ -678,8 +686,35 @@ func sharedValuesEmpty(values map[string]any) bool {
 // page): it reads the current values from disk, applies change and saves.
 // Callers hold stateMu.
 func (a *application) updateSharedLocked(change func(shared map[string]any) error) error {
+	return a.updateSharedWaitLocked(change, sharedLockWait)
+}
+
+// sharedHeldUnsaved starts the message shown while saveHeldLocked fails.
+const sharedHeldUnsaved = "Saved connections and settings this app holds could not be saved: "
+
+// saveHeldLocked saves the shared values this app holds beyond the settings
+// file (sharedData.dirty). A refresh calls it with stateMu held, so it waits
+// only a moment for another app. A failure is shown and tried again with the
+// next refresh; after sharedDirtyAttempts failures in a row the app stops
+// treating a changed settings file as "written anew". It still holds the
+// values, and its page's next save writes them.
+func (a *application) saveHeldLocked() {
+	err := a.updateSharedWaitLocked(func(map[string]any) error { return nil }, sharedRefreshLockWait)
+	if err == nil {
+		if strings.HasPrefix(a.storageError, sharedHeldUnsaved) {
+			a.storageError = ""
+		}
+		return
+	}
+	a.storageError = sharedHeldUnsaved + err.Error()
+	if a.shared.dirtyFailures++; a.shared.dirtyFailures >= sharedDirtyAttempts {
+		a.shared.dirty, a.shared.lost, a.shared.dirtyFailures = false, false, 0
+	}
+}
+
+func (a *application) updateSharedWaitLocked(change func(shared map[string]any) error, wait time.Duration) error {
 	a.ensureShared()
-	release, err := acquireSettingsLock(a.sharedRoot())
+	release, err := acquireSettingsLockWait(a.sharedRoot(), wait)
 	if err != nil {
 		return err
 	}
@@ -771,7 +806,7 @@ func (a *application) handleSharedData(w http.ResponseWriter, r *http.Request) {
 		// This app holds values that are in no file (the settings file was
 		// lost, or written anew by an app that could not know them). They are
 		// saved now, not with the next change the user happens to make.
-		_ = a.updateSharedLocked(func(map[string]any) error { return nil })
+		a.saveHeldLocked()
 	}
 	current := a.sharedValuesLocked()
 	revision := sharedRevision(current)

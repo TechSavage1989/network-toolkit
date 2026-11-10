@@ -93,7 +93,7 @@ func TestStatePersistenceAndReplacement(t *testing.T) {
 		t.Fatalf("Unexpected files remain after state replacement: %v", files)
 	}
 	witness, err := os.ReadDir(filepath.Join(filepath.Dir(a.dataPath), storageViewsDirectory))
-	if err != nil || len(witness) != 1 || witness[0].Name() != savedListsWitnessView || readSavedListsWitness(filepath.Dir(a.dataPath)) == "" {
+	if err != nil || len(witness) != 1 || witness[0].Name() != savedListsWitnessView || idBesideCopy(t, filepath.Dir(a.dataPath)) == "" {
 		t.Fatalf("Unexpected contents of %s: %v %v", storageViewsDirectory, witness, err)
 	}
 	for _, file := range files {

@@ -386,7 +386,7 @@ func TestSharedSavedListsCopyIsPairedWithTheSettingsFile(t *testing.T) {
 	if got, _ := r3Disk(t, root)[sharedWriterField].(string); got != copied.Pair {
 		t.Fatalf("the settings file's mark %q is not the copy's id %q", got, copied.Pair)
 	}
-	if got := readSavedListsWitness(root); got != copied.Pair {
+	if got := idBesideCopy(t, root); got != copied.Pair {
 		t.Fatalf("the id beside the copy is %q, want %q", got, copied.Pair)
 	}
 	// It stays the same from save to save.
@@ -439,7 +439,7 @@ func TestSharedSavedListsCopyIsPairedWithTheSettingsFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	newVersionStart(t, moved)
-	if readSavedListsWitness(moved) == "" {
+	if idBesideCopy(t, moved) == "" {
 		t.Fatal("the id beside the copy was not written again for a settings file that carries it")
 	}
 	// A copy from v1.21.40 has no id. It is used as that version used it.
