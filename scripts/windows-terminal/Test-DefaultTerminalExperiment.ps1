@@ -8,35 +8,21 @@ if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hoste
     throw 'The terminal selection experiment requires a disposable GitHub-hosted Windows fixture.'
 }
 $identity = [Security.Principal.WindowsIdentity]::GetCurrent()
-$principal = [Security.Principal.WindowsPrincipal]::new($identity)
-$groupOutput = & (Join-Path $env:SystemRoot 'System32\whoami.exe') /groups /fo csv /nh
-if ($principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator) -or
-    $identity.Name -notmatch '\\ntkci-[0-9a-f]{8}$' -or
-    $LASTEXITCODE -ne 0 -or -not ($groupOutput -match '"S-1-16-8192"')) {
-    throw 'Run the handoff proof only as the dedicated medium-integrity fixture user.'
+# Windows activates packaged COM servers (OpenConsole, the broker) as the user
+# who owns the interactive session, not as a Secondary Logon caller. A second
+# account inside the runner's session therefore never reaches its own broker
+# (run 42746029077: OpenConsole and the broker ran as runneradmin, and the
+# fixture account's activation probe got 0x80070005). Run as the session
+# owner, as a real user selecting a default terminal does.
+$sessionId = [Diagnostics.Process]::GetCurrentProcess().SessionId
+$explorerOwners = @(Get-CimInstance Win32_Process -Filter "Name='explorer.exe' AND SessionId=$sessionId" |
+    ForEach-Object { $owner = Invoke-CimMethod -InputObject $_ -MethodName GetOwner; '{0}\{1}' -f $owner.Domain, $owner.User })
+if ($identity.Name -notmatch '\\runneradmin$') {
+    throw 'Run the handoff proof only as the hosted runner account that owns this interactive session.'
 }
-
-# Secondary Logon loads the user's hive but Start-Process passes the runner
-# environment. Resolve the profile from this process token's SID, independently
-# of environment-backed known folder resolution.
-$accountName = ($identity.Name -split '\\')[-1]
-$profileListKey = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\ProfileList\' + $identity.User.Value
-$workerProfile = [Environment]::ExpandEnvironmentVariables(
-    (Get-ItemPropertyValue -LiteralPath $profileListKey -Name ProfileImagePath))
-if (-not [IO.Path]::IsPathRooted($workerProfile) -or (Split-Path $workerProfile -Leaf) -ine $accountName -or
-    -not (Test-Path -LiteralPath $workerProfile -PathType Container)) {
-    throw 'The token SID did not identify the new standard-user fixture profile.'
-}
-$localData = Join-Path $workerProfile 'AppData\Local'
-$roamingData = Join-Path $workerProfile 'AppData\Roaming'
-[void][IO.Directory]::CreateDirectory($localData)
-[void][IO.Directory]::CreateDirectory($roamingData)
-$env:USERNAME = $accountName
-$env:USERPROFILE = $workerProfile
-$env:LOCALAPPDATA = $localData
-$env:APPDATA = $roamingData
-$env:TEMP = Join-Path $PSScriptRoot 'Temp'
-$env:TMP = $env:TEMP
+$integrity = (& (Join-Path $env:SystemRoot 'System32\whoami.exe') /groups /fo csv /nh | Where-Object { $_ -match '"S-1-16-\d+"' } |
+    ForEach-Object { if ($_ -match '"(S-1-16-\d+)"') { $Matches[1] } }) | Select-Object -First 1
+$localData = $env:LOCALAPPDATA
 
 Add-Type -Path (Join-Path $PSScriptRoot 'InteractiveSmoke.cs')
 
@@ -44,7 +30,7 @@ $packageName = 'NetworkToolkit.DefaultTerminalExperiment'
 $consoleClsid = '{2EACA947-7F5F-4CFA-BA87-8F7FBEEFBE69}'
 $terminalClsid = '{B60E0829-5BF3-4A4A-ACB9-C661D85B7282}'
 $startupKey = 'Console\%%Startup'
-$results = [ordered]@{ fixture = 'Windows 11 ARM64 with x64 Network Toolkit'; installed = $false; shells = @() }
+$results = [ordered]@{ fixture = 'Windows 11 ARM64 with x64 Network Toolkit'; account = $identity.Name; sessionId = $sessionId; explorerOwners = $explorerOwners; integrity = $integrity; installed = $false; shells = @() }
 $brokerLog = $null
 $savedSelection = @{}
 $createdStartupKey = $false

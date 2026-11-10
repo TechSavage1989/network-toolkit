@@ -29,7 +29,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache: false
-      - name: Exercise Windows console handoff in a standard fixture account
+      - name: Exercise Windows console handoff as the interactive session user
         env:
           GOTOOLCHAIN: local
         run: ./scripts/windows-terminal/Run-DefaultTerminalExperiment.ps1

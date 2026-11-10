@@ -111,12 +111,10 @@ void writeDiagnostic(const char* stage, HRESULT status) {
     DWORD domainSize = ARRAYSIZE(domain);
     SID_NAME_USE accountType{};
     const auto sid = reinterpret_cast<const TOKEN_USER*>(user.data())->User.Sid;
+    // Diagnostics are compiled only into the CI experiment package and are
+    // written only for the hosted runner account that owns the session.
     if (!LookupAccountSidW(nullptr, sid, account, &accountSize, domain, &domainSize, &accountType) ||
-        accountType != SidTypeUser || std::wcslen(account) != 14 ||
-        std::wcsncmp(account, L"ntkci-", 6) != 0) return;
-    for (const wchar_t* suffix = account + 6; *suffix; ++suffix) {
-        if ((*suffix < L'0' || *suffix > L'9') && (*suffix < L'a' || *suffix > L'f')) return;
-    }
+        accountType != SidTypeUser || _wcsicmp(account, L"runneradmin") != 0) return;
 
     // COM can inherit a different process environment from the test launcher.
     // Use the real token's profile and the fixture's own package LocalState.

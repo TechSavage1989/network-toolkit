@@ -52,9 +52,7 @@ $stage = Join-Path $scratch 'stage'
 $workerDirectory = Join-Path $env:ProgramData "NTK-DefaultTerminal-CI-$nonce"
 $resultPath = Join-Path $env:RUNNER_TEMP 'ntk-default-terminal-evidence.json'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..\..')).Path
-$username = "ntkci-$nonce"
 $certificate = $null
-$account = $null
 $worker = $null
 $seen = $null
 $experimentStart = $null
@@ -123,23 +121,12 @@ try {
     foreach ($file in 'Test-DefaultTerminalExperiment.ps1', 'InteractiveSmoke.cs') {
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination $workerDirectory
     }
-    $password = ConvertTo-SecureString ("NtK!" + [Guid]::NewGuid().ToString('N')) -AsPlainText -Force
-    $account = New-LocalUser -Name $username -Password $password -Description 'Disposable Network Toolkit console fixture'
-    if (-not (Get-LocalGroupMember -SID 'S-1-5-32-545' | Where-Object SID -eq $account.SID)) {
-        Add-LocalGroupMember -SID 'S-1-5-32-545' -Member $account
-    }
-    $acl = Get-Acl -LiteralPath $workerDirectory
-    $acl.AddAccessRule([Security.AccessControl.FileSystemAccessRule]::new($account.SID, 'Modify',
-        'ContainerInherit,ObjectInherit', 'None', 'Allow'))
-    Set-Acl -LiteralPath $workerDirectory -AclObject $acl
     $workerFile = Join-Path $workerDirectory 'Test-DefaultTerminalExperiment.ps1'
     $stdout = Join-Path $scratch 'worker-output.txt'
     $stderr = Join-Path $scratch 'worker-error.txt'
     $startArgs = @{
         FilePath = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
         ArgumentList = '-NoLogo -NoProfile -NonInteractive -ExecutionPolicy RemoteSigned -File "{0}" -MicrosoftTerminalManifest "{1}"' -f $workerFile, $officialManifest
-        Credential = [PSCredential]::new(".\$username", $password)
-        LoadUserProfile = $true
         WorkingDirectory = $workerDirectory
         PassThru = $true
         Environment = @{
@@ -160,7 +147,7 @@ try {
     $seen = [ordered]@{}
     $deadline = [DateTime]::UtcNow.AddMilliseconds(300000)
     while (-not $worker.WaitForExit(500)) {
-        if ([DateTime]::UtcNow -ge $deadline) { throw 'The standard-user console handoff fixture timed out.' }
+        if ([DateTime]::UtcNow -ge $deadline) { throw 'The console handoff fixture timed out.' }
         try { $samples = @(Get-Process -Name $watched -IncludeUserName -ErrorAction SilentlyContinue) }
         catch { $samples = @(Get-Process -Name $watched -ErrorAction SilentlyContinue) }
         foreach ($sample in $samples) {
@@ -175,7 +162,7 @@ try {
     }
     Get-Content -LiteralPath $stdout
     Get-Content -LiteralPath $stderr
-    if ($worker.ExitCode -ne 0) { throw "The standard-user console handoff fixture failed with exit code $($worker.ExitCode)." }
+    if ($worker.ExitCode -ne 0) { throw "The console handoff fixture failed with exit code $($worker.ExitCode)." }
 } finally {
     if ($worker) {
         try {
@@ -206,7 +193,7 @@ try {
         }
     }
     try {
-        if ($account) { Remove-LocalUser -SID $account.SID }
+        # The experiment runs as the session owner; nothing else to remove here.
     } finally {
         if ($certificate) {
             foreach ($store in 'Cert:\LocalMachine\TrustedPeople', 'Cert:\CurrentUser\My') {
