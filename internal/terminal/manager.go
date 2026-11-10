@@ -109,9 +109,9 @@ func normalizeRequest(req ConnectRequest) (ConnectRequest, error) {
 	return normalizeConnectionRequest(req, false)
 }
 
-// alreadyAuthenticated is used only when adopting an existing SSH transport.
+// adopted is used only for an existing authenticated SSH or native console transport.
 // Opening a new connection must still provide all required authentication.
-func normalizeConnectionRequest(req ConnectRequest, alreadyAuthenticated bool) (ConnectRequest, error) {
+func normalizeConnectionRequest(req ConnectRequest, adopted bool) (ConnectRequest, error) {
 	req.Type = strings.ToLower(strings.TrimSpace(req.Type))
 	req.DisplayName = strings.TrimSpace(req.DisplayName)
 	if len([]rune(req.DisplayName)) > 100 || strings.IndexFunc(req.DisplayName, unicode.IsControl) >= 0 {
@@ -133,6 +133,9 @@ func normalizeConnectionRequest(req ConnectRequest, alreadyAuthenticated bool) (
 	case "cr", "lf", "crlf":
 	default:
 		return req, errors.New("line ending must be cr, lf, or crlf")
+	}
+	if req.Type == "console" && adopted {
+		return ConnectRequest{Type: "console", LineEnding: "cr", Cols: 80, Rows: 24}, nil
 	}
 	if req.Type != "ssh" && req.Type != "telnet" && req.Type != "serial" && req.Type != "cmd" && req.Type != "powershell" {
 		return req, errors.New("terminal type must be ssh, telnet, serial, cmd, or powershell")
@@ -223,7 +226,7 @@ func normalizeConnectionRequest(req ConnectRequest, alreadyAuthenticated bool) (
 	if req.AuthMethod != "password" && req.AuthMethod != "key" && req.AuthMethod != "keyboard" {
 		return req, errors.New("SSH authentication must be password, key, or keyboard")
 	}
-	if !alreadyAuthenticated && req.AuthMethod == "key" && strings.TrimSpace(req.PrivateKey) == "" {
+	if !adopted && req.AuthMethod == "key" && strings.TrimSpace(req.PrivateKey) == "" {
 		return req, errors.New("select an OpenSSH or PEM private key")
 	}
 	return req, nil
@@ -348,6 +351,8 @@ func newLiveSession(parent context.Context, id string, req ConnectRequest) *live
 		label = "Command Prompt (local)"
 	} else if req.Type == "powershell" {
 		label = "PowerShell (local)"
+	} else if req.Type == "console" {
+		label = "Windows Console"
 	}
 	labelSource := "default"
 	if req.DisplayName != "" {

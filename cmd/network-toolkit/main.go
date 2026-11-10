@@ -138,6 +138,9 @@ func randomHex(n int) string {
 }
 
 func main() {
+	if runTerminalHandoffIfRequested(os.Args[1:]) {
+		return
+	}
 	if err := waitUpdateReopenIfRequested(); err != nil {
 		platform.NotifyFatal("Network Toolkit could not finish reopening: " + err.Error())
 		return
