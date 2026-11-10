@@ -134,6 +134,33 @@ test('a change from another app waits for unsaved changes, dialogs, menus, drags
  c.answers.push({revision:'r11',credentials:'a'});await shared.poll();c.answers.push({revision:'r11',credentials:'a'});await shared.poll();assert.deepEqual(calls,[]);
  c.answers.push({revision:'r11',credentials:'b'});await shared.poll();assert.deepEqual(calls,['credentials']);
 });
+test('an answer to a poll that was asked before a save is ignored',async()=>{
+ const h=harness(),{c,shared}=h;shared.loaded();
+ let release;c.api=()=>new Promise(resolve=>{release=resolve;});
+ const polled=shared.poll();
+ // While the poll is on its way the user adds a connection and it is saved.
+ c.state.terminalProfiles=[profile('mine')];c.stateRevision=1;save(h,{sharedData:{revision:'r2'}});
+ release({revision:'r1',values:{...c.state,terminalProfiles:[]}});
+ assert.equal(await polled,false);
+ assert.deepEqual(c.state.terminalProfiles.map(p=>p.id),['mine'],'the older answer did not take the new connection away');assert.equal(shared.revision,'r2');
+});
+test('a host-key difference found by the one-time move is shown once, in plain words, and acknowledged',async()=>{
+ const h=harness(),{c,shared,selectors}=h;shared.loaded();
+ const modals=[],posts=[];let click=null;
+ c.openModal=(title,body,footer)=>{modals.push({title,body,footer});};c.closeModal=()=>modals.push('closed');
+ c.esc=value=>String(value).replace(/</g,'&lt;');
+ const query=c.document.querySelector;c.document.querySelector=selector=>selector==='[data-shared-notice-ok]'?{addEventListener:(type,fn)=>{click=fn;}}:query(selector);
+ c.api=async(path,method,body)=>{if(method==='POST'){posts.push([path,JSON.parse(JSON.stringify(body))]);return {ok:true};}return {revision:'r1',notices:[{id:'n1',kind:'host-key-conflict',source:'terminal',items:['router.test:22','<b>edge</b>:22']}]};};
+ // Not while a dialog is open.
+ selectors.add('#modalRoot .modal');await shared.poll();assert.equal(modals.length,0);selectors.delete('#modalRoot .modal');
+ await shared.poll();
+ assert.equal(modals.length,1);assert.equal(modals[0].title,'Saved data is now shared');
+ assert(modals[0].body.includes('router.test:22')&&modals[0].body.includes('&lt;b>edge&lt;/b>:22')&&!modals[0].body.includes('<b>edge'),'the hosts are listed as text');
+ assert(/the Terminal window had remembered a different host key than the main window/.test(modals[0].body)&&/main window's key was kept/.test(modals[0].body)&&/compare the fingerprint/.test(modals[0].body));
+ await shared.poll();assert.equal(modals.length,1,'the same notice is not shown again while it is open');
+ click();await new Promise(resolve=>setImmediate(resolve));
+ assert.deepEqual(posts,[['/shared-data/notices',{acknowledge:['n1']}]]);assert.equal(modals.at(-1),'closed');
+});
 test('nothing is asked while the page is hidden, offline, closing or a detached window',async()=>{
  const {c,shared}=harness();
  for(const [set,reset] of [[()=>{c.document.visibilityState='hidden';},()=>{c.document.visibilityState='visible';}],[()=>{c.online=false;},()=>{c.online=true;}],[()=>{c.stateLoaded=false;},()=>{c.stateLoaded=true;}],[()=>{c.shutDown=true;},()=>{c.shutDown=false;}],[()=>{c.EDITOR_WINDOW=true;},()=>{c.EDITOR_WINDOW=false;}],[()=>{c.DETACHED_TERMINAL=true;},()=>{c.DETACHED_TERMINAL=false;}]]){

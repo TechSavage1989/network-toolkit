@@ -434,7 +434,7 @@ func (a *application) putState(w http.ResponseWriter, r *http.Request) {
 func validateSharedTypes(state map[string]any) error {
 	for _, key := range sharedDataKeys {
 		value, ok := state[key.Name]
-		if !ok || value == nil {
+		if !ok || value == nil || key.MainOnly {
 			continue
 		}
 		switch key.Kind {

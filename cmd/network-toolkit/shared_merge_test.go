@@ -143,6 +143,15 @@ func TestSharedMergeOtherKindsAndInvalidInput(t *testing.T) {
 			t.Fatalf("%s accepted %s: %v", tc.key.Name, tc.ours, err)
 		}
 	}
+	// Data only the main window uses is never refused for its shape: it is
+	// then saved as one value, the page's if the page changed it.
+	mainOnly := sharedKey{Name: "graphPlotPreferences", Kind: sharedMap, MainOnly: true}
+	if got, err := mergeSharedKey(mainOnly, sharedJSON(t, `["a"]`), sharedJSON(t, `["a"]`), sharedJSON(t, `["a","b"]`), true); err != nil || !sharedEqual(got, sharedJSON(t, `["a","b"]`)) {
+		t.Fatalf("main-only value of an unexpected shape: %s %v", sharedText(t, got), err)
+	}
+	if got, err := mergeSharedKey(mainOnly, sharedJSON(t, `["a"]`), sharedJSON(t, `["z"]`), sharedJSON(t, `["a"]`), true); err != nil || !sharedEqual(got, sharedJSON(t, `["z"]`)) {
+		t.Fatalf("an unchanged main-only value replaced the one on disk: %s %v", sharedText(t, got), err)
+	}
 	// Go-typed values (as the sanitizers return them) merge like decoded JSON.
 	typed := []map[string]any{{"id": "a", "port": uint64(22)}}
 	got, err := mergeSharedKey(list, sharedJSON(t, `[{"id":"a","port":22}]`), sharedJSON(t, `[{"id":"a","port":22},{"id":"b"}]`), typed, true)

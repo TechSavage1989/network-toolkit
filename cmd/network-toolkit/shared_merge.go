@@ -364,12 +364,20 @@ func mergeSharedKey(key sharedKey, base, theirs, ours any, present bool) (any, e
 	case sharedList:
 		if _, ok := ours.([]any); !ok {
 			if _, typed := ours.([]map[string]any); !typed {
+				if key.MainOnly {
+					// The main window's own data in a shape this table does not
+					// expect is saved as one value rather than refused.
+					return mergeSharedPlain(base, theirs, ours), nil
+				}
 				return nil, fmt.Errorf("%w %s must be a list.", errSharedInvalid, key.Name)
 			}
 		}
 		return mergeSharedList(key, base, theirs, ours)
 	case sharedMap:
 		if _, ok := ours.(map[string]any); !ok {
+			if key.MainOnly {
+				return mergeSharedPlain(base, theirs, ours), nil
+			}
 			return nil, fmt.Errorf("%w %s must be an object.", errSharedInvalid, key.Name)
 		}
 		return mergeSharedMap(base, theirs, ours)

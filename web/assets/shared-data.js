@@ -82,8 +82,9 @@ function loaded(){
 
 // What a save sends: the page's settings plus, for each shared key the page
 // changed, the value it started from.
-let untouched=null;
+let untouched=null,saves=0;
 function outgoing(current){
+ saves++; // An answer to a poll that was asked before this save is out of date.
  if(!baseline){pending.push(null);return current;}
  const started={},sent=new Map();
  for(const key of SHARED){
@@ -192,8 +193,8 @@ async function poll(){
  if(polling||stopped||!ready()||document.visibilityState==='hidden')return false;
  polling=true;
  try{
-  const result=await api('/shared-data?revision='+encodeURIComponent(revision));
-  if(!result||typeof result.revision!=='string')return false;
+  const asked=saves,result=await api('/shared-data?revision='+encodeURIComponent(revision));
+  if(!result||typeof result.revision!=='string'||asked!==saves)return false;
   if(Array.isArray(result.notices)&&result.notices.length)attempt(()=>noticeHandler?.(result.notices));
   if(result.credentials!==undefined)credentialsChanged(result.credentials);
   if(!result.values){revision=result.revision;return false;}
