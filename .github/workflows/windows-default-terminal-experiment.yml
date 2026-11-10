@@ -1,0 +1,42 @@
+name: Windows default terminal experiment
+
+on:
+  push:
+    branches: [feat/windows-terminal-default]
+    paths:
+      - .github/workflows/windows-default-terminal-experiment.yml
+      - scripts/windows-terminal/**
+      - cmd/network-toolkit/**
+      - internal/terminal/**
+      - internal/desktop/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-default-terminal-experiment-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  default-terminal-windows-client:
+    runs-on: windows-11-arm
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: false
+      - name: Exercise Windows console handoff in a standard fixture account
+        env:
+          GOTOOLCHAIN: local
+        run: ./scripts/windows-terminal/Run-DefaultTerminalExperiment.ps1
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: default-terminal-experiment-evidence
+          path: ${{ runner.temp }}/ntk-default-terminal-evidence.json
+          if-no-files-found: ignore
+          retention-days: 7

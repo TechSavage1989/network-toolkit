@@ -1,0 +1,171 @@
+param([string]$MicrosoftTerminalManifest)
+
+$ErrorActionPreference = 'Stop'
+Set-StrictMode -Version Latest
+if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_ENVIRONMENT -ne 'github-hosted' -or
+    $env:GITHUB_REPOSITORY -ne 'TechSavage1989/network-toolkit' -or
+    $env:OS -ne 'Windows_NT' -or (Split-Path $PSScriptRoot -Leaf) -notlike 'NTK-DefaultTerminal-CI-*') {
+    throw 'The terminal selection experiment requires a disposable GitHub-hosted Windows fixture.'
+}
+$identity = [Security.Principal.WindowsIdentity]::GetCurrent()
+$principal = [Security.Principal.WindowsPrincipal]::new($identity)
+$groupOutput = & (Join-Path $env:SystemRoot 'System32\whoami.exe') /groups /fo csv /nh
+if ($principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator) -or
+    $identity.Name -notmatch '\\ntkci-[0-9a-f]{8}$' -or
+    $LASTEXITCODE -ne 0 -or -not ($groupOutput -match '"S-1-16-8192"')) {
+    throw 'Run the handoff proof only as the dedicated medium-integrity fixture user.'
+}
+
+Add-Type -Path (Join-Path $PSScriptRoot 'InteractiveSmoke.cs')
+
+$packageName = 'NetworkToolkit.DefaultTerminalExperiment'
+$consoleClsid = '{2EACA947-7F5F-4CFA-BA87-8F7FBEEFBE69}'
+$terminalClsid = '{B60E0829-5BF3-4A4A-ACB9-C661D85B7282}'
+$startupKey = 'Console\%%Startup'
+$results = [ordered]@{ fixture = 'Windows 11 ARM64 with x64 Network Toolkit'; installed = $false; shells = @() }
+$savedSelection = @{}
+$createdStartupKey = $false
+$restoreSelection = $false
+$processes = [Collections.Generic.List[Diagnostics.Process]]::new()
+
+function Wait-ForFile([string]$File, [string]$Expected) {
+    $until = [DateTime]::UtcNow.AddSeconds(20)
+    do {
+        if ((Test-Path -LiteralPath $File -PathType Leaf) -and (Get-Content -Raw -LiteralPath $File).Trim() -ceq $Expected) {
+            return
+        }
+        Start-Sleep -Milliseconds 250
+    } while ([DateTime]::UtcNow -lt $until)
+    throw "The original shell did not write the expected fixture marker in $(Split-Path $File -Leaf)."
+}
+
+function Test-Shell([string]$Name, [string]$Executable, [string]$Arguments,
+                   [string]$StartupMarker, [string]$InputCommand, [string]$ExpectedInput) {
+    $before = @(Get-Process -Name Network_Toolkit -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id)
+    $shellId = [DefaultTerminalSmoke]::LaunchNewConsole($Executable, $Arguments, $PSScriptRoot)
+    $shell = [Diagnostics.Process]::GetProcessById($shellId)
+    $processes.Add($shell)
+    $result = [ordered]@{ shell = $Name; shellPid = $shellId; window = $false; input = $false }
+    $results.shells += $result
+
+    Wait-ForFile (Join-Path $PSScriptRoot "$Name-startup.txt") $StartupMarker
+    $until = [DateTime]::UtcNow.AddSeconds(50)
+    $window = [IntPtr]::Zero
+    do {
+        foreach ($candidate in @(Get-Process -Name Network_Toolkit -ErrorAction SilentlyContinue)) {
+            if ($candidate.Id -in $before -or $candidate.Path -ine $installedExecutable) { continue }
+            $window = [DefaultTerminalSmoke]::FindWindow($candidate.Id)
+            if ($window -ne [IntPtr]::Zero) {
+                $hostProcess = $candidate
+                break
+            }
+        }
+        if ($window -ne [IntPtr]::Zero) { break }
+        Start-Sleep -Milliseconds 250
+    } while ([DateTime]::UtcNow -lt $until)
+    if ($window -eq [IntPtr]::Zero) {
+        throw "Windows did not route $Name to a visible Network Toolkit experiment window."
+    }
+    $processes.Add($hostProcess)
+    $result.hostPid = $hostProcess.Id
+    $result.window = $true
+    [DefaultTerminalSmoke]::SendCommand($window, $hostProcess.Id, $InputCommand)
+    Wait-ForFile (Join-Path $PSScriptRoot "$Name-input.txt") ($ExpectedInput.Replace('%PID%', [string]$shellId))
+    $result.input = $true
+    [DefaultTerminalSmoke]::SendCommand($window, $hostProcess.Id, 'exit')
+    if (-not $shell.WaitForExit(15000) -or -not $hostProcess.WaitForExit(15000)) {
+        throw "The delegated $Name shell or its Network Toolkit host did not close."
+    }
+    $result.closed = $true
+    Write-Host "Windows selected Network Toolkit for $Name, and the original shell accepted input."
+}
+
+try {
+    $officialTerminal = Get-AppxPackage -Name Microsoft.WindowsTerminal
+    if (-not $officialTerminal) {
+        if (-not (Test-Path -LiteralPath $MicrosoftTerminalManifest -PathType Leaf)) {
+            throw 'The hosted image does not have Microsoft Windows Terminal Stable available for the fixture.'
+        }
+        Add-AppxPackage -Register -DisableDevelopmentMode -Path $MicrosoftTerminalManifest
+        $officialTerminal = Get-AppxPackage -Name Microsoft.WindowsTerminal
+    }
+    if ($officialTerminal.PackageFamilyName -cne 'Microsoft.WindowsTerminal_8wekyb3d8bbwe') {
+        throw 'The registered console host does not have the expected Microsoft package identity.'
+    }
+
+    if (Get-AppxPackage -Name $packageName) { throw 'The fixture package already exists in this test profile.' }
+    Add-AppxPackage -Path (Join-Path $PSScriptRoot 'DefaultTerminalExperiment.msix')
+    $installed = Get-AppxPackage -Name $packageName
+    if (-not $installed -or $installed.Architecture -ne 'Arm64') { throw 'The native ARM64 fixture MSIX did not register.' }
+    $results.installed = $true
+    $installedExecutable = Join-Path $installed.InstallLocation 'Network_Toolkit.exe'
+    $manifest = Get-AppxPackageManifest -Package $installed.PackageFullName
+    foreach ($contract in @(
+        @{ Name = 'com.microsoft.windows.console.host'; Clsid = $consoleClsid },
+        @{ Name = 'com.microsoft.windows.terminal.host'; Clsid = $terminalClsid }
+    )) {
+        $node = $manifest.SelectSingleNode("//*[local-name()='AppExtension' and @Name='$($contract.Name)']/*[local-name()='Properties']/*[local-name()='Clsid']")
+        if (-not $node -or $node.InnerText -cne $contract.Clsid) { throw "Registered fixture lost the $($contract.Name) extension." }
+    }
+
+    # Model the choice written by Windows Settings, in this fixture profile only.
+    # Native CreateProcess then exercises the real OS console handoff.
+    $current = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($startupKey)
+    $createdStartupKey = $null -eq $current
+    if ($current) {
+        try {
+            foreach ($name in 'DelegationConsole', 'DelegationTerminal') {
+                if ($current.GetValueNames() -contains $name) {
+                    $savedSelection[$name] = @($current.GetValue($name), $current.GetValueKind($name))
+                }
+            }
+        } finally { $current.Dispose() }
+    }
+    $restoreSelection = $true
+    $current = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey($startupKey)
+    try {
+        $current.SetValue('DelegationConsole', $consoleClsid)
+        $current.SetValue('DelegationTerminal', $terminalClsid)
+    } finally { $current.Dispose() }
+
+    $nonce = [Guid]::NewGuid().ToString('N')
+    $cmdStart = '/D /Q /K "set NTK_HANDOFF_NONCE={0}&&echo {0}>cmd-startup.txt"' -f $nonce
+    Test-Shell 'cmd' (Join-Path $env:SystemRoot 'System32\cmd.exe') $cmdStart $nonce 'echo %NTK_HANDOFF_NONCE%>cmd-input.txt' $nonce
+
+    $ps = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    $psStart = '-NoLogo -NoProfile -NoExit -Command "$env:NTK_HANDOFF_NONCE = ''{0}''; Set-Content -Encoding Ascii ps-startup.txt ''{0}''"' -f $nonce
+    $psInput = 'Set-Content -Encoding Ascii ps-input.txt "$PID|$env:NTK_HANDOFF_NONCE"'
+    Test-Shell 'ps' $ps $psStart $nonce $psInput "%PID%|$nonce"
+} finally {
+    foreach ($process in $processes) {
+        try {
+            if (-not $process.HasExited) { $process.Kill(); [void]$process.WaitForExit(5000) }
+        } finally { $process.Dispose() }
+    }
+    try {
+        if ($restoreSelection) {
+            $current = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($startupKey, $true)
+            try {
+                foreach ($name in 'DelegationConsole', 'DelegationTerminal') {
+                    if ($savedSelection.ContainsKey($name)) {
+                        $current.SetValue($name, $savedSelection[$name][0], $savedSelection[$name][1])
+                    } else {
+                        $current.DeleteValue($name, $false)
+                    }
+                }
+                $removeEmpty = $createdStartupKey -and $current.ValueCount -eq 0 -and $current.SubKeyCount -eq 0
+            } finally { $current.Dispose() }
+            if ($removeEmpty) { [Microsoft.Win32.Registry]::CurrentUser.DeleteSubKey($startupKey, $false) }
+            $results.selectionRestored = $true
+        }
+    } finally {
+        try {
+            if ($results.installed) {
+                Get-AppxPackage -Name $packageName | Remove-AppxPackage
+                $results.packageRemoved = $true
+            }
+        } finally {
+            $results | ConvertTo-Json -Depth 5 | Set-Content -Encoding UTF8 -LiteralPath (Join-Path $PSScriptRoot 'evidence.json')
+        }
+    }
+}

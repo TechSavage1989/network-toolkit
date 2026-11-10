@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+         xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+         xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+         xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
+         xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
+         xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+         IgnorableNamespaces="uap uap3 uap10 com rescap">
+  <Identity Name="NetworkToolkit.DefaultTerminalExperiment" Publisher="CN=Network Toolkit Default Terminal CI"
+            Version="0.0.1.0" ProcessorArchitecture="arm64" />
+  <Properties>
+    <DisplayName>Network Toolkit Default Terminal Experiment</DisplayName>
+    <PublisherDisplayName>Network Toolkit CI</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.22000.0" MaxVersionTested="10.0.26200.0" />
+  </Dependencies>
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+  <Applications>
+    <Application Id="TerminalHandoff" Executable="NetworkToolkitTerminalHandoff.exe"
+                 uap10:RuntimeBehavior="packagedClassicApp" uap10:TrustLevel="mediumIL">
+      <uap:VisualElements DisplayName="Network Toolkit Default Terminal Experiment"
+                          Description="Hosted Windows console handoff fixture"
+                          BackgroundColor="transparent"
+                          Square44x44Logo="Assets\Square44x44Logo.png"
+                          Square150x150Logo="Assets\Square150x150Logo.png"
+                          AppListEntry="none" />
+      <Extensions>
+        <!-- This fixture references the installed Microsoft Stable OpenConsole.
+             It does not register or replace Microsoft's COM class or proxy. -->
+        <uap3:Extension Category="windows.appExtension">
+          <uap3:AppExtension Name="com.microsoft.windows.console.host" Id="Console"
+                             DisplayName="Network Toolkit Default Terminal Experiment" PublicFolder="Public">
+            <uap3:Properties>
+              <Clsid>{2EACA947-7F5F-4CFA-BA87-8F7FBEEFBE69}</Clsid>
+            </uap3:Properties>
+          </uap3:AppExtension>
+        </uap3:Extension>
+        <uap3:Extension Category="windows.appExtension">
+          <uap3:AppExtension Name="com.microsoft.windows.terminal.host" Id="Terminal"
+                             DisplayName="Network Toolkit Default Terminal Experiment" PublicFolder="Public">
+            <uap3:Properties>
+              <Clsid>{B60E0829-5BF3-4A4A-ACB9-C661D85B7282}</Clsid>
+            </uap3:Properties>
+          </uap3:AppExtension>
+        </uap3:Extension>
+        <com:Extension Category="windows.comServer">
+          <com:ComServer>
+            <com:ExeServer Executable="NetworkToolkitTerminalHandoff.exe"
+                           DisplayName="Network Toolkit Terminal Handoff">
+              <com:Class Id="B60E0829-5BF3-4A4A-ACB9-C661D85B7282" />
+            </com:ExeServer>
+          </com:ComServer>
+        </com:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+</Package>
