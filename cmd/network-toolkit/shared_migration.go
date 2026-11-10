@@ -211,7 +211,10 @@ func migrateSharedData(root string) error {
 	// What an older version did to the settings file since this version last
 	// saved is repaired at every start (shared_older_version.go).
 	repair := sharedSettingsNeedRepair(root)
-	if !found && !repair {
+	// A copy of the saved lists that is not paired with the settings file
+	// is settled at every start as well.
+	settle := savedListsCopyNeedsSettling(root)
+	if !found && !repair && !settle {
 		return nil // A new data folder: there is nothing to bring over.
 	}
 	release, err := acquireSharedDataLock(root)
@@ -225,6 +228,11 @@ func migrateSharedData(root string) error {
 	}
 	m := &sharedMigration{root: root, marker: marker}
 	var failures []error
+	if settle {
+		if err := m.settleSavedListsCopy(); err != nil {
+			failures = append(failures, fmt.Errorf("the copy of the saved lists: %w", err))
+		}
+	}
 	if repair {
 		if err := m.olderVersion(); err != nil {
 			failures = append(failures, fmt.Errorf("settings saved by an older version: %w", err))
@@ -483,7 +491,7 @@ func (m *sharedMigration) settings(workspace legacyWorkspace, dir string) error 
 		if err != nil {
 			return err
 		}
-		if err := writeSharedSettings(settingsPath, next); err != nil {
+		if _, err := writeSharedSettings(settingsPath, next); err != nil {
 			return err
 		}
 	}

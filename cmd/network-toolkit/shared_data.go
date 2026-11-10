@@ -144,6 +144,9 @@ var perWindowStateKeys = []string{
 	// The mark of a version that merges saves (kept by the engine, see
 	// shared_older_version.go).
 	sharedWriterField,
+	// Written by a standalone app that had to write the settings file anew
+	// without what only the main window uses (shared_older_version.go).
+	sharedMainOnlyAbsentField,
 }
 
 func sharedKeyNamed(name string) (sharedKey, bool) {
@@ -247,9 +250,24 @@ type sharedData struct {
 	// the keys it knows, and the main window must not read the others as
 	// removed.
 	had, lost bool
+	// The id of the settings file as last read or written (the value of its
+	// mark, shared_older_version.go). A file with another id was written anew
+	// by an app that could not know what this app holds.
+	lineage string
+	// What this app holds came from a settings file that a version which
+	// does not merge wrote last.
+	fromOlder bool
+	// This app holds shared values that are not in the settings file: they
+	// were kept when the file was found written anew, or come from the copy
+	// of the saved lists. The next refresh or save writes them.
+	dirty bool
 	// Names of saved entries that an older version had dropped and a save of
 	// this app wrote again. The user is told (a notice) once no lock is held.
 	pendingPutBack []string
+	// Saved entries this app took from the copy of the saved lists because
+	// the settings file was missing: recovering until the file is written
+	// again, pendingRecovered until the user has been told.
+	recovering, pendingRecovered []string
 	// Shared keys found in this standalone workspace's own settings file: a
 	// copy from before sharing. It is kept as it is and never used.
 	legacy map[string]json.RawMessage
@@ -306,6 +324,10 @@ type rootSettings struct {
 	// filled from the copy of the saved lists (recovered), or a copy is there
 	// but cannot be read.
 	recovered, copyUnreadable bool
+	// The copy of the saved lists, for a file that does not exist.
+	copy *savedListsCopy
+	// The id in the file's mark; empty for a file without one.
+	lineage string
 }
 
 // The file could be read but does not hold a settings object. Any other
@@ -388,6 +410,7 @@ func (s *rootSettings) marshal() ([]byte, error) { return marshalRootSettings(s.
 
 func marshalRootSettings(members map[string]json.RawMessage, exists bool) ([]byte, error) {
 	// Written by a version that merges saves (shared_older_version.go).
+	// writeSharedSettings puts the id of the file in place of the 1.
 	members[sharedWriterField] = json.RawMessage("1")
 	if !exists {
 		// The main window has not saved anything yet. Without this, its first

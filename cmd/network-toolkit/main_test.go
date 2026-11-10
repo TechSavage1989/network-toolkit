@@ -86,12 +86,20 @@ func TestStatePersistenceAndReplacement(t *testing.T) {
 	// The cross-process credential transaction guard is deliberately persistent;
 	// unlinking it would let concurrent instances lock different file objects.
 	// The copy of the saved lists is written with every save of the settings
-	// (shared_older_version.go) and is just as persistent.
-	want := map[string]bool{filepath.Base(a.dataPath): true, credentialTransactionFilename: true, savedListsFilename: true}
+	// (shared_older_version.go) and is just as persistent. So is the id that
+	// pairs the copy with the settings file: one file in a folder of its own.
+	want := map[string]bool{filepath.Base(a.dataPath): true, credentialTransactionFilename: true, savedListsFilename: true, storageViewsDirectory: true}
 	if len(files) != len(want) {
 		t.Fatalf("Unexpected files remain after state replacement: %v", files)
 	}
+	witness, err := os.ReadDir(filepath.Join(filepath.Dir(a.dataPath), storageViewsDirectory))
+	if err != nil || len(witness) != 1 || witness[0].Name() != savedListsWitnessView || readSavedListsWitness(filepath.Dir(a.dataPath)) == "" {
+		t.Fatalf("Unexpected contents of %s: %v %v", storageViewsDirectory, witness, err)
+	}
 	for _, file := range files {
+		if file.Name() == storageViewsDirectory && file.IsDir() {
+			continue
+		}
 		if !want[file.Name()] || !file.Type().IsRegular() {
 			t.Fatalf("Unexpected temporary or nonregular file remains: %s", file.Name())
 		}

@@ -257,24 +257,26 @@ function olderVersion(){
 
 // Things the user should know about shared data: what the one-time move
 // found (SSH hosts for which two apps had remembered different keys, lists
-// that were full), and saved entries that were put back after an older
-// version dropped them. Shown once, in plain words, when nothing else is
-// open; acknowledged notices do not return.
+// that were full), saved entries that were put back after an older version
+// dropped them, and saved entries that came back from the copy of the saved
+// lists after the settings file was lost. Shown once, in plain words, when
+// nothing else is open; acknowledged notices do not return.
 let noticeShown='';
 function showNotices(notices){
- const all=notices.filter(n=>n&&typeof n.id==='string'&&Array.isArray(n.items)&&n.items.length),older=all.filter(n=>n.kind==='older-version');
+ const all=notices.filter(n=>n&&typeof n.id==='string'&&Array.isArray(n.items)&&n.items.length),older=all.filter(n=>n.kind==='older-version'||n.kind==='recovered');
  const list=(older.length?older:all).slice(0,8),key=list.map(n=>n.id).join(',');
  if(!list.length||key===noticeShown||busy()||typeof openModal!=='function')return;
  const names={terminal:'Terminal',editor:'Text Editor'},escape=typeof esc==='function'?esc:value=>String(value).replace(/[&<>"']/g,'');
  const parts=list.map(n=>{
   const app=names[n.source]||'other',items='<ul>'+n.items.slice(0,61).map(item=>'<li style="overflow-wrap:anywhere">'+escape(item)+'</li>').join('')+'</ul>';
   if(n.kind==='older-version')return '<p>An older version of Network Toolkit saved its settings over the shared ones. It can hold fewer saved entries and does not know what other apps saved meanwhile, so these were missing afterwards. They were put back:</p>'+items+'<p>If you removed one of them in the older version on purpose, remove it again here. Update every copy of Network Toolkit to avoid this.</p>';
+  if(n.kind==='recovered')return '<p>The settings file of this data folder was missing. Network Toolkit keeps a second copy of its saved lists, and these came back from it:</p>'+items+'<p>If you had deleted the settings file on purpose to start over, remove what you do not want here. Preferences that are not part of that copy may be back at their defaults.</p>';
   if(n.kind==='hosts-added')return '<p>These SSH hosts were trusted only by the '+app+' window. They are trusted by every app now, also if you had removed one of them in another window. To stop trusting one, open the Saved sidebar of the Terminal, choose SSH host keys and remove it.</p>'+items;
   if(n.kind==='host-key-conflict')return '<p>For these SSH hosts the '+app+' window had remembered a different host key than the main window. The main window\'s key was kept and nothing else was changed. The next time you connect to one of them, compare the fingerprint that is shown with one you trust before you accept a changed key.</p>'+items;
   return '<p>Not everything the '+app+' window had saved could be added because these lists are full. Nothing was removed; remove entries you no longer need and the rest is added the next time the app starts.</p>'+items;
  });
  noticeShown=key;
- if(older.length)openModal('Saved entries were put back',parts.join(''),'<button class="btn primary" data-shared-notice-ok>OK</button>',true);
+ if(older.length)openModal(older.some(n=>n.kind==='older-version')?'Saved entries were put back':'Saved entries were recovered',parts.join(''),'<button class="btn primary" data-shared-notice-ok>OK</button>',true);
  else openModal('Saved data is now shared','<p>Network Toolkit, its Terminal and its Text Editor now share saved connections, settings, trusted SSH host keys and macros.</p>'+parts.join(''),'<button class="btn primary" data-shared-notice-ok>OK</button>',true);
  const button=document.querySelector('[data-shared-notice-ok]');
  if(button)button.addEventListener('click',()=>{void api('/shared-data/notices','POST',{acknowledge:list.map(n=>n.id)}).catch(()=>{noticeShown='';});if(typeof closeModal==='function')closeModal();});

@@ -277,7 +277,32 @@ func copyStorageData(source, destination *storageRoot) ([]string, func(), error)
 		rollback()
 		return nil, nil, err
 	}
-	return paths, func() { sessionRollback(); rollback() }, nil
+	// The id that pairs the copy of the saved lists with the settings file
+	// is kept with the window states, which stay behind. It goes along, or
+	// the copy would count as left over from deleted data at the new place.
+	witnessRollback, err := copySavedListsWitness(source.path, destination.path)
+	if err != nil {
+		sessionRollback()
+		rollback()
+		return nil, nil, err
+	}
+	return paths, func() { witnessRollback(); sessionRollback(); rollback() }, nil
+}
+
+func copySavedListsWitness(source, destination string) (func(), error) {
+	id := readSavedListsWitness(source)
+	if id == "" {
+		return func() {}, nil
+	}
+	if err := writeSavedListsWitness(destination, id); err != nil {
+		return nil, err
+	}
+	return func() {
+		path := savedListsWitnessPath(destination)
+		_ = os.Remove(path)
+		_ = os.Remove(filepath.Dir(path))
+		_ = os.Remove(filepath.Dir(filepath.Dir(path)))
+	}, nil
 }
 
 func collectStorageCopies(source *storageRoot) (copies []storageCopy, err error) {

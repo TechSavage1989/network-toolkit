@@ -1173,5 +1173,6 @@ func invalidateCredentialConfigIdentity(path string) error {
 	if err != nil {
 		return errors.New("App settings exceed their size limit.")
 	}
-	return writeSharedSettings(path, raw)
+	_, err = writeSharedSettings(path, raw)
+	return err
 }
