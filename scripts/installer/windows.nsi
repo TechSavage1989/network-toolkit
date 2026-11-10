@@ -56,6 +56,7 @@ Var ShellRegistrationStarted
 Var NewMainShortcut
 Var NewEditorShortcut
 Var NewTerminalShortcut
+Var DeleteAttempts
 
 !macro AcquireSetupMutex
   ; Keep the handle alive until this setup or uninstall process exits.
@@ -469,10 +470,19 @@ Section "Uninstall"
   !insertmacro IsOwnedShortcut "$SMPROGRAMS\${APP_NAME}\${APP_NAME} Terminal.lnk" "--terminal" "--terminal"
   StrCpy $NewTerminalShortcut $R5
   ; An open program must be closed before removing shortcuts or registrations.
+  ; Retry for about five seconds first: antivirus or the search indexer can
+  ; hold a just-written executable briefly, which is not an open program.
   IfFileExists "$INSTDIR\${APP_FILENAME}" 0 remove_registration
+  StrCpy $DeleteAttempts 0
+  delete_program:
   ClearErrors
   Delete "$INSTDIR\${APP_FILENAME}"
   ${If} ${Errors}
+    IntOp $DeleteAttempts $DeleteAttempts + 1
+    ${If} $DeleteAttempts < 20
+      Sleep 250
+      Goto delete_program
+    ${EndIf}
     MessageBox MB_OK|MB_ICONSTOP "Close Network Toolkit and any separate Editor or Terminal windows before uninstalling." /SD IDOK
     SetErrorLevel 2
     Abort

@@ -70,6 +70,18 @@ function Invoke-Uninstaller([string]$Path) {
     } finally { $process.Dispose() }
 }
 
+# When uninstall leaves the program behind, say why: a process still using a
+# file in the folder, or an uninstaller that refused (it keeps its own key).
+function Assert-UninstallFinished {
+    if (-not (Test-Path -LiteralPath $installedExe)) { return }
+    $holders = @(Get-Process -ErrorAction SilentlyContinue | Where-Object {
+        try { $_.Path -and $_.Path.StartsWith($installDir, [StringComparison]::OrdinalIgnoreCase) } catch { $false }
+    } | ForEach-Object { '{0} ({1})' -f $_.ProcessName, $_.Id })
+    $refused = Test-Path -LiteralPath $uninstallKey
+    throw ("Uninstall left $installedExe. Uninstall registration still present: $refused. " +
+        "Processes running from the install folder: $(if ($holders) { $holders -join ', ' } else { 'none' }).")
+}
+
 $setupFiles = @(Get-ChildItem -LiteralPath $ArtifactDirectory -Filter '*_Windows_x64_Setup.exe' -File)
 if ($setupFiles.Count -ne 1 -or $setupFiles[0].Name -cnotmatch '^Network_Toolkit_(\d+\.\d+\.\d+)_Windows_x64_Setup\.exe$') {
     throw 'The artifact must contain exactly one versioned Network Toolkit Windows setup executable.'
@@ -278,6 +290,7 @@ Copy-Item -LiteralPath $portableExe -Destination $installedExe
 
 Write-Host 'Checking uninstall removes owned registrations and preserves data.'
 Invoke-Uninstaller $uninstaller
+Assert-UninstallFinished
 foreach ($path in @($installedExe, $uninstaller, $menu, $desktopShortcut, $uninstallKey, "HKLM:\$uninstallSubkey", $capabilities, $progKey)) {
     Assert-Absent $path
 }
@@ -324,6 +337,7 @@ Invoke-Silent $setup
 Assert-Installed
 Assert-Preserved
 Invoke-Uninstaller $uninstaller
+Assert-UninstallFinished
 foreach ($path in @($installedExe, $uninstaller, $menu, $uninstallKey)) {
     Assert-Absent $path
 }
