@@ -99,6 +99,7 @@ type application struct {
 	openTerminalWindow           func(context.Context, *terminalWindowPreset) (bool, error)
 	views                        *terminalViewRegistry
 	editorViews                  *editorViewRegistry
+	editorSession                editorSessionStore
 	launchEditorView             func(context.Context, editorViewLaunch) (<-chan error, error)
 	launchTerminalView           func(context.Context, terminalViewLaunch) (<-chan error, error)
 	headless                     bool
@@ -685,7 +686,7 @@ func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		a.stateMu.Lock()
 		writable, storageErr := a.storageWritable, a.storageError
 		a.stateMu.Unlock()
-		jsonResponse(w, 200, map[string]any{"name": appName, "version": model.Version, "os": runtime.GOOS, "arch": runtime.GOARCH, "uiHost": a.currentUIHost(), "windowMode": a.windowMode, "localShellAvailable": terminal.LocalShellAvailable(), "terminalWindowAvailable": a.windowMode == "terminal" || a.openTerminalWindow != nil, "terminalDetachAvailable": a.launchTerminalView != nil, "editorDiskAvailable": a.editorViews != nil, "editorWindowAvailable": a.launchEditorView != nil && a.editorViews != nil, "editorLaunchAvailable": a.editorLaunchAvailable, "editorLaunchReusable": a.editorLaunchReusable, "connectionLaunchAvailable": runtime.GOOS == "windows", "started": a.started.UTC().Format(time.RFC3339), "portable": true, "storagePath": a.dataPath, "storageWritable": writable, "storageError": storageErr, "capabilities": capabilities, "limits": map[string]int{"maxJobs": maxConcurrent, "maxHistory": maxRetained}, "system": a.getSystem(false)})
+		jsonResponse(w, 200, map[string]any{"name": appName, "version": model.Version, "os": runtime.GOOS, "arch": runtime.GOARCH, "uiHost": a.currentUIHost(), "windowMode": a.windowMode, "localShellAvailable": terminal.LocalShellAvailable(), "terminalWindowAvailable": a.windowMode == "terminal" || a.openTerminalWindow != nil, "terminalDetachAvailable": a.launchTerminalView != nil, "editorDiskAvailable": a.editorViews != nil, "editorWindowAvailable": a.launchEditorView != nil && a.editorViews != nil, "editorLaunchAvailable": a.editorLaunchAvailable, "editorLaunchReusable": a.editorLaunchReusable, "editorSessionAvailable": a.windowMode == "main" || a.windowMode == standaloneEditorMode, "connectionLaunchAvailable": runtime.GOOS == "windows", "started": a.started.UTC().Format(time.RFC3339), "portable": true, "storagePath": a.dataPath, "storageWritable": writable, "storageError": storageErr, "capabilities": capabilities, "limits": map[string]int{"maxJobs": maxConcurrent, "maxHistory": maxRetained}, "system": a.getSystem(false)})
 	case r.URL.Path == "/api/terminal-views" || strings.HasPrefix(r.URL.Path, "/api/terminal-views/"):
 		a.handleTerminalViews(w, r)
 	case strings.HasPrefix(r.URL.Path, "/api/terminal-automation/"):
@@ -716,6 +717,8 @@ func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		a.handleEditorSaveDialog(w, r)
 	case r.URL.Path == "/api/file-editor/local":
 		a.handleLocalTextEditor(w, r)
+	case r.URL.Path == editorSessionEndpoint || strings.HasPrefix(r.URL.Path, editorSessionEndpoint+"/"):
+		a.handleEditorSession(w, r)
 	case r.URL.Path == "/api/remote-browser":
 		a.handleRemoteBrowser(w, r)
 	case r.URL.Path == "/api/connections/open":

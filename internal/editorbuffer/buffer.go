@@ -532,6 +532,17 @@ func (s *Snapshot) WriteTo(ctx context.Context, w io.Writer) error {
 	}
 	return visit(s.root)
 }
+
+// MarkUnsaved records that the current text has not been written to the
+// document's file, for example after restoring a kept copy of unsaved edits.
+// Only a later MarkSaved clears it; undo history is unchanged.
+func (b *Buffer) MarkUnsaved() Metadata {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.saved = &node{}
+	return b.metadataLocked()
+}
+
 func (s *Snapshot) MarkSaved() Metadata {
 	s.b.mu.Lock()
 	defer s.b.mu.Unlock()

@@ -399,3 +399,31 @@ func BenchmarkLargeFileInteraction(b *testing.B) {
 		})
 	}
 }
+
+func TestMarkUnsavedKeepsTextDirtyUntilSaved(t *testing.T) {
+	for _, text := range []string{"", "restored text\n"} {
+		b := openTest(t, text)
+		if b.Metadata().Dirty {
+			t.Fatal("a fresh import must be clean")
+		}
+		meta := b.MarkUnsaved()
+		if !meta.Dirty || meta.CanUndo || meta.CanRedo || textOf(t, b) != text {
+			t.Fatalf("restored text must stay unchanged and dirty: %+v", meta)
+		}
+		meta, err := b.Edit(meta.Revision, 0, 0, "x")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if meta, err = b.History(meta.Revision, false); err != nil || !meta.Dirty {
+			t.Fatalf("undo back to the restored text must stay dirty: %+v %v", meta, err)
+		}
+		s, err := b.Snapshot()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if s.MarkSaved().Dirty {
+			t.Fatal("saving the restored text must make it clean")
+		}
+		s.Close()
+	}
+}
