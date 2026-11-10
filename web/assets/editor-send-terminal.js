@@ -72,8 +72,8 @@ async function openPeer(other,snapshot){
  if(id!==sequence)return false;
  const list=info.targets.filter(item=>item.connected);
  if(!info.running||!list.length){
-  const what=!info.running?name+' is not open.':info.ready?'No terminal session is connected in '+name+'.':name+' is still starting.';
-  const next=!info.running?'Open it and connect a session there, then choose Send to terminal again.':'Connect a session there, then choose Send to terminal again.';
+  const what=!info.running?name+' is not open.':info.ready?'No terminal session is connected in '+name+'.':name+' is not ready yet.';
+  const next=info.running&&info.ready?'Connect a session there, then choose Send to terminal again.':'Open it and connect a session there, then choose Send to terminal again.';
   openModal('Send to terminal','<div data-editor-send-peer-missing><p>'+escapeHTML(what)+'</p><p class="help-line">'+escapeHTML(next)+'</p></div>','<button type="button" class="btn ghost" data-action="close-modal">Cancel</button><button type="button" class="btn primary" data-editor-send-open-peer>Open Terminal</button>');
   return false;
  }
