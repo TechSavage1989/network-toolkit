@@ -670,6 +670,10 @@ func (a *application) peerCall(ctx context.Context, method, path string, body an
 		req.Header.Set("Content-Type", "application/json")
 	}
 	req.Header.Set("X-Window-Activation-Token", record.Token)
+	if method == http.MethodPost {
+		// The other app raises its own window for the text it is given.
+		peerAllowForeground(record.PID)
+	}
 	transport := &http.Transport{Proxy: nil, DialContext: (&net.Dialer{Timeout: time.Second}).DialContext, DisableKeepAlives: true, MaxResponseHeaderBytes: 16384}
 	defer transport.CloseIdleConnections()
 	client := &http.Client{Transport: transport, CheckRedirect: func(*http.Request, []*http.Request) error {
@@ -744,6 +748,9 @@ func peerLaunchArguments(root, mode string, headless bool) ([]string, error) {
 // shell, parent-owned pipes or parent cancellation are passed to it.
 func launchPeerApp(ctx context.Context, root, mode string, headless bool) error {
 	dir := peerWorkspaceDir(root, mode)
+	if record, err := readWorkspaceWindowInstance(dir, mode != "terminal"); err == nil {
+		peerAllowForeground(record.PID) // a running app may come to the front
+	}
 	var raised error
 	if mode == "terminal" {
 		raised = activateTerminalWindow(ctx, dir, nil)
