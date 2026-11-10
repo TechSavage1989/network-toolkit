@@ -1340,7 +1340,9 @@ const sessionKeeping=()=>!!session&&session.phase==='ready'&&sessionAvailable()&
 // Keep the final session before a window close asks about unsaved changes.
 // Documents are read-only while their last copies are written.
 async function keepSessionForClose(){
- if(!sessionKeeping())return new Set();
+ // With "Reopen files next time" off nothing is kept, and kept copies of the
+ // open documents leave the session before closing asks about them.
+ if(!sessionKeeping()){try{await session?.settle?.();}catch{}return new Set();}
  const list=[...documents.values()];
  for(const d of list)d.frozen=true;
  if(current())draw();paneWorkspace()?.refresh();

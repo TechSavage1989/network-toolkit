@@ -42,7 +42,7 @@ function fakeHost(docs,overrides={}){
    if(path==='/editor-session/backup'&&method==='POST'){if(body.source==='text'&&h.failText.has(body.text))throw Object.assign(Error('Disk full'),{status:507});const id=(calls.length.toString(16)).padStart(32,'0');return {id,size:3+(body.text||'').length,sha256:hash('b'),revision:body.source==='buffer'?h.docs.find(d=>d.uid===body.uid).editRevision:0,elapsedMs:0};}
    if(path==='/editor-session'&&method==='GET')return h.session||{version:1,active:-1,tabs:[]};
    return {ok:true};},
-  documents:()=>h.docs,activeId:()=>h.current,stamp:d=>[d.editRevision,d.eol,d.encoding,d.bom].join(':'),flush:async d=>{calls.push({flush:d.uid});},pending:()=>false,lease:d=>d.lease||7,enabled:()=>true,idle:()=>true,readiness:()=>h.ready,
+  documents:()=>h.docs,activeId:()=>h.current,stamp:d=>[d.editRevision,d.eol,d.encoding,d.bom].join(':'),flush:async d=>{calls.push({flush:d.uid});},pending:()=>false,lease:d=>d.lease||7,enabled:()=>h.ready!=='off',idle:()=>true,readiness:()=>h.ready,
   restoreRecord:record=>h.restoreRecord(record),finishRestore:value=>{h.finished=value;},message:(text,error)=>{h.messages.push({text,error});},messages:[],...overrides};
  return h;
 }
@@ -104,9 +104,95 @@ test('restore keeps stored order, carries limited records and leaves the active 
 
 test('restore waits for settings, honours the preference and never runs outside primary workspaces',async()=>{
  const host=fakeHost([]);host.ready='never';const never=session.create(host);never.start();assert.equal(never.phase,'unavailable');
- host.ready='off';const off=session.create(host);off.start();assert.equal(off.phase,'off');assert.equal(off.tick(),false);
+ host.ready='off';const off=session.create(host);off.start();await settle();assert.equal(off.phase,'off');assert.equal(off.tick(),false);
  off.enable();assert.equal(off.phase,'ready');await off.disable();assert.equal(off.phase,'off');assert(host.calls.some(c=>c.method==='DELETE'));
  host.ready='ready';const keeper=session.create(host);keeper.start();await settle();assert.equal(keeper.phase,'ready');keeper.stop();assert.equal(keeper.phase,'closed');assert.equal(keeper.tick(),false);
+});
+
+const keptTab=(digit,name='Untitled.txt')=>({kind:'untitled',name,dirty:true,format:{encoding:'UTF-8',bom:false,eol:'LF'},backup:{id:digit.repeat(32),size:4,sha256:hash('c')}});
+function reopening(docs){let n=0;return record=>{const d=record.kind==='local'?local(record.path):{id:'untitled:'+(++n),uid:'u'+n,path:record.name,source:'Untitled',untitled:true,binding:{kind:'localDraft'},content:'restored',dirty:true,editRevision:1,sessionBackup:{key:'memory:u'+n,revision:1,ref:record.backup}};docs.push(d);return {doc:d};};}
+const changes=host=>host.calls.filter(c=>c.method==='PUT'||c.method==='DELETE');
+
+test('with the preference off, unsaved text an earlier run kept is reopened once and only then leaves the session',async()=>{
+ const docs=[],host=fakeHost(docs);host.ready='off';
+ host.session={version:1,active:0,tabs:[{kind:'local',path:'C:\\clean.txt',dirty:false},keptTab('1'),keptTab('2','notes.txt')]};
+ host.restoreRecord=reopening(docs);
+ const off=session.create(host);off.start();await settle();
+ assert.equal(off.phase,'off');
+ assert.deepEqual(docs.map(d=>d.path),['Untitled.txt','notes.txt'],'every unsaved document is back; a saved file is not reopened against the preference');
+ assert.match(host.messages.at(-1).text,/Unsaved documents from the last session were reopened/);
+ assert.deepEqual(changes(host),[],'nothing is removed before the documents are open');
+ // A document that is still loading its text from the kept copy keeps it.
+ docs[1].loading=true;assert.equal(off.tick(),false);await settle();assert.deepEqual(changes(host),[]);
+ docs[1].loading=false;off.tick();await waitFor(()=>changes(host).length>0,'kept copies leave the session');
+ assert.deepEqual(changes(host).map(c=>c.method),['DELETE'],'no new session is written while the preference is off');
+ off.tick();await settle();assert.equal(changes(host).length,1,'once');
+ // The next start finds nothing to reopen.
+ const again=fakeHost([]);again.ready='off';const later=session.create(again);later.start();await settle();
+ assert.equal(later.phase,'off');later.tick();await settle();assert.deepEqual(changes(again),[]);
+});
+
+test('records that could not be reopened survive the preference being off, switched on and switched off',async()=>{
+ const docs=[],host=fakeHost(docs);host.ready='off';
+ host.session={version:1,active:-1,tabs:[keptTab('1'),keptTab('2','big.log'),keptTab('3','later.txt')]};
+ const reopen=reopening(docs);
+ host.restoreRecord=record=>record.name==='Untitled.txt'?reopen(record):{carry:true,limit:record.name==='big.log'};
+ const off=session.create(host);off.start();await settle();
+ assert.deepEqual(off.carried.map(r=>r.name),['big.log','later.txt']);
+ off.tick();await waitFor(()=>changes(host).length>0,'the open document leaves the session');
+ assert.deepEqual(changes(host).map(c=>c.method),['PUT'],'a session that still holds unopened text is never deleted');
+ assert.deepEqual(changes(host)[0].body.tabs.map(t=>t.name),['big.log','later.txt']);
+ // Switched on (enable() after an "off" start): the first save still names
+ // both records that were not opened in this window.
+ host.ready='ready';off.enable();assert.equal(off.phase,'ready');host.calls.length=0;
+ await off.save();
+ assert.deepEqual(changes(host)[0].body.tabs.map(t=>t.name),['Untitled.txt','big.log','later.txt']);
+ // Switched off again: only the open document's copy goes.
+ host.ready='off';host.calls.length=0;await off.disable();
+ assert.deepEqual(changes(host).map(c=>c.method),['PUT']);
+ assert.deepEqual(changes(host)[0].body.tabs.map(t=>t.name),['big.log','later.txt']);
+});
+
+test('switching the preference off before or during the reopening of the last session removes nothing that is not open',async()=>{
+ // Before: settings and engine are not ready yet.
+ const docs=[],host=fakeHost(docs);host.ready='wait';
+ host.session={version:1,active:0,tabs:[keptTab('1')]};host.restoreRecord=reopening(docs);
+ const waiting=session.create(host);waiting.start();assert.equal(waiting.phase,'idle');
+ host.ready='off';await waiting.disable();
+ assert.deepEqual(host.calls,[],'nothing is read or removed yet');
+ await new Promise(resolve=>setTimeout(resolve,400));
+ assert.equal(docs.length,1,'the kept document is still reopened');assert.equal(waiting.phase,'off');
+ assert.deepEqual(changes(host),[]);waiting.stop();
+ // During: the kept copy of a large document is still being loaded.
+ const slow=[],busy=fakeHost(slow);busy.session={version:1,active:0,tabs:[keptTab('1'),keptTab('2','big.log')]};
+ let finish;const reopen=reopening(slow);
+ busy.restoreRecord=record=>record.name==='big.log'?new Promise(resolve=>{finish=()=>resolve(reopen(record));}):reopen(record);
+ const during=session.create(busy);during.start();await settle();assert.equal(during.phase,'restoring');
+ busy.ready='off';await during.disable();
+ assert.deepEqual(changes(busy),[],'the session is not deleted under the documents that are being reopened');
+ finish();await waitFor(()=>during.phase==='off','restore finishes');
+ assert.deepEqual(slow.map(d=>d.path),['Untitled.txt','big.log']);
+ during.tick();await waitFor(()=>changes(busy).length>0,'then the open documents leave the session');
+ assert.deepEqual(changes(busy).map(c=>c.method),['DELETE']);
+});
+
+test('the preference changing in another app stops and resumes keeping',async()=>{
+ const doc=local('C:\\a.txt',{dirty:true,content:'unsaved'});
+ const host=fakeHost([doc]),keeper=session.create(host);await keeper.restore();await keeper.save();
+ host.calls.length=0;
+ // editorPreferences.restoreSession arrives as false from another app.
+ host.ready='off';doc.content+='!';doc.editRevision++;
+ assert.equal(keeper.tick(),false);await waitFor(()=>changes(host).length>0,'kept copies of open documents are removed');
+ assert.equal(keeper.phase,'off');assert.deepEqual(changes(host).map(c=>c.method),['DELETE']);
+ assert(!host.calls.some(c=>c.path==='/editor-session/backup'),'nothing new is kept');
+ assert.equal(doc.sessionBackup,undefined);
+ // And back on.
+ host.ready='ready';host.calls.length=0;
+ assert.equal(keeper.tick(),true);await waitFor(()=>!keeper.busy,'save');assert.equal(keeper.phase,'ready');
+ assert.deepEqual(changes(host).map(c=>c.method),['PUT']);assert.equal(changes(host)[0].body.tabs.length,1);
+ // A close that comes before the next tick settles the session first.
+ host.ready='off';host.calls.length=0;await keeper.settle();
+ assert.deepEqual(changes(host).map(c=>c.method),['DELETE']);assert.equal(keeper.phase,'off');
 });
 
 // ---- Integration through the real file-editor.js in memory mode ----
@@ -169,9 +255,21 @@ test('the preference defaults on, survives as a saved setting and turning it off
  assert(h.root().querySelector('.nt-editor-dialog'),'with restore off the existing prompt appears as before');
  h.root().emit('click',h.root().querySelector('[data-ed-dialog-action="cancel"]'));assert.equal(await pending,false);
  assert.equal(h.calls.filter(c=>c.method==='PUT').length,1,'no session is written while restore is off');
- const off=harness({preferences:{restoreSession:false},stored:{version:1,active:0,tabs:[{kind:'untitled',name:'Untitled.txt',dirty:true,format:{encoding:'UTF-8',bom:false,eol:'LF'},backup:{id:'1'.repeat(32),size:4,sha256:hash('c')}}]}});
- off.mount();await settle();assert.equal(off.editor.session.phase,'off');assert.equal(off.editor.documents.size,0);assert.equal(off.root().querySelector('[data-ed-restore-session]').checked,false);
- assert(!off.calls.some(c=>c.path==='/editor-session'),'a disabled session is never read');
+ // The preference is off (here, or in another app of the data folder), but an
+ // earlier run kept unsaved text. It is reopened once instead of staying
+ // hidden; after that the preference-off rules apply.
+ const off=harness({preferences:{restoreSession:false},stored:{version:1,active:0,tabs:[{kind:'local',path:'C:\\work\\clean.txt',dirty:false},{kind:'untitled',name:'Untitled.txt',dirty:true,format:{encoding:'UTF-8',bom:false,eol:'LF'},backup:{id:'1'.repeat(32),size:4,sha256:hash('c')}}]}});
+ off.kept.set('1'.repeat(32),'kept while the preference was on');
+ off.mount();await waitFor(()=>off.editor.documents.size===1&&off.editor.session.phase==='off','the kept document is reopened');
+ const reopened=[...off.editor.documents.values()][0];assert.equal(reopened.content,'kept while the preference was on');assert.equal(reopened.dirty,true);
+ assert.equal(off.root().querySelector('[data-ed-restore-session]').checked,false);
+ assert(!off.calls.some(c=>c.path==='/file-editor/local'),'a saved file is not reopened against the preference');
+ assert(!off.calls.some(c=>c.method==='DELETE'||c.method==='PUT'),'the kept copy is not removed before its document is open');
+ off.editor.session.tick();await waitFor(()=>off.calls.some(c=>c.method==='DELETE'),'the reopened copy leaves the session');
+ assert(!off.calls.some(c=>c.method==='PUT'||c.path==='/editor-session/backup'&&c.method==='POST'),'no session is written while restore is off');
+ const asking=off.editor.windowAdapter.prepareWindowClose();
+ await waitFor(()=>off.root().querySelector('.nt-editor-dialog'),'closing asks about the reopened text as before');
+ off.root().emit('click',off.root().querySelector('[data-ed-dialog-action="cancel"]'));assert.equal(await asking,false);
  box.checked=true;h.root().emit('change',box);await settle();assert.equal(h.c.state.editorPreferences.restoreSession,true);assert.equal(h.editor.session.phase,'ready');
 });
 

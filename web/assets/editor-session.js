@@ -5,7 +5,16 @@
    copied by the engine from a stable buffer snapshot, so their text never
    passes through this renderer; only small memory documents send their text.
    Records never contain bindings, connection identities or credentials, and
-   detached editor windows never save or restore a session. */
+   detached editor windows never save or restore a session.
+
+   "Reopen files next time" is a setting shared by every app of the data
+   folder, so it can be off here although an earlier run of this app kept
+   unsaved text, and it can change while this app runs. Kept text is never
+   left hidden and never removed unseen: with the setting off, documents with
+   unsaved text are still reopened once; only after a document is open in this
+   window does its kept copy leave the session (closing then asks as usual).
+   Records that could not be reopened stay in the session whatever the
+   setting is. */
 (function(root){'use strict';
 const ENDPOINT='/editor-session',TICK_MS=3000,RETRY_MS=15000,TAB_LIMIT=64;
 const ENCODINGS=['UTF-8','UTF-16LE','UTF-16BE'],EOLS=['LF','CRLF','CR'];
@@ -51,6 +60,9 @@ function plan(docs){
 
 function create(host){
  let phase='idle',carried=[],lastSignature='',lastIndex='',retryAt=0,chain=Promise.resolve(),running=0,timer=null,waiting=null,waitStarted=0;
+ // True while keeping is off and the saved session may still name kept
+ // copies of documents that are open in this window.
+ let draining=false;
  const kept=new WeakMap();
  const signature=()=>{const docs=host.documents();return JSON.stringify([host.activeId(),carried.length,docs.map(d=>[d.id,d.uid,d.path,!!d.dirty,!!d.staged,!!d.disk,d.language||'',host.stamp(d)])]);};
 
@@ -116,11 +128,37 @@ function create(host){
  }
 
  function tick(){
-  if(phase!=='ready'||running||!host.enabled()||Date.now()<retryAt||!host.idle())return false;
+  if(running||Date.now()<retryAt)return false;
+  // The setting may have been changed in another app of the data folder.
+  if(phase==='ready'&&!host.enabled())turnOff();
+  else if(phase==='off'&&host.enabled())enable();
+  if(phase==='off'){if(draining&&host.idle())void drain().catch(()=>{});return false;}
+  if(phase!=='ready'||!host.idle())return false;
   if(signature()===lastSignature)return false;
   void save().catch(()=>{});
   return true;
  }
+
+ // Keeping is off: take the documents that are open in this window out of
+ // the saved session, so a later start does not reopen text the user has
+ // been asked about since. Records that were not reopened stay. A document
+ // that is still loading its text from a kept copy keeps that copy.
+ function drain(){
+  running++;
+  const next=chain.then(async()=>{
+   if(!draining||phase!=='off')return false;
+   const docs=host.documents();
+   if(docs.some(d=>d.loading||d.promoting))return false;
+   if(carried.length)await host.request(ENDPOINT,'PUT',{version:1,active:-1,tabs:carried.slice(0,TAB_LIMIT)});
+   else await host.request(ENDPOINT,'DELETE');
+   draining=false;
+   for(const d of docs)delete d.sessionBackup;
+   return true;
+  });
+  chain=next.catch(()=>{}).finally(()=>{running--;});
+  return next.catch(error=>{retryAt=Date.now()+RETRY_MS;throw error;});
+ }
+ function turnOff(){phase='off';draining=true;lastIndex='';lastSignature='';}
 
  function isKept(d){const stamp=kept.get(d);return stamp!==undefined&&stamp===host.stamp(d);}
 
@@ -133,13 +171,15 @@ function create(host){
   let session;
   try{session=await host.request(ENDPOINT,'GET');}
   catch(error){phase='failed';host.message('Files from the last session could not be reopened: '+error.message,true);return false;}
-  const records=Array.isArray(session?.tabs)?session.tabs:[],notes=session?.warning?[session.warning]:[],earlier=new Set(host.documents());
+  // With the setting off, saved files are not reopened; unsaved text is.
+  const stored=Array.isArray(session?.tabs)?session.tabs:[],keeping=host.enabled(),records=keeping?stored:stored.filter(record=>record&&record.backup);
+  const notes=session?.warning?[session.warning]:[],earlier=new Set(host.documents());
   const tasks=records.map(record=>{try{return Promise.resolve(host.restoreRecord(record));}catch(error){return Promise.reject(error);}});
   const results=await Promise.allSettled(tasks),restored=[],carry=[];let activeDoc=null,limited=0;
   results.forEach((result,index)=>{
    const record=records[index],value=result.status==='fulfilled'?result.value||{}:{error:result.reason,carry:true};
    if(value.note)notes.push(value.note);
-   if(value.doc){restored.push(value.doc);if(index===session.active)activeDoc=value.doc;return;}
+   if(value.doc){restored.push(value.doc);if(record===stored[session.active])activeDoc=value.doc;return;}
    if(value.carry&&record.backup){carry.push(record);if(value.limit)limited++;}
    if(value.error&&!value.limit)notes.push('Could not reopen '+(record.kind==='local'?baseName(record.path):record.name)+': '+(value.error.message||value.error));
   });
@@ -147,7 +187,12 @@ function create(host){
   if(limited)notes.push(limited+' unsaved tab(s) from the last session did not fit in 12 tabs. Their text is kept and they reopen the next time the editor starts with fewer tabs open.');
   const userOpened=host.documents().some(d=>!restored.includes(d))||earlier.size>0;
   host.finishRestore({docs:restored,active:userOpened?null:activeDoc});
-  phase='ready';lastSignature='';lastIndex='';startTimer();
+  if(!keeping&&restored.length)notes.push('Unsaved documents from the last session were reopened. "Reopen files next time" is off, so they are not kept again: save them before you close.');
+  // The setting as it is now decides what happens next; it may have changed
+  // while the documents were reopened.
+  lastSignature='';lastIndex='';
+  if(host.enabled())phase='ready';else{phase='off';draining=stored.length>0;}
+  startTimer();
   if(notes.length)host.message(notes.join(' '),false);
   return true;
  }
@@ -161,21 +206,37 @@ function create(host){
    if(phase!=='idle')return;
    const state=host.readiness();
    if(state==='never'){phase='unavailable';return;}
-   if(state==='off'){phase='off';return;}
-   if(state==='ready'){void restore();return;}
+   // 'off': the setting is off. What an earlier run kept is still reopened.
+   if(state==='ready'||state==='off'){void restore();return;}
    if(Date.now()-waitStarted<120000)waiting=root.setTimeout(attempt,250);
   };
   attempt();
  }
 
- // Turning the preference back on restores nothing (the tabs are already
- // open) and starts keeping the current tabs.
- function enable(){if(phase==='off'){root.clearTimeout(waiting);waiting=null;phase='ready';lastSignature='';lastIndex='';carried=[];startTimer();}}
- async function disable(){root.clearTimeout(waiting);waiting=null;phase='off';carried=[];lastIndex='';lastSignature='';await chain;for(const d of host.documents())delete d.sessionBackup;await host.request(ENDPOINT,'DELETE');}
+ // Turning the setting back on restores nothing (the tabs are already open)
+ // and starts keeping the current tabs. Records that could not be reopened
+ // stay in the session.
+ function enable(){if(phase==='off'){phase='ready';draining=false;lastSignature='';lastIndex='';startTimer();}}
+ // Turning it off removes the kept copies of the documents that are open in
+ // this window. A session that has not been reopened yet (settings or engine
+ // still loading, or documents still being reopened) is not touched: it is
+ // reopened first.
+ async function disable(){
+  if(phase!=='ready'&&phase!=='off')return;
+  if(phase==='ready')turnOff();
+  await chain;
+  if(draining)await drain();
+ }
+ // Before a window close asks about unsaved changes: bring the saved session
+ // in line with the setting now, without waiting for the next tick.
+ async function settle(){
+  if(phase==='ready'&&!host.enabled())turnOff();
+  if(phase==='off'&&draining)await drain();
+ }
  function startTimer(){if(timer===null&&typeof root.setInterval==='function'){timer=root.setInterval(tick,TICK_MS);timer?.unref?.();}}
  // After a window close is committed nothing may overwrite the final session.
  function stop(){if(timer!==null)root.clearInterval(timer);timer=null;root.clearTimeout(waiting);waiting=null;phase='closed';}
- return Object.freeze({start,restore,save,tick,isKept,enable,disable,stop,get phase(){return phase;},get carried(){return carried.slice();},get busy(){return running>0;}});
+ return Object.freeze({start,restore,save,tick,isKept,enable,disable,settle,stop,get phase(){return phase;},get carried(){return carried.slice();},get busy(){return running>0;}});
 }
 
 // The page's engine status (index.html) says whether this workspace keeps a

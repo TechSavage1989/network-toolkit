@@ -378,6 +378,9 @@ func (m *sharedMigration) settings(workspace legacyWorkspace, dir string) error 
 			for name, member := range ours {
 				next[name] = member
 			}
+			if key.Name == "editorPreferences" {
+				sharedMigrationSaferClosePreferences(next, theirs, source.Seen)
+			}
 			for name, member := range theirs {
 				seenKey, memberDigest := key.Name+"\x00"+name, sharedDigest(member)
 				if source.Seen[seenKey] == memberDigest {
@@ -454,6 +457,36 @@ func (m *sharedMigration) settings(workspace legacyWorkspace, dir string) error 
 	}
 	m.changed = true
 	return nil
+}
+
+// The two editor settings that decide what happens to unsaved text when a
+// window closes. Both are on unless set to false.
+var sharedEditorClosePreferences = []string{"restoreSession", "askSaveBeforeClose"}
+
+// sharedMigrationSaferClosePreferences settles those two settings when the
+// data folder and a workspace disagree: the value that keeps or asks about
+// unsaved text (on) wins. Elsewhere the data folder's value wins, but here
+// "off" from one side would hide, or allow discarding, unsaved text that the
+// other side kept with the setting on. This is decided once per workspace
+// (seen records it), so what the user chooses afterwards is never undone by a
+// later start, also when an older version changes the workspace file again.
+func sharedMigrationSaferClosePreferences(ours, theirs map[string]any, seen map[string]string) {
+	on := func(value any, present bool) bool { return !present || value != false }
+	for _, name := range sharedEditorClosePreferences {
+		mine, have := ours[name]
+		other, has := theirs[name]
+		// The ordinary rule (a setting the data folder does not have yet is
+		// taken over) never applies to these two.
+		delete(theirs, name)
+		decided := "editorPreferences\x00" + name + "\x00decided"
+		if seen[decided] != "" {
+			continue
+		}
+		seen[decided] = "1"
+		if on(mine, have) != on(other, has) {
+			ours[name] = true
+		}
+	}
 }
 
 // sharedMigrationRuleSets adds the workspace's own highlighting rule sets to

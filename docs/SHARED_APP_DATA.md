@@ -48,12 +48,18 @@ The 2 MiB limit of a settings file is unchanged, as are all sanitizers; they run
 - **Macros.** The library keeps its revision check; a save is read-compare-write under the same lock.
 - **Editor sessions.** Each process that uses its editor session holds a shared lock on `Network_Toolkit.editor-session.lock` in its workspace. An editor that restores its session takes over the other workspace's tabs only if it gets that lock exclusively (and no older version's window answers). A tab's record leaves the other index only after this index holds it; a kept copy is removed there only after it exists here. A file open in both with unsaved text keeps both versions.
 
+  "Reopen files next time" (`editorPreferences.restoreSession`) is a shared setting, so it can be off in an app whose last run kept unsaved text, and it can change while an app runs. Kept text is never left hidden and never removed unseen:
+  - An app that starts with the setting off still reads its session and reopens every document with unsaved text, once (saved files are not reopened). After a document is open in the window, its kept copy leaves the session and closing asks as usual.
+  - When the setting goes off while an app runs (here or in another app), the kept copies of the documents open in that window leave the session; records that could not be reopened stay. Switching it on again keeps those records too.
+  - The engine enforces this whatever a page does: until a run has been given the session (`GET /api/editor-session`), it removes only kept copies that run wrote itself and refuses (409) a save or delete that would drop the record of any other kept copy. After an unreadable index was set aside, deleting the session keeps that index and the copies it may name.
+
 ## One-time migration
 
 At start, `migrateSharedData` (`shared_migration.go`) adds what the standalone workspaces kept for themselves to the data folder:
 
 - Connections and macros the data folder does not have are added. One with the same id but different content is added as a second entry named "… (Terminal)". Nothing in the data folder is overwritten.
 - A setting that differs keeps the data folder's value; a setting only the workspace had is taken over. Highlighting rule sets written in the standalone window are kept next to the data folder's.
+- Two Text Editor settings are the exception, because they decide what happens to unsaved text: for "Reopen files next time" and "Ask before closing unsaved documents" the safer value (on) wins when the data folder and a workspace differ. This is decided once per workspace, so a later choice of the user stays.
 - Trusted SSH hosts are united. If the two had different keys for a host, the data folder's key stays, the other is not trusted, and the user is told which hosts to check.
 - Credentials are not moved automatically (the previous vault may have another master password). The password manager offers **Import saved credentials from the previous Terminal vault**; see `credential_vault_import.go`.
 
