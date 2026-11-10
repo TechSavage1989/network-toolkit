@@ -155,6 +155,15 @@ test('an entry that did not fit in a full list leaves the page and the user is t
  save(h,{sharedData:{revision:'r3',refused:{profiles:[{id:'extra',name:'Extra'}]}}});
  assert.deepEqual(c.state.profiles.map(p=>p.id),['t']);assert.match(toasts.at(-1)[1],/saved targets is full \(200\)/);
 });
+test('only the refused entry leaves when another entry shares its id, and the main-window lists are redrawn',()=>{
+ const h=harness(),{c,shared}=h;shared.loaded();
+ c.toast=()=>{};c.renderProfiles=()=>h.calls.push('targets');c.state.activePage='profiles';
+ c.NetworkToolkitTFTPConnections={mount:()=>h.calls.push('tftp')};
+ c.state.profiles=[{id:'t',name:'Gateway'},{id:'same',name:'Kept'},{id:'same',name:'Refused'}];c.state.tftpProfiles=[{id:'x',name:'One'},{id:'y',name:'Two'}];c.stateRevision++;
+ save(h,{sharedData:{revision:'r2',refused:{profiles:[{id:'same',name:'Refused'}],tftpProfiles:[{id:'y',name:'Two'}]}}});
+ assert.deepEqual(c.state.profiles.map(p=>p.name),['Gateway','Kept']);assert.deepEqual(c.state.tftpProfiles.map(p=>p.id),['x']);
+ assert(h.calls.includes('targets')&&h.calls.includes('tftp'),'saved targets and TFTP profiles are redrawn');
+});
 test('an answer to a poll that was asked before a save is ignored',async()=>{
  const h=harness(),{c,shared}=h;shared.loaded();
  let release;c.api=()=>new Promise(resolve=>{release=resolve;});

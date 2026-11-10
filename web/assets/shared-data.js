@@ -202,13 +202,18 @@ function notSaved(refused){
  for(const key of Object.keys(SAVED_LIMITS)){
   const rows=list(refused[key]).filter(row=>row&&typeof row.id==='string');
   if(!rows.length)continue;
-  const ids=new Set(rows.map(row=>row.id)),without=value=>list(value).filter(item=>!ids.has(item?.id));
+  // One entry leaves per entry that was refused, the last with that id: the
+  // engine takes them from the end, and another entry may share the id.
+  const without=value=>{const out=list(value).slice();for(const row of rows){const at=out.map(item=>item?.id).lastIndexOf(row.id);if(at>=0)out.splice(at,1);}return out;};
   state[key]=without(state[key]);
   if(baseline){let agreed=[];try{agreed=JSON.parse(baseline.get(key)||'[]');}catch{}baseline.set(key,textOf(without(agreed)));}
   lines.push(rows.map(row=>'"'+short(row.name,100)+'"').join(', ')+' was not saved: the list of '+LIST_NAMES[key]+' is full ('+SAVED_LIMITS[key]+') because another Network Toolkit app added entries at the same time. Remove one you no longer need, then save it again.');
  }
  if(!lines.length)return;
  redrawLists();
+ // Saved targets and saved TFTP profiles are drawn by the main window only.
+ if(plain(refused)&&list(refused.profiles).length)attempt(()=>{if(state.activePage==='profiles'&&typeof renderProfiles==='function')renderProfiles();});
+ if(plain(refused)&&list(refused.tftpProfiles).length)attempt(()=>{document.querySelector('.tftp-session-picker')?.remove?.();root.NetworkToolkitTFTPConnections?.mount?.();});
  attempt(()=>{if(typeof toast==='function')toast(lines.join(' '),'error');});
  document.dispatchEvent(new CustomEvent('shared-data-changed',{detail:{keys:Object.keys(refused)}}));
 }

@@ -62,7 +62,7 @@ function create(host){
  let phase='idle',carried=[],lastSignature='',lastIndex='',retryAt=0,chain=Promise.resolve(),running=0,timer=null,waiting=null,waitStarted=0;
  // True while keeping is off and the saved session may still name kept
  // copies of documents that are open in this window.
- let draining=false;
+ let draining=false,readFailed=false;
  const kept=new WeakMap();
  const signature=()=>{const docs=host.documents();return JSON.stringify([host.activeId(),carried.length,docs.map(d=>[d.id,d.uid,d.path,!!d.dirty,!!d.staged,!!d.disk,d.language||'',host.stamp(d)])]);};
 
@@ -129,6 +129,7 @@ function create(host){
 
  function tick(){
   if(running||Date.now()<retryAt)return false;
+  if(phase==='failed'){phase='idle';void restore();return false;}
   // The setting may have been changed in another app of the data folder.
   if(phase==='ready'&&!host.enabled())turnOff();
   else if(phase==='off'&&host.enabled())enable();
@@ -170,7 +171,14 @@ function create(host){
   phase='restoring';
   let session;
   try{session=await host.request(ENDPOINT,'GET');}
-  catch(error){phase='failed';host.message('Files from the last session could not be reopened: '+error.message,true);return false;}
+  catch(error){
+   // Nothing is written while the session is unread. It is asked for again
+   // later (tick), so one failed request does not last for the whole run.
+   phase='failed';retryAt=Date.now()+RETRY_MS;startTimer();
+   if(!readFailed)host.message('Files from the last session could not be reopened yet: '+error.message+' The editor tries again.',true);
+   readFailed=true;return false;
+  }
+  readFailed=false;
   // With the setting off, saved files are not reopened; unsaved text is.
   const stored=Array.isArray(session?.tabs)?session.tabs:[],keeping=host.enabled(),records=keeping?stored:stored.filter(record=>record&&record.backup);
   const notes=session?.warning?[session.warning]:[],earlier=new Set(host.documents());

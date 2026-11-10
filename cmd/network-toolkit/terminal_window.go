@@ -19,6 +19,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"networktoolkit/internal/sharedfile"
 )
 
 const terminalWorkspaceName = "Network_Toolkit.Terminal"
@@ -404,7 +406,8 @@ func readBoundedRegularFile(path string, limit int64) ([]byte, error) {
 	if !info.Mode().IsRegular() || info.Size() > limit {
 		return nil, errors.New("The saved file is not a regular file or exceeds its size limit.")
 	}
-	f, err := os.Open(path)
+	// Another app may be replacing the file (the shared settings are read here).
+	f, err := sharedfile.Open(path)
 	if err != nil {
 		return nil, err
 	}

@@ -195,6 +195,20 @@ test('the preference changing in another app stops and resumes keeping',async()=
  assert.deepEqual(changes(host).map(c=>c.method),['DELETE']);assert.equal(keeper.phase,'off');
 });
 
+test('a session that could not be read is asked for again and then reopened',async()=>{
+ const docs=[],host=fakeHost(docs);host.session={version:1,active:0,tabs:[keptTab('1')]};host.restoreRecord=reopening(docs);
+ const answer=host.request;let down=true;host.request=async(...args)=>{if(down)throw Error('engine not ready');return answer(...args);};
+ const keeper=session.create(host);assert.equal(await keeper.restore(),false);assert.equal(keeper.phase,'failed');
+ assert.equal(keeper.tick(),false,'not at once');assert.equal(docs.length,0);
+ const now=Date.now;Date.now=()=>now()+20000;
+ try{
+  keeper.tick();await settle();assert.equal(keeper.phase,'failed','still down: nothing is written');assert.equal(host.messages.length,1,'the failure is said once');
+  down=false;Date.now=()=>now()+40000;
+  keeper.tick();await waitFor(()=>keeper.phase==='ready','the session is read');
+  assert.deepEqual(docs.map(d=>d.path),['Untitled.txt']);assert.deepEqual(changes(host),[],'nothing was written before the session was read');
+ }finally{Date.now=now;keeper.stop();}
+});
+
 // ---- Integration through the real file-editor.js in memory mode ----
 const editorSource=fs.readFileSync(require.resolve('../web/assets/file-editor.js'),'utf8');
 function harness({preferences={},stored={version:1,active:-1,tabs:[]},files={},failBackup=()=>false}={}){
