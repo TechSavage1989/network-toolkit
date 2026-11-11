@@ -334,6 +334,14 @@ jobs:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results/window-send
         run: go test -mod=vendor ./cmd/network-toolkit -run '^TestWindowSendBrowser$' -count=1 -v -timeout=5m
+      - name: Pop the main window's editor out into the running standalone Text Editor through both real engines and pages
+        if: success() || failure()
+        env:
+          GOTOOLCHAIN: local
+          NTK_PEER_SEND_BROWSER: '1'
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results/editor-handover
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestEditorHandoverBrowser$' -count=1 -v -timeout=5m
       - name: Send text between the real separate Text Editor and Terminal programs
         if: success() || failure()
         env:

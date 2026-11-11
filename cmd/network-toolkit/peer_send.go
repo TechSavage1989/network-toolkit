@@ -40,8 +40,11 @@ import (
 //     most peerLaunchWait. A send that is waiting when this app closes is
 //     dropped; it is never written anywhere.
 //
-// The main window only receives. Its own Send to commands stay inside its
-// window, and its child windows take no part.
+// The main window only receives text. Its own Send to commands stay inside its
+// window, and its child windows take no part. Its one sending use is the
+// document hand-over of peer_handover.go: when the user pops its Text Editor
+// out while the standalone Text Editor runs, local and untitled tabs are given
+// to that editor ("documents", the only request that carries file paths).
 //
 // It is a separate capability from window launch (terminal_window.go,
 // editor_launch.go). Launch requests still carry only connection settings or a
@@ -65,6 +68,8 @@ import (
 //
 // Nothing here accepts or returns credentials, tokens, host keys, file paths,
 // document text or terminal output other than the text the user chose to send.
+// The one exception is the main window's document hand-over (kind "documents",
+// peer_handover.go): local file paths and the tabs' unsaved text.
 const (
 	peerInboundPrefix = "/api/peer/"
 	peerPagePrefix    = "/api/peer-send/"
@@ -147,6 +152,9 @@ type peerPayload struct {
 	Line      int    `json:"line,omitempty"`
 	Label     string `json:"label,omitempty"`
 	Text      string `json:"text"`
+	// Documents is set only for a hand-over from the main window
+	// (peer_handover.go); a terminal send or an editor insert never carries it.
+	Documents []peerHandoverItem `json:"documents,omitempty"`
 }
 
 type peerRequest struct {
@@ -158,6 +166,8 @@ type peerRequest struct {
 	message string
 	payload *peerPayload // nil once the page has it or the request ended
 	timer   *time.Timer
+	ids     []string             // a hand-over: the tabs it carries, kept after the page has it
+	items   []peerHandoverResult // a hand-over: what the page did with each tab
 }
 
 type peerSendState struct {
@@ -172,6 +182,8 @@ type peerSendState struct {
 	// Sending side (standalone apps only).
 	listed   peerListed      // the receiver whose targets this app's page was last shown
 	outbound []*peerOutbound // recent sends: where each went, or that it is waiting for a start
+	// Main window only: the one document hand-over that is waiting (peer_handover.go).
+	handover *peerHandoverOutbound
 }
 
 // peerReceiver is one app that may receive: the other standalone app or the
@@ -253,6 +265,9 @@ func peerReceivesKind(mode, kind string) bool {
 
 // peerSenderName names the standalone app that sends text of this kind.
 func peerSenderName(kind string) string {
+	if kind == peerHandoverKind {
+		return appName // documents come from the main window
+	}
 	if kind == "terminal" {
 		return standaloneEditorTitle
 	}
@@ -390,6 +405,9 @@ func validatePeerPayload(mode string, p *peerPayload) error {
 	if !utf8.ValidString(p.Text) {
 		return errors.New("The text is not valid UTF-8.")
 	}
+	if p.Documents != nil {
+		return errors.New("Text carries no documents.")
+	}
 	if mode == "terminal" {
 		if p.Target != "" || p.Where != "" || p.Line != 0 || p.Label != "" {
 			return errors.New("A terminal send carries a session and text only.")
@@ -480,7 +498,11 @@ func (a *application) peerEnqueue(kind string, payload peerPayload) (int, error)
 	if current := a.peer.request; current != nil && (current.state == peerQueued || current.state == peerTaken) {
 		return http.StatusConflict, errors.New("Another send is still waiting in " + peerAppName(mode) + ". Finish it there, then send again.")
 	}
-	targets, fresh := a.peer.freshTargetsLocked(now, kind)
+	lookup := kind
+	if kind == peerHandoverKind {
+		lookup = "editor" // documents go to the editor whose page reports its documents
+	}
+	targets, fresh := a.peer.freshTargetsLocked(now, lookup)
 	find := func(id string) *peerTarget {
 		for i := range targets {
 			if targets[i].ID == id {
@@ -489,7 +511,11 @@ func (a *application) peerEnqueue(kind string, payload peerPayload) (int, error)
 		}
 		return nil
 	}
-	if kind == "terminal" {
+	if kind == peerHandoverKind {
+		if !fresh {
+			return http.StatusServiceUnavailable, errors.New(peerAppName(mode) + " is not ready yet. Try again in a moment.")
+		}
+	} else if kind == "terminal" {
 		if !fresh {
 			return http.StatusServiceUnavailable, errors.New(peerAppName(mode) + " is not ready yet. Try again in a moment.")
 		}
@@ -512,6 +538,9 @@ func (a *application) peerEnqueue(kind string, payload peerPayload) (int, error)
 		previous.timer.Stop()
 	}
 	request := &peerRequest{id: payload.RequestID, kind: kind, created: now, state: peerQueued, payload: &payload}
+	for _, item := range payload.Documents {
+		request.ids = append(request.ids, item.ID)
+	}
 	// The text never outlives the request, even if this app's page has gone.
 	request.timer = time.AfterFunc(peerRequestLifetime+time.Second, func() {
 		a.peer.mu.Lock()
@@ -552,8 +581,9 @@ func (a *application) peerReport(targets map[string][]peerTarget) {
 }
 
 // peerAcknowledge records the page's result. valid is false when the outcome
-// does not belong to the kind of text the request carried.
-func (a *application) peerAcknowledge(id string, ok bool, outcome, message string) (found, valid bool) {
+// does not belong to the kind of text the request carried. items is the
+// per-tab result of a hand-over, and nil for text.
+func (a *application) peerAcknowledge(id string, ok bool, outcome, message string, items []peerHandoverResult) (found, valid bool) {
 	a.peer.mu.Lock()
 	defer a.peer.mu.Unlock()
 	a.peer.expireLocked(peerNow())
@@ -564,6 +594,10 @@ func (a *application) peerAcknowledge(id string, ok bool, outcome, message strin
 	if ok && !peerOutcomeAllowed(r.kind, outcome) {
 		return true, false
 	}
+	if items != nil && (r.kind != peerHandoverKind || !ok) || ok && r.kind == peerHandoverKind && !peerHandoverResultsValid(r.ids, items) {
+		return true, false
+	}
+	r.items = items
 	if ok {
 		r.state, r.outcome, r.message = peerDone, outcome, ""
 	} else {
@@ -587,6 +621,9 @@ func (a *application) peerResult(id string) (state, outcome, message string, fou
 }
 
 func peerOutcomeAllowed(kind, outcome string) bool {
+	if kind == peerHandoverKind {
+		return outcome == "opened"
+	}
 	if kind == "terminal" {
 		return outcome == "sent" || outcome == "review"
 	}
@@ -665,6 +702,10 @@ func (a *application) servePeerInbound(w http.ResponseWriter, r *http.Request) {
 	// /api/peer/<kind>/<action>: a standalone app serves its own kind only, the
 	// main window both (its Terminal page and its Text Editor).
 	kind, _, _ := strings.Cut(strings.TrimPrefix(r.URL.Path, peerInboundPrefix), "/")
+	if kind == peerHandoverKind && mode == standaloneEditorMode {
+		a.servePeerHandoverInbound(w, r) // documents from the main window
+		return
+	}
 	if !peerReceivesKind(mode, kind) {
 		http.NotFound(w, r)
 		return
@@ -755,6 +796,7 @@ type peerResponse struct {
 	State      string                `json:"state"`
 	Outcome    string                `json:"outcome"`
 	Message    string                `json:"message"`
+	Items      []peerHandoverResult  `json:"items"`
 }
 
 // readPeerInstance reads a receiver's instance record for peer send. The
@@ -805,8 +847,17 @@ func (a *application) peerStandalone() peerReceiver {
 // it was probed), nothing is sent to the new endpoint and errPeerNotOpen is
 // returned. Every call that carries the user's text passes it.
 func (a *application) peerCall(ctx context.Context, rc peerReceiver, expect, method, path string, body any, timeout time.Duration) (peerResponse, int, error) {
+	if a.peerSenderRoot() == "" {
+		return peerResponse{}, 0, errPeerNotOpen
+	}
+	return peerCallReceiver(ctx, rc, expect, method, path, body, timeout)
+}
+
+// peerCallReceiver is peerCall without the sender check. Only peerCall and the
+// main window's document hand-over (peer_handover.go) use it.
+func peerCallReceiver(ctx context.Context, rc peerReceiver, expect, method, path string, body any, timeout time.Duration) (peerResponse, int, error) {
 	var reply peerResponse
-	if a.peerSenderRoot() == "" || rc.mode == "" {
+	if rc.mode == "" || rc.dir == "" {
 		return reply, 0, errPeerNotOpen
 	}
 	record, err := readPeerInstance(rc.dir)
@@ -1381,12 +1432,13 @@ func (a *application) handlePeerSend(w http.ResponseWriter, r *http.Request) {
 		jsonResponse(w, http.StatusOK, map[string]any{"ok": true})
 	case "ack":
 		var ack *struct {
-			RequestID string `json:"requestId"`
-			OK        bool   `json:"ok"`
-			Outcome   string `json:"outcome"`
-			Error     string `json:"error"`
+			RequestID string               `json:"requestId"`
+			OK        bool                 `json:"ok"`
+			Outcome   string               `json:"outcome"`
+			Error     string               `json:"error"`
+			Items     []peerHandoverResult `json:"items"`
 		}
-		if err := decodePeerBody(w, r, 8192, &ack); err != nil {
+		if err := decodePeerBody(w, r, 64<<10, &ack); err != nil {
 			jsonError(w, http.StatusBadRequest, err.Error())
 			return
 		}
@@ -1395,6 +1447,8 @@ func (a *application) handlePeerSend(w http.ResponseWriter, r *http.Request) {
 			for _, received := range peerReceives(own) {
 				allowed = allowed || peerOutcomeAllowed(received, ack.Outcome)
 			}
+			// The standalone Text Editor also receives documents from the main window.
+			allowed = allowed || own == standaloneEditorMode && peerOutcomeAllowed(peerHandoverKind, ack.Outcome)
 		}
 		if ack == nil || !peerRequestID.MatchString(ack.RequestID) || ack.OK && !allowed || !ack.OK && ack.Outcome != "" {
 			jsonError(w, http.StatusBadRequest, "The acknowledgement is invalid.")
@@ -1404,7 +1458,7 @@ func (a *application) handlePeerSend(w http.ResponseWriter, r *http.Request) {
 		if !ack.OK && message == "" {
 			message = "The text was not accepted."
 		}
-		found, valid := a.peerAcknowledge(ack.RequestID, ack.OK, ack.Outcome, message)
+		found, valid := a.peerAcknowledge(ack.RequestID, ack.OK, ack.Outcome, message, ack.Items)
 		if !valid {
 			jsonError(w, http.StatusBadRequest, "The acknowledgement is invalid.")
 			return
