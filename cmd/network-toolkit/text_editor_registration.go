@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 // "Use this copy's Text Editor in Windows" (App settings > Editor, portable
@@ -697,7 +698,12 @@ func removeEditorCopy(p editorRegPlatform, exe string) (editorRegistrationStatus
 	})
 }
 
+// One action at a time in this process; the Setup mutex covers other processes.
+var editorRegActionMu sync.Mutex
+
 func (p editorRegPlatform) run(exe string, plan func(editorRegistrationStatus) (editorRegPlan, error)) (editorRegistrationStatus, error) {
+	editorRegActionMu.Lock()
+	defer editorRegActionMu.Unlock()
 	release, err := p.lock()
 	if err != nil {
 		return editorRegistrationStatus{}, err
