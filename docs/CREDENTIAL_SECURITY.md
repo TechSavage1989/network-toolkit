@@ -161,7 +161,8 @@ backup. Remote credential rotation and sensible backup retention remain necessar
 ## Required verification
 
 Build maintenance is part of this work. The release toolchain is pinned to the
-patched, supported Go 1.26.10 series (released 2026-10-19), rather than the old
+patched, supported Go 1.26 series (1.26.11 since 2026-11-11, for GO-2026-6859 in
+net/http), rather than the old
 unsupported Go 1.23.2 pin. This preserves the Windows 10/x64 platform minimum and
 avoids taking Go 1.27's additional default JSON and platform-certificate-store
 behavior changes in the same security build. See the official
