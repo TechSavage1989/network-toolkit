@@ -413,9 +413,22 @@ func (m *eolMap) kind(index int64) byte {
 	return m.kinds[index>>2] >> ((index & 3) * 2) & 3
 }
 
+// eolCursor finds, for one encoding pass, which imported '\n' a piece starts
+// at. It keeps the imported chunk it last looked at, so a document cut into
+// many pieces by edits reads each chunk once instead of once for every piece.
+type eolCursor struct {
+	m     *eolMap
+	file  io.ReaderAt
+	chunk int
+	data  []byte
+	at    int   // bytes of data counted so far
+	lines int64 // '\n' in data[:at]
+}
+
 // rank returns the index of the first imported '\n' at or after a scratch
 // offset, or -1 for text added after the import.
-func (m *eolMap) rank(file io.ReaderAt, offset int64) (int64, error) {
+func (c *eolCursor) rank(offset int64) (int64, error) {
+	m := c.m
 	if offset >= m.end {
 		return -1, nil
 	}
@@ -423,11 +436,24 @@ func (m *eolMap) rank(file io.ReaderAt, offset int64) (int64, error) {
 	if i < 0 {
 		return 0, nil
 	}
-	data := make([]byte, offset-m.starts[i])
-	if _, e := file.ReadAt(data, m.starts[i]); e != nil {
-		return 0, e
+	if c.data == nil || i != c.chunk {
+		end := m.end
+		if i+1 < len(m.starts) {
+			end = m.starts[i+1]
+		}
+		data := make([]byte, end-m.starts[i])
+		if _, e := c.file.ReadAt(data, m.starts[i]); e != nil {
+			return 0, e
+		}
+		c.chunk, c.data, c.at, c.lines = i, data, 0, 0
 	}
-	return m.ranks[i] + int64(bytes.Count(data, []byte{'\n'})), nil
+	to := int(offset - m.starts[i])
+	if to < c.at {
+		c.at, c.lines = 0, 0
+	}
+	c.lines += int64(bytes.Count(c.data[c.at:to], []byte{'\n'}))
+	c.at = to
+	return m.ranks[i] + c.lines, nil
 }
 
 // NewLineEOL is the line ending of text added to a document whose imported
@@ -575,6 +601,10 @@ func (s *Snapshot) encode(ctx context.Context, dst io.Writer, f Format, root *no
 		_, e := w.Write(p[:n])
 		return e
 	}
+	var endings *eolCursor
+	if f.EOL == MixedEOL {
+		endings = &eolCursor{m: s.b.eol, file: s.b.file}
+	}
 	var visit func(*node) error
 	visit = func(n *node) error {
 		if n == nil {
@@ -605,7 +635,7 @@ func (s *Snapshot) encode(ctx context.Context, dst io.Writer, f Format, root *no
 			case "CR":
 				ending = eolCR
 			case MixedEOL:
-				if line, e = s.b.eol.rank(s.b.file, n.part.offset); e != nil {
+				if line, e = endings.rank(n.part.offset); e != nil {
 					return e
 				}
 			}
