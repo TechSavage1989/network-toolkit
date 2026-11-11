@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net"
 	"net/http"
@@ -219,6 +220,19 @@ func TestStandalonePeerSendBrowser(t *testing.T) {
 	}
 	hook(startTerminal, startEditor)
 	hook(startEditor, startTerminal)
+	// main: the main window runs, so nothing may be started. A start is
+	// recorded and refused (instead of starting this test binary as an app).
+	for _, sender := range []*application{mainEditor, mainTerminal} {
+		sender := sender
+		sender.peer.mu.Lock()
+		sender.peer.launch = func(context.Context) error {
+			launchMu.Lock()
+			launches["main-only "+sender.windowMode]++
+			launchMu.Unlock()
+			return errors.New("the main window runs, so no app is started in this phase")
+		}
+		sender.peer.mu.Unlock()
+	}
 
 	more, err := json.Marshal(map[string]map[string]liveApp{
 		"main":  {"main": live(mainApp, mainSession), "editor": live(mainEditor, ""), "terminal": live(mainTerminal, mainTerminalSession)},
@@ -234,10 +248,14 @@ func TestStandalonePeerSendBrowser(t *testing.T) {
 	command.Env = append(os.Environ(),
 		"NTK_PEER_TERMINAL_URL=http://"+terminalApp.host, "NTK_PEER_TERMINAL_TOKEN="+terminalApp.token,
 		"NTK_PEER_EDITOR_URL=http://"+editorApp.host, "NTK_PEER_EDITOR_TOKEN="+editorApp.token,
-		"NTK_PEER_SESSION="+session, "NTK_PEER_MORE="+string(more))
+		"NTK_PEER_SESSION="+session, "NTK_PEER_MORE="+string(more),
+		"NTK_PEER_LAUNCH_WAIT_MS="+strconv.FormatInt(peerLaunchWait.Milliseconds(), 10))
 	output, err := command.CombinedOutput()
 	t.Log(string(output))
 	if err != nil {
+		launchMu.Lock()
+		t.Logf("apps started: %v", launches)
+		launchMu.Unlock()
 		t.Fatal(err)
 	}
 	// Everything the device received, in order: the selected line exactly as
@@ -263,7 +281,7 @@ func TestStandalonePeerSendBrowser(t *testing.T) {
 	}
 	launchMu.Lock()
 	defer launchMu.Unlock()
-	if launches[standaloneEditorMode] != 1 || launches["terminal"] != 1 {
+	if launches[standaloneEditorMode] != 1 || launches["terminal"] != 1 || len(launches) != 2 {
 		t.Fatalf("each app must be started exactly once: %v", launches)
 	}
 	for _, a := range apps {

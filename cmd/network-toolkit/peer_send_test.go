@@ -1225,6 +1225,9 @@ func TestPeerSendPrefersTheOtherStandaloneAppThenTheMainWindow(t *testing.T) {
 }
 
 func TestPeerSendSkipsAMainWindowWithoutARunningPage(t *testing.T) {
+	previous := peerMainGrace
+	peerMainGrace = 300 * time.Millisecond // TestPeerSendMainWindowGraceIsBounded checks the wait itself
+	defer func() { peerMainGrace = previous }()
 	root := t.TempDir()
 	terminal, _ := peerTestApp(t, root, "terminal")
 	main, _ := peerTestApp(t, root, "main")
@@ -1237,6 +1240,87 @@ func TestPeerSendSkipsAMainWindowWithoutARunningPage(t *testing.T) {
 	}
 	if _, has := reply["note"]; has {
 		t.Fatalf("a current main window was reported as skipped: %s", raw)
+	}
+}
+
+// A main window whose engine answers but whose page has not reported yet (it
+// was just started, or its page briefly missed a poll) is given a short grace
+// period: a page that reports within it receives the text, and the other
+// standalone app is not started.
+func TestPeerSendWaitsBrieflyForTheMainWindowPage(t *testing.T) {
+	root := t.TempDir()
+	terminal, _ := peerTestApp(t, root, "terminal")
+	editor, _ := peerTestApp(t, root, standaloneEditorMode)
+	main, _ := peerTestApp(t, root, "main")
+	peerRegister(t, main, root)
+	launches := 0
+	for _, sender := range []*application{terminal, editor} {
+		sender.peer.mu.Lock()
+		sender.peer.launch = func(context.Context) error { launches++; return errors.New("the other app must not be started") }
+		sender.peer.mu.Unlock()
+	}
+	// The main page starts polling 1.2 s after the sends begin.
+	pageStarted := make(chan (<-chan map[string]any), 1)
+	go func() {
+		time.Sleep(1200 * time.Millisecond)
+		pageStarted <- peerLivePage(t, main, peerMainSessions)
+	}()
+	began := time.Now()
+	code, reply, raw := peerPage(t, editor, http.MethodGet, "/api/peer-send/targets", "")
+	if code != http.StatusOK || reply["receiver"] != "main" || reply["running"] != true || reply["ready"] != true {
+		t.Fatalf("targets while the main page was about to report: %d %s (after %v)", code, raw, time.Since(began))
+	}
+	mainPage := <-pageStarted
+	// A new document from the Terminal goes to the main window too, with no launch.
+	code, reply, raw = peerPage(t, terminal, http.MethodPost, "/api/peer-send/send", `{"target":"new","text":"to main"}`)
+	if code != http.StatusOK || reply["receiver"] != "main" || reply["state"] != "queued" {
+		t.Fatalf("new document with the main page running: %d %s", code, raw)
+	}
+	if request := peerAwaitRequest(t, mainPage, "main window new document"); request["target"] != "new" || request["text"] != "to main" {
+		t.Fatalf("main window request: %v", request)
+	}
+	if launches != 0 {
+		t.Fatalf("the other standalone app was started %d times", launches)
+	}
+}
+
+// The grace period is bounded: a main window whose page never reports is
+// passed over after it, and a send for a new document starts the other app.
+func TestPeerSendMainWindowGraceIsBounded(t *testing.T) {
+	previous := peerMainGrace
+	peerMainGrace = 600 * time.Millisecond
+	defer func() { peerMainGrace = previous }()
+	root := t.TempDir()
+	terminal, _ := peerTestApp(t, root, "terminal")
+	main, _ := peerTestApp(t, root, "main")
+	peerRegister(t, main, root)
+	began := time.Now()
+	code, reply, raw := peerPage(t, terminal, http.MethodGet, "/api/peer-send/targets", "")
+	waited := time.Since(began)
+	if code != http.StatusOK || reply["running"] != false || reply["receiver"] != "" {
+		t.Fatalf("a main window without a page was chosen: %d %s", code, raw)
+	}
+	if waited < peerMainGrace || waited > peerMainGrace+3*time.Second {
+		t.Fatalf("the main window was waited for %v, want about %v", waited, peerMainGrace)
+	}
+	// Nothing registered at all: no grace period.
+	alone, _ := peerTestApp(t, t.TempDir(), "terminal")
+	began = time.Now()
+	if _, reply, _ := peerPage(t, alone, http.MethodGet, "/api/peer-send/targets", ""); reply["running"] != false {
+		t.Fatal("unexpected receiver")
+	}
+	if waited := time.Since(began); waited >= peerMainGrace {
+		t.Fatalf("an absent main window was waited for (%v)", waited)
+	}
+	// The sender's request ends: the grace period ends with it.
+	ctx, cancel := context.WithTimeout(context.Background(), 150*time.Millisecond)
+	defer cancel()
+	began = time.Now()
+	if rc, _, _, _, _ := terminal.peerChoose(ctx); rc != nil {
+		t.Fatalf("chose %v", rc)
+	}
+	if waited := time.Since(began); waited >= peerMainGrace {
+		t.Fatalf("the grace period outlived the request (%v)", waited)
 	}
 }
 
