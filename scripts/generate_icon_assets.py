@@ -3,6 +3,10 @@
 Regeneration needs Inkscape on PATH; ordinary builds use checked-in outputs and
 only Python's standard library. The editable source is never passed directly to an SVG renderer.
 No DTD/entity resolution, external resource fetching or script execution occurs.
+
+`--document` regenerates only the text document icon (the paper sheet Windows
+shows for files associated with the Text Editor) and never touches the
+published app icon.
 """
 from pathlib import Path
 import argparse
@@ -22,6 +26,15 @@ PNG = 'assets/Network_Toolkit_Icon.png'
 ICO = 'assets/Network_Toolkit_Icon.ico'
 MANIFEST = 'assets/Network_Toolkit_Icon.manifest.json'
 SIZES = (16, 20, 24, 32, 40, 48, 64, 128, 256)
+# The icon of files associated with the Text Editor: the editor icon's paper
+# sheet without its tile. The small sizes have their own drawings on the pixel
+# grid, so their edges stay sharp; every other size is rendered from the 256 px
+# drawing.
+DOCUMENT = 'assets/source/Network_Toolkit_Document.svg'
+DOCUMENT_HINTS = {size: f'assets/source/Network_Toolkit_Document.{size}.svg' for size in (16, 20, 24, 32)}
+DOCUMENT_ICO = 'assets/Network_Toolkit_Document.ico'
+DOCUMENT_MANIFEST = 'assets/Network_Toolkit_Document.manifest.json'
+DOCUMENT_SIZES = (16, 20, 24, 32, 40, 48, 64, 96, 128, 256)
 NS = 'http://www.w3.org/2000/svg'
 ENTITIES = {
     'ns_extend': 'http://ns.adobe.com/Extensibility/1.0/',
@@ -218,35 +231,108 @@ def validate_assets(root=ROOT):
         raise ValueError('Runtime SVG does not match the preserved canonical original')
 
 
+def document_sources():
+    """Each source of the document icon, in manifest order."""
+    return [DOCUMENT] + [DOCUMENT_HINTS[size] for size in sorted(DOCUMENT_HINTS)]
+
+
+def ico_entries(raw):
+    """(size, PNG bytes) of each image of an ICO, checking its exact layout."""
+    if len(raw) < 6:
+        raise ValueError('Truncated ICO')
+    reserved, kind, count = struct.unpack_from('<HHH', raw)
+    if reserved or kind != 1 or not 1 <= count <= 30 or len(raw) < 6 + 16 * count:
+        raise ValueError('Invalid ICO header')
+    offset = 6 + 16 * count
+    entries = []
+    for index in range(count):
+        width, height, colors, res, planes, bits, size, start = struct.unpack_from('<BBBBHHII', raw, 6 + 16 * index)
+        png = raw[start:start + size]
+        if start != offset or len(png) != size:
+            raise ValueError('ICO images are not stored in order without gaps')
+        if png[:8] != b'\x89PNG\r\n\x1a\n' or png[24:26] != b'\x08\x06':
+            raise ValueError('ICO image is not an 8-bit RGBA PNG')
+        pixels = struct.unpack_from('>II', png, 16)
+        if (width or 256, height or 256) != pixels or pixels[0] != pixels[1] or (colors, res, planes, bits) != (0, 0, 1, 32):
+            raise ValueError('ICO directory entry does not describe its image')
+        entries.append((pixels[0], png))
+        offset += size
+    if offset != len(raw):
+        raise ValueError('ICO has trailing data')
+    return entries
+
+
+def validate_document_icon(root=ROOT):
+    manifest = json.loads((root / DOCUMENT_MANIFEST).read_text())
+    if manifest.get('version') != 1 or manifest.get('sizes') != list(DOCUMENT_SIZES):
+        raise ValueError('Unsupported document icon manifest')
+    expected = set(document_sources()) | {DOCUMENT_ICO}
+    if set(manifest.get('sha256', {})) != expected:
+        raise ValueError('Document icon manifest does not cover the exact expected files')
+    for path in sorted(expected):
+        if digest((root / path).read_bytes()) != manifest['sha256'][path]:
+            raise ValueError('Document icon changed; regenerate with scripts/generate_icon_assets.py --document: ' + path)
+    for path in document_sources():
+        runtime_svg((root / path).read_bytes())
+    if [size for size, _ in ico_entries((root / DOCUMENT_ICO).read_bytes())] != list(DOCUMENT_SIZES):
+        raise ValueError('Document icon does not hold the expected sizes')
+
+
+def render_png(inkscape, svg, size, temp):
+    """Render reconstructed (safe) SVG bytes to one square RGBA PNG."""
+    safe = temp / f'safe-{size}.svg'
+    safe.write_bytes(svg)
+    path = temp / (str(size) + '.png')
+    subprocess.run([inkscape, str(safe), '--export-type=png', '--export-filename=' + str(path), '--export-width=' + str(size), '--export-height=' + str(size)], check=True, env={**os.environ, 'INKSCAPE_PROFILE_DIR': str(temp / 'inkscape-profile')})
+    data = path.read_bytes()
+    if data[:8] != b'\x89PNG\r\n\x1a\n' or struct.unpack('>II', data[16:24]) != (size, size):
+        raise ValueError('Renderer returned an invalid PNG')
+    return data
+
+
+def pack_ico(sizes, images):
+    icon = bytearray(struct.pack('<HHH', 0, 1, len(sizes)))
+    offset = 6 + 16 * len(sizes)
+    for size, data in zip(sizes, images):
+        icon.extend(struct.pack('<BBBBHHII', size % 256, size % 256, 0, 0, 1, 32, len(data), offset))
+        offset += len(data)
+    for data in images:
+        icon.extend(data)
+    return bytes(icon)
+
+
+def generate_document_icon(inkscape):
+    sources = {path: runtime_svg((ROOT / path).read_bytes()) for path in document_sources()}
+    with tempfile.TemporaryDirectory(prefix='network-toolkit-document-icon-') as temp:
+        temp = Path(temp)
+        images = [render_png(inkscape, sources[DOCUMENT_HINTS.get(size, DOCUMENT)], size, temp) for size in DOCUMENT_SIZES]
+    (ROOT / DOCUMENT_ICO).write_bytes(pack_ico(DOCUMENT_SIZES, images))
+    paths = document_sources() + [DOCUMENT_ICO]
+    manifest = {'version': 1, 'sizes': list(DOCUMENT_SIZES), 'sha256': {path: digest((ROOT / path).read_bytes()) for path in paths}}
+    (ROOT / DOCUMENT_MANIFEST).write_text(json.dumps(manifest, indent=2) + '\n')
+    validate_document_icon()
+    print(f'Generated the {len(DOCUMENT_SIZES)}-size text document ICO')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--inkscape', default='inkscape')
     parser.add_argument('--check', action='store_true')
+    parser.add_argument('--document', action='store_true', help='regenerate only the text document icon')
     args = parser.parse_args()
     if args.check:
         validate_assets()
+        validate_document_icon()
         print('Canonical icon source and runtime assets verified')
+        return
+    if args.document:
+        generate_document_icon(args.inkscape)
         return
     clean = runtime_svg((ROOT / ORIGINAL).read_bytes())
     with tempfile.TemporaryDirectory(prefix='network-toolkit-icons-') as temp:
         temp = Path(temp)
-        safe = temp / 'safe.svg'
-        safe.write_bytes(clean)
-        images = []
-        for size in SIZES:
-            path = temp / (str(size) + '.png')
-            subprocess.run([args.inkscape, str(safe), '--export-type=png', '--export-filename=' + str(path), '--export-width=' + str(size), '--export-height=' + str(size)], check=True, env={**os.environ, 'INKSCAPE_PROFILE_DIR': str(temp / 'inkscape-profile')})
-            data = path.read_bytes()
-            if data[:8] != b'\x89PNG\r\n\x1a\n' or struct.unpack('>II', data[16:24]) != (size, size):
-                raise ValueError('Renderer returned an invalid PNG')
-            images.append(data)
-        icon = bytearray(struct.pack('<HHH', 0, 1, len(SIZES)))
-        offset = 6 + 16 * len(SIZES)
-        for size, data in zip(SIZES, images):
-            icon.extend(struct.pack('<BBBBHHII', size % 256, size % 256, 0, 0, 1, 32, len(data), offset))
-            offset += len(data)
-        for data in images:
-            icon.extend(data)
+        images = [render_png(args.inkscape, clean, size, temp) for size in SIZES]
+        icon = pack_ico(SIZES, images)
         (ROOT / SVG).write_bytes(clean)
         (ROOT / PNG).write_bytes(images[-1])
         (ROOT / ICO).write_bytes(icon)

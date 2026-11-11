@@ -5,9 +5,18 @@ The generated object is included so ordinary source builds require Go only.
 """
 from pathlib import Path
 import struct
-from generate_icon_assets import validate_assets
+from generate_icon_assets import validate_assets, validate_document_icon
 
 ROOT = Path(__file__).resolve().parents[1]
+OUTPUT = ROOT / 'cmd/network-toolkit/resource_windows_amd64.syso'
+# Icon groups in resource ID order (1, 2, ...). Windows numbers them from zero
+# in the same order, and that number is what shortcuts and registry values such
+# as '"Network_Toolkit.exe",1' name: 0 app, 1 Text Editor, 2 Terminal (window
+# icons use the IDs, internal/desktop/desktop.go), 3 the text document icon of
+# files associated with the Text Editor (Setup only). Released Setups and
+# shortcuts already point at these numbers: never reorder or remove a group,
+# and append a new one at the end.
+ICON_GROUPS = ('Icon', 'Editor', 'Terminal', 'Document')
 
 
 def align(buffer, boundary=4):
@@ -45,13 +54,13 @@ def version_info():
     return version_block('VS_VERSION_INFO', fixed, [string_info, var_info])
 
 
-def main():
+def resource_object():
+    """The COFF object, built from the committed assets."""
     validate_assets(ROOT)
+    validate_document_icon(ROOT)
     icons = {}
     groups = {}
-    # Keep group order in sync with desktop icon resource IDs and the setup's
-    # zero-based shortcut icon indexes.
-    for group_id, name in enumerate(('Icon', 'Editor', 'Terminal'), 1):
+    for group_id, name in enumerate(ICON_GROUPS, 1):
         icon = (ROOT / f'assets/Network_Toolkit_{name}.ico').read_bytes()
         reserved, kind, count = struct.unpack_from('<HHH', icon)
         if reserved or kind != 1 or not 1 <= count <= 30:
@@ -101,9 +110,13 @@ def main():
     header = struct.pack('<HHIIIHH', 0x8664, 1, 0, symbols_offset, 1, 0, 0)
     sh = struct.pack('<8sIIIIIIHHI', b'.rsrc\0\0\0', 0, 0, len(section), raw_offset, reloc_offset, 0, len(leaves), 0, 0x40300040)
     symbol = struct.pack('<8sIhHBB', b'.rsrc\0\0\0', 0, 1, 0, 3, 0)
-    output = ROOT / 'cmd/network-toolkit/resource_windows_amd64.syso'
-    output.write_bytes(header + sh + section + relocations + symbol + struct.pack('<I', 4))
-    print(f'{output.name}: {output.stat().st_size} bytes, {len(leaves)} native resources')
+    return header + sh + section + relocations + symbol + struct.pack('<I', 4), len(leaves)
+
+
+def main():
+    data, count = resource_object()
+    OUTPUT.write_bytes(data)
+    print(f'{OUTPUT.name}: {OUTPUT.stat().st_size} bytes, {count} native resources')
 
 
 if __name__ == '__main__':

@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- Drawn on the 32 px grid: one unit is one pixel at 32 x 32. -->
+  <g transform="scale(8)">
+    <path d="M7 2H20L27 9V28 A2 2 0 0 1 25 30H7 A2 2 0 0 1 5 28V4 A2 2 0 0 1 7 2Z" fill="#071F43"/>
+    <path d="M7 3H19V10H26V28 A1 1 0 0 1 25 29H7 A1 1 0 0 1 6 28V4 A1 1 0 0 1 7 3Z" fill="#FFF"/>
+    <path d="M20 3L26 9H20Z" fill="#73DDFF"/>
+    <path d="M9 13h14v2h-14ZM9 17h14v2h-14ZM9 21h10v2h-10Z" fill="#071F43"/>
+  </g>
+</svg>
