@@ -165,14 +165,20 @@ func standaloneProgram(mode string) (string, error) {
 	if resolved, err := filepath.EvalSymlinks(self); err == nil {
 		self = resolved
 	}
-	if buildEdition == mode {
+	return standaloneProgramFrom(self, buildEdition, mode)
+}
+
+// standaloneProgramFrom is standaloneProgram for the running program self of
+// the given edition.
+func standaloneProgramFrom(self, edition, mode string) (string, error) {
+	if edition == mode {
 		return self, nil
 	}
 	dir := filepath.Dir(self)
 	if candidate := filepath.Join(dir, programName(mode)); separateProgramMatches(candidate, mode) {
 		return candidate, nil
 	}
-	if buildEdition == "" {
+	if edition == "" {
 		return self, nil
 	}
 	if candidate := filepath.Join(dir, programName("")); separateProgramMatches(candidate, "") {
@@ -199,8 +205,8 @@ func forwardToSeparateProgram(mode string, args []string) bool {
 	if resolved, err := filepath.EvalSymlinks(self); err == nil {
 		self = resolved
 	}
-	target := filepath.Join(filepath.Dir(self), programName(mode))
-	if updateNamingSamePath(target, self) || !separateProgramMatches(target, mode) {
+	target, ok := forwardTarget(self, mode)
+	if !ok {
 		return false
 	}
 	cmd := exec.Command(target, args...)
@@ -216,4 +222,14 @@ func forwardToSeparateProgram(mode string, args []string) bool {
 	peerAllowForeground(cmd.Process.Pid)
 	_ = cmd.Process.Release()
 	return true
+}
+
+// forwardTarget is the separate program beside the main program self that
+// opens mode, when it is a program of this version.
+func forwardTarget(self, mode string) (string, bool) {
+	target := filepath.Join(filepath.Dir(self), programName(mode))
+	if updateNamingSamePath(target, self) || !separateProgramMatches(target, mode) {
+		return "", false
+	}
+	return target, true
 }

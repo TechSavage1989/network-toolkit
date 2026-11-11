@@ -103,10 +103,11 @@ func updateReadPlan(dir string) (updatePlan, error) {
 				return p, errors.New("Invalid separate program in the update plan")
 			}
 			seen[strings.ToLower(c.Target)] = true
-			for _, digest := range []string{c.OriginalSHA256, c.CandidateSHA256} {
-				if digest == "" && digest == c.OriginalSHA256 {
-					continue
-				}
+			digests := []string{c.CandidateSHA256}
+			if c.OriginalSHA256 != "" { // empty: created by this update
+				digests = append(digests, c.OriginalSHA256)
+			}
+			for _, digest := range digests {
 				if b, err := hex.DecodeString(digest); err != nil || len(b) != 32 || strings.ToLower(digest) != digest {
 					return p, errors.New("Invalid separate program checksum in the update plan")
 				}
