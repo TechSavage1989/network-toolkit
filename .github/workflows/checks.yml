@@ -764,10 +764,10 @@ jobs:
         env:
           GOTOOLCHAIN: local
         run: go test -mod=vendor ./cmd/network-toolkit -run 'TestWindowsCredential|TestCredential|TestVaultV2|TestPublicBootstrap|TestTerminalActivationRecord|TestEmbeddedUI|TestTerminalWindow|TestTerminalView' -count=1 -v
-      - name: Test the portable copy's Windows registration and the held, verified full-version Setup on Windows
+      - name: Test the portable copy's Windows registration, the held, verified full-version Setup and the Start menu shortcuts of the separate programs on Windows
         env:
           GOTOOLCHAIN: local
-        run: go test -mod=vendor ./cmd/network-toolkit -run '^Test(FullInstall|EditorRegistration|TextEditorRegistration)' -count=1 -v
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^Test(FullInstall|EditorRegistration|TextEditorRegistration|CompanionShortcuts|DocumentIconRepair)' -count=1 -v
       - name: Test authenticated vault envelopes on Windows
         env:
           GOTOOLCHAIN: local

@@ -418,6 +418,9 @@ func main() {
 		}
 	}
 	a.configurePeerSend(rootDataDir)
+	// After an update: the Updates page shows from its first status read that
+	// the separate programs will be added (updater_companions_auto.go).
+	a.markCompanionsPending()
 	if runtime.GOOS == "windows" && !*noBrowser {
 		a.uiHost = "webview2"
 	}

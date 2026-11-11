@@ -45,3 +45,36 @@ test('install notes never borrow the body of a different latest release',async()
 test('staged settings action installs directly without another confirmation dialog',async()=>{const h=ui({data:{...available,staged:{version:'1.17.60',sha256:'verified'}}});await h.settings();assert.match(h.document.getElementById('appUpdateSettings').textContent,/Save your work before restarting/);await h.click('confirm','#appUpdateSettings');assert.equal(h.calls.filter(c=>c[0]==='/updates/install').length,1);assert.ok(h.document.getElementById('appUpdateSettings'));assert.equal(h.document.querySelector('[data-app-update="review"]'),null);});
 test('repeated final confirmation clicks cannot duplicate installation',async()=>{let resolve;const h=ui({context:{flushState:()=>new Promise(r=>resolve=r)}});h.c.NetworkToolkitUpdater.start();await h.tick();await h.click('download');await h.click('confirm-download');const installing=h.click('confirm','#modalRoot');await Promise.resolve();await h.click('confirm','#modalRoot');resolve(true);await installing;assert.equal(h.calls.filter(c=>c[0]==='/updates/install').length,1);});
 test('failed download stays retryable without opening installation confirmation',async()=>{const h=ui({context:{api:async path=>{if(path==='/updates/download')throw new Error('Checksum mismatch');return structuredClone(available);}}});h.c.NetworkToolkitUpdater.start();await h.tick();await h.click('download');await h.click('confirm-download');assert.match(h.document.getElementById('appUpdateDownloadResult').textContent,/Checksum mismatch/);assert.ok(h.document.querySelector('[data-app-update="confirm-download"]'));assert.equal(h.document.querySelector('[data-app-update="confirm"]'),null);assert.equal(h.calls.some(c=>c[0]==='/updates/install'),false);});
+
+test('separate programs added after an update: progress, one notice, then no button',async()=>{
+ const notices=[];const programs=[{name:'Network_Toolkit_TextEditor.exe',state:'missing'},{name:'Network_Toolkit_Terminal.exe',state:'missing'}];
+ let data={...available,hasUpdate:false,latest:null,companions:{needed:true,programs},companionsInstall:{automatic:true,state:'pending'}};
+ const h=ui({context:{toast:m=>notices.push(m),api:async()=>structuredClone(data)}});
+ await h.settings();
+ const text=()=>h.document.getElementById('appUpdateSettings').textContent;
+ // Pending: from the first status read, no button that the engine would refuse.
+ assert.match(text(),/will be added in a moment/);
+ assert.equal(h.document.querySelector('[data-app-update="companions"]'),null);
+ assert.equal(h.timers.size,1);
+ data={...data,companionsInstall:{automatic:true,state:'running'}};
+ await h.tick();
+ assert.match(text(),/Adding the separate Text Editor and Terminal programs/);
+ assert.equal(h.document.querySelector('[data-app-update="companions"]'),null);
+ assert.equal(h.timers.size,1);
+ data={...data,companions:{needed:false,programs:programs.map(p=>({...p,state:'current'}))},companionsInstall:{automatic:true,state:'added',startMenu:'next-setup'}};
+ await h.tick();
+ assert.match(text(),/The separate Text Editor and Terminal programs were added\./);
+ assert.match(text(),/next Setup/);
+ assert.equal(h.document.querySelector('[data-app-update="companions"]'),null);
+ await h.settings();
+ assert.equal(notices.filter(n=>/were added/.test(n)).length,1);
+ assert.equal(h.timers.size,0);
+});
+test('separate programs that could not be added keep the manual button with the reason',async()=>{
+ const data={...available,hasUpdate:false,latest:null,companions:{needed:true,programs:[{name:'Network_Toolkit_TextEditor.exe',state:'missing'},{name:'Network_Toolkit_Terminal.exe',state:'missing'}]},companionsInstall:{automatic:true,state:'failed',reason:'synthetic: no network connection'}};
+ const h=ui({context:{api:async()=>structuredClone(data)}});
+ await h.settings();
+ assert.match(h.document.getElementById('appUpdateSettings').textContent,/could not be added automatically: synthetic: no network connection/);
+ assert.ok(h.document.querySelector('[data-app-update="companions"]'));
+ assert.equal(h.timers.size,0);
+});

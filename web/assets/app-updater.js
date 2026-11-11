@@ -8,6 +8,8 @@
     const state=windows?.state;
     return editor?.documents?.size||editor?.windowAdapter?.hasPendingWindowClose?.()||state?.closing||state?.outgoing||state?.incoming?'Save your work and close all Text Editor documents and editor windows before installing. Finish or cancel any pending editor move or close; installation was not started.':'';
   }
+  // The automatic install of the separate programs is about to run or runs.
+  const companionsActive=data=>['pending','running'].includes(data?.companionsInstall?.state);
   function createController(env){
     let data=null,busy=false,error='',message='',backgroundError='',revision=0,checkAfter=0,progress=null;
     const changed=()=>env.changed?.(snapshot());
@@ -42,7 +44,8 @@
       finally{busy=false;render();changed();}
     }
     async function check(background=false){
-      if(busy||data?.installing)return 'skip';
+      // The automatic install of the separate programs holds the network slot.
+      if(busy||data?.installing||background&&data?.companionsInstall?.state==='running')return 'skip';
       if(checkAfter>(env.now?.()??Date.now())){if(!background){error='Update checks are paused until '+(globalThis.NetworkToolkitResultTime?.format(new Date(checkAfter),{milliseconds:false})||new Date(checkAfter).toLocaleString(undefined,{hour12:true}))+'. Please try again then.';render();}return 'retry';}
       busy=true;if(!background){error='';message='Checking the official release feed…';}render();
       let outcome='retry';
@@ -84,7 +87,7 @@
     // for a copy updated by an earlier updater (docs/SEPARATE_EXECUTABLES.md).
     // Like Download, only on the user's explicit request.
     async function installCompanions(version){
-      if(busy||data?.installing)return;
+      if(busy||data?.installing||companionsActive(data))return;
       if(!data?.companions?.needed||data.currentVersion!==version){error='The separate programs are already installed. Refresh update status.';render();return;}
       const turn=++revision;busy=true;error='';progress={phase:'checksums',version};message='Downloading and verifying the separate Text Editor and Terminal programs of this version. The installed app is unchanged until both are verified.';render();const stop=watchProgress(turn);
       try{data=await env.api('/updates/companions','POST',{confirm:true,version});progress=null;message='The separate Text Editor and Terminal programs are installed beside Network_Toolkit.exe.';}
@@ -102,10 +105,18 @@
     const detail=p.phase==='download'?(known?bytes(received)+' of '+bytes(total)+' ('+Math.floor(received/total*100)+'%)':bytes(received)+' received'):'',label=phases[p.phase];
     return '<div class="app-update-progress"><div class="row between gap6"><span>'+escape(label)+'</span>'+(detail?'<span>'+escape(detail)+'</span>':'')+'</div><progress aria-label="'+escape(label)+'" '+(p.phase==='ready'?'value="1" max="1"':known?'value="'+received+'" max="'+total+'"':'')+'></progress>'+(p.phase==='restarting'?'<small>The installer keeps a progress window open until the updated app starts.</small>':'')+'</div>';
   }
+  // After an update the user approved, the app adds the separate programs by
+  // itself (companionsInstall.automatic); the button stays for a failure.
   function companionsHTML(data,disabled){
-    const c=data?.companions;if(!c?.needed||data?.supported===false)return '';
+    const c=data?.companions,run=data?.companionsInstall;if(data?.supported===false)return '';
+    const shortcuts=run?.state!=='added'?'':run.shortcuts?'<p class="help-line">The Start menu shortcuts still open them through Network_Toolkit.exe: '+escape(run.shortcuts)+'</p>':run.startMenu==='next-setup'?'<p class="help-line">The Start menu shortcuts open them through Network_Toolkit.exe until the next Setup points the shortcuts at them.</p>':'';
+    if(run?.state==='pending')return '<div class="notice info mt"><span>The separate Text Editor and Terminal programs of this version will be added in a moment, in the background.</span></div>';
+    if(run?.state==='running')return '<div class="notice info mt"><span>Adding the separate Text Editor and Terminal programs of this version in the background. Until they are added, Network_Toolkit.exe opens the Text Editor and the Terminal itself.</span></div>';
+    if(run?.state==='added'&&run.automatic&&!c?.needed)return '<div class="notice info mt"><span>The separate Text Editor and Terminal programs were added.</span></div>'+shortcuts;
+    if(!c?.needed)return shortcuts;
     const missing=(c.programs||[]).filter(p=>p.state!=='current').map(p=>escape(p.name)).join(' and ');
-    return '<div class="notice info mt"><span>The separate Text Editor and Terminal programs of this version are not installed beside Network_Toolkit.exe ('+missing+'). Until they are, Network_Toolkit.exe opens the Text Editor and the Terminal itself, as before. They come with this version\'s update package and are checked against its SHA256SUMS before anything is added.</span></div><button type="button" class="btn small" data-app-update="companions" data-version="'+escape(data.currentVersion)+'" '+(disabled?'disabled':'')+'>Install the separate programs</button>';
+    const failed=run?.state==='failed'&&run.automatic?' They could not be added automatically: '+escape(run.reason||'unknown error')+'.':'';
+    return '<div class="notice info mt"><span>The separate Text Editor and Terminal programs of this version are not installed beside Network_Toolkit.exe ('+missing+').'+failed+' Until they are, Network_Toolkit.exe opens the Text Editor and the Terminal itself, as before. They come with this version\'s update package and are checked against its SHA256SUMS before anything is added.</span></div><button type="button" class="btn small" data-app-update="companions" data-version="'+escape(data.currentVersion)+'" '+(disabled?'disabled':'')+'>Install the separate programs</button>';
   }
   function html(state,available,currentVersion,preferences={}){
     const {data,busy,error,message,backgroundError}=state,disabled=!available||busy||data?.installing||data?.supported===false,staged=data?.staged,betaEnabled=preferences.beta===true;
@@ -196,7 +207,7 @@
   // Conditional requests keep this cheap for the release feed; download and
   // install still need explicit approval.
   const AUTO_CHECK_INTERVAL=30*60*1000,AUTO_CHECK_FRESHNESS=10*60*1000;
-  let controller,scheduler,updateWelcomeShown=false,namingWarningShown=false,announcedKey='';
+  let controller,scheduler,updateWelcomeShown=false,namingWarningShown=false,companionsNoticeShown=false,companionsPoll=null,announcedKey='';
   let preferencesLoaded=true,preferencesPending=false,preferencesError='',preferenceWritesPending=false,pendingManualResult='';
   const preferenceChanges={};
   const preferences=()=>state.appUpdatePreferences||{};
@@ -264,6 +275,13 @@
       new Promise((_,reject)=>{timer=setTimeout(()=>{abort.abort();reject(new Error('The update or saved-settings request timed out. It will be retried.'));},path==='/updates/check'?25000:10000);})
     ]);}finally{clearTimeout(timer);}
   }
+  // While the separate programs are being added after an update, read the
+  // status again every few seconds; say once when they were added.
+  function companionsProgress(data){
+    const run=data?.companionsInstall;
+    if(companionsActive(data)&&!companionsPoll&&!controller?.snapshot().busy)companionsPoll=root.setTimeout(()=>{companionsPoll=null;return getController().load(true);},2000);
+    if(run?.automatic&&run.state==='added'&&!companionsNoticeShown){companionsNoticeShown=true;toast('The separate Text Editor and Terminal programs were added.');}
+  }
   function getController(){
     if(controller)return controller;
     controller=createController({
@@ -275,7 +293,7 @@
         if(!response.ok)throw new Error(value.error||'Import failed ('+response.status+').');return value;
       },
       announce:snapshotValue=>{const item=notice(snapshotValue,preferences());if(!item||item.key===announcedKey)return;announcedKey=item.key;toast('Network Toolkit '+item.version+' is available. See what\u2019s new in the update notice at the top of the app.');},
-      render:()=>{render();const data=controller?.snapshot().data;if(data?.restartedAfterUpdate&&!updateWelcomeShown){updateWelcomeShown=true;toast('Now running Network Toolkit '+data.currentVersion+'. Your saved settings are kept.');}if(data?.executable?.warning&&!namingWarningShown){namingWarningShown=true;toast('The app is running, but stable filename setup needs attention. Open App settings > Updates.','error');}},reveal,
+      render:()=>{render();const data=controller?.snapshot().data;if(data?.restartedAfterUpdate&&!updateWelcomeShown){updateWelcomeShown=true;toast('Now running Network Toolkit '+data.currentVersion+'. Your saved settings are kept.');}if(data?.executable?.warning&&!namingWarningShown){namingWarningShown=true;toast('The app is running, but stable filename setup needs attention. Open App settings > Updates.','error');}companionsProgress(data);},reveal,
       restarting:()=>{toast('Installing update. The app will close, then reopen. Allow up to 90 seconds.');}
     });return controller;
   }

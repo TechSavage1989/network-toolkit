@@ -1,3 +1,7 @@
+## 1.21.48 Beta 1 - The separate programs arrive with the update
+
+- After an approved in-app update, the new version adds the separate Text Editor and Terminal programs itself (same release, same checks), points Setup-owned Start menu entries at them when the uninstaller knows them, and gives Text Editor files the document icon.
+
 ## 1.21.47 Beta 1 - The Text Editor and the Terminal as separate programs
 
 - `Network_Toolkit_TextEditor.exe` and `Network_Toolkit_Terminal.exe` ship beside `Network_Toolkit.exe` (installed and portable), each with its own icon and name, sharing all settings and saved data.
