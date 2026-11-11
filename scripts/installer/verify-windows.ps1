@@ -680,6 +680,24 @@ Assert-Installed
 Assert-Same (Read-RegistryValue $uninstallKey 'DesktopShortcut') 1 'Preserved desktop shortcut choice'
 Assert-Same (Read-RegistryValue $uninstallKey 'ContextMenu') 1 'Preserved right-click menu choice'
 
+Write-Host 'Checking /NoContextMenu removes the right-click entry and the two switches together are refused.'
+Invoke-Silent $setup 2 '/S /ContextMenu /NoContextMenu' 'Choose either /ContextMenu or /NoContextMenu, not both'
+Assert-Installed
+Invoke-Silent $setup 0 '/S /NoContextMenu'
+$contextMenuExpected = $false
+# The entry, the remembered choice and Setup's record for it are gone; the
+# other program's entry beside it and every other registration are as before.
+Assert-Installed
+Assert-Preserved
+Assert-Same (Read-UserValue $createdSubkey '*') $null 'Record for the all-files key after /NoContextMenu'
+Assert-Same (Read-UserValue $createdSubkey '*\shell') $null 'Record for the all-files shell key after /NoContextMenu'
+# A later upgrade without a switch does not bring it back.
+Invoke-Silent $setup
+Assert-Installed
+Invoke-Silent $setup 0 '/S /ContextMenu'
+$contextMenuExpected = $true
+Assert-Installed
+
 Write-Host 'Checking repair and uninstall preserve a replacement desktop shortcut.'
 $replacementShell = New-Object -ComObject WScript.Shell
 try {
@@ -716,7 +734,57 @@ if ($takenScheme) {
 # programs' entries beside them are as they were.
 Assert-ClassKeysRestored 'After uninstall with the right-click entry'
 Assert-Preserved
-foreach ($synthetic in "$allFilesSubkey\shell\SyntheticEdit", $applicationSubkey, $rivalProgSubkey, 'Software\Classes\.cfg') {
+
+Write-Host 'Checking an upgrade from a released version adopts only the Open With keys that hold nothing but the Text Editor.'
+# Setup up to 1.21.43 registered five types and kept no record of the keys it
+# created. Install, then make the registry what such a version left behind.
+$releasedTypes = '.txt', '.log', '.ini', '.cfg', '.conf'
+if ($extensionKeyExisted['.ini'] -or $extensionKeyExisted['.log'] -or $extensionKeyExisted['.conf']) {
+    throw 'The upgrade check needs an account without its own .ini, .log and .conf keys.'
+}
+Invoke-Silent $setup 0 "/S /D=$installDir"
+$contextMenuExpected = $false
+Assert-Installed
+[Microsoft.Win32.Registry]::CurrentUser.DeleteSubKeyTree('Software\Network Toolkit\TextEditor')
+foreach ($ext in $extensions) {
+    if ($releasedTypes -ccontains $ext) { continue }
+    if (-not $extensionKeyExisted[$ext]) {
+        [Microsoft.Win32.Registry]::CurrentUser.DeleteSubKeyTree("Software\Classes\$ext")
+    } elseif (-not $openWithExisted[$ext]) {
+        [Microsoft.Win32.Registry]::CurrentUser.DeleteSubKeyTree("Software\Classes\$ext\OpenWithProgids")
+    } else {
+        $openWith = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("Software\Classes\$ext\OpenWithProgids", $true)
+        try { $openWith.DeleteValue($progID) } finally { $openWith.Dispose() }
+    }
+}
+# Since then another program has added itself to the Open With list of .ini.
+Set-UserValue 'Software\Classes\.ini\OpenWithProgids' 'SyntheticIniTool.Document' ''
+$extensionKeyExisted['.ini'] = $true
+$openWithExisted['.ini'] = $true
+$classSnapshots['Software\Classes\.ini'] = '[OpenWithProgids]{SyntheticIniTool.Document=String:}'
+Invoke-Silent $setup
+Assert-Installed
+Assert-Preserved
+# .log and .conf hold nothing but the Text Editor: adopted, key and list.
+# .cfg belongs to another program: only the list Setup added is adopted.
+# .txt and .ini hold another program's value: left unrecorded.
+Assert-Same (Read-UserValue $createdSubkey '.log') 1 'Adopted .log key of a released version'
+Assert-Same (Read-UserValue $createdSubkey '.conf') 1 'Adopted .conf key of a released version'
+Assert-Same (Read-UserValue $createdSubkey '.cfg\OpenWithProgids') 1 'Adopted Open With list of .cfg'
+Assert-Same (Read-UserValue $createdSubkey '.cfg') $null "Record for another program's .cfg key"
+foreach ($shared in '.txt', '.ini') {
+    Assert-Same (Read-UserValue $createdSubkey $shared) $null "Record for the $shared key, whose Open With list another program uses"
+    Assert-Same (Read-UserValue $createdSubkey "$shared\OpenWithProgids") $null "Record for the Open With list of $shared, which another program uses"
+}
+# A later upgrade finds the record and adopts nothing more.
+Invoke-Silent $setup
+Assert-Installed
+Invoke-Uninstaller $uninstaller
+Assert-UninstallFinished
+Assert-Same (Get-UserKeyTree 'Software\Classes\.ini') '[OpenWithProgids]{SyntheticIniTool.Document=String:}' "Another program's value in the Open With list of .ini"
+Assert-ClassKeysRestored 'After uninstalling an upgrade from a released version'
+Assert-Preserved
+foreach ($synthetic in "$allFilesSubkey\shell\SyntheticEdit", $applicationSubkey, $rivalProgSubkey, 'Software\Classes\.cfg', 'Software\Classes\.ini') {
     [Microsoft.Win32.Registry]::CurrentUser.DeleteSubKeyTree($synthetic)
 }
 Write-Host "Windows setup smoke passed for $version."

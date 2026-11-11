@@ -115,6 +115,7 @@ Var NewSerialScheme
 Var RegistrationFailed
 Var OwnApplicationKey
 Var WantContextMenu
+Var AdoptReleased
 
 ; Silent setup and uninstall show no message. Leave the reason they stopped in
 ; a small log, replaced on every run, so the hosted setup check and support can
@@ -409,6 +410,38 @@ FunctionEnd
 ; The one list of text file types, shared with the hosted check and the guide.
 !include "text-extensions.nsh"
 
+; Setup up to 1.21.43 registered five types and kept no record of the keys it
+; created, so an uninstall would leave those keys behind, empty. On the first
+; upgrade from such a version a key is taken into the record only when it
+; holds nothing but this program's ProgID: then nobody else has written to it.
+; A key with anything else in it stays unrecorded and is never removed.
+!macro AdoptReleasedExtension EXTENSION
+  ClearErrors
+  EnumRegValue $0 HKCU "Software\Classes\${EXTENSION}\OpenWithProgids" 0
+  ${IfNot} ${Errors}
+  ${AndIf} $0 == "${PROG_ID}"
+    EnumRegValue $1 HKCU "Software\Classes\${EXTENSION}\OpenWithProgids" 1
+    ${If} ${Errors}
+      EnumRegKey $1 HKCU "Software\Classes\${EXTENSION}\OpenWithProgids" 0
+      ${If} $1 == ""
+        ; The type's own key as well, if the Open With list is all it holds.
+        EnumRegValue $1 HKCU "Software\Classes\${EXTENSION}" 0
+        ${If} ${Errors}
+          EnumRegKey $1 HKCU "Software\Classes\${EXTENSION}" 1
+        ${Else}
+          StrCpy $1 "has values"
+        ${EndIf}
+        ${If} $1 == ""
+          WriteRegDWORD HKCU "${CREATED_KEYS}" "${EXTENSION}" 1
+        ${Else}
+          WriteRegDWORD HKCU "${CREATED_KEYS}" "${EXTENSION}\OpenWithProgids" 1
+        ${EndIf}
+      ${EndIf}
+    ${EndIf}
+  ${EndIf}
+  ClearErrors
+!macroend
+
 ; "Open with" for any file. The key is named after the program file. Setup
 ; writes it when it is absent, or when it already starts this installed
 ; program: Windows writes such an entry itself, with the bare file name as the
@@ -640,6 +673,23 @@ Section "Network Toolkit"
   WriteRegStr HKCU "${CAPABILITIES}" "ApplicationName" "${EDITOR_NAME}"
   WriteRegStr HKCU "${CAPABILITIES}" "ApplicationDescription" "Open text, log, configuration, script and source files in Network Toolkit Text Editor."
   WriteRegStr HKCU "${CAPABILITIES}" "ApplicationIcon" '"$INSTDIR\${APP_FILENAME}",1'
+  IfErrors install_error
+  ; An upgrade from a version that kept no record of the keys it created.
+  StrCpy $AdoptReleased 0
+  ${If} $RegisteredInstallDir != ""
+    EnumRegKey $0 HKCU "${EDITOR_KEY}" 0
+    ${If} ${Errors}
+      StrCpy $AdoptReleased 1
+    ${EndIf}
+  ${EndIf}
+  ${If} $AdoptReleased == 1
+    !insertmacro AdoptReleasedExtension ".txt"
+    !insertmacro AdoptReleasedExtension ".log"
+    !insertmacro AdoptReleasedExtension ".ini"
+    !insertmacro AdoptReleasedExtension ".cfg"
+    !insertmacro AdoptReleasedExtension ".conf"
+  ${EndIf}
+  WriteRegDWORD HKCU "${EDITOR_KEY}" "Records" 1
   StrCpy $RegistrationFailed 0
   !insertmacro TextExtensions RegisterExtension
   WriteRegStr HKCU "Software\RegisteredApplications" "${EDITOR_NAME}" "${CAPABILITIES}"
@@ -788,6 +838,16 @@ Function .onInit
   ${GetOptions} $0 "/ContextMenu" $1
   ${IfNot} ${Errors}
     !insertmacro SelectSection ${ContextMenu}
+  ${EndIf}
+  ; /NoContextMenu clears the entry and the remembered choice in a silent
+  ; setup, where the box cannot be cleared.
+  ${GetOptions} $0 "/NoContextMenu" $1
+  ${IfNot} ${Errors}
+    ${GetOptions} $0 "/ContextMenu" $1
+    ${IfNot} ${Errors}
+      !insertmacro StopSetup "Choose either /ContextMenu or /NoContextMenu, not both."
+    ${EndIf}
+    !insertmacro UnselectSection ${ContextMenu}
   ${EndIf}
   ClearErrors
 FunctionEnd

@@ -30,7 +30,8 @@ test('Setup registers exactly the list, from the one file',()=>{
  assert.equal((code.match(/!insertmacro TextExtensions RegisterExtension/g)||[]).length,1);
  assert((code.match(/!insertmacro TextExtensions RemoveExtension/g)||[]).length>=1);
  assert.doesNotMatch(code,/!insertmacro (?:RegisterExtension|RemoveExtension) /,'no type is registered outside the list');
- assert.doesNotMatch(code,/"\.(?:txt|log|ini|cfg|conf|json|xml|py)"/,'no file type is written out in windows.nsi');
+ // The five types of released versions are named once more, for upgrades (checked below).
+ assert.doesNotMatch(code.replace(/^\s*!insertmacro AdoptReleasedExtension "\.[a-z]+"$/gm,''),/"\.(?:txt|log|ini|cfg|conf|json|xml|py)"/,'no file type is written out in windows.nsi');
 });
 
 test('the hosted Setup check reads the same file and finds the same types',()=>{
@@ -58,11 +59,11 @@ test('Setup only offers the editor: per user, no UserChoice, no default value of
  for(const line of writes)assert.match(line,/^\s*(?:WriteReg\w+|DeleteRegKey(?: \/ifempty)?|DeleteRegValue) HKCU "/,'only the current user\'s registry is changed: '+line.trim());
  // Under a file type, the only thing written is the ProgID in OpenWithProgids.
  const typeWrites=writes.filter(line=>line.includes('${EXTENSION}')&&/^\s*WriteReg/.test(line));
- assert.deepEqual(typeWrites.map(line=>line.trim()),[
-  'WriteRegStr HKCU "${CAPABILITIES}\\FileAssociations" "${EXTENSION}" "${PROG_ID}"',
-  'WriteRegStr HKCU "Software\\Classes\\${EXTENSION}\\OpenWithProgids" "${PROG_ID}" ""',
+ assert.deepEqual([...new Set(typeWrites.map(line=>line.trim()))].sort(),[
   'WriteRegDWORD HKCU "${CREATED_KEYS}" "${EXTENSION}" 1',
-  'WriteRegDWORD HKCU "${CREATED_KEYS}" "${EXTENSION}\\OpenWithProgids" 1']);
+  'WriteRegDWORD HKCU "${CREATED_KEYS}" "${EXTENSION}\\OpenWithProgids" 1',
+  'WriteRegStr HKCU "${CAPABILITIES}\\FileAssociations" "${EXTENSION}" "${PROG_ID}"',
+  'WriteRegStr HKCU "Software\\Classes\\${EXTENSION}\\OpenWithProgids" "${PROG_ID}" ""']);
  // A whole key under a file type is deleted only through the empty-key check.
  for(const line of writes.filter(line=>/DeleteRegKey/.test(line)&&line.includes('${EXTENSION}')))assert.fail('a file type key is deleted directly: '+line.trim());
  assert.doesNotMatch(code,/SupportedTypes/,'SupportedTypes would hide the editor for unknown file types');
@@ -85,6 +86,14 @@ test('every way Windows starts the editor with a file passes it as the one quote
 test('the right-click entry is optional, off unless chosen, remembered, and removed with the rest',()=>{
  assert.match(code,/^Section \/o "Right-click menu: \$\{MENU_TEXT\}" ContextMenu$/m,'an unselected optional section');
  assert.match(code,/\$\{GetOptions\} \$0 "\/ContextMenu" \$1/,'the switch for silent setup');
+ // /NoContextMenu clears it in a silent setup; both together are refused through StopSetup.
+ assert.match(code,/\$\{GetOptions\} \$0 "\/NoContextMenu" \$1\s+\$\{IfNot\} \$\{Errors\}\s+\$\{GetOptions\} \$0 "\/ContextMenu" \$1\s+\$\{IfNot\} \$\{Errors\}\s+!insertmacro StopSetup "Choose either \/ContextMenu or \/NoContextMenu, not both\."\s+\$\{EndIf\}\s+!insertmacro UnselectSection \$\{ContextMenu\}/);
+ for(const text of ["'/S /ContextMenu /NoContextMenu' 'Choose either /ContextMenu or /NoContextMenu, not both'","Invoke-Silent $setup 0 '/S /NoContextMenu'"])assert(ps1.includes(text),'verify-windows.ps1 no longer has '+text);
+ // An upgrade from a version without records adopts only the five released
+ // types, and only on the first such upgrade.
+ assert.deepEqual((code.match(/!insertmacro AdoptReleasedExtension "(\.[a-z]+)"/g)||[]).map(line=>/"(.+)"/.exec(line)[1]),['.txt','.log','.ini','.cfg','.conf']);
+ assert.match(code,/\$\{If\} \$RegisteredInstallDir != ""\s+EnumRegKey \$0 HKCU "\$\{EDITOR_KEY\}" 0\s+\$\{If\} \$\{Errors\}\s+StrCpy \$AdoptReleased 1/,'adoption only when the installed version kept no record');
+ assert(ps1.includes('adopts only the Open With keys that hold nothing but the Text Editor'),'the hosted check covers the upgrade from a released version');
  assert.match(code,/ReadRegDWORD \$0 HKCU "\$\{UNINSTALL_KEY\}" "ContextMenu"\s+\$\{If\} \$0 == 1\s+!insertmacro SelectSection \$\{ContextMenu\}/,'the choice is remembered on upgrade');
  assert.match(code,/^!define MENU_VERB_KEY "\$\{ALL_FILES_KEY\}\\shell\\NetworkToolkit\.TextEditor"$/m);
  const unregister=/!macro UnregisterShell\n([\s\S]*?)!macroend/.exec(code)[1];
