@@ -42,8 +42,10 @@ func TestFullInstallPrivateFolderIsOwnerOnly(t *testing.T) {
 		t.Fatal(err)
 	}
 	user, _ := credentialCurrentUserSID()
-	if !strings.HasPrefix(dacl, "D:P") || strings.Count(dacl, "(A;") != 1 || !strings.Contains(dacl, ";"+user+")") {
-		t.Fatalf("the download folder's access list is not owner-only: %s", dacl)
+	// SDDL writes some accounts as aliases (the built-in Administrator, the
+	// hosted runner's user, is "LA"), so compare the trustee as a SID.
+	if !strings.HasPrefix(dacl, "D:P") || strings.Count(dacl, "(A;") != 1 || sddlTrustee(t, dacl) != user {
+		t.Fatalf("the download folder's access list is not owner-only for %s: %s", user, dacl)
 	}
 	// A file written into it inherits the owner-only list.
 	file := filepath.Join(dir, "probe.txt")
@@ -181,4 +183,27 @@ func TestEditorRegistrationRefusesAFolderOthersCanChangeOnWindows(t *testing.T) 
 	if err != nil || status.CanRegister || !strings.Contains(status.LocationProblem, "Users") {
 		t.Fatalf("%+v %v", status, err)
 	}
+}
+
+// sddlTrustee returns, as a SID string, the trustee of the only ACE in dacl.
+func sddlTrustee(t *testing.T, dacl string) string {
+	t.Helper()
+	open := strings.Index(dacl, "(A;")
+	if open < 0 {
+		return ""
+	}
+	end := strings.Index(dacl[open:], ")")
+	if end < 0 {
+		return ""
+	}
+	fields := strings.Split(dacl[open+1:open+end], ";")
+	sid, err := syscall.StringToSid(fields[len(fields)-1])
+	if err != nil {
+		t.Fatalf("trustee %q of %s: %v", fields[len(fields)-1], dacl, err)
+	}
+	text, err := sid.String()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return text
 }

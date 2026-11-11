@@ -24,6 +24,7 @@ var (
 	privateGetAce             = credentialSecurityDLL.NewProc("GetAce")
 	privateCreateDirectory    = syscall.NewLazyDLL("kernel32.dll").NewProc("CreateDirectoryW")
 	privateGetFinalPathByFile = syscall.NewLazyDLL("kernel32.dll").NewProc("GetFinalPathNameByHandleW")
+	privateGetLongPathName    = syscall.NewLazyDLL("kernel32.dll").NewProc("GetLongPathNameW")
 )
 
 // SIDs that may always change the program: SYSTEM, Administrators and
@@ -225,12 +226,34 @@ func fullInstallOpenHeld(path string) (*os.File, error) {
 		file.Close()
 		return nil, err
 	}
+	// The path may hold short 8.3 names (%LOCALAPPDATA% often reads
+	// C:\Users\LONGNA~1\...), while the handle's final path is always the
+	// long form: compare the long form of both.
 	expected, err := filepath.Abs(path)
-	if err != nil || !strings.EqualFold(filepath.Clean(final), filepath.Clean(expected)) {
+	if err == nil {
+		expected = privateLongPath(expected)
+	}
+	if err != nil || !strings.EqualFold(filepath.Clean(privateLongPath(final)), filepath.Clean(expected)) {
 		file.Close()
 		return nil, fmt.Errorf("The downloaded Setup resolves to %s instead of %s.", final, path)
 	}
 	return file, nil
+}
+
+// privateLongPath returns the long form of an existing path (no 8.3 short
+// names), or the path unchanged when Windows cannot tell.
+func privateLongPath(path string) string {
+	name, err := syscall.UTF16PtrFromString(path)
+	if err != nil {
+		return path
+	}
+	buffer := make([]uint16, 32768)
+	n, _, _ := privateGetLongPathName.Call(uintptr(unsafe.Pointer(name)), uintptr(unsafe.Pointer(&buffer[0])), uintptr(len(buffer)))
+	runtime.KeepAlive(name)
+	if n == 0 || int(n) >= len(buffer) {
+		return path
+	}
+	return syscall.UTF16ToString(buffer[:n])
 }
 
 func privateFinalPath(handle syscall.Handle) (string, error) {
