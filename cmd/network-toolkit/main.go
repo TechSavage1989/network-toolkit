@@ -739,6 +739,8 @@ func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		a.handleEditorLaunch(w, r, false)
 	case strings.HasPrefix(r.URL.Path, peerPagePrefix):
 		a.handlePeerSend(w, r)
+	case strings.HasPrefix(r.URL.Path, peerHandoverPrefix):
+		a.handlePeerHandover(w, r) // the main window's tabs to the standalone Text Editor
 	case strings.HasPrefix(r.URL.Path, "/api/updates/"):
 		a.handleUpdates(w, r)
 	case r.URL.Path == "/api/activity":

@@ -22,10 +22,14 @@
  *   Text Editor: NetworkToolkitTerminalSendEditor.deliver → a new document, an
  *     insert, or the "choose the position" bar; an ordinary undoable edit.
  * Only text travels. Never credentials, host keys, file paths or contents the
- * user did not choose to send.
+ * user did not choose to send (the hand-over of documents below carries the
+ * local paths and unsaved text of the tabs the user popped out).
  * The main Toolkit window only receives (startMain(), when its engine says it
  * can be found); its own Send to commands stay inside the window. Detached
- * child windows do not use this module. */
+ * child windows do not use this module.
+ * Documents: the standalone Text Editor also receives tabs that the main
+ * window hands over when its editor is popped out (kind "documents"). They
+ * open through editor-handover.js behind the same blocked()/guard checks. */
 (function(root){
 'use strict';
 const document=root.document;if(!document)return;
@@ -134,14 +138,21 @@ async function receiveEditor(request){
  if(request.target!=='new'){const doc=editor.listDocuments().find(item=>item.uid===request.target);if(!doc)return refuse('That document is no longer open. Nothing was added.');if(doc.blocked)return refuse(doc.blocked);docId=doc.id;}
  return send.deliver({docId,where:request.where==='line'?{line:Number(request.line)}:request.where||'end',text:request.text,label:clip(request.label)||'Terminal output',report:true,guard:blocked});
 }
+// Tabs from the main window (editor-handover.js), standalone Text Editor only.
+async function receiveDocuments(request){
+ const handover=root.NetworkToolkitEditorHandover;
+ if(!handover?.receive||!Array.isArray(request.documents))return refuse(ownName()+' cannot take tabs right now.');
+ const busy=blocked();if(busy)return refuse(busy);
+ return handover.receive(request,{guard:blocked});
+}
 // kind: what the text is for. A standalone app receives its own kind only; the
 // main window is told by its engine ("terminal" or "editor").
 async function receive(request,kind){
  if(receiving||!request||typeof request.requestId!=='string')return;receiving=true;
  const own=mode==='main'?(kind==='terminal'||kind==='editor'?kind:''):mode;
  let result;
- try{result=own==='terminal'?await receiveTerminal(request):own==='editor'?await receiveEditor(request):refuse(ownName()+' cannot take the text right now.');}catch(error){result=refuse(error?.message||'The text could not be delivered.');}
- try{await call('ack','POST',result?.ok?{requestId:request.requestId,ok:true,outcome:result.outcome}:{requestId:request.requestId,ok:false,error:String(result?.error||'The text was not accepted.').slice(0,280)});}catch{}
+ try{result=kind==='documents'?(mode==='editor'?await receiveDocuments(request):refuse(ownName()+' cannot take tabs.')):own==='terminal'?await receiveTerminal(request):own==='editor'?await receiveEditor(request):refuse(ownName()+' cannot take the text right now.');}catch(error){result=refuse(error?.message||'The text could not be delivered.');}
+ try{await call('ack','POST',result?.ok?{requestId:request.requestId,ok:true,outcome:result.outcome,...(Array.isArray(result.items)?{items:result.items}:{})}:{requestId:request.requestId,ok:false,error:String(result?.error||'The text was not accepted.').slice(0,280)});}catch{}
  finally{receiving=false;}
 }
 // The summary goes to this app's engine when the engine asks for it, on this

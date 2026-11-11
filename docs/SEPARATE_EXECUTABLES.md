@@ -168,6 +168,10 @@ not compile.
   file name; `peerForegroundPID` takes the PID from such a record whichever
   program wrote it. Older versions' records (plain Terminal records, engines
   without `/api/peer/`) are skipped and named exactly as today.
+- **Document hand-over** (`peer_handover.go`): the main window's engine finds
+  the standalone Text Editor through the same protected record, by data root,
+  whichever program (`Network_Toolkit_TextEditor.exe` or
+  `Network_Toolkit.exe --editor-standalone`) runs it.
 - **Terminal link status** (`/api/terminal-links`): "this copy is the
   registered one" also accepts the registration of `Network_Toolkit.exe` beside
   the separate Terminal program, and the separate program's own command, so

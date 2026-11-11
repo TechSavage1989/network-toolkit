@@ -1313,6 +1313,47 @@ function restoreSessionDraft(record,{name=record.name,origin='',note=''}={}){
   return {doc:d,note};
  }).catch(error=>({error,carry:sessionCarry(error)}));
 }
+// Document hand-over (editor-handover.js, peer_handover.go): a tab that the
+// main Toolkit window gives to this standalone editor. A local file opens
+// through the ordinary local open with all its checks; its unsaved text then
+// replaces the file's text as one undoable edit, but only when the file still
+// holds the bytes the main window read and the result shows the same text,
+// format and unsaved state. An untitled document arrives as a new unsaved
+// document with its title. Nothing here saves a file. A tab that cannot be
+// carried exactly is removed again, untouched, and the main window keeps it.
+const sameFormat=(d,f)=>!!f&&d.encoding===f.encoding&&d.bom===(f.bom===true)&&d.eol===f.eol;
+function removeAdopted(d){if(documents.get(d.id)!==d)return false;if(d.disk)discardDiskView(d);if(displayedDocument===d)displayedDocument=null;documents.delete(d.id);if(active===d.id)active=[...documents.keys()].at(-1)||'';if(active)draw();else if(overlay)drawTabs();return true;}
+// Only a tab this hand-over created, and only while nobody has edited it.
+function discardAdopted(d){if(!d?.handoverAdopted||d.editRevision!==d.handoverRevision||d.frozen||d.saving||d.loading)return false;return removeAdopted(d);}
+async function adoptHandover(item){
+ if(windowCloseState)throw Error('The editor is closing.');
+ if(!item||typeof item!=='object'||!['file','untitled'].includes(item.kind))throw Error('The tab is invalid.');
+ const text=typeof item.text==='string'?item.text:'',fail=(d,message)=>{removeAdopted(d);throw Error(message);};
+ if(item.dirty&&shouldPage(text))throw Error('Its unsaved text is too large for this editor mode.');
+ let d;
+ if(item.kind==='untitled'){
+  if(documents.size>=12)throw Error('Close an editor tab here first (12 maximum).');
+  d=await open({id:'untitled:'+Date.now()+':'+Math.random().toString(36).slice(2,7),source:'Untitled',binding:{kind:'localDraft'},path:String(item.name||'Untitled.txt'),create:true,initialContent:'',read:async()=>({content:''}),write:localWrite});
+  if(text&&!setContent(d,text,false))fail(d,'Its unsaved text could not be carried.');
+  sessionFormat(d,item.savedFormat||item.format,true);sessionFormat(d,item.format);
+  if(d.disk||d.content!==text||!!d.dirty!==!!item.dirty)fail(d,'It could not be carried exactly.');
+ }else{
+  const path=String(item.path||''),existing=documents.get('local:'+path);
+  // Already open here: a saved tab needs nothing more; unsaved text is never merged into another tab.
+  if(existing){if(!item.dirty)return existing;throw Error(nameOf(path)+' is already open in this editor.');}
+  if(documents.size>=12)throw Error('Close an editor tab here first (12 maximum).');
+  d=await openLocalPath(path,false,true);
+  if(item.dirty){
+   if(d.hash!==item.hash)fail(d,nameOf(path)+' changed on disk since it was opened.');
+   if(d.disk||!sameFormat(d,item.savedFormat))fail(d,nameOf(path)+' could not be carried exactly.');
+   if(!setContent(d,text,true))fail(d,'Its unsaved text could not be carried.');
+   sessionFormat(d,item.format);
+   if(d.disk||d.content!==text||d.dirty!==true||!sameFormat(d,item.format))fail(d,nameOf(path)+' could not be carried exactly.');
+  }
+ }
+ sessionLanguage(d,item);d.handoverAdopted=true;d.handoverRevision=d.editRevision;showRestored(d);
+ return d;
+}
 function restoreSessionLocal(record){
  const path=record.path,name=nameOf(path),paged=!!diskAvailable();
  return open({id:'local:'+path,source:'Local computer',binding:{kind:'local'},path,diskMode:'restore',restore:{backup:record.backup.id,hash:record.hash||'',format:record.savedFormat||record.format},read:localRead,write:localWrite}).then(async d=>{
@@ -1490,5 +1531,5 @@ const textMenu=Object.freeze({
   }
   const button=overlay?.querySelector('[data-ed="'+action+'"]');if(!button||button.disabled)return false;button.click();return true;}
 });
-root.NetworkToolkitFileEditor={session:Object.freeze({get phase(){return session?.phase||'unavailable';},save:()=>session?session.save():Promise.resolve(new Set()),tick:()=>!!session?.tick(),isKept:d=>!!session?.isKept(d)}),textMenu,listDocuments,insertText,pickInsert,cancelInsertPick:endPick,insertPickActive:()=>!!pickState,openTabActions(uid){const d=[...documents.values()].find(item=>item.uid===uid);if(!d||!overlay||overlay.hidden)return false;const button=[...overlay.querySelectorAll('[data-ed-tab-actions]')].find(el=>el.dataset.edTabActions===uid);if(!button)return false;const rect=button.getBoundingClientRect();openTabMenu(d,rect.left,rect.bottom);return true;},beginSidebarPointerDrag,finishSidebarPointerDrop,cancelSidebarPointerDrag,requestName:(title,message,value)=>{skin();return askEditor({title,message,value,accept:'Create',validate:value=>value.trim()?'':'Enter a name.'});},moveDocumentToView,openSplit,get viewGroups(){return groups.snapshot();},windowAdapter,canReorderDocuments,reorderDocument,open,openDesktopFile,importFiles,openLocalPath,newDocument,renderPage,detachPage,closeAll,preferConnection,refreshConnectedSources,openRemotePath,showRemoteFilePicker,get documents(){return documents;},activateDocument,openComparison,closeComparison,get comparison(){return comparison;},get active(){return current();}};
+root.NetworkToolkitFileEditor={session:Object.freeze({get phase(){return session?.phase||'unavailable';},save:()=>session?session.save():Promise.resolve(new Set()),tick:()=>!!session?.tick(),isKept:d=>!!session?.isKept(d)}),textMenu,listDocuments,insertText,pickInsert,cancelInsertPick:endPick,insertPickActive:()=>!!pickState,openTabActions(uid){const d=[...documents.values()].find(item=>item.uid===uid);if(!d||!overlay||overlay.hidden)return false;const button=[...overlay.querySelectorAll('[data-ed-tab-actions]')].find(el=>el.dataset.edTabActions===uid);if(!button)return false;const rect=button.getBoundingClientRect();openTabMenu(d,rect.left,rect.bottom);return true;},beginSidebarPointerDrag,finishSidebarPointerDrop,cancelSidebarPointerDrag,requestName:(title,message,value)=>{skin();return askEditor({title,message,value,accept:'Create',validate:value=>value.trim()?'':'Enter a name.'});},moveDocumentToView,openSplit,get viewGroups(){return groups.snapshot();},windowAdapter,canReorderDocuments,reorderDocument,open,openDesktopFile,importFiles,openLocalPath,newDocument,adoptHandover,discardAdopted,renderPage,detachPage,closeAll,preferConnection,refreshConnectedSources,openRemotePath,showRemoteFilePicker,get documents(){return documents;},activateDocument,openComparison,closeComparison,get comparison(){return comparison;},get active(){return current();}};
 })(globalThis);

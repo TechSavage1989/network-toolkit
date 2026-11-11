@@ -194,6 +194,7 @@ func TestDiscoveryAssetsAreEmbeddedAndRooted(t *testing.T) {
 		{"/assets/network-config-language.js", "text/javascript"},
 		{"/assets/editor-compare.js", "text/javascript"},
 		{"/assets/editor-windows.js", "text/javascript"},
+		{"/assets/editor-handover.js", "text/javascript"},
 		{"/assets/editor-saved-connections.js", "text/javascript"},
 		{"/assets/editor-splitters.css", "text/css"},
 		{"/assets/vendor/codemirror/codemirror.js", "text/javascript"},
