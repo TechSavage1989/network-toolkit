@@ -132,6 +132,10 @@ type application struct {
 	updater                      appUpdater
 	updateHealthDir              string
 	updateFinalizing             atomic.Bool
+	// updateCommitPending: started by the update helper (--update-health),
+	// which has not confirmed the update yet and may still put every program
+	// back; no separate program is started meanwhile.
+	updateCommitPending atomic.Bool
 }
 
 func randomHex(n int) string {
@@ -364,6 +368,7 @@ func main() {
 	defer stop()
 	a := newApplicationForRoot(ctx, filepath.Join(*dataDir, "Network_Toolkit.settings.json"), rootDataDir)
 	a.updateHealthDir = *updateHealth
+	a.updateCommitPending.Store(*updateHealth != "")
 	if _, official := updateOfficialExecutableVersion(filepath.Base(executable)); official {
 		a.updateFinalizing.Store(true)
 	}

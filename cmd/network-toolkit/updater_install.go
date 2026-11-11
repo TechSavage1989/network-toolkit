@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -312,10 +313,39 @@ type updateInstallOperations struct {
 	// place creates a separate program that was not installed yet; nil uses
 	// the no-replace move.
 	place func(string, string) error
+	// checkProgram start-checks a placed separate program; nil runs it with
+	// --version (checkUpdateProgram).
+	checkProgram func(path, version string) error
+}
+
+// checkUpdateProgram proves that a separate program placed by an update
+// starts: its --version run exits 0 and names the version that was installed.
+func checkUpdateProgram(path, version string) error {
+	return checkUpdateProgramWithin(path, version, 30*time.Second)
+}
+
+func checkUpdateProgramWithin(path, version string, limit time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), limit)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, path, "--version")
+	cmd.Dir = filepath.Dir(path)
+	cmd.WaitDelay = time.Second
+	configureUpdateHelperProcess(cmd)
+	out, err := cmd.Output()
+	if ctx.Err() != nil {
+		return fmt.Errorf("%s did not finish starting", filepath.Base(path))
+	}
+	if err != nil {
+		return fmt.Errorf("%s did not start: %v", filepath.Base(path), err)
+	}
+	if !strings.HasPrefix(string(out), appName+" "+version+" ") {
+		return fmt.Errorf("%s did not report version %s", filepath.Base(path), version)
+	}
+	return nil
 }
 
 func applyUpdatePlan(dir string) error {
-	return applyUpdatePlanWithOperations(dir, updateInstallOperations{os.Executable, waitUpdateParent, replaceUpdateExecutable, restoreMissingUpdateTarget, 90 * time.Second, nil})
+	return applyUpdatePlanWithOperations(dir, updateInstallOperations{os.Executable, waitUpdateParent, replaceUpdateExecutable, restoreMissingUpdateTarget, 90 * time.Second, nil, nil})
 }
 
 func applyUpdatePlanWithOperations(dir string, ops updateInstallOperations) (result error) {
@@ -426,6 +456,21 @@ func applyUpdatePlanWithOperations(dir string, ops updateInstallOperations) (res
 	undoCompanions, startErr := applyUpdateCompanions(dir, p, ops)
 	if startErr != nil {
 		startErr = fmt.Errorf("Could not update the separate programs (another window, antivirus, or folder permissions may be blocking them): %w", startErr)
+	} else {
+		// Each separate program must start before the update counts; if one
+		// does not, every file is put back (undoCompanions and the main rollback).
+		check := ops.checkProgram
+		if check == nil {
+			check = checkUpdateProgram
+		}
+		for _, c := range p.Companions {
+			progress.Set("Checking " + c.Target + "...")
+			if err := check(filepath.Join(p.TargetDir, c.Target), p.Version); err != nil {
+				startErr = fmt.Errorf("The updated separate program does not start: %w", err)
+				break
+			}
+			updateLog(dir, "%s starts.", c.Target)
+		}
 	}
 	originalTarget := target
 	launchTarget := updatePlanLaunchTarget(dir, p)

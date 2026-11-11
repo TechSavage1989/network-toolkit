@@ -18,7 +18,7 @@ import (
 // handle are injected, as in TestUpdateRestartControllerIntegration.
 func TestUpdateHelperReplacesTheThreeProgramsTogether(t *testing.T) {
 	const editor, terminal = "Network_Toolkit_TextEditor.exe", "Network_Toolkit_Terminal.exe"
-	for _, mode := range []string{"healthy", "editor-locked", "terminal-not-created", "exit", "editor-changed", "candidate-changed", "terminal-appeared"} {
+	for _, mode := range []string{"healthy", "editor-locked", "terminal-not-created", "terminal-does-not-start", "exit", "editor-changed", "candidate-changed", "terminal-appeared"} {
 		t.Run(mode, func(t *testing.T) {
 			root := t.TempDir()
 			dir, err := os.MkdirTemp(t.TempDir(), ".network-toolkit-update-")
@@ -84,6 +84,14 @@ func TestUpdateHelperReplacesTheThreeProgramsTogether(t *testing.T) {
 			if mode == "terminal-not-created" {
 				ops.place = func(source, target string) error { return errors.New("Access is denied.") }
 			}
+			var checked []string
+			ops.checkProgram = func(path, version string) error {
+				checked = append(checked, filepath.Base(path)+" "+version)
+				if b, _ := os.ReadFile(path); mode == "terminal-does-not-start" && string(b) == string(newTerminal) {
+					return errors.New("the program exited with status 0xc0000135")
+				}
+				return nil
+			}
 			err = applyUpdatePlanWithOperations(dir, ops)
 			result, _ := os.ReadFile(filepath.Join(dir, "update-result.txt"))
 			read := func(name string) string { b, _ := os.ReadFile(filepath.Join(root, name)); return string(b) }
@@ -93,6 +101,9 @@ func TestUpdateHelperReplacesTheThreeProgramsTogether(t *testing.T) {
 				}
 				if read("Network_Toolkit.exe") != string(newMain) || read(editor) != string(newEditor) || read(terminal) != string(newTerminal) {
 					t.Fatal("the three programs are not the new version")
+				}
+				if strings.Join(checked, ", ") != editor+" 1.21.45, "+terminal+" 1.21.45" {
+					t.Fatalf("each separate program must be start-checked: %v", checked)
 				}
 				if b, _ := os.ReadFile(filepath.Join(dir, "previous-"+editor)); string(b) != string(oldEditor) {
 					t.Fatal("the replaced Text Editor program is not kept in the stage folder")

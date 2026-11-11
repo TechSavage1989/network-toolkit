@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"time"
 
 	"networktoolkit/internal/model"
 )
@@ -205,6 +206,17 @@ func forwardToSeparateProgram(mode string, args []string) bool {
 	if resolved, err := filepath.EvalSymlinks(self); err == nil {
 		self = resolved
 	}
+	return forwardFrom(self, mode, args)
+}
+
+// forwardStartWindow is how long a forwarded program is watched: one that
+// exits with a failure within it (it did not start) leaves the app to the
+// main program. One that exits successfully handed the request over; one
+// still running owns the window. Either way it is never started twice.
+var forwardStartWindow = 3 * time.Second
+
+// forwardFrom is forwardToSeparateProgram for the main program self.
+func forwardFrom(self, mode string, args []string) bool {
 	target, ok := forwardTarget(self, mode)
 	if !ok {
 		return false
@@ -227,8 +239,14 @@ func forwardToSeparateProgram(mode string, args []string) bool {
 	// This process was started by the user; the window it hands over to may
 	// come to the front in its place (peer_send_windows.go).
 	peerAllowForeground(cmd.Process.Pid)
-	_ = cmd.Process.Release()
-	return true
+	exited := make(chan error, 1)
+	go func() { exited <- cmd.Wait() }()
+	select {
+	case err := <-exited:
+		return err == nil
+	case <-time.After(forwardStartWindow):
+		return true
+	}
 }
 
 // forwardTarget is the separate program beside the main program self that

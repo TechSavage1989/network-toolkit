@@ -28,7 +28,9 @@ func (a *application) updateStartupReady() {
 			// process exit or timeout and roll back. Never point old launchers at the
 			// new binary until the helper itself records successful installation.
 			if a.updateHealthDir != "" {
-				if err := awaitUpdateCommit(a.ctx, a.updateHealthDir, model.Version, 95*time.Second); err != nil {
+				err := awaitUpdateCommit(a.ctx, a.updateHealthDir, model.Version, 95*time.Second)
+				a.updateCommitPending.Store(false)
+				if err != nil {
 					updateNamingState.Lock()
 					updateNamingState.status.Warning = "Versioned filename setup was not applied: " + err.Error()
 					updateNamingState.Unlock()
