@@ -1,3 +1,7 @@
+## 1.21.45 Beta 1 - A document icon for files opened with the Text Editor
+
+- Files whose type opens with the Text Editor show the page from its icon, without the tile; the app keeps its tile icon.
+
 ## 1.21.44 Beta 1 - The Text Editor opens almost any file
 
 - Setup offers the Text Editor for 108 text file types, lists it under Open with for any file, and can add an optional right-click entry.

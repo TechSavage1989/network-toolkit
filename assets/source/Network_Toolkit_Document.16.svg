@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- Drawn on the 16 px grid: one unit is one pixel at 16 x 16. -->
+  <g transform="scale(16)">
+    <path d="M2 0H10L14 4V16H2V0Z" fill="#071F43"/>
+    <path d="M3 1H9V5H13V15H3V1Z" fill="#FFF"/>
+    <path d="M10 1L13 4H10Z" fill="#73DDFF"/>
+    <path d="M5 7h6v1h-6ZM5 9h6v1h-6ZM5 11h4v1h-4Z" fill="#071F43"/>
+  </g>
+</svg>

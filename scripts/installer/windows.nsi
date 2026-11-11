@@ -21,6 +21,17 @@ RequestExecutionLevel user
 ; cannot hold a quotation mark, so the path is always one quoted argument: the
 ; value of --open-file. The program accepts no other argument beside it.
 !define EDITOR_COMMAND '"$INSTDIR\${APP_FILENAME}" ${EDITOR_ARGS} --open-file "%1"'
+;
+; Icons are zero-based indexes of the icon groups in the program file, in the
+; order of ICON_GROUPS in scripts/build_windows_resources.py: 0 app, 1 Text
+; Editor, 2 Terminal, 3 text document. Released Setups and shortcuts use 0 to 2,
+; so new groups are only ever appended.
+;   EDITOR_ICON    the Text Editor as a program: Default apps (ApplicationIcon),
+;                  Open with (Applications\...\DefaultIcon), right-click entry.
+;   DOCUMENT_ICON  a file of a type associated with the Text Editor: the
+;                  ProgID's DefaultIcon. Every install and upgrade rewrites it.
+!define EDITOR_ICON '"$INSTDIR\${APP_FILENAME}",1'
+!define DOCUMENT_ICON '"$INSTDIR\${APP_FILENAME}",3'
 ; How the Text Editor is offered for files. Setup only makes it available; the
 ; user makes it the default in Windows. Setup never writes a UserChoice (Windows
 ; protects it with a hash), never changes the default value of an extension and
@@ -41,7 +52,8 @@ RequestExecutionLevel user
 ;      shell\open\command  how Open with starts it. Without a verb, Windows runs
 ;                          the program with the bare file name.
 ;      FriendlyAppName     the name shown instead of the program's version text.
-;      DefaultIcon         the Text Editor's icon instead of the first icon.
+;      DefaultIcon         the Text Editor's program icon instead of the first
+;                          icon (EDITOR_ICON: this entry stands for the program).
 ;    SupportedTypes is deliberately absent: it limits Open with to the listed
 ;    types, and the Text Editor opens any file.
 ;    https://learn.microsoft.com/windows/win32/shell/app-registration
@@ -465,7 +477,7 @@ FunctionEnd
   ${If} $OwnApplicationKey == 1
     !insertmacro ProbeUserKey "${APPLICATIONS_KEY}" $R1
     WriteRegStr HKCU "${APPLICATION_KEY}" "FriendlyAppName" "${EDITOR_NAME}"
-    WriteRegStr HKCU "${APPLICATION_KEY}\DefaultIcon" "" '"$INSTDIR\${APP_FILENAME}",1'
+    WriteRegStr HKCU "${APPLICATION_KEY}\DefaultIcon" "" '${EDITOR_ICON}'
     WriteRegStr HKCU "${APPLICATION_KEY}\shell\open\command" "" '${EDITOR_COMMAND}'
     WriteRegDWORD HKCU "${CREATED_KEYS}" "Applications\${APP_FILENAME}" 1
     ${If} $R1 == 1
@@ -496,7 +508,7 @@ FunctionEnd
   !insertmacro ProbeUserKey "${ALL_FILES_KEY}" $R1
   !insertmacro ProbeUserKey "${ALL_FILES_KEY}\shell" $R2
   WriteRegStr HKCU "${MENU_VERB_KEY}" "" "${MENU_TEXT}"
-  WriteRegStr HKCU "${MENU_VERB_KEY}" "Icon" '"$INSTDIR\${APP_FILENAME}",1'
+  WriteRegStr HKCU "${MENU_VERB_KEY}" "Icon" '${EDITOR_ICON}'
   WriteRegStr HKCU "${MENU_VERB_KEY}\command" "" '${EDITOR_COMMAND}'
   ${If} $R1 == 1
     WriteRegDWORD HKCU "${CREATED_KEYS}" "*" 1
@@ -668,11 +680,13 @@ Section "Network Toolkit"
   WriteRegDWORD HKCU "${UNINSTALL_KEY}" "NoRepair" 1
   WriteRegStr HKCU "${PROG_KEY}" "" "${APP_NAME} text document"
   WriteRegNone HKCU "${PROG_KEY}" "AllowSilentDefaultTakeOver"
-  WriteRegStr HKCU "${PROG_KEY}\DefaultIcon" "" '"$INSTDIR\${APP_FILENAME}",1'
+  ; The icon of every file of a type associated with the Text Editor: the paper
+  ; sheet. Versions up to 1.21.44 wrote the editor icon here; this replaces it.
+  WriteRegStr HKCU "${PROG_KEY}\DefaultIcon" "" '${DOCUMENT_ICON}'
   WriteRegStr HKCU "${PROG_KEY}\shell\open\command" "" '${EDITOR_COMMAND}'
   WriteRegStr HKCU "${CAPABILITIES}" "ApplicationName" "${EDITOR_NAME}"
   WriteRegStr HKCU "${CAPABILITIES}" "ApplicationDescription" "Open text, log, configuration, script and source files in Network Toolkit Text Editor."
-  WriteRegStr HKCU "${CAPABILITIES}" "ApplicationIcon" '"$INSTDIR\${APP_FILENAME}",1'
+  WriteRegStr HKCU "${CAPABILITIES}" "ApplicationIcon" '${EDITOR_ICON}'
   IfErrors install_error
   ; An upgrade from a version that kept no record of the keys it created.
   StrCpy $AdoptReleased 0
@@ -735,6 +749,8 @@ Section "Network Toolkit"
   !insertmacro CreateStartShortcut "$SMPROGRAMS\${APP_NAME}\${APP_NAME}.lnk" "" "" 0 $NewMainShortcut
   !insertmacro CreateStartShortcut "$SMPROGRAMS\${APP_NAME}\${EDITOR_NAME}.lnk" "${EDITOR_ARGS}" "--editor" 1 $NewEditorShortcut
   !insertmacro CreateStartShortcut "$SMPROGRAMS\${APP_NAME}\${APP_NAME} Terminal.lnk" "--terminal" "--terminal" 2 $NewTerminalShortcut
+  ; SHCNE_ASSOCCHANGED: Explorer reloads associations and file type icons,
+  ; after every registration above, on a new install and an upgrade alike.
   System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, p 0, p 0)'
   Return
 
