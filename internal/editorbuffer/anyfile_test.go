@@ -41,7 +41,7 @@ func encoded(t *testing.T, b *Buffer, f Format) ([]byte, error) {
 	if e = s.Encode(context.Background(), &out, f); e != nil {
 		return nil, e
 	}
-	count, _, e := s.PrepareEncoding(f, nil)
+	count, _, e := s.PrepareEncoding(context.Background(), f, nil)
 	if e != nil || count != int64(out.Len()) {
 		t.Fatalf("announced length %d, wrote %d (%v) for %+v", count, out.Len(), e, f)
 	}
@@ -176,7 +176,7 @@ func TestMixedLineEndingsSurviveEdits(t *testing.T) {
 	s, _ := b.Snapshot()
 	defer s.Close()
 	var part bytes.Buffer
-	count, write, e := s.PrepareEncoding(v.Format, &[2]int64{4, 14})
+	count, write, e := s.PrepareEncoding(context.Background(), v.Format, &[2]int64{4, 14})
 	if e == nil {
 		e = write(context.Background(), &part)
 	}
@@ -192,48 +192,56 @@ func TestMixedLineEndingsSurviveEdits(t *testing.T) {
 
 // A model of the file as tokens checks random edits over thousands of lines
 // and several import chunks: the result is always the unedited tokens as they
-// were read plus the typed text with the file's most common ending.
+// were read plus the typed text with the file's most common ending. The
+// model is mixedModel (mixed_reopen_test.go), which also knows the rules for
+// a range replaced by as many lines and for a bare LF after a lone CR.
 func TestMixedLineEndingsRandomEdits(t *testing.T) {
 	r := rand.New(rand.NewSource(7))
 	endings := []string{"\r\n", "\n", "\r\n", "\r", "\r\n"}
-	var model []string
+	model := &mixedModel{base: "\r\n"}
 	for size := 0; size < ChunkBytes*3; {
 		for _, c := range "line" + strings.Repeat("x", r.Intn(30)) {
-			model = append(model, string(c))
+			model.tokens = append(model.tokens, string(c))
 			size++
 		}
-		model = append(model, endings[r.Intn(len(endings))])
-		size += len(model[len(model)-1])
+		ending := endings[r.Intn(len(endings))]
+		if ending == "\n" && model.tokens[len(model.tokens)-1] == "\r" {
+			ending = "\r\n"
+		}
+		model.tokens = append(model.tokens, ending)
+		size += len(ending)
 	}
-	v := importBytes(t, []byte(strings.Join(model, "")))
+	v := importBytes(t, []byte(strings.Join(model.tokens, "")))
 	if v.Format.EOL != "Mixed" || v.Buffer.NewLineEOL() != "CRLF" {
 		t.Fatal(v.Format, v.Buffer.NewLineEOL())
 	}
 	revision := v.Buffer.Metadata().Revision
 	for step := 0; step < 300; step++ {
-		from := r.Intn(len(model) + 1)
-		to := min(len(model), from+r.Intn(40))
+		from := r.Intn(len(model.tokens) + 1)
+		to := min(len(model.tokens), from+r.Intn(40))
 		var text strings.Builder
-		var tokens []string
 		for i := r.Intn(12); i > 0; i-- {
 			if r.Intn(4) == 0 {
 				text.WriteByte('\n')
-				tokens = append(tokens, "\r\n")
 			} else {
 				text.WriteByte('y')
-				tokens = append(tokens, "y")
 			}
 		}
 		m, e := v.Buffer.Edit(revision, int64(from), int64(to), text.String())
 		if e != nil {
 			t.Fatal(e)
 		}
+		if m.Revision != revision {
+			model.edit(from, to, text.String())
+		}
 		revision = m.Revision
-		model = append(model[:from:from], append(tokens, model[to:]...)...)
 	}
 	out, e := encoded(t, v.Buffer, v.Format)
-	if want := strings.Join(model, ""); e != nil || string(out) != want {
+	if want := model.bytes(); e != nil || !bytes.Equal(out, want) {
 		t.Fatalf("edited save differs from the model (%v): %d bytes, want %d", e, len(out), len(want))
+	}
+	if again := importBytes(t, out); textOf(t, again.Buffer) != textOf(t, v.Buffer) {
+		t.Fatal("the saved file reopens as different text")
 	}
 }
 
@@ -262,7 +270,7 @@ func TestLegacyEncodingEditsAndRefusesOtherCharacters(t *testing.T) {
 	if e = s.Encode(context.Background(), &sink, v.Format); !errors.As(e, &refused) || refused.Rune != '→' {
 		t.Fatal("a character outside Windows-1252 was written", e, sink.Bytes())
 	}
-	if _, _, e = s.PrepareEncoding(v.Format, nil); !errors.As(e, &refused) {
+	if _, _, e = s.PrepareEncoding(context.Background(), v.Format, nil); !errors.As(e, &refused) {
 		t.Fatal("an export was promised for text the encoding cannot hold", e)
 	}
 	if e = s.Encode(context.Background(), &sink, Format{"Windows-1252", true, "CRLF"}); e == nil {
@@ -316,7 +324,7 @@ func TestBinaryFilesAreDisplayOnly(t *testing.T) {
 				if e := s.Encode(context.Background(), &out, f); e == nil || out.Len() != 0 {
 					t.Fatalf("wrote %d bytes of a file that is not text as %+v", out.Len(), f)
 				}
-				if _, _, e := s.PrepareEncoding(f, nil); e == nil {
+				if _, _, e := s.PrepareEncoding(context.Background(), f, nil); e == nil {
 					t.Fatalf("prepared an export of a file that is not text as %+v", f)
 				}
 			}

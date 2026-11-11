@@ -1,10 +1,8 @@
 package editorbuffer
 
 import (
-	"bufio"
 	"bytes"
 	"context"
-	"errors"
 	"io"
 	"regexp"
 	"unicode/utf8"
@@ -61,21 +59,6 @@ func (c *searchCursor) ReadRune() (rune, int, error) {
 	r, n := utf8.DecodeRune(data)
 	c.at += int64(n)
 	return r, n, nil
-}
-
-func (c *searchCursor) writeTo(w io.Writer, end int64) error {
-	for c.at < end {
-		data, err := c.current()
-		if err != nil {
-			return err
-		}
-		data = data[:min(int64(len(data)), end-c.at)]
-		if _, err := w.Write(data); err != nil {
-			return err
-		}
-		c.at += int64(len(data))
-	}
-	return nil
 }
 
 type matchScan struct {
@@ -229,51 +212,4 @@ func (s *Snapshot) FindPrevious(ctx context.Context, query string, before int64,
 		}
 	}
 	return result, err
-}
-
-// WriteReplaced streams normalized document text with literal replacement of
-// each match. The caller stages and commits the completed revision separately.
-func (s *Snapshot) WriteReplaced(ctx context.Context, dst io.Writer, query, replacement string, regex, matchCase, wholeWord bool) (int64, error) {
-	if err := validateEditFragment(replacement); err != nil {
-		return 0, err
-	}
-	scan, err := s.matchScan(ctx, query, regex, matchCase, wholeWord)
-	if err != nil {
-		return 0, err
-	}
-	src := searchCursor{snapshot: s, ctx: ctx}
-	out := bufio.NewWriterSize(dst, ChunkBytes)
-	count := int64(0)
-	total := size(s.root).bytes
-	for at := int64(0); at <= total; {
-		from, to, found, err := scan.next(at)
-		if err != nil {
-			return 0, err
-		}
-		if !found {
-			break
-		}
-		if from < src.at {
-			return 0, errors.New("search produced an invalid overlapping replacement")
-		}
-		if err := src.writeTo(out, from); err != nil {
-			return 0, err
-		}
-		if _, err := out.WriteString(replacement); err != nil {
-			return 0, err
-		}
-		src.at = to
-		count++
-		at, err = scan.after(from, to)
-		if err != nil {
-			return 0, err
-		}
-	}
-	if count == 0 {
-		return 0, nil
-	}
-	if err := src.writeTo(out, total); err != nil {
-		return 0, err
-	}
-	return count, out.Flush()
 }

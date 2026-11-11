@@ -10,7 +10,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"sort"
 	"unicode/utf16"
 	"unicode/utf8"
 )
@@ -191,15 +190,16 @@ func importAs(ctx context.Context, source io.Reader, dir string, progress func(i
 	}
 	chunk := make([]byte, 0, ChunkBytes+4)
 	var crlf, lf, cr int64
-	endings := &eolMap{}
+	endings := &eolKinds{}
+	var starts, ranks []int64
 	var flushedLines int64
 	pendingCR := false
 	flush := func() error {
 		if len(chunk) == 0 {
 			return nil
 		}
-		endings.starts = append(endings.starts, b.end)
-		endings.ranks = append(endings.ranks, flushedLines)
+		starts = append(starts, b.end)
+		ranks = append(ranks, flushedLines)
 		flushedLines += int64(bytes.Count(chunk, []byte{'\n'}))
 		tree, e := b.append(chunk)
 		if e != nil {
@@ -280,20 +280,19 @@ func importAs(ctx context.Context, source io.Reader, dir string, progress func(i
 	if e = b.file.Sync(); e != nil {
 		return nil, e
 	}
-	endings.base = eolLF
+	base := eolLF
 	if crlf > 0 && crlf >= lf && crlf >= cr {
 		format.EOL = "CRLF"
-		endings.base = eolCRLF
+		base = eolCRLF
 	} else if cr > 0 && cr > lf {
 		format.EOL = "CR"
-		endings.base = eolCR
+		base = eolCR
 	}
 	if endings.mixed && mode != importBinary {
-		// The line endings differ: keep the record, so an unedited line is
-		// written back the way it was read. NewLineEOL stays the most common
-		// ending, which text added later uses.
-		endings.end = b.end
-		b.eol = endings
+		// The line endings differ: keep the record (see eol.go), so an
+		// unedited line is written back the way it was read. NewLineEOL stays
+		// the most common ending, which text added later uses.
+		b.eol = &eolMap{base: base, segments: []*eolSegment{newSegment(0, b.end, endings, starts, ranks)}}
 		format.EOL = MixedEOL
 	}
 	b.saved = b.root
@@ -355,116 +354,6 @@ func binaryRune(c byte) rune {
 	return legacyRune(c)
 }
 
-const (
-	eolLF byte = iota
-	eolCRLF
-	eolCR
-)
-
-var eolNames = [...]string{"LF", "CRLF", "CR"}
-
-// eolMap remembers how each line of an imported document ended. It is kept
-// only for a document whose line endings differ. Pieces refer to the scratch
-// file by offset and imported text is never rewritten there, so a '\n' that is
-// still at an imported offset is a line the user did not retype. Text added
-// later lies beyond end and uses base, the most common ending of the file.
-// The record costs two bits for each imported line.
-type eolMap struct {
-	base   byte
-	end    int64
-	mixed  bool
-	first  byte
-	count  int64
-	kinds  []byte  // two bits per imported '\n', in scratch order
-	starts []int64 // scratch offset of each imported chunk
-	ranks  []int64 // number of '\n' before that offset
-}
-
-func (m *eolMap) set(index int64, kind byte) {
-	for int64(len(m.kinds)) <= index>>2 {
-		m.kinds = append(m.kinds, 0)
-	}
-	m.kinds[index>>2] |= kind << ((index & 3) * 2)
-}
-
-func (m *eolMap) add(kind byte) {
-	if !m.mixed {
-		if m.count == 0 || kind == m.first {
-			m.first = kind
-			m.count++
-			return
-		}
-		// The first different ending: write down all the earlier ones.
-		m.mixed = true
-		whole := m.count >> 2
-		m.kinds = bytes.Repeat([]byte{m.first * 0x55}, int(whole))
-		for i := whole << 2; i < m.count; i++ {
-			m.set(i, m.first)
-		}
-	}
-	m.set(m.count, kind)
-	m.count++
-}
-
-func (m *eolMap) kind(index int64) byte {
-	if index < 0 || index >= m.count {
-		return m.base
-	}
-	return m.kinds[index>>2] >> ((index & 3) * 2) & 3
-}
-
-// eolCursor finds, for one encoding pass, which imported '\n' a piece starts
-// at. It keeps the imported chunk it last looked at, so a document cut into
-// many pieces by edits reads each chunk once instead of once for every piece.
-type eolCursor struct {
-	m     *eolMap
-	file  io.ReaderAt
-	chunk int
-	data  []byte
-	at    int   // bytes of data counted so far
-	lines int64 // '\n' in data[:at]
-}
-
-// rank returns the index of the first imported '\n' at or after a scratch
-// offset, or -1 for text added after the import.
-func (c *eolCursor) rank(offset int64) (int64, error) {
-	m := c.m
-	if offset >= m.end {
-		return -1, nil
-	}
-	i := sort.Search(len(m.starts), func(i int) bool { return m.starts[i] > offset }) - 1
-	if i < 0 {
-		return 0, nil
-	}
-	if c.data == nil || i != c.chunk {
-		end := m.end
-		if i+1 < len(m.starts) {
-			end = m.starts[i+1]
-		}
-		data := make([]byte, end-m.starts[i])
-		if _, e := c.file.ReadAt(data, m.starts[i]); e != nil {
-			return 0, e
-		}
-		c.chunk, c.data, c.at, c.lines = i, data, 0, 0
-	}
-	to := int(offset - m.starts[i])
-	if to < c.at {
-		c.at, c.lines = 0, 0
-	}
-	c.lines += int64(bytes.Count(c.data[c.at:to], []byte{'\n'}))
-	c.at = to
-	return m.ranks[i] + c.lines, nil
-}
-
-// NewLineEOL is the line ending of text added to a document whose imported
-// line endings differ, or "" for any other document.
-func (b *Buffer) NewLineEOL() string {
-	if b.eol == nil {
-		return ""
-	}
-	return eolNames[b.eol.base]
-}
-
 func (s *Snapshot) validFormat(f Format) bool {
 	switch f.Encoding {
 	case "UTF-8", "UTF-16LE", "UTF-16BE":
@@ -477,7 +366,7 @@ func (s *Snapshot) validFormat(f Format) bool {
 	}
 	// Only a document that was imported with differing line endings can
 	// write them back; nothing else has a record of them.
-	return f.EOL == "LF" || f.EOL == "CRLF" || f.EOL == "CR" || f.EOL == MixedEOL && s.b.eol != nil
+	return f.EOL == "LF" || f.EOL == "CRLF" || f.EOL == "CR" || f.EOL == MixedEOL && s.eol != nil
 }
 
 // ErrUnencodable reports a character that the chosen encoding cannot hold.
@@ -503,8 +392,10 @@ func (s *Snapshot) Encode(ctx context.Context, dst io.Writer, f Format) error {
 
 // PrepareEncoding validates a snapshot range and returns its exact encoded
 // byte length and a streaming encoder. The snapshot must stay open until the
-// encoder finishes. A nil range selects the complete document.
-func (s *Snapshot) PrepareEncoding(f Format, selection *[2]int64) (int64, func(context.Context, io.Writer) error, error) {
+// encoder finishes. A nil range selects the complete document. Finding the
+// length of Windows-1252 text or of lines with their own endings reads the
+// range once; ctx stops that pass.
+func (s *Snapshot) PrepareEncoding(ctx context.Context, f Format, selection *[2]int64) (int64, func(context.Context, io.Writer) error, error) {
 	if s.b.binary {
 		return 0, nil, ErrBinary
 	}
@@ -542,7 +433,7 @@ func (s *Snapshot) PrepareEncoding(f Format, selection *[2]int64) (int64, func(c
 		// not exist in a single-byte encoding: find out before anything is
 		// promised to the receiver.
 		var counted countingWriter
-		if e := s.encode(context.Background(), &counted, f, root); e != nil {
+		if e := s.encode(ctx, &counted, f, root); e != nil {
 			return 0, nil, e
 		}
 		count = counted.count
@@ -603,8 +494,16 @@ func (s *Snapshot) encode(ctx context.Context, dst io.Writer, f Format, root *no
 	}
 	var endings *eolCursor
 	if f.EOL == MixedEOL {
-		endings = &eolCursor{m: s.b.eol, file: s.b.file}
+		endings = &eolCursor{m: s.eol, file: s.b.file}
 	}
+	// afterCR: the last thing written was a line ending of a lone CR. A bare
+	// LF written next would join it into one CRLF, so a file with two line
+	// breaks there would reopen with one. That LF is written as CRLF instead:
+	// "\r" then "\r\n" reads back as the two breaks the editor shows. It is
+	// the one case in which an ending the user did not retype changes its
+	// bytes, and it only arises once an edit has put the two side by side (in
+	// a file as it was read, CR directly before LF is a single CRLF).
+	afterCR := false
 	var visit func(*node) error
 	visit = func(n *node) error {
 		if n == nil {
@@ -628,38 +527,47 @@ func (s *Snapshot) encode(ctx context.Context, dst io.Writer, f Format, root *no
 		} else {
 			// With differing line endings, each imported '\n' is written the
 			// way it was read; rank finds this piece's first one.
-			ending, line := eolLF, int64(-1)
+			ending, line := eolLF, int64(0)
+			var recorded *eolSegment
 			switch f.EOL {
 			case "CRLF":
 				ending = eolCRLF
 			case "CR":
 				ending = eolCR
 			case MixedEOL:
-				if line, e = endings.rank(n.part.offset); e != nil {
+				ending = s.eol.base
+				if recorded, line, e = endings.locate(n.part.offset); e != nil {
 					return e
 				}
 			}
 			for len(data) > 0 {
 				r, k := utf8.DecodeRune(data)
 				data = data[k:]
-				if r == '\n' {
-					if f.EOL == MixedEOL {
-						ending = s.b.eol.kind(line)
-						if line >= 0 {
-							line++
-						}
+				if r != '\n' {
+					afterCR = false
+					if e = writeRune(r); e != nil {
+						return e
 					}
-					if ending != eolLF {
-						if e = writeRune('\r'); e != nil {
-							return e
-						}
-						if ending == eolCR {
-							continue
-						}
+					continue
+				}
+				kind := ending
+				if recorded != nil {
+					kind = recorded.kind(line)
+					line++
+				}
+				if kind == eolLF && afterCR {
+					kind = eolCRLF
+				}
+				afterCR = kind == eolCR
+				if kind != eolLF {
+					if e = writeRune('\r'); e != nil {
+						return e
 					}
 				}
-				if e = writeRune(r); e != nil {
-					return e
+				if kind != eolCR {
+					if e = writeRune('\n'); e != nil {
+						return e
+					}
 				}
 			}
 		}

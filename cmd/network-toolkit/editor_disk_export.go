@@ -40,7 +40,7 @@ func (d *editorDiskDocument) export(ctx context.Context, w http.ResponseWriter, 
 	if req.Range != nil {
 		selection = &[2]int64{req.Range.From, req.Range.To}
 	}
-	count, encode, err := snapshot.PrepareEncoding(req.Format, selection)
+	count, encode, err := snapshot.PrepareEncoding(ctx, req.Format, selection)
 	if err != nil {
 		jsonError(w, 400, err.Error())
 		return

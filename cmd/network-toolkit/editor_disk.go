@@ -504,6 +504,8 @@ func (m *editorViewRegistry) diskDocument(w http.ResponseWriter, r *http.Request
 	if v.Binary {
 		// A file that is not text is shown, searched and reloaded. Nothing
 		// changes it and nothing writes it, whatever the page asks for.
+		// (Reading it again from a browser file handle, "reload-start",
+		// "import-chunk", "import-finish" and "cancel", is answered above.)
 		switch req.Action {
 		case "status", "window", "find", "reload":
 		default:

@@ -796,6 +796,11 @@ func (m *editorViewRegistry) sessionSnapshot(uid string, lease uint64) (*editorb
 		disk.mu.Unlock()
 		return nil, nil, errors.New("The document is still opening.")
 	}
+	if disk.imported.Binary {
+		// A file that is not text has no unsaved work and no kept copy.
+		disk.mu.Unlock()
+		return nil, nil, editorbuffer.ErrBinary
+	}
 	v, parent := disk.imported, disk.ctx
 	disk.mu.Unlock()
 	snapshot, err := v.Buffer.Snapshot()
