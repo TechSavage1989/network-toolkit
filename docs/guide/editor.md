@@ -111,7 +111,7 @@ In the Text Editor app, **Send to terminal** (toolbar button, right-click menu o
 You are never asked to open anything first. The Text Editor app looks for a terminal in this order:
 
 1. **Network Toolkit Terminal**, if it is open.
-2. Otherwise the main **Network Toolkit** window, if it is open: its Terminal sessions are listed, and the text goes to its Terminal page, which comes to the front.
+2. Otherwise the main **Network Toolkit** window, if it is open: its Terminal sessions are listed, and the text goes to its Terminal page, which comes to the front. A window that has only just opened gets up to about 3 seconds to get ready before it is passed over.
 3. Otherwise Network Toolkit Terminal is started for you. A newly started Terminal has no session yet, and nothing is connected for you: connect one there, then choose **Send to terminal** again. If the Terminal does not come up within about 25 seconds, the Text Editor says so and your document is unchanged.
 
 - The Terminal comes forward on that session and the text is entered like a paste, with the Terminal's own paste settings. Text with line breaks is shown there for review first when **Review multi-line paste** is on, and paste warnings apply. The Text Editor then tells you where the text went and whether it was sent or is waiting for your review.
