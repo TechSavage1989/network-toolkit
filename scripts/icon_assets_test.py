@@ -6,8 +6,46 @@ import struct
 import tempfile
 import unittest
 import xml.etree.ElementTree as ET
+import zlib
 
 import generate_icon_assets as icons
+
+PUBLISHED_ICONS = {
+    'Editor': '2bad5e7500e491c949538789a7f2d831e05a78f3f68b08dc7fea086f6586e524',
+    'Terminal': '5ce0600802717940569802c6f0f5dccc57e39d88d2b939012353cf7860ce4149',
+}
+
+
+def rgba_rows(png):
+    """Decode a non-interlaced 8-bit RGBA PNG into rows of bytes."""
+    width, height, depth, color, _, _, interlace = struct.unpack_from('>IIBBBBB', png, 16)
+    if (depth, color, interlace) != (8, 6, 0):
+        raise ValueError('Expected a non-interlaced 8-bit RGBA PNG')
+    data, at = b'', 8
+    while at < len(png):
+        length, kind = struct.unpack_from('>I4s', png, at)
+        if kind == b'IDAT':
+            data += png[at + 8:at + 8 + length]
+        at += 12 + length
+    raw, stride, rows, previous = zlib.decompress(data), width * 4, [], bytes(width * 4)
+    for y in range(height):
+        kind, line = raw[y * (stride + 1)], bytearray(raw[y * (stride + 1) + 1:(y + 1) * (stride + 1)])
+        for i in range(stride):
+            left = line[i - 4] if i >= 4 else 0
+            up, corner = previous[i], previous[i - 4] if i >= 4 else 0
+            if kind == 1:
+                line[i] = (line[i] + left) & 255
+            elif kind == 2:
+                line[i] = (line[i] + up) & 255
+            elif kind == 3:
+                line[i] = (line[i] + (left + up) // 2) & 255
+            elif kind == 4:
+                p = left + up - corner
+                pa, pb, pc = abs(p - left), abs(p - up), abs(p - corner)
+                line[i] = (line[i] + (left if pa <= pb and pa <= pc else up if pb <= pc else corner)) & 255
+        rows.append(bytes(line))
+        previous = line
+    return rows
 
 
 class IconAssetsTests(unittest.TestCase):
@@ -79,6 +117,70 @@ class IconAssetsTests(unittest.TestCase):
         rendered = icons.runtime_svg(original)
         self.assertNotIn(b'gradient', rendered.lower())
         self.assertNotIn(b'url(', rendered.lower())
+
+    def test_document_icon_manifest_covers_every_source_and_the_ico(self):
+        icons.validate_document_icon()
+        manifest = json.loads((icons.ROOT / icons.DOCUMENT_MANIFEST).read_text())
+        self.assertEqual(set(manifest['sha256']), set(icons.document_sources()) | {icons.DOCUMENT_ICO})
+        for path in icons.document_sources():
+            # Committed SVG keeps LF line endings (see AGENTS.md).
+            self.assertNotIn(b'\r', (icons.ROOT / path).read_bytes(), path)
+
+    def test_document_icon_rejects_stale_sources_or_ico(self):
+        files = icons.document_sources() + [icons.DOCUMENT_ICO, icons.DOCUMENT_MANIFEST]
+        for target in icons.document_sources() + [icons.DOCUMENT_ICO]:
+            with self.subTest(target=target), tempfile.TemporaryDirectory() as temp:
+                root = Path(temp)
+                for name in files:
+                    destination = root / name
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copyfile(icons.ROOT / name, destination)
+                with (root / target).open('ab') as output:
+                    output.write(b'changed')
+                with self.assertRaisesRegex(ValueError, 'Document icon changed'):
+                    icons.validate_document_icon(root)
+
+    def test_document_icon_is_the_paper_sheet_on_a_transparent_background(self):
+        entries = icons.ico_entries((icons.ROOT / icons.DOCUMENT_ICO).read_bytes())
+        self.assertEqual([size for size, _ in entries], list(icons.DOCUMENT_SIZES))
+        palette = {'#071F43', '#FFF', '#73DDFF'}
+        ns = '{' + icons.NS + '}'
+        for path in icons.document_sources():
+            with self.subTest(path=path):
+                source = icons.safe_source((icons.ROOT / path).read_bytes())
+                for node in source.iter():
+                    # No tile: nothing fills the canvas behind the page.
+                    self.assertNotEqual(node.tag, ns + 'rect')
+                    for name in ('fill', 'stroke'):
+                        paint = node.get(name)
+                        if paint and paint != 'none':
+                            self.assertIn(paint, palette)
+        # The page is drawn from the editor icon's own sheet.
+        editor = (icons.ROOT / 'assets/source/Network_Toolkit_Editor.svg').read_text()
+        document = icons.safe_source((icons.ROOT / icons.DOCUMENT).read_bytes())
+        for path in document.iter(ns + 'path'):
+            self.assertIn(path.get('d'), editor)
+        # Every image keeps its corners transparent, small sizes included, and
+        # the small hand-drawn sizes have hard (fully opaque) page edges.
+        for size, png in entries:
+            with self.subTest(size=size):
+                pixels = rgba_rows(png)
+                for x, y in ((0, 0), (size - 1, 0), (0, size - 1), (size - 1, size - 1)):
+                    self.assertEqual(pixels[y][4 * x + 3], 0, (x, y))
+                alpha = {row[4 * x + 3] for row in pixels for x in range(size)}
+                self.assertIn(255, alpha)
+                if size in icons.DOCUMENT_HINTS:
+                    middle = pixels[size // 2]
+                    edges = [middle[4 * x + 3] for x in range(size)]
+                    self.assertEqual(set(edges), {0, 255}, 'A blurred page edge at the middle row')
+
+    def test_published_icons_keep_their_bytes(self):
+        # Released Setups and shortcuts use these files' groups; regenerating
+        # the document icon must never change them. (The app icon is pinned by
+        # its manifest.)
+        for name in ('Editor', 'Terminal'):
+            raw = (icons.ROOT / f'assets/Network_Toolkit_{name}.ico').read_bytes()
+            self.assertEqual(icons.digest(raw), PUBLISHED_ICONS[name], name)
 
     def test_external_entities_scripts_and_resources_fail_closed(self):
         original = (icons.ROOT / icons.ORIGINAL).read_bytes()

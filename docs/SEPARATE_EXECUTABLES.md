@@ -227,7 +227,7 @@ them as its own.
 
 ### Users on released versions
 
-- **In-app update from v1.21.44 or older**: Network_Toolkit.exe is updated by
+- **In-app update from v1.21.46 or older**: Network_Toolkit.exe is updated by
   the old helper. Nothing else changes: every shortcut and registration still
   starts `Network_Toolkit.exe`, which runs every app itself because the
   separate programs are not there. No function is lost and no step is needed.
@@ -242,7 +242,7 @@ them as its own.
   `OriginalFilename`, and places both or neither (`updateInstallCompanions`).
   No restart is needed. Users who do not choose it get them with the next
   update, which installs all three (below).
-- **Setup over v1.21.44 or older**: installs all three and points its owned
+- **Setup over v1.21.46 or older**: installs all three and points its owned
   Text Editor and Terminal shortcuts at the separate programs (section 6).
 
 ### New updater (the first version with separate programs and later)

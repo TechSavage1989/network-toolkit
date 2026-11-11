@@ -32,7 +32,8 @@ import (
 //  1. the other standalone app, if it is running;
 //  2. the main Toolkit window of the same data root, if its page is running:
 //     the text goes to its Terminal page or its Text Editor, and that window
-//     comes to the front;
+//     comes to the front. A main window that answers but whose page has not
+//     reported yet is probed again for up to peerMainGrace first;
 //  3. otherwise the other standalone app is started (launchPeerApp: the fixed
 //     launch arguments, never text), and the text waits in THIS engine's
 //     memory until the new app's record appears and its page is ready, for at
@@ -90,7 +91,13 @@ var (
 	peerNow = time.Now
 	// peerLaunchWait bounds starting the other app: launch, instance record,
 	// page ready. It stays under the HTTP server's 30 second write timeout.
-	peerLaunchWait   = 25 * time.Second
+	peerLaunchWait = 25 * time.Second
+	// peerMainGrace is how long a main window whose protected record is valid
+	// and whose engine answers, but whose page has not reported within
+	// peerTargetsFresh, is probed again before it is passed over. Its page
+	// reports within a second or two of starting; without the wait a send just
+	// after the window opened would start the other standalone app instead.
+	peerMainGrace    = 3 * time.Second
 	peerIDPattern    = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`)
 	peerRequestID    = regexp.MustCompile(`^[a-f0-9]{32}$`)
 	peerTypePattern  = regexp.MustCompile(`^[a-z0-9-]{0,24}$`)
@@ -899,9 +906,15 @@ func (a *application) peerProbe(ctx context.Context, rc peerReceiver) (targets [
 // The main window counts only while its page is running: without a page it
 // cannot show a paste review or the position bar. skipped names apps that are
 // registered but cannot receive (an older version, or an unreadable record).
+// A main window that answers but whose page has not reported yet gets
+// peerMainGrace to report (peerProbeMain); a standalone app counts as running
+// even while it starts, so it needs none.
 func (a *application) peerChoose(ctx context.Context) (chosen *peerReceiver, targets []peerTarget, ready bool, instanceID string, skipped []string) {
 	for _, rc := range a.peerCandidates() {
 		list, isReady, id, err := a.peerProbe(ctx, rc)
+		if err == nil && rc.mode == "main" && !isReady {
+			list, isReady, id, err = a.peerProbeMain(ctx, rc)
+		}
 		if errors.Is(err, errPeerOlder) {
 			skipped = append(skipped, rc.name())
 			continue
@@ -913,6 +926,38 @@ func (a *application) peerChoose(ctx context.Context) (chosen *peerReceiver, tar
 		return &rc, list, isReady, id, skipped
 	}
 	return nil, nil, false, "", skipped
+}
+
+// peerProbeMain probes the main window again, for at most peerMainGrace and
+// never past the sender's request, until its page reports. Every probe goes
+// through peerProbe (protected record, echoed mode and instance), so nothing
+// is trusted that a single probe would not trust. The probes share the grace
+// deadline, so a main engine that stops answering adds at most peerMainGrace
+// to the sender's request. It returns not ready when the page did not report
+// in time, or the error that ended the wait.
+func (a *application) peerProbeMain(ctx context.Context, rc peerReceiver) (targets []peerTarget, ready bool, instanceID string, err error) {
+	graceCtx, cancel := context.WithTimeout(ctx, peerMainGrace)
+	defer cancel()
+	ticker := time.NewTicker(200 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-graceCtx.Done():
+			return nil, false, "", ctx.Err()
+		case <-ticker.C:
+		}
+		targets, ready, instanceID, err = a.peerProbe(graceCtx, rc)
+		if err == nil && ready {
+			return targets, ready, instanceID, nil
+		}
+		if graceCtx.Err() != nil {
+			// The probe was cut short by the deadline: not ready, not a failure.
+			return nil, false, "", ctx.Err()
+		}
+		if err != nil {
+			return nil, false, "", err
+		}
+	}
 }
 
 // peerNote tells the user, in plain words, which running apps were passed over.

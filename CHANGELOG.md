@@ -1,3 +1,12 @@
+## 1.21.46 Beta 1 - The portable program works with Windows
+
+- A portable copy can register its Text Editor with Windows (same types, Open with, right-click entry) and remove it again, and can download and run the full installer after asking.
+- Send to waits briefly for an open Toolkit window before starting a standalone app.
+
+## 1.21.45 Beta 1 - A document icon for files opened with the Text Editor
+
+- Files whose type opens with the Text Editor show the page from its icon, without the tile; the app keeps its tile icon.
+
 ## 1.21.44 Beta 1 - The Text Editor opens almost any file
 
 - Setup offers the Text Editor for 108 text file types, lists it under Open with for any file, and can add an optional right-click entry.

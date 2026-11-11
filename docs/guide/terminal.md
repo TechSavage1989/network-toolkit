@@ -79,7 +79,7 @@ In the Terminal app, **Send to Text Editor** (the document-with-arrow button und
 You are never asked to open anything first, and you choose **Send to editor** once. The Terminal app looks for an editor in this order:
 
 1. **Network Toolkit Text Editor**, if it is open.
-2. Otherwise the main **Network Toolkit** window, if it is open: its open documents are listed, and the text goes to its Text Editor, which comes to the front.
+2. Otherwise the main **Network Toolkit** window, if it is open: its open documents are listed, and the text goes to its Text Editor, which comes to the front. A window that has only just opened gets up to about 3 seconds to get ready before it is passed over.
 3. Otherwise Network Toolkit Text Editor is started for you and the text you sent goes into a new document as soon as it is ready. If it does not come up within about 25 seconds, the Terminal says so and nothing is sent; your terminal output is still there to send again.
 
 - The editor comes forward with the text added as an ordinary edit: the document is marked unsaved and Undo removes it. For **A position I choose in the editor**, the Text Editor shows its **Insert here** bar and waits for you.

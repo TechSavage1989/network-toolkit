@@ -16,6 +16,9 @@ const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const {NTK_PEER_TERMINAL_URL:terminalURL,NTK_PEER_TERMINAL_TOKEN:terminalToken,NTK_PEER_EDITOR_URL:editorURL,NTK_PEER_EDITOR_TOKEN:editorToken,NTK_PEER_SESSION:session}=process.env;
 const output=process.env.TOOLKIT_TEST_OUTPUT||process.env.NTK_BROWSER_OUTPUT_DIR;
 const more=JSON.parse(process.env.NTK_PEER_MORE||'null');
+// Where a send can start the other app, a wait must outlast the engine's bound on that start
+// (peerLaunchWait), so a slow start ends in its own answer instead of this script's time limit.
+const startBound=Number(process.env.NTK_PEER_LAUNCH_WAIT_MS||25000)+10000;
 const checks=[],errors=[];
 const pass=text=>{checks.push(text);console.log('PASS '+text);};
 (async()=>{
@@ -31,7 +34,7 @@ const pass=text=>{checks.push(text);console.log('PASS '+text);};
   await page.goto(url+'/');await page.waitForFunction(()=>window.__networkToolkitStartupState===1&&online);
   return page;
  }
- const toast=(page,text)=>page.waitForFunction(t=>[...document.querySelectorAll('#toastStack .toast')].some(n=>n.textContent.includes(t)),text);
+ const toast=(page,text,timeout)=>page.waitForFunction(t=>[...document.querySelectorAll('#toastStack .toast')].some(n=>n.textContent.includes(t)),text,timeout?{timeout}:{});
  const shot=async(page,name)=>{if(output)await page.screenshot({path:path.join(output,'standalone-peer-live-'+name+'.png')});};
  let terminal,editor;
  // On failure, say what each window showed (synthetic data only).
@@ -134,8 +137,12 @@ const pass=text=>{checks.push(text);console.log('PASS '+text);};
     // Text Editor app -> the main window's Terminal page: one selected line, no review, no Enter.
     const text=editorText(ed);await ed.locator('#networkToolkitFileEditor [data-ed="new"]').first().click();
     await text.fill('show version\nshow clock\n');await text.evaluate(el=>{el.focus();el.setSelectionRange(0,12);});
-    // The main window's page reports its sessions within a second or two of starting.
-    for(let attempt=0;;attempt++){await sendButton(ed).click();await ed.locator('#editorSendTerminalForm,[data-editor-send-peer-missing]').first().waitFor();if(await ed.locator('#editorSendTerminalForm').count())break;assert(attempt<20,'the main window never listed its session');await ed.evaluate(()=>closeModal());await ed.waitForTimeout(300);}
+    // The main window's page reports its sessions within a second or two of starting. Wait until
+    // the Text Editor app's own engine lists them (the same question Send to terminal asks), so
+    // the first click does not race that report.
+    await ed.waitForFunction(async id=>{const info=await NetworkToolkitPeerSend.targets();return info.running&&info.ready&&info.receiver==='main'&&info.targets.some(item=>item.id===id&&item.connected);},M.main.session,{polling:250});
+    // Nothing is started here (the Go test refuses and counts a start); the wait still outlasts one.
+    for(let attempt=0;;attempt++){await sendButton(ed).click();await ed.locator('#editorSendTerminalForm,[data-editor-send-peer-missing]').first().waitFor({timeout:startBound});if(await ed.locator('#editorSendTerminalForm').count())break;assert(attempt<20,'the main window never listed its session');await ed.evaluate(()=>closeModal());await ed.waitForTimeout(300);}
     assert.equal(await ed.locator('#editorSendTarget optgroup').getAttribute('label'),'Network Toolkit','the sessions are those of the main Toolkit window');
     assert.deepEqual(await ed.locator('#editorSendTarget option').evaluateAll(options=>options.map(o=>o.value)),[M.main.session]);
     assert.equal(await ed.locator('#editorSendTarget option').first().textContent(),mainName+' · Telnet');
@@ -204,7 +211,7 @@ const pass=text=>{checks.push(text);console.log('PASS '+text);};
     await submitEditor(term);
     await toast(term,'Opening Network Toolkit Text Editor… The text is sent when it is ready.');
     await shot(term,'start-terminal-opening');
-    await toast(term,'Sent to a new document in Network Toolkit Text Editor.');
+    await toast(term,'Sent to a new document in Network Toolkit Text Editor.',startBound);
     await ed.waitForFunction(n=>NetworkToolkitFileEditor.listDocuments().length===n+1,documents);
     assert.equal(await editorText(ed).inputValue(),'Synthetic Telnet device','the text that was sent arrived, with no second click');
     await ed.waitForTimeout(1500);assert.equal(await ed.evaluate(()=>NetworkToolkitFileEditor.listDocuments().length),documents+1,'the text arrived once');
@@ -217,7 +224,7 @@ const pass=text=>{checks.push(text);console.log('PASS '+text);};
     await text.fill('show version\nshow clock\n');await text.evaluate(el=>{el.focus();el.setSelectionRange(0,12);});
     await sendButton(ed).click();
     await toast(ed,'Opening Network Toolkit Terminal…');
-    await ed.locator('#editorSendTerminalForm').waitFor();
+    await ed.locator('#editorSendTerminalForm').waitFor({timeout:startBound});
     assert.equal(await ed.locator('[data-editor-send-peer-missing]').count(),0,'no "not open" question was shown');
     assert.equal(await ed.locator('#editorSendTarget optgroup').getAttribute('label'),'Network Toolkit Terminal');
     assert.deepEqual(await ed.locator('#editorSendTarget option').evaluateAll(options=>options.map(o=>o.value)),[S.terminal.session],'the started Terminal app\'s session is listed');

@@ -15,9 +15,18 @@ unchanged, so every index that Setup's registrations name keeps its icon.
 """
 from pathlib import Path
 import struct
-from generate_icon_assets import validate_assets
+from generate_icon_assets import validate_assets, validate_document_icon
 
 ROOT = Path(__file__).resolve().parents[1]
+OUTPUT = ROOT / 'cmd/network-toolkit/resource_windows_amd64.syso'
+# Icon groups in resource ID order (1, 2, ...). Windows numbers them from zero
+# in the same order, and that number is what shortcuts and registry values such
+# as '"Network_Toolkit.exe",1' name: 0 app, 1 Text Editor, 2 Terminal (window
+# icons use the IDs, internal/desktop/desktop.go), 3 the text document icon of
+# files associated with the Text Editor (Setup only). Released Setups and
+# shortcuts already point at these numbers: never reorder or remove a group,
+# and append a new one at the end.
+ICON_GROUPS = ('Icon', 'Editor', 'Terminal', 'Document')
 
 
 def align(buffer, boundary=4):
@@ -49,14 +58,14 @@ APP_GROUP = 'APP'
 
 
 def version_info(description=PROGRAMS[0][1], original=PROGRAMS[0][2]):
-    fixed = struct.pack('<13I', 0xFEEF04BD, 0x00010000, 0x00010015, 0x002C0000, 0x00010015, 0x002C0000, 0x3F, 0, 0x40004, 1, 0, 0, 0)
+    fixed = struct.pack('<13I', 0xFEEF04BD, 0x00010000, 0x00010015, 0x002E0000, 0x00010015, 0x002E0000, 0x3F, 0, 0x40004, 1, 0, 0, 0)
     strings = {
         'FileDescription': description,
-        'FileVersion': '1.21.44.0',
+        'FileVersion': '1.21.46.0',
         'InternalName': 'NetworkToolkit',
         'OriginalFilename': original,
         'ProductName': 'Network Toolkit',
-        'ProductVersion': '1.21.44',
+        'ProductVersion': '1.21.46',
     }
     table = version_block('040904B0', children=[version_block(k, utf16(v), text=True) for k, v in strings.items()], text=True)
     string_info = version_block('StringFileInfo', children=[table], text=True)
@@ -120,9 +129,7 @@ def icon_tables():
     """The icon images and the numbered groups shared by every program."""
     icons = {}
     groups = {}
-    # Keep group order in sync with desktop icon resource IDs and the setup's
-    # zero-based shortcut icon indexes.
-    for group_id, name in enumerate(('Icon', 'Editor', 'Terminal'), 1):
+    for group_id, name in enumerate(ICON_GROUPS, 1):
         icon = (ROOT / f'assets/Network_Toolkit_{name}.ico').read_bytes()
         reserved, kind, count = struct.unpack_from('<HHH', icon)
         if reserved or kind != 1 or not 1 <= count <= 30:
@@ -143,6 +150,7 @@ def icon_tables():
 def program_resources():
     """{output path: object bytes} for every program."""
     validate_assets(ROOT)
+    validate_document_icon(ROOT)
     icons, groups = icon_tables()
     result = {}
     for output, description, original, app_group in PROGRAMS:

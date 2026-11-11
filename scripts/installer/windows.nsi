@@ -29,6 +29,17 @@ RequestExecutionLevel user
 ; cannot hold a quotation mark, so the path is always one quoted argument: the
 ; value of --open-file. The program accepts no other argument beside it.
 !define EDITOR_COMMAND '"$INSTDIR\${APP_FILENAME}" ${EDITOR_ARGS} --open-file "%1"'
+;
+; Icons are zero-based indexes of the icon groups in the program file, in the
+; order of ICON_GROUPS in scripts/build_windows_resources.py: 0 app, 1 Text
+; Editor, 2 Terminal, 3 text document. Released Setups and shortcuts use 0 to 2,
+; so new groups are only ever appended.
+;   EDITOR_ICON    the Text Editor as a program: Default apps (ApplicationIcon),
+;                  Open with (Applications\...\DefaultIcon), right-click entry.
+;   DOCUMENT_ICON  a file of a type associated with the Text Editor: the
+;                  ProgID's DefaultIcon. Every install and upgrade rewrites it.
+!define EDITOR_ICON '"$INSTDIR\${APP_FILENAME}",1'
+!define DOCUMENT_ICON '"$INSTDIR\${APP_FILENAME}",3'
 ; How the Text Editor is offered for files. Setup only makes it available; the
 ; user makes it the default in Windows. Setup never writes a UserChoice (Windows
 ; protects it with a hash), never changes the default value of an extension and
@@ -49,7 +60,8 @@ RequestExecutionLevel user
 ;      shell\open\command  how Open with starts it. Without a verb, Windows runs
 ;                          the program with the bare file name.
 ;      FriendlyAppName     the name shown instead of the program's version text.
-;      DefaultIcon         the Text Editor's icon instead of the first icon.
+;      DefaultIcon         the Text Editor's program icon instead of the first
+;                          icon (EDITOR_ICON: this entry stands for the program).
 ;    SupportedTypes is deliberately absent: it limits Open with to the listed
 ;    types, and the Text Editor opens any file.
 ;    https://learn.microsoft.com/windows/win32/shell/app-registration
@@ -68,6 +80,16 @@ RequestExecutionLevel user
 ; what Setup wrote or have become empty.
 !define EDITOR_KEY "Software\${APP_NAME}\TextEditor"
 !define CREATED_KEYS "${EDITOR_KEY}\CreatedKeys"
+; A portable copy can write the same registrations for itself ("Use this copy's
+; Text Editor in Windows", cmd/network-toolkit/text_editor_registration.go) and
+; keeps its own record here: Executable (the copy), ContextMenu (1 when its
+; right-click entry was chosen) and CreatedKeys (named like Setup's). Setup
+; takes such a registration over: it adopts that record of created keys,
+; rewrites every command for the installed program, carries the right-click
+; choice over, and deletes the portable record once its own registration has
+; been written. While Setup's registration exists a portable copy changes
+; nothing, so the two never fight over the shared keys.
+!define PORTABLE_KEY "Software\${APP_NAME}\PortableTextEditor"
 ; Terminal links (ssh://, telnet://, serial:). Windows lists the Terminal under
 ; Default apps; the user chooses it there. Setup never writes a UserChoice and
 ; never changes a scheme key that another app or Windows already registered.
@@ -131,6 +153,8 @@ Var RegistrationFailed
 Var OwnApplicationKey
 Var WantContextMenu
 Var AdoptReleased
+Var PortableExe
+Var PortableMenu
 
 ; Silent setup and uninstall show no message. Leave the reason they stopped in
 ; a small log, replaced on every run, so the hosted setup check and support can
@@ -357,6 +381,18 @@ Function ValidateInstallDirectory
     StrCpy $0 $0 -1
   ${EndIf}
   StrCpy $INSTDIR $0
+  ; Explorer expands %1, %L and the like anywhere in a registered command, the
+  ; program's own path included, so the path holds no "%".
+  StrLen $1 $INSTDIR
+  StrCpy $2 0
+  ${DoWhile} $2 < $1
+    StrCpy $0 $INSTDIR 1 $2
+    ${If} $0 == "%"
+      StrCpy $R5 "Choose a program folder without a % sign in its path."
+      Return
+    ${EndIf}
+    IntOp $2 $2 + 1
+  ${Loop}
   ${GetRoot} "$INSTDIR" $0
   ${If} $0 == ""
   ${OrIf} $INSTDIR == $0
@@ -533,11 +569,47 @@ FunctionEnd
   ClearErrors
 !macroend
 
+; A portable copy's registration (PORTABLE_KEY) is taken over: its record of
+; the keys it created becomes part of Setup's record, so that uninstall removes
+; those keys once they are empty, and the "Open with" entry it wrote starts the
+; installed program from now on (RegisterApplication). Its right-click choice
+; is carried over in .onInit. The portable record itself is deleted only after
+; Setup's registration has been written (RetirePortableRegistration).
+!macro AdoptPortableRegistration
+  ClearErrors
+  ReadRegStr $PortableExe HKCU "${PORTABLE_KEY}" "Executable"
+  ClearErrors
+  StrCpy $R3 0
+  ${Do}
+    EnumRegValue $1 HKCU "${PORTABLE_KEY}\CreatedKeys" $R3
+    ${If} ${Errors}
+    ${OrIf} $1 == ""
+      ${ExitDo}
+    ${EndIf}
+    ReadRegDWORD $2 HKCU "${PORTABLE_KEY}\CreatedKeys" "$1"
+    ClearErrors
+    ${If} $2 == 1
+      WriteRegDWORD HKCU "${CREATED_KEYS}" "$1" 1
+      ${If} ${Errors}
+        StrCpy $RegistrationFailed 1
+      ${EndIf}
+    ${EndIf}
+    IntOp $R3 $R3 + 1
+  ${Loop}
+  ClearErrors
+!macroend
+
+!macro RetirePortableRegistration
+  DeleteRegKey HKCU "${PORTABLE_KEY}"
+!macroend
+
 ; "Open with" for any file. The key is named after the program file. Setup
 ; writes it when it is absent, or when it already starts this installed
 ; program: Windows writes such an entry itself, with the bare file name as the
-; only argument, when the user picks the program in "Open with". An entry that
-; starts a program somewhere else is left exactly as it is.
+; only argument, when the user picks the program in "Open with". It also takes
+; over the entry a portable registration wrote for its copy (AdoptPortable
+; Registration). An entry that starts a program somewhere else is left exactly
+; as it is.
 !macro RegisterApplication
   StrCpy $OwnApplicationKey 0
   ClearErrors
@@ -550,13 +622,19 @@ FunctionEnd
     StrCpy $2 $0 $1
     ${If} $2 == '"$INSTDIR\${APP_FILENAME}"'
       StrCpy $OwnApplicationKey 1
+    ${ElseIf} $PortableExe != ""
+      StrLen $1 '"$PortableExe"'
+      StrCpy $2 $0 $1
+      ${If} $2 == '"$PortableExe"'
+        StrCpy $OwnApplicationKey 1
+      ${EndIf}
     ${EndIf}
   ${EndIf}
   ClearErrors
   ${If} $OwnApplicationKey == 1
     !insertmacro ProbeUserKey "${APPLICATIONS_KEY}" $R1
     WriteRegStr HKCU "${APPLICATION_KEY}" "FriendlyAppName" "${EDITOR_NAME}"
-    WriteRegStr HKCU "${APPLICATION_KEY}\DefaultIcon" "" '"$INSTDIR\${APP_FILENAME}",1'
+    WriteRegStr HKCU "${APPLICATION_KEY}\DefaultIcon" "" '${EDITOR_ICON}'
     WriteRegStr HKCU "${APPLICATION_KEY}\shell\open\command" "" '${EDITOR_COMMAND}'
     WriteRegDWORD HKCU "${CREATED_KEYS}" "Applications\${APP_FILENAME}" 1
     ${If} $R1 == 1
@@ -587,7 +665,7 @@ FunctionEnd
   !insertmacro ProbeUserKey "${ALL_FILES_KEY}" $R1
   !insertmacro ProbeUserKey "${ALL_FILES_KEY}\shell" $R2
   WriteRegStr HKCU "${MENU_VERB_KEY}" "" "${MENU_TEXT}"
-  WriteRegStr HKCU "${MENU_VERB_KEY}" "Icon" '"$INSTDIR\${APP_FILENAME}",1'
+  WriteRegStr HKCU "${MENU_VERB_KEY}" "Icon" '${EDITOR_ICON}'
   WriteRegStr HKCU "${MENU_VERB_KEY}\command" "" '${EDITOR_COMMAND}'
   ${If} $R1 == 1
     WriteRegDWORD HKCU "${CREATED_KEYS}" "*" 1
@@ -806,11 +884,13 @@ Section "Network Toolkit"
   WriteRegDWORD HKCU "${UNINSTALL_KEY}" "NoRepair" 1
   WriteRegStr HKCU "${PROG_KEY}" "" "${APP_NAME} text document"
   WriteRegNone HKCU "${PROG_KEY}" "AllowSilentDefaultTakeOver"
-  WriteRegStr HKCU "${PROG_KEY}\DefaultIcon" "" '"$INSTDIR\${APP_FILENAME}",1'
+  ; The icon of every file of a type associated with the Text Editor: the paper
+  ; sheet. Versions up to 1.21.44 wrote the editor icon here; this replaces it.
+  WriteRegStr HKCU "${PROG_KEY}\DefaultIcon" "" '${DOCUMENT_ICON}'
   WriteRegStr HKCU "${PROG_KEY}\shell\open\command" "" '${EDITOR_COMMAND}'
   WriteRegStr HKCU "${CAPABILITIES}" "ApplicationName" "${EDITOR_NAME}"
   WriteRegStr HKCU "${CAPABILITIES}" "ApplicationDescription" "Open text, log, configuration, script and source files in Network Toolkit Text Editor."
-  WriteRegStr HKCU "${CAPABILITIES}" "ApplicationIcon" '"$INSTDIR\${APP_FILENAME}",1'
+  WriteRegStr HKCU "${CAPABILITIES}" "ApplicationIcon" '${EDITOR_ICON}'
   IfErrors install_error
   ; An upgrade from a version that kept no record of the keys it created.
   StrCpy $AdoptReleased 0
@@ -829,6 +909,7 @@ Section "Network Toolkit"
   ${EndIf}
   WriteRegDWORD HKCU "${EDITOR_KEY}" "Records" 1
   StrCpy $RegistrationFailed 0
+  !insertmacro AdoptPortableRegistration
   !insertmacro TextExtensions RegisterExtension
   WriteRegStr HKCU "Software\RegisteredApplications" "${EDITOR_NAME}" "${CAPABILITIES}"
   IfErrors install_error
@@ -840,14 +921,22 @@ Section "Network Toolkit"
   StrCpy $FailedStep "updating the right-click menu entry"
   Call ReadContextMenuChoice
   ReadRegDWORD $R8 HKCU "${UNINSTALL_KEY}" "ContextMenu"
+  ReadRegDWORD $PortableMenu HKCU "${PORTABLE_KEY}" "ContextMenu"
   ClearErrors
+  ; A portable copy's entry was preselected in .onInit; cleared, it goes too.
   ${If} $WantContextMenu == 1
     !insertmacro RegisterContextMenu
   ${ElseIf} $R8 == 1
+  ${OrIf} $PortableMenu == 1
     !insertmacro RemoveContextMenu
   ${EndIf}
   IfErrors install_error
   StrCmp $RegistrationFailed 1 install_error
+  ; Every command now starts the installed program; the portable record is
+  ; retired. Left behind (it cannot be: the key is this user's), it would only
+  ; be shown by the portable copy, which defers to the installed program.
+  !insertmacro RetirePortableRegistration
+  ClearErrors
   StrCpy $FailedStep "registering terminal links"
   ; Probing reports a missing key through the error flag; probe every scheme
   ; first, then write and check the registration as one step.
@@ -873,6 +962,8 @@ Section "Network Toolkit"
   !insertmacro CreateStartShortcut "$SMPROGRAMS\${APP_NAME}\${APP_NAME}.lnk" "${APP_FILENAME}" "" "" "" 0 $NewMainShortcut
   !insertmacro CreateStartShortcut "$SMPROGRAMS\${APP_NAME}\${EDITOR_NAME}.lnk" "${EDITOR_FILENAME}" "" "${EDITOR_ARGS}" "--editor" 0 $NewEditorShortcut
   !insertmacro CreateStartShortcut "$SMPROGRAMS\${APP_NAME}\${APP_NAME} Terminal.lnk" "${TERMINAL_FILENAME}" "" "--terminal" "--terminal" 0 $NewTerminalShortcut
+  ; SHCNE_ASSOCCHANGED: Explorer reloads associations and file type icons,
+  ; after every registration above, on a new install and an upgrade alike.
   System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, p 0, p 0)'
   Return
 
@@ -977,6 +1068,11 @@ Function .onInit
     !insertmacro SelectSection ${DesktopShortcut}
   ${EndIf}
   ReadRegDWORD $0 HKCU "${UNINSTALL_KEY}" "ContextMenu"
+  ${If} $0 == 1
+    !insertmacro SelectSection ${ContextMenu}
+  ${EndIf}
+  ; The right-click entry a portable copy registered is carried over.
+  ReadRegDWORD $0 HKCU "${PORTABLE_KEY}" "ContextMenu"
   ${If} $0 == 1
     !insertmacro SelectSection ${ContextMenu}
   ${EndIf}

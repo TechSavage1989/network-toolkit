@@ -64,9 +64,9 @@ class ProgramResources(unittest.TestCase):
     def test_main_program_icons_and_indexes_are_unchanged(self):
         main = self.objects['cmd/network-toolkit/resource_windows_amd64.syso']
         groups = group_icons(main)
-        # Index 0 Toolkit, 1 Text Editor, 2 Terminal: what Setup's registrations
-        # and the native window code (desktop.Icon*) name.
-        self.assertEqual([key for key, _ in groups], [1, 2, 3])
+        # Index 0 Toolkit, 1 Text Editor, 2 Terminal, 3 text document: what
+        # Setup's registrations and the native window code (desktop.Icon*) name.
+        self.assertEqual([key for key, _ in groups], [1, 2, 3, 4])
         self.assertIn(utf16('Network_Toolkit.exe'), main)
 
     def test_each_separate_program_shows_its_own_icon_first_and_keeps_the_rest(self):
@@ -74,7 +74,7 @@ class ProgramResources(unittest.TestCase):
         for output, app_group, original in (('internal/winres/editor/resource_windows_amd64.syso', 2, 'Network_Toolkit_TextEditor.exe'),
                                             ('internal/winres/terminal/resource_windows_amd64.syso', 3, 'Network_Toolkit_Terminal.exe')):
             groups = group_icons(self.objects[output])
-            self.assertEqual([key for key, _ in groups], ['APP', 1, 2, 3], output)
+            self.assertEqual([key for key, _ in groups], ['APP', 1, 2, 3, 4], output)
             self.assertEqual(groups[0][1], main_groups[app_group], f'{output}: icon 0 is its own app icon')
             for key, data in groups[1:]:
                 self.assertEqual(data, main_groups[key], f'{output}: group {key} matches the main program')

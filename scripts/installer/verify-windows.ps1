@@ -91,6 +91,31 @@ function Set-UserValue([string]$Subkey, [string]$Name, [string]$Value) {
     try { $key.SetValue($Name, $Value) } finally { $key.Dispose() }
 }
 
+# The icon groups of a program file as the shell reads a '"file.exe",N' icon
+# location: their number, and that each one loads at large and small size.
+Add-Type -Namespace NetworkToolkitSetupSmoke -Name IconResources -MemberDefinition @'
+[DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+public static extern uint ExtractIconExW(string file, int index, IntPtr[] large, IntPtr[] small, uint count);
+[DllImport("user32.dll")]
+public static extern bool DestroyIcon(IntPtr icon);
+'@
+function Assert-IconGroups([string]$Path, [int]$Expected) {
+    # Index -1 with no arrays asks for the number of icons in the file.
+    Assert-Same ([int][NetworkToolkitSetupSmoke.IconResources]::ExtractIconExW($Path, -1, $null, $null, 0)) $Expected 'Number of icon groups in the program file'
+    foreach ($index in 0..($Expected - 1)) {
+        $large = [IntPtr[]]::new(1)
+        $small = [IntPtr[]]::new(1)
+        [void][NetworkToolkitSetupSmoke.IconResources]::ExtractIconExW($Path, $index, $large, $small, 1)
+        try {
+            if ($large[0] -eq [IntPtr]::Zero -or $small[0] -eq [IntPtr]::Zero) { throw "Icon $index of $Path could not be loaded." }
+        } finally {
+            foreach ($icon in @($large[0], $small[0])) {
+                if ($icon -ne [IntPtr]::Zero) { [void][NetworkToolkitSetupSmoke.IconResources]::DestroyIcon($icon) }
+            }
+        }
+    }
+}
+
 function Get-ExecutableVersion([string]$Path) {
     $info = [Diagnostics.FileVersionInfo]::GetVersionInfo($Path)
     [version]::new($info.FileMajorPart, $info.FileMinorPart, $info.FileBuildPart, $info.FilePrivatePart)
@@ -219,6 +244,13 @@ $registeredApps = 'HKCU:\Software\RegisteredApplications'
 $registeredName = 'Network Toolkit Text Editor'
 $progID = 'NetworkToolkit.TextDocument'
 $progKey = "HKCU:\Software\Classes\$progID"
+$progSubkey = "Software\Classes\$progID"
+# Zero-based icon groups of the program file (ICON_GROUPS in
+# scripts/build_windows_resources.py): 0 app, 1 Text Editor, 2 Terminal,
+# 3 text document. The program values use the editor icon; files use the sheet.
+$editorIconIndex = 1
+$documentIconIndex = 3
+$iconGroupCount = 4
 # The one list of text file types that Setup registers. windows.nsi includes
 # this same file; scripts/text-extensions.test.cjs keeps the guide in step.
 $extensionList = Join-Path $PSScriptRoot 'text-extensions.nsh'
@@ -435,7 +467,9 @@ function Assert-Installed([string]$ExpectedHash = $portableHash) {
     Assert-Same (Read-RegistryValue $uninstallKey 'QuietUninstallString') ('"{0}" /S' -f $uninstaller) 'Silent uninstall command'
     Assert-Same (Read-RegistryValue $registeredApps $registeredName) 'Software\Network Toolkit\Capabilities' 'Default Apps registration'
     Assert-Same (Read-RegistryValue $capabilities 'ApplicationName') $registeredName 'Default Apps display name'
-    Assert-Same (Read-RegistryValue $capabilities 'ApplicationIcon') ('"{0}",1' -f $installedExe) 'Default Apps editor icon'
+    Assert-Same (Read-RegistryValue $capabilities 'ApplicationIcon') ('"{0}",{1}' -f $installedExe, $editorIconIndex) 'Default Apps editor icon'
+    # Files of the associated types show the paper sheet, not the program tile.
+    Assert-Same (Read-UserValue "$progSubkey\DefaultIcon" '') ('"{0}",{1}' -f $installedExe, $documentIconIndex) 'Text document icon of associated files'
     if (-not (Read-RegistryValue $capabilities 'ApplicationDescription')) { throw 'The Default Apps description is missing.' }
     $editorCommand = $editorCommandFormat -f $installedExe
     Assert-Same (Read-RegistryValue "$progKey\shell\open\command" '') $editorCommand 'Editor open command'
@@ -461,7 +495,7 @@ function Assert-Installed([string]$ExpectedHash = $portableHash) {
     # "Open with" for any file: the program is registered under Applications
     # with its command and no SupportedTypes, which would limit it to a list.
     if ($applicationOwnedBySetup) {
-        $expectedApplication = "FriendlyAppName=String:$registeredName`n[DefaultIcon]{=String:`"$installedExe`",1}`n[shell]{[open]{[command]{=String:$editorCommand}}}"
+        $expectedApplication = "FriendlyAppName=String:$registeredName`n[DefaultIcon]{=String:`"$installedExe`",$editorIconIndex}`n[shell]{[open]{[command]{=String:$editorCommand}}}"
         Assert-Same (Get-UserKeyTree $applicationSubkey) $expectedApplication 'Open With registration for any file'
         Assert-Same (Read-UserValue $createdSubkey 'Applications\Network_Toolkit.exe') 1 'Record that Setup created the Open With registration'
         $expectedRecord = if ($applicationsKeyExisted) { $null } else { 1 }
@@ -472,7 +506,7 @@ function Assert-Installed([string]$ExpectedHash = $portableHash) {
     }
     # The right-click entry exists only when it was chosen.
     if ($contextMenuExpected) {
-        $expectedVerb = "=String:Edit with $registeredName`nIcon=String:`"$installedExe`",1`n[command]{=String:$editorCommand}"
+        $expectedVerb = "=String:Edit with $registeredName`nIcon=String:`"$installedExe`",$editorIconIndex`n[command]{=String:$editorCommand}"
         Assert-Same (Get-UserKeyTree $menuVerbSubkey) $expectedVerb 'Right-click entry for all files'
         Assert-Same (Read-RegistryValue $uninstallKey 'ContextMenu') 1 'Remembered right-click menu choice'
         $expectedRecord = if ($allFilesKeyExisted) { $null } else { 1 }
@@ -550,6 +584,14 @@ try {
     Assert-Absent $uninstallKey
 } finally { [IO.Directory]::Delete($junctionPath) }
 
+Write-Host 'Checking setup refuses a folder with a % sign in its path.'
+# Explorer expands %1, %L and the like anywhere in a registered command.
+$percentDir = Join-Path $env:RUNNER_TEMP 'Network Toolkit 100%L'
+Invoke-Silent $setup 2 "/S /D=$percentDir" 'without a % sign in its path'
+Assert-Absent $percentDir
+Assert-Absent $uninstallKey
+Assert-Preserved
+
 Write-Host 'Checking a fresh setup rolls back when it cannot create Start menu shortcuts.'
 $lateFailureDir = Join-Path $env:RUNNER_TEMP 'Failed Network Toolkit Install'
 [IO.File]::WriteAllText($menu, 'Synthetic item occupying the Start menu folder')
@@ -589,6 +631,9 @@ Invoke-Silent $setup
 Assert-Installed
 Assert-Preserved
 Assert-Absent $desktopShortcut
+# Every icon a registry value or shortcut names exists: the text document icon
+# is the last group, after the three that released Setups already use.
+Assert-IconGroups $installedExe $iconGroupCount
 
 Write-Host 'Checking a terminal link reaches the running Terminal window without connecting.'
 # A headless Terminal owner stands in for the open window; the link launch
@@ -702,7 +747,7 @@ Add-Fixture (Join-Path $installDir 'user-created.txt') 'Unrelated file in the in
 [IO.File]::WriteAllText($installedExe, 'Synthetic fixture for installer repair')
 [IO.File]::WriteAllText($installedTerminal, 'Synthetic fixture for installer repair')
 # Version 1.21.35 created this shortcut with --editor, and every released Setup
-# up to 1.21.44 the Terminal shortcut as Network_Toolkit.exe --terminal. An
+# up to 1.21.46 the Terminal shortcut as Network_Toolkit.exe --terminal. An
 # upgrade points both at the separate programs.
 $legacyShell = New-Object -ComObject WScript.Shell
 try {
@@ -720,6 +765,9 @@ try {
 # itself, with the bare file name. Setup replaces the command of an entry that
 # starts the program it installs.
 Set-UserValue "$applicationSubkey\shell\open\command" '' ('"{0}" "%1"' -f $installedExe)
+# The icon that versions up to 1.21.44 gave the associated files; repair and
+# upgrade replace it with the text document icon (checked by Assert-Installed).
+Set-UserValue "$progSubkey\DefaultIcon" '' ('"{0}",{1}' -f $installedExe, $editorIconIndex)
 Invoke-Silent $setup 0 '/S /DesktopShortcut'
 Assert-Installed
 Assert-Preserved
@@ -908,7 +956,10 @@ Set-UserValue 'Software\Classes\.ini\OpenWithProgids' 'SyntheticIniTool.Document
 $extensionKeyExisted['.ini'] = $true
 $openWithExisted['.ini'] = $true
 $classSnapshots['Software\Classes\.ini'] = '[OpenWithProgids]{SyntheticIniTool.Document=String:}'
+# Versions up to 1.21.44 gave the associated files the editor icon.
+Set-UserValue "$progSubkey\DefaultIcon" '' ('"{0}",{1}' -f $installedExe, $editorIconIndex)
 Invoke-Silent $setup
+# Assert-Installed checks the upgrade replaced it with the text document icon.
 Assert-Installed
 Assert-Preserved
 # .log and .conf hold nothing but the Text Editor: adopted, key and list.
@@ -930,7 +981,169 @@ Assert-UninstallFinished
 Assert-Same (Get-UserKeyTree 'Software\Classes\.ini') '[OpenWithProgids]{SyntheticIniTool.Document=String:}' "Another program's value in the Open With list of .ini"
 Assert-ClassKeysRestored 'After uninstalling an upgrade from a released version'
 Assert-Preserved
+
+# A portable copy can write Setup's registrations for itself ("Use this copy's
+# Text Editor in Windows"). The hidden switch --text-editor-registration runs
+# one such action and exits (0 done, 3 the installed program is registered, 4
+# another copy is registered, 6 nothing of this copy's to remove, 7 this
+# copy's location is refused).
+Write-Host 'Checking a portable copy registers its Text Editor like Setup and removes exactly what it added.'
+$portableSubkey = 'Software\Network Toolkit\PortableTextEditor'
+$portableKey = "HKCU:\$portableSubkey"
+$portableCreatedSubkey = "$portableSubkey\CreatedKeys"
+# Under the user's own folder: a copy that other users can change is refused
+# (security review 11), and the runner's temporary folder may let them.
+$portableRoot = Join-Path $env:LOCALAPPDATA 'NTK Portable Check'
+$portableDirA = Join-Path $portableRoot 'Portable Copy A'
+$portableDirB = Join-Path $portableRoot 'Portable Copy B'
+$portableDirShared = Join-Path $portableRoot 'Shared Copy'
+foreach ($dir in $portableDirA, $portableDirB, $portableDirShared) {
+    New-Item -Path $dir -ItemType Directory | Out-Null
+    Copy-Item -LiteralPath $portableExe -Destination (Join-Path $dir 'Network_Toolkit.exe')
+}
+$portableA = Join-Path $portableDirA 'Network_Toolkit.exe'
+$portableB = Join-Path $portableDirB 'Network_Toolkit.exe'
+$portableShared = Join-Path $portableDirShared 'Network_Toolkit.exe'
+# BUILTIN\Users may change this one, as a folder on a shared drive often allows.
+& icacls $portableDirShared /grant '*S-1-5-32-545:(OI)(CI)M' | Out-Null
+if ($LASTEXITCODE -ne 0) { throw 'icacls could not open the shared copy folder to Users.' }
+function Invoke-Registration([string]$Exe, [string]$Action, [int]$ExpectedExitCode) {
+    $process = Start-Process -FilePath $Exe -ArgumentList "--text-editor-registration=$Action" -Wait -PassThru
+    try { Assert-Same $process.ExitCode $ExpectedExitCode "Exit code from --text-editor-registration=$Action of $Exe" } finally { $process.Dispose() }
+}
+# All of HKCU\Software\Classes except Local Settings (MuiCache notes every
+# program the shell starts, which says nothing about registrations).
+function Get-ClassesTree {
+    $classes = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Software\Classes')
+    try {
+        $lines = @(foreach ($name in ($classes.GetValueNames() | Sort-Object)) {
+            '{0}={1}:{2}' -f $name, $classes.GetValueKind($name), $classes.GetValue($name, $null, 'DoNotExpandEnvironmentNames')
+        })
+        $children = @($classes.GetSubKeyNames() | Where-Object { $_ -ne 'Local Settings' } | Sort-Object)
+    } finally { $classes.Dispose() }
+    foreach ($child in $children) { $lines += "[$child]{" + (Get-UserKeyTree "Software\Classes\$child") + '}' }
+    $lines -join "`n"
+}
+function Assert-PortableRegistered([string]$Launched, [bool]$Menu) {
+    # The program records its own path as Windows resolved it (long names,
+    # the case on disk); every command must name exactly that path.
+    $Exe = Read-UserValue $portableSubkey 'Executable'
+    if (-not $Exe -or $Exe -ine $Launched) { throw "The portable registration record names '$Exe', expected '$Launched'." }
+    $command = $editorCommandFormat -f $Exe
+    Assert-Same (Read-UserValue "Software\Classes\$progID\shell\open\command" '') $command 'Portable editor open command'
+    if ((Read-UserValue "Software\Classes\$progID\DefaultIcon" '') -notlike ('"{0}",*' -f $Exe)) { throw 'The document icon does not name the portable copy.' }
+    Assert-Same (Read-RegistryValue $registeredApps $registeredName) 'Software\Network Toolkit\Capabilities' 'Portable Default Apps registration'
+    Assert-Same (Read-RegistryValue $capabilities 'ApplicationIcon') ('"{0}",1' -f $Exe) 'Portable Default Apps editor icon'
+    $registeredTypes = Get-Item -LiteralPath "$capabilities\FileAssociations"
+    try { Assert-Same $registeredTypes.ValueCount $extensions.Count 'Number of file types the portable copy lists in Default Apps' } finally { $registeredTypes.Dispose() }
+    foreach ($ext in $extensions) {
+        Assert-Same (Read-RegistryValue "HKCU:\Software\Classes\$ext\OpenWithProgids" $progID) '' "$ext Open With registration of the portable copy"
+        if (-not $extensionKeyExisted[$ext]) {
+            Assert-Same (Get-UserKeyTree "Software\Classes\$ext") "[OpenWithProgids]{$progID=String:}" "Everything the portable copy wrote under HKCU\Software\Classes\$ext"
+            Assert-Same (Read-UserValue $portableCreatedSubkey $ext) 1 "Portable record that it created the $ext key"
+        } else {
+            Assert-Same (Read-UserValue $portableCreatedSubkey $ext) $null "Portable record for the $ext key, which existed before"
+            $expectedRecord = if ($openWithExisted[$ext]) { $null } else { 1 }
+            Assert-Same (Read-UserValue $portableCreatedSubkey "$ext\OpenWithProgids") $expectedRecord "Portable record for the Open With list of $ext"
+        }
+    }
+    $expectedApplication = "FriendlyAppName=String:$registeredName`n[DefaultIcon]{=String:`"$Exe`",1}`n[shell]{[open]{[command]{=String:$command}}}"
+    Assert-Same (Get-UserKeyTree $applicationSubkey) $expectedApplication 'Portable Open With registration for any file'
+    Assert-Same (Read-UserValue $portableCreatedSubkey 'Applications\Network_Toolkit.exe') 1 'Portable record of the Open With registration'
+    if ($Menu) {
+        Assert-Same (Get-UserKeyTree $menuVerbSubkey) "=String:Edit with $registeredName`nIcon=String:`"$Exe`",1`n[command]{=String:$command}" 'Portable right-click entry'
+        Assert-Same (Read-UserValue $portableSubkey 'ContextMenu') 1 'Portable right-click choice'
+    } else {
+        Assert-Same (Get-UserKeyTree $menuVerbSubkey) '<absent>' 'Portable right-click entry that was not chosen'
+    }
+    Assert-Absent $uninstallKey
+    Assert-Preserved
+}
+# The Open With entry of another copy (from the check above) goes, so that the
+# portable copy and then Setup own "Open with" for any file.
+[Microsoft.Win32.Registry]::CurrentUser.DeleteSubKeyTree($applicationSubkey)
+# Its parent, Applications, stays (now without that entry): snapshot both.
+Save-ClassSnapshot $applicationsSubkey
+Save-ClassSnapshot $applicationSubkey
+$applicationOwnedBySetup = $true
+Invoke-Registration $portableA 'remove' 6
+$classesBefore = Get-ClassesTree
+Assert-Absent $appKey
+Invoke-Registration $portableA 'register-menu' 0
+Assert-PortableRegistered $portableA $true
+Invoke-Registration $portableA 'register' 0
+Assert-PortableRegistered $portableA $false
+Invoke-Registration $portableA 'remove' 0
+Assert-Same (Get-ClassesTree) $classesBefore 'HKCU\Software\Classes after a portable register and remove'
+Assert-Absent $appKey
+Assert-Same (Read-RegistryValue $registeredApps $registeredName) $null 'Default Apps registration after a portable remove'
+Assert-ClassKeysRestored 'After a portable register and remove'
+
+Write-Host 'Checking a portable copy that other users can change is refused.'
+# Every double-clicked text file would run that copy.
+Invoke-Registration $portableShared 'register' 7
+Invoke-Registration $portableShared 'takeover-menu' 7
+Assert-Same (Get-ClassesTree) $classesBefore 'HKCU\Software\Classes after a refused registration of a shared copy'
+Assert-Absent $appKey
+Remove-Item -LiteralPath $portableDirShared -Recurse
+
+Write-Host 'Checking a second portable copy takes over only when asked, and a copy whose program is gone can be cleaned up.'
+Invoke-Registration $portableA 'register-menu' 0
+Invoke-Registration $portableB 'register' 4
+Assert-PortableRegistered $portableA $true
+Invoke-Registration $portableB 'takeover' 0
+Assert-PortableRegistered $portableB $false
+Invoke-Registration $portableA 'remove' 6
+# B still exists: there is nothing to clean up.
+Invoke-Registration $portableA 'cleanup' 6
+Assert-PortableRegistered $portableB $false
+Remove-Item -LiteralPath $portableDirB -Recurse
+Invoke-Registration $portableA 'cleanup' 0
+Assert-Same (Get-ClassesTree) $classesBefore 'HKCU\Software\Classes after cleaning up a deleted copy'
+Assert-Absent $appKey
+
+Write-Host 'Checking Setup takes over a portable registration and the portable record is retired.'
+Invoke-Registration $portableA 'register-menu' 0
+Assert-PortableRegistered $portableA $true
+# The portable copy chose the right-click entry: Setup carries the choice over.
+Invoke-Silent $setup 0 "/S /D=$installDir"
+$contextMenuExpected = $true
+Assert-Installed
+Assert-Preserved
+Assert-Absent $portableKey
+Write-Host 'Checking the portable record is retired and the installed program keeps every command.'
+$installedClasses = Get-ClassesTree
+$installedAppKey = Get-UserKeyTree 'Software\Network Toolkit'
+foreach ($action in 'register', 'register-menu', 'takeover', 'remove', 'cleanup') {
+    Invoke-Registration $portableA $action 3
+}
+Assert-Same (Get-ClassesTree) $installedClasses 'HKCU\Software\Classes after a portable copy tried to change the installed registration'
+Assert-Same (Get-UserKeyTree 'Software\Network Toolkit') $installedAppKey 'Setup registration after a portable copy tried to change it'
+Invoke-Uninstaller $uninstaller
+Assert-UninstallFinished
+Assert-Absent $appKey
+Assert-ClassKeysRestored 'After uninstalling a Setup that took over a portable registration'
+Assert-Same (Get-ClassesTree) $classesBefore 'HKCU\Software\Classes after uninstalling a Setup that took over a portable registration'
+Assert-Preserved
+
+Write-Host 'Checking a portable copy refuses to register while Setup is installed.'
+Invoke-Silent $setup 0 "/S /D=$installDir"
+$contextMenuExpected = $false
+Assert-Installed
+$installedClasses = Get-ClassesTree
+Invoke-Registration $portableA 'register' 3
+Invoke-Registration $portableA 'takeover-menu' 3
+Assert-Same (Get-ClassesTree) $installedClasses 'HKCU\Software\Classes after a refused portable registration'
+Assert-Absent $portableKey
+Invoke-Uninstaller $uninstaller
+Assert-UninstallFinished
+Assert-ClassKeysRestored 'After uninstalling Setup that a portable copy left alone'
+Assert-Same (Get-ClassesTree) $classesBefore 'HKCU\Software\Classes after the portable checks'
+Assert-Preserved
+Remove-Item -LiteralPath $portableRoot -Recurse
+
 foreach ($synthetic in "$allFilesSubkey\shell\SyntheticEdit", $applicationSubkey, $rivalProgSubkey, 'Software\Classes\.cfg', 'Software\Classes\.ini') {
-    [Microsoft.Win32.Registry]::CurrentUser.DeleteSubKeyTree($synthetic)
+    # The synthetic Open With entry was removed for the portable checks above.
+    [Microsoft.Win32.Registry]::CurrentUser.DeleteSubKeyTree($synthetic, $false)
 }
 Write-Host "Windows setup smoke passed for $version."
