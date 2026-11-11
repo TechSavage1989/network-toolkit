@@ -106,22 +106,32 @@ const (
 )
 
 type editorRegistrationStatus struct {
-	Supported       bool   `json:"supported"`
-	Executable      string `json:"executable"`
-	NameOK          bool   `json:"nameOk"`
+	Supported  bool   `json:"supported"`
+	Executable string `json:"executable"`
+	NameOK     bool   `json:"nameOk"`
+	// PathOK is false when the program path holds a "%": Explorer would
+	// expand %1, %L and the like inside the program path as well.
+	PathOK bool `json:"pathOk"`
+	// LocationProblem says why this copy may not be registered from where it
+	// is: someone other than this user, SYSTEM and Administrators can change
+	// the program or its folder (editorRegAccessCheck).
+	LocationProblem string `json:"locationProblem,omitempty"`
 	Installed       bool   `json:"installed"`
 	InstallLocation string `json:"installLocation,omitempty"`
 	ThisIsInstalled bool   `json:"thisIsInstalled"`
 	State           string `json:"state"`
 	Owner           string `json:"owner,omitempty"`
 	OwnerMissing    bool   `json:"ownerMissing"`
-	Complete        bool   `json:"complete"`
-	ContextMenu     bool   `json:"contextMenu"`
-	OpenWithElse    string `json:"openWithElsewhere,omitempty"`
-	CanRegister     bool   `json:"canRegister"`
-	NeedsTakeover   bool   `json:"needsTakeover"`
-	CanRemove       bool   `json:"canRemove"`
-	Message         string `json:"message"`
+	// OwnerUnreachable: the drive or share of that program is not connected
+	// (or could not be checked), so whether it exists is unknown.
+	OwnerUnreachable bool   `json:"ownerUnreachable"`
+	Complete         bool   `json:"complete"`
+	ContextMenu      bool   `json:"contextMenu"`
+	OpenWithElse     string `json:"openWithElsewhere,omitempty"`
+	CanRegister      bool   `json:"canRegister"`
+	NeedsTakeover    bool   `json:"needsTakeover"`
+	CanRemove        bool   `json:"canRemove"`
+	Message          string `json:"message"`
 }
 
 var (
@@ -129,6 +139,9 @@ var (
 	errEditorRegTakeover  = errors.New("Another copy of Network Toolkit is registered. Confirm that this copy should replace it.")
 	errEditorRegName      = errors.New("Windows lists the Text Editor under the program file name Network_Toolkit.exe. Rename this copy's program file to Network_Toolkit.exe, start it again, then register.")
 	errEditorRegNothing   = errors.New("This copy is not registered, so there is nothing to remove.")
+	errEditorRegPercent   = errors.New("This copy's folder has a % sign in its path. Windows would read it as part of the command that opens files, so this copy cannot be registered from there. Move the folder to a path without %, start it from there, then register.")
+	errEditorRegUnsafe    = errors.New("This copy cannot be registered from where it is.")
+	errEditorRegStale     = errors.New("The registration changed since it was shown. Look at it again before cleaning up.")
 )
 
 // Windows paths, handled the same way on every platform so that the tests of
@@ -180,18 +193,76 @@ func editorRegStartsWith(command, exe string) bool {
 	return exe != "" && len(command) >= len(prefix) && strings.EqualFold(command[:len(prefix)], prefix)
 }
 
-// editorRegMissing reports a file that is confirmed absent; a file that could
-// not be checked is not missing.
-type editorRegFileCheck func(path string) (missing bool)
+// Whether a registered program exists. Only a file that is confirmed absent
+// on a drive that is there is missing; a drive or share that is not connected,
+// or a file that could not be checked, is unreachable (unknown).
+type editorRegPresence int
 
-func editorRegFileMissing(path string) bool {
-	_, err := os.Stat(path)
-	return errors.Is(err, os.ErrNotExist)
+const (
+	editorRegPresent editorRegPresence = iota
+	editorRegAbsent
+	editorRegUnreachable
+)
+
+type editorRegFileCheck func(path string) editorRegPresence
+
+func editorRegFileState(path string) editorRegPresence {
+	return editorRegClassify(path, os.Stat)
 }
 
+func editorRegFileMissing(path string) bool { return editorRegFileState(path) == editorRegAbsent }
+
+// The root of a Windows path's volume: "D:\" or "\\server\share\".
+func editorRegVolumeRoot(path string) string {
+	p := editorRegWinPath(path)
+	if len(p) >= 2 && p[1] == ':' {
+		return p[:2] + `\`
+	}
+	if strings.HasPrefix(p, `\\`) {
+		parts := strings.SplitN(p[2:], `\`, 3)
+		if len(parts) >= 2 && parts[0] != "" && parts[1] != "" {
+			return `\\` + parts[0] + `\` + parts[1] + `\`
+		}
+	}
+	return ""
+}
+
+func editorRegClassify(path string, stat func(string) (os.FileInfo, error)) editorRegPresence {
+	_, err := stat(path)
+	switch {
+	case err == nil:
+		return editorRegPresent
+	case !errors.Is(err, os.ErrNotExist):
+		return editorRegUnreachable
+	}
+	if root := editorRegVolumeRoot(path); root != "" {
+		if _, err := stat(root); err != nil {
+			return editorRegUnreachable
+		}
+	}
+	return editorRegAbsent
+}
+
+// editorRegAccessCheck names who other than this user, SYSTEM and
+// Administrators (and TrustedInstaller) can change a file or folder; "" when
+// nobody. Windows reads the object's owner and DACL.
+type editorRegAccessCheck func(path string) (others string, err error)
+
 // editorRegState reads who owns the registration. exe is this copy's program.
-func editorRegState(reg editorRegistry, exe string, missing editorRegFileCheck) (editorRegistrationStatus, error) {
-	status := editorRegistrationStatus{Supported: true, Executable: exe, NameOK: strings.EqualFold(editorRegBase(exe), editorRegAppFile), State: editorRegNone}
+func editorRegState(reg editorRegistry, exe string, presence editorRegFileCheck) (editorRegistrationStatus, error) {
+	owner := func(path string) (missing, unreachable bool) {
+		if path == "" {
+			return true, false
+		}
+		switch presence(path) {
+		case editorRegAbsent:
+			return true, false
+		case editorRegUnreachable:
+			return false, true
+		}
+		return false, false
+	}
+	status := editorRegistrationStatus{Supported: true, Executable: exe, NameOK: strings.EqualFold(editorRegBase(exe), editorRegAppFile), PathOK: !strings.Contains(exe, "%"), State: editorRegNone}
 	location, found, ok, err := reg.String(editorRegUninstall, "InstallLocation")
 	if err != nil {
 		return status, fmt.Errorf("Windows could not read the installed program's registration: %w", err)
@@ -220,7 +291,7 @@ func editorRegState(reg editorRegistry, exe string, missing editorRegFileCheck) 
 			status.Complete = command == editorRegCommand(exe)
 		} else {
 			status.State = editorRegOther
-			status.OwnerMissing = recorded == "" || missing(recorded)
+			status.OwnerMissing, status.OwnerUnreachable = owner(recorded)
 		}
 		menu, _, err := reg.DWORD(editorRegPortable, "ContextMenu")
 		if err != nil {
@@ -240,7 +311,7 @@ func editorRegState(reg editorRegistry, exe string, missing editorRegFileCheck) 
 		if progExists || setupRecord {
 			status.State = editorRegUnrecorded
 			status.Owner = editorRegCommandProgram(command)
-			status.OwnerMissing = status.Owner == "" || missing(status.Owner)
+			status.OwnerMissing, status.OwnerUnreachable = owner(status.Owner)
 		}
 	}
 	if status.State == editorRegThis {
@@ -284,9 +355,42 @@ func editorRegState(reg editorRegistry, exe string, missing editorRegFileCheck) 
 		if status.OwnerMissing {
 			status.Message += " That program no longer exists, so Windows cannot open files with it. Clean up removes that registration."
 		}
+		if status.OwnerUnreachable {
+			status.Message += " Its drive or network location is not connected (or could not be checked), so this copy cannot tell whether that program still exists. Connect it, or remove the registration from that copy."
+		}
 	}
-	if !status.NameOK && status.State != editorRegSetup {
-		status.Message += " " + errEditorRegName.Error()
+	if status.State != editorRegSetup {
+		if !status.NameOK {
+			status.Message += " " + errEditorRegName.Error()
+		}
+		if !status.PathOK {
+			status.Message += " " + errEditorRegPercent.Error()
+		}
+	}
+	status.CanRegister = status.CanRegister && status.PathOK
+	return status, nil
+}
+
+// editorRegStatus is editorRegState plus the check of where this copy is:
+// registering makes Windows run this program for every file opened through
+// it, so a program or folder that other users can change is refused.
+func editorRegStatus(p editorRegPlatform, exe string) (editorRegistrationStatus, error) {
+	status, err := editorRegState(p.registry, exe, p.presence)
+	if err != nil || !status.CanRegister {
+		return status, err
+	}
+	for _, path := range []string{exe, editorRegDir(exe)} {
+		others, err := p.access(path)
+		if err != nil {
+			status.LocationProblem = "Windows could not check who can change " + path + " (" + err.Error() + "), so this copy is not registered from there."
+		} else if others != "" {
+			status.LocationProblem = others + " can change " + path + ". Once registered, Windows would run this program for every text file you double-click, so anyone who can change it could run their own program as you. Move this copy into a folder under your user folder (for example Documents or %LOCALAPPDATA%), start it from there, then register."
+		}
+		if status.LocationProblem != "" {
+			status.CanRegister = false
+			status.Message += " " + status.LocationProblem
+			break
+		}
 	}
 	return status, nil
 }
@@ -401,6 +505,10 @@ func planEditorRegister(reg editorRegistry, status editorRegistrationStatus, con
 		return nil, errEditorRegInstalled
 	case !status.NameOK:
 		return nil, errEditorRegName
+	case !status.PathOK:
+		return nil, errEditorRegPercent
+	case status.LocationProblem != "":
+		return nil, fmt.Errorf("%w %s", errEditorRegUnsafe, status.LocationProblem)
 	case status.NeedsTakeover && !takeover:
 		return nil, errEditorRegTakeover
 	}
@@ -680,7 +788,8 @@ type editorRegPlatform struct {
 	registry editorRegistry
 	lock     func() (func(), error)
 	notify   func()
-	missing  editorRegFileCheck
+	presence editorRegFileCheck
+	access   editorRegAccessCheck
 }
 
 // registerEditorCopy and removeEditorCopy run one action under the lock that
@@ -692,8 +801,31 @@ func registerEditorCopy(p editorRegPlatform, exe string, contextMenu, takeover b
 	})
 }
 
+// removeEditorCopy takes back this copy's own registration only.
 func removeEditorCopy(p editorRegPlatform, exe string) (editorRegistrationStatus, error) {
 	return p.run(exe, func(status editorRegistrationStatus) (editorRegPlan, error) {
+		switch status.State {
+		case editorRegThis:
+			return planEditorRemove(p.registry, status)
+		case editorRegSetup:
+			return nil, errEditorRegInstalled
+		}
+		return nil, errEditorRegNothing
+	})
+}
+
+// cleanupEditorCopy removes another copy's registration whose program is
+// confirmed missing. owner is the program the user saw: the registration must
+// still name it, and it must still be missing, when the action runs.
+func cleanupEditorCopy(p editorRegPlatform, exe, owner string) (editorRegistrationStatus, error) {
+	return p.run(exe, func(status editorRegistrationStatus) (editorRegPlan, error) {
+		if status.State == editorRegSetup {
+			return nil, errEditorRegInstalled
+		}
+		if (status.State != editorRegOther && status.State != editorRegUnrecorded) || !status.OwnerMissing ||
+			!(editorRegSamePath(owner, status.Owner) || owner == "" && status.Owner == "") {
+			return nil, errEditorRegStale
+		}
 		return planEditorRemove(p.registry, status)
 	})
 }
@@ -709,7 +841,7 @@ func (p editorRegPlatform) run(exe string, plan func(editorRegistrationStatus) (
 		return editorRegistrationStatus{}, err
 	}
 	defer release()
-	status, err := editorRegState(p.registry, exe, p.missing)
+	status, err := editorRegStatus(p, exe)
 	if err != nil {
 		return status, err
 	}
@@ -720,7 +852,7 @@ func (p editorRegPlatform) run(exe string, plan func(editorRegistrationStatus) (
 	applyErr := steps.apply(p.registry)
 	// SHCNE_ASSOCCHANGED after any change, also a partial one.
 	p.notify()
-	after, err := editorRegState(p.registry, exe, p.missing)
+	after, err := editorRegStatus(p, exe)
 	if applyErr != nil {
 		return after, applyErr
 	}

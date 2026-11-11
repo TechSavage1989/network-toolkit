@@ -299,6 +299,18 @@ Function ValidateInstallDirectory
     StrCpy $0 $0 -1
   ${EndIf}
   StrCpy $INSTDIR $0
+  ; Explorer expands %1, %L and the like anywhere in a registered command, the
+  ; program's own path included, so the path holds no "%".
+  StrLen $1 $INSTDIR
+  StrCpy $2 0
+  ${DoWhile} $2 < $1
+    StrCpy $0 $INSTDIR 1 $2
+    ${If} $0 == "%"
+      StrCpy $R5 "Choose a program folder without a % sign in its path."
+      Return
+    ${EndIf}
+    IntOp $2 $2 + 1
+  ${Loop}
   ${GetRoot} "$INSTDIR" $0
   ${If} $0 == ""
   ${OrIf} $INSTDIR == $0

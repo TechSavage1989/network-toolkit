@@ -29,7 +29,7 @@ function editorHTML(view){
  const buttons=[];
  if(s.canRegister&&!s.needsTakeover)buttons.push('<button type="button" class="btn small" data-windows-editor="register"'+dis+'>'+(s.state==='this'?'Register again':'Register')+'</button>');
  if(s.canRegister&&s.needsTakeover&&!view.confirmTakeover)buttons.push('<button type="button" class="btn small" data-windows-editor="takeover"'+dis+'>Use this copy instead…</button>');
- if(s.canRemove)buttons.push('<button type="button" class="btn small ghost" data-windows-editor="remove"'+dis+'>'+(s.state==='this'?'Remove':'Clean up')+'</button>');
+ if(s.canRemove)buttons.push('<button type="button" class="btn small ghost" data-windows-editor="'+(s.state==='this'?'remove':'cleanup')+'"'+(s.state==='this'?'':' data-owner="'+esc(s.owner||'')+'"')+dis+'>'+(s.state==='this'?'Remove':'Clean up')+'</button>');
  if(buttons.length)body+='<div class="button-row">'+buttons.join('')+'</div>';
  if(view.confirmTakeover)body+='<div class="mt" data-windows-editor-confirm><div class="notice info"><span>Replace the registration of '+esc(s.owner||'the other copy')+' with this copy? Windows will open files with this copy from now on, and the other copy shows that it is no longer registered.</span></div><label class="toggle-row"><input type="checkbox" data-windows-editor-menu'+(view.menu?' checked':'')+dis+'><span><strong>Right-click menu: Edit with Network Toolkit Text Editor</strong></span></label><div class="button-row"><button type="button" class="btn small primary" data-windows-editor="takeover-confirm"'+dis+'>Replace it</button><button type="button" class="btn small ghost" data-windows-editor="takeover-cancel"'+dis+'>Cancel</button></div></div>';
  if(s.state==='this')body+='<p class="help-line">Before you move or delete this folder, choose Remove. Otherwise Windows keeps pointing at the missing program and says it cannot find the app; another copy can then clean up the registration. Running Setup takes the registration over for the installed program.</p>';
@@ -107,13 +107,16 @@ function inject(){
  if(updates&&!updates.querySelector('#windowsFullInstall')){const block=document.createElement('section');block.id='windowsFullInstall';block.className='data-section';updates.append(block);added=true;}
  if(added){editorView.message='';editorView.error='';installView.message='';installView.error='';render();void refresh();}
 }
-async function editorAction(action){
+async function editorAction(action,owner){
  const menu=document.querySelector('[data-windows-editor-menu]');if(menu)editorView.menu=menu.checked;
  if(action==='takeover'){editorView.confirmTakeover=true;editorView.menu=!!shared?.textEditor?.contextMenu;render();return;}
  if(action==='takeover-cancel'){editorView.confirmTakeover=false;render();return;}
  editorView.busy=true;editorView.error='';editorView.message='';render();
  try{
-  if(action==='remove'){const result=await call('/windows-integration/text-editor/remove','POST',{});shared={...shared,textEditor:result.textEditor};editorView.message=result.textEditor?.state==='none'?'Removed. Windows no longer offers this copy\'s Text Editor.':'Removed what this registration had written.';}
+  // Clean up names the program the user saw; the engine refuses if the
+  // registration has changed since (security review 11).
+  if(action==='cleanup'){const result=await call('/windows-integration/text-editor/cleanup','POST',{owner:owner??''});shared={...shared,textEditor:result.textEditor};editorView.message='The registration of the missing program was removed.';}
+  else if(action==='remove'){const result=await call('/windows-integration/text-editor/remove','POST',{});shared={...shared,textEditor:result.textEditor};editorView.message=result.textEditor?.state==='none'?'Removed. Windows no longer offers this copy\'s Text Editor.':'Removed what this registration had written.';}
   else{const result=await call('/windows-integration/text-editor/register','POST',{contextMenu:editorView.menu===true,takeover:action==='takeover-confirm'});shared={...shared,textEditor:result.textEditor};editorView.message='Registered. Choose Network Toolkit Text Editor in Open with or in Settings > Apps > Default apps to use it.';}
   editorView.confirmTakeover=false;
  }catch(error){editorView.error=error.message||String(error);}
@@ -145,12 +148,12 @@ async function installAction(action,version){
 }
 document.addEventListener('click',event=>{
  const editor=event.target.closest?.('[data-windows-editor]');
- if(editor&&!editor.disabled){event.preventDefault();void editorAction(editor.dataset.windowsEditor);return;}
+ if(editor&&!editor.disabled){event.preventDefault();void editorAction(editor.dataset.windowsEditor,editor.dataset.owner);return;}
  const install=event.target.closest?.('[data-windows-install]');
  if(install&&!install.disabled){event.preventDefault();void installAction(install.dataset.windowsInstall,install.dataset.version);return;}
  const clean=event.target.closest?.('[data-windows-cleanup]');
  if(clean){event.preventDefault();const toast=clean.closest('.toast');if(clean.dataset.windowsCleanup==='later'){toast?.remove();return;}
-  clean.disabled=true;call('/windows-integration/text-editor/remove','POST',{}).then(result=>{shared={...shared,textEditor:result.textEditor};toast?.remove();notify('The registration of the missing program was removed.');render();},error=>{toast?.remove();notify('The registration could not be cleaned up: '+(error.message||error),'error');});}
+  clean.disabled=true;call('/windows-integration/text-editor/cleanup','POST',{owner:clean.dataset.owner??''}).then(result=>{shared={...shared,textEditor:result.textEditor};toast?.remove();notify('The registration of the missing program was removed.');render();},error=>{toast?.remove();notify('The registration could not be cleaned up: '+(error.message||error),'error');});}
 },true);
 document.addEventListener('change',event=>{if(event.target.matches?.('[data-windows-editor-menu]'))editorView.menu=event.target.checked;});
 function notify(message,kind){try{if(typeof toast==='function')toast(message,kind);}catch{}}
@@ -167,7 +170,7 @@ async function startupCheck(attempt=0){
  if(!s||!(s.state==='other'||s.state==='unrecorded')||!s.ownerMissing)return;
  const host=document.getElementById('toastStack');if(!host)return;
  const box=document.createElement('div');box.className='toast info';box.id='windowsEditorCleanup';box.setAttribute('role','status');
- box.innerHTML='<span>Windows still offers a Network Toolkit Text Editor at '+esc(s.owner||'a missing location')+', which no longer exists. Clean up that registration?</span><button type="button" class="btn small" data-windows-cleanup="now">Clean up</button><button type="button" class="btn small ghost" data-windows-cleanup="later">Not now</button>';
+ box.innerHTML='<span>Windows still offers a Network Toolkit Text Editor at '+esc(s.owner||'a missing location')+', which no longer exists. Clean up that registration?</span><button type="button" class="btn small" data-windows-cleanup="now" data-owner="'+esc(s.owner||'')+'">Clean up</button><button type="button" class="btn small ghost" data-windows-cleanup="later">Not now</button>';
  host.append(box);
 }
 const watch=()=>{const target=document.getElementById('modalRoot');if(!target){root.setTimeout(watch,500);return;}new MutationObserver(()=>inject()).observe(target,{childList:true,subtree:true});};watch();

@@ -136,16 +136,52 @@ const shot=async(page,name)=>{if(output){fs.mkdirSync(output,{recursive:true});a
 
   await scenario(browser,'a registration whose program is gone is offered for clean up at startup',{
    integration:{supported:true,textEditor:editorStatus('other',{owner:copyB,ownerMissing:true,canRemove:true}),install:installStatus()},
-   handle:async(p,body,f)=>{if(p.endsWith('/text-editor/remove')){f.integration={...f.integration,textEditor:editorStatus('none')};return {data:{textEditor:f.integration.textEditor}};}}
+   handle:async(p,body,f)=>{if(p.endsWith('/text-editor/cleanup')){f.integration={...f.integration,textEditor:editorStatus('none')};return {data:{textEditor:f.integration.textEditor}};}}
   },async(page,requests)=>{
    const notice=page.locator('#windowsEditorCleanup');
    await notice.waitFor({timeout:10000});
    assert.match(await notice.textContent(),/D:\\Portable\\Network_Toolkit\.exe, which no longer exists/);
-   assert.equal(posts(requests,'/text-editor/remove').length,0,'the startup check only reads');
+   assert.equal(posts(requests,'/text-editor/cleanup').length+posts(requests,'/text-editor/remove').length,0,'the startup check only reads');
    await shot(page,'windows-editor-cleanup');
    await notice.locator('[data-windows-cleanup="now"]').click();
    await notice.waitFor({state:'detached'});
-   assert.equal(posts(requests,'/text-editor/remove').length,1);
+   // Clean up has its own request naming the program the user saw; Remove is not used.
+   assert.deepEqual(posts(requests,'/text-editor/cleanup').map(r=>r.body),[{owner:copyB}]);
+   assert.equal(posts(requests,'/text-editor/remove').length,0);
+  });
+
+  await scenario(browser,'Clean up in the section names the program shown',{
+   integration:{supported:true,textEditor:editorStatus('other',{owner:copyB,ownerMissing:true,canRemove:true}),install:installStatus()},
+   handle:async(p,body,f)=>{if(p.endsWith('/text-editor/cleanup')){f.integration={...f.integration,textEditor:editorStatus('none')};return {data:{textEditor:f.integration.textEditor}};}}
+  },async(page,requests)=>{
+   await page.locator('#windowsEditorCleanup [data-windows-cleanup="later"]').click({timeout:10000});
+   await openSettings(page,'editor');
+   const block=page.locator('#windowsTextEditorSettings');
+   await block.locator('[data-windows-editor="cleanup"]').click();
+   await block.locator('[data-windows-editor="cleanup"]').waitFor({state:'detached'});
+   assert.deepEqual(posts(requests,'/text-editor/cleanup').map(r=>r.body),[{owner:copyB}]);
+  });
+
+  await scenario(browser,'a program on a drive that is not connected is not offered for clean up',{
+   integration:{supported:true,textEditor:editorStatus('other',{owner:copyB,ownerMissing:false,ownerUnreachable:true,canRemove:false,message:'Another copy of Network Toolkit is registered, at '+copyB+'. Its drive or network location is not connected (or could not be checked), so this copy cannot tell whether that program still exists.'}),install:installStatus()}
+  },async(page,requests)=>{
+   await page.waitForTimeout(2500);
+   assert.equal(await page.locator('#windowsEditorCleanup').count(),0,'no startup clean up offer');
+   await openSettings(page,'editor');
+   const block=page.locator('#windowsTextEditorSettings');
+   await block.locator('#windowsEditorStatus').waitFor();
+   assert.match(await block.textContent(),/not connected/);
+   assert.equal(await block.locator('[data-windows-editor="cleanup"]').count(),0);
+  });
+
+  await scenario(browser,'a copy that others can change, or with % in its path, offers no Register',{
+   integration:{supported:true,textEditor:editorStatus('none',{canRegister:false,pathOk:false,locationProblem:'BUILTIN\\Users can change C:\\Shared. Once registered, Windows would run this program for every text file you double-click.',message:'Windows does not offer this copy\'s Text Editor. BUILTIN\\Users can change C:\\Shared. Once registered, Windows would run this program for every text file you double-click.'}),install:installStatus()}
+  },async(page,requests)=>{
+   await openSettings(page,'editor');
+   const block=page.locator('#windowsTextEditorSettings');
+   await block.locator('#windowsEditorStatus').waitFor();
+   assert.match(await block.textContent(),/BUILTIN\\Users can change/);
+   assert.equal(await block.locator('[data-windows-editor="register"]').count(),0);
   });
 
   // The download returns while the fixture reports progress in between.

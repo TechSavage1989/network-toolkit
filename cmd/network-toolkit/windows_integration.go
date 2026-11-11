@@ -61,7 +61,7 @@ func (a *application) windowsIntegrationStatus() windowsIntegrationData {
 		data.Error = "The program's location could not be read: " + err.Error()
 		return data
 	}
-	status, err := editorRegState(platform.registry, exe, platform.missing)
+	status, err := editorRegStatus(platform, exe)
 	if err != nil {
 		data.Error = err.Error()
 	}
@@ -117,6 +117,18 @@ func (a *application) handleWindowsIntegration(w http.ResponseWriter, r *http.Re
 		}
 		status, err := removeEditorCopy(platform, exe)
 		a.writeEditorRegResult(w, status, err)
+	case "/text-editor/cleanup":
+		// Clean up names the program the user saw; the engine refuses unless
+		// the registration still names it and it is still missing.
+		var request struct {
+			Owner *string `json:"owner"`
+		}
+		if err := decodeBody(w, r, 8192, &request); err != nil || request.Owner == nil {
+			jsonError(w, http.StatusBadRequest, "Name the registration to clean up.")
+			return
+		}
+		status, err := cleanupEditorCopy(platform, exe, *request.Owner)
+		a.writeEditorRegResult(w, status, err)
 	case "/open-installed":
 		var request struct {
 			Confirm bool `json:"confirm"`
@@ -125,7 +137,7 @@ func (a *application) handleWindowsIntegration(w http.ResponseWriter, r *http.Re
 			jsonError(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		status, err := editorRegState(platform.registry, exe, platform.missing)
+		status, err := editorRegState(platform.registry, exe, platform.presence)
 		if err != nil {
 			jsonError(w, http.StatusServiceUnavailable, err.Error())
 			return
@@ -135,7 +147,7 @@ func (a *application) handleWindowsIntegration(w http.ResponseWriter, r *http.Re
 			jsonError(w, http.StatusConflict, "The installed program is not available from this copy.")
 			return
 		}
-		if platform.missing(installed) {
+		if platform.presence(installed) != editorRegPresent {
 			jsonError(w, http.StatusConflict, "The installed program's file is missing at "+installed+". Run Setup to repair it.")
 			return
 		}
@@ -165,7 +177,8 @@ func (a *application) writeEditorRegResult(w http.ResponseWriter, status editorR
 	case errors.Is(err, errEditorRegTakeover):
 		jsonResponse(w, code, map[string]any{"error": err.Error(), "needsTakeover": true, "textEditor": status})
 		return
-	case errors.Is(err, errEditorRegInstalled), errors.Is(err, errEditorRegName), errors.Is(err, errEditorRegNothing):
+	case errors.Is(err, errEditorRegInstalled), errors.Is(err, errEditorRegName), errors.Is(err, errEditorRegNothing),
+		errors.Is(err, errEditorRegPercent), errors.Is(err, errEditorRegUnsafe), errors.Is(err, errEditorRegStale):
 	default:
 		code = http.StatusServiceUnavailable
 	}
@@ -178,7 +191,9 @@ func (a *application) writeEditorRegResult(w http.ResponseWriter, status editorR
 // no argument, opens no window, settings or data folder, and shows no message.
 // Exit codes: 0 done; 2 failed; 3 the installed program is registered; 4
 // another copy is registered (use takeover); 5 the program file is not named
-// Network_Toolkit.exe; 6 nothing of this copy's to remove.
+// Network_Toolkit.exe; 6 nothing of this copy's to remove, or nothing that
+// may be cleaned up; 7 this copy's location is refused (a "%" in its path, or
+// others can change the program or its folder).
 const textEditorRegistrationFlag = "text-editor-registration"
 
 func runTextEditorRegistrationCommand(action string) int {
@@ -193,19 +208,14 @@ func runTextEditorRegistrationCommand(action string) int {
 	switch action {
 	case "register", "register-menu", "takeover", "takeover-menu":
 		_, err = registerEditorCopy(platform, exe, strings.HasSuffix(action, "-menu"), strings.HasPrefix(action, "takeover"))
-	case "remove", "cleanup":
+	case "remove":
+		_, err = removeEditorCopy(platform, exe)
+	case "cleanup":
+		// The owner this run reads is the one it names (the page names the
+		// one the user saw).
 		var status editorRegistrationStatus
-		if status, err = editorRegState(platform.registry, exe, platform.missing); err == nil {
-			if action == "remove" && status.State != editorRegThis {
-				err = errEditorRegNothing
-				if status.State == editorRegSetup {
-					err = errEditorRegInstalled
-				}
-			} else if action == "cleanup" && status.State == editorRegThis {
-				err = errEditorRegNothing
-			} else {
-				_, err = removeEditorCopy(platform, exe)
-			}
+		if status, err = editorRegState(platform.registry, exe, platform.presence); err == nil {
+			_, err = cleanupEditorCopy(platform, exe, status.Owner)
 		}
 	default:
 		return 2
@@ -219,8 +229,10 @@ func runTextEditorRegistrationCommand(action string) int {
 		return 4
 	case errors.Is(err, errEditorRegName):
 		return 5
-	case errors.Is(err, errEditorRegNothing):
+	case errors.Is(err, errEditorRegNothing), errors.Is(err, errEditorRegStale):
 		return 6
+	case errors.Is(err, errEditorRegPercent), errors.Is(err, errEditorRegUnsafe):
+		return 7
 	}
 	return 2
 }

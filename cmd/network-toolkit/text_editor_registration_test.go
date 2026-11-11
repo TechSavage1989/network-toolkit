@@ -205,14 +205,16 @@ func testEditorPlatform(reg *fakeRegistry, missing ...string) (editorRegPlatform
 		registry: reg,
 		lock:     func() (func(), error) { return func() {}, nil },
 		notify:   func() { notified++ },
-		missing: func(path string) bool {
+		presence: func(path string) editorRegPresence {
 			for _, m := range missing {
 				if strings.EqualFold(m, path) {
-					return true
+					return editorRegAbsent
 				}
 			}
-			return false
+			return editorRegPresent
 		},
+		// Only this user, SYSTEM and Administrators can change the copies.
+		access: func(string) (string, error) { return "", nil },
 	}, &notified
 }
 
@@ -441,7 +443,7 @@ func TestEditorRegistrationOwnershipStates(t *testing.T) {
 	t.Run("nothing", func(t *testing.T) {
 		reg := fixtureRegistry()
 		platform, _ := testEditorPlatform(reg)
-		status, err := editorRegState(reg, testCopyA, platform.missing)
+		status, err := editorRegState(reg, testCopyA, platform.presence)
 		if err != nil || status.State != editorRegNone || !status.CanRegister || status.CanRemove || status.NeedsTakeover {
 			t.Fatalf("%+v %v", status, err)
 		}
@@ -454,7 +456,7 @@ func TestEditorRegistrationOwnershipStates(t *testing.T) {
 		setup(reg)
 		before := reg.dump()
 		platform, notified := testEditorPlatform(reg)
-		status, _ := editorRegState(reg, testCopyA, platform.missing)
+		status, _ := editorRegState(reg, testCopyA, platform.presence)
 		if status.State != editorRegSetup || status.CanRegister || status.CanRemove || status.NeedsTakeover || !status.Installed || status.ThisIsInstalled {
 			t.Fatalf("%+v", status)
 		}
@@ -473,7 +475,7 @@ func TestEditorRegistrationOwnershipStates(t *testing.T) {
 			t.Fatal("a refused action changed the registry")
 		}
 		// The installed program itself sees that it is the installed one.
-		status, _ = editorRegState(reg, `C:\Users\u\AppData\Local\Programs\Network Toolkit\Network_Toolkit.exe`, platform.missing)
+		status, _ = editorRegState(reg, `C:\Users\u\AppData\Local\Programs\Network Toolkit\Network_Toolkit.exe`, platform.presence)
 		if !status.ThisIsInstalled || status.CanRegister {
 			t.Fatalf("installed copy: %+v", status)
 		}
@@ -485,7 +487,7 @@ func TestEditorRegistrationOwnershipStates(t *testing.T) {
 			t.Fatal(err)
 		}
 		recordsBefore, _ := editorRegRecords(reg)
-		status, _ := editorRegState(reg, testCopyA, platform.missing)
+		status, _ := editorRegState(reg, testCopyA, platform.presence)
 		if status.State != editorRegOther || status.Owner != testCopyB || status.OwnerMissing || !status.NeedsTakeover || status.CanRemove {
 			t.Fatalf("other copy: %+v", status)
 		}
@@ -522,7 +524,7 @@ func TestEditorRegistrationOwnershipStates(t *testing.T) {
 			}
 		}
 		// B now sees A.
-		status, _ = editorRegState(reg, testCopyB, platform.missing)
+		status, _ = editorRegState(reg, testCopyB, platform.presence)
 		if status.State != editorRegOther || status.Owner != testCopyA {
 			t.Fatalf("B after takeover: %+v", status)
 		}
@@ -535,11 +537,12 @@ func TestEditorRegistrationOwnershipStates(t *testing.T) {
 			t.Fatal(err)
 		}
 		platform, _ = testEditorPlatform(reg, testCopyB)
-		status, _ := editorRegState(reg, testCopyA, platform.missing)
+		status, _ := editorRegState(reg, testCopyA, platform.presence)
 		if status.State != editorRegOther || !status.OwnerMissing || !status.CanRemove || !strings.Contains(status.Message, "no longer exists") {
 			t.Fatalf("missing: %+v", status)
 		}
-		if _, err := removeEditorCopy(platform, testCopyA); err != nil {
+		// Clean up names the program the user saw (security review 11).
+		if _, err := cleanupEditorCopy(platform, testCopyA, testCopyB); err != nil {
 			t.Fatal(err)
 		}
 		if reg.dump() != before {
@@ -550,11 +553,11 @@ func TestEditorRegistrationOwnershipStates(t *testing.T) {
 		reg := fixtureRegistry()
 		reg.SetString(editorRegProgKey+`\shell\open\command`, "", editorRegCommand(`F:\Old\Network_Toolkit.exe`))
 		platform, _ := testEditorPlatform(reg, `F:\Old\Network_Toolkit.exe`)
-		status, _ := editorRegState(reg, testCopyA, platform.missing)
+		status, _ := editorRegState(reg, testCopyA, platform.presence)
 		if status.State != editorRegUnrecorded || status.Owner != `F:\Old\Network_Toolkit.exe` || !status.OwnerMissing || !status.NeedsTakeover || !status.CanRemove {
 			t.Fatalf("unrecorded: %+v", status)
 		}
-		if _, err := removeEditorCopy(platform, testCopyA); err != nil {
+		if _, err := cleanupEditorCopy(platform, testCopyA, `F:\Old\Network_Toolkit.exe`); err != nil {
 			t.Fatal(err)
 		}
 		if reg.has(editorRegProgKey) {
@@ -565,7 +568,7 @@ func TestEditorRegistrationOwnershipStates(t *testing.T) {
 		reg := fixtureRegistry()
 		platform, _ := testEditorPlatform(reg)
 		before := reg.dump()
-		status, _ := editorRegState(reg, `C:\Tools\Network_Toolkit_1.21.44.exe`, platform.missing)
+		status, _ := editorRegState(reg, `C:\Tools\Network_Toolkit_1.21.44.exe`, platform.presence)
 		if status.NameOK || status.CanRegister {
 			t.Fatalf("%+v", status)
 		}

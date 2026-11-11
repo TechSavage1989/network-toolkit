@@ -76,6 +76,12 @@ test('the portable program registers exactly Setup\'s list and keys, from the sa
  assert(main.indexOf('!insertmacro RegisterApplication')<main.indexOf('!insertmacro RetirePortableRegistration'),'the portable record is retired after the registration is written');
  assert(main.indexOf('!insertmacro RegisterContextMenu')<main.indexOf('!insertmacro RetirePortableRegistration'));
  assert.match(code,/ReadRegDWORD \$0 HKCU "\$\{PORTABLE_KEY\}" "ContextMenu"\s+\$\{If\} \$0 == 1\s+!insertmacro SelectSection \$\{ContextMenu\}/,'the portable copy\'s right-click choice is carried over');
+ // Explorer expands %1, %L and the like in a command's program path too:
+ // Setup refuses such a folder, and the portable copy refuses to register
+ // from one, or from a folder others can change (security review 11).
+ assert.match(code,/\$\{If\} \$0 == "%"\s+StrCpy \$R5 "Choose a program folder without a % sign in its path\."/);
+ assert.match(go,/PathOK: !strings\.Contains\(exe, "%"\)/);
+ for(const text of ["'without a % sign in its path'","Invoke-Registration $portableShared 'register' 7","Invoke-Registration $portableA 'cleanup' 6"])assert(ps1.includes(text),'verify-windows.ps1 no longer has '+text);
  // The hosted check runs both orders: portable first then Setup, and Setup first.
  for(const text of ['"--text-editor-registration=$Action"',"Invoke-Registration $portableA 'register-menu' 0","Invoke-Registration $portableB 'takeover' 0","Invoke-Registration $portableA 'cleanup' 0","Invoke-Registration $portableA 'register' 3",'Assert-Absent $portableKey','the portable record is retired',"Assert-Same (Get-ClassesTree) $classesBefore"])assert(ps1.includes(text),'verify-windows.ps1 no longer has '+text);
 });

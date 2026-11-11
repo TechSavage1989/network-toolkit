@@ -242,5 +242,5 @@ func editorRegNotifyShell() {
 }
 
 func editorRegDefaultPlatform() (editorRegPlatform, bool) {
-	return editorRegPlatform{registry: windowsEditorRegistry{}, lock: editorRegSetupLock, notify: editorRegNotifyShell, missing: editorRegFileMissing}, true
+	return editorRegPlatform{registry: windowsEditorRegistry{}, lock: editorRegSetupLock, notify: editorRegNotifyShell, presence: editorRegFileState, access: editorRegWritableByOthers}, true
 }
