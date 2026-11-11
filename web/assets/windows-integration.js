@@ -81,15 +81,18 @@ const channel=()=>{try{return typeof state!=='undefined'&&state?.appUpdatePrefer
 const editorView={data:null,busy:false,error:'',message:'',menu:null,confirmTakeover:false};
 const installView={busy:false,error:'',message:'',reinstall:false,confirmDownload:false,confirmStart:false};
 let shared=null;
+// Both sections stay hidden until the engine says it supports them (the
+// Windows main window); a read that fails is shown in the Editor section.
 function render(){
  installView.data=editorView.data=shared;
- const e=document.getElementById('windowsTextEditorSettings');if(e)e.innerHTML=editorHTML(editorView);
- const i=document.getElementById('windowsFullInstall');if(i){i.innerHTML=installHTML(installView);i.hidden=!i.innerHTML;}
+ const supported=shared?.supported===true;
+ const e=document.getElementById('windowsTextEditorSettings');if(e){e.innerHTML=supported||editorView.error?editorHTML(editorView):'';e.hidden=!e.innerHTML;}
+ const i=document.getElementById('windowsFullInstall');if(i){i.innerHTML=supported?installHTML(installView):'';i.hidden=!i.innerHTML;}
  document.querySelector('[data-windows-editor-confirm],[data-windows-install-confirm]')?.scrollIntoView?.({block:'nearest'});
 }
 async function refresh(){
- try{shared=await call('/windows-integration');editorView.error=editorView.error||'';}
- catch(error){editorView.error='The Windows registration could not be read: '+(error.message||error);}
+ try{shared=await call('/windows-integration');}
+ catch(error){if(shared?.supported===true)editorView.error='The Windows registration could not be read: '+(error.message||error);}
  render();return shared;
 }
 function inject(){
