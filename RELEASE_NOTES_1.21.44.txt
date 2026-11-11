@@ -13,5 +13,5 @@ Network Toolkit 1.21.44
 - A file that is not text (a program, an archive, an image) is shown read-only and can never be saved over.
 - A file with mixed line endings keeps each line's own ending; lines you type get the most common one. Choosing LF, CRLF or CR converts all of them.
 - Text that is not valid UTF-8 is read as Windows-1252 and saved the same way. If you type a character that encoding does not have, the save stops and tells you to switch to UTF-8; nothing is replaced.
-- The right-click entry is off unless you tick it in Setup (or use /ContextMenu with silent setup). On Windows 11 it is under Show more options.
+- The right-click entry is off unless you tick it in Setup (or use /ContextMenu with silent setup; /NoContextMenu removes it again). On Windows 11 it is under Show more options.
 - Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.
