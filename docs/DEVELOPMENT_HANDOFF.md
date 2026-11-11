@@ -1,3 +1,21 @@
+# v1.21.46 Beta 1 - The portable program works with Windows
+
+Owner: "i want option 2 for full functionality" (the portable copy writes the same per-user registrations as Setup, with Remove) and "id also like an option for the portable version to be able to download the full install version if desired."
+
+v1.21.45 was published and verified: tag at merge commit 517757c (PR #167), release run 42970739003 green (build, windows-setup, publish), all seven assets matching GitHub's digests, `github_release.py verify` reporting "Verified 1.21.45", stable channel still at v1.21.34. It is the first release built with Go 1.26.11 (PR #168, GO-2026-6859 in net/http).
+
+Portable registration (`cmd/network-toolkit/text_editor_registration*.go`, App settings → Editor of the Windows main window): the same keys, values and file-type list as Setup (the Go list is generated from `scripts/installer/text-extensions.nsh`), commands pointing at the portable exe, the editor icon for program values and the document icon (3) for the ProgID; record and created keys under `Software\Network Toolkit\PortableTextEditor`; Remove deletes only recorded keys and only when empty (Go port of `DeleteEmptyUserKey`). Ownership: refused while Setup is installed; one portable copy at a time (takeover after confirming); Setup adopts a portable registration and retires its record only after its own registration is written; clean-up of a copy whose program is missing has its own request naming the program shown; a drive that is not connected is "unknown", not missing. Refused for a path containing % (Setup refuses such a folder too) and for a copy others can change. A hidden `--text-editor-registration=` switch, accepted only alone, serves the hosted check.
+
+Install the full version (`cmd/network-toolkit/full_install*.go`, App settings → Updates): this version's Setup asset from the release (a fallback only when newer, and named), downloaded after consent through the updater's own download functions and verified with `updateVerifySum` against the release's SHA256SUMS; stored in `%LOCALAPPDATA%\NetworkToolkit-Setup` with an owner-only DACL (never the data folder); started after a second confirmation from a handle opened with read sharing only, hashed from that handle and held until CreateProcess returns.
+
+A security review found two MEDIUM issues (the started Setup could differ from the verified bytes in a folder others can write to; the fallback could offer an older release as an update) and four LOW ones; all fixed. The Windows-only tests (`full_install_windows_test.go`, the registration DACL test) run in the `windows-terminal` job.
+
+Also in this release (branch fix/peer-send-main-grace): Send to gives the main window up to 3 s to report before passing it over (`peerMainGrace`), and `scripts/standalone-peer-live.browser.cjs` waits for the main window to be listed before clicking. Known limit: a main window minimised for a long time may have its page's 1-second inbox poll throttled; a long-poll inbox is the proposed fix.
+
+Known limits: Explorer's behaviour and the real Setup start were exercised under Wine and by hosted checks, not on a physical PC; in-app updates do not register anything (only the portable section or Setup does).
+
+---
+
 # v1.21.45 Beta 1 - A document icon for files opened with the Text Editor
 
 Owner: "id like the icon files that set text editor to open as to be the icon image of the paper sheet, but not the background or border of the icon." The owner approved a rendered preview (outlined page, larger, transparent background).

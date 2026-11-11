@@ -79,6 +79,8 @@
 
 The [releases page](https://github.com/TechSavage1989/network-toolkit/releases) also offers **`Network_Toolkit_<version>_Windows_x64_Setup.exe`**. Choose an install folder, an optional desktop shortcut and an optional **Edit with Network Toolkit Text Editor** entry in the Explorer right-click menu. Setup adds separate Start menu shortcuts for Toolkit, Text Editor and Terminal; the Text Editor and Terminal apps can send text to each other. See [Windows installation and defaults](docs/guide/settings-and-updates.md#windows-installation-and-defaults).
 
+Started from the portable package, Network Toolkit can do the same from **App settings**: **Editor → Use this copy's Text Editor in Windows** offers the portable copy's Text Editor in Windows' **Open with** and **Default apps** (with an optional right-click entry), and **Updates → Install the full version** downloads Setup for the same version, checks it against **`SHA256SUMS`** and starts it when you confirm. Both keep your data folder and settings. See [Portable copy: Text Editor in Windows](docs/guide/editor.md#portable-copy-use-its-text-editor-in-windows) and [Install the full version](docs/guide/settings-and-updates.md#install-the-full-version-from-the-portable-copy).
+
 **Linux (beta):** the Linux edition is an opt-in beta while it gains every Windows feature ([plan](docs/LINUX_PLAN.md)). Download **`Network_Toolkit_<version>_Linux_x86_64.tar.gz`** (or **`_Linux_aarch64.tar.gz`** for 64-bit Arm) from the [releases page](https://github.com/TechSavage1989/network-toolkit/releases); the same **`SHA256SUMS`** lists it.
 
 ## Requirements

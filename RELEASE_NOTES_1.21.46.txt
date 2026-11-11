@@ -1,0 +1,15 @@
+Network Toolkit 1.21.46
+
+## What's New
+
+- The portable program can now offer its Text Editor to Windows, just like the installed one: for the same file types, under Open with for any file, and with the optional right-click entry. Remove takes it all out again.
+- The portable program can download and run the full installer for you, after asking, so you can switch to the installed version without visiting the download page.
+- Send to from a standalone app now waits a moment for an open Toolkit window instead of opening a second app.
+
+## Additional Details
+
+- Find both in the Toolkit window under App settings: Editor for the Windows registration, Updates for the installer.
+- The registration is refused while the installed version is present (its own registration is used), for a copy in a folder other people can change, and for a folder whose name contains %. Only one portable copy can be registered at a time. Installing later takes the registration over cleanly.
+- Windows still decides the default app: choose the Text Editor with Open with, Always, or in Default apps.
+- The installer is the one for this version (or a newer one, which is named), checked against the release's checksums, kept in a folder only you can change, and started only after you confirm a second time. Your data folder and settings carry over, and the portable copy stays where it is.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.

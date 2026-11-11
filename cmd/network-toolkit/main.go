@@ -130,6 +130,7 @@ type application struct {
 	dragTickets                  map[string]remoteDragTicket
 	httpGate                     sync.RWMutex
 	updater                      appUpdater
+	fullInstall                  fullInstallState // "Install the full version" (full_install.go)
 	updateHealthDir              string
 	updateFinalizing             atomic.Bool
 }
@@ -171,7 +172,23 @@ func main() {
 	packetParent := flag.Uint("packet-capture-parent", 0, "Expected packet capture helper parent process")
 	shellHelper := flag.String("terminal-shell-helper", "", "Private administrator terminal pipe")
 	shellParent := flag.Uint("terminal-shell-parent", 0, "Expected administrator terminal parent")
+	editorRegistration := flag.String(textEditorRegistrationFlag, "", "Private Text Editor registration action for the hosted Setup check")
 	flag.Parse()
+	// Alone only: no other switch, no argument, no window and no data folder.
+	registrationRequested, registrationOther := false, false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == textEditorRegistrationFlag {
+			registrationRequested = true
+		} else {
+			registrationOther = true
+		}
+	})
+	if registrationRequested {
+		if registrationOther || flag.NArg() != 0 {
+			os.Exit(2)
+		}
+		os.Exit(runTextEditorRegistrationCommand(*editorRegistration))
+	}
 	shellRequested, shellOther := false, false
 	flag.Visit(func(f *flag.Flag) {
 		if f.Name == "terminal-shell-helper" || f.Name == "terminal-shell-parent" {
@@ -356,6 +373,7 @@ func main() {
 		a.updateFinalizing.Store(true)
 	}
 	defer a.cleanupStagedUpdate()
+	defer a.cleanupFullInstall()
 	if !editorStandalone {
 		a.storage = storage
 	}
@@ -761,6 +779,8 @@ func (a *application) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		a.handleTerminalWindow(w, r)
 	case r.URL.Path == "/api/terminal-links" || strings.HasPrefix(r.URL.Path, "/api/terminal-links/"):
 		a.handleTerminalLinks(w, r)
+	case r.URL.Path == windowsIntegrationPath || strings.HasPrefix(r.URL.Path, windowsIntegrationPath+"/"):
+		a.handleWindowsIntegration(w, r)
 	case r.URL.Path == "/api/credential-vault":
 		a.handleCredentialVault(w, r)
 	case r.URL.Path == "/api/credentials" || strings.HasPrefix(r.URL.Path, "/api/credentials/"):
