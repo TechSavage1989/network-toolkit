@@ -354,6 +354,49 @@ the same Terminal workspace with the same data, and both cannot run at once
 for one data root. The update rollback slot (`updates/<hash of the program
 folder>`) is per folder, so all three programs of a folder share it.
 
+## Review follow-ups
+
+- **Start check.** The update helper runs each separate program it placed
+  with `--version` (it must exit 0 and name the installed version within
+  30 s) before it starts the new main program; if one does not start, every
+  file is put back. `Network_Toolkit.exe` that forwards a standalone app
+  watches the separate program for 3 s and runs the app itself when that
+  program exits with a failure in that time (a successful exit is a
+  hand-over, a running program owns the window; neither is started twice).
+- **Unconfirmed update.** Until the helper confirms the update, the restarted
+  main window opens no separate terminal window, so undoing the update does
+  not meet a separate program it started.
+- **Setup over left-behind programs.** An uninstaller of 1.21.46 or older
+  leaves the separate programs behind after an in-app update added them. Only
+  `Network_Toolkit.exe` or `Uninstall.exe` make a folder another installation;
+  left-behind separate programs are replaced once they are closed.
+- **Release gate.** `FIRST_SEPARATE_PROGRAMS` is 1.21.47: the published
+  1.21.44 to 1.21.46 still verify with one program.
+
+## Known limits
+
+- **Open windows are found by data root.** The updater's "close these first"
+  check looks for the separate Text Editor and Terminal windows of the data
+  root, not of the program folder. A Terminal of the same data root opened
+  from another portable copy is listed too (close it or ignore the list and
+  close it later); one that uses another data root is not, and if it runs
+  from this folder its file stays in use, so the update fails and puts every
+  file back.
+- **Download time under released updaters.** The Update ZIP is about 26 MB.
+  Released updaters download it with their existing 5-minute limit, as they
+  did the 8.8 MB package: on a connection slower than about 90 KB/s the
+  download stops with the existing message and nothing changes; the portable
+  ZIP or Setup remain available.
+- **A lone program gets company.** A copy of `Network_Toolkit.exe` kept on its
+  own (for example the single-file release asset) is offered **Install the
+  separate programs**, and the next update adds the two separate programs
+  beside it, because releases ship all three together.
+- **Programs started outside the main window during an unconfirmed update.**
+  A separate program started from the Start menu, or through a link, while the
+  helper waits for the new version is not stopped by it; if the update is then
+  put back, that file is in use and the helper reports which file to restore
+  (as it does for the main program).
+
 ## Tests
 
 - Go: edition rules for each build, forwarding and launch selection
