@@ -262,11 +262,17 @@ them as its own.
     and the updater page shows **Install the separate programs** with the
     reason. It is not retried automatically; the next update installs all
     three anyway.
-  - While it runs, the Updates page says that the programs are being added
-    (it reads the status every 2 s) and other update actions that download or
-    install are refused until it ends (checking for updates still works);
-    then it shows "The separate Text Editor and Terminal programs were added."
-    once.
+  - From the first status read of such a start (`--update-health` given and
+    the programs missing), the status reports `pending` and the Updates page
+    says that they will be added, without the manual button (the engine
+    refuses it while pending); the helper's confirmation can take up to 95 s.
+    The page reads the status every 2 s while pending or running. A start
+    whose update is not confirmed, or that does not qualify, drops `pending`.
+    While it runs, the install holds the updater's network slot
+    (`networkBusy`), like the manual button, so no check, download or
+    "Install with Setup" runs beside it; the page's automatic checks wait and
+    every other update action is refused with a plain message. Then the page
+    shows "The separate Text Editor and Terminal programs were added." once.
   - **Start menu shortcuts of an installed copy.** After either path placed the
     programs, and only when Setup's uninstall key's `InstallLocation` is the
     running program's folder, the shortcuts **Network Toolkit Text Editor**
@@ -275,7 +281,17 @@ them as its own.
     with their icon 0, as Setup does. Only Setup's own shortcuts change, by
     Setup's rule (`IsOwnedShortcut`): target `$INSTDIR\Network_Toolkit.exe`
     with `--editor-standalone`/`--editor` or `--terminal`. A shortcut that
-    points elsewhere, has other arguments, or is a link is left as it is. The
+    points elsewhere, has other arguments, or is a link is left as it is.
+    **Only when the installed uninstaller removes the new form:** an in-app
+    update never replaces `Uninstall.exe`, and the uninstaller of 1.21.46 or
+    older recognises only shortcuts that start `Network_Toolkit.exe`, so it
+    would leave retargeted shortcuts (and the folder) behind. The uninstall
+    key's `DisplayVersion` is written only by Setup, so it is the version of
+    the uninstaller; it must be a strict `x.y.z` of at least 1.21.47 (the
+    first Setup with the separate-program form in `IsOwnedShortcut`).
+    Otherwise, or when it cannot be read, the shortcuts are left for the next
+    Setup and the Updates page says so (`startMenu: "next-setup"`); they keep
+    working through forwarding. The
     change goes through the Shell's IShellLinkW (target, arguments and icon
     only), a copy is saved outside the Start menu and checked, and the
     original is overwritten only while it still holds the bytes that were read

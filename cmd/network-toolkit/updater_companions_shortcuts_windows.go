@@ -44,6 +44,10 @@ func companionShortcutNativeOps(reg editorRegistry) companionShortcutOps {
 			value, found, ok, err := reg.String(editorRegUninstall, "InstallLocation")
 			return value, found && ok, err
 		},
+		setupVersion: func() (string, bool, error) {
+			value, found, ok, err := reg.String(editorRegUninstall, "DisplayVersion")
+			return value, found && ok, err
+		},
 		programsFolder: func() (string, error) { return updateShortcutKnownFolder(companionProgramsFolderID) },
 		exists:         companionShortcutExists,
 		read:           companionShortcutReadNative,

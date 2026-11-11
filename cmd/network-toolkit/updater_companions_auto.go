@@ -35,12 +35,17 @@ import (
 // companionInstallState is the last install of the separate programs in this
 // run: Automatic after an update, otherwise the manual button.
 type companionInstallState struct {
-	Automatic bool   `json:"automatic"`
-	State     string `json:"state"` // running, added or failed
-	Reason    string `json:"reason,omitempty"`
+	Automatic bool `json:"automatic"`
+	// State: pending (an update start that qualifies, waiting for the helper's
+	// confirmation), running, added or failed.
+	State  string `json:"state"`
+	Reason string `json:"reason,omitempty"`
 	// Shortcuts: why Setup's Start menu shortcuts could not be pointed at the
 	// separate programs (they keep working through Network_Toolkit.exe).
 	Shortcuts string `json:"shortcuts,omitempty"`
+	// StartMenu "next-setup": the installed uninstaller is older than the
+	// separate programs, so the next Setup points the shortcuts at them.
+	StartMenu string `json:"startMenu,omitempty"`
 }
 
 // companionPlatformSupported: the separate programs exist for the Windows x64
@@ -51,29 +56,62 @@ var companionPlatformSupported = func() bool { return runtime.GOOS == "windows" 
 // installed copy in dir at the separate programs (platform file; tests replace it).
 var updateCompanionShortcuts = updateCompanionShortcutsNative
 
-// companionsBlockLocked refuses every update action that downloads, stages or
-// installs while the separate programs are being added. Caller holds updater.mu.
+// companionsBlockLocked: while the separate programs are being added, every
+// update action that uses the network is refused (the slot is reserved as for
+// the manual button); while they are pending, the manual button only. Caller
+// holds updater.mu.
 func (a *application) companionsBlockLocked(path string) string {
-	if s := a.updater.companionsInstall; s == nil || s.State != "running" {
-		return ""
+	s := a.updater.companionsInstall
+	switch {
+	case s == nil:
+	case s.State == "pending" && path == "/api/updates/companions":
+		return "The separate Text Editor and Terminal programs will be added in a moment."
+	case s.State == "running" && path != "/api/updates/open-releases":
+		return "The separate Text Editor and Terminal programs are being added. Try again when that has finished."
 	}
-	switch path {
-	case "/api/updates/check", "/api/updates/open-releases":
-		return ""
+	return ""
+}
+
+// markCompanionsPending: from the start of a run that follows an update and
+// lacks its separate programs, the Updates page shows that they will be added
+// (and offers no button) until the install runs or does not.
+func (a *application) markCompanionsPending() {
+	if a.updateHealthDir == "" {
+		return
 	}
-	return "The separate Text Editor and Terminal programs are being added. Try again when that has finished."
+	a.updater.mu.Lock()
+	defer a.updater.mu.Unlock()
+	status := a.companionStatusLocked()
+	a.updater.companions = nil // read again once the program's name is settled
+	if a.updater.companionsInstall == nil && status != nil && status.Needed {
+		a.updater.companionsInstall = &companionInstallState{Automatic: true, State: "pending"}
+	}
+}
+
+// clearCompanionsPending ends a pending install that will not run.
+func (a *application) clearCompanionsPending() {
+	a.updater.mu.Lock()
+	defer a.updater.mu.Unlock()
+	a.clearCompanionsPendingLocked()
+}
+
+func (a *application) clearCompanionsPendingLocked() {
+	if s := a.updater.companionsInstall; s != nil && s.State == "pending" {
+		a.updater.companionsInstall = nil
+	}
 }
 
 // installCompanionsAfterUpdate adds the separate programs in the start that
 // follows an update the user approved and the helper confirmed. confirmed is
 // awaitUpdateCommit's answer for this run's --update-health folder.
 func (a *application) installCompanionsAfterUpdate(ctx context.Context, confirmed bool, client *http.Client, metadataURL string) {
+	a.updater.mu.Lock()
+	defer a.updater.mu.Unlock()
+	defer a.clearCompanionsPendingLocked() // whatever did not start
 	if a.updateHealthDir == "" || !confirmed {
 		return
 	}
-	a.updater.mu.Lock()
-	defer a.updater.mu.Unlock()
-	if a.updater.companionsInstall != nil {
+	if s := a.updater.companionsInstall; s != nil && s.State != "pending" {
 		return // once per update, whatever the result
 	}
 	status := a.companionStatusLocked()
@@ -81,8 +119,7 @@ func (a *application) installCompanionsAfterUpdate(ctx context.Context, confirme
 		return
 	}
 	// A check or a manual action that started first finishes first (a check
-	// takes at most about 25 s); a manual install of the same programs makes
-	// this one unnecessary.
+	// takes at most about 25 s).
 	for deadline := time.Now().Add(40 * time.Second); a.updater.networkBusy || a.updater.installing; {
 		if time.Now().After(deadline) || ctx.Err() != nil {
 			return
@@ -94,7 +131,7 @@ func (a *application) installCompanionsAfterUpdate(ctx context.Context, confirme
 		}
 		a.updater.mu.Lock()
 	}
-	if a.updater.companionsInstall != nil || a.updater.staged != nil {
+	if s := a.updater.companionsInstall; s != nil && s.State != "pending" || a.updater.staged != nil {
 		return
 	}
 	a.updater.companions = nil
@@ -103,6 +140,10 @@ func (a *application) installCompanionsAfterUpdate(ctx context.Context, confirme
 	}
 	state := &companionInstallState{Automatic: true, State: "running"}
 	a.updater.companionsInstall = state
+	// The network slot, as for the manual button: no check, download or
+	// "Install with Setup" (fullInstallReserveNetwork) runs beside it.
+	a.updater.networkBusy = true
+	defer func() { a.updater.networkBusy = false }()
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Minute)
 	defer cancel()
 	err := a.updateInstallCompanionsFromRelease(ctx, client, metadataURL)
@@ -124,7 +165,10 @@ func (a *application) companionShortcutsLocked(state *companionInstallState) {
 	if err == nil {
 		err = updateCompanionShortcuts(filepath.Dir(exe))
 	}
-	if err != nil {
+	switch {
+	case errors.Is(err, errCompanionShortcutsNextSetup):
+		state.StartMenu = "next-setup"
+	case err != nil:
 		state.Shortcuts = err.Error()
 		log.Print("Start menu shortcuts of the separate programs: ", err)
 	}
@@ -141,9 +185,23 @@ var companionShortcuts = []struct {
 	{"Network Toolkit Terminal.lnk", terminalProgramWindows, []string{"--terminal"}},
 }
 
+// companionShortcutUninstallerVersion is the first Setup whose uninstaller
+// recognises and removes Start menu shortcuts that start the separate programs
+// (IsOwnedShortcut with PROGRAM in windows.nsi; 1.21.46 has no such form).
+const companionShortcutUninstallerVersion = "1.21.47"
+
+// errCompanionShortcutsNextSetup: Setup's shortcuts were left for the next
+// Setup to change, because the installed uninstaller is older than
+// companionShortcutUninstallerVersion (or its version could not be read).
+// Nothing is lost: Network_Toolkit.exe forwards to the separate programs.
+var errCompanionShortcutsNextSetup = errors.New("The Start menu shortcuts will be pointed at the separate programs by the next Setup.")
+
 type companionShortcutOps struct {
 	// installLocation: InstallLocation of Setup's uninstall key (HKCU).
 	installLocation func() (string, bool, error)
+	// setupVersion: DisplayVersion of Setup's uninstall key, written only by
+	// Setup (never by the in-app updater): the version of its uninstaller.
+	setupVersion func() (string, bool, error)
 	// programsFolder: this user's Start menu Programs folder ($SMPROGRAMS).
 	programsFolder func() (string, error)
 	// exists: a regular file (not a link) is at that path.
@@ -173,7 +231,9 @@ func updateRetargetCompanionShortcuts(dir string, ops companionShortcutOps) erro
 		return err
 	}
 	main := editorRegJoin(location, mainProgramWindows)
+	type owned struct{ name, link, target, args, program string }
 	var failures []error
+	var change []owned
 	for _, s := range companionShortcuts {
 		link := filepath.Join(menu, "Network Toolkit", s.link)
 		ok, err := ops.exists(link)
@@ -192,8 +252,21 @@ func updateRetargetCompanionShortcuts(dir string, ops companionShortcutOps) erro
 		if !editorRegSamePath(target, main) || !companionShortcutArgsOwned(args, s.owned) {
 			continue
 		}
-		if err := ops.retarget(link, target, args, editorRegJoin(location, s.program)); err != nil {
-			failures = append(failures, fmt.Errorf("%s: %w", s.link, err))
+		change = append(change, owned{s.link, link, target, args, editorRegJoin(location, s.program)})
+	}
+	if len(change) > 0 {
+		// The installed uninstaller removes only the shortcut forms it knows.
+		// An in-app update never replaces it, and only Setup writes
+		// DisplayVersion: an uninstaller older than the separate programs would
+		// leave retargeted shortcuts behind, so they wait for the next Setup.
+		version, found, err := ops.setupVersion()
+		if err != nil || !found || !updateVersionPattern.MatchString(version) || updateNewer(companionShortcutUninstallerVersion, version) {
+			return errCompanionShortcutsNextSetup
+		}
+	}
+	for _, c := range change {
+		if err := ops.retarget(c.link, c.target, c.args, c.program); err != nil {
+			failures = append(failures, fmt.Errorf("%s: %w", c.name, err))
 		}
 	}
 	if len(failures) > 0 {
@@ -214,6 +287,7 @@ func companionShortcutArgsOwned(args string, owned []string) bool {
 // postUpdateRepairs runs in the start that follows an update the helper
 // confirmed: the separate programs, then the document icon.
 func (a *application) postUpdateRepairs(confirmed bool) {
+	defer a.clearCompanionsPending()
 	if a.updateHealthDir == "" || !confirmed || a.windowMode != "main" || buildEdition != "" || a.ctx.Err() != nil {
 		return
 	}

@@ -73,6 +73,15 @@ func TestCompanionShortcutsNativeRetarget(t *testing.T) {
 	}
 	ops := companionShortcutNativeOps(nil)
 	ops.installLocation = func() (string, bool, error) { return install, true, nil }
+	ops.setupVersion = func() (string, bool, error) { return "1.21.46", true, nil }
+	editorBefore, _ := os.ReadFile(editor)
+	if err := updateRetargetCompanionShortcuts(install, ops); err != errCompanionShortcutsNextSetup {
+		t.Fatalf("an uninstaller of 1.21.46 would leave the changed shortcuts behind: %v", err)
+	}
+	if after, _ := os.ReadFile(editor); string(after) != string(editorBefore) {
+		t.Fatal("shortcut changed for an older uninstaller")
+	}
+	ops.setupVersion = func() (string, bool, error) { return companionShortcutUninstallerVersion, true, nil }
 	ops.programsFolder = func() (string, error) { return menu, nil }
 	if err := updateRetargetCompanionShortcuts(install, ops); err != nil {
 		t.Fatal(err)
@@ -106,7 +115,7 @@ func TestCompanionShortcutsNativeRetarget(t *testing.T) {
 	}
 	// A portable copy: nothing changes.
 	create(editor, main, "--editor", "", 1)
-	editorBefore, _ := os.ReadFile(editor)
+	editorBefore, _ = os.ReadFile(editor)
 	ops.installLocation = func() (string, bool, error) { return "", false, nil }
 	if err := updateRetargetCompanionShortcuts(install, ops); err != nil {
 		t.Fatal(err)

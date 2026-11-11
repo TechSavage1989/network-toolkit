@@ -382,16 +382,18 @@ func (a *application) handleUpdates(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 409, "Install updates from the main Windows x64 application window.")
 		return
 	}
+	// Before networkBusy, which the automatic install also holds, so that the
+	// refusal names it.
+	if msg := a.companionsBlockLocked(r.URL.Path); msg != "" {
+		jsonError(w, 409, msg)
+		return
+	}
 	if a.updater.networkBusy {
 		jsonError(w, 409, "An update check or download is already running.")
 		return
 	}
 	if a.updater.installing {
 		jsonError(w, 409, "An update is already installing.")
-		return
-	}
-	if msg := a.companionsBlockLocked(r.URL.Path); msg != "" {
-		jsonError(w, 409, msg)
 		return
 	}
 	if a.handleUpdateFeedLocked(w, r) || a.handleUpdateCompanionsLocked(w, r) {

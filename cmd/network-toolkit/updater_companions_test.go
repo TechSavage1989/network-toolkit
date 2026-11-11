@@ -381,14 +381,15 @@ func TestInstallCompanionsPlacesBothOrNeither(t *testing.T) {
 // and SHA256SUMS at their trusted GitHub URLs from a local server: every
 // trusted host resolves to it, nothing leaves the machine.
 type companionReleaseFixture struct {
-	client   *http.Client
-	programs updateTestRelease
-	name     string
-	archive  []byte
-	serve    []byte // the Update ZIP served (archive unless a test changes it)
-	sums     []byte
-	offline  bool // every request fails as without a connection
-	requests []string
+	client    *http.Client
+	programs  updateTestRelease
+	name      string
+	archive   []byte
+	serve     []byte // the Update ZIP served (archive unless a test changes it)
+	sums      []byte
+	offline   bool // every request fails as without a connection
+	requests  []string
+	onRequest func() // called for each request before it is answered
 }
 
 func newCompanionReleaseFixture(t *testing.T) *companionReleaseFixture {
@@ -401,6 +402,9 @@ func newCompanionReleaseFixture(t *testing.T) *companionReleaseFixture {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		f.requests = append(f.requests, r.Host+r.URL.Path)
+		if f.onRequest != nil {
+			f.onRequest()
+		}
 		switch {
 		case r.Host == "api.github.com" && r.URL.Path == "/repos/"+updateRepository+"/releases/tags/v"+model.Version:
 			io.WriteString(w, metadata)

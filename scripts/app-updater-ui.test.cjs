@@ -48,16 +48,23 @@ test('failed download stays retryable without opening installation confirmation'
 
 test('separate programs added after an update: progress, one notice, then no button',async()=>{
  const notices=[];const programs=[{name:'Network_Toolkit_TextEditor.exe',state:'missing'},{name:'Network_Toolkit_Terminal.exe',state:'missing'}];
- let data={...available,hasUpdate:false,latest:null,companions:{needed:true,programs},companionsInstall:{automatic:true,state:'running'}};
+ let data={...available,hasUpdate:false,latest:null,companions:{needed:true,programs},companionsInstall:{automatic:true,state:'pending'}};
  const h=ui({context:{toast:m=>notices.push(m),api:async()=>structuredClone(data)}});
  await h.settings();
  const text=()=>h.document.getElementById('appUpdateSettings').textContent;
+ // Pending: from the first status read, no button that the engine would refuse.
+ assert.match(text(),/will be added in a moment/);
+ assert.equal(h.document.querySelector('[data-app-update="companions"]'),null);
+ assert.equal(h.timers.size,1);
+ data={...data,companionsInstall:{automatic:true,state:'running'}};
+ await h.tick();
  assert.match(text(),/Adding the separate Text Editor and Terminal programs/);
  assert.equal(h.document.querySelector('[data-app-update="companions"]'),null);
  assert.equal(h.timers.size,1);
- data={...data,companions:{needed:false,programs:programs.map(p=>({...p,state:'current'}))},companionsInstall:{automatic:true,state:'added'}};
+ data={...data,companions:{needed:false,programs:programs.map(p=>({...p,state:'current'}))},companionsInstall:{automatic:true,state:'added',startMenu:'next-setup'}};
  await h.tick();
  assert.match(text(),/The separate Text Editor and Terminal programs were added\./);
+ assert.match(text(),/next Setup/);
  assert.equal(h.document.querySelector('[data-app-update="companions"]'),null);
  await h.settings();
  assert.equal(notices.filter(n=>/were added/.test(n)).length,1);

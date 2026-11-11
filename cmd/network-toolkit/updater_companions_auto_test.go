@@ -190,32 +190,122 @@ func TestSeparateProgramsShortcutFailureIsReportedNotFatal(t *testing.T) {
 		t.Fatalf("programs: %v", names)
 	}
 	state := a.updater.companionsInstall
-	if state == nil || state.State != "added" || !strings.Contains(state.Shortcuts, "synthetic shortcut failure") {
+	if state == nil || state.State != "added" || !strings.Contains(state.Shortcuts, "synthetic shortcut failure") || state.StartMenu != "" {
+		t.Fatalf("state %+v", state)
+	}
+	// An uninstaller of 1.21.46 or older: recorded, not an error.
+	a, _, _ = autoCompanionApplication(t, fixture.programs.main, "health")
+	updateCompanionShortcuts = func(string) error { return errCompanionShortcutsNextSetup }
+	a.installCompanionsAfterUpdate(context.Background(), true, fixture.client, updateReleaseTagURL+model.Version)
+	state = a.updater.companionsInstall
+	if state == nil || state.State != "added" || state.Shortcuts != "" || state.StartMenu != "next-setup" {
 		t.Fatalf("state %+v", state)
 	}
 }
 
-// While the programs are being added, nothing else that downloads, stages or
-// installs may start; checking the feed and reading status still work.
+// While the programs are being added, no other update action that uses the
+// network starts (the network slot is reserved, as for the manual button);
+// the release page and the status still work. While they are pending (the
+// update is not confirmed yet), only the manual button is refused.
 func TestSeparateProgramsRunningBlocksOtherUpdateActions(t *testing.T) {
 	a := testApplication(t)
 	if msg := a.companionsBlockLocked("/api/updates/download"); msg != "" {
 		t.Fatalf("blocked while idle: %s", msg)
 	}
+	a.updater.companionsInstall = &companionInstallState{Automatic: true, State: "pending"}
+	if a.companionsBlockLocked("/api/updates/companions") == "" {
+		t.Fatal("the manual install allowed while the automatic one is pending")
+	}
+	for _, path := range []string{"/api/updates/check", "/api/updates/download", "/api/updates/open-releases"} {
+		if msg := a.companionsBlockLocked(path); msg != "" {
+			t.Fatalf("%s blocked while pending: %s", path, msg)
+		}
+	}
 	a.updater.companionsInstall = &companionInstallState{Automatic: true, State: "running"}
-	for _, path := range []string{"/api/updates/download", "/api/updates/import", "/api/updates/install", "/api/updates/companions"} {
+	for _, path := range []string{"/api/updates/check", "/api/updates/download", "/api/updates/import", "/api/updates/install", "/api/updates/companions"} {
 		if a.companionsBlockLocked(path) == "" {
 			t.Fatalf("%s allowed while the separate programs are being added", path)
 		}
 	}
-	for _, path := range []string{"/api/updates/check", "/api/updates/open-releases"} {
-		if msg := a.companionsBlockLocked(path); msg != "" {
-			t.Fatalf("%s blocked: %s", path, msg)
-		}
+	if msg := a.companionsBlockLocked("/api/updates/open-releases"); msg != "" {
+		t.Fatalf("release page blocked: %s", msg)
 	}
 	status := a.updateStatusLocked()
 	if got, ok := status["companionsInstall"].(*companionInstallState); !ok || got.State != "running" {
 		t.Fatalf("status does not report the running install: %#v", status["companionsInstall"])
+	}
+}
+
+// The network slot is reserved for the whole automatic install, so "Install
+// with Setup" (fullInstallReserveNetwork) cannot run beside it.
+func TestSeparateProgramsReserveTheNetworkSlot(t *testing.T) {
+	fixture := newCompanionReleaseFixture(t)
+	a, _, _ := autoCompanionApplication(t, fixture.programs.main, "health")
+	var refusals, requests int
+	fixture.onRequest = func() {
+		requests++
+		if a.fullInstallReserveNetwork() != nil {
+			refusals++
+		} else {
+			a.fullInstallReleaseNetwork()
+		}
+	}
+	a.installCompanionsAfterUpdate(context.Background(), true, fixture.client, updateReleaseTagURL+model.Version)
+	if requests == 0 || refusals != requests {
+		t.Fatalf("Install with Setup could start during %d of %d requests", requests-refusals, requests)
+	}
+	if a.updater.networkBusy {
+		t.Fatal("the network slot was not released")
+	}
+	if a.updater.companionsInstall == nil || a.updater.companionsInstall.State != "added" {
+		t.Fatalf("state %+v", a.updater.companionsInstall)
+	}
+}
+
+// The page sees the install coming from the first status read: "pending"
+// from the start of a run that qualifies, until it runs or does not.
+func TestSeparateProgramsArePendingFromTheStart(t *testing.T) {
+	fixture := newCompanionReleaseFixture(t)
+	t.Run("an update start that qualifies", func(t *testing.T) {
+		a, _, _ := autoCompanionApplication(t, fixture.programs.main, "health")
+		a.markCompanionsPending()
+		if s := a.updater.companionsInstall; s == nil || s.State != "pending" || !s.Automatic {
+			t.Fatalf("state %+v", s)
+		}
+		a.installCompanionsAfterUpdate(context.Background(), true, fixture.client, updateReleaseTagURL+model.Version)
+		if s := a.updater.companionsInstall; s == nil || s.State != "added" {
+			t.Fatalf("pending did not run: %+v", s)
+		}
+	})
+	t.Run("a plain start", func(t *testing.T) {
+		a, _, _ := autoCompanionApplication(t, fixture.programs.main, "")
+		a.markCompanionsPending()
+		if a.updater.companionsInstall != nil {
+			t.Fatalf("pending without an update: %+v", a.updater.companionsInstall)
+		}
+	})
+	for _, end := range []string{"unconfirmed", "cleared", "already current"} {
+		t.Run("pending ends: "+end, func(t *testing.T) {
+			a, dir, _ := autoCompanionApplication(t, fixture.programs.main, "health")
+			a.markCompanionsPending()
+			fixture.requests = nil
+			switch end {
+			case "unconfirmed":
+				a.installCompanionsAfterUpdate(context.Background(), false, fixture.client, updateReleaseTagURL+model.Version)
+			case "cleared":
+				a.clearCompanionsPending()
+			case "already current":
+				for name, data := range map[string][]byte{"Network_Toolkit_TextEditor.exe": fixture.programs.editor, "Network_Toolkit_Terminal.exe": fixture.programs.terminal} {
+					if err := os.WriteFile(filepath.Join(dir, name), data, 0700); err != nil {
+						t.Fatal(err)
+					}
+				}
+				a.installCompanionsAfterUpdate(context.Background(), true, fixture.client, updateReleaseTagURL+model.Version)
+			}
+			if a.updater.companionsInstall != nil || len(fixture.requests) != 0 {
+				t.Fatalf("state %+v, requests %v", a.updater.companionsInstall, fixture.requests)
+			}
+		})
 	}
 }
 
@@ -233,10 +323,12 @@ func TestCompanionShortcutsRetargetOnlySetupsOwnShortcuts(t *testing.T) {
 		retargeted map[string]string
 		err        error
 	}
+	setupVersion, setupVersionFound := companionShortcutUninstallerVersion, true
 	run := func(location string, found bool, links map[string]fakeCompanionShortcut, readErr error) result {
 		r := result{retargeted: map[string]string{}}
 		ops := companionShortcutOps{
 			installLocation: func() (string, bool, error) { return location, found, nil },
+			setupVersion:    func() (string, bool, error) { return setupVersion, setupVersionFound, nil },
 			programsFolder:  func() (string, error) { return programs, nil },
 			exists: func(link string) (bool, error) {
 				_, ok := links[link]
@@ -294,6 +386,28 @@ func TestCompanionShortcutsRetargetOnlySetupsOwnShortcuts(t *testing.T) {
 	// A shortcut that cannot be read is left alone and reported.
 	if r := run(install, true, owned, errors.New("synthetic read failure")); r.err == nil || len(r.retargeted) != 0 {
 		t.Fatalf("unreadable: %+v", r)
+	}
+	// The uninstaller in the folder is Setup's, never replaced by an in-app
+	// update. One of 1.21.46 or older removes only shortcuts that start
+	// Network_Toolkit.exe, so the shortcuts wait for the next Setup.
+	for _, tc := range []struct {
+		version string
+		found   bool
+	}{{"1.21.46", true}, {"1.17.63", true}, {"", false}, {"", true}, {"1.21.047", true}, {"1.21.47 ", true}, {"v1.21.47", true}, {"1.21", true}} {
+		setupVersion, setupVersionFound = tc.version, tc.found
+		if r := run(install, true, owned, nil); !errors.Is(r.err, errCompanionShortcutsNextSetup) || len(r.retargeted) != 0 {
+			t.Fatalf("Setup %q (found %v): %+v", tc.version, tc.found, r)
+		}
+		// Nothing to change: nothing to report.
+		if r := run(install, true, map[string]fakeCompanionShortcut{}, nil); r.err != nil {
+			t.Fatalf("Setup %q without shortcuts: %+v", tc.version, r)
+		}
+	}
+	for _, version := range []string{"1.21.47", "1.21.48", "1.22.0", "2.0.0"} {
+		setupVersion, setupVersionFound = version, true
+		if r := run(install, true, owned, nil); r.err != nil || len(r.retargeted) != 2 {
+			t.Fatalf("Setup %s: %+v", version, r)
+		}
 	}
 }
 

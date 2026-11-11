@@ -34,6 +34,7 @@ func (a *application) updateStartupReady() {
 					updateNamingState.Lock()
 					updateNamingState.status.Warning = "Versioned filename setup was not applied: " + err.Error()
 					updateNamingState.Unlock()
+					a.clearCompanionsPending() // not a confirmed update: nothing is added
 					return
 				}
 			}

@@ -149,3 +149,15 @@ test('a background check that finds an update announces it once per version; man
   await h.c.check(true);await h.c.check(true);assert.deepEqual(announced,['1.17.60','1.17.60'],'The controller reports every background find; the host decides whether to toast');
   await h.c.check();assert.equal(announced.length,2,'Manual checks show their result inline instead');
 });
+test('automatic checks wait while the separate programs are being added; the manual install is not requested meanwhile',async()=>{
+  let state='running';const requests=[];
+  const h=harness({api:async(...args)=>{requests.push(args[0]);return {...staged,companions:{needed:true,programs:[]},companionsInstall:{automatic:true,state}};}});
+  await h.c.load();
+  assert.equal(await h.c.check(true),'skip');
+  assert.equal(requests.includes('/updates/check'),false);
+  for(const s of ['pending','running']){state=s;await h.c.load();await h.c.installCompanions('1.17.58');}
+  assert.equal(requests.includes('/updates/companions'),false);
+  state='failed';await h.c.load();
+  await h.c.check(true);
+  assert.ok(requests.includes('/updates/check'));
+});
