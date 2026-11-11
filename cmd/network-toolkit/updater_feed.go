@@ -22,6 +22,10 @@ const updateFeedMaxBody = 2 << 20
 
 var errUpdateFeedCooldown = errors.New("GitHub has temporarily limited update checks. Please wait until the next permitted check")
 
+// A download or metadata request answered 404. The full-version install looks
+// for the running version's release this way (full_install.go).
+var errUpdateNotFound = errors.New("The public update feed is not available yet. Your current installation is unchanged")
+
 // Feed state belongs to this app process, not to a browser window. Only a
 // successfully parsed trusted release can replace the cached payload and ETag.
 // Download requests deliberately do not share this metadata cache or cooldown.
@@ -252,7 +256,7 @@ func updateFetchProgress(ctx context.Context, client *http.Client, raw string, l
 	}
 	defer response.Body.Close()
 	if response.StatusCode == 404 {
-		return nil, errors.New("The public update feed is not available yet. Your current installation is unchanged")
+		return nil, errUpdateNotFound
 	}
 	if response.StatusCode == 403 || response.StatusCode == 429 {
 		return nil, errors.New("GitHub has temporarily limited update requests. Try again later")
