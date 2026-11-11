@@ -27,11 +27,13 @@ func TestDiskEditorLostAcknowledgementAndReload(t *testing.T) {
 	if r := diskCall(a, a.token, lease, edit); r.Code != 409 {
 		t.Fatal("reused nonce changed the document")
 	}
-	if err := os.WriteFile(path, []byte{0xff}, 0600); err != nil {
+	// A file that cannot be read fails the reload. (A single 0xff byte used
+	// to fail it; that is now Windows-1252 text, see editor_any_file_test.go.)
+	if err := os.Remove(path); err != nil {
 		t.Fatal(err)
 	}
 	if r := diskCall(a, a.token, lease, map[string]any{"action": "reload"}); r.Code != 409 {
-		t.Fatal("invalid reload succeeded")
+		t.Fatal("a reload that could not read the file succeeded")
 	}
 	r := diskCall(a, a.token, lease, map[string]any{"action": "window"})
 	var window editorbuffer.Window

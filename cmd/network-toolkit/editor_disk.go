@@ -7,12 +7,16 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"io/fs"
 	"net/http"
 	"networktoolkit/internal/editorbuffer"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
+	"syscall"
 )
 
 // This state stays with the existing document grant across window moves. Only
@@ -42,6 +46,33 @@ type editorDiskDocument struct {
 	verify         *editorDiskVerify
 	ftp            *editorFTPEndpoint
 	restored       *editorSessionRestoreState
+	// Replace Alls that are still searching, each with the way to stop it.
+	replacing map[*replaceAllContext]struct{}
+}
+
+// replaceAllContext is the request's context for one Replace All, with a way
+// for the document to stop it. The search only asks Err.
+type replaceAllContext struct {
+	context.Context
+	stopped atomic.Bool
+}
+
+func (c *replaceAllContext) Err() error {
+	if c.stopped.Load() {
+		return context.Canceled
+	}
+	return c.Context.Err()
+}
+
+// stopReplaceAll stops every Replace All that is still searching this
+// document. Whoever replaces or closes the buffer calls it first: the search
+// holds the old buffer open, and its result must not be applied.
+func (d *editorDiskDocument) stopReplaceAll() {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	for search := range d.replacing {
+		search.stopped.Store(true)
+	}
 }
 
 type editorDiskReceipt struct {
@@ -113,6 +144,7 @@ func (g *editorDocumentGrant) diskSnapshotMatches(s editorDocumentSnapshot) bool
 }
 
 func (d *editorDiskDocument) close() {
+	d.stopReplaceAll()
 	d.mu.Lock()
 	d.closed = true
 	d.cancel()
@@ -325,14 +357,17 @@ func (m *editorViewRegistry) importDiskDocument(ctx context.Context, g *editorDo
 	}
 	info, e := os.Lstat(path)
 	if e != nil {
-		return nil, e
+		return nil, editorOpenError(e)
+	}
+	if info.IsDir() {
+		return nil, errors.New("This is a folder, not a file.")
 	}
 	if !info.Mode().IsRegular() {
 		return nil, errors.New("text editor requires a regular file")
 	}
 	f, e := os.Open(path)
 	if e != nil {
-		return nil, e
+		return nil, editorOpenError(e)
 	}
 	defer f.Close()
 	opened, e := f.Stat()
@@ -349,6 +384,22 @@ func (m *editorViewRegistry) importDiskDocument(ctx context.Context, g *editorDo
 		return nil, errors.New("file changed while loading; reopen it")
 	}
 	return result, nil
+}
+
+// editorOpenError says in plain words why a file could not be opened. Nothing
+// of the file has been read when it is returned, so no document is shown.
+func editorOpenError(e error) error {
+	var code syscall.Errno
+	switch {
+	case errors.Is(e, fs.ErrNotExist):
+		return errors.New("The file does not exist.")
+	case runtime.GOOS == "windows" && errors.As(e, &code) && (code == 32 || code == 33):
+		// ERROR_SHARING_VIOLATION, ERROR_LOCK_VIOLATION
+		return errors.New("The file is in use by another program and could not be read.")
+	case errors.Is(e, fs.ErrPermission):
+		return errors.New("The file could not be read: access was denied.")
+	}
+	return e
 }
 
 type editorDiskRequest struct {
@@ -479,11 +530,26 @@ func (m *editorViewRegistry) diskDocument(w http.ResponseWriter, r *http.Request
 		jsonResponse(w, 202, map[string]any{"loading": true, "bytesRead": progress})
 		return
 	}
+	if v.Binary {
+		// A file that is not text is shown, searched and reloaded. Nothing
+		// changes it and nothing writes it, whatever the page asks for.
+		// (Reading it again from a browser file handle, "reload-start",
+		// "import-chunk", "import-finish" and "cancel", is answered above.)
+		switch req.Action {
+		case "status", "window", "find", "reload":
+		default:
+			jsonError(w, 409, editorbuffer.ErrBinary.Error())
+			return
+		}
+	}
 	var value any
 	var err error
 	switch req.Action {
 	case "status":
 		status := map[string]any{"loading": false, "metadata": v.Buffer.Metadata(), "format": format, "hash": hash, "path": path, "reloadError": reloadError}
+		if ending := v.Buffer.NewLineEOL(); ending != "" {
+			status["newLineEol"] = ending
+		}
 		if restored != nil {
 			status["restore"] = restored
 		}
@@ -544,6 +610,7 @@ func (m *editorViewRegistry) diskDocument(w http.ResponseWriter, r *http.Request
 			disk.receipts = nil
 			disk.editMu.Unlock()
 			m.cancelComparisonsUsing(uid)
+			disk.stopReplaceAll()
 			old.Buffer.Close()
 			m.mu.Lock()
 			g.snapshot.Hash = v.Hash
@@ -554,7 +621,7 @@ func (m *editorViewRegistry) diskDocument(w http.ResponseWriter, r *http.Request
 			g.snapshot.EOL = v.Format.EOL
 			g.snapshot.SavedEOL = v.Format.EOL
 			m.mu.Unlock()
-			value = map[string]any{"metadata": v.Buffer.Metadata(), "format": v.Format, "hash": v.Hash}
+			value = map[string]any{"metadata": v.Buffer.Metadata(), "format": v.Format, "hash": v.Hash, "newLineEol": v.Buffer.NewLineEOL()}
 		}
 	default:
 		jsonError(w, 400, "Unsupported disk-backed editor action.")
@@ -619,6 +686,10 @@ func (m *editorViewRegistry) saveDiskDocument(ctx context.Context, g *editorDocu
 	v := d.imported
 	d.mu.Unlock()
 	defer func() { d.mu.Lock(); d.saving = false; d.mu.Unlock() }()
+	if v.Binary {
+		// Before any temporary file or remote transfer: nothing is written.
+		return nil, editorbuffer.ErrBinary
+	}
 	if req.Revision != v.Buffer.Metadata().Revision {
 		return nil, editorbuffer.ErrRevision
 	}

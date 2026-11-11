@@ -19,6 +19,7 @@ import (
 	"unicode/utf8"
 
 	"networktoolkit/internal/diag"
+	"networktoolkit/internal/editorbuffer"
 	"networktoolkit/internal/model"
 )
 
@@ -442,13 +443,15 @@ func validateEditorBatch(batch editorBatch) error {
 				return errors.New("Editor contents exceed the 32 MiB decoded document limit or contain invalid text.")
 			}
 		}
+		// Only the engine's disk-backed documents hold Windows-1252 text,
+		// lines with their own endings, or a file that is not text.
 		for _, s := range []string{d.EOL, d.SavedEOL} {
-			if s != "LF" && s != "CRLF" && s != "CR" {
+			if s != "LF" && s != "CRLF" && s != "CR" && !(d.Disk && s == editorbuffer.MixedEOL) {
 				return errors.New("Unsupported editor line ending.")
 			}
 		}
 		for _, s := range []string{d.Encoding, d.SavedEncoding} {
-			if s != "UTF-8" && s != "UTF-16LE" && s != "UTF-16BE" {
+			if s != "UTF-8" && s != "UTF-16LE" && s != "UTF-16BE" && !(d.Disk && (s == editorbuffer.Windows1252 || s == editorbuffer.BinaryEncoding)) {
 				return errors.New("Unsupported editor encoding.")
 			}
 		}

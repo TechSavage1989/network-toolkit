@@ -9,6 +9,45 @@ Hold **Ctrl** and roll the mouse wheel over editor text to change the font size.
 
 Editor preferences (word wrap, highlighting, indent, font size, colors, compare options, and whether files are reopened) and the saved connections in the Files sidebar are the same in the main window's editor and in the separate **Network Toolkit Text Editor** window. See [One set of settings and saved data for all apps](settings-and-updates.md#one-set-of-settings-and-saved-data-for-all-apps).
 
+## Open any file
+The Text Editor opens whatever you give it, like Notepad++: a file of a type it knows, a type nobody knows, or a file with no extension at all. It never changes a file just by opening it, and a save changes only what you edited.
+
+- **Text is recognized by its content, not its name.** UTF-8 (with or without a byte order mark) and UTF-16 with a byte order mark are read as such. Text that is not valid UTF-8 is read as **Windows-1252** (Western European, which also covers Latin-1), so every byte shows as a character and none is lost.
+- **Saving keeps the file's own format.** The encoding, the byte order mark and the line endings stay as they were. If you save without editing, or with **Save As**, the file is written back byte for byte.
+- **Mixed line endings are kept line by line.** When a file's lines end in different ways (some CRLF, some LF or CR), **Line endings** shows **Mixed (keep each line)** and the status bar says **Mixed line endings**. Every line you did not retype keeps its own ending; lines you add get the ending most of the file uses. Commands that rewrite lines keep the endings as well: **Replace All** changes only its matches, and changing case, indenting, commenting, trimming or sorting a selection (or pasting as many lines as you selected) leaves each line's ending where it was. There is one exception, so that the file always reopens as the text you saw: a line break that would be saved as a bare LF directly after a line ending in a lone CR is saved as CRLF, because CR followed by LF reads back as a single line break. Choose **LF**, **CRLF** or **CR** to convert all lines when you save.
+- **Windows-1252 files stay Windows-1252.** If you type a character that encoding does not have (for example `→`), Save stops and tells you; choose **UTF-8** under **Encoding** to save every character. Nothing is written until then.
+- **A file that is not text is shown read-only.** A program, an archive, an image, or any file with NUL bytes (also UTF-16 text without a byte order mark) opens so you can look at it and search it: its bytes are shown as characters and control symbols such as `␀`. The editor says that it is not a text file, **Save**, **Save As**, **Line endings** and **Encoding** are off, and nothing you type, paste or replace reaches it. The editor cannot save such a file, so it can never damage one. **Reload** reads it again.
+- **Size does not matter.** Large files of any kind use temporary disk storage as described below. Showing a large file that is not text can need two to three times its size in temporary space.
+- **A folder, a missing file, or a file another program has locked** gives a short message and opens nothing.
+- **Coloring** follows the file name when the editor has a language for it, and the content for network device configurations. Everything else opens as plain text; choose a language under **Language** if you want one.
+
+### Make the Text Editor a default app in Windows
+With the Windows setup installed, Windows offers **Network Toolkit Text Editor** for files. Setup only makes it available: it never changes which app opens a file, and it never replaces another app's registration. You choose in Windows. The portable program registers nothing.
+
+- **One file type:** right-click a file, choose **Open with → Choose another app**, pick **Network Toolkit Text Editor** and choose **Always**.
+- **Several types at once:** open **Settings → Apps → Default apps**, search for **Network Toolkit Text Editor** and open it. Windows lists every type below; choose the editor for each one you want. (On Windows 10: **Default apps → Set defaults by app → Network Toolkit Text Editor → Manage**.) The last page of Setup has a box, **Open Windows Default Apps to choose a text editor**, that takes you there.
+- **Unknown types and files without an extension:** the editor is in **Open with → Choose another app** for every file (under **More apps** if it is not at the top). For a type Windows has not seen before, **Always** makes it the default for that type.
+- **Right-click entry (optional):** in Setup, tick **Right-click menu: Edit with Network Toolkit Text Editor** to get that entry for every file, like Notepad++'s. On Windows 11 it is under **Show more options**. For a silent setup add `/ContextMenu`. The choice is remembered when you upgrade; run Setup again and clear the box, or run a silent setup with `/NoContextMenu`, to remove it (the two switches cannot be used together). Uninstall removes it.
+
+Setup lists the editor in Default apps for these types:
+
+<!-- text-extensions:start (generated from scripts/installer/text-extensions.nsh; run node scripts/text-extensions.cjs --write) -->
+- **Plain text and logs:** `.txt` `.text` `.log` `.out` `.err` `.nfo` `.list`
+- **Configuration:** `.ini` `.cfg` `.conf` `.cnf` `.config` `.properties` `.env` `.toml` `.yaml` `.yml` `.editorconfig` `.rules` `.inf` `.reg`
+- **Network devices:** `.rsc` `.cisco` `.ios` `.junos` `.cli` `.zone`
+- **Certificates in text form:** `.pem` `.csr`
+- **Data:** `.json` `.jsonl` `.ndjson` `.jsonc` `.json5` `.xml` `.xsd` `.xsl` `.xslt` `.csv` `.tsv` `.sql`
+- **Documentation and web:** `.md` `.markdown` `.rst` `.adoc` `.tex` `.html` `.htm` `.xhtml` `.css` `.scss` `.less`
+- **Scripts:** `.sh` `.bash` `.zsh` `.ksh` `.fish` `.ps1` `.psm1` `.psd1` `.bat` `.cmd` `.vbs` `.awk` `.tcl`
+- **Source code:** `.py` `.pyw` `.js` `.mjs` `.cjs` `.jsx` `.ts` `.tsx` `.go` `.c` `.h` `.cpp` `.cc` `.cxx` `.hpp` `.hh` `.cs` `.java` `.kt` `.rs` `.rb` `.pl` `.pm` `.php` `.lua` `.swift` `.vb`
+- **Build and infrastructure:** `.mk` `.mak` `.cmake` `.gradle` `.proto` `.tf` `.tfvars` `.hcl` `.dockerfile`
+- **Version control:** `.diff` `.patch` `.gitignore` `.gitattributes` `.gitconfig` `.gitmodules` `.dockerignore`
+<!-- text-extensions:end -->
+
+If Windows already has an **Open with** entry for a `Network_Toolkit.exe` in another folder (for example the portable program, picked there earlier with **Choose an app on your PC**), Setup leaves that entry exactly as it is, and uninstall does not remove it. **Open with** for unknown file types then still starts that other copy; the types listed above, Default apps and the right-click entry use the installed editor.
+
+Documents, images, media, archives and programs are not in the list, because the editor is not the right default for them; they still open through **Open with**. The file you open from Windows becomes the selected tab, as described next.
+
 ## Reopen files from the last session
 Like Notepad and Notepad++, the Text Editor reopens the tabs that were open when it last closed, in the same order, with the same tab selected. Unsaved changes come back too, still marked as unsaved. The main window reopens its tabs the first time the Text Editor opens there; the Text Editor app reopens its tabs when it starts. Each of the two also reopens what the other one had kept, if that other app is not running at the time: tabs you left open in the Text Editor app come back in the main window, and the other way round. They are moved, not copied, so nothing appears twice. If both are running, each keeps its own tabs. A file that was open in both with unsaved changes comes back twice, once as the file and once as a copy that names it, so neither version is lost. Detached editor windows do not keep a session.
 

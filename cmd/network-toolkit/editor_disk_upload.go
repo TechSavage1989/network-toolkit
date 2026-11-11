@@ -191,6 +191,7 @@ func (m *editorViewRegistry) finishUploadReload(g *editorDocumentGrant, d *edito
 	d.mu.Unlock()
 	m.mu.Unlock()
 	m.cancelComparisonsUsing(uid)
+	d.stopReplaceAll()
 	old.Buffer.Close()
 	d.mu.Lock()
 	d.loading = false

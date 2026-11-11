@@ -26,6 +26,35 @@ const diskBusy=d=>!!(d.diskOpening||d.promoting||d.diskSession?.pending||d.diskE
 const editorComposing=()=>!!(paneWorkspace()?.composing||singleDiskView?.composing);
 const formatOf=d=>({encoding:d.encoding,bom:d.bom,eol:d.eol});
 const formatDirty=d=>d.eol!==d.savedEol||d.bom!==d.savedBOM||d.encoding!==d.savedEncoding;
+// The editor opens any file. A file that is not text (encoding 'Binary') is
+// shown read-only: the engine refuses every change and every save of it.
+// Windows-1252 text and lines that keep their own ending ('Mixed') exist only
+// in the engine's disk-backed documents, which write unedited bytes back
+// exactly; such a document is never turned into a page-held one.
+const notText=d=>d?.encoding==='Binary';
+const engineFormat=format=>format?.encoding==='Binary'||format?.encoding==='Windows-1252'||format?.eol==='Mixed';
+function openedNote(d){
+ const name=nameOf(d.path);
+ if(notText(d))return name+' is not a text file. It is shown read-only and cannot be changed or saved in the Text Editor.';
+ const notes=[];
+ if(d.encoding==='Windows-1252')notes.push('It is not UTF-8 and was read as Windows-1252; it is saved the same way unless you choose another encoding.');
+ if(d.eol==='Mixed')notes.push('Its lines end in different ways. Each line keeps its own ending'+(d.newLineEol?' and new lines use '+d.newLineEol:'')+', unless you choose one under Line endings.');
+ return 'Opened '+name+'.'+(notes.length?' '+notes.join(' '):'');
+}
+// Line endings and Encoding list what this document can be saved as.
+function formatControls(d){
+ const locked=notText(d),mixed=d.eol==='Mixed'||d.savedEol==='Mixed',legacy=d.encoding==='Windows-1252'||d.savedEncoding==='Windows-1252';
+ // The lists are rebuilt only when their choices change; the usual three of
+ // each are the markup the editor starts with.
+ const fill=(select,usual,rows,value)=>{
+  const choices=rows.map(row=>row[0]).join('|');
+  if((select.dataset.edChoices||usual)!==choices){select.innerHTML=rows.map(([id,label])=>'<option value="'+id+'">'+label+'</option>').join('');select.dataset.edChoices=choices;}
+  select.value=value;select.disabled=locked;
+ };
+ fill(findEl('[data-ed-eol]'),'LF|CRLF|CR',[...(mixed?[['Mixed','Mixed (keep each line)']]:[]),['LF','LF'],['CRLF','CRLF'],['CR','CR']],d.eol);
+ fill(findEl('[data-ed-encoding]'),'UTF-8|UTF-16LE|UTF-16BE',locked?[['Binary','Not text']]:[['UTF-8','UTF-8'],['UTF-16LE','UTF-16LE'],['UTF-16BE','UTF-16BE'],...(legacy?[['Windows-1252','Windows-1252']]:[])],d.encoding);
+ const bom=findEl('[data-ed-bom]');bom.checked=d.bom;bom.disabled=locked||d.encoding==='Windows-1252';
+}
 
 function ensureDiskSession(d){
  if(d.diskSession)return d.diskSession;
@@ -50,6 +79,7 @@ function applyDiskFormat(d,result){
  d.encoding=d.savedEncoding=result.format.encoding;
  d.bom=d.savedBOM=result.format.bom;
  d.eol=d.savedEol=result.format.eol;
+ d.newLineEol=result.newLineEol||'';
 }
 
 function useDiskDocument(d,result){
@@ -113,7 +143,7 @@ async function openDiskDocument(d,mode='',file){
   if(mode==='restore')d.restoreStatus=result.restore||null;
   // A kept copy of a local file stays disk-backed so its save baseline stays
   // with the engine; a small restored draft becomes an ordinary memory document.
-  if((!mode||mode==='restore'&&d.binding?.kind==='localDraft')&&!d.diskRemote&&result.metadata.units<=memoryEditorUnits&&result.metadata.lines<=memoryEditorLines){
+  if((!mode||mode==='restore'&&d.binding?.kind==='localDraft')&&!d.diskRemote&&result.metadata.units<=memoryEditorUnits&&result.metadata.lines<=memoryEditorLines&&!engineFormat(result.format)){
    const parts=[];
    let start=0;
    while(start<result.metadata.units){
@@ -258,7 +288,7 @@ function mountDiskView(d,{textarea,gutter,container,readOnly=false,changed=()=>{
  textarea.wrap='off';
  let sample, detected;
  const syntaxLanguage=text=>{
-  if(!syntax)return '';
+  if(!syntax||notText(d))return '';
   if(d.language)return d.language;
   if(d.diskSyntaxLanguage)return d.diskSyntaxLanguage;
   if(sample!==text){
@@ -272,7 +302,7 @@ function mountDiskView(d,{textarea,gutter,container,readOnly=false,changed=()=>{
   }
   return detected||'text';
  };
- const view=root.NTKEditorDiskView.create({textarea,gutter,container,session,syntaxLanguage,wordWrap:()=>wordWrap,readOnly,changed,message:setMessage});
+ const view=root.NTKEditorDiskView.create({textarea,gutter,container,session,syntaxLanguage,wordWrap:()=>wordWrap,readOnly:readOnly||notText(d),locked:()=>notText(d),changed,message:setMessage});
  let disposed=false,loaded=false;
  const ready=(async()=>{
   if(!session.state().metadata.revision){
@@ -305,7 +335,7 @@ function drawDiskDocument(d,savedView){
  const textarea=findEl('[data-ed-text]');
  findEl('[data-ed-title]').textContent=d.source+' · '+d.path;
  findEl('[data-ed-highlight]').hidden=true;
- for(const button of overlay.querySelectorAll('[data-ed="save"],[data-ed="saveAs"],[data-ed="reload"]'))button.disabled=!!(d.loading||d.frozen||d.reloading);
+ for(const button of overlay.querySelectorAll('[data-ed="save"],[data-ed="saveAs"],[data-ed="reload"]'))button.disabled=!!(d.loading||d.frozen||d.reloading)||notText(d)&&button.dataset.ed!=='reload';
  if(d.staged){disposeSingleDiskView();textarea.value='';textarea.disabled=true;return;}
  const focus=d.showStart;
  d.showStart=false;
@@ -737,7 +767,7 @@ function disposePaneWorkspace(){paneUsesDisk=false;comparisonReturnLayout=null;c
 function openComparison(){if(comparison)return;const saved=paneWorkspace()?.snapshot();if(splitView)disposePaneWorkspace();createPaneWorkspace(true);if(saved)comparison.restore(saved);drawTabs();}
 function openSplit(){if(editorComposing()){setMessage('Finish text composition before changing editor views.',true);return false;}if(paneWorkspace()){if(comparison)closeComparison();disposePaneWorkspace();splitEnabled=false;groups.single();draw();return;}splitEnabled=true;createPaneWorkspace(false);}
 function moveDocumentToView(uid,side,beforeUID=null){const error=canReorderDocuments();if(error){setMessage(error,true);return false;}const d=[...documents.values()].find(d=>d.uid===uid);if(!d)return false;side=side|| (groups.sideOf(uid)==='left'?'right':'left');comparisonReturnLayout=null;groups.move(uid,side);splitEnabled=true;active=d.id;if(!paneWorkspace())createPaneWorkspace(false);if(beforeUID)reorderDocument(uid,beforeUID);drawTabs();paneWorkspace().showDocument(d.id);root.NetworkToolkitEditorWindows?.notifyChanged?.();return true;}
-function syncEditorControls(d){if(!d)return;for(const [selector,value] of [['[data-ed-language-select]',d.language||''],['[data-ed-eol]',d.eol],['[data-ed-encoding]',d.encoding],['[data-ed-indent]',String(tabSpaces)],['[data-ed-font]',String(editorFontSize)],['[data-ed-palette]',editorPalette]])findEl(selector).value=value;findEl('[data-ed-bom]').checked=d.bom;const wrap=findEl('[data-ed-wrap]');wrap.checked=wordWrap;wrap.disabled=!paneUsesDisk&&!!paneWorkspace()&&workspaceLarge();wrap.title=wrap.disabled?'Wrap is paused in large-file mode; your saved preference is retained.':'';findEl('[data-ed-syntax]').checked=syntax;findEl('[data-ed-find]').hidden=!showFind;findEl('[data-ed-replace-fields]').hidden=!showReplace;applyEditorTheme();syncLanguageControls(d);status();}
+function syncEditorControls(d){if(!d)return;for(const [selector,value] of [['[data-ed-language-select]',d.language||''],['[data-ed-indent]',String(tabSpaces)],['[data-ed-font]',String(editorFontSize)],['[data-ed-palette]',editorPalette]])findEl(selector).value=value;formatControls(d);const wrap=findEl('[data-ed-wrap]');wrap.checked=wordWrap;wrap.disabled=!paneUsesDisk&&!!paneWorkspace()&&workspaceLarge();wrap.title=wrap.disabled?'Wrap is paused in large-file mode; your saved preference is retained.':'';findEl('[data-ed-syntax]').checked=syntax;findEl('[data-ed-find]').hidden=!showFind;findEl('[data-ed-replace-fields]').hidden=!showReplace;applyEditorTheme();syncLanguageControls(d);status();}
 function closeComparison(){if(!comparison)return;if(comparison.composing){setMessage('Finish text composition before closing the comparison.',true);return false;}const restore=comparisonReturnLayout;disposePaneWorkspace();if(restore)groups.restore(restore);if(splitEnabled)createPaneWorkspace(false);else{groups.single();draw();}}
 function setFileValues(d){d.editRevision=(d.editRevision||0)+1;d.eol=lineMode(d.original);d.content=normalize(d.original);d.saved=d.content;d.savedEol=d.eol;d.savedBOM=d.bom;d.savedEncoding=d.encoding||'UTF-8';d.dirty=false;d.saveFailed=false;d.undo=[];d.redo=[];d.bom=!!d.bom;d.showStart=true;}
 async function open({id,source,path,read,write,afterSave,list,binding=null,create=false,initialContent='',diskMode='',diskFile=null,diskRemote=null,desktopHandle=null,restore=null}){
@@ -768,7 +798,7 @@ async function open({id,source,path,read,write,afterSave,list,binding=null,creat
     else updatePaneFactory();
     if(active===key){
      draw();
-     if(doc.disk)setMessage('Opened '+nameOf(doc.path)+'.');
+     if(doc.disk){setMessage(openedNote(doc));if(notText(doc)&&typeof toast==='function')toast(openedNote(doc),'info');}
      else if(!comparison)findEl('[data-ed-text]')?.focus();
     }else paneWorkspace()?.refresh();
     return doc;
@@ -791,7 +821,7 @@ function syncText(d){paneWorkspace()?.refresh(true);const el=findEl('[data-ed-te
 function status(){const d=current(),text=findEl('[data-ed-text]');if(!d||!text)return;
  if(d.disk){
   const meta=d.diskMeta,cursor=diskView()?.cursor;
-  if(meta){findEl('[data-ed-size]').textContent=meta.units.toLocaleString()+' chars, '+meta.lines.toLocaleString()+' lines'+(d.dirty?' · Unsaved':'');}
+  if(meta){findEl('[data-ed-size]').textContent=meta.units.toLocaleString()+' chars, '+meta.lines.toLocaleString()+' lines'+(d.dirty?' · Unsaved':'')+(notText(d)?' · Read-only: not a text file':d.eol==='Mixed'?' · Mixed line endings':'');}
   if(cursor)findEl('[data-ed-position]').textContent='Ln '+(cursor.line+1).toLocaleString()+', Col '+(cursor.column+1).toLocaleString();
   return;
  }
@@ -865,8 +895,8 @@ function syncLanguageControls(d){const selected=findEl('[data-ed-language-select
 }
 function draw(){const d=current();if(!d)return;groups.activate(d.uid);if(paneWorkspace()){drawTabs();syncEditorControls(d);paneWorkspace().refresh();return;}if(displayedDocument&&displayedDocument!==d)displayedDocument.view=captureView();const view=d.showStart?null:displayedDocument===d?captureView():d.view;
  if(d.disk){drawDiskDocument(d,view);return;}
- disposeSingleDiskView();displayedDocument=d;drawTabs();const ta=findEl('[data-ed-text]');ta.disabled=!!(d.loading||d.frozen||d.promoting);if(ta.value!==d.content)ta.value=d.content;ta.wrap=effectiveWrap(current())?'soft':'off';ta.classList.toggle('is-wrapped',effectiveWrap(current()));findEl('[data-ed-title]').textContent=d.source+' · '+d.path;findEl('[data-ed-eol]').value=d.eol;findEl('[data-ed-indent]').value=String(tabSpaces);findEl('[data-ed-wrap]').checked=wordWrap;findEl('[data-ed-syntax]').checked=syntax;findEl('[data-ed-bom]').checked=d.bom;findEl('[data-ed-encoding]').value=d.encoding;findEl('[data-ed-language-select]').value=d.language||'';findEl('[data-ed-font]').value=String(editorFontSize);findEl('[data-ed-palette]').value=editorPalette;applyEditorTheme();findEl('[data-ed-find]').hidden=!showFind;findEl('[data-ed-replace-fields]').hidden=!showReplace;setMessage(d.loading?'Opening '+nameOf(d.path)+'...':'Ready');for(const button of overlay.querySelectorAll('[data-ed="save"],[data-ed="saveAs"],[data-ed="reload"]'))button.disabled=!!d.loading;const focus=d.showStart;d.showStart=false;paintText(d);if(view)restoreView(view,view.start,view.end,focus);else if(focus)restoreView({start:0,end:0,top:0,left:0,direction:'none'},0,0,true);status();}
-async function save(as=false,d=current()){if(!d||d.loading||d.saving||d.frozen||d.promoting||d.diskEditing||editorComposing()||documents.get(d.id)!==d)return;as=as||d.untitled||d.source==='Desktop import';let path=d.path;
+ disposeSingleDiskView();displayedDocument=d;drawTabs();const ta=findEl('[data-ed-text]');ta.disabled=!!(d.loading||d.frozen||d.promoting);if(ta.value!==d.content)ta.value=d.content;ta.wrap=effectiveWrap(current())?'soft':'off';ta.classList.toggle('is-wrapped',effectiveWrap(current()));findEl('[data-ed-title]').textContent=d.source+' · '+d.path;formatControls(d);findEl('[data-ed-indent]').value=String(tabSpaces);findEl('[data-ed-wrap]').checked=wordWrap;findEl('[data-ed-syntax]').checked=syntax;findEl('[data-ed-language-select]').value=d.language||'';findEl('[data-ed-font]').value=String(editorFontSize);findEl('[data-ed-palette]').value=editorPalette;applyEditorTheme();findEl('[data-ed-find]').hidden=!showFind;findEl('[data-ed-replace-fields]').hidden=!showReplace;setMessage(d.loading?'Opening '+nameOf(d.path)+'...':'Ready');for(const button of overlay.querySelectorAll('[data-ed="save"],[data-ed="saveAs"],[data-ed="reload"]'))button.disabled=!!d.loading;const focus=d.showStart;d.showStart=false;paintText(d);if(view)restoreView(view,view.start,view.end,focus);else if(focus)restoreView({start:0,end:0,top:0,left:0,direction:'none'},0,0,true);status();}
+async function save(as=false,d=current()){if(!d||d.loading||d.saving||d.frozen||d.promoting||d.diskEditing||editorComposing()||documents.get(d.id)!==d)return;if(notText(d)){setMessage(nameOf(d.path)+' is not a text file. It is shown read-only and cannot be saved from the Text Editor.',true);return;}as=as||d.untitled||d.source==='Desktop import';let path=d.path;
  if(as&&d.source==='Desktop'&&!d.disk){exportCopy(d);return;}
  let overwrite=false;
  if(as){const stamp=documentStamp(d),choice=await chooseSaveAsPath(d);if(choice===null||current()!==d||documents.get(d.id)!==d||documentStamp(d)!==stamp)return;path=String(choice.path||'').trim();overwrite=choice.overwrite===true;if(!path||path.length>4096||path===d.path){setMessage('Choose a different path for Save As.',true);return;}}
@@ -980,7 +1010,7 @@ function click(ev){if(ev.target.closest?.('[data-ed-insert-cancel]')){ev.prevent
  }}
 function beforeInput(ev){pendingLargeInput=null;if(!ev.target.matches?.('[data-ed-text]')||ev.isComposing||!largeDocument(current()))return;const d=current(),ta=ev.target;pendingLargeInput=root.NTKEditorLargeIndex?.plan?.(d.content,d.editRevision,ta.selectionStart,ta.selectionEnd,ev.inputType,ev.data)||null;}
 function input(ev){if(ev.target.matches('[data-ed-text]')&&current()?.disk)return;if(ev.target.matches('[data-ed-text]')){const text=ev.target.value,view=captureView();let d=current();if(!d){void newDocument().catch(error=>setMessage(error.message,true));d=current();}const edit=pendingLargeInput;pendingLargeInput=null;if(d){setContent(d,text,true,edit,view?.start);if(ev.target.value!==d.content)ev.target.value=d.content;restoreView(view,view?.start,view?.end);}}else if(ev.target.matches('[data-ed-query]')&&ev.target.value){search(false,false,false,false);}}
-function change(ev){const t=ev.target;if(t.matches?.('[data-ed-ask-save-close]')){void changeClosePreference(t.checked);return;}if(t.matches?.('[data-ed-restore-session]')){void changeRestorePreference(t.checked);return;}if(t.matches?.('[data-ed-color]')){setEditorColor(t.dataset.edColor,t.value);return;}if(t.matches?.('[data-ed-color-hex]')){if(goodEditorColor(t.value.trim())){t.setCustomValidity('');setEditorColor(t.dataset.edColorHex,t.value.trim());}else{t.setCustomValidity('Use #RRGGBB');t.reportValidity();}return;}if(t.matches('[data-ed-palette]')){editorPalette=editorPalettes.includes(t.value)?t.value:'auto';applyEditorTheme();keepPreferences();if(editorPalette==='custom')findEl('[data-ed-custom-palette]').hidden=false;return;}if(t.matches('[data-ed-wrap]')){wordWrap=t.checked;if(paneWorkspace())paneWorkspace().refresh(true);else if(singleDiskView)singleDiskView.refreshWrap();else draw();keepPreferences();return;}if(t.matches('[data-ed-syntax]')){syntax=t.checked;if(paneWorkspace())paneWorkspace().refresh(true);else if(current())paintText(current());keepPreferences();return;}const d=current();if(!d||d.frozen)return;if(t.matches('[data-ed-eol]')){d.eol=t.value;d.dirty=(d.disk?!!d.diskMeta?.dirty:d.content!==d.saved)||formatDirty(d);drawTabs();status();}if(t.matches('[data-ed-bom]')){d.bom=t.checked;d.dirty=(d.disk?!!d.diskMeta?.dirty:d.content!==d.saved)||formatDirty(d);drawTabs();status();}if(t.matches('[data-ed-encoding]')){d.encoding=t.value;d.bom=t.value!=='UTF-8'?true:d.bom;d.dirty=true;drawTabs();}if(t.matches('[data-ed-language-select]')){d.language=t.value?languageTools?.valid(t.value)||'text':'';paintText(d);paneWorkspace()?.refresh(true);}if(t.matches('[data-ed-font]'))setEditorFontSize(t.value);if(t.matches('[data-ed-indent]')){tabSpaces=Number(t.value);syncLanguageControls(d);if(paneWorkspace())paneWorkspace().refresh(true);else if(singleDiskView)singleDiskView.refreshWrap();else paintText(d);keepPreferences();}if(t.matches('[data-ed-case]'))matchCase=t.checked;if(t.matches('[data-ed-regex]'))useRegex=t.checked;if(t.matches('[data-ed-word]'))wholeWord=t.checked;}
+function change(ev){const t=ev.target;if(t.matches?.('[data-ed-ask-save-close]')){void changeClosePreference(t.checked);return;}if(t.matches?.('[data-ed-restore-session]')){void changeRestorePreference(t.checked);return;}if(t.matches?.('[data-ed-color]')){setEditorColor(t.dataset.edColor,t.value);return;}if(t.matches?.('[data-ed-color-hex]')){if(goodEditorColor(t.value.trim())){t.setCustomValidity('');setEditorColor(t.dataset.edColorHex,t.value.trim());}else{t.setCustomValidity('Use #RRGGBB');t.reportValidity();}return;}if(t.matches('[data-ed-palette]')){editorPalette=editorPalettes.includes(t.value)?t.value:'auto';applyEditorTheme();keepPreferences();if(editorPalette==='custom')findEl('[data-ed-custom-palette]').hidden=false;return;}if(t.matches('[data-ed-wrap]')){wordWrap=t.checked;if(paneWorkspace())paneWorkspace().refresh(true);else if(singleDiskView)singleDiskView.refreshWrap();else draw();keepPreferences();return;}if(t.matches('[data-ed-syntax]')){syntax=t.checked;if(paneWorkspace())paneWorkspace().refresh(true);else if(current())paintText(current());keepPreferences();return;}const d=current();if(!d||d.frozen)return;if(notText(d)){formatControls(d);return;}if(t.matches('[data-ed-eol]')){d.eol=t.value;d.dirty=(d.disk?!!d.diskMeta?.dirty:d.content!==d.saved)||formatDirty(d);drawTabs();status();}if(t.matches('[data-ed-bom]')){d.bom=t.checked;d.dirty=(d.disk?!!d.diskMeta?.dirty:d.content!==d.saved)||formatDirty(d);drawTabs();status();}if(t.matches('[data-ed-encoding]')){d.encoding=t.value;d.bom=t.value==='Windows-1252'?false:t.value!=='UTF-8'?true:d.bom;d.dirty=true;drawTabs();formatControls(d);}if(t.matches('[data-ed-language-select]')){d.language=t.value?languageTools?.valid(t.value)||'text':'';paintText(d);paneWorkspace()?.refresh(true);}if(t.matches('[data-ed-font]'))setEditorFontSize(t.value);if(t.matches('[data-ed-indent]')){tabSpaces=Number(t.value);syncLanguageControls(d);if(paneWorkspace())paneWorkspace().refresh(true);else if(singleDiskView)singleDiskView.refreshWrap();else paintText(d);keepPreferences();}if(t.matches('[data-ed-case]'))matchCase=t.checked;if(t.matches('[data-ed-regex]'))useRegex=t.checked;if(t.matches('[data-ed-word]'))wholeWord=t.checked;}
 function scroll(ev){if(current()?.disk)return;if(paneWorkspace()&&ev.target===paneWorkspace().textarea){status();return;}if(!ev.target.matches?.('[data-ed-text]'))return;const ta=ev.target,pre=findEl('[data-ed-highlight]'),gutter=findEl('[data-ed-gutter-lines]');if(pre)pre.style.transform='translate('+(-ta.scrollLeft)+'px,'+(-ta.scrollTop)+'px)';if(gutter)gutter.style.transform='translateY('+(-ta.scrollTop)+'px)';if(!largeDocument(current())){status();return;}if(typeof root.requestAnimationFrame!=='function'){paintGutter(current(),ta,gutter);status();return;}if(largeScrollFrame!==null)return;const d=current();largeScrollFrame=root.requestAnimationFrame(()=>{largeScrollFrame=null;if(current()!==d||findEl('[data-ed-text]')!==ta||!gutter)return;paintGutter(d,ta,gutter);status();});}
 function keydown(ev){if(ev.target.closest?.('[data-ed-files-sidebar]'))return;if(tabMenu){tabMenuKey(ev);return;}const menuTab=ev.target.closest?.('[data-ed-uid]');if(menuTab&&(ev.key==='ContextMenu'||(ev.shiftKey&&ev.key==='F10'))){ev.preventDefault();const d=[...documents.values()].find(d=>d.uid===menuTab.dataset.edUid),rect=menuTab.getBoundingClientRect();if(d)openTabMenu(d,rect.left,rect.bottom);return;}if(pendingEditorDialog){ev.stopPropagation();if(ev.key==='Escape'){ev.preventDefault();answerEditorDialog(false);}else if(ev.key==='Enter'){ev.preventDefault();answerEditorDialog(ev.target.closest?.('[data-ed-dialog-action]')?.dataset.edDialogAction!=='cancel');}else if(ev.key==='Tab'){const controls=[...pendingEditorDialog.panel.querySelectorAll('input,button')],at=controls.indexOf(document.activeElement);ev.preventDefault();controls[(at+(ev.shiftKey?-1:1)+controls.length)%controls.length]?.focus();}return;}const d=current(),ta=findEl('[data-ed-text]'),ctrl=ev.ctrlKey||ev.metaKey;const tab=ev.target.closest?.('[data-ed-open]');if(tab&&ev.altKey&&ev.shiftKey&&['ArrowLeft','ArrowRight'].includes(ev.key)){ev.preventDefault();ev.stopPropagation();const selectedDoc=documents.get(tab.dataset.edOpen),list=paneWorkspace()?groups.list(groups.sideOf(selectedDoc?.uid)):[...documents.values()],at=list.findIndex(doc=>doc.id===tab.dataset.edOpen);if(at>=0&&((ev.key==='ArrowLeft'&&at>0)||(ev.key==='ArrowRight'&&at<list.length-1)))reorderDocument(list[at].uid,ev.key==='ArrowLeft'?list[at-1].uid:list[at+2]?.uid||null);return;}if((tab&&['ArrowLeft','ArrowRight','Home','End'].includes(ev.key))||(ctrl&&['PageUp','PageDown'].includes(ev.key))){const tabDoc=documents.get(tab?.dataset.edOpen||active),ids=(paneWorkspace()?groups.list(groups.sideOf(tabDoc?.uid)):[...documents.values()]).map(d=>d.id),at=ids.indexOf(tab?.dataset.edOpen||active),next=ev.key==='Home'?0:ev.key==='End'?ids.length-1:(at+(ev.key==='ArrowLeft'||ev.key==='PageUp'?-1:1)+ids.length)%ids.length;ev.preventDefault();activateDocument(ids[next]);[...overlay.querySelectorAll('[data-ed-open]')].find(node=>node.dataset.edOpen===ids[next])?.focus({preventScroll:true});return;}if(comparison&&!(ctrl&&['n','o'].includes(ev.key.toLowerCase()))){if(ctrl&&ev.key.toLowerCase()==='s'){ev.preventDefault();void save(ev.shiftKey);}return;}if(ctrl&&['n','o'].includes(ev.key.toLowerCase())){ev.preventDefault();if(ev.key.toLowerCase()==='n')void newDocument();else void openDesktopFile();return;}if(!d)return;
  if(ctrl&&ev.shiftKey&&ev.key==='Enter'&&!ev.isComposing){ev.preventDefault();sendToTerminal();return;}
@@ -1024,7 +1054,7 @@ async function reload(){
  }catch(error){failure=error;}
  finally{
   d.reloading=false;
-  if(current()===d){diskView()?.setReadOnly(!!comparison);draw();if(failure)setMessage(failure.message,true);else if(d.disk)setMessage('Reloaded '+nameOf(d.path)+'.');}
+  if(current()===d){diskView()?.setReadOnly(!!comparison);draw();if(failure)setMessage(failure.message,true);else if(d.disk)setMessage(notText(d)?openedNote(d):'Reloaded '+nameOf(d.path)+'.');}
  }
 }
 function applyEditorTheme(){if(!overlay)return;overlay.dataset.palette=editorPalette;overlay.style.setProperty('--nt-editor-font',editorFontSize+'px');for(const [key,hex] of Object.entries({...editorColorDefaults,...editorCustomColors})){if(editorPalette==='custom'&&goodEditorColor(hex))overlay.style.setProperty('--nt-code-'+key,hex);else overlay.style.removeProperty('--nt-code-'+key);} }
@@ -1263,7 +1293,10 @@ function applyTransferredPreferences(value){if(!value||typeof value!=='object')r
 const sessionBackupPath=id=>'/editor-session/backup?id='+encodeURIComponent(id);
 const localRead=p=>api('/file-editor/local','POST',{action:'read-text',path:p}),localWrite=data=>api('/file-editor/local','POST',{action:'write-text',...data});
 const sessionCarry=error=>!(error?.status===400||error?.status===404||/damaged|no longer available/i.test(error?.message||''));
-function sessionFormat(d,format,file=false){if(!format)return;d.encoding=format.encoding;d.bom=format.bom===true;d.eol=format.eol;if(file){d.savedEncoding=d.encoding;d.savedBOM=d.bom;d.savedEol=d.eol;}d.dirty=(d.disk?!!d.diskMeta?.dirty:d.content!==d.saved)||formatDirty(d);}
+function sessionFormat(d,format,file=false){if(!format)return;d.encoding=format.encoding;d.bom=format.bom===true;
+ // Only the engine knows whether the reopened text still has lines that end
+ // differently; without them it reports the one ending that is left.
+ if(format.eol!=='Mixed'||d.disk&&d.eol==='Mixed')d.eol=format.eol;if(file){d.savedEncoding=d.encoding;d.savedBOM=d.bom;d.savedEol=d.eol;}d.dirty=(d.disk?!!d.diskMeta?.dirty:d.content!==d.saved)||formatDirty(d);}
 function sessionLanguage(d,record){if(record.language)d.language=languageTools?.valid?languageTools.valid(record.language):record.language;}
 function keepRestoredCopy(d,record){d.sessionBackup={key:(d.disk?'disk:':'memory:')+d.uid,revision:d.editRevision,ref:record.backup,next:0};}
 function showRestored(d){if(current()===d)draw();else drawTabs();paneWorkspace()?.refresh();}

@@ -1,3 +1,8 @@
+## 1.21.44 Beta 1 - The Text Editor opens almost any file
+
+- Setup offers the Text Editor for 108 text file types, lists it under Open with for any file, and can add an optional right-click entry.
+- Windows-1252 text and mixed line endings open and save unchanged; files that are not text open read-only.
+
 ## 1.21.43 Beta 1 - An opened document is the tab in front
 
 - A document opened from Windows with the Text Editor becomes the active tab, also while last session's tabs reopen.

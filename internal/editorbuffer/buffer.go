@@ -18,6 +18,9 @@ const MaxEditBytes = 1024 * 1024
 
 var ErrRevision = errors.New("the document changed; refresh this view before editing")
 var ErrClosed = errors.New("the document buffer is closed")
+
+// ErrBinary answers every attempt to change or write a file that is not text.
+var ErrBinary = errors.New("This is not a text file. It is shown read-only and cannot be changed or saved in the Text Editor.")
 var ErrBoundary = errors.New("text position splits a Unicode character or is outside the document")
 
 type measure struct{ bytes, units, lines int64 }
@@ -139,6 +142,10 @@ type Buffer struct {
 	revision    uint64
 	end         int64
 	closed      bool
+	// eol is set at import for a document whose line endings differ (eol.go).
+	eol *eolMap
+	// binary marks the display-only rendering of a file that is not text.
+	binary bool
 }
 
 func empty(dir string) (*Buffer, error) {
@@ -250,6 +257,9 @@ func (b *Buffer) Edit(revision uint64, from, to int64, text string) (Metadata, e
 	if b.closed {
 		return Metadata{}, ErrClosed
 	}
+	if b.binary {
+		return b.metadataLocked(), ErrBinary
+	}
 	if revision != b.revision {
 		return b.metadataLocked(), ErrRevision
 	}
@@ -259,20 +269,46 @@ func (b *Buffer) Edit(revision uint64, from, to int64, text string) (Metadata, e
 	if e := validateEditFragment(text); e != nil {
 		return b.metadataLocked(), e
 	}
+	if b.eol != nil && from < to && text != "" && to-from <= MaxEditBytes {
+		// Lines keep their own endings in this document. A command that
+		// rewrites a range hands over text that mostly repeats what was
+		// there (duplicate a line, change one word of a selection): what the
+		// new text repeats at the start and the end of the range is not
+		// replaced at all, so those lines stay the lines that were read.
+		var old []byte
+		if e := b.readRange(b.root, from, to, &old); e != nil {
+			return b.metadataLocked(), e
+		}
+		if string(old) != text {
+			prefix, suffix := commonEnds(old, text)
+			from += measureText(old[:prefix]).units
+			to -= measureText(old[len(old)-suffix:]).units
+			text = text[prefix : len(text)-suffix]
+		}
+	}
 	left, rest, e := b.split(b.root, from)
 	if e != nil {
 		return b.metadataLocked(), e
 	}
-	_, right, e := b.split(rest, to-from)
+	replaced, right, e := b.split(rest, to-from)
 	if e != nil {
 		return b.metadataLocked(), e
 	}
+	start := b.end
 	insert, e := b.append([]byte(text))
 	if e != nil {
 		return b.metadataLocked(), e
 	}
 	if from == to && text == "" {
 		return b.metadataLocked(), nil
+	}
+	if b.eol != nil && insert != nil {
+		// As many lines as before (a case change, an indent, a sort): each
+		// line break is written like the one it replaced.
+		starts, ranks := textIndex(start, text)
+		if b.eol, e = b.eol.inherit(b.file, replaced, insert, start, b.end, starts, ranks); e != nil {
+			return b.metadataLocked(), e
+		}
 	}
 	b.undo = append(b.undo, b.root)
 	b.redo = nil
@@ -287,6 +323,9 @@ func (b *Buffer) History(revision uint64, redo bool) (Metadata, error) {
 	defer b.mu.Unlock()
 	if b.closed {
 		return Metadata{}, ErrClosed
+	}
+	if b.binary {
+		return b.metadataLocked(), ErrBinary
 	}
 	if revision != b.revision {
 		return b.metadataLocked(), ErrRevision
@@ -498,6 +537,7 @@ func (b *Buffer) Close() error {
 type Snapshot struct {
 	b        *Buffer
 	root     *node
+	eol      *eolMap
 	Revision uint64
 	once     sync.Once
 }
@@ -510,7 +550,7 @@ func (b *Buffer) Snapshot() (*Snapshot, error) {
 		b.lifetime.RUnlock()
 		return nil, ErrClosed
 	}
-	return &Snapshot{b: b, root: b.root, Revision: b.revision}, nil
+	return &Snapshot{b: b, root: b.root, eol: b.eol, Revision: b.revision}, nil
 }
 func (s *Snapshot) Close() { s.once.Do(func() { s.b.lifetime.RUnlock() }) }
 func (s *Snapshot) WriteTo(ctx context.Context, w io.Writer) error {
@@ -533,12 +573,32 @@ func (s *Snapshot) WriteTo(ctx context.Context, w io.Writer) error {
 	return visit(s.root)
 }
 
+// WriteKept writes the text for a kept copy of unsaved work: UTF-8 with one
+// '\n' for each line ending, except that a document whose imported line
+// endings differ is written with each line's own ending, so importing the
+// copy again restores the record of them.
+func (s *Snapshot) WriteKept(ctx context.Context, w io.Writer) error {
+	if s.b.binary {
+		// There is never unsaved work in a file that is not text, and its
+		// display rendering must not reach a file.
+		return ErrBinary
+	}
+	if s.eol == nil {
+		return s.WriteTo(ctx, w)
+	}
+	return s.Encode(ctx, w, Format{Encoding: "UTF-8", EOL: MixedEOL})
+}
+
 // MarkUnsaved records that the current text has not been written to the
 // document's file, for example after restoring a kept copy of unsaved edits.
 // Only a later MarkSaved clears it; undo history is unchanged.
 func (b *Buffer) MarkUnsaved() Metadata {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	if b.binary {
+		// A file that is not text never has unsaved work.
+		return b.metadataLocked()
+	}
 	b.saved = &node{}
 	return b.metadataLocked()
 }

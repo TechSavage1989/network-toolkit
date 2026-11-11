@@ -101,19 +101,39 @@ func TestDiskEditorBrowserReloadExportAndVerification(t *testing.T) {
 	if r = call("reload-start", map[string]any{"revision": 3}); r.Code != 200 {
 		t.Fatal(r.Body)
 	}
+	// A reload that does not finish leaves the ready document as it was. (A
+	// single 0xff byte used to be the unfinished reload here; it is now read
+	// as Windows-1252 text, which the next block checks.)
+	if r = call("import-chunk", map[string]any{"offset": 0, "data": []byte{0xff}}); r.Code != 200 {
+		t.Fatal(r.Body)
+	}
+	if r = call("cancel", nil); r.Code != 200 {
+		t.Fatal(r.Body)
+	}
+	if r = waitDiskReady(t, a, 1); !strings.Contains(r.Body.String(), "Browser file reload cancelled.") {
+		t.Fatal("unfinished reload did not preserve a ready document", r.Body)
+	}
+	if r = call("window", nil); r.Code != 200 || !strings.Contains(r.Body.String(), "newer changed") {
+		t.Fatal("unfinished reload lost original text", r.Body)
+	}
+	if r = call("reload-start", map[string]any{"revision": 3}); r.Code != 200 {
+		t.Fatal(r.Body)
+	}
 	if r = call("import-chunk", map[string]any{"offset": 0, "data": []byte{0xff}}); r.Code != 200 {
 		t.Fatal(r.Body)
 	}
 	if r = call("import-finish", map[string]any{"size": 1}); r.Code != 202 {
 		t.Fatal(r.Body)
 	}
-	if r = waitDiskReady(t, a, 1); !strings.Contains(r.Body.String(), "invalid UTF-8 text") {
-		t.Fatal("invalid reload did not preserve a ready document", r.Body)
+	if r = waitDiskReady(t, a, 1); !strings.Contains(r.Body.String(), `"encoding":"Windows-1252"`) || strings.Contains(r.Body.String(), "invalid UTF-8 text") {
+		t.Fatal("a byte that is not UTF-8 was not read as Windows-1252", r.Body)
 	}
-	if r = call("window", nil); r.Code != 200 || !strings.Contains(r.Body.String(), "newer changed") {
-		t.Fatal("invalid reload lost original text", r.Body)
+	if r = call("window", nil); r.Code != 200 || !strings.Contains(r.Body.String(), `"text":"ÿ"`) || !strings.Contains(r.Body.String(), `"dirty":false`) {
+		t.Fatal("the reloaded byte is not shown as its Windows-1252 character", r.Body)
 	}
-	if r = call("reload-start", map[string]any{"revision": 3}); r.Code != 200 {
+	var reloaded editorbuffer.Window
+	json.Unmarshal(r.Body.Bytes(), &reloaded)
+	if r = call("reload-start", map[string]any{"revision": reloaded.Revision}); r.Code != 200 {
 		t.Fatal(r.Body)
 	}
 	if r = call("import-chunk", map[string]any{"offset": 0, "data": []byte("replacement")}); r.Code != 200 {

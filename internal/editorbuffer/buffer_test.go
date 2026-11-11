@@ -179,7 +179,9 @@ func TestEncodingRoundTripsAcrossChunks(t *testing.T) {
 func TestInvalidEncodingAndCancellationCleanScratch(t *testing.T) {
 	for _, raw := range [][]byte{{0xff}, {0}, {0xff, 0xfe, 0}, {0xff, 0xfe, 0, 0xd8}, {0xfe, 0xff, 0xdc, 0}, {0xef, 0xbb, 0xbf, 0xc0, 0xaf}} {
 		dir := t.TempDir()
-		if _, e := Import(context.Background(), bytes.NewReader(raw), dir, nil); e == nil {
+		// A source that cannot be read a second time keeps the strict reading;
+		// TestImportOpensAnyFile covers what a file on disk becomes.
+		if _, e := Import(context.Background(), io.MultiReader(bytes.NewReader(raw)), dir, nil); e == nil {
 			t.Fatal("invalid Unicode accepted")
 		}
 		files, _ := os.ReadDir(dir)

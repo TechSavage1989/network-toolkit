@@ -12,10 +12,15 @@ type EditTransaction struct {
 	buffer            *Buffer
 	revision          uint64
 	left, right, text *node
+	replaced          *node
 	from, to          int64
 	start, end        int64
 	contiguous        bool
 	closed            bool
+	// Index of the line breaks of the new text, for a document whose lines
+	// keep their own endings (eol.go).
+	starts, ranks []int64
+	lines         int64
 }
 
 func (b *Buffer) BeginEdit(revision uint64, from, to int64) (*EditTransaction, error) {
@@ -25,6 +30,9 @@ func (b *Buffer) BeginEdit(revision uint64, from, to int64) (*EditTransaction, e
 	defer b.mu.RUnlock()
 	if b.closed {
 		return nil, ErrClosed
+	}
+	if b.binary {
+		return nil, ErrBinary
 	}
 	if b.revision != revision {
 		return nil, ErrRevision
@@ -36,11 +44,11 @@ func (b *Buffer) BeginEdit(revision uint64, from, to int64) (*EditTransaction, e
 	if err != nil {
 		return nil, err
 	}
-	_, right, err := b.split(rest, to-from)
+	replaced, right, err := b.split(rest, to-from)
 	if err != nil {
 		return nil, err
 	}
-	return &EditTransaction{buffer: b, revision: revision, left: left, right: right, from: from, to: to, start: b.end, end: b.end, contiguous: true}, nil
+	return &EditTransaction{buffer: b, revision: revision, left: left, right: right, replaced: replaced, from: from, to: to, start: b.end, end: b.end, contiguous: true}, nil
 }
 
 func (t *EditTransaction) Received() int64 { return size(t.text).units }
@@ -73,11 +81,13 @@ func (t *EditTransaction) Append(text string) error {
 		return ErrRevision
 	}
 	t.contiguous = t.contiguous && b.end == t.end
+	t.starts, t.ranks = append(t.starts, b.end), append(t.ranks, t.lines)
 	tree, err := b.append([]byte(text))
 	t.end = b.end
 	if err != nil {
 		return err
 	}
+	t.lines += size(tree).lines
 	t.text = join(t.text, tree)
 	return nil
 }
@@ -93,6 +103,15 @@ func (t *EditTransaction) Commit() (Metadata, error) {
 	}
 	if t.revision != b.revision {
 		return b.metadataLocked(), ErrRevision
+	}
+	if b.eol != nil && t.contiguous && t.text != nil {
+		// As many lines as were replaced: each keeps the ending of the line
+		// it stands for (see Buffer.Edit).
+		eol, err := b.eol.inherit(b.file, t.replaced, t.text, t.start, t.end, t.starts, t.ranks)
+		if err != nil {
+			return b.metadataLocked(), err
+		}
+		b.eol = eol
 	}
 	t.closed = true
 	if t.from != t.to || t.text != nil {

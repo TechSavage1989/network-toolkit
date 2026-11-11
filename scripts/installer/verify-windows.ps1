@@ -64,6 +64,33 @@ function Get-RegistryTree([string]$Path) {
     $lines -join "`n"
 }
 
+# The same canonical form for a key of the current user, read through .NET.
+# The registry provider treats a key named "*" (all files) as a wildcard.
+function Get-UserKeyTree([string]$Subkey) {
+    $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($Subkey)
+    if ($null -eq $key) { return '<absent>' }
+    try {
+        $lines = @(foreach ($name in ($key.GetValueNames() | Sort-Object)) {
+            '{0}={1}:{2}' -f $name, $key.GetValueKind($name), $key.GetValue($name, $null, 'DoNotExpandEnvironmentNames')
+        })
+        $children = @($key.GetSubKeyNames() | Sort-Object)
+    } finally { $key.Dispose() }
+    foreach ($child in $children) { $lines += "[$child]{" + (Get-UserKeyTree "$Subkey\$child") + '}' }
+    $lines -join "`n"
+}
+
+# A value of a key of the current user, or $null when the key or value is absent.
+function Read-UserValue([string]$Subkey, [string]$Name) {
+    $key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($Subkey)
+    if ($null -eq $key) { return $null }
+    try { $key.GetValue($Name, $null, 'DoNotExpandEnvironmentNames') } finally { $key.Dispose() }
+}
+
+function Set-UserValue([string]$Subkey, [string]$Name, [string]$Value) {
+    $key = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey($Subkey)
+    try { $key.SetValue($Name, $Value) } finally { $key.Dispose() }
+}
+
 function Get-ExecutableVersion([string]$Path) {
     $info = [Diagnostics.FileVersionInfo]::GetVersionInfo($Path)
     [version]::new($info.FileMajorPart, $info.FileMinorPart, $info.FileBuildPart, $info.FilePrivatePart)
@@ -168,7 +195,26 @@ $registeredApps = 'HKCU:\Software\RegisteredApplications'
 $registeredName = 'Network Toolkit Text Editor'
 $progID = 'NetworkToolkit.TextDocument'
 $progKey = "HKCU:\Software\Classes\$progID"
-$extensions = '.txt', '.log', '.ini', '.cfg', '.conf'
+# The one list of text file types that Setup registers. windows.nsi includes
+# this same file; scripts/text-extensions.test.cjs keeps the guide in step.
+$extensionList = Join-Path $PSScriptRoot 'text-extensions.nsh'
+$extensions = @([regex]::Matches([IO.File]::ReadAllText($extensionList), '(?m)^\s*!insertmacro \$\{ACTION\} "(\.[a-z0-9_-]+)"\s*$') | ForEach-Object { $_.Groups[1].Value })
+if ($extensions.Count -lt 50) { throw "Only $($extensions.Count) text file types were read from $extensionList." }
+if (@($extensions | Sort-Object -Unique).Count -ne $extensions.Count) { throw "A text file type is listed twice in $extensionList." }
+foreach ($released in '.txt', '.log', '.ini', '.cfg', '.conf') {
+    if ($extensions -cnotcontains $released) { throw "$released was registered by released versions and is missing from $extensionList." }
+}
+$editorCommandFormat = '"{0}" --editor-standalone --open-file "%1"'
+# "Open with" for any file, the optional right-click entry, and Setup's record
+# of the keys it created where another program's key could have been.
+$applicationsSubkey = 'Software\Classes\Applications'
+$applicationSubkey = "$applicationsSubkey\Network_Toolkit.exe"
+$allFilesSubkey = 'Software\Classes\*'
+$menuVerbSubkey = "$allFilesSubkey\shell\NetworkToolkit.TextEditor"
+$editorKey = "$appKey\TextEditor"
+$createdSubkey = 'Software\Network Toolkit\TextEditor\CreatedKeys'
+$contextMenuExpected = $false
+$rivalMenuTree = ''
 $shortcutArguments = [ordered]@{
     'Network Toolkit.lnk' = ''
     'Network Toolkit Text Editor.lnk' = '--editor-standalone'
@@ -226,6 +272,70 @@ foreach ($ext in $extensions) {
     Assert-Same (Read-RegistryValue "HKCU:\Software\Classes\$ext\OpenWithProgids" $progID) $null "Preexisting $ext Open With registration"
 }
 
+# Another program that owns .cfg for this user: its ProgID is the default value
+# of the extension. Setup must list the Text Editor beside it and change neither
+# the default nor the program's own registration.
+$rivalProgID = 'SyntheticConfigTool.Document'
+$rivalProgSubkey = "Software\Classes\$rivalProgID"
+Set-UserValue 'Software\Classes\.cfg' '' $rivalProgID
+Set-UserValue 'Software\Classes\.cfg' 'Content Type' 'text/plain'
+Set-UserValue $rivalProgSubkey '' 'Synthetic configuration document'
+Set-UserValue "$rivalProgSubkey\shell\open\command" '' '"C:\Synthetic Config Tool\tool.exe" "%1"'
+$rivalProgTree = Get-UserKeyTree $rivalProgSubkey
+
+# Every key of the current user that Setup may add to, as it is before Setup
+# runs. After a rolled back install and after each uninstall they must be
+# exactly this again: Setup removes what it created and nothing else.
+$watchedClassKeys = @($extensions | ForEach-Object { "Software\Classes\$_" }) + $allFilesSubkey, $applicationsSubkey, $applicationSubkey
+$classSnapshots = @{}
+$extensionDefaults = @{}
+$extensionKeyExisted = @{}
+$openWithExisted = @{}
+function Save-ClassSnapshot([string]$Subkey) { $classSnapshots[$Subkey] = Get-UserKeyTree $Subkey }
+foreach ($subkey in $watchedClassKeys) { Save-ClassSnapshot $subkey }
+foreach ($ext in $extensions) {
+    $extensionDefaults[$ext] = Read-UserValue "Software\Classes\$ext" ''
+    $extensionKeyExisted[$ext] = $classSnapshots["Software\Classes\$ext"] -cne '<absent>'
+    $openWithExisted[$ext] = (Get-UserKeyTree "Software\Classes\$ext\OpenWithProgids") -cne '<absent>'
+}
+if (-not $extensionKeyExisted['.cfg'] -or $openWithExisted['.cfg'] -or -not $openWithExisted['.txt']) {
+    throw 'The fixtures for an owned extension (.cfg) and an existing Open With list (.txt) are not in place.'
+}
+$allFilesKeyExisted = $classSnapshots[$allFilesSubkey] -cne '<absent>'
+$allFilesShellExisted = (Get-UserKeyTree "$allFilesSubkey\shell") -cne '<absent>'
+$applicationsKeyExisted = $classSnapshots[$applicationsSubkey] -cne '<absent>'
+$applicationOwnedBySetup = $classSnapshots[$applicationSubkey] -ceq '<absent>'
+if (-not $applicationOwnedBySetup) { throw "This runner already has HKCU\$applicationSubkey; the Open With check needs a clean account." }
+Assert-Same (Get-UserKeyTree $menuVerbSubkey) '<absent>' 'Preexisting right-click entry'
+
+function Assert-ClassKeysRestored([string]$When) {
+    foreach ($subkey in $watchedClassKeys) {
+        $now = Get-UserKeyTree $subkey
+        if ($now -cne $classSnapshots[$subkey]) {
+            throw "$When, HKCU\$subkey is not as it was before Setup ran.`nBefore:`n$($classSnapshots[$subkey])`nNow:`n$now"
+        }
+    }
+    Assert-Same (Get-UserKeyTree $menuVerbSubkey) '<absent>' "$When, the right-click entry"
+    Assert-Same (Get-UserKeyTree $createdSubkey) '<absent>' "$When, Setup's record of created keys"
+    Assert-Absent $editorKey
+}
+
+# Setup only offers the Text Editor. No file type, known or unknown, may have
+# it as the user's choice unless the user made that choice in Windows.
+function Get-EditorUserChoices {
+    $root = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts')
+    if ($null -eq $root) { return @() }
+    try {
+        @(foreach ($name in $root.GetSubKeyNames()) {
+            try { $choice = $root.OpenSubKey("$name\UserChoice") } catch { continue }
+            if ($null -eq $choice) { continue }
+            try { $chosen = [string]$choice.GetValue('ProgId') } finally { $choice.Dispose() }
+            if ($chosen -eq $progID -or $chosen -like 'Applications\Network_Toolkit.exe*') { "$name=$chosen" }
+        })
+    } finally { $root.Dispose() }
+}
+$editorChoicesBefore = @(Get-EditorUserChoices) -join ', '
+
 $fixtures = @{}
 function Add-Fixture([string]$Path, [string]$Content) {
     [IO.File]::WriteAllText($Path, $Content)
@@ -241,6 +351,18 @@ function Assert-Preserved {
         if ((Get-UserChoice $ext) -cne $originalChoices[$ext]) {
             throw "The current default app selection changed for $ext."
         }
+        # The extension's default value names the program that owns the type.
+        Assert-Same (Read-UserValue "Software\Classes\$ext" '') $extensionDefaults[$ext] "Default value of HKCU\Software\Classes\$ext"
+    }
+    Assert-Same (@(Get-EditorUserChoices) -join ', ') $editorChoicesBefore 'File types with the Text Editor as the user choice (Setup must never write a UserChoice)'
+    Assert-Same (Read-UserValue 'Software\Classes\.cfg' '') $rivalProgID "Another program's ownership of .cfg"
+    Assert-Same (Read-UserValue 'Software\Classes\.cfg' 'Content Type') 'text/plain' "Another program's .cfg content type"
+    Assert-Same (Get-UserKeyTree $rivalProgSubkey) $rivalProgTree "Another program's .cfg registration"
+    if ($rivalMenuTree) {
+        Assert-Same (Get-UserKeyTree "$allFilesSubkey\shell\SyntheticEdit") $rivalMenuTree "Another program's right-click entry for all files"
+    }
+    if (-not $applicationOwnedBySetup) {
+        Assert-Same (Get-UserKeyTree $applicationSubkey) $classSnapshots[$applicationSubkey] "Another program's Open With entry named Network_Toolkit.exe"
     }
     foreach ($scheme in $linkSchemes.Keys) {
         if ((Get-UrlUserChoice $scheme) -cne $originalUrlChoices[$scheme]) {
@@ -278,14 +400,52 @@ function Assert-Installed([string]$ExpectedHash = $portableHash) {
     Assert-Same (Read-RegistryValue $capabilities 'ApplicationName') $registeredName 'Default Apps display name'
     Assert-Same (Read-RegistryValue $capabilities 'ApplicationIcon') ('"{0}",1' -f $installedExe) 'Default Apps editor icon'
     if (-not (Read-RegistryValue $capabilities 'ApplicationDescription')) { throw 'The Default Apps description is missing.' }
-    Assert-Same (Read-RegistryValue "$progKey\shell\open\command" '') ('"{0}" --editor-standalone --open-file "%1"' -f $installedExe) 'Editor open command'
+    $editorCommand = $editorCommandFormat -f $installedExe
+    Assert-Same (Read-RegistryValue "$progKey\shell\open\command" '') $editorCommand 'Editor open command'
     $editorClass = Get-Item -LiteralPath $progKey
     try {
         Assert-Same ($editorClass.GetValueKind('AllowSilentDefaultTakeOver')) ([Microsoft.Win32.RegistryValueKind]::None) 'Default takeover opt-out'
     } finally { $editorClass.Dispose() }
+    $registeredTypes = Get-Item -LiteralPath "$capabilities\FileAssociations"
+    try { Assert-Same $registeredTypes.ValueCount $extensions.Count 'Number of file types listed in Default Apps' } finally { $registeredTypes.Dispose() }
     foreach ($ext in $extensions) {
         Assert-Same (Read-RegistryValue "$capabilities\FileAssociations" $ext) $progID "$ext Default Apps registration"
         Assert-Same (Read-RegistryValue "HKCU:\Software\Classes\$ext\OpenWithProgids" $progID) '' "$ext Open With registration"
+        # Setup records a key only when it created it, and writes nothing else there.
+        if (-not $extensionKeyExisted[$ext]) {
+            Assert-Same (Get-UserKeyTree "Software\Classes\$ext") "[OpenWithProgids]{$progID=String:}" "Everything Setup wrote under HKCU\Software\Classes\$ext"
+            Assert-Same (Read-UserValue $createdSubkey $ext) 1 "Record that Setup created the $ext key"
+        } else {
+            Assert-Same (Read-UserValue $createdSubkey $ext) $null "Record for the $ext key, which existed before Setup"
+            $expectedRecord = if ($openWithExisted[$ext]) { $null } else { 1 }
+            Assert-Same (Read-UserValue $createdSubkey "$ext\OpenWithProgids") $expectedRecord "Record for the Open With list of $ext"
+        }
+    }
+    # "Open with" for any file: the program is registered under Applications
+    # with its command and no SupportedTypes, which would limit it to a list.
+    if ($applicationOwnedBySetup) {
+        $expectedApplication = "FriendlyAppName=String:$registeredName`n[DefaultIcon]{=String:`"$installedExe`",1}`n[shell]{[open]{[command]{=String:$editorCommand}}}"
+        Assert-Same (Get-UserKeyTree $applicationSubkey) $expectedApplication 'Open With registration for any file'
+        Assert-Same (Read-UserValue $createdSubkey 'Applications\Network_Toolkit.exe') 1 'Record that Setup created the Open With registration'
+        $expectedRecord = if ($applicationsKeyExisted) { $null } else { 1 }
+        Assert-Same (Read-UserValue $createdSubkey 'Applications') $expectedRecord 'Record for the Applications key'
+    } else {
+        Assert-Same (Read-UserValue $createdSubkey 'Applications\Network_Toolkit.exe') $null "Record for another program's Open With entry"
+        Assert-Same (Read-UserValue $createdSubkey 'Applications') $null "Record for the Applications key beside another program's entry"
+    }
+    # The right-click entry exists only when it was chosen.
+    if ($contextMenuExpected) {
+        $expectedVerb = "=String:Edit with $registeredName`nIcon=String:`"$installedExe`",1`n[command]{=String:$editorCommand}"
+        Assert-Same (Get-UserKeyTree $menuVerbSubkey) $expectedVerb 'Right-click entry for all files'
+        Assert-Same (Read-RegistryValue $uninstallKey 'ContextMenu') 1 'Remembered right-click menu choice'
+        $expectedRecord = if ($allFilesKeyExisted) { $null } else { 1 }
+        Assert-Same (Read-UserValue $createdSubkey '*') $expectedRecord 'Record for the all-files key'
+        $expectedRecord = if ($allFilesKeyExisted -and -not $allFilesShellExisted) { 1 } else { $null }
+        Assert-Same (Read-UserValue $createdSubkey '*\shell') $expectedRecord 'Record for the all-files shell key'
+    } else {
+        Assert-Same (Get-UserKeyTree $menuVerbSubkey) '<absent>' 'Right-click entry that was not chosen'
+        Assert-Same (Read-RegistryValue $uninstallKey 'ContextMenu') $null 'Right-click menu choice that was not made'
+        Assert-Same (Get-UserKeyTree $allFilesSubkey) $classSnapshots[$allFilesSubkey] 'All-files key without the right-click entry'
     }
     Assert-Same (Read-RegistryValue $registeredApps $terminalRegisteredName) 'Software\Network Toolkit\Terminal\Capabilities' 'Terminal Default Apps registration'
     Assert-Same (Read-RegistryValue $terminalCapabilities 'ApplicationName') $terminalRegisteredName 'Terminal Default Apps display name'
@@ -353,7 +513,9 @@ $lateFailureDir = Join-Path $env:RUNNER_TEMP 'Failed Network Toolkit Install'
 [IO.File]::WriteAllText($menu, 'Synthetic item occupying the Start menu folder')
 $blockedMenuHash = (Get-FileHash -LiteralPath $menu -Algorithm SHA256).Hash
 try {
-    Invoke-Silent $setup 2 "/S /D=$lateFailureDir" 'could not finish while creating the Start menu (folder|shortcuts)'
+    # With the right-click entry chosen: every registration is written before
+    # the Start menu step fails, and all of it must be taken back.
+    Invoke-Silent $setup 2 "/S /ContextMenu /D=$lateFailureDir" 'could not finish while creating the Start menu (folder|shortcuts)'
     Assert-Absent (Join-Path $lateFailureDir 'Network_Toolkit.exe')
     Assert-Absent (Join-Path $lateFailureDir 'Uninstall.exe')
     Assert-Absent $uninstallKey
@@ -361,9 +523,22 @@ try {
     Assert-Absent $progKey
     Assert-Same (Read-RegistryValue $registeredApps $registeredName) $null 'Rolled back editor registration'
     Assert-LinkRegistrationAbsent
+    Assert-ClassKeysRestored 'After a rolled back install'
+    foreach ($ext in $extensions) {
+        Assert-Same (Read-RegistryValue "HKCU:\Software\Classes\$ext\OpenWithProgids" $progID) $null "Rolled back $ext Open With registration"
+    }
     Assert-Same (Get-FileHash -LiteralPath $menu -Algorithm SHA256).Hash $blockedMenuHash 'Unrelated Start menu item'
     Assert-Preserved
 } finally { Remove-Item -LiteralPath $menu }
+
+# Another program's right-click entry for all files, added only now so that the
+# rolled back install above had to create and remove the all-files key itself.
+Set-UserValue "$allFilesSubkey\shell\SyntheticEdit" '' 'Edit with Synthetic Editor'
+Set-UserValue "$allFilesSubkey\shell\SyntheticEdit\command" '' '"C:\Synthetic Editor\edit.exe" "%1"'
+$rivalMenuTree = Get-UserKeyTree "$allFilesSubkey\shell\SyntheticEdit"
+Save-ClassSnapshot $allFilesSubkey
+$allFilesKeyExisted = $true
+$allFilesShellExisted = $true
 
 Write-Host 'Checking silent install, shortcuts, editor and terminal link registration.'
 Invoke-Silent $setup
@@ -436,6 +611,10 @@ try {
         $legacyLink.Save()
     } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($legacyLink) }
 } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($legacyShell) }
+# When the user picks the program in "Open with", Windows writes this entry
+# itself, with the bare file name. Setup replaces the command of an entry that
+# starts the program it installs.
+Set-UserValue "$applicationSubkey\shell\open\command" '' ('"{0}" "%1"' -f $installedExe)
 Invoke-Silent $setup 0 '/S /DesktopShortcut'
 Assert-Installed
 Assert-Preserved
@@ -465,14 +644,25 @@ Assert-LinkRegistrationAbsent
 foreach ($ext in $extensions) {
     Assert-Same (Read-RegistryValue "HKCU:\Software\Classes\$ext\OpenWithProgids" $progID) $null "Removed $ext Open With registration"
 }
+Assert-ClassKeysRestored 'After uninstall'
 Assert-Preserved
-Write-Host 'Checking custom location, optional desktop shortcut, and in-place upgrade.'
+
+Write-Host 'Checking custom location, optional shortcut and right-click entry, and in-place upgrade.'
+# An entry named after the program file that starts a copy somewhere else (a
+# portable copy the user picked in "Open with"). It is not this Setup's.
+Set-UserValue "$applicationSubkey\shell\open\command" '' '"C:\Synthetic Portable\Network_Toolkit.exe" "%1"'
+Save-ClassSnapshot $applicationsSubkey
+Save-ClassSnapshot $applicationSubkey
+$applicationsKeyExisted = $true
+$applicationOwnedBySetup = $false
 $defaultInstallDir = $installDir
 $installDir = Join-Path $env:RUNNER_TEMP 'Custom Network Toolkit Install'
 $installedExe = Join-Path $installDir 'Network_Toolkit.exe'
 $uninstaller = Join-Path $installDir 'Uninstall.exe'
-Invoke-Silent $setup 0 "/S /DesktopShortcut /D=$installDir"
+Invoke-Silent $setup 0 "/S /DesktopShortcut /ContextMenu /D=$installDir"
+$contextMenuExpected = $true
 Assert-Installed
+Assert-Preserved
 $desktopShell = New-Object -ComObject WScript.Shell
 try {
     if (-not (Test-Path -LiteralPath $desktopShortcut -PathType Leaf)) { throw 'Selected desktop shortcut is missing.' }
@@ -488,6 +678,25 @@ Assert-Absent (Join-Path $defaultInstallDir 'Network_Toolkit.exe')
 Invoke-Silent $setup
 Assert-Installed
 Assert-Same (Read-RegistryValue $uninstallKey 'DesktopShortcut') 1 'Preserved desktop shortcut choice'
+Assert-Same (Read-RegistryValue $uninstallKey 'ContextMenu') 1 'Preserved right-click menu choice'
+
+Write-Host 'Checking /NoContextMenu removes the right-click entry and the two switches together are refused.'
+Invoke-Silent $setup 2 '/S /ContextMenu /NoContextMenu' 'Choose either /ContextMenu or /NoContextMenu, not both'
+Assert-Installed
+Invoke-Silent $setup 0 '/S /NoContextMenu'
+$contextMenuExpected = $false
+# The entry, the remembered choice and Setup's record for it are gone; the
+# other program's entry beside it and every other registration are as before.
+Assert-Installed
+Assert-Preserved
+Assert-Same (Read-UserValue $createdSubkey '*') $null 'Record for the all-files key after /NoContextMenu'
+Assert-Same (Read-UserValue $createdSubkey '*\shell') $null 'Record for the all-files shell key after /NoContextMenu'
+# A later upgrade without a switch does not bring it back.
+Invoke-Silent $setup
+Assert-Installed
+Invoke-Silent $setup 0 '/S /ContextMenu'
+$contextMenuExpected = $true
+Assert-Installed
 
 Write-Host 'Checking repair and uninstall preserve a replacement desktop shortcut.'
 $replacementShell = New-Object -ComObject WScript.Shell
@@ -521,5 +730,61 @@ if ($takenScheme) {
     Assert-Same (Get-RegistryTree "HKCU:\Software\Classes\$takenScheme") $takenTree "Another app's $takenScheme handler"
     [Microsoft.Win32.Registry]::CurrentUser.DeleteSubKeyTree("Software\Classes\$takenScheme")
 }
+# The right-click entry and every other registration are gone; the other
+# programs' entries beside them are as they were.
+Assert-ClassKeysRestored 'After uninstall with the right-click entry'
 Assert-Preserved
+
+Write-Host 'Checking an upgrade from a released version adopts only the Open With keys that hold nothing but the Text Editor.'
+# Setup up to 1.21.43 registered five types and kept no record of the keys it
+# created. Install, then make the registry what such a version left behind.
+$releasedTypes = '.txt', '.log', '.ini', '.cfg', '.conf'
+if ($extensionKeyExisted['.ini'] -or $extensionKeyExisted['.log'] -or $extensionKeyExisted['.conf']) {
+    throw 'The upgrade check needs an account without its own .ini, .log and .conf keys.'
+}
+Invoke-Silent $setup 0 "/S /D=$installDir"
+$contextMenuExpected = $false
+Assert-Installed
+[Microsoft.Win32.Registry]::CurrentUser.DeleteSubKeyTree('Software\Network Toolkit\TextEditor')
+foreach ($ext in $extensions) {
+    if ($releasedTypes -ccontains $ext) { continue }
+    if (-not $extensionKeyExisted[$ext]) {
+        [Microsoft.Win32.Registry]::CurrentUser.DeleteSubKeyTree("Software\Classes\$ext")
+    } elseif (-not $openWithExisted[$ext]) {
+        [Microsoft.Win32.Registry]::CurrentUser.DeleteSubKeyTree("Software\Classes\$ext\OpenWithProgids")
+    } else {
+        $openWith = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey("Software\Classes\$ext\OpenWithProgids", $true)
+        try { $openWith.DeleteValue($progID) } finally { $openWith.Dispose() }
+    }
+}
+# Since then another program has added itself to the Open With list of .ini.
+Set-UserValue 'Software\Classes\.ini\OpenWithProgids' 'SyntheticIniTool.Document' ''
+$extensionKeyExisted['.ini'] = $true
+$openWithExisted['.ini'] = $true
+$classSnapshots['Software\Classes\.ini'] = '[OpenWithProgids]{SyntheticIniTool.Document=String:}'
+Invoke-Silent $setup
+Assert-Installed
+Assert-Preserved
+# .log and .conf hold nothing but the Text Editor: adopted, key and list.
+# .cfg belongs to another program: only the list Setup added is adopted.
+# .txt and .ini hold another program's value: left unrecorded.
+Assert-Same (Read-UserValue $createdSubkey '.log') 1 'Adopted .log key of a released version'
+Assert-Same (Read-UserValue $createdSubkey '.conf') 1 'Adopted .conf key of a released version'
+Assert-Same (Read-UserValue $createdSubkey '.cfg\OpenWithProgids') 1 'Adopted Open With list of .cfg'
+Assert-Same (Read-UserValue $createdSubkey '.cfg') $null "Record for another program's .cfg key"
+foreach ($shared in '.txt', '.ini') {
+    Assert-Same (Read-UserValue $createdSubkey $shared) $null "Record for the $shared key, whose Open With list another program uses"
+    Assert-Same (Read-UserValue $createdSubkey "$shared\OpenWithProgids") $null "Record for the Open With list of $shared, which another program uses"
+}
+# A later upgrade finds the record and adopts nothing more.
+Invoke-Silent $setup
+Assert-Installed
+Invoke-Uninstaller $uninstaller
+Assert-UninstallFinished
+Assert-Same (Get-UserKeyTree 'Software\Classes\.ini') '[OpenWithProgids]{SyntheticIniTool.Document=String:}' "Another program's value in the Open With list of .ini"
+Assert-ClassKeysRestored 'After uninstalling an upgrade from a released version'
+Assert-Preserved
+foreach ($synthetic in "$allFilesSubkey\shell\SyntheticEdit", $applicationSubkey, $rivalProgSubkey, 'Software\Classes\.cfg', 'Software\Classes\.ini') {
+    [Microsoft.Win32.Registry]::CurrentUser.DeleteSubKeyTree($synthetic)
+}
 Write-Host "Windows setup smoke passed for $version."
