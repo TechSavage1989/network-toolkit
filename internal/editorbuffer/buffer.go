@@ -18,6 +18,9 @@ const MaxEditBytes = 1024 * 1024
 
 var ErrRevision = errors.New("the document changed; refresh this view before editing")
 var ErrClosed = errors.New("the document buffer is closed")
+
+// ErrBinary answers every attempt to change or write a file that is not text.
+var ErrBinary = errors.New("this is not a text file; it is shown read-only and cannot be changed or saved in the Text Editor")
 var ErrBoundary = errors.New("text position splits a Unicode character or is outside the document")
 
 type measure struct{ bytes, units, lines int64 }
@@ -139,6 +142,10 @@ type Buffer struct {
 	revision    uint64
 	end         int64
 	closed      bool
+	// eol is set at import for a document whose line endings differ.
+	eol *eolMap
+	// binary marks the display-only rendering of a file that is not text.
+	binary bool
 }
 
 func empty(dir string) (*Buffer, error) {
@@ -249,6 +256,9 @@ func (b *Buffer) Edit(revision uint64, from, to int64, text string) (Metadata, e
 	defer b.mu.Unlock()
 	if b.closed {
 		return Metadata{}, ErrClosed
+	}
+	if b.binary {
+		return b.metadataLocked(), ErrBinary
 	}
 	if revision != b.revision {
 		return b.metadataLocked(), ErrRevision

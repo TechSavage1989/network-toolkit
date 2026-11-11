@@ -26,6 +26,9 @@ func (b *Buffer) BeginEdit(revision uint64, from, to int64) (*EditTransaction, e
 	if b.closed {
 		return nil, ErrClosed
 	}
+	if b.binary {
+		return nil, ErrBinary
+	}
 	if b.revision != revision {
 		return nil, ErrRevision
 	}
