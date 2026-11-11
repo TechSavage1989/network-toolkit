@@ -119,7 +119,7 @@ def fake_program(current, original):
 
 
 class SeparateProgramPackaging(unittest.TestCase):
-    current = '1.21.45'
+    current = '1.21.47'
 
     def build(self, root, programs=True, swap=False):
         (root / 'docs').mkdir()
@@ -151,6 +151,8 @@ class SeparateProgramPackaging(unittest.TestCase):
         self.patches = [mock.patch.object(release, 'ROOT', root), mock.patch.object(release, 'validate', return_value=self.current),
                         mock.patch.object(release, 'source_files', return_value=[source]),
                         mock.patch.object(release, 'package_windows_setup', side_effect=fake_setup),
+                        # A published version's Setup comes from its own source; stand in for it.
+                        mock.patch.object(release, 'package_windows_setup_legacy', side_effect=lambda e, c, o: fake_setup(e, c, o)),
                         mock.patch.object(release, 'check_windows_setup')]
         for patch in self.patches:
             patch.start()
@@ -210,10 +212,33 @@ class SeparateProgramPackaging(unittest.TestCase):
             release.check_program(fake_program('1.21.44', 'Network_Toolkit_Terminal.exe'), self.current, 'Network_Toolkit_Terminal.exe')
 
     def test_versions_before_the_gate_keep_the_earlier_packages(self):
-        self.assertTrue(release.has_separate_programs('1.21.44'))
+        self.assertTrue(release.has_separate_programs('1.21.47'))
         self.assertTrue(release.has_separate_programs('1.22.0'))
-        self.assertFalse(release.has_separate_programs('1.21.43'))
-        self.assertFalse(release.has_separate_programs('1.17.63'))
+        for published in ('1.21.44', '1.21.45', '1.21.46', '1.17.63'):
+            self.assertFalse(release.has_separate_programs(published), published)
+
+
+class PublishedReleasesStillVerify(SeparateProgramPackaging):
+    """1.21.44 to 1.21.46 were published with one program: verifying them again passes."""
+    current = '1.21.46'
+
+    def test_published_layout_verifies(self):
+        with tempfile.TemporaryDirectory() as temp:
+            output = self.build(Path(temp), programs=False)
+            self.assertEqual(release.verify(output, 'v' + self.current), self.current)
+            with zipfile.ZipFile(output / f'Network_Toolkit_{self.current}_Portable.zip') as portable:
+                self.assertEqual(sum(n.endswith('.exe') for n in portable.namelist()), 1)
+
+    def test_a_rehearsal_before_the_version_bump_may_carry_the_programs(self):
+        # A checkout still at a published version builds and checks the programs.
+        with tempfile.TemporaryDirectory() as temp:
+            output = self.build(Path(temp))
+            self.assertEqual(release.verify(output, 'v' + self.current), self.current)
+
+    # The checks below are for versions from the gate on.
+    test_portable_update_and_setup_carry_the_three_programs_and_assets_stay_seven = None
+    test_verify_refuses_an_update_zip_without_the_separate_programs = None
+    test_swapped_or_missing_programs_are_refused = None
 
 
 class SetupScript(unittest.TestCase):

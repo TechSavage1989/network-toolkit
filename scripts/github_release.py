@@ -24,10 +24,11 @@ STABLE_EXE = 'Network_Toolkit.exe'
 FIRST_WINDOWS_SETUP = (1, 21, 35)
 # The separate Text Editor and Terminal programs (docs/SEPARATE_EXECUTABLES.md)
 # ship inside the portable ZIP, the Update ZIP and Setup, never as assets of
-# their own. v1.21.44 was published before them; the gate includes it so that
-# release rehearsals of a checkout still at 1.21.44 build and check them.
-# Published releases are never packaged again.
-FIRST_SEPARATE_PROGRAMS = (1, 21, 44)
+# their own. From this version on they are required; 1.21.44 to 1.21.46 were
+# published with one program and still verify. A rehearsal of a checkout that
+# is still at an earlier version may carry them (package with --editor-exe
+# and --terminal-exe; verify then checks the three programs it finds).
+FIRST_SEPARATE_PROGRAMS = (1, 21, 47)
 EDITOR_EXE = 'Network_Toolkit_TextEditor.exe'
 TERMINAL_EXE = 'Network_Toolkit_Terminal.exe'
 SEPARATE_PROGRAMS = (EDITOR_EXE, TERMINAL_EXE)
@@ -313,10 +314,10 @@ def package(exe, output, tag, allow_untracked, linux=None, programs=None):
     current = validate(tag)
     linux = linux or {}
     require(set(linux) == {arch for arch, _ in LINUX_ARCHES}, 'Provide the Linux x86_64 and aarch64 executables')
-    separate = has_separate_programs(current)
     programs = programs or {}
+    separate = has_separate_programs(current) or bool(programs)
     require(set(programs) == (set(SEPARATE_PROGRAMS) if separate else set()),
-            'Provide the separate Text Editor and Terminal programs' if separate else 'This version has no separate programs')
+            'Provide the separate Text Editor and Terminal programs')
     output.mkdir(parents=True, exist_ok=True)
     binary = exe.read_bytes()
     check_exe(binary, current)
@@ -451,8 +452,8 @@ def verify(output, tag=None):
     import package_public_update
     check_exe((output / STABLE_EXE).read_bytes(), current)
     prefix = f'Network_Toolkit_{current}/'
-    separate = has_separate_programs(current)
     with zipfile.ZipFile(archive) as bundle:
+        separate = has_separate_programs(current) or any(prefix + name in bundle.namelist() for name in SEPARATE_PROGRAMS)
         programs = {name: bundle.read(prefix + name) for name in SEPARATE_PROGRAMS} if separate else None
     for name, data in (programs or {}).items():
         check_program(data, current, name)
