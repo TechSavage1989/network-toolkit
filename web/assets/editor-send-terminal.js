@@ -17,7 +17,13 @@
  * window. That app's page then calls deliver() below, so the text takes
  * exactly the same paste path there. If neither is running, the Terminal app
  * is opened automatically (no question). A session still has to be connected
- * by the user: nothing here connects one, as inside one window. */
+ * by the user: nothing here connects one, as inside one window.
+ *
+ * Windows of one Toolkit (window-send.js): the main window's dialog also
+ * lists the sessions shown in its detached Terminal windows, and a detached
+ * Text Editor window lists the sessions of the main window and of every
+ * Terminal window. The window that shows the chosen session receives the text
+ * through deliver() below, exactly as a send inside that window. */
 (function(root){
 'use strict';
 const document=root.document;if(!document)return;
@@ -27,7 +33,10 @@ const g=name=>{try{return root[name]??(typeof globalThis!=='undefined'?globalThi
 function sessions(){try{return typeof terminalSessions!=='undefined'?terminalSessions:null;}catch{return null;}}
 // The standalone Text Editor sends to the standalone Terminal app instead.
 function peer(){const p=root.NetworkToolkitPeerSend;return p?.sender?.()==='editor'?p:null;}
-function windowAllows(){try{if(typeof EDITOR_STANDALONE!=='undefined'&&EDITOR_STANDALONE)return peer()?'':'Open the editor in Network Toolkit to send text to a terminal.';if(typeof EDITOR_WINDOW!=='undefined'&&EDITOR_WINDOW)return 'Return this editor to the main window to send text to a terminal.';if(typeof DETACHED_TERMINAL!=='undefined'&&DETACHED_TERMINAL)return 'Open the main window to send text to a terminal.';}catch{}return sessions()?'':'The Terminal is not available in this window.';}
+function editorWindow(){try{return typeof EDITOR_WINDOW!=='undefined'&&EDITOR_WINDOW===true;}catch{return false;}}
+// The other windows of this Toolkit (main window and its detached windows), when its engine offers them.
+function across(){const w=root.NetworkToolkitWindowSend;return w?.enabled?.()&&(editorWindow()||w.kind?.()==='main')?w:null;}
+function windowAllows(){try{if(typeof EDITOR_STANDALONE!=='undefined'&&EDITOR_STANDALONE)return peer()?'':'Open the editor in Network Toolkit to send text to a terminal.';if(editorWindow())return across()?'':'Return this editor to the main window to send text to a terminal.';if(typeof DETACHED_TERMINAL!=='undefined'&&DETACHED_TERMINAL)return 'Open the main window to send text to a terminal.';}catch{}return sessions()?'':'The Terminal is not available in this window.';}
 function shown(entry){try{return typeof terminalEntryShown!=='function'||terminalEntryShown(entry);}catch{return false;}}
 function owned(entry){try{return typeof terminalOwnerCanMutate!=='function'||terminalOwnerCanMutate(entry);}catch{return false;}}
 // Connected sessions displayed in this window, in tab order.
@@ -58,6 +67,7 @@ function open(snapshot){
  const blocked=windowAllows();if(blocked){toastMessage(blocked);return false;}
  const openModal=g('openModal');if(typeof openModal!=='function'||!snapshot)return false;
  const other=peer();if(other){void openPeer(other,snapshot).catch(e=>toastMessage(e.message,'error'));return true;}
+ const windows=across();if(windows){void openAcross(windows,snapshot).catch(e=>toastMessage(e.message,'error'));return true;}
  const list=targets(),content=String(snapshot.content||''),selection=String(snapshot.selection||'');
  if(!list.length){openModal('Send to terminal','<p>No terminal session is connected in this window.</p><p class="help-line">Connect one in Terminal, then choose Send to terminal again.</p>','<button class="btn primary" data-action="close-modal">OK</button>');return false;}
  const id=++sequence,active=(()=>{try{return typeof terminalActive!=='undefined'?terminalActive:'';}catch{return '';}})();
@@ -103,6 +113,24 @@ async function openPeer(other,snapshot){
   escapeHTML(name)+' opens on this session and the text is entered as a paste, using its paste settings. Text with line breaks is shown there for review first when Review multi-line paste is on. Line breaks can run commands.'),FORM_FOOTER,true);
  return true;
 }
+// This window's sessions plus those of the other windows of this Toolkit.
+async function openAcross(windows,snapshot){
+ const openModal=g('openModal'),id=++sequence,stamp=snapshot.stamp?.(),content=String(snapshot.content||''),selection=String(snapshot.selection||'');
+ pending=null;
+ const local=editorWindow()?[]:targets(),reply=await windows.targets('terminal');
+ if(id!==sequence)return false;
+ const groups=reply.windows.filter(w=>w.targets.length),remote=new Map();
+ if(!local.length&&!groups.length){openModal('Send to terminal','<p>No terminal session is connected in any window.</p><p class="help-line">Connect one in Terminal, then choose Send to terminal again.</p>','<button class="btn primary" data-action="close-modal">OK</button>');return false;}
+ let n=0;for(const w of groups)for(const t of w.targets)remote.set('window-send:'+(n++),{windows,window:w.window,windowName:w.name,id:t.id,name:t.name,type:t.type,active:t.active});
+ const active=(()=>{try{return typeof terminalActive!=='undefined'?terminalActive:'';}catch{return '';}})(),items=[...remote.entries()];
+ const chosen=local.find(e=>e.info.id===lastTarget)?.info.id||items.find(([,t])=>t.id===lastTarget)?.[0]||local.find(e=>e.info.id===active)?.info.id||local[0]?.info.id||items.find(([,t])=>t.active)?.[0]||items[0][0];
+ const localOptions=local.map(e=>'<option value="'+escapeHTML(e.info.id)+'"'+(e.info.id===chosen?' selected':'')+'>'+escapeHTML(label(e)+(kind(e)?' · '+kind(e):''))+'</option>').join('');
+ const remoteOptions=groups.map(w=>'<optgroup label="'+escapeHTML(w.name)+'">'+items.filter(([,t])=>t.window===w.window).map(([key,t])=>'<option value="'+escapeHTML(key)+'"'+(key===chosen?' selected':'')+'>'+escapeHTML(t.name+(kindOf(t.type)?' · '+kindOf(t.type):''))+'</option>').join('')+'</optgroup>').join('');
+ pending={id,snapshot,stamp,content,selection,remote};
+ openModal('Send to terminal',formHTML(id,content,selection,(local.length&&groups.length?'<optgroup label="This window">'+localOptions+'</optgroup>':localOptions)+remoteOptions,
+  'The window that shows this session opens it and the text is entered as a paste, using your Terminal paste settings. Text with line breaks is shown for review first when Review multi-line paste is on. Line breaks can run commands.'),FORM_FOOTER,true);
+ return true;
+}
 function wait(bounded){return new Promise(resolve=>{const raf=root.requestAnimationFrame||(fn=>setTimeout(fn,16));let done=false;const finish=()=>{if(!done){done=true;resolve();}};raf(()=>raf(finish));
  // A window in the background may not paint; text from the other app must not wait for it.
  if(bounded)setTimeout(finish,150);});}
@@ -144,6 +172,12 @@ async function submit(form){
  if(bytes(text)>MAX_BYTES){fail('Send no more than 1 MiB at a time. Select a smaller part of the document.');return;}
  if(p.snapshot.stamp&&p.snapshot.stamp()!==p.stamp){fail('The document changed after this dialog opened. Cancel and choose Send to terminal again.');return;}
  const closeModal=g('closeModal');
+ const chosen=form.querySelector('#editorSendTarget')?.value||'';
+ if(p.remote?.has(chosen)){
+  // Another window of this Toolkit shows the session: it pastes the text there.
+  const t=p.remote.get(chosen);pending=null;lastTarget=t.id;if(typeof closeModal==='function')closeModal();
+  await t.windows.send({kind:'terminal',window:t.window,session:t.id,text},{target:t.name});return;
+ }
  if(p.peer){
   const id=form.querySelector('#editorSendTarget')?.value||'';if(!p.names.has(id)){fail('Choose a terminal session.');return;}
   pending=null;lastTarget=id;if(typeof closeModal==='function')closeModal();

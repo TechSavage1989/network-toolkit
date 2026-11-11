@@ -122,7 +122,8 @@ func terminalViewChildArguments(noBrowser bool) []string {
 	return args
 }
 
-// launchDetachedTerminal launches only this executable. The request context
+// launchDetachedTerminal launches the separate program of its app
+// (detachedViewProgram) or this executable. The request context
 // bounds the decision to start, not the child's lifetime. The owner observes
 // the returned buffered completion channel for crash recovery.
 func launchDetachedTerminal(ctx context.Context, launch terminalViewLaunch) (<-chan error, error) {
@@ -130,7 +131,9 @@ func launchDetachedTerminal(ctx context.Context, launch terminalViewLaunch) (<-c
 	if err != nil {
 		return nil, err
 	}
-	executable, err := updateCurrentExecutable()
+	// The separate program of this app and version when it is beside the
+	// running program (its icon and taskbar name), else this program.
+	executable, err := detachedViewProgram("terminal")
 	if err != nil {
 		clear(raw)
 		return nil, fmt.Errorf("locate the detached Terminal executable: %w", err)

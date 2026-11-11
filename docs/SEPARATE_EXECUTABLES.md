@@ -160,10 +160,55 @@ not compile.
   The arguments are the existing fixed ones (`--terminal --data-dir <root>
   [--terminal-preset ...]`, `--editor-standalone --data-dir <root>`): no text,
   credentials or file paths.
-- **Detached windows** (`--terminal-view`, `--editor-view`) stay children of
-  the process that opens them and are started from that process's own file, so
-  a detached editor window of the Terminal program belongs to the Terminal
-  program. The main window's detached windows are unchanged.
+- **Detached windows** (`--terminal-view`, `--editor-view`) are "connected
+  separate programs" (owner decision 2026-11-11: a popped-out window has the
+  separate program's icon and taskbar name but stays connected to the engine
+  that opened it). `launchDetachedTerminal` and `launchDetachedEditor` start
+  `detachedViewProgram`: on Windows, the separate program of that app
+  (`Network_Toolkit_Terminal.exe` for `--terminal-view`,
+  `Network_Toolkit_TextEditor.exe` for `--editor-view`) beside the running
+  program when `separateProgramMatches` accepts it (a regular file, not a
+  link, whose version resource names this exact version and that program's
+  `OriginalFilename`, the check `standaloneProgram` and forwarding use);
+  otherwise the running program itself, as before. Linux always uses the
+  running program. This applies to every engine: the main window's pop-outs,
+  the standalone Terminal's (already the Terminal program) and an editor
+  window opened from the Terminal program (the Text Editor program when it is
+  there). The child receives the same private stdin bootstrap (owner endpoint,
+  view id, scoped view token, profile folder); nothing is on its command line
+  but `--terminal-view`/`--editor-view` and `--no-browser`. The page, the
+  sessions, the documents and their ownership stay in the opening engine, so
+  tabs, unsaved text and live sessions move with nothing reconnected, and
+  dock back, SFTP, macros and credentials work as before. The separate
+  programs accept the view switches (`applyBuildEdition`: a view never also
+  opens the standalone app, and the other app's switches are still refused
+  beside it), never forward (forwarding is main program only), and carry the
+  same icon groups, so `desktop.IconTerminal`/`IconEditor` still give the
+  window its icon. The taskbar button and grouping come from the program's
+  path (no explicit AppUserModelID), so a popped-out window groups with the
+  standalone app of that program. The same-folder check trusts the separate
+  program exactly as much as `Network_Toolkit.exe` itself (it is replaced by
+  the same updater and Setup).
+- **Send between the windows of one engine** (`window_send.go`,
+  `web/assets/window-send.js`): Send to terminal and Send to Text Editor reach
+  the other windows of the same engine (main window, detached Terminal
+  windows, detached editor windows). Every window's page polls
+  `/api/window-send/inbox` under its own token and reports its connected,
+  owned sessions and its open documents (names only); the engine keeps only
+  sessions the window owns (`ownerLocked`). A send names the window and the
+  target; the engine refuses it unless that window is alive (main page
+  present, Terminal view `detached`, editor view `ready`), polled within
+  `peerTargetsFresh`, lists the target, still owns the session (the ownership
+  `withTerminalOwner` checks) or holds the registry's document without a
+  pending move, and has no other send waiting (one per window, a minute at
+  most). The receiving page runs peer-send.js's `receiveTerminal` /
+  `receiveEditor`, which are the in-window paths (`pasteText` with paste
+  review, warnings and bracketed paste; `newDocument`/`insertText`/
+  `pickInsert`) behind `blocked()` before and immediately before the change;
+  its paste is then checked by `withTerminalOwner` like any input. Text only,
+  no Enter. Only the main Toolkit engine offers it (`windowSendAvailable`);
+  standalone apps' windows keep their refusal, and child windows still have no
+  peer routes (`/api/peer-send/` is refused to view tokens).
 - **Peer send** trusts protected records only, by their protection, not by a
   file name; `peerForegroundPID` takes the PID from such a record whichever
   program wrote it. Older versions' records (plain Terminal records, engines

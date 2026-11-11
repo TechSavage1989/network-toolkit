@@ -30,7 +30,7 @@ function enabled(action,t){if(!valid(t))return false;const entry=t.entry,owned=e
  if(action==='rename')return !!t.draft||!!owned;
  if(action==='move-left'||action==='move-right'){const ids=root.NetworkToolkitTerminalTabDrag?.ids?.()||[],at=ids.indexOf(t.id);return at>=0&&(action==='move-left'?at>0:at<ids.length-1);}
 
- if(action==='send-editor')return !!entry&&(!TERMINAL_ONLY||standaloneTerminal())&&!!root.NetworkToolkitTerminalSendEditor?.available?.();
+ if(action==='send-editor')return !!entry&&(!TERMINAL_ONLY||standaloneTerminal()||DETACHED_TERMINAL)&&!!root.NetworkToolkitTerminalSendEditor?.available?.();
  if(action==='run-as-admin'||action==='convert-admin')return adminCandidate(entry)&&!(DETACHED_TERMINAL&&!DETACHED_WORKSPACE)&&!terminalConnectBusy&&!terminalWorkspaceTransferBusy;
  if(action==='duplicate')return !(DETACHED_TERMINAL&&!DETACHED_WORKSPACE)&&!terminalConnectBusy&&!terminalWorkspaceTransferBusy;
  if(!entry)return action==='workspace'&&terminalViewRegistry.available;

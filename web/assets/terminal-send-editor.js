@@ -18,7 +18,14 @@
  * window. That app's page then calls deliver() below, so the text is added
  * there in exactly the same way. If neither is running, Send starts the Text
  * Editor app: this app's engine holds the text until that app is ready and
- * delivers it to a new document, so the user sends once. */
+ * delivers it to a new document, so the user sends once.
+ *
+ * Windows of one Toolkit (window-send.js): the main window also lists the
+ * documents of its detached Text Editor windows, and a detached Terminal
+ * window lists the documents of the main window and of every Text Editor
+ * window; a new document goes to the main window's editor (or, while that is
+ * closed, to a Text Editor window). The window that holds the document adds
+ * the text through deliver() below, exactly as a send inside that window. */
 (function(root){
 'use strict';
 const document=root.document;if(!document)return;
@@ -28,7 +35,10 @@ const g=name=>{try{return root[name];}catch{return undefined;}};
 function editor(){return root.NetworkToolkitFileEditor;}
 // The standalone Terminal sends to the standalone Text Editor app instead.
 function peer(){try{if(typeof TERMINAL_WINDOW==='undefined'||!TERMINAL_WINDOW)return null;}catch{return null;}const p=root.NetworkToolkitPeerSend;return p?.sender?.()==='terminal'?p:null;}
-function unavailable(){try{if(typeof DETACHED_TERMINAL!=='undefined'&&DETACHED_TERMINAL)return 'Use the main window to send output to the Text Editor.';if(typeof TERMINAL_ONLY!=='undefined'&&TERMINAL_ONLY)return peer()?'':'The Text Editor is not available in this window.';}catch{}return editor()?.insertText?'':'The Text Editor is not available.';}
+function detached(){try{return typeof DETACHED_TERMINAL!=='undefined'&&DETACHED_TERMINAL===true;}catch{return false;}}
+// The other windows of this Toolkit (main window and its detached windows), when its engine offers them.
+function across(){const w=root.NetworkToolkitWindowSend;return w?.enabled?.()&&(detached()||w.kind?.()==='main')?w:null;}
+function unavailable(){try{if(detached())return across()?'':'Use the main window to send output to the Text Editor.';if(typeof TERMINAL_ONLY!=='undefined'&&TERMINAL_ONLY)return peer()?'':'The Text Editor is not available in this window.';}catch{}return editor()?.insertText?'':'The Text Editor is not available.';}
 function escapeHTML(value){return String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);}
 function lines(text){return text?(text.match(/\r\n|\r|\n/g)||[]).length+(/[\r\n]$/.test(text)?0:1):0;}
 function describe(text){const n=lines(text);return n.toLocaleString()+(n===1?' line':' lines')+' · '+text.length.toLocaleString()+' characters';}
@@ -46,20 +56,28 @@ async function open(entry){
  // Standalone Terminal: the documents are those of the standalone Text Editor app.
  const other=peer();let remote=null;
  if(other){remote=await other.targets();if(id!==sequence)return false;}
- const docs=other?remote.targets.map(item=>({id:item.id,name:item.name,dirty:item.unsaved,active:item.active,blocked:item.busy?'unavailable':''})):(editor().listDocuments?.()||[]),usable=docs.filter(d=>!d.blocked),activeDoc=usable.find(d=>d.active)||usable[0];
+ // Windows of this Toolkit: documents held by its other windows, and where a new document goes.
+ const windows=other?null:across();let elsewhere=null,newWindow=null;const remoteDocs=new Map();
+ if(windows){elsewhere=await windows.targets('editor');if(id!==sequence)return false;
+  let n=0;for(const w of elsewhere.windows)for(const t of w.targets)remoteDocs.set('window-send:'+(n++),{window:w.window,windowName:w.name,uid:t.id,name:t.name,dirty:t.unsaved,active:t.active,blocked:t.busy?'unavailable':''});
+  if(detached()&&elsewhere.newDocument)newWindow={window:elsewhere.newDocument,name:elsewhere.newName};}
+ const localDocs=other?remote.targets.map(item=>({id:item.id,name:item.name,dirty:item.unsaved,active:item.active,blocked:item.busy?'unavailable':''})):detached()?[]:(editor()?.listDocuments?.()||[]);
+ const docs=localDocs.concat([...remoteDocs.entries()].map(([key,d])=>({id:key,name:d.name,dirty:d.dirty,active:d.active&&!localDocs.length,blocked:d.blocked,source:d.windowName}))),usable=docs.filter(d=>!d.blocked),activeDoc=usable.find(d=>d.active)||usable[0];
+ // A detached Terminal window has no editor of its own: a new document needs another window's editor.
+ const noNew=detached()&&!other&&!newWindow;
  // The receiver: the Text Editor app, or the main Toolkit window when that app is not running.
  const name=other?remote.name||other.peerName():'';
- pending={id,entry,output,selection,kind,label:sessionLabel(entry),peer:other,names:new Map(docs.map(d=>[d.id,d.name]))};
+ pending={id,entry,output,selection,kind,label:sessionLabel(entry),peer:other,names:new Map(docs.map(d=>[d.id,d.name])),remote:remoteDocs,newWindow,windows};
  const sourceRow=(value,title,text,checked)=>'<label class="toggle-row"><input type="radio" name="terminalSendSource" value="'+value+'" '+(text?(checked?'checked':''):'disabled')+'><span>'+title+' <span class="help-line">('+(text?describe(text):value==='selection'?'nothing selected':'nothing retained yet')+')</span></span></label>';
  openModal('Send to Text Editor',
   '<form id="terminalSendEditorForm" class="terminal-send-editor" data-send-id="'+id+'">'+
   '<fieldset><legend>Send</legend>'+sourceRow('output',kind,output,false)+sourceRow('selection','Selected terminal text',selection,!!selection)+(block?.truncated?'<p class="help-line">Only the retained part of a long output is available.</p>':'')+'</fieldset>'+
-  '<fieldset><legend>'+(other?'To '+escapeHTML(name):'To')+'</legend>'+(other&&!remote.running?'<p class="help-line" data-terminal-send-peer-missing>'+escapeHTML(name)+' is not open. It opens when you choose Send to editor.</p>':'')+(other&&remote.note?'<p class="help-line" data-terminal-send-peer-note>'+escapeHTML(remote.note)+'</p>':'')+'<label class="toggle-row"><input type="radio" name="terminalSendTarget" value="new" '+(activeDoc?'':'checked')+'><span>New document</span></label>'+
+  '<fieldset><legend>'+(other?'To '+escapeHTML(name):'To')+'</legend>'+(other&&!remote.running?'<p class="help-line" data-terminal-send-peer-missing>'+escapeHTML(name)+' is not open. It opens when you choose Send to editor.</p>':'')+(other&&remote.note?'<p class="help-line" data-terminal-send-peer-note>'+escapeHTML(remote.note)+'</p>':'')+'<label class="toggle-row"><input type="radio" name="terminalSendTarget" value="new" '+(noNew?'disabled':activeDoc?'':'checked')+'><span>New document'+(newWindow?' <span class="help-line">(in '+escapeHTML(newWindow.name)+')</span>':noNew?' <span class="help-line">(open the main window first)</span>':'')+'</span></label>'+
   '<label class="toggle-row"><input type="radio" name="terminalSendTarget" value="existing" '+(activeDoc?'checked':'disabled')+'><span>Open document'+(docs.length?'':' <span class="help-line">(none open)</span>')+'</span></label>'+
   '<div class="field terminal-send-existing"><label for="terminalSendDocument">Document</label><select id="terminalSendDocument" '+(activeDoc?'':'disabled')+'>'+docs.map((d,i)=>'<option value="'+escapeHTML(d.id)+'"'+(d.blocked?' disabled':'')+(d===activeDoc?' selected':'')+'>'+escapeHTML((i+1)+'. '+d.name+(d.dirty?' (unsaved)':'')+(d.source?' · '+d.source:'')+(d.blocked?' · unavailable':''))+'</option>').join('')+'</select></div>'+
   '<div class="field terminal-send-existing"><label for="terminalSendWhere">Insert at</label><select id="terminalSendWhere" '+(activeDoc?'':'disabled')+'><option value="pick" selected>A position I choose in the editor</option><option value="cursor">The document’s current cursor</option><option value="end">The end of the document</option><option value="start">The start of the document</option><option value="line">The start of line…</option></select></div>'+
   '<div class="field terminal-send-line" hidden><label for="terminalSendLine">Line number</label><input id="terminalSendLine" type="number" min="1" step="1" value="1" inputmode="numeric"></div></fieldset>'+
-  '<p class="help-line">'+(other?escapeHTML(name)+' opens with the text added as an ordinary edit: the document is marked unsaved and Undo removes it.':'The Text Editor opens with the text added as an ordinary edit: the document is marked unsaved and Undo removes it.')+'</p>'+
+  '<p class="help-line">'+(other?escapeHTML(name)+' opens with the text added as an ordinary edit: the document is marked unsaved and Undo removes it.':windows?'The window that holds the document shows it with the text added as an ordinary edit: the document is marked unsaved and Undo removes it.':'The Text Editor opens with the text added as an ordinary edit: the document is marked unsaved and Undo removes it.')+'</p>'+
   '<p class="help-line terminal-send-error" id="terminalSendError" role="alert"></p></form>',
   '<button type="button" class="btn ghost" data-action="close-modal">Cancel</button><button class="btn primary" type="submit" form="terminalSendEditorForm">Send to editor</button>',true);
  // Output is the default source unless only a selection exists.
@@ -95,8 +113,9 @@ async function submit(form){
  const source=form.querySelector('[name="terminalSendSource"]:checked')?.value,text=source==='selection'?p.selection:p.output;
  if(!text){fail('There is no text to send.');return;}if(text.length>MAX_CHARS){fail('That is more text than the editor accepts at once. Select a smaller part.');return;}
  const target=form.querySelector('[name="terminalSendTarget"]:checked')?.value,ed=editor();let docId='',where='end';
+ if(target!=='existing'&&detached()&&!p.peer&&!p.newWindow){fail('Open the main window first, or choose an open document.');return;}
  if(target==='existing'){docId=form.querySelector('#terminalSendDocument')?.value||'';
-  if(p.peer){if(!p.names.has(docId)){fail('That document is no longer open. Choose another.');return;}}
+  if(p.peer||p.remote?.has(docId)){if(!p.names.has(docId)){fail('That document is no longer open. Choose another.');return;}if(p.remote?.get(docId)?.blocked){fail('That document cannot take text right now. Choose another or try again.');return;}}
   else{const doc=(ed.listDocuments?.()||[]).find(d=>d.id===docId);if(!doc){fail('That document is no longer open. Choose another.');return;}if(doc.blocked){fail(doc.blocked);return;}}
   where=form.querySelector('#terminalSendWhere')?.value||'pick';if(where==='line'){const n=Number(form.querySelector('#terminalSendLine')?.value);if(!Number.isSafeInteger(n)||n<1){fail('Enter a line number of 1 or more.');return;}where={line:n};}}
  const label=(source==='selection'?'Selected terminal text':p.kind)+' from '+p.label;
@@ -107,6 +126,14 @@ async function submit(form){
   // If no receiver is running, this app's engine starts the Text Editor app and delivers this text itself.
   const payload=target==='existing'?{target:docId,where:typeof where==='object'?'line':where,text,label}:{target:'new',text,label};if(typeof where==='object')payload.line=where.line;
   await p.peer.send(payload,{target:target==='existing'?p.names.get(docId):'a new document'});return;
+ }
+ // Another window of this Toolkit holds the document (or takes the new one): it adds the text there.
+ const there=target==='existing'?p.remote?.get(docId):detached()?p.newWindow:null;
+ if(there&&p.windows){
+  if(text.length*3>PEER_MAX_BYTES&&new TextEncoder().encode(text).length>PEER_MAX_BYTES){fail('Send no more than 8 MiB of text to the Text Editor at a time. Select a smaller part.');return;}
+  pending=null;if(typeof closeModal==='function')closeModal();
+  const payload=target==='existing'?{kind:'editor',window:there.window,target:there.uid,where:typeof where==='object'?'line':where,text,label}:{kind:'editor',window:there.window,target:'new',text,label};if(typeof where==='object'&&target==='existing')payload.line=where.line;
+  await p.windows.send(payload,{target:target==='existing'?there.name:'a new document'});return;
  }
  pending=null;if(typeof closeModal==='function')closeModal();
  await deliver({docId:target==='existing'?docId:'',where,text,label});

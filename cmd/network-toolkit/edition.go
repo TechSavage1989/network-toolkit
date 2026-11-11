@@ -77,9 +77,15 @@ func applyBuildEdition(flags *flag.FlagSet, edition string) error {
 	}
 	set := map[string]bool{}
 	flags.Visit(func(f *flag.Flag) { set[f.Name] = true })
-	if set["version"] || set["terminal-view"] || set["editor-view"] {
+	if set["version"] {
 		return nil
 	}
+	// A detached window (--terminal-view, --editor-view with its stdin
+	// bootstrap) runs in the program it was started from: the separate
+	// program of its app (detachedViewProgram) or, as a fallback, any build.
+	// It never also opens the standalone app, and the other app's switches
+	// are still refused beside it.
+	view := set["terminal-view"] || set["editor-view"]
 	refuse := func(name string) error {
 		other := "the Text Editor with " + programName(standaloneEditorMode) + " or " + programName("") + " --editor-standalone"
 		if edition == standaloneEditorMode {
@@ -94,12 +100,18 @@ func applyBuildEdition(flags *flag.FlagSet, edition string) error {
 				return refuse(name)
 			}
 		}
+		if view {
+			return nil
+		}
 		return flags.Set("terminal", "true")
 	case standaloneEditorMode:
 		for _, name := range []string{"terminal", "terminal-preset", terminalLinkFlag} {
 			if set[name] {
 				return refuse(name)
 			}
+		}
+		if view {
+			return nil
 		}
 		if set["editor"] {
 			// The Start menu's earlier Text Editor argument: the same app here.
@@ -186,6 +198,39 @@ func standaloneProgramFrom(self, edition, mode string) (string, error) {
 		return candidate, nil
 	}
 	return "", fmt.Errorf("Neither %s nor %s is beside %s.", programName(mode), programName(""), filepath.Base(self))
+}
+
+// detachedViewProgram is the program that runs a detached window of an app
+// (mode "terminal" for --terminal-view, standaloneEditorMode for
+// --editor-view) started by the running program (owner request, "connected
+// separate program"): the separate program of that app beside the running
+// program when it is a regular file of this exact version, so the window has
+// that program's icon, name and taskbar button; otherwise the running program
+// itself, exactly as before. The window stays connected to the engine that
+// started it: the program only shows the page; sessions, documents and their
+// ownership stay in that engine. Linux ships only the main program.
+func detachedViewProgram(mode string) (string, error) {
+	self, err := updateCurrentExecutable()
+	if err != nil {
+		return "", err
+	}
+	if resolved, err := filepath.EvalSymlinks(self); err == nil {
+		self = resolved
+	}
+	return detachedViewProgramFrom(runtime.GOOS, self, buildEdition, mode), nil
+}
+
+// detachedViewProgramFrom is detachedViewProgram for the running program self
+// of the given edition on goos.
+func detachedViewProgramFrom(goos, self, edition, mode string) string {
+	if goos != "windows" || edition == mode {
+		return self
+	}
+	candidate := filepath.Join(filepath.Dir(self), programNameFor(goos, mode))
+	if updateNamingSamePath(candidate, self) || !separateProgramMatches(candidate, mode) {
+		return self
+	}
+	return candidate
 }
 
 // forwardToSeparateProgram runs a standalone app in its separate program when

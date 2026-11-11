@@ -25,7 +25,8 @@
  * user did not choose to send.
  * The main Toolkit window only receives (startMain(), when its engine says it
  * can be found); its own Send to commands stay inside the window. Detached
- * child windows do not use this module. */
+ * child windows never use peer send; between the windows of one engine
+ * window-send.js uses this module's summaries and receive code. */
 (function(root){
 'use strict';
 const document=root.document;if(!document)return;
@@ -106,33 +107,37 @@ function ownName(){return NAMES[mode]||'';}
 // colour picker), the editor's Move / merge box, command search.
 function dialogOpen(){return !!document.querySelector('#modalRoot .modal,#modalRoot [role="dialog"],.nt-editor-dialog,[data-ed-dialog],#uxCommandOverlay,dialog[open],[data-editor-window-controls]:not([hidden])');}
 // The main window clears a typed secret (the Wi-Fi password) when it changes page.
-function entryPending(){if(mode!=='main')return false;try{return [...document.querySelectorAll('[data-transient-secret]')].some(input=>!!input.value);}catch{return false;}}
+function entryPending(main=mode==='main'){if(!main)return false;try{return [...document.querySelectorAll('[data-transient-secret]')].some(input=>!!input.value);}catch{return false;}}
 // Why arriving text cannot be shown right now, or ''. It is asked before the
 // window changes page and again immediately before the text is pasted or
 // inserted (deliver() can wait a few seconds for a session to be ready).
-function blocked(){
- if(dialogOpen())return 'A dialog is open in '+ownName()+'. Finish or close it there, then send again.';
- if(entryPending())return 'A password is being entered in '+ownName()+'. Finish that there, then send again.';
+// window-send.js asks the same question for a window of this engine: name is
+// that window's name and main says whether it is the main window.
+function blocked(name=ownName(),main=mode==='main'){
+ if(dialogOpen())return 'A dialog is open in '+name+'. Finish or close it there, then send again.';
+ if(entryPending(main))return 'A password is being entered in '+name+'. Finish that there, then send again.';
  return '';
 }
 const refuse=error=>({ok:false,error});
-async function receiveTerminal(request){
+// guard: the blocked() question for the receiving window (window-send.js
+// passes its own; peer send uses this app's).
+async function receiveTerminal(request,guard=blocked,name=ownName()){
  const send=root.NetworkToolkitEditorSendTerminal;
- if(!send?.deliver||typeof request.text!=='string'||!request.text)return refuse(ownName()+' cannot take the text right now.');
+ if(!send?.deliver||typeof request.text!=='string'||!request.text)return refuse(name+' cannot take the text right now.');
  // Never replace a connection form, a host key or sign-in prompt, or a paste review.
  // Checked before anything changes here (deliver() changes the page), and again by deliver().
- const busy=blocked();if(busy)return refuse(busy);
+ const busy=guard();if(busy)return refuse(busy);
  const entry=send.targets().find(item=>item.info.id===request.session);
  if(!entry)return refuse('That terminal session is no longer connected. Nothing was sent.');
- return send.deliver(entry,request.text,{report:true,guard:blocked});
+ return send.deliver(entry,request.text,{report:true,guard});
 }
-async function receiveEditor(request){
+async function receiveEditor(request,guard=blocked,name=ownName()){
  const send=root.NetworkToolkitTerminalSendEditor,editor=root.NetworkToolkitFileEditor;
- if(!send?.deliver||!editor?.listDocuments||typeof request.text!=='string'||!request.text)return refuse(ownName()+' cannot take the text right now.');
- const busy=blocked();if(busy)return refuse(busy);
+ if(!send?.deliver||!editor?.listDocuments||typeof request.text!=='string'||!request.text)return refuse(name+' cannot take the text right now.');
+ const busy=guard();if(busy)return refuse(busy);
  let docId='';
  if(request.target!=='new'){const doc=editor.listDocuments().find(item=>item.uid===request.target);if(!doc)return refuse('That document is no longer open. Nothing was added.');if(doc.blocked)return refuse(doc.blocked);docId=doc.id;}
- return send.deliver({docId,where:request.where==='line'?{line:Number(request.line)}:request.where||'end',text:request.text,label:clip(request.label)||'Terminal output',report:true,guard:blocked});
+ return send.deliver({docId,where:request.where==='line'?{line:Number(request.line)}:request.where||'end',text:request.text,label:clip(request.label)||'Terminal output',report:true,guard});
 }
 // kind: what the text is for. A standalone app receives its own kind only; the
 // main window is told by its engine ("terminal" or "editor").
@@ -140,7 +145,7 @@ async function receive(request,kind){
  if(receiving||!request||typeof request.requestId!=='string')return;receiving=true;
  const own=mode==='main'?(kind==='terminal'||kind==='editor'?kind:''):mode;
  let result;
- try{result=own==='terminal'?await receiveTerminal(request):own==='editor'?await receiveEditor(request):refuse(ownName()+' cannot take the text right now.');}catch(error){result=refuse(error?.message||'The text could not be delivered.');}
+ try{result=own==='terminal'?await receiveTerminal(request,()=>blocked()):own==='editor'?await receiveEditor(request,()=>blocked()):refuse(ownName()+' cannot take the text right now.');}catch(error){result=refuse(error?.message||'The text could not be delivered.');}
  try{await call('ack','POST',result?.ok?{requestId:request.requestId,ok:true,outcome:result.outcome}:{requestId:request.requestId,ok:false,error:String(result?.error||'The text was not accepted.').slice(0,280)});}catch{}
  finally{receiving=false;}
 }
@@ -161,5 +166,6 @@ function start(app){if(app!=='editor'&&app!=='terminal')return false;return begi
 // The main Toolkit window: receive only, and only when its engine reports that
 // a standalone app can find it (status.peerReceive).
 function startMain(){if(mode&&mode!=='main')return false;return begin('main');}
-root.NetworkToolkitPeerSend=Object.freeze({start,startMain,sender,peerKind,peerName,targets,open,send,poll,summary,dialogOpen});
+// window-send.js (windows of one engine) reports and receives with the same code.
+root.NetworkToolkitPeerSend=Object.freeze({start,startMain,sender,peerKind,peerName,targets,open,send,poll,summary,dialogOpen,blocked,sessionSummary,documentSummary,receiveTerminal,receiveEditor});
 })(window);
