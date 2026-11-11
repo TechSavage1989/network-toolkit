@@ -45,6 +45,41 @@ test('the hosted Setup check reads the same file and finds the same types',()=>{
  for(const text of ['Assert-ClassKeysRestored','Get-EditorUserChoices','$applicationSubkey','$menuVerbSubkey',"'/S /DesktopShortcut /ContextMenu /D=$installDir'".replace(/'/g,'"'),'/S /ContextMenu /D=$lateFailureDir'])assert(ps1.includes(text),'verify-windows.ps1 no longer has '+text);
 });
 
+test('the portable program registers exactly Setup\'s list and keys, from the same file',()=>{
+ // cmd/network-toolkit/text_editor_extensions.go is generated from the .nsh.
+ assert.equal(fs.readFileSync(list.GO,'utf8'),list.goSource(),'text_editor_extensions.go is out of date: run node scripts/text-extensions.cjs --write');
+ const go=read('cmd/network-toolkit/text_editor_registration.go');
+ assert.doesNotMatch(go,/"\.(?:txt|log|ini|cfg|conf|json|xml|py)"/,'the portable registration has no list of its own');
+ assert.match(go,/for _, ext := range textEditorExtensions/);
+ // The portable program writes what Setup writes: the same names, the same
+ // command shape and the same key for its own record as windows.nsi reads.
+ for(const [goName,nsiName] of [['editorRegProgID','PROG_ID'],['editorRegAppFile','APP_FILENAME'],['editorRegArgs','EDITOR_ARGS']]){
+  const goValue=new RegExp(goName+'\\s*=\\s*"([^"]+)"').exec(go)?.[1],nsiValue=new RegExp('^!define '+nsiName+' "([^"]+)"$','m').exec(code)?.[1];
+  assert(goValue&&goValue===nsiValue,goName+' ('+goValue+') differs from '+nsiName+' ('+nsiValue+')');
+ }
+ assert.match(code,/^!define PORTABLE_KEY "Software\\\$\{APP_NAME\}\\PortableTextEditor"$/m);
+ assert.match(go,/editorRegPortable\s*=\s*editorRegVendorKey \+ `\\PortableTextEditor`/);
+ // Never a UserChoice, FileExts or an extension's default value; deletes go
+ // through the empty-key check, never a recursive delete.
+ const goCode=go.split('\n').filter(line=>!/^\s*\/\//.test(line)).join('\n');
+ assert.doesNotMatch(goCode,/UserChoice|FileExts|SupportedTypes|OpenWithList/i);
+ assert.doesNotMatch(goCode,/plan\.str\(`Software\\\\Classes\\\\` \+ ext, ""/,'the default value of an extension is never written');
+ assert.doesNotMatch(read('cmd/network-toolkit/text_editor_registration_windows.go'),/RegDeleteTree|SHDeleteKey/,'no recursive delete');
+ // Setup takes a portable registration over: adopts its records, the Open
+ // with entry it wrote and its right-click choice, then retires its record.
+ const step=name=>new RegExp('^!macro '+name+'\\n([\\s\\S]*?)^!macroend','m').exec(code)?.[1]||'';
+ assert.match(step('AdoptPortableRegistration'),/EnumRegValue \$1 HKCU "\$\{PORTABLE_KEY\}\\CreatedKeys" \$R3[\s\S]*WriteRegDWORD HKCU "\$\{CREATED_KEYS\}" "\$1" 1/);
+ assert.match(step('RetirePortableRegistration'),/DeleteRegKey HKCU "\$\{PORTABLE_KEY\}"/);
+ assert.match(step('RegisterApplication'),/\$\{ElseIf\} \$PortableExe != ""[\s\S]*\$\{If\} \$2 == '"\$PortableExe"'/);
+ const main=/Section "Network Toolkit"\n([\s\S]*?)SectionEnd/.exec(code)[1];
+ assert(main.indexOf('!insertmacro AdoptPortableRegistration')<main.indexOf('!insertmacro TextExtensions RegisterExtension'),'records are adopted before the types are registered');
+ assert(main.indexOf('!insertmacro RegisterApplication')<main.indexOf('!insertmacro RetirePortableRegistration'),'the portable record is retired after the registration is written');
+ assert(main.indexOf('!insertmacro RegisterContextMenu')<main.indexOf('!insertmacro RetirePortableRegistration'));
+ assert.match(code,/ReadRegDWORD \$0 HKCU "\$\{PORTABLE_KEY\}" "ContextMenu"\s+\$\{If\} \$0 == 1\s+!insertmacro SelectSection \$\{ContextMenu\}/,'the portable copy\'s right-click choice is carried over');
+ // The hosted check runs both orders: portable first then Setup, and Setup first.
+ for(const text of ['"--text-editor-registration=$Action"',"Invoke-Registration $portableA 'register-menu' 0","Invoke-Registration $portableB 'takeover' 0","Invoke-Registration $portableA 'cleanup' 0","Invoke-Registration $portableA 'register' 3",'Assert-Absent $portableKey','the portable record is retired',"Assert-Same (Get-ClassesTree) $classesBefore"])assert(ps1.includes(text),'verify-windows.ps1 no longer has '+text);
+});
+
 test('the guide shows the list as generated',()=>{
  assert.equal(list.guideBlock(),list.block(),'docs/guide/editor.md is out of date: run node scripts/text-extensions.cjs --write');
  assert.match(read('AGENTS.md'),/scripts\/installer\/text-extensions\.nsh/,'AGENTS.md names the one list');

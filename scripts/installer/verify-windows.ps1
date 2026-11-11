@@ -784,7 +784,144 @@ Assert-UninstallFinished
 Assert-Same (Get-UserKeyTree 'Software\Classes\.ini') '[OpenWithProgids]{SyntheticIniTool.Document=String:}' "Another program's value in the Open With list of .ini"
 Assert-ClassKeysRestored 'After uninstalling an upgrade from a released version'
 Assert-Preserved
+
+# A portable copy can write Setup's registrations for itself ("Use this copy's
+# Text Editor in Windows"). The hidden switch --text-editor-registration runs
+# one such action and exits (0 done, 3 the installed program is registered, 4
+# another copy is registered, 6 nothing of this copy's to remove).
+Write-Host 'Checking a portable copy registers its Text Editor like Setup and removes exactly what it added.'
+$portableSubkey = 'Software\Network Toolkit\PortableTextEditor'
+$portableKey = "HKCU:\$portableSubkey"
+$portableCreatedSubkey = "$portableSubkey\CreatedKeys"
+$portableDirA = Join-Path $env:RUNNER_TEMP 'Portable Copy A'
+$portableDirB = Join-Path $env:RUNNER_TEMP 'Portable Copy B'
+foreach ($dir in $portableDirA, $portableDirB) {
+    New-Item -Path $dir -ItemType Directory | Out-Null
+    Copy-Item -LiteralPath $portableExe -Destination (Join-Path $dir 'Network_Toolkit.exe')
+}
+$portableA = Join-Path $portableDirA 'Network_Toolkit.exe'
+$portableB = Join-Path $portableDirB 'Network_Toolkit.exe'
+function Invoke-Registration([string]$Exe, [string]$Action, [int]$ExpectedExitCode) {
+    $process = Start-Process -FilePath $Exe -ArgumentList "--text-editor-registration=$Action" -Wait -PassThru
+    try { Assert-Same $process.ExitCode $ExpectedExitCode "Exit code from --text-editor-registration=$Action of $Exe" } finally { $process.Dispose() }
+}
+# All of HKCU\Software\Classes except Local Settings (MuiCache notes every
+# program the shell starts, which says nothing about registrations).
+function Get-ClassesTree {
+    $classes = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Software\Classes')
+    try {
+        $lines = @(foreach ($name in ($classes.GetValueNames() | Sort-Object)) {
+            '{0}={1}:{2}' -f $name, $classes.GetValueKind($name), $classes.GetValue($name, $null, 'DoNotExpandEnvironmentNames')
+        })
+        $children = @($classes.GetSubKeyNames() | Where-Object { $_ -ne 'Local Settings' } | Sort-Object)
+    } finally { $classes.Dispose() }
+    foreach ($child in $children) { $lines += "[$child]{" + (Get-UserKeyTree "Software\Classes\$child") + '}' }
+    $lines -join "`n"
+}
+function Assert-PortableRegistered([string]$Exe, [bool]$Menu) {
+    $command = $editorCommandFormat -f $Exe
+    Assert-Same (Read-UserValue $portableSubkey 'Executable') $Exe 'Portable registration record'
+    Assert-Same (Read-UserValue "Software\Classes\$progID\shell\open\command" '') $command 'Portable editor open command'
+    if ((Read-UserValue "Software\Classes\$progID\DefaultIcon" '') -notlike ('"{0}",*' -f $Exe)) { throw 'The document icon does not name the portable copy.' }
+    Assert-Same (Read-RegistryValue $registeredApps $registeredName) 'Software\Network Toolkit\Capabilities' 'Portable Default Apps registration'
+    Assert-Same (Read-RegistryValue $capabilities 'ApplicationIcon') ('"{0}",1' -f $Exe) 'Portable Default Apps editor icon'
+    $registeredTypes = Get-Item -LiteralPath "$capabilities\FileAssociations"
+    try { Assert-Same $registeredTypes.ValueCount $extensions.Count 'Number of file types the portable copy lists in Default Apps' } finally { $registeredTypes.Dispose() }
+    foreach ($ext in $extensions) {
+        Assert-Same (Read-RegistryValue "HKCU:\Software\Classes\$ext\OpenWithProgids" $progID) '' "$ext Open With registration of the portable copy"
+        if (-not $extensionKeyExisted[$ext]) {
+            Assert-Same (Get-UserKeyTree "Software\Classes\$ext") "[OpenWithProgids]{$progID=String:}" "Everything the portable copy wrote under HKCU\Software\Classes\$ext"
+            Assert-Same (Read-UserValue $portableCreatedSubkey $ext) 1 "Portable record that it created the $ext key"
+        } else {
+            Assert-Same (Read-UserValue $portableCreatedSubkey $ext) $null "Portable record for the $ext key, which existed before"
+            $expectedRecord = if ($openWithExisted[$ext]) { $null } else { 1 }
+            Assert-Same (Read-UserValue $portableCreatedSubkey "$ext\OpenWithProgids") $expectedRecord "Portable record for the Open With list of $ext"
+        }
+    }
+    $expectedApplication = "FriendlyAppName=String:$registeredName`n[DefaultIcon]{=String:`"$Exe`",1}`n[shell]{[open]{[command]{=String:$command}}}"
+    Assert-Same (Get-UserKeyTree $applicationSubkey) $expectedApplication 'Portable Open With registration for any file'
+    Assert-Same (Read-UserValue $portableCreatedSubkey 'Applications\Network_Toolkit.exe') 1 'Portable record of the Open With registration'
+    if ($Menu) {
+        Assert-Same (Get-UserKeyTree $menuVerbSubkey) "=String:Edit with $registeredName`nIcon=String:`"$Exe`",1`n[command]{=String:$command}" 'Portable right-click entry'
+        Assert-Same (Read-UserValue $portableSubkey 'ContextMenu') 1 'Portable right-click choice'
+    } else {
+        Assert-Same (Get-UserKeyTree $menuVerbSubkey) '<absent>' 'Portable right-click entry that was not chosen'
+    }
+    Assert-Absent $uninstallKey
+    Assert-Preserved
+}
+# The Open With entry of another copy (from the check above) goes, so that the
+# portable copy and then Setup own "Open with" for any file.
+[Microsoft.Win32.Registry]::CurrentUser.DeleteSubKeyTree($applicationSubkey)
+Save-ClassSnapshot $applicationSubkey
+$applicationOwnedBySetup = $true
+Invoke-Registration $portableA 'remove' 6
+$classesBefore = Get-ClassesTree
+Assert-Absent $appKey
+Invoke-Registration $portableA 'register-menu' 0
+Assert-PortableRegistered $portableA $true
+Invoke-Registration $portableA 'register' 0
+Assert-PortableRegistered $portableA $false
+Invoke-Registration $portableA 'remove' 0
+Assert-Same (Get-ClassesTree) $classesBefore 'HKCU\Software\Classes after a portable register and remove'
+Assert-Absent $appKey
+Assert-Same (Read-RegistryValue $registeredApps $registeredName) $null 'Default Apps registration after a portable remove'
+Assert-ClassKeysRestored 'After a portable register and remove'
+
+Write-Host 'Checking a second portable copy takes over only when asked, and a copy whose program is gone can be cleaned up.'
+Invoke-Registration $portableA 'register-menu' 0
+Invoke-Registration $portableB 'register' 4
+Assert-PortableRegistered $portableA $true
+Invoke-Registration $portableB 'takeover' 0
+Assert-PortableRegistered $portableB $false
+Invoke-Registration $portableA 'remove' 6
+Remove-Item -LiteralPath $portableDirB -Recurse
+Invoke-Registration $portableA 'cleanup' 0
+Assert-Same (Get-ClassesTree) $classesBefore 'HKCU\Software\Classes after cleaning up a deleted copy'
+Assert-Absent $appKey
+
+Write-Host 'Checking Setup takes over a portable registration and the portable record is retired.'
+Invoke-Registration $portableA 'register-menu' 0
+Assert-PortableRegistered $portableA $true
+# The portable copy chose the right-click entry: Setup carries the choice over.
+Invoke-Silent $setup 0 "/S /D=$installDir"
+$contextMenuExpected = $true
+Assert-Installed
+Assert-Preserved
+Assert-Absent $portableKey
+Write-Host 'Checking the portable record is retired and the installed program keeps every command.'
+$installedClasses = Get-ClassesTree
+$installedAppKey = Get-UserKeyTree 'Software\Network Toolkit'
+foreach ($action in 'register', 'register-menu', 'takeover', 'remove', 'cleanup') {
+    Invoke-Registration $portableA $action 3
+}
+Assert-Same (Get-ClassesTree) $installedClasses 'HKCU\Software\Classes after a portable copy tried to change the installed registration'
+Assert-Same (Get-UserKeyTree 'Software\Network Toolkit') $installedAppKey 'Setup registration after a portable copy tried to change it'
+Invoke-Uninstaller $uninstaller
+Assert-UninstallFinished
+Assert-Absent $appKey
+Assert-ClassKeysRestored 'After uninstalling a Setup that took over a portable registration'
+Assert-Same (Get-ClassesTree) $classesBefore 'HKCU\Software\Classes after uninstalling a Setup that took over a portable registration'
+Assert-Preserved
+
+Write-Host 'Checking a portable copy refuses to register while Setup is installed.'
+Invoke-Silent $setup 0 "/S /D=$installDir"
+$contextMenuExpected = $false
+Assert-Installed
+$installedClasses = Get-ClassesTree
+Invoke-Registration $portableA 'register' 3
+Invoke-Registration $portableA 'takeover-menu' 3
+Assert-Same (Get-ClassesTree) $installedClasses 'HKCU\Software\Classes after a refused portable registration'
+Assert-Absent $portableKey
+Invoke-Uninstaller $uninstaller
+Assert-UninstallFinished
+Assert-ClassKeysRestored 'After uninstalling Setup that a portable copy left alone'
+Assert-Same (Get-ClassesTree) $classesBefore 'HKCU\Software\Classes after the portable checks'
+Assert-Preserved
+Remove-Item -LiteralPath $portableDirA -Recurse
+
 foreach ($synthetic in "$allFilesSubkey\shell\SyntheticEdit", $applicationSubkey, $rivalProgSubkey, 'Software\Classes\.cfg', 'Software\Classes\.ini') {
-    [Microsoft.Win32.Registry]::CurrentUser.DeleteSubKeyTree($synthetic)
+    # The synthetic Open With entry was removed for the portable checks above.
+    [Microsoft.Win32.Registry]::CurrentUser.DeleteSubKeyTree($synthetic, $false)
 }
 Write-Host "Windows setup smoke passed for $version."

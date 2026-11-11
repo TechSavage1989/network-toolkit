@@ -60,6 +60,16 @@ RequestExecutionLevel user
 ; what Setup wrote or have become empty.
 !define EDITOR_KEY "Software\${APP_NAME}\TextEditor"
 !define CREATED_KEYS "${EDITOR_KEY}\CreatedKeys"
+; A portable copy can write the same registrations for itself ("Use this copy's
+; Text Editor in Windows", cmd/network-toolkit/text_editor_registration.go) and
+; keeps its own record here: Executable (the copy), ContextMenu (1 when its
+; right-click entry was chosen) and CreatedKeys (named like Setup's). Setup
+; takes such a registration over: it adopts that record of created keys,
+; rewrites every command for the installed program, carries the right-click
+; choice over, and deletes the portable record once its own registration has
+; been written. While Setup's registration exists a portable copy changes
+; nothing, so the two never fight over the shared keys.
+!define PORTABLE_KEY "Software\${APP_NAME}\PortableTextEditor"
 ; Terminal links (ssh://, telnet://, serial:). Windows lists the Terminal under
 ; Default apps; the user chooses it there. Setup never writes a UserChoice and
 ; never changes a scheme key that another app or Windows already registered.
@@ -116,6 +126,8 @@ Var RegistrationFailed
 Var OwnApplicationKey
 Var WantContextMenu
 Var AdoptReleased
+Var PortableExe
+Var PortableMenu
 
 ; Silent setup and uninstall show no message. Leave the reason they stopped in
 ; a small log, replaced on every run, so the hosted setup check and support can
@@ -442,11 +454,47 @@ FunctionEnd
   ClearErrors
 !macroend
 
+; A portable copy's registration (PORTABLE_KEY) is taken over: its record of
+; the keys it created becomes part of Setup's record, so that uninstall removes
+; those keys once they are empty, and the "Open with" entry it wrote starts the
+; installed program from now on (RegisterApplication). Its right-click choice
+; is carried over in .onInit. The portable record itself is deleted only after
+; Setup's registration has been written (RetirePortableRegistration).
+!macro AdoptPortableRegistration
+  ClearErrors
+  ReadRegStr $PortableExe HKCU "${PORTABLE_KEY}" "Executable"
+  ClearErrors
+  StrCpy $R3 0
+  ${Do}
+    EnumRegValue $1 HKCU "${PORTABLE_KEY}\CreatedKeys" $R3
+    ${If} ${Errors}
+    ${OrIf} $1 == ""
+      ${ExitDo}
+    ${EndIf}
+    ReadRegDWORD $2 HKCU "${PORTABLE_KEY}\CreatedKeys" "$1"
+    ClearErrors
+    ${If} $2 == 1
+      WriteRegDWORD HKCU "${CREATED_KEYS}" "$1" 1
+      ${If} ${Errors}
+        StrCpy $RegistrationFailed 1
+      ${EndIf}
+    ${EndIf}
+    IntOp $R3 $R3 + 1
+  ${Loop}
+  ClearErrors
+!macroend
+
+!macro RetirePortableRegistration
+  DeleteRegKey HKCU "${PORTABLE_KEY}"
+!macroend
+
 ; "Open with" for any file. The key is named after the program file. Setup
 ; writes it when it is absent, or when it already starts this installed
 ; program: Windows writes such an entry itself, with the bare file name as the
-; only argument, when the user picks the program in "Open with". An entry that
-; starts a program somewhere else is left exactly as it is.
+; only argument, when the user picks the program in "Open with". It also takes
+; over the entry a portable registration wrote for its copy (AdoptPortable
+; Registration). An entry that starts a program somewhere else is left exactly
+; as it is.
 !macro RegisterApplication
   StrCpy $OwnApplicationKey 0
   ClearErrors
@@ -459,6 +507,12 @@ FunctionEnd
     StrCpy $2 $0 $1
     ${If} $2 == '"$INSTDIR\${APP_FILENAME}"'
       StrCpy $OwnApplicationKey 1
+    ${ElseIf} $PortableExe != ""
+      StrLen $1 '"$PortableExe"'
+      StrCpy $2 $0 $1
+      ${If} $2 == '"$PortableExe"'
+        StrCpy $OwnApplicationKey 1
+      ${EndIf}
     ${EndIf}
   ${EndIf}
   ClearErrors
@@ -691,6 +745,7 @@ Section "Network Toolkit"
   ${EndIf}
   WriteRegDWORD HKCU "${EDITOR_KEY}" "Records" 1
   StrCpy $RegistrationFailed 0
+  !insertmacro AdoptPortableRegistration
   !insertmacro TextExtensions RegisterExtension
   WriteRegStr HKCU "Software\RegisteredApplications" "${EDITOR_NAME}" "${CAPABILITIES}"
   IfErrors install_error
@@ -702,14 +757,22 @@ Section "Network Toolkit"
   StrCpy $FailedStep "updating the right-click menu entry"
   Call ReadContextMenuChoice
   ReadRegDWORD $R8 HKCU "${UNINSTALL_KEY}" "ContextMenu"
+  ReadRegDWORD $PortableMenu HKCU "${PORTABLE_KEY}" "ContextMenu"
   ClearErrors
+  ; A portable copy's entry was preselected in .onInit; cleared, it goes too.
   ${If} $WantContextMenu == 1
     !insertmacro RegisterContextMenu
   ${ElseIf} $R8 == 1
+  ${OrIf} $PortableMenu == 1
     !insertmacro RemoveContextMenu
   ${EndIf}
   IfErrors install_error
   StrCmp $RegistrationFailed 1 install_error
+  ; Every command now starts the installed program; the portable record is
+  ; retired. Left behind (it cannot be: the key is this user's), it would only
+  ; be shown by the portable copy, which defers to the installed program.
+  !insertmacro RetirePortableRegistration
+  ClearErrors
   StrCpy $FailedStep "registering terminal links"
   ; Probing reports a missing key through the error flag; probe every scheme
   ; first, then write and check the registration as one step.
@@ -827,6 +890,11 @@ Function .onInit
     !insertmacro SelectSection ${DesktopShortcut}
   ${EndIf}
   ReadRegDWORD $0 HKCU "${UNINSTALL_KEY}" "ContextMenu"
+  ${If} $0 == 1
+    !insertmacro SelectSection ${ContextMenu}
+  ${EndIf}
+  ; The right-click entry a portable copy registered is carried over.
+  ReadRegDWORD $0 HKCU "${PORTABLE_KEY}" "ContextMenu"
   ${If} $0 == 1
     !insertmacro SelectSection ${ContextMenu}
   ${EndIf}

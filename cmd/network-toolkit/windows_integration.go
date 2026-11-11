@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 )
@@ -131,7 +130,7 @@ func (a *application) handleWindowsIntegration(w http.ResponseWriter, r *http.Re
 			jsonError(w, http.StatusServiceUnavailable, err.Error())
 			return
 		}
-		installed := filepath.Join(status.InstallLocation, editorRegAppFile)
+		installed := editorRegJoin(status.InstallLocation, editorRegAppFile)
 		if !request.Confirm || !status.Installed || status.ThisIsInstalled {
 			jsonError(w, http.StatusConflict, "The installed program is not available from this copy.")
 			return
@@ -184,7 +183,7 @@ const textEditorRegistrationFlag = "text-editor-registration"
 
 func runTextEditorRegistrationCommand(action string) int {
 	platform, supported := windowsIntegrationPlatform()
-	if !supported || runtime.GOOS != "windows" {
+	if !supported { // Windows only
 		return 2
 	}
 	exe, err := windowsIntegrationExecutable()

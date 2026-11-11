@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -48,7 +47,7 @@ const (
 	editorRegApplication  = editorRegApplications + `\` + editorRegAppFile
 	editorRegAllFiles     = `Software\Classes\*` // ALL_FILES_KEY
 	editorRegMenuVerb     = editorRegAllFiles + `\shell\NetworkToolkit.TextEditor`
-	editorRegMenuText     = "Edit with " + editorRegAppName // MENU_TEXT
+	editorRegMenuText     = "Edit with " + editorRegAppName    // MENU_TEXT
 	editorRegSetupRecord  = editorRegVendorKey + `\TextEditor` // EDITOR_KEY
 	editorRegUninstall    = `Software\Microsoft\Windows\CurrentVersion\Uninstall\NetworkToolkit`
 	// The portable registration's own record (PORTABLE_KEY in windows.nsi):
@@ -131,11 +130,36 @@ var (
 	errEditorRegNothing   = errors.New("This copy is not registered, so there is nothing to remove.")
 )
 
+// Windows paths, handled the same way on every platform so that the tests of
+// these decisions run anywhere: either slash separates, case does not matter.
+func editorRegWinPath(p string) string {
+	p = strings.ReplaceAll(p, "/", `\`)
+	for len(p) > 3 && strings.HasSuffix(p, `\`) {
+		p = p[:len(p)-1]
+	}
+	return p
+}
+
+func editorRegBase(p string) string {
+	p = editorRegWinPath(p)
+	return p[strings.LastIndex(p, `\`)+1:]
+}
+
+func editorRegDir(p string) string {
+	p = editorRegWinPath(p)
+	if i := strings.LastIndex(p, `\`); i >= 0 {
+		return p[:i]
+	}
+	return ""
+}
+
+func editorRegJoin(dir, name string) string { return editorRegWinPath(dir) + `\` + name }
+
 func editorRegSamePath(a, b string) bool {
 	if a == "" || b == "" {
 		return false
 	}
-	return strings.EqualFold(filepath.Clean(a), filepath.Clean(b))
+	return strings.EqualFold(editorRegWinPath(a), editorRegWinPath(b))
 }
 
 // The program a registration command starts: the first quoted part.
@@ -166,15 +190,15 @@ func editorRegFileMissing(path string) bool {
 
 // editorRegState reads who owns the registration. exe is this copy's program.
 func editorRegState(reg editorRegistry, exe string, missing editorRegFileCheck) (editorRegistrationStatus, error) {
-	status := editorRegistrationStatus{Supported: true, Executable: exe, NameOK: strings.EqualFold(filepath.Base(exe), editorRegAppFile), State: editorRegNone}
+	status := editorRegistrationStatus{Supported: true, Executable: exe, NameOK: strings.EqualFold(editorRegBase(exe), editorRegAppFile), State: editorRegNone}
 	location, found, ok, err := reg.String(editorRegUninstall, "InstallLocation")
 	if err != nil {
 		return status, fmt.Errorf("Windows could not read the installed program's registration: %w", err)
 	}
 	if found && ok && strings.TrimSpace(location) != "" {
 		status.Installed, status.InstallLocation = true, location
-		status.ThisIsInstalled = editorRegSamePath(filepath.Dir(exe), location)
-		status.State, status.Owner = editorRegSetup, filepath.Join(location, editorRegAppFile)
+		status.ThisIsInstalled = editorRegSamePath(editorRegDir(exe), location)
+		status.State, status.Owner = editorRegSetup, editorRegJoin(location, editorRegAppFile)
 	}
 	command, _, _, err := reg.String(editorRegProgKey+`\shell\open\command`, "")
 	if err != nil {

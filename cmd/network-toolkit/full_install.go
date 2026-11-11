@@ -103,7 +103,7 @@ func (a *application) fullInstallStatus(editor editorRegistrationStatus) fullIns
 	status.Portable = !editor.ThisIsInstalled
 	status.Installed, status.InstallLocation = editor.Installed, editor.InstallLocation
 	if editor.Installed {
-		status.InstalledExists = !editorRegFileMissing(filepath.Join(editor.InstallLocation, editorRegAppFile))
+		status.InstalledExists = !editorRegFileMissing(editorRegJoin(editor.InstallLocation, editorRegAppFile))
 	}
 	status.Data = a.fullInstallDataNote(editor.Executable)
 	a.fullInstall.mu.Lock()
