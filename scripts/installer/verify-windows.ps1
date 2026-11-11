@@ -542,6 +542,14 @@ try {
     Assert-Absent $uninstallKey
 } finally { [IO.Directory]::Delete($junctionPath) }
 
+Write-Host 'Checking setup refuses a folder with a % sign in its path.'
+# Explorer expands %1, %L and the like anywhere in a registered command.
+$percentDir = Join-Path $env:RUNNER_TEMP 'Network Toolkit 100%L'
+Invoke-Silent $setup 2 "/S /D=$percentDir" 'without a % sign in its path'
+Assert-Absent $percentDir
+Assert-Absent $uninstallKey
+Assert-Preserved
+
 Write-Host 'Checking a fresh setup rolls back when it cannot create Start menu shortcuts.'
 $lateFailureDir = Join-Path $env:RUNNER_TEMP 'Failed Network Toolkit Install'
 [IO.File]::WriteAllText($menu, 'Synthetic item occupying the Start menu folder')
@@ -831,19 +839,28 @@ Assert-Preserved
 # A portable copy can write Setup's registrations for itself ("Use this copy's
 # Text Editor in Windows"). The hidden switch --text-editor-registration runs
 # one such action and exits (0 done, 3 the installed program is registered, 4
-# another copy is registered, 6 nothing of this copy's to remove).
+# another copy is registered, 6 nothing of this copy's to remove, 7 this
+# copy's location is refused).
 Write-Host 'Checking a portable copy registers its Text Editor like Setup and removes exactly what it added.'
 $portableSubkey = 'Software\Network Toolkit\PortableTextEditor'
 $portableKey = "HKCU:\$portableSubkey"
 $portableCreatedSubkey = "$portableSubkey\CreatedKeys"
-$portableDirA = Join-Path $env:RUNNER_TEMP 'Portable Copy A'
-$portableDirB = Join-Path $env:RUNNER_TEMP 'Portable Copy B'
-foreach ($dir in $portableDirA, $portableDirB) {
+# Under the user's own folder: a copy that other users can change is refused
+# (security review 11), and the runner's temporary folder may let them.
+$portableRoot = Join-Path $env:LOCALAPPDATA 'NTK Portable Check'
+$portableDirA = Join-Path $portableRoot 'Portable Copy A'
+$portableDirB = Join-Path $portableRoot 'Portable Copy B'
+$portableDirShared = Join-Path $portableRoot 'Shared Copy'
+foreach ($dir in $portableDirA, $portableDirB, $portableDirShared) {
     New-Item -Path $dir -ItemType Directory | Out-Null
     Copy-Item -LiteralPath $portableExe -Destination (Join-Path $dir 'Network_Toolkit.exe')
 }
 $portableA = Join-Path $portableDirA 'Network_Toolkit.exe'
 $portableB = Join-Path $portableDirB 'Network_Toolkit.exe'
+$portableShared = Join-Path $portableDirShared 'Network_Toolkit.exe'
+# BUILTIN\Users may change this one, as a folder on a shared drive often allows.
+& icacls $portableDirShared /grant '*S-1-5-32-545:(OI)(CI)M' | Out-Null
+if ($LASTEXITCODE -ne 0) { throw 'icacls could not open the shared copy folder to Users.' }
 function Invoke-Registration([string]$Exe, [string]$Action, [int]$ExpectedExitCode) {
     $process = Start-Process -FilePath $Exe -ArgumentList "--text-editor-registration=$Action" -Wait -PassThru
     try { Assert-Same $process.ExitCode $ExpectedExitCode "Exit code from --text-editor-registration=$Action of $Exe" } finally { $process.Dispose() }
@@ -914,6 +931,14 @@ Assert-Absent $appKey
 Assert-Same (Read-RegistryValue $registeredApps $registeredName) $null 'Default Apps registration after a portable remove'
 Assert-ClassKeysRestored 'After a portable register and remove'
 
+Write-Host 'Checking a portable copy that other users can change is refused.'
+# Every double-clicked text file would run that copy.
+Invoke-Registration $portableShared 'register' 7
+Invoke-Registration $portableShared 'takeover-menu' 7
+Assert-Same (Get-ClassesTree) $classesBefore 'HKCU\Software\Classes after a refused registration of a shared copy'
+Assert-Absent $appKey
+Remove-Item -LiteralPath $portableDirShared -Recurse
+
 Write-Host 'Checking a second portable copy takes over only when asked, and a copy whose program is gone can be cleaned up.'
 Invoke-Registration $portableA 'register-menu' 0
 Invoke-Registration $portableB 'register' 4
@@ -921,6 +946,9 @@ Assert-PortableRegistered $portableA $true
 Invoke-Registration $portableB 'takeover' 0
 Assert-PortableRegistered $portableB $false
 Invoke-Registration $portableA 'remove' 6
+# B still exists: there is nothing to clean up.
+Invoke-Registration $portableA 'cleanup' 6
+Assert-PortableRegistered $portableB $false
 Remove-Item -LiteralPath $portableDirB -Recurse
 Invoke-Registration $portableA 'cleanup' 0
 Assert-Same (Get-ClassesTree) $classesBefore 'HKCU\Software\Classes after cleaning up a deleted copy'
@@ -964,7 +992,7 @@ Assert-UninstallFinished
 Assert-ClassKeysRestored 'After uninstalling Setup that a portable copy left alone'
 Assert-Same (Get-ClassesTree) $classesBefore 'HKCU\Software\Classes after the portable checks'
 Assert-Preserved
-Remove-Item -LiteralPath $portableDirA -Recurse
+Remove-Item -LiteralPath $portableRoot -Recurse
 
 foreach ($synthetic in "$allFilesSubkey\shell\SyntheticEdit", $applicationSubkey, $rivalProgSubkey, 'Software\Classes\.cfg', 'Software\Classes\.ini') {
     # The synthetic Open With entry was removed for the portable checks above.

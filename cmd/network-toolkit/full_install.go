@@ -3,9 +3,12 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"networktoolkit/internal/model"
 	"os"
@@ -26,6 +29,16 @@ import (
 // and reserves the updater's network slot, so an update and this download
 // never run at the same time. Nothing partial or unverified is ever written:
 // the file is verified in memory first and checked again before it starts.
+//
+// Where the file lives and how it starts (security review 11): never in the
+// data folder, which the user may have put where others can write, but in
+// %LOCALAPPDATA%\NetworkToolkit-Setup, each download in its own folder; both
+// are created with a protected access list that lets only this user in
+// (fullInstallMakePrivateDir) and must be plain folders nobody else can change
+// (fullInstallCheckPrivateDir), checked again before Setup starts. Setup is
+// opened once without write or delete sharing (fullInstallOpenHeld), hashed
+// from that handle, and started with CreateProcess while the handle is still
+// open, so the program that starts is the one that was verified.
 
 const (
 	fullInstallMaxSetup = updateMaxEXE // updateRemoveVerified reads up to this size
@@ -35,8 +48,10 @@ const (
 var (
 	errFullInstallNoAsset = errors.New("This release has no Windows Setup and SHA256SUMS.")
 	errFullInstallNoNewer = errors.New("no newer release with Setup")
-	fullInstallLaunch     = fullInstallStartSetup
-	fullInstallOpen       = fullInstallStartSetup
+	// fullInstallLaunch starts Setup; it runs while the verified file is held.
+	fullInstallLaunch = fullInstallStartSetup
+	fullInstallOpen   = fullInstallOpenProgram
+	fullInstallRoot   = fullInstallDefaultRoot
 )
 
 func fullInstallSetupName(version string) string {
@@ -102,6 +117,7 @@ type fullInstallState struct {
 	download *fullInstallDownload
 	progress *updateProgress
 	started  bool
+	starting bool // Setup is being verified and started (the lock is not held for that)
 }
 
 func (a *application) fullInstallStatus(editor editorRegistrationStatus) fullInstallStatus {
@@ -109,7 +125,7 @@ func (a *application) fullInstallStatus(editor editorRegistrationStatus) fullIns
 	status.Portable = !editor.ThisIsInstalled
 	status.Installed, status.InstallLocation = editor.Installed, editor.InstallLocation
 	if editor.Installed {
-		status.InstalledExists = !editorRegFileMissing(editorRegJoin(editor.InstallLocation, editorRegAppFile))
+		status.InstalledExists = editorRegFileState(editorRegJoin(editor.InstallLocation, editorRegAppFile)) == editorRegPresent
 	}
 	status.Data = a.fullInstallDataNote(editor.Executable)
 	a.fullInstall.mu.Lock()
@@ -299,9 +315,9 @@ func (a *application) handleFullInstall(w http.ResponseWriter, r *http.Request, 
 		}
 	}
 	a.fullInstall.mu.Lock()
-	if a.fullInstall.busy {
+	if a.fullInstall.busy || a.fullInstall.starting {
 		a.fullInstall.mu.Unlock()
-		jsonError(w, http.StatusConflict, "Setup is already being looked up or downloaded.")
+		jsonError(w, http.StatusConflict, "Setup is already being looked up, downloaded or started.")
 		return
 	}
 	switch action {
@@ -361,22 +377,28 @@ func (a *application) handleFullInstall(w http.ResponseWriter, r *http.Request, 
 			jsonError(w, http.StatusConflict, "Download and verify Setup, then confirm that it should start.")
 			return
 		}
-		// The file is read once more right before it starts: a file that
-		// changed on disk since it was verified is deleted, never started.
-		b, err := updateNamingReadFile(download.path, fullInstallMaxSetup)
-		if err != nil || updateHash(b) != download.SHA256 {
+		// Verifying and starting happen without the lock (status reads go on);
+		// starting refuses a second start meanwhile.
+		held := *download
+		a.fullInstall.starting = true
+		a.fullInstall.mu.Unlock()
+		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
+		err := fullInstallLaunchVerified(ctx, &held)
+		cancel()
+		a.fullInstall.mu.Lock()
+		a.fullInstall.starting = false
+		if errors.Is(err, errFullInstallChanged) {
+			// A file that changed since it was verified is deleted (if it
+			// still has the verified bytes nothing is lost), never started.
 			fullInstallDiscard(download)
 			a.fullInstall.download, a.fullInstall.progress = nil, nil
 			a.fullInstall.mu.Unlock()
-			jsonError(w, http.StatusConflict, "The downloaded Setup changed after it was verified, so it was deleted. Download it again.")
+			jsonError(w, http.StatusConflict, err.Error())
 			return
 		}
-		ctx, cancel := context.WithTimeout(r.Context(), 15*time.Second)
-		err = fullInstallLaunch(ctx, download.path)
-		cancel()
 		if err != nil {
 			a.fullInstall.mu.Unlock()
-			jsonError(w, http.StatusServiceUnavailable, "Setup could not be started: "+err.Error())
+			jsonError(w, http.StatusServiceUnavailable, "Setup was not started: "+err.Error())
 			return
 		}
 		a.fullInstall.started = true
@@ -392,7 +414,7 @@ func (a *application) handleFullInstall(w http.ResponseWriter, r *http.Request, 
 		jsonError(w, http.StatusNotFound, "Unknown install action.")
 		return
 	}
-	editor, err := editorRegState(platform.registry, exe, platform.missing)
+	editor, err := editorRegState(platform.registry, exe, platform.presence)
 	if err != nil {
 		editor = editorRegistrationStatus{Executable: exe}
 	}
@@ -440,20 +462,20 @@ func (a *application) fullInstallDownload(ctx context.Context, found *fullInstal
 	if !bytes.HasPrefix(setup, []byte("MZ")) {
 		return nil, errors.New("The downloaded file is not a Windows program.")
 	}
-	root, err := a.fullInstallFolder()
+	root, err := fullInstallRoot()
 	if err != nil {
-		return nil, err
+		return nil, errors.New("Setup could not be saved in a folder only you can change: " + err.Error())
 	}
 	fullInstallSweep(root)
-	dir, err := os.MkdirTemp(root, strings.TrimSuffix(fullInstallDirGlob, "*"))
+	dir, err := fullInstallNewDir(root)
 	if err != nil {
-		return nil, errors.New("Setup could not be saved in the app data folder: " + err.Error())
+		return nil, errors.New("Setup could not be saved in a folder only you can change: " + err.Error())
 	}
 	path := filepath.Join(dir, found.Name)
 	if err := updateWriteExclusive(path, setup, 0700); err != nil {
 		_ = os.Remove(path)
 		_ = os.Remove(dir)
-		return nil, errors.New("Setup could not be saved in the app data folder: " + err.Error())
+		return nil, errors.New("Setup could not be saved: " + err.Error())
 	}
 	return &fullInstallDownload{Version: found.Version, Name: found.Name, Size: int64(len(setup)), SHA256: updateHash(setup), Folder: dir, path: path, dir: dir}, nil
 }
@@ -464,13 +486,74 @@ func (a *application) setFullInstallProgress(progress *updateProgress) {
 	a.fullInstall.mu.Unlock()
 }
 
-// The download lives beside the updater's staged files, in the data folder.
-func (a *application) fullInstallFolder() (string, error) {
-	exe, err := windowsIntegrationExecutable()
-	if err != nil {
+var errFullInstallChanged = errors.New("The downloaded Setup changed after it was verified, so it was not started and was deleted. Download it again.")
+
+// The folder for downloads: %LOCALAPPDATA%\NetworkToolkit-Setup on Windows,
+// created owner-only and accepted only as a plain folder only this user can
+// change. The data folder is never used: the user may have put it anywhere.
+func fullInstallDefaultRoot() (string, error) {
+	base, err := os.UserCacheDir()
+	if err != nil || base == "" {
+		return "", errors.New("the per-user application data folder is unavailable")
+	}
+	root := filepath.Join(base, "NetworkToolkit-Setup")
+	if err := fullInstallMakePrivateDir(root); err != nil && !errors.Is(err, os.ErrExist) {
 		return "", err
 	}
-	return updateStorageRoot(filepath.Dir(a.dataPath), filepath.Dir(exe))
+	if err := fullInstallCheckPrivateDir(root); err != nil {
+		return "", err
+	}
+	return root, nil
+}
+
+// One owner-only folder per download, with a name nobody can guess.
+func fullInstallNewDir(root string) (string, error) {
+	for attempt := 0; attempt < 16; attempt++ {
+		dir := filepath.Join(root, strings.TrimSuffix(fullInstallDirGlob, "*")+randomHex(12))
+		err := fullInstallMakePrivateDir(dir)
+		if errors.Is(err, os.ErrExist) {
+			continue
+		}
+		if err != nil {
+			return "", err
+		}
+		if err := fullInstallCheckPrivateDir(dir); err != nil {
+			_ = os.Remove(dir)
+			return "", err
+		}
+		return dir, nil
+	}
+	return "", errors.New("no new folder name was free")
+}
+
+// fullInstallLaunchVerified checks the folders again, opens Setup once
+// without write or delete sharing, hashes it from that handle and starts it
+// while the handle is open. Any failed check refuses to start it.
+func fullInstallLaunchVerified(ctx context.Context, download *fullInstallDownload) error {
+	root, err := fullInstallRoot()
+	if err != nil {
+		return err
+	}
+	if !strings.EqualFold(filepath.Dir(download.dir), root) || !strings.EqualFold(filepath.Dir(download.path), download.dir) {
+		return errors.New("the downloaded Setup is not where it was saved")
+	}
+	if err := fullInstallCheckPrivateDir(download.dir); err != nil {
+		return err
+	}
+	held, err := fullInstallOpenHeld(download.path)
+	if err != nil {
+		return err
+	}
+	defer held.Close()
+	digest := sha256.New()
+	n, err := io.Copy(digest, io.LimitReader(held, fullInstallMaxSetup+1))
+	if err != nil {
+		return err
+	}
+	if n != download.Size || n > fullInstallMaxSetup || hex.EncodeToString(digest.Sum(nil)) != download.SHA256 {
+		return errFullInstallChanged
+	}
+	return fullInstallLaunch(ctx, download.path)
 }
 
 // A verified download that was never started, or one whose Setup has since

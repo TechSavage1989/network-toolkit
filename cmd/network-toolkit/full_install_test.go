@@ -27,6 +27,7 @@ type fullInstallFixture struct {
 	launched []string
 	dir      string
 	exe      string
+	root     string
 }
 
 func fullInstallReleaseJSON(version string, prerelease bool, assets map[string]int) string {
@@ -73,10 +74,16 @@ func newFullInstallFixture(t *testing.T) *fullInstallFixture {
 		t.Fatal(err)
 	}
 	f.exe = filepath.Join(program, "Network_Toolkit.exe")
-	oldExe, oldPlatform, oldLaunch, oldAny := windowsIntegrationExecutable, windowsIntegrationPlatform, fullInstallLaunch, fullInstallAnyPlatform
+	oldExe, oldPlatform, oldLaunch, oldAny, oldRoot := windowsIntegrationExecutable, windowsIntegrationPlatform, fullInstallLaunch, fullInstallAnyPlatform, fullInstallRoot
 	t.Cleanup(func() {
-		windowsIntegrationExecutable, windowsIntegrationPlatform, fullInstallLaunch, fullInstallAnyPlatform = oldExe, oldPlatform, oldLaunch, oldAny
+		windowsIntegrationExecutable, windowsIntegrationPlatform, fullInstallLaunch, fullInstallAnyPlatform, fullInstallRoot = oldExe, oldPlatform, oldLaunch, oldAny, oldRoot
 	})
+	// Downloads go to a private folder of their own, never the data folder.
+	f.root = filepath.Join(f.dir, "Setup downloads")
+	if err := fullInstallMakePrivateDir(f.root); err != nil {
+		t.Fatal(err)
+	}
+	fullInstallRoot = func() (string, error) { return f.root, fullInstallCheckPrivateDir(f.root) }
 	windowsIntegrationExecutable = func() (string, error) { return f.exe, nil }
 	platform, _ := testEditorPlatform(newFakeRegistry())
 	windowsIntegrationPlatform = func() (editorRegPlatform, bool) { return platform, true }
@@ -120,10 +127,11 @@ func (f *fullInstallFixture) call(a *application, action string, body any) (int,
 	return w.Code, out
 }
 
-// Setup files and folders anywhere under the data folder.
+// Setup files and folders anywhere under the test's folder (data folder and
+// download folder).
 func (f *fullInstallFixture) setupFiles() []string {
 	var found []string
-	_ = filepath.Walk(filepath.Join(f.dir, "data"), func(path string, info os.FileInfo, err error) error {
+	_ = filepath.Walk(f.dir, func(path string, info os.FileInfo, err error) error {
 		if err == nil && (strings.HasPrefix(info.Name(), ".network-toolkit-setup-") || strings.HasSuffix(info.Name(), "_Setup.exe")) {
 			found = append(found, path)
 		}
