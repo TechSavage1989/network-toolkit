@@ -1,3 +1,17 @@
+# v1.21.44 Beta 1 - The Text Editor opens almost any file
+
+Owner: "the text editor should be configurable as default app for other text formats and file formats that are unknown. similar to how notepad++ opens and supports almost any file type."
+
+v1.21.43 was published and verified: tag at merge commit 1a4d6ee (PR #165), release run 42877313781 green (build, windows-setup, publish), all seven assets matching GitHub's digests, `github_release.py verify` reporting "Verified 1.21.43", stable channel still at v1.21.34. On that pull request two jobs failed once and passed on their single re-run: `TestSharedSavesFromSeparateProcessesLoseNothing` (one helper process got 409 "another app is saving" after the full five-second lock wait; to be investigated) and `scripts/editor-saved-connections113.browser.cjs` at 390 px (the "locked" hint did not appear within 15 s; not explained).
+
+Installer: the offered types live in one file, `scripts/installer/text-extensions.nsh` (108 types), used by `windows.nsi`, `verify-windows.ps1` and the generated list in `docs/guide/editor.md` (`node scripts/text-extensions.cjs --write`; `scripts/text-extensions.test.cjs` fails on drift). Setup writes, per user: the Capabilities\FileAssociations values and each extension's `OpenWithProgids` value (never an extension's default value); `Software\Classes\Applications\Network_Toolkit.exe` (shown under Open with for any file; written only when absent or already starting the installed program); and, only with the Setup option or `/ContextMenu`, `Software\Classes\*\shell\NetworkToolkit.TextEditor`. Keys that could pre-exist are recorded under `Software\Network Toolkit\TextEditor\CreatedKeys`; uninstall and rollback remove only those. No `UserChoice`, nothing under `FileExts`, no `SupportedTypes`.
+
+Editor engine (`internal/editorbuffer/codec.go`): bytes that are not valid UTF-8 are read as Windows-1252 and saved back in it (a character the encoding lacks stops the save); mixed line endings are kept per line ("Mixed (keep each line)"); content that is not text opens read-only and the engine refuses every write path; unreadable, missing and folder paths give one plain message. UTF-16 without a BOM is shown as not text, not guessed.
+
+Known limits: in-app updates do not add the new registrations (only Setup does); there is no silent switch to turn the right-click entry off again; how Explorer on Windows 10 and 11 presents these entries was not observed (Setup was exercised under Wine and by the hosted setup check, not on a physical PC). A large binary file can need two to three times its size in temporary space.
+
+---
+
 # v1.21.43 Beta 1 - An opened document is the tab in front
 
 Owner: "when a document is opened by default with text editor, the opened document must be the active tab. currently it seems like the last active tab remains active even when the new document is added as a new tab."

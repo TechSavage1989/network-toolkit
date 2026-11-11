@@ -1,0 +1,17 @@
+Network Toolkit 1.21.44
+
+## What's New
+
+- The Text Editor can now be chosen in Windows for many more kinds of text files (code, scripts, configuration, logs, data and device exports) and shows up under Open with for any file, including files Windows does not know.
+- It opens almost anything safely: older Windows-1252 text and files with mixed line endings open and save without being changed, and files that are not text open read-only instead of being refused.
+- Setup offers an optional right-click entry, Edit with Network Toolkit Text Editor, for all files.
+
+## Additional Details
+
+- These choices are added by Setup. Run the new Setup once to get them; updating from inside the app does not add them. The portable program adds nothing to Windows.
+- Windows decides the default app: choose the Text Editor once per file type with Open with, Always, or in Settings, Default apps. Setup makes it available and never changes your defaults or another program's entries.
+- A file that is not text (a program, an archive, an image) is shown read-only and can never be saved over.
+- A file with mixed line endings keeps each line's own ending; lines you type get the most common one. Choosing LF, CRLF or CR converts all of them.
+- Text that is not valid UTF-8 is read as Windows-1252 and saved the same way. If you type a character that encoding does not have, the save stops and tells you to switch to UTF-8; nothing is replaced.
+- The right-click entry is off unless you tick it in Setup (or use /ContextMenu with silent setup). On Windows 11 it is under Show more options.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.
