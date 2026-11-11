@@ -1,0 +1,16 @@
+Network Toolkit 1.21.49
+
+## What's New
+
+- Popping out the Text Editor or the Terminal now opens it as the separate Text Editor or Terminal program, with its own icon and taskbar name, and it stays connected to the main window: tabs, unsaved text and live sessions move with nothing reconnected.
+- Send to terminal and Send to Text Editor now work between the main window and its popped-out windows.
+- If the Text Editor app is already open, Detach editor and Move all add your tabs to it.
+- From a popped-out Terminal, Edit in the SFTP browser opens the file in the main window's Text Editor.
+
+## Additional Details
+
+- Dock back, SFTP files, macros and saved passwords keep working in popped-out windows. Moving a single tab to a separate window still gives it its own connected window.
+- Tabs added to the open Text Editor keep their unsaved text, encoding and line endings; a tab leaves the main window only after the Text Editor confirms it has it. Files opened over SFTP or SSH, binary files, large files with unsaved changes, files that changed on disk and a few special formats still open in a connected window, and the message says where each tab went. Undo history does not move.
+- A popped-out window starts from the separate program only when it is beside the main program, is of the same version, and only you can change it; otherwise it opens as before.
+- Text sent between windows goes through the same paste review and warnings as inside one window, never replaces an open dialog and never presses Enter.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.
