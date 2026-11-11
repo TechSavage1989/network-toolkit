@@ -60,7 +60,7 @@ const (
 	// scripts/build_windows_resources.py). The program icon of the Text Editor
 	// stands for the application; the document icon for files of its types.
 	editorRegEditorIcon   = 1
-	editorRegDocumentIcon = 1
+	editorRegDocumentIcon = 3
 )
 
 // The command every registration starts the Text Editor with: the program, the

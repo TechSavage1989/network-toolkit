@@ -3,10 +3,16 @@ package desktop
 
 import "context"
 
+// Linked group icon resource IDs (ICON_GROUPS in scripts/build_windows_resources.py).
+// Windows numbers them from zero in this order, so Setup's "Network_Toolkit.exe",N
+// values use the ID minus one. New groups are appended, never inserted.
 const (
 	IconToolkit  = 1
 	IconEditor   = 2
 	IconTerminal = 3
+	// IconDocument is the paper sheet shown for files associated with the
+	// Text Editor (index 3). No window uses it.
+	IconDocument = 4
 )
 
 // Config describes one app window. DataDir is the portable application's folder.

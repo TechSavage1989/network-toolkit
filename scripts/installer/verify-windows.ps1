@@ -91,6 +91,31 @@ function Set-UserValue([string]$Subkey, [string]$Name, [string]$Value) {
     try { $key.SetValue($Name, $Value) } finally { $key.Dispose() }
 }
 
+# The icon groups of a program file as the shell reads a '"file.exe",N' icon
+# location: their number, and that each one loads at large and small size.
+Add-Type -Namespace NetworkToolkitSetupSmoke -Name IconResources -MemberDefinition @'
+[DllImport("shell32.dll", CharSet = CharSet.Unicode)]
+public static extern uint ExtractIconExW(string file, int index, IntPtr[] large, IntPtr[] small, uint count);
+[DllImport("user32.dll")]
+public static extern bool DestroyIcon(IntPtr icon);
+'@
+function Assert-IconGroups([string]$Path, [int]$Expected) {
+    # Index -1 with no arrays asks for the number of icons in the file.
+    Assert-Same ([int][NetworkToolkitSetupSmoke.IconResources]::ExtractIconExW($Path, -1, $null, $null, 0)) $Expected 'Number of icon groups in the program file'
+    foreach ($index in 0..($Expected - 1)) {
+        $large = [IntPtr[]]::new(1)
+        $small = [IntPtr[]]::new(1)
+        [void][NetworkToolkitSetupSmoke.IconResources]::ExtractIconExW($Path, $index, $large, $small, 1)
+        try {
+            if ($large[0] -eq [IntPtr]::Zero -or $small[0] -eq [IntPtr]::Zero) { throw "Icon $index of $Path could not be loaded." }
+        } finally {
+            foreach ($icon in @($large[0], $small[0])) {
+                if ($icon -ne [IntPtr]::Zero) { [void][NetworkToolkitSetupSmoke.IconResources]::DestroyIcon($icon) }
+            }
+        }
+    }
+}
+
 function Get-ExecutableVersion([string]$Path) {
     $info = [Diagnostics.FileVersionInfo]::GetVersionInfo($Path)
     [version]::new($info.FileMajorPart, $info.FileMinorPart, $info.FileBuildPart, $info.FilePrivatePart)
@@ -195,6 +220,13 @@ $registeredApps = 'HKCU:\Software\RegisteredApplications'
 $registeredName = 'Network Toolkit Text Editor'
 $progID = 'NetworkToolkit.TextDocument'
 $progKey = "HKCU:\Software\Classes\$progID"
+$progSubkey = "Software\Classes\$progID"
+# Zero-based icon groups of the program file (ICON_GROUPS in
+# scripts/build_windows_resources.py): 0 app, 1 Text Editor, 2 Terminal,
+# 3 text document. The program values use the editor icon; files use the sheet.
+$editorIconIndex = 1
+$documentIconIndex = 3
+$iconGroupCount = 4
 # The one list of text file types that Setup registers. windows.nsi includes
 # this same file; scripts/text-extensions.test.cjs keeps the guide in step.
 $extensionList = Join-Path $PSScriptRoot 'text-extensions.nsh'
@@ -398,7 +430,9 @@ function Assert-Installed([string]$ExpectedHash = $portableHash) {
     Assert-Same (Read-RegistryValue $uninstallKey 'QuietUninstallString') ('"{0}" /S' -f $uninstaller) 'Silent uninstall command'
     Assert-Same (Read-RegistryValue $registeredApps $registeredName) 'Software\Network Toolkit\Capabilities' 'Default Apps registration'
     Assert-Same (Read-RegistryValue $capabilities 'ApplicationName') $registeredName 'Default Apps display name'
-    Assert-Same (Read-RegistryValue $capabilities 'ApplicationIcon') ('"{0}",1' -f $installedExe) 'Default Apps editor icon'
+    Assert-Same (Read-RegistryValue $capabilities 'ApplicationIcon') ('"{0}",{1}' -f $installedExe, $editorIconIndex) 'Default Apps editor icon'
+    # Files of the associated types show the paper sheet, not the program tile.
+    Assert-Same (Read-UserValue "$progSubkey\DefaultIcon" '') ('"{0}",{1}' -f $installedExe, $documentIconIndex) 'Text document icon of associated files'
     if (-not (Read-RegistryValue $capabilities 'ApplicationDescription')) { throw 'The Default Apps description is missing.' }
     $editorCommand = $editorCommandFormat -f $installedExe
     Assert-Same (Read-RegistryValue "$progKey\shell\open\command" '') $editorCommand 'Editor open command'
@@ -424,7 +458,7 @@ function Assert-Installed([string]$ExpectedHash = $portableHash) {
     # "Open with" for any file: the program is registered under Applications
     # with its command and no SupportedTypes, which would limit it to a list.
     if ($applicationOwnedBySetup) {
-        $expectedApplication = "FriendlyAppName=String:$registeredName`n[DefaultIcon]{=String:`"$installedExe`",1}`n[shell]{[open]{[command]{=String:$editorCommand}}}"
+        $expectedApplication = "FriendlyAppName=String:$registeredName`n[DefaultIcon]{=String:`"$installedExe`",$editorIconIndex}`n[shell]{[open]{[command]{=String:$editorCommand}}}"
         Assert-Same (Get-UserKeyTree $applicationSubkey) $expectedApplication 'Open With registration for any file'
         Assert-Same (Read-UserValue $createdSubkey 'Applications\Network_Toolkit.exe') 1 'Record that Setup created the Open With registration'
         $expectedRecord = if ($applicationsKeyExisted) { $null } else { 1 }
@@ -435,7 +469,7 @@ function Assert-Installed([string]$ExpectedHash = $portableHash) {
     }
     # The right-click entry exists only when it was chosen.
     if ($contextMenuExpected) {
-        $expectedVerb = "=String:Edit with $registeredName`nIcon=String:`"$installedExe`",1`n[command]{=String:$editorCommand}"
+        $expectedVerb = "=String:Edit with $registeredName`nIcon=String:`"$installedExe`",$editorIconIndex`n[command]{=String:$editorCommand}"
         Assert-Same (Get-UserKeyTree $menuVerbSubkey) $expectedVerb 'Right-click entry for all files'
         Assert-Same (Read-RegistryValue $uninstallKey 'ContextMenu') 1 'Remembered right-click menu choice'
         $expectedRecord = if ($allFilesKeyExisted) { $null } else { 1 }
@@ -545,6 +579,9 @@ Invoke-Silent $setup
 Assert-Installed
 Assert-Preserved
 Assert-Absent $desktopShortcut
+# Every icon a registry value or shortcut names exists: the text document icon
+# is the last group, after the three that released Setups already use.
+Assert-IconGroups $installedExe $iconGroupCount
 
 Write-Host 'Checking a terminal link reaches the running Terminal window without connecting.'
 # A headless Terminal owner stands in for the open window; the link launch
@@ -615,6 +652,9 @@ try {
 # itself, with the bare file name. Setup replaces the command of an entry that
 # starts the program it installs.
 Set-UserValue "$applicationSubkey\shell\open\command" '' ('"{0}" "%1"' -f $installedExe)
+# The icon that versions up to 1.21.44 gave the associated files; repair and
+# upgrade replace it with the text document icon (checked by Assert-Installed).
+Set-UserValue "$progSubkey\DefaultIcon" '' ('"{0}",{1}' -f $installedExe, $editorIconIndex)
 Invoke-Silent $setup 0 '/S /DesktopShortcut'
 Assert-Installed
 Assert-Preserved
@@ -762,7 +802,10 @@ Set-UserValue 'Software\Classes\.ini\OpenWithProgids' 'SyntheticIniTool.Document
 $extensionKeyExisted['.ini'] = $true
 $openWithExisted['.ini'] = $true
 $classSnapshots['Software\Classes\.ini'] = '[OpenWithProgids]{SyntheticIniTool.Document=String:}'
+# Versions up to 1.21.44 gave the associated files the editor icon.
+Set-UserValue "$progSubkey\DefaultIcon" '' ('"{0}",{1}' -f $installedExe, $editorIconIndex)
 Invoke-Silent $setup
+# Assert-Installed checks the upgrade replaced it with the text document icon.
 Assert-Installed
 Assert-Preserved
 # .log and .conf hold nothing but the Text Editor: adopted, key and list.

@@ -48,6 +48,8 @@ If Windows already has an **Open with** entry for a `Network_Toolkit.exe` in ano
 
 Documents, images, media, archives and programs are not in the list, because the editor is not the right default for them; they still open through **Open with**. The file you open from Windows becomes the selected tab, as described next.
 
+**File icons:** a file whose type opens in the Text Editor shows a plain sheet of paper: the page from the editor's icon, without the blue tile behind it. The editor itself keeps its full icon in the Start menu, on the taskbar, in Default apps, in **Open with** and on the right-click entry. A type outside the list above that you set to the editor through **Open with** may show the editor's icon instead. To get the sheet after an upgrade, run the new Setup; an update from inside the app does not change what Windows has registered. Windows keeps a cache of icons, so Explorer can show the old icon for a while; signing out and back in, or restarting Explorer, refreshes it.
+
 ### Portable copy: use its Text Editor in Windows
 Without installing, the portable program can offer its own Text Editor to Windows the way Setup does. In the portable copy open **App settings → Editor → Use this copy's Text Editor in Windows** and choose **Register**. Tick **Right-click menu: Edit with Network Toolkit Text Editor** first if you want that entry. The portable copy then appears under **Open with** for every file and in **Settings → Apps → Default apps** for the types listed above, exactly as the installed program would, and you choose the default in Windows as described above. Opening a file this way works like the installed program: the file goes to a Text Editor window that is already open, as the selected tab.
 
