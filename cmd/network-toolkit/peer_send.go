@@ -947,8 +947,9 @@ func peerForegroundPID(dir string) (int, bool) {
 }
 
 // launchPeerApp opens the other standalone app the way its Start menu shortcut
-// does: a running app is raised, otherwise this executable is started with the
-// fixed --terminal or --editor-standalone arguments. No text, credentials,
+// does: a running app is raised, otherwise its program (standaloneProgram:
+// the separate program, else Network_Toolkit.exe) is started with the fixed
+// --terminal or --editor-standalone arguments. No text, credentials,
 // shell, parent-owned pipes or parent cancellation are passed to it.
 func launchPeerApp(ctx context.Context, root, mode string, headless bool) error {
 	dir := peerWorkspaceDir(root, mode)
@@ -970,7 +971,9 @@ func launchPeerApp(ctx context.Context, root, mode string, headless bool) error 
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	exe, err := updateCurrentExecutable()
+	// The other app's separate program when it is beside this one, else the
+	// main program with the fixed switch (edition.go).
+	exe, err := standaloneProgram(mode)
 	if err != nil {
 		return err
 	}

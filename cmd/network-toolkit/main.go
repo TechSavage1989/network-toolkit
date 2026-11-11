@@ -227,6 +227,12 @@ func main() {
 		}
 		return
 	}
+	// The separate Text Editor and Terminal programs open their app without a
+	// switch (edition.go, docs/SEPARATE_EXECUTABLES.md).
+	if err := applyBuildEdition(flag.CommandLine, buildEdition); err != nil {
+		platform.NotifyFatal(err.Error())
+		return
+	}
 	editorLaunch, err := editorOptions.request(flag.CommandLine, *terminalOnly || *terminalPreset != "" || *terminalView || *editorView || *printVersion || *previewHost != "")
 	if err != nil {
 		platform.NotifyFatal(err.Error())
@@ -253,6 +259,12 @@ func main() {
 		if err := runDetachedTerminalView(os.Stdin, *noBrowser); err != nil {
 			platform.NotifyFatal("Unable to open the detached terminal: " + err.Error())
 		}
+		return
+	}
+	// Network_Toolkit.exe started for a standalone app hands the same
+	// arguments to that app's separate program when it is beside it.
+	if *terminalOnly && forwardToSeparateProgram("terminal", os.Args[1:]) ||
+		editorStandalone && forwardToSeparateProgram(standaloneEditorMode, os.Args[1:]) {
 		return
 	}
 	if *port < 0 || *port > 65535 {

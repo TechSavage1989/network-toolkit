@@ -626,7 +626,9 @@ func launchIndependentTerminal(ctx context.Context, root string, preset *termina
 	if err := ctx.Err(); err != nil {
 		return false, err
 	}
-	exe, err := updateCurrentExecutable()
+	// The separate Terminal program when it is beside this one, else this
+	// program with --terminal (edition.go).
+	exe, err := standaloneProgram("terminal")
 	if err != nil {
 		return false, err
 	}

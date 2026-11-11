@@ -1,7 +1,17 @@
-"""Generate a standard Windows COFF resource object before Go links the EXE.
+"""Generate the standard Windows COFF resource objects before Go links the EXEs.
 
-Only Python's standard library is needed. The executable is never patched.
-The generated object is included so ordinary source builds require Go only.
+Only Python's standard library is needed. The executables are never patched.
+The generated objects are included so ordinary source builds require Go only.
+
+One object per program (docs/SEPARATE_EXECUTABLES.md): Network_Toolkit.exe in
+cmd/network-toolkit, and the separate Text Editor and Terminal programs in
+internal/winres/<edition>, which only the build-tagged edition imports. Every
+program carries the same icon groups at the same IDs, so the native window code
+loads the same icons in each. A separate program adds one named group, APP,
+that refers to its own app's icon images: named groups come first in a resource
+directory, so it is icon index 0 (Explorer, Task Manager, Start, pins), and the
+main program's indexes follow it shifted by one. The main program's object is
+unchanged, so every index that Setup's registrations name keeps its icon.
 """
 from pathlib import Path
 import struct
@@ -29,13 +39,22 @@ def version_block(key, value=b'', children=(), text=False):
     return bytes(block)
 
 
-def version_info():
+# (output, FileDescription, OriginalFilename, icon group used as index 0 or None)
+PROGRAMS = (
+    ('cmd/network-toolkit/resource_windows_amd64.syso', 'Network Toolkit - Network Diagnostics', 'Network_Toolkit.exe', None),
+    ('internal/winres/editor/resource_windows_amd64.syso', 'Network Toolkit Text Editor', 'Network_Toolkit_TextEditor.exe', 2),
+    ('internal/winres/terminal/resource_windows_amd64.syso', 'Network Toolkit Terminal', 'Network_Toolkit_Terminal.exe', 3),
+)
+APP_GROUP = 'APP'
+
+
+def version_info(description=PROGRAMS[0][1], original=PROGRAMS[0][2]):
     fixed = struct.pack('<13I', 0xFEEF04BD, 0x00010000, 0x00010015, 0x002C0000, 0x00010015, 0x002C0000, 0x3F, 0, 0x40004, 1, 0, 0, 0)
     strings = {
-        'FileDescription': 'Network Toolkit - Network Diagnostics',
+        'FileDescription': description,
         'FileVersion': '1.21.44.0',
         'InternalName': 'NetworkToolkit',
-        'OriginalFilename': 'Network_Toolkit.exe',
+        'OriginalFilename': original,
         'ProductName': 'Network Toolkit',
         'ProductVersion': '1.21.44',
     }
@@ -45,37 +64,30 @@ def version_info():
     return version_block('VS_VERSION_INFO', fixed, [string_info, var_info])
 
 
-def main():
-    validate_assets(ROOT)
-    icons = {}
-    groups = {}
-    # Keep group order in sync with desktop icon resource IDs and the setup's
-    # zero-based shortcut icon indexes.
-    for group_id, name in enumerate(('Icon', 'Editor', 'Terminal'), 1):
-        icon = (ROOT / f'assets/Network_Toolkit_{name}.ico').read_bytes()
-        reserved, kind, count = struct.unpack_from('<HHH', icon)
-        if reserved or kind != 1 or not 1 <= count <= 30:
-            raise ValueError(f'Invalid {name} ICO')
-        group = bytearray(struct.pack('<HHH', 0, 1, count))
-        for i in range(count):
-            width, height, colors, res, planes, bits, size, offset = struct.unpack_from('<BBBBHHII', icon, 6 + i * 16)
-            data = icon[offset:offset+size]
-            if len(data) != size:
-                raise ValueError(f'Truncated {name} ICO entry')
-            icon_id = len(icons) + 1
-            icons[icon_id] = {1033: data}
-            group.extend(struct.pack('<BBBBHHIH', width, height, colors, res, planes, bits, size, icon_id))
-        groups[group_id] = {1033: bytes(group)}
-    tree = {3: icons, 14: groups, 16: {1: {1033: version_info()}}, 24: {1: {1033: (ROOT/'assets/app.manifest').read_bytes()}}}
+def resource_object(groups_tree, icons, description, original):
+    """The COFF object of one program: icons, groups, version and manifest."""
+    tree = {3: icons, 14: groups_tree, 16: {1: {1033: version_info(description, original)}},
+            24: {1: {1033: (ROOT/'assets/app.manifest').read_bytes()}}}
     section = bytearray()
     leaves = []
 
     def directory(items):
         align(section)
         at = len(section)
+        named = sorted(key for key in items if isinstance(key, str))
+        numbered = sorted(key for key in items if not isinstance(key, str))
         section.extend(b'\0'*(16+8*len(items)))
-        struct.pack_into('<IIHHHH', section, at, 0, 0, 0, 0, 0, len(items))
-        for i, (key, value) in enumerate(sorted(items.items())):
+        struct.pack_into('<IIHHHH', section, at, 0, 0, 0, 0, len(named), len(numbered))
+        for i, key in enumerate(named + numbered):
+            value = items[key]
+            if isinstance(key, str):
+                # IMAGE_RESOURCE_DIR_STRING_U: a length and UTF-16 text, at a
+                # section offset (no relocation, unlike the data entries).
+                align(section, 2)
+                name_at = len(section)
+                text = key.encode('utf-16le')
+                section.extend(struct.pack('<H', len(text) // 2) + text)
+                key = name_at | 0x80000000
             if isinstance(value, dict):
                 child = directory(value) | 0x80000000
             else:
@@ -101,9 +113,52 @@ def main():
     header = struct.pack('<HHIIIHH', 0x8664, 1, 0, symbols_offset, 1, 0, 0)
     sh = struct.pack('<8sIIIIIIHHI', b'.rsrc\0\0\0', 0, 0, len(section), raw_offset, reloc_offset, 0, len(leaves), 0, 0x40300040)
     symbol = struct.pack('<8sIhHBB', b'.rsrc\0\0\0', 0, 1, 0, 3, 0)
-    output = ROOT / 'cmd/network-toolkit/resource_windows_amd64.syso'
-    output.write_bytes(header + sh + section + relocations + symbol + struct.pack('<I', 4))
-    print(f'{output.name}: {output.stat().st_size} bytes, {len(leaves)} native resources')
+    return header + sh + section + relocations + symbol + struct.pack('<I', 4), len(leaves)
+
+
+def icon_tables():
+    """The icon images and the numbered groups shared by every program."""
+    icons = {}
+    groups = {}
+    # Keep group order in sync with desktop icon resource IDs and the setup's
+    # zero-based shortcut icon indexes.
+    for group_id, name in enumerate(('Icon', 'Editor', 'Terminal'), 1):
+        icon = (ROOT / f'assets/Network_Toolkit_{name}.ico').read_bytes()
+        reserved, kind, count = struct.unpack_from('<HHH', icon)
+        if reserved or kind != 1 or not 1 <= count <= 30:
+            raise ValueError(f'Invalid {name} ICO')
+        group = bytearray(struct.pack('<HHH', 0, 1, count))
+        for i in range(count):
+            width, height, colors, res, planes, bits, size, offset = struct.unpack_from('<BBBBHHII', icon, 6 + i * 16)
+            data = icon[offset:offset+size]
+            if len(data) != size:
+                raise ValueError(f'Truncated {name} ICO entry')
+            icon_id = len(icons) + 1
+            icons[icon_id] = {1033: data}
+            group.extend(struct.pack('<BBBBHHIH', width, height, colors, res, planes, bits, size, icon_id))
+        groups[group_id] = {1033: bytes(group)}
+    return icons, groups
+
+
+def program_resources():
+    """{output path: object bytes} for every program."""
+    validate_assets(ROOT)
+    icons, groups = icon_tables()
+    result = {}
+    for output, description, original, app_group in PROGRAMS:
+        tree = dict(groups)
+        if app_group is not None:
+            tree[APP_GROUP] = groups[app_group]
+        result[output] = resource_object(tree, icons, description, original)
+    return result
+
+
+def main():
+    for output, (data, leaves) in program_resources().items():
+        path = ROOT / output
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+        print(f'{output}: {path.stat().st_size} bytes, {leaves} native resources')
 
 
 if __name__ == '__main__':
