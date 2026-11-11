@@ -36,7 +36,17 @@ type stagedUpdate struct {
 	Beta    bool   `json:"beta"`
 	SHA256  string `json:"sha256"`
 	Size    int    `json:"size"`
-	dir     string
+	// The separate Text Editor and Terminal programs staged with it
+	// (docs/SEPARATE_EXECUTABLES.md); empty for a package without them.
+	Companions []stagedCompanion `json:"companions,omitempty"`
+	dir        string
+}
+
+// stagedCompanion is one separate program staged as candidate-<Name>.
+type stagedCompanion struct {
+	Name   string `json:"name"`
+	SHA256 string `json:"sha256"`
+	Size   int    `json:"size"`
 }
 type appUpdater struct {
 	mu          sync.Mutex
@@ -49,6 +59,7 @@ type appUpdater struct {
 	networkBusy bool
 	progress    *updateProgress
 	feed        updateFeedCache
+	companions  *companionStatus // cached; reset after the separate programs change
 }
 
 func updateNewer(candidate, current string) bool {
@@ -148,11 +159,69 @@ func updateValidatePE(b []byte, version string) error {
 	return nil
 }
 func updateExtractPackage(filename string, archive, checksums []byte, current string) (string, []byte, error) {
+	pkg, err := updateExtractRelease(filename, archive, checksums, current, false)
+	return pkg.version, pkg.main, err
+}
+
+// updatePackage is a verified update: Network_Toolkit.exe and, from releases
+// that ship them, the separate Text Editor and Terminal programs, keyed by
+// their Windows file names.
+type updatePackage struct {
+	version    string
+	main       []byte
+	companions map[string][]byte
+}
+
+// The separate programs, in the order they are installed.
+var updateCompanionEditions = []string{standaloneEditorMode, "terminal"}
+
+// updateCompanionMember is the Update ZIP member of a separate program. It is
+// not an official versioned name (updateOfficialExecutableVersion), so no
+// naming code of any version takes it for the main program.
+func updateCompanionMember(version, edition string) string {
+	return strings.TrimSuffix(programNameFor("windows", edition), ".exe") + "_" + version + "_Windows_x64.exe"
+}
+
+// updateValidateCompanion checks a separate program like the main one and by
+// its original file name, so one program can never be installed as another.
+func updateValidateCompanion(b []byte, version, edition string) error {
+	if err := updateValidatePE(b, version); err != nil {
+		return err
+	}
+	f, err := pe.NewFile(bytes.NewReader(b))
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	resource, err := f.Section(".rsrc").Data()
+	if err != nil {
+		return err
+	}
+	if err := programResourceMatches(resource, version, programNameFor("windows", edition)); err != nil {
+		return errors.New("Update program " + programNameFor("windows", edition) + " does not match its package.")
+	}
+	return nil
+}
+
+// updateNotCompanion refuses a separate program in the main program's place.
+func updateNotCompanion(b []byte) error {
+	for _, edition := range updateCompanionEditions {
+		if bytes.Contains(b, updateUTF16(programNameFor("windows", edition))) {
+			return errors.New("The update's main executable is not Network_Toolkit.exe.")
+		}
+	}
+	return nil
+}
+
+// updateExtractRelease verifies an official package. allowSame accepts the
+// running version: only for installing the separate programs of this version.
+func updateExtractRelease(filename string, archive, checksums []byte, current string, allowSame bool) (updatePackage, error) {
+	var none updatePackage
 	if len(archive) > updateMaxPackage {
-		return "", nil, errors.New("Update package exceeds 128 MiB.")
+		return none, errors.New("Update package exceeds 128 MiB.")
 	}
 	if err := updateVerifySum(checksums, filename, archive); err != nil {
-		return "", nil, err
+		return none, err
 	}
 	prefix := "Network_Toolkit_"
 	suffix := "_Portable.zip"
@@ -160,27 +229,32 @@ func updateExtractPackage(filename string, archive, checksums []byte, current st
 		suffix = "_Update.zip"
 	}
 	if !strings.HasPrefix(filename, prefix) || !strings.HasSuffix(filename, suffix) {
-		return "", nil, errors.New("Choose the official Network_Toolkit_VERSION_Portable.zip release asset.")
+		return none, errors.New("Choose the official Network_Toolkit_VERSION_Portable.zip release asset.")
 	}
 	version := strings.TrimSuffix(strings.TrimPrefix(filename, prefix), suffix)
-	if !updateNewer(version, current) {
-		return "", nil, errors.New("Choose a release newer than the installed version. Downgrades and same-version replacements are not allowed.")
+	if !updateNewer(version, current) && !(allowSame && version == current && updateVersionPattern.MatchString(version)) {
+		return none, errors.New("Choose a release newer than the installed version. Downgrades and same-version replacements are not allowed.")
 	}
 	z, e := zip.NewReader(bytes.NewReader(archive), int64(len(archive)))
 	if e != nil {
-		return "", nil, e
+		return none, e
 	}
 	if len(z.File) > 3000 {
-		return "", nil, errors.New("Update contains too many files.")
+		return none, errors.New("Update contains too many files.")
 	}
 	root := prefix + version + "/"
 	exeName := prefix + version + "_Windows_x64.exe"
+	members := map[string]string{} // ZIP member -> separate program's edition
+	for _, edition := range updateCompanionEditions {
+		members[root+updateCompanionMember(version, edition)] = edition
+	}
 	var executable, manifest []byte
+	companions := map[string][]byte{}
 	seen := map[string]bool{}
 	for _, f := range z.File {
 		name := f.Name
 		if name != path.Clean(name) || strings.ContainsAny(name, "\\:\x00") || !strings.HasPrefix(name, root) || f.Mode()&os.ModeSymlink != 0 || seen[strings.ToLower(name)] {
-			return "", nil, errors.New("Update contains an unsafe or duplicate archive path.")
+			return none, errors.New("Update contains an unsafe or duplicate archive path.")
 		}
 		seen[strings.ToLower(name)] = true
 		switch name {
@@ -188,21 +262,50 @@ func updateExtractPackage(filename string, archive, checksums []byte, current st
 			executable, e = updateReadZipFile(f, updateMaxEXE)
 		case root + "SHA256SUMS":
 			manifest, e = updateReadZipFile(f, 64<<10)
+		default:
+			if edition, ok := members[name]; ok {
+				var b []byte
+				b, e = updateReadZipFile(f, updateMaxEXE)
+				companions[edition] = b
+			}
 		}
 		if e != nil {
-			return "", nil, e
+			return none, e
 		}
 	}
 	if len(executable) == 0 || len(manifest) == 0 {
-		return "", nil, errors.New("Update is missing its executable or internal checksums.")
+		return none, errors.New("Update is missing its executable or internal checksums.")
 	}
 	if e = updateVerifySum(manifest, exeName, executable); e != nil {
-		return "", nil, e
+		return none, e
 	}
 	if e = updateValidatePE(executable, version); e != nil {
-		return "", nil, e
+		return none, e
 	}
-	return version, executable, nil
+	if e = updateNotCompanion(executable); e != nil {
+		return none, e
+	}
+	pkg := updatePackage{version: version, main: executable}
+	if len(companions) != 0 {
+		// Both separate programs or neither: they are updated together.
+		if len(companions) != len(updateCompanionEditions) {
+			return none, errors.New("Update contains only one of the separate Text Editor and Terminal programs.")
+		}
+		pkg.companions = map[string][]byte{}
+		for edition, b := range companions {
+			if len(b) == 0 {
+				return none, errors.New("Update contains an empty separate program.")
+			}
+			if e = updateVerifySum(manifest, updateCompanionMember(version, edition), b); e != nil {
+				return none, e
+			}
+			if e = updateValidateCompanion(b, version, edition); e != nil {
+				return none, e
+			}
+			pkg.companions[programNameFor("windows", edition)] = b
+		}
+	}
+	return pkg, nil
 }
 func (a *application) updateBusy() []string {
 	busy := []string{}
@@ -252,10 +355,14 @@ func (a *application) updateBusy() []string {
 	if a.editorViews != nil && a.editorViews.hasLiveViews() {
 		busy = append(busy, "Detached editor documents or window transfers")
 	}
+	if a.windowMode == "main" && a.shared != nil {
+		// Their programs are replaced too (docs/SEPARATE_EXECUTABLES.md).
+		busy = append(busy, standaloneAppsOpen(a.shared.root)...)
+	}
 	return busy
 }
 func (a *application) updateStatusLocked() map[string]any {
-	return map[string]any{"currentVersion": model.Version, "executable": updateNamingStatus(), "restartedAfterUpdate": a.updateHealthDir != "", "finalizing": a.updateFinalizing.Load(), "supported": runtime.GOOS == "windows" && runtime.GOARCH == "amd64" && a.windowMode == "main", "mode": "direct", "currentChannel": updateBuildChannel, "channel": func() string {if a.updater.channel == "beta" {return "beta"};return "stable"}(), "latest": a.updater.latest, "checked": a.updater.checked, "checkAfter": a.updater.feed.checkAfterMillis(), "hasUpdate": a.updater.latest != nil && updateNewer(a.updater.latest.Version, model.Version), "releasesUrl": updateReleasesURL, "staged": a.updater.staged, "installing": a.updater.installing, "networkBusy": a.updater.networkBusy, "progress": a.updater.progress, "busy": a.updateBusy()}
+	return map[string]any{"currentVersion": model.Version, "executable": updateNamingStatus(), "restartedAfterUpdate": a.updateHealthDir != "", "finalizing": a.updateFinalizing.Load(), "supported": runtime.GOOS == "windows" && runtime.GOARCH == "amd64" && a.windowMode == "main", "mode": "direct", "currentChannel": updateBuildChannel, "channel": func() string {if a.updater.channel == "beta" {return "beta"};return "stable"}(), "latest": a.updater.latest, "checked": a.updater.checked, "checkAfter": a.updater.feed.checkAfterMillis(), "hasUpdate": a.updater.latest != nil && updateNewer(a.updater.latest.Version, model.Version), "releasesUrl": updateReleasesURL, "staged": a.updater.staged, "installing": a.updater.installing, "networkBusy": a.updater.networkBusy, "progress": a.updater.progress, "busy": a.updateBusy(), "companions": a.companionStatusLocked()}
 }
 func (a *application) handleUpdates(w http.ResponseWriter, r *http.Request) {
 	a.updater.mu.Lock()
@@ -280,7 +387,7 @@ func (a *application) handleUpdates(w http.ResponseWriter, r *http.Request) {
 		jsonError(w, 409, "An update is already installing.")
 		return
 	}
-	if a.handleUpdateFeedLocked(w, r) {
+	if a.handleUpdateFeedLocked(w, r) || a.handleUpdateCompanionsLocked(w, r) {
 		return
 	}
 	switch r.URL.Path {
@@ -323,12 +430,12 @@ func (a *application) handleUpdates(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, 400, e.Error())
 			return
 		}
-		version, binary, e := updateExtractPackage(h.Filename, archive, sums, model.Version)
+		pkg, e := updateExtractRelease(h.Filename, archive, sums, model.Version, false)
 		if e != nil {
 			jsonError(w, 400, e.Error())
 			return
 		}
-		if e = a.updateStageBinary(version, binary); e != nil {
+		if e = a.updateStagePackage(pkg); e != nil {
 			jsonError(w, 409, e.Error())
 			return
 		}
@@ -389,6 +496,15 @@ func updateFileHash(name string) (string, error) {
 }
 
 func (a *application) updateStageBinary(version string, binary []byte) error {
+	return a.updateStagePackage(updatePackage{version: version, main: binary})
+}
+
+// updateStagePackage stages a verified package: candidate.exe and one
+// candidate-<name> per separate program. A package without the separate
+// programs is refused where they are installed beside this program, so the
+// three never end up at different versions.
+func (a *application) updateStagePackage(pkg updatePackage) error {
+	version, binary := pkg.version, pkg.main
 	exe, e := updateCurrentExecutable()
 	if e != nil {
 		return e
@@ -401,19 +517,50 @@ func (a *application) updateStageBinary(version string, binary []byte) error {
 	if e != nil {
 		return e
 	}
+	if len(pkg.companions) == 0 {
+		for _, edition := range updateCompanionEditions {
+			if _, err := os.Lstat(filepath.Join(filepath.Dir(exe), programNameFor("windows", edition))); !os.IsNotExist(err) {
+				return errors.New("This update package does not include the separate Text Editor and Terminal programs installed beside " + filepath.Base(exe) + ". Use the Update ZIP of a release that includes them.")
+			}
+		}
+	}
 	dir, e := os.MkdirTemp(root, ".network-toolkit-update-")
 	if e != nil {
 		return errors.New("The settings update folder is not writable. Check the app settings location and try again.")
 	}
+	staged := &stagedUpdate{Version: version, SHA256: updateHash(binary), Size: len(binary), dir: dir}
 	if e = updateWriteExclusive(filepath.Join(dir, "candidate.exe"), binary, 0700); e != nil {
 		updateDiscardStage(dir, updateHash(binary))
 		return e
 	}
+	for _, edition := range updateCompanionEditions {
+		name := programNameFor("windows", edition)
+		b, ok := pkg.companions[name]
+		if !ok {
+			continue
+		}
+		if e = updateWriteExclusive(filepath.Join(dir, "candidate-"+name), b, 0700); e != nil {
+			updateDiscardCompanions(dir, staged.Companions)
+			_ = os.Remove(filepath.Join(dir, "candidate-"+name))
+			updateDiscardStage(dir, updateHash(binary))
+			return e
+		}
+		staged.Companions = append(staged.Companions, stagedCompanion{Name: name, SHA256: updateHash(b), Size: len(b)})
+	}
 	if old := a.updater.staged; old != nil {
+		updateDiscardCompanions(old.dir, old.Companions)
 		updateDiscardStage(old.dir, old.SHA256)
 	}
-	a.updater.staged = &stagedUpdate{Version: version, SHA256: updateHash(binary), Size: len(binary), dir: dir}
+	a.updater.staged = staged
 	return nil
+}
+
+// updateDiscardCompanions removes the staged separate programs of a stage
+// that was never installed, each only while it still has its staged bytes.
+func updateDiscardCompanions(dir string, companions []stagedCompanion) {
+	for _, c := range companions {
+		_ = updateRemoveVerified(filepath.Join(dir, "candidate-"+c.Name), c.SHA256)
+	}
 }
 
 // Uninstalled imports belong to this session. Successful installers retain their
@@ -422,6 +569,7 @@ func (a *application) cleanupStagedUpdate() {
 	a.updater.mu.Lock()
 	defer a.updater.mu.Unlock()
 	if !a.updater.installing && a.updater.staged != nil {
+		updateDiscardCompanions(a.updater.staged.dir, a.updater.staged.Companions)
 		_ = updateDiscardStage(a.updater.staged.dir, a.updater.staged.SHA256)
 		a.updater.staged = nil
 	}

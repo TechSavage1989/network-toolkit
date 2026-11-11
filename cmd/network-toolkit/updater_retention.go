@@ -244,6 +244,24 @@ func cleanupCompletedUpdate(c completedUpdate) error {
 			}
 		}
 	}
+	// The separate programs' transaction files (docs/SEPARATE_EXECUTABLES.md).
+	for _, companion := range c.plan.Companions {
+		files := map[string]string{
+			updateCompanionSwapFile(c.plan, companion.Target, "candidate"): companion.CandidateSHA256,
+			updateCompanionSwapFile(c.plan, companion.Target, "failed"):    companion.CandidateSHA256,
+			updateCompanionStageFile(c.dir, "candidate", companion.Target): companion.CandidateSHA256,
+			updateCompanionStageFile(c.dir, "failed", companion.Target):    companion.CandidateSHA256,
+		}
+		if companion.OriginalSHA256 != "" {
+			files[updateCompanionSwapFile(c.plan, companion.Target, "previous")] = companion.OriginalSHA256
+			files[updateCompanionStageFile(c.dir, "previous", companion.Target)] = companion.OriginalSHA256
+		}
+		for path, hash := range files {
+			if err := removeRetentionHash(path, hash); err != nil {
+				return err
+			}
+		}
+	}
 	// Only exact members written by our updater are removed. Any unknown file,
 	// directory, link, or changed binary is preserved, and rmdir will leave it.
 	for name, hash := range map[string]string{"previous.exe": c.plan.OriginalSHA256, "candidate.exe": c.plan.CandidateSHA256, "failed.exe": c.plan.CandidateSHA256} {
