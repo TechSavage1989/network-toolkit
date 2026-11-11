@@ -17,6 +17,49 @@ RequestExecutionLevel user
 !define CAPABILITIES "Software\${APP_NAME}\Capabilities"
 !define PROG_ID "NetworkToolkit.TextDocument"
 !define PROG_KEY "Software\Classes\${PROG_ID}"
+; Windows starts the Text Editor with the chosen file as "%1". A file name
+; cannot hold a quotation mark, so the path is always one quoted argument: the
+; value of --open-file. The program accepts no other argument beside it.
+!define EDITOR_COMMAND '"$INSTDIR\${APP_FILENAME}" ${EDITOR_ARGS} --open-file "%1"'
+; How the Text Editor is offered for files. Setup only makes it available; the
+; user makes it the default in Windows. Setup never writes a UserChoice (Windows
+; protects it with a hash), never changes the default value of an extension and
+; never changes a key another program wrote. Everything is per user (HKCU).
+;
+; 1. Default apps: RegisteredApplications -> Capabilities\FileAssociations
+;    lists the Text Editor in Settings > Apps > Default apps for every type in
+;    text-extensions.nsh.
+;    https://learn.microsoft.com/windows/win32/shell/default-programs
+; 2. Open with, known types: the ProgID as a value of <.ext>\OpenWithProgids
+;    adds the Text Editor to the "Open with" list of that type. Microsoft
+;    prefers OpenWithProgids to the older OpenWithList.
+;    https://learn.microsoft.com/windows/win32/shell/how-to-include-an-application-on-the-open-with-dialog-box
+; 3. Open with, any file: an application registered under
+;    Classes\Applications\<program.exe> "is presented in the Open with dialog
+;    box regardless of whether the application is registered to handle the file
+;    type". That covers unknown types and files without an extension.
+;      shell\open\command  how Open with starts it. Without a verb, Windows runs
+;                          the program with the bare file name.
+;      FriendlyAppName     the name shown instead of the program's version text.
+;      DefaultIcon         the Text Editor's icon instead of the first icon.
+;    SupportedTypes is deliberately absent: it limits Open with to the listed
+;    types, and the Text Editor opens any file.
+;    https://learn.microsoft.com/windows/win32/shell/app-registration
+;    https://learn.microsoft.com/previous-versions/windows/desktop/legacy/hh127438(v=vs.85)
+; 4. Optional right-click entry: a static verb under Classes\*\shell applies to
+;    every file. Windows 11 shows such entries under "Show more options".
+;    https://learn.microsoft.com/windows/win32/shell/context-menu-handlers
+!define APPLICATIONS_KEY "Software\Classes\Applications"
+!define APPLICATION_KEY "${APPLICATIONS_KEY}\${APP_FILENAME}"
+!define ALL_FILES_KEY "Software\Classes\*"
+!define MENU_VERB_KEY "${ALL_FILES_KEY}\shell\NetworkToolkit.TextEditor"
+!define MENU_TEXT "Edit with ${EDITOR_NAME}"
+; Keys that Setup created where another program's key could already have been:
+; a value named after the key, as in the Terminal's CreatedSchemes. Uninstall
+; and a rolled back install remove only these, and only while they are still
+; what Setup wrote or have become empty.
+!define EDITOR_KEY "Software\${APP_NAME}\TextEditor"
+!define CREATED_KEYS "${EDITOR_KEY}\CreatedKeys"
 ; Terminal links (ssh://, telnet://, serial:). Windows lists the Terminal under
 ; Default apps; the user chooses it there. Setup never writes a UserChoice and
 ; never changes a scheme key that another app or Windows already registered.
@@ -69,6 +112,9 @@ Var FailedStep
 Var NewSshScheme
 Var NewTelnetScheme
 Var NewSerialScheme
+Var RegistrationFailed
+Var OwnApplicationKey
+Var WantContextMenu
 
 ; Silent setup and uninstall show no message. Leave the reason they stopped in
 ; a small log, replaced on every run, so the hosted setup check and support can
@@ -304,21 +350,145 @@ Function RefuseDowngrade
   ${EndIf}
 FunctionEnd
 
+; ${RESULT} becomes 1 when this user has no such key yet. Probing reports a
+; missing key through the error flag, so an earlier write error is noted first.
+!macro ProbeUserKey KEY RESULT
+  ${If} ${Errors}
+    StrCpy $RegistrationFailed 1
+  ${EndIf}
+  StrCpy ${RESULT} 0
+  EnumRegKey $0 HKCU "${KEY}" 0
+  ${If} ${Errors}
+    StrCpy ${RESULT} 1
+  ${EndIf}
+!macroend
+
+; Removes a key that Setup created once nothing is left in it: no subkey and
+; no value, not even an unnamed one. What another program added keeps the key.
+!macro DeleteEmptyUserKey KEY
+  ClearErrors
+  EnumRegKey $1 HKCU "${KEY}" 0
+  ${IfNot} ${Errors}
+  ${AndIf} $1 == ""
+    EnumRegValue $2 HKCU "${KEY}" 0
+    ${If} ${Errors}
+      DeleteRegKey HKCU "${KEY}"
+    ${EndIf}
+  ${EndIf}
+  ClearErrors
+!macroend
+
+; The extension's own key and default value belong to whichever program
+; registered the type; Setup only adds its ProgID to OpenWithProgids.
 !macro RegisterExtension EXTENSION
+  !insertmacro ProbeUserKey "Software\Classes\${EXTENSION}" $R1
+  !insertmacro ProbeUserKey "Software\Classes\${EXTENSION}\OpenWithProgids" $R2
   WriteRegStr HKCU "${CAPABILITIES}\FileAssociations" "${EXTENSION}" "${PROG_ID}"
   WriteRegStr HKCU "Software\Classes\${EXTENSION}\OpenWithProgids" "${PROG_ID}" ""
+  ${If} $R1 == 1
+    WriteRegDWORD HKCU "${CREATED_KEYS}" "${EXTENSION}" 1
+  ${ElseIf} $R2 == 1
+    WriteRegDWORD HKCU "${CREATED_KEYS}" "${EXTENSION}\OpenWithProgids" 1
+  ${EndIf}
 !macroend
 
 !macro RemoveExtension EXTENSION
   DeleteRegValue HKCU "Software\Classes\${EXTENSION}\OpenWithProgids" "${PROG_ID}"
+  ReadRegDWORD $0 HKCU "${CREATED_KEYS}" "${EXTENSION}"
+  ${If} $0 == 1
+    !insertmacro DeleteEmptyUserKey "Software\Classes\${EXTENSION}\OpenWithProgids"
+    !insertmacro DeleteEmptyUserKey "Software\Classes\${EXTENSION}"
+  ${Else}
+    ReadRegDWORD $0 HKCU "${CREATED_KEYS}" "${EXTENSION}\OpenWithProgids"
+    ${If} $0 == 1
+      !insertmacro DeleteEmptyUserKey "Software\Classes\${EXTENSION}\OpenWithProgids"
+    ${EndIf}
+  ${EndIf}
 !macroend
 
-!macro TextExtensions ACTION
-  !insertmacro ${ACTION} ".txt"
-  !insertmacro ${ACTION} ".log"
-  !insertmacro ${ACTION} ".ini"
-  !insertmacro ${ACTION} ".cfg"
-  !insertmacro ${ACTION} ".conf"
+; The one list of text file types, shared with the hosted check and the guide.
+!include "text-extensions.nsh"
+
+; "Open with" for any file. The key is named after the program file. Setup
+; writes it when it is absent, or when it already starts this installed
+; program: Windows writes such an entry itself, with the bare file name as the
+; only argument, when the user picks the program in "Open with". An entry that
+; starts a program somewhere else is left exactly as it is.
+!macro RegisterApplication
+  StrCpy $OwnApplicationKey 0
+  ClearErrors
+  EnumRegKey $0 HKCU "${APPLICATION_KEY}" 0
+  ${If} ${Errors}
+    StrCpy $OwnApplicationKey 1
+  ${Else}
+    ReadRegStr $0 HKCU "${APPLICATION_KEY}\shell\open\command" ""
+    StrLen $1 '"$INSTDIR\${APP_FILENAME}"'
+    StrCpy $2 $0 $1
+    ${If} $2 == '"$INSTDIR\${APP_FILENAME}"'
+      StrCpy $OwnApplicationKey 1
+    ${EndIf}
+  ${EndIf}
+  ClearErrors
+  ${If} $OwnApplicationKey == 1
+    !insertmacro ProbeUserKey "${APPLICATIONS_KEY}" $R1
+    WriteRegStr HKCU "${APPLICATION_KEY}" "FriendlyAppName" "${EDITOR_NAME}"
+    WriteRegStr HKCU "${APPLICATION_KEY}\DefaultIcon" "" '"$INSTDIR\${APP_FILENAME}",1'
+    WriteRegStr HKCU "${APPLICATION_KEY}\shell\open\command" "" '${EDITOR_COMMAND}'
+    WriteRegDWORD HKCU "${CREATED_KEYS}" "Applications\${APP_FILENAME}" 1
+    ${If} $R1 == 1
+      WriteRegDWORD HKCU "${CREATED_KEYS}" "Applications" 1
+    ${EndIf}
+  ${EndIf}
+!macroend
+
+!macro RemoveApplication
+  ReadRegDWORD $0 HKCU "${CREATED_KEYS}" "Applications\${APP_FILENAME}"
+  ReadRegStr $1 HKCU "${APPLICATION_KEY}\shell\open\command" ""
+  ; Leave the key if another program has since pointed it somewhere else.
+  ${If} $0 == 1
+  ${AndIf} $1 == '${EDITOR_COMMAND}'
+    DeleteRegKey HKCU "${APPLICATION_KEY}"
+  ${EndIf}
+  ReadRegDWORD $0 HKCU "${CREATED_KEYS}" "Applications"
+  ${If} $0 == 1
+    !insertmacro DeleteEmptyUserKey "${APPLICATIONS_KEY}"
+  ${EndIf}
+  ClearErrors
+!macroend
+
+; The optional "Edit with Network Toolkit Text Editor" entry for every file.
+; The verb key has this program's own name; the keys above it are shared with
+; other programs' entries and are recorded only when Setup created them.
+!macro RegisterContextMenu
+  !insertmacro ProbeUserKey "${ALL_FILES_KEY}" $R1
+  !insertmacro ProbeUserKey "${ALL_FILES_KEY}\shell" $R2
+  WriteRegStr HKCU "${MENU_VERB_KEY}" "" "${MENU_TEXT}"
+  WriteRegStr HKCU "${MENU_VERB_KEY}" "Icon" '"$INSTDIR\${APP_FILENAME}",1'
+  WriteRegStr HKCU "${MENU_VERB_KEY}\command" "" '${EDITOR_COMMAND}'
+  ${If} $R1 == 1
+    WriteRegDWORD HKCU "${CREATED_KEYS}" "*" 1
+  ${ElseIf} $R2 == 1
+    WriteRegDWORD HKCU "${CREATED_KEYS}" "*\shell" 1
+  ${EndIf}
+  WriteRegDWORD HKCU "${UNINSTALL_KEY}" "ContextMenu" 1
+!macroend
+
+!macro RemoveContextMenu
+  DeleteRegKey HKCU "${MENU_VERB_KEY}"
+  ReadRegDWORD $0 HKCU "${CREATED_KEYS}" "*"
+  ${If} $0 == 1
+    !insertmacro DeleteEmptyUserKey "${ALL_FILES_KEY}\shell"
+    !insertmacro DeleteEmptyUserKey "${ALL_FILES_KEY}"
+  ${Else}
+    ReadRegDWORD $0 HKCU "${CREATED_KEYS}" "*\shell"
+    ${If} $0 == 1
+      !insertmacro DeleteEmptyUserKey "${ALL_FILES_KEY}\shell"
+    ${EndIf}
+  ${EndIf}
+  DeleteRegValue HKCU "${CREATED_KEYS}" "*"
+  DeleteRegValue HKCU "${CREATED_KEYS}" "*\shell"
+  DeleteRegValue HKCU "${UNINSTALL_KEY}" "ContextMenu"
+  ClearErrors
 !macroend
 
 ; A scheme key is described only when neither this user nor the machine has
@@ -366,6 +536,9 @@ FunctionEnd
 
 !macro UnregisterShell
   !insertmacro TextExtensions RemoveExtension
+  !insertmacro RemoveApplication
+  !insertmacro RemoveContextMenu
+  DeleteRegKey HKCU "${EDITOR_KEY}"
   DeleteRegValue HKCU "Software\RegisteredApplications" "${EDITOR_NAME}"
   DeleteRegKey HKCU "${CAPABILITIES}"
   DeleteRegKey HKCU "${PROG_KEY}"
@@ -463,13 +636,30 @@ Section "Network Toolkit"
   WriteRegStr HKCU "${PROG_KEY}" "" "${APP_NAME} text document"
   WriteRegNone HKCU "${PROG_KEY}" "AllowSilentDefaultTakeOver"
   WriteRegStr HKCU "${PROG_KEY}\DefaultIcon" "" '"$INSTDIR\${APP_FILENAME}",1'
-  WriteRegStr HKCU "${PROG_KEY}\shell\open\command" "" '"$INSTDIR\${APP_FILENAME}" ${EDITOR_ARGS} --open-file "%1"'
+  WriteRegStr HKCU "${PROG_KEY}\shell\open\command" "" '${EDITOR_COMMAND}'
   WriteRegStr HKCU "${CAPABILITIES}" "ApplicationName" "${EDITOR_NAME}"
-  WriteRegStr HKCU "${CAPABILITIES}" "ApplicationDescription" "Open text, log and configuration files in Network Toolkit Text Editor."
+  WriteRegStr HKCU "${CAPABILITIES}" "ApplicationDescription" "Open text, log, configuration, script and source files in Network Toolkit Text Editor."
   WriteRegStr HKCU "${CAPABILITIES}" "ApplicationIcon" '"$INSTDIR\${APP_FILENAME}",1'
+  StrCpy $RegistrationFailed 0
   !insertmacro TextExtensions RegisterExtension
   WriteRegStr HKCU "Software\RegisteredApplications" "${EDITOR_NAME}" "${CAPABILITIES}"
   IfErrors install_error
+  StrCmp $RegistrationFailed 1 install_error
+  StrCpy $FailedStep "adding the Text Editor to Open with"
+  !insertmacro RegisterApplication
+  IfErrors install_error
+  StrCmp $RegistrationFailed 1 install_error
+  StrCpy $FailedStep "updating the right-click menu entry"
+  Call ReadContextMenuChoice
+  ReadRegDWORD $R8 HKCU "${UNINSTALL_KEY}" "ContextMenu"
+  ClearErrors
+  ${If} $WantContextMenu == 1
+    !insertmacro RegisterContextMenu
+  ${ElseIf} $R8 == 1
+    !insertmacro RemoveContextMenu
+  ${EndIf}
+  IfErrors install_error
+  StrCmp $RegistrationFailed 1 install_error
   StrCpy $FailedStep "registering terminal links"
   ; Probing reports a missing key through the error flag; probe every scheme
   ; first, then write and check the registration as one step.
@@ -557,6 +747,19 @@ Section -ApplyDesktopShortcut
   ${EndIf}
 SectionEnd
 
+; The right-click entry is added and removed with the other registrations in
+; the main section, so that a failure there is rolled back with them. Like the
+; desktop shortcut, the choice is remembered for upgrades.
+Section /o "Right-click menu: ${MENU_TEXT}" ContextMenu
+SectionEnd
+
+Function ReadContextMenuChoice
+  StrCpy $WantContextMenu 0
+  ${If} ${SectionIsSelected} ${ContextMenu}
+    StrCpy $WantContextMenu 1
+  ${EndIf}
+FunctionEnd
+
 Function .onInit
   ${IfNot} ${RunningX64}
     !insertmacro StopSetup "This setup requires 64-bit Windows."
@@ -573,11 +776,20 @@ Function .onInit
   ${If} $0 == 1
     !insertmacro SelectSection ${DesktopShortcut}
   ${EndIf}
+  ReadRegDWORD $0 HKCU "${UNINSTALL_KEY}" "ContextMenu"
+  ${If} $0 == 1
+    !insertmacro SelectSection ${ContextMenu}
+  ${EndIf}
   ${GetParameters} $0
   ${GetOptions} $0 "/DesktopShortcut" $1
   ${IfNot} ${Errors}
     !insertmacro SelectSection ${DesktopShortcut}
   ${EndIf}
+  ${GetOptions} $0 "/ContextMenu" $1
+  ${IfNot} ${Errors}
+    !insertmacro SelectSection ${ContextMenu}
+  ${EndIf}
+  ClearErrors
 FunctionEnd
 
 Section "Uninstall"
