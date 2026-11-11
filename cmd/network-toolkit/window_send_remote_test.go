@@ -92,11 +92,73 @@ func TestWindowSendRemoteFileFromADetachedWorkspace(t *testing.T) {
 	if w := viewTestRequest(a, view, "POST", "/api/remote-browser", map[string]any{"protocol": "ssh", "sessionId": session, "action": "write-text", "path": "startup.cfg"}, &f.revision); w.Code != http.StatusForbidden {
 		t.Fatalf("the workspace wrote: %d", w.Code)
 	}
-	if code, out := windowSendCall(t, a, a.token, "POST", "/api/window-send/ack", map[string]any{"requestId": id, "ok": true, "outcome": "opened"}); code != 200 || out["found"] != true {
+	// Second review, HIGH: Save As elsewhere is refused on both save paths.
+	if r := main("write-text", "/etc/cron.d/synthetic", map[string]any{"content": "x\n", "encoding": "UTF-8"}); r.code != http.StatusConflict || !strings.Contains(r.raw, "Save a copy locally") {
+		t.Fatalf("Save As through the page-held path: %d %s", r.code, r.raw)
+	}
+	snapshot := editorDocumentSnapshot{UID: editorFixtureUID2, Path: "startup.cfg", Binding: editorBinding{Kind: "terminal", SessionID: session}}
+	g, err := a.editorViews.makeGrant("", snapshot)
+	if err != nil {
+		t.Fatalf("the disk-backed grant for the opened file: %v", err)
+	}
+	local := filepath.Join(t.TempDir(), "copy")
+	if _, err := g.run(t.Context(), remoteBrowserRequest{Protocol: "sftp", Action: "download", Path: "startup.cfg", LocalPath: local}); err != nil {
+		t.Fatalf("download of the opened file: %v", err)
+	}
+	for _, req := range []remoteBrowserRequest{
+		{Protocol: "sftp", Action: "upload", Path: "/etc/cron.d/synthetic", LocalPath: local, Overwrite: true, StagedUpload: true},
+		{Protocol: "sftp", Action: "download", Path: "other.cfg", LocalPath: local},
+		{Protocol: "sftp", Action: "remove", Path: "startup.cfg"},
+		{Protocol: "sftp", Action: "rename", Path: "startup.cfg", NewPath: "moved.cfg"},
+		{Protocol: "sftp", Action: "list", Path: "."},
+	} {
+		if _, err := g.run(t.Context(), req); err == nil {
+			t.Fatalf("the disk-backed grant ran %s %s", req.Action, req.Path)
+		}
+	}
+	if _, err := remoteSaveDestination(g, "startup.cfg", "/etc/cron.d/synthetic"); err == nil || !strings.Contains(err.Error(), "Save a copy locally") {
+		t.Fatalf("Save As through the disk-backed path: %v", err)
+	}
+	if destination, err := remoteSaveDestination(g, "startup.cfg", ""); err != nil || destination != "startup.cfg" {
+		t.Fatalf("saving the opened file: %q %v", destination, err)
+	}
+	// MEDIUM: the document never leaves the main window.
+	batch := editorFixtureBatch()
+	batch.Documents[0].UID, batch.Documents[0].ID, batch.Documents[0].Path, batch.Documents[0].Binding = editorFixtureUID2, "terminal:"+session+":startup.cfg", "startup.cfg", editorBinding{Kind: "terminal", SessionID: session}
+	batch.Documents[0].Untitled, batch.Active = false, editorFixtureUID2
+	if _, err := a.editorViews.offer("", editorTransferRequest{ID: randomHex(16), Destination: "new", Batch: batch}); err == nil || !strings.Contains(err.Error(), "stays in the main window") {
+		t.Fatalf("a remote file opened from a workspace moved to another window: %v", err)
+	}
+	// The main page confirms with the tab it opened, and reports it.
+	if code, out := windowSendCall(t, a, a.token, "POST", "/api/window-send/ack", map[string]any{"requestId": id, "ok": true, "outcome": "opened", "document": editorFixtureUID2}); code != 200 || out["found"] != true {
 		t.Fatalf("ack: %d %v", code, out)
 	}
 	if _, out := windowSendCall(t, a, view, "GET", "/api/window-send/result?requestId="+id, nil); out["state"] != peerDone || out["outcome"] != "opened" {
 		t.Fatalf("result: %v", out)
+	}
+	windowSendCall(t, a, a.token, "POST", "/api/window-send/report", map[string]any{"targets": []any{}, "documents": []map[string]any{{"id": editorFixtureUID2, "name": "startup.cfg"}}})
+	if r := main("read-text", "startup.cfg", nil); r.code != 200 {
+		t.Fatalf("the open tab lost its file: %d %s", r.code, r.raw)
+	}
+	// LOW 2: closing the tab in the main window ends the grant, also for the disk path.
+	windowSendCall(t, a, a.token, "POST", "/api/window-send/report", map[string]any{"targets": []any{}, "documents": []any{}})
+	if r := main("read-text", "startup.cfg", nil); r.code != http.StatusConflict {
+		t.Fatalf("a closed tab kept its grant: %d %s", r.code, r.raw)
+	}
+	if g.valid() {
+		t.Fatal("the disk-backed grant outlived the closed tab")
+	}
+	// LOW 4: a save after that says why, plainly.
+	if _, err := remoteSaveDestination(g, "startup.cfg", ""); err == nil || !strings.Contains(err.Error(), "no longer holds the connection") {
+		t.Fatalf("a save after the grant ended: %v", err)
+	}
+	// A request the main page refused leaves no grant behind.
+	_, out = windowSendCall(t, a, view, "POST", "/api/window-send/send", map[string]any{"kind": "remote", "window": "main", "session": session, "path": "startup.cfg"})
+	refused := out["requestId"].(string)
+	windowSendCall(t, a, a.token, "GET", "/api/window-send/inbox", nil)
+	windowSendCall(t, a, a.token, "POST", "/api/window-send/ack", map[string]any{"requestId": refused, "ok": false, "error": "A dialog is open."})
+	if r := main("read-text", "startup.cfg", nil); r.code != http.StatusConflict {
+		t.Fatalf("a refused request kept its grant: %d %s", r.code, r.raw)
 	}
 	// Once the session comes back to the main window the grant is not needed;
 	// when the transport ends it no longer admits anything.

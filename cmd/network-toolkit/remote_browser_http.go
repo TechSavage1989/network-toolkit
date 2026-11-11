@@ -205,6 +205,7 @@ func (a *application) handleRemoteBrowser(w http.ResponseWriter, request *http.R
 			return
 		}
 	}
+	var pinned *windowSendGrant
 	if r.SessionID != "" {
 		// Terminal-owned SSH connections have already authenticated and
 		// verified the server key. Reject mixed or forged credential fields.
@@ -219,11 +220,20 @@ func (a *application) handleRemoteBrowser(w http.ResponseWriter, request *http.R
 		if err := a.withTerminalOwner(request, r.SessionID, "browse", func() error {
 			_, _, err := a.terminals.SFTPClient(r.SessionID)
 			return err
-		}); err != nil && !a.remoteBrowserGrantAllows(request, r.SessionID, r.Action, r.Path) {
+		}); err != nil {
 			// A file a detached Terminal workspace opened in the main window's
-			// Text Editor is the one exception (window_send.go).
-			jsonError(w, http.StatusConflict, "SSH terminal is not available to this window: "+err.Error())
-			return
+			// Text Editor is the one exception (window_send.go); it runs on
+			// the transport the grant was checked against.
+			grant, why := a.remoteBrowserGrant(request, r.SessionID, r.Action, r.Path)
+			if grant == nil {
+				message := "SSH terminal is not available to this window: " + err.Error()
+				if why != nil {
+					message = why.Error()
+				}
+				jsonError(w, http.StatusConflict, message)
+				return
+			}
+			pinned = grant
 		}
 	}
 	if r.Protocol != "ftp" {
@@ -331,6 +341,10 @@ func (a *application) handleRemoteBrowser(w http.ResponseWriter, request *http.R
 	if r.Action == "read-text" || r.Action == "write-text" {
 		if len(r.ExpectedHash) != 0 && len(r.ExpectedHash) != 64 {
 			jsonError(w, 400, "Invalid file revision")
+			return
+		}
+		if pinned != nil {
+			a.handleRemoteTextEditorWithOperation(w, request, r, a.windowSendRun(pinned))
 			return
 		}
 		a.handleRemoteTextEditor(w, request, r)

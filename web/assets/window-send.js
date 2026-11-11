@@ -89,8 +89,9 @@ async function receiveRemote(request,guard){
  if((busy=guard()))return {ok:false,error:busy};
  const revision=(()=>{try{return typeof terminalSessionRevision==='function'?terminalSessionRevision(session):0;}catch{return 0;}})();
  const call=(action,extra)=>api('/remote-browser','POST',{protocol:'ssh',sessionId:session,action,...extra});
- await editor.open({source:'SSH terminal',path,id:'terminal:'+session+':'+path,binding:{kind:'terminal',sessionId:session,revision},read:async p=>call('read-text',{path:p}),write:async data=>call('write-text',data)});
- return {ok:true,outcome:'opened'};
+ const d=await editor.open({source:'SSH terminal',path,id:'terminal:'+session+':'+path,binding:{kind:'terminal',sessionId:session,revision},read:async p=>call('read-text',{path:p}),write:async data=>call('write-text',data)});
+ // The engine's grant follows this tab: closing it, or moving it away, ends the grant.
+ return ID.test(d?.uid||'')?{ok:true,outcome:'opened',document:d.uid}:{ok:false,error:'The Text Editor did not open the file.'};
 }
 // A detached Terminal workspace: open one remote file in the main window's Text Editor.
 function openRemote({session,path,name}={}){return send({kind:'remote',window:'main',session,path},{target:clip(name)||'the file'});}
@@ -100,7 +101,7 @@ async function receive(request,want){
  let result;
  try{result=want==='remote'&&k==='main'?await receiveRemote(request,guard):want==='terminal'&&k!=='editor'&&p?.receiveTerminal?await p.receiveTerminal(request,guard,name):want==='editor'&&k!=='terminal'&&p?.receiveEditor?await p.receiveEditor(request,guard,name):{ok:false,error:name+' cannot take this text.'};}
  catch(error){result={ok:false,error:error?.message||'The text could not be delivered.'};}
- try{await call('ack','POST',result?.ok?{requestId:request.requestId,ok:true,outcome:result.outcome}:{requestId:request.requestId,ok:false,error:String(result?.error||'The text was not accepted.').slice(0,280)});}catch{}
+ try{await call('ack','POST',result?.ok?{requestId:request.requestId,ok:true,outcome:result.outcome,...(result.document?{document:result.document}:{})}:{requestId:request.requestId,ok:false,error:String(result?.error||'The text was not accepted.').slice(0,280)});}catch{}
  finally{receiving=false;}
 }
 async function poll(){

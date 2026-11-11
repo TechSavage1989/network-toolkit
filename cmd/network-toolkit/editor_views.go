@@ -146,6 +146,10 @@ type editorDocumentGrant struct {
 	bytes    int
 	run      func(context.Context, remoteBrowserRequest) (model.Result, error)
 	valid    func() bool
+	// fixedPath: a remote file a detached Terminal workspace opened in the
+	// main window (window_send.go). It is saved only to this path and never
+	// leaves the main window.
+	fixedPath string
 }
 type editorTransfer struct {
 	id, source, destination, state, failure, digest string
@@ -653,19 +657,14 @@ func (m *editorViewRegistry) makeGrant(caller string, d editorDocumentSnapshot) 
 	defer m.app.views.mu.Unlock()
 	owner := m.app.views.ownerLocked(b.SessionID)
 	if owner.ViewID != "" && opened != nil && m.app.windowSendGrantLiveLocked(opened) {
-		client, lifetime := opened.client, opened.lifetime
+		grant.fixedPath = opened.path
 		grant.valid = func() bool {
 			m.app.views.mu.Lock()
 			defer m.app.views.mu.Unlock()
 			return m.app.windowSendGrantLiveLocked(opened)
 		}
-		grant.run = func(ctx context.Context, req remoteBrowserRequest) (model.Result, error) {
-			operation, cancel := context.WithCancel(ctx)
-			defer cancel()
-			stop := context.AfterFunc(lifetime, cancel)
-			defer stop()
-			return diag.RunSFTPOnClient(operation, client, req.request(), nil)
-		}
+		// Only the approved file, on the transport it was checked against.
+		grant.run = m.app.windowSendRun(opened)
 		return grant, nil
 	}
 	if owner.ViewID != "" || owner.Revision != b.Revision || !owner.Ready || !m.app.views.homePresent || m.app.views.homeClosing {
@@ -766,6 +765,23 @@ func (m *editorViewRegistry) offer(caller string, req editorTransferRequest) (ma
 	}
 	if req.DragTicket != "" && (!editorHexID.MatchString(req.DragTicket) || req.DragTicket != req.ID) {
 		return nil, errEditorDrag
+	}
+	// A remote file a detached Terminal workspace opened in the main window
+	// stays there (window_send.go): its grant is the main window's only.
+	if caller == "" && m.app != nil && m.app.windowSendAvailable() {
+		for _, d := range req.Batch.Documents {
+			if d.Binding.Kind == "terminal" && m.app.windowSendGrantFor(d.Binding.SessionID, d.Path) != nil {
+				return nil, errWindowSendStays
+			}
+		}
+		m.mu.Lock()
+		for _, d := range req.Batch.Documents {
+			if g := m.documents[d.UID]; g != nil && g.fixedPath != "" {
+				m.mu.Unlock()
+				return nil, errWindowSendStays
+			}
+		}
+		m.mu.Unlock()
 	}
 	if err := validateEditorBatch(req.Batch); err != nil {
 		return nil, err

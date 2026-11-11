@@ -8,11 +8,15 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 	"unicode"
 	"unicode/utf8"
 
 	"golang.org/x/crypto/ssh"
+
+	"networktoolkit/internal/diag"
+	"networktoolkit/internal/model"
 )
 
 // Window send: "Send to terminal" and "Send to Text Editor" between the
@@ -54,10 +58,11 @@ import (
 // one path on that exact SSH transport; the main page opens the file with the
 // main window's own SFTP editor code (/api/remote-browser read-text and
 // write-text with the same hash, encoding and staging checks). The grant
-// admits only read-text, write-text and stat of that path from the main
-// window, only while the session stays in a detached workspace on the same
-// transport (remoteBrowserGrantAllows); nothing else of the session becomes
-// the main window's.
+// admits only reading and saving that path from the main window
+// (remoteBrowserGrant, makeGrant), on the pinned transport (windowSendRun),
+// while that tab is open and the session stays in the asking workspace; Save
+// As elsewhere and moving the tab out of the main window are refused. Nothing
+// else of the session becomes the main window's.
 const (
 	windowSendPrefix   = "/api/window-send/"
 	windowSendMain     = "main"
@@ -97,9 +102,20 @@ type windowSendPayload struct {
 // detached Terminal workspace owns, on the SSH transport it was granted on.
 type windowSendGrant struct {
 	session, path string
+	view          string // the Terminal workspace that asked; the session must stay its own
+	request       string // the request that opened it; refused or expired drops the grant
+	document      string // the main window's tab, once confirmed; closing it drops the grant
+	confirmed     bool
 	client        *ssh.Client
 	lifetime      context.Context
+	dropped       atomic.Bool
 }
+
+var (
+	errWindowSendSaveElsewhere = errors.New("This file was opened from a popped-out terminal window, so it can be saved only to the same file. Save a copy locally, or open the file from the main window's own connection to save it elsewhere.")
+	errWindowSendGone          = errors.New("This file was opened through the popped-out terminal, which no longer holds the connection; reopen it from here to save.")
+	errWindowSendStays         = errors.New("This file was opened from a popped-out terminal window and stays in the main window. Save a copy locally to move it.")
+)
 
 type windowSendState struct {
 	mu       sync.Mutex
@@ -207,6 +223,20 @@ func (s *windowSendState) expireLocked(now time.Time) {
 			r.message = "The window did not confirm what happened to the text. Check that window."
 		}
 		r.state, r.payload = peerExpired, nil
+	}
+	for _, g := range append([]*windowSendGrant(nil), s.grants...) {
+		if g.confirmed {
+			continue
+		}
+		known := false
+		for _, r := range s.requests {
+			if r.id == g.request {
+				known = r.state == peerQueued || r.state == peerTaken || r.state == peerDone
+			}
+		}
+		if !known {
+			s.dropGrantLocked(g)
+		}
 	}
 	for key, w := range s.windows {
 		if w.request != nil && w.request.state != peerQueued && w.request.state != peerTaken {
@@ -432,7 +462,7 @@ func (a *application) windowSendRemoteEnqueue(caller string, body windowSendBody
 		return "", "", http.StatusBadRequest, errors.New("Choose one remote file.")
 	}
 	view := strings.TrimPrefix(caller, windowSendTerminal)
-	grant := &windowSendGrant{session: body.Session, path: path}
+	grant := &windowSendGrant{session: body.Session, path: path, view: view}
 	a.views.mu.Lock()
 	owner := a.views.ownerLocked(body.Session)
 	v := a.views.views[view]
@@ -464,19 +494,32 @@ func (a *application) windowSendRemoteEnqueue(caller string, body windowSendBody
 	if current := w.request; current != nil && (current.state == peerQueued || current.state == peerTaken) {
 		return "", "", http.StatusConflict, errors.New("Another request is still waiting in " + name + ". Finish it there, then try again.")
 	}
-	kept := a.windowSend.grants[:0]
+	id = randomHex(16)
+	grant.request = id
 	for _, g := range a.windowSend.grants {
-		if g.lifetime.Err() == nil && !(g.session == grant.session && g.path == grant.path) {
-			kept = append(kept, g)
+		if g.lifetime.Err() != nil || g.session == grant.session && g.path == grant.path && !g.confirmed {
+			a.windowSend.dropGrantLocked(g)
 		}
 	}
-	a.windowSend.grants = append(kept, grant)
-	if extra := len(a.windowSend.grants) - windowSendGrants; extra > 0 {
-		a.windowSend.grants = a.windowSend.grants[extra:]
+	a.windowSend.grants = append(a.windowSend.grants, grant)
+	// Known limit: at most windowSendGrants files at once; the oldest ends first.
+	for len(a.windowSend.grants) > windowSendGrants {
+		a.windowSend.dropGrantLocked(a.windowSend.grants[0])
 	}
-	id = randomHex(16)
 	a.windowSendQueueLocked(w, &windowSendRequest{id: id, kind: "remote", from: caller, to: windowSendMain, created: now, state: peerQueued, payload: &windowSendPayload{peerPayload: peerPayload{RequestID: id, Session: body.Session}, Path: path}})
 	return id, name, http.StatusOK, nil
+}
+
+// dropGrantLocked ends a grant: no save path admits it any more.
+func (s *windowSendState) dropGrantLocked(g *windowSendGrant) {
+	g.dropped.Store(true)
+	kept := s.grants[:0]
+	for _, other := range s.grants {
+		if other != g {
+			kept = append(kept, other)
+		}
+	}
+	s.grants = kept
 }
 
 // windowSendGrantFor returns the grant for one remote file, if any.
@@ -495,36 +538,88 @@ func (a *application) windowSendGrantFor(session, path string) *windowSendGrant 
 // stands: the session is still in a detached Terminal workspace, on the SSH
 // transport the grant was given on.
 func (a *application) windowSendGrantLiveLocked(g *windowSendGrant) bool {
-	if g == nil || g.lifetime.Err() != nil {
+	if g == nil || g.dropped.Load() || g.lifetime.Err() != nil {
 		return false
 	}
 	owner := a.views.ownerLocked(g.session)
 	v := a.views.views[owner.ViewID]
-	if owner.ViewID == "" || !owner.Ready || v == nil || !v.info.Workspace || !v.includesSession(g.session) || (v.info.State != "detached" && v.info.State != "return_requested") {
+	if owner.ViewID != g.view || !owner.Ready || v == nil || !v.info.Workspace || !v.includesSession(g.session) || (v.info.State != "detached" && v.info.State != "return_requested") {
 		return false
 	}
 	client, lifetime, err := a.terminals.SFTPClient(g.session)
 	return err == nil && client == g.client && lifetime == g.lifetime
 }
 
-// remoteBrowserGrantAllows reports whether the main window may run action on
-// path of a session that a detached Terminal workspace owns, because that
-// workspace opened the file in the main window's Text Editor: only read-text,
-// write-text and stat of exactly that path, while the grant stands.
-func (a *application) remoteBrowserGrantAllows(r *http.Request, session, action, path string) bool {
+// remoteBrowserGrant decides whether the main window may run action on path
+// of a session that a detached Terminal workspace owns, because that workspace
+// opened the file in the main window's Text Editor: only read-text and
+// write-text of exactly that path, while the grant stands. It returns the
+// grant, whose pinned transport the operation must use, or a plain reason when
+// a grant exists for the session but not for this (Save As elsewhere, or the
+// workspace no longer holds the connection).
+func (a *application) remoteBrowserGrant(r *http.Request, session, action, path string) (*windowSendGrant, error) {
 	if !a.windowSendAvailable() || terminalRequestView(r) != "" || editorRequestView(r) != "" || a.views == nil || a.terminals == nil {
-		return false
-	}
-	if action != "read-text" && action != "write-text" && action != "stat" {
-		return false
+		return nil, nil
 	}
 	grant := a.windowSendGrantFor(session, path)
 	if grant == nil {
-		return false
+		if action == "write-text" && a.windowSendSessionGranted(session) {
+			return nil, errWindowSendSaveElsewhere
+		}
+		return nil, nil
+	}
+	if action != "read-text" && action != "write-text" {
+		return nil, nil
 	}
 	a.views.mu.Lock()
-	defer a.views.mu.Unlock()
-	return a.windowSendGrantLiveLocked(grant)
+	live := a.windowSendGrantLiveLocked(grant)
+	a.views.mu.Unlock()
+	if !live {
+		return nil, errWindowSendGone
+	}
+	return grant, nil
+}
+
+// windowSendSessionGranted reports whether any file of the session was opened
+// from a workspace.
+func (a *application) windowSendSessionGranted(session string) bool {
+	a.windowSend.mu.Lock()
+	defer a.windowSend.mu.Unlock()
+	for _, g := range a.windowSend.grants {
+		if g.session == session {
+			return true
+		}
+	}
+	return false
+}
+
+// windowSendRun runs one SFTP operation for a grant on the transport it was
+// checked against: only reading, checking and replacing exactly the approved
+// file (read-text, stat, download, upload), never another path, a rename or a
+// listing, and only while the grant stands.
+func (a *application) windowSendRun(g *windowSendGrant) func(context.Context, remoteBrowserRequest) (model.Result, error) {
+	return func(ctx context.Context, req remoteBrowserRequest) (model.Result, error) {
+		switch req.Action {
+		case "read-text", "stat", "download", "upload":
+		default:
+			return model.Result{}, errWindowSendSaveElsewhere
+		}
+		if req.Path != g.path || req.NewPath != "" || req.SessionID != "" && req.SessionID != g.session || req.ConnectionID != "" {
+			return model.Result{}, errWindowSendSaveElsewhere
+		}
+		a.views.mu.Lock()
+		live := a.windowSendGrantLiveLocked(g)
+		a.views.mu.Unlock()
+		if !live {
+			return model.Result{}, errWindowSendGone
+		}
+		operation, cancel := context.WithCancel(ctx)
+		defer cancel()
+		stop := context.AfterFunc(g.lifetime, cancel)
+		defer stop()
+		req.SessionID = ""
+		return diag.RunSFTPOnClient(operation, g.client, req.request(), nil)
+	}
 }
 
 // windowSendPoll is a page's inbox poll: it proves the page runs, hands over
@@ -586,9 +681,20 @@ func (a *application) windowSendReport(key string, sessions, documents []peerTar
 	w := a.windowSend.windowLocked(key)
 	w.targets = map[string][]peerTarget{"terminal": sessions, "editor": documents}
 	w.reported = true
+	if key == windowSendMain {
+		open := map[string]bool{}
+		for _, d := range documents {
+			open[d.ID] = true
+		}
+		for _, g := range append([]*windowSendGrant(nil), a.windowSend.grants...) {
+			if g.confirmed && !open[g.document] {
+				a.windowSend.dropGrantLocked(g)
+			}
+		}
+	}
 }
 
-func (a *application) windowSendAcknowledge(key, id string, ok bool, outcome, message string) (found, valid bool) {
+func (a *application) windowSendAcknowledge(key, id string, ok bool, outcome, message, document string) (found, valid bool) {
 	a.windowSend.mu.Lock()
 	defer a.windowSend.mu.Unlock()
 	a.windowSend.expireLocked(windowSendNow())
@@ -603,6 +709,19 @@ func (a *application) windowSendAcknowledge(key, id string, ok bool, outcome, me
 			r.state, r.outcome, r.message = peerDone, outcome, ""
 		} else {
 			r.state, r.outcome, r.message = peerFailed, "", message
+		}
+		if r.kind == "remote" {
+			// The grant follows the tab the main window opened, and only that.
+			for _, g := range append([]*windowSendGrant(nil), a.windowSend.grants...) {
+				if g.request != id {
+					continue
+				}
+				if !ok || !peerIDPattern.MatchString(document) {
+					a.windowSend.dropGrantLocked(g)
+				} else {
+					g.document, g.confirmed = document, true
+				}
+			}
 		}
 		return true, true
 	}
@@ -733,12 +852,13 @@ func (a *application) handleWindowSend(w http.ResponseWriter, r *http.Request, k
 			OK        bool   `json:"ok"`
 			Outcome   string `json:"outcome,omitempty"`
 			Error     string `json:"error,omitempty"`
+			Document  string `json:"document,omitempty"` // remote: the tab the main window opened
 		}
 		if err := decodePeerBody(w, r, 4096, &body); err != nil || !peerRequestID.MatchString(body.RequestID) {
 			jsonError(w, http.StatusBadRequest, "The acknowledgement is invalid.")
 			return
 		}
-		found, valid := a.windowSendAcknowledge(key, body.RequestID, body.OK, body.Outcome, peerPlainText(body.Error, peerMessageRunes))
+		found, valid := a.windowSendAcknowledge(key, body.RequestID, body.OK, body.Outcome, peerPlainText(body.Error, peerMessageRunes), body.Document)
 		if !valid {
 			jsonError(w, http.StatusBadRequest, "The outcome does not match the request.")
 			return
