@@ -1,0 +1,16 @@
+Network Toolkit 1.21.48
+
+## What's New
+
+- After an update, the separate Text Editor and Terminal programs are added by themselves. There is no button to find any more.
+- Files that open with the Text Editor now get the document icon after an update too, not only after running Setup.
+- In the installed version, the Start menu entries for the Text Editor and the Terminal start the separate programs.
+
+## Additional Details
+
+- The programs come from the same release as the update you approved and are checked against its checksums first; both are added or neither is. The Updates page shows when they are being added and when they are done.
+- If they cannot be added (for example offline), nothing changes: Network_Toolkit.exe keeps opening the Text Editor and the Terminal itself, the Updates page says why and offers Install the separate programs, and the next update tries again.
+- Only Start menu entries that Setup created are changed, and only when the installed uninstaller (Setup 1.21.47 or newer) can remove them again; otherwise the next Setup updates them. Pins and shortcuts you made yourself are left as they are and keep working.
+- The file icon is changed only where files open with this program; types that open with another app are left alone.
+- Updating to this version already does it: the new version does the work on its first start after the update.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.

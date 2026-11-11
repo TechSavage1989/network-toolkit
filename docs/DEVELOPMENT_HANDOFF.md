@@ -1,3 +1,17 @@
+# v1.21.48 Beta 1 - The separate programs arrive with the update
+
+Owner, after updating to 1.21.47: "i updated but the separate exes did not appear", then "it should add them without asking because it's not obvious at all that it needs to be done manually", and "it also doesn't look like the file type icon has updated".
+
+v1.21.47 was published and verified: tag at merge commit 5c47d15 (PR #170), release run 42983334985 green, all seven assets matching GitHub's digests, the portable ZIP holding all three programs, `github_release.py verify` reporting "Verified 1.21.47", stable channel still at v1.21.34.
+
+Cause: updates from 1.21.46 and older are finished by the old helper, which replaces only Network_Toolkit.exe; only Setup rewrote shortcuts and the document icon. Now (`updater_companions_auto.go`, `postUpdateRepairs` in `updater_startup.go`): the first start after an approved update (`--update-health` plus the helper's confirmation, which every helper since v1.17.63 writes; Windows x64 main window only) installs the separate programs through the same verified path as the button, holding the network slot, once per run, never retried until the next update; the status reads `pending` from the first request so the page polls and hides the button. Setup-owned Start menu shortcuts are pointed at the separate programs only when the uninstall key's `DisplayVersion` is at least 1.21.47 (an older uninstaller would leave them behind); otherwise the page says the next Setup does it. `editorRegRepairDocumentIcon` sets our ProgID's `DefaultIcon` to index 3 only when its command starts the running exe. This is the owner's exception to the explicit download consent rule: only after an update the user approved, only this version's files from its own release.
+
+An independent review found one MEDIUM issue (the shortcut rewrite stranded shortcuts with an old uninstaller) and three LOW ones (the page missed the install; no network slot; no auto-install after a versioned-filename reopen). The first three are fixed; the last is a documented known limit.
+
+Known limits: the real shortcut rewrite runs only in hosted Windows CI; not run on physical Windows. It already applies to the update that installs 1.21.48 (the new exe runs the repairs on its first start, and the 1.21.47 helper installs all three programs anyway).
+
+---
+
 # v1.21.47 Beta 1 - The Text Editor and the Terminal as separate programs
 
 Owner: "i'd like the full version to offer Text Editor and Terminal as separate executables that retain all of their current functionality and interactions", answered "Full separate programs" and "Portable too".
