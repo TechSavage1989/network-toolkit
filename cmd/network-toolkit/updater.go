@@ -60,6 +60,9 @@ type appUpdater struct {
 	progress    *updateProgress
 	feed        updateFeedCache
 	companions  *companionStatus // cached; reset after the separate programs change
+	// companionsInstall: the last install of the separate programs in this
+	// run (automatic after an update, or the manual button); memory only.
+	companionsInstall *companionInstallState
 }
 
 func updateNewer(candidate, current string) bool {
@@ -362,7 +365,7 @@ func (a *application) updateBusy() []string {
 	return busy
 }
 func (a *application) updateStatusLocked() map[string]any {
-	return map[string]any{"currentVersion": model.Version, "executable": updateNamingStatus(), "restartedAfterUpdate": a.updateHealthDir != "", "finalizing": a.updateFinalizing.Load(), "supported": runtime.GOOS == "windows" && runtime.GOARCH == "amd64" && a.windowMode == "main", "mode": "direct", "currentChannel": updateBuildChannel, "channel": func() string {if a.updater.channel == "beta" {return "beta"};return "stable"}(), "latest": a.updater.latest, "checked": a.updater.checked, "checkAfter": a.updater.feed.checkAfterMillis(), "hasUpdate": a.updater.latest != nil && updateNewer(a.updater.latest.Version, model.Version), "releasesUrl": updateReleasesURL, "staged": a.updater.staged, "installing": a.updater.installing, "networkBusy": a.updater.networkBusy, "progress": a.updater.progress, "busy": a.updateBusy(), "companions": a.companionStatusLocked()}
+	return map[string]any{"currentVersion": model.Version, "executable": updateNamingStatus(), "restartedAfterUpdate": a.updateHealthDir != "", "finalizing": a.updateFinalizing.Load(), "supported": runtime.GOOS == "windows" && runtime.GOARCH == "amd64" && a.windowMode == "main", "mode": "direct", "currentChannel": updateBuildChannel, "channel": func() string {if a.updater.channel == "beta" {return "beta"};return "stable"}(), "latest": a.updater.latest, "checked": a.updater.checked, "checkAfter": a.updater.feed.checkAfterMillis(), "hasUpdate": a.updater.latest != nil && updateNewer(a.updater.latest.Version, model.Version), "releasesUrl": updateReleasesURL, "staged": a.updater.staged, "installing": a.updater.installing, "networkBusy": a.updater.networkBusy, "progress": a.updater.progress, "busy": a.updateBusy(), "companions": a.companionStatusLocked(), "companionsInstall": a.updater.companionsInstall}
 }
 func (a *application) handleUpdates(w http.ResponseWriter, r *http.Request) {
 	a.updater.mu.Lock()
@@ -385,6 +388,10 @@ func (a *application) handleUpdates(w http.ResponseWriter, r *http.Request) {
 	}
 	if a.updater.installing {
 		jsonError(w, 409, "An update is already installing.")
+		return
+	}
+	if msg := a.companionsBlockLocked(r.URL.Path); msg != "" {
+		jsonError(w, 409, msg)
 		return
 	}
 	if a.handleUpdateFeedLocked(w, r) || a.handleUpdateCompanionsLocked(w, r) {

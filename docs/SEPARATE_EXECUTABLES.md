@@ -231,17 +231,70 @@ them as its own.
   the old helper. Nothing else changes: every shortcut and registration still
   starts `Network_Toolkit.exe`, which runs every app itself because the
   separate programs are not there. No function is lost and no step is needed.
-  The updater page of the new version then offers **Install the separate Text
-  Editor and Terminal programs** (only when they are missing or not of this
-  version, Windows main window). It is an explicit action like Download:
-  it downloads the **same version's** Update ZIP and `SHA256SUMS` from the
-  version's own release (the trusted URL checks of the feed), verifies the ZIP,
-  requires the ZIP's `Network_Toolkit.exe` to be byte-identical to the running
-  one (so the programs belong to exactly this build), verifies each separate
-  program against the inner checksums, `updateValidatePE` and its
-  `OriginalFilename`, and places both or neither (`updateInstallCompanions`).
-  No restart is needed. Users who do not choose it get them with the next
-  update, which installs all three (below).
+  **Added without asking after the update (v1.21.48, owner decision
+  2026-11-11: "it should add them without asking because it's not obvious at
+  all that it needs to be done manually").** In the start that follows the
+  update, the new version adds the separate programs in the background
+  (`installCompanionsAfterUpdate`, `updater_companions_auto.go`): the user's
+  approval of the update is the consent. It uses the manual path below
+  unchanged: the **same version's** Update ZIP and `SHA256SUMS` from the
+  version's own release (the trusted URL checks of the feed), the ZIP verified,
+  the ZIP's `Network_Toolkit.exe` byte-identical to the running one (so the
+  programs belong to exactly this build), each separate program verified
+  against the inner checksums, `updateValidatePE` and its `OriginalFilename`,
+  both or neither placed (`updateInstallCompanions`). No restart is needed.
+  - **The signal** is what every released helper (v1.17.63 to v1.21.46) gives
+    when it restarts the new program: `--update-health <stage folder>` on the
+    command line (`updateRestartCommand`) and, once the new window reported
+    its start, the confirmation "Installed <version> and confirmed the
+    application interface started. ..." in `update-result.txt` of that folder,
+    which `awaitUpdateCommit` already waits for. The programs are added only
+    after that confirmation (an update that is still being put back adds
+    nothing), only in the Windows x64 main window, and only when they are
+    missing or not of this version. A plain start (no `--update-health`: a
+    lone downloaded exe, a later start, a restart through
+    `updateRestartArgs`, which drops the switch) never downloads, nor does
+    Linux.
+  - **Once per update.** The `--update-health` start happens once; the result
+    is kept in that run's memory (`companionsInstall` in the status), never
+    in saved settings. A failure (offline, a locked file, any check) leaves
+    everything as it was, Network_Toolkit.exe keeps running the apps itself,
+    and the updater page shows **Install the separate programs** with the
+    reason. It is not retried automatically; the next update installs all
+    three anyway.
+  - While it runs, the Updates page says that the programs are being added
+    (it reads the status every 2 s) and other update actions that download or
+    install are refused until it ends (checking for updates still works);
+    then it shows "The separate Text Editor and Terminal programs were added."
+    once.
+  - **Start menu shortcuts of an installed copy.** After either path placed the
+    programs, and only when Setup's uninstall key's `InstallLocation` is the
+    running program's folder, the shortcuts **Network Toolkit Text Editor**
+    and **Network Toolkit Terminal** in this user's Start menu folder
+    "Network Toolkit" are pointed at the separate programs, without arguments,
+    with their icon 0, as Setup does. Only Setup's own shortcuts change, by
+    Setup's rule (`IsOwnedShortcut`): target `$INSTDIR\Network_Toolkit.exe`
+    with `--editor-standalone`/`--editor` or `--terminal`. A shortcut that
+    points elsewhere, has other arguments, or is a link is left as it is. The
+    change goes through the Shell's IShellLinkW (target, arguments and icon
+    only), a copy is saved outside the Start menu and checked, and the
+    original is overwritten only while it still holds the bytes that were read
+    (`updateShortcutCommitNative`). A failure is reported on the Updates page
+    and never undoes the programs: such a shortcut keeps working through
+    forwarding.
+  - **Document icon.** The same first start points the Text Editor ProgID's
+    `DefaultIcon` at the document icon (`"<program>",3`) when its
+    `shell\open\command` starts the running `Network_Toolkit.exe` (Setup's or
+    the portable registration), as Setup does on every install; an in-app
+    update from 1.21.44 or older left the editor icon (1). Only that value is
+    written, then `SHChangeNotify(SHCNE_ASSOCCHANGED)`.
+
+  The updater page offers **Install the separate Text Editor and Terminal
+  programs** when they are still missing or not of this version (Windows main
+  window): after a failure above, or for a copy that was not updated in-app.
+  It is an explicit action like Download, with the same path and checks.
+  Users who do not choose it get them with the next update, which installs
+  all three (below).
 - **Setup over v1.21.46 or older**: installs all three and points its owned
   Text Editor and Terminal shortcuts at the separate programs (section 6).
 
@@ -389,8 +442,18 @@ folder>`) is per folder, so all three programs of a folder share it.
   ZIP or Setup remain available.
 - **A lone program gets company.** A copy of `Network_Toolkit.exe` kept on its
   own (for example the single-file release asset) is offered **Install the
-  separate programs**, and the next update adds the two separate programs
-  beside it, because releases ship all three together.
+  separate programs**, and the next in-app update adds the two separate
+  programs beside it (in the update or, from a helper of 1.21.46 or older, in
+  the start after it), because releases ship all three together.
+- **Legacy versioned file names.** When the update was installed under an
+  old versioned file name and the new program reopens itself as
+  `Network_Toolkit.exe` (`reopenPromotedUpdate`), the reopened run has no
+  `--update-health`, so the separate programs are not added automatically;
+  the Updates page offers the button.
+- **Pinned and other shortcuts.** Only Setup's two Start menu shortcuts are
+  changed. Taskbar pins, desktop or user-made shortcuts that start
+  `Network_Toolkit.exe --terminal` or `--editor-standalone` keep working
+  through forwarding.
 - **Programs started outside the main window during an unconfirmed update.**
   A separate program started from the Start menu, or through a link, while the
   helper waits for the new version is not stopped by it; if the update is then

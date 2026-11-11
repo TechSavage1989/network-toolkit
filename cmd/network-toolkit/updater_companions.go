@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 
@@ -17,9 +16,10 @@ import (
 // The separate Text Editor and Terminal programs beside Network_Toolkit.exe
 // (docs/SEPARATE_EXECUTABLES.md, section 4). A version updated in-app by a
 // released updater gets only Network_Toolkit.exe, which runs every app itself
-// until the separate programs are there. The updater page then offers to
-// install them: an explicit action, like Download, that fetches this version's
-// own Update ZIP, verifies it and places both programs or neither.
+// until the separate programs are there. The start that follows the update
+// adds them by itself (updater_companions_auto.go); if that fails, the updater
+// page offers to install them: both paths fetch this version's own Update ZIP,
+// verify it and place both programs or neither.
 
 const updateReleaseTagURL = "https://api.github.com/repos/" + updateRepository + "/releases/tags/v"
 
@@ -54,7 +54,7 @@ func companionStatusFor(dir string) *companionStatus {
 // companionStatusLocked reports the separate programs where the main window
 // installs updates (Windows x64); nil elsewhere. Caller holds updater.mu.
 func (a *application) companionStatusLocked() *companionStatus {
-	if runtime.GOOS != "windows" || runtime.GOARCH != "amd64" || a.windowMode != "main" || buildEdition != "" {
+	if !companionPlatformSupported() || a.windowMode != "main" || buildEdition != "" {
 		return nil
 	}
 	if a.updater.companions == nil {
@@ -68,7 +68,8 @@ func (a *application) companionStatusLocked() *companionStatus {
 }
 
 // handleUpdateCompanionsLocked installs this version's separate programs on
-// the user's explicit request. Caller holds updater.mu.
+// the user's explicit request (the automatic install after an approved update
+// is updater_companions_auto.go). Caller holds updater.mu.
 func (a *application) handleUpdateCompanionsLocked(w http.ResponseWriter, r *http.Request) bool {
 	if r.URL.Path != "/api/updates/companions" {
 		return false
@@ -109,6 +110,9 @@ func (a *application) handleUpdateCompanionsLocked(w http.ResponseWriter, r *htt
 	}
 	finished = true
 	a.updater.progress.Phase = "ready"
+	state := &companionInstallState{State: "added"}
+	a.companionShortcutsLocked(state)
+	a.updater.companionsInstall = state
 	jsonResponse(w, 200, a.updateStatusLocked())
 	return true
 }

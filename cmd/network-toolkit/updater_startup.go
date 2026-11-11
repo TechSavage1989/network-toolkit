@@ -47,6 +47,13 @@ func (a *application) updateStartupReady() {
 				updateNamingState.status.Warning = err.Error()
 				updateNamingState.Unlock()
 			}
+			// Only an update the helper confirmed reaches this point with a
+			// health folder (an unconfirmed one returned above). A reopen under
+			// the canonical name stopped this run (a.ctx is done); its new run
+			// has no health folder, so the updater page offers the manual button.
+			// The window is usable meanwhile: the download runs in the background.
+			a.updateFinalizing.Store(false)
+			a.postUpdateRepairs(a.updateHealthDir != "")
 		}()
 	})
 }

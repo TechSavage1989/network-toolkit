@@ -377,38 +377,59 @@ func TestInstallCompanionsPlacesBothOrNeither(t *testing.T) {
 // A copy updated by a released updater installs this version's separate
 // programs from the version's own release: a synthetic GitHub (release
 // metadata, Update ZIP and SHA256SUMS) on a local server.
-func TestInstallCompanionsFromTheVersionsOwnRelease(t *testing.T) {
-	programs := updateTestPrograms(model.Version)
-	name, archive, sums := updateTestReleaseZip(t, model.Version, programs)
-	var requests []string
-	mux := http.NewServeMux()
+// companionReleaseFixture serves this version's release metadata, Update ZIP
+// and SHA256SUMS at their trusted GitHub URLs from a local server: every
+// trusted host resolves to it, nothing leaves the machine.
+type companionReleaseFixture struct {
+	client   *http.Client
+	programs updateTestRelease
+	name     string
+	archive  []byte
+	serve    []byte // the Update ZIP served (archive unless a test changes it)
+	sums     []byte
+	offline  bool // every request fails as without a connection
+	requests []string
+}
+
+func newCompanionReleaseFixture(t *testing.T) *companionReleaseFixture {
+	t.Helper()
+	f := &companionReleaseFixture{programs: updateTestPrograms(model.Version)}
+	f.name, f.archive, f.sums = updateTestReleaseZip(t, model.Version, f.programs)
+	f.serve = f.archive
 	base := "https://github.com/" + updateRepository + "/releases/download/v" + model.Version + "/"
-	metadata := fmt.Sprintf(`{"tag_name":"v%s","body":"synthetic","draft":false,"prerelease":true,"assets":[{"name":%q,"browser_download_url":%q,"size":%d},{"name":"SHA256SUMS","browser_download_url":%q,"size":%d}]}`, model.Version, name, base+name, len(archive), base+"SHA256SUMS", len(sums))
-	serveArchive := archive
+	metadata := fmt.Sprintf(`{"tag_name":"v%s","body":"synthetic","draft":false,"prerelease":true,"assets":[{"name":%q,"browser_download_url":%q,"size":%d},{"name":"SHA256SUMS","browser_download_url":%q,"size":%d}]}`, model.Version, f.name, base+f.name, len(f.archive), base+"SHA256SUMS", len(f.sums))
+	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		requests = append(requests, r.Host+r.URL.Path)
+		f.requests = append(f.requests, r.Host+r.URL.Path)
 		switch {
 		case r.Host == "api.github.com" && r.URL.Path == "/repos/"+updateRepository+"/releases/tags/v"+model.Version:
 			io.WriteString(w, metadata)
-		case r.Host == "github.com" && strings.HasSuffix(r.URL.Path, "/"+name):
-			w.Write(serveArchive)
+		case r.Host == "github.com" && strings.HasSuffix(r.URL.Path, "/"+f.name):
+			w.Write(f.serve)
 		case r.Host == "github.com" && strings.HasSuffix(r.URL.Path, "/SHA256SUMS"):
-			w.Write(sums)
+			w.Write(f.sums)
 		default:
 			http.NotFound(w, r)
 		}
 	})
 	server := httptest.NewTLSServer(mux)
-	defer server.Close()
-	// Every trusted host resolves to the fixture server; nothing leaves the machine.
+	t.Cleanup(server.Close)
 	transport := server.Client().Transport.(*http.Transport).Clone()
 	addr := server.Listener.Addr().String()
 	transport.DialContext = func(ctx context.Context, network, _ string) (net.Conn, error) {
+		if f.offline {
+			return nil, errors.New("synthetic: no network connection")
+		}
 		return (&net.Dialer{}).DialContext(ctx, network, addr)
 	}
 	transport.TLSClientConfig.InsecureSkipVerify = true // the fixture's certificate is not GitHub's
-	client := &http.Client{Transport: transport, CheckRedirect: updateHTTPClient().CheckRedirect}
+	f.client = &http.Client{Transport: transport, CheckRedirect: updateHTTPClient().CheckRedirect}
+	return f
+}
 
+func TestInstallCompanionsFromTheVersionsOwnRelease(t *testing.T) {
+	fixture := newCompanionReleaseFixture(t)
+	programs, name, archive, client := fixture.programs, fixture.name, fixture.archive, fixture.client
 	install := func(t *testing.T, running []byte) (string, error) {
 		dir := withRunningProgram(t, running)
 		a := testApplication(t)
@@ -418,7 +439,7 @@ func TestInstallCompanionsFromTheVersionsOwnRelease(t *testing.T) {
 		return dir, err
 	}
 	t.Run("the official build gets its separate programs", func(t *testing.T) {
-		requests = nil
+		fixture.requests = nil
 		dir, err := install(t, programs.main)
 		if err != nil {
 			t.Fatal(err)
@@ -432,8 +453,8 @@ func TestInstallCompanionsFromTheVersionsOwnRelease(t *testing.T) {
 			t.Fatalf("still needed: %+v", status)
 		}
 		want := []string{"api.github.com/repos/" + updateRepository + "/releases/tags/v" + model.Version, "github.com/" + updateRepository + "/releases/download/v" + model.Version + "/SHA256SUMS", "github.com/" + updateRepository + "/releases/download/v" + model.Version + "/" + name}
-		if strings.Join(requests, " ") != strings.Join(want, " ") {
-			t.Fatalf("requests %v, want %v", requests, want)
+		if strings.Join(fixture.requests, " ") != strings.Join(want, " ") {
+			t.Fatalf("requests %v, want %v", fixture.requests, want)
 		}
 	})
 	t.Run("another build of the main program gets nothing", func(t *testing.T) {
@@ -447,8 +468,8 @@ func TestInstallCompanionsFromTheVersionsOwnRelease(t *testing.T) {
 		}
 	})
 	t.Run("a changed download gets nothing", func(t *testing.T) {
-		serveArchive = append(append([]byte{}, archive...), 0)
-		defer func() { serveArchive = archive }()
+		fixture.serve = append(append([]byte{}, archive...), 0)
+		defer func() { fixture.serve = archive }()
 		dir, err := install(t, programs.main)
 		if err == nil || !strings.Contains(err.Error(), "Checksum") {
 			t.Fatalf("want a checksum refusal, got %v", err)
