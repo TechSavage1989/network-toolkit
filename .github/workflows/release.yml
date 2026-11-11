@@ -108,7 +108,7 @@ jobs:
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
           RELEASE_VERSION: ${{ steps.release.outputs.version }}
         run: |
-          python3 scripts/github_release.py package --tag "$RELEASE_TAG" --exe "build/Network_Toolkit.exe" --linux-x86-64 "build/linux-amd64/network-toolkit" --linux-aarch64 "build/linux-arm64/network-toolkit"
+          python3 scripts/github_release.py package --tag "$RELEASE_TAG" --exe "build/Network_Toolkit.exe" --editor-exe "build/Network_Toolkit_TextEditor.exe" --terminal-exe "build/Network_Toolkit_Terminal.exe" --linux-x86-64 "build/linux-amd64/network-toolkit" --linux-aarch64 "build/linux-arm64/network-toolkit"
           if test -f "dist/Network_Toolkit_${RELEASE_VERSION}_Windows_x64_Setup.exe"; then
             echo "windows_setup=true" >> "$GITHUB_OUTPUT"
           fi

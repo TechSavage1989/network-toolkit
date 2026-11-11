@@ -4,13 +4,29 @@ from pathlib import Path
 import zipfile
 import github_release as release
 
-def package(binary_path, output, write_manifest=True):
+def companion_member(current, name):
+    """Update ZIP member of a separate program, e.g. Network_Toolkit_Terminal_1.21.45_Windows_x64.exe.
+
+    It is not an official versioned name of the main program, which released
+    updaters read (Network_Toolkit_<version>_Windows_x64.exe), and they ignore it.
+    """
+    return name[:-len('.exe')] + '_' + current + '_Windows_x64.exe'
+
+
+def package(binary_path, output, write_manifest=True, programs=None):
+    """The binary-only Update ZIP. programs: {separate program name: path}, both or none."""
     current = release.validate()
     binary = binary_path.read_bytes()
     release.check_exe(binary, current)
     root = 'Network_Toolkit_' + current
     name = root + '_Windows_x64.exe'
     entries = {name: binary}
+    programs = programs or {}
+    release.require(set(programs) in (set(), set(release.SEPARATE_PROGRAMS)), 'Provide both separate programs or neither')
+    for program, path in programs.items():
+        data = path.read_bytes()
+        release.check_program(data, current, program)
+        entries[companion_member(current, program)] = data
     for filename in ['UPDATING.txt', 'THIRD_PARTY_NOTICES.txt']:
         content = (release.ROOT / 'docs' / filename).read_text()
         if filename == 'THIRD_PARTY_NOTICES.txt':
@@ -44,16 +60,23 @@ if __name__ == '__main__':
     package(args.exe, args.output_dir)
 
 
-def verify_archive(archive, binary, current):
+def verify_archive(archive, binary, current, programs=None):
+    """programs: {separate program name: bytes} that the archive must carry, or None for none."""
     root = 'Network_Toolkit_' + current + '/'
     executable = 'Network_Toolkit_' + current + '_Windows_x64.exe'
     expected = {executable, 'UPDATING.txt', 'THIRD_PARTY_NOTICES.txt', 'SHA256SUMS'}
+    expected.update(companion_member(current, name) for name in programs or {})
     with zipfile.ZipFile(archive) as bundle:
         names = bundle.namelist()
-        release.require(len(names) == 4 and set(names) == {root + n for n in expected},
+        release.require(len(names) == len(expected) and set(names) == {root + n for n in expected},
+                        'Update ZIP must contain exactly the six allowlisted members' if programs else
                         'Update ZIP must contain exactly the four allowlisted members')
         release.require(bundle.testzip() is None, 'Update ZIP CRC verification failed')
         checked = release.check_sums(bundle.read(root + 'SHA256SUMS'), lambda n: bundle.read(root + n))
         release.require(checked == expected - {'SHA256SUMS'}, 'Update ZIP checksum coverage differs')
         release.require(bundle.read(root + executable) == binary, 'Update and standalone executables differ')
         release.check_exe(binary, current)
+        for name, data in (programs or {}).items():
+            release.require(bundle.read(root + companion_member(current, name)) == data,
+                            f'Update and portable {name} differ')
+            release.check_program(data, current, name)

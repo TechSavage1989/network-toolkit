@@ -22,6 +22,15 @@ ROOT = Path(__file__).resolve().parents[1]
 VERSION_PATTERN = r'(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)'
 STABLE_EXE = 'Network_Toolkit.exe'
 FIRST_WINDOWS_SETUP = (1, 21, 35)
+# The separate Text Editor and Terminal programs (docs/SEPARATE_EXECUTABLES.md)
+# ship inside the portable ZIP, the Update ZIP and Setup, never as assets of
+# their own. v1.21.44 was published before them; the gate includes it so that
+# release rehearsals of a checkout still at 1.21.44 build and check them.
+# Published releases are never packaged again.
+FIRST_SEPARATE_PROGRAMS = (1, 21, 44)
+EDITOR_EXE = 'Network_Toolkit_TextEditor.exe'
+TERMINAL_EXE = 'Network_Toolkit_Terminal.exe'
+SEPARATE_PROGRAMS = (EDITOR_EXE, TERMINAL_EXE)
 # Linux edition (docs/LINUX_PLAN.md): one portable .tar.gz per architecture.
 LINUX_EXE = 'network-toolkit'
 LINUX_ARCHES = (('x86_64', 62), ('aarch64', 183))  # release name, ELF e_machine
@@ -38,6 +47,11 @@ def windows_setup_name(current):
 
 def has_windows_setup(current):
     return tuple(map(int, current.split('.'))) >= FIRST_WINDOWS_SETUP
+
+
+def has_separate_programs(current):
+    return tuple(map(int, current.split('.'))) >= FIRST_SEPARATE_PROGRAMS
+
 
 
 def release_assets(current):
@@ -97,6 +111,14 @@ def validate(tag=None):
     require('Network_Toolkit.exe'.encode('utf-16le') in resources, 'Windows resource executable name differs')
     require(resources in (ROOT / 'cmd/network-toolkit/resource_windows_amd64.syso').read_bytes(),
             'Regenerate resource_windows_amd64.syso with scripts/build_windows_resources.py before pushing this version')
+    generator = runpy.run_path(str(ROOT / 'scripts/build_windows_resources.py'))
+    for output, description, original, _ in generator['PROGRAMS'][1:]:
+        program = generator['version_info'](description, original)
+        require(fixed in program and (current + '.0').encode('utf-16le') in program,
+                f'Windows resource version of {original} differs from Go version')
+        require((original + '\0').encode('utf-16le') in program, f'Windows resource name of {original} differs')
+        require(program in (ROOT / output).read_bytes(),
+                f'Regenerate {output} with scripts/build_windows_resources.py before pushing this version')
     require((ROOT / f'RELEASE_NOTES_{current}.txt').is_file(), 'Current release notes are missing')
     readme = (ROOT / 'docs/README.txt').read_text()
     require(readme.startswith('NETWORK TOOLKIT ' + current + '\n'), 'README current version differs')
@@ -211,6 +233,14 @@ def check_exe(data, current):
     require((current + '.0').encode('utf-16le') in data, 'Executable version resource does not match the release')
 
 
+def check_program(data, current, name):
+    """A separate program: the GUI build of this version with its own original file name."""
+    check_exe(data, current)
+    require((name + '\0').encode('utf-16le') in data, f'{name} does not carry its own version resource')
+    others = {STABLE_EXE, *SEPARATE_PROGRAMS} - {name}
+    require(not any((other + '\0').encode('utf-16le') in data for other in others), f'{name} carries another program\'s version resource')
+
+
 def check_windows_setup(data, current):
     require(len(data) >= 128 and data[:2] == b'MZ', 'Windows setup is not a PE file')
     at = struct.unpack_from('<I', data, 0x3c)[0]
@@ -228,12 +258,15 @@ def windows_version_words(current):
     return major << 16 | minor, patch << 16
 
 
-def package_windows_setup(exe, current, output):
+def package_windows_setup(exe, current, output, programs=None):
     setup = output / windows_setup_name(current)
     temporary = setup.with_name(setup.name + '.building')
     option = '/' if os.name == 'nt' else '-'
+    programs = programs or {}
+    require(set(programs) == set(SEPARATE_PROGRAMS), 'Windows setup needs the separate Text Editor and Terminal programs')
     try:
         subprocess.run(['makensis', option + 'WX', f'{option}DAPP_VERSION={current}', f'{option}DAPP_EXE={exe.resolve()}',
+                        f'{option}DEDITOR_EXE={programs[EDITOR_EXE].resolve()}', f'{option}DTERMINAL_EXE={programs[TERMINAL_EXE].resolve()}',
                         f'{option}DSETUP_EXE={temporary.resolve()}', f'{option}DAPP_ICON={ROOT / "assets/Network_Toolkit_Icon.ico"}',
                         str(ROOT / 'scripts/installer/windows.nsi')], check=True, cwd=ROOT)
         check_windows_setup(temporary.read_bytes(), current)
@@ -276,18 +309,26 @@ def sums(items):
     return ''.join(f'{sha(data)}  {name}\n' for name, data in sorted(items.items())).encode()
 
 
-def package(exe, output, tag, allow_untracked, linux=None):
+def package(exe, output, tag, allow_untracked, linux=None, programs=None):
     current = validate(tag)
     linux = linux or {}
     require(set(linux) == {arch for arch, _ in LINUX_ARCHES}, 'Provide the Linux x86_64 and aarch64 executables')
+    separate = has_separate_programs(current)
+    programs = programs or {}
+    require(set(programs) == (set(SEPARATE_PROGRAMS) if separate else set()),
+            'Provide the separate Text Editor and Terminal programs' if separate else 'This version has no separate programs')
     output.mkdir(parents=True, exist_ok=True)
     binary = exe.read_bytes()
     check_exe(binary, current)
+    program_bytes = {name: path.read_bytes() for name, path in programs.items()}
+    for name, data in program_bytes.items():
+        check_program(data, current, name)
     prefix = f'Network_Toolkit_{current}'
     versioned_exe = STABLE_EXE
-    entries = {versioned_exe: binary,
+    terminal_command = f'start "" "%~dp0{TERMINAL_EXE}"' if separate else f'start "" "%~dp0{versioned_exe}" --terminal'
+    entries = {versioned_exe: binary, **program_bytes,
                'Open_Terminal.cmd': ('@echo off\r\nsetlocal DisableDelayedExpansion\r\ncd /d "%~dp0"\r\n'
-                                     f'start "" "%~dp0{versioned_exe}" --terminal\r\n').encode()}
+                                     f'{terminal_command}\r\n').encode()}
     for name in ['README.txt', f'RELEASE_NOTES_{current}.txt', 'VALIDATION.txt']:
         entries[name] = (ROOT / name if name.startswith('RELEASE_NOTES_') else ROOT / 'docs' / name).read_bytes()
     entries['SHA256SUMS'] = sums(entries)
@@ -310,15 +351,20 @@ def package(exe, output, tag, allow_untracked, linux=None):
     os.replace(temporary, archive)
     atomic_write(output / STABLE_EXE, binary)
     import package_public_update
-    update_archive = package_public_update.package(exe, output, write_manifest=False)
+    update_archive = package_public_update.package(exe, output, write_manifest=False, programs=programs or None)
     packages = [output / STABLE_EXE, archive, update_archive]
     if has_windows_setup(current):
-        packages.append(package_windows_setup(exe, current, output))
+        packages.append(package_windows_setup(exe, current, output, programs) if separate else package_windows_setup_legacy(exe, current, output))
     packages.extend(package_linux(linux[arch].read_bytes(), current, arch, machine, output) for arch, machine in LINUX_ARCHES)
     atomic_write(output / 'SHA256SUMS', sums({path.name: path.read_bytes() for path in packages}))
     verify(output, tag)
     print(json.dumps({'version': current, 'archive': str(archive), 'bytes': archive.stat().st_size,
                       'sha256': sha(archive.read_bytes()), 'members': len(entries)}))
+
+
+def package_windows_setup_legacy(exe, current, output):
+    """Setup of a version before the separate programs: never built by this checkout's script."""
+    raise ValueError(f'Windows setup of {current} predates the separate programs; build it from its own release source')
 
 
 def check_linux_exe(data, current, machine):
@@ -403,9 +449,14 @@ def verify(output, tag=None):
     for arch, machine in LINUX_ARCHES:
         verify_linux(output / linux_archive_name(current, arch), current, arch, machine)
     import package_public_update
-    package_public_update.verify_archive(update_archive, (output / STABLE_EXE).read_bytes(), current)
     check_exe((output / STABLE_EXE).read_bytes(), current)
     prefix = f'Network_Toolkit_{current}/'
+    separate = has_separate_programs(current)
+    with zipfile.ZipFile(archive) as bundle:
+        programs = {name: bundle.read(prefix + name) for name in SEPARATE_PROGRAMS} if separate else None
+    for name, data in (programs or {}).items():
+        check_program(data, current, name)
+    package_public_update.verify_archive(update_archive, (output / STABLE_EXE).read_bytes(), current, programs)
     with zipfile.ZipFile(archive) as bundle:
         require(bundle.testzip() is None, 'Portable ZIP CRC verification failed')
         members = bundle.namelist()
@@ -416,7 +467,12 @@ def verify(output, tag=None):
         expected = {prefix + name for name in root_names | {'SHA256SUMS'}}
         expected.update(prefix + 'source/' + name for name in source_names | {'SHA256SUMS'})
         require(set(members) == expected, 'Unverified entries found in portable ZIP')
-        require(sum(name.lower().endswith('.exe') for name in members) == 1, 'Portable ZIP must contain exactly one executable')
+        executables = {name[len(prefix):] for name in members if name.lower().endswith('.exe')}
+        if separate:
+            require(executables == {STABLE_EXE, *SEPARATE_PROGRAMS},
+                    'Portable ZIP must contain exactly Network_Toolkit.exe and the separate Text Editor and Terminal programs')
+        else:
+            require(sum(name.lower().endswith('.exe') for name in members) == 1, 'Portable ZIP must contain exactly one executable')
         require(bundle.read(prefix + STABLE_EXE) == (output / STABLE_EXE).read_bytes(),
                 'Standalone and portable executables differ')
     return current
@@ -456,6 +512,8 @@ def main():
             command.add_argument('--expected-new-commit', default='')
         if name == 'package':
             command.add_argument('--exe', type=Path, required=True)
+            command.add_argument('--editor-exe', type=Path, help='Network_Toolkit_TextEditor.exe (versions with separate programs)')
+            command.add_argument('--terminal-exe', type=Path, help='Network_Toolkit_Terminal.exe (versions with separate programs)')
             for arch, _ in LINUX_ARCHES:
                 command.add_argument('--linux-' + arch.replace('_', '-'), type=Path, required=True, dest='linux_' + arch,
                                      help=f'Linux {arch} executable')
@@ -471,8 +529,9 @@ def main():
         else:
             prepare(args.tag, args.default_branch, args.revision, args.expected_old_commit, args.expected_old_manifest, args.expected_new_commit)
     elif args.command == 'package':
+        programs = {name: path for name, path in ((EDITOR_EXE, args.editor_exe), (TERMINAL_EXE, args.terminal_exe)) if path}
         package(args.exe, args.output_dir.resolve(), args.tag, args.allow_untracked_source,
-                {arch: getattr(args, 'linux_' + arch) for arch, _ in LINUX_ARCHES})
+                {arch: getattr(args, 'linux_' + arch) for arch, _ in LINUX_ARCHES}, programs)
     elif args.command == 'verify':
         print('Verified ' + verify(args.output_dir.resolve(), args.tag))
     else:
