@@ -589,7 +589,7 @@ func (m *editorViewRegistry) diskDocument(w http.ResponseWriter, r *http.Request
 			g.snapshot.EOL = v.Format.EOL
 			g.snapshot.SavedEOL = v.Format.EOL
 			m.mu.Unlock()
-			value = map[string]any{"metadata": v.Buffer.Metadata(), "format": v.Format, "hash": v.Hash}
+			value = map[string]any{"metadata": v.Buffer.Metadata(), "format": v.Format, "hash": v.Hash, "newLineEol": v.Buffer.NewLineEOL()}
 		}
 	default:
 		jsonError(w, 400, "Unsupported disk-backed editor action.")

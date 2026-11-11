@@ -17,7 +17,8 @@
    setting is. */
 (function(root){'use strict';
 const ENDPOINT='/editor-session',TICK_MS=3000,RETRY_MS=15000,TAB_LIMIT=64;
-const ENCODINGS=['UTF-8','UTF-16LE','UTF-16BE'],EOLS=['LF','CRLF','CR'];
+// Windows-1252 and Mixed belong to disk-backed documents (see notText in file-editor.js).
+const ENCODINGS=['UTF-8','UTF-16LE','UTF-16BE','Windows-1252'],EOLS=['LF','CRLF','CR','Mixed'];
 const absolutePath=path=>/^(?:[A-Za-z]:[\\/]|\\\\[^\\/]|\/)/.test(String(path||''));
 const baseName=path=>String(path||'').split(/[\\/]/).pop()||'';
 const label=(text,limit)=>String(text||'').replace(/[\u0000-\u001f\u007f-\u009f]+/g,' ').trim().slice(0,limit);

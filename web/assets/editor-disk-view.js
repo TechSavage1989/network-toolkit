@@ -59,7 +59,7 @@ function measureWrapRows(text, textarea) {
 }
 
 function create({textarea, gutter, container, session, syntaxLanguage, wordWrap = () => false,
- changed = () => {}, message = () => {}, readOnly = false}) {
+ changed = () => {}, message = () => {}, readOnly = false, locked = () => false}) {
  const pageUnits = root.NTKEditorDiskSession.PAGE_UNITS;
  const abort = new AbortController();
  const listeners = {signal: abort.signal};
@@ -1282,7 +1282,8 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
   comparisonPage: () => ({line:page.line, text:page.text, column:page.column, complete:page.start+page.text.length>=session.state().metadata.units}),
   measureWrapRows:measureCurrentWrapRows, refreshWrap, refreshSyntax: paintSyntax,
   selectAll() { select(0, session.state().metadata.units, 'none', true); },
-  setReadOnly(value) { readOnly = !!value; updateReadOnly(); },
+  // locked() is a document that can never be edited (a file that is not text).
+  setReadOnly(value) { readOnly = !!value || !!locked(); updateReadOnly(); },
   refresh() {
    const value = session.state().page;
    if (value.start !== page.start || value.text !== page.text || value.line !== page.line ||
