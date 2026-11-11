@@ -373,4 +373,24 @@ folder>`) is per folder, so all three programs of a folder share it.
 
 ## Appendix: measured sizes
 
-Filled in from the builds of this change.
+Builds of this change (Go 1.26.11, `sh ./build.sh`, `github_release.py package`):
+
+| Item | Before | With the separate programs |
+|---|---|---|
+| Each Windows program | 22.9 MB | 22.9 MB (three programs) |
+| One program compressed in a ZIP | 8.8 MB | 8.8 MB each |
+| Update ZIP | about 8.8 MB | 26.3 MB |
+| Portable ZIP | about 19 MB | 37.2 MB |
+| Setup | 7.08 MB | 7.66 MB (64 MB LZMA dictionary: the second and third program cost 0.6 MB) |
+| Linux archives | unchanged | unchanged |
+
+Setup was also tried without the larger dictionary: 20.9 MB.
+
+Wine (not Windows) was used to run the Windows builds: `--version` of each
+program; `Network_Toolkit.exe --terminal` forwarding to
+`Network_Toolkit_Terminal.exe` (the PE version check passed) with a DPAPI
+record written, and a second start handing over; a fresh silent Setup, an
+upgrade and an uninstall (three programs, shortcuts at the separate programs
+without arguments, byte-identical files). Wine does not lock a running
+program file as Windows does, so the open-program refusals are checked only by
+`scripts/installer/verify-windows.ps1` on hosted Windows.
