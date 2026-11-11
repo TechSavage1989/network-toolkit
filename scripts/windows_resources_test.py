@@ -50,7 +50,7 @@ class WindowsResourceTests(unittest.TestCase):
         self.tree = read_resources(self.data)
 
     def test_committed_object_matches_the_committed_assets(self):
-        built, _ = resources.resource_object()
+        built, _ = resources.program_resources()[str(resources.OUTPUT.relative_to(resources.ROOT))]
         self.assertEqual(self.data, built, 'Run python3 scripts/build_windows_resources.py')
 
     def test_icon_groups_keep_released_indexes_and_append_the_document_icon(self):

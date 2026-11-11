@@ -6,7 +6,6 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"strings"
 	"syscall"
 )
 
@@ -21,7 +20,7 @@ func terminalLinkRegistrationState() terminalLinkRegistration {
 		if resolved, err := filepath.EvalSymlinks(exe); err == nil {
 			exe = resolved
 		}
-		state.Current = strings.EqualFold(command, `"`+exe+`" --terminal --open-url "%1"`)
+		state.Current = terminalLinkCommandIsCurrent(command, exe)
 	}
 	return state
 }

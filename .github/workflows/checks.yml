@@ -326,6 +326,14 @@ jobs:
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results/standalone-peer
         run: go test -mod=vendor ./cmd/network-toolkit -run '^TestStandalonePeerSendBrowser$' -count=1 -v -timeout=5m
+      - name: Send text between the real separate Text Editor and Terminal programs
+        if: success() || failure()
+        env:
+          GOTOOLCHAIN: local
+          NTK_SEPARATE_PROGRAMS_BROWSER: '1'
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
+          TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results/separate-programs
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestSeparateProgramsBrowser$' -count=1 -v -timeout=5m
       - name: Restore Text Editor tabs and unsaved changes in the shipped page
         if: success() || failure()
         env:
@@ -599,7 +607,7 @@ jobs:
       - name: Rehearse release packaging (Windows assets and Linux archives)
         run: |
           REVIEW_VERSION=$(node -p "require('./package.json').version")
-          python3 scripts/github_release.py package --tag "v${REVIEW_VERSION}" --exe build/Network_Toolkit.exe --linux-x86-64 build/linux-amd64/network-toolkit --linux-aarch64 build/linux-arm64/network-toolkit
+          python3 scripts/github_release.py package --tag "v${REVIEW_VERSION}" --exe build/Network_Toolkit.exe --editor-exe build/Network_Toolkit_TextEditor.exe --terminal-exe build/Network_Toolkit_Terminal.exe --linux-x86-64 build/linux-amd64/network-toolkit --linux-aarch64 build/linux-arm64/network-toolkit
           python3 scripts/github_release.py verify --tag "v${REVIEW_VERSION}"
       - uses: actions/upload-artifact@v7
         with:
@@ -607,6 +615,7 @@ jobs:
           path: |
             dist/*_Windows_x64_Setup.exe
             dist/Network_Toolkit.exe
+            dist/*_Portable.zip
           if-no-files-found: error
           retention-days: 7
       - uses: actions/upload-artifact@v7

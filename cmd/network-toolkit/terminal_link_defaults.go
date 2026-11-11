@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"net/http"
+	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -60,4 +62,25 @@ func (a *application) handleTerminalLinks(w http.ResponseWriter, r *http.Request
 	default:
 		http.NotFound(w, r)
 	}
+}
+
+// terminalLinkCommandIsCurrent reports whether a link registration starts this
+// copy: the running program itself with --terminal, or, from a program of the
+// same folder, Network_Toolkit.exe --terminal or the separate Terminal program
+// (docs/SEPARATE_EXECUTABLES.md). Setup registers Network_Toolkit.exe.
+func terminalLinkCommandIsCurrent(command, exe string) bool {
+	dir := filepath.Dir(exe)
+	main := filepath.Join(dir, programNameFor("windows", ""))
+	separate := filepath.Join(dir, programNameFor("windows", "terminal"))
+	for _, candidate := range []string{
+		`"` + exe + `" --terminal --open-url "%1"`,
+		`"` + main + `" --terminal --open-url "%1"`,
+		`"` + separate + `" --open-url "%1"`,
+		`"` + separate + `" --terminal --open-url "%1"`,
+	} {
+		if strings.EqualFold(command, candidate) {
+			return true
+		}
+	}
+	return false
 }

@@ -80,7 +80,18 @@
       }catch(e){progress=null;error=e.message;message='';}
       finally{busy=false;render();changed();}
     }
-    return {snapshot,load,importPackage,check,download,install};
+    // The separate Text Editor and Terminal programs of the running version,
+    // for a copy updated by an earlier updater (docs/SEPARATE_EXECUTABLES.md).
+    // Like Download, only on the user's explicit request.
+    async function installCompanions(version){
+      if(busy||data?.installing)return;
+      if(!data?.companions?.needed||data.currentVersion!==version){error='The separate programs are already installed. Refresh update status.';render();return;}
+      const turn=++revision;busy=true;error='';progress={phase:'checksums',version};message='Downloading and verifying the separate Text Editor and Terminal programs of this version. The installed app is unchanged until both are verified.';render();const stop=watchProgress(turn);
+      try{data=await env.api('/updates/companions','POST',{confirm:true,version});progress=null;message='The separate Text Editor and Terminal programs are installed beside Network_Toolkit.exe.';}
+      catch(e){progress=null;error='The separate programs were not installed: '+e.message;message='';}
+      finally{stop();busy=false;render();changed();}
+    }
+    return {snapshot,load,importPackage,check,download,install,installCompanions};
   }
   function progressHTML(state){
     const p=state.progress;if(!p)return '';
@@ -91,6 +102,11 @@
     const detail=p.phase==='download'?(known?bytes(received)+' of '+bytes(total)+' ('+Math.floor(received/total*100)+'%)':bytes(received)+' received'):'',label=phases[p.phase];
     return '<div class="app-update-progress"><div class="row between gap6"><span>'+escape(label)+'</span>'+(detail?'<span>'+escape(detail)+'</span>':'')+'</div><progress aria-label="'+escape(label)+'" '+(p.phase==='ready'?'value="1" max="1"':known?'value="'+received+'" max="'+total+'"':'')+'></progress>'+(p.phase==='restarting'?'<small>The installer keeps a progress window open until the updated app starts.</small>':'')+'</div>';
   }
+  function companionsHTML(data,disabled){
+    const c=data?.companions;if(!c?.needed||data?.supported===false)return '';
+    const missing=(c.programs||[]).filter(p=>p.state!=='current').map(p=>escape(p.name)).join(' and ');
+    return '<div class="notice info mt"><span>The separate Text Editor and Terminal programs of this version are not installed beside Network_Toolkit.exe ('+missing+'). Until they are, Network_Toolkit.exe opens the Text Editor and the Terminal itself, as before. They come with this version\'s update package and are checked against its SHA256SUMS before anything is added.</span></div><button type="button" class="btn small" data-app-update="companions" data-version="'+escape(data.currentVersion)+'" '+(disabled?'disabled':'')+'>Install the separate programs</button>';
+  }
   function html(state,available,currentVersion,preferences={}){
     const {data,busy,error,message,backgroundError}=state,disabled=!available||busy||data?.installing||data?.supported===false,staged=data?.staged,betaEnabled=preferences.beta===true;
     return '<h3>Network Toolkit updates</h3><p class="help-line">Installed version: '+escape(data?.currentVersion||currentVersion)+'</p>'+
@@ -100,10 +116,10 @@
       (data?.latest?'<div class="notice info mt">Latest release: '+escape(data.latest.version)+(data.latest.beta?' (Beta)':' (Stable)')+'</div>'+releaseNotes(data,data.latest.version)+(data.hasUpdate===true?'<button type="button" class="btn small" data-app-update="download" data-version="'+escape(data.latest.version)+'" '+(disabled?'disabled':'')+'>Download update</button>':'<p class="help-line">'+'No newer update was found at the last successful check.'+'</p>'):'')+
       '<details class="mt"><summary>Import a downloaded update instead</summary><p class="help-line">Select the binary-only Update.zip and SHA256SUMS from the same official release. No GitHub credentials are needed.</p><p class="help-line" style="overflow-wrap:anywhere">Official feed: '+RELEASES+'</p>'+
       (!available?'<p class="help-line">Open the executable to import and install updates.</p>':data?.supported===false?'<p class="help-line">In-app installation is supported only by the Windows x64 executable.</p>':'<div class="form-stack mt"><div class="field"><label for="appUpdatePackage">Official binary-only Update ZIP</label><input type="file" id="appUpdatePackage" accept=".zip" '+(disabled?'disabled':'')+'></div><div class="field"><label for="appUpdateChecksums">SHA256SUMS from the same release</label><input type="file" id="appUpdateChecksums" '+(disabled?'disabled':'')+'></div><div><button type="button" class="btn small" data-app-update="import" '+(disabled?'disabled':'')+'>Verify and stage update</button></div></div>')+
-      '</details><p class="help-line">SHA-256 checks detect corruption, not publisher identity. Use files only from the official release page. Only the app executable is replaced; your app data folder is not changed.</p>'+
-      (staged?'<div class="notice info mt"><span>Ready to install version '+escape(staged.version)+(staged.beta?' (Beta)':'')+'. Save your work before restarting.</span></div><p class="help-line" style="overflow-wrap:anywhere">Executable SHA-256: '+escape(staged.sha256)+'</p>'+(staged.beta&&!betaEnabled?'<p class="help-line">Enable beta updates to install this staged beta.</p>':'<button type="button" class="btn primary" data-app-update="confirm" data-version="'+escape(staged.version)+'" '+(disabled?'disabled':'')+'>Install and restart</button>'):'')+
+      '</details><p class="help-line">SHA-256 checks detect corruption, not publisher identity. Use files only from the official release page. Only the app\'s programs are replaced (Network_Toolkit.exe and, beside it, the separate Text Editor and Terminal programs); your app data folder is not changed.</p>'+
+      (staged?'<div class="notice info mt"><span>Ready to install version '+escape(staged.version)+(staged.beta?' (Beta)':'')+'. Save your work before restarting.</span></div><p class="help-line" style="overflow-wrap:anywhere">Executable SHA-256: '+escape(staged.sha256)+'</p>'+(Array.isArray(staged.companions)&&staged.companions.length?'<p class="help-line" style="overflow-wrap:anywhere">Also installs '+staged.companions.map(c=>escape(c.name)+' (SHA-256: '+escape(c.sha256)+')').join(', ')+'.</p>':'')+(staged.beta&&!betaEnabled?'<p class="help-line">Enable beta updates to install this staged beta.</p>':'<button type="button" class="btn primary" data-app-update="confirm" data-version="'+escape(staged.version)+'" '+(disabled?'disabled':'')+'>Install and restart</button>'):'')+
       (data?.busy?.length?'<p class="help-line">Active operations: '+escape(data.busy.join(', '))+'. Finish or stop them before installing.</p>':'')+
-      progressHTML(state)+'<div role="status" aria-live="polite">'+(message?'<p class="help-line">'+escape(message)+'</p>':'')+(busy&&!message?'<p class="help-line">Reading update status…</p>':'')+(backgroundError?'<p class="help-line">'+escape(backgroundError)+' Use Check for updates to retry.</p>':'')+(error?'<div class="notice warn mt">'+escape(error)+'</div>':'')+'</div>';
+      companionsHTML(data,disabled)+progressHTML(state)+'<div role="status" aria-live="polite">'+(message?'<p class="help-line">'+escape(message)+'</p>':'')+(busy&&!message?'<p class="help-line">Reading update status…</p>':'')+(backgroundError?'<p class="help-line">'+escape(backgroundError)+' Use Check for updates to retry.</p>':'')+(error?'<div class="notice warn mt">'+escape(error)+'</div>':'')+'</div>';
   }
   // Timers are independent of navigation. No timer may download, install, or restart.
   function createScheduler(env){
@@ -295,6 +311,7 @@
       if(button.isConnected)button.disabled=false;
     }
     else if(action==='refresh')await c.load();
+    else if(action==='companions'){button.disabled=true;await c.installCompanions(button.dataset.version);}
     else if(action==='import')await c.importPackage(document.getElementById('appUpdatePackage')?.files?.[0],document.getElementById('appUpdateChecksums')?.files?.[0]);
     else if(action==='confirm'){
       const error=document.getElementById('appUpdateInstallError');button.disabled=true;await c.install(button.dataset.version);

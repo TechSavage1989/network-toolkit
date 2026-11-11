@@ -1,3 +1,8 @@
+## 1.21.47 Beta 1 - The Text Editor and the Terminal as separate programs
+
+- `Network_Toolkit_TextEditor.exe` and `Network_Toolkit_Terminal.exe` ship beside `Network_Toolkit.exe` (installed and portable), each with its own icon and name, sharing all settings and saved data.
+- Updates replace all three together and roll back if one fails its start check.
+
 ## 1.21.46 Beta 1 - The portable program works with Windows
 
 - A portable copy can register its Text Editor with Windows (same types, Open with, right-click entry) and remove it again, and can download and run the full installer after asking.

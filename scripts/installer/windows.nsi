@@ -1,4 +1,5 @@
-; APP_VERSION, APP_EXE, SETUP_EXE and APP_ICON are supplied by release packaging.
+; APP_VERSION, APP_EXE, EDITOR_EXE, TERMINAL_EXE, SETUP_EXE and APP_ICON are
+; supplied by release packaging.
 Unicode true
 RequestExecutionLevel user
 
@@ -12,6 +13,13 @@ RequestExecutionLevel user
 !define EDITOR_NAME "${APP_NAME} Text Editor"
 !define EDITOR_ARGS "--editor-standalone"
 !define APP_FILENAME "Network_Toolkit.exe"
+; The separate Text Editor and Terminal programs (docs/SEPARATE_EXECUTABLES.md):
+; the same code built for one app each. Their Start menu shortcuts start them
+; without arguments; icon 0 of each is its app's icon. The file registrations
+; and terminal links below still start Network_Toolkit.exe, which hands the
+; request to the separate program beside it.
+!define EDITOR_FILENAME "Network_Toolkit_TextEditor.exe"
+!define TERMINAL_FILENAME "Network_Toolkit_Terminal.exe"
 !define INSTALL_DIR "$LOCALAPPDATA\Programs\${APP_NAME}"
 !define UNINSTALL_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\NetworkToolkit"
 !define CAPABILITIES "Software\${APP_NAME}\Capabilities"
@@ -96,6 +104,9 @@ OutFile "${SETUP_EXE}"
 InstallDir "${INSTALL_DIR}"
 InstallDirRegKey HKCU "${UNINSTALL_KEY}" "InstallLocation"
 SetCompressor /SOLID lzma
+; The three programs are nearly identical; a dictionary larger than one of them
+; lets LZMA store the second and third mostly as references to the first.
+SetCompressorDictSize 64
 VIProductVersion "${APP_VERSION}.0"
 VIAddVersionKey "ProductName" "${APP_NAME}"
 VIAddVersionKey "ProductVersion" "${APP_VERSION}"
@@ -121,9 +132,13 @@ VIAddVersionKey "LegalCopyright" "Network Toolkit contributors"
 !insertmacro MUI_LANGUAGE "English"
 
 Var StagedApp
+Var StagedEditor
+Var StagedTerminal
 Var StagedUninstaller
 Var RegisteredInstallDir
 Var NewAppWritten
+Var NewEditorWritten
+Var NewTerminalWritten
 Var NewUninstallerWritten
 Var ShellRegistrationStarted
 Var NewMainShortcut
@@ -197,6 +212,62 @@ Var PortableMenu
   ${Loop}
 !macroend
 
+; A program file that is running cannot be opened for writing without
+; sharing. Check each program before anything is replaced or removed, so an
+; open separate Text Editor or Terminal never leaves the three programs at
+; different versions or half removed. A scanner can hold a just-written file
+; briefly, so a sharing failure is retried for about five seconds. $R5 is 1
+; when the program is still open; a missing file counts as closed. A
+; read-only file refuses writing with error 5 like an open one: its read-only
+; attribute is cleared first (Setup replaces or removes the file anyway).
+!macro IsProgramOpen FILE
+  StrCpy $R5 0
+  StrCpy $DeleteAttempts 0
+  System::Call 'kernel32::GetFileAttributesW(w "${FILE}") i .r0'
+  ${If} $0 != -1
+    IntOp $1 $0 & 1
+    ${If} $1 != 0
+      IntOp $0 $0 & 0xFFFFFFFE
+      System::Call 'kernel32::SetFileAttributesW(w "${FILE}", i r0) i .r1'
+    ${EndIf}
+  ${EndIf}
+  ${Do}
+    ${IfNot} ${FileExists} "${FILE}"
+      ${ExitDo}
+    ${EndIf}
+    System::Call 'kernel32::CreateFileW(w "${FILE}", i 0x40000000, i 0, p 0, i 3, i 0, p 0) p .r0 ?e'
+    Pop $1
+    ${If} $0 != -1
+      System::Call 'kernel32::CloseHandle(p r0)'
+      StrCpy $R5 0
+      ${ExitDo}
+    ${EndIf}
+    ; Only a sharing or access failure means another program has it open;
+    ; any other failure is reported by the step that replaces the file.
+    ${If} $1 != 32
+    ${AndIf} $1 != 5
+      StrCpy $R5 0
+      ${ExitDo}
+    ${EndIf}
+    StrCpy $R5 1
+    IntOp $DeleteAttempts $DeleteAttempts + 1
+    ${If} $DeleteAttempts >= 20
+      ${ExitDo}
+    ${EndIf}
+    Sleep 250
+  ${Loop}
+!macroend
+
+!macro AreProgramsOpen
+  !insertmacro IsProgramOpen "$INSTDIR\${APP_FILENAME}"
+  ${If} $R5 != 1
+    !insertmacro IsProgramOpen "$INSTDIR\${EDITOR_FILENAME}"
+  ${EndIf}
+  ${If} $R5 != 1
+    !insertmacro IsProgramOpen "$INSTDIR\${TERMINAL_FILENAME}"
+  ${EndIf}
+!macroend
+
 ; Compare the filesystem's resolved directory to its ordinary long path.
 ; A junction, symbolic link, or substituted drive can redirect the deletes.
 !macro IsPhysicalDirectory PATH
@@ -231,7 +302,10 @@ Var PortableMenu
 ; Read the stored target and arguments without resolving or following the link.
 ; NSIS uses IShellLinkW to create these links. IPersistFile::Load opens a copy
 ; for inspection, while SLGP_RAWPATH avoids looking up a moved executable.
-!macro IsOwnedShortcut LINK ARGS LEGACY
+; A shortcut is Setup's own when it starts Network_Toolkit.exe with ARGS or
+; LEGACY (every released Setup), or PROGRAM, a separate program, without
+; arguments (this Setup). PROGRAM is empty for the main and desktop shortcuts.
+!macro IsOwnedShortcut LINK ARGS LEGACY PROGRAM
   StrCpy $R5 0
   ${If} ${FileExists} "${LINK}"
     System::Call 'ole32::CoInitialize(p 0) i .r9'
@@ -250,6 +324,14 @@ Var PortableMenu
               ${OrIf} $4 == "${LEGACY}"
                 StrCpy $R5 1
               ${EndIf}
+            ${EndIf}
+          ${ElseIf} $1 == 0
+          ${AndIf} "${PROGRAM}" != ""
+          ${AndIf} $3 == "$INSTDIR\${PROGRAM}"
+            System::Call '$0->10(w .r4, i ${NSIS_MAX_STRLEN}) i .r1'
+            ${If} $1 == 0
+            ${AndIf} $4 == ""
+              StrCpy $R5 1
             ${EndIf}
           ${EndIf}
         ${EndIf}
@@ -348,6 +430,9 @@ Function ValidateInstallDirectory
   ${EndIf}
   StrCpy $R5 ""
   ${If} $RegisteredInstallDir == ""
+    ; Separate Text Editor and Terminal programs alone do not make another
+    ; installation: an uninstaller of 1.21.46 or older, after an in-app
+    ; update added them, leaves them behind. They are replaced once closed.
     ${If} ${FileExists} "$INSTDIR\${APP_FILENAME}"
     ${OrIf} ${FileExists} "$INSTDIR\Uninstall.exe"
       StrCpy $R5 "Choose a folder without an existing Network Toolkit executable or uninstaller."
@@ -382,6 +467,12 @@ Function RefuseDowngrade
   ${If} $1 == 1
     ${If} $StagedApp != ""
       Delete "$StagedApp"
+    ${EndIf}
+    ${If} $StagedEditor != ""
+      Delete "$StagedEditor"
+    ${EndIf}
+    ${If} $StagedTerminal != ""
+      Delete "$StagedTerminal"
     ${EndIf}
     !insertmacro StopSetup "A newer version of Network Toolkit ($0) is already installed. Use setup for that version or a later version."
   ${EndIf}
@@ -664,19 +755,22 @@ FunctionEnd
   System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, p 0, p 0)'
 !macroend
 
-!macro CreateStartShortcut LINK ARGS LEGACY ICON CREATED
+; PROGRAM is the file the shortcut starts (without arguments when it is a
+; separate program); ARGS and LEGACY are the released forms that started
+; Network_Toolkit.exe instead. An upgrade rewrites only Setup's own shortcuts.
+!macro CreateStartShortcut LINK PROGRAM PROGRAM_ARGS ARGS LEGACY ICON CREATED
   ${If} ${FileExists} "${LINK}"
     ${If} $RegisteredInstallDir != ""
-      !insertmacro IsOwnedShortcut "${LINK}" "${ARGS}" "${LEGACY}"
+      !insertmacro IsOwnedShortcut "${LINK}" "${ARGS}" "${LEGACY}" "${PROGRAM}"
       ${If} $R5 == 1
         ClearErrors
-        CreateShortcut "${LINK}" "$INSTDIR\${APP_FILENAME}" "${ARGS}" "$INSTDIR\${APP_FILENAME}" ${ICON}
+        CreateShortcut "${LINK}" "$INSTDIR\${PROGRAM}" "${PROGRAM_ARGS}" "$INSTDIR\${PROGRAM}" ${ICON}
         IfErrors install_error
       ${EndIf}
     ${EndIf}
   ${Else}
     ClearErrors
-    CreateShortcut "${LINK}" "$INSTDIR\${APP_FILENAME}" "${ARGS}" "$INSTDIR\${APP_FILENAME}" ${ICON}
+    CreateShortcut "${LINK}" "$INSTDIR\${PROGRAM}" "${PROGRAM_ARGS}" "$INSTDIR\${PROGRAM}" ${ICON}
     IfErrors install_error
     StrCpy ${CREATED} 1
   ${EndIf}
@@ -703,6 +797,16 @@ Section "Network Toolkit"
   SetOverwrite try
   File /oname=$StagedApp "${APP_EXE}"
   IfErrors install_error
+  StrCpy $FailedStep "extracting the Text Editor program"
+  GetTempFileName $StagedEditor "$INSTDIR"
+  IfErrors install_error
+  File /oname=$StagedEditor "${EDITOR_EXE}"
+  IfErrors install_error
+  StrCpy $FailedStep "extracting the Terminal program"
+  GetTempFileName $StagedTerminal "$INSTDIR"
+  IfErrors install_error
+  File /oname=$StagedTerminal "${TERMINAL_EXE}"
+  IfErrors install_error
 
   ; Replace the program on the same volume only after extraction succeeds.
   ; Windows rejects the move if the running program is still using the file.
@@ -713,7 +817,41 @@ Section "Network Toolkit"
   IfErrors install_error
   WriteUninstaller "$StagedUninstaller"
   IfErrors install_error
-  ; Fresh setup must never replace a competing program or uninstaller.
+  ; Replace nothing while one of the three programs is open, also on a fresh
+  ; setup that finds separate programs left behind (ValidateInstallDirectory).
+  StrCpy $FailedStep "checking that Network Toolkit and its Text Editor and Terminal programs are closed"
+  !insertmacro AreProgramsOpen
+  ${If} $R5 == 1
+    Goto install_error
+  ${EndIf}
+  ; A separate program is always replaced; a rolled back fresh setup removes
+  ; only one it created. Fresh setup never replaces a competing main program
+  ; or uninstaller.
+  StrCpy $R7 0x9
+  ; The separate programs first: if one cannot be placed, Network_Toolkit.exe
+  ; keeps its version, so the same Setup may run again (RefuseDowngrade).
+  StrCpy $R6 0
+  ${IfNot} ${FileExists} "$INSTDIR\${EDITOR_FILENAME}"
+    StrCpy $R6 1
+  ${EndIf}
+  !insertmacro PlaceStagedFile "$StagedEditor" "$INSTDIR\${EDITOR_FILENAME}"
+  ${If} $0 == 0
+    StrCpy $FailedStep "placing the Text Editor program file (Windows error $1)"
+    Goto install_error
+  ${EndIf}
+  StrCpy $StagedEditor ""
+  StrCpy $NewEditorWritten $R6
+  StrCpy $R6 0
+  ${IfNot} ${FileExists} "$INSTDIR\${TERMINAL_FILENAME}"
+    StrCpy $R6 1
+  ${EndIf}
+  !insertmacro PlaceStagedFile "$StagedTerminal" "$INSTDIR\${TERMINAL_FILENAME}"
+  ${If} $0 == 0
+    StrCpy $FailedStep "placing the Terminal program file (Windows error $1)"
+    Goto install_error
+  ${EndIf}
+  StrCpy $StagedTerminal ""
+  StrCpy $NewTerminalWritten $R6
   StrCpy $R7 0x8
   ${If} $RegisteredInstallDir != ""
     StrCpy $R7 0x9
@@ -821,9 +959,9 @@ Section "Network Toolkit"
   CreateDirectory "$SMPROGRAMS\${APP_NAME}"
   IfErrors install_error
   StrCpy $FailedStep "creating the Start menu shortcuts"
-  !insertmacro CreateStartShortcut "$SMPROGRAMS\${APP_NAME}\${APP_NAME}.lnk" "" "" 0 $NewMainShortcut
-  !insertmacro CreateStartShortcut "$SMPROGRAMS\${APP_NAME}\${EDITOR_NAME}.lnk" "${EDITOR_ARGS}" "--editor" 1 $NewEditorShortcut
-  !insertmacro CreateStartShortcut "$SMPROGRAMS\${APP_NAME}\${APP_NAME} Terminal.lnk" "--terminal" "--terminal" 2 $NewTerminalShortcut
+  !insertmacro CreateStartShortcut "$SMPROGRAMS\${APP_NAME}\${APP_NAME}.lnk" "${APP_FILENAME}" "" "" "" 0 $NewMainShortcut
+  !insertmacro CreateStartShortcut "$SMPROGRAMS\${APP_NAME}\${EDITOR_NAME}.lnk" "${EDITOR_FILENAME}" "" "${EDITOR_ARGS}" "--editor" 0 $NewEditorShortcut
+  !insertmacro CreateStartShortcut "$SMPROGRAMS\${APP_NAME}\${APP_NAME} Terminal.lnk" "${TERMINAL_FILENAME}" "" "--terminal" "--terminal" 0 $NewTerminalShortcut
   ; SHCNE_ASSOCCHANGED: Explorer reloads associations and file type icons,
   ; after every registration above, on a new install and an upgrade alike.
   System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, p 0, p 0)'
@@ -833,6 +971,12 @@ install_error:
   !insertmacro LogSetupStop "Setup could not finish while $FailedStep."
   ${If} $StagedApp != ""
     Delete "$StagedApp"
+  ${EndIf}
+  ${If} $StagedEditor != ""
+    Delete "$StagedEditor"
+  ${EndIf}
+  ${If} $StagedTerminal != ""
+    Delete "$StagedTerminal"
   ${EndIf}
   ${If} $StagedUninstaller != ""
     Delete "$StagedUninstaller"
@@ -856,6 +1000,12 @@ install_error:
     ${If} $NewAppWritten == 1
       Delete "$INSTDIR\${APP_FILENAME}"
     ${EndIf}
+    ${If} $NewEditorWritten == 1
+      Delete "$INSTDIR\${EDITOR_FILENAME}"
+    ${EndIf}
+    ${If} $NewTerminalWritten == 1
+      Delete "$INSTDIR\${TERMINAL_FILENAME}"
+    ${EndIf}
   ${EndIf}
   MessageBox MB_OK|MB_ICONSTOP "Setup could not finish. Close Network Toolkit and any separate Editor or Terminal windows, then run setup again." /SD IDOK
   SetErrorLevel 2
@@ -876,7 +1026,7 @@ Section -ApplyDesktopShortcut
       ${EndIf}
     ${EndIf}
   ${ElseIf} $R8 == 1
-    !insertmacro IsOwnedShortcut "$DESKTOP\${APP_NAME}.lnk" "" ""
+    !insertmacro IsOwnedShortcut "$DESKTOP\${APP_NAME}.lnk" "" "" ""
     ${If} $R5 == 1
       ClearErrors
       Delete "$DESKTOP\${APP_NAME}.lnk"
@@ -948,48 +1098,59 @@ Function .onInit
   ClearErrors
 FunctionEnd
 
+; Remove one program file, retrying for about five seconds, then wait for
+; its name to go: Windows reports a delete as done while another program (a
+; scanner) still has the file open, and removes the name only when that
+; program closes it, and the program folder is removed below.
+!macro RemoveProgram FILE
+  StrCpy $DeleteAttempts 0
+  ${DoWhile} ${FileExists} "$INSTDIR\${FILE}"
+    ClearErrors
+    Delete "$INSTDIR\${FILE}"
+    ${IfNot} ${Errors}
+      ${ExitDo}
+    ${EndIf}
+    IntOp $DeleteAttempts $DeleteAttempts + 1
+    ${If} $DeleteAttempts >= 20
+      !insertmacro StopSetup "Close Network Toolkit and any separate Editor or Terminal windows before uninstalling."
+    ${EndIf}
+    Sleep 250
+  ${Loop}
+  StrCpy $DeleteAttempts 0
+  ${DoWhile} ${FileExists} "$INSTDIR\${FILE}"
+    IntOp $DeleteAttempts $DeleteAttempts + 1
+    ${If} $DeleteAttempts >= 20
+      ${ExitDo}
+    ${EndIf}
+    Sleep 250
+  ${Loop}
+!macroend
+
 Section "Uninstall"
   ReadRegDWORD $R8 HKCU "${UNINSTALL_KEY}" "DesktopShortcut"
   StrCpy $R7 0
   ${If} $R8 == 1
-    !insertmacro IsOwnedShortcut "$DESKTOP\${APP_NAME}.lnk" "" ""
+    !insertmacro IsOwnedShortcut "$DESKTOP\${APP_NAME}.lnk" "" "" ""
     StrCpy $R7 $R5
   ${EndIf}
-  !insertmacro IsOwnedShortcut "$SMPROGRAMS\${APP_NAME}\${APP_NAME}.lnk" "" ""
+  !insertmacro IsOwnedShortcut "$SMPROGRAMS\${APP_NAME}\${APP_NAME}.lnk" "" "" ""
   StrCpy $NewMainShortcut $R5
-  !insertmacro IsOwnedShortcut "$SMPROGRAMS\${APP_NAME}\${EDITOR_NAME}.lnk" "${EDITOR_ARGS}" "--editor"
+  !insertmacro IsOwnedShortcut "$SMPROGRAMS\${APP_NAME}\${EDITOR_NAME}.lnk" "${EDITOR_ARGS}" "--editor" "${EDITOR_FILENAME}"
   StrCpy $NewEditorShortcut $R5
-  !insertmacro IsOwnedShortcut "$SMPROGRAMS\${APP_NAME}\${APP_NAME} Terminal.lnk" "--terminal" "--terminal"
+  !insertmacro IsOwnedShortcut "$SMPROGRAMS\${APP_NAME}\${APP_NAME} Terminal.lnk" "--terminal" "--terminal" "${TERMINAL_FILENAME}"
   StrCpy $NewTerminalShortcut $R5
   ; An open program must be closed before removing shortcuts or registrations.
-  ; Retry for about five seconds first: antivirus or the search indexer can
-  ; hold a just-written executable briefly, which is not an open program.
-  IfFileExists "$INSTDIR\${APP_FILENAME}" 0 remove_registration
-  StrCpy $DeleteAttempts 0
-  delete_program:
-  ClearErrors
-  Delete "$INSTDIR\${APP_FILENAME}"
-  ${If} ${Errors}
-    IntOp $DeleteAttempts $DeleteAttempts + 1
-    ${If} $DeleteAttempts < 20
-      Sleep 250
-      Goto delete_program
-    ${EndIf}
+  ; None of the three programs is removed while any of them is open; the check
+  ; retries for about five seconds first, because antivirus or the search
+  ; indexer can hold a just-written executable briefly.
+  !insertmacro AreProgramsOpen
+  ${If} $R5 == 1
     !insertmacro StopSetup "Close Network Toolkit and any separate Editor or Terminal windows before uninstalling."
   ${EndIf}
-  ; Windows reports a delete as done while another program (a scanner) still
-  ; has the file open, and removes the name only when that program closes it.
-  ; Wait for the name to go, so the program folder can be removed below.
-  StrCpy $DeleteAttempts 0
-  wait_program_gone:
-  IfFileExists "$INSTDIR\${APP_FILENAME}" 0 remove_registration
-  IntOp $DeleteAttempts $DeleteAttempts + 1
-  ${If} $DeleteAttempts < 20
-    Sleep 250
-    Goto wait_program_gone
-  ${EndIf}
+  !insertmacro RemoveProgram "${EDITOR_FILENAME}"
+  !insertmacro RemoveProgram "${TERMINAL_FILENAME}"
+  !insertmacro RemoveProgram "${APP_FILENAME}"
 
-remove_registration:
   ${If} $R7 == 1
     Delete "$DESKTOP\${APP_NAME}.lnk"
   ${EndIf}

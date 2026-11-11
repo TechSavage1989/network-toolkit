@@ -467,14 +467,14 @@ func (a *application) handleUpdateFeedLocked(w http.ResponseWriter, r *http.Requ
 	}
 	a.updater.progress.Phase = "verifying"
 	a.updater.mu.Unlock()
-	version, binary, e := updateExtractPackage(latest.packageName, archive, sums, model.Version)
+	pkg, e := updateExtractRelease(latest.packageName, archive, sums, model.Version, false)
 	a.updater.mu.Lock()
 	if e != nil {
 		jsonError(w, 400, e.Error())
 		return true
 	}
 	a.updater.progress.Phase = "staging"
-	if e = a.updateStageBinary(version, binary); e != nil {
+	if e = a.updateStagePackage(pkg); e != nil {
 		jsonError(w, 409, e.Error())
 		return true
 	}

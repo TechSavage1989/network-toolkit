@@ -340,6 +340,11 @@ func (a *application) handleTerminalWindow(w http.ResponseWriter, r *http.Reques
 		jsonResponse(w, http.StatusOK, map[string]any{"ok": true, "reused": true, "windowMode": "terminal", "instanceId": a.windowInstanceID})
 		return
 	}
+	if a.updateCommitPending.Load() {
+		// Undoing the update would replace the separate Terminal program's file.
+		jsonError(w, http.StatusServiceUnavailable, "The update is being finished. Open the separate terminal window again in a moment.")
+		return
+	}
 	if a.openTerminalWindow == nil {
 		jsonError(w, http.StatusNotImplemented, "A separate native terminal window is available in the Windows desktop application.")
 		return
@@ -626,7 +631,9 @@ func launchIndependentTerminal(ctx context.Context, root string, preset *termina
 	if err := ctx.Err(); err != nil {
 		return false, err
 	}
-	exe, err := updateCurrentExecutable()
+	// The separate Terminal program when it is beside this one, else this
+	// program with --terminal (edition.go).
+	exe, err := standaloneProgram("terminal")
 	if err != nil {
 		return false, err
 	}

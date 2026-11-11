@@ -205,10 +205,34 @@ $portableExe = (Get-Item -LiteralPath (Join-Path $ArtifactDirectory 'Network_Too
 Assert-Same (Get-ExecutableVersion $setup) $expectedVersion 'Setup executable version'
 Assert-Same (Get-ExecutableVersion $portableExe) $expectedVersion 'Portable executable version'
 $portableHash = (Get-FileHash -LiteralPath $portableExe -Algorithm SHA256).Hash
+# The separate Text Editor and Terminal programs (docs/SEPARATE_EXECUTABLES.md)
+# are not release assets of their own; the portable ZIP of the same build holds
+# the bytes Setup must install.
+$portableZip = @(Get-ChildItem -LiteralPath $ArtifactDirectory -Filter "Network_Toolkit_${version}_Portable.zip" -File)
+if ($portableZip.Count -ne 1) { throw 'The artifact must contain the portable ZIP of the same version.' }
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$separateHashes = @{}
+$zip = [IO.Compression.ZipFile]::OpenRead($portableZip[0].FullName)
+try {
+    foreach ($name in 'Network_Toolkit_TextEditor.exe', 'Network_Toolkit_Terminal.exe') {
+        $entry = $zip.GetEntry("Network_Toolkit_$version/$name")
+        if ($null -eq $entry) { throw "The portable ZIP does not contain $name." }
+        $stream = $entry.Open()
+        try { $separateHashes[$name] = (Get-FileHash -InputStream $stream -Algorithm SHA256).Hash } finally { $stream.Dispose() }
+    }
+} finally { $zip.Dispose() }
+# What Task Manager, the taskbar and Open with show for each program.
+$programDescriptions = [ordered]@{
+    'Network_Toolkit.exe' = 'Network Toolkit - Network Diagnostics'
+    'Network_Toolkit_TextEditor.exe' = 'Network Toolkit Text Editor'
+    'Network_Toolkit_Terminal.exe' = 'Network Toolkit Terminal'
+}
 
 $installDir = Join-Path $env:LOCALAPPDATA 'Programs\Network Toolkit'
 $dataDir = Join-Path $env:LOCALAPPDATA 'NetworkToolkit'
 $installedExe = Join-Path $installDir 'Network_Toolkit.exe'
+$installedEditor = Join-Path $installDir 'Network_Toolkit_TextEditor.exe'
+$installedTerminal = Join-Path $installDir 'Network_Toolkit_Terminal.exe'
 $uninstaller = Join-Path $installDir 'Uninstall.exe'
 $menu = Join-Path ([Environment]::GetFolderPath('Programs')) 'Network Toolkit'
 $desktopShortcut = Join-Path ([Environment]::GetFolderPath('DesktopDirectory')) 'Network Toolkit.lnk'
@@ -247,14 +271,16 @@ $editorKey = "$appKey\TextEditor"
 $createdSubkey = 'Software\Network Toolkit\TextEditor\CreatedKeys'
 $contextMenuExpected = $false
 $rivalMenuTree = ''
-$shortcutArguments = [ordered]@{
-    'Network Toolkit.lnk' = ''
-    'Network Toolkit Text Editor.lnk' = '--editor-standalone'
-    'Network Toolkit Terminal.lnk' = '--terminal'
+# Each Start menu shortcut starts its own program without arguments; the
+# separate programs' icon 0 is their app's icon.
+$shortcutPrograms = [ordered]@{
+    'Network Toolkit.lnk' = 'Network_Toolkit.exe'
+    'Network Toolkit Text Editor.lnk' = 'Network_Toolkit_TextEditor.exe'
+    'Network Toolkit Terminal.lnk' = 'Network_Toolkit_Terminal.exe'
 }
 $shortcutIcons = @{
-    'Network Toolkit Text Editor.lnk' = 1
-    'Network Toolkit Terminal.lnk' = 2
+    'Network Toolkit Text Editor.lnk' = 0
+    'Network Toolkit Terminal.lnk' = 0
 }
 $terminalRegisteredName = 'Network Toolkit Terminal'
 $terminalKey = "$appKey\Terminal"
@@ -420,6 +446,17 @@ function Assert-LinkRegistrationAbsent {
 
 function Assert-Installed([string]$ExpectedHash = $portableHash) {
     Assert-Same (Get-FileHash -LiteralPath $installedExe -Algorithm SHA256).Hash $ExpectedHash 'Installed executable SHA-256'
+    foreach ($name in $separateHashes.Keys) {
+        Assert-Same (Get-FileHash -LiteralPath (Join-Path $installDir $name) -Algorithm SHA256).Hash $separateHashes[$name] "Installed $name SHA-256"
+    }
+    foreach ($name in $programDescriptions.Keys) {
+        if ($name -eq 'Network_Toolkit.exe' -and $ExpectedHash -cne $portableHash) { continue }
+        $info = [Diagnostics.FileVersionInfo]::GetVersionInfo((Join-Path $installDir $name))
+        Assert-Same $info.FileDescription $programDescriptions[$name] "$name description"
+        Assert-Same $info.OriginalFilename $name "$name original file name"
+        Assert-Same $info.ProductName 'Network Toolkit' "$name product name"
+        Assert-Same ([version]::new($info.FileMajorPart, $info.FileMinorPart, $info.FileBuildPart, $info.FilePrivatePart)) $expectedVersion "$name version"
+    }
     if (-not (Test-Path -LiteralPath $uninstaller -PathType Leaf)) { throw 'The uninstaller is missing.' }
     Assert-Absent "HKLM:\$uninstallSubkey"
     Assert-Same (Read-RegistryValue $uninstallKey 'DisplayName') 'Network Toolkit' 'Installed app name'
@@ -503,20 +540,25 @@ function Assert-Installed([string]$ExpectedHash = $portableHash) {
 
     $shell = New-Object -ComObject WScript.Shell
     try {
-        foreach ($name in $shortcutArguments.Keys) {
+        foreach ($name in $shortcutPrograms.Keys) {
             $path = Join-Path $menu $name
             if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Start menu shortcut is missing: $name" }
+            $program = Join-Path $installDir $shortcutPrograms[$name]
+            if ($keptShortcuts.ContainsKey($name)) { continue }
             $link = $shell.CreateShortcut($path)
             try {
-                Assert-Same $link.TargetPath $installedExe "$name target"
-                Assert-Same $link.Arguments $shortcutArguments[$name] "$name arguments"
+                Assert-Same $link.TargetPath $program "$name target"
+                Assert-Same $link.Arguments '' "$name arguments"
                 if ($shortcutIcons.ContainsKey($name)) {
-                    Assert-Same ($link.IconLocation -replace ',\s+', ',') ('{0},{1}' -f $installedExe, $shortcutIcons[$name]) "$name icon"
+                    Assert-Same ($link.IconLocation -replace ',\s+', ',') ('{0},{1}' -f $program, $shortcutIcons[$name]) "$name icon"
                 }
             } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($link) }
         }
     } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($shell) }
 }
+
+# Start menu shortcuts the user changed: Setup must keep them as they are.
+$keptShortcuts = @{}
 
 New-Item -Path $dataDir -ItemType Directory | Out-Null
 Add-Fixture (Join-Path $dataDir 'Network_Toolkit.settings.json') '{"theme":"dark"}'
@@ -559,6 +601,8 @@ try {
     # the Start menu step fails, and all of it must be taken back.
     Invoke-Silent $setup 2 "/S /ContextMenu /D=$lateFailureDir" 'could not finish while creating the Start menu (folder|shortcuts)'
     Assert-Absent (Join-Path $lateFailureDir 'Network_Toolkit.exe')
+    Assert-Absent (Join-Path $lateFailureDir 'Network_Toolkit_TextEditor.exe')
+    Assert-Absent (Join-Path $lateFailureDir 'Network_Toolkit_Terminal.exe')
     Assert-Absent (Join-Path $lateFailureDir 'Uninstall.exe')
     Assert-Absent $uninstallKey
     Assert-Absent $capabilities
@@ -596,7 +640,8 @@ Write-Host 'Checking a terminal link reaches the running Terminal window without
 # exits 0 only after that window validated and queued the connection form.
 # 192.0.2.10 is documentation address space; nothing connects to it.
 $terminalInstance = Join-Path $dataDir 'Network_Toolkit.Terminal\Network_Toolkit.instance.json'
-$owner = Start-Process -FilePath $installedExe -ArgumentList '--terminal --no-browser' -PassThru
+# The separate Terminal program opens the Terminal without a switch.
+$owner = Start-Process -FilePath $installedTerminal -ArgumentList '--no-browser' -PassThru
 $null = $owner.Handle
 try {
     $deadline = [DateTime]::UtcNow.AddSeconds(45)
@@ -605,7 +650,7 @@ try {
         if ([DateTime]::UtcNow -gt $deadline) { throw 'The Terminal window did not register within 45 seconds.' }
         Start-Sleep -Milliseconds 200
     }
-    $linkLaunch = Start-Process -FilePath $installedExe -ArgumentList '--terminal --open-url "ssh://operator:synthetic-password@192.0.2.10:2222"' -PassThru
+    $linkLaunch = Start-Process -FilePath $installedTerminal -ArgumentList '--open-url "ssh://operator:synthetic-password@192.0.2.10:2222"' -PassThru
     $null = $linkLaunch.Handle
     try {
         if (-not $linkLaunch.WaitForExit(30000)) { throw 'The link launch did not hand its connection to the running Terminal window.' }
@@ -615,6 +660,30 @@ try {
         $linkLaunch.Dispose()
     }
     if ($owner.HasExited) { throw 'The Terminal window stopped after receiving a link.' }
+    # The registered command and a released shortcut still start
+    # Network_Toolkit.exe --terminal: it hands the same request to the separate
+    # Terminal program, which hands it to the running window. One Terminal
+    # stays open, whichever program was started.
+    foreach ($arguments in '--terminal --open-url "telnet://192.0.2.10:2323"', '--terminal --no-browser') {
+        $forwarded = Start-Process -FilePath $installedExe -ArgumentList $arguments -PassThru
+        $null = $forwarded.Handle
+        try {
+            if (-not $forwarded.WaitForExit(30000)) { throw "Network_Toolkit.exe $arguments did not finish." }
+            Assert-Same $forwarded.ExitCode 0 "Exit code from Network_Toolkit.exe $arguments"
+        } finally {
+            if (-not $forwarded.HasExited) { $forwarded.Kill() }
+            $forwarded.Dispose()
+        }
+        $deadline = [DateTime]::UtcNow.AddSeconds(30)
+        do {
+            $others = @(Get-Process -ErrorAction SilentlyContinue | Where-Object {
+                $_.Id -ne $owner.Id -and $(try { $_.Path -and $_.Path.StartsWith($installDir, [StringComparison]::OrdinalIgnoreCase) } catch { $false })
+            })
+            if ($others.Count -gt 0) { Start-Sleep -Milliseconds 200 }
+        } while ($others.Count -gt 0 -and [DateTime]::UtcNow -lt $deadline)
+        if ($others.Count -gt 0) { throw "A second program stayed open after Network_Toolkit.exe ${arguments}: $(($others | ForEach-Object { $_.ProcessName }) -join ', ')" }
+        if ($owner.HasExited) { throw "The Terminal window stopped after Network_Toolkit.exe $arguments." }
+    }
     if (Get-NetTCPConnection -OwningProcess $owner.Id -RemoteAddress '192.0.2.10' -ErrorAction SilentlyContinue) {
         throw 'Opening a terminal link started a connection before the user confirmed it.'
     }
@@ -629,32 +698,68 @@ Assert-Preserved
 
 Write-Host 'Checking install and uninstall leave a locked program intact.'
 $temporaryUninstaller = Join-Path $env:RUNNER_TEMP "ntk-uninstall-$([Guid]::NewGuid().ToString('N')).exe"
-$programLock = [IO.File]::Open($installedExe, 'Open', 'Read', 'Read')
+# Each of the three programs in turn: nothing is replaced or removed while one
+# of them is in use.
+foreach ($lockedProgram in $installedExe, $installedEditor, $installedTerminal) {
+    $programLock = [IO.File]::Open($lockedProgram, 'Open', 'Read', 'Read')
+    try {
+        Invoke-Silent $setup 2 '/S' 'could not finish while checking that Network Toolkit and its Text Editor and Terminal programs are closed'
+        Assert-Installed
+        # NSIS normally relaunches from a temp copy, hiding the worker's exit code.
+        # Run our own copy with _?= last and unquoted, including spaces in the path.
+        Copy-Item -LiteralPath $uninstaller -Destination $temporaryUninstaller -Force
+        Invoke-Silent $temporaryUninstaller 2 "/S _?=$installDir" 'Close Network Toolkit and any separate Editor or Terminal windows before uninstalling'
+        Assert-Installed
+        Assert-Preserved
+    } finally {
+        $programLock.Dispose()
+        if (Test-Path -LiteralPath $temporaryUninstaller) { Remove-Item -LiteralPath $temporaryUninstaller }
+    }
+}
+
+Write-Host 'Checking a running separate Terminal program blocks uninstall.'
+# The Terminal stopped above left its record; wait for this one's own.
+Remove-Item -LiteralPath $terminalInstance -ErrorAction SilentlyContinue
+$runningTerminal = Start-Process -FilePath $installedTerminal -ArgumentList '--no-browser' -PassThru
+$null = $runningTerminal.Handle
 try {
-    Invoke-Silent $setup 2 '/S' 'could not finish while placing the program file \(Windows error (5|32)\)'
-    Assert-Installed
-    # NSIS normally relaunches from a temp copy, hiding the worker's exit code.
-    # Run our own copy with _?= last and unquoted, including spaces in the path.
-    Copy-Item -LiteralPath $uninstaller -Destination $temporaryUninstaller
+    $deadline = [DateTime]::UtcNow.AddSeconds(45)
+    while (-not (Test-Path -LiteralPath $terminalInstance -PathType Leaf)) {
+        if ($runningTerminal.HasExited) { throw "The Terminal program stopped during startup (exit code $($runningTerminal.ExitCode))." }
+        if ([DateTime]::UtcNow -gt $deadline) { throw 'The Terminal program did not register within 45 seconds.' }
+        Start-Sleep -Milliseconds 200
+    }
+    Copy-Item -LiteralPath $uninstaller -Destination $temporaryUninstaller -Force
     Invoke-Silent $temporaryUninstaller 2 "/S _?=$installDir" 'Close Network Toolkit and any separate Editor or Terminal windows before uninstalling'
     Assert-Installed
     Assert-Preserved
 } finally {
-    $programLock.Dispose()
+    if (-not $runningTerminal.HasExited) {
+        $runningTerminal.Kill()
+        [void]$runningTerminal.WaitForExit(15000)
+    }
+    $runningTerminal.Dispose()
     if (Test-Path -LiteralPath $temporaryUninstaller) { Remove-Item -LiteralPath $temporaryUninstaller }
 }
 
 Write-Host 'Checking repair replaces the executable and preserves data.'
 Add-Fixture (Join-Path $installDir 'user-created.txt') 'Unrelated file in the install directory'
 [IO.File]::WriteAllText($installedExe, 'Synthetic fixture for installer repair')
-# Version 1.21.35 created this shortcut with --editor. Upgrade it in place.
+[IO.File]::WriteAllText($installedTerminal, 'Synthetic fixture for installer repair')
+# Version 1.21.35 created this shortcut with --editor, and every released Setup
+# up to 1.21.46 the Terminal shortcut as Network_Toolkit.exe --terminal. An
+# upgrade points both at the separate programs.
 $legacyShell = New-Object -ComObject WScript.Shell
 try {
-    $legacyLink = $legacyShell.CreateShortcut((Join-Path $menu 'Network Toolkit Text Editor.lnk'))
-    try {
-        $legacyLink.Arguments = '--editor'
-        $legacyLink.Save()
-    } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($legacyLink) }
+    foreach ($legacy in @(@('Network Toolkit Text Editor.lnk', '--editor', 1), @('Network Toolkit Terminal.lnk', '--terminal', 2))) {
+        $legacyLink = $legacyShell.CreateShortcut((Join-Path $menu $legacy[0]))
+        try {
+            $legacyLink.TargetPath = $installedExe
+            $legacyLink.Arguments = $legacy[1]
+            $legacyLink.IconLocation = '{0},{1}' -f $installedExe, $legacy[2]
+            $legacyLink.Save()
+        } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($legacyLink) }
+    }
 } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($legacyShell) }
 # When the user picks the program in "Open with", Windows writes this entry
 # itself, with the bare file name. Setup replaces the command of an entry that
@@ -668,6 +773,28 @@ Assert-Installed
 Assert-Preserved
 Assert-Same (Read-RegistryValue $uninstallKey 'DesktopShortcut') 1 'Selected desktop shortcut'
 
+Write-Host 'Checking an upgrade keeps a Start menu shortcut the user changed.'
+$customTerminal = Join-Path $menu 'Network Toolkit Terminal.lnk'
+$customShell = New-Object -ComObject WScript.Shell
+try {
+    $customLink = $customShell.CreateShortcut($customTerminal)
+    try {
+        $customLink.TargetPath = $installedExe
+        $customLink.Arguments = '--terminal --data-dir "C:\Synthetic Data"'
+        $customLink.Save()
+    } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($customLink) }
+} finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($customShell) }
+$customHash = (Get-FileHash -LiteralPath $customTerminal -Algorithm SHA256).Hash
+$keptShortcuts['Network Toolkit Terminal.lnk'] = $true
+Invoke-Silent $setup
+Assert-Installed
+Assert-Same (Get-FileHash -LiteralPath $customTerminal -Algorithm SHA256).Hash $customHash 'Start menu shortcut the user changed'
+# Uninstall leaves it too; put Setup's own shortcut back for the checks below.
+$keptShortcuts.Remove('Network Toolkit Terminal.lnk')
+Remove-Item -LiteralPath $customTerminal
+Invoke-Silent $setup
+Assert-Installed
+
 Write-Host 'Checking setup refuses to overwrite a newer executable.'
 # An inbox PE has a real fixed version resource. It is copied only, never launched.
 $newerExe = Join-Path $env:SystemRoot 'System32\cmd.exe'
@@ -676,6 +803,7 @@ $newerHash = (Get-FileHash -LiteralPath $newerExe -Algorithm SHA256).Hash
 $uninstallHash = (Get-FileHash -LiteralPath $uninstaller -Algorithm SHA256).Hash
 Copy-Item -LiteralPath $newerExe -Destination $installedExe
 Invoke-Silent $setup 2 '/S' 'A newer version of Network Toolkit'
+# Refused before anything is placed: the separate programs are untouched too.
 Assert-Installed $newerHash
 Assert-Same (Get-FileHash -LiteralPath $uninstaller -Algorithm SHA256).Hash $uninstallHash 'Uninstaller after refused downgrade'
 Assert-Preserved
@@ -684,7 +812,7 @@ Copy-Item -LiteralPath $portableExe -Destination $installedExe
 Write-Host 'Checking uninstall removes owned registrations and preserves data.'
 Invoke-Uninstaller $uninstaller
 Assert-UninstallFinished
-foreach ($path in @($installedExe, $uninstaller, $menu, $desktopShortcut, $uninstallKey, "HKLM:\$uninstallSubkey", $capabilities, $progKey, $appKey)) {
+foreach ($path in @($installedExe, $installedEditor, $installedTerminal, $uninstaller, $menu, $desktopShortcut, $uninstallKey, "HKLM:\$uninstallSubkey", $capabilities, $progKey, $appKey)) {
     Assert-Absent $path
 }
 Assert-Same (Read-RegistryValue $registeredApps $registeredName) $null 'Removed Default Apps registration'
@@ -706,7 +834,23 @@ $applicationOwnedBySetup = $false
 $defaultInstallDir = $installDir
 $installDir = Join-Path $env:RUNNER_TEMP 'Custom Network Toolkit Install'
 $installedExe = Join-Path $installDir 'Network_Toolkit.exe'
+$installedEditor = Join-Path $installDir 'Network_Toolkit_TextEditor.exe'
+$installedTerminal = Join-Path $installDir 'Network_Toolkit_Terminal.exe'
 $uninstaller = Join-Path $installDir 'Uninstall.exe'
+# An uninstaller of 1.21.46 or older, after an in-app update added the separate
+# programs, leaves them behind. A fresh setup in that folder replaces them once
+# they are closed, a read-only one included, and refuses while one is open.
+New-Item -Path $installDir -ItemType Directory | Out-Null
+[IO.File]::WriteAllText($installedEditor, 'Separate program left by an older uninstaller')
+[IO.File]::WriteAllText($installedTerminal, 'Separate program left by an older uninstaller')
+$leftoverLock = [IO.File]::Open($installedTerminal, 'Open', 'Read', 'Read')
+try {
+    Invoke-Silent $setup 2 "/S /D=$installDir" 'could not finish while checking that Network Toolkit and its Text Editor and Terminal programs are closed'
+    Assert-Absent $installedExe
+    Assert-Absent $uninstallKey
+    Assert-Same ([IO.File]::ReadAllText($installedEditor)) 'Separate program left by an older uninstaller' 'Left-behind Text Editor program while another one is open'
+} finally { $leftoverLock.Dispose() }
+(Get-Item -LiteralPath $installedTerminal).IsReadOnly = $true
 Invoke-Silent $setup 0 "/S /DesktopShortcut /ContextMenu /D=$installDir"
 $contextMenuExpected = $true
 Assert-Installed
@@ -721,6 +865,8 @@ try {
     } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($desktopLink) }
 } finally { [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($desktopShell) }
 Assert-Absent (Join-Path $defaultInstallDir 'Network_Toolkit.exe')
+Assert-Absent (Join-Path $defaultInstallDir 'Network_Toolkit_TextEditor.exe')
+Assert-Absent (Join-Path $defaultInstallDir 'Network_Toolkit_Terminal.exe')
 
 # Re-running Setup with no location switch must reuse the registered custom folder.
 Invoke-Silent $setup
@@ -770,7 +916,7 @@ if ($takenScheme) {
 }
 Invoke-Uninstaller $uninstaller
 Assert-UninstallFinished
-foreach ($path in @($installedExe, $uninstaller, $menu, $uninstallKey, $terminalKey, $linkProgKey, $appKey)) {
+foreach ($path in @($installedExe, $installedEditor, $installedTerminal, $uninstaller, $menu, $uninstallKey, $terminalKey, $linkProgKey, $appKey)) {
     Assert-Absent $path
 }
 Assert-Same (Read-RegistryValue $registeredApps $terminalRegisteredName) $null 'Removed terminal link registration'

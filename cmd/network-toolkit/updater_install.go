@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -27,6 +28,28 @@ type updatePlan struct {
 	ParentPID       int      `json:"parentPID"`
 	Nonce           string   `json:"nonce"`
 	Args            []string `json:"args"`
+	// Companions are the separate Text Editor and Terminal programs replaced
+	// (or created) with Target in one transaction (docs/SEPARATE_EXECUTABLES.md).
+	// Plans of earlier versions have none.
+	Companions []updatePlanCompanion `json:"companions,omitempty"`
+}
+
+// updatePlanCompanion is one separate program beside Target. OriginalSHA256 is
+// empty when the program is not installed yet and is created by the update.
+type updatePlanCompanion struct {
+	Target          string `json:"target"`
+	OriginalSHA256  string `json:"originalSHA256,omitempty"`
+	CandidateSHA256 string `json:"candidateSHA256"`
+}
+
+// Transaction files of a separate program: candidate-<target> and
+// previous-<target> in the stage folder, and beside the program while it is
+// replaced (ReplaceFileW needs one volume).
+func updateCompanionStageFile(dir, role, target string) string {
+	return filepath.Join(dir, role+"-"+target)
+}
+func updateCompanionSwapFile(p updatePlan, target, role string) string {
+	return filepath.Join(p.TargetDir, ".network-toolkit-swap-"+p.Nonce+"-"+strings.TrimSuffix(target, ".exe")+"-"+role+".exe")
 }
 
 func updateReadPlan(dir string) (updatePlan, error) {
@@ -66,6 +89,31 @@ func updateReadPlan(dir string) (updatePlan, error) {
 	}
 	if p.LaunchTarget != "" && (p.TargetDir == "" || (p.LaunchTarget != updateOfficialExecutableName(p.Version) && p.LaunchTarget != updateStableExecutableName)) {
 		return p, errors.New("Invalid versioned launch target")
+	}
+	if len(p.Companions) > 0 {
+		if p.TargetDir == "" || len(p.Companions) > len(updateCompanionEditions) {
+			return p, errors.New("Invalid separate programs in the update plan")
+		}
+		seen := map[string]bool{}
+		for _, c := range p.Companions {
+			known := false
+			for _, edition := range updateCompanionEditions {
+				known = known || c.Target == programNameFor("windows", edition)
+			}
+			if !known || seen[strings.ToLower(c.Target)] || strings.EqualFold(c.Target, p.Target) || strings.EqualFold(c.Target, p.LaunchTarget) {
+				return p, errors.New("Invalid separate program in the update plan")
+			}
+			seen[strings.ToLower(c.Target)] = true
+			digests := []string{c.CandidateSHA256}
+			if c.OriginalSHA256 != "" { // empty: created by this update
+				digests = append(digests, c.OriginalSHA256)
+			}
+			for _, digest := range digests {
+				if b, err := hex.DecodeString(digest); err != nil || len(b) != 32 || strings.ToLower(digest) != digest {
+					return p, errors.New("Invalid separate program checksum in the update plan")
+				}
+			}
+		}
 	}
 	return p, nil
 }
@@ -157,6 +205,10 @@ func startUpdateInstaller(s *stagedUpdate) error {
 		return fmt.Errorf("Cannot preserve working directory: %w", e)
 	}
 	p := updatePlan{TargetDir: filepath.Dir(exe), WorkingDir: workingDir, Target: filepath.Base(exe), OriginalSHA256: updateHash(old), CandidateSHA256: s.SHA256, Version: s.Version, ParentPID: os.Getpid(), Nonce: randomHex(32), Args: updateRestartArgs(os.Args[1:])}
+	if p.Companions, e = updatePlanCompanions(s, p.TargetDir); e != nil {
+		os.Remove(helper)
+		return e
+	}
 	if _, official := updateOfficialExecutableVersion(p.Target); official {
 		p.LaunchTarget = updateStableExecutableName
 		if _, err := os.Lstat(filepath.Join(p.TargetDir, p.LaunchTarget)); !os.IsNotExist(err) {
@@ -192,6 +244,31 @@ func startUpdateInstaller(s *stagedUpdate) error {
 	os.Remove(filepath.Join(s.dir, "plan.json"))
 	return errors.New("The update helper did not start. The current application remains running.")
 }
+
+// updatePlanCompanions records each staged separate program with the hash of
+// the file it replaces beside the main program, or none when it is created.
+func updatePlanCompanions(s *stagedUpdate, targetDir string) ([]updatePlanCompanion, error) {
+	var list []updatePlanCompanion
+	for _, c := range s.Companions {
+		b, err := updateNamingReadFile(updateCompanionStageFile(s.dir, "candidate", c.Name), updateMaxEXE)
+		if err != nil {
+			return nil, err
+		}
+		if updateHash(b) != c.SHA256 {
+			return nil, errors.New("Staged update changed. Import or download it again.")
+		}
+		entry := updatePlanCompanion{Target: c.Name, CandidateSHA256: c.SHA256}
+		installed, err := updateNamingReadFile(filepath.Join(targetDir, c.Name), updateMaxEXE)
+		if err == nil {
+			entry.OriginalSHA256 = updateHash(installed)
+		} else if !os.IsNotExist(err) {
+			return nil, fmt.Errorf("%s could not be read: %w", c.Name, err)
+		}
+		list = append(list, entry)
+	}
+	return list, nil
+}
+
 func runUpdateHelperIfRequested() bool {
 	if len(os.Args) < 2 || os.Args[1] != "--apply-update" {
 		return false
@@ -233,10 +310,42 @@ type updateInstallOperations struct {
 	replace        func(string, string, string) error
 	restoreMissing func(string, string) error
 	startupTimeout time.Duration
+	// place creates a separate program that was not installed yet; nil uses
+	// the no-replace move.
+	place func(string, string) error
+	// checkProgram start-checks a placed separate program; nil runs it with
+	// --version (checkUpdateProgram).
+	checkProgram func(path, version string) error
+}
+
+// checkUpdateProgram proves that a separate program placed by an update
+// starts: its --version run exits 0 and names the version that was installed.
+func checkUpdateProgram(path, version string) error {
+	return checkUpdateProgramWithin(path, version, 30*time.Second)
+}
+
+func checkUpdateProgramWithin(path, version string, limit time.Duration) error {
+	ctx, cancel := context.WithTimeout(context.Background(), limit)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, path, "--version")
+	cmd.Dir = filepath.Dir(path)
+	cmd.WaitDelay = time.Second
+	configureUpdateHelperProcess(cmd)
+	out, err := cmd.Output()
+	if ctx.Err() != nil {
+		return fmt.Errorf("%s did not finish starting", filepath.Base(path))
+	}
+	if err != nil {
+		return fmt.Errorf("%s did not start: %v", filepath.Base(path), err)
+	}
+	if !strings.HasPrefix(string(out), appName+" "+version+" ") {
+		return fmt.Errorf("%s did not report version %s", filepath.Base(path), version)
+	}
+	return nil
 }
 
 func applyUpdatePlan(dir string) error {
-	return applyUpdatePlanWithOperations(dir, updateInstallOperations{os.Executable, waitUpdateParent, replaceUpdateExecutable, restoreMissingUpdateTarget, 90 * time.Second})
+	return applyUpdatePlanWithOperations(dir, updateInstallOperations{os.Executable, waitUpdateParent, replaceUpdateExecutable, restoreMissingUpdateTarget, 90 * time.Second, nil, nil})
 }
 
 func applyUpdatePlanWithOperations(dir string, ops updateInstallOperations) (result error) {
@@ -289,6 +398,31 @@ func applyUpdatePlanWithOperations(dir string, ops updateInstallOperations) (res
 	if e != nil || newHash != p.CandidateSHA256 {
 		return errors.New("Staged executable changed; update was not applied.")
 	}
+	// Every separate program and its candidate is checked before anything is
+	// replaced, so a changed file stops the whole update.
+	for _, c := range p.Companions {
+		installed, err := updateFileHash(filepath.Join(p.TargetDir, c.Target))
+		if c.OriginalSHA256 == "" {
+			if _, statErr := os.Lstat(filepath.Join(p.TargetDir, c.Target)); !os.IsNotExist(statErr) {
+				return errors.New(c.Target + " appeared after the update was prepared; update was not applied.")
+			}
+		} else if err != nil || installed != c.OriginalSHA256 {
+			return errors.New(c.Target + " changed; update was not applied.")
+		}
+		if staged, err := updateFileHash(updateCompanionStageFile(dir, "candidate", c.Target)); err != nil || staged != c.CandidateSHA256 {
+			return errors.New("Staged " + c.Target + " changed; update was not applied.")
+		}
+		if _, err := os.Lstat(updateCompanionSwapFile(p, c.Target, "previous")); !os.IsNotExist(err) {
+			return errors.New("Recovery transaction file already exists; refusing to overwrite it")
+		}
+	}
+	for _, c := range p.Companions {
+		swap := updateCompanionSwapFile(p, c.Target, "candidate")
+		if e = updateCopyVerified(updateCompanionStageFile(dir, "candidate", c.Target), swap, c.CandidateSHA256); e != nil {
+			return e
+		}
+		defer updateRemoveVerified(swap, c.CandidateSHA256)
+	}
 	// ReplaceFileW requires all participants on the target volume. Settings
 	// may be on a different drive; only these transaction files live beside
 	// the application, and their nonce+hash ownership is recorded by the plan.
@@ -317,10 +451,30 @@ func applyUpdatePlanWithOperations(dir string, ops updateInstallOperations) (res
 		}
 		return fmt.Errorf("Could not replace the application (another window, antivirus, or folder permissions may be blocking it): %w", e)
 	}
+	// The separate programs follow; if one fails, the done steps and the main
+	// program are put back before the previous version restarts.
+	undoCompanions, startErr := applyUpdateCompanions(dir, p, ops)
+	if startErr != nil {
+		startErr = fmt.Errorf("Could not update the separate programs (another window, antivirus, or folder permissions may be blocking them): %w", startErr)
+	} else {
+		// Each separate program must start before the update counts; if one
+		// does not, every file is put back (undoCompanions and the main rollback).
+		check := ops.checkProgram
+		if check == nil {
+			check = checkUpdateProgram
+		}
+		for _, c := range p.Companions {
+			progress.Set("Checking " + c.Target + "...")
+			if err := check(filepath.Join(p.TargetDir, c.Target), p.Version); err != nil {
+				startErr = fmt.Errorf("The updated separate program does not start: %w", err)
+				break
+			}
+			updateLog(dir, "%s starts.", c.Target)
+		}
+	}
 	originalTarget := target
-	var startErr error
 	launchTarget := updatePlanLaunchTarget(dir, p)
-	if !updateNamingSamePath(target, launchTarget) {
+	if startErr == nil && !updateNamingSamePath(target, launchTarget) {
 		startErr = moveUpdateNamingNoReplace(target, launchTarget)
 		if startErr == nil {
 			target = launchTarget
@@ -349,6 +503,7 @@ func applyUpdatePlanWithOperations(dir string, ops updateInstallOperations) (res
 				b, _ := os.ReadFile(filepath.Join(dir, "ready"))
 				if string(b) == p.Nonce {
 					updateLog(dir, "Application startup confirmed.")
+					keepUpdateCompanionBackups(dir, p)
 					if p.TargetDir != "" {
 						if e = updateCopyVerified(backup, stagedBackup, p.OriginalSHA256); e != nil {
 							// The healthy app stays running. Preserve the only rollback
@@ -375,6 +530,10 @@ func applyUpdatePlanWithOperations(dir string, ops updateInstallOperations) (res
 	}
 	progress.Set("Restoring the previous application after a restart failure...")
 	updateLog(dir, "Restart failed: %v. Restoring the previous executable.", startErr)
+	if err := undoCompanions(); err != nil {
+		updateLog(dir, "Restoring the separate programs failed: %v", err)
+		startErr = fmt.Errorf("%v Restoring the separate programs also failed: %v. Restore them from the .network-toolkit-swap-*-previous.exe files beside the program while all app windows are closed", startErr, err)
+	}
 	// The failed new process is stopped before rollback; keep its binary for diagnostics.
 	failed := filepath.Join(dir, "failed.exe")
 	if p.TargetDir != "" {
@@ -402,6 +561,94 @@ func applyUpdatePlanWithOperations(dir string, ops updateInstallOperations) (res
 	updateLog(dir, "Previous executable restored; recovery process started (PID %d).", restore.Process.Pid)
 	_ = restore.Process.Release()
 	return fmt.Errorf("%v The previous executable was restored and restarted", startErr)
+}
+
+// applyUpdateCompanions replaces or creates each separate program after the
+// main program was replaced. It returns the undo of every step it did (also
+// after a failure, when it has already undone its own steps and the returned
+// undo does nothing more).
+func applyUpdateCompanions(dir string, p updatePlan, ops updateInstallOperations) (func() error, error) {
+	place := ops.place
+	if place == nil {
+		place = moveUpdateNamingNoReplace
+	}
+	type step struct {
+		c        updatePlanCompanion
+		target   string
+		replaced bool
+	}
+	var done []step
+	undo := func() error {
+		var failures []string
+		for i := len(done) - 1; i >= 0; i-- {
+			s := done[i]
+			if s.replaced {
+				failed := updateCompanionSwapFile(p, s.c.Target, "failed")
+				if err := ops.replace(s.target, updateCompanionSwapFile(p, s.c.Target, "previous"), failed); err != nil {
+					failures = append(failures, s.c.Target+": "+err.Error())
+					continue
+				}
+				if err := updateCopyVerified(failed, updateCompanionStageFile(dir, "failed", s.c.Target), s.c.CandidateSHA256); err == nil {
+					_ = updateRemoveVerified(failed, s.c.CandidateSHA256)
+				}
+			} else if err := updateRemoveVerified(s.target, s.c.CandidateSHA256); err != nil {
+				failures = append(failures, s.c.Target+": "+err.Error())
+			}
+		}
+		done = nil
+		if len(failures) > 0 {
+			return errors.New(strings.Join(failures, "; "))
+		}
+		return nil
+	}
+	for _, c := range p.Companions {
+		target := filepath.Join(p.TargetDir, c.Target)
+		candidate := updateCompanionSwapFile(p, c.Target, "candidate")
+		if c.OriginalSHA256 == "" {
+			if err := place(candidate, target); err != nil {
+				if undoErr := undo(); undoErr != nil {
+					return undo, fmt.Errorf("%s: %v; undo failed: %v", c.Target, err, undoErr)
+				}
+				return undo, fmt.Errorf("%s: %w", c.Target, err)
+			}
+			done = append(done, step{c, target, false})
+			updateLog(dir, "Created %s.", c.Target)
+			continue
+		}
+		backup := updateCompanionSwapFile(p, c.Target, "previous")
+		if err := ops.replace(target, candidate, backup); err != nil {
+			// ReplaceFileW can leave the original under its backup name.
+			if _, statErr := os.Stat(target); os.IsNotExist(statErr) {
+				if hash, hashErr := updateFileHash(backup); hashErr == nil && hash == c.OriginalSHA256 {
+					_ = ops.restoreMissing(backup, target)
+				}
+			}
+			if undoErr := undo(); undoErr != nil {
+				return undo, fmt.Errorf("%s: %v; undo failed: %v", c.Target, err, undoErr)
+			}
+			return undo, fmt.Errorf("%s: %w", c.Target, err)
+		}
+		done = append(done, step{c, target, true})
+		updateLog(dir, "Replaced %s.", c.Target)
+	}
+	return undo, nil
+}
+
+// keepUpdateCompanionBackups moves the replaced separate programs from beside
+// the program into the stage folder (previous-<target>), like previous.exe.
+// A copy that cannot be moved stays where it is; retention removes it later.
+func keepUpdateCompanionBackups(dir string, p updatePlan) {
+	for _, c := range p.Companions {
+		if c.OriginalSHA256 == "" {
+			continue
+		}
+		swap := updateCompanionSwapFile(p, c.Target, "previous")
+		if err := updateCopyVerified(swap, updateCompanionStageFile(dir, "previous", c.Target), c.OriginalSHA256); err != nil {
+			updateLog(dir, "Previous %s transfer pending: %v", c.Target, err)
+			continue
+		}
+		_ = updateRemoveVerified(swap, c.OriginalSHA256)
+	}
 }
 
 // Keep the launch directory as well as arguments: relative --data-dir values

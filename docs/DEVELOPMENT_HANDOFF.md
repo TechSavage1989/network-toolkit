@@ -1,3 +1,17 @@
+# v1.21.47 Beta 1 - The Text Editor and the Terminal as separate programs
+
+Owner: "i'd like the full version to offer Text Editor and Terminal as separate executables that retain all of their current functionality and interactions", answered "Full separate programs" and "Portable too".
+
+v1.21.46 was published and verified: tag at merge commit 7e3e1fc (PR #169), release run 42979316729 green, all seven assets matching GitHub's digests, `github_release.py verify` reporting "Verified 1.21.46", stable channel still at v1.21.34. Its new Windows tests found a real bug before release ("Install the full version" refused Setup when %LOCALAPPDATA% has 8.3 short names; fixed by comparing long path forms).
+
+Design, upgrade paths and known limits are in `docs/SEPARATE_EXECUTABLES.md`. `Network_Toolkit_TextEditor.exe` and `Network_Toolkit_Terminal.exe` are the same code built with `ntk_editor`/`ntk_terminal` (resources in `internal/winres/<edition>`, linked with `build/separate-programs.overlay.json` so the main resource object is left out; a plain tagged `go build` fails with "too many .rsrc sections"). `Network_Toolkit.exe` forwards a standalone app to a same-version sibling and runs it itself when the sibling fails within 3 s. The Update ZIP carries all three; the update helper replaces them in one transaction, start-checks each separate program with `--version` and rolls everything back on any failure. Setup installs all three and replaces separate programs left behind by an older uninstaller. Release assets stay seven; `FIRST_SEPARATE_PROGRAMS` is 1.21.47, so 1.21.44 to 1.21.46 still verify.
+
+An independent review found two MEDIUM issues (Setup refused a folder with left-behind separate programs; nothing checked that the separate programs start) and seven LOW ones; the MEDIUM ones and three LOW ones were fixed, the rest are recorded as known limits (busy check keyed by data root, a ~26 MB Update ZIP under older updaters' five-minute limit, a lone exe gaining two programs on update, a separate program started from Start during the update's start check is not stopped).
+
+Known limits: not run on physical Windows; the release builds' real PE resources and the Setup paths are exercised only by hosted CI.
+
+---
+
 # v1.21.46 Beta 1 - The portable program works with Windows
 
 Owner: "i want option 2 for full functionality" (the portable copy writes the same per-user registrations as Setup, with Remove) and "id also like an option for the portable version to be able to download the full install version if desired."

@@ -17,7 +17,13 @@ Run commands from the repository root. Read [AGENTS.md](../AGENTS.md) and the
 
 Use the Go version in `go.mod`. Windows build wrappers keep their original
 entry points and output: `BUILD_WINDOWS.cmd` or `sh build.sh` produces
-`build/Network_Toolkit.exe`. The executable does not need the source folders.
+`build/Network_Toolkit.exe`, and beside it the separate Text Editor and
+Terminal programs `build/Network_Toolkit_TextEditor.exe` and
+`build/Network_Toolkit_Terminal.exe` ([separate programs](SEPARATE_EXECUTABLES.md)).
+They are the same code built with the `ntk_editor` and `ntk_terminal` tags and an
+overlay that leaves the main program's resource object out; a plain
+`go build -tags ntk_terminal` for Windows stops with "too many .rsrc sections".
+The executables do not need the source folders.
 
 ```sh
 python3 scripts/github_release.py validate
@@ -61,14 +67,17 @@ make `makensis` available on `PATH` to include the Windows setup executable.
 
 ```sh
 python3 scripts/github_release.py package --exe build/Network_Toolkit.exe \
+  --editor-exe build/Network_Toolkit_TextEditor.exe --terminal-exe build/Network_Toolkit_Terminal.exe \
   --linux-x86-64 build/linux-amd64/network-toolkit --linux-aarch64 build/linux-arm64/network-toolkit
 python3 scripts/github_release.py verify
 ```
 
 Packaging uses the current version from source. Portable bundles retain
-top-level `README.txt`, `VALIDATION.txt` and the current release note;
-their `source/` tree mirrors the repository. The binary-only update bundle keeps
-its original four-member allowlist, taking its guides from `docs/`.
+top-level `README.txt`, `VALIDATION.txt` and the current release note, and hold
+the three programs; their `source/` tree mirrors the repository. The
+binary-only update bundle keeps the four members released updaters read and
+adds the two separate programs (six members), taking its guides from `docs/`.
+The release assets stay the same seven.
 
 Checks installs and removes the setup build on an isolated Windows runner.
 Release repeats that validation against the exact installer before publishing.

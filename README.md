@@ -77,7 +77,9 @@
 
 [Download the latest stable release](https://github.com/TechSavage1989/network-toolkit/releases/latest). It provides the portable package **`Network_Toolkit_<version>_Portable.zip`**, the executable **`Network_Toolkit.exe`** and **`SHA256SUMS`** for checking the files.
 
-The [releases page](https://github.com/TechSavage1989/network-toolkit/releases) also offers **`Network_Toolkit_<version>_Windows_x64_Setup.exe`**. Choose an install folder, an optional desktop shortcut and an optional **Edit with Network Toolkit Text Editor** entry in the Explorer right-click menu. Setup adds separate Start menu shortcuts for Toolkit, Text Editor and Terminal; the Text Editor and Terminal apps can send text to each other. See [Windows installation and defaults](docs/guide/settings-and-updates.md#windows-installation-and-defaults).
+The [releases page](https://github.com/TechSavage1989/network-toolkit/releases) also offers **`Network_Toolkit_<version>_Windows_x64_Setup.exe`**. Choose an install folder, an optional desktop shortcut and an optional **Edit with Network Toolkit Text Editor** entry in the Explorer right-click menu. Setup adds separate Start menu shortcuts for Toolkit, Text Editor and Terminal; the Text Editor and Terminal apps can send text to each other.
+
+The Text Editor and the Terminal are also separate programs, **`Network_Toolkit_TextEditor.exe`** and **`Network_Toolkit_Terminal.exe`**, beside `Network_Toolkit.exe` in the portable package and in the installed folder, each with its own icon and name in the taskbar and Task Manager. They share all settings and saved data with the main program, and updates install the three together. See [Windows installation and defaults](docs/guide/settings-and-updates.md#windows-installation-and-defaults).
 
 Started from the portable package, Network Toolkit can do the same from **App settings**: **Editor → Use this copy's Text Editor in Windows** offers the portable copy's Text Editor in Windows' **Open with** and **Default apps** (with an optional right-click entry), and **Updates → Install the full version** downloads Setup for the same version, checks it against **`SHA256SUMS`** and starts it when you confirm. Both keep your data folder and settings. See [Portable copy: Text Editor in Windows](docs/guide/editor.md#portable-copy-use-its-text-editor-in-windows) and [Install the full version](docs/guide/settings-and-updates.md#install-the-full-version-from-the-portable-copy).
 
@@ -94,7 +96,7 @@ Started from the portable package, Network Toolkit can do the same from **App se
 ## Getting started
 
 1. Download the stable portable package and extract it to a location you control.
-2. Start **Network_Toolkit.exe**.
+2. Start **Network_Toolkit.exe**, or **Network_Toolkit_TextEditor.exe** or **Network_Toolkit_Terminal.exe** for the Text Editor or the Terminal alone.
 3. Select a tool from the navigation menu.
 4. Enter a target or create a terminal connection, then run only the operations you are authorized to perform.
 5. Review any changes to network configuration before confirming them.
