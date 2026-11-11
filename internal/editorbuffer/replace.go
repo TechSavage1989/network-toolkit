@@ -13,6 +13,11 @@ type Replacement struct {
 	root     *node
 	eol      *eolMap
 	Count    int64
+	// The new text lies in the scratch file at [start, end). While nothing
+	// else was stored in between or after it, Abort gives the space back.
+	start, end int64
+	contiguous bool
+	done       bool
 }
 
 // A stretch of the document's own text between two matches that is shorter
@@ -60,7 +65,15 @@ func (s *Snapshot) ReplaceAll(ctx context.Context, query, replacement string, re
 	if err != nil {
 		return nil, err
 	}
-	result := &Replacement{b: b, revision: s.Revision, eol: s.eol}
+	result := &Replacement{b: b, revision: s.Revision, eol: s.eol, start: -1, contiguous: true}
+	// Whatever stops the work, a cancelled search or a failed read, the text
+	// stored so far is given back.
+	finished := false
+	defer func() {
+		if !finished {
+			result.Abort()
+		}
+	}()
 	var endings *eolCursor
 	if s.eol != nil {
 		endings = &eolCursor{m: s.eol, file: b.file}
@@ -88,8 +101,14 @@ func (s *Snapshot) ReplaceAll(ctx context.Context, query, replacement string, re
 			return ErrClosed
 		}
 		start := b.end
+		if result.start < 0 {
+			result.start = start
+		} else if start != result.end {
+			result.contiguous = false
+		}
 		tree, err := b.append(run)
 		end := b.end
+		result.end = end
 		b.mu.Unlock()
 		if err != nil {
 			return err
@@ -204,6 +223,7 @@ func (s *Snapshot) ReplaceAll(ctx context.Context, query, replacement string, re
 		}
 	}
 	if result.Count == 0 {
+		finished = true
 		return result, nil
 	}
 	if err = keep(total); err != nil {
@@ -213,15 +233,43 @@ func (s *Snapshot) ReplaceAll(ctx context.Context, query, replacement string, re
 		return nil, err
 	}
 	closeSegment()
-	return result, ctx.Err()
+	if err = ctx.Err(); err != nil {
+		return nil, err
+	}
+	finished = true
+	return result, nil
+}
+
+// Abort gives up a Replace All that was not committed and returns the space
+// of its new text to the scratch file. It is safe to call more than once and
+// after Commit, where it does nothing. Every caller of ReplaceAll calls it
+// (usually deferred) unless Commit succeeded.
+func (r *Replacement) Abort() {
+	b := r.b
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if r.done {
+		return
+	}
+	r.done = true
+	r.root, r.eol = nil, nil
+	// No live root points into text that was never committed. Only the tail
+	// of the file is cut: never a later edit or another operation's text.
+	if !b.closed && r.contiguous && r.start >= 0 && b.end == r.end && r.end > r.start && b.file.Truncate(r.start) == nil {
+		b.end = r.start
+	}
 }
 
 // Commit applies the replacement if the document is still at the revision it
 // was prepared from.
+//
+// It does not hold the buffer open (the lifetime lock) the way an edit does:
+// it reads nothing from the scratch file, and the closed flag is checked
+// under the editing mutex. A caller may still hold the Snapshot the
+// replacement was prepared from, and a second claim on the lifetime lock
+// would wait forever behind a Close that is itself waiting for that Snapshot.
 func (r *Replacement) Commit() (Metadata, error) {
 	b := r.b
-	b.lifetime.RLock()
-	defer b.lifetime.RUnlock()
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	if b.closed {
@@ -230,9 +278,13 @@ func (r *Replacement) Commit() (Metadata, error) {
 	if b.binary {
 		return b.metadataLocked(), ErrBinary
 	}
+	if r.done {
+		return b.metadataLocked(), errors.New("this Replace All was already applied or given up")
+	}
 	if r.revision != b.revision {
 		return b.metadataLocked(), ErrRevision
 	}
+	r.done = true
 	if r.Count > 0 {
 		b.undo = append(b.undo, b.root)
 		b.redo = nil

@@ -15,6 +15,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 )
 
@@ -45,6 +46,33 @@ type editorDiskDocument struct {
 	verify         *editorDiskVerify
 	ftp            *editorFTPEndpoint
 	restored       *editorSessionRestoreState
+	// Replace Alls that are still searching, each with the way to stop it.
+	replacing map[*replaceAllContext]struct{}
+}
+
+// replaceAllContext is the request's context for one Replace All, with a way
+// for the document to stop it. The search only asks Err.
+type replaceAllContext struct {
+	context.Context
+	stopped atomic.Bool
+}
+
+func (c *replaceAllContext) Err() error {
+	if c.stopped.Load() {
+		return context.Canceled
+	}
+	return c.Context.Err()
+}
+
+// stopReplaceAll stops every Replace All that is still searching this
+// document. Whoever replaces or closes the buffer calls it first: the search
+// holds the old buffer open, and its result must not be applied.
+func (d *editorDiskDocument) stopReplaceAll() {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	for search := range d.replacing {
+		search.stopped.Store(true)
+	}
 }
 
 type editorDiskReceipt struct {
@@ -116,6 +144,7 @@ func (g *editorDocumentGrant) diskSnapshotMatches(s editorDocumentSnapshot) bool
 }
 
 func (d *editorDiskDocument) close() {
+	d.stopReplaceAll()
 	d.mu.Lock()
 	d.closed = true
 	d.cancel()
@@ -581,6 +610,7 @@ func (m *editorViewRegistry) diskDocument(w http.ResponseWriter, r *http.Request
 			disk.receipts = nil
 			disk.editMu.Unlock()
 			m.cancelComparisonsUsing(uid)
+			disk.stopReplaceAll()
 			old.Buffer.Close()
 			m.mu.Lock()
 			g.snapshot.Hash = v.Hash

@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 )
 
 func replaceAll(t *testing.T, b *Buffer, query, replacement string, regex bool) (Metadata, int64) {
@@ -16,11 +17,14 @@ func replaceAll(t *testing.T, b *Buffer, query, replacement string, regex bool) 
 	if e != nil {
 		t.Fatal(e)
 	}
-	defer s.Close()
 	staged, e := s.ReplaceAll(context.Background(), query, replacement, regex, true, false)
+	// Released before anything else touches the buffer: a snapshot holds the
+	// buffer open, and nothing may wait for the buffer while holding one.
+	s.Close()
 	if e != nil {
 		t.Fatal(e)
 	}
+	defer staged.Abort()
 	before, was := textOf(t, b), b.Metadata()
 	m, e := staged.Commit()
 	if e != nil {
@@ -176,8 +180,6 @@ func TestBinaryBufferRefusesEveryWrite(t *testing.T) {
 	v := importBytes(t, raw)
 	b := v.Buffer
 	before, shown := b.Metadata(), textOf(t, b)
-	s, _ := b.Snapshot()
-	defer s.Close()
 	var sink bytes.Buffer
 	text := Format{Encoding: "UTF-8", EOL: "LF"}
 	refusals := map[string]error{}
@@ -186,6 +188,8 @@ func TestBinaryBufferRefusesEveryWrite(t *testing.T) {
 	_, refusals["BeginEdit"] = b.BeginEdit(before.Revision, 0, 0)
 	_, refusals["History (undo)"] = b.History(before.Revision, false)
 	_, refusals["History (redo)"] = b.History(before.Revision, true)
+	// The snapshot is held only for its own methods (see replaceAll).
+	s, _ := b.Snapshot()
 	refusals["Encode"] = s.Encode(context.Background(), &sink, text)
 	refusals["Encode in its own format"] = s.Encode(context.Background(), &sink, v.Format)
 	_, _, refusals["PrepareEncoding"] = s.PrepareEncoding(context.Background(), text, nil)
@@ -193,6 +197,7 @@ func TestBinaryBufferRefusesEveryWrite(t *testing.T) {
 	refusals["WriteKept"] = s.WriteKept(context.Background(), &sink)
 	_, refusals["ReplaceAll"] = s.ReplaceAll(context.Background(), "name", "x", false, true, false)
 	_, refusals["ReplaceAll without a match"] = s.ReplaceAll(context.Background(), "absent", "x", false, true, false)
+	s.Close()
 	_, refusals["Replacement.Commit"] = (&Replacement{b: b, revision: before.Revision, Count: 1}).Commit()
 	for name, e := range refusals {
 		if !errors.Is(e, ErrBinary) {
@@ -301,3 +306,123 @@ func TestReplaceAllKeepsMixedLineEndings(t *testing.T) {
 		v.Buffer.Close()
 	}
 }
+
+// within fails the test when work does not finish in time, so that a lock
+// taken twice shows as a failure and not as a suite that never ends.
+func within(t *testing.T, limit time.Duration, what string, work func()) {
+	t.Helper()
+	done := make(chan struct{})
+	go func() { defer close(done); work() }()
+	select {
+	case <-done:
+	case <-time.After(limit):
+		t.Fatalf("%s did not finish within %v", what, limit)
+	}
+}
+
+// A buffer may be closed (the tab closes, the file is reloaded) while a
+// Replace All is between its search and its Commit. Close then waits for the
+// snapshot; Commit must not wait for Close. It reports the closed document
+// or completes, and the Close goes through once the snapshot is released.
+func TestReplaceAllCommitNeverWaitsForAPendingClose(t *testing.T) {
+	b := openTest(t, "foo bar foo")
+	s, _ := b.Snapshot()
+	defer s.Close()
+	staged, e := s.ReplaceAll(context.Background(), "foo", "x", false, true, false)
+	if e != nil {
+		t.Fatal(e)
+	}
+	closed := make(chan struct{})
+	go func() { b.Close(); close(closed) }()
+	time.Sleep(200 * time.Millisecond) // Close is now waiting for the snapshot
+	within(t, 5*time.Second, "Commit under an open snapshot with a Close waiting", func() {
+		if _, e := staged.Commit(); e != nil && !errors.Is(e, ErrClosed) {
+			t.Errorf("commit: %v", e)
+		}
+		staged.Abort()
+	})
+	s.Close()
+	within(t, 5*time.Second, "Close after the snapshot was released", func() { <-closed })
+	if _, e := staged.Commit(); !errors.Is(e, ErrClosed) {
+		t.Fatal("a Replace All was committed to a closed document: ", e)
+	}
+	staged.Abort()
+}
+
+// A Replace All that is cancelled, refused or simply not committed gives the
+// space of its new text back: repeating it does not grow the scratch file.
+func TestAbandonedReplaceAllLeavesNoTextBehind(t *testing.T) {
+	b := openTest(t, strings.Repeat("vlan 10\nname x\n", 20000))
+	size := func() int64 {
+		info, e := b.file.Stat()
+		if e != nil {
+			t.Fatal(e)
+		}
+		b.mu.RLock()
+		defer b.mu.RUnlock()
+		if info.Size() != b.end {
+			t.Fatalf("the scratch file holds %d bytes, the buffer counts %d", info.Size(), b.end)
+		}
+		return b.end
+	}
+	before, text := size(), textOf(t, b)
+	for round := 0; round < 30; round++ {
+		s, _ := b.Snapshot()
+		switch round % 3 {
+		case 0: // prepared, then given up
+			staged, e := s.ReplaceAll(context.Background(), "vlan", "VLAN", false, true, false)
+			if e != nil || staged.Count != 20000 {
+				t.Fatal(e)
+			}
+			s.Close()
+			staged.Abort()
+			staged.Abort()
+			if _, e = staged.Commit(); e == nil {
+				t.Fatal("an abandoned Replace All was committed")
+			}
+		case 1: // cancelled half way through the search
+			ctx, cancel := context.WithCancel(context.Background())
+			seen := 0
+			stop := &countingContext{Context: ctx, each: func() {
+				if seen++; seen == 9000 {
+					cancel()
+				}
+			}}
+			if _, e := s.ReplaceAll(stop, "vlan", "VLAN", false, true, false); !errors.Is(e, context.Canceled) {
+				t.Fatal(e)
+			}
+			s.Close()
+		default: // refused: the document changed in the meantime (a deletion stores no text)
+			staged, e := s.ReplaceAll(context.Background(), "name", "NAME", false, true, false)
+			s.Close()
+			if e != nil {
+				t.Fatal(e)
+			}
+			m, e := b.Edit(b.Metadata().Revision, 0, 1, "")
+			if e != nil {
+				t.Fatal(e)
+			}
+			if _, e = staged.Commit(); !errors.Is(e, ErrRevision) {
+				t.Fatal(e)
+			}
+			staged.Abort()
+			if _, e = b.History(m.Revision, false); e != nil {
+				t.Fatal(e)
+			}
+		}
+	}
+	if after := size(); after != before || textOf(t, b) != text {
+		t.Fatalf("the scratch file grew from %d to %d bytes over 30 abandoned Replace Alls", before, after)
+	}
+	// A committed one still works afterwards, and its text stays.
+	if _, n := replaceAll(t, b, "vlan", "VLAN", false); n != 20000 || !strings.HasPrefix(textOf(t, b), "VLAN 10\n") || size() <= before {
+		t.Fatal("Replace All after abandoned ones")
+	}
+}
+
+type countingContext struct {
+	context.Context
+	each func()
+}
+
+func (c *countingContext) Err() error { c.each(); return c.Context.Err() }

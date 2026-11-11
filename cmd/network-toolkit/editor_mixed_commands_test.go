@@ -9,7 +9,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"networktoolkit/internal/editorbuffer"
 )
@@ -310,5 +312,121 @@ func TestEditorBinaryFromABrowserHandleReloadsAndIsNeverKept(t *testing.T) {
 	keep := requestApp(a, http.MethodPost, editorSessionEndpoint+"/backup", sessionJSON(t, map[string]any{"source": "buffer", "uid": editorFixtureUID, "lease": 1}), true)
 	if keep.Code == 200 || bytes.Contains(keep.Body.Bytes(), []byte(`"sha256"`)) {
 		t.Fatal("the session kept a copy of a file that is not text: ", keep.Code, keep.Body.String())
+	}
+}
+
+// hookContext runs a function the first time the search asks whether it was
+// cancelled: the moment "in the middle of a Replace All".
+type hookContext struct {
+	context.Context
+	once sync.Once
+	hook func()
+}
+
+func (c *hookContext) Err() error { c.once.Do(c.hook); return c.Context.Err() }
+
+func finishes(t *testing.T, what string, work func()) {
+	t.Helper()
+	done := make(chan struct{})
+	go func() { defer close(done); work() }()
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatalf("%s did not finish within 10 seconds", what)
+	}
+}
+
+// The buffer is closed while Replace All searches (the tab is closed, or a
+// reload replaced the buffer). The request must return, and the document's
+// edit lock must be free again: otherwise no later edit, undo or close of
+// that document ever returns.
+func TestEditorReplaceAllReturnsWhenItsBufferIsClosed(t *testing.T) {
+	v, e := editorbuffer.Import(t.Context(), strings.NewReader("foo bar foo"), t.TempDir(), nil)
+	if e != nil {
+		t.Fatal(e)
+	}
+	d := &editorDiskDocument{}
+	closed := make(chan struct{})
+	ctx := &hookContext{Context: t.Context(), hook: func() {
+		go func() { v.Buffer.Close(); close(closed) }()
+		time.Sleep(300 * time.Millisecond) // Close is now waiting for the search
+	}}
+	finishes(t, "Replace All on a buffer that is being closed", func() {
+		_, e := d.replaceDiskMatches(ctx, v.Buffer, editorDiskRequest{Revision: v.Buffer.Metadata().Revision, Query: "foo", Replace: "x", MatchCase: true})
+		if e != nil && !errors.Is(e, editorbuffer.ErrClosed) {
+			t.Errorf("replace-all: %v", e)
+		}
+	})
+	finishes(t, "closing the buffer", func() { <-closed })
+	if !d.editMu.TryLock() {
+		t.Fatal("the document's edit lock is still held")
+	}
+	d.editMu.Unlock()
+}
+
+// A reload replaces the buffer. It stops a Replace All that is still
+// searching the old one instead of waiting for it, and nothing of that
+// Replace All is applied.
+func TestEditorReloadStopsAReplaceAllInFlight(t *testing.T) {
+	v, e := editorbuffer.Import(t.Context(), strings.NewReader(strings.Repeat("foo bar\n", 4000)), t.TempDir(), nil)
+	if e != nil {
+		t.Fatal(e)
+	}
+	defer v.Buffer.Close()
+	d := &editorDiskDocument{}
+	ctx := &hookContext{Context: t.Context(), hook: func() { d.stopReplaceAll() }}
+	finishes(t, "a Replace All stopped by a reload", func() {
+		_, e := d.replaceDiskMatches(ctx, v.Buffer, editorDiskRequest{Revision: 1, Query: "foo", Replace: "x", MatchCase: true})
+		if !errors.Is(e, context.Canceled) {
+			t.Errorf("replace-all after the reload stopped it: %v", e)
+		}
+	})
+	if meta := v.Buffer.Metadata(); meta.Revision != 1 || meta.Dirty {
+		t.Fatalf("a stopped Replace All changed the document: %+v", meta)
+	}
+	d.mu.Lock()
+	left := len(d.replacing)
+	d.mu.Unlock()
+	if left != 0 {
+		t.Fatal("a finished Replace All is still registered")
+	}
+	// The next one runs normally.
+	result, e := d.replaceDiskMatches(t.Context(), v.Buffer, editorDiskRequest{Revision: 1, Query: "foo", Replace: "x", MatchCase: true})
+	if e != nil || result.(map[string]any)["count"].(int64) != 4000 {
+		t.Fatal(result, e)
+	}
+}
+
+// Through the real handlers: a reload and a Replace All of the same large
+// document at the same time both answer, whichever comes first.
+func TestEditorReloadAndReplaceAllTogetherBothAnswer(t *testing.T) {
+	f := openMixed(t, strings.Repeat("interface a\r\n shutdown\n", 150000))
+	codes := make(chan int, 2)
+	finishes(t, "a reload during a Replace All", func() {
+		var wait sync.WaitGroup
+		for _, body := range []map[string]any{
+			{"action": "replace-all", "revision": f.revision, "query": "shutdown", "replacement": "no shutdown", "matchCase": true},
+			{"action": "reload"},
+		} {
+			wait.Add(1)
+			go func() {
+				defer wait.Done()
+				codes <- diskCall(f.a, f.a.token, f.lease, body).Code
+			}()
+			time.Sleep(20 * time.Millisecond)
+		}
+		wait.Wait()
+	})
+	for i := 0; i < 2; i++ {
+		if code := <-codes; code != 200 && code != 409 {
+			t.Fatal("unexpected answer: ", code)
+		}
+	}
+	// The document still answers and can be edited.
+	status := f.call(map[string]any{"action": "status"})
+	f.revision = uint64(status["metadata"].(map[string]any)["revision"].(float64))
+	f.edit(0, 0, "x")
+	if !strings.HasPrefix(f.text(), "x") {
+		t.Fatal("the document cannot be edited after a reload met a Replace All")
 	}
 }

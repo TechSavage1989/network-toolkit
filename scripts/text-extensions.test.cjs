@@ -58,12 +58,20 @@ test('Setup only offers the editor: per user, no UserChoice, no default value of
  assert(writes.length>40);
  for(const line of writes)assert.match(line,/^\s*(?:WriteReg\w+|DeleteRegKey(?: \/ifempty)?|DeleteRegValue) HKCU "/,'only the current user\'s registry is changed: '+line.trim());
  // Under a file type, the only thing written is the ProgID in OpenWithProgids.
- const typeWrites=writes.filter(line=>line.includes('${EXTENSION}')&&/^\s*WriteReg/.test(line));
- assert.deepEqual([...new Set(typeWrites.map(line=>line.trim()))].sort(),[
-  'WriteRegDWORD HKCU "${CREATED_KEYS}" "${EXTENSION}" 1',
-  'WriteRegDWORD HKCU "${CREATED_KEYS}" "${EXTENSION}\\OpenWithProgids" 1',
+ // Each macro's registry writes are compared as the exact list, in order: a
+ // repeated, reordered or added write fails here.
+ const writesOf=name=>{const body=new RegExp('^!macro '+name+' EXTENSION\\n([\\s\\S]*?)^!macroend','m').exec(code);assert(body,'windows.nsi has the macro '+name);return (body[1].match(/^\s*WriteReg\w+ .*$/gm)||[]).map(line=>line.trim());};
+ assert.deepEqual(writesOf('RegisterExtension'),[
   'WriteRegStr HKCU "${CAPABILITIES}\\FileAssociations" "${EXTENSION}" "${PROG_ID}"',
-  'WriteRegStr HKCU "Software\\Classes\\${EXTENSION}\\OpenWithProgids" "${PROG_ID}" ""']);
+  'WriteRegStr HKCU "Software\\Classes\\${EXTENSION}\\OpenWithProgids" "${PROG_ID}" ""',
+  'WriteRegDWORD HKCU "${CREATED_KEYS}" "${EXTENSION}" 1',
+  'WriteRegDWORD HKCU "${CREATED_KEYS}" "${EXTENSION}\\OpenWithProgids" 1']);
+ // Adopting a released version's key writes a record and nothing under the type.
+ assert.deepEqual(writesOf('AdoptReleasedExtension'),[
+  'WriteRegDWORD HKCU "${CREATED_KEYS}" "${EXTENSION}" 1',
+  'WriteRegDWORD HKCU "${CREATED_KEYS}" "${EXTENSION}\\OpenWithProgids" 1']);
+ const typeWrites=writes.filter(line=>line.includes('${EXTENSION}')&&/^\s*WriteReg/.test(line));
+ assert.equal(typeWrites.length,6,'no other macro writes under a file type');
  // A whole key under a file type is deleted only through the empty-key check.
  for(const line of writes.filter(line=>/DeleteRegKey/.test(line)&&line.includes('${EXTENSION}')))assert.fail('a file type key is deleted directly: '+line.trim());
  assert.doesNotMatch(code,/SupportedTypes/,'SupportedTypes would hide the editor for unknown file types');
