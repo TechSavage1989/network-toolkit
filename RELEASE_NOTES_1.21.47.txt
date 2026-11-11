@@ -1,0 +1,15 @@
+Network Toolkit 1.21.47
+
+## What's New
+
+- The Text Editor and the Terminal are now also separate programs, Network_Toolkit_TextEditor.exe and Network_Toolkit_Terminal.exe, each with its own icon and name in the taskbar, Task Manager and Start menu.
+- They keep everything they could do before: Send to between them, links, Open with, saved connections, settings and unsaved work, shared with the main program.
+- Updates install all three programs together, and undo the update if one of them would not start.
+
+## Additional Details
+
+- They come in the installer and in the portable package, next to Network_Toolkit.exe, which still opens every tool as before.
+- A copy updated in-app from 1.21.46 or older gets them on its next update, or at once with App settings → Updates → Install the separate programs, which downloads them from this release and checks them first.
+- Close the separate Text Editor and Terminal windows before updating; the updater lists them if they are open, and changes nothing if one cannot be replaced.
+- The update download is larger (about 26 MB instead of 9 MB) because it carries all three programs.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.
