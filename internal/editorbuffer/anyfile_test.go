@@ -329,3 +329,33 @@ func TestBinaryFilesAreDisplayOnly(t *testing.T) {
 		t.Fatalf("display text %q", text)
 	}
 }
+
+// The kept copy of unsaved work holds each line's own ending, so the session
+// that reopens it saves the same bytes the first session would have saved.
+func TestKeptCopyRestoresMixedLineEndings(t *testing.T) {
+	v := importBytes(t, []byte("one\r\ntwo\nthree\r\nfour\r\n"))
+	if _, e := v.Buffer.Edit(1, 0, 0, "new\n"); e != nil {
+		t.Fatal(e)
+	}
+	want, _ := encoded(t, v.Buffer, v.Format)
+	s, _ := v.Buffer.Snapshot()
+	var kept bytes.Buffer
+	e := s.WriteKept(context.Background(), &kept)
+	s.Close()
+	if e != nil || kept.String() != "new\r\none\r\ntwo\nthree\r\nfour\r\n" {
+		t.Fatalf("%v %q", e, kept.String())
+	}
+	restored := importBytes(t, kept.Bytes())
+	got, e := encoded(t, restored.Buffer, v.Format)
+	if e != nil || !bytes.Equal(got, want) {
+		t.Fatalf("restored copy saves %q, want %q (%v)", got, want, e)
+	}
+	// Any other document is kept as plain normalized text, as before.
+	plain := importBytes(t, []byte("a\r\nb\r\n"))
+	s, _ = plain.Buffer.Snapshot()
+	defer s.Close()
+	kept.Reset()
+	if e = s.WriteKept(context.Background(), &kept); e != nil || kept.String() != "a\nb\n" {
+		t.Fatalf("%v %q", e, kept.String())
+	}
+}

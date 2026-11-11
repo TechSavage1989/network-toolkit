@@ -146,7 +146,10 @@ func validEditorSessionFormat(f *editorbuffer.Format) bool {
 }
 
 func validEditorDiskFormat(f editorbuffer.Format) bool {
-	return (f.Encoding == "UTF-8" || f.Encoding == "UTF-16LE" || f.Encoding == "UTF-16BE") && (f.EOL == "LF" || f.EOL == "CRLF" || f.EOL == "CR")
+	// A file that is not text never has unsaved changes, so it has no format
+	// here. Windows-1252 has no byte order mark.
+	return (f.Encoding == "UTF-8" || f.Encoding == "UTF-16LE" || f.Encoding == "UTF-16BE" || f.Encoding == editorbuffer.Windows1252 && !f.BOM) &&
+		(f.EOL == "LF" || f.EOL == "CRLF" || f.EOL == "CR" || f.EOL == editorbuffer.MixedEOL)
 }
 
 func validEditorSessionLabel(s string, limit int) bool {
@@ -762,7 +765,7 @@ func (a *application) postEditorSessionBackup(w http.ResponseWriter, r *http.Req
 		revision = snapshot.Revision
 		ctx, cancel := context.WithCancel(r.Context())
 		stop := context.AfterFunc(parent, cancel)
-		backup, err = a.writeEditorSessionBackup(ctx, func(out io.Writer) error { return snapshot.WriteTo(ctx, out) })
+		backup, err = a.writeEditorSessionBackup(ctx, func(out io.Writer) error { return snapshot.WriteKept(ctx, out) })
 		stop()
 		cancel()
 		snapshot.Close()
@@ -822,6 +825,15 @@ func (m *editorViewRegistry) importSessionBackup(ctx context.Context, g *editorD
 		return nil, fmt.Errorf("The kept copy could not be read: %w", err)
 	}
 	if result.Hash != expected.SHA256 || result.Bytes != expected.Size {
+		result.Buffer.Close()
+		return nil, errors.New("The kept copy of this document is damaged and was not restored.")
+	}
+	// A kept copy is written with each line's own ending while they differ.
+	// If the unsaved edits left only one kind, that is the document's ending.
+	if restore.Format.EOL == editorbuffer.MixedEOL && result.Format.EOL != editorbuffer.MixedEOL {
+		restore.Format.EOL = result.Format.EOL
+	}
+	if result.Binary {
 		result.Buffer.Close()
 		return nil, errors.New("The kept copy of this document is damaged and was not restored.")
 	}

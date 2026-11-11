@@ -20,7 +20,7 @@ var ErrRevision = errors.New("the document changed; refresh this view before edi
 var ErrClosed = errors.New("the document buffer is closed")
 
 // ErrBinary answers every attempt to change or write a file that is not text.
-var ErrBinary = errors.New("this is not a text file; it is shown read-only and cannot be changed or saved in the Text Editor")
+var ErrBinary = errors.New("This is not a text file. It is shown read-only and cannot be changed or saved in the Text Editor.")
 var ErrBoundary = errors.New("text position splits a Unicode character or is outside the document")
 
 type measure struct{ bytes, units, lines int64 }
@@ -541,6 +541,17 @@ func (s *Snapshot) WriteTo(ctx context.Context, w io.Writer) error {
 		return visit(n.right)
 	}
 	return visit(s.root)
+}
+
+// WriteKept writes the text for a kept copy of unsaved work: UTF-8 with one
+// '\n' for each line ending, except that a document whose imported line
+// endings differ is written with each line's own ending, so importing the
+// copy again restores the record of them.
+func (s *Snapshot) WriteKept(ctx context.Context, w io.Writer) error {
+	if s.b.eol == nil {
+		return s.WriteTo(ctx, w)
+	}
+	return s.Encode(ctx, w, Format{Encoding: "UTF-8", EOL: MixedEOL})
 }
 
 // MarkUnsaved records that the current text has not been written to the
