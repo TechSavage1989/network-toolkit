@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"networktoolkit/internal/model"
 	"os"
@@ -33,6 +34,7 @@ const (
 
 var (
 	errFullInstallNoAsset = errors.New("This release has no Windows Setup and SHA256SUMS.")
+	errFullInstallNoNewer = errors.New("no newer release with Setup")
 	fullInstallLaunch     = fullInstallStartSetup
 	fullInstallOpen       = fullInstallStartSetup
 )
@@ -51,8 +53,12 @@ type fullInstallRelease struct {
 	Size     int64  `json:"size"`
 	Beta     bool   `json:"beta"`
 	Fallback bool   `json:"fallback"`
-	url      string
-	sumsURL  string
+	// Running is the version of this copy and Newer whether Version is newer
+	// than it; a fallback is offered only when it is (never a downgrade).
+	Running string `json:"running"`
+	Newer   bool   `json:"newer"`
+	url     string
+	sumsURL string
 }
 
 type fullInstallDownload struct {
@@ -209,6 +215,7 @@ func fullInstallFind(ctx context.Context, client *http.Client, version, channel 
 	if err == nil {
 		release, parseErr := fullInstallParseRelease(data, true)
 		if parseErr == nil && release.Version == version {
+			release.Running = version
 			return release, nil
 		}
 		if parseErr != nil && !errors.Is(parseErr, errFullInstallNoAsset) {
@@ -243,10 +250,13 @@ func fullInstallFind(ctx context.Context, client *http.Client, version, channel 
 	} else if best, err = fullInstallParseRelease(data, false); err != nil {
 		best = nil
 	}
-	if best == nil {
-		return nil, errors.New("Setup for version " + version + " is not on the release page, and no other release with Setup was found.")
+	// Only a newer release may stand in: an older one would downgrade the
+	// program, could save over settings a newer version wrote, and its Setup
+	// would not take over this copy's Text Editor registration.
+	if best == nil || !updateNewer(best.Version, version) {
+		return nil, fmt.Errorf("No installer was found for version %s: its release has no Windows Setup, and no newer release offers one. %w", version, errFullInstallNoNewer)
 	}
-	best.Fallback = true
+	best.Fallback, best.Running, best.Newer = true, version, true
 	return best, nil
 }
 
@@ -320,7 +330,7 @@ func (a *application) handleFullInstall(w http.ResponseWriter, r *http.Request, 
 		}
 	case "download":
 		found := a.fullInstall.found
-		if !request.Confirm || found == nil || request.Version != found.Version {
+		if !request.Confirm || found == nil || request.Version != found.Version || (found.Version != model.Version && !updateNewer(found.Version, model.Version)) {
 			a.fullInstall.mu.Unlock()
 			jsonError(w, http.StatusConflict, "Look up Setup again and confirm the download.")
 			return

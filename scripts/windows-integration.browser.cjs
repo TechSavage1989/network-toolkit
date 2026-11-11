@@ -206,16 +206,39 @@ const shot=async(page,name)=>{if(output){fs.mkdirSync(output,{recursive:true});a
    assert.equal(posts(requests,'/full-install/start').length,0);
   });
 
-  await scenario(browser,'Setup of this version is missing: the latest release is offered and the page says so',{
+  await scenario(browser,'Setup of this version is missing: a newer release is offered and the page names both versions',{
    beta:true,
-   handle:async(p,body,f)=>{if(p.endsWith('/full-install/find')){f.integration={...f.integration,install:installStatus({found:{version:'9.9.9',name:'Network_Toolkit_9.9.9_Windows_x64_Setup.exe',size:1048576,beta:true,fallback:true}})};return {data:{install:f.integration.install}};}}
+   handle:async(p,body,f)=>{if(p.endsWith('/full-install/find')){f.integration={...f.integration,install:installStatus({found:{version:'99.0.0',name:'Network_Toolkit_99.0.0_Windows_x64_Setup.exe',size:1048576,beta:true,fallback:true,running:version,newer:true}})};return {data:{install:f.integration.install}};}}
   },async(page,requests)=>{
    await openSettings(page,'updates');
    const install=page.locator('#windowsFullInstall');
    await install.locator('[data-windows-install="find"]').click();
    await install.locator('[data-windows-install-fallback]').waitFor();
-   assert.match(await install.textContent(),new RegExp('Setup for version '+version.replaceAll('.','\\.')+' is not on the release page\\. The latest beta release, 9\\.9\\.9, is offered instead'));
+   const v=version.replaceAll('.','\\.');
+   assert.match(await install.textContent(),new RegExp('This copy is version '+v+'\\. Its release has no Windows Setup\\. The beta release 99\\.0\\.0 is newer and has one: installing it also updates the program from '+v+' to 99\\.0\\.0'));
    assert.deepEqual(posts(requests,'/full-install/find').map(r=>r.body),[{channel:'beta'}]);
+  });
+
+  await scenario(browser,'no installer for this version and nothing newer: nothing is offered',{
+   handle:async(p,body,f)=>{if(p.endsWith('/full-install/find'))return {status:502,data:{error:'No installer was found for version '+version+': its release has no Windows Setup, and no newer release offers one. no newer release with Setup'}};}
+  },async(page,requests)=>{
+   await openSettings(page,'updates');
+   const install=page.locator('#windowsFullInstall');
+   await install.locator('[data-windows-install="find"]').click();
+   await page.waitForFunction(()=>/No installer was found for version/.test(document.getElementById('windowsFullInstall').textContent));
+   assert.equal(await install.locator('[data-windows-install="download"]').count(),0,'no download is offered');
+   assert.doesNotMatch(await install.textContent(),/updates the program/);
+  });
+
+  await scenario(browser,'an older release is never presented as an update, even if one were reported',{
+   handle:async(p,body,f)=>{if(p.endsWith('/full-install/find')){f.integration={...f.integration,install:installStatus({found:{version:'1.0.1',name:'Network_Toolkit_1.0.1_Windows_x64_Setup.exe',size:1048576,beta:false,fallback:true,running:version,newer:false}})};return {data:{install:f.integration.install}};}}
+  },async page=>{
+   await openSettings(page,'updates');
+   const install=page.locator('#windowsFullInstall');
+   await install.locator('[data-windows-install="find"]').click();
+   await install.locator('[data-windows-install-none]').waitFor();
+   assert.equal(await install.locator('[data-windows-install="download"]').count(),0);
+   assert.doesNotMatch(await install.textContent(),/updates the program|1\.0\.1/);
   });
 
   await scenario(browser,'a run with --data-dir is told the installed program will not see that data',{

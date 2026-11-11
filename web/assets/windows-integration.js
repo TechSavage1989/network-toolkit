@@ -52,8 +52,12 @@ function installHTML(view){
  const found=i.found,download=i.download,p=i.progress;
  if(!download){
   if(!found)body+='<div class="button-row"><button type="button" class="btn small" data-windows-install="find"'+dis+'>Find Setup for version '+esc(i.version)+'</button></div>';
-  else{
-   body+=found.fallback?'<div class="notice warn" data-windows-install-fallback><span>Setup for version '+esc(i.version)+' is not on the release page. The latest '+(found.beta?'beta':'stable')+' release, '+esc(found.version)+', is offered instead. Installing it also updates the program.</span></div>':'<p class="help-line">Found '+esc(found.name)+' ('+bytes(found.size)+') on the official release page.</p>';
+  else if(found.fallback&&found.newer!==true||found.version!==i.version&&!found.fallback){
+   // Never offered by the engine; never shown as an update either.
+   body+='<div class="notice warn" data-windows-install-none><span>No installer was found for version '+esc(i.version)+'.</span></div><div class="button-row"><button type="button" class="btn small ghost" data-windows-install="find"'+dis+'>Look again</button></div>';
+  }else{
+   // The wording follows the engine's comparison: a fallback is only ever a newer version.
+   body+=found.fallback?'<div class="notice warn" data-windows-install-fallback><span>This copy is version '+esc(found.running||i.version)+'. Its release has no Windows Setup. The '+(found.beta?'beta':'stable')+' release '+esc(found.version)+' is newer and has one: installing it also updates the program from '+esc(found.running||i.version)+' to '+esc(found.version)+'.</span></div>':'<p class="help-line">Found '+esc(found.name)+' ('+bytes(found.size)+'), the Setup of this version, on the official release page.</p>';
    if(view.confirmDownload)body+='<div data-windows-install-confirm="download"><div class="notice info"><span>Download '+esc(found.name)+' ('+bytes(found.size)+') from the official release page and check it against the release\'s SHA256SUMS? Nothing is installed yet; Setup starts only when you choose to start it.</span></div><div class="button-row"><button type="button" class="btn small primary" data-windows-install="download-confirm" data-version="'+esc(found.version)+'"'+dis+'>Download and verify</button><button type="button" class="btn small ghost" data-windows-install="cancel"'+dis+'>Cancel</button></div></div>';
    else body+='<div class="button-row"><button type="button" class="btn small" data-windows-install="download"'+dis+'>Download Setup ('+bytes(found.size)+')…</button><button type="button" class="btn small ghost" data-windows-install="find"'+dis+'>Look again</button></div>';
   }
