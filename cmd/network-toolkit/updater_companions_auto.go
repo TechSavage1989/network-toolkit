@@ -233,6 +233,9 @@ func updateRetargetCompanionShortcuts(dir string, ops companionShortcutOps) erro
 	if err != nil {
 		return err
 	}
+	// The folder checks before a write resolve links and short names and
+	// refuse a path that differs from what was resolved: use the long form.
+	menu = companionLongPath(menu)
 	main := editorRegJoin(location, mainProgramWindows)
 	type owned struct{ name, link, target, args, program string }
 	var failures []error

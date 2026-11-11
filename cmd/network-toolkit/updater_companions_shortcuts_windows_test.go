@@ -25,7 +25,7 @@ func TestCompanionShortcutsNativeRetarget(t *testing.T) {
 	defer updateShortcutOLE.NewProc("CoUninitialize").Call()
 	// The runner's temporary folder has 8.3 short names; the program builds
 	// paths from the long form, and so do the checks below.
-	install, menu := privateLongPath(t.TempDir()), t.TempDir()
+	install, menu := privateLongPath(t.TempDir()), privateLongPath(t.TempDir())
 	folder := filepath.Join(menu, "Network Toolkit")
 	if err := os.MkdirAll(folder, 0700); err != nil {
 		t.Fatal(err)
