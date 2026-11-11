@@ -161,3 +161,8 @@ func companionShortcutRetargetNative(path, target, args, program string) error {
 	}
 	return updateShortcutCommitNative(path, identity, original, replacement)
 }
+
+// companionLongPath is the long form of an existing path: a folder may be
+// written with 8.3 short names (C:\Users\RUNNER~1\...), while a shortcut's
+// target reads back in the long form.
+func companionLongPath(path string) string { return privateLongPath(path) }

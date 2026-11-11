@@ -223,7 +223,10 @@ func updateRetargetCompanionShortcuts(dir string, ops companionShortcutOps) erro
 		return fmt.Errorf("Windows could not read the installed program's registration: %w", err)
 	}
 	location = strings.TrimSpace(location)
-	if !found || location == "" || !editorRegSamePath(location, dir) {
+	if location != "" {
+		location = companionLongPath(location)
+	}
+	if !found || location == "" || !editorRegSamePath(location, companionLongPath(dir)) {
 		return nil
 	}
 	menu, err := ops.programsFolder()
@@ -249,7 +252,7 @@ func updateRetargetCompanionShortcuts(dir string, ops companionShortcutOps) erro
 			failures = append(failures, fmt.Errorf("%s: %w", s.link, err))
 			continue
 		}
-		if !editorRegSamePath(target, main) || !companionShortcutArgsOwned(args, s.owned) {
+		if !editorRegSamePath(companionLongPath(target), main) || !companionShortcutArgsOwned(args, s.owned) {
 			continue
 		}
 		change = append(change, owned{s.link, link, target, args, editorRegJoin(location, s.program)})
