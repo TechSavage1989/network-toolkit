@@ -6,6 +6,8 @@ v1.21.44 was published and verified: tag at merge commit 8381055 (PR #166), rele
 
 `assets/source/Network_Toolkit_Document.svg` (and hand-drawn `Network_Toolkit_Document.<16|20|24|32>.svg` for the small sizes) build `assets/Network_Toolkit_Document.ico` (`python3 scripts/generate_icon_assets.py --document`). It is a fourth icon group appended after app 0, editor 1 and terminal 2, so the document icon is index 3 and earlier indexes are unchanged (`scripts/windows_resources_test.py`). Setup points the ProgID `NetworkToolkit.TextDocument\DefaultIcon` at index 3 on every install, repair and upgrade; `ApplicationIcon`, `Applications\Network_Toolkit.exe\DefaultIcon` and the right-click verb's `Icon` keep the editor tile (index 1).
 
+This release is the first built with Go 1.26.11 (PR #168), which fixes GO-2026-6859, an HTTP/1 server crash in `net/http` published on 2026-11-11 that failed the dependency scan on every branch.
+
 Known limits: Explorer's display and icon cache on real Windows were not observed (Setup was exercised under Wine and by the hosted setup check); in-app updates do not change file icons; a type the user sets to the editor through Open with, Always that Setup does not list uses `Applications\Network_Toolkit.exe` and so shows the tile.
 
 ---
