@@ -916,6 +916,8 @@ function Assert-PortableRegistered([string]$Launched, [bool]$Menu) {
 # The Open With entry of another copy (from the check above) goes, so that the
 # portable copy and then Setup own "Open with" for any file.
 [Microsoft.Win32.Registry]::CurrentUser.DeleteSubKeyTree($applicationSubkey)
+# Its parent, Applications, stays (now without that entry): snapshot both.
+Save-ClassSnapshot $applicationsSubkey
 Save-ClassSnapshot $applicationSubkey
 $applicationOwnedBySetup = $true
 Invoke-Registration $portableA 'remove' 6
