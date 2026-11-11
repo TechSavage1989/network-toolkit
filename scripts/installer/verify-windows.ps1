@@ -818,9 +818,12 @@ function Get-ClassesTree {
     foreach ($child in $children) { $lines += "[$child]{" + (Get-UserKeyTree "Software\Classes\$child") + '}' }
     $lines -join "`n"
 }
-function Assert-PortableRegistered([string]$Exe, [bool]$Menu) {
+function Assert-PortableRegistered([string]$Launched, [bool]$Menu) {
+    # The program records its own path as Windows resolved it (long names,
+    # the case on disk); every command must name exactly that path.
+    $Exe = Read-UserValue $portableSubkey 'Executable'
+    if (-not $Exe -or $Exe -ine $Launched) { throw "The portable registration record names '$Exe', expected '$Launched'." }
     $command = $editorCommandFormat -f $Exe
-    Assert-Same (Read-UserValue $portableSubkey 'Executable') $Exe 'Portable registration record'
     Assert-Same (Read-UserValue "Software\Classes\$progID\shell\open\command" '') $command 'Portable editor open command'
     if ((Read-UserValue "Software\Classes\$progID\DefaultIcon" '') -notlike ('"{0}",*' -f $Exe)) { throw 'The document icon does not name the portable copy.' }
     Assert-Same (Read-RegistryValue $registeredApps $registeredName) 'Software\Network Toolkit\Capabilities' 'Portable Default Apps registration'
