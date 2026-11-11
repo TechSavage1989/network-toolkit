@@ -193,10 +193,20 @@ Var AdoptReleased
 ; open separate Text Editor or Terminal never leaves the three programs at
 ; different versions or half removed. A scanner can hold a just-written file
 ; briefly, so a sharing failure is retried for about five seconds. $R5 is 1
-; when the program is still open; a missing file counts as closed.
+; when the program is still open; a missing file counts as closed. A
+; read-only file refuses writing with error 5 like an open one: its read-only
+; attribute is cleared first (Setup replaces or removes the file anyway).
 !macro IsProgramOpen FILE
   StrCpy $R5 0
   StrCpy $DeleteAttempts 0
+  System::Call 'kernel32::GetFileAttributesW(w "${FILE}") i .r0'
+  ${If} $0 != -1
+    IntOp $1 $0 & 1
+    ${If} $1 != 0
+      IntOp $0 $0 & 0xFFFFFFFE
+      System::Call 'kernel32::SetFileAttributesW(w "${FILE}", i r0) i .r1'
+    ${EndIf}
+  ${EndIf}
   ${Do}
     ${IfNot} ${FileExists} "${FILE}"
       ${ExitDo}
@@ -208,11 +218,14 @@ Var AdoptReleased
       StrCpy $R5 0
       ${ExitDo}
     ${EndIf}
-    StrCpy $R5 1
+    ; Only a sharing or access failure means another program has it open;
+    ; any other failure is reported by the step that replaces the file.
     ${If} $1 != 32
     ${AndIf} $1 != 5
+      StrCpy $R5 0
       ${ExitDo}
     ${EndIf}
+    StrCpy $R5 1
     IntOp $DeleteAttempts $DeleteAttempts + 1
     ${If} $DeleteAttempts >= 20
       ${ExitDo}
@@ -381,9 +394,10 @@ Function ValidateInstallDirectory
   ${EndIf}
   StrCpy $R5 ""
   ${If} $RegisteredInstallDir == ""
+    ; Separate Text Editor and Terminal programs alone do not make another
+    ; installation: an uninstaller of 1.21.46 or older, after an in-app
+    ; update added them, leaves them behind. They are replaced once closed.
     ${If} ${FileExists} "$INSTDIR\${APP_FILENAME}"
-    ${OrIf} ${FileExists} "$INSTDIR\${EDITOR_FILENAME}"
-    ${OrIf} ${FileExists} "$INSTDIR\${TERMINAL_FILENAME}"
     ${OrIf} ${FileExists} "$INSTDIR\Uninstall.exe"
       StrCpy $R5 "Choose a folder without an existing Network Toolkit executable or uninstaller."
     ${EndIf}
@@ -725,33 +739,45 @@ Section "Network Toolkit"
   IfErrors install_error
   WriteUninstaller "$StagedUninstaller"
   IfErrors install_error
-  ; Fresh setup must never replace a competing program or uninstaller.
-  StrCpy $R7 0x8
-  ${If} $RegisteredInstallDir != ""
-    StrCpy $R7 0x9
-    ; Replace nothing while one of the three programs is open.
-    StrCpy $FailedStep "checking that Network Toolkit and its Text Editor and Terminal programs are closed"
-    !insertmacro AreProgramsOpen
-    ${If} $R5 == 1
-      Goto install_error
-    ${EndIf}
+  ; Replace nothing while one of the three programs is open, also on a fresh
+  ; setup that finds separate programs left behind (ValidateInstallDirectory).
+  StrCpy $FailedStep "checking that Network Toolkit and its Text Editor and Terminal programs are closed"
+  !insertmacro AreProgramsOpen
+  ${If} $R5 == 1
+    Goto install_error
   ${EndIf}
+  ; A separate program is always replaced; a rolled back fresh setup removes
+  ; only one it created. Fresh setup never replaces a competing main program
+  ; or uninstaller.
+  StrCpy $R7 0x9
   ; The separate programs first: if one cannot be placed, Network_Toolkit.exe
   ; keeps its version, so the same Setup may run again (RefuseDowngrade).
+  StrCpy $R6 0
+  ${IfNot} ${FileExists} "$INSTDIR\${EDITOR_FILENAME}"
+    StrCpy $R6 1
+  ${EndIf}
   !insertmacro PlaceStagedFile "$StagedEditor" "$INSTDIR\${EDITOR_FILENAME}"
   ${If} $0 == 0
     StrCpy $FailedStep "placing the Text Editor program file (Windows error $1)"
     Goto install_error
   ${EndIf}
   StrCpy $StagedEditor ""
-  StrCpy $NewEditorWritten 1
+  StrCpy $NewEditorWritten $R6
+  StrCpy $R6 0
+  ${IfNot} ${FileExists} "$INSTDIR\${TERMINAL_FILENAME}"
+    StrCpy $R6 1
+  ${EndIf}
   !insertmacro PlaceStagedFile "$StagedTerminal" "$INSTDIR\${TERMINAL_FILENAME}"
   ${If} $0 == 0
     StrCpy $FailedStep "placing the Terminal program file (Windows error $1)"
     Goto install_error
   ${EndIf}
   StrCpy $StagedTerminal ""
-  StrCpy $NewTerminalWritten 1
+  StrCpy $NewTerminalWritten $R6
+  StrCpy $R7 0x8
+  ${If} $RegisteredInstallDir != ""
+    StrCpy $R7 0x9
+  ${EndIf}
   !insertmacro PlaceStagedFile "$StagedApp" "$INSTDIR\${APP_FILENAME}"
   ${If} $0 == 0
     StrCpy $FailedStep "placing the program file (Windows error $1)"

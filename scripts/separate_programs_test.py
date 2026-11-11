@@ -254,6 +254,35 @@ class SetupScript(unittest.TestCase):
         self.assertIn('\'"$INSTDIR\\${APP_FILENAME}",1\'', self.nsi)
         self.assertIn('\'"$INSTDIR\\${APP_FILENAME}",2\'', self.nsi)
 
+    def macro(self, name):
+        start = self.nsi.index('!macro ' + name)
+        return self.nsi[start:self.nsi.index('!macroend', start)]
+
+    def test_a_fresh_install_replaces_leftover_separate_programs(self):
+        # An older uninstaller (after an in-app update) leaves the separate
+        # programs behind: only Network_Toolkit.exe or Uninstall.exe make a
+        # folder another installation; leftovers are replaced once closed.
+        start = self.nsi.index('Function ValidateInstallDirectory')
+        validate = self.nsi[start:self.nsi.index('FunctionEnd', start)]
+        self.assertIn('${FileExists} "$INSTDIR\\${APP_FILENAME}"', validate)
+        self.assertIn('${FileExists} "$INSTDIR\\Uninstall.exe"', validate)
+        self.assertNotIn('EDITOR_FILENAME', validate)
+        self.assertNotIn('TERMINAL_FILENAME', validate)
+        section = self.nsi[self.nsi.index('Section "Network Toolkit"'):self.nsi.index('install_error:')]
+        check = section.index('!insertmacro AreProgramsOpen')
+        before = section[:check]
+        self.assertEqual(before.count('${If}'), before.count('${EndIf}'), 'the open-program check runs on a fresh install too')
+        self.assertIn('StrCpy $R7 0x9', section[check:section.index('!insertmacro PlaceStagedFile "$StagedEditor"')])
+        # The main program and the uninstaller are still never replaced on a fresh setup.
+        main = section.index('!insertmacro PlaceStagedFile "$StagedApp"')
+        self.assertIn('StrCpy $R7 0x8', section[section.index('!insertmacro PlaceStagedFile "$StagedTerminal"'):main])
+
+    def test_a_read_only_program_is_not_reported_open(self):
+        macro = self.macro('IsProgramOpen')
+        self.assertIn('GetFileAttributesW', macro)
+        self.assertIn('SetFileAttributesW', macro)
+        self.assertLess(macro.index('SetFileAttributesW'), macro.index('CreateFileW'))
+
     def test_every_program_is_installed_checked_and_removed(self):
         for name in ('APP_FILENAME', 'EDITOR_FILENAME', 'TERMINAL_FILENAME'):
             self.assertIn(f'!insertmacro IsProgramOpen "$INSTDIR\\${{{name}}}"', self.nsi)

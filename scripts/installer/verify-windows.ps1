@@ -789,6 +789,20 @@ $installedExe = Join-Path $installDir 'Network_Toolkit.exe'
 $installedEditor = Join-Path $installDir 'Network_Toolkit_TextEditor.exe'
 $installedTerminal = Join-Path $installDir 'Network_Toolkit_Terminal.exe'
 $uninstaller = Join-Path $installDir 'Uninstall.exe'
+# An uninstaller of 1.21.46 or older, after an in-app update added the separate
+# programs, leaves them behind. A fresh setup in that folder replaces them once
+# they are closed, a read-only one included, and refuses while one is open.
+New-Item -Path $installDir -ItemType Directory | Out-Null
+[IO.File]::WriteAllText($installedEditor, 'Separate program left by an older uninstaller')
+[IO.File]::WriteAllText($installedTerminal, 'Separate program left by an older uninstaller')
+$leftoverLock = [IO.File]::Open($installedTerminal, 'Open', 'Read', 'Read')
+try {
+    Invoke-Silent $setup 2 "/S /D=$installDir" 'could not finish while checking that Network Toolkit and its Text Editor and Terminal programs are closed'
+    Assert-Absent $installedExe
+    Assert-Absent $uninstallKey
+    Assert-Same ([IO.File]::ReadAllText($installedEditor)) 'Separate program left by an older uninstaller' 'Left-behind Text Editor program while another one is open'
+} finally { $leftoverLock.Dispose() }
+(Get-Item -LiteralPath $installedTerminal).IsReadOnly = $true
 Invoke-Silent $setup 0 "/S /DesktopShortcut /ContextMenu /D=$installDir"
 $contextMenuExpected = $true
 Assert-Installed
