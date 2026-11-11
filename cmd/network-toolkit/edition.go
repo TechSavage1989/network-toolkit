@@ -81,10 +81,10 @@ func applyBuildEdition(flags *flag.FlagSet, edition string) error {
 		return nil
 	}
 	// A detached window (--terminal-view, --editor-view with its stdin
-	// bootstrap) runs in the program it was started from: the separate
-	// program of its app (detachedViewProgram) or, as a fallback, any build.
-	// It never also opens the standalone app, and the other app's switches
-	// are still refused beside it.
+	// bootstrap) runs in the separate program of its own app
+	// (detachedViewProgram) or in the main program: a separate program
+	// refuses the other app's window. It never also opens the standalone
+	// app, and the other app's switches are still refused beside it.
 	view := set["terminal-view"] || set["editor-view"]
 	refuse := func(name string) error {
 		other := "the Text Editor with " + programName(standaloneEditorMode) + " or " + programName("") + " --editor-standalone"
@@ -95,7 +95,7 @@ func applyBuildEdition(flags *flag.FlagSet, edition string) error {
 	}
 	switch edition {
 	case "terminal":
-		for _, name := range []string{"editor", standaloneEditorMode, "open-file"} {
+		for _, name := range []string{"editor", standaloneEditorMode, "open-file", "editor-view"} {
 			if set[name] {
 				return refuse(name)
 			}
@@ -105,7 +105,7 @@ func applyBuildEdition(flags *flag.FlagSet, edition string) error {
 		}
 		return flags.Set("terminal", "true")
 	case standaloneEditorMode:
-		for _, name := range []string{"terminal", "terminal-preset", terminalLinkFlag} {
+		for _, name := range []string{"terminal", "terminal-preset", terminalLinkFlag, "terminal-view"} {
 			if set[name] {
 				return refuse(name)
 			}
@@ -204,33 +204,79 @@ func standaloneProgramFrom(self, edition, mode string) (string, error) {
 // (mode "terminal" for --terminal-view, standaloneEditorMode for
 // --editor-view) started by the running program (owner request, "connected
 // separate program"): the separate program of that app beside the running
-// program when it is a regular file of this exact version, so the window has
-// that program's icon, name and taskbar button; otherwise the running program
-// itself, exactly as before. The window stays connected to the engine that
-// started it: the program only shows the page; sessions, documents and their
-// ownership stay in that engine. Linux ships only the main program.
-func detachedViewProgram(mode string) (string, error) {
+// program, so the window has that program's icon, name and taskbar button;
+// otherwise the running program when it is the main program (as before), else
+// Network_Toolkit.exe beside it, because a separate program runs only its own
+// app's windows. The window stays connected to the engine that started it:
+// the program only shows the page; sessions, documents and their ownership
+// stay in that engine. Linux ships only the main program.
+//
+// A program other than the running one receives the view token on its
+// standard input, so it is trusted no more than the running program: a
+// regular file (no link or reparse point) of this exact version, which only
+// this user, SYSTEM, Administrators and TrustedInstaller can change, in a
+// folder they alone can change. It is opened first and held, readable only
+// (FILE_SHARE_READ: no write, rename or delete), through the checks and until
+// release is called after the window started, so the file checked is the
+// file that starts. Residual: Windows starts the image by its path, so a
+// folder junction above the program's folder that is changed between the
+// check and the start is not covered; the folder check makes that need the
+// rights to change the program folder itself.
+func detachedViewProgram(mode string) (string, func(), error) {
 	self, err := updateCurrentExecutable()
 	if err != nil {
-		return "", err
+		return "", func() {}, err
 	}
 	if resolved, err := filepath.EvalSymlinks(self); err == nil {
 		self = resolved
 	}
-	return detachedViewProgramFrom(runtime.GOOS, self, buildEdition, mode), nil
+	return detachedViewProgramFrom(runtime.GOOS, self, buildEdition, mode)
 }
+
+// detachedViewWritable names who else can change a program or its folder
+// (editorRegWritableByOthers on Windows). Tests replace it.
+var detachedViewWritable = programWritableByOthers
 
 // detachedViewProgramFrom is detachedViewProgram for the running program self
 // of the given edition on goos.
-func detachedViewProgramFrom(goos, self, edition, mode string) string {
+func detachedViewProgramFrom(goos, self, edition, mode string) (string, func(), error) {
+	none := func() {}
 	if goos != "windows" || edition == mode {
-		return self
+		return self, none, nil
 	}
-	candidate := filepath.Join(filepath.Dir(self), programNameFor(goos, mode))
-	if updateNamingSamePath(candidate, self) || !separateProgramMatches(candidate, mode) {
-		return self
+	dir := filepath.Dir(self)
+	trusted := func(path, edition string) (func(), bool) {
+		if updateNamingSamePath(path, self) {
+			return none, false
+		}
+		held, err := fullInstallOpenHeld(path)
+		if err != nil {
+			return none, false
+		}
+		for _, item := range []string{path, dir} {
+			if who, err := detachedViewWritable(item); err != nil || who != "" {
+				held.Close()
+				return none, false
+			}
+		}
+		if !separateProgramMatches(path, edition) {
+			held.Close()
+			return none, false
+		}
+		return func() { held.Close() }, true
 	}
-	return candidate
+	candidate := filepath.Join(dir, programNameFor(goos, mode))
+	if release, ok := trusted(candidate, mode); ok {
+		return candidate, release, nil
+	}
+	if edition == "" {
+		return self, none, nil
+	}
+	main := filepath.Join(dir, programNameFor(goos, ""))
+	if release, ok := trusted(main, ""); ok {
+		return main, release, nil
+	}
+	return "", none, fmt.Errorf("Neither %s nor %s can open this window beside %s.", programNameFor(goos, mode), programNameFor(goos, ""), filepath.Base(self))
 }
 
 // forwardToSeparateProgram runs a standalone app in its separate program when

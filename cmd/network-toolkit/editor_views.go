@@ -643,9 +643,31 @@ func (m *editorViewRegistry) makeGrant(caller string, d editorDocumentSnapshot) 
 	if m.app.views == nil || m.app.terminals == nil {
 		return nil, errors.New("The terminal service is unavailable.")
 	}
+	// A file a detached Terminal workspace opened in the main window's Text
+	// Editor (window_send.go): looked up before the views lock (lock order).
+	var opened *windowSendGrant
+	if caller == "" && m.app.windowSendAvailable() {
+		opened = m.app.windowSendGrantFor(b.SessionID, d.Path)
+	}
 	m.app.views.mu.Lock()
 	defer m.app.views.mu.Unlock()
 	owner := m.app.views.ownerLocked(b.SessionID)
+	if owner.ViewID != "" && opened != nil && m.app.windowSendGrantLiveLocked(opened) {
+		client, lifetime := opened.client, opened.lifetime
+		grant.valid = func() bool {
+			m.app.views.mu.Lock()
+			defer m.app.views.mu.Unlock()
+			return m.app.windowSendGrantLiveLocked(opened)
+		}
+		grant.run = func(ctx context.Context, req remoteBrowserRequest) (model.Result, error) {
+			operation, cancel := context.WithCancel(ctx)
+			defer cancel()
+			stop := context.AfterFunc(lifetime, cancel)
+			defer stop()
+			return diag.RunSFTPOnClient(operation, client, req.request(), nil)
+		}
+		return grant, nil
+	}
 	if owner.ViewID != "" || owner.Revision != b.Revision || !owner.Ready || !m.app.views.homePresent || m.app.views.homeClosing {
 		return nil, errEditorLease
 	}

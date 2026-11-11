@@ -132,12 +132,15 @@ func launchDetachedTerminal(ctx context.Context, launch terminalViewLaunch) (<-c
 		return nil, err
 	}
 	// The separate program of this app and version when it is beside the
-	// running program (its icon and taskbar name), else this program.
-	executable, err := detachedViewProgram("terminal")
+	// running program and trusted (its icon and taskbar name), else the main
+	// program (detachedViewProgram).
+	executable, held, err := detachedViewProgram("terminal")
 	if err != nil {
 		clear(raw)
 		return nil, fmt.Errorf("locate the detached Terminal executable: %w", err)
 	}
+	// The checked program stays held (readable only) until it has started.
+	defer held()
 	cmd := exec.Command(executable, terminalViewChildArguments(launch.NoBrowser)...)
 	return startTerminalViewChild(ctx, cmd, raw)
 }

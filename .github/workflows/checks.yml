@@ -333,7 +333,7 @@ jobs:
           NTK_WINDOW_SEND_BROWSER: '1'
           PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-editor112/node_modules/playwright
           TOOLKIT_TEST_OUTPUT: ${{ runner.temp }}/ntk-editor112-results/window-send
-        run: go test -mod=vendor ./cmd/network-toolkit -run '^TestWindowSendBrowser$' -count=1 -v -timeout=5m
+        run: go test -mod=vendor ./cmd/network-toolkit -run '^(TestWindowSendBrowser|TestWindowSendRemoteFileBrowser)$' -count=1 -v -timeout=5m
       - name: Pop the main window's editor out into the running standalone Text Editor through both real engines and pages
         if: success() || failure()
         env:

@@ -131,12 +131,15 @@ func launchDetachedEditor(ctx context.Context, launch editorViewLaunch) (<-chan 
 		return nil, err
 	}
 	// The separate program of this app and version when it is beside the
-	// running program (its icon and taskbar name), else this program.
-	executable, err := detachedViewProgram(standaloneEditorMode)
+	// running program and trusted (its icon and taskbar name), else the main
+	// program (detachedViewProgram).
+	executable, held, err := detachedViewProgram(standaloneEditorMode)
 	if err != nil {
 		clear(raw)
 		return nil, fmt.Errorf("locate the detached editor executable: %w", err)
 	}
+	// The checked program stays held (readable only) until it has started.
+	defer held()
 	cmd := exec.Command(executable, editorViewChildArguments(launch.NoBrowser)...)
 	return startEditorViewChild(ctx, cmd, raw)
 }

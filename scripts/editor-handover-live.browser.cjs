@@ -83,7 +83,17 @@ const pass=text=>console.log('PASS '+text);
   await editor.evaluate(()=>{document.querySelector('#modalRoot').innerHTML='<section class="modal" role="dialog"></section>';});
   const tabMenu=await main.evaluate(()=>NetworkToolkitFileEditor.active.uid);
   // move() refuses while the window's ownership poll runs; ask again, as a second click would.
-  for(let attempt=0;;attempt++){const error=await main.evaluate(uid=>NetworkToolkitEditorWindows.move([uid],'new').then(()=>'',e=>e.message),tabMenu);if(!error)break;assert(/Wait for the current/.test(error)&&attempt<40,error);await main.waitForTimeout(100);}
+  const moveTab=async options=>{for(let attempt=0;;attempt++){const error=await main.evaluate(([uid,options])=>NetworkToolkitEditorWindows.move([uid],'new',options).then(()=>'',e=>e.message),[tabMenu,options]);if(!error)return;assert(/Wait for the current/.test(error)&&attempt<40,error);await main.waitForTimeout(100);}};
+  // Owner decision: Move to separate window on ONE tab always opens its own connected window,
+  // even while the Text Editor runs (the tab menu calls move() without a hand-over).
+  await moveTab(undefined);
+  await main.waitForFunction(()=>NetworkToolkitEditorWindows.state.outgoing===1);
+  assert.equal((await docs(editor)).length,3,'a single tab is never handed to the Text Editor');
+  await main.evaluate(()=>NetworkToolkitEditorWindows.cancel());
+  await main.waitForFunction(()=>NetworkToolkitEditorWindows.state.outgoing===0&&[...NetworkToolkitFileEditor.documents.values()].every(d=>!d.frozen));
+  pass('Move to separate window on a single tab goes to a connected window, not to the running Text Editor');
+  // Detach editor and Move all hand over (move(..., {handover:true})); here the editor refuses.
+  await moveTab({handover:true});
   await toast(main,'1 tab stayed here: A dialog is open in Network Toolkit Text Editor');
   const kept=(await docs(main)).find(d=>d.text==='kept here');
   assert(kept&&!kept.frozen&&kept.dirty,'the refused tab is still here, editable and unsaved');

@@ -50,11 +50,11 @@ func TestBuildEditionOpensItsOwnAppAndKeepsItsSwitches(t *testing.T) {
 		{edition: "terminal", name: "terminal refuses the editor", args: []string{"--editor-standalone"}, refused: "--editor-standalone"},
 		{edition: "terminal", name: "terminal refuses a file", args: []string{"--open-file", file}, refused: "--open-file"},
 		{edition: "terminal", name: "terminal refuses the main editor", args: []string{"--editor"}, refused: "--editor "},
-		{edition: "terminal", name: "terminal keeps detached views", args: []string{"--editor-view"}},
+		{edition: "terminal", name: "terminal refuses an editor window", args: []string{"--editor-view"}, refused: "--editor-view"},
 		{edition: "terminal", name: "terminal runs its detached Terminal windows", args: []string{"--terminal-view", "--no-browser"}},
 		{edition: "terminal", name: "terminal view refuses a file", args: []string{"--terminal-view", "--open-file", file}, refused: "--open-file"},
 		{edition: standaloneEditorMode, name: "editor runs its detached editor windows", args: []string{"--editor-view", "--no-browser"}},
-		{edition: standaloneEditorMode, name: "editor keeps a Terminal's detached view fallback", args: []string{"--terminal-view"}},
+		{edition: standaloneEditorMode, name: "editor refuses a Terminal window", args: []string{"--terminal-view"}, refused: "--terminal-view"},
 		{edition: standaloneEditorMode, name: "editor view refuses a link", args: []string{"--editor-view", "--open-url", "ssh://192.0.2.10"}, refused: "--open-url"},
 		{edition: standaloneEditorMode, name: "editor without a switch", args: nil, editor: true},
 		{edition: standaloneEditorMode, name: "editor opens a file", args: []string{"--open-file", file}, editor: true, path: true},
@@ -273,68 +273,96 @@ func TestTerminalLinkRegistrationOfTheProgramFolderIsCurrent(t *testing.T) {
 	}
 }
 
-// Owner request (connected separate program): a detached window of the main
-// Toolkit runs as the separate program of its app, with that program's icon
-// and taskbar name, when the program of this exact version is beside the
-// running one; otherwise, and always on Linux, it runs as the running program
-// exactly as before.
+// Owner request (connected separate program): a detached window runs as the
+// separate program of its app, with that program's icon and taskbar name,
+// when the program of this exact version is beside the running one and only
+// this user and the system can change it and its folder; otherwise the
+// running program when that is the main program, else Network_Toolkit.exe of
+// this version; always the running program on Linux. The chosen file is held
+// open (no write, rename or delete) until the window has started.
 func TestDetachedViewProgramPrefersTheSeparateProgramOfThisVersion(t *testing.T) {
 	dir := t.TempDir()
 	main, editor, terminal := filepath.Join(dir, programNameFor("windows", "")), filepath.Join(dir, programNameFor("windows", standaloneEditorMode)), filepath.Join(dir, programNameFor("windows", "terminal"))
 	writeProgram(t, main)
-	if got := detachedViewProgramFrom("windows", main, "", standaloneEditorMode); got != main {
-		t.Fatalf("without the Text Editor program the editor window must run as %s, got %s", main, got)
+	got := func(goos, self, edition, mode string) string {
+		t.Helper()
+		path, release, err := detachedViewProgramFrom(goos, self, edition, mode)
+		if err != nil {
+			return "error: " + err.Error()
+		}
+		release()
+		return path
 	}
-	if got := detachedViewProgramFrom("windows", main, "", "terminal"); got != main {
-		t.Fatalf("without the Terminal program the terminal window must run as %s, got %s", main, got)
+	if got("windows", main, "", standaloneEditorMode) != main || got("windows", main, "", "terminal") != main {
+		t.Fatal("without the separate programs the main program runs both windows")
 	}
 	writeProgram(t, editor)
 	writeProgram(t, terminal)
-	if got := detachedViewProgramFrom("windows", main, "", standaloneEditorMode); got != editor {
-		t.Fatalf("the detached editor must run as %s, got %s", editor, got)
+	if path := got("windows", main, "", standaloneEditorMode); path != editor {
+		t.Fatalf("the detached editor must run as %s, got %s", editor, path)
 	}
-	if got := detachedViewProgramFrom("windows", main, "", "terminal"); got != terminal {
-		t.Fatalf("the detached terminal must run as %s, got %s", terminal, got)
+	if path := got("windows", main, "", "terminal"); path != terminal {
+		t.Fatalf("the detached terminal must run as %s, got %s", terminal, path)
 	}
-	// The standalone Terminal's own pop-out runs as the Terminal program, and
-	// its editor window (if any) as the Text Editor program.
-	if got := detachedViewProgramFrom("windows", terminal, "terminal", "terminal"); got != terminal {
-		t.Fatalf("a Terminal program's terminal window is its own, got %s", got)
-	}
-	if got := detachedViewProgramFrom("windows", terminal, "terminal", standaloneEditorMode); got != editor {
-		t.Fatalf("a Terminal program's editor window runs as the Text Editor program, got %s", got)
+	// The standalone Terminal's pop-out runs as itself; an editor window it
+	// opens runs as the Text Editor program, else as Network_Toolkit.exe
+	// (a separate program never runs the other app's window).
+	if got("windows", terminal, "terminal", "terminal") != terminal || got("windows", terminal, "terminal", standaloneEditorMode) != editor {
+		t.Fatal("a Terminal program's windows")
 	}
 	// Linux ships only the main program: never a sibling.
-	if got := detachedViewProgramFrom("linux", main, "", "terminal"); got != main {
-		t.Fatalf("Linux must keep the running program, got %s", got)
+	if got("linux", main, "", "terminal") != main {
+		t.Fatal("Linux must keep the running program")
 	}
-	// Another version (or a link, or anything that does not match) is never started.
-	original := separateProgramMatches
-	t.Cleanup(func() { separateProgramMatches = original })
-	separateProgramMatches = func(path, edition string) bool { return path != editor && original(path, edition) }
-	if got := detachedViewProgramFrom("windows", main, "", standaloneEditorMode); got != main {
-		t.Fatalf("a Text Editor program of another version must not run the window, got %s", got)
+	// Another version, a program or folder others can change: never handed a view token.
+	matches, writable := separateProgramMatches, detachedViewWritable
+	t.Cleanup(func() { separateProgramMatches, detachedViewWritable = matches, writable })
+	separateProgramMatches = func(path, edition string) bool { return path != editor && matches(path, edition) }
+	if got("windows", main, "", standaloneEditorMode) != main || got("windows", main, "", "terminal") != terminal {
+		t.Fatal("a Text Editor program of another version must not run the window")
 	}
-	if got := detachedViewProgramFrom("windows", main, "", "terminal"); got != terminal {
-		t.Fatalf("the matching Terminal program must still run its window, got %s", got)
+	if got("windows", terminal, "terminal", standaloneEditorMode) != main {
+		t.Fatal("the Terminal program must fall back to Network_Toolkit.exe for an editor window")
 	}
-	separateProgramMatches = original
+	separateProgramMatches = matches
+	detachedViewWritable = func(path string) (string, error) {
+		if path == terminal {
+			return "Users", nil
+		}
+		return "", nil
+	}
+	if got("windows", main, "", "terminal") != main {
+		t.Fatal("a Terminal program others can change must not run the window")
+	}
+	detachedViewWritable = func(path string) (string, error) {
+		if path == dir {
+			return "", os.ErrPermission
+		}
+		return "", nil
+	}
+	if got("windows", main, "", "terminal") != main {
+		t.Fatal("a folder whose permissions cannot be read must not be trusted")
+	}
+	if path := got("windows", terminal, "terminal", standaloneEditorMode); !strings.HasPrefix(path, "error: ") {
+		t.Fatalf("nothing trusted to run the editor window, got %s", path)
+	}
+	detachedViewWritable = writable
 	if err := os.Remove(terminal); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Symlink(main, terminal); err != nil {
 		t.Fatal(err)
 	}
-	if got := detachedViewProgramFrom("windows", main, "", "terminal"); got != main {
-		t.Fatalf("a link must never run a detached window, got %s", got)
+	if got("windows", main, "", "terminal") != main {
+		t.Fatal("a link must never run a detached window")
 	}
 }
 
 // The separate programs never forward a detached window anywhere: the view
 // role runs in the process that was started.
 func TestSeparateProgramsDoNotForwardDetachedWindows(t *testing.T) {
-	for _, args := range [][]string{terminalViewChildArguments(false), editorViewChildArguments(true)} {
-		for _, edition := range []string{"terminal", standaloneEditorMode} {
+	for edition, args := range map[string][]string{"terminal": terminalViewChildArguments(false), standaloneEditorMode: editorViewChildArguments(true)} {
+		{
 			flags, options := editionFlags()
 			if err := flags.Parse(args); err != nil {
 				t.Fatal(err)

@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -289,12 +290,83 @@ func TestPeerHandoverKeepsTabsOnRefusalTimeoutAndCrash(t *testing.T) {
 		peerRegister(t, editor, root)
 		peerLivePage(t, editor, peerOwnDocuments)
 		peerHandoverAwaitReceiver(t, main)
+		advance := peerTestClock(t)
 		id := start(t, main)
 		server.CloseClientConnections()
 		server.Close()
+		// One failed status check does not end the hand-over: the editor may
+		// still answer. It ends as lost only at the overall deadline.
+		if _, reply, raw := peerPage(t, main, http.MethodGet, "/api/peer-handover/result?requestId="+id, ""); reply["state"] != peerTaken {
+			t.Fatalf("a failed status check ended the hand-over: %s", raw)
+		}
+		advance(peerHandoverStatusDeadline + time.Second)
 		result := peerHandoverAwait(t, main, id, func(s string) bool { return s == "lost" })
 		if len(result["items"].([]any)) != 0 || !strings.Contains(result["message"].(string), "closed") {
 			t.Fatalf("lost result: %v", result)
+		}
+	})
+	t.Run("a status check fails once", func(t *testing.T) {
+		root := t.TempDir()
+		main, _ := peerTestApp(t, root, "main")
+		var mu sync.Mutex
+		failed := 0
+		editor, _ := peerTestAppWith(t, root, standaloneEditorMode, func(a *application) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				mu.Lock()
+				fail := strings.HasPrefix(r.URL.Path, peerInboundPrefix+peerHandoverKind+"/result") && failed == 0
+				if fail {
+					failed++
+				}
+				mu.Unlock()
+				if fail {
+					http.Error(w, "busy", http.StatusServiceUnavailable)
+					return
+				}
+				a.ServeHTTP(w, r)
+			})
+		})
+		peerRegister(t, main, root)
+		peerRegister(t, editor, root)
+		collected := peerLivePage(t, editor, peerOwnDocuments)
+		peerHandoverAwaitReceiver(t, main)
+		id := start(t, main)
+		peerAwaitRequest(t, collected, "flaky status")
+		if _, reply, raw := peerPage(t, main, http.MethodGet, "/api/peer-handover/result?requestId="+id, ""); reply["state"] != peerTaken {
+			t.Fatalf("the failed check: %s", raw)
+		}
+		if code, raw := peerHandoverAck(t, editor, `{"requestId":"`+id+`","ok":true,"outcome":"opened","items":[{"id":"doc-draft","ok":true}]}`); code != http.StatusOK {
+			t.Fatalf("ack: %d %s", code, raw)
+		}
+		result := peerHandoverAwait(t, main, id, func(s string) bool { return s == peerDone })
+		if items := result["items"].([]any); len(items) != 1 {
+			t.Fatalf("done result: %v", result)
+		}
+	})
+	t.Run("the start reply is lost", func(t *testing.T) {
+		root := t.TempDir()
+		main, _ := peerTestApp(t, root, "main")
+		editor, _ := peerTestAppWith(t, root, standaloneEditorMode, func(a *application) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if strings.HasPrefix(r.URL.Path, peerInboundPrefix+peerHandoverKind+"/handover") {
+					// The editor took the request, but its answer never arrives.
+					a.ServeHTTP(httptest.NewRecorder(), r)
+					if hijacker, ok := w.(http.Hijacker); ok {
+						if conn, _, err := hijacker.Hijack(); err == nil {
+							conn.Close()
+						}
+					}
+					return
+				}
+				a.ServeHTTP(w, r)
+			})
+		})
+		peerRegister(t, main, root)
+		peerRegister(t, editor, root)
+		peerLivePage(t, editor, peerOwnDocuments)
+		peerHandoverAwaitReceiver(t, main)
+		code, _, raw := peerPage(t, main, http.MethodPost, "/api/peer-handover/start", peerHandoverJSON(t, map[string]any{"items": draft}))
+		if code == http.StatusOK || !strings.Contains(raw, "The tabs stay here") || !strings.Contains(raw, "in case they also opened there") {
+			t.Fatalf("a lost start reply: %d %s", code, raw)
 		}
 	})
 }

@@ -18,6 +18,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 	"unicode/utf16"
@@ -260,6 +261,10 @@ func (a *application) handleLocalTextEditor(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	switch req.Action {
+	case "canonical-path":
+		// One name per file (editor-handover.js): nothing is read or written.
+		canonical := editorCanonicalPath(filepathAbs)
+		jsonResponse(w, 200, map[string]string{"path": canonical, "key": editorPathKey(runtime.GOOS, canonical)})
 	case "read-text":
 		result, e := readEditableFile(filepathAbs)
 		if e != nil {
@@ -599,4 +604,27 @@ func (a *application) handleEditorSaveDialog(w http.ResponseWriter, r *http.Requ
 		return
 	}
 	jsonResponse(w, 200, map[string]any{"path": absolute})
+}
+
+// editorCanonicalPath is one spelling of a local file's path: absolute and
+// clean (absoluteExplorerPath), with links resolved; on Windows EvalSymlinks
+// also gives each element its real case and the long form of 8.3 names. A
+// path that cannot be resolved (a file that does not exist yet) stays as it
+// was given.
+func editorCanonicalPath(path string) string {
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		if abs, err := filepath.Abs(resolved); err == nil {
+			return filepath.Clean(abs)
+		}
+	}
+	return path
+}
+
+// editorPathKey compares two canonical paths: Windows file names are not
+// case-sensitive.
+func editorPathKey(goos, path string) string {
+	if goos == "windows" {
+		return strings.ToLower(strings.ReplaceAll(path, "/", `\`))
+	}
+	return path
 }

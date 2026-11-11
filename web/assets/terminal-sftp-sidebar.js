@@ -15,7 +15,12 @@ const active=()=>typeof currentTerminal==='function'?currentTerminal():null;
 const eligible=entry=>!!(entry?.info?.id&&entry.info.type==='ssh'&&entry.info.state==='connected'&&typeof terminalOwnerCanMutate==='function'&&terminalOwnerCanMutate(entry));
 const readOnlyActions=new Set(['up','home','root','refresh','preview','copyPath','open']);
 const readOnlyRequests=new Set(['list','stat','preview','read-text']);
-function limitReadOnlyControls(area,m){if(!m.readOnly)return;for(const button of area.querySelectorAll('[data-tsftp],[data-tsftp-menu]'))if(!readOnlyActions.has(button.dataset.tsftp||button.dataset.tsftpMenu))button.remove();area.querySelector('[data-tsftp-os-files]')?.remove();}
+// A detached Terminal workspace (not a single-session window) of the main
+// Toolkit can open a remote file in the main window's Text Editor; everything
+// else in its browser stays read-only (window-send.js, owner decision).
+function remoteEdit(){try{return typeof DETACHED_WORKSPACE!=='undefined'&&DETACHED_WORKSPACE&&!!root.NetworkToolkitWindowSend?.enabled?.();}catch{return false;}}
+const allowedReadOnly=name=>readOnlyActions.has(name)||name==='edit'&&remoteEdit();
+function limitReadOnlyControls(area,m){if(!m.readOnly)return;for(const button of area.querySelectorAll('[data-tsftp],[data-tsftp-menu]'))if(!allowedReadOnly(button.dataset.tsftp||button.dataset.tsftpMenu))button.remove();area.querySelector('[data-tsftp-os-files]')?.remove();}
 function identity(entry){return entry.info.id+'|'+entry.info.host+'|'+entry.info.port+'|'+terminalSessionRevision(entry.info.id)}
 function current(entry){if(!eligible(entry))return null;const existing=sessions.get(entry.info.id);return existing&&existing.identity===identity(entry)?existing:null}
 function notify(){root.NetworkToolkitSessionSidebar?.render?.()}
@@ -93,13 +98,17 @@ function render(panel,entry){
   '<input type="search" class="tsftp-filter" data-tsftp-filter placeholder="Filter remote files" aria-label="Filter SFTP files">'+
   '<div data-tsftp-note class="tsftp-notice" hidden></div><div class="tsftp-file-list" data-tsftp-list role="group" aria-label="Remote files"></div>'+
   '<div class="tsftp-file-tools"><button class="btn small ghost" data-tsftp="upload" data-tsftp-needs-free>Upload</button><button class="btn small ghost" data-tsftp="download" data-tsftp-needs-file>Download</button><button class="btn small ghost" data-tsftp="rename" data-tsftp-needs-file>Rename</button><button class="btn small ghost danger" data-tsftp="delete" data-tsftp-needs-file>Delete</button><button class="btn small ghost" data-tsftp="edit" data-tsftp-needs-file>Edit</button><button class="btn small ghost" data-tsftp="newFile" data-tsftp-needs-free>+ File</button><button class="btn small ghost" data-tsftp="preview" data-tsftp-needs-file>Preview</button></div><div class="tsftp-footer"><span data-tsftp-status>Ready</span><span>Drag files to Windows Explorer</span></div></div>';
-  limitReadOnlyControls(panel,m);if(m.readOnly)panel.querySelector('.tsftp-footer').children[1].textContent='Read-only · '+(nativeFileDrag()?'Drag to Windows Explorer':'Preview files here');
+  limitReadOnlyControls(panel,m);if(m.readOnly)panel.querySelector('.tsftp-footer').children[1].textContent='Read-only · '+(remoteEdit()?'Edit opens in the main window':nativeFileDrag()?'Drag to Windows Explorer':'Preview files here');
   const filter=panel.querySelector('[data-tsftp-filter]');if(filter)filter.value=m.filter;
  }
  paint();
  if(!m.loaded&&!m.loading)void load(m.id,m.folder);
 }
-async function editor(create=false){const m=current(active()),entry=m?.entries.find(x=>x.path===m.selected);if(!m||m.readOnly)return;if(!create&&(!entry||entry.directory)){message('Select one text file.');return;}
+async function editor(create=false){const m=current(active()),entry=m?.entries.find(x=>x.path===m.selected);if(!m)return;
+ if(m.readOnly){if(create||!remoteEdit())return;if(!entry||entry.directory){message('Select one text file.');return;}
+  // The main window's Text Editor opens it on this SSH connection.
+  const sent=await root.NetworkToolkitWindowSend.openRemote({session:m.id,path:entry.path,name:entry.name});if(!sent?.ok)message('Cannot edit: '+(sent?.error||'the main window did not open the file.'),true);return;}
+ if(!create&&(!entry||entry.directory)){message('Select one text file.');return;}
  const filename=create?prompt('New UTF-8 text file name:','new-file.txt'):entry.name;if(filename===null)return;if(!safeName(filename)){message('Enter a valid file name.',true);return;}
  const path=create?join(m.folder,filename):entry.path;
  try{await root.NetworkToolkitFileEditor.open({source:'SSH terminal',path,id:'terminal:'+m.id+':'+path,create,binding:{kind:'terminal',sessionId:m.id,revision:terminalSessionRevision(m.id)},
@@ -183,7 +192,7 @@ async function preview(){
 }
 function command(name){
  const entry=active(),m=current(entry);if(!m||m.status!=='supported')return;
- if(m.readOnly&&!readOnlyActions.has(name))return;
+ if(m.readOnly&&!allowedReadOnly(name))return;
  if(name==='up')void load(m.id,parent(m.folder));
  if(name==='home')void load(m.id,m.home||'.');
  if(name==='root')void load(m.id,'/');

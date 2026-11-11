@@ -186,9 +186,21 @@ not compile.
   same icon groups, so `desktop.IconTerminal`/`IconEditor` still give the
   window its icon. The taskbar button and grouping come from the program's
   path (no explicit AppUserModelID), so a popped-out window groups with the
-  standalone app of that program. The same-folder check trusts the separate
-  program exactly as much as `Network_Toolkit.exe` itself (it is replaced by
-  the same updater and Setup).
+  standalone app of that program. Because the separate program receives the
+  view token on stdin, it is trusted no more than the running program: it must
+  also be a file that only this user, SYSTEM, Administrators and
+  TrustedInstaller can change, in a folder only they can change
+  (`editorRegWritableByOthers`, as the portable registration and the full
+  install use). It is opened first with read sharing only and no reparse
+  following (`fullInstallOpenHeld`) and held through the checks until the
+  child started, so the checked file cannot be written, renamed or deleted
+  before it starts. Residual: Windows starts the image by path, so a change of
+  a junction above the program folder between the check and the start is not
+  covered; that requires the rights to change the program folder's parents.
+  A separate program never runs the other app's window: an editor window
+  opened by the Terminal program falls back to `Network_Toolkit.exe`, and
+  `applyBuildEdition` refuses `--terminal-view` in the Text Editor program and
+  `--editor-view` in the Terminal program.
 - **Send between the windows of one engine** (`window_send.go`,
   `web/assets/window-send.js`): Send to terminal and Send to Text Editor reach
   the other windows of the same engine (main window, detached Terminal
@@ -216,7 +228,9 @@ not compile.
 - **Document hand-over** (`peer_handover.go`): the main window's engine finds
   the standalone Text Editor through the same protected record, by data root,
   whichever program (`Network_Toolkit_TextEditor.exe` or
-  `Network_Toolkit.exe --editor-standalone`) runs it.
+  `Network_Toolkit.exe --editor-standalone`) runs it. Only Detach editor and
+  Move all hand tabs over; Move to separate window on one tab always opens a
+  connected window (owner decision).
 - **Terminal link status** (`/api/terminal-links`): "this copy is the
   registered one" also accepts the registration of `Network_Toolkit.exe` beside
   the separate Terminal program, and the separate program's own command, so

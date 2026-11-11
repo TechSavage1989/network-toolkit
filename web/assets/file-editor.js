@@ -1325,6 +1325,20 @@ const sameFormat=(d,f)=>!!f&&d.encoding===f.encoding&&d.bom===(f.bom===true)&&d.
 function removeAdopted(d){if(documents.get(d.id)!==d)return false;if(d.disk)discardDiskView(d);if(displayedDocument===d)displayedDocument=null;documents.delete(d.id);if(active===d.id)active=[...documents.keys()].at(-1)||'';if(active)draw();else if(overlay)drawTabs();return true;}
 // Only a tab this hand-over created, and only while nobody has edited it.
 function discardAdopted(d){if(!d?.handoverAdopted||d.editRevision!==d.handoverRevision||d.frozen||d.saving||d.loading)return false;return removeAdopted(d);}
+// The engine's canonical form of a local path (absolute, links resolved, the
+// long form of 8.3 names, and on Windows case-insensitive): a file is never
+// opened twice under another spelling. Cached per tab and path.
+async function localPathKey(path){const r=await api('/file-editor/local','POST',{action:'canonical-path',path});const key=String(r?.key||'');if(!key)throw Error('The file path could not be checked.');return key;}
+async function openLocalTab(path){
+ const key=await localPathKey(path);
+ for(const d of documents.values()){
+  if(d.binding?.kind!=='local'||!d.path)continue;
+  if(d.pathKeyFor!==d.path){try{d.pathKey=await localPathKey(d.path);}catch{d.pathKey='';}d.pathKeyFor=d.path;}
+  if(d.pathKey===key&&documents.get(d.id)===d)return d;
+ }
+ return null;
+}
+// Returns {document, created}: created is false when the file was already open here.
 async function adoptHandover(item){
  if(windowCloseState)throw Error('The editor is closing.');
  if(!item||typeof item!=='object'||!['file','untitled'].includes(item.kind))throw Error('The tab is invalid.');
@@ -1338,9 +1352,9 @@ async function adoptHandover(item){
   sessionFormat(d,item.savedFormat||item.format,true);sessionFormat(d,item.format);
   if(d.disk||d.content!==text||!!d.dirty!==!!item.dirty)fail(d,'It could not be carried exactly.');
  }else{
-  const path=String(item.path||''),existing=documents.get('local:'+path);
+  const path=String(item.path||''),existing=await openLocalTab(path);
   // Already open here: a saved tab needs nothing more; unsaved text is never merged into another tab.
-  if(existing){if(!item.dirty)return existing;throw Error(nameOf(path)+' is already open in this editor.');}
+  if(existing){if(!item.dirty)return {document:existing,created:false};throw Error(nameOf(path)+' is already open in this editor.');}
   if(documents.size>=12)throw Error('Close an editor tab here first (12 maximum).');
   d=await openLocalPath(path,false,true);
   if(item.dirty){
@@ -1352,7 +1366,7 @@ async function adoptHandover(item){
   }
  }
  sessionLanguage(d,item);d.handoverAdopted=true;d.handoverRevision=d.editRevision;showRestored(d);
- return d;
+ return {document:d,created:true};
 }
 function restoreSessionLocal(record){
  const path=record.path,name=nameOf(path),paged=!!diskAvailable();

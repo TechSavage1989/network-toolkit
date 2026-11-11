@@ -127,11 +127,13 @@ You are never asked to open anything first. The Text Editor app looks for a term
 - If a dialog is open in the Terminal (a connection form, a sign-in or host key question, or another paste review), the text is refused instead of replacing it. Close the dialog and send again.
 
 ### Pop out into the open Text Editor app
-When the Text Editor app is already open with the same data folder, popping the editor out of the main **Network Toolkit** window (**Detach editor**, **Move all / detach editor** or **Move to separate window** with **New editor window**) adds your tabs to the open Text Editor instead of a new window, and that window comes to the front:
+When the Text Editor app is already open with the same data folder, popping the editor out of the main **Network Toolkit** window with **Detach editor** or **Move all / detach editor** (destination **New editor window**) adds your tabs to the open Text Editor instead of a new window, and that window comes to the front:
 
 - Untitled documents arrive as new unsaved documents with their title and text.
 - Files on this computer arrive with their unsaved changes, encoding, line endings and unsaved marker as they were. The Text Editor opens the file itself and checks that it still holds what the main window read.
 - Tabs that need the main window still open in a connected window, as before: files opened over SFTP or SSH, binary files, unsaved changes in large documents, encodings or line endings that cannot be carried exactly (Windows-1252, mixed line endings), files not saved yet, files on a network share, and files that changed on disk since they were opened.
+
+**Move to separate window** on a single tab always opens that tab in its own connected window, even while the Text Editor app is open.
 
 The main window tells you where the tabs went, for example "3 tabs moved to the open Network Toolkit Text Editor; 1 tab that uses an SFTP connection opens in a connected window." A tab leaves the main window only after the Text Editor confirms that it has it; with **Reopen files next time** on, that includes keeping its unsaved text for next time. If the Text Editor refuses (for example because a dialog is open there), does not answer within about a minute, or closes, the tabs stay in the main window unchanged and you are told why. Undo history does not move with the tabs: in the Text Editor, the first Undo returns an edited file to its saved text. When the Text Editor app is not open, popping out works exactly as before. Terminal sessions never move into the Terminal app.
 

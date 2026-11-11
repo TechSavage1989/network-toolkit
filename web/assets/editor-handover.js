@@ -3,7 +3,9 @@
  * already running with the same data folder, instead of opening a new
  * connected window for them.
  *
- * Sending (main window, editor-windows.js move() to "new"):
+ * Sending (main window, editor-windows.js move() to "new" with handover:
+ * Detach editor and Move all only; a single tab moved to a separate window
+ * always gets its own connected window, owner decision):
  *   - Handed over: untitled documents and local files (saved, or with unsaved
  *     text held by this page). Saved files that this window holds disk-backed
  *     are reopened from disk there.
@@ -154,12 +156,14 @@ async function receive(request,{guard}={}){
   // Never replace a dialog that opened while earlier tabs were opening.
   const why=typeof guard==='function'?guard():'';
   if(why){results.push({id,ok:false,error:clip(why)});continue;}
-  try{const d=await editor.adoptHandover(item);adopted.push({id,d});results.push({id,ok:true});}
+  // created: this request opened the tab. A file already open here returns
+  // the existing tab, which this request must never discard or count as its own.
+  try{const {document:d,created}=await editor.adoptHandover(item);adopted.push({id,d,created:created===true});results.push({id,ok:true});}
   catch(error){results.push({id,ok:false,error:clip(error?.message)||'The tab could not be opened.'});}
  }
  // Unsaved text is confirmed once this editor keeps it for next time. With
  // "Reopen files next time" off, it is held in this window like any tab.
- const unsaved=adopted.filter(x=>x.d.dirty&&x.d.handoverAdopted);
+ const unsaved=adopted.filter(x=>x.created&&x.d.dirty&&x.d.handoverAdopted);
  if(unsaved.length){
   const session=editor.session;let failure='';
   if(session.phase==='ready'){try{await session.save();}catch(error){failure='Its unsaved text could not be kept for next time: '+clip(error?.message);}}

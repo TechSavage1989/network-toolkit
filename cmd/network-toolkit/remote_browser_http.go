@@ -219,7 +219,9 @@ func (a *application) handleRemoteBrowser(w http.ResponseWriter, request *http.R
 		if err := a.withTerminalOwner(request, r.SessionID, "browse", func() error {
 			_, _, err := a.terminals.SFTPClient(r.SessionID)
 			return err
-		}); err != nil {
+		}); err != nil && !a.remoteBrowserGrantAllows(request, r.SessionID, r.Action, r.Path) {
+			// A file a detached Terminal workspace opened in the main window's
+			// Text Editor is the one exception (window_send.go).
 			jsonError(w, http.StatusConflict, "SSH terminal is not available to this window: "+err.Error())
 			return
 		}

@@ -113,7 +113,7 @@ test('the receiving editor opens each tab, keeps unsaved text and confirms per t
  // editor-handover.js reads NetworkToolkitFileEditor from its own global object.
  const ctx=load({windowMode:'editor-standalone'}).context;
  const opened=[],discarded=[],activated=[];let saves=0;
- ctx.NetworkToolkitFileEditor={session:{phase:'ready',save:async()=>{saves++;},isKept:d=>d.uid!=='r-c'},async adoptHandover(item){if(item.fail)throw Error(item.fail);opened.push(item.id);return {id:'local:'+item.id,uid:'r-'+item.id,dirty:!!item.dirty,handoverAdopted:true};},discardAdopted:d=>{discarded.push(d.id);return true;},activateDocument:id=>activated.push(id)};
+ ctx.NetworkToolkitFileEditor={session:{phase:'ready',save:async()=>{saves++;},isKept:d=>d.uid!=='r-c'},async adoptHandover(item){if(item.fail)throw Error(item.fail);opened.push(item.id);return {document:{id:'local:'+item.id,uid:'r-'+item.id,dirty:!!item.dirty,handoverAdopted:true},created:true};},discardAdopted:d=>{discarded.push(d.id);return true;},activateDocument:id=>activated.push(id)};
  const api=ctx.NetworkToolkitEditorHandover;
  const result=await api.receive({requestId:'1'.repeat(32),documents:[{id:'x',fail:'notes.txt changed on disk since it was opened.'},{id:'a',dirty:true},{id:'b'},{id:'c',dirty:true}]},{guard:()=>''});
  assert.deepEqual(JSON.parse(JSON.stringify(result)),{ok:true,outcome:'opened',items:[{id:'x',ok:false,error:'notes.txt changed on disk since it was opened.'},{id:'a',ok:true},{id:'b',ok:true},{id:'c',ok:false,error:'Its unsaved text could not be kept for next time.'}]});
@@ -131,6 +131,19 @@ test('the receiving editor opens each tab, keeps unsaved text and confirms per t
  assert.equal((await api.receive({requestId:'5'.repeat(32),documents:[{id:'f',dirty:true}]},{guard:()=>''})).items[0].ok,true);
  ctx.NetworkToolkitFileEditor.session.phase='ready';ctx.NetworkToolkitFileEditor.session.save=async()=>{throw Error('disk full');};
  assert.match((await api.receive({requestId:'6'.repeat(32),documents:[{id:'g',dirty:true}]},{guard:()=>''})).items[0].error,/could not be kept for next time: disk full/);
+});
+
+// Review finding: a clean file whose path is already open here returns the
+// EXISTING tab. If that tab is unsaved from an earlier hand-over, this request
+// must neither report it as unsaved nor discard it when keeping fails.
+test('a clean file already open here never loses the unsaved tab of an earlier hand-over',async()=>{
+ const ctx=load({windowMode:'editor-standalone'}).context,discarded=[];
+ const earlier={id:'local:C:\\lab\\notes.txt',uid:'r-earlier',dirty:true,handoverAdopted:true};
+ ctx.NetworkToolkitFileEditor={session:{phase:'ready',save:async()=>{throw Error('disk full');},isKept:()=>false},async adoptHandover(){return {document:earlier,created:false};},discardAdopted:d=>{discarded.push(d.id);return true;},activateDocument(){}};
+ const result=await ctx.NetworkToolkitEditorHandover.receive({requestId:'7'.repeat(32),documents:[{id:'n',kind:'file',path:'c:/LAB/NOTES.TXT'}]},{guard:()=>''});
+ assert.deepEqual(JSON.parse(JSON.stringify(result.items)),[{id:'n',ok:true}],'the clean file is confirmed: it is open here');
+ assert.deepEqual(discarded,[],'the earlier unsaved tab is never discarded');
+ assert.equal(earlier.dirty,true);
 });
 
 test('peer-send.js gives documents to the hand-over in the standalone Text Editor only',async()=>{

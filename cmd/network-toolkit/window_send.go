@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"sort"
@@ -8,6 +9,10 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
+	"unicode/utf8"
+
+	"golang.org/x/crypto/ssh"
 )
 
 // Window send: "Send to terminal" and "Send to Text Editor" between the
@@ -41,12 +46,26 @@ import (
 //     sender reads the result.
 //
 // Only text travels, never credentials, host keys, file paths or an Enter.
+//
+// One more kind, "remote" (owner decision): Edit in the SFTP browser of a
+// detached Terminal workspace opens that remote file in the main window's
+// Text Editor, on the same SSH connection. The workspace asks; the engine
+// checks that the workspace owns the session and records a grant for that
+// one path on that exact SSH transport; the main page opens the file with the
+// main window's own SFTP editor code (/api/remote-browser read-text and
+// write-text with the same hash, encoding and staging checks). The grant
+// admits only read-text, write-text and stat of that path from the main
+// window, only while the session stays in a detached workspace on the same
+// transport (remoteBrowserGrantAllows); nothing else of the session becomes
+// the main window's.
 const (
 	windowSendPrefix   = "/api/window-send/"
 	windowSendMain     = "main"
 	windowSendTerminal = "terminal:"
 	windowSendEditor   = "editor:"
 	windowSendKept     = 16
+	windowSendGrants   = 32
+	windowSendPathMax  = 4096
 	windowSendForget   = 2 * time.Minute
 )
 
@@ -64,13 +83,29 @@ type windowSendRequest struct {
 	created            time.Time
 	state              string // peerQueued, peerTaken, peerDone, peerFailed, peerExpired
 	outcome, message   string
-	payload            *peerPayload // nil once the page has it or the request ended
+	payload            *windowSendPayload // nil once the page has it or the request ended
+}
+
+// windowSendPayload is what the receiving page gets: peer send's request, plus
+// the remote path for kind "remote".
+type windowSendPayload struct {
+	peerPayload
+	Path string `json:"path,omitempty"`
+}
+
+// windowSendGrant lets the main window edit one remote file of a session that a
+// detached Terminal workspace owns, on the SSH transport it was granted on.
+type windowSendGrant struct {
+	session, path string
+	client        *ssh.Client
+	lifetime      context.Context
 }
 
 type windowSendState struct {
 	mu       sync.Mutex
 	windows  map[string]*windowSendWindow
 	requests []*windowSendRequest // recent requests, newest last
+	grants   []*windowSendGrant   // remote files opened from detached workspaces, newest last
 }
 
 // windowSendAvailable: only the main Toolkit engine has windows of both
@@ -81,7 +116,7 @@ func (a *application) windowSendAvailable() bool { return a.windowMode == "main"
 func windowSendReceives(key, kind string) bool {
 	switch {
 	case key == windowSendMain:
-		return kind == "terminal" || kind == "editor"
+		return kind == "terminal" || kind == "editor" || kind == "remote"
 	case strings.HasPrefix(key, windowSendTerminal):
 		return kind == "terminal"
 	case strings.HasPrefix(key, windowSendEditor):
@@ -286,11 +321,18 @@ type windowSendBody struct {
 	Line    int    `json:"line,omitempty"`
 	Label   string `json:"label,omitempty"`
 	Text    string `json:"text"`
+	Path    string `json:"path,omitempty"`
 }
 
 // windowSendEnqueue queues a validated request for one other window.
 func (a *application) windowSendEnqueue(caller string, body windowSendBody) (id, name string, status int, err error) {
 	kind := body.Kind
+	if kind == "remote" {
+		return a.windowSendRemoteEnqueue(caller, body)
+	}
+	if body.Path != "" {
+		return "", "", http.StatusBadRequest, errors.New("Text carries no file path.")
+	}
 	payload := peerPayload{RequestID: randomHex(16), Session: body.Session, Target: body.Target, Where: body.Where, Line: body.Line, Label: body.Label, Text: body.Text}
 	if err := validatePeerPayload(kind, &payload); err != nil {
 		return "", "", http.StatusBadRequest, err
@@ -345,7 +387,13 @@ func (a *application) windowSendEnqueue(caller string, body windowSendBody) (id,
 	if current := w.request; current != nil && (current.state == peerQueued || current.state == peerTaken) {
 		return "", "", http.StatusConflict, errors.New("Another send is still waiting in " + name + ". Finish it there, then send again.")
 	}
-	request := &windowSendRequest{id: payload.RequestID, kind: kind, from: caller, to: body.Window, created: now, state: peerQueued, payload: &payload}
+	a.windowSendQueueLocked(w, &windowSendRequest{id: payload.RequestID, kind: kind, from: caller, to: body.Window, created: now, state: peerQueued, payload: &windowSendPayload{peerPayload: payload}})
+	return payload.RequestID, name, http.StatusOK, nil
+}
+
+// windowSendQueueLocked queues a request for a window and keeps the list of
+// recent requests short.
+func (a *application) windowSendQueueLocked(w *windowSendWindow, request *windowSendRequest) {
 	w.request = request
 	a.windowSend.requests = append(a.windowSend.requests, request)
 	if extra := len(a.windowSend.requests) - windowSendKept; extra > 0 {
@@ -365,12 +413,123 @@ func (a *application) windowSendEnqueue(caller string, body windowSendBody) (id,
 		defer a.windowSend.mu.Unlock()
 		a.windowSend.expireLocked(windowSendNow())
 	})
-	return payload.RequestID, name, http.StatusOK, nil
+}
+
+// windowSendRemoteEnqueue: a detached Terminal workspace asks the main window
+// to open one remote file of a session it owns (Edit in its SFTP browser).
+func (a *application) windowSendRemoteEnqueue(caller string, body windowSendBody) (id, name string, status int, err error) {
+	if !strings.HasPrefix(caller, windowSendTerminal) {
+		return "", "", http.StatusBadRequest, errors.New("Remote files are opened from a Terminal window's SFTP browser.")
+	}
+	if body.Window != windowSendMain {
+		return "", "", http.StatusBadRequest, errors.New("Remote files open in the main window's Text Editor.")
+	}
+	if body.Text != "" || body.Target != "" || body.Where != "" || body.Line != 0 || body.Label != "" {
+		return "", "", http.StatusBadRequest, errors.New("Opening a remote file carries a session and a path only.")
+	}
+	path := body.Path
+	if path == "" || len(path) > windowSendPathMax || !utf8.ValidString(path) || strings.ContainsFunc(path, unicode.IsControl) || !peerIDPattern.MatchString(body.Session) {
+		return "", "", http.StatusBadRequest, errors.New("Choose one remote file.")
+	}
+	view := strings.TrimPrefix(caller, windowSendTerminal)
+	grant := &windowSendGrant{session: body.Session, path: path}
+	a.views.mu.Lock()
+	owner := a.views.ownerLocked(body.Session)
+	v := a.views.views[view]
+	if owner.ViewID != view || !owner.Ready || v == nil || !v.info.Workspace || !v.includesSession(body.Session) || v.info.State != "detached" {
+		a.views.mu.Unlock()
+		return "", "", http.StatusConflict, errors.New("That SSH session is not in this window's workspace.")
+	}
+	client, lifetime, clientErr := a.terminals.SFTPClient(body.Session)
+	a.views.mu.Unlock()
+	if clientErr != nil || lifetime == nil || lifetime.Err() != nil {
+		return "", "", http.StatusConflict, errors.New("The SSH session is not connected.")
+	}
+	grant.client, grant.lifetime = client, lifetime
+	now := windowSendNow()
+	a.windowSend.mu.Lock()
+	defer a.windowSend.mu.Unlock()
+	a.windowSend.expireLocked(now)
+	live := a.windowSendLiveLocked(now)
+	names := windowSendNames(append([]string(nil), live...))
+	found := false
+	for _, key := range live {
+		found = found || key == windowSendMain
+	}
+	if !found {
+		return "", "", http.StatusConflict, errors.New("Open the main Network Toolkit window to edit remote files, then choose Edit again.")
+	}
+	name = names[windowSendMain]
+	w := a.windowSend.windows[windowSendMain]
+	if current := w.request; current != nil && (current.state == peerQueued || current.state == peerTaken) {
+		return "", "", http.StatusConflict, errors.New("Another request is still waiting in " + name + ". Finish it there, then try again.")
+	}
+	kept := a.windowSend.grants[:0]
+	for _, g := range a.windowSend.grants {
+		if g.lifetime.Err() == nil && !(g.session == grant.session && g.path == grant.path) {
+			kept = append(kept, g)
+		}
+	}
+	a.windowSend.grants = append(kept, grant)
+	if extra := len(a.windowSend.grants) - windowSendGrants; extra > 0 {
+		a.windowSend.grants = a.windowSend.grants[extra:]
+	}
+	id = randomHex(16)
+	a.windowSendQueueLocked(w, &windowSendRequest{id: id, kind: "remote", from: caller, to: windowSendMain, created: now, state: peerQueued, payload: &windowSendPayload{peerPayload: peerPayload{RequestID: id, Session: body.Session}, Path: path}})
+	return id, name, http.StatusOK, nil
+}
+
+// windowSendGrantFor returns the grant for one remote file, if any.
+func (a *application) windowSendGrantFor(session, path string) *windowSendGrant {
+	a.windowSend.mu.Lock()
+	defer a.windowSend.mu.Unlock()
+	for i := len(a.windowSend.grants) - 1; i >= 0; i-- {
+		if g := a.windowSend.grants[i]; g.session == session && g.path == path {
+			return g
+		}
+	}
+	return nil
+}
+
+// windowSendGrantLiveLocked (a.views.mu held) reports whether a grant still
+// stands: the session is still in a detached Terminal workspace, on the SSH
+// transport the grant was given on.
+func (a *application) windowSendGrantLiveLocked(g *windowSendGrant) bool {
+	if g == nil || g.lifetime.Err() != nil {
+		return false
+	}
+	owner := a.views.ownerLocked(g.session)
+	v := a.views.views[owner.ViewID]
+	if owner.ViewID == "" || !owner.Ready || v == nil || !v.info.Workspace || !v.includesSession(g.session) || (v.info.State != "detached" && v.info.State != "return_requested") {
+		return false
+	}
+	client, lifetime, err := a.terminals.SFTPClient(g.session)
+	return err == nil && client == g.client && lifetime == g.lifetime
+}
+
+// remoteBrowserGrantAllows reports whether the main window may run action on
+// path of a session that a detached Terminal workspace owns, because that
+// workspace opened the file in the main window's Text Editor: only read-text,
+// write-text and stat of exactly that path, while the grant stands.
+func (a *application) remoteBrowserGrantAllows(r *http.Request, session, action, path string) bool {
+	if !a.windowSendAvailable() || terminalRequestView(r) != "" || editorRequestView(r) != "" || a.views == nil || a.terminals == nil {
+		return false
+	}
+	if action != "read-text" && action != "write-text" && action != "stat" {
+		return false
+	}
+	grant := a.windowSendGrantFor(session, path)
+	if grant == nil {
+		return false
+	}
+	a.views.mu.Lock()
+	defer a.views.mu.Unlock()
+	return a.windowSendGrantLiveLocked(grant)
 }
 
 // windowSendPoll is a page's inbox poll: it proves the page runs, hands over
 // the request waiting for it, and says whether the engine needs its summary.
-func (a *application) windowSendPoll(key string) (payload *peerPayload, kind string, report bool, others int) {
+func (a *application) windowSendPoll(key string) (payload *windowSendPayload, kind string, report bool, others int) {
 	now := windowSendNow()
 	a.windowSend.mu.Lock()
 	defer a.windowSend.mu.Unlock()
@@ -437,7 +596,7 @@ func (a *application) windowSendAcknowledge(key, id string, ok bool, outcome, me
 		if r.id != id || r.to != key || r.state != peerTaken {
 			continue
 		}
-		if ok && !peerOutcomeAllowed(r.kind, outcome) {
+		if ok && !(r.kind == "remote" && outcome == "opened" || r.kind != "remote" && peerOutcomeAllowed(r.kind, outcome)) {
 			return true, false
 		}
 		if ok {
@@ -501,7 +660,7 @@ func (a *application) handleWindowSend(w http.ResponseWriter, r *http.Request, k
 			jsonError(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		if body.Kind != "terminal" && body.Kind != "editor" {
+		if body.Kind != "terminal" && body.Kind != "editor" && body.Kind != "remote" {
 			jsonError(w, http.StatusBadRequest, "Send text to a terminal or the Text Editor.")
 			return
 		}

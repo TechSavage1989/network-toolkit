@@ -64,6 +64,11 @@ const (
 	peerHandoverBodyLimit = 6*peerHandoverTextLimit + 256<<10
 	// A main page that stopped asking leaves its hand-over behind this long.
 	peerHandoverAbandoned = peerRequestLifetime + 30*time.Second
+	// peerHandoverStatusDeadline bounds how long a hand-over whose status
+	// cannot be read is still asked about: one failed check (the editor busy
+	// for a moment) never ends it. It ends before peerHandoverAbandoned and
+	// after the editor's own request lifetime.
+	peerHandoverStatusDeadline = peerRequestLifetime + 15*time.Second
 )
 
 var (
@@ -456,12 +461,15 @@ func (a *application) handlePeerHandover(w http.ResponseWriter, r *http.Request)
 		reply, status, err := peerCallReceiver(r.Context(), rc, instanceID, http.MethodPost, peerInboundPrefix+peerHandoverKind+"/handover", payload, 20*time.Second)
 		if err != nil || reply.RequestID != payload.RequestID {
 			release()
-			message, code := name+" did not take the tabs. They stay here.", http.StatusServiceUnavailable
-			if err != nil && !errors.Is(err, errPeerNotOpen) && !errors.Is(err, errPeerUnchecked) && !errors.Is(err, errPeerOlder) {
-				message = strings.TrimSuffix(err.Error(), " Nothing was moved.") + " The tabs stay here."
-				if status >= 400 && status < 500 {
-					code = http.StatusConflict
-				}
+			// The request may have reached the editor with its answer lost:
+			// say plainly that the tabs stay here and where to look.
+			message, code := name+" did not confirm that it took the tabs. The tabs stay here; check "+name+" in case they also opened there.", http.StatusServiceUnavailable
+			// errPeerNotOpen also stands for a reply that never arrived.
+			if errors.Is(err, errPeerOlder) {
+				message = name + " did not take the tabs. The tabs stay here."
+			} else if err != nil && !errors.Is(err, errPeerUnchecked) && status >= 400 && status < 500 {
+				// An answer: the editor refused the request.
+				message, code = strings.TrimSuffix(err.Error(), " Nothing was moved.")+" The tabs stay here.", http.StatusConflict
 			}
 			jsonError(w, code, message)
 			return
@@ -496,6 +504,11 @@ func (a *application) handlePeerHandover(w http.ResponseWriter, r *http.Request)
 		}
 		reply, _, err := peerCallReceiver(r.Context(), rc, pending.instanceID, http.MethodGet, peerInboundPrefix+peerHandoverKind+"/result?requestId="+id, nil, 2*time.Second)
 		if err != nil || reply.RequestID != id {
+			if peerNow().Sub(pending.created) < peerHandoverStatusDeadline {
+				// Ask again on the page's next check.
+				jsonResponse(w, http.StatusOK, map[string]any{"requestId": id, "state": peerTaken, "items": []peerHandoverResult{}, "name": name})
+				return
+			}
 			finish()
 			jsonResponse(w, http.StatusOK, map[string]any{"requestId": id, "state": "lost", "items": []peerHandoverResult{}, "name": name, "message": name + " closed or stopped answering before it confirmed the tabs. They stay here; check " + name + " for copies."})
 			return
