@@ -213,7 +213,14 @@ func forwardToSeparateProgram(mode string, args []string) bool {
 	if cwd, err := os.Getwd(); err == nil {
 		cmd.Dir = cwd
 	}
-	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+	if runtime.GOOS == "windows" {
+		// A GUI program has no standard handles to pass on; start it as the
+		// Separate terminal window starts the Terminal.
+		configureTerminalChild(cmd)
+	} else {
+		// Development and test runs: the URL line and messages stay visible.
+		cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+	}
 	if err := cmd.Start(); err != nil {
 		return false
 	}
