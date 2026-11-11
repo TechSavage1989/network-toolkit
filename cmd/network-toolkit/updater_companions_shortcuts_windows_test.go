@@ -72,6 +72,8 @@ func TestCompanionShortcutsNativeRetarget(t *testing.T) {
 		t.Fatal(err)
 	}
 	ops := companionShortcutNativeOps(nil)
+	// The temporary folder from the start: never the runner's own Start menu.
+	ops.programsFolder = func() (string, error) { return menu, nil }
 	ops.installLocation = func() (string, bool, error) { return install, true, nil }
 	ops.setupVersion = func() (string, bool, error) { return "1.21.46", true, nil }
 	editorBefore, _ := os.ReadFile(editor)
@@ -82,7 +84,6 @@ func TestCompanionShortcutsNativeRetarget(t *testing.T) {
 		t.Fatal("shortcut changed for an older uninstaller")
 	}
 	ops.setupVersion = func() (string, bool, error) { return companionShortcutUninstallerVersion, true, nil }
-	ops.programsFolder = func() (string, error) { return menu, nil }
 	if err := updateRetargetCompanionShortcuts(install, ops); err != nil {
 		t.Fatal(err)
 	}
