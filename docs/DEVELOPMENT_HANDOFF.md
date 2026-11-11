@@ -1,3 +1,15 @@
+# v1.21.45 Beta 1 - A document icon for files opened with the Text Editor
+
+Owner: "id like the icon files that set text editor to open as to be the icon image of the paper sheet, but not the background or border of the icon." The owner approved a rendered preview (outlined page, larger, transparent background).
+
+v1.21.44 was published and verified: tag at merge commit 8381055 (PR #166), release run green (build, windows-setup, publish), all seven assets matching GitHub's digests, `github_release.py verify` reporting "Verified 1.21.44", stable channel still at v1.21.34.
+
+`assets/source/Network_Toolkit_Document.svg` (and hand-drawn `Network_Toolkit_Document.<16|20|24|32>.svg` for the small sizes) build `assets/Network_Toolkit_Document.ico` (`python3 scripts/generate_icon_assets.py --document`). It is a fourth icon group appended after app 0, editor 1 and terminal 2, so the document icon is index 3 and earlier indexes are unchanged (`scripts/windows_resources_test.py`). Setup points the ProgID `NetworkToolkit.TextDocument\DefaultIcon` at index 3 on every install, repair and upgrade; `ApplicationIcon`, `Applications\Network_Toolkit.exe\DefaultIcon` and the right-click verb's `Icon` keep the editor tile (index 1).
+
+Known limits: Explorer's display and icon cache on real Windows were not observed (Setup was exercised under Wine and by the hosted setup check); in-app updates do not change file icons; a type the user sets to the editor through Open with, Always that Setup does not list uses `Applications\Network_Toolkit.exe` and so shows the tile.
+
+---
+
 # v1.21.44 Beta 1 - The Text Editor opens almost any file
 
 Owner: "the text editor should be configurable as default app for other text formats and file formats that are unknown. similar to how notepad++ opens and supports almost any file type."

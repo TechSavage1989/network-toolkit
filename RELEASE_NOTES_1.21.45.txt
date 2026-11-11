@@ -1,0 +1,12 @@
+Network Toolkit 1.21.45
+
+## What's New
+
+- Files that open with the Text Editor now show a plain document icon (the page from the Text Editor's icon, without the blue tile), so they look like documents in Explorer instead of like the app.
+
+## Additional Details
+
+- Run the new Setup once to get the new icon; updating from inside the app does not change file icons. Windows may keep showing the old icon until Explorer refreshes its icon cache or you sign in again.
+- The Text Editor itself keeps its tile icon in shortcuts, the taskbar, Open with and Default apps.
+- A file type you set to the Text Editor yourself with Open with, Always (one Setup does not list) may still show the Text Editor's icon.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.
