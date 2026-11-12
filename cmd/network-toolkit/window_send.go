@@ -274,6 +274,9 @@ func (s *windowSendState) expireLocked(now time.Time) {
 		}
 		if w.request == nil && now.Sub(w.polledAt) > windowSendForget {
 			delete(s.windows, key)
+			if act := s.activations[key]; act != nil && act.polling == 0 {
+				delete(s.activations, key) // a window that is gone collects nothing
+			}
 		}
 	}
 }
@@ -657,13 +660,34 @@ func (a *application) windowSendMainLive() bool {
 }
 
 // windowSendHomeClosed forgets that the main window's page ran: after its
-// native window closed, only a new page that polls and reports counts as live
-// (a request already queued for it waits there for that page).
+// native window closed, only a new page that polls and reports counts as live.
+// A request still waiting for that page ends at once and says so (its sender
+// is told now, not after a minute), and a remote file's grant that was not
+// confirmed by an open tab ends with it.
 func (a *application) windowSendHomeClosed() {
 	a.windowSend.mu.Lock()
 	defer a.windowSend.mu.Unlock()
-	if w := a.windowSend.windows[windowSendMain]; w != nil {
-		w.reported, w.polledAt, w.targets = false, time.Time{}, nil
+	w := a.windowSend.windows[windowSendMain]
+	if w == nil {
+		return
+	}
+	w.reported, w.polledAt, w.targets = false, time.Time{}, nil
+	if r := w.request; r != nil && (r.state == peerQueued || r.state == peerTaken) {
+		switch {
+		case r.state == peerTaken:
+			r.message = "The main window closed before it confirmed what happened. Check it when it is open again."
+		case r.kind == "remote":
+			r.message = "The main window closed before it opened the file. Choose Edit again."
+		default:
+			r.message = "The main window closed before it took the text. Nothing was sent."
+		}
+		r.state, r.payload = peerFailed, nil
+		w.request = nil
+		for _, g := range append([]*windowSendGrant(nil), a.windowSend.grants...) {
+			if g.request == r.id && !g.confirmed {
+				a.windowSend.dropGrantLocked(g)
+			}
+		}
 	}
 }
 

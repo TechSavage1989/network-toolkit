@@ -348,7 +348,7 @@ func (a *application) servePeerHandoverInbound(w http.ResponseWriter, r *http.Re
 			a.peerRefuse(w, status, err.Error())
 			return
 		}
-		a.activatePrimary() // the tabs arrive in this window: bring it forward
+		a.peerRaisePrimary() // the tabs arrive in this window: bring it forward
 		a.peerReply(w, http.StatusOK, map[string]any{"requestId": request.RequestID, "state": peerQueued})
 	case base + "result":
 		if r.Method != http.MethodGet {

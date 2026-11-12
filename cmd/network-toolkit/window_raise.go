@@ -58,8 +58,13 @@ type windowSendActivation struct {
 	raise   bool
 	raiseAt time.Time
 	allow   int // a process this child is to allow to come to the front
+	polling int // long polls of this child waiting now
 	wake    chan struct{}
 }
+
+// windowAllowWait bounds how long a request waits for the sending child to
+// collect its permission before the request goes out (windowSendAllowFirst).
+var windowAllowWait = 400 * time.Millisecond
 
 func (s *windowSendState) activationLocked(key string) *windowSendActivation {
 	if s.activations == nil {
@@ -92,8 +97,8 @@ func (a *application) trackWindowProcess(key string, launch func(started func(in
 	forget := func() {
 		a.windowSend.mu.Lock()
 		delete(a.windowSend.pids, key)
-		delete(a.windowSend.activations, key)
 		a.windowSend.mu.Unlock()
+		a.windowSendForgetWindow(key)
 	}
 	done, err := launch(func(pid int) {
 		if pid < 1 {
@@ -132,14 +137,12 @@ func windowSendChild(key string) bool {
 // the front. Callers call it only after the request was queued for that window.
 // from is the sending window ("peer" for the other standalone app).
 func (a *application) windowSendRaise(from, to string) {
-	now := windowSendNow()
 	pid := 0
 	if to == windowSendMain {
 		pid = os.Getpid()
 	} else if windowSendChild(to) {
 		a.windowSend.mu.Lock()
 		pid = a.windowSend.pids[to]
-		a.windowSend.signalLocked(to, true, 0, now)
 		a.windowSend.mu.Unlock()
 		if pid > 0 {
 			windowAllowForeground(pid)
@@ -147,7 +150,15 @@ func (a *application) windowSendRaise(from, to string) {
 	} else {
 		return
 	}
-	a.windowSendAllowFrom(from, pid)
+	// The sending child (the foreground process) allows the receiver first,
+	// so the receiver's own raise below is allowed (child to child as well).
+	a.windowSendAllowFirst(from, pid)
+	if windowSendChild(to) {
+		a.windowSend.mu.Lock()
+		a.windowSend.signalLocked(to, true, 0, windowSendNow())
+		a.windowSend.mu.Unlock()
+		return
+	}
 	if to == windowSendMain {
 		a.activatePrimary()
 		windowRaiseLater(func() {
@@ -172,11 +183,59 @@ func (a *application) windowSendAllowFrom(from string, pid int) {
 	a.windowSend.signalLocked(from, false, pid, windowSendNow())
 }
 
+// windowSendAllowFirst is windowSendAllowFrom that waits, at most
+// windowAllowWait, until the sending child has collected the permission, so it
+// is given before the receiver tries to come forward. A child with no long
+// poll waiting (no native window, or an older child) is not waited for.
+func (a *application) windowSendAllowFirst(from string, pid int) {
+	if pid < 1 || !windowSendChild(from) {
+		return
+	}
+	a.windowSendAllowFrom(from, pid)
+	deadline := time.Now().Add(windowAllowWait)
+	for {
+		a.windowSend.mu.Lock()
+		act := a.windowSend.activations[from]
+		waiting := act != nil && act.allow == pid && act.polling > 0
+		a.windowSend.mu.Unlock()
+		if !waiting || time.Now().After(deadline) {
+			if !waiting {
+				time.Sleep(15 * time.Millisecond) // the child's AllowSetForegroundWindow call
+			}
+			return
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+// windowSendForgetWindow drops what the engine keeps about a detached window
+// that closed: its activation and, for peer send, what it was last shown.
+func (a *application) windowSendForgetWindow(key string) {
+	a.windowSend.mu.Lock()
+	if act := a.windowSend.activations[key]; act == nil || act.polling == 0 {
+		delete(a.windowSend.activations, key)
+	}
+	a.windowSend.mu.Unlock()
+	a.peer.mu.Lock()
+	delete(a.peer.listed, key)
+	a.peer.mu.Unlock()
+}
+
 // windowSendActivationWait is a child window's long poll: it returns what that
 // window has to do, or nothing after windowRaiseWait.
 func (a *application) windowSendActivationWait(ctx context.Context, key string) (raise bool, allow int) {
 	timer := time.NewTimer(windowRaiseWait)
 	defer timer.Stop()
+	a.windowSend.mu.Lock()
+	a.windowSend.activationLocked(key).polling++
+	a.windowSend.mu.Unlock()
+	defer func() {
+		a.windowSend.mu.Lock()
+		if act := a.windowSend.activations[key]; act != nil && act.polling > 0 {
+			act.polling--
+		}
+		a.windowSend.mu.Unlock()
+	}()
 	for {
 		a.windowSend.mu.Lock()
 		act := a.windowSend.activationLocked(key)

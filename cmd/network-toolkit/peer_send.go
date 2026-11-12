@@ -713,6 +713,18 @@ func peerLoopback(remote string) bool {
 	return ip != nil && ip.IsLoopback()
 }
 
+// peerRaisePrimary raises this app's own window for a request it queued, and
+// once more after windowRaiseRetry, as windowSendRaise does: the sender's
+// permission may arrive a moment after the request.
+func (a *application) peerRaisePrimary() {
+	a.activatePrimary()
+	windowRaiseLater(func() {
+		if a.homeCanConnect() {
+			a.activatePrimary()
+		}
+	})
+}
+
 func (a *application) peerReply(w http.ResponseWriter, status int, body map[string]any) {
 	if body == nil {
 		body = map[string]any{}
@@ -835,7 +847,7 @@ func (a *application) servePeerInbound(w http.ResponseWriter, r *http.Request) {
 		if window != "" {
 			a.windowSendRaise(windowSendPeer, window)
 		} else {
-			a.activatePrimary()
+			a.peerRaisePrimary()
 		}
 		a.peerReply(w, http.StatusOK, map[string]any{"requestId": payload.RequestID, "state": peerQueued})
 	case base + "result":
@@ -1259,6 +1271,9 @@ func (a *application) peerOutboundFor(from, id string) (peerOutbound, bool) {
 func (a *application) peerStartAndDeliver(o *peerOutbound, payload peerPayload) {
 	instanceID, err := a.peerOpen(a.ctx)
 	if err == nil {
+		// A sending detached window allows the started app before the text goes.
+		// The record is read here, never under a.peer.mu.
+		a.windowSendAllowFirst(o.from, peerReceiverPID(o.receiver, instanceID))
 		_, err = a.peerDeliver(a.ctx, o.receiver, instanceID, &payload)
 	}
 	a.peer.mu.Lock()
@@ -1273,9 +1288,6 @@ func (a *application) peerStartAndDeliver(o *peerOutbound, payload peerPayload) 
 		return
 	}
 	o.state = peerQueued
-	if windowSendChild(o.from) {
-		go a.windowSendAllowFrom(o.from, peerReceiverPID(o.receiver, instanceID))
-	}
 }
 
 // ---- Page routes: this app's own page, session token ----
@@ -1373,9 +1385,20 @@ func (a *application) handlePeerSendFrom(w http.ResponseWriter, r *http.Request,
 			a.peer.listed = map[string]peerListed{}
 		}
 		a.peer.listed[caller] = listed
+		// What a detached window that has closed was shown is not kept.
+		for key := range a.peer.listed {
+			if windowSendChild(key) && key != caller && !a.windowSendAlive(key) {
+				delete(a.peer.listed, key)
+			}
+		}
 		a.peer.mu.Unlock()
 		jsonResponse(w, http.StatusOK, body)
 	case "open":
+		// A running app is raised by the open: a sending detached window
+		// allows it first (only a process its protected record names).
+		if pid, ok := peerForegroundPID(a.peerStandalone().dir); ok {
+			a.windowSendAllowFirst(caller, pid)
+		}
 		instanceID, err := a.peerOpen(r.Context())
 		if err != nil {
 			jsonError(w, http.StatusServiceUnavailable, err.Error())
@@ -1437,12 +1460,15 @@ func (a *application) handlePeerSendFrom(w http.ResponseWriter, r *http.Request,
 				jsonError(w, http.StatusServiceUnavailable, candidate.name()+" is not open any more. Nothing was sent.")
 				return
 			}
+			// A sending detached window (the foreground process) allows the
+			// probed instance's process before the text is posted, so that app
+			// may come forward when it takes the text.
+			a.windowSendAllowFirst(caller, peerReceiverPID(candidate, listed.instanceID))
 			if code, err := a.peerDeliver(r.Context(), candidate, listed.instanceID, payload); err != nil {
 				jsonError(w, code, err.Error())
 				return
 			}
 			a.peerRemember(&peerOutbound{id: payload.RequestID, from: caller, receiver: candidate, instanceID: listed.instanceID, state: peerQueued})
-			a.windowSendAllowFrom(caller, peerReceiverPID(candidate, listed.instanceID))
 			jsonResponse(w, http.StatusOK, map[string]any{"requestId": payload.RequestID, "state": peerQueued, "name": candidate.name(), "receiver": candidate.role()})
 			return
 		}
@@ -1472,13 +1498,13 @@ func (a *application) handlePeerSendFrom(w http.ResponseWriter, r *http.Request,
 			jsonResponse(w, http.StatusOK, body)
 			return
 		}
+		a.windowSendAllowFirst(caller, peerReceiverPID(*rc, instanceID))
 		if code, err := a.peerDeliver(r.Context(), *rc, instanceID, payload); err != nil {
 			settle(peerFailed, err.Error(), rc, instanceID)
 			jsonError(w, code, err.Error())
 			return
 		}
 		settle(peerQueued, "", rc, instanceID)
-		a.windowSendAllowFrom(caller, peerReceiverPID(*rc, instanceID))
 		body := map[string]any{"requestId": payload.RequestID, "state": peerQueued, "name": rc.name(), "receiver": rc.role()}
 		if note != "" {
 			body["note"] = note
