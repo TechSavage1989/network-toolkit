@@ -154,7 +154,7 @@ func TestEditorRegistrationTypesAreNotWrittenWhereSetupMustRun(t *testing.T) {
 		{name: "a version that is not x.y.z", version: "1.21.50-beta", exe: testInstalled, notice: true},
 		{name: "a version with spaces inside", version: "1. 21.50", exe: testInstalled, notice: true},
 		{name: "a portable copy", version: "1.21.50", exe: testCopyA},
-		{name: "the Text Editor program", version: "1.21.50", exe: editorRegEditorProgram(testInstalled)},
+		{name: "the Text Editor program", version: "1.21.50", exe: editorRegJoin(editorRegDir(testInstalled), "Network_Toolkit_TextEditor.exe")},
 		{name: "a ProgID of another program", version: "1.21.50", exe: testInstalled, notice: true, err: errEditorTypesNotSetups, change: func(reg *fakeRegistry) {
 			reg.SetString(editorRegProgKey+`\shell\open\command`, "", editorRegCommand(testCopyB))
 		}},
