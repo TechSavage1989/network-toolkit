@@ -179,6 +179,57 @@ func TestStandalonePeerSendBrowser(t *testing.T) {
 	peerRegister(t, terminalApp, both)
 	peerRegister(t, editorApp, both)
 	device, session := connect(terminalApp)
+	// Owner decision (v1.21.50): each standalone app pops a window out with its
+	// own code; the launch that would start the separate program hands the
+	// window's page to the script through a private file instead, and this
+	// test plays the native child's heartbeat.
+	launchDir := t.TempDir()
+	terminalLaunchFile, editorLaunchFile := filepath.Join(launchDir, "terminal-view.json"), filepath.Join(launchDir, "editor-view.json")
+	var childMu sync.Mutex
+	var terminalChild, editorChild string
+	terminalApp.launchTerminalView = func(_ context.Context, launch terminalViewLaunch) (<-chan error, error) {
+		childMu.Lock()
+		terminalChild = launch.ViewToken
+		childMu.Unlock()
+		raw, _ := json.Marshal(map[string]string{"view": launch.ViewID, "token": launch.ViewToken})
+		return nil, os.WriteFile(terminalLaunchFile, raw, 0600)
+	}
+	editorApp.launchEditorView = func(_ context.Context, launch editorViewLaunch) (<-chan error, error) {
+		childMu.Lock()
+		editorChild = launch.ViewToken
+		childMu.Unlock()
+		raw, _ := json.Marshal(map[string]string{"view": launch.ViewID, "token": launch.ViewToken})
+		return nil, os.WriteFile(editorLaunchFile, raw, 0600)
+	}
+	heartbeat, stopHeartbeat := context.WithCancel(context.Background())
+	defer stopHeartbeat()
+	go func() {
+		ticker := time.NewTicker(time.Second)
+		defer ticker.Stop()
+		for {
+			childMu.Lock()
+			beats := []struct {
+				host, token, path string
+			}{{terminalApp.host, terminalChild, "/api/terminal-views/current/pulse"}, {editorApp.host, editorChild, "/api/editor-views/current/pulse"}}
+			childMu.Unlock()
+			for _, beat := range beats {
+				if beat.token == "" {
+					continue
+				}
+				request, _ := http.NewRequestWithContext(heartbeat, http.MethodPost, "http://"+beat.host+beat.path, strings.NewReader("{}"))
+				request.Header.Set("Content-Type", "application/json")
+				request.Header.Set("X-Session-Token", beat.token)
+				if response, err := http.DefaultClient.Do(request); err == nil {
+					response.Body.Close()
+				}
+			}
+			select {
+			case <-heartbeat.Done():
+				return
+			case <-ticker.C:
+			}
+		}
+	}()
 
 	// main: only the main window runs; the two standalone apps of this data
 	// root are open as senders but are not registered, so they are not receivers.
@@ -249,6 +300,7 @@ func TestStandalonePeerSendBrowser(t *testing.T) {
 		"NTK_PEER_TERMINAL_URL=http://"+terminalApp.host, "NTK_PEER_TERMINAL_TOKEN="+terminalApp.token,
 		"NTK_PEER_EDITOR_URL=http://"+editorApp.host, "NTK_PEER_EDITOR_TOKEN="+editorApp.token,
 		"NTK_PEER_SESSION="+session, "NTK_PEER_MORE="+string(more),
+		"NTK_PEER_TERMINAL_LAUNCH="+terminalLaunchFile, "NTK_PEER_EDITOR_LAUNCH="+editorLaunchFile,
 		"NTK_PEER_LAUNCH_WAIT_MS="+strconv.FormatInt(peerLaunchWait.Milliseconds(), 10))
 	output, err := command.CombinedOutput()
 	t.Log(string(output))
@@ -262,8 +314,12 @@ func TestStandalonePeerSendBrowser(t *testing.T) {
 	// sent (peer send added no Enter), the Enter the script pressed in the
 	// Terminal itself, then the reviewed text once, after it was confirmed
 	// there. The send refused during the review never reached the device.
+	// Then, in the Terminal window popped out of the standalone Terminal: a
+	// line from the Text Editor's own window and one from its popped-out
+	// window, each with no Enter added, each followed by the Enter the script
+	// pressed in that Terminal window.
 	got := device.input()
-	if want := "show version" + "\r" + "show clock\r\r"; got != want {
+	if want := "show version" + "\r" + "show clock\r\r" + "show inventory" + "\r" + "show users" + "\r"; got != want {
 		t.Fatalf("the device received %q, want %q", got, want)
 	}
 	// The main window's session: the selected line with no Enter added, then

@@ -124,6 +124,85 @@ const pass=text=>{checks.push(text);console.log('PASS '+text);};
   const submitTerminal=page=>page.locator('#modalRoot button[type="submit"][form="editorSendTerminalForm"]').click();
   const submitEditor=page=>page.locator('#modalRoot button[type="submit"][form="terminalSendEditorForm"]').click();
   const ready=(page,id)=>page.waitForFunction(id=>terminalSessions.get(id)?.info.state==='connected'&&currentTerminal()?.info.id===id&&terminalEntryAcceptsInput(currentTerminal()),id);
+  const clearToasts=page=>page.evaluate(()=>{const stack=document.querySelector('#toastStack');if(stack)stack.innerHTML='';});
+
+  // ---- Popped-out windows of the standalone apps (owner decision, v1.21.50) ----
+  // A window popped out of a standalone app sends exactly as that app's own window, through its
+  // owner engine, and text for a session or a document it holds reaches it there.
+  {
+   const launched=async file=>{for(let i=0;i<100;i++){try{return JSON.parse(fs.readFileSync(file,'utf8'));}catch{await new Promise(r=>setTimeout(r,100));}}return null;};
+   async function child(url,pathname,token,label,isReady){
+    const context=await browser.newContext({viewport:{width:1280,height:800}}),page=await context.newPage();page.setDefaultTimeout(20000);
+    page.on('pageerror',error=>errors.push(label+': '+error.message));
+    await page.route('**/*',route=>new URL(route.request().url()).origin===url?route.continue():route.abort());
+    await page.addInitScript(value=>{window.__networkToolkitNativeSession=value;},token);
+    await page.goto(url+pathname);await page.waitForFunction(isReady);
+    return page;
+   }
+   // The standalone Terminal pops its workspace out with its own code.
+   await terminal.evaluate(()=>detachTerminalWorkspace());
+   const tl=await launched(process.env.NTK_PEER_TERMINAL_LAUNCH);
+   assert(tl?.view&&tl?.token,'the standalone Terminal started its Terminal window');
+   const popTerm=await child(terminalURL,'/terminal-view/'+tl.view,tl.token,'Terminal window of the standalone Terminal',()=>typeof terminalDetachedReady!=='undefined'&&terminalDetachedReady&&online);
+   await ready(popTerm,session);
+   assert.equal(await popTerm.evaluate(()=>NetworkToolkitPeerSend.sender()+':'+NetworkToolkitWindowSend.kind()+':'+NetworkToolkitWindowSend.enabled()),'terminal:terminal:true');
+   // Text Editor (its own window) -> the session in the Terminal window.
+   await clearToasts(editor);
+   await editor.locator('#networkToolkitFileEditor [data-ed="new"]').first().click();
+   await editorText(editor).fill('show inventory\n');await editorText(editor).evaluate(el=>{el.focus();el.setSelectionRange(0,14);});
+   for(let attempt=0;;attempt++){await sendButton(editor).click();await editor.locator('#editorSendTerminalForm,[data-editor-send-peer-missing]').first().waitFor();if(await editor.locator('#editorSendTarget option[value="'+session+'"]').count())break;assert(attempt<20,'the Terminal window\'s session was never listed');await editor.evaluate(()=>closeModal());await editor.waitForTimeout(400);}
+   await submitTerminal(editor);
+   await toast(editor,'Sent to '+name+' in Network Toolkit Terminal.');
+   await screen(popTerm,/lab-switch-01# show inventory$/);
+   assert.equal(await popTerm.locator('#terminalPasteForm').count(),0,'one line needs no review');
+   pass('Popped-out Terminal window of the standalone Terminal: a line from the Text Editor reached its session through its own paste path, with no Enter');
+   await shot(popTerm,'popped-terminal');
+   await popTerm.evaluate(()=>currentTerminal().xterm.focus());await popTerm.keyboard.press('Enter');
+   await screen(popTerm,/synthetic reply to show inventory/);
+   // The Terminal window -> a new document in the Text Editor, through the standalone Terminal's engine.
+   assert.equal(await selectLine(popTerm,'synthetic reply to show inventory'),'synthetic reply to show inventory');
+   const documents=await editor.evaluate(()=>NetworkToolkitFileEditor.listDocuments().length);
+   await toEditorDialog(popTerm,session);
+   assert.equal(await popTerm.locator('#terminalSendEditorForm fieldset legend').nth(1).textContent(),'To Network Toolkit Text Editor');
+   await popTerm.locator('[name="terminalSendSource"][value="selection"]').check();await popTerm.locator('[name="terminalSendTarget"][value="new"]').check();
+   await submitEditor(popTerm);
+   await toast(popTerm,'Sent to a new document in Network Toolkit Text Editor.');
+   await editor.waitForFunction(n=>NetworkToolkitFileEditor.listDocuments().length===n+1,documents);
+   await editor.waitForFunction(()=>document.querySelector('#networkToolkitFileEditor [data-ed-text]').value==='synthetic reply to show inventory');
+   pass('Popped-out Terminal window of the standalone Terminal: its Send to Text Editor reached a new document of the Text Editor app');
+   // The Text Editor pops its active tab out into a window of its own.
+   await editor.waitForFunction(()=>NetworkToolkitEditorWindows.state.enabled===true);
+   const uid=await editor.evaluate(()=>NetworkToolkitFileEditor.active.uid);
+   for(let attempt=0;;attempt++){const error=await editor.evaluate(uid=>NetworkToolkitEditorWindows.move([uid],'new').then(()=>'',e=>e.message),uid);if(!error)break;assert(/Wait for the current/.test(error)&&attempt<40,error);await editor.waitForTimeout(100);}
+   const el=await launched(process.env.NTK_PEER_EDITOR_LAUNCH);
+   assert(el?.view&&el?.token,'the standalone Text Editor started its Text Editor window');
+   const popEd=await child(editorURL,'/editor-view/'+el.view,el.token,'Text Editor window of the standalone Text Editor',()=>online&&NetworkToolkitFileEditor.listDocuments().length===1);
+   assert.equal(await popEd.evaluate(()=>NetworkToolkitPeerSend.sender()+':'+NetworkToolkitWindowSend.kind()),'editor:editor');
+   // The Text Editor window -> the session in the Terminal window.
+   await editorText(popEd).fill('show users\n');await editorText(popEd).evaluate(el=>{el.focus();el.setSelectionRange(0,10);});
+   for(let attempt=0;;attempt++){await sendButton(popEd).click();await popEd.locator('#editorSendTerminalForm,[data-editor-send-peer-missing]').first().waitFor();if(await popEd.locator('#editorSendTarget option[value="'+session+'"]').count())break;assert(attempt<20,'the Text Editor window never listed the session');await popEd.evaluate(()=>closeModal());await popEd.waitForTimeout(400);}
+   assert.equal(await popEd.locator('#editorSendTarget optgroup').getAttribute('label'),'Network Toolkit Terminal');
+   await submitTerminal(popEd);
+   await toast(popEd,'Sent to '+name+' in Network Toolkit Terminal.');
+   await screen(popTerm,/lab-switch-01# show users$/);
+   pass('Popped-out Text Editor window of the standalone Text Editor: its Send to terminal reached the session in the Terminal window');
+   await shot(popEd,'popped-editor');
+   await popTerm.evaluate(()=>currentTerminal().xterm.focus());await popTerm.keyboard.press('Enter');
+   await screen(popTerm,/synthetic reply to show users/);
+   // The Terminal window -> the document held by the Text Editor window.
+   const held=await popEd.evaluate(()=>NetworkToolkitFileEditor.listDocuments()[0].uid);
+   await selectLine(popTerm,'synthetic reply to show users');
+   await clearToasts(popTerm);
+   await toEditorDialog(popTerm,session);
+   await popTerm.locator('[name="terminalSendSource"][value="selection"]').check();await popTerm.locator('[name="terminalSendTarget"][value="existing"]').check();
+   await popTerm.locator('#terminalSendDocument').selectOption(held);await popTerm.locator('#terminalSendWhere').selectOption('end');
+   await submitEditor(popTerm);
+   await toast(popTerm,'in Network Toolkit Text Editor.');
+   await popEd.waitForFunction(()=>document.querySelector('#networkToolkitFileEditor [data-ed-text]').value==='show users\nsynthetic reply to show users');
+   pass('Popped-out windows of both apps: terminal text reached the document that the Text Editor window holds');
+   for(const [page,other] of [[popTerm,editorToken],[popEd,terminalToken]])assert.equal(await page.evaluate(token=>document.documentElement.outerHTML.includes(token),other),false);
+   assert.deepEqual(errors,[]);
+  }
 
   // ---- Only the main Toolkit window runs (the standalone apps here are senders, not registered) ----
   {

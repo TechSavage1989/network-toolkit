@@ -23,9 +23,16 @@
  * asks the main window to open that remote file (kind "remote"): the main
  * window opens it with the same code as its own SFTP browser's Edit, on the
  * same SSH connection; the engine admits only that file (window_send.go).
+ * When the main window is closed, the engine reopens it first and the file
+ * opens there once its page runs (owner decision, v1.21.50).
  *
- * This is not peer send: nothing leaves the engine, and a standalone app's
- * windows do not use it (its engine does not offer it). */
+ * The window that takes the text or the file comes to the front (its engine
+ * allows it and tells its native window; window_raise.go).
+ *
+ * This is not peer send: nothing leaves the engine. In the standalone
+ * Terminal and Text Editor, only their detached windows use it: to receive
+ * text the other standalone app sent to a session or a document they hold
+ * (peer send routes it to them). Their own Send to goes through peer-send.js. */
 (function(root){
 'use strict';
 const document=root.document;if(!document)return;
@@ -67,7 +74,8 @@ function doneMessage(outcome,target,name){
 async function send(payload,options={}){
  let queued;
  try{queued=await call('send','POST',payload);}
- catch(error){const message=error.message||'The other window did not accept the text.';toastMessage(message,'error');return {ok:false,error:message};}
+ catch(error){options.sent?.();const message=error.message||'The other window did not accept the text.';toastMessage(message,'error');return {ok:false,error:message};}
+ options.sent?.();
  const name=clip(queued.name)||'The other window',target=options.target||(payload.kind==='terminal'?'the terminal session':'the document'),began=Date.now();let noted=false;
  for(;;){
   await sleep(options.interval||300);
@@ -93,8 +101,12 @@ async function receiveRemote(request,guard){
  // The engine's grant follows this tab: closing it, or moving it away, ends the grant.
  return ID.test(d?.uid||'')?{ok:true,outcome:'opened',document:d.uid}:{ok:false,error:'The Text Editor did not open the file.'};
 }
-// A detached Terminal workspace: open one remote file in the main window's Text Editor.
-function openRemote({session,path,name}={}){return send({kind:'remote',window:'main',session,path},{target:clip(name)||'the file'});}
+// A detached Terminal workspace: open one remote file in the main window's
+// Text Editor. A closed main window is reopened first, which takes a moment.
+function openRemote({session,path,name}={}){
+ const note=setTimeout(()=>toastMessage('Opening the main window to edit '+(clip(name)||'the file')+'…'),1200);
+ return send({kind:'remote',window:'main',session,path},{target:clip(name)||'the file',sent:()=>clearTimeout(note)}).finally(()=>clearTimeout(note));
+}
 async function receive(request,want){
  if(receiving||!request||typeof request.requestId!=='string')return;receiving=true;
  const p=peer(),k=kind(),name=ownName(),guard=()=>p?.blocked?p.blocked(name,k==='main'):'';

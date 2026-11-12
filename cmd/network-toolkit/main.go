@@ -401,10 +401,20 @@ func main() {
 		a.editorLaunchInbox.add(*editorLaunch)
 	}
 	if runtime.GOOS == "windows" || *noBrowser {
+		// The engine keeps each detached window's process identifier while it
+		// runs, to let that window come to the front (window_raise.go).
 		if !editorStandalone {
-			a.launchTerminalView = launchDetachedTerminal
+			a.launchTerminalView = func(ctx context.Context, launch terminalViewLaunch) (<-chan error, error) {
+				return a.trackWindowProcess(windowSendTerminal+launch.ViewID, func(started func(int)) (<-chan error, error) {
+					return launchDetachedTerminalWith(ctx, launch, started)
+				})
+			}
 		}
-		a.launchEditorView = launchDetachedEditor
+		a.launchEditorView = func(ctx context.Context, launch editorViewLaunch) (<-chan error, error) {
+			return a.trackWindowProcess(windowSendEditor+launch.ViewID, func(started func(int)) (<-chan error, error) {
+				return launchDetachedEditorWith(ctx, launch, started)
+			})
+		}
 	}
 	title := appName
 	if *terminalOnly {

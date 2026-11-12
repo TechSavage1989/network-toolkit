@@ -22,6 +22,14 @@ import (
 //   - local files, saved or with unsaved text held by the page, and saved
 //     (clean) local files that the main engine holds disk-backed.
 //
+// A page-held tab also carries its undo history (owner decision, v1.21.50),
+// within the same 8 MiB as unsaved text; the receiving editor restores it only
+// when it opened exactly the text the history belongs to, and otherwise says
+// that the tab moved without it. A tab whose history does not fit moves
+// without it, and the main window says so; nothing is dropped silently.
+// Disk-backed tabs move without history (their edit buffer stays in this
+// engine), and the main window says so when they had any.
+//
 // Everything else (files opened over SFTP, SSH or FTP, binary files, unsaved
 // changes in disk-backed documents, files that changed on disk) still opens in
 // a connected detached window, as before. No standalone editor running: no
@@ -101,14 +109,28 @@ type peerHandoverItem struct {
 	Format      *peerHandoverFormat `json:"format,omitempty"`
 	SavedFormat *peerHandoverFormat `json:"savedFormat,omitempty"`
 	Language    string              `json:"language,omitempty"`
+	// Undo and Redo are a page-held tab's undo history (owner decision,
+	// v1.21.50): the texts the editor's own Undo and Redo return to, oldest
+	// first, exactly as the editor keeps them. They count against the same
+	// 8 MiB as unsaved text; a tab whose history does not fit moves without
+	// it and the user is told. Disk-backed tabs never carry history: it lives
+	// in the main engine's edit buffer and cannot be rebuilt exactly elsewhere.
+	Undo []string `json:"undo,omitempty"`
+	Redo []string `json:"redo,omitempty"`
 }
 
-// peerHandoverResult is what the receiving page did with one tab.
+// peerHandoverResult is what the receiving page did with one tab. HistoryLost
+// says that a tab that moved did not keep the undo history it carried (the
+// receiving editor could not apply it exactly); the user is told.
 type peerHandoverResult struct {
-	ID    string `json:"id"`
-	OK    bool   `json:"ok"`
-	Error string `json:"error,omitempty"`
+	ID          string `json:"id"`
+	OK          bool   `json:"ok"`
+	Error       string `json:"error,omitempty"`
+	HistoryLost bool   `json:"historyLost,omitempty"`
 }
+
+// peerHandoverHistoryEntries is the editor's own undo limit (file-editor.js).
+const peerHandoverHistoryEntries = 80
 
 // peerHandoverRequest is the body the main engine posts to the editor's engine.
 type peerHandoverRequest struct {
@@ -197,6 +219,17 @@ func validatePeerHandover(items []peerHandoverItem) error {
 		if total += len(item.Text); total > peerHandoverTextLimit {
 			return errors.New("Hand over no more than 8 MiB of unsaved text at a time.")
 		}
+		if len(item.Undo) > peerHandoverHistoryEntries || len(item.Redo) > peerHandoverHistoryEntries {
+			return errors.New("A tab's undo history is longer than the editor keeps.")
+		}
+		for _, entry := range append(append([]string(nil), item.Undo...), item.Redo...) {
+			if !utf8.ValidString(entry) {
+				return errors.New("A tab's undo history is not valid UTF-8.")
+			}
+			if total += len(entry); total > peerHandoverTextLimit {
+				return errors.New("Hand over no more than 8 MiB of unsaved text and undo history at a time.")
+			}
+		}
 		switch item.Kind {
 		case "file":
 			if item.Name != "" {
@@ -261,7 +294,7 @@ func peerHandoverResultsValid(ids []string, items []peerHandoverResult) bool {
 		want[id] = true
 	}
 	for _, item := range items {
-		if !want[item.ID] || !utf8.ValidString(item.Error) || utf8.RuneCountInString(item.Error) > peerMessageRunes || item.OK && item.Error != "" {
+		if !want[item.ID] || !utf8.ValidString(item.Error) || utf8.RuneCountInString(item.Error) > peerMessageRunes || item.OK && item.Error != "" || item.HistoryLost && !item.OK {
 			return false
 		}
 		delete(want, item.ID)
@@ -311,7 +344,7 @@ func (a *application) servePeerHandoverInbound(w http.ResponseWriter, r *http.Re
 				return
 			}
 		}
-		if status, err := a.peerEnqueue(peerHandoverKind, peerPayload{RequestID: request.RequestID, Documents: request.Documents}); err != nil {
+		if status, _, err := a.peerEnqueue(peerHandoverKind, peerPayload{RequestID: request.RequestID, Documents: request.Documents}); err != nil {
 			a.peerRefuse(w, status, err.Error())
 			return
 		}
@@ -522,7 +555,7 @@ func (a *application) handlePeerHandover(w http.ResponseWriter, r *http.Request)
 				break
 			}
 			for _, item := range reply.Items {
-				items = append(items, peerHandoverResult{ID: item.ID, OK: item.OK, Error: peerPlainText(item.Error, peerMessageRunes)})
+				items = append(items, peerHandoverResult{ID: item.ID, OK: item.OK, Error: peerPlainText(item.Error, peerMessageRunes), HistoryLost: item.OK && item.HistoryLost})
 			}
 		case peerFailed:
 			if message == "" {

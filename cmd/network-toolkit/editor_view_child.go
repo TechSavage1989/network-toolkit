@@ -126,6 +126,12 @@ func editorViewChildArguments(noBrowser bool) []string {
 // bounds the decision to start, not the child's lifetime. The owner observes
 // the returned buffered completion channel for crash recovery.
 func launchDetachedEditor(ctx context.Context, launch editorViewLaunch) (<-chan error, error) {
+	return launchDetachedEditorWith(ctx, launch, nil)
+}
+
+// launchDetachedEditorWith is launchDetachedEditor that also reports the
+// started process's identifier (window_raise.go).
+func launchDetachedEditorWith(ctx context.Context, launch editorViewLaunch, started func(int)) (<-chan error, error) {
 	raw, err := encodeEditorViewLaunch(launch)
 	if err != nil {
 		return nil, err
@@ -141,10 +147,14 @@ func launchDetachedEditor(ctx context.Context, launch editorViewLaunch) (<-chan 
 	// The checked program stays held (readable only) until it has started.
 	defer held()
 	cmd := exec.Command(executable, editorViewChildArguments(launch.NoBrowser)...)
-	return startEditorViewChild(ctx, cmd, raw)
+	return startEditorViewChildNotify(ctx, cmd, raw, started)
 }
 
 func startEditorViewChild(ctx context.Context, cmd *exec.Cmd, bootstrap []byte) (<-chan error, error) {
+	return startEditorViewChildNotify(ctx, cmd, bootstrap, nil)
+}
+
+func startEditorViewChildNotify(ctx context.Context, cmd *exec.Cmd, bootstrap []byte, started func(int)) (<-chan error, error) {
 	if ctx == nil {
 		clear(bootstrap)
 		return nil, errors.New("the detached editor launch context is unavailable")
@@ -161,6 +171,9 @@ func startEditorViewChild(ctx context.Context, cmd *exec.Cmd, bootstrap []byte) 
 	if err := cmd.Start(); err != nil {
 		clear(bootstrap)
 		return nil, fmt.Errorf("start the detached editor window: %w", err)
+	}
+	if started != nil && cmd.Process != nil {
+		started(cmd.Process.Pid)
 	}
 	done := make(chan error, 1)
 	go func() {
@@ -342,10 +355,14 @@ func runDetachedEditorView(input io.Reader, noBrowser bool) error {
 	if noBrowser || launch.NoBrowser {
 		<-ctx.Done()
 	} else {
+		// The owner says when this window takes text and comes forward.
+		activate := make(chan struct{}, 1)
+		go watchWindowActivation(ctx, launch.OwnerHost, launch.ViewToken, activate)
 		err = desktop.Run(ctx, desktop.Config{
 			Title: launch.Title, URL: "http://" + launch.OwnerHost + "/editor-view/" + launch.ViewID,
 			IconResource:         desktop.IconEditor,
 			SessionToken:         launch.ViewToken,
+			Activate:             activate,
 			RequireCloseApproval: true,
 			DataDir:              launch.DataDir, Stop: cancel,
 		})

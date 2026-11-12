@@ -25,9 +25,15 @@
  * user did not choose to send (the hand-over of documents below carries the
  * local paths and unsaved text of the tabs the user popped out).
  * The main Toolkit window only receives (startMain(), when its engine says it
- * can be found); its own Send to commands stay inside the window. Detached
- * child windows never use peer send; between the windows of one engine
- * window-send.js uses this module's summaries and receive code.
+ * can be found); its own Send to commands stay inside the window. Between the
+ * windows of one engine window-send.js uses this module's summaries and
+ * receive code.
+ * Detached windows of a standalone app (owner decision, v1.21.50) send like
+ * that app's own window: startSender(), when their engine reports peerSend,
+ * makes this page a sender only. Its requests go to its OWNER engine with its
+ * own view token (the same /api/peer-send/ paths, sending routes only), and
+ * that engine sends with every rule above. Such a window receives text from
+ * the other app through window-send.js, never through this module's inbox.
  * Documents: the standalone Text Editor also receives tabs that the main
  * window hands over when its editor is popped out (kind "documents"). They
  * open through editor-handover.js behind the same blocked()/guard checks. */
@@ -174,9 +180,12 @@ async function poll(){
 }
 function begin(app){mode=app;if(started)return true;started=true;setInterval(()=>void poll(),1000);return true;}
 function start(app){if(app!=='editor'&&app!=='terminal')return false;return begin(app);}
+// A detached window of a standalone app: send only, through its owner engine.
+// It never polls the peer inbox (it receives through window-send.js).
+function startSender(app){if(app!=='editor'&&app!=='terminal'||started&&mode!==app)return false;mode=app;return true;}
 // The main Toolkit window: receive only, and only when its engine reports that
 // a standalone app can find it (status.peerReceive).
 function startMain(){if(mode&&mode!=='main')return false;return begin('main');}
 // window-send.js (windows of one engine) reports and receives with the same code.
-root.NetworkToolkitPeerSend=Object.freeze({start,startMain,sender,peerKind,peerName,targets,open,send,poll,summary,dialogOpen,blocked,sessionSummary,documentSummary,receiveTerminal,receiveEditor});
+root.NetworkToolkitPeerSend=Object.freeze({start,startMain,startSender,sender,peerKind,peerName,targets,open,send,poll,summary,dialogOpen,blocked,sessionSummary,documentSummary,receiveTerminal,receiveEditor});
 })(window);

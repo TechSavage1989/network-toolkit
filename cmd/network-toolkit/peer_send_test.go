@@ -1467,7 +1467,7 @@ func TestPeerSendStartThatTimesOutOrIsAbandonedDeliversNothing(t *testing.T) {
 	closing.stop()
 	deadline := time.Now().Add(5 * time.Second)
 	for {
-		if o, ok := closing.peerOutboundFor(id); ok && o.state == peerFailed {
+		if o, ok := closing.peerOutboundFor(windowSendMain, id); ok && o.state == peerFailed {
 			break
 		}
 		if time.Now().After(deadline) {

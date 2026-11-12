@@ -1338,23 +1338,38 @@ async function openLocalTab(path){
  }
  return null;
 }
-// Returns {document, created}: created is false when the file was already open here.
+// Undo history carried by a hand-over (owner decision, v1.21.50): applied only
+// to a page-held tab showing exactly the text it belongs to, within this
+// editor's own limits. Returns whether it was applied.
+function adoptHistory(d,item,exact){
+ const undo=item.undo,redo=item.redo;
+ if(!exact||!d||d.disk||!Array.isArray(undo)&&undo!==undefined||!Array.isArray(redo)&&redo!==undefined)return false;
+ const list=[...(undo||[]),...(redo||[])];
+ if((undo||[]).length>80||(redo||[]).length>80||list.some(text=>typeof text!=='string'||text.length>EDITOR_DOCUMENT_BYTES))return false;
+ d.undo=[...(undo||[])];d.redo=[...(redo||[])];retainUndo(d,d.undo);retainUndo(d,d.redo);
+ return true;
+}
+// Returns {document, created, historyLost}: created is false when the file was
+// already open here; historyLost when undo history came with the tab but could
+// not be restored exactly (the tab is open without it).
 async function adoptHandover(item){
  if(windowCloseState)throw Error('The editor is closing.');
  if(!item||typeof item!=='object'||!['file','untitled'].includes(item.kind))throw Error('The tab is invalid.');
  const text=typeof item.text==='string'?item.text:'',fail=(d,message)=>{removeAdopted(d);throw Error(message);};
+ const history=Array.isArray(item.undo)&&item.undo.length>0||Array.isArray(item.redo)&&item.redo.length>0;
  if(item.dirty&&shouldPage(text))throw Error('Its unsaved text is too large for this editor mode.');
- let d;
+ let d,exact=false;
  if(item.kind==='untitled'){
   if(documents.size>=12)throw Error('Close an editor tab here first (12 maximum).');
   d=await open({id:'untitled:'+Date.now()+':'+Math.random().toString(36).slice(2,7),source:'Untitled',binding:{kind:'localDraft'},path:String(item.name||'Untitled.txt'),create:true,initialContent:'',read:async()=>({content:''}),write:localWrite});
   if(text&&!setContent(d,text,false))fail(d,'Its unsaved text could not be carried.');
   sessionFormat(d,item.savedFormat||item.format,true);sessionFormat(d,item.format);
   if(d.disk||d.content!==text||!!d.dirty!==!!item.dirty)fail(d,'It could not be carried exactly.');
+  exact=true;
  }else{
   const path=String(item.path||''),existing=await openLocalTab(path);
-  // Already open here: a saved tab needs nothing more; unsaved text is never merged into another tab.
-  if(existing){if(!item.dirty)return {document:existing,created:false};throw Error(nameOf(path)+' is already open in this editor.');}
+  // Already open here: a saved tab needs nothing more (its own history stays); unsaved text is never merged into another tab.
+  if(existing){if(!item.dirty)return {document:existing,created:false,historyLost:history};throw Error(nameOf(path)+' is already open in this editor.');}
   if(documents.size>=12)throw Error('Close an editor tab here first (12 maximum).');
   d=await openLocalPath(path,false,true);
   if(item.dirty){
@@ -1363,10 +1378,12 @@ async function adoptHandover(item){
    if(!setContent(d,text,true))fail(d,'Its unsaved text could not be carried.');
    sessionFormat(d,item.format);
    if(d.disk||d.content!==text||d.dirty!==true||!sameFormat(d,item.format))fail(d,nameOf(path)+' could not be carried exactly.');
-  }
+   exact=true;
+  }else exact=!d.disk&&d.hash===item.hash; // a saved tab: the history belongs to exactly the bytes the main window read
  }
+ const historyLost=history&&!adoptHistory(d,item,exact);
  sessionLanguage(d,item);d.handoverAdopted=true;d.handoverRevision=d.editRevision;showRestored(d);
- return {document:d,created:true};
+ return {document:d,created:true,historyLost};
 }
 function restoreSessionLocal(record){
  const path=record.path,name=nameOf(path),paged=!!diskAvailable();

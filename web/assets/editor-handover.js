@@ -23,8 +23,14 @@
  *   document (NetworkToolkitFileEditor.adoptHandover), behind the same guard
  *   as text from another app, and unsaved text is confirmed only once this
  *   editor keeps it for next time (when "Reopen files next time" is on).
- * Undo history does not travel: the first Undo there returns to the file's
- * text. Never credentials, tokens, host keys, connections or remote paths. */
+ * Undo history travels with page-held tabs (owner decision, v1.21.50): Undo
+ * and Redo there continue where they were here. It counts against the same
+ * 8 MiB as unsaved text; a tab whose history does not fit moves without it,
+ * and a disk-backed (large) tab always moves without it (its history lives in
+ * this window's engine). The receiving editor restores history only onto
+ * exactly the text it belongs to. Whenever a moved tab did not keep its
+ * history, the message says so; nothing is dropped silently.
+ * Never credentials, tokens, host keys, connections or remote paths. */
 (function(root){
 'use strict';
 const TEXT_LIMIT=8*1024*1024,WAIT_MS=80000,ENCODINGS=['UTF-8','UTF-16LE','UTF-16BE'],EOLS=['LF','CRLF','CR'];
@@ -39,6 +45,9 @@ const REASONS={
  size:['is too large to move at once','are too large to move at once'],
  mixed:['needs this window','need this window']
 };
+// Why a moved tab did not keep its undo history.
+const HISTORY={size:'too large to move with the text',disk:'large documents keep it in their own window',receiver:'the Text Editor could not restore it exactly',mixed:'it could not be carried'};
+const HISTORY_ENTRIES=80;
 const g=name=>{try{return root[name];}catch{return undefined;}};
 const clip=(value,limit=280)=>String(value??'').replace(/[\u0000-\u001f\u007f-\u009f]+/g,' ').trim().slice(0,limit);
 const tabs=n=>n===1?'1 tab':n+' tabs';
@@ -73,6 +82,19 @@ function itemFor(v){
  return {id:v.uid,kind:'file',path:v.path,hash:v.hash,dirty:true,text:v.content,format,savedFormat,...extra};
 }
 
+// A page-held tab's undo history as the editor keeps it, or null.
+function historyOf(v){
+ if(v?.disk)return null;
+ const undo=Array.isArray(v?.undo)?v.undo:[],redo=Array.isArray(v?.redo)?v.redo:[];
+ if(!undo.length&&!redo.length)return null;
+ if(undo.length>HISTORY_ENTRIES||redo.length>HISTORY_ENTRIES||[...undo,...redo].some(s=>typeof s!=='string'))return {invalid:true};
+ return {undo:[...undo],redo:[...redo]};
+}
+// Whether a tab has any undo history here (a disk-backed one in its engine).
+function hasHistory(d){return d?.disk?!!(d.diskMeta?.canUndo||d.diskMeta?.canRedo):!!(d?.undo?.length||d?.redo?.length);}
+// The UTF-8 size of strings, or Infinity once it passes limit.
+function sizeWithin(strings,limit){let total=0;for(const s of strings){total+=s.length*3>limit-total?bytes(s):s.length*3;if(total>limit)return Infinity;}return total;}
+
 async function receiver(){if(!enabled())return null;try{const reply=await call('receiver');return reply?.available===true?reply:null;}catch{return null;}}
 
 // Waits for the Text Editor's answer. Its engine ends a request after a minute.
@@ -88,9 +110,10 @@ async function outcome(requestId){
  }
 }
 
-function summary(moved,rest,reasons,stayed,stayedWhy,name){
+function summary(moved,rest,reasons,stayed,stayedWhy,name,lost=[],noHistory=new Map()){
  const parts=[];
  if(moved)parts.push(tabs(moved)+' moved to the open '+name);
+ if(lost.length){const kinds=[...new Set(lost.map(uid=>noHistory.get(uid)||'mixed'))],why=HISTORY[kinds.length===1?kinds[0]:'mixed'];parts.push(tabs(lost.length)+' moved without '+(lost.length===1?'its':'their')+' undo history ('+why+'), so Undo there starts from the moved text');}
  if(rest.length){const kinds=[...new Set(rest.map(uid=>reasons.get(uid)||'mixed'))],[one,many]=REASONS[kinds.length===1?kinds[0]:'mixed'];parts.push(tabs(rest.length)+' that '+(rest.length===1?one:many)+(rest.length===1?' opens':' open')+' in a connected window');}
  if(stayed)parts.push(tabs(stayed)+' stayed here'+(stayedWhy?': '+stayedWhy.replace(/\.$/,''):''));
  return parts.length?parts.join('; ')+'.':'';
@@ -102,7 +125,9 @@ function summary(moved,rest,reasons,stayed,stayedWhy,name){
 async function handOver(ids,{adapter}={}){
  const none={rest:[...ids],message:''};
  if(!enabled()||!adapter||!Array.isArray(ids)||!ids.length)return none;
- const live=adapter.documents().filter(d=>ids.includes(d.uid)),reasons=new Map();
+ const live=adapter.documents().filter(d=>ids.includes(d.uid)),reasons=new Map(),noHistory=new Map();
+ // A disk-backed tab is reopened from disk there; its history stays in this window's engine.
+ for(const d of live)if(d.disk&&hasHistory(d))noHistory.set(d.uid,'disk');
  for(const d of live){const why=reasonFor(d);if(why)reasons.set(d.uid,why);}
  const eligible=live.filter(d=>!reasons.has(d.uid)).map(d=>d.uid),others=ids.filter(uid=>!eligible.includes(uid));
  if(!eligible.length)return none;
@@ -115,7 +140,12 @@ async function handOver(ids,{adapter}={}){
  let batch;try{batch=adapter.snapshot(eligible);}catch{return none;}
  // From here the eligible tabs are read-only until confirmed or given back.
  const items=[],back=[];let budget=TEXT_LIMIT;
- for(const v of batch.documents){const why=reasonFor(v);if(why){reasons.set(v.uid,why);back.push(v.uid);continue;}const item=itemFor(v),size=bytes(item.text||'');if(size>budget){reasons.set(v.uid,'size');back.push(v.uid);continue;}budget-=size;items.push(item);}
+ for(const v of batch.documents){const why=reasonFor(v);if(why){reasons.set(v.uid,why);back.push(v.uid);continue;}const item=itemFor(v),size=bytes(item.text||'');if(size>budget){reasons.set(v.uid,'size');back.push(v.uid);continue;}budget-=size;
+  // The undo history goes with the text when it fits in what is left; otherwise the tab moves without it, and says so.
+  const history=historyOf(v);
+  if(history?.invalid)noHistory.set(v.uid,'mixed');
+  else if(history){const extra=sizeWithin([...history.undo,...history.redo],budget);if(extra<=budget){item.undo=history.undo;item.redo=history.redo;budget-=extra;}else noHistory.set(v.uid,'size');}
+  items.push(item);}
  if(back.length)adapter.rollback(back);
  let moved=[],stayed=[],stayedWhy='';
  const frozen=new Set(items.map(item=>item.id));
@@ -132,6 +162,7 @@ async function handOver(ids,{adapter}={}){
      const result=await outcome(started.requestId);
      const confirmed=new Set(result.state==='done'?result.items.filter(item=>item&&item.ok===true&&sent.includes(item.id)).map(item=>item.id):[]);
      moved=sent.filter(uid=>confirmed.has(uid));
+     if(result.state==='done')for(const item of result.items)if(item?.ok===true&&item.historyLost===true&&confirmed.has(item.id)&&!noHistory.has(item.id))noHistory.set(item.id,'receiver');
      stayed=sent.filter(uid=>!confirmed.has(uid));
      stayedWhy=result.state==='done'?clip(result.items.find(item=>item&&item.ok!==true)?.error):result.message||name+' did not take the tabs.';
      if(moved.length){adapter.release(moved);for(const uid of moved)frozen.delete(uid);}
@@ -140,9 +171,10 @@ async function handOver(ids,{adapter}={}){
   }
  }finally{giveBack([...frozen]);}
  const rest=ids.filter(uid=>reasons.has(uid)&&!moved.includes(uid)&&!stayed.includes(uid));
- const message=summary(moved.length,rest,reasons,stayed.length,stayedWhy,name);
- const toast=g('toast');if(message&&typeof toast==='function')toast(message,stayed.length?'error':moved.length?'success':'info');
- return {rest,message,moved,stayed};
+ const historyLost=moved.filter(uid=>noHistory.has(uid));
+ const message=summary(moved.length,rest,reasons,stayed.length,stayedWhy,name,historyLost,noHistory);
+ const toast=g('toast');if(message&&typeof toast==='function')toast(message,stayed.length?'error':historyLost.length?'info':moved.length?'success':'info');
+ return {rest,message,moved,stayed,historyLost};
 }
 
 // ---- Receiving: the standalone Text Editor ----
@@ -158,7 +190,8 @@ async function receive(request,{guard}={}){
   if(why){results.push({id,ok:false,error:clip(why)});continue;}
   // created: this request opened the tab. A file already open here returns
   // the existing tab, which this request must never discard or count as its own.
-  try{const {document:d,created}=await editor.adoptHandover(item);adopted.push({id,d,created:created===true});results.push({id,ok:true});}
+  // historyLost: the tab opened but the undo history it carried could not be restored exactly.
+  try{const {document:d,created,historyLost}=await editor.adoptHandover(item);adopted.push({id,d,created:created===true});results.push(historyLost===true?{id,ok:true,historyLost:true}:{id,ok:true});}
   catch(error){results.push({id,ok:false,error:clip(error?.message)||'The tab could not be opened.'});}
  }
  // Unsaved text is confirmed once this editor keeps it for next time. With
@@ -170,7 +203,7 @@ async function receive(request,{guard}={}){
   else if(!['off','unavailable','closed'].includes(session.phase))failure='This Text Editor is still reopening its last session. Try again in a moment.';
   for(const x of unsaved){
    if(!failure&&(session.phase!=='ready'||session.isKept(x.d)))continue;
-   const entry=results.find(r=>r.id===x.id);entry.ok=false;entry.error=clip(failure||'Its unsaved text could not be kept for next time.');
+   const entry=results.find(r=>r.id===x.id);entry.ok=false;delete entry.historyLost;entry.error=clip(failure||'Its unsaved text could not be kept for next time.');
    editor.discardAdopted(x.d);
   }
  }
@@ -179,7 +212,7 @@ async function receive(request,{guard}={}){
  return {ok:true,outcome:'opened',items:results};
 }
 
-const api=Object.freeze({enabled,receiver,reasonFor,itemFor,handOver,receive});
+const api=Object.freeze({enabled,receiver,reasonFor,itemFor,historyOf,handOver,receive});
 root.NetworkToolkitEditorHandover=api;
 if(typeof module==='object'&&module.exports)module.exports=api;
 })(globalThis);

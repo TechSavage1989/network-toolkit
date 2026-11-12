@@ -170,3 +170,51 @@ test('peer-send.js gives documents to the hand-over in the standalone Text Edito
   assert.deepEqual(other.received,[],mode+' never opens documents');assert.equal(other.acks.at(-1)?.ok,false);
  }
 });
+
+// Owner decision (v1.21.50): undo history moves with page-held tabs, within the
+// same 8 MiB as unsaved text. A tab whose history does not fit, or a large
+// (disk-backed) tab, moves without it, and the message says so: never silently.
+test('undo history moves with the tab, or the message says it did not',async()=>{
+ const big='x'.repeat(3*1024*1024);
+ const list=[
+  doc('a',{dirty:true,content:'edited twice',undo:['text of a','edited once'],redo:['edited thrice']}),
+  doc('b',{undo:['before save'],redo:[]}),
+  doc('h',{dirty:true,content:'small edit',undo:[big,big,big]}),
+  doc('d',{disk:true,diskMeta:{canUndo:true,canRedo:false}}),
+  doc('n')
+ ];
+ let sent;
+ const h=load({engine(route,method,body){
+  if(route==='/peer-handover/receiver')return {available:true,name:'Network Toolkit Text Editor'};
+  if(route==='/peer-handover/start'){sent=body.items;return {requestId:'8'.repeat(32),sent:body.items.map(i=>i.id),ineligible:[]};}
+  return {state:'done',items:sent.map(i=>({id:i.id,ok:true}))};}});
+ const result=await h.api.handOver(['a','b','h','d','n'],{adapter:adapter(list)});
+ const byId=Object.fromEntries(sent.map(i=>[i.id,JSON.parse(JSON.stringify(i))]));
+ assert.deepEqual(byId.a.undo,['text of a','edited once']);assert.deepEqual(byId.a.redo,['edited thrice']);
+ assert.deepEqual(byId.b.undo,['before save'],'a saved page-held tab carries its history too');
+ assert.equal(byId.h.undo,undefined,'history that does not fit stays out');assert.equal(byId.h.text,'small edit','the text itself still moves');
+ assert.equal(byId.d.undo,undefined,'a disk-backed tab carries no history');assert.equal(byId.n.undo,undefined);
+ assert.deepEqual(JSON.parse(JSON.stringify(result.historyLost)).sort(),['d','h']);
+ assert.equal(result.message,'5 tabs moved to the open Network Toolkit Text Editor; 2 tabs moved without their undo history (it could not be carried), so Undo there starts from the moved text.');
+ assert.equal(h.toasts.at(-1)[1],'info');
+ // One reason, named.
+ const only=load({engine(route,method,body){if(route==='/peer-handover/receiver')return {available:true,name:'Network Toolkit Text Editor'};if(route==='/peer-handover/start'){sent=body.items;return {requestId:'9'.repeat(32),sent:['h'],ineligible:[]};}return {state:'done',items:[{id:'h',ok:true}]};}});
+ const one=await only.api.handOver(['h'],{adapter:adapter([doc('h',{dirty:true,content:'small edit',undo:[big,big,big]})])});
+ assert.match(one.message,/1 tab moved without its undo history \(too large to move with the text\)/);
+ const disk=load({engine(route,method,body){if(route==='/peer-handover/receiver')return {available:true,name:'Network Toolkit Text Editor'};if(route==='/peer-handover/start'){sent=body.items;return {requestId:'c'.repeat(32),sent:['d'],ineligible:[]};}return {state:'done',items:[{id:'d',ok:true}]};}});
+ assert.match((await disk.api.handOver(['d'],{adapter:adapter([doc('d',{disk:true,diskMeta:{canUndo:false,canRedo:true}})])})).message,/1 tab moved without its undo history \(large documents keep it in their own window\)/);
+ // The receiving editor could not restore it exactly.
+ const back=load({engine(route,method,body){if(route==='/peer-handover/receiver')return {available:true,name:'Network Toolkit Text Editor'};if(route==='/peer-handover/start'){sent=body.items;return {requestId:'a'.repeat(32),sent:['a'],ineligible:[]};}return {state:'done',items:[{id:'a',ok:true,historyLost:true}]};}});
+ const lost=await back.api.handOver(['a'],{adapter:adapter([doc('a',{dirty:true,content:'e',undo:['text of a']})])});
+ assert.match(lost.message,/1 tab moved without its undo history \(the Text Editor could not restore it exactly\)/);
+ // No history at all: nothing to say.
+ const plain=load({engine(route,method,body){if(route==='/peer-handover/receiver')return {available:true,name:'Network Toolkit Text Editor'};if(route==='/peer-handover/start'){sent=body.items;return {requestId:'d'.repeat(32),sent:['n'],ineligible:[]};}return {state:'done',items:[{id:'n',ok:true}]};}});
+ assert.equal((await plain.api.handOver(['n'],{adapter:adapter([doc('n')])})).message,'1 tab moved to the open Network Toolkit Text Editor.');
+});
+
+test('the receiving editor reports a tab whose history it could not restore, only for a tab that opened',async()=>{
+ const ctx=load({windowMode:'editor-standalone'}).context;
+ ctx.NetworkToolkitFileEditor={session:{phase:'ready',save:async()=>{},isKept:d=>d.uid!=='r-c'},async adoptHandover(item){return {document:{id:'local:'+item.id,uid:'r-'+item.id,dirty:!!item.dirty,handoverAdopted:true},created:true,historyLost:item.id!=='a'};},discardAdopted:()=>true,activateDocument(){}};
+ const result=await ctx.NetworkToolkitEditorHandover.receive({requestId:'b'.repeat(32),documents:[{id:'a',undo:['x']},{id:'b',undo:['y']},{id:'c',dirty:true,undo:['z']}]},{guard:()=>''});
+ assert.deepEqual(JSON.parse(JSON.stringify(result.items)),[{id:'a',ok:true},{id:'b',ok:true,historyLost:true},{id:'c',ok:false,error:'Its unsaved text could not be kept for next time.'}],'a refused tab carries no history flag');
+});

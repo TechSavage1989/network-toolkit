@@ -27,7 +27,7 @@ const pass=text=>console.log('PASS '+text);
  }
  const shot=async(page,name)=>{if(output)await page.screenshot({path:path.join(output,'editor-handover-'+name+'.png')});};
  const toast=(page,text)=>page.waitForFunction(t=>[...document.querySelectorAll('#toastStack .toast')].some(n=>n.textContent.includes(t)),text);
- const docs=page=>page.evaluate(()=>[...NetworkToolkitFileEditor.documents.values()].map(d=>({name:d.path.split(/[\\/]/).pop(),path:d.path,text:d.content,dirty:!!d.dirty,eol:d.eol,encoding:d.encoding,frozen:!!d.frozen,untitled:!!d.untitled,active:d===NetworkToolkitFileEditor.active})));
+ const docs=page=>page.evaluate(()=>[...NetworkToolkitFileEditor.documents.values()].map(d=>({name:d.path.split(/[\\/]/).pop(),path:d.path,text:d.content,dirty:!!d.dirty,eol:d.eol,encoding:d.encoding,frozen:!!d.frozen,untitled:!!d.untitled,active:d===NetworkToolkitFileEditor.active,undo:[...d.undo],redo:[...d.redo]})));
  let main,editor;
  try{
   main=await app(mainURL,mainToken,'main');editor=await app(editorURL,editorToken,'editor');
@@ -65,6 +65,16 @@ const pass=text=>console.log('PASS '+text);
   // The unsaved text is kept in the editor's own session before the main window let go of it.
   assert.equal(await editor.evaluate(()=>[...NetworkToolkitFileEditor.documents.values()].filter(d=>d.dirty).every(d=>NetworkToolkitFileEditor.session.isKept(d))),true);
   pass('the local and untitled tabs arrived in the running Text Editor with their unsaved text, format and title');
+  // Owner decision (v1.21.50): the undo history came with them, so Undo there continues where it was.
+  assert(before[0].undo.length>0&&before[2].undo.length>0,'the main window had undo history for the edited tabs');
+  assert.deepEqual(received[0].undo,before[0].undo,'the edited file\'s undo history arrived exactly');
+  assert.deepEqual(received[2].undo,before[2].undo,'the draft\'s undo history arrived exactly');
+  await editor.locator('#networkToolkitFileEditor [data-ed="undo"]').first().click();
+  await editor.waitForFunction(expected=>NetworkToolkitFileEditor.active.content===expected,before[0].undo.at(-1));
+  assert.equal((await docs(editor))[0].redo.at(-1),before[0].text,'Redo returns to the moved text');
+  await editor.locator('#networkToolkitFileEditor [data-ed="redo"]').first().click();
+  await editor.waitForFunction(expected=>NetworkToolkitFileEditor.active.content===expected,before[0].text);
+  pass('Undo and Redo in the Text Editor continue the history the tab had in the main window');
   await shot(editor,'received');
   // The changed file goes to a connected window; nothing else is left in the main window.
   await main.waitForFunction(()=>[...NetworkToolkitFileEditor.documents.values()].length===1);

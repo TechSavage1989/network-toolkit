@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -26,11 +27,16 @@ func TestWindowSendRemoteFileBrowser(t *testing.T) {
 		t.Skip("requires the isolated Playwright browser")
 	}
 	f := newShellSFTPBrowserFixture(t)
+	var sending atomic.Int32 // window-send requests in flight
 	a := f.app
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/api/updates/") {
 			jsonResponse(w, http.StatusOK, map[string]any{})
 			return
+		}
+		if r.URL.Path == "/api/window-send/send" {
+			sending.Add(1)
+			defer sending.Add(-1)
 		}
 		a.ServeHTTP(w, r)
 	}))
@@ -81,13 +87,69 @@ func TestWindowSendRemoteFileBrowser(t *testing.T) {
 			}
 		}
 	}()
+	// Owner decision (v1.21.50): with the main window closed, Edit reopens it.
+	// The script closes the main page and says so through a private file; this
+	// test then does what the native host's close does (the engine runs on for
+	// the workspace), waits for the engine to ask for the main window again
+	// (activatePrimary wakes runPrimaryLifecycle) and lets the script open the
+	// main page again, as the reopened native window would.
+	closedFile, reopenFile := filepath.Join(filepath.Dir(launchFile), "main-closed"), filepath.Join(filepath.Dir(launchFile), "main-reopen")
+	var reopened sync.WaitGroup
+	reopened.Add(1)
+	go func() {
+		defer reopened.Done()
+		for {
+			if _, err := os.Stat(closedFile); err == nil {
+				break
+			}
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(100 * time.Millisecond):
+			}
+		}
+		a.views.mu.Lock()
+		a.views.homePresent = false
+		a.views.mu.Unlock()
+		a.editorViews.setHomePresent(false)
+		a.windowSendHomeClosed() // as runPrimaryLifecycle does when the native window closes
+		for drained := false; !drained; {
+			select {
+			case <-a.primaryWake:
+			default:
+				drained = true
+			}
+		}
+		_ = os.Remove(closedFile) // the script waits for this
+		// Only Edit's request counts: closing the page can ask for the main
+		// window too (its last requests as it unloads).
+		for asked := false; !asked; {
+			select {
+			case <-a.primaryWake:
+				asked = sending.Load() > 0
+			case <-ctx.Done():
+				return
+			}
+		}
+		a.views.mu.Lock()
+		a.views.homePresent = true
+		a.views.mu.Unlock()
+		a.editorViews.setHomePresent(true)
+		_ = os.WriteFile(reopenFile, []byte("reopen"), 0600)
+	}()
 	command := exec.CommandContext(ctx, "node", "scripts/window-send-remote-live.browser.cjs")
 	command.Dir = filepath.Join("..", "..")
-	command.Env = append(os.Environ(), "NTK_WINDOW_URL="+server.URL, "NTK_WINDOW_MAIN_TOKEN="+a.token, "NTK_WINDOW_TERMINAL_LAUNCH="+launchFile, "NTK_WINDOW_SESSION="+session)
+	command.Env = append(os.Environ(), "NTK_WINDOW_URL="+server.URL, "NTK_WINDOW_MAIN_TOKEN="+a.token, "NTK_WINDOW_TERMINAL_LAUNCH="+launchFile, "NTK_WINDOW_SESSION="+session,
+		"NTK_WINDOW_MAIN_CLOSED="+closedFile, "NTK_WINDOW_MAIN_REOPEN="+reopenFile)
 	output, err := command.CombinedOutput()
 	t.Log(string(output))
 	if err != nil {
 		t.Fatal(err)
+	}
+	cancel()
+	reopened.Wait()
+	if _, err := os.Stat(reopenFile); err != nil {
+		t.Fatal("Edit never asked for the closed main window")
 	}
 	if raw, err := os.ReadFile(filepath.Join(f.root, "startup.cfg")); err != nil || string(raw) != "hostname test-switch\r\nbanner edited-in-main\r\n" {
 		t.Fatalf("the remote file after the save: %q %v", raw, err)

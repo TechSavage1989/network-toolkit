@@ -41,11 +41,16 @@ func (a *application) serveEditorAPI(w http.ResponseWriter, r *http.Request) {
 	}
 	switch {
 	case r.URL.Path == "/api/status" && r.Method == http.MethodGet:
-		jsonResponse(w, 200, map[string]any{"editorDiskAvailable": a.editorViews != nil, "editorWindowAvailable": a.launchEditorView != nil, "windowSend": a.windowSendAvailable(), "version": model.Version, "os": runtime.GOOS, "arch": runtime.GOARCH})
+		jsonResponse(w, 200, map[string]any{"editorDiskAvailable": a.editorViews != nil, "editorWindowAvailable": a.launchEditorView != nil, "windowSend": a.windowSendAvailable(), "peerSend": a.peerChildKind(windowSendEditor + editorRequestView(r)), "version": model.Version, "os": runtime.GOOS, "arch": runtime.GOARCH})
 	case strings.HasPrefix(r.URL.Path, windowSendPrefix):
-		// Send to terminal / receive from another window of this engine
-		// (window_send.go); never peer send.
+		// Send to terminal / receive from another window of this engine, or
+		// text another standalone app sent to a document held here
+		// (window_send.go).
 		a.handleWindowSend(w, r, windowSendEditor+editorRequestView(r))
+	case strings.HasPrefix(r.URL.Path, peerPagePrefix):
+		// A Text Editor window of the standalone Text Editor sends to the
+		// Terminal through this engine, as the app's own window does.
+		a.handleChildPeerSend(w, r, windowSendEditor+editorRequestView(r))
 	case r.URL.Path == "/api/editor-views" || strings.HasPrefix(r.URL.Path, "/api/editor-views/"):
 		a.handleEditorViews(w, r)
 	case r.URL.Path == "/api/file-editor/local":
