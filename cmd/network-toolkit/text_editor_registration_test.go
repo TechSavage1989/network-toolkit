@@ -435,6 +435,187 @@ func TestEditorRegistrationLeavesAnotherProgramsOpenWithEntry(t *testing.T) {
 	}
 }
 
+// withSeparateEditor lets the copies named have their separate Text Editor
+// program beside them (editorRegPlatform.separate).
+func withSeparateEditor(platform editorRegPlatform, copies ...string) editorRegPlatform {
+	platform.separate = func(exe string) string {
+		for _, c := range copies {
+			if editorRegSamePath(c, exe) {
+				return editorRegEditorProgram(exe)
+			}
+		}
+		return ""
+	}
+	return platform
+}
+
+// The separate Text Editor program's own Open with entry
+// (Applications\Network_Toolkit_TextEditor.exe) follows the rules of the
+// entry of Network_Toolkit.exe: written when absent or when it starts this
+// copy's Text Editor program, recorded, and taken back exactly by Remove.
+func TestEditorRegistrationOffersTheSeparateEditorProgram(t *testing.T) {
+	editorA := editorRegEditorProgram(testCopyA)
+	if editorA != `C:\Tools\Network Toolkit\Network_Toolkit_TextEditor.exe` {
+		t.Fatalf("the Text Editor program beside copy A: %s", editorA)
+	}
+	for _, windowsEntry := range []bool{false, true} {
+		reg := fixtureRegistry()
+		if windowsEntry {
+			// Windows wrote this when the user browsed for the program in
+			// Open with; it is taken over like the entry of Network_Toolkit.exe.
+			reg.SetString(editorRegEditorApplication+`\shell\open\command`, "", `"`+editorA+`" "%1"`)
+		}
+		before := reg.dump()
+		base, _ := testEditorPlatform(reg)
+		platform := withSeparateEditor(base, testCopyA)
+		status, err := registerEditorCopy(platform, testCopyA, false, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if status.EditorProgram != editorA || !status.Complete {
+			t.Fatalf("status: %+v", status)
+		}
+		for at, want := range map[[2]string]string{
+			{editorRegEditorApplication, "FriendlyAppName"}:          editorRegAppName,
+			{editorRegEditorApplication + `\DefaultIcon`, ""}:        `"` + editorA + `",0`,
+			{editorRegEditorApplication + `\shell\open\command`, ""}: `"` + editorA + `" --open-file "%1"`,
+			{editorRegApplication + `\shell\open\command`, ""}:       editorRegCommand(testCopyA),
+			{editorRegProgKey + `\shell\open\command`, ""}:           editorRegCommand(testCopyA),
+			{editorRegMenuVerb + `\command`, ""}:                     "",
+		} {
+			if got := reg.str(t, at[0], at[1]); got != want {
+				t.Errorf("%s [%s] = %q, want %q", at[0], at[1], got, want)
+			}
+		}
+		if _, found := reg.value(editorRegEditorApplication, "SupportedTypes"); found {
+			t.Error("SupportedTypes would hide the Text Editor program for unknown types")
+		}
+		records, _ := editorRegRecords(reg)
+		// Applications existed when Windows had written its entry there.
+		if !records[`Applications\Network_Toolkit_TextEditor.exe`] || !records[`Applications\Network_Toolkit.exe`] || records["Applications"] == windowsEntry {
+			t.Errorf("records: %v", records)
+		}
+		// Registering again changes nothing.
+		again := reg.dump()
+		if _, err := registerEditorCopy(platform, testCopyA, false, false); err != nil || reg.dump() != again {
+			t.Fatalf("a repair changed the registration: %v", err)
+		}
+		if _, err := removeEditorCopy(platform, testCopyA); err != nil {
+			t.Fatal(err)
+		}
+		after := reg.dump()
+		if windowsEntry {
+			// The entry this registration took over goes with it, as Setup's does.
+			if reg.has(editorRegEditorApplication) {
+				t.Fatalf("the Text Editor program's entry stayed:\n%s", after)
+			}
+			continue
+		}
+		if after != before {
+			t.Fatalf("the registry differs after register and remove:\nbefore:\n%s\nafter:\n%s", before, after)
+		}
+	}
+}
+
+func TestEditorRegistrationLeavesAnotherSeparateEditorEntry(t *testing.T) {
+	reg := fixtureRegistry()
+	other := `"E:\Elsewhere\Network_Toolkit_TextEditor.exe" "%1"`
+	reg.SetString(editorRegEditorApplication+`\shell\open\command`, "", other)
+	base, _ := testEditorPlatform(reg)
+	platform := withSeparateEditor(base, testCopyA)
+	if _, err := registerEditorCopy(platform, testCopyA, false, false); err != nil {
+		t.Fatal(err)
+	}
+	if got := reg.str(t, editorRegEditorApplication+`\shell\open\command`, ""); got != other || reg.has(editorRegEditorApplication+`\DefaultIcon`) {
+		t.Fatalf("another program's entry changed: %q", got)
+	}
+	if records, _ := editorRegRecords(reg); records[`Applications\Network_Toolkit_TextEditor.exe`] {
+		t.Fatal("another program's entry was recorded")
+	}
+	if _, err := removeEditorCopy(platform, testCopyA); err != nil {
+		t.Fatal(err)
+	}
+	if got := reg.str(t, editorRegEditorApplication+`\shell\open\command`, ""); got != other {
+		t.Fatal("remove changed another program's entry")
+	}
+	// No separate program beside the copy: nothing is written for it.
+	reg = fixtureRegistry()
+	plain, _ := testEditorPlatform(reg)
+	status, err := registerEditorCopy(plain, testCopyA, false, false)
+	if err != nil || status.EditorProgram != "" || reg.has(editorRegEditorApplication) {
+		t.Fatalf("an entry for a missing Text Editor program: %v %+v", err, status)
+	}
+}
+
+// One copy at a time, the separate program included: a takeover moves or
+// takes back the replaced copy's entry, and clean up removes it with the rest.
+func TestEditorRegistrationSeparateEditorAcrossCopies(t *testing.T) {
+	editorA, editorB := editorRegEditorProgram(testCopyA), editorRegEditorProgram(testCopyB)
+	command := func(reg *fakeRegistry) string {
+		return reg.str(t, editorRegEditorApplication+`\shell\open\command`, "")
+	}
+	// B has its Text Editor program too: the entry moves to it.
+	reg := fixtureRegistry()
+	before := reg.dump()
+	base, _ := testEditorPlatform(reg)
+	both := withSeparateEditor(base, testCopyA, testCopyB)
+	if _, err := registerEditorCopy(both, testCopyA, false, false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := registerEditorCopy(both, testCopyB, false, true); err != nil {
+		t.Fatal(err)
+	}
+	if got := command(reg); got != editorRegEditorCommand(editorB) || reg.str(t, editorRegEditorApplication+`\DefaultIcon`, "") != `"`+editorB+`",0` {
+		t.Fatalf("after B took over: %q", got)
+	}
+	if _, err := removeEditorCopy(both, testCopyB); err != nil {
+		t.Fatal(err)
+	}
+	if after := reg.dump(); after != before {
+		t.Fatalf("left behind after a takeover and remove:\n%s", after)
+	}
+	// B has no Text Editor program: A's entry is taken back.
+	reg = fixtureRegistry()
+	base, _ = testEditorPlatform(reg)
+	onlyA := withSeparateEditor(base, testCopyA)
+	if _, err := registerEditorCopy(onlyA, testCopyA, true, false); err != nil {
+		t.Fatal(err)
+	}
+	if command(reg) != editorRegEditorCommand(editorA) {
+		t.Fatal("A's Text Editor program is not offered")
+	}
+	if _, err := registerEditorCopy(onlyA, testCopyB, false, true); err != nil {
+		t.Fatal(err)
+	}
+	if reg.has(editorRegEditorApplication) {
+		t.Fatalf("the replaced copy's Text Editor program is still offered: %q", command(reg))
+	}
+	if records, _ := editorRegRecords(reg); records[`Applications\Network_Toolkit_TextEditor.exe`] {
+		t.Fatal("the record still names the entry that was taken back")
+	}
+	if _, err := removeEditorCopy(onlyA, testCopyB); err != nil {
+		t.Fatal(err)
+	}
+	if after := reg.dump(); after != before {
+		t.Fatalf("left behind after B replaced A:\n%s", after)
+	}
+	// A was deleted with its Text Editor program: B cleans it all up.
+	reg = fixtureRegistry()
+	base, _ = testEditorPlatform(reg, testCopyA)
+	gone := withSeparateEditor(base, testCopyA, testCopyB)
+	// The registration A wrote before it was deleted.
+	written, _ := testEditorPlatform(reg)
+	if _, err := registerEditorCopy(withSeparateEditor(written, testCopyA), testCopyA, false, false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := cleanupEditorCopy(gone, testCopyB, testCopyA); err != nil {
+		t.Fatal(err)
+	}
+	if after := reg.dump(); after != before {
+		t.Fatalf("left behind after cleaning up a deleted copy:\n%s", after)
+	}
+}
+
 func TestEditorRegistrationOwnershipStates(t *testing.T) {
 	setup := func(reg *fakeRegistry) {
 		reg.SetString(editorRegUninstall, "InstallLocation", `C:\Users\u\AppData\Local\Programs\Network Toolkit`)
@@ -659,6 +840,9 @@ func TestEditorRegistrationMatchesSetup(t *testing.T) {
 		"PROG_KEY": editorRegProgKey, "CAPABILITIES": editorRegCapabilities, "APPLICATIONS_KEY": editorRegApplications, "APPLICATION_KEY": editorRegApplication,
 		"ALL_FILES_KEY": editorRegAllFiles, "MENU_VERB_KEY": editorRegMenuVerb, "MENU_TEXT": editorRegMenuText, "EDITOR_KEY": editorRegSetupRecord,
 		"UNINSTALL_KEY": editorRegUninstall, "PORTABLE_KEY": editorRegPortable,
+		"EDITOR_FILENAME": editorRegEditorFile, "EDITOR_APPLICATION_KEY": editorRegEditorApplication,
+		"EDITOR_PROGRAM_COMMAND": editorRegEditorCommand(`$INSTDIR\Network_Toolkit_TextEditor.exe`),
+		"EDITOR_PROGRAM_ICON":    editorRegIcon(`$INSTDIR\Network_Toolkit_TextEditor.exe`, editorRegEditorProgramIcon),
 	} {
 		if got := expand("${" + name + "}"); got != want {
 			t.Errorf("windows.nsi %s = %q, the portable program uses %q", name, got, want)
@@ -669,6 +853,13 @@ func TestEditorRegistrationMatchesSetup(t *testing.T) {
 	}
 	text := expand(string(nsi))
 	for _, line := range []string{
+		// The separate Text Editor program's Open with entry, as the portable
+		// program writes it.
+		`WriteRegStr HKCU "` + editorRegEditorApplication + `" "FriendlyAppName" "` + editorRegAppName + `"`,
+		`WriteRegStr HKCU "` + editorRegEditorApplication + `\DefaultIcon" "" '` + editorRegIcon(`$INSTDIR\Network_Toolkit_TextEditor.exe`, editorRegEditorProgramIcon) + `'`,
+		`WriteRegStr HKCU "` + editorRegEditorApplication + `\shell\open\command" "" '` + editorRegEditorCommand(`$INSTDIR\Network_Toolkit_TextEditor.exe`) + `'`,
+		`WriteRegDWORD HKCU "` + editorRegSetupRecord + `\CreatedKeys" "Applications\` + editorRegEditorFile + `" 1`,
+		`DeleteRegKey HKCU "` + editorRegEditorApplication + `"`,
 		`WriteRegStr HKCU "` + editorRegProgKey + `" "" "` + editorRegProgName + `"`,
 		`WriteRegStr HKCU "` + editorRegCapabilities + `" "ApplicationDescription" "` + editorRegDescription + `"`,
 		`WriteRegStr HKCU "Software\RegisteredApplications" "` + editorRegAppName + `" "` + editorRegCapabilities + `"`,

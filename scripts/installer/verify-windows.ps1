@@ -265,6 +265,10 @@ $editorCommandFormat = '"{0}" --editor-standalone --open-file "%1"'
 # of the keys it created where another program's key could have been.
 $applicationsSubkey = 'Software\Classes\Applications'
 $applicationSubkey = "$applicationsSubkey\Network_Toolkit.exe"
+# The separate Text Editor program's own Open with entry, written by the same
+# rules with its own icon 0 and its own --open-file command.
+$editorApplicationSubkey = "$applicationsSubkey\Network_Toolkit_TextEditor.exe"
+$editorProgramCommandFormat = '"{0}" --open-file "%1"'
 $allFilesSubkey = 'Software\Classes\*'
 $menuVerbSubkey = "$allFilesSubkey\shell\NetworkToolkit.TextEditor"
 $editorKey = "$appKey\TextEditor"
@@ -344,7 +348,7 @@ $rivalProgTree = Get-UserKeyTree $rivalProgSubkey
 # Every key of the current user that Setup may add to, as it is before Setup
 # runs. After a rolled back install and after each uninstall they must be
 # exactly this again: Setup removes what it created and nothing else.
-$watchedClassKeys = @($extensions | ForEach-Object { "Software\Classes\$_" }) + $allFilesSubkey, $applicationsSubkey, $applicationSubkey
+$watchedClassKeys = @($extensions | ForEach-Object { "Software\Classes\$_" }) + $allFilesSubkey, $applicationsSubkey, $applicationSubkey, $editorApplicationSubkey
 $classSnapshots = @{}
 $extensionDefaults = @{}
 $extensionKeyExisted = @{}
@@ -364,6 +368,7 @@ $allFilesShellExisted = (Get-UserKeyTree "$allFilesSubkey\shell") -cne '<absent>
 $applicationsKeyExisted = $classSnapshots[$applicationsSubkey] -cne '<absent>'
 $applicationOwnedBySetup = $classSnapshots[$applicationSubkey] -ceq '<absent>'
 if (-not $applicationOwnedBySetup) { throw "This runner already has HKCU\$applicationSubkey; the Open With check needs a clean account." }
+if ($classSnapshots[$editorApplicationSubkey] -cne '<absent>') { throw "This runner already has HKCU\$editorApplicationSubkey; the Open With check needs a clean account." }
 Assert-Same (Get-UserKeyTree $menuVerbSubkey) '<absent>' 'Preexisting right-click entry'
 
 function Assert-ClassKeysRestored([string]$When) {
@@ -504,6 +509,12 @@ function Assert-Installed([string]$ExpectedHash = $portableHash) {
         Assert-Same (Read-UserValue $createdSubkey 'Applications\Network_Toolkit.exe') $null "Record for another program's Open With entry"
         Assert-Same (Read-UserValue $createdSubkey 'Applications') $null "Record for the Applications key beside another program's entry"
     }
+    # The separate Text Editor program under its own name: Setup's entry, also
+    # where Windows had written one for that program (repair check below).
+    $editorProgramCommand = $editorProgramCommandFormat -f $installedEditor
+    $expectedEditorApplication = "FriendlyAppName=String:$registeredName`n[DefaultIcon]{=String:`"$installedEditor`",0}`n[shell]{[open]{[command]{=String:$editorProgramCommand}}}"
+    Assert-Same (Get-UserKeyTree $editorApplicationSubkey) $expectedEditorApplication 'Open With registration of the Text Editor program'
+    Assert-Same (Read-UserValue $createdSubkey 'Applications\Network_Toolkit_TextEditor.exe') 1 'Record that Setup created the Open With registration of the Text Editor program'
     # The right-click entry exists only when it was chosen.
     if ($contextMenuExpected) {
         $expectedVerb = "=String:Edit with $registeredName`nIcon=String:`"$installedExe`",$editorIconIndex`n[command]{=String:$editorCommand}"
@@ -765,6 +776,9 @@ try {
 # itself, with the bare file name. Setup replaces the command of an entry that
 # starts the program it installs.
 Set-UserValue "$applicationSubkey\shell\open\command" '' ('"{0}" "%1"' -f $installedExe)
+# The same for the separate Text Editor program ("Look for another app on this
+# PC" and that program picked).
+Set-UserValue "$editorApplicationSubkey\shell\open\command" '' ('"{0}" "%1"' -f $installedEditor)
 # The icon that versions up to 1.21.44 gave the associated files; repair and
 # upgrade replace it with the text document icon (checked by Assert-Installed).
 Set-UserValue "$progSubkey\DefaultIcon" '' ('"{0}",{1}' -f $installedExe, $editorIconIndex)
@@ -1002,6 +1016,12 @@ foreach ($dir in $portableDirA, $portableDirB, $portableDirShared) {
     Copy-Item -LiteralPath $portableExe -Destination (Join-Path $dir 'Network_Toolkit.exe')
 }
 $portableA = Join-Path $portableDirA 'Network_Toolkit.exe'
+# Copy A has the separate Text Editor program beside it, copy B does not: only
+# a copy with that program also offers it in Open with under its own name.
+$zip = [IO.Compression.ZipFile]::OpenRead($portableZip[0].FullName)
+try {
+    [IO.Compression.ZipFileExtensions]::ExtractToFile($zip.GetEntry("Network_Toolkit_$version/Network_Toolkit_TextEditor.exe"), (Join-Path $portableDirA 'Network_Toolkit_TextEditor.exe'))
+} finally { $zip.Dispose() }
 $portableB = Join-Path $portableDirB 'Network_Toolkit.exe'
 $portableShared = Join-Path $portableDirShared 'Network_Toolkit.exe'
 # BUILTIN\Users may change this one, as a folder on a shared drive often allows.
@@ -1050,6 +1070,16 @@ function Assert-PortableRegistered([string]$Launched, [bool]$Menu) {
     $expectedApplication = "FriendlyAppName=String:$registeredName`n[DefaultIcon]{=String:`"$Exe`",1}`n[shell]{[open]{[command]{=String:$command}}}"
     Assert-Same (Get-UserKeyTree $applicationSubkey) $expectedApplication 'Portable Open With registration for any file'
     Assert-Same (Read-UserValue $portableCreatedSubkey 'Applications\Network_Toolkit.exe') 1 'Portable record of the Open With registration'
+    $editorProgram = Join-Path (Split-Path -Parent $Exe) 'Network_Toolkit_TextEditor.exe'
+    if (Test-Path -LiteralPath $editorProgram -PathType Leaf) {
+        $editorProgramCommand = $editorProgramCommandFormat -f $editorProgram
+        Assert-Same (Get-UserKeyTree $editorApplicationSubkey) "FriendlyAppName=String:$registeredName`n[DefaultIcon]{=String:`"$editorProgram`",0}`n[shell]{[open]{[command]{=String:$editorProgramCommand}}}" 'Portable Open With registration of the Text Editor program'
+        Assert-Same (Read-UserValue $portableCreatedSubkey 'Applications\Network_Toolkit_TextEditor.exe') 1 'Portable record of the Open With registration of the Text Editor program'
+    } else {
+        # A copy without the program offers none, and a replaced copy's entry is gone.
+        Assert-Same (Get-UserKeyTree $editorApplicationSubkey) '<absent>' 'Open With registration of a Text Editor program the copy does not have'
+        Assert-Same (Read-UserValue $portableCreatedSubkey 'Applications\Network_Toolkit_TextEditor.exe') $null 'Portable record of a Text Editor program the copy does not have'
+    }
     if ($Menu) {
         Assert-Same (Get-UserKeyTree $menuVerbSubkey) "=String:Edit with $registeredName`nIcon=String:`"$Exe`",1`n[command]{=String:$command}" 'Portable right-click entry'
         Assert-Same (Read-UserValue $portableSubkey 'ContextMenu') 1 'Portable right-click choice'

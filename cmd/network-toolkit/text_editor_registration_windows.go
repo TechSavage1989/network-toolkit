@@ -242,5 +242,20 @@ func editorRegNotifyShell() {
 }
 
 func editorRegDefaultPlatform() (editorRegPlatform, bool) {
-	return editorRegPlatform{registry: windowsEditorRegistry{}, lock: editorRegSetupLock, notify: editorRegNotifyShell, presence: editorRegFileState, access: editorRegWritableByOthers}, true
+	return editorRegPlatform{registry: windowsEditorRegistry{}, lock: editorRegSetupLock, notify: editorRegNotifyShell, presence: editorRegFileState, access: editorRegWritableByOthers, separate: editorRegSeparateEditor}, true
+}
+
+// editorRegSeparateEditor is the separate Text Editor program beside exe when
+// a registration may name it: a regular file (no link) of this exact version
+// (separateProgramMatches) that only this user and the system can change. Its
+// folder is exe's, which editorRegStatus has already checked.
+func editorRegSeparateEditor(exe string) string {
+	program := filepath.Join(filepath.Dir(exe), editorRegEditorFile)
+	if !separateProgramMatches(program, standaloneEditorMode) {
+		return ""
+	}
+	if others, err := editorRegWritableByOthers(program); err != nil || others != "" {
+		return ""
+	}
+	return program
 }

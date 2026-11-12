@@ -508,6 +508,21 @@ step by the owner.
   programs, only in Setup (which always installs them), keep recognizing and
   removing the old commands, and keep `Network_Toolkit.exe` accepting both
   forms.
+- **The Text Editor program's own Open with entry** (added later): when the
+  user picks `Network_Toolkit_TextEditor.exe` with "Choose another app > Look
+  for another app on this PC", Windows writes
+  `Applications\Network_Toolkit_TextEditor.exe\shell\open\command` =
+  `"<program>" "%1"` itself, and the program then receives the file alone
+  (section 1 accepts it). Setup and the portable registration now write that
+  entry properly, beside `Applications\Network_Toolkit.exe` and by the same
+  rules: `FriendlyAppName`, the program's icon 0 and
+  `"<dir>\Network_Toolkit_TextEditor.exe" --open-file "%1"`, only when the key
+  is absent or already starts that program (or the one beside a portable copy
+  Setup takes over), recorded as `Applications\Network_Toolkit_TextEditor.exe`
+  in the created keys and removed by uninstall, Remove and Clean up. The
+  portable registration writes it only when the program is beside the copy, of
+  this version and changeable only by this user and the system. Every other
+  registration keeps starting `Network_Toolkit.exe`.
 
 ## 7. Data and settings
 
