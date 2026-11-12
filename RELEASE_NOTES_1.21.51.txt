@@ -1,0 +1,13 @@
+Network Toolkit 1.21.51
+
+## What's New
+
+- Choosing the Text Editor yourself in Windows' "Open with" (by browsing for the program) now opens the file instead of showing an error.
+- After an update, the Text Editor is offered for every supported file type, such as .json, where your installation allows it; otherwise App settings shows a one-click way to run Setup once.
+
+## Additional Details
+
+- Network_Toolkit.exe or Network_Toolkit_TextEditor.exe started with just a file opens that file in the Text Editor. The Terminal program does not take a file.
+- An installation made with Setup 1.21.44 or later gets the missing file types added after an update, exactly as Setup would add them, and removed again by its uninstaller. An installation made with an older Setup gets a notice under App settings → Updates and → Editor with Run Setup, which downloads and checks this version's Setup, starts it after you confirm twice, and then closes the app (asking about unsaved documents as usual). Your settings and data stay.
+- Windows still decides the default app: pick the Text Editor in Open with or Default apps.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.
