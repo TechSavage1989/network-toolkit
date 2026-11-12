@@ -1,3 +1,15 @@
+# v1.21.50 Beta 1 - Pop-out limits resolved
+
+Owner, about the v1.21.49 limits: "can you resolve the limits?"
+
+v1.21.49 was published and verified: tag at merge commit 9eefb9e (PR #172), release run 43126248300 green, all seven assets matching GitHub's digests, `github_release.py verify` reporting "Verified 1.21.49", stable channel still at v1.21.34. Its PR needed the native fixtures to allow `POST /api/window-send/report`, and a second review found and fixed a Save As path in the remote-file grant (now limited to the exact file on the pinned connection, tab kept in the main window).
+
+What changed (owner decisions recorded in AGENTS.md): the receiving window of Send to comes to the front after a successful delivery (`window_raise.go`; child PIDs recorded at launch, `AllowSetForegroundWindow` for the receiver only, `GET /api/window-send/activation` long-poll per child); the document hand-over carries undo/redo for page-held tabs within the 8 MiB limit and names any tab that moved without it (disk-backed history lives in the engine buffer and stays); detached windows of the standalone apps reach peer send only through their owner engine, and window send runs in the standalone engines too; SFTP Edit from a detached workspace reopens a closed main window (`activatePrimary`, up to 20 s, only the reopened window counts as ready) before the grant.
+
+Known limits: Windows may refuse the raise (the taskbar button flashes); disk-backed tabs move without undo history; not run on physical Windows.
+
+---
+
 # v1.21.49 Beta 1 - Popped-out windows are the separate programs, still connected
 
 Owner: "when popping out or detaching the text editor from the main toolkit app, it must open the standalone text editor and transfer the tabs and content, or maintain a live, updated feed of the tabs or content between both. same for terminal. also all the single toolkit app features between them must continue to work accordingly". Decisions: "Connected separate program", "Add to the open one where possible", a single tab moved to a separate window keeps its own connected window, and Edit from a popped-out Terminal workspace's SFTP browser is allowed.

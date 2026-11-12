@@ -1,0 +1,16 @@
+Network Toolkit 1.21.50
+
+## What's New
+
+- The window that receives text from Send to now comes to the front.
+- Tabs added to an already-open Text Editor keep their undo history.
+- Popped-out windows of the separate Text Editor and Terminal can now use Send to with the other app.
+- Edit in a popped-out Terminal's SFTP browser reopens the main window if it was closed.
+
+## Additional Details
+
+- A window comes forward only after the text was delivered to it. If Windows does not allow it (for example after you clicked another program), its taskbar button flashes instead.
+- Undo history moves for tabs held in the window, within the same size limit as their text. Large files kept on disk move without it; the message names any tab that moved without its history.
+- Send to from a popped-out window of the separate apps goes through the program that opened it, with the same checks as from its main window; text for a popped-out window of the other app goes to that window.
+- A file opened this way keeps the earlier limits: it saves only to its own path and stays in the main window.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.
