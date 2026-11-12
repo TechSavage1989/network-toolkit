@@ -101,6 +101,130 @@ func TestBuildEditionOpensItsOwnAppAndKeepsItsSwitches(t *testing.T) {
 	}
 }
 
+// Windows' own "Open with" entry ("Choose another app > Look for another app
+// on this PC") starts the chosen program with the file alone: "<program>"
+// "%1". The main and Text Editor programs read that as --editor-standalone
+// --open-file "<file>"; nothing may be given beside it, and the Terminal
+// program opens no file.
+func TestOpenWithArgumentPerEdition(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "notes & résumé %1.txt")
+	if err := os.WriteFile(file, []byte("synthetic"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(dir)
+	type result struct {
+		refused bool   // applyOpenWithArgument or applyBuildEdition refused the start
+		launch  bool   // the editor launch request (editorLaunchPath) refused the file
+		path    string // the file opened in the standalone Text Editor
+		app     string // "editor", "terminal" or "main"
+	}
+	run := func(t *testing.T, edition, goos string, args []string) result {
+		t.Helper()
+		flags, options := editionFlags()
+		if err := flags.Parse(args); err != nil {
+			t.Fatal(err)
+		}
+		if err := applyOpenWithArgument(flags, args, edition, goos); err != nil {
+			if !strings.Contains(err.Error(), programNameFor(goos, edition)) {
+				t.Fatalf("the refusal does not name the program: %v", err)
+			}
+			return result{refused: true}
+		}
+		if err := applyBuildEdition(flags, edition); err != nil {
+			return result{refused: true}
+		}
+		terminal := flags.Lookup("terminal").Value.String() == "true"
+		request, err := options.request(flags, terminal)
+		if err != nil {
+			return result{launch: true}
+		}
+		if _, err := terminalLinkLaunch(flags, goos); err != nil {
+			return result{refused: true}
+		}
+		got := result{app: "main"}
+		switch {
+		case *options.standalone:
+			got.app = "editor"
+		case terminal:
+			got.app = "terminal"
+		}
+		if request != nil {
+			got.path = request.Path
+		}
+		return got
+	}
+	opened := result{app: "editor", path: file}
+	for _, edition := range []string{"", standaloneEditorMode, "terminal"} {
+		for _, tc := range []struct {
+			name string
+			args []string
+			want result
+		}{
+			{"nothing", nil, result{app: map[string]string{"": "main", standaloneEditorMode: "editor", "terminal": "terminal"}[edition]}},
+			{"the file alone", []string{file}, opened},
+			{"a relative file alone", []string{filepath.Base(file)}, opened},
+			{"the registered form", []string{"--open-file", file}, opened},
+			{"two files", []string{file, file}, result{refused: true}},
+			{"a switch before the file", []string{"--no-browser", file}, result{refused: true}},
+			{"the data folder before the file", []string{"--data-dir", dir, file}, result{refused: true}},
+			{"the editor switch before the file", []string{"--editor-standalone", file}, result{refused: true}},
+			{"--open-file and a second file", []string{"--open-file", file, file}, result{refused: true}},
+			{"a switch after the file", []string{file, "--terminal"}, result{refused: true}},
+			{"after the end of switches", []string{"--", file}, result{refused: true}},
+			{"a lone dash", []string{"-"}, result{refused: true}},
+			{"a dashed name", []string{"--", "-notes.txt"}, result{refused: true}},
+			{"a missing file", []string{filepath.Join(dir, "missing.txt")}, result{launch: true}},
+			{"a folder", []string{dir}, result{launch: true}},
+			{"an empty argument", []string{""}, result{launch: true}},
+			{"a link beside a file", []string{"--open-url", "ssh://192.0.2.10", file}, result{refused: true}},
+		} {
+			t.Run(map[string]string{"": "main", standaloneEditorMode: "editor", "terminal": "terminal"}[edition]+"/"+tc.name, func(t *testing.T) {
+				want := tc.want
+				if edition == "terminal" && tc.name != "nothing" {
+					// The Terminal program opens no file, alone or with --open-file.
+					want = result{refused: true}
+				}
+				if edition == "" && tc.name == "the registered form" {
+					// --open-file alone keeps opening the main window's editor.
+					want.app = "main"
+				}
+				if got := run(t, edition, runtime.GOOS, tc.args); got != want {
+					t.Fatalf("%q: got %+v, want %+v", tc.args, got, want)
+				}
+			})
+		}
+	}
+	// Windows switch syntax is never a file; a UNC path is not switch syntax.
+	for _, edition := range []string{"", standaloneEditorMode} {
+		for arg, refused := range map[string]bool{"/S": true, "/open-file": true, `\\server\share\notes.txt`: false, "//server/share/notes.txt": false, `C:\Users\operator\notes.txt`: false} {
+			flags, _ := editionFlags()
+			if err := flags.Parse([]string{arg}); err != nil {
+				t.Fatal(err)
+			}
+			err := applyOpenWithArgument(flags, []string{arg}, edition, "windows")
+			if (err != nil) != refused {
+				t.Fatalf("%q on Windows (%q): %v, want refused %v", arg, edition, err, refused)
+			}
+			if err == nil && flags.Lookup("open-file").Value.String() != arg {
+				t.Fatalf("%q on Windows was not read as --open-file", arg)
+			}
+		}
+	}
+	// On Linux an absolute path starts with "/".
+	flags, _ := editionFlags()
+	if err := flags.Parse([]string{"/home/operator/notes.txt"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := applyOpenWithArgument(flags, []string{"/home/operator/notes.txt"}, standaloneEditorMode, "linux"); err != nil {
+		t.Fatalf("an absolute Linux path was refused: %v", err)
+	}
+	// A restart after an update opens the Text Editor again, without the file.
+	if got := updateRestartArgs([]string{file}); strings.Join(got, " ") != "--editor-standalone" {
+		t.Fatalf("restart arguments after an Open with start: %v", got)
+	}
+}
+
 func TestProgramNamesAndUpdateMembers(t *testing.T) {
 	for edition, want := range map[string]string{"": "Network_Toolkit.exe", standaloneEditorMode: "Network_Toolkit_TextEditor.exe", "terminal": "Network_Toolkit_Terminal.exe"} {
 		if got := programNameFor("windows", edition); got != want {

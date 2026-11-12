@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -35,6 +36,44 @@ func registerEditorLaunchOptions(flags *flag.FlagSet) editorLaunchOptions {
 		standalone: flags.Bool(standaloneEditorMode, false, "Open the independent Text Editor window"),
 		file:       flags.String("open-file", "", "Open a local file in Text Editor"),
 	}
+}
+
+// applyOpenWithArgument accepts the one bare file path that Windows' own
+// "Open with" entry passes. When the user picks a program in "Choose another
+// app > Look for another app on this PC", Windows writes
+// HKCU\Software\Classes\Applications\<program>\shell\open\command itself (if
+// that key has no command yet) as "<program>" "%1": the program receives the
+// file path alone, without --open-file. Such a start is the same request as
+// --editor-standalone --open-file "<path>", and the flag set is parsed again
+// in that form, so every check that follows (the edition, the launch request
+// with editorLaunchPath, forwarding to the separate Text Editor program) sees
+// exactly that. args are the program's arguments as given (os.Args[1:]).
+//
+// The path is accepted only alone: no switch beside it (the Text Editor
+// program's standalone mode comes from its edition, not from a switch), never
+// two or more, never after "--", and never anything with switch syntax: a
+// leading "-", or on Windows a leading "/" that is not a UNC path ("//server"),
+// since an absolute Windows path never starts with either. The Terminal
+// program opens no file and refuses it.
+func applyOpenWithArgument(flags *flag.FlagSet, args []string, edition, goos string) error {
+	if flags.NArg() == 0 {
+		return nil
+	}
+	program := programNameFor(goos, edition)
+	if edition == "terminal" {
+		return fmt.Errorf("%s opens %s only and does not open files. Open a file with %s or %s --editor-standalone --open-file \"<file>\".", program, editionTitle(edition), programNameFor(goos, standaloneEditorMode), programNameFor(goos, ""))
+	}
+	other := false
+	flags.Visit(func(*flag.Flag) { other = true })
+	refused := fmt.Errorf("%s opens a file given on its own (%s \"<file>\") or with --open-file \"<file>\". Nothing else can be given beside it.", program, program)
+	if other || flags.NArg() != 1 || len(args) != 1 || args[0] != flags.Arg(0) {
+		return refused
+	}
+	path := flags.Arg(0)
+	if strings.HasPrefix(path, "-") || goos == "windows" && strings.HasPrefix(path, "/") && !strings.HasPrefix(path, "//") {
+		return refused
+	}
+	return flags.Parse([]string{"--" + standaloneEditorMode, "--open-file=" + path})
 }
 
 func (o editorLaunchOptions) request(flags *flag.FlagSet, incompatible bool) (*editorLaunchRequest, error) {

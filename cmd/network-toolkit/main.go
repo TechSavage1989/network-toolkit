@@ -249,6 +249,12 @@ func main() {
 		}
 		return
 	}
+	// Windows' own "Open with" entry passes the file alone; it is read as
+	// --editor-standalone --open-file "<file>" (editor_launch.go).
+	if err := applyOpenWithArgument(flag.CommandLine, os.Args[1:], buildEdition, runtime.GOOS); err != nil {
+		platform.NotifyFatal(err.Error())
+		return
+	}
 	// The separate Text Editor and Terminal programs open their app without a
 	// switch (edition.go, docs/SEPARATE_EXECUTABLES.md).
 	if err := applyBuildEdition(flag.CommandLine, buildEdition); err != nil {
