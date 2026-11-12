@@ -18,7 +18,9 @@ const readOnlyRequests=new Set(['list','stat','preview','read-text']);
 // A detached Terminal workspace (not a single-session window) of the main
 // Toolkit can open a remote file in the main window's Text Editor; everything
 // else in its browser stays read-only (window-send.js, owner decision).
-function remoteEdit(){try{return typeof DETACHED_WORKSPACE!=='undefined'&&DETACHED_WORKSPACE&&!!root.NetworkToolkitWindowSend?.enabled?.();}catch{return false;}}
+// Only a workspace popped out of the main Toolkit window: the main window's
+// Text Editor opens the file (a standalone Terminal has no Text Editor).
+function remoteEdit(){try{return typeof DETACHED_WORKSPACE!=='undefined'&&DETACHED_WORKSPACE&&typeof status!=='undefined'&&status?.windowSendRemote===true&&!!root.NetworkToolkitWindowSend?.enabled?.();}catch{return false;}}
 const allowedReadOnly=name=>readOnlyActions.has(name)||name==='edit'&&remoteEdit();
 function limitReadOnlyControls(area,m){if(!m.readOnly)return;for(const button of area.querySelectorAll('[data-tsftp],[data-tsftp-menu]'))if(!allowedReadOnly(button.dataset.tsftp||button.dataset.tsftpMenu))button.remove();area.querySelector('[data-tsftp-os-files]')?.remove();}
 function identity(entry){return entry.info.id+'|'+entry.info.host+'|'+entry.info.port+'|'+terminalSessionRevision(entry.info.id)}

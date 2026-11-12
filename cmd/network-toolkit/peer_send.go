@@ -40,8 +40,21 @@ import (
 //     most peerLaunchWait. A send that is waiting when this app closes is
 //     dropped; it is never written anywhere.
 //
+// Detached windows (owner decision, v1.21.50). A window popped out of a
+// standalone app sends exactly as that app's own window: its page asks its
+// OWNER engine with its view token (handleChildPeerSend: only the sending
+// routes, and only a window of the app's own tool), and the owner engine sends
+// with every rule below. No peer route is ever served to a child window or
+// reached by it directly. On the receiving side, an engine lists and accepts
+// the sessions and documents of its detached windows too (what they report
+// through window send), and text for one of them is queued for that window
+// (peerEnqueue, window_send.go) and raises it.
+//
 // The main window only receives text. Its own Send to commands stay inside its
-// window, and its child windows take no part. Its one sending use is the
+// window, and its child windows send only through window send. They do receive
+// (owner decision): text for a session or a document a detached window of the
+// main engine holds goes to that window, also while the main window is closed.
+// Its one sending use is the
 // document hand-over of peer_handover.go: when the user pops its Text Editor
 // out while the standalone Text Editor runs, local and untitled tabs are given
 // to that editor ("documents", the only request that carries file paths).
@@ -69,7 +82,8 @@ import (
 // Nothing here accepts or returns credentials, tokens, host keys, file paths,
 // document text or terminal output other than the text the user chose to send.
 // The one exception is the main window's document hand-over (kind "documents",
-// peer_handover.go): local file paths and the tabs' unsaved text.
+// peer_handover.go): local file paths and the tabs' unsaved text and undo
+// history.
 const (
 	peerInboundPrefix = "/api/peer/"
 	peerPagePrefix    = "/api/peer-send/"
@@ -168,6 +182,10 @@ type peerRequest struct {
 	timer   *time.Timer
 	ids     []string             // a hand-over: the tabs it carries, kept after the page has it
 	items   []peerHandoverResult // a hand-over: what the page did with each tab
+	// window: text for a session or document of a detached window of this
+	// engine. The request lives in window send (from windowSendPeer); its
+	// state, result and expiry are read there.
+	window string
 }
 
 type peerSendState struct {
@@ -179,9 +197,10 @@ type peerSendState struct {
 	request  *peerRequest
 	launchMu sync.Mutex
 	launch   func(context.Context) error // tests start the other app in-process
-	// Sending side (standalone apps only).
-	listed   peerListed      // the receiver whose targets this app's page was last shown
-	outbound []*peerOutbound // recent sends: where each went, or that it is waiting for a start
+	// Sending side (standalone apps only), by sending window: windowSendMain
+	// for the app's own window, a window-send key for a detached window.
+	listed   map[string]peerListed // the receiver whose targets each window's page was last shown
+	outbound []*peerOutbound       // recent sends: where each went, or that it is waiting for a start
 	// Main window only: the one document hand-over that is waiting (peer_handover.go).
 	handover *peerHandoverOutbound
 }
@@ -212,6 +231,7 @@ type peerListed struct {
 // here and never on disk.
 type peerOutbound struct {
 	id         string
+	from       string // the sending window; only it reads the result
 	receiver   peerReceiver
 	instanceID string // the instance the text was delivered to
 	state      string // peerStarting, peerQueued (delivered: ask the receiver), peerFailed
@@ -467,7 +487,7 @@ func peerBodyLimit(mode string) int64 {
 
 func (s *peerSendState) expireLocked(now time.Time) {
 	r := s.request
-	if r == nil || (r.state != peerQueued && r.state != peerTaken) || now.Sub(r.created) < peerRequestLifetime {
+	if r == nil || r.window != "" || (r.state != peerQueued && r.state != peerTaken) || now.Sub(r.created) < peerRequestLifetime {
 		return
 	}
 	if r.state == peerQueued {
@@ -487,16 +507,38 @@ func (s *peerSendState) freshTargetsLocked(now time.Time, kind string) ([]peerTa
 	return s.targets[kind], true
 }
 
-// peerEnqueue queues one validated request for this app's page. It returns an
-// HTTP status with a plain-language reason when the request cannot be taken.
-func (a *application) peerEnqueue(kind string, payload peerPayload) (int, error) {
+// peerRequestStateLocked is a request's state; one queued for a detached
+// window is read from window send (a.peer.mu held, then window send's lock).
+func (a *application) peerRequestStateLocked(r *peerRequest) string {
+	if r == nil {
+		return ""
+	}
+	if r.window != "" {
+		state, _, _, _, found := a.windowSendResult(windowSendPeer, r.id)
+		if !found {
+			return peerExpired
+		}
+		return state
+	}
+	return r.state
+}
+
+// peerEnqueue queues one validated request for this app's page, or, for a
+// session or a document that one of this engine's detached windows holds, for
+// that window (window send, from windowSendPeer). window names that window;
+// it is empty when the primary page takes the request. It returns an HTTP
+// status with a plain-language reason when the request cannot be taken. The
+// caller raises the window that took it.
+func (a *application) peerEnqueue(kind string, payload peerPayload) (status int, window string, err error) {
 	mode := a.windowMode
 	now := peerNow()
 	a.peer.mu.Lock()
 	defer a.peer.mu.Unlock()
 	a.peer.expireLocked(now)
-	if current := a.peer.request; current != nil && (current.state == peerQueued || current.state == peerTaken) {
-		return http.StatusConflict, errors.New("Another send is still waiting in " + peerAppName(mode) + ". Finish it there, then send again.")
+	if current := a.peer.request; current != nil {
+		if state := a.peerRequestStateLocked(current); state == peerQueued || state == peerTaken {
+			return http.StatusConflict, "", errors.New("Another send is still waiting in " + peerAppName(mode) + ". Finish it there, then send again.")
+		}
 	}
 	lookup := kind
 	if kind == peerHandoverKind {
@@ -511,6 +553,46 @@ func (a *application) peerEnqueue(kind string, payload peerPayload) (int, error)
 		}
 		return nil
 	}
+	if kind == "terminal" || kind == "editor" {
+		id := payload.Session
+		if kind == "editor" {
+			id = payload.Target
+		}
+		// The primary page may still list a session or a document that has
+		// just moved to a detached window: the engine's ownership decides.
+		holds := a.peerPrimaryHolds(kind, id)
+		primary := fresh && (id == "new" || find(id) != nil && holds)
+		if !primary {
+			// A detached window of this engine shows that session or holds that
+			// document (or, with no primary page, takes the new document).
+			if holder := a.windowSendHolder(kind, id); holder != "" {
+				body := windowSendBody{Kind: kind, Window: holder, Session: payload.Session, Target: payload.Target, Where: payload.Where, Line: payload.Line, Label: payload.Label, Text: payload.Text}
+				if _, _, code, err := a.windowSendEnqueueText(windowSendPeer, body, payload.RequestID); err != nil {
+					return code, "", err
+				}
+				if previous := a.peer.request; previous != nil && previous.timer != nil {
+					previous.timer.Stop()
+				}
+				a.peer.request = &peerRequest{id: payload.RequestID, kind: kind, created: now, state: peerQueued, window: holder}
+				return http.StatusOK, holder, nil
+			}
+			// Held by a detached window that has not reported it yet: never the
+			// primary page's, so it is refused instead of sent there.
+			if !holds {
+				if kind == "terminal" {
+					return http.StatusConflict, "", errors.New("That terminal session moved to another window. Choose Send to terminal again.")
+				}
+				return http.StatusConflict, "", errors.New("That document moved to another window. Choose Send to editor again.")
+			}
+		}
+	}
+	code, err := a.peerEnqueuePrimaryLocked(kind, payload, now, fresh, find)
+	return code, "", err
+}
+
+// peerEnqueuePrimaryLocked queues a request for this app's own page.
+func (a *application) peerEnqueuePrimaryLocked(kind string, payload peerPayload, now time.Time, fresh bool, find func(string) *peerTarget) (int, error) {
+	mode := a.windowMode
 	if kind == peerHandoverKind {
 		if !fresh {
 			return http.StatusServiceUnavailable, errors.New(peerAppName(mode) + " is not ready yet. Try again in a moment.")
@@ -588,8 +670,8 @@ func (a *application) peerAcknowledge(id string, ok bool, outcome, message strin
 	defer a.peer.mu.Unlock()
 	a.peer.expireLocked(peerNow())
 	r := a.peer.request
-	if r == nil || r.id != id || r.state != peerTaken {
-		return false, true
+	if r == nil || r.id != id || r.window != "" || r.state != peerTaken {
+		return false, true // a detached window acknowledges through window send
 	}
 	if ok && !peerOutcomeAllowed(r.kind, outcome) {
 		return true, false
@@ -617,6 +699,10 @@ func (a *application) peerResult(id string) (state, outcome, message string, fou
 	if r == nil || r.id != id {
 		return "", "", "", false
 	}
+	if r.window != "" {
+		state, outcome, message, _, found = a.windowSendResult(windowSendPeer, id)
+		return state, outcome, message, found
+	}
 	return r.state, r.outcome, r.message, true
 }
 
@@ -639,6 +725,18 @@ func peerLoopback(remote string) bool {
 	}
 	ip := net.ParseIP(host)
 	return ip != nil && ip.IsLoopback()
+}
+
+// peerRaisePrimary raises this app's own window for a request it queued, and
+// once more after windowRaiseRetry, as windowSendRaise does: the sender's
+// permission may arrive a moment after the request.
+func (a *application) peerRaisePrimary() {
+	a.activatePrimary()
+	windowRaiseLater(func() {
+		if a.homeCanConnect() {
+			a.activatePrimary()
+		}
+	})
 }
 
 func (a *application) peerReply(w http.ResponseWriter, status int, body map[string]any) {
@@ -721,10 +819,7 @@ func (a *application) servePeerInbound(w http.ResponseWriter, r *http.Request) {
 			a.peerRefuse(w, http.StatusMethodNotAllowed, "This method is not supported.")
 			return
 		}
-		a.peer.mu.Lock()
-		targets, ready := a.peer.freshTargetsLocked(peerNow(), kind)
-		targets = append([]peerTarget(nil), targets...)
-		a.peer.mu.Unlock()
+		targets, ready := a.peerInboundTargets(kind)
 		body := map[string]any{"ready": ready}
 		if kind == "terminal" {
 			sessions := make([]peerSessionSummary, 0, len(targets))
@@ -754,13 +849,20 @@ func (a *application) servePeerInbound(w http.ResponseWriter, r *http.Request) {
 			a.peerRefuse(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		if status, err := a.peerEnqueue(kind, *payload); err != nil {
+		status, window, err := a.peerEnqueue(kind, *payload)
+		if err != nil {
 			a.peerRefuse(w, status, err.Error())
 			return
 		}
-		// Raise this window so a paste review or the position bar is seen. The
-		// page then shows its Terminal page or its Text Editor (deliver()).
-		a.activatePrimary()
+		// Raise the window that took it so a paste review or the position bar
+		// is seen: this app's own window, whose page then shows its Terminal
+		// page or its Text Editor (deliver()), or the detached window that
+		// holds the session or the document (window_raise.go).
+		if window != "" {
+			a.windowSendRaise(windowSendPeer, window)
+		} else {
+			a.peerRaisePrimary()
+		}
 		a.peerReply(w, http.StatusOK, map[string]any{"requestId": payload.RequestID, "state": peerQueued})
 	case base + "result":
 		if r.Method != http.MethodGet {
@@ -1164,11 +1266,11 @@ func (s *peerSendState) rememberLocked(o *peerOutbound) {
 	}
 }
 
-func (a *application) peerOutboundFor(id string) (peerOutbound, bool) {
+func (a *application) peerOutboundFor(from, id string) (peerOutbound, bool) {
 	a.peer.mu.Lock()
 	defer a.peer.mu.Unlock()
 	for _, o := range a.peer.outbound {
-		if o.id == id {
+		if o.id == id && o.from == from {
 			return *o, true
 		}
 	}
@@ -1183,6 +1285,9 @@ func (a *application) peerOutboundFor(id string) (peerOutbound, bool) {
 func (a *application) peerStartAndDeliver(o *peerOutbound, payload peerPayload) {
 	instanceID, err := a.peerOpen(a.ctx)
 	if err == nil {
+		// A sending detached window allows the started app before the text goes.
+		// The record is read here, never under a.peer.mu.
+		a.windowSendAllowFirst(o.from, peerReceiverPID(o.receiver, instanceID))
 		_, err = a.peerDeliver(a.ctx, o.receiver, instanceID, &payload)
 	}
 	a.peer.mu.Lock()
@@ -1202,6 +1307,57 @@ func (a *application) peerStartAndDeliver(o *peerOutbound, payload peerPayload) 
 // ---- Page routes: this app's own page, session token ----
 
 func (a *application) handlePeerSend(w http.ResponseWriter, r *http.Request) {
+	a.handlePeerSendFrom(w, r, windowSendMain)
+}
+
+// peerChildKind is the app a detached window sends as: only a window of a
+// standalone app's own tool (a Terminal window of the standalone Terminal, a
+// Text Editor window of the standalone Text Editor) that can send at all.
+func (a *application) peerChildKind(key string) string {
+	if a.peerSenderRoot() == "" {
+		return ""
+	}
+	switch {
+	case a.windowMode == "terminal" && strings.HasPrefix(key, windowSendTerminal):
+		return "terminal"
+	case a.windowMode == standaloneEditorMode && strings.HasPrefix(key, windowSendEditor):
+		return "editor"
+	}
+	return ""
+}
+
+// handleChildPeerSend serves /api/peer-send/ to a detached window of this
+// engine (its view token): only the sending routes, which the owner engine
+// runs as for its own window. A child never receives through peer send (it
+// receives through window send) and never reaches /api/peer/.
+func (a *application) handleChildPeerSend(w http.ResponseWriter, r *http.Request, key string) {
+	route := strings.TrimPrefix(r.URL.Path, peerPagePrefix)
+	if a.peerChildKind(key) == "" || route != "targets" && route != "result" && route != "open" && route != "send" {
+		jsonError(w, http.StatusForbidden, "This window cannot send between apps.")
+		return
+	}
+	if !a.windowSendAlive(key) {
+		jsonError(w, http.StatusGone, "This window is closing.")
+		return
+	}
+	a.handlePeerSendFrom(w, r, key)
+}
+
+// peerReceiverPID names the process of the receiver instance that just took
+// text, from its protected record, so a sending detached window can allow it
+// to come to the front. Zero when the record names another instance.
+func peerReceiverPID(rc peerReceiver, instanceID string) int {
+	record, err := readPeerInstance(rc.dir)
+	if err != nil || instanceID == "" || subtle.ConstantTimeCompare([]byte(record.InstanceID), []byte(instanceID)) != 1 || record.PID < 1 {
+		return 0
+	}
+	return record.PID
+}
+
+// handlePeerSendFrom serves /api/peer-send/ for one sending window: the app's
+// own window (windowSendMain, which also receives) or a detached window
+// (handleChildPeerSend, sending routes only).
+func (a *application) handlePeerSendFrom(w http.ResponseWriter, r *http.Request, caller string) {
 	own := a.windowMode
 	const unavailable = "Sending between apps is available in the standalone Text Editor and Terminal."
 	if a.peerRoot() == "" {
@@ -1239,14 +1395,30 @@ func (a *application) handlePeerSend(w http.ResponseWriter, r *http.Request) {
 			body["note"] = note
 		}
 		a.peer.mu.Lock()
-		a.peer.listed = listed
+		if a.peer.listed == nil {
+			a.peer.listed = map[string]peerListed{}
+		}
+		a.peer.listed[caller] = listed
+		// What a detached window that has closed was shown is not kept.
+		for key := range a.peer.listed {
+			if windowSendChild(key) && key != caller && !a.windowSendAlive(key) {
+				delete(a.peer.listed, key)
+			}
+		}
 		a.peer.mu.Unlock()
 		jsonResponse(w, http.StatusOK, body)
 	case "open":
-		if _, err := a.peerOpen(r.Context()); err != nil {
+		// A running app is raised by the open: a sending detached window
+		// allows it first (only a process its protected record names).
+		if pid, ok := peerForegroundPID(a.peerStandalone().dir); ok {
+			a.windowSendAllowFirst(caller, pid)
+		}
+		instanceID, err := a.peerOpen(r.Context())
+		if err != nil {
 			jsonError(w, http.StatusServiceUnavailable, err.Error())
 			return
 		}
+		a.windowSendAllowFrom(caller, peerReceiverPID(a.peerStandalone(), instanceID))
 		jsonResponse(w, http.StatusOK, map[string]any{"app": kind, "name": a.peerStandalone().name(), "receiver": "standalone", "running": true, "ready": true})
 	case "send":
 		var payload *peerPayload
@@ -1270,9 +1442,9 @@ func (a *application) handlePeerSend(w http.ResponseWriter, r *http.Request) {
 		// One lock for "is another send being started?" and for recording this
 		// one, so two sends can never both start the other app. A send for a new
 		// document is recorded as starting before a receiver is looked for.
-		o := &peerOutbound{id: payload.RequestID, receiver: standalone, state: peerStarting}
+		o := &peerOutbound{id: payload.RequestID, from: caller, receiver: standalone, state: peerStarting}
 		a.peer.mu.Lock()
-		listed, starting := a.peer.listed, false
+		listed, starting := a.peer.listed[caller], false
 		for _, other := range a.peer.outbound {
 			starting = starting || other.state == peerStarting
 		}
@@ -1302,11 +1474,15 @@ func (a *application) handlePeerSend(w http.ResponseWriter, r *http.Request) {
 				jsonError(w, http.StatusServiceUnavailable, candidate.name()+" is not open any more. Nothing was sent.")
 				return
 			}
+			// A sending detached window (the foreground process) allows the
+			// probed instance's process before the text is posted, so that app
+			// may come forward when it takes the text.
+			a.windowSendAllowFirst(caller, peerReceiverPID(candidate, listed.instanceID))
 			if code, err := a.peerDeliver(r.Context(), candidate, listed.instanceID, payload); err != nil {
 				jsonError(w, code, err.Error())
 				return
 			}
-			a.peerRemember(&peerOutbound{id: payload.RequestID, receiver: candidate, instanceID: listed.instanceID, state: peerQueued})
+			a.peerRemember(&peerOutbound{id: payload.RequestID, from: caller, receiver: candidate, instanceID: listed.instanceID, state: peerQueued})
 			jsonResponse(w, http.StatusOK, map[string]any{"requestId": payload.RequestID, "state": peerQueued, "name": candidate.name(), "receiver": candidate.role()})
 			return
 		}
@@ -1336,6 +1512,7 @@ func (a *application) handlePeerSend(w http.ResponseWriter, r *http.Request) {
 			jsonResponse(w, http.StatusOK, body)
 			return
 		}
+		a.windowSendAllowFirst(caller, peerReceiverPID(*rc, instanceID))
 		if code, err := a.peerDeliver(r.Context(), *rc, instanceID, payload); err != nil {
 			settle(peerFailed, err.Error(), rc, instanceID)
 			jsonError(w, code, err.Error())
@@ -1353,7 +1530,7 @@ func (a *application) handlePeerSend(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, http.StatusBadRequest, "The request identifier is invalid.")
 			return
 		}
-		o, known := a.peerOutboundFor(id)
+		o, known := a.peerOutboundFor(caller, id)
 		if !known {
 			jsonResponse(w, http.StatusOK, map[string]any{"requestId": id, "state": "lost", "name": a.peerStandalone().name(), "message": "This request is no longer known. Check the other window."})
 			return

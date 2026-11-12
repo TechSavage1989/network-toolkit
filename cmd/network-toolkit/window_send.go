@@ -29,8 +29,16 @@ import (
 //
 // This is not peer send (peer_send.go): nothing crosses to another engine,
 // no instance record or activation token is used, and the routes live under
-// each window's own session or view token. Child windows still have no peer
-// routes.
+// each window's own session or view token. Child windows reach peer send only
+// through their owner engine (handleChildPeerSend), never a peer route of
+// their own.
+//
+// The standalone Terminal and the standalone Text Editor serve these routes
+// too (owner decision, v1.21.50): their detached windows report what they
+// show and receive text that the other standalone app sends to a session or a
+// document they hold (peerEnqueue routes it here, from "peer"). Their own
+// windows all show one tool, so they send to each other's tool only through
+// peer send.
 //
 // The protocol is peer send's, inside the engine:
 //   - Every window's page polls /api/window-send/inbox once a second and
@@ -62,7 +70,13 @@ import (
 // (remoteBrowserGrant, makeGrant), on the pinned transport (windowSendRun),
 // while that tab is open and the session stays in the asking workspace; Save
 // As elsewhere and moving the tab out of the main window are refused. Nothing
-// else of the session becomes the main window's.
+// else of the session becomes the main window's. When the main window is
+// closed (the engine runs on for its detached windows), Edit reopens it
+// (activatePrimary) and waits, at most windowSendReopenWait, for its page;
+// the grant is then made exactly as when it was open (owner decision).
+//
+// The window that receives comes to the front after a request is queued for it
+// (window_raise.go).
 const (
 	windowSendPrefix   = "/api/window-send/"
 	windowSendMain     = "main"
@@ -72,7 +86,12 @@ const (
 	windowSendGrants   = 32
 	windowSendPathMax  = 4096
 	windowSendForget   = 2 * time.Minute
+	windowSendPeer     = "peer" // the sender of text another standalone app sent to a detached window
 )
+
+// windowSendReopenWait bounds reopening the main window for Edit; it stays
+// under the HTTP server's 30 second write timeout.
+var windowSendReopenWait = 20 * time.Second
 
 var windowSendNow = time.Now
 
@@ -122,11 +141,22 @@ type windowSendState struct {
 	windows  map[string]*windowSendWindow
 	requests []*windowSendRequest // recent requests, newest last
 	grants   []*windowSendGrant   // remote files opened from detached workspaces, newest last
+	// window_raise.go: the processes of the detached windows this engine
+	// started, by window, and what each child window has still to collect.
+	pids        map[string]int
+	activations map[string]*windowSendActivation
 }
 
-// windowSendAvailable: only the main Toolkit engine has windows of both
-// tools. A standalone app's detached windows show its own tool only.
-func (a *application) windowSendAvailable() bool { return a.windowMode == "main" }
+// windowSendAvailable: every engine with windows. The main Toolkit engine has
+// windows of both tools; a standalone app's detached windows show its own tool
+// only and use these routes to receive peer text and to be raised.
+func (a *application) windowSendAvailable() bool {
+	return a.windowMode == "main" || a.windowMode == "terminal" || a.windowMode == standaloneEditorMode
+}
+
+// windowSendRemoteAvailable: Edit from a detached workspace opens the file in
+// the main window's Text Editor; only the main Toolkit engine has one.
+func (a *application) windowSendRemoteAvailable() bool { return a.windowMode == "main" }
 
 // windowSendReceives reports whether a window takes text of a kind.
 func windowSendReceives(key, kind string) bool {
@@ -244,6 +274,9 @@ func (s *windowSendState) expireLocked(now time.Time) {
 		}
 		if w.request == nil && now.Sub(w.polledAt) > windowSendForget {
 			delete(s.windows, key)
+			if act := s.activations[key]; act != nil && act.polling == 0 {
+				delete(s.activations, key) // a window that is gone collects nothing
+			}
 		}
 	}
 }
@@ -303,6 +336,100 @@ func (a *application) windowSendTargets(caller, kind string) (lists []windowSend
 	return lists, newDocument, newName, others
 }
 
+// windowSendPeerWindows lists the detached windows of this engine (never its
+// primary window, whose page reports to peer send itself) that can take text
+// of a kind from another standalone app now, with what each reported.
+func (a *application) windowSendPeerWindows(kind string) []windowSendList {
+	if !a.windowSendAvailable() || kind != "terminal" && kind != "editor" {
+		return nil
+	}
+	now := windowSendNow()
+	a.windowSend.mu.Lock()
+	defer a.windowSend.mu.Unlock()
+	a.windowSend.expireLocked(now)
+	var lists []windowSendList
+	for _, key := range a.windowSendLiveLocked(now) {
+		if !windowSendChild(key) || !windowSendReceives(key, kind) {
+			continue
+		}
+		lists = append(lists, windowSendList{Window: key, Targets: append([]peerTarget(nil), a.windowSend.windows[key].targets[kind]...)})
+	}
+	return lists
+}
+
+// windowSendHolder names the detached window that lists a session or a
+// document (id), or, for a new document, the first detached editor window.
+func (a *application) windowSendHolder(kind, id string) string {
+	for _, w := range a.windowSendPeerWindows(kind) {
+		if kind == "editor" && id == "new" {
+			return w.Window
+		}
+		for _, t := range w.Targets {
+			if t.ID == id {
+				return w.Window
+			}
+		}
+	}
+	return ""
+}
+
+// peerPrimaryHolds reports whether a session or a document is the primary
+// window's now, by the engine's own ownership, not by what its page last
+// reported: a page reports a session it just popped out until its next
+// report. A terminal session must be owned by no detached view; a document
+// must not be held by a detached editor window or be moving.
+func (a *application) peerPrimaryHolds(kind, id string) bool {
+	if kind == "terminal" {
+		if a.views == nil {
+			return true
+		}
+		a.views.mu.Lock()
+		defer a.views.mu.Unlock()
+		return a.views.ownerLocked(id).ViewID == ""
+	}
+	if id == "new" || a.editorViews == nil {
+		return true
+	}
+	a.editorViews.mu.Lock()
+	defer a.editorViews.mu.Unlock()
+	grant := a.editorViews.documents[id]
+	return grant == nil || grant.owner == "" && grant.pending == ""
+}
+
+// peerInboundTargets is what this engine can receive of a kind from another
+// standalone app: what its primary page reported and still holds, then what
+// its detached windows reported. ready: a window that can take it runs.
+func (a *application) peerInboundTargets(kind string) ([]peerTarget, bool) {
+	a.peer.mu.Lock()
+	own, ready := a.peer.freshTargetsLocked(peerNow(), kind)
+	reported := append([]peerTarget{}, own...)
+	a.peer.mu.Unlock()
+	targets := make([]peerTarget, 0, len(reported))
+	for _, t := range reported {
+		if a.peerPrimaryHolds(kind, t.ID) {
+			targets = append(targets, t)
+		}
+	}
+	limit := peerSessionLimit
+	if kind != "terminal" {
+		limit = peerDocumentLimit
+	}
+	seen := make(map[string]bool, len(targets))
+	for _, t := range targets {
+		seen[t.ID] = true
+	}
+	for _, w := range a.windowSendPeerWindows(kind) {
+		ready = true
+		for _, t := range w.Targets {
+			if !seen[t.ID] && len(targets) < limit {
+				seen[t.ID] = true
+				targets = append(targets, t)
+			}
+		}
+	}
+	return targets, ready
+}
+
 // windowSendOwned checks, at the moment of sending, that the target window
 // still owns the session (the ownership withTerminalOwner checks for every
 // input) or, for a document held by the editor registry, that the window
@@ -354,16 +481,31 @@ type windowSendBody struct {
 	Path    string `json:"path,omitempty"`
 }
 
-// windowSendEnqueue queues a validated request for one other window.
-func (a *application) windowSendEnqueue(caller string, body windowSendBody) (id, name string, status int, err error) {
+// windowSendEnqueue queues a validated request for one other window and, once
+// it is queued (never on a refusal), brings that window to the front.
+func (a *application) windowSendEnqueue(ctx context.Context, caller string, body windowSendBody) (id, name string, status int, err error) {
+	if body.Kind == "remote" {
+		id, name, status, err = a.windowSendRemoteEnqueue(ctx, caller, body)
+	} else {
+		id, name, status, err = a.windowSendEnqueueText(caller, body, randomHex(16))
+	}
+	if err == nil {
+		a.windowSendRaise(caller, body.Window)
+	}
+	return id, name, status, err
+}
+
+// windowSendEnqueueText queues text for one other window under requestID.
+// It does not raise the window; its callers do once it is queued.
+func (a *application) windowSendEnqueueText(caller string, body windowSendBody, requestID string) (id, name string, status int, err error) {
 	kind := body.Kind
-	if kind == "remote" {
-		return a.windowSendRemoteEnqueue(caller, body)
+	if kind != "terminal" && kind != "editor" {
+		return "", "", http.StatusBadRequest, errors.New("Send text to a terminal or the Text Editor.")
 	}
 	if body.Path != "" {
 		return "", "", http.StatusBadRequest, errors.New("Text carries no file path.")
 	}
-	payload := peerPayload{RequestID: randomHex(16), Session: body.Session, Target: body.Target, Where: body.Where, Line: body.Line, Label: body.Label, Text: body.Text}
+	payload := peerPayload{RequestID: requestID, Session: body.Session, Target: body.Target, Where: body.Where, Line: body.Line, Label: body.Label, Text: body.Text}
 	if err := validatePeerPayload(kind, &payload); err != nil {
 		return "", "", http.StatusBadRequest, err
 	}
@@ -447,7 +589,10 @@ func (a *application) windowSendQueueLocked(w *windowSendWindow, request *window
 
 // windowSendRemoteEnqueue: a detached Terminal workspace asks the main window
 // to open one remote file of a session it owns (Edit in its SFTP browser).
-func (a *application) windowSendRemoteEnqueue(caller string, body windowSendBody) (id, name string, status int, err error) {
+func (a *application) windowSendRemoteEnqueue(ctx context.Context, caller string, body windowSendBody) (id, name string, status int, err error) {
+	if !a.windowSendRemoteAvailable() {
+		return "", "", http.StatusBadRequest, errors.New("Remote files open in the main window's Text Editor.")
+	}
 	if !strings.HasPrefix(caller, windowSendTerminal) {
 		return "", "", http.StatusBadRequest, errors.New("Remote files are opened from a Terminal window's SFTP browser.")
 	}
@@ -462,6 +607,15 @@ func (a *application) windowSendRemoteEnqueue(caller string, body windowSendBody
 		return "", "", http.StatusBadRequest, errors.New("Choose one remote file.")
 	}
 	view := strings.TrimPrefix(caller, windowSendTerminal)
+	if !a.windowSendWorkspaceOwns(view, body.Session) {
+		return "", "", http.StatusConflict, errors.New("That SSH session is not in this window's workspace.")
+	}
+	// The main window is closed (the engine runs on for its detached windows)
+	// or its page has not started yet: reopen or raise it and wait for its
+	// page. Everything below is checked again afterwards.
+	if err := a.windowSendOpenMain(ctx); err != nil {
+		return "", "", http.StatusConflict, err
+	}
 	grant := &windowSendGrant{session: body.Session, path: path, view: view}
 	a.views.mu.Lock()
 	owner := a.views.ownerLocked(body.Session)
@@ -487,7 +641,7 @@ func (a *application) windowSendRemoteEnqueue(caller string, body windowSendBody
 		found = found || key == windowSendMain
 	}
 	if !found {
-		return "", "", http.StatusConflict, errors.New("Open the main Network Toolkit window to edit remote files, then choose Edit again.")
+		return "", "", http.StatusConflict, errors.New("The main " + appName + " window closed before it could open the file. Choose Edit again.")
 	}
 	name = names[windowSendMain]
 	w := a.windowSend.windows[windowSendMain]
@@ -508,6 +662,90 @@ func (a *application) windowSendRemoteEnqueue(caller string, body windowSendBody
 	}
 	a.windowSendQueueLocked(w, &windowSendRequest{id: id, kind: "remote", from: caller, to: windowSendMain, created: now, state: peerQueued, payload: &windowSendPayload{peerPayload: peerPayload{RequestID: id, Session: body.Session}, Path: path}})
 	return id, name, http.StatusOK, nil
+}
+
+// windowSendWorkspaceOwns reports whether a detached Terminal workspace owns a
+// session now.
+func (a *application) windowSendWorkspaceOwns(view, session string) bool {
+	a.views.mu.Lock()
+	defer a.views.mu.Unlock()
+	owner := a.views.ownerLocked(session)
+	v := a.views.views[view]
+	return owner.ViewID == view && owner.Ready && v != nil && v.info.Workspace && v.includesSession(session) && v.info.State == "detached"
+}
+
+// windowSendMainLive reports whether the main window's page runs and reported.
+func (a *application) windowSendMainLive() bool {
+	now := windowSendNow()
+	a.windowSend.mu.Lock()
+	defer a.windowSend.mu.Unlock()
+	a.windowSend.expireLocked(now)
+	for _, key := range a.windowSendLiveLocked(now) {
+		if key == windowSendMain {
+			return true
+		}
+	}
+	return false
+}
+
+// windowSendHomeClosed forgets that the main window's page ran: after its
+// native window closed, only a new page that polls and reports counts as live.
+// A request still waiting for that page ends at once and says so (its sender
+// is told now, not after a minute), and a remote file's grant that was not
+// confirmed by an open tab ends with it.
+func (a *application) windowSendHomeClosed() {
+	a.windowSend.mu.Lock()
+	defer a.windowSend.mu.Unlock()
+	w := a.windowSend.windows[windowSendMain]
+	if w == nil {
+		return
+	}
+	w.reported, w.polledAt, w.targets = false, time.Time{}, nil
+	if r := w.request; r != nil && (r.state == peerQueued || r.state == peerTaken) {
+		switch {
+		case r.state == peerTaken:
+			r.message = "The main window closed before it confirmed what happened. Check it when it is open again."
+		case r.kind == "remote":
+			r.message = "The main window closed before it opened the file. Choose Edit again."
+		default:
+			r.message = "The main window closed before it took the text. Nothing was sent."
+		}
+		r.state, r.payload = peerFailed, nil
+		w.request = nil
+		for _, g := range append([]*windowSendGrant(nil), a.windowSend.grants...) {
+			if g.request == r.id && !g.confirmed {
+				a.windowSend.dropGrantLocked(g)
+			}
+		}
+	}
+}
+
+// windowSendOpenMain makes sure the main window's page runs: a closed main
+// window is reopened (activatePrimary wakes runPrimaryLifecycle), an open one
+// is raised, and this waits until its page polls and reports, for at most
+// windowSendReopenWait and never past the request.
+func (a *application) windowSendOpenMain(ctx context.Context) error {
+	if a.windowSendMainLive() {
+		return nil
+	}
+	if a.shutdownRequested.Load() || a.ctx.Err() != nil {
+		return errors.New(appName + " is closing. Nothing was opened.")
+	}
+	a.activatePrimary()
+	wait, cancel := context.WithTimeout(ctx, windowSendReopenWait)
+	defer cancel()
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-wait.Done():
+			return errors.New("The main " + appName + " window did not open in time. Choose Edit again.")
+		case <-ticker.C:
+		}
+		if a.windowSendMainLive() {
+			return nil
+		}
+	}
 }
 
 // dropGrantLocked ends a grant: no save path admits it any more.
@@ -558,7 +796,7 @@ func (a *application) windowSendGrantLiveLocked(g *windowSendGrant) bool {
 // a grant exists for the session but not for this (Save As elsewhere, or the
 // workspace no longer holds the connection).
 func (a *application) remoteBrowserGrant(r *http.Request, session, action, path string) (*windowSendGrant, error) {
-	if !a.windowSendAvailable() || terminalRequestView(r) != "" || editorRequestView(r) != "" || a.views == nil || a.terminals == nil {
+	if !a.windowSendRemoteAvailable() || terminalRequestView(r) != "" || editorRequestView(r) != "" || a.views == nil || a.terminals == nil {
 		return nil, nil
 	}
 	grant := a.windowSendGrantFor(session, path)
@@ -748,6 +986,21 @@ func (a *application) handleWindowSend(w http.ResponseWriter, r *http.Request, k
 		http.NotFound(w, r)
 		return
 	}
+	if strings.TrimPrefix(r.URL.Path, windowSendPrefix) == "activation" {
+		// A detached window's own process (window_raise.go), from its start:
+		// a Terminal window asks before its page has reported that it is ready.
+		if r.Method != http.MethodGet {
+			methodError(w)
+			return
+		}
+		if !windowSendChild(key) {
+			http.NotFound(w, r)
+			return
+		}
+		raise, allow := a.windowSendActivationWait(r.Context(), key)
+		jsonResponse(w, http.StatusOK, map[string]any{"raise": raise, "allow": allow})
+		return
+	}
 	if !a.windowSendAlive(key) {
 		jsonError(w, http.StatusGone, "This window is closing.")
 		return
@@ -783,7 +1036,7 @@ func (a *application) handleWindowSend(w http.ResponseWriter, r *http.Request, k
 			jsonError(w, http.StatusBadRequest, "Send text to a terminal or the Text Editor.")
 			return
 		}
-		id, name, status, err := a.windowSendEnqueue(key, body)
+		id, name, status, err := a.windowSendEnqueue(r.Context(), key, body)
 		if err != nil {
 			jsonError(w, status, err.Error())
 			return

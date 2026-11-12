@@ -231,20 +231,5 @@ func TestWindowSendRefusesWhatTheWindowDoesNotHold(t *testing.T) {
 	}
 }
 
-func TestWindowSendIsMainEngineOnly(t *testing.T) {
-	a := testApplication(t)
-	a.windowMode = "terminal"
-	if r := requestApp(a, "GET", "/api/window-send/inbox", "", true); r.Code != http.StatusNotFound {
-		t.Fatalf("a standalone engine served window send: %d", r.Code)
-	}
-	if r := requestApp(a, "GET", "/api/window-send/inbox", "", false); r.Code != http.StatusUnauthorized {
-		t.Fatalf("window send without a token: %d", r.Code)
-	}
-	// The peer routes stay closed to child windows.
-	f := newWindowSendFixture(t)
-	for _, token := range []string{f.terminalToken, f.editorTok} {
-		if r := viewTestRequest(f.app, token, "GET", "/api/peer-send/targets", nil, nil); r.Code != http.StatusForbidden {
-			t.Fatalf("a child window reached peer send: %d %s", r.Code, r.Body.String())
-		}
-	}
-}
+// Window send now runs in the standalone apps' engines too (v1.21.50):
+// TestWindowSendInEveryEngineAndPeerSendOnlyForStandaloneWindows.

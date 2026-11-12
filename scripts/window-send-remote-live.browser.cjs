@@ -62,6 +62,27 @@ const pass=text=>console.log('PASS '+text);
   pass('the main window saved the remote file with its own save path');
   // The workspace still cannot write anything itself.
   await assert.rejects(term.evaluate(id=>NetworkToolkitTerminalSFTP.request(id,'write-text',{path:'startup.cfg',content:'x'}),session),/read-only/);
+
+  // ---- Owner decision (v1.21.50): the main window is closed; Edit reopens it and opens the file there ----
+  await main.context().close();main=null;
+  fs.writeFileSync(E.NTK_WINDOW_MAIN_CLOSED,'closed');
+  for(let i=0;fs.existsSync(E.NTK_WINDOW_MAIN_CLOSED);i++){assert(i<100,'the engine never saw the main window close');await new Promise(r=>setTimeout(r,100));}
+  await term.evaluate(()=>{const stack=document.querySelector('#toastStack');if(stack)stack.innerHTML='';});
+  // startup.cfg is still the selected file in the workspace's SFTP browser.
+  await term.locator('#terminalSidebarSFTP [data-tsftp="edit"]').click();
+  // The engine asks for the main window (the native host reopens it; here the Go test says so).
+  let reopened=false;for(let i=0;i<150&&!reopened;i++){reopened=fs.existsSync(E.NTK_WINDOW_MAIN_REOPEN);if(!reopened)await new Promise(r=>setTimeout(r,100));}
+  assert(reopened,'Edit did not ask for the closed main window');
+  await toast(term,'Opening the main window to edit startup.cfg');
+  main=await window('/',E.NTK_WINDOW_MAIN_TOKEN,'reopened main window',()=>window.__networkToolkitStartupState===1&&online);
+  await toast(term,'Opened startup.cfg in the Text Editor of Main window.');
+  await main.waitForFunction(()=>state.activePage==='editor'&&NetworkToolkitFileEditor.active?.path?.endsWith('startup.cfg')&&!NetworkToolkitFileEditor.active.loading);
+  assert.match(await main.evaluate(()=>NetworkToolkitFileEditor.active.content),/banner edited-in-main/,'the reopened main window shows the saved file');
+  assert.equal(await main.evaluate(()=>NetworkToolkitFileEditor.active.binding?.kind),'terminal');
+  await shot(main,'reopened');
+  pass('With the main window closed, Edit in the workspace reopened it and opened the remote file there');
+  // The same grant rules: only that path, never a save elsewhere.
+  await assert.rejects(main.evaluate(id=>api('/remote-browser','POST',{protocol:'ssh',sessionId:id,action:'read-text',path:'other.cfg'}),session),/./);
   assert.deepEqual(errors,[]);
   console.log('window-send-remote-live: OK');
  }catch(error){

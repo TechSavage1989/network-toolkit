@@ -1,3 +1,7 @@
+## 1.21.50 Beta 1 - Pop-out limits resolved
+
+- Send to brings the receiving window forward; hand-over keeps undo history for page-held tabs; popped-out windows of the separate apps can send to the other app; SFTP Edit from a popped-out Terminal reopens a closed main window.
+
 ## 1.21.49 Beta 1 - Popped-out windows are the separate programs, still connected
 
 - Detached Text Editor and Terminal windows start from the separate programs (own icon and taskbar name) and stay connected to the main window's engine.

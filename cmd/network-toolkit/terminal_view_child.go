@@ -127,6 +127,12 @@ func terminalViewChildArguments(noBrowser bool) []string {
 // bounds the decision to start, not the child's lifetime. The owner observes
 // the returned buffered completion channel for crash recovery.
 func launchDetachedTerminal(ctx context.Context, launch terminalViewLaunch) (<-chan error, error) {
+	return launchDetachedTerminalWith(ctx, launch, nil)
+}
+
+// launchDetachedTerminalWith is launchDetachedTerminal that also reports the
+// started process's identifier (window_raise.go).
+func launchDetachedTerminalWith(ctx context.Context, launch terminalViewLaunch, started func(int)) (<-chan error, error) {
 	raw, err := encodeTerminalViewLaunch(launch)
 	if err != nil {
 		return nil, err
@@ -142,10 +148,14 @@ func launchDetachedTerminal(ctx context.Context, launch terminalViewLaunch) (<-c
 	// The checked program stays held (readable only) until it has started.
 	defer held()
 	cmd := exec.Command(executable, terminalViewChildArguments(launch.NoBrowser)...)
-	return startTerminalViewChild(ctx, cmd, raw)
+	return startTerminalViewChildNotify(ctx, cmd, raw, started)
 }
 
 func startTerminalViewChild(ctx context.Context, cmd *exec.Cmd, bootstrap []byte) (<-chan error, error) {
+	return startTerminalViewChildNotify(ctx, cmd, bootstrap, nil)
+}
+
+func startTerminalViewChildNotify(ctx context.Context, cmd *exec.Cmd, bootstrap []byte, started func(int)) (<-chan error, error) {
 	if ctx == nil {
 		clear(bootstrap)
 		return nil, errors.New("the detached Terminal launch context is unavailable")
@@ -162,6 +172,9 @@ func startTerminalViewChild(ctx context.Context, cmd *exec.Cmd, bootstrap []byte
 	if err := cmd.Start(); err != nil {
 		clear(bootstrap)
 		return nil, fmt.Errorf("start the detached Terminal window: %w", err)
+	}
+	if started != nil && cmd.Process != nil {
+		started(cmd.Process.Pid)
 	}
 	done := make(chan error, 1)
 	go func() {
@@ -358,10 +371,14 @@ func runDetachedTerminalView(input io.Reader, noBrowser bool) error {
 	if noBrowser || launch.NoBrowser {
 		<-ctx.Done()
 	} else {
+		// The owner says when this window takes text and comes forward.
+		activate := make(chan struct{}, 1)
+		go watchWindowActivation(ctx, launch.OwnerHost, launch.ViewToken, activate)
 		err = desktop.Run(ctx, desktop.Config{
 			Title: launch.Title, URL: "http://" + launch.OwnerHost + "/terminal-view/" + launch.ViewID,
 			IconResource: desktop.IconTerminal,
 			SessionToken: launch.ViewToken,
+			Activate:     activate,
 			DataDir:      launch.DataDir, Stop: cancel,
 		})
 	}

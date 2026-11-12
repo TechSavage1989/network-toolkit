@@ -218,9 +218,36 @@ not compile.
   review, warnings and bracketed paste; `newDocument`/`insertText`/
   `pickInsert`) behind `blocked()` before and immediately before the change;
   its paste is then checked by `withTerminalOwner` like any input. Text only,
-  no Enter. Only the main Toolkit engine offers it (`windowSendAvailable`);
-  standalone apps' windows keep their refusal, and child windows still have no
-  peer routes (`/api/peer-send/` is refused to view tokens).
+  no Enter. Every engine with windows offers it (`windowSendAvailable`; in
+  the standalone apps only their detached windows poll it, to receive peer
+  text); remote Edit is the main engine's only (`windowSendRemoteAvailable`).
+  The window that took the text or the file comes to the front
+  (`window_raise.go`): the engine keeps each detached window's process id
+  from launching it (`trackWindowProcess`), allows only that process
+  (AllowSetForegroundWindow) and tells the child through
+  `GET /api/window-send/activation` (its own view token) to raise its native
+  window (`desktop.Config.Activate`); a sending child is told to allow the
+  receiver's process. Never on a refusal.
+- **Detached windows of a standalone app and peer send** (owner decision,
+  v1.21.50): child windows reach peer send only through their owner engine. A
+  Terminal window of the standalone Terminal or a Text Editor window of the
+  standalone Text Editor sends with its view token to the owner's
+  `/api/peer-send/` sending routes (`handleChildPeerSend`); the owner sends
+  with every peer-send rule (receiver order, probing, the probed instance
+  pinned, protected records, size limits, `launchPeerApp`, guards), keeps
+  what each window was shown separately and lets only the sending window read
+  its result. The children of the main Toolkit window are refused, and no
+  `/api/peer/` route is served to a child. A receiving engine also lists and
+  takes the sessions and documents of its detached windows, and text for one
+  of them goes to that window through window send.
+- **Edit with the main window closed** (owner decision, v1.21.50): Edit in a
+  detached workspace's SFTP browser reopens the main window
+  (`activatePrimary`) and waits up to 20 seconds for its page before the
+  grant is made as before.
+- **Undo history in the hand-over** (owner decision, v1.21.50): page-held tabs
+  carry their undo and redo history within the request's 8 MiB; disk-backed
+  tabs and history that does not fit move without it, and the main window
+  says which tabs did.
 - **Peer send** trusts protected records only, by their protection, not by a
   file name; `peerForegroundPID` takes the PID from such a record whichever
   program wrote it. Older versions' records (plain Terminal records, engines
@@ -507,6 +534,15 @@ folder>`) is per folder, so all three programs of a folder share it.
 
 ## Known limits
 
+- **Coming to the front is up to Windows.** A receiving window is allowed to
+  come forward and asks to; when the sending process does not hold the
+  foreground right itself (for example another program was clicked in
+  between), Windows flashes the taskbar button instead. Not verified on a
+  physical Windows desktop by the hosted checks.
+- **Undo history of large documents.** A disk-backed (large) tab handed over
+  to the Text Editor app moves without its undo history: the history is the
+  main engine's edit buffer, which cannot be rebuilt exactly in another
+  engine. The main window says so.
 - **Open windows are found by data root.** The updater's "close these first"
   check looks for the separate Text Editor and Terminal windows of the data
   root, not of the program folder. A Terminal of the same data root opened

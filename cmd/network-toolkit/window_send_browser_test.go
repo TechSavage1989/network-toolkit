@@ -112,7 +112,7 @@ func TestWindowSendBrowser(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	go func() {
-		ticker := time.NewTicker(time.Second)
+		ticker := time.NewTicker(200 * time.Millisecond) // as promptly as a native child pulses
 		defer ticker.Stop()
 		for {
 			launchMu.Lock()
@@ -162,6 +162,19 @@ func TestWindowSendBrowser(t *testing.T) {
 	defer launchMu.Unlock()
 	if terminalLaunch.ViewToken == "" || editorToken == "" {
 		t.Fatal("the main page did not open the Terminal and Text Editor windows")
+	}
+	// Owner decision (v1.21.50): each window that took text was told to come
+	// to the front (its native host would collect this; Chromium has none):
+	// the Terminal window, and the main window through its own activation.
+	a.windowSend.mu.Lock()
+	act := a.windowSend.activations[windowSendTerminal+terminalLaunch.ViewID]
+	raised := act != nil && !act.raiseAt.IsZero()
+	a.windowSend.mu.Unlock()
+	if !raised {
+		t.Fatal("the Terminal window that took text was never told to come to the front")
+	}
+	if len(a.windowActivate) == 0 {
+		t.Fatal("the main window that took text was never raised")
 	}
 	for _, secret := range []string{a.token, terminalLaunch.ViewToken, editorToken} {
 		if bytes.Contains(output, []byte(secret)) {

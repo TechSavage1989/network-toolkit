@@ -33,12 +33,14 @@ const MAX_CHARS=8*1024*1024,PEER_MAX_BYTES=8*1024*1024;
 let pending=null,sequence=0;
 const g=name=>{try{return root[name];}catch{return undefined;}};
 function editor(){return root.NetworkToolkitFileEditor;}
-// The standalone Terminal sends to the standalone Text Editor app instead.
-function peer(){try{if(typeof TERMINAL_WINDOW==='undefined'||!TERMINAL_WINDOW)return null;}catch{return null;}const p=root.NetworkToolkitPeerSend;return p?.sender?.()==='terminal'?p:null;}
 function detached(){try{return typeof DETACHED_TERMINAL!=='undefined'&&DETACHED_TERMINAL===true;}catch{return false;}}
+// The standalone Terminal sends to the standalone Text Editor app instead, and
+// so does a Terminal window popped out of it (through the standalone
+// Terminal's engine, peer-send.js startSender).
+function peer(){try{if(typeof TERMINAL_WINDOW==='undefined'||!TERMINAL_WINDOW&&!detached())return null;}catch{return null;}const p=root.NetworkToolkitPeerSend;return p?.sender?.()==='terminal'?p:null;}
 // The other windows of this Toolkit (main window and its detached windows), when its engine offers them.
 function across(){const w=root.NetworkToolkitWindowSend;return w?.enabled?.()&&(detached()||w.kind?.()==='main')?w:null;}
-function unavailable(){try{if(detached())return across()?'':'Use the main window to send output to the Text Editor.';if(typeof TERMINAL_ONLY!=='undefined'&&TERMINAL_ONLY)return peer()?'':'The Text Editor is not available in this window.';}catch{}return editor()?.insertText?'':'The Text Editor is not available.';}
+function unavailable(){try{if(detached())return peer()||across()?'':'Use the main window to send output to the Text Editor.';if(typeof TERMINAL_ONLY!=='undefined'&&TERMINAL_ONLY)return peer()?'':'The Text Editor is not available in this window.';}catch{}return editor()?.insertText?'':'The Text Editor is not available.';}
 function escapeHTML(value){return String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);}
 function lines(text){return text?(text.match(/\r\n|\r|\n/g)||[]).length+(/[\r\n]$/.test(text)?0:1):0;}
 function describe(text){const n=lines(text);return n.toLocaleString()+(n===1?' line':' lines')+' · '+text.length.toLocaleString()+' characters';}

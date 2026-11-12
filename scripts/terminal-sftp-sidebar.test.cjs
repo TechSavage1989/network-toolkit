@@ -29,7 +29,7 @@ function harness(options={}){
   openModal:(title,body,footer)=>{document.getElementById('testModal').innerHTML=body+footer;notes.push(['modal',title]);},
   closeModal:()=>{document.getElementById('testModal').innerHTML='';}
  };
- if(options.native)root.__networkToolkitNativeSession='b'.repeat(64);if(options.detached)root.DETACHED_TERMINAL=true;if(options.workspace){root.DETACHED_WORKSPACE=true;root.opened=[];root.NetworkToolkitWindowSend={enabled:()=>options.workspace!=='off',openRemote:async request=>{root.opened.push({...request});return {ok:true};}};}
+ if(options.native)root.__networkToolkitNativeSession='b'.repeat(64);if(options.detached)root.DETACHED_TERMINAL=true;if(options.workspace){root.DETACHED_WORKSPACE=true;root.opened=[];root.status={windowSendRemote:options.remote!==false};root.NetworkToolkitWindowSend={enabled:()=>options.workspace!=='off',openRemote:async request=>{root.opened.push({...request});return {ok:true};}};}
  root.globalThis=root;root.window=root;vm.createContext(root);if(options.bridge)vm.runInContext(nativeSource,root);vm.runInContext(source,root);
  const pointer=(type,target,extra={})=>new PointerEvent(type,{target,...extra});
  const emit=(type,target,extra={})=>{const event=pointer(type,target,extra);for(const listener of document.listeners[type]||[])listener(event);return event;};
@@ -143,10 +143,15 @@ test('a detached workspace offers Edit, which opens the file in the main window,
  await h.api.editor(true);assert.equal(h.root.opened.length,1,'no new remote file is created from a detached window');
  for(const action of ['write-text','upload','remove'])await assert.rejects(h.api.request(h.entry.info.id,action,{path:'./startup.cfg'}),/read-only/);
  assert.equal(h.calls.some(x=>x[2]?.action==='write-text'),false,'the detached window itself never writes');
- // Without window send (a standalone Terminal's workspace), Edit is not offered.
+ // Without window send, Edit is not offered.
  const off=await ready({detached:true,workspace:'off',native:true,bridge:true});
  assert.deepEqual(off.panel.querySelectorAll('[data-tsftp]').map(button=>button.dataset.tsftp),['up','home','root','refresh','preview']);
  await off.api.editor();assert.deepEqual(off.root.opened,[]);
+ // A standalone Terminal's workspace (v1.21.50): window send runs there to
+ // receive text, but there is no main window's Text Editor, so no Edit.
+ const standalone=await ready({detached:true,workspace:true,remote:false,native:true,bridge:true});
+ assert.deepEqual(standalone.panel.querySelectorAll('[data-tsftp]').map(button=>button.dataset.tsftp),['up','home','root','refresh','preview']);
+ await standalone.api.editor();assert.deepEqual(standalone.root.opened,[]);
 });
 test('detached read-only sidebar rejects write requests and incoming file drops without advertising a drop target',async()=>{
  const h=await ready({detached:true,native:true}),list=h.panel.querySelector('[data-tsftp-list]'),before=h.calls.length;

@@ -19,7 +19,9 @@ const more=JSON.parse(process.env.NTK_PEER_MORE||'null');
 // Where a send can start the other app, a wait must outlast the engine's bound on that start
 // (peerLaunchWait), so a slow start ends in its own answer instead of this script's time limit.
 const startBound=Number(process.env.NTK_PEER_LAUNCH_WAIT_MS||25000)+10000;
-const checks=[],errors=[];
+const checks=[],errors=[],extra=[];
+// Every toast a page showed, so a failure names a refusal that has already faded (CI timing findings).
+const recordToasts=()=>{window.__toastLog=[];addEventListener("DOMContentLoaded",()=>{const stack=document.getElementById("toastStack");if(stack)new MutationObserver(()=>{for(const n of stack.querySelectorAll(".toast"))if(!n.__logged){n.__logged=true;window.__toastLog.push(n.textContent);}}).observe(stack,{childList:true});});};
 const pass=text=>{checks.push(text);console.log('PASS '+text);};
 (async()=>{
  assert(terminalURL&&terminalToken&&editorURL&&editorToken&&session&&more?.main&&more?.start,'run through go test (TestStandalonePeerSendBrowser)');
@@ -30,7 +32,7 @@ const pass=text=>{checks.push(text);console.log('PASS '+text);};
   page.on('pageerror',error=>errors.push(name+': '+error.message));
   // Only loopback requests to this app's own engine are allowed.
   await page.route('**/*',route=>new URL(route.request().url()).origin===url?route.continue():route.abort());
-  await page.addInitScript(value=>{window.__networkToolkitNativeSession=value;},token);
+  await page.addInitScript(value=>{window.__networkToolkitNativeSession=value;},token);await page.addInitScript(recordToasts);
   await page.goto(url+'/');await page.waitForFunction(()=>window.__networkToolkitStartupState===1&&online);
   return page;
  }
@@ -124,6 +126,85 @@ const pass=text=>{checks.push(text);console.log('PASS '+text);};
   const submitTerminal=page=>page.locator('#modalRoot button[type="submit"][form="editorSendTerminalForm"]').click();
   const submitEditor=page=>page.locator('#modalRoot button[type="submit"][form="terminalSendEditorForm"]').click();
   const ready=(page,id)=>page.waitForFunction(id=>terminalSessions.get(id)?.info.state==='connected'&&currentTerminal()?.info.id===id&&terminalEntryAcceptsInput(currentTerminal()),id);
+  const clearToasts=page=>page.evaluate(()=>{const stack=document.querySelector('#toastStack');if(stack)stack.innerHTML='';});
+
+  // ---- Popped-out windows of the standalone apps (owner decision, v1.21.50) ----
+  // A window popped out of a standalone app sends exactly as that app's own window, through its
+  // owner engine, and text for a session or a document it holds reaches it there.
+  {
+   const launched=async file=>{for(let i=0;i<100;i++){try{return JSON.parse(fs.readFileSync(file,'utf8'));}catch{await new Promise(r=>setTimeout(r,100));}}return null;};
+   async function child(url,pathname,token,label,isReady){
+    const context=await browser.newContext({viewport:{width:1280,height:800}}),page=await context.newPage();page.setDefaultTimeout(20000);
+    page.on('pageerror',error=>errors.push(label+': '+error.message));
+    await page.route('**/*',route=>new URL(route.request().url()).origin===url?route.continue():route.abort());
+    await page.addInitScript(value=>{window.__networkToolkitNativeSession=value;},token);await page.addInitScript(recordToasts);
+    await page.goto(url+pathname);await page.waitForFunction(isReady);
+    extra.push([label,page]);return page;
+   }
+   // The standalone Terminal pops its workspace out with its own code.
+   await terminal.evaluate(()=>detachTerminalWorkspace());
+   const tl=await launched(process.env.NTK_PEER_TERMINAL_LAUNCH);
+   assert(tl?.view&&tl?.token,'the standalone Terminal started its Terminal window');
+   const popTerm=await child(terminalURL,'/terminal-view/'+tl.view,tl.token,'Terminal window of the standalone Terminal',()=>typeof terminalDetachedReady!=='undefined'&&terminalDetachedReady&&online);
+   await ready(popTerm,session);
+   assert.equal(await popTerm.evaluate(()=>NetworkToolkitPeerSend.sender()+':'+NetworkToolkitWindowSend.kind()+':'+NetworkToolkitWindowSend.enabled()),'terminal:terminal:true');
+   // Text Editor (its own window) -> the session in the Terminal window.
+   await clearToasts(editor);
+   await editor.locator('#networkToolkitFileEditor [data-ed="new"]').first().click();
+   await editorText(editor).fill('show inventory\n');await editorText(editor).evaluate(el=>{el.focus();el.setSelectionRange(0,14);});
+   for(let attempt=0;;attempt++){await sendButton(editor).click();await editor.locator('#editorSendTerminalForm,[data-editor-send-peer-missing]').first().waitFor();if(await editor.locator('#editorSendTarget option[value="'+session+'"]').count())break;assert(attempt<20,'the Terminal window\'s session was never listed');await editor.evaluate(()=>closeModal());await editor.waitForTimeout(400);}
+   await submitTerminal(editor);
+   await toast(editor,'Sent to '+name+' in Network Toolkit Terminal.');
+   await screen(popTerm,/lab-switch-01# show inventory$/);
+   assert.equal(await popTerm.locator('#terminalPasteForm').count(),0,'one line needs no review');
+   pass('Popped-out Terminal window of the standalone Terminal: a line from the Text Editor reached its session through its own paste path, with no Enter');
+   await shot(popTerm,'popped-terminal');
+   await popTerm.evaluate(()=>currentTerminal().xterm.focus());await popTerm.keyboard.press('Enter');
+   await screen(popTerm,/synthetic reply to show inventory/);
+   // The Terminal window -> a new document in the Text Editor, through the standalone Terminal's engine.
+   assert.equal(await selectLine(popTerm,'synthetic reply to show inventory'),'synthetic reply to show inventory');
+   const documents=await editor.evaluate(()=>NetworkToolkitFileEditor.listDocuments().length);
+   await toEditorDialog(popTerm,session);
+   assert.equal(await popTerm.locator('#terminalSendEditorForm fieldset legend').nth(1).textContent(),'To Network Toolkit Text Editor');
+   await popTerm.locator('[name="terminalSendSource"][value="selection"]').check();await popTerm.locator('[name="terminalSendTarget"][value="new"]').check();
+   await submitEditor(popTerm);
+   await toast(popTerm,'Sent to a new document in Network Toolkit Text Editor.');
+   await editor.waitForFunction(n=>NetworkToolkitFileEditor.listDocuments().length===n+1,documents);
+   await editor.waitForFunction(()=>document.querySelector('#networkToolkitFileEditor [data-ed-text]').value==='synthetic reply to show inventory');
+   pass('Popped-out Terminal window of the standalone Terminal: its Send to Text Editor reached a new document of the Text Editor app');
+   // The Text Editor pops its active tab out into a window of its own.
+   await editor.waitForFunction(()=>NetworkToolkitEditorWindows.state.enabled===true);
+   const uid=await editor.evaluate(()=>NetworkToolkitFileEditor.active.uid);
+   for(let attempt=0;;attempt++){const error=await editor.evaluate(uid=>NetworkToolkitEditorWindows.move([uid],'new').then(()=>'',e=>e.message),uid);if(!error)break;assert(/Wait for the current/.test(error)&&attempt<40,error);await editor.waitForTimeout(100);}
+   const el=await launched(process.env.NTK_PEER_EDITOR_LAUNCH);
+   assert(el?.view&&el?.token,'the standalone Text Editor started its Text Editor window');
+   const popEd=await child(editorURL,'/editor-view/'+el.view,el.token,'Text Editor window of the standalone Text Editor',()=>online&&NetworkToolkitFileEditor.listDocuments().length===1);
+   assert.equal(await popEd.evaluate(()=>NetworkToolkitPeerSend.sender()+':'+NetworkToolkitWindowSend.kind()),'editor:editor');
+   // The Text Editor window -> the session in the Terminal window.
+   await editorText(popEd).fill('show users\n');await editorText(popEd).evaluate(el=>{el.focus();el.setSelectionRange(0,10);});
+   for(let attempt=0;;attempt++){await sendButton(popEd).click();await popEd.locator('#editorSendTerminalForm,[data-editor-send-peer-missing]').first().waitFor();if(await popEd.locator('#editorSendTarget option[value="'+session+'"]').count())break;assert(attempt<20,'the Text Editor window never listed the session');await popEd.evaluate(()=>closeModal());await popEd.waitForTimeout(400);}
+   assert.equal(await popEd.locator('#editorSendTarget optgroup').getAttribute('label'),'Network Toolkit Terminal');
+   await submitTerminal(popEd);
+   await toast(popEd,'Sent to '+name+' in Network Toolkit Terminal.');
+   await screen(popTerm,/lab-switch-01# show users$/);
+   pass('Popped-out Text Editor window of the standalone Text Editor: its Send to terminal reached the session in the Terminal window');
+   await shot(popEd,'popped-editor');
+   await popTerm.evaluate(()=>currentTerminal().xterm.focus());await popTerm.keyboard.press('Enter');
+   await screen(popTerm,/synthetic reply to show users/);
+   // The Terminal window -> the document held by the Text Editor window.
+   const held=await popEd.evaluate(()=>NetworkToolkitFileEditor.listDocuments()[0].uid);
+   await selectLine(popTerm,'synthetic reply to show users');
+   await clearToasts(popTerm);
+   await toEditorDialog(popTerm,session);
+   await popTerm.locator('[name="terminalSendSource"][value="selection"]').check();await popTerm.locator('[name="terminalSendTarget"][value="existing"]').check();
+   await popTerm.locator('#terminalSendDocument').selectOption(held);await popTerm.locator('#terminalSendWhere').selectOption('end');
+   await submitEditor(popTerm);
+   await toast(popTerm,'in Network Toolkit Text Editor.');
+   await popEd.waitForFunction(()=>document.querySelector('#networkToolkitFileEditor [data-ed-text]').value==='show users\nsynthetic reply to show users');
+   pass('Popped-out windows of both apps: terminal text reached the document that the Text Editor window holds');
+   for(const [page,other] of [[popTerm,editorToken],[popEd,terminalToken]])assert.equal(await page.evaluate(token=>document.documentElement.outerHTML.includes(token),other),false);
+   assert.deepEqual(errors,[]);
+  }
 
   // ---- Only the main Toolkit window runs (the standalone apps here are senders, not registered) ----
   {
@@ -191,6 +272,33 @@ const pass=text=>{checks.push(text);console.log('PASS '+text);};
     await shot(main,'main-only-editor-received');
     pass('Only the main window runs: the Terminal app\'s selected text arrived in a new document and through the Insert here bar of the main window\'s Text Editor');
     for(const [page,tokens] of [[main,[M.editor.token,M.terminal.token]],[ed,[M.main.token,M.terminal.token]],[term,[M.main.token,M.editor.token]]])for(const token of tokens)assert.equal(await page.evaluate(token=>document.documentElement.outerHTML.includes(token)||JSON.stringify(state).includes(token),token),false);
+    // Owner decision (v1.21.50): the main window pops its session out and closes; the engine runs on
+    // for that Terminal window, which still receives the Text Editor app's text through its paste path.
+    {
+     await main.evaluate(()=>navigate('terminal'));
+     await main.evaluate(id=>detachTerminal(terminalSessions.get(id)),M.main.session);
+     let launch=null;for(let i=0;i<100&&!launch;i++){try{launch=JSON.parse(fs.readFileSync(process.env.NTK_PEER_MAIN_LAUNCH,'utf8'));}catch{await new Promise(r=>setTimeout(r,100));}}
+     assert(launch?.view&&launch?.token,'the main window started its Terminal window');
+     const context=await browser.newContext({viewport:{width:1280,height:800}}),pop=await context.newPage();pop.setDefaultTimeout(20000);
+     pop.on('pageerror',error=>errors.push('main window\'s Terminal window: '+error.message));
+     await pop.route('**/*',route=>new URL(route.request().url()).origin===M.main.url?route.continue():route.abort());
+     await pop.addInitScript(value=>{window.__networkToolkitNativeSession=value;},launch.token);
+     await pop.goto(M.main.url+'/terminal-view/'+launch.view);await pop.waitForFunction(()=>typeof terminalDetachedReady!=='undefined'&&terminalDetachedReady&&online);
+     await ready(pop,M.main.session);
+     await main.context().close();
+     fs.writeFileSync(process.env.NTK_PEER_MAIN_CLOSED,'closed');
+     for(let i=0;fs.existsSync(process.env.NTK_PEER_MAIN_CLOSED);i++){assert(i<100,'the engine never saw the main window close');await new Promise(r=>setTimeout(r,100));}
+     await clearToasts(ed);
+     await editorText(ed).fill('show users\n');await editorText(ed).evaluate(el=>{el.focus();el.setSelectionRange(0,10);});
+     for(let attempt=0;;attempt++){await sendButton(ed).click();await ed.locator('#editorSendTerminalForm,[data-editor-send-peer-missing]').first().waitFor();if(await ed.locator('#editorSendTarget option[value="'+M.main.session+'"]').count())break;assert(attempt<20,'the Terminal window of the closed main window was never listed');await ed.evaluate(()=>closeModal());await ed.waitForTimeout(400);}
+     assert.equal(await ed.locator('#editorSendTarget optgroup').getAttribute('label'),'Network Toolkit');
+     await submitTerminal(ed);
+     await toast(ed,'in Network Toolkit.');
+     await screen(pop,/lab-switch-01# show users$/);
+     assert.equal(await pop.locator('#terminalPasteForm').count(),0,'one line needs no review');
+     await shot(pop,'main-closed-terminal-window');
+     pass('Only the main engine runs, its main window closed: the Text Editor app\'s line reached the session in its popped-out Terminal window');
+    }
    }catch(error){try{for(const [name,page] of [['main',main],['editor',ed],['terminal',term]]){console.error(name+' window (main only): '+JSON.stringify(await page.evaluate(()=>({page:state.activePage,modal:document.querySelector('#modalTitle')?.textContent||'',toasts:[...document.querySelectorAll('#toastStack .toast')].map(n=>n.textContent)}))));if(output)await page.screenshot({path:path.join(output,'standalone-peer-live-failure-main-only-'+name+'.png')});}}catch{}throw error;}
   }
 
@@ -237,6 +345,6 @@ const pass=text=>{checks.push(text);console.log('PASS '+text);};
    }catch(error){try{for(const [name,page] of [['terminal',term],['editor',ed]]){console.error(name+' window (start): '+JSON.stringify(await page.evaluate(()=>({page:state.activePage,modal:document.querySelector('#modalTitle')?.textContent||'',toasts:[...document.querySelectorAll('#toastStack .toast')].map(n=>n.textContent)}))));if(output)await page.screenshot({path:path.join(output,'standalone-peer-live-failure-start-'+name+'.png')});}}catch{}throw error;}
   }
   assert.deepEqual(errors,[]);
- }catch(error){await describe();throw error;}finally{await browser.close();}
+ }catch(error){await describe();for(const [name,page] of [["Terminal app",terminal],["Text Editor app",editor],...extra]){try{if(page)console.error(name+" toasts: "+JSON.stringify(await page.evaluate(()=>window.__toastLog||[])));}catch{}}throw error;}finally{await browser.close();}
  console.log(JSON.stringify({passed:true,checks:checks.length}));
 })().catch(error=>{console.error(error);console.error(JSON.stringify(errors));process.exit(1);});
