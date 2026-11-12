@@ -63,31 +63,10 @@ const (
 	editorRegDocumentIcon = 3
 )
 
-// The separate Text Editor program's own Open with entry
-// (EDITOR_APPLICATION_KEY in windows.nsi): its file name, its icon 0 (the APP
-// group of that program) and its own command (editorRegEditorCommand).
-const (
-	editorRegEditorFile        = editorProgramWindows // EDITOR_FILENAME
-	editorRegEditorApplication = editorRegApplications + `\` + editorRegEditorFile
-	editorRegEditorProgramIcon = 0
-)
-
 // The command every registration starts the Text Editor with: the program, the
 // mode and the file as the one quoted value of --open-file (EDITOR_COMMAND).
 func editorRegCommand(exe string) string {
 	return `"` + exe + `" ` + editorRegArgs + ` --open-file "%1"`
-}
-
-// The command of the separate Text Editor program's Open with entry
-// (EDITOR_PROGRAM_COMMAND): that program opens the Text Editor without a mode
-// switch, and the file is again the one quoted value of --open-file.
-func editorRegEditorCommand(program string) string {
-	return `"` + program + `" --open-file "%1"`
-}
-
-// The separate Text Editor program beside a copy's Network_Toolkit.exe.
-func editorRegEditorProgram(exe string) string {
-	return editorRegJoin(editorRegDir(exe), editorRegEditorFile)
 }
 
 func editorRegIcon(exe string, index int) string {
@@ -153,11 +132,6 @@ type editorRegistrationStatus struct {
 	NeedsTakeover    bool   `json:"needsTakeover"`
 	CanRemove        bool   `json:"canRemove"`
 	Message          string `json:"message"`
-	// EditorProgram is the separate Text Editor program beside this copy that
-	// a registration also offers under its own name in Open with: present,
-	// of this version, and changeable only by this user and the system
-	// (editorRegPlatform.separate). Empty when there is none.
-	EditorProgram string `json:"editorProgram,omitempty"`
 }
 
 var (
@@ -418,9 +392,6 @@ func editorRegStatus(p editorRegPlatform, exe string) (editorRegistrationStatus,
 			break
 		}
 	}
-	if status.CanRegister && p.separate != nil {
-		status.EditorProgram = p.separate(exe)
-	}
 	return status, nil
 }
 
@@ -586,28 +557,11 @@ func planEditorRegister(reg editorRegistry, status editorRegistrationStatus, con
 	if err != nil {
 		return nil, err
 	}
-	// The separate Text Editor program's own Open with entry, by the same
-	// rules, when that program is beside this copy (status.EditorProgram).
-	// Without it, an entry this registration (or the replaced one) recorded
-	// and that still starts its program is taken back.
-	editorCommand, editorFound, _, err := reg.String(editorRegEditorApplication+`\shell\open\command`, "")
-	if err != nil {
-		return nil, err
-	}
-	editorExists, err := editorRegExists(reg, editorRegEditorApplication)
-	if err != nil {
-		return nil, err
-	}
-	editorPrevious := editorFound && (editorCommand == editorRegEditorCommand(editorRegEditorProgram(exe)) || (previous != "" && editorCommand == editorRegEditorCommand(editorRegEditorProgram(previous))))
-	ownEditorApplication := status.EditorProgram != "" && (!editorExists || (editorFound && (editorRegStartsWith(editorCommand, status.EditorProgram) || editorPrevious)))
 	if ownApplication {
 		plan.dword(editorRegPortableKeys, `Applications\`+editorRegAppFile, 1)
-	}
-	if ownEditorApplication {
-		plan.dword(editorRegPortableKeys, `Applications\`+editorRegEditorFile, 1)
-	}
-	if (ownApplication || ownEditorApplication) && !applicationsExists {
-		plan.dword(editorRegPortableKeys, "Applications", 1)
+		if !applicationsExists {
+			plan.dword(editorRegPortableKeys, "Applications", 1)
+		}
 	}
 	allFiles, err := editorRegExists(reg, editorRegAllFiles)
 	if err != nil {
@@ -644,15 +598,6 @@ func planEditorRegister(reg editorRegistry, status editorRegistrationStatus, con
 		plan.str(editorRegApplication+`\DefaultIcon`, "", editorRegIcon(exe, editorRegEditorIcon))
 		plan.str(editorRegApplication+`\shell\open\command`, "", command)
 	}
-	switch {
-	case ownEditorApplication:
-		plan.str(editorRegEditorApplication, "FriendlyAppName", editorRegAppName)
-		plan.str(editorRegEditorApplication+`\DefaultIcon`, "", editorRegIcon(status.EditorProgram, editorRegEditorProgramIcon))
-		plan.str(editorRegEditorApplication+`\shell\open\command`, "", editorRegEditorCommand(status.EditorProgram))
-	case status.EditorProgram == "" && editorPrevious && records[`Applications\`+editorRegEditorFile]:
-		planEditorRemoveApplication(&plan, editorRegEditorApplication)
-		plan.del(editorRegPortableKeys, `Applications\`+editorRegEditorFile)
-	}
 	verbCommand, verbFound, _, err := reg.String(editorRegMenuVerb+`\command`, "")
 	if err != nil {
 		return nil, err
@@ -671,19 +616,6 @@ func planEditorRegister(reg editorRegistry, status editorRegistrationStatus, con
 		plan.del(editorRegPortable, "ContextMenu")
 	}
 	return plan, nil
-}
-
-// An Open with entry under Applications: the values a registration wrote, then
-// each key once it is empty.
-func planEditorRemoveApplication(plan *editorRegPlan, key string) {
-	plan.del(key+`\shell\open\command`, "")
-	plan.empty(key + `\shell\open\command`)
-	plan.empty(key + `\shell\open`)
-	plan.empty(key + `\shell`)
-	plan.del(key+`\DefaultIcon`, "")
-	plan.empty(key + `\DefaultIcon`)
-	plan.del(key, "FriendlyAppName")
-	plan.empty(key)
 }
 
 // The right-click entry: the values this program wrote, then each key once it
@@ -761,16 +693,14 @@ func planEditorRemove(reg editorRegistry, status editorRegistrationStatus) (edit
 		return nil, err
 	}
 	if records[`Applications\`+editorRegAppFile] && appCommand == command {
-		planEditorRemoveApplication(&plan, editorRegApplication)
-	}
-	// The separate Text Editor program's entry, while it still starts the
-	// Text Editor program beside this registration's program.
-	editorCommand, _, _, err := reg.String(editorRegEditorApplication+`\shell\open\command`, "")
-	if err != nil {
-		return nil, err
-	}
-	if records[`Applications\`+editorRegEditorFile] && editorCommand == editorRegEditorCommand(editorRegEditorProgram(owner)) {
-		planEditorRemoveApplication(&plan, editorRegEditorApplication)
+		plan.del(editorRegApplication+`\shell\open\command`, "")
+		plan.empty(editorRegApplication + `\shell\open\command`)
+		plan.empty(editorRegApplication + `\shell\open`)
+		plan.empty(editorRegApplication + `\shell`)
+		plan.del(editorRegApplication+`\DefaultIcon`, "")
+		plan.empty(editorRegApplication + `\DefaultIcon`)
+		plan.del(editorRegApplication, "FriendlyAppName")
+		plan.empty(editorRegApplication)
 	}
 	if records["Applications"] {
 		plan.empty(editorRegApplications)
@@ -860,9 +790,6 @@ type editorRegPlatform struct {
 	notify   func()
 	presence editorRegFileCheck
 	access   editorRegAccessCheck
-	// separate names the separate Text Editor program beside exe when it may
-	// be registered (EditorProgram), or "". Nil: never.
-	separate func(exe string) string
 }
 
 // registerEditorCopy and removeEditorCopy run one action under the lock that

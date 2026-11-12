@@ -17,8 +17,7 @@ RequestExecutionLevel user
 ; the same code built for one app each. Their Start menu shortcuts start them
 ; without arguments; icon 0 of each is its app's icon. The file registrations
 ; and terminal links below still start Network_Toolkit.exe, which hands the
-; request to the separate program beside it. Only the Open with entry named
-; after the Text Editor program (EDITOR_APPLICATION_KEY) starts that program.
+; request to the separate program beside it.
 !define EDITOR_FILENAME "Network_Toolkit_TextEditor.exe"
 !define TERMINAL_FILENAME "Network_Toolkit_Terminal.exe"
 !define INSTALL_DIR "$LOCALAPPDATA\Programs\${APP_NAME}"
@@ -41,11 +40,6 @@ RequestExecutionLevel user
 ;                  ProgID's DefaultIcon. Every install and upgrade rewrites it.
 !define EDITOR_ICON '"$INSTDIR\${APP_FILENAME}",1'
 !define DOCUMENT_ICON '"$INSTDIR\${APP_FILENAME}",3'
-; The separate Text Editor program as a program: its own icon 0 (the APP group)
-; and its own command for its Open with entry (EDITOR_APPLICATION_KEY). Like
-; EDITOR_COMMAND, "%1" is the one quoted value of --open-file.
-!define EDITOR_PROGRAM_ICON '"$INSTDIR\${EDITOR_FILENAME}",0'
-!define EDITOR_PROGRAM_COMMAND '"$INSTDIR\${EDITOR_FILENAME}" --open-file "%1"'
 ; How the Text Editor is offered for files. Setup only makes it available; the
 ; user makes it the default in Windows. Setup never writes a UserChoice (Windows
 ; protects it with a hash), never changes the default value of an extension and
@@ -70,12 +64,6 @@ RequestExecutionLevel user
 ;                          icon (EDITOR_ICON: this entry stands for the program).
 ;    SupportedTypes is deliberately absent: it limits Open with to the listed
 ;    types, and the Text Editor opens any file.
-;    The separate Text Editor program gets the same entry under its own file
-;    name (EDITOR_APPLICATION_KEY): Windows writes one itself, with the bare
-;    file name as the only argument, when the user picks that program with
-;    "Choose another app > Look for another app on this PC". Setup writes it
-;    with the program's own name, icon and --open-file command, under the same
-;    rules as the entry of Network_Toolkit.exe, and uninstall removes it.
 ;    https://learn.microsoft.com/windows/win32/shell/app-registration
 ;    https://learn.microsoft.com/previous-versions/windows/desktop/legacy/hh127438(v=vs.85)
 ; 4. Optional right-click entry: a static verb under Classes\*\shell applies to
@@ -83,7 +71,6 @@ RequestExecutionLevel user
 ;    https://learn.microsoft.com/windows/win32/shell/context-menu-handlers
 !define APPLICATIONS_KEY "Software\Classes\Applications"
 !define APPLICATION_KEY "${APPLICATIONS_KEY}\${APP_FILENAME}"
-!define EDITOR_APPLICATION_KEY "${APPLICATIONS_KEY}\${EDITOR_FILENAME}"
 !define ALL_FILES_KEY "Software\Classes\*"
 !define MENU_VERB_KEY "${ALL_FILES_KEY}\shell\NetworkToolkit.TextEditor"
 !define MENU_TEXT "Edit with ${EDITOR_NAME}"
@@ -164,7 +151,6 @@ Var NewTelnetScheme
 Var NewSerialScheme
 Var RegistrationFailed
 Var OwnApplicationKey
-Var OwnEditorApplicationKey
 Var WantContextMenu
 Var AdoptReleased
 Var PortableExe
@@ -657,57 +643,6 @@ FunctionEnd
   ${EndIf}
 !macroend
 
-; "Open with" for any file, named after the separate Text Editor program, under
-; the rules of RegisterApplication: written when absent, when it already starts
-; the installed Text Editor program (Windows writes such an entry itself when
-; the user picks that program in Open with), or when it starts the Text Editor
-; program beside a portable copy whose registration Setup takes over.
-!macro RegisterEditorApplication
-  StrCpy $OwnEditorApplicationKey 0
-  ClearErrors
-  EnumRegKey $0 HKCU "${EDITOR_APPLICATION_KEY}" 0
-  ${If} ${Errors}
-    StrCpy $OwnEditorApplicationKey 1
-  ${Else}
-    ReadRegStr $0 HKCU "${EDITOR_APPLICATION_KEY}\shell\open\command" ""
-    StrLen $1 '"$INSTDIR\${EDITOR_FILENAME}"'
-    StrCpy $2 $0 $1
-    ${If} $2 == '"$INSTDIR\${EDITOR_FILENAME}"'
-      StrCpy $OwnEditorApplicationKey 1
-    ${ElseIf} $PortableExe != ""
-      ${GetParent} "$PortableExe" $3
-      StrLen $1 '"$3\${EDITOR_FILENAME}"'
-      StrCpy $2 $0 $1
-      ${If} $2 == '"$3\${EDITOR_FILENAME}"'
-        StrCpy $OwnEditorApplicationKey 1
-      ${EndIf}
-    ${EndIf}
-  ${EndIf}
-  ClearErrors
-  ${If} $OwnEditorApplicationKey == 1
-    !insertmacro ProbeUserKey "${APPLICATIONS_KEY}" $R1
-    WriteRegStr HKCU "${EDITOR_APPLICATION_KEY}" "FriendlyAppName" "${EDITOR_NAME}"
-    WriteRegStr HKCU "${EDITOR_APPLICATION_KEY}\DefaultIcon" "" '${EDITOR_PROGRAM_ICON}'
-    WriteRegStr HKCU "${EDITOR_APPLICATION_KEY}\shell\open\command" "" '${EDITOR_PROGRAM_COMMAND}'
-    WriteRegDWORD HKCU "${CREATED_KEYS}" "Applications\${EDITOR_FILENAME}" 1
-    ${If} $R1 == 1
-      WriteRegDWORD HKCU "${CREATED_KEYS}" "Applications" 1
-    ${EndIf}
-  ${EndIf}
-!macroend
-
-; Before RemoveApplication, which removes the Applications key once it is empty.
-!macro RemoveEditorApplication
-  ReadRegDWORD $0 HKCU "${CREATED_KEYS}" "Applications\${EDITOR_FILENAME}"
-  ReadRegStr $1 HKCU "${EDITOR_APPLICATION_KEY}\shell\open\command" ""
-  ; Leave the key if another program has since pointed it somewhere else.
-  ${If} $0 == 1
-  ${AndIf} $1 == '${EDITOR_PROGRAM_COMMAND}'
-    DeleteRegKey HKCU "${EDITOR_APPLICATION_KEY}"
-  ${EndIf}
-  ClearErrors
-!macroend
-
 !macro RemoveApplication
   ReadRegDWORD $0 HKCU "${CREATED_KEYS}" "Applications\${APP_FILENAME}"
   ReadRegStr $1 HKCU "${APPLICATION_KEY}\shell\open\command" ""
@@ -803,7 +738,6 @@ FunctionEnd
 
 !macro UnregisterShell
   !insertmacro TextExtensions RemoveExtension
-  !insertmacro RemoveEditorApplication
   !insertmacro RemoveApplication
   !insertmacro RemoveContextMenu
   DeleteRegKey HKCU "${EDITOR_KEY}"
@@ -982,10 +916,6 @@ Section "Network Toolkit"
   StrCmp $RegistrationFailed 1 install_error
   StrCpy $FailedStep "adding the Text Editor to Open with"
   !insertmacro RegisterApplication
-  IfErrors install_error
-  StrCmp $RegistrationFailed 1 install_error
-  StrCpy $FailedStep "adding the Text Editor program to Open with"
-  !insertmacro RegisterEditorApplication
   IfErrors install_error
   StrCmp $RegistrationFailed 1 install_error
   StrCpy $FailedStep "updating the right-click menu entry"

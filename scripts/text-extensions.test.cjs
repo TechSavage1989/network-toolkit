@@ -126,14 +126,10 @@ test('every way Windows starts the editor with a file passes it as the one quote
  const commands=code.match(/^\s*WriteRegStr HKCU "[^"]*\\command" "" .*$/gm)||[];
  assert.deepEqual(commands.map(line=>/"(\$\{[A-Z_]+\})\\/.exec(line)[1]+' '+line.trim().split(' "" ')[1]).sort(),[
   "${APPLICATION_KEY} '${EDITOR_COMMAND}'",
-  "${EDITOR_APPLICATION_KEY} '${EDITOR_PROGRAM_COMMAND}'",
   "${LINK_PROG_KEY} '\"$INSTDIR\\${APP_FILENAME}\" --terminal --open-url \"%1\"'",
   "${MENU_VERB_KEY} '${EDITOR_COMMAND}'",
   "${PROG_KEY} '${EDITOR_COMMAND}'"]);
- // The separate Text Editor program's own Open with entry starts it without a
- // mode switch; the file is again the one quoted value of --open-file.
- assert(code.includes('!define EDITOR_PROGRAM_COMMAND \'"$INSTDIR\\${EDITOR_FILENAME}" --open-file "%1"\''),'the Text Editor program\'s command is the quoted program and the quoted file');
- assert.equal((code.match(/%1/g)||[]).length,3,'"%1" appears in the two editor commands and the terminal link command only');
+ assert.equal((code.match(/%1/g)||[]).length,2,'"%1" appears in the editor command and the terminal link command only');
 });
 
 test('the right-click entry is optional, off unless chosen, remembered, and removed with the rest',()=>{
@@ -150,11 +146,10 @@ test('the right-click entry is optional, off unless chosen, remembered, and remo
  assert.match(code,/ReadRegDWORD \$0 HKCU "\$\{UNINSTALL_KEY\}" "ContextMenu"\s+\$\{If\} \$0 == 1\s+!insertmacro SelectSection \$\{ContextMenu\}/,'the choice is remembered on upgrade');
  assert.match(code,/^!define MENU_VERB_KEY "\$\{ALL_FILES_KEY\}\\shell\\NetworkToolkit\.TextEditor"$/m);
  const unregister=/!macro UnregisterShell\n([\s\S]*?)!macroend/.exec(code)[1];
- for(const step of ['TextExtensions RemoveExtension','RemoveEditorApplication','RemoveApplication','RemoveContextMenu'])assert(unregister.includes('!insertmacro '+step+'\n'),'uninstall and rollback run '+step);
- assert(unregister.indexOf('RemoveEditorApplication')<unregister.indexOf('RemoveApplication\n'),'the Text Editor program\'s entry goes before the Applications key is removed once empty');
+ for(const step of ['TextExtensions RemoveExtension','RemoveApplication','RemoveContextMenu'])assert(unregister.includes('!insertmacro '+step),'uninstall and rollback run '+step);
  assert(unregister.indexOf('RemoveContextMenu')<unregister.indexOf('DeleteRegKey HKCU "${EDITOR_KEY}"'),'the record of created keys is read before it is removed');
  // Each new step names itself for the log of a failed install.
- for(const step of ['adding the Text Editor to Open with','adding the Text Editor program to Open with','updating the right-click menu entry'])assert(code.includes('StrCpy $FailedStep "'+step+'"'),step);
+ for(const step of ['adding the Text Editor to Open with','updating the right-click menu entry'])assert(code.includes('StrCpy $FailedStep "'+step+'"'),step);
 });
 
 test('a type from the list is highlighted only by a language the editor already has; unknown types are plain text',()=>{
