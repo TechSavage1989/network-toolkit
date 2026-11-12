@@ -186,7 +186,8 @@ func TestStandalonePeerSendBrowser(t *testing.T) {
 	launchDir := t.TempDir()
 	terminalLaunchFile, editorLaunchFile := filepath.Join(launchDir, "terminal-view.json"), filepath.Join(launchDir, "editor-view.json")
 	var childMu sync.Mutex
-	var terminalChild, editorChild string
+	var terminalChild, editorChild, mainChild string
+	var mainApp *application
 	terminalApp.launchTerminalView = func(_ context.Context, launch terminalViewLaunch) (<-chan error, error) {
 		childMu.Lock()
 		terminalChild = launch.ViewToken
@@ -211,6 +212,9 @@ func TestStandalonePeerSendBrowser(t *testing.T) {
 			beats := []struct {
 				host, token, path string
 			}{{terminalApp.host, terminalChild, "/api/terminal-views/current/pulse"}, {editorApp.host, editorChild, "/api/editor-views/current/pulse"}}
+			if mainChild != "" {
+				beats = append(beats, struct{ host, token, path string }{mainApp.host, mainChild, "/api/terminal-views/current/pulse"})
+			}
 			childMu.Unlock()
 			for _, beat := range beats {
 				if beat.token == "" {
@@ -234,7 +238,7 @@ func TestStandalonePeerSendBrowser(t *testing.T) {
 	// main: only the main window runs; the two standalone apps of this data
 	// root are open as senders but are not registered, so they are not receivers.
 	onlyMain := t.TempDir()
-	mainApp := track(engine(onlyMain, "main"))
+	mainApp = track(engine(onlyMain, "main"))
 	mainEditor, mainTerminal := track(engine(onlyMain, standaloneEditorMode)), track(engine(onlyMain, "terminal"))
 	peerRegister(t, mainApp, onlyMain)
 	if !mainApp.peerReceiveAvailable() {
@@ -242,6 +246,32 @@ func TestStandalonePeerSendBrowser(t *testing.T) {
 	}
 	mainDevice, mainSession := connect(mainApp)
 	mainTerminalDevice, mainTerminalSession := connect(mainTerminal)
+	// Owner decision (v1.21.50): the main window pops its session out and then
+	// closes; the engine runs on for that Terminal window, which still receives.
+	// The script says when the main page closed; this test then does what the
+	// native host's close does.
+	mainLaunchFile, mainClosedFile := filepath.Join(launchDir, "main-terminal-view.json"), filepath.Join(launchDir, "main-closed")
+	mainApp.launchTerminalView = func(_ context.Context, launch terminalViewLaunch) (<-chan error, error) {
+		childMu.Lock()
+		mainChild = launch.ViewToken
+		childMu.Unlock()
+		raw, _ := json.Marshal(map[string]string{"view": launch.ViewID, "token": launch.ViewToken})
+		return nil, os.WriteFile(mainLaunchFile, raw, 0600)
+	}
+	go func() {
+		for heartbeat.Err() == nil {
+			if _, err := os.Stat(mainClosedFile); err == nil {
+				mainApp.views.mu.Lock()
+				mainApp.views.homePresent = false
+				mainApp.views.mu.Unlock()
+				mainApp.editorViews.setHomePresent(false)
+				mainApp.windowSendHomeClosed()
+				_ = os.Remove(mainClosedFile) // the script waits for this
+				return
+			}
+			time.Sleep(100 * time.Millisecond)
+		}
+	}()
 
 	// start: nothing is registered. Each app's launch hook stands in for
 	// starting the other app's process: it registers that engine a moment later.
@@ -301,6 +331,7 @@ func TestStandalonePeerSendBrowser(t *testing.T) {
 		"NTK_PEER_EDITOR_URL=http://"+editorApp.host, "NTK_PEER_EDITOR_TOKEN="+editorApp.token,
 		"NTK_PEER_SESSION="+session, "NTK_PEER_MORE="+string(more),
 		"NTK_PEER_TERMINAL_LAUNCH="+terminalLaunchFile, "NTK_PEER_EDITOR_LAUNCH="+editorLaunchFile,
+		"NTK_PEER_MAIN_LAUNCH="+mainLaunchFile, "NTK_PEER_MAIN_CLOSED="+mainClosedFile,
 		"NTK_PEER_LAUNCH_WAIT_MS="+strconv.FormatInt(peerLaunchWait.Milliseconds(), 10))
 	output, err := command.CombinedOutput()
 	t.Log(string(output))
@@ -324,7 +355,7 @@ func TestStandalonePeerSendBrowser(t *testing.T) {
 	}
 	// The main window's session: the selected line with no Enter added, then
 	// the reviewed line once, after it was confirmed in the main window.
-	if got, want := mainDevice.input(), "show version"+"show clock\r"; got != want {
+	if got, want := mainDevice.input(), "show version"+"show clock\r"+"show users"; got != want {
 		t.Fatalf("the main window's device received %q, want %q", got, want)
 	}
 	// A Terminal that only sent its output received nothing.

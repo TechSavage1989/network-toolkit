@@ -51,7 +51,10 @@ import (
 // (peerEnqueue, window_send.go) and raises it.
 //
 // The main window only receives text. Its own Send to commands stay inside its
-// window, and its child windows send only through window send. Its one sending use is the
+// window, and its child windows send only through window send. They do receive
+// (owner decision): text for a session or a document a detached window of the
+// main engine holds goes to that window, also while the main window is closed.
+// Its one sending use is the
 // document hand-over of peer_handover.go: when the user pops its Text Editor
 // out while the standalone Text Editor runs, local and untitled tabs are given
 // to that editor ("documents", the only request that carries file paths).
