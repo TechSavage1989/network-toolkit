@@ -296,6 +296,48 @@ const shot=async(page,name)=>{if(output){fs.mkdirSync(output,{recursive:true});a
    assert.equal(await page.locator('#windowsFullInstall').isHidden(),true);
   });
 
+  // The installed program registered by an older Setup: Windows lists the Text
+  // Editor for only some file types. The notice runs this version's verified
+  // Setup with both confirmations, then closes the app through its own close.
+  const installedEditor=editorStatus('setup',{installed:true,thisIsInstalled:true,canRegister:false,needsTakeover:false,message:'This is the installed program. Setup registered its Text Editor with Windows; run Setup again or uninstall to change that.'});
+  const missingTypes={total:108,missing:103,setupVersion:'1.21.20',uninstallerRecords:false,setupNeeded:true};
+  for(const closes of [true,false]){
+   await scenario(browser,'the installed program with only some file types runs Setup, then '+(closes?'closes':'stays open when the close is cancelled'),{
+    integration:{supported:true,textEditor:installedEditor,install:installStatus({portable:false,installed:true}),types:missingTypes},
+    handle:async(p,body,f)=>{
+     const installed=extra=>installStatus({portable:false,installed:true,...extra});
+     if(p.endsWith('/full-install/find')){f.integration={...f.integration,install:installed({found})};return {data:{install:f.integration.install}};}
+     if(p.endsWith('/full-install/download')){f.integration={...f.integration,install:installed({found,download:downloaded,progress:{phase:'ready',version}})};return {data:{install:f.integration.install}};}
+     if(p.endsWith('/full-install/start')){f.integration={...f.integration,install:installed({found,download:downloaded,started:true})};return {data:{install:f.integration.install}};}
+    }},async(page,requests)=>{
+    await page.evaluate(closes=>{window.__closeCalls=0;window.__networkToolkitClose=async()=>{window.__closeCalls++;return closes;};},closes);
+    await openSettings(page,'editor');
+    const editor=page.locator('#windowsTextEditorSettings');
+    await editor.locator('[data-windows-types-notice]').waitFor();
+    assert.match(await editor.textContent(),/Windows lists the Text Editor for only some file types\. Run Setup [0-9.]+ once to update Windows integration \(your settings and data stay\)\./);
+    await page.locator('[data-settings-section="updates"]').click();
+    const updates=page.locator('#windowsFullInstall');
+    await updates.locator('[data-windows-types-notice]').waitFor();
+    assert.equal(await updates.locator('[data-windows-install-installed]').count(),0,'no "already installed" block for the installed program');
+    await shot(page,'windows-types-notice');
+    assert.equal(posts(requests,'/full-install/find').length,0,'nothing is looked up before the click');
+    await updates.locator('[data-windows-install="find"]').click();
+    await updates.locator('[data-windows-install-confirm="download"]').waitFor();
+    assert.equal(posts(requests,'/full-install/download').length,0,'nothing is downloaded before the first confirmation');
+    await updates.locator('[data-windows-install="download-confirm"]').click();
+    await updates.locator('[data-windows-install-confirm="start"]').waitFor();
+    assert.deepEqual(posts(requests,'/full-install/download').map(r=>r.body),[{version,confirm:true}]);
+    assert.equal(posts(requests,'/full-install/start').length,0,'Setup never starts without the second confirmation');
+    assert.match(await updates.textContent(),/asked about unsaved documents first/);
+    await shot(page,'windows-types-start');
+    await updates.locator('[data-windows-install="start-confirm"]').click();
+    await page.waitForFunction(()=>window.__closeCalls===1);
+    assert.deepEqual(posts(requests,'/full-install/start').map(r=>r.body),[{version,confirm:true}]);
+    if(closes)await page.waitForFunction(()=>/Network Toolkit is closing so that Setup can update it/.test(document.getElementById('windowsFullInstall').textContent));
+    else await page.waitForFunction(()=>/Close Network Toolkit, and its separate Text Editor and Terminal windows, before you choose Install in Setup/.test(document.getElementById('windowsFullInstall').textContent));
+   });
+  }
+
   for(const [name,options] of [['Linux',{os:'linux'}]]){
    await scenario(browser,'no Windows sections in '+name,options,async(page,requests)=>{
     await openSettings(page,'editor');

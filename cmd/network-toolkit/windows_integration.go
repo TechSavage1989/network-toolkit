@@ -12,7 +12,8 @@ import (
 
 // App settings for the Windows integration of the main window:
 //
-//	GET  /api/windows-integration                         both features' status
+//	GET  /api/windows-integration                         both features' status, and
+//	                                                      the installed program's file types
 //	POST /api/windows-integration/text-editor/register    {contextMenu, takeover}
 //	POST /api/windows-integration/text-editor/remove      {}
 //	POST /api/windows-integration/full-install/find       {channel}
@@ -46,7 +47,10 @@ type windowsIntegrationData struct {
 	Supported  bool                     `json:"supported"`
 	TextEditor editorRegistrationStatus `json:"textEditor"`
 	Install    fullInstallStatus        `json:"install"`
-	Error      string                   `json:"error,omitempty"`
+	// Types: the file types the installed program's registration lacks
+	// (installed program only; text_editor_types.go).
+	Types *editorRegTypesStatus `json:"types,omitempty"`
+	Error string                `json:"error,omitempty"`
 }
 
 func (a *application) windowsIntegrationStatus() windowsIntegrationData {
@@ -67,6 +71,12 @@ func (a *application) windowsIntegrationStatus() windowsIntegrationData {
 	}
 	data.TextEditor = status
 	data.Install = a.fullInstallStatus(status)
+	// Read only. A read that fails shows no notice; the section above says
+	// what could not be read.
+	if types, err := editorRegTypesState(platform.registry, exe); err == nil && types != nil {
+		types.Added = int(a.editorTypesAdded.Load())
+		data.Types = types
+	}
 	return data
 }
 

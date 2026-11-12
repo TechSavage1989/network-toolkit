@@ -101,6 +101,7 @@ type application struct {
 	windowSend                   windowSendState // text between the windows of this engine (window_send.go)
 	windowLaunchMu               sync.Mutex
 	shutdownRequested            atomic.Bool
+	editorTypesAdded             atomic.Int64 // file types added after an approved update (text_editor_types.go)
 	openTerminalWindow           func(context.Context, *terminalWindowPreset) (bool, error)
 	views                        *terminalViewRegistry
 	editorViews                  *editorViewRegistry
