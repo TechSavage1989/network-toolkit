@@ -1,3 +1,8 @@
+## 1.21.49 Beta 1 - Popped-out windows are the separate programs, still connected
+
+- Detached Text Editor and Terminal windows start from the separate programs (own icon and taskbar name) and stay connected to the main window's engine.
+- Send to between the main window and its popped-out windows; Detach editor and Move all hand tabs to an already-open Text Editor; Edit from a popped-out Terminal's SFTP browser.
+
 ## 1.21.48 Beta 1 - The separate programs arrive with the update
 
 - After an approved in-app update, the new version adds the separate Text Editor and Terminal programs itself (same release, same checks), points Setup-owned Start menu entries at them when the uninstaller knows them, and gives Text Editor files the document icon.

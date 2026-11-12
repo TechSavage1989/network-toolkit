@@ -121,7 +121,8 @@ func editorViewChildArguments(noBrowser bool) []string {
 	return args
 }
 
-// launchDetachedEditor launches only this executable. The request context
+// launchDetachedEditor launches the separate program of its app
+// (detachedViewProgram) or this executable. The request context
 // bounds the decision to start, not the child's lifetime. The owner observes
 // the returned buffered completion channel for crash recovery.
 func launchDetachedEditor(ctx context.Context, launch editorViewLaunch) (<-chan error, error) {
@@ -129,11 +130,16 @@ func launchDetachedEditor(ctx context.Context, launch editorViewLaunch) (<-chan 
 	if err != nil {
 		return nil, err
 	}
-	executable, err := updateCurrentExecutable()
+	// The separate program of this app and version when it is beside the
+	// running program and trusted (its icon and taskbar name), else the main
+	// program (detachedViewProgram).
+	executable, held, err := detachedViewProgram(standaloneEditorMode)
 	if err != nil {
 		clear(raw)
 		return nil, fmt.Errorf("locate the detached editor executable: %w", err)
 	}
+	// The checked program stays held (readable only) until it has started.
+	defer held()
 	cmd := exec.Command(executable, editorViewChildArguments(launch.NoBrowser)...)
 	return startEditorViewChild(ctx, cmd, raw)
 }

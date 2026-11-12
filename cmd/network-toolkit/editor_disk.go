@@ -803,16 +803,36 @@ func (m *editorViewRegistry) saveDiskDocument(ctx context.Context, g *editorDocu
 	return map[string]any{"metadata": meta, "hash": newHash, "path": destination}, nil
 }
 
-func (m *editorViewRegistry) saveRemoteDiskDocument(ctx context.Context, g *editorDocumentGrant, d *editorDiskDocument, v *editorbuffer.Imported, path string, req editorDiskRequest) (any, error) {
-	if d.ftp == nil && (g.valid == nil || !g.valid()) {
-		return nil, errEditorLease
-	}
+// remoteSaveDestination is where a remote disk-backed save writes: the opened
+// path, or a Save As path. A file a detached Terminal workspace opened in the
+// main window is saved only to itself, and only while the workspace still
+// holds the connection.
+func remoteSaveDestination(g *editorDocumentGrant, path, requested string) (string, error) {
 	destination := path
-	if req.Path != "" {
-		destination = req.Path
+	if requested != "" {
+		destination = requested
+	}
+	if g != nil && g.fixedPath != "" {
+		if destination != g.fixedPath {
+			return "", errWindowSendSaveElsewhere
+		}
+		if g.valid == nil || !g.valid() {
+			return "", errWindowSendGone
+		}
 	}
 	if !validEditorText(destination, 4096) || destination == "" {
-		return nil, errors.New("invalid remote destination")
+		return "", errors.New("invalid remote destination")
+	}
+	return destination, nil
+}
+
+func (m *editorViewRegistry) saveRemoteDiskDocument(ctx context.Context, g *editorDocumentGrant, d *editorDiskDocument, v *editorbuffer.Imported, path string, req editorDiskRequest) (any, error) {
+	if d.ftp == nil && g.fixedPath == "" && (g.valid == nil || !g.valid()) {
+		return nil, errEditorLease
+	}
+	destination, e := remoteSaveDestination(g, path, req.Path)
+	if e != nil {
+		return nil, e
 	}
 	m.mu.Lock()
 	if m.explorerConflictLocked(g.snapshot.Binding, destination) {

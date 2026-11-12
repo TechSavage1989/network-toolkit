@@ -1,3 +1,17 @@
+# v1.21.49 Beta 1 - Popped-out windows are the separate programs, still connected
+
+Owner: "when popping out or detaching the text editor from the main toolkit app, it must open the standalone text editor and transfer the tabs and content, or maintain a live, updated feed of the tabs or content between both. same for terminal. also all the single toolkit app features between them must continue to work accordingly". Decisions: "Connected separate program", "Add to the open one where possible", a single tab moved to a separate window keeps its own connected window, and Edit from a popped-out Terminal workspace's SFTP browser is allowed.
+
+v1.21.48 was published and verified: tag at merge commit eca3c84 (PR #171), release run 43033856517 green on its fifth attempt (attempts 1 to 4 failed before building because the hosted Ubuntu runner could not resolve the Ubuntu package mirrors for about 4.5 hours), all seven assets matching GitHub's digests, the Update ZIP holding all three programs, `github_release.py verify` reporting "Verified 1.21.48", stable channel still at v1.21.34. Its PR needed three Windows fixes for 8.3 short paths in the Start menu rewrite (long-path the install folder, shortcut targets and the Start menu folder).
+
+What changed (rules in AGENTS.md): detached windows start through `detachedViewProgram` (edition.go) from the same-version separate program when only this user and the system can change it and its folder, holding the checked file open until the window starts, else from the running exe; each separate program accepts only its own view switch. Window send (`window_send.go`, `web/assets/window-send.js`) routes Send to between the windows of one engine to the window that owns the target. Document hand-over (`peer_handover.go`, `web/assets/editor-handover.js`) gives local and untitled tabs to a running standalone Text Editor on Detach editor / Move all, confirm-then-release, with canonical path keys from the receiving engine. A detached Terminal workspace's SFTP Edit opens the file in the main window's editor through a grant limited to that file while the workspace owns the session on the same connection.
+
+Two independent reviews: the first found one MEDIUM (unsaved text of an earlier hand-over could be discarded) and five LOW issues, all fixed or documented (a junction to a network share passes the drive-letter check; a junction above the program folder changed between check and start).
+
+Known limits: not run on physical Windows; the taskbar identity of a pop-out comes from the separate program's file and is unconfirmed on a real PC; Send to does not bring the receiving window to the front; a detached window of a standalone app still cannot send to the other app; undo history does not move with a hand-over; SFTP Edit from a popped-out workspace needs the main window open.
+
+---
+
 # v1.21.48 Beta 1 - The separate programs arrive with the update
 
 Owner, after updating to 1.21.47: "i updated but the separate exes did not appear", then "it should add them without asking because it's not obvious at all that it needs to be done manually", and "it also doesn't look like the file type icon has updated".

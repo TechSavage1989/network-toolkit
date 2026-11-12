@@ -289,7 +289,9 @@ func (h *nativeEditorFixture) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	if strings.HasPrefix(r.URL.Path, "/api/file-editor/") ||
 		strings.HasPrefix(r.URL.Path, "/api/editor-views/documents/") && strings.HasSuffix(r.URL.Path, "/file") ||
-		r.Method != http.MethodGet && r.Method != http.MethodHead && r.URL.Path != "/api/state" && !strings.HasPrefix(r.URL.Path, "/api/editor-views/") {
+		r.Method != http.MethodGet && r.Method != http.MethodHead && r.URL.Path != "/api/state" && !strings.HasPrefix(r.URL.Path, "/api/editor-views/") &&
+			// Each window reports what Send to can reach in it (window-send.js); it changes nothing.
+			r.URL.Path != "/api/window-send/report" {
 		h.mu.Lock()
 		h.blocked = append(h.blocked, r.Method+" "+r.URL.Path)
 		h.mu.Unlock()

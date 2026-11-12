@@ -29,7 +29,7 @@ function harness(options={}){
   openModal:(title,body,footer)=>{document.getElementById('testModal').innerHTML=body+footer;notes.push(['modal',title]);},
   closeModal:()=>{document.getElementById('testModal').innerHTML='';}
  };
- if(options.native)root.__networkToolkitNativeSession='b'.repeat(64);if(options.detached)root.DETACHED_TERMINAL=true;
+ if(options.native)root.__networkToolkitNativeSession='b'.repeat(64);if(options.detached)root.DETACHED_TERMINAL=true;if(options.workspace){root.DETACHED_WORKSPACE=true;root.opened=[];root.NetworkToolkitWindowSend={enabled:()=>options.workspace!=='off',openRemote:async request=>{root.opened.push({...request});return {ok:true};}};}
  root.globalThis=root;root.window=root;vm.createContext(root);if(options.bridge)vm.runInContext(nativeSource,root);vm.runInContext(source,root);
  const pointer=(type,target,extra={})=>new PointerEvent(type,{target,...extra});
  const emit=(type,target,extra={})=>{const event=pointer(type,target,extra);for(const listener of document.listeners[type]||[])listener(event);return event;};
@@ -130,6 +130,23 @@ test('detached read-only capability exposes navigation, preview and native copy,
  h.document.emit('contextmenu',h.row,{clientX:40,clientY:60});assert.deepEqual(h.document.querySelectorAll('[data-tsftp-menu]').map(button=>button.dataset.tsftpMenu),['preview','copyPath','refresh']);
  const forged=h.document.createElement('button');forged.dataset.tsftp='download';h.panel.append(forged);const before=h.notes.length;h.document.emit('click',forged);assert.equal(h.notes.length,before);
  const currentRow=h.panel.querySelector('[data-tsftp-item="./startup.cfg"]');currentRow.setPointerCapture=()=>{};currentRow.hasPointerCapture=()=>true;currentRow.releasePointerCapture=()=>{};h.emit('pointerdown',currentRow);h.emit('pointermove',currentRow,{clientX:1005});await settle();assert.deepEqual(h.calls.filter(x=>x[0].startsWith('/explorer-transfer')).filter(x=>x[2]).map(x=>x[2].action),['direct','arm']);assert.equal(h.root.NetworkToolkitNativeDrag.releaseFileRowCapture('a'.repeat(32),1),true);}
+});
+// Owner decision: Edit in a detached Terminal WORKSPACE opens the remote file
+// in the main window's Text Editor (window-send.js openRemote); nothing else
+// becomes writable, and a single-session window keeps its read-only browser.
+test('a detached workspace offers Edit, which opens the file in the main window, and nothing else',async()=>{
+ const h=await ready({detached:true,workspace:true,native:true,bridge:true});
+ assert.deepEqual(h.panel.querySelectorAll('[data-tsftp]').map(button=>button.dataset.tsftp),['up','home','root','refresh','edit','preview']);
+ h.document.emit('contextmenu',h.row,{clientX:40,clientY:60});assert.deepEqual(h.document.querySelectorAll('[data-tsftp-menu]').map(button=>button.dataset.tsftpMenu),['edit','preview','copyPath','refresh']);
+ h.document.emit('click',h.document.querySelector('[data-tsftp-menu="edit"]'));await settle();
+ assert.deepEqual(h.root.opened,[{session:'ssh-one',path:'./startup.cfg',name:'startup.cfg'}]);
+ await h.api.editor(true);assert.equal(h.root.opened.length,1,'no new remote file is created from a detached window');
+ for(const action of ['write-text','upload','remove'])await assert.rejects(h.api.request(h.entry.info.id,action,{path:'./startup.cfg'}),/read-only/);
+ assert.equal(h.calls.some(x=>x[2]?.action==='write-text'),false,'the detached window itself never writes');
+ // Without window send (a standalone Terminal's workspace), Edit is not offered.
+ const off=await ready({detached:true,workspace:'off',native:true,bridge:true});
+ assert.deepEqual(off.panel.querySelectorAll('[data-tsftp]').map(button=>button.dataset.tsftp),['up','home','root','refresh','preview']);
+ await off.api.editor();assert.deepEqual(off.root.opened,[]);
 });
 test('detached read-only sidebar rejects write requests and incoming file drops without advertising a drop target',async()=>{
  const h=await ready({detached:true,native:true}),list=h.panel.querySelector('[data-tsftp-list]'),before=h.calls.length;

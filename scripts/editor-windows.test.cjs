@@ -87,3 +87,23 @@ test('unchanged revision checkpoint skips full text cloning and serialization bu
 test('missing authoritative ownership bypasses unchanged checkpoint revision',async()=>{
  const f=fixture();let snapshots=0;f.adapter.checkpointVersion=()=>1;f.adapter.checkpoint=()=>{snapshots++;return {documents:f.documents,active:uid};};await f.controller.poll();await f.controller.poll();assert.equal(snapshots,2);f.controller.stop();
 });
+
+// Owner decision: "Move to separate window" on a single tab always gives that
+// tab its own connected window, even while the standalone Text Editor runs.
+// Only Detach editor and Move all (destination new) hand tabs over to it.
+test('only Detach editor and Move all hand tabs over to a running Text Editor',async()=>{
+ const handed=[];global.NetworkToolkitEditorHandover={enabled:()=>true,handOver:async ids=>{handed.push([...ids]);return {rest:[...ids],message:''};}};
+ try{
+  const failed=async(p,m,b,s)=>p.endsWith('/transfers')?{id:b.id,state:'failed',error:'synthetic'}:s;
+  const f=fixture({request:failed});
+  await f.controller.move([uid],'new');
+  assert.deepEqual(handed,[],'a single tab moved to a separate window is never handed over');
+  await f.controller.move([uid],'new',{handover:true});
+  assert.deepEqual(handed,[[uid]],'Move all (destination new) hands over');
+  f.controller.stop();
+  const d=fixture({request:failed});
+  await d.controller.detachEditor();
+  assert.deepEqual(handed,[[uid],[uid]],'Detach editor hands over');
+  d.controller.stop();
+ }finally{delete global.NetworkToolkitEditorHandover;}
+});
