@@ -112,7 +112,7 @@ func TestWindowSendBrowser(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 	go func() {
-		ticker := time.NewTicker(time.Second)
+		ticker := time.NewTicker(200 * time.Millisecond) // as promptly as a native child pulses
 		defer ticker.Stop()
 		for {
 			launchMu.Lock()

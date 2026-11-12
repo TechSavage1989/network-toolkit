@@ -205,7 +205,9 @@ func TestStandalonePeerSendBrowser(t *testing.T) {
 	heartbeat, stopHeartbeat := context.WithCancel(context.Background())
 	defer stopHeartbeat()
 	go func() {
-		ticker := time.NewTicker(time.Second)
+		// A native child pulses before its window opens; play that promptly so a
+		// page is never usable while its view is still "opening".
+		ticker := time.NewTicker(200 * time.Millisecond)
 		defer ticker.Stop()
 		for {
 			childMu.Lock()

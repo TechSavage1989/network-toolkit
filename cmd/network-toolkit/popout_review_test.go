@@ -68,6 +68,57 @@ func TestPeerSendReachesADetachedWindowOfAClosedMainWindow(t *testing.T) {
 	peerAwaitResult(t, editor, sent["requestId"].(string), peerDone)
 }
 
+// CI finding (v1.21.50): right after a session pops out, the app's own page
+// still reports it until its next report. Text for it must never be queued
+// for that page (which refuses it); the engine's ownership decides, and the
+// session is offered again once the detached window reports it.
+func TestPeerSendNeverQueuesAPoppedOutSessionForTheAppsOwnWindow(t *testing.T) {
+	windowRaiseRecorder(t)
+	root := t.TempDir()
+	term, _ := peerTestApp(t, root, "terminal")
+	peerRegister(t, term, root)
+	editor, _ := peerTestApp(t, root, standaloneEditorMode)
+	var launched terminalViewLaunch
+	term.launchTerminalView = func(_ context.Context, l terminalViewLaunch) (<-chan error, error) { launched = l; return nil, nil }
+	session := viewTestConnected(t, term)
+	report := `{"targets":[{"id":"` + session.ID + `","name":"lab-router-02","type":"telnet","connected":true}]}`
+	peerPage(t, term, http.MethodPost, "/api/peer-send/report", report)
+	peerPage(t, term, http.MethodGet, "/api/peer-send/inbox", "")
+	if r := viewTestRequest(term, term.token, "POST", "/api/terminal-views", map[string]any{"sessionId": session.ID, "snapshot": viewTestSnapshot(term, session)}, nil); r.Code != 201 {
+		t.Fatalf("detach: %d %s", r.Code, r.Body.String())
+	}
+	if r := viewTestRequest(term, launched.ViewToken, "POST", "/api/terminal-views/current/ready", map[string]any{}, nil); r.Code != 200 {
+		t.Fatalf("ready: %d", r.Code)
+	}
+	// The app's own page has not reported since: it still lists the session.
+	peerPage(t, term, http.MethodGet, "/api/peer-send/inbox", "")
+	if _, _, raw := peerPage(t, editor, http.MethodGet, "/api/peer-send/targets", ""); strings.Contains(raw, session.ID) {
+		t.Fatalf("a popped-out session was offered as the app's own window's: %s", raw)
+	}
+	// A sender whose list is older still names it: refused, never queued there.
+	editor.peer.mu.Lock()
+	editor.peer.listed[windowSendMain] = peerListed{mode: "terminal", instanceID: term.windowInstanceID}
+	editor.peer.mu.Unlock()
+	if code, _, raw := peerPage(t, editor, http.MethodPost, "/api/peer-send/send", `{"session":"`+session.ID+`","text":"show inventory"}`); code == 200 || !strings.Contains(raw, "moved to another window") {
+		t.Fatalf("text for a popped-out session: %d %s", code, raw)
+	}
+	if _, inbox, _ := peerPage(t, term, http.MethodGet, "/api/peer-send/inbox", ""); inbox["request"] != nil {
+		t.Fatalf("the app's own window got text for a session it no longer holds: %v", inbox)
+	}
+	// Once the Terminal window reports it, it is offered and the text goes there.
+	windowSendCall(t, term, launched.ViewToken, "GET", "/api/window-send/inbox", nil)
+	windowSendCall(t, term, launched.ViewToken, "POST", "/api/window-send/report", map[string]any{"targets": []map[string]any{{"id": session.ID, "name": "lab-router-02", "type": "telnet", "connected": true}}, "documents": []any{}})
+	if _, _, raw := peerPage(t, editor, http.MethodGet, "/api/peer-send/targets", ""); !strings.Contains(raw, session.ID) {
+		t.Fatalf("the Terminal window's session is not offered: %s", raw)
+	}
+	if code, _, raw := peerPage(t, editor, http.MethodPost, "/api/peer-send/send", `{"session":"`+session.ID+`","text":"show inventory"}`); code != 200 {
+		t.Fatalf("send: %d %s", code, raw)
+	}
+	if _, inbox := windowSendCall(t, term, launched.ViewToken, "GET", "/api/window-send/inbox", nil); inbox["request"] == nil {
+		t.Fatal("the Terminal window did not get the text")
+	}
+}
+
 // A detached window that sends to another app allows that app's process
 // before the text is posted, and the receiving app raises its window twice.
 func TestADetachedSenderAllowsTheReceiverBeforeTheTextIsPosted(t *testing.T) {

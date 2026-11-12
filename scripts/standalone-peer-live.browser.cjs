@@ -19,7 +19,9 @@ const more=JSON.parse(process.env.NTK_PEER_MORE||'null');
 // Where a send can start the other app, a wait must outlast the engine's bound on that start
 // (peerLaunchWait), so a slow start ends in its own answer instead of this script's time limit.
 const startBound=Number(process.env.NTK_PEER_LAUNCH_WAIT_MS||25000)+10000;
-const checks=[],errors=[];
+const checks=[],errors=[],extra=[];
+// Every toast a page showed, so a failure names a refusal that has already faded (CI timing findings).
+const recordToasts=()=>{window.__toastLog=[];addEventListener("DOMContentLoaded",()=>{const stack=document.getElementById("toastStack");if(stack)new MutationObserver(()=>{for(const n of stack.querySelectorAll(".toast"))if(!n.__logged){n.__logged=true;window.__toastLog.push(n.textContent);}}).observe(stack,{childList:true});});};
 const pass=text=>{checks.push(text);console.log('PASS '+text);};
 (async()=>{
  assert(terminalURL&&terminalToken&&editorURL&&editorToken&&session&&more?.main&&more?.start,'run through go test (TestStandalonePeerSendBrowser)');
@@ -30,7 +32,7 @@ const pass=text=>{checks.push(text);console.log('PASS '+text);};
   page.on('pageerror',error=>errors.push(name+': '+error.message));
   // Only loopback requests to this app's own engine are allowed.
   await page.route('**/*',route=>new URL(route.request().url()).origin===url?route.continue():route.abort());
-  await page.addInitScript(value=>{window.__networkToolkitNativeSession=value;},token);
+  await page.addInitScript(value=>{window.__networkToolkitNativeSession=value;},token);await page.addInitScript(recordToasts);
   await page.goto(url+'/');await page.waitForFunction(()=>window.__networkToolkitStartupState===1&&online);
   return page;
  }
@@ -135,9 +137,9 @@ const pass=text=>{checks.push(text);console.log('PASS '+text);};
     const context=await browser.newContext({viewport:{width:1280,height:800}}),page=await context.newPage();page.setDefaultTimeout(20000);
     page.on('pageerror',error=>errors.push(label+': '+error.message));
     await page.route('**/*',route=>new URL(route.request().url()).origin===url?route.continue():route.abort());
-    await page.addInitScript(value=>{window.__networkToolkitNativeSession=value;},token);
+    await page.addInitScript(value=>{window.__networkToolkitNativeSession=value;},token);await page.addInitScript(recordToasts);
     await page.goto(url+pathname);await page.waitForFunction(isReady);
-    return page;
+    extra.push([label,page]);return page;
    }
    // The standalone Terminal pops its workspace out with its own code.
    await terminal.evaluate(()=>detachTerminalWorkspace());
@@ -343,6 +345,6 @@ const pass=text=>{checks.push(text);console.log('PASS '+text);};
    }catch(error){try{for(const [name,page] of [['terminal',term],['editor',ed]]){console.error(name+' window (start): '+JSON.stringify(await page.evaluate(()=>({page:state.activePage,modal:document.querySelector('#modalTitle')?.textContent||'',toasts:[...document.querySelectorAll('#toastStack .toast')].map(n=>n.textContent)}))));if(output)await page.screenshot({path:path.join(output,'standalone-peer-live-failure-start-'+name+'.png')});}}catch{}throw error;}
   }
   assert.deepEqual(errors,[]);
- }catch(error){await describe();throw error;}finally{await browser.close();}
+ }catch(error){await describe();for(const [name,page] of [["Terminal app",terminal],["Text Editor app",editor],...extra]){try{if(page)console.error(name+" toasts: "+JSON.stringify(await page.evaluate(()=>window.__toastLog||[])));}catch{}}throw error;}finally{await browser.close();}
  console.log(JSON.stringify({passed:true,checks:checks.length}));
 })().catch(error=>{console.error(error);console.error(JSON.stringify(errors));process.exit(1);});

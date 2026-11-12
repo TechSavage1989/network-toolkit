@@ -558,7 +558,10 @@ func (a *application) peerEnqueue(kind string, payload peerPayload) (status int,
 		if kind == "editor" {
 			id = payload.Target
 		}
-		primary := fresh && (id == "new" || find(id) != nil)
+		// The primary page may still list a session or a document that has
+		// just moved to a detached window: the engine's ownership decides.
+		holds := a.peerPrimaryHolds(kind, id)
+		primary := fresh && (id == "new" || find(id) != nil && holds)
 		if !primary {
 			// A detached window of this engine shows that session or holds that
 			// document (or, with no primary page, takes the new document).
@@ -572,6 +575,14 @@ func (a *application) peerEnqueue(kind string, payload peerPayload) (status int,
 				}
 				a.peer.request = &peerRequest{id: payload.RequestID, kind: kind, created: now, state: peerQueued, window: holder}
 				return http.StatusOK, holder, nil
+			}
+			// Held by a detached window that has not reported it yet: never the
+			// primary page's, so it is refused instead of sent there.
+			if !holds {
+				if kind == "terminal" {
+					return http.StatusConflict, "", errors.New("That terminal session moved to another window. Choose Send to terminal again.")
+				}
+				return http.StatusConflict, "", errors.New("That document moved to another window. Choose Send to editor again.")
 			}
 		}
 	}

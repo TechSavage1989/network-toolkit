@@ -373,14 +373,43 @@ func (a *application) windowSendHolder(kind, id string) string {
 	return ""
 }
 
+// peerPrimaryHolds reports whether a session or a document is the primary
+// window's now, by the engine's own ownership, not by what its page last
+// reported: a page reports a session it just popped out until its next
+// report. A terminal session must be owned by no detached view; a document
+// must not be held by a detached editor window or be moving.
+func (a *application) peerPrimaryHolds(kind, id string) bool {
+	if kind == "terminal" {
+		if a.views == nil {
+			return true
+		}
+		a.views.mu.Lock()
+		defer a.views.mu.Unlock()
+		return a.views.ownerLocked(id).ViewID == ""
+	}
+	if id == "new" || a.editorViews == nil {
+		return true
+	}
+	a.editorViews.mu.Lock()
+	defer a.editorViews.mu.Unlock()
+	grant := a.editorViews.documents[id]
+	return grant == nil || grant.owner == "" && grant.pending == ""
+}
+
 // peerInboundTargets is what this engine can receive of a kind from another
-// standalone app: what its primary page reported, then what its detached
-// windows reported. ready: a window that can take it runs.
+// standalone app: what its primary page reported and still holds, then what
+// its detached windows reported. ready: a window that can take it runs.
 func (a *application) peerInboundTargets(kind string) ([]peerTarget, bool) {
 	a.peer.mu.Lock()
 	own, ready := a.peer.freshTargetsLocked(peerNow(), kind)
-	targets := append([]peerTarget{}, own...)
+	reported := append([]peerTarget{}, own...)
 	a.peer.mu.Unlock()
+	targets := make([]peerTarget, 0, len(reported))
+	for _, t := range reported {
+		if a.peerPrimaryHolds(kind, t.ID) {
+			targets = append(targets, t)
+		}
+	}
 	limit := peerSessionLimit
 	if kind != "terminal" {
 		limit = peerDocumentLimit
