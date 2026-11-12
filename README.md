@@ -120,7 +120,7 @@ Use scanning, configuration, capture and connection features only on networks an
 
 ## Updates and settings
 
-Use **Check for updates** to check manually. Beta updates are available only after opting in to the beta channel. Downloading and installing an update requires explicit approval; packages are verified before installation. Your saved profiles, settings and credential vault must be preserved.
+Use **Check for updates** to check manually. Beta updates are available only after opting in to the beta channel. Downloading and installing an update requires explicit approval; packages are verified before installation. Your saved profiles, settings and credential vault must be preserved. An update does not run Setup: if an older Setup offered the Text Editor for only some file types, **App settings → Updates** offers to run this version's Setup once ([details](docs/guide/settings-and-updates.md#updates)).
 
 Open **App settings** to search General, Appearance, Terminal, Editor, Graphs, Transfers, Network, Updates and Confirmations. Preferences, saved targets and connection profiles are stored in the app data folder and are shared by Network Toolkit, its Terminal window and its Text Editor window ([details](docs/guide/settings-and-updates.md#one-set-of-settings-and-saved-data-for-all-apps)); diagnostic results stay in the current session until you export them. See the [change history](CHANGELOG.md) for what each release changed.
 
