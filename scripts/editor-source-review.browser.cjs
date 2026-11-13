@@ -2,6 +2,7 @@
 // Source-only UI validation: static bundled assets, mock files and transports.
 // No Go executable, application package, real shell, install or release.
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
+const {handleTextTools}=require('./editor-text-tools-fixture.cjs');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const root=path.resolve(__dirname,'..'),out=process.env.TOOLKIT_TEST_OUTPUT;
 const report={passed:false,checks:[],layouts:[],errors:[]};let browser,page;
@@ -10,7 +11,7 @@ const settle=()=>page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requ
 (async()=>{
  if(out)fs.mkdirSync(out,{recursive:true});browser=await chromium.launch({headless:true,args:['--no-sandbox']});const context=await browser.newContext({viewport:{width:1440,height:1000}});page=await context.newPage();page.setDefaultTimeout(12000);page.on('pageerror',e=>report.errors.push(e.message));
  await context.addInitScript(()=>{window.confirm=window.prompt=()=>{throw Error('Native script dialogs are disabled in the desktop host');};});
- await context.route('**/*',async route=>{const req=route.request(),url=new URL(req.url());assert.equal(url.origin,'https://source-review.toolkit.test');const p=url.pathname;let data={};
+ await context.route('**/*',async route=>{const req=route.request(),url=new URL(req.url());assert.equal(url.origin,'https://source-review.toolkit.test');if(await handleTextTools(route))return;const p=url.pathname;let data={};
   if(p.startsWith('/api/')){if(p==='/api/status')data={version:require('../package.json').version,os:'windows',arch:'amd64',localShellAvailable:true};if(p==='/api/state'&&req.method()==='GET')data={appUpdatePreferences:{enabled:false}};if(p==='/api/jobs')data=[];if(p==='/api/terminals'||p==='/api/remote-browser')data={sessions:[]};if(p==='/api/terminal-views')data={available:false,owners:{},views:[]};if(p.includes('/events')){await new Promise(r=>setTimeout(r,100));data={events:[],sessions:[],after:0};}return route.fulfill({contentType:'application/json',body:JSON.stringify(data)});}
   try{let file=path.join(root,'web',p==='/'?'index.html':p);if(!fs.existsSync(file))file=path.join(root,p);let body=fs.readFileSync(file);if(p==='/')body=body.toString().replaceAll('__SESSION_TOKEN__','source-review').replaceAll('__WINDOW_MODE__','main');return route.fulfill({body,contentType:p==='/'?'text/html':p.endsWith('.js')?'application/javascript':p.endsWith('.css')?'text/css':p.endsWith('.svg')?'image/svg+xml':'application/octet-stream'});}catch{return route.fulfill({status:404,body:''});}
  });
@@ -20,7 +21,7 @@ const settle=()=>page.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requ
  const ta=page.locator('[data-ed-text]'),action=name=>page.locator('[data-ed="'+name+'"]');
  await open('review');await page.waitForFunction(()=>NetworkToolkitFileEditor.active.syntaxCache);
  for(const name of ['upper','lower','comment','duplicate','trim','sortLines','undo','redo']){
-  await ta.evaluate(el=>{const start=el.value.indexOf('line 60');el.setSelectionRange(start,start+7);el.scrollTop=700;el.scrollLeft=25;});const before=await ta.evaluate(el=>({top:el.scrollTop,left:el.scrollLeft}));if(name!=='undo'&&name!=='redo')await page.locator('.nt-editor-more summary').click();await action(name).click();await settle();assert.deepEqual(await ta.evaluate(el=>({top:el.scrollTop,left:el.scrollLeft})),before,name);
+  await ta.evaluate(el=>{const start=el.value.indexOf('line 60');el.setSelectionRange(start,start+7);el.scrollTop=700;el.scrollLeft=25;});const before=await ta.evaluate(el=>({top:el.scrollTop,left:el.scrollLeft}));if(name==='undo'||name==='redo')await action(name).click();else await page.evaluate(name=>NetworkToolkitFileEditor.textMenu.runTool(name),name);await settle();assert.deepEqual(await ta.evaluate(el=>({top:el.scrollTop,left:el.scrollLeft})),before,name);
  }
  check('case, comment, duplicate, trim, sort, undo and redo preserve both scroll positions');
  await action('goto').click();await page.locator('[data-ed-dialog-input]').fill('30');await page.locator('[data-ed-dialog-action="accept"]').click();await settle();assert.equal(await ta.evaluate(el=>el.value.slice(0,el.selectionStart).split('\n').length),30);

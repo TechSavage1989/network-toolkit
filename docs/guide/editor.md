@@ -89,7 +89,7 @@ When both comparison documents use disk-backed editing, gray, unnumbered rows fi
 
 **Highlight changed characters** emphasizes the edited parts of paired lines. A replacement can highlight a whole value when only a few letters happen to match. A line marked **Added** or **Removed** uses a whole-line color.
 
-Select text, then open **More** or right-click and choose **Convert text** to convert between UTF-8 text and hex or Base64. The result replaces the selection and can be undone. Each conversion accepts a selection of about one million characters.
+To convert between text and hex, Base64 and other encodings, use the [text tools](#text-tools): they work on the selection or the whole document, of any size, and can be undone.
 
 Detached Editor windows have a minimum width of 640 pixels.
 
@@ -104,11 +104,60 @@ Starting with v1.21.20 Beta 1, large text files use temporary disk storage and d
 
 Large comparisons run in the background and show changes as they are found. Use **Next** and **Previous** to move through differences. Use **Wrap** to fit long lines to the window. The first row shows the source line number and continuation rows leave the gutter blank. Compare aligns wrapped lines that fit in a loaded page when both files use the same editor mode. Very long lines can continue across pages, and their sections remain accessible. Comparisons highlight changed lines and may group distant rearrangements into one change. Select the commands you intend to send when using **Send to terminal** from a large file.
 
+## Text tools
+The **Tools** button on the toolbar (next to **Send to terminal**) opens the text tools in four groups. The same groups are in the right-click menu, and **Search tools and commands** (Ctrl+Shift+P) finds every tool by name. Each tool shows a one-line description, also as its tooltip, and its shortcut if it has one.
+
+- A tool works on the **selection**, or on the **whole document** when nothing is selected. The status bar says which: for example *Decoded the whole document from Base64* or *Sorted the selected lines A→Z (12 lines)*. Tools that work on lines take in the whole of every line the selection touches.
+- Every tool is **one undo step**: Ctrl+Z takes it back.
+- A tool that would change nothing says so and changes nothing. A tool that cannot run (Base64 that is not valid, JSON or XML with an error, decoded bytes that are not UTF-8 text) changes nothing and says why, with the line and column of the problem.
+- **Any size.** The tools run in the Network Toolkit engine, one implementation for every document. On a large document they run over its disk storage, show their progress above the text with **Cancel**, and the rest of the app stays responsive; sorting and removing duplicates spill to temporary files instead of holding the document in memory. Only a single line is ever held whole while lines are compared.
+- Text that is not UTF-8 (Windows-1252), UTF-16 text and files whose lines end in different ways keep their format: a tool changes the text you see, lines it does not change keep their own endings, and saving still stops if the result has a character the file's encoding cannot hold. A file that is not text cannot be changed by any tool.
+- The tools are in every Text Editor: the main window's, separate editor windows and the Text Editor app. The editor inside the Terminal app (for files of its SFTP sidebar) keeps the editing actions it always had in its **Tools** and right-click menus: Toggle comment, Duplicate lines, Sort A→Z, Trim trailing spaces, Base64 and hex, Format document, UPPERCASE and lowercase.
+
+| Group | Tool | What it does | Shortcut |
+|---|---|---|---|
+| Lines | Toggle comment | Comments or uncomments the selected lines in the document's language. | Ctrl+/ |
+| Lines | Duplicate lines | Copies the line with the cursor, or the selected lines, below themselves. | Ctrl+D |
+| Lines | Split at text… | Starts a new line at every occurrence of a text you choose, such as `&`, and removes that text (like replacing `&` with `\n`). Tick **Keep the separator at the end of each line** to keep it. The text is matched exactly. | Ctrl+Shift+L |
+| Lines | Join lines… | Joins the selected lines into one line, with a separator you choose (a space unless you change it; it may be empty). | Ctrl+J |
+| Lines | Sort A→Z / Sort Z→A | Sorts lines ignoring letter case, with numbers in number order (2 before 10); other characters by their code. Equal lines keep their order. | |
+| Lines | Remove duplicate lines | Removes lines that repeat an earlier line exactly; the first one stays where it is. | |
+| Lines | Remove empty lines | Removes lines that are empty or hold only spaces and tabs. | |
+| Lines | Trim trailing spaces | Removes spaces and tabs at the end of each line. | |
+| Lines | Trim leading and trailing spaces | Removes spaces and tabs at the start and the end of each line. | |
+| Lines | Reverse line order | Puts the lines in the opposite order. | |
+| Encode / decode | Base64 decode | Decodes Base64 (standard or URL-safe, with or without padding) back to text; line breaks and spaces in it are ignored. | Ctrl+Shift+B |
+| Encode / decode | Base64 encode | Encodes the UTF-8 text as Base64 on one line. | |
+| Encode / decode | URL decode | Turns `%XX` escapes into characters (`%20` is a space). A `+` stays a plus sign. | |
+| Encode / decode | URL decode form data | Like URL decode, but `+` is a space, as in submitted web forms. | |
+| Encode / decode | URL encode | Writes every character except letters, digits and `- _ . ~` as `%XX`. | |
+| Encode / decode | Hex to text / Text to hex | Turns pairs of hexadecimal digits into text (spaces, `:`, `-`, `,` and `0x` are ignored), or writes the UTF-8 bytes of the text as hex. | |
+| Encode / decode | HTML entities decode / encode | Turns `&amp;`, `&lt;`, `&nbsp;`, `&#233;` and the other HTML entities into characters, or writes `& < > " '` as entities. | |
+| Encode / decode | Unescape / Escape `\n \t \" \\` | Turns `\n`, `\t`, `\r`, `\"`, `\\`, `\xNN` and `\uNNNN` into the characters, or writes line breaks, tabs, double quotes and backslashes (other control characters as `\xNN`) as escapes. | |
+| Format | Format document | Formats the document with the rules of its language (as before; **Indent document** for languages whose indentation only is adjusted). | Ctrl+Shift+F |
+| Format | Pretty-print JSON / Minify JSON | Puts each member and item on its own line, indented with the editor's **Indent** setting, or removes all white space. Strings and numbers are copied exactly. | |
+| Format | Pretty-print XML / Minify XML | Puts each element on its own line, indented (an element that holds only text stays on one line), or removes the white space between tags. Tags, text and comments are copied exactly. | |
+| Format | Tabs to spaces / Leading spaces to tabs | Replaces tabs with spaces up to the next tab stop, or the spaces that indent each line with tabs, using the **Indent** width (4 when Indent is Tabs). | |
+| Format | UPPERCASE / lowercase / Title Case | Changes the letter case; Title Case starts every word with a capital letter. | Ctrl+Shift+U / Ctrl+U |
+| Device configs | Make SonicWall export readable | Opens a readable copy of a SonicWall settings export in a new tab (see below). | |
+
+### SonicWall settings exports
+A SonicWall settings export (`.exp`) is one long line of Base64, usually followed by `&&`. When you open a file that starts like one, a bar offers **Make readable** (or **Dismiss** to hide it for that tab); the check reads only the first few kilobytes. **Make readable** (also **Tools → Device configs**) never changes the export: it opens a new, unsaved tab named like `firewall (readable).txt` with one `key=value` setting per line, in the export's order, values decoded (`%20` is a space, `%3a` a colon; a `+` stays a plus sign). A line break or another control character inside a value is shown as `\n`, `\r` or `\xNN` so that every setting stays on one line, and a backslash in a value is shown as it is, so the copy is for reading and searching, not for importing back into a firewall. For a large export the engine writes the copy directly; nothing passes through the page.
+
+### Find and Replace modes
+Choose **Mode** in the Find bar:
+
+- **Normal** finds the text exactly as typed.
+- **Extended (\n, \r, \t, \0, \x…, \u…)** works like Normal, but `\n`, `\r`, `\t`, `\\`, `\xNN` and `\uNNNN` in **Find** and **Replace** stand for a line break, a tab and other characters (Notepad++'s Extended mode). Find `&`, Replace `\n` and **Replace all** starts a new line at every `&`. The editor holds every line break as one `\n`, so `\r` and `\r\n` mean a line break too; `\0` is refused, because no text in the editor can hold a NUL character.
+- **Regular expression**: **Find** is a regular expression, and **Replace** may use `$1` to `$99`, `${name}`, `$&` (or `$0`) for the text of groups, `$$` for a dollar sign, and `\n`, `\t` for a line break and a tab. A group that does not exist stays as written. Large documents and the page use the same rules for the replacement.
+
+The mode applies to Find, Replace and Replace all of every document, of any size, and lasts while the editor is open.
+
 ## Files and Connect sidebar
 The sidebar's Connect and Files buttons open saved connections and the file browser. Drag its edge to resize it, or double-click the edge to hide it. The ⇄ button at the bottom of the sidebar's icon strip moves it to the other side of the editor; the side, width and open panel are kept when you restart.
 
 ## Tabs and splitters
-Open a new document with the **+** at the end of the tab strip or Ctrl+N. When the tabs do not fit, scroll the tab row with the mouse wheel or the arrow buttons at its right end. Right-click editor text or press Shift+F10 for common editing and navigation commands. **Edit text** groups comment, duplicate, case, and format commands. **Convert text** groups hex and Base64 commands, and **Compare** groups comparison commands. Hover or click to open a submenu. With the keyboard, use Right Arrow to open it and Left Arrow to return to the main menu. To run text on a device, choose **Send to terminal** (the terminal-with-arrow button on the toolbar, the right-click menu, or Ctrl+Shift+Enter): pick the selection or the whole document and a connected Terminal session; the Terminal opens on that session and the text is entered like a paste, with your paste review settings. Each tab has a visible **More actions** menu with Move left, Move right and Move to separate window. Existing Alt+drag and Alt+Shift+Arrow shortcuts remain supported, as does tab dragging. Dividers can be resized and may support double-click reset or collapse.
+Open a new document with the **+** at the end of the tab strip or Ctrl+N. When the tabs do not fit, scroll the tab row with the mouse wheel or the arrow buttons at its right end. Right-click editor text or press Shift+F10 for common editing and navigation commands. The [text tools](#text-tools) are grouped as **Lines**, **Encode / decode**, **Format** and **Device configs**, the same groups as the toolbar's **Tools** menu, and **Compare** groups comparison commands. **More** on the toolbar keeps **Save copy**, **Text colors** and the close and reopen preferences. Hover or click to open a submenu. With the keyboard, use Right Arrow to open it and Left Arrow to return to the main menu. To run text on a device, choose **Send to terminal** (the terminal-with-arrow button on the toolbar, the right-click menu, or Ctrl+Shift+Enter): pick the selection or the whole document and a connected Terminal session; the Terminal opens on that session and the text is entered like a paste, with your paste review settings. Each tab has a visible **More actions** menu with Move left, Move right and Move to separate window. Existing Alt+drag and Alt+Shift+Arrow shortcuts remain supported, as does tab dragging. Dividers can be resized and may support double-click reset or collapse.
 
 ## The Text Editor app
 With the Windows setup installed, **Network Toolkit Text Editor** in the Start menu opens the editor in its own window, without the rest of the Toolkit. It is its own program, **Network_Toolkit_TextEditor.exe** (also in the portable folder), with its own taskbar button and name in Task Manager; a file opened from Explorer or `Network_Toolkit.exe --editor-standalone` opens in the same window. It contains what belongs to the editor: documents and tabs, compare and split view, the Files and Connect sidebar (files on your computer and on SFTP, FTP and SSH connections), text colors and **Send to terminal**. Diagnostics, the Toolkit's App settings and update controls stay in the main Toolkit window. **Open terminal** on a connected SFTP session is offered only in the main Toolkit window, because a signed-in connection cannot be handed to another app.

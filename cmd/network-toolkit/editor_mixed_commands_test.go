@@ -121,10 +121,32 @@ func (f *mixedFile) bulk(from, to int, text string) {
 	f.call(map[string]any{"action": "edit-commit", "requestId": id})
 }
 
+// textTool runs a text tool of the Tools menu in the engine and waits for it
+// (editor_text_tools.go). from == to means the whole document.
+func (f *mixedFile) textTool(id string, options map[string]any, from, to int) map[string]any {
+	f.t.Helper()
+	started := f.call(map[string]any{"action": "tool-start", "revision": f.revision, "tool": id, "options": options, "from": from, "to": to})
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		state := f.call(map[string]any{"action": "tool-status", "job": started["job"]})
+		switch state["state"] {
+		case "done":
+			return state
+		case "failed":
+			f.t.Fatalf("%s: %v", id, state["error"])
+		}
+		if time.Now().After(deadline) {
+			f.t.Fatalf("%s did not finish", id)
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
 // The commands of the page that rewrite a range (web/assets/file-editor.js
-// transformDiskSelection, the disk view's replace, Replace All, Convert text,
-// insert from the Terminal) reach the engine as one of three requests: an
-// edit of the range, a bulk edit of the range, or replace-all. Each row is
+// transformDiskSelection, the disk view's replace, Replace All, insert from
+// the Terminal, the text tools of the Tools menu) reach the engine as one of
+// four requests: an edit of the range, a bulk edit of the range,
+// replace-all, or a text tool (tool-start). Each row is
 // one command on a file whose five lines end CRLF, LF, CR, CRLF, CRLF; the
 // saved bytes show which endings it kept.
 func TestEditorRangeCommandsKeepMixedLineEndings(t *testing.T) {
@@ -159,6 +181,22 @@ func TestEditorRangeCommandsKeepMixedLineEndings(t *testing.T) {
 		{"Paste over the whole document, other lines: all of it is new text", func(f *mixedFile) { f.edit(0, 24, "x\ny\n") }, "x\r\ny\r\n"},
 		{"A large paste over lines (bulk edit), as many lines", func(f *mixedFile) { f.bulk(4, 18, "TWO\nTHREE\nFOUR") }, "one\r\nTWO\nTHREE\rFOUR\r\nfive\r\n"},
 		{"A large paste (bulk edit) of more lines: the pasted lines are new text", func(f *mixedFile) { f.bulk(4, 18, "a\nb\nc\nd") }, "one\r\na\r\nb\r\nc\r\nd\r\nfive\r\n"},
+		// The Tools menu (editor_text_tools.go): a tool keeps what it does
+		// not change, so the lines it leaves keep their endings.
+		{"Tools: UPPERCASE of a selection across lines", func(f *mixedFile) { f.textTool("upper", nil, 4, 18) }, "one\r\nTWO\nTHREE\rFOUR\r\nfive\r\n"},
+		{"Tools: Title Case of the whole document", func(f *mixedFile) { f.textTool("title", nil, 0, 0) }, "One\r\nTwo\nThree\rFour\r\nFive\r\n"},
+		{"Tools: Sort A→Z, each place keeps its ending", func(f *mixedFile) { f.textTool("sort-asc", nil, 4, 18) }, "one\r\nfour\nthree\rtwo\r\nfive\r\n"},
+		{"Tools: Reverse line order, each place keeps its ending", func(f *mixedFile) { f.textTool("reverse", nil, 6, 16) }, "one\r\nfour\nthree\rtwo\r\nfive\r\n"},
+		{"Tools: Trim trailing spaces with nothing to trim", func(f *mixedFile) { f.textTool("trim-trailing", nil, 0, 0) }, raw},
+		{"Tools: Remove duplicate lines with none to remove", func(f *mixedFile) { f.textTool("dedupe", nil, 0, 0) }, raw},
+		{"Tools: Split at text, the new line break is new text", func(f *mixedFile) {
+			f.textTool("split", map[string]any{"separator": "h"}, 4, 18)
+		}, "one\r\ntwo\nt\r\nree\rfour\r\nfive\r\n"},
+		{"Tools: Join lines, only the joined breaks go", func(f *mixedFile) {
+			f.textTool("join", map[string]any{"separator": " "}, 4, 18)
+		}, "one\r\ntwo three four\r\nfive\r\n"},
+		{"Tools: Base64 encode of a selection (one line for two)", func(f *mixedFile) { f.textTool("base64-encode", nil, 4, 13) }, "one\r\ndHdvCnRocmVl\rfour\r\nfive\r\n"},
+		{"Tools: Tabs to spaces with no tabs", func(f *mixedFile) { f.textTool("tabs-to-spaces", map[string]any{"indent": 4}, 0, 0) }, raw},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

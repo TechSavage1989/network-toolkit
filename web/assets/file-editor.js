@@ -2,7 +2,7 @@
    Nothing is autosaved. Remote saves use the authenticated file browser and
    refuse stale revisions rather than overwriting a file changed elsewhere. */
 (function(root){'use strict';
-const documents=new Map();let active='',selectedRemoteSource='',preferredRemotePath='',remoteSourceGeneration=0,embedded=false,showFind=false,showReplace=false,matchCase=false,useRegex=false,wholeWord=false,wordWrap=false,syntax=true,tabSpaces=4,overlay=null,updating=false,editorFontSize=13,editorPalette='auto',editorCustomColors={};
+const documents=new Map();let active='',selectedRemoteSource='',preferredRemotePath='',remoteSourceGeneration=0,embedded=false,showFind=false,showReplace=false,matchCase=false,searchMode='normal',wholeWord=false,wordWrap=false,syntax=true,tabSpaces=4,overlay=null,updating=false,editorFontSize=13,editorPalette='auto',editorCustomColors={};
 const escaped=x=>esc(String(x??''));
 const paneWorkspace=()=>comparison||splitView;
 const groups=root.NTKEditorTabGroups.create(()=>[...documents.values()]);
@@ -138,7 +138,7 @@ async function openDiskDocument(d,mode='',file){
   const identity=documentTransferValue(d);
   const remote=await d.diskRemote?.();
   if(documents.get(d.id)!==d)throw Error('The file was closed.');
-  await windows.openBuffer(identity,mode,remote,mode==='restore'?d.restoreRequest:undefined);
+  await windows.openBuffer(identity,mode,remote,mode==='restore'?d.restoreRequest:undefined,mode==='derive'?d.deriveRequest:undefined);
   const result=file?await importBrowserFile(d,file):await waitForDiskDocument(d);
   if(mode==='restore')d.restoreStatus=result.restore||null;
   // A kept copy of a local file stays disk-backed so its save baseline stays
@@ -352,7 +352,7 @@ function drawDiskDocument(d,savedView){
  }
 }
 
-async function searchDiskDocument(d,query,backwards,replace,all,focus){
+async function searchDiskDocument(d,query,backwards,replace,all,focus,replacement=''){
  const view=diskView();
  if(!view||d.loading||d.frozen||d.reloading||d.diskEditing)return;
  d.diskSearch?.abort();
@@ -360,8 +360,7 @@ async function searchDiskDocument(d,query,backwards,replace,all,focus){
  d.diskSearch=controller;
  const {signal}=controller;
  const session=ensureDiskSession(d);
- const options={regex:useRegex,matchCase,wholeWord};
- const replacement=findEl('[data-ed-replacement]')?.value||'';
+ const options={regex:searchMode==='regex',matchCase,wholeWord};
  try{
   if(!focus)await new Promise(resolve=>root.setTimeout(resolve,140));
   if(signal.aborted||current()!==d||view!==diskView())return;
@@ -386,7 +385,19 @@ async function searchDiskDocument(d,query,backwards,replace,all,focus){
   if(!match.found&&backwards&&start<d.diskMeta.units)match=await session.find(query,d.diskMeta.units,{...options,backwards:true},signal);
   if(signal.aborted||current()!==d||diskView()!==view)return;
   if(!match.found){setMessage('No matches.');return;}
-  if(replace&&match.from===range.start&&match.to===range.end)await view.replace(replacement);
+  if(replace&&match.from===range.start&&match.to===range.end){
+   // A regular expression's Replace text names groups of this match ($1):
+   // the engine expands it exactly as Replace All does.
+   let text=replacement;
+   if(options.regex){
+    await session.flush();
+    const expanded=await diskCall(d,'replace-text',{query,replacement,...options,from:match.from,to:match.to,revision:d.editRevision},signal);
+    if(signal.aborted||current()!==d)return;
+    if(!expanded.found){setMessage('The selection is no longer a match. Search again.');return;}
+    text=expanded.text;
+   }
+   await view.replace(text);
+  }
   else await view.position(match.from,match.to,focus);
   setMessage('Match on line '+(match.line+1).toLocaleString()+'.');
  }catch(error){if(!signal.aborted&&current()===d)setMessage(error.message,true);}
@@ -597,9 +608,9 @@ function editorIconButton(action,label,glyph,attributes=''){
 function skin(){if(overlay)return;readPreferences();
  overlay=document.createElement('div');overlay.id='networkToolkitFileEditor';overlay.className='nt-editor';overlay.hidden=true;
  overlay.innerHTML='<div class="nt-editor-window" role="dialog" aria-modal="true" aria-label="Network Toolkit text editor">'+
- '<div class="nt-editor-toolbar"><button class="btn small ghost" data-ed="browse" title="Open a Windows file with editing permissions (Ctrl+O)">Open file</button><button class="btn small primary" data-ed="save" title="Save (Ctrl+S)">Save</button><button class="btn small ghost" data-ed="saveAs" title="Save As (Ctrl+Shift+S)">Save as</button>'+editorIconButton('reload','Reload','refresh')+editorIconButton('compare','Compare documents','compare',' aria-pressed="false"')+editorIconButton('split','Split view','split',' aria-pressed="false"')+'<button type="button" class="btn small ghost" data-ed="files" aria-expanded="false">Files</button><span class="nt-editor-rule"></span>'+editorIconButton('undo','Undo','undo')+editorIconButton('redo','Redo','redo')+'<button class="btn small ghost" data-ed="find">Find</button><button class="btn small ghost" data-ed="replace">Replace</button>'+editorIconButton('goto','Go to line','goto')+'<button type="button" class="btn small ghost nt-editor-icon-button" data-ed="sendTerminal" aria-label="Send to terminal" title="Send to terminal: the selection or the whole document (Ctrl+Shift+Enter)" aria-keyshortcuts="Control+Shift+Enter">'+(typeof icon==='function'?icon('sendTerminal'):'&gt;_')+'</button><details class="nt-editor-more"><summary class="btn small ghost" aria-controls="ntEditorMoreActions" aria-expanded="false">More</summary><div id="ntEditorMoreActions" class="nt-editor-more-actions" role="group" aria-label="More editor actions" hidden><button class="btn small ghost" data-ed="comment" title="Toggle comment (Ctrl+/)">Comment</button><button class="btn small ghost" data-ed="duplicate" title="Duplicate line (Ctrl+D)">Duplicate</button><button class="btn small ghost" data-ed="trim">Trim spaces</button><button class="btn small ghost" data-ed="upper">UPPER</button><button class="btn small ghost" data-ed="lower">lower</button><button class="btn small ghost" data-ed="sortLines">Sort lines</button>'+conversionActions.map(([action,label])=>'<button type="button" class="btn small ghost" data-ed="'+action+'">'+label+'</button>').join('')+'<button class="btn small ghost" data-ed="format" title="Format document (Ctrl+Shift+F)">Format document</button><button class="btn small ghost" data-ed="download">Save copy</button><button type="button" class="btn small ghost" data-ed="colors" title="Customize syntax and editor colors">Text colors</button><label class="nt-editor-close-preference"><input type="checkbox" data-ed-ask-save-close checked aria-label="Ask to save unsaved changes before closing" aria-describedby="ntEditorClosePolicyNote"> Confirm unsaved close</label><span id="ntEditorClosePolicyNote" data-ed-close-policy-note class="nt-editor-window-announcement"></span><label class="nt-editor-close-preference"><input type="checkbox" data-ed-restore-session checked aria-describedby="ntEditorRestoreHint"> Reopen files and unsaved changes from the last session</label><small id="ntEditorRestoreHint" class="nt-editor-preference-hint">Unsaved text is kept in this app’s data folder until it is saved or its tab is closed.</small></div></details><button type="button" class="btn small ghost" data-ed="localTools" title="Open the full Text Editor in Tools">Full editor</button><button type="button" class="btn small ghost" data-ed="close" aria-label="Close text editor">Close editor</button><span data-ed-title hidden></span></div>'+
+ '<div class="nt-editor-toolbar"><button class="btn small ghost" data-ed="browse" title="Open a Windows file with editing permissions (Ctrl+O)">Open file</button><button class="btn small primary" data-ed="save" title="Save (Ctrl+S)">Save</button><button class="btn small ghost" data-ed="saveAs" title="Save As (Ctrl+Shift+S)">Save as</button>'+editorIconButton('reload','Reload','refresh')+editorIconButton('compare','Compare documents','compare',' aria-pressed="false"')+editorIconButton('split','Split view','split',' aria-pressed="false"')+'<button type="button" class="btn small ghost" data-ed="files" aria-expanded="false">Files</button><span class="nt-editor-rule"></span>'+editorIconButton('undo','Undo','undo')+editorIconButton('redo','Redo','redo')+'<button class="btn small ghost" data-ed="find">Find</button><button class="btn small ghost" data-ed="replace">Replace</button>'+editorIconButton('goto','Go to line','goto')+'<button type="button" class="btn small ghost nt-editor-icon-button" data-ed="sendTerminal" aria-label="Send to terminal" title="Send to terminal: the selection or the whole document (Ctrl+Shift+Enter)" aria-keyshortcuts="Control+Shift+Enter">'+(typeof icon==='function'?icon('sendTerminal'):'&gt;_')+'</button><button type="button" class="btn small ghost nt-editor-tools-button" data-ed="tools" aria-haspopup="menu" aria-expanded="false" title="Text tools: lines, encode and decode, format, device configs">Tools</button><details class="nt-editor-more"><summary class="btn small ghost" aria-controls="ntEditorMoreActions" aria-expanded="false">More</summary><div id="ntEditorMoreActions" class="nt-editor-more-actions" role="group" aria-label="More editor actions" hidden><button class="btn small ghost" data-ed="download">Save copy</button><button type="button" class="btn small ghost" data-ed="colors" title="Customize syntax and editor colors">Text colors</button><label class="nt-editor-close-preference"><input type="checkbox" data-ed-ask-save-close checked aria-label="Ask to save unsaved changes before closing" aria-describedby="ntEditorClosePolicyNote"> Confirm unsaved close</label><span id="ntEditorClosePolicyNote" data-ed-close-policy-note class="nt-editor-window-announcement"></span><label class="nt-editor-close-preference"><input type="checkbox" data-ed-restore-session checked aria-describedby="ntEditorRestoreHint"> Reopen files and unsaved changes from the last session</label><small id="ntEditorRestoreHint" class="nt-editor-preference-hint">Unsaved text is kept in this app’s data folder until it is saved or its tab is closed.</small></div></details><button type="button" class="btn small ghost" data-ed="localTools" title="Open the full Text Editor in Tools">Full editor</button><button type="button" class="btn small ghost" data-ed="close" aria-label="Close text editor">Close editor</button><span data-ed-title hidden></span></div>'+
  '<div id="ntEditorRemotePanel" class="nt-editor-file-sessions" data-ed-page-panel="remote" hidden><div class="nt-editor-file-session-row"><label class="sr-only" for="ntEditorRemoteSource">Active or saved file connection</label><select id="ntEditorRemoteSource" aria-label="Connected or saved SSH, SFTP, FTP or FTPS session"><option value="">Loading connections...</option></select><button type="button" class="btn small primary" id="ntEditorConnectSaved" data-ed-page="connectSaved" hidden disabled>Connect</button><button type="button" class="btn small primary" id="ntEditorOpenRemote" data-ed-page="useRemote" disabled>Use</button><button type="button" class="btn small ghost" data-ed-page="refreshRemote" title="Refresh active and saved connections" aria-label="Refresh connections">↻</button></div><details class="nt-editor-file-path-actions"><summary class="btn small ghost">Open / create by path</summary><label>Remote file path<input id="ntEditorRemotePath" type="text" spellcheck="false" placeholder="/home/user/config.txt"></label><div class="row"><button type="button" class="btn small ghost" data-ed-page="browseRemote">Browse…</button><button class="btn small ghost" id="ntEditorOpenRemotePath" data-ed-page="openRemotePath" disabled>Open file</button><button class="btn small ghost" id="ntEditorNewRemote" data-ed-page="newRemote" disabled>New file</button></div></details><div class="nt-editor-remote-hint" id="ntEditorRemoteHint" role="status">Select an active or saved connection.</div></div>'+
- '<div class="nt-editor-find" data-ed-find hidden><label>Find <input type="text" data-ed-query placeholder="Find text (Ctrl+F)"></label><button class="btn small ghost" data-ed="previous">Previous</button><button class="btn small ghost" data-ed="next">Next</button><label><input type="checkbox" data-ed-case> Case</label><label><input type="checkbox" data-ed-regex> Regex</label><label><input type="checkbox" data-ed-word> Word</label><div data-ed-replace-fields hidden class="nt-editor-replace-fields"><label>Replace <input type="text" data-ed-replacement placeholder="Replacement text"></label><button class="btn small ghost" data-ed="replaceOne">Replace</button><button class="btn small ghost" data-ed="replaceAll">Replace all</button></div><button type="button" class="btn small ghost" data-ed="hideFind">Hide</button></div>'+
+ '<div class="nt-editor-find" data-ed-find hidden><label>Find <input type="text" data-ed-query placeholder="Find text (Ctrl+F)"></label><button class="btn small ghost" data-ed="previous">Previous</button><button class="btn small ghost" data-ed="next">Next</button><label><input type="checkbox" data-ed-case> Case</label><label class="nt-editor-search-mode" title="'+escaped(searchModeHelp.normal)+'" data-ed-search-mode-label>Mode <select data-ed-search-mode aria-label="Search mode">'+[['normal','Normal'],['extended','Extended (\\n, \\r, \\t, \\0, \\x…, \\u…)'],['regex','Regular expression']].map(([value,label])=>'<option value="'+value+'" title="'+escaped(searchModeHelp[value])+'">'+escaped(label)+'</option>').join('')+'</select></label><label><input type="checkbox" data-ed-word> Word</label><div data-ed-replace-fields hidden class="nt-editor-replace-fields"><label>Replace <input type="text" data-ed-replacement placeholder="Replacement text"></label><button class="btn small ghost" data-ed="replaceOne">Replace</button><button class="btn small ghost" data-ed="replaceAll">Replace all</button></div><button type="button" class="btn small ghost" data-ed="hideFind">Hide</button></div>'+
  '<div class="nt-editor-options"><label>Line endings <select data-ed-eol><option>LF</option><option>CRLF</option><option>CR</option></select></label><label>Indent <select data-ed-indent><option value="4">4 spaces</option><option value="2">2 spaces</option><option value="0">Tabs</option></select></label><label><input data-ed-wrap type="checkbox"> Wrap</label><label><input data-ed-syntax type="checkbox" checked> Highlight</label><label>Language <select data-ed-language-select>'+'<option value="" data-ed-auto-language>Auto</option>'+languageRows.map(row=>'<option value="'+escaped(row.id)+'">'+escaped(row.label)+'</option>').join('')+'</select></label><label>Encoding <select data-ed-encoding><option>UTF-8</option><option>UTF-16LE</option><option>UTF-16BE</option></select></label><label><input type="checkbox" data-ed-bom> BOM</label><label>Font size <input type="number" data-ed-font data-input-clear="off" min="10" max="24" step="1" title="Hold Ctrl and use the mouse wheel over editor text to zoom" value="13"></label><label>Editor colors <select data-ed-palette><option value="auto">Follow app</option><option value="dark">Dark</option><option value="light">Light</option><option value="pastel">Pastel</option><option value="forest">Forest</option><option value="highContrast">High contrast</option><option value="custom">Custom</option></select></label></div><section class="nt-editor-color-controls" data-ed-custom-palette hidden><div class="row between"><strong>Custom editor colors</strong><button type="button" class="btn small ghost" data-ed="colors">Close</button></div><div data-ed-color-panel></div></section>'+
  '<div class="nt-editor-workspace"><aside class="nt-editor-files-sidebar" data-ed-files-sidebar hidden></aside><div class="nt-editor-document-area"><div class="nt-editor-tabs" data-ed-tabs data-ed-view="single" role="tablist" aria-label="Open document tabs"></div><div class="nt-editor-code"><div class="nt-editor-gutter" data-ed-gutter aria-hidden="true"><div data-ed-gutter-lines></div></div><div class="nt-editor-surface"><pre class="nt-editor-highlight" data-ed-highlight aria-hidden="true"></pre><textarea data-ed-text data-input-clear="off" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" wrap="off" aria-label="Editable file contents"></textarea></div></div>'+
  '</div></div><div class="nt-editor-status"><span data-ed-message></span><span data-ed-position></span><span data-ed-size></span></div></div>';
@@ -715,8 +726,8 @@ function remoteSaveAsPicker(d){
   void load(dir).then(()=>nameInput.focus({preventScroll:true}));
  });
 }
-function askEditor({title,message='',value,accept='Continue',validate}){if(pendingEditorDialog)pendingEditorDialog.finish(null);const returnView=captureView(),owner=current(),panel=document.createElement('section');panel.className='nt-editor-dialog';panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','true');panel.setAttribute('aria-label',title);panel.innerHTML='<div class="nt-editor-dialog-card"><h3>'+escaped(title)+'</h3><p>'+escaped(message)+'</p>'+(value===undefined?'':'<label>'+escaped(title)+'<input data-ed-dialog-input data-input-clear="off" type="text" autocomplete="off" spellcheck="false" value="'+escaped(value)+'"></label>')+'<p data-ed-dialog-error role="status"></p><div class="row"><button type="button" class="btn ghost" data-ed-dialog-action="cancel">Cancel</button><button type="button" class="btn primary" data-ed-dialog-action="accept">'+escaped(accept)+'</button></div></div>';overlay.querySelector('.nt-editor-window').append(panel);return new Promise(resolve=>{const finish=result=>{panel.remove();pendingEditorDialog=null;if(current()===owner)restoreView(returnView,returnView?.start,returnView?.end,true);resolve(result);};pendingEditorDialog={panel,finish,validate};(panel.querySelector('input')||panel.querySelector('button'))?.focus({preventScroll:true});panel.querySelector('input')?.select?.();});}
-function answerEditorDialog(accept){const pending=pendingEditorDialog;if(!pending)return;if(!accept){pending.finish(null);return;}const value=pending.panel.querySelector('input')?.value??true,error=pending.validate?.(value);if(error){pending.panel.querySelector('[data-ed-dialog-error]').textContent=error;pending.panel.querySelector('input')?.focus({preventScroll:true});return;}pending.finish(value);}
+function askEditor({title,message='',value,accept='Continue',validate,check}){if(pendingEditorDialog)pendingEditorDialog.finish(null);const returnView=captureView(),owner=current(),panel=document.createElement('section');panel.className='nt-editor-dialog';panel.setAttribute('role','dialog');panel.setAttribute('aria-modal','true');panel.setAttribute('aria-label',title);panel.innerHTML='<div class="nt-editor-dialog-card"><h3>'+escaped(title)+'</h3><p>'+escaped(message)+'</p>'+(value===undefined?'':'<label>'+escaped(title)+'<input data-ed-dialog-input data-input-clear="off" type="text" autocomplete="off" spellcheck="false" value="'+escaped(value)+'"></label>')+(check?'<label class="nt-editor-dialog-check"><input type="checkbox" data-ed-dialog-check'+(check.checked?' checked':'')+'> '+escaped(check.label)+'</label>':'')+'<p data-ed-dialog-error role="status"></p><div class="row"><button type="button" class="btn ghost" data-ed-dialog-action="cancel">Cancel</button><button type="button" class="btn primary" data-ed-dialog-action="accept">'+escaped(accept)+'</button></div></div>';overlay.querySelector('.nt-editor-window').append(panel);return new Promise(resolve=>{const finish=result=>{panel.remove();pendingEditorDialog=null;if(current()===owner)restoreView(returnView,returnView?.start,returnView?.end,true);resolve(result);};pendingEditorDialog={panel,finish,validate,check:!!check};(panel.querySelector('input')||panel.querySelector('button'))?.focus({preventScroll:true});panel.querySelector('input')?.select?.();});}
+function answerEditorDialog(accept){const pending=pendingEditorDialog;if(!pending)return;if(!accept){pending.finish(null);return;}const value=(pending.panel.querySelector('[data-ed-dialog-input]')||pending.panel.querySelector('input'))?.value??true,error=pending.validate?.(value);if(error){pending.panel.querySelector('[data-ed-dialog-error]').textContent=error;pending.panel.querySelector('input')?.focus({preventScroll:true});return;}pending.finish(pending.check?{value,checked:!!pending.panel.querySelector('[data-ed-dialog-check]')?.checked}:value);}
 const LARGE_EDITOR_CHARS=2*1024*1024,HISTORY_MEMORY_LIMIT=128*1024*1024;
 const largeDocument=d=>!!d&&(d.disk||d.content.length>LARGE_EDITOR_CHARS);
 const effectiveWrap=d=>wordWrap&&!largeDocument(d);
@@ -770,7 +781,7 @@ function moveDocumentToView(uid,side,beforeUID=null){const error=canReorderDocum
 function syncEditorControls(d){if(!d)return;for(const [selector,value] of [['[data-ed-language-select]',d.language||''],['[data-ed-indent]',String(tabSpaces)],['[data-ed-font]',String(editorFontSize)],['[data-ed-palette]',editorPalette]])findEl(selector).value=value;formatControls(d);const wrap=findEl('[data-ed-wrap]');wrap.checked=wordWrap;wrap.disabled=!paneUsesDisk&&!!paneWorkspace()&&workspaceLarge();wrap.title=wrap.disabled?'Wrap is paused in large-file mode; your saved preference is retained.':'';findEl('[data-ed-syntax]').checked=syntax;findEl('[data-ed-find]').hidden=!showFind;findEl('[data-ed-replace-fields]').hidden=!showReplace;applyEditorTheme();syncLanguageControls(d);status();}
 function closeComparison(){if(!comparison)return;if(comparison.composing){setMessage('Finish text composition before closing the comparison.',true);return false;}const restore=comparisonReturnLayout;disposePaneWorkspace();if(restore)groups.restore(restore);if(splitEnabled)createPaneWorkspace(false);else{groups.single();draw();}}
 function setFileValues(d){d.editRevision=(d.editRevision||0)+1;d.eol=lineMode(d.original);d.content=normalize(d.original);d.saved=d.content;d.savedEol=d.eol;d.savedBOM=d.bom;d.savedEncoding=d.encoding||'UTF-8';d.dirty=false;d.saveFailed=false;d.undo=[];d.redo=[];d.bom=!!d.bom;d.showStart=true;}
-async function open({id,source,path,read,write,afterSave,list,binding=null,create=false,initialContent='',diskMode='',diskFile=null,diskRemote=null,desktopHandle=null,restore=null}){
+async function open({id,source,path,read,write,afterSave,list,binding=null,create=false,initialContent='',diskMode='',diskFile=null,diskRemote=null,desktopHandle=null,restore=null,derive=null}){
  if(windowCloseState)throw Error('The editor is waiting for window close confirmation.');
  if(editorComposing())throw Error('Finish text composition before opening another document.');
  if(!path||typeof write!=='function'||typeof read!=='function')throw Error('Editor requires a file path and read/write functions.');skin();
@@ -780,7 +791,7 @@ async function open({id,source,path,read,write,afterSave,list,binding=null,creat
  if(doc){noteAsked(key);active=key;doc.showStart=true;overlay.hidden=false;root.NetworkToolkitEditorFiles?.initialize?.(overlay);draw();if(doc.loading)return doc.loadingPromise;if(!comparison)findEl('[data-ed-text]')?.focus();return doc;}
  if(documents.size>=12)throw Error('Close an editor tab before opening another file (12 maximum).');
  startSession();
- doc={id:key,restoreRequest:restore,uid:root.crypto?.randomUUID?.()||'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const n=Math.floor(Math.random()*16);return (c==='x'?n:(n&3)|8).toString(16);}),binding,path,source:source||'SFTP',read,write,afterSave,diskRemote,desktopHandle,diskFile,list:typeof list==='function'?list:null,hash:'',encoding:'UTF-8',bom:false,original:initialContent,content:'',saved:'',dirty:false,eol:'LF',undo:[],redo:[],language:'',untitled:source==='Untitled',loading:!create};
+ doc={id:key,restoreRequest:restore,deriveRequest:derive,uid:root.crypto?.randomUUID?.()||'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const n=Math.floor(Math.random()*16);return (c==='x'?n:(n&3)|8).toString(16);}),binding,path,source:source||'SFTP',read,write,afterSave,diskRemote,desktopHandle,diskFile,list:typeof list==='function'?list:null,hash:'',encoding:'UTF-8',bom:false,original:initialContent,content:'',saved:'',dirty:false,eol:'LF',undo:[],redo:[],language:'',untitled:source==='Untitled',loading:!create};
  const paged=!!diskAvailable()&&(!!diskMode||!create&&['local','terminal','sshConnection','ftp'].includes(binding?.kind));
  if(paged)doc.loading=true;
  setFileValues(doc);documents.set(key,doc);if(!paged)root.NetworkToolkitEditorWindows?.prepareDocument?.(doc);
@@ -801,6 +812,7 @@ async function open({id,source,path,read,write,afterSave,list,binding=null,creat
      if(doc.disk){setMessage(openedNote(doc));if(notText(doc)&&typeof toast==='function')toast(openedNote(doc),'info');}
      else if(!comparison)findEl('[data-ed-text]')?.focus();
     }else paneWorkspace()?.refresh();
+    void textTools?.opened(doc);
     return doc;
    }catch(error){
     if(documents.get(key)===doc){documents.delete(key);if(active===key){active=documents.has(previous)?previous:[...documents.keys()].at(-1)||'';if(active){draw();setMessage('Cannot open '+nameOf(path)+': '+error.message,true);}else overlay.hidden=true;}}
@@ -870,6 +882,7 @@ function drawTabs(){
  const compareButton=findEl('[data-ed="compare"]');if(compareButton){compareButton.setAttribute('aria-pressed',String(!!comparison));compareButton.title=comparison?'Exit comparison':'Compare documents';}
  const split=findEl('[data-ed="split"]');if(split){const label=workspace?'Single view':'Split view';split.setAttribute('aria-label',label);split.title=label;split.setAttribute('aria-pressed',String(!!workspace));}
  if(focusID){const node=[...overlay.querySelectorAll(closeFocus?'[data-ed-close-tab]':'[data-ed-open]')].find(node=>(closeFocus?node.dataset.edCloseTab:node.dataset.edOpen)===focusID);node?.focus({preventScroll:true});}
+ textTools?.draw();
 }
 
 // Paint a plain escaped copy immediately. Late worker replies must match the
@@ -915,72 +928,23 @@ function rememberClosedDocument(d){
 }
 async function closeTab(key){const d=documents.get(key);if(!d)return false;if(pendingEditorDialog||documentCloseBlocked(d)||editorComposing()){setMessage('Finish text composition, document saving or the window move before closing it.',true);return false;}const stamp=documentStamp(d);if(closeNeedsConfirmation([d])&&await askEditor({title:'Close file',message:(d.saveFailed?'A previous save failed. ':'')+'Discard unsaved changes to '+nameOf(d.path)+'?',accept:'Discard and close'})===null)return false;if(editorComposing()||documentCloseBlocked(d)||documents.get(key)!==d||documentStamp(d)!==stamp){setMessage('The file changed while the dialog was open. Review it before closing.',true);return false;}const wasActive=active===key;if(d.disk)discardDiskView(d);if(wasActive)displayedDocument=null;rememberClosedDocument(d);documents.delete(key);paneWorkspace()?.refresh(true);if(wasActive)active=[...documents.keys()].at(-1)||'';if(active){if(wasActive)draw();else drawTabs();}else{if(paneWorkspace())disposePaneWorkspace();splitEnabled=false;groups.single();findEl('[data-ed-text]').value='';findEl('[data-ed-text]').disabled=false;findEl('[data-ed-highlight]').textContent='';findEl('[data-ed-gutter-lines]').textContent='';drawTabs();overlay.hidden=!embedded;setMessage('No open documents.');paintGeneration++;root.NTKEditorLanguageService?.cancelHighlight?.();}return true;}
 async function closeAll(){if(pendingEditorDialog||editorComposing()||[...documents.values()].some(d=>documentCloseBlocked(d))){setMessage('Finish text composition, pending saves or window moves before closing the editor.',true);return false;}const snapshot=[...documents.values()].map(d=>({d,stamp:documentStamp(d)})),dirty=snapshot.filter(({d})=>d.dirty);if(closeNeedsConfirmation(snapshot.map(x=>x.d))&&await askEditor({title:'Close editor',message:(snapshot.some(x=>x.d.saveFailed)?'A previous save failed. ':'')+'Discard unsaved changes in '+dirty.length+' file(s)?',accept:'Discard and close'})===null)return false;if(editorComposing()||snapshot.length!==documents.size||snapshot.some(({d,stamp})=>documents.get(d.id)!==d||documentStamp(d)!==stamp||documentCloseBlocked(d))){setMessage('An open file changed. Review it before closing.',true);return false;}for(const {d} of snapshot){rememberClosedDocument(d);if(d.disk)discardDiskView(d);}if(paneWorkspace())disposePaneWorkspace();splitEnabled=false;documents.clear();root.NetworkToolkitEditorWindows?.notifyChanged?.();active='';displayedDocument=null;if(embedded)detachPage();overlay.hidden=true;paintGeneration++;if(paintTimer!==null){root.clearTimeout(paintTimer);paintTimer=null;}root.NTKEditorLanguageService?.dispose?.();return true;}
-const conversionActions = [
- ['textToHex','Text to hex'], ['hexToText','Hex to text'],
- ['base64Encode','Base64 encode'], ['base64Decode','Base64 decode']
-];
-
-function convertText(kind, text) {
- if (kind === 'textToHex' || kind === 'base64Encode') {
-  const bytes = new TextEncoder().encode(text);
-  if (kind === 'textToHex') return Array.from(bytes, byte => byte.toString(16).padStart(2, '0')).join('');
-  let binary = '';
-  for (let start = 0; start < bytes.length; start += 8192) {
-   binary += String.fromCharCode(...bytes.subarray(start, start + 8192));
-  }
-  return btoa(binary);
- }
- const input = text.replace(/\s/g, '');
- let bytes;
- if (kind === 'hexToText') {
-  if (!input || input.length % 2 || /[^\da-f]/i.test(input)) throw Error('Select complete pairs of hexadecimal digits.');
-  bytes = new Uint8Array(input.length / 2);
-  for (let i = 0; i < bytes.length; i++) bytes[i] = parseInt(input.slice(i * 2, i * 2 + 2), 16);
- } else {
-  let decoded;
-  try { decoded = atob(input); } catch { throw Error('The selection is not valid Base64.'); }
-  bytes = Uint8Array.from(decoded, char => char.charCodeAt(0));
- }
- try { return new TextDecoder('utf-8', {fatal:true, ignoreBOM:true}).decode(bytes).replace(/\r\n?/g, '\n'); }
- catch { throw Error('The decoded bytes are not valid UTF-8 text.'); }
-}
-
-async function convertSelection(kind) {
- const d = current(), ta = findEl('[data-ed-text]'), view = diskView();
- if (!d || !ta || ta.disabled || d.loading || d.frozen || d.reloading || editorComposing()) return;
- const range = view?.selection() || {start:ta.selectionStart, end:ta.selectionEnd};
- if (!(range.end > range.start)) { setMessage('Select the text you want to convert.'); return; }
- const limit = 1024 * 1024;
- if (range.end - range.start > limit) { setMessage('Select up to 1 million characters to convert at a time.', true); return; }
- const revision = d.disk ? d.diskMeta?.revision : d.editRevision;
- try {
-  const text = view ? await view.selectedText(limit) : d.content.slice(range.start, range.end);
-  const selection = view?.selection() || {start:ta.selectionStart, end:ta.selectionEnd};
-  if (current() !== d || findEl('[data-ed-text]') !== ta || diskView() !== view ||
-      d.loading || d.frozen || d.reloading || editorComposing() ||
-      revision !== (d.disk ? d.diskMeta?.revision : d.editRevision) ||
-      selection.start !== range.start || selection.end !== range.end) return;
-  const converted = convertText(kind, text);
-  if (view) {
-   if (await view.replace(converted, range)) view.select(range.start, range.start + converted.length, 'none', true);
-  } else if (ta.inputElement) {
-   ta.setRangeText(converted, range.start, range.end, 'select');
-   ta.focus();
-  } else if (paneWorkspace()) {
-   ta.setRangeText(converted, range.start, range.end, 'select');
-   ta.dispatchEvent(new Event('input', {bubbles:true}));
-  } else replaceSelection(converted, true);
- } catch (error) { setMessage(error.message, true); }
-}
+// Search modes of the Find bar. Extended escapes and the Replace template of
+// a regular expression are read by editor-text-tools.js, the template with
+// the engine's rules (internal/editorbuffer/template.go).
+const searchModeHelp={normal:'Normal: finds the text exactly as typed.',extended:'Extended: like Normal, but \\n, \\r, \\t, \\0, \\xNN and \\uNNNN in Find and Replace stand for a line break, a tab and other characters. Find & and replace with \\n to start a new line at every &.',regex:'Regular expression: Find is a regular expression. Replace can use $1, ${name} and $& for the text of groups, and \\n and \\t for a line break and a tab.'};
 
 function replaceSelection(value,select=false){const paged=diskView();if(paged){const start=paged.selection().start;return paged.replace(value).then(()=>{if(select)paged.select(start,start+value.length,'none',true);}).catch(error=>setMessage(error.message,true));}const el=findEl('[data-ed-text]'),d=current();if(!el||!d||d.loading)return;const a=el.selectionStart,b=el.selectionEnd,next=d.content.slice(0,a)+value+d.content.slice(b);applyEdit(d,next,select?a:a+value.length,a+value.length);}
-function search(backwards=false,replace=false,all=false,focus=true){const d=current(),ta=findEl('[data-ed-text]'),query=findEl('[data-ed-query]')?.value||'';if(!d||!ta||!query)return;
- if(d.disk){void searchDiskDocument(d,query,backwards,replace,all,focus);return;}
- let pattern;try{const s=useRegex?query:query.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');pattern=new RegExp(wholeWord?'\\b(?:'+s+')\\b':s,matchCase?'g':'gi');}catch(e){setMessage('Invalid search: '+e.message,true);return;}
- if(all){if(!replace)return;let count=0;const next=d.content.replace(pattern,(...args)=>{count++;return findEl('[data-ed-replacement]')?.value||'';});const view=captureView();applyEdit(d,next,view.start,view.end,view);setMessage('Replaced '+count+' occurrence(s).');return;}
+function search(backwards=false,replace=false,all=false,focus=true){const d=current(),ta=findEl('[data-ed-text]'),tools=root.NTKEditorTextTools,regex=searchMode==='regex';let query=findEl('[data-ed-query]')?.value||'',replacement=findEl('[data-ed-replacement]')?.value||'';if(!d||!ta||!query)return;
+ // Extended: escapes in Find and Replace are the characters they name.
+ if(searchMode==='extended'&&tools){const q=tools.decodeExtended(query),r=tools.decodeExtended(replacement);if(q.error||r.error){setMessage(q.error||r.error,true);return;}query=q.text;replacement=r.text;if(!query)return;}
+ if(d.disk){void searchDiskDocument(d,query,backwards,replace,all,focus,replacement);return;}
+ let pattern;try{const s=regex?query:query.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');pattern=new RegExp(wholeWord?'\\b(?:'+s+')\\b':s,matchCase?'g':'gi');}catch(e){setMessage('Invalid search: '+e.message,true);return;}
+ // Regular expression: the Replace text is a template ($1, ${name}, \n), expanded as the engine does.
+ const expand=match=>regex&&tools?tools.expandReplacement(replacement,match,pattern.source):replacement;
+ if(all){if(!replace)return;let count=0,next;try{next=d.content.replace(pattern,(...args)=>{count++;return expand(args.slice(0,typeof args.at(-1)==='object'?args.length-3:args.length-2));});}catch(e){setMessage(e.message,true);return;}if(next===d.content){setMessage(count?'Replaced '+count+' occurrence(s); the text did not change.':'No matches.');return;}const view=captureView();applyEdit(d,next,view.start,view.end,view);setMessage('Replaced '+count+' occurrence(s).');return;}
  const results=[...d.content.matchAll(pattern)].filter(m=>m[0].length>0);if(!results.length){setMessage('No matches.');return;}
  const at=ta.selectionStart;const match=backwards?([...results].reverse().find(m=>m.index<at)||results.at(-1)):(results.find(m=>m.index>=Math.max(at,ta.selectionEnd>at?ta.selectionEnd:at+1))||results[0]);
- if(replace){const chosen=results.find(m=>m.index===ta.selectionStart&&m.index+m[0].length===ta.selectionEnd);if(chosen){replaceSelection(findEl('[data-ed-replacement]')?.value||'');return;}}
+ if(replace){const chosen=results.find(m=>m.index===ta.selectionStart&&m.index+m[0].length===ta.selectionEnd);if(chosen){let text;try{text=expand(chosen);}catch(e){setMessage(e.message,true);return;}replaceSelection(text);return;}}
  positionAt(match.index,focus);const view=captureView();restoreView(view,match.index,match.index+match[0].length,focus);status();setMessage(results.length+' match(es).');
 }
 function linesAction(kind){const d=current(),ta=findEl('[data-ed-text]');if(!d||!ta||d.loading)return;if(d.disk){void transformDiskSelection(d,kind);return;}const a=ta.selectionStart,b=ta.selectionEnd,start=a===0?0:d.content.lastIndexOf('\n',a-1)+1,limit=b>a&&d.content[b-1]==='\n'?b-1:b,last=d.content.indexOf('\n',limit),end=last<0?d.content.length:last,part=d.content.slice(start,end),lines=part.split('\n');
@@ -1006,18 +970,19 @@ function click(ev){if(ev.target.closest?.('[data-ed-insert-cancel]')){ev.prevent
  case 'replace':showFind=true;showReplace=true;draw();findEl('[data-ed-query]').focus();break;
  case 'hideFind':showFind=false;showReplace=false;draw();break;
  case 'next':search();break;case 'previous':search(true);break;case 'replaceOne':search(false,true);break;case 'replaceAll':search(false,true,true);break;
- case 'textToHex':case 'hexToText':case 'base64Encode':case 'base64Decode':void convertSelection(el.dataset.ed);break;
- case 'upper':transformSelection('upper');break;case 'lower':transformSelection('lower');break;case 'sortLines':transformSelection('sort');break;case 'format':void formatDocument();break;case 'comment':linesAction('comment');break;case 'duplicate':linesAction('duplicate');break;case 'trim':linesAction('trim');break;
+ case 'tools':root.NetworkToolkitEditorContextMenu?.openTools?.(el);break;
+ case 'format':void formatDocument();break;case 'comment':linesAction('comment');break;case 'duplicate':linesAction('duplicate');break;
+ default:if(root.NTKEditorTextTools?.tool(el.dataset.ed))void textTools?.run(el.dataset.ed);
  case 'goto':void goToLine();break;
  case 'download':{exportCopy(current());break;}
  }}
 function beforeInput(ev){pendingLargeInput=null;if(!ev.target.matches?.('[data-ed-text]')||ev.isComposing||!largeDocument(current()))return;const d=current(),ta=ev.target;pendingLargeInput=root.NTKEditorLargeIndex?.plan?.(d.content,d.editRevision,ta.selectionStart,ta.selectionEnd,ev.inputType,ev.data)||null;}
 function input(ev){if(ev.target.matches('[data-ed-text]')&&current()?.disk)return;if(ev.target.matches('[data-ed-text]')){const text=ev.target.value,view=captureView();let d=current();if(!d){void newDocument().catch(error=>setMessage(error.message,true));d=current();}const edit=pendingLargeInput;pendingLargeInput=null;if(d){setContent(d,text,true,edit,view?.start);if(ev.target.value!==d.content)ev.target.value=d.content;restoreView(view,view?.start,view?.end);}}else if(ev.target.matches('[data-ed-query]')&&ev.target.value){search(false,false,false,false);}}
-function change(ev){const t=ev.target;if(t.matches?.('[data-ed-ask-save-close]')){void changeClosePreference(t.checked);return;}if(t.matches?.('[data-ed-restore-session]')){void changeRestorePreference(t.checked);return;}if(t.matches?.('[data-ed-color]')){setEditorColor(t.dataset.edColor,t.value);return;}if(t.matches?.('[data-ed-color-hex]')){if(goodEditorColor(t.value.trim())){t.setCustomValidity('');setEditorColor(t.dataset.edColorHex,t.value.trim());}else{t.setCustomValidity('Use #RRGGBB');t.reportValidity();}return;}if(t.matches('[data-ed-palette]')){editorPalette=editorPalettes.includes(t.value)?t.value:'auto';applyEditorTheme();keepPreferences();if(editorPalette==='custom')findEl('[data-ed-custom-palette]').hidden=false;return;}if(t.matches('[data-ed-wrap]')){wordWrap=t.checked;if(paneWorkspace())paneWorkspace().refresh(true);else if(singleDiskView)singleDiskView.refreshWrap();else draw();keepPreferences();return;}if(t.matches('[data-ed-syntax]')){syntax=t.checked;if(paneWorkspace())paneWorkspace().refresh(true);else if(current())paintText(current());keepPreferences();return;}const d=current();if(!d||d.frozen)return;if(notText(d)){formatControls(d);return;}if(t.matches('[data-ed-eol]')){d.eol=t.value;d.dirty=(d.disk?!!d.diskMeta?.dirty:d.content!==d.saved)||formatDirty(d);drawTabs();status();}if(t.matches('[data-ed-bom]')){d.bom=t.checked;d.dirty=(d.disk?!!d.diskMeta?.dirty:d.content!==d.saved)||formatDirty(d);drawTabs();status();}if(t.matches('[data-ed-encoding]')){d.encoding=t.value;d.bom=t.value==='Windows-1252'?false:t.value!=='UTF-8'?true:d.bom;d.dirty=true;drawTabs();formatControls(d);}if(t.matches('[data-ed-language-select]')){d.language=t.value?languageTools?.valid(t.value)||'text':'';paintText(d);paneWorkspace()?.refresh(true);}if(t.matches('[data-ed-font]'))setEditorFontSize(t.value);if(t.matches('[data-ed-indent]')){tabSpaces=Number(t.value);syncLanguageControls(d);if(paneWorkspace())paneWorkspace().refresh(true);else if(singleDiskView)singleDiskView.refreshWrap();else paintText(d);keepPreferences();}if(t.matches('[data-ed-case]'))matchCase=t.checked;if(t.matches('[data-ed-regex]'))useRegex=t.checked;if(t.matches('[data-ed-word]'))wholeWord=t.checked;}
+function change(ev){const t=ev.target;if(t.matches?.('[data-ed-ask-save-close]')){void changeClosePreference(t.checked);return;}if(t.matches?.('[data-ed-restore-session]')){void changeRestorePreference(t.checked);return;}if(t.matches?.('[data-ed-color]')){setEditorColor(t.dataset.edColor,t.value);return;}if(t.matches?.('[data-ed-color-hex]')){if(goodEditorColor(t.value.trim())){t.setCustomValidity('');setEditorColor(t.dataset.edColorHex,t.value.trim());}else{t.setCustomValidity('Use #RRGGBB');t.reportValidity();}return;}if(t.matches('[data-ed-palette]')){editorPalette=editorPalettes.includes(t.value)?t.value:'auto';applyEditorTheme();keepPreferences();if(editorPalette==='custom')findEl('[data-ed-custom-palette]').hidden=false;return;}if(t.matches('[data-ed-wrap]')){wordWrap=t.checked;if(paneWorkspace())paneWorkspace().refresh(true);else if(singleDiskView)singleDiskView.refreshWrap();else draw();keepPreferences();return;}if(t.matches('[data-ed-syntax]')){syntax=t.checked;if(paneWorkspace())paneWorkspace().refresh(true);else if(current())paintText(current());keepPreferences();return;}const d=current();if(!d||d.frozen)return;if(notText(d)){formatControls(d);return;}if(t.matches('[data-ed-eol]')){d.eol=t.value;d.dirty=(d.disk?!!d.diskMeta?.dirty:d.content!==d.saved)||formatDirty(d);drawTabs();status();}if(t.matches('[data-ed-bom]')){d.bom=t.checked;d.dirty=(d.disk?!!d.diskMeta?.dirty:d.content!==d.saved)||formatDirty(d);drawTabs();status();}if(t.matches('[data-ed-encoding]')){d.encoding=t.value;d.bom=t.value==='Windows-1252'?false:t.value!=='UTF-8'?true:d.bom;d.dirty=true;drawTabs();formatControls(d);}if(t.matches('[data-ed-language-select]')){d.language=t.value?languageTools?.valid(t.value)||'text':'';paintText(d);paneWorkspace()?.refresh(true);}if(t.matches('[data-ed-font]'))setEditorFontSize(t.value);if(t.matches('[data-ed-indent]')){tabSpaces=Number(t.value);syncLanguageControls(d);if(paneWorkspace())paneWorkspace().refresh(true);else if(singleDiskView)singleDiskView.refreshWrap();else paintText(d);keepPreferences();}if(t.matches('[data-ed-case]'))matchCase=t.checked;if(t.matches('[data-ed-search-mode]')){searchMode=['normal','extended','regex'].includes(t.value)?t.value:'normal';t.closest('label')?.setAttribute('title',searchModeHelp[searchMode]);}if(t.matches('[data-ed-word]'))wholeWord=t.checked;}
 function scroll(ev){if(current()?.disk)return;if(paneWorkspace()&&ev.target===paneWorkspace().textarea){status();return;}if(!ev.target.matches?.('[data-ed-text]'))return;const ta=ev.target,pre=findEl('[data-ed-highlight]'),gutter=findEl('[data-ed-gutter-lines]');if(pre)pre.style.transform='translate('+(-ta.scrollLeft)+'px,'+(-ta.scrollTop)+'px)';if(gutter)gutter.style.transform='translateY('+(-ta.scrollTop)+'px)';if(!largeDocument(current())){status();return;}if(typeof root.requestAnimationFrame!=='function'){paintGutter(current(),ta,gutter);status();return;}if(largeScrollFrame!==null)return;const d=current();largeScrollFrame=root.requestAnimationFrame(()=>{largeScrollFrame=null;if(current()!==d||findEl('[data-ed-text]')!==ta||!gutter)return;paintGutter(d,ta,gutter);status();});}
 function keydown(ev){if(ev.target.closest?.('[data-ed-files-sidebar]'))return;if(tabMenu){tabMenuKey(ev);return;}const menuTab=ev.target.closest?.('[data-ed-uid]');if(menuTab&&(ev.key==='ContextMenu'||(ev.shiftKey&&ev.key==='F10'))){ev.preventDefault();const d=[...documents.values()].find(d=>d.uid===menuTab.dataset.edUid),rect=menuTab.getBoundingClientRect();if(d)openTabMenu(d,rect.left,rect.bottom);return;}if(pendingEditorDialog){ev.stopPropagation();if(ev.key==='Escape'){ev.preventDefault();answerEditorDialog(false);}else if(ev.key==='Enter'){ev.preventDefault();answerEditorDialog(ev.target.closest?.('[data-ed-dialog-action]')?.dataset.edDialogAction!=='cancel');}else if(ev.key==='Tab'){const controls=[...pendingEditorDialog.panel.querySelectorAll('input,button')],at=controls.indexOf(document.activeElement);ev.preventDefault();controls[(at+(ev.shiftKey?-1:1)+controls.length)%controls.length]?.focus();}return;}const d=current(),ta=findEl('[data-ed-text]'),ctrl=ev.ctrlKey||ev.metaKey;const tab=ev.target.closest?.('[data-ed-open]');if(tab&&ev.altKey&&ev.shiftKey&&['ArrowLeft','ArrowRight'].includes(ev.key)){ev.preventDefault();ev.stopPropagation();const selectedDoc=documents.get(tab.dataset.edOpen),list=paneWorkspace()?groups.list(groups.sideOf(selectedDoc?.uid)):[...documents.values()],at=list.findIndex(doc=>doc.id===tab.dataset.edOpen);if(at>=0&&((ev.key==='ArrowLeft'&&at>0)||(ev.key==='ArrowRight'&&at<list.length-1)))reorderDocument(list[at].uid,ev.key==='ArrowLeft'?list[at-1].uid:list[at+2]?.uid||null);return;}if((tab&&['ArrowLeft','ArrowRight','Home','End'].includes(ev.key))||(ctrl&&['PageUp','PageDown'].includes(ev.key))){const tabDoc=documents.get(tab?.dataset.edOpen||active),ids=(paneWorkspace()?groups.list(groups.sideOf(tabDoc?.uid)):[...documents.values()]).map(d=>d.id),at=ids.indexOf(tab?.dataset.edOpen||active),next=ev.key==='Home'?0:ev.key==='End'?ids.length-1:(at+(ev.key==='ArrowLeft'||ev.key==='PageUp'?-1:1)+ids.length)%ids.length;ev.preventDefault();activateDocument(ids[next]);[...overlay.querySelectorAll('[data-ed-open]')].find(node=>node.dataset.edOpen===ids[next])?.focus({preventScroll:true});return;}if(comparison&&!(ctrl&&['n','o'].includes(ev.key.toLowerCase()))){if(ctrl&&ev.key.toLowerCase()==='s'){ev.preventDefault();void save(ev.shiftKey);}return;}if(ctrl&&['n','o'].includes(ev.key.toLowerCase())){ev.preventDefault();if(ev.key.toLowerCase()==='n')void newDocument();else void openDesktopFile();return;}if(!d)return;
  if(ctrl&&ev.shiftKey&&ev.key==='Enter'&&!ev.isComposing){ev.preventDefault();sendToTerminal();return;}
- if(ctrl){const key=ev.key.toLowerCase();if(key==='f'&&ev.shiftKey){ev.preventDefault();void formatDocument();return;}if(key==='g'){ev.preventDefault();void goToLine();return;}if(key==='o'){ev.preventDefault();void openDesktopFile();return;}if(key==='n'){ev.preventDefault();void newDocument();return;}if(key==='s'){ev.preventDefault();void save(ev.shiftKey);return;}if(key==='f'){ev.preventDefault();showFind=true;showReplace=false;draw();findEl('[data-ed-query]').focus();return;}if(key==='h'){ev.preventDefault();showFind=true;showReplace=true;draw();findEl('[data-ed-query]').focus();return;}if(key==='z'){ev.preventDefault();doUndo(d,ev.shiftKey);return;}if(key==='y'){ev.preventDefault();doUndo(d,true);return;}if(key==='d'){ev.preventDefault();linesAction('duplicate');return;}if(key==='/'){ev.preventDefault();linesAction('comment');return;}}
+ if(ctrl){const key=ev.key.toLowerCase(),toolKey=ev.altKey?'':ev.shiftKey?{u:'upper',l:'split',b:'base64-decode'}[key]:{u:'lower',j:'join'}[key];if(toolKey&&textTools?.full()){ev.preventDefault();void textTools.run(toolKey);return;}if(key==='f'&&ev.shiftKey){ev.preventDefault();void formatDocument();return;}if(key==='g'){ev.preventDefault();void goToLine();return;}if(key==='o'){ev.preventDefault();void openDesktopFile();return;}if(key==='n'){ev.preventDefault();void newDocument();return;}if(key==='s'){ev.preventDefault();void save(ev.shiftKey);return;}if(key==='f'){ev.preventDefault();showFind=true;showReplace=false;draw();findEl('[data-ed-query]').focus();return;}if(key==='h'){ev.preventDefault();showFind=true;showReplace=true;draw();findEl('[data-ed-query]').focus();return;}if(key==='z'){ev.preventDefault();doUndo(d,ev.shiftKey);return;}if(key==='y'){ev.preventDefault();doUndo(d,true);return;}if(key==='d'){ev.preventDefault();linesAction('duplicate');return;}if(key==='/'){ev.preventDefault();linesAction('comment');return;}}
  if(ev.key==='Escape'&&ev.target!==ta){showFind=false;showReplace=false;draw();ta.focus();return;}
  if(ev.target!==ta)return;
  if(d.disk&&ev.key==='Enter')return;
@@ -1063,9 +1028,6 @@ async function reload(){
 function applyEditorTheme(){if(!overlay)return;overlay.dataset.palette=editorPalette;overlay.style.setProperty('--nt-editor-font',editorFontSize+'px');for(const [key,hex] of Object.entries({...editorColorDefaults,...editorCustomColors})){if(editorPalette==='custom'&&goodEditorColor(hex))overlay.style.setProperty('--nt-code-'+key,hex);else overlay.style.removeProperty('--nt-code-'+key);} }
 function setEditorColor(key,value){if(!Object.hasOwn(editorColorLabels,key)||!goodEditorColor(value))return;editorCustomColors[key]=value.toLowerCase();editorPalette='custom';const selector=findEl('[data-ed-palette]');if(selector)selector.value='custom';for(const element of overlay.querySelectorAll('[data-ed-color="'+key+'"],[data-ed-color-hex="'+key+'"]'))element.value=editorCustomColors[key];applyEditorTheme();keepPreferences();}
 
-function transformSelection(kind){const d=current(),ta=findEl('[data-ed-text]');if(!d||!ta)return;if(d.disk){void transformDiskSelection(d,kind);return;}const a=ta.selectionStart,b=ta.selectionEnd;if(kind==='upper'||kind==='lower'){const text=d.content.slice(a,b);if(!text){setMessage('Select text to change its case.');return;}replaceSelection(kind==='upper'?text.toLocaleUpperCase():text.toLocaleLowerCase(),true);return;}
- const start=a===0?0:d.content.lastIndexOf('\n',a-1)+1,endIndex=d.content.indexOf('\n',b>a&&d.content[b-1]==='\n'?b-1:b),end=endIndex<0?d.content.length:endIndex;
- const original=d.content.slice(start,end),lines=original.split('\n'),sorted=lines.sort((x,y)=>x.localeCompare(y,undefined,{numeric:true,sensitivity:'base'}));applyEdit(d,d.content.slice(0,start)+sorted.join('\n')+d.content.slice(end),start,start+original.length);}
 async function formatDocument(){const d=current(),ta=findEl('[data-ed-text]');if(!d||!ta||d.loading||d.reloading||d.formatting||d.frozen||d.disk)return;const language=languageOf(d),kind=languageTools?.formatKind(language);if(!kind){setMessage('Automatic formatting is unavailable for this language.');return;}
  const snapshot=d.content,revision=d.editRevision,selection={start:ta.selectionStart,end:ta.selectionEnd,top:ta.scrollTop,left:ta.scrollLeft};d.formatting=true;syncLanguageControls(d);setMessage(kind==='indent'?'Indenting code...':'Formatting document...');
  try{const result=await root.NTKEditorLanguageService.format(snapshot,language,{indent:tabSpaces});
@@ -1295,6 +1257,23 @@ function applyTransferredPreferences(value){if(!value||typeof value!=='object')r
 // new unsaved documents. The engine imports large kept copies itself.
 const sessionBackupPath=id=>'/editor-session/backup?id='+encodeURIComponent(id);
 const localRead=p=>api('/file-editor/local','POST',{action:'read-text',path:p}),localWrite=data=>api('/file-editor/local','POST',{action:'write-text',...data});
+// Text tools (editor-text-tools.js). The tools run in the engine; this is
+// what the module needs of the editor.
+const textTools=root.NTKEditorTextTools?.create({
+ current,overlay:()=>overlay,textarea:()=>findEl('[data-ed-text]'),diskView,setMessage,
+ scope:()=>root.NetworkToolkitStandalone?.mode?.()==='terminal'?'terminal':'all',
+ session:d=>ensureDiskSession(d),diskCall:(d,action,body)=>diskCall(d,action,body),
+ focus:()=>findEl('[data-ed-text]')?.focus({preventScroll:true}),indent:()=>tabSpaces,
+ engine:()=>typeof api==='function'&&!(typeof OFFLINE!=='undefined'&&OFFLINE),request:(path,method,body)=>api(path,method,body),ask:askEditor,
+ blocked:(d,reading)=>notText(d)?nameOf(d.path)+' is not a text file. Text tools cannot change it.':d.loading?'The document is still loading.':d.frozen?'The document is being moved between windows.':d.reloading||d.promoting||d.diskEditing||d.formatting?'Wait for the current document operation to finish.':pendingEditorDialog?'Close the open dialog first.':editorComposing()?'Finish text composition first.':!reading&&comparison&&d.disk?'Close the document comparison first.':'',
+ readOnly:()=>!!comparison,changed:()=>{drawTabs();status();},
+ // A pane of a split or comparison view applies the result through its own
+ // input path (as Convert text did); one undo step either way.
+ applyRange:(d,start,end,text)=>{const ta=findEl('[data-ed-text]');if(ta?.inputElement){ta.setRangeText(text,start,end,'select');ta.focus();}else if(paneWorkspace()){ta.setRangeText(text,start,end,'select');ta.dispatchEvent(new Event('input',{bubbles:true}));}else applyEdit(d,d.content.slice(0,start)+text+d.content.slice(end),start,start+text.length);},
+ pageAction:id=>{if(id==='format')void formatDocument();else linesAction(id);return true;},
+ openDerived:(d,name,derive)=>open({id:'untitled:'+Date.now()+':'+Math.random().toString(36).slice(2,7),source:'Untitled',binding:{kind:'localDraft'},path:name,create:true,initialContent:'',diskMode:'derive',derive,read:async()=>({content:''}),write:localWrite}),
+ openText:async(name,text)=>{const d=await open({id:'untitled:'+Date.now()+':'+Math.random().toString(36).slice(2,7),source:'Untitled',binding:{kind:'localDraft'},path:name,create:true,initialContent:'',read:async()=>({content:''}),write:localWrite});if(!setContent(d,text,false))throw Error('The text could not be opened.');if(current()===d)draw();return d;}
+});
 const sessionCarry=error=>!(error?.status===400||error?.status===404||/damaged|no longer available/i.test(error?.message||''));
 function sessionFormat(d,format,file=false){if(!format)return;d.encoding=format.encoding;d.bom=format.bom===true;
  // Only the engine knows whether the reopened text still has lines that end
@@ -1523,11 +1502,25 @@ const compareMenuControls=[
  ['compareChangedSpaces','Ignore changed spaces','[data-compare-spaces]','changed'],
  ['compareAllSpaces','Ignore all spaces','[data-compare-spaces]','all']
 ];
+// The Tools menu and the right-click menu list the text tools in groups;
+// each item says whether it can run on the active document now.
+function toolMenuGroups(){
+ const tools=root.NTKEditorTextTools;if(!tools||!textTools)return [];
+ const d=current(),open=!!d&&!d.loading,editable=open&&!d.frozen&&!comparison&&!notText(d),convertible=open&&!d.frozen&&!d.reloading&&!notText(d)&&!(comparison&&d.disk),empty=!d||!(d.disk?d.diskMeta?.units:d.content.length),language=d?languageOf(d):'',kind=languageTools?.formatKind(language)||'';
+ const enabled=tool=>{
+  if(tool.id==='format')return editable&&!d.disk&&!!kind&&d.content.length<=250000&&!d.formatting;
+  if(tool.id==='comment'||tool.id==='duplicate')return editable;
+  if(tool.id==='sonicwall-readable')return open&&!notText(d)&&!empty&&!d.frozen;
+  return convertible&&!empty;
+ };
+ return tools.GROUPS.map(group=>({...group,tools:tools.TOOLS.filter(tool=>tool.group===group.id&&textTools.allows(tool.id)).map(tool=>({...tool,label:tool.id==='format'&&kind==='indent'?'Indent document':tool.label,enabled:enabled(tool)}))})).filter(group=>group.tools.length);
+}
 const textMenu=Object.freeze({
  // The text area the right-click menu applies to (single view or the focused split pane).
  target(el){const ta=findEl('[data-ed-text]'), input=el?.closest?.('[data-compare-text]')||el;return !!input&&!!overlay&&!overlay.hidden&&overlay.contains(input)&&(input===(ta?.inputElement||ta)||input.matches('[data-compare-text]'));},
  focusTarget(el){el?.closest?.('[data-compare-text]')?.focus({preventScroll:true});},
- conversions:conversionActions,
+ toolGroups:toolMenuGroups,
+ runTool:id=>textTools?textTools.run(id):Promise.resolve(false),
  compareActions(){
   if(!comparison)return [];
   return [['compareOptions','Compare options...',true],['compareRun','Recalculate comparison',!comparison.composing],...compareMenuControls.flatMap(([action,label,selector,value])=>{
@@ -1537,7 +1530,7 @@ const textMenu=Object.freeze({
    return [[action,label,!control.disabled,checked]];
   })];
  },
- state(){const d=current(),ta=findEl('[data-ed-text]'),range=d?.disk?diskView()?.selection():null,a=range?.start??ta?.selectionStart??0,b=range?.end??ta?.selectionEnd??0;return {open:!!d,editable:!!d&&!d.loading&&!d.frozen&&!comparison,convertible:!!d&&!d.loading&&!d.frozen&&!d.reloading&&!ta?.disabled,selection:!!d&&b>a,empty:!d||!(d.disk?d.diskMeta?.units:d.content.length),canUndo:!!(d?.disk?d.diskMeta?.canUndo:d?.undo?.length),canRedo:!!(d?.disk?d.diskMeta?.canRedo:d?.redo?.length)};},
+ state(){const d=current(),ta=findEl('[data-ed-text]'),range=d?.disk?diskView()?.selection():null,a=range?.start??ta?.selectionStart??0,b=range?.end??ta?.selectionEnd??0;return {open:!!d,binary:notText(d),editable:!!d&&!d.loading&&!d.frozen&&!comparison,convertible:!!d&&!d.loading&&!d.frozen&&!d.reloading&&!ta?.disabled,selection:!!d&&b>a,empty:!d||!(d.disk?d.diskMeta?.units:d.content.length),canUndo:!!(d?.disk?d.diskMeta?.canUndo:d?.undo?.length),canRedo:!!(d?.disk?d.diskMeta?.canRedo:d?.redo?.length)};},
  selection(){const d=current(),ta=findEl('[data-ed-text]');if(!d||!ta)return '';return d.content.slice(Math.min(ta.selectionStart,ta.selectionEnd),Math.max(ta.selectionStart,ta.selectionEnd));},
  copy(cut){return current()?.disk?diskView()?.copy(cut):undefined;},
  replace(text){const d=current();if(!d||d.loading||d.frozen||comparison)return false;if(d.disk)return diskView()?.replace(String(text??'')).then(()=>true);replaceSelection(String(text??''));status();return true;},
@@ -1563,6 +1556,7 @@ const textMenu=Object.freeze({
    else if(control.value!==value){control.value=value;control.dispatchEvent(new Event('change',{bubbles:true}));}
    return true;
   }
+  if(root.NTKEditorTextTools?.tool(action)){void textTools?.run(action);return true;}
   const button=overlay?.querySelector('[data-ed="'+action+'"]');if(!button||button.disabled)return false;button.click();return true;}
 });
 root.NetworkToolkitFileEditor={session:Object.freeze({get phase(){return session?.phase||'unavailable';},save:()=>session?session.save():Promise.resolve(new Set()),tick:()=>!!session?.tick(),isKept:d=>!!session?.isKept(d)}),textMenu,listDocuments,insertText,pickInsert,cancelInsertPick:endPick,insertPickActive:()=>!!pickState,openTabActions(uid){const d=[...documents.values()].find(item=>item.uid===uid);if(!d||!overlay||overlay.hidden)return false;const button=[...overlay.querySelectorAll('[data-ed-tab-actions]')].find(el=>el.dataset.edTabActions===uid);if(!button)return false;const rect=button.getBoundingClientRect();openTabMenu(d,rect.left,rect.bottom);return true;},beginSidebarPointerDrag,finishSidebarPointerDrop,cancelSidebarPointerDrag,requestName:(title,message,value)=>{skin();return askEditor({title,message,value,accept:'Create',validate:value=>value.trim()?'':'Enter a name.'});},moveDocumentToView,openSplit,get viewGroups(){return groups.snapshot();},windowAdapter,canReorderDocuments,reorderDocument,open,openDesktopFile,importFiles,openLocalPath,newDocument,adoptHandover,discardAdopted,renderPage,detachPage,closeAll,preferConnection,refreshConnectedSources,openRemotePath,showRemoteFilePicker,get documents(){return documents;},activateDocument,openComparison,closeComparison,get comparison(){return comparison;},get active(){return current();}};

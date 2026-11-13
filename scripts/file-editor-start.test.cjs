@@ -5,11 +5,18 @@ const source=fs.readFileSync(process.env.TOOLKIT_EDITOR_SOURCE||require.resolve(
 const text=Array.from({length:300},(_,i)=>'Line '+(i+1)+' '+ 'x'.repeat(100)).join('\n');
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};};
 const settle=()=>new Promise(resolve=>setImmediate(resolve));
+// A stand-in for the engine's text tools route (cmd/network-toolkit/editor_text_tools.go).
+const toolEngine=async(path,method,body)=>{
+ if(path!=='/editor-views/text-tools')throw Error('Unexpected request '+path);
+ if(body.action==='detect')return {sonicwall:false};
+ const fn={upper:t=>t.toUpperCase(),lower:t=>t.toLowerCase(),'trim-trailing':t=>t.replace(/[ \t]+$/gm,''),'sort-asc':t=>t.split('\n').sort().join('\n')}[body.tool];
+ const text=fn(body.text);return {ok:true,changed:text!==body.text,count:1,text};
+};
 function harness(preferences={}){
  const document=makeDocument('');document.body=document;
  const create=document.createElement;document.createElement=tag=>{const el=create(tag);el.style.setProperty=(k,v)=>el.style[k]=v;el.style.removeProperty=k=>delete el.style[k];return el;};
- const c={document,console,Map,Set,Date,Math,TextDecoder,TextEncoder,Uint8Array,DataView,Blob,URL,setTimeout,clearTimeout,state:{editorPreferences:preferences},saveState(){},confirm:()=>true,esc:x=>String(x).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;'),addEventListener(){}};
- vm.createContext(c);vm.runInContext(fs.readFileSync(require.resolve('../web/assets/editor-tab-groups.js'),'utf8'),c);vm.runInContext(source,c);const api=c.NetworkToolkitFileEditor;
+ const c={document,console,Map,Set,Date,Math,TextDecoder,TextEncoder,Uint8Array,DataView,Blob,URL,setTimeout,clearTimeout,state:{editorPreferences:preferences},saveState(){},api:toolEngine,confirm:()=>true,esc:x=>String(x).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;'),addEventListener(){}};
+ vm.createContext(c);vm.runInContext(fs.readFileSync(require.resolve('../web/assets/editor-tab-groups.js'),'utf8'),c);vm.runInContext(fs.readFileSync(require.resolve('../web/assets/editor-text-tools.js'),'utf8'),c);vm.runInContext(source,c);const api=c.NetworkToolkitFileEditor;
  async function first(){
   const pending=deferred(),running=api.open({id:'first',path:'first.txt',source:'Local computer',read:()=>pending.promise,write:async()=>({})}),ta=document.querySelector('[data-ed-text]');
   let value=ta.value||'';
@@ -18,7 +25,7 @@ function harness(preferences={}){
   ta.focus=()=>{document.activeElement=ta;if(ta.selectionStart===value.length&&value.length){ta.scrollTop=900;ta.scrollLeft=200;}};
   pending.resolve({content:text});await running;return ta;
  }
- return {api,document,first,c,click:action=>{const root=document.getElementById('networkToolkitFileEditor');root.emit('click',root.querySelector('[data-ed="'+action+'"]'));}};
+ return {api,document,first,c,click:action=>{const root=document.getElementById('networkToolkitFileEditor'),button=root.querySelector('[data-ed="'+action+'"]');if(button){root.emit('click',button);return settle();}return api.textMenu.runTool(action).then(settle);}};
 }
 function atStart(h,ta){assert.equal(ta.selectionStart,0);assert.equal(ta.selectionEnd,0);assert.equal(ta.scrollTop,0);assert.equal(ta.scrollLeft,0);assert.equal(h.document.querySelector('[data-ed-position]').textContent,'Ln 1, Col 1');assert.equal(h.document.querySelector('[data-ed-highlight]').style.transform,'translate(0px,0px)');assert.equal(h.document.querySelector('[data-ed-gutter-lines]').style.transform,'translateY(0px)');}
 test('loaded files, imported content and explicit reopens show the document start without changing text',async()=>{
@@ -41,13 +48,13 @@ test('reload resets the active file but a background completion leaves the other
 test('case, line transforms, sort, undo and redo retain the current viewport and selected contents',async()=>{
  const h=harness(),ta=await h.first();h.c.getComputedStyle=()=>({lineHeight:'20px'});
  for(const action of ['upper','lower','duplicate','trim','sortLines','undo','redo']){
-  ta.setSelectionRange(230,290);ta.scrollTop=360;ta.scrollLeft=42;h.click(action);
+  ta.setSelectionRange(230,290);ta.scrollTop=360;ta.scrollLeft=42;await h.click(action);
   assert.equal(ta.scrollTop,360,action+' scrolled vertically');assert.equal(ta.scrollLeft,42,action+' scrolled horizontally');assert.equal(h.document.querySelector('[data-ed-highlight]').style.transform,'translate(-42px,-360px)');assert(ta.selectionStart<ta.value.length,action+' left the caret at EOF');
  }
 });
 test('dirty tab and editor closes use in-app dialogs; cancelling and stale documents never lose edits',async()=>{
  const h=harness(),ta=await h.first();h.c.confirm=h.c.prompt=()=>{throw Error('Native browser dialogs are disabled');};
- ta.setSelectionRange(0,4);h.click('upper');const root=h.document.getElementById('networkToolkitFileEditor');
+ ta.setSelectionRange(0,4);await h.click('upper');const root=h.document.getElementById('networkToolkitFileEditor');
  root.emit('click',root.querySelector('[data-ed-close-tab="first"]'));assert(root.querySelector('.nt-editor-dialog'));root.emit('click',root.querySelector('[data-ed-dialog-action="cancel"]'));await settle();assert.equal(h.api.documents.size,1);
  const closing=h.api.closeAll();root.emit('click',root.querySelector('[data-ed-dialog-action="cancel"]'));assert.equal(await closing,false);assert.equal(h.api.documents.size,1);assert(!root.hidden);
  const stale=h.api.closeAll();ta.value+='new edit';root.emit('input',ta);root.emit('click',root.querySelector('[data-ed-dialog-action="accept"]'));assert.equal(await stale,false);assert.equal(h.api.documents.size,1);
@@ -58,12 +65,12 @@ test('Go to line validates input inside the editor and goes to the requested log
  field.value='30';root.emit('click',root.querySelector('[data-ed-dialog-action="accept"]'));await settle();assert.equal(ta.value.slice(0,ta.selectionStart).split('\n').length,30);assert.equal(ta.scrollTop,560);assert.equal(h.api.active.dirty,false);
 });
 test('late save completion keeps newer edits dirty and cannot switch the active document',async()=>{
- const h=harness(),ta=await h.first(),pending=deferred(),doc=h.api.active;let request;doc.write=data=>{request=data;return pending.promise;};ta.setSelectionRange(0,4);h.click('upper');h.click('save');const sent=request.content;
- ta.setSelectionRange(0,4);h.click('lower');assert.notEqual(doc.content,sent);pending.resolve({hash:'new'});await settle();assert.equal(doc.saved,sent);assert(doc.dirty);
+ const h=harness(),ta=await h.first(),pending=deferred(),doc=h.api.active;let request;doc.write=data=>{request=data;return pending.promise;};ta.setSelectionRange(0,4);await h.click('upper');h.click('save');const sent=request.content;
+ ta.setSelectionRange(0,4);await h.click('lower');assert.notEqual(doc.content,sent);pending.resolve({hash:'new'});await settle();assert.equal(doc.saved,sent);assert(doc.dirty);
 });
 
 test('confirmation Enter on Cancel preserves edits, Escape dismisses, and accepting closes once',async()=>{
- const h=harness(),ta=await h.first();ta.setSelectionRange(0,4);h.click('upper');const root=h.document.getElementById('networkToolkitFileEditor');
+ const h=harness(),ta=await h.first();ta.setSelectionRange(0,4);await h.click('upper');const root=h.document.getElementById('networkToolkitFileEditor');
  const closing=h.api.closeAll();root.emit('keydown',root.querySelector('[data-ed-dialog-action="cancel"]'),{key:'Enter'});assert.equal(await closing,false);assert.equal(h.api.documents.size,1);
  const escape=h.api.closeAll();root.emit('keydown',root.querySelector('[data-ed-dialog-action="accept"]'),{key:'Escape'});assert.equal(await escape,false);assert.equal(h.api.documents.size,1);
  const accept=h.api.closeAll();root.emit('keydown',root.querySelector('[data-ed-dialog-action="accept"]'),{key:'Enter'});assert.equal(await accept,true);assert.equal(h.api.documents.size,0);
@@ -90,7 +97,7 @@ test('tab keyboard switching retains per-document views and pending saves block 
 
 
 test('window snapshots freeze atomically, preserve undo and views, and rollback without losing the draft',async()=>{
- const h=harness(),ta=await h.first();h.api.active.binding={kind:'local'};ta.setSelectionRange(3,7);ta.scrollTop=150;ta.scrollLeft=10;h.click('upper');const doc=h.api.active,uid=doc.uid,contents=doc.content,undo=Array.from(doc.undo),adapter=h.api.windowAdapter;
+ const h=harness(),ta=await h.first();h.api.active.binding={kind:'local'};ta.setSelectionRange(3,7);ta.scrollTop=150;ta.scrollLeft=10;await h.click('upper');const doc=h.api.active,uid=doc.uid,contents=doc.content,undo=Array.from(doc.undo),adapter=h.api.windowAdapter;
  assert.equal(adapter.canTransfer([uid]),'');const snapshot=adapter.snapshot([uid]);assert(doc.frozen);assert.equal(snapshot.documents[0].content,contents);assert.deepEqual(Array.from(snapshot.documents[0].undo),undo);assert.equal(snapshot.documents[0].view.top,150);ta.value='should not become owner';h.document.getElementById('networkToolkitFileEditor').emit('input',ta);assert.equal(doc.content,contents);assert.equal(ta.value,contents);assert.equal(await h.api.closeAll(),false);
  adapter.rollback([uid]);assert.equal(doc.frozen,false);assert.equal(adapter.canTransfer([uid]),'');
  const dest=harness();await dest.first();await dest.api.closeAll();const destination=dest.api.windowAdapter;await destination.stage(snapshot,()=>({read:async()=>({content:contents}),write:async()=>({hash:'new'})}));assert.equal(dest.api.documents.size,1);assert(dest.api.active.frozen);destination.activate([uid]);assert.equal(dest.api.active.frozen,false);assert.equal(dest.api.active.uid,uid);assert.deepEqual(Array.from(dest.api.active.undo),undo);assert.equal(dest.api.active.view.top,150);
@@ -152,7 +159,7 @@ test('navigation captures view before the mounted editor is hidden and restores 
 test('Files replaces redundant connection toolbar without recreating documents or storing content',async()=>{
  const h=harness();h.c.OFFLINE=true;h.document.body.appendChild=h.document.body.append;await h.first();const mount=h.document.createElement('div');h.document.append(mount);h.api.renderPage(mount);
  assert.equal(h.document.querySelector('[data-ed-panel-toggle="remote"]'),null);assert.equal(h.document.querySelector('[data-ed-panel-toggle="local"]'),null);assert(h.document.querySelector('[data-ed="files"]'));
- const doc=h.api.active,ta=h.document.querySelector('[data-ed-text]');ta.setSelectionRange(34,55);ta.scrollTop=123;h.click('upper');const before={text:doc.content,undo:[...doc.undo],revision:doc.editRevision};
+ const doc=h.api.active,ta=h.document.querySelector('[data-ed-text]');ta.setSelectionRange(34,55);ta.scrollTop=123;await h.click('upper');const before={text:doc.content,undo:[...doc.undo],revision:doc.editRevision};
  h.api.detachPage();h.api.renderPage(mount);assert.equal(doc.content,before.text);assert.deepEqual([...doc.undo],before.undo);assert.equal(doc.editRevision,before.revision);assert.equal(ta.selectionStart,34);assert.equal(ta.scrollTop,123);assert(!JSON.stringify(h.c.state).includes('Line 299'));
 });
 test('legacy disclosure preferences cannot restore a redundant toolbar or expose an orphaned form',async()=>{
@@ -168,7 +175,7 @@ test('More stays in the toolbar while its dropdown toggles and restores keyboard
  const h=harness(),ta=await h.first(),root=h.document.getElementById('networkToolkitFileEditor'),more=root.querySelector('.nt-editor-more'),actions=root.querySelector('#ntEditorMoreActions'),summary=more.querySelector('summary');
  assert(more.closest('.nt-editor-toolbar'));assert(actions.closest('.nt-editor-more')===more);assert(actions.hasAttribute('hidden'));const doc=h.api.active;ta.setSelectionRange(8,16);ta.scrollTop=40;
  more.open=true;more.emit('toggle',more);assert.equal(actions.hidden,false);assert.equal(summary.getAttribute('aria-expanded'),'true');assert.equal(actions.querySelector('[data-ed="openLocalPath"]'),null);assert.equal(actions.querySelector('[data-ed="newLocalPath"]'),null);assert.equal(root.querySelector('[data-ed-panel-toggle="remote"]'),null);
- h.document.activeElement=actions.querySelector('[data-ed="trim"]');summary.focus=()=>{h.document.activeElement=summary;};more.open=false;more.emit('toggle',more);assert.equal(actions.hidden,true);assert(h.document.activeElement===summary);assert.equal(h.api.active,doc);assert.equal(ta.selectionStart,8);assert.equal(ta.scrollTop,40);
+ h.document.activeElement=actions.querySelector('[data-ed="download"]');summary.focus=()=>{h.document.activeElement=summary;};more.open=false;more.emit('toggle',more);assert.equal(actions.hidden,true);assert(h.document.activeElement===summary);assert.equal(h.api.active,doc);assert.equal(ta.selectionStart,8);assert.equal(ta.scrollTop,40);
 });
 test('local file APIs remain available to Files while More contains no duplicate path commands',async()=>{
  const h=harness();await h.first();const requests=[];h.c.api=async(path,method,body)=>{requests.push({path,method,body});return {content:'synthetic opened text',hash:'read-hash'};};
@@ -186,7 +193,7 @@ test('detached saved selection labels explicit request and preserves approval gu
 
 
 test('stable UID tab reordering preserves active document objects, edit history, selection and scroll',async()=>{
- const h=harness(),ta=await h.first(),first=h.api.active;await h.api.open({id:'second',path:'second.txt',source:'Local computer',create:true,initialContent:'second content',read:async()=>({content:''}),write:async()=>({})});const second=h.api.active;await h.api.open({id:'third',path:'third.txt',source:'Local computer',create:true,initialContent:'third content',read:async()=>({content:''}),write:async()=>({})});const third=h.api.active;ta.setSelectionRange(1,5);ta.scrollTop=61;ta.scrollLeft=7;h.click('upper');const saved={text:third.content,undo:[...third.undo],revision:third.editRevision,start:ta.selectionStart,end:ta.selectionEnd,top:ta.scrollTop,left:ta.scrollLeft};assert(h.api.reorderDocument(third.uid,first.uid));assert.deepEqual([...h.api.documents.values()],[third,first,second]);assert.equal(h.api.active,third);assert.deepEqual({text:third.content,undo:[...third.undo],revision:third.editRevision,start:ta.selectionStart,end:ta.selectionEnd,top:ta.scrollTop,left:ta.scrollLeft},saved);assert.equal(h.document.querySelector('[data-ed-open="third"]').getAttribute('aria-posinset'),'1');assert.equal(h.document.querySelector('[data-ed-open="third"]').id,'nt-editor-tab-'+third.uid);assert(h.api.reorderDocument(first.uid,null));assert.deepEqual([...h.api.documents.values()],[third,second,first]);assert.equal(h.api.active,third);
+ const h=harness(),ta=await h.first(),first=h.api.active;await h.api.open({id:'second',path:'second.txt',source:'Local computer',create:true,initialContent:'second content',read:async()=>({content:''}),write:async()=>({})});const second=h.api.active;await h.api.open({id:'third',path:'third.txt',source:'Local computer',create:true,initialContent:'third content',read:async()=>({content:''}),write:async()=>({})});const third=h.api.active;ta.setSelectionRange(1,5);ta.scrollTop=61;ta.scrollLeft=7;await h.click('upper');const saved={text:third.content,undo:[...third.undo],revision:third.editRevision,start:ta.selectionStart,end:ta.selectionEnd,top:ta.scrollTop,left:ta.scrollLeft};assert(h.api.reorderDocument(third.uid,first.uid));assert.deepEqual([...h.api.documents.values()],[third,first,second]);assert.equal(h.api.active,third);assert.deepEqual({text:third.content,undo:[...third.undo],revision:third.editRevision,start:ta.selectionStart,end:ta.selectionEnd,top:ta.scrollTop,left:ta.scrollLeft},saved);assert.equal(h.document.querySelector('[data-ed-open="third"]').getAttribute('aria-posinset'),'1');assert.equal(h.document.querySelector('[data-ed-open="third"]').id,'nt-editor-tab-'+third.uid);assert(h.api.reorderDocument(first.uid,null));assert.deepEqual([...h.api.documents.values()],[third,second,first]);assert.equal(h.api.active,third);
 });
 test('keyboard reorder is distinct from tab switching and pending/stale requests leave order intact',async()=>{
  const h=harness();await h.first();const first=h.api.active;await h.api.open({id:'second',path:'second.txt',source:'Local computer',create:true,initialContent:'second',read:async()=>({content:''}),write:async()=>({})});const second=h.api.active,root=h.document.getElementById('networkToolkitFileEditor');root.emit('keydown',root.querySelector('[data-ed-open="second"]'),{key:'ArrowLeft',altKey:true,shiftKey:true});assert.deepEqual([...h.api.documents.values()],[second,first]);assert.equal(h.api.active,second);root.emit('keydown',root.querySelector('[data-ed-open="second"]'),{key:'ArrowRight',altKey:true,shiftKey:true});assert.deepEqual([...h.api.documents.values()],[first,second]);for(const field of ['saving','loading','reloading','formatting','frozen']){first[field]=true;assert.equal(h.api.reorderDocument(second.uid,first.uid),false,field);assert.deepEqual([...h.api.documents.values()],[first,second]);first[field]=false;}assert.equal(h.api.reorderDocument('stale',first.uid),false);assert.equal(h.api.reorderDocument(second.uid,'stale'),false);assert.deepEqual([...h.api.documents.values()],[first,second]);h.c.NetworkToolkitEditorWindows={state:{outgoing:1}};assert.equal(h.api.reorderDocument(second.uid,first.uid),false);assert.equal(h.api.active,second);

@@ -66,6 +66,9 @@ type matchScan struct {
 	cursor           searchCursor
 	previous         searchCursor
 	literal          []byte
+	// groups holds the byte range of each group of the last match (-1 for a
+	// group that took no part), group 0 being the whole match.
+	groups []int64
 }
 
 func (s *Snapshot) matchScan(ctx context.Context, query string, regex, matchCase, wholeWord bool) (*matchScan, error) {
@@ -124,6 +127,14 @@ func (m *matchScan) next(at int64) (int64, int64, bool, error) {
 	}
 	if match == nil {
 		return 0, 0, false, nil
+	}
+	m.groups = m.groups[:0]
+	for k := group; k+1 < len(match); k += 2 {
+		if match[k] < 0 {
+			m.groups = append(m.groups, -1, -1)
+		} else {
+			m.groups = append(m.groups, start+int64(match[k]), start+int64(match[k+1]))
+		}
 	}
 	return start + int64(match[group]), start + int64(match[group+1]), true, nil
 }

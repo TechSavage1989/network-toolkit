@@ -46,9 +46,9 @@ test('brace indentation preserves PowerShell here-strings and C raw strings/macr
 });
 function editorHarness(){const document=makeDocument('');document.body=document;const create=document.createElement;document.createElement=tag=>{const el=create(tag);el.style.setProperty=(k,v)=>el.style[k]=v;el.style.removeProperty=k=>delete el.style[k];return el;};let complete;
  const c={document,console,Map,Set,TextDecoder,TextEncoder,Uint8Array,DataView,Blob,URL,setTimeout,clearTimeout,state:{},saveState(){},confirm:()=>true,esc:s=>String(s).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('"','&quot;'),addEventListener(){},NTKEditorLanguageService:{highlight:async text=>({html:text}),format:()=>new Promise(resolve=>complete=resolve),dispose(){}}};
- load(c,['editor-vendor/languages.js','network-config-language.js','editor-languages.js','editor-tab-groups.js','file-editor.js']);const api=c.NetworkToolkitFileEditor;
+ load(c,['editor-vendor/languages.js','network-config-language.js','editor-languages.js','editor-tab-groups.js','editor-text-tools.js','file-editor.js']);const api=c.NetworkToolkitFileEditor;
  const root=()=>document.getElementById('networkToolkitFileEditor');const ta=()=>document.querySelector('[data-ed-text]');
- return {api,c,document,ta,root,complete:result=>complete(result),async open(id,text){await api.open({id,path:id,create:true,initialContent:text,read:async()=>({content:text}),write:async()=>({})});},click:action=>root().emit('click',root().querySelector('[data-ed="'+action+'"]')),settle:()=>new Promise(resolve=>setImmediate(resolve))};
+ return {api,c,document,ta,root,complete:result=>complete(result),async open(id,text){await api.open({id,path:id,create:true,initialContent:text,read:async()=>({content:text}),write:async()=>({})});},click:action=>{const button=root().querySelector('[data-ed="'+action+'"]');if(button)root().emit('click',button);else api.textMenu.run(action);},settle:()=>new Promise(resolve=>setImmediate(resolve))};
 }
 test('formatting cannot overwrite a changed, closed or switched editor document',async()=>{
  const h=editorHarness();await h.open('one.json','{"x":1}');h.click('format');h.ta().value='{"x":2}';h.root().emit('input',h.ta());h.complete({text:'{"x":1}\n',mode:'format'});await h.settle();assert.equal(h.api.active.content,'{"x":2}');

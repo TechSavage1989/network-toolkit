@@ -37,6 +37,9 @@ async function make(viewport){
    else{
     if(!['GET','PUT'].includes(method))console.log('Synthetic reply to '+method+' '+name);
     if(name==='/api/status')data={version,os:'windows',arch:'amd64',portable:true,editorWindowAvailable:true,system:systemInfo};
+    // Editor window ownership before a shot sets its own: an empty, available
+    // state, so the toolbar shows Move / merge rather than a stale warning.
+    if(name==='/api/editor-views'||name==='/api/editor-views/current')data={available:true,ownerInstanceId:'readme-owner',self:'',views:[],incoming:[],outgoing:[],owned:{},recovery:[]};
     if(name==='/api/state'){if(method==='PUT'){stored=request.postDataJSON();}else data=stored;}
     if(name==='/api/system')data=systemInfo;
     if(name==='/api/public-ip')data={provider:'ipify',checkedAt:stamp(0),expiresAt:stamp(600),ipv4:{status:'ok',address:'203.0.113.45'},ipv6:{status:'ok',address:'2001:db8:45::1'}};

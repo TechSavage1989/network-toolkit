@@ -1,0 +1,24 @@
+{
+  "about": "Replace text of a regular-expression search, expanded by the engine (internal/editorbuffer/template.go) and by the page (expandReplacement in web/assets/editor-text-tools.js). Both tests read these cases.",
+  "cases": [
+    {"pattern": "(\\w+)=(\\w+)", "text": "key=value", "replacement": "$2=$1", "want": "value=key"},
+    {"pattern": "(\\w+)=(\\w+)", "text": "key=value", "replacement": "$&!", "want": "key=value!"},
+    {"pattern": "(\\w+)=(\\w+)", "text": "key=value", "replacement": "[$0]", "want": "[key=value]"},
+    {"pattern": "(\\w+)=(\\w+)", "text": "key=value", "replacement": "$$1", "want": "$1"},
+    {"pattern": "(\\w+)=(\\w+)", "text": "key=value", "replacement": "$3", "want": "$3"},
+    {"pattern": "(\\w+)=(\\w+)", "text": "key=value", "replacement": "$12", "want": "key2"},
+    {"pattern": "(\\w+)=(\\w+)", "text": "key=value", "replacement": "${2}", "want": "value"},
+    {"pattern": "(?<k>\\w+)=(?<v>\\w+)", "text": "key=value", "replacement": "${v}:${k}", "want": "value:key"},
+    {"pattern": "(?<k>\\w+)=(?<v>\\w+)", "text": "key=value", "replacement": "${missing}", "want": "${missing}"},
+    {"pattern": "=", "text": "a=b", "replacement": "\\n", "want": "\n"},
+    {"pattern": "&", "text": "a&b", "replacement": "\\t|\\r\\n|\\r", "want": "\t|\n|\n"},
+    {"pattern": "x", "text": "x", "replacement": "\\\\ \\$1 \\q", "want": "\\ $1 \\q"},
+    {"pattern": "x", "text": "x", "replacement": "\\x41\\u00e9\\u", "want": "Aé\\u"},
+    {"pattern": "x", "text": "x", "replacement": "a$", "want": "a$"},
+    {"pattern": "x", "text": "x", "replacement": "${", "want": "${"},
+    {"pattern": "(a)|(b)", "text": "b", "replacement": "[$1|$2]", "want": "[|b]"},
+    {"pattern": "(\\d+)", "text": "port 22", "replacement": "<$1>", "want": "<22>"},
+    {"pattern": "x", "text": "x", "replacement": "\\0", "error": true},
+    {"pattern": "x", "text": "x", "replacement": "\\x00", "error": true}
+  ]
+}

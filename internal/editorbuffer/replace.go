@@ -3,6 +3,8 @@ package editorbuffer
 import (
 	"context"
 	"errors"
+	"io"
+	"unicode/utf8"
 )
 
 // Replacement is a prepared Replace All: the document of one snapshot with
@@ -13,6 +15,8 @@ type Replacement struct {
 	root     *node
 	eol      *eolMap
 	Count    int64
+	// Units is the new length of the replaced range (Rewrite).
+	Units int64
 	// The new text lies in the scratch file at [start, end). While nothing
 	// else was stored in between or after it, Abort gives the space back.
 	start, end int64
@@ -52,7 +56,9 @@ func (w *leafWalk) next() (piece, bool) {
 //     bounds the number of pieces when a word on every line is replaced.
 //
 // A line break inside a replacement is new text. The work is one pass over
-// the document; nothing changes until Commit.
+// the document; nothing changes until Commit. With a regular expression the
+// replacement is a template ($1, ${name}, \n ...: template.go); the text of
+// a group is copied from the document a chunk at a time.
 func (s *Snapshot) ReplaceAll(ctx context.Context, query, replacement string, regex, matchCase, wholeWord bool) (*Replacement, error) {
 	b := s.b
 	if b.binary {
@@ -64,6 +70,12 @@ func (s *Snapshot) ReplaceAll(ctx context.Context, query, replacement string, re
 	scan, err := s.matchScan(ctx, query, regex, matchCase, wholeWord)
 	if err != nil {
 		return nil, err
+	}
+	var parts []templatePart
+	if regex {
+		if parts, err = parseTemplate(replacement, scan.pattern.SubexpNames()); err != nil {
+			return nil, err
+		}
 	}
 	result := &Replacement{b: b, revision: s.Revision, eol: s.eol, start: -1, contiguous: true}
 	// Whatever stops the work, a cancelled search or a failed read, the text
@@ -126,6 +138,22 @@ func (s *Snapshot) ReplaceAll(ctx context.Context, query, replacement string, re
 			segmentEnd = end
 		}
 		run, runKinds = run[:0], runKinds[:0]
+		return nil
+	}
+	// addNew adds new text (a replacement, or a group's text copied into
+	// it): its line breaks are new and get the file's most common ending.
+	addNew := func(p []byte) error {
+		run = append(run, p...)
+		if endings != nil {
+			for _, c := range p {
+				if c == '\n' {
+					runKinds = append(runKinds, s.eol.base)
+				}
+			}
+		}
+		if len(run) >= ChunkBytes {
+			return flush()
+		}
 		return nil
 	}
 	walk := &leafWalk{}
@@ -203,18 +231,23 @@ func (s *Snapshot) ReplaceAll(ctx context.Context, query, replacement string, re
 		if err = keep(from); err != nil {
 			return nil, err
 		}
-		run = append(run, replacement...)
-		if endings != nil {
-			for i := 0; i < len(replacement); i++ {
-				if replacement[i] == '\n' {
-					runKinds = append(runKinds, s.eol.base)
+		if parts == nil {
+			err = addNew([]byte(replacement))
+		} else {
+			groups := append([]int64(nil), scan.groups...)
+			for _, part := range parts {
+				if err != nil {
+					break
+				}
+				if part.group < 0 {
+					err = addNew([]byte(part.text))
+				} else if 2*part.group+1 < len(groups) && groups[2*part.group] >= 0 {
+					err = s.copyBytes(ctx, groups[2*part.group], groups[2*part.group+1], addNew)
 				}
 			}
 		}
-		if len(run) >= ChunkBytes {
-			if err = flush(); err != nil {
-				return nil, err
-			}
+		if err != nil {
+			return nil, err
 		}
 		pos = to
 		result.Count++
@@ -293,4 +326,108 @@ func (r *Replacement) Commit() (Metadata, error) {
 		b.revision++
 	}
 	return b.metadataLocked(), nil
+}
+
+// copyBytes passes the document's bytes [from, to) to fn in chunks that end
+// on a character boundary.
+func (s *Snapshot) copyBytes(ctx context.Context, from, to int64, fn func([]byte) error) error {
+	reader := &snapshotReader{ctx: ctx, b: s.b}
+	reader.seek(s.root, from)
+	in := io.LimitReader(reader, to-from)
+	buf := make([]byte, ChunkBytes)
+	var carry []byte
+	for {
+		n, err := in.Read(buf)
+		if n > 0 {
+			chunk := append(carry, buf[:n]...)
+			cut := len(chunk)
+			for k := 1; k <= utf8.UTFMax && k <= len(chunk); k++ {
+				if utf8.RuneStart(chunk[len(chunk)-k]) {
+					if !utf8.FullRune(chunk[len(chunk)-k:]) {
+						cut = len(chunk) - k
+					}
+					break
+				}
+			}
+			if e := fn(chunk[:cut]); e != nil {
+				return e
+			}
+			carry = append([]byte(nil), chunk[cut:]...)
+		}
+		if err == io.EOF {
+			if len(carry) > 0 {
+				return fn(carry)
+			}
+			return nil
+		}
+		if err != nil {
+			return err
+		}
+	}
+}
+
+// ReplaceText is the Replace text for the match of query that is selected,
+// [from, to): with a regular expression its template is expanded with that
+// match's groups. found is false when the selection is not such a match.
+func (s *Snapshot) ReplaceText(ctx context.Context, query, replacement string, from, to int64, regex, matchCase, wholeWord bool) (string, bool, error) {
+	if s.b.binary {
+		return "", false, ErrBinary
+	}
+	if err := validateEditFragment(replacement); err != nil {
+		return "", false, err
+	}
+	scan, err := s.matchScan(ctx, query, regex, matchCase, wholeWord)
+	if err != nil {
+		return "", false, err
+	}
+	start, err := s.bytePosition(s.root, from)
+	if err != nil {
+		return "", false, err
+	}
+	end, err := s.bytePosition(s.root, to)
+	if err != nil {
+		return "", false, err
+	}
+	if end-start > MaxEditBytes {
+		return "", false, errors.New("This match is too long to replace on its own. Use Replace all.")
+	}
+	a, z, found, err := scan.next(start)
+	if err != nil || !found || a != start || z != end {
+		return "", false, err
+	}
+	if !regex {
+		return replacement, true, nil
+	}
+	parts, err := parseTemplate(replacement, scan.pattern.SubexpNames())
+	if err != nil {
+		return "", false, err
+	}
+	// The length of the expansion is known from the group ranges: a Replace
+	// text that would be too long is refused before anything is built.
+	var size int64
+	for _, part := range parts {
+		if part.group < 0 {
+			size += int64(len(part.text))
+		} else if 2*part.group+1 < len(scan.groups) && scan.groups[2*part.group] >= 0 {
+			size += scan.groups[2*part.group+1] - scan.groups[2*part.group]
+		}
+		if size > MaxEditBytes {
+			return "", false, errors.New("The replacement is too long to apply on its own. Use Replace all.")
+		}
+	}
+	var groups []string
+	for k := 0; k+1 < len(scan.groups); k += 2 {
+		var text []byte
+		if scan.groups[k] >= 0 {
+			if err = s.copyBytes(ctx, scan.groups[k], scan.groups[k+1], func(p []byte) error { text = append(text, p...); return nil }); err != nil {
+				return "", false, err
+			}
+		}
+		groups = append(groups, string(text))
+	}
+	text := expandTemplate(parts, groups)
+	if len(text) > MaxEditBytes {
+		return "", false, errors.New("The replacement is too long to apply on its own. Use Replace all.")
+	}
+	return text, true, nil
 }

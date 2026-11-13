@@ -6,6 +6,7 @@
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const {handleEditorActivityMetadata}=require('./editor-activity-fixture.cjs');
+const {handleTextTools}=require('./editor-text-tools-fixture.cjs');
 const root=path.resolve(__dirname,'..'),version=require('../package.json').version,output=process.env.TOOLKIT_TEST_OUTPUT,origin='https://tabscroll.toolkit.test';
 const report={passed:false,checks:[],errors:[],scope:'Synthetic sessions and API in Chromium; no live device or native Windows claim.'};
 const sessions=Array.from({length:14},(_,i)=>({id:'s'+(i+1),label:'lab-switch-'+String(i+1).padStart(2,'0'),type:'ssh',host:'192.0.2.'+(i+10),port:22,username:'operator',state:'connected',cols:100,rows:28}));
@@ -13,7 +14,7 @@ const sessions=Array.from({length:14},(_,i)=>({id:'s'+(i+1),label:'lab-switch-'+
  try{
   const context=await browser.newContext({viewport:{width:1280,height:800}});await context.grantPermissions(['clipboard-read','clipboard-write'],{origin});const page=await context.newPage();page.setDefaultTimeout(15000);page.on('pageerror',e=>report.errors.push(e.message));
   let saved={activePage:'terminal',appUpdatePreferences:{enabled:false},terminalInteraction:{pasteReview:true,copyOnSelect:false,rightClick:'menu'},terminalSidebarCollapsed:true};const inputs=[];
-  await page.route(origin+'/**',async route=>{if(await handleEditorActivityMetadata(route,origin,report))return;const req=route.request(),p=new URL(req.url()).pathname,method=req.method();
+  await page.route(origin+'/**',async route=>{if(await handleEditorActivityMetadata(route,origin,report))return;if(await handleTextTools(route))return;const req=route.request(),p=new URL(req.url()).pathname,method=req.method();
    if(p.startsWith('/api/')){let data={};
     if(p==='/api/status')data={version,os:'windows',arch:'amd64'};
     else if(p==='/api/state'){if(method==='PUT')saved=req.postDataJSON();else data=saved;}
@@ -165,13 +166,19 @@ const sessions=Array.from({length:14},(_,i)=>({id:'s'+(i+1),label:'lab-switch-'+
   for(const label of ['Undo','Redo','Cut','Copy','Paste','Select all','Send selection to terminal…','Find','Replace','Go to line']) {
     assert.equal(await menu.getByRole('menuitem',{name:new RegExp('^'+label+'(?:\\s|$)')}).count(),1,label);
   }
-  await submenuPanel('edit').waitFor({state:'hidden'});
-  await submenuPanel('convert').waitFor({state:'hidden'});
-  await submenu('edit').hover();
-  await submenuPanel('edit').waitFor();
-  assert.equal(await submenu('edit').getAttribute('aria-expanded'),'true');
-  for(const action of ['comment','duplicate','upper','lower','format']) {
-    assert.equal(await submenuPanel('edit').locator(`[data-editor-menu-action="${action}"]`).isVisible(),true,action);
+  assert.deepEqual(await menu.locator('.nt-editor-menu-root [data-editor-submenu]').evaluateAll(list=>list.map(el=>el.dataset.editorSubmenu)),['tools-lines','tools-encode','tools-format','tools-device']);
+  await submenuPanel('tools-lines').waitFor({state:'hidden'});
+  await submenuPanel('tools-encode').waitFor({state:'hidden'});
+  await submenu('tools-lines').hover();
+  await submenuPanel('tools-lines').waitFor();
+  assert.equal(await submenu('tools-lines').getAttribute('aria-expanded'),'true');
+  for(const action of ['comment','duplicate','sort-asc','trim-trailing']) {
+    assert.equal(await submenuPanel('tools-lines').locator(`[data-editor-menu-action="${action}"]`).isVisible(),true,action);
+  }
+  await submenu('tools-format').hover();
+  await submenuPanel('tools-format').waitFor();
+  for(const action of ['format','upper','lower','json-pretty']) {
+    assert.equal(await submenuPanel('tools-format').locator(`[data-editor-menu-action="${action}"]`).isVisible(),true,action);
   }
   if(output)await page.screenshot({path:path.join(output,'editor-context-menu.png')});
   await page.locator('#editorContextMenu [data-editor-menu-action="cut"]').click();await page.waitForFunction(()=>document.querySelector('#networkToolkitFileEditor [data-ed-text]').value===' beta\ngamma');
@@ -184,42 +191,45 @@ const sessions=Array.from({length:14},(_,i)=>({id:'s'+(i+1),label:'lab-switch-'+
   report.checks.push('Text Editor right-click menu groups text tools and keeps Cut, Paste and Undo directly available');
   await text.evaluate(el=>{el.focus();el.setSelectionRange(1,5);});
   await text.evaluate(el=>el.dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true,clientX:innerWidth-4,clientY:innerHeight-4,button:2})));
-  await submenu('convert').hover();
-  await submenuPanel('convert').waitFor();
-  const submenuBounds=await submenuPanel('convert').boundingBox(), menuBounds=await menu.boundingBox();
+  await submenu('tools-encode').hover();
+  await submenuPanel('tools-encode').waitFor();
+  const submenuBounds=await submenuPanel('tools-encode').boundingBox(), menuBounds=await menu.boundingBox();
   assert(submenuBounds.x>=0&&submenuBounds.y>=0&&submenuBounds.x+submenuBounds.width<=1280&&submenuBounds.y+submenuBounds.height<=800,'submenu fits at the lower-right edge');
   assert(submenuBounds.x+submenuBounds.width/2<menuBounds.x,'submenu opens on the left where there is room: '+JSON.stringify({submenuBounds,menuBounds}));
-  const triggerBounds=await submenu('convert').boundingBox();
+  const triggerBounds=await submenu('tools-encode').boundingBox();
   await page.mouse.move(submenuBounds.x+submenuBounds.width-12,triggerBounds.y+triggerBounds.height/2,{steps:6});
-  assert.equal(await submenuPanel('convert').isVisible(),true,'moving across to the submenu keeps it open');
-  await submenuPanel('convert').locator('[data-editor-menu-action="base64Encode"]').click();
-  assert.equal(await text.inputValue(),' YmV0YQ==\ngamma');
+  assert.equal(await submenuPanel('tools-encode').isVisible(),true,'moving across to the submenu keeps it open');
+  await submenuPanel('tools-encode').locator('[data-editor-menu-action="base64-encode"]').click();
+  await page.waitForFunction(()=>document.querySelector('#networkToolkitFileEditor [data-ed-text]').value===' YmV0YQ==\ngamma');
   await text.press('Shift+F10');
-  await submenu('convert').focus();
+  await submenu('tools-encode').focus();
   await page.keyboard.press('ArrowRight');
-  await submenuPanel('convert').waitFor();
-  assert.equal(await submenuPanel('convert').locator(':focus').count(),1,'opening by keyboard focuses a conversion');
+  await submenuPanel('tools-encode').waitFor();
+  assert.equal(await submenuPanel('tools-encode').locator(':focus').count(),1,'opening by keyboard focuses a conversion');
   await page.keyboard.press('ArrowLeft');
-  await submenuPanel('convert').waitFor({state:'hidden'});
-  assert.equal(await submenu('convert').evaluate(el=>el===document.activeElement),true);
+  await submenuPanel('tools-encode').waitFor({state:'hidden'});
+  assert.equal(await submenu('tools-encode').evaluate(el=>el===document.activeElement),true);
   await page.keyboard.press('ArrowRight');
   await page.keyboard.press('Escape');
-  await submenuPanel('convert').waitFor({state:'hidden'});
-  assert.equal(await submenu('convert').evaluate(el=>el===document.activeElement),true);
+  await submenuPanel('tools-encode').waitFor({state:'hidden'});
+  assert.equal(await submenu('tools-encode').evaluate(el=>el===document.activeElement),true);
   await page.keyboard.press('ArrowRight');
-  await page.keyboard.press('End');
-  assert.equal(await page.evaluate(()=>document.activeElement?.dataset.editorMenuAction),'base64Decode');
+  await page.keyboard.press('Home');
+  assert.equal(await page.evaluate(()=>document.activeElement?.dataset.editorMenuAction),'base64-decode');
   await page.keyboard.press('Enter');
   await menu.waitFor({state:'hidden'});
-  assert.equal(await text.inputValue(),' beta\ngamma');
-  await page.locator('.nt-editor-more summary').click();
-  await page.locator('[data-ed="textToHex"]').click();
-  assert.equal(await text.inputValue(),' 62657461\ngamma');
-  await page.locator('.nt-editor-more summary').click();
-  await page.locator('[data-ed="hexToText"]').click();
-  assert.equal(await text.inputValue(),' beta\ngamma');
-  await page.locator('.nt-editor-more summary').click();
-  report.checks.push('Conversion submenu fits at the window edge, supports keyboard navigation, and replaces only the selection');
+  await page.waitForFunction(()=>document.querySelector('#networkToolkitFileEditor [data-ed-text]').value===' beta\ngamma');
+  // The toolbar's Tools button opens the same groups.
+  const toolsButton=page.locator('#networkToolkitFileEditor [data-ed="tools"]');
+  await toolsButton.click();await menu.waitFor();
+  await submenu('tools-encode').hover();await submenuPanel('tools-encode').waitFor();
+  await submenuPanel('tools-encode').locator('[data-editor-menu-action="hex-encode"]').click();
+  await page.waitForFunction(()=>document.querySelector('#networkToolkitFileEditor [data-ed-text]').value===' 62657461\ngamma');
+  await toolsButton.click();await menu.waitFor();
+  await submenu('tools-encode').hover();await submenuPanel('tools-encode').waitFor();
+  await submenuPanel('tools-encode').locator('[data-editor-menu-action="hex-decode"]').click();
+  await page.waitForFunction(()=>document.querySelector('#networkToolkitFileEditor [data-ed-text]').value===' beta\ngamma');
+  report.checks.push('Encode / decode submenu fits at the window edge, supports keyboard navigation, and replaces only the selection; the Tools button opens the same tools');
   await page.keyboard.press('Escape');
   await page.evaluate(()=>{const t=document.querySelector('#networkToolkitFileEditor [data-ed-text]');t.focus();t.setSelectionRange(1,5);});await page.keyboard.press('Shift+F10');await page.locator('#editorContextMenu').waitFor();
   assert.equal(await page.evaluate(()=>document.activeElement?.closest('#editorContextMenu')!==null),true,'keyboard opens the menu with focus inside');
