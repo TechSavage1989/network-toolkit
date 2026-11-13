@@ -45,6 +45,9 @@ const step=name=>console.log('FIND WINDOW '+name);
  const until=(fn,arg,timeout=60000)=>page.waitForFunction(fn,arg,{timeout});
  const messageIs=re=>until(source=>new RegExp(source).test(document.querySelector('[data-ed-find-message]')?.textContent||''),re.source);
  const shoot=async name=>{if(output)await page.screenshot({path:path.join(output,name)});};
+ // The Find window on a tab: the shortcut opens it when it is closed (it
+ // closes it when that tab shows, so it is not pressed then).
+ const showTab=async name=>{if(!await win().isVisible())await page.keyboard.press({find:'Control+f',replace:'Control+h',mark:'Control+m'}[name]);await win().waitFor({state:'visible'});await win().locator('[data-ed-find-tab="'+name+'"]').click();await until(n=>document.querySelector('[data-ed-find]').dataset.tab===n,name);};
  const theme=async value=>{await page.evaluate(value=>setTheme(value),value);await page.waitForTimeout(120);};
  const load=async()=>{
   await page.goto(url);
@@ -73,7 +76,19 @@ const step=name=>console.log('FIND WINDOW '+name);
   assert.equal(await page.evaluate(()=>document.activeElement.matches('[data-ed-query]')),true,'Find what has the focus');
   assert.deepEqual(await win().locator('[data-ed-find-tab]').evaluateAll(list=>list.map(b=>[b.textContent,b.getAttribute('aria-selected')])),[['Find','true'],['Replace','false'],['Mark','false']]);
   const visibleButtons=()=>win().locator('.nt-find-buttons .btn').evaluateAll(list=>list.filter(b=>b.offsetParent).map(b=>b.textContent));
-  assert.deepEqual(await visibleButtons(),['Find Next','Count','Find All in Current Document','Find All in All Opened Documents','Close']);
+  assert.deepEqual(await visibleButtons(),['Find Next','Count','Find All in Current Document','Find All in All Opened Documents']);
+  // The toolbar's Find shows that its tab is open, and closes the window
+  // again; Replace switches the tab; Ctrl+F opens and closes it too.
+  const toolbarFind=page.locator('.nt-editor-toolbar [data-ed="find"]'),toolbarReplace=page.locator('.nt-editor-toolbar [data-ed="replace"]');
+  assert.equal(await toolbarFind.getAttribute('aria-pressed'),'true');assert.equal(await toolbarReplace.getAttribute('aria-pressed'),'false');
+  await toolbarReplace.click();await until(()=>document.querySelector('[data-ed-find]').dataset.tab==='replace');
+  assert.equal(await toolbarReplace.getAttribute('aria-pressed'),'true');assert.equal(await toolbarFind.getAttribute('aria-pressed'),'false');
+  await toolbarReplace.click();await win().waitFor({state:'hidden'});
+  assert.equal(await toolbarReplace.getAttribute('aria-pressed'),'false');
+  await toolbarFind.click();await win().waitFor({state:'visible'});assert.equal(await win().getAttribute('data-tab'),'find');
+  await page.keyboard.press('Control+f');await win().waitFor({state:'hidden'});
+  await page.keyboard.press('Control+f');await win().waitFor({state:'visible'});
+  assert.equal(await win().locator('[data-ed="hideFind"]').count(),0,'no Close button: the toolbar button and × close the window');
   assert.equal(await option('wrap').isChecked(),true,'Wrap around is on');
   assert.equal(await option('inSelection').isDisabled(),true,'In selection needs a selection');
   assert.equal(await option('dotAll').isDisabled(),true,'. matches newline is for regular expressions');
@@ -122,13 +137,55 @@ const step=name=>console.log('FIND WINDOW '+name);
   await option('dotAll').check();await win().locator('[data-ed-find-action="count"]').click();
   await messageIs(/^Count: 1 match\.$/);
   await option('dotAll').uncheck();
+  // The syntax guide: "?" beside Search Mode opens it for the mode, and
+  // closes it again; a row inserts its token at the cursor. The line under
+  // Find what explains the part at the cursor, or names the problem.
+  const guideToggle=win().locator('[data-ed-find-guide-toggle]'),guide=win().locator('[data-ed-find-guide]'),explainLine=win().locator('[data-ed-find-explain]');
+  const explained=re=>until(source=>new RegExp(source).test(document.querySelector('[data-ed-find-explain]').textContent),re.source);
+  await guideToggle.click();await guide.waitFor({state:'visible'});
+  assert.equal(await guideToggle.getAttribute('aria-expanded'),'true');
+  const tokens=await guide.locator('.nt-find-guide-row code').evaluateAll(list=>list.map(c=>c.textContent));
+  for(const token of ['.','\\d  \\D','\\w  \\W','\\s  \\S','\\b','^  $','*','+','?','{n}  {n,m}','[abc]','[^abc]','[a-z]','( )','(?: )','(?<name> )','|','\\','(?i)'])assert(tokens.includes(token),token+' is in the guide');
+  assert.equal(tokens.includes('$1'),false,'the Replace with rows are on the Replace tab');
+  assert.match(await guide.textContent(),/Not supported.*lookahead and lookbehind.*backreferences/);
+  await query('port ');await win().locator('[data-ed-query]').press('End');
+  await guide.locator('.nt-find-guide-row').filter({hasText:'a digit 0–9'}).click();
+  assert.equal(await page.locator('[data-ed-query]').inputValue(),'port \\d');
+  await explained(/^\\d — a digit 0–9$/);
+  await page.keyboard.type('+');
+  await explained(/^\+ — the item before, once or more$/);
+  await guide.locator('.nt-find-guide-row').filter({hasText:'a group: repeats'}).click();
+  assert.equal(await page.locator('[data-ed-query]').inputValue(),'port \\d+()');
+  assert.equal(await page.evaluate(()=>document.activeElement.selectionStart),9,'the cursor is inside the group');
+  await query('foo(?=bar)');
+  await explained(/^Problem at character 4: Lookahead and lookbehind \(\(\?=, \(\?!, \(\?<=, \(\?<!\) are not supported\.$/);
+  assert.match(await explainLine.getAttribute('class'),/error/);
+  await win().locator('[data-ed-find-action="count"]').click();
+  await messageIs(/^Invalid regular expression at character 4: Lookahead and lookbehind/);
+  await query('(\\w+');await explained(/^Problem at character 1: A \( has no closing \)\.$/);
+  await theme('dark');await shoot('editor-find-window-guide-dark.png');
+  await theme('light');await shoot('editor-find-window-guide-light.png');await theme('dark');
+  await win().locator('[data-ed-find-tab="replace"]').click();
+  assert((await guide.locator('.nt-find-guide-row code').evaluateAll(list=>list.map(c=>c.textContent))).includes('$1'),'Replace with rows on the Replace tab');
+  await page.locator('[data-ed-replacement]').fill('$2=$1');await page.locator('[data-ed-replacement]').press('End');
+  await explained(/^\$1 — the text of group 1$/);
+  await win().locator('[data-ed-find-tab="find"]').click();
+  await win().locator('[data-ed-search-mode] input[value="extended"]').check();
+  assert.match(await guide.textContent(),/\\uNNNN/);
+  await query('a\\tb');await win().locator('[data-ed-query]').press('ArrowLeft');
+  await explained(/^\\t — a tab$/);
+  await query('\\0');await explained(/NUL/);
+  await guideToggle.click();await guide.waitFor({state:'hidden'});
+  assert.equal(await guideToggle.getAttribute('aria-expanded'),'false');
+  await win().locator('[data-ed-search-mode] input[value="normal"]').check();
+  assert.equal(await explainLine.isVisible(),false,'no line in Normal mode');
   await win().locator('[data-ed-search-mode] input[value="normal"]').check();
   // The history list holds the searches, newest first.
   await query('');
   await win().locator('[data-ed-query] ~ .combobox-toggle').click();
   await page.locator('#comboboxPopup').waitFor({state:'visible'});
   const history=await page.locator('#comboboxPopup [role="option"]').evaluateAll(list=>list.map(o=>o.textContent));
-  assert.deepEqual(history.slice(0,4),['ge-0/0/12. description','^interface ge-0/0/\\d+$','\\tvlan','ge-0/0/1']);
+  assert.deepEqual(history.slice(0,4),['foo(?=bar)','ge-0/0/12. description','^interface ge-0/0/\\d+$','\\tvlan']);
   await page.keyboard.press('Escape');
   await theme('dark');await shoot('editor-find-window-find-dark.png');
   await theme('light');await shoot('editor-find-window-find-light.png');await theme('dark');
@@ -151,11 +208,21 @@ const step=name=>console.log('FIND WINDOW '+name);
   assert.equal((await active()).disk,true,'100,000 lines are disk-backed');
   await open('image.bin');
   await activate('config.txt');await settled();
-  await page.keyboard.press('Control+f');
+  await showTab('find');
   await query('vlan');
   await win().locator('[data-ed-find-action="all-current"]').click();
   await results().waitFor({state:'visible'});
+  // The status bar's Results button shows and hides the panel; it has no
+  // close button of its own.
+  const resultsToggle=page.locator('[data-ed-find-results-toggle]');
+  await resultsToggle.waitFor({state:'visible'});
+  assert.equal(await resultsToggle.getAttribute('aria-expanded'),'true');
+  assert.equal(await results().locator('button[aria-label^="Close"]').count(),0);
   await messageIs(/^Find All: 12 hits in 1 file of 1 searched\.$/);
+  await until(()=>document.querySelector('[data-ed-find-badge]').textContent==='12');
+  await resultsToggle.click();await results().waitFor({state:'hidden'});
+  assert.equal(await resultsToggle.getAttribute('aria-expanded'),'false');
+  await resultsToggle.click();await results().waitFor({state:'visible'});
   const rowsText=()=>results().locator('.nt-find-row').evaluateAll(list=>list.map(r=>r.textContent));
   await until(()=>![...document.querySelectorAll('.nt-find-row')].some(r=>r.classList.contains('is-pending')));
   let rows=await rowsText();
@@ -226,15 +293,16 @@ const step=name=>console.log('FIND WINDOW '+name);
   await results().locator('.nt-find-row.is-search').first().click({button:'right'});
   await page.locator('.nt-find-results-menu [data-ed-find-menu="clear"]').click();
   await until(()=>!document.querySelector('.nt-find-row'));
+  await results().waitFor({state:'hidden'});await resultsToggle.waitFor({state:'hidden'});
   step('find all done');
 
   // ---- 3. Replace ----
   step('replace');
   await activate('config.txt');await settled();
   await text().focus();await page.keyboard.press('Control+Home');
-  await page.keyboard.press('Control+h');
+  await page.keyboard.press('Control+h'); // from the Find tab: switches to Replace
   await until(()=>document.querySelector('[data-ed-find]').dataset.tab==='replace');
-  assert.deepEqual(await visibleButtons(),['Find Next','Replace','Replace All','Replace All in All Opened Documents','Close']);
+  assert.deepEqual(await visibleButtons(),['Find Next','Replace','Replace All','Replace All in All Opened Documents']);
   // Swap and the swap menu.
   await query('uplink');await page.locator('[data-ed-replacement]').fill('downlink');
   await win().locator('.nt-find-swap > [data-ed-find-swap="swap"]').click();
@@ -264,7 +332,7 @@ const step=name=>console.log('FIND WINDOW '+name);
   // Replace All in All Opened Documents: page-held and disk-backed
   // documents change and show as unsaved; the file that is not text is
   // skipped and named; nothing is saved.
-  await page.keyboard.press('Control+h');
+  await showTab('replace');
   await query('vlan');await page.locator('[data-ed-replacement]').fill('VLAN');await option('matchCase').check();
   await win().locator('[data-ed-find-action="replace-open"]').click();
   await messageIs(/^Replace All in all opened documents: 200,0\d\d occurrences were replaced in 3 documents\. Nothing was saved: .* Skipped: image\.bin \(not a text file\)\./);
@@ -283,9 +351,9 @@ const step=name=>console.log('FIND WINDOW '+name);
   step('mark');
   await activate('config.txt');await settled();
   await text().focus();await page.keyboard.press('Control+Home');
-  await page.keyboard.press('Control+m');
+  await page.keyboard.press('Control+m'); // from the Replace tab: switches to Mark
   await until(()=>document.querySelector('[data-ed-find]').dataset.tab==='mark');
-  assert.deepEqual(await visibleButtons(),['Mark All','Clear all marks','Copy Marked Text','Close']);
+  assert.deepEqual(await visibleButtons(),['Mark All','Clear all marks','Copy Marked Text']);
   await query('192.0.2.1');await option('bookmark').check();
   await win().locator('[data-ed-find-action="mark"]').click();
   await messageIs(/^Mark: 4 matches\.$/);
@@ -340,7 +408,7 @@ const step=name=>console.log('FIND WINDOW '+name);
   step('in selection');
   await activate('config.txt');await settled();
   await page.evaluate(()=>{const ta=document.querySelector('.nt-editor-code textarea[data-ed-text]'),start=ta.value.indexOf('interface ge-0/0/2\n'),end=ta.value.indexOf('interface ge-0/0/5\n');ta.focus();ta.setSelectionRange(start,end);ta.dispatchEvent(new Event('select',{bubbles:true}));document.dispatchEvent(new Event('selectionchange'));});
-  await page.keyboard.press('Control+h');
+  await showTab('replace');
   await until(()=>!document.querySelector('[data-ed-find-option="inSelection"]').disabled);
   await option('inSelection').check();
   await query('uplink');await page.locator('[data-ed-replacement]').fill('trunk');
@@ -399,7 +467,7 @@ const step=name=>console.log('FIND WINDOW '+name);
     await win().locator('[data-ed-find-tab="'+tab+'"]').click();
     const rect=await win().boundingBox();
     assert(rect.x>=0&&rect.y>=0&&rect.x+rect.width<=width&&rect.y+rect.height<=height,tab+' fits '+width+'×'+height+': '+JSON.stringify(rect));
-    const last=win().locator('[data-ed="hideFind"]');await last.scrollIntoViewIfNeeded();assert.equal(await last.isVisible(),true);
+    const last=win().locator('.nt-find-buttons .btn:visible').last();await last.scrollIntoViewIfNeeded();assert.equal(await last.isVisible(),true);
     await shoot('editor-find-window-'+tab+'-640x400-dark.png');
    }
   }

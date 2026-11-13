@@ -111,7 +111,7 @@ const file=name=>path.join(files,name);
   await page.waitForFunction(()=>NetworkToolkitFileEditor.active.content==='a:host&22:port&admin:user');
   // The same on a disk-backed document (one line of 60,000 settings): the
   // engine's Replace All, and a single Replace that expands $2=$1.
-  await page.locator('[data-ed="hideFind"]').click();
+  await page.locator('[data-ed="hideFind"],[data-ed-find-close]').click();
   await open('pairs.txt');
   let pairs=await active();
   assert.equal(pairs.disk,true);
@@ -136,7 +136,7 @@ const file=name=>path.join(files,name);
   await page.locator('[data-ed="replaceOne"]').click();
   await page.waitForFunction(()=>NetworkToolkitFileEditor.active.dirty&&!NetworkToolkitFileEditor.active.diskSession.pending);
   assert.equal((await engine('window',{start:0,limit:12})).text,'0=k0&k1=1&k2');
-  await page.locator('[data-ed="hideFind"]').click();
+  await page.locator('[data-ed="hideFind"],[data-ed-find-close]').click();
 
   // 4. Base64 decode of a whole 1.7 MB single-line document, nothing selected.
   const plain=fs.readFileSync(file('expected-b64.txt'),'utf8');

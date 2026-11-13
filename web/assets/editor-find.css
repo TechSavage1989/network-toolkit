@@ -17,7 +17,7 @@
 .nt-find-tabs button:focus-visible,.nt-find-x:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .nt-find-x{margin-left:auto;align-self:center;display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;margin-bottom:3px;border:0;border-radius:5px;background:transparent;color:var(--muted);font-size:17px;line-height:1;cursor:pointer}
 .nt-find-x:hover{background:var(--hover);color:var(--text)}
-.nt-find-panel{display:grid;grid-template-columns:minmax(0,1fr) minmax(170px,auto);grid-template-rows:auto auto 1fr;grid-template-areas:"main buttons" "mode buttons" "mode transparency";gap:8px 12px;padding:10px 12px;overflow:auto;min-height:0;align-items:start}
+.nt-find-panel{display:grid;grid-template-columns:minmax(0,1fr) minmax(170px,auto);grid-template-rows:auto auto 1fr auto;grid-template-areas:"main buttons" "mode buttons" "mode transparency" "guide guide";gap:8px 12px;padding:10px 12px;overflow:auto;min-height:0;align-items:start}
 .nt-find-main{grid-area:main;display:grid;gap:10px;min-width:0}
 .nt-find-fields{display:grid;gap:6px;min-width:0}
 .nt-find-field{display:grid;grid-template-columns:6.8em minmax(0,1fr) auto;align-items:center;gap:6px;min-width:0}
@@ -54,7 +54,7 @@
 .nt-find-window[data-tab=mark] [data-tabs]:not([data-tabs~=mark]){display:none}
 /* A narrow window (a detached editor at its minimum size). */
 @media(max-width:620px){
- .nt-find-panel{grid-template-columns:minmax(0,1fr);grid-template-areas:"main" "buttons" "mode" "transparency"}
+ .nt-find-panel{grid-template-columns:minmax(0,1fr);grid-template-areas:"main" "buttons" "mode" "transparency" "guide"}
  .nt-find-buttons{flex-flow:row wrap}
  .nt-find-buttons .btn{width:auto;flex:1 1 auto}
  .nt-find-in-selection{flex-basis:100%}
@@ -66,6 +66,30 @@
  .nt-find-mode,.nt-find-transparency{padding:1px 8px 4px;gap:1px}
 }
 .nt-editor.is-comparing .nt-find-window{display:none}
+/* Find and Replace on the toolbar show that their tab is open. */
+.nt-editor-toolbar :is([data-ed="find"],[data-ed="replace"])[aria-pressed="true"]{background:var(--accentBg);color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+/* The line under Find what and the syntax guide. */
+.nt-find-explain{margin:-2px 0 0 calc(6.8em + 6px);min-height:1.3em;font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nt-find-explain.error{color:var(--bad)}
+.nt-find-guide-toggle{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;margin-left:4px;padding:0;border:1px solid var(--border);border-radius:50%;background:transparent;color:var(--muted);font:600 11px/1 inherit;cursor:pointer;vertical-align:middle}
+.nt-find-guide-toggle:hover,.nt-find-guide-toggle[aria-expanded="true"]{background:var(--accentBg);color:var(--accent);border-color:var(--accent)}
+.nt-find-guide-toggle:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.nt-find-guide{grid-area:guide;max-height:170px;overflow:auto;padding:6px 8px;border:1px solid var(--border);border-radius:7px;background:var(--panel2,var(--panel));font-size:11px}
+.nt-find-guide p{margin:2px 0 5px;color:var(--muted)}
+.nt-find-guide p strong{color:var(--text)}
+.nt-find-guide-note{margin-top:6px!important}
+.nt-find-guide-rows{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1px 8px}
+.nt-find-guide-row{display:grid;grid-template-columns:5.6em minmax(0,1fr);grid-template-rows:auto auto;column-gap:6px;align-items:baseline;text-align:left;padding:3px 5px;border:0;border-radius:5px;background:transparent;color:var(--text);font:inherit;cursor:pointer}
+.nt-find-guide-row:hover,.nt-find-guide-row:focus-visible{background:var(--hover);outline:0}
+.nt-find-guide-row code{grid-row:1/3;font:600 12px var(--mono,Consolas,monospace);color:var(--nt-code-keyword,var(--accent));white-space:nowrap}
+.nt-find-guide-row small{color:var(--muted);font-size:10px;overflow-wrap:anywhere}
+@media(max-width:620px){.nt-find-guide-rows{grid-template-columns:minmax(0,1fr)}.nt-find-explain{margin-left:0}}
+/* The status bar's toggle of the Search results panel. */
+.nt-find-results-toggle{display:inline-flex;align-items:center;gap:5px;min-height:20px;padding:1px 7px;border:1px solid var(--border);border-radius:10px;background:transparent;color:var(--muted);font:inherit;font-size:10px;cursor:pointer}
+.nt-find-results-toggle:hover{color:var(--text);background:var(--hover)}
+.nt-find-results-toggle.is-open{background:var(--accentBg);color:var(--accent);border-color:var(--accent)}
+.nt-find-results-toggle:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.nt-find-badge{min-width:1.6em;padding:0 5px;border-radius:8px;background:color-mix(in srgb,var(--accent) 22%,transparent);color:var(--text);font-weight:600;text-align:center}
 
 /* Marks: a layer behind the text, placed like the syntax colours. */
 .nt-editor-marks{position:absolute;inset:0;width:max-content;min-width:100%;height:auto;min-height:100%;margin:0;padding:10px 12px 20px;border:0;background:transparent;font:inherit;line-height:1.55;letter-spacing:0;tab-size:var(--nt-editor-tab,4);white-space:pre;overflow-wrap:normal;overflow:visible;pointer-events:none;color:transparent}

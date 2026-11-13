@@ -95,12 +95,138 @@ function shiftLines(lines,edit){
  return out;
 }
 
+// ---- The syntax guide and the line that explains the caret ----
+// Every search runs in the engine (Go's regular expressions), so this lists
+// exactly what works for every document; what the engine refuses is named
+// in NOT_SUPPORTED. Each row: the token shown, the text a click inserts
+// (with ‸ where the cursor goes), what it means, an example.
+const GUIDE={
+ extended:[
+  ['\\n','\\n','a line break','a\\nb finds “a” and “b” on two lines'],
+  ['\\r','\\r','a line break too (the editor keeps one \\n per line)','a\\rb is the same as a\\nb'],
+  ['\\t','\\t','a tab','\\tvlan finds an indented “vlan”'],
+  ['\\\\','\\\\','a backslash','C:\\\\temp finds “C:\\temp”'],
+  ['\\xNN','\\x‸','the character with hex code NN','\\x41 finds “A”'],
+  ['\\uNNNN','\\u‸','the character with hex code NNNN','\\u00e9 finds “é”']
+ ],
+ regex:[
+  ['.','.','any character but a line break (any character with . matches newline)','v.an finds “vlan”'],
+  ['\\d  \\D','\\d','a digit 0–9 / any other character','\\d+ finds “192” in “port 192”'],
+  ['\\w  \\W','\\w','a letter, digit or _ / any other character','\\w+ finds “ge0” in “ge0/1”'],
+  ['\\s  \\S','\\s','a space, tab or line break / any other character','a\\s+b finds “a   b”'],
+  ['\\b','\\b','the edge of a word','\\bvlan\\b finds “vlan” but not “vlans”'],
+  ['^  $','^','the start / end of a line (of each line, also with . matches newline)','^end$ finds a line that is only “end”'],
+  ['*','*','the item before, any number of times (also none)','ab*c finds “ac” and “abbc”'],
+  ['+','+','the item before, once or more','\\d+ finds “10” and “4094”'],
+  ['?','?','the item before, optional; after a repeat: as few as possible','colou?r finds “color” and “colour”; <.+?> finds one tag'],
+  ['{n}  {n,m}','{‸}','the item before, exactly n / n to m times','\\d{1,3} finds “192”'],
+  ['[abc]','[‸]','one of the characters listed','[ab]c finds “ac” and “bc”'],
+  ['[^abc]','[^‸]','one character that is not listed','[^0-9] finds “x” in “x1”'],
+  ['[a-z]','[a-z]','one character in a range','[0-9a-f]+ finds “1f” in “0x1f”'],
+  ['( )','(‸)','a group: repeats as one item, and is kept as $1, $2…','(ab)+ finds “abab”'],
+  ['(?: )','(?:‸)','a group that is not kept','(?:ge|xe)-\\d finds “ge-0”'],
+  ['(?<name> )','(?<‸>)','a group kept under a name, for ${name} in Replace with','(?<port>\\d+) keeps “22” as ${port}'],
+  ['|','|','or: the part before, or the part after','ssh|telnet finds either'],
+  ['\\','\\','takes the next character as it is','192\\.0 finds “192.0”, not “19210”'],
+  ['(?i)','(?i)','from here on, upper and lower case are the same','(?i)vlan finds “VLAN”']
+ ],
+ replace:[
+  ['$1','$1','the text of group 1 (up to $99)','(\\w+)=(\\w+) → $2=$1 turns “a=b” into “b=a”'],
+  ['${name}','${‸}','the text of a named group','${port}'],
+  ['$&  $0','$&','the whole match','[$&] puts it in brackets'],
+  ['$$','$$','a dollar sign','$$1 writes “$1”'],
+  ['\\n','\\n','a line break','&→\\n starts a line at each &'],
+  ['\\t','\\t','a tab','\\t$1 indents the group']
+ ]
+};
+const NOT_SUPPORTED='Not supported (the search says so): lookahead and lookbehind (?= (?! (?<= (?<!, backreferences such as \\1 in Find what (use $1 in Replace with), \\uNNNN in a regular expression (use \\x{NNNN}), possessive repeats such as ++ and atomic groups (?>…).';
+
+// The token of a pattern at a position: [start, end, meaning].
+function regexTokens(pattern){
+ const out=[];let groups=0;
+ for(let i=0;i<pattern.length;){
+  const c=pattern[i],start=i;let end=i+1,meaning='the character “'+c+'”';
+  if(c==='\\'){
+   const n=pattern[i+1];end=Math.min(pattern.length,i+2);
+   const named={d:'a digit 0–9',D:'any character but a digit',w:'a letter, digit or _',W:'any character but a letter, digit or _',s:'a space, tab or line break',S:'any character but a space, tab or line break',b:'the edge of a word',B:'not the edge of a word',A:'the start of the document',z:'the end of the document',n:'a line break',t:'a tab',r:'a carriage return (the editor keeps line breaks as \\n)',f:'a form feed',v:'a vertical tab'};
+   if(n===undefined)meaning='a lone \\ at the end: write \\\\ for a backslash';
+   else if(named[n])meaning=named[n];
+   else if(n==='x'){const m=/^\\x(\{[0-9a-fA-F]+\}|[0-9a-fA-F]{2})/.exec(pattern.slice(i));if(m){end=i+m[0].length;meaning='the character with hex code '+m[1].replace(/[{}]/g,'');}else meaning='\\x needs a hex code: \\x41 or \\x{263a}';}
+   else if(n==='u')meaning='\\uNNNN is not supported in a regular expression: use \\x{NNNN}';
+   else if(/[1-9]/.test(n))meaning='backreferences such as \\'+n+' are not supported: use $'+n+' in Replace with';
+   else if(n==='p'||n==='P'){const m=/^\\[pP](\{[^}]*\}|[A-Za-z])/.exec(pattern.slice(i));if(m)end=i+m[0].length;meaning=(n==='P'?'a character not in the Unicode class ':'a character in the Unicode class ')+(m?m[1].replace(/[{}]/g,''):'');}
+   else meaning='the character “'+n+'” itself';
+  }else if(c==='['){
+   let j=i+1;const negate=pattern[j]==='^';if(negate)j++;if(pattern[j]===']')j++;
+   while(j<pattern.length&&pattern[j]!==']'){if(pattern[j]==='\\')j++;j++;}
+   end=Math.min(pattern.length,j+1);
+   const body=pattern.slice(i+(negate?2:1),j);
+   meaning=j>=pattern.length?'a [ without its closing ]':(negate?'one character that is not ':'one of ')+(body.includes('-')?'the characters and ranges ':'')+'“'+body+'”';
+  }else if(c==='('){
+   const rest=pattern.slice(i);
+   let m;
+   if((m=/^\(\?P?<([A-Za-z_][A-Za-z0-9_]*)>/.exec(rest))){groups++;end=i+m[0].length;meaning='starts group '+groups+', named “'+m[1]+'”: ${'+m[1]+'} in Replace with';}
+   else if(/^\(\?[=!]|^\(\?<[=!]/.test(rest)){end=i+(rest[2]==='<'?4:3);meaning='lookahead and lookbehind are not supported';}
+   else if(rest.startsWith('(?:')){end=i+3;meaning='starts a group that is not kept';}
+   else if((m=/^\(\?([imsU-]+)(\)|:)/.exec(rest))){end=i+m[0].length;meaning=(m[2]===')'?'from here on: ':'a group with: ')+(m[1].includes('i')?'case is ignored':m[1].includes('s')?'. matches line breaks':m[1].includes('m')?'^ and $ match at lines':'these flags');}
+   else{groups++;meaning='starts group '+groups+': $'+groups+' in Replace with';}
+  }else if(c===')')meaning='ends a group';
+  else if(c==='|')meaning='or: the part before, or the part after';
+  else if(c==='.')meaning='any character but a line break';
+  else if(c==='^')meaning='the start of a line';
+  else if(c==='$')meaning='the end of a line';
+  else if(c==='*'||c==='+'||c==='?'){
+   const lazy=pattern[i+1]==='?';if(lazy)end=i+2;
+   meaning=(c==='*'?'the item before, any number of times (also none)':c==='+'?'the item before, once or more':'the item before is optional')+(lazy?', as few as possible':'');
+  }else if(c==='{'){
+   const m=/^\{(\d+)(,(\d*))?\}(\?)?/.exec(pattern.slice(i));
+   if(m){end=i+m[0].length;meaning='the item before, '+(m[2]===undefined?'exactly '+m[1]+' times':m[3]===''?m[1]+' or more times':m[1]+' to '+m[3]+' times')+(m[4]?', as few as possible':'');}
+  }
+  out.push([start,end,meaning]);i=end;
+ }
+ return out;
+}
+function templateTokens(text){
+ const out=[];
+ for(let i=0;i<text.length;){
+  const rest=text.slice(i);let m;
+  if((m=/^\$(\d{1,2})/.exec(rest)))out.push([i,i+m[0].length,m[1]==='0'?'the whole match':'the text of group '+m[1]]);
+  else if((m=/^\$\{(\w+)\}/.exec(rest)))out.push([i,i+m[0].length,'the text of the group '+m[1]]);
+  else if(rest.startsWith('$&'))out.push([i,i+2,'the whole match']);
+  else if(rest.startsWith('$$'))out.push([i,i+2,'a dollar sign']);
+  else if((m=/^\\([ntr\\$])/.exec(rest)))out.push([i,i+2,{n:'a line break',t:'a tab',r:'a line break','\\':'a backslash',$:'a dollar sign'}[m[1]]]);
+  else out.push([i,i+1,'the character “'+rest[0]+'”']);
+  i=out.at(-1)[1];
+ }
+ return out;
+}
+function extendedTokens(text){
+ const out=[];
+ for(let i=0;i<text.length;){
+  const rest=text.slice(i);let m;
+  if((m=/^\\x([0-9a-fA-F]{2})/.exec(rest)))out.push([i,i+4,m[1]==='00'?'\\x00 is a NUL character, which no text can hold':'the character with hex code '+m[1]]);
+  else if((m=/^\\u([0-9a-fA-F]{4})/.exec(rest)))out.push([i,i+6,m[1]==='0000'?'\\u0000 is a NUL character, which no text can hold':'the character with hex code '+m[1]]);
+  else if((m=/^\\([nrt0\\])/.exec(rest)))out.push([i,i+2,{n:'a line break',r:'a line break (the editor keeps one \\n per line)',t:'a tab','0':'\\0 is a NUL character, which no text can hold','\\':'a backslash'}[m[1]]]);
+  else out.push([i,i+1,'the character “'+rest[0]+'”']);
+  i=out.at(-1)[1];
+ }
+ return out;
+}
+// The meaning of what is at the caret (or just before it) in a field.
+function explain(text,caret,mode,field='find'){
+ if(!text||mode==='normal')return '';
+ const tokens=mode==='extended'?extendedTokens(text):field==='replace'?templateTokens(text):regexTokens(text);
+ const token=tokens.find(([a,b])=>caret>a&&caret<=b)||tokens.find(([a])=>a===caret)||tokens.at(-1);
+ return token?text.slice(token[0],token[1])+' — '+token[2]:'';
+}
+
 function create(a){
  const opts={backward:false,word:false,matchCase:false,wrap:true,inSelection:false,mode:'normal',dotAll:false,bookmark:false,purge:false};
  const transparency={enabled:false,mode:'blur',level:70};
  const marks=new WeakMap(),bookmarks=new WeakMap(),markCache=new WeakMap();
  const searches=[],pages=new Map(),running=new Set();
  let el=null,panel=null,tab='find',pos=null,scope=null,lastFound=null,history={find:[],replace:[]},historyAsked=false;
+ let resultsToggle=null,lastField='find',checkTimer=0,checkTicket=0,patternProblem=null;
  let selection={anchor:-1,focus:-1},menu=null,panelHeight=180,panelSized=false,renderFrame=0,searchSeq=0,markVersion=0,statusTimer=0,cancelling=null;
 
  // ---- Engine calls ----
@@ -308,6 +434,17 @@ function create(a){
   scroll.setAttribute('aria-activedescendant',selection.focus>=0&&selection.focus>=first&&selection.focus<last?'ntFindRow'+selection.focus:'');
   const hits=searches.reduce((sum,s)=>sum+s.files.reduce((n,f)=>n+f.hits,0),0);
   panel.querySelector('[data-ed-find-results-summary]').textContent=searches.length?plural(searches.length,'search','searches')+', '+plural(hits,'hit','hits'):'No searches';
+  syncResultsToggle();
+ }
+ function compact(n){return n<1000?String(n):n<1e6?(n/1000).toFixed(n<1e4?1:0).replace(/\.0$/,'')+'K':(n/1e6).toFixed(n<1e7?1:0).replace(/\.0$/,'')+'M';}
+ function syncResultsToggle(){
+  if(!resultsToggle)return;
+  const hits=searches.reduce((sum,s)=>sum+s.files.reduce((n,f)=>n+f.hits,0),0);
+  resultsToggle.hidden=!searches.length;
+  resultsToggle.setAttribute('aria-expanded',String(!panel.hidden));
+  resultsToggle.classList.toggle('is-open',!panel.hidden);
+  resultsToggle.querySelector('[data-ed-find-badge]').textContent=compact(hits);
+  resultsToggle.title=(panel.hidden?'Show':'Hide')+' the search results: '+plural(searches.length,'search','searches')+', '+plural(hits,'hit','hits');
  }
  function showPanel(show){
   if(!panel)return;
@@ -315,10 +452,11 @@ function create(a){
   if(show&&panel.hidden&&!panelSized){panelHeight=Math.round(Math.min(180,Math.max(90,(a.windowEl().clientHeight||600)*0.3)));panel.style.setProperty('--nt-find-results-height',panelHeight+'px');}
   panel.hidden=!show;a.layoutChanged?.();
   if(show)scheduleRender();
+  syncResultsToggle();
  }
  function clearResults(){
   for(const s of searches)for(const f of s.files)release(f.job);
-  searches.length=0;pages.clear();selection={anchor:-1,focus:-1};scheduleRender();status('Search results cleared.',false,false);
+  searches.length=0;pages.clear();selection={anchor:-1,focus:-1};panel.querySelector('.nt-find-results-rows').textContent='';showPanel(false);scheduleRender();status('Search results cleared.',false,false);a.focusText();
  }
  function toggleBlock(item,value){
   if(item.type==='search')item.s.collapsed=value??!item.s.collapsed;
@@ -605,6 +743,54 @@ function create(a){
   }
  }
 
+ // ---- The syntax guide and the line under Find what ----
+ function renderGuide(){
+  const guide=el?.querySelector('[data-ed-find-guide]');if(!guide||guide.hidden)return;
+  const rows=(list,field)=>'<div class="nt-find-guide-rows">'+list.map(([token,insert,meaning,example])=>'<button type="button" class="nt-find-guide-row" data-ed-find-insert="'+escapeHTML(insert)+'"'+(field?' data-ed-find-field="'+field+'"':'')+' title="Insert '+escapeHTML(insert.replace('‸',''))+' at the cursor"><code>'+escapeHTML(token)+'</code><span>'+escapeHTML(meaning)+'</span><small>'+escapeHTML(example)+'</small></button>').join('')+'</div>';
+  let html;
+  if(opts.mode==='normal')html='<p>Normal finds the text exactly as typed. Choose Extended or Regular expression to see what their characters mean here.</p>';
+  else if(opts.mode==='extended')html='<p>Extended: these stand for other characters in Find what and Replace with. Click one to insert it.</p>'+rows(GUIDE.extended)+'<p class="nt-find-guide-note">\\0 is refused: no text in the editor can hold a NUL character.</p>';
+  else html='<p>Regular expression: click one to insert it at the cursor. The same rules apply to every document.</p>'+rows(GUIDE.regex,'find')+(tab==='replace'?'<p><strong>In Replace with</strong></p>'+rows(GUIDE.replace,'replace'):'')+'<p class="nt-find-guide-note">'+escapeHTML(NOT_SUPPORTED)+'</p>';
+  guide.innerHTML=html;
+ }
+ function insertToken(text,field){
+  const input=el.querySelector(field==='replace'||!field&&lastField==='replace'?'[data-ed-replacement]':'[data-ed-query]');
+  const caret=text.indexOf('‸'),value=text.replace('‸','');
+  const start=input.selectionStart??input.value.length,end=input.selectionEnd??start;
+  input.focus({preventScroll:true});
+  input.setRangeText(value,start,end,'end');
+  if(caret>=0)input.setSelectionRange(start+caret,start+caret);
+  input.dispatchEvent(new Event('input',{bubbles:true}));
+ }
+ // One quiet line under Find what: what the token at the cursor means, or
+ // what is wrong with the pattern, and where. Hidden in Normal mode.
+ function explainCaret(changed=false){
+  const line=el?.querySelector('[data-ed-find-explain]');if(!line)return;
+  if(opts.mode==='normal'){line.hidden=true;line.textContent='';patternProblem=null;return;}
+  line.hidden=false;
+  const field=lastField==='replace'&&tab==='replace'?'replace':'find';
+  const input=el.querySelector(field==='replace'?'[data-ed-replacement]':'[data-ed-query]'),text=input.value;
+  if(changed&&field==='find')checkPattern();
+  const problem=field==='find'?patternProblem:null;
+  if(problem&&problem.text===text){line.textContent='Problem at character '+count(problem.at+1)+': '+problem.error;line.classList.add('error');return;}
+  line.classList.remove('error');
+  if(opts.mode==='extended'){const value=decode(text,'extended');if(value.error){line.textContent=value.error;line.classList.add('error');return;}}
+  const meaning=explain(text,input.selectionStart??text.length,opts.mode,field);
+  line.textContent=meaning||(field==='replace'?'Replace with: what each match becomes.':'Type a pattern; the meaning of each part shows here.');
+ }
+ // Whether the engine can use the regular expression (it searches every
+ // document), checked while it is typed.
+ function checkPattern(){
+  root.clearTimeout(checkTimer);
+  const text=el.querySelector('[data-ed-query]').value,ticket=++checkTicket;
+  if(opts.mode!=='regex'||!text||!a.engine()){patternProblem=null;return;}
+  checkTimer=root.setTimeout(()=>{void engine({action:'check',search:{query:text,regex:true}}).then(value=>{
+   if(ticket!==checkTicket)return;
+   patternProblem=value.ok?null:{text,error:value.error,at:value.at};
+   explainCaret();
+  }).catch(()=>{});},180);
+ }
+
  // ---- The window ----
  function markup(){
   const tabs=TABS.map(([id,label])=>'<button type="button" role="tab" id="ntFindTab-'+id+'" data-ed-find-tab="'+id+'" aria-controls="ntFindPanel" aria-selected="false" tabindex="-1">'+label+'</button>').join('');
@@ -612,7 +798,8 @@ function create(a){
   return '<div class="nt-find-head" data-ed-find-drag title="Drag to move the Find window"><div class="nt-find-tabs" role="tablist" aria-label="Find, Replace or Mark">'+tabs+'</div><button type="button" class="nt-find-x" data-ed-find-close aria-label="Close the Find window" title="Close (Esc)">×</button></div>'+
   '<div class="nt-find-panel" id="ntFindPanel" role="tabpanel" aria-labelledby="ntFindTab-find">'+
    '<div class="nt-find-main"><div class="nt-find-fields">'+
-    '<label class="nt-find-field"><span>Find what:</span><span class="nt-find-input"><input type="text" data-ed-query list="ntEditorFindHistory" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Find what"></span></label><datalist id="ntEditorFindHistory"></datalist>'+
+    '<label class="nt-find-field"><span>Find what:</span><span class="nt-find-input"><input type="text" data-ed-query list="ntEditorFindHistory" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Find what" aria-describedby="ntFindExplain"></span></label><datalist id="ntEditorFindHistory"></datalist>'+
+    '<div class="nt-find-explain" id="ntFindExplain" data-ed-find-explain aria-live="polite" hidden></div>'+
     '<div class="nt-find-field" data-ed-replace-fields data-tabs="replace"><label for="ntFindReplacement">Replace with:</label><span class="nt-find-input"><input type="text" id="ntFindReplacement" data-ed-replacement list="ntEditorReplaceHistory" spellcheck="false" autocomplete="off" autocapitalize="off" aria-label="Replace with"></span>'+
      '<span class="nt-find-swap"><button type="button" class="btn small ghost" data-ed-find-swap="swap" title="Swap Find what and Replace with" aria-label="Swap Find what and Replace with">⇅</button><button type="button" class="btn small ghost nt-find-swap-more" data-ed-find-swap-menu aria-haspopup="menu" aria-expanded="false" aria-label="More swap choices" title="More swap choices">▾</button>'+
      '<span class="nt-find-swap-list" role="menu" aria-label="Swap" hidden><button type="button" role="menuitem" data-ed-find-swap="swap">Swap Find and Replace</button><button type="button" role="menuitem" data-ed-find-swap="to-replace">Copy Find to Replace</button><button type="button" role="menuitem" data-ed-find-swap="to-find">Copy Replace to Find</button></span></span></div><datalist id="ntEditorReplaceHistory"></datalist>'+
@@ -621,7 +808,7 @@ function create(a){
     check('bookmark','Bookmark line','','mark')+check('purge','Purge for each search','','mark')+
     check('backward','Backward direction',' aria-keyshortcuts="Shift+F3"','find replace')+check('word','Match whole word only',' data-ed-word')+check('matchCase','Match case',' data-ed-case')+check('wrap','Wrap around',' checked','find replace')+
    '</div></div>'+
-   '<fieldset class="nt-find-mode" data-ed-search-mode data-ed-search-mode-label title="'+escapeHTML(MODE_HELP.normal)+'"><legend>Search Mode</legend>'+
+   '<fieldset class="nt-find-mode" data-ed-search-mode data-ed-search-mode-label title="'+escapeHTML(MODE_HELP.normal)+'"><legend>Search Mode <button type="button" class="nt-find-guide-toggle" data-ed-find-guide-toggle aria-expanded="false" aria-controls="ntFindGuide" aria-label="Syntax guide" title="What the characters of this search mode mean">?</button></legend>'+
     MODES.map(([value,label])=>'<label class="nt-find-check" title="'+escapeHTML(MODE_HELP[value])+'"><input type="radio" name="ntFindMode" value="'+value+'"'+(value==='normal'?' checked':'')+'> '+escapeHTML(label)+'</label>').join('')+
     check('dotAll','. matches newline',' disabled')+
    '</fieldset>'+
@@ -637,19 +824,19 @@ function create(a){
     '<button type="button" class="btn small primary" data-ed-find-action="mark" data-tabs="mark">Mark All</button>'+
     '<button type="button" class="btn small ghost" data-ed-find-action="clear-marks" data-tabs="mark">Clear all marks</button>'+
     '<button type="button" class="btn small ghost" data-ed-find-action="copy-marks" data-tabs="mark">Copy Marked Text</button>'+
-    '<button type="button" class="btn small ghost" data-ed="hideFind">Close</button>'+
    '</div>'+
    '<fieldset class="nt-find-transparency"><legend><label class="nt-find-check"><input type="checkbox" data-ed-find-transparency> Transparency</label></legend>'+
     '<label class="nt-find-check"><input type="radio" name="ntFindTransparency" value="blur" data-ed-find-transparency-mode checked> On losing focus</label>'+
     '<label class="nt-find-check"><input type="radio" name="ntFindTransparency" value="always" data-ed-find-transparency-mode> Always</label>'+
     '<input type="range" min="20" max="95" step="5" value="70" data-ed-find-opacity aria-label="Opacity of the Find window when it is transparent" title="Opacity when transparent">'+
    '</fieldset>'+
+   '<div class="nt-find-guide" id="ntFindGuide" data-ed-find-guide role="region" aria-label="Syntax guide" hidden></div>'+
   '</div>'+
   '<div class="nt-find-status" role="status" aria-live="polite"><span data-ed-find-message></span><span class="nt-find-progress" data-ed-find-progress hidden><span data-ed-find-progress-text></span><button type="button" class="btn small ghost" data-ed-find-cancel>Cancel</button></span></div>';
  }
  function panelMarkup(){
   return '<div class="nt-editor-pane-resize nt-find-results-resize" data-ed-find-results-resize role="separator" aria-orientation="horizontal" aria-label="Resize search results" tabindex="0" title="Drag to resize the search results. Arrow keys resize; Home / End use limits; Enter or double-click resets."></div>'+
-  '<div class="nt-find-results-head"><strong id="ntFindResultsTitle">Search results</strong><span class="nt-find-results-summary" data-ed-find-results-summary></span><button type="button" class="btn small ghost" data-ed-find-results-cancel hidden>Cancel search</button><button type="button" class="nt-find-x" data-ed-find-results-close aria-label="Close search results" title="Close search results">×</button></div>'+
+  '<div class="nt-find-results-head"><strong id="ntFindResultsTitle">Search results</strong><span class="nt-find-results-summary" data-ed-find-results-summary></span><button type="button" class="btn small ghost" data-ed-find-results-cancel hidden>Cancel search</button></div>'+
   '<div class="nt-find-results-scroll" data-ed-find-results-scroll tabindex="0" role="tree" aria-labelledby="ntFindResultsTitle" aria-multiselectable="true"><div class="nt-find-results-space"></div><div class="nt-find-results-rows"></div></div>';
  }
  function mount(){
@@ -657,8 +844,14 @@ function create(a){
   const host=a.windowEl();if(!host)return null;
   el=document.createElement('section');el.className='nt-find-window';el.dataset.edFind='';el.setAttribute('role','dialog');el.setAttribute('aria-modal','false');el.setAttribute('aria-label','Find');el.hidden=true;el.dataset.tab='find';
   el.innerHTML=markup();host.append(el);
-  panel=document.createElement('section');panel.className='nt-find-results';panel.dataset.edFindResults='';panel.setAttribute('role','region');panel.setAttribute('aria-label','Search results');panel.hidden=true;panel.innerHTML=panelMarkup();
+  panel=document.createElement('section');panel.className='nt-find-results';panel.id='ntFindResults';panel.dataset.edFindResults='';panel.setAttribute('role','region');panel.setAttribute('aria-label','Search results');panel.hidden=true;panel.innerHTML=panelMarkup();
   const statusBar=host.querySelector('.nt-editor-status');if(statusBar)statusBar.before(panel);else host.append(panel);
+  // The panel's toggle sits in the status bar, shown once there are results.
+  resultsToggle=document.createElement('button');resultsToggle.type='button';resultsToggle.className='nt-find-results-toggle';resultsToggle.dataset.edFindResultsToggle='';resultsToggle.hidden=true;
+  resultsToggle.setAttribute('aria-controls','ntFindResults');resultsToggle.setAttribute('aria-expanded','false');
+  resultsToggle.innerHTML='Results <span class="nt-find-badge" data-ed-find-badge></span>';
+  resultsToggle.addEventListener('click',()=>{showPanel(panel.hidden);if(panel.hidden)a.focusText();});
+  statusBar?.querySelector('[data-ed-message]')?.after(resultsToggle);
   panel.style.setProperty('--nt-find-results-height',panelHeight+'px');
   bindWindow();bindPanel();syncControls();applyTransparency();fillHistory();
   return el;
@@ -685,6 +878,7 @@ function create(a){
   el.dataset.tab=next;el.setAttribute('aria-label',TABS.find(([id])=>id===next)[1]);
   for(const button of el.querySelectorAll('[data-ed-find-tab]')){const on=button.dataset.edFindTab===next;button.setAttribute('aria-selected',String(on));button.tabIndex=on?0:-1;}
   el.querySelector('.nt-find-panel').setAttribute('aria-labelledby','ntFindTab-'+next);
+  syncToolbar();renderGuide();
   if(focus){const input=el.querySelector('[data-ed-query]');input.focus({preventScroll:true});input.select();}
   place();
  }
@@ -708,11 +902,25 @@ function create(a){
   }
   setTab(next,true);
   if(wasHidden)status('',false,false);
-  syncControls();applyTransparency();void loadHistory();
+  syncControls();applyTransparency();void loadHistory();explainCaret();
  }
  function close(){
   if(!el||el.hidden)return;
-  closeSwapMenu();el.hidden=true;a.focusText();
+  closeSwapMenu();el.hidden=true;syncToolbar();a.focusText();
+ }
+ // The toolbar's Find and Replace, and Ctrl+F, Ctrl+H and Ctrl+M, open the
+ // window on their tab; the one of the tab that shows closes it.
+ function toggle(next){
+  if(el&&!el.hidden&&tab===next){close();return;}
+  void open(next);
+ }
+ function syncToolbar(){
+  const host=a.windowEl(),shown=!!el&&!el.hidden;
+  for(const [action,id] of [['find','find'],['replace','replace']]){
+   const button=host?.querySelector('.nt-editor-toolbar [data-ed="'+action+'"]');if(!button)continue;
+   const on=shown&&tab===id;button.setAttribute('aria-pressed',String(on));button.setAttribute('aria-expanded',String(on));button.setAttribute('aria-controls','ntFindPanel');
+   button.title=(on?'Close the Find window':'Open the Find window on '+(id==='find'?'Find':'Replace'))+' ('+(id==='find'?'Ctrl+F':'Ctrl+H')+')';
+  }
  }
  function closeSwapMenu(){const list=el?.querySelector('.nt-find-swap-list');if(list&&!list.hidden){list.hidden=true;el.querySelector('[data-ed-find-swap-menu]').setAttribute('aria-expanded','false');}}
  function swap(kind){
@@ -748,15 +956,23 @@ function create(a){
    if(event.target.closest('[data-ed-find-swap-menu]')){const list=el.querySelector('.nt-find-swap-list'),openNow=list.hidden;list.hidden=!openNow;event.target.closest('[data-ed-find-swap-menu]').setAttribute('aria-expanded',String(openNow));if(openNow)list.querySelector('button').focus();return;}
    const swapButton=event.target.closest('[data-ed-find-swap]');if(swapButton){swap(swapButton.dataset.edFindSwap);return;}
    if(event.target.closest('[data-ed-find-cancel]')){for(const entry of running)entry.cancel();return;}
+   const guideToggle=event.target.closest('[data-ed-find-guide-toggle]');
+   if(guideToggle){const guide=el.querySelector('[data-ed-find-guide]');guide.hidden=!guide.hidden;guideToggle.setAttribute('aria-expanded',String(!guide.hidden));renderGuide();place();return;}
+   const row=event.target.closest('[data-ed-find-insert]');if(row){insertToken(row.dataset.edFindInsert,row.dataset.edFindField);return;}
    const act=event.target.closest('[data-ed-find-action]');if(act&&!act.disabled)void action(act.dataset.edFindAction);
   });
   el.addEventListener('change',event=>{
    const t=event.target;
    if(t.matches('[data-ed-find-option]')){opts[t.dataset.edFindOption]=t.checked;if(t.dataset.edFindOption==='inSelection'&&t.checked){scope=null;lastFound=null;}syncControls();return;}
-   if(t.matches('input[name="ntFindMode"]')){opts.mode=t.value;syncControls();return;}
+   if(t.matches('input[name="ntFindMode"]')){opts.mode=t.value;syncControls();renderGuide();explainCaret(true);return;}
    if(t.matches('[data-ed-find-transparency]')){transparency.enabled=t.checked;syncControls();applyTransparency();a.savePreferences();return;}
    if(t.matches('[data-ed-find-transparency-mode]')){transparency.mode=t.value==='always'?'always':'blur';applyTransparency();a.savePreferences();return;}
    if(t.matches('[data-ed-find-opacity]')){transparency.level=Math.max(20,Math.min(95,Number(t.value)||70));applyTransparency();a.savePreferences();}
+  });
+  for(const type of ['input','keyup','click','focusin','select'])el.addEventListener(type,event=>{
+   if(!event.target.matches?.('[data-ed-query],[data-ed-replacement]'))return;
+   lastField=event.target.matches('[data-ed-replacement]')?'replace':'find';
+   explainCaret(type==='input');
   });
   el.addEventListener('input',event=>{if(event.target.matches('[data-ed-find-opacity]')){transparency.level=Math.max(20,Math.min(95,Number(event.target.value)||70));applyTransparency();}});
   el.addEventListener('focusin',applyTransparency);
@@ -779,7 +995,6 @@ function create(a){
   scroll.addEventListener('scroll',scheduleRender);
   if(typeof root.ResizeObserver==='function')new root.ResizeObserver(scheduleRender).observe(scroll);
   panel.addEventListener('click',event=>{
-   if(event.target.closest('[data-ed-find-results-close]')){showPanel(false);a.focusText();return;}
    if(event.target.closest('[data-ed-find-results-cancel]')){for(const entry of running)entry.cancel();return;}
    const row=event.target.closest('[data-row]');if(!row)return;
    const index=Number(row.dataset.row);
@@ -824,7 +1039,7 @@ function create(a){
   if(event.isComposing)return inWindow||inPanel;
   const ctrl=event.ctrlKey||event.metaKey,k=event.key.length===1?event.key.toLowerCase():event.key;
   if(a.comparing())return false;
-  if(ctrl&&!event.shiftKey&&!event.altKey&&(k==='f'||k==='h'||k==='m')){event.preventDefault();void open(k==='f'?'find':k==='h'?'replace':'mark');return true;}
+  if(ctrl&&!event.shiftKey&&!event.altKey&&(k==='f'||k==='h'||k==='m')){event.preventDefault();toggle(k==='f'?'find':k==='h'?'replace':'mark');return true;}
   if(event.key==='F3'&&!ctrl&&!event.altKey){event.preventDefault();if(!el?.querySelector('[data-ed-query]')?.value){void open('find');return true;}void findNext(event.shiftKey);return true;}
   if(inPanel)return panelKey(event)||true;
   if(inWindow){
@@ -851,7 +1066,7 @@ function create(a){
  }
  function closed(d){marks.delete(d);bookmarks.delete(d);markCache.delete(d);if(scope?.uid===d.uid)scope=null;scheduleRender();}
  return Object.freeze({
-  open,close,isOpen:()=>!!el&&!el.hidden,key,draw,
+  open,close,toggle,isOpen:()=>!!el&&!el.hidden,key,draw,
   findNext,replaceOne,replaceAll,
   selectionChanged,edited,closed,
   marksIn,hasMarks:d=>marksOf(d).length>0||!!currentMatch(d),
