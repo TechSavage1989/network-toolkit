@@ -1,3 +1,15 @@
+# Unreleased (branch fix/file-icon-applications) - The document icon through Open with entries
+
+Owner, after Setup 1.21.50/51 and setting .txt/.conf/.json to the Text Editor in Settings → Default apps: the files still show the Text Editor's program icon (the page on the dark tile), not the document icon. The released exe's icon groups are in order, so `"…\Network_Toolkit.exe",3` is the document icon and the ProgID already used it: the files were associated through an Applications entry. Explorer shows the `DefaultIcon` of the key the UserChoice names; `Applications\Network_Toolkit.exe\DefaultIcon` was the editor icon (1), and Windows' own `Applications\Network_Toolkit_TextEditor.exe` (written when the user picks that program in Open with) has none, so its files show that program's icon 0, also the tile.
+
+What changed (rules and sources in AGENTS.md, the icon rule): Setup, the portable registration and the post-update repair write the document icon (3) to `Applications\Network_Toolkit.exe\DefaultIcon` (the repair only when that entry's command is the Text Editor command of the running program). Windows' own entry of the separate Text Editor program gets `"<folder>\Network_Toolkit.exe",3` when it starts the program beside the installed or registered portable copy and has no `DefaultIcon` key (or the recorded value); the value is recorded as `EditorApplicationIcon` in Setup's `TextEditor` key or the portable record (Setup adopts the portable value), and uninstall, Remove and Clean up delete only that value while it equals the record. The entry is never created and its command never changed. `ApplicationIcon` and the right-click verb keep the editor icon.
+
+Before release: `editorRegEditorAppIconUninstallerVersion` is 1.21.52 (the post-update repair writes the separate program's entry for an installed copy only when its uninstaller is at least that version); if the release gets another number, change the constant. CHANGELOG and What's New are not written yet (no version bump on this branch).
+
+Known limits: not run on physical Windows. Which icon Open with shows for the "Network Toolkit Text Editor" entry after this change is not confirmed on Windows 11 (Microsoft documents the Applications `DefaultIcon` as the files' icon; Visual Studio Code registers it the same way; ReactOS's Open with uses the program file's icon). Check Open with and Default apps on a real PC.
+
+---
+
 # v1.21.51 Beta 1 - Open with and file types after an update
 
 Owner (installed with Setup long ago, updated in the app to 1.21.50): "Text editor won't show up in the list of apps for json and some other file types", and picking `Network_Toolkit_TextEditor.exe` with "Look for another app on this PC" failed with "The Text Editor launch request cannot be combined with another application mode."
