@@ -196,12 +196,15 @@ const step=name=>console.log('FIND WINDOW '+name);
   await shoot('editor-find-results-dark.png');
   await results().locator('.nt-find-row.is-line').last().dblclick();
   await until(()=>NetworkToolkitFileEditor.active.path.endsWith('hits.txt'));
-  await until(()=>/^Ln 99,9\d\d,/.test(document.querySelector('[data-ed-position]').textContent));
+  await until(()=>/^Ln (99,9\d\d|100,000),/.test(document.querySelector('[data-ed-position]').textContent));
   await results().locator('.nt-find-row').first().click({button:'right'});
   await page.locator('.nt-find-results-menu [data-ed-find-menu="expand"]').click();
   await page.evaluate(()=>{document.querySelector('[data-ed-find-results-scroll]').scrollTop=0;});
   await until(()=>[...document.querySelectorAll('.nt-find-row.is-search')].every(r=>r.getAttribute('aria-expanded')==='true')&&document.querySelector('.nt-find-row.is-search'));
-  // Keyboard: the second row of the newest search, Enter jumps to second.txt.
+  // Keyboard: with config.txt collapsed, the row after second.txt's is its
+  // first match; Enter jumps there.
+  await results().locator('.nt-find-row.is-file',{hasText:'config.txt'}).first().locator('.nt-find-toggle').click();
+  await until(()=>document.querySelector('.nt-find-row.is-file')?.getAttribute('aria-expanded')==='false');
   await results().locator('.nt-find-row',{hasText:'second.txt'}).first().click();
   await page.keyboard.press('ArrowDown');await page.keyboard.press('Enter');
   await until(()=>NetworkToolkitFileEditor.active.path.endsWith('second.txt'));
@@ -214,7 +217,7 @@ const step=name=>console.log('FIND WINDOW '+name);
   await messageIs(/^Copied 2 lines\.$/);
   assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),'vlan 99\nvlan 100');
   // A row whose document changed says so instead of jumping.
-  await text().focus();await page.keyboard.press('Control+Home');await page.keyboard.type('! ');
+  await text().focus();await page.keyboard.press('Control+Home');await page.keyboard.type('X');
   await results().locator('.nt-find-row',{hasText:'second.txt'}).first().click();
   await page.keyboard.press('ArrowDown');await page.keyboard.press('Enter');
   await messageIs(/second\.txt changed since this search/);

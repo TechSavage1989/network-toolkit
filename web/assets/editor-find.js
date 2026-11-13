@@ -108,7 +108,9 @@ function create(a){
  async function call(d,action,body,signal){
   if(a.disk(d)){await a.flush(d);return a.diskCall(d,action,body,signal);}
   const page={next:'next','find-matches':'matches','replace-text':'replace-text','find-start':'start'}[action]||action;
-  return engine({action:page,...body,...textBody(d)});
+  // Page-held text is searched as sent: a revision means nothing there.
+  const {revision,...rest}=body;void revision;
+  return engine({action:page,...rest,...textBody(d)});
  }
  // A background job (Count, Find All, Mark All, Copy Marked Text, Replace
  // All of a disk-backed document): started, then polled until it ends.

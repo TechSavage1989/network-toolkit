@@ -252,6 +252,17 @@ async function standaloneTerminal(){
  await floating.locator('[data-ed-text]').focus();await page.keyboard.press('Control+Shift+L');await page.waitForTimeout(200);
  assert.equal(await page.locator('.nt-editor-dialog').count(),0,'no new tool shortcut in the Terminal');
  assert.equal(await page.evaluate(()=>document.querySelector('#networkToolkitFileEditor [data-ed-text]').value),'hostname lab-switch-01\n');
+ // Its Find and Replace are the Text Editor's Find window (editor-find.js).
+ await floating.locator('[data-ed-text]').focus();await page.keyboard.press('Control+f');
+ const findWindow=floating.locator('[data-ed-find]');await findWindow.waitFor({state:'visible'});
+ assert.equal(await findWindow.getAttribute('data-tab'),'find');
+ await findWindow.locator('[data-ed-query]').fill('lab-switch');await page.keyboard.press('Enter');
+ await page.waitForFunction(()=>{const ta=document.querySelector('#networkToolkitFileEditor [data-ed-text]');return ta.value.slice(ta.selectionStart,ta.selectionEnd)==='lab-switch';});
+ await floating.locator('[data-ed="replace"]').click();
+ await page.waitForFunction(()=>document.querySelector('#networkToolkitFileEditor [data-ed-find]').dataset.tab==='replace');
+ assert.equal(await findWindow.locator('[data-ed-replacement]').isVisible(),true);
+ await shot('terminal-floating-editor-find');
+ await findWindow.locator('[data-ed-query]').focus();await page.keyboard.press('Escape');await findWindow.waitFor({state:'hidden'});
  await shot('terminal-floating-editor');await floating.locator('[data-ed="close"]').click();
  pass('Terminal: the tab menu, the SFTP sidebar and the floating editor offer nothing that needs another Toolkit tool');
  // FTP/FTPS connections saved for the Toolkit's File Transfer tool are not listed in this app.
