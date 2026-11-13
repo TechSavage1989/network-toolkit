@@ -345,3 +345,28 @@ func TestEditorFindWindowReadsAFileThatIsNotText(t *testing.T) {
 		t.Fatal("the file changed on disk")
 	}
 }
+
+// The Find window's Transparency goes with documents to a detached window,
+// checked like every preference there; it is the only saved Find setting.
+func TestEditorFindTransparencyPreference(t *testing.T) {
+	batch := editorFixtureBatch()
+	batch.Preferences = &editorPreferences{FontSize: 13, Indent: 4, Palette: "auto", Syntax: true, FindTransparency: &editorFindTransparency{Enabled: true, Mode: "always", Level: 55}}
+	if err := validateEditorBatch(batch); err != nil {
+		t.Fatal(err)
+	}
+	clone := editorCloneBatch(batch)
+	batch.Preferences.FindTransparency.Level = 90
+	if f := clone.Preferences.FindTransparency; f == nil || !f.Enabled || f.Mode != "always" || f.Level != 55 {
+		t.Fatalf("the transparency was not copied: %+v", f)
+	}
+	for _, bad := range []editorFindTransparency{{Mode: "sometimes", Level: 50}, {Mode: "blur", Level: 5}, {Mode: "always", Level: 100}, {Mode: "", Level: 70}} {
+		batch.Preferences.FindTransparency = &bad
+		if err := validateEditorBatch(batch); err == nil {
+			t.Fatalf("%+v was accepted", bad)
+		}
+	}
+	batch.Preferences.FindTransparency = nil
+	if err := validateEditorBatch(batch); err != nil {
+		t.Fatal("a batch from a version without the Find window was refused:", err)
+	}
+}

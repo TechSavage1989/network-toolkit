@@ -193,7 +193,7 @@ const step=name=>console.log('FIND WINDOW '+name);
   await page.evaluate(()=>{const s=document.querySelector('[data-ed-find-results-scroll]');s.scrollTop=s.scrollHeight;});
   await until(()=>[...document.querySelectorAll('.nt-find-row.is-line')].some(r=>/^Line 99,9\d\d: vlan \d+ name vlan-999\d\d$/.test(r.textContent)));
   assert(await page.evaluate(()=>document.querySelectorAll('.nt-find-row').length)<80,'only the rows in view are drawn');
-  await shoot('editor-find-results-dark.png');
+  await shoot('editor-find-results-dark.png');await theme('light');await shoot('editor-find-results-light.png');await theme('dark');
   await results().locator('.nt-find-row.is-line').last().dblclick();
   await until(()=>NetworkToolkitFileEditor.active.path.endsWith('hits.txt'));
   await until(()=>/^Ln (99,9\d\d|100,000),/.test(document.querySelector('[data-ed-position]').textContent));
@@ -252,7 +252,7 @@ const step=name=>console.log('FIND WINDOW '+name);
   await until(()=>{const ta=document.querySelector('.nt-editor-code textarea[data-ed-text]');return ta.value.slice(ta.selectionStart,ta.selectionEnd)==='uplink';});
   await win().locator('[data-ed="replaceOne"]').click();
   await until(()=>NetworkToolkitFileEditor.active.content.includes('description core to 192.0.2.1\n'));
-  await shoot('editor-find-window-replace-dark.png');
+  await shoot('editor-find-window-replace-dark.png');await theme('light');await shoot('editor-find-window-replace-light.png');await theme('dark');
   // Replace All: one undo step.
   await win().locator('[data-ed="replaceAll"]').click();
   await messageIs(/^Replace All: 11 occurrences were replaced in the entire file\.$/);
@@ -332,7 +332,7 @@ const step=name=>console.log('FIND WINDOW '+name);
   await messageIs(/^Mark: 11,111 matches\.$/);
   await until(()=>document.querySelectorAll('.nt-editor-marks mark').length>=10);
   assert.equal(await page.evaluate(()=>[...document.querySelectorAll('.nt-editor-marks mark')].every(m=>m.textContent==='name vlan-1')),true);
-  await shoot('editor-find-marks-disk-dark.png');
+  await shoot('editor-find-marks-disk-dark.png');await theme('light');await shoot('editor-find-marks-disk-light.png');await theme('dark');
   await win().locator('[data-ed-find-action="clear-marks"]').click();
   step('mark done');
 
