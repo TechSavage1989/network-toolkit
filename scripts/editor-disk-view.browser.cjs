@@ -240,7 +240,7 @@ async function verifyLongLineWrap(page,editor){
 
   // Native textarea selection and visible syntax text share a baseline deep
   // inside a page, where fractional line heights can accumulate error.
-  await page.evaluate(async()=>{
+  await page.evaluate(async()=>{window.makeSyntaxView=async()=>{
    view.dispose();session.close();
    const text=Array.from({length:1024},(_,i)=>'set alias FIXTURE_'+String(i).padStart(4,'0')).join('\n');
    const metadata={revision:1,units:text.length,lines:1024};
@@ -259,12 +259,42 @@ async function verifyLongLineWrap(page,editor){
     container,session,syntaxLanguage:()=> 'fixture',readOnly:true});
    await view.load({start:0});
    await view.goLine(846);
+  };await makeSyntaxView();});
+  // CI (Chrome Headless Shell 151) found an empty selection after this
+  // double-click a few times; it never fails locally. Record what touches the
+  // selection, repeat the double-click, and print the record of any failure.
+  await page.evaluate(()=>{
+   const ta=document.querySelector('textarea'),log=window.selectionLog=[],t0=performance.now();
+   const proto=HTMLTextAreaElement.prototype,valueOf=Object.getOwnPropertyDescriptor(proto,'value'),scrollOf=Object.getOwnPropertyDescriptor(Element.prototype,'scrollTop');
+   const where=()=>new Error().stack.split('\n').slice(3,6).map(line=>line.trim().replace(/^at /,'').replace(/\(?file:[^)]*\/(web\/assets\/[^)]*)\)?/,'$1')).join(' < ');
+   const state=()=>[ta.selectionStart,ta.selectionEnd,Math.round(scrollOf.get.call(ta)),ta.scrollLeft,document.activeElement===ta];
+   const note=(what,extra='')=>{if(log.length<300)log.push([Math.round(performance.now()-t0),what,...state(),extra]);};
+   for(const type of ['pointerdown','pointerup','mousedown','mouseup','click','dblclick','select','selectionchange','scroll','focus','blur'])
+    ta.addEventListener(type,event=>note(type,event.detail||''),true);
+   const range=proto.setSelectionRange;
+   ta.setSelectionRange=function(...args){note('setSelectionRange('+args.join(',')+')',where());return range.apply(this,args);};
+   Object.defineProperty(ta,'value',{configurable:true,get(){return valueOf.get.call(this);},set(value){note('value='+String(value).length,where());valueOf.set.call(this,value);}});
+   Object.defineProperty(ta,'scrollTop',{configurable:true,get(){return scrollOf.get.call(this);},set(value){note('scrollTop='+value,where());scrollOf.set.call(this,value);}});
   });
-  const token=page.locator('.nt-editor-disk-highlight .nt-ed-string').filter({hasText:'FIXTURE_0850'});
-  await token.waitFor();
-  const box=await token.boundingBox();
-  await page.mouse.dblclick(box.x+box.width/2,box.y+box.height*.8);
-  assert.equal(await editor.evaluate(ta=>ta.value.slice(ta.selectionStart,ta.selectionEnd)),'FIXTURE_0850');
+  const attempts=[];
+  for(let attempt=0;attempt<25;attempt++){
+   if(attempt)await page.evaluate(()=>makeSyntaxView());
+   await page.evaluate(()=>{selectionLog.length=0;});
+   const token=page.locator('.nt-editor-disk-highlight .nt-ed-string').filter({hasText:'FIXTURE_0850'});
+   await token.waitFor();
+   const box=await token.boundingBox();
+   await page.mouse.dblclick(box.x+box.width/2,box.y+box.height*.8);
+   const chosen=await editor.evaluate(ta=>ta.value.slice(ta.selectionStart,ta.selectionEnd));
+   if(chosen==='FIXTURE_0850'){attempts.push({attempt,ok:true});continue;}
+   attempts.push({attempt,chosen,box,later:await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    const ta=document.querySelector('textarea'),rect=ta.getBoundingClientRect();
+    done({chosen:ta.value.slice(ta.selectionStart,ta.selectionEnd),readOnly:ta.readOnly,rect:[rect.x,rect.y,rect.width,rect.height],
+     classes:ta.className,syntaxHidden:document.querySelector('.nt-editor-disk-highlight')?.hidden,log:selectionLog.slice()});
+   }))))});
+  }
+  const failed=attempts.filter(item=>!item.ok);
+  if(failed.length)console.error('DOUBLE-CLICK DIAGNOSTICS '+JSON.stringify(failed));
+  assert.equal(failed.length,0,'a double-clicked word was not selected in '+failed.length+' of '+attempts.length+' attempts');
 
   report.longLineWrap=await verifyLongLineWrap(page,editor);
   assert.equal(report.errors.length,0);report.passed=true;
