@@ -112,7 +112,7 @@ The **Tools** button on the toolbar (next to **Send to terminal**) opens the tex
 - A tool that would change nothing says so and changes nothing. A tool that cannot run (Base64 that is not valid, JSON or XML with an error, decoded bytes that are not UTF-8 text) changes nothing and says why, with the line and column of the problem.
 - **Any size.** The tools run in the Network Toolkit engine, one implementation for every document. On a large document they run over its disk storage, show their progress above the text with **Cancel**, and the rest of the app stays responsive; sorting and removing duplicates spill to temporary files instead of holding the document in memory. Only a single line is ever held whole while lines are compared.
 - Text that is not UTF-8 (Windows-1252), UTF-16 text and files whose lines end in different ways keep their format: a tool changes the text you see, lines it does not change keep their own endings, and saving still stops if the result has a character the file's encoding cannot hold. A file that is not text cannot be changed by any tool.
-- The tools are in every Text Editor: the main window's, separate editor windows and the Text Editor app. The editor inside the Terminal app has none of them.
+- The tools are in every Text Editor: the main window's, separate editor windows and the Text Editor app. The editor inside the Terminal app (for files of its SFTP sidebar) keeps the editing actions it always had in its **Tools** and right-click menus: Toggle comment, Duplicate lines, Sort A→Z, Trim trailing spaces, Base64 and hex, Format document, UPPERCASE and lowercase.
 
 | Group | Tool | What it does | Shortcut |
 |---|---|---|---|

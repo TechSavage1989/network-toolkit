@@ -8,6 +8,7 @@
 // files or credentials are used. Not native Windows WebView2 acceptance.
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const {handleEditorActivityMetadata}=require('./editor-activity-fixture.cjs');
+const {handleTextTools}=require('./editor-text-tools-fixture.cjs');
 const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
 const root=path.resolve(__dirname,'..'),version=require('../package.json').version,out=process.env.NTK_BROWSER_OUTPUT_DIR||process.env.TOOLKIT_TEST_OUTPUT,origin='https://standalone-apps.toolkit.test';
 const report={passed:false,checks:[],errors:[],screenshots:[],scope:'Synthetic production-asset browser acceptance in Chromium. Not native Windows WebView2 acceptance.'};
@@ -21,7 +22,7 @@ async function open(mode,options={}){
  const f=fixture,sessions=options.sessions||[];
  const context=await browser.newContext({viewport:{width:1280,height:800},serviceWorkers:'block'});page=await context.newPage();page.setDefaultTimeout(15000);
  page.on('pageerror',error=>report.errors.push(mode+': '+error.message));
- await page.route('**/*',async route=>{if(await handleEditorActivityMetadata(route,origin,report))return;
+ await page.route('**/*',async route=>{if(await handleEditorActivityMetadata(route,origin,report))return;if(await handleTextTools(route))return;
   const req=route.request(),url=new URL(req.url()),p=url.pathname,method=req.method();assert.equal(url.origin,origin,'No external requests are allowed');
   if(p.startsWith('/api/')){let data={};const body=()=>{try{return req.postDataJSON();}catch{return null;}};f.calls.push(method+' '+p);
    if(p==='/api/state'&&method==='GET')data=f.saved;else if(p==='/api/state')f.saved=body();
@@ -231,13 +232,25 @@ async function standaloneTerminal(){
  const floating=page.locator('#networkToolkitFileEditor:not(.nt-editor-embedded)');await floating.locator('[data-ed-text]').waitFor();await page.waitForFunction(()=>document.querySelector('#networkToolkitFileEditor [data-ed-text]').value==='hostname lab-switch-01\n');
  assert.equal(await floating.locator('[data-ed="localTools"]').isVisible(),false,'"Full editor" is hidden');assert.equal(await floating.locator('[data-ed="close"]').isVisible(),true);assert.equal(await floating.locator('[data-ed="sendTerminal"]').isVisible(),true,'the editor inside the Terminal can still send to its own sessions');
  assert.equal(await floating.locator('.standalone-app-tools').count(),0,'the Terminal keeps its app buttons in the sidebar rail');
- // The Text Editor's text tools stay in the Text Editor: no Tools button, no
- // tool groups in the right-click menu, no tool shortcuts.
- assert.equal(await floating.locator('[data-ed="tools"]').isVisible(),false,'no Tools button in the Terminal');
+ // The editing actions this editor always had stay reachable by mouse
+ // (Toggle comment, Duplicate, Format document, case, trim, sort and the
+ // hex and Base64 conversions), in the Tools menu and the right-click menu.
+ // The Text Editor's other text tools, their new shortcuts and the
+ // SonicWall offer stay in the Text Editor.
+ const terminalTools={'tools-lines':['comment','duplicate','sort-asc','trim-trailing'],'tools-encode':['base64-decode','base64-encode','hex-decode','hex-encode'],'tools-format':['format','upper','lower']};
+ const listed=async()=>{const out={};for(const group of await page.locator('#editorContextMenu .nt-editor-menu-root [data-editor-submenu]').evaluateAll(list=>list.map(el=>el.dataset.editorSubmenu)))out[group]=await page.locator('#editorContextMenu [data-editor-submenu-panel="'+group+'"] [data-editor-menu-action]').evaluateAll(list=>list.map(el=>el.dataset.editorMenuAction));return out;};
+ assert.equal(await floating.locator('[data-ed="tools"]').isVisible(),true,'the Tools button is there');
+ await floating.locator('[data-ed="tools"]').click();await page.locator('#editorContextMenu').waitFor();
+ assert.deepEqual(await listed(),terminalTools,'the Tools menu offers the actions the editor always had, and no others');
+ await page.locator('#editorContextMenu [data-editor-submenu="tools-format"]').hover();await page.locator('#editorContextMenu [data-editor-submenu-panel="tools-format"] [data-editor-menu-action="upper"]').click();
+ await page.waitForFunction(()=>document.querySelector('#networkToolkitFileEditor [data-ed-text]').value==='HOSTNAME LAB-SWITCH-01\n');
+ await floating.locator('[data-ed-text]').focus();await page.keyboard.press('Control+z');
+ await page.waitForFunction(()=>document.querySelector('#networkToolkitFileEditor [data-ed-text]').value==='hostname lab-switch-01\n');
  await floating.locator('[data-ed-text]').dispatchEvent('contextmenu',{clientX:500,clientY:400,button:2});await page.locator('#editorContextMenu').waitFor();
- assert.equal(await page.locator('#editorContextMenu [data-editor-submenu^="tools-"]').count(),0,'no text tool groups in the Terminal');await page.keyboard.press('Escape');
- await floating.locator('[data-ed-text]').focus();await page.keyboard.press('Control+Shift+U');await page.waitForTimeout(200);
- assert.equal(await page.evaluate(()=>document.querySelector('#networkToolkitFileEditor [data-ed-text]').value),'hostname lab-switch-01\n','no tool shortcut in the Terminal');
+ assert.deepEqual(await listed(),terminalTools,'the right-click menu offers the same');await page.keyboard.press('Escape');
+ await floating.locator('[data-ed-text]').focus();await page.keyboard.press('Control+Shift+L');await page.waitForTimeout(200);
+ assert.equal(await page.locator('.nt-editor-dialog').count(),0,'no new tool shortcut in the Terminal');
+ assert.equal(await page.evaluate(()=>document.querySelector('#networkToolkitFileEditor [data-ed-text]').value),'hostname lab-switch-01\n');
  await shot('terminal-floating-editor');await floating.locator('[data-ed="close"]').click();
  pass('Terminal: the tab menu, the SFTP sidebar and the floating editor offer nothing that needs another Toolkit tool');
  // FTP/FTPS connections saved for the Toolkit's File Transfer tool are not listed in this app.

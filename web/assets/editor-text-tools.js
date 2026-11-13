@@ -62,6 +62,10 @@ const TOOLS=Object.freeze([
  {id:'sonicwall-readable',group:'device',engine:'sonicwall-readable',label:'Make SonicWall export readable',description:'Opens a readable copy of a SonicWall settings export (.exp) in a new tab: one setting per line, values decoded. Line breaks and other control characters inside a value show as \\n, \\r or \\xNN. The export is not changed.'}
 ]);
 const byId=new Map(TOOLS.map(tool=>[tool.id,tool]));
+// The standalone Terminal's floating editor (files of its SFTP sidebar) keeps
+// the editing actions it always had, now through the Tools menu: no other
+// tools, no new shortcuts and no SonicWall offer there.
+const TERMINAL_TOOLS=new Set(['comment','duplicate','format','upper','lower','trim-trailing','sort-asc','hex-encode','hex-decode','base64-encode','base64-decode']);
 // Action names of earlier versions (toolbar buttons, menus, tests) still work.
 const ALIASES=Object.freeze({sortLines:'sort-asc',trim:'trim-trailing',textToHex:'hex-encode',hexToText:'hex-decode',base64Encode:'base64-encode',base64Decode:'base64-decode'});
 // "Trim spaces" of earlier versions trimmed the ends of lines: "trim" is
@@ -191,10 +195,11 @@ function message(template,scope,lines,count){
 
 function create(adapter){
  let running=null;
- // The tools belong to every Text Editor: the main window's, detached editor
- // windows and the standalone Text Editor. The standalone Terminal's
- // floating editor (for files of its SFTP sidebar) has none of them.
- const available=()=>adapter.available?.()!==false;
+ // Every tool belongs to every Text Editor: the main window's, detached
+ // editor windows and the standalone Text Editor. The standalone Terminal's
+ // floating editor offers only TERMINAL_TOOLS.
+ const full=()=>adapter.scope?.()!=='terminal';
+ const allows=id=>{const t=tool(id);return !!t&&(full()||TERMINAL_TOOLS.has(t.id));};
  const nameOf=path=>String(path||'Untitled').split(/[\\/]/).pop()||'Untitled';
  function bar(kind){return adapter.overlay()?.querySelector('[data-ed-tool-bar="'+kind+'"]');}
  function removeBar(kind){bar(kind)?.remove();}
@@ -241,7 +246,7 @@ function create(adapter){
  // ---- Running a tool ----
  async function run(id){
   const t=tool(id);
-  if(!t||!available())return false;
+  if(!t||!allows(t.id))return false;
   if(t.page)return adapter.pageAction(t.id);
   const d=adapter.current();
   if(!d){adapter.setMessage('Open or create a document first.');return false;}
@@ -339,7 +344,7 @@ function create(adapter){
  // A document that was opened is checked once, on its first few kilobytes,
  // for the shape of a SonicWall export; a match offers the readable copy.
  async function opened(d){
-  if(!d||d.textToolOffer||d.untitled||d.encoding==='Binary'||!available()||!adapter.engine())return;
+  if(!d||d.textToolOffer||d.untitled||d.encoding==='Binary'||!full()||!adapter.engine())return;
   d.textToolOffer='checking';
   // Page-held text that does not start with lines of Base64 characters (no
   // spaces) is not sent to the engine to be checked.
@@ -366,7 +371,7 @@ function create(adapter){
    void run('sonicwall-readable');
   });
  }
- return Object.freeze({run,opened,draw,cancel,available,get busy(){return !!running;}});
+ return Object.freeze({run,opened,draw,cancel,allows,full,get busy(){return !!running;}});
 }
 root.NTKEditorTextTools=Object.freeze({GROUPS,TOOLS,tool,decodeExtended,parseTemplate,groupNames,expandReplacement,lineRange,lineColumn,create});
 if(typeof module==='object'&&module.exports)module.exports=root.NTKEditorTextTools;

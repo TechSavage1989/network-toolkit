@@ -22,5 +22,4 @@ body.standalone-editor [data-rb-action="openTerminal"]{display:none!important}
 body.standalone-terminal [data-tsftp="textEditor"],
 body.standalone-terminal [data-tsftp="full"],
 body.standalone-terminal .nt-editor [data-ed="localTools"],
-body.standalone-terminal .nt-editor [data-ed="tools"],
 body.standalone-terminal .transfer-session-section{display:none!important}
