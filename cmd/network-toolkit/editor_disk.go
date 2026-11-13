@@ -325,8 +325,12 @@ func (m *editorViewRegistry) openDiskDocument(w http.ResponseWriter, r *http.Req
 		m.finishDiskOpen(grant, disk, result, err)
 	} else if req.Mode == "derive" {
 		derive := *req.Derive
+		// Registered with the source before this open is answered: closing
+		// or reloading the source right after it stops the copy.
+		stop, unregister := source.registerStop(ctx)
 		go func() {
-			result, err := m.deriveDiskDocument(ctx, disk, source, derive)
+			defer unregister()
+			result, err := m.deriveDiskDocument(stop, disk, source, derive)
 			m.finishDiskOpen(grant, disk, result, err)
 		}()
 	} else if req.Mode == "restore" {

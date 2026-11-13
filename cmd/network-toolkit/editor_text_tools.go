@@ -132,7 +132,13 @@ func (d *editorDiskDocument) startTool(v *editorbuffer.Imported, req editorDiskR
 	job := &editorToolJob{id: newJobID(), cancel: cancel}
 	d.tool = job
 	d.mu.Unlock()
-	go d.runTool(ctx, job, tool, v.Buffer, req)
+	// Registered before the start is answered: a reload or close that comes
+	// right after it stops the tool.
+	stop, unregister := d.registerStop(ctx)
+	go func() {
+		defer unregister()
+		d.runTool(stop, job, tool, v.Buffer, req)
+	}()
 	return map[string]any{"job": job.id}, nil
 }
 
@@ -142,11 +148,10 @@ func (j *editorToolJob) isDone() bool {
 	return j.done
 }
 
-func (d *editorDiskDocument) runTool(parent context.Context, job *editorToolJob, tool *texttools.Tool, b *editorbuffer.Buffer, req editorDiskRequest) {
+// runTool runs a tool started by startTool; ctx is already registered to be
+// stopped by a reload or close of the document.
+func (d *editorDiskDocument) runTool(ctx context.Context, job *editorToolJob, tool *texttools.Tool, b *editorbuffer.Buffer, req editorDiskRequest) {
 	defer job.cancel()
-	stop, unregister := d.registerStop(parent)
-	defer unregister()
-	var ctx context.Context = stop
 	position := func(at int64) (int64, int64, bool) {
 		w, err := b.WindowNear(at, 1)
 		return w.Line, w.Column, err == nil
@@ -263,7 +268,8 @@ type editorDeriveRequest struct {
 
 // deriveDiskDocument fills a new document with a tool's result over the
 // whole of another document. The source is read through a snapshot and
-// never changed; closing or reloading it stops the work.
+// never changed; closing or reloading it stops the work: ctx is registered
+// with the source (registerStop) before the open is answered.
 func (m *editorViewRegistry) deriveDiskDocument(ctx context.Context, d *editorDiskDocument, source *editorDiskDocument, req editorDeriveRequest) (*editorbuffer.Imported, error) {
 	tool, ok := texttools.Lookup(req.Tool)
 	if !ok || req.Tool != "sonicwall-readable" {
@@ -278,23 +284,22 @@ func (m *editorViewRegistry) deriveDiskDocument(ctx context.Context, d *editorDi
 	if v.Binary {
 		return nil, editorbuffer.ErrBinary
 	}
-	stop, unregister := source.registerStop(ctx)
-	defer unregister()
 	s, err := v.Buffer.Snapshot()
 	if err != nil {
 		return nil, err
 	}
-	defer s.Close()
 	if s.Revision != req.Revision {
+		s.Close()
 		return nil, editorbuffer.ErrRevision
 	}
-	src, err := s.Source(stop, 0, s.Units())
+	src, err := s.Source(ctx, 0, s.Units())
 	if err != nil {
+		s.Close()
 		return nil, err
 	}
 	var count int64
-	result, err := editorbuffer.NewText(stop, "", func(out editorbuffer.Edits) error {
-		r, err := texttools.Run(stop, tool.ID, texttools.Options{}, src, out, texttools.Env{Dir: v.Buffer.ScratchDir(), Progress: func(p float64) {
+	result, err := editorbuffer.NewText(ctx, "", func(out editorbuffer.Edits) error {
+		r, err := texttools.Run(ctx, tool.ID, texttools.Options{}, src, out, texttools.Env{Dir: v.Buffer.ScratchDir(), Progress: func(p float64) {
 			d.mu.Lock()
 			d.progress = int64(p * float64(src.Size()))
 			d.mu.Unlock()
@@ -302,6 +307,10 @@ func (m *editorViewRegistry) deriveDiskDocument(ctx context.Context, d *editorDi
 		count = r.Count
 		return err
 	})
+	// The snapshot holds the source open: it is released before the message
+	// reads the source again (WindowNear claims the same lock, and a close
+	// of the source may be waiting in between).
+	s.Close()
 	if err != nil {
 		position := func(at int64) (int64, int64, bool) {
 			w, e := v.Buffer.WindowNear(at, 1)
