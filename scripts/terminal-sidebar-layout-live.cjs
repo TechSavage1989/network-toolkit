@@ -200,30 +200,34 @@ async function collapseSidebar(page) {
   assert.equal(await page.evaluate(() => document.activeElement?.dataset?.sessionTab), active, 'Collapse leaves keyboard focus on the active rail tab');
 }
 
-// Command bar (the macro composer above the terminal). Its Hide control may
-// become a toggle (branch fix/toggle-buttons), so this is the only place that
-// knows its controls: adapt COMMAND_BAR, not the checks that call commandBar().
-//  bar:    the command bar itself; hidden means not rendered.
-//  toggle: the toolbar's "Command bar" button; stays visible while the bar is
-//          hidden, aria-controls the bar, aria-expanded = bar shown.
-//  hide:   the bar's own "Hide command bar" control.
-const COMMAND_BAR = { bar: '#terminalMacroComposer', toggle: '#terminalMacroComposerToggle', hide: '#terminalMacroComposer [data-macro-action="hide-composer"]' };
-// commandBar(page, label) checks the bar and its toggle agree and returns
-// whether the bar is shown; commandBar(page, label, shown) first hides it with
-// its own control or shows it with the toolbar toggle, and waits until the app
-// saved that state.
+// Command bar (the Send to row above the terminal). This is the only place
+// that knows its controls: if they change, adapt COMMAND_BAR and commandBar(),
+// not the checks that call it. The toolbar's Command bar button is its only
+// control, a toggle (toggle-button rule in docs/UI_GUIDELINES.md):
+//  bar:        the command bar; hidden means not rendered.
+//  toggle:     the toolbar's Command bar button; stays visible while the bar is
+//              hidden, aria-controls the bar, aria-expanded = bar shown, and
+//              `reveal-toggle` so it looks pressed while the bar is shown.
+//  retiredHide: the bar's former own Hide button, which must not come back.
+// The app saves the state as terminalComposerCollapsed.
+const COMMAND_BAR = { bar: '#terminalMacroComposer', toggle: '#terminalMacroComposerToggle', retiredHide: '[data-macro-action="hide-composer"]' };
+// commandBar(page, label) checks that the bar and its toggle agree and returns
+// whether the bar is shown; commandBar(page, label, shown) first shows or hides
+// it with the toggle and waits until the app saved that state.
 async function commandBar(page, label, want) {
   const bar = page.locator(COMMAND_BAR.bar), toggle = page.locator(COMMAND_BAR.toggle);
   if (want !== undefined) {
     assert.equal(await bar.isVisible(), !want, label + ': command bar starts ' + (want ? 'hidden' : 'shown'));
-    await page.locator(want ? COMMAND_BAR.toggle : COMMAND_BAR.hide).click(); await settle(page);
+    await toggle.click(); await settle(page);
     await page.waitForFunction(async collapsed => (await api('/state')).terminalComposerCollapsed === collapsed, !want);
   }
   const shown = await bar.isVisible();
   if (want !== undefined) assert.equal(shown, want, label + ': command bar ' + (want ? 'shown' : 'hidden'));
+  assert.equal(await page.locator(COMMAND_BAR.retiredHide).count(), 0, label + ': the toggle is the only command bar control');
   assert(await toggle.isVisible(), label + ': the Command bar toggle stays visible');
   assert.equal(await toggle.getAttribute('aria-controls'), COMMAND_BAR.bar.slice(1), label + ': the toggle controls the command bar');
   assert.equal(await toggle.getAttribute('aria-expanded'), String(shown), label + ': the toggle reports the command bar state');
+  assert(await toggle.evaluate(element => element.classList.contains('reveal-toggle')), label + ': the Command bar button is a reveal toggle');
   return shown;
 }
 async function checkSidebarResize(page, mode) {
@@ -382,22 +386,34 @@ async function checkPreferences(page) {
     await confirmation.selectOption('multiple');
   }
   await selectRail(page, 'recent');
-  // Command bar is a toggle (owner rule): the toolbar button hides the bar; the bar has no hide button.
-  assert.equal(await page.locator('[data-macro-action="hide-composer"]').count(), 0);
-  assert.equal(await page.locator('#terminalMacroComposerToggle').getAttribute('aria-expanded'), 'true');
-  await page.click('#terminalMacroComposerToggle');
-  assert.equal(await page.locator('#terminalMacroComposerToggle').getAttribute('aria-expanded'), 'false');
+  await commandBar(page, 'Hide before reload', false);
   // Wait on the public state endpoint so a navigation cannot race debounce.
-  await page.waitForFunction(async () => { const saved = await api('/state'); return saved.terminalSidebarTab === 'recent' && saved.terminalComposerCollapsed === true && (!document.querySelector('#terminalMacroConfirmation') || saved.terminalMacroConfirmation === 'multiple'); });
-  await page.reload({ waitUntil: 'domcontentloaded' });
-  await page.locator('#terminalSidebarTabRecent').waitFor({ state: 'visible' }); await settle(page);
+  await page.waitForFunction(async () => { const saved = await api('/state'); return saved.terminalSidebarTab === 'recent' && saved.terminalSidebarCollapsed === false && saved.terminalComposerCollapsed === true && (!document.querySelector('#terminalMacroConfirmation') || saved.terminalMacroConfirmation === 'multiple'); });
+  await reloadTerminal(page);
   assert.equal(await page.locator('#terminalSidebarTabRecent').getAttribute('aria-selected'), 'true');
+  await assertSidebarToggle(page, true, 'Expanded Recent after reload');
   assert.equal(await page.evaluate(() => state.terminalSidebarWidth), sidebarWidth, 'Expanded sidebar width persists through reload');
-  assert.equal(await page.locator('#terminalMacroComposer').isVisible(), false, 'Composer hide preference persists');
-  assert.equal(await page.locator('#terminalMacroComposerToggle').getAttribute('aria-expanded'), 'false', 'The restored hidden command bar shows its toggle as not pressed');
+  assert.equal(Math.round(await page.locator('#terminalSessionSidebar').evaluate(element => element.getBoundingClientRect().width)), sidebarWidth, 'The reloaded sidebar is drawn at the saved width');
+  assert.equal(await commandBar(page, 'After reload'), false, 'Command bar hide preference persists');
   if (await confirmation.count()) assert.equal(await page.evaluate(async () => (await api('/state')).terminalMacroConfirmation), 'multiple');
-  await page.click('#terminalMacroComposerToggle'); await settle(page);
-  pass('Selected sidebar tab, hidden composer and available confirmation preference persist through a real reload');
+  // Collapsed with the selected rail tab, the sidebar stays collapsed on that
+  // tab through a reload and reopens at the saved width.
+  await collapseSidebar(page);
+  await page.waitForFunction(async () => { const saved = await api('/state'); return saved.terminalSidebarCollapsed === true && saved.terminalSidebarTab === 'recent'; });
+  await reloadTerminal(page);
+  await assertSidebarToggle(page, false, 'Collapsed Recent after reload');
+  assert.equal(await page.evaluate(() => NetworkToolkitSessionSidebar.activeTab()), 'recent', 'Collapsed sidebar keeps its tab through reload');
+  assert.equal(await commandBar(page, 'After second reload'), false, 'Command bar stays hidden through a second reload');
+  await selectRail(page, 'recent');
+  assert.equal(Math.round(await page.locator('#terminalSessionSidebar').evaluate(element => element.getBoundingClientRect().width)), sidebarWidth, 'Reopening after reload restores the saved width');
+  await commandBar(page, 'Show after reload', true);
+  await page.waitForFunction(async () => (await api('/state')).terminalSidebarCollapsed === false);
+  pass('Selected sidebar tab, width, collapsed state, hidden command bar and available confirmation preference persist through a real reload');
+}
+async function reloadTerminal(page) {
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.locator('#terminalSidebarTabSaved').waitFor({ state: 'attached' });
+  await page.locator('#terminalSessionSidebar .terminal-sidebar-rail').waitFor({ state: 'visible' }); await settle(page);
 }
 
 async function baseline() {
@@ -445,7 +461,7 @@ async function checkDetached(app, page) {
   await view.waitForFunction(() => !!currentTerminal()?.xterm && terminalDetachedReady === true);
   assert(await view.locator('#terminalSidebarTabMacros').isVisible(), 'Single-session detached view exposes Macros rail');
   assert.equal(await view.locator('#terminalSidebarTabSaved').isVisible(), false, 'Restricted detached view must hide Saved');
-  await view.click('#terminalSidebarTabMacros'); await settle(view);
+  await selectRail(view, 'macros');
   const identity = await captureIdentity(view), initial = await measure(view, 'detached Macros/Library'); assertFits(initial); report.geometry.push(initial);
   for (const tab of ['Runs', 'Library']) {
     await view.click('#terminalMacro' + tab + 'Tab'); await settle(view);
