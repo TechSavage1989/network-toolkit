@@ -87,7 +87,7 @@ func (a *application) handleEditorViews(w http.ResponseWriter, r *http.Request) 
 	}
 	caller := editorRequestView(r)
 	path := strings.TrimPrefix(r.URL.Path, "/api/editor-views")
-	largeComparison := (path == "/buffers/compare" || path == "/text-tools") && (r.ContentLength < 0 || r.ContentLength > 1<<20)
+	largeComparison := (path == "/buffers/compare" || path == "/text-tools" || path == "/find") && (r.ContentLength < 0 || r.ContentLength > 1<<20)
 	if (r.Method == http.MethodGet && (path == "" || path == "/current")) || (r.Method == http.MethodPost && (path == "/transfers" || path == "/current/state" || path == "/buffers/promote" || largeComparison || (strings.HasPrefix(path, "/documents/") && strings.HasSuffix(path, "/file")))) {
 		var release func()
 		var admitted bool
@@ -127,6 +127,13 @@ func (a *application) handleEditorViews(w http.ResponseWriter, r *http.Request) 
 		// Text tools over page-held text (editor_text_tools.go); every
 		// editor window may use them.
 		m.handleTextTools(w, r)
+		return
+	}
+	if path == "/find" {
+		// The Find window's searches of page-held text, its background
+		// jobs and its search history (editor_find.go); every editor window
+		// may use them, and reads only its own jobs.
+		m.handleFind(w, r, caller)
 		return
 	}
 	if path == "/drags" || strings.HasPrefix(path, "/drags/") {

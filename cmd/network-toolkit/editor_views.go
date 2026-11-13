@@ -174,6 +174,8 @@ type editorViewRegistry struct {
 	homeCloseApproved        bool
 	nextView                 uint64
 	now                      func() time.Time
+	// find holds the Find window's search history and jobs (editor_find.go).
+	find editorFind
 }
 type editorViewContextKey struct{}
 
@@ -206,6 +208,7 @@ func newEditorViewRegistry(a *application) *editorViewRegistry {
 						}
 					}
 					m.mu.Unlock()
+					m.find.dropOwner("*")
 					for _, buffer := range buffers {
 						buffer.close()
 					}
@@ -1085,6 +1088,8 @@ func (m *editorViewRegistry) release(caller string) error {
 	}
 	delete(m.loaded, caller)
 	v.info.State = "returned"
+	// Its Find All results and searches go with it (editor_find.go).
+	go m.find.dropOwner(caller)
 	return nil
 }
 
