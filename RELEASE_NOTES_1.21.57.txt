@@ -1,0 +1,18 @@
+Network Toolkit 1.21.57
+
+## What's New
+
+- The Text Editor has a Find window like Notepad++, with Find, Replace and Mark tabs. Ctrl+F, Ctrl+H, Ctrl+M and the toolbar's Find and Replace open it, and the same key or button closes it again.
+- Find All lists every match in a Search results panel at the bottom of the editor; double-click a row to go to it. Bookmarks (Ctrl+F2, then F2) mark lines to come back to.
+- The ? beside Search Mode explains each Extended and regular expression code with an example, and a line under Find what explains the part at the cursor.
+
+## Additional Details
+
+- Search in the selection, the document or all open documents, with whole word, match case, wrap around and backward options.
+- Replace All in All Opened Documents changes every open document that can change; Undo takes it back in each one, and nothing is saved until you save.
+- Mark All highlights every match, and Copy Marked Text copies the marked text.
+- Find what and Replace with remember your last 20 entries until the app closes. They are never saved, because search text can contain passwords.
+- Searching, counting, marking and replacing work in files of any size; long searches run in the background with Cancel.
+- The window can turn see-through while you work in the document (Transparency).
+- Regular expressions do not support lookahead, lookbehind or \1 in Find what (use $1 in Replace with); the window says so.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.
