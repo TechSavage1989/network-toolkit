@@ -175,7 +175,7 @@ async function standaloneTerminal(){
  const mainCommands=await palette();for(const label of GONE)assert(mainCommands.some(row=>row.endsWith('| '+label)),'main window keeps '+label);
  for(const label of ['Ping','Text Editor','Terminal','Reports'])assert(mainCommands.some(row=>row.endsWith('| '+label)),'main window keeps the '+label+' tool');
  assert.equal(mainCommands.some(row=>/Open Network Toolkit (Terminal|Text Editor)|\| Window settings$/.test(row)),false);
- const mainHelp=await helpRows();assert.deepEqual([...new Set(mainHelp.map(row=>row.split(' | ')[0]))],['Application','Text Editor','Terminal','File browser','Panels']);assert.equal(mainHelp.length,13);
+ const mainHelp=await helpRows();assert.deepEqual([...new Set(mainHelp.map(row=>row.split(' | ')[0]))],['Application','Text Editor','Terminal','File browser','Panels']);assert.equal(mainHelp.length,16);
  await page.evaluate(()=>navigate('editor'));await page.locator('#networkToolkitFileEditor button[aria-label="Connections"],#networkToolkitFileEditor button[title="Connections"]').first().click();
  await page.waitForFunction(()=>/Connect through Terminal or the SFTP \/ FTP \/ FTPS browser first\./.test(document.querySelector('#ntEditorRemoteHint')?.textContent||''));
  assert.equal(await page.evaluate(()=>[...document.querySelectorAll('#networkToolkitFileEditor [data-rb-action="openTerminal"]')].some(el=>getComputedStyle(el).display!=='none')),true,'the main window keeps Open terminal for file connections');
@@ -231,6 +231,13 @@ async function standaloneTerminal(){
  const floating=page.locator('#networkToolkitFileEditor:not(.nt-editor-embedded)');await floating.locator('[data-ed-text]').waitFor();await page.waitForFunction(()=>document.querySelector('#networkToolkitFileEditor [data-ed-text]').value==='hostname lab-switch-01\n');
  assert.equal(await floating.locator('[data-ed="localTools"]').isVisible(),false,'"Full editor" is hidden');assert.equal(await floating.locator('[data-ed="close"]').isVisible(),true);assert.equal(await floating.locator('[data-ed="sendTerminal"]').isVisible(),true,'the editor inside the Terminal can still send to its own sessions');
  assert.equal(await floating.locator('.standalone-app-tools').count(),0,'the Terminal keeps its app buttons in the sidebar rail');
+ // The Text Editor's text tools stay in the Text Editor: no Tools button, no
+ // tool groups in the right-click menu, no tool shortcuts.
+ assert.equal(await floating.locator('[data-ed="tools"]').isVisible(),false,'no Tools button in the Terminal');
+ await floating.locator('[data-ed-text]').dispatchEvent('contextmenu',{clientX:500,clientY:400,button:2});await page.locator('#editorContextMenu').waitFor();
+ assert.equal(await page.locator('#editorContextMenu [data-editor-submenu^="tools-"]').count(),0,'no text tool groups in the Terminal');await page.keyboard.press('Escape');
+ await floating.locator('[data-ed-text]').focus();await page.keyboard.press('Control+Shift+U');await page.waitForTimeout(200);
+ assert.equal(await page.evaluate(()=>document.querySelector('#networkToolkitFileEditor [data-ed-text]').value),'hostname lab-switch-01\n','no tool shortcut in the Terminal');
  await shot('terminal-floating-editor');await floating.locator('[data-ed="close"]').click();
  pass('Terminal: the tab menu, the SFTP sidebar and the floating editor offer nothing that needs another Toolkit tool');
  // FTP/FTPS connections saved for the Toolkit's File Transfer tool are not listed in this app.
