@@ -448,3 +448,37 @@ func TestFindResultsPagesAndSpills(t *testing.T) {
 		t.Fatal("the results file is still there")
 	}
 }
+
+// What the engine does not support is refused in plain words, with the
+// position of the problem; the guide of the Find window lists the rest.
+func TestFindPatternErrors(t *testing.T) {
+	for _, c := range []struct {
+		query, message string
+		at             int64
+	}{
+		{`(a|b`, "A ( has no closing ).", 0},
+		{`ab)c`, "A ) has no opening (.", 2},
+		{`x[a-`, "A [ has no closing ].", 1},
+		{`(\w+) \1`, `Backreferences such as \1 are not supported in Find what (use $1 in Replace with).`, 6},
+		{`foo(?=bar)`, "Lookahead and lookbehind ((?=, (?!, (?<=, (?<!) are not supported.", 3},
+		{`λ(?<!x)y`, "Lookahead and lookbehind ((?=, (?!, (?<=, (?<!) are not supported.", 1},
+		{"a\\u00e9", `\uNNNN is not supported in a regular expression: use \x{NNNN}, or Extended mode.`, 1},
+		{`*x`, "Nothing to repeat before *.", 0},
+		{`a**`, "Two repeats in a row (**).", 1},
+		{`[z-a]`, "The range z-a runs backwards.", 1},
+		{`ab\`, `The pattern ends with a lone \.`, 2},
+	} {
+		e := CheckPattern(c.query)
+		if e == nil || e.Message != c.message || e.Offset != c.at {
+			t.Errorf("%q: %+v, want %q at %d", c.query, e, c.message, c.at)
+		}
+		if _, err := (Search{Query: c.query, Regex: true}).pattern(); err == nil || !strings.Contains(err.Error(), c.message) {
+			t.Errorf("%q: the search said %v", c.query, err)
+		}
+	}
+	for _, good := range []string{`\d+\.\d+`, `(?P<port>\d+)`, `(?<port>\d+)`, `[^abc]`, `(?i)vlan`, `a{2,3}?`, `\x{263a}`, `^$`} {
+		if e := CheckPattern(good); e != nil {
+			t.Errorf("%q refused: %v", good, e)
+		}
+	}
+}

@@ -193,6 +193,12 @@ func (q Search) pattern() (string, error) {
 	if query == "" || len(query) > 4096 {
 		return "", errors.New("enter a search pattern of up to 4096 bytes")
 	}
+	if regex {
+		// What the engine does not support is refused in plain words.
+		if e := CheckPattern(query); e != nil {
+			return "", e
+		}
+	}
 	if !regex {
 		query = regexp.QuoteMeta(query)
 	} else if q.DotAll {

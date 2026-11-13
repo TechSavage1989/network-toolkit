@@ -89,6 +89,10 @@ func findMessage(err error) string {
 	case errors.Is(err, editorbuffer.ErrRevision):
 		return "The document changed while the search ran. Nothing was changed; search again."
 	}
+	var pattern *editorbuffer.PatternError
+	if errors.As(err, &pattern) {
+		return pattern.Error()
+	}
 	text := err.Error()
 	if strings.HasPrefix(text, "error parsing regexp: ") {
 		return "Invalid regular expression: " + strings.TrimPrefix(text, "error parsing regexp: ")
@@ -314,6 +318,14 @@ func (m *editorViewRegistry) handleFind(w http.ResponseWriter, r *http.Request, 
 	switch req.Action {
 	case "history":
 		value = m.find.recall()
+	case "check":
+		// The Find window's line under Find what: is this regular
+		// expression usable, and where is the problem if not.
+		if e := editorbuffer.CheckPattern(req.Search.Query); e != nil {
+			value = map[string]any{"ok": false, "error": e.Message, "at": e.Offset}
+		} else {
+			value = map[string]any{"ok": true}
+		}
 	case "remember":
 		if err = m.find.remember(req.List, req.Value); err == nil {
 			value = map[string]any{"ok": true}
