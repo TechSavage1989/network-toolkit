@@ -1,8 +1,16 @@
 'use strict';
-// Optional installed-app layout regression. Every app asset and API response
+// Installed-app Terminal sidebar regression. Every app asset and API response
 // comes from the executable's HTTP server. No asset injection or API mocks.
+// Each app run gets its own temporary data folder (os.tmpdir()), removed at
+// the end; no real profile is read or written.
 // NTK_APP_EXECUTABLE=/path/to/app CHROME_EXECUTABLE=/path/to/chrome \
 //   NTK_BASELINE_EXECUTABLE=/path/to/1.17.13 node scripts/terminal-sidebar-layout-live.cjs
+// CI: the `browser` job of .github/workflows/checks.yml runs it against the
+// Linux build it already makes for the other live checks (about 30 s; stable in
+// repeated and concurrent local runs). The 1.17.13 baseline comparison is
+// optional and Windows-only (no Linux edition existed), so CI leaves it out.
+// The sidebar has no heading collapse arrow: the selected rail tab is its
+// show/hide toggle (aria-expanded) and the divider hides, shows and resizes it.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const net = require('node:net');
@@ -10,11 +18,11 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawn } = require('node:child_process');
 
-const HELP = 'Usage: NTK_APP_EXECUTABLE=/absolute/path/to/app [CHROME_EXECUTABLE=/path/to/chrome] [NTK_BASELINE_EXECUTABLE=/path/to/1.17.13] [NTK_BROWSER_OUTPUT_DIR=/path/to/results] node scripts/terminal-sidebar-layout-live.cjs\nUses installed Playwright/Chromium, temporary app data and a real local Telnet peer. Nothing is downloaded or injected.';
+const HELP = 'Usage: NTK_APP_EXECUTABLE=/absolute/path/to/app [PLAYWRIGHT_MODULE=playwright] [CHROME_EXECUTABLE=/path/to/chrome] [NTK_BASELINE_EXECUTABLE=/path/to/1.17.13] [NTK_BROWSER_OUTPUT_DIR=/path/to/results] node scripts/terminal-sidebar-layout-live.cjs\nUses installed Playwright/Chromium, temporary app data and a real local Telnet peer. Nothing is downloaded or injected.';
 if (process.argv.includes('--help')) { console.log(HELP); process.exit(0); }
 if (!process.env.NTK_APP_EXECUTABLE) { console.error(HELP); process.exit(2); }
 function loadPlaywright() {
-  try { return require('playwright'); }
+  try { return require(process.env.PLAYWRIGHT_MODULE || 'playwright'); }
   catch (error) {
     if (error.code !== 'MODULE_NOT_FOUND') throw error;
     if (process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES) return require(path.join(process.env.CODEX_PRIMARY_RUNTIME_NODE_MODULES, 'playwright'));
@@ -137,43 +145,129 @@ async function captureIdentity(page) {
 async function assertIdentity(page, identity, label) {
   assert(await page.evaluate(ref => ref.root === document.querySelector('#terminalWorkspace') && ref.stage === document.querySelector('#terminalStage') && ref.grid === document.querySelector('#terminalPaneGrid') && ref.entry === currentTerminal() && ref.xterm === currentTerminal()?.xterm && ref.element === currentTerminal()?.element && ref.element?.isConnected, identity), label + ': terminal DOM/session/xterm was replaced');
 }
+// The sidebar has no heading collapse arrow or separate Show/Hide button: the
+// selected rail tab (Saved, Recent, SFTP, Macros) is its toggle and carries
+// aria-expanded, and the divider beside it hides and shows it too.
+const RAIL_NAMES = { saved: 'Saved', recent: 'Recent', files: 'SFTP', macros: 'Macros' };
+const railTab = (page, tab) => page.locator('#terminalSidebarTab' + RAIL_NAMES[tab]);
+async function assertSidebarToggle(page, expanded, label) {
+  const view = await page.evaluate(() => {
+    const visible = element => !!element && element.getClientRects().length > 0 && getComputedStyle(element).visibility !== 'hidden';
+    const rect = element => { const r = element.getBoundingClientRect(); return { left: r.left, right: r.right }; };
+    const sidebar = document.querySelector('#terminalSessionSidebar'), divider = document.querySelector('#terminalSidebarDivider'), columns = document.querySelector('#terminalWorkspaceColumns');
+    return {
+      active: NetworkToolkitSessionSidebar.activeTab(), side: state.terminalSidebarSide === 'left' ? 'left' : 'right', collapsed: sidebar.classList.contains('is-collapsed'),
+      contentVisible: visible(document.querySelector('#terminalSidebarContent')), railVisible: visible(sidebar.querySelector('.terminal-sidebar-rail')),
+      tabs: [...sidebar.querySelectorAll('.terminal-sidebar-rail [data-session-tab]')].map(tab => ({ tab: tab.dataset.sessionTab, visible: visible(tab), selected: tab.getAttribute('aria-selected'), expanded: tab.getAttribute('aria-expanded'), title: tab.title })),
+      divider: { visible: visible(divider), role: divider.getAttribute('role'), controls: divider.getAttribute('aria-controls'), label: divider.getAttribute('aria-label'), valuetext: divider.getAttribute('aria-valuetext') },
+      sidebarRect: rect(sidebar), dividerRect: rect(divider), columnsRect: rect(columns),
+      separateControls: document.querySelectorAll('[data-session-action="collapse"], #terminalSidebarVisibilityToggle').length
+    };
+  });
+  const detail = label + ' ' + JSON.stringify(view);
+  assert.equal(view.separateControls, 0, label + ': no heading collapse arrow or separate visibility button returns');
+  assert.equal(view.collapsed, !expanded, label + ': sidebar collapsed state');
+  assert.equal(view.contentVisible, expanded, label + ': sidebar content visibility');
+  assert(view.railVisible, label + ': the rail stays visible expanded and collapsed');
+  const selected = view.tabs.filter(tab => tab.selected === 'true');
+  assert.equal(selected.length, 1, label + ': exactly one rail tab is selected ' + detail);
+  assert.equal(selected[0].tab, view.active, label + ': the selected rail tab is the active panel');
+  assert(selected[0].visible, label + ': the selected rail tab stays visible as the toggle');
+  for (const tab of view.tabs.filter(tab => tab.visible)) {
+    const toggle = tab.selected === 'true';
+    assert.equal(tab.expanded, String(toggle && expanded), label + ': aria-expanded of rail tab ' + tab.tab + ' ' + detail);
+    assert.equal(tab.title, (toggle && expanded ? 'Close ' : 'Open ') + RAIL_NAMES[tab.tab], label + ': title of rail tab ' + tab.tab);
+  }
+  assert(view.divider.visible, label + ': divider stays available');
+  assert.equal(view.divider.role, 'separator'); assert.equal(view.divider.controls, 'terminalSidebarContent');
+  assert.equal(view.divider.label, expanded ? 'Resize or hide terminal sidebar' : 'Show terminal sidebar', label + ': divider label');
+  if (!expanded) assert.equal(view.divider.valuetext, 'Collapsed', label + ': divider value');
+  // The (collapsed) rail stays docked on its side, the divider facing the terminal.
+  if (view.side === 'right') assert(Math.abs(view.sidebarRect.right - view.columnsRect.right) <= 2 && view.dividerRect.right <= view.sidebarRect.left + 2, label + ': sidebar docked right ' + detail);
+  else assert(Math.abs(view.sidebarRect.left - view.columnsRect.left) <= 2 && view.dividerRect.left >= view.sidebarRect.right - 2, label + ': sidebar docked left ' + detail);
+  return view;
+}
 async function selectRail(page, tab) {
-  await page.click('#terminalSidebarTab' + tab[0].toUpperCase() + tab.slice(1));
+  const button = railTab(page, tab);
+  // Clicking the selected tab of an open sidebar hides it, so click only when
+  // the wanted panel is not already showing.
+  if (await button.getAttribute('aria-expanded') !== 'true') await button.click();
   await settle(page);
-  assert.equal(await page.locator('[data-session-tab="' + tab + '"]').getAttribute('aria-selected'), 'true');
+  assert.equal(await button.getAttribute('aria-selected'), 'true', tab + ' rail tab is selected');
+  assert.equal(await button.getAttribute('aria-expanded'), 'true', tab + ' rail tab reports its open panel');
+  assert(await page.locator('#terminalSidebar' + RAIL_NAMES[tab]).isVisible(), tab + ' panel is shown');
 }
 async function collapseSidebar(page) {
-  await page.locator('#terminalSidebarContent .session-library-heading [data-session-action="collapse"]').click();
+  const active = await page.evaluate(() => NetworkToolkitSessionSidebar.activeTab());
+  await assertSidebarToggle(page, true, 'Before collapsing ' + active);
+  await railTab(page, active).click();
   await settle(page);
-  assert.equal(await page.locator('#terminalSidebarContent').isVisible(), false, 'Heading arrow collapses sidebar content');
+  assert.equal(await page.locator('#terminalSidebarContent').isVisible(), false, 'The selected rail tab collapses sidebar content');
   assert(await page.locator('.terminal-sidebar-rail').isVisible(), 'Collapsed sidebar keeps its reopening tabs');
-  assert(await page.locator('.terminal-sidebar-rail>#terminalSidebarVisibilityToggle').isVisible(), 'The same visibility button remains beside the closed sidebar');
-  assert.equal(await page.locator('#terminalSidebarVisibilityToggle').getAttribute('aria-label'), 'Show sidebar');
-  assert.equal(await page.locator('#terminalSidebarVisibilityToggle [data-panel-direction]').getAttribute('data-panel-direction'), 'right');
-  assert.equal(await page.evaluate(() => document.activeElement?.dataset?.sessionTab), await page.evaluate(() => NetworkToolkitSessionSidebar.activeTab()), 'Collapse returns keyboard focus to the active rail tab');
+  await assertSidebarToggle(page, false, 'Collapsed from ' + active);
+  assert.equal(await page.evaluate(() => document.activeElement?.dataset?.sessionTab), active, 'Collapse leaves keyboard focus on the active rail tab');
+}
+
+// Command bar (the Send to row above the terminal). This is the only place
+// that knows its controls: if they change, adapt COMMAND_BAR and commandBar(),
+// not the checks that call it. The toolbar's Command bar button is its only
+// control, a toggle (toggle-button rule in docs/UI_GUIDELINES.md):
+//  bar:        the command bar; hidden means not rendered.
+//  toggle:     the toolbar's Command bar button; stays visible while the bar is
+//              hidden, aria-controls the bar, aria-expanded = bar shown, and
+//              `reveal-toggle` so it looks pressed while the bar is shown.
+//  retiredHide: the bar's former own Hide button, which must not come back.
+// The app saves the state as terminalComposerCollapsed.
+const COMMAND_BAR = { bar: '#terminalMacroComposer', toggle: '#terminalMacroComposerToggle', retiredHide: '[data-macro-action="hide-composer"]' };
+// commandBar(page, label) checks that the bar and its toggle agree and returns
+// whether the bar is shown; commandBar(page, label, shown) first shows or hides
+// it with the toggle and waits until the app saved that state.
+async function commandBar(page, label, want) {
+  const bar = page.locator(COMMAND_BAR.bar), toggle = page.locator(COMMAND_BAR.toggle);
+  if (want !== undefined) {
+    assert.equal(await bar.isVisible(), !want, label + ': command bar starts ' + (want ? 'hidden' : 'shown'));
+    await toggle.click(); await settle(page);
+    await page.waitForFunction(async collapsed => (await api('/state')).terminalComposerCollapsed === collapsed, !want);
+  }
+  const shown = await bar.isVisible();
+  if (want !== undefined) assert.equal(shown, want, label + ': command bar ' + (want ? 'shown' : 'hidden'));
+  assert.equal(await page.locator(COMMAND_BAR.retiredHide).count(), 0, label + ': the toggle is the only command bar control');
+  assert(await toggle.isVisible(), label + ': the Command bar toggle stays visible');
+  assert.equal(await toggle.getAttribute('aria-controls'), COMMAND_BAR.bar.slice(1), label + ': the toggle controls the command bar');
+  assert.equal(await toggle.getAttribute('aria-expanded'), String(shown), label + ': the toggle reports the command bar state');
+  assert(await toggle.evaluate(element => element.classList.contains('reveal-toggle')), label + ': the Command bar button is a reveal toggle');
+  return shown;
 }
 async function checkSidebarResize(page, mode) {
   await page.setViewportSize(viewports[0]); await selectRail(page, 'saved');
   const identity = await captureIdentity(page), divider = page.locator('#terminalSidebarDivider'), sidebar = page.locator('#terminalSessionSidebar');
   assert.equal(await divider.getAttribute('role'), 'separator');
+  await assertSidebarToggle(page, true, mode + ' before resizing');
   const initial = await sidebar.evaluate(element => element.getBoundingClientRect().width), handle = await divider.boundingBox();
+  // The divider faces the terminal: moving it away from the sidebar widens it.
+  // The sidebar docks right by default, so "away" is left there.
+  const away = handle.x < (await sidebar.boundingBox()).x ? -1 : 1, widen = away < 0 ? 'ArrowLeft' : 'ArrowRight', shrink = away < 0 ? 'ArrowRight' : 'ArrowLeft';
   await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2); await page.mouse.down();
-  await page.mouse.move(handle.x + handle.width / 2 + 70, handle.y + handle.height / 2, { steps: 6 }); await page.mouse.up(); await settle(page);
+  await page.mouse.move(handle.x + handle.width / 2 + away * 70, handle.y + handle.height / 2, { steps: 6 }); await page.mouse.up(); await settle(page);
   const resized = await sidebar.evaluate(element => element.getBoundingClientRect().width);
-  assert(resized >= initial + 50 && resized <= 480, 'Divider drag resizes within the saved width bounds');
+  assert(resized >= initial + 50 && resized <= 480, 'Divider drag resizes within the saved width bounds ' + JSON.stringify({ initial, resized, away }));
   await divider.dblclick(); await settle(page);
   assert(await sidebar.evaluate(element => element.classList.contains('is-collapsed')), 'Double-click hides sidebar content');
   assert(await divider.isVisible(), 'Collapsed divider remains available to restore the sidebar');
+  await assertSidebarToggle(page, false, mode + ' divider double-click');
   await divider.dblclick(); await settle(page);
   assert(Math.abs(await sidebar.evaluate(element => element.getBoundingClientRect().width) - resized) <= 1, 'Double-click restores the previous expanded width');
   await divider.press('Enter'); await settle(page);
-  assert.equal(await page.locator('#terminalSidebarVisibilityToggle').getAttribute('aria-label'), 'Show sidebar');
-  await page.locator('#terminalSidebarVisibilityToggle').click(); await settle(page);
-  assert(Math.abs(await sidebar.evaluate(element => element.getBoundingClientRect().width) - resized) <= 1, 'Shared Show button restores the same expanded width');
-  await divider.press('Home'); await divider.press('ArrowRight'); await settle(page);
+  await assertSidebarToggle(page, false, mode + ' divider Enter');
+  await railTab(page, 'saved').click(); await settle(page);
+  await assertSidebarToggle(page, true, mode + ' selected rail tab reopens');
+  assert(Math.abs(await sidebar.evaluate(element => element.getBoundingClientRect().width) - resized) <= 1, 'The selected rail tab restores the same expanded width');
+  await divider.press('Home'); await divider.press(widen); await settle(page);
   assert.equal(Math.round(await sidebar.evaluate(element => element.getBoundingClientRect().width)), 310, 'Arrow keys resize from the default width');
-  await divider.press('Shift+ArrowRight'); await settle(page);
+  await divider.press('Shift+' + widen); await settle(page);
   assert.equal(Math.round(await sidebar.evaluate(element => element.getBoundingClientRect().width)), 350, 'Shift resizes in larger increments');
+  await divider.press(shrink); await settle(page);
+  assert.equal(Math.round(await sidebar.evaluate(element => element.getBoundingClientRect().width)), 340, 'The other arrow key narrows the sidebar');
   await divider.press('End'); await settle(page);
   assert.equal(Math.round(await sidebar.evaluate(element => element.getBoundingClientRect().width)), 480);
   await page.setViewportSize(viewports[1]); await settle(page);
@@ -198,7 +292,11 @@ async function contextMenu(page, kind) {
 async function checkGeometry(page, mode) {
   assert.equal(await page.locator('#sessionSidebarToggle').count(), 0, 'Toolbar has no redundant Sidebar toggle');
   assert.equal(await page.locator('#terminalMacrosToggle').count(), 0, 'Toolbar has no redundant Macros toggle');
-  assert.equal(await page.locator('[data-session-action="collapse"]').count(), 1, 'Sidebar has one heading collapse arrow');
+  // Formerly "one heading collapse arrow": the selected rail tab is now the one
+  // show/hide toggle (aria-expanded), with the divider beside it.
+  await selectRail(page, 'saved');
+  await assertSidebarToggle(page, true, mode + ' sidebar toggle');
+  assert(await commandBar(page, mode + ' initial'), 'The command bar is shown by default');
   for (const viewport of viewports) {
     await page.setViewportSize(viewport); await selectRail(page, 'saved');
     const identity = await captureIdentity(page), initial = await measure(page, mode + ' Saved ' + viewport.width);
@@ -228,6 +326,7 @@ async function checkGeometry(page, mode) {
     assert(collapsed.stage.height >= initial.stage.height - 2, 'Collapsing sidebar reduced console height');
     await assertIdentity(page, identity, collapsed.label);
     await selectRail(page, 'saved');
+    await assertSidebarToggle(page, true, mode + ' reopened ' + viewport.width);
     await identity.dispose();
     if (output) {
       await selectRail(page, 'macros'); await page.click('#terminalMacroLibraryTab'); await settle(page);
@@ -295,17 +394,34 @@ async function checkPreferences(page) {
     await confirmation.selectOption('multiple');
   }
   await selectRail(page, 'recent');
-  await page.locator('[data-macro-action="hide-composer"]').click();
+  await commandBar(page, 'Hide before reload', false);
   // Wait on the public state endpoint so a navigation cannot race debounce.
-  await page.waitForFunction(async () => { const saved = await api('/state'); return saved.terminalSidebarTab === 'recent' && saved.terminalComposerCollapsed === true && (!document.querySelector('#terminalMacroConfirmation') || saved.terminalMacroConfirmation === 'multiple'); });
-  await page.reload({ waitUntil: 'domcontentloaded' });
-  await page.locator('#terminalSidebarTabRecent').waitFor({ state: 'visible' }); await settle(page);
+  await page.waitForFunction(async () => { const saved = await api('/state'); return saved.terminalSidebarTab === 'recent' && saved.terminalSidebarCollapsed === false && saved.terminalComposerCollapsed === true && (!document.querySelector('#terminalMacroConfirmation') || saved.terminalMacroConfirmation === 'multiple'); });
+  await reloadTerminal(page);
   assert.equal(await page.locator('#terminalSidebarTabRecent').getAttribute('aria-selected'), 'true');
+  await assertSidebarToggle(page, true, 'Expanded Recent after reload');
   assert.equal(await page.evaluate(() => state.terminalSidebarWidth), sidebarWidth, 'Expanded sidebar width persists through reload');
-  assert.equal(await page.locator('#terminalMacroComposer').isVisible(), false, 'Composer hide preference persists');
+  assert.equal(Math.round(await page.locator('#terminalSessionSidebar').evaluate(element => element.getBoundingClientRect().width)), sidebarWidth, 'The reloaded sidebar is drawn at the saved width');
+  assert.equal(await commandBar(page, 'After reload'), false, 'Command bar hide preference persists');
   if (await confirmation.count()) assert.equal(await page.evaluate(async () => (await api('/state')).terminalMacroConfirmation), 'multiple');
-  await page.click('#terminalMacroComposerToggle'); await settle(page);
-  pass('Selected sidebar tab, hidden composer and available confirmation preference persist through a real reload');
+  // Collapsed with the selected rail tab, the sidebar stays collapsed on that
+  // tab through a reload and reopens at the saved width.
+  await collapseSidebar(page);
+  await page.waitForFunction(async () => { const saved = await api('/state'); return saved.terminalSidebarCollapsed === true && saved.terminalSidebarTab === 'recent'; });
+  await reloadTerminal(page);
+  await assertSidebarToggle(page, false, 'Collapsed Recent after reload');
+  assert.equal(await page.evaluate(() => NetworkToolkitSessionSidebar.activeTab()), 'recent', 'Collapsed sidebar keeps its tab through reload');
+  assert.equal(await commandBar(page, 'After second reload'), false, 'Command bar stays hidden through a second reload');
+  await selectRail(page, 'recent');
+  assert.equal(Math.round(await page.locator('#terminalSessionSidebar').evaluate(element => element.getBoundingClientRect().width)), sidebarWidth, 'Reopening after reload restores the saved width');
+  await commandBar(page, 'Show after reload', true);
+  await page.waitForFunction(async () => (await api('/state')).terminalSidebarCollapsed === false);
+  pass('Selected sidebar tab, width, collapsed state, hidden command bar and available confirmation preference persist through a real reload');
+}
+async function reloadTerminal(page) {
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.locator('#terminalSidebarTabSaved').waitFor({ state: 'attached' });
+  await page.locator('#terminalSessionSidebar .terminal-sidebar-rail').waitFor({ state: 'visible' }); await settle(page);
 }
 
 async function baseline() {
@@ -353,7 +469,7 @@ async function checkDetached(app, page) {
   await view.waitForFunction(() => !!currentTerminal()?.xterm && terminalDetachedReady === true);
   assert(await view.locator('#terminalSidebarTabMacros').isVisible(), 'Single-session detached view exposes Macros rail');
   assert.equal(await view.locator('#terminalSidebarTabSaved').isVisible(), false, 'Restricted detached view must hide Saved');
-  await view.click('#terminalSidebarTabMacros'); await settle(view);
+  await selectRail(view, 'macros');
   const identity = await captureIdentity(view), initial = await measure(view, 'detached Macros/Library'); assertFits(initial); report.geometry.push(initial);
   for (const tab of ['Runs', 'Library']) {
     await view.click('#terminalMacro' + tab + 'Tab'); await settle(view);

@@ -148,7 +148,7 @@ function helpText(){
  ['Text Editor','Documents (sidebar)','List the open documents; Up / Down and Enter switch, Shift+F10 opens the tab menu'],
  ['Terminal','Alt+Shift+Left / Right','Reorder a terminal tab'],
  ['Terminal','Shift+F10','Open the terminal tab menu'],
- ['Terminal','Ctrl+Shift+F','Find in terminal output'],
+ ['Terminal','Ctrl+Shift+F','Show or hide Find in terminal output'],
  ['File browser','F2','Rename selected file'],['File browser','Ctrl / Shift+click','Select multiple files'],
  ['Panels','Enter or Space on divider','Collapse or restore a sidebar'],
  ['Panels','Arrow keys on divider','Resize a panel']];

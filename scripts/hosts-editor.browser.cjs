@@ -13,7 +13,7 @@ async function setup(page,text=initial){
  current='# Session '+(++generation)+'\n'+text;operation=null;polls=0;
  await page.evaluate(snapshot=>{online=true;state.activePage='hosts';localConfiguration.hosts={snapshot,draft:snapshot.content,loading:false,attempted:true,error:'',operation:null};renderPage();},snapshot());await settle(page);
  await page.locator('[data-hosts-view="text"]').click();
- if(await page.locator('#hostsFindPanel').isVisible())await page.locator('[data-hosts-action="close-find"]').click();
+ if(await page.locator('#hostsFindPanel').isVisible())await page.locator('[data-hosts-action="find"]').click();
  await page.locator('[data-hosts-view="entries"]').click();await page.fill('#hostsEntrySearch','');await page.selectOption('#hostsEntryFilter','all');
  if(await page.locator('#hostsIssueButton').getAttribute('aria-expanded')==='true')await page.locator('#hostsIssueButton').click();
 }
@@ -26,7 +26,22 @@ async function checkCompactText(page,view){
   for(const value of ['all','enabled','disabled','issues']){await page.selectOption('#hostsEntryFilter',value);const m=await compactMetrics(page,'#hostsEntryFilter');assert.ok(m.contentHeight+.25>=m.requiredHeight,'Entry filter clips text vertically: '+JSON.stringify(m));assert.ok(m.contentWidth+.25>=m.textWidth,'Entry filter clips label horizontally: '+JSON.stringify(m));}
   await page.selectOption('#hostsEntryFilter','all');const search=await compactMetrics(page,'#hostsEntrySearch');assert.ok(search.contentHeight+.25>=search.requiredHeight,'Hosts search clips text vertically: '+JSON.stringify(search));
  }else{
-  await page.locator('[data-hosts-action="find"]').click();for(const selector of ['#hostsFind','#hostsReplacement']){const m=await compactMetrics(page,selector);assert.ok(m.contentHeight+.25>=m.requiredHeight,'Hosts find/replace clips text vertically: '+JSON.stringify(m));}await page.locator('[data-hosts-action="close-find"]').click();
+  await page.locator('[data-hosts-action="find"]').click();for(const selector of ['#hostsFind','#hostsReplacement']){const m=await compactMetrics(page,selector);assert.ok(m.contentHeight+.25>=m.requiredHeight,'Hosts find/replace clips text vertically: '+JSON.stringify(m));}
+  // Owner rule: Find / replace is a toggle. The button, Ctrl+F, Ctrl+H and Escape close the row; the row has no Close button.
+  {const toggle=page.locator('[data-hosts-action="find"]'),panel=page.locator('#hostsFindPanel');assert.equal(await page.locator('#hostsFindPanel button',{hasText:'Close'}).count(),0);assert.equal(await page.locator('[data-hosts-action="close-find"]').count(),0);
+   assert.equal(await toggle.getAttribute('aria-expanded'),'true');assert.equal(await toggle.evaluate(e=>e.classList.contains('reveal-toggle')),true);
+   await toggle.click();assert.equal(await panel.isVisible(),false);assert.equal(await page.locator('[data-hosts-action="find"]').getAttribute('aria-expanded'),'false');assert.equal(await page.evaluate(()=>document.activeElement?.id),'hostsSourceEditor');
+   await page.locator('#hostsSourceEditor').press('Control+f');assert.equal(await panel.isVisible(),true);assert.equal(await page.evaluate(()=>document.activeElement?.id),'hostsFind');assert.equal(await page.locator('[data-hosts-action="find"]').getAttribute('aria-expanded'),'true');
+   await page.locator('#hostsFind').press('Control+f');assert.equal(await panel.isVisible(),false,'Ctrl+F closes Find');
+   await page.locator('#hostsSourceEditor').press('Control+h');assert.equal(await panel.isVisible(),true);assert.equal(await page.evaluate(()=>document.activeElement?.id),'hostsReplacement');
+   await page.locator('#hostsReplacement').press('Escape');assert.equal(await panel.isVisible(),false,'Escape closes Find');assert.equal(await page.evaluate(()=>document.activeElement?.id),'hostsSourceEditor');
+   await page.locator('[data-hosts-action="find"]').click();assert.equal(await panel.isVisible(),true);await page.locator('#hostsReplacement').press('Control+h');assert.equal(await panel.isVisible(),false,'Ctrl+H closes Find');
+   await page.locator('[data-hosts-view="entries"]').click();await page.locator('[data-hosts-action="find"]').click();assert.equal(await page.locator('[data-hosts-view="text"]').getAttribute('aria-selected'),'true','Find opens the text view');assert.equal(await panel.isVisible(),true);
+   await page.locator('[data-hosts-view="entries"]').click();assert.equal(await page.locator('[data-hosts-action="find"]').getAttribute('aria-expanded'),'false','Find is not shown in the entries view');
+   await page.locator('[data-hosts-view="text"]').click();await page.locator('[data-hosts-action="find"]').click();assert.equal(await panel.isVisible(),false);
+   // Validation is a toggle for the issue list as well.
+   const validation=page.locator('#hostsIssueButton'),issues=page.locator('#hostsIssues');assert.equal(await validation.evaluate(e=>e.classList.contains('reveal-toggle')),true);assert.equal(await validation.getAttribute('aria-controls'),'hostsIssues');
+   for(const open of [true,false]){await validation.click();assert.equal(await issues.isVisible(),open);assert.equal(await validation.getAttribute('aria-expanded'),String(open));}}
  }
 }
 async function main(){

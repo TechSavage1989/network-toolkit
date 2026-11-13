@@ -362,7 +362,7 @@ function sync(){
    document.querySelector('.terminal-statusbar').insertAdjacentHTML('beforebegin',bottomHTML());
    // Keep the output itself free of hovering navigation and copy buttons.
    for(const action of ['scroll-top','scroll-bottom','paste-start'])bar.querySelector('[data-terminal-action="'+action+'"]')?.remove();
-   bar.querySelector('.terminal-quick-tools').insertAdjacentHTML('beforeend','<button class="btn small ghost" id="terminalSessionToggle" data-terminal-extra="session" aria-haspopup="dialog" aria-expanded="false" aria-controls="terminalSessionPanel" title="Terminal settings: appearance and highlighting, features, mouse and keyboard">'+icon('settings')+'Settings</button>');
+   bar.querySelector('.terminal-quick-tools').insertAdjacentHTML('beforeend','<button class="btn small ghost reveal-toggle" id="terminalSessionToggle" data-terminal-extra="session" aria-haspopup="dialog" aria-expanded="false" aria-controls="terminalSessionPanel" title="Terminal settings: appearance and highlighting, features, mouse and keyboard">'+icon('settings')+'Settings</button>');
    // Terminal settings (owner request, v1.21.11): one panel with tabs like
    // MobaXterm's settings instead of one long page. Pieces of the Tools panel
    // markup marked data-terminal-settings-target move into their tab.
