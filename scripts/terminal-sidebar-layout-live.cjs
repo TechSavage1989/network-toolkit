@@ -295,7 +295,11 @@ async function checkPreferences(page) {
     await confirmation.selectOption('multiple');
   }
   await selectRail(page, 'recent');
-  await page.locator('[data-macro-action="hide-composer"]').click();
+  // Command bar is a toggle (owner rule): the toolbar button hides the bar; the bar has no hide button.
+  assert.equal(await page.locator('[data-macro-action="hide-composer"]').count(), 0);
+  assert.equal(await page.locator('#terminalMacroComposerToggle').getAttribute('aria-expanded'), 'true');
+  await page.click('#terminalMacroComposerToggle');
+  assert.equal(await page.locator('#terminalMacroComposerToggle').getAttribute('aria-expanded'), 'false');
   // Wait on the public state endpoint so a navigation cannot race debounce.
   await page.waitForFunction(async () => { const saved = await api('/state'); return saved.terminalSidebarTab === 'recent' && saved.terminalComposerCollapsed === true && (!document.querySelector('#terminalMacroConfirmation') || saved.terminalMacroConfirmation === 'multiple'); });
   await page.reload({ waitUntil: 'domcontentloaded' });
@@ -303,6 +307,7 @@ async function checkPreferences(page) {
   assert.equal(await page.locator('#terminalSidebarTabRecent').getAttribute('aria-selected'), 'true');
   assert.equal(await page.evaluate(() => state.terminalSidebarWidth), sidebarWidth, 'Expanded sidebar width persists through reload');
   assert.equal(await page.locator('#terminalMacroComposer').isVisible(), false, 'Composer hide preference persists');
+  assert.equal(await page.locator('#terminalMacroComposerToggle').getAttribute('aria-expanded'), 'false', 'The restored hidden command bar shows its toggle as not pressed');
   if (await confirmation.count()) assert.equal(await page.evaluate(async () => (await api('/state')).terminalMacroConfirmation), 'multiple');
   await page.click('#terminalMacroComposerToggle'); await settle(page);
   pass('Selected sidebar tab, hidden composer and available confirmation preference persist through a real reload');
