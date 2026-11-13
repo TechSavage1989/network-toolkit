@@ -24,8 +24,10 @@ function setup(editor){
   activate:id=>root.NetworkToolkitFileEditor?.activateDocument?.(id),
   menu:(uid,x,y,back)=>root.NetworkToolkitFileEditor?.openTabMenuAt?.(uid,x,y,back),
   focusText:()=>root.NetworkToolkitFileEditor?.focusText?.(),
-  // In a narrow window the sidebar covers the document: choosing one closes it.
-  chosen:()=>{if(isCompact()&&!host.hidden){compactOpen=false;visibility(editor,host,false);root.NetworkToolkitFileEditor?.focusText?.();}}
+  // In a narrow window the sidebar covers the document: choosing one, or
+  // Escape, closes it. Escape returns to the text in any window.
+  chosen:()=>{if(isCompact()&&!host.hidden){compactOpen=false;visibility(editor,host,false);root.NetworkToolkitFileEditor?.focusText?.();}},
+  escape:()=>{if(isCompact()&&!host.hidden){compactOpen=false;visibility(editor,host,false);}root.NetworkToolkitFileEditor?.focusText?.();}
  })||null;
  documentList?.mount(host.querySelector('[data-editor-documents]'));
  const paths=sessions?.querySelector('.nt-editor-file-path-actions');if(paths)host.querySelector('[data-editor-file-paths]').append(paths);

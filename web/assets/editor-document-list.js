@@ -113,7 +113,7 @@ function create(source){
   const target={ArrowDown:all[at+1],ArrowUp:all[at-1],Home:all[0],End:all.at(-1)}[event.key];
   if(['ArrowDown','ArrowUp','Home','End'].includes(event.key)){event.preventDefault();event.stopPropagation();rove(target||row);return;}
   if(event.key==='Enter'||event.key===' '){event.preventDefault();event.stopPropagation();choose(row,true);return;}
-  if(event.key==='Escape'){event.preventDefault();event.stopPropagation();source.focusText?.();}
+  if(event.key==='Escape'){event.preventDefault();event.stopPropagation();(source.escape||source.focusText)?.();}
  }
 
  function focus(){

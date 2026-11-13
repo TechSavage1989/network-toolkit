@@ -86,13 +86,11 @@ const frames=page=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(
 function mapInfo(page){
  return page.evaluate(()=>{
   const host=document.querySelector('#networkToolkitFileEditor [data-ed-map]'),box=host?.querySelector('[data-ed-map-view]'),map=NetworkToolkitFileEditor.documentMap,layout=map?.layout;
-  const d=NetworkToolkitFileEditor.active,ta=NetworkToolkitFileEditor.comparison?null:(document.querySelector('.nt-editor.is-split [data-compare-text]:focus')||null);
-  const area=[...document.querySelectorAll('#networkToolkitFileEditor textarea[data-ed-text],#networkToolkitFileEditor textarea[data-compare-text]')].filter(el=>el.offsetParent);
-  const style=host&&getComputedStyle(host),rect=host?.getBoundingClientRect();
+  const d=NetworkToolkitFileEditor.active,style=host&&getComputedStyle(host),rect=host?.getBoundingClientRect();
   return {hidden:!host||host.hidden||style.display==='none',width:rect?.width||0,height:host?.clientHeight||0,top:rect?.top||0,left:rect?.left||0,
    box:box&&!box.hidden?{top:parseFloat(box.style.top),height:parseFloat(box.style.height)}:null,
    layout:layout?{kind:layout.kind,g:layout.g,key:layout.key}:null,stats:{...map?.stats},
-   doc:d?{uid:d.uid,name:d.path.split(/[\\/]/).pop(),disk:!!d.disk}:null,areas:area.length,focused:!!ta};
+   doc:d?{uid:d.uid,name:d.path.split(/[\\/]/).pop(),disk:!!d.disk}:null};
  });
 }
 // The text area that shows the active document (single view or the active pane).
@@ -353,11 +351,10 @@ async function mainWindow(browser){
  {
   const i=await mapInfo(page);
   assert.equal(i.doc.name,'synthetic-16mb.cfg');assert.equal(i.layout.kind,'text');
-  const ta=await activeArea(page),lines=await page.evaluate(()=>NetworkToolkitFileEditor.active.content.split('\n').length);
+  const lines=await page.evaluate(()=>NetworkToolkitFileEditor.active.content.split('\n').length);
   assert(lines>i.layout.g.used*8,'more lines than map pixels times eight: the overview samples pixel rows ('+lines+' lines)');
   assert.equal(i.layout.g.used,i.height,'the whole document is fitted to the map');
   for(const fraction of [0.5,1])await setActiveScroll(page,fraction),await assertBoxMatches(page,'16 MB '+fraction);
-  void ta;
   const x=i.left+i.width/2;
   await page.mouse.click(x,i.top+i.height*0.25);await frames(page);
   await page.mouse.move(x,i.top+(await mapInfo(page)).box.top+5);await page.mouse.down();for(let step=1;step<=8;step++)await page.mouse.move(x,i.top+i.height*0.25+step*20);await page.mouse.up();
@@ -406,6 +403,11 @@ async function detachedWindow(browser){
  assert.equal(await page.locator('#networkToolkitFileEditor [data-ed-files-sidebar]').isVisible(),false,'the narrow sidebar closes after the choice');
  assert.equal(await page.evaluate(()=>document.activeElement?.matches('[data-ed-text]')),true,'and the text has the focus');
  g=await geometry();assert(g.overflow<=0);
+ // Escape in the list closes the narrow sidebar too.
+ await page.locator('#networkToolkitFileEditor [data-editor-files-panel="documents"]').click();await frames(page);
+ await page.locator('#networkToolkitFileEditor [data-ed-doc-uid]').first().focus();await page.keyboard.press('Escape');await frames(page);
+ assert.equal(await page.locator('#networkToolkitFileEditor [data-ed-files-sidebar]').isVisible(),false,'Escape closes the narrow sidebar');
+ assert.equal(await page.evaluate(()=>document.activeElement?.matches('[data-ed-text]')),true,'and returns to the text');
  assert.equal(JSON.parse(await page.evaluate(()=>sessionStorage.getItem('ntk.editor.files'))).panel,'documents','the detached window keeps its sidebar choice like Files');
  pass('Detached window at 640 x 400: the map and the Document List stay usable');
  await context.close();
@@ -421,7 +423,7 @@ async function engine(browser){
  assert.equal(await page.evaluate(()=>EDITOR_STANDALONE),true);
  const settled=()=>page.waitForFunction(()=>{const d=NetworkToolkitFileEditor.active;return d&&!d.loading&&!d.diskOpening&&!d.diskSession?.pending;});
  const open=async name=>{assert.equal(await page.evaluate(file=>NetworkToolkitFileEditor.openLocalPath(file,false,true).then(()=>'',error=>error.message),path.join(engineFiles,name)),'');await settled();};
- const diskState=()=>page.evaluate(()=>{const view=NetworkToolkitFileEditor.documentMap&&document.querySelector('#networkToolkitFileEditor .nt-editor-disk-scroll');const d=NetworkToolkitFileEditor.active;return {disk:!!d.disk,lines:d.diskMeta?.lines,units:d.diskMeta?.units,value:Number(view?.getAttribute('aria-valuenow'))};});
+ const diskState=()=>page.evaluate(()=>{const d=NetworkToolkitFileEditor.active;return {disk:!!d.disk,lines:d.diskMeta?.lines,units:d.diskMeta?.units};});
  if(!await page.evaluate(()=>NetworkToolkitFileEditor.documentMapOn))await page.evaluate(()=>NetworkToolkitFileEditor.toggleDocumentMap());
  await page.evaluate(()=>NetworkToolkitEditorFiles.showDocuments(true));
 
@@ -467,7 +469,6 @@ async function engine(browser){
  info=await mapInfo(page);
  assert.equal(info.layout.g.total,d.units,'the map covers every character of the line');
  assert(info.layout.g.used>info.height*0.9,'a 1.7 MB line fills the map');
- const offset=()=>page.evaluate(()=>{const l=NetworkToolkitFileEditor.documentMap.layout;return l.g.box.top/l.g.scale;});
  await page.mouse.click(x,info.top+info.layout.g.used*0.5);
  await page.waitForFunction(()=>{const l=NetworkToolkitFileEditor.documentMap.layout;return l&&Math.abs((l.g.box.top+l.g.box.height/2)/l.g.used-0.5)<0.02;},null,{timeout:15000});
  const middle=await page.evaluate(()=>{const ta=document.querySelector('#networkToolkitFileEditor .nt-editor-code [data-ed-text]'),view=NetworkToolkitFileEditor.active.diskSession.state().page;return {start:view.start,end:view.start+view.text.length,shown:ta.value.slice(0,16)};});
@@ -484,7 +485,6 @@ async function engine(browser){
  info=await mapInfo(page);
  await page.mouse.move(x,info.top+info.box.top+info.box.height/2);await page.mouse.down();await page.mouse.move(x,info.top-40,{steps:12});await page.mouse.up();
  await page.waitForFunction(()=>{const s=NetworkToolkitFileEditor.active.diskSession.state().page;const ta=document.querySelector('#networkToolkitFileEditor .nt-editor-code [data-ed-text]');return s.start===0&&ta.scrollTop<2;},null,{timeout:15000});
- void offset;
  await shot(page,'editor-map-list-base64-wrap-dark');
  pass('1.7 MB single-line Base64 with Wrap on: mapped by character offset; the map reaches the middle, the end and the start');
 
