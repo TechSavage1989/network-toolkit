@@ -117,7 +117,7 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
  let verticalFrame = 0, horizontalFrame = 0;
  // A pointer selection in progress: its anchor may leave the page while the
  // page slides under the pointer.
- let drag = null;
+ let drag = null, pressed = null, clicks = 0;
  // Word-wrap flow state: the last painted view position, a slide that could
  // not make progress, scrolling that waits for text, and the wrap grid.
  let flowView = null, flowStuck = '', pendingScroll = 0, flowFrame = 0, grid = null, padding = 30;
@@ -1597,11 +1597,26 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
   if (event.button !== 0) return;
   pointer = true;
   drag = null;
+  pressed = null;
   // The textarea's own scroll bar is not text.
   if (event.offsetX >= textarea.clientWidth || event.offsetY >= textarea.clientHeight) return;
   // Shift+click extends the whole selection, also when it reaches past the page.
-  drag = {anchor: event.shiftKey ? cursorAnchor(capture()) : null};
-  if (!event.shiftKey) virtual = false;
+  if (event.shiftKey) drag = {anchor: cursorAnchor(capture())};
+  else {
+   virtual = false;
+   // A plain click, double-click (word) or triple-click (line) is not a drag:
+   // the page must stay put until the button is released, or replacing it
+   // would drop the selection the browser just made (CI found a lost
+   // double-click word). It becomes a drag once the pointer moves.
+   pressed = {x: event.clientX, y: event.clientY};
+  }
+ }, listeners);
+ textarea.addEventListener('mousedown', event => { clicks = event.detail; }, listeners);
+ textarea.addEventListener('pointermove', event => {
+  if (!pointer || drag || !pressed || !(event.buttons & 1) || clicks > 1) return;
+  if (Math.abs(event.clientX - pressed.x) + Math.abs(event.clientY - pressed.y) < 4) return;
+  pressed = null;
+  drag = {anchor: null};
  }, listeners);
  const release = () => {
   if (!pointer) return;
@@ -1612,6 +1627,7 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
    select(view.start, view.end, view.direction);
   }
   drag = null;
+  pressed = null;
   schedulePaint();
  };
  root.addEventListener('pointerup', release, listeners);
