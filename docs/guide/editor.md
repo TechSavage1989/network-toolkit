@@ -1,6 +1,6 @@
 # Text Editor
 
-The built-in Editor works with local and supported remote text documents. It provides multiple tabs, comparison, search, syntax highlighting and document navigation.
+The built-in Editor works with local and supported remote text documents. It provides multiple tabs, comparison, Find, Replace and Mark with a search results panel, bookmarks, syntax highlighting and document navigation.
 
 ## Open and edit
 Open or create a document, review its source/connection, then edit. Save explicitly. Save As opens the Windows Save As dialog for files on your computer and a folder picker for files on an SFTP server; an existing file is replaced only after you confirm. Keep unsaved changes and undo history when switching views or during update workflows.
@@ -144,14 +144,39 @@ The **Tools** button on the toolbar (next to **Send to terminal**) opens the tex
 ### SonicWall settings exports
 A SonicWall settings export (`.exp`) is one long line of Base64, usually followed by `&&`. When you open a file that starts like one, a bar offers **Make readable** (or **Dismiss** to hide it for that tab); the check reads only the first few kilobytes. **Make readable** (also **Tools → Device configs**) never changes the export: it opens a new, unsaved tab named like `firewall (readable).txt` with one `key=value` setting per line, in the export's order, values decoded (`%20` is a space, `%3a` a colon; a `+` stays a plus sign). A line break or another control character inside a value is shown as `\n`, `\r` or `\xNN` so that every setting stays on one line, and a backslash in a value is shown as it is, so the copy is for reading and searching, not for importing back into a firewall. For a large export the engine writes the copy directly; nothing passes through the page.
 
-### Find and Replace modes
-Choose **Mode** in the Find bar:
+## Find, Replace and Mark
+**Find** and **Replace** on the toolbar, Ctrl+F, Ctrl+H and Ctrl+M open the **Find window** on its **Find**, **Replace** or **Mark** tab, as in Notepad++. It floats over the editor: drag its tab row to move it. Escape or **Close** closes it, and it opens again where you left it, on the tab you chose, while the editor is open. Text selected in the document (one line) becomes **Find what**. The window works the same in the main window's editor, in separate editor windows (it fits a window of 640 × 400) and in the Text Editor app; the editor that opens SFTP files in the Terminal app has it too.
 
-- **Normal** finds the text exactly as typed.
-- **Extended (\n, \r, \t, \0, \x…, \u…)** works like Normal, but `\n`, `\r`, `\t`, `\\`, `\xNN` and `\uNNNN` in **Find** and **Replace** stand for a line break, a tab and other characters (Notepad++'s Extended mode). Find `&`, Replace `\n` and **Replace all** starts a new line at every `&`. The editor holds every line break as one `\n`, so `\r` and `\r\n` mean a line break too; `\0` is refused, because no text in the editor can hold a NUL character.
-- **Regular expression**: **Find** is a regular expression, and **Replace** may use `$1` to `$99`, `${name}`, `$&` (or `$0`) for the text of groups, `$$` for a dollar sign, and `\n`, `\t` for a line break and a tab. A group that does not exist stays as written. Large documents and the page use the same rules for the replacement.
+**Find what** and **Replace with** keep the last 20 searches and replacements: open the list with the arrow at the end of the field. The list is shared by the editor windows of one app and lasts until the app closes. It is never saved: search text can contain passwords.
 
-The mode applies to Find, Replace and Replace all of every document, of any size, and lasts while the editor is open.
+### Options
+- **Backward direction**: **Find Next** goes up instead of down (Find and Replace tabs).
+- **Match whole word only** and **Match case**.
+- **Wrap around** (on by default): at the end of the document, or of the selection with **In selection**, the search goes on from the other end, and the status line says so. Off, **Find Next** stops at the end.
+- **In selection** (when text is selected): **Count**, **Find Next**, **Find All in Current Document**, **Replace**, **Replace All** and **Mark All** look only inside the selected range, also in a large (disk-backed) document. The range is kept while **Find Next** selects the matches inside it.
+- **Search Mode**:
+  - **Normal** finds the text exactly as typed.
+  - **Extended (\n, \r, \t, \0, \x…)** works like Normal, but `\n`, `\r`, `\t`, `\\`, `\xNN` and `\uNNNN` in **Find what** and **Replace with** stand for a line break, a tab and other characters (Notepad++'s Extended mode). Find `&`, replace with `\n` and **Replace All** starts a new line at every `&`. The editor holds every line break as one `\n`, so `\r` and `\r\n` mean a line break too; `\0` is refused, because no text in the editor can hold a NUL character.
+  - **Regular expression**: **Find what** is a regular expression; `^` and `$` match at the start and end of each line. **Replace with** may use `$1` to `$99`, `${name}`, `$&` (or `$0`) for the text of groups, `$$` for a dollar sign, and `\n`, `\t` for a line break and a tab. A group that does not exist stays as written.
+  - **. matches newline** (Regular expression only): `.` also matches a line break, so a pattern can span lines.
+- **Transparency**: makes the window see-through **On losing focus** (while you work in the document) or **Always**; the slider sets how opaque it stays. This setting is kept when you restart; the other options last while the editor is open.
+
+### Find
+**Find Next** (F3; Shift+F3 finds the previous match) selects the next match; the match stays highlighted while you work in the window. **Count** shows the number of matches in the window's status line. **Find All in Current Document** and **Find All in All Opened Documents** list the matches in the **Search results** panel.
+
+### Replace
+**Replace** replaces the selected match and selects the next one. **Replace All** replaces every match of the document (or of the selection) as one step that one Undo takes back. **Replace All in All Opened Documents** does the same in every open document that can change: a file that is not text, a document being saved, moved to another window, still opening or shown in a comparison is skipped and named. Nothing is saved: the changed documents show as unsaved, and Undo in each document takes its replacements back. The ⇅ button swaps **Find what** and **Replace with**; its menu also copies one to the other.
+
+### Mark
+**Mark All** highlights every match in the document with the mark colour of the editor colours (it follows the light and dark themes and your custom colours), and with **Bookmark line** also bookmarks each line with a match. **Purge for each search** clears the earlier marks (and, with **Bookmark line**, the earlier bookmarks) first; without it, marks of several searches add up. **Clear all marks** removes the marks, and **Copy Marked Text** copies the text of every mark, one per line. Marks follow edits: they are the matches of the search wherever the text now is. In a large document only the part on screen is searched for its marks.
+
+### Bookmarks
+Ctrl+F2 bookmarks the line of the cursor (again to remove it); a dot in the line-number gutter shows it. F2 and Shift+F2 go to the next and previous bookmark. Lines you add or remove above a bookmark move it with its line. Marks and bookmarks last while their document is open in that window; they are never saved.
+
+### Search results
+The **Search results** panel is docked at the bottom of the editor. Drag its top edge to resize it (arrow keys on the edge resize it too; double-click resets it) and close it with ×; the command palette's **Show or hide search results** opens it again. Each **Find All** adds a block at the top: `Search "text" (N hits in M files of K searched)` with the search mode, then each document and its `Line N:` rows, with the matches highlighted. Very long lines are cut down around their matches (… marks the cut). Click ▸ / ▾ (or the Left and Right arrow keys) to collapse or expand a search or a document. Double-click a row, or select it and press Enter, to go to that match and select it. If the document was closed or has changed since the search, the row says so instead of going to the wrong place: search again. Right-click (or Shift+F10) for **Copy** (the selected rows as shown), **Copy selected lines** (only the lines' text), **Collapse all**, **Expand all** and **Clear all**. Shift+Arrow keys or Shift+click select several rows. Earlier searches stay until you clear them.
+
+A search with millions of matches works in any document: the app keeps the rows and the panel reads and draws only the rows on screen. Count, Find All, Mark All, Copy Marked Text and Replace All of a large document run in the background with their progress in the window's status line, where **Cancel** stops them. A file that is not text can be searched, counted and marked, but nothing in it is replaced.
 
 ## Files and Connect sidebar
 The sidebar's Connect and Files buttons open saved connections and the file browser. Drag its edge to resize it, or double-click the edge to hide it. The ⇄ button at the bottom of the sidebar's icon strip moves it to the other side of the editor; the side, width and open panel are kept when you restart.

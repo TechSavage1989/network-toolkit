@@ -8,9 +8,9 @@ import (
 )
 
 // The Replace text of a regular-expression search is a template (the Find
-// bar's "Regular expression" search mode). The page-held editor expands it
-// with the same rules (expandReplacement in web/assets/editor-text-tools.js);
-// testdata/replace-template.json holds the cases both tests read.
+// window's "Regular expression" search mode). It is expanded here for every
+// document, page-held text too (ReplaceInText, find.go): the page has no
+// second implementation. testdata/replace-template.json holds the cases.
 //
 //	$1 .. $99   a group; two digits name a group only when it exists, so with
 //	            three groups "$12" is group 1 followed by "2"

@@ -72,7 +72,9 @@ const ALIASES=Object.freeze({sortLines:'sort-asc',trim:'trim-trailing',textToHex
 // Trim trailing spaces, and Trim leading and trailing spaces is "trim-both".
 function tool(id){return byId.get(ALIASES[id]||id)||null;}
 
-// ---- Find bar: Extended escapes and the Replace template ----
+// ---- Find window: Extended escapes ----
+// (The Replace text of a regular expression is a template that the engine
+// expands for every document: internal/editorbuffer/template.go.)
 // Extended mode turns \n \r \t \0 \\ \xNN and \uNNNN in Find and Replace into
 // the characters. The editor holds every line break as one \n, so \r and
 // \r\n are a line break too; \0 is refused because no text can hold NUL.
@@ -93,87 +95,6 @@ function decodeExtended(text){
  }
  return {text:out};
 }
-// The Replace text of a regular-expression search (internal/editorbuffer/
-// template.go has the same rules; testdata/replace-template.json is read by
-// both tests): $1..$99, $0 and $& the whole match, ${name} or ${n}, $$ a
-// dollar sign, \n \t (\r and \r\n a line break), \\ \$, \xNN \uNNNN. A
-// reference to a group that does not exist, and any other backslash, stay as
-// written; \0 is refused.
-function parseTemplate(template,count,names){
- const parts=[];let text='';
- const group=n=>{if(text){parts.push({text});text='';}parts.push({group:n});};
- for(let i=0;i<template.length;){
-  const c=template[i];
-  if(c==='$'){
-   const n=template[i+1];
-   if(n===undefined){text+='$';i++;continue;}
-   if(n==='$'){text+='$';i+=2;continue;}
-   if(n==='&'){group(0);i+=2;continue;}
-   if(n>='0'&&n<='9'){
-    const d=template[i+2];
-    if(d>='0'&&d<='9'){const two=Number(n+d);if(two>=1&&two<=count){group(two);i+=3;continue;}}
-    if(Number(n)<=count)group(Number(n));else text+=template.slice(i,i+2);
-    i+=2;continue;
-   }
-   if(n==='{'){
-    const end=template.indexOf('}',i+2);
-    if(end<0){text+='$';i++;continue;}
-    const name=template.slice(i+2,end);let found=-1;
-    if(/^(0|[1-9]\d*)$/.test(name)&&Number(name)<=count)found=Number(name);
-    else if(name)found=names.indexOf(name);
-    if(found<0)text+=template.slice(i,end+1);else group(found);
-    i=end+1;continue;
-   }
-   text+='$';i++;continue;
-  }
-  if(c==='\\'){
-   const n=template[i+1];
-   if(n===undefined){text+='\\';i++;continue;}
-   if(n==='n'){text+='\n';i+=2;continue;}
-   if(n==='r'){text+='\n';i+=2;if(template.startsWith('\\n',i))i+=2;continue;}
-   if(n==='t'){text+='\t';i+=2;continue;}
-   if(n==='\\'){text+='\\';i+=2;continue;}
-   if(n==='$'){text+='$';i+=2;continue;}
-   if(n==='0')throw Error('The replacement would add a NUL character, which the Text Editor cannot hold.');
-   if(n==='x'||n==='u'){
-    const width=n==='x'?2:4,digits=template.slice(i+2,i+2+width);
-    if(digits.length===width&&/^[0-9a-f]+$/i.test(digits)){
-     let v=parseInt(digits,16);
-     if(v===0)throw Error('The replacement would add a NUL character, which the Text Editor cannot hold.');
-     if(v===13)v=10;if(v>=0xd800&&v<0xe000)v=0xfffd;
-     text+=String.fromCharCode(v);i+=2+width;continue;
-    }
-   }
-   text+=template.slice(i,i+2);i+=2;continue;
-  }
-  text+=c;i++;
- }
- if(text||!parts.length)parts.push({text});
- return parts;
-}
-// The group names of a regular expression, by number (index 0 unused).
-function groupNames(source){
- const names=[''];
- // Count capturing groups in order: '(' not escaped, not in a class, not (?: (?= (?! (?<= (?<!.
- let inClass=false;
- for(let i=0;i<source.length;i++){
-  const c=source[i];
-  if(c==='\\'){i++;continue;}
-  if(inClass){if(c===']')inClass=false;continue;}
-  if(c==='['){inClass=true;continue;}
-  if(c!=='(')continue;
-  if(source[i+1]!=='?'){names.push('');continue;}
-  const named=/^\?(?:P?<)([A-Za-z_][A-Za-z0-9_]*)>/.exec(source.slice(i+1));
-  if(named)names.push(named[1]);
- }
- return names;
-}
-// expandReplacement(template, match) for a JavaScript RegExp match array.
-function expandReplacement(template,match,source){
- const names=groupNames(source),count=match.length-1,parts=parseTemplate(template,count,names);
- return parts.map(part=>part.group===undefined?part.text:(match[part.group]??'')).join('');
-}
-
 // A partial selection widened to the whole lines it touches, with the line
 // break that ends the last of them (Snapshot.LineRange does the same): so an
 // empty last line is a line of the range.
@@ -373,6 +294,6 @@ function create(adapter){
  }
  return Object.freeze({run,opened,draw,cancel,allows,full,get busy(){return !!running;}});
 }
-root.NTKEditorTextTools=Object.freeze({GROUPS,TOOLS,tool,decodeExtended,parseTemplate,groupNames,expandReplacement,lineRange,lineColumn,create});
+root.NTKEditorTextTools=Object.freeze({GROUPS,TOOLS,tool,decodeExtended,lineRange,lineColumn,create});
 if(typeof module==='object'&&module.exports)module.exports=root.NTKEditorTextTools;
 })(globalThis);

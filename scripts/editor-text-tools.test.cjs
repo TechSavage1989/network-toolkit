@@ -22,7 +22,7 @@ test('every tool has a group, a label, a description and a message; shortcuts ar
  // Names the toolbar and menus used before still run the same tools.
  for(const [old,now] of [['sortLines','sort-asc'],['trim','trim-trailing'],['textToHex','hex-encode'],['hexToText','hex-decode'],['base64Encode','base64-encode'],['base64Decode','base64-decode'],['upper','upper'],['lower','lower']])assert.equal(tools.tool(old).id,now);
  // The shortcuts do not clash with the editor's own or the app's.
- for(const taken of ['Ctrl+Z','Ctrl+Y','Ctrl+S','Ctrl+Shift+S','Ctrl+F','Ctrl+H','Ctrl+G','Ctrl+N','Ctrl+O','Ctrl+Shift+P','Ctrl+Shift+T','Ctrl+Shift+Enter'])assert(!shortcuts.has(taken),taken+' is taken');
+ for(const taken of ['Ctrl+Z','Ctrl+Y','Ctrl+S','Ctrl+Shift+S','Ctrl+F','Ctrl+H','Ctrl+M','F3','Shift+F3','F2','Shift+F2','Ctrl+F2','Ctrl+G','Ctrl+N','Ctrl+O','Ctrl+Shift+P','Ctrl+Shift+T','Ctrl+Shift+Enter'])assert(!shortcuts.has(taken),taken+' is taken');
 });
 
 test('Extended escapes in Find and Replace',()=>{
@@ -30,19 +30,6 @@ test('Extended escapes in Find and Replace',()=>{
  assert.deepEqual(tools.decodeExtended('a\\nb\\tc\\\\d'),{text:'a\nb\tc\\d'});
  assert.deepEqual(tools.decodeExtended('\\r\\n|\\r|\\x41\\u00e9|\\q'),{text:'\n|\n|Aé|\\q'});
  for(const nul of ['\\0','\\x00','\\u0000'])assert.match(tools.decodeExtended(nul).error,/NUL/);
-});
-
-test('the Replace template expands as the engine does',()=>{
- const file=JSON.parse(fs.readFileSync(path.join(__dirname,'..','internal','editorbuffer','testdata','replace-template.json'),'utf8'));
- for(const c of file.cases){
-  const pattern=new RegExp(c.pattern),match=pattern.exec(c.text);
-  if(c.error){assert.throws(()=>tools.expandReplacement(c.replacement,match,pattern.source),/NUL/,c.replacement);continue;}
-  assert.equal(tools.expandReplacement(c.replacement,match,pattern.source),c.want,c.pattern+' with '+c.replacement);
-  // Replace All over page-held text, as the Find bar does it.
-  const all=c.text.replace(new RegExp(c.pattern,'g'),(...args)=>tools.expandReplacement(c.replacement,args.slice(0,typeof args.at(-1)==='object'?args.length-3:args.length-2),c.pattern));
-  assert.equal(all,c.text.slice(0,match.index)+c.want+c.text.slice(match.index+match[0].length));
- }
- assert.deepEqual(tools.groupNames('(a)(?:b)(?<name>c)[(]\\(d(?=e)'),['','','name']);
 });
 
 test('line tools widen a selection to whole lines with their line break; positions are lines and columns',()=>{

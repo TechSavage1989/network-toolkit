@@ -334,7 +334,9 @@ function create(a){
   const hit=row.hits[Math.min(hitIndex,row.hits.length-1)]||[row.start,row.start];
   const d=a.byUid(f.uid);if(!d||fileState(f))return;
   if(!a.activate(d)){status('Could not switch to '+f.name+'.',true);return;}
+  lastFound={uid:d.uid,revision:a.revision(d),from:hit[0],to:hit[1]};
   await a.select(d,hit[0],hit[1],true);
+  lastFound.revision=a.revision(d);refreshFound();
   status('Line '+count(row.line+1)+' of '+f.name+'.',false);
  }
  function selectedIndexes(){const low=Math.min(selection.anchor,selection.focus),high=Math.max(selection.anchor,selection.focus);return low<0?[]:Array.from({length:high-low+1},(_,k)=>low+k);}
@@ -357,6 +359,8 @@ function create(a){
   const items=[['copy','Copy',selectedIndexes().length>0],['copy-lines','Copy selected lines',selectedIndexes().length>0],null,['collapse','Collapse all',searches.length>0],['expand','Expand all',searches.length>0],null,['clear','Clear all',searches.length>0]];
   menu=document.createElement('div');menu.className='nt-editor-tab-menu nt-find-results-menu';menu.setAttribute('role','menu');menu.setAttribute('aria-label','Search results');
   menu.innerHTML=items.map(item=>item?'<button type="button" role="menuitem" tabindex="-1" data-ed-find-menu="'+item[0]+'"'+(item[2]?'':' disabled')+'>'+item[1]+'</button>':'<div role="separator"></div>').join('');
+  menu.addEventListener('click',event=>{const item=event.target.closest('[data-ed-find-menu]');if(item&&!item.disabled)runMenu(item.dataset.edFindMenu);});
+  menu.addEventListener('keydown',event=>{menuKey(event);event.stopPropagation();});
   a.windowEl().append(menu);
   const rect=menu.getBoundingClientRect();
   menu.style.left=Math.max(6,Math.min(x,root.innerWidth-rect.width-6))+'px';menu.style.top=Math.max(6,Math.min(y,root.innerHeight-rect.height-6))+'px';
@@ -774,7 +778,6 @@ function create(a){
   panel.addEventListener('click',event=>{
    if(event.target.closest('[data-ed-find-results-close]')){showPanel(false);a.focusText();return;}
    if(event.target.closest('[data-ed-find-results-cancel]')){for(const entry of running)entry.cancel();return;}
-   const menuItem=event.target.closest('[data-ed-find-menu]');if(menuItem){runMenu(menuItem.dataset.edFindMenu);return;}
    const row=event.target.closest('[data-row]');if(!row)return;
    const index=Number(row.dataset.row);
    if(event.target.closest('.nt-find-toggle')){const item=rowAt(layout(searches),index);if(item)toggleBlock(item);}
