@@ -10,7 +10,7 @@ Causes: Windows' own Open with entry starts the chosen program as `"<program>" "
 
 What changed (rules in AGENTS.md): `applyOpenWithArgument` (editor_launch.go) reads one bare path, alone, as `--editor-standalone --open-file` (Terminal program refuses it; `updateRestartArgs` drops it). After an approved update, `refreshEditorTypes` (text_editor_types.go) adds missing types as Setup would when the installed uninstaller is 1.21.44 or later; with an older one, App settings → Updates and → Editor show "Windows lists the Text Editor for only some file types. Run Setup <version> once…" with a Run Setup button (Install the full version's verified download, two confirmations, then the app's own close).
 
-Known limits: not run on physical Windows; verify-windows.ps1 changes run only in hosted CI; no startup toast for the notice (it is in App settings only).
+Known limits: not run on physical Windows; no startup toast for the notice (it is in App settings only).
 
 ---
 

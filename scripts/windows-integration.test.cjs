@@ -55,6 +55,21 @@ test('download and start each need their own confirmation, and the start says th
  assert.match(text(html),/The stable release 1\.21\.52 is newer and has one/);
 });
 
+test('while other windows keep a program open, Setup is not offered to start and they are named',()=>{
+ const found={version,name,size:12582912,beta:false,fallback:false,running:version};
+ const download={version,name,size:12582912,sha256:'b'.repeat(64)};
+ const otherWindows=['popped-out Terminal windows','Network Toolkit Text Editor window'];
+ for(const confirmStart of [false,true]){
+  const html=typesHTML(view({supported:true,install:install({found,download,otherWindows}),types:types()},{confirmStart}),true);
+  assert.match(text(html),/Close all Network Toolkit windows first, including popped-out Text Editor and Terminal windows and the separate Text Editor and Terminal programs\. Still open: popped-out Terminal windows, Network Toolkit Text Editor window\./);
+  assert.match(html,/data-windows-install-blocked/);
+  assert.match(html,/data-windows-install="check"/);
+  assert.doesNotMatch(html,/data-windows-install="start(-confirm)?"/,'no way to start Setup while they are open');
+ }
+ // Names are escaped like everything the engine reports.
+ assert.match(typesHTML(view({supported:true,install:install({found,download,otherWindows:['<b>x</b>']}),types:types()}),true),/&lt;b&gt;x&lt;\/b&gt;/);
+});
+
 test('the Editor section of the installed program is unchanged',()=>{
  const html=editorHTML(view({supported:true,textEditor:editor,install:install(),types:types()}));
  assert.match(text(html),/This is the installed program\./);

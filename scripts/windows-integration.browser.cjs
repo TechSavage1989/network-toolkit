@@ -338,6 +338,56 @@ const shot=async(page,name)=>{if(output){fs.mkdirSync(output,{recursive:true});a
    });
   }
 
+  // Popped-out windows and the standalone apps keep a program open after this
+  // window closes, and Setup stops for them: the engine names them and refuses
+  // the start; nothing is started or closed until they are closed.
+  await scenario(browser,'the installed program\'s Setup waits until the other Network Toolkit windows are closed',{
+   integration:{supported:true,textEditor:installedEditor,install:installStatus({portable:false,installed:true}),types:missingTypes},
+   handle:async(p,body,f)=>{
+    const installed=extra=>installStatus({portable:false,installed:true,...extra});
+    if(p.endsWith('/full-install/find')){f.integration={...f.integration,install:installed({found})};return {data:{install:f.integration.install}};}
+    if(p.endsWith('/full-install/download')){f.integration={...f.integration,install:installed({found,download:downloaded,progress:{phase:'ready',version},otherWindows:f.open})};return {data:{install:f.integration.install}};}
+    if(p.endsWith('/full-install/start')){
+     if(f.open.length)return {status:409,data:{error:'Close all Network Toolkit windows first, including popped-out Text Editor and Terminal windows and the separate Text Editor and Terminal programs. Still open: '+f.open.join(', ')+'.',otherWindows:f.open}};
+     f.integration={...f.integration,install:installed({found,download:downloaded,started:true})};return {data:{install:f.integration.install}};
+    }
+   },
+   open:['popped-out Terminal windows','Network Toolkit Text Editor window']
+  },async(page,requests,f)=>{
+   await page.evaluate(()=>{window.__closeCalls=0;window.__networkToolkitClose=async()=>{window.__closeCalls++;return true;};});
+   await openSettings(page,'updates');
+   const updates=page.locator('#windowsFullInstall');
+   await updates.locator('[data-windows-install="find"]').click();
+   await updates.locator('[data-windows-install="download-confirm"]').click();
+   await updates.locator('[data-windows-install-blocked]').waitFor();
+   assert.match(await updates.locator('[data-windows-install-blocked]').textContent(),/Close all Network Toolkit windows first, including popped-out Text Editor and Terminal windows and the separate Text Editor and Terminal programs\. Still open: popped-out Terminal windows, Network Toolkit Text Editor window\./);
+   assert.equal(await updates.locator('[data-windows-install="start-confirm"],[data-windows-install="start"]').count(),0,'no way to start Setup while they are open');
+   await shot(page,'windows-types-blocked');
+   // One window is still open when the user checks again.
+   f.open=['Network Toolkit Text Editor window'];
+   f.integration={...f.integration,install:{...f.integration.install,otherWindows:f.open}};
+   await updates.locator('[data-windows-install="check"]').click();
+   await page.waitForFunction(()=>/Still open: Network Toolkit Text Editor window\./.test(document.getElementById('windowsFullInstall').textContent));
+   // All closed: the second confirmation, then Setup starts and the app closes.
+   f.open=[];
+   f.integration={...f.integration,install:{...f.integration.install,otherWindows:undefined}};
+   await updates.locator('[data-windows-install="check"]').click();
+   await updates.locator('[data-windows-install-confirm="start"]').waitFor();
+   // A window popped out again after the check: the engine refuses, nothing starts or closes.
+   f.open=['popped-out Text Editor windows'];
+   f.integration={...f.integration,install:{...f.integration.install,otherWindows:f.open}};
+   await updates.locator('[data-windows-install="start-confirm"]').click();
+   await page.waitForFunction(()=>/Still open: popped-out Text Editor windows\./.test(document.getElementById('windowsFullInstall').textContent));
+   assert.equal(await page.evaluate(()=>window.__closeCalls),0,'the app does not close when Setup did not start');
+   assert.equal(await updates.locator('[role="alert"]').count(),0,'the refusal is said once, by the notice that names the windows');
+   f.open=[];
+   f.integration={...f.integration,install:{...f.integration.install,otherWindows:undefined}};
+   await updates.locator('[data-windows-install="check"]').click();
+   await updates.locator('[data-windows-install="start-confirm"]').click();
+   await page.waitForFunction(()=>window.__closeCalls===1);
+   assert.equal(posts(requests,'/full-install/start').length,2);
+  });
+
   for(const [name,options] of [['Linux',{os:'linux'}]]){
    await scenario(browser,'no Windows sections in '+name,options,async(page,requests)=>{
     await openSettings(page,'editor');

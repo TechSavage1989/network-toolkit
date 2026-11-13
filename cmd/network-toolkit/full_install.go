@@ -108,6 +108,10 @@ type fullInstallStatus struct {
 	Progress        *updateProgress      `json:"progress,omitempty"`
 	Busy            bool                 `json:"busy"`
 	Started         bool                 `json:"started"`
+	// OtherWindows names what keeps one of the installed programs open
+	// besides this window (fullInstallOtherWindows), while a downloaded Setup
+	// of the installed program waits to start: Setup refuses until it closes.
+	OtherWindows []string `json:"otherWindows,omitempty"`
 }
 
 type fullInstallState struct {
@@ -129,13 +133,47 @@ func (a *application) fullInstallStatus(editor editorRegistrationStatus) fullIns
 	}
 	status.Data = a.fullInstallDataNote(editor.Executable)
 	a.fullInstall.mu.Lock()
-	defer a.fullInstall.mu.Unlock()
 	status.Found, status.Download, status.Busy, status.Started = a.fullInstall.found, a.fullInstall.download, a.fullInstall.busy, a.fullInstall.started
 	if a.fullInstall.progress != nil {
 		progress := *a.fullInstall.progress
 		status.Progress = &progress
 	}
+	a.fullInstall.mu.Unlock()
+	if editor.ThisIsInstalled && status.Download != nil && !status.Started {
+		status.OtherWindows = a.fullInstallOtherWindows()
+	}
 	return status
+}
+
+// Setup of the installed program replaces the three programs and stops while
+// any of them is open (AreProgramsOpen in windows.nsi). The page closes this
+// window after starting Setup, but popped-out Terminal and Text Editor windows
+// keep this engine (and Network_Toolkit.exe or a separate program) running,
+// and the standalone Text Editor and Terminal run the separate programs. So
+// Setup of the installed program is not started while any of them is open.
+const fullInstallCloseAll = "Close all Network Toolkit windows first, including popped-out Text Editor and Terminal windows and the separate Text Editor and Terminal programs."
+
+// fullInstallStandaloneOpen names the standalone apps of the data root that
+// are open (tests replace it).
+var fullInstallStandaloneOpen = standaloneAppsOpen
+
+// fullInstallOtherWindows names what besides this window keeps one of the
+// programs open: this engine's popped-out windows (also a Text Editor
+// document waiting to be recovered or moved, which keeps the engine running
+// as they do) and the standalone apps of this data root. A program started
+// with another data folder is not seen here; Setup's own check names it.
+func (a *application) fullInstallOtherWindows() []string {
+	var open []string
+	if a.views != nil && a.views.count() > 0 {
+		open = append(open, "popped-out Terminal windows")
+	}
+	if a.editorViews != nil && a.editorViews.hasLiveViews() {
+		open = append(open, "popped-out Text Editor windows")
+	}
+	if a.shared != nil {
+		open = append(open, fullInstallStandaloneOpen(a.shared.root)...)
+	}
+	return open
 }
 
 // Whether the installed program will find this copy's data (storage_location.go):
@@ -314,6 +352,14 @@ func (a *application) handleFullInstall(w http.ResponseWriter, r *http.Request, 
 			return
 		}
 	}
+	// Setup of the installed program (or of a program whose registration
+	// could not be read) starts only once nothing else keeps it open.
+	var others []string
+	if action == "start" {
+		if installed, _, err := editorRegInstalledHere(platform.registry, exe); err != nil || installed {
+			others = a.fullInstallOtherWindows()
+		}
+	}
 	a.fullInstall.mu.Lock()
 	if a.fullInstall.busy || a.fullInstall.starting {
 		a.fullInstall.mu.Unlock()
@@ -375,6 +421,11 @@ func (a *application) handleFullInstall(w http.ResponseWriter, r *http.Request, 
 		if !request.Confirm || download == nil || request.Version != download.Version {
 			a.fullInstall.mu.Unlock()
 			jsonError(w, http.StatusConflict, "Download and verify Setup, then confirm that it should start.")
+			return
+		}
+		if len(others) > 0 {
+			a.fullInstall.mu.Unlock()
+			jsonResponse(w, http.StatusConflict, map[string]any{"error": fullInstallCloseAll + " Still open: " + strings.Join(others, ", ") + ".", "otherWindows": others})
 			return
 		}
 		// Verifying and starting happen without the lock (status reads go on);

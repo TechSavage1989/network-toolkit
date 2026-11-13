@@ -80,7 +80,13 @@ function setupSteps(view,refresh){
   }
  }else{
   body+='<p class="help-line">'+esc(download.name)+' ('+bytes(download.size)+') was downloaded and matches the release\'s SHA256SUMS.</p><p class="help-line" style="overflow-wrap:anywhere">SHA-256: '+esc(download.sha256)+'</p>';
-  if(i.started)body+=refresh?'<div class="notice info" data-windows-install-started><span>Setup is running in its own window. Network Toolkit closes so that Setup can update it; choose Install in Setup once it has closed. Your settings and saved data stay.</span></div>':'<div class="notice info" data-windows-install-started><span>Setup is running in its own window. When it has finished, open Network Toolkit from the Start menu. You can then close this portable copy and delete its folder; your settings and saved data stay in the data folder.</span></div>';
+  // Setup of the installed program stops while one of its programs is open,
+  // and closing this window does not close popped-out windows or the
+  // standalone apps: the engine names them and refuses the start until they
+  // are closed (full_install.go). The verified download is kept meanwhile.
+  const others=Array.isArray(i.otherWindows)?i.otherWindows:[];
+  if(!i.started&&others.length)body+='<div class="notice warn" data-windows-install-blocked><span>Close all Network Toolkit windows first, including popped-out Text Editor and Terminal windows and the separate Text Editor and Terminal programs. Still open: '+others.map(esc).join(', ')+'. Setup starts only when they are closed; the download is kept.</span></div><div class="button-row"><button type="button" class="btn small" data-windows-install="check"'+dis+'>Check again</button><button type="button" class="btn small ghost" data-windows-install="discard"'+dis+'>Delete the download</button></div>';
+  else if(i.started)body+=refresh?'<div class="notice info" data-windows-install-started><span>Setup is running in its own window. Network Toolkit closes so that Setup can update it; choose Install in Setup once it has closed. Your settings and saved data stay.</span></div>':'<div class="notice info" data-windows-install-started><span>Setup is running in its own window. When it has finished, open Network Toolkit from the Start menu. You can then close this portable copy and delete its folder; your settings and saved data stay in the data folder.</span></div>';
   else if(view.confirmStart)body+=refresh?'<div data-windows-install-confirm="start"><div class="notice info"><span>Start Network Toolkit Setup '+esc(download.version)+' now? Network Toolkit then closes so that Setup can update it: you are asked about unsaved documents first, and your settings and saved data stay. Close the separate Text Editor and Terminal windows too. Setup asks before it changes anything.</span></div><div class="button-row"><button type="button" class="btn small primary" data-windows-install="start-confirm" data-version="'+esc(download.version)+'"'+dis+'>Start Setup and close Network Toolkit</button><button type="button" class="btn small ghost" data-windows-install="cancel"'+dis+'>Cancel</button></div></div>':'<div data-windows-install-confirm="start"><div class="notice info"><span>Start Network Toolkit Setup '+esc(download.version)+' now? It opens in its own window and asks before it installs anything. This copy keeps running.</span></div><div class="button-row"><button type="button" class="btn small primary" data-windows-install="start-confirm" data-version="'+esc(download.version)+'"'+dis+'>Start Setup</button><button type="button" class="btn small ghost" data-windows-install="cancel"'+dis+'>Cancel</button></div></div>';
   else body+='<div class="button-row"><button type="button" class="btn small primary" data-windows-install="start"'+dis+'>Start Setup…</button><button type="button" class="btn small ghost" data-windows-install="discard"'+dis+'>Delete the download</button></div>';
  }
@@ -176,6 +182,7 @@ async function installAction(action,version){
  if(action==='reinstall'){installView.reinstall=true;render();return;}
  if(action==='download'){installView.confirmDownload=true;render();return;}
  if(action==='start'){installView.confirmStart=true;render();return;}
+ if(action==='check'){installView.error='';installView.message='';installView.busy=true;render();try{await refresh();}finally{installView.busy=false;render();}return;}
  if(action==='cancel'){installView.confirmDownload=installView.confirmStart=false;render();return;}
  installView.busy=true;installView.error='';installView.message='';render();
  const notice=refreshing();let closeAfter=false;
@@ -189,7 +196,11 @@ async function installAction(action,version){
   else if(action==='open-installed'){await call('/windows-integration/open-installed','POST',{confirm:true});installView.message='The installed program is starting. You can close this portable copy.';}
   if(result?.install)shared={...shared,install:result.install};
  }catch(error){installView.error=(action==='download-confirm'?'Setup was not downloaded: ':action==='find'?'Setup could not be found: ':'')+(error.message||String(error));installView.message='';}
- finally{installView.busy=false;watchProgress(false);await refresh();if(closeAfter)await closeForSetup();}
+ finally{installView.busy=false;watchProgress(false);await refresh();
+  // A start refused because other windows are open is said once, by the notice that names them.
+  // The confirmation comes back once they are closed (Check again).
+  if(action==='start-confirm'&&shared?.install?.otherWindows?.length){installView.error='';installView.confirmStart=true;render();}
+  if(closeAfter)await closeForSetup();}
 }
 document.addEventListener('click',event=>{
  const editor=event.target.closest?.('[data-windows-editor]');
