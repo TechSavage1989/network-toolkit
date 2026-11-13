@@ -731,7 +731,16 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
   const from = starts[first] || 0, to = end < starts.length ? starts[end] : text.length;
   const ranges = marks(page.start + from, page.start + to);
   const key = [page.start, from, to, markStamp, text.length].join(':');
-  if (ranges && (ranges !== markRanges || key !== markKey)) {
+  if (!ranges?.length) {
+   // Nothing marked here, or not known yet: no marks of another part show.
+   if (ranges || key !== markKey) markLayer.hidden = true;
+   if (ranges) {
+    markRanges = ranges;
+    markKey = key;
+   }
+   return;
+  }
+  if (ranges !== markRanges || key !== markKey) {
    markRanges = ranges;
    markKey = key;
    let html = '', at = from;
@@ -743,12 +752,8 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
    }
    markLayer.innerHTML = html + escapeText(text.slice(at, to)) + '\n';
    markLayer.dataset.first = String(first);
-   markLayer.hidden = !ranges.length;
   }
-  if (!markRanges?.length) {
-   markLayer.hidden = true;
-   return;
-  }
+  markLayer.hidden = false;
   markLayer.style.transform = 'translate(' + (-textarea.scrollLeft) + 'px,' +
    (pixelAt(Number(markLayer.dataset.first) || 0) - textarea.scrollTop) + 'px)';
  }

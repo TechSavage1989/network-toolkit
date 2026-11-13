@@ -29,6 +29,7 @@ const MODE_HELP={
 };
 const ROW=20,PAGE_ROWS=200,PAGE_CACHE=64,MARK_PATTERNS=16,BOOKMARKS=100000,COPY_ROWS=50000;
 const TABS=[['find','Find'],['replace','Replace'],['mark','Mark']];
+const NONE=Object.freeze([]);
 const escapeHTML=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const count=n=>Number(n||0).toLocaleString();
 const plural=(n,one,many)=>count(n)+' '+(Number(n)===1?one:many);
@@ -557,7 +558,7 @@ function create(a){
   return foundRanges;
  }
  function patternMarks(d,from,to){
-  const list=marksOf(d);if(!list.length)return [];
+  const list=marksOf(d);if(!list.length)return NONE;
   const key=[a.revision(d),from,to,markVersion].join(':'),cached=markCache.get(d);
   if(cached?.key===key)return cached.ranges;
   if(cached?.pending===key)return cached.ranges||null;
