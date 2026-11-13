@@ -237,10 +237,19 @@ async function verifyLongLineWrap(page,editor){
    return start+text.length===8*1024*1024*1024&&ta.scrollTop+ta.clientHeight>=ta.scrollHeight-2;
   });
   assert.ok(await editor.evaluate(ta=>ta.value.length<=49152));
+  // CI's record showed the browser scrolling the textarea by 120px on its own
+  // (no script set it) just after the next view's Go to line 846: the wheel
+  // step above, delivered late. Let the textarea's scrolling come to rest
+  // before the view is replaced, so it cannot land on the next view.
+  await page.evaluate(()=>new Promise(done=>{
+   const ta=document.querySelector('textarea');let last=ta.scrollTop,same=0;
+   const tick=()=>{if(ta.scrollTop===last){if(++same>=6)return done();}else{same=0;last=ta.scrollTop;}setTimeout(tick,50);};
+   tick();
+  }));
 
   // Native textarea selection and visible syntax text share a baseline deep
   // inside a page, where fractional line heights can accumulate error.
-  await page.evaluate(async()=>{
+  await page.evaluate(async()=>{window.makeSyntaxView=async()=>{
    view.dispose();session.close();
    const text=Array.from({length:1024},(_,i)=>'set alias FIXTURE_'+String(i).padStart(4,'0')).join('\n');
    const metadata={revision:1,units:text.length,lines:1024};
@@ -259,12 +268,72 @@ async function verifyLongLineWrap(page,editor){
     container,session,syntaxLanguage:()=> 'fixture',readOnly:true});
    await view.load({start:0});
    await view.goLine(846);
+  };});
+  // CI (Chrome Headless Shell 151) found an empty selection after this
+  // double-click a few times; it never fails locally. Record what touches the
+  // selection, repeat the double-click, and print the record of any failure.
+  await page.evaluate(()=>{
+   const ta=document.querySelector('textarea'),log=window.selectionLog=[],t0=performance.now();
+   const proto=HTMLTextAreaElement.prototype,valueOf=Object.getOwnPropertyDescriptor(proto,'value'),scrollOf=Object.getOwnPropertyDescriptor(Element.prototype,'scrollTop');
+   const where=()=>new Error().stack.split('\n').slice(3,6).map(line=>line.trim().replace(/^at /,'').replace(/\(?file:[^)]*\/(web\/assets\/[^)]*)\)?/,'$1')).join(' < ');
+   const state=()=>[ta.selectionStart,ta.selectionEnd,Math.round(scrollOf.get.call(ta)),ta.scrollLeft,document.activeElement===ta];
+   const note=(what,extra='')=>{if(log.length<600)log.push([Math.round(performance.now()-t0),what,...state(),extra]);};
+   for(const type of ['pointerdown','pointerup','mousedown','mouseup','click','dblclick','select','selectionchange','scroll','focus','blur'])
+    ta.addEventListener(type,event=>note(type,event.detail||''),true);
+   const range=proto.setSelectionRange;
+   ta.setSelectionRange=function(...args){note('setSelectionRange('+args.join(',')+')',where());return range.apply(this,args);};
+   Object.defineProperty(ta,'value',{configurable:true,get(){return valueOf.get.call(this);},set(value){note('value='+String(value).length,where());valueOf.set.call(this,value);}});
+   Object.defineProperty(ta,'scrollTop',{configurable:true,get(){return scrollOf.get.call(this);},set(value){note('scrollTop='+value,where());scrollOf.set.call(this,value);}});
   });
-  const token=page.locator('.nt-editor-disk-highlight .nt-ed-string').filter({hasText:'FIXTURE_0850'});
-  await token.waitFor();
-  const box=await token.boundingBox();
-  await page.mouse.dblclick(box.x+box.width/2,box.y+box.height*.8);
-  assert.equal(await editor.evaluate(ta=>ta.value.slice(ta.selectionStart,ta.selectionEnd)),'FIXTURE_0850');
+  const attempts=[];
+  for(let attempt=0;attempt<5;attempt++){
+   await page.evaluate(()=>{selectionLog.length=0;});
+   await page.evaluate(()=>makeSyntaxView());
+   const token=page.locator('.nt-editor-disk-highlight .nt-ed-string').filter({hasText:'FIXTURE_0850'});
+   await token.waitFor();
+   // CI found FIXTURE_0850 above the textarea twice: after Go to line 846 the
+   // textarea showed line 851 at its top (scrollTop 17159 at 20.15px rows), so
+   // the double-click landed outside it. Click only once the word lies inside
+   // the textarea on two polls in a row; if it never does, fail with the
+   // view's position and the record of every scroll change since the view
+   // was created, which names what moved it.
+   await page.evaluate(()=>{window.lastWordPlace='';});
+   await page.waitForFunction(()=>{
+    const word=[...document.querySelectorAll('.nt-editor-disk-highlight .nt-ed-string')].find(el=>el.textContent==='FIXTURE_0850');
+    const ta=document.querySelector('textarea').getBoundingClientRect(),box=word?.getBoundingClientRect();
+    const place=box&&box.top>=ta.top&&box.bottom<=ta.bottom?Math.round(box.top*4)+':'+Math.round(box.left*4):'';
+    const settled=!!place&&place===window.lastWordPlace;window.lastWordPlace=place;return settled;
+   },null,{timeout:10000,polling:100}).catch(async error=>{
+    throw Error('FIXTURE_0850 never settled inside the textarea: '+JSON.stringify(await page.evaluate(()=>{
+     const ta=document.querySelector('textarea'),style=getComputedStyle(ta),word=[...document.querySelectorAll('.nt-editor-disk-highlight .nt-ed-string')].find(el=>el.textContent==='FIXTURE_0850');
+     return {textarea:ta.getBoundingClientRect().toJSON(),word:word?.getBoundingClientRect().toJSON(),lineHeight:style.lineHeight,font:style.font,scrollTop:ta.scrollTop,
+      layer:document.querySelector('.nt-editor-disk-highlight')?.style.transform,cursor:view.cursor,view:view.capture(),
+      scrollHeight:ta.scrollHeight,clientHeight:ta.clientHeight,overflowAnchor:style.overflowAnchor,record:selectionLog.slice(0,200)};
+    }))+' ('+error.message+')');
+   });
+   const box=await token.boundingBox();
+   await page.mouse.dblclick(box.x+box.width/2,box.y+box.height*.8);
+   const chosen=await editor.evaluate(ta=>ta.value.slice(ta.selectionStart,ta.selectionEnd));
+   if(chosen==='FIXTURE_0850'){attempts.push({attempt,ok:true});continue;}
+   // A browser may apply the double-click's word selection after the mouse
+   // events have been delivered: wait for it before calling it lost.
+   if(await page.waitForFunction(()=>{const ta=document.querySelector('textarea');return ta.value.slice(ta.selectionStart,ta.selectionEnd)==='FIXTURE_0850';},null,{timeout:2000}).then(()=>true,()=>false)){
+    attempts.push({attempt,ok:true,late:true,first:chosen,log:await page.evaluate(()=>selectionLog.slice())});continue;
+   }
+   attempts.push({attempt,chosen,box,later:await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    const ta=document.querySelector('textarea'),rect=ta.getBoundingClientRect();
+    done({chosen:ta.value.slice(ta.selectionStart,ta.selectionEnd),readOnly:ta.readOnly,rect:[rect.x,rect.y,rect.width,rect.height],
+     classes:ta.className,syntaxHidden:document.querySelector('.nt-editor-disk-highlight')?.hidden,lineHeight:getComputedStyle(ta).lineHeight,
+     layer:document.querySelector('.nt-editor-disk-highlight')?.style.transform,scrollTop:ta.scrollTop,log:selectionLog.slice()});
+   }))))});
+  }
+  // The record slows every change of the textarea: end it before the next checks.
+  await page.evaluate(()=>{const ta=document.querySelector('textarea');for(const key of ['value','scrollTop','setSelectionRange'])delete ta[key];window.selectionLog.length=0;window.selectionLog.push=()=>0;});
+  const failed=attempts.filter(item=>!item.ok),late=attempts.filter(item=>item.late);
+  report.doubleClick={attempts:attempts.length,late:late.length,failed:failed.length};
+  if(late.length)console.log('DOUBLE-CLICK LATE SELECTION '+JSON.stringify(late.slice(0,2)));
+  if(failed.length)console.error('DOUBLE-CLICK DIAGNOSTICS '+JSON.stringify(failed));
+  assert.equal(failed.length,0,'a double-clicked word was not selected in '+failed.length+' of '+attempts.length+' attempts');
 
   report.longLineWrap=await verifyLongLineWrap(page,editor);
   assert.equal(report.errors.length,0);report.passed=true;
