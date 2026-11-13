@@ -207,8 +207,12 @@ test('continuous scroll uses bounded packet windows, keeps important events visi
  assert(h.api.model.windowStart>=1200);assert(h.doc.querySelectorAll('#packetTableScroll [data-packet-number]').length<=302);assert(h.doc.querySelector('[data-packet-number="1300"]'));
  h.doc.emit('click',h.doc.querySelector('[data-packet-jump="1500"]'));await h.settle();
  assert.equal(h.api.model.detail?.packet.number,1501);assert(h.doc.querySelector('.packet-layer-tree').textContent.includes('Frame 1501'));
- h.doc.emit('click',h.doc.querySelector('[data-packet-action="toggle-insights"]'));assert.equal(h.doc.getElementById('packetInsights').hidden,true);
+ // Show/Hide insights is a toggle (owner rule): it is the only control for the panel and shows its state.
+ const insightsToggles=h.doc.querySelectorAll('[data-packet-action="toggle-insights"]'),insightsToggle=insightsToggles[0];assert.equal(insightsToggles.length,1,'No separate close button in the insights panel');assert(insightsToggle.closest('.packet-list-actions'));assert(insightsToggle.className.includes('reveal-toggle'));assert.equal(insightsToggle.getAttribute('aria-expanded'),'true');
+ h.doc.emit('click',insightsToggle);assert.equal(h.doc.getElementById('packetInsights').hidden,true);assert.equal(insightsToggle.getAttribute('aria-expanded'),'false');assert.equal(insightsToggle.textContent,'Show insights');
  assert.equal(h.c.state.packetInsightsOpen,false);assert.equal(h.api.model.total,1800);
+ h.doc.emit('click',insightsToggle);assert.equal(h.doc.getElementById('packetInsights').hidden,false);assert.equal(insightsToggle.getAttribute('aria-expanded'),'true');assert.equal(insightsToggle.textContent,'Hide insights');assert.equal(h.c.state.packetInsightsOpen,true);
+ h.doc.emit('click',insightsToggle);assert.equal(h.c.state.packetInsightsOpen,false);
 });
 
 test('packet overview clicks select the exact proportional frame and keep viewport centered',async()=>{
@@ -287,6 +291,8 @@ test('compact packet guidance explains common patterns and applies supported fil
  const guide=h.doc.getElementById('packetQuickGuide'),scroll=h.doc.getElementById('packetTableScroll');
  assert.equal(guide.hasAttribute('hidden'),true);assert(h.doc.querySelector('[data-packet-action="toggle-guide"]'));
  h.doc.emit('click',h.doc.querySelector('[data-packet-action="toggle-guide"]'));assert.equal(guide.hidden,false);
+ // What to look for is a toggle (owner rule): pressing it again closes the guide, and it shows its state.
+ {const toggle=h.doc.querySelector('[data-packet-action="toggle-guide"]');assert(toggle.className.includes('reveal-toggle'));assert.equal(toggle.getAttribute('aria-expanded'),'true');assert.equal(guide.querySelector('header button'),null,'The guide has no separate close button');h.doc.emit('click',toggle);assert.equal(guide.hidden,true);assert.equal(toggle.getAttribute('aria-expanded'),'false');h.doc.emit('click',toggle);assert.equal(guide.hidden,false);assert.equal(toggle.getAttribute('aria-expanded'),'true');}
  assert.match(guide.textContent,/DHCP Discover/);assert.match(guide.textContent,/NXDOMAIN/);assert.match(guide.textContent,/SYN\/ACK/);assert.match(guide.textContent,/retransmission/);
  const action=guide.querySelector('[data-packet-filter="dns"]');h.doc.emit('click',action);await h.settle();
  assert.equal(h.api.model.expression,'dns');assert.equal(h.api.model.guideOpen,false);
@@ -306,6 +312,8 @@ test('packet colors and map sizes can be customized without removing the packet 
  assert(h.doc.querySelector('[data-packet-action="toggle-appearance"]'));
  h.doc.emit('click',h.doc.querySelector('[data-packet-action="toggle-appearance"]'));
  const panel=h.doc.getElementById('packetAppearanceSettings');assert.equal(panel.hidden,false);
+ // Colors & maps is a toggle (owner rule): pressing it again closes the panel, and it shows its state.
+ {const toggle=h.doc.querySelector('[data-packet-action="toggle-appearance"]');assert(toggle.className.includes('reveal-toggle'));assert.equal(toggle.getAttribute('aria-expanded'),'true');assert.equal(panel.querySelector('header button'),null,'Colors & maps has no separate close button');h.doc.emit('click',toggle);assert.equal(panel.hidden,true);assert.equal(toggle.getAttribute('aria-expanded'),'false');h.doc.emit('click',toggle);assert.equal(panel.hidden,false);assert.equal(toggle.getAttribute('aria-expanded'),'true');}
  const color=h.doc.querySelector('[data-packet-color="tcp"]');color.value='#123abc';h.doc.emit('input',color);
  assert.equal(h.c.state.packetMapSettings.colors.tcp,'#123abc');
  assert.equal(h.doc.getElementById('packetCaptureWorkspace').style['--packet-color-tcp'],'#123abc');
