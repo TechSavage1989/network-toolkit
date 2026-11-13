@@ -87,7 +87,7 @@ func (a *application) handleEditorViews(w http.ResponseWriter, r *http.Request) 
 	}
 	caller := editorRequestView(r)
 	path := strings.TrimPrefix(r.URL.Path, "/api/editor-views")
-	largeComparison := path == "/buffers/compare" && (r.ContentLength < 0 || r.ContentLength > 1<<20)
+	largeComparison := (path == "/buffers/compare" || path == "/text-tools") && (r.ContentLength < 0 || r.ContentLength > 1<<20)
 	if (r.Method == http.MethodGet && (path == "" || path == "/current")) || (r.Method == http.MethodPost && (path == "/transfers" || path == "/current/state" || path == "/buffers/promote" || largeComparison || (strings.HasPrefix(path, "/documents/") && strings.HasSuffix(path, "/file")))) {
 		var release func()
 		var admitted bool
@@ -121,6 +121,12 @@ func (a *application) handleEditorViews(w http.ResponseWriter, r *http.Request) 
 	}
 	if path == "/buffers/compare" {
 		m.compareDiskDocuments(w, r, caller)
+		return
+	}
+	if path == "/text-tools" {
+		// Text tools over page-held text (editor_text_tools.go); every
+		// editor window may use them.
+		m.handleTextTools(w, r)
 		return
 	}
 	if path == "/drags" || strings.HasPrefix(path, "/drags/") {

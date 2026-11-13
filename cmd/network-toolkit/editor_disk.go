@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"net/http"
 	"networktoolkit/internal/editorbuffer"
+	"networktoolkit/internal/texttools"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -46,8 +47,14 @@ type editorDiskDocument struct {
 	verify         *editorDiskVerify
 	ftp            *editorFTPEndpoint
 	restored       *editorSessionRestoreState
-	// Replace Alls that are still searching, each with the way to stop it.
+	// Replace Alls and text tools that still read this document's buffer,
+	// each with the way to stop it.
 	replacing map[*replaceAllContext]struct{}
+	// tool is the last text tool started on this document (editor_text_tools.go).
+	tool *editorToolJob
+	// derived counts what a derived document's tool wrote (settings of a
+	// readable SonicWall export), for the page's message.
+	derived int64
 }
 
 // replaceAllContext is the request's context for one Replace All, with a way
@@ -64,9 +71,9 @@ func (c *replaceAllContext) Err() error {
 	return c.Context.Err()
 }
 
-// stopReplaceAll stops every Replace All that is still searching this
-// document. Whoever replaces or closes the buffer calls it first: the search
-// holds the old buffer open, and its result must not be applied.
+// stopReplaceAll stops every Replace All and text tool that is still reading
+// this document. Whoever replaces or closes the buffer calls it first: the
+// work holds the old buffer open, and its result must not be applied.
 func (d *editorDiskDocument) stopReplaceAll() {
 	d.mu.Lock()
 	defer d.mu.Unlock()
@@ -169,6 +176,7 @@ func (m *editorViewRegistry) openDiskDocument(w http.ResponseWriter, r *http.Req
 		Mode     string                 `json:"mode"`
 		Remote   *remoteBrowserRequest  `json:"remote"`
 		Restore  *editorSessionRestore  `json:"restore,omitempty"`
+		Derive   *editorDeriveRequest   `json:"derive,omitempty"`
 	}
 	if e := decodeEditorBody(w, r, 64<<10, &req); e != nil {
 		jsonError(w, 400, e.Error())
@@ -239,7 +247,11 @@ func (m *editorViewRegistry) openDiskDocument(w http.ResponseWriter, r *http.Req
 			return
 		}
 	}
-	if req.Mode != "" && req.Mode != "draft" && req.Mode != "upload" && req.Mode != "restore" {
+	if (req.Mode == "derive") != (req.Derive != nil) || req.Mode == "derive" && s.Binding.Kind != "localDraft" {
+		jsonError(w, 400, "A derived document is a new untitled document made from an open one.")
+		return
+	}
+	if req.Mode != "" && req.Mode != "draft" && req.Mode != "upload" && req.Mode != "restore" && req.Mode != "derive" {
 		jsonError(w, 400, "Unsupported file opening mode.")
 		return
 	}
@@ -286,6 +298,20 @@ func (m *editorViewRegistry) openDiskDocument(w http.ResponseWriter, r *http.Req
 		jsonError(w, 409, "This document cannot be opened in the current workspace.")
 		return
 	}
+	var source *editorDiskDocument
+	if req.Mode == "derive" {
+		// The source must be a loaded document of the same window, under
+		// the lease the page holds.
+		if from := m.documents[req.Derive.UID]; from != nil && from.owner == caller && from.lease == req.Derive.Lease && from.pending == "" {
+			source = from.buffer
+		}
+		if source == nil {
+			m.mu.Unlock()
+			disk.close()
+			jsonError(w, 409, "The document to make a copy of is not open in this window.")
+			return
+		}
+	}
 	m.documents[s.UID] = grant
 	m.registerLoadedLocked(s.UID)
 	lease := grant.lease
@@ -297,6 +323,12 @@ func (m *editorViewRegistry) openDiskDocument(w http.ResponseWriter, r *http.Req
 			result.Format = editorbuffer.Format{Encoding: s.Encoding, BOM: s.BOM, EOL: s.EOL}
 		}
 		m.finishDiskOpen(grant, disk, result, err)
+	} else if req.Mode == "derive" {
+		derive := *req.Derive
+		go func() {
+			result, err := m.deriveDiskDocument(ctx, disk, source, derive)
+			m.finishDiskOpen(grant, disk, result, err)
+		}()
 	} else if req.Mode == "restore" {
 		file, restore := backup, *req.Restore
 		backup = nil
@@ -429,6 +461,10 @@ type editorDiskRequest struct {
 	Receipt   string                `json:"receipt"`
 	Range     *editorDiskRange      `json:"range"`
 	Remote    *remoteBrowserRequest `json:"remote"`
+	// Text tools (editor_text_tools.go).
+	Tool    string            `json:"tool"`
+	Options texttools.Options `json:"options"`
+	Job     string            `json:"job"`
 }
 
 func (m *editorViewRegistry) diskDocument(w http.ResponseWriter, r *http.Request, caller, uid string) {
@@ -485,7 +521,7 @@ func (m *editorViewRegistry) diskDocument(w http.ResponseWriter, r *http.Request
 		jsonError(w, 410, "The document is closed.")
 		return
 	}
-	loading, progress, failure, v, reloadError, restored := disk.loading, disk.progress, disk.err, disk.imported, disk.reloadError, disk.restored
+	loading, progress, failure, v, reloadError, restored, derived := disk.loading, disk.progress, disk.err, disk.imported, disk.reloadError, disk.restored, disk.derived
 	if req.Action == "cancel" && disk.reloadUpload {
 		if disk.upload != nil {
 			disk.upload.close()
@@ -553,6 +589,9 @@ func (m *editorViewRegistry) diskDocument(w http.ResponseWriter, r *http.Request
 		if restored != nil {
 			status["restore"] = restored
 		}
+		if derived > 0 {
+			status["derived"] = derived
+		}
 		value = status
 	case "window":
 		if req.Limit == 0 {
@@ -591,6 +630,17 @@ func (m *editorViewRegistry) diskDocument(w http.ResponseWriter, r *http.Request
 		}
 	case "replace-all":
 		value, err = disk.replaceDiskMatches(ctx, v.Buffer, req)
+	case "replace-text":
+		value, err = replaceText(ctx, v.Buffer, req)
+	case "tool-start":
+		value, err = disk.startTool(v, req)
+	case "tool-status", "tool-cancel":
+		value, err = disk.toolStatus(req, req.Action == "tool-cancel")
+	case "tool-detect":
+		var head editorbuffer.Window
+		if head, err = v.Buffer.Window(0, int(min(detectPrefix, max(1, v.Buffer.Metadata().Units)))); err == nil {
+			value = detectTool(head.Text)
+		}
 	case "reload":
 		var replacement *editorbuffer.Imported
 		if g.snapshot.Untitled && g.snapshot.Binding.Kind == "localDraft" && !filepath.IsAbs(g.snapshot.Path) {
