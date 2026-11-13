@@ -39,7 +39,10 @@ const profile=(id,name,host)=>({id,name,type:'ssh',host,port:22,username:'operat
    await page.keyboard.press('Escape');await page.mouse.up();await page.waitForTimeout(150);assert.deepEqual(await order(),['p-ap','p-edge','p-core']);report.checks.push('Drop line only where the move would change the order');}
   // Drag switch-core above ap-floor2.
   await drag('p-core','p-ap',false);assert.deepEqual(await order(),['p-core','p-ap','p-edge']);
-  await page.waitForFunction(()=>state.terminalSavedManualOrder===true);await page.waitForTimeout(400);
+  // The page saves 550 ms after the last change (saveState): wait for that
+  // save, not a fixed pause shorter than it.
+  await page.waitForFunction(()=>state.terminalSavedManualOrder===true);
+  for(const t0=Date.now();!(puts.at(-1)?.terminalSavedManualOrder===true)&&Date.now()-t0<10000;)await page.waitForTimeout(25);
   const last=puts.at(-1);assert(last&&last.terminalSavedManualOrder===true,'manual order flag saved');assert.deepEqual(last.terminalProfiles.map(p=>p.id),['p-core','p-ap','p-edge'],'stored profile order follows the list');
   assert.equal(await page.locator('#modalRoot .modal').count(),0,'a drag does not open the connection');report.checks.push('Drag above reorders, persists the order and opens nothing');
   // Drag ap-floor2 below firewall-edge.
