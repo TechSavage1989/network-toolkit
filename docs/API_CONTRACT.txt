@@ -392,8 +392,9 @@ failures include browser-download/CSV-import guidance. The UI appends a previous
 database notice only when the server has not already supplied one.
 
 Display is inserted directly before terminalToolsToggle. terminalSearch starts
-without the hidden class; initial rendering does not call focus on its input.
-Closing/reopening search and the existing key shortcuts remain available.
+hidden (owner rule: a button that reveals a row is a toggle that also closes it);
+the Find button (aria-expanded) and Ctrl+Shift+F open and close it, Escape in the
+row closes it, and initial rendering does not call focus on its input.
 
 Terminal highlight kinds add command, field, protocol, value, number and comment
 to the six existing roles. These keys are allowlisted in frontend/backend
