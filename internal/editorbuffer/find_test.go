@@ -212,6 +212,96 @@ func TestFindWindowInSelection(t *testing.T) {
 	}
 }
 
+// The end of a range searched In selection is not the end of the text: a
+// selection of lines two to four ends at the start of line five, and line
+// five is not part of it. ^, $, word edges and matches of empty text are as
+// in the whole document, and only matches that lie in the range count.
+func TestFindWindowInSelectionEndsWhereTheSelectionEnds(t *testing.T) {
+	text := "one\ntwo\nthree\nfour\nfive\n"
+	// Lines two to four, selected the usual way: [4, 19).
+	both(t, text, func(name string, s *Snapshot) {
+		for _, c := range []struct {
+			q    Search
+			want int64
+		}{
+			{Search{Query: `^`, Regex: true}, 3},
+			{Search{Query: `$`, Regex: true}, 3},
+			{Search{Query: `^\w+$`, Regex: true}, 3},
+			{Search{Query: `x*`, Regex: true}, 15},
+			{Search{Query: `e`, MatchCase: true}, 2},
+		} {
+			if n, err := s.Count(context.Background(), c.q, 4, 19, nil); err != nil || n != c.want {
+				t.Errorf("%s: %q in lines 2-4: %d %v, want %d", name, c.q.Query, n, err, c.want)
+			}
+		}
+		// Find Next at the end of the range wraps inside it: never line five.
+		m, err := s.FindNext(context.Background(), Search{Query: `^`, Regex: true}, 19, 4, 19, false, true)
+		if err != nil || !m.Found || m.From != 4 || !m.Wrapped {
+			t.Errorf("%s: ^ from the end of the range: %+v %v", name, m, err)
+		}
+		if m, _ = s.FindNext(context.Background(), Search{Query: `^`, Regex: true}, 4, 4, 19, true, true); m.From != 14 {
+			t.Errorf("%s: ^ backwards from the start of the range: %+v", name, m)
+		}
+	})
+	want := "one\n# two\n# three\n# four\nfive\n"
+	if got, n, err := ReplaceInText(context.Background(), text, Search{Query: `^`, Regex: true}, "# ", 4, 19, 1<<20); err != nil || n != 3 || got != want {
+		t.Errorf("page: Replace All ^ in lines 2-4: %d %v %q", n, err, got)
+	}
+	b := openTest(t, text)
+	s, _ := b.Snapshot()
+	r, err := s.ReplaceAllIn(context.Background(), Search{Query: `^`, Regex: true}, "# ", 4, 19, nil)
+	s.Close()
+	if err != nil || r.Count != 3 {
+		t.Fatal(r, err)
+	}
+	if _, err = r.Commit(); err != nil || textOf(t, b) != want {
+		t.Errorf("disk: Replace All ^ in lines 2-4: %v %q", err, textOf(t, b))
+	}
+	// A whole word at the edge of the range: "foo" of "foobar" is not one.
+	both(t, "foo foobar", func(name string, s *Snapshot) {
+		q := Search{Query: "foo", WholeWord: true, MatchCase: true}
+		if n, _ := s.Count(context.Background(), q, 0, 7, nil); n != 1 {
+			t.Errorf("%s: whole word foo in [0,7): %d", name, n)
+		}
+		if m, _ := s.FindNext(context.Background(), q, 3, 0, 7, false, true); m.From != 0 || !m.Wrapped {
+			t.Errorf("%s: Find Next stays on whole words: %+v", name, m)
+		}
+	})
+	if got, n, _ := ReplaceInText(context.Background(), "foo foobar", Search{Query: "foo", WholeWord: true, MatchCase: true}, "X", 0, 7, 1<<20); n != 1 || got != "X foobar" {
+		t.Errorf("whole word replaced part of a word: %d %q", n, got)
+	}
+	// The whole document still counts a match of empty text at its end.
+	both(t, text, func(name string, s *Snapshot) {
+		if n, _ := s.Count(context.Background(), Search{Query: `^`, Regex: true}, 0, -1, nil); n != 6 {
+			t.Errorf("%s: ^ in the whole document: %d", name, n)
+		}
+	})
+}
+
+// Find Next moves on from a match of empty text (^$ on an empty line, \d*),
+// forwards and backwards.
+func TestFindNextPassesMatchesOfEmptyText(t *testing.T) {
+	both(t, "a\n\nb\n\nc", func(name string, s *Snapshot) {
+		q := Search{Query: `^$`, Regex: true}
+		steps := []struct {
+			at        int64
+			backwards bool
+			want      int64
+			wrapped   bool
+		}{{0, false, 2, false}, {2, false, 5, false}, {5, false, 2, true}, {5, true, 2, false}, {2, true, 5, true}}
+		for _, step := range steps {
+			m, err := s.FindNext(context.Background(), q, step.at, 0, -1, step.backwards, true)
+			if err != nil || !m.Found || m.From != step.want || m.To != step.want || m.Wrapped != step.wrapped {
+				t.Errorf("%s: ^$ from %d (backwards %t): %+v %v", name, step.at, step.backwards, m, err)
+			}
+		}
+		m, _ := s.FindNext(context.Background(), Search{Query: `\d*`, Regex: true}, 0, 0, -1, false, true)
+		if m.From != 1 {
+			t.Errorf("%s: \\d* from 0: %+v", name, m)
+		}
+	})
+}
+
 // ". matches newline" and lines: ^ and $ are at every line.
 func TestFindWindowDotMatchesNewline(t *testing.T) {
 	text := "begin\nmiddle\nend\n"
@@ -284,16 +374,16 @@ func TestFindWindowMatchesOfAPage(t *testing.T) {
 	text := strings.Repeat("ab\n", 50000)
 	both(t, text, func(name string, s *Snapshot) {
 		q := Search{Query: "b", MatchCase: true}
-		hits, more, err := s.Matches(context.Background(), q, 300, 330, -1, 100)
+		hits, more, err := s.Matches(context.Background(), q, 300, 330, 0, -1, 100)
 		if err != nil || more || len(hits) != 10 || hits[0] != (Hit{From: 301, To: 302, Line: 100}) {
 			t.Fatalf("%s: %v %v %+v", name, err, more, hits)
 		}
-		hits, more, _ = s.Matches(context.Background(), q, 0, 150000, -1, 50)
+		hits, more, _ = s.Matches(context.Background(), q, 0, 150000, 0, -1, 50)
 		if !more || len(hits) != 50 {
 			t.Fatalf("%s: %d %v", name, len(hits), more)
 		}
 		// Marks of a range end where the range ends.
-		if hits, _, _ = s.Matches(context.Background(), q, 300, 330, 310, 100); len(hits) != 3 {
+		if hits, _, _ = s.Matches(context.Background(), q, 300, 330, 0, 310, 100); len(hits) != 3 {
 			t.Fatalf("%s: %+v", name, hits)
 		}
 	})

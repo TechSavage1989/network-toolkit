@@ -17,9 +17,11 @@ type searchCursor struct {
 	chunk    []byte
 	base     int64
 	at       int64
-	// limit is where reading stops, as if the document ended there (the end
-	// of a range searched "In selection"); -1 is the end of the document.
+	// limit is where reading stops, as if the document ended there (a
+	// window past a searched range, find.go within); -1 is the end of the
+	// document. cut records that reading reached it.
 	limit int64
+	cut   bool
 	err   error
 	// onRead, when set, is told the position of each piece the cursor reads
 	// (the progress of a long search).
@@ -30,6 +32,7 @@ type searchCursor struct {
 // limit when that comes first.
 func (c *searchCursor) current() ([]byte, error) {
 	if c.limit >= 0 && c.at >= c.limit {
+		c.cut = true
 		return nil, io.EOF
 	}
 	data, err := c.piece()
@@ -126,15 +129,21 @@ func (m *matchScan) next(at int64) (int64, int64, bool, error) {
 		return 0, 0, false, err
 	}
 	total := size(m.cursor.snapshot.root).bytes
-	if m.limit >= 0 && m.limit < total {
+	limited := m.limit >= 0 && m.limit < total
+	if limited {
 		total = m.limit
 	}
 	if at > total {
+		m.cursor.cut = limited
 		return 0, 0, false, nil
 	}
 	m.cursor.limit = m.limit
 	if len(m.literal) > 0 {
-		return m.nextLiteral(at, total)
+		// Plain text needs no context: only a search that ran into the limit
+		// without a match was cut short.
+		a, z, found, err := m.nextLiteral(at, total)
+		m.cursor.cut = limited && !found
+		return a, z, found, err
 	}
 	start, group, pattern := at, 0, m.pattern
 	if at > 0 {

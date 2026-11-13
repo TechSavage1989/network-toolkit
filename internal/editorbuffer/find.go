@@ -46,6 +46,56 @@ func TextSnapshot(text string) (*Snapshot, error) {
 	return &Snapshot{b: b, root: tree, Revision: 1}, nil
 }
 
+// scope is the searched part of a document, in bytes: a match counts when it
+// lies entirely in [lo, hi). A match is found as in the whole text, so ^, $,
+// word edges and anchors see the text around the range; a match that runs
+// past hi, or that starts at hi, is outside. The whole document (whole) also
+// counts a match of empty text at its very end.
+type scope struct {
+	lo, hi int64
+	whole  bool
+}
+
+func (s *Snapshot) scope(from, to int64) (scope, error) {
+	lo, hi, err := s.span(from, to)
+	return scope{lo, hi, to < 0}, err
+}
+
+// searchWindow is how far past the part that matters the text is read for
+// the context of a match before the search looks further (within).
+const searchWindow = 64 << 10
+
+// within is the first match at or after at that lies in sc and starts
+// before want (want <= sc.hi). The text after the range is read only as far
+// as the match needs: in steps from searchWindow, and again with more text
+// whenever the text past the window could have changed the match found.
+func (m *matchScan) within(at int64, sc scope, want int64) (int64, int64, bool, error) {
+	total := size(m.cursor.snapshot.root).bytes
+	for window := int64(searchWindow); ; window *= 8 {
+		m.limit = -1
+		if end := min(want, sc.hi) + window; end < total {
+			m.limit = end
+		}
+		m.cursor.cut = false
+		a, z, found, err := m.next(at)
+		m.limit = -1
+		if err != nil {
+			return 0, 0, false, err
+		}
+		if found && m.cursor.cut {
+			// The match was found in text that ends at the window; the rest
+			// of the document could make it another match.
+			continue
+		}
+		// Without a match in the window there is none in range either: every
+		// match that ends in the range is a match of the window's text.
+		if !found || z > sc.hi || a == sc.hi && !sc.whole || a >= want && want < sc.hi {
+			return 0, 0, false, nil
+		}
+		return a, z, true, nil
+	}
+}
+
 // span is a range in UTF-16 units as bytes; to < 0 is the end of the
 // document.
 func (s *Snapshot) span(from, to int64) (int64, int64, error) {
@@ -71,7 +121,6 @@ func (s *Snapshot) scanIn(ctx context.Context, q Search, lo, hi int64, progress 
 	if err != nil {
 		return nil, err
 	}
-	scan.limit = hi
 	if progress != nil && hi > lo {
 		scan.cursor.onRead = func(at int64) { progress(min(1, max(0, float64(at-lo)/float64(hi-lo)))) }
 	}
@@ -84,10 +133,11 @@ func (s *Snapshot) scanIn(ctx context.Context, q Search, lo, hi int64, progress 
 // reaches the end of the range goes on from its other end.
 func (s *Snapshot) FindNext(ctx context.Context, q Search, at, from, to int64, backwards, wrap bool) (Match, error) {
 	result := Match{Revision: s.Revision}
-	lo, hi, err := s.span(from, to)
+	sc, err := s.scope(from, to)
 	if err != nil {
 		return result, err
 	}
+	lo, hi := sc.lo, sc.hi
 	scan, err := s.scanIn(ctx, q, lo, hi, nil)
 	if err != nil {
 		return result, err
@@ -103,16 +153,19 @@ func (s *Snapshot) FindNext(ctx context.Context, q Search, at, from, to int64, b
 	var a, z int64
 	var found bool
 	if !backwards {
-		a, z, found, err = scan.next(position)
+		a, z, found, err = scan.forward(position, sc)
 		if err == nil && !found && wrap && position > lo {
-			a, z, found, err = scan.next(lo)
+			a, z, found, err = scan.within(lo, sc, sc.hi)
 			found = found && a < position
 			result.Wrapped = found
 		}
 	} else {
-		a, z, found, err = scan.last(lo, position)
+		// Matches that start before the position; a match of empty text at
+		// the position itself is the one already found.
+		a, z, found, err = scan.last(sc, position)
 		if err == nil && !found && wrap && position < hi {
-			a, z, found, err = scan.last(position, hi)
+			a, z, found, err = scan.last(sc, hi+1)
+			found = found && a >= position
 			result.Wrapped = found
 		}
 	}
@@ -131,30 +184,44 @@ func (s *Snapshot) FindNext(ctx context.Context, q Search, at, from, to int64, b
 	return result, err
 }
 
-// last is the last match that starts in [from, before).
-func (m *matchScan) last(from, before int64) (int64, int64, bool, error) {
-	var a, z int64
-	found := false
-	for at := from; at < before; {
-		x, y, ok, err := m.next(at)
-		if err != nil {
+// forward is the first match in sc at or after at, passing over a match of
+// empty text at at itself: Find Next from a match of empty text (^$ on an
+// empty line) moves on.
+func (m *matchScan) forward(at int64, sc scope) (int64, int64, bool, error) {
+	a, z, found, err := m.within(at, sc, sc.hi)
+	if err == nil && found && a == at && z == at {
+		var next int64
+		if next, err = m.after(a, z); err != nil || next > sc.hi {
 			return 0, 0, false, err
 		}
-		if !ok || x >= before {
-			break
-		}
-		a, z, found = x, y, true
-		if at, err = m.after(x, y); err != nil {
-			return 0, 0, false, err
-		}
+		return m.within(next, sc, sc.hi)
 	}
-	return a, z, found, nil
+	return a, z, found, err
 }
 
-// each passes every match in [lo, hi) to fn, in order.
-func (m *matchScan) each(lo, hi int64, fn func(a, z int64) error) error {
-	for at := lo; at <= hi; {
-		a, z, found, err := m.next(at)
+// last is the last match in sc that starts before before.
+func (m *matchScan) last(sc scope, before int64) (int64, int64, bool, error) {
+	var a, z int64
+	found := false
+	err := m.each(sc, func(x, y int64) error {
+		if x >= before {
+			return errStop
+		}
+		a, z, found = x, y, true
+		return nil
+	})
+	if err == errStop {
+		err = nil
+	}
+	return a, z, found, err
+}
+
+var errStop = errors.New("stop")
+
+// each passes every match in sc to fn, in order.
+func (m *matchScan) each(sc scope, fn func(a, z int64) error) error {
+	for at := sc.lo; at <= sc.hi; {
+		a, z, found, err := m.within(at, sc, sc.hi)
 		if err != nil || !found {
 			return err
 		}
@@ -170,16 +237,16 @@ func (m *matchScan) each(lo, hi int64, fn func(a, z int64) error) error {
 
 // Count is the number of matches in [from, to).
 func (s *Snapshot) Count(ctx context.Context, q Search, from, to int64, progress func(float64)) (int64, error) {
-	lo, hi, err := s.span(from, to)
+	sc, err := s.scope(from, to)
 	if err != nil {
 		return 0, err
 	}
-	scan, err := s.scanIn(ctx, q, lo, hi, progress)
+	scan, err := s.scanIn(ctx, q, sc.lo, sc.hi, progress)
 	if err != nil {
 		return 0, err
 	}
 	var count int64
-	err = scan.each(lo, hi, func(int64, int64) error { count++; return nil })
+	err = scan.each(sc, func(int64, int64) error { count++; return nil })
 	return count, err
 }
 
@@ -190,32 +257,37 @@ type Hit struct {
 	Line int64 `json:"line"`
 }
 
-// Matches lists the matches that start in [from, to): the marks of the
-// part of a document that is shown. A match is read to at most 64 KiB past
-// to (and never past limit, the end of the marked range; limit < 0 is the
-// end of the document), so a page of a huge file never searches the rest of
-// it. At most max matches are listed; more says there were others.
-func (s *Snapshot) Matches(ctx context.Context, q Search, from, to, limit int64, max int) ([]Hit, bool, error) {
+// Matches lists the matches that start in [from, to) and lie in the marked
+// range [scopeFrom, scopeTo) (scopeTo < 0: the whole document): the marks
+// of the part of a document that is shown. The text past to is read only as
+// far as a match needs (within), so a page of a huge file never searches
+// the rest of it. At most max matches are listed; more says there were
+// others.
+func (s *Snapshot) Matches(ctx context.Context, q Search, from, to, scopeFrom, scopeTo int64, most int) ([]Hit, bool, error) {
 	units := size(s.root).units
-	if limit < 0 || limit > units {
-		limit = units
+	if scopeTo > units {
+		scopeTo = units
 	}
-	if to > limit {
-		to = limit
+	scopeFrom = min(max(scopeFrom, 0), units)
+	if scopeTo >= 0 && scopeFrom > scopeTo {
+		scopeFrom = scopeTo
 	}
-	if from > to {
-		from = to
+	sc, err := s.scope(scopeFrom, scopeTo)
+	if err != nil {
+		return nil, false, err
 	}
+	to = min(max(to, 0), units)
+	from = min(max(from, 0), to)
 	lo, end, err := s.span(from, to)
 	if err != nil {
 		return nil, false, err
 	}
-	_, hi, err := s.span(0, limit)
-	if err != nil {
-		return nil, false, err
+	lo, end = max(lo, sc.lo), min(end, sc.hi)
+	if end < lo {
+		return nil, false, nil
 	}
-	hi = min(hi, end+64<<10)
-	scan, err := s.scanIn(ctx, q, lo, hi, nil)
+	sc.lo = lo
+	scan, err := s.scanIn(ctx, q, lo, end, nil)
 	if err != nil {
 		return nil, false, err
 	}
@@ -223,11 +295,11 @@ func (s *Snapshot) Matches(ctx context.Context, q Search, from, to, limit int64,
 	var hits []Hit
 	more := false
 	stop := errors.New("stop")
-	err = scan.each(lo, hi, func(a, z int64) error {
-		if a >= end {
+	err = scan.each(sc, func(a, z int64) error {
+		if a >= end && !(a == end && end == sc.hi && sc.whole) {
 			return stop
 		}
-		if len(hits) >= max {
+		if len(hits) >= most {
 			more = true
 			return stop
 		}
@@ -252,11 +324,12 @@ func (s *Snapshot) Matches(ctx context.Context, q Search, from, to, limit int64,
 // (Mark All with "Bookmark line"), at most maxLines of them; more says that
 // other lines had matches too.
 func (s *Snapshot) Mark(ctx context.Context, q Search, from, to int64, maxLines int, progress func(float64)) (int64, []int64, bool, error) {
-	lo, hi, err := s.span(from, to)
+	sc, err := s.scope(from, to)
 	if err != nil {
 		return 0, nil, false, err
 	}
-	scan, err := s.scanIn(ctx, q, lo, hi, progress)
+	lo := sc.lo
+	scan, err := s.scanIn(ctx, q, sc.lo, sc.hi, progress)
 	if err != nil {
 		return 0, nil, false, err
 	}
@@ -267,7 +340,7 @@ func (s *Snapshot) Mark(ctx context.Context, q Search, from, to int64, maxLines 
 	if maxLines > 0 {
 		track = s.tracker(lo)
 	}
-	err = scan.each(lo, hi, func(a, z int64) error {
+	err = scan.each(sc, func(a, z int64) error {
 		count++
 		if track == nil || more {
 			return nil
@@ -291,17 +364,18 @@ func (s *Snapshot) Mark(ctx context.Context, q Search, from, to int64, maxLines 
 // other with sep between them (Copy Marked Text). It is refused when it
 // would be longer than max bytes.
 func (s *Snapshot) MatchedText(ctx context.Context, q Search, from, to int64, sep string, max int64) (string, int64, error) {
-	lo, hi, err := s.span(from, to)
+	sc, err := s.scope(from, to)
 	if err != nil {
 		return "", 0, err
 	}
+	lo, hi := sc.lo, sc.hi
 	scan, err := s.scanIn(ctx, q, lo, hi, nil)
 	if err != nil {
 		return "", 0, err
 	}
 	var out []byte
 	var count int64
-	err = scan.each(lo, hi, func(a, z int64) error {
+	err = scan.each(sc, func(a, z int64) error {
 		if count > 0 {
 			out = append(out, sep...)
 		}
@@ -348,10 +422,11 @@ const (
 // FindAll passes each row of the matches in [from, to) to add, in order,
 // and returns the number of matches.
 func (s *Snapshot) FindAll(ctx context.Context, q Search, from, to int64, add func(Row) error, progress func(float64)) (int64, error) {
-	lo, hi, err := s.span(from, to)
+	sc, err := s.scope(from, to)
 	if err != nil {
 		return 0, err
 	}
+	lo, hi := sc.lo, sc.hi
 	scan, err := s.scanIn(ctx, q, lo, hi, progress)
 	if err != nil {
 		return 0, err
@@ -375,7 +450,7 @@ func (s *Snapshot) FindAll(ctx context.Context, q Search, from, to int64, add fu
 		row = nil
 		return add(r)
 	}
-	err = scan.each(lo, hi, func(a, z int64) error {
+	err = scan.each(sc, func(a, z int64) error {
 		if err := track.advance(a); err != nil {
 			return err
 		}
@@ -638,10 +713,11 @@ func ReplaceInText(ctx context.Context, text string, q Search, replacement strin
 		return "", 0, err
 	}
 	defer s.Close()
-	lo, hi, err := s.span(from, to)
+	sc, err := s.scope(from, to)
 	if err != nil {
 		return "", 0, err
 	}
+	lo, hi := sc.lo, sc.hi
 	scan, err := s.scanIn(ctx, q, lo, hi, nil)
 	if err != nil {
 		return "", 0, err
@@ -655,7 +731,7 @@ func ReplaceInText(ctx context.Context, text string, q Search, replacement strin
 	data := s.b.mem
 	var out strings.Builder
 	var pos, count int64
-	err = scan.each(lo, hi, func(a, z int64) error {
+	err = scan.each(sc, func(a, z int64) error {
 		out.Write(data[pos:a])
 		if parts == nil {
 			out.WriteString(replacement)

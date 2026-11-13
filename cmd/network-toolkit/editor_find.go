@@ -390,7 +390,7 @@ func (m *editorViewRegistry) findInText(ctx context.Context, caller string, req 
 		if req.Limit > 0 && req.Limit < limit {
 			limit = req.Limit
 		}
-		hits, more, err := s.Matches(ctx, req.Search, req.From, req.To, to, limit)
+		hits, more, err := s.Matches(ctx, req.Search, req.From, req.To, from, to, limit)
 		return map[string]any{"hits": hits, "more": more}, err
 	case "replace":
 		s.Close()
@@ -448,7 +448,7 @@ func (m *editorViewRegistry) findDisk(ctx context.Context, caller string, d *edi
 			return nil, err
 		}
 		defer s.Close()
-		hits, more, err := s.Matches(ctx, q, req.From, req.To, to, editorFindMatches)
+		hits, more, err := s.Matches(ctx, q, req.From, req.To, from, to, editorFindMatches)
 		return map[string]any{"hits": hits, "more": more, "revision": s.Revision}, err
 	}
 	// find-start

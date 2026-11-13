@@ -74,10 +74,11 @@ func (s *Snapshot) ReplaceAllIn(ctx context.Context, q Search, replacement strin
 	if err := validateEditFragment(replacement); err != nil {
 		return nil, err
 	}
-	lo, hi, err := s.span(from, to)
+	sc, err := s.scope(from, to)
 	if err != nil {
 		return nil, err
 	}
+	lo, hi := sc.lo, sc.hi
 	scan, err := s.scanIn(ctx, q, lo, hi, progress)
 	if err != nil {
 		return nil, err
@@ -230,7 +231,7 @@ func (s *Snapshot) ReplaceAllIn(ctx context.Context, q Search, replacement strin
 	}
 	total := size(s.root).bytes
 	for at := lo; at <= hi; {
-		from, to, found, err := scan.next(at)
+		from, to, found, err := scan.within(at, sc, hi)
 		if err != nil {
 			return nil, err
 		}
