@@ -1,3 +1,7 @@
+## 1.21.53 Beta 1 - Wrapped long lines scroll all the way through
+
+- In a large document with Wrap on, the vertical bar follows the position in the whole text and scrolling continues through very long lines; selections continue across loaded pages and the status bar shows the selection size.
+
 ## 1.21.52 Beta 1 - The document icon through Open with entries
 
 - `Applications\Network_Toolkit.exe` gives files the document icon (its verb keeps the program icon), and Windows' own `Applications\Network_Toolkit_TextEditor.exe` entry gets the document icon, recorded and removed on uninstall.

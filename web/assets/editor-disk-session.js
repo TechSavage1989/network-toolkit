@@ -307,6 +307,19 @@ function create({request, exportRange, changed = () => {}, failed = () => {}, id
   return promise;
  }
 
+ // Read a window without showing it, for example to choose where the next
+ // page starts. Returns null when the document changed during the read.
+ async function peek(target, limit = PAGE_UNITS, signal) {
+  await flush();
+  ensure();
+  const revision = metadata.revision;
+  const value = await request('window', {...target, limit, align: true}, signal);
+  ensure();
+  if (value.loading || hasChanges() || value.revision !== revision || metadata.revision !== revision ||
+      typeof value.text !== 'string' || !Number.isSafeInteger(value.start)) return null;
+  return {start: value.start, line: value.line, column: value.column || 0, lineUnits: value.lineUnits || 0, text: value.text};
+ }
+
  async function previewWindow(line, signal) {
   await flush();
   ensure();
@@ -463,7 +476,7 @@ function create({request, exportRange, changed = () => {}, failed = () => {}, id
  }
 
  return Object.freeze({
-  change, flush, load, prefetch, previewWindow, replace, history, readParts, readText, readBlob, find, save, reload,
+  change, flush, load, prefetch, peek, previewWindow, replace, history, readParts, readText, readBlob, find, save, reload,
   cancelRead,
   initialize(value) { ensure(); receive(value); notify(); },
   state,

@@ -58,14 +58,14 @@ APP_GROUP = 'APP'
 
 
 def version_info(description=PROGRAMS[0][1], original=PROGRAMS[0][2]):
-    fixed = struct.pack('<13I', 0xFEEF04BD, 0x00010000, 0x00010015, 0x00340000, 0x00010015, 0x00340000, 0x3F, 0, 0x40004, 1, 0, 0, 0)
+    fixed = struct.pack('<13I', 0xFEEF04BD, 0x00010000, 0x00010015, 0x00350000, 0x00010015, 0x00350000, 0x3F, 0, 0x40004, 1, 0, 0, 0)
     strings = {
         'FileDescription': description,
-        'FileVersion': '1.21.52.0',
+        'FileVersion': '1.21.53.0',
         'InternalName': 'NetworkToolkit',
         'OriginalFilename': original,
         'ProductName': 'Network Toolkit',
-        'ProductVersion': '1.21.52',
+        'ProductVersion': '1.21.53',
     }
     table = version_block('040904B0', children=[version_block(k, utf16(v), text=True) for k, v in strings.items()], text=True)
     string_info = version_block('StringFileInfo', children=[table], text=True)
