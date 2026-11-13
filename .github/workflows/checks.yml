@@ -1139,6 +1139,13 @@ jobs:
           NTK_APP_EXECUTABLE: ${{ runner.temp }}/Network_Toolkit_UI_Test
           NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-browser-results
         run: node scripts/terminal-selection-live.cjs
+      - name: Check the Terminal sidebar rail toggle, divider, macro tabs and saved layout through a real reload
+        if: success() || failure()
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/ntk-browser-tests/node_modules/playwright
+          NTK_APP_EXECUTABLE: ${{ runner.temp }}/Network_Toolkit_UI_Test
+          NTK_BROWSER_OUTPUT_DIR: ${{ runner.temp }}/ntk-browser-results/terminal-sidebar-layout
+        run: node scripts/terminal-sidebar-layout-live.cjs
       - name: Check Hosts editor interactions and responsive layouts
         if: success() || failure()
         env:
