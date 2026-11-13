@@ -270,7 +270,7 @@ func Run(ctx context.Context, cfg Config) error {
 	w := &hostWindow{
 		ctx: ctx, cfg: cfg, state: saved, initializing: true,
 		statusTitle: cfg.Title,
-		startup:     startupGate{deadline: time.Now().Add(45 * time.Second)},
+		startup:     startupGate{deadline: time.Now().Add(StartupLimit)},
 	}
 	token := uintptr(wndNextToken.Add(1))
 	wndPending.Store(token, w)

@@ -1,7 +1,17 @@
 // Package desktop hosts the local application in a native Windows WebView2 window.
 package desktop
 
-import "context"
+import (
+	"context"
+	"time"
+)
+
+// StartupLimit is how long a window's page has to finish starting (WebView2
+// environment, navigation and the page's own setup) before the window shows a
+// startup error. A hosted or freshly booted machine can take most of it, so
+// anything that waits for a newly started window (an editor move to a new
+// window) waits this long, not less.
+const StartupLimit = 45 * time.Second
 
 // Linked group icon resource IDs (ICON_GROUPS in scripts/build_windows_resources.py).
 // Windows numbers them from zero in this order, so Setup's "Network_Toolkit.exe",N

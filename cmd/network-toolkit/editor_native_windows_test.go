@@ -99,7 +99,19 @@ func TestNativeEditorTransferInstalledWebView2(t *testing.T) {
 	if err := os.MkdirAll(output, 0700); err != nil {
 		t.Fatal(err)
 	}
-	h := &nativeEditorFixture{ctx: ctx, app: a, root: root, executable: executable, output: output, driver: driver, queues: map[string]chan nativeEditorCommand{}, replies: map[uint64]chan nativeEditorReply{}, tokens: map[string]string{}, children: map[string]*nativeEditorChild{}}
+	h := &nativeEditorFixture{ctx: ctx, app: a, root: root, executable: executable, output: output, driver: driver, queues: map[string]chan nativeEditorCommand{}, replies: map[uint64]chan nativeEditorReply{}, tokens: map[string]string{}, children: map[string]*nativeEditorChild{}, pages: map[string]*nativeEditorPage{}}
+	// The exercise runs in a goroutine that can outlive a failed test; t.Logf
+	// must not be called after the test function returned.
+	var logMu sync.Mutex
+	logOpen := true
+	defer func() { logMu.Lock(); logOpen = false; logMu.Unlock() }()
+	h.logf = func(format string, args ...any) {
+		logMu.Lock()
+		defer logMu.Unlock()
+		if logOpen {
+			t.Logf(format, args...)
+		}
+	}
 	a.launchEditorView = h.launch
 	server := httptest.NewServer(http.HandlerFunc(h.serve))
 	defer server.Close()
@@ -232,6 +244,14 @@ type nativeEditorChild struct {
 	done    chan struct{}
 	err     error
 }
+
+// nativeEditorPage: a window's page has started once its driver first asks for
+// work (kind "next"); fatal is the driver's startup failure, if it sent one.
+type nativeEditorPage struct {
+	ready chan struct{}
+	once  sync.Once
+	fatal string
+}
 type nativeEditorFixture struct {
 	ctx                       context.Context
 	app                       *application
@@ -254,6 +274,77 @@ type nativeEditorFixture struct {
 	gestures                  []json.RawMessage
 	brokerTrace128            []map[string]any
 	finalTrace128             []map[string]any
+	pages                     map[string]*nativeEditorPage
+	pageStarts                []map[string]any
+	logf                      func(string, ...any)
+}
+
+func (h *nativeEditorFixture) page(view string) *nativeEditorPage {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	// Other native tests build this fixture without pages.
+	if h.pages == nil {
+		h.pages = map[string]*nativeEditorPage{}
+	}
+	if h.pages[view] == nil {
+		h.pages[view] = &nativeEditorPage{ready: make(chan struct{})}
+	}
+	return h.pages[view]
+}
+
+// awaitPage waits for the precondition of every command: the window's page
+// has started and its driver asks for work. A window the test just opened is
+// given the product's own limit for that (editorViewOpenLimit: its process
+// plus desktop.StartupLimit for WebView2 and the page), the same time the move
+// that opened it waits before failing. The wait ends at once when the window
+// exits or its driver reports a startup failure. Never a fixed sleep: a cold
+// hosted runner has taken more than 20 s to start a child window.
+func (h *nativeEditorFixture) awaitPage(view string) error {
+	page := h.page(view)
+	select {
+	case <-page.ready:
+		return nil
+	default:
+	}
+	started := time.Now()
+	limit := time.NewTimer(editorViewOpenLimit)
+	defer limit.Stop()
+	check := time.NewTicker(50 * time.Millisecond)
+	defer check.Stop()
+	for {
+		select {
+		case <-page.ready:
+			elapsed := time.Since(started)
+			h.mu.Lock()
+			h.pageStarts = append(h.pageStarts, map[string]any{"main": view == "", "waitedMs": elapsed.Milliseconds()})
+			h.mu.Unlock()
+			if h.logf != nil && view != "" {
+				h.logf("editor window %.8s: page started after %s", view, elapsed.Round(time.Millisecond))
+			}
+			return nil
+		case <-limit.C:
+			h.mu.Lock()
+			failures := append([]string{}, h.failures...)
+			h.mu.Unlock()
+			return fmt.Errorf("native %q page did not start within %s (the move's own open limit); driver failures: %v", view, editorViewOpenLimit, failures)
+		case <-h.ctx.Done():
+			return h.ctx.Err()
+		case <-check.C:
+			h.mu.Lock()
+			child, fatal := h.children[view], page.fatal
+			h.mu.Unlock()
+			if fatal != "" {
+				return fmt.Errorf("native %q page failed to start: %s", view, fatal)
+			}
+			if child != nil {
+				select {
+				case <-child.done:
+					return fmt.Errorf("native %q window exited before its page started: %v", view, child.err)
+				default:
+				}
+			}
+		}
+	}
 }
 
 func (h *nativeEditorFixture) queue(view string) chan nativeEditorCommand {
@@ -355,6 +446,8 @@ func (h *nativeEditorFixture) automation(w http.ResponseWriter, r *http.Request)
 	}
 	switch reply.Kind {
 	case "next":
+		page := h.page(view)
+		page.once.Do(func() { close(page.ready) })
 		select {
 		case command := <-h.queue(view):
 			jsonResponse(w, 200, command)
@@ -375,8 +468,12 @@ func (h *nativeEditorFixture) automation(w http.ResponseWriter, r *http.Request)
 		}
 		jsonResponse(w, 200, map[string]any{})
 	case "fatal":
+		page := h.page(view)
 		h.mu.Lock()
 		h.failures = append(h.failures, view+": "+reply.Error)
+		if page.fatal == "" {
+			page.fatal = reply.Error
+		}
 		h.mu.Unlock()
 		jsonResponse(w, 200, map[string]any{})
 	default:
@@ -419,6 +516,11 @@ func (h *nativeEditorFixture) launch(ctx context.Context, launch editorViewLaunc
 }
 
 func (h *nativeEditorFixture) command(view string, command nativeEditorCommand) (nativeEditorSnapshot, error) {
+	// The 35 s below is for running a command on a started page, not for
+	// starting the window.
+	if err := h.awaitPage(view); err != nil {
+		return nativeEditorSnapshot{}, fmt.Errorf("command %s: %w", command.Action, err)
+	}
 	command.ID = h.sequence.Add(1)
 	channel := make(chan nativeEditorReply, 1)
 	h.mu.Lock()
@@ -454,8 +556,12 @@ func (h *nativeEditorFixture) command(view string, command nativeEditorCommand) 
 }
 
 func (h *nativeEditorFixture) waitState(view, description string, predicate func(nativeEditorSnapshot) bool) (nativeEditorSnapshot, error) {
-	deadline := time.Now().Add(18 * time.Second)
 	var state nativeEditorSnapshot
+	// The 18 s is for the state change, counted once the page has started.
+	if err := h.awaitPage(view); err != nil {
+		return state, fmt.Errorf("%s: %w", description, err)
+	}
+	deadline := time.Now().Add(18 * time.Second)
 	for time.Now().Before(deadline) {
 		var err error
 		state, err = h.command(view, nativeEditorCommand{Action: "snapshot"})
@@ -817,7 +923,7 @@ func (h *nativeEditorFixture) exercise() error {
 func (h *nativeEditorFixture) writeReport(err error) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	report := map[string]any{"diagnostic128Broker": h.brokerTrace128, "diagnostic128Views": h.finalTrace128, "passed": err == nil, "actualTabPointerDrags": h.dragComplete, "pointerDragCount": h.pointerDrags.Load(), "tabGestureEvidence": h.gestures, "tabGestureScope": "Win32 mouse input into actual installed WebView2; DOM fixture creates synthetic text and observes state, never dispatches drag events", "actualNativeWebView2": true, "productionChildCLI": true, "realApplicationBackendAndRegistry": true, "productionAuthenticationAndOriginChecks": true, "testOnlyDOMAutomation": true, "productionBridgeChanges": false, "syntheticUnsavedDocumentsOnly": true, "scope": "Real parent native host and separately built production --editor-view children; fixture chooses child executable and decorates test HTTP document with DOM automation only; no main CLI/storage lifecycle assertion", "closePreference113": h.closePreferenceComplete, "phases": h.phases, "nativeCaptures": h.captures, "childProcesses": len(h.children), "realFailedLaunches": h.failedLaunches.Load(), "blockedUnexpectedOperations": h.blocked, "driverFailures": h.failures}
+	report := map[string]any{"diagnostic128Broker": h.brokerTrace128, "diagnostic128Views": h.finalTrace128, "passed": err == nil, "actualTabPointerDrags": h.dragComplete, "pointerDragCount": h.pointerDrags.Load(), "tabGestureEvidence": h.gestures, "tabGestureScope": "Win32 mouse input into actual installed WebView2; DOM fixture creates synthetic text and observes state, never dispatches drag events", "actualNativeWebView2": true, "productionChildCLI": true, "realApplicationBackendAndRegistry": true, "productionAuthenticationAndOriginChecks": true, "testOnlyDOMAutomation": true, "productionBridgeChanges": false, "syntheticUnsavedDocumentsOnly": true, "scope": "Real parent native host and separately built production --editor-view children; fixture chooses child executable and decorates test HTTP document with DOM automation only; no main CLI/storage lifecycle assertion", "closePreference113": h.closePreferenceComplete, "phases": h.phases, "nativeCaptures": h.captures, "childProcesses": len(h.children), "realFailedLaunches": h.failedLaunches.Load(), "blockedUnexpectedOperations": h.blocked, "driverFailures": h.failures, "pageStarts": h.pageStarts}
 	if err != nil {
 		report["error"] = err.Error()
 	}
@@ -1132,12 +1238,19 @@ func (h *nativeEditorFixture) collectDiagnostics128() {
 	}
 	h.mu.Unlock()
 	for _, view := range views {
-		s, err := h.command(view, nativeEditorCommand{Action: "snapshot"})
 		kind := "child"
 		if view == "" {
 			kind = "main"
 		}
-		row := map[string]any{"view": kind, "snapshotAvailable": err == nil}
+		select {
+		case <-h.page(view).ready:
+		default:
+			// Its page never started: there is no driver to ask.
+			h.finalTrace128 = append(h.finalTrace128, map[string]any{"view": kind, "pageStarted": false, "snapshotAvailable": false})
+			continue
+		}
+		s, err := h.command(view, nativeEditorCommand{Action: "snapshot"})
+		row := map[string]any{"view": kind, "pageStarted": true, "snapshotAvailable": err == nil}
 		if err == nil {
 			row["events"] = s.Diagnostic
 			row["documentCount"] = len(s.Documents)

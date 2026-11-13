@@ -95,6 +95,14 @@ func (h *nativeEditorFixture) exercisePerformance114() (failure error) {
 				}
 				child = target
 			}
+			// The precondition of the acknowledgement is the new window's page
+			// having started (bounded by the move's own open limit). Count the
+			// ownership deadline from there; elapsed above still measures from
+			// the button, window start included.
+			if err := h.awaitPage(target); err != nil {
+				return fmt.Errorf("native %s: %w", direction, err)
+			}
+			deadline = time.Now().Add(30 * time.Second)
 			for {
 				state, err := h.command(target, nativeEditorCommand{Action: "performance-state"})
 				if err != nil {
