@@ -156,6 +156,13 @@ async function main(){
  await page.locator('.transfer-activity-splitter').dblclick();
  assert.equal(await page.evaluate(()=>state.transferServerSidebar.sftp.activityHeight),0);
  if(out)await page.screenshot({path:path.join(out,'sftp-server-activity.png')});
+ // Owner rule: Browse local folder is a toggle for its folder list in the copy dialog.
+ await page.evaluate(()=>window.NetworkToolkitTransfers.fileAction('sftp','download','config-0.txt'));
+ {const browse=page.locator('.modal [data-transfer-local-picker]'),picker=page.locator('#transferLocalPicker');assert.equal(await browse.getAttribute('aria-expanded'),'false');assert.equal(await picker.isVisible(),false);
+  await browse.click();await picker.locator('[data-transfer-local-directory]').waitFor();assert.equal(await browse.getAttribute('aria-expanded'),'true');
+  await browse.click();assert.equal(await picker.isVisible(),false);assert.equal(await browse.getAttribute('aria-expanded'),'false');
+  await browse.click();await picker.locator('[data-transfer-local-directory]').click();assert.equal(await picker.isVisible(),false);assert.equal(await browse.getAttribute('aria-expanded'),'false');assert.match(await page.locator('#transferActionLocal').inputValue(),/config-0\.txt$/);
+  await page.locator('.modal [data-action="close-modal"]').first().click();}
  assert.deepEqual(errors,[]);
  const summary={passed:true,renderedCases:results.length,selectedTabCases:tabCases.length,selectedTabStyleParity:true,selectedTabHoverAndFocus:true,serverSidebarToggle:true,adapterSelection:true,pointerAndKeyboardResize:true,reloadPersistence:true,viewportRecovery:true,errors,results};
  if(out)fs.writeFileSync(path.join(out,'server-layout-results.json'),JSON.stringify(summary,null,2));
