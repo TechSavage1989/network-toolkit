@@ -286,13 +286,20 @@ async function verifyLongLineWrap(page,editor){
    await page.mouse.dblclick(box.x+box.width/2,box.y+box.height*.8);
    const chosen=await editor.evaluate(ta=>ta.value.slice(ta.selectionStart,ta.selectionEnd));
    if(chosen==='FIXTURE_0850'){attempts.push({attempt,ok:true});continue;}
+   // A browser may apply the double-click's word selection after the mouse
+   // events have been delivered: wait for it before calling it lost.
+   if(await page.waitForFunction(()=>{const ta=document.querySelector('textarea');return ta.value.slice(ta.selectionStart,ta.selectionEnd)==='FIXTURE_0850';},null,{timeout:2000}).then(()=>true,()=>false)){
+    attempts.push({attempt,ok:true,late:true,first:chosen,log:await page.evaluate(()=>selectionLog.slice())});continue;
+   }
    attempts.push({attempt,chosen,box,later:await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(()=>{
     const ta=document.querySelector('textarea'),rect=ta.getBoundingClientRect();
     done({chosen:ta.value.slice(ta.selectionStart,ta.selectionEnd),readOnly:ta.readOnly,rect:[rect.x,rect.y,rect.width,rect.height],
      classes:ta.className,syntaxHidden:document.querySelector('.nt-editor-disk-highlight')?.hidden,log:selectionLog.slice()});
    }))))});
   }
-  const failed=attempts.filter(item=>!item.ok);
+  const failed=attempts.filter(item=>!item.ok),late=attempts.filter(item=>item.late);
+  report.doubleClick={attempts:attempts.length,late:late.length,failed:failed.length};
+  if(late.length)console.log('DOUBLE-CLICK LATE SELECTION '+JSON.stringify(late.slice(0,2)));
   if(failed.length)console.error('DOUBLE-CLICK DIAGNOSTICS '+JSON.stringify(failed));
   assert.equal(failed.length,0,'a double-clicked word was not selected in '+failed.length+' of '+attempts.length+' attempts');
 
