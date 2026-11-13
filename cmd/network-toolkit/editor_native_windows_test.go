@@ -282,6 +282,10 @@ type nativeEditorFixture struct {
 func (h *nativeEditorFixture) page(view string) *nativeEditorPage {
 	h.mu.Lock()
 	defer h.mu.Unlock()
+	// Other native tests build this fixture without pages.
+	if h.pages == nil {
+		h.pages = map[string]*nativeEditorPage{}
+	}
 	if h.pages[view] == nil {
 		h.pages[view] = &nativeEditorPage{ready: make(chan struct{})}
 	}
