@@ -43,8 +43,11 @@ const (
 	editorBookmarkLimit = 100000
 	// editorFindPageRows is the most rows of a Find All read at once.
 	editorFindPageRows = 500
-	// editorFindMatches is the most marks of a shown page.
-	editorFindMatches = 20000
+	// editorFindMatches is the most marks of a shown page of a disk-backed
+	// document; editorFindPageMatches of a page-held document, which the
+	// page marks whole.
+	editorFindMatches     = 20000
+	editorFindPageMatches = 250000
 )
 
 type editorFind struct {
@@ -371,7 +374,11 @@ func (m *editorViewRegistry) findInText(ctx context.Context, caller string, req 
 		return s.FindNext(ctx, req.Search, req.At, from, to, req.Backwards, req.Wrap)
 	case "matches":
 		defer s.Close()
-		hits, more, err := s.Matches(ctx, req.Search, req.From, req.To, to, editorFindMatches)
+		limit := editorFindPageMatches
+		if req.Limit > 0 && req.Limit < limit {
+			limit = req.Limit
+		}
+		hits, more, err := s.Matches(ctx, req.Search, req.From, req.To, to, limit)
 		return map[string]any{"hits": hits, "more": more}, err
 	case "replace":
 		s.Close()

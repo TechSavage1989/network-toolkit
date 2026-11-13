@@ -42,7 +42,7 @@ const createIdentity = () => Array.from(
  n => n.toString(16).padStart(2, '0')
 ).join('');
 
-function create({request, exportRange, changed = () => {}, failed = () => {}, identity = createIdentity}) {
+function create({request, exportRange, changed = () => {}, failed = () => {}, edited = () => {}, identity = createIdentity}) {
  let metadata = {revision: 0, units: 0, bytes: 0, lines: 1, dirty: false, canUndo: false, canRedo: false};
  let page = emptyPage();
  let acknowledged = '', pageLines = 0, acknowledgedLines = 0;
@@ -198,6 +198,9 @@ function create({request, exportRange, changed = () => {}, failed = () => {}, id
    install(value);
    external = null;
    notify();
+   // An edit elsewhere than the page, Undo or Redo: where lines moved is
+   // not known here (bookmarks keep their lines, within the document).
+   edited({bulk: true, lines: metadata.lines});
   }
   while (retry || page.text !== acknowledged) {
    ensure();
@@ -206,6 +209,12 @@ function create({request, exportRange, changed = () => {}, failed = () => {}, id
     retry = {
      sent: page.text,
      lines: pageLines,
+     // The lines of the edit, for whoever follows lines (bookmarks).
+     edit: {
+      line: page.line + countLines(acknowledged.slice(0, edit.from)),
+      removed: countLines(acknowledged.slice(edit.from, edit.to)),
+      inserted: countLines(edit.text)
+     },
      payload: {
       action: 'edit', requestId: identity(), revision: metadata.revision,
       from: page.start + edit.from, to: page.start + edit.to, text: edit.text
@@ -222,6 +231,7 @@ function create({request, exportRange, changed = () => {}, failed = () => {}, id
    failure = null;
    clearCache();
    notify();
+   if (sent.edit) edited(sent.edit);
   }
  }
 

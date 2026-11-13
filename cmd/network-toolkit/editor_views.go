@@ -107,6 +107,15 @@ type editorPreferences struct {
 	Palette                   string            `json:"palette"`
 	AppTheme                  string            `json:"appTheme,omitempty"`
 	Colors                    map[string]string `json:"colors"`
+	// FindTransparency is the Find window's Transparency setting
+	// (editor-find.js): on, "blur" (on losing focus) or "always", and the
+	// opacity in percent.
+	FindTransparency *editorFindTransparency `json:"findTransparency,omitempty"`
+}
+type editorFindTransparency struct {
+	Enabled bool   `json:"enabled"`
+	Mode    string `json:"mode"`
+	Level   int    `json:"level"`
 }
 type editorBatch struct {
 	Documents   []editorDocumentSnapshot `json:"documents"`
@@ -419,6 +428,9 @@ func validateEditorBatch(batch editorBatch) error {
 		default:
 			return errors.New("Invalid editor palette.")
 		}
+		if f := p.FindTransparency; f != nil && (f.Mode != "blur" && f.Mode != "always" || f.Level < 20 || f.Level > 95) {
+			return errors.New("Invalid Find window transparency.")
+		}
 		allowed := map[string]bool{"bg": true, "fg": true, "comment": true, "string": true, "keyword": true, "number": true, "property": true}
 		for k, v := range p.Colors {
 			if !allowed[k] || !regexp.MustCompile(`^#[0-9a-fA-F]{6}$`).MatchString(v) {
@@ -583,6 +595,10 @@ func editorCloneBatch(b editorBatch) editorBatch {
 	}
 	if b.Preferences != nil {
 		v := *b.Preferences
+		if b.Preferences.FindTransparency != nil {
+			f := *b.Preferences.FindTransparency
+			v.FindTransparency = &f
+		}
 		if b.Preferences.Colors != nil {
 			v.Colors = make(map[string]string, len(b.Preferences.Colors))
 			for k, c := range b.Preferences.Colors {
