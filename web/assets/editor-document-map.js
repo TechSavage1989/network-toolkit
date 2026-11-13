@@ -201,8 +201,10 @@ function create(adapter){
   return textLayout(d,textarea,d.content,adapter.lineStarts(d),d.editRevision,height,width,null);
  }
 
+ // What every layout's drawing depends on besides the text (palette() first,
+ // so the colour key is current).
  function common(d,height,width){
-  const c=palette();
+  palette();
   return [height,width,root.devicePixelRatio||1,colorKey,adapter.tabSize(),adapter.language(d),adapter.syntax()].join(':');
  }
 
