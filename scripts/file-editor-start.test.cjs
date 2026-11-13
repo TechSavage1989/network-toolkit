@@ -8,7 +8,6 @@ const settle=()=>new Promise(resolve=>setImmediate(resolve));
 // A stand-in for the engine's text tools route (cmd/network-toolkit/editor_text_tools.go).
 const toolEngine=async(path,method,body)=>{
  if(path!=='/editor-views/text-tools')throw Error('Unexpected request '+path);
- if(body.action==='detect')return {sonicwall:false};
  const fn={upper:t=>t.toUpperCase(),lower:t=>t.toLowerCase(),'trim-trailing':t=>t.replace(/[ \t]+$/gm,''),'sort-asc':t=>t.split('\n').sort().join('\n')}[body.tool];
  const text=fn(body.text);return {ok:true,changed:text!==body.text,count:1,text};
 };

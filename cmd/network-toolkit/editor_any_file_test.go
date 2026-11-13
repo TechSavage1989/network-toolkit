@@ -243,7 +243,8 @@ func TestEditorShowsBinaryFilesReadOnlyAndNeverWritesThem(t *testing.T) {
 				{"action": "replace-text", "revision": revision, "query": "P", "replacement": "Q", "from": 0, "to": 1, "regex": true},
 				{"action": "tool-start", "revision": revision, "tool": "upper"},
 				{"action": "tool-start", "revision": revision, "tool": "base64-encode", "from": 0, "to": 1},
-				{"action": "tool-detect"},
+				// Decode the part before it: the same tool over a range.
+				{"action": "tool-start", "revision": revision, "tool": "base64-decode", "from": 0, "to": 3},
 				{"action": "save", "revision": revision, "format": status.Format},
 				{"action": "save", "revision": revision, "format": text},
 				{"action": "save", "revision": revision, "format": text, "path": filepath.Join(dir, "saved-as.txt")},

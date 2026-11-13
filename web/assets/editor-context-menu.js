@@ -4,7 +4,7 @@
  * it) opens the app's own menu instead of the browser's, styled like the
  * Terminal menu: Undo/Redo, Cut/Copy/Paste/Select all, Send to terminal,
  * Find/Replace/Go to line, the text tool groups (Lines, Encode / decode,
- * Format, Device configs) and Compare tools as submenus. The toolbar's Tools
+ * Format) and Compare tools as submenus. The toolbar's Tools
  * button opens the same tool groups on their own. Every tool item shows a
  * one-line description, also its tooltip, and its shortcut; the tools come
  * from editor-text-tools.js through NetworkToolkitFileEditor.textMenu, so

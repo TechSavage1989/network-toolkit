@@ -3,8 +3,9 @@ package texttools
 import (
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"io"
+	"strconv"
+	"unicode/utf8"
 )
 
 func init() {
@@ -33,6 +34,25 @@ func isSpace(c byte) bool {
 	return c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f' || c == '\v'
 }
 
+// notDecoded is the error of a decoder that met c, a character it does not
+// decode, at offset at: nothing changes, and the message names the character
+// (the caller adds its line and column). before tells whether the text before
+// it decodes on its own; the page then offers "Decode the part before it",
+// the same tool over just that part. A decoder never skips such a character.
+func (j *job) notDecoded(at int64, c byte, what string, before bool) error {
+	return &PositionError{Offset: at, Message: quoted(c, j.in.peek(utf8.UTFMax-1)) + " is not " + what + ".", Before: before && at > 0}
+}
+
+// quoted shows the character that starts with the byte c (rest are the bytes
+// after it) as a message names it: '&', 'é', '\u00a0'.
+func quoted(c byte, rest []byte) string {
+	if c < utf8.RuneSelf {
+		return strconv.QuoteRune(rune(c))
+	}
+	r, _ := utf8.DecodeRune(append([]byte{c}, rest...))
+	return strconv.QuoteRune(r)
+}
+
 // base64Stream decodes Base64 a symbol at a time: the standard and the
 // URL-safe alphabet, with or without padding, with any white space between
 // symbols. emit receives each decoded byte and the input position (UTF-16
@@ -46,26 +66,28 @@ type base64Stream struct {
 	emit    func(b byte, at int64) error
 }
 
-func (s *base64Stream) feed(c byte, at int64) error {
+// feed takes the next character. It returns false, and takes nothing, for a
+// character that is not Base64.
+func (s *base64Stream) feed(c byte, at int64) (bool, error) {
 	if isSpace(c) {
-		return nil
+		return true, nil
 	}
 	if c == '=' {
 		if s.n < 2 && !s.padded {
-			return &PositionError{Offset: at, Message: "The Base64 padding (=) comes too early."}
+			return true, &PositionError{Offset: at, Message: "The Base64 padding (=) comes too early."}
 		}
 		if !s.padded {
 			s.padded = true
-			return s.flush()
+			return true, s.flush()
 		}
-		return nil
+		return true, nil
 	}
 	v, ok := base64Value(c)
 	if !ok {
-		return &PositionError{Offset: at, Message: fmt.Sprintf("%q is not a Base64 character.", rune(c))}
+		return false, nil
 	}
 	if s.padded {
-		return &PositionError{Offset: at, Message: "The Base64 text continues after its padding (=)."}
+		return true, &PositionError{Offset: at, Message: "The Base64 text continues after its padding (=)."}
 	}
 	if s.n == 0 {
 		s.start = at
@@ -74,9 +96,9 @@ func (s *base64Stream) feed(c byte, at int64) error {
 	s.n++
 	s.symbols++
 	if s.n == 4 {
-		return s.flush()
+		return true, s.flush()
 	}
-	return nil
+	return true, nil
 }
 
 // flush decodes the symbols collected so far: four make three bytes, three
@@ -99,7 +121,9 @@ func (s *base64Stream) flush() error {
 	return nil
 }
 
-// Base64 decode: the decoded bytes must be UTF-8 text.
+// Base64 decode: the decoded bytes must be UTF-8 text. A character that is
+// not Base64 (such as a "&&" after the Base64) stops it; the text before that
+// character is offered on its own when its Base64 is complete.
 func base64Decode(j *job) error {
 	d := &decoded{j: j}
 	stream := &base64Stream{emit: d.add}
@@ -112,8 +136,14 @@ func base64Decode(j *job) error {
 		if err != nil {
 			return err
 		}
-		if err = stream.feed(c, at); err != nil {
+		ok, err := stream.feed(c, at)
+		if err != nil {
 			return err
+		}
+		if !ok {
+			// What a run over the text before c would do at its end.
+			before := stream.symbols > 0 && stream.flush() == nil && d.done() == nil
+			return j.notDecoded(at, c, "a Base64 character", before)
 		}
 		if len(d.out) >= 32<<10 {
 			if err = j.out.Insert(d.take()); err != nil {
@@ -171,7 +201,8 @@ func base64Encode(j *job) error {
 
 // Hex to text: pairs of hexadecimal digits, each pair one byte; white
 // space, colons, dashes and commas between them and a 0x before them are
-// ignored. The bytes must be UTF-8 text.
+// ignored. The bytes must be UTF-8 text. Another character stops it, as in
+// Base64 decode.
 func hexDecode(j *job) error {
 	d := &decoded{j: j}
 	var high byte
@@ -201,7 +232,8 @@ func hexDecode(j *job) error {
 		}
 		v, ok := hexValue(c)
 		if !ok {
-			return &PositionError{Offset: at, Message: fmt.Sprintf("%q is not a hexadecimal digit.", rune(c))}
+			// What a run over the text before c would do at its end.
+			return j.notDecoded(at, c, "a hexadecimal digit", !half && digits > 0 && d.done() == nil)
 		}
 		digits++
 		if !half {

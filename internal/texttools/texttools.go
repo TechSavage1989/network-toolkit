@@ -1,8 +1,9 @@
 // Package texttools holds the Text Editor's text tools (Tools menu, owner
-// request v1.21.53): line tools, encoders and decoders, formatters and the
-// readable copy of a SonicWall settings export. Every tool exists once, here;
-// the page sends page-held text to the engine and the engine runs the same
-// code over a buffer snapshot of a disk-backed document.
+// request v1.21.53): line tools, encoders and decoders, and formatters. They
+// are general tools, none of them for one brand's files or one workflow.
+// Every tool exists once, here; the page sends page-held text to the engine
+// and the engine runs the same code over a buffer snapshot of a disk-backed
+// document.
 //
 // A tool reads its input once as a stream (UTF-8 text in which every line
 // break is one '\n', as the editor holds it) and reports what it does through
@@ -118,6 +119,11 @@ type Tool struct {
 type PositionError struct {
 	Offset  int64
 	Message string
+	// Before is set by a decoder (Base64 decode, Hex to text) that stopped at
+	// a character it does not decode when the input before Offset decodes on
+	// its own: the same tool over just that part succeeds. The page offers
+	// it as "Decode the part before it".
+	Before bool
 }
 
 func (e *PositionError) Error() string { return e.Message }
