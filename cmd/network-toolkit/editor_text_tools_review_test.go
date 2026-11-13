@@ -50,11 +50,17 @@ func TestEditorTextToolStartIsStoppedByAnImmediateReload(t *testing.T) {
 			t.Fatal(err)
 		}
 		d := &editorDiskDocument{ctx: t.Context(), imported: v}
+		// The tool commits under the document's edit lock: holding it until
+		// the stop keeps a tool this small from finishing first, which made
+		// this test fail now and then without telling anything.
+		d.editMu.Lock()
 		started, err := d.startTool(v, editorDiskRequest{Tool: "upper", Revision: v.Buffer.Metadata().Revision})
 		if err != nil {
+			d.editMu.Unlock()
 			t.Fatal(err)
 		}
 		d.stopReplaceAll() // what a reload does before it replaces the buffer
+		d.editMu.Unlock()
 		var state any
 		finishes(t, "the stopped tool", func() {
 			for {
