@@ -32,7 +32,7 @@ async function copy(button,expected,keyboard=false){
 // button, racing hosts-editor's F3 check), and a dialog without fields starts on
 // a footer button, never on Close.
 // open runs in the page; {click} opens the dialog with the actual control instead.
-async function dialogFocus(name,open,expected){
+async function dialogFocus(name,open,expected,close=()=>page.evaluate(()=>closeModal())){
  if(open.click)await open.click();else await page.evaluate(open);
  await page.evaluate(()=>new Promise(resolve=>setTimeout(resolve,50)));
  const focus=await page.evaluate(()=>{const a=document.activeElement;return {inside:!!a?.closest('#modalRoot .modal'),id:a?.id||'',label:a?.getAttribute('aria-label')||'',text:(a?.textContent||'').trim()};});
@@ -40,7 +40,7 @@ async function dialogFocus(name,open,expected){
  assert.notEqual(focus.label,'Close dialog',name+': focus is on the header Close button');
  for(const [key,value] of Object.entries(expected))assert.equal(focus[key],value,name+': '+JSON.stringify(focus));
  result.dialogFocus.push({name,...focus});
- await page.evaluate(()=>closeModal());
+ await close();
 }
 async function checkDialogFocus(){
  await dialogFocus('dialog code focuses a field',()=>{openModal('Focus check','<input id="focusCheckFirst"><input id="focusCheckChosen">','<button class="btn primary" data-action="close-modal">Done</button>');document.querySelector('#focusCheckChosen').focus();},{id:'focusCheckChosen'});
@@ -50,7 +50,22 @@ async function checkDialogFocus(){
  await dialogFocus('Terminal panes help',()=>showTerminalLayoutHelp(),{text:'Done'});
  await dialogFocus('App settings',{click:()=>openAppSettings(page)},{id:'uxSettingsSearch'});
  await openAppSettings(page);await page.locator('[data-settings-section="confirmations"]').click();
- await dialogFocus('Quit confirmation',{click:()=>page.locator('.modal [data-action="quit-confirm"]').click()},{text:'Cancel'});
+ await dialogFocus('Quit confirmation',{click:()=>page.locator('.modal [data-action="quit-confirm"]').click()},{text:'Cancel'},()=>page.locator('.modal-foot [data-action="close-modal"]').click());
+ await focusReturn('quit confirmation opened from App settings','settingsButton');
+ await page.locator('#settingsButton').focus();
+ await page.evaluate(()=>{openModal('Redraw check','<input id="focusCheckField">','<button class="btn primary" data-action="close-modal">Done</button>');document.querySelector('#focusCheckField').focus();});
+ await page.evaluate(()=>new Promise(resolve=>setTimeout(resolve,50)));
+ await page.evaluate(()=>openModal('Redraw check','<input id="focusCheckField">','<button class="btn primary" data-action="close-modal">Done</button>'));
+ await page.locator('.modal-foot [data-action="close-modal"]').click();
+ await focusReturn('dialog redrawn through openModal','settingsButton');
+}
+// Closing returns focus to the control that opened the first dialog, also after
+// it was redrawn through openModal or replaced by a dialog opened from it (focus
+// once went to the replaced dialog's control, which no longer exists, so <body>).
+async function focusReturn(name,id){
+ const focus=await page.evaluate(()=>({open:!!document.querySelector('#modalRoot .modal'),id:document.activeElement?.id||document.activeElement?.tagName}));
+ assert.deepEqual(focus,{open:false,id},name+': focus did not return to the opener '+JSON.stringify(focus));
+ result.dialogFocus.push({name,returnedTo:id});
 }
 (async()=>{
  browser=await chromium.launch({headless:true,args:['--no-sandbox']});
