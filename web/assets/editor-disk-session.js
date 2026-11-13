@@ -213,7 +213,8 @@ function create({request, exportRange, changed = () => {}, failed = () => {}, ed
      edit: {
       line: page.line + countLines(acknowledged.slice(0, edit.from)),
       removed: countLines(acknowledged.slice(edit.from, edit.to)),
-      inserted: countLines(edit.text)
+      inserted: countLines(edit.text),
+      from: page.start + edit.from, to: page.start + edit.to, length: edit.text.length
      },
      payload: {
       action: 'edit', requestId: identity(), revision: metadata.revision,

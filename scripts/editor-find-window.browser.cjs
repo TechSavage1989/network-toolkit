@@ -180,12 +180,54 @@ const step=name=>console.log('FIND WINDOW '+name);
   await win().locator('[data-ed-search-mode] input[value="normal"]').check();
   assert.equal(await explainLine.isVisible(),false,'no line in Normal mode');
   await win().locator('[data-ed-search-mode] input[value="normal"]').check();
+  // Find Next moves on from a match of empty text (^$ on an empty line),
+  // and Replace replaces it and goes on.
+  await open('blank.txt');
+  await text().focus();await page.keyboard.press('Control+Home');
+  await showTab('replace');
+  await win().locator('[data-ed-search-mode] input[value="regex"]').check();
+  await query('^$');await page.locator('[data-ed-replacement]').fill('-');
+  await win().locator('[data-ed="next"]').click();await messageIs(/^Match on line 2\.$/);
+  await win().locator('[data-ed="next"]').click();await messageIs(/^Match on line 4\.$/);
+  await win().locator('[data-ed="next"]').click();await messageIs(/^Match on line 6\.$/);
+  await win().locator('[data-ed="next"]').click();await messageIs(/Found the first occurrence from the top/);
+  await win().locator('[data-ed="replaceOne"]').click();
+  await until(()=>NetworkToolkitFileEditor.active.content==='a\n-\nb\n\nc\n');
+  await messageIs(/^Match on line 4\.$/);
+  await text().focus();await page.keyboard.press('Control+z');
+  await until(()=>NetworkToolkitFileEditor.active.content==='a\n\nb\n\nc\n'&&!NetworkToolkitFileEditor.active.dirty);
+  await page.locator('[data-ed-close-tab][aria-label="Close blank.txt"]').click();
+  await until(()=>![...document.querySelectorAll('[data-ed-open]')].some(t=>t.textContent.includes('blank.txt')));
+  await win().locator('[data-ed-search-mode] input[value="normal"]').check();
+  await showTab('find');
+  // Search as you type (Normal mode): a pause in typing selects the first
+  // match from the cursor; no button is pressed.
+  await activate('config.txt');await settled();await text().focus();await page.keyboard.press('Control+Home');
+  await win().locator('[data-ed-query]').fill('');await win().locator('[data-ed-query]').focus();await page.keyboard.type('vlan 3');
+  await until(()=>{const ta=document.querySelector('.nt-editor-code textarea[data-ed-text]');return ta.value.slice(ta.selectionStart,ta.selectionEnd)==='vlan 3';});
+  assert.equal(await page.evaluate(()=>document.activeElement.matches('[data-ed-query]')),true,'the focus stays in Find what');
+  // The editor's shortcuts work from the Find window (Ctrl+N: a new
+  // document); the field keeps its own editing keys (Ctrl+A selects its text).
+  const tabs=await page.locator('[data-ed-open]').count();
+  await page.keyboard.press('Control+n');
+  await until(n=>document.querySelectorAll('[data-ed-open]').length===n+1,tabs);
+  await page.locator('[data-ed-close-tab]').last().click();
+  await until(n=>document.querySelectorAll('[data-ed-open]').length===n,tabs);
+  await activate('config.txt');await settled();
+  await win().locator('[data-ed-query]').focus();await page.keyboard.press('Control+a');
+  assert.equal(await page.evaluate(()=>{const el=document.activeElement;return el.matches('[data-ed-query]')&&el.selectionStart===0&&el.selectionEnd===el.value.length;}),true);
+  // A shortcut nobody took never reaches the browser (Ctrl+P would print
+  // the page); the field's own keys keep their default.
+  const prevented=key=>page.evaluate(key=>{const e=new KeyboardEvent('keydown',{key,ctrlKey:true,bubbles:true,cancelable:true});document.querySelector('[data-ed-query]').dispatchEvent(e);return e.defaultPrevented;},key);
+  assert.equal(await prevented('p'),true,'Ctrl+P from the Find window');
+  assert.equal(await prevented('c'),false,'Ctrl+C in Find what');
+  await showTab('find');
   // The history list holds the searches, newest first.
   await query('');
   await win().locator('[data-ed-query] ~ .combobox-toggle').click();
   await page.locator('#comboboxPopup').waitFor({state:'visible'});
   const history=await page.locator('#comboboxPopup [role="option"]').evaluateAll(list=>list.map(o=>o.textContent));
-  assert.deepEqual(history.slice(0,4),['foo(?=bar)','ge-0/0/12. description','^interface ge-0/0/\\d+$','\\tvlan']);
+  assert.deepEqual(history.slice(0,4),['^$','foo(?=bar)','ge-0/0/12. description','^interface ge-0/0/\\d+$']);
   await page.keyboard.press('Escape');
   await theme('dark');await shoot('editor-find-window-find-dark.png');
   await theme('light');await shoot('editor-find-window-find-light.png');await theme('dark');
@@ -294,6 +336,25 @@ const step=name=>console.log('FIND WINDOW '+name);
   await page.locator('.nt-find-results-menu [data-ed-find-menu="clear"]').click();
   await until(()=>!document.querySelector('.nt-find-row'));
   await results().waitFor({state:'hidden'});await resultsToggle.waitFor({state:'hidden'});
+  // The results of a search the engine no longer has: the rows say so once
+  // and the panel stops asking for them.
+  const pageRequests=[];
+  const watch=request=>{if(request.url().endsWith('/api/editor-views/find')&&request.postDataJSON()?.action==='page')pageRequests.push(request.postDataJSON().job);};
+  page.on('request',watch);
+  await activate('hits.txt');await settled();await showTab('find');
+  await query('name vlan');await win().locator('[data-ed-find-action="all-current"]').click();
+  await messageIs(/^Find All: 100,000 hits in 1 file of 1 searched\.$/);
+  await until(()=>![...document.querySelectorAll('.nt-find-row')].some(r=>r.classList.contains('is-pending')));
+  const goneJob=pageRequests.at(-1);assert(goneJob,'the panel read a page of rows');
+  await page.evaluate(job=>api('/editor-views/find','POST',{action:'release',job}),goneJob);
+  const before=pageRequests.length;
+  await page.evaluate(()=>{const s=document.querySelector('[data-ed-find-results-scroll]');s.scrollTop=s.scrollHeight/2;});
+  await until(()=>[...document.querySelectorAll('.nt-find-row.is-file')].some(r=>r.textContent.includes('results are no longer available')));
+  await page.waitForTimeout(1500);
+  assert(pageRequests.length-before<=2,'the panel stopped asking for rows of a search that is gone: '+(pageRequests.length-before));
+  page.off('request',watch);
+  await results().locator('.nt-find-row').first().click({button:'right'});
+  await page.locator('.nt-find-results-menu [data-ed-find-menu="clear"]').click();
   step('find all done');
 
   // ---- 3. Replace ----
@@ -304,7 +365,9 @@ const step=name=>console.log('FIND WINDOW '+name);
   await until(()=>document.querySelector('[data-ed-find]').dataset.tab==='replace');
   assert.deepEqual(await visibleButtons(),['Find Next','Replace','Replace All','Replace All in All Opened Documents']);
   // Swap and the swap menu.
-  await query('uplink');await page.locator('[data-ed-replacement]').fill('downlink');
+  await query('uplink');
+  await until(()=>{const ta=document.querySelector('.nt-editor-code textarea[data-ed-text]');return ta.value.slice(ta.selectionStart,ta.selectionEnd)==='uplink';});
+  await page.locator('[data-ed-replacement]').fill('downlink');
   await win().locator('.nt-find-swap > [data-ed-find-swap="swap"]').click();
   assert.equal(await page.locator('[data-ed-query]').inputValue(),'downlink');assert.equal(await page.locator('[data-ed-replacement]').inputValue(),'uplink');
   await win().locator('[data-ed-find-swap-menu]').click();
@@ -315,7 +378,10 @@ const step=name=>console.log('FIND WINDOW '+name);
   await win().locator('.nt-find-swap-list [data-ed-find-swap="to-replace"]').click();
   assert.equal(await page.locator('[data-ed-replacement]').inputValue(),'uplink');
   await page.locator('[data-ed-replacement]').fill('core');
-  // Replace: the first press finds, the second replaces and finds the next.
+  // Replace: from the cursor (no selection) the first press finds, the
+  // second replaces and finds the next. (Search as you type selected the
+  // first match while uplink was typed; the cursor goes back to the start.)
+  await text().focus();await page.keyboard.press('Control+Home');
   await win().locator('[data-ed="replaceOne"]').click();
   await until(()=>{const ta=document.querySelector('.nt-editor-code textarea[data-ed-text]');return ta.value.slice(ta.selectionStart,ta.selectionEnd)==='uplink';});
   await win().locator('[data-ed="replaceOne"]').click();
@@ -345,6 +411,49 @@ const step=name=>console.log('FIND WINDOW '+name);
    await until(()=>!NetworkToolkitFileEditor.active.dirty,null,60000);
   }
   await option('matchCase').uncheck();
+  // Replace All right after typing in a disk-backed document: the typing
+  // is sent first, and the Replace All applies to it.
+  await activate('hits.txt');await settled();
+  await text().focus();await page.keyboard.press('Control+Home');
+  await until(()=>NetworkToolkitFileEditor.active.diskSession.state().page.start===0);
+  // The typing's edit is held on its way until Replace All has started.
+  let holdEdit;const editHeld=new Promise(resolve=>{holdEdit=resolve;});let editSeen=false;
+  await page.route('**/documents/*/buffer',async route=>{if(route.request().postDataJSON()?.action==='edit'&&!editSeen){editSeen=true;await editHeld;}await route.continue();});
+  await page.keyboard.type('Z');await until(()=>NetworkToolkitFileEditor.active.diskSession.pending);
+  await showTab('replace');await query('name vlan-99999');await page.locator('[data-ed-replacement]').fill('name last');
+  await win().locator('[data-ed="replaceAll"]').click();
+  await page.waitForTimeout(300);assert.equal(editSeen,true,'the typing was still on its way');holdEdit();
+  await messageIs(/^Replace All: 1 occurrence was replaced in the entire file\.$/);
+  await page.unroute('**/documents/*/buffer');
+  await settled();
+  assert.equal((await page.evaluate(async()=>{const d=NetworkToolkitFileEditor.active;return (await NetworkToolkitEditorWindows.buffer(d.uid,'window',{start:0,limit:6})).text;})),'Zvlan ');
+  await text().focus();await page.keyboard.press('Control+z');await settled();await page.keyboard.press('Control+z');
+  await until(()=>!NetworkToolkitFileEditor.active.dirty,null,60000);
+  // A single Replace whose selection changes while the engine answers
+  // replaces nothing there: it searches again.
+  await activate('config.txt');await settled();
+  await text().focus();await page.keyboard.press('Control+Home');
+  await query('uplink');await page.locator('[data-ed-replacement]').fill('core');
+  await until(()=>{const ta=document.querySelector('.nt-editor-code textarea[data-ed-text]');return ta.value.slice(ta.selectionStart,ta.selectionEnd)==='uplink'&&ta.selectionStart<100;});
+  await page.route('**/api/editor-views/find',async route=>{if(route.request().postDataJSON()?.action==='replace-text')await new Promise(resolve=>setTimeout(resolve,700));await route.continue();});
+  await page.evaluate(()=>{document.querySelector('[data-ed-find-message]').textContent='';});
+  await win().locator('[data-ed="replaceOne"]').click();
+  await page.evaluate(()=>{const ta=document.querySelector('.nt-editor-code textarea[data-ed-text]');ta.setSelectionRange(0,8);document.dispatchEvent(new Event('selectionchange'));});
+  await messageIs(/^Match on line \d+\.$/);
+  await page.unroute('**/api/editor-views/find');
+  assert.equal((await active()).content.split('uplink').length-1,12,'nothing was replaced');
+  assert.equal((await active()).content.startsWith('hostname'),true,'the new selection was not replaced');
+  // A Replace All that makes a page-held document too large for the page
+  // moves it to the engine: the replacement happens once and is reported.
+  await activate('second.txt');await settled();
+  await query('vlan');await page.locator('[data-ed-replacement]').fill('w'.repeat(300000));
+  await win().locator('[data-ed="replaceAll"]').click();
+  await messageIs(/^Replace All: 2 occurrences were replaced in the entire file\.$/);
+  await until(()=>NetworkToolkitFileEditor.active.disk&&!NetworkToolkitFileEditor.active.promoting,null,60000);
+  await settled();
+  assert.equal(await page.evaluate(()=>NetworkToolkitFileEditor.active.diskMeta.units),600000+'vlan 99\n name lab\nvlan 100\n name voice\n'.length-8);
+  await text().focus();await page.keyboard.press('Control+z');
+  await until(()=>NetworkToolkitFileEditor.active.diskMeta?.units==='vlan 99\n name lab\nvlan 100\n name voice\n'.length,null,60000);
   step('replace done');
 
   // ---- 4. Mark ----
@@ -364,6 +473,16 @@ const step=name=>console.log('FIND WINDOW '+name);
   await until(()=>[...document.querySelectorAll('[data-ed-gutter-lines] .is-bookmarked')].map(r=>r.textContent).join()==='4,31,34,37');
   await page.keyboard.press('Control+z');
   await until(()=>[...document.querySelectorAll('[data-ed-gutter-lines] .is-bookmarked')].map(r=>r.textContent).join()==='3,30,33,36');
+  // A Replace All of a word on several lines keeps the number of lines:
+  // every bookmark stays where it is, also after Undo.
+  await showTab('replace');await query('uplink');await page.locator('[data-ed-replacement]').fill('up');
+  await win().locator('[data-ed="replaceAll"]').click();
+  await messageIs(/^Replace All: 12 occurrences were replaced/);
+  assert.equal([...await page.locator('[data-ed-gutter-lines] .is-bookmarked').evaluateAll(list=>list.map(r=>r.textContent))].join(),'3,30,33,36');
+  await text().focus();await page.keyboard.press('Control+z');
+  await until(()=>NetworkToolkitFileEditor.active.content.includes('uplink'));
+  assert.equal([...await page.locator('[data-ed-gutter-lines] .is-bookmarked').evaluateAll(list=>list.map(r=>r.textContent))].join(),'3,30,33,36');
+  await showTab('mark');await query('192.0.2.1');
   // F2 and Shift+F2 go between bookmarks; Ctrl+F2 adds and removes one.
   await text().focus();await page.keyboard.press('Control+Home');
   await page.keyboard.press('F2');
@@ -385,7 +504,7 @@ const step=name=>console.log('FIND WINDOW '+name);
   // Copy Marked Text: the text of every mark.
   await win().locator('[data-ed-find-action="copy-marks"]').click();
   await messageIs(/^Copied the text of 5 marks\.$/);
-  assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),'192.0.2.1\n192.0.2.1\n192.0.2.1\n192.0.2.1\nlab-switch','the text of each mark: 192.0.2.1 also marks the start of 192.0.2.10');
+  assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),'lab-switch\n192.0.2.1\n192.0.2.1\n192.0.2.1\n192.0.2.1','in document order (lab-switch is on line 1); 192.0.2.1 also marks the start of 192.0.2.10');
   await option('purge').check();
   await query('vlan 120');await win().locator('[data-ed-find-action="mark"]').click();
   await until(()=>document.querySelectorAll('[data-ed-marks] mark').length===1);
@@ -393,6 +512,22 @@ const step=name=>console.log('FIND WINDOW '+name);
   await win().locator('[data-ed-find-action="clear-marks"]').click();
   await until(()=>!document.querySelector('[data-ed-marks] mark'));
   await option('purge').uncheck();
+  // A mark made In selection follows its text: a long line typed above it
+  // moves the range, and the same "vlan" stays marked and is copied.
+  await page.evaluate(()=>{const ta=document.querySelector('.nt-editor-code textarea[data-ed-text]'),start=ta.value.indexOf('interface ge-0/0/1\n'),end=ta.value.indexOf('interface ge-0/0/2\n');ta.focus();ta.setSelectionRange(start,end);document.dispatchEvent(new Event('selectionchange'));});
+  await until(()=>!document.querySelector('[data-ed-find-option="inSelection"]').disabled);
+  await option('inSelection').check();await option('bookmark').uncheck();await option('purge').check();
+  await query('vlan');await win().locator('[data-ed-find-action="mark"]').click();
+  await messageIs(/^Mark: 1 match in the selection\.$/);
+  await option('inSelection').uncheck();
+  await text().focus();await page.keyboard.press('Control+Home');await page.keyboard.insertText('x'.repeat(90)+'\n');
+  await until(()=>{const marks=[...document.querySelectorAll('[data-ed-marks] mark')];return marks.length===1&&marks[0].textContent==='vlan';});
+  await win().locator('[data-ed-find-action="copy-marks"]').click();
+  await messageIs(/^Copied the text of 1 mark\.$/);
+  assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),'vlan');
+  await text().focus();await page.keyboard.press('Control+z');
+  await until(()=>!NetworkToolkitFileEditor.active.dirty);
+  await win().locator('[data-ed-find-action="clear-marks"]').click();await option('purge').uncheck();
   // Marks on a disk-backed document: only the part in view is searched.
   await activate('hits.txt');await settled();await text().focus();await page.keyboard.press('Control+Home');
   await query('name vlan-1');await option('bookmark').uncheck();

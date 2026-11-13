@@ -66,6 +66,9 @@ function ensureDiskSession(d){
   exportRange:(payload,signal)=>root.NetworkToolkitEditorWindows.bufferExport(d.uid,payload,signal),
   changed(value){
    const wasDirty=d.dirty;
+   // Fewer lines after a change whose place is not known (a text tool):
+   // bookmarks past the end stay on the last line (editor-find.js).
+   if(d.diskMeta&&value.metadata.lines<d.diskMeta.lines&&findWindow?.hasBookmarks(d))findWindow.edited(d,{bulk:true,lines:value.metadata.lines});
    d.diskMeta=value.metadata;
    d.editRevision=value.metadata.revision;
    d.dirty=value.metadata.dirty||formatDirty(d);
@@ -74,7 +77,7 @@ function ensureDiskSession(d){
   },
   failed(error){d.saveFailed=true;if(current()===d)setMessage('Your changes are still in this tab. '+error.message,true);},
   // Bookmarks follow the lines of an edit (editor-find.js).
-  edited(edit){if(!findWindow?.hasBookmarks(d))return;findWindow.edited(d,edit);repaintFind(d);}
+  edited(edit){if(!findWindow?.follows(d))return;findWindow.edited(d,edit);repaintFind(d);}
  });
  return d.diskSession;
 }
@@ -1235,12 +1238,12 @@ function placeMarks(d,ta){const layer=findEl('[data-ed-marks]');if(!layer||!laye
 // An edit of page-held text moves the bookmarks after it by the lines it
 // added or removed.
 function noteEdit(d,before,after){
- if(!findWindow?.hasBookmarks(d)||before===after)return;
+ if(!findWindow?.follows(d)||before===after)return;
  const n=Math.min(before.length,after.length);let p=0,q=0;
  while(p<n&&before.charCodeAt(p)===after.charCodeAt(p))p++;
  while(q<n-p&&before.charCodeAt(before.length-1-q)===after.charCodeAt(after.length-1-q))q++;
  const lines=(text,from,to)=>{let c=0;for(let at=text.indexOf('\n',from);at>=0&&at<to;at=text.indexOf('\n',at+1))c++;return c;};
- findWindow.edited(d,{line:lines(before,0,p),removed:lines(before,p,before.length-q),inserted:lines(after,p,after.length-q)});
+ findWindow.edited(d,{line:lines(before,0,p),removed:lines(before,p,before.length-q),inserted:lines(after,p,after.length-q),from:p,to:before.length-q,length:after.length-q-p});
 }
 function repaintFind(d){
  if(!d||current()!==d)return;
@@ -1266,15 +1269,19 @@ const findAdapter={
  activate:d=>current()===d||activateDocument(d.id),
  diskCall:(d,action,body,signal)=>diskCall(d,action,body,signal),
  flush:d=>ensureDiskSession(d).flush(),
- request:body=>api('/editor-views/find','POST',body),
+ request:(body,signal)=>api('/editor-views/find','POST',body,false,signal),
  engine:()=>typeof api==='function'&&!(typeof OFFLINE!=='undefined'&&OFFLINE),
  readBlocked:d=>d.loading||d.diskOpening?'The document is still opening.':d.frozen?'The document is being moved between windows.':d.reloading||d.promoting?'Wait for the current document operation to finish.':'',
  writeBlocked:d=>notText(d)?nameOf(d.path)+' is not a text file. Nothing in it can be replaced.':d.loading||d.diskOpening?'The document is still opening.':d.frozen?'The document is being moved between windows.':d.saving?'Wait for the save to finish.':d.reloading||d.promoting||d.diskEditing||d.formatting?'Wait for the current document operation to finish.':inComparison(d)?'Close the document comparison first.':pendingEditorDialog?'Close the open dialog first.':editorComposing()?'Finish text composition first.':'',
  skipReason:d=>notText(d)?'not a text file':d.frozen?'being moved to another window':d.saving?'being saved':d.loading||d.diskOpening?'still opening':inComparison(d)?'in a comparison':'busy',
  async replaceSelection(d,text){if(current()!==d)throw Error('Switch back to '+nameOf(d.path)+' first.');await Promise.resolve(replaceSelection(text));status();},
- setText(d,text,start,end){
-  if(current()===d&&!paneWorkspace()){const view=captureView(),s=start??Math.min(view?.start??0,text.length),e=end??s;if(!setContent(d,text))return false;const ta=findEl('[data-ed-text]');if(ta&&ta.value!==d.content)ta.value=d.content;restoreView(view,s,Math.min(e,d.content.length),false);status();}
+ // One edit, the whole result. A result too large for a page-held document
+ // moves it to a disk-backed one in the background: the outcome is that
+ // move's (the edit is applied once, by it).
+ async setText(d,text,start,end){
+  if(current()===d&&!paneWorkspace()){const view=captureView(),s=start??Math.min(view?.start??0,text.length),e=end??s;if(!setContent(d,text))return false;const ta=findEl('[data-ed-text]');if(!d.promotionResult&&ta&&ta.value!==d.content)ta.value=d.content;if(!d.promotionResult)restoreView(view,s,Math.min(e,d.content.length),false);status();}
   else{if(!setContent(d,text))return false;paneWorkspace()?.refresh(true);}
+  if(d.promotionResult){const outcome=await d.promotionResult;if(!outcome?.ok)throw Error('The result of Replace All could not be applied to '+nameOf(d.path)+'. '+(outcome?.error||''));return true;}
   return d.content===text;
  },
  async diskReplaced(d,metadata){

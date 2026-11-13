@@ -30,6 +30,7 @@ const MODE_HELP={
 const ROW=20,PAGE_ROWS=200,PAGE_CACHE=64,MARK_PATTERNS=16,BOOKMARKS=100000,COPY_ROWS=50000;
 const TABS=[['find','Find'],['replace','Replace'],['mark','Mark']];
 const NONE=Object.freeze([]);
+const GONE='This search’s results are no longer available. Run it again.';
 const escapeHTML=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const count=n=>Number(n||0).toLocaleString();
 const plural=(n,one,many)=>count(n)+' '+(Number(n)===1?one:many);
@@ -81,18 +82,32 @@ function rowHTML(row){
  return html+escapeHTML(text.slice(at))+(row.cutEnd?'<span class="nt-find-cut">…</span>':'');
 }
 
-// Bookmarks follow an edit: lines after it move by the lines it added or
-// removed; a bookmark on a line the edit removed moves to the edit's line.
+// Bookmarks follow an edit of the lines [line, line+removed], which become
+// [line, line+inserted]: an edit that keeps the number of lines (a word
+// replaced on several lines, a sort, Undo of such a change) keeps every
+// bookmark where it is. Otherwise bookmarks before the edit stay, those
+// after it move by the lines it added or removed, and those inside it stay
+// on their line while it exists (else on the edit's last line).
 function shiftLines(lines,edit){
  if(!lines?.length)return lines;
  const {line,removed=0,inserted=0}=edit,delta=inserted-removed,out=[];
+ if(!delta)return lines;
  for(const value of lines){
   let next=value;
   if(value>line+removed)next=value+delta;
-  else if(value>line&&removed)next=line;
+  else if(value>line+inserted)next=line+inserted;
   if(next>=0&&out.at(-1)!==next)out.push(next);
  }
  return out;
+}
+// A range follows an edit that replaced [from, to) with length units: what
+// lies after it moves, and the range keeps the text it held.
+function shiftRange(range,edit){
+ if(!range||!Number.isFinite(edit?.from))return range;
+ const {from,to,length}=edit,delta=length-(to-from);
+ const start=range[0]<from||range[0]===from&&to>from?range[0]:range[0]>=to?range[0]+delta:from;
+ const end=range[1]<=from?range[1]:range[1]>=to?range[1]+delta:from+length;
+ return [start,Math.max(start,end)];
 }
 
 // ---- The syntax guide and the line that explains the caret ----
@@ -230,14 +245,20 @@ function create(a){
  let selection={anchor:-1,focus:-1},menu=null,panelHeight=180,panelSized=false,renderFrame=0,searchSeq=0,markVersion=0,statusTimer=0,cancelling=null;
 
  // ---- Engine calls ----
- const engine=body=>a.request(body);
+ const engine=(body,signal)=>a.request(body,signal);
  function textBody(d){return {text:a.text(d)};}
  async function call(d,action,body,signal){
-  if(a.disk(d)){await a.flush(d);return a.diskCall(d,action==='next'?'find':action,body,signal);}
+  if(a.disk(d)){
+   // Typing still on its way is sent first; the revision a request names
+   // is the one after it.
+   await a.flush(d);
+   if('revision' in body)body={...body,revision:a.revision(d)};
+   return a.diskCall(d,action==='next'?'find':action,body,signal);
+  }
   const page={next:'next','find-matches':'matches','replace-text':'replace-text','find-start':'start'}[action]||action;
   // Page-held text is searched as sent: a revision means nothing there.
   const {revision,...rest}=body;void revision;
-  return engine({action:page,...rest,...textBody(d)});
+  return engine({action:page,...rest,...textBody(d)},signal);
  }
  // A background job (Count, Find All, Mark All, Copy Marked Text, Replace
  // All of a disk-backed document): started, then polled until it ends.
@@ -288,7 +309,7 @@ function create(a){
   return {error:'Select the text to search in first, or clear In selection.'};
  }
  function remember(list,value){
-  if(!value)return;
+  if(!value||value.length>4096)return;
   history[list]=[value,...history[list].filter(item=>item!==value)].slice(0,20);fillHistory();
   void engine({action:'remember',list,value}).catch(()=>{});
  }
@@ -316,7 +337,33 @@ function create(a){
  }
  function progressText(label,state){return label+'… '+Math.round(100*Math.min(1,state?.progress||0))+'%';}
 
+ // Search as you type (Normal mode, as the Find bar did): a pause in typing
+ // Find what moves to the first match from where the cursor was when the
+ // typing began. A newer keystroke cancels the search still running.
+ let typing=null;
+ function typed(){
+  root.clearTimeout(typing?.timer);typing?.controller?.abort();
+  const d=a.current(),input=el?.querySelector('[data-ed-query]');
+  if(!d||opts.mode!=='normal'||tab==='mark'||!input?.value||input.value.length>4096||!a.engine()||blockedRead(d)||a.comparing())return;
+  if(!typing||typing.uid!==d.uid)typing={uid:d.uid,at:a.selection(d).start};
+  const state=typing;
+  state.timer=root.setTimeout(async()=>{
+   const query=input.value,search={query,regex:false,matchCase:opts.matchCase,wholeWord:opts.word,dotAll:false};
+   const area=range(d);if(area.error||typing!==state)return;
+   const controller=new AbortController();state.controller=controller;
+   let result;
+   try{result=await call(d,'next',{search,at:state.at,within:area.within,backwards:false,wrap:opts.wrap},controller.signal);}catch{return;}
+   if(controller.signal.aborted||typing!==state||a.current()!==d||input.value!==query)return;
+   if(!result.found){status('Find: Can’t find the text “'+query+'”.',true);return;}
+   lastFound={uid:d.uid,revision:a.revision(d),from:result.from,to:result.to};
+   await a.select(d,result.from,result.to,false);
+   lastFound.revision=a.revision(d);refreshFound();
+   status('Match on line '+count(result.line+1)+'.');
+  },200);
+ }
+ function stopTyping(){root.clearTimeout(typing?.timer);typing?.controller?.abort();typing=null;}
  async function findNext(backwards=opts.backward){
+  stopTyping();
   const d=a.current(),blocked=blockedRead(d);if(blocked){status(blocked,true);return false;}
   const s=search();if(!s)return false;
   const area=range(d);if(area.error){status(area.error,true);return false;}
@@ -338,6 +385,7 @@ function create(a){
  }
 
  async function countMatches(){
+  stopTyping();
   const d=a.current(),blocked=blockedRead(d);if(blocked){status(blocked,true);return;}
   const s=search();if(!s)return;
   const area=range(d);if(area.error){status(area.error,true);return;}
@@ -351,6 +399,7 @@ function create(a){
 
  // ---- Find All and the Search results panel ----
  async function findAll(all){
+  stopTyping();
   const d=a.current();
   const s=search();if(!s)return;
   const docs=all?a.documents():[d].filter(Boolean);
@@ -369,6 +418,7 @@ function create(a){
    try{
     const state=await job(doc,'all',{search:s.search,within:area.within},value=>{f.rows=value.rows||0;f.hits=value.hits||0;f.progress=value.progress;scheduleRender();showProgress(progressText('Searching',value));});
     Object.assign(f,{job:state.job,revision:state.revision,rows:state.rows||0,hits:state.hits||0,state:'done'});
+    if(!f.hits){release(f.job);f.job='';}
     block.searched++;
    }catch(error){f.state='failed';f.note=error.message;}
    scheduleRender();
@@ -383,18 +433,27 @@ function create(a){
  async function pageRows(f,pageIndex){
   const key=f.job+':'+pageIndex;
   if(pages.has(key)){const value=pages.get(key);pages.delete(key);pages.set(key,value);return value;}
-  const promise=engine({action:'page',job:f.job,start:pageIndex*PAGE_ROWS,limit:PAGE_ROWS}).then(value=>{pages.set(key,value.items||[]);trimPages();scheduleRender();return value.items||[];},error=>{pages.delete(key);f.note=error.message;scheduleRender();return [];});
+  const promise=engine({action:'page',job:f.job,start:pageIndex*PAGE_ROWS,limit:PAGE_ROWS}).then(value=>{pages.set(key,value.items||[]);trimPages();scheduleRender();return value.items||[];},error=>{
+   if(error.status===409||/no longer available|cleared/i.test(error.message||'')){
+    // The engine no longer has these rows: say so, and never ask again.
+    for(const k of [...pages.keys()])if(k.startsWith(f.job+':'))pages.delete(k);
+    Object.assign(f,{gone:true,job:'',rows:0,note:GONE});
+   }else pages.set(key,{error:error.message});
+   scheduleRender();return [];
+  });
   pages.set(key,promise);trimPages();return promise;
  }
  function trimPages(){while(pages.size>PAGE_CACHE){const key=pages.keys().next().value;pages.delete(key);}}
  function cachedRow(f,index){
   const value=pages.get(f.job+':'+Math.floor(index/PAGE_ROWS));
   if(Array.isArray(value))return value[index%PAGE_ROWS]||null;
-  if(!value&&f.job)void pageRows(f,Math.floor(index/PAGE_ROWS));
+  if(!value&&f.job&&!f.gone)void pageRows(f,Math.floor(index/PAGE_ROWS));
   return null;
  }
  async function rowData(f,index){
   const cached=cachedRow(f,index);if(cached)return cached;
+  if(f.gone||!f.job)return null;
+  const value=pages.get(f.job+':'+Math.floor(index/PAGE_ROWS));if(value?.error)return null;
   const rows=await pageRows(f,Math.floor(index/PAGE_ROWS));return rows[index%PAGE_ROWS]||null;
  }
  function fileState(f){
@@ -409,10 +468,12 @@ function create(a){
    return {html:'<span class="nt-find-toggle" aria-hidden="true">'+(s.collapsed?'▸':'▾')+'</span><strong>Search “'+escapeHTML(s.raw)+'”</strong> ('+plural(hits,'hit','hits')+' in '+plural(found,'file','files')+' of '+count(searched)+' searched)'+(s.done?'':' · searching…')+' <span class="nt-find-tag">'+escapeHTML(s.tag)+'</span>',text:'Search "'+s.raw+'" ('+plural(hits,'hit','hits')+' in '+plural(found,'file','files')+' of '+count(searched)+' searched) '+s.tag};
   }
   if(item.type==='file'){
-   const f=item.f,state=fileState(f),note=f.state==='skipped'?' · skipped: '+f.note:f.state==='failed'?' · '+f.note:state==='closed'?' · closed':state==='changed'?' · changed since this search':'';
+   const f=item.f,state=fileState(f),note=f.gone?' · '+GONE:f.state==='skipped'?' · skipped: '+f.note:f.state==='failed'?' · '+f.note:state==='closed'?' · closed':state==='changed'?' · changed since this search':'';
    return {html:'<span class="nt-find-toggle" aria-hidden="true">'+(f.collapsed?'▸':'▾')+'</span><span class="nt-find-file" title="'+escapeHTML(f.title)+'">'+escapeHTML(f.title)+'</span> ('+plural(f.hits,'hit','hits')+')<span class="nt-find-note">'+escapeHTML(note)+'</span>',text:'  '+f.title+' ('+plural(f.hits,'hit','hits')+')'+note};
   }
   const row=cachedRow(item.f,item.index);
+  const failed=pages.get(item.f.job+':'+Math.floor(item.index/PAGE_ROWS))?.error;
+  if(!row&&failed)return {html:'<span class="nt-find-note">'+escapeHTML(failed)+'</span>',text:''};
   if(!row)return {html:'<span class="nt-find-line-number">Line …</span>',text:'',pending:true};
   return {html:'<span class="nt-find-line-number">Line '+count(row.line+1)+':</span> <span class="nt-find-line-text">'+rowHTML(row)+'</span>',text:'    Line '+(row.line+1)+': '+row.text,row};
  }
@@ -471,6 +532,7 @@ function create(a){
   if(state==='closed'){status(f.name+' was closed. Search again to find its matches.',true);return;}
   if(state==='changed'){status(f.name+' changed since this search. Search again to go to its matches.',true);scheduleRender();return;}
   if(a.comparing()){status('Close the comparison first.',true);return;}
+  if(f.gone){status(GONE,true);return;}
   const row=await rowData(f,item.index);if(!row)return;
   const hit=row.hits[Math.min(hitIndex,row.hits.length-1)]||[row.start,row.start];
   const d=a.byUid(f.uid);if(!d||fileState(f))return;
@@ -550,19 +612,30 @@ function create(a){
  // ---- Replace ----
  const writeBlocked=d=>!d?'Open or create a document first.':a.writeBlocked(d);
  async function replaceOne(){
+  stopTyping();
   const d=a.current(),blocked=writeBlocked(d);if(blocked){status(blocked,true);return;}
   const s=search();if(!s)return;
   const r=replacementText();if(r.error){status(r.error,true);return;}
   const area=range(d);if(area.error){status(area.error,true);return;}
   remember('find',s.raw);if(r.raw)remember('replace',r.raw);
-  const sel=a.selection(d);
-  if(sel.end>sel.start){
+  if(a.disk(d))await a.flush(d);
+  const sel=a.selection(d),before=a.revision(d);
+  // The selection is a match to replace: some text, or the match of empty
+  // text that Find Next just selected (^$ on an empty line).
+  const empty=sel.end===sel.start&&lastFound&&lastFound.uid===d.uid&&lastFound.revision===before&&lastFound.from===sel.start&&lastFound.to===sel.end;
+  if(sel.end>sel.start||empty){
    let result;
-   try{result=await call(d,'replace-text',{search:s.search,replacement:r.text,from:sel.start,to:sel.end,revision:a.revision(d)});}
+   try{result=await call(d,'replace-text',{search:s.search,replacement:r.text,from:sel.start,to:sel.end,revision:before});}
    catch(error){status(error.message,true);return;}
    if(a.current()!==d)return;
+   const now=a.selection(d);
+   if(a.revision(d)!==before||now.start!==sel.start||now.end!==sel.end){
+    // The document or the selection changed while the engine answered:
+    // nothing is replaced; the search goes on from where things are now.
+    await findNext(false);
+    return;
+   }
    if(result.found){
-    const before=a.revision(d);
     try{await a.replaceSelection(d,result.text);}catch(error){status(error.message,true);return;}
     if(scope&&scope.uid===d.uid&&scope.revision===before&&area.within){scope.to+=result.text.length-(sel.end-sel.start);scope.revision=a.revision(d);}
     const after=a.selection(d);
@@ -582,7 +655,7 @@ function create(a){
   if(a.disk(d)){
    a.diskBusy(d,true);
    try{
-    const state=await job(d,'replace',{search:s.search,replacement:r.text,within,revision:a.revision(d)},value=>showProgress(progressText('Replacing',value)));
+    const state=await job(d,'replace',{search:s.search,replacement:r.text,within,revision:0},value=>showProgress(progressText('Replacing',value)));
     release(state.job);
     await a.diskReplaced(d,state.metadata,state.count);
     return {count:state.count,from:state.from,to:state.to};
@@ -592,10 +665,11 @@ function create(a){
   if(!result.changed)return {count:result.count,from:within?.[0],to:within?.[1]};
   if(a.text(d)!==before)throw Error(a.nameOf(d)+' changed during Replace All. Nothing was replaced.');
   const to=within?within[1]+result.text.length-before.length:null;
-  if(!a.setText(d,result.text,within?within[0]:null,to))throw Error('The result of Replace All could not be applied to '+a.nameOf(d)+'.');
+  if(!await a.setText(d,result.text,within?within[0]:null,to))throw Error('The result of Replace All could not be applied to '+a.nameOf(d)+'.');
   return {count:result.count,from:within?.[0],to};
  }
  async function replaceAll(){
+  stopTyping();
   const d=a.current(),blocked=writeBlocked(d);if(blocked){status(blocked,true);return;}
   const s=search();if(!s)return;
   const r=replacementText();if(r.error){status(r.error,true);return;}
@@ -608,6 +682,7 @@ function create(a){
   }catch(error){status(error.message,true);}
  }
  async function replaceAllOpen(){
+  stopTyping();
   const s=search();if(!s)return;
   const r=replacementText();if(r.error){status(r.error,true);return;}
   remember('find',s.raw);if(r.raw)remember('replace',r.raw);
@@ -629,6 +704,7 @@ function create(a){
  // ---- Mark ----
  function marksOf(d){return d&&marks.get(d)||[];}
  async function markAll(){
+  stopTyping();
   const d=a.current(),blocked=blockedRead(d);if(blocked){status(blocked,true);return;}
   const s=search();if(!s)return;
   const area=range(d);if(area.error){status(area.error,true);return;}
@@ -656,15 +732,14 @@ function create(a){
  async function copyMarked(){
   const d=a.current(),blocked=blockedRead(d);if(blocked){status(blocked,true);return;}
   const list=marksOf(d);if(!list.length){status('Nothing is marked in this document. Use Mark All first.',true);return;}
-  const parts=[];let total=0;
   try{
-   for(const mark of list){
-    const state=await job(d,'copy',{search:mark.search,within:mark.within,separator:a.eol(d)},value=>showProgress(progressText('Reading marked text',value)));
-    release(state.job);if(state.count){parts.push(state.text);total+=state.count;}
-   }
-   if(!total){status('No marked text is left in this document.',true);return;}
-   await a.copyText(parts.join(a.eol(d)));
-   status('Copied the text of '+plural(total,'mark','marks')+'.');
+   // Every mark at once, in document order; text two marks share is
+   // copied once.
+   const state=await job(d,'copy',{marks:list.map(mark=>({search:mark.search,within:mark.within})),separator:a.eol(d)},value=>showProgress(progressText('Reading marked text',value)));
+   release(state.job);
+   if(!state.count){status('No marked text is left in this document.',true);return;}
+   await a.copyText(state.text);
+   status('Copied the text of '+plural(state.count,'mark','marks')+'.');
   }catch(error){status(error.message,true);}
  }
  // The marks of [from, to) of a document, for painting: an array of
@@ -735,11 +810,22 @@ function create(a){
   await a.goLine(d,target);
   a.setMessage('Bookmark on line '+count(target+1)+(wrapped&&list.length>1?' (wrapped around).':'.'));
  }
+ // An edit of a document: bookmarks follow its lines (shiftLines) and the
+ // range of a mark made In selection follows its text (shiftRange). An
+ // edit whose place is not known (Undo, Redo, Replace All or a text tool of
+ // a large document) keeps bookmarks on their line numbers and ranges at
+ // their positions, within the document.
  function edited(d,edit){
   const list=bookmarks.get(d);
   if(list?.length){
-   const next=edit.bulk?list.filter(line=>line<edit.lines):shiftLines(list,edit);
+   const last=Math.max(0,(edit.lines||1)-1);
+   const next=edit.bulk?[...new Set(list.map(line=>Math.min(line,last)))]:shiftLines(list,edit);
    if(next.length)bookmarks.set(d,next);else bookmarks.delete(d);
+  }
+  const ranges=marks.get(d);
+  if(ranges?.some(mark=>mark.within)&&!edit.bulk&&Number.isFinite(edit.from)){
+   marks.set(d,ranges.map(mark=>mark.within?{...mark,within:shiftRange(mark.within,edit)}:mark));
+   markVersion++;markCache.delete(d);
   }
  }
 
@@ -893,7 +979,7 @@ function create(a){
   if(!mount())return;
   if(a.comparing()){a.setMessage('Find is not available while documents are compared. Close the comparison first.',true);return;}
   const d=a.current(),input=el.querySelector('[data-ed-query]');
-  const wasHidden=el.hidden;el.hidden=false;
+  const wasHidden=el.hidden;el.hidden=false;typing=null;
   if(d){
    const sel=a.selection(d);
    if(sel.end>sel.start&&sel.end-sel.start<=1024){
@@ -973,6 +1059,7 @@ function create(a){
    if(!event.target.matches?.('[data-ed-query],[data-ed-replacement]'))return;
    lastField=event.target.matches('[data-ed-replacement]')?'replace':'find';
    explainCaret(type==='input');
+   if(type==='input'&&lastField==='find')typed();
   });
   el.addEventListener('input',event=>{if(event.target.matches('[data-ed-find-opacity]')){transparency.level=Math.max(20,Math.min(95,Number(event.target.value)||70));applyTransparency();}});
   el.addEventListener('focusin',applyTransparency);
@@ -989,6 +1076,14 @@ function create(a){
    head.addEventListener('pointermove',move);head.addEventListener('pointerup',end);head.addEventListener('pointercancel',end);
   });
   if(typeof root.ResizeObserver==='function')new root.ResizeObserver(()=>place()).observe(a.windowEl());
+  // A shortcut pressed in the window that neither the editor nor the app
+  // took must not reach the browser either (Ctrl+D would bookmark the page,
+  // Ctrl+P print it); the fields keep their own editing keys.
+  document.addEventListener('keydown',event=>{
+   if(!el.contains(event.target)||event.defaultPrevented||!(event.ctrlKey||event.metaKey)||event.altKey||event.key.length!==1)return;
+   if(['z','y','a','c','v','x'].includes(event.key.toLowerCase()))return;
+   event.preventDefault();
+  });
  }
  function bindPanel(){
   const scroll=panel.querySelector('[data-ed-find-results-scroll]');
@@ -1047,7 +1142,12 @@ function create(a){
    if(event.key==='Enter'&&event.target.matches('input[type="text"]')&&!event.defaultPrevented){event.preventDefault();if(tab==='mark')void markAll();else void findNext(event.shiftKey?!opts.backward:opts.backward);return true;}
    const tabs=event.target.closest('[data-ed-find-tab]');
    if(tabs&&['ArrowLeft','ArrowRight','Home','End'].includes(event.key)){event.preventDefault();const ids=TABS.map(([id])=>id),at=ids.indexOf(tab),next=event.key==='Home'?0:event.key==='End'?ids.length-1:(at+(event.key==='ArrowLeft'?-1:1)+ids.length)%ids.length;setTab(ids[next],false);el.querySelector('[data-ed-find-tab="'+ids[next]+'"]').focus();return true;}
-   return true;
+   // The fields' own editing (undo, select all, copy, paste, cut) and
+   // typing stay in the window; Ctrl+S, Ctrl+N, Ctrl+O, Ctrl+Shift+F and
+   // the editor's and the app's other shortcuts, and the bookmark keys, go
+   // on to the editor, which handles them as from the text.
+   const fieldKey=(event.ctrlKey||event.metaKey)&&!event.altKey&&!event.shiftKey&&['z','y','a','c','v','x'].includes(k)||(event.ctrlKey||event.metaKey)&&event.shiftKey&&!event.altKey&&k==='z';
+   if(fieldKey||!(event.ctrlKey||event.metaKey)&&event.key!=='F2')return true;
   }
   if(event.key==='F2'&&!event.altKey&&!event.shiftKey&&ctrl){event.preventDefault();toggleBookmark();return true;}
   if(event.key==='F2'&&!event.altKey&&!ctrl){event.preventDefault();void nextBookmark(event.shiftKey);return true;}
@@ -1072,6 +1172,9 @@ function create(a){
   marksIn,hasMarks:d=>marksOf(d).length>0||!!currentMatch(d),
   bookmarks:d=>{const list=bookmarks.get(d);return list?.length?new Set(list):null;},
   hasBookmarks:d=>!!bookmarks.get(d)?.length,
+  // Whether edits of a document must be followed (bookmarks, or marks made
+  // In selection).
+  follows:d=>!!bookmarks.get(d)?.length||marksOf(d).some(mark=>mark.within),
   toggleBookmark,nextBookmark,
   showResults:show=>{mount();showPanel(show===undefined?panel.hidden:!!show);},
   resultsShown:()=>!!panel&&!panel.hidden,
@@ -1082,6 +1185,6 @@ function create(a){
   get renderedRows(){return panel?panel.querySelectorAll('.nt-find-row').length:0;}
  });
 }
-root.NTKEditorFind=Object.freeze({create,layout,rowAt,rowHTML,shiftLines,explain,GUIDE,MODE_HELP});
-if(typeof module==="object"&&module.exports)module.exports={create,layout,rowAt,rowHTML,shiftLines,explain,GUIDE,MODE_HELP};
+root.NTKEditorFind=Object.freeze({create,layout,rowAt,rowHTML,shiftLines,shiftRange,explain,GUIDE,MODE_HELP});
+if(typeof module==="object"&&module.exports)module.exports={create,layout,rowAt,rowHTML,shiftLines,shiftRange,explain,GUIDE,MODE_HELP};
 })(globalThis);

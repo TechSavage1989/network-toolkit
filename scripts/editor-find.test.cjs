@@ -31,9 +31,22 @@ test('a row marks its hits, cut to its text, and escapes the text',()=>{
 
 test('bookmarks move with the lines an edit adds or removes',()=>{
  assert.deepEqual(find.shiftLines([2,10,20],{line:5,removed:0,inserted:2}),[2,12,22]);
- assert.deepEqual(find.shiftLines([2,10,20],{line:5,removed:6,inserted:1}),[2,5,15],'a bookmark on a removed line moves to the edit');
+ assert.deepEqual(find.shiftLines([2,10,20],{line:5,removed:6,inserted:1}),[2,6,15],'a bookmark on a removed line moves to the edit\'s last line');
+ assert.deepEqual(find.shiftLines([2,6,20],{line:5,removed:6,inserted:3}),[2,6,17],'one inside the edit stays on its line while it exists');
  assert.deepEqual(find.shiftLines([5,6,7],{line:5,removed:2,inserted:0}),[5],'and never twice');
  assert.deepEqual(find.shiftLines([0,3],{line:3,removed:0,inserted:4}),[0,3],'the edited line itself keeps its bookmark');
+ // Replace All of a word on lines 5 and 40, a sort, Undo of such a change:
+ // as many lines as before, every bookmark stays (one stretch of 35 lines).
+ assert.deepEqual(find.shiftLines([10,20,30],{line:5,removed:35,inserted:35}),[10,20,30]);
+});
+
+test('the range of a mark made In selection follows the text it holds',()=>{
+ assert.deepEqual(find.shiftRange([10,20],{from:0,to:0,length:5}),[15,25],'text typed before it');
+ assert.deepEqual(find.shiftRange([10,20],{from:25,to:30,length:0}),[10,20],'text removed after it');
+ assert.deepEqual(find.shiftRange([10,20],{from:12,to:14,length:6}),[10,24],'an edit inside it');
+ assert.deepEqual(find.shiftRange([10,20],{from:5,to:12,length:1}),[5,14],'an edit across its start');
+ assert.deepEqual(find.shiftRange([10,20],{from:20,to:20,length:3}),[10,20],'text typed at its end stays outside');
+ assert.deepEqual(find.shiftRange([10,20],{from:10,to:10,length:3}),[13,23],'text typed at its start stays outside');
 });
 
 test('the syntax guide lists each mode, and Replace with on the Replace tab',()=>{

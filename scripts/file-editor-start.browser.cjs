@@ -55,7 +55,7 @@ const text='# START OF DOCUMENT\n'+Array.from({length:300},(_,i)=>'Line '+(i+2)+
    await bottom();await page.locator('[data-ed="reload"]').click();await page.waitForFunction(()=>document.querySelector('[data-ed-text]').selectionStart===0);await atStart('reload');assert.equal(await input().inputValue(),text);
    await bottom();await openLocal(file+'-second');await bottom();await openLocal(file);
    // Ordinary Find and manual navigation still reach the end of the file.
-   await page.locator('[data-ed="find"]').click();await page.fill('[data-ed-query]','END OF DOCUMENT');await page.locator('[data-ed="next"]').click();await page.waitForFunction(()=>{const ta=document.querySelector('[data-ed-text]');return ta.value.slice(ta.selectionStart,ta.selectionEnd)==='END OF DOCUMENT';});await settled();assert(await input().evaluate(el=>el.selectionStart>0&&el.scrollTop>0));await page.locator('[data-ed="hideFind"],[data-ed-find-close]').click();assert(await input().evaluate(el=>el.scrollTop>0));
+   await page.locator('[data-ed="find"]').click();await page.fill('[data-ed-query]','END OF DOCUMENT');/* Search as you type: a pause in typing selects the first match from the cursor (debounced). */await page.waitForFunction(()=>{const ta=document.querySelector('[data-ed-text]');return ta.value.slice(ta.selectionStart,ta.selectionEnd)==='END OF DOCUMENT';});await settled();assert(await input().evaluate(el=>el.selectionStart>0&&el.scrollTop>0));await page.locator('[data-ed="hideFind"],[data-ed-find-close]').click();assert(await input().evaluate(el=>el.scrollTop>0));
    layouts.push({width,theme,mode});await close();
   }
   await page.setViewportSize({width:1280,height:900});await page.evaluate(()=>navigate('editor'));
