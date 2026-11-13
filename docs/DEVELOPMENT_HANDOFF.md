@@ -1,3 +1,11 @@
+# CI: the intermittent editor-layout-map failure explained and fixed (2026-11-13)
+
+`scripts/editor-layout-map.browser.cjs` (browser-workflows107) timed out now and then in `locator.fill` of a comparison editor (Checks push run 43378638847, attempt 1). The call log has no "element is not …" retry: the page was busy, not hidden or disabled. Chromium inserts Playwright's 600-line fill one line at a time, with a forced style and layout per line, and every update restyled ~630 elements. Cause: an obsolete rule, `.diagnostic-page #toolResult:has(.result-graph-entry) .graph-run-details[open]>div` (the run details control was removed; features-93 checks it is gone). Chromium shares one invalidation set among all `:has()` rules, scheduled on body here, and a bare `div` in it matches every div of the page. Each fill took 20 to 22 s locally and about 19 s on the passing hosted run, against the 20 s action limit. Word wrap, the theme and the comparison code were not involved.
+
+Fix: the `.graph-run-details` rules are removed (result-details.css, graph-workspace.css). Locally, one inserted line now restyles 49 elements instead of 536 to 630, and each fill takes about 6 s. New checks: `scripts/css-has-invalidation.test.cjs` rejects a bare frequent tag after a non-subject `:has()`, and the browser script asserts the restyle count per inserted line (median ≤ 150) and records both fill times. Both fail without the fix. Rule in AGENTS.md (CSS `:has()`). No version bump or release.
+
+---
+
 # v1.21.52 Beta 1 - The document icon through Open with entries
 
 Owner, after Setup 1.21.50/51 and setting .txt/.conf/.json to the Text Editor in Settings → Default apps: the files still show the Text Editor's program icon (the page on the dark tile), not the document icon. The released exe's icon groups are in order, so `"…\Network_Toolkit.exe",3` is the document icon and the ProgID already used it: the files were associated through an Applications entry. Explorer shows the `DefaultIcon` of the key the UserChoice names; `Applications\Network_Toolkit.exe\DefaultIcon` was the editor icon (1), and Windows' own `Applications\Network_Toolkit_TextEditor.exe` (written when the user picks that program in Open with) has none, so its files show that program's icon 0, also the tile.

@@ -51,6 +51,20 @@ async function snapshot(page){return page.evaluate(()=>{const d=NetworkToolkitFi
 
 async function compareText(page,side){return page.evaluate(side=>NetworkToolkitFileEditor.documents.get(NetworkToolkitFileEditor.comparison.selection[side]).content,side);}
 async function ready(p){await p.waitForFunction(()=>document.querySelector('[data-compare-map]')?.getAttribute('aria-disabled')==='false');await settle(p);}
+// Chromium inserts multi-line text (fill, IME) one line at a time and updates
+// style after each line. A bare-tag subject after a non-subject :has() once
+// made every update restyle ~600 elements, so a 600-line fill took ~20 s, the
+// action limit (see css-has-invalidation.test.cjs). Count elements per update.
+async function restyledPerInsertedLine(page,editor){
+ const text=Array.from({length:24},(_,i)=>'const restyle'+i+' = '+i+';').join('\n');
+ await browser.startTracing(page,{categories:['blink','devtools.timeline','disabled-by-default-devtools.timeline']});
+ let trace;try{await editor.fill(text);}finally{trace=JSON.parse(String(await browser.stopTracing()));}
+ const events=trace.traceEvents||trace,insert=events.filter(e=>e.name==='TypingCommand::InsertText'&&e.ph==='X').sort((a,b)=>b.dur-a.dur)[0];
+ assert(insert,'Chromium did not insert the filled text through its typing command; review this check');
+ const counts=events.filter(e=>e.name==='UpdateLayoutTree'&&e.pid===insert.pid&&e.tid===insert.tid&&e.ts>=insert.ts&&e.ts<=insert.ts+insert.dur&&Number.isFinite(e.args?.elementCount)).map(e=>e.args.elementCount).sort((a,b)=>a-b);
+ assert(counts.length>=24,'Expected a style update per inserted line, saw '+counts.length);
+ return {lines:24,updates:counts.length,median:counts[counts.length>>1],max:counts.at(-1),insertMs:Math.round(insert.dur/1000)};
+}
 async function compareOpen(p){await p.locator('[data-ed="compare"]').click();await ready(p);}
 (async()=>{
  assert(baseline&&fs.existsSync(path.join(baseline,'web/index.html')),'Provide the verified110 baseline');
@@ -101,7 +115,10 @@ async function compareOpen(p){await p.locator('[data-ed="compare"]').click();awa
    for(const pair of [['',''],['a','b'],[Array.from({length:900},(_,i)=>'left'+i).join('\n'),Array.from({length:950},(_,i)=>'right'+i).join('\n')]]){await p.evaluate(([a,b])=>{const c=NetworkToolkitFileEditor.comparison,l=NetworkToolkitFileEditor.documents.get(c.selection.left),r=NetworkToolkitFileEditor.documents.get(c.selection.right);l.content=a;r.content=b;l.editRevision++;r.editRevision++;c.refresh(true);},pair);await ready(p);assert.equal(await p.locator('[data-compare-map-viewport]:visible').count(),2);}
    check('empty, one-line, unequal-length and heavily changed documents render both tracks');
    await p.setViewportSize({width:1440,height:1000});await p.uncheck('[data-ed-wrap]');await p.evaluate(()=>setTheme('dark'));
-   const example=Array.from({length:600},(_,i)=>'const synthetic'+i+' = '+i+';'),revised=example.slice();revised.splice(450,15,...Array.from({length:15},(_,i)=>'const modified'+i+' = true;'));revised.splice(260,0,...Array.from({length:35},(_,i)=>'const added'+i+' = true;'));revised.splice(90,25);await left.fill(example.join('\n'));await ready(p);await right.fill(revised.join('\n'));await ready(p);
+   const restyle=report.restylePerInsertedLine=await restyledPerInsertedLine(p,left);await ready(p);
+   assert(restyle.median<=150,'Each inserted editor line restyles '+restyle.median+' elements; a frequent bare tag after :has() restyles the whole page '+JSON.stringify(restyle));
+   check('a line inserted into a comparison editor restyles '+restyle.median+' elements, not the page');
+   const example=Array.from({length:600},(_,i)=>'const synthetic'+i+' = '+i+';'),revised=example.slice();revised.splice(450,15,...Array.from({length:15},(_,i)=>'const modified'+i+' = true;'));revised.splice(260,0,...Array.from({length:35},(_,i)=>'const added'+i+' = true;'));revised.splice(90,25);const fillMs=report.comparisonFillMs=[];for(const [editor,lines] of [[left,example],[right,revised]]){const started=Date.now();await editor.fill(lines.join('\n'));fillMs.push(Date.now()-started);await ready(p);}
    await p.waitForFunction(()=>[
     ['left','removed'],['right','added'],['left','changed'],['right','changed']
    ].every(([side,kind])=>document.querySelector('[data-compare-map-marks="'+side+'"] .'+kind)));
