@@ -4,6 +4,7 @@ import (
 	"html"
 	"io"
 	"strconv"
+	"strings"
 	"unicode"
 	"unicode/utf8"
 )
@@ -308,8 +309,8 @@ func htmlDecode(j *job) error {
 			continue
 		}
 		entity := "&" + string(p[:end+1])
-		text := html.UnescapeString(entity)
-		if text == entity {
+		text, ok := completeEntity(entity)
+		if !ok {
 			if err = j.out.Keep(1); err != nil {
 				return err
 			}
@@ -331,6 +332,35 @@ func htmlDecode(j *job) error {
 			return err
 		}
 	}
+}
+
+// completeEntity decodes "&name;", "&#NNN;" or "&#xHH;" when the whole of
+// it is one reference. Go's decoder also takes the legacy names that may
+// stand without a semicolon (&not, &amp, &copy ...) as the start of a longer
+// name ("&notit;" would become "¬it;"); such text stays as written. A whole
+// named reference never leaves its semicolon behind, except &semi; itself.
+func completeEntity(entity string) (string, bool) {
+	name := entity[1 : len(entity)-1]
+	if name[0] == '#' {
+		digits, base := name[1:], 10
+		if len(digits) > 0 && (digits[0] == 'x' || digits[0] == 'X') {
+			digits, base = digits[1:], 16
+		}
+		if digits == "" {
+			return "", false
+		}
+		for i := 0; i < len(digits); i++ {
+			if _, ok := hexValue(digits[i]); !ok || base == 10 && digits[i] > '9' {
+				return "", false
+			}
+		}
+		return html.UnescapeString(entity), true
+	}
+	text := html.UnescapeString(entity)
+	if text == entity || strings.HasSuffix(text, ";") && name != "semi" {
+		return "", false
+	}
+	return text, true
 }
 
 func htmlEncode(j *job) error {

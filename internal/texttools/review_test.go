@@ -101,6 +101,23 @@ func TestDecodersFlushLongRunsOfEscapes(t *testing.T) {
 	}
 }
 
+// HTML entities decode takes only complete references: a name that only
+// starts with a legacy entity name (&not, &amp, &copy) stays as written.
+func TestHTMLDecodeTakesOnlyCompleteReferences(t *testing.T) {
+	for in, want := range map[string]string{
+		"&notit;":                                "&notit;",
+		"&ampfoo;":                               "&ampfoo;",
+		"&copy2;":                                "&copy2;",
+		"&#x41g;":                                "&#x41g;",
+		"&not; &amp; &copy; &semi; &#65; &#x42;": "¬ & © ; A B",
+	} {
+		got, _, err := run(t, "html-decode", Options{}, in)
+		if err != nil || got != want {
+			t.Errorf("%q: %q, want %q (%v)", in, got, want, err)
+		}
+	}
+}
+
 // The result of a tool over page-held text is held in memory and sent to the
 // page: it stops at its bound.
 func TestPageHeldResultIsBounded(t *testing.T) {
