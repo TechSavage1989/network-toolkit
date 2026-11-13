@@ -105,9 +105,9 @@ test('resize divider supports keyboard, captured pointer, and keyboard/double-cl
 test('unhandled rail shortcuts reach existing editor save/find handlers and native Enter/Space stays available',()=>{
  const h=harness();h.api.initialize(h.editor);const shell=h.host.closest('.nt-editor-files-shell'),files=shell.querySelector('[data-editor-files-panel="files"]'),calls=[];
  const source=fs.readFileSync(require.resolve('../web/assets/file-editor.js'),'utf8'),start=source.indexOf('function keydown(ev){'),end=source.indexOf('async function reload()',start);
- Object.assign(h.root,{tabMenu:null,pendingEditorDialog:null,comparison:null,current:()=>({}),findEl:()=>({focus:()=>calls.push('focus')}),save:shift=>calls.push('save:'+!!shift),draw:()=>calls.push('draw'),showFind:false,showReplace:false});vm.runInNewContext(source.slice(start,end)+';globalThis.editorKeydown=keydown;',h.root);
+ Object.assign(h.root,{tabMenu:null,pendingEditorDialog:null,comparison:null,current:()=>({}),findEl:()=>({focus:()=>calls.push('focus')}),save:shift=>calls.push('save:'+!!shift),draw:()=>calls.push('draw'),findWindow:{key:ev=>{if((ev.ctrlKey||ev.metaKey)&&ev.key==='f'){ev.preventDefault();calls.push('find window');return true;}return false;}}});vm.runInNewContext(source.slice(start,end)+';globalThis.editorKeydown=keydown;',h.root);
  for(const modifier of ['ctrlKey','metaKey'])for(const key of ['s','f']){let stopped=false,prevented=false;const event={target:files,key,[modifier]:true,preventDefault(){prevented=true;},stopPropagation(){stopped=true;}};shell.emit('keydown',files,event);assert.equal(stopped,false);assert.equal(prevented,false);h.root.editorKeydown(event);assert.equal(prevented,true);}
- assert.deepEqual(calls,['save:false','draw','focus','save:false','draw','focus']);
+ assert.deepEqual(calls,['save:false','find window','save:false','find window']);
  for(const props of [{key:'k',ctrlKey:true},{key:'k',metaKey:true},{key:'Tab'},{key:'Enter'},{key:' '}]){let stopped=false,prevented=false;shell.emit('keydown',files,{...props,preventDefault(){prevented=true;},stopPropagation(){stopped=true;}});assert.equal(stopped,false);assert.equal(prevented,false);assert.equal(h.host.hidden,false);assert.equal(h.host.dataset.editorSidebarPanel,'files');}
 });
 

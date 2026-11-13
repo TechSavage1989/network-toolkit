@@ -221,7 +221,7 @@ const step=name=>console.log('FIND WINDOW '+name);
   await results().locator('.nt-find-row',{hasText:'second.txt'}).first().click();
   await page.keyboard.press('ArrowDown');await page.keyboard.press('Enter');
   await messageIs(/second\.txt changed since this search/);
-  assert.match(await results().locator('.nt-find-row.is-file',{hasText:'second.txt'}).first().textContent(),/changed since this search/);
+  await until(()=>[...document.querySelectorAll('.nt-find-row.is-file')].some(r=>r.textContent.includes('second.txt')&&r.textContent.includes('changed since this search')));
   await text().focus();await page.keyboard.press('Control+z');
   await results().locator('.nt-find-row.is-search').first().click({button:'right'});
   await page.locator('.nt-find-results-menu [data-ed-find-menu="clear"]').click();
@@ -317,7 +317,7 @@ const step=name=>console.log('FIND WINDOW '+name);
   // Copy Marked Text: the text of every mark.
   await win().locator('[data-ed-find-action="copy-marks"]').click();
   await messageIs(/^Copied the text of 5 marks\.$/);
-  assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),'192.0.2.1\n192.0.2.10\n192.0.2.11\n192.0.2.12\nlab-switch');
+  assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),'192.0.2.1\n192.0.2.1\n192.0.2.1\n192.0.2.1\nlab-switch','the text of each mark: 192.0.2.1 also marks the start of 192.0.2.10');
   await option('purge').check();
   await query('vlan 120');await win().locator('[data-ed-find-action="mark"]').click();
   await until(()=>document.querySelectorAll('[data-ed-marks] mark').length===1);
@@ -326,7 +326,7 @@ const step=name=>console.log('FIND WINDOW '+name);
   await until(()=>!document.querySelector('[data-ed-marks] mark'));
   await option('purge').uncheck();
   // Marks on a disk-backed document: only the part in view is searched.
-  await activate('hits.txt');await settled();
+  await activate('hits.txt');await settled();await text().focus();await page.keyboard.press('Control+Home');
   await query('name vlan-1');await option('bookmark').uncheck();
   await win().locator('[data-ed-find-action="mark"]').click();
   await messageIs(/^Mark: 11,111 matches\.$/);
