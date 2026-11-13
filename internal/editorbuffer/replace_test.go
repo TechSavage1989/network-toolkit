@@ -198,6 +198,8 @@ func TestBinaryBufferRefusesEveryWrite(t *testing.T) {
 	_, refusals["ReplaceAll"] = s.ReplaceAll(context.Background(), "name", "x", false, true, false)
 	_, refusals["ReplaceAll without a match"] = s.ReplaceAll(context.Background(), "absent", "x", false, true, false)
 	_, _, refusals["ReplaceText (one Replace)"] = s.ReplaceText(context.Background(), "name", "x", 6, 10, false, true, false)
+	_, refusals["ReplaceAllIn (Replace All in selection, Find window)"] = s.ReplaceAllIn(context.Background(), Search{Query: "name", MatchCase: true}, "x", 0, 10, nil)
+	_, _, refusals["ReplaceTextFor (one Replace, Find window)"] = s.ReplaceTextFor(context.Background(), Search{Query: "name", MatchCase: true, DotAll: true}, "x", 6, 10)
 	_, refusals["Rewrite (a text tool)"] = s.Rewrite(context.Background(), 0, 1, false, func(src *RangeSource, out Edits) (bool, error) {
 		out.Drop(src.Size())
 		return true, out.Insert([]byte("x"))

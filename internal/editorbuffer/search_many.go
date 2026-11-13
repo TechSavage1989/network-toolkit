@@ -17,10 +17,29 @@ type searchCursor struct {
 	chunk    []byte
 	base     int64
 	at       int64
-	err      error
+	// limit is where reading stops, as if the document ended there (the end
+	// of a range searched "In selection"); -1 is the end of the document.
+	limit int64
+	err   error
+	// onRead, when set, is told the position of each piece the cursor reads
+	// (the progress of a long search).
+	onRead func(at int64)
 }
 
+// current is the text from the cursor to the end of its piece, or to the
+// limit when that comes first.
 func (c *searchCursor) current() ([]byte, error) {
+	if c.limit >= 0 && c.at >= c.limit {
+		return nil, io.EOF
+	}
+	data, err := c.piece()
+	if err == nil && c.limit >= 0 && int64(len(data)) > c.limit-c.at {
+		data = data[:c.limit-c.at]
+	}
+	return data, err
+}
+
+func (c *searchCursor) piece() ([]byte, error) {
 	if c.at >= c.base && c.at-c.base < int64(len(c.chunk)) {
 		return c.chunk[c.at-c.base:], nil
 	}
@@ -40,6 +59,9 @@ func (c *searchCursor) current() ([]byte, error) {
 			data, err := c.snapshot.b.bytes(n.part)
 			if err != nil {
 				return nil, err
+			}
+			if c.onRead != nil {
+				c.onRead(start)
 			}
 			c.chunk, c.base = data, start
 			return data[c.at-start:], nil
@@ -69,10 +91,18 @@ type matchScan struct {
 	// groups holds the byte range of each group of the last match (-1 for a
 	// group that took no part), group 0 being the whole match.
 	groups []int64
+	// limit is the byte position where the searched text ends (-1: the end
+	// of the document). The text before a match is still read, so anchors
+	// and word boundaries see the document.
+	limit int64
 }
 
 func (s *Snapshot) matchScan(ctx context.Context, query string, regex, matchCase, wholeWord bool) (*matchScan, error) {
-	pattern, err := searchPattern(query, regex, matchCase, wholeWord)
+	return s.searchScan(ctx, Search{Query: query, Regex: regex, MatchCase: matchCase, WholeWord: wholeWord})
+}
+
+func (s *Snapshot) searchScan(ctx context.Context, q Search) (*matchScan, error) {
+	pattern, err := q.pattern()
 	if err != nil {
 		return nil, err
 	}
@@ -84,9 +114,9 @@ func (s *Snapshot) matchScan(ctx context.Context, query string, regex, matchCase
 	if err != nil {
 		return nil, err
 	}
-	result := &matchScan{pattern: plain, resumed: resumed, cursor: searchCursor{snapshot: s, ctx: ctx}, previous: searchCursor{snapshot: s, ctx: ctx}}
-	if !regex && matchCase && !wholeWord {
-		result.literal = []byte(query)
+	result := &matchScan{pattern: plain, resumed: resumed, cursor: searchCursor{snapshot: s, ctx: ctx, limit: -1}, previous: searchCursor{snapshot: s, ctx: ctx, limit: -1}, limit: -1}
+	if !q.Regex && q.MatchCase && !q.WholeWord {
+		result.literal = []byte(q.Query)
 	}
 	return result, nil
 }
@@ -96,9 +126,13 @@ func (m *matchScan) next(at int64) (int64, int64, bool, error) {
 		return 0, 0, false, err
 	}
 	total := size(m.cursor.snapshot.root).bytes
+	if m.limit >= 0 && m.limit < total {
+		total = m.limit
+	}
 	if at > total {
 		return 0, 0, false, nil
 	}
+	m.cursor.limit = m.limit
 	if len(m.literal) > 0 {
 		return m.nextLiteral(at, total)
 	}

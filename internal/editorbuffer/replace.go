@@ -60,6 +60,13 @@ func (w *leafWalk) next() (piece, bool) {
 // replacement is a template ($1, ${name}, \n ...: template.go); the text of
 // a group is copied from the document a chunk at a time.
 func (s *Snapshot) ReplaceAll(ctx context.Context, query, replacement string, regex, matchCase, wholeWord bool) (*Replacement, error) {
+	return s.ReplaceAllIn(ctx, Search{Query: query, Regex: regex, MatchCase: matchCase, WholeWord: wholeWord}, replacement, 0, -1, nil)
+}
+
+// ReplaceAllIn is ReplaceAll of the matches in [from, to) only (to < 0: the
+// end of the document): Replace All "In selection" of the Find window. The
+// text outside the range is kept as it is.
+func (s *Snapshot) ReplaceAllIn(ctx context.Context, q Search, replacement string, from, to int64, progress func(float64)) (*Replacement, error) {
 	b := s.b
 	if b.binary {
 		return nil, ErrBinary
@@ -67,10 +74,15 @@ func (s *Snapshot) ReplaceAll(ctx context.Context, query, replacement string, re
 	if err := validateEditFragment(replacement); err != nil {
 		return nil, err
 	}
-	scan, err := s.matchScan(ctx, query, regex, matchCase, wholeWord)
+	lo, hi, err := s.span(from, to)
 	if err != nil {
 		return nil, err
 	}
+	scan, err := s.scanIn(ctx, q, lo, hi, progress)
+	if err != nil {
+		return nil, err
+	}
+	regex := q.Regex
 	var parts []templatePart
 	if regex {
 		if parts, err = parseTemplate(replacement, scan.pattern.SubexpNames()); err != nil {
@@ -217,7 +229,7 @@ func (s *Snapshot) ReplaceAll(ctx context.Context, query, replacement string, re
 		return nil
 	}
 	total := size(s.root).bytes
-	for at := int64(0); at <= total; {
+	for at := lo; at <= hi; {
 		from, to, found, err := scan.next(at)
 		if err != nil {
 			return nil, err
@@ -370,16 +382,22 @@ func (s *Snapshot) copyBytes(ctx context.Context, from, to int64, fn func([]byte
 // [from, to): with a regular expression its template is expanded with that
 // match's groups. found is false when the selection is not such a match.
 func (s *Snapshot) ReplaceText(ctx context.Context, query, replacement string, from, to int64, regex, matchCase, wholeWord bool) (string, bool, error) {
+	return s.ReplaceTextFor(ctx, Search{Query: query, Regex: regex, MatchCase: matchCase, WholeWord: wholeWord}, replacement, from, to)
+}
+
+// ReplaceTextFor is ReplaceText for a search of the Find window.
+func (s *Snapshot) ReplaceTextFor(ctx context.Context, q Search, replacement string, from, to int64) (string, bool, error) {
 	if s.b.binary {
 		return "", false, ErrBinary
 	}
 	if err := validateEditFragment(replacement); err != nil {
 		return "", false, err
 	}
-	scan, err := s.matchScan(ctx, query, regex, matchCase, wholeWord)
+	scan, err := s.searchScan(ctx, q)
 	if err != nil {
 		return "", false, err
 	}
+	regex := q.Regex
 	start, err := s.bytePosition(s.root, from)
 	if err != nil {
 		return "", false, err

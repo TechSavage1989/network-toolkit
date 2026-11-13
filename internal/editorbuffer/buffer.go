@@ -146,6 +146,9 @@ type Buffer struct {
 	eol *eolMap
 	// binary marks the display-only rendering of a file that is not text.
 	binary bool
+	// mem holds the text of a read-only TextSnapshot (find.go) instead of a
+	// scratch file.
+	mem []byte
 }
 
 func empty(dir string) (*Buffer, error) {
@@ -156,6 +159,9 @@ func empty(dir string) (*Buffer, error) {
 	return &Buffer{file: f, revision: 1}, nil
 }
 func (b *Buffer) append(p []byte) (*node, error) {
+	if b.file == nil {
+		return nil, errors.New("this text is read-only")
+	}
 	var tree *node
 	for len(p) > 0 {
 		n := min(len(p), ChunkBytes)
@@ -178,6 +184,10 @@ func (b *Buffer) append(p []byte) (*node, error) {
 	return tree, nil
 }
 func (b *Buffer) bytes(p piece) ([]byte, error) {
+	if b.mem != nil {
+		end := p.offset + p.bytes
+		return b.mem[p.offset:end:end], nil
+	}
 	data := make([]byte, int(p.bytes))
 	_, e := b.file.ReadAt(data, p.offset)
 	return data, e
@@ -524,6 +534,10 @@ func (b *Buffer) Close() error {
 		return nil
 	}
 	b.closed = true
+	if b.file == nil {
+		b.mem = nil
+		return nil
+	}
 	e := b.file.Close()
 	remove := os.Remove(b.file.Name())
 	if e != nil {

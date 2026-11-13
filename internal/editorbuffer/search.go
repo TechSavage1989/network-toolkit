@@ -119,6 +119,9 @@ type Match struct {
 	From     int64  `json:"from"`
 	To       int64  `json:"to"`
 	Line     int64  `json:"line"`
+	// Wrapped: the match was found after the search wrapped around the end
+	// (or, searching backwards, the start) of the searched range.
+	Wrapped bool `json:"wrapped,omitempty"`
 }
 
 func (s *Snapshot) Find(ctx context.Context, query string, from int64, regex, matchCase, wholeWord bool) (Match, error) {
@@ -178,12 +181,28 @@ func resumeSearchPattern(pattern string) string {
 }
 
 func searchPattern(query string, regex, matchCase, wholeWord bool) (string, error) {
+	return Search{Query: query, Regex: regex, MatchCase: matchCase, WholeWord: wholeWord}.pattern()
+}
+
+// pattern is the regular expression of a search. A regular expression is
+// read as the Find window shows it (as in Notepad++): ^ and $ match at the
+// start and end of every line, and "." matches a line break only with
+// DotAll (". matches newline").
+func (q Search) pattern() (string, error) {
+	query, regex := q.Query, q.Regex
 	if query == "" || len(query) > 4096 {
 		return "", errors.New("enter a search pattern of up to 4096 bytes")
 	}
 	if !regex {
 		query = regexp.QuoteMeta(query)
+	} else if q.DotAll {
+		// Flags at the start, not a group around the pattern: a pattern with
+		// an unbalanced parenthesis stays an invalid pattern.
+		query = "(?ms)" + query
+	} else {
+		query = "(?m)" + query
 	}
+	matchCase, wholeWord := q.MatchCase, q.WholeWord
 	if wholeWord {
 		query = `\b(?:` + query + `)\b`
 	}
