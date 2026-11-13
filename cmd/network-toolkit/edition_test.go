@@ -24,6 +24,7 @@ func editionFlags() (*flag.FlagSet, editorLaunchOptions) {
 	flags.Bool("version", false, "")
 	flags.Bool("no-browser", false, "")
 	flags.String("data-dir", "", "")
+	flags.String("update-health", "", "")
 	return flags, registerEditorLaunchOptions(flags)
 }
 
@@ -222,6 +223,87 @@ func TestOpenWithArgumentPerEdition(t *testing.T) {
 	// A restart after an update opens the Text Editor again, without the file.
 	if got := updateRestartArgs([]string{file}); strings.Join(got, " ") != "--editor-standalone" {
 		t.Fatalf("restart arguments after an Open with start: %v", got)
+	}
+}
+
+// A copy of 1.21.50 or older started through Windows' Open with ignored the
+// file and kept it as its restart argument; its update helper then starts the
+// new version as "<file>" --update-health <stage folder>. That one shape is a
+// main window after an update, with the file dropped; anything else beside a
+// file is still refused, so the update is never rolled back for it.
+func TestOpenWithArgumentFromAnOlderUpdateHelper(t *testing.T) {
+	file := filepath.Join(t.TempDir(), "gone since.json") // need not exist any more
+	stage := filepath.Join(t.TempDir(), ".network-toolkit-update-x")
+	type result struct {
+		refused bool
+		health  string
+		editor  bool
+		path    string
+	}
+	run := func(edition, goos string, args []string) result {
+		t.Helper()
+		flags, options := editionFlags()
+		if err := flags.Parse(args); err != nil {
+			return result{refused: true}
+		}
+		if err := applyOpenWithArgument(flags, args, edition, goos); err != nil {
+			return result{refused: true}
+		}
+		if err := applyBuildEdition(flags, edition); err != nil {
+			return result{refused: true}
+		}
+		request, err := options.request(flags, flags.Lookup("terminal").Value.String() == "true")
+		if err != nil || flags.NArg() != 0 {
+			return result{refused: true}
+		}
+		got := result{health: flags.Lookup("update-health").Value.String(), editor: *options.standalone}
+		if request != nil {
+			got.path = request.Path
+		}
+		return got
+	}
+	afterUpdate := result{health: stage}
+	for _, tc := range []struct {
+		name string
+		args []string
+		want result
+	}{
+		{"the released helper's form", []string{file, "--update-health", stage}, afterUpdate},
+		{"the form with =", []string{file, "--update-health=" + stage}, afterUpdate},
+		{"no stage folder", []string{file, "--update-health"}, result{refused: true}},
+		{"an empty stage folder", []string{file, "--update-health", ""}, result{refused: true}},
+		{"an empty stage folder with =", []string{file, "--update-health="}, result{refused: true}},
+		{"another switch after the file", []string{file, "--no-browser"}, result{refused: true}},
+		{"another switch with a value", []string{file, "--data-dir", stage}, result{refused: true}},
+		{"a switch after the stage folder", []string{file, "--update-health", stage, "--no-browser"}, result{refused: true}},
+		{"a single-dash switch", []string{file, "-update-health", stage}, result{refused: true}},
+		{"a switch before the file", []string{"--no-browser", file, "--update-health", stage}, result{refused: true}},
+		{"two files", []string{file, file, "--update-health", stage}, result{refused: true}},
+		{"a dash for the file", []string{"-", "--update-health", stage}, result{refused: true}},
+	} {
+		if got := run("", runtime.GOOS, tc.args); got != tc.want {
+			t.Errorf("%s %q: got %+v, want %+v", tc.name, tc.args, got, tc.want)
+		}
+	}
+	// Windows switch syntax in the file's place is refused there too.
+	if got := run("", "windows", []string{"/S", "--update-health", stage}); !got.refused {
+		t.Errorf("/S before --update-health on Windows: %+v", got)
+	}
+	// Only the main program installs updates: the separate programs refuse it.
+	for _, edition := range []string{standaloneEditorMode, "terminal"} {
+		if got := run(edition, runtime.GOOS, []string{file, "--update-health", stage}); !got.refused {
+			t.Errorf("%s accepted a file beside --update-health: %+v", edition, got)
+		}
+	}
+	// The run that follows restarts (reopens, or installs the next update) as
+	// the main window, never with the old file or stage folder.
+	for _, args := range [][]string{{file, "--update-health", stage}, {file, "--update-health=" + stage}} {
+		if got := updateRestartArgs(args); len(got) != 0 {
+			t.Errorf("restart arguments of %q: %q", args, got)
+		}
+	}
+	if got := updateRestartArgs([]string{file, "--no-browser"}); strings.Join(got, " ") != file+" --no-browser" {
+		t.Errorf("a shape that is refused at startup is left as it was: %q", got)
 	}
 }
 
