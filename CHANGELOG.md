@@ -1,3 +1,7 @@
+## 1.21.55 Beta 1 - Document Map and Document List
+
+- The Text Editor gets a Document Map at the right edge (bounded for any size; disk-backed documents mapped by position) and a Document List on the left rail beside Connect and Files; both settings are shared editor preferences. A paint no longer moves a disk-view scrollbar back while the user's move of it is pending (a track click could be lost).
+
 ## 1.21.54 Beta 1 - Text tools in the Text Editor
 
 - A Tools menu (and right-click and command search) with line, encode/decode and format tools implemented once in the engine (`internal/texttools`), on the selection or the whole document, any size, one undo step; Find and Replace modes Normal, Extended and Regular expression (replacement templates); a readable copy of a SonicWall settings export in a new tab, offered when one is opened.

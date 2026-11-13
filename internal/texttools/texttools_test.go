@@ -206,98 +206,144 @@ func TestToolListMatchesThePage(t *testing.T) {
 	}
 }
 
-// A fictional export with the shape of a real one.
-func sonicwallExport(settings int) (string, string) {
-	var plain, readable strings.Builder
-	add := func(key, value, shown string) {
-		plain.WriteString(key + "=" + value + "&")
-		readable.WriteString(key + "=" + shown + "\n")
-	}
-	add("checksumVersion", "1", "1")
-	add("buildNum", "7.1.3-0000-R0000", "7.1.3-0000-R0000")
-	add("shortProdName", "TZ%20370", "TZ 370")
+// settingsLine is a fictional one-line settings file: key=value& settings
+// with %XX escapes, as one line of Base64. It is what the editor guide's
+// recipe (Base64 decode, Split at text &, URL decode) makes readable.
+func settingsLine(settings int) (encoded, plain string) {
+	var b strings.Builder
 	for i := 0; i < settings; i++ {
 		n := fmt.Sprint(i)
-		add("addrObjId_"+n, "LAN%20Subnets%20"+n, "LAN Subnets "+n)
-		add("addrObjIp1_"+n, "192.0.2."+fmt.Sprint(i%250), "192.0.2."+fmt.Sprint(i%250))
-		add("schedObjType_"+n, "a+b%3ac", "a+b:c")
-		add("uuid_InternalInstanceId_"+n, "line%0Abreak%09tab%01", `line\nbreak`+"\ttab"+`\x01`)
+		b.WriteString("name_" + n + "=Office%20" + n + "&")
+		b.WriteString("address_" + n + "=192.0.2." + fmt.Sprint(i%250) + "&")
+		b.WriteString("note_" + n + "=a+b%3Ac&")
+		b.WriteString("site_" + n + "=www.example.com%2Fpath&")
 	}
-	add("checksum", "0000abcd", "0000abcd")
-	return base64.StdEncoding.EncodeToString([]byte(plain.String())), readable.String()
+	return base64.StdEncoding.EncodeToString([]byte(b.String())), b.String()
 }
 
-func TestSonicWallReadable(t *testing.T) {
-	export, want := sonicwallExport(3)
-	got, result, err := run(t, "sonicwall-readable", Options{}, export)
-	if err != nil || got != want {
-		t.Fatalf("%v\n got %q\nwant %q", err, got, want)
-	}
-	if result.Count != 3+4*3+1 {
-		t.Errorf("count %d", result.Count)
-	}
-	if !LooksLikeSonicWall([]byte(export)) {
-		t.Error("the export was not recognised")
-	}
-	// Bytes that are not UTF-8 and control characters are shown as escapes.
-	odd := base64.StdEncoding.EncodeToString([]byte("buildNum=%FF%C3%A9%0D%E2x&checksum=1&"))
-	if got, _, err = run(t, "sonicwall-readable", Options{}, odd); err != nil || got != "buildNum=\\xffé\\r\\xe2x\nchecksum=1\n" {
-		t.Fatalf("%v %q", err, got)
-	}
-	for _, other := range []string{"plain text", base64.StdEncoding.EncodeToString([]byte("hello world, not settings")), base64.StdEncoding.EncodeToString([]byte("a=1&b=2&c=3&d=4&e=5&f=6&"))} {
-		if LooksLikeSonicWall([]byte(other)) {
-			t.Errorf("%q was taken for an export", other)
-		}
-	}
-	if _, _, err = run(t, "sonicwall-readable", Options{}, base64.StdEncoding.EncodeToString([]byte("<html> not settings"))); err == nil || !strings.Contains(err.Error(), "does not look like") {
-		t.Fatal(err)
-	}
-	// Only a prefix is needed to recognise one.
-	if !LooksLikeSonicWall([]byte(export[:120])) {
-		t.Error("the start of the export was not recognised")
-	}
-	// A real export ends its Base64 with "&&" (seen on the owner's export:
-	// "...==&&"); with or without padding, that trailer is not an error.
-	for _, trailer := range []string{"&&", "&&\r\n", "&"} {
-		if got, _, err = run(t, "sonicwall-readable", Options{}, export+trailer); err != nil || got != want {
-			t.Fatalf("trailer %q: %v", trailer, err)
-		}
-	}
-	unpadded := base64.StdEncoding.EncodeToString([]byte("buildNum=7&checksum=123&"))
-	if strings.Contains(unpadded, "=") {
-		t.Fatal("the unpadded fixture has padding")
-	}
-	if got, _, err = run(t, "sonicwall-readable", Options{}, unpadded+"&&"); err != nil || got != "buildNum=7\nchecksum=123\n" {
-		t.Fatalf("unpadded with trailer: %v %q", err, got)
-	}
-	// Only '&' and white space may follow it.
-	if _, _, err = run(t, "sonicwall-readable", Options{}, export+"&&QUJD"); err == nil || !strings.Contains(err.Error(), "continues after") {
-		t.Fatalf("text after the trailer: %v", err)
-	}
-	if _, _, err = run(t, "sonicwall-readable", Options{}, "&&"+export); err == nil {
-		t.Fatal("an export may not start with &")
-	}
-}
-
-// A multi-megabyte export on one line, as the owner's 1.75 MB file was.
+// A multi-megabyte file on one line: the recipe's three steps, each over the
+// whole of it.
 func TestLargeSingleLineInputs(t *testing.T) {
-	export, want := sonicwallExport(11000)
-	if len(export) < 1500000 {
-		t.Fatalf("the fixture is only %d bytes", len(export))
+	encoded, plain := settingsLine(12000)
+	if len(encoded) < 1500000 {
+		t.Fatalf("the fixture is only %d bytes", len(encoded))
 	}
-	got, result, err := run(t, "sonicwall-readable", Options{}, export)
-	if err != nil || got != want {
-		t.Fatalf("%v (%d bytes, want %d)", err, len(got), len(want))
-	}
-	if result.Count != 44004 {
-		t.Errorf("%d settings", result.Count)
-	}
-	plain, _ := base64.StdEncoding.DecodeString(export)
-	if got, _, err = run(t, "base64-decode", Options{}, export); err != nil || got != string(plain) {
+	got, _, err := run(t, "base64-decode", Options{}, encoded)
+	if err != nil || got != plain {
 		t.Fatalf("decoding the whole line: %v (%d bytes, want %d)", err, len(got), len(plain))
 	}
-	if got, _, err = run(t, "split", Options{Separator: "&"}, string(plain)); err != nil || strings.Count(got, "\n") != 44004 || strings.Contains(got, "&") {
-		t.Fatalf("splitting: %v", err)
+	lines, result, err := run(t, "split", Options{Separator: "&"}, plain)
+	if err != nil || result.Count != 48000 || strings.Count(lines, "\n") != 48000 || strings.Contains(lines, "&") {
+		t.Fatalf("splitting: %v (%d places)", err, result.Count)
+	}
+	readable, _, err := run(t, "url-decode", Options{}, lines)
+	if err != nil || !strings.HasPrefix(readable, "name_0=Office 0\naddress_0=192.0.2.0\nnote_0=a+b:c\nsite_0=www.example.com/path\n") || strings.Count(readable, "\n") != 48000 {
+		t.Fatalf("URL decoding: %v %q", err, readable[:min(len(readable), 120)])
+	}
+}
+
+// prefix is the start of s that holds units UTF-16 units.
+func prefix(s string, units int64) string {
+	for i, r := range s {
+		if units <= 0 {
+			return s[:i]
+		}
+		units--
+		if r > 0xffff {
+			units--
+		}
+	}
+	return s
+}
+
+// A decoder that meets a character it does not decode stops and changes
+// nothing; it names the character, its position, and whether the text before
+// it decodes on its own. Then the same tool over just that part succeeds, and
+// otherwise it fails: Decode the part before it is offered only when it works.
+func TestDecodersStopAtACharacterAndOfferThePartBefore(t *testing.T) {
+	b64 := func(s string) string { return base64.StdEncoding.EncodeToString([]byte(s)) }
+	cases := []struct {
+		id, in string
+		offset int64
+		before bool
+		found  string
+		want   string // the part before, decoded
+	}{
+		// A one-line file whose Base64 is followed by "&&".
+		{"base64-decode", b64("a=1&b=%20&") + "&&", 16, true, "'&'", "a=1&b=%20&"},
+		{"base64-decode", b64("hello") + "&&\r\n", 8, true, "'&'", "hello"},
+		// Unpadded Base64 before the problem.
+		{"base64-decode", strings.TrimRight(b64("hi!?"), "=") + "&&", 6, true, "'&'", "hi!?"},
+		// A character in the middle: the rest after it stays as it is.
+		{"base64-decode", "aGVsbG8gd29y#bGQ=", 12, true, "'#'", "hello wor"},
+		{"base64-decode", "QUJD\nQU#D", 7, true, "'#'", "ABCA"},
+		{"base64-decode", "QUJDé", 4, true, "'é'", "ABC"},
+		{"base64-decode", "QUJD\u00a0QUJD", 4, true, `'\u00a0'`, "ABC"},
+		{"base64-decode", "QUJD😀QUJD", 4, true, "'😀'", "ABC"},
+		// Nothing before it, an incomplete group, or bytes that are not text.
+		{"base64-decode", "&&QUJD", 0, false, "'&'", ""},
+		{"base64-decode", "  &", 2, false, "'&'", ""},
+		{"base64-decode", "QUJDR&", 5, false, "'&'", ""},
+		{"base64-decode", base64.StdEncoding.EncodeToString([]byte{0x41, 0xc3}) + "&", 4, false, "'&'", ""},
+		{"base64-decode", strings.TrimRight(b64("a\x00"), "=") + "&", 3, false, "'&'", ""},
+		{"hex-decode", "68 65 6c 6c 6f;", 14, true, "';'", "hello"},
+		{"hex-decode", "0x41,0x42 zz", 10, true, "'z'", "AB"},
+		{"hex-decode", "41 4z", 4, false, "'z'", ""},
+		{"hex-decode", "c3z", 2, false, "'z'", ""},
+		{"hex-decode", "zz", 0, false, "'z'", ""},
+	}
+	for _, c := range cases {
+		_, result, err := run(t, c.id, Options{}, c.in)
+		var at *PositionError
+		if !errors.As(err, &at) || result.Changed {
+			t.Fatalf("%s %q: %v (changed %t)", c.id, c.in, err, result.Changed)
+		}
+		if at.Offset != c.offset || at.Before != c.before || !strings.HasPrefix(at.Message, c.found+" is not a") {
+			t.Errorf("%s %q: %+v, want offset %d, before %t, %s", c.id, c.in, at, c.offset, c.before, c.found)
+		}
+		part := prefix(c.in, at.Offset)
+		got, _, err := run(t, c.id, Options{}, part)
+		if c.before && (err != nil || got != c.want) {
+			t.Errorf("%s of the part before %q: %q, %v", c.id, part, got, err)
+		}
+		if !c.before && part != "" && err == nil {
+			t.Errorf("%s of %q succeeded, but the part before was not offered", c.id, part)
+		}
+	}
+}
+
+// The same over many short inputs: the part before is offered exactly when
+// decoding it on its own succeeds.
+func TestThePartBeforeIsOfferedExactlyWhenItDecodes(t *testing.T) {
+	r := rand.New(rand.NewSource(7))
+	for id, alphabet := range map[string][]string{
+		"base64-decode": {"Q", "U", "J", "D", "z", "/", "_", "-", "=", " ", "\n", "&", "é", "#", "A", "8"},
+		"hex-decode":    {"4", "1", "c", "3", "a", "9", "0", "x", " ", ":", "-", ",", "z", "&", "é", "00"},
+	} {
+		offered := 0
+		for round := 0; round < 4000; round++ {
+			var b strings.Builder
+			for n := r.Intn(14); n >= 0; n-- {
+				b.WriteString(alphabet[r.Intn(len(alphabet))])
+			}
+			in := b.String()
+			_, _, err := run(t, id, Options{}, in)
+			var at *PositionError
+			if !errors.As(err, &at) || !strings.Contains(at.Message, "is not a") {
+				continue
+			}
+			part := prefix(in, at.Offset)
+			_, _, partErr := run(t, id, Options{}, part)
+			if at.Before != (part != "" && partErr == nil) {
+				t.Fatalf("%s %q: the part before %q was offered %t, decoding it alone: %v", id, in, part, at.Before, partErr)
+			}
+			if at.Before {
+				offered++
+			}
+		}
+		if offered < 50 {
+			t.Errorf("%s: only %d inputs offered the part before", id, offered)
+		}
 	}
 }
 

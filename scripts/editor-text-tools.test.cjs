@@ -12,8 +12,13 @@ test('every tool has a group, a label, a description and a message; shortcuts ar
  for(const tool of tools.TOOLS){
   assert(!ids.has(tool.id),tool.id+' twice');ids.add(tool.id);
   assert(groups.has(tool.group),tool.id+' has no group');
-  assert(tool.label&&tool.description&&tool.description.length<=240,tool.id+' needs a label and a short description');
-  if(tool.engine&&tool.id!=='sonicwall-readable')assert(tool.done&&tool.same,tool.id+' needs its messages');
+  // Short enough for two lines in the menu (the browser check measures them).
+  assert(tool.label&&tool.description&&tool.description.length<=130,tool.id+' needs a label and a short description');
+  if(tool.engine)assert(tool.done&&tool.same,tool.id+' needs its messages');
+  // Every engine tool shows what it does with a tiny example, which the
+  // list marks with backticks: shown without them and never broken in two.
+  if(tool.engine)assert(/\S\u00a0→\u00a0\S/.test(tool.description),tool.id+' needs an example in its description');
+  assert(!tool.description.includes('`'),tool.id+' shows a backtick');
   if(tool.shortcut){assert(!shortcuts.has(tool.shortcut),tool.shortcut+' twice');shortcuts.add(tool.shortcut);}
  }
  for(const group of tools.GROUPS)assert(tools.TOOLS.some(tool=>tool.group===group.id),group.id+' is empty');
@@ -21,8 +26,17 @@ test('every tool has a group, a label, a description and a message; shortcuts ar
  for(const [id,shortcut] of [['comment','Ctrl+/'],['duplicate','Ctrl+D'],['format','Ctrl+Shift+F']])assert.equal(tools.tool(id).shortcut,shortcut);
  // Names the toolbar and menus used before still run the same tools.
  for(const [old,now] of [['sortLines','sort-asc'],['trim','trim-trailing'],['textToHex','hex-encode'],['hexToText','hex-decode'],['base64Encode','base64-encode'],['base64Decode','base64-decode'],['upper','upper'],['lower','lower']])assert.equal(tools.tool(old).id,now);
+ // Decode the part before it: only the decoders say what it did.
+ assert.deepEqual(tools.TOOLS.filter(tool=>tool.partial).map(tool=>tool.id),['base64-decode','hex-decode']);
+ for(const id of ['base64-decode','hex-decode'])assert.match(tools.tool(id).partial,/^Decoded the part before \{where\} from .+; the text from there on is unchanged\.$/);
  // The shortcuts do not clash with the editor's own or the app's.
  for(const taken of ['Ctrl+Z','Ctrl+Y','Ctrl+S','Ctrl+Shift+S','Ctrl+F','Ctrl+H','Ctrl+M','F3','Shift+F3','F2','Shift+F2','Ctrl+F2','Ctrl+G','Ctrl+N','Ctrl+O','Ctrl+Shift+P','Ctrl+Shift+T','Ctrl+Shift+Enter'])assert(!shortcuts.has(taken),taken+' is taken');
+});
+
+test('the tools are general: no brand, product or one workflow in their names or descriptions',()=>{
+ const words=/sonic|wall|fortinet|fortigate|forti|cisco|juniper|palo alto|mikrotik|ubiquiti|firewall|router|switch|\.exp\b|export|device config/i;
+ for(const entry of [...tools.GROUPS,...tools.TOOLS])for(const text of [entry.label,entry.description,entry.done,entry.same,entry.partial].filter(Boolean))assert(!words.test(text),entry.id+': '+text);
+ assert.deepEqual(tools.GROUPS.map(group=>group.id),['lines','encode','format']);
 });
 
 test('Extended escapes in Find and Replace',()=>{

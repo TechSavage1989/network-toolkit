@@ -21,10 +21,12 @@ import (
 // Text Editor against its production engine through the Tools menu (owner
 // request v1.21.53): the menu and its tooltips, Split at text on page-held
 // text, Base64 decode of a whole 1.7 MB single-line document with nothing
-// selected, the SonicWall offer and its readable copy of a 1.5 MB export,
-// the Find window's Extended mode, and Undo. The script is
-// scripts/editor-text-tools.browser.cjs; afterwards the export on disk must
-// be exactly as it was written.
+// selected, the editor guide's recipe for a one-line encoded settings file
+// (Base64 decode stops at the "&&" after the Base64 and offers Decode the
+// part before it; Split at text &; URL decode; Undo) on a synthetic 1.5 MB
+// file, the Find window's Extended mode, and Undo. The script is
+// scripts/editor-text-tools.browser.cjs; afterwards the files on disk must be
+// exactly as they were written.
 func TestEditorSessionBrowserTextTools(t *testing.T) {
 	if os.Getenv("NTK_EDITOR_SESSION_BROWSER") != "1" {
 		t.Skip("requires the isolated Playwright browser")
@@ -35,10 +37,11 @@ func TestEditorSessionBrowserTextTools(t *testing.T) {
 	root := t.TempDir()
 	a := sharedTestApp(t, root, standaloneEditorDirectory, standaloneEditorMode)
 	files := t.TempDir()
-	export, readable := sonicwallFixture(9500)
-	if len(export) < 1500000 {
-		t.Fatalf("the export fixture is only %d bytes", len(export))
+	encodedSettings, _, readable := settingsLine(11000)
+	if len(encodedSettings) < 1500000 {
+		t.Fatalf("the settings fixture is only %d bytes", len(encodedSettings))
 	}
+	smallSettings, smallPlain, _ := settingsLine(2)
 	var plain strings.Builder
 	for i := 0; plain.Len() < 1300000; i++ {
 		fmt.Fprintf(&plain, "interface ge-0/0/%d\n description link to 192.0.2.%d\n", i, i%250)
@@ -55,17 +58,20 @@ func TestEditorSessionBrowserTextTools(t *testing.T) {
 	for i := 0; i < 60000; i++ {
 		fmt.Fprintf(&pairs, "k%d=%d&", i, i%10)
 	}
-	small, _ := sonicwallFixture(2)
 	contents := map[string]string{
-		"firewall.exp":     export + "&&", // a real export ends with "&&"
-		"branch.exp":       small,
-		"large.b64":        encoded,
-		"settings.txt":     "a=1&b=2&c=3",
-		"replace.txt":      "host=a&port=22&user=admin",
-		"pairs.txt":        pairs.String(),
-		"hosts.txt":        hosts.String(),
-		"expected.txt":     readable,
-		"expected-b64.txt": plain.String(),
+		// One line of Base64 followed by "&&": disk-backed, and page-held.
+		"settings.b64": encodedSettings + "&&",
+		"small.b64":    smallSettings + "&&",
+		"large.b64":    encoded,
+		"settings.txt": "a=1&b=2&c=3",
+		"replace.txt":  "host=a&port=22&user=admin",
+		"pairs.txt":    pairs.String(),
+		"hosts.txt":    hosts.String(),
+		// After Decode the part before it, each step works on the text the
+		// step before selected: the "&&" after the Base64 stays as it is.
+		"expected-readable.txt": readable + "&&",
+		"expected-small.txt":    smallPlain + "&&",
+		"expected-b64.txt":      plain.String(),
 	}
 	for name, text := range contents {
 		if err := os.WriteFile(filepath.Join(files, name), []byte(text), 0600); err != nil {
@@ -127,8 +133,8 @@ func TestEditorSessionBrowserTextTools(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// The export was never written: making it readable opened a new tab.
-	for _, name := range []string{"firewall.exp", "branch.exp", "large.b64", "pairs.txt", "hosts.txt"} {
+	// Nothing was saved: every tool changed only the open documents.
+	for _, name := range []string{"settings.b64", "small.b64", "large.b64", "pairs.txt", "hosts.txt"} {
 		if got, err := os.ReadFile(filepath.Join(files, name)); err != nil || string(got) != contents[name] {
 			t.Errorf("%s changed on disk (%v)", name, err)
 		}

@@ -75,7 +75,7 @@ function measureWrapRows(text, textarea) {
 }
 
 function create({textarea, gutter, container, session, syntaxLanguage, wordWrap = () => false,
- changed = () => {}, message = () => {}, readOnly = false, locked = () => false, marks = null, bookmarks = null}) {
+ changed = () => {}, message = () => {}, readOnly = false, locked = () => false, marks = null, bookmarks = null, painted = () => {}}) {
  const pageUnits = root.NTKEditorDiskSession.PAGE_UNITS;
  const abort = new AbortController();
  const listeners = {signal: abort.signal};
@@ -126,6 +126,27 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
  let wrapped = false, wrapStyle = '', measure, measured, wrapGeometry, gutterGeometry;
  let wrapFrame = 0, wrapRead;
  let verticalFrame = 0, horizontalFrame = 0;
+ // Where the view last put each bar. A bar that is elsewhere was moved by the
+ // user (a click on the track, a drag) and its scroll event is still on its
+ // way: painting must not move it back, or the user's move is lost (CI caught
+ // a track click undone by a paint that ran before the bar's scroll event).
+ let barSet = 0, barLeftSet = 0;
+ const barMoved = () => Math.abs(vertical.scrollTop - barSet) > 1;
+ const barLeftMoved = () => Math.abs(horizontal.scrollLeft - barLeftSet) > 1;
+ // A bar that is or was just hidden has no position the user chose (the
+ // browser may reset it while hidden): take it as the view's own.
+ function showBar(bar, hidden) {
+  const was = bar.hidden;
+  bar.hidden = hidden;
+  if (was || hidden) {
+   if (bar === vertical) barSet = vertical.scrollTop;
+   else barLeftSet = horizontal.scrollLeft;
+  }
+ }
+ function placeBar(moved) {
+  if (!verticalFrame && !moved && Math.abs(vertical.scrollTop - barTop) > 1) vertical.scrollTop = barTop;
+  if (!moved) barSet = vertical.scrollTop;
+ }
  // A pointer selection in progress: its anchor may leave the page while the
  // page slides under the pointer.
  let drag = null, pressed = null, clicks = 0;
@@ -653,15 +674,15 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
   else {
    flowView = null;
    const scrollLines = alignment?.rows || lines, scrollTop = projected?.row ?? top;
-   vertical.hidden = scrollLines <= clientRows;
-   const lastTop = Math.max(1, scrollLines - clientRows);
+   showBar(vertical, scrollLines <= clientRows);
+   const lastTop = Math.max(1, scrollLines - clientRows), moved = barMoved();
    barTop = clamp(scrollTop / lastTop, 0, 1) * thumb(vertical, clientRows / scrollLines);
-   if (!verticalFrame && Math.abs(vertical.scrollTop - barTop) > 1) vertical.scrollTop = barTop;
+   placeBar(moved);
    scrollbarValue(vertical, scrollLines, scrollTop + 1);
   }
   // With word wrap the vertical bar covers long lines too.
   const longLine = page.lineUnits > pageUnits && !flow;
-  horizontal.hidden = !longLine;
+  showBar(horizontal, !longLine);
   horizontal.setAttribute('aria-label', wrapped ? 'Section of long source line' : 'Position in long line');
   container.classList.toggle('nt-editor-disk-long-line', longLine);
   if (longLine) {
@@ -669,9 +690,10 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
    horizontal.style.left = surface.offsetLeft + 'px';
    horizontal.style.width = surface.offsetWidth + 'px';
    const column = page.column + textarea.scrollLeft / characterWidth;
-   const lastColumn = Math.max(1, page.lineUnits - (wrapped ? 1 : clientColumns));
+   const lastColumn = Math.max(1, page.lineUnits - (wrapped ? 1 : clientColumns)), moved = barLeftMoved();
    barLeft = clamp(column / lastColumn, 0, 1) * thumb(horizontal, wrapped ? 1 / page.lineUnits : clientColumns / page.lineUnits);
-   if (!horizontalFrame && Math.abs(horizontal.scrollLeft - barLeft) > 1) horizontal.scrollLeft = barLeft;
+   if (!horizontalFrame && !moved && Math.abs(horizontal.scrollLeft - barLeft) > 1) horizontal.scrollLeft = barLeft;
+   if (!moved) barLeftSet = horizontal.scrollLeft;
    scrollbarValue(horizontal, page.lineUnits + 1, Math.floor(column) + 1);
   }
   if (!flow && page.start + page.text.length < units) {
@@ -681,6 +703,7 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
   lastScrollTop = textarea.scrollTop;
   lastScrollLeft = textarea.scrollLeft;
   announce();
+  painted();
  }
 
  function paintSyntax() {
@@ -788,7 +811,7 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
   const end = page.start + page.text.length, whole = page.start === 0 && end >= units;
   const range = Math.max(0, textarea.scrollHeight - textarea.clientHeight);
   const view = flowView = flowPosition();
-  vertical.hidden = whole && range <= 1;
+  showBar(vertical, whole && range <= 1);
   let position, share;
   if (whole) {
    position = range ? textarea.scrollTop / range : 0;
@@ -800,8 +823,9 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
    const rows = lines + Math.max(0, units - lines + 1) / wrapGrid();
    share = Math.min(1, viewHeight() / rowHeight / Math.max(1, rows));
   }
+  const moved = barMoved();
   barTop = position * thumb(vertical, share);
-  if (!verticalFrame && Math.abs(vertical.scrollTop - barTop) > 1) vertical.scrollTop = barTop;
+  placeBar(moved);
   const percent = Math.round(position * 1000) / 10;
   scrollbarValue(vertical, 100, percent, 'Line ' + (top + 1).toLocaleString() + ' of ' + lines.toLocaleString() + ', ' + percent + '%', 0);
  }
@@ -1772,27 +1796,32 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
  textarea.addEventListener('wheel', wheel, {...listeners, passive: false});
 
  vertical.addEventListener('scroll', () => {
-  if (Math.abs(vertical.scrollTop - barTop) <= 1 || verticalFrame) return;
+  if (!barMoved() || verticalFrame) return;
   verticalFrame = root.requestAnimationFrame(() => {
    verticalFrame = 0;
-   if (disposed || Math.abs(vertical.scrollTop - barTop) <= 1) return;
-   const position = clamp(vertical.scrollTop / Math.max(1, vertical.scrollHeight - vertical.clientHeight), 0, 1);
-   if (flowing()) {
-    const {units} = session.state().metadata;
-    if (page.start === 0 && page.start + page.text.length >= units) {
-     textarea.scrollTop = position * (textarea.scrollHeight - textarea.clientHeight);
-     paint();
-    } else {
-     const target = position * Math.max(0, units - (flowView?.visible || 0));
-     run(navigate(active => flowGo(position >= 1 ? units : target, active, position >= 1)));
-    }
-    return;
-   }
-   const last = Math.max(0, (alignment?.rows || session.state().metadata.lines) - clientRows);
-   const line = Math.round(position * last);
-   run(alignment ? goAlignedRow(line) : goLine(line));
+   if (disposed || !barMoved()) return;
+   barSet = vertical.scrollTop;
+   seek(clamp(vertical.scrollTop / Math.max(1, vertical.scrollHeight - vertical.clientHeight), 0, 1));
   });
  }, listeners);
+
+ // Show a position of the document bar (0 to 1) at the top of the view.
+ function seek(position) {
+  if (flowing()) {
+   const {units} = session.state().metadata;
+   if (page.start === 0 && page.start + page.text.length >= units) {
+    textarea.scrollTop = position * (textarea.scrollHeight - textarea.clientHeight);
+    paint();
+   } else {
+    const target = position * Math.max(0, units - (flowView?.visible || 0));
+    run(navigate(active => flowGo(position >= 1 ? units : target, active, position >= 1)));
+   }
+   return;
+  }
+  const last = Math.max(0, (alignment?.rows || session.state().metadata.lines) - clientRows);
+  const line = Math.round(position * last);
+  run(alignment ? goAlignedRow(line) : goLine(line));
+ }
  vertical.addEventListener('keydown', event => {
   if (flowing()) {
    const step = {ArrowUp: -rowHeight, ArrowDown: rowHeight, PageUp: rowHeight - viewHeight(), PageDown: viewHeight() - rowHeight};
@@ -1817,10 +1846,11 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
   run(alignment ? goAlignedRow(targets[event.key]) : goLine(targets[event.key]));
  }, listeners);
  horizontal.addEventListener('scroll', () => {
-  if (Math.abs(horizontal.scrollLeft - barLeft) <= 1 || horizontalFrame) return;
+  if (!barLeftMoved() || horizontalFrame) return;
   horizontalFrame = root.requestAnimationFrame(() => {
    horizontalFrame = 0;
-   if (disposed || Math.abs(horizontal.scrollLeft - barLeft) <= 1) return;
+   if (disposed || !barLeftMoved()) return;
+   barLeftSet = horizontal.scrollLeft;
    const last = Math.max(0, page.lineUnits - (wrapped ? 1 : clientColumns));
    run(panLongLine(Math.round(horizontal.scrollLeft / Math.max(1, horizontal.scrollWidth - horizontal.clientWidth) * last)));
   });
@@ -1843,8 +1873,53 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
  refreshWrap();
  schedulePaint();
 
+ // The Document Map (editor-document-map.js) maps a document that is not all
+ // in the page by position, like the document bar: by line without word wrap,
+ // by character offset with it. It reads what the last paint used.
+ function mapState() {
+  const {lines, units, revision} = session.state().metadata;
+  const flow = flowing(), end = page.start + page.text.length;
+  let estimatedRows = lines, wrapColumns = clientColumns;
+  if (flow) {
+   wrapColumns = wrapGrid();
+   estimatedRows = lines + Math.max(0, units - lines + 1) / wrapColumns;
+  }
+  return {lines, units, revision, flow, aligned: !!alignment, whole: page.start === 0 && end >= units,
+   top, fraction, rows: viewHeight() / rowHeight, offset: flowView?.offset ?? page.start, visible: flowView?.visible ?? 0,
+   estimatedRows, wrapColumns, rowHeight, characterWidth,
+   page: {start: page.start, line: page.line, column: page.column, text: page.text, lineUnits: page.lineUnits}};
+ }
+
+ // Put a line (without word wrap) or a character offset (with it) at the top
+ // of the view, as the document bar does.
+ function mapSeek({line, offset}) {
+  if (disposed || alignment) return;
+  const {lines, units} = session.state().metadata;
+  if (flowing()) {
+   const visible = flowView?.visible || 0, target = clamp(Number(offset) || 0, 0, units);
+   const last = target >= units - visible;
+   if (page.start === 0 && page.start + page.text.length >= units) {
+    seek(clamp(target / Math.max(1, units - visible), 0, 1));
+    return;
+   }
+   run(navigate(active => flowGo(last ? units : target, active, last)));
+   return;
+  }
+  const value = clamp(Number(line) || 0, 0, Math.max(0, lines - clientRows));
+  run(goLine(Math.floor(value), false, false, value - Math.floor(value)));
+ }
+
+ // Scroll by pixels as the mouse wheel over the text does, loading pages.
+ function wheelBy(delta) {
+  let prevented = false;
+  wheel({deltaY: delta, deltaMode: 0, ctrlKey: false, shiftKey: false,
+   get defaultPrevented() { return prevented; }, preventDefault() { prevented = true; }});
+  if (!prevented) textarea.scrollTop += delta;
+ }
+
  return Object.freeze({
   load, goLine, goAlignedRow, setAlignment, position, restore, replace, history, capture, select, selectedText, copy,
+  mapState, mapSeek, wheelBy,
   comparisonPage: () => ({line:page.line, text:page.text, column:page.column, complete:page.start+page.text.length>=session.state().metadata.units}),
   measureWrapRows:measureCurrentWrapRows, refreshWrap, refreshSyntax: paintSyntax,
   // The Find window's marks or bookmarks changed: paint them again.

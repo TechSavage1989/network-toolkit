@@ -125,15 +125,22 @@ func (f *mixedFile) bulk(from, to int, text string) {
 // (editor_text_tools.go). from == to means the whole document.
 func (f *mixedFile) textTool(id string, options map[string]any, from, to int) map[string]any {
 	f.t.Helper()
+	state := f.toolState(id, options, from, to)
+	if state["state"] == "failed" {
+		f.t.Fatalf("%s: %v", id, state["error"])
+	}
+	return state
+}
+
+// toolState runs a text tool and returns how it ended, failed or done.
+func (f *mixedFile) toolState(id string, options map[string]any, from, to any) map[string]any {
+	f.t.Helper()
 	started := f.call(map[string]any{"action": "tool-start", "revision": f.revision, "tool": id, "options": options, "from": from, "to": to})
 	deadline := time.Now().Add(10 * time.Second)
 	for {
 		state := f.call(map[string]any{"action": "tool-status", "job": started["job"]})
-		switch state["state"] {
-		case "done":
+		if state["state"] != "running" {
 			return state
-		case "failed":
-			f.t.Fatalf("%s: %v", id, state["error"])
 		}
 		if time.Now().After(deadline) {
 			f.t.Fatalf("%s did not finish", id)
@@ -169,6 +176,21 @@ func (f *mixedFile) findReplace(search map[string]any, replacement string, withi
 			f.t.Fatal("Replace All did not finish")
 		}
 		time.Sleep(2 * time.Millisecond)
+	}
+}
+
+// decodeBefore is the page's Decode the part before it: the decoder over
+// [from, to) stops at a character it does not decode, and runs again over
+// the range its failure names.
+func (f *mixedFile) decodeBefore(id string, from, to int) {
+	f.t.Helper()
+	state := f.toolState(id, nil, from, to)
+	partial, _ := state["partial"].(map[string]any)
+	if state["state"] != "failed" || partial == nil {
+		f.t.Fatalf("%s offered no part before the problem: %v", id, state)
+	}
+	if state = f.toolState(id, nil, partial["from"], partial["to"]); state["state"] != "done" {
+		f.t.Fatalf("%s of the part before: %v", id, state)
 	}
 }
 
@@ -241,9 +263,21 @@ func TestEditorRangeCommandsKeepMixedLineEndings(t *testing.T) {
 		{"Find window: Replace All in selection that joins lines (. matches newline)", func(f *mixedFile) {
 			f.findReplace(map[string]any{"query": `o.t`, "regex": true, "dotAll": true}, "o t", []int64{4, 18})
 		}, "one\r\ntwo three\rfour\r\nfive\r\n"},
+		// Decode the part before it: Base64 over two lines up to the "&&"; the
+		// line break inside the decoded part goes, the "&&" keeps its CR.
+		{"Tools: Base64 decode of the part before a character that is not Base64", func(f *mixedFile) { f.decodeBefore("base64-decode", 4, 15) }, "one\r\nhello!&&\rfour\r\nfive\r\n"},
+	}
+	// Rows that need other text, with the same line endings.
+	files := map[string]string{
+		// Lines two and three hold "aGVs" and "bG8h&&" (hello!).
+		"Tools: Base64 decode of the part before a character that is not Base64": "one\r\naGVs\nbG8h&&\rfour\r\nfive\r\n",
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
+			raw := raw
+			if file, ok := files[c.name]; ok {
+				raw = file
+			}
 			f := openMixed(t, raw)
 			c.run(f)
 			shown := f.text()

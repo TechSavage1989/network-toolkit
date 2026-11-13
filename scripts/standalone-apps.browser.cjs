@@ -75,7 +75,7 @@ const connectForm=async()=>{const frames=()=>page.evaluate(()=>new Promise(resol
  let previous=JSON.stringify(await connectFormNow());for(let attempt=0;attempt<100;attempt++){await frames();const form=await connectFormNow(),text=JSON.stringify(form);if(text===previous)return form;previous=text;}
  throw new Error('The connection form kept changing.');};
 
-const EDITOR_COMMANDS=['Application | Keyboard shortcuts and help','Application | Search tools and commands','Application | Window settings','Application | Reopen recently closed tab','Application | Switch light/dark theme','Text Editor | New Text Editor document','Text Editor | More actions for selected Editor tab','Text Editor | Send to terminal','Text Editor | Open Network Toolkit Terminal'];
+const EDITOR_COMMANDS=['Application | Keyboard shortcuts and help','Application | Search tools and commands','Application | Window settings','Application | Reopen recently closed tab','Application | Switch light/dark theme','Text Editor | New Text Editor document','Text Editor | More actions for selected Editor tab','Text Editor | Show or hide the document map','Text Editor | Show the document list','Text Editor | Send to terminal','Text Editor | Open Network Toolkit Terminal'];
 const TERMINAL_COMMANDS=['Application | Keyboard shortcuts and help','Application | Search tools and commands','Application | Window settings','Application | Reopen recently closed tab','Application | Switch light/dark theme','Terminal | Open a new terminal tab','Terminal | Reconnect all terminal sessions','Terminal | More actions for selected Terminal tab','Terminal | Send output to Text Editor','Terminal | Open Network Toolkit Text Editor'];
 const GONE=['Welcome and quick starts','App settings','Update settings / Check for updates','Show or hide navigation'];
 
@@ -124,6 +124,8 @@ async function standaloneEditor(){
  await run('Search tools and commands');await page.locator('#uxCommandOverlay .ux-command-input').waitFor();await page.keyboard.press('Escape');
  {const before=await page.evaluate(()=>NetworkToolkitFileEditor.listDocuments().length);await run('New Text Editor document');await page.waitForFunction(n=>NetworkToolkitFileEditor.listDocuments().length===n+1,before);}
  await run('More actions for selected Editor tab');await page.getByRole('menuitem',{name:/^Save as/}).first().waitFor();await page.keyboard.press('Escape');
+ {const shown=()=>page.evaluate(()=>!document.querySelector('#networkToolkitFileEditor [data-ed-map]').hidden);const before=await shown();await run('Show or hide the document map');await page.waitForFunction(value=>!document.querySelector('#networkToolkitFileEditor [data-ed-map]').hidden===value,!before);await run('Show or hide the document map');await page.waitForFunction(value=>!document.querySelector('#networkToolkitFileEditor [data-ed-map]').hidden===value,before);}
+ await run('Show the document list');await page.locator(editor+' [data-editor-documents] [data-ed-doc-uid]').first().waitFor();assert.equal(await page.evaluate(()=>!!document.activeElement?.closest('[data-editor-documents]')),true,'the keyboard is on the document list');
  await page.locator(editor+' [data-ed-text]').fill('show version');
  // Send to terminal with nothing running opens the Terminal app by itself (owner request; this used to
  // show "Network Toolkit Terminal is not open." and wait for the user). A new Terminal has no session yet.
@@ -177,7 +179,7 @@ async function standaloneTerminal(){
  const mainCommands=await palette();for(const label of GONE)assert(mainCommands.some(row=>row.endsWith('| '+label)),'main window keeps '+label);
  for(const label of ['Ping','Text Editor','Terminal','Reports'])assert(mainCommands.some(row=>row.endsWith('| '+label)),'main window keeps the '+label+' tool');
  assert.equal(mainCommands.some(row=>/Open Network Toolkit (Terminal|Text Editor)|\| Window settings$/.test(row)),false);
- const mainHelp=await helpRows();assert.deepEqual([...new Set(mainHelp.map(row=>row.split(' | ')[0]))],['Application','Text Editor','Terminal','File browser','Panels']);assert.equal(mainHelp.length,20);
+ const mainHelp=await helpRows();assert.deepEqual([...new Set(mainHelp.map(row=>row.split(' | ')[0]))],['Application','Text Editor','Terminal','File browser','Panels']);assert.equal(mainHelp.length,22);
  await page.evaluate(()=>navigate('editor'));await page.locator('#networkToolkitFileEditor button[aria-label="Connections"],#networkToolkitFileEditor button[title="Connections"]').first().click();
  await page.waitForFunction(()=>/Connect through Terminal or the SFTP \/ FTP \/ FTPS browser first\./.test(document.querySelector('#ntEditorRemoteHint')?.textContent||''));
  assert.equal(await page.evaluate(()=>[...document.querySelectorAll('#networkToolkitFileEditor [data-rb-action="openTerminal"]')].some(el=>getComputedStyle(el).display!=='none')),true,'the main window keeps Open terminal for file connections');
@@ -197,7 +199,7 @@ async function standaloneTerminal(){
  for(const label of GONE.concat(['Ping','Text Editor','Reports','File Transfer','SFTP','Overview'])){await page.locator('#uxCommandOverlay .ux-command-input').fill(label);await page.waitForTimeout(30);assert.equal(await page.locator('#uxCommandResults .ux-command-row strong').evaluateAll((rows,l)=>rows.some(r=>r.textContent===l),label),false,label+' is not offered');}
  await shot('terminal-palette');await page.keyboard.press('Escape');
  const help=await helpRows();
- assert.deepEqual([...new Set(help.map(row=>row.split(' | ')[0]))],['Application','Terminal','Panels']);assert(help.includes('Terminal | Send to Text Editor | Send output or selected text to Network Toolkit Text Editor (button under the console, tab menu, right-click menu)'));assert(help.includes('Terminal | Ctrl+Shift+F | Find in terminal output'));
+ assert.deepEqual([...new Set(help.map(row=>row.split(' | ')[0]))],['Application','Terminal','Panels']);assert(help.includes('Terminal | Send to Text Editor | Send output or selected text to Network Toolkit Text Editor (button under the console, tab menu, right-click menu)'));assert(help.includes('Terminal | Ctrl+Shift+F | Show or hide Find in terminal output'));
  await page.locator('#uxTerminalHelpLauncher').click();await page.locator('[aria-label="Keyboard shortcuts and help"][role="dialog"]').waitFor();assert.equal(await page.locator('#uxCommandOverlay .ux-help-row').count(),help.length);
  assert.equal(/welcome and quick starts|Rename selected file|New document/i.test(await page.locator('#uxCommandOverlay').innerText()),false);await shot('terminal-help');await page.keyboard.press('Escape');
  pass('Terminal: the command palette and F1 help list terminal commands and Send to Text Editor only');
@@ -236,8 +238,8 @@ async function standaloneTerminal(){
  // The editing actions this editor always had stay reachable by mouse
  // (Toggle comment, Duplicate, Format document, case, trim, sort and the
  // hex and Base64 conversions), in the Tools menu and the right-click menu.
- // The Text Editor's other text tools, their new shortcuts and the
- // SonicWall offer stay in the Text Editor.
+ // The Text Editor's other text tools and their new shortcuts stay in the
+ // Text Editor.
  const terminalTools={'tools-lines':['comment','duplicate','sort-asc','trim-trailing'],'tools-encode':['base64-decode','base64-encode','hex-decode','hex-encode'],'tools-format':['format','upper','lower']};
  const listed=async()=>{const out={};for(const group of await page.locator('#editorContextMenu .nt-editor-menu-root [data-editor-submenu]').evaluateAll(list=>list.map(el=>el.dataset.editorSubmenu)))out[group]=await page.locator('#editorContextMenu [data-editor-submenu-panel="'+group+'"] [data-editor-menu-action]').evaluateAll(list=>list.map(el=>el.dataset.editorMenuAction));return out;};
  assert.equal(await floating.locator('[data-ed="tools"]').isVisible(),true,'the Tools button is there');
@@ -263,6 +265,27 @@ async function standaloneTerminal(){
  assert.equal(await findWindow.locator('[data-ed-replacement]').isVisible(),true);
  await shot('terminal-floating-editor-find');
  await findWindow.locator('[data-ed-query]').focus();await page.keyboard.press('Escape');await findWindow.waitFor({state:'hidden'});
+ // Base64 decode keeps its Decode the part before it here: Base64 followed
+ // by text that is not Base64 decodes up to that text, one undo step.
+ await floating.locator('[data-ed-text]').fill('aGk=&&');
+ await floating.locator('[data-ed="tools"]').click();await page.locator('#editorContextMenu').waitFor();
+ await page.locator('#editorContextMenu [data-editor-submenu="tools-encode"]').hover();await page.locator('#editorContextMenu [data-editor-submenu-panel="tools-encode"] [data-editor-menu-action="base64-decode"]').click();
+ const partBar=floating.locator('[data-ed-tool-bar="partial"]');await partBar.waitFor();
+ assert.equal(await page.evaluate(()=>document.querySelector('#networkToolkitFileEditor [data-ed-text]').value),'aGk=&&','Base64 decode changed nothing');
+ await partBar.locator('[data-ed-tool-partial]').click();
+ await page.waitForFunction(()=>document.querySelector('#networkToolkitFileEditor [data-ed-text]').value==='hi&&');
+ await floating.locator('[data-ed-text]').focus();await page.keyboard.press('Control+z');
+ await page.waitForFunction(()=>document.querySelector('#networkToolkitFileEditor [data-ed-text]').value==='aGk=&&');
+ await page.keyboard.press('Control+z');
+ await page.waitForFunction(()=>document.querySelector('#networkToolkitFileEditor [data-ed-text]').value==='hostname lab-switch-01\n');
+ // The Document List and the Document Map need nothing but the editor: the
+ // floating editor has them, through its own rail and More menu only.
+ assert.deepEqual(await floating.locator('[data-editor-files-panel]').evaluateAll(list=>list.map(el=>el.dataset.editorFilesPanel)),['connections','files','documents']);
+ await floating.locator('[data-editor-files-panel="documents"]').click();await floating.locator('[data-editor-documents] [data-ed-doc-uid]').first().waitFor();
+ assert.deepEqual(await floating.locator('[data-editor-documents] [data-ed-doc-uid]').evaluateAll(list=>list.map(el=>el.textContent)),['running-configtxt']);
+ await floating.locator('.nt-editor-more summary').click();await floating.locator('[data-ed-document-map]').check();await page.waitForFunction(()=>!document.querySelector('#networkToolkitFileEditor [data-ed-map]').hidden&&NetworkToolkitFileEditor.documentMap.layout);
+ await floating.locator('.nt-editor-more summary').click();await floating.locator('[data-ed-document-map]').uncheck();
+ assert.equal((await palette()).some(row=>/document (map|list)/i.test(row)),false,'the Terminal\'s palette lists terminal commands only');
  await shot('terminal-floating-editor');await floating.locator('[data-ed="close"]').click();
  pass('Terminal: the tab menu, the SFTP sidebar and the floating editor offer nothing that needs another Toolkit tool');
  // FTP/FTPS connections saved for the Toolkit's File Transfer tool are not listed in this app.

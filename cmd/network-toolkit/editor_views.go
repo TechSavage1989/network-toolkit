@@ -107,6 +107,7 @@ type editorPreferences struct {
 	Palette                   string            `json:"palette"`
 	AppTheme                  string            `json:"appTheme,omitempty"`
 	Colors                    map[string]string `json:"colors"`
+	DocumentMap               *bool             `json:"documentMap,omitempty"` // the Document Map setting, for a new editor window
 	// FindTransparency is the Find window's Transparency setting
 	// (editor-find.js): on, "blur" (on losing focus) or "always", and the
 	// opacity in percent.

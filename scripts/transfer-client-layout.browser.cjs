@@ -96,6 +96,14 @@ async function main(){
  await page.locator('[data-client-tab="saved"]').click();assert.ok(await page.getByText('Shared SSH profile',{exact:true}).isVisible());
  await page.locator('[data-client-tab="recent"]').click();await page.locator('[data-client-tab="settings"]').click();assert.equal(listings(),before);
  await page.locator('.rb-client-sidebar [data-client-tab][aria-selected="true"]').click();
+ // Owner rule: Active session's Connection settings is a toggle for the sidebar's connection settings and shows its state.
+ {const gear=page.locator('.rb-session-tools [data-rb-action="connectionSettings"]'),collapsed=()=>page.locator('.rb-client-sidebar').evaluate(el=>el.classList.contains('is-collapsed')),settingsTab=page.locator('.rb-client-sidebar [data-client-tab="settings"]');
+  assert.equal(await gear.getAttribute('aria-expanded'),'false');assert.equal(await collapsed(),true);
+  await gear.click();assert.equal(await gear.getAttribute('aria-expanded'),'true');assert.equal(await collapsed(),false);assert.equal(await settingsTab.getAttribute('aria-selected'),'true');
+  await gear.click();assert.equal(await gear.getAttribute('aria-expanded'),'false');assert.equal(await collapsed(),true);
+  await page.locator('[data-client-tab="saved"]').click();assert.equal(await collapsed(),false);assert.equal(await gear.getAttribute('aria-expanded'),'false','Saved connections are not the connection settings');
+  await gear.click();assert.equal(await settingsTab.getAttribute('aria-selected'),'true');assert.equal(await collapsed(),false);assert.equal(await gear.getAttribute('aria-expanded'),'true');
+  await gear.click();assert.equal(await collapsed(),true);assert.equal(await gear.getAttribute('aria-expanded'),'false');assert.equal(listings(),before);}
  const divider=page.locator('.transfer-activity-splitter'),height=Number(await divider.getAttribute('aria-valuenow')),box=await divider.boundingBox();
  await page.mouse.move(box.x+box.width/2,box.y+3);await page.mouse.down();await page.mouse.move(box.x+box.width/2,box.y-75,{steps:7});await page.mouse.up();
  const enlarged=Number(await divider.getAttribute('aria-valuenow'));assert.ok(enlarged>height+65,'pointer activity resize failed');

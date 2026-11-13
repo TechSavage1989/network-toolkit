@@ -49,11 +49,28 @@ const root=path.resolve(__dirname,'..'),version=require('../package.json').versi
    await input.evaluate(el=>el.scrollTop=0);await input.hover();await page.mouse.wheel(0,150);await page.waitForFunction(()=>document.querySelector('#terminalMacroCommand').scrollTop>0);
    assert.equal(await input.inputValue(),multiline);await noTracks('after wheel');
    if(output&&width===1280&&theme==='light'&&side==='right')await composer.screenshot({path:path.join(output,'terminal-commandbar-expanded.png')});
-   await page.locator('[data-macro-action="hide-composer"]').click();await page.locator('#terminalMacroComposerToggle').click();assert.equal(await input.inputValue(),multiline);await noTracks('after reopening');
+   // Command bar is a toggle (owner rule): the toolbar button hides and restores the bar; the bar has no hide button of its own.
+   const toggle=page.locator('#terminalMacroComposerToggle');assert.equal(await page.locator('[data-macro-action="hide-composer"]').count(),0);assert.equal(await toggle.getAttribute('aria-expanded'),'true');
+   await toggle.click();assert.equal(await composer.isVisible(),false);assert.equal(await toggle.getAttribute('aria-expanded'),'false');
+   await toggle.click();assert.equal(await composer.isVisible(),true);assert.equal(await toggle.getAttribute('aria-expanded'),'true');assert.equal(await input.inputValue(),multiline);await noTracks('after reopening');
    layouts.push({width,theme,side});
   }
+  // Find is a toggle (owner rule): the Find button, Ctrl+Shift+F and Escape close the row the button opened; the row has no close button.
+  await page.setViewportSize({width:1280,height:900});
+  await page.evaluate(()=>{startTerminalFeed=()=>{};startTerminalWindowRequests=()=>{};startTerminalViews=()=>{};queueTerminalResize=()=>{};upsertTerminalSession({id:'find-ssh',type:'ssh',state:'connected',host:'192.0.2.10',port:22,username:'operator',label:'lab-switch-01'});terminalActive='find-ssh';terminalPanes=['find-ssh','','',''];renderPage();renderTerminalChrome();});
+  const find=page.locator('#terminalCommandBar [data-terminal-action="search"]'),row=page.locator('#terminalSearch'),search=page.locator('#terminalSearchInput');
+  await find.waitFor();assert.equal(await row.isVisible(),false,'Find starts closed');assert.equal(await find.getAttribute('aria-expanded'),'false');assert.equal(await page.locator('[data-terminal-action="close-search"]').count(),0);
+  const pressed=async()=>{await page.mouse.move(5,890);await page.waitForTimeout(350);return find.evaluate(el=>{const s=getComputedStyle(el);return s.backgroundColor+' '+s.borderColor;});};const idle=await pressed();
+  await find.click();assert.equal(await row.isVisible(),true);assert.equal(await find.getAttribute('aria-expanded'),'true');assert.equal(await search.evaluate(el=>document.activeElement===el),true);assert.notEqual(await pressed(),idle,'Find looks pressed while open');
+  if(output)await page.locator('#terminalCommandBar').screenshot({path:path.join(output,'terminal-find-open.png')});
+  await find.click();assert.equal(await row.isVisible(),false);assert.equal(await find.getAttribute('aria-expanded'),'false');assert.equal(await pressed(),idle);
+  await find.click();await search.fill('interface');await search.press('Control+Shift+F');assert.equal(await row.isVisible(),false,'Ctrl+Shift+F closes Find');assert.equal(await find.getAttribute('aria-expanded'),'false');
+  await page.locator('#terminalStage .xterm-helper-textarea').first().focus();await page.keyboard.press('Control+Shift+F');assert.equal(await row.isVisible(),true,'Ctrl+Shift+F in the terminal opens Find');assert.equal(await search.inputValue(),'interface');
+  await search.press('Escape');assert.equal(await row.isVisible(),false,'Escape closes Find');
+  await page.locator('#terminalStage .xterm-helper-textarea').first().focus();await page.keyboard.press('Control+Shift+F');assert.equal(await row.isVisible(),true);await page.locator('#terminalStage .xterm-helper-textarea').first().focus();await page.keyboard.press('Control+Shift+F');assert.equal(await row.isVisible(),false,'Ctrl+Shift+F in the terminal closes Find again');
+  await find.click();await page.evaluate(()=>{terminalSessions.get('find-ssh').info.state='closed';terminalSessions.delete('find-ssh');terminalActive='';terminalPanes=['','','',''];renderTerminalChrome();});assert.equal(await row.isVisible(),false,'Find closes when no session is left to search');assert.equal(await find.getAttribute('aria-expanded'),'false');
   assert.equal(writes.filter(p=>p==='/api/terminals'||p.includes('/terminal-macros/send')).length,0);assert.deepEqual(errors,[]);
-  const result={passed:true,renderedCases:layouts.length,releasedScrollbarPolicy:negative,noVisibleTracks:true,longCommandCaret:true,multilineCaretAndWheel:true,inputPreserved:true,noCommandsSent:true,errors};
+  const result={passed:true,renderedCases:layouts.length,releasedScrollbarPolicy:negative,noVisibleTracks:true,longCommandCaret:true,multilineCaretAndWheel:true,inputPreserved:true,noCommandsSent:true,findToggle:true,commandBarToggle:true,errors};
   if(output)fs.writeFileSync(path.join(output,'terminal-commandbar-results.json'),JSON.stringify(result,null,2));console.log(JSON.stringify(result));
  }catch(error){if(output)await page.screenshot({path:path.join(output,'terminal-commandbar-failure.png')}).catch(()=>{});throw error;}
  finally{await browser.close();}

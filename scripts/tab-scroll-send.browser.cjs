@@ -166,7 +166,7 @@ const sessions=Array.from({length:14},(_,i)=>({id:'s'+(i+1),label:'lab-switch-'+
   for(const label of ['Undo','Redo','Cut','Copy','Paste','Select all','Send selection to terminal…','Find','Replace','Go to line']) {
     assert.equal(await menu.getByRole('menuitem',{name:new RegExp('^'+label+'(?:\\s|$)')}).count(),1,label);
   }
-  assert.deepEqual(await menu.locator('.nt-editor-menu-root [data-editor-submenu]').evaluateAll(list=>list.map(el=>el.dataset.editorSubmenu)),['tools-lines','tools-encode','tools-format','tools-device']);
+  assert.deepEqual(await menu.locator('.nt-editor-menu-root [data-editor-submenu]').evaluateAll(list=>list.map(el=>el.dataset.editorSubmenu)),['tools-lines','tools-encode','tools-format']);
   await submenuPanel('tools-lines').waitFor({state:'hidden'});
   await submenuPanel('tools-encode').waitFor({state:'hidden'});
   await submenu('tools-lines').hover();
