@@ -1,0 +1,14 @@
+Network Toolkit 1.21.55
+
+## What's New
+
+- Document Map: turn it on in the Text Editor's More menu to see a miniature of the whole document at the right edge. Click or drag it to move through the text.
+- Document List: the new Docs item beside Connect and Files lists your open documents, with unsaved ones marked. Click one to switch to it.
+
+## Additional Details
+
+- The map shows which part of the document is on screen, follows scrolling, typing, Wrap and the color theme, and stays quick on very large files.
+- In split view the map follows the active side, and the list groups documents by side. Right-click a document in the list for the same menu as its tab.
+- Both settings are kept, and are the same in the main window, separate editor windows and the Text Editor app.
+- In a large file, a click on the scrollbar track or a quick drag of it is no longer sometimes ignored.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.
