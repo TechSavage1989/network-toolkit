@@ -10,4 +10,5 @@ Network Toolkit 1.21.55
 - The map shows which part of the document is on screen, follows scrolling, typing, Wrap and the color theme, and stays quick on very large files.
 - In split view the map follows the active side, and the list groups documents by side. Right-click a document in the list for the same menu as its tab.
 - Both settings are kept, and are the same in the main window, separate editor windows and the Text Editor app.
+- In a large file, a click on the scrollbar track or a quick drag of it is no longer sometimes ignored.
 - Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.

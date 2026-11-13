@@ -13,6 +13,8 @@ What changed (rules in AGENTS.md, the Document Map bullet; guide in docs/guide/e
 
 Checks: `TestEditorSessionBrowserMapList` (`scripts/editor-map-list.browser.cjs`: box against scroll, click/drag/wheel, typing, Wrap, font, themes, split view, list keys and menu, reload, a 640x400 detached window, 16 MB page-held and disk-backed documents with no long task over 50 ms on the disk-backed one, a 1.7 MB single-line Base64 document with Wrap on), `scripts/editor-document-map.test.cjs`, `standalone-apps`, `editor-disk-view`, `connect-sidebar118`, `editor-sidebar117`/`121`, `editor-toolbar113`, `file-row-drag120`, `TestSharedDataBrowser`.
 
+Also in this release: a track click on the disk view's document bar could be lost (CI timed out waiting for the view to follow it): a paint that ran between the bar's move and its scroll event put the bar back. The view now remembers where it last put each bar (`barSet`, `barLeftSet`) and leaves a bar the user moved for its scroll event; `scripts/editor-disk-view.browser.cjs` moves the bar and paints in the same task (fails on the old code). The disk-view double-click check (#180) found the earlier CI failure: the browser delivered a wheel step late, onto the next view.
+
 Known limits: on a 16 MB page-held document the browser's own textarea causes 100–300 ms long tasks with or without the map (the map's own work peaks near 8 ms); the map of a disk-backed document shows detail only for the loaded page and a light texture elsewhere. Not yet tried on Windows by the owner.
 
 # v1.21.54 Beta 1 - Text tools in the Text Editor

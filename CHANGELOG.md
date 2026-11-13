@@ -1,6 +1,6 @@
 ## 1.21.55 Beta 1 - Document Map and Document List
 
-- The Text Editor gets a Document Map at the right edge (bounded for any size; disk-backed documents mapped by position) and a Document List on the left rail beside Connect and Files; both settings are shared editor preferences.
+- The Text Editor gets a Document Map at the right edge (bounded for any size; disk-backed documents mapped by position) and a Document List on the left rail beside Connect and Files; both settings are shared editor preferences. A paint no longer moves a disk-view scrollbar back while the user's move of it is pending (a track click could be lost).
 
 ## 1.21.54 Beta 1 - Text tools in the Text Editor
 
