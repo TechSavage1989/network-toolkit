@@ -360,32 +360,112 @@ func (s *Snapshot) Mark(ctx context.Context, q Search, from, to int64, maxLines 
 	return count, lines, more, err
 }
 
-// MatchedText is the text of every match in [from, to), one match after the
-// other with sep between them (Copy Marked Text). It is refused when it
-// would be longer than max bytes.
+// MarkSearch is one search of Mark All: its pattern and the range it
+// marked (nil: the whole document).
+type MarkSearch struct {
+	Search Search    `json:"search"`
+	Within *[2]int64 `json:"within"`
+}
+
+// MatchedText is the text of every match of one search in [from, to), with
+// sep between them (Copy Marked Text of one mark).
 func (s *Snapshot) MatchedText(ctx context.Context, q Search, from, to int64, sep string, max int64) (string, int64, error) {
-	sc, err := s.scope(from, to)
-	if err != nil {
-		return "", 0, err
+	within := &[2]int64{from, to}
+	if to < 0 {
+		within = nil
 	}
-	lo, hi := sc.lo, sc.hi
-	scan, err := s.scanIn(ctx, q, lo, hi, nil)
-	if err != nil {
-		return "", 0, err
+	return s.MarkedText(ctx, []MarkSearch{{Search: q, Within: within}}, sep, max)
+}
+
+// MarkedText is the marked text of a document (Copy Marked Text): the
+// matches of every mark, in document order, with sep between them. Text
+// that several marks (or overlapping matches) cover is copied once, as one
+// stretch. Matches of empty text copy nothing. It is refused when it would
+// be longer than most bytes, and it returns the number of stretches.
+func (s *Snapshot) MarkedText(ctx context.Context, marks []MarkSearch, sep string, most int64) (string, int64, error) {
+	type source struct {
+		scan *matchScan
+		sc   scope
+		a, z int64
+		ok   bool
+	}
+	var sources []*source
+	advance := func(src *source, at int64) error {
+		var err error
+		src.ok = false
+		if at <= src.sc.hi {
+			src.a, src.z, src.ok, err = src.scan.within(at, src.sc, src.sc.hi)
+		}
+		return err
+	}
+	for _, mark := range marks {
+		from, to := int64(0), int64(-1)
+		if mark.Within != nil {
+			from, to = mark.Within[0], mark.Within[1]
+		}
+		sc, err := s.scope(from, to)
+		if err != nil {
+			return "", 0, err
+		}
+		scan, err := s.scanIn(ctx, mark.Search, sc.lo, sc.hi, nil)
+		if err != nil {
+			return "", 0, err
+		}
+		src := &source{scan: scan, sc: sc}
+		if err = advance(src, sc.lo); err != nil {
+			return "", 0, err
+		}
+		sources = append(sources, src)
 	}
 	var out []byte
 	var count int64
-	err = scan.each(sc, func(a, z int64) error {
+	start, end := int64(-1), int64(-1)
+	flush := func() error {
+		if start < 0 || end <= start {
+			return nil
+		}
 		if count > 0 {
 			out = append(out, sep...)
 		}
 		count++
-		if int64(len(out))+z-a > max {
+		if int64(len(out))+end-start > most {
 			return ErrTooMuchText
 		}
-		return s.copyBytes(ctx, a, z, func(p []byte) error { out = append(out, p...); return nil })
-	})
-	return string(out), count, err
+		return s.copyBytes(ctx, start, end, func(p []byte) error { out = append(out, p...); return nil })
+	}
+	for {
+		var next *source
+		for _, src := range sources {
+			if src.ok && (next == nil || src.a < next.a) {
+				next = src
+			}
+		}
+		if next == nil {
+			break
+		}
+		a, z := next.a, next.z
+		if z > a {
+			if start >= 0 && a <= end {
+				end = max(end, z)
+			} else {
+				if err := flush(); err != nil {
+					return "", 0, err
+				}
+				start, end = a, z
+			}
+		}
+		at, err := next.scan.after(a, z)
+		if err == nil {
+			err = advance(next, at)
+		}
+		if err != nil {
+			return "", 0, err
+		}
+	}
+	if err := flush(); err != nil {
+		return "", 0, err
+	}
+	return string(out), count, nil
 }
 
 // ErrTooMuchText refuses to copy more marked text than the clipboard is

@@ -34,9 +34,10 @@ import (
 // replaces anything in it (the buffer route and editorbuffer refuse it).
 
 const (
-	// editorFindJobs is how many jobs the engine keeps; the oldest goes
-	// first (a running one is cancelled).
-	editorFindJobs = 96
+	// editorFindJobs is how many jobs one editor window keeps: a new one
+	// makes room by dropping the window's oldest finished job, never a
+	// running one, and never another window's.
+	editorFindJobs = 64
 	// editorFindHistory is the length of each search history list.
 	editorFindHistory = 20
 	// editorBookmarkLimit is the most lines one Mark All bookmarks.
@@ -126,23 +127,49 @@ func (j *editorFindJob) state() map[string]any {
 	return state
 }
 
-func (f *editorFind) add(job *editorFindJob) {
+// errFindBusy refuses a new search while every search a window keeps is
+// still running.
+var errFindBusy = errors.New("Too many searches are running in this window. Wait for one to finish, or cancel it.")
+
+func (f *editorFind) add(job *editorFindJob) error {
 	f.mu.Lock()
 	if f.jobs == nil {
 		f.jobs = map[string]*editorFindJob{}
 	}
-	var gone []*editorFindJob
-	for len(f.order) >= editorFindJobs {
-		gone = append(gone, f.jobs[f.order[0]])
-		delete(f.jobs, f.order[0])
-		f.order = f.order[1:]
+	owned, oldest := 0, -1
+	for k, id := range f.order {
+		other := f.jobs[id]
+		if other.owner != job.owner {
+			continue
+		}
+		owned++
+		if oldest < 0 && other.isDone() {
+			oldest = k
+		}
+	}
+	var gone *editorFindJob
+	if owned >= editorFindJobs {
+		if oldest < 0 {
+			f.mu.Unlock()
+			return errFindBusy
+		}
+		gone = f.jobs[f.order[oldest]]
+		delete(f.jobs, gone.id)
+		f.order = append(f.order[:oldest], f.order[oldest+1:]...)
 	}
 	f.jobs[job.id] = job
 	f.order = append(f.order, job.id)
 	f.mu.Unlock()
-	for _, old := range gone {
-		old.stop()
+	if gone != nil {
+		gone.stop()
 	}
+	return nil
+}
+
+func (j *editorFindJob) isDone() bool {
+	j.mu.Lock()
+	defer j.mu.Unlock()
+	return j.done
 }
 
 func (j *editorFindJob) stop() {
@@ -238,8 +265,9 @@ func findRange(within *[2]int64) (int64, int64) {
 	return within[0], within[1]
 }
 
-// runFind runs a read-only job over a snapshot, which it closes.
-func runFind(ctx context.Context, job *editorFindJob, s *editorbuffer.Snapshot, q editorbuffer.Search, within *[2]int64, separator string, maxLines int) {
+// runFind runs a read-only job over a snapshot, which it closes. Copy Marked
+// Text reads the matches of every mark of the document (marks).
+func runFind(ctx context.Context, job *editorFindJob, s *editorbuffer.Snapshot, q editorbuffer.Search, within *[2]int64, marks []editorbuffer.MarkSearch, separator string, maxLines int) {
 	defer job.cancel()
 	defer s.Close()
 	from, to := findRange(within)
@@ -254,11 +282,18 @@ func runFind(ctx context.Context, job *editorFindJob, s *editorbuffer.Snapshot, 
 		var hits int64
 		hits, err = s.FindAll(ctx, q, from, to, job.results.Add, job.setProgress)
 		answer = map[string]any{"count": hits}
+		if hits == 0 {
+			// Nothing to read a page of: the memory goes at once.
+			job.results.Close()
+		}
 	case "mark":
 		count, lines, more, e := s.Mark(ctx, q, from, to, maxLines, job.setProgress)
 		answer, err = map[string]any{"count": count, "lines": lines, "more": more}, e
 	case "copy":
-		text, count, e := s.MatchedText(ctx, q, from, to, separator, pageToolOutputAllowance)
+		if len(marks) == 0 {
+			marks = []editorbuffer.MarkSearch{{Search: q, Within: within}}
+		}
+		text, count, e := s.MarkedText(ctx, marks, separator, pageToolOutputAllowance)
 		answer, err = map[string]any{"count": count, "text": text}, e
 	}
 	job.finish(answer, err)
@@ -275,14 +310,20 @@ func findSeparator(separator string) string {
 	return "\n"
 }
 
-func (m *editorViewRegistry) newFindJob(caller, kind string, revision uint64, parent context.Context) (*editorFindJob, context.Context) {
+func (m *editorViewRegistry) newFindJob(caller, kind string, revision uint64, parent context.Context) (*editorFindJob, context.Context, error) {
 	ctx, cancel := context.WithCancel(parent)
 	job := &editorFindJob{id: newJobID(), owner: caller, kind: kind, revision: revision, cancel: cancel}
 	if kind == "all" {
 		job.results = editorbuffer.NewResults("")
 	}
-	m.find.add(job)
-	return job, ctx
+	if err := m.find.add(job); err != nil {
+		cancel()
+		if job.results != nil {
+			job.results.Close()
+		}
+		return nil, nil, err
+	}
+	return job, ctx, nil
 }
 
 // editorFindRequest is a request of the Find window to
@@ -303,8 +344,10 @@ type editorFindRequest struct {
 	Start       int64               `json:"start"`
 	Limit       int                 `json:"limit"`
 	Separator   string              `json:"separator"`
-	List        string              `json:"list"`
-	Value       string              `json:"value"`
+	// Marks are the searches of Copy Marked Text (at most 16).
+	Marks []editorbuffer.MarkSearch `json:"marks"`
+	List  string                    `json:"list"`
+	Value string                    `json:"value"`
 }
 
 func (m *editorViewRegistry) handleFind(w http.ResponseWriter, r *http.Request, caller string) {
@@ -404,7 +447,7 @@ func (m *editorViewRegistry) findInText(ctx context.Context, caller string, req 
 		text, found, err := s.ReplaceTextFor(ctx, req.Search, req.Replacement, req.From, req.To)
 		return map[string]any{"found": found, "text": text}, err
 	}
-	if !findKind(req.Kind) {
+	if !findKind(req.Kind) || len(req.Marks) > 16 {
 		s.Close()
 		return nil, errors.New("Unsupported Find request.")
 	}
@@ -412,8 +455,12 @@ func (m *editorViewRegistry) findInText(ctx context.Context, caller string, req 
 	if m.app != nil && m.app.ctx != nil {
 		parent = m.app.ctx
 	}
-	job, jobCtx := m.newFindJob(caller, req.Kind, 0, parent)
-	go runFind(jobCtx, job, s, req.Search, req.Within, findSeparator(req.Separator), editorBookmarkLimit)
+	job, jobCtx, err := m.newFindJob(caller, req.Kind, 0, parent)
+	if err != nil {
+		s.Close()
+		return nil, err
+	}
+	go runFind(jobCtx, job, s, req.Search, req.Within, req.Marks, findSeparator(req.Separator), editorBookmarkLimit)
 	return map[string]any{"job": job.id}, nil
 }
 
@@ -456,7 +503,7 @@ func (m *editorViewRegistry) findDisk(ctx context.Context, caller string, d *edi
 		if v.Binary {
 			return nil, editorbuffer.ErrBinary
 		}
-	} else if !findKind(req.Kind) {
+	} else if !findKind(req.Kind) || len(req.Marks) > 16 {
 		return nil, errors.New("Unsupported Find request.")
 	}
 	s, err := v.Buffer.Snapshot()
@@ -467,7 +514,11 @@ func (m *editorViewRegistry) findDisk(ctx context.Context, caller string, d *edi
 		s.Close()
 		return nil, editorbuffer.ErrRevision
 	}
-	job, jobCtx := m.newFindJob(caller, req.Kind, s.Revision, d.ctx)
+	job, jobCtx, err := m.newFindJob(caller, req.Kind, s.Revision, d.ctx)
+	if err != nil {
+		s.Close()
+		return nil, err
+	}
 	// Registered before the start is answered: a reload or close that comes
 	// right after it stops the job, and the job releases its snapshot.
 	stop, unregister := d.registerStop(jobCtx)
@@ -477,7 +528,7 @@ func (m *editorViewRegistry) findDisk(ctx context.Context, caller string, d *edi
 			d.runReplaceJob(stop, job, s, q, req.Replace, req.Within)
 			return
 		}
-		runFind(stop, job, s, q, req.Within, findSeparator(req.Separator), editorBookmarkLimit)
+		runFind(stop, job, s, q, req.Within, req.Marks, findSeparator(req.Separator), editorBookmarkLimit)
 	}()
 	return map[string]any{"job": job.id, "revision": s.Revision}, nil
 }

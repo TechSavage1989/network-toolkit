@@ -479,6 +479,8 @@ type editorDiskRequest struct {
 	Wrap      bool                 `json:"wrap"`
 	Kind      string               `json:"kind"`
 	Separator string               `json:"separator"`
+	// Marks are the searches of Copy Marked Text (editor_find.go).
+	Marks []editorbuffer.MarkSearch `json:"marks,omitempty"`
 }
 
 func (m *editorViewRegistry) diskDocument(w http.ResponseWriter, r *http.Request, caller, uid string) {
