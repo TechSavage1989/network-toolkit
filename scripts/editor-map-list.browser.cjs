@@ -238,6 +238,7 @@ async function mainWindow(browser){
  assert.deepEqual(await bottom(),[0x12,0x34,0x56],'Custom: the map has the custom background');
  await page.locator('#networkToolkitFileEditor [data-ed-palette]').selectOption('auto');await frames(page);
  assert.deepEqual(await bottom(),dark,'back to Follow app');
+ await page.locator('#networkToolkitFileEditor [data-ed-custom-palette] [data-ed="colors"]').click();await frames(page);
  pass('Document map: follows the light and dark themes and the Custom palette');
 
  // ---- Document List ----
@@ -254,6 +255,7 @@ async function mainWindow(browser){
  assert.deepEqual(rows.map(row=>row.active),[true,false,false,false],'the active document is highlighted');
  assert.match(rows[0].label,/^core-router\.cfg, unsaved changes$/);
  assert.equal(await page.locator('#networkToolkitFileEditor [data-ed-doc-uid].is-active').evaluate(el=>getComputedStyle(el).backgroundColor!==getComputedStyle(el.parentElement).backgroundColor),true,'the active row has its own background');
+ await shot(page,'editor-map-and-list-dark');await page.evaluate(()=>setTheme('light'));await frames(page);await shot(page,'editor-map-and-list-light');await page.evaluate(()=>setTheme('dark'));await frames(page);
  // Click, then Up/Down and Enter.
  await page.locator('#networkToolkitFileEditor [data-ed-doc-uid]').nth(2).click();
  assert.equal(await activeUID(page),rows[2].uid,'a click activates that tab');
