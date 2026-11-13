@@ -634,7 +634,7 @@ function skin(){if(overlay)return;readPreferences();
  overlay.addEventListener('contextmenu',event=>{const tab=event.target.closest('[data-ed-uid]');if(!tab)return;event.preventDefault();const d=[...documents.values()].find(d=>d.uid===tab.dataset.edUid);if(d)openTabMenu(d,event.clientX,event.clientY);});
  document.addEventListener('pointerdown',event=>{if(tabMenu&&!tabMenu.contains(event.target))closeTabMenu(false);},true);
  overlay.addEventListener('wheel',zoomEditorText,{capture:true,passive:false});
- overlay.addEventListener('click',click);overlay.addEventListener('change',change);overlay.addEventListener('beforeinput',beforeInput);overlay.addEventListener('input',input);overlay.addEventListener('keydown',keydown);overlay.addEventListener('scroll',scroll,true);root.NetworkToolkitEditorWindows?.mount?.();
+ overlay.addEventListener('click',click);overlay.addEventListener('change',change);overlay.addEventListener('beforeinput',beforeInput);overlay.addEventListener('input',input);overlay.addEventListener('keydown',keydown);overlay.addEventListener('scroll',scroll,true);overlay.addEventListener('selectionchange',event=>{if(event.target.matches?.('[data-ed-text]')&&!current()?.disk)status();},true);root.NetworkToolkitEditorWindows?.mount?.();
 }
 function zoomEditorText(event){
  if(!event.ctrlKey||!event.target.closest?.('.nt-editor-code,.nt-compare-surface,.nt-disk-compare-code,.nt-compare-preview-scroll'))return;
@@ -818,14 +818,17 @@ function setContent(d,value,record=true,inputEdit=null,caret=null){if(!d||d.froz
  }
  if(value.length>EDITOR_DOCUMENT_BYTES){setMessage('The edit exceeds the 32 MiB decoded document limit. Existing text is unchanged.',true);return false;}const previous=d.content,priorRevision=d.editRevision,cached=d.lineIndex;if(record){d.undo.push(d.content);retainUndo(d,d.undo);d.redo=[];}d.content=value;d.editRevision=(d.editRevision||0)+1;const updated=inputEdit?.revision===priorRevision?root.NTKEditorLargeIndex?.update?.(cached,previous,value,inputEdit,caret):null;d.lineIndex=updated?{text:value,starts:updated}:null;d.dirty=d.content!==d.saved||d.eol!==d.savedEol||d.bom!==d.savedBOM||d.encoding!==d.savedEncoding;paintText(d);drawTabs();status();paneWorkspace()?.refresh();return true;}
 function syncText(d){paneWorkspace()?.refresh(true);const el=findEl('[data-ed-text]');if(el)el.value=d.content;paintText(d);drawTabs();status();}
+// The size of the selection in the whole document, so a selection that ends at
+// a page edge of a large file cannot pass for the whole document.
+function selectedNote(range){const count=range?Math.max(0,range.end-range.start):0;return count?' · '+count.toLocaleString()+' selected':'';}
 function status(){const d=current(),text=findEl('[data-ed-text]');if(!d||!text)return;
  if(d.disk){
-  const meta=d.diskMeta,cursor=diskView()?.cursor;
+  const meta=d.diskMeta,view=diskView(),cursor=view?.cursor;
   if(meta){findEl('[data-ed-size]').textContent=meta.units.toLocaleString()+' chars, '+meta.lines.toLocaleString()+' lines'+(d.dirty?' · Unsaved':'')+(notText(d)?' · Read-only: not a text file':d.eol==='Mixed'?' · Mixed line endings':'');}
-  if(cursor)findEl('[data-ed-position]').textContent='Ln '+(cursor.line+1).toLocaleString()+', Col '+(cursor.column+1).toLocaleString();
+  if(cursor)findEl('[data-ed-position]').textContent='Ln '+(cursor.line+1).toLocaleString()+', Col '+(cursor.column+1).toLocaleString()+selectedNote(view.selection());
   return;
  }
- const pos=text.selectionStart,starts=lineIndex(d),at=sourceLineAt(starts,pos),column=pos-starts[at]+1;findEl('[data-ed-position]').textContent='Ln '+(at+1)+', Col '+column;const mode=largeDocument(d)?' · Large-file mode: plain text, Wrap paused; undo up to 128 MiB / 80 entries':'';findEl('[data-ed-size]').textContent=d.content.length.toLocaleString()+' chars, '+starts.length.toLocaleString()+' lines'+(d.dirty?' · Unsaved':'')+mode;}
+ const pos=text.selectionStart,starts=lineIndex(d),at=sourceLineAt(starts,pos),column=pos-starts[at]+1;findEl('[data-ed-position]').textContent='Ln '+(at+1)+', Col '+column+selectedNote({start:pos,end:text.selectionEnd});const mode=largeDocument(d)?' · Large-file mode: plain text, Wrap paused; undo up to 128 MiB / 80 entries':'';findEl('[data-ed-size]').textContent=d.content.length.toLocaleString()+' chars, '+starts.length.toLocaleString()+' lines'+(d.dirty?' · Unsaved':'')+mode;}
 
 // Send to terminal: snapshot the active document (and its selection) for the
 // dialog in editor-send-terminal.js; a floating editor is hidden so the
