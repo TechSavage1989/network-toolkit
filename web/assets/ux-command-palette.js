@@ -88,6 +88,14 @@ function catalog(){
    const btn=doc.querySelector('.nt-editor-tab [data-ed-tab-actions]');if(btn)btn.click();
   }}
  );
+ // The Text Editor's text tools (editor-text-tools.js), while it shows a
+ // document: the main window's editor, detached editor windows and the
+ // standalone Text Editor. The standalone Terminal shows no editor.
+ const editor=root.NetworkToolkitFileEditor,textTools=root.NTKEditorTextTools,editorShown=doc.getElementById('networkToolkitFileEditor');
+ if(allowedTool('editor')&&textTools&&editor?.active&&editorShown&&!editorShown.hidden&&standalone()?.mode?.()!=='terminal')for(const tool of textTools.TOOLS){
+  const group=textTools.GROUPS.find(entry=>entry.id===tool.group);
+  global.push({id:'text-tool-'+tool.id,label:'Text tools: '+tool.label.replace(/…$/,''),group:'Text Editor',shortcut:tool.shortcut||'',keywords:(group?.label||'')+' '+tool.description,run:()=>void editor.textMenu?.run(tool.id)});
+ }
  return [...tools,...(app?app.commands(global):global),...buttons()];
 }
 function rank(item,words){
@@ -127,6 +135,9 @@ function helpText(){
  const all=[['Application','Ctrl+Shift+P','Search tools and commands'],['Application','F1','Open this help sheet'],['Application','Ctrl+Shift+T','Reopen an eligible recently closed tab'],
  ['Text Editor','Ctrl+N','New document'],['Text Editor','Alt+Shift+Left / Right','Reorder a document tab'],
  ['Text Editor','Shift+F10','Open the document tab menu'],
+ ['Text Editor','Ctrl+Shift+U / Ctrl+U','Change the selection or the document to UPPERCASE / lowercase'],
+ ['Text Editor','Ctrl+J / Ctrl+Shift+L','Join lines / Split lines at a text'],
+ ['Text Editor','Ctrl+Shift+B','Base64 decode the selection or the document'],
  ['Terminal','Alt+Shift+Left / Right','Reorder a terminal tab'],
  ['Terminal','Shift+F10','Open the terminal tab menu'],
  ['Terminal','Ctrl+Shift+F','Find in terminal output'],

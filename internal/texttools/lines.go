@@ -16,7 +16,7 @@ import (
 
 func init() {
 	register(&Tool{ID: "trim-trailing", Lines: true, run: trimSpaces(false)})
-	register(&Tool{ID: "trim", Lines: true, run: trimSpaces(true)})
+	register(&Tool{ID: "trim-both", Lines: true, run: trimSpaces(true)})
 	register(&Tool{ID: "remove-empty", Lines: true, run: removeEmpty})
 	register(&Tool{ID: "split", run: split})
 	register(&Tool{ID: "join", Lines: true, run: join})
