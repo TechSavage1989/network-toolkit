@@ -25,11 +25,12 @@ import (
 //     its buffer ("tool-start" on the document's buffer route), in the
 //     background, with progress ("tool-status") and cancellation
 //     ("tool-cancel"); the result replaces the range as one edit
-//     (Snapshot.Rewrite, committed like Replace All);
-//   - the readable copy of a SonicWall export is a new untitled document
-//     whose buffer the engine fills from the source document's snapshot
-//     (open mode "derive"): no text passes through the page, and the export
-//     itself is never changed.
+//     (Snapshot.Rewrite, committed like Replace All).
+// A decoder that stops at a character it does not decode changes nothing;
+// when the text before that character decodes on its own
+// (texttools.PositionError.Before), the answer names that part ("partial"),
+// and the page's "Decode the part before it" runs the same tool over just
+// that range.
 // A file that is not text refuses every tool (the buffer route refuses the
 // actions, and Rewrite refuses a binary buffer).
 
@@ -42,6 +43,9 @@ type editorToolJob struct {
 	done     bool
 	result   map[string]any
 	err      string
+	// partial is set on a failure when the part of the range before the
+	// problem decodes on its own (see partialRange).
+	partial map[string]any
 }
 
 func (j *editorToolJob) setProgress(p float64) { j.progress.Store(math.Float64bits(p)) }
@@ -52,6 +56,12 @@ func (j *editorToolJob) finish(result map[string]any, err string) {
 	j.mu.Unlock()
 }
 
+func (j *editorToolJob) fail(err string, partial map[string]any) {
+	j.mu.Lock()
+	j.done, j.err, j.partial = true, err, partial
+	j.mu.Unlock()
+}
+
 func (j *editorToolJob) state() map[string]any {
 	j.mu.Lock()
 	defer j.mu.Unlock()
@@ -59,7 +69,11 @@ func (j *editorToolJob) state() map[string]any {
 	case !j.done:
 		return map[string]any{"state": "running", "progress": math.Float64frombits(j.progress.Load())}
 	case j.err != "":
-		return map[string]any{"state": "failed", "error": j.err}
+		state := map[string]any{"state": "failed", "error": j.err}
+		if j.partial != nil {
+			state["partial"] = j.partial
+		}
+		return state
 	}
 	state := map[string]any{"state": "done"}
 	for k, v := range j.result {
@@ -92,6 +106,22 @@ func toolMessage(err error, position func(int64) (int64, int64, bool), from int6
 	return err.Error() + " Nothing was changed."
 }
 
+// partialRange names the part of a tool's range [from, ...) before the
+// character a decoder stopped at, when that part decodes on its own: the
+// document range the page's "Decode the part before it" runs the same tool
+// over, with the line and column (from 1) of the problem. nil otherwise.
+func partialRange(err error, position func(int64) (int64, int64, bool), from int64, scope string) map[string]any {
+	var at *texttools.PositionError
+	if !errors.As(err, &at) || !at.Before || at.Offset <= 0 || position == nil {
+		return nil
+	}
+	line, column, ok := position(from + at.Offset)
+	if !ok {
+		return nil
+	}
+	return map[string]any{"from": from, "to": from + at.Offset, "line": line + 1, "column": column + 1, "scope": scope}
+}
+
 // registerStop lets a reload or close of d stop work that holds its buffer
 // open (the same list Replace All uses).
 func (d *editorDiskDocument) registerStop(ctx context.Context) (*replaceAllContext, func()) {
@@ -116,9 +146,6 @@ func (d *editorDiskDocument) startTool(v *editorbuffer.Imported, req editorDiskR
 	tool, ok := texttools.Lookup(req.Tool)
 	if !ok {
 		return nil, texttools.ErrUnknownTool
-	}
-	if req.Tool == "sonicwall-readable" {
-		return nil, errors.New("The readable copy of a SonicWall export opens in a new tab.")
 	}
 	if v.Binary {
 		return nil, editorbuffer.ErrBinary
@@ -156,8 +183,10 @@ func (d *editorDiskDocument) runTool(ctx context.Context, job *editorToolJob, to
 		w, err := b.WindowNear(at, 1)
 		return w.Line, w.Column, err == nil
 	}
-	from, to := req.From, req.To
-	fail := func(err error) { job.finish(nil, toolMessage(err, position, from)) }
+	from, to, scope := req.From, req.To, "selection"
+	fail := func(err error) {
+		job.fail(toolMessage(err, position, from), partialRange(err, position, from, scope))
+	}
 	s, err := b.Snapshot()
 	if err != nil {
 		fail(err)
@@ -168,7 +197,6 @@ func (d *editorDiskDocument) runTool(ctx context.Context, job *editorToolJob, to
 		fail(editorbuffer.ErrRevision)
 		return
 	}
-	scope := "selection"
 	if from == to {
 		from, to, scope = 0, s.Units(), "document"
 	} else if tool.Lines {
@@ -231,15 +259,6 @@ func (d *editorDiskDocument) toolStatus(req editorDiskRequest, cancel bool) (any
 // page-held text (handleTextTools).
 const pageToolOutputAllowance = 32 << 20
 
-// detectPrefix is how much of a document's start is read to recognise it.
-const detectPrefix = 4096
-
-// detectTool tells the page whether the start of a document looks like a
-// SonicWall settings export; only its first few kilobytes are read.
-func detectTool(text string) map[string]any {
-	return map[string]any{"sonicwall": texttools.LooksLikeSonicWall([]byte(text))}
-}
-
 // replaceText answers a single Replace of a selected match: with a regular
 // expression, the Replace text expanded with that match's groups.
 func replaceText(ctx context.Context, b *editorbuffer.Buffer, req editorDiskRequest) (any, error) {
@@ -258,72 +277,6 @@ func replaceText(ctx context.Context, b *editorbuffer.Buffer, req editorDiskRequ
 	return map[string]any{"found": found, "text": text}, nil
 }
 
-// editorDeriveRequest names the document a derived document is made from.
-type editorDeriveRequest struct {
-	UID      string `json:"uid"`
-	Lease    uint64 `json:"lease"`
-	Tool     string `json:"tool"`
-	Revision uint64 `json:"revision"`
-}
-
-// deriveDiskDocument fills a new document with a tool's result over the
-// whole of another document. The source is read through a snapshot and
-// never changed; closing or reloading it stops the work: ctx is registered
-// with the source (registerStop) before the open is answered.
-func (m *editorViewRegistry) deriveDiskDocument(ctx context.Context, d *editorDiskDocument, source *editorDiskDocument, req editorDeriveRequest) (*editorbuffer.Imported, error) {
-	tool, ok := texttools.Lookup(req.Tool)
-	if !ok || req.Tool != "sonicwall-readable" {
-		return nil, texttools.ErrUnknownTool
-	}
-	source.mu.Lock()
-	v := source.imported
-	source.mu.Unlock()
-	if v == nil {
-		return nil, errors.New("The export is still opening. Try again when it has opened.")
-	}
-	if v.Binary {
-		return nil, editorbuffer.ErrBinary
-	}
-	s, err := v.Buffer.Snapshot()
-	if err != nil {
-		return nil, err
-	}
-	if s.Revision != req.Revision {
-		s.Close()
-		return nil, editorbuffer.ErrRevision
-	}
-	src, err := s.Source(ctx, 0, s.Units())
-	if err != nil {
-		s.Close()
-		return nil, err
-	}
-	var count int64
-	result, err := editorbuffer.NewText(ctx, "", func(out editorbuffer.Edits) error {
-		r, err := texttools.Run(ctx, tool.ID, texttools.Options{}, src, out, texttools.Env{Dir: v.Buffer.ScratchDir(), Progress: func(p float64) {
-			d.mu.Lock()
-			d.progress = int64(p * float64(src.Size()))
-			d.mu.Unlock()
-		}})
-		count = r.Count
-		return err
-	})
-	// The snapshot holds the source open: it is released before the message
-	// reads the source again (WindowNear claims the same lock, and a close
-	// of the source may be waiting in between).
-	s.Close()
-	if err != nil {
-		position := func(at int64) (int64, int64, bool) {
-			w, e := v.Buffer.WindowNear(at, 1)
-			return w.Line, w.Column, e == nil
-		}
-		return nil, errors.New(toolMessage(err, position, 0))
-	}
-	d.mu.Lock()
-	d.derived = count
-	d.mu.Unlock()
-	return result, nil
-}
-
 // handleTextTools runs a text tool over page-held text.
 func (m *editorViewRegistry) handleTextTools(w http.ResponseWriter, r *http.Request) {
 	var req struct {
@@ -334,14 +287,6 @@ func (m *editorViewRegistry) handleTextTools(w http.ResponseWriter, r *http.Requ
 	}
 	if err := decodeEditorBody(w, r, editorTransferLimit+16384, &req); err != nil {
 		jsonError(w, 400, err.Error())
-		return
-	}
-	if req.Action == "detect" {
-		text := req.Text
-		if len(text) > detectPrefix*4 {
-			text = text[:detectPrefix*4]
-		}
-		jsonResponse(w, 200, detectTool(text))
 		return
 	}
 	if req.Action != "run" {
@@ -362,6 +307,11 @@ func (m *editorViewRegistry) handleTextTools(w http.ResponseWriter, r *http.Requ
 		var at *texttools.PositionError
 		if errors.As(err, &at) {
 			answer["offset"] = at.Offset
+			// The text before offset decodes on its own: the page offers
+			// Decode the part before it, the same tool over text[:offset].
+			if at.Before && at.Offset > 0 {
+				answer["partial"] = true
+			}
 		}
 		jsonResponse(w, 200, answer)
 		return

@@ -167,7 +167,8 @@ func (d *decoded) take() []byte {
 }
 
 // URL decode: %XX becomes the byte it names. With form data a '+' is a space;
-// otherwise it stays a '+' (a SonicWall export keeps literal plus signs).
+// otherwise it stays a '+' (percent-encoded settings often hold literal plus
+// signs).
 func urlDecode(form bool) func(*job) error {
 	return func(j *job) error {
 		d := &decoded{j: j}

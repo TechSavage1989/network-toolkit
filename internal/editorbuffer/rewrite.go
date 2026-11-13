@@ -418,35 +418,3 @@ func (s *Snapshot) Rewrite(ctx context.Context, from, to int64, positional bool,
 	finished = true
 	return result, nil
 }
-
-// NewText makes a document from the text a tool inserts (a readable copy in
-// a new tab). The text is stored as it comes; it is unsaved work in UTF-8
-// with LF line breaks. The tool's Keep and Drop refer to its own input and
-// are ignored.
-func NewText(ctx context.Context, dir string, fill func(out Edits) error) (*Imported, error) {
-	b, err := empty(dir)
-	if err != nil {
-		return nil, err
-	}
-	out := newAppender(b)
-	sink := &textSink{out: out}
-	if err = fill(sink); err == nil {
-		err = ctx.Err()
-	}
-	if err == nil {
-		err = out.flush(true)
-	}
-	if err != nil {
-		b.Close()
-		return nil, err
-	}
-	b.root = out.tree
-	b.saved = &node{}
-	return &Imported{Buffer: b, Format: Format{Encoding: "UTF-8", EOL: "LF"}, Bytes: size(b.root).bytes}, nil
-}
-
-type textSink struct{ out *appender }
-
-func (t *textSink) Keep(int64) error      { return nil }
-func (t *textSink) Drop(int64) error      { return nil }
-func (t *textSink) Insert(p []byte) error { return t.out.add(p) }

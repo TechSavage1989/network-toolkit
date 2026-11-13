@@ -160,36 +160,6 @@ func TestLineRange(t *testing.T) {
 	}
 }
 
-func TestNewTextIsUnsavedUTF8(t *testing.T) {
-	dir := t.TempDir()
-	v, err := NewText(context.Background(), dir, func(out Edits) error {
-		out.Drop(10)
-		for i := 0; i < 3000; i++ {
-			if err := out.Insert([]byte("setting=value é\n")); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer v.Buffer.Close()
-	meta := v.Buffer.Metadata()
-	if !meta.Dirty || meta.CanUndo || meta.Lines != 3001 || v.Format != (Format{Encoding: "UTF-8", EOL: "LF"}) || v.Hash != "" {
-		t.Fatalf("%+v %+v", meta, v)
-	}
-	if textOf(t, v.Buffer) != strings.Repeat("setting=value é\n", 3000) {
-		t.Fatal("text")
-	}
-	if _, err = NewText(context.Background(), dir, func(out Edits) error { return out.Insert([]byte("a\x00b")) }); err == nil {
-		t.Fatal("a NUL character reached a new document")
-	}
-	if files, _ := os.ReadDir(dir); len(files) != 1 {
-		t.Fatalf("%d scratch files", len(files))
-	}
-}
-
 type templateCase struct {
 	Pattern     string `json:"pattern"`
 	Text        string `json:"text"`

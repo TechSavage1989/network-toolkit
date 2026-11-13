@@ -15,7 +15,6 @@ const tools={
  'hex-decode':text=>Buffer.from(text.replace(/[\s:,-]/g,''),'hex').toString('utf8')
 };
 function runTool(body){
- if(body.action==='detect')return {sonicwall:false};
  const fn=tools[body.tool];
  if(!fn)return {ok:false,error:'This text tool is not available in the synthetic fixture.'};
  const text=fn(body.text);

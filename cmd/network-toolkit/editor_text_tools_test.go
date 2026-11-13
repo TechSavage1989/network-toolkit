@@ -43,12 +43,9 @@ func TestEditorTextToolsForPageHeldText(t *testing.T) {
 	if out["ok"] != false {
 		t.Fatal(out)
 	}
-	export, _ := sonicwallFixture(2)
-	if out = textToolsCall(t, a, a.token, map[string]any{"action": "detect", "text": export[:200]}); out["sonicwall"] != true {
-		t.Fatal(out)
-	}
-	if out = textToolsCall(t, a, a.token, map[string]any{"action": "detect", "text": "hello"}); out["sonicwall"] != false {
-		t.Fatal(out)
+	// The detection of v1.21.54 is gone: only "run" is a text tool request.
+	if r := editorHTTP(a, a.token, "/api/editor-views/text-tools", map[string]any{"action": "detect", "text": "aGVsbG8="}); r.Code != 400 {
+		t.Fatal(r.Code)
 	}
 	// Unknown fields are refused like every editor request.
 	if r := editorHTTP(a, a.token, "/api/editor-views/text-tools", map[string]any{"action": "run", "tool": "upper", "text": "x", "path": "/etc/passwd"}); r.Code != 400 {
@@ -56,24 +53,24 @@ func TestEditorTextToolsForPageHeldText(t *testing.T) {
 	}
 }
 
-// A fictional SonicWall export: Base64 of key=value& settings.
-func sonicwallFixture(settings int) (string, string) {
-	var plain, readable strings.Builder
+// settingsLine is a fictional one-line settings file: key=value& settings
+// with %XX escapes as one line of Base64, the kind the editor guide's recipe
+// makes readable (Base64 decode, Split at text &, URL decode). readable is
+// the recipe's result for the Base64 followed by "&&".
+func settingsLine(settings int) (encoded, plain, readable string) {
+	var pairs, lines strings.Builder
 	add := func(key, value, shown string) {
-		plain.WriteString(key + "=" + value + "&")
-		readable.WriteString(key + "=" + shown + "\n")
+		pairs.WriteString(key + "=" + value + "&")
+		lines.WriteString(key + "=" + shown + "\n")
 	}
-	add("checksumVersion", "1", "1")
-	add("buildNum", "7.1.3-0000-R0000", "7.1.3-0000-R0000")
-	add("shortProdName", "TZ%20370", "TZ 370")
 	for i := 0; i < settings; i++ {
-		add(fmt.Sprintf("addrObjId_%d", i), fmt.Sprintf("LAN%%20Subnets%%20%d", i), fmt.Sprintf("LAN Subnets %d", i))
-		add(fmt.Sprintf("addrObjIp1_%d", i), fmt.Sprintf("192.0.2.%d", i%250), fmt.Sprintf("192.0.2.%d", i%250))
-		add(fmt.Sprintf("schedObjType_%d", i), "a+b%3ac", "a+b:c")
-		add(fmt.Sprintf("uuid_InternalInstanceId_%d", i), "x%0Ay", `x\ny`)
+		add(fmt.Sprintf("name_%d", i), fmt.Sprintf("Office%%20%d", i), fmt.Sprintf("Office %d", i))
+		add(fmt.Sprintf("address_%d", i), fmt.Sprintf("192.0.2.%d", i%250), fmt.Sprintf("192.0.2.%d", i%250))
+		add(fmt.Sprintf("note_%d", i), "a+b%3Ac%20d", "a+b:c d")
+		add(fmt.Sprintf("site_%d", i), "www.example.com%2Fpath", "www.example.com/path")
 	}
-	add("checksum", "0000abcd", "0000abcd")
-	return base64.StdEncoding.EncodeToString([]byte(plain.String())), readable.String()
+	// The "&&" after the Base64 become two more empty lines.
+	return base64.StdEncoding.EncodeToString([]byte(pairs.String())), pairs.String(), lines.String() + "\n\n"
 }
 
 // waitTool polls a text tool until it ends.
@@ -162,8 +159,8 @@ func TestEditorTextToolsOnADiskDocument(t *testing.T) {
 	if state = waitTool(t, a, lease, started["job"]); state["state"] != "failed" || !strings.Contains(state["error"].(string), "changed while the tool ran") {
 		t.Fatal(state)
 	}
-	// The readable copy of an export never replaces the export.
-	if r = diskCall(a, a.token, lease, map[string]any{"action": "tool-start", "revision": revision + 2, "tool": "sonicwall-readable"}); r.Code != 409 {
+	// A tool the engine does not have changes nothing.
+	if r = diskCall(a, a.token, lease, map[string]any{"action": "tool-start", "revision": revision + 2, "tool": "no-such-tool"}); r.Code != 409 {
 		t.Fatal(r.Code)
 	}
 	if r = diskCall(a, a.token, lease, map[string]any{"action": "tool-status", "job": "0123"}); r.Code != 409 {
@@ -215,68 +212,149 @@ func TestEditorTextToolCancel(t *testing.T) {
 	}
 }
 
-// The readable copy of a SonicWall export is a new untitled document filled
-// by the engine from the export's buffer; the export does not change.
-func TestEditorSonicWallReadableCopy(t *testing.T) {
-	a, m, _ := editorFixture(t)
-	export, readable := sonicwallFixture(9000)
-	path := filepath.Join(t.TempDir(), "firewall.exp")
-	os.WriteFile(path, []byte(export+"&&"), 0600) // a real export ends with "&&"
-	lease, status, code := openAnyFile(t, a, path)
-	if code != 200 {
-		t.Fatal(code)
-	}
-	defer m.releaseDocument("", editorFixtureUID, lease)
-	if r := diskCall(a, a.token, lease, map[string]any{"action": "tool-detect"}); r.Code != 200 || !strings.Contains(r.Body.String(), `"sonicwall":true`) {
-		t.Fatal(r.Body.String())
-	}
-	copySnapshot := emptyDiskFixture()
-	copySnapshot.UID, copySnapshot.ID, copySnapshot.Path = editorFixtureUID2, "untitled:readable", "firewall.exp (readable).txt"
-	derive := map[string]any{"uid": editorFixtureUID, "lease": lease, "tool": "sonicwall-readable", "revision": status.Metadata.Revision}
-	// Another window's lease, or a missing source, opens nothing.
-	if r := editorHTTP(a, a.token, "/api/editor-views/buffers/open", map[string]any{"document": copySnapshot, "mode": "derive", "derive": map[string]any{"uid": editorFixtureUID, "lease": lease + 5, "tool": "sonicwall-readable", "revision": 1}}); r.Code != 409 {
+// runTool starts a text tool on a disk-backed document and waits for it.
+func runTool(t *testing.T, a *application, lease uint64, body map[string]any) map[string]any {
+	t.Helper()
+	body["action"] = "tool-start"
+	r := diskCall(a, a.token, lease, body)
+	var started map[string]any
+	json.Unmarshal(r.Body.Bytes(), &started)
+	if r.Code != 200 || started["job"] == nil {
 		t.Fatal(r.Code, r.Body.String())
 	}
-	r := editorHTTP(a, a.token, "/api/editor-views/buffers/open", map[string]any{"document": copySnapshot, "mode": "derive", "derive": derive})
-	if r.Code != 202 {
-		t.Fatal(r.Code, r.Body.String())
+	return waitTool(t, a, lease, started["job"])
+}
+
+// Page-held text: a decoder that stops at a character it does not decode
+// changes nothing and names the position; when the text before it decodes on
+// its own the answer offers it ("partial"), and the page sends that part
+// again. Here the page's side is done by hand: the selection [start, end) is
+// sent, then [start, start+offset), and the result goes in its place.
+func TestEditorDecodeThePartBeforeForPageHeldText(t *testing.T) {
+	a, _, _ := editorFixture(t)
+	encoded, plain, _ := settingsLine(3)
+	cases := []struct {
+		tool, content string
+		start, end    int
+		want          string // the document afterwards; "" when nothing is offered
+	}{
+		// A one-line file whose Base64 is followed by "&&", nothing selected.
+		{"base64-decode", encoded + "&&", 0, len(encoded) + 2, plain + "&&"},
+		// A character that is not Base64 in the middle of a selection.
+		{"base64-decode", "before\naGVsbG8gd29y#bGQ=\nafter", 7, 24, "before\nhello wor#bGQ=\nafter"},
+		{"hex-decode", "x 68656c6c6f;20776f726c64 y", 2, 25, "x hello;20776f726c64 y"},
+		// Nothing before it, or an incomplete group: nothing is offered.
+		{"base64-decode", "&&QUJD", 0, 6, ""},
+		{"base64-decode", "QUJDR&&", 0, 7, ""},
 	}
-	var opened struct {
-		Lease uint64 `json:"lease"`
-	}
-	json.Unmarshal(r.Body.Bytes(), &opened)
-	defer m.releaseDocument("", editorFixtureUID2, opened.Lease)
-	deadline := time.Now().Add(20 * time.Second)
-	var result map[string]any
-	for {
-		r = editorHTTP(a, a.token, "/api/editor-views/documents/"+editorFixtureUID2+"/buffer", map[string]any{"action": "status", "lease": opened.Lease})
-		if r.Code == 200 {
-			json.Unmarshal(r.Body.Bytes(), &result)
-			break
+	for _, c := range cases {
+		text := c.content[c.start:c.end]
+		out := textToolsCall(t, a, a.token, map[string]any{"action": "run", "tool": c.tool, "text": text})
+		if out["ok"] != false || !strings.Contains(out["error"].(string), " is not a") {
+			t.Fatalf("%q: %v", text, out)
 		}
-		if r.Code != 202 || time.Now().After(deadline) {
-			t.Fatal(r.Code, r.Body.String())
+		if c.want == "" {
+			if out["partial"] != nil {
+				t.Errorf("%q offers the part before: %v", text, out)
+			}
+			continue
 		}
-		time.Sleep(5 * time.Millisecond)
+		offset := int(out["offset"].(float64))
+		if out["partial"] != true || offset <= 0 {
+			t.Fatalf("%q: %v", text, out)
+		}
+		part := textToolsCall(t, a, a.token, map[string]any{"action": "run", "tool": c.tool, "text": text[:offset]})
+		if part["ok"] != true || part["changed"] != true {
+			t.Fatalf("the part before %q: %v", text[:offset], part)
+		}
+		got := c.content[:c.start] + part["text"].(string) + c.content[c.start+offset:]
+		if got != c.want {
+			t.Errorf("%q became %q, want %q", c.content, got, c.want)
+		}
 	}
-	meta := result["metadata"].(map[string]any)
-	if result["derived"].(float64) != 3+4*9000+1 || meta["dirty"] != true || meta["units"].(float64) != float64(len(readable)) {
-		t.Fatal(result)
+}
+
+// A disk-backed document: the decoder stops, changes nothing and names the
+// line and column; the failure names the range before the problem, and the
+// same tool over that range decodes it as one undo step. Everything after
+// the problem keeps its bytes, line endings included.
+func TestEditorDecodeThePartBeforeOnADiskDocument(t *testing.T) {
+	encoded, plain, _ := settingsLine(9000)
+	cases := []struct {
+		name, tool, file string
+		from, to         int
+		partial          map[string]any
+		saved            string
+	}{
+		{"a one-line file whose Base64 is followed by &&", "base64-decode", encoded + "&&", 0, 0,
+			map[string]any{"from": 0, "to": len(encoded), "line": 1, "column": len(encoded) + 1, "scope": "document"}, plain + "&&"},
+		{"a selection with a character in the middle", "base64-decode", "header\r\naGVsbG8gd29y#bGQ=\nfooter\r\n", 7, 24,
+			map[string]any{"from": 7, "to": 19, "line": 2, "column": 13, "scope": "selection"}, "header\r\nhello wor#bGQ=\nfooter\r\n"},
+		{"Hex to text", "hex-decode", "68656c6c6f;\r\nrest\n", 0, 0,
+			map[string]any{"from": 0, "to": 10, "line": 1, "column": 11, "scope": "document"}, "hello;\r\nrest\n"},
 	}
-	var got strings.Builder
-	for start := 0; start < len(readable); {
-		w := windowText(t, a, editorFixtureUID2, opened.Lease, start, editorbuffer.MaxWindowUnits)
-		got.WriteString(w.Text)
-		start += len(w.Text)
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			a, m, _ := editorFixture(t)
+			path := filepath.Join(t.TempDir(), "settings.txt")
+			os.WriteFile(path, []byte(c.file), 0600)
+			lease, status, code := openAnyFile(t, a, path)
+			if code != 200 {
+				t.Fatal(code)
+			}
+			defer m.releaseDocument("", editorFixtureUID, lease)
+			revision := status.Metadata.Revision
+			state := runTool(t, a, lease, map[string]any{"revision": revision, "tool": c.tool, "from": c.from, "to": c.to})
+			message, _ := state["error"].(string)
+			if state["state"] != "failed" || !strings.Contains(message, " is not a") || !strings.Contains(message, fmt.Sprintf("(line %d, column %d) Nothing was changed.", c.partial["line"], c.partial["column"])) {
+				t.Fatal(state)
+			}
+			want, _ := json.Marshal(c.partial)
+			if got, _ := json.Marshal(state["partial"]); string(got) != string(want) {
+				t.Fatalf("partial %s, want %s", got, want)
+			}
+			if w := windowText(t, a, editorFixtureUID, lease, 0, 16); w.Revision != revision || w.Dirty {
+				t.Fatal("the failed tool changed the document")
+			}
+			partial := state["partial"].(map[string]any)
+			state = runTool(t, a, lease, map[string]any{"revision": revision, "tool": c.tool, "from": partial["from"], "to": partial["to"]})
+			if state["state"] != "done" || state["changed"] != true || state["from"] != partial["from"] {
+				t.Fatal(state)
+			}
+			meta := state["metadata"].(map[string]any)
+			if r := diskCall(a, a.token, lease, map[string]any{"action": "save", "revision": meta["revision"], "format": status.Format}); r.Code != 200 {
+				t.Fatal(r.Body.String())
+			}
+			if raw, _ := os.ReadFile(path); string(raw) != c.saved {
+				t.Fatalf("saved %q..., want %q...", raw[:min(len(raw), 80)], c.saved[:min(len(c.saved), 80)])
+			}
+			// One undo step gives the text back as it was.
+			w := windowText(t, a, editorFixtureUID, lease, 0, 16)
+			if r := diskCall(a, a.token, lease, map[string]any{"action": "undo", "revision": w.Revision}); r.Code != 200 {
+				t.Fatal(r.Body.String())
+			}
+			w = windowText(t, a, editorFixtureUID, lease, 0, 16)
+			if r := diskCall(a, a.token, lease, map[string]any{"action": "save", "revision": w.Revision, "format": status.Format}); r.Code != 200 {
+				t.Fatal(r.Body.String())
+			}
+			if raw, _ := os.ReadFile(path); string(raw) != c.file {
+				t.Fatal("undo did not give the document back")
+			}
+		})
 	}
-	if got.String() != readable {
-		t.Fatal("the readable copy differs")
-	}
-	if w := windowText(t, a, editorFixtureUID, lease, 0, 64); w.Revision != status.Metadata.Revision || w.Dirty || w.Text != export[:64] {
-		t.Fatal("the export changed")
-	}
-	if raw, _ := os.ReadFile(path); string(raw) != export+"&&" {
-		t.Fatal("the export changed on disk")
+	// Nothing before the problem, or an incomplete group: no part is offered.
+	for _, file := range []string{"&&QUJD", "QUJDR&&"} {
+		a, m, _ := editorFixture(t)
+		path := filepath.Join(t.TempDir(), "other.txt")
+		os.WriteFile(path, []byte(file), 0600)
+		lease, status, code := openAnyFile(t, a, path)
+		if code != 200 {
+			t.Fatal(code)
+		}
+		if state := runTool(t, a, lease, map[string]any{"revision": status.Metadata.Revision, "tool": "base64-decode"}); state["state"] != "failed" || state["partial"] != nil {
+			t.Errorf("%q: %v", file, state)
+		}
+		m.releaseDocument("", editorFixtureUID, lease)
 	}
 }
 
