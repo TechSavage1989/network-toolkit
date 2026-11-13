@@ -237,6 +237,15 @@ async function verifyLongLineWrap(page,editor){
    return start+text.length===8*1024*1024*1024&&ta.scrollTop+ta.clientHeight>=ta.scrollHeight-2;
   });
   assert.ok(await editor.evaluate(ta=>ta.value.length<=49152));
+  // CI's record showed the browser scrolling the textarea by 120px on its own
+  // (no script set it) just after the next view's Go to line 846: the wheel
+  // step above, delivered late. Let the textarea's scrolling come to rest
+  // before the view is replaced, so it cannot land on the next view.
+  await page.evaluate(()=>new Promise(done=>{
+   const ta=document.querySelector('textarea');let last=ta.scrollTop,same=0;
+   const tick=()=>{if(ta.scrollTop===last){if(++same>=6)return done();}else{same=0;last=ta.scrollTop;}setTimeout(tick,50);};
+   tick();
+  }));
 
   // Native textarea selection and visible syntax text share a baseline deep
   // inside a page, where fractional line heights can accumulate error.
@@ -299,7 +308,7 @@ async function verifyLongLineWrap(page,editor){
      const ta=document.querySelector('textarea'),style=getComputedStyle(ta),word=[...document.querySelectorAll('.nt-editor-disk-highlight .nt-ed-string')].find(el=>el.textContent==='FIXTURE_0850');
      return {textarea:ta.getBoundingClientRect().toJSON(),word:word?.getBoundingClientRect().toJSON(),lineHeight:style.lineHeight,font:style.font,scrollTop:ta.scrollTop,
       layer:document.querySelector('.nt-editor-disk-highlight')?.style.transform,cursor:view.cursor,view:view.capture(),
-      scrollHeight:ta.scrollHeight,clientHeight:ta.clientHeight,record:selectionLog.slice(0,200)};
+      scrollHeight:ta.scrollHeight,clientHeight:ta.clientHeight,overflowAnchor:style.overflowAnchor,record:selectionLog.slice(0,200)};
     }))+' ('+error.message+')');
    });
    const box=await token.boundingBox();
