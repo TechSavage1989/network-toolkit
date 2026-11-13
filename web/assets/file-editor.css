@@ -26,6 +26,8 @@
 .nt-editor-disk .nt-editor-surface textarea::-webkit-scrollbar-thumb:horizontal{background:var(--muted);border-radius:6px;border:2px solid var(--nt-code-bg,var(--input))}
 .nt-editor-disk-horizontal{position:absolute;bottom:0;left:52px;right:16px;height:16px;overflow-x:scroll;overflow-y:hidden;z-index:3}
 .nt-editor-disk-long-line .nt-editor-surface textarea{height:calc(100% - 16px)}
+/* The bar below a long line covers the whole line; the page's own bar would cover one page of it. */
+.nt-editor-disk-long-line .nt-editor-surface textarea::-webkit-scrollbar{height:0}
 .nt-editor-disk-wrapped .nt-editor-surface textarea{overflow-x:hidden}
 .nt-editor-disk-highlight.is-wrapped{width:100%;min-width:0;white-space:pre-wrap;overflow-wrap:anywhere}
 .nt-editor-disk [hidden]{display:none!important}

@@ -1,5 +1,19 @@
 /* A native text control for one bounded document page. Selections and the
-   scroll map use document offsets even when they extend outside that page. */
+   scroll map use document offsets even when they extend outside that page.
+
+   Word wrap ("flow" below, when no comparison alignment is active): the page
+   is a window that slides through the document as the reader scrolls, keeping
+   text above and below the view. The vertical bar maps to a character offset
+   in the whole document instead of a line number, because one line can hold
+   most of a file (a Base64 export is a single line) and counting the wrapped
+   rows of a huge file exactly would mean laying out all of it. The thumb size
+   uses an estimate of the wrapped rows (lines plus characters per row); a
+   document that fits in one page maps exactly. Moving the window never moves
+   the text the reader sees: the visual row at the top of the view is put back
+   at the same height. A page moving forward starts at a visual row start of
+   the current page, so every following row wraps the same way; scrolling back
+   returns to the earlier pages of that chain (`trail`); any other page inside
+   a long line starts on the wrap grid (see startBefore). */
 (function (root) {
 'use strict';
 
@@ -7,6 +21,8 @@ const RANGE = 1000000;
 const BUFFER_LINES = 40;
 const PREVIEW_UNITS = 512;
 const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
+const highSurrogate = code => code >= 0xd800 && code <= 0xdbff;
+const lowSurrogate = code => code >= 0xdc00 && code <= 0xdfff;
 
 function measurementStyle(textarea) {
  const style = root.getComputedStyle(textarea);
@@ -99,6 +115,17 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
  let wrapped = false, wrapStyle = '', measure, measured, wrapGeometry, gutterGeometry;
  let wrapFrame = 0, wrapRead;
  let verticalFrame = 0, horizontalFrame = 0;
+ // A pointer selection in progress: its anchor may leave the page while the
+ // page slides under the pointer.
+ let drag = null;
+ // Word-wrap flow state: the last painted view position, a slide that could
+ // not make progress, scrolling that waits for text, and the wrap grid.
+ let flowView = null, flowStuck = '', pendingScroll = 0, flowFrame = 0, grid = null, padding = 30;
+ // Earlier page starts that the current page continues, in order: each page
+ // started at a visual row start of the one before, so they wrap a long line
+ // the same way and scrolling back to one of them changes no row.
+ let trail = [];
+ const recenter = Math.floor(pageUnits * 0.4);
  textarea.value = page.text;
  textarea.setSelectionRange(0, 0);
  updateReadOnly();
@@ -208,6 +235,134 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
   textarea.scrollTop = rowScrollOffset(row, fraction);
  }
 
+ // Word-wrap flow: visual rows of the page, found from character boxes in the
+ // hidden measure, which wraps the same text with the textarea's width, font
+ // and wrapping rules. Offsets here are page-local (no projection in flow).
+ function flowing() { return wrapped && !alignment; }
+
+ function charBox(data, line, column) {
+  const element = data.rows[line], node = element?.firstChild, text = data.lines[line] || '';
+  if (!node || !text.length) return null;
+  let at = clamp(column, 0, text.length - 1);
+  if (at > 0 && lowSurrogate(text.charCodeAt(at)) && highSurrogate(text.charCodeAt(at - 1))) at--;
+  const range = document.createRange();
+  range.setStart(node, at);
+  range.setEnd(node, Math.min(text.length, at + (highSurrogate(text.charCodeAt(at)) ? 2 : 1)));
+  const box = range.getBoundingClientRect(), base = element.getBoundingClientRect();
+  return {row: Math.max(0, Math.round((box.top - base.top) / rowHeight)), left: box.left - base.left, right: box.right - base.left};
+ }
+
+ // The first column of visual row `row` in display line `line`.
+ function rowStartColumn(data, line, row) {
+  const text = data.lines[line] || '';
+  if (row <= 0 || !text.length) return 0;
+  let low = 0, high = text.length;
+  while (low < high) {
+   const mid = (low + high) >> 1;
+   if (charBox(data, line, mid).row >= row) high = mid;
+   else low = mid + 1;
+  }
+  return low;
+ }
+
+ function describeRow(data, line, row) {
+  const text = data.lines[line] || '', count = data.counts[line] || 1;
+  row = clamp(row, 0, count - 1);
+  const start = rowStartColumn(data, line, row);
+  // The line break belongs to the last row of its line.
+  const end = row + 1 < count ? Math.max(start, rowStartColumn(data, line, row + 1)) : text.length + 1;
+  return {line, row, last: row + 1 >= count, top: pixelAt(line) + row * rowHeight,
+   start: starts[line] + start, end: starts[line] + end};
+ }
+
+ function visualRow(data, y) {
+  const line = rowAt(y);
+  return describeRow(data, line, Math.floor((y - pixelAt(line)) / rowHeight + 1e-6));
+ }
+
+ function rowOf(data, offset) {
+  offset = clamp(offset, 0, page.text.length);
+  const line = localLine(offset), text = data.lines[line] || '';
+  const column = offset - starts[line];
+  const box = text.length ? charBox(data, line, Math.min(column, text.length - 1)) : null;
+  return describeRow(data, line, box?.row || 0);
+ }
+
+ function caretX(data, offset) {
+  const line = localLine(offset), text = data.lines[line] || '', column = offset - starts[line];
+  if (!text.length) return 0;
+  return column < text.length ? charBox(data, line, column).left : charBox(data, line, text.length - 1).right;
+ }
+
+ // The page offset nearest to x on the visual row at y.
+ function offsetAtPoint(data, x, y) {
+  const row = visualRow(data, y), text = data.lines[row.line] || '';
+  const from = row.start - starts[row.line], to = Math.min(text.length, row.end - starts[row.line]);
+  let low = from, high = to;
+  while (low < high) {
+   const mid = (low + high) >> 1, box = charBox(data, row.line, mid);
+   if ((box.left + box.right) / 2 > x) high = mid;
+   else low = mid + 1;
+  }
+  // The end of a wrapped row is the start of the next one; stay on this row.
+  if (!row.last && low >= to && low > from) low = to - 1;
+  return starts[row.line] + low;
+ }
+
+ function viewHeight() { return Math.max(rowHeight, textarea.clientHeight - padding); }
+
+ // Characters per row for text without break opportunities, measured once per
+ // width and font. Long-line pages start on this grid (see startBefore).
+ function wrapGrid() {
+  const style = measurementStyle(textarea), key = Object.values(style).join(':');
+  if (grid?.key === key) return grid.columns;
+  const probe = createMeasure(container);
+  try {
+   Object.assign(probe.style, {width:style.width + 'px', font:'inherit', letterSpacing:style.letterSpacing, tabSize:style.tabSize});
+   const element = document.createElement('div');
+   element.textContent = '0'.repeat(Math.ceil(style.width / Math.max(1, characterWidth)) * 2 + 8);
+   probe.append(element);
+   const data = {rows:[element], lines:[element.textContent]};
+   const columns = rowStartColumn(data, 0, 1);
+   grid = {key, columns: Math.max(1, columns || element.textContent.length)};
+  } finally { probe.remove(); }
+  return grid.columns;
+ }
+
+ // The position at the top of the view as a fractional document offset, and
+ // how many characters the view shows.
+ function flowPosition() {
+  const data = measureText(textarea.value);
+  const point = y => {
+   const row = visualRow(data, y);
+   const part = clamp((y - row.top) / rowHeight, 0, 1);
+   return page.start + Math.min(page.text.length, row.start + part * Math.max(0, row.end - row.start));
+  };
+  const offset = point(textarea.scrollTop);
+  return {offset, visible: Math.max(1, point(textarea.scrollTop + viewHeight()) - offset)};
+ }
+
+ function flowAnchor() {
+  const row = visualRow(measureText(textarea.value), textarea.scrollTop);
+  return {offset: page.start + Math.min(row.start, page.text.length), dy: textarea.scrollTop - row.top};
+ }
+
+ // Put the visual row that holds the anchor back at the same height.
+ function flowRestore(anchor) {
+  const local = anchor.offset - page.start;
+  if (local < 0 || local > page.text.length) return false;
+  textarea.scrollTop = rowOf(measureText(textarea.value), local).top + anchor.dy;
+  return true;
+ }
+
+ // Show a fractional document offset at the top of the view (the inverse of
+ // flowPosition, so dragging the bar inside a page is smooth).
+ function flowPlace(target) {
+  const local = clamp(target - page.start, 0, page.text.length);
+  const row = rowOf(measureText(textarea.value), Math.floor(local));
+  textarea.scrollTop = row.top + clamp((local - row.start) / Math.max(1, row.end - row.start), 0, 0.999) * rowHeight;
+ }
+
  function projectionRows(layout, around, source, offsets) {
   const gaps = new Map(layout.gaps.map(gap => [gap.line - source.line, gap.count]));
   const rows = [];
@@ -301,15 +456,35 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
 
  function run(promise) { void promise.catch(report); }
 
+ function nativeSelection() {
+  return {
+   start: page.start + sourceOffset(textarea.selectionStart),
+   end: page.start + sourceOffset(textarea.selectionEnd),
+   direction: textarea.selectionDirection || 'none'
+  };
+ }
+
  function capture() {
-  if (!virtual) {
-   selection = {
-    start: page.start + sourceOffset(textarea.selectionStart),
-    end: page.start + sourceOffset(textarea.selectionEnd),
-    direction: textarea.selectionDirection || 'none'
-   };
-  }
-  return {...selection, top, left: textarea.scrollLeft + page.column * characterWidth, fraction, alignedTop};
+  if (drag) {
+   // A pointer selection: the browser moves the focus inside the page. Once
+   // the page slides away from the anchor, the native anchor rests on the
+   // page edge and only the focus comes from the browser.
+   const native = nativeSelection(), backward = native.direction === 'backward';
+   const base = backward ? native.end : native.start, focus = backward ? native.start : native.end;
+   drag.anchor ??= base;
+   const inside = drag.anchor >= page.start && drag.anchor <= page.start + page.text.length;
+   if (inside) {
+    drag.anchor = base;
+    selection = native;
+   } else {
+    selection = focus < drag.anchor ? {start: focus, end: drag.anchor, direction: 'backward'}
+     : {start: drag.anchor, end: focus, direction: 'forward'};
+   }
+   virtual = !inside;
+  } else if (!virtual) selection = nativeSelection();
+  const view = {...selection, top, left: textarea.scrollLeft + page.column * characterWidth, fraction, alignedTop};
+  if (flowing() && flowView) view.offset = flowView.offset;
+  return view;
  }
 
  function viewAnchor() {
@@ -364,6 +539,7 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
   }
   clientRows = Math.max(1, Math.floor(textarea.clientHeight / rowHeight));
   clientColumns = Math.max(1, Math.floor(textarea.clientWidth / characterWidth));
+  padding = (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0);
   return changedMetrics;
  }
 
@@ -385,6 +561,8 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
   syntax?.classList.toggle('is-wrapped', next);
   gutterStamp = '';
   wrapGeometry = null;
+  flowView = null;
+  flowStuck = '';
   metrics();
   if (next) textarea.scrollLeft = 0;
   const ticket = ++alignmentTicket;
@@ -397,6 +575,15 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
   }
   if (!alignment) {
    wrapFrame = 0;
+   // The text wraps anew at this width: a page inside a long line moves to
+   // the wrap grid (see startBefore) without moving the view.
+   trail = [];
+   if (next && !navigating && !editing && !composing && page.column % wrapGrid()) {
+    run(navigate(async active => {
+     const start = await startBefore(page.start + 1, 1);
+     return start !== null && active() && (start === page.start || flowShift(start, active));
+    }));
+   } else scheduleFlow();
    return;
   }
   wrapFrame = root.requestAnimationFrame(() => {
@@ -446,24 +633,33 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
   top = Math.min(lines - 1, page.line + (projection?.rows[groupStart(row)]?.source ?? row));
   fraction = rowFraction(row);
   alignedTop = projected?.row;
-  const scrollLines = alignment?.rows || lines, scrollTop = projected?.row ?? top;
-  vertical.hidden = scrollLines <= clientRows;
-  const lastTop = Math.max(1, scrollLines - clientRows);
-  barTop = clamp(scrollTop / lastTop, 0, 1) * (RANGE - vertical.clientHeight);
-  if (Math.abs(vertical.scrollTop - barTop) > 1) vertical.scrollTop = barTop;
-  scrollbarValue(vertical, scrollLines, scrollTop + 1);
-  const longLine = page.lineUnits > pageUnits;
+  const flow = flowing();
+  if (flow) paintFlowBar(lines, units);
+  else {
+   flowView = null;
+   const scrollLines = alignment?.rows || lines, scrollTop = projected?.row ?? top;
+   vertical.hidden = scrollLines <= clientRows;
+   const lastTop = Math.max(1, scrollLines - clientRows);
+   barTop = clamp(scrollTop / lastTop, 0, 1) * thumb(vertical, clientRows / scrollLines);
+   if (!verticalFrame && Math.abs(vertical.scrollTop - barTop) > 1) vertical.scrollTop = barTop;
+   scrollbarValue(vertical, scrollLines, scrollTop + 1);
+  }
+  // With word wrap the vertical bar covers long lines too.
+  const longLine = page.lineUnits > pageUnits && !flow;
   horizontal.hidden = !longLine;
   horizontal.setAttribute('aria-label', wrapped ? 'Section of long source line' : 'Position in long line');
   container.classList.toggle('nt-editor-disk-long-line', longLine);
   if (longLine) {
+   const surface = textarea.parentElement;
+   horizontal.style.left = surface.offsetLeft + 'px';
+   horizontal.style.width = surface.offsetWidth + 'px';
    const column = page.column + textarea.scrollLeft / characterWidth;
    const lastColumn = Math.max(1, page.lineUnits - (wrapped ? 1 : clientColumns));
-   barLeft = clamp(column / lastColumn, 0, 1) * (RANGE - horizontal.clientWidth);
-   if (Math.abs(horizontal.scrollLeft - barLeft) > 1) horizontal.scrollLeft = barLeft;
+   barLeft = clamp(column / lastColumn, 0, 1) * thumb(horizontal, wrapped ? 1 / page.lineUnits : clientColumns / page.lineUnits);
+   if (!horizontalFrame && Math.abs(horizontal.scrollLeft - barLeft) > 1) horizontal.scrollLeft = barLeft;
    scrollbarValue(horizontal, page.lineUnits + 1, Math.floor(column) + 1);
   }
-  if (page.start + page.text.length < units) {
+  if (!flow && page.start + page.text.length < units) {
    const origin = nextPageOrigin();
    if (origin > page.line) prefetch({line: origin});
   }
@@ -505,10 +701,48 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
   }).catch(() => {}), 140);
  }
 
- function scrollbarValue(element, maximum, value) {
-  element.setAttribute('aria-valuemin', '1');
+ function scrollbarValue(element, maximum, value, text = '', minimum = 1) {
+  element.setAttribute('aria-valuemin', String(minimum));
   element.setAttribute('aria-valuemax', String(maximum));
   element.setAttribute('aria-valuenow', String(Math.min(maximum, value)));
+  if (text) element.setAttribute('aria-valuetext', text);
+  else element.removeAttribute('aria-valuetext');
+ }
+
+ // Size a bar's spacer so its thumb shows the visible share of the content.
+ // Returns the bar's scroll range. Painting moves a bar to the view's
+ // position only while no scroll of that bar by the user waits to be read.
+ function thumb(bar, share) {
+  const across = bar === horizontal, track = across ? bar.clientWidth : bar.clientHeight;
+  const size = Math.round(clamp(track / Math.max(share, 1e-9), track + 1, RANGE)) + 'px';
+  const spacer = bar.firstChild;
+  if (across ? spacer.style.width !== size : spacer.style.height !== size) spacer.style[across ? 'width' : 'height'] = size;
+  return Math.max(1, parseFloat(size) - track);
+ }
+
+ // The document bar in word-wrap flow: the position is the character offset
+ // at the top of the view; the thumb is the share of the estimated wrapped rows
+ // that fit the view. A document that fits in one page maps exactly.
+ function paintFlowBar(lines, units) {
+  const end = page.start + page.text.length, whole = page.start === 0 && end >= units;
+  const range = Math.max(0, textarea.scrollHeight - textarea.clientHeight);
+  const view = flowView = flowPosition();
+  vertical.hidden = whole && range <= 1;
+  let position, share;
+  if (whole) {
+   position = range ? textarea.scrollTop / range : 0;
+   share = textarea.clientHeight / Math.max(1, textarea.scrollHeight);
+  } else {
+   const atEnd = end >= units && textarea.scrollTop >= range - 1;
+   position = atEnd ? 1 : page.start === 0 && textarea.scrollTop < 1 ? 0 :
+    clamp(view.offset / Math.max(1, units - view.visible), 0, 1);
+   const rows = lines + Math.max(0, units - lines + 1) / wrapGrid();
+   share = Math.min(1, viewHeight() / rowHeight / Math.max(1, rows));
+  }
+  barTop = position * thumb(vertical, share);
+  if (!verticalFrame && Math.abs(vertical.scrollTop - barTop) > 1) vertical.scrollTop = barTop;
+  const percent = Math.round(position * 1000) / 10;
+  scrollbarValue(vertical, 100, percent, 'Line ' + (top + 1).toLocaleString() + ' of ' + lines.toLocaleString() + ', ' + percent + '%', 0);
  }
 
  function schedulePaint() {
@@ -520,6 +754,7 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
   const view = capture();
   projection = planned;
   alignmentTicket++;
+  trail = [];
   page = value;
   starts = lineStarts(page.text);
   const text = projection?.text ?? page.text;
@@ -536,12 +771,191 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
   try {
    return await operation(active);
   } finally {
-   if (ticket === navigation) navigating = false;
+   if (ticket === navigation) {
+    navigating = false;
+    // Scrolling that waited for text continues; otherwise keep text around
+    // the view so the reader can keep scrolling without waiting.
+    if (flowing() && !disposed) {
+     if (pendingScroll) run(navigate(flowDrain));
+     else scheduleFlow();
+    }
+   }
   }
  }
 
+ // Word-wrap flow: keep at least this much text above and below the view.
+ function flowMargin() {
+  const range = Math.max(0, textarea.scrollHeight - textarea.clientHeight);
+  return clamp(range / 4, rowHeight * 2, Math.max(rowHeight * 2, textarea.clientHeight));
+ }
+
+ function flowNeed() {
+  const units = session.state().metadata.units, margin = flowMargin();
+  const below = textarea.scrollHeight - textarea.clientHeight - textarea.scrollTop;
+  if (page.start + page.text.length < units && below < margin) return 1;
+  if (page.start > 0 && textarea.scrollTop < margin) return -1;
+  return 0;
+ }
+
+ function scheduleFlow() {
+  if (flowFrame || disposed) return;
+  flowFrame = root.requestAnimationFrame(() => {
+   flowFrame = 0;
+   if (disposed || !flowing() || composing || editing || navigating) return;
+   const direction = flowNeed();
+   const stamp = [page.start, page.text.length, direction, session.state().metadata.revision].join(':');
+   if (direction && stamp !== flowStuck) {
+    run(navigate(async active => {
+     const moved = await flowSlide(active, direction);
+     if (!moved && active()) flowStuck = stamp;
+     return moved;
+    }));
+   }
+  });
+ }
+
+ // A start that leaves about `before` characters, and at most half a page of
+ // lines, ahead of `target`. Only the text before the target is read. Inside
+ // a long line the start is on the wrap grid: a whole number of rows of the
+ // width's character count after the line start, so text that can break
+ // anywhere (Base64, hex) wraps into the same rows on every page. Word wrap
+ // from different starts need not agree (with a fixed-width font it often
+ // does not for hundreds of rows), so a page with such text reached this way
+ // can wrap differently from the one before; see `trail` for scrolling back.
+ async function startBefore(target, before) {
+  target = Math.floor(target);
+  if (target <= 0) return 0;
+  const from = Math.max(0, target - before);
+  const probe = await session.peek({start: from}, target - from);
+  if (!probe) return null;
+  const text = probe.text, cap = root.NTKEditorDiskSession.PAGE_LINES >> 1;
+  let lines = 0;
+  for (let at = text.length; at > 0 && (at = text.lastIndexOf('\n', at - 1)) >= 0;) {
+   if (++lines > cap) return probe.start + at + 1;
+  }
+  return probe.start - probe.column % wrapGrid();
+ }
+
+ // Replace the page without moving the text the reader sees. `chain` is the
+ // trail that the new page continues.
+ async function flowShift(start, active, chain = []) {
+  const value = await session.load({start}, pageUnits);
+  if (!value || !active()) return false;
+  const anchor = flowAnchor(), end = page.start + page.text.length;
+  install(value);
+  trail = chain;
+  if (!flowRestore(anchor)) textarea.scrollTop = anchor.offset >= end ? textarea.scrollHeight : 0;
+  paint();
+  return true;
+ }
+
+ function flowSlide(active, direction) {
+  const units = session.state().metadata.units, end = page.start + page.text.length;
+  if (direction > 0 ? end >= units : page.start <= 0) return false;
+  const margin = flowMargin();
+  if (direction > 0 && textarea.scrollTop > margin * 2) {
+   const row = visualRow(measureText(textarea.value), textarea.scrollTop - margin * 2);
+   if (row.start > 0 && row.start < page.text.length) return flowForward(active, page.start + row.start);
+  }
+  return flowRecenter(active, flowAnchor().offset, direction);
+ }
+
+ // A visual row start of this page keeps every following row exactly as it
+ // is; this page joins the trail.
+ function flowForward(active, start) {
+  return flowShift(start, active, [...trail, page.start].slice(-64));
+ }
+
+ // Load a page around `offset` (near the view, around the view itself).
+ async function flowRecenter(active, offset, direction) {
+  const anchor = flowAnchor().offset;
+  const target = Math.abs(offset - anchor) < recenter / 2 ? anchor : offset;
+  if (direction > 0 && target - recenter > page.start) {
+   const row = rowOf(measureText(textarea.value), target - recenter - page.start);
+   if (row.start > 0) return flowForward(active, page.start + row.start);
+  }
+  if (direction < 0) {
+   // Back to text this chain of pages already wrapped: its rows stay as they were.
+   for (let i = trail.length - 1; i >= 0 && target - trail[i] <= pageUnits - recenter / 2; i--) {
+    if (trail[i] < page.start) return flowShift(trail[i], active, trail.slice(0, i));
+   }
+  }
+  const start = await startBefore(target, recenter);
+  if (start === null || !active() || start === page.start) return false;
+  return flowShift(start, active);
+ }
+
+ // Scroll by `delta` pixels, bringing more text into the page as needed.
+ function flowScroll(delta) {
+  const limit = textarea.clientHeight * 4;
+  pendingScroll = clamp(pendingScroll + delta, -limit, limit);
+  if (!navigating) run(navigate(flowDrain));
+ }
+
+ async function flowDrain(active) {
+  for (let step = 0; step < 8 && pendingScroll && active(); step++) {
+   const before = textarea.scrollTop;
+   textarea.scrollTop = before + pendingScroll;
+   pendingScroll -= textarea.scrollTop - before;
+   if (Math.abs(pendingScroll) < 1 || !await flowSlide(active, Math.sign(pendingScroll))) break;
+  }
+  pendingScroll = 0;
+  paint();
+  return true;
+ }
+
+ // Show a document offset at the top of the view, or the end of the document.
+ async function flowGo(target, active, bottom = false) {
+  const units = session.state().metadata.units;
+  target = clamp(target, 0, units);
+  const at = Math.floor(target), end = page.start + page.text.length;
+  if (at < page.start || at > end || at === end && end < units) {
+   const start = await startBefore(at, recenter);
+   if (start === null || !active() || !await loadPage({start, gridded: true}, active)) return false;
+  }
+  if (bottom) textarea.scrollTop = textarea.scrollHeight;
+  else flowPlace(target);
+  paint();
+  return true;
+ }
+
+ // Keyboard moves by visual rows when the selection reaches past the page.
+ async function flowMove(key, anchor, cursor, extend, active) {
+  const units = session.state().metadata.units;
+  let data = measureText(textarea.value);
+  let row = rowOf(data, cursor - page.start);
+  const reach = viewHeight() + rowHeight * 2;
+  const up = row.top < reach && page.start > 0;
+  if (up || row.top + reach > pixelAt(starts.length) && page.start + page.text.length < units) {
+   await flowRecenter(active, cursor, up ? -1 : 1);
+   if (!active()) return false;
+   data = measureText(textarea.value);
+   row = rowOf(data, cursor - page.start);
+  }
+  let offset;
+  if (key === 'Home') offset = row.start;
+  else if (key === 'End') offset = row.last ? row.end - 1 : extend ? row.end : row.end - 1;
+  else {
+   const screen = viewHeight() - rowHeight;
+   const step = {ArrowUp: -rowHeight, ArrowDown: rowHeight, PageUp: -screen, PageDown: screen}[key];
+   const y = row.top + step + rowHeight / 2, content = pixelAt(starts.length);
+   if (y < 0) offset = 0;
+   else if (y >= content) offset = page.text.length;
+   else offset = offsetAtPoint(data, caretX(data, cursor - page.start), y);
+   if (key === 'PageUp' || key === 'PageDown') textarea.scrollTop += step;
+  }
+  moveSelection(anchor, alignCursor(page.start + clamp(offset, 0, page.text.length)), extend);
+  return true;
+ }
+
  async function loadPage(target, active) {
-  const {alignedRow, ...source} = target;
+  const {alignedRow, gridded, ...source} = target;
+  // In word wrap a page inside a long line starts on the wrap grid (see startBefore).
+  if (flowing() && source.start > 0 && !gridded) {
+   const start = await startBefore(source.start + 1, 1);
+   if (start === null || !active()) return false;
+   source.start = Math.min(source.start, start);
+  }
   let planned, current;
   // Keep the current projected page visible until the new source text and
   // its spacer layout can be installed together.
@@ -680,7 +1094,10 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
 
  async function reveal(offset, active) {
   if (offset < page.start || offset > page.start + page.text.length) {
-   if (!await loadPage({start: Math.max(0, offset - PREVIEW_UNITS)}, active)) return false;
+   // In word wrap, also keep text above the target so the reader can
+   // scroll back without waiting.
+   const start = flowing() ? await startBefore(offset, recenter) : Math.max(0, offset - PREVIEW_UNITS);
+   if (start === null || !active() || !await loadPage({start, gridded: true}, active)) return false;
   }
   return true;
  }
@@ -732,6 +1149,13 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
 
  async function restore(view, focus = false) {
   if (!view) return;
+  if (flowing() && Number.isFinite(view.offset)) {
+   return navigate(async active => {
+    if (!await flowGo(view.offset, active)) return false;
+    select(view.start ?? 0, view.end ?? view.start ?? 0, view.direction, focus);
+    return true;
+   });
+  }
   return navigate(async active => {
    const line = clamp(view.top ?? 0, 0, session.state().metadata.lines - 1);
    if (!await openLine(line, active)) return false;
@@ -808,7 +1232,13 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
 
  function scroll() {
   schedulePaint();
-  if (composing || navigating || editing || pointer) return;
+  if (flowing()) {
+   if (!composing && !editing) scheduleFlow();
+   return;
+  }
+  // A pointer on the textarea's own scroll bar must not have its page
+  // replaced; a selection drag may move on to the next page (see capture).
+  if (composing || navigating || editing || pointer && !drag) return;
   const {units, lines} = session.state().metadata;
   const display = displayRow(), projected = projection?.rows[display];
   const row = projection?.rows[groupStart(display)]?.source ?? display;
@@ -865,6 +1295,20 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
  }
 
  function wheel(event) {
+  if (flowing()) {
+   if (composing || editing || event.defaultPrevented || event.ctrlKey || !event.deltaY) return;
+   const delta = event.deltaY * (event.deltaMode === 1 ? rowHeight : event.deltaMode === 2 ? viewHeight() : 1);
+   const range = textarea.scrollHeight - textarea.clientHeight;
+   const units = session.state().metadata.units;
+   const blocked = delta > 0 ? textarea.scrollTop + delta > range - 1 && page.start + page.text.length < units
+    : textarea.scrollTop + delta < 0 && page.start > 0;
+   // The native scroll handles everything the page holds.
+   if (blocked || pendingScroll) {
+    event.preventDefault();
+    flowScroll(delta);
+   }
+   return;
+  }
   if (composing || navigating || editing || event.defaultPrevented) return;
   const current = session.state().metadata;
   const delta = event.deltaY;
@@ -977,7 +1421,13 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
    if (!await reveal(cursor, active)) return false;
    const leftEdge = key === 'ArrowLeft' && cursor === page.start && cursor > 0;
    const rightEdge = key === 'ArrowRight' && cursor === page.start + page.text.length && cursor < units;
-   if ((leftEdge || rightEdge) && !await loadPage({start: Math.max(0, cursor - PREVIEW_UNITS)}, active)) return false;
+   if (leftEdge || rightEdge) {
+    const start = flowing() ? await startBefore(cursor, recenter) : Math.max(0, cursor - PREVIEW_UNITS);
+    if (start === null || !active() || !await loadPage({start, gridded: true}, active)) return false;
+   }
+   if (flowing() && ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'].includes(key)) {
+    return flowMove(key, anchor, cursor, extend, active);
+   }
    const at = cursor - page.start;
    if (key === 'ArrowLeft' || key === 'ArrowRight') {
     if (!extend && view.end > view.start) {
@@ -1143,16 +1593,31 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
  }
 
  textarea.addEventListener('pointerdown', event => {
+  // Another button (the context menu) keeps a selection that spans pages.
+  if (event.button !== 0) return;
   pointer = true;
+  drag = null;
+  // The textarea's own scroll bar is not text.
+  if (event.offsetX >= textarea.clientWidth || event.offsetY >= textarea.clientHeight) return;
+  // Shift+click extends the whole selection, also when it reaches past the page.
+  drag = {anchor: event.shiftKey ? cursorAnchor(capture()) : null};
   if (!event.shiftKey) virtual = false;
  }, listeners);
- root.addEventListener('pointerup', () => {
+ const release = () => {
   if (!pointer) return;
   pointer = false;
+  if (drag && !disposed) {
+   const view = capture();
+   drag = null;
+   select(view.start, view.end, view.direction);
+  }
+  drag = null;
   schedulePaint();
- }, listeners);
- root.addEventListener('pointercancel', () => { pointer = false; }, listeners);
+ };
+ root.addEventListener('pointerup', release, listeners);
+ root.addEventListener('pointercancel', release, listeners);
  textarea.addEventListener('select', schedulePaint, listeners);
+ textarea.addEventListener('selectionchange', schedulePaint, listeners);
  textarea.addEventListener('keyup', schedulePaint, listeners);
  textarea.addEventListener('compositionstart', () => {
   if (projection) {
@@ -1234,12 +1699,36 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
   verticalFrame = root.requestAnimationFrame(() => {
    verticalFrame = 0;
    if (disposed || Math.abs(vertical.scrollTop - barTop) <= 1) return;
+   const position = clamp(vertical.scrollTop / Math.max(1, vertical.scrollHeight - vertical.clientHeight), 0, 1);
+   if (flowing()) {
+    const {units} = session.state().metadata;
+    if (page.start === 0 && page.start + page.text.length >= units) {
+     textarea.scrollTop = position * (textarea.scrollHeight - textarea.clientHeight);
+     paint();
+    } else {
+     const target = position * Math.max(0, units - (flowView?.visible || 0));
+     run(navigate(active => flowGo(position >= 1 ? units : target, active, position >= 1)));
+    }
+    return;
+   }
    const last = Math.max(0, (alignment?.rows || session.state().metadata.lines) - clientRows);
-   const line = Math.round(vertical.scrollTop / Math.max(1, RANGE - vertical.clientHeight) * last);
+   const line = Math.round(position * last);
    run(alignment ? goAlignedRow(line) : goLine(line));
   });
  }, listeners);
  vertical.addEventListener('keydown', event => {
+  if (flowing()) {
+   const step = {ArrowUp: -rowHeight, ArrowDown: rowHeight, PageUp: rowHeight - viewHeight(), PageDown: viewHeight() - rowHeight};
+   if (event.key === 'Home' || event.key === 'End') {
+    event.preventDefault();
+    const end = event.key === 'End';
+    run(navigate(active => flowGo(end ? session.state().metadata.units : 0, active, end)));
+   } else if (Object.hasOwn(step, event.key)) {
+    event.preventDefault();
+    flowScroll(step[event.key]);
+   }
+   return;
+  }
   const count = alignment?.rows || session.state().metadata.lines;
   const position = projection?.rows[displayRow()].row ?? top;
   const targets = {
@@ -1256,7 +1745,7 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
    horizontalFrame = 0;
    if (disposed || Math.abs(horizontal.scrollLeft - barLeft) <= 1) return;
    const last = Math.max(0, page.lineUnits - (wrapped ? 1 : clientColumns));
-   run(panLongLine(Math.round(horizontal.scrollLeft / Math.max(1, RANGE - horizontal.clientWidth) * last)));
+   run(panLongLine(Math.round(horizontal.scrollLeft / Math.max(1, horizontal.scrollWidth - horizontal.clientWidth) * last)));
   });
  }, listeners);
  horizontal.addEventListener('keydown', event => {
@@ -1295,7 +1784,11 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
   selection: capture,
   get composing() { return composing; },
   get cursor() {
-   const offset = clamp(cursorOffset(capture()) - page.start, 0, page.text.length);
+   const focus = cursorOffset(capture()), lineStart = page.start - page.column;
+   // A focus beyond the page on the page's first line (a long line).
+   if ((focus < page.start || focus > page.start + page.text.length) && focus >= lineStart &&
+       focus <= lineStart + page.lineUnits) return {line: page.line, column: focus - lineStart};
+   const offset = clamp(focus - page.start, 0, page.text.length);
    const row = localLine(offset);
    return {line: page.line + row, column: offset - starts[row] + (row === 0 ? page.column : 0)};
   },
@@ -1306,7 +1799,7 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
    wrapRead?.abort();
    abort.abort();
    resize?.disconnect();
-   for (const job of [frame, verticalFrame, horizontalFrame, wrapFrame]) if (job) root.cancelAnimationFrame(job);
+   for (const job of [frame, verticalFrame, horizontalFrame, wrapFrame, flowFrame]) if (job) root.cancelAnimationFrame(job);
    vertical.remove();
    horizontal.remove();
    if (syntax) {

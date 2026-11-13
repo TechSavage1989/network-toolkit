@@ -183,6 +183,61 @@ async function verifyMovedLogBlock(page) {
   }
 }
 
+// A synthetic Base64 export of 1.7 MB on one line, opened disk-backed: with
+// word wrap the document bar reaches its last characters, and the status bar
+// counts the selected characters of disk-backed and page-held documents.
+async function verifyLongLineStatus(page) {
+  const units = 1748322;
+  await page.evaluate(async units => {
+    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+    let seed = 0x6d2b79f5;
+    const random = () => { seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5; return (seed >>> 0) / 4294967296; };
+    const parts = new Array(units - 2);
+    for (let i = 0; i < parts.length; i++) parts[i] = letters[(random() * 64) | 0];
+    const content = parts.join('') + '==';
+    const file = new File([content], 'synthetic-export.txt');
+    await NetworkToolkitFileEditor.open({
+      id:'long-line', path:file.name, source:'Synthetic export', binding:{kind:'localDraft'},
+      create:true, diskMode:'upload', diskFile:file, read:async()=>({content}), write:async()=>({}),
+    });
+  }, units);
+  await page.waitForFunction(n => NetworkToolkitFileEditor.active?.diskMeta?.units === n &&
+    !document.querySelector('.nt-editor-code textarea[data-ed-text]').disabled, units);
+  const text = page.locator('.nt-editor-code textarea[data-ed-text]').first();
+  const position = page.locator('[data-ed-position]');
+  const wrap = page.locator('[data-ed-wrap]');
+  await wrap.check();
+  const bar = page.locator('.nt-editor-code .nt-editor-disk-scroll');
+  await bar.waitFor();
+  await bar.press('End');
+  await page.waitForFunction(n => {
+    const ta = document.querySelector('.nt-editor-code textarea[data-ed-text]');
+    const view = NetworkToolkitFileEditor.active.diskSession.state().page;
+    return view.start + view.text.length === n && ta.scrollTop + ta.clientHeight >= ta.scrollHeight - 2 &&
+      ta.value.endsWith('==') && document.querySelector('.nt-editor-code .nt-editor-disk-scroll').getAttribute('aria-valuenow') === '100';
+  }, units);
+  await text.press('Control+a');
+  await page.waitForFunction(() => document.querySelector('[data-ed-position]').textContent.endsWith(' selected'));
+  assert.equal(await position.textContent(), 'Ln 1, Col 1,748,323 · 1,748,322 selected');
+  await text.click({position:{x:40, y:40}});
+  await page.waitForFunction(() => !document.querySelector('[data-ed-position]').textContent.includes('selected'));
+  await text.press('Control+Shift+Home');
+  await page.waitForFunction(() => {
+    const match = / · ([\d,]+) selected$/.exec(document.querySelector('[data-ed-position]').textContent);
+    return match && Number(match[1].replace(/,/g, '')) > 49152;
+  });
+  await wrap.uncheck();
+  await page.evaluate(async () => {
+    await NetworkToolkitFileEditor.open({
+      id:'held', path:'held.txt', source:'Synthetic', binding:{kind:'localDraft'}, create:true,
+      initialContent:'alpha\nbravo\ncharlie\n', read:async()=>({content:''}), write:async()=>({}),
+    });
+  });
+  await page.waitForFunction(() => NetworkToolkitFileEditor.active?.path === 'held.txt' && !NetworkToolkitFileEditor.active.disk);
+  await text.evaluate(el => { el.focus(); el.setSelectionRange(6, 17); });
+  await page.waitForFunction(() => document.querySelector('[data-ed-position]').textContent === 'Ln 2, Col 1 · 11 selected');
+}
+
 async function main() {
   const browser = await chromium.launch({ headless: true, ignoreDefaultArgs:['--hide-scrollbars'],
     ...(process.env.TOOLKIT_BROWSER_EXECUTABLE ? { executablePath: process.env.TOOLKIT_BROWSER_EXECUTABLE } : {}) });
@@ -676,6 +731,10 @@ async function main() {
     await waitForEngine(page, state => state.grants === 0 && state.comparisons === 0);
     report.phase = 'generic-log-comparison';
     await verifyMovedLogBlock(page);
+    assert.ok(await page.evaluate(() => NetworkToolkitFileEditor.closeAll()));
+    await waitForEngine(page, state => state.grants === 0 && state.comparisons === 0);
+    report.phase = 'long-line-status';
+    await verifyLongLineStatus(page);
     assert.ok(await page.evaluate(() => NetworkToolkitFileEditor.closeAll()));
     await waitForEngine(page, state => state.grants === 0 && state.comparisons === 0);
     assert.deepEqual(report.browserErrors, []);
