@@ -102,6 +102,40 @@ func TestEditorTextToolStartIsStoppedByAnImmediateReload(t *testing.T) {
 	}
 }
 
+// Line tools take in an empty last selected line. Selecting lines 1 to 3 of
+// "a\n\n\nb" by dragging to the start of "b" is the range [0,4).
+func TestEditorLineToolsTakeAnEmptyLastLine(t *testing.T) {
+	cases := []struct {
+		text, tool string
+		options    map[string]any
+		from, to   int
+		want       string
+		count      float64
+	}{
+		{"a\n\n\nb", "remove-empty", nil, 0, 4, "a\nb", 2},
+		{"a\n\nb", "join", map[string]any{"separator": "+"}, 0, 3, "a+\nb", 1},
+		{"\nx\n\nb", "dedupe", nil, 0, 4, "\nx\nb", 1},
+		{"b\n\nc", "sort-asc", nil, 0, 3, "\nb\nc", 2},
+	}
+	for _, c := range cases {
+		a, m, _ := editorFixture(t)
+		path := filepath.Join(t.TempDir(), "lines.txt")
+		os.WriteFile(path, []byte(c.text), 0600)
+		lease, status, code := openAnyFile(t, a, path)
+		if code != 200 {
+			t.Fatal(code)
+		}
+		r := diskCall(a, a.token, lease, map[string]any{"action": "tool-start", "revision": status.Metadata.Revision, "tool": c.tool, "options": c.options, "from": c.from, "to": c.to})
+		var started map[string]any
+		json.Unmarshal(r.Body.Bytes(), &started)
+		state := waitTool(t, a, lease, started["job"])
+		if got := windowText(t, a, editorFixtureUID, lease, 0, 64).Text; got != c.want || state["count"] != c.count {
+			t.Errorf("%s of %q [%d,%d): %q (%v), want %q (%v)", c.tool, c.text, c.from, c.to, got, state["count"], c.want, c.count)
+		}
+		m.releaseDocument("", editorFixtureUID, lease)
+	}
+}
+
 // Closing a disk-backed document while a tool writes far more than it reads
 // stops the tool at once; it does not finish writing first.
 func TestEditorTextToolStopsWhenItsDocumentCloses(t *testing.T) {

@@ -152,7 +152,7 @@ func TestLineRange(t *testing.T) {
 	v := importBytes(t, []byte("first\nsecond\nthird"))
 	s, _ := v.Buffer.Snapshot()
 	defer s.Close()
-	for _, c := range [][4]int64{{2, 3, 0, 5}, {2, 8, 0, 12}, {6, 13, 6, 12}, {14, 15, 13, 18}, {0, 18, 0, 18}} {
+	for _, c := range [][4]int64{{2, 3, 0, 6}, {2, 8, 0, 13}, {6, 13, 6, 13}, {14, 15, 13, 18}, {0, 18, 0, 18}} {
 		from, to, err := s.LineRange(c[0], c[1])
 		if err != nil || from != c[2] || to != c[3] {
 			t.Errorf("%v: %d %d %v", c, from, to, err)

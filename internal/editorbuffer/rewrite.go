@@ -69,8 +69,12 @@ func (s *Snapshot) Source(ctx context.Context, from, to int64) (*RangeSource, er
 func (s *Snapshot) Units() int64 { return size(s.root).units }
 
 // LineRange widens [from, to) to the whole lines it touches: from the start
-// of the first line to the end of the last, without its line break. A range
-// that ends just after a line break ends on the line before it.
+// of the first line to the end of the last, with the line break that ends it
+// when there is one. A range that ends just after a line break ends on the
+// line before it. With its line break, an empty last line is a line of the
+// range (selecting "a", "" and "" of "a\n\n\nb" is "a\n\n\n", three lines);
+// without it, the range would end where that empty line starts and a line
+// tool would not see it.
 func (s *Snapshot) LineRange(from, to int64) (int64, int64, error) {
 	total := size(s.root)
 	if from < 0 || to < from || to > total.units {
@@ -97,11 +101,9 @@ func (s *Snapshot) LineRange(from, to int64) (int64, int64, error) {
 	}
 	end := total.units
 	if line < total.lines {
-		next, err := s.b.lineStart(s.root, line+1)
-		if err != nil {
+		if end, err = s.b.lineStart(s.root, line+1); err != nil {
 			return 0, 0, err
 		}
-		end = next - 1
 	}
 	return start, max(end, start), nil
 }

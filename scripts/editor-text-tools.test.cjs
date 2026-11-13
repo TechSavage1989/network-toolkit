@@ -45,12 +45,16 @@ test('the Replace template expands as the engine does',()=>{
  assert.deepEqual(tools.groupNames('(a)(?:b)(?<name>c)[(]\\(d(?=e)'),['','','name']);
 });
 
-test('line tools widen a selection to whole lines; positions are lines and columns',()=>{
+test('line tools widen a selection to whole lines with their line break; positions are lines and columns',()=>{
  const text='first\nsecond\nthird';
- assert.deepEqual(tools.lineRange(text,2,3),[0,5]);
- assert.deepEqual(tools.lineRange(text,2,8),[0,12]);
- assert.deepEqual(tools.lineRange(text,6,13),[6,12]);
+ assert.deepEqual(tools.lineRange(text,2,3),[0,6]);
+ assert.deepEqual(tools.lineRange(text,2,8),[0,13]);
+ assert.deepEqual(tools.lineRange(text,6,13),[6,13]);
  assert.deepEqual(tools.lineRange(text,14,15),[13,18]);
+ // An empty last line is a line of the range: lines 1 to 3 of "a\n\n\nb",
+ // selected by dragging to the start of "b", are "a\n\n\n".
+ assert.deepEqual(tools.lineRange('a\n\n\nb',0,4),[0,4]);
+ assert.deepEqual(tools.lineRange('a\n\nb',0,3),[0,3]);
  assert.deepEqual(tools.lineColumn(text,8),[2,3]);
  assert.deepEqual(tools.lineColumn(text,0),[1,1]);
 });

@@ -170,11 +170,12 @@ function expandReplacement(template,match,source){
  return parts.map(part=>part.group===undefined?part.text:(match[part.group]??'')).join('');
 }
 
-// A partial selection widened to the whole lines it touches (the range ends
-// before the line break of its last line).
+// A partial selection widened to the whole lines it touches, with the line
+// break that ends the last of them (Snapshot.LineRange does the same): so an
+// empty last line is a line of the range.
 function lineRange(content,a,b){
  const start=a===0?0:content.lastIndexOf('\n',a-1)+1,limit=b>a&&content[b-1]==='\n'?b-1:b,last=content.indexOf('\n',limit);
- return [start,Math.max(start,last<0?content.length:last)];
+ return [start,Math.max(start,last<0?content.length:last+1)];
 }
 // Line and column (from 1) of a text position.
 function lineColumn(content,at){
