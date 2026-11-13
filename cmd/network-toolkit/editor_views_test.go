@@ -711,7 +711,20 @@ func TestEditorComparisonPreferencesOptionalBooleans(t *testing.T) {
 	if err := json.Unmarshal([]byte(`{"fontSize":13,"palette":"auto"}`), &old); err != nil || old.CompareUnderline != nil || old.CompareIntralineHighlight != nil || old.CompareHorizontalSync {
 		t.Fatal("legacy omitted defaults changed", err)
 	}
-	for _, field := range []string{"compareHorizontalSync", "compareUnderline", "compareIntralineHighlight"} {
+	for _, value := range []bool{false, true} {
+		batch := editorFixtureBatch()
+		batch.Preferences = &editorPreferences{FontSize: 13, Indent: 4, Palette: "auto", DocumentMap: &value}
+		if err := validateEditorBatch(batch); err != nil {
+			t.Fatal(err)
+		}
+		if clone := editorCloneBatch(batch); clone.Preferences.DocumentMap == nil || *clone.Preferences.DocumentMap != value {
+			t.Fatal("the Document Map setting was not carried to the new window")
+		}
+	}
+	if old.DocumentMap != nil {
+		t.Fatal("an older window's preferences gained a Document Map setting")
+	}
+	for _, field := range []string{"compareHorizontalSync", "compareUnderline", "compareIntralineHighlight", "documentMap"} {
 		var bad editorPreferences
 		if err := json.Unmarshal([]byte(`{"`+field+`":"false"}`), &bad); err == nil {
 			t.Fatal("non-boolean accepted", field)

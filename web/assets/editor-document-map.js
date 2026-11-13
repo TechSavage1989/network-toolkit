@@ -127,7 +127,13 @@ function create(adapter){
 
  function visible(){return !!adapter.enabled()&&!adapter.comparing();}
 
+ // How long the map's own work took (checked by the browser tests).
+ const stats={updates:0,draws:0,maxUpdate:0,maxDraw:0};
  function update(){
+  const started=root.performance?.now?.()??0;
+  try{run();}finally{const spent=(root.performance?.now?.()??0)-started;stats.updates++;if(spent>stats.maxUpdate)stats.maxUpdate=spent;}
+ }
+ function run(){
   frame=0;if(!host)return;
   const show=visible();
   if(shown!==show){shown=show;host.hidden=!show;adapter.layoutChanged?.();}
@@ -267,15 +273,19 @@ function create(adapter){
 
 
  // Rows the reader has seen at this revision and size: bar width (0..1) and
- // whether the row starts with a comment. Unknown rows stay a faint band.
+ // whether the row starts with a comment. The rows of pages not read are a
+ // faint texture as wide as the document's average line (`estimate`).
  function seenRows(key,used){
   if(seen?.key!==key)seen={key,widths:new Float32Array(Math.ceil(used)).fill(-1),comments:new Uint8Array(Math.ceil(used))};
   return seen;
  }
- function drawSeen(ctx,c,record,g,width){
-  ctx.fillStyle=c.band;ctx.globalAlpha=0.08;ctx.fillRect(0,0,width,g.used);
-  ctx.globalAlpha=0.6;
-  for(let y=0;y<record.widths.length;y++){const w=record.widths[y];if(w>0){ctx.fillStyle=record.comments[y]?c.kinds[COMMENT]:c.fg;ctx.fillRect(0,y,Math.max(0.6,w*width),1);}}
+ function drawSeen(ctx,c,record,g,width,estimate){
+  ctx.fillStyle=c.band;ctx.globalAlpha=0.16;ctx.fillRect(0,0,Math.max(1,clamp(estimate,0,1)*width),g.used);
+  for(let y=0;y<record.widths.length;y++){
+   const w=record.widths[y];if(w<0)continue;
+   ctx.globalAlpha=1;ctx.fillStyle=c.bg;ctx.fillRect(0,y,width,1);
+   if(w>0){ctx.globalAlpha=0.6;ctx.fillStyle=record.comments[y]?c.kinds[COMMENT]:c.fg;ctx.fillRect(0,y,Math.max(0.6,w*width),1);}
+  }
   ctx.globalAlpha=1;
  }
 
@@ -296,7 +306,7 @@ function create(adapter){
      const shape=lineShape(text,starts[i],end(i),{tab,markers}),w=shape.blank?0:Math.min(1,Math.max(0,shape.length)/columns);
      for(let y=y0;y<y1;y++)if(record.widths[y]<w||record.widths[y]<0){record.widths[y]=w;record.comments[y]=shape.comment?1:0;}
     }
-    ctx.fillStyle=c.bg;ctx.fillRect(0,0,width,g.used);drawSeen(ctx,c,record,g,width);
+    ctx.fillStyle=c.bg;ctx.fillRect(0,0,width,g.used);drawSeen(ctx,c,record,g,width,(state.units/Math.max(1,state.lines)-1)/columns);
     // The loaded page in detail while it has at most PER_LINE lines per pixel.
     if(rowHeight*PER_LINE>=1){
      const top=page.line*g.scale,detail=rowHeight>=1,block=detail?Math.max(1,Math.min(rowHeight-0.5,rowHeight*0.7)):Math.max(0.35,rowHeight),alpha=detail?1:0.55;
@@ -328,7 +338,7 @@ function create(adapter){
      const chars=b-a-breaks,rows=Math.max(1,breaks+chars/columns);
      record.widths[y]=Math.min(1,chars/(rows*columns));record.comments[y]=0;
     }
-    ctx.fillStyle=c.bg;ctx.fillRect(0,0,width,g.used);drawSeen(ctx,c,record,g,width);
+    ctx.fillStyle=c.bg;ctx.fillRect(0,0,width,g.used);drawSeen(ctx,c,record,g,width,(state.units-state.lines+1)/Math.max(1,state.estimatedRows*columns));
    },
    seek:value=>paged.mapSeek({offset:value}),
    scroll:delta=>paged.wheelBy(delta),
@@ -336,6 +346,10 @@ function create(adapter){
  }
 
  function draw(layout){
+  const started=root.performance?.now?.()??0;
+  try{paint(layout);}finally{const spent=(root.performance?.now?.()??0)-started;stats.draws++;if(spent>stats.maxDraw)stats.maxDraw=spent;}
+ }
+ function paint(layout){
   const ctx=prepare();if(!ctx)return;
   const c=palette();ctx.globalAlpha=1;ctx.fillStyle=c.bg;ctx.fillRect(0,0,host.clientWidth,host.clientHeight);
   try{layout.draw(ctx);}catch(error){root.console?.error?.('The document map could not be drawn.',error);}
@@ -391,7 +405,7 @@ function create(adapter){
   event.preventDefault();event.stopPropagation();schedule();
  }
 
- return Object.freeze({mount,schedule,get layout(){return lastLayout;},redraw(){drawn='';colors=null;schedule();},dispose(){if(frame)root.cancelAnimationFrame(frame);root.clearTimeout(timer);host=null;}});
+ return Object.freeze({mount,schedule,stats,get layout(){return lastLayout;},redraw(){drawn='';colors=null;schedule();},dispose(){if(frame)root.cancelAnimationFrame(frame);root.clearTimeout(timer);host=null;}});
 }
 
 const api={create,commentMarkers,lineRuns,lineShape,lineStarts,geometry,targetAt,ROW,MIN_BOX,PER_LINE,SAMPLE,kinds:{TEXT,COMMENT,STRING,KEYWORD,NUMBER}};
