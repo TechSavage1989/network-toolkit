@@ -653,7 +653,9 @@ FunctionEnd
 ; only argument, when the user picks the program in "Open with". It also takes
 ; over the entry a portable registration wrote for its copy (AdoptPortable
 ; Registration). An entry that starts a program somewhere else is left exactly
-; as it is.
+; as it is. Setup rewrites every value of its own entry on each install and
+; upgrade, an icon the user set there included (the portable registration and
+; the post-update repair leave such an icon).
 !macro RegisterApplication
   StrCpy $OwnApplicationKey 0
   ClearErrors
@@ -709,6 +711,7 @@ FunctionEnd
 ; DefaultIcon key, or its icon is the one Setup wrote (the recorded value, or
 ; exactly DOCUMENT_ICON), Setup writes DOCUMENT_ICON and records the value.
 ; An icon of anyone else and an icon key someone else created stay as they are.
+; The step is never fatal: a failed write is skipped and not recorded.
 !macro RegisterEditorApplicationIcon
   StrCpy $R1 0
   ClearErrors
@@ -737,13 +740,18 @@ FunctionEnd
       ${EndIf}
     ${EndIf}
   ${EndIf}
-  ; Probing reports a missing key or value through the error flag; only the
-  ; writes below may leave it set.
+  ; Probing reports a missing key or value through the error flag. The icon is
+  ; a nicety: a write that fails is skipped and never stops Setup. It is
+  ; recorded only once written; should the record fail, the next Setup still
+  ; finds exactly DOCUMENT_ICON there and records it.
   ClearErrors
   ${If} $R1 == 1
-    WriteRegStr HKCU "${EDITOR_KEY}" "${EDITOR_APPLICATION_ICON}" '${DOCUMENT_ICON}'
     WriteRegStr HKCU "${EDITOR_APPLICATION_KEY}\DefaultIcon" "" '${DOCUMENT_ICON}'
+    ${IfNot} ${Errors}
+      WriteRegStr HKCU "${EDITOR_KEY}" "${EDITOR_APPLICATION_ICON}" '${DOCUMENT_ICON}'
+    ${EndIf}
   ${EndIf}
+  ClearErrors
 !macroend
 
 ; The recorded icon goes only while it is still what Setup wrote, then its key
@@ -1026,9 +1034,8 @@ Section "Network Toolkit"
   !insertmacro RegisterApplication
   IfErrors install_error
   StrCmp $RegistrationFailed 1 install_error
-  StrCpy $FailedStep "giving the Text Editor program's Open with entry the document icon"
+  ; Not checked: a failed icon write is skipped (RegisterEditorApplicationIcon).
   !insertmacro RegisterEditorApplicationIcon
-  IfErrors install_error
   StrCpy $FailedStep "updating the right-click menu entry"
   Call ReadContextMenuChoice
   ReadRegDWORD $R8 HKCU "${UNINSTALL_KEY}" "ContextMenu"

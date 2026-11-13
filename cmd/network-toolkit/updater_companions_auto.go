@@ -369,7 +369,10 @@ func editorRegRepairDocumentIcon(p editorRegPlatform, exe string) (bool, error) 
 //     icon on its open verb (shell\open, Icon), when its command is the Text
 //     Editor command of exe, so Setup or the portable registration wrote it
 //     and removes it with its other values (an entry Windows wrote itself,
-//     with the bare file name, is nobody's to take back, so it is left alone);
+//     with the bare file name, is nobody's to take back, so it is left alone).
+//     Each only where it is absent or exactly what 1.21.44 to 1.21.51 wrote
+//     (the editor icon as DefaultIcon, no verb Icon): an icon the user set
+//     there stays;
 //   - Windows' own entry of the separate Text Editor program beside exe
 //     (planEditorAppIcon), recorded in the record of this program's
 //     registration: Setup's, when exe is the installed program and the
@@ -377,41 +380,63 @@ func editorRegRepairDocumentIcon(p editorRegPlatform, exe string) (bool, error) 
 //     or the portable record, when it names exe and nothing is installed.
 func planEditorIconRepair(reg editorRegistry, exe string) (editorRegPlan, error) {
 	var plan editorRegPlan
-	// set adds a write when the value is not already want.
-	set := func(key, name, want string) error {
+	// owned reads a key's command: the program it starts, when that is exe
+	// and accept agrees.
+	owned := func(key string, accept func(command string) bool) (string, error) {
+		command, found, ok, err := reg.String(key+`\shell\open\command`, "")
+		if err != nil || !found || !ok || !editorRegStartsWith(command, exe) || !accept(command) {
+			return "", err
+		}
+		return editorRegCommandProgram(command), nil
+	}
+	// set adds want unless the value is already want. With keepOthers, only
+	// where the value is absent or one of replaceable: anything else stays.
+	set := func(key, name, want string, keepOthers bool, replaceable ...string) error {
 		current, found, ok, err := reg.String(key, name)
 		if err != nil || found && ok && current == want {
 			return err
 		}
+		if found && keepOthers {
+			mine := false
+			for _, r := range replaceable {
+				mine = mine || ok && current == r
+			}
+			if !mine {
+				return nil
+			}
+		}
 		plan.str(key, name, want)
 		return nil
-	}
-	// repair gives a key whose command starts exe (and that owned accepts)
-	// the document icon; verbIcon also gives its open verb the program icon.
-	repair := func(key string, owned func(command string) bool, verbIcon bool) error {
-		command, found, ok, err := reg.String(key+`\shell\open\command`, "")
-		if err != nil || !found || !ok || !editorRegStartsWith(command, exe) || !owned(command) {
-			return err
-		}
-		program := editorRegCommandProgram(command)
-		if err := set(key+`\DefaultIcon`, "", editorRegIcon(program, editorRegDocumentIcon)); err != nil || !verbIcon {
-			return err
-		}
-		return set(key+`\shell\open`, "Icon", editorRegIcon(program, editorRegEditorIcon))
 	}
 	progID, err := editorRegExists(reg, editorRegProgKey)
 	if err != nil {
 		return nil, err
 	}
 	if progID {
-		if err := repair(editorRegProgKey, func(string) bool { return true }, false); err != nil {
+		program, err := owned(editorRegProgKey, func(string) bool { return true })
+		if err != nil {
 			return nil, err
 		}
+		if program != "" {
+			if err := set(editorRegProgKey+`\DefaultIcon`, "", editorRegIcon(program, editorRegDocumentIcon), false); err != nil {
+				return nil, err
+			}
+		}
 	}
-	if err := repair(editorRegApplication, func(command string) bool {
+	program, err := owned(editorRegApplication, func(command string) bool {
 		return strings.EqualFold(command, editorRegCommand(editorRegCommandProgram(command)))
-	}, true); err != nil {
+	})
+	if err != nil {
 		return nil, err
+	}
+	if program != "" {
+		if err := set(editorRegApplication+`\DefaultIcon`, "", editorRegIcon(program, editorRegDocumentIcon), true, editorRegIcon(program, editorRegEditorIcon)); err != nil {
+			return nil, err
+		}
+		// No released version wrote a verb icon: only an absent one is added.
+		if err := set(editorRegApplication+`\shell\open`, "Icon", editorRegIcon(program, editorRegEditorIcon), true); err != nil {
+			return nil, err
+		}
 	}
 	location, found, ok, err := reg.String(editorRegUninstall, "InstallLocation")
 	if err != nil {

@@ -613,8 +613,20 @@ func planEditorRegister(reg editorRegistry, status editorRegistrationStatus, con
 		// The icon of the files the user associates through this entry, and
 		// the program icon on its verb, which keeps Open with showing the
 		// program whichever value it reads (Visual Studio Code's pattern).
-		plan.str(editorRegApplication+`\DefaultIcon`, "", editorRegIcon(exe, editorRegDocumentIcon))
-		plan.str(editorRegApplication+`\shell\open`, "Icon", editorRegIcon(exe, editorRegEditorIcon))
+		// Each only where it is absent or what a registration wrote (this
+		// copy's or the replaced copy's): an icon the user set there stays.
+		for _, icon := range []struct{ path, name, want string }{
+			{editorRegApplication + `\DefaultIcon`, "", editorRegIcon(exe, editorRegDocumentIcon)},
+			{editorRegApplication + `\shell\open`, "Icon", editorRegIcon(exe, editorRegEditorIcon)},
+		} {
+			current, found, _, err := reg.String(icon.path, icon.name)
+			if err != nil {
+				return nil, err
+			}
+			if !found || editorRegWrittenIcon(current, exe, previous) {
+				plan.str(icon.path, icon.name, icon.want)
+			}
+		}
 		plan.str(editorRegApplication+`\shell\open\command`, "", command)
 	}
 	if err := planEditorAppIcon(reg, &plan, exe, editorRegPortable); err != nil {
@@ -638,6 +650,19 @@ func planEditorRegister(reg editorRegistry, status editorRegistrationStatus, con
 		plan.del(editorRegPortable, "ContextMenu")
 	}
 	return plan, nil
+}
+
+// editorRegWrittenIcon reports whether an icon value of the registration's
+// own Open with entry is one a registration of these programs wrote: the
+// editor or the document icon of one of them (empty names are skipped).
+// Anything else is the user's and is not replaced.
+func editorRegWrittenIcon(value string, programs ...string) bool {
+	for _, program := range programs {
+		if program != "" && (value == editorRegIcon(program, editorRegEditorIcon) || value == editorRegIcon(program, editorRegDocumentIcon)) {
+			return true
+		}
+	}
+	return false
 }
 
 // The right-click entry: the values this program wrote, then each key once it

@@ -531,6 +531,54 @@ func TestDocumentIconRepairOfTheOpenWithEntry(t *testing.T) {
 			t.Fatalf("verb Icon %q", got)
 		}
 	})
+	// Only a value that is absent or exactly what 1.21.44 to 1.21.51 wrote is
+	// written: the editor icon as DefaultIcon, no verb Icon. An icon the user
+	// set on the entry stays.
+	t.Run("icons the user set stay", func(t *testing.T) {
+		reg := fixtureRegistry()
+		reg.SetString(editorRegApplication, "FriendlyAppName", editorRegAppName)
+		reg.SetString(editorRegApplication+`\DefaultIcon`, "", `C:\Icons\files.ico`)
+		reg.SetString(editorRegApplication+`\shell\open`, "Icon", `C:\Icons\program.ico`)
+		reg.SetString(editorRegApplication+`\shell\open\command`, "", command)
+		before := reg.dump()
+		platform, notified := testEditorPlatform(reg)
+		if changed, err := editorRegRepairDocumentIcon(platform, testCopyA); err != nil || changed || *notified != 0 || reg.dump() != before {
+			t.Fatalf("replaced the user's icons: %v %v\n%s", changed, err, reg.dump())
+		}
+		// The document icon of another index the user chose stays too.
+		reg.SetString(editorRegApplication+`\DefaultIcon`, "", `"`+testCopyA+`",0`)
+		reg.SetString(editorRegApplication+`\shell\open`, "Icon", `"`+testCopyA+`",2`)
+		before = reg.dump()
+		if changed, err := editorRegRepairDocumentIcon(platform, testCopyA); err != nil || changed || reg.dump() != before {
+			t.Fatalf("replaced the user's choice of index: %v %v", changed, err)
+		}
+	})
+	t.Run("a user's file icon stays while the missing verb icon is added", func(t *testing.T) {
+		reg := fixtureRegistry()
+		reg.SetString(editorRegApplication+`\DefaultIcon`, "", `C:\Icons\files.ico`)
+		reg.SetString(editorRegApplication+`\shell\open\command`, "", command)
+		platform, _ := testEditorPlatform(reg)
+		if changed, err := editorRegRepairDocumentIcon(platform, testCopyA); err != nil || !changed {
+			t.Fatalf("changed=%v err=%v", changed, err)
+		}
+		if got := reg.str(t, editorRegApplication+`\DefaultIcon`, ""); got != `C:\Icons\files.ico` {
+			t.Fatalf("DefaultIcon %q", got)
+		}
+		if got := reg.str(t, editorRegApplication+`\shell\open`, "Icon"); got != `"`+testCopyA+`",1` {
+			t.Fatalf("verb Icon %q", got)
+		}
+	})
+	t.Run("an entry without an icon gets both", func(t *testing.T) {
+		reg := fixtureRegistry()
+		reg.SetString(editorRegApplication+`\shell\open\command`, "", command)
+		platform, _ := testEditorPlatform(reg)
+		if changed, err := editorRegRepairDocumentIcon(platform, testCopyA); err != nil || !changed {
+			t.Fatalf("changed=%v err=%v", changed, err)
+		}
+		if reg.str(t, editorRegApplication+`\DefaultIcon`, "") != `"`+testCopyA+`",3` || reg.str(t, editorRegApplication+`\shell\open`, "Icon") != `"`+testCopyA+`",1` {
+			t.Fatalf("after repair:\n%s", reg.dump())
+		}
+	})
 	for _, tc := range []struct {
 		name    string
 		command string
@@ -706,6 +754,84 @@ func TestDocumentIconRepairOfWindowsOwnEditorEntry(t *testing.T) {
 			}
 		}
 	})
+}
+
+// The post-update repair trusts an installed uninstaller of at least
+// editorRegEditorAppIconUninstallerVersion to take the icon back: that version
+// must be this build's or older (a released one) and its Setup must hold the
+// removal, inserted where uninstall and a rolled back install unregister.
+func TestEditorAppIconUninstallerVersion(t *testing.T) {
+	v := editorRegEditorAppIconUninstallerVersion
+	if !updateVersionPattern.MatchString(v) || updateNewer(v, model.Version) {
+		t.Fatalf("editorRegEditorAppIconUninstallerVersion %q must be a strict x.y.z no newer than this build (%s)", v, model.Version)
+	}
+	nsi, err := os.ReadFile(filepath.Join("..", "..", "scripts", "installer", "windows.nsi"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(nsi)
+	if !strings.Contains(text, "\n!macro RemoveEditorApplicationIcon\n") {
+		t.Fatal("windows.nsi has no RemoveEditorApplicationIcon")
+	}
+	start := strings.Index(text, "\n!macro UnregisterShell\n")
+	if start < 0 {
+		t.Fatal("windows.nsi has no UnregisterShell")
+	}
+	unregister := text[start : start+strings.Index(text[start:], "\n!macroend")]
+	if !strings.Contains(unregister, "!insertmacro RemoveEditorApplicationIcon") {
+		t.Fatal("UnregisterShell does not remove the icon of Windows' own entry of the Text Editor program")
+	}
+}
+
+// Giving Windows' own entry of the Text Editor program the document icon is a
+// nicety: a write that fails is skipped (no record of it) and never rolls back
+// an install or stops an upgrade.
+func TestSetupEditorApplicationIconIsNotFatal(t *testing.T) {
+	nsi, err := os.ReadFile(filepath.Join("..", "..", "scripts", "installer", "windows.nsi"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := strings.ReplaceAll(string(nsi), "\r\n", "\n")
+	start := strings.Index(text, "\n!macro RegisterEditorApplicationIcon\n")
+	if start < 0 {
+		t.Fatal("windows.nsi has no RegisterEditorApplicationIcon")
+	}
+	body := text[start : start+strings.Index(text[start:], "\n!macroend")]
+	var lines []string
+	for _, line := range strings.Split(body, "\n") {
+		if line = strings.TrimSpace(line); line != "" && !strings.HasPrefix(line, ";") {
+			lines = append(lines, line)
+		}
+	}
+	for _, fatal := range []string{"install_error", "RegistrationFailed", "Abort", "StopSetup"} {
+		if strings.Contains(body, fatal) {
+			t.Errorf("RegisterEditorApplicationIcon uses %s", fatal)
+		}
+	}
+	if last := lines[len(lines)-1]; last != "ClearErrors" {
+		t.Errorf("RegisterEditorApplicationIcon must end with ClearErrors, ends with %q", last)
+	}
+	icon := strings.Index(body, `WriteRegStr HKCU "${EDITOR_APPLICATION_KEY}\DefaultIcon" ""`)
+	record := strings.Index(body, `WriteRegStr HKCU "${EDITOR_KEY}" "${EDITOR_APPLICATION_ICON}"`)
+	if icon < 0 || record < 0 || record < icon || !strings.Contains(body[icon:record], "${IfNot} ${Errors}") {
+		t.Error("the icon is recorded only after its write succeeded")
+	}
+	// The step in the main section is not followed by an error check.
+	section := text[strings.Index(text, `Section "Network Toolkit"`):]
+	at := strings.Index(section, "!insertmacro RegisterEditorApplicationIcon")
+	if at < 0 {
+		t.Fatal("Setup does not give Windows' own entry the document icon")
+	}
+	for _, line := range strings.Split(section[at:], "\n")[1:] {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, ";") {
+			continue
+		}
+		if strings.Contains(line, "install_error") {
+			t.Errorf("a failed icon write would stop Setup: %q follows the step", line)
+		}
+		break
+	}
 }
 
 // simulateUninstallEditorAppIcon is Setup's RemoveEditorApplicationIcon.
