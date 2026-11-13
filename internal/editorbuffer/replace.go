@@ -402,6 +402,19 @@ func (s *Snapshot) ReplaceText(ctx context.Context, query, replacement string, f
 	if err != nil {
 		return "", false, err
 	}
+	// The length of the expansion is known from the group ranges: a Replace
+	// text that would be too long is refused before anything is built.
+	var size int64
+	for _, part := range parts {
+		if part.group < 0 {
+			size += int64(len(part.text))
+		} else if 2*part.group+1 < len(scan.groups) && scan.groups[2*part.group] >= 0 {
+			size += scan.groups[2*part.group+1] - scan.groups[2*part.group]
+		}
+		if size > MaxEditBytes {
+			return "", false, errors.New("The replacement is too long to apply on its own. Use Replace all.")
+		}
+	}
 	var groups []string
 	for k := 0; k+1 < len(scan.groups); k += 2 {
 		var text []byte
