@@ -880,7 +880,17 @@ function create(a){
  // ---- The window ----
  function markup(){
   const tabs=TABS.map(([id,label])=>'<button type="button" role="tab" id="ntFindTab-'+id+'" data-ed-find-tab="'+id+'" aria-controls="ntFindPanel" aria-selected="false" tabindex="-1">'+label+'</button>').join('');
-  const check=(option,label,extra='',tabs='')=>'<label class="nt-find-check"'+(tabs?' data-tabs="'+tabs+'"':'')+'><input type="checkbox" data-ed-find-option="'+option+'"'+extra+'> '+label+'</label>';
+  // Every option says what it does when the pointer rests on it.
+  const tips={
+   bookmark:'Also puts a bookmark (a dot in the line numbers) on every line with a match. F2 goes to the next bookmark.',
+   purge:'Clears the marks of earlier searches before marking this one.',
+   backward:'Find Next searches up, toward the start of the document.',
+   word:'Finds the text only as a whole word: "port" finds "port 22" but not "export" or "ports".',
+   matchCase:'Upper and lower case must match: "Vlan" does not find "vlan".',
+   wrap:'At the end of the document, the search goes on from the start (or from the end when searching backward).',
+   dotAll:'In a regular expression, a dot (.) also matches a line break, so one match can span several lines.'
+  };
+  const check=(option,label,extra='',tabs='')=>'<label class="nt-find-check"'+(tabs?' data-tabs="'+tabs+'"':'')+(tips[option]?' title="'+escapeHTML(tips[option])+'"':'')+'><input type="checkbox" data-ed-find-option="'+option+'"'+extra+'> '+label+'</label>';
   return '<div class="nt-find-head" data-ed-find-drag title="Drag to move the Find window"><div class="nt-find-tabs" role="tablist" aria-label="Find, Replace or Mark">'+tabs+'</div><button type="button" class="nt-find-x" data-ed-find-close aria-label="Close the Find window" title="Close (Esc)">×</button></div>'+
   '<div class="nt-find-panel" id="ntFindPanel" role="tabpanel" aria-labelledby="ntFindTab-find">'+
    '<div class="nt-find-main"><div class="nt-find-fields">'+
@@ -899,17 +909,17 @@ function create(a){
     check('dotAll','. matches newline',' disabled')+
    '</fieldset>'+
    '<div class="nt-find-buttons">'+
-    '<label class="nt-find-check nt-find-in-selection"><input type="checkbox" data-ed-find-option="inSelection" disabled> In selection</label>'+
+    '<label class="nt-find-check nt-find-in-selection" title="Searches, counts, replaces and marks only inside the text you selected. Select text first to turn it on."><input type="checkbox" data-ed-find-option="inSelection" disabled> In selection</label>'+
     '<button type="button" class="btn small primary" data-ed="next" data-tabs="find replace" aria-keyshortcuts="F3" title="Find Next (F3; Shift+F3 finds the previous)">Find Next</button>'+
-    '<button type="button" class="btn small ghost" data-ed-find-action="count" data-tabs="find">Count</button>'+
-    '<button type="button" class="btn small ghost" data-ed-find-action="all-current" data-tabs="find">Find All in Current Document</button>'+
-    '<button type="button" class="btn small ghost" data-ed-find-action="all-open" data-tabs="find">Find All in All Opened Documents</button>'+
-    '<button type="button" class="btn small ghost" data-ed="replaceOne" data-tabs="replace">Replace</button>'+
-    '<button type="button" class="btn small ghost" data-ed="replaceAll" data-tabs="replace">Replace All</button>'+
+    '<button type="button" class="btn small ghost" data-ed-find-action="count" data-tabs="find" title="Counts the matches without moving the cursor">Count</button>'+
+    '<button type="button" class="btn small ghost" data-ed-find-action="all-current" data-tabs="find" title="Lists every match of this document in the Search results panel; double-click a line there to go to it">Find All in Current Document</button>'+
+    '<button type="button" class="btn small ghost" data-ed-find-action="all-open" data-tabs="find" title="Lists the matches of every open document in the Search results panel">Find All in All Opened Documents</button>'+
+    '<button type="button" class="btn small ghost" data-ed="replaceOne" data-tabs="replace" title="Replaces the selected match and finds the next one">Replace</button>'+
+    '<button type="button" class="btn small ghost" data-ed="replaceAll" data-tabs="replace" title="Replaces every match in this document (or in the selection) as one step; Ctrl+Z undoes it">Replace All</button>'+
     '<button type="button" class="btn small ghost" data-ed-find-action="replace-open" data-tabs="replace" title="Replaces in every open document that can change; nothing is saved">Replace All in All Opened Documents</button>'+
-    '<button type="button" class="btn small primary" data-ed-find-action="mark" data-tabs="mark">Mark All</button>'+
-    '<button type="button" class="btn small ghost" data-ed-find-action="clear-marks" data-tabs="mark">Clear all marks</button>'+
-    '<button type="button" class="btn small ghost" data-ed-find-action="copy-marks" data-tabs="mark">Copy Marked Text</button>'+
+    '<button type="button" class="btn small primary" data-ed-find-action="mark" data-tabs="mark" title="Highlights every match in the document">Mark All</button>'+
+    '<button type="button" class="btn small ghost" data-ed-find-action="clear-marks" data-tabs="mark" title="Removes all highlights (bookmarks stay)">Clear all marks</button>'+
+    '<button type="button" class="btn small ghost" data-ed-find-action="copy-marks" data-tabs="mark" title="Copies the highlighted text to the clipboard, one match per line">Copy Marked Text</button>'+
    '</div>'+
    '<fieldset class="nt-find-transparency"><legend><label class="nt-find-check"><input type="checkbox" data-ed-find-transparency> Transparency</label></legend>'+
     '<label class="nt-find-check"><input type="radio" name="ntFindTransparency" value="blur" data-ed-find-transparency-mode checked> On losing focus</label>'+
