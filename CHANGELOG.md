@@ -1,3 +1,7 @@
+## 1.21.51 Beta 1 - Open with and file types after an update
+
+- A file passed alone (Windows' own Open with entry) opens in the Text Editor instead of failing; after an update, an installation by Setup 1.21.44 or later gets the missing Text Editor file types, and older installations get a Run Setup notice.
+
 ## 1.21.50 Beta 1 - Pop-out limits resolved
 
 - Send to brings the receiving window forward; hand-over keeps undo history for page-held tabs; popped-out windows of the separate apps can send to the other app; SFTP Edit from a popped-out Terminal reopens a closed main window.

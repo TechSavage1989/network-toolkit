@@ -291,21 +291,33 @@ func companionShortcutArgsOwned(args string, owned []string) bool {
 }
 
 // postUpdateRepairs runs in the start that follows an update the helper
-// confirmed: the separate programs, then the document icon.
+// confirmed: the document icon, the file types the installed uninstaller
+// knows (text_editor_types.go), then the separate programs.
 func (a *application) postUpdateRepairs(confirmed bool) {
 	defer a.clearCompanionsPending()
 	if a.updateHealthDir == "" || !confirmed || a.windowMode != "main" || buildEdition != "" || a.ctx.Err() != nil {
 		return
 	}
-	if platform, ok := editorRegDefaultPlatform(); ok {
-		if exe, err := updateCurrentExecutable(); err == nil {
+	if platform, ok := postUpdateEditorPlatform(); ok {
+		if exe, err := postUpdateExecutable(); err == nil {
 			if _, err := editorRegRepairDocumentIcon(platform, exe); err != nil {
 				log.Print("Text Editor document icon: ", err)
 			}
+			added, err := refreshEditorTypes(platform, exe)
+			if err != nil {
+				log.Print("Text Editor file types: ", err)
+			}
+			a.editorTypesAdded.Store(int64(added))
 		}
 	}
 	a.installCompanionsAfterUpdate(a.ctx, true, updateHTTPClient(), updateReleaseTagURL+model.Version)
 }
+
+// The registry and program path postUpdateRepairs uses (tests replace them).
+var (
+	postUpdateEditorPlatform = editorRegDefaultPlatform
+	postUpdateExecutable     = updateCurrentExecutable
+)
 
 // editorRegRepairDocumentIcon points the ProgID's DefaultIcon at the document
 // icon (index 3) when the ProgID's command starts exe, as Setup does on every

@@ -1,3 +1,19 @@
+# v1.21.51 Beta 1 - Open with and file types after an update
+
+Owner (installed with Setup long ago, updated in the app to 1.21.50): "Text editor won't show up in the list of apps for json and some other file types", and picking `Network_Toolkit_TextEditor.exe` with "Look for another app on this PC" failed with "The Text Editor launch request cannot be combined with another application mode."
+
+v1.21.50 was published and verified: tag at merge commit fa936d2 (PR #173), release run 43159439824 green, all seven assets matching GitHub's digests, `github_release.py verify` reporting "Verified 1.21.50", stable channel still at v1.21.34. Its CI found a real peer-send bug (text queued for the standalone Terminal's own window right after a session popped out; fixed by `peerPrimaryHolds`).
+
+A first version of this change also registered `Applications\Network_Toolkit_TextEditor.exe`; it was reverted because Windows could list "Network Toolkit Text Editor" twice under Open with, and the bare-path fix already makes Windows' own entry for that program work.
+
+Causes: Windows' own Open with entry starts the chosen program as `"<program>" "%1"`, and the programs refused (Text Editor program) or ignored (`Network_Toolkit.exe`, which opened the main window) a bare path; and Setup up to 1.21.43 registered five types, while an in-app update never runs Setup.
+
+What changed (rules in AGENTS.md): `applyOpenWithArgument` (editor_launch.go) reads one bare path, alone, as `--editor-standalone --open-file` (Terminal program refuses it; `updateRestartArgs` drops it). After an approved update, `refreshEditorTypes` (text_editor_types.go) adds missing types as Setup would when the installed uninstaller is 1.21.44 or later; with an older one, App settings → Updates and → Editor show "Windows lists the Text Editor for only some file types. Run Setup <version> once…" with a Run Setup button (Install the full version's verified download, two confirmations, then the app's own close).
+
+Known limits: not run on physical Windows; no startup toast for the notice (it is in App settings only).
+
+---
+
 # v1.21.50 Beta 1 - Pop-out limits resolved
 
 Owner, about the v1.21.49 limits: "can you resolve the limits?"

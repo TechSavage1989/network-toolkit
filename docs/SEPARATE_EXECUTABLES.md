@@ -66,6 +66,13 @@ How a separate program treats switches (`applyBuildEdition` in `edition.go`):
   `--terminal`); the Text Editor program accepts `--editor-standalone`,
   `--editor` (treated as the standalone editor) and `--open-file "<path>"`.
   `--data-dir`, `--port` and `--no-browser` work as before.
+- A file path given alone, as Windows' own Open with entry passes it after
+  the user browsed for a program in "Choose another app" (`"<program>" "%1"`),
+  is read as `--editor-standalone --open-file "<path>"` by the Text Editor
+  program and by `Network_Toolkit.exe` (which forwards it to the Text Editor
+  program like any standalone start). Only alone: beside any switch, after
+  `--`, as two arguments or with switch syntax it is refused, and the Terminal
+  program refuses it (`applyOpenWithArgument` in `editor_launch.go`).
 - Private roles keep working on every build, unchanged: `--terminal-view` and
   `--editor-view` (detached windows of that process), the elevated helpers,
   `--apply-update`, `--update-reopen`, `--update-health`, `--version`.

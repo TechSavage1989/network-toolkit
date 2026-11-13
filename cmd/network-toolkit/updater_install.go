@@ -133,6 +133,18 @@ func updatePlanLaunchTarget(dir string, p updatePlan) string {
 }
 func updateRestartArgs(args []string) []string {
 	out := []string{}
+	// The one file Windows' Open with entry passes on its own is a one-shot
+	// --editor-standalone --open-file (applyOpenWithArgument): the restart
+	// opens the Text Editor without the file. Anything else beside a bare
+	// argument is refused at startup, so it never reaches a restart, except
+	// the start an older update helper made after such a run: that is the
+	// main window, restarted without the file or the old stage folder.
+	if _, ok := openWithUpdateHealth(args); ok {
+		return []string{}
+	}
+	if len(args) == 1 && args[0] != "" && !strings.HasPrefix(args[0], "-") {
+		return []string{"--" + standaloneEditorMode}
+	}
 	for i := 0; i < len(args); i++ {
 		arg := args[i]
 		if arg == "--" || arg == "-" || !strings.HasPrefix(arg, "-") {

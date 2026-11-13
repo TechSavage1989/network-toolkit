@@ -4,7 +4,7 @@
 // from a preview page, an open editor, or locally cached connection state.
 function create(options={}){
  let requestTail=Promise.resolve(),pollDone=null,bufferAvailable=options.bufferAvailable||(()=>false);
- let request=options.request,adapter=options.adapter,available=options.available||(()=>false),self=options.self||'',enabled=false,stopped=false,timer=null,running=false,error='',instance='',owned={},views=[],lastCheckpoint='',lastCheckpointVersion=null,closing=false,detaching=false,dragPreparing=false,handing=false,closeAfterReturn=false,receivedAny=false,closeCancellationPending=false;
+ let request=options.request,adapter=options.adapter,available=options.available||(()=>false),self=options.self||'',enabled=false,stopped=false,timer=null,running=false,cancelling=false,error='',instance='',owned={},views=[],lastCheckpoint='',lastCheckpointVersion=null,closing=false,detaching=false,dragPreparing=false,handing=false,closeAfterReturn=false,receivedAny=false,closeCancellationPending=false;
  const outgoing=new Map(),incoming=new Map(),receipts=new Set(),handledDrags=new Map();
  let activityPending=null,lastActivity=null,activityAvailable=options.activityAvailable||(()=>false);
  const activityReadable=()=>{try{return !stopped&&!closing&&typeof request==='function'&&activityAvailable()===true&&(!self||supported());}catch{return false;}};
@@ -95,7 +95,11 @@ function create(options={}){
   for(;;){ready();try{const result=await call('/drags/'+action,'POST',{ticket},ready);schedule(0);return result;}catch(e){if(action==='cancel'||e.status!==404)throw e;missing=e;const remaining=deadline-now();if(remaining<=0)throw e;await new Promise(resolve=>root.setTimeout(resolve,Math.min(100,remaining)));if(remaining<=100)throw e;}}
  }
  async function detachEditor(){if(!supported())throw Error('Native editor windows are unavailable in this mode.');if(busy(true))throw Error('Finish pending editor operations before detaching.');detaching=true;render();try{if(pollDone)await pollDone;if(closing||incoming.size||outgoing.size)throw Error('Finish pending editor operations before detaching.');let selected=docs().map(d=>d.uid),handover=true;if(!selected.length){handover=false;if(typeof getAdapter().createBlankDocument!=='function')throw Error('Create a new document before opening a separate editor.');const draft=await getAdapter().createBlankDocument();if(!draft?.uid||!docs().some(d=>d===draft))throw Error('The new document is no longer available.');selected=[draft.uid];}await move(selected,'new',{handover});}finally{detaching=false;render();}}
- async function cancel(){if(running)return;running=true;try{for(const key of [...outgoing.keys()])acceptMetadata(await call('/transfers/'+key+'/cancel','POST',{}));}catch(e){note('Cancellation could not be confirmed. Documents remain protected. '+e.message);}finally{running=false;render();schedule(0);}}
+ // While a move is pending the ownership poll runs every 100 ms. A Cancel that
+ // arrives while the poll (or the move's own request) runs waits for it, then
+ // cancels: it is never dropped, so no tab stays frozen after Cancel.
+ async function cancel(){if(cancelling)return;cancelling=true;render();try{const deadline=Date.now()+20000;while(running){if(Date.now()>deadline){note('Cancellation is waiting for the current editor ownership check. Documents remain protected; choose Cancel again.');return;}await (pollDone||new Promise(resolve=>root.setTimeout(resolve,50)));}
+  running=true;try{for(const key of [...outgoing.keys()])acceptMetadata(await call('/transfers/'+key+'/cancel','POST',{}));}catch(e){note('Cancellation could not be confirmed. Documents remain protected. '+e.message);}finally{running=false;}}finally{cancelling=false;render();schedule(0);}}
  async function beforeClose(){if(!enabled)return true;if(busy()){note('Finish or cancel the document move or save before closing. No document has been discarded.');return false;}if(self){if(docs().length){try{await move(docs().map(d=>d.uid),'main');closeAfterReturn=true;note('Returning all documents to the main workspace; this window closes only after ownership is acknowledged.');}catch(e){note(e.message);}return false;}try{await call('/current/release','POST',{});closing=true;return false;}catch(e){note('The editor could not confirm a safe close. '+e.message);return false;}}return true;}
 
  async function cancelMainClose(){closeCancellationPending=true;if(enabled&&available()===true&&!self){try{await call('/current/cancel-close','POST',{});}catch(e){closing=true;note(e.status===409?'Shutdown was already approved; documents stay protected until the window closes.':'Close cancellation could not be confirmed. Documents stay protected; retry Close to check again. '+e.message);return false;}}getAdapter()?.cancelWindowClose?.();closeCancellationPending=false;closing=false;note('');schedule(0);return true;}
@@ -115,7 +119,7 @@ function create(options={}){
   box.querySelector('[data-editor-window-message]').textContent=message;
   const announcement=root.document.querySelector('[data-editor-window-announcement]');if(announcement&&announcement.textContent!==error)announcement.textContent=error;
   for(const button of box.querySelectorAll('[data-editor-window-move]'))button.disabled=!supported()||busy()||!docs().length;
-  box.querySelector('[data-editor-window-cancel]').hidden=!outgoing.size;box.querySelector('[data-editor-window-cancel]').disabled=running;
+  box.querySelector('[data-editor-window-cancel]').hidden=!outgoing.size;box.querySelector('[data-editor-window-cancel]').disabled=cancelling;
  }
  function mount(){
   if(!supported())return;enabled=true;const toolbar=root.document?.querySelector?.('.nt-editor-toolbar');if(!toolbar)return;

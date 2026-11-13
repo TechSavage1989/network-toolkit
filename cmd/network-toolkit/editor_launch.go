@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -35,6 +36,79 @@ func registerEditorLaunchOptions(flags *flag.FlagSet) editorLaunchOptions {
 		standalone: flags.Bool(standaloneEditorMode, false, "Open the independent Text Editor window"),
 		file:       flags.String("open-file", "", "Open a local file in Text Editor"),
 	}
+}
+
+// applyOpenWithArgument accepts the one bare file path that Windows' own
+// "Open with" entry passes. When the user picks a program in "Choose another
+// app > Look for another app on this PC", Windows writes
+// HKCU\Software\Classes\Applications\<program>\shell\open\command itself (if
+// that key has no command yet) as "<program>" "%1": the program receives the
+// file path alone, without --open-file. Such a start is the same request as
+// --editor-standalone --open-file "<path>", and the flag set is parsed again
+// in that form, so every check that follows (the edition, the launch request
+// with editorLaunchPath, forwarding to the separate Text Editor program) sees
+// exactly that. args are the program's arguments as given (os.Args[1:]).
+//
+// The path is accepted only alone: no switch beside it (the Text Editor
+// program's standalone mode comes from its edition, not from a switch), never
+// two or more, never after "--", and never anything with switch syntax: a
+// leading "-", or on Windows a leading "/" that is not a UNC path ("//server"),
+// since an absolute Windows path never starts with either. The Terminal
+// program opens no file and refuses it.
+//
+// One more shape is accepted, by the main program only: "<file>"
+// --update-health <stage folder> (or --update-health=<stage folder>). A copy
+// of 1.21.50 or older that Windows' Open with started with a file alone
+// ignored the file and opened the main window, but kept the file as its
+// restart argument; its update helper starts the new version that way. It is
+// the main window after an update, so the file is dropped and the start is
+// --update-health <stage folder> alone (openWithUpdateHealth). Refusing it
+// would make the helper roll every such update back.
+func applyOpenWithArgument(flags *flag.FlagSet, args []string, edition, goos string) error {
+	if flags.NArg() == 0 {
+		return nil
+	}
+	program := programNameFor(goos, edition)
+	if edition == "terminal" {
+		return fmt.Errorf("%s opens %s only and does not open files. Open a file with %s or %s --editor-standalone --open-file \"<file>\".", program, editionTitle(edition), programNameFor(goos, standaloneEditorMode), programNameFor(goos, ""))
+	}
+	other := false
+	flags.Visit(func(*flag.Flag) { other = true })
+	refused := fmt.Errorf("%s opens a file given on its own (%s \"<file>\") or with --open-file \"<file>\". Nothing else can be given beside it.", program, program)
+	if other || flags.NArg() != len(args) || args[0] != flags.Arg(0) || openWithSwitchSyntax(args[0], goos) {
+		return refused
+	}
+	if stage, ok := openWithUpdateHealth(args); ok && edition == "" {
+		return flags.Parse([]string{"--update-health=" + stage})
+	}
+	if len(args) != 1 {
+		return refused
+	}
+	return flags.Parse([]string{"--" + standaloneEditorMode, "--open-file=" + args[0]})
+}
+
+// openWithSwitchSyntax: a leading "-", or on Windows a leading "/" that is not
+// a UNC path, is switch syntax and never a file.
+func openWithSwitchSyntax(arg, goos string) bool {
+	return strings.HasPrefix(arg, "-") || goos == "windows" && strings.HasPrefix(arg, "/") && !strings.HasPrefix(arg, "//")
+}
+
+// openWithUpdateHealth recognises exactly "<file>" --update-health <stage
+// folder> and "<file>" --update-health=<stage folder>, the start an update
+// helper of 1.21.50 or older makes after a run that Windows' Open with started
+// with a file alone, and returns the stage folder.
+func openWithUpdateHealth(args []string) (string, bool) {
+	if len(args) < 2 || args[0] == "" || strings.HasPrefix(args[0], "-") {
+		return "", false
+	}
+	const name = "--update-health"
+	switch {
+	case len(args) == 3 && args[1] == name && args[2] != "":
+		return args[2], true
+	case len(args) == 2 && strings.HasPrefix(args[1], name+"=") && len(args[1]) > len(name)+1:
+		return args[1][len(name)+1:], true
+	}
+	return "", false
 }
 
 func (o editorLaunchOptions) request(flags *flag.FlagSet, incompatible bool) (*editorLaunchRequest, error) {

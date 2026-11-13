@@ -8,6 +8,10 @@
  * - Updates: "Install the full version" (portable copy only). Find Setup of
  *   this version, download it after the user agreed, verified against
  *   SHA256SUMS, then start it after a second confirmation (full_install.go).
+ * - Updates and Editor of the installed program, when its Setup registered the
+ *   Text Editor for only some file types (text_editor_types.go): a notice whose
+ *   "Run Setup" takes the same steps and then closes the app through its
+ *   normal close, so that Setup can update the programs.
  * Shown only in the Windows main window: the standalone Text Editor and
  * Terminal have no App settings, and the Linux edition has no such section.
  * Nothing here writes anything without a click; the startup check only reads,
@@ -49,10 +53,23 @@ function installHTML(view){
   body+='<div class="notice info" data-windows-install-installed><span>Network Toolkit is already installed'+(i.installLocation?' at '+esc(i.installLocation):'')+'.'+(i.installedExists?'':' Its program file is missing; run Setup to repair it.')+'</span></div><div class="button-row">'+(i.installedExists?'<button type="button" class="btn small primary" data-windows-install="open-installed"'+dis+'>Open the installed program</button>':'')+'<button type="button" class="btn small ghost" data-windows-install="reinstall"'+dis+'>Reinstall or repair anyway</button></div>';
   return body+statusLines(view);
  }
- const found=i.found,download=i.download,p=i.progress;
+ return body+setupSteps(view,false)+statusLines(view);
+}
+
+// Whether the engine found a Setup it offers: this version's, or a newer
+// release's when this version's release has none (never an older one).
+const setupOffered=(found,version)=>!!found&&(found.fallback?found.newer===true:found.version===version);
+
+// The steps to Setup: find it, download and verify it after the first
+// confirmation, start it after the second (full_install.go). Shared by the
+// portable copy's "Install the full version" and the installed program's
+// notice (refresh), whose start also closes Network Toolkit.
+function setupSteps(view,refresh){
+ const i=view.data.install,busy=view.busy||i.busy,dis=busy?' disabled':'';
+ const found=i.found,download=i.download,p=i.progress;let body='';
  if(!download){
-  if(!found)body+='<div class="button-row"><button type="button" class="btn small" data-windows-install="find"'+dis+'>Find Setup for version '+esc(i.version)+'</button></div>';
-  else if(found.fallback&&found.newer!==true||found.version!==i.version&&!found.fallback){
+  if(!found)body+='<div class="button-row"><button type="button" class="btn small'+(refresh?' primary':'')+'" data-windows-install="find"'+dis+'>'+(refresh?'Run Setup '+esc(i.version)+'…':'Find Setup for version '+esc(i.version))+'</button></div>';
+  else if(!setupOffered(found,i.version)){
    // Never offered by the engine; never shown as an update either.
    body+='<div class="notice warn" data-windows-install-none><span>No installer was found for version '+esc(i.version)+'.</span></div><div class="button-row"><button type="button" class="btn small ghost" data-windows-install="find"'+dis+'>Look again</button></div>';
   }else{
@@ -63,8 +80,14 @@ function installHTML(view){
   }
  }else{
   body+='<p class="help-line">'+esc(download.name)+' ('+bytes(download.size)+') was downloaded and matches the release\'s SHA256SUMS.</p><p class="help-line" style="overflow-wrap:anywhere">SHA-256: '+esc(download.sha256)+'</p>';
-  if(i.started)body+='<div class="notice info" data-windows-install-started><span>Setup is running in its own window. When it has finished, open Network Toolkit from the Start menu. You can then close this portable copy and delete its folder; your settings and saved data stay in the data folder.</span></div>';
-  else if(view.confirmStart)body+='<div data-windows-install-confirm="start"><div class="notice info"><span>Start Network Toolkit Setup '+esc(download.version)+' now? It opens in its own window and asks before it installs anything. This copy keeps running.</span></div><div class="button-row"><button type="button" class="btn small primary" data-windows-install="start-confirm" data-version="'+esc(download.version)+'"'+dis+'>Start Setup</button><button type="button" class="btn small ghost" data-windows-install="cancel"'+dis+'>Cancel</button></div></div>';
+  // Setup of the installed program stops while one of its programs is open,
+  // and closing this window does not close popped-out windows or the
+  // standalone apps: the engine names them and refuses the start until they
+  // are closed (full_install.go). The verified download is kept meanwhile.
+  const others=Array.isArray(i.otherWindows)?i.otherWindows:[];
+  if(!i.started&&others.length)body+='<div class="notice warn" data-windows-install-blocked><span>Close all Network Toolkit windows first, including popped-out Text Editor and Terminal windows and the separate Text Editor and Terminal programs. Still open: '+others.map(esc).join(', ')+'. Setup starts only when they are closed; the download is kept.</span></div><div class="button-row"><button type="button" class="btn small" data-windows-install="check"'+dis+'>Check again</button><button type="button" class="btn small ghost" data-windows-install="discard"'+dis+'>Delete the download</button></div>';
+  else if(i.started)body+=refresh?'<div class="notice info" data-windows-install-started><span>Setup is running in its own window. Network Toolkit closes so that Setup can update it; choose Install in Setup once it has closed. Your settings and saved data stay.</span></div>':'<div class="notice info" data-windows-install-started><span>Setup is running in its own window. When it has finished, open Network Toolkit from the Start menu. You can then close this portable copy and delete its folder; your settings and saved data stay in the data folder.</span></div>';
+  else if(view.confirmStart)body+=refresh?'<div data-windows-install-confirm="start"><div class="notice info"><span>Start Network Toolkit Setup '+esc(download.version)+' now? Network Toolkit then closes so that Setup can update it: you are asked about unsaved documents first, and your settings and saved data stay. Close the separate Text Editor and Terminal windows too. Setup asks before it changes anything.</span></div><div class="button-row"><button type="button" class="btn small primary" data-windows-install="start-confirm" data-version="'+esc(download.version)+'"'+dis+'>Start Setup and close Network Toolkit</button><button type="button" class="btn small ghost" data-windows-install="cancel"'+dis+'>Cancel</button></div></div>':'<div data-windows-install-confirm="start"><div class="notice info"><span>Start Network Toolkit Setup '+esc(download.version)+' now? It opens in its own window and asks before it installs anything. This copy keeps running.</span></div><div class="button-row"><button type="button" class="btn small primary" data-windows-install="start-confirm" data-version="'+esc(download.version)+'"'+dis+'>Start Setup</button><button type="button" class="btn small ghost" data-windows-install="cancel"'+dis+'>Cancel</button></div></div>';
   else body+='<div class="button-row"><button type="button" class="btn small primary" data-windows-install="start"'+dis+'>Start Setup…</button><button type="button" class="btn small ghost" data-windows-install="discard"'+dis+'>Delete the download</button></div>';
  }
  if(p&&(p.phase==='checksums'||p.phase==='download'||p.phase==='verifying')){
@@ -72,11 +95,26 @@ function installHTML(view){
   const label={checksums:'Preparing download',download:'Downloading Setup',verifying:'Verifying Setup'}[p.phase];
   body+='<div class="app-update-progress" data-windows-install-progress><div class="row between gap6"><span>'+label+'</span>'+(p.phase==='download'?'<span>'+(known?bytes(received)+' of '+bytes(total)+' ('+Math.floor(received/total*100)+'%)':bytes(received)+' received')+'</span>':'')+'</div><progress aria-label="'+label+'"'+(known?' value="'+received+'" max="'+total+'"':'')+'></progress></div>';
  }
- return body+statusLines(view);
+ return body;
+}
+
+// The installed program whose Setup registered the Text Editor for only some
+// file types (Setup up to 1.21.43; an update from inside the app does not
+// change what Windows has registered, text_editor_types.go): a plain notice in
+// App settings > Updates (heading) and > Editor, with the steps to run this
+// version's verified Setup, which then closes the app through its normal close.
+function typesHTML(view,heading){
+ const data=view.data,i=data?.install,t=data?.types;
+ if(!data||!i||i.portable||!t)return '';
+ const added=Number(t.added)>0?'<p class="help-line" data-windows-types-added>After the update, Windows also offers the Text Editor for '+Number(t.added)+' more file '+(Number(t.added)===1?'type':'types')+'.</p>':'';
+ if(t.setupNeeded!==true)return added;
+ let body=(heading?'<h4>Windows integration</h4>':'')+'<div class="notice warn" data-windows-types-notice><span>Windows lists the Text Editor for only some file types. Run Setup '+esc(i.version)+' once to update Windows integration (your settings and data stay).</span></div>'+added;
+ if(!i.supported)return body+'<p class="help-line">Setup runs on Windows x64.</p>';
+ return body+setupSteps(view,true)+statusLines(view);
 }
 function statusLines(view){return (view.message?'<p class="help-line" role="status">'+esc(view.message)+'</p>':'')+(view.error?'<div class="notice warn mt" role="alert">'+esc(view.error)+'</div>':'');}
 
-if(typeof module==='object'&&module.exports){module.exports={editorHTML,installHTML};return;}
+if(typeof module==='object'&&module.exports){module.exports={editorHTML,installHTML,typesHTML};return;}
 const document=root.document;if(!document)return;
 // The page's globals (index.html): status, api, state, toast.
 const mainWindow=()=>{try{return typeof status!=='undefined'&&!!status&&status.os==='windows'&&status.windowMode==='main';}catch{return false;}};
@@ -90,8 +128,8 @@ let shared=null;
 function render(){
  installView.data=editorView.data=shared;
  const supported=shared?.supported===true;
- const e=document.getElementById('windowsTextEditorSettings');if(e){e.innerHTML=supported||editorView.error?editorHTML(editorView):'';e.hidden=!e.innerHTML;}
- const i=document.getElementById('windowsFullInstall');if(i){i.innerHTML=supported?installHTML(installView):'';i.hidden=!i.innerHTML;}
+ const e=document.getElementById('windowsTextEditorSettings');if(e){e.innerHTML=supported||editorView.error?editorHTML(editorView)+(supported?typesHTML(installView,false):''):'';e.hidden=!e.innerHTML;}
+ const i=document.getElementById('windowsFullInstall');if(i){i.innerHTML=supported?installHTML(installView)||typesHTML(installView,true):'';i.hidden=!i.innerHTML;}
  document.querySelector('[data-windows-editor-confirm],[data-windows-install-confirm]')?.scrollIntoView?.({block:'nearest'});
 }
 async function refresh(){
@@ -129,22 +167,40 @@ function watchProgress(on){
  const tick=async()=>{try{const data=await call('/windows-integration');if(installView.busy){shared=data;render();}}catch{}if(installView.busy)progressTimer=root.setTimeout(tick,400);};
  progressTimer=root.setTimeout(tick,400);
 }
+// The installed program's notice runs Setup and then closes the app, so that
+// Setup can replace the programs (it refuses while one of them is open). The
+// close is the app's own: it asks about unsaved documents and saves settings,
+// and the user can keep the app open.
+const refreshing=()=>shared?.install?.portable===false&&shared?.types?.setupNeeded===true;
+async function closeForSetup(){
+ installView.message='Setup is running in its own window. Network Toolkit is closing so that Setup can update it.';render();
+ let closed=false;
+ try{const close=root.__networkToolkitClose;closed=typeof close==='function'&&await close()===true;}catch{}
+ if(!closed){installView.message='Setup is running in its own window. Close Network Toolkit, and its separate Text Editor and Terminal windows, before you choose Install in Setup.';render();}
+}
 async function installAction(action,version){
  if(action==='reinstall'){installView.reinstall=true;render();return;}
  if(action==='download'){installView.confirmDownload=true;render();return;}
  if(action==='start'){installView.confirmStart=true;render();return;}
+ if(action==='check'){installView.error='';installView.message='';installView.busy=true;render();try{await refresh();}finally{installView.busy=false;render();}return;}
  if(action==='cancel'){installView.confirmDownload=installView.confirmStart=false;render();return;}
  installView.busy=true;installView.error='';installView.message='';render();
+ const notice=refreshing();let closeAfter=false;
  try{
   let result;
-  if(action==='find'){installView.message='Looking for Setup on the official release page…';render();result=await call('/windows-integration/full-install/find','POST',{channel:channel()});installView.message='';}
-  else if(action==='download-confirm'){installView.confirmDownload=false;installView.message='Downloading and verifying Setup. Nothing is installed.';watchProgress(true);result=await call('/windows-integration/full-install/download','POST',{version,confirm:true});installView.message='Setup was downloaded and verified.';}
-  else if(action==='start-confirm'){installView.confirmStart=false;result=await call('/windows-integration/full-install/start','POST',{version,confirm:true});installView.message='';}
+  // The notice's steps ask each confirmation as soon as the step before it is done.
+  if(action==='find'){installView.message='Looking for Setup on the official release page…';render();result=await call('/windows-integration/full-install/find','POST',{channel:channel()});installView.message='';if(notice&&setupOffered(result?.install?.found,result?.install?.version))installView.confirmDownload=true;}
+  else if(action==='download-confirm'){installView.confirmDownload=false;installView.message='Downloading and verifying Setup. Nothing is installed.';watchProgress(true);result=await call('/windows-integration/full-install/download','POST',{version,confirm:true});installView.message='Setup was downloaded and verified.';if(notice&&result?.install?.download)installView.confirmStart=true;}
+  else if(action==='start-confirm'){installView.confirmStart=false;result=await call('/windows-integration/full-install/start','POST',{version,confirm:true});installView.message='';closeAfter=notice&&result?.install?.started===true;}
   else if(action==='discard'){result=await call('/windows-integration/full-install/discard','POST',{});installView.message='The downloaded Setup was deleted.';}
   else if(action==='open-installed'){await call('/windows-integration/open-installed','POST',{confirm:true});installView.message='The installed program is starting. You can close this portable copy.';}
   if(result?.install)shared={...shared,install:result.install};
  }catch(error){installView.error=(action==='download-confirm'?'Setup was not downloaded: ':action==='find'?'Setup could not be found: ':'')+(error.message||String(error));installView.message='';}
- finally{installView.busy=false;watchProgress(false);await refresh();}
+ finally{installView.busy=false;watchProgress(false);await refresh();
+  // A start refused because other windows are open is said once, by the notice that names them.
+  // The confirmation comes back once they are closed (Check again).
+  if(action==='start-confirm'&&shared?.install?.otherWindows?.length){installView.error='';installView.confirmStart=true;render();}
+  if(closeAfter)await closeForSetup();}
 }
 document.addEventListener('click',event=>{
  const editor=event.target.closest?.('[data-windows-editor]');

@@ -264,6 +264,34 @@ func TestSeparateProgramsShareOneInstanceWithRealBinaries(t *testing.T) {
 	if strings.Join(paths, ", ") != first+", "+second {
 		t.Fatalf("the files that reached the Text Editor: %v", paths)
 	}
+	// Windows' own Open with entry starts the chosen program with the file
+	// alone ("<program>" "%1"): the Text Editor program, and Network_Toolkit.exe
+	// (which forwards it unchanged), hand it to the running Text Editor.
+	third, fourth := filepath.Join(home, "third.json"), filepath.Join(home, "fourth.yaml")
+	for _, file := range []string{third, fourth} {
+		if err := os.WriteFile(file, []byte("synthetic"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	runProgram(t, env, editor, third).wait(t, 20*time.Second)
+	runProgram(t, env, main, fourth).wait(t, 20*time.Second)
+	if err := json.Unmarshal(pageCall(t, editorRecord.Host, http.MethodPost, editorLaunchEndpoint, "{}"), &launches); err != nil {
+		t.Fatal(err)
+	}
+	paths = nil
+	for _, request := range launches.Requests {
+		paths = append(paths, request.Path)
+	}
+	if strings.Join(paths, ", ") != third+", "+fourth {
+		t.Fatalf("the files Open with passed alone that reached the Text Editor: %v", paths)
+	}
+	// Nothing may be given beside it, and the Terminal program opens no file.
+	if refused := runProgram(t, env, editor, third, fourth).wait(t, 20*time.Second); !strings.Contains(refused, "Nothing else can be given beside it") {
+		t.Fatalf("two files were not refused: %s", refused)
+	}
+	if refused := runProgram(t, env, terminal, third).wait(t, 20*time.Second); !strings.Contains(refused, "does not open files") {
+		t.Fatalf("the Terminal program did not refuse a file: %s", refused)
+	}
 
 	// 5. A separate program refuses the other app's switch; nothing changes.
 	refused := runProgram(t, env, terminal, append([]string{"--editor-standalone"}, data...)...).wait(t, 20*time.Second)

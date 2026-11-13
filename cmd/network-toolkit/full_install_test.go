@@ -377,3 +377,72 @@ func TestWindowsIntegrationOnlyInTheMainWindow(t *testing.T) {
 		t.Fatalf("a GET may never change anything: %d", w.Code)
 	}
 }
+
+// Setup of the installed program replaces the three programs and stops while
+// one is open; the page closes this window after starting it. So it is not
+// started while a popped-out window or a standalone app keeps a program open:
+// the status names them and the start is refused until they are closed.
+func TestFullInstallStartsTheInstalledProgramsSetupOnlyWhenNothingElseIsOpen(t *testing.T) {
+	for _, installed := range []bool{true, false} {
+		f := newFullInstallFixture(t)
+		f.publish(model.Version, synthSetup("i"), "")
+		reg := newFakeRegistry()
+		if installed {
+			reg.SetString(editorRegUninstall, "InstallLocation", filepath.Dir(f.exe))
+		}
+		platform, _ := testEditorPlatform(reg)
+		windowsIntegrationPlatform = func() (editorRegPlatform, bool) { return platform, true }
+		original := fullInstallStandaloneOpen
+		t.Cleanup(func() { fullInstallStandaloneOpen = original })
+		standalone := []string{"Network Toolkit Terminal window"}
+		roots := []string{}
+		fullInstallStandaloneOpen = func(root string) []string { roots = append(roots, root); return standalone }
+		a := f.app()
+		a.shared = &sharedData{root: f.dir}
+		a.views = &terminalViewRegistry{views: map[string]*terminalView{"popped-out": {}}}
+		if code, out := f.call(a, "/full-install/find", map[string]any{"channel": "stable"}); code != http.StatusOK {
+			t.Fatalf("find: %d %v", code, out)
+		}
+		code, out := f.call(a, "/full-install/download", map[string]any{"version": model.Version, "confirm": true})
+		if code != http.StatusOK {
+			t.Fatalf("download: %d %v", code, out)
+		}
+		listed, _ := out["install"].(map[string]any)["otherWindows"].([]any)
+		if !installed {
+			// A portable copy's Setup installs elsewhere: nothing holds it back.
+			if len(listed) != 0 {
+				t.Fatalf("a portable copy lists other windows: %v", listed)
+			}
+			if code, out := f.call(a, "/full-install/start", map[string]any{"version": model.Version, "confirm": true}); code != http.StatusOK || len(f.launched) != 1 {
+				t.Fatalf("start from a portable copy: %d %v", code, out)
+			}
+			continue
+		}
+		if fmt.Sprint(listed) != "[popped-out Terminal windows Network Toolkit Terminal window]" {
+			t.Fatalf("the status does not name what is open: %v", listed)
+		}
+		code, out = f.call(a, "/full-install/start", map[string]any{"version": model.Version, "confirm": true})
+		message, _ := out["error"].(string)
+		if code != http.StatusConflict || !strings.HasPrefix(message, fullInstallCloseAll) || !strings.Contains(message, "popped-out Terminal windows, Network Toolkit Terminal window") || len(f.launched) != 0 {
+			t.Fatalf("Setup started while other windows were open: %d %v launched=%v", code, out, f.launched)
+		}
+		if roots[len(roots)-1] != f.dir {
+			t.Fatalf("the standalone apps of another data root were checked: %v", roots)
+		}
+		// The verified download stays for the next try.
+		if a.fullInstall.download == nil || len(f.setupFiles()) != 2 {
+			t.Fatalf("the download was dropped: %v", f.setupFiles())
+		}
+		// A popped-out Text Editor window counts as well.
+		a.views, standalone = &terminalViewRegistry{views: map[string]*terminalView{}}, nil
+		a.editorViews = &editorViewRegistry{views: map[string]*editorWindow{"popped-out": {info: editorViewInfo{State: "detached"}}}}
+		if code, out := f.call(a, "/full-install/start", map[string]any{"version": model.Version, "confirm": true}); code != http.StatusConflict || !strings.Contains(fmt.Sprint(out["error"]), "popped-out Text Editor windows") || len(f.launched) != 0 {
+			t.Fatalf("start with a popped-out Text Editor window: %d %v", code, out)
+		}
+		a.editorViews = nil
+		code, out = f.call(a, "/full-install/start", map[string]any{"version": model.Version, "confirm": true})
+		if code != http.StatusOK || len(f.launched) != 1 || out["install"].(map[string]any)["otherWindows"] != nil {
+			t.Fatalf("start once everything else was closed: %d %v launched=%v", code, out, f.launched)
+		}
+	}
+}

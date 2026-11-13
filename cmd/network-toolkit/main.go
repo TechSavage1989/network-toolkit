@@ -101,6 +101,7 @@ type application struct {
 	windowSend                   windowSendState // text between the windows of this engine (window_send.go)
 	windowLaunchMu               sync.Mutex
 	shutdownRequested            atomic.Bool
+	editorTypesAdded             atomic.Int64 // file types added after an approved update (text_editor_types.go)
 	openTerminalWindow           func(context.Context, *terminalWindowPreset) (bool, error)
 	views                        *terminalViewRegistry
 	editorViews                  *editorViewRegistry
@@ -247,6 +248,12 @@ func main() {
 			// lose its pipe during normal cancellation or UAC dismissal.
 			log.Print("Local configuration helper: ", err)
 		}
+		return
+	}
+	// Windows' own "Open with" entry passes the file alone; it is read as
+	// --editor-standalone --open-file "<file>" (editor_launch.go).
+	if err := applyOpenWithArgument(flag.CommandLine, os.Args[1:], buildEdition, runtime.GOOS); err != nil {
+		platform.NotifyFatal(err.Error())
 		return
 	}
 	// The separate Text Editor and Terminal programs open their app without a
