@@ -96,6 +96,12 @@ function catalog(){
   const group=textTools.GROUPS.find(entry=>entry.id===tool.group);
   global.push({id:'text-tool-'+tool.id,label:'Text tools: '+tool.label.replace(/…$/,''),group:'Text Editor',shortcut:tool.shortcut||'',keywords:(group?.label||'')+' '+tool.description,run:()=>void editor.textMenu?.run(tool.id)});
  }
+ // The Document Map and the Document List, while the editor is shown. The
+ // standalone Terminal's palette lists terminal commands only.
+ if(allowedTool('editor')&&editor?.toggleDocumentMap&&editorShown&&!editorShown.hidden&&standalone()?.mode?.()!=='terminal')global.push(
+  {id:'document-map',label:'Show or hide the document map',group:'Text Editor',keywords:'minimap overview miniature navigate scroll view',run:()=>editor.toggleDocumentMap()},
+  {id:'document-list',label:'Show the document list',group:'Text Editor',keywords:'open documents tabs switch files view',run:()=>root.NetworkToolkitEditorFiles?.showDocuments?.(true,{focus:true})}
+ );
  return [...tools,...(app?app.commands(global):global),...buttons()];
 }
 function rank(item,words){
@@ -138,6 +144,8 @@ function helpText(){
  ['Text Editor','Ctrl+Shift+U / Ctrl+U','Change the selection or the document to UPPERCASE / lowercase'],
  ['Text Editor','Ctrl+J / Ctrl+Shift+L','Join lines / Split lines at a text'],
  ['Text Editor','Ctrl+Shift+B','Base64 decode the selection or the document'],
+ ['Text Editor','More > Document map','Show a miniature of the whole document at the right edge; click or drag in it to move'],
+ ['Text Editor','Documents (sidebar)','List the open documents; Up / Down and Enter switch, Shift+F10 opens the tab menu'],
  ['Terminal','Alt+Shift+Left / Right','Reorder a terminal tab'],
  ['Terminal','Shift+F10','Open the terminal tab menu'],
  ['Terminal','Ctrl+Shift+F','Show or hide Find in terminal output'],
