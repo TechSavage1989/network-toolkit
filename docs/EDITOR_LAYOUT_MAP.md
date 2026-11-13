@@ -71,6 +71,11 @@ Checks workflow prepares that baseline and runs the new gate. It covers:
   independent/synchronized scrolling, wrapping, resize, swaps, edits and undo.
 - Existing editor gates retain first-paste creation, saved disclosure preferences,
   source/save conflicts, close consent, history, tabs, failed launches and transfers.
+- Elements restyled per line Chromium inserts into a comparison editor (traced
+  24-line fill; median at most 150). A bare `div` subject after `:has()` once made
+  it ~600 and each 600-line fill ~20 s, the action limit (intermittent failure
+  until 2026-11-13; see the `:has()` rule in AGENTS.md). The results record both
+  fill times (`comparisonFillMs`).
 
 Measured visible document heights at 1440×1000 (CSS px, dark; light also passes):
 
