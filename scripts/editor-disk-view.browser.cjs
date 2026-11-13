@@ -282,6 +282,23 @@ async function verifyLongLineWrap(page,editor){
    await page.evaluate(()=>{selectionLog.length=0;});
    const token=page.locator('.nt-editor-disk-highlight .nt-ed-string').filter({hasText:'FIXTURE_0850'});
    await token.waitFor();
+   // CI caught the syntax layer a few frames before it settled: the word was
+   // drawn about six rows above its text (above the textarea itself), so the
+   // double-click missed the textarea. Click once the word lies inside the
+   // textarea and has kept its place for two frames; a layer that stays
+   // misaligned still fails here.
+   await page.waitForFunction(()=>new Promise(done=>{
+    const place=()=>{const word=[...document.querySelectorAll('.nt-editor-disk-highlight .nt-ed-string')].find(el=>el.textContent==='FIXTURE_0850');
+     const ta=document.querySelector('textarea').getBoundingClientRect(),box=word?.getBoundingClientRect();
+     return box&&box.top>=ta.top&&box.bottom<=ta.bottom?Math.round(box.top*4)+':'+Math.round(box.left*4):'';};
+    const first=place();requestAnimationFrame(()=>requestAnimationFrame(()=>done(!!first&&place()===first)));
+   }),null,{timeout:10000,polling:50}).catch(async error=>{
+    throw Error('FIXTURE_0850 never settled inside the textarea: '+JSON.stringify(await page.evaluate(()=>{
+     const ta=document.querySelector('textarea'),style=getComputedStyle(ta),word=[...document.querySelectorAll('.nt-editor-disk-highlight .nt-ed-string')].find(el=>el.textContent==='FIXTURE_0850');
+     return {textarea:ta.getBoundingClientRect().toJSON(),word:word?.getBoundingClientRect().toJSON(),lineHeight:style.lineHeight,font:style.font,scrollTop:ta.scrollTop,
+      layer:document.querySelector('.nt-editor-disk-highlight')?.style.transform,cursor:view.cursor};
+    }))+' ('+error.message+')');
+   });
    const box=await token.boundingBox();
    await page.mouse.dblclick(box.x+box.width/2,box.y+box.height*.8);
    const chosen=await editor.evaluate(ta=>ta.value.slice(ta.selectionStart,ta.selectionEnd));
@@ -294,7 +311,8 @@ async function verifyLongLineWrap(page,editor){
    attempts.push({attempt,chosen,box,later:await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(()=>{
     const ta=document.querySelector('textarea'),rect=ta.getBoundingClientRect();
     done({chosen:ta.value.slice(ta.selectionStart,ta.selectionEnd),readOnly:ta.readOnly,rect:[rect.x,rect.y,rect.width,rect.height],
-     classes:ta.className,syntaxHidden:document.querySelector('.nt-editor-disk-highlight')?.hidden,log:selectionLog.slice()});
+     classes:ta.className,syntaxHidden:document.querySelector('.nt-editor-disk-highlight')?.hidden,lineHeight:getComputedStyle(ta).lineHeight,
+     layer:document.querySelector('.nt-editor-disk-highlight')?.style.transform,scrollTop:ta.scrollTop,log:selectionLog.slice()});
    }))))});
   }
   // The record slows every change of the textarea: end it before the next checks.
