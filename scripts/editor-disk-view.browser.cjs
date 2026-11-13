@@ -259,7 +259,7 @@ async function verifyLongLineWrap(page,editor){
     container,session,syntaxLanguage:()=> 'fixture',readOnly:true});
    await view.load({start:0});
    await view.goLine(846);
-  };await makeSyntaxView();});
+  };});
   // CI (Chrome Headless Shell 151) found an empty selection after this
   // double-click a few times; it never fails locally. Record what touches the
   // selection, repeat the double-click, and print the record of any failure.
@@ -268,7 +268,7 @@ async function verifyLongLineWrap(page,editor){
    const proto=HTMLTextAreaElement.prototype,valueOf=Object.getOwnPropertyDescriptor(proto,'value'),scrollOf=Object.getOwnPropertyDescriptor(Element.prototype,'scrollTop');
    const where=()=>new Error().stack.split('\n').slice(3,6).map(line=>line.trim().replace(/^at /,'').replace(/\(?file:[^)]*\/(web\/assets\/[^)]*)\)?/,'$1')).join(' < ');
    const state=()=>[ta.selectionStart,ta.selectionEnd,Math.round(scrollOf.get.call(ta)),ta.scrollLeft,document.activeElement===ta];
-   const note=(what,extra='')=>{if(log.length<300)log.push([Math.round(performance.now()-t0),what,...state(),extra]);};
+   const note=(what,extra='')=>{if(log.length<600)log.push([Math.round(performance.now()-t0),what,...state(),extra]);};
    for(const type of ['pointerdown','pointerup','mousedown','mouseup','click','dblclick','select','selectionchange','scroll','focus','blur'])
     ta.addEventListener(type,event=>note(type,event.detail||''),true);
    const range=proto.setSelectionRange;
@@ -278,25 +278,28 @@ async function verifyLongLineWrap(page,editor){
   });
   const attempts=[];
   for(let attempt=0;attempt<5;attempt++){
-   if(attempt)await page.evaluate(()=>makeSyntaxView());
    await page.evaluate(()=>{selectionLog.length=0;});
+   await page.evaluate(()=>makeSyntaxView());
    const token=page.locator('.nt-editor-disk-highlight .nt-ed-string').filter({hasText:'FIXTURE_0850'});
    await token.waitFor();
-   // CI caught the syntax layer a few frames before it settled: the word was
-   // drawn about six rows above its text (above the textarea itself), so the
-   // double-click missed the textarea. Click once the word lies inside the
-   // textarea and has kept its place for two frames; a layer that stays
-   // misaligned still fails here.
-   await page.waitForFunction(()=>new Promise(done=>{
-    const place=()=>{const word=[...document.querySelectorAll('.nt-editor-disk-highlight .nt-ed-string')].find(el=>el.textContent==='FIXTURE_0850');
-     const ta=document.querySelector('textarea').getBoundingClientRect(),box=word?.getBoundingClientRect();
-     return box&&box.top>=ta.top&&box.bottom<=ta.bottom?Math.round(box.top*4)+':'+Math.round(box.left*4):'';};
-    const first=place();requestAnimationFrame(()=>requestAnimationFrame(()=>done(!!first&&place()===first)));
-   }),null,{timeout:10000,polling:50}).catch(async error=>{
+   // CI found FIXTURE_0850 above the textarea twice: after Go to line 846 the
+   // textarea showed line 851 at its top (scrollTop 17159 at 20.15px rows), so
+   // the double-click landed outside it. Click only once the word lies inside
+   // the textarea on two polls in a row; if it never does, fail with the
+   // view's position and the record of every scroll change since the view
+   // was created, which names what moved it.
+   await page.evaluate(()=>{window.lastWordPlace='';});
+   await page.waitForFunction(()=>{
+    const word=[...document.querySelectorAll('.nt-editor-disk-highlight .nt-ed-string')].find(el=>el.textContent==='FIXTURE_0850');
+    const ta=document.querySelector('textarea').getBoundingClientRect(),box=word?.getBoundingClientRect();
+    const place=box&&box.top>=ta.top&&box.bottom<=ta.bottom?Math.round(box.top*4)+':'+Math.round(box.left*4):'';
+    const settled=!!place&&place===window.lastWordPlace;window.lastWordPlace=place;return settled;
+   },null,{timeout:10000,polling:100}).catch(async error=>{
     throw Error('FIXTURE_0850 never settled inside the textarea: '+JSON.stringify(await page.evaluate(()=>{
      const ta=document.querySelector('textarea'),style=getComputedStyle(ta),word=[...document.querySelectorAll('.nt-editor-disk-highlight .nt-ed-string')].find(el=>el.textContent==='FIXTURE_0850');
      return {textarea:ta.getBoundingClientRect().toJSON(),word:word?.getBoundingClientRect().toJSON(),lineHeight:style.lineHeight,font:style.font,scrollTop:ta.scrollTop,
-      layer:document.querySelector('.nt-editor-disk-highlight')?.style.transform,cursor:view.cursor};
+      layer:document.querySelector('.nt-editor-disk-highlight')?.style.transform,cursor:view.cursor,view:view.capture(),
+      scrollHeight:ta.scrollHeight,clientHeight:ta.clientHeight,record:selectionLog.slice(0,200)};
     }))+' ('+error.message+')');
    });
    const box=await token.boundingBox();
