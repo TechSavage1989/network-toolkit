@@ -1,19 +1,33 @@
 (function(root){
 'use strict';
 // side is the file location (local or remote); dock is where the sidebar sits.
-let dock='left',side='local',panel='files',protocol='ssh',width=300,accessTimer=null,requests=[],sourceBusy=false,navigationRevision=0,preferencesLoaded=false,wideCollapsed=false,compactOpen=false,compactLayout=null;
+let dock='left',side='local',panel='files',protocol='ssh',width=300,accessTimer=null,requests=[],sourceBusy=false,navigationRevision=0,preferencesLoaded=false,wideCollapsed=false,compactOpen=false,compactLayout=null,documentList=null;
 const detached=()=>typeof EDITOR_WINDOW!=='undefined'&&EDITOR_WINDOW;
-function readPreferences(){if(preferencesLoaded)return;preferencesLoaded=true;let v={};if(detached()){try{v=JSON.parse(root.sessionStorage?.getItem('ntk.editor.files')||'{}');}catch{}}else v=typeof state==='undefined'?{}:state.editorFilesPreferences||{};dock=v.dock==='right'?'right':'left';side=v.side==='remote'?'remote':'local';panel=v.panel==='connections'?'connections':'files';width=Number.isFinite(v.width)?Math.max(220,Math.min(600,v.width)):300;wideCollapsed=v.collapsed===true;return v;}
+// The rail's panels: Connect, Files and the Document List (owner request,
+// like Notepad++'s Document List). They share one sidebar: its width, side
+// and open/closed setting.
+const PANELS={connections:{label:'Connect',name:'Connections',icon:'connect',id:'ntEditorConnectionsTab'},files:{label:'Files',name:'Files',icon:'folder',id:'ntEditorFilesTab'},documents:{label:'Docs',name:'Documents',icon:'documents',id:'ntEditorDocumentsTab'}};
+const panelName=value=>Object.hasOwn(PANELS,value)?value:'files';
+function readPreferences(){if(preferencesLoaded)return;preferencesLoaded=true;let v={};if(detached()){try{v=JSON.parse(root.sessionStorage?.getItem('ntk.editor.files')||'{}');}catch{}}else v=typeof state==='undefined'?{}:state.editorFilesPreferences||{};dock=v.dock==='right'?'right':'left';side=v.side==='remote'?'remote':'local';panel=panelName(v.panel);width=Number.isFinite(v.width)?Math.max(220,Math.min(600,v.width)):300;wideCollapsed=v.collapsed===true;return v;}
 function remember(host){const value={side,panel,width,collapsed:wideCollapsed,dock};if(detached()){try{root.sessionStorage?.setItem('ntk.editor.files',JSON.stringify(value));}catch{}}else if(typeof state!=='undefined'){state.editorFilesPreferences=value;if(typeof saveState==='function')saveState();}}
 function setup(editor){
  const host=editor?.querySelector('[data-ed-files-sidebar]');if(!host)return null;
  if(host.querySelector('[data-editor-file-browser]'))return host;
  host.id='ntEditorFilesContent';host.setAttribute('role','tabpanel');
  const shell=document.createElement('div');shell.className='nt-editor-files-shell';host.before(shell);
- shell.innerHTML='<div class="terminal-sidebar-rail"><div class="terminal-sidebar-tabs" role="tablist" aria-label="Editor sidebar" aria-orientation="vertical">'+[['connections','Connect','connect'],['files','Files','folder']].map(([name,label,symbol])=>'<button type="button" class="terminal-sidebar-tab" role="tab" data-editor-files-panel="'+name+'" id="'+(name==='files'?'ntEditorFilesTab':'ntEditorConnectionsTab')+'" aria-label="'+(name==='files'?'Files':'Connections')+'" aria-controls="ntEditorFilesContent">'+icon(symbol)+'<span>'+label+'</span></button>').join('')+'</div><button type="button" class="iconbtn terminal-sidebar-side-button sidebar-rail-swap nt-editor-files-dock" data-editor-files-dock title="Move editor sidebar to right" aria-label="Move editor sidebar to right">'+icon('arrowSwap')+'</button></div>';shell.append(host);
- host.innerHTML='<div id="ntEditorFilesBrowse" class="nt-editor-files-locations" role="tablist" aria-label="File locations"><button type="button" class="btn small ghost" role="tab" data-editor-files-side="local">Windows files</button><button type="button" class="btn small ghost" role="tab" data-editor-files-side="remote">SFTP</button></div><div id="ntEditorFilesConnections" data-editor-file-sessions></div><div class="nt-editor-files-body" id="ntEditorFilesBody" data-editor-file-browser></div><div data-editor-file-paths></div>';
+ shell.innerHTML='<div class="terminal-sidebar-rail"><div class="terminal-sidebar-tabs" role="tablist" aria-label="Editor sidebar" aria-orientation="vertical">'+Object.entries(PANELS).map(([name,item])=>'<button type="button" class="terminal-sidebar-tab" role="tab" data-editor-files-panel="'+name+'" id="'+item.id+'" aria-label="'+item.name+'" aria-controls="ntEditorFilesContent">'+icon(item.icon)+'<span>'+item.label+'</span></button>').join('')+'</div><button type="button" class="iconbtn terminal-sidebar-side-button sidebar-rail-swap nt-editor-files-dock" data-editor-files-dock title="Move editor sidebar to right" aria-label="Move editor sidebar to right">'+icon('arrowSwap')+'</button></div>';shell.append(host);
+ host.innerHTML='<div id="ntEditorFilesBrowse" class="nt-editor-files-locations" role="tablist" aria-label="File locations"><button type="button" class="btn small ghost" role="tab" data-editor-files-side="local">Windows files</button><button type="button" class="btn small ghost" role="tab" data-editor-files-side="remote">SFTP</button></div><div id="ntEditorFilesConnections" data-editor-file-sessions></div><div class="nt-editor-files-body" id="ntEditorFilesBody" data-editor-file-browser></div><div data-editor-file-paths></div><div class="nt-editor-documents" data-editor-documents hidden></div>';
  shell.insertAdjacentHTML('beforeend','<div class="nt-editor-files-resize" role="separator" tabindex="0" aria-label="Resize or hide editor sidebar" aria-controls="ntEditorFilesContent" aria-orientation="vertical" aria-valuemin="220" aria-valuemax="600" title="Drag to resize. Double-click or press Enter or Space to hide. Arrow keys resize; Home or End selects a size limit."></div>');
  const sessions=editor.querySelector('#ntEditorRemotePanel');if(sessions)host.querySelector('[data-editor-file-sessions]').append(sessions);
+ documentList=root.NTKEditorDocumentList?.create({
+  model:()=>root.NetworkToolkitFileEditor?.documentModel?.()||{views:[]},
+  activate:id=>root.NetworkToolkitFileEditor?.activateDocument?.(id),
+  menu:(uid,x,y,back)=>root.NetworkToolkitFileEditor?.openTabMenuAt?.(uid,x,y,back),
+  focusText:()=>root.NetworkToolkitFileEditor?.focusText?.(),
+  // In a narrow window the sidebar covers the document: choosing one closes it.
+  chosen:()=>{if(isCompact()&&!host.hidden){compactOpen=false;visibility(editor,host,false);root.NetworkToolkitFileEditor?.focusText?.();}}
+ })||null;
+ documentList?.mount(host.querySelector('[data-editor-documents]'));
  const paths=sessions?.querySelector('.nt-editor-file-path-actions');if(paths)host.querySelector('[data-editor-file-paths]').append(paths);
  shell.addEventListener('click',event=>{if(event.target.closest('[data-editor-files-dock]')){setDock(editor,dock==='left'?'right':'left');return;}const primary=event.target.closest('[data-editor-files-panel]'),tab=event.target.closest('[data-editor-files-side]');if(primary){if(primary.dataset.editorFilesPanel===panel&&!host.hidden)toggle(editor);else selectPanel(primary.dataset.editorFilesPanel);return;}if(tab){navigationRevision++;side=tab.dataset.editorFilesSide;if(side==='local'&&protocol!=='ftp')protocol='ssh';mount(host);remember(host);}});
  shell.addEventListener('keydown',event=>{if(event.key==='Escape'&&isCompact()&&!host.hidden){event.preventDefault();event.stopPropagation();toggle(editor);return;}const tab=event.target.closest('[role="tab"]');if(!tab)return;const vertical=tab.parentElement.getAttribute('aria-orientation')==='vertical',back=vertical?'ArrowUp':'ArrowLeft',forward=vertical?'ArrowDown':'ArrowRight';if(![back,forward,'Home','End'].includes(event.key))return;const tabs=[...tab.parentElement.querySelectorAll('[role="tab"]')],at=tabs.indexOf(tab),next=event.key==='Home'?0:event.key==='End'?tabs.length-1:(at+(event.key===back?-1:1)+tabs.length)%tabs.length;event.preventDefault();event.stopPropagation();if(vertical)selectPanel(tabs[next].dataset.editorFilesPanel);else tabs[next].click();tabs[next].focus();});
@@ -34,8 +48,10 @@ function applyDock(editor){
 }
 function setDock(editor,next){dock=next==='right'?'right':'left';applyDock(editor);const host=editor?.querySelector('[data-ed-files-sidebar]');if(host)remember(host);editor?.querySelector('[data-editor-files-dock]')?.focus?.({preventScroll:true});}
 function syncRail(host){
- const shell=host.closest('.nt-editor-files-shell');shell.classList.toggle('is-collapsed',host.hidden);host.inert=host.hidden;host.setAttribute('aria-labelledby',panel==='connections'?'ntEditorConnectionsTab':'ntEditorFilesTab');
- for(const tab of shell.querySelectorAll('[data-editor-files-panel]')){const selected=tab.dataset.editorFilesPanel===panel;tab.setAttribute('aria-selected',String(selected));tab.setAttribute('aria-expanded',String(selected&&!host.hidden));tab.tabIndex=selected?0:-1;tab.title=(selected&&!host.hidden?'Close ':'Open ')+(tab.dataset.editorFilesPanel==='files'?'Files':'Connections');tab.removeAttribute('data-editor-files-close');tab.removeAttribute('data-editor-files-reopen');if(selected)tab.setAttribute(host.hidden?'data-editor-files-reopen':'data-editor-files-close','');}
+ const shell=host.closest('.nt-editor-files-shell');shell.classList.toggle('is-collapsed',host.hidden);host.inert=host.hidden;host.setAttribute('aria-labelledby',PANELS[panel].id);
+ for(const tab of shell.querySelectorAll('[data-editor-files-panel]')){const selected=tab.dataset.editorFilesPanel===panel;tab.setAttribute('aria-selected',String(selected));tab.setAttribute('aria-expanded',String(selected&&!host.hidden));tab.tabIndex=selected?0:-1;tab.title=(selected&&!host.hidden?'Close ':'Open ')+PANELS[panelName(tab.dataset.editorFilesPanel)].name;tab.removeAttribute('data-editor-files-close');tab.removeAttribute('data-editor-files-reopen');if(selected)tab.setAttribute(host.hidden?'data-editor-files-reopen':'data-editor-files-close','');}
+ // The More menu's "Document list" box shows whether the list is open.
+ const box=host.closest('#networkToolkitFileEditor')?.querySelector('[data-ed-document-list]');if(box)box.checked=panel==='documents'&&!host.hidden;
 }
 function visibility(editor,host,show){host.hidden=!show;editor.querySelector('[data-ed="files"]')?.setAttribute('aria-expanded',String(show));syncRail(host);if(!show)clearTimeout(accessTimer);else mount(host);}
 function isCompact(){return (root.innerWidth||900)<=680;}
@@ -43,17 +59,20 @@ function expandedIntent(show){compactLayout=isCompact();if(compactLayout)compact
 function responsive(editor,host){const compact=isCompact();if(compactLayout!==compact){compactOpen=false;compactLayout=compact;}const show=compact?compactOpen:!wideCollapsed,focused=!show&&host.contains(document.activeElement);if(host.hidden===show)navigationRevision++;visibility(editor,host,show);if(focused)editor.querySelector('[data-editor-files-reopen]')?.focus?.({preventScroll:true});}
 function initialize(editor){readPreferences();const host=setup(editor);if(host)responsive(editor,host);}
 function toggle(editor){readPreferences();const host=setup(editor);if(!host)return;navigationRevision++;expandedIntent(host.hidden);visibility(editor,host,host.hidden);remember(host);(host.hidden?editor.querySelector('[data-editor-files-reopen]'):editor.querySelector('[data-editor-files-panel][aria-selected="true"]'))?.focus?.({preventScroll:true});}
-function selectPanel(value){const host=document.querySelector('[data-ed-files-sidebar]');if(!host)return;const next=value==='connections'?'connections':'files';
+function selectPanel(value){const host=document.querySelector('[data-ed-files-sidebar]');if(!host)return;const next=panelName(value);
  // Preserve the active connection toolbar and keyboard focus when already open.
  navigationRevision++;
  if(panel===next&&!host.hidden){if(detached())mount(host);return;}
  panel=next;if(host.hidden){expandedIntent(true);visibility(host.closest('#networkToolkitFileEditor'),host,true);}else mount(host);remember(host);}
 function mount(host){
- syncRail(host);host.dataset.editorSidebarPanel=panel;host.dataset.editorSidebarSide=side;host.querySelector('[data-editor-file-browser]')?.setAttribute('aria-labelledby',panel==='connections'?'ntEditorConnectionsTab':'ntEditorFilesTab');
+ syncRail(host);host.dataset.editorSidebarPanel=panel;host.dataset.editorSidebarSide=side;host.querySelector('[data-editor-file-browser]')?.setAttribute('aria-labelledby',PANELS[panel].id);
+ const list=host.querySelector('[data-editor-documents]');if(list)list.hidden=panel!=='documents';
  const sessions=host.querySelector('#ntEditorRemotePanel');if(sessions){sessions.hidden=panel!=='connections';if(panel==='connections')void root.NetworkToolkitFileEditor?.refreshConnectedSources?.();}
  const locations=host.querySelector('.nt-editor-files-locations');if(locations)locations.hidden=panel!=='files';
  const remoteTab=host.querySelector('[data-editor-files-side="remote"]');if(remoteTab)remoteTab.textContent=protocol==='ftp'?'FTP / FTPS':'SFTP';
  for(const tab of host.querySelectorAll('[role="tab"]')){const selected=tab.dataset.editorFilesPanel?tab.dataset.editorFilesPanel===panel:tab.dataset.editorFilesSide===side;tab.setAttribute('aria-selected',String(selected));tab.tabIndex=selected?0:-1;tab.classList.toggle('primary',selected);tab.classList.toggle('ghost',!selected);}
+ // The Document List needs no file access: it lists this editor's tabs.
+ if(panel==='documents'){clearTimeout(accessTimer);documentList?.render();return;}
  if(detached()&&(panel!=='files'||side!=='local')){void checkAccess(host);return;}
  clearTimeout(accessTimer);
  root.NetworkToolkitRemoteBrowser.mountSidebar(host.querySelector('[data-editor-file-browser]'),side,protocol,{panel});syncAccessButton();
@@ -99,5 +118,11 @@ async function useSource(source){
  }finally{sourceBusy=false;}
 }
 root.addEventListener?.('resize',()=>{if(!preferencesLoaded)return;const editor=document.querySelector('#networkToolkitFileEditor'),host=editor?.querySelector('[data-ed-files-sidebar]');if(editor&&!editor.hidden&&host&&isCompact()!==compactLayout)responsive(editor,host);});
-root.NetworkToolkitEditorFiles=Object.freeze({initialize,selectPanel,useSource,showConnection,toggle,syncRequests,manageAccess,detached,setDock(value){setDock(document.querySelector('#networkToolkitFileEditor'),value);},get dock(){return dock;}});
+// Show (or hide) the Document List; with focus, put the keyboard on its rows.
+function showDocuments(show=true,{focus=false}={}){
+ const editor=document.querySelector('#networkToolkitFileEditor');readPreferences();const host=setup(editor);if(!host)return false;
+ if(!show){if(panel==='documents'&&!host.hidden)toggle(editor);return true;}
+ selectPanel('documents');if(focus)documentList?.focus();return true;
+}
+root.NetworkToolkitEditorFiles=Object.freeze({initialize,selectPanel,useSource,showConnection,toggle,syncRequests,manageAccess,detached,showDocuments,refreshDocuments(){documentList?.render();},get documentList(){return documentList;},get panel(){return panel;},setDock(value){setDock(document.querySelector('#networkToolkitFileEditor'),value);},get dock(){return dock;}});
 })(globalThis);
