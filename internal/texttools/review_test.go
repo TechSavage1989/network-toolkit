@@ -3,6 +3,8 @@ package texttools
 import (
 	"context"
 	"errors"
+	"fmt"
+	"os"
 	"strings"
 	"testing"
 )
@@ -115,6 +117,44 @@ func TestHTMLDecodeTakesOnlyCompleteReferences(t *testing.T) {
 		if err != nil || got != want {
 			t.Errorf("%q: %q, want %q (%v)", in, got, want, err)
 		}
+	}
+}
+
+// A sort whose scratch folder refuses a new run file part way through a
+// merge pass leaves no run file behind (a merged file of that pass leaked).
+func TestSortLeavesNoRunFileWhenOneCannotBeCreated(t *testing.T) {
+	var lines []string
+	for i := 0; i < 3000; i++ {
+		lines = append(lines, fmt.Sprintf("host%04d.example.com", (i*7919)%3000))
+	}
+	input := strings.Join(lines, "\n")
+	budget, width, create := runBudget, mergeWidth, createRun
+	defer func() { runBudget, mergeWidth, createRun = budget, width, create }()
+	runBudget = 2048
+	// Count the run files the spills make, with one merge reading them all.
+	spills := 0
+	createRun = func(dir string) (*os.File, error) { spills++; return create(dir) }
+	mergeWidth = 1 << 20
+	if _, _, err := run(t, "sort-asc", Options{}, input); err != nil {
+		t.Fatal(err)
+	}
+	// Now merge two at a time, and refuse the second merged file of the
+	// first pass.
+	mergeWidth = 2
+	calls := 0
+	createRun = func(dir string) (*os.File, error) {
+		if calls++; calls == spills+2 {
+			return nil, errors.New("the scratch folder is full")
+		}
+		return create(dir)
+	}
+	dir := t.TempDir()
+	_, err := Run(context.Background(), "sort-asc", Options{}, BytesSource(input), &Output{In: []byte(input)}, Env{Dir: dir})
+	if err == nil || !strings.Contains(err.Error(), "full") {
+		t.Fatalf("spills %d, calls %d: %v", spills, calls, err)
+	}
+	if entries, _ := os.ReadDir(dir); len(entries) != 0 {
+		t.Fatalf("%d run files left behind", len(entries))
 	}
 }
 

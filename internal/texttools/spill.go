@@ -17,6 +17,9 @@ var runBudget = 32 << 20
 // mergeWidth is how many run files one merge reads at once.
 var mergeWidth = 64
 
+// createRun makes a run file in the scratch folder (a test makes it fail).
+var createRun = func(dir string) (*os.File, error) { return os.CreateTemp(dir, "nt-text-tool-*") }
+
 // sorter is an external merge sort of byte records. Records are added in
 // order; each records group that fills the budget is sorted (stably) and
 // written to a run file in the scratch folder; the runs are then merged, and
@@ -66,7 +69,7 @@ func (s *sorter) spill() error {
 		return err
 	}
 	s.sortRun()
-	f, err := os.CreateTemp(s.j.env.Dir, "nt-text-tool-*")
+	f, err := createRun(s.j.env.Dir)
 	if err != nil {
 		return err
 	}
@@ -193,7 +196,9 @@ func (s *sorter) merge(runs []*runFile, fn func([]byte) error) error {
 	return nil
 }
 
-// narrow merges groups of run files until one merge can read them all.
+// narrow merges groups of run files until one merge can read them all. On
+// every path s.runs keeps every run file that still exists, merged or not,
+// so close removes them all.
 func (s *sorter) narrow() error {
 	for len(s.runs) > mergeWidth {
 		var next []*runFile
@@ -203,8 +208,11 @@ func (s *sorter) narrow() error {
 				next = append(next, group[0])
 				continue
 			}
-			f, err := os.CreateTemp(s.j.env.Dir, "nt-text-tool-*")
+			f, err := createRun(s.j.env.Dir)
 			if err != nil {
+				// The files merged so far in this pass are runs too: close
+				// removes them with the rest.
+				s.runs = append(next, s.runs[start:]...)
 				return err
 			}
 			merged := &runFile{f: f}
