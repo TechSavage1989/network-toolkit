@@ -17,6 +17,20 @@
 (function (root) {
 'use strict';
 
+// Chromium 151 (fixed by 153): once a click on a button has taken the focus
+// from a textarea, the page's selection stays at that textarea, and each later
+// click on a button puts back the selection the textarea had then, undoing
+// one set by script since (Find Next's match before Replace). Dropping that
+// stale page selection keeps the one set here (as in file-editor.js).
+function keepScriptSelection(ta) {
+ const doc = ta?.ownerDocument;
+ if (!doc || doc.activeElement === ta) return;
+ const s = doc.getSelection?.();
+ if (!s?.rangeCount) return;
+ const at = (node, offset) => node === ta || node === ta.parentNode && (node.childNodes[offset] === ta || node.childNodes[offset - 1] === ta);
+ if (at(s.anchorNode, s.anchorOffset) || at(s.focusNode, s.focusOffset)) s.removeAllRanges();
+}
+
 const RANGE = 1000000;
 const BUFFER_LINES = 40;
 const PREVIEW_UNITS = 512;
@@ -545,6 +559,7 @@ function create({textarea, gutter, container, session, syntaxLanguage, wordWrap 
    direction
   );
   if (focus) textarea.focus({preventScroll: true});
+  else keepScriptSelection(textarea);
   announce();
  }
 

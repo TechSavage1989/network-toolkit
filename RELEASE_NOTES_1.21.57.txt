@@ -14,5 +14,6 @@ Network Toolkit 1.21.57
 - Find what and Replace with remember your last 20 entries until the app closes. They are never saved, because search text can contain passwords.
 - Searching, counting, marking and replacing work in files of any size; long searches run in the background with Cancel.
 - The window can turn see-through while you work in the document (Transparency).
+- Clicking Replace or Find Next again keeps the match the window selected. With some browser engine versions it went back to where the cursor had been.
 - Regular expressions do not support lookahead, lookbehind or \1 in Find what (use $1 in Replace with); the window says so.
 - Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.

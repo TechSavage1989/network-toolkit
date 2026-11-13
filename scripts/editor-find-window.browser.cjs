@@ -422,7 +422,10 @@ const step=name=>console.log('FIND WINDOW '+name);
   await page.keyboard.type('Z');await until(()=>NetworkToolkitFileEditor.active.diskSession.pending);
   await showTab('replace');await query('name vlan-99999');await page.locator('[data-ed-replacement]').fill('name last');
   await win().locator('[data-ed="replaceAll"]').click();
-  await page.waitForTimeout(300);assert.equal(editSeen,true,'the typing was still on its way');holdEdit();
+  // The edit reaches the route while Replace All waits for it (it is held
+  // there); a busy runner may take longer than a fixed pause to send it.
+  for(const t0=Date.now();!editSeen&&Date.now()-t0<15000;)await page.waitForTimeout(25);
+  assert.equal(editSeen,true,'the typing was still on its way');holdEdit();
   await messageIs(/^Replace All: 1 occurrence was replaced in the entire file\.$/);
   await page.unroute('**/documents/*/buffer');
   await settled();
