@@ -1,0 +1,14 @@
+Network Toolkit 1.21.53
+
+## What's New
+
+- With Wrap on, a very long line (such as a Base64 file) now scrolls all the way through, with a vertical scrollbar, instead of stopping after the first part.
+- Selecting text in a large file continues past what is loaded, and the status bar shows how many characters are selected.
+
+## Additional Details
+
+- In large files the vertical scrollbar follows your position in the text. Its size is an estimate when lines are very long.
+- Without Wrap, the bar under a long line now spans the text and shows how much of the line is in view.
+- The cursor column on a long line is now exact.
+- A right-click no longer shrinks a whole-document selection (Ctrl+A) to the visible part, so commands from the right-click menu apply to everything you selected.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.
