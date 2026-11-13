@@ -1,3 +1,7 @@
+## 1.21.52 Beta 1 - The document icon through Open with entries
+
+- `Applications\Network_Toolkit.exe` gives files the document icon (its verb keeps the program icon), and Windows' own `Applications\Network_Toolkit_TextEditor.exe` entry gets the document icon, recorded and removed on uninstall.
+
 ## 1.21.51 Beta 1 - Open with and file types after an update
 
 - A file passed alone (Windows' own Open with entry) opens in the Text Editor instead of failing; after an update, an installation by Setup 1.21.44 or later gets the missing Text Editor file types, and older installations get a Run Setup notice.

@@ -1,0 +1,12 @@
+Network Toolkit 1.21.52
+
+## What's New
+
+- Files you open with the Text Editor now show the document icon (the page without the tile) however you chose the Text Editor for them: in Default apps, in Open with, or by browsing for the program.
+
+## Additional Details
+
+- The Text Editor itself keeps its own icon in Open with and in Default apps.
+- An update fixes the icon for files set through the Text Editor's own entries. If you once chose the Text Editor by browsing for Network_Toolkit_TextEditor.exe, run Setup 1.21.52 once (App settings → Updates → Run Setup) to fix those files too; uninstalling removes only what Setup added.
+- Windows may take a moment, or a sign-out, to redraw icons it has already shown.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.

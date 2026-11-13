@@ -252,7 +252,8 @@ func TestEditorRegistrationPlanWritesSetupsKeysForThisCopy(t *testing.T) {
 		{editorRegCapabilities, "ApplicationDescription"}:            editorRegDescription,
 		{editorRegRegistered, "Network Toolkit Text Editor"}:         `Software\Network Toolkit\Capabilities`,
 		{editorRegApplication, "FriendlyAppName"}:                    "Network Toolkit Text Editor",
-		{editorRegApplication + `\DefaultIcon`, ""}:                  `"` + testCopyA + `",1`,
+		{editorRegApplication + `\DefaultIcon`, ""}:                  `"` + testCopyA + `",3`,
+		{editorRegApplication + `\shell\open`, "Icon"}:               `"` + testCopyA + `",1`,
 		{editorRegApplication + `\shell\open\command`, ""}:           command,
 		{editorRegMenuVerb, ""}:                                      "Edit with Network Toolkit Text Editor",
 		{editorRegMenuVerb, "Icon"}:                                  `"` + testCopyA + `",1`,
@@ -433,6 +434,285 @@ func TestEditorRegistrationLeavesAnotherProgramsOpenWithEntry(t *testing.T) {
 	if got := reg.str(t, editorRegApplication+`\shell\open\command`, ""); got != editorRegCommand(testCopyA) {
 		t.Errorf("Windows' own entry for this copy was not updated: %q", got)
 	}
+	// Taken over, it carries every value of the registration's own entry.
+	for _, at := range [][3]string{
+		{editorRegApplication + `\DefaultIcon`, "", `"` + testCopyA + `",3`},
+		{editorRegApplication + `\shell\open`, "Icon", `"` + testCopyA + `",1`},
+		{editorRegApplication, "FriendlyAppName", editorRegAppName},
+	} {
+		if got := reg.str(t, at[0], at[1]); got != at[2] {
+			t.Errorf("%s [%s] = %q after taking over Windows' entry, want %q", at[0], at[1], got, at[2])
+		}
+	}
+}
+
+// Registering again (a repair, or the right-click choice changed) writes the
+// icons of the registration's own Open with entry only where they are absent
+// or what a registration wrote (this copy's or the replaced copy's, either
+// index): an icon the user set there stays. A 1.21.51 portable registration
+// (editor icon as DefaultIcon, no verb Icon) is brought up to date.
+func TestEditorRegistrationKeepsTheUsersIconsOnItsOpenWithEntry(t *testing.T) {
+	fileIcon, verbIcon := editorRegApplication+`\DefaultIcon`, editorRegApplication+`\shell\open`
+	t.Run("icons the user set", func(t *testing.T) {
+		reg := fixtureRegistry()
+		platform, _ := testEditorPlatform(reg)
+		if _, err := registerEditorCopy(platform, testCopyA, false, false); err != nil {
+			t.Fatal(err)
+		}
+		reg.SetString(fileIcon, "", `C:\Icons\files.ico`)
+		reg.SetString(verbIcon, "Icon", `C:\Icons\program.ico`)
+		if _, err := registerEditorCopy(platform, testCopyA, true, false); err != nil {
+			t.Fatal(err)
+		}
+		if reg.str(t, fileIcon, "") != `C:\Icons\files.ico` || reg.str(t, verbIcon, "Icon") != `C:\Icons\program.ico` {
+			t.Fatalf("register replaced the user's icons:\n%s", reg.dump())
+		}
+		// Remove takes the whole entry back, as Setup's uninstall does.
+		if _, err := removeEditorCopy(platform, testCopyA); err != nil {
+			t.Fatal(err)
+		}
+		if reg.has(editorRegApplication) {
+			t.Fatalf("the entry stayed:\n%s", reg.dump())
+		}
+	})
+	t.Run("a 1.21.51 registration", func(t *testing.T) {
+		reg := fixtureRegistry()
+		platform, _ := testEditorPlatform(reg)
+		if _, err := registerEditorCopy(platform, testCopyA, false, false); err != nil {
+			t.Fatal(err)
+		}
+		reg.SetString(fileIcon, "", `"`+testCopyA+`",1`)
+		reg.DeleteValue(verbIcon, "Icon")
+		if _, err := registerEditorCopy(platform, testCopyA, false, false); err != nil {
+			t.Fatal(err)
+		}
+		if reg.str(t, fileIcon, "") != `"`+testCopyA+`",3` || reg.str(t, verbIcon, "Icon") != `"`+testCopyA+`",1` {
+			t.Fatalf("not brought up to date:\n%s", reg.dump())
+		}
+	})
+	t.Run("takeover rewrites the replaced copy's icons", func(t *testing.T) {
+		for _, old := range []string{`",1`, `",3`} {
+			reg := fixtureRegistry()
+			platform, _ := testEditorPlatform(reg)
+			if _, err := registerEditorCopy(platform, testCopyB, false, false); err != nil {
+				t.Fatal(err)
+			}
+			reg.SetString(fileIcon, "", `"`+testCopyB+old)
+			if _, err := registerEditorCopy(platform, testCopyA, false, true); err != nil {
+				t.Fatal(err)
+			}
+			if reg.str(t, fileIcon, "") != `"`+testCopyA+`",3` || reg.str(t, verbIcon, "Icon") != `"`+testCopyA+`",1` {
+				t.Fatalf("B's icons (%s) were not taken over:\n%s", old, reg.dump())
+			}
+		}
+	})
+	t.Run("Windows' own entry for this copy", func(t *testing.T) {
+		reg := fixtureRegistry()
+		reg.SetString(editorRegApplication+`\shell\open\command`, "", `"`+testCopyA+`" "%1"`)
+		platform, _ := testEditorPlatform(reg)
+		if _, err := registerEditorCopy(platform, testCopyA, false, false); err != nil {
+			t.Fatal(err)
+		}
+		if reg.str(t, fileIcon, "") != `"`+testCopyA+`",3` || reg.str(t, verbIcon, "Icon") != `"`+testCopyA+`",1` {
+			t.Fatalf("Windows' entry was not completed:\n%s", reg.dump())
+		}
+	})
+	t.Run("a read that fails writes nothing", func(t *testing.T) {
+		for _, path := range []string{fileIcon, verbIcon} {
+			reg := fixtureRegistry()
+			reg.readFault = path
+			before := reg.dump()
+			platform, _ := testEditorPlatform(reg)
+			if _, err := registerEditorCopy(platform, testCopyA, false, false); err == nil || reg.dump() != before {
+				t.Fatalf("register with %s unreadable: %v", path, err)
+			}
+		}
+	})
+}
+
+// When the user picks Network_Toolkit_TextEditor.exe in "Open with", Windows
+// writes Applications\Network_Toolkit_TextEditor.exe itself, with a command and
+// no DefaultIcon, so Explorer shows that program's own first icon (the editor
+// tile) for every file associated through it. A registration gives such an
+// entry the document icon, records the value, and takes back exactly that
+// value; it never creates the entry and never changes its command.
+func TestEditorRegistrationGivesWindowsOwnEditorEntryTheDocumentIcon(t *testing.T) {
+	editorA := editorRegJoin(editorRegDir(testCopyA), editorRegEditorFile)
+	windowsEntry := func(reg *fakeRegistry, program string) {
+		reg.SetString(editorRegEditorApplication+`\shell\open\command`, "", `"`+program+`" "%1"`)
+	}
+	entry := func(reg *fakeRegistry) string {
+		var lines []string
+		for _, line := range strings.Split(reg.dump(), "\n") {
+			if strings.Contains(strings.ToLower(line), `applications\network_toolkit_texteditor.exe`) {
+				lines = append(lines, line)
+			}
+		}
+		return strings.Join(lines, "\n")
+	}
+	t.Run("Windows' entry for this copy's Text Editor program", func(t *testing.T) {
+		reg := fixtureRegistry()
+		windowsEntry(reg, editorA)
+		before := reg.dump()
+		platform, _ := testEditorPlatform(reg)
+		if _, err := registerEditorCopy(platform, testCopyA, false, false); err != nil {
+			t.Fatal(err)
+		}
+		want := `"` + testCopyA + `",3`
+		if got := reg.str(t, editorRegEditorApplication+`\DefaultIcon`, ""); got != want {
+			t.Fatalf("DefaultIcon %q, want %q", got, want)
+		}
+		if got := reg.str(t, editorRegPortable, editorRegEditorAppIcon); got != want {
+			t.Fatalf("the written icon is not recorded: %q", got)
+		}
+		if got := reg.str(t, editorRegEditorApplication+`\shell\open\command`, ""); got != `"`+editorA+`" "%1"` {
+			t.Fatalf("Windows' command changed: %q", got)
+		}
+		if _, found := reg.value(editorRegEditorApplication, "FriendlyAppName"); found {
+			t.Fatal("only the icon is written into Windows' entry")
+		}
+		if _, found := reg.value(editorRegEditorApplication+`\shell\open`, "Icon"); found {
+			t.Fatal("the verb icon belongs to the registration's own entry, not to Windows' entry of the Text Editor program")
+		}
+		// A repair writes the same and records nothing more.
+		snapshot := reg.dump()
+		if _, err := registerEditorCopy(platform, testCopyA, false, false); err != nil {
+			t.Fatal(err)
+		}
+		if reg.dump() != snapshot {
+			t.Fatalf("registering again changed:\n%s", reg.dump())
+		}
+		if _, err := removeEditorCopy(platform, testCopyA); err != nil {
+			t.Fatal(err)
+		}
+		if reg.dump() != before {
+			t.Fatalf("remove did not leave Windows' entry as it was:\nbefore:\n%s\nafter:\n%s", before, reg.dump())
+		}
+	})
+	t.Run("an icon the user set later stays", func(t *testing.T) {
+		reg := fixtureRegistry()
+		windowsEntry(reg, editorA)
+		platform, _ := testEditorPlatform(reg)
+		if _, err := registerEditorCopy(platform, testCopyA, false, false); err != nil {
+			t.Fatal(err)
+		}
+		reg.SetString(editorRegEditorApplication+`\DefaultIcon`, "", `C:\Icons\custom.ico`)
+		// Registering again does not overwrite it either.
+		if _, err := registerEditorCopy(platform, testCopyA, false, false); err != nil {
+			t.Fatal(err)
+		}
+		if got := reg.str(t, editorRegEditorApplication+`\DefaultIcon`, ""); got != `C:\Icons\custom.ico` {
+			t.Fatalf("register replaced the user's icon: %q", got)
+		}
+		if _, err := removeEditorCopy(platform, testCopyA); err != nil {
+			t.Fatal(err)
+		}
+		if got := reg.str(t, editorRegEditorApplication+`\DefaultIcon`, ""); got != `C:\Icons\custom.ico` {
+			t.Fatalf("remove took the user's icon: %q", got)
+		}
+		if reg.has(editorRegPortable) {
+			t.Fatalf("the record stayed:\n%s", reg.dump())
+		}
+	})
+	for _, tc := range []struct {
+		name  string
+		setup func(reg *fakeRegistry)
+	}{
+		{"an entry of another copy's program", func(reg *fakeRegistry) { windowsEntry(reg, `E:\Other\Network_Toolkit_TextEditor.exe`) }},
+		{"an entry with an icon of its own", func(reg *fakeRegistry) {
+			windowsEntry(reg, editorA)
+			reg.SetString(editorRegEditorApplication+`\DefaultIcon`, "", `C:\Icons\custom.ico`)
+		}},
+		{"an icon key someone else created", func(reg *fakeRegistry) {
+			windowsEntry(reg, editorA)
+			reg.create(editorRegEditorApplication + `\DefaultIcon`)
+		}},
+		{"an entry without a command", func(reg *fakeRegistry) { reg.SetString(editorRegEditorApplication, "Custom", "1") }},
+		{"no entry", func(reg *fakeRegistry) {}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			reg := fixtureRegistry()
+			tc.setup(reg)
+			before, beforeEntry := reg.dump(), entry(reg)
+			platform, _ := testEditorPlatform(reg)
+			if _, err := registerEditorCopy(platform, testCopyA, true, false); err != nil {
+				t.Fatal(err)
+			}
+			if entry(reg) != beforeEntry {
+				t.Fatalf("the entry changed:\n%s\nwas:\n%s", entry(reg), beforeEntry)
+			}
+			if _, found := reg.value(editorRegPortable, editorRegEditorAppIcon); found {
+				t.Fatal("an icon that was not written is recorded")
+			}
+			if _, err := removeEditorCopy(platform, testCopyA); err != nil {
+				t.Fatal(err)
+			}
+			if reg.dump() != before {
+				t.Fatalf("register and remove changed:\n%s", reg.dump())
+			}
+		})
+	}
+	t.Run("takeover keeps the record of the replaced copy's icon", func(t *testing.T) {
+		reg := fixtureRegistry()
+		editorB := editorRegJoin(editorRegDir(testCopyB), editorRegEditorFile)
+		windowsEntry(reg, editorB)
+		before := reg.dump()
+		platform, _ := testEditorPlatform(reg)
+		if _, err := registerEditorCopy(platform, testCopyB, false, false); err != nil {
+			t.Fatal(err)
+		}
+		if got := reg.str(t, editorRegEditorApplication+`\DefaultIcon`, ""); got != `"`+testCopyB+`",3` {
+			t.Fatalf("B's entry: %q", got)
+		}
+		if _, err := registerEditorCopy(platform, testCopyA, false, true); err != nil {
+			t.Fatal(err)
+		}
+		// A leaves the entry of B's program as it is; the record goes on.
+		if got := reg.str(t, editorRegEditorApplication+`\DefaultIcon`, ""); got != `"`+testCopyB+`",3` {
+			t.Fatalf("A changed B's entry: %q", got)
+		}
+		if got := reg.str(t, editorRegPortable, editorRegEditorAppIcon); got != `"`+testCopyB+`",3` {
+			t.Fatalf("the record of B's icon was lost: %q", got)
+		}
+		if _, err := removeEditorCopy(platform, testCopyA); err != nil {
+			t.Fatal(err)
+		}
+		if reg.dump() != before {
+			t.Fatalf("after takeover and remove:\n%s", reg.dump())
+		}
+	})
+	t.Run("clean up of a copy that is gone", func(t *testing.T) {
+		reg := fixtureRegistry()
+		editorB := editorRegJoin(editorRegDir(testCopyB), editorRegEditorFile)
+		windowsEntry(reg, editorB)
+		before := reg.dump()
+		platform, _ := testEditorPlatform(reg)
+		if _, err := registerEditorCopy(platform, testCopyB, true, false); err != nil {
+			t.Fatal(err)
+		}
+		platform, _ = testEditorPlatform(reg, testCopyB)
+		if _, err := cleanupEditorCopy(platform, testCopyA, testCopyB); err != nil {
+			t.Fatal(err)
+		}
+		if reg.dump() != before {
+			t.Fatalf("clean up left:\n%s", reg.dump())
+		}
+	})
+	t.Run("a read that fails writes nothing", func(t *testing.T) {
+		for _, path := range []string{editorRegEditorApplication, editorRegEditorApplication + `\shell\open\command`, editorRegEditorApplication + `\DefaultIcon`} {
+			reg := fixtureRegistry()
+			windowsEntry(reg, editorA)
+			reg.readFault = path
+			before := reg.dump()
+			platform, _ := testEditorPlatform(reg)
+			if _, err := registerEditorCopy(platform, testCopyA, false, false); err == nil {
+				t.Fatalf("register with %s unreadable succeeded", path)
+			}
+			if reg.dump() != before {
+				t.Fatalf("register wrote although %s could not be read", path)
+			}
+		}
+	})
 }
 
 func TestEditorRegistrationOwnershipStates(t *testing.T) {
@@ -659,6 +939,7 @@ func TestEditorRegistrationMatchesSetup(t *testing.T) {
 		"PROG_KEY": editorRegProgKey, "CAPABILITIES": editorRegCapabilities, "APPLICATIONS_KEY": editorRegApplications, "APPLICATION_KEY": editorRegApplication,
 		"ALL_FILES_KEY": editorRegAllFiles, "MENU_VERB_KEY": editorRegMenuVerb, "MENU_TEXT": editorRegMenuText, "EDITOR_KEY": editorRegSetupRecord,
 		"UNINSTALL_KEY": editorRegUninstall, "PORTABLE_KEY": editorRegPortable,
+		"EDITOR_FILENAME": editorRegEditorFile, "EDITOR_APPLICATION_KEY": editorRegEditorApplication, "EDITOR_APPLICATION_ICON": editorRegEditorAppIcon,
 	} {
 		if got := expand("${" + name + "}"); got != want {
 			t.Errorf("windows.nsi %s = %q, the portable program uses %q", name, got, want)
@@ -687,8 +968,25 @@ func TestEditorRegistrationMatchesSetup(t *testing.T) {
 	if got := icon(editorRegProgKey + `\DefaultIcon`); got != fmt.Sprint(editorRegDocumentIcon) {
 		t.Errorf("Setup's document icon is %s, the portable program writes %d", got, editorRegDocumentIcon)
 	}
-	if got := icon(editorRegApplication + `\DefaultIcon`); got != fmt.Sprint(editorRegEditorIcon) {
-		t.Errorf("Setup's editor icon is %s, the portable program writes %d", got, editorRegEditorIcon)
+	// Explorer shows the DefaultIcon of an Applications entry as the icon of
+	// every file the user associated through it: the document icon, as the
+	// ProgID's. The program values keep the editor icon.
+	if got := icon(editorRegApplication + `\DefaultIcon`); got != fmt.Sprint(editorRegDocumentIcon) {
+		t.Errorf("Setup's Open with entry icon is %s, the portable program writes %d", got, editorRegDocumentIcon)
+	}
+	if got := icon(editorRegEditorApplication + `\DefaultIcon`); got != fmt.Sprint(editorRegDocumentIcon) {
+		t.Errorf("Setup gives Windows' own entry of the Text Editor program icon %s, the portable program writes %d", got, editorRegDocumentIcon)
+	}
+	for _, line := range []string{
+		`WriteRegStr HKCU "` + editorRegCapabilities + `" "ApplicationIcon" '"$INSTDIR\Network_Toolkit.exe",` + fmt.Sprint(editorRegEditorIcon) + `'`,
+		`WriteRegStr HKCU "` + editorRegMenuVerb + `" "Icon" '"$INSTDIR\Network_Toolkit.exe",` + fmt.Sprint(editorRegEditorIcon) + `'`,
+		// Open with shows the program by its verb icon, whatever it reads.
+		`WriteRegStr HKCU "` + editorRegApplication + `\shell\open" "Icon" '"$INSTDIR\Network_Toolkit.exe",` + fmt.Sprint(editorRegEditorIcon) + `'`,
+		`WriteRegStr HKCU "` + editorRegSetupRecord + `" "` + editorRegEditorAppIcon + `" '"$INSTDIR\Network_Toolkit.exe",` + fmt.Sprint(editorRegDocumentIcon) + `'`,
+	} {
+		if !strings.Contains(text, line) {
+			t.Errorf("windows.nsi no longer writes %s", line)
+		}
 	}
 	list, err := os.ReadFile(filepath.Join("..", "..", "scripts", "installer", "text-extensions.nsh"))
 	if err != nil {
