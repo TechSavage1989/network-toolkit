@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"networktoolkit/internal/desktop"
 	"networktoolkit/internal/model"
 )
 
@@ -131,8 +132,10 @@ func TestEditorRegistryTimeoutAndLaunchFailureRetainSource(t *testing.T) {
 			}
 			req, _, destination := editorFixtureOffer(t, m)
 			if kind == "timeout" {
+				// The new window's page received the offer, then did not acknowledge it.
+				_ = m.state(destination)
 				m.mu.Lock()
-				m.transfers[req.ID].created = m.now().Add(-21 * time.Second)
+				m.transfers[req.ID].delivered = m.now().Add(-editorTransferAckWindow - time.Second)
 				m.expireLocked()
 				m.mu.Unlock()
 			}
@@ -149,6 +152,103 @@ func TestEditorRegistryTimeoutAndLaunchFailureRetainSource(t *testing.T) {
 			}
 		})
 	}
+}
+
+// A move to a new window must not fail while that window is still starting
+// (process, WebView2 and page; desktop.StartupLimit): the 20 s acknowledgement
+// window starts when the window's page first receives the offer. This was the
+// intermittent TestNativeEditorTransferInstalledWebView2 failure on hosted
+// Windows ("The destination did not acknowledge the transfer"): a cold child
+// took over 20 s to start, the move failed and the window opened empty.
+func TestEditorRegistryNewWindowAckWindowStartsWhenItsPageReceivesTheOffer(t *testing.T) {
+	if editorViewOpenLimit < desktop.StartupLimit+editorTransferAckWindow/4 || editorTransferAckWindow != 20*time.Second {
+		t.Fatal("a new window must get at least its own startup limit, and the acknowledgement window stays 20 s")
+	}
+	failure := func(m *editorViewRegistry, id string) string {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		m.expireLocked()
+		if m.transfers[id].state == "offered" {
+			return ""
+		}
+		return m.transfers[id].failure
+	}
+	retained := func(t *testing.T, m *editorViewRegistry, uid string) {
+		t.Helper()
+		if d := m.documents[uid]; d == nil || d.owner != "" || d.lease != 1 || d.pending != "" {
+			t.Fatal("a failed move did not leave the documents with the source")
+		}
+	}
+
+	t.Run("slow window still accepts", func(t *testing.T) {
+		_, m, _ := editorFixture(t)
+		clock := editorDragClock(m)
+		req, _, destination := editorFixtureOffer(t, m)
+		clock.Add(int64(editorViewOpenLimit - time.Second))
+		if note := failure(m, req.ID); note != "" {
+			t.Fatalf("move failed while its new window was still starting: %s", note)
+		}
+		if incoming := m.state(destination)["incoming"].([]any); len(incoming) != 1 {
+			t.Fatal("the late page did not receive the offer")
+		}
+		clock.Add(int64(editorTransferAckWindow - time.Second))
+		if note := failure(m, req.ID); note != "" {
+			t.Fatalf("move failed before its acknowledgement window ended: %s", note)
+		}
+		if out, err := m.accept(destination, req.ID); err != nil || out["state"] != "accepted" || m.documents[req.Batch.Active].owner != destination {
+			t.Fatal("slow new window could not take the documents", out, err)
+		}
+	})
+
+	t.Run("delivered then silent fails and the source can retry", func(t *testing.T) {
+		_, m, _ := editorFixture(t)
+		clock := editorDragClock(m)
+		req, _, destination := editorFixtureOffer(t, m)
+		clock.Add(int64(5 * time.Second))
+		_ = m.state(destination)
+		clock.Add(int64(editorTransferAckWindow + time.Second))
+		if note := failure(m, req.ID); !strings.Contains(note, "did not acknowledge") {
+			t.Fatalf("an unacknowledged delivered move did not fail: %q", note)
+		}
+		retained(t, m, req.Batch.Active)
+		if _, err := m.accept(destination, req.ID); err == nil {
+			t.Fatal("accepted an expired move")
+		}
+		// The window that opened late is still there: moving into it again works.
+		retry := editorTransferRequest{ID: randomHex(16), Destination: destination, Batch: editorFixtureBatch(), Leases: map[string]uint64{editorFixtureUID: 1}}
+		if _, err := m.offer("", retry); err != nil {
+			t.Fatal("source could not retry into the window", err)
+		}
+		_ = m.state(destination)
+		if out, err := m.accept(destination, retry.ID); err != nil || out["state"] != "accepted" {
+			t.Fatal("retry was not accepted", out, err)
+		}
+	})
+
+	t.Run("window that never opens fails at its open limit", func(t *testing.T) {
+		_, m, _ := editorFixture(t)
+		clock := editorDragClock(m)
+		req, _, _ := editorFixtureOffer(t, m)
+		clock.Add(int64(editorViewOpenLimit + time.Second))
+		if note := failure(m, req.ID); !strings.Contains(note, "did not open in time") {
+			t.Fatalf("a window that never received the offer did not fail at its open limit: %q", note)
+		}
+		retained(t, m, req.Batch.Active)
+	})
+
+	t.Run("open window keeps the 20 s from the offer", func(t *testing.T) {
+		_, m, destination, _, _, _ := editorDragFixture(t)
+		clock := editorDragClock(m)
+		req := editorTransferRequest{ID: randomHex(16), Destination: destination, Batch: editorFixtureBatch(), Leases: map[string]uint64{editorFixtureUID: 1}}
+		if _, err := m.offer("", req); err != nil {
+			t.Fatal(err)
+		}
+		clock.Add(int64(editorTransferAckWindow + time.Second))
+		if note := failure(m, req.ID); !strings.Contains(note, "did not acknowledge") {
+			t.Fatalf("a move to an open window that never polled did not fail after 20 s: %q", note)
+		}
+		retained(t, m, req.Batch.Active)
+	})
 }
 
 func TestEditorRegistryCapabilitiesExposeOnlyIntendedDocuments(t *testing.T) {

@@ -18,6 +18,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"networktoolkit/internal/desktop"
 	"networktoolkit/internal/diag"
 	"networktoolkit/internal/editorbuffer"
 	"networktoolkit/internal/model"
@@ -27,6 +28,19 @@ const editorTransferLimit = 256 << 20
 const editorDocumentLimit = 32 << 20
 const editorViewLimit = 8
 const editorDocumentCountLimit = 64
+
+// A destination has editorTransferAckWindow to acknowledge a transfer from
+// the moment its page first receives the offer. A move to a new window must
+// first start that window (its process, WebView2 and page), which the window
+// itself allows desktop.StartupLimit; until its page receives the offer the
+// move waits for that, plus time for the process to start, so a slow start no
+// longer fails the move and leaves an empty window behind. A window that
+// exits fails the move at once (processExited) and the source can always
+// cancel; the source keeps its documents either way.
+const (
+	editorTransferAckWindow = 20 * time.Second
+	editorViewOpenLimit     = desktop.StartupLimit + 10*time.Second
+)
 
 var editorHexID = regexp.MustCompile(`^[0-9a-f]{32}$`)
 var editorUID = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
@@ -157,6 +171,10 @@ type editorTransfer struct {
 	leases                                          map[string]uint64
 	created                                         time.Time
 	acked                                           bool
+	// opened: this transfer started its destination window. delivered: when
+	// the destination's page first received the offer (state).
+	opened    bool
+	delivered time.Time
 }
 type editorViewRegistry struct {
 	diskComparisons          map[string]*diskComparisonJob
@@ -692,7 +710,19 @@ func (m *editorViewRegistry) makeGrant(caller string, d editorDocumentSnapshot) 
 func (m *editorViewRegistry) expireLocked() {
 	now := m.now()
 	for _, t := range m.transfers {
-		if t.state == "offered" && now.Sub(t.created) > 20*time.Second {
+		if t.state != "offered" {
+			continue
+		}
+		switch {
+		case !t.delivered.IsZero():
+			if now.Sub(t.delivered) > editorTransferAckWindow {
+				m.failLocked(t, "failed", "The destination did not acknowledge the transfer. The source still owns the documents.")
+			}
+		case t.opened:
+			if now.Sub(t.created) > editorViewOpenLimit {
+				m.failLocked(t, "failed", "The new editor window did not open in time. The source still owns the documents.")
+			}
+		case now.Sub(t.created) > editorTransferAckWindow:
 			m.failLocked(t, "failed", "The destination did not acknowledge the transfer. The source still owns the documents.")
 		}
 	}
@@ -744,6 +774,9 @@ func (m *editorViewRegistry) state(caller string) map[string]any {
 			outgoing = append(outgoing, editorTransferInfo(t))
 		}
 		if t.destination == caller && t.state == "offered" && t.batch != nil {
+			if t.delivered.IsZero() {
+				t.delivered = m.now()
+			}
 			row := editorTransferInfo(t)
 			row["batch"] = editorCloneBatch(*t.batch)
 			incoming = append(incoming, row)
@@ -914,7 +947,7 @@ func (m *editorViewRegistry) offer(caller string, req editorTransferRequest) (ma
 		launch = &editorViewLaunch{Version: 1, OwnerHost: m.app.host, OwnerInstanceID: m.app.windowInstanceID, ViewID: destination, ViewToken: v.token, DataDir: filepath.Join(filepath.Dir(m.app.dataPath), editorViewDirectoryName, destination), Title: "Network Toolkit — " + name, NoBrowser: m.app.headless}
 	}
 	batch := editorCloneBatch(req.Batch)
-	t := &editorTransfer{id: req.ID, source: caller, destination: destination, state: "offered", digest: digest, batch: &batch, leases: map[string]uint64{}, created: m.now()}
+	t := &editorTransfer{id: req.ID, source: caller, destination: destination, state: "offered", digest: digest, batch: &batch, leases: map[string]uint64{}, created: m.now(), opened: launch != nil}
 	for _, snapshot := range batch.Documents {
 		d := m.documents[snapshot.UID]
 		if d == nil {

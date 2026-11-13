@@ -1,3 +1,15 @@
+# After v1.21.51 Beta 1 - A move to a new editor window waits for the window to start (not released)
+
+Owner asked for the root cause of the intermittent `TestNativeEditorTransferInstalledWebView2` failures on hosted Windows (PR #175 run 43371469238: "The destination did not acknowledge the transfer. The source still owns the documents."; PR #172: `command performance-state timed out`; earlier handoffs: "did not accept the offered transfer within its fixed 20 seconds").
+
+Cause (a product bug, not only the test): a destination had 20 s from the **offer** to accept, and for a move to a new window those 20 s included starting the window's process, WebView2 and page, which the window itself allows 45 s (`desktop.StartupLimit`, the splash startup gate). A passing run starts each child in about 2 s (the whole 4 MiB mode with three round trips took 19.5 s); in the failing run the child took over 20 s, the move expired while the window was still opening, and the window then opened empty. Users on a slow or freshly booted PC could hit the same thing.
+
+What changed (rules in AGENTS.md, "Editor move acknowledgement"): the 20 s count from when the destination's page first receives the offer; a move that opens a new window waits up to `editorViewOpenLimit` (45 s + 10 s) for that, then fails with "The new editor window did not open in time"; a window that exits still fails the move at once, Cancel still works, and the source keeps its documents either way. The native fixture now waits for each window's page to start (`awaitPage`, same limit, ends early on exit or a driver startup failure) before its 35 s command and 18 s state limits, and logs each child's start time.
+
+Not established: why that one child took over 20 s (the run's artifact could not be downloaded from this session; the blob storage host is not allowed). The new start-time log line and `pageStarts` in the report will show it next time. Not run on physical Windows; hosted CI on the PR is the evidence.
+
+---
+
 # v1.21.51 Beta 1 - Open with and file types after an update
 
 Owner (installed with Setup long ago, updated in the app to 1.21.50): "Text editor won't show up in the list of apps for json and some other file types", and picking `Network_Toolkit_TextEditor.exe` with "Look for another app on this PC" failed with "The Text Editor launch request cannot be combined with another application mode."
