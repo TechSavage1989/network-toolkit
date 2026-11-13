@@ -7,7 +7,7 @@ const root=path.resolve(__dirname,'../web'),out=process.env.TOOLKIT_TEST_OUTPUT,
 const hosts='# UI review fixture\n127.0.0.1 localhost\n::1 localhost\n192.0.2.20 switch.test\n'.replaceAll('\n','\r\n');
 const adapters=[{index:7,name:'Ethernet',description:'Realtek PCIe 5GbE Family Controller',up:true,addresses:['192.0.2.4/24','2001:db8:1234:5678::4/64'],mac:'02:00:00:00:00:04',mtu:1500,speedMbps:1000,gateway:'192.0.2.1',gateways:['192.0.2.1'],dns:['192.0.2.53','2001:db8:1234:5678::53']},{index:8,name:'Ethernet 5',description:'Virtual adapter with a deliberately long description for responsive layout review',up:true,addresses:['198.51.100.4/24'],mac:'02:00:00:00:00:08',mtu:1500,speedMbps:1000,dns:['198.51.100.53']}];
 const snapshot=()=>({available:true,editable:true,exists:true,path:'C:\\Windows\\System32\\drivers\\etc\\hosts',content:hosts,revision:crypto.createHash('sha256').update(hosts).digest('hex'),encoding:'UTF-8',newline:'CRLF',warnings:[]});
-const result={passed:false,pages:[],cases:[],copies:[],hostsMenu:[],errors:[],assetFailures:[]};
+const result={passed:false,pages:[],cases:[],copies:[],hostsMenu:[],dialogFocus:[],errors:[],assetFailures:[]};
 const settle=page=>page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
 let browser,page,saved={appUpdatePreferences:{enabled:false},terminalSidebarSide:'right',terminalSidebarTab:'saved'},writes=0;
 async function fit(){return page.locator('.main .btn,.main .tab,.main .scope-switch button,.main .tool-panel-tabs button,.main .iconbtn').evaluateAll(elements=>elements.flatMap(element=>{
@@ -26,6 +26,31 @@ async function copy(button,expected,keyboard=false){
  await page.waitForFunction(async value=>(await navigator.clipboard.readText())===value,expected);
  assert.equal(await page.locator('#toastStack .toast').filter({hasText:'Copied to clipboard.'}).count(),1);
  result.copies.push({expected,keyboard});
+}
+// openModal focuses a dialog after a timeout. That focus must never take over the
+// field the dialog's own code focused (it once moved to the header's Close
+// button, racing hosts-editor's F3 check), and a dialog without fields starts on
+// a footer button, never on Close.
+// open runs in the page; {click} opens the dialog with the actual control instead.
+async function dialogFocus(name,open,expected){
+ if(open.click)await open.click();else await page.evaluate(open);
+ await page.evaluate(()=>new Promise(resolve=>setTimeout(resolve,50)));
+ const focus=await page.evaluate(()=>{const a=document.activeElement;return {inside:!!a?.closest('#modalRoot .modal'),id:a?.id||'',label:a?.getAttribute('aria-label')||'',text:(a?.textContent||'').trim()};});
+ assert(focus.inside,name+': focus left the dialog '+JSON.stringify(focus));
+ assert.notEqual(focus.label,'Close dialog',name+': focus is on the header Close button');
+ for(const [key,value] of Object.entries(expected))assert.equal(focus[key],value,name+': '+JSON.stringify(focus));
+ result.dialogFocus.push({name,...focus});
+ await page.evaluate(()=>closeModal());
+}
+async function checkDialogFocus(){
+ await dialogFocus('dialog code focuses a field',()=>{openModal('Focus check','<input id="focusCheckFirst"><input id="focusCheckChosen">','<button class="btn primary" data-action="close-modal">Done</button>');document.querySelector('#focusCheckChosen').focus();},{id:'focusCheckChosen'});
+ await dialogFocus('dialog code focuses a field a moment later',()=>{openModal('Focus check','<input id="focusCheckFirst"><input id="focusCheckChosen">','<button class="btn primary" data-action="close-modal">Done</button>');void Promise.resolve().then(()=>document.querySelector('#focusCheckChosen').focus());},{id:'focusCheckChosen'});
+ await dialogFocus('first usable field',()=>openModal('Focus check','<input id="focusCheckHidden" hidden><input id="focusCheckDisabled" disabled><div style="display:none"><input id="focusCheckInvisible"></div><input id="focusCheckReadOnly" readonly><label><input type="checkbox" id="focusCheckBox"> Option</label><input id="focusCheckField">','<button class="btn primary" data-action="close-modal">Done</button>'),{id:'focusCheckField'});
+ await dialogFocus('no fields, disabled primary',()=>openModal('Focus check','<p>Nothing to fill in.</p>','<button class="btn ghost" data-action="close-modal">Cancel</button><button class="btn primary" disabled>Continue</button>'),{text:'Cancel'});
+ await dialogFocus('Terminal panes help',()=>showTerminalLayoutHelp(),{text:'Done'});
+ await dialogFocus('App settings',{click:()=>openAppSettings(page)},{id:'uxSettingsSearch'});
+ await openAppSettings(page);await page.locator('[data-settings-section="confirmations"]').click();
+ await dialogFocus('Quit confirmation',{click:()=>page.locator('.modal [data-action="quit-confirm"]').click()},{text:'Cancel'});
 }
 (async()=>{
  browser=await chromium.launch({headless:true,args:['--no-sandbox']});
@@ -63,6 +88,7 @@ async function copy(button,expected,keyboard=false){
  assert(result.pages.includes('terminal')&&result.pages.includes('local')&&result.pages.includes('capture'));
  // Pages that are tabs inside merged entries (Test a target, Test a website, Local network) keep their coverage.
  for(const id of ['quick','ping','trace','dns','tcp','monitor','identify','http','tls','hosts'])if(!result.pages.includes(id))result.pages.push(id);
+ await checkDialogFocus();
  for(const width of [1600,1280,960])for(const theme of ['light','dark']){
   await page.setViewportSize({width,height:1000});await page.evaluate(theme=>setTheme(theme),theme);
   for(const id of result.pages){
@@ -103,5 +129,5 @@ async function copy(button,expected,keyboard=false){
   }
  }
  assert.equal(writes,0);assert.deepEqual(result.errors,[]);assert.deepEqual(result.assetFailures,[]);result.passed=true;
- console.log(JSON.stringify({passed:true,pages:result.pages.length,renderedCases:result.cases.length,copies:result.copies.length,hostsMenuCases:result.hostsMenu.length,noHostsWrites:true}));
+ console.log(JSON.stringify({passed:true,pages:result.pages.length,renderedCases:result.cases.length,copies:result.copies.length,hostsMenuCases:result.hostsMenu.length,dialogFocusCases:result.dialogFocus.length,noHostsWrites:true}));
 })().catch(async error=>{result.failure=error.stack||String(error);console.error(result.failure);if(out&&page)await page.screenshot({path:path.join(out,'ui-consistency-failure.png')}).catch(()=>{});process.exitCode=1;}).finally(async()=>{if(out)fs.writeFileSync(path.join(out,'ui-consistency-results.json'),JSON.stringify(result,null,2)+'\n');await browser?.close();});
