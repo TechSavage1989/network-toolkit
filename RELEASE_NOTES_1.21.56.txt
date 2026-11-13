@@ -1,0 +1,16 @@
+Network Toolkit 1.21.56
+
+## What's New
+
+- The Text Editor's tools are general and each shows a small example, such as a&b&c → three lines. When Base64 decode meets a few extra characters, it offers Decode the part before it. The brand-specific readable copy is gone.
+- A button that opens a row or panel now closes it when you click it again, so separate Hide and Close buttons are gone: Terminal Find and command bar, Hosts file Find, packet capture panels and File Transfer settings.
+- Dialogs start in their first field and, when they close, return you to the button that opened them.
+
+## Additional Details
+
+- The Text Editor guide has a short recipe for a one-line encoded settings file: Base64 decode, Split at text (&), then URL decode.
+- Hex to text offers Decode the part before it too.
+- The Terminal's Find row starts closed; its Find button and Ctrl+Shift+F open and close it, and Escape closes it.
+- Packet capture's What to look for and Colors & maps panels open below their buttons, so the same button closes them.
+- A dialog that redraws itself (such as Saved filters) or one opened from another dialog still returns focus to where you started.
+- Saved targets, connection profiles, credential vault, macros, unsaved documents, sessions and settings are kept.
