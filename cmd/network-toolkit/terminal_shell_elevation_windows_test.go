@@ -77,7 +77,10 @@ func TestTerminalShellExplicitApprovalAndLateCancellation(t *testing.T) {
 	if h == 0 || h == syscall.InvalidHandle {
 		t.Fatal("synthetic late-launch handle could not be created")
 	}
-	deadline := time.Now().Add(time.Second)
+	// The launch goroutine closes the late handle as soon as it runs again;
+	// on a loaded hosted runner that can take longer than a second (this
+	// failed CI with a 1 s limit), so wait for the condition, not a guess.
+	deadline := time.Now().Add(10 * time.Second)
 	for time.Now().Before(deadline) {
 		if _, err := syscall.WaitForSingleObject(h, 0); err != nil {
 			return
