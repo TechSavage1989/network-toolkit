@@ -17,17 +17,18 @@ test('Connect has a dedicated centered plug path; old plug, play and settings re
  assert.equal(makeDocument(icon('connect')).querySelector('svg').getAttribute('aria-hidden'),'true');
 });
 test('actual editor rail puts Connect before Files without changing default or saved selection',async()=>{
- for(const child of [false,true])for(const panel of [undefined,'files','connections']){
+ for(const child of [false,true])for(const panel of [undefined,'files','connections','documents']){
   const preference=panel?{panel,side:'remote',width:380,collapsed:true}:undefined,h=editor(child,preference),tabs=h.shell.querySelectorAll('[role="tab"]');
-  const primary=tabs.filter(el=>el.dataset.editorFilesPanel);assert.deepEqual(primary.map(el=>el.dataset.editorFilesPanel),['connections','files']);
+  const primary=tabs.filter(el=>el.dataset.editorFilesPanel);assert.deepEqual(primary.map(el=>el.dataset.editorFilesPanel),['connections','files','documents']);
   assert.equal(primary[0].textContent,'Connect');assert.equal(primary[0].getAttribute('aria-label'),'Connections');assert.equal(primary[0].querySelector('path').getAttribute('d'),paths.connect);assert.equal(primary[1].querySelector('path').getAttribute('d'),paths.folder);
+  assert.equal(primary[2].textContent,'Docs');assert.equal(primary[2].getAttribute('aria-label'),'Documents');assert.equal(primary[2].querySelector('path').getAttribute('d'),paths.documents);for(const key of ['connect','folder','file','report'])assert.notEqual(paths.documents,paths[key]);
   const selected=primary.find(el=>el.getAttribute('aria-selected')==='true');assert.equal(selected.dataset.editorFilesPanel,panel||'files');assert.equal(selected.tabIndex,0);assert.equal(h.host.hidden,!!preference);assert.equal(h.shell.style.width,preference?'380px':'300px');
   await new Promise(resolve=>setImmediate(resolve));assert(h.calls.every(c=>c.p==='/editor-views/current/explorer'&&!c.method));
  }
 });
 test('Connect-first keyboard Home/End and arrows match DOM order, without connecting',()=>{
- const h=editor(false),files=h.shell.querySelector('[data-editor-files-panel="files"]'),connect=h.shell.querySelector('[data-editor-files-panel="connections"]');
- for(const [target,key,panel]of [[files,'Home','connections'],[connect,'ArrowDown','files'],[files,'ArrowUp','connections'],[connect,'End','files']]){let prevented=false;h.shell.emit('keydown',target,{key,preventDefault(){prevented=true;}});assert(prevented);assert.equal(h.host.dataset.editorSidebarPanel,panel);assert(!h.host.hidden);}
+ const h=editor(false),files=h.shell.querySelector('[data-editor-files-panel="files"]'),connect=h.shell.querySelector('[data-editor-files-panel="connections"]'),documents=h.shell.querySelector('[data-editor-files-panel="documents"]');
+ for(const [target,key,panel]of [[files,'Home','connections'],[connect,'ArrowDown','files'],[files,'ArrowUp','connections'],[connect,'End','documents'],[documents,'ArrowUp','files']]){let prevented=false;h.shell.emit('keydown',target,{key,preventDefault(){prevented=true;}});assert(prevented);assert.equal(h.host.dataset.editorSidebarPanel,panel);assert(!h.host.hidden);}
  for(const key of ['Enter',' ','Tab']){let prevented=false;h.shell.emit('keydown',files,{key,preventDefault(){prevented=true;}});assert(!prevented);}
  assert.deepEqual(h.calls,[]);
 });
