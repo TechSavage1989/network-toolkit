@@ -135,6 +135,7 @@ Sending between the Text Editor and the Terminal (v1.20.13, owner request):
 Buttons:
 - One **primary** button per view, for the main action. Other actions use the default or `ghost` style; `small` inside toolbars and tab rows.
 - Icon-only buttons need an `aria-label` and a tooltip; show the shortcut in the tooltip when one exists.
+- Toggle buttons (owner request, after v1.21.54): a button that reveals a row, bar, strip, sidebar section or panel is a toggle. Pressing it again (or its shortcut) closes what it opened, and it looks pressed while open (`reveal-toggle` with `aria-expanded`, the `.btn.selected` colors). There is no separate Hide or Close button for that row or panel. Only panels that open without a button (details opened by selecting a device, packet or result) keep their collapse control, and dialogs keep theirs. A panel that opens over the page never covers its own toggle. Applied to: Terminal Find (starts closed; Ctrl+Shift+F and Escape close it too) and Command bar, the local shell's starting folder Browse…, Hosts file Find / replace (Ctrl+F, Ctrl+H, Escape) and Validation, Packet capture Show/Hide insights, What to look for and Colors & maps, File Transfer server settings (rail Connect), client Connection settings (Active session) and the server copy dialog's Browse local files / folder.
 
 States every tool provides:
 - **Empty:** what the tool does, what to enter, and an example (see `web/assets/ux-phase5.js`).
@@ -188,7 +189,7 @@ Keep a confirmation only when an action can lose data, interrupt live sessions o
 | Terminal Saved list | Alt+Shift+Up / Down | Move a focused Saved session |
 | Test a target / Test a website | Alt+Shift+Left / Right | Reorder a focused test tab |
 | Text Editor / Terminal | Shift+F10 | Open the tab menu |
-| Terminal | Ctrl+Shift+F | Find in terminal output |
+| Terminal | Ctrl+Shift+F | Show or hide Find in terminal output |
 | File browser | F2 · Ctrl/Shift+click | Rename · select multiple |
 | Panels | Enter or Space / arrow keys on a divider | Collapse or restore / resize |
 

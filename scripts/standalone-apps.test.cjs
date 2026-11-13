@@ -13,7 +13,7 @@ function standalone(){
  return {api:window.NetworkToolkitStandalone,document,started,window};
 }
 const GLOBAL=[['help','Keyboard shortcuts and help'],['welcome','Welcome and quick starts'],['palette','Search tools and commands'],['settings','App settings'],['restore-tab','Reopen recently closed tab'],['updates','Update settings / Check for updates'],['theme','Switch light/dark theme'],['navigation','Show or hide navigation']].map(([id,label])=>({id,label,group:'Application',run(){}}));
-const HELP=[['Application','Ctrl+Shift+P','Search tools and commands'],['Application','F1','Open this help sheet'],['Text Editor','Ctrl+N','New document'],['Terminal','Ctrl+Shift+F','Find in terminal output'],['File browser','F2','Rename selected file'],['Panels','Arrow keys on divider','Resize a panel']];
+const HELP=[['Application','Ctrl+Shift+P','Search tools and commands'],['Application','F1','Open this help sheet'],['Text Editor','Ctrl+N','New document'],['Terminal','Ctrl+Shift+F','Show or hide Find in terminal output'],['File browser','F2','Rename selected file'],['Panels','Arrow keys on divider','Resize a panel']];
 
 test('the main window and child windows keep every command, help row and footer',()=>{
  const h=standalone();
