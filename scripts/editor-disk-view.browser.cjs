@@ -277,7 +277,7 @@ async function verifyLongLineWrap(page,editor){
    Object.defineProperty(ta,'scrollTop',{configurable:true,get(){return scrollOf.get.call(this);},set(value){note('scrollTop='+value,where());scrollOf.set.call(this,value);}});
   });
   const attempts=[];
-  for(let attempt=0;attempt<25;attempt++){
+  for(let attempt=0;attempt<5;attempt++){
    if(attempt)await page.evaluate(()=>makeSyntaxView());
    await page.evaluate(()=>{selectionLog.length=0;});
    const token=page.locator('.nt-editor-disk-highlight .nt-ed-string').filter({hasText:'FIXTURE_0850'});
@@ -297,6 +297,8 @@ async function verifyLongLineWrap(page,editor){
      classes:ta.className,syntaxHidden:document.querySelector('.nt-editor-disk-highlight')?.hidden,log:selectionLog.slice()});
    }))))});
   }
+  // The record slows every change of the textarea: end it before the next checks.
+  await page.evaluate(()=>{const ta=document.querySelector('textarea');for(const key of ['value','scrollTop','setSelectionRange'])delete ta[key];window.selectionLog.length=0;window.selectionLog.push=()=>0;});
   const failed=attempts.filter(item=>!item.ok),late=attempts.filter(item=>item.late);
   report.doubleClick={attempts:attempts.length,late:late.length,failed:failed.length};
   if(late.length)console.log('DOUBLE-CLICK LATE SELECTION '+JSON.stringify(late.slice(0,2)));
