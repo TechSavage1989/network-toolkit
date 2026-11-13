@@ -1,3 +1,16 @@
+# v1.21.56 Beta 1 - General text tools, toggle buttons and dialog focus
+
+Owner decisions after v1.21.54: no brand-specific tool ("just make sure the tools required to do so exist and their functionality are clearly explained in an intuitive way, but not specific to any brand"), and "buttons that open a new row of menu items, like "Find" should be a toggle ... instead of needing a dedicated "hide" or close button". The owner also asked for three suggested follow-ups to be done in this session: dialog initial focus, focus back to the opener after a dialog redraws, and the stale live Terminal sidebar check.
+
+v1.21.55 was published and verified: tag at merge commit 3dbc1a8 (PR #181), release run 43503395074 green, all seven assets matching GitHub's digests, `github_release.py verify` reporting "Verified 1.21.55", stable channel still at v1.21.34. Its CI caught a lost track click on the disk view's document bar (a paint put the bar back before its scroll event), fixed in that release; #180 had traced the earlier double-click failure to a wheel step the browser delivered late onto the next view. One native run took 27 s to start the editor page (2 s on its re-run): runner time, not the Document Map.
+
+What changed:
+- #182 General text tools: the SonicWall tool, its offer bar, `tool-detect`, the `derive` open mode and `editorbuffer.NewText` are removed. Base64 decode and Hex to text stop at a character that is not Base64/hex and offer **Decode the part before it** (`texttools.PositionError.Before`; page-held `partial`/`offset`, disk-backed `partial {from,to,line,column,scope}` and a ranged `tool-start`). Every tool description is plain with an example (`scripts/editor-text-tools.test.cjs` rejects brand or vendor words), short enough for two menu lines in CI's fonts. docs/guide/editor.md has the recipe "Make a one-line encoded settings file readable".
+- #183 Toggle buttons: every button that reveals a row or panel outside the Text Editor toggles it (`aria-controls`/`aria-expanded`, shared `reveal-toggle` style); the Terminal Find row starts closed; packet capture's helper panels open below their buttons. Rule in AGENTS.md and docs/UI_GUIDELINES.md. `scripts/terminal-sidebar-layout-live.cjs` is rewritten for the rail-tab sidebar and runs in the `browser` job.
+- #184 Dialog focus: `focusModalDefault` never overrides focus already inside the new dialog and never starts on the header's Close; `modalLastFocus` is set only when no dialog is open, so a redraw or a stacked dialog returns focus to the original opener. `checkDialogFocus()` in `scripts/ui-consistency.browser.cjs`; hosts-editor 12/12 (it failed 3 of 6 on main).
+
+Known limits: the Text Editor's own Find bar still has its Hide button; the movable Find window (feat/editor-find-window, reviewed and fixed, next release) replaces it. Intermittent native Windows failures (`TestNativeSFTPDirect121InstalledWebView2`, `TestNativeEditorLocal119InstalledWebView2`) are tracked separately; they pass on re-run.
+
 # v1.21.55 Beta 1 - Document Map and Document List
 
 Owner request (Notepad++ screenshot): a Document Map and a Document List in the Text Editor. The owner confirmed on their PC that word-wrapped long lines scroll all the way through in v1.21.53.

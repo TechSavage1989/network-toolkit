@@ -1,3 +1,7 @@
+## 1.21.56 Beta 1 - General text tools, toggle buttons and dialog focus
+
+- Text tools are general with plain examples; Base64 decode and Hex to text offer Decode the part before it; the brand-specific readable copy (tool-detect, derive) is removed. Buttons that reveal a row or panel toggle it closed, without separate Hide/Close controls (Terminal Find and command bar, Hosts Find, packet capture panels, File Transfer settings). Dialogs keep the field they focus and return focus to their opener after a redraw or a stacked dialog. The live Terminal sidebar check is repaired and runs in CI.
+
 ## 1.21.55 Beta 1 - Document Map and Document List
 
 - The Text Editor gets a Document Map at the right edge (bounded for any size; disk-backed documents mapped by position) and a Document List on the left rail beside Connect and Files; both settings are shared editor preferences. A paint no longer moves a disk-view scrollbar back while the user's move of it is pending (a track click could be lost).
