@@ -6,12 +6,12 @@ Element.prototype.replaceChildren=function(...children){this.children=[];this.ap
 Object.defineProperty(Element.prototype,'options',{get(){return this.children;}});
 Element.prototype.focus=function(){let top=this;while(top.parentElement)top=top.parentElement;top.activeElement=this;};
 const source=fs.readFileSync(require.resolve('../web/assets/editor-windows.js'),'utf8');
-function fixture(beforePoll){
+function fixture(beforePoll,options={}){
  const document=makeDocument('<div class="nt-editor-window"><div class="nt-editor-toolbar"><button data-ed="compare">Compare documents</button></div></div>');
  const calls=[],docs=[{uid:'11111111-1111-4111-8111-111111111111',content:'synthetic retained draft',dirty:true}],events=[];let transfer='',viewName='Other window';
- const ctx={document,console,Uint8Array,AbortController,crypto:require('node:crypto').webcrypto,setTimeout:()=>1,clearTimeout(){}};vm.createContext(ctx);vm.runInContext(source,ctx);
+ const ctx={document,console,Uint8Array,AbortController,crypto:require('node:crypto').webcrypto,setTimeout:options.timers?setTimeout:()=>1,clearTimeout:options.timers?clearTimeout:()=>{}};vm.createContext(ctx);vm.runInContext(source,ctx);
  const adapter={documents:()=>docs,active:()=>docs[0]?.uid,canTransfer:()=>'',snapshot(ids){events.push('freeze');docs[0].frozen=true;return {documents:docs.map(d=>({...d})),active:docs[0].uid};},rollback(){docs[0].frozen=false;events.push('rollback');},release(){events.push('release');docs.splice(0);}};
- const controller=ctx.NetworkToolkitEditorWindows;controller.configure({adapter,available:()=>true,request:async(path,method,body)=>{calls.push({path,method,body});if(path.endsWith('/transfers')){transfer=body.id;return {id:transfer,state:'offered'};}if(path.endsWith('/cancel'))return {id:transfer,state:'cancelled'};if(beforePoll)await beforePoll();return {available:true,ownerInstanceId:'engine',self:'',owned:{},incoming:[],outgoing:transfer?[{id:transfer,state:'offered'}]:[],views:[{id:'other',name:viewName,state:'ready'}]};}});
+ const controller=ctx.NetworkToolkitEditorWindows;controller.configure({adapter,available:()=>true,request:async(path,method,body)=>{calls.push({path,method,body});if(path.endsWith('/transfers')){transfer=body.id;if(options.beforeTransfer)await options.beforeTransfer();return {id:transfer,state:'offered'};}if(path.endsWith('/cancel'))return {id:transfer,state:'cancelled'};if(beforePoll)await beforePoll();return {available:true,ownerInstanceId:'engine',self:'',owned:{},incoming:[],outgoing:transfer?[{id:transfer,state:'offered'}]:[],views:[{id:'other',name:viewName,state:'ready'}]};}});
  return {document,controller,calls,docs,events,adapter,setName:v=>viewName=v,button:()=>document.querySelector('[data-editor-window-toggle]'),box:()=>document.querySelector('[data-editor-window-controls]')};
 }
 test('compact window action adds no row and opens a keyboard dialog without transfer side effects',async()=>{
@@ -61,5 +61,44 @@ test('Detach stays enabled during an ownership poll and a click waits for it',as
  await Promise.all([polling,moving]);
  assert.equal(f.calls.filter(call=>call.path.endsWith('/transfers')).length,1);
  assert.equal(f.docs[0].frozen,true);
+ f.controller.stop();
+});
+
+// While a move is pending the ownership poll runs every 100 ms. A Cancel that
+// arrives during a poll (or during the move's own request) waits for it and
+// then cancels; it is never dropped, so no tab stays frozen after Cancel.
+test('Cancel during an ownership poll waits for the poll and still cancels the move',async()=>{
+ let hold=false,finish=()=>{};
+ const f=fixture(()=>hold?new Promise(resolve=>{finish=resolve;}):undefined);
+ await f.controller.poll();
+ await f.controller.move([f.docs[0].uid],'other');
+ assert.equal(f.controller.state.outgoing,1);assert.equal(f.docs[0].frozen,true);
+ hold=true;const polling=f.controller.poll();
+ assert.equal(f.controller.state.running,true,'the poll is running');
+ const cancelling=f.controller.cancel();
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(f.calls.filter(c=>c.path.endsWith('/cancel')).length,0,'nothing is sent while the poll runs');
+ hold=false;finish();await polling;await cancelling;
+ assert.equal(f.calls.filter(c=>c.path.endsWith('/cancel')).length,1,'the cancel was sent once the poll finished');
+ assert.equal(f.controller.state.outgoing,0);assert.equal(f.docs[0].frozen,false);assert.equal(f.docs[0].content,'synthetic retained draft');
+ f.controller.stop();
+});
+
+// The move's own request runs with the same flag: a Cancel right after Move
+// (the tab menu, or a test that sees the pending move at once) waits for the
+// request to answer and then cancels.
+test('Cancel while the move request is still unanswered waits for it and still cancels the move',async()=>{
+ let answer=()=>{};
+ const f=fixture(undefined,{timers:true,beforeTransfer:()=>new Promise(resolve=>{answer=resolve;})});
+ await f.controller.poll();
+ const moving=f.controller.move([f.docs[0].uid],'other');
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(f.controller.state.outgoing,1);assert.equal(f.controller.state.running,true,'the move request is unanswered');
+ const cancelling=f.controller.cancel();
+ await new Promise(resolve=>setTimeout(resolve,120));
+ assert.equal(f.calls.filter(c=>c.path.endsWith('/cancel')).length,0,'nothing is sent before the move is answered');
+ answer();await moving;await cancelling;
+ assert.equal(f.calls.filter(c=>c.path.endsWith('/cancel')).length,1);
+ assert.equal(f.controller.state.outgoing,0);assert.equal(f.docs[0].frozen,false);
  f.controller.stop();
 });
