@@ -60,13 +60,13 @@ func TestEditorSessionBrowserTextTools(t *testing.T) {
 	}
 	contents := map[string]string{
 		// One line of Base64 followed by "&&": disk-backed, and page-held.
-		"settings.b64":          encodedSettings + "&&",
-		"small.b64":             smallSettings + "&&",
-		"large.b64":             encoded,
-		"settings.txt":          "a=1&b=2&c=3",
-		"replace.txt":           "host=a&port=22&user=admin",
-		"pairs.txt":             pairs.String(),
-		"hosts.txt":             hosts.String(),
+		"settings.b64": encodedSettings + "&&",
+		"small.b64":    smallSettings + "&&",
+		"large.b64":    encoded,
+		"settings.txt": "a=1&b=2&c=3",
+		"replace.txt":  "host=a&port=22&user=admin",
+		"pairs.txt":    pairs.String(),
+		"hosts.txt":    hosts.String(),
 		// After Decode the part before it, each step works on the text the
 		// step before selected: the "&&" after the Base64 stays as it is.
 		"expected-readable.txt": readable + "&&",
