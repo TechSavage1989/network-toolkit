@@ -34,10 +34,23 @@ RequestExecutionLevel user
 ; order of ICON_GROUPS in scripts/build_windows_resources.py: 0 app, 1 Text
 ; Editor, 2 Terminal, 3 text document. Released Setups and shortcuts use 0 to 2,
 ; so new groups are only ever appended.
-;   EDITOR_ICON    the Text Editor as a program: Default apps (ApplicationIcon),
-;                  Open with (Applications\...\DefaultIcon), right-click entry.
-;   DOCUMENT_ICON  a file of a type associated with the Text Editor: the
-;                  ProgID's DefaultIcon. Every install and upgrade rewrites it.
+;   EDITOR_ICON    the Text Editor as a program: Default apps (ApplicationIcon)
+;                  and the right-click entry (the verb's Icon).
+;   DOCUMENT_ICON  a file that opens with the Text Editor: the ProgID's
+;                  DefaultIcon, and the DefaultIcon of the Applications entries
+;                  below. Explorer shows the DefaultIcon of the key that
+;                  UserChoice names as the icon of the file, and choosing the
+;                  editor in "Open with" or Default apps can name an
+;                  Applications entry instead of the ProgID ("If a user
+;                  associates your application with an additional file type,
+;                  that class will have these characteristics ... If you
+;                  include a DefaultIcon subkey, then you should use a generic
+;                  icon", Verbs and File Associations, "Register an Application
+;                  to Handle Arbitrary File Types"). Without one Explorer shows
+;                  the program's first icon. Every install and upgrade
+;                  rewrites them; 1.21.51 and older wrote EDITOR_ICON to
+;                  Applications\Network_Toolkit.exe.
+;    https://learn.microsoft.com/windows/win32/shell/fa-verbs
 !define EDITOR_ICON '"$INSTDIR\${APP_FILENAME}",1'
 !define DOCUMENT_ICON '"$INSTDIR\${APP_FILENAME}",3'
 ; How the Text Editor is offered for files. Setup only makes it available; the
@@ -60,17 +73,33 @@ RequestExecutionLevel user
 ;      shell\open\command  how Open with starts it. Without a verb, Windows runs
 ;                          the program with the bare file name.
 ;      FriendlyAppName     the name shown instead of the program's version text.
-;      DefaultIcon         the Text Editor's program icon instead of the first
-;                          icon (EDITOR_ICON: this entry stands for the program).
+;      DefaultIcon         the icon of every file the user associates through
+;                          this entry (DOCUMENT_ICON, see above), as Visual
+;                          Studio Code's Setup registers Code.exe: its file
+;                          icon here, the program on the verb. Open with and
+;                          Default apps show the program by other values
+;                          (the program file, ApplicationIcon).
 ;    SupportedTypes is deliberately absent: it limits Open with to the listed
 ;    types, and the Text Editor opens any file.
 ;    https://learn.microsoft.com/windows/win32/shell/app-registration
 ;    https://learn.microsoft.com/previous-versions/windows/desktop/legacy/hh127438(v=vs.85)
+;    When the user picks the separate Text Editor program in "Open with",
+;    Windows writes Applications\Network_Toolkit_TextEditor.exe itself: a
+;    command and no DefaultIcon, so its files show that program's first icon,
+;    the editor tile. Setup never creates that entry (a second Applications
+;    entry would list the editor twice) and never changes its command; when
+;    the entry starts the Text Editor program it installs and has no
+;    DefaultIcon key (or the icon Setup wrote), Setup writes DOCUMENT_ICON
+;    there and keeps the value it wrote as EDITOR_APPLICATION_ICON in its
+;    record. Uninstall removes that value only while it is still the recorded
+;    one (RemoveEditorApplicationIcon).
 ; 4. Optional right-click entry: a static verb under Classes\*\shell applies to
 ;    every file. Windows 11 shows such entries under "Show more options".
 ;    https://learn.microsoft.com/windows/win32/shell/context-menu-handlers
 !define APPLICATIONS_KEY "Software\Classes\Applications"
 !define APPLICATION_KEY "${APPLICATIONS_KEY}\${APP_FILENAME}"
+!define EDITOR_APPLICATION_KEY "${APPLICATIONS_KEY}\${EDITOR_FILENAME}"
+!define EDITOR_APPLICATION_ICON "EditorApplicationIcon"
 !define ALL_FILES_KEY "Software\Classes\*"
 !define MENU_VERB_KEY "${ALL_FILES_KEY}\shell\NetworkToolkit.TextEditor"
 !define MENU_TEXT "Edit with ${EDITOR_NAME}"
@@ -596,6 +625,17 @@ FunctionEnd
     ${EndIf}
     IntOp $R3 $R3 + 1
   ${Loop}
+  ; The icon it wrote into Windows' own entry of the separate Text Editor
+  ; program: from now on Setup's uninstall takes it back.
+  ClearErrors
+  ReadRegStr $1 HKCU "${PORTABLE_KEY}" "${EDITOR_APPLICATION_ICON}"
+  ${IfNot} ${Errors}
+  ${AndIf} $1 != ""
+    WriteRegStr HKCU "${EDITOR_KEY}" "${EDITOR_APPLICATION_ICON}" "$1"
+    ${If} ${Errors}
+      StrCpy $RegistrationFailed 1
+    ${EndIf}
+  ${EndIf}
   ClearErrors
 !macroend
 
@@ -634,7 +674,7 @@ FunctionEnd
   ${If} $OwnApplicationKey == 1
     !insertmacro ProbeUserKey "${APPLICATIONS_KEY}" $R1
     WriteRegStr HKCU "${APPLICATION_KEY}" "FriendlyAppName" "${EDITOR_NAME}"
-    WriteRegStr HKCU "${APPLICATION_KEY}\DefaultIcon" "" '${EDITOR_ICON}'
+    WriteRegStr HKCU "${APPLICATION_KEY}\DefaultIcon" "" '${DOCUMENT_ICON}'
     WriteRegStr HKCU "${APPLICATION_KEY}\shell\open\command" "" '${EDITOR_COMMAND}'
     WriteRegDWORD HKCU "${CREATED_KEYS}" "Applications\${APP_FILENAME}" 1
     ${If} $R1 == 1
@@ -655,6 +695,68 @@ FunctionEnd
   ${If} $0 == 1
     !insertmacro DeleteEmptyUserKey "${APPLICATIONS_KEY}"
   ${EndIf}
+  ClearErrors
+!macroend
+
+; Windows' own "Open with" entry of the separate Text Editor program (see
+; APPLICATION_KEY above): Setup never creates it and never changes its
+; command. When it starts the Text Editor program in $INSTDIR and has no
+; DefaultIcon key, or its icon is the one Setup wrote (the recorded value, or
+; exactly DOCUMENT_ICON), Setup writes DOCUMENT_ICON and records the value.
+; An icon of anyone else and an icon key someone else created stay as they are.
+!macro RegisterEditorApplicationIcon
+  StrCpy $R1 0
+  ClearErrors
+  EnumRegKey $0 HKCU "${EDITOR_APPLICATION_KEY}" 0
+  ${IfNot} ${Errors}
+    ReadRegStr $0 HKCU "${EDITOR_APPLICATION_KEY}\shell\open\command" ""
+    StrLen $1 '"$INSTDIR\${EDITOR_FILENAME}"'
+    StrCpy $2 $0 $1
+    ${If} $2 == '"$INSTDIR\${EDITOR_FILENAME}"'
+      ClearErrors
+      EnumRegKey $0 HKCU "${EDITOR_APPLICATION_KEY}\DefaultIcon" 0
+      ${If} ${Errors}
+        StrCpy $R1 1
+      ${Else}
+        ClearErrors
+        ReadRegStr $0 HKCU "${EDITOR_APPLICATION_KEY}\DefaultIcon" ""
+        ${IfNot} ${Errors}
+          ReadRegStr $3 HKCU "${EDITOR_KEY}" "${EDITOR_APPLICATION_ICON}"
+          ${If} $0 S== '${DOCUMENT_ICON}'
+            StrCpy $R1 1
+          ${ElseIf} $3 != ""
+          ${AndIf} $0 S== $3
+            StrCpy $R1 1
+          ${EndIf}
+        ${EndIf}
+      ${EndIf}
+    ${EndIf}
+  ${EndIf}
+  ; Probing reports a missing key or value through the error flag; only the
+  ; writes below may leave it set.
+  ClearErrors
+  ${If} $R1 == 1
+    WriteRegStr HKCU "${EDITOR_KEY}" "${EDITOR_APPLICATION_ICON}" '${DOCUMENT_ICON}'
+    WriteRegStr HKCU "${EDITOR_APPLICATION_KEY}\DefaultIcon" "" '${DOCUMENT_ICON}'
+  ${EndIf}
+!macroend
+
+; The recorded icon goes only while it is still what Setup wrote, then its key
+; once empty (Setup created it); Windows' entry stays.
+!macro RemoveEditorApplicationIcon
+  ClearErrors
+  ReadRegStr $0 HKCU "${EDITOR_KEY}" "${EDITOR_APPLICATION_ICON}"
+  ${IfNot} ${Errors}
+  ${AndIf} $0 != ""
+    ClearErrors
+    ReadRegStr $1 HKCU "${EDITOR_APPLICATION_KEY}\DefaultIcon" ""
+    ${IfNot} ${Errors}
+    ${AndIf} $1 S== $0
+      DeleteRegValue HKCU "${EDITOR_APPLICATION_KEY}\DefaultIcon" ""
+      !insertmacro DeleteEmptyUserKey "${EDITOR_APPLICATION_KEY}\DefaultIcon"
+    ${EndIf}
+  ${EndIf}
+  DeleteRegValue HKCU "${EDITOR_KEY}" "${EDITOR_APPLICATION_ICON}"
   ClearErrors
 !macroend
 
@@ -739,6 +841,7 @@ FunctionEnd
 !macro UnregisterShell
   !insertmacro TextExtensions RemoveExtension
   !insertmacro RemoveApplication
+  !insertmacro RemoveEditorApplicationIcon
   !insertmacro RemoveContextMenu
   DeleteRegKey HKCU "${EDITOR_KEY}"
   DeleteRegValue HKCU "Software\RegisteredApplications" "${EDITOR_NAME}"
@@ -918,6 +1021,9 @@ Section "Network Toolkit"
   !insertmacro RegisterApplication
   IfErrors install_error
   StrCmp $RegistrationFailed 1 install_error
+  StrCpy $FailedStep "giving the Text Editor program's Open with entry the document icon"
+  !insertmacro RegisterEditorApplicationIcon
+  IfErrors install_error
   StrCpy $FailedStep "updating the right-click menu entry"
   Call ReadContextMenuChoice
   ReadRegDWORD $R8 HKCU "${UNINSTALL_KEY}" "ContextMenu"
