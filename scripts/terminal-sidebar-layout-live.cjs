@@ -1,8 +1,16 @@
 'use strict';
-// Optional installed-app layout regression. Every app asset and API response
+// Installed-app Terminal sidebar regression. Every app asset and API response
 // comes from the executable's HTTP server. No asset injection or API mocks.
+// Each app run gets its own temporary data folder (os.tmpdir()), removed at
+// the end; no real profile is read or written.
 // NTK_APP_EXECUTABLE=/path/to/app CHROME_EXECUTABLE=/path/to/chrome \
 //   NTK_BASELINE_EXECUTABLE=/path/to/1.17.13 node scripts/terminal-sidebar-layout-live.cjs
+// CI: the `browser` job of .github/workflows/checks.yml runs it against the
+// Linux build it already makes for the other live checks (about 30 s; stable in
+// repeated and concurrent local runs). The 1.17.13 baseline comparison is
+// optional and Windows-only (no Linux edition existed), so CI leaves it out.
+// The sidebar has no heading collapse arrow: the selected rail tab is its
+// show/hide toggle (aria-expanded) and the divider hides, shows and resizes it.
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const net = require('node:net');
