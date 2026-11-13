@@ -79,7 +79,7 @@
 .nt-find-guide p strong{color:var(--text)}
 .nt-find-guide-note{margin-top:6px!important}
 .nt-find-guide-rows{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:1px 8px}
-.nt-find-guide-row{display:grid;grid-template-columns:5.6em minmax(0,1fr);grid-template-rows:auto auto;column-gap:6px;align-items:baseline;text-align:left;padding:3px 5px;border:0;border-radius:5px;background:transparent;color:var(--text);font:inherit;cursor:pointer}
+.nt-find-guide-row{display:grid;grid-template-columns:7.2em minmax(0,1fr);grid-template-rows:auto auto;column-gap:6px;align-items:baseline;text-align:left;padding:3px 5px;border:0;border-radius:5px;background:transparent;color:var(--text);font:inherit;cursor:pointer}
 .nt-find-guide-row:hover,.nt-find-guide-row:focus-visible{background:var(--hover);outline:0}
 .nt-find-guide-row code{grid-row:1/3;font:600 12px var(--mono,Consolas,monospace);color:var(--nt-code-keyword,var(--accent));white-space:nowrap}
 .nt-find-guide-row small{color:var(--muted);font-size:10px;overflow-wrap:anywhere}

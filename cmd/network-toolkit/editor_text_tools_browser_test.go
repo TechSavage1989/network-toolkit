@@ -22,7 +22,7 @@ import (
 // request v1.21.53): the menu and its tooltips, Split at text on page-held
 // text, Base64 decode of a whole 1.7 MB single-line document with nothing
 // selected, the SonicWall offer and its readable copy of a 1.5 MB export,
-// the Find bar's Extended mode, and Undo. The script is
+// the Find window's Extended mode, and Undo. The script is
 // scripts/editor-text-tools.browser.cjs; afterwards the export on disk must
 // be exactly as it was written.
 func TestEditorSessionBrowserTextTools(t *testing.T) {

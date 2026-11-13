@@ -1082,6 +1082,6 @@ function create(a){
   get renderedRows(){return panel?panel.querySelectorAll('.nt-find-row').length:0;}
  });
 }
-root.NTKEditorFind=Object.freeze({create,layout,rowAt,rowHTML,shiftLines,MODE_HELP});
-if(typeof module==='object'&&module.exports)module.exports={create,layout,rowAt,rowHTML,shiftLines,MODE_HELP};
+root.NTKEditorFind=Object.freeze({create,layout,rowAt,rowHTML,shiftLines,explain,GUIDE,MODE_HELP});
+if(typeof module==="object"&&module.exports)module.exports={create,layout,rowAt,rowHTML,shiftLines,explain,GUIDE,MODE_HELP};
 })(globalThis);
